@@ -1,0 +1,2394 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Knuro HMI">
+<meta name="theme-color" content="#1a1c22">
+<title>Knuro HMI — B2</title>
+<script>
+const _m={name:"Knuro HMI",short_name:"Knuro HMI",display:"standalone",background_color:"#1a1c22",theme_color:"#1a1c22",orientation:"any",icons:[{src:"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' fill='%231a1c22'/><text x='50%' y='55%' font-size='80' text-anchor='middle' dominant-baseline='middle' fill='%234499ff'>K</text></svg>",sizes:"192x192",type:"image/svg+xml"}]};
+const _b=new Blob([JSON.stringify(_m)],{type:'application/json'});const _l=document.createElement('link');_l.rel='manifest';_l.href=URL.createObjectURL(_b);document.head.appendChild(_l);
+</script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#1a1c22;--pb:#13151b;--bdr:#252830;
+  --ac:#4499ff;--ac2:#6688cc;
+  --scr:#c2c2cc;--hdr:#b0b0bc;--hbg:#9898a8;
+  --nb:#c8c8d0;--nbb:#9898a8;
+  --ab:#dcdce8;--abb:#aaaabc;
+}
+html,body{height:100%;background:var(--bg);color:#ccc;font-family:'Segoe UI',Arial,sans-serif;overflow:hidden;}
+#app{display:flex;flex-direction:column;height:100%;height:100dvh;}
+#tb{display:none;align-items:center;justify-content:space-between;padding:0 14px;height:46px;background:#111318;border-bottom:1px solid var(--bdr);flex-shrink:0;gap:10px;}
+.tbt{font-size:13px;font-weight:600;color:var(--ac);letter-spacing:1px;}
+.tbs{font-size:11px;color:#555;flex:1;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+#ttbtn{background:none;border:1px solid #333;color:#888;width:32px;height:32px;border-radius:6px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+#ttbtn.open{border-color:var(--ac);color:var(--ac);}
+#mn{flex:1;display:flex;overflow:hidden;min-height:0;}
+#hp{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;padding:16px;min-width:0;overflow:hidden;}
+.hml{font-size:11px;color:#555;letter-spacing:2px;text-transform:uppercase;align-self:flex-start;margin-left:24px;flex-shrink:0;}
+.dev{background:linear-gradient(160deg,#2e2e2e,#1a1a1a);border-radius:14px;padding:18px 18px 14px;box-shadow:0 12px 50px rgba(0,0,0,.9),inset 0 1px 0 rgba(255,255,255,.08),0 0 0 1px #333;position:relative;flex-shrink:0;}
+.led{width:9px;height:9px;background:var(--ac);border-radius:50%;box-shadow:0 0 10px var(--ac),0 0 20px rgba(68,153,255,.4);position:absolute;top:26px;left:26px;}
+.sw{position:relative;border:3px solid #111;box-shadow:inset 0 0 12px rgba(0,0,0,.6);}
+.brd{display:flex;justify-content:space-between;align-items:center;padding:7px 4px 0;}
+.brd .mn{font-size:14px;font-weight:700;color:#888;letter-spacing:1px;}.brd .mn span{font-weight:300;}
+.brd .bj{font-size:11px;color:#888;font-style:italic;letter-spacing:1px;}
+#hs{width:800px;height:480px;background:var(--scr);position:relative;overflow:hidden;transform-origin:top left;}
+.sc{display:none;width:100%;height:100%;flex-direction:column;background:var(--scr);position:absolute;top:0;left:0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#111;}
+.sc.active{display:flex;}
+.sh{display:flex;justify-content:space-between;align-items:center;background:var(--hdr);border-bottom:2px solid #9898a8;padding:4px 10px;min-height:28px;flex-shrink:0;}
+.sh .st{font-size:11.5px;color:#222;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sh .sd{font-size:11px;color:#444;flex-shrink:0;margin-left:8px;font-family:'Courier New',monospace;}
+.sb{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 12px;overflow:hidden;}
+/* nav */
+.nw{flex-shrink:0;background:var(--hbg);border-top:2px solid var(--nbb);}
+.nr{display:flex;gap:2px;padding:3px 4px;}
+.nr.ar{padding-bottom:1px;}
+.nb{flex:1;padding:5px 2px;background:var(--nb);border:1px solid var(--nbb);border-bottom:2px solid #808090;font-size:10.5px;font-family:Arial,sans-serif;color:#111;cursor:pointer;text-align:center;user-select:none;line-height:1.25;}
+.nb:hover{background:#d8d8e0;}.nb:active{background:#b8b8c8;border-bottom-width:1px;margin-top:1px;}
+.na{padding:4px 20px;background:var(--ab);border:1px solid var(--abb);border-bottom:3px solid #8888a0;border-radius:4px;font-size:11.5px;font-family:Arial,sans-serif;font-weight:700;color:#111;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.15);}
+.na:hover{background:#ccccd8;}.na:active{background:#c0c0cc;border-bottom-width:1px;margin-top:2px;}
+.btn-bloqueo{background:#cc2200;color:#fff;border:1px solid #881100;border-bottom:2px solid #660000;padding:4px 10px;font-size:11px;cursor:pointer;font-family:Arial,sans-serif;}
+.hb{background:#dcdce8;border:1px solid #9090a0;border-bottom:2px solid #707080;padding:5px 14px;font-size:12px;font-family:Arial,sans-serif;color:#111;cursor:pointer;text-align:center;user-select:none;border-radius:2px;}
+.hb:hover{background:#ccccd8;}.hb:active{background:#c0c0cc;}
+.hb.pill{border-radius:8px;}
+.hb.red{background:#c82000;color:#fff;border-color:#901800;border-bottom-color:#601000;}
+.hb.green{background:#58a000;color:#fff;border-color:#407000;border-bottom-color:#285000;}
+.hb.lime{background:#a8d000;color:#222;border-color:#778800;border-bottom-color:#556600;font-weight:600;}
+.hb.sm{font-size:10.5px;padding:3px 8px;}
+.hb.xs{font-size:10px;padding:2px 5px;min-width:46px;}
+.hb.empty{background:#f0f0f6;border-color:#c4c4d4;border-bottom-color:#a8a8b8;color:#555;}
+/* param table */
+.pt{width:100%;border-collapse:collapse;}
+.pt .plb{text-align:right;color:#111;padding:4px 10px 4px 0;white-space:nowrap;font-size:12px;vertical-align:middle;}
+.pt td{vertical-align:middle;padding:2px 3px;}
+input.fe{width:58px;height:22px;background:#fff;border:1px solid #888;font-size:12px;font-family:'Courier New',monospace;text-align:right;padding:0 4px;color:#111;outline:none;}
+input.fe:focus{border-color:#4499ff;background:#fffff8;}
+input.fe1{width:74px;height:22px;background:#fff;border:1px solid #888;font-size:12px;font-family:'Courier New',monospace;text-align:right;padding:0 4px;color:#111;outline:none;}
+input.fe1:focus{border-color:#4499ff;background:#fffff8;}
+.fr{display:inline-block;font-size:11.5px;font-family:'Courier New',monospace;color:#666;padding-left:4px;vertical-align:middle;min-width:30px;}
+.fr.editing{background:#2a2200;border:1px dashed #aa8800;border-radius:2px;color:#ffcc44;cursor:text;padding:0 3px;outline:none;min-width:28px;}
+.fr.editing:focus{border-color:#ffee66;background:#332800;color:#ffee88;}
+.pbtn.refs-btn{background:#1e2028;color:#aaaacc;border-color:#446688;}
+.pbtn.refs-btn:hover{background:#252a38;}
+.pbtn.refs-btn.active{background:#1e3418;color:#88ee88;border-color:#448844;}
+.vla td{padding-top:12px;}
+.bnav{display:inline-block;min-width:60px;height:22px;background:#fff;border:1px solid #999;border-bottom:2px solid #777;cursor:pointer;vertical-align:middle;border-radius:4px;}
+.bnav:hover{background:#f0f0f0;}
+/* sensor tables */
+.sen-list{width:100%;border-collapse:collapse;}
+.sen-list td{padding:5px 14px;font-size:12.5px;}
+.sen-list tr:not(:last-child) td{border-bottom:1px solid #c8c8d0;}
+.sen-off{color:#777;}.sen-on{color:#111;font-weight:600;}
+/* idx */
+.idxl{display:flex;flex-direction:column;gap:14px;width:460px;}
+.idxr{display:flex;align-items:center;justify-content:space-between;}
+.idxr span{font-size:14px;color:#111;}
+/* principal */
+#sp .sb{padding:0;position:relative;justify-content:flex-start;}
+.ptop{display:flex;justify-content:space-between;padding:5px 14px 0;width:100%;}
+.ptop span{font-size:12px;color:#333;cursor:pointer;text-decoration:underline;}
+.pctr{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding-bottom:6px;}
+.pclk{font-size:28px;font-weight:bold;font-family:'Courier New',monospace;color:#111;margin:5px 0 2px;}
+.fbox{border:1px solid #8888a0;background:#d0d0dc;padding:3px 22px 5px;text-align:center;min-width:170px;}
+.fbox .fl{font-size:11px;color:#444;margin-bottom:1px;}.fbox .fv{font-size:17px;font-weight:700;}
+.pftr{display:flex;justify-content:space-between;align-items:center;width:100%;padding:0 10px 5px;}
+.tg{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;width:100%;padding:4px;}
+#s6 .sb{padding:0;align-items:stretch;justify-content:flex-start;}
+.atbl{width:100%;border-collapse:collapse;font-size:11.5px;}
+.atbl th{background:#a0a0b0;border:1px solid #888;padding:3px 7px;text-align:left;font-weight:600;}
+.atbl td{border:1px solid #9898aa;padding:3px 7px;background:#c8c8d8;color:#111;}
+.atbl tr:nth-child(odd) td{background:#c0c0cc;}
+.astat{padding:3px 8px;font-size:10.5px;color:#333;background:#aaabb8;border-top:1px solid #999;}
+.iag{display:grid;grid-template-columns:1fr 1fr;gap:4px;width:100%;}
+.iar{display:flex;align-items:center;gap:3px;padding:1px 0;}
+.ian{flex:1;color:#111;font-size:11px;}
+.ian.act{color:#bb1100;font-weight:bold;}
+.ton{background:#a8d000;color:#222;border:2px solid #889900;border-bottom:3px solid #667700;font-size:13px;font-weight:700;padding:8px 24px;cursor:pointer;font-family:Arial,sans-serif;}
+/* ── RIGHT PANEL ── */
+#rp{width:300px;flex-shrink:0;background:var(--pb);border-left:1px solid var(--bdr);display:flex;flex-direction:column;overflow:hidden;transition:width .2s ease;}
+/* tree section */
+.rp-sec{flex-shrink:0;}
+.rp-sec-hdr{display:flex;align-items:center;gap:6px;padding:8px 12px 6px;border-bottom:1px solid var(--bdr);cursor:pointer;user-select:none;}
+.rp-sec-hdr span{font-size:10px;font-weight:600;color:var(--ac2);letter-spacing:2px;text-transform:uppercase;flex:1;}
+.rp-sec-hdr .arr{font-size:10px;color:#444;transition:transform .2s;}
+.rp-sec-hdr.open .arr{transform:rotate(90deg);}
+.rp-body{overflow:hidden;transition:max-height .25s ease;}
+.rp-tree{overflow-y:auto;padding:6px 10px;}
+.rp-tree::-webkit-scrollbar{width:3px;}
+.rp-tree::-webkit-scrollbar-thumb{background:#333;border-radius:2px;}
+.tn{margin:1px 0;}
+.tnh{display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:4px;cursor:pointer;transition:background .1s;}
+.tnh:hover{background:#1e2028;}
+.tnh.act{background:#1a2844;border-left:2px solid var(--ac2);}
+.tni{font-size:11px;flex-shrink:0;}
+.tnl{font-size:11px;color:#bbb;flex:1;}
+.tnh.act .tnl{color:#88aaff;}
+.tnbg{font-size:9px;background:#1e2028;color:#555;padding:1px 4px;border-radius:3px;border:1px solid #2a2e3a;}
+.tnc{margin-left:12px;border-left:1px dashed #252830;padding-left:6px;}
+.tna{display:flex;align-items:center;gap:4px;padding:2px 8px;font-size:10.5px;color:#555;cursor:pointer;border-radius:3px;}
+.tna:hover{background:#1e2028;color:#888;}
+.sym{color:#44668a;}.to{color:var(--ac2);}.unk{color:#444;font-style:italic;}
+.tdv{height:1px;background:#1e2028;margin:5px 0;}
+/* ── PRESET SECTION ── */
+.psp{flex:1;display:flex;flex-direction:column;overflow:hidden;border-top:1px solid var(--bdr);}
+.psp-hdr{display:flex;align-items:center;gap:6px;padding:8px 12px 6px;flex-shrink:0;}
+.psp-hdr span{font-size:10px;font-weight:600;color:var(--ac2);letter-spacing:2px;text-transform:uppercase;flex:1;}
+/* tabs */
+.ptabs{display:flex;gap:2px;padding:0 10px 6px;flex-shrink:0;}
+.ptab{flex:1;padding:4px 2px;background:#1a1c22;border:1px solid #2a2e3a;font-size:10px;color:#555;cursor:pointer;border-radius:3px;text-align:center;}
+.ptab.active{background:#1a2844;color:#88aaff;border-color:var(--ac2);}
+/* preset activo */
+.ps-curr{background:#0a1a30;border:1px solid #1a3060;border-radius:4px;padding:5px 8px;display:flex;flex-direction:column;gap:1px;flex-shrink:0;}
+.ps-curr-lbl{font-size:8px;color:#3a5080;letter-spacing:1.5px;text-transform:uppercase;}
+.ps-curr-name{font-size:11px;font-weight:700;color:#88aaff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+/* lista */
+.ps-list-hdr{font-size:8px;color:#444;letter-spacing:1.5px;text-transform:uppercase;padding:4px 0 2px;border-bottom:1px solid #1e2028;flex-shrink:0;}
+/* guardar nuevo */
+.ps-new{display:flex;flex-direction:column;gap:3px;border-top:1px solid #1e2028;padding-top:6px;flex-shrink:0;}
+.ps-acts{display:flex;gap:3px;flex-shrink:0;}
+/* tab panels */
+.pt-panel{display:none;flex:1;overflow:hidden;flex-direction:column;}
+.pt-panel.active{display:flex;}
+/* tab: save */
+.psave{padding:6px 10px;display:flex;flex-direction:column;gap:5px;flex:1;overflow-y:auto;}
+.psave::-webkit-scrollbar{width:3px;}
+.psave::-webkit-scrollbar-thumb{background:#333;}
+.psave input{width:100%;background:#1e2028;border:1px solid #333;color:#ccc;font-size:10px;padding:4px 6px;border-radius:3px;outline:none;}
+.psave input:focus{border-color:var(--ac2);}
+.pbtn-row{display:flex;gap:3px;}
+.pbtn{flex:1;background:#1a2844;color:#88aaff;border:1px solid #6688cc;font-size:10px;padding:4px 4px;cursor:pointer;border-radius:3px;text-align:center;}
+.pbtn:hover{background:#223366;}
+.pbtn.del{background:#2a1818;color:#ff8888;border-color:#884444;}
+.pbtn.del:hover{background:#381818;}
+.pbtn.exp{background:#182818;color:#88dd88;border-color:#448844;}
+.pbtn.exp:hover{background:#1e3020;}
+.pbtn.pdf{background:#1c1c2c;color:#aaaaff;border-color:#4444aa;}
+.pbtn.pdf:hover{background:#222240;}
+.pi{background:#1a1c22;border:1px solid #252830;border-radius:3px;padding:4px 8px;margin-bottom:3px;display:flex;align-items:center;gap:4px;}
+.pi span{flex:1;font-size:10px;color:#aaa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pi-active{border-color:var(--ac2);}
+/* tab: compare */
+.pcmp{flex:1;overflow:auto;padding:6px 8px;}
+.pcmp::-webkit-scrollbar{width:3px;}
+.pcmp::-webkit-scrollbar-thumb{background:#333;}
+.cmp-row-sel{display:flex;gap:3px;align-items:center;margin-bottom:2px;}
+.cmp-row-sel select{flex:1;background:#1e2028;border:1px solid #333;color:#ccc;font-size:10px;padding:3px 5px;border-radius:3px;outline:none;min-width:0;}
+.cmp-row-sel .cmp-rem{background:#2a1818;color:#f88;border:1px solid #844;width:18px;height:22px;border-radius:3px;cursor:pointer;font-size:13px;line-height:1;flex-shrink:0;padding:0;}
+.cmp-tbl{width:100%;border-collapse:collapse;font-size:9.5px;}
+.cmp-tbl th{background:#1a2844;color:#88aaff;padding:3px 5px;text-align:center;border:1px solid #252830;position:sticky;top:0;max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.cmp-tbl td{padding:2px 5px;border:1px solid #1e2028;color:#bbb;white-space:nowrap;}
+.cmp-tbl tr:nth-child(even) td{background:#111318;}
+.cmp-diff{color:#ffbb44!important;font-weight:600;}
+.cmp-lbl{color:#aaa;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:normal;line-height:1.2;font-size:9px;}
+.cmp-sec-hdr td{background:#0a1a30!important;color:#4a8ac4!important;font-size:8.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:4px 5px 2px;border-top:1px solid #1a3060!important;}
+.cmp-summary{font-size:9px;color:#666;margin-bottom:5px;}
+.cmp-summary b{color:#ffbb44;}
+/* bottom bar */
+#bb{display:none;flex-shrink:0;padding:6px 10px;padding-bottom:max(6px,env(safe-area-inset-bottom));background:#111318;border-top:1px solid var(--bdr);align-items:center;justify-content:space-between;gap:4px;}
+.scl{font-size:10px;color:#444;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px;}
+#ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99;}
+@media(max-width:1100px){#rp{width:260px;}}
+@media(max-width:860px){
+  #tb,#bb{display:flex;}
+  .hml{display:none;}
+  #hp{padding:8px 0;justify-content:flex-start;align-items:center;overflow:auto;}
+  .dev{padding:10px 8px 8px;border-radius:10px;}
+  .led{top:13px;left:13px;}
+  #rp{position:fixed;top:0;right:0;bottom:0;width:min(90vw,340px);z-index:100;transform:translateX(100%);transition:transform .25s;border-left:1px solid #333;}
+  #rp.open{transform:translateX(0);}
+  #ov.show{display:block;}
+}
+</style>
+</head>
+<body>
+<div id="app">
+<div id="tb">
+  <span class="tbt">Knuro</span>
+  <span class="tbs" id="ts">Principal</span>
+  <button id="ttbtn" onclick="togglePanel()">⚙</button>
+</div>
+<div id="mn">
+<div id="hp">
+  <div class="hml" id="hml-title">Knuro B2 — HMI Simulator</div>
+  <div class="dev">
+    <div class="led"></div>
+    <div class="sw"><div id="hs">
+
+<!-- S01 PRINCIPAL -->
+<div class="sc active" id="sp">
+  <div class="sb" style="padding:0;position:relative;">
+    <div class="ptop"><span>Limpiar Máquina</span><span>Limpiar Vacío</span></div>
+    <div class="pctr">
+      <div style="position:relative;display:inline-block;line-height:1;margin-bottom:2px;">
+        <span style="font-family:'Segoe UI',Arial,sans-serif;font-size:44px;font-weight:700;color:#111;letter-spacing:1px;">kn</span><span style="font-family:'Segoe UI',Arial,sans-serif;font-size:44px;font-weight:700;color:#111;position:relative;">ū<span style="position:absolute;top:2px;left:0;right:0;height:3px;background:#cc3300;border-radius:2px;"></span></span><span style="font-family:'Segoe UI',Arial,sans-serif;font-size:44px;font-weight:700;color:#111;letter-spacing:1px;">ro</span>
+      </div>
+      <div id="sp-maquina" style="font-size:14px;color:#333;margin-top:4px;">Máquina no está lista</div>
+      <div id="sp-baader" style="font-size:20px;font-weight:600;margin-top:2px;">Baader detenida</div>
+      <div id="sp-programa" style="font-size:18px;font-weight:600;margin-top:1px;">Coho</div>
+      <div class="pclk" id="clk">18:48:42</div>
+      <div class="fbox"><div class="fl">Número de pescados</div><div class="fv">1&thinsp;577&thinsp;120</div></div>
+    </div>
+    <div class="pftr">
+      <button class="hb lime" id="vvbtn" onclick="this.classList.toggle('lime');this.classList.toggle('red');">Válvula de vacío</button>
+      <div style="font-size:10px;color:#666;text-align:center;">CNC: S/N<br>V02.19</div>
+      <button class="hb sm" onclick="nav('s7')">Información de<br>alarma</button>
+    </div>
+  </div>
+</div>
+
+<!-- S02 MENÚ -->
+<div class="sc" id="s2">
+  <div class="sh"><span class="st">Menu Principal</span><span class="sd"></span></div>
+  <div class="sb">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;width:480px;">
+      <div style="border:1px solid #8888a0;background:#b0b0c0;padding:10px 12px 16px;display:flex;flex-direction:column;gap:6px;align-items:center;">
+        <div style="font-size:12px;color:#222;align-self:flex-start;">Seleccione programa</div>
+        <button class="hb" id="btn-programa" onclick="togglePrograma(this)">Coho/Salmón</button>
+      </div>
+      <div style="border:1px solid #8888a0;background:#b0b0c0;padding:10px 12px 16px;display:flex;flex-direction:column;gap:6px;align-items:center;">
+        <div style="font-size:12px;color:#222;align-self:flex-start;">Seleccione presión</div>
+        <button class="hb">Normal/Suave</button>
+      </div>
+      <div style="grid-column:1/-1;border:1px solid #8888a0;background:#b0b0c0;padding:10px 12px 16px;overflow:hidden;">
+        <div style="font-size:12px;color:#222;white-space:nowrap;overflow:hidden;margin-bottom:8px;">Seleccionar pescado grande o pequeño</div>
+        <div style="display:flex;gap:16px;align-items:center;">
+          <button class="hb">Pequeño/Grande</button>
+          <span style="font-size:12px;color:#444;">Activar Grande</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- S03 RÁPIDO -->
+<div class="sc" id="s3">
+  <div class="sh"><span class="st">Principal - Menú Rápido</span><span class="sd"></span></div>
+  <div class="sb">
+    <div style="display:grid;grid-template-columns:160px 1fr;gap:6px 16px;width:680px;align-items:center;">
+      <button class="hb" style="width:100%;">Fecha y Hora</button>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;"><span style="font-size:11px;">Desactivar Knuro (Baader debe estar apagada)</span><button id="btn-knuro" class="hb green sm" style="white-space:nowrap;line-height:1.3;flex-shrink:0;" onclick="toggleKnuro(this)">Knuro<br>Encendido</button></div>
+      <button class="hb" style="width:100%;">Idioma/<br>Language</button>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;"><span style="font-size:11px;">Programa de Prueba</span><button class="hb green sm" style="flex-shrink:0;" onclick="this.classList.toggle('red');this.classList.toggle('green');this.textContent=this.textContent==='Encendido'?'Apagado':'Encendido';">Encendido</button></div>
+      <button class="hb" style="width:100%;">Presión Herramienta<br>2</button>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;"><span style="font-size:11px;">Ignorar Errores</span><button class="hb red sm" style="flex-shrink:0;" onclick="this.classList.toggle('red');this.classList.toggle('green');this.textContent=this.textContent==='Apagado'?'Encendido':'Apagado';">Apagado</button></div>
+      <button class="hb" style="width:100%;">Drenaje de succión</button>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;"><span style="font-size:11px;">Cambiar entre serial y ethernet</span><button class="hb xs" style="flex-shrink:0;">○</button></div>
+      <div></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;"><span style="font-size:11px;">Cambiar controlador activo (PLC). Requiere reiniciar</span><button class="hb xs" style="flex-shrink:0;">KNURO‑02 ▾</button></div>
+      <div></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;"><span style="font-size:11px;">Ajustes panel IP</span><button class="hb xs" style="flex-shrink:0;">○</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- S04 TÉCNICO -->
+<div class="sc" id="s4">
+  <div class="sh"><span class="st">Principal - Menú Técnico</span><span class="sd"></span></div>
+  <div class="sb">
+    <div class="tg" style="width:660px;gap:12px;padding:8px;grid-auto-rows:56px;align-items:stretch;">
+      <button class="hb pill" style="height:100%;" onclick="nav('c1')">Carro 1</button>
+      <button class="hb pill" style="height:100%;" onclick="nav('h1')">Herramienta 1</button>
+      <button class="hb pill" style="height:100%;" onclick="nav('c2')">Carro 2</button>
+      <button class="hb pill empty" style="height:100%;font-size:11px;line-height:1.3;" onclick="nav('succion')">Succión Principal<br>Baader</button>
+      <button class="hb pill" style="height:100%;" onclick="nav('ev')">Evacuador</button>
+      <button class="hb pill" style="height:100%;" onclick="nav('ci')">Ciclo</button>
+      <button class="hb pill" style="height:100%;" onclick="nav('h2')">Herramienta 2</button>
+      <div></div>
+      <button class="hb pill empty" style="height:100%;">Chute</button>
+      <button class="hb pill" style="height:100%;font-weight:700;" onclick="nav('sensores')">Sensores</button>
+      <button class="hb pill" style="height:100%;" onclick="nav('vacio')">Vacío</button>
+      <div></div>
+      <button class="hb pill empty" style="height:100%;">Limpiar</button>
+      <button class="hb pill empty" style="height:100%;">Anular</button>
+      <button class="hb pill" style="height:100%;font-size:11px;line-height:1.3;" onclick="nav('cfg-menu-1')">Configuración<br>de Menú</button>
+      <div></div>
+    </div>
+  </div>
+</div>
+
+<!-- S05 CÓDIGO -->
+<div class="sc" id="s5">
+  <div class="sh"><span class="st"></span><span class="sd"></span></div>
+  <div class="sb" style="position:relative;">
+    <div style="position:absolute;top:12px;right:18px;font-size:38px;">👥</div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:18px;">
+      <div style="font-size:30px;font-weight:200;letter-spacing:6px;color:#1a1a1a;">knuro</div>
+      <div style="display:flex;align-items:center;gap:14px;font-size:14px;"><span>Contraseña</span><div style="border:1px solid #888;background:#fff;padding:6px 14px;font-size:18px;letter-spacing:10px;width:140px;text-align:center;">••••</div></div>
+      <div style="display:flex;gap:12px;"><button class="hb" style="min-width:110px;">Acceso</button><button class="hb" style="min-width:110px;" onclick="nav('sp')">Cerrar sesión</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- S06 ALARMA -->
+<div class="sc" id="s6">
+  <div class="sb" style="padding:0;align-items:stretch;justify-content:flex-start;">
+    <div style="flex:1;overflow:hidden;">
+      <table class="atbl">
+        <thead><tr><th style="width:88px;">State</th><th style="width:158px;">Active Time</th><th>Text</th></tr></thead>
+        <tbody>
+          <tr><td>Normal</td><td>24‑03‑2026 20:48:25</td><td>Compuerta Abierta</td></tr>
+          <tr><td>Normal</td><td>23‑03‑2026 20:36:21</td><td>Error de Ciclo</td></tr>
+          <tr><td>Normal</td><td>23‑03‑2026 15:27:34</td><td>Error de Ciclo</td></tr>
+          <tr><td>Normal</td><td>23‑03‑2026 15:15:16</td><td>Error de Ciclo</td></tr>
+          <tr><td>Normal</td><td>23‑03‑2026 15:15:15</td><td>Error de Ciclo</td></tr>
+          <tr><td>Normal</td><td>23‑03‑2026 15:10:49</td><td>Error de Evacuador</td></tr>
+          <tr><td>Normal</td><td>23‑03‑2026 15:10:47</td><td>Error de Pulsos</td></tr>
+          <tr><td>Normal</td><td>23‑03‑2026 15:02:30</td><td>Compuerta Abierta</td></tr>
+          <tr><td>Normal</td><td>23‑03‑2026 15:02:28</td><td>Compuerta Abierta</td></tr>
+          <tr><td>Normal</td><td>22‑03‑2026 08:14:11</td><td>Error de Ciclo</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="astat">Active: 0 · Inactive: 0 · Normal: 523 · Disabled: 0 [100/523]</div>
+    <div style="display:flex;gap:3px;padding:4px 5px;background:var(--hbg);border-top:2px solid var(--nbb);">
+      <button class="na" onclick="nav('sp')">ATRÁS</button>
+      <button class="nb" style="flex:1;">Recon.</button><button class="nb" style="flex:1.4;">Recon. Todo</button><button class="nb" style="flex:1;">Despejar</button><button class="nb" style="flex:.8;">Filtro</button>
+    </div>
+  </div>
+</div>
+
+<!-- S07 INFO ALARMA -->
+<div class="sc" id="s7">
+  <div class="sh"><span class="st">Principal - Información Alarma</span><span class="sd"></span></div>
+  <div class="sb" style="padding:6px 10px;">
+    <div class="iag">
+      <div class="iar"><button class="hb xs">Reset</button><button class="hb xs">Mostrar<br>pantalla</button><span class="ian act">Alarma "escotilla abierta -<br>parada de emergencia"</span></div>
+      <div class="iar"><button class="hb xs" style="visibility:hidden">Reset</button><button class="hb xs">Mostrar<br>pantalla</button><span class="ian">Limpiando la máquina</span></div>
+      <div class="iar"><button class="hb xs">Reset</button><button class="hb xs">Mostrar<br>pantalla</button><span class="ian">Alarma "número equivocado<br>de pulsos"</span></div>
+      <div class="iar"><button class="hb xs" style="visibility:hidden">Reset</button><button class="hb xs">Mostrar<br>pantalla</button><span class="ian">Limpiar vacío</span></div>
+      <div class="iar"><button class="hb xs">Reset</button><button class="hb xs">Mostrar<br>pantalla</button><span class="ian">Alarma "error de ciclo"</span></div>
+      <div class="iar"><button class="hb xs" style="visibility:hidden">Reset</button><button class="hb xs">Mostrar<br>pantalla</button><span class="ian">Alarma "Grader -<br>producción reducida"</span></div>
+      <div class="iar"><button class="hb xs">Reset</button><button class="hb xs">Mostrar<br>pantalla</button><span class="ian">Alarma "error de evacuador"</span></div>
+      <div class="iar"><button class="hb xs" style="visibility:hidden">Reset</button><button class="hb xs">Mostrar<br>pantalla</button><span class="ian">Alarma "falta vacío"</span></div>
+      <div class="iar"><button class="hb xs">Reset</button><button class="hb xs">Mostrar<br>pantalla</button><span class="ian">Alarma "error de carro 2"</span></div>
+      <div class="iar"><button class="hb xs" style="visibility:hidden">Reset</button><button class="hb xs">Mostrar<br>pantalla</button><span class="ian">Alarma "Grader detenido"</span></div>
+      <div class="iar"><button class="hb xs" style="visibility:hidden">Reset</button><button class="hb xs">Mostrar<br>pantalla</button><span class="ian">Advertencia Alta Velocidad</span></div>
+      <div class="iar"><button class="hb xs">Reset</button><button class="hb xs">Mostrar<br>pantalla</button><span class="ian">Error Succión Principal<br>Baader</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- CARRO 1 -->
+<div class="sc" id="c1" data-back="s4"><div class="sh"><span class="st">Principal - Menu Técnico - Carro 1</span><span class="sd"></span></div>
+  <div class="sb"><div class="idxl" style="gap:28px;"><div class="idxr"><span>Tiempos y Pulsos</span><button class="bnav" onclick="nav('c1tp')"></button></div><div class="idxr"><span>Presión</span><button class="bnav" onclick="nav('c1pr')"></button></div></div></div>
+</div>
+<div class="sc" id="c1tp" data-back="c1"><div class="sh"><span class="st">Principal - Menu Técnico - Carro 1 - Tiempos y Pulsos</span><span class="sd"></span></div>
+  <div class="sb" style="padding:4px 14px;align-items:stretch;justify-content:flex-start;"><table class="pt" style="margin-top:8px;">
+    <tr><td class="plb">Esperar ciclo</td><td><input class="fe" id="c1tp-0" value="0,00"><span class="fr">0.00</span></td></tr>
+    <tr><td class="plb">Presión de Pulsos 1 - Salmón</td><td><input class="fe" id="c1tp-1" value="260"><span class="fr">165</span></td></tr>
+    <tr><td class="plb">Presión de Pulsos 1 - Coho</td><td><input class="fe" id="c1tp-2" value="250"><span class="fr">180</span></td></tr>
+    <tr><td class="plb">Activar Presión 2 - Salmón</td><td><input class="fe" id="c1tp-3" value="0,30"><span class="fr">0.30</span></td></tr>
+    <tr><td class="plb">Activar presión 2 - Coho</td><td><input class="fe" id="c1tp-4" value="0,30"><span class="fr">0.30</span></td></tr>
+    <tr><td class="plb">Tiempo fuera del pescado - Salmón</td><td><input class="fe" id="c1tp-5" value="0,55"><span class="fr">0.55</span></td></tr>
+    <tr><td class="plb">Tiempo fuera del pescado - Coho</td><td><input class="fe" id="c1tp-6" value="0,55"><span class="fr">0.50</span></td></tr>
+  </table></div>
+</div>
+<div class="sc" id="c1pr" data-back="c1"><div class="sh"><span class="st">Principal - Menu Técnico - Carro 1 - Presión</span><span class="sd"></span></div>
+  <div class="sb" style="padding:4px 10px;flex-direction:row;gap:10px;align-items:flex-start;">
+    <div style="display:flex;align-items:center;justify-content:center;width:90px;flex-shrink:0;padding-top:36px;"><button class="hb pill" style="font-size:12px;padding:8px 10px;width:82px;" onclick="nav('c1pr2')">Presión 2</button></div>
+    <table class="pt" style="flex:1;">
+      <thead><tr><th style="width:140px;"></th><th style="font-size:10.5px;color:#555;font-weight:400;text-align:center;" colspan="2">Hacia atrás</th><th style="font-size:10.5px;color:#555;font-weight:400;text-align:center;" colspan="2">Adelante</th></tr></thead>
+      <tr><td class="plb">Lubricación trasera</td><td><input class="fe" id="c1pr-0" value="0,00"><span class="fr">0.00</span></td><td></td><td><input class="fe" id="c1pr-1" value="1,00"><span class="fr">0.50</span></td></tr>
+      <tr><td class="plb">Lubricación delantera</td><td><input class="fe" id="c1pr-2" value="0,00"><span class="fr">0.00</span></td><td></td><td><input class="fe" id="c1pr-3" value="1,00"><span class="fr">0.50</span></td></tr>
+      <tr><td class="plb">Posición inicial</td><td><input class="fe" id="c1pr-4" value="0,00"><span class="fr">0.00</span></td><td></td><td><input class="fe" id="c1pr-5" value="1,60"><span class="fr">1.60</span></td></tr>
+      <tr><td class="plb">Presión 1 Salmón</td><td><input class="fe" id="c1pr-6" value="0,00"><span class="fr">0.00</span></td><td></td><td><input class="fe" id="c1pr-7" value="2,00"><span class="fr">2.00</span></td></tr>
+      <tr><td class="plb">Presión 1 Coho</td><td><input class="fe" id="c1pr-8" value="0,00"><span class="fr">0.00</span></td><td></td><td><input class="fe" id="c1pr-9" value="1,50"><span class="fr">1.50</span></td></tr>
+      <tr><td class="plb">Sin pescado</td><td><input class="fe" id="c1pr-10" value="4,00"><span class="fr">4.00</span></td><td></td><td><input class="fe" id="c1pr-11" value="0,00"><span class="fr">0.50</span></td></tr>
+      <tr><td class="plb">Volver al comienzo</td><td><input class="fe" id="c1pr-12" value="1,00"><span class="fr">0.50</span></td><td></td><td><input class="fe" id="c1pr-13" value="2,00"><span class="fr">1.80</span></td></tr>
+    </table>
+  </div>
+</div>
+<div class="sc" id="c1pr2" data-back="c1pr"><div class="sh"><span class="st">Menu Técnico - Carro 1 - Presión - Categorías de Presión 2</span><span class="sd"></span></div>
+  <div class="sb" style="padding:8px 16px;align-items:stretch;justify-content:flex-start;"><table class="pt" style="margin-top:10px;">
+    <thead><tr><th style="width:200px;"></th><th style="font-size:10.5px;color:#555;font-weight:400;text-align:center;" colspan="2">Hacia atrás</th><th style="font-size:10.5px;color:#555;font-weight:400;text-align:center;" colspan="2">Hacia adelante</th></tr></thead>
+    <tr><td class="plb">Categoría 1 y Coho</td><td><input class="fe" id="c1p2-0" value="0,00"><span class="fr">0.00</span></td><td></td><td><input class="fe" id="c1p2-1" value="0,00"><span class="fr">0.50</span></td></tr>
+    <tr><td class="plb">Categoría 2</td><td><input class="fe" id="c1p2-2" value="0,00"><span class="fr">0.00</span></td><td></td><td><input class="fe" id="c1p2-3" value="0,50"><span class="fr">1.50</span></td></tr>
+    <tr><td class="plb">Categoría 3</td><td><input class="fe" id="c1p2-4" value="0,00"><span class="fr">0.00</span></td><td></td><td><input class="fe" id="c1p2-5" value="1,00"><span class="fr">1.00</span></td></tr>
+    <tr><td class="plb">Categoría 4</td><td><input class="fe" id="c1p2-6" value="0,00"><span class="fr">0.00</span></td><td></td><td><input class="fe" id="c1p2-7" value="1,00"><span class="fr">1.50</span></td></tr>
+  </table></div>
+</div>
+
+<!-- HERRAMIENTA 1 -->
+<div class="sc" id="h1" data-back="s4"><div class="sh"><span class="st">Principal - Technical Menu - Herramienta 1</span><span class="sd"></span></div>
+  <div class="sb"><div class="idxl" style="gap:11px;">
+    <div class="idxr"><span>Esperar - Velocidad</span><button class="bnav" onclick="nav('h1ev')"></button></div>
+    <div class="idxr"><span>Esperar Pulsos - Categorías</span><button class="bnav" onclick="nav('h1epc')"></button></div>
+    <div class="idxr"><span>Tiempo de movimiento de bajada</span><button class="bnav" onclick="nav('h1tmb')"></button></div>
+    <div class="idxr"><span>Tiempos y Pulsos dentro del Pescado</span><button class="bnav" onclick="nav('h1tpp')"></button></div>
+    <div class="idxr"><span>Presión de bajada</span><button class="bnav" onclick="nav('h1pb')"></button></div>
+    <div class="idxr"><span>Presión de subida</span><button class="bnav" onclick="nav('h1ps')"></button></div>
+  </div></div>
+</div>
+<div class="sc" id="h1ev" data-back="h1"><div class="sh"><span class="st">Principal - Menu Técnico - Herramienta 1 - Esperar Velocidad</span><span class="sd"></span></div>
+  <div class="sb" style="padding:4px 16px;align-items:center;justify-content:center;"><table class="pt">
+    <tr><td class="plb">Esperar ciclo</td><td><input class="fe" id="h1ev-0" value="0,00"><span class="fr">0.00</span></td></tr>
+    <tr><td style="height:12px;"></td></tr>
+    <tr><td class="plb">15-16 Pescados</td><td><input class="fe" id="h1ev-1" value="0,00"><span class="fr">0.00</span></td></tr>
+    <tr><td class="plb">13-14 Pescados</td><td><input class="fe" id="h1ev-2" value="0,00"><span class="fr">0.00</span></td></tr>
+    <tr><td class="plb">11-12 Pescados</td><td><input class="fe" id="h1ev-3" value="0,50"><span class="fr">0.50</span></td></tr>
+    <tr><td class="plb">09-10 Pescados</td><td><input class="fe" id="h1ev-4" value="0,60"><span class="fr">0.60</span></td></tr>
+  </table></div>
+</div>
+<div class="sc" id="h1epc" data-back="h1"><div class="sh"><span class="st">Principal - Menu Técnico - Herramienta 1 - Esperar Pulsos - Cat…</span><span class="sd"></span></div>
+  <div class="sb" style="padding:4px 16px;align-items:center;justify-content:center;"><table class="pt">
+    <tr><td class="plb">Categoría 1 y Coho</td><td><input class="fe" id="h1epc-0" value="30"><span class="fr">20</span></td></tr>
+    <tr><td class="plb">Categoría 2</td><td><input class="fe" id="h1epc-1" value="45"><span class="fr">30</span></td></tr>
+    <tr><td class="plb">Categoría 3</td><td><input class="fe" id="h1epc-2" value="70"><span class="fr">50</span></td></tr>
+    <tr><td class="plb">Categoría 4</td><td><input class="fe" id="h1epc-3" value="85"><span class="fr">70</span></td></tr>
+    <tr class="vla"><td class="plb">Valor límite actual</td><td><input class="fe1" id="h1epc-v" value="425"></td></tr>
+  </table></div>
+</div>
+<div class="sc" id="h1tmb" data-back="h1"><div class="sh"><span class="st">Principal - Menu Técnico - Herramienta 1 - Tiempo Movimiento</span><span class="sd"></span></div>
+  <div class="sb" style="padding:2px 14px;align-items:stretch;justify-content:flex-start;"><table class="pt" style="margin-top:4px;">
+    <tr><td class="plb">Categoría - Normal</td><td><input class="fe" id="h1tmb-0" value="0,32"><span class="fr">0.31</span></td></tr>
+    <tr><td class="plb">Categoría 2 - Normal</td><td><input class="fe" id="h1tmb-1" value="0,31"><span class="fr">0.30</span></td></tr>
+    <tr><td class="plb">Categoría 3 - Normal</td><td><input class="fe" id="h1tmb-2" value="0,30"><span class="fr">0.30</span></td></tr>
+    <tr><td class="plb">Categoría 4 - Normal</td><td><input class="fe" id="h1tmb-3" value="0,29"><span class="fr">0.29</span></td></tr>
+    <tr><td class="plb">Categoría 1 - Suave</td><td><input class="fe" id="h1tmb-4" value="0,31"><span class="fr">0.31</span></td></tr>
+    <tr><td class="plb">Categoría 2 - Suave</td><td><input class="fe" id="h1tmb-5" value="0,30"><span class="fr">0.30</span></td></tr>
+    <tr><td class="plb">Categoría 3 - Suave</td><td><input class="fe" id="h1tmb-6" value="0,30"><span class="fr">0.30</span></td></tr>
+    <tr><td class="plb">Categoría 4 - Suave</td><td><input class="fe" id="h1tmb-7" value="0,29"><span class="fr">0.29</span></td></tr>
+  </table></div>
+</div>
+<div class="sc" id="h1tpp" data-back="h1"><div class="sh"><span class="st">… - Herramienta 1 - Tiempos y Pulsos dentro del Pescado</span><span class="sd"></span></div>
+  <div class="sb" style="padding:4px 16px;align-items:center;justify-content:center;"><table class="pt">
+    <tr><td class="plb">Tiempo dentro del Pescado</td><td><input class="fe" id="h1tpp-0" value="0,48"><span class="fr">0.10</span></td></tr>
+    <tr><td class="plb">Pulsos dentro del pescado - Salmón</td><td><input class="fe" id="h1tpp-1" value="270"><span class="fr">200</span></td></tr>
+    <tr><td class="plb">Pulsos dentro del pescado - Coho</td><td><input class="fe" id="h1tpp-2" value="260"><span class="fr">205</span></td></tr>
+    <tr class="vla"><td class="plb">Valor límite actual</td><td><input class="fe1" id="h1tpp-v" value="425"></td></tr>
+  </table></div>
+</div>
+<div class="sc" id="h1pb" data-back="h1"><div class="sh"><span class="st">Principal - Menu Técnico - Herramienta 1 - Presión de bajada</span><span class="sd"></span></div>
+  <div class="sb" style="padding:2px 14px;align-items:stretch;justify-content:flex-start;"><table class="pt" style="margin-top:4px;">
+    <tr><td class="plb">Inicio primera vez</td><td><input class="fe" id="h1pb-0" value="1,00"><span class="fr">1.00</span></td></tr>
+    <tr><td class="plb">Posición inicial</td><td><input class="fe" id="h1pb-1" value="0,50"><span class="fr">0.50</span></td></tr>
+    <tr><td class="plb">Movimiento de bajada - Normal</td><td><input class="fe" id="h1pb-2" value="2,40"><span class="fr">2.40</span></td></tr>
+    <tr><td class="plb">Movimiento de bajada - Suave</td><td><input class="fe" id="h1pb-3" value="2,20"><span class="fr">2.20</span></td></tr>
+    <tr><td class="plb">Presión Normal</td><td><input class="fe" id="h1pb-4" value="0,30"><span class="fr">0.00</span></td></tr>
+    <tr><td class="plb">Presión Suave</td><td><input class="fe" id="h1pb-5" value="0,00"><span class="fr">0.00</span></td></tr>
+    <tr><td class="plb">Movimiento de subida</td><td><input class="fe" id="h1pb-6" value="0,30"><span class="fr">0.00</span></td></tr>
+  </table></div>
+</div>
+<div class="sc" id="h1ps" data-back="h1"><div class="sh"><span class="st">Principal - Menu Técnico - Herramienta 1 - Presión de subida</span><span class="sd"></span></div>
+  <div class="sb" style="padding:2px 14px;align-items:stretch;justify-content:flex-start;"><table class="pt" style="margin-top:4px;">
+    <tr><td class="plb">Inicio primera vez</td><td><input class="fe" id="h1ps-0" value="3,00"><span class="fr">3.00</span></td></tr>
+    <tr><td class="plb">Posición inicial</td><td><input class="fe" id="h1ps-1" value="2,00"><span class="fr">2.00</span></td></tr>
+    <tr><td class="plb">Movimiento de bajada - Normal</td><td><input class="fe" id="h1ps-2" value="1,00"><span class="fr">0.00</span></td></tr>
+    <tr><td class="plb">Movimiento de bajada - Suave</td><td><input class="fe" id="h1ps-3" value="1,00"><span class="fr">0.00</span></td></tr>
+    <tr><td class="plb">Presión Normal</td><td><input class="fe" id="h1ps-4" value="0,55"><span class="fr">0.55</span></td></tr>
+    <tr><td class="plb">Presión Suave</td><td><input class="fe" id="h1ps-5" value="0,75"><span class="fr">0.75</span></td></tr>
+    <tr><td class="plb">Movimiento de subida</td><td><input class="fe" id="h1ps-6" value="4,00"><span class="fr">4.00</span></td></tr>
+  </table></div>
+</div>
+
+<!-- CARRO 2 -->
+<div class="sc" id="c2" data-back="s4"><div class="sh"><span class="st">Principal - Menu Técnico - Carro 2</span><span class="sd"></span></div>
+  <div class="sb"><div class="idxl" style="gap:30px;"><div class="idxr"><span>Tiempo</span><button class="bnav" onclick="nav('c2t')"></button></div><div class="idxr"><span>Festo</span><button class="bnav" onclick="nav('c2f')"></button></div></div></div>
+</div>
+<div class="sc" id="c2t" data-back="c2"><div class="sh"><span class="st">Principal - Menu Técnico - Carro 2 - Tiempo</span><span class="sd"></span></div>
+  <div class="sb" style="padding:4px 16px;align-items:center;justify-content:center;"><table class="pt">
+    <tr><td class="plb">Esperar tiempo antes de mover hacia adelante</td><td><input class="fe" id="c2t-0" value="0,00"><span class="fr">0.00</span></td></tr>
+    <tr><td style="height:16px;"></td></tr>
+    <tr><td class="plb">Esperar tiempo &nbsp;antes de mover hacia ATRÁS.</td><td><input class="fe" id="c2t-1" value="0,00"><span class="fr">0.00</span></td></tr>
+  </table></div>
+</div>
+<div class="sc" id="c2f" data-back="c2"><div class="sh"><span class="st">Principal - Menu Técnico - Carro 2 - Festo</span><span class="sd"></span></div>
+  <div class="sb" style="padding:6px 10px;flex-direction:row;gap:12px;align-items:flex-start;">
+    <div style="flex:1;font-size:11.5px;color:#111;line-height:1.5;">
+      <p style="font-weight:700;margin-bottom:6px;">INFO: Esta página es para calibrar e identificar el cilindro del Carro #2. Ningún botón debe estar activo cuando cierres esta página."Activar" debe estar activado para operar los botones "Enseñar".</p>
+      <p style="font-weight:700;margin-bottom:4px;">Cómo hacerlo:</p>
+      <p>Poner Enseñar 1 - espere hasta que se apague, antes de poner Enseñar 2 y Enseñar 3. El cilindro comenzará a moverse. Mensaje: IDENTIFICACIÓN EXITOSA aparecerá cuando la calibración se lleve a cabo.</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;flex-shrink:0;align-items:flex-end;padding-top:20px;">
+      <div style="display:flex;align-items:center;gap:6px;"><span style="font-size:12px;">Activar</span><button class="bnav" style="min-width:60px;height:26px;"></button></div>
+      <div style="display:flex;align-items:center;gap:6px;"><span style="font-size:12px;">Enseñar 1</span><button class="bnav" style="min-width:60px;height:26px;"></button></div>
+      <div style="display:flex;align-items:center;gap:6px;"><span style="font-size:12px;">Enseñar 2</span><button class="bnav" style="min-width:60px;height:26px;"></button></div>
+      <div style="display:flex;align-items:center;gap:6px;"><span style="font-size:12px;">Enseñar 3</span><button class="bnav" style="min-width:60px;height:26px;"></button></div>
+    </div>
+  </div>
+</div>
+
+<!-- SUCCIÓN -->
+<div class="sc" id="succion" data-back="s4"><div class="sh"><span class="st">Principal - Menu Técnico - Succión Principal Baader</span><span class="sd"></span></div>
+  <div class="sb" style="gap:10px;"><div style="font-size:13px;color:#666;">Succión Principal Baader</div><div style="font-size:11px;color:#999;">Sin parámetros configurados</div></div>
+</div>
+
+<!-- EVACUADOR -->
+<div class="sc" id="ev" data-back="s4"><div class="sh"><span class="st">Principal - Menu Técnico - Evacuador</span><span class="sd"></span></div>
+  <div class="sb" style="padding:4px 14px;align-items:stretch;justify-content:flex-start;"><table class="pt" style="margin-top:4px;">
+    <tr><td class="plb" style="white-space:normal;text-align:right;max-width:320px;line-height:1.3;">Activación de tiempo tiempo máximo<br>de evacuador 0,25 segundos</td><td style="vertical-align:middle;"><input class="fe" id="ev-0" value="0,25"><span class="fr">0.25</span></td></tr>
+    <tr><td style="height:6px;"></td></tr>
+    <tr><td class="plb">Retardar pulsos no limpio</td><td><input class="fe" id="ev-1" value="10"><span class="fr">230</span></td></tr>
+    <tr><td class="plb">Retardar pulsos salmón limpio</td><td><input class="fe" id="ev-2" value="65"><span class="fr">250</span></td></tr>
+    <tr><td class="plb">Retrasar pulsos limpiar Coho/pqueña</td><td><input class="fe" id="ev-3" value="65"><span class="fr">240</span></td></tr>
+    <tr><td class="plb">Limitar pulsos Bajo</td><td><input class="fe" id="ev-4" value="140"><span class="fr">60</span></td></tr>
+    <tr><td class="plb">Limitar pulsos Alto</td><td><input class="fe" id="ev-5" value="200"><span class="fr">140</span></td></tr>
+    <tr class="vla"><td class="plb">Valor límite actual</td><td><input class="fe1" id="ev-v" value="0"></td></tr>
+  </table></div>
+</div>
+
+<!-- CICLO -->
+<div class="sc" id="ci" data-back="s4"><div class="sh"><span class="st">Principal - Menu Técnico - Ciclo</span><span class="sd"></span></div>
+  <div class="sb"><div class="idxl" style="gap:10px;">
+    <div class="idxr"><span>Formas de Ajustes</span><button class="bnav" onclick="nav('ci-fa')"></button></div>
+    <div class="idxr"><span>Ajuste Velocidad</span><button class="bnav" onclick="nav('ci-av')"></button></div>
+    <div class="idxr"><span>Valores de inicio de ciclos</span><button class="bnav" onclick="nav('ci-vic')"></button></div>
+    <div class="idxr"><span>YMK</span><button class="bnav" onclick="nav('ci-ymk')"></button></div>
+    <div class="idxr"><span>Alimentación</span><button class="bnav" onclick="nav('ci-al')"></button></div>
+    <div class="idxr"><span>Contar</span><button class="bnav" onclick="nav('ci-ct')"></button></div>
+  </div></div>
+</div>
+<div class="sc" id="ci-fa" data-back="ci"><div class="sh"><span class="st">Principal - Menu Técnico - Ciclo - Ajuste de Categorías</span><span class="sd"></span></div>
+  <div class="sb" style="padding:4px 16px;align-items:center;justify-content:center;"><table class="pt">
+    <tr><td class="plb">Categoría 1</td><td><input class="fe1" id="ci-fa-0" value="150"></td></tr>
+    <tr><td class="plb">Categoría 2</td><td><input class="fe1" id="ci-fa-1" value="180"></td></tr>
+    <tr><td class="plb">Categoría 3</td><td><input class="fe1" id="ci-fa-2" value="190"></td></tr>
+    <tr><td class="plb">Categoría 4</td><td><input class="fe1" id="ci-fa-3" value="220"></td></tr>
+    <tr class="vla"><td class="plb">Valor límite actual</td><td><input class="fe1" id="ci-fa-v" value="202"></td></tr>
+    <tr><td class="plb" style="padding-top:6px;font-size:11px;color:#555;">Activar categoría</td><td></td></tr>
+  </table></div>
+</div>
+<div class="sc" id="ci-av" data-back="ci"><div class="sh"><span class="st">Principal - Menu Técnico - Ciclo - Ajuste de Velocidad</span><span class="sd"></span></div>
+  <div class="sb" style="padding:4px 16px;align-items:center;justify-content:center;"><table class="pt">
+    <tr><td class="plb">Velocidad 15-16 Pescados</td><td><input class="fe1" id="ci-av-0" value="110"></td></tr>
+    <tr><td class="plb">Velocidad 13-14 Pescados</td><td><input class="fe1" id="ci-av-1" value="95"></td></tr>
+    <tr><td class="plb">Velocidad 11-12 Pescados</td><td><input class="fe1" id="ci-av-2" value="82"></td></tr>
+    <tr><td class="plb">Velocidad 09-10 Pescados</td><td><input class="fe1" id="ci-av-3" value="72"></td></tr>
+    <tr class="vla"><td class="plb">Valor límite actual</td><td><input class="fe1" id="ci-av-v" value="425"></td></tr>
+    <tr><td class="plb" style="padding-top:6px;font-size:11px;color:#555;">Categoría (que tamaño de pescado)</td><td></td></tr>
+  </table></div>
+</div>
+<div class="sc" id="ci-vic" data-back="ci"><div class="sh"><span class="st">Principal - Menu Técnico - Ciclo - Criterios de inicio del ciclo</span><span class="sd"></span></div>
+  <div class="sb" style="padding:4px 16px;align-items:center;justify-content:center;"><table class="pt">
+    <tr><td class="plb">Sensor de tiempo de espera</td><td><input class="fe1" id="ci-vic-0" value="0,15"></td></tr>
+    <tr><td class="plb">Comenzar "ventana"</td><td><input class="fe1" id="ci-vic-1" value="220"></td></tr>
+    <tr class="vla"><td class="plb">Valor límite actual</td><td><input class="fe1" id="ci-vic-v" value="425"></td></tr>
+  </table></div>
+</div>
+<div class="sc" id="ci-ymk" data-back="ci"><div class="sh"><span class="st">Principal - Menu Técnico - Ciclo - YMK</span><span class="sd"></span></div>
+  <div class="sb" style="padding:4px 16px;align-items:center;justify-content:center;"><table class="pt">
+    <tr><td class="plb" style="white-space:normal;text-align:right;max-width:300px;line-height:1.4;">Tiempo de actividad de la<br>válvula solenoide.</td><td style="vertical-align:middle;"><input class="fe" id="ci-ymk-0" value="0,20"><span class="fr">0.30</span></td></tr>
+  </table></div>
+</div>
+<div class="sc" id="ci-al" data-back="ci"><div class="sh"><span class="st">Principal - Menu Técnico - Ciclo - Alimentación</span><span class="sd"></span></div>
+  <div class="sb" style="gap:16px;align-items:center;justify-content:center;">
+    <div style="font-size:14px;color:#111;text-align:center;">Anular error de Alimentación</div>
+    <button class="ton" onclick="this.classList.toggle('ton');this.classList.toggle('hb');this.classList.toggle('red');this.textContent=this.classList.contains('red')?'Apagado':'Encendido/Apagado';">Encendido/Apagado</button>
+    <div style="font-size:11.5px;color:#111;text-align:left;max-width:480px;line-height:1.5;">Cuando este botón esté activado, Baader no se detendrá en el error de alimentación (777) hasta que el pescado esté eviscerado y limpio</div>
+  </div>
+</div>
+<div class="sc" id="ci-ct" data-back="ci"><div class="sh"><span class="st">Principal - Menu Técnico - Ciclo - Contar</span><span class="sd"></span></div>
+  <div class="sb" style="padding:4px 16px;align-items:center;justify-content:center;"><table class="pt">
+    <tr><td class="plb">Knuro</td><td><input class="fe1" id="ci-ct-0" value="1577120" style="width:90px;"></td></tr>
+    <tr><td style="height:16px;"></td></tr>
+    <tr><td class="plb">Baader</td><td><input class="fe1" id="ci-ct-1" value="1347144" style="width:90px;"></td></tr>
+  </table></div>
+</div>
+
+<!-- HERRAMIENTA 2 -->
+<div class="sc" id="h2" data-back="s4"><div class="sh"><span class="st">Principal - Menu Técnico - Herramienta 2</span><span class="sd"></span></div>
+  <div class="sb"><div class="idxl" style="gap:22px;">
+    <div class="idxr"><span>Tiempo y Pulsos</span><button class="bnav" onclick="nav('h2-tp')"></button></div>
+    <div class="idxr"><span>Presión</span><button class="bnav" onclick="nav('h2-pr')"></button></div>
+    <div class="idxr"><span>Agua</span><button class="bnav" onclick="nav('h2-ag')"></button></div>
+  </div></div>
+</div>
+<div class="sc" id="h2-tp" data-back="h2"><div class="sh"><span class="st">Principal - Menu Técnico - Herramienta 2 - Tiempos y Pulsos</span><span class="sd"></span></div>
+  <div class="sb"><div class="idxl" style="gap:14px;">
+    <div class="idxr"><span>2A Salmón</span><button class="bnav" onclick="nav('h2-2as')"></button></div>
+    <div class="idxr"><span>2B - Velocidad - Salmón</span><button class="bnav" onclick="nav('h2-2bvs')"></button></div>
+    <div class="idxr"><span>2A Coho</span><button class="bnav" onclick="nav('h2-2ac')"></button></div>
+    <div class="idxr"><span>2B - Velocidad - Coho</span><button class="bnav" onclick="nav('h2-2bvc')"></button></div>
+  </div></div>
+</div>
+<div class="sc" id="h2-2as" data-back="h2-tp"><div class="sh"><span class="st">Menu Técnico - Herramienta 2 - Tiempos y Pulsos - 2A Salmón</span><span class="sd"></span></div>
+  <div class="sb" style="padding:4px 14px;align-items:stretch;justify-content:flex-start;"><table class="pt" style="margin-top:6px;">
+    <tr><td class="plb">Esperar pulsos - Velocidad</td><td><button class="bnav" onclick="nav('h2-2as-epv')" style="min-width:60px;height:22px;"></button></td></tr>
+    <tr><td class="plb">Tiempo de espera</td><td><input class="fe" id="h2-2as-0" value="0,00"><span class="fr">0.00</span></td></tr>
+    <tr><td class="plb">Tiempo de movimiento de bajada - normal</td><td><input class="fe" id="h2-2as-1" value="0,10"><span class="fr">0.10</span></td></tr>
+    <tr><td class="plb">Tiempo de movimiento de bajada - suave</td><td><input class="fe" id="h2-2as-2" value="0,09"><span class="fr">0.09</span></td></tr>
+    <tr><td class="plb">Tiempo de presión 1</td><td><input class="fe" id="h2-2as-3" value="0,25"><span class="fr">0.30</span></td></tr>
+    <tr><td class="plb">Pulsos en espera - Velocidad</td><td><button class="bnav" onclick="nav('h2-2as-pev')" style="min-width:60px;height:22px;"></button></td></tr>
+    <tr><td class="plb">Pulsos activos - Velocidad</td><td><button class="bnav" onclick="nav('h2-2as-pav')" style="min-width:60px;height:22px;"></button></td></tr>
+  </table></div>
+</div>
+<div class="sc" id="h2-2as-epv" data-back="h2-2as"><div class="sh"><span class="st">H2 - T&P - 2A Salmón - Categorías - Esperar Pulsos</span><span class="sd"></span></div>
+  <div class="sb" style="padding:4px 16px;align-items:center;justify-content:center;"><table class="pt">
+    <tr><td class="plb">Categoría 1</td><td><input class="fe1" id="h2-2as-epv-0" value="70"></td></tr>
+    <tr><td class="plb">Categoría 2</td><td><input class="fe1" id="h2-2as-epv-1" value="60"></td></tr>
+    <tr><td class="plb">Categoría 3</td><td><input class="fe1" id="h2-2as-epv-2" value="50"></td></tr>
+    <tr><td class="plb">Categoría 4</td><td><input class="fe1" id="h2-2as-epv-3" value="30"></td></tr>
+    <tr class="vla"><td class="plb">Valor límite actual</td><td><input class="fe1" id="h2-2as-epv-v" value="425"></td></tr>
+  </table></div>
+</div>
+<div class="sc" id="h2-2as-pev" data-back="h2-2as"><div class="sh"><span class="st">H2 - 2A Salmón - esperar pulsos velocidad</span><span class="sd"></span></div>
+  <div class="sb" style="padding:4px 16px;align-items:center;justify-content:center;"><table class="pt">
+    <tr><td class="plb">15-16 Pescados</td><td><input class="fe1" id="h2-2as-pev-0" value="125"></td></tr>
+    <tr><td class="plb">13-14 Pescados</td><td><input class="fe1" id="h2-2as-pev-1" value="145"></td></tr>
+    <tr><td class="plb">11-12 Pescados</td><td><input class="fe1" id="h2-2as-pev-2" value="160"></td></tr>
+    <tr><td class="plb">09-10 Pescados</td><td><input class="fe1" id="h2-2as-pev-3" value="175"></td></tr>
+    <tr class="vla"><td class="plb">Valor límite actual</td><td><input class="fe1" id="h2-2as-pev-v" value="425"></td></tr>
+  </table></div>
+</div>
+<div class="sc" id="h2-2as-pav" data-back="h2-2as"><div class="sh"><span class="st">H2 - 2A Salmón - Pulsos activos</span><span class="sd"></span></div>
+  <div class="sb" style="padding:4px 16px;align-items:center;justify-content:center;"><table class="pt">
+    <tr><td class="plb">15-16 Pescados</td><td><input class="fe" id="h2-2as-pav-0" value="300"><span class="fr">210</span></td></tr>
+    <tr><td class="plb">13-14 Pescados</td><td><input class="fe" id="h2-2as-pav-1" value="300"><span class="fr">210</span></td></tr>
+    <tr><td class="plb">11-12 Pescados</td><td><input class="fe" id="h2-2as-pav-2" value="300"><span class="fr">210</span></td></tr>
+    <tr><td class="plb">09-10 Pescados</td><td><input class="fe" id="h2-2as-pav-3" value="300"><span class="fr">210</span></td></tr>
+    <tr class="vla"><td class="plb">Valor límite actual</td><td><input class="fe1" id="h2-2as-pav-v" value="425"></td></tr>
+  </table></div>
+</div>
+<div class="sc" id="h2-2bvs" data-back="h2-tp"><div class="sh"><span class="st">Menu Técnico - H2 - Tiempos y Pulsos - 2B Velocidad Salmón</span><span class="sd"></span></div>
+  <div class="sb" style="padding:2px 14px;align-items:stretch;justify-content:flex-start;"><table class="pt" style="margin-top:4px;">
+    <tr><td class="plb">Valor negativo - Esperar Pulsos</td><td><input class="fe" id="h2-2bvs-0" value="0"><span class="fr">0.00</span></td></tr>
+    <tr><td class="plb">Esperar tiempo</td><td><input class="fe" id="h2-2bvs-1" value="0,30"><span class="fr">0.25</span></td></tr>
+    <tr><td class="plb">Pulsos de 15-16 pescados/min</td><td><input class="fe" id="h2-2bvs-2" value="300"><span class="fr">210</span></td></tr>
+    <tr><td class="plb">Pulsos de 13-14 pescados/min</td><td><input class="fe" id="h2-2bvs-3" value="300"><span class="fr">210</span></td></tr>
+    <tr><td class="plb">Pulsos de 11-12 pescados/min</td><td><input class="fe" id="h2-2bvs-4" value="300"><span class="fr">210</span></td></tr>
+    <tr><td class="plb">Pulsos de 09-10 pescados/min</td><td><input class="fe" id="h2-2bvs-5" value="300"><span class="fr">210</span></td></tr>
+    <tr><td class="plb">Tiempo dentro del Pescado</td><td><input class="fe" id="h2-2bvs-6" value="0,00"><span class="fr">0.00</span></td></tr>
+    <tr class="vla"><td class="plb">Valor límite actual</td><td><input class="fe1" id="h2-2bvs-v" value="425"></td></tr>
+  </table></div>
+</div>
+<div class="sc" id="h2-2ac" data-back="h2-tp"><div class="sh"><span class="st">Menu Técnico - H2 - Tiempos y Pulsos - 2A Coho</span><span class="sd"></span></div>
+  <div class="sb" style="padding:4px 14px;align-items:stretch;justify-content:flex-start;"><table class="pt" style="margin-top:20px;">
+    <tr><td class="plb">Tiempo de presión 1</td><td><input class="fe" id="h2-2ac-0" value="0,30"><span class="fr">0.40</span></td></tr>
+    <tr><td class="plb">Pulsos detenidos - Velocidad</td><td><button class="bnav" onclick="nav('h2-2ac-ve')" style="min-width:60px;height:22px;"></button></td></tr>
+    <tr><td colspan="2"><hr style="border:none;border-top:1px solid #aaa;margin:8px 0;"></td></tr>
+    <tr><td class="plb">Pusos activos - Velocidad</td><td><button class="bnav" onclick="nav('h2-2ac-pa')" style="min-width:60px;height:22px;"></button></td></tr>
+  </table></div>
+</div>
+<div class="sc" id="h2-2ac-ve" data-back="h2-2ac"><div class="sh"><span class="st">H2 - 2A Coho - Velocidad Esperar</span><span class="sd"></span></div>
+  <div class="sb" style="padding:4px 16px;align-items:center;justify-content:center;"><table class="pt">
+    <tr><td class="plb">15-16 Pescados</td><td><input class="fe" id="h2-2ac-ve-0" value="160"><span class="fr">120</span></td></tr>
+    <tr><td class="plb">13-14 Pescados</td><td><input class="fe" id="h2-2ac-ve-1" value="175"><span class="fr">140</span></td></tr>
+    <tr><td class="plb">11-12 Pescados</td><td><input class="fe" id="h2-2ac-ve-2" value="190"><span class="fr">150</span></td></tr>
+    <tr><td class="plb">09-10 Pescados</td><td><input class="fe" id="h2-2ac-ve-3" value="205"><span class="fr">155</span></td></tr>
+    <tr class="vla"><td class="plb">Valor límite actual</td><td><input class="fe1" id="h2-2ac-ve-v" value="425"></td></tr>
+  </table></div>
+</div>
+<div class="sc" id="h2-2ac-pa" data-back="h2-2ac"><div class="sh"><span class="st">H2 - 2A Coho - Pulsos Activos</span><span class="sd"></span></div>
+  <div class="sb" style="padding:4px 16px;align-items:center;justify-content:center;"><table class="pt">
+    <tr><td class="plb">15-16 Pescados</td><td><input class="fe" id="h2-2ac-pa-0" value="290"><span class="fr">260</span></td></tr>
+    <tr><td class="plb">13-14 Pescados</td><td><input class="fe" id="h2-2ac-pa-1" value="290"><span class="fr">260</span></td></tr>
+    <tr><td class="plb">11-12 Pescados</td><td><input class="fe" id="h2-2ac-pa-2" value="290"><span class="fr">260</span></td></tr>
+    <tr><td class="plb">09-10 Pescados</td><td><input class="fe" id="h2-2ac-pa-3" value="290"><span class="fr">260</span></td></tr>
+    <tr class="vla"><td class="plb">Valor límite actual</td><td><input class="fe1" id="h2-2ac-pa-v" value="425"></td></tr>
+  </table></div>
+</div>
+<div class="sc" id="h2-2bvc" data-back="h2-tp"><div class="sh"><span class="st">Menu Técnico - H2 - Tiempos y Pulsos - 2B Velocidad Coho</span><span class="sd"></span></div>
+  <div class="sb" style="padding:2px 14px;align-items:stretch;justify-content:flex-start;"><table class="pt" style="margin-top:4px;">
+    <tr><td class="plb">Valor negativo - Esperar Pulsos</td><td><input class="fe" id="h2-2bvc-0" value="0"><span class="fr">0.00</span></td></tr>
+    <tr><td class="plb">Pulsos de 15-16 pescados/min</td><td><input class="fe" id="h2-2bvc-1" value="290"><span class="fr">270</span></td></tr>
+    <tr><td class="plb">Pulsos de 13-14 pescados/min</td><td><input class="fe" id="h2-2bvc-2" value="290"><span class="fr">270</span></td></tr>
+    <tr><td class="plb">Pulsos de 11-12 pescados/min</td><td><input class="fe" id="h2-2bvc-3" value="290"><span class="fr">270</span></td></tr>
+    <tr><td class="plb">Pulsos de 09-10 pescados/min</td><td><input class="fe" id="h2-2bvc-4" value="290"><span class="fr">270</span></td></tr>
+    <tr class="vla"><td class="plb">Valor límite actual</td><td><input class="fe1" id="h2-2bvc-v" value="425"></td></tr>
+  </table></div>
+</div>
+<div class="sc" id="h2-pr" data-back="h2"><div class="sh"><span class="st">Principal - Menu Técnico - Herramienta 2 - Presión hacia abajo</span><span class="sd"></span></div>
+  <div class="sb" style="padding:3px 8px;align-items:stretch;justify-content:flex-start;"><table class="pt" style="margin-top:2px;">
+    <thead><tr><th></th><th style="font-size:10.5px;color:#555;font-weight:400;text-align:center;" colspan="2">De bajada</th><th style="font-size:10.5px;color:#555;font-weight:400;text-align:center;" colspan="2">De subida</th></tr></thead>
+    <tr><td class="plb">Inicio primera vez</td><td><input class="fe" id="h2pr-0" value="0,50"><span class="fr">0.50</span></td><td></td><td><input class="fe" id="h2pr-1" value="2,00"><span class="fr">2.00</span></td></tr>
+    <tr><td class="plb">Posición inicial</td><td><input class="fe" id="h2pr-2" value="0,50"><span class="fr">0.50</span></td><td></td><td><input class="fe" id="h2pr-3" value="1,60"><span class="fr">2.00</span></td></tr>
+    <tr><td class="plb">Movimiento de bajada - Normal</td><td><input class="fe" id="h2pr-4" value="2,50"><span class="fr">2.60</span></td><td></td><td><input class="fe" id="h2pr-5" value="1,00"><span class="fr">1.00</span></td></tr>
+    <tr><td class="plb">Movimiento de bajada - Suave</td><td><input class="fe" id="h2pr-6" value="2,20"><span class="fr">2.00</span></td><td></td><td><input class="fe" id="h2pr-7" value="1,00"><span class="fr">1.00</span></td></tr>
+    <tr><td class="plb">Presión - Normal</td><td><button class="hb pill" style="font-size:11px;padding:4px 10px;" onclick="nav('h2-pr-imp')">Presión</button></td><td></td><td><input class="fe" id="h2pr-8" value="3,00"><span class="fr">3.00</span></td></tr>
+    <tr><td class="plb">Presión - Suave</td><td></td><td></td><td><input class="fe" id="h2pr-9" value="3,00"><span class="fr">3.00</span></td></tr>
+    <tr><td class="plb">Movimiento de subida</td><td><input class="fe" id="h2pr-10" value="1,00"><span class="fr">1.50</span></td><td></td><td><input class="fe" id="h2pr-11" value="3,00"><span class="fr">4.00</span></td></tr>
+  </table></div>
+</div>
+<div class="sc" id="h2-pr-imp" data-back="h2-pr"><div class="sh"><span class="st">Menu Técnico - Herramienta 2 - Presión de bajada - Ímpetu</span><span class="sd"></span></div>
+  <div class="sb" style="padding:6px 10px;flex-direction:row;gap:0;align-items:flex-start;">
+    <div style="flex:1;padding:0 8px;"><div style="text-align:center;font-size:13px;font-weight:600;margin-bottom:8px;color:#111;">Salmón</div><table class="pt">
+      <tr><td class="plb">Presión 1 - Normal</td><td><input class="fe" id="h2imp-s0" value="2,60"><span class="fr">2.60</span></td></tr>
+      <tr><td class="plb">Presión 1 - Suave</td><td><input class="fe" id="h2imp-s1" value="2,40"><span class="fr">2.40</span></td></tr>
+      <tr><td class="plb">Presión 2 - Normal</td><td><input class="fe" id="h2imp-s2" value="4,00"><span class="fr">4.00</span></td></tr>
+      <tr><td class="plb">Presión 2 - Suave</td><td><input class="fe" id="h2imp-s3" value="3,80"><span class="fr">3.60</span></td></tr>
+    </table></div>
+    <div style="width:1px;background:#aaa;align-self:stretch;margin:0 4px;"></div>
+    <div style="flex:1;padding:0 8px;"><div style="text-align:center;font-size:13px;font-weight:600;margin-bottom:8px;color:#111;">Coho</div><table class="pt">
+      <tr><td class="plb">Presión 1 - Normal</td><td><input class="fe" id="h2imp-c0" value="2,40"><span class="fr">2.80</span></td></tr>
+      <tr><td class="plb">Presión 1 - Blando</td><td><input class="fe" id="h2imp-c1" value="2,20"><span class="fr">2.60</span></td></tr>
+      <tr><td class="plb">Presión 2 - Normal</td><td><input class="fe" id="h2imp-c2" value="3,80"><span class="fr">4.20</span></td></tr>
+      <tr><td class="plb">Presión 2 - Blando</td><td><input class="fe" id="h2imp-c3" value="3,50"><span class="fr">3.80</span></td></tr>
+    </table></div>
+  </div>
+</div>
+<div class="sc" id="h2-ag" data-back="h2"><div class="sh"><span class="st">Principal - Menu Técnico - Herramienta 2 - Agua</span><span class="sd"></span></div>
+  <div class="sb" style="padding:4px 16px;align-items:center;justify-content:center;"><table class="pt">
+    <tr><td class="plb">1. Esperar tiempo 1</td><td><input class="fe" id="h2ag-0" value="2,50"><span class="fr">2.30</span></td></tr>
+    <tr><td class="plb">2. Tiempo de lavado</td><td><input class="fe" id="h2ag-1" value="1,00"><span class="fr">0.80</span></td></tr>
+    <tr><td class="plb">3. y 6. Tiempo de descarga</td><td><input class="fe" id="h2ag-2" value="0,45"><span class="fr">0.40</span></td></tr>
+    <tr><td class="plb">4. Tiempo de espera 2</td><td><input class="fe" id="h2ag-3" value="5,00"><span class="fr">5.00</span></td></tr>
+    <tr><td class="plb">5. Tiempo de lavado 2</td><td><input class="fe" id="h2ag-4" value="1,50"><span class="fr">0.00</span></td></tr>
+  </table></div>
+</div>
+
+<!-- SENSORES -->
+<div class="sc" id="sensores" data-back="s4" data-next="sen-a010-1" data-sennav="1">
+  <div class="sh"><span class="st">Principal - Menu Técnico - Sensores</span><span class="sd"></span></div>
+  <div class="sb" style="align-items:center;justify-content:center;">
+    <table style="border:1px solid #888;background:#d0d0da;width:420px;">
+      <tr style="border-bottom:1px solid #c0c0cc;"><td style="padding:7px 16px;font-size:13px;">Herramienta 1</td><td style="padding:7px 16px;font-size:13px;color:#777;">APAGADO</td></tr>
+      <tr style="border-bottom:1px solid #c0c0cc;"><td style="padding:7px 16px;font-size:13px;">Herramienta 2</td><td style="padding:7px 16px;font-size:13px;font-weight:600;color:#111;">ENCENDIDO</td></tr>
+      <tr style="border-bottom:1px solid #c0c0cc;"><td style="padding:7px 16px;font-size:13px;">Cilindro del carro 1</td><td style="padding:7px 16px;font-size:13px;font-weight:600;color:#111;">ENCENDIDO</td></tr>
+      <tr><td style="padding:7px 16px;font-size:13px;">Escavador B - Baader</td><td style="padding:7px 16px;font-size:13px;color:#777;">APAGADO</td></tr>
+    </table>
+  </div>
+</div>
+<div class="sc" id="sen-a010-1" data-back="sensores" data-next="sen-a010-2" data-sennav="1">
+  <div class="sh"><span class="st">Principal - Menu Técnico - Sensores - Entradas A010</span><span class="sd"></span></div>
+  <div class="sb" style="padding:4px 14px;align-items:stretch;justify-content:flex-start;"><table class="sen-list" style="margin-top:6px;">
+    <tr><td>X0 - Velocidad</td><td style="text-align:right;color:#777;">APAGADO</td></tr>
+    <tr><td>X1 - Parada de Emergencia</td><td style="text-align:right;color:#777;">APAGADO</td></tr>
+    <tr><td>X2 - Posición cero del cuchillo</td><td style="text-align:right;color:#777;">APAGADO</td></tr>
+    <tr><td>X3 - Velocidad</td><td style="text-align:right;color:#777;">APAGADO</td></tr>
+    <tr><td>X4 - Sensor de abrazadera trasera</td><td style="text-align:right;color:#777;">APAGADO</td></tr>
+    <tr><td>X5 - Velocidad</td><td style="text-align:right;color:#777;">APAGADO</td></tr>
+    <tr><td>X6 - Herramienta 1</td><td style="text-align:right;color:#777;">APAGADO</td></tr>
+    <tr><td>X7 - Carro 1</td><td style="text-align:right;font-weight:600;color:#111;">ENCENDIDO</td></tr>
+  </table></div>
+</div>
+<div class="sc" id="sen-a010-2" data-back="sen-a010-1" data-next="sen-a110" data-sennav="1">
+  <div class="sh"><span class="st">Principal - Menu Técnico - Sensores - Entradas A010</span><span class="sd"></span></div>
+  <div class="sb" style="padding:4px 14px;align-items:stretch;justify-content:flex-start;"><table class="sen-list" style="margin-top:6px;">
+    <tr><td>X10 - Marel Lista</td><td style="text-align:right;color:#777;">APAGADO</td></tr>
+    <tr><td>X11 - Grader está reduciendo</td><td style="text-align:right;color:#777;">APAGADO</td></tr>
+    <tr><td>X12 - repuesto</td><td style="text-align:right;color:#777;">APAGADO</td></tr>
+    <tr><td>X13 - Escavador B - Baader</td><td style="text-align:right;color:#777;">APAGADO</td></tr>
+    <tr><td>X14 - Evacuador</td><td style="text-align:right;font-weight:600;color:#111;">ENCENDIDO</td></tr>
+    <tr><td>X15 - Medidor de longitud Baader</td><td style="text-align:right;font-weight:600;color:#111;">ENCENDIDO</td></tr>
+    <tr><td>X16 - Herramienta 2</td><td style="text-align:right;font-weight:600;color:#111;">ENCENDIDO</td></tr>
+    <tr><td>X17 - YMK Activo</td><td style="text-align:right;font-weight:600;color:#111;">ENCENDIDO</td></tr>
+  </table></div>
+</div>
+<div class="sc" id="sen-a110" data-back="sen-a010-2" data-next="sen-a111" data-sennav="1">
+  <div class="sh"><span class="st">Principal - Menu Técnico - Sensores - Entradas A110</span><span class="sd"></span></div>
+  <div class="sb" style="padding:4px 14px;align-items:stretch;justify-content:flex-start;"><table class="sen-list" style="margin-top:6px;">
+    <tr><td>00 - Repuesto</td><td style="text-align:right;color:#777;">APAGADO</td></tr>
+    <tr><td>01 - "Rechazar" válvula activa</td><td style="text-align:right;color:#777;">APAGADO</td></tr>
+    <tr><td>02 - Interruptor de parada activo</td><td style="text-align:right;color:#777;">APAGADO</td></tr>
+    <tr><td>03 - Parte inferior herramienta principal</td><td style="text-align:right;color:#777;">APAGADO</td></tr>
+    <tr><td>04 - Parte inferior Escavador A</td><td style="text-align:right;color:#777;">APAGADO</td></tr>
+    <tr><td>05 - Parte inferior Escavador B</td><td style="text-align:right;color:#777;">APAGADO</td></tr>
+    <tr><td>06 - Escavador principal posición cero</td><td style="text-align:right;color:#777;">APAGADO</td></tr>
+    <tr><td>07 - Escavador A posición cero</td><td style="text-align:right;color:#777;">APAGADO</td></tr>
+  </table></div>
+</div>
+<div class="sc" id="sen-a111" data-back="sen-a110" data-next="sen-a112" data-sennav="1">
+  <div class="sh"><span class="st">Principal - Menu Técnico - Sensores - Entradas A111</span><span class="sd"></span></div>
+  <div class="sb" style="padding:4px 14px;align-items:stretch;justify-content:flex-start;"><table class="sen-list" style="margin-top:6px;">
+    <tr><td>00 - Relé de cubierta</td><td style="text-align:right;color:#777;">APAGADO</td></tr>
+    <tr><td>01 - Fallo Presión de aire</td><td style="text-align:right;color:#777;">APAGADO</td></tr>
+    <tr><td>02 - CIP</td><td style="text-align:right;color:#777;">APAGADO</td></tr>
+    <tr><td>03 - Vacío principal activo</td><td style="text-align:right;font-weight:600;color:#111;">ENCENDIDO</td></tr>
+    <tr><td>04 - Repuesto</td><td style="text-align:right;color:#777;">APAGADO</td></tr>
+    <tr><td>05 - Falta vacío</td><td style="text-align:right;font-weight:600;color:#111;">ENCENDIDO</td></tr>
+    <tr><td>06 - Repuesto</td><td style="text-align:right;color:#777;">APAGADO</td></tr>
+    <tr><td>07 - Repuesto</td><td style="text-align:right;color:#777;">APAGADO</td></tr>
+  </table></div>
+</div>
+<div class="sc" id="sen-a112" data-back="sen-a111" data-next="sen-info" data-sennav="1">
+  <div class="sh"><span class="st">Principal - Menú Técnico - Sensores - Entradas A 112</span><span class="sd"></span></div>
+  <div class="sb" style="padding:4px 14px;align-items:stretch;justify-content:flex-start;"><table class="sen-list" style="margin-top:6px;">
+    <tr><td>00 - Repuesto</td><td style="text-align:right;color:#777;">APAGADO</td></tr>
+    <tr><td>01 - Contando antes de eviscerar</td><td style="text-align:right;color:#777;">APAGADO</td></tr>
+    <tr><td>02 - Repuesto</td><td style="text-align:right;color:#777;">APAGADO</td></tr>
+    <tr><td>03 - 821 Posición cero - Centrador</td><td style="text-align:right;color:#777;">APAGADO</td></tr>
+    <tr><td>04 - Baader está funcionando</td><td style="text-align:right;font-weight:600;color:#111;">ENCENDIDO</td></tr>
+    <tr><td>05 - Repuesto</td><td style="text-align:right;color:#777;">APAGADO</td></tr>
+    <tr><td>06 - Sensor anal</td><td style="text-align:right;color:#777;">APAGADO</td></tr>
+    <tr><td>07 - Conteo de señal de embalaje</td><td style="text-align:right;color:#777;">APAGADO</td></tr>
+  </table></div>
+</div>
+<div class="sc" id="sen-info" data-back="sen-a112" data-sennav="1">
+  <div class="sh"><span class="st">Principal - Menu Técnico - Sensores - Entradas - Información de…</span><span class="sd"></span></div>
+  <div class="sb" style="padding:6px 16px;flex-direction:row;gap:12px;align-items:flex-start;justify-content:center;">
+    <div style="flex:1;display:flex;flex-direction:column;gap:10px;padding-top:8px;">
+      <div style="font-size:13px;color:#88aa00;font-weight:600;">Knuro activado</div>
+      <div style="font-size:13px;color:#111;">Baader está funcionando</div>
+      <div style="font-size:13px;color:#88aa00;font-weight:600;">Pescado detectado Baader</div>
+      <div style="font-size:13px;color:#111;">Knuro - Posición Inicial</div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:10px;padding-top:8px;">
+      <div style="font-size:13px;color:#111;">Carro 2 Funcionando</div>
+      <div style="font-size:13px;color:#111;">Clase Seleccionada</div>
+      <div style="font-size:13px;color:#111;">Evacuador activo</div>
+      <div style="font-size:13px;color:#111;">Escavador B - Baader</div>
+    </div>
+    <div style="flex-shrink:0;border:1px solid #888;background:#d8d8e0;padding:8px 14px;display:flex;align-items:center;gap:8px;margin-top:8px;">
+      <span style="font-size:12px;color:#111;">Comenzar Knuro</span>
+      <span style="color:#cc2200;font-size:20px;letter-spacing:2px;">⬤⬤⬤</span>
+    </div>
+  </div>
+</div>
+
+<!-- VACÍO -->
+<div class="sc" id="vacio" data-back="s4">
+  <div class="sh"><span class="st">Principal - Menu Técnico - Vacío</span><span class="sd"></span></div>
+  <div class="sb" style="padding:4px 16px;align-items:center;justify-content:center;">
+    <table class="pt" style="width:480px;">
+      <tr><td class="plb">Monitorear Vacío</td><td><button class="hb pill" style="min-width:80px;" onclick="nav('vacio-mv')">Vacío</button></td></tr>
+      <tr><td style="height:8px;"></td></tr>
+      <tr><td class="plb">Drenaje de Succión al Vacío</td><td><button class="hb pill" style="min-width:80px;">Drenaje</button></td></tr>
+      <tr><td style="height:8px;"></td></tr>
+      <tr><td class="plb">Vacío Knuro</td><td><button class="hb pill" style="min-width:80px;" onclick="nav('vacio-knuro')">Knuro</button></td></tr>
+      <tr><td style="height:8px;"></td></tr>
+      <tr><td class="plb">Vacío Baader</td><td><button class="hb pill" style="min-width:80px;" onclick="nav('vacio-baader')">Baader</button></td></tr>
+      <tr><td style="height:16px;"></td></tr>
+      <tr><td class="plb">Activar el control de vacío de Baader</td><td><button class="hb red" style="min-width:80px;" onclick="this.classList.toggle('red');this.classList.toggle('green');this.textContent=this.textContent==='Apagado'?'Encendido':'Apagado';">Apagado</button></td></tr>
+    </table>
+  </div>
+</div>
+<div class="sc" id="vacio-mv" data-back="vacio">
+  <div class="sh"><span class="st">Principal - Menu Técnico - Vacío - Monitorear Vacío</span><span class="sd"></span></div>
+  <div class="sb" style="padding:4px 16px;align-items:center;justify-content:center;"><table class="pt" style="width:500px;">
+    <tr><td class="plb">Anular la protección de Vacío</td><td><button class="bnav" style="min-width:80px;height:26px;"></button></td></tr>
+    <tr><td style="height:10px;"></td></tr>
+    <tr><td class="plb">Tiempo antes de alarma activa</td><td><input class="fe1" id="vac-mv-0" value="0 s" style="width:80px;"></td></tr>
+    <tr><td style="height:6px;"></td></tr>
+    <tr><td class="plb">Valor para la alarma</td><td><input class="fe1" id="vac-mv-1" value="0 mBar" style="width:80px;"></td></tr>
+    <tr><td style="height:6px;"></td></tr>
+    <tr><td class="plb">Valor para la advertencia</td><td><input class="fe1" id="vac-mv-2" value="0 mBar" style="width:80px;"></td></tr>
+  </table></div>
+</div>
+<div class="sc" id="vacio-knuro" data-back="vacio">
+  <div class="sh"><span class="st">Principal - Menu Técnico - Vacío - Knuro</span><span class="sd"></span></div>
+  <div class="sb" style="padding:4px 16px;align-items:center;justify-content:center;"><table class="pt" style="width:500px;">
+    <tr><td class="plb">Retrasar apertura Herramienta 1</td><td><input class="fe" id="vac-k-0" value="0,20"><span class="fr">0.20</span></td></tr>
+    <tr><td class="plb">Retrasar apertura Herramienta 2</td><td><input class="fe" id="vac-k-1" value="0,20"><span class="fr">0.20</span></td></tr>
+    <tr><td colspan="2"><hr style="border:none;border-top:1px solid #aaa;margin:10px 0;"></td></tr>
+    <tr><td class="plb">Retrasar cierre Herramienta 1</td><td><input class="fe" id="vac-k-2" value="0,00"><span class="fr">0.00</span></td></tr>
+    <tr><td class="plb">Retrasar cierre Herramienta 2</td><td><input class="fe" id="vac-k-3" value="0,00"><span class="fr">0.00</span></td></tr>
+  </table></div>
+</div>
+<div class="sc" id="vacio-baader" data-back="vacio">
+  <div class="sh"><span class="st">Principal - Menu Tecnico - Vacío - Baader</span><span class="sd"></span></div>
+  <div class="sb" style="padding:4px 14px;align-items:center;justify-content:center;">
+    <table style="border-collapse:collapse;font-size:13px;width:520px;">
+      <thead><tr>
+        <th style="padding:4px 12px;font-weight:400;"></th>
+        <th style="padding:4px 12px;font-weight:600;text-align:center;color:#333;">Pulso</th>
+        <th style="padding:4px 12px;font-weight:600;text-align:center;color:#333;">Abrir</th>
+        <th style="padding:4px 12px;font-weight:600;text-align:center;color:#333;">Cerrar</th>
+      </tr></thead>
+      <tbody>
+        <tr><td style="padding:6px 12px;text-align:right;color:#111;">Principal</td><td style="padding:4px 6px;text-align:center;"><input class="fe1" id="vac-b-0" value="143"></td><td style="padding:4px 6px;text-align:center;"><input class="fe1" id="vac-b-1" value="255"></td><td style="padding:4px 6px;text-align:center;"><input class="fe1" id="vac-b-2" value="30"></td></tr>
+        <tr><td style="padding:6px 12px;text-align:right;color:#111;">Escavador A</td><td style="padding:4px 6px;text-align:center;"><input class="fe1" id="vac-b-3" value="305"></td><td style="padding:4px 6px;text-align:center;"><input class="fe1" id="vac-b-4" value="280"></td><td style="padding:4px 6px;text-align:center;"><input class="fe1" id="vac-b-5" value="90"></td></tr>
+        <tr><td style="padding:6px 12px;text-align:right;color:#111;">Escavador B</td><td style="padding:4px 6px;text-align:center;"><input class="fe1" id="vac-b-6" value="350"></td><td style="padding:4px 6px;text-align:center;"><input class="fe1" id="vac-b-7" value="320"></td><td style="padding:4px 6px;text-align:center;"><input class="fe1" id="vac-b-8" value="140"></td></tr>
+        <tr><td style="padding:6px 12px;text-align:right;color:#111;">Knuro</td><td style="padding:4px 6px;text-align:center;"><input class="fe1" id="vac-b-9" value="406"></td><td style="padding:4px 6px;text-align:center;"><input class="fe1" id="vac-b-10" value="20"></td><td style="padding:4px 6px;text-align:center;"><input class="fe1" id="vac-b-11" value="290"></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- CONFIG MENÚ -->
+<div class="sc" id="cfg-menu-1" data-back="s4" data-next="cfg-menu-2" data-sennav="1">
+  <div class="sh"><span class="st">Principal - Menú Técnico - Configuración de Menú 1/2</span><span class="sd"></span></div>
+  <div class="sb" style="padding:6px 14px;align-items:stretch;justify-content:flex-start;">
+    <div style="font-size:12px;text-align:center;color:#111;margin-bottom:10px;">Activar y desactivar menús/alarmas</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 20px;width:100%;">
+      <div style="display:flex;align-items:center;gap:8px;"><button class="hb red sm" style="width:36px;height:28px;" onclick="this.classList.toggle('red');this.classList.toggle('green');"></button><span style="font-size:12px;">Limpiar Máquina</span></div>
+      <div style="display:flex;align-items:center;gap:8px;"><button class="hb red sm" style="width:36px;height:28px;" onclick="this.classList.toggle('red');this.classList.toggle('green');"></button><span style="font-size:12px;">Alarma "falta vacío"</span></div>
+      <div style="display:flex;align-items:center;gap:8px;"><button class="hb red sm" style="width:36px;height:28px;" onclick="this.classList.toggle('red');this.classList.toggle('green');"></button><span style="font-size:12px;">Limpiar vacío</span></div>
+      <div style="display:flex;align-items:center;gap:8px;"><button class="hb red sm" style="width:36px;height:28px;" onclick="this.classList.toggle('red');this.classList.toggle('green');"></button><span style="font-size:12px;">Menú pescado<br>grande/pequeño</span></div>
+      <div style="display:flex;align-items:center;gap:8px;"><button class="hb red sm" style="width:36px;height:28px;" onclick="this.classList.toggle('red');this.classList.toggle('green');"></button><span style="font-size:12px;">Chute</span></div>
+      <div style="display:flex;align-items:center;gap:8px;"><button class="hb red sm" style="width:36px;height:28px;" onclick="this.classList.toggle('red');this.classList.toggle('green');"></button><span style="font-size:12px;">Menú/Alarma - Succión<br>Principal Baader</span></div>
+      <div style="display:flex;align-items:center;gap:8px;"><button class="hb red sm" style="width:36px;height:28px;" onclick="this.classList.toggle('red');this.classList.toggle('green');"></button><span style="font-size:12px;">Anular</span></div>
+      <div style="display:flex;align-items:center;gap:8px;"><button class="hb red sm" style="width:36px;height:28px;" onclick="this.classList.toggle('red');this.classList.toggle('green');"></button><span style="font-size:12px;">Evacuador</span></div>
+    </div>
+  </div>
+</div>
+<div class="sc" id="cfg-menu-2" data-back="cfg-menu-1" data-sennav="1">
+  <div class="sh"><span class="st">Principal . Menú Técnico - Ajustes de Menú 2/2</span><span class="sd"></span></div>
+  <div class="sb" style="padding:6px 14px;align-items:stretch;justify-content:flex-start;">
+    <div style="font-size:12px;text-align:center;color:#111;margin-bottom:10px;">Activación y desactivación de menús /alarmas</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 20px;width:100%;">
+      <div style="display:flex;align-items:center;gap:8px;"><button class="hb red sm" style="width:36px;height:28px;" onclick="this.classList.toggle('red');this.classList.toggle('green');"></button><span style="font-size:12px;">Alarma "Grader reducido"</span></div>
+      <div style="display:flex;align-items:center;gap:8px;"><button class="hb red sm" style="width:36px;height:28px;" onclick="this.classList.toggle('red');this.classList.toggle('green');"></button><span style="font-size:12px;">Mostrar vacío</span></div>
+      <div style="display:flex;align-items:center;gap:8px;"><button class="hb red sm" style="width:36px;height:28px;" onclick="this.classList.toggle('red');this.classList.toggle('green');"></button><span style="font-size:12px;">Alarma "Grader detenido"</span></div>
+      <div style="display:flex;align-items:center;gap:8px;"><button class="hb red sm" style="width:36px;height:28px;" onclick="this.classList.toggle('red');this.classList.toggle('green');"></button><span style="font-size:12px;">Drenaje de succión de Vacío</span></div>
+      <div style="display:flex;align-items:center;gap:8px;"><button class="hb red sm" style="width:36px;height:28px;" onclick="this.classList.toggle('red');this.classList.toggle('green');"></button><span style="font-size:12px;">Alarma "Producción Detenida"</span></div>
+      <div style="display:flex;align-items:center;gap:8px;"><button class="hb green sm" style="width:36px;height:28px;" onclick="this.classList.toggle('red');this.classList.toggle('green');"></button><span style="font-size:12px;">Mostrar valores<br>predeterminados</span></div>
+      <div style="display:flex;align-items:center;gap:8px;"><button class="hb red sm" style="width:36px;height:28px;" onclick="this.classList.toggle('red');this.classList.toggle('green');"></button><span style="font-size:12px;">Mensaje "Tanque casi lleno"</span></div>
+      <div style="display:flex;align-items:center;gap:8px;"><button class="hb green sm" style="width:36px;height:28px;" onclick="this.classList.toggle('red');this.classList.toggle('green');"></button><span style="font-size:12px;">Normal Maskin</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- PLACEHOLDER -->
+<div class="sc" id="ph">
+  <div class="sh"><span class="st" id="ph-t">—</span><span class="sd"></span></div>
+  <div class="sb" style="gap:14px;">
+    <div style="font-size:30px;opacity:.25;">⚙</div>
+    <div style="font-size:13px;color:#666;text-align:center;">Pantalla pendiente de mapear<br><span style="font-size:11px;color:#888;">Envía foto para agregarla</span></div>
+    <button class="hb pill sm" id="ph-back">← Volver</button>
+  </div>
+</div>
+
+    </div></div>
+    <div class="brd"><div class="mn">X2 <span>pro</span></div><div class="bj">Beijer</div></div>
+  </div>
+</div><!-- /hp -->
+
+<!-- ══ RIGHT PANEL ══ -->
+<div id="rp">
+
+  <!-- Tree section -->
+  <div class="rp-sec">
+    <div class="rp-sec-hdr open" id="tree-hdr" onclick="toggleSec('tree-hdr','tree-body')">
+      <span>🌐 Mapa de Navegación</span>
+      <span class="arr">▶</span>
+    </div>
+    <div class="rp-body" id="tree-body" style="max-height:240px;">
+      <div class="rp-tree" style="max-height:240px;">
+        <div class="tn"><div class="tnh act" id="tr-sp" onclick="nav('sp')"><span class="tni">🏠</span><span class="tnl">Principal</span><span class="tnbg">S01</span></div>
+          <div class="tnc">
+            <div class="tna" onclick="nav('s2')"><span class="sym">→</span><span class="tnl">Menú</span><span class="to">S02</span></div>
+            <div class="tna" onclick="nav('s3')"><span class="sym">→</span><span class="tnl">Menú rápido</span><span class="to">S03</span></div>
+            <div class="tna" onclick="nav('s4')"><span class="sym">→</span><span class="tnl">Menú Técnico</span><span class="to">S04</span></div>
+            <div class="tna" onclick="nav('s5')"><span class="sym">→</span><span class="tnl">Código</span><span class="to">S05</span></div>
+            <div class="tna" onclick="nav('s6')"><span class="sym">→</span><span class="tnl">Alarma</span><span class="to">S06</span></div>
+            <div class="tna" onclick="nav('s7')"><span class="sym">→</span><span class="tnl">Info Alarma</span><span class="to">S07</span></div>
+          </div>
+        </div>
+        <div class="tdv"></div>
+        <div class="tn"><div class="tnh" id="tr-s4" onclick="nav('s4')"><span class="tni">🔧</span><span class="tnl">Menú Técnico</span><span class="tnbg">S04</span></div>
+          <div class="tnc">
+            <div class="tn"><div class="tnh" id="tr-c1" onclick="nav('c1')" style="padding:3px 8px;"><span class="tni">🚃</span><span class="tnl">Carro 1</span><span class="tnbg">1</span></div>
+              <div class="tnc">
+                <div class="tna" onclick="nav('c1tp')"><span class="sym">→</span><span class="tnl">T. y Pulsos</span><span class="to">1-1</span></div>
+                <div class="tna" onclick="nav('c1pr')"><span class="sym">→</span><span class="tnl">Presión</span><span class="to">1-2</span></div>
+              </div>
+            </div>
+            <div class="tn"><div class="tnh" id="tr-h1" onclick="nav('h1')" style="padding:3px 8px;"><span class="tni">🔩</span><span class="tnl">Herramienta 1</span><span class="tnbg">2</span></div>
+              <div class="tnc">
+                <div class="tna" onclick="nav('h1ev')"><span class="sym">→</span><span class="tnl">Esp. Velocidad</span><span class="to">2-1</span></div>
+                <div class="tna" onclick="nav('h1epc')"><span class="sym">→</span><span class="tnl">Esp. Pulsos Cat.</span><span class="to">2-2</span></div>
+                <div class="tna" onclick="nav('h1tmb')"><span class="sym">→</span><span class="tnl">T.Mov. Bajada</span><span class="to">2-3</span></div>
+                <div class="tna" onclick="nav('h1tpp')"><span class="sym">→</span><span class="tnl">T.Pulsos/Pescado</span><span class="to">2-4</span></div>
+                <div class="tna" onclick="nav('h1pb')"><span class="sym">→</span><span class="tnl">Presión bajada</span><span class="to">2-5</span></div>
+                <div class="tna" onclick="nav('h1ps')"><span class="sym">→</span><span class="tnl">Presión subida</span><span class="to">2-6</span></div>
+              </div>
+            </div>
+            <div class="tn"><div class="tnh" id="tr-c2" onclick="nav('c2')" style="padding:3px 8px;"><span class="tni">🚃</span><span class="tnl">Carro 2</span><span class="tnbg">3</span></div>
+              <div class="tnc">
+                <div class="tna" onclick="nav('c2t')"><span class="sym">→</span><span class="tnl">Tiempo</span><span class="to">3-1</span></div>
+                <div class="tna" onclick="nav('c2f')"><span class="sym">→</span><span class="tnl">Festo</span><span class="to">3-2</span></div>
+              </div>
+            </div>
+            <div class="tna" onclick="nav('ev')"><span class="sym">→</span><span class="tnl">Evacuador</span><span class="to">5</span></div>
+            <div class="tn"><div class="tnh" id="tr-ci" onclick="nav('ci')" style="padding:3px 8px;"><span class="tni">🔄</span><span class="tnl">Ciclo</span><span class="tnbg">6</span></div>
+              <div class="tnc">
+                <div class="tna" onclick="nav('ci-fa')"><span class="sym">→</span><span class="tnl">Formas Ajustes</span><span class="to">6-1</span></div>
+                <div class="tna" onclick="nav('ci-av')"><span class="sym">→</span><span class="tnl">Ajuste Velocidad</span><span class="to">6-2</span></div>
+                <div class="tna" onclick="nav('ci-vic')"><span class="sym">→</span><span class="tnl">Valores inicio</span><span class="to">6-3</span></div>
+                <div class="tna" onclick="nav('ci-ymk')"><span class="sym">→</span><span class="tnl">YMK</span><span class="to">6-4</span></div>
+                <div class="tna" onclick="nav('ci-al')"><span class="sym">→</span><span class="tnl">Alimentación</span><span class="to">6-5</span></div>
+                <div class="tna" onclick="nav('ci-ct')"><span class="sym">→</span><span class="tnl">Contar</span><span class="to">6-6</span></div>
+              </div>
+            </div>
+            <div class="tn"><div class="tnh" id="tr-h2" onclick="nav('h2')" style="padding:3px 8px;"><span class="tni">🔩</span><span class="tnl">Herramienta 2</span><span class="tnbg">7</span></div>
+              <div class="tnc">
+                <div class="tna" onclick="nav('h2-tp')"><span class="sym">→</span><span class="tnl">T. y Pulsos</span><span class="to">7-1</span></div>
+                <div class="tna" onclick="nav('h2-pr')"><span class="sym">→</span><span class="tnl">Presión</span><span class="to">7-2</span></div>
+                <div class="tna" onclick="nav('h2-ag')"><span class="sym">→</span><span class="tnl">Agua</span><span class="to">7-3</span></div>
+              </div>
+            </div>
+            <div class="tn"><div class="tnh" id="tr-sensores" onclick="nav('sensores')" style="padding:3px 8px;"><span class="tni">📡</span><span class="tnl">Sensores</span><span class="tnbg">8</span></div></div>
+            <div class="tn"><div class="tnh" id="tr-vacio" onclick="nav('vacio')" style="padding:3px 8px;"><span class="tni">💨</span><span class="tnl">Vacío</span><span class="tnbg">9</span></div>
+              <div class="tnc">
+                <div class="tna" onclick="nav('vacio-mv')"><span class="sym">→</span><span class="tnl">Monitorear</span><span class="to">9-1</span></div>
+                <div class="tna" onclick="nav('vacio-knuro')"><span class="sym">→</span><span class="tnl">Knuro</span><span class="to">9-2</span></div>
+                <div class="tna" onclick="nav('vacio-baader')"><span class="sym">→</span><span class="tnl">Baader</span><span class="to">9-3</span></div>
+              </div>
+            </div>
+            <div class="tn"><div class="tnh" id="tr-cfg" onclick="nav('cfg-menu-1')" style="padding:3px 8px;"><span class="tni">⚙</span><span class="tnl">Config. Menú</span><span class="tnbg">10</span></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Preset section -->
+  <div class="psp">
+    <div class="psp-hdr"><span>💾 Presets de máquina</span></div>
+    <div class="ptabs">
+      <button class="ptab active" id="tab-save" onclick="switchTab('save')">Guardar / Cargar</button>
+      <button class="ptab" id="tab-cmp" onclick="switchTab('cmp')">Comparar</button>
+    </div>
+
+    <!-- TAB SAVE -->
+    <div class="pt-panel active" id="panel-save">
+      <div class="psave">
+        <!-- Preset activo -->
+        <div class="ps-curr">
+          <span class="ps-curr-lbl">Preset activo</span>
+          <span class="ps-curr-name" id="ps-active-name">Sin preset cargado</span>
+        </div>
+        <!-- Lista de presets -->
+        <div class="ps-list-hdr">Presets guardados</div>
+        <div id="pl"></div>
+        <!-- Guardar con nombre -->
+        <div class="ps-new">
+          <input id="pn" placeholder="Nombre de máquina…">
+          <button class="pbtn" onclick="savePreset()" title="Guarda los valores actuales del HMI con este nombre">💾 Guardar preset</button>
+        </div>
+        <!-- Importar / Exportar -->
+        <div class="ps-acts">
+          <button class="pbtn exp" onclick="importJSON()" style="flex:none;">📂 Importar</button>
+          <button class="pbtn pdf" onclick="showExportDialog()">📤 Exportar PDF</button>
+        </div>
+        <!-- Editar valores de referencia -->
+        <div class="ps-acts" style="margin-top:4px;">
+          <button id="refs-edit-btn" class="pbtn refs-btn" onclick="toggleRefsEdit(this)" title="Activa la edición manual de los valores de referencia (fábrica) mostrados junto a cada parámetro">✏ Editar Refs</button>
+        </div>
+        <div id="refs-hint" style="display:none;font-size:8.5px;color:#aa8800;margin-top:3px;padding:3px 4px;background:#2a2200;border-radius:3px;border:1px solid #554400;">Haz clic en cualquier valor gris junto a un parámetro para editarlo. Enter o clic fuera para confirmar.</div>
+        <input type="file" id="file-in" accept=".json" style="display:none;" onchange="handleImport(event)">
+      </div>
+    </div>
+
+    <!-- TAB COMPARE -->
+    <div class="pt-panel" id="panel-cmp">
+      <div class="pcmp">
+        <div style="margin-bottom:5px;">
+          <span style="font-size:8.5px;color:#444;text-transform:uppercase;letter-spacing:1px;">Máquinas a comparar</span>
+        </div>
+        <div id="cmp-sels"></div>
+        <div style="display:flex;gap:3px;margin-bottom:6px;">
+          <button id="cmp-add-btn" onclick="addCmpPreset()" class="pbtn" style="font-size:9px;padding:2px 8px;flex:none;">+ Agregar</button>
+          <button onclick="renderCompare()" class="pbtn" style="font-size:9px;padding:2px 8px;">↻ Comparar</button>
+        </div>
+        <div style="font-size:9px;color:#555;margin-bottom:4px;">🟡 = valores diferentes entre máquinas</div>
+        <div id="cmp-out"></div>
+      </div>
+    </div>
+  </div>
+</div><!-- /rp -->
+
+</div><!-- /mn -->
+
+<div id="bb">
+  <span class="scl" id="bs">Principal</span>
+  <div style="display:flex;gap:4px;">
+    <button style="background:#1e2028;color:#888;border:1px solid #333;padding:4px 8px;font-size:14px;cursor:pointer;border-radius:4px;" onclick="nav('sp')">🏠</button>
+    <button style="background:#1e2028;color:#888;border:1px solid #333;padding:4px 8px;font-size:14px;cursor:pointer;border-radius:4px;" onclick="nav('s6')">🔔</button>
+    <button style="background:#1e2028;color:#888;border:1px solid #333;padding:4px 8px;font-size:14px;cursor:pointer;border-radius:4px;" onclick="nav('s4')">🔧</button>
+  </div>
+</div>
+</div><!-- /app -->
+<div id="ov" onclick="closePanel()"></div>
+
+<!-- ══ EXPORT MODAL ══ -->
+<div id="exp-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:#1a1c22;border:1px solid #2a2e3a;border-radius:10px;padding:22px 26px;width:min(500px,95vw);max-height:90vh;overflow-y:auto;font-family:'Segoe UI',Arial,sans-serif;">
+    <h2 style="color:#88aaff;font-size:14px;margin-bottom:16px;">📤 Exportar HMI</h2>
+    <!-- Formato -->
+    <div style="margin-bottom:14px;">
+      <div style="font-size:10px;color:#555;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;">Formato de exportación</div>
+      <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;margin-bottom:7px;padding:9px 12px;border:1px solid #2a2e3a;border-radius:6px;background:#13151b;">
+        <input type="radio" name="exp-type" value="table" checked onchange="expToggle()" style="margin-top:3px;accent-color:#4499ff;">
+        <div><div style="font-size:12px;color:#ccc;font-weight:600;">📋 Tabla de Parámetros</div><div style="font-size:10px;color:#555;margin-top:2px;">Nombres completos, ruta HMI, valor de referencia y comparación entre presets</div></div>
+      </label>
+      <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:9px 12px;border:1px solid #2a2e3a;border-radius:6px;background:#13151b;">
+        <input type="radio" name="exp-type" value="visual" onchange="expToggle()" style="margin-top:3px;accent-color:#4499ff;">
+        <div><div style="font-size:12px;color:#ccc;font-weight:600;">🖥 Pantallas del HMI</div><div style="font-size:10px;color:#555;margin-top:2px;">Vista visual de cada pantalla con los valores actuales</div></div>
+      </label>
+    </div>
+    <!-- Sección tabla: presets -->
+    <div id="exp-sect-table" style="margin-bottom:18px;">
+      <div style="font-size:10px;color:#555;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;">Presets a comparar</div>
+      <div id="exp-presets" style="display:flex;flex-direction:column;gap:5px;max-height:160px;overflow-y:auto;padding-right:2px;"></div>
+    </div>
+    <!-- Sección visual: pantallas -->
+    <div id="exp-sect-visual" style="display:none;margin-bottom:18px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div style="font-size:10px;color:#555;text-transform:uppercase;letter-spacing:1px;">Pantallas a exportar</div>
+        <div style="display:flex;gap:5px;">
+          <button onclick="expSelectAll(true)" style="background:#1e2028;color:#88aaff;border:1px solid #334;padding:2px 9px;border-radius:3px;cursor:pointer;font-size:10px;">Todas</button>
+          <button onclick="expSelectAll(false)" style="background:#1e2028;color:#666;border:1px solid #334;padding:2px 9px;border-radius:3px;cursor:pointer;font-size:10px;">Ninguna</button>
+        </div>
+      </div>
+      <div id="exp-screens" style="display:flex;flex-direction:column;gap:4px;max-height:220px;overflow-y:auto;padding-right:2px;border:1px solid #252830;border-radius:5px;padding:6px 8px;background:#13151b;"></div>
+    </div>
+    <!-- Botones -->
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button onclick="closeExportDialog()" style="background:#1e2028;color:#888;border:1px solid #333;padding:7px 18px;border-radius:5px;cursor:pointer;font-size:12px;">Cancelar</button>
+      <button onclick="doExport()" style="background:#4499ff;color:#fff;border:none;padding:7px 18px;border-radius:5px;cursor:pointer;font-size:12px;font-weight:700;">Exportar →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ── PWA ── */
+if('serviceWorker' in navigator){const sw=`self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));`;navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw],{type:'application/javascript'}))).catch(()=>{});}
+
+/* ── Build nav bars ── */
+const STD=`<button class="nb" onclick="nav('sp')">Principal</button><button class="nb" onclick="nav('s2')">Menú</button><button class="nb" onclick="nav('s3')">Menú rápido</button><button class="nb" onclick="nav('s4')">Menú Técnico</button><button class="nb" onclick="nav('s5')">Código</button><button class="nb" onclick="nav('s6')">Alarma</button><button class="nb" onclick="nav('s7')">Información<br>de alarma</button>`;
+function buildNavs(){
+  document.querySelectorAll('.sc').forEach(sc=>{
+    if(sc.id==='sp') return;
+    const b=sc.dataset.back,n=sc.dataset.next,s=sc.dataset.sennav;
+    let h='<div class="nw">';
+    if(s){
+      h+=`<div class="nr ar" style="justify-content:space-between;align-items:center;">`;
+      h+=b?`<button class="na" onclick="nav('${b}')">ATRÁS</button>`:'<div style="width:70px;"></div>';
+      h+=`<button class="btn-bloqueo">Bloqueo de<br>pantalla</button>`;
+      h+=n?`<button class="na" onclick="nav('${n}')">SIGUIENTE</button>`:'<div style="width:70px;"></div>';
+      h+=`</div>`;
+    } else if(b){
+      h+=`<div class="nr ar"><button class="na" onclick="nav('${b}')">ATRÁS</button></div>`;
+    }
+    h+=`<div class="nr">${STD}</div></div>`;
+    sc.insertAdjacentHTML('beforeend',h);
+  });
+  document.getElementById('sp').insertAdjacentHTML('beforeend',
+    `<div class="nw"><div class="nr" style="justify-content:center;gap:3px;"><button class="nb" style="flex:none;min-width:90px;" onclick="nav('s2')">Menú</button><button class="nb" style="flex:none;min-width:90px;" onclick="nav('s3')">Menú rápido</button><button class="nb" style="flex:none;min-width:90px;" onclick="nav('s4')">Menú<br>Técnico</button><button class="nb" style="flex:none;min-width:90px;" onclick="nav('s5')">Código</button><button class="nb" style="flex:none;min-width:90px;" onclick="nav('s6')">Alarma</button></div></div>`
+  );
+}
+
+/* ── Clock ── */
+function tick(){
+  const n=new Date(),p=v=>String(v).padStart(2,'0');
+  const t=`${p(n.getHours())}:${p(n.getMinutes())}:${p(n.getSeconds())}`;
+  const d=`${p(n.getDate())}-${p(n.getMonth()+1)}-${n.getFullYear()} ${t}`;
+  document.getElementById('clk').textContent=t;
+  document.querySelectorAll('.sd').forEach(el=>el.textContent=d);
+}
+setInterval(tick,1000);tick();
+
+/* ── Scale ── */
+function scaleHMI(){
+  const p=document.getElementById('hp'),s=document.getElementById('hs');
+  let sc=Math.min((p.clientWidth-72)/800,(p.clientHeight-60)/480,1);
+  sc=Math.max(sc,.28);
+  s.style.transform=`scale(${sc})`;s.style.width='800px';s.style.height='480px';
+  s.parentElement.style.width=Math.round(800*sc)+'px';
+  s.parentElement.style.height=Math.round(480*sc)+'px';
+  s.parentElement.style.overflow='hidden';
+}
+window.addEventListener('resize',scaleHMI);
+
+/* ── Navigation ── */
+const NAMES={
+  'sp':'Principal','s2':'Menú Principal','s3':'Menú Rápido','s4':'Menú Técnico','s5':'Código','s6':'Alarma','s7':'Info Alarma','ph':'…',
+  'c1':'Carro 1','c1tp':'C1 › T.y Pulsos','c1pr':'C1 › Presión','c1pr2':'C1 › Cat.Presión 2',
+  'h1':'Herramienta 1','h1ev':'H1 › Esp.Velocidad','h1epc':'H1 › Esp.Pulsos Cat.','h1tmb':'H1 › T.Mov.Bajada','h1tpp':'H1 › T.Pulsos/Pescado','h1pb':'H1 › Presión Bajada','h1ps':'H1 › Presión Subida',
+  'c2':'Carro 2','c2t':'C2 › Tiempo','c2f':'C2 › Festo',
+  'succion':'Succión Baader','ev':'Evacuador',
+  'ci':'Ciclo','ci-fa':'Ciclo › Formas Ajustes','ci-av':'Ciclo › Ajuste Velocidad','ci-vic':'Ciclo › Valores inicio','ci-ymk':'Ciclo › YMK','ci-al':'Ciclo › Alimentación','ci-ct':'Ciclo › Contar',
+  'h2':'Herramienta 2','h2-tp':'H2 › T.y Pulsos','h2-2as':'H2 › 2A Salmón','h2-2as-epv':'H2 › 2A Sal › Esp.Pulsos','h2-2as-pev':'H2 › 2A Sal › P.Espera','h2-2as-pav':'H2 › 2A Sal › P.Activos','h2-2bvs':'H2 › 2B Vel.Salmón','h2-2ac':'H2 › 2A Coho','h2-2ac-ve':'H2 › 2A Coho › Vel.Esp.','h2-2ac-pa':'H2 › 2A Coho › P.Activos','h2-2bvc':'H2 › 2B Vel.Coho','h2-pr':'H2 › Presión','h2-pr-imp':'H2 › Presión › Ímpetu','h2-ag':'H2 › Agua',
+  'sensores':'Sensores','sen-a010-1':'Sen. › A010 p.1','sen-a010-2':'Sen. › A010 p.2','sen-a110':'Sen. › A110','sen-a111':'Sen. › A111','sen-a112':'Sen. › A112','sen-info':'Sen. › Info Entradas',
+  'vacio':'Vacío','vacio-mv':'Vacío › Monitorear','vacio-knuro':'Vacío › Knuro','vacio-baader':'Vacío › Baader',
+  'cfg-menu-1':'Config. Menú 1/2','cfg-menu-2':'Config. Menú 2/2',
+};
+const TREE={
+  'sp':'tr-sp','s4':'tr-s4',
+  'c1':'tr-c1','c1tp':'tr-c1','c1pr':'tr-c1','c1pr2':'tr-c1',
+  'h1':'tr-h1','h1ev':'tr-h1','h1epc':'tr-h1','h1tmb':'tr-h1','h1tpp':'tr-h1','h1pb':'tr-h1','h1ps':'tr-h1',
+  'c2':'tr-c2','c2t':'tr-c2','c2f':'tr-c2',
+  'ev':'tr-s4','succion':'tr-s4',
+  'ci':'tr-ci','ci-fa':'tr-ci','ci-av':'tr-ci','ci-vic':'tr-ci','ci-ymk':'tr-ci','ci-al':'tr-ci','ci-ct':'tr-ci',
+  'h2':'tr-h2','h2-tp':'tr-h2','h2-2as':'tr-h2','h2-2as-epv':'tr-h2','h2-2as-pev':'tr-h2','h2-2as-pav':'tr-h2','h2-2bvs':'tr-h2','h2-2ac':'tr-h2','h2-2ac-ve':'tr-h2','h2-2ac-pa':'tr-h2','h2-2bvc':'tr-h2','h2-pr':'tr-h2','h2-pr-imp':'tr-h2','h2-ag':'tr-h2',
+  'sensores':'tr-sensores','sen-a010-1':'tr-sensores','sen-a010-2':'tr-sensores','sen-a110':'tr-sensores','sen-a111':'tr-sensores','sen-a112':'tr-sensores','sen-info':'tr-sensores',
+  'vacio':'tr-vacio','vacio-mv':'tr-vacio','vacio-knuro':'tr-vacio','vacio-baader':'tr-vacio',
+  'cfg-menu-1':'tr-cfg','cfg-menu-2':'tr-cfg',
+};
+
+function nav(id){
+  const el=document.getElementById(id);
+  if(el){show(id,NAMES[id]||id);}
+  else{document.getElementById('ph-t').textContent=id;document.getElementById('ph-back').onclick=()=>nav('s4');show('ph',id);}
+  if(window.innerWidth<=860)closePanel();
+}
+function show(id,name){
+  document.querySelector('.sc.active')?.classList.remove('active');
+  document.getElementById(id).classList.add('active');
+  ['ts','bs'].forEach(x=>{const e=document.getElementById(x);if(e)e.textContent=name;});
+  document.querySelectorAll('.tnh.act').forEach(e=>e.classList.remove('act'));
+  const tk=TREE[id]||'tr-s4';
+  const te=document.getElementById(tk);
+  te?.classList.add('act');te?.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+/* ── Panel toggle (mobile) ── */
+function togglePanel(){
+  const p=document.getElementById('rp'),o=document.getElementById('ov'),b=document.getElementById('ttbtn');
+  const open=p.classList.contains('open');
+  p.classList.toggle('open',!open);o.classList.toggle('show',!open);b.classList.toggle('open',!open);
+  b.textContent=open?'⚙':'✕';
+}
+function closePanel(){
+  document.getElementById('rp').classList.remove('open');
+  document.getElementById('ov').classList.remove('show');
+  const b=document.getElementById('ttbtn');b.classList.remove('open');b.textContent='⚙';
+}
+
+/* ── Collapsible tree section ── */
+function toggleSec(hdrId,bodyId){
+  const hdr=document.getElementById(hdrId),body=document.getElementById(bodyId);
+  const open=hdr.classList.contains('open');
+  hdr.classList.toggle('open',!open);
+  body.style.maxHeight=open?'0':'240px';
+}
+
+/* ── Tabs ── */
+function switchTab(tab){
+  ['save','cmp'].forEach(t=>{
+    document.getElementById('tab-'+t).classList.toggle('active',t===tab);
+    document.getElementById('panel-'+t).classList.toggle('active',t===tab);
+  });
+  if(tab==='cmp'){
+    if(!document.querySelectorAll('.cmp-preset-sel').length){
+      createCmpSelect(0);createCmpSelect(1);
+    }
+    renderCompare();
+  } else {
+    resetRpWidth();
+  }
+}
+
+/* ── Detección iframe para integración con mantenimiento-planta ── */
+const IN_IFRAME=(()=>{try{return window.self!==window.top;}catch(e){return true;}})();
+
+/* ── Presets — persisted in window.storage / Firestore via postMessage ── */
+let presets={};
+
+async function loadFromStorage(){
+  if(IN_IFRAME) return; // datos vienen via hmi:init desde HmiKnuroPage
+  try{
+    if(window.storage){
+      const r=await window.storage.get('knuro-presets');
+      if(r) presets=JSON.parse(r.value);
+    } else {
+      const s=localStorage.getItem('knuro-presets');
+      if(s) presets=JSON.parse(s);
+    }
+  }catch(e){presets={};}
+  // Restaurar título desde storage de inmediato
+  const cur=localStorage.getItem('knuro-current');
+  if(cur&&presets[cur]){
+    const t=document.getElementById('hml-title');
+    if(t) t.textContent=cur+' — HMI';
+    const a=document.getElementById('ps-active-name');
+    if(a) a.textContent=cur;
+    document.getElementById('pn').value=cur;
+  }
+  renderPresets();
+  populateCmpSelects();
+}
+
+/* ── Listener postMessage desde HmiKnuroPage (sólo en iframe) ── */
+if(IN_IFRAME){
+  window.addEventListener('message',e=>{
+    if(!e.data||e.data.type!=='hmi:init') return;
+    presets=e.data.presets||{};
+    // Aplicar refs de Firestore
+    if(e.data.refs){
+      document.querySelectorAll('span.fr[data-frid]').forEach(fr=>{
+        const v=e.data.refs[fr.dataset.frid];
+        if(v!==undefined) fr.textContent=v;
+      });
+    }
+    const cur=e.data.current||null;
+    if(cur&&presets[cur]){
+      const t=document.getElementById('hml-title');
+      if(t) t.textContent=cur+' — HMI';
+      const a=document.getElementById('ps-active-name');
+      if(a) a.textContent=cur;
+      const pn=document.getElementById('pn');
+      if(pn) pn.value=cur;
+    }
+    renderPresets(); populateCmpSelects();
+    const toLoad=(cur&&presets[cur])?cur:(Object.keys(presets)[0]||null);
+    if(toLoad){setAllInputs(presets[toLoad]);updateActivePreset(toLoad);}
+  });
+}
+
+async function persistPresets(changedName,previousData){
+  if(IN_IFRAME){
+    window.parent.postMessage({
+      type:'hmi:save-preset',
+      name:changedName||null,
+      data:changedName?presets[changedName]:null,
+      previousData:previousData||null
+    },'*');
+    return;
+  }
+  try{
+    if(window.storage){
+      await window.storage.set('knuro-presets',JSON.stringify(presets));
+    } else {
+      localStorage.setItem('knuro-presets',JSON.stringify(presets));
+    }
+  }catch(e){}
+}
+
+// ── Referencias editables ─────────────────────────────────────────────
+function initRefIds(){
+  document.querySelectorAll('input.fe,input.fe1').forEach(inp=>{
+    if(!inp.id) return;
+    const fr=inp.nextElementSibling;
+    if(fr&&fr.classList.contains('fr')) fr.dataset.frid=inp.id;
+  });
+}
+
+function persistRefs(){
+  const refs={};
+  document.querySelectorAll('span.fr[data-frid]').forEach(fr=>{
+    refs[fr.dataset.frid]=fr.textContent.trim();
+  });
+  if(IN_IFRAME){
+    window.parent.postMessage({type:'hmi:save-refs',refs},'*');
+    return;
+  }
+  localStorage.setItem('knuro-refs',JSON.stringify(refs));
+}
+
+function loadRefs(){
+  try{
+    const saved=localStorage.getItem('knuro-refs');
+    if(!saved) return;
+    const refs=JSON.parse(saved);
+    document.querySelectorAll('span.fr[data-frid]').forEach(fr=>{
+      const v=refs[fr.dataset.frid];
+      if(v!==undefined) fr.textContent=v;
+    });
+  }catch(e){}
+}
+
+let _refsEdit=false;
+function toggleRefsEdit(btn){
+  _refsEdit=!_refsEdit;
+  document.querySelectorAll('span.fr[data-frid]').forEach(fr=>{
+    fr.contentEditable=_refsEdit?'true':'false';
+    fr.classList.toggle('editing',_refsEdit);
+  });
+  btn.classList.toggle('active',_refsEdit);
+  btn.textContent=_refsEdit?'✓ Guardar Refs':'✏ Editar Refs';
+  const hint=document.getElementById('refs-hint');
+  if(hint) hint.style.display=_refsEdit?'block':'none';
+  if(!_refsEdit) persistRefs();
+}
+// ─────────────────────────────────────────────────────────────────────
+
+function getAllInputs(){
+  return [...document.querySelectorAll('input.fe,input.fe1')].reduce((a,e)=>{if(e.id)a[e.id]=e.value;return a;},{});
+}
+function setAllInputs(d){Object.entries(d).forEach(([id,v])=>{const e=document.getElementById(id);if(e)e.value=v;});}
+
+function updateActivePreset(name){
+  const a=document.getElementById('ps-active-name');
+  if(a) a.textContent=name||'Sin preset cargado';
+  const t=document.getElementById('hml-title');
+  if(t) t.textContent=name?name+' — HMI':'Knuro B2 — HMI Simulator';
+  document.getElementById('pn').value=name||'';
+  if(IN_IFRAME){
+    window.parent.postMessage({type:'hmi:set-current',name:name||''},'*');
+  } else {
+    localStorage.setItem('knuro-current',name||'');
+  }
+  document.querySelectorAll('#pl .pi').forEach(el=>el.classList.toggle('pi-active',el.dataset.name===name));
+}
+
+function savePreset(){
+  const n=document.getElementById('pn').value.trim()||'Sin nombre';
+  const previousData=presets[n]?{...presets[n]}:null;
+  presets[n]=getAllInputs();
+  persistPresets(n,previousData);
+  renderPresets();
+  populateCmpSelects();
+  updateActivePreset(n);
+}
+
+function loadPreset(n){
+  if(presets[n]){
+    setAllInputs(presets[n]);
+    updateActivePreset(n);
+  }
+}
+
+function deletePreset(n){
+  if(!confirm('¿Eliminar preset "'+n+'"?')) return;
+  if(IN_IFRAME){
+    window.parent.postMessage({type:'hmi:delete-preset',name:n},'*');
+  }
+  delete presets[n];
+  if(!IN_IFRAME) persistPresets();
+  renderPresets();
+  populateCmpSelects();
+  renderCompare();
+}
+
+function renderPresets(){
+  const pl=document.getElementById('pl');pl.innerHTML='';
+  const keys=Object.keys(presets);
+  const cur=IN_IFRAME?(document.getElementById('pn').value||''):(localStorage.getItem('knuro-current')||'');
+  if(!keys.length){pl.innerHTML='<div style="font-size:9.5px;color:#444;padding:3px 0;">Sin presets guardados.</div>';return;}
+  keys.forEach(n=>{
+    const d=document.createElement('div');
+    d.className='pi'+(n===cur?' pi-active':'');
+    d.dataset.name=n;
+    const sp=document.createElement('span');sp.textContent=n;sp.title=n;
+    const lb=document.createElement('button');lb.className='pbtn';lb.style.cssText='flex:none;padding:2px 5px;font-size:9px;';lb.textContent='Cargar';lb.onclick=()=>loadPreset(n);
+    const db=document.createElement('button');db.className='pbtn del';db.style.cssText='flex:none;padding:2px 4px;font-size:9px;';db.textContent='✕';db.onclick=()=>deletePreset(n);
+    d.append(sp,lb,db);
+    pl.appendChild(d);
+  });
+}
+
+/* ── Export JSON (download) ── */
+function exportJSON(){
+  const n=document.getElementById('pn').value.trim()||'Sin nombre';
+  const data=JSON.stringify({name:n,date:new Date().toISOString(),values:getAllInputs()},null,2);
+  const a=document.createElement('a');
+  a.href='data:application/json;charset=utf-8,'+encodeURIComponent(data);
+  a.download=n.replace(/[^a-z0-9_\-]/gi,'_')+'_knuro.json';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+}
+
+/* ── Import JSON ── */
+function importJSON(){document.getElementById('file-in').click();}
+function handleImport(e){
+  const f=e.target.files[0];if(!f) return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    try{
+      const d=JSON.parse(ev.target.result);
+      const n=d.name||f.name.replace('.json','');
+      presets[n]=d.values||d;
+      persistPresets();renderPresets();populateCmpSelects();
+      setAllInputs(presets[n]);
+      updateActivePreset(n);
+      alert('Preset "'+n+'" importado ✓');
+    }catch(err){alert('Error al leer JSON: '+err.message);}
+  };
+  r.readAsText(f);
+  e.target.value='';
+}
+
+/* ── Compare ── */
+function adaptRpWidth(n){
+  // 150px param col + 68px per machine + 30px padding, min 300px
+  const w=Math.max(300, 150 + n*68 + 30);
+  document.getElementById('rp').style.width=w+'px';
+}
+function resetRpWidth(){
+  document.getElementById('rp').style.width='300px';
+}
+
+function createCmpSelect(idx){
+  const keys=Object.keys(presets);
+  const container=document.getElementById('cmp-sels');
+  const d=document.createElement('div');
+  d.className='cmp-row-sel';
+  const label=String.fromCharCode(65+idx);
+  let html=`<select class="cmp-preset-sel" onchange="renderCompare()"><option value="">— Máquina ${label} —</option>`;
+  keys.forEach(k=>{html+=`<option value="${k}">${k}</option>`;});
+  html+=`</select>`;
+  if(idx>=2) html+=`<button class="cmp-rem" onclick="removeCmpSelect(this)" title="Quitar">×</button>`;
+  d.innerHTML=html;
+  container.appendChild(d);
+  updateCmpAddBtn();
+}
+
+function removeCmpSelect(btn){
+  btn.parentElement.remove();
+  updateCmpAddBtn();
+  renderCompare();
+}
+
+function addCmpPreset(){
+  const count=document.querySelectorAll('.cmp-preset-sel').length;
+  if(count>=6) return;
+  createCmpSelect(count);
+  renderCompare();
+}
+
+function updateCmpAddBtn(){
+  const count=document.querySelectorAll('.cmp-preset-sel').length;
+  const btn=document.getElementById('cmp-add-btn');
+  if(btn) btn.style.display=count>=6?'none':'';
+}
+
+function populateCmpSelects(){
+  const keys=Object.keys(presets);
+  document.querySelectorAll('.cmp-preset-sel').forEach(s=>{
+    const cur=s.value;
+    const label=s.options[0]?.text||'';
+    s.innerHTML=`<option value="">${label}</option>`;
+    keys.forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=k;if(k===cur)o.selected=true;s.appendChild(o);});
+  });
+}
+
+function buildCmpLookup(){
+  // id → {name, section, route} desde PARAMS
+  const m={};
+  PARAMS.forEach(sec=>sec.rows.forEach(([name,id])=>{m[id]={name,s:sec.s,r:sec.r};}));
+  return m;
+}
+
+function renderCompareSectionsN(pArr,names,diffSet,allSet,showAll){
+  const LK=buildCmpLookup();
+  const N=pArr.length;
+  const handled=new Set();
+  let rows='';
+  PARAMS.forEach(sec=>{
+    const secRows=sec.rows.filter(([,id])=>showAll?allSet.has(id):diffSet.has(id));
+    if(!secRows.length) return;
+    const parts=sec.r.split('›').map(s=>s.trim());
+    const secLbl=parts.slice(2).join(' › ')||sec.s;
+    rows+=`<tr class="cmp-sec-hdr"><td colspan="${N+1}" title="${sec.r}">${secLbl}</td></tr>`;
+    secRows.forEach(([name,id])=>{
+      handled.add(id);
+      const vals=pArr.map(p=>p[id]??'—');
+      const anyDiff=vals.some(v=>v!==vals[0]);
+      const cells=vals.map(v=>`<td class="${anyDiff?'cmp-diff':''}" style="text-align:right;font-size:9px;">${v}</td>`).join('');
+      rows+=`<tr><td class="cmp-lbl" title="${id}">${name}</td>${cells}</tr>`;
+    });
+  });
+  const extra=[...(showAll?allSet:diffSet)].filter(id=>!handled.has(id));
+  if(extra.length){
+    rows+=`<tr class="cmp-sec-hdr"><td colspan="${N+1}">Otros</td></tr>`;
+    extra.forEach(id=>{
+      const vals=pArr.map(p=>p[id]??'—');
+      const anyDiff=vals.some(v=>v!==vals[0]);
+      const cells=vals.map(v=>`<td class="${anyDiff?'cmp-diff':''}" style="text-align:right;font-size:9px;">${v}</td>`).join('');
+      rows+=`<tr><td class="cmp-lbl" title="${id}">${LK[id]?.name||id}</td>${cells}</tr>`;
+    });
+  }
+  return rows;
+}
+
+function renderCompare(){
+  const out=document.getElementById('cmp-out');
+  const selected=[...document.querySelectorAll('.cmp-preset-sel')].map(s=>s.value).filter(v=>v&&presets[v]);
+  adaptRpWidth(Math.max(2,selected.length));
+  if(selected.length<2){out.innerHTML='<div style="font-size:9.5px;color:#555;padding:4px;">Selecciona al menos 2 máquinas.</div>';return;}
+  const pArr=selected.map(n=>presets[n]);
+  const allSet=new Set(pArr.flatMap(p=>Object.keys(p)));
+  const diffSet=new Set([...allSet].filter(k=>{const vs=pArr.map(p=>p[k]??'—');return vs.some(v=>v!==vs[0]);}));
+  let html=`<div class="cmp-summary">${diffSet.size?`<b>${diffSet.size}</b> diferencia(s) de`:'✓ Sin diferencias —'} ${allSet.size} parámetros</div>`;
+  if(!diffSet.size){out.innerHTML=html;return;}
+  const hdrs=selected.map(n=>`<th title="${n}">${n}</th>`).join('');
+  html+=`<table class="cmp-tbl"><thead><tr><th class="cmp-lbl" style="text-align:left;">Parámetro</th>${hdrs}</tr></thead><tbody>`;
+  html+=renderCompareSectionsN(pArr,selected,diffSet,allSet,false);
+  html+=`</tbody></table>`;
+  const ids=selected.map(s=>s.replace(/,/g,'|')).join(',');
+  html+=`<button onclick="cmpToggleAllN(this)" data-ids="${ids}" class="pbtn" style="margin-top:5px;width:100%;font-size:9px;">Ver todos los parámetros</button>`;
+  out.innerHTML=html;
+}
+
+function cmpToggleAllN(btn){
+  const names=btn.dataset.ids.split(',').map(s=>s.replace(/\|/g,','));
+  const pArr=names.map(n=>presets[n]);
+  const allSet=new Set(pArr.flatMap(p=>Object.keys(p)));
+  const diffSet=new Set([...allSet].filter(k=>{const vs=pArr.map(p=>p[k]??'—');return vs.some(v=>v!==vs[0]);}));
+  const hdrs=names.map(n=>`<th title="${n}">${n}</th>`).join('');
+  let tbl=`<table class="cmp-tbl"><thead><tr><th class="cmp-lbl" style="text-align:left;">Parámetro</th>${hdrs}</tr></thead><tbody>`;
+  tbl+=renderCompareSectionsN(pArr,names,diffSet,allSet,true);
+  tbl+=`</tbody></table>`;
+  btn.insertAdjacentHTML('afterend',tbl);btn.remove();
+}
+
+/* ── Exportar ── */
+const PARAMS=[
+  {s:'Carro 1 — Tiempos y Pulsos',r:'Principal › Menú Técnico › Carro 1 › Tiempos y Pulsos',rows:[
+    ['Esperar ciclo','c1tp-0'],['Presión de Pulsos 1 - Salmón','c1tp-1'],['Presión de Pulsos 1 - Coho','c1tp-2'],
+    ['Activar Presión 2 - Salmón','c1tp-3'],['Activar presión 2 - Coho','c1tp-4'],
+    ['Tiempo fuera del pescado - Salmón','c1tp-5'],['Tiempo fuera del pescado - Coho','c1tp-6']]},
+  {s:'Carro 1 — Presión › Hacia atrás',r:'Principal › Menú Técnico › Carro 1 › Presión (Hacia atrás)',rows:[
+    ['Lubricación trasera','c1pr-0'],['Lubricación delantera','c1pr-2'],['Posición inicial','c1pr-4'],
+    ['Presión 1 Salmón','c1pr-6'],['Presión 1 Coho','c1pr-8'],['Sin pescado','c1pr-10'],['Volver al comienzo','c1pr-12']]},
+  {s:'Carro 1 — Presión › Hacia adelante',r:'Principal › Menú Técnico › Carro 1 › Presión (Hacia adelante)',rows:[
+    ['Lubricación trasera','c1pr-1'],['Lubricación delantera','c1pr-3'],['Posición inicial','c1pr-5'],
+    ['Presión 1 Salmón','c1pr-7'],['Presión 1 Coho','c1pr-9'],['Sin pescado','c1pr-11'],['Volver al comienzo','c1pr-13']]},
+  {s:'Carro 1 — Presión 2 Categorías › Hacia atrás',r:'Principal › Menú Técnico › Carro 1 › Presión › Categorías Presión 2 (atrás)',rows:[
+    ['Categoría 1 y Coho','c1p2-0'],['Categoría 2','c1p2-2'],['Categoría 3','c1p2-4'],['Categoría 4','c1p2-6']]},
+  {s:'Carro 1 — Presión 2 Categorías › Hacia adelante',r:'Principal › Menú Técnico › Carro 1 › Presión › Categorías Presión 2 (adelante)',rows:[
+    ['Categoría 1 y Coho','c1p2-1'],['Categoría 2','c1p2-3'],['Categoría 3','c1p2-5'],['Categoría 4','c1p2-7']]},
+  {s:'Herramienta 1 — Esperar Velocidad',r:'Principal › Menú Técnico › Herramienta 1 › Esperar Velocidad',rows:[
+    ['Esperar ciclo','h1ev-0'],['15-16 Pescados','h1ev-1'],['13-14 Pescados','h1ev-2'],['11-12 Pescados','h1ev-3'],['09-10 Pescados','h1ev-4']]},
+  {s:'Herramienta 1 — Esperar Pulsos Categorías',r:'Principal › Menú Técnico › Herramienta 1 › Esperar Pulsos - Categorías',rows:[
+    ['Categoría 1 y Coho','h1epc-0'],['Categoría 2','h1epc-1'],['Categoría 3','h1epc-2'],['Categoría 4','h1epc-3'],['Valor límite actual','h1epc-v']]},
+  {s:'Herramienta 1 — Tiempo de Movimiento de Bajada',r:'Principal › Menú Técnico › Herramienta 1 › Tiempo de movimiento de bajada',rows:[
+    ['Categoría 1 - Normal','h1tmb-0'],['Categoría 2 - Normal','h1tmb-1'],['Categoría 3 - Normal','h1tmb-2'],['Categoría 4 - Normal','h1tmb-3'],
+    ['Categoría 1 - Suave','h1tmb-4'],['Categoría 2 - Suave','h1tmb-5'],['Categoría 3 - Suave','h1tmb-6'],['Categoría 4 - Suave','h1tmb-7']]},
+  {s:'Herramienta 1 — Tiempos y Pulsos dentro del Pescado',r:'Principal › Menú Técnico › Herramienta 1 › Tiempos y Pulsos dentro del Pescado',rows:[
+    ['Tiempo dentro del Pescado','h1tpp-0'],['Pulsos dentro del pescado - Salmón','h1tpp-1'],['Pulsos dentro del pescado - Coho','h1tpp-2'],['Valor límite actual','h1tpp-v']]},
+  {s:'Herramienta 1 — Presión de Bajada',r:'Principal › Menú Técnico › Herramienta 1 › Presión de bajada',rows:[
+    ['Inicio primera vez','h1pb-0'],['Posición inicial','h1pb-1'],['Movimiento de bajada - Normal','h1pb-2'],
+    ['Movimiento de bajada - Suave','h1pb-3'],['Presión Normal','h1pb-4'],['Presión Suave','h1pb-5'],['Movimiento de subida','h1pb-6']]},
+  {s:'Herramienta 1 — Presión de Subida',r:'Principal › Menú Técnico › Herramienta 1 › Presión de subida',rows:[
+    ['Inicio primera vez','h1ps-0'],['Posición inicial','h1ps-1'],['Movimiento de bajada - Normal','h1ps-2'],
+    ['Movimiento de bajada - Suave','h1ps-3'],['Presión Normal','h1ps-4'],['Presión Suave','h1ps-5'],['Movimiento de subida','h1ps-6']]},
+  {s:'Carro 2 — Tiempo',r:'Principal › Menú Técnico › Carro 2 › Tiempo',rows:[
+    ['Esperar tiempo antes de mover hacia adelante','c2t-0'],['Esperar tiempo antes de mover hacia atrás','c2t-1']]},
+  {s:'Evacuador',r:'Principal › Menú Técnico › Evacuador',rows:[
+    ['Activación de tiempo máximo del evacuador (0,25 s)','ev-0'],['Retardar pulsos no limpio','ev-1'],
+    ['Retardar pulsos salmón limpio','ev-2'],['Retrasar pulsos limpiar Coho / pequeña','ev-3'],
+    ['Limitar pulsos Bajo','ev-4'],['Limitar pulsos Alto','ev-5'],['Valor límite actual','ev-v']]},
+  {s:'Ciclo — Ajuste de Categorías',r:'Principal › Menú Técnico › Ciclo › Formas de Ajustes',rows:[
+    ['Categoría 1','ci-fa-0'],['Categoría 2','ci-fa-1'],['Categoría 3','ci-fa-2'],['Categoría 4','ci-fa-3'],['Valor límite actual','ci-fa-v']]},
+  {s:'Ciclo — Ajuste de Velocidad',r:'Principal › Menú Técnico › Ciclo › Ajuste Velocidad',rows:[
+    ['Velocidad 15-16 Pescados','ci-av-0'],['Velocidad 13-14 Pescados','ci-av-1'],['Velocidad 11-12 Pescados','ci-av-2'],['Velocidad 09-10 Pescados','ci-av-3'],['Valor límite actual','ci-av-v']]},
+  {s:'Ciclo — Criterios de Inicio del Ciclo',r:'Principal › Menú Técnico › Ciclo › Valores de inicio de ciclos',rows:[
+    ['Sensor de tiempo de espera','ci-vic-0'],['Comenzar "ventana"','ci-vic-1'],['Valor límite actual','ci-vic-v']]},
+  {s:'Ciclo — YMK',r:'Principal › Menú Técnico › Ciclo › YMK',rows:[
+    ['Tiempo de actividad de la válvula solenoide','ci-ymk-0']]},
+  {s:'Ciclo — Contadores',r:'Principal › Menú Técnico › Ciclo › Contar',rows:[
+    ['Knuro','ci-ct-0'],['Baader','ci-ct-1']]},
+  {s:'Herramienta 2 — 2A Salmón',r:'Principal › Menú Técnico › Herramienta 2 › Tiempos y Pulsos › 2A Salmón',rows:[
+    ['Tiempo de espera','h2-2as-0'],['Tiempo de movimiento de bajada - normal','h2-2as-1'],
+    ['Tiempo de movimiento de bajada - suave','h2-2as-2'],['Tiempo de presión 1','h2-2as-3']]},
+  {s:'Herramienta 2 — 2B Velocidad Salmón',r:'Principal › Menú Técnico › Herramienta 2 › Tiempos y Pulsos › 2B Velocidad Salmón',rows:[
+    ['Valor negativo Esperar Pulsos','h2-2bvs-0'],['Esperar tiempo','h2-2bvs-1'],
+    ['Pulsos 15-16 /min','h2-2bvs-2'],['Pulsos 13-14 /min','h2-2bvs-3'],['Pulsos 11-12 /min','h2-2bvs-4'],
+    ['Pulsos 09-10 /min','h2-2bvs-5'],['T. dentro del pescado','h2-2bvs-6'],['Valor límite actual','h2-2bvs-v']]},
+  {s:'Herramienta 2 — 2A Coho',r:'Principal › Menú Técnico › Herramienta 2 › Tiempos y Pulsos › 2A Coho',rows:[
+    ['Tiempo de presión 1','h2-2ac-0']]},
+  {s:'Herramienta 2 — 2B Velocidad Coho',r:'Principal › Menú Técnico › Herramienta 2 › Tiempos y Pulsos › 2B Velocidad Coho',rows:[
+    ['Valor negativo Esperar Pulsos','h2-2bvc-0'],['Pulsos 15-16 /min','h2-2bvc-1'],['Pulsos 13-14 /min','h2-2bvc-2'],
+    ['Pulsos 11-12 /min','h2-2bvc-3'],['Pulsos 09-10 /min','h2-2bvc-4'],['Valor límite actual','h2-2bvc-v']]},
+  {s:'Herramienta 2 — Presión Bajada / Subida',r:'Principal › Menú Técnico › Herramienta 2 › Presión',rows:[
+    ['Inicio primera vez - bajada','h2pr-0'],['Inicio primera vez - subida','h2pr-1'],
+    ['Posición inicial - bajada','h2pr-2'],['Posición inicial - subida','h2pr-3'],
+    ['Movimiento de bajada Normal - bajada','h2pr-4'],['Movimiento de bajada Normal - subida','h2pr-5'],
+    ['Movimiento de bajada Suave - bajada','h2pr-6'],['Movimiento de bajada Suave - subida','h2pr-7'],
+    ['Presión de subida Normal','h2pr-8'],['Presión de subida Suave','h2pr-9'],
+    ['Movimiento de subida - bajada','h2pr-10'],['Movimiento de subida - subida','h2pr-11']]},
+  {s:'Herramienta 2 — Presión Ímpetu Salmón',r:'Principal › Menú Técnico › Herramienta 2 › Presión › Ímpetu Salmón',rows:[
+    ['Presión 1 - Normal','h2imp-s0'],['Presión 1 - Suave','h2imp-s1'],['Presión 2 - Normal','h2imp-s2'],['Presión 2 - Suave','h2imp-s3']]},
+  {s:'Herramienta 2 — Presión Ímpetu Coho',r:'Principal › Menú Técnico › Herramienta 2 › Presión › Ímpetu Coho',rows:[
+    ['Presión 1 - Normal','h2imp-c0'],['Presión 1 - Blando','h2imp-c1'],['Presión 2 - Normal','h2imp-c2'],['Presión 2 - Blando','h2imp-c3']]},
+  {s:'Herramienta 2 — Agua',r:'Principal › Menú Técnico › Herramienta 2 › Agua',rows:[
+    ['1. Esperar tiempo 1','h2ag-0'],['2. Tiempo de lavado','h2ag-1'],['3. y 6. Tiempo de descarga','h2ag-2'],
+    ['4. Tiempo de espera 2','h2ag-3'],['5. Tiempo de lavado 2','h2ag-4']]},
+  {s:'Vacío — Monitorear',r:'Principal › Menú Técnico › Vacío › Monitorear Vacío',rows:[
+    ['Tiempo antes de alarma activa','vac-mv-0'],['Valor para la alarma','vac-mv-1'],['Valor para la advertencia','vac-mv-2']]},
+  {s:'Vacío — Knuro',r:'Principal › Menú Técnico › Vacío › Vacío Knuro',rows:[
+    ['Retrasar apertura Herramienta 1','vac-k-0'],['Retrasar apertura Herramienta 2','vac-k-1'],
+    ['Retrasar cierre Herramienta 1','vac-k-2'],['Retrasar cierre Herramienta 2','vac-k-3']]},
+  {s:'Vacío — Baader',r:'Principal › Menú Técnico › Vacío › Vacío Baader',rows:[
+    ['Principal - Pulso','vac-b-0'],['Principal - Abrir','vac-b-1'],['Principal - Cerrar','vac-b-2'],
+    ['Escavador A - Pulso','vac-b-3'],['Escavador A - Abrir','vac-b-4'],['Escavador A - Cerrar','vac-b-5'],
+    ['Escavador B - Pulso','vac-b-6'],['Escavador B - Abrir','vac-b-7'],['Escavador B - Cerrar','vac-b-8'],
+    ['Knuro - Pulso','vac-b-9'],['Knuro - Abrir','vac-b-10'],['Knuro - Cerrar','vac-b-11']]},
+];
+
+function getRefValues(){
+  const refs={};
+  document.querySelectorAll('input.fe,input.fe1').forEach(inp=>{
+    if(!inp.id) return;
+    const fr=inp.nextElementSibling;
+    if(fr&&fr.classList.contains('fr')) refs[inp.id]=fr.textContent.trim();
+  });
+  return refs;
+}
+
+function showExportDialog(){
+  // Presets
+  const pc=document.getElementById('exp-presets');
+  pc.innerHTML='';
+  const keys=Object.keys(presets);
+  if(!keys.length){
+    pc.innerHTML='<div style="font-size:11px;color:#555;">No hay presets — se exportarán los valores actuales.</div>';
+  } else {
+    keys.forEach(n=>{
+      const lbl=document.createElement('label');
+      lbl.style.cssText='display:flex;align-items:center;gap:9px;cursor:pointer;padding:3px 0;';
+      const cb=document.createElement('input');
+      cb.type='checkbox'; cb.value=n; cb.checked=true; cb.style.accentColor='#4499ff';
+      const sp=document.createElement('span');
+      sp.textContent=n; sp.style.cssText='font-size:12px;color:#ccc;';
+      lbl.append(cb,sp); pc.appendChild(lbl);
+    });
+  }
+  // Pantallas (screens with parameter inputs)
+  const sc=document.getElementById('exp-screens');
+  sc.innerHTML='';
+  getParamScreens().forEach(el=>{
+    const title=el.querySelector('.st')?.textContent?.trim()||el.id;
+    const lbl=document.createElement('label');
+    lbl.style.cssText='display:flex;align-items:center;gap:8px;cursor:pointer;padding:2px 0;border-bottom:1px solid #1e2028;';
+    const cb=document.createElement('input');
+    cb.type='checkbox'; cb.value=el.id; cb.checked=true; cb.style.accentColor='#4499ff';
+    const sp=document.createElement('span');
+    sp.textContent=title; sp.style.cssText='font-size:10.5px;color:#aaa;';
+    lbl.append(cb,sp); sc.appendChild(lbl);
+  });
+  expToggle();
+  document.getElementById('exp-modal').style.display='flex';
+}
+
+function expToggle(){
+  const isTable=document.querySelector('input[name="exp-type"]:checked').value==='table';
+  document.getElementById('exp-sect-table').style.display=isTable?'':'none';
+  document.getElementById('exp-sect-visual').style.display=isTable?'none':'';
+}
+
+function expSelectAll(v){
+  document.querySelectorAll('#exp-screens input[type=checkbox]').forEach(cb=>cb.checked=v);
+}
+
+function getParamScreens(){
+  return [...document.querySelectorAll('.sc')].filter(sc=>sc.querySelector('input.fe,input.fe1'));
+}
+
+function closeExportDialog(){
+  document.getElementById('exp-modal').style.display='none';
+}
+
+function doExport(){
+  const type=document.querySelector('input[name="exp-type"]:checked').value;
+  closeExportDialog();
+  if(type==='table'){
+    const sel=[...document.querySelectorAll('#exp-presets input:checked')].map(cb=>cb.value);
+    exportTable(sel);
+  } else {
+    const selIds=[...document.querySelectorAll('#exp-screens input:checked')].map(cb=>cb.value);
+    exportVisual(selIds);
+  }
+}
+
+function exportTable(sel){
+  const machine=document.getElementById('pn').value.trim()||'Sin nombre';
+  const date=new Date().toLocaleString('es-CL');
+  const refs=getRefValues();
+  const vals=getAllInputs();
+  const sources=sel.length?sel.map(n=>({name:n,data:presets[n]||{}})):[{name:'Valor actual',data:vals}];
+  const multi=sources.length>1;
+  const nc=sources.length; // número de columnas de datos
+
+  // Colores por índice de máquina para encabezados
+  const machineColors=['#0066a1','#007a4d','#8b1a00','#5a0080','#7a5a00','#004d4d'];
+
+  // Construir filas — capturar cuántas difieren para resumen
+  let diffCount=0,totalRows=0;
+  let tbl='';
+  PARAMS.forEach(sec=>{
+    // Encabezado de sección
+    tbl+=`<tr class="sec-hdr"><td colspan="${2+nc}">
+      <span class="sec-name">${sec.s}</span>
+      <span class="sec-route">${sec.r}</span>
+    </td></tr>`;
+    sec.rows.forEach(([lbl,id])=>{
+      totalRows++;
+      const rowVals=sources.map(s=>s.data[id]??'—');
+      const unique=new Set(rowVals.filter(v=>v!=='—'));
+      const diff=multi&&unique.size>1;
+      const allSame=!diff;
+      if(diff) diffCount++;
+      const ref=refs[id]||'—';
+      // Badge semáforo por celda
+      const cells=rowVals.map((v,ci)=>{
+        const isRef=v===ref&&ref!=='—';
+        const isDiff=diff&&v!==rowVals[0];
+        const cls=diff?(isDiff?'vd':'vs'):'vn';
+        return `<td class="vc ${cls}" data-same="${allSame?1:0}">${v}</td>`;
+      }).join('');
+      tbl+=`<tr class="pr${diff?' dr':''}" data-same="${allSame?1:0}">
+        <td class="pl">${lbl}</td>
+        <td class="pr-ref">${ref}</td>
+        ${cells}
+      </tr>`;
+    });
+    tbl+=`<tr class="sec-gap"><td colspan="${2+nc}"></td></tr>`;
+  });
+
+  // Resumen de diferencias
+  const summaryHtml=multi?`<div class="summary">
+    <span class="sum-badge ${diffCount>0?'sum-alert':'sum-ok'}">${diffCount>0?'⚠ '+diffCount+' parámetros difieren':'✓ Sin diferencias'}</span>
+    <span class="sum-meta">${totalRows} parámetros comparados entre ${nc} máquinas</span>
+    ${diffCount>0?`<button class="btn-filter" onclick="toggleFilter(this)">Mostrar solo diferencias</button>`:''}
+  </div>`:'';
+
+  const thMachines=sources.map((s,i)=>`<th class="th-mc" style="background:${machineColors[i]||machineColors[0]};">${s.name}</th>`).join('');
+
+  const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+<title>Knuro HMI — ${machine}</title>
+<style>
+@page{size:A4 landscape;margin:1.2cm 1.5cm;}
+*{box-sizing:border-box;}
+body{font-family:Arial,sans-serif;font-size:9.5pt;margin:0;color:#111;background:#f0f2f5;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+.wrap{max-width:${Math.min(880+nc*80,1380)}px;margin:0 auto;padding:20px 24px;}
+/* ── toolbar ── */
+.noprint{background:#fff;border:1px solid #ccd;border-radius:8px;padding:12px 18px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;box-shadow:0 1px 4px rgba(0,0,0,.07);}
+.np-title{font-size:13pt;font-weight:700;color:#0066a1;}
+.np-meta{font-size:9pt;color:#888;margin-top:2px;}
+.btn-print{padding:7px 18px;background:#0066a1;color:#fff;border:none;cursor:pointer;border-radius:5px;font-size:11px;font-weight:600;}
+.btn-print:hover{background:#004d7a;}
+/* ── resumen ── */
+.summary{display:flex;align-items:center;gap:12px;padding:10px 16px;background:#fff;border-radius:7px;margin-bottom:14px;border:1px solid #dde;flex-wrap:wrap;}
+.sum-badge{font-size:10.5pt;font-weight:700;padding:3px 10px;border-radius:4px;}
+.sum-alert{background:#fff3e0;color:#b35000;border:1px solid #f5c080;}
+.sum-ok{background:#e6f4ea;color:#1a7a40;border:1px solid #a0d8b0;}
+.sum-meta{font-size:9.5pt;color:#666;}
+.btn-filter{margin-left:auto;padding:5px 14px;background:#0066a1;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:10px;font-weight:600;}
+.btn-filter:hover{background:#004d7a;}
+.btn-filter.active{background:#c84000;}
+/* ── tabla ── */
+.tbl-wrap{overflow-x:auto;border-radius:8px;box-shadow:0 1px 6px rgba(0,0,0,.1);}
+table{border-collapse:collapse;width:100%;background:#fff;table-layout:fixed;}
+/* sticky header en pantalla */
+thead th{position:sticky;top:0;z-index:3;}
+td.pl,th.th-lbl{position:sticky;left:0;z-index:2;background:#fff;}
+td.pr-ref,th.th-ref{position:sticky;left:200px;z-index:2;}
+/* encabezados */
+th{padding:6px 8px;white-space:nowrap;font-size:8.5pt;border:1px solid rgba(255,255,255,.2);}
+.th-lbl{background:#004d7a;color:#fff;text-align:left;width:200px;min-width:200px;}
+.th-ref{background:#005a8a;color:#cde8f5;text-align:center;width:70px;}
+.th-mc{color:#fff;text-align:center;width:${Math.max(70,Math.floor((740-nc*10)/nc))}px;font-size:8pt;overflow:hidden;text-overflow:ellipsis;}
+/* secciones */
+tr.sec-hdr{break-inside:avoid;break-before:avoid;}
+tr.sec-hdr td{padding:7px 10px;background:#0066a1;color:#fff;border:none;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+.sec-name{font-weight:700;font-size:9.5pt;}
+.sec-route{font-size:7.5pt;opacity:.65;margin-left:8px;}
+tr.sec-gap td{height:2px;background:#e8eaf0;border:none;}
+/* filas */
+tr.pr{border-bottom:1px solid #eaeef5;break-inside:avoid;}
+tr.pr:hover{background:#f0f8ff!important;}
+td.pl{padding:3px 8px;color:#111;font-size:8.5pt;border-right:1px solid #dde;background:#fff;word-wrap:break-word;}
+td.pr-ref{padding:3px 6px;color:#0066a1;font-family:monospace;font-size:8pt;background:#f0f8ff;border-right:1px solid #dde;text-align:center;}
+/* celdas valor */
+td.vc{padding:3px 8px;text-align:center;font-family:monospace;font-weight:700;font-size:8.5pt;border-left:1px solid #eef;}
+td.vn{color:#333;}
+td.vs{background:#e8f5e9;color:#1a7a40;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+td.vd{background:#fff3e0;color:#b35000;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+tr.dr td.pl{background:#fff8f0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+tr.dr td.pr-ref{background:#fdf0e0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+tr.hide-same{display:none!important;}
+@media print{
+  .noprint,.summary .btn-filter{display:none!important;}
+  body{background:#fff;}
+  .wrap{padding:0;max-width:none;}
+  /* sin sticky en print — thead repite automáticamente */
+  thead th,td.pl,th.th-lbl,td.pr-ref,th.th-ref{position:static;}
+  .tbl-wrap{overflow:visible;box-shadow:none;border-radius:0;}
+  /* forzar colores en print */
+  tr.sec-hdr td,td.vs,td.vd,tr.dr td.pl,tr.dr td.pr-ref,th{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
+  /* saltos de página: nunca cortar dentro de una sección */
+  tr.sec-hdr{break-before:auto;break-inside:avoid;}
+  tr.sec-hdr + tr.pr{break-before:avoid;}
+  tr.pr{break-inside:avoid;}
+}
+</style>
+<script>
+function toggleFilter(btn){
+  const on=btn.classList.toggle('active');
+  btn.textContent=on?'Ver todos los parámetros':'Mostrar solo diferencias';
+  document.querySelectorAll('tr.pr[data-same="1"]').forEach(tr=>{
+    tr.classList.toggle('hide-same',on);
+  });
+  // Ocultar secciones donde todas las filas están ocultas
+  document.querySelectorAll('tr.sec-hdr').forEach(hdr=>{
+    let next=hdr.nextElementSibling;
+    let hasVisible=false;
+    while(next&&!next.classList.contains('sec-hdr')&&!next.classList.contains('sec-gap')){
+      if(next.classList.contains('pr')&&!next.classList.contains('hide-same')) hasVisible=true;
+      next=next.nextElementSibling;
+    }
+    hdr.classList.toggle('hide-same',!hasVisible);
+    // también gap
+    const gap=hdr.nextElementSibling;
+    if(gap&&gap.classList.contains('sec-gap')&&!hasVisible) gap.classList.add('hide-same');
+    else if(gap&&gap.classList.contains('sec-gap')) gap.classList.remove('hide-same');
+  });
+}
+<\/script>
+</head>
+<body><div class="wrap">
+<div class="noprint">
+  <div>
+    <div class="np-title">🔧 Knuro HMI — ${machine}</div>
+    <div class="np-meta">Generado: ${date}${multi?' &nbsp;·&nbsp; Comparando: '+sources.map((s,i)=>`<span style="color:${machineColors[i]};font-weight:700;">${s.name}</span>`).join(', '):''}</div>
+  </div>
+  <button class="btn-print" onclick="window.print()">🖨 Guardar PDF</button>
+</div>
+${summaryHtml}
+<div class="tbl-wrap">
+<table>
+<thead><tr>
+  <th class="th-lbl">Parámetro</th>
+  <th class="th-ref">Referencia</th>
+  ${thMachines}
+</tr></thead>
+<tbody>${tbl}</tbody>
+</table>
+</div>
+</div></body></html>`;
+  openBlob(html);
+}
+
+function exportVisual(selIds){
+  const machine=document.getElementById('pn').value.trim()||'Sin nombre';
+  const date=new Date().toLocaleString('es-CL');
+
+  // Limpiar CSS del HMI: quitar reglas que bloquean multi-página en print
+  const rawcss=document.querySelector('style').textContent
+    .replace(/html\s*,\s*body\s*\{[^}]*\}/g,'')
+    .replace(/html\s*\{[^}]*\}/g,'')
+    .replace(/body\s*\{[^}]*\}/g,'')
+    .replace(/#app\s*\{[^}]*\}/g,'')
+    .replace(/\.sc\s*\{[^}]*\}/g,'')
+    .replace(/\.sc\.active\s*\{[^}]*\}/g,'')
+    .replace(/#mn\s*\{[^}]*\}/g,'')
+    .replace(/#hp\s*\{[^}]*\}/g,'')
+    .replace(/#hs\s*\{[^}]*\}/g,'');
+
+  const all=getParamScreens();
+  const screens=selIds&&selIds.length?all.filter(sc=>selIds.includes(sc.id)):all;
+  if(!screens.length){alert('No hay pantallas seleccionadas.');return;}
+
+  // ── Mapear cada pantalla a su info de ruta (primer PARAMS que contenga sus inputs) ──
+  const screenInfo=screens.map(sc=>{
+    const ids=new Set([...sc.querySelectorAll('input.fe,input.fe1')].map(i=>i.id).filter(Boolean));
+    for(const p of PARAMS){
+      for(const[,id]of p.rows){ if(ids.has(id)) return{s:p.s,r:p.r}; }
+    }
+    return{s:sc.querySelector('.st')?.textContent?.trim()||sc.id,r:''};
+  });
+
+  // ── Mapear cada sección de PARAMS al índice de pantalla que la contiene ──
+  const paramToIdx={};
+  screens.forEach((sc,i)=>{
+    const ids=new Set([...sc.querySelectorAll('input.fe,input.fe1')].map(inp=>inp.id).filter(Boolean));
+    PARAMS.forEach((p,pi)=>{
+      if(paramToIdx[pi]!==undefined) return;
+      if(p.rows.some(([,id])=>ids.has(id))) paramToIdx[pi]=i;
+    });
+  });
+
+  // ── Árbol de navegación agrupado por 3er segmento de ruta ──
+  const groups={},groupOrder=[];
+  PARAMS.forEach((p,pi)=>{
+    if(paramToIdx[pi]===undefined) return;
+    const parts=p.r.split('›').map(s=>s.trim());
+    const gname=parts[2]||parts[1]||'Otros';
+    if(!groups[gname]){groups[gname]=[];groupOrder.push(gname);}
+    groups[gname].push({r:p.r,pageIdx:paramToIdx[pi]});
+  });
+
+  let treeHtml='';
+  groupOrder.forEach(gname=>{
+    treeHtml+=`<div class="tg-grp"><div class="tg-gn">${gname}</div>`;
+    groups[gname].forEach(item=>{
+      const leaf=item.r.split('›').slice(3).join('›').trim()||item.r.split('›').pop().trim();
+      treeHtml+=`<div class="tg-it"><a href="#pg-${item.pageIdx}" class="tg-lk">
+        <span class="tg-lb">${leaf}</span><span class="tg-dt"></span><span class="tg-pn">${item.pageIdx+1}</span>
+      </a></div>`;
+    });
+    treeHtml+=`</div>`;
+  });
+
+  // ── HTML de cada pantalla con divisores de sección ──
+  let pages='';
+  let lastGroup=null;
+  screens.forEach((sc,i)=>{
+    const info=screenInfo[i];
+    const parts=info.r?info.r.split('›').map(s=>s.trim()):[info.s];
+    const gname=parts[2]||parts[1]||'General';
+    // Insertar página divisora al cambiar de sección principal
+    if(gname!==lastGroup){
+      lastGroup=gname;
+      pages+=`<div class="xpg xsep">
+  <div class="xsep-inner">
+    <div class="xsep-sub">Knuro B2 · Menú Técnico</div>
+    <div class="xsep-title">${gname}</div>
+    <div class="xsep-mach">${machine}</div>
+  </div>
+</div>\n`;
+    }
+    const breadHtml=parts.map((p,bi)=>
+      `<span class="xbc">${p}</span>${bi<parts.length-1?'<span class="xbs"> › </span>':''}`
+    ).join('');
+    const clone=sc.cloneNode(true);
+    clone.querySelectorAll('.nw').forEach(n=>n.remove());
+    const sh=clone.querySelector('.sh');
+    const sb=clone.querySelector('.sb');
+    const inner=(sh?sh.outerHTML:'')+(sb?sb.outerHTML:'');
+    pages+=`<div id="pg-${i}" class="xpg">
+  <div class="xhdr">
+    <a href="#cov" class="xhb">↑ Índice</a>
+    <span class="xhd-mach">${machine}</span>
+    <div class="xhd-bc">${breadHtml}</div>
+    <div class="xhd-pn">${i+1} / ${screens.length}</div>
+  </div>
+  <div class="xin">${inner}</div>
+</div>\n`;
+  });
+
+  const css=`
+${rawcss}
+*{box-sizing:border-box;print-color-adjust:exact;-webkit-print-color-adjust:exact;}
+html,body{overflow:visible!important;height:auto!important;margin:0;padding:0;background:#e8eaed;font-family:Arial,Helvetica,sans-serif;}
+/* ── Wrapper de página ── */
+.xpg{width:800px;margin:0 auto 28px;overflow:hidden;box-shadow:0 3px 18px rgba(0,0,0,.28);}
+/* ── Header de pantalla ── */
+.xhdr{height:28px;background:#0066a1;color:#cce8f8;display:flex;align-items:center;padding:0 12px;gap:10px;font-size:10px;flex-shrink:0;}
+.xhb{color:#fff;text-decoration:none;font-weight:700;flex-shrink:0;font-size:9.5px;opacity:.85;}
+.xhb:hover{opacity:1;}
+.xhd-bc{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:#b8ddf2;}
+.xbc{color:#daeef8;} .xbs{color:#5a9ec4;}
+.xhd-pn{flex-shrink:0;color:#7bbfdf;font-size:9px;letter-spacing:.3px;}
+.xhd-mach{flex-shrink:0;font-weight:700;color:#fff;font-size:9px;background:rgba(255,255,255,.18);padding:2px 7px;border-radius:3px;letter-spacing:.3px;}
+/* ── Divisor de sección ── */
+.xsep{background:#0a2540;display:flex;align-items:center;justify-content:flex-start;}
+.xsep .xin{display:none;}
+.xsep-inner{padding:0 60px;display:flex;flex-direction:column;gap:10px;}
+.xsep-sub{font-size:10px;font-weight:700;letter-spacing:4px;color:rgba(255,255,255,.45);text-transform:uppercase;}
+.xsep-title{font-size:38px;font-weight:700;color:#fff;letter-spacing:.5px;line-height:1.1;}
+.xsep-mach{font-size:13px;color:#00a0d4;font-weight:600;margin-top:4px;}
+/* ── Contenido HMI ── */
+.xin{width:800px;height:480px;display:flex;flex-direction:column;background:#c2c2cc;font-size:13px;color:#111;overflow:hidden;}
+.sh{display:flex!important;flex:0 0 auto;}
+.sb{flex:1!important;display:flex!important;overflow:hidden!important;}
+/* ════════════════════════════════════════
+   PORTADA — diseño "corporate report"
+   ════════════════════════════════════════ */
+#cov{height:480px;background:#fff;display:flex;flex-direction:column;}
+/* Banda azul superior */
+.cov-band{background:#0066a1;height:72px;flex-shrink:0;display:flex;align-items:center;padding:0 28px;gap:14px;}
+.cov-band-line{width:3px;height:36px;background:rgba(255,255,255,.35);border-radius:2px;}
+.cov-band-txt{display:flex;flex-direction:column;gap:2px;}
+.cov-brand{font-size:10px;font-weight:700;letter-spacing:4px;color:rgba(255,255,255,.7);text-transform:uppercase;}
+.cov-title{font-size:15px;font-weight:700;color:#fff;letter-spacing:.5px;}
+/* Franja de color delgada */
+.cov-stripe{height:4px;background:#00a0d4;flex-shrink:0;}
+/* Cuerpo blanco */
+.cov-body{flex:1;padding:18px 28px 16px;display:flex;flex-direction:column;overflow:hidden;}
+.cov-mc{font-size:22px;font-weight:700;color:#0a2540;margin-bottom:2px;}
+.cov-mt{font-size:10px;color:#6b7a8d;margin-bottom:14px;border-bottom:1px solid #e0e5ec;padding-bottom:10px;}
+.cov-idx-lbl{font-size:8px;font-weight:700;letter-spacing:2.5px;color:#0066a1;text-transform:uppercase;margin-bottom:8px;}
+/* Árbol en 3 columnas */
+.cov-tree{display:grid;grid-template-columns:repeat(3,1fr);gap:6px 20px;flex:1;overflow:hidden;}
+.tg-grp{min-width:0;}
+.tg-gn{font-size:8.5px;font-weight:700;color:#0066a1;text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px;padding-bottom:3px;border-bottom:1.5px solid #0066a1;}
+.tg-it{margin-bottom:1px;}
+.tg-lk{display:flex;align-items:baseline;gap:3px;text-decoration:none;padding:1px 0;}
+.tg-lk:hover .tg-lb{color:#0066a1;}
+.tg-lb{font-size:9px;color:#2c3e50;flex-shrink:0;max-width:148px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tg-dt{flex:1;border-bottom:1px dotted #c8d0da;margin-bottom:2px;min-width:4px;}
+.tg-pn{flex-shrink:0;color:#0066a1;font-size:8.5px;font-weight:700;}
+/* ── Barra de control noprint ── */
+.noprint{width:800px;margin:0 auto 20px;padding:9px 16px;background:#e8f4ff;border:1px solid #4499ff;border-radius:6px;display:flex;align-items:center;justify-content:space-between;gap:8px;}
+/* ── PRINT ── */
+@page{size:landscape;margin:0;}
+@media print{
+  *{print-color-adjust:exact!important;-webkit-print-color-adjust:exact!important;}
+  html,body{overflow:visible!important;height:auto!important;background:#e8eaed!important;padding:0!important;margin:0!important;}
+  .noprint{display:none!important;}
+  .xpg{
+    width:100vw!important;height:100vh!important;
+    overflow:hidden!important;margin:0!important;box-shadow:none!important;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:#e8eaed!important;
+    page-break-after:always;break-after:page;
+  }
+  /* Divisor de sección — restaurar fondo oscuro y colores de texto */
+  .xpg.xsep{
+    background:#0a2540!important;
+    -webkit-print-color-adjust:exact!important;
+    print-color-adjust:exact!important;
+    align-items:flex-start!important;
+    justify-content:center!important;
+  }
+  .xsep .xsep-sub{color:rgba(255,255,255,.7)!important;}
+  .xsep .xsep-title{color:#fff!important;}
+  .xsep .xsep-mach{color:#00c8ff!important;}
+  #cov{height:100vh!important;width:100vw!important;align-items:stretch;justify-content:flex-start;background:#fff!important;}
+  .cov-body{flex:1;}
+  .xhdr{width:800px;flex-shrink:0;}
+  .xin{flex-shrink:0;}
+  .xsep{width:100vw!important;height:100vh!important;overflow:hidden!important;margin:0!important;box-shadow:none!important;padding:0!important;}
+  .xsep-inner{padding:0 80px;}
+}`;
+
+  const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+<title>Knuro HMI — Pantallas — ${machine}</title>
+<style>${css}</style>
+</head><body>
+<div class="noprint">
+  <div><strong>Knuro HMI — ${machine}</strong> <span style="font-size:10px;color:#666;">${screens.length} pantallas · ${date}</span></div>
+  <button onclick="window.print()" style="padding:6px 16px;background:#0066a1;color:#fff;border:none;cursor:pointer;border-radius:4px;font-size:11px;font-weight:600;">🖨 Guardar PDF</button>
+</div>
+<div id="cov" class="xpg">
+  <div class="cov-band">
+    <div class="cov-band-line"></div>
+    <div class="cov-band-txt">
+      <div class="cov-brand">Knuro B2 — HMI Simulator</div>
+      <div class="cov-title">Informe de Parámetros</div>
+    </div>
+  </div>
+  <div class="cov-stripe"></div>
+  <div class="cov-body">
+    <div class="cov-mc">${machine}</div>
+    <div class="cov-mt">Exportado: ${date} &nbsp;·&nbsp; ${screens.length} pantallas de parámetros</div>
+    <div class="cov-idx-lbl">Índice de Pantallas</div>
+    <div class="cov-tree">${treeHtml}</div>
+  </div>
+</div>
+${pages}
+<script>window.addEventListener('load',()=>setTimeout(()=>window.print(),700));<\/script>
+</body></html>`;
+  openBlob(html);
+}
+
+function openBlob(html){
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url),30000);
+}
+
+/* ── Estado máquina / programa ── */
+let programaActual = 'Coho';
+let knuroEncendido = true;
+
+function togglePrograma(btn) {
+  programaActual = programaActual === 'Coho' ? 'Salmón' : 'Coho';
+  btn.textContent = programaActual === 'Coho' ? 'Coho/Salmón' : 'Salmón/Coho';
+  document.getElementById('sp-programa').textContent = programaActual;
+}
+
+function toggleKnuro(btn) {
+  knuroEncendido = !knuroEncendido;
+  btn.classList.toggle('green', knuroEncendido);
+  btn.classList.toggle('red', !knuroEncendido);
+  btn.innerHTML = knuroEncendido ? 'Knuro<br>Encendido' : 'Knuro<br>Apagado';
+  document.getElementById('sp-baader').style.display = knuroEncendido ? '' : 'none';
+  document.getElementById('sp-maquina').style.display = knuroEncendido ? '' : 'none';
+}
+
+/* ── Install prompt ── */
+let dp;
+window.addEventListener('beforeinstallprompt',e=>{
+  e.preventDefault();dp=e;
+  if(window.innerWidth<=860){
+    const btn=document.createElement('button');
+    btn.style.cssText='background:#1a2844;color:#88aaff;border:1px solid #6688cc;padding:4px 8px;font-size:10px;cursor:pointer;border-radius:4px;';
+    btn.textContent='⬇ Instalar';
+    btn.onclick=()=>{dp.prompt();btn.remove();};
+    document.getElementById('bb').appendChild(btn);
+  }
+});
+
+/* ── Presets por defecto (demo 6 Baader) ── */
+function initDefaultPresets(){
+  const BASE={
+    'c1tp-0':'0,00','c1tp-1':'260','c1tp-2':'250','c1tp-3':'0,30','c1tp-4':'0,30','c1tp-5':'0,55','c1tp-6':'0,55',
+    'c1pr-0':'0,00','c1pr-1':'1,00','c1pr-2':'0,00','c1pr-3':'1,00','c1pr-4':'0,00','c1pr-5':'1,60',
+    'c1pr-6':'0,00','c1pr-7':'2,00','c1pr-8':'0,00','c1pr-9':'1,50','c1pr-10':'4,00','c1pr-11':'0,00','c1pr-12':'1,00','c1pr-13':'2,00',
+    'c1p2-0':'0,00','c1p2-1':'0,00','c1p2-2':'0,00','c1p2-3':'0,50','c1p2-4':'0,00','c1p2-5':'1,00','c1p2-6':'0,00','c1p2-7':'1,00',
+    'h1ev-0':'0,00','h1ev-1':'0,00','h1ev-2':'0,00','h1ev-3':'0,50','h1ev-4':'0,60',
+    'h1epc-0':'30','h1epc-1':'45','h1epc-2':'70','h1epc-3':'85','h1epc-v':'425',
+    'h1tmb-0':'0,32','h1tmb-1':'0,31','h1tmb-2':'0,30','h1tmb-3':'0,29','h1tmb-4':'0,31','h1tmb-5':'0,30','h1tmb-6':'0,30','h1tmb-7':'0,29',
+    'h1tpp-0':'0,48','h1tpp-1':'270','h1tpp-2':'260','h1tpp-v':'425',
+    'h1pb-0':'1,00','h1pb-1':'0,50','h1pb-2':'2,40','h1pb-3':'2,20','h1pb-4':'0,30','h1pb-5':'0,00','h1pb-6':'0,30',
+    'h1ps-0':'3,00','h1ps-1':'2,00','h1ps-2':'1,00','h1ps-3':'1,00','h1ps-4':'0,55','h1ps-5':'0,75','h1ps-6':'4,00',
+    'c2t-0':'0,00','c2t-1':'0,00',
+    'ev-0':'0,25','ev-1':'10','ev-2':'65','ev-3':'65','ev-4':'140','ev-5':'200','ev-v':'0',
+    'ci-fa-0':'150','ci-fa-1':'180','ci-fa-2':'190','ci-fa-3':'220','ci-fa-v':'202',
+    'ci-av-0':'110','ci-av-1':'95','ci-av-2':'82','ci-av-3':'72','ci-av-v':'425',
+    'ci-vic-0':'0,15','ci-vic-1':'220','ci-vic-v':'425',
+    'ci-ymk-0':'0,20',
+    'ci-ct-0':'1577120','ci-ct-1':'1347144',
+    'h2-2as-0':'0,00','h2-2as-1':'0,10','h2-2as-2':'0,09','h2-2as-3':'0,25',
+    'h2-2as-epv-0':'70','h2-2as-epv-1':'60','h2-2as-epv-2':'50','h2-2as-epv-3':'30','h2-2as-epv-v':'425',
+    'h2-2as-pev-0':'125','h2-2as-pev-1':'145','h2-2as-pev-2':'160','h2-2as-pev-3':'175','h2-2as-pev-v':'425',
+    'h2-2as-pav-0':'300','h2-2as-pav-1':'300','h2-2as-pav-2':'300','h2-2as-pav-3':'300','h2-2as-pav-v':'425',
+    'h2-2bvs-0':'0','h2-2bvs-1':'0,30','h2-2bvs-2':'300','h2-2bvs-3':'300','h2-2bvs-4':'300','h2-2bvs-5':'300','h2-2bvs-6':'0,00','h2-2bvs-v':'425',
+    'h2-2ac-0':'0,30',
+    'h2-2ac-ve-0':'160','h2-2ac-ve-1':'175','h2-2ac-ve-2':'190','h2-2ac-ve-3':'205','h2-2ac-ve-v':'425',
+    'h2-2ac-pa-0':'290','h2-2ac-pa-1':'290','h2-2ac-pa-2':'290','h2-2ac-pa-3':'290','h2-2ac-pa-v':'425',
+    'h2-2bvc-0':'0','h2-2bvc-1':'290','h2-2bvc-2':'290','h2-2bvc-3':'290','h2-2bvc-4':'290','h2-2bvc-v':'425',
+    'h2pr-0':'0,50','h2pr-1':'2,00','h2pr-2':'0,50','h2pr-3':'1,60','h2pr-4':'2,50','h2pr-5':'1,00',
+    'h2pr-6':'2,20','h2pr-7':'1,00','h2pr-8':'3,00','h2pr-9':'3,00','h2pr-10':'1,00','h2pr-11':'3,00',
+    'h2imp-s0':'2,60','h2imp-s1':'2,40','h2imp-s2':'4,00','h2imp-s3':'3,80',
+    'h2imp-c0':'2,40','h2imp-c1':'2,20','h2imp-c2':'3,80','h2imp-c3':'3,50',
+    'h2ag-0':'2,50','h2ag-1':'1,00','h2ag-2':'0,45','h2ag-3':'5,00','h2ag-4':'1,50',
+    'vac-mv-0':'5 s','vac-mv-1':'-400 mBar','vac-mv-2':'-300 mBar',
+    'vac-k-0':'0,20','vac-k-1':'0,20','vac-k-2':'0,00','vac-k-3':'0,00',
+    'vac-b-0':'143','vac-b-1':'255','vac-b-2':'30','vac-b-3':'305','vac-b-4':'280','vac-b-5':'90',
+    'vac-b-6':'350','vac-b-7':'320','vac-b-8':'140','vac-b-9':'406','vac-b-10':'20','vac-b-11':'290'
+  };
+  function mk(o){return Object.assign({},BASE,o);}
+  const DEFAULTS={
+    'PP-N1': mk({
+      'ci-ct-0':'2103540','ci-ct-1':'1892310',
+      'vac-mv-0':'5 s','vac-mv-1':'-420 mBar','vac-mv-2':'-310 mBar'
+    }),
+    'PP-N2': mk({
+      'ci-ct-0':'1577120','ci-ct-1':'1347144'
+    }),
+    'PP-N3': mk({
+      'c1tp-1':'258','c1tp-2':'248','c1tp-3':'0,32','c1tp-4':'0,32','c1tp-5':'0,52','c1tp-6':'0,52',
+      'c1pr-5':'1,65','c1pr-7':'1,95','c1pr-9':'1,45','c1pr-13':'1,95',
+      'c1p2-3':'0,45','c1p2-5':'0,95','c1p2-7':'0,95',
+      'h1ev-3':'0,55','h1ev-4':'0,65',
+      'h1epc-0':'28','h1epc-1':'43','h1epc-2':'68','h1epc-3':'82',
+      'h1tmb-2':'0,31','h1tmb-3':'0,30','h1tmb-6':'0,31','h1tmb-7':'0,30',
+      'h1tpp-0':'0,46','h1tpp-1':'268','h1tpp-2':'258',
+      'h1pb-2':'2,38','h1pb-3':'2,18',
+      'h1ps-2':'0,95','h1ps-3':'0,95','h1ps-4':'0,52','h1ps-5':'0,72',
+      'ci-fa-0':'152','ci-fa-1':'182','ci-fa-2':'188','ci-fa-3':'218','ci-fa-v':'200',
+      'ci-av-1':'93','ci-av-2':'80','ci-av-3':'70',
+      'h2ag-0':'2,40','h2ag-1':'0,95','h2ag-4':'1,40',
+      'vac-k-0':'0,25','vac-k-1':'0,25',
+      'vac-b-6':'345','vac-b-7':'315','vac-b-9':'400',
+      'ci-ct-0':'987630','ci-ct-1':'845210',
+      'vac-mv-0':'6 s','vac-mv-1':'-410 mBar','vac-mv-2':'-300 mBar'
+    }),
+    'YAL-N1': mk({
+      'c1tp-1':'255','c1tp-2':'245','c1tp-3':'0,28','c1tp-4':'0,28','c1tp-5':'0,50','c1tp-6':'0,50',
+      'c1pr-1':'1,05','c1pr-3':'1,05','c1pr-5':'1,55','c1pr-7':'1,90','c1pr-9':'1,40',
+      'c1pr-10':'4,20','c1pr-12':'0,95','c1pr-13':'1,90',
+      'h1epc-0':'28','h1epc-1':'42','h1epc-2':'66','h1epc-3':'80',
+      'h1tmb-0':'0,30','h1tmb-1':'0,29','h1tmb-2':'0,28','h1tmb-3':'0,27',
+      'h1tmb-4':'0,29','h1tmb-5':'0,28','h1tmb-6':'0,28','h1tmb-7':'0,27',
+      'h1tpp-0':'0,45','h1tpp-1':'265','h1tpp-2':'255',
+      'h1pb-2':'2,35','h1pb-3':'2,15','h1pb-4':'0,28','h1pb-6':'0,28',
+      'h1ps-0':'2,90','h1ps-1':'1,90','h1ps-4':'0,52','h1ps-5':'0,72','h1ps-6':'3,90',
+      'c2t-0':'0,10','c2t-1':'0,10',
+      'ev-2':'60','ev-3':'60','ev-4':'135','ev-5':'195',
+      'ci-fa-0':'145','ci-fa-1':'175','ci-fa-2':'185','ci-fa-3':'215','ci-fa-v':'198',
+      'ci-av-0':'108','ci-av-1':'93','ci-av-2':'80','ci-av-3':'70',
+      'ci-ymk-0':'0,18',
+      'h2-2as-1':'0,11','h2-2as-2':'0,10','h2-2as-3':'0,28',
+      'h2-2bvs-1':'0,28','h2-2bvs-2':'295','h2-2bvs-3':'295','h2-2bvs-4':'295','h2-2bvs-5':'295',
+      'h2-2ac-0':'0,28',
+      'h2-2bvc-1':'285','h2-2bvc-2':'285','h2-2bvc-3':'285','h2-2bvc-4':'285',
+      'h2pr-3':'1,55','h2pr-4':'2,45','h2pr-6':'2,15','h2pr-8':'2,90','h2pr-9':'2,90','h2pr-11':'2,90',
+      'h2imp-s0':'2,50','h2imp-s1':'2,30','h2imp-s2':'3,90','h2imp-s3':'3,70',
+      'h2imp-c0':'2,30','h2imp-c1':'2,10','h2imp-c2':'3,70','h2imp-c3':'3,40',
+      'h2ag-0':'2,40','h2ag-2':'0,42',
+      'vac-k-0':'0,25','vac-k-1':'0,25','vac-k-2':'0,05','vac-k-3':'0,05',
+      'vac-b-0':'138','vac-b-1':'250','vac-b-2':'28','vac-b-3':'298','vac-b-4':'275','vac-b-5':'85',
+      'vac-b-6':'342','vac-b-7':'312','vac-b-8':'135','vac-b-9':'398','vac-b-10':'18','vac-b-11':'285',
+      'ci-ct-0':'3241580','ci-ct-1':'2987400',
+      'vac-mv-0':'4 s','vac-mv-1':'-430 mBar','vac-mv-2':'-320 mBar'
+    }),
+    'YAL-N2': mk({
+      'c1tp-1':'256','c1tp-2':'246','c1tp-3':'0,28','c1tp-4':'0,29','c1tp-5':'0,51','c1tp-6':'0,51',
+      'c1pr-1':'1,05','c1pr-3':'1,05','c1pr-5':'1,55','c1pr-7':'1,92','c1pr-9':'1,42',
+      'c1pr-10':'4,20','c1pr-12':'0,96','c1pr-13':'1,92',
+      'h1epc-0':'29','h1epc-1':'43','h1epc-2':'67','h1epc-3':'81',
+      'h1tmb-0':'0,30','h1tmb-1':'0,29','h1tmb-2':'0,29','h1tmb-3':'0,28',
+      'h1tmb-4':'0,29','h1tmb-5':'0,29','h1tmb-6':'0,28','h1tmb-7':'0,28',
+      'h1tpp-0':'0,46','h1tpp-1':'266','h1tpp-2':'256',
+      'h1pb-2':'2,36','h1pb-3':'2,16','h1pb-4':'0,29','h1pb-6':'0,29',
+      'h1ps-4':'0,53','h1ps-5':'0,73','h1ps-6':'3,92',
+      'c2t-0':'0,10','c2t-1':'0,10',
+      'ev-2':'62','ev-3':'62','ev-4':'136','ev-5':'196',
+      'ci-fa-0':'146','ci-fa-1':'176','ci-fa-2':'186','ci-fa-3':'216','ci-fa-v':'199',
+      'ci-av-0':'109','ci-av-1':'94','ci-av-2':'81','ci-av-3':'71',
+      'ci-ymk-0':'0,18',
+      'h2-2as-1':'0,11','h2-2as-2':'0,10','h2-2as-3':'0,27',
+      'h2-2bvs-1':'0,29','h2-2bvs-2':'296','h2-2bvs-3':'296','h2-2bvs-4':'296','h2-2bvs-5':'296',
+      'h2-2ac-0':'0,28',
+      'h2-2bvc-1':'286','h2-2bvc-2':'286','h2-2bvc-3':'286','h2-2bvc-4':'286',
+      'h2pr-3':'1,56','h2pr-4':'2,46','h2pr-6':'2,16','h2pr-8':'2,92','h2pr-9':'2,92','h2pr-11':'2,92',
+      'h2imp-s0':'2,52','h2imp-s1':'2,32','h2imp-s2':'3,92','h2imp-s3':'3,72',
+      'h2imp-c0':'2,32','h2imp-c1':'2,12','h2imp-c2':'3,72','h2imp-c3':'3,42',
+      'h2ag-0':'2,42','h2ag-2':'0,43',
+      'vac-k-0':'0,25','vac-k-1':'0,25','vac-k-2':'0,05','vac-k-3':'0,05',
+      'vac-b-0':'140','vac-b-1':'252','vac-b-2':'29','vac-b-3':'300','vac-b-4':'277','vac-b-5':'86',
+      'vac-b-6':'344','vac-b-7':'314','vac-b-8':'137','vac-b-9':'400','vac-b-10':'19','vac-b-11':'287',
+      'ci-ct-0':'2756340','ci-ct-1':'2512180',
+      'vac-mv-0':'4 s','vac-mv-1':'-428 mBar','vac-mv-2':'-318 mBar'
+    }),
+    'YAL-N3': mk({
+      'c1tp-1':'253','c1tp-2':'243','c1tp-3':'0,27','c1tp-4':'0,27','c1tp-5':'0,49','c1tp-6':'0,49',
+      'c1pr-1':'1,08','c1pr-3':'1,08','c1pr-5':'1,52','c1pr-7':'1,88','c1pr-9':'1,38',
+      'c1pr-10':'4,30','c1pr-12':'0,92','c1pr-13':'1,88',
+      'c1p2-3':'0,42','c1p2-5':'0,92','c1p2-7':'0,92',
+      'h1ev-3':'0,48','h1ev-4':'0,58',
+      'h1epc-0':'27','h1epc-1':'41','h1epc-2':'65','h1epc-3':'79',
+      'h1tmb-0':'0,29','h1tmb-1':'0,28','h1tmb-2':'0,28','h1tmb-3':'0,27',
+      'h1tmb-4':'0,28','h1tmb-5':'0,28','h1tmb-6':'0,27','h1tmb-7':'0,27',
+      'h1tpp-0':'0,44','h1tpp-1':'262','h1tpp-2':'252',
+      'h1pb-2':'2,32','h1pb-3':'2,12','h1pb-4':'0,26','h1pb-6':'0,26',
+      'h1ps-0':'2,85','h1ps-1':'1,85','h1ps-4':'0,50','h1ps-5':'0,70','h1ps-6':'3,85',
+      'c2t-0':'0,12','c2t-1':'0,12',
+      'ev-1':'8','ev-2':'58','ev-3':'58','ev-4':'132','ev-5':'192',
+      'ci-fa-0':'143','ci-fa-1':'173','ci-fa-2':'183','ci-fa-3':'212','ci-fa-v':'195',
+      'ci-av-0':'106','ci-av-1':'91','ci-av-2':'78','ci-av-3':'68',
+      'ci-ymk-0':'0,17',
+      'h2-2as-1':'0,12','h2-2as-2':'0,11','h2-2as-3':'0,30',
+      'h2-2bvs-1':'0,26','h2-2bvs-2':'292','h2-2bvs-3':'292','h2-2bvs-4':'292','h2-2bvs-5':'292',
+      'h2-2ac-0':'0,26',
+      'h2-2bvc-1':'282','h2-2bvc-2':'282','h2-2bvc-3':'282','h2-2bvc-4':'282',
+      'h2pr-3':'1,52','h2pr-4':'2,42','h2pr-6':'2,12','h2pr-8':'2,85','h2pr-9':'2,85','h2pr-11':'2,85',
+      'h2imp-s0':'2,48','h2imp-s1':'2,28','h2imp-s2':'3,85','h2imp-s3':'3,65',
+      'h2imp-c0':'2,28','h2imp-c1':'2,08','h2imp-c2':'3,65','h2imp-c3':'3,35',
+      'h2ag-0':'2,35','h2ag-1':'0,95','h2ag-2':'0,40','h2ag-4':'1,45',
+      'vac-k-0':'0,28','vac-k-1':'0,28','vac-k-2':'0,08','vac-k-3':'0,08',
+      'vac-b-0':'135','vac-b-1':'248','vac-b-2':'26','vac-b-3':'295','vac-b-4':'272','vac-b-5':'82',
+      'vac-b-6':'338','vac-b-7':'308','vac-b-8':'132','vac-b-9':'393','vac-b-10':'16','vac-b-11':'281',
+      'ci-ct-0':'1432760','ci-ct-1':'1298540',
+      'vac-mv-0':'4 s','vac-mv-1':'-432 mBar','vac-mv-2':'-322 mBar'
+    })
+  };
+  // Eliminar preset legacy auto-creado (nunca toca los 6 presets de Baader)
+  ['PP-B142-B2','PP-B142-B1','PP-B142-B3'].forEach(old=>{
+    if(presets[old]) delete presets[old];
+  });
+  // Agrega solo los que no existen — nunca sobreescribe data del usuario
+  Object.entries(DEFAULTS).forEach(([name,data])=>{
+    if(!presets[name]) presets[name]=data;
+  });
+  persistPresets();
+  renderPresets();
+  populateCmpSelects();
+}
+
+/* ── Init ── */
+window.addEventListener('load',async()=>{
+  buildNavs();
+  scaleHMI();
+  initRefIds();          // asignar data-frid a cada .fr span
+
+  if(IN_IFRAME){
+    // Notificar al padre (HmiKnuroPage) que estamos listos para recibir datos
+    window.parent.postMessage({type:'hmi:ready'},'*');
+    // Los presets/refs llegarán via hmi:init → ver listener arriba
+  } else {
+    // Modo standalone: cargar desde localStorage como siempre
+    await loadFromStorage();
+    loadRefs();
+    initDefaultPresets();
+    const cur=localStorage.getItem('knuro-current');
+    const toLoad=(cur&&presets[cur])?cur:(Object.keys(presets)[0]||null);
+    if(toLoad){setAllInputs(presets[toLoad]);updateActivePreset(toLoad);}
+  }
+
+  // Delegated events para refs editables (ambos modos)
+  const hs=document.getElementById('hs');
+  hs.addEventListener('focusout',e=>{
+    if(_refsEdit&&e.target.classList.contains('fr')) persistRefs();
+  });
+  hs.addEventListener('keydown',e=>{
+    if(_refsEdit&&e.target.classList.contains('fr')&&e.key==='Enter'){
+      e.preventDefault(); e.target.blur();
+    }
+  });
+  // Evitar pegar HTML con formato
+  hs.addEventListener('paste',e=>{
+    if(!e.target.classList.contains('fr')) return;
+    e.preventDefault();
+    const txt=(e.clipboardData||window.clipboardData).getData('text/plain');
+    document.execCommand('insertText',false,txt);
+  });
+});
+</script>
+</body>
+</html>
