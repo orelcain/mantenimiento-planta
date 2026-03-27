@@ -83,6 +83,7 @@ const GanttModulePage = lazyWithReload(() => import('@/pages/gantt/GanttModulePa
 const AriaActionsPage = lazyWithReload(() => import('@/pages/AriaActionsPage').then((mod) => ({ default: mod.AriaActionsPage })))
 const ClimaPortPage = lazyWithReload(() => import('@/pages/ClimaPortPage').then((mod) => ({ default: mod.ClimaPortPage })))
 const CalendarioMantencionPage = lazyWithReload(() => import('@/pages/CalendarioMantencionPage').then((mod) => ({ default: mod.CalendarioMantencionPage })))
+const HmiKnuroPage = lazyWithReload(() => import('@/pages/HmiKnuroPage').then((mod) => ({ default: mod.HmiKnuroPage })))
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuthStore()
@@ -392,6 +393,13 @@ export function App() {
               <AdminRoute>
                 <Suspense fallback={<LoadingScreen />}>
                   <ClimaPortPage />
+                </Suspense>
+              </AdminRoute>
+            } />
+            <Route path="hmi-knuro" element={
+              <AdminRoute>
+                <Suspense fallback={<LoadingScreen />}>
+                  <HmiKnuroPage />
                 </Suspense>
               </AdminRoute>
             } />

@@ -72,6 +72,7 @@ const adminNavigation = [
   { name: 'Mapas', href: '/admin/maps', icon: MapPin },
   { name: 'ETT', href: '/admin/ett', icon: FileText },
   { name: 'Clima Puerto', href: '/clima-puerto', icon: CloudSun, module: 'climaPuerto' as AppModule },
+  { name: 'HMI Knuro', href: '/hmi-knuro', icon: Cpu },
 ]
 
 export function MainLayout() {

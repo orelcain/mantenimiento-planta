@@ -35,6 +35,7 @@ export const APP_MODULES = [
   'calendarioMantencion',
   'aria',
   'climaPuerto',
+  'hmiKnuro',
 ] as const
 
 export type AppModule = typeof APP_MODULES[number]

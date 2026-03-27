@@ -720,5 +720,25 @@ service cloud.firestore {
       allow create, update: if isAdmin();
       allow delete: if isAdmin();
     }
+
+    // ============================================
+    // HMI KNURO B2 — Presets, historial y config
+    // ============================================
+    match /hmi-knuro-presets/{presetId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isSupervisor() && isValidDocSize();
+      allow delete: if isSupervisor();
+    }
+
+    match /hmi-knuro-history/{entryId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidDocSize();
+      allow update, delete: if isAdmin();
+    }
+
+    match /hmi-knuro-config/{configId} {
+      allow read: if isAuthenticated();
+      allow write: if isSupervisor();
+    }
   }
 }
