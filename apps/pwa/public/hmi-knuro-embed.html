@@ -1322,7 +1322,7 @@ if(IN_IFRAME){
     }
     renderPresets(); populateCmpSelects();
     const toLoad=(cur&&presets[cur])?cur:(Object.keys(presets)[0]||null);
-    if(toLoad){setAllInputs(presets[toLoad]);updateActivePreset(toLoad);}
+    if(toLoad){setAllInputs(presets[toLoad],toLoad);updateActivePreset(toLoad);}
     requestAnimationFrame(()=>requestAnimationFrame(scaleHMI));
   });
 }
@@ -1397,7 +1397,26 @@ function toggleRefsEdit(btn){
 function getAllInputs(){
   return [...document.querySelectorAll('input.fe,input.fe1')].reduce((a,e)=>{if(e.id)a[e.id]=e.value;return a;},{});
 }
-function setAllInputs(d){Object.entries(d).forEach(([id,v])=>{const e=document.getElementById(id);if(e)e.value=v;});}
+const _PESC_N2=['15-16','13-14','11-12','09-10'];
+const _PESC_N1=['18-19','16-17','14-15','12-13'];
+let pescRows=[..._PESC_N2];
+function applyPescRows(d){
+  const rows=(d&&d['pesc-rows'])?d['pesc-rows'].split(','):[..._PESC_N2];
+  pescRows=rows;
+  document.querySelectorAll('.plb').forEach(el=>{
+    let t=el.textContent;
+    // normalizar a N2 primero (por si venía de N1), luego aplicar destino
+    _PESC_N1.forEach((nr,i)=>{t=t.replaceAll(nr,_PESC_N2[i]);});
+    _PESC_N2.forEach((nr,i)=>{t=t.replaceAll(nr,rows[i]);});
+    el.textContent=t;
+  });
+}
+function setAllInputs(d,presetName){
+  Object.entries(d).forEach(([id,v])=>{const e=document.getElementById(id);if(e)e.value=v;});
+  // Si el preset no tiene pesc-rows pero el nombre es N1, aplicar labels N1 automáticamente
+  const deff=(!d['pesc-rows']&&presetName&&/\bN1\b/i.test(presetName))?{...d,'pesc-rows':'18-19,16-17,14-15,12-13'}:d;
+  applyPescRows(deff);
+}
 
 function updateActivePreset(name){
   const a=document.getElementById('ps-active-name');
@@ -1425,7 +1444,7 @@ function savePreset(){
 
 function loadPreset(n){
   if(presets[n]){
-    setAllInputs(presets[n]);
+    setAllInputs(presets[n],n);
     updateActivePreset(n);
   }
 }
@@ -1777,7 +1796,10 @@ function exportTable(sel){
       <span class="sec-name">${sec.s}</span>
       <span class="sec-route">${sec.r}</span>
     </td></tr>`;
-    sec.rows.forEach(([lbl,id])=>{
+    sec.rows.forEach(([rawLbl,id])=>{
+      // Actualizar labels con el conteo de pescados del preset activo
+      let lbl=rawLbl;
+      _PESC_N2.forEach((nr,i)=>{lbl=lbl.replaceAll(nr,pescRows[i]);});
       totalRows++;
       const rowVals=sources.map(s=>s.data[id]??'—');
       const unique=new Set(rowVals.filter(v=>v!=='—'));
@@ -2374,8 +2396,27 @@ window.addEventListener('load',async()=>{
     initDefaultPresets();
     const cur=localStorage.getItem('knuro-current');
     const toLoad=(cur&&presets[cur])?cur:(Object.keys(presets)[0]||null);
-    if(toLoad){setAllInputs(presets[toLoad]);updateActivePreset(toLoad);}
+    if(toLoad){setAllInputs(presets[toLoad],toLoad);updateActivePreset(toLoad);}
   }
+
+  // ── Auto-guardado: cualquier cambio en un input guarda el preset activo ──
+  let _autoSaveTimer=null;
+  function autoSave(){
+    const n=(document.getElementById('ps-active-name')||{}).textContent||'';
+    if(!n||n==='Sin preset cargado') return;
+    clearTimeout(_autoSaveTimer);
+    _autoSaveTimer=setTimeout(()=>{
+      const previousData=presets[n]?{...presets[n]}:null;
+      presets[n]=getAllInputs();
+      persistPresets(n,previousData);
+      // Feedback visual breve en el nombre del preset
+      const el=document.getElementById('ps-active-name');
+      if(el){el.style.color='#4ade80';setTimeout(()=>{el.style.color='';},700);}
+    },800);
+  }
+  document.addEventListener('change',e=>{
+    if(e.target.matches('input.fe,input.fe1')) autoSave();
+  });
 
   // Delegated events para refs editables (ambos modos)
   const hs=document.getElementById('hs');

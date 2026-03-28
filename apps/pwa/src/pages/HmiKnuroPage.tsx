@@ -1,5 +1,5 @@
 import { useEffect, useRef, useMemo, useState, useCallback } from 'react'
-import { History, Cpu, RefreshCw, X, ChevronDown, ChevronUp, Sliders } from 'lucide-react'
+import { History, Cpu, RefreshCw, X, ChevronDown, ChevronUp, Sliders, RotateCcw } from 'lucide-react'
 import { useAuthStore } from '@/store'
 import { cn } from '@/lib/utils'
 import {
@@ -192,6 +192,16 @@ export function HmiKnuroPage() {
     }, 50)
   }
 
+  const resetToDefaults = useCallback(async () => {
+    if (!user) return
+    if (!confirm('¿Restaurar los 6 presets a los valores por defecto? Se perderán cambios personalizados.')) return
+    await seedDefaultPresets(user.id)
+    const [presetsData, current, refs] = await Promise.all([getHmiPresets(), getCurrentPreset(), getHmiRefs()])
+    setPresets(presetsData)
+    setCurrentPresetName(current)
+    iframeRef.current?.contentWindow?.postMessage({ type: 'hmi:init', presets: presetsData, current, refs }, '*')
+  }, [user])
+
   const presetKeys = Object.keys(presets)
 
   return (
@@ -265,6 +275,11 @@ export function HmiKnuroPage() {
           <Button variant="ghost" size="sm" onClick={refreshIframe} className="h-7 gap-1 text-xs">
             <RefreshCw className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Recargar</span>
+          </Button>
+
+          <Button variant="ghost" size="sm" onClick={resetToDefaults} className="h-7 gap-1 text-xs" title="Restaurar presets a valores por defecto">
+            <RotateCcw className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Restaurar</span>
           </Button>
         </div>
       </div>
