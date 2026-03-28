@@ -96,8 +96,6 @@ export function IsometricCamera({
     }
   }, [camera])
 
-  // Trigger initial render and re-render when camera props change
-  const { invalidate } = useThree()
   useEffect(() => {
     invalidate()
   }, [zoom, panOffset, invalidate])
