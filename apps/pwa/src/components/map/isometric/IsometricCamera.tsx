@@ -68,19 +68,23 @@ export function IsometricCamera({
   const targetVec = useRef(new THREE.Vector3(...target))
   const currentPan = useRef({ x: panOffset?.x ?? 0, z: panOffset?.z ?? 0 })
 
+  const { invalidate } = useThree()
+
   // Actualizar target del centro
   useEffect(() => {
     targetVec.current.set(...target)
-  }, [target])
+    invalidate()
+  }, [target, invalidate])
 
-  // Cuando cambia el ángulo, calcular el nuevo azimut objetivo
+  // Cuando cambia el ángulo, calcular el nuevo azimut objetivo y disparar animación
   useEffect(() => {
     const newAzimuth = CAMERA_ANGLE_AZIMUTH[angle]
     const current = currentAzimuth.current
     // Usar el camino más corto
     targetAzimuth.current = current + shortestAnglePath(current, newAzimuth)
     isAnimating.current = true
-  }, [angle])
+    invalidate()
+  }, [angle, invalidate])
 
   // Setup ortográfico inicial
   useEffect(() => {
@@ -92,8 +96,14 @@ export function IsometricCamera({
     }
   }, [camera])
 
-  // Frame loop: interpolar posición de cámara y zoom
-  useFrame((_, delta) => {
+  // Trigger initial render and re-render when camera props change
+  const { invalidate } = useThree()
+  useEffect(() => {
+    invalidate()
+  }, [zoom, panOffset, invalidate])
+
+  // Frame loop: interpolar posición de cámara y zoom (demand-driven)
+  useFrame((state, delta) => {
     if (!(camera instanceof THREE.OrthographicCamera)) return
 
     const dt = Math.min(delta, 0.1) // Cap delta para evitar saltos
@@ -102,7 +112,7 @@ export function IsometricCamera({
     // Interpolar azimut
     currentAzimuth.current = dampedLerp(currentAzimuth.current, targetAzimuth.current, DAMPING, dt)
 
-    // Detectar fin de animación
+    // Detectar fin de animación de rotación
     if (isAnimating.current && Math.abs(currentAzimuth.current - targetAzimuth.current) < 0.001) {
       currentAzimuth.current = targetAzimuth.current
       isAnimating.current = false
@@ -145,6 +155,16 @@ export function IsometricCamera({
     camera.bottom = -halfHeight
     camera.zoom = 1
     camera.updateProjectionMatrix()
+
+    // Con frameloop="demand", continuar animando solo mientras haya movimiento pendiente
+    const stillMoving =
+      Math.abs(currentAzimuth.current - targetAzimuth.current) > 0.0005 ||
+      Math.abs(currentZoom.current - zoom) > 0.05 ||
+      Math.abs(currentPan.current.x - targetPanX) > 0.05 ||
+      Math.abs(currentPan.current.z - targetPanZ) > 0.05
+    if (stillMoving) {
+      state.invalidate()
+    }
   })
 
   return null
