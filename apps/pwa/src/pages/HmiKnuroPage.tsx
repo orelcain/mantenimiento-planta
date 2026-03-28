@@ -48,7 +48,9 @@ export function HmiKnuroPage() {
 
   const iframeSrc = useMemo(() => {
     const basePath = import.meta.env.BASE_URL || '/'
-    return basePath + 'hmi-knuro-embed.html'
+    // Cache buster: fuerza recarga del iframe cuando cambia la version del build
+    const v = import.meta.env.VITE_APP_VERSION || Date.now().toString().slice(0, 8)
+    return basePath + 'hmi-knuro-embed.html?v=' + v
   }, [])
 
   // ── Carga inicial desde Firestore → iframe ──────────────────────────────
