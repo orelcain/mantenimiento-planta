@@ -1,5 +1,5 @@
 import { useEffect, useRef, useMemo, useState, useCallback } from 'react'
-import { History, Cpu, RefreshCw, X, ChevronDown, ChevronUp, Sliders, RotateCcw, Copy } from 'lucide-react'
+import { History, Cpu, RefreshCw, X, ChevronDown, ChevronUp, Sliders, RotateCcw, Copy, Pencil, Check, ArrowUp, ArrowDown } from 'lucide-react'
 import { useAuthStore } from '@/store'
 import { cn } from '@/lib/utils'
 import {
@@ -13,6 +13,8 @@ import {
   addHmiHistory,
   getHmiHistory,
   seedDefaultPresets,
+  getPresetOrder,
+  savePresetOrder,
 } from '@/services/hmiKnuro'
 import type { HmiHistoryEntry } from '@/services/hmiKnuro'
 import { Button } from '@/components/ui'
@@ -39,6 +41,8 @@ export function HmiKnuroPage() {
   const [presets, setPresets] = useState<Record<string, Record<string, string>>>({})
   const [currentPresetName, setCurrentPresetName] = useState<string | null>(null)
   const [presetsOpen, setPresetsOpen] = useState(false)
+  const [presetOrder, setPresetOrder] = useState<string[]>([])
+  const [editingPreset, setEditingPreset] = useState<{ name: string; value: string } | null>(null)
 
   // ── Estado historial ────────────────────────────────────────────────────
   const [historyOpen, setHistoryOpen] = useState(false)
@@ -57,10 +61,11 @@ export function HmiKnuroPage() {
   // No depende de user para leer; solo lo necesita para sembrar presets si vacío.
   const sendInitData = useCallback(async (iframe: HTMLIFrameElement) => {
     try {
-      let [presetsData, current, refs] = await Promise.all([
+      let [presetsData, current, refs, order] = await Promise.all([
         getHmiPresets(),
         getCurrentPreset(),
         getHmiRefs(),
+        getPresetOrder(),
       ])
       // Si Firestore está vacío, sembrar los 6 presets por defecto automáticamente
       if (Object.keys(presetsData).length === 0) {
@@ -77,6 +82,7 @@ export function HmiKnuroPage() {
       }
       setPresets(presetsData)
       setCurrentPresetName(current)
+      setPresetOrder(order)
       iframe.contentWindow?.postMessage({ type: 'hmi:init', presets: presetsData, current, refs }, '*')
     } catch (err) {
       console.error('[HMI] Error cargando Firestore:', err)
@@ -233,7 +239,49 @@ export function HmiKnuroPage() {
     iframeRef.current?.contentWindow?.postMessage({ type: 'hmi:init', presets: presetsData, current, refs }, '*')
   }, [user])
 
-  const presetKeys = Object.keys(presets)
+  // Orden: los que están en presetOrder primero, luego los que falten al final
+  const presetKeys = useMemo(() => {
+    const all = Object.keys(presets)
+    const ordered = presetOrder.filter(n => all.includes(n))
+    const rest = all.filter(n => !presetOrder.includes(n))
+    return [...ordered, ...rest]
+  }, [presets, presetOrder])
+
+  const movePreset = useCallback(async (name: string, dir: 'up' | 'down') => {
+    const keys = [...presetKeys]
+    const idx = keys.indexOf(name)
+    if (dir === 'up' && idx === 0) return
+    if (dir === 'down' && idx === keys.length - 1) return
+    const swap = dir === 'up' ? idx - 1 : idx + 1
+    const tmp = keys[idx] as string; keys[idx] = keys[swap] as string; keys[swap] = tmp
+    setPresetOrder(keys)
+    await savePresetOrder(keys)
+  }, [presetKeys])
+
+  const confirmRename = useCallback(async () => {
+    if (!user || !editingPreset) return
+    const { name: oldName, value: newName } = editingPreset
+    const trimmed = newName.trim()
+    if (!trimmed || trimmed === oldName) { setEditingPreset(null); return }
+    if (presets[trimmed]) { alert(`Ya existe un preset con el nombre "${trimmed}"`); return }
+    const data = { ...presets[oldName] }
+    await saveHmiPreset(trimmed, data, user.id)
+    await deleteHmiPreset(oldName)
+    const newOrder = presetKeys.map(n => n === oldName ? trimmed : n)
+    setPresetOrder(newOrder)
+    await savePresetOrder(newOrder)
+    const updatedPresets = { ...presets, [trimmed]: data }
+    delete updatedPresets[oldName]
+    setPresets(updatedPresets)
+    if (currentPresetName === oldName) {
+      await setCurrentPreset(trimmed)
+      setCurrentPresetName(trimmed)
+      iframeRef.current?.contentWindow?.postMessage(
+        { type: 'hmi:init', presets: updatedPresets, current: trimmed, refs: {} }, '*'
+      )
+    }
+    setEditingPreset(null)
+  }, [user, editingPreset, presets, presetKeys, currentPresetName])
 
   return (
     <div className="flex flex-col h-full w-full relative">
@@ -273,35 +321,107 @@ export function HmiKnuroPage() {
                     Cargando presets…
                   </div>
                 ) : (
-                  presetKeys.map(name => (
-                    <div
-                      key={name}
-                      className={cn(
-                        'flex items-center text-xs hover:bg-muted transition-colors group',
-                        name === currentPresetName && 'bg-primary/10'
-                      )}
-                    >
-                      <button
-                        onClick={() => loadPresetFromReact(name)}
+                  presetKeys.map((name, idx) => {
+                    const isEditing = editingPreset?.name === name
+                    return (
+                      <div
+                        key={name}
                         className={cn(
-                          'flex-1 text-left px-3 py-2 flex items-center gap-2 min-w-0',
-                          name === currentPresetName && 'text-primary font-semibold'
+                          'flex items-center text-xs hover:bg-muted transition-colors group',
+                          name === currentPresetName && 'bg-primary/10'
                         )}
                       >
-                        <span className="flex-1 truncate">{name}</span>
-                        {name === currentPresetName && (
-                          <span className="text-[10px] opacity-60">activo</span>
+                        {/* Mover arriba / abajo */}
+                        {!isEditing && (
+                          <div className="flex flex-col opacity-0 group-hover:opacity-50 flex-shrink-0 pl-1">
+                            <button
+                              onClick={e => { e.stopPropagation(); movePreset(name, 'up') }}
+                              disabled={idx === 0}
+                              className="hover:opacity-100 disabled:opacity-20 p-0.5"
+                              title="Mover arriba"
+                            >
+                              <ArrowUp className="h-2.5 w-2.5" />
+                            </button>
+                            <button
+                              onClick={e => { e.stopPropagation(); movePreset(name, 'down') }}
+                              disabled={idx === presetKeys.length - 1}
+                              className="hover:opacity-100 disabled:opacity-20 p-0.5"
+                              title="Mover abajo"
+                            >
+                              <ArrowDown className="h-2.5 w-2.5" />
+                            </button>
+                          </div>
                         )}
-                      </button>
-                      <button
-                        onClick={e => { e.stopPropagation(); clonePreset(name) }}
-                        className="px-2 py-2 opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity flex-shrink-0"
-                        title={`Clonar "${name}"`}
-                      >
-                        <Copy className="h-3 w-3" />
-                      </button>
-                    </div>
-                  ))
+
+                        {/* Nombre o input de edición */}
+                        {isEditing ? (
+                          <input
+                            autoFocus
+                            value={editingPreset.value}
+                            onChange={e => setEditingPreset({ name, value: e.target.value })}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') confirmRename()
+                              if (e.key === 'Escape') setEditingPreset(null)
+                            }}
+                            onClick={e => e.stopPropagation()}
+                            className="flex-1 mx-1 px-1.5 py-1 bg-background border border-primary rounded text-xs outline-none min-w-0"
+                          />
+                        ) : (
+                          <button
+                            onClick={() => loadPresetFromReact(name)}
+                            className={cn(
+                              'flex-1 text-left px-2 py-2 flex items-center gap-1.5 min-w-0',
+                              name === currentPresetName && 'text-primary font-semibold'
+                            )}
+                          >
+                            <span className="flex-1 truncate">{name}</span>
+                            {name === currentPresetName && (
+                              <span className="text-[10px] opacity-60 flex-shrink-0">activo</span>
+                            )}
+                          </button>
+                        )}
+
+                        {/* Acciones: confirmar/cancelar o editar/clonar */}
+                        <div className="flex items-center flex-shrink-0 pr-1">
+                          {isEditing ? (
+                            <>
+                              <button
+                                onClick={e => { e.stopPropagation(); confirmRename() }}
+                                className="p-1.5 text-emerald-400 hover:text-emerald-300"
+                                title="Confirmar"
+                              >
+                                <Check className="h-3 w-3" />
+                              </button>
+                              <button
+                                onClick={e => { e.stopPropagation(); setEditingPreset(null) }}
+                                className="p-1.5 text-muted-foreground hover:text-foreground"
+                                title="Cancelar"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                onClick={e => { e.stopPropagation(); setEditingPreset({ name, value: name }) }}
+                                className="p-1.5 opacity-0 group-hover:opacity-50 hover:!opacity-100 transition-opacity"
+                                title="Renombrar"
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </button>
+                              <button
+                                onClick={e => { e.stopPropagation(); clonePreset(name) }}
+                                className="p-1.5 opacity-0 group-hover:opacity-50 hover:!opacity-100 transition-opacity"
+                                title={`Clonar "${name}"`}
+                              >
+                                <Copy className="h-3 w-3" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })
                 )}
               </div>
             )}

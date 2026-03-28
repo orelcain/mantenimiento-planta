@@ -93,6 +93,18 @@ export async function saveHmiRefs(refs: Record<string, string>): Promise<void> {
   await setDoc(doc(db, CONFIG_COL, 'refs'), { data: refs, updatedAt: serverTimestamp() })
 }
 
+// ── Orden de presets ──────────────────────────────────────────────────────────
+/** Obtiene el orden personalizado de presets */
+export async function getPresetOrder(): Promise<string[]> {
+  const snap = await getDoc(doc(db, CONFIG_COL, 'preset-order'))
+  return snap.exists() ? (snap.data().order as string[]) || [] : []
+}
+
+/** Guarda el orden personalizado de presets */
+export async function savePresetOrder(order: string[]): Promise<void> {
+  await setDoc(doc(db, CONFIG_COL, 'preset-order'), { order, updatedAt: serverTimestamp() })
+}
+
 // ── Historial de cambios ──────────────────────────────────────────────────────
 /** Registra una entrada en el historial de cambios */
 export async function addHmiHistory(
