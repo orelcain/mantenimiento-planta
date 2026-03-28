@@ -1169,11 +1169,12 @@ setInterval(tick,1000);tick();
 function scaleHMI(){
   const p=document.getElementById('hp'),s=document.getElementById('hs');
   if(!p||!s) return;
-  const availW=p.clientWidth||window.innerWidth;
-  const availH=p.clientHeight||window.innerHeight;
-  if(availW<10||availH<10) return; // dimensiones aún no disponibles
-  const rpW=IN_IFRAME?0:300; // en iframe sin panel derecho propio
-  let sc=Math.min((availW-rpW-40)/800,(availH-40)/480,1);
+  // Si #hp tiene dimensiones reales usarlas directamente (ya excluye #rp).
+  // Fallback: window.innerWidth menos el panel si estamos en modo standalone.
+  const availW=p.clientWidth>10?p.clientWidth:(window.innerWidth-(IN_IFRAME?0:300));
+  const availH=p.clientHeight>10?p.clientHeight:window.innerHeight;
+  if(availW<10||availH<10) return;
+  let sc=Math.min((availW-40)/800,(availH-40)/480,1);
   sc=Math.max(sc,.28);
   s.style.transform=`scale(${sc})`;s.style.width='800px';s.style.height='480px';
   s.parentElement.style.width=Math.round(800*sc)+'px';
@@ -1301,7 +1302,9 @@ async function loadFromStorage(){
 /* ── Listener postMessage desde HmiKnuroPage (sólo en iframe) ── */
 if(IN_IFRAME){
   window.addEventListener('message',e=>{
-    if(!e.data||e.data.type!=='hmi:init') return;
+    if(!e.data||typeof e.data.type!=='string') return;
+    if(e.data.type==='hmi:load-preset'){loadPreset(e.data.name);return;}
+    if(e.data.type!=='hmi:init') return;
     presets=e.data.presets||{};
     // Aplicar refs de Firestore
     if(e.data.refs){
@@ -1322,6 +1325,7 @@ if(IN_IFRAME){
     renderPresets(); populateCmpSelects();
     const toLoad=(cur&&presets[cur])?cur:(Object.keys(presets)[0]||null);
     if(toLoad){setAllInputs(presets[toLoad]);updateActivePreset(toLoad);}
+    requestAnimationFrame(()=>requestAnimationFrame(scaleHMI));
   });
 }
 
@@ -2370,9 +2374,8 @@ window.addEventListener('load',async()=>{
   initRefIds();          // asignar data-frid a cada .fr span
 
   if(IN_IFRAME){
-    // En iframe: ocultar panel derecho para maximizar área HMI
-    const rp=document.getElementById('rp');
-    if(rp) rp.style.display='none';
+    // En iframe: #rp queda visible (desktop=inline, mobile=drawer).
+    // En mobile el CSS lo convierte en panel deslizable; en desktop queda inline.
     // Notificar al padre (HmiKnuroPage) que estamos listos para recibir datos
     window.parent.postMessage({type:'hmi:ready'},'*');
     // Los presets/refs llegarán via hmi:init → ver listener arriba
