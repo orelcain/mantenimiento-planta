@@ -1,0 +1,52 @@
+name: Deploy Firestore Rules & Indexes
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'firestore.rules'
+      - 'firestore.indexes.json'
+      - '.github/workflows/deploy-firestore-rules.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy Firestore Rules
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools@15.11.0
+
+      - name: Deploy Firestore Rules & Indexes
+        run: |
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/sa.json
+          GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json firebase deploy --only firestore:rules,firestore:indexes --non-interactive
+          rm -f /tmp/sa.json
+
+      - name: Notificar deploy exitoso
+        if: success()
+        run: |
+          curl -s -X POST \
+            -H "Title: Firestore Rules desplegadas" \
+            -H "Tags: shield" \
+            -H "Priority: default" \
+            -d "Firestore rules e indexes actualizados en main" \
+            https://ntfy.sh/mis-notificaciones-claude || true
+
+      - name: Notificar deploy fallido
+        if: failure()
+        run: |
+          curl -s -X POST \
+            -H "Title: Deploy Firestore Rules fallo" \
+            -H "Tags: warning" \
+            -H "Priority: high" \
+            -d "El deploy de Firestore rules fallo. Revisa los logs." \
+            https://ntfy.sh/mis-notificaciones-claude || true
