@@ -24,12 +24,15 @@ import { Button } from '@/components/ui'
  * puente postMessage <-> Firestore para persistir presets, preset activo,
  * referencias de fábrica e historial de cambios.
  *
- * La toolbar React expone un selector de presets (dropdown) accesible en
- * mobile/tablet donde el panel #rp del HMI puede estar fuera de pantalla.
+ * NOTA de timing: el iframe puede enviar 'hmi:ready' ANTES de que Firebase Auth
+ * restaure la sesión. Usamos iframeReadyRef para reintentar sendInitData cuando
+ * user se vuelve disponible.
  */
 export function HmiKnuroPage() {
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const presetsDropdownRef = useRef<HTMLDivElement>(null)
+  /** Flag: el iframe ya envió hmi:ready pero user no estaba disponible aún */
+  const iframeReadyRef = useRef(false)
   const user = useAuthStore(state => state.user)
 
   // ── Estado presets ──────────────────────────────────────────────────────
@@ -49,6 +52,7 @@ export function HmiKnuroPage() {
   }, [])
 
   // ── Carga inicial desde Firestore → iframe ──────────────────────────────
+  // No depende de user para leer; solo lo necesita para sembrar presets si vacío.
   const sendInitData = useCallback(async (iframe: HTMLIFrameElement) => {
     try {
       let [presetsData, current, refs] = await Promise.all([
@@ -57,17 +61,32 @@ export function HmiKnuroPage() {
         getHmiRefs(),
       ])
       // Si Firestore está vacío, sembrar los 6 presets por defecto automáticamente
-      if (Object.keys(presetsData).length === 0 && user) {
-        await seedDefaultPresets(user.id)
-        ;[presetsData, current] = await Promise.all([getHmiPresets(), getCurrentPreset()])
+      if (Object.keys(presetsData).length === 0) {
+        const uid = user?.id ?? useAuthStore.getState().user?.id
+        if (uid) {
+          try {
+            await seedDefaultPresets(uid)
+            ;[presetsData, current] = await Promise.all([getHmiPresets(), getCurrentPreset()])
+            console.info('[HMI] Presets sembrados:', Object.keys(presetsData).join(', '))
+          } catch (seedErr) {
+            console.error('[HMI] Error sembrando presets (reglas Firestore?):', seedErr)
+          }
+        }
       }
       setPresets(presetsData)
       setCurrentPresetName(current)
       iframe.contentWindow?.postMessage({ type: 'hmi:init', presets: presetsData, current, refs }, '*')
     } catch (err) {
-      console.error('[HMI Knuro] Error cargando datos de Firestore:', err)
+      console.error('[HMI] Error cargando Firestore:', err)
     }
   }, [user])
+
+  // ── Re-intentar si user llega después de que el iframe estaba listo ────
+  useEffect(() => {
+    if (user && iframeReadyRef.current && iframeRef.current) {
+      sendInitData(iframeRef.current)
+    }
+  }, [user, sendInitData])
 
   // ── Cerrar dropdown al hacer clic fuera ─────────────────────────────────
   useEffect(() => {
@@ -85,12 +104,19 @@ export function HmiKnuroPage() {
     const handleMessage = async (event: MessageEvent) => {
       if (!event.data || typeof event.data.type !== 'string') return
       if (!event.data.type.startsWith('hmi:')) return
-      if (!user) return
       const { type } = event.data
+
+      // hmi:ready NO necesita user — llama sendInitData que puede leer Firestore sin user
+      if (type === 'hmi:ready') {
+        iframeReadyRef.current = true
+        if (iframeRef.current) await sendInitData(iframeRef.current)
+        return
+      }
+
+      // El resto de mensajes requieren user autenticado
+      if (!user) return
+
       switch (type) {
-        case 'hmi:ready':
-          if (iframeRef.current) await sendInitData(iframeRef.current)
-          break
         case 'hmi:save-preset': {
           const { name, data, previousData } = event.data
           if (!name || !data) break
@@ -197,11 +223,10 @@ export function HmiKnuroPage() {
             </Button>
 
             {presetsOpen && (
-              <div className="absolute right-0 top-full mt-1 z-50 bg-card border border-border rounded-lg shadow-xl w-52 max-h-72 overflow-y-auto">
+              <div className="absolute right-0 top-full mt-1 z-50 bg-card border border-border rounded-lg shadow-xl w-56 max-h-72 overflow-y-auto">
                 {presetKeys.length === 0 ? (
                   <div className="text-xs text-muted-foreground px-3 py-3 text-center leading-relaxed">
-                    Sin presets guardados.<br />
-                    <span className="opacity-60">Usa el panel derecho del HMI para guardar uno.</span>
+                    Cargando presets…
                   </div>
                 ) : (
                   presetKeys.map(name => (
