@@ -1272,6 +1272,7 @@ const IN_IFRAME=(()=>{try{return window.self!==window.top;}catch(e){return true;
 
 /* ── Presets — persisted in window.storage / Firestore via postMessage ── */
 let presets={};
+let presetOrder=[];
 
 async function loadFromStorage(){
   if(IN_IFRAME) return; // datos vienen via hmi:init desde HmiKnuroPage
@@ -1304,6 +1305,7 @@ if(IN_IFRAME){
     if(e.data.type==='hmi:load-preset'){loadPreset(e.data.name);return;}
     if(e.data.type!=='hmi:init') return;
     presets=e.data.presets||{};
+    presetOrder=e.data.order||[];
     // Aplicar refs de Firestore
     if(e.data.refs){
       document.querySelectorAll('span.fr[data-frid]').forEach(fr=>{
@@ -1463,19 +1465,40 @@ function deletePreset(n){
 
 function renderPresets(){
   const pl=document.getElementById('pl');pl.innerHTML='';
-  const keys=Object.keys(presets);
+  const allKeys=Object.keys(presets);
   const cur=IN_IFRAME?(document.getElementById('pn').value||''):(localStorage.getItem('knuro-current')||'');
-  if(!keys.length){pl.innerHTML='<div style="font-size:9.5px;color:#444;padding:3px 0;">Sin presets guardados.</div>';return;}
-  keys.forEach(n=>{
+  if(!allKeys.length){pl.innerHTML='<div style="font-size:9.5px;color:#444;padding:3px 0;">Sin presets guardados.</div>';return;}
+  // Ordenar: primero los que están en presetOrder, luego el resto
+  const ordered=[...presetOrder.filter(n=>allKeys.includes(n)),...allKeys.filter(n=>!presetOrder.includes(n))];
+  ordered.forEach((n,idx)=>{
     const d=document.createElement('div');
     d.className='pi'+(n===cur?' pi-active':'');
     d.dataset.name=n;
+    // Botones reordenar
+    const mv=document.createElement('div');mv.style.cssText='display:flex;flex-direction:column;flex-shrink:0;margin-right:3px;';
+    const bu=document.createElement('button');bu.className='pbtn';bu.style.cssText='flex:none;padding:0 3px;font-size:8px;line-height:1.2;';bu.textContent='▲';bu.title='Mover arriba';bu.disabled=(idx===0);
+    bu.onclick=e=>{e.stopPropagation();reorderPreset(n,'up');};
+    const bd=document.createElement('button');bd.className='pbtn';bd.style.cssText='flex:none;padding:0 3px;font-size:8px;line-height:1.2;';bd.textContent='▼';bd.title='Mover abajo';bd.disabled=(idx===ordered.length-1);
+    bd.onclick=e=>{e.stopPropagation();reorderPreset(n,'down');};
+    mv.append(bu,bd);
     const sp=document.createElement('span');sp.textContent=n;sp.title=n;
     const lb=document.createElement('button');lb.className='pbtn';lb.style.cssText='flex:none;padding:2px 5px;font-size:9px;';lb.textContent='Cargar';lb.onclick=()=>loadPreset(n);
     const db=document.createElement('button');db.className='pbtn del';db.style.cssText='flex:none;padding:2px 4px;font-size:9px;';db.textContent='✕';db.onclick=()=>deletePreset(n);
-    d.append(sp,lb,db);
+    d.append(mv,sp,lb,db);
     pl.appendChild(d);
   });
+}
+function reorderPreset(n,dir){
+  const allKeys=Object.keys(presets);
+  const base=[...presetOrder.filter(k=>allKeys.includes(k)),...allKeys.filter(k=>!presetOrder.includes(k))];
+  const idx=base.indexOf(n);
+  if(dir==='up'&&idx===0) return;
+  if(dir==='down'&&idx===base.length-1) return;
+  const swap=dir==='up'?idx-1:idx+1;
+  const tmp=base[idx];base[idx]=base[swap];base[swap]=tmp;
+  presetOrder=base;
+  renderPresets();
+  if(IN_IFRAME) window.parent.postMessage({type:'hmi:reorder-preset',order:base},'*');
 }
 
 /* ── Export JSON (download) ── */

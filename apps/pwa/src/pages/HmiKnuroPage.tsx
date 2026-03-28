@@ -83,7 +83,7 @@ export function HmiKnuroPage() {
       setPresets(presetsData)
       setCurrentPresetName(current)
       setPresetOrder(order)
-      iframe.contentWindow?.postMessage({ type: 'hmi:init', presets: presetsData, current, refs }, '*')
+      iframe.contentWindow?.postMessage({ type: 'hmi:init', presets: presetsData, current, refs, order }, '*')
     } catch (err) {
       console.error('[HMI] Error cargando Firestore:', err)
     }
@@ -166,6 +166,14 @@ export function HmiKnuroPage() {
         case 'hmi:save-refs':
           if (event.data.refs) await saveHmiRefs(event.data.refs)
           break
+        case 'hmi:reorder-preset': {
+          const { order: newOrder } = event.data
+          if (Array.isArray(newOrder)) {
+            setPresetOrder(newOrder)
+            await savePresetOrder(newOrder)
+          }
+          break
+        }
       }
     }
     window.addEventListener('message', handleMessage)
@@ -219,15 +227,18 @@ export function HmiKnuroPage() {
       userId: user.id,
       userName: ((user.nombre ?? '') + ' ' + (user.apellido ?? '')).trim() || user.email,
     })
+    const cloneOrder = [...presetOrder, trimmed]
+    setPresetOrder(cloneOrder)
+    await savePresetOrder(cloneOrder)
     // Cargar el clon en el iframe
     iframeRef.current?.contentWindow?.postMessage(
-      { type: 'hmi:init', presets: updatedPresets, current: trimmed, refs: {} },
+      { type: 'hmi:init', presets: updatedPresets, current: trimmed, refs: {}, order: cloneOrder },
       '*'
     )
     await setCurrentPreset(trimmed)
     setCurrentPresetName(trimmed)
     setPresetsOpen(false)
-  }, [user, presets])
+  }, [user, presets, presetOrder])
 
   const resetToDefaults = useCallback(async () => {
     if (!user) return
@@ -236,7 +247,7 @@ export function HmiKnuroPage() {
     const [presetsData, current, refs] = await Promise.all([getHmiPresets(), getCurrentPreset(), getHmiRefs()])
     setPresets(presetsData)
     setCurrentPresetName(current)
-    iframeRef.current?.contentWindow?.postMessage({ type: 'hmi:init', presets: presetsData, current, refs }, '*')
+    iframeRef.current?.contentWindow?.postMessage({ type: 'hmi:init', presets: presetsData, current, refs, order: presetOrder }, '*')
   }, [user])
 
   // Orden: los que están en presetOrder primero, luego los que falten al final
@@ -277,7 +288,7 @@ export function HmiKnuroPage() {
       await setCurrentPreset(trimmed)
       setCurrentPresetName(trimmed)
       iframeRef.current?.contentWindow?.postMessage(
-        { type: 'hmi:init', presets: updatedPresets, current: trimmed, refs: {} }, '*'
+        { type: 'hmi:init', presets: updatedPresets, current: trimmed, refs: {}, order: newOrder }, '*'
       )
     }
     setEditingPreset(null)
