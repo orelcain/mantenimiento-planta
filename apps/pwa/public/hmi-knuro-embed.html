@@ -18,9 +18,9 @@ const _b=new Blob([JSON.stringify(_m)],{type:'application/json'});const _l=docum
 :root{
   --bg:#1a1c22;--pb:#13151b;--bdr:#252830;
   --ac:#4499ff;--ac2:#6688cc;
-  --scr:#2a2d3a;--hdr:#1e2028;--hbg:#9898a8;
-  --nb:#c8c8d0;--nbb:#9898a8;
-  --ab:#dcdce8;--abb:#aaaabc;
+  --scr:#f4f4f4;--hdr:#dcdcdc;--hbg:#b8b8b8;
+  --nb:#e8e8e8;--nbb:#aaaaaa;
+  --ab:#e0e0e0;--abb:#aaaaaa;
 }
 html,body{height:100%;background:var(--bg);color:#ccc;font-family:'Segoe UI',Arial,sans-serif;overflow:hidden;}
 #app{display:flex;flex-direction:column;height:100%;height:100dvh;}
@@ -39,11 +39,11 @@ html,body{height:100%;background:var(--bg);color:#ccc;font-family:'Segoe UI',Ari
 .brd .mn{font-size:14px;font-weight:700;color:#888;letter-spacing:1px;}.brd .mn span{font-weight:300;}
 .brd .bj{font-size:11px;color:#888;font-style:italic;letter-spacing:1px;}
 #hs{width:800px;height:480px;background:var(--scr);position:relative;overflow:hidden;transform-origin:top left;}
-.sc{display:none;width:100%;height:100%;flex-direction:column;background:var(--scr);position:absolute;top:0;left:0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#ccccdd;}
+.sc{display:none;width:100%;height:100%;flex-direction:column;background:var(--scr);position:absolute;top:0;left:0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#111;}
 .sc.active{display:flex;}
-.sh{display:flex;justify-content:space-between;align-items:center;background:var(--hdr);border-bottom:2px solid #404060;padding:4px 10px;min-height:28px;flex-shrink:0;}
-.sh .st{font-size:11.5px;color:#ccccee;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.sh .sd{font-size:11px;color:#6688aa;flex-shrink:0;margin-left:8px;font-family:'Courier New',monospace;}
+.sh{display:flex;justify-content:space-between;align-items:center;background:var(--hdr);border-bottom:1px solid #c0c0c0;padding:4px 10px;min-height:28px;flex-shrink:0;}
+.sh .st{font-size:11.5px;color:#222;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sh .sd{font-size:11px;color:#555;flex-shrink:0;margin-left:8px;font-family:'Courier New',monospace;}
 .sb{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 12px;overflow:hidden;}
 /* nav */
 .nw{flex-shrink:0;background:var(--hbg);border-top:2px solid var(--nbb);}
@@ -65,13 +65,13 @@ html,body{height:100%;background:var(--bg);color:#ccc;font-family:'Segoe UI',Ari
 .hb.empty{background:#f0f0f6;border-color:#c4c4d4;border-bottom-color:#a8a8b8;color:#555;}
 /* param table */
 .pt{width:100%;border-collapse:collapse;}
-.pt .plb{text-align:right;color:#ccccdd;padding:4px 10px 4px 0;white-space:nowrap;font-size:12px;vertical-align:middle;}
+.pt .plb{text-align:right;color:#222;padding:4px 10px 4px 0;white-space:nowrap;font-size:12px;vertical-align:middle;}
 .pt td{vertical-align:middle;padding:2px 3px;}
 input.fe{width:58px;height:22px;background:#fff;border:1px solid #888;font-size:12px;font-family:'Courier New',monospace;text-align:right;padding:0 4px;color:#111;outline:none;}
 input.fe:focus{border-color:#4499ff;background:#fffff8;}
 input.fe1{width:74px;height:22px;background:#fff;border:1px solid #888;font-size:12px;font-family:'Courier New',monospace;text-align:right;padding:0 4px;color:#111;outline:none;}
 input.fe1:focus{border-color:#4499ff;background:#fffff8;}
-.fr{display:inline-block;font-size:11.5px;font-family:'Courier New',monospace;color:#ffffff;padding-left:4px;vertical-align:middle;min-width:30px;}
+.fr{display:inline-block;font-size:11.5px;font-family:'Courier New',monospace;color:#aaaaaa;padding-left:4px;vertical-align:middle;min-width:30px;}
 .fr.editing{background:#2a2200;border:1px dashed #aa8800;border-radius:2px;color:#ffcc44;cursor:text;padding:0 3px;outline:none;min-width:28px;}
 .fr.editing:focus{border-color:#ffee66;background:#332800;color:#ffee88;}
 .pbtn.refs-btn{background:#1e2028;color:#aaaacc;border-color:#446688;}
@@ -84,40 +84,32 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
 .sen-list{width:100%;border-collapse:collapse;}
 .sen-list td{padding:5px 14px;font-size:12.5px;}
 .sen-list tr:not(:last-child) td{border-bottom:1px solid #c8c8d0;}
-.sen-off{color:#5577aa;}.sen-on{color:#ddeeff;font-weight:600;}
+.sen-off{color:#aaa;}.sen-on{color:#111;font-weight:600;}
 /* idx */
 .idxl{display:flex;flex-direction:column;gap:14px;width:460px;}
 .idxr{display:flex;align-items:center;justify-content:space-between;}
-.idxr span{font-size:14px;color:#ccccdd;}
+.idxr span{font-size:14px;color:#111;}
 /* principal */
 #sp .sb{padding:0;position:relative;justify-content:flex-start;}
 .ptop{display:flex;justify-content:space-between;padding:5px 14px 0;width:100%;}
 .ptop span{font-size:12px;color:#333;cursor:pointer;text-decoration:underline;}
 .pctr{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding-bottom:6px;}
-.pclk{font-size:28px;font-weight:bold;font-family:'Courier New',monospace;color:#ccccee;margin:5px 0 2px;}
+.pclk{font-size:28px;font-weight:bold;font-family:'Courier New',monospace;color:#111;margin:5px 0 2px;}
 .fbox{border:1px solid #8888a0;background:#d0d0dc;padding:3px 22px 5px;text-align:center;min-width:170px;}
-.fbox .fl{font-size:11px;color:#8899bb;margin-bottom:1px;}.fbox .fv{font-size:17px;font-weight:700;color:#ccccee;}
+.fbox .fl{font-size:11px;color:#555;margin-bottom:1px;}.fbox .fv{font-size:17px;font-weight:700;color:#111;}
 .pftr{display:flex;justify-content:space-between;align-items:center;width:100%;padding:0 10px 5px;}
 .tg{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;width:100%;padding:4px;}
 #s6 .sb{padding:0;align-items:stretch;justify-content:flex-start;}
 .atbl{width:100%;border-collapse:collapse;font-size:11.5px;}
-.atbl th{background:#1e2030;border:1px solid #404060;padding:3px 7px;text-align:left;font-weight:600;color:#aabbcc;}
-.atbl td{border:1px solid #404060;padding:3px 7px;background:#232840;color:#ccccdd;}
-.atbl tr:nth-child(odd) td{background:#1e2235;}
-.astat{padding:3px 8px;font-size:10.5px;color:#8899bb;background:#1a1c28;border-top:1px solid #404060;}
+.atbl th{background:#d0d0d0;border:1px solid #aaa;padding:3px 7px;text-align:left;font-weight:600;color:#111;}
+.atbl td{border:1px solid #c0c0c0;padding:3px 7px;background:#ececec;color:#111;}
+.atbl tr:nth-child(odd) td{background:#e4e4e4;}
+.astat{padding:3px 8px;font-size:10.5px;color:#444;background:#d8d8d8;border-top:1px solid #bbb;}
 .iag{display:grid;grid-template-columns:1fr 1fr;gap:4px;width:100%;}
 .iar{display:flex;align-items:center;gap:3px;padding:1px 0;}
-.ian{flex:1;color:#ccccdd;font-size:11px;}
+.ian{flex:1;color:#111;font-size:11px;}
 .ian.act{color:#bb1100;font-weight:bold;}
 .ton{background:#a8d000;color:#222;border:2px solid #889900;border-bottom:3px solid #667700;font-size:13px;font-weight:700;padding:8px 24px;cursor:pointer;font-family:Arial,sans-serif;}
-/* ── Dark theme: override inline text/border colors inside screens ── */
-.sc *[style*="color:#111"]{color:#ccccdd!important;}
-.sc *[style*="color:#222"]{color:#ccccee!important;}
-.sc *[style*="color:#333"]{color:#aaaacc!important;}
-.sc *[style*="color:#444"]{color:#8899bb!important;}
-.sc *[style*="color:#555"]{color:#6677aa!important;}
-.sc *[style*="border-bottom:1px solid #c0c0cc"]{border-bottom-color:#404060!important;}
-.sc *[style*="border-bottom:1px solid #c8c8d0"]{border-bottom-color:#404060!important;}
 /* ── RIGHT PANEL ── */
 #rp{width:300px;flex-shrink:0;background:var(--pb);border-left:1px solid var(--bdr);display:flex;flex-direction:column;overflow:hidden;transition:width .2s ease;}
 /* tree section */
@@ -2057,18 +2049,12 @@ html,body{overflow:visible!important;height:auto!important;margin:0;padding:0;ba
 .xsep-sub{font-size:10px;font-weight:700;letter-spacing:4px;color:rgba(255,255,255,.45);text-transform:uppercase;}
 .xsep-title{font-size:38px;font-weight:700;color:#fff;letter-spacing:.5px;line-height:1.1;}
 .xsep-mach{font-size:13px;color:#00a0d4;font-weight:600;margin-top:4px;}
-/* ── Contenido HMI — tema oscuro (fiel al diseño original Knuro B2) ── */
-.xin{width:800px;height:480px;display:flex;flex-direction:column;background:#2a2d3a;font-size:13px;color:#ccccdd;overflow:hidden;}
-.sh{display:flex!important;flex:0 0 auto;background:#1e2028!important;border-bottom-color:#404060!important;}
-.sh .st{color:#ccccee!important;}
-.sh .sd{color:#8888bb!important;}
-.sb{flex:1!important;display:flex!important;overflow:hidden!important;background:#2a2d3a!important;}
-/* Etiquetas y tablas de parámetros */
-.pt .plb{color:#ccccdd!important;}
-.pt td{color:#aaaacc!important;}
-th{color:#8899bb!important;}
-/* Valores de referencia: blanco sobre fondo oscuro, fiel al diseño original */
-.fr{color:#ffffff!important;}
+/* ── Contenido HMI — tema claro fiel al diseño original Knuro B2 ── */
+.xin{width:800px;height:480px;display:flex;flex-direction:column;background:#f4f4f4;font-size:13px;color:#111;overflow:hidden;}
+.sh{display:flex!important;flex:0 0 auto;}
+.sb{flex:1!important;display:flex!important;overflow:hidden!important;}
+/* Valores de referencia: gris sutil sobre fondo claro */
+.fr{color:#aaaaaa!important;}
 /* ════════════════════════════════════════
    PORTADA — diseño "corporate report"
    ════════════════════════════════════════ */
