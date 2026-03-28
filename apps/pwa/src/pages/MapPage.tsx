@@ -375,6 +375,8 @@ export function MapPage() {
   const [addEquipmentType, setAddEquipmentType] = useState<MapNode['type']>('pump')
   const [showLinkDialog, setShowLinkDialog] = useState(false)
   const overlayState = useEditorOverlayState()
+  // Destructure stable useCallback methods to avoid recreating callbacks on every render
+  const { closeOverlay: closeEditorOverlay, openOverlay: openEditorOverlay, closeOverlayIf: closeEditorOverlayIf } = overlayState
   const showAddDialog = overlayState.isOverlayOpen('add-equipment')
   const showShapeEditor = overlayState.isOverlayOpen('shape-editor')
   const showAreaEditor = overlayState.isOverlayOpen('area-editor')
@@ -1389,6 +1391,9 @@ export function MapPage() {
     [history, areas, connectors, terrainTiles]
   )
 
+  const openAreaOverlayCb = useCallback(() => openEditorOverlay('area-editor'), [openEditorOverlay])
+  const closeAreaOverlayCb = useCallback(() => closeEditorOverlayIf('area-editor'), [closeEditorOverlayIf])
+
   const {
     editingArea,
     areaPaintState,
@@ -1408,8 +1413,8 @@ export function MapPage() {
     setSelectedAreaId,
     setEditorTool,
     commitEditorChange,
-    openAreaOverlay: () => overlayState.openOverlay('area-editor'),
-    closeAreaOverlay: () => overlayState.closeOverlayIf('area-editor'),
+    openAreaOverlay: openAreaOverlayCb,
+    closeAreaOverlay: closeAreaOverlayCb,
   })
 
   const handleToggleEditMode = useCallback(() => {
@@ -1427,7 +1432,7 @@ export function MapPage() {
     setTerrainEditEnabled(false)
     setShowTerrainModal(false)
     closeAreaEditor()
-    overlayState.closeOverlay()
+    closeEditorOverlay()
     setViewerState((prev) => ({
       ...prev,
       mode: 'view',
@@ -1440,7 +1445,7 @@ export function MapPage() {
         showAlerts: false,
       },
     }))
-  }, [isTerrainBaseStage, closeAreaEditor, overlayState, setTerrainEditEnabled, setShowTerrainModal])
+  }, [isTerrainBaseStage, closeAreaEditor, closeEditorOverlay, setTerrainEditEnabled, setShowTerrainModal])
 
   const enterEditorWorkspace = useCallback(() => {
     setWorkspaceStage('editor')
