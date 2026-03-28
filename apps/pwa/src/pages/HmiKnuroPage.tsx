@@ -1,6 +1,7 @@
 import { useEffect, useRef, useMemo, useState, useCallback } from 'react'
-import { History, Cpu, RefreshCw, X, ChevronDown, ChevronUp } from 'lucide-react'
+import { History, Cpu, RefreshCw, X, ChevronDown, ChevronUp, Sliders } from 'lucide-react'
 import { useAuthStore } from '@/store'
+import { cn } from '@/lib/utils'
 import {
   getHmiPresets,
   saveHmiPreset,
@@ -21,10 +22,21 @@ import { Button } from '@/components/ui'
  * Carga el simulador HMI (hmi-knuro-embed.html) en un iframe y actúa como
  * puente postMessage <-> Firestore para persistir presets, preset activo,
  * referencias de fábrica e historial de cambios.
+ *
+ * La toolbar React expone un selector de presets (dropdown) accesible en
+ * mobile/tablet donde el panel #rp del HMI puede estar fuera de pantalla.
  */
 export function HmiKnuroPage() {
   const iframeRef = useRef<HTMLIFrameElement>(null)
+  const presetsDropdownRef = useRef<HTMLDivElement>(null)
   const user = useAuthStore(state => state.user)
+
+  // ── Estado presets ──────────────────────────────────────────────────────
+  const [presets, setPresets] = useState<Record<string, Record<string, string>>>({})
+  const [currentPresetName, setCurrentPresetName] = useState<string | null>(null)
+  const [presetsOpen, setPresetsOpen] = useState(false)
+
+  // ── Estado historial ────────────────────────────────────────────────────
   const [historyOpen, setHistoryOpen] = useState(false)
   const [historyExpanded, setHistoryExpanded] = useState(false)
   const [history, setHistory] = useState<HmiHistoryEntry[]>([])
@@ -35,19 +47,34 @@ export function HmiKnuroPage() {
     return basePath + 'hmi-knuro-embed.html'
   }, [])
 
+  // ── Carga inicial desde Firestore → iframe ──────────────────────────────
   const sendInitData = useCallback(async (iframe: HTMLIFrameElement) => {
     try {
-      const [presets, current, refs] = await Promise.all([
+      const [presetsData, current, refs] = await Promise.all([
         getHmiPresets(),
         getCurrentPreset(),
         getHmiRefs(),
       ])
-      iframe.contentWindow?.postMessage({ type: 'hmi:init', presets, current, refs }, '*')
+      setPresets(presetsData)
+      setCurrentPresetName(current)
+      iframe.contentWindow?.postMessage({ type: 'hmi:init', presets: presetsData, current, refs }, '*')
     } catch (err) {
       console.error('[HMI Knuro] Error cargando datos de Firestore:', err)
     }
   }, [])
 
+  // ── Cerrar dropdown al hacer clic fuera ─────────────────────────────────
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (presetsDropdownRef.current && !presetsDropdownRef.current.contains(e.target as Node)) {
+        setPresetsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  // ── Puente postMessage ──────────────────────────────────────────────────
   useEffect(() => {
     const handleMessage = async (event: MessageEvent) => {
       if (!event.data || typeof event.data.type !== 'string') return
@@ -62,6 +89,7 @@ export function HmiKnuroPage() {
           const { name, data, previousData } = event.data
           if (!name || !data) break
           await saveHmiPreset(name, data, user.id)
+          setPresets(prev => ({ ...prev, [name]: data }))
           await addHmiHistory({
             presetName: name,
             action: 'save',
@@ -75,20 +103,24 @@ export function HmiKnuroPage() {
         case 'hmi:delete-preset': {
           const { name } = event.data
           if (!name) break
-          const presets = await getHmiPresets()
+          const currentPresets = await getHmiPresets()
           await deleteHmiPreset(name)
+          setPresets(prev => { const p = { ...prev }; delete p[name]; return p })
           await addHmiHistory({
             presetName: name,
             action: 'delete',
             data: null,
-            previousData: presets[name] ?? null,
+            previousData: currentPresets[name] ?? null,
             userId: user.id,
             userName: ((user.nombre ?? '') + ' ' + (user.apellido ?? '')).trim() || user.email,
           })
           break
         }
         case 'hmi:set-current':
-          if (typeof event.data.name === 'string') await setCurrentPreset(event.data.name)
+          if (typeof event.data.name === 'string') {
+            await setCurrentPreset(event.data.name)
+            setCurrentPresetName(event.data.name)
+          }
           break
         case 'hmi:save-refs':
           if (event.data.refs) await saveHmiRefs(event.data.refs)
@@ -99,6 +131,14 @@ export function HmiKnuroPage() {
     return () => window.removeEventListener('message', handleMessage)
   }, [user, sendInitData])
 
+  // ── Cargar preset desde la toolbar React (útil en mobile) ──────────────
+  const loadPresetFromReact = useCallback((name: string) => {
+    iframeRef.current?.contentWindow?.postMessage({ type: 'hmi:load-preset', name }, '*')
+    setCurrentPresetName(name)
+    setPresetsOpen(false)
+  }, [])
+
+  // ── Historial ──────────────────────────────────────────────────────────
   const openHistory = async () => {
     setHistoryOpen(true)
     setLoadingHistory(true)
@@ -117,18 +157,67 @@ export function HmiKnuroPage() {
     }, 50)
   }
 
+  const presetKeys = Object.keys(presets)
+
   return (
     <div className="flex flex-col h-full w-full relative">
-      {/* Toolbar */}
+
+      {/* ── Toolbar ──────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between px-3 py-1.5 bg-card border-b border-border flex-shrink-0 gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <Cpu className="h-4 w-4 text-primary flex-shrink-0" />
           <span className="text-sm font-semibold truncate">HMI Knuro B2</span>
-          <span className="text-xs text-muted-foreground hidden sm:inline">
+          <span className="text-xs text-muted-foreground hidden md:inline">
             Simulador de parámetros — Baader
           </span>
         </div>
+
         <div className="flex items-center gap-1 flex-shrink-0">
+
+          {/* Selector de presets */}
+          <div className="relative" ref={presetsDropdownRef}>
+            <Button
+              variant={presetsOpen ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setPresetsOpen(p => !p)}
+              className="h-7 gap-1 text-xs"
+              title="Seleccionar preset"
+            >
+              <Sliders className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline max-w-[90px] truncate">
+                {currentPresetName ?? 'Presets'}
+              </span>
+              <ChevronDown className={cn('h-3 w-3 transition-transform', presetsOpen && 'rotate-180')} />
+            </Button>
+
+            {presetsOpen && (
+              <div className="absolute right-0 top-full mt-1 z-50 bg-card border border-border rounded-lg shadow-xl w-52 max-h-72 overflow-y-auto">
+                {presetKeys.length === 0 ? (
+                  <div className="text-xs text-muted-foreground px-3 py-3 text-center leading-relaxed">
+                    Sin presets guardados.<br />
+                    <span className="opacity-60">Usa el panel derecho del HMI para guardar uno.</span>
+                  </div>
+                ) : (
+                  presetKeys.map(name => (
+                    <button
+                      key={name}
+                      onClick={() => loadPresetFromReact(name)}
+                      className={cn(
+                        'w-full text-left text-xs px-3 py-2 hover:bg-muted transition-colors flex items-center gap-2',
+                        name === currentPresetName && 'bg-primary/10 text-primary font-semibold'
+                      )}
+                    >
+                      <span className="flex-1 truncate">{name}</span>
+                      {name === currentPresetName && (
+                        <span className="text-[10px] opacity-60">activo</span>
+                      )}
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
           <Button
             variant="ghost"
             size="sm"
@@ -138,6 +227,7 @@ export function HmiKnuroPage() {
             <History className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Historial</span>
           </Button>
+
           <Button variant="ghost" size="sm" onClick={refreshIframe} className="h-7 gap-1 text-xs">
             <RefreshCw className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Recargar</span>
@@ -145,7 +235,7 @@ export function HmiKnuroPage() {
         </div>
       </div>
 
-      {/* iframe */}
+      {/* ── iframe ───────────────────────────────────────────────────── */}
       <div className="flex-1 min-h-0 relative overflow-hidden">
         <iframe
           ref={iframeRef}
@@ -157,7 +247,7 @@ export function HmiKnuroPage() {
         />
       </div>
 
-      {/* Panel historial */}
+      {/* ── Panel historial (drawer lateral) ────────────────────────── */}
       {historyOpen && (
         <div
           className="absolute inset-y-0 right-0 flex flex-col bg-card border-l border-border shadow-2xl z-50"
@@ -181,12 +271,7 @@ export function HmiKnuroPage() {
                   : <ChevronUp className="h-3.5 w-3.5" />
                 }
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                onClick={() => setHistoryOpen(false)}
-              >
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setHistoryOpen(false)}>
                 <X className="h-3.5 w-3.5" />
               </Button>
             </div>
@@ -209,7 +294,7 @@ export function HmiKnuroPage() {
                   className="text-xs rounded-lg border border-border p-2 space-y-0.5 hover:bg-muted/40 transition-colors"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className={`font-semibold truncate ${entry.action === 'delete' ? 'text-red-400' : 'text-emerald-400'}`}>
+                    <span className={cn('font-semibold truncate', entry.action === 'delete' ? 'text-red-400' : 'text-emerald-400')}>
                       {entry.action === 'save' ? '💾' : '🗑'} {entry.presetName}
                     </span>
                     <span className="text-[10px] text-muted-foreground flex-shrink-0">
