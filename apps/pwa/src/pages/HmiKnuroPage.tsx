@@ -1,5 +1,5 @@
 import { useEffect, useRef, useMemo, useState, useCallback } from 'react'
-import { History, Cpu, RefreshCw, X, ChevronDown, ChevronUp, Sliders, RotateCcw } from 'lucide-react'
+import { History, Cpu, RefreshCw, X, ChevronDown, ChevronUp, Sliders, RotateCcw, Copy } from 'lucide-react'
 import { useAuthStore } from '@/store'
 import { cn } from '@/lib/utils'
 import {
@@ -192,6 +192,37 @@ export function HmiKnuroPage() {
     }, 50)
   }
 
+  const clonePreset = useCallback(async (sourceName: string) => {
+    if (!user) return
+    const newName = prompt('Nombre del nuevo preset:', `${sourceName} - copia`)
+    if (!newName || !newName.trim()) return
+    const trimmed = newName.trim()
+    if (presets[trimmed]) {
+      alert(`Ya existe un preset con el nombre "${trimmed}"`)
+      return
+    }
+    const data = { ...presets[sourceName] }
+    await saveHmiPreset(trimmed, data, user.id)
+    const updatedPresets = { ...presets, [trimmed]: data }
+    setPresets(updatedPresets)
+    await addHmiHistory({
+      presetName: trimmed,
+      action: 'save',
+      data,
+      previousData: null,
+      userId: user.id,
+      userName: ((user.nombre ?? '') + ' ' + (user.apellido ?? '')).trim() || user.email,
+    })
+    // Cargar el clon en el iframe
+    iframeRef.current?.contentWindow?.postMessage(
+      { type: 'hmi:init', presets: updatedPresets, current: trimmed, refs: {} },
+      '*'
+    )
+    await setCurrentPreset(trimmed)
+    setCurrentPresetName(trimmed)
+    setPresetsOpen(false)
+  }, [user, presets])
+
   const resetToDefaults = useCallback(async () => {
     if (!user) return
     if (!confirm('¿Restaurar los 6 presets a los valores por defecto? Se perderán cambios personalizados.')) return
@@ -243,19 +274,33 @@ export function HmiKnuroPage() {
                   </div>
                 ) : (
                   presetKeys.map(name => (
-                    <button
+                    <div
                       key={name}
-                      onClick={() => loadPresetFromReact(name)}
                       className={cn(
-                        'w-full text-left text-xs px-3 py-2 hover:bg-muted transition-colors flex items-center gap-2',
-                        name === currentPresetName && 'bg-primary/10 text-primary font-semibold'
+                        'flex items-center text-xs hover:bg-muted transition-colors group',
+                        name === currentPresetName && 'bg-primary/10'
                       )}
                     >
-                      <span className="flex-1 truncate">{name}</span>
-                      {name === currentPresetName && (
-                        <span className="text-[10px] opacity-60">activo</span>
-                      )}
-                    </button>
+                      <button
+                        onClick={() => loadPresetFromReact(name)}
+                        className={cn(
+                          'flex-1 text-left px-3 py-2 flex items-center gap-2 min-w-0',
+                          name === currentPresetName && 'text-primary font-semibold'
+                        )}
+                      >
+                        <span className="flex-1 truncate">{name}</span>
+                        {name === currentPresetName && (
+                          <span className="text-[10px] opacity-60">activo</span>
+                        )}
+                      </button>
+                      <button
+                        onClick={e => { e.stopPropagation(); clonePreset(name) }}
+                        className="px-2 py-2 opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity flex-shrink-0"
+                        title={`Clonar "${name}"`}
+                      >
+                        <Copy className="h-3 w-3" />
+                      </button>
+                    </div>
                   ))
                 )}
               </div>
