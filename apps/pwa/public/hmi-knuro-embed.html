@@ -2032,8 +2032,6 @@ function exportVisual(selIds){
 ${rawcss}
 *{box-sizing:border-box;print-color-adjust:exact;-webkit-print-color-adjust:exact;}
 html,body{overflow:visible!important;height:auto!important;margin:0;padding:0;background:#e8eaed;font-family:Arial,Helvetica,sans-serif;}
-/* Override: reference values white on the dark HMI background (rawcss sets #666) */
-.fr{color:#fff!important;}
 /* ── Wrapper de página ── */
 .xpg{width:800px;margin:0 auto 28px;overflow:hidden;box-shadow:0 3px 18px rgba(0,0,0,.28);}
 /* ── Header de pantalla ── */
@@ -2051,10 +2049,18 @@ html,body{overflow:visible!important;height:auto!important;margin:0;padding:0;ba
 .xsep-sub{font-size:10px;font-weight:700;letter-spacing:4px;color:rgba(255,255,255,.45);text-transform:uppercase;}
 .xsep-title{font-size:38px;font-weight:700;color:#fff;letter-spacing:.5px;line-height:1.1;}
 .xsep-mach{font-size:13px;color:#00a0d4;font-weight:600;margin-top:4px;}
-/* ── Contenido HMI ── */
-.xin{width:800px;height:480px;display:flex;flex-direction:column;background:#c2c2cc;font-size:13px;color:#111;overflow:hidden;}
-.sh{display:flex!important;flex:0 0 auto;}
-.sb{flex:1!important;display:flex!important;overflow:hidden!important;}
+/* ── Contenido HMI — tema oscuro (fiel al diseño original Knuro B2) ── */
+.xin{width:800px;height:480px;display:flex;flex-direction:column;background:#2a2d3a;font-size:13px;color:#ccccdd;overflow:hidden;}
+.sh{display:flex!important;flex:0 0 auto;background:#1e2028!important;border-bottom-color:#404060!important;}
+.sh .st{color:#ccccee!important;}
+.sh .sd{color:#8888bb!important;}
+.sb{flex:1!important;display:flex!important;overflow:hidden!important;background:#2a2d3a!important;}
+/* Etiquetas y tablas de parámetros */
+.pt .plb{color:#ccccdd!important;}
+.pt td{color:#aaaacc!important;}
+th{color:#8899bb!important;}
+/* Valores de referencia: blanco sobre fondo oscuro, fiel al diseño original */
+.fr{color:#ffffff!important;}
 /* ════════════════════════════════════════
    PORTADA — diseño "corporate report"
    ════════════════════════════════════════ */
