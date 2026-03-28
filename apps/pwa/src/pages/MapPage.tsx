@@ -424,6 +424,9 @@ export function MapPage() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const history = useEditorHistory()
+  // Destructure stable methods to avoid applyMapDocument recreating on every render
+  // (history object reference changes each render because canUndo/canRedo are computed inline)
+  const { clear: historyClear, pushSnapshot: historyPushSnapshot } = history
 
   const applyMapDocument = useCallback((map: IsometricMap | null) => {
     const nextConfig = map?.config
@@ -493,10 +496,10 @@ export function MapPage() {
       },
     }))
     setHasUnsavedChanges(false)
-    history.clear()
-    history.pushSnapshot({ nodes: nextNodes, areas: nextAreas, connectors: nextConnectors })
+    historyClear()
+    historyPushSnapshot({ nodes: nextNodes, areas: nextAreas, connectors: nextConnectors })
     setFitRequestKey((prev) => prev + 1)
-  }, [blankMapConfig, history, setTerrainImportCoordinatesText, setTerrainImportSampleStep, setTerrainAdminMarkup, setSelectedBaseLocationId, setBackgroundMap, setShowBaseMap])
+  }, [blankMapConfig, historyClear, historyPushSnapshot, setTerrainImportCoordinatesText, setTerrainImportSampleStep, setTerrainAdminMarkup, setSelectedBaseLocationId, setBackgroundMap, setShowBaseMap])
 
   const handleTerrainImportCoordinatesTextChange = useCallback((value: string) => {
     setTerrainImportCoordinatesText(value)
