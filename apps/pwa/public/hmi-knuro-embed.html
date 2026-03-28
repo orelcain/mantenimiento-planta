@@ -2007,6 +2007,11 @@ function exportVisual(selIds){
     const breadHtml=parts.map((p,bi)=>
       `<span class="xbc">${p}</span>${bi<parts.length-1?'<span class="xbs"> › </span>':''}`
     ).join('');
+    // Sync .value property → value attribute before cloning.
+    // cloneNode copies HTML attributes (default values), NOT the JS .value property
+    // set by setAllInputs(). Without this, the visual PDF shows the original HTML
+    // default values instead of the preset values currently loaded on screen.
+    sc.querySelectorAll('input.fe,input.fe1').forEach(inp=>inp.setAttribute('value',inp.value));
     const clone=sc.cloneNode(true);
     clone.querySelectorAll('.nw').forEach(n=>n.remove());
     const sh=clone.querySelector('.sh');
