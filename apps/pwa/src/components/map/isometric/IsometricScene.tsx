@@ -13,8 +13,8 @@
  * Es el equivalente del <Canvas> + <SceneContent> patrón Viewer3D.
  */
 
-import { Suspense, useCallback, useMemo } from 'react'
-import { Canvas } from '@react-three/fiber'
+import { Suspense, useCallback, useEffect, useMemo } from 'react'
+import { Canvas, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { IsometricCamera } from './IsometricCamera'
 import { EquipmentNode } from './EquipmentNode'
@@ -135,6 +135,12 @@ function SceneContent({
   const { terrainBrushPreview, placementPreview, bulldozerPreview, paintTiles } = previews ?? {}
   const { onNodeClick, onNodeHover, onAreaClick, onBackgroundClick, onNodeDragEnd,
     onFloorClick, onFloorDrag, onFloorHover } = callbacks ?? {}
+  // Invalidate frame when scene data changes (required for frameloop="demand")
+  const { invalidate } = useThree()
+  useEffect(() => {
+    invalidate()
+  }, [entities, terrainData, viewerState, underlay, previews, invalidate])
+
   // Centro de la planta
   const centerTarget = useMemo<[number, number, number]>(
     () => [0, 0, 0],
@@ -370,6 +376,7 @@ export function IsometricScene(props: IsometricSceneProps) {
     <div className="w-full h-full relative">
       <Canvas
         orthographic
+        frameloop="demand"
         camera={{
           position: [40, 40, 40],
           zoom: 1,
