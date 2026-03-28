@@ -106,10 +106,11 @@ export function HmiKnuroPage() {
       if (!event.data.type.startsWith('hmi:')) return
       const { type } = event.data
 
-      // hmi:ready NO necesita user — llama sendInitData que puede leer Firestore sin user
+      // hmi:ready: guardar flag. Solo llamar sendInitData si user ya está disponible.
+      // Si user aún es null (auth restaurando sesión), el useEffect de reintento lo maneja.
       if (type === 'hmi:ready') {
         iframeReadyRef.current = true
-        if (iframeRef.current) await sendInitData(iframeRef.current)
+        if (user && iframeRef.current) await sendInitData(iframeRef.current)
         return
       }
 
