@@ -275,7 +275,7 @@ export function HmiKnuroPage() {
           title="HMI Knuro Simulator"
           className="w-full h-full border-0"
           allow="fullscreen"
-          sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+          sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals"
         />
       </div>
 
