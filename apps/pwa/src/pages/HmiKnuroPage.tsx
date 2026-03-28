@@ -12,6 +12,7 @@ import {
   saveHmiRefs,
   addHmiHistory,
   getHmiHistory,
+  seedDefaultPresets,
 } from '@/services/hmiKnuro'
 import type { HmiHistoryEntry } from '@/services/hmiKnuro'
 import { Button } from '@/components/ui'
@@ -50,18 +51,23 @@ export function HmiKnuroPage() {
   // ── Carga inicial desde Firestore → iframe ──────────────────────────────
   const sendInitData = useCallback(async (iframe: HTMLIFrameElement) => {
     try {
-      const [presetsData, current, refs] = await Promise.all([
+      let [presetsData, current, refs] = await Promise.all([
         getHmiPresets(),
         getCurrentPreset(),
         getHmiRefs(),
       ])
+      // Si Firestore está vacío, sembrar los 6 presets por defecto automáticamente
+      if (Object.keys(presetsData).length === 0 && user) {
+        await seedDefaultPresets(user.id)
+        ;[presetsData, current] = await Promise.all([getHmiPresets(), getCurrentPreset()])
+      }
       setPresets(presetsData)
       setCurrentPresetName(current)
       iframe.contentWindow?.postMessage({ type: 'hmi:init', presets: presetsData, current, refs }, '*')
     } catch (err) {
       console.error('[HMI Knuro] Error cargando datos de Firestore:', err)
     }
-  }, [])
+  }, [user])
 
   // ── Cerrar dropdown al hacer clic fuera ─────────────────────────────────
   useEffect(() => {
@@ -166,7 +172,7 @@ export function HmiKnuroPage() {
       <div className="flex items-center justify-between px-3 py-1.5 bg-card border-b border-border flex-shrink-0 gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <Cpu className="h-4 w-4 text-primary flex-shrink-0" />
-          <span className="text-sm font-semibold truncate">HMI Knuro B2</span>
+          <span className="text-sm font-semibold truncate">HMI Knuro</span>
           <span className="text-xs text-muted-foreground hidden md:inline">
             Simulador de parámetros — Baader
           </span>
@@ -240,7 +246,7 @@ export function HmiKnuroPage() {
         <iframe
           ref={iframeRef}
           src={iframeSrc}
-          title="HMI Knuro B2 Simulator"
+          title="HMI Knuro Simulator"
           className="w-full h-full border-0"
           allow="fullscreen"
           sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
