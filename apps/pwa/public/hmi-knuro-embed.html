@@ -1044,7 +1044,6 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
         </div>
         <!-- Importar / Exportar -->
         <div class="ps-acts">
-          <button class="pbtn exp" onclick="importJSON()" style="flex:none;">📂 Importar</button>
           <button class="pbtn pdf" onclick="showExportDialog()">📤 Exportar PDF</button>
         </div>
         <!-- Editar valores de referencia -->
@@ -1052,7 +1051,6 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
           <button id="refs-edit-btn" class="pbtn refs-btn" onclick="toggleRefsEdit(this)" title="Activa la edición manual de los valores de referencia (fábrica) mostrados junto a cada parámetro">✏ Editar Refs</button>
         </div>
         <div id="refs-hint" style="display:none;font-size:8.5px;color:#aa8800;margin-top:3px;padding:3px 4px;background:#2a2200;border-radius:3px;border:1px solid #554400;">Haz clic en cualquier valor gris junto a un parámetro para editarlo. Enter o clic fuera para confirmar.</div>
-        <input type="file" id="file-in" accept=".json" style="display:none;" onchange="handleImport(event)">
       </div>
     </div>
 
@@ -1471,25 +1469,8 @@ function exportJSON(){
   document.body.appendChild(a);a.click();document.body.removeChild(a);
 }
 
-/* ── Import JSON ── */
-function importJSON(){document.getElementById('file-in').click();}
-function handleImport(e){
-  const f=e.target.files[0];if(!f) return;
-  const r=new FileReader();
-  r.onload=ev=>{
-    try{
-      const d=JSON.parse(ev.target.result);
-      const n=d.name||f.name.replace('.json','');
-      presets[n]=d.values||d;
-      persistPresets();renderPresets();populateCmpSelects();
-      setAllInputs(presets[n]);
-      updateActivePreset(n);
-      alert('Preset "'+n+'" importado ✓');
-    }catch(err){alert('Error al leer JSON: '+err.message);}
-  };
-  r.readAsText(f);
-  e.target.value='';
-}
+/* Import JSON removed */
+/* handleImport removed */
 
 /* ── Compare ── */
 function adaptRpWidth(n){
@@ -1594,7 +1575,7 @@ function renderCompare(){
   const diffSet=new Set([...allSet].filter(k=>{const vs=pArr.map(p=>p[k]??'—');return vs.some(v=>v!==vs[0]);}));
   let html=`<div class="cmp-summary">${diffSet.size?`<b>${diffSet.size}</b> diferencia(s) de`:'✓ Sin diferencias —'} ${allSet.size} parámetros</div>`;
   if(!diffSet.size){out.innerHTML=html;return;}
-  const hdrs=selected.map(n=>`<th title="${n}">${n}</th>`).join('');
+  const hdrs=selected.map(n=>`<th title="${n}" style="white-space:normal;word-break:break-word;max-width:120px;font-size:8px;line-height:1.3;padding:4px 6px;">${n}</th>`).join('');
   html+=`<table class="cmp-tbl"><thead><tr><th class="cmp-lbl" style="text-align:left;">Parámetro</th>${hdrs}</tr></thead><tbody>`;
   html+=renderCompareSectionsN(pArr,selected,diffSet,allSet,false);
   html+=`</tbody></table>`;
@@ -1608,7 +1589,7 @@ function cmpToggleAllN(btn){
   const pArr=names.map(n=>presets[n]);
   const allSet=new Set(pArr.flatMap(p=>Object.keys(p)));
   const diffSet=new Set([...allSet].filter(k=>{const vs=pArr.map(p=>p[k]??'—');return vs.some(v=>v!==vs[0]);}));
-  const hdrs=names.map(n=>`<th title="${n}">${n}</th>`).join('');
+  const hdrs=names.map(n=>`<th title="${n}" style="white-space:normal;word-break:break-word;max-width:120px;font-size:8px;line-height:1.3;padding:4px 6px;">${n}</th>`).join('');
   let tbl=`<table class="cmp-tbl"><thead><tr><th class="cmp-lbl" style="text-align:left;">Parámetro</th>${hdrs}</tr></thead><tbody>`;
   tbl+=renderCompareSectionsN(pArr,names,diffSet,allSet,true);
   tbl+=`</tbody></table>`;
@@ -1859,10 +1840,10 @@ thead th{position:sticky;top:0;z-index:3;}
 td.pl,th.th-lbl{position:sticky;left:0;z-index:2;background:#fff;}
 td.pr-ref,th.th-ref{position:sticky;left:200px;z-index:2;}
 /* encabezados */
-th{padding:6px 8px;white-space:nowrap;font-size:8.5pt;border:1px solid rgba(255,255,255,.2);}
+th{padding:6px 8px;font-size:8.5pt;border:1px solid rgba(255,255,255,.2);}
 .th-lbl{background:#004d7a;color:#fff;text-align:left;width:200px;min-width:200px;}
 .th-ref{background:#005a8a;color:#cde8f5;text-align:center;width:70px;}
-.th-mc{color:#fff;text-align:center;width:${Math.max(70,Math.floor((740-nc*10)/nc))}px;font-size:8pt;overflow:hidden;text-overflow:ellipsis;}
+.th-mc{color:#fff;text-align:center;width:${Math.max(70,Math.floor((740-nc*10)/nc))white-space:normal;word-break:break-word;line-height:1.2;}px;font-size:8pt;overflow:hidden;text-overflow:ellipsis;}
 /* secciones */
 tr.sec-hdr{break-inside:avoid;break-before:avoid;}
 tr.sec-hdr td{padding:7px 10px;background:#0066a1;color:#fff;border:none;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
@@ -2140,7 +2121,7 @@ html,body{overflow:visible!important;height:auto!important;margin:0;padding:0;ba
   <div class="cov-band">
     <div class="cov-band-line"></div>
     <div class="cov-band-txt">
-      <div class="cov-brand">Knuro B2 — HMI Simulator</div>
+      <div class="cov-brand">Knuro — HMI Simulator</div>
       <div class="cov-title">Informe de Parámetros</div>
     </div>
   </div>
