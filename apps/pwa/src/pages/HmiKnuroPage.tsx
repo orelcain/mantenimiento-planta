@@ -1,5 +1,5 @@
 import { useEffect, useRef, useMemo, useState, useCallback } from 'react'
-import { History, Cpu, RefreshCw, X, ChevronDown, ChevronUp, Sliders, RotateCcw, Copy, Pencil, Check, ArrowUp, ArrowDown } from 'lucide-react'
+import { History, Cpu, RefreshCw, X, ChevronDown, ChevronUp, Sliders, RotateCcw, Copy, Pencil, Check, ArrowUp, ArrowDown, BookmarkCheck } from 'lucide-react'
 import { useAuthStore } from '@/store'
 import { cn } from '@/lib/utils'
 import {
@@ -15,6 +15,7 @@ import {
   seedDefaultPresets,
   getPresetOrder,
   savePresetOrder,
+  saveDefaultSnapshot,
 } from '@/services/hmiKnuro'
 import type { HmiHistoryEntry } from '@/services/hmiKnuro'
 import { Button } from '@/components/ui'
@@ -250,6 +251,13 @@ export function HmiKnuroPage() {
     iframeRef.current?.contentWindow?.postMessage({ type: 'hmi:init', presets: presetsData, current, refs, order: presetOrder }, '*')
   }, [user])
 
+  const saveAsDefaults = useCallback(async () => {
+    if (!user) return
+    if (!confirm('¿Guardar los presets actuales como nuevos defaults?\n"Restaurar" usará estos valores en el futuro.')) return
+    await saveDefaultSnapshot(user.id)
+    alert('✓ Presets actuales guardados como defaults.')
+  }, [user])
+
   // Orden: los que están en presetOrder primero, luego los que falten al final
   const presetKeys = useMemo(() => {
     const all = Object.keys(presets)
@@ -456,6 +464,10 @@ export function HmiKnuroPage() {
           <Button variant="ghost" size="sm" onClick={resetToDefaults} className="h-7 gap-1 text-xs" title="Restaurar presets a valores por defecto">
             <RotateCcw className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Restaurar</span>
+          </Button>
+          <Button variant="ghost" size="sm" onClick={saveAsDefaults} className="h-7 gap-1 text-xs" title="Guardar presets actuales como defaults (Restaurar usará estos valores)">
+            <BookmarkCheck className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Guardar Defaults</span>
           </Button>
         </div>
       </div>

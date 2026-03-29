@@ -105,6 +105,33 @@ export async function savePresetOrder(order: string[]): Promise<void> {
   await setDoc(doc(db, CONFIG_COL, 'preset-order'), { order, updatedAt: serverTimestamp() })
 }
 
+// ── Snapshot de defaults ──────────────────────────────────────────────────────
+const DEFAULTS_COL = 'hmi-knuro-defaults'
+
+/** Guarda los presets actuales como snapshot de defaults */
+export async function saveDefaultSnapshot(userId: string): Promise<void> {
+  const currentPresets = await getHmiPresets()
+  for (const [name, data] of Object.entries(currentPresets)) {
+    await setDoc(doc(db, DEFAULTS_COL, name), {
+      name,
+      data,
+      savedAt: serverTimestamp(),
+      savedBy: userId,
+    })
+  }
+}
+
+/** Lee el snapshot de defaults guardado por el usuario */
+export async function getDefaultSnapshot(): Promise<Record<string, Record<string, string>>> {
+  const snap = await getDocs(collection(db, DEFAULTS_COL))
+  const result: Record<string, Record<string, string>> = {}
+  snap.forEach(d => {
+    const data = d.data()
+    if (data.name && data.data) result[data.name as string] = data.data as Record<string, string>
+  })
+  return result
+}
+
 // ── Historial de cambios ──────────────────────────────────────────────────────
 /** Registra una entrada en el historial de cambios */
 export async function addHmiHistory(
@@ -270,10 +297,14 @@ export const DEFAULT_PRESETS: Record<string, Record<string, string>> = {
   'Planta Yal - BAA142 - N3': { ..._BASE },
 }
 
-/** Siembra los 6 presets por defecto en Firestore (solo si no existen). */
+/** Siembra los presets por defecto en Firestore.
+ *  Usa el snapshot guardado por el usuario si existe, sino los DEFAULT_PRESETS del código. */
 export async function seedDefaultPresets(userId: string): Promise<void> {
-  for (const [name, data] of Object.entries(DEFAULT_PRESETS)) {
+  const snapshot = await getDefaultSnapshot()
+  const defaults = Object.keys(snapshot).length > 0 ? snapshot : DEFAULT_PRESETS
+  for (const [name, data] of Object.entries(defaults)) {
     await saveHmiPreset(name, data, userId)
   }
-  await setCurrentPreset('Planta Principal - BAA142 - N2')
+  const firstKey = Object.keys(defaults)[0] ?? 'Planta Principal - BAA142 - N2'
+  await setCurrentPreset(firstKey)
 }
