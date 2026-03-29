@@ -1786,12 +1786,22 @@ const PARAMS=[
   {s:'Herramienta 2 — 2A Salmón',r:'Principal › Menú Técnico › Herramienta 2 › Tiempos y Pulsos › 2A Salmón',rows:[
     ['Tiempo de espera','h2-2as-0'],['Tiempo de movimiento de bajada - normal','h2-2as-1'],
     ['Tiempo de movimiento de bajada - suave','h2-2as-2'],['Tiempo de presión 1','h2-2as-3']]},
+  {s:'H2 — 2A Salmón › Esp. Pulsos Cat.',r:'Principal › Menú Técnico › Herramienta 2 › Tiempos y Pulsos › 2A Salmón › Esp. Pulsos Cat.',rows:[
+    ['Categoría 1','h2-2as-epv-0'],['Categoría 2','h2-2as-epv-1'],['Categoría 3','h2-2as-epv-2'],['Categoría 4','h2-2as-epv-3'],['Valor límite actual','h2-2as-epv-v']]},
+  {s:'H2 — 2A Salmón › P. Espera Vel.',r:'Principal › Menú Técnico › Herramienta 2 › Tiempos y Pulsos › 2A Salmón › P. Espera Vel.',rows:[
+    ['15-16 Pescados','h2-2as-pev-0'],['13-14 Pescados','h2-2as-pev-1'],['11-12 Pescados','h2-2as-pev-2'],['09-10 Pescados','h2-2as-pev-3'],['Valor límite actual','h2-2as-pev-v']]},
+  {s:'H2 — 2A Salmón › P. Activos Vel.',r:'Principal › Menú Técnico › Herramienta 2 › Tiempos y Pulsos › 2A Salmón › P. Activos Vel.',rows:[
+    ['15-16 Pescados','h2-2as-pav-0'],['13-14 Pescados','h2-2as-pav-1'],['11-12 Pescados','h2-2as-pav-2'],['09-10 Pescados','h2-2as-pav-3'],['Valor límite actual','h2-2as-pav-v']]},
   {s:'Herramienta 2 — 2B Velocidad Salmón',r:'Principal › Menú Técnico › Herramienta 2 › Tiempos y Pulsos › 2B Velocidad Salmón',rows:[
     ['Valor negativo Esperar Pulsos','h2-2bvs-0'],['Esperar tiempo','h2-2bvs-1'],
     ['Pulsos 15-16 /min','h2-2bvs-2'],['Pulsos 13-14 /min','h2-2bvs-3'],['Pulsos 11-12 /min','h2-2bvs-4'],
     ['Pulsos 09-10 /min','h2-2bvs-5'],['T. dentro del pescado','h2-2bvs-6'],['Valor límite actual','h2-2bvs-v']]},
   {s:'Herramienta 2 — 2A Coho',r:'Principal › Menú Técnico › Herramienta 2 › Tiempos y Pulsos › 2A Coho',rows:[
     ['Tiempo de presión 1','h2-2ac-0']]},
+  {s:'H2 — 2A Coho › Vel. Espera',r:'Principal › Menú Técnico › Herramienta 2 › Tiempos y Pulsos › 2A Coho › Vel. Espera',rows:[
+    ['15-16 Pescados','h2-2ac-ve-0'],['13-14 Pescados','h2-2ac-ve-1'],['11-12 Pescados','h2-2ac-ve-2'],['09-10 Pescados','h2-2ac-ve-3'],['Valor límite actual','h2-2ac-ve-v']]},
+  {s:'H2 — 2A Coho › P. Activos Vel.',r:'Principal › Menú Técnico › Herramienta 2 › Tiempos y Pulsos › 2A Coho › P. Activos Vel.',rows:[
+    ['15-16 Pescados','h2-2ac-pa-0'],['13-14 Pescados','h2-2ac-pa-1'],['11-12 Pescados','h2-2ac-pa-2'],['09-10 Pescados','h2-2ac-pa-3'],['Valor límite actual','h2-2ac-pa-v']]},
   {s:'Herramienta 2 — 2B Velocidad Coho',r:'Principal › Menú Técnico › Herramienta 2 › Tiempos y Pulsos › 2B Velocidad Coho',rows:[
     ['Valor negativo Esperar Pulsos','h2-2bvc-0'],['Pulsos 15-16 /min','h2-2bvc-1'],['Pulsos 13-14 /min','h2-2bvc-2'],
     ['Pulsos 11-12 /min','h2-2bvc-3'],['Pulsos 09-10 /min','h2-2bvc-4'],['Valor límite actual','h2-2bvc-v']]},
@@ -1819,6 +1829,18 @@ const PARAMS=[
     ['Escavador A - Pulso','vac-b-3'],['Escavador A - Abrir','vac-b-4'],['Escavador A - Cerrar','vac-b-5'],
     ['Escavador B - Pulso','vac-b-6'],['Escavador B - Abrir','vac-b-7'],['Escavador B - Cerrar','vac-b-8'],
     ['Knuro - Pulso','vac-b-9'],['Knuro - Abrir','vac-b-10'],['Knuro - Cerrar','vac-b-11']]},
+  /* ── Pantallas sin parámetros editables (display/toggle) ── */
+  {s:'Carro 2 — Festo',r:'Principal › Menú Técnico › Carro 2 › Festo',scId:'c2f',rows:[]},
+  {s:'Succión Baader',r:'Principal › Menú Técnico › Succión Baader',scId:'succion',rows:[]},
+  {s:'Ciclo — Alimentación',r:'Principal › Menú Técnico › Ciclo › Alimentación',scId:'ci-al',rows:[]},
+  {s:'Sensores — A010 p.1',r:'Principal › Menú Técnico › Sensores › A010 p.1',scId:'sen-a010-1',rows:[]},
+  {s:'Sensores — A010 p.2',r:'Principal › Menú Técnico › Sensores › A010 p.2',scId:'sen-a010-2',rows:[]},
+  {s:'Sensores — A110',r:'Principal › Menú Técnico › Sensores › A110',scId:'sen-a110',rows:[]},
+  {s:'Sensores — A111',r:'Principal › Menú Técnico › Sensores › A111',scId:'sen-a111',rows:[]},
+  {s:'Sensores — A112',r:'Principal › Menú Técnico › Sensores › A112',scId:'sen-a112',rows:[]},
+  {s:'Sensores — Info Entradas',r:'Principal › Menú Técnico › Sensores › Info Entradas',scId:'sen-info',rows:[]},
+  {s:'Config. Menú — Página 1/2',r:'Principal › Menú Técnico › Config. Menú › Página 1/2',scId:'cfg-menu-1',rows:[]},
+  {s:'Config. Menú — Página 2/2',r:'Principal › Menú Técnico › Config. Menú › Página 2/2',scId:'cfg-menu-2',rows:[]},
 ];
 
 function getRefValues(){
@@ -1877,7 +1899,10 @@ function expSelectAll(v){
 }
 
 function getParamScreens(){
-  return [...document.querySelectorAll('.sc')].filter(sc=>sc.querySelector('input.fe,input.fe1'));
+  const byInput=[...document.querySelectorAll('.sc')].filter(sc=>sc.querySelector('input.fe,input.fe1'));
+  const scIds=new Set(PARAMS.filter(p=>p.scId).map(p=>p.scId));
+  scIds.forEach(id=>{if(!byInput.find(sc=>sc.id===id)){const el=document.getElementById(id);if(el)byInput.push(el);}});
+  return byInput;
 }
 
 function closeExportDialog(){
@@ -2088,10 +2113,11 @@ function exportVisual(selIds){
   const screens=selIds&&selIds.length?all.filter(sc=>selIds.includes(sc.id)):all;
   if(!screens.length){alert('No hay pantallas seleccionadas.');return;}
 
-  // ── Mapear cada pantalla a su info de ruta (primer PARAMS que contenga sus inputs) ──
+  // ── Mapear cada pantalla a su info de ruta (primer PARAMS que contenga sus inputs o scId) ──
   const screenInfo=screens.map(sc=>{
     const ids=new Set([...sc.querySelectorAll('input.fe,input.fe1')].map(i=>i.id).filter(Boolean));
     for(const p of PARAMS){
+      if(p.scId&&p.scId===sc.id) return{s:p.s,r:p.r};
       for(const[,id]of p.rows){ if(ids.has(id)) return{s:p.s,r:p.r}; }
     }
     return{s:sc.querySelector('.st')?.textContent?.trim()||sc.id,r:''};
@@ -2105,6 +2131,11 @@ function exportVisual(selIds){
       if(paramToIdx[pi]!==undefined) return;
       if(p.rows.some(([,id])=>ids.has(id))) paramToIdx[pi]=i;
     });
+  });
+  // Mapear entradas PARAMS con scId (pantallas sin inputs paramétricos)
+  PARAMS.forEach((p,pi)=>{
+    if(paramToIdx[pi]!==undefined) return;
+    if(p.scId){const scIdx=screens.findIndex(sc=>sc.id===p.scId);if(scIdx>=0)paramToIdx[pi]=scIdx;}
   });
 
   // ── Árbol de navegación multi-nivel desde rutas de PARAMS ──
