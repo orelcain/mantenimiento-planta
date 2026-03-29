@@ -230,7 +230,7 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
     <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px 0;width:100%;flex-shrink:0;">
       <span style="font-size:12px;color:#333;cursor:pointer;text-decoration:underline;align-self:flex-start;margin-top:6px;">Limpiar Máquina</span>
       <div style="position:relative;display:inline-block;line-height:1;transform:scaleX(1.05);transform-origin:center;">
-        <span style="font-family:'Segoe UI',Arial,sans-serif;font-size:51px;font-weight:400;color:#111;letter-spacing:1px;">kn</span><span style="font-family:'Segoe UI',Arial,sans-serif;font-size:51px;font-weight:400;color:#111;position:relative;">u<svg style="position:absolute;top:1px;left:50%;transform:translateX(-50%);" width="36" height="12" viewBox="0 0 36 12" xmlns="http://www.w3.org/2000/svg"><polygon points="36,2 36,10 0,8" fill="#e03300"/></svg></span><span style="font-family:'Segoe UI',Arial,sans-serif;font-size:51px;font-weight:400;color:#111;letter-spacing:1px;">ro</span>
+        <span style="font-family:'Segoe UI',Arial,sans-serif;font-size:51px;font-weight:400;color:#111;letter-spacing:1px;">kn</span><span style="font-family:'Segoe UI',Arial,sans-serif;font-size:51px;font-weight:400;color:#111;position:relative;">u<svg style="position:absolute;top:0px;left:50%;transform:translateX(-50%);" width="36" height="12" viewBox="0 0 36 12" xmlns="http://www.w3.org/2000/svg"><polygon points="36,2 36,10 0,8" fill="#e03300"/></svg></span><span style="font-family:'Segoe UI',Arial,sans-serif;font-size:51px;font-weight:400;color:#111;letter-spacing:1px;">ro</span>
       </div>
       <span style="font-size:12px;color:#333;cursor:pointer;text-decoration:underline;align-self:flex-start;margin-top:6px;">Limpiar Vacío</span>
     </div>
@@ -977,7 +977,11 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
             <div class="tn"><div class="tnh" id="tr-c1" onclick="nav('c1')" style="padding:3px 8px;"><span class="tni">🚃</span><span class="tnl">Carro 1</span><span class="tnbg">1</span></div>
               <div class="tnc">
                 <div class="tna" onclick="nav('c1tp')"><span class="sym">→</span><span class="tnl">T. y Pulsos</span><span class="to">1-1</span></div>
-                <div class="tna" onclick="nav('c1pr')"><span class="sym">→</span><span class="tnl">Presión</span><span class="to">1-2</span></div>
+                <div class="tn"><div class="tnh" id="tr-c1-pr" onclick="nav('c1pr')" style="padding:2px 6px;"><span class="sym">→</span><span class="tnl">Presión</span><span class="to">1-2</span></div>
+                  <div class="tnc">
+                    <div class="tna" onclick="nav('c1pr2')"><span class="sym">·</span><span class="tnl">Cat. Presión 2</span></div>
+                  </div>
+                </div>
               </div>
             </div>
             <div class="tn"><div class="tnh" id="tr-h1" onclick="nav('h1')" style="padding:3px 8px;"><span class="tni">🔩</span><span class="tnl">Herramienta 1</span><span class="tnbg">2</span></div>
@@ -1009,8 +1013,20 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
             </div>
             <div class="tn"><div class="tnh" id="tr-h2" onclick="nav('h2')" style="padding:3px 8px;"><span class="tni">🔩</span><span class="tnl">Herramienta 2</span><span class="tnbg">7</span></div>
               <div class="tnc">
-                <div class="tna" onclick="nav('h2-tp')"><span class="sym">→</span><span class="tnl">T. y Pulsos</span><span class="to">7-1</span></div>
-                <div class="tna" onclick="nav('h2-pr')"><span class="sym">→</span><span class="tnl">Presión</span><span class="to">7-2</span></div>
+                <div class="tn"><div class="tnh" id="tr-h2-tp" onclick="nav('h2-tp')" style="padding:2px 6px;"><span class="sym">→</span><span class="tnl">T. y Pulsos</span><span class="to">7-1</span></div>
+                  <div class="tnc">
+                    <div class="tna" onclick="nav('h2-2as')"><span class="sym">·</span><span class="tnl">2A Salmón</span></div>
+                    <div class="tna" onclick="nav('h2-2bvs')"><span class="sym">·</span><span class="tnl">2B Vel. Salmón</span></div>
+                    <div class="tna" onclick="nav('h2-2ac')"><span class="sym">·</span><span class="tnl">2A Coho</span></div>
+                    <div class="tna" onclick="nav('h2-2bvc')"><span class="sym">·</span><span class="tnl">2B Vel. Coho</span></div>
+                  </div>
+                </div>
+                <div class="tn"><div class="tnh" id="tr-h2-pr" onclick="nav('h2-pr')" style="padding:2px 6px;"><span class="sym">→</span><span class="tnl">Presión</span><span class="to">7-2</span></div>
+                  <div class="tnc">
+                    <div class="tna" onclick="nav('h2-pr-imp')"><span class="sym">·</span><span class="tnl">Ímpetu Salmón</span></div>
+                    <div class="tna" onclick="nav('h2-pr-imp')"><span class="sym">·</span><span class="tnl">Ímpetu Coho</span></div>
+                  </div>
+                </div>
                 <div class="tna" onclick="nav('h2-ag')"><span class="sym">→</span><span class="tnl">Agua</span><span class="to">7-3</span></div>
               </div>
             </div>
@@ -1214,12 +1230,12 @@ const NAMES={
 };
 const TREE={
   'sp':'tr-sp','s4':'tr-s4',
-  'c1':'tr-c1','c1tp':'tr-c1','c1pr':'tr-c1','c1pr2':'tr-c1',
+  'c1':'tr-c1','c1tp':'tr-c1','c1pr':'tr-c1-pr','c1pr2':'tr-c1-pr',
   'h1':'tr-h1','h1ev':'tr-h1','h1epc':'tr-h1','h1tmb':'tr-h1','h1tpp':'tr-h1','h1pb':'tr-h1','h1ps':'tr-h1',
   'c2':'tr-c2','c2t':'tr-c2','c2f':'tr-c2',
   'ev':'tr-s4','succion':'tr-s4',
   'ci':'tr-ci','ci-fa':'tr-ci','ci-av':'tr-ci','ci-vic':'tr-ci','ci-ymk':'tr-ci','ci-al':'tr-ci','ci-ct':'tr-ci',
-  'h2':'tr-h2','h2-tp':'tr-h2','h2-2as':'tr-h2','h2-2as-epv':'tr-h2','h2-2as-pev':'tr-h2','h2-2as-pav':'tr-h2','h2-2bvs':'tr-h2','h2-2ac':'tr-h2','h2-2ac-ve':'tr-h2','h2-2ac-pa':'tr-h2','h2-2bvc':'tr-h2','h2-pr':'tr-h2','h2-pr-imp':'tr-h2','h2-ag':'tr-h2',
+  'h2':'tr-h2','h2-tp':'tr-h2-tp','h2-2as':'tr-h2-tp','h2-2as-epv':'tr-h2-tp','h2-2as-pev':'tr-h2-tp','h2-2as-pav':'tr-h2-tp','h2-2bvs':'tr-h2-tp','h2-2ac':'tr-h2-tp','h2-2ac-ve':'tr-h2-tp','h2-2ac-pa':'tr-h2-tp','h2-2bvc':'tr-h2-tp','h2-pr':'tr-h2-pr','h2-pr-imp':'tr-h2-pr','h2-ag':'tr-h2',
   'sensores':'tr-sensores','sen-a010-1':'tr-sensores','sen-a010-2':'tr-sensores','sen-a110':'tr-sensores','sen-a111':'tr-sensores','sen-a112':'tr-sensores','sen-info':'tr-sensores',
   'vacio':'tr-vacio','vacio-mv':'tr-vacio','vacio-knuro':'tr-vacio','vacio-baader':'tr-vacio',
   'cfg-menu-1':'tr-cfg','cfg-menu-2':'tr-cfg',
@@ -2020,27 +2036,63 @@ function exportVisual(selIds){
     });
   });
 
-  // ── Árbol de navegación agrupado por 3er segmento de ruta ──
-  const groups={},groupOrder=[];
+  // ── Árbol de navegación multi-nivel desde rutas de PARAMS ──
+  const treeEntries=[];
   PARAMS.forEach((p,pi)=>{
     if(paramToIdx[pi]===undefined) return;
-    const parts=p.r.split('›').map(s=>s.trim());
-    const gname=parts[2]||parts[1]||'Otros';
-    if(!groups[gname]){groups[gname]=[];groupOrder.push(gname);}
-    groups[gname].push({r:p.r,pageIdx:paramToIdx[pi]});
+    treeEntries.push({r:p.r,pageIdx:paramToIdx[pi]});
   });
-
-  let treeHtml='';
-  groupOrder.forEach(gname=>{
-    treeHtml+=`<div class="tg-grp"><div class="tg-gn">${gname}</div>`;
-    groups[gname].forEach(item=>{
-      const leaf=item.r.split('›').slice(3).join('›').trim()||item.r.split('›').pop().trim();
-      treeHtml+=`<div class="tg-it"><a href="#pg-${item.pageIdx}" class="tg-lk">
-        <span class="tg-lb">${leaf}</span><span class="tg-dt"></span><span class="tg-pn">${item.pageIdx+1}</span>
-      </a></div>`;
+  // Construir árbol jerárquico (omitir "Principal" y "Menú Técnico")
+  const treeRoot={children:{}};
+  treeEntries.forEach(entry=>{
+    const parts=entry.r.split('›').map(s=>s.trim()).slice(2);
+    let node=treeRoot;
+    parts.forEach((part,i)=>{
+      if(!node.children[part]) node.children[part]={children:{}};
+      node=node.children[part];
+      if(i===parts.length-1) node.pageIdx=entry.pageIdx;
     });
-    treeHtml+=`</div>`;
   });
+  // Renderizar árbol multi-nivel
+  function renderTreeIdx(node,depth){
+    let html='';
+    Object.keys(node.children).forEach(name=>{
+      const child=node.children[name];
+      const hasPage=child.pageIdx!==undefined;
+      const hasKids=Object.keys(child.children).length>0;
+      if(depth===0){
+        // Nivel raíz = encabezado de grupo (Carro 1, Herramienta 2, etc.)
+        html+=`<div class="tg-grp"><div class="tg-gn">${name}</div>`;
+        if(hasPage&&!hasKids){
+          html+=`<div class="tg-it"><a href="#pg-${child.pageIdx}" class="tg-lk">
+            <span class="tg-lb">${name}</span><span class="tg-dt"></span><span class="tg-pn">${child.pageIdx+1}</span>
+          </a></div>`;
+        }
+        html+=renderTreeIdx(child,depth+1);
+        html+=`</div>`;
+      } else if(hasKids){
+        // Sub-grupo intermedio (T. y Pulsos dentro de H2, Presión dentro de C1)
+        const indent=(depth-1)*8;
+        html+=`<div class="tg-sub" style="margin-left:${indent}px;">`;
+        html+=`<div class="tg-sn">${name}</div>`;
+        if(hasPage){
+          html+=`<div class="tg-it"><a href="#pg-${child.pageIdx}" class="tg-lk">
+            <span class="tg-lb">${name}</span><span class="tg-dt"></span><span class="tg-pn">${child.pageIdx+1}</span>
+          </a></div>`;
+        }
+        html+=renderTreeIdx(child,depth+1);
+        html+=`</div>`;
+      } else {
+        // Hoja final
+        const indent=(depth-1)*8;
+        html+=`<div class="tg-it" style="margin-left:${indent}px;"><a href="#pg-${child.pageIdx}" class="tg-lk">
+          <span class="tg-lb">${name}</span><span class="tg-dt"></span><span class="tg-pn">${child.pageIdx+1}</span>
+        </a></div>`;
+      }
+    });
+    return html;
+  }
+  let treeHtml=renderTreeIdx(treeRoot,0);
 
   // ── HTML de cada pantalla con divisores de sección ──
   let pages='';
@@ -2138,6 +2190,8 @@ html,body{overflow:visible!important;height:auto!important;margin:0;padding:0;ba
 .tg-lb{font-size:9px;color:#2c3e50;flex-shrink:0;max-width:148px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .tg-dt{flex:1;border-bottom:1px dotted #c8d0da;margin-bottom:2px;min-width:4px;}
 .tg-pn{flex-shrink:0;color:#0066a1;font-size:8.5px;font-weight:700;}
+.tg-sub{margin-top:2px;margin-bottom:3px;}
+.tg-sn{font-size:7.5px;font-weight:600;color:#2980b9;letter-spacing:.3px;padding-bottom:1px;border-bottom:.5px solid #bdd8ea;margin-bottom:2px;}
 /* ── Barra de control noprint ── */
 .noprint{width:800px;margin:0 auto 20px;padding:9px 16px;background:#e8f4ff;border:1px solid #4499ff;border-radius:6px;display:flex;align-items:center;justify-content:space-between;gap:8px;}
 /* ── PRINT ── */
