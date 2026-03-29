@@ -1015,9 +1015,20 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
               <div class="tnc">
                 <div class="tn"><div class="tnh" id="tr-h2-tp" onclick="nav('h2-tp')" style="padding:2px 6px;"><span class="sym">→</span><span class="tnl">T. y Pulsos</span><span class="to">7-1</span></div>
                   <div class="tnc">
-                    <div class="tna" onclick="nav('h2-2as')"><span class="sym">·</span><span class="tnl">2A Salmón</span></div>
+                    <div class="tn"><div class="tnh" id="tr-h2-2as" onclick="nav('h2-2as')" style="padding:1px 4px;"><span class="sym">·</span><span class="tnl">2A Salmón</span></div>
+                      <div class="tnc">
+                        <div class="tna" onclick="nav('h2-2as-epv')"><span class="sym">·</span><span class="tnl">Esp. Pulsos</span></div>
+                        <div class="tna" onclick="nav('h2-2as-pev')"><span class="sym">·</span><span class="tnl">P. Espera Vel.</span></div>
+                        <div class="tna" onclick="nav('h2-2as-pav')"><span class="sym">·</span><span class="tnl">P. Activos Vel.</span></div>
+                      </div>
+                    </div>
                     <div class="tna" onclick="nav('h2-2bvs')"><span class="sym">·</span><span class="tnl">2B Vel. Salmón</span></div>
-                    <div class="tna" onclick="nav('h2-2ac')"><span class="sym">·</span><span class="tnl">2A Coho</span></div>
+                    <div class="tn"><div class="tnh" id="tr-h2-2ac" onclick="nav('h2-2ac')" style="padding:1px 4px;"><span class="sym">·</span><span class="tnl">2A Coho</span></div>
+                      <div class="tnc">
+                        <div class="tna" onclick="nav('h2-2ac-ve')"><span class="sym">·</span><span class="tnl">Vel. Espera</span></div>
+                        <div class="tna" onclick="nav('h2-2ac-pa')"><span class="sym">·</span><span class="tnl">P. Activos Vel.</span></div>
+                      </div>
+                    </div>
                     <div class="tna" onclick="nav('h2-2bvc')"><span class="sym">·</span><span class="tnl">2B Vel. Coho</span></div>
                   </div>
                 </div>
@@ -1235,7 +1246,7 @@ const TREE={
   'c2':'tr-c2','c2t':'tr-c2','c2f':'tr-c2',
   'ev':'tr-s4','succion':'tr-s4',
   'ci':'tr-ci','ci-fa':'tr-ci','ci-av':'tr-ci','ci-vic':'tr-ci','ci-ymk':'tr-ci','ci-al':'tr-ci','ci-ct':'tr-ci',
-  'h2':'tr-h2','h2-tp':'tr-h2-tp','h2-2as':'tr-h2-tp','h2-2as-epv':'tr-h2-tp','h2-2as-pev':'tr-h2-tp','h2-2as-pav':'tr-h2-tp','h2-2bvs':'tr-h2-tp','h2-2ac':'tr-h2-tp','h2-2ac-ve':'tr-h2-tp','h2-2ac-pa':'tr-h2-tp','h2-2bvc':'tr-h2-tp','h2-pr':'tr-h2-pr','h2-pr-imp':'tr-h2-pr','h2-ag':'tr-h2',
+  'h2':'tr-h2','h2-tp':'tr-h2-tp','h2-2as':'tr-h2-2as','h2-2as-epv':'tr-h2-2as','h2-2as-pev':'tr-h2-2as','h2-2as-pav':'tr-h2-2as','h2-2bvs':'tr-h2-tp','h2-2ac':'tr-h2-2ac','h2-2ac-ve':'tr-h2-2ac','h2-2ac-pa':'tr-h2-2ac','h2-2bvc':'tr-h2-tp','h2-pr':'tr-h2-pr','h2-pr-imp':'tr-h2-pr','h2-ag':'tr-h2',
   'sensores':'tr-sensores','sen-a010-1':'tr-sensores','sen-a010-2':'tr-sensores','sen-a110':'tr-sensores','sen-a111':'tr-sensores','sen-a112':'tr-sensores','sen-info':'tr-sensores',
   'vacio':'tr-vacio','vacio-mv':'tr-vacio','vacio-knuro':'tr-vacio','vacio-baader':'tr-vacio',
   'cfg-menu-1':'tr-cfg','cfg-menu-2':'tr-cfg',
