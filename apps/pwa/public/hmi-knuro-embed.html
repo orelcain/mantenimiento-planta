@@ -93,11 +93,14 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
 #sp .sb{padding:0;position:relative;justify-content:flex-start;}
 .ptop{display:flex;justify-content:space-between;padding:5px 14px 0;width:100%;}
 .ptop span{font-size:12px;color:#333;cursor:pointer;text-decoration:underline;}
-.pctr{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding-bottom:4px;}
-.pclk{font-size:40px;font-weight:bold;font-family:'Courier New',monospace;color:#111;margin:4px 0 2px;}
-.fbox{border:1px solid #999;background:#f0f0f0;padding:3px 32px 6px;text-align:center;min-width:220px;}
-.fbox .fl{font-size:11px;color:#333;margin-bottom:3px;}.fbox .fv{font-size:22px;font-weight:700;color:#111;letter-spacing:1px;}
-.pftr{display:flex;justify-content:space-between;align-items:center;width:100%;padding:0 10px 5px;}
+/* pctr solo tiene Salmón */
+.pctr{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding-bottom:0;}
+.pclk{font-size:24px;font-weight:500;font-family:'Courier New',monospace;color:#111;margin:0;}
+.fbox{border:1px solid #888;background:#fff;padding:3px 18px 5px;text-align:center;display:inline-block;}
+.fbox .fl{font-size:11px;color:#444;margin-bottom:1px;}.fbox .fv{font-size:16px;font-weight:400;color:#111;letter-spacing:1px;background:#fff;padding:1px 3px;}
+/* pftr flota justo encima del nav bar — align-items:flex-end alinea botones con fbox */
+#sp .pftr{position:absolute;bottom:2px;left:10px;right:10px;display:flex;justify-content:space-between;align-items:flex-end;padding:0;}
+.pftr{display:flex;justify-content:space-between;align-items:center;width:100%;padding:0 10px 3px;}
 .tg{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;width:100%;padding:4px;}
 #s6 .sb{padding:0;align-items:stretch;justify-content:flex-start;}
 .atbl{width:100%;border-collapse:collapse;font-size:11.5px;}
@@ -223,21 +226,29 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
 <!-- S01 PRINCIPAL -->
 <div class="sc active" id="sp">
   <div class="sb" style="padding:0;position:relative;">
-    <div class="ptop"><span>Limpiar Máquina</span><span>Limpiar Vacío</span></div>
-    <div class="pctr">
-      <div style="position:relative;display:inline-block;line-height:1;">
-        <span style="font-family:'Segoe UI',Arial,sans-serif;font-size:46px;font-weight:400;color:#111;letter-spacing:1px;">kn</span><span style="font-family:'Segoe UI',Arial,sans-serif;font-size:46px;font-weight:400;color:#111;position:relative;">u<span style="position:absolute;top:4px;left:0;right:0;height:3px;background:#cc3300;border-radius:1px;"></span></span><span style="font-family:'Segoe UI',Arial,sans-serif;font-size:46px;font-weight:400;color:#111;letter-spacing:1px;">ro</span>
+    <!-- Fila superior: links a los lados, logo centrado en la misma línea -->
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px 0;width:100%;flex-shrink:0;">
+      <span style="font-size:12px;color:#333;cursor:pointer;text-decoration:underline;align-self:flex-start;margin-top:6px;">Limpiar Máquina</span>
+      <div style="position:relative;display:inline-block;line-height:1;transform:scaleX(1.05);transform-origin:center;">
+        <span style="font-family:'Segoe UI',Arial,sans-serif;font-size:51px;font-weight:400;color:#111;letter-spacing:1px;">kn</span><span style="font-family:'Segoe UI',Arial,sans-serif;font-size:51px;font-weight:400;color:#111;position:relative;">u<svg style="position:absolute;top:1px;left:50%;transform:translateX(-50%);" width="36" height="12" viewBox="0 0 36 12" xmlns="http://www.w3.org/2000/svg"><polygon points="36,2 36,10 0,8" fill="#e03300"/></svg></span><span style="font-family:'Segoe UI',Arial,sans-serif;font-size:51px;font-weight:400;color:#111;letter-spacing:1px;">ro</span>
       </div>
-      <div id="sp-maquina" style="font-size:14px;color:#444;margin-top:2px;">Knuro está listo</div>
-      <div id="sp-baader" style="font-size:13px;color:#777;display:none;"></div>
-      <div id="sp-programa" style="font-size:32px;font-weight:400;color:#111;margin-top:4px;">Salmón</div>
-      <div class="pclk" id="clk">8:51:06</div>
-      <div class="fbox"><div class="fl">Número de pescados</div><div class="fv" id="sp-pescados">1577120</div></div>
+      <span style="font-size:12px;color:#333;cursor:pointer;text-decoration:underline;align-self:flex-start;margin-top:6px;">Limpiar Vacío</span>
     </div>
+    <!-- Estado -->
+    <div id="sp-maquina" style="text-align:center;font-size:16px;color:#555;padding:4px 0 0;flex-shrink:0;">Knuro está listo</div>
+    <div id="sp-baader" style="font-size:13px;color:#777;display:none;text-align:center;"></div>
+    <!-- Contenido central: solo Salmón -->
+    <div class="pctr">
+      <div id="sp-programa" style="font-size:29px;font-weight:400;color:#111;">Salmón</div>
+    </div>
+    <!-- Footer: [Válvula] [Reloj + fbox centrados] [Información] en la misma fila -->
     <div class="pftr">
-      <button class="hb red" id="vvbtn" onclick="this.classList.toggle('lime');this.classList.toggle('red');">Válvula de vacío</button>
-      <div style="font-size:10px;color:#666;text-align:center;">CMC – Chia<br>ver. 3.15</div>
-      <button class="hb sm" onclick="nav('s7')">Información de<br>alarma</button>
+      <button class="hb red" id="vvbtn" style="padding:5px 28px;" onclick="this.classList.toggle('lime');this.classList.toggle('red');">Válvula de vacío</button>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:3px;margin-left:-7%;">
+        <div class="pclk" id="clk">8:51:06</div>
+        <div class="fbox"><div class="fl">Número de pescados</div><div class="fv" id="sp-pescados">1577120</div></div>
+      </div>
+      <button class="hb" style="background:#ffffc8;border-color:#cccc80;border-bottom-color:#aaaa60;padding:4px 14px;margin-right:5%;" onclick="nav('s7')">Información de<br>alarma</button>
     </div>
   </div>
 </div>
@@ -1149,14 +1160,14 @@ function buildNavs(){
     sc.insertAdjacentHTML('beforeend',h);
   });
   document.getElementById('sp').insertAdjacentHTML('beforeend',
-    `<div class="nw"><div class="nr" style="justify-content:center;gap:3px;"><button class="nb" style="flex:none;min-width:90px;" onclick="nav('s2')">Menú</button><button class="nb" style="flex:none;min-width:90px;" onclick="nav('s3')">Menú rápido</button><button class="nb" style="flex:none;min-width:90px;" onclick="nav('s4')">Menú<br>Técnico</button><button class="nb" style="flex:none;min-width:90px;" onclick="nav('s5')">Código</button><button class="nb" style="flex:none;min-width:90px;" onclick="nav('s6')">Alarma</button></div></div>`
+    `<div class="nw" style="position:relative;"><div class="nr" style="justify-content:center;"><button class="nb" style="flex:none;min-width:88px;" onclick="nav('s2')">Menú</button><button class="nb" style="flex:none;min-width:88px;" onclick="nav('s3')">Menú rápido</button><button class="nb" style="flex:none;min-width:88px;" onclick="nav('s4')">Menú<br>Técnico</button><button class="nb" style="flex:none;min-width:88px;" onclick="nav('s5')">Código</button><button class="nb" style="flex:none;min-width:88px;" onclick="nav('s6')">Alarma</button></div><div style="position:absolute;right:8px;bottom:4px;font-size:9px;color:#666;text-align:right;line-height:1.3;">CMC – Chia<br>ver. 3.15</div></div>`
   );
 }
 
 /* ── Clock ── */
 function tick(){
   const n=new Date(),p=v=>String(v).padStart(2,'0');
-  const t=`${p(n.getHours())}:${p(n.getMinutes())}:${p(n.getSeconds())}`;
+  const t=`${n.getHours()}:${p(n.getMinutes())}:${p(n.getSeconds())}`;
   const d=`${p(n.getDate())}-${p(n.getMonth()+1)}-${n.getFullYear()} ${t}`;
   document.getElementById('clk').textContent=t;
   document.querySelectorAll('.sd').forEach(el=>el.textContent=d);
