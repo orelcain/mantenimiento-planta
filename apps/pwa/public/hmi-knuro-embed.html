@@ -114,15 +114,23 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
 .ian.act{color:#bb1100;font-weight:bold;}
 .ton{background:#a8d000;color:#222;border:2px solid #889900;border-bottom:3px solid #667700;font-size:13px;font-weight:700;padding:8px 24px;cursor:pointer;font-family:Arial,sans-serif;}
 /* ── RIGHT PANEL ── */
-#rp{width:300px;flex-shrink:0;background:var(--pb);border-left:1px solid var(--bdr);display:flex;flex-direction:column;overflow:hidden;transition:width .2s ease;}
+#rp{width:300px;flex-shrink:0;background:var(--pb);border-left:1px solid var(--bdr);display:flex;flex-direction:column;overflow:hidden;transition:width .2s ease;position:relative;}
+#rp.collapsed{width:36px;}
+#rp.collapsed .rp-sec,#rp.collapsed .psp{display:none;}
+#rp.collapsed .rp-mini{display:flex;}
+.rp-toggle{position:absolute;top:6px;left:-14px;width:14px;height:28px;background:var(--pb);border:1px solid var(--bdr);border-right:none;border-radius:4px 0 0 4px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:9px;color:#666;z-index:5;}
+.rp-toggle:hover{color:#aaa;background:#1e2028;}
+.rp-mini{display:none;flex-direction:column;align-items:center;gap:12px;padding:10px 0;cursor:pointer;}
+.rp-mini span{font-size:14px;opacity:.6;transition:opacity .15s;}
+.rp-mini span:hover{opacity:1;}
 /* tree section */
-.rp-sec{flex-shrink:0;}
-.rp-sec-hdr{display:flex;align-items:center;gap:6px;padding:8px 12px 6px;border-bottom:1px solid var(--bdr);cursor:pointer;user-select:none;}
+.rp-sec{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;}
+.rp-sec-hdr{display:flex;align-items:center;gap:6px;padding:8px 12px 6px;border-bottom:1px solid var(--bdr);cursor:pointer;user-select:none;flex-shrink:0;}
 .rp-sec-hdr span{font-size:10px;font-weight:600;color:var(--ac2);letter-spacing:2px;text-transform:uppercase;flex:1;}
 .rp-sec-hdr .arr{font-size:10px;color:#444;transition:transform .2s;}
 .rp-sec-hdr.open .arr{transform:rotate(90deg);}
-.rp-body{overflow:hidden;transition:max-height .25s ease;}
-.rp-tree{overflow-y:auto;padding:6px 10px;}
+.rp-body{overflow:hidden;transition:max-height .25s ease;flex:1;display:flex;flex-direction:column;min-height:0;}
+.rp-tree{overflow-y:auto;padding:6px 10px;flex:1;}
 .rp-tree::-webkit-scrollbar{width:3px;}
 .rp-tree::-webkit-scrollbar-thumb{background:#333;border-radius:2px;}
 .tn{margin:1px 0;}
@@ -140,16 +148,20 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
 .tdv{height:1px;background:#1e2028;margin:5px 0;}
 /* ── PRESET SECTION ── */
 .psp{flex:1;display:flex;flex-direction:column;overflow:hidden;border-top:1px solid var(--bdr);}
-.psp-hdr{display:flex;align-items:center;gap:6px;padding:8px 12px 6px;flex-shrink:0;}
+.psp-hdr{display:flex;align-items:center;gap:6px;padding:8px 12px 6px;flex-shrink:0;cursor:pointer;user-select:none;border-bottom:1px solid var(--bdr);}
 .psp-hdr span{font-size:10px;font-weight:600;color:var(--ac2);letter-spacing:2px;text-transform:uppercase;flex:1;}
+.psp-hdr .arr{font-size:10px;color:#444;transition:transform .2s;}
+.psp-hdr.open .arr{transform:rotate(90deg);}
+.psp-body{overflow:hidden;transition:max-height .3s ease;}
+.psp.collapsed .psp-body{max-height:0!important;}
 /* tabs */
 .ptabs{display:flex;gap:2px;padding:0 10px 6px;flex-shrink:0;}
 .ptab{flex:1;padding:4px 2px;background:#1a1c22;border:1px solid #2a2e3a;font-size:10px;color:#555;cursor:pointer;border-radius:3px;text-align:center;}
 .ptab.active{background:#1a2844;color:#88aaff;border-color:var(--ac2);}
 /* preset activo */
-.ps-curr{background:#0a1a30;border:1px solid #1a3060;border-radius:4px;padding:5px 8px;display:flex;flex-direction:column;gap:1px;flex-shrink:0;}
-.ps-curr-lbl{font-size:8px;color:#3a5080;letter-spacing:1.5px;text-transform:uppercase;}
-.ps-curr-name{font-size:11px;font-weight:700;color:#88aaff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ps-curr{background:#0d2244;border:1px solid #2255aa;border-radius:5px;padding:7px 10px;display:flex;flex-direction:column;gap:2px;flex-shrink:0;}
+.ps-curr-lbl{font-size:8px;color:#5580bb;letter-spacing:1.5px;text-transform:uppercase;}
+.ps-curr-name{font-size:13px;font-weight:700;color:#aaccff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 /* lista */
 .ps-list-hdr{font-size:8px;color:#444;letter-spacing:1.5px;text-transform:uppercase;padding:4px 0 2px;border-bottom:1px solid #1e2028;flex-shrink:0;}
 /* guardar nuevo */
@@ -952,6 +964,11 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
 
 <!-- ══ RIGHT PANEL ══ -->
 <div id="rp">
+  <div class="rp-toggle" onclick="toggleRightPanel()" title="Colapsar/expandir panel">◀</div>
+  <div class="rp-mini" onclick="toggleRightPanel()">
+    <span title="Mapa de Navegación">🌐</span>
+    <span title="Presets">💾</span>
+  </div>
 
   <!-- Tree section -->
   <div class="rp-sec">
@@ -959,8 +976,8 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
       <span>🌐 Mapa de Navegación</span>
       <span class="arr">▶</span>
     </div>
-    <div class="rp-body" id="tree-body" style="max-height:240px;">
-      <div class="rp-tree" style="max-height:240px;">
+    <div class="rp-body" id="tree-body" style="max-height:none;">
+      <div class="rp-tree">
         <div class="tn"><div class="tnh act" id="tr-sp" onclick="nav('sp')"><span class="tni">🏠</span><span class="tnl">Principal</span><span class="tnbg">S01</span></div>
           <div class="tnc">
             <div class="tna" onclick="nav('s2')"><span class="sym">→</span><span class="tnl">Menú</span><span class="to">S02</span></div>
@@ -1073,7 +1090,8 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
 
   <!-- Preset section -->
   <div class="psp">
-    <div class="psp-hdr"><span>💾 Presets de máquina</span></div>
+    <div class="psp-hdr open" id="presets-hdr" onclick="togglePresets()"><span>💾 Presets de máquina</span><span class="arr">▶</span></div>
+    <div class="psp-body" id="presets-body">
     <div class="ptabs">
       <button class="ptab active" id="tab-save" onclick="switchTab('save')">Guardar / Cargar</button>
       <button class="ptab" id="tab-cmp" onclick="switchTab('cmp')">Comparar</button>
@@ -1122,6 +1140,7 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
         <div id="cmp-out"></div>
       </div>
     </div>
+    </div><!-- /psp-body -->
   </div>
 </div><!-- /rp -->
 
@@ -1301,7 +1320,25 @@ function toggleSec(hdrId,bodyId){
   const hdr=document.getElementById(hdrId),body=document.getElementById(bodyId);
   const open=hdr.classList.contains('open');
   hdr.classList.toggle('open',!open);
-  body.style.maxHeight=open?'0':'240px';
+  body.style.maxHeight=open?'0':'none';
+}
+function toggleRightPanel(){
+  const rp=document.getElementById('rp');
+  const btn=rp.querySelector('.rp-toggle');
+  const collapsed=rp.classList.toggle('collapsed');
+  btn.textContent=collapsed?'▶':'◀';
+  try{localStorage.setItem('hmi-rp-collapsed',collapsed?'1':'');}catch(e){}
+}
+// Restaurar estado del panel
+try{if(localStorage.getItem('hmi-rp-collapsed')==='1'){document.getElementById('rp').classList.add('collapsed');document.querySelector('.rp-toggle').textContent='▶';}}catch(e){}
+
+function togglePresets(){
+  const hdr=document.getElementById('presets-hdr');
+  const body=document.getElementById('presets-body');
+  const open=hdr.classList.contains('open');
+  hdr.classList.toggle('open',!open);
+  body.style.maxHeight=open?'0':'600px';
+  body.style.overflow=open?'hidden':'';
 }
 
 /* ── Tabs ── */
