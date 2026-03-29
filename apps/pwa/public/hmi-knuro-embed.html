@@ -153,7 +153,7 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
 .psp-hdr span{font-size:10px;font-weight:600;color:var(--ac2);letter-spacing:2px;text-transform:uppercase;flex:1;}
 .psp-hdr .arr{font-size:10px;color:#444;transition:transform .2s;}
 .psp-hdr.open .arr{transform:rotate(90deg);}
-.psp-body{overflow:hidden;transition:max-height .3s ease;}
+.psp-body{overflow:hidden;transition:max-height .3s ease;display:flex;flex-direction:column;flex:1;min-height:0;}
 .psp.collapsed .psp-body{max-height:0!important;}
 /* tabs */
 .ptabs{display:flex;gap:2px;padding:0 10px 6px;flex-shrink:0;}
@@ -165,14 +165,17 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
 .ps-curr-name{font-size:13px;font-weight:700;color:#aaccff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 /* lista */
 .ps-list-hdr{font-size:8px;color:#444;letter-spacing:1.5px;text-transform:uppercase;padding:4px 0 2px;border-bottom:1px solid #1e2028;flex-shrink:0;}
+#pl{flex:1;overflow-y:auto;min-height:0;}
+#pl::-webkit-scrollbar{width:3px;}
+#pl::-webkit-scrollbar-thumb{background:#333;border-radius:2px;}
 /* guardar nuevo */
 .ps-new{display:flex;flex-direction:column;gap:3px;border-top:1px solid #1e2028;padding-top:6px;flex-shrink:0;}
 .ps-acts{display:flex;gap:3px;flex-shrink:0;}
 /* tab panels */
-.pt-panel{display:none;flex:1;overflow:hidden;flex-direction:column;}
+.pt-panel{display:none;flex:1;overflow:hidden;flex-direction:column;min-height:0;}
 .pt-panel.active{display:flex;}
 /* tab: save */
-.psave{padding:6px 10px;display:flex;flex-direction:column;gap:5px;flex:1;overflow-y:auto;}
+.psave{padding:6px 10px;display:flex;flex-direction:column;gap:5px;flex:1;overflow:hidden;min-height:0;}
 .psave::-webkit-scrollbar{width:3px;}
 .psave::-webkit-scrollbar-thumb{background:#333;}
 .psave input{width:100%;background:#1e2028;border:1px solid #333;color:#ccc;font-size:10px;padding:4px 6px;border-radius:3px;outline:none;}
@@ -1340,8 +1343,8 @@ function togglePresets(){
   const open=hdr.classList.contains('open');
   hdr.classList.toggle('open',!open);
   psp.classList.toggle('collapsed',open);
-  body.style.maxHeight=open?'0':'600px';
-  body.style.overflow=open?'hidden':'';
+  body.style.maxHeight=open?'0':'';
+  body.style.overflow=open?'hidden':'auto';
 }
 
 /* ── Tabs ── */
