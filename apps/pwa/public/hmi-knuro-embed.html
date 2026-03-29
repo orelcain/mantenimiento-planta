@@ -93,10 +93,10 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
 #sp .sb{padding:0;position:relative;justify-content:flex-start;}
 .ptop{display:flex;justify-content:space-between;padding:5px 14px 0;width:100%;}
 .ptop span{font-size:12px;color:#333;cursor:pointer;text-decoration:underline;}
-.pctr{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding-bottom:6px;}
-.pclk{font-size:28px;font-weight:bold;font-family:'Courier New',monospace;color:#111;margin:5px 0 2px;}
-.fbox{border:1px solid #8888a0;background:#d0d0dc;padding:3px 22px 5px;text-align:center;min-width:170px;}
-.fbox .fl{font-size:11px;color:#555;margin-bottom:1px;}.fbox .fv{font-size:17px;font-weight:700;color:#111;}
+.pctr{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding-bottom:6px;}
+.pclk{font-size:38px;font-weight:bold;font-family:'Courier New',monospace;color:#111;margin:2px 0;}
+.fbox{border:1px solid #8888a0;background:#d0d0dc;padding:4px 28px 6px;text-align:center;min-width:190px;}
+.fbox .fl{font-size:12px;color:#555;margin-bottom:2px;}.fbox .fv{font-size:20px;font-weight:700;color:#111;}
 .pftr{display:flex;justify-content:space-between;align-items:center;width:100%;padding:0 10px 5px;}
 .tg{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;width:100%;padding:4px;}
 #s6 .sb{padding:0;align-items:stretch;justify-content:flex-start;}
@@ -225,18 +225,18 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
   <div class="sb" style="padding:0;position:relative;">
     <div class="ptop"><span>Limpiar Máquina</span><span>Limpiar Vacío</span></div>
     <div class="pctr">
-      <div style="position:relative;display:inline-block;line-height:1;margin-bottom:2px;">
-        <span style="font-family:'Segoe UI',Arial,sans-serif;font-size:44px;font-weight:700;color:#111;letter-spacing:1px;">kn</span><span style="font-family:'Segoe UI',Arial,sans-serif;font-size:44px;font-weight:700;color:#111;position:relative;">ū<span style="position:absolute;top:2px;left:0;right:0;height:3px;background:#cc3300;border-radius:2px;"></span></span><span style="font-family:'Segoe UI',Arial,sans-serif;font-size:44px;font-weight:700;color:#111;letter-spacing:1px;">ro</span>
+      <div style="position:relative;display:inline-block;line-height:1;">
+        <span style="font-family:'Segoe UI',Arial,sans-serif;font-size:46px;font-weight:400;color:#111;letter-spacing:1px;">kn</span><span style="font-family:'Segoe UI',Arial,sans-serif;font-size:46px;font-weight:400;color:#111;position:relative;">u<span style="position:absolute;top:4px;left:0;right:0;height:3px;background:#cc3300;border-radius:1px;"></span></span><span style="font-family:'Segoe UI',Arial,sans-serif;font-size:46px;font-weight:400;color:#111;letter-spacing:1px;">ro</span>
       </div>
-      <div id="sp-maquina" style="font-size:14px;color:#333;margin-top:4px;">Máquina no está lista</div>
-      <div id="sp-baader" style="font-size:20px;font-weight:600;margin-top:2px;">Baader detenida</div>
-      <div id="sp-programa" style="font-size:18px;font-weight:600;margin-top:1px;">Coho</div>
-      <div class="pclk" id="clk">18:48:42</div>
-      <div class="fbox"><div class="fl">Número de pescados</div><div class="fv">1&thinsp;577&thinsp;120</div></div>
+      <div id="sp-maquina" style="font-size:15px;color:#333;">Knuro está listo</div>
+      <div id="sp-baader" style="font-size:13px;color:#777;display:none;"></div>
+      <div id="sp-programa" style="font-size:30px;font-weight:500;color:#111;">Salmón</div>
+      <div class="pclk" id="clk">8:51:06</div>
+      <div class="fbox"><div class="fl">Número de pescados</div><div class="fv" id="sp-pescados">1577120</div></div>
     </div>
     <div class="pftr">
-      <button class="hb lime" id="vvbtn" onclick="this.classList.toggle('lime');this.classList.toggle('red');">Válvula de vacío</button>
-      <div style="font-size:10px;color:#666;text-align:center;">CNC: S/N<br>V02.19</div>
+      <button class="hb red" id="vvbtn" onclick="this.classList.toggle('lime');this.classList.toggle('red');">Válvula de vacío</button>
+      <div style="font-size:10px;color:#666;text-align:center;">CMC – Chia<br>ver. 3.15</div>
       <button class="hb sm" onclick="nav('s7')">Información de<br>alarma</button>
     </div>
   </div>
