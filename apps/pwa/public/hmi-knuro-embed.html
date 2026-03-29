@@ -125,6 +125,7 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
 .rp-mini span:hover{opacity:1;}
 /* tree section */
 .rp-sec{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;}
+.rp-sec.collapsed{flex:none;}
 .rp-sec-hdr{display:flex;align-items:center;gap:6px;padding:8px 12px 6px;border-bottom:1px solid var(--bdr);cursor:pointer;user-select:none;flex-shrink:0;}
 .rp-sec-hdr span{font-size:10px;font-weight:600;color:var(--ac2);letter-spacing:2px;text-transform:uppercase;flex:1;}
 .rp-sec-hdr .arr{font-size:10px;color:#444;transition:transform .2s;}
@@ -1325,6 +1326,7 @@ function toggleSec(hdrId,bodyId){
   const open=hdr.classList.contains('open');
   hdr.classList.toggle('open',!open);
   body.style.maxHeight=open?'0':'none';
+  hdr.closest('.rp-sec').classList.toggle('collapsed',open);
 }
 function toggleRightPanel(){
   const rp=document.getElementById('rp');
