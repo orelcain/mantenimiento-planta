@@ -148,6 +148,7 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
 .tdv{height:1px;background:#1e2028;margin:5px 0;}
 /* ── PRESET SECTION ── */
 .psp{flex:1;display:flex;flex-direction:column;overflow:hidden;border-top:1px solid var(--bdr);}
+.psp.collapsed{flex:none;margin-top:auto;}
 .psp-hdr{display:flex;align-items:center;gap:6px;padding:8px 12px 6px;flex-shrink:0;cursor:pointer;user-select:none;border-bottom:1px solid var(--bdr);}
 .psp-hdr span{font-size:10px;font-weight:600;color:var(--ac2);letter-spacing:2px;text-transform:uppercase;flex:1;}
 .psp-hdr .arr{font-size:10px;color:#444;transition:transform .2s;}
@@ -1335,8 +1336,10 @@ try{if(localStorage.getItem('hmi-rp-collapsed')==='1'){document.getElementById('
 function togglePresets(){
   const hdr=document.getElementById('presets-hdr');
   const body=document.getElementById('presets-body');
+  const psp=hdr.closest('.psp');
   const open=hdr.classList.contains('open');
   hdr.classList.toggle('open',!open);
+  psp.classList.toggle('collapsed',open);
   body.style.maxHeight=open?'0':'600px';
   body.style.overflow=open?'hidden':'';
 }
