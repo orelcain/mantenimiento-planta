@@ -3036,9 +3036,10 @@ function openTipEdit(paramId,iconEl){
     '<button class="tip-save">Guardar</button>'+
     '<span style="font-size:9px;color:#666;">Pos:'+selectHTML+'</span>'+
     '</div>'+
-    '<div style="margin-top:5px;display:flex;align-items:center;gap:6px;">'+
+    '<div style="margin-top:5px;display:flex;align-items:center;justify-content:space-between;gap:6px;">'+
     '<label class="tip-lbl"><input type="checkbox" class="tip-chk"'+(curHidden?' checked':'')+'>'+
-    ' Ocultar tooltip <span style="color:#aaa;">(no se muestra al hacer click)</span></label>'+
+    ' Ocultar tooltip</label>'+
+    '<span onclick="setAdminPassword()" style="font-size:9px;color:#aaa;cursor:pointer;text-decoration:underline;">⚙ cambiar clave</span>'+
     '</div>';
 
   box.querySelector('.tip-close').onclick=()=>{box.remove();};
