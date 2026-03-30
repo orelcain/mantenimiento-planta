@@ -41,9 +41,12 @@ html,body{height:100%;background:var(--bg);color:#ccc;font-family:'Segoe UI',Ari
 #hs{width:800px;height:480px;background:var(--scr);position:relative;overflow:hidden;transform-origin:top left;}
 .sc{display:none;width:100%;height:100%;flex-direction:column;background:var(--scr);position:absolute;top:0;left:0;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#111;}
 .sc.active{display:flex;}
-.sh{display:flex;justify-content:space-between;align-items:center;background:var(--hdr);border-bottom:1px solid #c0c0c0;padding:5px 12px;min-height:32px;flex-shrink:0;}
-.sh .st{font-size:13px;color:#222;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.sh .sd{font-size:12px;color:#555;flex-shrink:0;margin-left:8px;font-family:'Courier New',monospace;}
+.sh{display:flex;justify-content:space-between;align-items:center;background:var(--hdr);border-bottom:1px solid #c0c0c0;padding:5px 12px;min-height:32px;flex-shrink:0;gap:6px;}
+.sh .st{font-size:13px;color:#222;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;}
+.sh .sd{font-size:12px;color:#555;flex-shrink:0;font-family:'Courier New',monospace;}
+#tip-vis-btn{flex-shrink:0;background:#2255aa;color:#fff;border:none;border-radius:10px;padding:2px 9px;font-size:10px;cursor:pointer;opacity:0.75;transition:opacity .2s;display:none;white-space:nowrap;}
+#tip-vis-btn:hover{opacity:1;}
+#tip-vis-btn.active{background:#cc4400;}
 .sb{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 12px;overflow:hidden;}
 /* nav */
 .nw{flex-shrink:0;background:var(--hbg);border-top:2px solid var(--nbb);}
@@ -243,12 +246,10 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
 .tip-drag{display:flex;height:18px;background:#4488cc22;border-radius:3px 3px 0 0;margin:-7px -10px 5px -10px;cursor:move;align-items:center;justify-content:center;font-size:8px;color:#4488cc99;user-select:none;gap:6px;}
 .tip-drag:hover{background:#4488cc44;}
 .tip-drag .tip-drag-lbl{flex:1;text-align:center;}
-.tip-i.is-hidden{opacity:0.3;border-style:dashed !important;}
+.tip-i.is-hidden{opacity:0.25;border-style:dashed !important;}
 .tip-i.is-hidden::after{content:'∅' !important;font-style:normal !important;}
-.tip-i.reveal-hidden{opacity:0.7 !important;border-style:dashed !important;}
-#tip-vis-btn{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);z-index:10001;background:#2255aa;color:#fff;border:none;border-radius:12px;padding:3px 12px;font-size:10px;cursor:pointer;opacity:0.7;transition:opacity .2s;display:none;}
-#tip-vis-btn:hover{opacity:1;}
-#tip-vis-btn.active{background:#cc4400;}
+.tip-i.reveal-hidden{opacity:1 !important;border-style:dashed !important;background:#ffe0cc !important;border-color:#cc4400 !important;}
+.tip-i.reveal-hidden::after{content:'i' !important;color:#cc4400 !important;font-style:italic !important;}
 .tip-box.editing{border-color:#ee8800;background:#fffdf0;max-height:none;overflow-y:visible;min-width:240px;}
 .tip-box.editing::before{display:none;}
 .tip-box .tip-close{position:absolute;top:2px;right:5px;cursor:pointer;color:#999;font-size:12px;line-height:1;}
@@ -1341,6 +1342,7 @@ function show(id,name){
   const te=document.getElementById(tk);
   te?.classList.add('act');te?.scrollIntoView({behavior:'smooth',block:'nearest'});
   renderTooltipIcons();  // Actualizar iconos de tooltip en la pantalla
+  _moveTipVisBtn();      // Mover botón al header activo
 }
 
 /* ── Panel toggle (mobile) ── */
@@ -2611,7 +2613,8 @@ function _addTipIcon(container,tipId){
   const icon=document.createElement('span');
   const _hasText=_getTipText(tipId);
   const _isHidden=_getTipHidden(tipId);
-  icon.className='tip-i'+(_hasText?' has-text':'')+(_isHidden?' is-hidden':'');
+  icon.className='tip-i'+(_hasText?' has-text':'')+
+    (_isHidden?(_tipRevealHidden?' reveal-hidden':' is-hidden'):'');
   icon.dataset.pid=tipId;
 
   let _clickTimer=null;
@@ -2757,6 +2760,7 @@ function initTooltipSystem(){
     localStorage.setItem('knuro-admin-pwd','admin');
   }
   _updateVisBtnState();
+  setTimeout(_moveTipVisBtn,100); // esperar a que el DOM esté listo
 }
 
 function saveTooltips(){
@@ -2765,7 +2769,27 @@ function saveTooltips(){
 
 /* Helpers: leer texto/posición/hidden de un tooltip (soporta string o {text,pos,hidden,x,y,w,h}) */
 function _getTipText(id){const v=PARAM_TOOLTIPS[id];if(!v)return '';return typeof v==='string'?v:(v.text||'');}
-function _getTipPos(id){const v=PARAM_TOOLTIPS[id];if(!v||typeof v==='string')return 'abajo-der';return v.pos||'abajo-der';}
+function _getTipPos(id){const v=PARAM_TOOLTIPS[id];if(!v||typeof v==='string')return 'flotante';return v.pos||'flotante';}
+
+/* Obtener nombre legible de un parámetro/nav/btn a partir de su ID */
+function _getTipLabel(id){
+  if(id.startsWith('nav:')){
+    const navId=id.slice(4);
+    const row=Array.from(document.querySelectorAll('.idxr')).find(r=>{
+      const btn=r.querySelector('button.bnav');
+      return btn&&(btn.getAttribute('onclick')||'').includes("'"+navId+"'");
+    });
+    if(row){const sp=row.querySelector('span');if(sp)return sp.textContent.trim();}
+  } else if(id.startsWith('btn:')){
+    const navId=id.slice(4);
+    const btn=Array.from(document.querySelectorAll('button.hb.pill')).find(b=>(b.getAttribute('onclick')||'').includes("'"+navId+"'"));
+    if(btn)return btn.textContent.replace(/\s+/g,' ').trim();
+  } else {
+    const inp=document.getElementById(id);
+    if(inp){const td=inp.closest('td');if(td){const plb=td.previousElementSibling;if(plb&&plb.classList.contains('plb'))return plb.textContent.replace(/\s+/g,' ').trim();}}
+  }
+  return id;
+}
 function _getTipHidden(id){const v=PARAM_TOOLTIPS[id];if(!v||typeof v==='string')return false;return !!v.hidden;}
 function _getTipXY(id){const v=PARAM_TOOLTIPS[id];if(!v||typeof v==='string')return null;return (v.x!=null)?{x:v.x,y:v.y}:null;}
 function _getTipWH(id){const v=PARAM_TOOLTIPS[id];if(!v||typeof v==='string')return null;return (v.w!=null)?{w:v.w,h:v.h}:null;}
@@ -2792,22 +2816,34 @@ function _saveTipWH(id,w,h){
   if(v&&typeof v==='object'){v.w=w;v.h=h;saveTooltips();}
 }
 
-/* Toggle global: mostrar tooltips ocultos */
+/* Toggle global: mostrar/ocultar tooltips marcados como hidden */
 let _tipRevealHidden=false;
 function toggleTipVisibility(){
   _tipRevealHidden=!_tipRevealHidden;
-  const btn=document.getElementById('tip-vis-btn');
-  if(btn){btn.textContent=_tipRevealHidden?'👁 Ocultar ocultos':'👁 Ver ocultos';btn.classList.toggle('active',_tipRevealHidden);}
   closeTipBox();
   renderTooltipIcons();
+  _updateVisBtnState();
+}
+function _moveTipVisBtn(){
+  const btn=document.getElementById('tip-vis-btn');
+  if(!btn) return;
+  // Mover botón al .sh de la pantalla activa
+  const activeSh=document.querySelector('.sc.active .sh')||document.querySelector('.sh');
+  if(activeSh&&!activeSh.contains(btn)){
+    // Insertar antes del .sd (reloj)
+    const sd=activeSh.querySelector('.sd');
+    if(sd) activeSh.insertBefore(btn,sd);
+    else activeSh.appendChild(btn);
+  }
 }
 function _updateVisBtnState(){
   const btn=document.getElementById('tip-vis-btn');
   if(!btn) return;
   const hasHidden=Object.values(PARAM_TOOLTIPS).some(v=>v&&typeof v==='object'&&v.hidden);
-  btn.style.display=hasHidden?'block':'none';
-  btn.textContent=_tipRevealHidden?'👁 Ocultar ocultos':'👁 Ver ocultos';
+  btn.style.display=hasHidden?'inline-block':'none';
+  btn.textContent=_tipRevealHidden?'🙈 Ocultar':'👁 Ver ocultos';
   btn.classList.toggle('active',_tipRevealHidden);
+  _moveTipVisBtn();
 }
 
 /* Cerrar cualquier tip-box abierto */
@@ -2957,9 +2993,10 @@ function openTipEdit(paramId,iconEl){
   const box=document.createElement('div');
   box.className='tip-box editing';
   box.dataset.pid=paramId;
+  const label=_getTipLabel(paramId);
   box.innerHTML=
     '<span class="tip-close">&times;</span>'+
-    '<div style="font-size:9px;color:#aa6600;font-weight:600;margin-bottom:3px;">Editando: '+paramId+'</div>'+
+    '<div style="font-size:9px;color:#aa6600;font-weight:600;margin-bottom:3px;">✏️ '+label+'</div>'+
     '<textarea placeholder="Escribe la explicación...">'+text.replace(/</g,'&lt;')+'</textarea>'+
     '<div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-top:4px;">'+
     '<button class="tip-save">Guardar</button>'+
@@ -2977,7 +3014,7 @@ function openTipEdit(paramId,iconEl){
     if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();saveTipEdit(paramId,box);}
   });
 
-  _positionTipBox(box,iconEl,'abajo-der'); // editor siempre abajo-der para verlo completo
+  _positionTipBox(box,iconEl,'flotante',paramId+'_edit');
   setTimeout(()=>ta.focus(),50);
 }
 
@@ -3016,6 +3053,5 @@ document.addEventListener('keydown',e=>{
   }
 });
 </script>
-<button id="tip-vis-btn" onclick="toggleTipVisibility()" style="display:none;">👁 Ver ocultos</button>
-</body>
+<button id="tip-vis-btn" onclick="toggleTipVisibility()" style="display:none;">👁 Ver ocultos</button></body>
 </html>
