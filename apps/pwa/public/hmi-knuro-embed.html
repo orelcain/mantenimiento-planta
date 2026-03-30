@@ -233,6 +233,8 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
 .tip-i.has-text::after{color:#1144aa;}
 .tip-i.has-text:hover{background:#2255aa;border-color:#113388;}
 .tip-i.has-text:hover::after{color:#fff;}
+.hb.pill .tip-i{position:absolute;top:2px;right:2px;margin:0;width:12px;height:12px;}
+.hb.pill .tip-i::after{font-size:8px;}
 .tip-box{position:absolute;background:#ffffee;border:1.5px solid #4488cc;border-radius:5px;padding:7px 10px;font-size:11px;color:#222;white-space:normal;max-width:260px;min-width:140px;z-index:9999;box-shadow:0 3px 10px rgba(0,0,0,.25);line-height:1.4;font-family:Arial,sans-serif;}
 .tip-box::before{content:'';position:absolute;top:-6px;right:14px;width:10px;height:10px;background:#ffffee;border-left:1.5px solid #4488cc;border-top:1.5px solid #4488cc;transform:rotate(45deg);}
 .tip-box .tip-close{position:absolute;top:2px;right:5px;cursor:pointer;color:#999;font-size:12px;line-height:1;}
@@ -2586,38 +2588,60 @@ function initDefaultPresets(){
   populateCmpSelects();
 }
 
+/* ── Agregar icono tip-i a un contenedor ── */
+function _addTipIcon(container,tipId){
+  const old=container.querySelector('.tip-i');
+  if(old) old.remove();
+
+  const icon=document.createElement('span');
+  icon.className='tip-i'+(PARAM_TOOLTIPS[tipId]?' has-text':'');
+  icon.dataset.pid=tipId;
+
+  icon.addEventListener('click',e=>{
+    e.stopPropagation();
+    toggleTipBox(tipId,icon);
+  });
+  icon.addEventListener('dblclick',e=>{
+    e.stopPropagation();
+    openTipEdit(tipId,icon);
+  });
+
+  container.appendChild(icon);
+}
+
 /* ── Renderizar iconos de tooltip ── */
 function renderTooltipIcons(){
-  // Poner icono "i" en la celda del label (.plb), no al lado del input
+  // 1) Parámetros: icono en la celda del label (.plb)
   document.querySelectorAll('.pt .plb').forEach(td=>{
-    // Buscar el input asociado en la celda siguiente
     const nextTd=td.nextElementSibling;
     if(!nextTd) return;
     const inp=nextTd.querySelector('input.fe,input.fe1');
     if(!inp||!inp.id) return;
+    _addTipIcon(td,inp.id);
+  });
 
-    // Eliminar icono antiguo si existe
-    const old=td.querySelector('.tip-i');
-    if(old) old.remove();
+  // 2) Menús de navegación: icono en el span del .idxr
+  document.querySelectorAll('.idxr').forEach(row=>{
+    const span=row.querySelector('span');
+    const btn=row.querySelector('button.bnav');
+    if(!span||!btn) return;
+    const onclick=btn.getAttribute('onclick')||'';
+    const m=onclick.match(/nav\('([^']+)'\)/);
+    if(!m) return;
+    const tipId='nav:'+m[1];
+    _addTipIcon(span,tipId);
+  });
 
-    // Agregar icono en TODOS los labels (permite agregar explicación a cualquiera)
-    const icon=document.createElement('span');
-    icon.className='tip-i'+(PARAM_TOOLTIPS[inp.id]?' has-text':'');
-    icon.dataset.pid=inp.id;
-
-    // Click: fijar/cerrar tooltip
-    icon.addEventListener('click',e=>{
-      e.stopPropagation();
-      toggleTipBox(inp.id,icon);
-    });
-
-    // Doble-click: modo edición con clave
-    icon.addEventListener('dblclick',e=>{
-      e.stopPropagation();
-      openTipEdit(inp.id,icon);
-    });
-
-    td.appendChild(icon);
+  // 3) Botones .hb.pill con onclick nav(): menú técnico y sub-navegación
+  document.querySelectorAll('button.hb.pill').forEach(btn=>{
+    if(btn.closest('.idxr')) return;
+    const onclick=btn.getAttribute('onclick')||'';
+    const m=onclick.match(/nav\('([^']+)'\)/);
+    if(!m) return;
+    const tipId='btn:'+m[1];
+    // Icono dentro del botón con position:relative para posicionar absoluto
+    btn.style.position='relative';
+    _addTipIcon(btn,tipId);
   });
 }
 
@@ -2725,10 +2749,10 @@ function closeTipBox(){
 
 /* Posicionar tip-box relativo al td del label */
 function _positionTipBox(box,iconEl){
-  const td=iconEl.closest('td');
-  td.style.position='relative';
-  td.appendChild(box);
-  // Posicionar justo debajo del label, alineado a la derecha
+  const container=iconEl.closest('td')||iconEl.closest('div')||iconEl.closest('span')||iconEl.parentElement;
+  container.style.position='relative';
+  container.appendChild(box);
+  // Posicionar justo debajo del contenedor, alineado a la derecha
   box.style.right='0';
   box.style.top='100%';
   box.style.marginTop='4px';
