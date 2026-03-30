@@ -9,9 +9,9 @@
  * - Ruta: /hmi/learn  y  /hmi/learn/:presetId
  */
 
-import { useEffect, useRef, useState, useMemo } from 'react'
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Loader2, AlertCircle, BookOpen, QrCode, X, Copy, Check } from 'lucide-react'
+import { Loader2, AlertCircle, BookOpen, QrCode, X, Copy, Check, Maximize, Minimize } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { getHmiPresets, getHmiTooltips, getPresetOrder } from '@/services/hmiKnuro'
 
@@ -31,6 +31,22 @@ export function HmiKnuroPublicPage() {
   // QR dialog
   const [qrOpen, setQrOpen] = useState(false)
   const [copied, setCopied] = useState(false)
+
+  // Fullscreen
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const toggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      containerRef.current?.requestFullscreen().catch(() => {})
+    } else {
+      document.exitFullscreen().catch(() => {})
+    }
+  }, [])
+  useEffect(() => {
+    const handler = () => setIsFullscreen(!!document.fullscreenElement)
+    document.addEventListener('fullscreenchange', handler)
+    return () => document.removeEventListener('fullscreenchange', handler)
+  }, [])
 
   const iframeSrc = useMemo(() => {
     const basePath = import.meta.env.BASE_URL || '/'
@@ -141,7 +157,7 @@ export function HmiKnuroPublicPage() {
   }
 
   return (
-    <div className="flex flex-col w-screen bg-[#0a1628]" style={{ height: '100dvh' }}>
+    <div ref={containerRef} className="flex flex-col w-screen bg-[#0a1628]" style={{ height: '100dvh' }}>
 
       {/* Header */}
       <div
@@ -152,6 +168,13 @@ export function HmiKnuroPublicPage() {
         <span className="text-blue-300 text-xs font-semibold tracking-wide uppercase">Modo Aprendizaje</span>
         <span className="text-[#3a5a7a] text-xs hidden sm:inline">— HMI Knuro</span>
         <div className="flex-1" />
+        <button
+          onClick={toggleFullscreen}
+          className="flex items-center gap-1 text-[10px] text-blue-400 hover:text-blue-200 transition-colors px-2 py-1 rounded border border-[#1e3a5f] hover:border-blue-400"
+          title={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
+        >
+          {isFullscreen ? <Minimize className="h-3 w-3" /> : <Maximize className="h-3 w-3" />}
+        </button>
         <button
           onClick={() => setQrOpen(true)}
           className="flex items-center gap-1 text-[10px] text-blue-400 hover:text-blue-200 transition-colors px-2 py-1 rounded border border-[#1e3a5f] hover:border-blue-400"
