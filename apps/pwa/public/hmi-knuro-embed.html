@@ -241,7 +241,9 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
 .tip-box{position:absolute;background:#ffffee;border:1.5px solid #4488cc;border-radius:5px;padding:7px 10px;font-size:11px;color:#222;white-space:normal;max-width:320px;min-width:140px;max-height:220px;overflow-y:auto;z-index:9999;box-shadow:0 3px 10px rgba(0,0,0,.25);line-height:1.4;font-family:Arial,sans-serif;}
 .tip-box::before{content:'';position:absolute;top:-6px;right:14px;width:10px;height:10px;background:#ffffee;border-left:1.5px solid #4488cc;border-top:1.5px solid #4488cc;transform:rotate(45deg);pointer-events:none;}
 .tip-box.pos-arriba::before{top:auto;bottom:-6px;transform:rotate(225deg);}
-.tip-box.pos-flotante{position:fixed!important;max-width:360px;max-height:300px;overflow:auto;resize:both;}
+.tip-box.pos-flotante{position:fixed!important;max-width:min(320px,calc(100vw - 16px));max-height:min(240px,45vh);overflow:auto;resize:both;font-size:clamp(10px,2vw,12px);}
+#fs-btn{position:fixed;bottom:8px;right:8px;z-index:9998;background:rgba(0,0,0,.55);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:7px;width:30px;height:30px;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s;}
+#fs-btn:hover{background:rgba(0,0,0,.8);}
 .tip-box.pos-flotante::before{display:none;}
 .tip-drag{display:flex;height:18px;background:#4488cc22;border-radius:3px 3px 0 0;margin:-7px -10px 5px -10px;cursor:move;align-items:center;justify-content:center;font-size:8px;color:#4488cc99;user-select:none;gap:6px;}
 .tip-drag:hover{background:#4488cc44;}
@@ -2703,6 +2705,24 @@ function renderTooltipIcons(){
 window.addEventListener('load',async()=>{
   buildNavs();
   scaleHMI();
+  // Botón fullscreen flotante
+  (()=>{
+    if(!document.fullscreenEnabled) return;
+    const btn=document.createElement('button');
+    btn.id='fs-btn'; btn.title='Pantalla completa';
+    btn.innerHTML='⛶';
+    btn.onclick=()=>{
+      if(!document.fullscreenElement){
+        document.documentElement.requestFullscreen().catch(()=>{});
+      } else {
+        document.exitFullscreen().catch(()=>{});
+      }
+    };
+    document.addEventListener('fullscreenchange',()=>{
+      btn.innerHTML=document.fullscreenElement?'⛛':'⛶';
+    });
+    document.body.appendChild(btn);
+  })();
   initRefIds();          // asignar data-frid a cada .fr span
   _applyReadOnly();      // aplicar modo lectura si ?mode=readonly
   renderTooltipIcons();  // renderizar iconos de tooltip
@@ -2844,6 +2864,7 @@ function _setTip(id,text,pos,hidden){
   PARAM_TOOLTIPS[id]=isDefault?text:Object.assign({text,pos:pos||'abajo-der'},extra);
 }
 function _saveTipXY(id,x,y){
+  if(READ_ONLY) return;
   const v=PARAM_TOOLTIPS[id];
   if(v&&typeof v==='object'){v.x=x;v.y=y;saveTooltips();}
 }
@@ -2892,25 +2913,49 @@ function _makeDraggable(box,paramId){
   const drag=box.querySelector('.tip-drag');
   if(!drag) return;
   let ox=0,oy=0,sx=0,sy=0;
+
+  function startDrag(cx,cy){
+    sx=cx; sy=cy;
+    ox=parseInt(box.style.left)||0; oy=parseInt(box.style.top)||0;
+  }
+  function moveDrag(cx,cy){
+    const vw=window.innerWidth, vh=window.innerHeight;
+    const bw=box.offsetWidth||200, bh=box.offsetHeight||100;
+    const nx=Math.max(0,Math.min(ox+(cx-sx),vw-bw));
+    const ny=Math.max(0,Math.min(oy+(cy-sy),vh-bh));
+    box.style.left=nx+'px'; box.style.top=ny+'px';
+    box.style.right='auto'; box.style.bottom='auto';
+  }
+  function endDrag(){
+    _saveTipXY(paramId,parseInt(box.style.left),parseInt(box.style.top));
+  }
+
+  // Mouse
   drag.addEventListener('mousedown',e=>{
     e.preventDefault();
-    sx=e.clientX; sy=e.clientY;
-    ox=parseInt(box.style.left)||0; oy=parseInt(box.style.top)||0;
-    const onMove=ev=>{
-      const nx=ox+(ev.clientX-sx);
-      const ny=oy+(ev.clientY-sy);
-      box.style.left=nx+'px'; box.style.top=ny+'px';
-      box.style.right='auto'; box.style.bottom='auto';
-    };
-    const onUp=ev=>{
+    startDrag(e.clientX,e.clientY);
+    const onMove=ev=>moveDrag(ev.clientX,ev.clientY);
+    const onUp=()=>{
       document.removeEventListener('mousemove',onMove);
       document.removeEventListener('mouseup',onUp);
-      // Guardar posición
-      _saveTipXY(paramId,parseInt(box.style.left),parseInt(box.style.top));
+      endDrag();
     };
     document.addEventListener('mousemove',onMove);
     document.addEventListener('mouseup',onUp);
   });
+
+  // Touch
+  drag.addEventListener('touchstart',e=>{
+    e.preventDefault();
+    const t=e.touches[0];
+    startDrag(t.clientX,t.clientY);
+  },{passive:false});
+  drag.addEventListener('touchmove',e=>{
+    e.preventDefault();
+    const t=e.touches[0];
+    moveDrag(t.clientX,t.clientY);
+  },{passive:false});
+  drag.addEventListener('touchend',()=>endDrag());
 }
 
 /* Posicionar tip-box según posición elegida */
