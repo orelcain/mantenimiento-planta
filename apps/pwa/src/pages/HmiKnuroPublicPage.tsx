@@ -32,20 +32,42 @@ export function HmiKnuroPublicPage() {
   const [qrOpen, setQrOpen] = useState(false)
   const [copied, setCopied] = useState(false)
 
-  // Fullscreen
+  // Fullscreen (real API + fallback visual para iOS)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [visualFs, setVisualFs] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+
   const toggleFullscreen = useCallback(() => {
-    if (!document.fullscreenElement) {
-      containerRef.current?.requestFullscreen().catch(() => {})
+    const doc = document as Document & { webkitFullscreenElement?: Element; webkitExitFullscreen?: () => void }
+    const el = (containerRef.current ?? document.documentElement) as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> }
+    const isFs = !!(document.fullscreenElement || doc.webkitFullscreenElement)
+
+    if (!isFs) {
+      const req = el.requestFullscreen?.bind(el) ?? el.webkitRequestFullscreen?.bind(el)
+      if (req) {
+        req().catch(() => setVisualFs(true)) // iOS fallback
+      } else {
+        setVisualFs(v => !v) // iOS: toggle visual fullscreen
+      }
     } else {
-      document.exitFullscreen().catch(() => {})
+      const exit = document.exitFullscreen?.bind(document) ?? doc.webkitExitFullscreen?.bind(document)
+      exit?.()
     }
   }, [])
+
   useEffect(() => {
-    const handler = () => setIsFullscreen(!!document.fullscreenElement)
+    const handler = () => {
+      const doc = document as Document & { webkitFullscreenElement?: Element }
+      const fs = !!(document.fullscreenElement || doc.webkitFullscreenElement)
+      setIsFullscreen(fs)
+      if (!fs) setVisualFs(false)
+    }
     document.addEventListener('fullscreenchange', handler)
-    return () => document.removeEventListener('fullscreenchange', handler)
+    document.addEventListener('webkitfullscreenchange', handler)
+    return () => {
+      document.removeEventListener('fullscreenchange', handler)
+      document.removeEventListener('webkitfullscreenchange', handler)
+    }
   }, [])
 
   const iframeSrc = useMemo(() => {
@@ -162,7 +184,7 @@ export function HmiKnuroPublicPage() {
       {/* Header */}
       <div
         className="flex items-center gap-2 px-3 flex-shrink-0 border-b border-[#1e3a5f]"
-        style={{ height: '40px', background: '#0d1f3c' }}
+        style={{ height: visualFs ? '0' : '40px', overflow: 'hidden', background: '#0d1f3c', transition: 'height .2s' }}
       >
         <BookOpen className="h-4 w-4 text-blue-400 flex-shrink-0" />
         <span className="text-blue-300 text-xs font-semibold tracking-wide uppercase">Modo Aprendizaje</span>
@@ -171,9 +193,9 @@ export function HmiKnuroPublicPage() {
         <button
           onClick={toggleFullscreen}
           className="flex items-center gap-1 text-[10px] text-blue-400 hover:text-blue-200 transition-colors px-2 py-1 rounded border border-[#1e3a5f] hover:border-blue-400"
-          title={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
+          title={(isFullscreen || visualFs) ? 'Salir de pantalla completa' : 'Pantalla completa'}
         >
-          {isFullscreen ? <Minimize className="h-3 w-3" /> : <Maximize className="h-3 w-3" />}
+          {(isFullscreen || visualFs) ? <Minimize className="h-3 w-3" /> : <Maximize className="h-3 w-3" />}
         </button>
         <button
           onClick={() => setQrOpen(true)}
@@ -188,7 +210,7 @@ export function HmiKnuroPublicPage() {
       {/* Preset selector */}
       <div
         className="flex items-center gap-2 px-3 flex-shrink-0 overflow-x-auto"
-        style={{ height: '36px', background: '#0a1628', borderBottom: '1px solid #12243a' }}
+        style={{ height: visualFs ? '0' : '36px', overflow: visualFs ? 'hidden' : 'auto', background: '#0a1628', borderBottom: '1px solid #12243a', transition: 'height .2s' }}
       >
         <span className="text-[10px] text-[#3a5a7a] flex-shrink-0 uppercase tracking-wide">Preset:</span>
         {presetKeys.map(name => (
@@ -220,12 +242,25 @@ export function HmiKnuroPublicPage() {
       </div>
 
       {/* Footer branding */}
-      <div
-        className="flex-shrink-0 text-center"
-        style={{ padding: '3px 0', background: '#0d1f3c', borderTop: '1px solid #12243a' }}
-      >
-        <p className="text-[9px] text-[#2a4a6a] uppercase tracking-wider">Mantenimiento Industrial — Solo lectura</p>
-      </div>
+      {!visualFs && (
+        <div
+          className="flex-shrink-0 text-center"
+          style={{ padding: '3px 0', background: '#0d1f3c', borderTop: '1px solid #12243a' }}
+        >
+          <p className="text-[9px] text-[#2a4a6a] uppercase tracking-wider">Mantenimiento Industrial — Solo lectura</p>
+        </div>
+      )}
+
+      {/* Botón salir de fullscreen visual (iOS / fallback) */}
+      {visualFs && (
+        <button
+          onClick={() => setVisualFs(false)}
+          className="fixed top-2 right-2 z-50 flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] text-blue-200"
+          style={{ background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.2)' }}
+        >
+          <Minimize className="h-3 w-3" />
+        </button>
+      )}
 
       {/* QR Dialog */}
       {qrOpen && (
