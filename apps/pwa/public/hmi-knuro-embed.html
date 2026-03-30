@@ -241,7 +241,9 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
 .tip-box{position:absolute;background:#ffffee;border:1.5px solid #4488cc;border-radius:5px;padding:7px 10px;font-size:11px;color:#222;white-space:normal;max-width:320px;min-width:140px;max-height:220px;overflow-y:auto;z-index:9999;box-shadow:0 3px 10px rgba(0,0,0,.25);line-height:1.4;font-family:Arial,sans-serif;}
 .tip-box::before{content:'';position:absolute;top:-6px;right:14px;width:10px;height:10px;background:#ffffee;border-left:1.5px solid #4488cc;border-top:1.5px solid #4488cc;transform:rotate(45deg);pointer-events:none;}
 .tip-box.pos-arriba::before{top:auto;bottom:-6px;transform:rotate(225deg);}
-.tip-box.pos-flotante{position:fixed!important;max-width:min(320px,calc(100vw - 16px));max-height:min(240px,45vh);overflow:auto;resize:both;font-size:clamp(10px,2vw,12px);}
+.tip-box.pos-flotante{position:fixed!important;max-width:min(320px,calc(100vw - 16px));max-height:min(240px,45vh);overflow:auto;resize:none;font-size:clamp(10px,2vw,12px);padding-bottom:18px;}
+.tip-resize-h{position:absolute;bottom:2px;right:3px;width:20px;height:16px;display:flex;align-items:center;justify-content:center;cursor:se-resize;color:#4488cc66;font-size:13px;user-select:none;touch-action:none;z-index:2;}
+.tip-resize-h:active,.tip-resize-h:hover{color:#4488cccc;}
 #fs-btn{position:fixed;bottom:8px;right:8px;z-index:9998;background:rgba(0,0,0,.55);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:7px;width:30px;height:30px;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s;}
 #fs-btn:hover{background:rgba(0,0,0,.8);}
 .tip-box.pos-flotante::before{display:none;}
@@ -2869,6 +2871,7 @@ function _saveTipXY(id,x,y){
   if(v&&typeof v==='object'){v.x=x;v.y=y;saveTooltips();}
 }
 function _saveTipWH(id,w,h){
+  if(READ_ONLY) return;
   const v=PARAM_TOOLTIPS[id];
   if(v&&typeof v==='object'){v.w=w;v.h=h;saveTooltips();}
 }
@@ -2958,6 +2961,43 @@ function _makeDraggable(box,paramId){
   drag.addEventListener('touchend',()=>endDrag());
 }
 
+/* Resize táctil/mouse de tip-box flotante */
+function _makeTouchResizable(box,handle,paramId){
+  let sx=0,sy=0,sw=0,sh=0;
+  function startResize(cx,cy){
+    sx=cx; sy=cy; sw=box.offsetWidth; sh=box.offsetHeight;
+  }
+  function doResize(cx,cy){
+    const vw=window.innerWidth,vh=window.innerHeight;
+    const bx=parseInt(box.style.left)||0, by=parseInt(box.style.top)||0;
+    const nw=Math.max(140,Math.min(sw+(cx-sx), vw-bx-8));
+    const nh=Math.max(60, Math.min(sh+(cy-sy), vh-by-8));
+    box.style.width=nw+'px'; box.style.height=nh+'px';
+  }
+  function endResize(){
+    _saveTipWH(paramId,box.offsetWidth,box.offsetHeight);
+  }
+  // Mouse
+  handle.addEventListener('mousedown',e=>{
+    e.preventDefault(); e.stopPropagation();
+    startResize(e.clientX,e.clientY);
+    const onMove=ev=>doResize(ev.clientX,ev.clientY);
+    const onUp=()=>{document.removeEventListener('mousemove',onMove);document.removeEventListener('mouseup',onUp);endResize();};
+    document.addEventListener('mousemove',onMove);
+    document.addEventListener('mouseup',onUp);
+  });
+  // Touch
+  handle.addEventListener('touchstart',e=>{
+    e.preventDefault(); e.stopPropagation();
+    const t=e.touches[0]; startResize(t.clientX,t.clientY);
+  },{passive:false});
+  handle.addEventListener('touchmove',e=>{
+    e.preventDefault(); e.stopPropagation();
+    const t=e.touches[0]; doResize(t.clientX,t.clientY);
+  },{passive:false});
+  handle.addEventListener('touchend',endResize);
+}
+
 /* Posicionar tip-box según posición elegida */
 function _positionTipBox(box,iconEl,pos,paramId){
   pos=pos||'abajo-der';
@@ -2999,13 +3039,11 @@ function _positionTipBox(box,iconEl,pos,paramId){
     const savedWH=paramId?_getTipWH(paramId):null;
     if(savedWH){box.style.width=savedWH.w+'px';box.style.height=savedWH.h+'px';}
     if(paramId) _makeDraggable(box,paramId);
-    // Guardar tamaño al soltar tras redimensionar (resize:both nativo)
-    if(paramId){
-      box.addEventListener('mouseup',()=>{
-        const w=box.offsetWidth,h=box.offsetHeight;
-        if(w&&h) _saveTipWH(paramId,w,h);
-      });
-    }
+    // Handle de resize táctil/mouse (esquina inferior derecha)
+    const rh=document.createElement('span');
+    rh.className='tip-resize-h'; rh.innerHTML='⇲'; rh.title='Redimensionar';
+    box.appendChild(rh);
+    _makeTouchResizable(box,rh,paramId||'_tmp');
     return;
   }
   const isArriba=pos.startsWith('arriba');
