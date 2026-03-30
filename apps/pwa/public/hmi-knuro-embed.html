@@ -2968,16 +2968,47 @@ function toggleTipBox(paramId,iconEl){
   },10);
 }
 
+/* Pedir clave inline (sin prompt nativo) */
+function _askPwd(iconEl,onSuccess){
+  closeTipBox();
+  const box=document.createElement('div');
+  box.className='tip-box editing';
+  box.style.minWidth='200px';
+  box.innerHTML=
+    '<span class="tip-close">&times;</span>'+
+    '<div style="font-size:10px;color:#aa6600;font-weight:600;margin-bottom:6px;">🔒 Clave de edición</div>'+
+    '<input type="password" class="tip-pwd" placeholder="Contraseña..." style="width:100%;padding:4px;border:1px solid #aac;border-radius:3px;font-size:11px;box-sizing:border-box;">'+
+    '<div style="margin-top:5px;display:flex;gap:4px;align-items:center;">'+
+    '<button class="tip-save">Entrar</button>'+
+    '<span class="tip-pwd-err" style="font-size:9px;color:#c00;display:none;">Clave incorrecta</span>'+
+    '</div>';
+  box.querySelector('.tip-close').onclick=()=>box.remove();
+  const inp=box.querySelector('.tip-pwd');
+  const err=box.querySelector('.tip-pwd-err');
+  const verify=()=>{
+    const val=inp.value;
+    if(!val) return;
+    if(val===localStorage.getItem('knuro-admin-pwd')){
+      _tipAuth=true;
+      box.remove();
+      onSuccess();
+    } else {
+      err.style.display='inline';
+      inp.value='';
+      setTimeout(()=>inp.focus(),50);
+    }
+  };
+  box.querySelector('.tip-save').onclick=verify;
+  inp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();verify();}});
+  _positionTipBox(box,iconEl,'flotante',null);
+  setTimeout(()=>inp.focus(),50);
+}
+
 /* Doble-click: modo edición con clave */
 function openTipEdit(paramId,iconEl){
   if(!_tipAuth){
-    const pwd=prompt('Clave para editar tooltips:');
-    if(!pwd) return;
-    if(pwd!==localStorage.getItem('knuro-admin-pwd')){
-      alert('Clave incorrecta');
-      return;
-    }
-    _tipAuth=true;
+    _askPwd(iconEl,()=>openTipEdit(paramId,iconEl));
+    return;
   }
   closeTipBox();
 
@@ -3037,13 +3068,31 @@ function saveTipEdit(paramId,el){
 }
 
 function setAdminPassword(){
-  const pwd1=prompt('Nueva contraseña:');
-  if(!pwd1) return;
-  const pwd2=prompt('Confirmar contraseña:');
-  if(pwd1!==pwd2){alert('Las contraseñas no coinciden');return;}
-  localStorage.setItem('knuro-admin-pwd',pwd1);
-  _tipAuth=false;
-  alert('Contraseña actualizada');
+  closeTipBox();
+  const box=document.createElement('div');
+  box.className='tip-box editing';
+  box.style.cssText='position:fixed;top:80px;left:50%;transform:translateX(-50%);min-width:220px;z-index:99999;';
+  box.innerHTML=
+    '<span class="tip-close">&times;</span>'+
+    '<div style="font-size:10px;color:#aa6600;font-weight:600;margin-bottom:6px;">🔑 Cambiar contraseña</div>'+
+    '<input type="password" id="_pwd1" placeholder="Nueva contraseña" style="width:100%;padding:4px;border:1px solid #aac;border-radius:3px;font-size:11px;box-sizing:border-box;margin-bottom:4px;">'+
+    '<input type="password" id="_pwd2" placeholder="Confirmar contraseña" style="width:100%;padding:4px;border:1px solid #aac;border-radius:3px;font-size:11px;box-sizing:border-box;">'+
+    '<div style="margin-top:5px;display:flex;gap:4px;align-items:center;">'+
+    '<button class="tip-save">Guardar</button>'+
+    '<span id="_pwdmsg" style="font-size:9px;color:#c00;display:none;"></span></div>';
+  box.querySelector('.tip-close').onclick=()=>box.remove();
+  box.querySelector('.tip-save').onclick=()=>{
+    const v1=box.querySelector('#_pwd1').value;
+    const v2=box.querySelector('#_pwd2').value;
+    const msg=box.querySelector('#_pwdmsg');
+    if(!v1){msg.textContent='Ingresa una contraseña';msg.style.display='inline';return;}
+    if(v1!==v2){msg.textContent='No coinciden';msg.style.display='inline';return;}
+    localStorage.setItem('knuro-admin-pwd',v1);
+    _tipAuth=false;
+    box.remove();
+  };
+  document.body.appendChild(box);
+  setTimeout(()=>box.querySelector('#_pwd1').focus(),50);
 }
 
 initTooltipSystem();
