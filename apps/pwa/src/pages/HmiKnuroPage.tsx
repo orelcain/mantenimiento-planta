@@ -12,6 +12,8 @@ import {
   getHmiRefs,
   saveHmiRefs,
   saveHmiTooltips,
+  getHmiTooltipPwd,
+  saveHmiTooltipPwd,
   addHmiHistory,
   getHmiHistory,
   seedDefaultPresets,
@@ -68,11 +70,12 @@ export function HmiKnuroPage() {
   // No depende de user para leer; solo lo necesita para sembrar presets si vacío.
   const sendInitData = useCallback(async (iframe: HTMLIFrameElement) => {
     try {
-      let [presetsData, current, refs, order] = await Promise.all([
+      let [presetsData, current, refs, order, pwd] = await Promise.all([
         getHmiPresets(),
         getCurrentPreset(),
         getHmiRefs(),
         getPresetOrder(),
+        getHmiTooltipPwd(),
       ])
       // Si Firestore está vacío, sembrar los 6 presets por defecto automáticamente
       if (Object.keys(presetsData).length === 0) {
@@ -90,7 +93,7 @@ export function HmiKnuroPage() {
       setPresets(presetsData)
       setCurrentPresetName(current)
       setPresetOrder(order)
-      iframe.contentWindow?.postMessage({ type: 'hmi:init', presets: presetsData, current, refs, order }, '*')
+      iframe.contentWindow?.postMessage({ type: 'hmi:init', presets: presetsData, current, refs, order, pwd }, '*')
     } catch (err) {
       console.error('[HMI] Error cargando Firestore:', err)
     }
@@ -191,6 +194,14 @@ export function HmiKnuroPage() {
           if (event.data.tooltips) {
             await saveHmiTooltips(event.data.tooltips).catch(err =>
               console.error('[HMI] Error guardando tooltips en Firestore:', err)
+            )
+          }
+          break
+        }
+        case 'hmi:save-pwd': {
+          if (typeof event.data.pwd === 'string' && event.data.pwd) {
+            await saveHmiTooltipPwd(event.data.pwd).catch(err =>
+              console.error('[HMI] Error guardando clave en Firestore:', err)
             )
           }
           break

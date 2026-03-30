@@ -300,6 +300,17 @@ export const DEFAULT_PRESETS: Record<string, Record<string, string>> = {
 // ── Tooltips de parámetros ────────────────────────────────────────────────────
 const TOOLTIPS_COL = 'hmi-knuro-tooltips'
 
+/** Obtiene la clave de edición de tooltips desde Firestore */
+export async function getHmiTooltipPwd(): Promise<string> {
+  const snap = await getDoc(doc(db, CONFIG_COL, 'tooltip-pwd'))
+  return snap.exists() ? (snap.data().pwd as string) || 'admin' : 'admin'
+}
+
+/** Guarda la clave de edición de tooltips en Firestore */
+export async function saveHmiTooltipPwd(pwd: string): Promise<void> {
+  await setDoc(doc(db, CONFIG_COL, 'tooltip-pwd'), { pwd, updatedAt: serverTimestamp() })
+}
+
 /** Guarda los tooltips editados por el admin en Firestore (documento único "default") */
 export async function saveHmiTooltips(tooltips: Record<string, unknown>): Promise<void> {
   await setDoc(doc(db, TOOLTIPS_COL, 'default'), {

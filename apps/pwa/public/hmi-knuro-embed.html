@@ -1484,9 +1484,10 @@ if(IN_IFRAME){
       const pn=document.getElementById('pn');
       if(pn) pn.value=cur;
     }
-    // Modo readonly y tooltips desde la página pública
+    // Modo readonly, tooltips y clave desde la página pública/admin
     if(e.data.readonly) READ_ONLY=true;
     if(e.data.tooltips) Object.assign(PARAM_TOOLTIPS,e.data.tooltips);
+    if(e.data.pwd) localStorage.setItem('knuro-admin-pwd',e.data.pwd);
     renderPresets(); populateCmpSelects();
     const toLoad=(cur&&presets[cur])?cur:(Object.keys(presets)[0]||null);
     if(toLoad){setAllInputs(presets[toLoad],toLoad);updateActivePreset(toLoad);}
@@ -3213,6 +3214,7 @@ function setAdminPassword(){
     if(!v1){msg.textContent='Ingresa una contraseña';msg.style.display='inline';return;}
     if(v1!==v2){msg.textContent='No coinciden';msg.style.display='inline';return;}
     localStorage.setItem('knuro-admin-pwd',v1);
+    if(IN_IFRAME) window.parent.postMessage({type:'hmi:save-pwd',pwd:v1},'*');
     _tipAuth=false;
     box.remove();
   };
