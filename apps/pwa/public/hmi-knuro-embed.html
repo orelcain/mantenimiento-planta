@@ -2597,12 +2597,15 @@ function _addTipIcon(container,tipId){
   icon.className='tip-i'+(PARAM_TOOLTIPS[tipId]?' has-text':'');
   icon.dataset.pid=tipId;
 
+  let _clickTimer=null;
   icon.addEventListener('click',e=>{
     e.stopPropagation();
-    toggleTipBox(tipId,icon);
+    if(_clickTimer) clearTimeout(_clickTimer);
+    _clickTimer=setTimeout(()=>{_clickTimer=null;toggleTipBox(tipId,icon);},250);
   });
   icon.addEventListener('dblclick',e=>{
     e.stopPropagation();
+    if(_clickTimer){clearTimeout(_clickTimer);_clickTimer=null;}
     openTipEdit(tipId,icon);
   });
 
