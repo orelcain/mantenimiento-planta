@@ -1342,6 +1342,7 @@ function show(id,name){
   const te=document.getElementById(tk);
   te?.classList.add('act');te?.scrollIntoView({behavior:'smooth',block:'nearest'});
   renderTooltipIcons();  // Actualizar iconos de tooltip en la pantalla
+  _updateVisBtnState();  // Actualizar visibilidad del botón
   _moveTipVisBtn();      // Mover botón al header activo
 }
 
@@ -2610,11 +2611,13 @@ function _addTipIcon(container,tipId){
   const old=container.querySelector('.tip-i');
   if(old) old.remove();
 
+  const _isHidden=_getTipHidden(tipId);
+  // Si está oculto y no estamos en modo revelar: no mostrar el ícono
+  if(_isHidden&&!_tipRevealHidden) return;
+
   const icon=document.createElement('span');
   const _hasText=_getTipText(tipId);
-  const _isHidden=_getTipHidden(tipId);
-  icon.className='tip-i'+(_hasText?' has-text':'')+
-    (_isHidden?(_tipRevealHidden?' reveal-hidden':' is-hidden'):'');
+  icon.className='tip-i'+(_hasText?' has-text':'')+(_isHidden?' reveal-hidden':'');
   icon.dataset.pid=tipId;
 
   let _clickTimer=null;
