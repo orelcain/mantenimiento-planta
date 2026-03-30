@@ -224,6 +224,30 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
   #rp.open{transform:translateX(0);}
   #ov.show{display:block;}
 }
+/* ── TOOLTIPS ── */
+.param-info-icon{display:inline-block;width:14px;height:14px;background:#4499ff;color:#fff;border-radius:50%;font-size:10px;line-height:14px;text-align:center;cursor:help;margin-left:2px;vertical-align:middle;user-select:none;font-weight:bold;}
+.tooltip-popup{position:fixed;background:#0a0a12;border:1px solid #4499ff;border-radius:6px;padding:8px 12px;font-size:11px;color:#aaccff;white-space:normal;max-width:280px;z-index:9999;box-shadow:0 4px 12px rgba(68,153,255,.3),inset 0 0 1px rgba(68,153,255,.2);pointer-events:none;}
+.tooltip-popup.admin{border-color:#ff9900;background:#1a1510;}
+/* admin panel */
+#admin-panel{position:fixed;bottom:20px;right:20px;background:#0d0f15;border:2px solid #4499ff;border-radius:8px;padding:16px;width:380px;max-height:600px;display:none;flex-direction:column;gap:10px;z-index:10000;font-size:11px;font-family:'Segoe UI',Arial,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.8);}
+#admin-panel.show{display:flex;}
+#admin-panel h3{color:#4499ff;font-size:12px;margin-bottom:5px;letter-spacing:1px;}
+#admin-panel input[type="password"]{width:100%;padding:6px;background:#1a1c22;border:1px solid #333;color:#aaa;border-radius:4px;font-size:11px;}
+#admin-panel input[type="password"]:focus{border-color:#4499ff;outline:none;}
+#admin-panel .admin-tabs{display:flex;gap:5px;margin-bottom:10px;}
+#admin-panel .admin-tab-btn{flex:1;padding:6px;background:#1a2844;color:#88aaff;border:1px solid #334;border-radius:4px;cursor:pointer;font-size:10px;}
+#admin-panel .admin-tab-btn.active{background:#223366;border-color:#6688cc;}
+#admin-panel .admin-content{flex:1;overflow-y:auto;border:1px solid #252830;border-radius:4px;background:#13151b;padding:8px;}
+#admin-panel .admin-item{padding:6px;border-bottom:1px solid #1e2028;display:flex;gap:6px;align-items:center;}
+#admin-panel .admin-item:last-child{border-bottom:none;}
+#admin-panel .admin-item input{flex:1;padding:4px;background:#1e2028;border:1px solid #333;color:#aaa;border-radius:3px;font-size:10px;}
+#admin-panel .admin-item input:focus{border-color:#4499ff;outline:none;}
+#admin-panel .admin-actions{display:flex;gap:5px;}
+#admin-panel button{padding:6px 10px;background:#1a2844;color:#88aaff;border:1px solid #334;border-radius:4px;cursor:pointer;font-size:10px;}
+#admin-panel button:hover{background:#223366;}
+#admin-panel button.danger{background:#2a1818;color:#ff8888;border-color:#884444;}
+#admin-panel button.danger:hover{background:#381818;}
+#admin-panel .close-btn{background:#1e2028;color:#888;border-color:#333;padding:4px 8px;}
 </style>
 </head>
 <body>
@@ -1305,6 +1329,7 @@ function show(id,name){
   const tk=TREE[id]||'tr-s4';
   const te=document.getElementById(tk);
   te?.classList.add('act');te?.scrollIntoView({behavior:'smooth',block:'nearest'});
+  renderTooltipIcons();  // Actualizar iconos de tooltip en la pantalla
 }
 
 /* ── Panel toggle (mobile) ── */
@@ -2567,11 +2592,39 @@ function initDefaultPresets(){
   populateCmpSelects();
 }
 
+/* ── Renderizar iconos de tooltip ── */
+function renderTooltipIcons(){
+  document.querySelectorAll('input.fe,input.fe1').forEach(inp=>{
+    if(!inp.id) return;
+
+    // Eliminar icono antiguo si existe
+    const oldIcon=inp.nextElementSibling;
+    if(oldIcon&&oldIcon.classList.contains('param-info-icon')){
+      oldIcon.remove();
+    }
+
+    // Solo agregar icono si existe una explicación
+    if(PARAM_TOOLTIPS[inp.id]){
+      const icon=document.createElement('span');
+      icon.className='param-info-icon';
+      icon.textContent='ⓘ';
+      icon.title='Información del parámetro (Ctrl+Shift+T para editar)';
+      icon.onclick=(e)=>{
+        e.stopPropagation();
+        showTooltip(inp.id,PARAM_TOOLTIPS[inp.id]);
+      };
+      icon.onmouseover=()=>showTooltip(inp.id,PARAM_TOOLTIPS[inp.id]);
+      inp.parentNode.insertBefore(icon,inp.nextSibling);
+    }
+  });
+}
+
 /* ── Init ── */
 window.addEventListener('load',async()=>{
   buildNavs();
   scaleHMI();
   initRefIds();          // asignar data-frid a cada .fr span
+  renderTooltipIcons();  // renderizar iconos de tooltip
 
   if(IN_IFRAME){
     // En iframe: #rp queda visible (desktop=inline, mobile=drawer).
@@ -2626,6 +2679,186 @@ window.addEventListener('load',async()=>{
     document.execCommand('insertText',false,txt);
   });
 });
+
+/* ── TOOLTIP SYSTEM ── */
+let PARAM_TOOLTIPS={};
+let tooltipCurrentId=null;
+
+function initTooltipSystem(){
+  const stored=localStorage.getItem('knuro-tooltips');
+  if(stored) {
+    PARAM_TOOLTIPS=JSON.parse(stored);
+  } else {
+    // Ejemplos de tooltips iniciales para demostración
+    PARAM_TOOLTIPS={
+      'c1tp-0':'Tiempo de espera del ciclo antes de comenzar. Medido en centésimas de segundo.',
+      'c1tp-1':'Presión aplicada por los pulsos en la primera herramienta para salmón. Valor entre 0 y 100.',
+      'h1pb-0':'Presión inicial al bajar la herramienta por primera vez. Importante para calibración.',
+      'h2-2as-0':'Tiempo de espera antes de aplicar presión en la herramienta 2A para salmón.'
+    };
+    saveTooltips();
+  }
+
+  // Inicializar contraseña de admin si no existe
+  if(!localStorage.getItem('knuro-admin-pwd')){
+    localStorage.setItem('knuro-admin-pwd','admin');
+  }
+}
+
+function saveTooltips(){
+  localStorage.setItem('knuro-tooltips',JSON.stringify(PARAM_TOOLTIPS));
+}
+
+function showTooltip(paramId,text,isAdmin=false){
+  if(!text) return;
+
+  // Eliminar tooltip anterior si existe
+  const oldTooltip=document.querySelector('.tooltip-popup');
+  if(oldTooltip) oldTooltip.remove();
+
+  const tooltip=document.createElement('div');
+  tooltip.className='tooltip-popup'+(isAdmin?' admin':'');
+  tooltip.textContent=text;
+  document.body.appendChild(tooltip);
+  tooltipCurrentId=paramId;
+
+  const evt=event;
+  const x=evt.clientX+10;
+  const y=evt.clientY+10;
+  tooltip.style.left=x+'px';
+  tooltip.style.top=y+'px';
+
+  const cleanup=()=>{
+    if(tooltip.parentNode) tooltip.parentNode.removeChild(tooltip);
+    tooltipCurrentId=null;
+  };
+  tooltip.addEventListener('mouseleave',cleanup);
+  document.addEventListener('click',cleanup,{once:true});
+  setTimeout(()=>{if(tooltip.parentNode) cleanup();},6000);
+}
+
+function openAdminPanel(){
+  const pwd=prompt('🔐 Contraseña de administrador:');
+  if(!pwd) return;
+  if(pwd!==localStorage.getItem('knuro-admin-pwd')){
+    alert('❌ Contraseña incorrecta');
+    return;
+  }
+  const panel=document.getElementById('admin-panel');
+  panel.classList.add('show');
+  loadAdminPanel();
+}
+
+function closeAdminPanel(){
+  document.getElementById('admin-panel').classList.remove('show');
+}
+
+function loadAdminPanel(){
+  const content=document.getElementById('admin-content');
+  if(!content) return;
+  content.innerHTML='';
+
+  // Sección: Agregar nuevo tooltip
+  const addNew=document.createElement('div');
+  addNew.style.cssText='padding:8px;border-bottom:2px solid #1e2028;margin-bottom:8px;background:#0a0a12;border-radius:4px;';
+  addNew.innerHTML=`
+    <div style="font-size:10px;color:#4499ff;font-weight:600;margin-bottom:6px;">➕ Agregar Parámetro</div>
+    <div style="display:flex;gap:4px;">
+      <input id="new-param-id" type="text" placeholder="ID del parámetro (ej: c1tp-0)" style="flex:1;padding:4px;background:#1e2028;border:1px solid #333;color:#aaa;border-radius:3px;font-size:10px;">
+      <button onclick="addNewParamTooltip()" style="padding:4px 8px;background:#18a818;color:#fff;border:1px solid #0a6a0a;border-radius:3px;cursor:pointer;font-size:10px;">+</button>
+    </div>
+  `;
+  content.appendChild(addNew);
+
+  // Sección: Lista de tooltips existentes
+  const items=Object.keys(PARAM_TOOLTIPS).sort();
+  if(items.length===0){
+    const empty=document.createElement('div');
+    empty.style.cssText='padding:12px;text-align:center;color:#666;font-size:10px;';
+    empty.textContent='Sin tooltips. Agrega uno arriba →';
+    content.appendChild(empty);
+  } else {
+    items.forEach(paramId=>{
+      const item=document.createElement('div');
+      item.className='admin-item';
+      item.innerHTML=`
+        <span style="flex:0.3;color:#666;font-size:9px;font-family:monospace;word-break:break-all;">${paramId}</span>
+        <input type="text" placeholder="Explicación (ES)" value="${(PARAM_TOOLTIPS[paramId]||'').replace(/"/g,'&quot;')}" onchange="updateParamTooltip('${paramId}',this.value)" style="flex:1;">
+        <button class="danger" onclick="deleteParamTooltip('${paramId}')">🗑</button>
+      `;
+      content.appendChild(item);
+    });
+  }
+}
+
+function addNewParamTooltip(){
+  const input=document.getElementById('new-param-id');
+  if(!input.value.trim()){alert('⚠ Ingresa un ID de parámetro');return;}
+  const paramId=input.value.trim();
+  if(PARAM_TOOLTIPS[paramId]){alert('⚠ Este parámetro ya existe');return;}
+  PARAM_TOOLTIPS[paramId]='';
+  saveTooltips();
+  loadAdminPanel();
+  input.value='';
+  // Focus en el input del nuevo parámetro
+  setTimeout(()=>{
+    const inputs=document.querySelectorAll('#admin-content input');
+    if(inputs.length>0) inputs[inputs.length-1].focus();
+  },100);
+}
+
+function updateParamTooltip(paramId,text){
+  if(text) PARAM_TOOLTIPS[paramId]=text;
+  else delete PARAM_TOOLTIPS[paramId];
+  saveTooltips();
+  renderTooltipIcons();  // Actualizar iconos en la pantalla
+  loadAdminPanel();
+}
+
+function deleteParamTooltip(paramId){
+  delete PARAM_TOOLTIPS[paramId];
+  saveTooltips();
+  renderTooltipIcons();  // Actualizar iconos en la pantalla
+  loadAdminPanel();
+}
+
+function setAdminPassword(){
+  const pwd1=prompt('Nueva contraseña:');
+  if(!pwd1) return;
+  const pwd2=prompt('Confirmar contraseña:');
+  if(pwd1!==pwd2){
+    alert('Las contraseñas no coinciden');
+    return;
+  }
+  localStorage.setItem('knuro-admin-pwd',pwd1);
+  alert('✅ Contraseña actualizada');
+}
+
+initTooltipSystem();
+
+// Keyboard shortcut: Ctrl+Shift+T to open admin panel
+document.addEventListener('keydown',e=>{
+  if(e.ctrlKey&&e.shiftKey&&e.key==='T'){
+    e.preventDefault();
+    openAdminPanel();
+  }
+});
+});
 </script>
+<!-- Admin Panel -->
+<div id="admin-panel">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+    <h3>⚙ Editor de Tooltips</h3>
+    <button class="close-btn" onclick="closeAdminPanel()">✕</button>
+  </div>
+  <div class="admin-tabs">
+    <button class="admin-tab-btn active" onclick="this.parentElement.querySelector('.admin-tab-btn.active').classList.remove('active');this.classList.add('active');document.getElementById('admin-content').style.display='block';document.getElementById('admin-pwd').style.display='none';">📝 Editar</button>
+    <button class="admin-tab-btn" onclick="this.parentElement.querySelector('.admin-tab-btn.active').classList.remove('active');this.classList.add('active');document.getElementById('admin-content').style.display='none';document.getElementById('admin-pwd').style.display='flex';">🔐 Seguridad</button>
+  </div>
+  <div id="admin-content" class="admin-content"></div>
+  <div id="admin-pwd" style="display:none;flex-direction:column;gap:8px;padding:8px;">
+    <button onclick="setAdminPassword()">Cambiar Contraseña</button>
+  </div>
+</div>
 </body>
 </html>
