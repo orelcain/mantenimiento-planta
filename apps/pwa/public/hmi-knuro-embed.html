@@ -225,10 +225,14 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
   #ov.show{display:block;}
 }
 /* ── TOOLTIPS ── */
-.tip-i{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;background:#e0eeff;border:1.5px solid #6699cc;border-radius:50%;font-size:10px;font-weight:700;font-style:normal;font-family:Georgia,'Times New Roman',serif;color:#3366aa;cursor:pointer;margin-left:6px;vertical-align:middle;user-select:none;flex-shrink:0;transition:all .15s;line-height:1;box-shadow:0 1px 2px rgba(0,0,0,.12);}
-.tip-i:hover{background:#3366aa;color:#fff;border-color:#224488;transform:scale(1.2);box-shadow:0 1px 4px rgba(0,0,0,.25);}
-.tip-i.has-text{background:#cce0ff;border-color:#2255aa;color:#1144aa;}
-.tip-i.has-text:hover{background:#2255aa;color:#fff;border-color:#113388;}
+.tip-i{display:inline-block;width:14px;height:14px;background:#e8e8e8;border:1.5px solid #aaa;border-radius:50%;cursor:pointer;margin-left:6px;vertical-align:middle;user-select:none;flex-shrink:0;transition:all .15s;box-shadow:0 1px 2px rgba(0,0,0,.1);position:relative;}
+.tip-i::after{content:'i';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font:italic 700 10px/1 Georgia,serif;color:#888;}
+.tip-i:hover{background:#3366aa;border-color:#224488;transform:scale(1.2);box-shadow:0 1px 4px rgba(0,0,0,.25);}
+.tip-i:hover::after{color:#fff;}
+.tip-i.has-text{background:#cce0ff;border-color:#2255aa;}
+.tip-i.has-text::after{color:#1144aa;}
+.tip-i.has-text:hover{background:#2255aa;border-color:#113388;}
+.tip-i.has-text:hover::after{color:#fff;}
 .tip-box{position:absolute;background:#ffffee;border:1.5px solid #4488cc;border-radius:5px;padding:7px 10px;font-size:11px;color:#222;white-space:normal;max-width:260px;min-width:140px;z-index:9999;box-shadow:0 3px 10px rgba(0,0,0,.25);line-height:1.4;font-family:Arial,sans-serif;}
 .tip-box::before{content:'';position:absolute;top:-6px;right:14px;width:10px;height:10px;background:#ffffee;border-left:1.5px solid #4488cc;border-top:1.5px solid #4488cc;transform:rotate(45deg);}
 .tip-box .tip-close{position:absolute;top:2px;right:5px;cursor:pointer;color:#999;font-size:12px;line-height:1;}
@@ -2596,12 +2600,9 @@ function renderTooltipIcons(){
     const old=td.querySelector('.tip-i');
     if(old) old.remove();
 
-    // Solo agregar icono si el parámetro tiene explicación
-    if(!PARAM_TOOLTIPS[inp.id]) return;
-
+    // Agregar icono en TODOS los labels (permite agregar explicación a cualquiera)
     const icon=document.createElement('span');
-    icon.className='tip-i has-text';
-    icon.textContent='i';
+    icon.className='tip-i'+(PARAM_TOOLTIPS[inp.id]?' has-text':'');
     icon.dataset.pid=inp.id;
 
     // Click: fijar/cerrar tooltip
