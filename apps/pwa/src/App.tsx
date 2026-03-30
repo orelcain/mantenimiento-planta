@@ -73,6 +73,7 @@ const PermissionsPage = lazyWithReload(() => import('@/pages/admin/PermissionsPa
 const Visor3DListPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DListPage').then((mod) => ({ default: mod.Visor3DListPage })))
 const Visor3DViewerPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DViewerPage').then((mod) => ({ default: mod.Visor3DViewerPage })))
 const Visor3DPublicPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DPublicPage').then((mod) => ({ default: mod.Visor3DPublicPage })))
+const HmiKnuroPublicPage = lazyWithReload(() => import('@/pages/HmiKnuroPublicPage').then((mod) => ({ default: mod.HmiKnuroPublicPage })))
 const Visor3DInteractiveToboganPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DInteractiveToboganPage').then((mod) => ({ default: mod.Visor3DInteractiveToboganPage })))
 const Visor3DInteractiveBaader142Page = lazyWithReload(() => import('@/pages/Visor3D/Visor3DInteractiveBaader142Page').then((mod) => ({ default: mod.Visor3DInteractiveBaader142Page })))
 const AnalisisGraderWizardPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderWizardPage').then((mod) => ({ default: mod.AnalisisGraderWizardPage })))
@@ -225,6 +226,24 @@ export function App() {
             element={
               <Suspense fallback={<LoadingScreen />}>
                 <Visor3DPublicPage />
+              </Suspense>
+            }
+          />
+
+          {/* Public HMI learning mode (no auth required) */}
+          <Route
+            path="/hmi/learn/:presetId"
+            element={
+              <Suspense fallback={<LoadingScreen />}>
+                <HmiKnuroPublicPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/hmi/learn"
+            element={
+              <Suspense fallback={<LoadingScreen />}>
+                <HmiKnuroPublicPage />
               </Suspense>
             }
           />

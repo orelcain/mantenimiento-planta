@@ -1,5 +1,6 @@
 import { useEffect, useRef, useMemo, useState, useCallback } from 'react'
-import { History, Cpu, RefreshCw, X, ChevronDown, ChevronUp, Sliders, RotateCcw, Copy, Pencil, Check, ArrowUp, ArrowDown, BookmarkCheck } from 'lucide-react'
+import { History, Cpu, RefreshCw, X, ChevronDown, ChevronUp, Sliders, RotateCcw, Copy, Pencil, Check, ArrowUp, ArrowDown, BookmarkCheck, QrCode } from 'lucide-react'
+import { QRCodeSVG } from 'qrcode.react'
 import { useAuthStore } from '@/store'
 import { cn } from '@/lib/utils'
 import {
@@ -10,6 +11,7 @@ import {
   setCurrentPreset,
   getHmiRefs,
   saveHmiRefs,
+  saveHmiTooltips,
   addHmiHistory,
   getHmiHistory,
   seedDefaultPresets,
@@ -44,6 +46,10 @@ export function HmiKnuroPage() {
   const [presetsOpen, setPresetsOpen] = useState(false)
   const [presetOrder, setPresetOrder] = useState<string[]>([])
   const [editingPreset, setEditingPreset] = useState<{ name: string; value: string } | null>(null)
+
+  // ── Estado QR ───────────────────────────────────────────────────────────
+  const [qrPreset, setQrPreset] = useState<string | null>(null)
+  const [qrCopied, setQrCopied] = useState(false)
 
   // ── Estado historial ────────────────────────────────────────────────────
   const [historyOpen, setHistoryOpen] = useState(false)
@@ -117,8 +123,14 @@ export function HmiKnuroPage() {
 
       // hmi:ready: guardar flag. Solo llamar sendInitData si user ya está disponible.
       // Si user aún es null (auth restaurando sesión), el useEffect de reintento lo maneja.
+      // Auto-sync: si el iframe envía tooltips locales, guardarlos a Firestore en background.
       if (type === 'hmi:ready') {
         iframeReadyRef.current = true
+        if (event.data.tooltips && Object.keys(event.data.tooltips).length > 0) {
+          saveHmiTooltips(event.data.tooltips).catch(err =>
+            console.warn('[HMI] Auto-sync tooltips:', err)
+          )
+        }
         if (user && iframeRef.current) await sendInitData(iframeRef.current)
         return
       }
@@ -172,6 +184,14 @@ export function HmiKnuroPage() {
           if (Array.isArray(newOrder)) {
             setPresetOrder(newOrder)
             await savePresetOrder(newOrder)
+          }
+          break
+        }
+        case 'hmi:save-tooltip': {
+          if (event.data.tooltips) {
+            await saveHmiTooltips(event.data.tooltips).catch(err =>
+              console.error('[HMI] Error guardando tooltips en Firestore:', err)
+            )
           }
           break
         }
@@ -435,6 +455,13 @@ export function HmiKnuroPage() {
                               >
                                 <Copy className="h-3 w-3" />
                               </button>
+                              <button
+                                onClick={e => { e.stopPropagation(); setPresetsOpen(false); setQrPreset(name) }}
+                                className="p-1.5 opacity-0 group-hover:opacity-50 hover:!opacity-100 transition-opacity"
+                                title={`Compartir "${name}" (QR)`}
+                              >
+                                <QrCode className="h-3 w-3" />
+                              </button>
                             </>
                           )}
                         </div>
@@ -483,6 +510,60 @@ export function HmiKnuroPage() {
           sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals"
         />
       </div>
+
+      {/* ── QR Dialog ────────────────────────────────────────────────── */}
+      {qrPreset && (() => {
+        const base = window.location.origin + (import.meta.env.BASE_URL || '/').replace(/\/$/, '')
+        const learnUrl = `${base}/hmi/learn/${encodeURIComponent(qrPreset)}`
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+            onClick={() => setQrPreset(null)}
+          >
+            <div
+              className="bg-card border border-border rounded-xl p-6 flex flex-col items-center gap-4 shadow-2xl max-w-xs w-full mx-4"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center gap-1.5">
+                  <QrCode className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-semibold">Compartir preset</span>
+                </div>
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setQrPreset(null)}>
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground text-center">{qrPreset}</p>
+              <div className="bg-white p-3 rounded-lg">
+                <QRCodeSVG value={learnUrl} size={180} level="M" includeMargin={false} />
+              </div>
+              <div className="flex items-center gap-2 w-full">
+                <input
+                  readOnly
+                  value={learnUrl}
+                  className="flex-1 text-[10px] bg-muted border border-border rounded px-2 py-1.5 text-foreground outline-none min-w-0"
+                />
+                <Button
+                  size="sm"
+                  className="h-7 gap-1 text-xs flex-shrink-0"
+                  onClick={() => {
+                    navigator.clipboard.writeText(learnUrl).then(() => {
+                      setQrCopied(true)
+                      setTimeout(() => setQrCopied(false), 2000)
+                    })
+                  }}
+                >
+                  {qrCopied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                  {qrCopied ? 'Copiado' : 'Copiar'}
+                </Button>
+              </div>
+              <p className="text-[10px] text-muted-foreground text-center leading-relaxed">
+                Este link abre el HMI en modo lectura.<br/>No requiere login.
+              </p>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ── Panel historial (drawer lateral) ────────────────────────── */}
       {historyOpen && (

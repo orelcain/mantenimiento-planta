@@ -260,6 +260,12 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
 .tip-box .tip-save:hover{background:#1a5090;}
 .tip-chk{vertical-align:middle;margin-right:3px;cursor:pointer;}
 label.tip-lbl{font-size:9px;color:#885500;cursor:pointer;}
+/* ── MODO APRENDIZAJE (readonly) ── */
+.readonly-banner{background:#1a3a6a;color:#7ec8ff;padding:3px 10px;font-size:10px;text-align:center;letter-spacing:0.5px;flex-shrink:0;border-bottom:1px solid #2a5a9a;}
+body.readonly .psp{display:none!important;}
+body.readonly input.fe,body.readonly input.fe1,body.readonly select{pointer-events:none;opacity:0.65;user-select:none;}
+body.readonly #tip-vis-btn{display:none!important;}
+body.readonly .tip-i{cursor:default;}
 </style>
 </head>
 <body>
@@ -1407,6 +1413,21 @@ function switchTab(tab){
 /* ── Detección iframe para integración con mantenimiento-planta ── */
 const IN_IFRAME=(()=>{try{return window.self!==window.top;}catch(e){return true;}})();
 
+/* ── Modo Aprendizaje (readonly) ── */
+let READ_ONLY=new URLSearchParams(location.search).get('mode')==='readonly';
+function _applyReadOnly(){
+  if(!READ_ONLY) return;
+  document.body.classList.add('readonly');
+  // Insertar banner en cada .sh al mostrar pantalla
+  document.querySelectorAll('.sc .sh').forEach(sh=>{
+    if(sh.querySelector('.readonly-banner')) return;
+    const b=document.createElement('div');
+    b.className='readonly-banner';
+    b.textContent='📖 Modo Aprendizaje — Solo lectura';
+    sh.insertBefore(b,sh.firstChild);
+  });
+}
+
 /* ── Presets — persisted in window.storage / Firestore via postMessage ── */
 let presets={};
 let presetOrder=[];
@@ -1459,9 +1480,14 @@ if(IN_IFRAME){
       const pn=document.getElementById('pn');
       if(pn) pn.value=cur;
     }
+    // Modo readonly y tooltips desde la página pública
+    if(e.data.readonly) READ_ONLY=true;
+    if(e.data.tooltips) Object.assign(PARAM_TOOLTIPS,e.data.tooltips);
     renderPresets(); populateCmpSelects();
     const toLoad=(cur&&presets[cur])?cur:(Object.keys(presets)[0]||null);
     if(toLoad){setAllInputs(presets[toLoad],toLoad);updateActivePreset(toLoad);}
+    _applyReadOnly();
+    renderTooltipIcons();
     requestAnimationFrame(()=>requestAnimationFrame(scaleHMI));
   });
 }
@@ -2626,11 +2652,13 @@ function _addTipIcon(container,tipId){
     if(_clickTimer) clearTimeout(_clickTimer);
     _clickTimer=setTimeout(()=>{_clickTimer=null;toggleTipBox(tipId,icon);},250);
   });
-  icon.addEventListener('dblclick',e=>{
-    e.stopPropagation();
-    if(_clickTimer){clearTimeout(_clickTimer);_clickTimer=null;}
-    openTipEdit(tipId,icon);
-  });
+  if(!READ_ONLY){
+    icon.addEventListener('dblclick',e=>{
+      e.stopPropagation();
+      if(_clickTimer){clearTimeout(_clickTimer);_clickTimer=null;}
+      openTipEdit(tipId,icon);
+    });
+  }
 
   container.appendChild(icon);
 }
@@ -2676,13 +2704,15 @@ window.addEventListener('load',async()=>{
   buildNavs();
   scaleHMI();
   initRefIds();          // asignar data-frid a cada .fr span
+  _applyReadOnly();      // aplicar modo lectura si ?mode=readonly
   renderTooltipIcons();  // renderizar iconos de tooltip
 
   if(IN_IFRAME){
     // En iframe: #rp queda visible (desktop=inline, mobile=drawer).
     // En mobile el CSS lo convierte en panel deslizable; en desktop queda inline.
     // Notificar al padre (HmiKnuroPage) que estamos listos para recibir datos
-    window.parent.postMessage({type:'hmi:ready'},'*');
+    // Incluir tooltips locales para sincronización automática a Firestore
+    window.parent.postMessage({type:'hmi:ready',tooltips:PARAM_TOOLTIPS},'*');
     // Los presets/refs llegarán via hmi:init → ver listener arriba
   } else {
     // Modo standalone: cargar desde localStorage como siempre
@@ -2768,6 +2798,9 @@ function initTooltipSystem(){
 
 function saveTooltips(){
   localStorage.setItem('knuro-tooltips',JSON.stringify(PARAM_TOOLTIPS));
+  if(IN_IFRAME){
+    window.parent.postMessage({type:'hmi:save-tooltip',tooltips:PARAM_TOOLTIPS},'*');
+  }
 }
 
 /* Helpers: leer texto/posición/hidden de un tooltip (soporta string o {text,pos,hidden,x,y,w,h}) */

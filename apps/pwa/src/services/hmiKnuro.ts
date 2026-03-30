@@ -297,6 +297,23 @@ export const DEFAULT_PRESETS: Record<string, Record<string, string>> = {
   'Planta Yal - BAA142 - N3': { ..._BASE },
 }
 
+// ── Tooltips de parámetros ────────────────────────────────────────────────────
+const TOOLTIPS_COL = 'hmi-knuro-tooltips'
+
+/** Guarda los tooltips editados por el admin en Firestore (documento único "default") */
+export async function saveHmiTooltips(tooltips: Record<string, unknown>): Promise<void> {
+  await setDoc(doc(db, TOOLTIPS_COL, 'default'), {
+    data: tooltips,
+    updatedAt: serverTimestamp(),
+  })
+}
+
+/** Obtiene los tooltips desde Firestore (público, sin autenticación requerida) */
+export async function getHmiTooltips(): Promise<Record<string, unknown>> {
+  const snap = await getDoc(doc(db, TOOLTIPS_COL, 'default'))
+  return snap.exists() ? (snap.data().data as Record<string, unknown>) || {} : {}
+}
+
 /** Siembra los presets por defecto en Firestore.
  *  Usa el snapshot guardado por el usuario si existe, sino los DEFAULT_PRESETS del código. */
 export async function seedDefaultPresets(userId: string): Promise<void> {

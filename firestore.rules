@@ -725,7 +725,8 @@ service cloud.firestore {
     // HMI KNURO B2 — Presets, historial y config
     // ============================================
     match /hmi-knuro-presets/{presetId} {
-      allow read: if isAuthenticated();
+      // Lectura pública (Modo Aprendizaje vía QR, sin login)
+      allow read: if true;
       allow create, update: if isSupervisor() && isValidDocSize();
       allow delete: if isSupervisor();
     }
@@ -737,8 +738,15 @@ service cloud.firestore {
     }
 
     match /hmi-knuro-config/{configId} {
-      allow read: if isAuthenticated();
+      // Lectura pública para preset-order (Modo Aprendizaje)
+      allow read: if true;
       allow write: if isSupervisor();
+    }
+
+    // Tooltips de parámetros — lectura pública, escritura solo supervisor
+    match /hmi-knuro-tooltips/{docId} {
+      allow read: if true;
+      allow write: if isSupervisor() && isValidDocSize();
     }
   }
 }
