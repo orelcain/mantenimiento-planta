@@ -238,8 +238,10 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
 .tip-box{position:absolute;background:#ffffee;border:1.5px solid #4488cc;border-radius:5px;padding:7px 10px;font-size:11px;color:#222;white-space:normal;max-width:320px;min-width:140px;max-height:220px;overflow-y:auto;z-index:9999;box-shadow:0 3px 10px rgba(0,0,0,.25);line-height:1.4;font-family:Arial,sans-serif;}
 .tip-box::before{content:'';position:absolute;top:-6px;right:14px;width:10px;height:10px;background:#ffffee;border-left:1.5px solid #4488cc;border-top:1.5px solid #4488cc;transform:rotate(45deg);pointer-events:none;}
 .tip-box.pos-arriba::before{top:auto;bottom:-6px;transform:rotate(225deg);}
-.tip-box.pos-flotante{position:fixed!important;bottom:80px;right:16px;max-width:380px;max-height:300px;}
+.tip-box.pos-flotante{position:fixed!important;max-width:360px;max-height:300px;}
 .tip-box.pos-flotante::before{display:none;}
+.tip-drag{display:block;height:16px;background:#4488cc22;border-radius:3px 3px 0 0;margin:-7px -10px 5px -10px;cursor:move;text-align:center;font-size:8px;color:#4488cc99;line-height:16px;user-select:none;}
+.tip-drag:hover{background:#4488cc44;}
 .tip-box.editing{border-color:#ee8800;background:#fffdf0;max-height:none;overflow-y:visible;min-width:220px;}
 .tip-box.editing::before{display:none;}
 .tip-box .tip-close{position:absolute;top:2px;right:5px;cursor:pointer;color:#999;font-size:12px;line-height:1;}
@@ -2753,9 +2755,18 @@ function saveTooltips(){
 /* Helpers: leer texto/posición de un tooltip (soporta string o {text,pos}) */
 function _getTipText(id){const v=PARAM_TOOLTIPS[id];if(!v)return '';return typeof v==='string'?v:(v.text||'');}
 function _getTipPos(id){const v=PARAM_TOOLTIPS[id];if(!v||typeof v==='string')return 'abajo-der';return v.pos||'abajo-der';}
+function _getTipXY(id){const v=PARAM_TOOLTIPS[id];if(!v||typeof v==='string')return null;return (v.x!=null)?{x:v.x,y:v.y}:null;}
 function _setTip(id,text,pos){
   if(!text){delete PARAM_TOOLTIPS[id];return;}
-  PARAM_TOOLTIPS[id]=(pos&&pos!=='abajo-der')?{text,pos}:text;
+  if(!pos||pos==='abajo-der'){PARAM_TOOLTIPS[id]=text;return;}
+  // Conservar x/y guardadas si el pos no cambió a flotante
+  const old=PARAM_TOOLTIPS[id];
+  const xy=(pos==='flotante'&&old&&typeof old==='object'&&old.x!=null)?{x:old.x,y:old.y}:{};
+  PARAM_TOOLTIPS[id]=Object.assign({text,pos},xy);
+}
+function _saveTipXY(id,x,y){
+  const v=PARAM_TOOLTIPS[id];
+  if(v&&typeof v==='object'){v.x=x;v.y=y;saveTooltips();}
 }
 
 /* Cerrar cualquier tip-box abierto */
@@ -2763,12 +2774,62 @@ function closeTipBox(){
   document.querySelectorAll('.tip-box').forEach(b=>b.remove());
 }
 
+/* Hacer draggable un tip-box flotante */
+function _makeDraggable(box,paramId){
+  const drag=box.querySelector('.tip-drag');
+  if(!drag) return;
+  let ox=0,oy=0,sx=0,sy=0;
+  drag.addEventListener('mousedown',e=>{
+    e.preventDefault();
+    sx=e.clientX; sy=e.clientY;
+    ox=parseInt(box.style.left)||0; oy=parseInt(box.style.top)||0;
+    const onMove=ev=>{
+      const nx=ox+(ev.clientX-sx);
+      const ny=oy+(ev.clientY-sy);
+      box.style.left=nx+'px'; box.style.top=ny+'px';
+      box.style.right='auto'; box.style.bottom='auto';
+    };
+    const onUp=ev=>{
+      document.removeEventListener('mousemove',onMove);
+      document.removeEventListener('mouseup',onUp);
+      // Guardar posición
+      _saveTipXY(paramId,parseInt(box.style.left),parseInt(box.style.top));
+    };
+    document.addEventListener('mousemove',onMove);
+    document.addEventListener('mouseup',onUp);
+  });
+}
+
 /* Posicionar tip-box según posición elegida */
-function _positionTipBox(box,iconEl,pos){
+function _positionTipBox(box,iconEl,pos,paramId){
   pos=pos||'abajo-der';
   if(pos==='flotante'){
     box.classList.add('pos-flotante');
+    // Agregar barra de arrastre al inicio
+    const dragBar=document.createElement('span');
+    dragBar.className='tip-drag';
+    dragBar.textContent='⠿ arrastra';
+    box.insertBefore(dragBar,box.firstChild);
     document.body.appendChild(box);
+    // Posición guardada o cerca del ícono
+    const saved=paramId?_getTipXY(paramId):null;
+    if(saved){
+      box.style.left=saved.x+'px'; box.style.top=saved.y+'px';
+      box.style.right='auto'; box.style.bottom='auto';
+    } else {
+      // Calcular posición relativa al ícono dentro del iframe
+      const iframe=document.querySelector('iframe')||document.body;
+      const iRect=iframe.getBoundingClientRect?iframe.getBoundingClientRect():{left:0,top:0};
+      const iRect2=iconEl.getBoundingClientRect();
+      const x=iRect.left+iRect2.left+iRect2.width+8;
+      const y=iRect.top+iRect2.top;
+      // Asegurar que no salga de la pantalla
+      const finalX=Math.min(x,window.innerWidth-300);
+      const finalY=Math.min(Math.max(y,8),window.innerHeight-200);
+      box.style.left=finalX+'px'; box.style.top=finalY+'px';
+      box.style.right='auto'; box.style.bottom='auto';
+    }
+    if(paramId) _makeDraggable(box,paramId);
     return;
   }
   const isArriba=pos.startsWith('arriba');
@@ -2777,10 +2838,8 @@ function _positionTipBox(box,iconEl,pos){
   const container=iconEl.closest('td')||iconEl.closest('div')||iconEl.closest('span')||iconEl.parentElement;
   container.style.position='relative';
   container.appendChild(box);
-  // Horizontal
   if(isDer){box.style.right='0';box.style.left='auto';}
   else{box.style.left='0';box.style.right='auto';}
-  // Vertical
   if(isArriba){box.style.bottom='100%';box.style.top='auto';box.style.marginBottom='4px';}
   else{box.style.top='100%';box.style.bottom='auto';box.style.marginTop='4px';}
 }
@@ -2803,7 +2862,7 @@ function toggleTipBox(paramId,iconEl){
     box.innerHTML='<span class="tip-close">&times;</span><span style="color:#999;font-style:italic;">Sin descripción. Doble-click en <b>ⓘ</b> para agregar.</span>';
   }
   box.querySelector('.tip-close').onclick=()=>box.remove();
-  _positionTipBox(box,iconEl,pos);
+  _positionTipBox(box,iconEl,pos,paramId);
 
   // Cerrar al hacer click fuera
   setTimeout(()=>{
@@ -2837,7 +2896,7 @@ function openTipEdit(paramId,iconEl){
     ['abajo-izq','↘ Abajo izquierda'],
     ['arriba-der','↖ Arriba derecha'],
     ['arriba-izq','↗ Arriba izquierda'],
-    ['flotante','📌 Flotante (esquina)']
+    ['flotante','📌 Flotante (arrastrable)']
   ];
   const selectHTML='<select class="tip-pos">'+posOpts.map(([v,l])=>'<option value="'+v+'"'+(v===curPos?' selected':'')+'>'+l+'</option>').join('')+'</select>';
 
