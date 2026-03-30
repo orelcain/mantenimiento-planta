@@ -2924,23 +2924,31 @@ function _positionTipBox(box,iconEl,pos,paramId){
     dragBar.textContent='⠿ arrastra';
     box.insertBefore(dragBar,box.firstChild);
     document.body.appendChild(box);
+
+    const vw=window.innerWidth;
+    const vh=window.innerHeight;
+    // Limitar ancho máximo al viewport (móvil)
+    const tipMaxW=Math.min(320,vw-16);
+    box.style.maxWidth=tipMaxW+'px';
+    box.style.right='auto'; box.style.bottom='auto';
+
     // Posición guardada o cerca del ícono
     const saved=paramId?_getTipXY(paramId):null;
     if(saved){
-      box.style.left=saved.x+'px'; box.style.top=saved.y+'px';
-      box.style.right='auto'; box.style.bottom='auto';
+      // Clampar posición guardada al viewport actual (puede ser más pequeño en móvil)
+      const sx=Math.max(8,Math.min(saved.x,vw-tipMaxW-8));
+      const sy=Math.max(8,Math.min(saved.y,vh-80));
+      box.style.left=sx+'px'; box.style.top=sy+'px';
     } else {
-      // Calcular posición relativa al ícono dentro del iframe
-      const iframe=document.querySelector('iframe')||document.body;
-      const iRect=iframe.getBoundingClientRect?iframe.getBoundingClientRect():{left:0,top:0};
-      const iRect2=iconEl.getBoundingClientRect();
-      const x=iRect.left+iRect2.left+iRect2.width+8;
-      const y=iRect.top+iRect2.top;
-      // Asegurar que no salga de la pantalla
-      const finalX=Math.min(x,window.innerWidth-300);
-      const finalY=Math.min(Math.max(y,8),window.innerHeight-200);
-      box.style.left=finalX+'px'; box.style.top=finalY+'px';
-      box.style.right='auto'; box.style.bottom='auto';
+      const r=iconEl.getBoundingClientRect();
+      // Intentar a la derecha del ícono; si no cabe, a la izquierda; si no, centrado
+      let px=r.right+8;
+      if(px+tipMaxW>vw-8){
+        const leftX=r.left-tipMaxW-8;
+        px=leftX>=8?leftX:Math.max(8,Math.round((vw-tipMaxW)/2));
+      }
+      const py=Math.max(8,Math.min(r.top,vh-180));
+      box.style.left=px+'px'; box.style.top=py+'px';
     }
     // Restaurar tamaño guardado
     const savedWH=paramId?_getTipWH(paramId):null;
