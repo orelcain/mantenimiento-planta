@@ -2596,9 +2596,11 @@ function renderTooltipIcons(){
     const old=td.querySelector('.tip-i');
     if(old) old.remove();
 
-    // Siempre agregar icono (permite editar desde cualquier parámetro)
+    // Solo agregar icono si el parámetro tiene explicación
+    if(!PARAM_TOOLTIPS[inp.id]) return;
+
     const icon=document.createElement('span');
-    icon.className='tip-i'+(PARAM_TOOLTIPS[inp.id]?' has-text':'');
+    icon.className='tip-i has-text';
     icon.textContent='i';
     icon.dataset.pid=inp.id;
 
