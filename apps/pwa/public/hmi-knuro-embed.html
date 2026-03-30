@@ -238,11 +238,18 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
 .tip-box{position:absolute;background:#ffffee;border:1.5px solid #4488cc;border-radius:5px;padding:7px 10px;font-size:11px;color:#222;white-space:normal;max-width:320px;min-width:140px;max-height:220px;overflow-y:auto;z-index:9999;box-shadow:0 3px 10px rgba(0,0,0,.25);line-height:1.4;font-family:Arial,sans-serif;}
 .tip-box::before{content:'';position:absolute;top:-6px;right:14px;width:10px;height:10px;background:#ffffee;border-left:1.5px solid #4488cc;border-top:1.5px solid #4488cc;transform:rotate(45deg);pointer-events:none;}
 .tip-box.pos-arriba::before{top:auto;bottom:-6px;transform:rotate(225deg);}
-.tip-box.pos-flotante{position:fixed!important;max-width:360px;max-height:300px;}
+.tip-box.pos-flotante{position:fixed!important;max-width:360px;max-height:300px;overflow:auto;resize:both;}
 .tip-box.pos-flotante::before{display:none;}
-.tip-drag{display:block;height:16px;background:#4488cc22;border-radius:3px 3px 0 0;margin:-7px -10px 5px -10px;cursor:move;text-align:center;font-size:8px;color:#4488cc99;line-height:16px;user-select:none;}
+.tip-drag{display:flex;height:18px;background:#4488cc22;border-radius:3px 3px 0 0;margin:-7px -10px 5px -10px;cursor:move;align-items:center;justify-content:center;font-size:8px;color:#4488cc99;user-select:none;gap:6px;}
 .tip-drag:hover{background:#4488cc44;}
-.tip-box.editing{border-color:#ee8800;background:#fffdf0;max-height:none;overflow-y:visible;min-width:220px;}
+.tip-drag .tip-drag-lbl{flex:1;text-align:center;}
+.tip-i.is-hidden{opacity:0.3;border-style:dashed !important;}
+.tip-i.is-hidden::after{content:'∅' !important;font-style:normal !important;}
+.tip-i.reveal-hidden{opacity:0.7 !important;border-style:dashed !important;}
+#tip-vis-btn{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);z-index:10001;background:#2255aa;color:#fff;border:none;border-radius:12px;padding:3px 12px;font-size:10px;cursor:pointer;opacity:0.7;transition:opacity .2s;display:none;}
+#tip-vis-btn:hover{opacity:1;}
+#tip-vis-btn.active{background:#cc4400;}
+.tip-box.editing{border-color:#ee8800;background:#fffdf0;max-height:none;overflow-y:visible;min-width:240px;}
 .tip-box.editing::before{display:none;}
 .tip-box .tip-close{position:absolute;top:2px;right:5px;cursor:pointer;color:#999;font-size:12px;line-height:1;}
 .tip-box .tip-close:hover{color:#c00;}
@@ -250,7 +257,8 @@ input.fe1:focus{border-color:#4499ff;background:#fffff8;}
 .tip-box select.tip-pos{font-size:9px;border:1px solid #aac;border-radius:2px;padding:1px 2px;margin-left:4px;background:#fff;color:#333;}
 .tip-box .tip-save{display:inline-block;margin-top:4px;padding:2px 10px;background:#2266aa;color:#fff;border:none;border-radius:3px;cursor:pointer;font-size:10px;}
 .tip-box .tip-save:hover{background:#1a5090;}
-.tip-box.editing::before{border-color:#ee8800;background:#fffdf0;}
+.tip-chk{vertical-align:middle;margin-right:3px;cursor:pointer;}
+label.tip-lbl{font-size:9px;color:#885500;cursor:pointer;}
 </style>
 </head>
 <body>
@@ -2601,7 +2609,9 @@ function _addTipIcon(container,tipId){
   if(old) old.remove();
 
   const icon=document.createElement('span');
-  icon.className='tip-i'+(_getTipText(tipId)?' has-text':'');
+  const _hasText=_getTipText(tipId);
+  const _isHidden=_getTipHidden(tipId);
+  icon.className='tip-i'+(_hasText?' has-text':'')+(_isHidden?' is-hidden':'');
   icon.dataset.pid=tipId;
 
   let _clickTimer=null;
@@ -2746,27 +2756,58 @@ function initTooltipSystem(){
   if(!localStorage.getItem('knuro-admin-pwd')){
     localStorage.setItem('knuro-admin-pwd','admin');
   }
+  _updateVisBtnState();
 }
 
 function saveTooltips(){
   localStorage.setItem('knuro-tooltips',JSON.stringify(PARAM_TOOLTIPS));
 }
 
-/* Helpers: leer texto/posición de un tooltip (soporta string o {text,pos}) */
+/* Helpers: leer texto/posición/hidden de un tooltip (soporta string o {text,pos,hidden,x,y,w,h}) */
 function _getTipText(id){const v=PARAM_TOOLTIPS[id];if(!v)return '';return typeof v==='string'?v:(v.text||'');}
 function _getTipPos(id){const v=PARAM_TOOLTIPS[id];if(!v||typeof v==='string')return 'abajo-der';return v.pos||'abajo-der';}
+function _getTipHidden(id){const v=PARAM_TOOLTIPS[id];if(!v||typeof v==='string')return false;return !!v.hidden;}
 function _getTipXY(id){const v=PARAM_TOOLTIPS[id];if(!v||typeof v==='string')return null;return (v.x!=null)?{x:v.x,y:v.y}:null;}
-function _setTip(id,text,pos){
+function _getTipWH(id){const v=PARAM_TOOLTIPS[id];if(!v||typeof v==='string')return null;return (v.w!=null)?{w:v.w,h:v.h}:null;}
+function _setTip(id,text,pos,hidden){
   if(!text){delete PARAM_TOOLTIPS[id];return;}
-  if(!pos||pos==='abajo-der'){PARAM_TOOLTIPS[id]=text;return;}
-  // Conservar x/y guardadas si el pos no cambió a flotante
   const old=PARAM_TOOLTIPS[id];
-  const xy=(pos==='flotante'&&old&&typeof old==='object'&&old.x!=null)?{x:old.x,y:old.y}:{};
-  PARAM_TOOLTIPS[id]=Object.assign({text,pos},xy);
+  const isObj=old&&typeof old==='object';
+  // Conservar x/y/w/h previos si eran flotante
+  const extra={};
+  if(pos==='flotante'&&isObj){
+    if(old.x!=null){extra.x=old.x;extra.y=old.y;}
+    if(old.w!=null){extra.w=old.w;extra.h=old.h;}
+  }
+  if(hidden) extra.hidden=true;
+  const isDefault=(!pos||pos==='abajo-der')&&!hidden&&!Object.keys(extra).length;
+  PARAM_TOOLTIPS[id]=isDefault?text:Object.assign({text,pos:pos||'abajo-der'},extra);
 }
 function _saveTipXY(id,x,y){
   const v=PARAM_TOOLTIPS[id];
   if(v&&typeof v==='object'){v.x=x;v.y=y;saveTooltips();}
+}
+function _saveTipWH(id,w,h){
+  const v=PARAM_TOOLTIPS[id];
+  if(v&&typeof v==='object'){v.w=w;v.h=h;saveTooltips();}
+}
+
+/* Toggle global: mostrar tooltips ocultos */
+let _tipRevealHidden=false;
+function toggleTipVisibility(){
+  _tipRevealHidden=!_tipRevealHidden;
+  const btn=document.getElementById('tip-vis-btn');
+  if(btn){btn.textContent=_tipRevealHidden?'👁 Ocultar ocultos':'👁 Ver ocultos';btn.classList.toggle('active',_tipRevealHidden);}
+  closeTipBox();
+  renderTooltipIcons();
+}
+function _updateVisBtnState(){
+  const btn=document.getElementById('tip-vis-btn');
+  if(!btn) return;
+  const hasHidden=Object.values(PARAM_TOOLTIPS).some(v=>v&&typeof v==='object'&&v.hidden);
+  btn.style.display=hasHidden?'block':'none';
+  btn.textContent=_tipRevealHidden?'👁 Ocultar ocultos':'👁 Ver ocultos';
+  btn.classList.toggle('active',_tipRevealHidden);
 }
 
 /* Cerrar cualquier tip-box abierto */
@@ -2829,7 +2870,17 @@ function _positionTipBox(box,iconEl,pos,paramId){
       box.style.left=finalX+'px'; box.style.top=finalY+'px';
       box.style.right='auto'; box.style.bottom='auto';
     }
+    // Restaurar tamaño guardado
+    const savedWH=paramId?_getTipWH(paramId):null;
+    if(savedWH){box.style.width=savedWH.w+'px';box.style.height=savedWH.h+'px';}
     if(paramId) _makeDraggable(box,paramId);
+    // Guardar tamaño al soltar tras redimensionar (resize:both nativo)
+    if(paramId){
+      box.addEventListener('mouseup',()=>{
+        const w=box.offsetWidth,h=box.offsetHeight;
+        if(w&&h) _saveTipWH(paramId,w,h);
+      });
+    }
     return;
   }
   const isArriba=pos.startsWith('arriba');
@@ -2848,6 +2899,8 @@ function _positionTipBox(box,iconEl,pos,paramId){
 function toggleTipBox(paramId,iconEl){
   const existing=document.querySelector('.tip-box[data-pid="'+paramId+'"]');
   if(existing){existing.remove();return;}
+  // Si está oculto y no estamos en modo "ver ocultos", no mostrar
+  if(_getTipHidden(paramId)&&!_tipRevealHidden) return;
   closeTipBox();
 
   const text=_getTipText(paramId);
@@ -2891,6 +2944,7 @@ function openTipEdit(paramId,iconEl){
 
   const text=_getTipText(paramId);
   const curPos=_getTipPos(paramId);
+  const curHidden=_getTipHidden(paramId);
   const posOpts=[
     ['abajo-der','↙ Abajo derecha'],
     ['abajo-izq','↘ Abajo izquierda'],
@@ -2910,7 +2964,11 @@ function openTipEdit(paramId,iconEl){
     '<div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-top:4px;">'+
     '<button class="tip-save">Guardar</button>'+
     '<span style="font-size:9px;color:#666;">Pos:'+selectHTML+'</span>'+
-    '<span style="font-size:9px;color:#aaa;">Shift+Enter=salto</span></div>';
+    '</div>'+
+    '<div style="margin-top:5px;display:flex;align-items:center;gap:6px;">'+
+    '<label class="tip-lbl"><input type="checkbox" class="tip-chk"'+(curHidden?' checked':'')+'>'+
+    ' Ocultar tooltip <span style="color:#aaa;">(no se muestra al hacer click)</span></label>'+
+    '</div>';
 
   box.querySelector('.tip-close').onclick=()=>{box.remove();};
   box.querySelector('.tip-save').onclick=()=>saveTipEdit(paramId,box);
@@ -2927,12 +2985,15 @@ function saveTipEdit(paramId,el){
   const box=el.closest?el.closest('.tip-box'):el;
   const ta=box.querySelector('textarea');
   const sel=box.querySelector('select.tip-pos');
+  const chk=box.querySelector('.tip-chk');
   const val=ta.value.trim();
   const pos=sel?sel.value:'abajo-der';
-  _setTip(paramId,val,pos);
+  const hidden=chk?chk.checked:false;
+  _setTip(paramId,val,pos,hidden);
   saveTooltips();
   box.remove();
   renderTooltipIcons();
+  _updateVisBtnState();
 }
 
 function setAdminPassword(){
@@ -2955,5 +3016,6 @@ document.addEventListener('keydown',e=>{
   }
 });
 </script>
+<button id="tip-vis-btn" onclick="toggleTipVisibility()" style="display:none;">👁 Ver ocultos</button>
 </body>
 </html>
