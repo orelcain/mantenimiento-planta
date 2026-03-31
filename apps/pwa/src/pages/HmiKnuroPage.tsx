@@ -126,7 +126,7 @@ export function HmiKnuroPage() {
       const { type } = event.data
 
       // hmi:ready: guardar flag. Solo llamar sendInitData si user ya está disponible.
-      // Si user aún es null (auth restaurando sesión), el useEffect de reintento lo maneja.
+      // Si user aún es null (auth restaurando sesión), el useEffect de reintento lo maniza.
       // Auto-sync: si el iframe envía tooltips locales, guardarlos a Firestore en background.
       if (type === 'hmi:ready') {
         iframeReadyRef.current = true
@@ -136,6 +136,26 @@ export function HmiKnuroPage() {
           )
         }
         if (user && iframeRef.current) await sendInitData(iframeRef.current)
+        return
+      }
+
+      // Guardar tooltips y clave: NO requieren user autenticado
+      // (los tooltips son globales, compartidos por todos)
+      if (type === 'hmi:save-tooltip') {
+        if (event.data.tooltips) {
+          await saveHmiTooltips(event.data.tooltips).catch(err =>
+            console.error('[HMI] Error guardando tooltips en Firestore:', err)
+          )
+        }
+        return
+      }
+
+      if (type === 'hmi:save-pwd') {
+        if (typeof event.data.pwd === 'string' && event.data.pwd) {
+          await saveHmiTooltipPwd(event.data.pwd).catch(err =>
+            console.error('[HMI] Error guardando clave en Firestore:', err)
+          )
+        }
         return
       }
 
@@ -188,22 +208,6 @@ export function HmiKnuroPage() {
           if (Array.isArray(newOrder)) {
             setPresetOrder(newOrder)
             await savePresetOrder(newOrder)
-          }
-          break
-        }
-        case 'hmi:save-tooltip': {
-          if (event.data.tooltips) {
-            await saveHmiTooltips(event.data.tooltips).catch(err =>
-              console.error('[HMI] Error guardando tooltips en Firestore:', err)
-            )
-          }
-          break
-        }
-        case 'hmi:save-pwd': {
-          if (typeof event.data.pwd === 'string' && event.data.pwd) {
-            await saveHmiTooltipPwd(event.data.pwd).catch(err =>
-              console.error('[HMI] Error guardando clave en Firestore:', err)
-            )
           }
           break
         }
