@@ -70,12 +70,13 @@ export function HmiKnuroPage() {
   // No depende de user para leer; solo lo necesita para sembrar presets si vacío.
   const sendInitData = useCallback(async (iframe: HTMLIFrameElement) => {
     try {
-      let [presetsData, current, refs, order, pwd] = await Promise.all([
+      let [presetsData, current, refs, order, pwd, tooltips] = await Promise.all([
         getHmiPresets(),
         getCurrentPreset(),
         getHmiRefs(),
         getPresetOrder(),
         getHmiTooltipPwd(),
+        getHmiTooltips(),
       ])
       // Si Firestore está vacío, sembrar los 6 presets por defecto automáticamente
       if (Object.keys(presetsData).length === 0) {
@@ -93,7 +94,7 @@ export function HmiKnuroPage() {
       setPresets(presetsData)
       setCurrentPresetName(current)
       setPresetOrder(order)
-      iframe.contentWindow?.postMessage({ type: 'hmi:init', presets: presetsData, current, refs, order, pwd }, '*')
+      iframe.contentWindow?.postMessage({ type: 'hmi:init', presets: presetsData, current, refs, order, pwd, tooltips }, '*')
     } catch (err) {
       console.error('[HMI] Error cargando Firestore:', err)
     }

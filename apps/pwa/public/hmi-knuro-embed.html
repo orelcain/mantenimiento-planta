@@ -2790,27 +2790,31 @@ let PARAM_TOOLTIPS={};
 let _tipAuth=false; // sesión autenticada para edición
 
 function initTooltipSystem(){
-  const stored=localStorage.getItem('knuro-tooltips');
-  if(stored){
-    PARAM_TOOLTIPS=JSON.parse(stored);
-  } else {
-    PARAM_TOOLTIPS={
-      'c1tp-0':'Tiempo de espera del ciclo antes de comenzar. Medido en centésimas de segundo.',
-      'c1tp-1':'Presión aplicada por los pulsos en la primera herramienta para salmón. Valor entre 0 y 100.',
-      'c1tp-2':'Presión aplicada por los pulsos en la primera herramienta para coho.',
-      'c1tp-3':'Tiempo para activar la segunda presión en salmón.',
-      'c1tp-4':'Tiempo para activar la segunda presión en coho.',
-      'c1tp-5':'Tiempo fuera del pescado para salmón. Determina cuánto se retrae la herramienta.',
-      'c1tp-6':'Tiempo fuera del pescado para coho.',
-      'h1ev-0':'Tiempo de espera del ciclo antes de que la herramienta 1 comience.',
-      'h1pb-0':'Presión inicial al bajar la herramienta por primera vez. Importante para calibración.',
-      'h2-2as-0':'Tiempo de espera antes de aplicar presión en la herramienta 2A para salmón.',
-      'ev-0':'Activación de tiempo máximo del evacuador medido en 0,25 segundos.',
-      'vac-mv-0':'Tiempo antes de que se active la alarma de vacío.',
-      'vac-mv-1':'Valor de presión para disparar la alarma de vacío.',
-      'vac-mv-2':'Valor de presión para la advertencia de vacío (antes de alarma).'
-    };
-    saveTooltips();
+  // En iframe: esperar a hmi:init de Firestore. No cargar localStorage.
+  // En standalone: cargar de localStorage (fallback a defaults)
+  if(!IN_IFRAME){
+    const stored=localStorage.getItem('knuro-tooltips');
+    if(stored){
+      PARAM_TOOLTIPS=JSON.parse(stored);
+    } else {
+      PARAM_TOOLTIPS={
+        'c1tp-0':'Tiempo de espera del ciclo antes de comenzar. Medido en centésimas de segundo.',
+        'c1tp-1':'Presión aplicada por los pulsos en la primera herramienta para salmón. Valor entre 0 y 100.',
+        'c1tp-2':'Presión aplicada por los pulsos en la primera herramienta para coho.',
+        'c1tp-3':'Tiempo para activar la segunda presión en salmón.',
+        'c1tp-4':'Tiempo para activar la segunda presión en coho.',
+        'c1tp-5':'Tiempo fuera del pescado para salmón. Determina cuánto se retrae la herramienta.',
+        'c1tp-6':'Tiempo fuera del pescado para coho.',
+        'h1ev-0':'Tiempo de espera del ciclo antes de que la herramienta 1 comience.',
+        'h1pb-0':'Presión inicial al bajar la herramienta por primera vez. Importante para calibración.',
+        'h2-2as-0':'Tiempo de espera antes de aplicar presión en la herramienta 2A para salmón.',
+        'ev-0':'Activación de tiempo máximo del evacuador medido en 0,25 segundos.',
+        'vac-mv-0':'Tiempo antes de que se active la alarma de vacío.',
+        'vac-mv-1':'Valor de presión para disparar la alarma de vacío.',
+        'vac-mv-2':'Valor de presión para la advertencia de vacío (antes de alarma).'
+      };
+      saveTooltips();
+    }
   }
   if(!localStorage.getItem('knuro-admin-pwd')){
     localStorage.setItem('knuro-admin-pwd','admin');
