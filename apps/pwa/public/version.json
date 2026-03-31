@@ -1,7 +1,7 @@
 {
-  "version": "2.70.80",
-  "buildDate": "2026-03-23",
-  "buildTimestamp": 1773988384239,
+  "version": "2.71.0",
+  "buildDate": "2026-03-31",
+  "buildTimestamp": 1774939459090,
   "features": [
     "Prueba de deploy desde Claude Code — v2.70.67",
     "Visor de mapas: la etapa base incorpora una vista georreferenciada tipo A con imagen satelital, relieve y marcadores P1-P4 antes de importar al canvas",
