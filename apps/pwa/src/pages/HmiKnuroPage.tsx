@@ -12,6 +12,7 @@ import {
   getHmiRefs,
   saveHmiRefs,
   saveHmiTooltips,
+  getHmiTooltips,
   getHmiTooltipPwd,
   saveHmiTooltipPwd,
   addHmiHistory,
