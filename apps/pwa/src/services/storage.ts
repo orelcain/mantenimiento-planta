@@ -350,14 +350,37 @@ export async function listEquipmentPhotos(equipmentId: string): Promise<string[]
   try {
     const folderRef = ref(storage, `equipment/${equipmentId}`)
     const result = await listAll(folderRef)
-    
+
     const urls = await Promise.all(
       result.items.map((itemRef) => getDownloadURL(itemRef))
     )
-    
+
     return urls
   } catch (error) {
     logger.error('Error listing equipment photos', error as Error, { equipmentId })
     return []
+  }
+}
+
+// ── Bodega: fotos de repuestos ──
+
+export async function uploadBodegaPhoto(codigoSAP: string, file: File): Promise<string> {
+  const validation = validateFile(file)
+  if (!validation.valid) throw new Error(validation.error)
+
+  const fileToUpload = await compressImage(file, 1200, 0.85, true)
+  const fileName = `${generateId()}.webp`
+  const storageRef = ref(storage, `bodega/${codigoSAP}/fotos/${fileName}`)
+
+  await uploadBytes(storageRef, fileToUpload, { contentType: 'image/webp' })
+  return await getDownloadURL(storageRef)
+}
+
+export async function deleteBodegaPhoto(url: string): Promise<void> {
+  try {
+    const storageRef = ref(storage, url)
+    await deleteObject(storageRef)
+  } catch (error) {
+    console.error('Error eliminando foto bodega:', error)
   }
 }

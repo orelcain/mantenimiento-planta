@@ -26,6 +26,7 @@ import {
   Timestamp,
 } from 'firebase/firestore'
 import { db } from '@/services/firebase'
+import { uploadBodegaPhoto, deleteBodegaPhoto } from '@/services/storage'
 import type { GlobalSearchResult } from '@/hooks/repuestos/useGlobalSearch'
 
 // ══════════════════════════════════════════════
@@ -46,6 +47,7 @@ export interface BodegaOverlay {
   ultimaCompra?: Date
   categoria?: 'A' | 'B' | 'C' // clasificación ABC
   observaciones?: string
+  fotos?: string[]
   createdAt: Date
   updatedAt: Date
 }
@@ -70,6 +72,7 @@ export interface BodegaMergedItem {
   ultimaCompra?: Date
   categoria?: 'A' | 'B' | 'C'
   observaciones?: string
+  fotos?: string[]
   isWatched?: boolean
 }
 
@@ -194,6 +197,7 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
           ultimaCompra: data.ultimaCompra ? tsToDate(data.ultimaCompra) : undefined,
           categoria: data.categoria || undefined,
           observaciones: data.observaciones || undefined,
+          fotos: Array.isArray(data.fotos) ? data.fotos : undefined,
           createdAt: tsToDate(data.createdAt),
           updatedAt: tsToDate(data.updatedAt),
         })
@@ -252,6 +256,7 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
         ultimaCompra: overlay?.ultimaCompra,
         categoria: overlay?.categoria,
         observaciones: overlay?.observaciones,
+        fotos: overlay?.fotos,
         isWatched: watchlist.has(sap),
       })
     }
@@ -540,6 +545,50 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
     }
   }, [items])
 
+  // ── Fotos ──
+  const addPhoto = useCallback(async (codigoSAP: string, file: File) => {
+    const url = await uploadBodegaPhoto(codigoSAP, file)
+    const key = codigoSAP.trim()
+    const existing = bodegaOverlays.get(key)
+    const currentFotos = existing?.fotos || []
+    const newFotos = [...currentFotos, url]
+    if (existing) {
+      await updateDoc(doc(db, BODEGA_COL, existing.id), { fotos: newFotos, updatedAt: serverTimestamp() })
+    } else {
+      await setDoc(doc(db, BODEGA_COL, key), {
+        codigoSAP: key, stockActual: 0, stockMinimo: 0,
+        ubicacionBodega: '', unidad: 'pzas', fotos: newFotos,
+        createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+      })
+    }
+    await reloadBodega()
+    return url
+  }, [bodegaOverlays, reloadBodega])
+
+  const removePhoto = useCallback(async (codigoSAP: string, url: string) => {
+    await deleteBodegaPhoto(url)
+    const key = codigoSAP.trim()
+    const existing = bodegaOverlays.get(key)
+    if (existing) {
+      const newFotos = (existing.fotos || []).filter(f => f !== url)
+      await updateDoc(doc(db, BODEGA_COL, existing.id), { fotos: newFotos, updatedAt: serverTimestamp() })
+    }
+    await reloadBodega()
+  }, [bodegaOverlays, reloadBodega])
+
+  // ── Cálculo de punto de reorden ──
+  const calcReorderData = useCallback((item: BodegaMergedItem, movimientos: MovimientoBodega[]) => {
+    const salidas = movimientos.filter(m => m.tipo === 'salida')
+    if (salidas.length === 0 || !item.leadTime) return null
+    const dates = salidas.map(s => s.createdAt.getTime())
+    const spanDays = Math.max(1, (Math.max(...dates) - Math.min(...dates)) / (1000 * 60 * 60 * 24))
+    const totalSalidas = salidas.reduce((s, m) => s + m.cantidad, 0)
+    const consumoDiario = totalSalidas / spanDays
+    const puntoReorden = Math.ceil(consumoDiario * item.leadTime) + item.stockMinimo
+    const diasRestantes = consumoDiario > 0 ? Math.floor(item.stockActual / consumoDiario) : Infinity
+    return { consumoDiario, puntoReorden, diasRestantes, necesitaPedir: item.stockActual <= puntoReorden }
+  }, [])
+
   return {
     items,
     loading: bodegaLoading,
@@ -553,6 +602,11 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
     // Watch list
     watchlist,
     toggleWatch,
+    // Fotos
+    addPhoto,
+    removePhoto,
+    // Reorden
+    calcReorderData,
     // Inventario
     crearInventario,
     loadInventarios,

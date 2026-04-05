@@ -18,8 +18,9 @@ import {
   BarChart3, Plus, ChevronRight, CheckCircle2, CircleDot,
   AlertCircle, Clock, Download, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown,
   Layers, Truck, ShieldCheck, ShieldAlert, ShieldX,
-  Star, Activity, Zap, Archive,
+  Star, Activity, Zap, Archive, Camera, QrCode, ShoppingCart, Image,
 } from 'lucide-react'
+import { QRCodeSVG } from 'qrcode.react'
 import { collection, getDocs, query as fsQuery, where } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import { useGlobalSearch } from '@/hooks/repuestos/useGlobalSearch'
@@ -164,7 +165,7 @@ function exportCsv(items: BodegaMergedItem[]) {
 }
 
 function StockTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>; user: any }) {
-  const { items, stats, saveStock, registrarMovimiento, registrarMovimientoBatch, loadMovimientos, toggleWatch } = bodega
+  const { items, stats, saveStock, registrarMovimiento, registrarMovimientoBatch, loadMovimientos, toggleWatch, addPhoto, removePhoto, calcReorderData } = bodega
   const [searchQuery, setSearchQuery] = useState('')
   const [stockFilter, setStockFilter] = useState<StockFilter>('todos')
   const [editingItem, setEditingItem] = useState<BodegaMergedItem | null>(null)
@@ -289,7 +290,7 @@ function StockTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>; user
       {historialItem && <HistorialModal item={historialItem} loadMovimientos={loadMovimientos} onClose={() => setHistorialItem(null)} />}
       {showBulkConfig && <BulkConfigModal items={items.filter(i => !i.bodegaId)} saveStock={saveStock} onClose={() => setShowBulkConfig(false)} />}
       {showBatchMov && <BatchMovimientoModal items={items.filter(i => i.bodegaId)} registrarMovimientoBatch={registrarMovimientoBatch} user={user} onClose={() => setShowBatchMov(false)} />}
-      {drawerItem && <ItemDrawer item={drawerItem} loadMovimientos={loadMovimientos} onClose={() => setDrawerItem(null)} onEdit={() => { setEditingItem(drawerItem); setDrawerItem(null) }} onMovimiento={() => { setMovimientoItem(drawerItem); setDrawerItem(null) }} />}
+      {drawerItem && <ItemDrawer item={drawerItem} loadMovimientos={loadMovimientos} onClose={() => setDrawerItem(null)} onEdit={() => { setEditingItem(drawerItem); setDrawerItem(null) }} onMovimiento={() => { setMovimientoItem(drawerItem); setDrawerItem(null) }} addPhoto={addPhoto} removePhoto={removePhoto} calcReorderData={calcReorderData} />}
     </>
   )
 }
@@ -1218,12 +1219,18 @@ function BodegaRow({ item, onEdit, onMovimiento, onHistorial, onToggleWatch, onO
 //  DRAWER LATERAL (vista rápida por ítem)
 // ══════════════════════════════════════════════
 
-function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento }: {
+function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addPhoto, removePhoto, calcReorderData }: {
   item: BodegaMergedItem; loadMovimientos: (id: string, max?: number) => Promise<MovimientoBodega[]>
   onClose: () => void; onEdit: () => void; onMovimiento: () => void
+  addPhoto?: (sap: string, file: File) => Promise<string>
+  removePhoto?: (sap: string, url: string) => Promise<void>
+  calcReorderData?: (item: BodegaMergedItem, movs: MovimientoBodega[]) => { consumoDiario: number; puntoReorden: number; diasRestantes: number; necesitaPedir: boolean } | null
 }) {
   const [movs, setMovs] = useState<MovimientoBodega[]>([])
   const [loading, setLoading] = useState(true)
+  const [uploading, setUploading] = useState(false)
+  const [showQR, setShowQR] = useState(false)
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
 
   useEffect(() => {
     if (!item.bodegaId) { setLoading(false); return }
@@ -1235,6 +1242,37 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento }: {
   const isSin = has && item.stockActual === 0 && item.stockMinimo > 0
   const valorTotal = item.stockActual * (item.costoCompra ?? item.valorUnitario ?? 0)
   const sparkData = movs.slice(0, 15).reverse().map(m => m.stockResultante)
+  const reorder = calcReorderData?.(item, movs) ?? null
+  const qrValue = `${window.location.origin}${window.location.pathname}?sap=${item.codigoSAP}`
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !addPhoto) return
+    setUploading(true)
+    try { await addPhoto(item.codigoSAP, file) } finally { setUploading(false) }
+    e.target.value = ''
+  }
+
+  const handleDownloadQR = () => {
+    const svg = document.getElementById('bodega-qr-svg')
+    if (!svg) return
+    const svgData = new XMLSerializer().serializeToString(svg)
+    const canvas = document.createElement('canvas')
+    canvas.width = 300; canvas.height = 300
+    const ctx = canvas.getContext('2d')
+    const img = new window.Image()
+    img.onload = () => { ctx?.drawImage(img, 0, 0); const a = document.createElement('a'); a.download = `QR_${item.codigoSAP}.png`; a.href = canvas.toDataURL('image/png'); a.click() }
+    img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)))
+  }
+
+  const handlePrintQR = () => {
+    const w = window.open('', '_blank', 'width=400,height=500')
+    if (!w) return
+    const svg = document.getElementById('bodega-qr-svg')
+    const svgHtml = svg ? new XMLSerializer().serializeToString(svg) : ''
+    w.document.write(`<html><head><title>QR ${item.codigoSAP}</title><style>body{font-family:sans-serif;text-align:center;padding:20px}h2{margin:0 0 4px}p{margin:2px 0;color:#666;font-size:12px}.qr{margin:16px auto}</style></head><body><h2>${item.textoBreve}</h2><p>${item.codigoSAP}</p>${item.codigoFabricante ? `<p>${item.codigoFabricante}</p>` : ''}<div class="qr">${svgHtml}</div><p>${item.ubicacionBodega || ''}</p><script>setTimeout(()=>{window.print();window.close()},300)</script></body></html>`)
+    w.document.close()
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end" onClick={onClose}>
@@ -1290,6 +1328,95 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento }: {
               </div>
             </div>
           )}
+
+          {/* Punto de reorden */}
+          {reorder && (
+            <div className={`rounded-lg border p-3 ${reorder.necesitaPedir ? 'border-red-500/30 bg-red-500/5' : 'border-border'}`}>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1">
+                <ShoppingCart className="h-3 w-3" /> Reposición
+                {reorder.necesitaPedir && <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded bg-red-500/15 text-red-400 font-bold uppercase">Pedir ahora</span>}
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="text-center">
+                  <p className="text-lg font-bold text-foreground tabular-nums">{reorder.puntoReorden}</p>
+                  <p className="text-[8px] text-muted-foreground">Pto. reorden</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-lg font-bold text-blue-400 tabular-nums">{reorder.consumoDiario.toFixed(1)}</p>
+                  <p className="text-[8px] text-muted-foreground">Consumo/día</p>
+                </div>
+                <div className="text-center">
+                  <p className={`text-lg font-bold tabular-nums ${reorder.diasRestantes < 14 ? 'text-red-400' : reorder.diasRestantes < 30 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                    {reorder.diasRestantes === Infinity ? '∞' : reorder.diasRestantes}
+                  </p>
+                  <p className="text-[8px] text-muted-foreground">Días restantes</p>
+                </div>
+              </div>
+              {item.leadTime && <p className="text-[9px] text-muted-foreground text-center mt-2">Lead time proveedor: {item.leadTime} días</p>}
+            </div>
+          )}
+
+          {/* Fotos */}
+          <div className="rounded-lg border border-border overflow-hidden">
+            <div className="px-3 py-2 bg-muted/20 border-b border-border flex items-center justify-between">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold flex items-center gap-1">
+                <Image className="h-3 w-3" /> Fotos ({item.fotos?.length || 0})
+              </p>
+              {addPhoto && (
+                <label className="flex items-center gap-1 text-[10px] text-primary cursor-pointer hover:underline">
+                  <Camera className="h-3 w-3" /> Agregar
+                  <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoUpload} disabled={uploading} />
+                </label>
+              )}
+            </div>
+            {uploading && (
+              <div className="px-3 py-2 flex items-center gap-2">
+                <Loader2 className="h-3 w-3 text-primary animate-spin" />
+                <span className="text-[10px] text-muted-foreground">Subiendo foto...</span>
+              </div>
+            )}
+            {item.fotos && item.fotos.length > 0 ? (
+              <div className="p-2 grid grid-cols-4 gap-1.5">
+                {item.fotos.map((url, i) => (
+                  <div key={i} className="relative group aspect-square rounded-lg overflow-hidden border border-border/50 cursor-pointer" onClick={() => setLightboxUrl(url)}>
+                    <img src={url} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" loading="lazy" />
+                    {removePhoto && (
+                      <button onClick={e => { e.stopPropagation(); removePhoto(item.codigoSAP, url) }}
+                        className="absolute top-0.5 right-0.5 p-0.5 rounded bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="px-3 py-3 text-[10px] text-muted-foreground text-center">Sin fotos. Agrega una para identificación visual.</p>
+            )}
+          </div>
+
+          {/* Código QR */}
+          <div className="rounded-lg border border-border overflow-hidden">
+            <button onClick={() => setShowQR(q => !q)} className="w-full px-3 py-2 bg-muted/20 flex items-center justify-between hover:bg-muted/30 transition-colors">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold flex items-center gap-1">
+                <QrCode className="h-3 w-3" /> Código QR
+              </p>
+              <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform ${showQR ? 'rotate-180' : ''}`} />
+            </button>
+            {showQR && (
+              <div className="p-4 flex flex-col items-center gap-3">
+                <QRCodeSVG id="bodega-qr-svg" value={qrValue} size={180} level="H" includeMargin />
+                <p className="text-[9px] text-muted-foreground text-center break-all max-w-[200px]">{item.codigoSAP}</p>
+                <div className="flex gap-2">
+                  <button onClick={handleDownloadQR} className="flex items-center gap-1 px-3 py-1.5 text-[10px] font-medium bg-muted/30 border border-border rounded-lg hover:bg-muted/50 text-muted-foreground">
+                    <Download className="h-3 w-3" /> Descargar PNG
+                  </button>
+                  <button onClick={handlePrintQR} className="flex items-center gap-1 px-3 py-1.5 text-[10px] font-medium bg-primary/10 border border-primary/30 rounded-lg hover:bg-primary/20 text-primary">
+                    <QrCode className="h-3 w-3" /> Imprimir
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Detalles */}
           <div className="rounded-lg border border-border divide-y divide-border/50">
@@ -1359,6 +1486,13 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento }: {
           )}
         </div>
       </div>
+      {/* Lightbox */}
+      {lightboxUrl && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4" onClick={() => setLightboxUrl(null)}>
+          <button onClick={() => setLightboxUrl(null)} className="absolute top-4 right-4 p-2 rounded-full bg-black/50 text-white hover:bg-black/70"><X className="h-6 w-6" /></button>
+          <img src={lightboxUrl} alt="Foto repuesto" className="max-w-full max-h-full rounded-lg object-contain" />
+        </div>
+      )}
     </div>
   )
 }
