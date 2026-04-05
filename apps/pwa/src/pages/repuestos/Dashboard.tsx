@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from 'react'
-import { AlertTriangle, Plus, FileText, Upload, Package, ClipboardList, ImageIcon, DollarSign, Wrench, ArrowRightLeft, Copy as CopyDuplicateIcon, Globe, ExternalLink, Search, X, WifiOff } from 'lucide-react'
+import { AlertTriangle, Plus, FileText, Upload, Package, ClipboardList, ImageIcon, DollarSign, Wrench, ArrowRightLeft, Copy as CopyDuplicateIcon, Globe, ExternalLink, Search, X, WifiOff, Star } from 'lucide-react'
 import { RepuestosTable } from '@/components/repuestos/RepuestosTable'
 import { RepuestoFormModal } from '@/components/repuestos/RepuestoForm'
 import { RepuestosPagination } from '@/components/repuestos/RepuestosPagination'
@@ -83,6 +83,7 @@ export function RepuestosDashboard({
   const [, setSelectedCategoryId] = useState<string | null>('maquinas-principales')
   const [selectedEquipmentInfo, setSelectedEquipmentInfo] = useState<SelectedEquipmentInfo | null>(null)
   const equipmentDetailRef = useRef<HTMLDivElement | null>(null)
+  const [favMachines, setFavMachines] = useState<Map<string, { nombre: string; equipmentId: string }>>(new Map())
 
   // Scroll al detalle del equipo cuando se selecciona
   useEffect(() => {
@@ -477,7 +478,34 @@ export function RepuestosDashboard({
           repuestosCounts={repuestosCounts}
           onCategoryChange={setSelectedCategoryId}
           onEquipmentSelect={setSelectedEquipmentInfo}
+          onFavoriteMachinesChange={setFavMachines}
         />
+
+        {/* ═══ Chips de equipos favoritos ═══ */}
+        {favMachines.size > 0 && (
+          <div className="flex items-center gap-1.5 flex-wrap border-t border-border/30 pt-3 mt-1">
+            <Star className="h-3.5 w-3.5 text-yellow-400/60 shrink-0" />
+            {[...favMachines.entries()].map(([machineId, info]) => {
+              const isActive = currentMachine?.id === machineId
+              return (
+                <button
+                  key={machineId}
+                  onClick={() => {
+                    setCurrentMachine(machineId)
+                    setSelectedEquipmentInfo({ id: info.equipmentId, nombre: info.nombre, codigo: '', alias: undefined })
+                  }}
+                  className={`text-[10px] font-medium px-2.5 py-1 rounded-lg border transition-all ${
+                    isActive
+                      ? 'bg-primary/10 border-primary/30 text-primary'
+                      : 'bg-muted/20 border-border/50 text-muted-foreground hover:border-primary/30 hover:text-foreground'
+                  }`}
+                >
+                  {info.nombre}
+                </button>
+              )
+            })}
+          </div>
+        )}
 
         {/* ═══ Detalle de la máquina seleccionada ═══ */}
         {!currentMachine && !selectedEquipmentInfo ? (
@@ -492,35 +520,78 @@ export function RepuestosDashboard({
           </div>
         ) : (
         <div ref={equipmentDetailRef} className="border-t border-border/40 pt-4">
-        {/* Machine Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: (currentMachine?.color || '#3b82f6') + '20' }}>
-              <Wrench className="h-5 w-5" style={{ color: currentMachine?.color || '#3b82f6' }} />
+        {/* Machine Header — KPIs estilo Excel */}
+        {(() => {
+          const equipName = selectedEquipmentInfo
+            ? (selectedEquipmentInfo.alias || selectedEquipmentInfo.nombre)
+            : currentMachine?.nombre || ''
+          const totalCatalogo = repuestos.length
+          const conSAP = repuestos.filter(r => r.codigoSAP).length
+          const conStock = repuestos.filter(r => (r.cantidadPorMaquina || 0) > 0).length
+          const valorTotal = repuestos.reduce((s, r) => s + (r.valorUnitario || 0) * (r.cantidadPorMaquina || 0), 0)
+          const cobertura = totalCatalogo > 0 ? Math.round((conSAP / totalCatalogo) * 100) : 0
+          const isFav = !!currentMachine && favMachines.has(currentMachine.id)
+
+          return (
+            <div className="mb-4">
+              {/* Nombre + favorito */}
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: (currentMachine?.color || '#3b82f6') + '20' }}>
+                    <Wrench className="h-5 w-5" style={{ color: currentMachine?.color || '#3b82f6' }} />
+                  </div>
+                  <div>
+                    <h2 className="text-base sm:text-lg font-semibold text-foreground leading-tight">{equipName}</h2>
+                    <p className="text-xs text-muted-foreground">
+                      {selectedEquipmentInfo ? (
+                        <>
+                          <span className="font-mono text-muted-foreground/60">{selectedEquipmentInfo.codigo}</span>
+                          {selectedEquipmentInfo.alias && <span className="ml-1.5">{selectedEquipmentInfo.nombre}</span>}
+                        </>
+                      ) : (
+                        [currentMachine?.marca, currentMachine?.modelo].filter(Boolean).join(' · ') || 'Catálogo de repuestos'
+                      )}
+                    </p>
+                  </div>
+                </div>
+                {isFav && <Star className="h-4 w-4 text-yellow-400 fill-yellow-400 shrink-0" />}
+              </div>
+
+              {/* KPI strip */}
+              {totalCatalogo > 0 && (
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                  <div className="bg-muted/15 border border-border/40 rounded-lg px-3 py-2">
+                    <p className="text-lg font-bold text-foreground tabular-nums">{totalCatalogo}</p>
+                    <p className="text-[9px] text-muted-foreground uppercase">Total catálogo</p>
+                  </div>
+                  <div className="bg-muted/15 border border-border/40 rounded-lg px-3 py-2">
+                    <p className="text-lg font-bold text-blue-400 tabular-nums">{conSAP}</p>
+                    <p className="text-[9px] text-muted-foreground uppercase">Con CÓD SAP</p>
+                  </div>
+                  <div className="bg-muted/15 border border-border/40 rounded-lg px-3 py-2">
+                    <p className="text-lg font-bold text-emerald-400 tabular-nums">{conStock}</p>
+                    <p className="text-[9px] text-muted-foreground uppercase">Con stock</p>
+                  </div>
+                  <div className="bg-muted/15 border border-border/40 rounded-lg px-3 py-2">
+                    <p className="text-lg font-bold text-violet-400 tabular-nums">${valorTotal.toLocaleString('es-CL', { maximumFractionDigits: 0 })}</p>
+                    <p className="text-[9px] text-muted-foreground uppercase">Valor total</p>
+                  </div>
+                  <div className="bg-muted/15 border border-border/40 rounded-lg px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <p className={`text-lg font-bold tabular-nums ${cobertura >= 50 ? 'text-emerald-400' : cobertura >= 20 ? 'text-amber-400' : 'text-red-400'}`}>{cobertura}%</p>
+                      <div className="flex-1 h-2 bg-muted/30 rounded-full overflow-hidden hidden sm:block">
+                        <div className={`h-full rounded-full ${cobertura >= 50 ? 'bg-emerald-500' : cobertura >= 20 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${cobertura}%` }} />
+                      </div>
+                    </div>
+                    <p className="text-[9px] text-muted-foreground uppercase">Cobertura SAP</p>
+                  </div>
+                </div>
+              )}
             </div>
-            <div>
-              <h2 className="text-base sm:text-lg font-semibold text-foreground leading-tight">
-                {selectedEquipmentInfo
-                  ? (selectedEquipmentInfo.alias || selectedEquipmentInfo.nombre)
-                  : currentMachine?.nombre || ''}
-              </h2>
-              <p className="text-xs text-muted-foreground">
-                {selectedEquipmentInfo ? (
-                  <>
-                    <span className="font-mono text-muted-foreground/60">{selectedEquipmentInfo.codigo}</span>
-                    {selectedEquipmentInfo.alias && (
-                      <span className="ml-1.5">{selectedEquipmentInfo.nombre}</span>
-                    )}
-                  </>
-                ) : (
-                  [currentMachine?.marca, currentMachine?.modelo].filter(Boolean).join(' · ') || 'Catálogo de repuestos'
-                )}
-                {repuestos.length > 0 && <span className="ml-1.5 text-muted-foreground/70">— {repuestos.length} repuestos</span>}
-              </p>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-2">
+          )
+        })()}
+
+        <div className="flex flex-wrap items-center gap-2 mb-4">
             {isAdmin && (
               <Button variant="outline" size="sm" onClick={() => setImportOpen(true)} className="gap-1.5" title="Importar">
                 <Upload className="h-3.5 w-3.5" />
@@ -549,7 +620,6 @@ export function RepuestosDashboard({
                 <span className="text-xs">Repuesto</span>
               </Button>
             )}
-          </div>
         </div>
 
         <div className="mb-4 space-y-3">

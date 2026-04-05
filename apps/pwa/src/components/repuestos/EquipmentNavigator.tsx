@@ -54,6 +54,7 @@ interface EquipmentNavigatorProps {
   className?: string
   onCategoryChange?: (categoryId: string | null) => void
   onEquipmentSelect?: (info: SelectedEquipmentInfo | null) => void
+  onFavoriteMachinesChange?: (favorites: Map<string, { nombre: string; equipmentId: string }>) => void
 }
 
 /** Verdadero si el nodo o alguno de sus descendientes tiene el id dado */
@@ -570,16 +571,56 @@ const GlobalSearchDropdown = forwardRef<HTMLDivElement, {
 /* ═══════════════════════════════════════════════════════════════
    Componente Principal
    ═══════════════════════════════════════════════════════════════ */
+const FAV_MACHINES_KEY = 'equipment-favorite-machines'
+
+function loadFavMachines(): Set<string> {
+  try {
+    const raw = localStorage.getItem(FAV_MACHINES_KEY)
+    return raw ? new Set(JSON.parse(raw)) : new Set()
+  } catch { return new Set() }
+}
+
 export function EquipmentNavigator({
   repuestosCounts = {},
   className = '',
   onCategoryChange,
   onEquipmentSelect,
+  onFavoriteMachinesChange,
 }: EquipmentNavigatorProps) {
   const currentMachine = useCurrentMachine()
   const activeMachines = useActiveMachines()
   const { setCurrentMachine, clearCurrentMachine } = useMachineContext()
   const isAdmin = useIsAdmin()
+
+  // ── Máquinas favoritas ──
+  const [favMachineIds, setFavMachineIds] = useState<Set<string>>(loadFavMachines)
+
+  const toggleFavoriteMachine = useCallback((machineId: string) => {
+    setFavMachineIds(prev => {
+      const next = new Set(prev)
+      if (next.has(machineId)) { next.delete(machineId) } else { next.add(machineId) }
+      localStorage.setItem(FAV_MACHINES_KEY, JSON.stringify([...next]))
+      return next
+    })
+  }, [])
+
+  // Notificar al padre cuando cambian favoritos (con nombres de equipos)
+  useEffect(() => {
+    if (!onFavoriteMachinesChange || favMachineIds.size === 0) {
+      onFavoriteMachinesChange?.(new Map())
+      return
+    }
+    // Resolver nombres de máquinas favoritas desde el cache global de equipos
+    const eq = getGlobalEquipmentCache()
+    if (!eq) return
+    const map = new Map<string, { nombre: string; equipmentId: string }>()
+    for (const e of eq) {
+      if (e.linkedMachineId && favMachineIds.has(e.linkedMachineId) && !map.has(e.linkedMachineId)) {
+        map.set(e.linkedMachineId, { nombre: e.alias || e.nombre, equipmentId: e.id })
+      }
+    }
+    onFavoriteMachinesChange(map)
+  }, [favMachineIds, onFavoriteMachinesChange])
 
   // Hooks nuevos: árbol de áreas + equipos del área seleccionada
   const { areaTree, loading: areaTreeLoading, expandNode, findNode, getNodePath } = useHierarchyAreaTree()
@@ -1451,6 +1492,8 @@ export function EquipmentNavigator({
                   onMoveUp={() => handleMoveEquipment(eq.id, 'up')}
                   onMoveDown={() => handleMoveEquipment(eq.id, 'down')}
                   onToggleHidden={handleToggleHidden}
+                  isFavoriteMachine={!!eq.linkedMachineId && favMachineIds.has(eq.linkedMachineId)}
+                  onToggleFavoriteMachine={toggleFavoriteMachine}
                 />
               ))}
 

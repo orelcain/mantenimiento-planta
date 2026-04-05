@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { ChevronRight, ChevronDown, X, Loader2, Pencil, Check, Plus, ArrowUp, ArrowDown, EyeOff, Eye, Pin, PinOff } from 'lucide-react'
+import { ChevronRight, ChevronDown, X, Loader2, Pencil, Check, Plus, ArrowUp, ArrowDown, EyeOff, Eye, Pin, PinOff, Star } from 'lucide-react'
 import { doc, updateDoc, addDoc, collection, Timestamp } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import type { EquipmentDisplayNode } from '@/hooks/useEquipmentForArea'
@@ -59,6 +59,8 @@ interface EquipmentCardProps {
   onMoveUp?: () => void
   onMoveDown?: () => void
   onToggleHidden?: (equipmentId: string, hidden: boolean) => Promise<void>
+  isFavoriteMachine?: boolean
+  onToggleFavoriteMachine?: (machineId: string) => void
 }
 
 export function EquipmentCard({
@@ -79,6 +81,8 @@ export function EquipmentCard({
   onMoveUp,
   onMoveDown,
   onToggleHidden,
+  isFavoriteMachine,
+  onToggleFavoriteMachine,
 }: EquipmentCardProps) {
   const hasChildren = equipment.children.length > 0
   const hasLinkedMachine = !!equipment.linkedMachineId
@@ -461,6 +465,20 @@ export function EquipmentCard({
                 0 rep.
               </span>
             ) : null}
+            {/* Star favorito — solo en equipos con máquina vinculada */}
+            {hasLinkedMachine && onToggleFavoriteMachine && (
+              <button
+                onClick={e => { e.stopPropagation(); onToggleFavoriteMachine(equipment.linkedMachineId!) }}
+                className={`shrink-0 p-0.5 rounded transition-colors ${
+                  isFavoriteMachine
+                    ? 'text-yellow-400'
+                    : 'text-muted-foreground/20 hover:text-yellow-400/60 hidden group-hover:inline-flex'
+                }`}
+                title={isFavoriteMachine ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+              >
+                <Star className={`h-3 w-3 ${isFavoriteMachine ? 'fill-yellow-400' : ''}`} />
+              </button>
+            )}
           </div>
         </div>
 
