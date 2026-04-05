@@ -2,9 +2,10 @@
  * BodegaView — Sistema de gestión de bodega de repuestos
  *
  * Sub-pestañas:
- *  - Stock:        gestión de stock, movimientos, alertas
- *  - Inventarios:  conteos periódicos, reconciliación
- *  - Estadísticas: KPIs, alertas, distribución, valor
+ *  - Stock:        gestión de stock, movimientos, alertas, watchlist
+ *  - Inventarios:  conteos periódicos, reconciliación, resumen post-finalización
+ *  - Movimientos:  historial global filtrable
+ *  - Estadísticas: KPIs, rotación, ABC, stock muerto, distribución, valor
  *
  * Solo repuestos con código SAP.
  */
@@ -17,6 +18,7 @@ import {
   BarChart3, Plus, ChevronRight, CheckCircle2, CircleDot,
   AlertCircle, Clock, Download, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown,
   Layers, Truck, ShieldCheck, ShieldAlert, ShieldX,
+  Star, Activity, Zap, Archive,
 } from 'lucide-react'
 import { collection, getDocs, query as fsQuery, where } from 'firebase/firestore'
 import { db } from '@/services/firebase'
@@ -31,7 +33,7 @@ import type { Machine } from '@/types/repuestos'
 import { useAuthStore } from '@/store/authStore'
 
 type BodegaTab = 'stock' | 'inventarios' | 'movimientos' | 'estadisticas'
-type StockFilter = 'todos' | 'configurados' | 'bajo' | 'sin' | 'sinConfig'
+type StockFilter = 'todos' | 'configurados' | 'bajo' | 'sin' | 'sinConfig' | 'favoritos'
 
 const INPUT = 'w-full px-3 py-2 text-sm bg-muted/30 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground'
 
@@ -162,15 +164,19 @@ function exportCsv(items: BodegaMergedItem[]) {
 }
 
 function StockTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>; user: any }) {
-  const { items, stats, saveStock, registrarMovimiento, loadMovimientos } = bodega
+  const { items, stats, saveStock, registrarMovimiento, registrarMovimientoBatch, loadMovimientos, toggleWatch } = bodega
   const [searchQuery, setSearchQuery] = useState('')
   const [stockFilter, setStockFilter] = useState<StockFilter>('todos')
   const [editingItem, setEditingItem] = useState<BodegaMergedItem | null>(null)
   const [movimientoItem, setMovimientoItem] = useState<BodegaMergedItem | null>(null)
   const [historialItem, setHistorialItem] = useState<BodegaMergedItem | null>(null)
   const [showBulkConfig, setShowBulkConfig] = useState(false)
+  const [showBatchMov, setShowBatchMov] = useState(false)
+  const [drawerItem, setDrawerItem] = useState<BodegaMergedItem | null>(null)
   const [sortField, setSortField] = useState<SortField>('nombre')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
+
+  const favCount = items.filter(i => i.isWatched).length
 
   const toggleSort = useCallback((field: SortField) => {
     setSortField(prev => { if (prev === field) { setSortDir(d => d === 'asc' ? 'desc' : 'asc'); return prev } setSortDir('asc'); return field })
@@ -182,6 +188,7 @@ function StockTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>; user
     else if (stockFilter === 'bajo') result = result.filter(i => i.bodegaId && i.stockMinimo > 0 && i.stockActual <= i.stockMinimo && i.stockActual > 0)
     else if (stockFilter === 'sin') result = result.filter(i => i.bodegaId && i.stockActual === 0 && i.stockMinimo > 0)
     else if (stockFilter === 'sinConfig') result = result.filter(i => !i.bodegaId)
+    else if (stockFilter === 'favoritos') result = result.filter(i => i.isWatched)
 
     if (searchQuery.trim()) {
       const terms = searchQuery.toLowerCase().trim().split(/\s+/)
@@ -191,7 +198,6 @@ function StockTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>; user
       })
     }
 
-    // Ordenar
     const dir = sortDir === 'asc' ? 1 : -1
     result = [...result].sort((a, b) => {
       switch (sortField) {
@@ -217,15 +223,16 @@ function StockTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>; user
   return (
     <>
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
         <StatCard icon={Package} label="Con SAP" value={stats.total} color="text-blue-400" bg="bg-blue-500/10" onClick={() => setStockFilter('todos')} active={stockFilter === 'todos'} />
         <StatCard icon={PackageCheck} label="Configurados" value={stats.conStock} color="text-emerald-400" bg="bg-emerald-500/10" onClick={() => setStockFilter('configurados')} active={stockFilter === 'configurados'} />
         <StatCard icon={TrendingDown} label="Bajo stock" value={stats.bajoStock} color="text-amber-400" bg="bg-amber-500/10" onClick={() => setStockFilter('bajo')} active={stockFilter === 'bajo'} />
         <StatCard icon={PackageX} label="Sin stock" value={stats.sinStock} color="text-red-400" bg="bg-red-500/10" onClick={() => setStockFilter('sin')} active={stockFilter === 'sin'} />
-        <StatCard icon={DollarSign} label="Valor bodega" value={`$${stats.valorTotal.toLocaleString('es-CL', { maximumFractionDigits: 0 })}`} color="text-violet-400" bg="bg-violet-500/10" onClick={() => setStockFilter('sinConfig')} active={stockFilter === 'sinConfig'} sublabel="Sin configurar" />
+        <StatCard icon={Settings2} label="Sin configurar" value={stats.sinConfig} color="text-zinc-400" bg="bg-zinc-500/10" onClick={() => setStockFilter('sinConfig')} active={stockFilter === 'sinConfig'} />
+        <StatCard icon={Star} label="Favoritos" value={favCount} color="text-yellow-400" bg="bg-yellow-500/10" onClick={() => setStockFilter('favoritos')} active={stockFilter === 'favoritos'} />
       </div>
 
-      {/* Search + Export */}
+      {/* Search + Actions */}
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -233,13 +240,16 @@ function StockTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>; user
             className="w-full pl-9 pr-8 py-2 text-sm bg-muted/30 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground placeholder:text-muted-foreground" />
           {searchQuery && <button onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-muted/50"><X className="h-3.5 w-3.5 text-muted-foreground" /></button>}
         </div>
+        <button onClick={() => setShowBatchMov(true)} title="Movimiento en lote" className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-emerald-500/10 border border-emerald-500/30 rounded-lg hover:bg-emerald-500/20 text-emerald-400 transition-colors shrink-0">
+          <Layers className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Lote</span>
+        </button>
         {stats.sinConfig > 0 && (
           <button onClick={() => setShowBulkConfig(true)} title="Configurar múltiples" className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-primary/10 border border-primary/30 rounded-lg hover:bg-primary/20 text-primary transition-colors shrink-0">
-            <Settings2 className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Config. masiva</span>
+            <Settings2 className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Config.</span>
           </button>
         )}
         <button onClick={() => exportCsv(filtered)} title="Exportar CSV" className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-muted/30 border border-border rounded-lg hover:bg-muted/50 text-muted-foreground transition-colors shrink-0">
-          <Download className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Exportar</span>
+          <Download className="h-3.5 w-3.5" /> <span className="hidden sm:inline">CSV</span>
         </button>
       </div>
 
@@ -253,7 +263,7 @@ function StockTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>; user
         <EmptyState message={items.length === 0 ? 'No hay repuestos con código SAP' : 'Sin resultados'} />
       ) : (
         <div className="border border-border rounded-xl overflow-hidden bg-card">
-          <div className="hidden sm:grid grid-cols-[1fr_60px_70px_70px_70px_110px_100px] gap-2 px-4 py-2 bg-muted/20 border-b border-border text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
+          <div className="hidden sm:grid grid-cols-[1fr_60px_70px_70px_70px_110px_120px] gap-2 px-4 py-2 bg-muted/20 border-b border-border text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
             <button onClick={() => toggleSort('nombre')} className="flex items-center gap-1 hover:text-foreground transition-colors">Repuesto <SortIcon field="nombre" /></button>
             <button onClick={() => toggleSort('equipos')} className="flex items-center gap-1 justify-center hover:text-foreground transition-colors"><Layers className="h-3 w-3" /> <SortIcon field="equipos" /></button>
             <button onClick={() => toggleSort('stock')} className="flex items-center gap-1 justify-center hover:text-foreground transition-colors">Stock <SortIcon field="stock" /></button>
@@ -266,7 +276,8 @@ function StockTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>; user
             {filtered.map(item => (
               <BodegaRow key={item.codigoSAP} item={item}
                 onEdit={() => setEditingItem(item)} onMovimiento={() => setMovimientoItem(item)}
-                onHistorial={() => setHistorialItem(item)} />
+                onHistorial={() => setHistorialItem(item)} onToggleWatch={() => toggleWatch(item.codigoSAP)}
+                onOpenDrawer={() => setDrawerItem(item)} />
             ))}
           </div>
           <div className="px-4 py-2 bg-muted/10 border-t border-border text-xs text-muted-foreground">{filtered.length} de {items.length} repuestos</div>
@@ -277,12 +288,14 @@ function StockTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>; user
       {movimientoItem && <MovimientoModal item={movimientoItem} onSave={async (t, c, m) => { if (user) { await registrarMovimiento(movimientoItem, { tipo: t, cantidad: c, motivo: m }, user.id, user.nombre); setMovimientoItem(null) } }} onClose={() => setMovimientoItem(null)} />}
       {historialItem && <HistorialModal item={historialItem} loadMovimientos={loadMovimientos} onClose={() => setHistorialItem(null)} />}
       {showBulkConfig && <BulkConfigModal items={items.filter(i => !i.bodegaId)} saveStock={saveStock} onClose={() => setShowBulkConfig(false)} />}
+      {showBatchMov && <BatchMovimientoModal items={items.filter(i => i.bodegaId)} registrarMovimientoBatch={registrarMovimientoBatch} user={user} onClose={() => setShowBatchMov(false)} />}
+      {drawerItem && <ItemDrawer item={drawerItem} loadMovimientos={loadMovimientos} onClose={() => setDrawerItem(null)} onEdit={() => { setEditingItem(drawerItem); setDrawerItem(null) }} onMovimiento={() => { setMovimientoItem(drawerItem); setDrawerItem(null) }} />}
     </>
   )
 }
 
 // ══════════════════════════════════════════════
-//  TAB: INVENTARIOS
+//  TAB: INVENTARIOS (mejorado con resumen + escaneo rápido)
 // ══════════════════════════════════════════════
 
 function InventarioTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>; user: any }) {
@@ -294,6 +307,7 @@ function InventarioTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>;
   const [creando, setCreando] = useState(false)
   const [nuevoNombre, setNuevoNombre] = useState('')
   const [soloConStock, setSoloConStock] = useState(true)
+  const [resumenFinal, setResumenFinal] = useState<{ contados: number; ajustados: number; valorDif: number; precision: number } | null>(null)
 
   const reload = useCallback(async () => {
     setLoading(true)
@@ -327,7 +341,6 @@ function InventarioTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>;
     await registrarConteo(activeSesion.id, codigoSAP, stockFisico, user.id, user.nombre, obs)
     const data = await loadConteos(activeSesion.id)
     setConteos(data)
-    // Actualizar sesión en la lista
     const updated = await loadInventarios()
     setSesiones(updated)
     setActiveSesion(updated.find(s => s.id === activeSesion.id) || activeSesion)
@@ -336,9 +349,53 @@ function InventarioTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>;
   const handleFinalizar = async () => {
     if (!user || !activeSesion) return
     if (!confirm('¿Finalizar inventario y ajustar stock según conteo físico? Los ítems no contados NO se modificarán.')) return
+    // Calcular resumen antes de finalizar
+    const contados = conteos.filter(c => c.stockFisico !== null)
+    const ajustados = contados.filter(c => c.diferencia !== 0)
+    const valorDif = ajustados.reduce((sum, c) => {
+      const item = items.find(i => i.codigoSAP === c.codigoSAP)
+      const costo = item?.costoCompra ?? item?.valorUnitario ?? 0
+      return sum + Math.abs(c.diferencia) * costo
+    }, 0)
+    const precision = contados.length > 0 ? Math.round(((contados.length - ajustados.length) / contados.length) * 100) : 100
+
     await finalizarInventario(activeSesion.id, user.id, user.nombre)
+    setResumenFinal({ contados: contados.length, ajustados: ajustados.length, valorDif, precision })
     setActiveSesion(null)
     await reload()
+  }
+
+  // Resumen post-finalización
+  if (resumenFinal) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 gap-4">
+        <div className="h-16 w-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center">
+          <CheckCircle2 className="h-8 w-8 text-emerald-400" />
+        </div>
+        <h3 className="text-lg font-bold text-foreground">Inventario finalizado</h3>
+        <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
+          <div className="bg-card border border-border rounded-xl p-4 text-center">
+            <p className="text-2xl font-bold text-foreground">{resumenFinal.contados}</p>
+            <p className="text-[10px] text-muted-foreground">Ítems contados</p>
+          </div>
+          <div className="bg-card border border-border rounded-xl p-4 text-center">
+            <p className="text-2xl font-bold text-amber-400">{resumenFinal.ajustados}</p>
+            <p className="text-[10px] text-muted-foreground">Con diferencia</p>
+          </div>
+          <div className="bg-card border border-border rounded-xl p-4 text-center">
+            <p className="text-2xl font-bold text-violet-400">${resumenFinal.valorDif.toLocaleString('es-CL', { maximumFractionDigits: 0 })}</p>
+            <p className="text-[10px] text-muted-foreground">Valor diferencias</p>
+          </div>
+          <div className="bg-card border border-border rounded-xl p-4 text-center">
+            <p className={`text-2xl font-bold ${resumenFinal.precision >= 95 ? 'text-emerald-400' : resumenFinal.precision >= 80 ? 'text-amber-400' : 'text-red-400'}`}>{resumenFinal.precision}%</p>
+            <p className="text-[10px] text-muted-foreground">Precisión</p>
+          </div>
+        </div>
+        <button onClick={() => setResumenFinal(null)} className="mt-4 px-6 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90">
+          Volver a inventarios
+        </button>
+      </div>
+    )
   }
 
   if (activeSesion) {
@@ -347,7 +404,6 @@ function InventarioTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>;
 
     return (
       <div className="space-y-3">
-        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <button onClick={() => setActiveSesion(null)} className="text-xs text-primary hover:underline mb-1 flex items-center gap-1">
@@ -367,38 +423,30 @@ function InventarioTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>;
           )}
         </div>
 
-        {/* Progreso */}
         <div className="bg-muted/20 rounded-lg p-3 border border-border">
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
             <span>Progreso</span>
-            <span>{Math.round((contados.length / conteos.length) * 100)}%</span>
+            <span>{conteos.length > 0 ? Math.round((contados.length / conteos.length) * 100) : 0}%</span>
           </div>
           <div className="h-2 bg-muted/40 rounded-full overflow-hidden">
-            <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${(contados.length / conteos.length) * 100}%` }} />
+            <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${conteos.length > 0 ? (contados.length / conteos.length) * 100 : 0}%` }} />
           </div>
         </div>
 
-        {/* Tabs: Pendientes / Contados / Con diferencia */}
-        <ConteoList
-          conteos={conteos}
-          isFinalizado={activeSesion.estado === 'finalizado'}
-          onConteo={handleConteo}
-        />
+        <ConteoList conteos={conteos} isFinalizado={activeSesion.estado === 'finalizado'} onConteo={handleConteo} />
       </div>
     )
   }
 
   return (
     <div className="space-y-4">
-      {/* Crear nuevo */}
       <div className="bg-card border border-border rounded-xl p-4">
         <h3 className="text-sm font-bold text-foreground mb-3">Nuevo inventario periódico</h3>
         <div className="flex items-end gap-3">
           <div className="flex-1">
             <label className="text-xs text-muted-foreground block mb-1">Nombre</label>
             <input type="text" value={nuevoNombre} onChange={e => setNuevoNombre(e.target.value)}
-              placeholder={`Inventario ${new Date().toLocaleDateString('es-CL')}`}
-              className={INPUT} />
+              placeholder={`Inventario ${new Date().toLocaleDateString('es-CL')}`} className={INPUT} />
           </div>
           <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer shrink-0 pb-2">
             <input type="checkbox" checked={soloConStock} onChange={e => setSoloConStock(e.target.checked)} className="rounded" />
@@ -406,23 +454,16 @@ function InventarioTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>;
           </label>
           <button onClick={handleCrear} disabled={creando || !nuevoNombre.trim()}
             className="flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors shrink-0">
-            {creando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-            Crear
+            {creando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Crear
           </button>
         </div>
         {soloConStock && items.filter(i => i.bodegaId).length === 0 ? (
-          <p className="text-[10px] text-amber-400 mt-2 flex items-center gap-1">
-            <AlertTriangle className="h-3 w-3 shrink-0" />
-            No hay ítems con stock configurado. Desmarca la opción o configura stock primero en la pestaña Stock.
-          </p>
+          <p className="text-[10px] text-amber-400 mt-2 flex items-center gap-1"><AlertTriangle className="h-3 w-3 shrink-0" />No hay ítems con stock configurado.</p>
         ) : (
-          <p className="text-[10px] text-muted-foreground mt-2">
-            Se incluirán {soloConStock ? items.filter(i => i.bodegaId).length : items.length} ítems con código SAP
-          </p>
+          <p className="text-[10px] text-muted-foreground mt-2">Se incluirán {soloConStock ? items.filter(i => i.bodegaId).length : items.length} ítems con código SAP</p>
         )}
       </div>
 
-      {/* Lista de sesiones */}
       {loading ? (
         <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 text-primary animate-spin" /></div>
       ) : sesiones.length === 0 ? (
@@ -444,12 +485,8 @@ function InventarioTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>;
                   <span>{s.createdAt.toLocaleDateString('es-CL')}</span>
                 </div>
               </div>
-              {s.estado === 'en_curso' && (
-                <span className="text-[9px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 font-semibold uppercase shrink-0">En curso</span>
-              )}
-              {s.estado === 'finalizado' && (
-                <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-semibold uppercase shrink-0">Finalizado</span>
-              )}
+              {s.estado === 'en_curso' && <span className="text-[9px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 font-semibold uppercase shrink-0">En curso</span>}
+              {s.estado === 'finalizado' && <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-semibold uppercase shrink-0">Finalizado</span>}
               <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
             </button>
           ))}
@@ -459,11 +496,10 @@ function InventarioTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>;
   )
 }
 
-// ── Lista de conteos ──
+// ── Lista de conteos (con escaneo rápido) ──
 
 function ConteoList({ conteos, isFinalizado, onConteo }: {
-  conteos: InventarioConteo[]
-  isFinalizado: boolean
+  conteos: InventarioConteo[]; isFinalizado: boolean
   onConteo: (sap: string, stockFisico: number, obs?: string) => Promise<void>
 }) {
   const [tab, setTab] = useState<'pendientes' | 'contados' | 'diferencias'>('pendientes')
@@ -471,6 +507,7 @@ function ConteoList({ conteos, isFinalizado, onConteo }: {
   const [editValue, setEditValue] = useState(0)
   const [editObs, setEditObs] = useState('')
   const [conteoSearch, setConteoSearch] = useState('')
+  const [quickScan, setQuickScan] = useState(false)
 
   const pendientes = conteos.filter(c => c.stockFisico === null)
   const contados = conteos.filter(c => c.stockFisico !== null)
@@ -490,11 +527,19 @@ function ConteoList({ conteos, isFinalizado, onConteo }: {
     await onConteo(sap, editValue, editObs)
     setEditingSAP(null)
     setEditObs('')
+    // Escaneo rápido: avanzar al siguiente pendiente
+    if (quickScan) {
+      const nextPending = pendientes.find(c => c.codigoSAP !== sap)
+      if (nextPending) {
+        setEditingSAP(nextPending.codigoSAP)
+        setEditValue(nextPending.stockSistema)
+      }
+    }
   }
 
   return (
     <div>
-      <div className="flex gap-1 mb-3">
+      <div className="flex items-center gap-1 mb-3">
         {[
           { id: 'pendientes' as const, label: 'Pendientes', count: pendientes.length, color: 'text-amber-400' },
           { id: 'contados' as const, label: 'Contados', count: contados.length, color: 'text-emerald-400' },
@@ -505,9 +550,15 @@ function ConteoList({ conteos, isFinalizado, onConteo }: {
             {t.label} <span className={t.color}>{t.count}</span>
           </button>
         ))}
+        <div className="flex-1" />
+        {!isFinalizado && tab === 'pendientes' && (
+          <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground cursor-pointer">
+            <input type="checkbox" checked={quickScan} onChange={e => setQuickScan(e.target.checked)} className="rounded h-3 w-3" />
+            <Zap className="h-3 w-3" /> Escaneo rápido
+          </label>
+        )}
       </div>
 
-      {/* Búsqueda dentro de conteos */}
       {conteos.length > 10 && (
         <div className="relative mb-3">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -528,12 +579,10 @@ function ConteoList({ conteos, isFinalizado, onConteo }: {
                   <p className="text-sm font-medium text-foreground truncate">{c.textoBreve}</p>
                   <span className="text-[10px] font-mono text-blue-400">{c.codigoSAP}</span>
                 </div>
-
                 <div className="text-center shrink-0 w-16">
                   <p className="text-[9px] text-muted-foreground uppercase">Sistema</p>
                   <p className="text-sm font-bold text-foreground tabular-nums">{c.stockSistema}</p>
                 </div>
-
                 {c.stockFisico !== null ? (
                   <>
                     <div className="text-center shrink-0 w-16">
@@ -555,9 +604,9 @@ function ConteoList({ conteos, isFinalizado, onConteo }: {
                   editingSAP === c.codigoSAP ? (
                     <div className="flex items-center gap-2 shrink-0">
                       <input type="number" min={0} value={editValue} onChange={e => setEditValue(Number(e.target.value))}
-                        className="w-20 px-2 py-1 text-sm text-center bg-muted/30 border border-border rounded-lg tabular-nums font-bold focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground" autoFocus />
-                      <input type="text" value={editObs} onChange={e => setEditObs(e.target.value)}
-                        placeholder="Obs." className="w-28 px-2 py-1 text-xs bg-muted/30 border border-border rounded-lg text-foreground" />
+                        className="w-20 px-2 py-1 text-sm text-center bg-muted/30 border border-border rounded-lg tabular-nums font-bold focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground" autoFocus
+                        onKeyDown={e => { if (e.key === 'Enter') handleSave(c.codigoSAP) }} />
+                      {!quickScan && <input type="text" value={editObs} onChange={e => setEditObs(e.target.value)} placeholder="Obs." className="w-28 px-2 py-1 text-xs bg-muted/30 border border-border rounded-lg text-foreground" />}
                       <button onClick={() => handleSave(c.codigoSAP)} className="p-1 rounded bg-primary text-primary-foreground"><Check className="h-3.5 w-3.5" /></button>
                       <button onClick={() => setEditingSAP(null)} className="p-1 rounded hover:bg-muted/50 text-muted-foreground"><X className="h-3.5 w-3.5" /></button>
                     </div>
@@ -569,9 +618,7 @@ function ConteoList({ conteos, isFinalizado, onConteo }: {
                   )
                 )}
               </div>
-              {c.observaciones && c.stockFisico !== null && (
-                <p className="text-[10px] text-muted-foreground mt-1 ml-1">📝 {c.observaciones}</p>
-              )}
+              {c.observaciones && c.stockFisico !== null && <p className="text-[10px] text-muted-foreground mt-1 ml-1">Obs: {c.observaciones}</p>}
             </div>
           ))}
         </div>
@@ -631,37 +678,28 @@ function MovimientosTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
   const salidas = movimientos.filter(m => m.tipo === 'salida').length
   const ajustes = movimientos.filter(m => m.tipo === 'ajuste').length
 
-  if (loading) {
-    return <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 text-primary animate-spin" /></div>
-  }
+  if (loading) return <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 text-primary animate-spin" /></div>
 
   return (
     <div className="space-y-3">
-      {/* Resumen */}
       <div className="grid grid-cols-4 gap-2">
-        <button onClick={() => setFiltroTipo('todos')}
-          className={`flex items-center gap-2 p-3 rounded-xl border transition-all text-left ${filtroTipo === 'todos' ? 'border-primary/40 bg-primary/5 ring-1 ring-primary/20' : 'border-border bg-card hover:bg-muted/20'}`}>
-          <History className="h-4 w-4 text-blue-400" />
-          <div><p className="text-lg font-bold text-foreground tabular-nums">{movimientos.length}</p><p className="text-[10px] text-muted-foreground">Total</p></div>
-        </button>
-        <button onClick={() => setFiltroTipo('entrada')}
-          className={`flex items-center gap-2 p-3 rounded-xl border transition-all text-left ${filtroTipo === 'entrada' ? 'border-emerald-500/40 bg-emerald-500/5 ring-1 ring-emerald-500/20' : 'border-border bg-card hover:bg-muted/20'}`}>
-          <ArrowDownCircle className="h-4 w-4 text-emerald-400" />
-          <div><p className="text-lg font-bold text-foreground tabular-nums">{entradas}</p><p className="text-[10px] text-muted-foreground">Entradas</p></div>
-        </button>
-        <button onClick={() => setFiltroTipo('salida')}
-          className={`flex items-center gap-2 p-3 rounded-xl border transition-all text-left ${filtroTipo === 'salida' ? 'border-red-500/40 bg-red-500/5 ring-1 ring-red-500/20' : 'border-border bg-card hover:bg-muted/20'}`}>
-          <ArrowUpCircle className="h-4 w-4 text-red-400" />
-          <div><p className="text-lg font-bold text-foreground tabular-nums">{salidas}</p><p className="text-[10px] text-muted-foreground">Salidas</p></div>
-        </button>
-        <button onClick={() => setFiltroTipo('ajuste')}
-          className={`flex items-center gap-2 p-3 rounded-xl border transition-all text-left ${filtroTipo === 'ajuste' ? 'border-blue-500/40 bg-blue-500/5 ring-1 ring-blue-500/20' : 'border-border bg-card hover:bg-muted/20'}`}>
-          <Settings2 className="h-4 w-4 text-blue-400" />
-          <div><p className="text-lg font-bold text-foreground tabular-nums">{ajustes}</p><p className="text-[10px] text-muted-foreground">Ajustes</p></div>
-        </button>
+        {[
+          { f: 'todos' as MovFilter, label: 'Total', count: movimientos.length, icon: History, color: 'text-blue-400', border: 'border-primary/40 bg-primary/5 ring-1 ring-primary/20' },
+          { f: 'entrada' as MovFilter, label: 'Entradas', count: entradas, icon: ArrowDownCircle, color: 'text-emerald-400', border: 'border-emerald-500/40 bg-emerald-500/5 ring-1 ring-emerald-500/20' },
+          { f: 'salida' as MovFilter, label: 'Salidas', count: salidas, icon: ArrowUpCircle, color: 'text-red-400', border: 'border-red-500/40 bg-red-500/5 ring-1 ring-red-500/20' },
+          { f: 'ajuste' as MovFilter, label: 'Ajustes', count: ajustes, icon: Settings2, color: 'text-blue-400', border: 'border-blue-500/40 bg-blue-500/5 ring-1 ring-blue-500/20' },
+        ].map(o => {
+          const I = o.icon
+          return (
+            <button key={o.f} onClick={() => setFiltroTipo(o.f)}
+              className={`flex items-center gap-2 p-3 rounded-xl border transition-all text-left ${filtroTipo === o.f ? o.border : 'border-border bg-card hover:bg-muted/20'}`}>
+              <I className={`h-4 w-4 ${o.color}`} />
+              <div><p className="text-lg font-bold text-foreground tabular-nums">{o.count}</p><p className="text-[10px] text-muted-foreground">{o.label}</p></div>
+            </button>
+          )
+        })}
       </div>
 
-      {/* Búsqueda + Export */}
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -674,7 +712,6 @@ function MovimientosTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
         </button>
       </div>
 
-      {/* Lista */}
       {filtered.length === 0 ? (
         <EmptyState message={movimientos.length === 0 ? 'Sin movimientos registrados' : 'Sin resultados'} />
       ) : (
@@ -723,7 +760,7 @@ function MovimientosTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
 }
 
 // ══════════════════════════════════════════════
-//  TAB: ESTADÍSTICAS
+//  TAB: ESTADÍSTICAS (mejorada con rotación, ABC, stock muerto)
 // ══════════════════════════════════════════════
 
 function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
@@ -733,25 +770,82 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
 
   useEffect(() => {
     setMovLoading(true)
-    bodega.loadAllMovimientos(5).then(data => {
+    bodega.loadAllMovimientos(30).then(data => {
       setMovimientos(data)
       setMovLoading(false)
     }).catch(() => setMovLoading(false))
   }, [bodega.loadAllMovimientos])
 
+  // Rotación por ítem (salidas / stock promedio)
+  const rotacionData = useMemo(() => {
+    if (movimientos.length === 0) return { itemRotacion: [] as { item: BodegaMergedItem; salidas: number; rotacion: number }[], avgRotacion: 0 }
+    const salidasPorItem = new Map<string, number>()
+    for (const m of movimientos) {
+      if (m.tipo === 'salida') salidasPorItem.set(m.bodegaItemId, (salidasPorItem.get(m.bodegaItemId) || 0) + m.cantidad)
+    }
+    const itemRotacion = items.filter(i => i.bodegaId).map(item => {
+      const salidas = salidasPorItem.get(item.bodegaId || item.codigoSAP) || 0
+      const stockProm = Math.max(item.stockActual, 1)
+      return { item, salidas, rotacion: salidas / stockProm }
+    }).sort((a, b) => b.rotacion - a.rotacion)
+    const avgRotacion = itemRotacion.length > 0 ? itemRotacion.reduce((s, r) => s + r.rotacion, 0) / itemRotacion.length : 0
+    return { itemRotacion, avgRotacion }
+  }, [items, movimientos])
+
+  // ABC automático
+  const abcData = useMemo(() => {
+    const conStock = items.filter(i => i.bodegaId)
+    const sorted = conStock.map(i => ({
+      item: i,
+      valorTotal: (i.costoCompra ?? i.valorUnitario ?? 0) * i.stockActual,
+    })).sort((a, b) => b.valorTotal - a.valorTotal)
+    const totalValor = sorted.reduce((s, r) => s + r.valorTotal, 0)
+    let acum = 0
+    const classified = sorted.map(r => {
+      acum += r.valorTotal
+      const pctAcum = totalValor > 0 ? (acum / totalValor) * 100 : 0
+      const abc: 'A' | 'B' | 'C' = pctAcum <= 80 ? 'A' : pctAcum <= 95 ? 'B' : 'C'
+      return { ...r, abc, pctAcum }
+    })
+    return {
+      A: classified.filter(c => c.abc === 'A'),
+      B: classified.filter(c => c.abc === 'B'),
+      C: classified.filter(c => c.abc === 'C'),
+      totalValor,
+    }
+  }, [items])
+
+  // Stock muerto (sin movimiento reciente)
+  const deadStock = useMemo(() => {
+    if (movimientos.length === 0) return { noMov90: [] as BodegaMergedItem[], noMov180: [] as BodegaMergedItem[] }
+    const lastMovDate = new Map<string, Date>()
+    for (const m of movimientos) {
+      const prev = lastMovDate.get(m.bodegaItemId)
+      if (!prev || m.createdAt > prev) lastMovDate.set(m.bodegaItemId, m.createdAt)
+    }
+    const now = new Date()
+    const d90 = 90 * 24 * 60 * 60 * 1000
+    const d180 = 180 * 24 * 60 * 60 * 1000
+    const conStock = items.filter(i => i.bodegaId && i.stockActual > 0)
+    const noMov90 = conStock.filter(i => {
+      const last = lastMovDate.get(i.bodegaId || i.codigoSAP)
+      return !last || (now.getTime() - last.getTime()) > d90
+    })
+    const noMov180 = conStock.filter(i => {
+      const last = lastMovDate.get(i.bodegaId || i.codigoSAP)
+      return !last || (now.getTime() - last.getTime()) > d180
+    })
+    return { noMov90, noMov180 }
+  }, [items, movimientos])
+
   const movEntradas = movimientos.filter(m => m.tipo === 'entrada').length
   const movSalidas = movimientos.filter(m => m.tipo === 'salida').length
   const movAjustes = movimientos.filter(m => m.tipo === 'ajuste').length
-
-  // Cobertura y salud
   const coberturaPct = stats.total > 0 ? Math.round((stats.conStock / stats.total) * 100) : 0
   const okCount = stats.stockOk
   const proveedores = useMemo(() => {
     const map = new Map<string, number>()
-    for (const i of items) {
-      if (!i.proveedor) continue
-      map.set(i.proveedor, (map.get(i.proveedor) || 0) + 1)
-    }
+    for (const i of items) { if (i.proveedor) map.set(i.proveedor, (map.get(i.proveedor) || 0) + 1) }
     return [...map.entries()].sort((a, b) => b[1] - a[1])
   }, [items])
 
@@ -765,9 +859,8 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
         <KpiCard label="Bajo / Sin stock" value={`${stats.bajoStock} / ${stats.sinStock}`} icon={AlertTriangle} color="text-amber-400" />
       </div>
 
-      {/* Salud de stock + Cobertura */}
+      {/* Salud + Cobertura */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Salud de stock */}
         <div className="bg-card border border-border rounded-xl p-4">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Salud del inventario</p>
           <div className="flex items-center gap-3 mb-3">
@@ -777,23 +870,18 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
               { icon: ShieldX, label: 'Sin stock', count: stats.sinStock, color: 'text-red-400', bg: 'bg-red-500/10' },
             ].map(s => (
               <div key={s.label} className="flex-1 flex flex-col items-center gap-1 py-2 rounded-lg border border-border/50 bg-muted/10">
-                <s.icon className={`h-5 w-5 ${s.color}`} />
-                <span className="text-lg font-bold text-foreground tabular-nums">{s.count}</span>
-                <span className="text-[9px] text-muted-foreground">{s.label}</span>
+                <s.icon className={`h-5 w-5 ${s.color}`} /><span className="text-lg font-bold text-foreground tabular-nums">{s.count}</span><span className="text-[9px] text-muted-foreground">{s.label}</span>
               </div>
             ))}
           </div>
-          {/* Barra de salud apilada */}
           {stats.conStock > 0 && (
             <div className="h-3 rounded-full overflow-hidden flex bg-muted/30">
-              {okCount > 0 && <div className="bg-emerald-500 h-full transition-all" style={{ width: `${(okCount / stats.conStock) * 100}%` }} title={`OK: ${okCount}`} />}
-              {stats.bajoStock > 0 && <div className="bg-amber-500 h-full transition-all" style={{ width: `${(stats.bajoStock / stats.conStock) * 100}%` }} title={`Bajo: ${stats.bajoStock}`} />}
-              {stats.sinStock > 0 && <div className="bg-red-500 h-full transition-all" style={{ width: `${(stats.sinStock / stats.conStock) * 100}%` }} title={`Sin: ${stats.sinStock}`} />}
+              {okCount > 0 && <div className="bg-emerald-500 h-full transition-all" style={{ width: `${(okCount / stats.conStock) * 100}%` }} />}
+              {stats.bajoStock > 0 && <div className="bg-amber-500 h-full transition-all" style={{ width: `${(stats.bajoStock / stats.conStock) * 100}%` }} />}
+              {stats.sinStock > 0 && <div className="bg-red-500 h-full transition-all" style={{ width: `${(stats.sinStock / stats.conStock) * 100}%` }} />}
             </div>
           )}
         </div>
-
-        {/* Cobertura */}
         <div className="bg-card border border-border rounded-xl p-4">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Cobertura de bodega</p>
           <div className="flex items-center justify-center">
@@ -817,30 +905,129 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
         </div>
       </div>
 
+      {/* Clasificación ABC automática */}
+      <div className="bg-card border border-border rounded-xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-border bg-violet-500/5">
+          <p className="text-xs font-semibold text-violet-400 uppercase tracking-wide flex items-center gap-1.5">
+            <Activity className="h-3.5 w-3.5" /> Clasificación ABC (por valor inventario)
+          </p>
+        </div>
+        <div className="p-4">
+          <div className="grid grid-cols-3 gap-3 mb-3">
+            {[
+              { label: 'A — Crítico', data: abcData.A, color: 'text-red-400', bg: 'bg-red-500/10', desc: '80% del valor' },
+              { label: 'B — Importante', data: abcData.B, color: 'text-amber-400', bg: 'bg-amber-500/10', desc: '15% del valor' },
+              { label: 'C — Estándar', data: abcData.C, color: 'text-emerald-400', bg: 'bg-emerald-500/10', desc: '5% del valor' },
+            ].map(cat => (
+              <div key={cat.label} className={`rounded-lg border border-border/50 p-3 ${cat.bg}`}>
+                <p className={`text-xs font-semibold ${cat.color}`}>{cat.label}</p>
+                <p className="text-xl font-bold text-foreground tabular-nums mt-1">{cat.data.length}</p>
+                <p className="text-[9px] text-muted-foreground">{cat.desc}</p>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  ${cat.data.reduce((s, r) => s + r.valorTotal, 0).toLocaleString('es-CL', { maximumFractionDigits: 0 })}
+                </p>
+              </div>
+            ))}
+          </div>
+          {/* Barra proporcional */}
+          {abcData.totalValor > 0 && (
+            <div className="h-4 rounded-full overflow-hidden flex bg-muted/30">
+              {abcData.A.length > 0 && <div className="bg-red-500/70 h-full" style={{ width: `${(abcData.A.reduce((s, r) => s + r.valorTotal, 0) / abcData.totalValor) * 100}%` }} title={`A: ${abcData.A.length} ítems`} />}
+              {abcData.B.length > 0 && <div className="bg-amber-500/70 h-full" style={{ width: `${(abcData.B.reduce((s, r) => s + r.valorTotal, 0) / abcData.totalValor) * 100}%` }} title={`B: ${abcData.B.length} ítems`} />}
+              {abcData.C.length > 0 && <div className="bg-emerald-500/70 h-full" style={{ width: `${(abcData.C.reduce((s, r) => s + r.valorTotal, 0) / abcData.totalValor) * 100}%` }} title={`C: ${abcData.C.length} ítems`} />}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Stock muerto + Rotación */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Alertas de stock bajo */}
+        {/* Stock sin movimiento */}
         <div className="bg-card border border-border rounded-xl overflow-hidden">
-          <div className="px-4 py-3 border-b border-border bg-red-500/5">
-            <p className="text-xs font-semibold text-red-400 uppercase tracking-wide flex items-center gap-1.5">
-              <AlertCircle className="h-3.5 w-3.5" /> Alertas de stock ({stats.alertas.length})
+          <div className="px-4 py-3 border-b border-border bg-zinc-500/5">
+            <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wide flex items-center gap-1.5">
+              <Archive className="h-3.5 w-3.5" /> Stock sin movimiento
             </p>
           </div>
+          {movLoading ? (
+            <div className="flex justify-center py-6"><Loader2 className="h-4 w-4 text-primary animate-spin" /></div>
+          ) : (
+            <div className="p-4 space-y-3">
+              <div className="flex gap-3">
+                <div className="flex-1 rounded-lg border border-border/50 bg-amber-500/5 p-3 text-center">
+                  <p className="text-xl font-bold text-amber-400 tabular-nums">{deadStock.noMov90.length}</p>
+                  <p className="text-[9px] text-muted-foreground">+90 días</p>
+                </div>
+                <div className="flex-1 rounded-lg border border-border/50 bg-red-500/5 p-3 text-center">
+                  <p className="text-xl font-bold text-red-400 tabular-nums">{deadStock.noMov180.length}</p>
+                  <p className="text-[9px] text-muted-foreground">+180 días</p>
+                </div>
+              </div>
+              {deadStock.noMov180.length > 0 && (
+                <div className="max-h-[150px] overflow-y-auto divide-y divide-border/50 border border-border/50 rounded-lg">
+                  {deadStock.noMov180.slice(0, 8).map(item => (
+                    <div key={item.codigoSAP} className="px-3 py-1.5 flex items-center gap-2">
+                      <span className="text-xs text-foreground truncate flex-1">{item.textoBreve}</span>
+                      <span className="text-[10px] font-mono text-blue-400 shrink-0">{item.codigoSAP}</span>
+                      <span className="text-xs font-bold text-muted-foreground tabular-nums shrink-0">{item.stockActual}</span>
+                    </div>
+                  ))}
+                  {deadStock.noMov180.length > 8 && <p className="px-3 py-1.5 text-[10px] text-muted-foreground text-center">+{deadStock.noMov180.length - 8} más</p>}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Rotación */}
+        <div className="bg-card border border-border rounded-xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-border bg-blue-500/5">
+            <p className="text-xs font-semibold text-blue-400 uppercase tracking-wide flex items-center gap-1.5">
+              <Activity className="h-3.5 w-3.5" /> Rotación de inventario
+            </p>
+          </div>
+          {movLoading ? (
+            <div className="flex justify-center py-6"><Loader2 className="h-4 w-4 text-primary animate-spin" /></div>
+          ) : (
+            <div className="p-4 space-y-3">
+              <div className="rounded-lg border border-border/50 bg-blue-500/5 p-3 text-center">
+                <p className="text-xl font-bold text-blue-400 tabular-nums">{rotacionData.avgRotacion.toFixed(2)}</p>
+                <p className="text-[9px] text-muted-foreground">Rotación promedio</p>
+              </div>
+              {rotacionData.itemRotacion.filter(r => r.salidas > 0).length > 0 && (
+                <div className="max-h-[150px] overflow-y-auto divide-y divide-border/50 border border-border/50 rounded-lg">
+                  <div className="px-3 py-1 bg-muted/20 text-[9px] text-muted-foreground font-semibold flex items-center">
+                    <span className="flex-1">Ítem</span><span className="w-14 text-center">Salidas</span><span className="w-14 text-right">Rotación</span>
+                  </div>
+                  {rotacionData.itemRotacion.filter(r => r.salidas > 0).slice(0, 8).map(r => (
+                    <div key={r.item.codigoSAP} className="px-3 py-1.5 flex items-center gap-2">
+                      <span className="text-xs text-foreground truncate flex-1">{r.item.textoBreve}</span>
+                      <span className="text-xs font-bold text-muted-foreground tabular-nums w-14 text-center">{r.salidas}</span>
+                      <span className="text-xs font-bold text-blue-400 tabular-nums w-14 text-right">{r.rotacion.toFixed(1)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Alertas */}
+        <div className="bg-card border border-border rounded-xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-border bg-red-500/5">
+            <p className="text-xs font-semibold text-red-400 uppercase tracking-wide flex items-center gap-1.5"><AlertCircle className="h-3.5 w-3.5" /> Alertas ({stats.alertas.length})</p>
+          </div>
           <div className="max-h-[250px] overflow-y-auto divide-y divide-border/50">
-            {stats.alertas.length === 0 ? (
-              <p className="p-4 text-xs text-muted-foreground text-center">Sin alertas de stock bajo</p>
-            ) : stats.alertas.map(item => (
+            {stats.alertas.length === 0 ? <p className="p-4 text-xs text-muted-foreground text-center">Sin alertas</p>
+            : stats.alertas.map(item => (
               <div key={item.codigoSAP} className="px-4 py-2.5 flex items-center gap-3">
                 <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${item.stockActual === 0 ? 'bg-red-500/10' : 'bg-amber-500/10'}`}>
                   {item.stockActual === 0 ? <PackageX className="h-4 w-4 text-red-400" /> : <TrendingDown className="h-4 w-4 text-amber-400" />}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-foreground truncate">{item.textoBreve}</p>
-                  <p className="text-[10px] font-mono text-blue-400">{item.codigoSAP}</p>
-                </div>
-                <div className="text-right shrink-0">
-                  <p className={`text-sm font-bold tabular-nums ${item.stockActual === 0 ? 'text-red-400' : 'text-amber-400'}`}>{item.stockActual}</p>
-                  <p className="text-[9px] text-muted-foreground">mín: {item.stockMinimo}</p>
-                </div>
+                <div className="flex-1 min-w-0"><p className="text-xs font-medium text-foreground truncate">{item.textoBreve}</p><p className="text-[10px] font-mono text-blue-400">{item.codigoSAP}</p></div>
+                <div className="text-right shrink-0"><p className={`text-sm font-bold tabular-nums ${item.stockActual === 0 ? 'text-red-400' : 'text-amber-400'}`}>{item.stockActual}</p><p className="text-[9px] text-muted-foreground">mín: {item.stockMinimo}</p></div>
               </div>
             ))}
           </div>
@@ -848,39 +1035,26 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
 
         {/* Distribución por tipo */}
         <div className="bg-card border border-border rounded-xl overflow-hidden">
-          <div className="px-4 py-3 border-b border-border bg-muted/10">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Distribución por tipo</p>
-          </div>
+          <div className="px-4 py-3 border-b border-border bg-muted/10"><p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Distribución por tipo</p></div>
           <div className="max-h-[250px] overflow-y-auto divide-y divide-border/50">
             {stats.tipoDistribution.map(([tipo, count]) => (
               <div key={tipo} className="px-4 py-2 flex items-center justify-between">
                 <span className="text-xs text-foreground">{tipo}</span>
-                <div className="flex items-center gap-2">
-                  <div className="w-24 h-1.5 bg-muted/30 rounded-full overflow-hidden">
-                    <div className="h-full bg-primary/60 rounded-full" style={{ width: `${(count / stats.total) * 100}%` }} />
-                  </div>
-                  <span className="text-xs font-bold text-muted-foreground tabular-nums w-8 text-right">{count}</span>
-                </div>
+                <div className="flex items-center gap-2"><div className="w-24 h-1.5 bg-muted/30 rounded-full overflow-hidden"><div className="h-full bg-primary/60 rounded-full" style={{ width: `${(count / stats.total) * 100}%` }} /></div><span className="text-xs font-bold text-muted-foreground tabular-nums w-8 text-right">{count}</span></div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Top ítems por valor */}
+        {/* Top por valor */}
         <div className="bg-card border border-border rounded-xl overflow-hidden">
-          <div className="px-4 py-3 border-b border-border bg-violet-500/5">
-            <p className="text-xs font-semibold text-violet-400 uppercase tracking-wide">Top 10 ítems por valor</p>
-          </div>
+          <div className="px-4 py-3 border-b border-border bg-violet-500/5"><p className="text-xs font-semibold text-violet-400 uppercase tracking-wide">Top 10 por valor</p></div>
           <div className="max-h-[250px] overflow-y-auto divide-y divide-border/50">
-            {stats.topByValue.length === 0 ? (
-              <p className="p-4 text-xs text-muted-foreground text-center">Sin datos de valor</p>
-            ) : stats.topByValue.map((item, i) => (
+            {stats.topByValue.length === 0 ? <p className="p-4 text-xs text-muted-foreground text-center">Sin datos</p>
+            : stats.topByValue.map((item, i) => (
               <div key={item.codigoSAP} className="px-4 py-2 flex items-center gap-3">
                 <span className="text-[10px] text-muted-foreground/50 w-4 text-right shrink-0">{i + 1}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-foreground truncate">{item.textoBreve}</p>
-                  <p className="text-[10px] text-muted-foreground">{item.stockActual} × ${(item.costoCompra ?? item.valorUnitario ?? 0).toLocaleString('es-CL')}</p>
-                </div>
+                <div className="flex-1 min-w-0"><p className="text-xs font-medium text-foreground truncate">{item.textoBreve}</p><p className="text-[10px] text-muted-foreground">{item.stockActual} × ${(item.costoCompra ?? item.valorUnitario ?? 0).toLocaleString('es-CL')}</p></div>
                 <span className="text-xs font-bold text-violet-400 tabular-nums shrink-0">${item.valorInventario.toLocaleString('es-CL', { maximumFractionDigits: 0 })}</span>
               </div>
             ))}
@@ -891,23 +1065,18 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
         <div className="bg-card border border-border rounded-xl overflow-hidden">
           <div className="px-4 py-3 border-b border-border bg-muted/10">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-              <Clock className="h-3.5 w-3.5" /> Movimientos recientes
-              {!movLoading && <span className="text-muted-foreground/50">({movEntradas}↓ {movSalidas}↑ {movAjustes}⟳)</span>}
+              <Clock className="h-3.5 w-3.5" /> Movimientos recientes {!movLoading && <span className="text-muted-foreground/50">({movEntradas}↓ {movSalidas}↑ {movAjustes}⟳)</span>}
             </p>
           </div>
           <div className="max-h-[250px] overflow-y-auto divide-y divide-border/50">
-            {movLoading ? (
-              <div className="flex justify-center py-6"><Loader2 className="h-4 w-4 text-primary animate-spin" /></div>
-            ) : movimientos.length === 0 ? (
-              <p className="p-4 text-xs text-muted-foreground text-center">Sin movimientos registrados</p>
-            ) : movimientos.slice(0, 15).map(m => (
+            {movLoading ? <div className="flex justify-center py-6"><Loader2 className="h-4 w-4 text-primary animate-spin" /></div>
+            : movimientos.length === 0 ? <p className="p-4 text-xs text-muted-foreground text-center">Sin movimientos</p>
+            : movimientos.slice(0, 15).map(m => (
               <div key={m.id} className="px-4 py-2 flex items-center gap-2">
                 <span className={`text-[10px] font-bold w-12 shrink-0 ${m.tipo === 'entrada' ? 'text-emerald-400' : m.tipo === 'salida' ? 'text-red-400' : 'text-blue-400'}`}>
                   {m.tipo === 'entrada' ? '↓ Entr.' : m.tipo === 'salida' ? '↑ Sal.' : '⟳ Ajuste'}
                 </span>
-                <span className="text-xs font-bold text-foreground tabular-nums w-8 shrink-0">
-                  {m.tipo === 'ajuste' ? `→${m.stockResultante}` : `${m.tipo === 'entrada' ? '+' : '-'}${m.cantidad}`}
-                </span>
+                <span className="text-xs font-bold text-foreground tabular-nums w-8 shrink-0">{m.tipo === 'ajuste' ? `→${m.stockResultante}` : `${m.tipo === 'entrada' ? '+' : '-'}${m.cantidad}`}</span>
                 <span className="text-xs text-muted-foreground truncate flex-1">{m.motivo || m.bodegaItemId}</span>
                 <span className="text-[10px] text-muted-foreground/50 shrink-0">{m.createdAt.toLocaleDateString('es-CL')}</span>
               </div>
@@ -920,20 +1089,13 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
       {proveedores.length > 0 && (
         <div className="bg-card border border-border rounded-xl overflow-hidden">
           <div className="px-4 py-3 border-b border-border bg-muted/10">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-              <Truck className="h-3.5 w-3.5" /> Proveedores ({proveedores.length})
-            </p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5"><Truck className="h-3.5 w-3.5" /> Proveedores ({proveedores.length})</p>
           </div>
           <div className="max-h-[200px] overflow-y-auto divide-y divide-border/50">
             {proveedores.map(([prov, count]) => (
               <div key={prov} className="px-4 py-2 flex items-center justify-between">
                 <span className="text-xs text-foreground truncate">{prov}</span>
-                <div className="flex items-center gap-2 shrink-0">
-                  <div className="w-20 h-1.5 bg-muted/30 rounded-full overflow-hidden">
-                    <div className="h-full bg-blue-500/60 rounded-full" style={{ width: `${(count / items.length) * 100}%` }} />
-                  </div>
-                  <span className="text-xs font-bold text-muted-foreground tabular-nums w-8 text-right">{count}</span>
-                </div>
+                <div className="flex items-center gap-2 shrink-0"><div className="w-20 h-1.5 bg-muted/30 rounded-full overflow-hidden"><div className="h-full bg-blue-500/60 rounded-full" style={{ width: `${(count / items.length) * 100}%` }} /></div><span className="text-xs font-bold text-muted-foreground tabular-nums w-8 text-right">{count}</span></div>
               </div>
             ))}
           </div>
@@ -967,27 +1129,38 @@ function KpiCard({ label, value, icon: Icon, color, sub }: {
 }) {
   return (
     <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-3">
-      <div className={`h-10 w-10 rounded-lg flex items-center justify-center shrink-0 bg-muted/20`}><Icon className={`h-5 w-5 ${color}`} /></div>
-      <div>
-        <p className="text-xl font-bold text-foreground tabular-nums">{value}</p>
-        <p className="text-[10px] text-muted-foreground">{label}</p>
-        {sub && <p className="text-[9px] text-muted-foreground/60 mt-0.5">{sub}</p>}
-      </div>
+      <div className="h-10 w-10 rounded-lg flex items-center justify-center shrink-0 bg-muted/20"><Icon className={`h-5 w-5 ${color}`} /></div>
+      <div><p className="text-xl font-bold text-foreground tabular-nums">{value}</p><p className="text-[10px] text-muted-foreground">{label}</p>{sub && <p className="text-[9px] text-muted-foreground/60 mt-0.5">{sub}</p>}</div>
     </div>
   )
 }
 
 function EmptyState({ message }: { message: string }) {
+  return (<div className="text-center py-12 text-muted-foreground"><Package className="h-10 w-10 mx-auto mb-3 opacity-40" /><p className="text-sm font-medium">{message}</p></div>)
+}
+
+function Sparkline({ data, width = 80, height = 24, color = '#3b82f6' }: { data: number[]; width?: number; height?: number; color?: string }) {
+  if (data.length < 2) return <span className="text-[9px] text-muted-foreground">—</span>
+  const min = Math.min(...data)
+  const max = Math.max(...data)
+  const range = max - min || 1
+  const pad = 2
+  const coords = data.map((v, i) => ({
+    x: pad + (i / (data.length - 1)) * (width - pad * 2),
+    y: pad + (1 - (v - min) / range) * (height - pad * 2),
+  }))
+  const points = coords.map(c => `${c.x},${c.y}`).join(' ')
+  const last = coords[coords.length - 1] ?? { x: 0, y: 0 }
   return (
-    <div className="text-center py-12 text-muted-foreground">
-      <Package className="h-10 w-10 mx-auto mb-3 opacity-40" />
-      <p className="text-sm font-medium">{message}</p>
-    </div>
+    <svg width={width} height={height} className="shrink-0">
+      <polyline points={points} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={last.x} cy={last.y} r="2" fill={color} />
+    </svg>
   )
 }
 
-function BodegaRow({ item, onEdit, onMovimiento, onHistorial }: {
-  item: BodegaMergedItem; onEdit: () => void; onMovimiento: () => void; onHistorial: () => void
+function BodegaRow({ item, onEdit, onMovimiento, onHistorial, onToggleWatch, onOpenDrawer }: {
+  item: BodegaMergedItem; onEdit: () => void; onMovimiento: () => void; onHistorial: () => void; onToggleWatch: () => void; onOpenDrawer: () => void
 }) {
   const has = !!item.bodegaId
   const isBajo = has && item.stockMinimo > 0 && item.stockActual <= item.stockMinimo && item.stockActual > 0
@@ -995,7 +1168,8 @@ function BodegaRow({ item, onEdit, onMovimiento, onHistorial }: {
   const valorTotal = item.stockActual * (item.costoCompra ?? item.valorUnitario ?? 0)
 
   return (
-    <div className={`sm:grid sm:grid-cols-[1fr_60px_70px_70px_70px_110px_100px] gap-2 px-4 py-2.5 transition-colors ${isSin ? 'bg-red-500/5 hover:bg-red-500/10 border-l-2 border-l-red-500/40' : isBajo ? 'bg-amber-500/5 hover:bg-amber-500/10 border-l-2 border-l-amber-500/40' : 'hover:bg-muted/10'}`}>
+    <div className={`sm:grid sm:grid-cols-[1fr_60px_70px_70px_70px_110px_120px] gap-2 px-4 py-2.5 transition-colors cursor-pointer ${isSin ? 'bg-red-500/5 hover:bg-red-500/10 border-l-2 border-l-red-500/40' : isBajo ? 'bg-amber-500/5 hover:bg-amber-500/10 border-l-2 border-l-amber-500/40' : 'hover:bg-muted/10'}`}
+      onClick={onOpenDrawer}>
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <p className="text-sm font-medium text-foreground truncate">{item.textoBreve}</p>
@@ -1009,11 +1183,8 @@ function BodegaRow({ item, onEdit, onMovimiento, onHistorial }: {
           {item.tipo && <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground uppercase">{item.tipo}</span>}
         </div>
       </div>
-      {/* Equipos */}
       <div className="hidden sm:flex items-center justify-center" title={item.equipos.map(e => e.machineName).join(', ')}>
-        <span className="text-xs font-medium text-muted-foreground tabular-nums flex items-center gap-0.5">
-          <Layers className="h-3 w-3 opacity-50" />{item.equipos.length}
-        </span>
+        <span className="text-xs font-medium text-muted-foreground tabular-nums flex items-center gap-0.5"><Layers className="h-3 w-3 opacity-50" />{item.equipos.length}</span>
       </div>
       <div className="flex sm:flex-col items-center justify-center gap-1 mt-2 sm:mt-0">
         <span className="sm:hidden text-xs text-muted-foreground">Stock:</span>
@@ -1021,7 +1192,6 @@ function BodegaRow({ item, onEdit, onMovimiento, onHistorial }: {
           : <span className="text-sm text-muted-foreground/30">—</span>}
       </div>
       <div className="hidden sm:flex items-center justify-center"><span className="text-sm text-muted-foreground tabular-nums">{has && item.stockMinimo > 0 ? item.stockMinimo : '—'}</span></div>
-      {/* Valor */}
       <div className="hidden sm:flex items-center justify-center">
         {has && valorTotal > 0 ? <span className="text-xs font-medium text-violet-400 tabular-nums">${valorTotal.toLocaleString('es-CL', { maximumFractionDigits: 0 })}</span>
           : <span className="text-xs text-muted-foreground/30">—</span>}
@@ -1030,12 +1200,164 @@ function BodegaRow({ item, onEdit, onMovimiento, onHistorial }: {
         {item.ubicacionBodega ? <span className="text-xs text-muted-foreground truncate flex items-center gap-1"><MapPin className="h-3 w-3 shrink-0" />{item.ubicacionBodega}</span>
           : <span className="text-xs text-muted-foreground/30">—</span>}
       </div>
-      <div className="flex items-center justify-end gap-1 mt-2 sm:mt-0">
+      <div className="flex items-center justify-end gap-1 mt-2 sm:mt-0" onClick={e => e.stopPropagation()}>
+        <button onClick={onToggleWatch} title={item.isWatched ? 'Quitar favorito' : 'Agregar favorito'} className="p-1.5 rounded-md hover:bg-yellow-500/10 transition-colors">
+          <Star className={`h-3.5 w-3.5 ${item.isWatched ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground/40'}`} />
+        </button>
         <button onClick={onMovimiento} title="Movimiento" className="p-1.5 rounded-md hover:bg-emerald-500/10 text-emerald-400 transition-colors"><ArrowDownCircle className="h-4 w-4" /></button>
         {has && <button onClick={onHistorial} title="Historial" className="p-1.5 rounded-md hover:bg-blue-500/10 text-blue-400 transition-colors"><History className="h-4 w-4" /></button>}
         <button onClick={onEdit} title={has ? 'Editar' : 'Configurar'} className="p-1.5 rounded-md hover:bg-muted/50 text-muted-foreground transition-colors">
           {has ? <Pencil className="h-4 w-4" /> : <Settings2 className="h-4 w-4" />}
         </button>
+      </div>
+    </div>
+  )
+}
+
+// ══════════════════════════════════════════════
+//  DRAWER LATERAL (vista rápida por ítem)
+// ══════════════════════════════════════════════
+
+function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento }: {
+  item: BodegaMergedItem; loadMovimientos: (id: string, max?: number) => Promise<MovimientoBodega[]>
+  onClose: () => void; onEdit: () => void; onMovimiento: () => void
+}) {
+  const [movs, setMovs] = useState<MovimientoBodega[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!item.bodegaId) { setLoading(false); return }
+    loadMovimientos(item.bodegaId, 20).then(d => { setMovs(d); setLoading(false) }).catch(() => setLoading(false))
+  }, [item.bodegaId, loadMovimientos])
+
+  const has = !!item.bodegaId
+  const isBajo = has && item.stockMinimo > 0 && item.stockActual <= item.stockMinimo && item.stockActual > 0
+  const isSin = has && item.stockActual === 0 && item.stockMinimo > 0
+  const valorTotal = item.stockActual * (item.costoCompra ?? item.valorUnitario ?? 0)
+  const sparkData = movs.slice(0, 15).reverse().map(m => m.stockResultante)
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/40" />
+      <div className="relative w-full max-w-md bg-card border-l border-border shadow-2xl overflow-y-auto animate-in slide-in-from-right" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="sticky top-0 bg-card border-b border-border px-5 py-4 z-10">
+          <div className="flex items-start justify-between">
+            <div className="min-w-0 flex-1">
+              <p className="text-base font-bold text-foreground">{item.textoBreve}</p>
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 font-mono">{item.codigoSAP}</span>
+                {item.codigoFabricante && <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400 font-mono">{item.codigoFabricante}</span>}
+                {item.tipo && <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground uppercase">{item.tipo}</span>}
+                {item.categoria && <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${item.categoria === 'A' ? 'bg-red-500/10 text-red-400' : item.categoria === 'B' ? 'bg-amber-500/10 text-amber-400' : 'bg-emerald-500/10 text-emerald-400'}`}>ABC: {item.categoria}</span>}
+              </div>
+            </div>
+            <button onClick={onClose} className="p-1 rounded hover:bg-muted/50 shrink-0"><X className="h-5 w-5 text-muted-foreground" /></button>
+          </div>
+          <div className="flex gap-2 mt-3">
+            <button onClick={onMovimiento} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-emerald-500/10 border border-emerald-500/30 rounded-lg hover:bg-emerald-500/20 text-emerald-400">
+              <ArrowDownCircle className="h-3.5 w-3.5" /> Movimiento
+            </button>
+            <button onClick={onEdit} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-muted/30 border border-border rounded-lg hover:bg-muted/50 text-muted-foreground">
+              <Pencil className="h-3.5 w-3.5" /> {has ? 'Editar' : 'Configurar'}
+            </button>
+          </div>
+        </div>
+
+        <div className="px-5 py-4 space-y-4">
+          {/* Stock actual */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="rounded-lg border border-border p-3 text-center">
+              <p className={`text-2xl font-bold tabular-nums ${isSin ? 'text-red-400' : isBajo ? 'text-amber-400' : 'text-foreground'}`}>{item.stockActual}</p>
+              <p className="text-[9px] text-muted-foreground">Stock actual</p>
+            </div>
+            <div className="rounded-lg border border-border p-3 text-center">
+              <p className="text-2xl font-bold text-muted-foreground tabular-nums">{item.stockMinimo}</p>
+              <p className="text-[9px] text-muted-foreground">Mínimo</p>
+            </div>
+            <div className="rounded-lg border border-border p-3 text-center">
+              <p className="text-2xl font-bold text-violet-400 tabular-nums">${valorTotal.toLocaleString('es-CL', { maximumFractionDigits: 0 })}</p>
+              <p className="text-[9px] text-muted-foreground">Valor</p>
+            </div>
+          </div>
+
+          {/* Sparkline */}
+          {sparkData.length >= 2 && (
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1"><Activity className="h-3 w-3" /> Tendencia de stock</p>
+              <div className="flex items-center justify-center">
+                <Sparkline data={sparkData} width={280} height={40} color={isSin ? '#ef4444' : isBajo ? '#f59e0b' : '#3b82f6'} />
+              </div>
+            </div>
+          )}
+
+          {/* Detalles */}
+          <div className="rounded-lg border border-border divide-y divide-border/50">
+            {[
+              { label: 'Ubicación', value: item.ubicacionBodega || '—' },
+              { label: 'Proveedor', value: item.proveedor || '—' },
+              { label: 'Costo compra', value: item.costoCompra ? `$${item.costoCompra.toLocaleString('es-CL')}` : '—' },
+              { label: 'Unidad', value: item.unidad },
+              { label: 'Stock máximo', value: item.stockMaximo ? String(item.stockMaximo) : '—' },
+              { label: 'Lead time', value: item.leadTime ? `${item.leadTime} días` : '—' },
+            ].map(d => (
+              <div key={d.label} className="flex items-center justify-between px-3 py-2">
+                <span className="text-[10px] text-muted-foreground">{d.label}</span>
+                <span className="text-xs text-foreground font-medium">{d.value}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Equipos vinculados */}
+          <div className="rounded-lg border border-border overflow-hidden">
+            <div className="px-3 py-2 bg-muted/20 border-b border-border">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold flex items-center gap-1">
+                <Layers className="h-3 w-3" /> Equipos ({item.equipos.length})
+              </p>
+            </div>
+            <div className="max-h-[120px] overflow-y-auto divide-y divide-border/50">
+              {item.equipos.map(e => (
+                <div key={e.machineId} className="px-3 py-1.5">
+                  <span className="text-xs text-foreground">{e.machineName}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Historial de movimientos */}
+          <div className="rounded-lg border border-border overflow-hidden">
+            <div className="px-3 py-2 bg-muted/20 border-b border-border">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold flex items-center gap-1">
+                <History className="h-3 w-3" /> Movimientos recientes
+              </p>
+            </div>
+            {loading ? <div className="flex justify-center py-4"><Loader2 className="h-4 w-4 text-primary animate-spin" /></div>
+            : movs.length === 0 ? <p className="p-3 text-[10px] text-muted-foreground text-center">Sin movimientos</p>
+            : (
+              <div className="max-h-[200px] overflow-y-auto divide-y divide-border/50">
+                {movs.map(m => (
+                  <div key={m.id} className="px-3 py-2 flex items-center gap-2">
+                    <span className={`text-[10px] font-bold w-10 shrink-0 ${m.tipo === 'entrada' ? 'text-emerald-400' : m.tipo === 'salida' ? 'text-red-400' : 'text-blue-400'}`}>
+                      {m.tipo === 'entrada' ? '↓ Ent' : m.tipo === 'salida' ? '↑ Sal' : '⟳ Aj'}
+                    </span>
+                    <span className="text-xs font-bold text-foreground tabular-nums w-8 shrink-0">
+                      {m.tipo === 'ajuste' ? `→${m.stockResultante}` : `${m.tipo === 'entrada' ? '+' : '-'}${m.cantidad}`}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground truncate flex-1">{m.motivo || '—'}</span>
+                    <span className="text-[9px] text-muted-foreground/50 shrink-0">{m.createdAt.toLocaleDateString('es-CL')}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {item.observaciones && (
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Observaciones</p>
+              <p className="text-xs text-foreground">{item.observaciones}</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -1056,9 +1378,7 @@ function AlertPanel({ alertas, onFilter }: { alertas: BodegaMergedItem[]; onFilt
         className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-red-500/10 transition-colors">
         <div className="flex items-center gap-2">
           <AlertTriangle className="h-4 w-4 text-red-400" />
-          <span className="text-xs font-semibold text-red-400">
-            {alertas.length} alerta{alertas.length > 1 ? 's' : ''} de stock
-          </span>
+          <span className="text-xs font-semibold text-red-400">{alertas.length} alerta{alertas.length > 1 ? 's' : ''} de stock</span>
           {sinStock.length > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/15 text-red-400 font-bold">{sinStock.length} sin stock</span>}
           {bajoStock.length > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 font-bold">{bajoStock.length} bajo mínimo</span>}
         </div>
@@ -1068,36 +1388,22 @@ function AlertPanel({ alertas, onFilter }: { alertas: BodegaMergedItem[]; onFilt
         <div className="border-t border-red-500/10 divide-y divide-red-500/10 max-h-[200px] overflow-y-auto">
           {alertas.slice(0, 10).map(item => (
             <div key={item.codigoSAP} className="flex items-center gap-3 px-4 py-2">
-              {item.stockActual === 0
-                ? <PackageX className="h-4 w-4 text-red-400 shrink-0" />
-                : <TrendingDown className="h-4 w-4 text-amber-400 shrink-0" />}
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-foreground truncate">{item.textoBreve}</p>
-                <span className="text-[10px] font-mono text-blue-400">{item.codigoSAP}</span>
-              </div>
-              <div className="text-right shrink-0">
-                <span className={`text-sm font-bold tabular-nums ${item.stockActual === 0 ? 'text-red-400' : 'text-amber-400'}`}>{item.stockActual}</span>
-                <span className="text-[9px] text-muted-foreground ml-1">/ {item.stockMinimo}</span>
-              </div>
+              {item.stockActual === 0 ? <PackageX className="h-4 w-4 text-red-400 shrink-0" /> : <TrendingDown className="h-4 w-4 text-amber-400 shrink-0" />}
+              <div className="flex-1 min-w-0"><p className="text-xs font-medium text-foreground truncate">{item.textoBreve}</p><span className="text-[10px] font-mono text-blue-400">{item.codigoSAP}</span></div>
+              <div className="text-right shrink-0"><span className={`text-sm font-bold tabular-nums ${item.stockActual === 0 ? 'text-red-400' : 'text-amber-400'}`}>{item.stockActual}</span><span className="text-[9px] text-muted-foreground ml-1">/ {item.stockMinimo}</span></div>
             </div>
           ))}
-          {alertas.length > 10 && (
-            <div className="px-4 py-2 text-center">
-              <button onClick={() => onFilter('bajo')} className="text-[10px] text-primary hover:underline">
-                Ver todas las {alertas.length} alertas →
-              </button>
-            </div>
-          )}
+          {alertas.length > 10 && <div className="px-4 py-2 text-center"><button onClick={() => onFilter('bajo')} className="text-[10px] text-primary hover:underline">Ver todas →</button></div>}
         </div>
       )}
     </div>
   )
 }
 
-function ModalBackdrop({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
+function ModalBackdrop({ onClose, children, wide }: { onClose: () => void; children: React.ReactNode; wide?: boolean }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>{children}</div>
+      <div className={`bg-card border border-border rounded-2xl shadow-2xl w-full ${wide ? 'max-w-2xl' : 'max-w-lg'} max-h-[85vh] overflow-y-auto`} onClick={e => e.stopPropagation()}>{children}</div>
     </div>
   )
 }
@@ -1109,12 +1415,10 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function StockFormModal({ item, onSave, onClose }: { item: BodegaMergedItem; onSave: (d: BodegaStockData) => Promise<void>; onClose: () => void }) {
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState<BodegaStockData>({
-    stockActual: item.stockActual, stockMinimo: item.stockMinimo,
-    stockMaximo: item.stockMaximo ?? 0,
+    stockActual: item.stockActual, stockMinimo: item.stockMinimo, stockMaximo: item.stockMaximo ?? 0,
     ubicacionBodega: item.ubicacionBodega || '', proveedor: item.proveedor || '',
     costoCompra: item.costoCompra ?? item.valorUnitario ?? 0, unidad: item.unidad || 'pzas',
-    leadTime: item.leadTime ?? 0, categoria: item.categoria,
-    observaciones: item.observaciones || '',
+    leadTime: item.leadTime ?? 0, categoria: item.categoria, observaciones: item.observaciones || '',
   })
   const set = (k: keyof BodegaStockData, v: string | number) => setForm(p => ({ ...p, [k]: v }))
 
@@ -1141,15 +1445,10 @@ function StockFormModal({ item, onSave, onClose }: { item: BodegaMergedItem; onS
             <Field label="Costo compra ($)"><input type="number" min={0} step={0.01} value={form.costoCompra ?? 0} onChange={e => set('costoCompra', Number(e.target.value))} className={`${INPUT} tabular-nums`} /></Field>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Lead time (días)"><input type="number" min={0} value={form.leadTime ?? 0} onChange={e => set('leadTime', Number(e.target.value))} className={`${INPUT} tabular-nums`} placeholder="Días de entrega" /></Field>
-            <Field label="Categoría ABC">
-              <select value={form.categoria || ''} onChange={e => set('categoria', e.target.value)} className={INPUT}>
-                <option value="">Sin clasificar</option>
-                <option value="A">A — Crítico / Alto valor</option>
-                <option value="B">B — Importante / Valor medio</option>
-                <option value="C">C — Estándar / Bajo valor</option>
-              </select>
-            </Field>
+            <Field label="Lead time (días)"><input type="number" min={0} value={form.leadTime ?? 0} onChange={e => set('leadTime', Number(e.target.value))} className={`${INPUT} tabular-nums`} /></Field>
+            <Field label="Categoría ABC"><select value={form.categoria || ''} onChange={e => set('categoria', e.target.value)} className={INPUT}>
+              <option value="">Sin clasificar</option><option value="A">A — Crítico / Alto valor</option><option value="B">B — Importante / Valor medio</option><option value="C">C — Estándar / Bajo valor</option>
+            </select></Field>
           </div>
           <Field label="Observaciones"><textarea value={form.observaciones || ''} onChange={e => set('observaciones', e.target.value)} rows={2} className={`${INPUT} resize-none`} /></Field>
         </div>
@@ -1202,10 +1501,7 @@ function MovimientoModal({ item, onSave, onClose }: {
   const motivoLabel = motivos.find(m => m.value === motivoKey)?.label || ''
   const motivoFinal = motivoLabel + (referencia.trim() ? ` — ${referencia.trim()}` : '')
 
-  const handleTipoChange = (t: typeof tipo) => {
-    setTipo(t)
-    setMotivoKey('')
-  }
+  const handleTipoChange = (t: typeof tipo) => { setTipo(t); setMotivoKey('') }
 
   const OPTS = [
     { v: 'entrada' as const, l: 'Entrada', icon: ArrowDownCircle, c: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' },
@@ -1237,15 +1533,8 @@ function MovimientoModal({ item, onSave, onClose }: {
             <span className="text-muted-foreground">→</span>
             <span className="text-sm text-muted-foreground">Nuevo: <strong className={preview <= (item.stockMinimo || 0) && item.stockMinimo > 0 ? 'text-amber-400' : 'text-emerald-400'}>{preview}</strong></span>
           </div>
-          <Field label="Motivo">
-            <select value={motivoKey} onChange={e => setMotivoKey(e.target.value)} className={INPUT}>
-              <option value="">— Seleccionar motivo —</option>
-              {motivos.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-            </select>
-          </Field>
-          <Field label="Referencia (opcional)">
-            <input type="text" value={referencia} onChange={e => setReferencia(e.target.value)} placeholder="Ej: OC #123, OT #456, Bomba L3…" className={INPUT} />
-          </Field>
+          <Field label="Motivo"><select value={motivoKey} onChange={e => setMotivoKey(e.target.value)} className={INPUT}><option value="">— Seleccionar motivo —</option>{motivos.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}</select></Field>
+          <Field label="Referencia (opcional)"><input type="text" value={referencia} onChange={e => setReferencia(e.target.value)} placeholder="Ej: OC #123, OT #456…" className={INPUT} /></Field>
         </div>
         <div className="flex justify-end gap-2 px-5 py-3 border-t border-border">
           <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-muted-foreground hover:bg-muted/40 rounded-lg">Cancelar</button>
@@ -1310,10 +1599,147 @@ function HistorialModal({ item, loadMovimientos, onClose }: {
   )
 }
 
-function BulkConfigModal({ items, saveStock, onClose }: {
+// ══════════════════════════════════════════════
+//  MODAL: MOVIMIENTOS EN LOTE (batch)
+// ══════════════════════════════════════════════
+
+function BatchMovimientoModal({ items, registrarMovimientoBatch, user, onClose }: {
   items: BodegaMergedItem[]
-  saveStock: (sap: string, data: BodegaStockData) => Promise<void>
-  onClose: () => void
+  registrarMovimientoBatch: (batchItems: { item: BodegaMergedItem; cantidad: number }[], tipo: 'entrada' | 'salida' | 'ajuste', motivo: string, userId: string, userName: string, onProgress?: (done: number, total: number) => void) => Promise<void>
+  user: any; onClose: () => void
+}) {
+  const [tipo, setTipo] = useState<'entrada' | 'salida'>('entrada')
+  const [motivoKey, setMotivoKey] = useState('')
+  const [referencia, setReferencia] = useState('')
+  const [searchBatch, setSearchBatch] = useState('')
+  const [selected, setSelected] = useState<Map<string, number>>(new Map())
+  const [saving, setSaving] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [done, setDone] = useState(false)
+
+  const motivos = MOTIVOS_POR_TIPO[tipo]
+  const motivoLabel = motivos.find(m => m.value === motivoKey)?.label || ''
+  const motivoFinal = motivoLabel + (referencia.trim() ? ` — ${referencia.trim()}` : '')
+
+  const visible = useMemo(() => {
+    if (!searchBatch.trim()) return items
+    const terms = searchBatch.toLowerCase().split(/\s+/)
+    return items.filter(i => {
+      const h = `${i.codigoSAP} ${i.textoBreve} ${i.tipo || ''}`.toLowerCase()
+      return terms.every(t => h.includes(t))
+    })
+  }, [items, searchBatch])
+
+  const handleApply = async () => {
+    if (!user || selected.size === 0 || !motivoKey) return
+    setSaving(true)
+    const batchItems = [...selected.entries()].map(([sap, cantidad]) => {
+      const item = items.find(i => i.codigoSAP === sap)!
+      return { item, cantidad }
+    }).filter(b => b.item)
+    await registrarMovimientoBatch(batchItems, tipo, motivoFinal, user.id, user.nombre, (d, t) => setProgress(Math.round((d / t) * 100)))
+    setDone(true)
+    setSaving(false)
+  }
+
+  const toggleItem = (sap: string) => {
+    const next = new Map(selected)
+    if (next.has(sap)) next.delete(sap); else next.set(sap, 1)
+    setSelected(next)
+  }
+
+  const setCant = (sap: string, cant: number) => {
+    const next = new Map(selected)
+    next.set(sap, Math.max(0, cant))
+    setSelected(next)
+  }
+
+  return (
+    <ModalBackdrop onClose={onClose} wide>
+      <div className="px-5 py-4 border-b border-border">
+        <h3 className="text-base font-bold">Movimiento en lote</h3>
+        <p className="text-xs text-muted-foreground mt-0.5">Registrar entrada o salida de múltiples ítems a la vez</p>
+      </div>
+      <div className="px-5 py-4 space-y-3">
+        {done ? (
+          <div className="text-center py-6">
+            <CheckCircle2 className="h-10 w-10 text-emerald-400 mx-auto mb-3" />
+            <p className="text-sm font-medium text-foreground">{selected.size} movimientos registrados</p>
+            <p className="text-xs text-muted-foreground mt-1">{tipo === 'entrada' ? 'Entradas' : 'Salidas'} — {motivoLabel}</p>
+          </div>
+        ) : (
+          <>
+            {/* Tipo */}
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => { setTipo('entrada'); setMotivoKey('') }}
+                className={`flex items-center justify-center gap-2 py-3 rounded-xl border-2 transition-all text-sm font-medium ${tipo === 'entrada' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' : 'border-border bg-muted/10 text-muted-foreground'}`}>
+                <ArrowDownCircle className="h-5 w-5" /> Entrada
+              </button>
+              <button type="button" onClick={() => { setTipo('salida'); setMotivoKey('') }}
+                className={`flex items-center justify-center gap-2 py-3 rounded-xl border-2 transition-all text-sm font-medium ${tipo === 'salida' ? 'text-red-400 bg-red-500/10 border-red-500/30' : 'border-border bg-muted/10 text-muted-foreground'}`}>
+                <ArrowUpCircle className="h-5 w-5" /> Salida
+              </button>
+            </div>
+
+            {/* Motivo compartido */}
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Motivo"><select value={motivoKey} onChange={e => setMotivoKey(e.target.value)} className={INPUT}><option value="">— Seleccionar —</option>{motivos.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}</select></Field>
+              <Field label="Referencia"><input type="text" value={referencia} onChange={e => setReferencia(e.target.value)} placeholder="OC #123…" className={INPUT} /></Field>
+            </div>
+
+            {/* Selección de ítems con cantidad */}
+            <div className="border border-border rounded-lg overflow-hidden">
+              <div className="flex items-center gap-2 px-3 py-2 bg-muted/20 border-b border-border">
+                <span className="text-xs text-muted-foreground font-semibold">{selected.size} seleccionados</span>
+                <div className="flex-1" />
+                <input type="text" value={searchBatch} onChange={e => setSearchBatch(e.target.value)} placeholder="Filtrar…" className="w-40 px-2 py-1 text-[10px] bg-muted/30 border border-border rounded text-foreground" />
+              </div>
+              <div className="max-h-[250px] overflow-y-auto divide-y divide-border/50">
+                {visible.slice(0, 100).map(item => {
+                  const isSelected = selected.has(item.codigoSAP)
+                  return (
+                    <div key={item.codigoSAP} className={`flex items-center gap-2 px-3 py-2 ${isSelected ? 'bg-primary/5' : 'hover:bg-muted/10'}`}>
+                      <input type="checkbox" checked={isSelected} onChange={() => toggleItem(item.codigoSAP)} className="rounded" />
+                      <span className="text-xs text-foreground truncate flex-1">{item.textoBreve}</span>
+                      <span className="text-[10px] font-mono text-blue-400 shrink-0 w-20">{item.codigoSAP}</span>
+                      <span className="text-[10px] text-muted-foreground shrink-0 w-12 text-right">stk: {item.stockActual}</span>
+                      {isSelected && (
+                        <input type="number" min={0} value={selected.get(item.codigoSAP) || 1}
+                          onChange={e => setCant(item.codigoSAP, Number(e.target.value))}
+                          className="w-16 px-2 py-0.5 text-xs text-center bg-muted/30 border border-border rounded tabular-nums font-bold text-foreground shrink-0"
+                          onClick={e => e.stopPropagation()} />
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {saving && (
+              <div className="bg-muted/20 rounded-lg p-3 border border-border">
+                <div className="flex justify-between text-xs text-muted-foreground mb-1"><span>Procesando…</span><span>{progress}%</span></div>
+                <div className="h-2 bg-muted/40 rounded-full overflow-hidden"><div className="h-full bg-primary rounded-full transition-all" style={{ width: `${progress}%` }} /></div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+      <div className="flex justify-end gap-2 px-5 py-3 border-t border-border">
+        <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-muted-foreground hover:bg-muted/40 rounded-lg">{done ? 'Cerrar' : 'Cancelar'}</button>
+        {!done && (
+          <button onClick={handleApply} disabled={saving || selected.size === 0 || !motivoKey}
+            className="flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50">
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+            Registrar {selected.size} {tipo === 'entrada' ? 'entradas' : 'salidas'}
+          </button>
+        )}
+      </div>
+    </ModalBackdrop>
+  )
+}
+
+function BulkConfigModal({ items, saveStock, onClose }: {
+  items: BodegaMergedItem[]; saveStock: (sap: string, data: BodegaStockData) => Promise<void>; onClose: () => void
 }) {
   const [stockMinimo, setStockMinimo] = useState(1)
   const [unidad, setUnidad] = useState('pzas')
@@ -1345,11 +1771,7 @@ function BulkConfigModal({ items, saveStock, onClose }: {
     let count = 0
     for (const item of toApply) {
       try {
-        await saveStock(item.codigoSAP, {
-          stockActual: 0, stockMinimo, stockMaximo: 0,
-          ubicacionBodega: ubicacion, unidad,
-          observaciones: '',
-        })
+        await saveStock(item.codigoSAP, { stockActual: 0, stockMinimo, stockMaximo: 0, ubicacionBodega: ubicacion, unidad, observaciones: '' })
         count++
         setProgress(Math.round((count / toApply.length) * 100))
       } catch { /* continue */ }
@@ -1375,15 +1797,11 @@ function BulkConfigModal({ items, saveStock, onClose }: {
           <>
             <div className="grid grid-cols-3 gap-3">
               <Field label="Stock mínimo"><input type="number" min={0} value={stockMinimo} onChange={e => setStockMinimo(Number(e.target.value))} className={`${INPUT} tabular-nums`} /></Field>
-              <Field label="Unidad">
-                <select value={unidad} onChange={e => setUnidad(e.target.value)} className={INPUT}>
-                  <option value="pzas">Piezas</option><option value="litros">Litros</option><option value="metros">Metros</option><option value="kg">Kilogramos</option><option value="rollos">Rollos</option><option value="cajas">Cajas</option><option value="sets">Sets</option>
-                </select>
-              </Field>
+              <Field label="Unidad"><select value={unidad} onChange={e => setUnidad(e.target.value)} className={INPUT}>
+                <option value="pzas">Piezas</option><option value="litros">Litros</option><option value="metros">Metros</option><option value="kg">Kilogramos</option><option value="rollos">Rollos</option><option value="cajas">Cajas</option><option value="sets">Sets</option>
+              </select></Field>
               <Field label="Ubicación"><input type="text" value={ubicacion} onChange={e => setUbicacion(e.target.value)} placeholder="Opcional" className={INPUT} /></Field>
             </div>
-
-            {/* Selección */}
             <div className="border border-border rounded-lg overflow-hidden">
               <div className="flex items-center gap-2 px-3 py-2 bg-muted/20 border-b border-border">
                 <input type="checkbox" checked={selected.size === visible.length && visible.length > 0} onChange={toggleAll} className="rounded" />
@@ -1405,7 +1823,6 @@ function BulkConfigModal({ items, saveStock, onClose }: {
                 ))}
               </div>
             </div>
-
             {saving && (
               <div className="bg-muted/20 rounded-lg p-3 border border-border">
                 <div className="flex justify-between text-xs text-muted-foreground mb-1"><span>Configurando…</span><span>{progress}%</span></div>

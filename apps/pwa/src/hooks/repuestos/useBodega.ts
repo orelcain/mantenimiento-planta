@@ -70,6 +70,7 @@ export interface BodegaMergedItem {
   ultimaCompra?: Date
   categoria?: 'A' | 'B' | 'C'
   observaciones?: string
+  isWatched?: boolean
 }
 
 export interface MovimientoBodega {
@@ -154,6 +155,23 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
   const [bodegaLoading, setBodegaLoading] = useState(true)
   const bodegaLoadedRef = useRef(false)
 
+  // ── Watch list (localStorage) ──
+  const [watchlist, setWatchlist] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem('bodega_watchlist')
+      return stored ? new Set(JSON.parse(stored) as string[]) : new Set<string>()
+    } catch { return new Set<string>() }
+  })
+
+  const toggleWatch = useCallback((sap: string) => {
+    setWatchlist(prev => {
+      const next = new Set(prev)
+      if (next.has(sap)) next.delete(sap); else next.add(sap)
+      localStorage.setItem('bodega_watchlist', JSON.stringify([...next]))
+      return next
+    })
+  }, [])
+
   // ── Cargar datos de bodega ──
   const reloadBodega = useCallback(async () => {
     try {
@@ -234,6 +252,7 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
         ultimaCompra: overlay?.ultimaCompra,
         categoria: overlay?.categoria,
         observaciones: overlay?.observaciones,
+        isWatched: watchlist.has(sap),
       })
     }
 
@@ -242,7 +261,7 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
       if (!a.bodegaId && b.bodegaId) return 1
       return a.textoBreve.localeCompare(b.textoBreve, 'es')
     })
-  }, [catalogRepuestos, bodegaOverlays])
+  }, [catalogRepuestos, bodegaOverlays, watchlist])
 
   // ── Guardar/actualizar stock ──
   const saveStock = useCallback(async (codigoSAP: string, data: BodegaStockData) => {
@@ -470,6 +489,23 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
     await reloadBodega()
   }, [bodegaOverlays, loadConteos, reloadBodega])
 
+  // ── Movimiento en lote ──
+  const registrarMovimientoBatch = useCallback(async (
+    batchItems: { item: BodegaMergedItem; cantidad: number }[],
+    tipo: 'entrada' | 'salida' | 'ajuste',
+    motivo: string,
+    userId: string,
+    userName: string,
+    onProgress?: (done: number, total: number) => void
+  ) => {
+    let done = 0
+    for (const { item, cantidad } of batchItems) {
+      await registrarMovimiento(item, { tipo, cantidad, motivo }, userId, userName)
+      done++
+      onProgress?.(done, batchItems.length)
+    }
+  }, [registrarMovimiento])
+
   // ── Estadísticas ──
   const stats = useMemo(() => {
     const conStock = items.filter(i => i.bodegaId)
@@ -510,9 +546,13 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
     stats,
     saveStock,
     registrarMovimiento,
+    registrarMovimientoBatch,
     loadMovimientos,
     loadAllMovimientos,
     reloadBodega,
+    // Watch list
+    watchlist,
+    toggleWatch,
     // Inventario
     crearInventario,
     loadInventarios,
