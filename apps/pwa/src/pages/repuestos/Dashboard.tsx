@@ -219,11 +219,11 @@ export function RepuestosDashboard({
     }
 
     if (kpiFilter === 'conSAP') {
-      filtered = filtered.filter(r => r.codigoSAP)
-    } else if (kpiFilter === 'conStock') {
-      filtered = filtered.filter(r => (r.cantidadPorMaquina || 0) > 0)
+      filtered = filtered.filter(r => !!r.codigoSAP)
     } else if (kpiFilter === 'sinSAP') {
       filtered = filtered.filter(r => !r.codigoSAP)
+    } else if (kpiFilter === 'conStock') {
+      filtered = filtered.filter(r => (r.cantidadPorMaquina || 0) > 0)
     } else if (kpiFilter === 'conFicha') {
       filtered = filtered.filter(r => r.technicalSpecs)
     } else if (kpiFilter === 'conFoto') {
@@ -570,39 +570,95 @@ export function RepuestosDashboard({
                 {isFav && <Star className="h-4 w-4 text-yellow-400 fill-yellow-400 shrink-0" />}
               </div>
 
-              {/* KPI strip — interactivo (click filtra) */}
+              {/* KPI strip — interactivo (click filtra + panel desglose) */}
               {totalCatalogo > 0 && (() => {
+                const sinSAP = totalCatalogo - conSAP
                 const conFicha = repuestos.filter(r => r.technicalSpecs).length
                 const conFoto = repuestos.filter(r => (r.fotosReales?.length || 0) + (r.imagenesManual?.length || 0) + (r.gallery?.length || 0) > 0).length
+                const tiposUnicos = new Set(repuestos.map(r => r.tipo).filter(Boolean)).size
+                const coberturaPct = totalCatalogo > 0 ? Math.round((conSAP / totalCatalogo) * 100) : 0
+
                 const kpis: { key: string | null; label: string; value: string | number; color: string; accent: string }[] = [
                   { key: null, label: 'Total', value: totalCatalogo, color: 'text-foreground', accent: 'border-border/40' },
                   { key: 'conSAP', label: 'Con SAP', value: conSAP, color: 'text-blue-400', accent: 'border-blue-500/40' },
+                  { key: 'sinSAP', label: 'Sin SAP', value: sinSAP, color: 'text-orange-400', accent: 'border-orange-500/40' },
                   { key: 'conStock', label: 'Con stock', value: conStock, color: 'text-emerald-400', accent: 'border-emerald-500/40' },
                   { key: 'conFicha', label: 'Con ficha', value: conFicha, color: 'text-cyan-400', accent: 'border-cyan-500/40' },
                   { key: 'conFoto', label: 'Con foto', value: conFoto, color: 'text-amber-400', accent: 'border-amber-500/40' },
-                  { key: null, label: 'Valor', value: `$${valorTotal.toLocaleString('es-CL', { maximumFractionDigits: 0 })}`, color: 'text-violet-400', accent: 'border-border/40' },
+                  { key: null, label: 'Tipos', value: tiposUnicos, color: 'text-indigo-400', accent: 'border-border/40' },
+                  { key: null, label: 'Valor ref.', value: `$${valorTotal.toLocaleString('es-CL', { maximumFractionDigits: 0 })}`, color: 'text-violet-400', accent: 'border-border/40' },
                 ]
+
+                // Desglose por tipo para el panel expandido
+                const tipoFreq: Record<string, number> = {}
+                const sourceItems = kpiFilter ? filteredRepuestos : repuestos
+                for (const r of sourceItems) { tipoFreq[r.tipo || 'SIN TIPO'] = (tipoFreq[r.tipo || 'SIN TIPO'] || 0) + 1 }
+                const tipoEntries = Object.entries(tipoFreq).sort((a, b) => b[1] - a[1])
+
                 return (
-                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
-                    {kpis.map(k => {
-                      const isActive = k.key !== null && kpiFilter === k.key
-                      const isClickable = k.key !== null
-                      return (
-                        <button
-                          key={k.label}
-                          onClick={() => isClickable ? setKpiFilter(kpiFilter === k.key ? null : k.key) : undefined}
-                          className={[
-                            'rounded-lg px-2.5 py-2 text-left transition-all',
-                            isActive ? `bg-primary/10 border-2 ${k.accent} ring-1 ring-primary/20` : 'bg-muted/15 border border-border/40',
-                            isClickable ? 'cursor-pointer hover:bg-muted/30' : 'cursor-default',
-                          ].join(' ')}
-                        >
-                          <p className={`text-base sm:text-lg font-bold tabular-nums ${isActive ? 'text-primary' : k.color}`}>{k.value}</p>
-                          <p className="text-[8px] sm:text-[9px] text-muted-foreground uppercase">{k.label}</p>
-                        </button>
-                      )
-                    })}
-                  </div>
+                  <>
+                    {/* Barra cobertura SAP */}
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className="text-[9px] text-muted-foreground uppercase shrink-0">Cobertura SAP</span>
+                      <div className="flex-1 h-2.5 bg-muted/30 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${coberturaPct >= 50 ? 'bg-emerald-500' : coberturaPct >= 20 ? 'bg-amber-500' : 'bg-red-500'}`}
+                          style={{ width: `${coberturaPct}%` }}
+                        />
+                      </div>
+                      <span className={`text-xs font-bold tabular-nums ${coberturaPct >= 50 ? 'text-emerald-400' : coberturaPct >= 20 ? 'text-amber-400' : 'text-red-400'}`}>
+                        {coberturaPct}%
+                      </span>
+                    </div>
+
+                    {/* KPIs grid */}
+                    <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
+                      {kpis.map(k => {
+                        const isActive = k.key !== null && kpiFilter === k.key
+                        const isClickable = k.key !== null
+                        return (
+                          <button
+                            key={k.label}
+                            onClick={() => isClickable ? setKpiFilter(kpiFilter === k.key ? null : k.key) : undefined}
+                            className={[
+                              'rounded-lg px-2 py-1.5 text-left transition-all',
+                              isActive ? `bg-primary/10 border-2 ${k.accent} ring-1 ring-primary/20` : 'bg-muted/15 border border-border/40',
+                              isClickable ? 'cursor-pointer hover:bg-muted/30' : 'cursor-default',
+                            ].join(' ')}
+                          >
+                            <p className={`text-sm sm:text-base font-bold tabular-nums leading-tight ${isActive ? 'text-primary' : k.color}`}>{k.value}</p>
+                            <p className="text-[7px] sm:text-[8px] text-muted-foreground uppercase leading-tight">{k.label}</p>
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    {/* Panel desglose — visible cuando hay filtro KPI activo */}
+                    {kpiFilter && (
+                      <div className="mt-2 bg-muted/10 border border-border/40 rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-[10px] font-semibold text-muted-foreground uppercase">
+                            Desglose: {kpis.find(k => k.key === kpiFilter)?.label} ({filteredRepuestos.length} de {totalCatalogo})
+                          </p>
+                          <button onClick={() => setKpiFilter(null)} className="text-[9px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded hover:bg-muted/30">
+                            Cerrar
+                          </button>
+                        </div>
+                        {tipoEntries.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5">
+                            {tipoEntries.slice(0, 15).map(([tipo, count]) => (
+                              <span key={tipo} className="text-[9px] px-2 py-0.5 rounded-full bg-muted/30 border border-border/30 text-muted-foreground tabular-nums">
+                                {tipo} <strong className="text-foreground">{count}</strong>
+                              </span>
+                            ))}
+                            {tipoEntries.length > 15 && (
+                              <span className="text-[9px] text-muted-foreground/50 px-1 py-0.5">+{tipoEntries.length - 15} más</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
                 )
               })()}
             </div>
