@@ -16,7 +16,7 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import {
   Search, X, Package, Filter, ChevronRight, ChevronDown,
   BarChart3, Layers, Tag, ExternalLink, MapPin,
-  ArrowUpDown, ArrowUp, ArrowDown, Download,
+  ArrowUp, ArrowDown, Download,
 } from 'lucide-react'
 import { collection, getDocs, query as fsQuery, where } from 'firebase/firestore'
 import { db } from '@/services/firebase'

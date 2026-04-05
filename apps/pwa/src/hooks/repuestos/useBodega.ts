@@ -22,7 +22,6 @@ import {
   query,
   orderBy,
   limit,
-  where,
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore'
