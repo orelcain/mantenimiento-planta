@@ -37,10 +37,14 @@ export interface BodegaOverlay {
   codigoSAP: string
   stockActual: number
   stockMinimo: number
+  stockMaximo?: number
   ubicacionBodega: string
   proveedor?: string
   costoCompra?: number
   unidad: string
+  leadTime?: number // días de entrega del proveedor
+  ultimaCompra?: Date
+  categoria?: 'A' | 'B' | 'C' // clasificación ABC
   observaciones?: string
   createdAt: Date
   updatedAt: Date
@@ -57,10 +61,14 @@ export interface BodegaMergedItem {
   bodegaId?: string
   stockActual: number
   stockMinimo: number
+  stockMaximo?: number
   ubicacionBodega: string
   proveedor?: string
   costoCompra?: number
   unidad: string
+  leadTime?: number
+  ultimaCompra?: Date
+  categoria?: 'A' | 'B' | 'C'
   observaciones?: string
 }
 
@@ -79,10 +87,13 @@ export interface MovimientoBodega {
 export interface BodegaStockData {
   stockActual: number
   stockMinimo: number
+  stockMaximo?: number
   ubicacionBodega: string
   proveedor?: string
   costoCompra?: number
   unidad: string
+  leadTime?: number
+  categoria?: 'A' | 'B' | 'C'
   observaciones?: string
 }
 
@@ -156,10 +167,14 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
           codigoSAP: sap,
           stockActual: data.stockActual ?? 0,
           stockMinimo: data.stockMinimo ?? 0,
+          stockMaximo: data.stockMaximo ?? undefined,
           ubicacionBodega: data.ubicacionBodega || '',
           proveedor: data.proveedor || undefined,
           costoCompra: data.costoCompra ?? undefined,
           unidad: data.unidad || 'pzas',
+          leadTime: data.leadTime ?? undefined,
+          ultimaCompra: data.ultimaCompra ? tsToDate(data.ultimaCompra) : undefined,
+          categoria: data.categoria || undefined,
           observaciones: data.observaciones || undefined,
           createdAt: tsToDate(data.createdAt),
           updatedAt: tsToDate(data.updatedAt),
@@ -210,10 +225,14 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
         bodegaId: overlay?.id,
         stockActual: overlay?.stockActual ?? 0,
         stockMinimo: overlay?.stockMinimo ?? 0,
+        stockMaximo: overlay?.stockMaximo,
         ubicacionBodega: overlay?.ubicacionBodega || '',
         proveedor: overlay?.proveedor,
         costoCompra: overlay?.costoCompra,
         unidad: overlay?.unidad || 'pzas',
+        leadTime: overlay?.leadTime,
+        ultimaCompra: overlay?.ultimaCompra,
+        categoria: overlay?.categoria,
         observaciones: overlay?.observaciones,
       })
     }

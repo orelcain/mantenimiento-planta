@@ -360,6 +360,38 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Bodega de repuestos — stock overlay por código SAP
+    match /bodega/{codigoSAP} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAdmin();
+
+      // Movimientos de bodega (entradas, salidas, ajustes)
+      match /movimientos/{movId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated();
+        allow update: if isAdmin();
+        allow delete: if isAdmin();
+      }
+    }
+
+    // Inventarios periódicos de bodega
+    match /bodega_inventarios/{inventarioId} {
+      allow read: if isAuthenticated();
+      allow create: if isSupervisor();
+      allow update: if isAuthenticated();
+      allow delete: if isAdmin();
+
+      // Conteos individuales por SAP
+      match /conteos/{conteoId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated();
+        allow update: if isAuthenticated();
+        allow delete: if isAdmin();
+      }
+    }
+
     // ============================================
     // EVIDENCIAS FOTOGRÁFICAS
     // ============================================

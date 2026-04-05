@@ -15,7 +15,7 @@ import {
   Settings2, History, X, Check, Pencil, MapPin, TrendingDown,
   PackageX, DollarSign, PackageCheck, Loader2, ClipboardList,
   BarChart3, Plus, ChevronRight, CheckCircle2, CircleDot,
-  AlertCircle, Clock, Download, ArrowUpDown, ArrowUp, ArrowDown,
+  AlertCircle, Clock, Download, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown,
   Layers, Truck, ShieldCheck, ShieldAlert, ShieldX,
 } from 'lucide-react'
 import { collection, getDocs, query as fsQuery, where } from 'firebase/firestore'
@@ -30,7 +30,7 @@ import type {
 import type { Machine } from '@/types/repuestos'
 import { useAuthStore } from '@/store/authStore'
 
-type BodegaTab = 'stock' | 'inventarios' | 'estadisticas'
+type BodegaTab = 'stock' | 'inventarios' | 'movimientos' | 'estadisticas'
 type StockFilter = 'todos' | 'configurados' | 'bajo' | 'sin' | 'sinConfig'
 
 const INPUT = 'w-full px-3 py-2 text-sm bg-muted/30 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground'
@@ -98,6 +98,7 @@ export function BodegaView() {
   const SUB_TABS: { id: BodegaTab; label: string; icon: typeof Package }[] = [
     { id: 'stock', label: 'Stock', icon: Package },
     { id: 'inventarios', label: 'Inventarios', icon: ClipboardList },
+    { id: 'movimientos', label: 'Movimientos', icon: History },
     { id: 'estadisticas', label: 'Estadísticas', icon: BarChart3 },
   ]
 
@@ -131,6 +132,7 @@ export function BodegaView() {
 
       {subTab === 'stock' && <StockTab bodega={bodega} user={user} />}
       {subTab === 'inventarios' && <InventarioTab bodega={bodega} user={user} />}
+      {subTab === 'movimientos' && <MovimientosTab bodega={bodega} />}
       {subTab === 'estadisticas' && <EstadisticasTab bodega={bodega} />}
     </div>
   )
@@ -166,6 +168,7 @@ function StockTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>; user
   const [editingItem, setEditingItem] = useState<BodegaMergedItem | null>(null)
   const [movimientoItem, setMovimientoItem] = useState<BodegaMergedItem | null>(null)
   const [historialItem, setHistorialItem] = useState<BodegaMergedItem | null>(null)
+  const [showBulkConfig, setShowBulkConfig] = useState(false)
   const [sortField, setSortField] = useState<SortField>('nombre')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
 
@@ -230,10 +233,20 @@ function StockTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>; user
             className="w-full pl-9 pr-8 py-2 text-sm bg-muted/30 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground placeholder:text-muted-foreground" />
           {searchQuery && <button onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-muted/50"><X className="h-3.5 w-3.5 text-muted-foreground" /></button>}
         </div>
+        {stats.sinConfig > 0 && (
+          <button onClick={() => setShowBulkConfig(true)} title="Configurar múltiples" className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-primary/10 border border-primary/30 rounded-lg hover:bg-primary/20 text-primary transition-colors shrink-0">
+            <Settings2 className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Config. masiva</span>
+          </button>
+        )}
         <button onClick={() => exportCsv(filtered)} title="Exportar CSV" className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-muted/30 border border-border rounded-lg hover:bg-muted/50 text-muted-foreground transition-colors shrink-0">
           <Download className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Exportar</span>
         </button>
       </div>
+
+      {/* Panel de alertas */}
+      {stats.alertas.length > 0 && stockFilter === 'todos' && !searchQuery && (
+        <AlertPanel alertas={stats.alertas} onFilter={(f: StockFilter) => setStockFilter(f)} />
+      )}
 
       {/* List */}
       {filtered.length === 0 ? (
@@ -263,6 +276,7 @@ function StockTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>; user
       {editingItem && <StockFormModal item={editingItem} onSave={async d => { await saveStock(editingItem.codigoSAP, d); setEditingItem(null) }} onClose={() => setEditingItem(null)} />}
       {movimientoItem && <MovimientoModal item={movimientoItem} onSave={async (t, c, m) => { if (user) { await registrarMovimiento(movimientoItem, { tipo: t, cantidad: c, motivo: m }, user.id, user.nombre); setMovimientoItem(null) } }} onClose={() => setMovimientoItem(null)} />}
       {historialItem && <HistorialModal item={historialItem} loadMovimientos={loadMovimientos} onClose={() => setHistorialItem(null)} />}
+      {showBulkConfig && <BulkConfigModal items={items.filter(i => !i.bodegaId)} saveStock={saveStock} onClose={() => setShowBulkConfig(false)} />}
     </>
   )
 }
@@ -567,6 +581,148 @@ function ConteoList({ conteos, isFinalizado, onConteo }: {
 }
 
 // ══════════════════════════════════════════════
+//  TAB: MOVIMIENTOS
+// ══════════════════════════════════════════════
+
+type MovFilter = 'todos' | 'entrada' | 'salida' | 'ajuste'
+
+function exportMovsCsv(movs: MovimientoBodega[]) {
+  const header = 'Fecha,Hora,Tipo,Código SAP,Cantidad,Stock Resultante,Motivo,Realizado por\n'
+  const rows = movs.map(m =>
+    [m.createdAt.toLocaleDateString('es-CL'), m.createdAt.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }), m.tipo, m.bodegaItemId, m.cantidad, m.stockResultante, `"${(m.motivo || '').replace(/"/g, '""')}"`, m.realizadoPorNombre].join(',')
+  ).join('\n')
+  const blob = new Blob(['\uFEFF' + header + rows], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `movimientos_bodega_${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function MovimientosTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
+  const [movimientos, setMovimientos] = useState<MovimientoBodega[]>([])
+  const [loading, setLoading] = useState(true)
+  const [filtroTipo, setFiltroTipo] = useState<MovFilter>('todos')
+  const [searchMov, setSearchMov] = useState('')
+
+  useEffect(() => {
+    setLoading(true)
+    bodega.loadAllMovimientos(50).then(data => {
+      setMovimientos(data)
+      setLoading(false)
+    }).catch(() => setLoading(false))
+  }, [bodega.loadAllMovimientos])
+
+  const filtered = useMemo(() => {
+    let result = movimientos
+    if (filtroTipo !== 'todos') result = result.filter(m => m.tipo === filtroTipo)
+    if (searchMov.trim()) {
+      const terms = searchMov.toLowerCase().trim().split(/\s+/)
+      result = result.filter(m => {
+        const h = `${m.bodegaItemId} ${m.motivo} ${m.realizadoPorNombre}`.toLowerCase()
+        return terms.every(t => h.includes(t))
+      })
+    }
+    return result
+  }, [movimientos, filtroTipo, searchMov])
+
+  const entradas = movimientos.filter(m => m.tipo === 'entrada').length
+  const salidas = movimientos.filter(m => m.tipo === 'salida').length
+  const ajustes = movimientos.filter(m => m.tipo === 'ajuste').length
+
+  if (loading) {
+    return <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 text-primary animate-spin" /></div>
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Resumen */}
+      <div className="grid grid-cols-4 gap-2">
+        <button onClick={() => setFiltroTipo('todos')}
+          className={`flex items-center gap-2 p-3 rounded-xl border transition-all text-left ${filtroTipo === 'todos' ? 'border-primary/40 bg-primary/5 ring-1 ring-primary/20' : 'border-border bg-card hover:bg-muted/20'}`}>
+          <History className="h-4 w-4 text-blue-400" />
+          <div><p className="text-lg font-bold text-foreground tabular-nums">{movimientos.length}</p><p className="text-[10px] text-muted-foreground">Total</p></div>
+        </button>
+        <button onClick={() => setFiltroTipo('entrada')}
+          className={`flex items-center gap-2 p-3 rounded-xl border transition-all text-left ${filtroTipo === 'entrada' ? 'border-emerald-500/40 bg-emerald-500/5 ring-1 ring-emerald-500/20' : 'border-border bg-card hover:bg-muted/20'}`}>
+          <ArrowDownCircle className="h-4 w-4 text-emerald-400" />
+          <div><p className="text-lg font-bold text-foreground tabular-nums">{entradas}</p><p className="text-[10px] text-muted-foreground">Entradas</p></div>
+        </button>
+        <button onClick={() => setFiltroTipo('salida')}
+          className={`flex items-center gap-2 p-3 rounded-xl border transition-all text-left ${filtroTipo === 'salida' ? 'border-red-500/40 bg-red-500/5 ring-1 ring-red-500/20' : 'border-border bg-card hover:bg-muted/20'}`}>
+          <ArrowUpCircle className="h-4 w-4 text-red-400" />
+          <div><p className="text-lg font-bold text-foreground tabular-nums">{salidas}</p><p className="text-[10px] text-muted-foreground">Salidas</p></div>
+        </button>
+        <button onClick={() => setFiltroTipo('ajuste')}
+          className={`flex items-center gap-2 p-3 rounded-xl border transition-all text-left ${filtroTipo === 'ajuste' ? 'border-blue-500/40 bg-blue-500/5 ring-1 ring-blue-500/20' : 'border-border bg-card hover:bg-muted/20'}`}>
+          <Settings2 className="h-4 w-4 text-blue-400" />
+          <div><p className="text-lg font-bold text-foreground tabular-nums">{ajustes}</p><p className="text-[10px] text-muted-foreground">Ajustes</p></div>
+        </button>
+      </div>
+
+      {/* Búsqueda + Export */}
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <input type="text" placeholder="Buscar por SAP, motivo, usuario…" value={searchMov} onChange={e => setSearchMov(e.target.value)}
+            className="w-full pl-9 pr-8 py-2 text-sm bg-muted/30 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground placeholder:text-muted-foreground" />
+          {searchMov && <button onClick={() => setSearchMov('')} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-muted/50"><X className="h-3.5 w-3.5 text-muted-foreground" /></button>}
+        </div>
+        <button onClick={() => exportMovsCsv(filtered)} title="Exportar CSV" className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-muted/30 border border-border rounded-lg hover:bg-muted/50 text-muted-foreground transition-colors shrink-0">
+          <Download className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Exportar</span>
+        </button>
+      </div>
+
+      {/* Lista */}
+      {filtered.length === 0 ? (
+        <EmptyState message={movimientos.length === 0 ? 'Sin movimientos registrados' : 'Sin resultados'} />
+      ) : (
+        <div className="border border-border rounded-xl overflow-hidden bg-card">
+          <div className="hidden sm:grid grid-cols-[90px_80px_1fr_80px_80px_120px] gap-2 px-4 py-2 bg-muted/20 border-b border-border text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
+            <span>Fecha</span><span>Tipo</span><span>Motivo</span><span className="text-center">Cantidad</span><span className="text-center">Stock</span><span>Realizado por</span>
+          </div>
+          <div className="divide-y divide-border/50 max-h-[55vh] overflow-y-auto">
+            {filtered.map(m => {
+              const tipoConfig = {
+                entrada: { label: 'Entrada', color: 'text-emerald-400', bg: 'bg-emerald-500/10', icon: ArrowDownCircle },
+                salida: { label: 'Salida', color: 'text-red-400', bg: 'bg-red-500/10', icon: ArrowUpCircle },
+                ajuste: { label: 'Ajuste', color: 'text-blue-400', bg: 'bg-blue-500/10', icon: Settings2 },
+              }[m.tipo]
+              const TIcon = tipoConfig.icon
+              return (
+                <div key={m.id} className="sm:grid sm:grid-cols-[90px_80px_1fr_80px_80px_120px] gap-2 px-4 py-2.5 hover:bg-muted/10 transition-colors">
+                  <div className="text-xs text-muted-foreground tabular-nums">
+                    <p>{m.createdAt.toLocaleDateString('es-CL')}</p>
+                    <p className="text-[10px] text-muted-foreground/60">{m.createdAt.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}</p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className={`h-6 w-6 rounded flex items-center justify-center shrink-0 ${tipoConfig.bg}`}><TIcon className={`h-3.5 w-3.5 ${tipoConfig.color}`} /></div>
+                    <span className={`text-[10px] font-semibold ${tipoConfig.color}`}>{tipoConfig.label}</span>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs text-foreground truncate">{m.motivo || '—'}</p>
+                    <span className="text-[10px] font-mono text-blue-400">{m.bodegaItemId}</span>
+                  </div>
+                  <div className="flex items-center justify-center">
+                    <span className={`text-sm font-bold tabular-nums ${tipoConfig.color}`}>
+                      {m.tipo === 'ajuste' ? `→${m.stockResultante}` : `${m.tipo === 'entrada' ? '+' : '-'}${m.cantidad}`}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-center"><span className="text-xs text-muted-foreground tabular-nums">{m.stockResultante}</span></div>
+                  <div className="flex items-center"><span className="text-xs text-muted-foreground truncate">{m.realizadoPorNombre || '—'}</span></div>
+                </div>
+              )
+            })}
+          </div>
+          <div className="px-4 py-2 bg-muted/10 border-t border-border text-xs text-muted-foreground">{filtered.length} movimientos</div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ══════════════════════════════════════════════
 //  TAB: ESTADÍSTICAS
 // ══════════════════════════════════════════════
 
@@ -839,7 +995,7 @@ function BodegaRow({ item, onEdit, onMovimiento, onHistorial }: {
   const valorTotal = item.stockActual * (item.costoCompra ?? item.valorUnitario ?? 0)
 
   return (
-    <div className="sm:grid sm:grid-cols-[1fr_60px_70px_70px_70px_110px_100px] gap-2 px-4 py-2.5 hover:bg-muted/10 transition-colors">
+    <div className={`sm:grid sm:grid-cols-[1fr_60px_70px_70px_70px_110px_100px] gap-2 px-4 py-2.5 transition-colors ${isSin ? 'bg-red-500/5 hover:bg-red-500/10 border-l-2 border-l-red-500/40' : isBajo ? 'bg-amber-500/5 hover:bg-amber-500/10 border-l-2 border-l-amber-500/40' : 'hover:bg-muted/10'}`}>
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <p className="text-sm font-medium text-foreground truncate">{item.textoBreve}</p>
@@ -889,6 +1045,55 @@ function BodegaRow({ item, onEdit, onMovimiento, onHistorial }: {
 //  MODALES
 // ══════════════════════════════════════════════
 
+function AlertPanel({ alertas, onFilter }: { alertas: BodegaMergedItem[]; onFilter: (f: StockFilter) => void }) {
+  const [expanded, setExpanded] = useState(false)
+  const sinStock = alertas.filter(a => a.stockActual === 0)
+  const bajoStock = alertas.filter(a => a.stockActual > 0)
+
+  return (
+    <div className="bg-red-500/5 border border-red-500/20 rounded-xl overflow-hidden">
+      <button onClick={() => setExpanded(e => !e)}
+        className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-red-500/10 transition-colors">
+        <div className="flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 text-red-400" />
+          <span className="text-xs font-semibold text-red-400">
+            {alertas.length} alerta{alertas.length > 1 ? 's' : ''} de stock
+          </span>
+          {sinStock.length > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/15 text-red-400 font-bold">{sinStock.length} sin stock</span>}
+          {bajoStock.length > 0 && <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 font-bold">{bajoStock.length} bajo mínimo</span>}
+        </div>
+        <ChevronDown className={`h-4 w-4 text-red-400/60 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+      </button>
+      {expanded && (
+        <div className="border-t border-red-500/10 divide-y divide-red-500/10 max-h-[200px] overflow-y-auto">
+          {alertas.slice(0, 10).map(item => (
+            <div key={item.codigoSAP} className="flex items-center gap-3 px-4 py-2">
+              {item.stockActual === 0
+                ? <PackageX className="h-4 w-4 text-red-400 shrink-0" />
+                : <TrendingDown className="h-4 w-4 text-amber-400 shrink-0" />}
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-foreground truncate">{item.textoBreve}</p>
+                <span className="text-[10px] font-mono text-blue-400">{item.codigoSAP}</span>
+              </div>
+              <div className="text-right shrink-0">
+                <span className={`text-sm font-bold tabular-nums ${item.stockActual === 0 ? 'text-red-400' : 'text-amber-400'}`}>{item.stockActual}</span>
+                <span className="text-[9px] text-muted-foreground ml-1">/ {item.stockMinimo}</span>
+              </div>
+            </div>
+          ))}
+          {alertas.length > 10 && (
+            <div className="px-4 py-2 text-center">
+              <button onClick={() => onFilter('bajo')} className="text-[10px] text-primary hover:underline">
+                Ver todas las {alertas.length} alertas →
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function ModalBackdrop({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
@@ -905,8 +1110,10 @@ function StockFormModal({ item, onSave, onClose }: { item: BodegaMergedItem; onS
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState<BodegaStockData>({
     stockActual: item.stockActual, stockMinimo: item.stockMinimo,
+    stockMaximo: item.stockMaximo ?? 0,
     ubicacionBodega: item.ubicacionBodega || '', proveedor: item.proveedor || '',
     costoCompra: item.costoCompra ?? item.valorUnitario ?? 0, unidad: item.unidad || 'pzas',
+    leadTime: item.leadTime ?? 0, categoria: item.categoria,
     observaciones: item.observaciones || '',
   })
   const set = (k: keyof BodegaStockData, v: string | number) => setForm(p => ({ ...p, [k]: v }))
@@ -920,9 +1127,10 @@ function StockFormModal({ item, onSave, onClose }: { item: BodegaMergedItem; onS
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 font-mono">{item.codigoSAP}</span>
         </div>
         <div className="px-5 py-4 space-y-3">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-4 gap-3">
             <Field label="Stock actual"><input type="number" min={0} value={form.stockActual} onChange={e => set('stockActual', Number(e.target.value))} className={`${INPUT} tabular-nums`} /></Field>
             <Field label="Stock mínimo"><input type="number" min={0} value={form.stockMinimo} onChange={e => set('stockMinimo', Number(e.target.value))} className={`${INPUT} tabular-nums`} /></Field>
+            <Field label="Stock máximo"><input type="number" min={0} value={form.stockMaximo ?? 0} onChange={e => set('stockMaximo', Number(e.target.value))} className={`${INPUT} tabular-nums`} /></Field>
             <Field label="Unidad"><select value={form.unidad} onChange={e => set('unidad', e.target.value)} className={INPUT}>
               <option value="pzas">Piezas</option><option value="litros">Litros</option><option value="metros">Metros</option><option value="kg">Kilogramos</option><option value="rollos">Rollos</option><option value="cajas">Cajas</option><option value="sets">Sets</option>
             </select></Field>
@@ -931,6 +1139,17 @@ function StockFormModal({ item, onSave, onClose }: { item: BodegaMergedItem; onS
           <div className="grid grid-cols-2 gap-3">
             <Field label="Proveedor"><input type="text" value={form.proveedor || ''} onChange={e => set('proveedor', e.target.value)} className={INPUT} /></Field>
             <Field label="Costo compra ($)"><input type="number" min={0} step={0.01} value={form.costoCompra ?? 0} onChange={e => set('costoCompra', Number(e.target.value))} className={`${INPUT} tabular-nums`} /></Field>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Lead time (días)"><input type="number" min={0} value={form.leadTime ?? 0} onChange={e => set('leadTime', Number(e.target.value))} className={`${INPUT} tabular-nums`} placeholder="Días de entrega" /></Field>
+            <Field label="Categoría ABC">
+              <select value={form.categoria || ''} onChange={e => set('categoria', e.target.value)} className={INPUT}>
+                <option value="">Sin clasificar</option>
+                <option value="A">A — Crítico / Alto valor</option>
+                <option value="B">B — Importante / Valor medio</option>
+                <option value="C">C — Estándar / Bajo valor</option>
+              </select>
+            </Field>
           </div>
           <Field label="Observaciones"><textarea value={form.observaciones || ''} onChange={e => set('observaciones', e.target.value)} rows={2} className={`${INPUT} resize-none`} /></Field>
         </div>
@@ -945,14 +1164,48 @@ function StockFormModal({ item, onSave, onClose }: { item: BodegaMergedItem; onS
   )
 }
 
+const MOTIVOS_POR_TIPO: Record<'entrada' | 'salida' | 'ajuste', { value: string; label: string }[]> = {
+  entrada: [
+    { value: 'compra_oc', label: 'Compra / Orden de compra' },
+    { value: 'devolucion_taller', label: 'Devolución de taller' },
+    { value: 'transferencia_in', label: 'Transferencia recibida' },
+    { value: 'donacion', label: 'Donación' },
+    { value: 'otro_entrada', label: 'Otro' },
+  ],
+  salida: [
+    { value: 'uso_mantencion', label: 'Uso en mantención' },
+    { value: 'uso_emergencia', label: 'Uso en emergencia' },
+    { value: 'prestamo', label: 'Préstamo' },
+    { value: 'baja_descarte', label: 'Baja / Descarte' },
+    { value: 'transferencia_out', label: 'Transferencia enviada' },
+    { value: 'otro_salida', label: 'Otro' },
+  ],
+  ajuste: [
+    { value: 'inventario_periodico', label: 'Inventario periódico' },
+    { value: 'correccion_admin', label: 'Corrección administrativa' },
+    { value: 'merma', label: 'Merma' },
+    { value: 'otro_ajuste', label: 'Otro' },
+  ],
+}
+
 function MovimientoModal({ item, onSave, onClose }: {
   item: BodegaMergedItem; onSave: (t: 'entrada' | 'salida' | 'ajuste', c: number, m: string) => Promise<void>; onClose: () => void
 }) {
   const [tipo, setTipo] = useState<'entrada' | 'salida' | 'ajuste'>('entrada')
   const [cantidad, setCantidad] = useState(1)
-  const [motivo, setMotivo] = useState('')
+  const [motivoKey, setMotivoKey] = useState('')
+  const [referencia, setReferencia] = useState('')
   const [saving, setSaving] = useState(false)
   const preview = tipo === 'entrada' ? item.stockActual + cantidad : tipo === 'salida' ? Math.max(0, item.stockActual - cantidad) : cantidad
+
+  const motivos = MOTIVOS_POR_TIPO[tipo]
+  const motivoLabel = motivos.find(m => m.value === motivoKey)?.label || ''
+  const motivoFinal = motivoLabel + (referencia.trim() ? ` — ${referencia.trim()}` : '')
+
+  const handleTipoChange = (t: typeof tipo) => {
+    setTipo(t)
+    setMotivoKey('')
+  }
 
   const OPTS = [
     { v: 'entrada' as const, l: 'Entrada', icon: ArrowDownCircle, c: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' },
@@ -962,7 +1215,7 @@ function MovimientoModal({ item, onSave, onClose }: {
 
   return (
     <ModalBackdrop onClose={onClose}>
-      <form onSubmit={async e => { e.preventDefault(); setSaving(true); try { await onSave(tipo, cantidad, motivo) } finally { setSaving(false) } }}>
+      <form onSubmit={async e => { e.preventDefault(); setSaving(true); try { await onSave(tipo, cantidad, motivoFinal) } finally { setSaving(false) } }}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div><h3 className="text-base font-bold">Registrar movimiento</h3><p className="text-xs text-muted-foreground truncate mt-0.5">{item.textoBreve} — {item.codigoSAP}</p></div>
           <button type="button" onClick={onClose} className="p-1 rounded hover:bg-muted/50"><X className="h-5 w-5 text-muted-foreground" /></button>
@@ -970,7 +1223,7 @@ function MovimientoModal({ item, onSave, onClose }: {
         <div className="px-5 py-4 space-y-4">
           <div className="grid grid-cols-3 gap-2">
             {OPTS.map(o => { const I = o.icon; return (
-              <button key={o.v} type="button" onClick={() => setTipo(o.v)}
+              <button key={o.v} type="button" onClick={() => handleTipoChange(o.v)}
                 className={`flex flex-col items-center gap-1 py-3 rounded-xl border-2 transition-all text-sm font-medium ${tipo === o.v ? o.c : 'border-border bg-muted/10 text-muted-foreground hover:bg-muted/20'}`}>
                 <I className="h-5 w-5" />{o.l}
               </button>
@@ -984,11 +1237,19 @@ function MovimientoModal({ item, onSave, onClose }: {
             <span className="text-muted-foreground">→</span>
             <span className="text-sm text-muted-foreground">Nuevo: <strong className={preview <= (item.stockMinimo || 0) && item.stockMinimo > 0 ? 'text-amber-400' : 'text-emerald-400'}>{preview}</strong></span>
           </div>
-          <Field label="Motivo"><input type="text" value={motivo} onChange={e => setMotivo(e.target.value)} placeholder="Ej: Recepción OC #123, Uso mantención bomba…" className={INPUT} /></Field>
+          <Field label="Motivo">
+            <select value={motivoKey} onChange={e => setMotivoKey(e.target.value)} className={INPUT}>
+              <option value="">— Seleccionar motivo —</option>
+              {motivos.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+            </select>
+          </Field>
+          <Field label="Referencia (opcional)">
+            <input type="text" value={referencia} onChange={e => setReferencia(e.target.value)} placeholder="Ej: OC #123, OT #456, Bomba L3…" className={INPUT} />
+          </Field>
         </div>
         <div className="flex justify-end gap-2 px-5 py-3 border-t border-border">
           <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-muted-foreground hover:bg-muted/40 rounded-lg">Cancelar</button>
-          <button type="submit" disabled={saving || (cantidad <= 0 && tipo !== 'ajuste')}
+          <button type="submit" disabled={saving || !motivoKey || (cantidad <= 0 && tipo !== 'ajuste')}
             className="flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Confirmar
           </button>
@@ -1044,6 +1305,125 @@ function HistorialModal({ item, loadMovimientos, onClose }: {
       </div>
       <div className="px-5 py-3 border-t border-border flex justify-end">
         <button onClick={onClose} className="px-4 py-2 text-sm text-muted-foreground hover:bg-muted/40 rounded-lg">Cerrar</button>
+      </div>
+    </ModalBackdrop>
+  )
+}
+
+function BulkConfigModal({ items, saveStock, onClose }: {
+  items: BodegaMergedItem[]
+  saveStock: (sap: string, data: BodegaStockData) => Promise<void>
+  onClose: () => void
+}) {
+  const [stockMinimo, setStockMinimo] = useState(1)
+  const [unidad, setUnidad] = useState('pzas')
+  const [ubicacion, setUbicacion] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [done, setDone] = useState(false)
+  const [searchBulk, setSearchBulk] = useState('')
+  const [selected, setSelected] = useState<Set<string>>(() => new Set(items.map(i => i.codigoSAP)))
+
+  const visible = useMemo(() => {
+    if (!searchBulk.trim()) return items
+    const terms = searchBulk.toLowerCase().split(/\s+/)
+    return items.filter(i => {
+      const h = `${i.codigoSAP} ${i.textoBreve} ${i.tipo || ''}`.toLowerCase()
+      return terms.every(t => h.includes(t))
+    })
+  }, [items, searchBulk])
+
+  const toggleAll = () => {
+    if (selected.size === visible.length) setSelected(new Set())
+    else setSelected(new Set(visible.map(i => i.codigoSAP)))
+  }
+
+  const handleApply = async () => {
+    const toApply = items.filter(i => selected.has(i.codigoSAP))
+    if (toApply.length === 0) return
+    setSaving(true)
+    let count = 0
+    for (const item of toApply) {
+      try {
+        await saveStock(item.codigoSAP, {
+          stockActual: 0, stockMinimo, stockMaximo: 0,
+          ubicacionBodega: ubicacion, unidad,
+          observaciones: '',
+        })
+        count++
+        setProgress(Math.round((count / toApply.length) * 100))
+      } catch { /* continue */ }
+    }
+    setDone(true)
+    setSaving(false)
+  }
+
+  return (
+    <ModalBackdrop onClose={onClose}>
+      <div className="px-5 py-4 border-b border-border">
+        <h3 className="text-base font-bold">Configuración masiva</h3>
+        <p className="text-xs text-muted-foreground mt-0.5">{items.length} ítems sin configurar</p>
+      </div>
+      <div className="px-5 py-4 space-y-3">
+        {done ? (
+          <div className="text-center py-6">
+            <CheckCircle2 className="h-10 w-10 text-emerald-400 mx-auto mb-3" />
+            <p className="text-sm font-medium text-foreground">{selected.size} ítems configurados</p>
+            <p className="text-xs text-muted-foreground mt-1">Stock mín: {stockMinimo} | Unidad: {unidad}</p>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-3 gap-3">
+              <Field label="Stock mínimo"><input type="number" min={0} value={stockMinimo} onChange={e => setStockMinimo(Number(e.target.value))} className={`${INPUT} tabular-nums`} /></Field>
+              <Field label="Unidad">
+                <select value={unidad} onChange={e => setUnidad(e.target.value)} className={INPUT}>
+                  <option value="pzas">Piezas</option><option value="litros">Litros</option><option value="metros">Metros</option><option value="kg">Kilogramos</option><option value="rollos">Rollos</option><option value="cajas">Cajas</option><option value="sets">Sets</option>
+                </select>
+              </Field>
+              <Field label="Ubicación"><input type="text" value={ubicacion} onChange={e => setUbicacion(e.target.value)} placeholder="Opcional" className={INPUT} /></Field>
+            </div>
+
+            {/* Selección */}
+            <div className="border border-border rounded-lg overflow-hidden">
+              <div className="flex items-center gap-2 px-3 py-2 bg-muted/20 border-b border-border">
+                <input type="checkbox" checked={selected.size === visible.length && visible.length > 0} onChange={toggleAll} className="rounded" />
+                <span className="text-xs text-muted-foreground">{selected.size} seleccionados</span>
+                <div className="flex-1" />
+                <input type="text" value={searchBulk} onChange={e => setSearchBulk(e.target.value)} placeholder="Filtrar…" className="w-32 px-2 py-1 text-[10px] bg-muted/30 border border-border rounded text-foreground" />
+              </div>
+              <div className="max-h-[200px] overflow-y-auto divide-y divide-border/50">
+                {visible.slice(0, 100).map(item => (
+                  <label key={item.codigoSAP} className="flex items-center gap-2 px-3 py-1.5 hover:bg-muted/10 cursor-pointer">
+                    <input type="checkbox" checked={selected.has(item.codigoSAP)} onChange={() => {
+                      const next = new Set(selected)
+                      next.has(item.codigoSAP) ? next.delete(item.codigoSAP) : next.add(item.codigoSAP)
+                      setSelected(next)
+                    }} className="rounded" />
+                    <span className="text-xs text-foreground truncate flex-1">{item.textoBreve}</span>
+                    <span className="text-[10px] font-mono text-blue-400 shrink-0">{item.codigoSAP}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {saving && (
+              <div className="bg-muted/20 rounded-lg p-3 border border-border">
+                <div className="flex justify-between text-xs text-muted-foreground mb-1"><span>Configurando…</span><span>{progress}%</span></div>
+                <div className="h-2 bg-muted/40 rounded-full overflow-hidden"><div className="h-full bg-primary rounded-full transition-all" style={{ width: `${progress}%` }} /></div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+      <div className="flex justify-end gap-2 px-5 py-3 border-t border-border">
+        <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-muted-foreground hover:bg-muted/40 rounded-lg">{done ? 'Cerrar' : 'Cancelar'}</button>
+        {!done && (
+          <button onClick={handleApply} disabled={saving || selected.size === 0}
+            className="flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50">
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+            Configurar {selected.size} ítems
+          </button>
+        )}
       </div>
     </ModalBackdrop>
   )
