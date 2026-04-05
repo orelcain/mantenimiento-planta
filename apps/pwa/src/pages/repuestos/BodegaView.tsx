@@ -1396,7 +1396,7 @@ function BulkConfigModal({ items, saveStock, onClose }: {
                   <label key={item.codigoSAP} className="flex items-center gap-2 px-3 py-1.5 hover:bg-muted/10 cursor-pointer">
                     <input type="checkbox" checked={selected.has(item.codigoSAP)} onChange={() => {
                       const next = new Set(selected)
-                      next.has(item.codigoSAP) ? next.delete(item.codigoSAP) : next.add(item.codigoSAP)
+                      if (next.has(item.codigoSAP)) { next.delete(item.codigoSAP) } else { next.add(item.codigoSAP) }
                       setSelected(next)
                     }} className="rounded" />
                     <span className="text-xs text-foreground truncate flex-1">{item.textoBreve}</span>
