@@ -296,6 +296,7 @@ export function useRepuestos(machineId: string | null) {
       const textoBreve = (row.textoBreve || '').trim();
       const descripcion = (row.descripcion || '').trim();
       const ubicacionEnPlanta = (row.ubicacionEnPlanta || '').trim();
+      const observaciones = (row.observaciones || '').trim();
       const forceOverride = row.forceOverride || {};
       
       if (!existing && codigoSAP === placeholder && codigoFabricante === placeholder) {
@@ -305,7 +306,7 @@ export function useRepuestos(machineId: string | null) {
         }
       }
 
-      return { existing, codigoSAP, codigoFabricante, valorUnitario, cantidadPorMaquina, textoBreve, descripcion, ubicacionEnPlanta, forceOverride };
+      return { existing, codigoSAP, codigoFabricante, valorUnitario, cantidadPorMaquina, textoBreve, descripcion, ubicacionEnPlanta, observaciones, forceOverride };
     });
 
     const chunks = chunk(ops, 400);
@@ -331,6 +332,7 @@ export function useRepuestos(machineId: string | null) {
             valorUnitario: nextValorUnitario,
             cantidadPorMaquina: op.cantidadPorMaquina > 0 ? op.cantidadPorMaquina : (r.cantidadPorMaquina || 0),
             ubicacionEnPlanta: op.ubicacionEnPlanta || r.ubicacionEnPlanta || '',
+            observaciones: op.observaciones || r.observaciones || '',
             updatedAt: Timestamp.now()
           });
         } else {
@@ -344,6 +346,7 @@ export function useRepuestos(machineId: string | null) {
             valorUnitario: op.valorUnitario,
             cantidadPorMaquina: op.cantidadPorMaquina,
             ubicacionEnPlanta: op.ubicacionEnPlanta,
+            observaciones: op.observaciones || '',
             vinculosManual: [],
             imagenesManual: [],
             fotosReales: [],

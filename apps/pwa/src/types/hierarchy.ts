@@ -60,6 +60,12 @@ export interface HierarchyNode {
   // Campos para diferenciar estructura base de expansiones
   isBaseStructure?: boolean // true = nodo de estructura base inicial, false/undefined = expansión
   baseStructureDate?: Timestamp // Fecha en que se estableció la base (misma para todos los nodos base)
+
+  // Nombre descriptivo personalizado (editable por admin)
+  alias?: string
+
+  // Vinculación con máquinas manuales (colección machines/)
+  linkedMachineId?: string // ID del doc en machines/ para vincular repuestos
 }
 
 // Nodo con hijos (para renderizar árbol)
@@ -184,6 +190,11 @@ export function generateHierarchyCode(
   }
 
   return `${prefix}-${paddedSeq}`
+}
+
+// Determina si un nodo es equipo (código SAP numérico) vs área (código alfanumérico)
+export function isEquipmentNode(codigo: string): boolean {
+  return /^\d+$/.test(codigo)
 }
 
 // Constantes de validación

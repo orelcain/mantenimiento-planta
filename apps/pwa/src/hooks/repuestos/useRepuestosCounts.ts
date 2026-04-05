@@ -8,13 +8,17 @@ import { collection, getCountFromServer } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import type { Machine } from '@/types/repuestos'
 
+// Cache global para evitar re-fetch innecesarios
+let cachedCounts: Record<string, number> = {}
+let cachedKey = ''
+
 export function useRepuestosCounts(machines: Machine[]) {
-  const [counts, setCounts] = useState<Record<string, number>>({})
+  const [counts, setCounts] = useState<Record<string, number>>(cachedCounts)
   const [loading, setLoading] = useState(true)
 
   // Estabilizar dependencia: solo re-fetch si cambia la lista de IDs
   const machineIdsKey = machines.map(m => m.id).sort().join(',')
-  const prevKeyRef = useRef('')
+  const fetchingRef = useRef(false)
 
   useEffect(() => {
     if (machines.length === 0) {
@@ -23,9 +27,16 @@ export function useRepuestosCounts(machines: Machine[]) {
       return
     }
 
-    // Si las IDs no cambiaron, no refetch
-    if (prevKeyRef.current === machineIdsKey) return
-    prevKeyRef.current = machineIdsKey
+    // Si ya tenemos cache con la misma key, usar cache
+    if (cachedKey === machineIdsKey && Object.keys(cachedCounts).length > 0) {
+      setCounts(cachedCounts)
+      setLoading(false)
+      return
+    }
+
+    // Evitar fetches concurrentes
+    if (fetchingRef.current) return
+    fetchingRef.current = true
 
     let cancelled = false
 
@@ -33,33 +44,43 @@ export function useRepuestosCounts(machines: Machine[]) {
       setLoading(true)
       const result: Record<string, number> = {}
 
-      // Fetch en paralelo en batches de 10
-      const BATCH = 10
-      for (let i = 0; i < machines.length; i += BATCH) {
-        const batch = machines.slice(i, i + BATCH)
-        const promises = batch.map(async (m) => {
-          try {
-            const colRef = collection(db, `machines/${m.id}/repuestos`)
-            const snapshot = await getCountFromServer(colRef)
-            return { id: m.id, count: snapshot.data().count }
-          } catch {
-            return { id: m.id, count: 0 }
-          }
-        })
-        const results = await Promise.all(promises)
-        if (cancelled) return
-        results.forEach(r => { result[r.id] = r.count })
-      }
+      try {
+        // Fetch en paralelo en batches de 10
+        const BATCH = 10
+        for (let i = 0; i < machines.length; i += BATCH) {
+          if (cancelled) return
+          const batch = machines.slice(i, i + BATCH)
+          const promises = batch.map(async (m) => {
+            try {
+              const colRef = collection(db, `machines/${m.id}/repuestos`)
+              const snapshot = await getCountFromServer(colRef)
+              return { id: m.id, count: snapshot.data().count }
+            } catch {
+              return { id: m.id, count: 0 }
+            }
+          })
+          const results = await Promise.all(promises)
+          if (cancelled) return
+          results.forEach(r => { result[r.id] = r.count })
+        }
 
-      if (!cancelled) {
-        setCounts(result)
-        setLoading(false)
+        if (!cancelled) {
+          cachedCounts = result
+          cachedKey = machineIdsKey
+          setCounts(result)
+          setLoading(false)
+        }
+      } finally {
+        fetchingRef.current = false
       }
     }
 
     fetchCounts()
 
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      fetchingRef.current = false
+    }
   }, [machineIdsKey, machines])
 
   return { counts, loading }

@@ -267,10 +267,10 @@ export function MainLayout() {
 
   // Bottom nav: rutas principales para móvil (máx 4 + "Más")
   const bottomNavDef: Array<{ name: string; href: string; icon: React.ElementType; module?: AppModule }> = [
-    { name: 'Inicio', href: '/', icon: LayoutDashboard, module: 'dashboard' },
-    { name: 'Alertas', href: '/incidents', icon: AlertTriangle, module: 'incidencias' },
-    { name: 'Equipos', href: '/equipment', icon: Wrench, module: 'equipos' },
-    { name: 'Preventivo', href: '/preventive', icon: CalendarClock, module: 'preventivo' },
+    { name: 'Inicio',     href: '/',           icon: LayoutDashboard, module: 'dashboard' },
+    { name: 'Alertas',   href: '/incidents',   icon: AlertTriangle,   module: 'incidencias' },
+    { name: 'Repuestos', href: '/repuestos',   icon: Package,         module: 'repuestos' },
+    { name: 'Equipos',   href: '/equipment',   icon: Wrench,          module: 'equipos' },
   ]
   const bottomNavItems = bottomNavDef.filter(item => !item.module || canSee(item.module))
 

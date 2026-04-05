@@ -4,7 +4,7 @@ import { storage } from '@/services/firebase';
 import type { ImagenRepuesto } from '@/types/repuestos';
 import { optimizeImage } from '@/utils/repuestos';
 
-export function useStorage(machineId: string | null) {
+export function useStorage(machineId: string | null, manualStoragePath?: string) {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
 
@@ -137,10 +137,11 @@ export function useStorage(machineId: string | null) {
       const ext = file.name.split('.').pop() || 'pdf';
       const uniqueName = `${baseName}_${timestamp}.${ext}`;
 
-      // Estructura unificada para todas las máquinas
-      const path = `machines/${machineId}/manuales/${uniqueName}`;
-      
-      console.log('📁 [useStorage] Upload path for machine', machineId, ':', path);
+      // Usa ruta personalizada si se proporcionó, o la default
+      const basePath = manualStoragePath || `machines/${machineId}/manuales`;
+      const path = `${basePath}/${uniqueName}`;
+
+      console.log('📁 [useStorage] Upload path:', path);
       const storageRef = ref(storage, path);
 
       // Upload con progreso real
@@ -186,8 +187,7 @@ export function useStorage(machineId: string | null) {
       return null;
     }
 
-    // Estructura unificada (aislamiento total): machines/{machineId}/manuales
-    const folder = `machines/${machineId}/manuales`;
+    const folder = manualStoragePath || `machines/${machineId}/manuales`;
     try {
       const folderRef = ref(storage, folder);
       const listResult = await listAll(folderRef);

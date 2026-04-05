@@ -76,7 +76,7 @@ function EntryCard({
           )}
         </div>
         <div className="mt-1 pl-4.5 space-y-0.5">
-          <div className="text-foreground/80 truncate">{entry.repuesto.textoBreve || 'Sin nombre'}</div>
+          <div className="text-foreground/80 truncate">{entry.repuesto.textoBreve || entry.repuesto.descripcion || 'Sin nombre'}</div>
           <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
             <span>Cant: <span className="font-bold text-foreground">{entry.repuesto.cantidadPorMaquina || 0}</span></span>
             <span>Valor: ${(entry.repuesto.valorUnitario || 0).toLocaleString('es-CL')}</span>
@@ -129,7 +129,8 @@ function GroupCard({
 
   const totalCantidad = group.entries.reduce((s, e) => s + (e.repuesto.cantidadPorMaquina || 0), 0)
   const totalFotos = group.entries.reduce((s, e) => s + (e.repuesto.fotosReales?.length || 0) + (e.repuesto.imagenesManual?.length || 0), 0)
-  const bestName = group.entries.find(e => e.repuesto.textoBreve)?.repuesto.textoBreve || 'Sin nombre'
+  const bestName = group.entries.find(e => e.repuesto.textoBreve || e.repuesto.descripcion)
+    ?.repuesto.textoBreve || group.entries[0]?.repuesto.descripcion || 'Sin nombre'
 
   if (merged) {
     return (

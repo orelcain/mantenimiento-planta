@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react'
+import { ScanLine } from 'lucide-react'
 import type { Repuesto, RepuestoFormData } from '@/types/repuestos'
 import {
   Button,
@@ -11,6 +12,7 @@ import {
   Label,
   Textarea,
 } from '@/components/ui'
+import { BarcodeScannerModal } from './BarcodeScannerModal'
 
 export type RepuestoFormMode = 'create' | 'edit'
 
@@ -46,6 +48,7 @@ export function RepuestoFormModal({
 }: RepuestoFormModalProps) {
   const [form, setForm] = useState<RepuestoFormData>(defaultForm)
   const [error, setError] = useState<string | null>(null)
+  const [scannerOpen, setScannerOpen] = useState(false)
 
   useEffect(() => {
     if (open) {
@@ -114,12 +117,25 @@ export function RepuestoFormModal({
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="codigoSAP">Código SAP</Label>
-              <Input
-                id="codigoSAP"
-                value={form.codigoSAP}
-                onChange={(e) => setForm({ ...form, codigoSAP: e.target.value })}
-                placeholder="Ej: 123-456"
-              />
+              <div className="flex gap-2">
+                <Input
+                  id="codigoSAP"
+                  value={form.codigoSAP}
+                  onChange={(e) => setForm({ ...form, codigoSAP: e.target.value })}
+                  placeholder="Ej: 123-456"
+                  className="flex-1"
+                />
+                {/* Escanear código de barras / QR */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setScannerOpen(true)}
+                  title="Escanear código de barras o QR"
+                >
+                  <ScanLine className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="codigoFabricante">Código Fabricante</Label>
@@ -213,6 +229,13 @@ export function RepuestoFormModal({
           </DialogFooter>
         </form>
       </DialogContent>
+      {/* Modal de escaneo de código de barras / QR */}
+      <BarcodeScannerModal
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onScan={(value) => setForm({ ...form, codigoSAP: value })}
+        hint="Apunta la cámara al código SAP del repuesto"
+      />
     </Dialog>
   )
 }

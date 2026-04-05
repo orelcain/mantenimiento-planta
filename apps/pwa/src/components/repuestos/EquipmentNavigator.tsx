@@ -1,86 +1,122 @@
 /**
- * EquipmentNavigator — Fusión P2+P6
+ * EquipmentNavigator — Navegación por áreas de jerarquía
  *
- * Layout:
- *  Rail lateral (iconos categoría) | Header + Breadcrumb + SubcatChips + Search + MachineGrid
- *  Admin mode integrado
+ * Layout revisado:
+ *  Sidebar colapsable (áreas agrupadas por planta) | Lista de equipos
+ *  Mobile: pills horizontales en lugar de sidebar
  */
 
-import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef, forwardRef } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Settings2,
   X,
   Search,
-  Factory,
-  Wrench,
-  Link2,
   ChevronRight,
-  GripVertical,
-  Save,
+  ChevronsLeft,
+  ChevronsRight,
+  AlertCircle,
+  Package,
+  Plus,
+  Star,
+  Minimize2,
+  Maximize2,
+  ArrowUpDown,
+  EyeOff,
+  Eye,
 } from 'lucide-react'
 import { useCurrentMachine, useActiveMachines, useMachineContext } from '@/contexts/MachineContext'
-import { useMachineCategories } from '@/hooks/repuestos/useMachineCategories'
 import { useIsAdmin } from '@/store/authStore'
-import { CategoryManager } from '@/components/repuestos/CategoryManager'
+import { MachineManager } from '@/components/repuestos/MachineManager'
 import { Button, Input } from '@/components/ui'
-import { doc, writeBatch, updateDoc, Timestamp } from 'firebase/firestore'
+import { doc, updateDoc, addDoc, collection as firestoreCollection, Timestamp } from 'firebase/firestore'
 import { db } from '@/services/firebase'
-import type { Machine, MachineCategory } from '@/types/repuestos'
+import type { Machine } from '@/types/repuestos'
 import { InlineEditName } from '@/components/repuestos/InlineEditName'
+import { useHierarchyAreaTree, type AreaTreeNode } from '@/hooks/useHierarchyAreaTree'
+import { useEquipmentForArea, type EquipmentDisplayNode, invalidateEquipmentCache } from '@/hooks/useEquipmentForArea'
+import { useLinkMachine } from '@/hooks/useLinkMachine'
+import { EquipmentCard } from '@/components/repuestos/EquipmentCard'
+// import { LinkMachineModal } from '@/components/repuestos/LinkMachineModal' // deshabilitado
+import { useGlobalEquipmentSearch, getGlobalEquipmentCache, type GlobalEquipmentResult } from '@/hooks/useGlobalEquipmentSearch'
+import { Loader2, MapPin } from 'lucide-react'
 
 /* ═══════════════════════════════════════════════════════════════ */
+export interface SelectedEquipmentInfo {
+  id: string
+  nombre: string
+  alias?: string
+  codigo: string
+}
+
 interface EquipmentNavigatorProps {
   repuestosCounts?: Record<string, number>
   className?: string
   onCategoryChange?: (categoryId: string | null) => void
+  onEquipmentSelect?: (info: SelectedEquipmentInfo | null) => void
+}
+
+/** Verdadero si el nodo o alguno de sus descendientes tiene el id dado */
+function nodeContains(node: AreaTreeNode, targetId: string): boolean {
+  if (node.id === targetId) return true
+  return node.children.some(c => nodeContains(c, targetId))
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   Favorites helpers
+   ═══════════════════════════════════════════════════════════════ */
+const STORAGE_KEY_FAV = 'hierarchy-favorites'
+
+function getDefaultFavorites(tree: AreaTreeNode[]): Set<string> {
+  const favs = new Set<string>()
+  function findLeaves(node: AreaTreeNode) {
+    if (node.children.length === 0 && node.equipmentCount > 0) favs.add(node.id)
+    else node.children.forEach(findLeaves)
+  }
+  tree.forEach(findLeaves)
+  return favs
+}
+
+function filterForFavorites(nodes: AreaTreeNode[], favIds: Set<string>): AreaTreeNode[] {
+  return nodes.flatMap(node => {
+    const isFav = favIds.has(node.id)
+    const filteredChildren = filterForFavorites(node.children, favIds)
+    if (!isFav && filteredChildren.length === 0) return []
+    return [{ ...node, children: isFav ? node.children : filteredChildren }]
+  })
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   Lucide icon resolver — categor ía.icono → componente
+   SidebarAreaItem — ítem de área en el sidebar
    ═══════════════════════════════════════════════════════════════ */
-const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
-  Factory, Wrench, Link2,
-}
-function CategoryIcon({ cat, className = 'h-5 w-5' }: { cat: MachineCategory; className?: string }) {
-  const Icon = ICON_MAP[cat.icono] || Factory
-  return <Icon className={className} />
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   Rail Button (vertical sidebar)
-   ═══════════════════════════════════════════════════════════════ */
-function RailButton({
-  cat, isActive, count, onClick,
+function SidebarAreaItem({
+  label, count, isActive, onClick, indent = false, warning = false,
 }: {
-  cat: MachineCategory; isActive: boolean; count: number; onClick: () => void
+  label: string; count: number; isActive: boolean
+  onClick: () => void; indent?: boolean; warning?: boolean
 }) {
   return (
     <button
       onClick={onClick}
-      title={cat.nombre}
       className={`
-        relative flex flex-col items-center justify-center gap-0.5
-        w-[52px] min-h-[48px] rounded-lg cursor-pointer
-        transition-all duration-150 shrink-0
+        min-w-full flex items-center gap-1.5 text-left transition-all duration-100
+        border-l-2 py-0.5
+        ${indent ? 'pl-4 pr-1' : 'pl-2 pr-1'}
         ${isActive
-          ? 'bg-accent text-primary'
-          : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+          ? 'border-l-primary bg-primary/8 text-primary'
+          : 'border-l-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40'
         }
       `}
     >
-      {/* Active indicator */}
-      {isActive && (
-        <span className="absolute -left-[3px] top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-sm bg-primary" />
-      )}
-      <CategoryIcon cat={cat} className="h-5 w-5" />
-      <span className="text-[8px] uppercase tracking-wide leading-tight text-center truncate max-w-[46px]">
-        {cat.nombre.split(' ')[0]?.substring(0, 7)}
-      </span>
-      {/* Count badge */}
+      {warning
+        ? <AlertCircle className="h-2.5 w-2.5 shrink-0 text-amber-500" />
+        : <span className="h-1 w-1 rounded-full shrink-0 bg-current opacity-60" />
+      }
+      <span className="shrink-0 whitespace-nowrap text-[10px] font-medium leading-tight">{label}</span>
       <span className={`
-        absolute -top-0.5 -right-0.5 min-w-[16px] h-[14px] px-1
-        rounded-full text-[8px] font-bold leading-[14px] text-center
-        ${isActive ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}
+        text-[8.5px] font-bold px-1 py-0.5 rounded-full shrink-0 tabular-nums
+        ${isActive ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground'}
       `}>
         {count}
       </span>
@@ -89,102 +125,447 @@ function RailButton({
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   Subcategory Chip
+   MobilePill — pill de área para móvil
    ═══════════════════════════════════════════════════════════════ */
-function SubcatChip({
-  label, isActive, count, onClick, canEdit, onRename,
+function MobilePill({
+  label, count, isActive, onClick,
 }: {
-  label: string; isActive: boolean; count: number; onClick: () => void
-  canEdit?: boolean; onRename?: (newName: string) => Promise<void>
+  label: string; count: number; isActive: boolean; onClick: () => void
 }) {
   return (
     <button
       onClick={onClick}
       className={`
-        inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px]
-        border transition-all whitespace-nowrap cursor-pointer
+        flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium
+        whitespace-nowrap shrink-0 transition-all duration-150 border
         ${isActive
-          ? 'border-primary/40 bg-primary/10 text-foreground font-medium'
-          : 'border-border text-muted-foreground hover:border-muted-foreground/40 hover:text-foreground'
+          ? 'bg-primary text-primary-foreground border-primary'
+          : 'bg-muted/50 text-muted-foreground border-border hover:border-muted-foreground/40'
         }
       `}
     >
-      {canEdit && onRename ? (
-        <InlineEditName
-          value={label}
-          onSave={onRename}
-          canEdit
-          textClassName="truncate"
-        />
-      ) : (
-        label
-      )}
-      <span className={`text-[9px] tabular-nums ${isActive ? 'text-primary' : 'opacity-50'}`}>
+      {label}
+      <span className={`text-[9px] font-bold ${isActive ? 'opacity-80' : 'opacity-60'}`}>
         {count}
       </span>
     </button>
   )
 }
 
+
 /* ═══════════════════════════════════════════════════════════════
-   Machine Card (grid item)
+   SidebarTreeNodeView — nodo recursivo del árbol de sidebar
+   ═══════════════════════════════════════════════════════════════ */
+function SidebarTreeNodeView({
+  node,
+  openNodes,
+  onToggle,
+  onSelect,
+  selectedId,
+  showAllAreas,
+  onAddMachine,
+  onExpandNode,
+  favoriteIds,
+  onToggleFavorite,
+  repuestosCounts,
+  depth = 0,
+}: {
+  node: AreaTreeNode
+  openNodes: Record<string, boolean>
+  onToggle: (id: string) => void
+  onSelect: (node: AreaTreeNode) => void
+  selectedId: string | null
+  showAllAreas: boolean
+  onAddMachine?: (nodeId: string, nodeName: string) => void
+  onExpandNode?: (nodeId: string) => void
+  favoriteIds: Set<string>
+  onToggleFavorite: (id: string) => void
+  repuestosCounts?: Record<string, number>
+  depth?: number
+}) {
+  const hasChildren = node.children.length > 0
+  const canExpand = hasChildren || node.hasMoreChildren
+
+  const isOpen = !!openNodes[node.id]
+
+  // ── Estado activo / seleccionado ──
+  const isSelected         = !showAllAreas && selectedId === node.id
+  const descendantSelected = !showAllAreas && !isSelected && !!selectedId
+    && node.children.some(c => nodeContains(c, selectedId))
+  const isHighlighted      = isSelected
+  const isPartiallyActive  = descendantSelected
+
+  // indent: nivel 0 = 6px, cada nivel +13px para jerarquía clara
+  const indentPx = 6 + depth * 13
+
+  const handleLabelClick = () => {
+    if (canExpand) {
+      onToggle(node.id)
+      // Lazy load: si tiene hijos no cargados, expandir
+      if (node.hasMoreChildren && !hasChildren && onExpandNode) {
+        onExpandNode(node.id)
+      }
+    }
+    onSelect(node)
+  }
+
+  // Estilo de texto por nivel
+  const textClass = depth === 0
+    ? 'text-[10px] font-bold uppercase tracking-wider'
+    : depth === 1
+    ? 'text-[11px] font-semibold'
+    : 'text-[10.5px] font-medium'
+
+  // Mostrar todas las áreas — no podar
+
+  return (
+    <div>
+      <div className="group/row relative flex items-center w-full">
+        {/* Barra activa izquierda */}
+        {isHighlighted && (
+          <span className="absolute left-0 top-0 bottom-0 w-0.5 rounded-r-full bg-primary" />
+        )}
+
+        <button
+          onClick={handleLabelClick}
+          style={{ paddingLeft: `${indentPx}px` }}
+          className={[
+            'flex-1 flex items-center gap-1.5 pr-0.5 py-[3px] text-left transition-all duration-100',
+            isHighlighted
+              ? 'text-primary bg-primary/8'
+              : isPartiallyActive
+              ? 'text-primary/70 hover:text-primary/90 hover:bg-muted/40'
+              : 'text-muted-foreground hover:text-foreground hover:bg-muted/40',
+          ].join(' ')}
+        >
+          {/* Chevron, spinner, o dot */}
+          {node.isLoading ? (
+            <Loader2 className="h-3 w-3 shrink-0 animate-spin text-primary/60" />
+          ) : canExpand ? (
+            <span
+              onClick={e => { e.stopPropagation(); onToggle(node.id); if (node.hasMoreChildren && !hasChildren && onExpandNode) onExpandNode(node.id) }}
+              className="shrink-0 flex items-center cursor-pointer"
+            >
+              <ChevronRight
+                className={[
+                  'h-3 w-3 transition-transform duration-150',
+                  isOpen ? 'rotate-90' : '',
+                  isHighlighted ? 'text-primary' : isPartiallyActive ? 'text-primary/60' : 'text-muted-foreground/50',
+                ].join(' ')}
+              />
+            </span>
+          ) : (
+            <span className={`h-1.5 w-1.5 rounded-full shrink-0 ml-0.5 ${isHighlighted ? 'bg-primary' : 'bg-current opacity-40'}`} />
+          )}
+
+          {/* Nombre */}
+          <span className={`shrink-0 whitespace-nowrap leading-tight ${textClass}`}>
+            {node.nombre}
+          </span>
+
+          {/* Badge equipos visibles + repuestos */}
+          {(() => {
+            const visibleEqCount = repuestosCounts?.[`__eqcount_${node.id}`] ?? 0
+            return visibleEqCount > 0 ? (
+              <span className={[
+                'text-[8.5px] font-bold px-1 py-0.5 rounded-full shrink-0 tabular-nums',
+                isHighlighted
+                  ? 'bg-primary/20 text-primary'
+                  : isPartiallyActive
+                  ? 'bg-primary/10 text-primary/70'
+                  : 'bg-muted/80 text-muted-foreground',
+              ].join(' ')}>
+                {visibleEqCount} equipos
+              </span>
+            ) : null
+          })()}
+          {repuestosCounts && (() => {
+            // Sumar repuestos de todas las máquinas vinculadas en este nodo y descendientes
+            const total = Object.values(repuestosCounts).length > 0
+              ? (repuestosCounts[`__area_${node.id}`] ?? 0)
+              : 0
+            return total > 0 ? (
+              <span className={[
+                'text-[8px] font-bold px-1 py-0.5 rounded-full shrink-0 tabular-nums',
+                isHighlighted ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-500/10 text-emerald-500/60',
+              ].join(' ')}>
+                {total} rep
+              </span>
+            ) : null
+          })()}
+        </button>
+
+        {/* ★ Favorito */}
+        <button
+          onClick={e => { e.stopPropagation(); onToggleFavorite(node.id) }}
+          title={favoriteIds.has(node.id) ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+          className={[
+            'flex items-center justify-center w-5 h-5 rounded transition-all shrink-0',
+            favoriteIds.has(node.id)
+              ? 'opacity-100 text-amber-400 hover:text-amber-300 hover:bg-amber-400/10'
+              : 'opacity-0 group-hover/row:opacity-100 text-muted-foreground hover:text-amber-400 hover:bg-amber-400/10',
+          ].join(' ')}
+        >
+          <Star className={`h-3 w-3 ${favoriteIds.has(node.id) ? 'fill-amber-400' : ''}`} />
+        </button>
+
+        {/* + Agregar equipo (admin, hover) */}
+        {onAddMachine && (
+          <button
+            onClick={e => { e.stopPropagation(); onAddMachine(node.id, node.nombre) }}
+            title={`Agregar equipo en ${node.nombre}`}
+            className="opacity-0 group-hover/row:opacity-100 flex items-center justify-center w-5 h-5 mr-0.5 rounded text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all shrink-0"
+          >
+            <Plus className="h-3 w-3" />
+          </button>
+        )}
+      </div>
+
+      {/* Hijos — con línea guía vertical */}
+      {hasChildren && isOpen && (
+        <div className="relative">
+          {/* Línea vertical conectora */}
+          <div
+            className="absolute top-0 bottom-2 w-px bg-border/40"
+            style={{ left: `${indentPx + 5}px` }}
+          />
+          {node.children.map(child => (
+            <SidebarTreeNodeView
+              key={child.id}
+              node={child}
+              openNodes={openNodes}
+              onToggle={onToggle}
+              onSelect={onSelect}
+              selectedId={selectedId}
+              showAllAreas={showAllAreas}
+
+              onAddMachine={onAddMachine}
+              onExpandNode={onExpandNode}
+              favoriteIds={favoriteIds}
+              onToggleFavorite={onToggleFavorite}
+              repuestosCounts={repuestosCounts}
+              depth={depth + 1}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MachineListRow — fila compacta de 2 líneas para el panel derecho
+   Vista unificada: siempre lista plana, sin tarjetas grandes
    ═══════════════════════════════════════════════════════════════ */
 function MachineCard({
-  machine, isActive, count, maxCount, onClick, canEdit, onRename,
+  machine, isActive, count, maxCount, onClick, canEdit, onRename, onDelete, areaLabel,
 }: {
-  machine: Machine; isActive: boolean; count: number; maxCount: number; onClick: () => void
-  canEdit?: boolean; onRename?: (newName: string) => Promise<void>
+  machine: Machine; isActive: boolean; count: number; maxCount: number
+  onClick: () => void; canEdit?: boolean; onRename?: (name: string) => Promise<void>
+  onDelete?: (id: string) => Promise<void>; areaLabel?: string
 }) {
+  const [deleting, setDeleting] = useState(false)
   const accent = machine.color || '#3b82f6'
+  const countColor = count === 0
+    ? 'text-muted-foreground/40'
+    : count < 5 ? 'text-amber-400' : 'text-emerald-400'
+  const barColor = count === 0 ? '#4b5563' : count < 5 ? '#f59e0b' : '#22c55e'
   const pct = maxCount > 0 ? Math.min(100, (count / maxCount) * 100) : 0
-  const barColor = count === 0 ? 'var(--muted-foreground)' : count < 5 ? 'var(--amber, #f59e0b)' : 'var(--green, #22c55e)'
+  const brandModel = [machine.marca, machine.modelo].filter(Boolean).join(' · ')
+  // Sub-línea: área (si viene de vista multi-área) o marca/modelo
+  const subline = areaLabel || brandModel
 
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
-      title={`${machine.nombre} — ${count} repuestos`}
-      className={`
-        relative flex items-center gap-2 px-3 py-2 rounded-lg text-left
-        transition-all duration-150 cursor-pointer overflow-hidden
-        ${isActive
-          ? 'bg-accent border border-primary/30 shadow-sm'
-          : 'border border-transparent hover:bg-muted/50 hover:border-border'
-        }
-      `}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') onClick() }}
+      className={[
+        'w-full flex items-center gap-2.5 px-3 py-[7px] text-left cursor-pointer',
+        'border-b border-border/20 last:border-b-0',
+        'transition-colors duration-100 group relative',
+        isActive ? 'bg-primary/8' : 'hover:bg-muted/25',
+      ].join(' ')}
     >
-      <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: accent }} />
-      {canEdit && onRename ? (
-        <InlineEditName
-          value={machine.nombre}
-          onSave={onRename}
-          canEdit
-          className="flex-1 min-w-0"
-          textClassName={`truncate text-[12px] ${isActive ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}
-        />
-      ) : (
-        <span className={`flex-1 truncate text-[12px] ${isActive ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
-          {machine.nombre}
-        </span>
+      {/* Indicador activo */}
+      {isActive && (
+        <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-primary" />
       )}
-      <span className={`
-        text-[10px] tabular-nums px-1.5 py-0.5 rounded
-        ${isActive
-          ? 'bg-primary/15 text-primary font-semibold'
-          : 'bg-muted/50 text-muted-foreground'
-        }
-      `}>
-        {count}
-      </span>
-      {/* Mini stock bar at bottom */}
-      <span className="absolute bottom-0 left-2 right-2 h-[2px] rounded-full bg-border/50 overflow-hidden">
-        <span
-          className="block h-full rounded-full transition-all duration-300"
-          style={{ width: `${pct}%`, backgroundColor: barColor }}
-        />
-      </span>
-    </button>
+
+      {/* Dot de color del equipo */}
+      <span
+        className="h-[9px] w-[9px] rounded-full shrink-0"
+        style={{ backgroundColor: accent }}
+      />
+
+      {/* Columna principal */}
+      <div className="flex-1 min-w-0">
+        {/* Línea 1: nombre */}
+        {canEdit && onRename ? (
+          <InlineEditName
+            value={machine.nombre}
+            onSave={onRename}
+            canEdit
+            className="w-full"
+            textClassName={`text-[11.5px] leading-snug font-medium truncate ${
+              isActive ? 'text-primary' : 'text-foreground group-hover:text-primary'
+            }`}
+          />
+        ) : (
+          <span className={`block text-[11.5px] leading-snug font-medium truncate transition-colors ${
+            isActive ? 'text-primary' : 'text-foreground group-hover:text-primary'
+          }`}>
+            {machine.nombre}
+          </span>
+        )}
+        {/* Línea 2: área/marca */}
+        {subline && (
+          <span className="block text-[9.5px] text-muted-foreground/70 truncate leading-tight mt-px">
+            {subline}
+          </span>
+        )}
+      </div>
+
+      {/* Barra + contador de repuestos */}
+      <div className="flex items-center gap-1.5 shrink-0">
+        <div className="w-14 h-[3px] rounded-full bg-muted/50 overflow-hidden hidden sm:block">
+          <div
+            className="h-full rounded-full transition-all duration-300"
+            style={{ width: `${pct}%`, backgroundColor: barColor }}
+          />
+        </div>
+        <span className={`text-[10px] font-bold tabular-nums w-5 text-right ${countColor}`}>
+          {count}
+        </span>
+      </div>
+
+      {/* Botón eliminar */}
+      {canEdit && onDelete && (
+        <button
+          onClick={async (e) => {
+            e.stopPropagation()
+            if (!confirm(`¿Eliminar "${machine.nombre}" de equipos manuales?`)) return
+            setDeleting(true)
+            try { await onDelete(machine.id) } finally { setDeleting(false) }
+          }}
+          disabled={deleting}
+          className="hidden group-hover:flex items-center justify-center w-5 h-5 rounded text-muted-foreground/40 hover:text-red-400 hover:bg-red-500/10 transition-all shrink-0"
+          title="Eliminar equipo manual"
+        >
+          {deleting ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3" />}
+        </button>
+      )}
+
+      <ChevronRight className={`h-3 w-3 shrink-0 transition-colors ${
+        isActive ? 'text-primary' : 'text-muted-foreground/25 group-hover:text-primary/50'
+      }`} />
+    </div>
   )
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   GlobalSearchDropdown — dropdown flotante (portal) de búsqueda global
+   ═══════════════════════════════════════════════════════════════ */
+const GlobalSearchDropdown = forwardRef<HTMLDivElement, {
+  anchorRef: React.RefObject<HTMLDivElement | null>
+  results: GlobalEquipmentResult[]
+  loading: boolean
+  searchQuery: string
+  sidebarNodeMap: Map<string, AreaTreeNode>
+  repuestosCounts: Record<string, number>
+  onSelect: (r: GlobalEquipmentResult) => void
+}>(({ anchorRef, results, loading, searchQuery, sidebarNodeMap, repuestosCounts, onSelect }, ref) => {
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 0 })
+
+  useEffect(() => {
+    const update = () => {
+      if (!anchorRef.current) return
+      const rect = anchorRef.current.getBoundingClientRect()
+      setPos({ top: rect.bottom + 4, left: rect.left, width: Math.min(Math.max(rect.width, 480), window.innerWidth - rect.left - 16) })
+    }
+    update()
+    window.addEventListener('scroll', update, true)
+    window.addEventListener('resize', update)
+    return () => {
+      window.removeEventListener('scroll', update, true)
+      window.removeEventListener('resize', update)
+    }
+  }, [anchorRef])
+
+  return (
+    <div
+      ref={ref}
+      className="bg-popover border border-border rounded-lg shadow-xl max-h-80 overflow-y-auto"
+      style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width, zIndex: 9999 }}
+    >
+      {loading ? (
+        <div className="flex items-center gap-2 px-3 py-3 text-xs text-muted-foreground">
+          <Loader2 className="h-3 w-3 animate-spin" /> Buscando…
+        </div>
+      ) : results.length === 0 ? (
+        <div className="px-3 py-3 text-xs text-muted-foreground">
+          Sin resultados para "{searchQuery}"
+        </div>
+      ) : (
+        <>
+          <div className="px-3 py-1.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider border-b border-border bg-muted/30 sticky top-0">
+            {results.length} equipo{results.length !== 1 ? 's' : ''} encontrado{results.length !== 1 ? 's' : ''}
+          </div>
+          {results.map(r => {
+            const breadcrumb = (r.path ?? [])
+              .map(id => sidebarNodeMap.get(id)?.nombre)
+              .filter(Boolean)
+              .join(' › ')
+            const repCount = r.linkedMachineId ? (repuestosCounts[r.linkedMachineId] || 0) : 0
+
+            return (
+              <button
+                key={r.id}
+                onClick={() => onSelect(r)}
+                className="w-full text-left px-3 py-2 hover:bg-accent/50 transition-colors border-b border-border/50 last:border-0"
+              >
+                <div className="flex items-center gap-2">
+                  <Package className="h-3.5 w-3.5 text-primary/60 shrink-0" />
+                  <span className="text-xs font-medium truncate">
+                    {r.alias || r.nombre}
+                  </span>
+                  {r.codigo && (
+                    <span className="text-[10px] text-muted-foreground bg-muted px-1 rounded shrink-0">
+                      {r.codigo}
+                    </span>
+                  )}
+                  {repCount > 0 ? (
+                    <span className="text-[9px] font-bold tabular-nums text-emerald-400 bg-emerald-400/10 px-1.5 py-0.5 rounded-full shrink-0">
+                      {repCount} rep.
+                    </span>
+                  ) : (
+                    <span className="text-[9px] text-muted-foreground/40 shrink-0">
+                      0 rep.
+                    </span>
+                  )}
+                </div>
+                {breadcrumb && (
+                  <div className="flex items-center gap-1 mt-0.5 ml-5">
+                    <MapPin className="h-2.5 w-2.5 text-muted-foreground/50 shrink-0" />
+                    <span className="text-[10px] text-muted-foreground truncate">
+                      {breadcrumb}
+                    </span>
+                  </div>
+                )}
+                {r.alias && r.nombre !== r.alias && (
+                  <div className="text-[10px] text-muted-foreground/70 ml-5 truncate">
+                    {r.nombre}
+                  </div>
+                )}
+              </button>
+            )
+          })}
+        </>
+      )}
+    </div>
+  )
+})
 
 /* ═══════════════════════════════════════════════════════════════
    Componente Principal
@@ -193,227 +574,474 @@ export function EquipmentNavigator({
   repuestosCounts = {},
   className = '',
   onCategoryChange,
+  onEquipmentSelect,
 }: EquipmentNavigatorProps) {
   const currentMachine = useCurrentMachine()
   const activeMachines = useActiveMachines()
   const { setCurrentMachine, clearCurrentMachine } = useMachineContext()
-  const { categories, updateCategory } = useMachineCategories()
   const isAdmin = useIsAdmin()
 
+  // Hooks nuevos: árbol de áreas + equipos del área seleccionada
+  const { areaTree, loading: areaTreeLoading, expandNode, findNode, getNodePath } = useHierarchyAreaTree()
+
   const [adminMode, setAdminMode] = useState(false)
+  const [quickAddNode, setQuickAddNode] = useState<{ id: string; name: string } | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const [reorderMode, setReorderMode] = useState(false)
-  const [localOrder, setLocalOrder] = useState<Machine[]>([])
-  const [savingOrder, setSavingOrder] = useState(false)
-  const dragItem = useRef<number | null>(null)
-  const dragOverItem = useRef<number | null>(null)
+  const [searchFocused, setSearchFocused] = useState(false)
+  const searchContainerRef = useRef<HTMLDivElement>(null)
+  const searchDropdownRef = useRef<HTMLDivElement>(null)
+  const { results: globalSearchResults, loading: globalSearchLoading } = useGlobalEquipmentSearch(searchQuery)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [showAllAreas, setShowAllAreas] = useState(false)
+  const [openNodes, setOpenNodes] = useState<Record<string, boolean>>({})
+  const [favoritesMode, setFavoritesMode] = useState(false)
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(() => {
+    try {
+      const s = localStorage.getItem(STORAGE_KEY_FAV)
+      if (s) return new Set(JSON.parse(s) as string[])
+    } catch { /* noop */ }
+    return new Set<string>()
+  })
+  // selectedTreeNode: id del nodo del árbol seleccionado (null = todos / sin árbol)
+  const [selectedTreeNodeId, setSelectedTreeNodeId] = useState<string | null>(() => {
+    try { return localStorage.getItem('repuestos-nav-node') } catch { return null }
+  })
+  const treeAutoInitRef = useRef(false)
+  // Nodos que el usuario cerró manualmente → el efecto openAncestors no los vuelve a abrir
+  const userClosedNodesRef = useRef<Set<string>>(new Set())
+  // Target anterior del efecto openAncestors → si cambia la selección, limpiamos el set
+  const prevAncestorTargetRef = useRef<string | null>(null)
 
-  // ── Categorías raíz ──
-  const rootCategories = useMemo(() =>
-    categories
-      .filter(c => c.activa && c.visible !== false && !c.parentId)
-      .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0)),
-    [categories]
+  // ── Sidebar tree = areaTree (sin poda, todas las áreas) ──
+  // Saltamos el nodo raíz si es único (CHONCHI → mostrar sus hijos directamente)
+  const sidebarTree = useMemo(() => {
+    if (areaTree.length === 1 && areaTree[0]!.children.length > 0) {
+      return areaTree[0]!.children
+    }
+    return areaTree
+  }, [areaTree])
+
+  // ── Árbol filtrado por favoritos ──
+  const visibleSidebarTree = useMemo(() =>
+    favoritesMode && favoriteIds.size > 0
+      ? filterForFavorites(sidebarTree, favoriteIds)
+      : sidebarTree,
+    [sidebarTree, favoritesMode, favoriteIds],
   )
 
-  // ── Estado categoría activa ──
-  const [activeCatId, setActiveCatId] = useState<string>(() => {
-    if (currentMachine) {
-      const catId = currentMachine.categoryId || 'maquinas-principales'
-      const sub = categories.find(c => c.id === catId && c.parentId)
-      return sub?.parentId || catId
+  // ── Flat map del sidebar tree para lookups rápidos ──
+  const sidebarNodeMap = useMemo(() => {
+    const map = new Map<string, AreaTreeNode>()
+    function walk(nodes: AreaTreeNode[]) {
+      for (const n of nodes) { map.set(n.id, n); walk(n.children) }
     }
-    return rootCategories[0]?.id || 'maquinas-principales'
-  })
+    walk(sidebarTree)
+    return map
+  }, [sidebarTree])
 
-  // ── Subcategorías de la cat activa ──
-  const subcategories = useMemo(() =>
-    categories
-      .filter(c => c.parentId === activeCatId && c.activa)
-      .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0)),
-    [categories, activeCatId]
-  )
+  // ── Mapa de repuestos totales por área (para sidebar) ──
+  // Suma repuestosCounts de todos los equipos cuyo path incluye cada área
+  const areaRepuestosCounts = useMemo(() => {
+    const result: Record<string, number> = { ...repuestosCounts }
+    const equipment = getGlobalEquipmentCache()
+    if (!equipment) return result
 
-  // ── Estado subcategoría activa ──
-  const [activeSubcatId, setActiveSubcatId] = useState<string | null>(() => {
-    if (currentMachine) {
-      const catId = currentMachine.categoryId || 'maquinas-principales'
-      const sub = categories.find(c => c.id === catId && c.parentId)
-      if (sub) return sub.id
+    // Conteo de equipos visibles por área
+    // Solo contar equipos de primer nivel: cuyo parentId es un área conocida en el sidebar
+    // y que tengan código numérico (no vacío)
+    // Cada equipo se cuenta SOLO en su área padre directa (parentId),
+    // luego se acumula hacia arriba por el árbol de áreas.
+    const areaDirectCount = new Map<string, number>()
+    for (const eq of equipment) {
+      if (eq.oculto) continue
+      if (!eq.parentId || !sidebarNodeMap.has(eq.parentId)) continue
+      areaDirectCount.set(eq.parentId, (areaDirectCount.get(eq.parentId) || 0) + 1)
     }
-    return null
-  })
+    // Acumular recursivamente: cada área suma sus equipos directos + los de sub-áreas
+    const areaEqCount = new Map<string, number>()
+    function accumulateEqCount(node: AreaTreeNode): number {
+      let total = areaDirectCount.get(node.id) || 0
+      for (const child of node.children) {
+        total += accumulateEqCount(child)
+      }
+      areaEqCount.set(node.id, total)
+      return total
+    }
+    for (const root of sidebarTree) {
+      accumulateEqCount(root)
+    }
+    for (const [areaId, total] of areaEqCount) {
+      result[`__eqcount_${areaId}`] = total
+    }
 
-  // Auto-select first subcategory when category changes or subcats load
+    // Repuestos por área — deduplicar por linkedMachineId para no contar
+    // la misma máquina múltiples veces cuando varios equipos SAP comparten una
+    if (Object.keys(repuestosCounts).length > 0) {
+      // Track which linkedMachineId ya se contó en cada área
+      const areaCountedMachines = new Map<string, Set<string>>()
+      const areaTotals = new Map<string, number>()
+      for (const eq of equipment) {
+        if (!eq.linkedMachineId) continue
+        const count = repuestosCounts[eq.linkedMachineId] || 0
+        if (count === 0) continue
+        const areaIds = new Set([...(eq.path || []), eq.parentId].filter(Boolean) as string[])
+        for (const areaId of areaIds) {
+          if (!areaCountedMachines.has(areaId)) areaCountedMachines.set(areaId, new Set())
+          const counted = areaCountedMachines.get(areaId)!
+          if (counted.has(eq.linkedMachineId)) continue // ya contada en esta área
+          counted.add(eq.linkedMachineId)
+          areaTotals.set(areaId, (areaTotals.get(areaId) || 0) + count)
+        }
+      }
+      for (const [areaId, total] of areaTotals) {
+        result[`__area_${areaId}`] = total
+      }
+    }
+    return result
+  }, [repuestosCounts, sidebarNodeMap, sidebarTree])
+
+  // ── Estado: nodo activo ──
+  // Hook de equipos para el área seleccionada
+  const [refreshKey, setRefreshKey] = useState(0)
+  const { equipment: areaEquipment, loading: equipmentLoading } = useEquipmentForArea(selectedTreeNodeId, refreshKey)
+
+  // ── Toggle colapsar/expandir todos los equipos ──
+  const [allEquipmentExpanded, setAllEquipmentExpanded] = useState<boolean | undefined>(undefined)
+
+  // ── Agregar equipo en área ──
+  const [addingEquipment, setAddingEquipment] = useState(false)
+  const [newEqName, setNewEqName] = useState('')
+  const [newEqCode, setNewEqCode] = useState('')
+  const [savingNewEq, setSavingNewEq] = useState(false)
+  const newEqInputRef = useRef<HTMLInputElement>(null)
+
   useEffect(() => {
-    if (subcategories.length > 0) {
-      const first = subcategories[0]
-      // If current activeSubcatId is not in this list, select first
-      if (first && (!activeSubcatId || !subcategories.find(s => s.id === activeSubcatId))) {
-        setActiveSubcatId(first.id)
+    if (addingEquipment) newEqInputRef.current?.focus()
+  }, [addingEquipment])
+
+  const handleAddEquipmentToArea = useCallback(async () => {
+    const name = newEqName.trim()
+    if (!name || !selectedTreeNodeId) return
+    const selNode = sidebarNodeMap.get(selectedTreeNodeId)
+    setSavingNewEq(true)
+    try {
+      const nextLevel = selNode ? (selNode as any).nivel + 1 : 5
+      const docData = {
+        nombre: name.toUpperCase(),
+        codigo: newEqCode.trim(),
+        nivel: nextLevel,
+        parentId: selectedTreeNodeId,
+        path: [...(selNode as any)?.path || [], selectedTreeNodeId],
+        orden: areaEquipment.length,
+        activo: true,
+        creadoPor: 'admin',
+        creadoEn: Timestamp.now(),
+        actualizadoEn: Timestamp.now(),
       }
-    } else {
-      setActiveSubcatId(null)
+      await addDoc(firestoreCollection(db, 'hierarchy'), docData)
+      invalidateEquipmentCache(selectedTreeNodeId)
+      setRefreshKey(k => k + 1)
+    } catch (err) {
+      console.error('Error al agregar equipo:', err)
+    } finally {
+      setSavingNewEq(false)
+      setAddingEquipment(false)
+      setNewEqName('')
+      setNewEqCode('')
     }
-  }, [subcategories, activeSubcatId])
+  }, [newEqName, newEqCode, selectedTreeNodeId, sidebarNodeMap, areaEquipment.length])
 
-  // ── Máquinas filtradas por subcategoría ──
-  const machinesInSubcat = useMemo(() => {
-    const targetId = activeSubcatId || activeCatId
-    let machines: Machine[]
+  // ── Ocultar/mostrar equipos ──
+  const [showHidden, setShowHidden] = useState(false)
 
-    if (activeCatId === 'maquinas-principales' && !activeSubcatId) {
-      machines = activeMachines.filter(m => !m.categoryId || m.categoryId === activeCatId)
-    } else {
-      machines = activeMachines.filter(m => m.categoryId === targetId)
+  const handleToggleHidden = useCallback(async (equipmentId: string, hidden: boolean) => {
+    try {
+      await updateDoc(doc(db, 'hierarchy', equipmentId), {
+        oculto: hidden,
+        actualizadoEn: Timestamp.now(),
+      })
+      invalidateEquipmentCache(selectedTreeNodeId ?? undefined)
+      setRefreshKey(k => k + 1)
+    } catch (err) {
+      console.error('Error toggling hidden', err)
+    }
+  }, [selectedTreeNodeId])
+
+  // ── Reordenar equipos ──
+  const [reorderMode, setReorderMode] = useState(false)
+
+  const handleMoveEquipment = useCallback(async (equipmentId: string, direction: 'up' | 'down') => {
+    const idx = areaEquipment.findIndex(eq => eq.id === equipmentId)
+    if (idx < 0) return
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1
+    if (swapIdx < 0 || swapIdx >= areaEquipment.length) return
+
+    const eqA = areaEquipment[idx]!
+    const eqB = areaEquipment[swapIdx]!
+
+    try {
+      await Promise.all([
+        updateDoc(doc(db, 'hierarchy', eqA.id), { orden: swapIdx, actualizadoEn: Timestamp.now() }),
+        updateDoc(doc(db, 'hierarchy', eqB.id), { orden: idx, actualizadoEn: Timestamp.now() }),
+      ])
+      invalidateEquipmentCache(selectedTreeNodeId ?? undefined)
+      setRefreshKey(k => k + 1)
+    } catch (err) {
+      console.error('Error reordering equipment', err)
+    }
+  }, [areaEquipment, selectedTreeNodeId])
+
+  // ── Vinculación máquinas ↔ equipos SAP ──
+  const { softDeleteMachine } = useLinkMachine()
+
+  // Vinculación deshabilitada — todas las máquinas ya vinculadas
+
+  // Auto-abrir ancestros del nodo seleccionado
+  useEffect(() => {
+    if (!sidebarTree.length || !selectedTreeNodeId) return
+
+    // Al cambiar la selección, limpiar el registro de nodos cerrados manualmente
+    if (prevAncestorTargetRef.current !== selectedTreeNodeId) {
+      prevAncestorTargetRef.current = selectedTreeNodeId
+      userClosedNodesRef.current.clear()
     }
 
-    return machines.sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0))
-  }, [activeMachines, activeCatId, activeSubcatId])
+    const path = getNodePath(selectedTreeNodeId)
+    if (path.length > 0) {
+      setOpenNodes(prev => {
+        const next = { ...prev }
+        // Abrir todos los ancestros menos el último (el seleccionado)
+        path.slice(0, -1).forEach(n => {
+          if (!userClosedNodesRef.current.has(n.id)) next[n.id] = true
+        })
+        return next
+      })
+    }
+  }, [sidebarTree, selectedTreeNodeId, getNodePath])
 
-  // ── Búsqueda ──
-  const filteredMachines = useMemo(() => {
-    if (!searchQuery.trim()) return machinesInSubcat
-    const q = searchQuery.toLowerCase()
-    return machinesInSubcat.filter(m =>
-      m.nombre.toLowerCase().includes(q) ||
-      m.marca?.toLowerCase().includes(q) ||
-      m.modelo?.toLowerCase().includes(q)
-    )
-  }, [machinesInSubcat, searchQuery])
+  // ── Persistir selección en localStorage ──
+  useEffect(() => {
+    try {
+      if (selectedTreeNodeId) localStorage.setItem('repuestos-nav-node', selectedTreeNodeId)
+      else localStorage.removeItem('repuestos-nav-node')
+    } catch { /* noop */ }
+  }, [selectedTreeNodeId])
 
-  // ── Max count para barras ──
-  const maxCount = useMemo(() =>
-    Math.max(1, ...activeMachines.map(m => repuestosCounts[m.id] || 0)),
-    [activeMachines, repuestosCounts]
+  // ── Inicializar favoritos por defecto (nodos hoja con máquinas) ──
+  useEffect(() => {
+    if (!sidebarTree.length || favoriteIds.size > 0) return
+    const defaults = getDefaultFavorites(sidebarTree)
+    if (!defaults.size) return
+    setFavoriteIds(defaults)
+    try { localStorage.setItem(STORAGE_KEY_FAV, JSON.stringify([...defaults])) } catch { /* noop */ }
+  }, [sidebarTree]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Toggle favorito ──
+  const toggleFavorite = useCallback((nodeId: string) => {
+    setFavoriteIds(prev => {
+      const next = new Set(prev)
+      if (next.has(nodeId)) next.delete(nodeId)
+      else next.add(nodeId)
+      try { localStorage.setItem(STORAGE_KEY_FAV, JSON.stringify([...next])) } catch { /* noop */ }
+      return next
+    })
+  }, [])
+
+  // ── Auto-abrir y seleccionar primer área al cargar el árbol ──
+  useEffect(() => {
+    if (treeAutoInitRef.current || !sidebarTree.length) return
+    if (selectedTreeNodeId) return  // ya hay selección guardada
+    treeAutoInitRef.current = true
+
+    // Seleccionar el primer nodo con equipos
+    function findFirstWithEquipment(nodes: AreaTreeNode[]): AreaTreeNode | null {
+      for (const n of nodes) {
+        if (n.equipmentCount > 0) return n
+        const found = findFirstWithEquipment(n.children)
+        if (found) return found
+      }
+      return null
+    }
+
+    const leaf = findFirstWithEquipment(sidebarTree) ?? sidebarTree[0]!
+
+    const path = getNodePath(leaf.id)
+    setOpenNodes(prev => {
+      const next = { ...prev }
+      path.slice(0, -1).forEach(n => { next[n.id] = true })
+      return next
+    })
+
+    setSelectedTreeNodeId(leaf.id)
+    setShowAllAreas(false)
+    onCategoryChange?.(leaf.id)
+  }, [sidebarTree, selectedTreeNodeId, onCategoryChange, getNodePath])
+
+  // Equipos del área — filtrar ocultos si no se pide verlos
+  const hiddenCount = useMemo(() => areaEquipment.filter(eq => eq.oculto).length, [areaEquipment])
+  const filteredEquipment = useMemo(() =>
+    showHidden ? areaEquipment : areaEquipment.filter(eq => !eq.oculto),
+    [areaEquipment, showHidden],
   )
 
-  // ── Conteo por cat raíz ──
-  const machineCountPerCat = useMemo(() => {
-    const result: Record<string, number> = {}
-    rootCategories.forEach(cat => {
-      const subcatIds = categories.filter(c => c.parentId === cat.id && c.activa).map(c => c.id)
-      const allIds = [cat.id, ...subcatIds]
-      if (cat.id === 'maquinas-principales') {
-        result[cat.id] = activeMachines.filter(m => !m.categoryId || allIds.includes(m.categoryId || '')).length
-      } else {
-        result[cat.id] = activeMachines.filter(m => m.categoryId && allIds.includes(m.categoryId)).length
-      }
-    })
-    return result
-  }, [rootCategories, categories, activeMachines])
-
-  // ── Conteo por subcategoría ──
-  const machineCountPerSubcat = useMemo(() => {
-    const result: Record<string, number> = {}
-    subcategories.forEach(sc => {
-      result[sc.id] = activeMachines.filter(m => m.categoryId === sc.id).length
-    })
-    return result
-  }, [subcategories, activeMachines])
+  // ── Máquinas del área (para compatibilidad con MachineCard existente) ──
+  const machinesInArea = useMemo(() => {
+    if (showAllAreas) return activeMachines
+    if (!selectedTreeNodeId) return activeMachines
+    // Filtrar máquinas cuyo hierarchyNodeId coincide con el nodo seleccionado
+    return activeMachines.filter(m => m.hierarchyNodeId === selectedTreeNodeId)
+  }, [showAllAreas, activeMachines, selectedTreeNodeId])
 
   // ── Handlers ──
-  const handleCategoryChange = useCallback((catId: string) => {
-    setActiveCatId(catId)
+  const handleSelectTreeNode = useCallback((node: AreaTreeNode) => {
+    setSelectedTreeNodeId(node.id)
+    setShowAllAreas(false)
     setSearchQuery('')
     clearCurrentMachine()
-    onCategoryChange?.(catId)
+    onCategoryChange?.(node.id)
   }, [clearCurrentMachine, onCategoryChange])
 
-  const handleSubcatChange = useCallback((subcatId: string) => {
-    setActiveSubcatId(subcatId)
+  const handleSelectAll = useCallback(() => {
+    setShowAllAreas(true)
+    setSelectedTreeNodeId(null)
     setSearchQuery('')
     clearCurrentMachine()
-  }, [clearCurrentMachine])
+    onCategoryChange?.(null)
+  }, [clearCurrentMachine, onCategoryChange])
 
-  const handleSelectMachine = useCallback((machine: Machine) => {
-    setCurrentMachine(machine.id)
-    const catId = machine.categoryId || 'maquinas-principales'
-    const sub = categories.find(c => c.id === catId && c.parentId)
-    onCategoryChange?.(sub?.parentId || catId)
-  }, [categories, setCurrentMachine, onCategoryChange])
-
-  // ── Reorder (drag & drop) ──
-  const enterReorderMode = useCallback(() => {
-    setLocalOrder([...machinesInSubcat])
-    setReorderMode(true)
-  }, [machinesInSubcat])
-
-  const cancelReorder = useCallback(() => {
-    setReorderMode(false)
-    setLocalOrder([])
-  }, [])
-
-  const handleDragStart = useCallback((index: number) => {
-    dragItem.current = index
-  }, [])
-
-  const handleDragEnter = useCallback((index: number) => {
-    dragOverItem.current = index
-  }, [])
-
-  const handleDragEnd = useCallback(() => {
-    if (dragItem.current === null || dragOverItem.current === null) return
-    if (dragItem.current === dragOverItem.current) {
-      dragItem.current = null
-      dragOverItem.current = null
-      return
-    }
-    setLocalOrder(prev => {
-      const updated = [...prev]
-      const draggedItem = updated.splice(dragItem.current!, 1)[0]
-      if (draggedItem) updated.splice(dragOverItem.current!, 0, draggedItem)
-      return updated
+  const toggleNode = useCallback((nodeId: string) => {
+    setOpenNodes(prev => {
+      const wasOpen = !!prev[nodeId]
+      const nextOpen = !wasOpen
+      // Registrar intención del usuario para que openAncestors la respete
+      if (nextOpen) userClosedNodesRef.current.delete(nodeId)
+      else          userClosedNodesRef.current.add(nodeId)
+      return { ...prev, [nodeId]: nextOpen }
     })
-    dragItem.current = null
-    dragOverItem.current = null
   }, [])
-
-  const saveOrder = useCallback(async () => {
-    if (localOrder.length === 0) return
-    setSavingOrder(true)
-    try {
-      const batch = writeBatch(db)
-      localOrder.forEach((machine, index) => {
-        const ref = doc(db, 'machines', machine.id)
-        batch.update(ref, { orden: index, updatedAt: Timestamp.now() })
-      })
-      await batch.commit()
-      setReorderMode(false)
-      setLocalOrder([])
-    } catch (err) {
-      console.error('Error saving order:', err)
-    } finally {
-      setSavingOrder(false)
-    }
-  }, [localOrder])
-
-  // ── Rename handlers (inline edit) ──
-  const handleRenameCategory = useCallback(async (catId: string, newName: string) => {
-    await updateCategory(catId, { nombre: newName })
-  }, [updateCategory])
 
   const handleRenameMachine = useCallback(async (machineId: string, newName: string) => {
-    const ref = doc(db, 'machines', machineId)
-    await updateDoc(ref, { nombre: newName, updatedAt: Timestamp.now() })
+    await updateDoc(doc(db, 'machines', machineId), { nombre: newName, updatedAt: Timestamp.now() })
   }, [])
 
-  // Sync activeCatId + activeSubcatId when currentMachine changes externally
+  // Handler para click en equipo SAP
+  const [selectedEquipment, setSelectedEquipment] = useState<EquipmentDisplayNode | null>(null)
+  const handleSelectEquipment = useCallback((eq: EquipmentDisplayNode) => {
+    setSelectedEquipment(eq)
+    onEquipmentSelect?.({ id: eq.id, nombre: eq.nombre, alias: eq.alias, codigo: eq.codigo })
+    if (eq.linkedMachineId) {
+      setCurrentMachine(eq.linkedMachineId)
+    } else {
+      clearCurrentMachine()
+    }
+  }, [setCurrentMachine, clearCurrentMachine, onEquipmentSelect])
+
+  // Helper: buscar equipo en el árbol por ID
+  function findEquipmentInTree(nodes: EquipmentDisplayNode[], id: string): EquipmentDisplayNode | null {
+    for (const eq of nodes) {
+      if (eq.id === id) return eq
+      const found = findEquipmentInTree(eq.children, id)
+      if (found) return found
+    }
+    return null
+  }
+
+  // Handler para seleccionar un equipo desde la búsqueda global
+  const handleGlobalSearchSelect = useCallback((result: GlobalEquipmentResult) => {
+    // El path del equipo contiene IDs desde raíz → el parentId es el área directa
+    // Recorremos el path para encontrar el área padre más cercana en el sidebar tree
+    const pathIds = result.path ?? []
+
+    // Buscar el área padre: recorrer el path de atrás hacia adelante
+    // y encontrar el primer nodo que exista en el sidebar tree (es un área)
+    let targetAreaId: string | null = null
+    for (let i = pathIds.length - 1; i >= 0; i--) {
+      if (sidebarNodeMap.has(pathIds[i]!)) {
+        targetAreaId = pathIds[i]!
+        break
+      }
+    }
+    // Fallback: si no encontramos en path, usar parentId directo
+    if (!targetAreaId && result.parentId && sidebarNodeMap.has(result.parentId)) {
+      targetAreaId = result.parentId
+    }
+
+    if (targetAreaId) {
+      // Abrir ancestros del área en el sidebar
+      const nodePath = getNodePath(targetAreaId)
+      setOpenNodes(prev => {
+        const next = { ...prev }
+        nodePath.forEach(n => { next[n.id] = true })
+        return next
+      })
+      // Seleccionar el área
+      setSelectedTreeNodeId(targetAreaId)
+      setShowAllAreas(false)
+      onCategoryChange?.(targetAreaId)
+    }
+
+    // Limpiar búsqueda y cerrar dropdown
+    setSearchQuery('')
+    setSearchFocused(false)
+
+    // Intentar seleccionar el equipo inmediatamente si ya está cargado
+    const existingEq = findEquipmentInTree(areaEquipment, result.id)
+    if (existingEq) {
+      handleSelectEquipment(existingEq)
+    } else {
+      // Guardar el ID para auto-seleccionar tras la carga del área
+      pendingEquipmentSelectRef.current = result.id
+      if (result.linkedMachineId) {
+        setCurrentMachine(result.linkedMachineId)
+      } else {
+        clearCurrentMachine()
+      }
+      onEquipmentSelect?.({ id: result.id, nombre: result.nombre, alias: result.alias, codigo: result.codigo })
+    }
+  }, [sidebarNodeMap, getNodePath, onCategoryChange, setCurrentMachine, clearCurrentMachine, onEquipmentSelect, areaEquipment, handleSelectEquipment])
+
+  // Ref para auto-seleccionar equipo tras carga del área
+  const pendingEquipmentSelectRef = useRef<string | null>(null)
+
+  // Efecto: auto-seleccionar equipo cuando se carguen los equipos del área
   useEffect(() => {
-    if (!currentMachine) return
-    const catId = currentMachine.categoryId || 'maquinas-principales'
-    const sub = categories.find(c => c.id === catId && c.parentId)
-    const rootId = sub?.parentId || catId
-    if (rootId !== activeCatId) setActiveCatId(rootId)
-    if (sub && sub.id !== activeSubcatId) setActiveSubcatId(sub.id)
-  }, [currentMachine, categories, activeCatId, activeSubcatId])
+    const pendingId = pendingEquipmentSelectRef.current
+    if (!pendingId || !areaEquipment.length) return
 
-  // ── Derived ──
-  const activeCat = rootCategories.find(c => c.id === activeCatId)
-  const activeSubcat = subcategories.find(c => c.id === activeSubcatId)
+    function findInTree(nodes: EquipmentDisplayNode[]): EquipmentDisplayNode | null {
+      for (const eq of nodes) {
+        if (eq.id === pendingId) return eq
+        const found = findInTree(eq.children)
+        if (found) return found
+      }
+      return null
+    }
+    const found = findInTree(areaEquipment)
+    if (found) {
+      setSelectedEquipment(found)
+      pendingEquipmentSelectRef.current = null
+    }
+  }, [areaEquipment])
 
-  if (rootCategories.length === 0) {
-    return <div className="text-center py-4 text-muted-foreground text-sm">No hay categorías configuradas.</div>
+  // Cerrar dropdown al hacer clic fuera (excluir el portal del dropdown)
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      const target = e.target as Node
+      if (searchContainerRef.current?.contains(target)) return
+      if (searchDropdownRef.current?.contains(target)) return
+      setSearchFocused(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  // ── Loading state ──
+  if (areaTreeLoading && sidebarTree.length === 0) {
+    return (
+      <div className="text-center py-4 text-muted-foreground text-sm">
+        Cargando jerarquía...
+      </div>
+    )
   }
 
   /* ═══ ADMIN MODE ═══ */
@@ -425,225 +1053,439 @@ export function EquipmentNavigator({
             <Settings2 className="h-4 w-4 text-primary" />
             <span className="text-sm font-semibold text-foreground">Administrar Estructura</span>
             <span className="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full hidden sm:inline">
-              Reordena, crea y edita categorías, subcategorías y equipos
+              Crea, edita y asigna áreas a los equipos
             </span>
           </div>
           <Button variant="ghost" size="sm" onClick={() => setAdminMode(false)} className="gap-1.5 text-muted-foreground hover:text-foreground">
             <X className="h-3.5 w-3.5" /> Cerrar
           </Button>
         </div>
-        <div className="max-h-[60vh] overflow-y-auto p-4">
-          <CategoryManager />
+        <div className="max-h-[70vh] overflow-y-auto p-4">
+          <MachineManager
+            defaultNodeId={quickAddNode?.id}
+            defaultNodeName={quickAddNode?.name}
+            onCreated={() => setQuickAddNode(null)}
+          />
         </div>
       </div>
     )
   }
 
-  /* ═══ BROWSE MODE — FUSION 2+6 ═══ */
+  /* ═══ BROWSE MODE ═══ */
   return (
     <div className={`rounded-xl border border-border bg-card overflow-hidden ${className}`}>
-      <div className="flex">
-        {/* ── RAIL (sidebar vertical de categorías) ── */}
-        <div className="flex flex-col items-center gap-0.5 px-1 py-2 border-r border-border bg-card shrink-0">
-          {rootCategories.map(cat => (
-            <RailButton
-              key={cat.id}
-              cat={cat}
-              isActive={activeCatId === cat.id}
-              count={machineCountPerCat[cat.id] || 0}
-              onClick={() => handleCategoryChange(cat.id)}
-            />
-          ))}
-          {/* Admin button at bottom of rail */}
-          {isAdmin && (
+
+      {/* ── HEADER (siempre visible) ── */}
+      <div className="flex items-center gap-2 px-2 py-2 border-b border-border bg-muted/10 flex-wrap">
+
+        {/* Toggle sidebar (desktop) */}
+        <button
+          onClick={() => setSidebarCollapsed(v => !v)}
+          className="hidden sm:flex items-center justify-center w-6 h-6 rounded text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors shrink-0"
+          title={sidebarCollapsed ? 'Mostrar áreas' : 'Ocultar áreas'}
+        >
+          {sidebarCollapsed
+            ? <ChevronsRight className="h-3.5 w-3.5" />
+            : <ChevronsLeft className="h-3.5 w-3.5" />
+          }
+        </button>
+
+        {/* Search with global dropdown */}
+        <div ref={searchContainerRef} className="relative flex-1 min-w-0" style={{ maxWidth: 280 }}>
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none z-10" />
+          <Input
+            value={searchQuery}
+            onChange={e => { setSearchQuery(e.target.value); setSearchFocused(true) }}
+            onFocus={() => setSearchFocused(true)}
+            placeholder="Buscar equipo en toda la planta…"
+            className="h-7 pl-7 pr-7 text-xs"
+          />
+          {searchQuery && (
             <button
-              onClick={() => setAdminMode(true)}
-              title="Administrar estructura"
-              className="flex items-center justify-center w-[52px] h-9 mt-auto rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+              onClick={() => { setSearchQuery(''); setSearchFocused(false) }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground z-10"
             >
-              <Settings2 className="h-4 w-4" />
+              <X className="h-3 w-3" />
             </button>
+          )}
+
+          {/* Global search dropdown (portal para escapar overflow-hidden) */}
+          {searchFocused && searchQuery.trim().length >= 2 && createPortal(
+            <GlobalSearchDropdown
+              ref={searchDropdownRef}
+              anchorRef={searchContainerRef}
+              results={globalSearchResults}
+              loading={globalSearchLoading}
+              searchQuery={searchQuery}
+              sidebarNodeMap={sidebarNodeMap}
+              repuestosCounts={repuestosCounts}
+              onSelect={handleGlobalSearchSelect}
+            />,
+            document.body,
           )}
         </div>
 
-        {/* ── CONTENT ── */}
-        <div className="flex-1 min-w-0">
-          {/* Header */}
-          <div className="flex items-center gap-2 px-3 py-2 border-b border-border">
-            {isAdmin && activeCat ? (
-              <InlineEditName
-                value={activeCat.nombre}
-                onSave={(n) => handleRenameCategory(activeCat.id, n)}
-                canEdit
-                textClassName="text-sm font-semibold text-foreground"
-              />
-            ) : (
-              <span className="text-sm font-semibold text-foreground">{activeCat?.nombre}</span>
-            )}
-            <span className="text-[10px] font-semibold bg-primary text-primary-foreground px-1.5 py-0.5 rounded-full tabular-nums">
-              {filteredMachines.length}
-            </span>
-            <div className="ml-auto flex items-center gap-1">
-              {isAdmin && !reorderMode && (
+        {/* Breadcrumb */}
+        <div className="flex items-center gap-0.5 text-[11px] text-muted-foreground min-w-0 flex-1 overflow-hidden">
+          {showAllAreas ? (
+            <span className="font-medium text-foreground">Todos los equipos</span>
+          ) : selectedTreeNodeId ? (
+            <>
+              {getNodePath(selectedTreeNodeId).map((n, i, arr) => (
+                <span key={n.id} className="flex items-center gap-0.5 min-w-0 shrink-0">
+                  {i > 0 && <ChevronRight className="h-2.5 w-2.5 shrink-0 opacity-30" />}
+                  <span className={`truncate ${i === arr.length - 1 ? 'text-foreground font-medium' : 'opacity-60'}`}>
+                    {n.nombre}
+                  </span>
+                </span>
+              ))}
+              {selectedEquipment && (
+                <>
+                  <ChevronRight className="h-2.5 w-2.5 shrink-0 opacity-30" />
+                  <span className="text-primary font-medium truncate shrink-0">
+                    {selectedEquipment.alias || selectedEquipment.nombre}
+                  </span>
+                </>
+              )}
+            </>
+          ) : (
+            <span className="truncate">—</span>
+          )}
+        </div>
+
+        {/* Count badge */}
+        <span className="text-[10px] font-bold bg-primary/10 text-primary border border-primary/20 px-1.5 py-0.5 rounded-full tabular-nums shrink-0">
+          {areaEquipment.length}
+        </span>
+
+        {/* Colapsar/expandir todos los equipos */}
+        <button
+          onClick={() => setAllEquipmentExpanded(v => v === undefined ? false : !v)}
+          title={allEquipmentExpanded === false ? 'Expandir todos los equipos' : 'Contraer todos los equipos'}
+          className="flex items-center justify-center w-6 h-6 rounded text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors shrink-0"
+        >
+          {allEquipmentExpanded === false
+            ? <Maximize2 className="h-3.5 w-3.5" />
+            : <Minimize2 className="h-3.5 w-3.5" />
+          }
+        </button>
+
+        {/* Favoritos toggle */}
+        <button
+          onClick={() => setFavoritesMode(v => !v)}
+          title={favoritesMode ? 'Ver todas las áreas' : 'Ver solo favoritos'}
+          className={[
+            'flex items-center justify-center w-6 h-6 rounded transition-colors shrink-0',
+            favoritesMode
+              ? 'text-amber-400 bg-amber-400/10 hover:bg-amber-400/20'
+              : 'text-muted-foreground hover:text-amber-400 hover:bg-muted/50',
+          ].join(' ')}
+        >
+          <Star className={`h-3.5 w-3.5 ${favoritesMode ? 'fill-amber-400' : ''}`} />
+        </button>
+
+        {/* Botón Administrar estructura — deshabilitado (máquinas manuales ya vinculadas) */}
+      </div>
+
+      {/* ── MOBILE: pills de navegación jerárquica ── */}
+      <div className="sm:hidden border-b border-border">
+        <div className="flex gap-1.5 px-3 py-2 overflow-x-auto scrollbar-hide">
+          <MobilePill
+            label="Todos"
+            count={0}
+            isActive={showAllAreas}
+            onClick={handleSelectAll}
+          />
+          {visibleSidebarTree.map(node => (
+            <MobilePill
+              key={node.id}
+              label={node.nombre}
+              count={node.equipmentCount}
+              isActive={!showAllAreas && (
+                selectedTreeNodeId === node.id ||
+                getNodePath(selectedTreeNodeId ?? '').some(n => n.id === node.id)
+              )}
+              onClick={() => handleSelectTreeNode(node)}
+            />
+          ))}
+        </div>
+
+        {/* Nivel 2 — sub-áreas del nodo seleccionado */}
+        {(() => {
+          if (showAllAreas || !selectedTreeNodeId) return null
+          const activePath = getNodePath(selectedTreeNodeId)
+          const activeTopNode = activePath[0] ? findNode(activePath[0].id) : null
+          if (!activeTopNode || !activeTopNode.children.length) return null
+          const subNodes = activeTopNode.id === selectedTreeNodeId
+            ? activeTopNode.children
+            : activeTopNode.children
+          if (!subNodes.length) return null
+          return (
+            <div className="flex gap-1.5 px-3 pb-2 overflow-x-auto scrollbar-hide">
+              {subNodes.map(sub => (
                 <button
-                  onClick={enterReorderMode}
-                  title="Reordenar equipos (drag & drop)"
-                  className="flex items-center gap-1 px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+                  key={sub.id}
+                  onClick={() => handleSelectTreeNode(sub)}
+                  className={[
+                    'flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium whitespace-nowrap shrink-0 transition-all border',
+                    selectedTreeNodeId === sub.id
+                      ? 'bg-primary/15 text-primary border-primary/30'
+                      : 'bg-transparent text-muted-foreground border-border/40 hover:border-muted-foreground/40 hover:text-foreground',
+                  ].join(' ')}
                 >
-                  <GripVertical className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Ordenar</span>
+                  <ChevronRight className="h-2.5 w-2.5 opacity-60 shrink-0" />
+                  {sub.nombre}
+                  {sub.equipmentCount > 0 && (
+                    <span className="text-[9px] opacity-60 tabular-nums">{sub.equipmentCount}</span>
+                  )}
                 </button>
-              )}
-              {reorderMode && (
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={cancelReorder}
-                    className="flex items-center gap-1 px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
-                  >
-                    <X className="h-3 w-3" /> Cancelar
-                  </button>
-                  <button
-                    onClick={saveOrder}
-                    disabled={savingOrder}
-                    className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-primary-foreground bg-primary hover:bg-primary/90 rounded transition-colors disabled:opacity-50"
-                  >
-                    <Save className="h-3 w-3" />
-                    {savingOrder ? 'Guardando…' : 'Guardar orden'}
-                  </button>
-                </div>
-              )}
+              ))}
             </div>
-          </div>
+          )
+        })()}
+      </div>
 
-          {/* Breadcrumb */}
-          <div className="flex items-center gap-1 px-3 py-1 text-[11px] text-muted-foreground bg-muted/30 border-b border-border">
-            <span>{activeCat?.nombre}</span>
-            {activeSubcat && (
-              <>
-                <ChevronRight className="h-3 w-3 text-muted-foreground/50" />
-                <span>{activeSubcat.nombre}</span>
-              </>
-            )}
-            {currentMachine && (
-              <>
-                <ChevronRight className="h-3 w-3 text-muted-foreground/50" />
-                <span className="text-primary font-medium">● {currentMachine.nombre}</span>
-              </>
-            )}
-          </div>
+      {/* ── BODY: sidebar + content ── */}
+      <div className="flex">
 
-          {/* Toolbar: subcats + search */}
-          <div className="flex items-center gap-2 px-3 py-1.5 flex-wrap">
-            {/* Subcategory chips */}
-            {subcategories.length > 0 && (
-              <div className="flex items-center gap-1 flex-wrap flex-1">
-                {subcategories.map(sc => (
-                  <SubcatChip
-                    key={sc.id}
-                    label={sc.nombre.replace(/^(Cintas?|Máquinas?|Cinta)\s*/i, '')}
-                    isActive={activeSubcatId === sc.id}
-                    count={machineCountPerSubcat[sc.id] || 0}
-                    onClick={() => handleSubcatChange(sc.id)}
-                    canEdit={isAdmin}
-                    onRename={(n) => handleRenameCategory(sc.id, n)}
-                  />
+        {/* ── SIDEBAR (desktop) ── */}
+        <div
+          style={{ width: sidebarCollapsed ? 0 : 400, minWidth: sidebarCollapsed ? 0 : 400 }}
+          className={`
+            hidden sm:flex flex-col border-r border-border bg-muted/5 shrink-0
+            transition-all duration-200
+            ${sidebarCollapsed ? 'overflow-hidden border-r-0' : ''}
+          `}
+        >
+          <div className="flex-1 overflow-y-auto overflow-x-scroll py-0.5 [scrollbar-width:thin] [scrollbar-color:hsl(var(--border))_transparent]">
+          <div className="min-w-max">
+
+            {/* Todos */}
+            <SidebarAreaItem
+              label="Todos los equipos"
+              count={activeMachines.length}
+              isActive={showAllAreas}
+              onClick={handleSelectAll}
+            />
+
+            <div className="my-0.5 mx-1.5 border-t border-border/40" />
+
+            {/* Árbol multi-nivel — todas las áreas */}
+            {visibleSidebarTree.map(plantNode => (
+              <SidebarTreeNodeView
+                key={plantNode.id}
+                node={plantNode}
+                openNodes={openNodes}
+                onToggle={toggleNode}
+                onSelect={handleSelectTreeNode}
+                selectedId={selectedTreeNodeId}
+                showAllAreas={showAllAreas}
+
+                onExpandNode={expandNode}
+                onAddMachine={isAdmin ? (id, name) => {
+                  setQuickAddNode({ id, name })
+                  setAdminMode(true)
+                } : undefined}
+                favoriteIds={favoriteIds}
+                onToggleFavorite={toggleFavorite}
+                repuestosCounts={areaRepuestosCounts}
+              />
+            ))}
+
+            {/* Skeleton cuando el árbol aún no cargó */}
+            {visibleSidebarTree.length === 0 && areaTreeLoading && (
+              <div className="px-3 py-2 flex flex-col gap-2 animate-pulse">
+                {[0.6, 0.8, 0.5, 0.7, 0.45].map((w, i) => (
+                  <div key={i} className="h-4 rounded bg-muted/60" style={{ width: `${w * 100}%` }} />
                 ))}
               </div>
             )}
-            {/* Search */}
-            <div className="relative w-full sm:w-auto sm:max-w-[180px] shrink-0">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-              <Input
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Buscar equipo…"
-                className="h-7 pl-7 pr-7 text-xs"
+          </div>{/* /min-w-max */}
+          </div>
+        </div>
+
+        {/* ── CONTENT: equipos SAP del área seleccionada ── */}
+        <div className="flex-1 min-w-0 flex flex-col max-h-[65vh]">
+
+          {/* Cabecera de contexto */}
+          {(() => {
+            const selNode = selectedTreeNodeId ? sidebarNodeMap.get(selectedTreeNodeId) : null
+            const areaName = showAllAreas
+              ? 'Todos los equipos'
+              : selNode?.nombre ?? '—'
+            const path = selectedTreeNodeId
+              ? getNodePath(selectedTreeNodeId).map(n => n.nombre)
+              : []
+            return (
+              <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border/30 bg-muted/5">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {path.length > 1 && path.slice(0, -1).map((p, i) => (
+                      <span key={i} className="text-[9px] text-muted-foreground/50 shrink-0">
+                        {p} <span className="opacity-40">/</span>
+                      </span>
+                    ))}
+                    <span className="text-[10px] font-semibold text-foreground">{areaName}</span>
+                  </div>
+                </div>
+                <span className="text-[9px] font-bold tabular-nums text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full shrink-0">
+                  {filteredEquipment.length} equipos
+                </span>
+                {isAdmin && hiddenCount > 0 && (
+                  <button
+                    onClick={() => setShowHidden(v => !v)}
+                    className={[
+                      'flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium transition-colors shrink-0',
+                      showHidden
+                        ? 'bg-amber-500/15 text-amber-500'
+                        : 'bg-muted/60 text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted',
+                    ].join(' ')}
+                    title={showHidden ? 'Ocultar equipos ocultos' : `Ver ${hiddenCount} oculto(s)`}
+                  >
+                    {showHidden ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                    {hiddenCount}
+                  </button>
+                )}
+                {isAdmin && selectedTreeNodeId && !showAllAreas && (
+                  <>
+                    <button
+                      onClick={() => setReorderMode(v => !v)}
+                      className={[
+                        'flex items-center justify-center w-5 h-5 rounded transition-colors shrink-0',
+                        reorderMode
+                          ? 'bg-primary/20 text-primary'
+                          : 'hover:bg-primary/20 text-muted-foreground/50 hover:text-primary',
+                      ].join(' ')}
+                      title={reorderMode ? 'Salir de reordenar' : 'Reordenar equipos'}
+                    >
+                      <ArrowUpDown className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setAddingEquipment(true)}
+                      className="flex items-center justify-center w-5 h-5 rounded hover:bg-primary/20 text-muted-foreground/50 hover:text-primary transition-colors shrink-0"
+                      title="Agregar equipo"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </button>
+                  </>
+                )}
+              </div>
+            )
+          })()}
+
+          {/* Formulario inline agregar equipo */}
+          {addingEquipment && (
+            <div className="flex items-center gap-1.5 px-3 py-2 border-b border-primary/20 bg-primary/5">
+              <Plus className="h-3.5 w-3.5 text-primary/50 shrink-0" />
+              <input
+                ref={newEqInputRef}
+                value={newEqName}
+                onChange={e => setNewEqName(e.target.value.toUpperCase())}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') handleAddEquipmentToArea()
+                  if (e.key === 'Escape') setAddingEquipment(false)
+                }}
+                placeholder="Nombre del equipo"
+                className="flex-1 min-w-0 h-6 px-1.5 text-[11px] uppercase rounded border border-primary/40 bg-background text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary/50"
               />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs"
-                >
-                  <X className="h-3 w-3" />
-                </button>
+              <input
+                value={newEqCode}
+                onChange={e => setNewEqCode(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') handleAddEquipmentToArea()
+                  if (e.key === 'Escape') setAddingEquipment(false)
+                }}
+                placeholder="Código (opc.)"
+                className="w-24 h-6 px-1.5 text-[10px] font-mono rounded border border-border bg-background text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary/50"
+              />
+              <button
+                onClick={handleAddEquipmentToArea}
+                disabled={savingNewEq || !newEqName.trim()}
+                className="flex items-center justify-center w-6 h-6 rounded bg-primary/20 hover:bg-primary/30 text-primary transition-colors shrink-0 disabled:opacity-40"
+              >
+                {savingNewEq ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+              </button>
+              <button
+                onClick={() => setAddingEquipment(false)}
+                className="flex items-center justify-center w-6 h-6 rounded hover:bg-muted/50 text-muted-foreground transition-colors shrink-0"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          )}
+
+          {equipmentLoading ? (
+            <div className="flex items-center justify-center gap-2 py-10">
+              <Loader2 className="h-5 w-5 animate-spin text-primary/50" />
+              <span className="text-xs text-muted-foreground">Cargando equipos...</span>
+            </div>
+          ) : filteredEquipment.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-2 py-10 px-4 text-center">
+              <Package className="h-7 w-7 text-muted-foreground/30" />
+              <p className="text-xs text-muted-foreground">
+                Sin equipos en esta área
+              </p>
+              {selectedTreeNodeId && (
+                <p className="text-[10px] text-muted-foreground/50">
+                  Selecciona un sub-área con equipos
+                </p>
               )}
             </div>
-          </div>
+          ) : (
+            /* ── LISTA DE EQUIPOS SAP ── */
+            <div className="flex-1 overflow-y-auto [scrollbar-width:thin] [scrollbar-color:hsl(var(--border))_transparent]">
+              {filteredEquipment.map((eq, idx) => (
+                <EquipmentCard
+                  key={eq.id}
+                  equipment={eq}
+                  isActive={selectedEquipment?.id === eq.id || currentMachine?.id === eq.linkedMachineId}
+                  onClick={handleSelectEquipment}
+                  repuestosCounts={repuestosCounts}
+                  isAdmin={isAdmin}
+                  allExpanded={allEquipmentExpanded}
+                  onAliasUpdated={() => { invalidateEquipmentCache(selectedTreeNodeId ?? undefined); setRefreshKey(k => k + 1) }}
+                  onChildAdded={() => { invalidateEquipmentCache(selectedTreeNodeId ?? undefined); setRefreshKey(k => k + 1) }}
+                  reorderMode={reorderMode}
+                  isFirst={idx === 0}
+                  isLast={idx === filteredEquipment.length - 1}
+                  onMoveUp={() => handleMoveEquipment(eq.id, 'up')}
+                  onMoveDown={() => handleMoveEquipment(eq.id, 'down')}
+                  onToggleHidden={handleToggleHidden}
+                />
+              ))}
 
-          {/* Machine Grid */}
-          <div className="px-2 pb-2 pt-0.5">
-            {reorderMode ? (
-              /* ── Reorder mode: drag & drop list ── */
-              localOrder.length === 0 ? (
-                <div className="text-center py-4 text-muted-foreground text-xs">
-                  Sin equipos en esta subcategoría
-                </div>
-              ) : (
+              {/* Máquinas manuales vinculadas al área (sin match SAP) */}
+              {machinesInArea.length > 0 && (
                 <>
-                  <div className="mb-1.5 px-1">
-                    <span className="text-[10px] text-muted-foreground">
-                      ↕ Arrastra los equipos para reordenar · El orden refleja la secuencia física del proceso
+                  <div className="px-3 py-1.5 border-t border-border/30 bg-muted/5">
+                    <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">
+                      Equipos manuales ({machinesInArea.length})
                     </span>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1">
-                    {localOrder.map((machine, index) => (
-                      <div
-                        key={machine.id}
-                        draggable
-                        onDragStart={() => handleDragStart(index)}
-                        onDragEnter={() => handleDragEnter(index)}
-                        onDragEnd={handleDragEnd}
-                        onDragOver={(e) => e.preventDefault()}
-                        className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg border border-border bg-card hover:border-primary/50 cursor-grab active:cursor-grabbing transition-colors select-none"
-                      >
-                        <span className="text-[10px] font-mono text-muted-foreground w-4 text-center shrink-0">
-                          {index + 1}
-                        </span>
-                        <GripVertical className="h-3.5 w-3.5 text-muted-foreground/60 shrink-0" />
-                        <span
-                          className="w-2 h-2 rounded-full shrink-0"
-                          style={{ backgroundColor: machine.color || '#3b82f6' }}
-                        />
-                        <span className="text-xs font-medium text-foreground truncate">
-                          {machine.nombre}
-                        </span>
-                        <span className="ml-auto text-[10px] text-muted-foreground tabular-nums shrink-0">
-                          {repuestosCounts[machine.id] || 0}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )
-            ) : (
-              /* ── Browse mode: normal grid ── */
-              filteredMachines.length === 0 ? (
-                <div className="text-center py-4 text-muted-foreground text-xs">
-                  {searchQuery
-                    ? <>🔍 Sin resultados para &quot;{searchQuery}&quot;</>
-                    : 'Sin equipos en esta subcategoría'
-                  }
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1">
-                  {filteredMachines.map(machine => (
+                  {machinesInArea.map(machine => (
                     <MachineCard
                       key={machine.id}
                       machine={machine}
                       isActive={currentMachine?.id === machine.id}
                       count={repuestosCounts[machine.id] || 0}
-                      maxCount={maxCount}
-                      onClick={() => handleSelectMachine(machine)}
+                      maxCount={Math.max(1, ...machinesInArea.map(m => repuestosCounts[m.id] || 0))}
+                      onClick={() => {
+                        setCurrentMachine(machine.id)
+                        onCategoryChange?.(machine.hierarchyNodeId || null)
+                      }}
                       canEdit={isAdmin}
-                      onRename={(n) => handleRenameMachine(machine.id, n)}
+                      onRename={n => handleRenameMachine(machine.id, n)}
+                      onDelete={softDeleteMachine}
                     />
                   ))}
-                </div>
-              )
-            )}
-          </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Modal de vinculación — deshabilitado (todas las máquinas ya vinculadas) */}
     </div>
   )
 }

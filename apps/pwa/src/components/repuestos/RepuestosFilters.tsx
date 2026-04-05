@@ -5,14 +5,20 @@ interface RepuestosFiltersProps {
   searchQuery: string
   onSearchChange: (value: string) => void
   onClearFilters: () => void
+  filterTipo?: string | null
+  onFilterTipoChange?: (tipo: string | null) => void
+  tiposDisponibles?: string[]
 }
 
 export function RepuestosFilters({
   searchQuery,
   onSearchChange,
   onClearFilters,
+  filterTipo = null,
+  onFilterTipoChange,
+  tiposDisponibles = [],
 }: RepuestosFiltersProps) {
-  const hasActiveFilters = searchQuery !== ''
+  const hasActiveFilters = searchQuery !== '' || filterTipo !== null
 
   return (
     <div className="space-y-3">
@@ -45,6 +51,36 @@ export function RepuestosFilters({
           </Button>
         )}
       </div>
+
+      {/* Chips de tipo */}
+      {tiposDisponibles.length > 0 && onFilterTipoChange && (
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 flex-nowrap">
+          {/* Chip "Todos" */}
+          <button
+            onClick={() => onFilterTipoChange(null)}
+            className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full border cursor-pointer transition-colors whitespace-nowrap ${
+              filterTipo === null
+                ? 'bg-primary text-primary-foreground border-primary'
+                : 'border-border text-muted-foreground hover:border-primary/50 hover:text-foreground'
+            }`}
+          >
+            Todos
+          </button>
+          {tiposDisponibles.slice(0, 12).map((tipo) => (
+            <button
+              key={tipo}
+              onClick={() => onFilterTipoChange(filterTipo === tipo ? null : tipo)}
+              className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full border cursor-pointer transition-colors whitespace-nowrap ${
+                filterTipo === tipo
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'border-border text-muted-foreground hover:border-primary/50 hover:text-foreground'
+              }`}
+            >
+              {tipo}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

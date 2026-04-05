@@ -102,7 +102,7 @@ export function RelocateRepuestoModal({
             {/* Repuesto info */}
             <div className="bg-muted/30 rounded-lg p-3 border border-border space-y-1">
               <div className="text-xs text-muted-foreground uppercase tracking-wider">Repuesto</div>
-              <div className="font-medium text-foreground text-sm">{repuesto.textoBreve || repuesto.codigoSAP || 'Sin nombre'}</div>
+              <div className="font-medium text-foreground text-sm">{repuesto.textoBreve || repuesto.descripcion || repuesto.codigoSAP || 'Sin nombre'}</div>
               {repuesto.codigoSAP && (
                 <div className="text-xs text-muted-foreground font-mono">SAP: {repuesto.codigoSAP}</div>
               )}

@@ -18,11 +18,15 @@ import { storage, db } from '@/services/firebase'
 import { useStorage } from '@/hooks/repuestos/useStorage'
 import { useIsAdmin } from '@/store/authStore'
 import { Button } from '@/components/ui'
-import { preloadMachinePdfsWithProgress, clearPdfCache, isCached } from '@/services/pdfCache'
+import { preloadMachinePdfsWithProgress, preloadPdf, clearPdfCache, isCached } from '@/services/pdfCache'
 import type { Machine } from '@/types/repuestos'
 
 interface MachineManualPanelProps {
-  machine: Machine
+  machine?: Machine
+  /** ID alternativo para almacenar manuales (ej: nodo SAP sin vincular) */
+  storageId?: string
+  /** Nombre para mostrar cuando no hay machine */
+  displayName?: string
   className?: string
 }
 
@@ -32,9 +36,13 @@ interface ManualFile {
   fullPath: string
 }
 
-export function MachineManualPanel({ machine, className = '' }: MachineManualPanelProps) {
+export function MachineManualPanel({ machine, storageId, displayName, className = '' }: MachineManualPanelProps) {
+  const effectiveId = machine?.id || storageId
+  const effectiveName = machine?.nombre || displayName || 'este equipo'
+  // Ruta de storage: machines/{id}/manuales para máquinas, equipment/{id}/manuales para nodos SAP
+  const storagePath = machine ? `machines/${machine.id}/manuales` : `equipment/${storageId}/manuales`
   const isAdmin = useIsAdmin()
-  const { uploadManualPDF, uploading, progress } = useStorage(machine.id)
+  const { uploadManualPDF, uploading, progress } = useStorage(effectiveId || null, storagePath)
   const [manuals, setManuals] = useState<ManualFile[]>([])
   const [loading, setLoading] = useState(true)
   const [deleting, setDeleting] = useState<string | null>(null)
@@ -50,9 +58,9 @@ export function MachineManualPanel({ machine, className = '' }: MachineManualPan
   const loadManuals = useCallback(async () => {
     setLoading(true)
     try {
-      const folderRef = ref(storage, `machines/${machine.id}/manuales`)
+      const folderRef = ref(storage, storagePath)
       const listResult = await listAll(folderRef)
-      
+
       const files: ManualFile[] = []
       for (const item of listResult.items) {
         try {
@@ -73,7 +81,7 @@ export function MachineManualPanel({ machine, className = '' }: MachineManualPan
     } finally {
       setLoading(false)
     }
-  }, [machine.id])
+  }, [storagePath])
 
   useEffect(() => { loadManuals() }, [loadManuals])
 
@@ -85,17 +93,32 @@ export function MachineManualPanel({ machine, className = '' }: MachineManualPan
     setCacheTotal(0)
 
     // Esperar a que los manuales se listen antes de precargar
-    if (loading) return
+    if (loading || !effectiveId) return
 
     const runPreload = async () => {
       setCacheState('loading')
       try {
-        await preloadMachinePdfsWithProgress(machine, ({ loaded, total, done }) => {
-          if (preloadAbortRef.current) return
-          setCacheLoaded(loaded)
+        if (machine) {
+          await preloadMachinePdfsWithProgress(machine, ({ loaded, total, done }) => {
+            if (preloadAbortRef.current) return
+            setCacheLoaded(loaded)
+            setCacheTotal(total)
+            if (done) setCacheState('done')
+          })
+        } else {
+          // Para nodos SAP sin machine: precargar desde las URLs ya listadas
+          const total = manuals.length
           setCacheTotal(total)
-          if (done) setCacheState('done')
-        })
+          if (total === 0) { setCacheState('done'); return }
+          let loaded = 0
+          for (const m of manuals) {
+            if (preloadAbortRef.current) return
+            try { await preloadPdf(m.url) } catch { /* skip */ }
+            loaded++
+            setCacheLoaded(loaded)
+          }
+          if (!preloadAbortRef.current) setCacheState('done')
+        }
       } catch {
         if (!preloadAbortRef.current) setCacheState('idle')
       }
@@ -104,7 +127,7 @@ export function MachineManualPanel({ machine, className = '' }: MachineManualPan
     runPreload()
 
     return () => { preloadAbortRef.current = true }
-  }, [machine, loading])
+  }, [machine, effectiveId, loading, manuals])
 
   // ─── Clear cache handler ─────────────────────────────────
   const handleClearCache = async () => {
@@ -116,13 +139,7 @@ export function MachineManualPanel({ machine, className = '' }: MachineManualPan
       setCacheTotal(0)
       // Re-trigger preload
       preloadAbortRef.current = false
-      setCacheState('loading')
-      await preloadMachinePdfsWithProgress(machine, ({ loaded, total, done }) => {
-        if (preloadAbortRef.current) return
-        setCacheLoaded(loaded)
-        setCacheTotal(total)
-        if (done) setCacheState('done')
-      })
+      await loadManuals()
     } catch {
       setCacheState('idle')
     } finally {
@@ -133,17 +150,26 @@ export function MachineManualPanel({ machine, className = '' }: MachineManualPan
   // Upload handler
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (!file) return
-    
+    if (!file || !effectiveId) return
+
     const baseName = file.name.replace(/\.pdf$/i, '').replace(/[^a-zA-Z0-9áéíóúñ\s-]/gi, '')
     try {
       const url = await uploadManualPDF(file, baseName)
-      // Also save in machine.manuals array for quick access
-      const machineRef = doc(db, 'machines', machine.id)
-      await updateDoc(machineRef, {
-        manuals: arrayUnion(url),
-        updatedAt: Timestamp.now(),
-      })
+      if (machine) {
+        // Guardar en machine.manuals array para acceso rápido
+        const machineRef = doc(db, 'machines', machine.id)
+        await updateDoc(machineRef, {
+          manuals: arrayUnion(url),
+          updatedAt: Timestamp.now(),
+        })
+      } else if (storageId) {
+        // Guardar referencia en hierarchy/{nodeId}.manuals
+        const nodeRef = doc(db, 'hierarchy', storageId)
+        await updateDoc(nodeRef, {
+          manuals: arrayUnion(url),
+          actualizadoEn: Timestamp.now(),
+        })
+      }
       await loadManuals()
     } catch (err) {
       console.error('Error uploading manual:', err)
@@ -159,12 +185,19 @@ export function MachineManualPanel({ machine, className = '' }: MachineManualPan
     try {
       const fileRef = ref(storage, manual.fullPath)
       await deleteObject(fileRef)
-      // Remove from machine.manuals
-      const machineRef = doc(db, 'machines', machine.id)
-      await updateDoc(machineRef, {
-        manuals: arrayRemove(manual.url),
-        updatedAt: Timestamp.now(),
-      })
+      if (machine) {
+        const machineRef = doc(db, 'machines', machine.id)
+        await updateDoc(machineRef, {
+          manuals: arrayRemove(manual.url),
+          updatedAt: Timestamp.now(),
+        })
+      } else if (storageId) {
+        const nodeRef = doc(db, 'hierarchy', storageId)
+        await updateDoc(nodeRef, {
+          manuals: arrayRemove(manual.url),
+          actualizadoEn: Timestamp.now(),
+        })
+      }
       await loadManuals()
     } catch (err) {
       console.error('Error deleting manual:', err)
@@ -288,7 +321,7 @@ export function MachineManualPanel({ machine, className = '' }: MachineManualPan
       {manuals.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-6 text-muted-foreground border border-dashed rounded-lg bg-muted/10 gap-2">
           <FileText className="h-8 w-8 text-muted-foreground/30" />
-          <span className="text-xs">No hay manuales cargados para {machine.nombre}</span>
+          <span className="text-xs">No hay manuales cargados para {effectiveName}</span>
           {isAdmin && (
             <span className="text-[10px] text-muted-foreground/60">
               Sube un PDF para habilitar la búsqueda por código de fabricante

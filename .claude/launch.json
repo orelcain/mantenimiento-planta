@@ -6,7 +6,14 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "cwd": "apps/pwa",
-      "port": 5173
+      "port": 5173,
+      "autoPort": true
+    },
+    {
+      "name": "propuestas-html",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "-l", "5500", "."],
+      "port": 5500
     }
   ]
 }

@@ -42,6 +42,19 @@ interface RepuestosTableProps {
 const formatNumber = (value: number) =>
   Number.isFinite(value) ? value.toLocaleString('es-CL') : '-';
 
+function tipoBadgeClass(tipo: string): string {
+  const t = tipo.toUpperCase()
+  if (['RODAMIENTO', 'COJINETE'].includes(t)) return 'bg-blue-500/15 text-blue-400'
+  if (['SELLO/JUNTA', 'ANILLO'].includes(t)) return 'bg-green-500/15 text-green-400'
+  if (['MOTOR', 'BOMBA'].includes(t)) return 'bg-red-500/15 text-red-400'
+  if (['SENSOR', 'INTERRUPTOR', 'MÓDULO ELÉCT.', 'RELÉ', 'CONTACTOR', 'FUENTE ALIM.', 'TRANSFORMADOR', 'VARIADOR', 'HMI', 'PLC'].includes(t)) return 'bg-purple-500/15 text-purple-400'
+  if (['TORNILLERÍA', 'PERNO', 'TUERCA', 'PASADOR', 'ARANDELA', 'ABRAZADERA'].includes(t)) return 'bg-zinc-500/15 text-zinc-400'
+  if (['CORREA', 'CADENA', 'CINTA/BANDA'].includes(t)) return 'bg-orange-500/15 text-orange-400'
+  if (['VÁLVULA', 'CILINDRO NEUM.', 'NEUMÁTICA GEN.'].includes(t)) return 'bg-cyan-500/15 text-cyan-400'
+  if (['FILTRO', 'LUBRICACIÓN'].includes(t)) return 'bg-yellow-500/15 text-yellow-500'
+  return 'bg-muted text-muted-foreground'
+}
+
 /** Thumbnail de la primera imagen disponible — click para preview rápido */
 function RepuestoThumbnail({ rep, onPreview }: { rep: Repuesto; onPreview?: (url: string, name: string) => void }) {
   const img = rep.fotosReales?.[0] || rep.imagenesManual?.[0] || rep.gallery?.[0]
@@ -204,7 +217,7 @@ export function RepuestosTable({
                   <div className="text-[11px] font-mono text-muted-foreground">{rep.codigoSAP || 'S/C'}</div>
                   {onRenameRepuesto ? (
                     <InlineEditName
-                      value={rep.textoBreve || 'Sin nombre'}
+                      value={rep.textoBreve || rep.descripcion || 'Sin nombre'}
                       onSave={(n) => onRenameRepuesto(rep.id, n)}
                       canEdit
                       textClassName="font-medium text-foreground line-clamp-2 text-sm"
@@ -213,7 +226,12 @@ export function RepuestosTable({
                     <button
                       onClick={() => onViewDetail?.(rep)}
                       className="font-medium text-foreground line-clamp-2 text-sm text-left hover:text-primary hover:underline transition-colors"
-                    >{rep.textoBreve || 'Sin nombre'}</button>
+                    >{rep.textoBreve || rep.descripcion || 'Sin nombre'}</button>
+                  )}
+                  {rep.tipo && (
+                    <span className={`inline-block text-[9px] px-1 py-0 rounded font-medium uppercase tracking-wide mt-0.5 ${tipoBadgeClass(rep.tipo)}`}>
+                      {rep.tipo}
+                    </span>
                   )}
                 </div>
                 <RepuestoActionsMenu
@@ -256,7 +274,7 @@ export function RepuestosTable({
                 </div>
               )}
              
-              {rep.descripcion && (
+              {rep.descripcion && rep.descripcion !== (rep.textoBreve || '') && (
                 <p className="text-xs text-muted-foreground line-clamp-2 bg-muted/20 p-2 rounded-lg">
                   {rep.descripcion}
                 </p>
@@ -333,7 +351,7 @@ export function RepuestosTable({
                       <div className="min-w-0">
                         {onRenameRepuesto ? (
                           <InlineEditName
-                            value={rep.textoBreve || 'Sin nombre'}
+                            value={rep.textoBreve || rep.descripcion || 'Sin nombre'}
                             onSave={(n) => onRenameRepuesto(rep.id, n)}
                             canEdit
                             textClassName="font-medium text-foreground truncate"
@@ -343,11 +361,16 @@ export function RepuestosTable({
                             onClick={() => onViewDetail?.(rep)}
                             className="font-medium text-foreground truncate text-left hover:text-primary hover:underline transition-colors cursor-pointer"
                             title="Ver ficha completa"
-                          >{rep.textoBreve || 'Sin nombre'}</button>
+                          >{rep.textoBreve || rep.descripcion || 'Sin nombre'}</button>
                         )}
-                        {rep.descripcion ? (
+                        {rep.descripcion && rep.descripcion !== (rep.textoBreve || '') ? (
                           <div className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{rep.descripcion}</div>
                         ) : null}
+                        {rep.tipo && (
+                          <span className={`inline-block text-[9px] px-1 py-0 rounded font-medium uppercase tracking-wide mt-0.5 ${tipoBadgeClass(rep.tipo)}`}>
+                            {rep.tipo}
+                          </span>
+                        )}
                       </div>
                       {hasMedia && (
                         <ImageIcon className="h-3.5 w-3.5 text-blue-400/60 shrink-0" />

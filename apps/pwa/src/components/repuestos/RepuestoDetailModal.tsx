@@ -1,22 +1,26 @@
 /**
- * RepuestoDetailModal — Ficha completa de repuesto (solo lectura)
+ * RepuestoDetailModal — Ficha completa de repuesto
  *
  * Muestra TODA la información de un repuesto en una sola vista:
- * - Datos principales (códigos, nombre, descripción, observaciones)
+ * - Datos principales (códigos, nombre, alias, descripción, observaciones)
  * - Valores (cantidad, valor unitario, ubicación)
  * - Ficha técnica (si existe)
  * - Galería de imágenes (fotos reales, manual, gallery)
  * - Vínculos al manual
  *
+ * Permite editar el alias del repuesto (nombre común del técnico).
  * Accesible para TODOS los usuarios (no solo admin).
  */
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import {
   X, Package, MapPin, DollarSign, Hash, Tag,
   ClipboardList, Camera, BookOpen, MessageSquareText,
   Image as ImageIcon, ChevronLeft, ChevronRight,
+  Pencil, Check, X as XIcon,
 } from 'lucide-react'
+import { doc, updateDoc } from 'firebase/firestore'
+import { db } from '@/services/firebase'
 import { Dialog, DialogContent, Badge } from '@/components/ui'
 import type { Repuesto, ImagenRepuesto, MachineImage } from '@/types/repuestos'
 
@@ -123,6 +127,8 @@ interface RepuestoDetailModalProps {
   onOpenChange: (open: boolean) => void
   repuesto: Repuesto
   machineName?: string
+  machineId?: string
+  onAliasUpdated?: (repuestoId: string, alias: string) => void
 }
 
 export function RepuestoDetailModal({
@@ -130,8 +136,32 @@ export function RepuestoDetailModal({
   onOpenChange,
   repuesto: rep,
   machineName,
+  machineId,
+  onAliasUpdated,
 }: RepuestoDetailModalProps) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
+  const [editingAlias, setEditingAlias] = useState(false)
+  const [aliasValue, setAliasValue] = useState(rep.alias || '')
+  const [savingAlias, setSavingAlias] = useState(false)
+  const aliasInputRef = useRef<HTMLInputElement>(null)
+
+  const saveAlias = async () => {
+    if (!machineId) return
+    const trimmed = aliasValue.trim()
+    setSavingAlias(true)
+    try {
+      await updateDoc(doc(db, `machines/${machineId}/repuestos/${rep.id}`), {
+        alias: trimmed || null,
+      })
+      rep.alias = trimmed || undefined
+      onAliasUpdated?.(rep.id, trimmed)
+      setEditingAlias(false)
+    } catch (err) {
+      console.error('Error saving alias:', err)
+    } finally {
+      setSavingAlias(false)
+    }
+  }
 
   // ── Collect all images ──
   const allImages: LightboxImage[] = []
@@ -188,11 +218,57 @@ export function RepuestoDetailModal({
               )}
               <div className="flex-1 min-w-0">
                 <h2 className="text-lg font-bold text-foreground leading-tight line-clamp-2">
-                  {rep.textoBreve || 'Sin nombre'}
+                  {rep.textoBreve || rep.descripcion || 'Sin nombre'}
                 </h2>
+
+                {/* Alias editable */}
+                <div className="flex items-center gap-1.5 mt-1">
+                  {editingAlias ? (
+                    <div className="flex items-center gap-1 flex-1 min-w-0">
+                      <input
+                        ref={aliasInputRef}
+                        value={aliasValue}
+                        onChange={e => setAliasValue(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') saveAlias(); if (e.key === 'Escape') setEditingAlias(false) }}
+                        placeholder="Nombre común (ej: motor de corte)"
+                        className="flex-1 min-w-0 h-7 text-xs bg-muted/50 border border-primary/30 rounded px-2 focus:outline-none focus:ring-1 focus:ring-primary/50 text-foreground placeholder:text-muted-foreground/40"
+                        autoFocus
+                        disabled={savingAlias}
+                      />
+                      <button onClick={saveAlias} disabled={savingAlias} className="h-6 w-6 rounded flex items-center justify-center text-primary hover:bg-primary/10 transition-colors">
+                        <Check className="h-3.5 w-3.5" />
+                      </button>
+                      <button onClick={() => { setEditingAlias(false); setAliasValue(rep.alias || '') }} className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:bg-muted/50 transition-colors">
+                        <XIcon className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      {rep.alias ? (
+                        <span className="text-xs text-primary/70 italic truncate">"{rep.alias}"</span>
+                      ) : null}
+                      {machineId && (
+                        <button
+                          onClick={() => { setAliasValue(rep.alias || ''); setEditingAlias(true) }}
+                          className="flex items-center gap-0.5 text-[9px] text-muted-foreground/50 hover:text-primary transition-colors shrink-0"
+                          title={rep.alias ? 'Editar alias' : 'Agregar nombre común'}
+                        >
+                          <Pencil className="h-2.5 w-2.5" />
+                          {!rep.alias && <span>Agregar alias</span>}
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+
                 <div className="flex flex-wrap items-center gap-2 mt-1">
                   {rep.codigoSAP && (
                     <Badge variant="secondary" className="text-[10px] font-mono">{rep.codigoSAP}</Badge>
+                  )}
+                  {rep.codigoFabricante && (
+                    <Badge variant="secondary" className="text-[10px] font-mono bg-blue-500/10 text-blue-400 border-blue-500/20">
+                      Fab: {rep.codigoFabricante}
+                    </Badge>
                   )}
                   {machineName && (
                     <Badge variant="outline" className="text-[10px]">{machineName}</Badge>
@@ -215,6 +291,8 @@ export function RepuestoDetailModal({
               <div className="bg-muted/20 rounded-lg p-3 space-y-0">
                 <InfoRow label="Código SAP" value={rep.codigoSAP} mono />
                 <InfoRow label="Código Fabricante" value={rep.codigoFabricante} mono />
+                {rep.alias && <InfoRow label="Alias (nombre común)" value={rep.alias} />}
+                <InfoRow label="N° Serie equipo" value={rep.numeroSerie} mono />
                 <InfoRow label="Nombre Manual" value={rep.nombreManual} />
                 {rep.descripcion && (
                   <div className="py-1.5 border-b border-border/30">

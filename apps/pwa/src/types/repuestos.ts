@@ -48,6 +48,8 @@ export interface Repuesto {
   codigoSAP: string;
   textoBreve: string;
   descripcion: string;
+  /** Alias común — nombre con el que los técnicos conocen la pieza */
+  alias?: string;
   nombreManual?: string; // Nombre según el manual del fabricante
   codigoFabricante: string; // o código del fabricante
   
@@ -70,6 +72,14 @@ export interface Repuesto {
   
   /** Observaciones o notas adicionales del repuesto */
   observaciones?: string;
+
+  // Campos del catálogo maestro (Excel)
+  /** Tipo de repuesto: RODAMIENTO, SELLO/JUNTA, SENSOR, MOTOR, etc. */
+  tipo?: string;
+  /** Sección del equipo a la que pertenece el repuesto */
+  seccion?: string;
+  /** Número de serie del equipo (para repuestos específicos de una unidad) */
+  numeroSerie?: string;
 
   // Ficha Técnica y Galería (Extendido de Machine)
   technicalSpecs?: TechnicalSpecs;
@@ -209,6 +219,7 @@ export interface ImportCatalogoRow {
   valorUnitario?: number;
   cantidadPorMaquina?: number;
   ubicacionEnPlanta?: string;
+  observaciones?: string;
   forceOverride?: {
     codigoSAP?: boolean;
     codigoFabricante?: boolean;

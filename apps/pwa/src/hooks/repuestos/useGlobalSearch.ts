@@ -100,13 +100,14 @@ const tokenMatchesText = (token: string, searchable: string, words: string[]) =>
 const scoreResult = (result: GlobalSearchResult, normalizedQuery: string, tokens: string[]) => {
   const rep = result.repuesto
   const name = normalizeText(rep.textoBreve || '')
+  const alias = normalizeText(rep.alias || '')
   const sap = normalizeText(rep.codigoSAP || '')
   const fabricante = normalizeText(rep.codigoFabricante || '')
   const descripcion = normalizeText(rep.descripcion || '')
   const ubicacion = normalizeText(rep.ubicacionEnPlanta || '')
   const machineName = normalizeText(result.machineName || '')
 
-  const searchable = `${name} ${sap} ${fabricante} ${descripcion} ${ubicacion} ${machineName}`.trim()
+  const searchable = `${name} ${alias} ${sap} ${fabricante} ${descripcion} ${ubicacion} ${machineName}`.trim()
   const words = searchable.split(' ').filter(Boolean)
 
   // ── FILTRO AND: TODOS los tokens deben estar presentes ──
@@ -130,6 +131,7 @@ const scoreResult = (result: GlobalSearchResult, normalizedQuery: string, tokens
   if (name.startsWith(normalizedQuery)) score += 90
 
   if (name.includes(normalizedQuery)) score += 65
+  if (alias && alias.includes(normalizedQuery)) score += 80
   if (fabricante.includes(normalizedQuery)) score += 50
   if (descripcion.includes(normalizedQuery)) score += 35
   if (machineName.includes(normalizedQuery)) score += 25
@@ -139,6 +141,7 @@ const scoreResult = (result: GlobalSearchResult, normalizedQuery: string, tokens
     if (!token) continue
     // Bonus por campo donde aparece
     if (name.includes(token)) score += 25
+    if (alias && alias.includes(token)) score += 30
     if (sap.includes(token)) score += 22
     if (fabricante.includes(token)) score += 18
     if (descripcion.includes(token)) score += 10
@@ -172,7 +175,7 @@ export function useGlobalSearch(machines: Machine[]) {
    * que requiere un índice de Firestore especial).
    */
   const loadAll = useCallback(async () => {
-    if (loadingRef.current) return
+    if (loadingRef.current || machines.length === 0) return
     loadingRef.current = true
     setLoading(true)
     setError(null)
