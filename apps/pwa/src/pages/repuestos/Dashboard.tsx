@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from 'react'
-import { AlertTriangle, Plus, FileText, Upload, Package, ClipboardList, ImageIcon, DollarSign, Wrench, ArrowRightLeft, Copy as CopyDuplicateIcon, Globe, ExternalLink, Search, X, WifiOff, Star } from 'lucide-react'
+import { AlertTriangle, Plus, FileText, Upload, Package, Wrench, ArrowRightLeft, Copy as CopyDuplicateIcon, Globe, ExternalLink, Search, X, WifiOff, Star } from 'lucide-react'
 import { RepuestosTable } from '@/components/repuestos/RepuestosTable'
 import { RepuestoFormModal } from '@/components/repuestos/RepuestoForm'
 import { RepuestosPagination } from '@/components/repuestos/RepuestosPagination'
@@ -97,6 +97,7 @@ export function RepuestosDashboard({
   // Filtros, ordenamiento y paginación
   const [searchQuery, setSearchQuery] = useState('')
   const [filterTipo, setFilterTipo] = useState<string | null>(null)
+  const [kpiFilter, setKpiFilter] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
   const [sortColumn, setSortColumn] = useState<string | null>(null)
@@ -217,8 +218,20 @@ export function RepuestosDashboard({
       filtered = filtered.filter(r => r.tipo === filterTipo)
     }
 
+    if (kpiFilter === 'conSAP') {
+      filtered = filtered.filter(r => r.codigoSAP)
+    } else if (kpiFilter === 'conStock') {
+      filtered = filtered.filter(r => (r.cantidadPorMaquina || 0) > 0)
+    } else if (kpiFilter === 'sinSAP') {
+      filtered = filtered.filter(r => !r.codigoSAP)
+    } else if (kpiFilter === 'conFicha') {
+      filtered = filtered.filter(r => r.technicalSpecs)
+    } else if (kpiFilter === 'conFoto') {
+      filtered = filtered.filter(r => (r.fotosReales?.length || 0) + (r.imagenesManual?.length || 0) + (r.gallery?.length || 0) > 0)
+    }
+
     return filtered
-  }, [repuestos, searchQuery, filterTipo])
+  }, [repuestos, searchQuery, filterTipo, kpiFilter])
 
   // Tipos únicos ordenados por frecuencia (sobre todos los repuestos, no el filtrado)
   const tiposDisponibles = useMemo(() => {
@@ -314,6 +327,7 @@ export function RepuestosDashboard({
   const handleClearFilters = () => {
     setSearchQuery('')
     setFilterTipo(null)
+    setKpiFilter(null)
   }
 
   /** Scroll al repuesto y resaltarlo */
@@ -529,7 +543,6 @@ export function RepuestosDashboard({
           const conSAP = repuestos.filter(r => r.codigoSAP).length
           const conStock = repuestos.filter(r => (r.cantidadPorMaquina || 0) > 0).length
           const valorTotal = repuestos.reduce((s, r) => s + (r.valorUnitario || 0) * (r.cantidadPorMaquina || 0), 0)
-          const cobertura = totalCatalogo > 0 ? Math.round((conSAP / totalCatalogo) * 100) : 0
           const isFav = !!currentMachine && favMachines.has(currentMachine.id)
 
           return (
@@ -557,36 +570,41 @@ export function RepuestosDashboard({
                 {isFav && <Star className="h-4 w-4 text-yellow-400 fill-yellow-400 shrink-0" />}
               </div>
 
-              {/* KPI strip */}
-              {totalCatalogo > 0 && (
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                  <div className="bg-muted/15 border border-border/40 rounded-lg px-3 py-2">
-                    <p className="text-lg font-bold text-foreground tabular-nums">{totalCatalogo}</p>
-                    <p className="text-[9px] text-muted-foreground uppercase">Total catálogo</p>
+              {/* KPI strip — interactivo (click filtra) */}
+              {totalCatalogo > 0 && (() => {
+                const conFicha = repuestos.filter(r => r.technicalSpecs).length
+                const conFoto = repuestos.filter(r => (r.fotosReales?.length || 0) + (r.imagenesManual?.length || 0) + (r.gallery?.length || 0) > 0).length
+                const kpis: { key: string | null; label: string; value: string | number; color: string; accent: string }[] = [
+                  { key: null, label: 'Total', value: totalCatalogo, color: 'text-foreground', accent: 'border-border/40' },
+                  { key: 'conSAP', label: 'Con SAP', value: conSAP, color: 'text-blue-400', accent: 'border-blue-500/40' },
+                  { key: 'conStock', label: 'Con stock', value: conStock, color: 'text-emerald-400', accent: 'border-emerald-500/40' },
+                  { key: 'conFicha', label: 'Con ficha', value: conFicha, color: 'text-cyan-400', accent: 'border-cyan-500/40' },
+                  { key: 'conFoto', label: 'Con foto', value: conFoto, color: 'text-amber-400', accent: 'border-amber-500/40' },
+                  { key: null, label: 'Valor', value: `$${valorTotal.toLocaleString('es-CL', { maximumFractionDigits: 0 })}`, color: 'text-violet-400', accent: 'border-border/40' },
+                ]
+                return (
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+                    {kpis.map(k => {
+                      const isActive = k.key !== null && kpiFilter === k.key
+                      const isClickable = k.key !== null
+                      return (
+                        <button
+                          key={k.label}
+                          onClick={() => isClickable ? setKpiFilter(kpiFilter === k.key ? null : k.key) : undefined}
+                          className={[
+                            'rounded-lg px-2.5 py-2 text-left transition-all',
+                            isActive ? `bg-primary/10 border-2 ${k.accent} ring-1 ring-primary/20` : 'bg-muted/15 border border-border/40',
+                            isClickable ? 'cursor-pointer hover:bg-muted/30' : 'cursor-default',
+                          ].join(' ')}
+                        >
+                          <p className={`text-base sm:text-lg font-bold tabular-nums ${isActive ? 'text-primary' : k.color}`}>{k.value}</p>
+                          <p className="text-[8px] sm:text-[9px] text-muted-foreground uppercase">{k.label}</p>
+                        </button>
+                      )
+                    })}
                   </div>
-                  <div className="bg-muted/15 border border-border/40 rounded-lg px-3 py-2">
-                    <p className="text-lg font-bold text-blue-400 tabular-nums">{conSAP}</p>
-                    <p className="text-[9px] text-muted-foreground uppercase">Con CÓD SAP</p>
-                  </div>
-                  <div className="bg-muted/15 border border-border/40 rounded-lg px-3 py-2">
-                    <p className="text-lg font-bold text-emerald-400 tabular-nums">{conStock}</p>
-                    <p className="text-[9px] text-muted-foreground uppercase">Con stock</p>
-                  </div>
-                  <div className="bg-muted/15 border border-border/40 rounded-lg px-3 py-2">
-                    <p className="text-lg font-bold text-violet-400 tabular-nums">${valorTotal.toLocaleString('es-CL', { maximumFractionDigits: 0 })}</p>
-                    <p className="text-[9px] text-muted-foreground uppercase">Valor total</p>
-                  </div>
-                  <div className="bg-muted/15 border border-border/40 rounded-lg px-3 py-2">
-                    <div className="flex items-center gap-2">
-                      <p className={`text-lg font-bold tabular-nums ${cobertura >= 50 ? 'text-emerald-400' : cobertura >= 20 ? 'text-amber-400' : 'text-red-400'}`}>{cobertura}%</p>
-                      <div className="flex-1 h-2 bg-muted/30 rounded-full overflow-hidden hidden sm:block">
-                        <div className={`h-full rounded-full ${cobertura >= 50 ? 'bg-emerald-500' : cobertura >= 20 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${cobertura}%` }} />
-                      </div>
-                    </div>
-                    <p className="text-[9px] text-muted-foreground uppercase">Cobertura SAP</p>
-                  </div>
-                </div>
-              )}
+                )
+              })()}
             </div>
           )
         })()}
@@ -686,7 +704,7 @@ export function RepuestosDashboard({
             </div>
           )}
 
-          {(searchQuery || filterTipo) && (
+          {(searchQuery || filterTipo || kpiFilter) && (
             <div className="flex items-center gap-2 flex-wrap">
               <Button variant="outline" size="sm" onClick={handleClearFilters} className="text-xs gap-1.5">
                 <X className="h-3.5 w-3.5" />
@@ -696,57 +714,7 @@ export function RepuestosDashboard({
           )}
         </div>
 
-        {/* KPI Summary Cards — Catálogo puro */}
-        {(() => {
-          const totalRepuestos = repuestos.length
-          const conFicha = repuestos.filter(r => r.technicalSpecs).length
-          const conFotoManual = repuestos.filter(r => (r.fotosReales?.length || 0) + (r.imagenesManual?.length || 0) + (r.gallery?.length || 0) > 0).length
-          const valorReferencial = repuestos.reduce((sum, r) => sum + ((r.cantidadPorMaquina || 1) * (r.valorUnitario || 0)), 0)
-          return (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              {/* Total repuestos */}
-              <div className="bg-card border rounded-xl p-4 flex items-center gap-3 hover:shadow-md transition-shadow">
-                <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
-                  <Package className="h-5 w-5 text-blue-500" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Total</p>
-                  <p className="text-xl font-bold text-foreground">{totalRepuestos}</p>
-                </div>
-              </div>
-              {/* Con ficha técnica */}
-              <div className="bg-card border rounded-xl p-4 flex items-center gap-3 hover:shadow-md transition-shadow">
-                <div className="h-10 w-10 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0">
-                  <ClipboardList className="h-5 w-5 text-emerald-500" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Con ficha</p>
-                  <p className="text-xl font-bold text-emerald-500">{conFicha}</p>
-                </div>
-              </div>
-              {/* Con foto / manual */}
-              <div className="bg-card border rounded-xl p-4 flex items-center gap-3 hover:shadow-md transition-shadow">
-                <div className="h-10 w-10 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
-                  <ImageIcon className="h-5 w-5 text-amber-500" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Con foto</p>
-                  <p className="text-xl font-bold text-amber-500">{conFotoManual}</p>
-                </div>
-              </div>
-              {/* Valor referencial */}
-              <div className="bg-card border rounded-xl p-4 flex items-center gap-3 hover:shadow-md transition-shadow">
-                <div className="h-10 w-10 rounded-lg bg-violet-500/10 flex items-center justify-center shrink-0">
-                  <DollarSign className="h-5 w-5 text-violet-500" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Valor ref.</p>
-                  <p className="text-lg font-bold text-foreground">${valorReferencial.toLocaleString('es-CL')}</p>
-                </div>
-              </div>
-            </div>
-          )
-        })()}
+        {/* KPIs eliminados — unificados en el header de equipo arriba */}
 
         {/* Machine Manuals Panel — only admins */}
         {isAdmin && currentMachine && (
@@ -783,7 +751,7 @@ export function RepuestosDashboard({
 
           {filteredRepuestos.length === 0 ? (
             <EmptyState
-              hasFilters={searchQuery !== '' || filterTipo !== null}
+              hasFilters={searchQuery !== '' || filterTipo !== null || kpiFilter !== null}
               onClearFilters={handleClearFilters}
             />
           ) : (
