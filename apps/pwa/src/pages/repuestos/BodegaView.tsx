@@ -18,7 +18,7 @@ import {
   BarChart3, Plus, ChevronRight, CheckCircle2, CircleDot,
   AlertCircle, Clock, Download, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown,
   Layers, Truck, ShieldCheck, ShieldAlert, ShieldX,
-  Star, Activity, Zap, Archive, Camera, QrCode, ShoppingCart, Image,
+  Star, Activity, Zap, Archive, Camera, QrCode, ShoppingCart, Image, Tag,
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { collection, getDocs, query as fsQuery, where } from 'firebase/firestore'
@@ -37,6 +37,27 @@ type BodegaTab = 'stock' | 'inventarios' | 'movimientos' | 'estadisticas'
 type StockFilter = 'todos' | 'configurados' | 'bajo' | 'sin' | 'sinConfig' | 'favoritos'
 
 const INPUT = 'w-full px-3 py-2 text-sm bg-muted/30 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground'
+
+function tipoBadgeColor(tipo?: string): string {
+  if (!tipo) return 'bg-muted text-muted-foreground'
+  const t = tipo.toUpperCase()
+  if (['RODAMIENTO', 'COJINETE'].includes(t)) return 'bg-blue-500/15 text-blue-400'
+  if (['SELLO/JUNTA', 'ANILLO', 'SELLO'].includes(t)) return 'bg-green-500/15 text-green-400'
+  if (['MOTOR', 'BOMBA'].includes(t)) return 'bg-red-500/15 text-red-400'
+  if (['SENSOR', 'INTERRUPTOR', 'MÓDULO ELÉCT.', 'RELÉ', 'CONTACTOR',
+    'FUENTE ALIM.', 'TRANSFORMADOR', 'VARIADOR', 'HMI', 'PLC'].includes(t))
+    return 'bg-purple-500/15 text-purple-400'
+  if (['TORNILLERÍA', 'PERNO', 'TUERCA', 'PASADOR', 'ARANDELA', 'ABRAZADERA'].includes(t))
+    return 'bg-zinc-500/15 text-zinc-400'
+  if (['CORREA', 'CADENA', 'CINTA/BANDA'].includes(t)) return 'bg-orange-500/15 text-orange-400'
+  if (['VÁLVULA', 'CILINDRO NEUM.', 'NEUMÁTICA GEN.'].includes(t))
+    return 'bg-cyan-500/15 text-cyan-400'
+  if (['FILTRO', 'LUBRICACIÓN'].includes(t)) return 'bg-yellow-500/15 text-yellow-500'
+  if (['RESORTE'].includes(t)) return 'bg-teal-500/15 text-teal-400'
+  if (['SOPORTE', 'CARCASA/TAPA', 'ESTRUCTURA'].includes(t)) return 'bg-slate-500/15 text-slate-400'
+  if (['AMORTIGUADOR'].includes(t)) return 'bg-rose-500/15 text-rose-400'
+  return 'bg-muted text-muted-foreground'
+}
 
 // ══════════════════════════════════════════════
 //  CONTENEDOR PRINCIPAL
@@ -1086,6 +1107,166 @@ function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
         </div>
       </div>
 
+      {/* ════ Cobertura por equipo (estilo Excel Inicio) ════ */}
+      {(() => {
+        // Agrupar ítems por equipo
+        const equipoMap = new Map<string, { nombre: string; total: number; conStock: number; unidades: number; valor: number }>()
+        for (const item of items) {
+          for (const eq of item.equipos) {
+            const key = eq.machineId
+            const prev = equipoMap.get(key) || { nombre: eq.machineName, total: 0, conStock: 0, unidades: 0, valor: 0 }
+            prev.total++
+            if (item.bodegaId && item.stockActual > 0) {
+              prev.conStock++
+              prev.unidades += item.stockActual
+              prev.valor += item.stockActual * (item.costoCompra ?? item.valorUnitario ?? 0)
+            }
+            equipoMap.set(key, prev)
+          }
+        }
+        const equipoRows = [...equipoMap.entries()]
+          .map(([id, d]) => ({ id, ...d, pct: d.total > 0 ? Math.round((d.conStock / d.total) * 100) : 0 }))
+          .sort((a, b) => b.valor - a.valor)
+        const totalValorEquipos = equipoRows.reduce((s, r) => s + r.valor, 0)
+        const totalUnidadesEquipos = equipoRows.reduce((s, r) => s + r.unidades, 0)
+
+        return equipoRows.length > 0 ? (
+          <div className="bg-card border border-border rounded-xl overflow-hidden">
+            <div className="px-4 py-3 border-b border-border bg-teal-500/5">
+              <p className="text-xs font-semibold text-teal-400 uppercase tracking-wide flex items-center gap-1.5">
+                <Layers className="h-3.5 w-3.5" /> Cobertura por equipo
+              </p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-muted/10 text-[9px] uppercase tracking-wider text-muted-foreground/60">
+                    <th className="px-4 py-2 text-left font-semibold">Equipo</th>
+                    <th className="px-2 py-2 text-center font-semibold">Repuestos</th>
+                    <th className="px-2 py-2 text-center font-semibold">Con stock</th>
+                    <th className="px-2 py-2 text-center font-semibold">Unidades</th>
+                    <th className="px-2 py-2 text-right font-semibold">Valor ($)</th>
+                    <th className="px-4 py-2 text-center font-semibold w-40">Cobertura</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/30">
+                  {equipoRows.map(row => (
+                    <tr key={row.id} className="hover:bg-muted/10 transition-colors">
+                      <td className="px-4 py-2 font-medium text-foreground truncate max-w-[200px]">{row.nombre}</td>
+                      <td className="px-2 py-2 text-center text-muted-foreground tabular-nums">{row.total}</td>
+                      <td className="px-2 py-2 text-center tabular-nums font-semibold text-emerald-400">{row.conStock}</td>
+                      <td className="px-2 py-2 text-center tabular-nums text-muted-foreground">{row.unidades.toLocaleString('es-CL')}</td>
+                      <td className="px-2 py-2 text-right tabular-nums font-medium text-violet-400">${row.valor.toLocaleString('es-CL', { maximumFractionDigits: 0 })}</td>
+                      <td className="px-4 py-2">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-2.5 bg-muted/30 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all ${row.pct >= 50 ? 'bg-emerald-500' : row.pct >= 20 ? 'bg-amber-500' : 'bg-red-500'}`}
+                              style={{ width: `${Math.min(row.pct, 100)}%` }}
+                            />
+                          </div>
+                          <span className={`text-[10px] font-bold tabular-nums w-8 text-right ${row.pct >= 50 ? 'text-emerald-400' : row.pct >= 20 ? 'text-amber-400' : 'text-red-400'}`}>
+                            {row.pct}%
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t-2 border-border bg-muted/10 font-bold text-foreground">
+                    <td className="px-4 py-2.5">TOTAL PLANTA</td>
+                    <td className="px-2 py-2.5 text-center tabular-nums">{stats.total}</td>
+                    <td className="px-2 py-2.5 text-center tabular-nums text-emerald-400">{stats.conStock}</td>
+                    <td className="px-2 py-2.5 text-center tabular-nums">{totalUnidadesEquipos.toLocaleString('es-CL')}</td>
+                    <td className="px-2 py-2.5 text-right tabular-nums text-violet-400">${totalValorEquipos.toLocaleString('es-CL', { maximumFractionDigits: 0 })}</td>
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-2.5 bg-muted/30 rounded-full overflow-hidden">
+                          <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${coberturaPct}%` }} />
+                        </div>
+                        <span className="text-[10px] font-bold tabular-nums w-8 text-right text-primary">{coberturaPct}%</span>
+                      </div>
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        ) : null
+      })()}
+
+      {/* ════ Resumen por tipo de repuesto (estilo Excel "Por Tipo") ════ */}
+      {(() => {
+        const tipoMap = new Map<string, { total: number; conStock: number; fisicos: number; valor: number }>()
+        for (const item of items) {
+          const tipo = item.tipo || 'SIN TIPO'
+          const prev = tipoMap.get(tipo) || { total: 0, conStock: 0, fisicos: 0, valor: 0 }
+          prev.total++
+          if (item.bodegaId && item.stockActual > 0) {
+            prev.conStock++
+            prev.fisicos += item.stockActual
+            prev.valor += item.stockActual * (item.costoCompra ?? item.valorUnitario ?? 0)
+          }
+          tipoMap.set(tipo, prev)
+        }
+        const tipoRows = [...tipoMap.entries()]
+          .map(([tipo, d]) => ({ tipo, ...d, pct: d.total > 0 ? Math.round((d.conStock / d.total) * 100) : 0 }))
+          .sort((a, b) => b.total - a.total)
+
+        return tipoRows.length > 0 ? (
+          <div className="bg-card border border-border rounded-xl overflow-hidden">
+            <div className="px-4 py-3 border-b border-border bg-indigo-500/5">
+              <p className="text-xs font-semibold text-indigo-400 uppercase tracking-wide flex items-center gap-1.5">
+                <Tag className="h-3.5 w-3.5" /> Resumen por tipo de repuesto
+              </p>
+            </div>
+            <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+              <table className="w-full text-xs">
+                <thead className="sticky top-0 bg-card z-10">
+                  <tr className="bg-muted/10 text-[9px] uppercase tracking-wider text-muted-foreground/60">
+                    <th className="px-4 py-2 text-left font-semibold">Tipo</th>
+                    <th className="px-2 py-2 text-center font-semibold">Total</th>
+                    <th className="px-2 py-2 text-center font-semibold">Con stock</th>
+                    <th className="px-2 py-2 text-center font-semibold">Uds. f&iacute;sicas</th>
+                    <th className="px-2 py-2 text-right font-semibold">Valor ($)</th>
+                    <th className="px-4 py-2 text-center font-semibold w-36">Cobertura</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/30">
+                  {tipoRows.map(row => (
+                    <tr key={row.tipo} className="hover:bg-muted/10 transition-colors">
+                      <td className="px-4 py-2">
+                        <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${tipoBadgeColor(row.tipo === 'SIN TIPO' ? undefined : row.tipo)}`}>
+                          {row.tipo}
+                        </span>
+                      </td>
+                      <td className="px-2 py-2 text-center tabular-nums text-muted-foreground">{row.total}</td>
+                      <td className="px-2 py-2 text-center tabular-nums font-semibold text-emerald-400">{row.conStock}</td>
+                      <td className="px-2 py-2 text-center tabular-nums text-muted-foreground">{row.fisicos}</td>
+                      <td className="px-2 py-2 text-right tabular-nums font-medium text-violet-400">
+                        {row.valor > 0 ? `$${row.valor.toLocaleString('es-CL', { maximumFractionDigits: 0 })}` : '—'}
+                      </td>
+                      <td className="px-4 py-2">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-2 bg-muted/30 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all ${row.pct >= 50 ? 'bg-emerald-500' : row.pct >= 20 ? 'bg-amber-500' : 'bg-red-500'}`}
+                              style={{ width: `${Math.min(row.pct, 100)}%` }}
+                            />
+                          </div>
+                          <span className="text-[10px] font-bold tabular-nums w-8 text-right text-muted-foreground">{row.pct}%</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : null
+      })()}
+
       {/* Proveedores */}
       {proveedores.length > 0 && (
         <div className="bg-card border border-border rounded-xl overflow-hidden">
@@ -1181,7 +1362,7 @@ function BodegaRow({ item, onEdit, onMovimiento, onHistorial, onToggleWatch, onO
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 font-mono">{item.codigoSAP}</span>
           {item.codigoFabricante && <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400 font-mono">{item.codigoFabricante}</span>}
-          {item.tipo && <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground uppercase">{item.tipo}</span>}
+          {item.tipo && <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold uppercase ${tipoBadgeColor(item.tipo)}`}>{item.tipo}</span>}
         </div>
       </div>
       <div className="hidden sm:flex items-center justify-center" title={item.equipos.map(e => e.machineName).join(', ')}>
@@ -1286,7 +1467,7 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 font-mono">{item.codigoSAP}</span>
                 {item.codigoFabricante && <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400 font-mono">{item.codigoFabricante}</span>}
-                {item.tipo && <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground uppercase">{item.tipo}</span>}
+                {item.tipo && <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold uppercase ${tipoBadgeColor(item.tipo)}`}>{item.tipo}</span>}
                 {item.categoria && <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${item.categoria === 'A' ? 'bg-red-500/10 text-red-400' : item.categoria === 'B' ? 'bg-amber-500/10 text-amber-400' : 'bg-emerald-500/10 text-emerald-400'}`}>ABC: {item.categoria}</span>}
               </div>
             </div>

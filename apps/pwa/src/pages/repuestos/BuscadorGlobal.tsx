@@ -53,9 +53,10 @@ type SortDir = 'asc' | 'desc'
 
 /** Exportar resultados a CSV */
 const exportToCSV = (results: GlobalSearchResult[], breadcrumbFn: (id: string) => string) => {
-  const header = 'Código SAP\tNombre\tCód. Fabricante\tTipo\tUbicación\tValor\tCantidad'
+  const header = 'Código SAP\tNombre\tCód. Fabricante\tTipo\tEquipo\tValor Unit.\tStock\tUbicación\tValor Total'
   const rows = results.map(r => {
     const rep = r.repuesto
+    const vTotal = (rep.valorUnitario || 0) * (rep.cantidadPorMaquina || 0)
     return [
       rep.codigoSAP || '',
       rep.textoBreve || rep.descripcion || '',
@@ -64,6 +65,8 @@ const exportToCSV = (results: GlobalSearchResult[], breadcrumbFn: (id: string) =
       breadcrumbFn(r.machineId),
       rep.valorUnitario || '',
       rep.cantidadPorMaquina || '',
+      rep.ubicacionEnPlanta || '',
+      vTotal || '',
     ].join('\t')
   })
   const content = '\uFEFF' + [header, ...rows].join('\n')
@@ -140,6 +143,7 @@ function ResultRow({
   const r = result.repuesto
   const name = r.textoBreve || r.descripcion || r.codigoSAP || 'Sin nombre'
   const { area, equipo } = splitBreadcrumb(breadcrumb)
+  const valorTotal = (r.valorUnitario || 0) * (r.cantidadPorMaquina || 0)
 
   return (
     <div
@@ -156,26 +160,18 @@ function ResultRow({
         {r.codigoSAP || <span className="opacity-30">—</span>}
       </span>
 
-      {/* Nombre + alias + código fabricante + ubicación en mobile */}
+      {/* Nombre + alias + código fabricante */}
       <div className="flex-1 min-w-0">
         <div className="text-[11px] sm:text-xs text-foreground font-medium truncate">{name}</div>
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-          {/* Alias */}
           {r.alias && (
             <span className="text-[9px] italic text-primary/60 truncate max-w-[140px]" title={`Alias: ${r.alias}`}>
               "{r.alias}"
             </span>
           )}
-          {/* Código fabricante */}
           {r.codigoFabricante && (
             <span className="text-[9px] font-mono text-muted-foreground/60 truncate max-w-[120px]" title={`Fabricante: ${r.codigoFabricante}`}>
               {r.codigoFabricante}
-            </span>
-          )}
-          {/* Ubicación en planta */}
-          {r.ubicacionEnPlanta && (
-            <span className="text-[9px] text-muted-foreground/50 truncate max-w-[100px] hidden sm:inline" title={r.ubicacionEnPlanta}>
-              📍 {r.ubicacionEnPlanta}
             </span>
           )}
         </div>
@@ -190,29 +186,45 @@ function ResultRow({
         )}
       </div>
 
-      {/* Tipo */}
+      {/* Tipo — prominente con color */}
       {r.tipo ? (
-        <span className={`hidden sm:inline-flex shrink-0 text-[8.5px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide ${tipoBadgeColor(r.tipo)}`}>
+        <span className={`hidden sm:inline-flex shrink-0 text-[8.5px] font-bold px-2 py-0.5 rounded uppercase tracking-wide ${tipoBadgeColor(r.tipo)}`}>
           {r.tipo}
         </span>
       ) : null}
 
-      {/* Ubicación jerárquica — equipo grande, área chica arriba */}
-      <div className="shrink-0 text-right hidden sm:block min-w-0 w-44" title={breadcrumb}>
+      {/* Stock */}
+      <span className="hidden md:block shrink-0 w-10 text-center text-xs font-bold tabular-nums text-foreground">
+        {r.cantidadPorMaquina || <span className="text-muted-foreground/30">—</span>}
+      </span>
+
+      {/* Ubicación */}
+      {r.ubicacionEnPlanta ? (
+        <span className="hidden lg:block shrink-0 w-16 text-[10px] text-muted-foreground truncate text-center" title={r.ubicacionEnPlanta}>
+          {r.ubicacionEnPlanta}
+        </span>
+      ) : (
+        <span className="hidden lg:block shrink-0 w-16 text-center text-muted-foreground/30 text-[10px]">—</span>
+      )}
+
+      {/* Ubicación jerárquica — equipo */}
+      <div className="shrink-0 text-right hidden sm:block min-w-0 w-36" title={breadcrumb}>
         {area && (
           <div className="text-[8px] text-muted-foreground/50 truncate uppercase tracking-wide">{area}</div>
         )}
         <div className="text-[10px] font-medium text-foreground/80 truncate">
           {equipo || result.machineName}
         </div>
-        {r.cantidadPorMaquina ? (
-          <div className="text-[8px] text-muted-foreground/40">x{r.cantidadPorMaquina} por equipo</div>
-        ) : null}
       </div>
 
-      {/* Valor */}
+      {/* Valor unitario */}
       <span className="shrink-0 text-[10px] font-mono text-muted-foreground w-16 text-right hidden md:block">
         {formatCurrency(r.valorUnitario || 0)}
+      </span>
+
+      {/* Valor total */}
+      <span className="shrink-0 text-[10px] font-bold font-mono text-right hidden lg:block w-20 tabular-nums text-foreground">
+        {valorTotal > 0 ? formatCurrency(valorTotal) : <span className="text-muted-foreground/30">—</span>}
       </span>
 
       {/* Acciones */}
@@ -543,7 +555,7 @@ export function BuscadorGlobal({ initialQuery, onQueryConsumed, onViewInCatalog 
       {query.trim() && (
         <div className="bg-card border border-border rounded-xl overflow-hidden">
 
-          {/* Header */}
+          {/* Header — estilo Excel con totales */}
           <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/10 gap-2 flex-wrap">
             <span className="text-[11px] text-muted-foreground">
               {results.length === 0
@@ -554,6 +566,11 @@ export function BuscadorGlobal({ initialQuery, onQueryConsumed, onViewInCatalog 
                     {' en '}
                     <span className="font-semibold text-foreground">{maquinasCount}</span>
                     {' equipo'}{maquinasCount !== 1 ? 's' : ''}
+                    {results.length > 0 && (
+                      <span className="hidden sm:inline ml-2 text-muted-foreground/60">
+                        {' · '}Valor: <span className="font-semibold text-violet-400">{formatCurrency(results.reduce((s, r) => s + (r.repuesto.valorUnitario || 0) * (r.repuesto.cantidadPorMaquina || 0), 0))}</span>
+                      </span>
+                    )}
                     {results.length > 100 && <span className="ml-1 opacity-50">(mostrando 100)</span>}
                   </>
               }
@@ -639,15 +656,18 @@ export function BuscadorGlobal({ initialQuery, onQueryConsumed, onViewInCatalog 
                 SAP {sortField === 'sap' && (sortDir === 'asc' ? <ArrowUp className="h-2.5 w-2.5" /> : <ArrowDown className="h-2.5 w-2.5" />)}
               </button>
               <button onClick={() => toggleSort('nombre')} className="flex-1 flex items-center gap-0.5 text-[8.5px] font-semibold uppercase tracking-wider text-muted-foreground/50 hover:text-muted-foreground transition-colors">
-                Nombre / Fabricante {sortField === 'nombre' && (sortDir === 'asc' ? <ArrowUp className="h-2.5 w-2.5" /> : <ArrowDown className="h-2.5 w-2.5" />)}
+                Descripci&oacute;n {sortField === 'nombre' && (sortDir === 'asc' ? <ArrowUp className="h-2.5 w-2.5" /> : <ArrowDown className="h-2.5 w-2.5" />)}
               </button>
               <button onClick={() => toggleSort('tipo')} className="hidden sm:flex shrink-0 w-16 items-center gap-0.5 text-[8.5px] font-semibold uppercase tracking-wider text-muted-foreground/50 hover:text-muted-foreground transition-colors">
                 Tipo {sortField === 'tipo' && (sortDir === 'asc' ? <ArrowUp className="h-2.5 w-2.5" /> : <ArrowDown className="h-2.5 w-2.5" />)}
               </button>
-              <span className="hidden sm:block shrink-0 w-44 text-right text-[8.5px] font-semibold uppercase tracking-wider text-muted-foreground/50">Ubicación</span>
+              <span className="hidden md:block shrink-0 w-10 text-center text-[8.5px] font-semibold uppercase tracking-wider text-muted-foreground/50">Stock</span>
+              <span className="hidden lg:block shrink-0 w-16 text-center text-[8.5px] font-semibold uppercase tracking-wider text-muted-foreground/50">Ubic.</span>
+              <span className="hidden sm:block shrink-0 w-36 text-right text-[8.5px] font-semibold uppercase tracking-wider text-muted-foreground/50">Equipo</span>
               <button onClick={() => toggleSort('valor')} className="hidden md:flex shrink-0 w-16 items-center justify-end gap-0.5 text-[8.5px] font-semibold uppercase tracking-wider text-muted-foreground/50 hover:text-muted-foreground transition-colors">
                 {sortField === 'valor' && (sortDir === 'asc' ? <ArrowUp className="h-2.5 w-2.5" /> : <ArrowDown className="h-2.5 w-2.5" />)} Valor
               </button>
+              <span className="hidden lg:block shrink-0 w-20 text-right text-[8.5px] font-semibold uppercase tracking-wider text-muted-foreground/50">V. Total</span>
               <span className="shrink-0 w-16" />
             </div>
           )}
