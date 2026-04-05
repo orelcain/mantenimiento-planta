@@ -43,7 +43,7 @@ function mapRowToImport(row: Record<string, unknown>): ImportCatalogoRow {
   Object.entries(row).forEach(([k, v]) => {
     const key = k.toLowerCase()
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // quitar tildes
-      .replace(/[°\.]/g, '')                              // quitar ° y punto
+      .replace(/[°.]/g, '')                               // quitar ° y punto
       .trim()
     lower[key] = v
     lower[k.toLowerCase().trim()] = v // también guardar original lowercase
