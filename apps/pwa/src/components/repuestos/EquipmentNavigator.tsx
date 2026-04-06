@@ -714,9 +714,15 @@ export function EquipmentNavigator({
         const favKey = e.linkedMachineId || e.id
         if (favMachineIds.has(favKey) && !map.has(favKey)) {
           const listName = isMachineInAnyList(favLists, favKey)
-          // Prioridad: alias fresco > nombre guardado > nombre SAP
           const nombre = e.alias || savedNames.get(favKey) || e.nombre
           map.set(favKey, { nombre, equipmentId: e.id, listName: listName || undefined })
+        }
+      }
+      // Agregar favoritos que no están en el cache global (equipos sin linkedMachineId)
+      for (const favId of favMachineIds) {
+        if (!map.has(favId) && savedNames.has(favId)) {
+          const listName = isMachineInAnyList(favLists, favId)
+          map.set(favId, { nombre: savedNames.get(favId)!, equipmentId: favId, listName: listName || undefined })
         }
       }
       onFavoriteMachinesChange(map)
