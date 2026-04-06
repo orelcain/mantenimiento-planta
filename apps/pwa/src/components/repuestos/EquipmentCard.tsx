@@ -60,7 +60,7 @@ interface EquipmentCardProps {
   onMoveDown?: () => void
   onToggleHidden?: (equipmentId: string, hidden: boolean) => Promise<void>
   isFavoriteMachine?: boolean
-  onToggleFavoriteMachine?: (machineId: string, e: React.MouseEvent) => void
+  onToggleFavoriteMachine?: (machineId: string, e: React.MouseEvent, displayName?: string) => void
   onDeleteEquipment?: (equipmentId: string, name: string) => void
   isFavoriteFn?: (id: string) => boolean
 }
@@ -472,7 +472,7 @@ export function EquipmentCard({
             {/* Star favorito — disponible para todos los equipos */}
             {onToggleFavoriteMachine && (
               <button
-                onClick={ev => { ev.stopPropagation(); onToggleFavoriteMachine(equipment.linkedMachineId || equipment.id, ev) }}
+                onClick={ev => { ev.stopPropagation(); onToggleFavoriteMachine(equipment.linkedMachineId || equipment.id, ev, displayName) }}
                 className={`shrink-0 p-0.5 rounded transition-colors ${
                   isFavoriteMachine
                     ? 'text-yellow-400'

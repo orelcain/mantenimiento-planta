@@ -614,7 +614,7 @@ export function EquipmentNavigator({
   // ── Máquinas favoritas (listas múltiples — Firestore + localStorage fallback) ──
   const currentUser = useAuthStore(s => s.user)
   const [favLists, setFavLists] = useState<FavList[]>(loadFavListsLocal)
-  const [favDropdown, setFavDropdown] = useState<{ machineId: string; anchorRect: DOMRect } | null>(null)
+  const [favDropdown, setFavDropdown] = useState<{ machineId: string; anchorRect: DOMRect; displayName: string } | null>(null)
   const [newListName, setNewListName] = useState('')
   const favLoadedRef = useRef(false)
 
@@ -647,7 +647,7 @@ export function EquipmentNavigator({
     if (currentUser) saveFavoriteLists(currentUser.id, lists)
   }, [currentUser])
 
-  const handleFavStarClick = useCallback((machineId: string, e: React.MouseEvent) => {
+  const handleFavStarClick = useCallback((machineId: string, e: React.MouseEvent, displayName?: string) => {
     const inList = isMachineInAnyList(favLists, machineId)
     if (inList) {
       const next = favLists.map(l => ({ ...l, machineIds: l.machineIds.filter(id => id !== machineId) })).filter(l => l.machineIds.length > 0)
@@ -655,7 +655,7 @@ export function EquipmentNavigator({
       persistFavs(next)
     } else {
       const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-      setFavDropdown({ machineId, anchorRect: rect })
+      setFavDropdown({ machineId, anchorRect: rect, displayName: displayName || machineId })
       setNewListName('')
     }
   }, [favLists, persistFavs])
@@ -671,7 +671,7 @@ export function EquipmentNavigator({
   }, [])
 
   const addToList = useCallback((listName: string, machineId: string) => {
-    const displayName = resolveEquipName(machineId)
+    const displayName = favDropdown?.displayName || resolveEquipName(machineId)
     setFavLists(prev => {
       const existing = prev.find(l => l.name === listName)
       let next: FavList[]
