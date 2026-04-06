@@ -85,6 +85,8 @@ const AriaActionsPage = lazyWithReload(() => import('@/pages/AriaActionsPage').t
 const ClimaPortPage = lazyWithReload(() => import('@/pages/ClimaPortPage').then((mod) => ({ default: mod.ClimaPortPage })))
 const CalendarioMantencionPage = lazyWithReload(() => import('@/pages/CalendarioMantencionPage').then((mod) => ({ default: mod.CalendarioMantencionPage })))
 const HmiKnuroPage = lazyWithReload(() => import('@/pages/HmiKnuroPage').then((mod) => ({ default: mod.HmiKnuroPage })))
+const Baader200LearningPublicPage = lazyWithReload(() => import('@/pages/Baader200LearningPublicPage').then((mod) => ({ default: mod.Baader200LearningPublicPage })))
+const Baader200LearningPage = lazyWithReload(() => import('@/pages/Baader200LearningPage').then((mod) => ({ default: mod.Baader200LearningPage })))
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuthStore()
@@ -244,6 +246,24 @@ export function App() {
             element={
               <Suspense fallback={<LoadingScreen />}>
                 <HmiKnuroPublicPage />
+              </Suspense>
+            }
+          />
+
+          {/* Public Baader 200 learning mode (no auth required) */}
+          <Route
+            path="/baader-200/learn/:sectionId"
+            element={
+              <Suspense fallback={<LoadingScreen />}>
+                <Baader200LearningPublicPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/baader-200/learn"
+            element={
+              <Suspense fallback={<LoadingScreen />}>
+                <Baader200LearningPublicPage />
               </Suspense>
             }
           />
@@ -419,6 +439,13 @@ export function App() {
               <AdminRoute>
                 <Suspense fallback={<LoadingScreen />}>
                   <HmiKnuroPage />
+                </Suspense>
+              </AdminRoute>
+            } />
+            <Route path="baader-200" element={
+              <AdminRoute>
+                <Suspense fallback={<LoadingScreen />}>
+                  <Baader200LearningPage />
                 </Suspense>
               </AdminRoute>
             } />

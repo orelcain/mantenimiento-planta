@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1a1c22">
+<title>Baader 200 — Manual de Ajustes</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#1a1c22;--pb:#13151b;--bdr:#252830;
+  --ac:#4499ff;--ac2:#2266cc;
+  --hdr-bg:#111318;--dev-bg:#1e2028;
+  --nav-bg:#16181f;--nav-hover:#1e2230;--nav-active:#1a2840;
+  --content-bg:#1c1e26;
+  --text:#cccccc;--text-dim:#888888;--text-bright:#eeeeee;
+  --badge-ajuste-bg:#1a4a8a;--badge-ajuste-fg:#88bbff;
+  --badge-ts-bg:#6b3a1f;--badge-ts-fg:#ffaa66;
+  --badge-seg-bg:#6b1f1f;--badge-seg-fg:#ff8888;
+  --badge-prec-bg:#5a4a0a;--badge-prec-fg:#ffdd44;
+  --step-imp-bg:#2a1f00;--step-imp-border:#554400;
+  --table-bg:#181a22;--table-row:#1e2028;--table-alt:#222430;
+  --modal-bg:#1c1e28;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe UI',Arial,sans-serif;overflow:hidden;}
+#app{display:flex;flex-direction:column;height:100%;height:100dvh;}
+/* ── device wrapper ── */
+#hp{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;padding:8px;overflow:hidden;}
+.dev{background:linear-gradient(160deg,#2e2e2e,#1a1a1a);border-radius:14px;padding:14px 14px 10px;box-shadow:0 12px 50px rgba(0,0,0,.9),inset 0 1px 0 rgba(255,255,255,.08),0 0 0 1px #333;position:relative;flex-shrink:0;}
+.led{width:9px;height:9px;background:var(--ac);border-radius:50%;box-shadow:0 0 10px var(--ac),0 0 20px rgba(68,153,255,.4);position:absolute;top:22px;left:22px;animation:pulse 2.5s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.5;}}
+#hs{width:800px;height:480px;background:var(--bg);position:relative;overflow:hidden;transform-origin:top left;border:2px solid #2a2c34;}
+/* ── main layout ── */
+#main-layout{display:flex;flex-direction:column;width:100%;height:100%;}
+/* header */
+#hdr{display:flex;align-items:center;gap:10px;padding:0 14px;height:36px;background:var(--hdr-bg);border-bottom:1px solid var(--bdr);flex-shrink:0;}
+.hdr-led{width:7px;height:7px;background:var(--ac);border-radius:50%;box-shadow:0 0 6px var(--ac);flex-shrink:0;}
+.hdr-title{font-size:12px;font-weight:700;color:var(--ac);letter-spacing:1.5px;text-transform:uppercase;}
+.hdr-sub{font-size:11px;color:var(--text-dim);margin-left:4px;}
+.hdr-spacer{flex:1;}
+#search-wrap{position:relative;display:flex;align-items:center;}
+#search-input{background:#1e2028;border:1px solid #333;border-radius:4px;color:var(--text);font-size:11px;padding:3px 8px 3px 22px;width:140px;outline:none;}
+#search-input:focus{border-color:var(--ac);}
+#search-icon{position:absolute;left:6px;font-size:10px;color:var(--text-dim);pointer-events:none;}
+/* body split */
+#body-split{display:flex;flex:1;overflow:hidden;}
+/* nav tree */
+#nav-tree{width:220px;flex-shrink:0;background:var(--nav-bg);border-right:1px solid var(--bdr);display:flex;flex-direction:column;overflow:hidden;}
+#nav-scroll{flex:1;overflow-y:auto;overflow-x:hidden;padding:6px 0;}
+#nav-scroll::-webkit-scrollbar{width:4px;}
+#nav-scroll::-webkit-scrollbar-track{background:transparent;}
+#nav-scroll::-webkit-scrollbar-thumb{background:#333;border-radius:2px;}
+.cat-header{display:flex;align-items:center;gap:6px;padding:5px 10px;cursor:pointer;user-select:none;font-size:11px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;border-top:1px solid var(--bdr);}
+.cat-header:first-child{border-top:none;}
+.cat-header:hover{color:var(--text);}
+.cat-arrow{font-size:9px;transition:transform .15s;flex-shrink:0;}
+.cat-arrow.open{transform:rotate(90deg);}
+.cat-count{margin-left:auto;font-size:10px;background:#222430;color:#666;padding:1px 5px;border-radius:8px;}
+.cat-items{overflow:hidden;}
+.cat-items.collapsed{display:none;}
+.nav-item{display:flex;align-items:center;padding:5px 8px 5px 20px;cursor:pointer;font-size:11px;color:var(--text-dim);border-left:2px solid transparent;transition:background .1s,color .1s;gap:4px;min-height:0;}
+.nav-item:hover{background:var(--nav-hover);color:var(--text);}
+.nav-item.active{background:var(--nav-active);color:var(--ac);border-left-color:var(--ac);}
+.nav-item-text{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.nav-item-num{font-size:10px;color:#555;flex-shrink:0;min-width:14px;text-align:right;}
+.nav-item-actions{display:none;gap:2px;flex-shrink:0;}
+.nav-item:hover .nav-item-actions{display:flex;}
+.nav-action-btn{background:none;border:none;color:#666;cursor:pointer;font-size:11px;padding:1px 3px;border-radius:2px;line-height:1;}
+.nav-action-btn:hover{background:#2a2c38;color:var(--text);}
+.nav-add-btn{display:flex;align-items:center;gap:6px;padding:7px 10px;cursor:pointer;font-size:11px;color:#556688;border-top:1px solid var(--bdr);transition:color .15s;}
+.nav-add-btn:hover{color:var(--ac);}
+/* content area */
+#content-area{flex:1;overflow-y:auto;overflow-x:hidden;padding:16px 18px;background:var(--content-bg);}
+#content-area::-webkit-scrollbar{width:5px;}
+#content-area::-webkit-scrollbar-track{background:transparent;}
+#content-area::-webkit-scrollbar-thumb{background:#2a2c38;border-radius:3px;}
+#content-placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:10px;color:var(--text-dim);}
+#content-placeholder .ph-icon{font-size:32px;opacity:.3;}
+#content-placeholder .ph-text{font-size:13px;}
+/* section content */
+.sec-badge{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:3px 8px;border-radius:3px;margin-bottom:8px;}
+.sec-badge.ajuste{background:var(--badge-ajuste-bg);color:var(--badge-ajuste-fg);}
+.sec-badge.troubleshooting{background:var(--badge-ts-bg);color:var(--badge-ts-fg);}
+.sec-badge.seguridad{background:var(--badge-seg-bg);color:var(--badge-seg-fg);}
+.sec-badge.precaucion{background:var(--badge-prec-bg);color:var(--badge-prec-fg);}
+.sec-title{font-size:15px;font-weight:700;color:var(--text-bright);margin-bottom:10px;line-height:1.3;}
+.sec-desc{font-size:12px;color:#aaa;line-height:1.6;margin-bottom:14px;border-left:2px solid #333;padding-left:10px;}
+.sec-block-title{font-size:11px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;margin-top:14px;display:flex;align-items:center;gap:6px;}
+.sec-block-title::after{content:'';flex:1;height:1px;background:var(--bdr);}
+/* steps */
+.steps-list{display:flex;flex-direction:column;gap:4px;margin-bottom:4px;}
+.step-item{display:flex;align-items:flex-start;gap:8px;padding:5px 8px;border-radius:4px;font-size:12px;line-height:1.5;color:var(--text);}
+.step-item.important{background:var(--step-imp-bg);border:1px solid var(--step-imp-border);color:#ffcc88;}
+.step-num{font-size:11px;color:var(--text-dim);flex-shrink:0;min-width:18px;padding-top:1px;font-family:'Courier New',monospace;}
+.step-imp-icon{flex-shrink:0;font-size:12px;}
+.step-text{flex:1;}
+/* measurements table */
+.meas-table{width:100%;border-collapse:collapse;font-size:11px;margin-bottom:4px;}
+.meas-table th{background:#1a1c24;color:var(--text-dim);font-weight:600;text-align:left;padding:5px 8px;border:1px solid #2a2c38;font-size:10px;text-transform:uppercase;letter-spacing:.5px;}
+.meas-table td{padding:5px 8px;border:1px solid #222430;color:var(--text);vertical-align:top;}
+.meas-table tr:nth-child(odd) td{background:var(--table-row);}
+.meas-table tr:nth-child(even) td{background:var(--table-alt);}
+.meas-val{font-family:'Courier New',monospace;color:#88ccff;font-weight:600;}
+.meas-unit{color:#666;font-size:10px;}
+.meas-note{color:#888;font-size:10px;font-style:italic;}
+/* notes */
+.notes-list{display:flex;flex-direction:column;gap:4px;margin-bottom:4px;}
+.note-item{display:flex;align-items:flex-start;gap:6px;font-size:12px;color:#aaa;line-height:1.5;padding:4px 0;}
+.note-bullet{color:var(--ac);flex-shrink:0;font-size:10px;padding-top:3px;}
+/* modal */
+#modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;align-items:center;justify-content:center;}
+#modal-overlay.open{display:flex;}
+#modal-box{background:var(--modal-bg);border:1px solid #333;border-radius:8px;width:520px;max-height:420px;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.8);}
+#modal-hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid #2a2c38;flex-shrink:0;}
+#modal-hdr span{font-size:13px;font-weight:700;color:var(--text-bright);}
+#modal-close{background:none;border:none;color:#666;cursor:pointer;font-size:16px;line-height:1;padding:2px 6px;}
+#modal-close:hover{color:var(--text);}
+#modal-body{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:10px;}
+#modal-body::-webkit-scrollbar{width:4px;}
+#modal-body::-webkit-scrollbar-thumb{background:#333;}
+.form-row{display:flex;flex-direction:column;gap:4px;}
+.form-row label{font-size:11px;color:var(--text-dim);font-weight:600;text-transform:uppercase;letter-spacing:.5px;}
+.form-row input,.form-row select,.form-row textarea{background:#13151b;border:1px solid #333;border-radius:4px;color:var(--text);font-size:12px;padding:6px 8px;outline:none;font-family:'Segoe UI',Arial,sans-serif;resize:vertical;}
+.form-row input:focus,.form-row select:focus,.form-row textarea:focus{border-color:var(--ac);}
+.form-row select option{background:#1a1c22;}
+.form-hint{font-size:10px;color:#556;margin-top:2px;font-style:italic;}
+#modal-ftr{display:flex;justify-content:flex-end;gap:8px;padding:10px 14px;border-top:1px solid #2a2c38;flex-shrink:0;}
+.btn-cancel{background:#1e2028;border:1px solid #333;color:#888;font-size:12px;padding:6px 14px;border-radius:4px;cursor:pointer;}
+.btn-cancel:hover{border-color:#555;color:var(--text);}
+.btn-save{background:var(--ac2);border:1px solid #3366aa;color:#fff;font-size:12px;padding:6px 14px;border-radius:4px;cursor:pointer;font-weight:600;}
+.btn-save:hover{background:#3377ee;}
+/* hidden */
+.hidden{display:none!important;}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="hp">
+    <div class="dev">
+      <div class="led"></div>
+      <div id="hs">
+        <div id="main-layout">
+          <!-- HEADER -->
+          <div id="hdr">
+            <div class="hdr-led"></div>
+            <span class="hdr-title">BAADER 200</span>
+            <span class="hdr-sub">— Manual de Ajustes Técnicos</span>
+            <div class="hdr-spacer"></div>
+            <div id="search-wrap">
+              <span id="search-icon">&#128269;</span>
+              <input id="search-input" type="text" placeholder="Buscar sección..." autocomplete="off">
+            </div>
+          </div>
+          <!-- BODY SPLIT -->
+          <div id="body-split">
+            <!-- NAV TREE -->
+            <div id="nav-tree">
+              <div id="nav-scroll"></div>
+              <div id="nav-add-btn" class="nav-add-btn hidden">
+                <span>+</span><span>Nueva sección</span>
+              </div>
+            </div>
+            <!-- CONTENT AREA -->
+            <div id="content-area">
+              <div id="content-placeholder">
+                <div class="ph-icon">&#128196;</div>
+                <div class="ph-text">Selecciona una sección del menú</div>
+              </div>
+              <div id="section-content" class="hidden"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 4px 0;">
+        <span style="font-size:13px;font-weight:700;color:#666;letter-spacing:1px;">BAADER <span style="font-weight:300;">200</span></span>
+        <span style="font-size:10px;color:#555;font-style:italic;letter-spacing:1px;">Learn Module</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div id="modal-overlay">
+  <div id="modal-box">
+    <div id="modal-hdr">
+      <span id="modal-title">Nueva sección</span>
+      <button id="modal-close" title="Cerrar">&#x2715;</button>
+    </div>
+    <div id="modal-body">
+      <div class="form-row">
+        <label>Título</label>
+        <input id="f-title" type="text" placeholder="Nombre de la sección" maxlength="80">
+      </div>
+      <div class="form-row">
+        <label>Tipo</label>
+        <select id="f-type">
+          <option value="ajuste">Ajuste</option>
+          <option value="troubleshooting">Troubleshooting</option>
+          <option value="seguridad">Seguridad</option>
+          <option value="precaucion">Precaución</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Descripción</label>
+        <textarea id="f-desc" rows="2" placeholder="Descripción general de la sección..."></textarea>
+      </div>
+      <div class="form-row">
+        <label>Pasos de ajuste</label>
+        <textarea id="f-steps" rows="4" placeholder="Un paso por línea&#10;Prefija con ! para paso importante&#10;Ej: !Verificar presión antes de ajustar"></textarea>
+        <div class="form-hint">Un paso por línea. Prefijo "!" = paso importante.</div>
+      </div>
+      <div class="form-row">
+        <label>Medidas clave</label>
+        <textarea id="f-meas" rows="3" placeholder="nombre|valor|unidad|nota&#10;Abertura guías|4.8|mm|Medida nominal"></textarea>
+        <div class="form-hint">Formato: nombre|valor|unidad|nota (una por línea)</div>
+      </div>
+      <div class="form-row">
+        <label>Notas importantes</label>
+        <textarea id="f-notes" rows="2" placeholder="Una nota por línea..."></textarea>
+      </div>
+    </div>
+    <div id="modal-ftr">
+      <button class="btn-cancel" id="modal-cancel-btn">Cancelar</button>
+      <button class="btn-save" id="modal-save-btn">Guardar sección</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+// ── state ──────────────────────────────────────────────────────
+var state = {
+  sections: [],
+  currentId: null,
+  readonly: true,
+  editingId: null,
+  searchQuery: '',
+  collapsed: {}
+};
+
+// ── category config ────────────────────────────────────────────
+var CAT_ORDER = ['ajuste','troubleshooting','seguridad','precaucion'];
+var CAT_LABELS = {
+  ajuste: 'Ajustes',
+  troubleshooting: 'Problemas',
+  seguridad: 'Seguridad',
+  precaucion: 'Precauciones'
+};
+var CAT_ICONS = {
+  ajuste: '&#9881;',
+  troubleshooting: '&#9888;',
+  seguridad: '&#128274;',
+  precaucion: '&#9888;'
+};
+
+// ── helpers ────────────────────────────────────────────────────
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function byId(id){ return document.getElementById(id); }
+
+// ── device scaling (same as HMI Knuro) ────────────────────────
+function scaleDevice(){
+  var hs = byId('hs');
+  if(!hs) return;
+  var W=800, H=480;
+  var cw=window.innerWidth, ch=window.innerHeight;
+  var s=Math.min(cw/W, ch/H);
+  hs.style.transform='scale('+s+')';
+  var dev=hs.parentElement;
+  if(dev){
+    dev.style.width=(W*s+28)+'px';
+    dev.style.height=(H*s+30)+'px';
+  }
+}
+
+// ── postMessage communication ──────────────────────────────────
+function send(type, payload){
+  var msg = Object.assign({type: type}, payload||{});
+  try{ parent.postMessage(msg,'*'); }catch(e){}
+}
+
+window.addEventListener('message', function(e){
+  var d = e.data;
+  if(!d || typeof d.type !== 'string') return;
+  if(d.type === 'b200:init'){
+    state.sections = Array.isArray(d.sections) ? d.sections : [];
+    state.currentId = d.currentId || null;
+    state.readonly = d.readonly !== false;
+    renderAll();
+    if(state.currentId) showSection(state.currentId);
+    else if(state.sections.length) showSection(state.sections[0].id);
+  } else if(d.type === 'b200:select-section'){
+    if(d.id) showSection(d.id);
+  }
+});
+
+// ── nav tree render ────────────────────────────────────────────
+function getGrouped(){
+  var q = state.searchQuery.toLowerCase().trim();
+  var grouped = {};
+  CAT_ORDER.forEach(function(c){ grouped[c]=[]; });
+  state.sections.forEach(function(sec){
+    if(!grouped[sec.type]) grouped[sec.type]=[];
+    if(!q || sec.title.toLowerCase().indexOf(q)>=0 || (sec.description||'').toLowerCase().indexOf(q)>=0){
+      grouped[sec.type].push(sec);
+    }
+  });
+  CAT_ORDER.forEach(function(c){
+    grouped[c].sort(function(a,b){ return (a.order||0)-(b.order||0); });
+  });
+  return grouped;
+}
+
+function renderNavTree(){
+  var scroll = byId('nav-scroll');
+  if(!scroll) return;
+  var grouped = getGrouped();
+  var html = '';
+  CAT_ORDER.forEach(function(cat){
+    var items = grouped[cat]||[];
+    if(state.searchQuery && items.length===0) return;
+    var isOpen = state.collapsed[cat] !== true;
+    html += '<div class="cat-header" data-cat="'+cat+'">';
+    html += '<span class="cat-arrow '+(isOpen?'open':'')+'">&#9658;</span>';
+    html += '<span>'+CAT_LABELS[cat]+'</span>';
+    html += '<span class="cat-count">'+items.length+'</span>';
+    html += '</div>';
+    html += '<div class="cat-items'+(isOpen?'':' collapsed')+'" data-cat-items="'+cat+'">';
+    items.forEach(function(sec, idx){
+      var isActive = sec.id === state.currentId;
+      html += '<div class="nav-item'+(isActive?' active':'')+'" data-id="'+esc(sec.id)+'">';
+      html += '<span class="nav-item-num">'+(idx+1)+'</span>';
+      html += '<span class="nav-item-text" title="'+esc(sec.title)+'">'+esc(sec.title)+'</span>';
+      if(!state.readonly){
+        html += '<span class="nav-item-actions">';
+        html += '<button class="nav-action-btn" data-edit="'+esc(sec.id)+'" title="Editar">&#9998;</button>';
+        html += '<button class="nav-action-btn" data-del="'+esc(sec.id)+'" title="Eliminar">&#128465;</button>';
+        html += '</span>';
+      }
+      html += '</div>';
+    });
+    html += '</div>';
+  });
+  if(!html) html = '<div style="padding:16px 12px;font-size:11px;color:#555;text-align:center;">Sin resultados</div>';
+  scroll.innerHTML = html;
+
+  // toggle category
+  scroll.querySelectorAll('.cat-header').forEach(function(el){
+    el.addEventListener('click', function(){
+      var cat = el.getAttribute('data-cat');
+      state.collapsed[cat] = !state.collapsed[cat];
+      renderNavTree();
+    });
+  });
+  // select section
+  scroll.querySelectorAll('.nav-item').forEach(function(el){
+    el.addEventListener('click', function(ev){
+      if(ev.target.closest('.nav-item-actions')) return;
+      var id = el.getAttribute('data-id');
+      if(id){ selectSection(id); }
+    });
+  });
+  // edit btn
+  scroll.querySelectorAll('[data-edit]').forEach(function(btn){
+    btn.addEventListener('click', function(ev){
+      ev.stopPropagation();
+      openModal(btn.getAttribute('data-edit'));
+    });
+  });
+  // delete btn
+  scroll.querySelectorAll('[data-del]').forEach(function(btn){
+    btn.addEventListener('click', function(ev){
+      ev.stopPropagation();
+      var id = btn.getAttribute('data-del');
+      var sec = state.sections.find(function(s){ return s.id===id; });
+      var name = sec ? sec.title : id;
+      if(confirm('¿Eliminar sección "'+name+'"?')){
+        send('b200:delete-section',{id:id});
+        state.sections = state.sections.filter(function(s){ return s.id!==id; });
+        if(state.currentId===id){
+          state.currentId=null;
+          byId('content-placeholder').classList.remove('hidden');
+          byId('section-content').classList.add('hidden');
+        }
+        renderNavTree();
+      }
+    });
+  });
+
+  // admin add button
+  var addBtn = byId('nav-add-btn');
+  if(addBtn){ addBtn.classList.toggle('hidden', state.readonly); }
+}
+
+// ── section content render ─────────────────────────────────────
+function renderSectionContent(sec){
+  var steps = Array.isArray(sec.steps) ? sec.steps : [];
+  var meas = Array.isArray(sec.measurements) ? sec.measurements : [];
+  var notes = Array.isArray(sec.notes) ? sec.notes : [];
+
+  var typeLabels = {ajuste:'Ajuste',troubleshooting:'Troubleshooting',seguridad:'Seguridad',precaucion:'Precaución'};
+  var typeIcons = {ajuste:'&#9881;',troubleshooting:'&#9888;',seguridad:'&#128274;',precaucion:'&#9888;'};
+
+  var html = '';
+  // badge + title
+  html += '<span class="sec-badge '+esc(sec.type||'ajuste')+'">'+
+    (typeIcons[sec.type]||'')+'&nbsp;'+esc(typeLabels[sec.type]||sec.type)+
+  '</span>';
+  html += '<div class="sec-title">'+esc(sec.title)+'</div>';
+  // description
+  if(sec.description){
+    html += '<div class="sec-desc">'+esc(sec.description)+'</div>';
+  }
+  // steps
+  if(steps.length){
+    html += '<div class="sec-block-title">Pasos de ajuste</div>';
+    html += '<div class="steps-list">';
+    steps.forEach(function(st,i){
+      var isImp = st.important === true;
+      html += '<div class="step-item'+(isImp?' important':'')+'">';
+      html += '<span class="step-num">'+(i+1)+'.</span>';
+      if(isImp) html += '<span class="step-imp-icon">&#9888;</span>';
+      html += '<span class="step-text">'+esc(st.text)+'</span>';
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+  // measurements
+  if(meas.length){
+    html += '<div class="sec-block-title">Medidas clave</div>';
+    html += '<table class="meas-table"><thead><tr>';
+    html += '<th>Parámetro</th><th>Valor</th><th>Nota</th>';
+    html += '</tr></thead><tbody>';
+    meas.forEach(function(m){
+      html += '<tr><td>'+esc(m.name)+'</td>';
+      html += '<td><span class="meas-val">'+esc(m.value)+'</span>';
+      if(m.unit) html += ' <span class="meas-unit">'+esc(m.unit)+'</span>';
+      html += '</td>';
+      html += '<td class="meas-note">'+esc(m.note||'—')+'</td></tr>';
+    });
+    html += '</tbody></table>';
+  }
+  // notes
+  if(notes.length){
+    html += '<div class="sec-block-title">&#9888; Notas importantes</div>';
+    html += '<div class="notes-list">';
+    notes.forEach(function(n){
+      html += '<div class="note-item"><span class="note-bullet">&#9679;</span><span>'+esc(n)+'</span></div>';
+    });
+    html += '</div>';
+  }
+  return html;
+}
+
+function showSection(id){
+  var sec = state.sections.find(function(s){ return s.id===id; });
+  if(!sec) return;
+  state.currentId = id;
+  var placeholder = byId('content-placeholder');
+  var content = byId('section-content');
+  if(placeholder) placeholder.classList.add('hidden');
+  if(content){
+    content.classList.remove('hidden');
+    content.innerHTML = renderSectionContent(sec);
+    content.scrollTop = 0;
+  }
+  renderNavTree();
+}
+
+function selectSection(id){
+  send('b200:select',{id:id});
+  showSection(id);
+}
+
+function renderAll(){
+  renderNavTree();
+  if(state.currentId) showSection(state.currentId);
+}
+
+// ── modal (admin mode) ─────────────────────────────────────────
+function openModal(editId){
+  state.editingId = editId || null;
+  var isEdit = !!editId;
+  byId('modal-title').textContent = isEdit ? 'Editar sección' : 'Nueva sección';
+  var sec = isEdit ? state.sections.find(function(s){ return s.id===editId; }) : null;
+  byId('f-title').value = sec ? sec.title : '';
+  byId('f-type').value = sec ? (sec.type||'ajuste') : 'ajuste';
+  byId('f-desc').value = sec ? (sec.description||'') : '';
+  var steps = sec && Array.isArray(sec.steps) ? sec.steps : [];
+  byId('f-steps').value = steps.map(function(s){ return (s.important?'!':'')+s.text; }).join('\n');
+  var meas = sec && Array.isArray(sec.measurements) ? sec.measurements : [];
+  byId('f-meas').value = meas.map(function(m){ return [m.name,m.value,m.unit,m.note].join('|'); }).join('\n');
+  var notes = sec && Array.isArray(sec.notes) ? sec.notes : [];
+  byId('f-notes').value = notes.join('\n');
+  byId('modal-overlay').classList.add('open');
+  setTimeout(function(){ byId('f-title').focus(); },50);
+}
+
+function closeModal(){
+  byId('modal-overlay').classList.remove('open');
+  state.editingId = null;
+}
+
+function saveModal(){
+  var title = byId('f-title').value.trim();
+  if(!title){ byId('f-title').focus(); return; }
+  var steps = byId('f-steps').value.split('\n').filter(function(l){ return l.trim(); }).map(function(l){
+    var imp = l.charAt(0)==='!';
+    return {text:(imp?l.slice(1):l).trim(), important:imp};
+  });
+  var meas = byId('f-meas').value.split('\n').filter(function(l){ return l.trim(); }).map(function(l){
+    var parts = l.split('|');
+    return {name:(parts[0]||'').trim(),value:(parts[1]||'').trim(),unit:(parts[2]||'').trim(),note:(parts[3]||'').trim()};
+  });
+  var notes = byId('f-notes').value.split('\n').filter(function(l){ return l.trim(); }).map(function(l){ return l.trim(); });
+  var existing = state.editingId ? state.sections.find(function(s){ return s.id===state.editingId; }) : null;
+  var sec = {
+    id: state.editingId || ('sec_'+Date.now()),
+    title: title,
+    type: byId('f-type').value,
+    order: existing ? existing.order : (state.sections.length+1),
+    description: byId('f-desc').value.trim(),
+    steps: steps,
+    measurements: meas,
+    notes: notes
+  };
+  send('b200:save-section',{section:sec});
+  if(state.editingId){
+    var idx = state.sections.findIndex(function(s){ return s.id===state.editingId; });
+    if(idx>=0) state.sections[idx]=sec; else state.sections.push(sec);
+  } else {
+    state.sections.push(sec);
+  }
+  closeModal();
+  renderNavTree();
+  showSection(sec.id);
+}
+
+// ── search ─────────────────────────────────────────────────────
+byId('search-input').addEventListener('input', function(){
+  state.searchQuery = this.value;
+  renderNavTree();
+});
+
+// ── modal events ───────────────────────────────────────────────
+byId('modal-close').addEventListener('click', closeModal);
+byId('modal-cancel-btn').addEventListener('click', closeModal);
+byId('modal-save-btn').addEventListener('click', saveModal);
+byId('modal-overlay').addEventListener('click', function(e){
+  if(e.target===this) closeModal();
+});
+byId('nav-add-btn').addEventListener('click', function(){
+  openModal(null);
+});
+
+// ── scale + init ───────────────────────────────────────────────
+window.addEventListener('resize', scaleDevice);
+document.addEventListener('DOMContentLoaded', function(){
+  scaleDevice();
+  send('b200:ready');
+});
+scaleDevice();
+send('b200:ready');
+
+})();
+</script>
+</body>
+</html>
