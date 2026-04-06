@@ -150,11 +150,12 @@ export function RepuestoDetailModal({
   const tipoInputRef = useRef<HTMLInputElement>(null)
 
   const saveAlias = async () => {
-    if (!machineId) return
+    const colPath = (rep as any).sourceCollection || (machineId ? `machines/${machineId}/repuestos` : null)
+    if (!colPath) return
     const trimmed = aliasValue.trim()
     setSavingAlias(true)
     try {
-      await updateDoc(doc(db, `machines/${machineId}/repuestos/${rep.id}`), {
+      await updateDoc(doc(db, `${colPath}/${rep.id}`), {
         alias: trimmed || null,
       })
       rep.alias = trimmed || undefined
@@ -168,11 +169,13 @@ export function RepuestoDetailModal({
   }
 
   const saveTipo = async () => {
-    if (!machineId) return
+    // Determinar la colección correcta: sourceCollection (EquipmentRepuesto) o machines/{machineId}/repuestos
+    const colPath = (rep as any).sourceCollection || (machineId ? `machines/${machineId}/repuestos` : null)
+    if (!colPath) return
     const trimmed = tipoValue.trim().toUpperCase()
     setSavingTipo(true)
     try {
-      await updateDoc(doc(db, `machines/${machineId}/repuestos/${rep.id}`), {
+      await updateDoc(doc(db, `${colPath}/${rep.id}`), {
         tipo: trimmed || null,
       })
       ;(rep as any).tipo = trimmed || undefined

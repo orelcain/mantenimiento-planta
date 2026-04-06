@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react'
-import { AlertTriangle, Plus, FileText, Upload, Package, ArrowRightLeft, Copy as CopyDuplicateIcon, Globe, ExternalLink, Search, X, WifiOff, Star, ChevronDown, Camera, ChevronLeft, ChevronRight as ChevronRightIcon, ZoomIn, Trash2, History } from 'lucide-react'
+import { AlertTriangle, Plus, FileText, Upload, Package, ArrowRightLeft, Copy as CopyDuplicateIcon, Globe, ExternalLink, Search, X, WifiOff, Star, ChevronDown, Camera, ChevronLeft, ChevronRight as ChevronRightIcon, ZoomIn, Trash2, History, Pencil } from 'lucide-react'
 import { uploadEquipmentPhoto, deleteEquipmentPhoto, listEquipmentPhotos } from '@/services/storage'
 import { RepuestosTable } from '@/components/repuestos/RepuestosTable'
 import { RepuestoFormModal } from '@/components/repuestos/RepuestoForm'
@@ -32,6 +32,8 @@ import { useOnlineStatus } from '@/hooks/useOnlineStatus'
 import { TrashPanel } from '@/components/repuestos/TrashPanel'
 import { AuditLogPanel } from '@/components/repuestos/AuditLogPanel'
 import { getTrashCount } from '@/services/auditLog'
+import { getHmiTooltipPwd } from '@/services/hmiKnuro'
+import { getRepuestoFavLists, saveRepuestoFavLists, type RepuestoFavList } from '@/services/userPreferences'
 import {
   Button,
   Dialog,
@@ -556,6 +558,78 @@ export function RepuestosDashboard({
     if (isAdmin) getTrashCount().then(setTrashCount)
   }, [isAdmin, trashOpen])
 
+  // ── Repuestos favoritos por equipo ──
+  const [repFavLists, setRepFavLists] = useState<RepuestoFavList[]>([])
+  const [activeFavListName, setActiveFavListName] = useState<string | null>(null)
+  const [editingFavList, setEditingFavList] = useState<string | null>(null)
+  const [editFavClave, setEditFavClave] = useState('')
+  const [editFavClaveError, setEditFavClaveError] = useState('')
+  const [editFavClaveOpen, setEditFavClaveOpen] = useState(false)
+  const repFavEquipId = selectedEquipmentInfo?.id || ''
+  const repFavIds = useMemo(() => {
+    const ids = new Set<string>()
+    repFavLists.forEach(l => l.repuestoIds.forEach(id => ids.add(id)))
+    return ids
+  }, [repFavLists])
+
+  // Cargar favoritos cuando cambia el equipo
+  useEffect(() => {
+    if (!repFavEquipId || !currentUser?.id) { setRepFavLists([]); setActiveFavListName(null); return }
+    setActiveFavListName(null)
+    getRepuestoFavLists(currentUser.id, repFavEquipId).then(setRepFavLists)
+  }, [repFavEquipId, currentUser?.id])
+
+  // Modal: al tocar estrella, abre selector de lista
+  const [favModalRepId, setFavModalRepId] = useState<string | null>(null)
+  const [favModalNewList, setFavModalNewList] = useState('')
+
+  const openFavModal = useCallback((repuestoId: string) => {
+    setFavModalRepId(repuestoId)
+    setFavModalNewList('')
+  }, [])
+
+  const addRepToList = useCallback((listName: string, repuestoId: string) => {
+    if (!currentUser?.id || !repFavEquipId) return
+    setRepFavLists(prev => {
+      let lists = [...prev]
+      const target = lists.find(l => l.name === listName)
+      if (target) {
+        if (!target.repuestoIds.includes(repuestoId)) {
+          target.repuestoIds = [...target.repuestoIds, repuestoId]
+        }
+      } else {
+        lists = [...lists, { name: listName, repuestoIds: [repuestoId] }]
+      }
+      saveRepuestoFavLists(currentUser!.id, repFavEquipId, lists)
+      return lists
+    })
+    setFavModalRepId(null)
+  }, [currentUser?.id, repFavEquipId])
+
+  const removeRepFromList = useCallback((listName: string, repuestoId: string) => {
+    if (!currentUser?.id || !repFavEquipId) return
+    setRepFavLists(prev => {
+      const lists = prev.map(l => l.name === listName ? { ...l, repuestoIds: l.repuestoIds.filter(id => id !== repuestoId) } : l)
+      saveRepuestoFavLists(currentUser!.id, repFavEquipId, lists)
+      return lists
+    })
+  }, [currentUser?.id, repFavEquipId])
+
+  // Toggle rápido: si ya es favorito en alguna lista, quita. Si no, abre modal.
+  const toggleRepFavorite = useCallback((repuestoId: string) => {
+    if (repFavIds.has(repuestoId)) {
+      // Quitar de todas las listas
+      if (!currentUser?.id || !repFavEquipId) return
+      setRepFavLists(prev => {
+        const lists = prev.map(l => ({ ...l, repuestoIds: l.repuestoIds.filter(id => id !== repuestoId) }))
+        saveRepuestoFavLists(currentUser!.id, repFavEquipId, lists)
+        return lists
+      })
+    } else {
+      openFavModal(repuestoId)
+    }
+  }, [repFavIds, currentUser?.id, repFavEquipId, openFavModal])
+
   // Scroll al detalle del equipo cuando se selecciona
   useEffect(() => {
     if (selectedEquipmentInfo && equipmentDetailRef.current) {
@@ -721,8 +795,17 @@ export function RepuestosDashboard({
       filtered = filtered.filter(r => (r.fotosReales?.length || 0) + (r.imagenesManual?.length || 0) + (r.gallery?.length || 0) > 0)
     }
 
+    // Filtro por lista de favoritos activa
+    if (activeFavListName) {
+      const activeList = repFavLists.find(l => l.name === activeFavListName)
+      if (activeList) {
+        const favSet = new Set(activeList.repuestoIds)
+        filtered = filtered.filter(r => favSet.has(r.id))
+      }
+    }
+
     return filtered
-  }, [repuestos, searchQuery, filterTipo, kpiFilter])
+  }, [repuestos, searchQuery, filterTipo, kpiFilter, activeFavListName, repFavLists])
 
   // Tipos únicos ordenados por frecuencia (sobre todos los repuestos, no el filtrado)
   const tiposDisponibles = useMemo(() => {
@@ -1205,6 +1288,101 @@ export function RepuestosDashboard({
           />
         )}
 
+        {/* ═══ Listas de repuestos favoritos (tags de filtro rápido) ═══ */}
+        {repFavLists.some(l => l.repuestoIds.length > 0) && (
+          <div className="mt-3 flex items-center gap-1.5 overflow-x-auto sm:flex-wrap no-scrollbar">
+            {repFavLists.filter(l => l.repuestoIds.length > 0).map(list => {
+              const isActive = activeFavListName === list.name
+              return (
+                <button
+                  key={list.name}
+                  onClick={() => setActiveFavListName(isActive ? null : list.name)}
+                  className={[
+                    'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all whitespace-nowrap shrink-0',
+                    isActive
+                      ? 'border-yellow-500/40 bg-yellow-500/15 text-yellow-400'
+                      : 'border-border bg-card text-muted-foreground hover:border-yellow-500/30 hover:text-foreground',
+                  ].join(' ')}
+                >
+                  <Star className={`h-3 w-3 ${isActive ? 'fill-yellow-400 text-yellow-400' : 'text-yellow-400/50'}`} />
+                  {list.name}
+                  <span className={`text-[9px] ${isActive ? 'text-yellow-400/70' : 'text-muted-foreground/40'}`}>
+                    {list.repuestoIds.length}
+                  </span>
+                </button>
+              )
+            })}
+            {/* Botón editar listas */}
+            <button
+              onClick={() => { setEditFavClaveOpen(true); setEditFavClave(''); setEditFavClaveError('') }}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium border border-dashed border-border text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap shrink-0"
+            >
+              <Pencil className="h-3 w-3" /> Editar
+            </button>
+          </div>
+        )}
+
+        {/* Panel editar listas (abierto tras clave correcta) */}
+        {editingFavList === '__all__' && (
+          <div className="mt-2 p-3 rounded-lg border border-yellow-500/20 bg-yellow-500/5 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-foreground flex items-center gap-1.5"><Star className="h-3.5 w-3.5 text-yellow-400 fill-yellow-400" /> Editar listas de favoritos</span>
+              <button onClick={() => setEditingFavList(null)} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+            </div>
+            {repFavLists.map(list => (
+              <div key={list.name} className="space-y-1.5 p-2 rounded-lg border border-border bg-card">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                    <Star className="h-3 w-3 text-yellow-400/60 shrink-0" />
+                    <input
+                      defaultValue={list.name}
+                      onBlur={e => {
+                        const newName = e.target.value.trim()
+                        if (!newName || newName === list.name || !currentUser?.id) return
+                        const updated = repFavLists.map(l => l.name === list.name ? { ...l, name: newName } : l)
+                        setRepFavLists(updated)
+                        saveRepuestoFavLists(currentUser.id, repFavEquipId, updated)
+                        if (activeFavListName === list.name) setActiveFavListName(newName)
+                      }}
+                      onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                      className="text-xs font-medium text-foreground bg-transparent border-b border-transparent hover:border-border focus:border-primary focus:outline-none px-0.5 py-0 min-w-0 flex-1"
+                    />
+                    <span className="text-[9px] text-muted-foreground/50 shrink-0">({list.repuestoIds.length})</span>
+                  </div>
+                  <div className="flex gap-1 shrink-0">
+                    <button onClick={() => {
+                      if (!currentUser?.id) return
+                      const updated = repFavLists.map(l => l.name === list.name ? { ...l, repuestoIds: [] } : l)
+                      setRepFavLists(updated)
+                      saveRepuestoFavLists(currentUser.id, repFavEquipId, updated)
+                    }} className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground hover:bg-muted/80">Vaciar</button>
+                    <button onClick={() => {
+                      if (!currentUser?.id) return
+                      const updated = repFavLists.filter(l => l.name !== list.name)
+                      setRepFavLists(updated)
+                      saveRepuestoFavLists(currentUser.id, repFavEquipId, updated)
+                      if (activeFavListName === list.name) setActiveFavListName(null)
+                    }} className="text-[9px] px-1.5 py-0.5 rounded bg-destructive/10 text-destructive hover:bg-destructive/20">Eliminar</button>
+                  </div>
+                </div>
+                {list.repuestoIds.length > 0 && (
+                  <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
+                    {list.repuestoIds.map(id => {
+                      const rep = repuestos.find(r => r.id === id)
+                      return (
+                        <span key={id} className="flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                          {rep?.textoBreve?.slice(0, 20) || id}
+                          <button onClick={() => removeRepFromList(list.name, id)} className="text-muted-foreground/60 hover:text-destructive"><X className="h-2.5 w-2.5" /></button>
+                        </span>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Error Display */}
         {repuestosError && (
           <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive flex items-center gap-2">
@@ -1254,6 +1432,8 @@ export function RepuestosDashboard({
                 onRelocate={isAdmin && currentMachine ? (rep) => setRelocateTarget(rep) : undefined}
                 onViewDetail={(rep) => setDetailTarget(rep)}
                 highlightedRepuestoId={highlightedRepuestoId}
+                favoriteIds={repFavIds}
+                onToggleFavorite={toggleRepFavorite}
               />
 
               <RepuestosPagination
@@ -1451,12 +1631,107 @@ export function RepuestosDashboard({
           onOpenChange={(open) => !open && setDetailTarget(null)}
           repuesto={detailTarget}
           machineName={currentMachine?.nombre}
+          machineId={currentMachine?.id}
         />
       )}
 
       {/* Audit Log + Papelera (admin/supervisor) */}
       <TrashPanel open={trashOpen} onOpenChange={setTrashOpen} />
       <AuditLogPanel open={auditLogOpen} onOpenChange={setAuditLogOpen} />
+
+      {/* Modal: Agregar repuesto a lista de favoritos */}
+      {favModalRepId && (() => {
+        const rep = repuestos.find(r => r.id === favModalRepId)
+        return (
+          <Dialog open={!!favModalRepId} onOpenChange={v => { if (!v) setFavModalRepId(null) }}>
+            <DialogContent className="max-w-sm">
+              <DialogHeader>
+                <DialogTitle className="text-sm">Agregar a lista</DialogTitle>
+              </DialogHeader>
+              <p className="text-xs text-muted-foreground truncate">{rep?.textoBreve || rep?.codigoSAP || ''}</p>
+              <div className="space-y-1.5 mt-2">
+                {repFavLists.length === 0 && (
+                  <p className="text-xs text-muted-foreground">No hay listas aún. Crea una:</p>
+                )}
+                {repFavLists.map(list => {
+                  const alreadyIn = list.repuestoIds.includes(favModalRepId!)
+                  return (
+                    <button
+                      key={list.name}
+                      onClick={() => {
+                        if (alreadyIn) removeRepFromList(list.name, favModalRepId!)
+                        else addRepToList(list.name, favModalRepId!)
+                      }}
+                      className={[
+                        'w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border transition-all text-left',
+                        alreadyIn
+                          ? 'border-yellow-500/40 bg-yellow-500/10 text-yellow-400'
+                          : 'border-border bg-card text-foreground hover:bg-muted/20',
+                      ].join(' ')}
+                    >
+                      <Star className={`h-3.5 w-3.5 ${alreadyIn ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground/40'}`} />
+                      <span className="flex-1">{list.name}</span>
+                      <span className="text-[9px] text-muted-foreground">{list.repuestoIds.length}</span>
+                      {alreadyIn && <span className="text-[9px] text-yellow-400">En lista</span>}
+                    </button>
+                  )
+                })}
+              </div>
+              {/* Crear nueva lista inline */}
+              <form onSubmit={e => {
+                e.preventDefault()
+                if (!favModalNewList.trim()) return
+                addRepToList(favModalNewList.trim(), favModalRepId!)
+                setFavModalNewList('')
+              }} className="flex gap-2 mt-2">
+                <input
+                  value={favModalNewList}
+                  onChange={e => setFavModalNewList(e.target.value)}
+                  placeholder="Nueva lista…"
+                  className="flex-1 h-8 px-3 text-xs bg-muted/30 border border-border rounded-lg focus:outline-none focus:ring-1 focus:ring-primary/40 text-foreground"
+                />
+                <Button type="submit" size="sm" disabled={!favModalNewList.trim()} className="h-8 text-xs">
+                  Crear
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )
+      })()}
+
+      {/* Dialog: Clave de edición para editar listas de favoritos */}
+      <Dialog open={editFavClaveOpen} onOpenChange={v => { if (!v) setEditFavClaveOpen(false) }}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader>
+            <DialogTitle className="text-sm">Clave de edición</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={async e => {
+            e.preventDefault()
+            setEditFavClaveError('')
+            const correctPwd = await getHmiTooltipPwd()
+            if (editFavClave.trim() !== correctPwd) {
+              setEditFavClaveError('Clave incorrecta')
+              return
+            }
+            setEditFavClaveOpen(false)
+            setEditingFavList('__all__')
+          }} className="space-y-3">
+            <input
+              type="password"
+              autoFocus
+              value={editFavClave}
+              onChange={e => { setEditFavClave(e.target.value); setEditFavClaveError('') }}
+              placeholder="Ingresa la clave…"
+              className="w-full h-9 px-3 text-sm bg-muted/30 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground"
+            />
+            {editFavClaveError && <p className="text-xs text-destructive">{editFavClaveError}</p>}
+            <DialogFooter>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setEditFavClaveOpen(false)}>Cancelar</Button>
+              <Button type="submit" size="sm" disabled={!editFavClave.trim()}>Confirmar</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

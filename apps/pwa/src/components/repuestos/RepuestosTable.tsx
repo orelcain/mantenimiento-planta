@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Package, ImageIcon, X, BookOpen, Eye, Camera, Pencil, Trash2, ArrowRightLeft, ArrowUpDown, ArrowUp, ArrowDown, MessageSquareText } from 'lucide-react'
+import { Package, ImageIcon, X, BookOpen, Eye, Camera, Pencil, Trash2, ArrowRightLeft, ArrowUpDown, ArrowUp, ArrowDown, MessageSquareText, Star } from 'lucide-react'
 import type { Repuesto, EquipmentRepuesto } from '@/types/repuestos'
 import { RepuestoActionsMenu } from './RepuestoActionsMenu'
 
@@ -36,6 +36,8 @@ interface RepuestosTableProps {
   onRelocate?: (repuesto: Repuesto) => void
   onViewDetail?: (repuesto: Repuesto) => void
   highlightedRepuestoId?: string | null
+  favoriteIds?: Set<string>
+  onToggleFavorite?: (repuestoId: string) => void
 }
 
 const formatNumber = (value: number) =>
@@ -250,6 +252,8 @@ export function RepuestosTable({
   onRelocate,
   onViewDetail,
   highlightedRepuestoId,
+  favoriteIds,
+  onToggleFavorite,
 }: RepuestosTableProps) {
   const [preview, setPreview] = useState<{ url: string; name: string; allImages?: { url: string }[]; rep?: Repuesto } | null>(null)
 
@@ -298,8 +302,15 @@ export function RepuestosTable({
                   <RepuestoThumbnail rep={rep} onPreview={(url, name, imgs) => setPreview({ url, name, allImages: imgs, rep })} onOpenGallery={onViewGallery} />
                 )}
                 <div className="flex-1 min-w-0">
-                  {/* Nombre — tap abre ficha */}
-                  <p className="font-medium text-foreground text-[13px] leading-tight line-clamp-1">{rep.textoBreve || rep.descripcion || 'Sin nombre'}</p>
+                  {/* Nombre + estrella favorito */}
+                  <div className="flex items-center gap-1">
+                    <p className="font-medium text-foreground text-[13px] leading-tight line-clamp-1 flex-1">{rep.textoBreve || rep.descripcion || 'Sin nombre'}</p>
+                    {onToggleFavorite && (
+                      <button onClick={e => { e.stopPropagation(); onToggleFavorite(rep.id) }} className="shrink-0 p-0.5">
+                        <Star className={`h-3.5 w-3.5 ${favoriteIds?.has(rep.id) ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground/20'}`} />
+                      </button>
+                    )}
+                  </div>
                   {/* Badges inline */}
                   <div className="flex items-center gap-1 mt-1 flex-wrap">
                     <span className="text-[9px] font-mono text-blue-400 bg-blue-500/10 px-1 py-0 rounded">{rep.codigoSAP || 'S/C'}</span>
@@ -398,6 +409,11 @@ export function RepuestosTable({
                       </div>
                       {hasMedia && (
                         <ImageIcon className="h-3.5 w-3.5 text-blue-400/60 shrink-0" />
+                      )}
+                      {onToggleFavorite && (
+                        <button onClick={() => onToggleFavorite(rep.id)} className="shrink-0 p-0.5 rounded hover:bg-yellow-500/10 transition-colors">
+                          <Star className={`h-3 w-3 ${favoriteIds?.has(rep.id) ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground/20 group-hover:text-muted-foreground/40'}`} />
+                        </button>
                       )}
                     </div>
                   </td>
