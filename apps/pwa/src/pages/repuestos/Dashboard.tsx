@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from 'react'
-import { AlertTriangle, Plus, FileText, Upload, Package, Wrench, ArrowRightLeft, Copy as CopyDuplicateIcon, Globe, ExternalLink, Search, X, WifiOff, Star } from 'lucide-react'
+import { AlertTriangle, Plus, FileText, Upload, Package, Wrench, ArrowRightLeft, Copy as CopyDuplicateIcon, Globe, ExternalLink, Search, X, WifiOff, Star, ChevronDown } from 'lucide-react'
 import { RepuestosTable } from '@/components/repuestos/RepuestosTable'
 import { RepuestoFormModal } from '@/components/repuestos/RepuestoForm'
 import { RepuestosPagination } from '@/components/repuestos/RepuestosPagination'
@@ -45,6 +45,147 @@ interface RepuestosDashboardProps {
   onJumpConsumed?: () => void
   /** Llamado cuando el usuario quiere buscar en todas las máquinas con una query */
   onSearchSimilar?: (query: string) => void
+}
+
+// ══════════════════════════════════════════════
+//  Panel de chips favoritos — drag & drop + colapsar
+// ══════════════════════════════════════════════
+
+const FAV_LISTS_KEY = 'equipment-favorite-lists'
+const FAV_COLLAPSED_KEY = 'equipment-favorite-collapsed'
+
+function FavChipsPanel({ favMachines, currentMachineId, onSelect }: {
+  favMachines: Map<string, { nombre: string; equipmentId: string; listName?: string }>
+  currentMachineId?: string
+  onSelect: (machineId: string, equipmentId: string, nombre: string) => void
+}) {
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => {
+    try { const raw = localStorage.getItem(FAV_COLLAPSED_KEY); return raw ? new Set(JSON.parse(raw)) : new Set() } catch { return new Set() }
+  })
+  const [dragItem, setDragItem] = useState<{ listName: string; idx: number } | null>(null)
+  const [dragOver, setDragOver] = useState<{ listName: string; idx: number } | null>(null)
+
+  // Agrupar por lista manteniendo orden del localStorage
+  const byList = useMemo(() => {
+    const map = new Map<string, { machineId: string; nombre: string; equipmentId: string }[]>()
+    for (const [machineId, info] of favMachines) {
+      const listName = info.listName || 'Favoritos'
+      const arr = map.get(listName) || []
+      arr.push({ machineId, nombre: info.nombre, equipmentId: info.equipmentId })
+      map.set(listName, arr)
+    }
+    // Aplicar orden guardado en localStorage
+    try {
+      const raw = localStorage.getItem(FAV_LISTS_KEY)
+      if (raw) {
+        const lists: { name: string; machineIds: string[] }[] = JSON.parse(raw)
+        for (const list of lists) {
+          const items = map.get(list.name)
+          if (items) {
+            items.sort((a, b) => {
+              const ai = list.machineIds.indexOf(a.machineId)
+              const bi = list.machineIds.indexOf(b.machineId)
+              return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi)
+            })
+          }
+        }
+      }
+    } catch { /* noop */ }
+    return map
+  }, [favMachines])
+
+  const toggleCollapse = (listName: string) => {
+    setCollapsed(prev => {
+      const next = new Set(prev)
+      if (next.has(listName)) { next.delete(listName) } else { next.add(listName) }
+      localStorage.setItem(FAV_COLLAPSED_KEY, JSON.stringify([...next]))
+      return next
+    })
+  }
+
+  const handleDragStart = (listName: string, idx: number) => {
+    setDragItem({ listName, idx })
+  }
+
+  const handleDragOver = (e: React.DragEvent, listName: string, idx: number) => {
+    e.preventDefault()
+    setDragOver({ listName, idx })
+  }
+
+  const handleDrop = (listName: string, dropIdx: number) => {
+    if (!dragItem || dragItem.listName !== listName) { setDragItem(null); setDragOver(null); return }
+    const items = byList.get(listName)
+    if (!items) return
+
+    // Reordenar en localStorage
+    try {
+      const raw = localStorage.getItem(FAV_LISTS_KEY)
+      if (raw) {
+        const lists: { name: string; machineIds: string[] }[] = JSON.parse(raw)
+        const list = lists.find(l => l.name === listName)
+        if (list) {
+          const currentOrder = items.map(i => i.machineId)
+          const [moved] = currentOrder.splice(dragItem.idx, 1)
+          if (moved) {
+            currentOrder.splice(dropIdx, 0, moved)
+            list.machineIds = currentOrder
+            localStorage.setItem(FAV_LISTS_KEY, JSON.stringify(lists))
+          }
+        }
+      }
+    } catch { /* noop */ }
+    setDragItem(null)
+    setDragOver(null)
+  }
+
+  return (
+    <div className="border-t border-border/30 pt-3 mt-1 space-y-1">
+      {[...byList.entries()].map(([listName, items]) => {
+        const isCollapsed = collapsed.has(listName)
+        return (
+          <div key={listName}>
+            <button
+              onClick={() => toggleCollapse(listName)}
+              className="text-[9px] text-yellow-400/70 font-semibold uppercase shrink-0 flex items-center gap-1 hover:text-yellow-400 transition-colors mb-1"
+            >
+              <Star className="h-3 w-3 fill-yellow-400/50" />
+              {listName}
+              <span className="text-muted-foreground/40">({items.length})</span>
+              <ChevronDown className={`h-3 w-3 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
+            </button>
+            {!isCollapsed && (
+              <div className="flex items-center gap-1.5 flex-wrap ml-4">
+                {items.map(({ machineId, nombre, equipmentId }, idx) => {
+                  const isActive = currentMachineId === machineId
+                  const isDragTarget = dragOver?.listName === listName && dragOver.idx === idx
+                  return (
+                    <button
+                      key={machineId}
+                      draggable
+                      onDragStart={() => handleDragStart(listName, idx)}
+                      onDragOver={e => handleDragOver(e, listName, idx)}
+                      onDrop={() => handleDrop(listName, idx)}
+                      onDragEnd={() => { setDragItem(null); setDragOver(null) }}
+                      onClick={() => onSelect(machineId, equipmentId, nombre)}
+                      className={[
+                        'text-[10px] font-medium px-2.5 py-1 rounded-lg border transition-all cursor-grab active:cursor-grabbing',
+                        isActive
+                          ? 'bg-primary/10 border-primary/30 text-primary'
+                          : 'bg-muted/20 border-border/50 text-muted-foreground hover:border-primary/30 hover:text-foreground',
+                        isDragTarget ? 'ring-2 ring-primary/40 scale-105' : '',
+                      ].join(' ')}
+                    >
+                      {nombre}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
 }
 
 // ══════════════════════════════════════════════
@@ -670,46 +811,16 @@ export function RepuestosDashboard({
         />
 
         {/* ═══ Chips de equipos favoritos agrupados por lista ═══ */}
-        {favMachines.size > 0 && (() => {
-          // Agrupar por lista
-          const byList = new Map<string, { machineId: string; nombre: string; equipmentId: string }[]>()
-          for (const [machineId, info] of favMachines) {
-            const listName = info.listName || 'Favoritos'
-            const arr = byList.get(listName) || []
-            arr.push({ machineId, nombre: info.nombre, equipmentId: info.equipmentId })
-            byList.set(listName, arr)
-          }
-          return (
-            <div className="border-t border-border/30 pt-3 mt-1 space-y-1.5">
-              {[...byList.entries()].map(([listName, items]) => (
-                <div key={listName} className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[9px] text-yellow-400/70 font-semibold uppercase shrink-0 flex items-center gap-1">
-                    <Star className="h-3 w-3 fill-yellow-400/50" /> {listName}
-                  </span>
-                  {items.map(({ machineId, nombre, equipmentId }) => {
-                    const isActive = currentMachine?.id === machineId
-                    return (
-                      <button
-                        key={machineId}
-                        onClick={() => {
-                          setCurrentMachine(machineId)
-                          setSelectedEquipmentInfo({ id: equipmentId, nombre, codigo: '', alias: undefined })
-                        }}
-                        className={`text-[10px] font-medium px-2.5 py-1 rounded-lg border transition-all ${
-                          isActive
-                            ? 'bg-primary/10 border-primary/30 text-primary'
-                            : 'bg-muted/20 border-border/50 text-muted-foreground hover:border-primary/30 hover:text-foreground'
-                        }`}
-                      >
-                        {nombre}
-                      </button>
-                    )
-                  })}
-                </div>
-              ))}
-            </div>
-          )
-        })()}
+        {favMachines.size > 0 && (
+          <FavChipsPanel
+            favMachines={favMachines}
+            currentMachineId={currentMachine?.id}
+            onSelect={(machineId, equipmentId, nombre) => {
+              setCurrentMachine(machineId)
+              setSelectedEquipmentInfo({ id: equipmentId, nombre, codigo: '', alias: undefined })
+            }}
+          />
+        )}
 
         {/* ═══ Detalle de la máquina seleccionada ═══ */}
         {!currentMachine && !selectedEquipmentInfo ? (
