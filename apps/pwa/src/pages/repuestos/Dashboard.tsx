@@ -635,8 +635,8 @@ export function RepuestosDashboard({
 
                     {/* Panel desglose — visible cuando hay filtro KPI activo */}
                     {kpiFilter && (
-                      <div className="mt-2 bg-muted/10 border border-border/40 rounded-lg p-3">
-                        <div className="flex items-center justify-between mb-2">
+                      <div className="mt-2 bg-muted/10 border border-border/40 rounded-lg p-3 space-y-2">
+                        <div className="flex items-center justify-between">
                           <p className="text-[10px] font-semibold text-muted-foreground uppercase">
                             Desglose: {kpis.find(k => k.key === kpiFilter)?.label} ({filteredRepuestos.length} de {totalCatalogo})
                           </p>
@@ -644,18 +644,47 @@ export function RepuestosDashboard({
                             Cerrar
                           </button>
                         </div>
+                        {/* Chips por tipo — clickeables para filtrar */}
                         {tipoEntries.length > 0 && (
                           <div className="flex flex-wrap gap-1.5">
-                            {tipoEntries.slice(0, 15).map(([tipo, count]) => (
-                              <span key={tipo} className="text-[9px] px-2 py-0.5 rounded-full bg-muted/30 border border-border/30 text-muted-foreground tabular-nums">
-                                {tipo} <strong className="text-foreground">{count}</strong>
-                              </span>
+                            {tipoEntries.map(([tipo, count]) => (
+                              <button
+                                key={tipo}
+                                onClick={() => setFilterTipo(filterTipo === tipo ? null : tipo)}
+                                className={`text-[9px] px-2 py-0.5 rounded-full border tabular-nums transition-all cursor-pointer ${
+                                  filterTipo === tipo
+                                    ? 'bg-primary/15 border-primary/40 text-primary font-bold'
+                                    : 'bg-muted/30 border-border/30 text-muted-foreground hover:border-primary/30 hover:text-foreground'
+                                }`}
+                              >
+                                {tipo} <strong className={filterTipo === tipo ? '' : 'text-foreground'}>{count}</strong>
+                              </button>
                             ))}
-                            {tipoEntries.length > 15 && (
-                              <span className="text-[9px] text-muted-foreground/50 px-1 py-0.5">+{tipoEntries.length - 15} más</span>
-                            )}
                           </div>
                         )}
+                        {/* Desglose de valor por tipo (solo visible en filtros con items) */}
+                        {filteredRepuestos.length > 0 && (() => {
+                          const valorPorTipo = new Map<string, number>()
+                          for (const r of filteredRepuestos) {
+                            const t = r.tipo || 'SIN TIPO'
+                            valorPorTipo.set(t, (valorPorTipo.get(t) || 0) + (r.valorUnitario || 0) * (r.cantidadPorMaquina || 0))
+                          }
+                          const valorEntries = [...valorPorTipo.entries()].filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1])
+                          const totalVal = valorEntries.reduce((s, [, v]) => s + v, 0)
+                          if (totalVal === 0) return null
+                          return (
+                            <div className="pt-1.5 border-t border-border/20">
+                              <p className="text-[9px] text-muted-foreground/60 uppercase mb-1">Valor por tipo</p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {valorEntries.slice(0, 10).map(([tipo, val]) => (
+                                  <span key={tipo} className="text-[9px] px-2 py-0.5 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-300 tabular-nums">
+                                    {tipo} <strong>${val.toLocaleString('es-CL', { maximumFractionDigits: 0 })}</strong>
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )
+                        })()}
                       </div>
                     )}
                   </>
@@ -744,7 +773,7 @@ export function RepuestosDashboard({
               >
                 Todos
               </button>
-              {tiposDisponibles.slice(0, 12).map((tipo) => (
+              {tiposDisponibles.map((tipo) => (
                 <button
                   key={tipo}
                   onClick={() => setFilterTipo(filterTipo === tipo ? null : tipo)}

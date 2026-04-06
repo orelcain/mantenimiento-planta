@@ -55,21 +55,35 @@ function tipoBadgeClass(tipo: string): string {
   return 'bg-muted text-muted-foreground'
 }
 
-/** Thumbnail de la primera imagen disponible — click para preview rápido */
-function RepuestoThumbnail({ rep, onPreview }: { rep: Repuesto; onPreview?: (url: string, name: string) => void }) {
-  const img = rep.fotosReales?.[0] || rep.imagenesManual?.[0] || rep.gallery?.[0]
-  const totalImages = (rep.fotosReales?.length || 0) + (rep.imagenesManual?.length || 0) + (rep.gallery?.length || 0)
+/** Thumbnail de la primera imagen disponible — click para carrusel, cajón vacío = upload */
+function RepuestoThumbnail({ rep, onPreview, onOpenGallery }: {
+  rep: Repuesto
+  onPreview?: (url: string, name: string, allImages: { url: string }[]) => void
+  onOpenGallery?: (rep: Repuesto) => void
+}) {
+  const allImages = [
+    ...(rep.fotosReales || []),
+    ...(rep.imagenesManual || []),
+    ...(rep.gallery || []),
+  ]
+  const img = allImages[0]
+  const totalImages = allImages.length
 
   if (!img) {
+    // Cajón vacío — click abre galería para subir imágenes
     return (
-      <div className="h-11 w-11 rounded-lg bg-muted/50 flex items-center justify-center shrink-0 border border-dashed border-border">
-        <Package className="h-4 w-4 text-muted-foreground/40" />
-      </div>
+      <button
+        onClick={(e) => { e.stopPropagation(); onOpenGallery?.(rep) }}
+        className="h-11 w-11 rounded-lg bg-muted/50 flex items-center justify-center shrink-0 border border-dashed border-border hover:border-primary/50 hover:bg-primary/5 transition-all cursor-pointer group"
+        title="Agregar imagen"
+      >
+        <Camera className="h-4 w-4 text-muted-foreground/40 group-hover:text-primary/60 transition-colors" />
+      </button>
     )
   }
   return (
     <button
-      onClick={(e) => { e.stopPropagation(); onPreview?.(img.url, rep.textoBreve || rep.codigoSAP || 'Repuesto') }}
+      onClick={(e) => { e.stopPropagation(); onPreview?.(img.url, rep.textoBreve || rep.codigoSAP || 'Repuesto', allImages) }}
       className="relative h-11 w-11 rounded-lg overflow-hidden shrink-0 ring-1 ring-border hover:ring-primary/50 transition-all cursor-pointer group"
     >
       <img
@@ -87,8 +101,18 @@ function RepuestoThumbnail({ rep, onPreview }: { rep: Repuesto; onPreview?: (url
   )
 }
 
-/** Preview rápido de imagen overlay */
-function QuickImagePreview({ url, name, onClose }: { url: string; name: string; onClose: () => void }) {
+/** Preview rápido con carrusel — navega entre imágenes con flechas */
+function QuickImagePreview({ url, name, allImages, onClose }: {
+  url: string; name: string; allImages?: { url: string }[]; onClose: () => void
+}) {
+  const images = allImages && allImages.length > 0 ? allImages : [{ url }]
+  const [idx, setIdx] = useState(() => {
+    const i = images.findIndex(img => img.url === url)
+    return i >= 0 ? i : 0
+  })
+  const current = images[idx]
+  if (!current) return null
+
   return (
     <div
       className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
@@ -102,11 +126,29 @@ function QuickImagePreview({ url, name, onClose }: { url: string; name: string; 
           <X className="h-4 w-4" />
         </button>
         <img
-          src={url}
+          src={current.url}
           alt={name}
           className="max-w-full max-h-[75vh] object-contain rounded-xl shadow-2xl"
         />
         <div className="text-center mt-2 text-white/80 text-sm truncate">{name}</div>
+        {/* Controles carrusel */}
+        {images.length > 1 && (
+          <div className="flex items-center justify-center gap-3 mt-3">
+            <button
+              onClick={() => setIdx(i => (i - 1 + images.length) % images.length)}
+              className="h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors"
+            >
+              <ArrowUp className="h-4 w-4 -rotate-90" />
+            </button>
+            <span className="text-white/60 text-xs tabular-nums">{idx + 1} / {images.length}</span>
+            <button
+              onClick={() => setIdx(i => (i + 1) % images.length)}
+              className="h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors"
+            >
+              <ArrowDown className="h-4 w-4 -rotate-90" />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -177,7 +219,7 @@ export function RepuestosTable({
   onViewDetail,
   highlightedRepuestoId,
 }: RepuestosTableProps) {
-  const [preview, setPreview] = useState<{ url: string; name: string } | null>(null)
+  const [preview, setPreview] = useState<{ url: string; name: string; allImages?: { url: string }[] } | null>(null)
 
   if (loading) {
     return (
@@ -203,7 +245,7 @@ export function RepuestosTable({
     <>
       {/* Quick Image Preview Overlay */}
       {preview && (
-        <QuickImagePreview url={preview.url} name={preview.name} onClose={() => setPreview(null)} />
+        <QuickImagePreview url={preview.url} name={preview.name} allImages={preview.allImages} onClose={() => setPreview(null)} />
       )}
 
       {/* Mobile Card View */}
@@ -212,7 +254,7 @@ export function RepuestosTable({
           return (
             <div key={rep.id} id={`repuesto-${rep.id}`} className={`bg-card border rounded-xl p-4 space-y-3 shadow-sm hover:shadow-md transition-shadow ${highlightedRepuestoId === rep.id ? 'ring-2 ring-emerald-500 bg-emerald-500/10 animate-pulse' : ''}`}>
               <div className="flex gap-3 items-start">
-                <RepuestoThumbnail rep={rep} onPreview={(url, name) => setPreview({ url, name })} />
+                <RepuestoThumbnail rep={rep} onPreview={(url, name, imgs) => setPreview({ url, name, allImages: imgs })} onOpenGallery={onViewGallery} />
                 <div className="flex-1 min-w-0">
                   <div className="text-[11px] font-mono text-muted-foreground">{rep.codigoSAP || 'S/C'}</div>
                   {onRenameRepuesto ? (
@@ -337,7 +379,7 @@ export function RepuestosTable({
                 >
                   {/* Thumbnail */}
                   <td className="pl-4 pr-2 py-2.5">
-                    <RepuestoThumbnail rep={rep} onPreview={(url, name) => setPreview({ url, name })} />
+                    <RepuestoThumbnail rep={rep} onPreview={(url, name, imgs) => setPreview({ url, name, allImages: imgs })} onOpenGallery={onViewGallery} />
                   </td>
                   {/* Código SAP */}
                   <td className="px-3 py-2.5 whitespace-nowrap">
