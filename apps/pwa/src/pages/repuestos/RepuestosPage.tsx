@@ -148,7 +148,12 @@ export function RepuestosPage() {
           </div>
         )}
 
-        {activeTab === 'bodega' && <BodegaView />}
+        {activeTab === 'bodega' && (
+          <BodegaView
+            onViewInEquipo={handleViewInCatalog}
+            onSearchSimilar={handleSearchSimilar}
+          />
+        )}
 
       </div>
     </div>

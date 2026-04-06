@@ -63,7 +63,12 @@ function tipoBadgeColor(tipo?: string): string {
 //  CONTENEDOR PRINCIPAL
 // ══════════════════════════════════════════════
 
-export function BodegaView() {
+interface BodegaViewProps {
+  onViewInEquipo?: (machineId: string) => void
+  onSearchSimilar?: (query: string) => void
+}
+
+export function BodegaView({ onViewInEquipo, onSearchSimilar }: BodegaViewProps = {}) {
   const user = useAuthStore(s => s.user)
   const [subTab, setSubTab] = useState<BodegaTab>('stock')
 
@@ -154,7 +159,7 @@ export function BodegaView() {
         })}
       </div>
 
-      {subTab === 'stock' && <StockTab bodega={bodega} user={user} />}
+      {subTab === 'stock' && <StockTab bodega={bodega} user={user} onViewInEquipo={onViewInEquipo} onSearchSimilar={onSearchSimilar} />}
       {subTab === 'inventarios' && <InventarioTab bodega={bodega} user={user} />}
       {subTab === 'movimientos' && <MovimientosTab bodega={bodega} />}
       {subTab === 'estadisticas' && <EstadisticasTab bodega={bodega} />}
@@ -185,7 +190,7 @@ function exportCsv(items: BodegaMergedItem[]) {
   URL.revokeObjectURL(url)
 }
 
-function StockTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>; user: any }) {
+function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: ReturnType<typeof useBodega>; user: any; onViewInEquipo?: (machineId: string) => void; onSearchSimilar?: (query: string) => void }) {
   const { items, stats, saveStock, registrarMovimiento, registrarMovimientoBatch, loadMovimientos, toggleWatch, addPhoto, removePhoto, calcReorderData } = bodega
   const [searchQuery, setSearchQuery] = useState('')
   const [stockFilter, setStockFilter] = useState<StockFilter>('todos')
@@ -311,7 +316,7 @@ function StockTab({ bodega, user }: { bodega: ReturnType<typeof useBodega>; user
       {historialItem && <HistorialModal item={historialItem} loadMovimientos={loadMovimientos} onClose={() => setHistorialItem(null)} />}
       {showBulkConfig && <BulkConfigModal items={items.filter(i => !i.bodegaId)} saveStock={saveStock} onClose={() => setShowBulkConfig(false)} />}
       {showBatchMov && <BatchMovimientoModal items={items.filter(i => i.bodegaId)} registrarMovimientoBatch={registrarMovimientoBatch} user={user} onClose={() => setShowBatchMov(false)} />}
-      {drawerItem && <ItemDrawer item={drawerItem} loadMovimientos={loadMovimientos} onClose={() => setDrawerItem(null)} onEdit={() => { setEditingItem(drawerItem); setDrawerItem(null) }} onMovimiento={() => { setMovimientoItem(drawerItem); setDrawerItem(null) }} addPhoto={addPhoto} removePhoto={removePhoto} calcReorderData={calcReorderData} />}
+      {drawerItem && <ItemDrawer item={drawerItem} loadMovimientos={loadMovimientos} onClose={() => setDrawerItem(null)} onEdit={() => { setEditingItem(drawerItem); setDrawerItem(null) }} onMovimiento={() => { setMovimientoItem(drawerItem); setDrawerItem(null) }} addPhoto={addPhoto} removePhoto={removePhoto} calcReorderData={calcReorderData} onViewInEquipo={onViewInEquipo} onSearchSimilar={onSearchSimilar} />}
     </>
   )
 }
@@ -1400,12 +1405,14 @@ function BodegaRow({ item, onEdit, onMovimiento, onHistorial, onToggleWatch, onO
 //  DRAWER LATERAL (vista rápida por ítem)
 // ══════════════════════════════════════════════
 
-function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addPhoto, removePhoto, calcReorderData }: {
+function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addPhoto, removePhoto, calcReorderData, onViewInEquipo, onSearchSimilar }: {
   item: BodegaMergedItem; loadMovimientos: (id: string, max?: number) => Promise<MovimientoBodega[]>
   onClose: () => void; onEdit: () => void; onMovimiento: () => void
   addPhoto?: (sap: string, file: File) => Promise<string>
   removePhoto?: (sap: string, url: string) => Promise<void>
   calcReorderData?: (item: BodegaMergedItem, movs: MovimientoBodega[]) => { consumoDiario: number; puntoReorden: number; diasRestantes: number; necesitaPedir: boolean } | null
+  onViewInEquipo?: (machineId: string) => void
+  onSearchSimilar?: (query: string) => void
 }) {
   const [movs, setMovs] = useState<MovimientoBodega[]>([])
   const [loading, setLoading] = useState(true)
@@ -1480,6 +1487,11 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
             <button onClick={onEdit} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-muted/30 border border-border rounded-lg hover:bg-muted/50 text-muted-foreground">
               <Pencil className="h-3.5 w-3.5" /> {has ? 'Editar' : 'Configurar'}
             </button>
+            {onSearchSimilar && (
+              <button onClick={() => { onSearchSimilar(item.textoBreve || item.codigoSAP); onClose() }} className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium bg-blue-500/10 border border-blue-500/30 rounded-lg hover:bg-blue-500/20 text-blue-400">
+                <Search className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -1625,8 +1637,16 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
             </div>
             <div className="max-h-[120px] overflow-y-auto divide-y divide-border/50">
               {item.equipos.map(e => (
-                <div key={e.machineId} className="px-3 py-1.5">
-                  <span className="text-xs text-foreground">{e.machineName}</span>
+                <div key={e.machineId} className="px-3 py-1.5 flex items-center justify-between gap-2">
+                  <span className="text-xs text-foreground truncate">{e.machineName}</span>
+                  {onViewInEquipo && (
+                    <button
+                      onClick={() => { onViewInEquipo(e.machineId); onClose() }}
+                      className="shrink-0 text-[9px] text-primary hover:text-primary/80 hover:underline transition-colors"
+                    >
+                      Ver equipo
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
