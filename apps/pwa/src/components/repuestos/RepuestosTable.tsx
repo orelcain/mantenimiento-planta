@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Package, ImageIcon, X, BookOpen, Eye, Camera, Pencil, Trash2, ArrowRightLeft, ArrowUpDown, ArrowUp, ArrowDown, MessageSquareText } from 'lucide-react'
 import type { Repuesto } from '@/types/repuestos'
 import { RepuestoActionsMenu } from './RepuestoActionsMenu'
-import { InlineEditName } from './InlineEditName'
 
 /** Tooltip ligero para botones de acción (CSS puro, sin deps) */
 function Tip({ label, children }: { label: string; children: React.ReactNode }) {
@@ -211,7 +210,6 @@ export function RepuestosTable({
   onViewPhotos,
   onViewSpecs,
   onViewGallery,
-  onRenameRepuesto,
   onSearchInManual,
   onViewInManual,
   onEditAnnotation,
@@ -257,19 +255,10 @@ export function RepuestosTable({
                 <RepuestoThumbnail rep={rep} onPreview={(url, name, imgs) => setPreview({ url, name, allImages: imgs })} onOpenGallery={onViewGallery} />
                 <div className="flex-1 min-w-0">
                   <div className="text-[11px] font-mono text-muted-foreground">{rep.codigoSAP || 'S/C'}</div>
-                  {onRenameRepuesto ? (
-                    <InlineEditName
-                      value={rep.textoBreve || rep.descripcion || 'Sin nombre'}
-                      onSave={(n) => onRenameRepuesto(rep.id, n)}
-                      canEdit
-                      textClassName="font-medium text-foreground line-clamp-2 text-sm"
-                    />
-                  ) : (
-                    <button
-                      onClick={() => onViewDetail?.(rep)}
-                      className="font-medium text-foreground line-clamp-2 text-sm text-left hover:text-primary hover:underline transition-colors"
-                    >{rep.textoBreve || rep.descripcion || 'Sin nombre'}</button>
-                  )}
+                  <button
+                    onClick={() => onViewDetail?.(rep)}
+                    className="font-medium text-foreground line-clamp-2 text-sm text-left hover:text-primary hover:underline transition-colors"
+                  >{rep.textoBreve || rep.descripcion || 'Sin nombre'}</button>
                   {rep.tipo && (
                     <span className={`inline-block text-[9px] px-1 py-0 rounded font-medium uppercase tracking-wide mt-0.5 ${tipoBadgeClass(rep.tipo)}`}>
                       {rep.tipo}
@@ -391,20 +380,11 @@ export function RepuestosTable({
                   <td className="px-3 py-2.5 max-w-[300px]">
                     <div className="flex items-center gap-2">
                       <div className="min-w-0">
-                        {onRenameRepuesto ? (
-                          <InlineEditName
-                            value={rep.textoBreve || rep.descripcion || 'Sin nombre'}
-                            onSave={(n) => onRenameRepuesto(rep.id, n)}
-                            canEdit
-                            textClassName="font-medium text-foreground truncate"
-                          />
-                        ) : (
-                          <button
-                            onClick={() => onViewDetail?.(rep)}
-                            className="font-medium text-foreground truncate text-left hover:text-primary hover:underline transition-colors cursor-pointer"
-                            title="Ver ficha completa"
-                          >{rep.textoBreve || rep.descripcion || 'Sin nombre'}</button>
-                        )}
+                        <button
+                          onClick={() => onViewDetail?.(rep)}
+                          className="font-medium text-foreground truncate text-left hover:text-primary hover:underline transition-colors cursor-pointer"
+                          title="Ver ficha completa"
+                        >{rep.textoBreve || rep.descripcion || 'Sin nombre'}</button>
                         {rep.descripcion && rep.descripcion !== (rep.textoBreve || '') ? (
                           <div className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{rep.descripcion}</div>
                         ) : null}

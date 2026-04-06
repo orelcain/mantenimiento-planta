@@ -415,8 +415,10 @@ export function RepuestosDashboard({
     }
     return Object.entries(freq)
       .sort((a, b) => b[1] - a[1])
-      .map(([tipo]) => tipo)
+      .map(([tipo, count]) => ({ tipo, count }))
   }, [repuestos])
+  const [tiposPage, setTiposPage] = useState(1)
+  const TIPOS_PAGE_SIZE = 10
 
   // Ordenar repuestos
   const sortedRepuestos = useMemo(() => {
@@ -841,11 +843,11 @@ export function RepuestosDashboard({
             )}
           </div>
 
-          {/* Chips de filtro por tipo */}
+          {/* Chips de filtro por tipo — paginados de 10 en 10 */}
           {tiposDisponibles.length > 0 && (
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 flex-nowrap">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <button
-                onClick={() => setFilterTipo(null)}
+                onClick={() => { setFilterTipo(null); setTiposPage(1) }}
                 className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full border cursor-pointer transition-colors whitespace-nowrap ${
                   filterTipo === null
                     ? 'bg-primary text-primary-foreground border-primary'
@@ -854,7 +856,7 @@ export function RepuestosDashboard({
               >
                 Todos
               </button>
-              {tiposDisponibles.map((tipo) => (
+              {tiposDisponibles.slice(0, tiposPage * TIPOS_PAGE_SIZE).map(({ tipo, count }) => (
                 <button
                   key={tipo}
                   onClick={() => setFilterTipo(filterTipo === tipo ? null : tipo)}
@@ -864,9 +866,17 @@ export function RepuestosDashboard({
                       : 'border-border text-muted-foreground hover:border-primary/50 hover:text-foreground'
                   }`}
                 >
-                  {tipo}
+                  {tipo} <span className="opacity-60">{count}</span>
                 </button>
               ))}
+              {tiposDisponibles.length > tiposPage * TIPOS_PAGE_SIZE && (
+                <button
+                  onClick={() => setTiposPage(p => p + 1)}
+                  className="shrink-0 text-[10px] px-2 py-0.5 rounded-full border border-primary/30 text-primary cursor-pointer hover:bg-primary/10 transition-colors whitespace-nowrap"
+                >
+                  Ver + ({tiposDisponibles.length - tiposPage * TIPOS_PAGE_SIZE})
+                </button>
+              )}
             </div>
           )}
 
