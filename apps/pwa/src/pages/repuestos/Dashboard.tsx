@@ -119,7 +119,7 @@ function FavChipsPanel({ favMachines, currentMachineId, onSelect }: {
     const items = byList.get(listName)
     if (!items) return
 
-    // Reordenar en localStorage
+    // Reordenar en localStorage + Firestore
     try {
       const raw = localStorage.getItem(FAV_LISTS_KEY)
       if (raw) {
@@ -132,6 +132,16 @@ function FavChipsPanel({ favMachines, currentMachineId, onSelect }: {
             currentOrder.splice(dropIdx, 0, moved)
             list.machineIds = currentOrder
             localStorage.setItem(FAV_LISTS_KEY, JSON.stringify(lists))
+            // Persistir en Firestore
+            try {
+              const parsed = JSON.parse(localStorage.getItem('auth-storage') || '{}')
+              const uid = parsed?.state?.user?.id
+              if (uid) {
+                import('@/services/userPreferences').then(({ saveFavoriteLists }) => {
+                  saveFavoriteLists(uid, lists)
+                })
+              }
+            } catch { /* noop */ }
           }
         }
       }

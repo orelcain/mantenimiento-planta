@@ -32,6 +32,8 @@ import { Button, Input } from '@/components/ui'
 import { doc, updateDoc, deleteDoc, addDoc, collection as firestoreCollection, Timestamp } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import { getHmiTooltipPwd } from '@/services/hmiKnuro'
+import { getUserPreferences, saveFavoriteLists, type FavList } from '@/services/userPreferences'
+import { useAuthStore } from '@/store/authStore'
 import type { Machine } from '@/types/repuestos'
 import { InlineEditName } from '@/components/repuestos/InlineEditName'
 import { useHierarchyAreaTree, type AreaTreeNode } from '@/hooks/useHierarchyAreaTree'
@@ -575,13 +577,12 @@ const GlobalSearchDropdown = forwardRef<HTMLDivElement, {
 const FAV_MACHINES_KEY = 'equipment-favorite-machines'
 const FAV_LISTS_KEY = 'equipment-favorite-lists'
 
-export interface FavList { name: string; machineIds: string[]; machineNames?: Record<string, string> }
+export type { FavList } from '@/services/userPreferences'
 
-function loadFavLists(): FavList[] {
+function loadFavListsLocal(): import('@/services/userPreferences').FavList[] {
   try {
     const raw = localStorage.getItem(FAV_LISTS_KEY)
-    if (raw) return JSON.parse(raw) as FavList[]
-    // Migrar favoritos antiguos si existen
+    if (raw) return JSON.parse(raw)
     const oldRaw = localStorage.getItem(FAV_MACHINES_KEY)
     if (oldRaw) {
       const oldIds: string[] = JSON.parse(oldRaw)
@@ -591,11 +592,7 @@ function loadFavLists(): FavList[] {
   } catch { return [] }
 }
 
-function saveFavLists(lists: FavList[]) {
-  localStorage.setItem(FAV_LISTS_KEY, JSON.stringify(lists))
-}
-
-function isMachineInAnyList(lists: FavList[], machineId: string): string | null {
+function isMachineInAnyList(lists: import('@/services/userPreferences').FavList[], machineId: string): string | null {
   for (const list of lists) {
     if (list.machineIds.includes(machineId)) return list.name
   }
@@ -614,10 +611,29 @@ export function EquipmentNavigator({
   const { setCurrentMachine, clearCurrentMachine } = useMachineContext()
   const isAdmin = useIsAdmin()
 
-  // ── Máquinas favoritas (listas múltiples) ──
-  const [favLists, setFavLists] = useState<FavList[]>(loadFavLists)
+  // ── Máquinas favoritas (listas múltiples — Firestore + localStorage fallback) ──
+  const currentUser = useAuthStore(s => s.user)
+  const [favLists, setFavLists] = useState<FavList[]>(loadFavListsLocal)
   const [favDropdown, setFavDropdown] = useState<{ machineId: string; anchorRect: DOMRect } | null>(null)
   const [newListName, setNewListName] = useState('')
+  const favLoadedRef = useRef(false)
+
+  // Cargar favoritos desde Firestore al montar (migra localStorage si es primera vez)
+  useEffect(() => {
+    if (!currentUser || favLoadedRef.current) return
+    favLoadedRef.current = true
+    getUserPreferences(currentUser.id).then(prefs => {
+      if (prefs.favoriteLists.length > 0) {
+        setFavLists(prefs.favoriteLists)
+      } else {
+        // Migrar localStorage a Firestore si hay datos locales
+        const local = loadFavListsLocal()
+        if (local.length > 0) {
+          saveFavoriteLists(currentUser.id, local)
+        }
+      }
+    })
+  }, [currentUser])
 
   // Set plano de todos los IDs favoritos (para UI rápida)
   const favMachineIds = useMemo(() => {
@@ -626,20 +642,23 @@ export function EquipmentNavigator({
     return s
   }, [favLists])
 
+  const persistFavs = useCallback((lists: FavList[]) => {
+    localStorage.setItem(FAV_LISTS_KEY, JSON.stringify(lists))
+    if (currentUser) saveFavoriteLists(currentUser.id, lists)
+  }, [currentUser])
+
   const handleFavStarClick = useCallback((machineId: string, e: React.MouseEvent) => {
     const inList = isMachineInAnyList(favLists, machineId)
     if (inList) {
-      // Ya está en una lista → quitar
       const next = favLists.map(l => ({ ...l, machineIds: l.machineIds.filter(id => id !== machineId) })).filter(l => l.machineIds.length > 0)
       setFavLists(next)
-      saveFavLists(next)
+      persistFavs(next)
     } else {
-      // No está → mostrar dropdown para elegir lista
       const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
       setFavDropdown({ machineId, anchorRect: rect })
       setNewListName('')
     }
-  }, [favLists])
+  }, [favLists, persistFavs])
 
   // Resolver nombre de equipo desde cache global (alias tiene prioridad)
   const resolveEquipName = useCallback((machineId: string): string => {
@@ -663,11 +682,11 @@ export function EquipmentNavigator({
       } else {
         next = [...prev, { name: listName, machineIds: [machineId], machineNames: { [machineId]: displayName } }]
       }
-      saveFavLists(next)
+      persistFavs(next)
       return next
     })
     setFavDropdown(null)
-  }, [resolveEquipName])
+  }, [resolveEquipName, persistFavs])
 
 
   // Notificar al padre cuando cambian favoritos (con nombres de equipos + listas)

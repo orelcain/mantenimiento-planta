@@ -393,6 +393,14 @@ service cloud.firestore {
     }
 
     // ============================================
+    // PREFERENCIAS DE USUARIO (favoritos, watchlist)
+    // ============================================
+    match /user_preferences/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // ============================================
     // EVIDENCIAS FOTOGRÁFICAS
     // ============================================
     match /photoEvidence/{evidenceId} {

@@ -158,19 +158,62 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
   const [bodegaLoading, setBodegaLoading] = useState(true)
   const bodegaLoadedRef = useRef(false)
 
-  // ── Watch list (localStorage) ──
+  // ── Watch list (Firestore + localStorage fallback) ──
   const [watchlist, setWatchlist] = useState<Set<string>>(() => {
     try {
       const stored = localStorage.getItem('bodega_watchlist')
       return stored ? new Set(JSON.parse(stored) as string[]) : new Set<string>()
     } catch { return new Set<string>() }
   })
+  const watchLoadedRef = useRef(false)
+
+  // Cargar watchlist desde Firestore al montar
+  useEffect(() => {
+    if (watchLoadedRef.current) return
+    watchLoadedRef.current = true
+    const userId = localStorage.getItem('auth-storage')
+    if (!userId) return
+    try {
+      const parsed = JSON.parse(userId)
+      const uid = parsed?.state?.user?.id
+      if (!uid) return
+      import('@/services/userPreferences').then(({ getUserPreferences }) => {
+        getUserPreferences(uid).then(prefs => {
+          if (prefs.bodegaWatchlist.length > 0) {
+            setWatchlist(new Set(prefs.bodegaWatchlist))
+          } else {
+            // Migrar localStorage a Firestore
+            const local = localStorage.getItem('bodega_watchlist')
+            if (local) {
+              const ids: string[] = JSON.parse(local)
+              if (ids.length > 0) {
+                import('@/services/userPreferences').then(({ saveBodegaWatchlist }) => {
+                  saveBodegaWatchlist(uid, ids)
+                })
+              }
+            }
+          }
+        })
+      })
+    } catch { /* noop */ }
+  }, [])
 
   const toggleWatch = useCallback((sap: string) => {
     setWatchlist(prev => {
       const next = new Set(prev)
       if (next.has(sap)) next.delete(sap); else next.add(sap)
-      localStorage.setItem('bodega_watchlist', JSON.stringify([...next]))
+      const arr = [...next]
+      localStorage.setItem('bodega_watchlist', JSON.stringify(arr))
+      // Persistir en Firestore
+      try {
+        const parsed = JSON.parse(localStorage.getItem('auth-storage') || '{}')
+        const uid = parsed?.state?.user?.id
+        if (uid) {
+          import('@/services/userPreferences').then(({ saveBodegaWatchlist }) => {
+            saveBodegaWatchlist(uid, arr)
+          })
+        }
+      } catch { /* noop */ }
       return next
     })
   }, [])
