@@ -625,6 +625,8 @@ export function EquipmentNavigator({
     getUserPreferences(currentUser.id).then(prefs => {
       if (prefs.favoriteLists.length > 0) {
         setFavLists(prefs.favoriteLists)
+        // Sincronizar localStorage para que FavChipsPanel pueda leer orden
+        localStorage.setItem(FAV_LISTS_KEY, JSON.stringify(prefs.favoriteLists))
       } else {
         // Migrar localStorage a Firestore si hay datos locales
         const local = loadFavListsLocal()
