@@ -29,8 +29,9 @@ import { useCurrentMachine, useActiveMachines, useMachineContext } from '@/conte
 import { useIsAdmin } from '@/store/authStore'
 import { MachineManager } from '@/components/repuestos/MachineManager'
 import { Button, Input } from '@/components/ui'
-import { doc, updateDoc, addDoc, collection as firestoreCollection, Timestamp } from 'firebase/firestore'
+import { doc, updateDoc, deleteDoc, addDoc, collection as firestoreCollection, Timestamp } from 'firebase/firestore'
 import { db } from '@/services/firebase'
+import { getHmiTooltipPwd } from '@/services/hmiKnuro'
 import type { Machine } from '@/types/repuestos'
 import { InlineEditName } from '@/components/repuestos/InlineEditName'
 import { useHierarchyAreaTree, type AreaTreeNode } from '@/hooks/useHierarchyAreaTree'
@@ -54,7 +55,7 @@ interface EquipmentNavigatorProps {
   className?: string
   onCategoryChange?: (categoryId: string | null) => void
   onEquipmentSelect?: (info: SelectedEquipmentInfo | null) => void
-  onFavoriteMachinesChange?: (favorites: Map<string, { nombre: string; equipmentId: string }>) => void
+  onFavoriteMachinesChange?: (favorites: Map<string, { nombre: string; equipmentId: string; listName?: string }>) => void
 }
 
 /** Verdadero si el nodo o alguno de sus descendientes tiene el id dado */
@@ -572,12 +573,33 @@ const GlobalSearchDropdown = forwardRef<HTMLDivElement, {
    Componente Principal
    ═══════════════════════════════════════════════════════════════ */
 const FAV_MACHINES_KEY = 'equipment-favorite-machines'
+const FAV_LISTS_KEY = 'equipment-favorite-lists'
 
-function loadFavMachines(): Set<string> {
+export interface FavList { name: string; machineIds: string[] }
+
+function loadFavLists(): FavList[] {
   try {
-    const raw = localStorage.getItem(FAV_MACHINES_KEY)
-    return raw ? new Set(JSON.parse(raw)) : new Set()
-  } catch { return new Set() }
+    const raw = localStorage.getItem(FAV_LISTS_KEY)
+    if (raw) return JSON.parse(raw) as FavList[]
+    // Migrar favoritos antiguos si existen
+    const oldRaw = localStorage.getItem(FAV_MACHINES_KEY)
+    if (oldRaw) {
+      const oldIds: string[] = JSON.parse(oldRaw)
+      if (oldIds.length > 0) return [{ name: 'Favoritos', machineIds: oldIds }]
+    }
+    return []
+  } catch { return [] }
+}
+
+function saveFavLists(lists: FavList[]) {
+  localStorage.setItem(FAV_LISTS_KEY, JSON.stringify(lists))
+}
+
+function isMachineInAnyList(lists: FavList[], machineId: string): string | null {
+  for (const list of lists) {
+    if (list.machineIds.includes(machineId)) return list.name
+  }
+  return null
 }
 
 export function EquipmentNavigator({
@@ -592,35 +614,67 @@ export function EquipmentNavigator({
   const { setCurrentMachine, clearCurrentMachine } = useMachineContext()
   const isAdmin = useIsAdmin()
 
-  // ── Máquinas favoritas ──
-  const [favMachineIds, setFavMachineIds] = useState<Set<string>>(loadFavMachines)
+  // ── Máquinas favoritas (listas múltiples) ──
+  const [favLists, setFavLists] = useState<FavList[]>(loadFavLists)
+  const [favDropdown, setFavDropdown] = useState<{ machineId: string; anchorRect: DOMRect } | null>(null)
+  const [newListName, setNewListName] = useState('')
 
-  const toggleFavoriteMachine = useCallback((machineId: string) => {
-    setFavMachineIds(prev => {
-      const next = new Set(prev)
-      if (next.has(machineId)) { next.delete(machineId) } else { next.add(machineId) }
-      localStorage.setItem(FAV_MACHINES_KEY, JSON.stringify([...next]))
+  // Set plano de todos los IDs favoritos (para UI rápida)
+  const favMachineIds = useMemo(() => {
+    const s = new Set<string>()
+    for (const l of favLists) for (const id of l.machineIds) s.add(id)
+    return s
+  }, [favLists])
+
+  const handleFavStarClick = useCallback((machineId: string, e: React.MouseEvent) => {
+    const inList = isMachineInAnyList(favLists, machineId)
+    if (inList) {
+      // Ya está en una lista → quitar
+      const next = favLists.map(l => ({ ...l, machineIds: l.machineIds.filter(id => id !== machineId) })).filter(l => l.machineIds.length > 0)
+      setFavLists(next)
+      saveFavLists(next)
+    } else {
+      // No está → mostrar dropdown para elegir lista
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+      setFavDropdown({ machineId, anchorRect: rect })
+      setNewListName('')
+    }
+  }, [favLists])
+
+  const addToList = useCallback((listName: string, machineId: string) => {
+    setFavLists(prev => {
+      const existing = prev.find(l => l.name === listName)
+      let next: FavList[]
+      if (existing) {
+        if (existing.machineIds.includes(machineId)) return prev
+        next = prev.map(l => l.name === listName ? { ...l, machineIds: [...l.machineIds, machineId] } : l)
+      } else {
+        next = [...prev, { name: listName, machineIds: [machineId] }]
+      }
+      saveFavLists(next)
       return next
     })
+    setFavDropdown(null)
   }, [])
 
-  // Notificar al padre cuando cambian favoritos (con nombres de equipos)
+
+  // Notificar al padre cuando cambian favoritos (con nombres de equipos + listas)
   useEffect(() => {
     if (!onFavoriteMachinesChange || favMachineIds.size === 0) {
       onFavoriteMachinesChange?.(new Map())
       return
     }
-    // Resolver nombres de máquinas favoritas desde el cache global de equipos
     const eq = getGlobalEquipmentCache()
     if (!eq) return
-    const map = new Map<string, { nombre: string; equipmentId: string }>()
+    const map = new Map<string, { nombre: string; equipmentId: string; listName?: string }>()
     for (const e of eq) {
       if (e.linkedMachineId && favMachineIds.has(e.linkedMachineId) && !map.has(e.linkedMachineId)) {
-        map.set(e.linkedMachineId, { nombre: e.alias || e.nombre, equipmentId: e.id })
+        const listName = isMachineInAnyList(favLists, e.linkedMachineId)
+        map.set(e.linkedMachineId, { nombre: e.alias || e.nombre, equipmentId: e.id, listName: listName || undefined })
       }
     }
     onFavoriteMachinesChange(map)
-  }, [favMachineIds, onFavoriteMachinesChange])
+  }, [favMachineIds, favLists, onFavoriteMachinesChange])
 
   // Hooks nuevos: árbol de áreas + equipos del área seleccionada
   const { areaTree, loading: areaTreeLoading, expandNode, findNode, getNodePath } = useHierarchyAreaTree()
@@ -805,6 +859,26 @@ export function EquipmentNavigator({
       setRefreshKey(k => k + 1)
     } catch (err) {
       console.error('Error toggling hidden', err)
+    }
+  }, [selectedTreeNodeId])
+
+  // ── Eliminar equipo SAP (con clave admin) ──
+  const handleDeleteEquipment = useCallback(async (equipmentId: string, name: string) => {
+    const clave = prompt(`Para eliminar "${name}", ingresa la clave de administrador:`)
+    if (!clave) return
+    try {
+      const correctPwd = await getHmiTooltipPwd()
+      if (clave !== correctPwd) {
+        alert('Clave incorrecta')
+        return
+      }
+      if (!confirm(`¿Estás seguro de eliminar "${name}" permanentemente?`)) return
+      await deleteDoc(doc(db, 'hierarchy', equipmentId))
+      invalidateEquipmentCache(selectedTreeNodeId ?? undefined)
+      setRefreshKey(k => k + 1)
+    } catch (err) {
+      console.error('Error deleting equipment', err)
+      alert('Error al eliminar')
     }
   }, [selectedTreeNodeId])
 
@@ -1492,8 +1566,9 @@ export function EquipmentNavigator({
                   onMoveUp={() => handleMoveEquipment(eq.id, 'up')}
                   onMoveDown={() => handleMoveEquipment(eq.id, 'down')}
                   onToggleHidden={handleToggleHidden}
+                  onDeleteEquipment={isAdmin ? handleDeleteEquipment : undefined}
                   isFavoriteMachine={!!eq.linkedMachineId && favMachineIds.has(eq.linkedMachineId)}
-                  onToggleFavoriteMachine={toggleFavoriteMachine}
+                  onToggleFavoriteMachine={handleFavStarClick}
                 />
               ))}
 
@@ -1529,6 +1604,55 @@ export function EquipmentNavigator({
       </div>
 
       {/* Modal de vinculación — deshabilitado (todas las máquinas ya vinculadas) */}
+
+      {/* Dropdown de selección de lista de favoritos */}
+      {favDropdown && (
+        <div className="fixed inset-0 z-50" onClick={() => setFavDropdown(null)}>
+          <div
+            className="absolute bg-card border border-border rounded-xl shadow-xl w-56 py-1"
+            style={{ top: favDropdown.anchorRect.bottom + 4, left: Math.min(favDropdown.anchorRect.left, window.innerWidth - 240) }}
+            onClick={e => e.stopPropagation()}
+          >
+            <p className="px-3 py-1.5 text-[9px] font-semibold text-muted-foreground uppercase">Agregar a lista</p>
+            {favLists.map(list => (
+              <button
+                key={list.name}
+                onClick={() => addToList(list.name, favDropdown.machineId)}
+                className="w-full text-left px-3 py-2 text-[11px] text-foreground hover:bg-muted/30 transition-colors flex items-center gap-2"
+              >
+                <Star className="h-3 w-3 text-yellow-400 fill-yellow-400 shrink-0" />
+                {list.name}
+                <span className="text-muted-foreground/50 ml-auto text-[9px]">{list.machineIds.length}</span>
+              </button>
+            ))}
+            <div className="border-t border-border/50 mt-1 pt-1 px-3 py-1.5">
+              <div className="flex items-center gap-1">
+                <input
+                  value={newListName}
+                  onChange={e => setNewListName(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && newListName.trim()) {
+                      addToList(newListName.trim(), favDropdown.machineId)
+                      setNewListName('')
+                    }
+                  }}
+                  placeholder="Nueva lista..."
+                  className="flex-1 h-7 px-2 text-[11px] bg-muted/30 border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary/40 text-foreground placeholder:text-muted-foreground/50"
+                  autoFocus
+                />
+                {newListName.trim() && (
+                  <button
+                    onClick={() => { addToList(newListName.trim(), favDropdown.machineId); setNewListName('') }}
+                    className="h-7 px-2 text-[10px] bg-primary/10 text-primary rounded border border-primary/30 hover:bg-primary/20 transition-colors"
+                  >
+                    Crear
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

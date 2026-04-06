@@ -255,7 +255,7 @@ export function RepuestosDashboard({
   const [, setSelectedCategoryId] = useState<string | null>('maquinas-principales')
   const [selectedEquipmentInfo, setSelectedEquipmentInfo] = useState<SelectedEquipmentInfo | null>(null)
   const equipmentDetailRef = useRef<HTMLDivElement | null>(null)
-  const [favMachines, setFavMachines] = useState<Map<string, { nombre: string; equipmentId: string }>>(new Map())
+  const [favMachines, setFavMachines] = useState<Map<string, { nombre: string; equipmentId: string; listName?: string }>>(new Map())
 
   // Scroll al detalle del equipo cuando se selecciona
   useEffect(() => {
@@ -667,31 +667,47 @@ export function RepuestosDashboard({
           onFavoriteMachinesChange={setFavMachines}
         />
 
-        {/* ═══ Chips de equipos favoritos ═══ */}
-        {favMachines.size > 0 && (
-          <div className="flex items-center gap-1.5 flex-wrap border-t border-border/30 pt-3 mt-1">
-            <Star className="h-3.5 w-3.5 text-yellow-400/60 shrink-0" />
-            {[...favMachines.entries()].map(([machineId, info]) => {
-              const isActive = currentMachine?.id === machineId
-              return (
-                <button
-                  key={machineId}
-                  onClick={() => {
-                    setCurrentMachine(machineId)
-                    setSelectedEquipmentInfo({ id: info.equipmentId, nombre: info.nombre, codigo: '', alias: undefined })
-                  }}
-                  className={`text-[10px] font-medium px-2.5 py-1 rounded-lg border transition-all ${
-                    isActive
-                      ? 'bg-primary/10 border-primary/30 text-primary'
-                      : 'bg-muted/20 border-border/50 text-muted-foreground hover:border-primary/30 hover:text-foreground'
-                  }`}
-                >
-                  {info.nombre}
-                </button>
-              )
-            })}
-          </div>
-        )}
+        {/* ═══ Chips de equipos favoritos agrupados por lista ═══ */}
+        {favMachines.size > 0 && (() => {
+          // Agrupar por lista
+          const byList = new Map<string, { machineId: string; nombre: string; equipmentId: string }[]>()
+          for (const [machineId, info] of favMachines) {
+            const listName = info.listName || 'Favoritos'
+            const arr = byList.get(listName) || []
+            arr.push({ machineId, nombre: info.nombre, equipmentId: info.equipmentId })
+            byList.set(listName, arr)
+          }
+          return (
+            <div className="border-t border-border/30 pt-3 mt-1 space-y-1.5">
+              {[...byList.entries()].map(([listName, items]) => (
+                <div key={listName} className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[9px] text-yellow-400/70 font-semibold uppercase shrink-0 flex items-center gap-1">
+                    <Star className="h-3 w-3 fill-yellow-400/50" /> {listName}
+                  </span>
+                  {items.map(({ machineId, nombre, equipmentId }) => {
+                    const isActive = currentMachine?.id === machineId
+                    return (
+                      <button
+                        key={machineId}
+                        onClick={() => {
+                          setCurrentMachine(machineId)
+                          setSelectedEquipmentInfo({ id: equipmentId, nombre, codigo: '', alias: undefined })
+                        }}
+                        className={`text-[10px] font-medium px-2.5 py-1 rounded-lg border transition-all ${
+                          isActive
+                            ? 'bg-primary/10 border-primary/30 text-primary'
+                            : 'bg-muted/20 border-border/50 text-muted-foreground hover:border-primary/30 hover:text-foreground'
+                        }`}
+                      >
+                        {nombre}
+                      </button>
+                    )
+                  })}
+                </div>
+              ))}
+            </div>
+          )
+        })()}
 
         {/* ═══ Detalle de la máquina seleccionada ═══ */}
         {!currentMachine && !selectedEquipmentInfo ? (

@@ -60,7 +60,8 @@ interface EquipmentCardProps {
   onMoveDown?: () => void
   onToggleHidden?: (equipmentId: string, hidden: boolean) => Promise<void>
   isFavoriteMachine?: boolean
-  onToggleFavoriteMachine?: (machineId: string) => void
+  onToggleFavoriteMachine?: (machineId: string, e: React.MouseEvent) => void
+  onDeleteEquipment?: (equipmentId: string, name: string) => void
 }
 
 export function EquipmentCard({
@@ -83,6 +84,7 @@ export function EquipmentCard({
   onToggleHidden,
   isFavoriteMachine,
   onToggleFavoriteMachine,
+  onDeleteEquipment,
 }: EquipmentCardProps) {
   const hasChildren = equipment.children.length > 0
   const hasLinkedMachine = !!equipment.linkedMachineId
@@ -468,7 +470,7 @@ export function EquipmentCard({
             {/* Star favorito — solo en equipos con máquina vinculada */}
             {hasLinkedMachine && onToggleFavoriteMachine && (
               <button
-                onClick={e => { e.stopPropagation(); onToggleFavoriteMachine(equipment.linkedMachineId!) }}
+                onClick={ev => { ev.stopPropagation(); onToggleFavoriteMachine(equipment.linkedMachineId!, ev) }}
                 className={`shrink-0 p-0.5 rounded transition-colors ${
                   isFavoriteMachine
                     ? 'text-yellow-400'
@@ -477,6 +479,16 @@ export function EquipmentCard({
                 title={isFavoriteMachine ? 'Quitar de favoritos' : 'Agregar a favoritos'}
               >
                 <Star className={`h-3 w-3 ${isFavoriteMachine ? 'fill-yellow-400' : ''}`} />
+              </button>
+            )}
+            {/* Eliminar equipo (admin) */}
+            {onDeleteEquipment && totalRepCount === 0 && (
+              <button
+                onClick={ev => { ev.stopPropagation(); onDeleteEquipment(equipment.id, displayName) }}
+                className="shrink-0 p-0.5 rounded text-muted-foreground/20 hover:text-red-400 hidden group-hover:inline-flex transition-colors"
+                title="Eliminar equipo"
+              >
+                <X className="h-3 w-3" />
               </button>
             )}
           </div>
