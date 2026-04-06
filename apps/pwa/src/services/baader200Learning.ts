@@ -30,6 +30,11 @@ export interface B200Measurement {
   note?: string
 }
 
+export interface B200Image {
+  url: string
+  caption?: string
+}
+
 export interface B200Section {
   id: string
   title: string
@@ -39,6 +44,7 @@ export interface B200Section {
   steps: B200Step[]
   measurements: B200Measurement[]
   notes: string[]
+  images: B200Image[]
   updatedAt: Date
   updatedBy: string
 }
@@ -66,6 +72,7 @@ export async function getB200Sections(): Promise<B200Section[]> {
       steps: (data.steps as B200Step[]) ?? [],
       measurements: (data.measurements as B200Measurement[]) ?? [],
       notes: (data.notes as string[]) ?? [],
+      images: (data.images as B200Image[]) ?? [],
       updatedAt: (data.updatedAt as Timestamp)?.toDate() ?? new Date(),
       updatedBy: data.updatedBy as string ?? '',
     }

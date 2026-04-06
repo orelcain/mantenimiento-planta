@@ -13,7 +13,7 @@
   --bg:#0f1117;--nav-bg:#13151d;--content-bg:#16181f;--hdr-bg:#0d0f15;
   --bdr:#1e2230;--bdr2:#252a38;
   --ac:#4499ff;--ac2:#2266cc;
-  --text:#ccd0d8;--text-dim:#6a7080;--text-bright:#e8ecf4;
+  --text:#e0e4ec;--text-dim:#8890a0;--text-bright:#f4f6fa;
   --badge-ajuste-bg:#1a3a6a;--badge-ajuste-fg:#88bbff;
   --badge-ts-bg:#5a3015;--badge-ts-fg:#ffaa66;
   --badge-seg-bg:#5a1515;--badge-seg-fg:#ff8888;
@@ -92,7 +92,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 .sec-badge.precaucion{background:var(--badge-prec-bg);color:var(--badge-prec-fg);}
 
 .sec-title{font-size:18px;font-weight:700;color:var(--text-bright);margin-bottom:12px;line-height:1.35;}
-.sec-desc{font-size:13px;color:#99a0b0;line-height:1.7;margin-bottom:18px;border-left:3px solid #2a3040;padding-left:14px;}
+.sec-desc{font-size:13px;color:#c0c8d8;line-height:1.7;margin-bottom:18px;border-left:3px solid #2a3040;padding-left:14px;}
 
 .sec-block-title{font-size:11px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px;margin-top:20px;display:flex;align-items:center;gap:8px;}
 .sec-block-title::after{content:'';flex:1;height:1px;background:var(--bdr);}
@@ -115,11 +115,11 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 .meas-table tr:last-child td{border-bottom:none;}
 .meas-val{font-family:'Courier New',monospace;color:#88ccff;font-weight:700;font-size:13px;}
 .meas-unit{color:#556;font-size:11px;margin-left:3px;}
-.meas-note{color:#777;font-size:11px;font-style:italic;}
+.meas-note{color:#99a0b0;font-size:11px;font-style:italic;}
 
 /* notes */
 .notes-list{display:flex;flex-direction:column;gap:6px;}
-.note-item{display:flex;align-items:flex-start;gap:8px;font-size:13px;color:#99a0b0;line-height:1.6;padding:6px 0;}
+.note-item{display:flex;align-items:flex-start;gap:8px;font-size:13px;color:#c0c8d8;line-height:1.6;padding:6px 0;}
 .note-bullet{color:var(--ac);flex-shrink:0;font-size:8px;padding-top:6px;}
 
 /* ── MODAL ── */
@@ -144,6 +144,18 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 .btn-cancel:hover{border-color:#555;color:var(--text);}
 .btn-save{background:var(--ac2);border:1px solid #3366aa;color:#fff;font-size:13px;padding:8px 18px;border-radius:6px;cursor:pointer;font-weight:600;transition:all .15s;}
 .btn-save:hover{background:#3377ee;}
+/* images gallery */
+.img-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:6px;}
+.img-card{border-radius:8px;overflow:hidden;border:1px solid #252a38;background:#12141c;transition:border-color .15s;}
+.img-card:hover{border-color:var(--ac);}
+.img-card img{width:100%;display:block;cursor:pointer;object-fit:cover;max-height:180px;background:#0a0c12;}
+.img-caption{font-size:11px;color:#99a0b0;padding:6px 8px;text-align:center;border-top:1px solid #1e2230;}
+.img-placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:24px 12px;border:2px dashed #252a38;border-radius:8px;color:#556;font-size:12px;cursor:default;}
+/* lightbox */
+#lightbox{display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:200;align-items:center;justify-content:center;cursor:zoom-out;}
+#lightbox.open{display:flex;}
+#lightbox img{max-width:90vw;max-height:90vh;border-radius:6px;box-shadow:0 10px 40px rgba(0,0,0,.5);}
+#lightbox-caption{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);color:#ccc;font-size:13px;background:rgba(0,0,0,.6);padding:6px 16px;border-radius:6px;}
 .hidden{display:none!important;}
 
 /* ── RESPONSIVE: mobile ── */
@@ -209,6 +221,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
   </div>
 </div>
 
+<!-- LIGHTBOX -->
+<div id="lightbox"><img id="lightbox-img" src="" alt=""><div id="lightbox-caption"></div></div>
+
 <!-- MODAL -->
 <div id="modal-overlay">
   <div id="modal-box">
@@ -247,6 +262,11 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
       <div class="form-row">
         <label>Notas importantes</label>
         <textarea id="f-notes" rows="2" placeholder="Una nota por línea..."></textarea>
+      </div>
+      <div class="form-row">
+        <label>Imágenes</label>
+        <textarea id="f-images" rows="3" placeholder="url|descripción&#10;https://ejemplo.com/foto1.jpg|Vista frontal del ajuste&#10;https://ejemplo.com/foto2.jpg|Detalle de chapaletas"></textarea>
+        <div class="form-hint">Formato: url|descripción (una por línea). Sube las imágenes a Firebase Storage o usa URLs públicas.</div>
       </div>
     </div>
     <div id="modal-ftr">
@@ -448,6 +468,24 @@ function renderSectionContent(sec){
     });
     html += '</div>';
   }
+
+  // images gallery
+  var imgs = Array.isArray(sec.images) ? sec.images.filter(function(im){ return im.url; }) : [];
+  if(imgs.length){
+    html += '<div class="sec-block-title">&#128247; Figuras / Imágenes</div>';
+    html += '<div class="img-gallery">';
+    imgs.forEach(function(im){
+      html += '<div class="img-card">';
+      html += '<img src="'+esc(im.url)+'" alt="'+esc(im.caption||sec.title)+'" loading="lazy" onclick="openLightbox(\''+esc(im.url).replace(/'/g,"\\'")+'\',\''+esc(im.caption||'').replace(/'/g,"\\'")+'\')"/>';
+      if(im.caption) html += '<div class="img-caption">'+esc(im.caption)+'</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+  } else if(!state.readonly) {
+    html += '<div class="sec-block-title">&#128247; Figuras / Imágenes</div>';
+    html += '<div class="img-placeholder"><span style="font-size:24px;opacity:.3;">&#128444;</span><span>Sin imágenes — edita la sección para agregar</span></div>';
+  }
+
   return html;
 }
 
@@ -482,6 +520,7 @@ function openModal(editId){
   byId('f-steps').value = (sec&&Array.isArray(sec.steps)?sec.steps:[]).map(function(s){ return (s.important?'!':'')+s.text; }).join('\n');
   byId('f-meas').value = (sec&&Array.isArray(sec.measurements)?sec.measurements:[]).map(function(m){ return [m.name,m.value,m.unit,m.note].join('|'); }).join('\n');
   byId('f-notes').value = (sec&&Array.isArray(sec.notes)?sec.notes:[]).join('\n');
+  byId('f-images').value = (sec&&Array.isArray(sec.images)?sec.images:[]).map(function(im){ return im.url+(im.caption?'|'+im.caption:''); }).join('\n');
   byId('modal-overlay').classList.add('open');
   setTimeout(function(){ byId('f-title').focus(); },50);
 }
@@ -503,6 +542,10 @@ function saveModal(){
     return {name:(p[0]||'').trim(),value:(p[1]||'').trim(),unit:(p[2]||'').trim(),note:(p[3]||'').trim()};
   });
   var notes = byId('f-notes').value.split('\n').filter(function(l){ return l.trim(); }).map(function(l){ return l.trim(); });
+  var images = byId('f-images').value.split('\n').filter(function(l){ return l.trim(); }).map(function(l){
+    var p = l.split('|');
+    return {url:(p[0]||'').trim(), caption:(p[1]||'').trim()};
+  }).filter(function(im){ return im.url; });
   var existing = state.editingId ? state.sections.find(function(s){ return s.id===state.editingId; }) : null;
   var sec = {
     id: state.editingId || ('sec_'+Date.now()),
@@ -512,7 +555,8 @@ function saveModal(){
     description: byId('f-desc').value.trim(),
     steps: steps,
     measurements: meas,
-    notes: notes
+    notes: notes,
+    images: images
   };
   send('b200:save-section',{section:sec});
   if(state.editingId){
@@ -545,6 +589,19 @@ byId('modal-cancel-btn').addEventListener('click', closeModal);
 byId('modal-save-btn').addEventListener('click', saveModal);
 byId('modal-overlay').addEventListener('click', function(e){ if(e.target===this) closeModal(); });
 byId('nav-add-btn').addEventListener('click', function(){ openModal(null); });
+
+// ── Lightbox ──
+window.openLightbox = function(url, caption){
+  var lb = byId('lightbox');
+  byId('lightbox-img').src = url;
+  byId('lightbox-caption').textContent = caption || '';
+  byId('lightbox-caption').style.display = caption ? 'block' : 'none';
+  lb.classList.add('open');
+};
+byId('lightbox').addEventListener('click', function(){
+  this.classList.remove('open');
+  byId('lightbox-img').src = '';
+});
 
 // ── Init ──
 send('b200:ready');
