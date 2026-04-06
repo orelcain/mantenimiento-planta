@@ -670,8 +670,8 @@ export function EquipmentNavigator({
     return machineId
   }, [])
 
-  const addToList = useCallback((listName: string, machineId: string) => {
-    const displayName = favDropdown?.displayName || resolveEquipName(machineId)
+  const addToList = useCallback((listName: string, machineId: string, nameOverride?: string) => {
+    const displayName = nameOverride || resolveEquipName(machineId)
     setFavLists(prev => {
       const existing = prev.find(l => l.name === listName)
       let next: FavList[]
@@ -1670,7 +1670,7 @@ export function EquipmentNavigator({
             {favLists.map(list => (
               <button
                 key={list.name}
-                onClick={() => addToList(list.name, favDropdown.machineId)}
+                onClick={() => addToList(list.name, favDropdown.machineId, favDropdown.displayName)}
                 className="w-full text-left px-3 py-2 text-[11px] text-foreground hover:bg-muted/30 transition-colors flex items-center gap-2"
               >
                 <Star className="h-3 w-3 text-yellow-400 fill-yellow-400 shrink-0" />
@@ -1685,7 +1685,7 @@ export function EquipmentNavigator({
                   onChange={e => setNewListName(e.target.value)}
                   onKeyDown={e => {
                     if (e.key === 'Enter' && newListName.trim()) {
-                      addToList(newListName.trim(), favDropdown.machineId)
+                      addToList(newListName.trim(), favDropdown.machineId, favDropdown.displayName)
                       setNewListName('')
                     }
                   }}
@@ -1695,7 +1695,7 @@ export function EquipmentNavigator({
                 />
                 {newListName.trim() && (
                   <button
-                    onClick={() => { addToList(newListName.trim(), favDropdown.machineId); setNewListName('') }}
+                    onClick={() => { addToList(newListName.trim(), favDropdown.machineId, favDropdown.displayName); setNewListName('') }}
                     className="h-7 px-2 text-[10px] bg-primary/10 text-primary rounded border border-primary/30 hover:bg-primary/20 transition-colors"
                   >
                     Crear
