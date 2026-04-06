@@ -100,52 +100,86 @@ function RepuestoThumbnail({ rep, onPreview, onOpenGallery }: {
   )
 }
 
-/** Preview rápido con carrusel — navega entre imágenes con flechas */
-function QuickImagePreview({ url, name, allImages, onClose }: {
+/** Preview con carrusel + zoom + paneo — mismas capacidades que galería de equipo */
+function QuickImagePreview({ url, name, allImages, onClose, onAddPhoto }: {
   url: string; name: string; allImages?: { url: string }[]; onClose: () => void
+  onAddPhoto?: () => void
 }) {
   const images = allImages && allImages.length > 0 ? allImages : [{ url }]
   const [idx, setIdx] = useState(() => {
     const i = images.findIndex(img => img.url === url)
     return i >= 0 ? i : 0
   })
+  const [zoom, setZoom] = useState(1)
+  const [panX, setPanX] = useState(0)
+  const [panY, setPanY] = useState(0)
   const current = images[idx]
   if (!current) return null
 
+  const resetView = () => { setZoom(1); setPanX(0); setPanY(0) }
+  const goTo = (i: number) => { setIdx(i); resetView() }
+
   return (
-    <div
-      className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div className="relative max-w-2xl max-h-[80vh]" onClick={e => e.stopPropagation()}>
-        <button
-          onClick={onClose}
-          className="absolute -top-3 -right-3 z-10 h-8 w-8 rounded-full bg-background/90 border border-border flex items-center justify-center hover:bg-destructive hover:text-destructive-foreground transition-colors"
-        >
+    <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center" onClick={onClose}>
+      <div className="relative max-w-4xl w-full max-h-[90vh] flex flex-col items-center" onClick={e => e.stopPropagation()}>
+        {/* Cerrar */}
+        <button onClick={onClose} className="absolute top-2 right-2 z-10 h-8 w-8 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-red-500 transition-colors">
           <X className="h-4 w-4" />
         </button>
-        <img
-          src={current.url}
-          alt={name}
-          className="max-w-full max-h-[75vh] object-contain rounded-xl shadow-2xl"
-        />
+
+        {/* Imagen con zoom + paneo */}
+        <div
+          className="overflow-hidden rounded-xl max-h-[70vh] cursor-grab active:cursor-grabbing"
+          onWheel={e => { e.preventDefault(); setZoom(z => Math.max(0.5, Math.min(5, z + (e.deltaY > 0 ? -0.3 : 0.3)))) }}
+          onMouseMove={e => { if (e.buttons === 1 && zoom > 1) { setPanX(p => p + e.movementX); setPanY(p => p + e.movementY) } }}
+        >
+          <img
+            src={current.url}
+            alt={name}
+            className="max-w-full max-h-[70vh] object-contain transition-transform"
+            style={{ transform: `scale(${zoom}) translate(${panX / zoom}px, ${panY / zoom}px)` }}
+            draggable={false}
+          />
+        </div>
+
         <div className="text-center mt-2 text-white/80 text-sm truncate">{name}</div>
-        {/* Controles carrusel */}
-        {images.length > 1 && (
-          <div className="flex items-center justify-center gap-3 mt-3">
-            <button
-              onClick={() => setIdx(i => (i - 1 + images.length) % images.length)}
-              className="h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors"
-            >
+
+        {/* Controles: carrusel + zoom */}
+        <div className="flex items-center gap-3 mt-2">
+          {images.length > 1 && (
+            <button onClick={() => goTo((idx - 1 + images.length) % images.length)}
+              className="h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white">
               <ArrowUp className="h-4 w-4 -rotate-90" />
             </button>
-            <span className="text-white/60 text-xs tabular-nums">{idx + 1} / {images.length}</span>
-            <button
-              onClick={() => setIdx(i => (i + 1) % images.length)}
-              className="h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors"
-            >
+          )}
+          <span className="text-white/60 text-xs tabular-nums">{idx + 1} / {images.length}</span>
+          <button onClick={() => { if (zoom < 2) { setZoom(2); setPanX(0); setPanY(0) } else resetView() }}
+            className="h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white">
+            <Eye className="h-4 w-4" />
+          </button>
+          {images.length > 1 && (
+            <button onClick={() => goTo((idx + 1) % images.length)}
+              className="h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white">
               <ArrowDown className="h-4 w-4 -rotate-90" />
             </button>
+          )}
+        </div>
+
+        {/* Thumbnails + agregar */}
+        {(images.length > 1 || onAddPhoto) && (
+          <div className="flex items-center gap-2 mt-3">
+            {images.map((img, i) => (
+              <button key={img.url} onClick={() => goTo(i)}
+                className={`h-10 w-10 rounded-lg overflow-hidden ring-2 transition-all ${idx === i ? 'ring-primary' : 'ring-transparent hover:ring-white/30'}`}>
+                <img src={img.url} alt="" className="h-full w-full object-cover" />
+              </button>
+            ))}
+            {onAddPhoto && (
+              <button onClick={onAddPhoto}
+                className="h-10 w-10 rounded-lg border-2 border-dashed border-white/20 hover:border-white/40 flex items-center justify-center text-white/40 hover:text-white/60 transition-colors">
+                <Camera className="h-4 w-4" />
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -217,7 +251,7 @@ export function RepuestosTable({
   onViewDetail,
   highlightedRepuestoId,
 }: RepuestosTableProps) {
-  const [preview, setPreview] = useState<{ url: string; name: string; allImages?: { url: string }[] } | null>(null)
+  const [preview, setPreview] = useState<{ url: string; name: string; allImages?: { url: string }[]; rep?: Repuesto } | null>(null)
 
   if (loading) {
     return (
@@ -243,7 +277,8 @@ export function RepuestosTable({
     <>
       {/* Quick Image Preview Overlay */}
       {preview && (
-        <QuickImagePreview url={preview.url} name={preview.name} allImages={preview.allImages} onClose={() => setPreview(null)} />
+        <QuickImagePreview url={preview.url} name={preview.name} allImages={preview.allImages} onClose={() => setPreview(null)}
+          onAddPhoto={onViewGallery && preview.rep ? () => { const r = preview.rep!; setPreview(null); onViewGallery(r) } : undefined} />
       )}
 
       {/* Mobile Card View */}
@@ -252,7 +287,7 @@ export function RepuestosTable({
           return (
             <div key={rep.id} id={`repuesto-${rep.id}`} className={`bg-card border rounded-xl p-4 space-y-3 shadow-sm hover:shadow-md transition-shadow ${highlightedRepuestoId === rep.id ? 'ring-2 ring-emerald-500 bg-emerald-500/10 animate-pulse' : ''}`}>
               <div className="flex gap-3 items-start">
-                <RepuestoThumbnail rep={rep} onPreview={(url, name, imgs) => setPreview({ url, name, allImages: imgs })} onOpenGallery={onViewGallery} />
+                <RepuestoThumbnail rep={rep} onPreview={(url, name, imgs) => setPreview({ url, name, allImages: imgs, rep })} onOpenGallery={onViewGallery} />
                 <div className="flex-1 min-w-0">
                   <div className="text-[11px] font-mono text-muted-foreground">{rep.codigoSAP || 'S/C'}</div>
                   <button
@@ -368,7 +403,7 @@ export function RepuestosTable({
                 >
                   {/* Thumbnail */}
                   <td className="pl-4 pr-2 py-2.5">
-                    <RepuestoThumbnail rep={rep} onPreview={(url, name, imgs) => setPreview({ url, name, allImages: imgs })} onOpenGallery={onViewGallery} />
+                    <RepuestoThumbnail rep={rep} onPreview={(url, name, imgs) => setPreview({ url, name, allImages: imgs, rep })} onOpenGallery={onViewGallery} />
                   </td>
                   {/* Código SAP */}
                   <td className="px-3 py-2.5 whitespace-nowrap">
