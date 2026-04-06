@@ -62,6 +62,7 @@ interface EquipmentCardProps {
   isFavoriteMachine?: boolean
   onToggleFavoriteMachine?: (machineId: string, e: React.MouseEvent) => void
   onDeleteEquipment?: (equipmentId: string, name: string) => void
+  isFavoriteFn?: (id: string) => boolean
 }
 
 export function EquipmentCard({
@@ -85,6 +86,7 @@ export function EquipmentCard({
   isFavoriteMachine,
   onToggleFavoriteMachine,
   onDeleteEquipment,
+  isFavoriteFn,
 }: EquipmentCardProps) {
   const hasChildren = equipment.children.length > 0
   const hasLinkedMachine = !!equipment.linkedMachineId
@@ -582,6 +584,10 @@ export function EquipmentCard({
               onAliasUpdated={onAliasUpdated}
               onChildAdded={onChildAdded}
               onToggleHidden={onToggleHidden}
+              isFavoriteMachine={isFavoriteFn ? isFavoriteFn(child.linkedMachineId || child.id) : false}
+              onToggleFavoriteMachine={onToggleFavoriteMachine}
+              onDeleteEquipment={onDeleteEquipment}
+              isFavoriteFn={isFavoriteFn}
               reorderMode={reorderMode}
               isFirst={idx === 0}
               isLast={idx === visibleChildren.length - 1}

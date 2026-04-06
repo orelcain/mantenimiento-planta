@@ -1580,6 +1580,7 @@ export function EquipmentNavigator({
                   onToggleHidden={handleToggleHidden}
                   onDeleteEquipment={isAdmin ? handleDeleteEquipment : undefined}
                   isFavoriteMachine={favMachineIds.has(eq.linkedMachineId || eq.id)}
+                  isFavoriteFn={(id: string) => favMachineIds.has(id)}
                   onToggleFavoriteMachine={handleFavStarClick}
                 />
               ))}
