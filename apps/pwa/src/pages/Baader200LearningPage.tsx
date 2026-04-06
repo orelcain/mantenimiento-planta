@@ -1,5 +1,5 @@
 import { useEffect, useRef, useMemo, useState, useCallback } from 'react'
-import { History, BookOpen, RefreshCw, X, ChevronDown, ChevronUp, Plus, QrCode, Copy, Check } from 'lucide-react'
+import { History, BookOpen, RefreshCw, X, ChevronDown, ChevronUp, QrCode, Copy, Check } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useAuthStore } from '@/store'
 import { cn } from '@/lib/utils'
@@ -8,7 +8,6 @@ import {
   saveB200Section,
   deleteB200Section,
   getB200SectionOrder,
-  saveB200SectionOrder,
   addB200History,
   getB200History,
   seedB200Sections,
@@ -22,7 +21,7 @@ export function Baader200LearningPage() {
   const user = useAuthStore(state => state.user)
 
   const [sections, setSections] = useState<B200Section[]>([])
-  const [sectionOrder, setSectionOrder] = useState<string[]>([])
+  const [, setSectionOrder] = useState<string[]>([])
   const [currentSectionId, setCurrentSectionId] = useState<string | null>(null)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [historyExpanded, setHistoryExpanded] = useState(false)
@@ -88,7 +87,7 @@ export function Baader200LearningPage() {
 
       if (type === 'b200:save-section') {
         const { section } = event.data as { section: B200Section }
-        if (!section?.id) break
+        if (!section?.id) return
         const isNew = !sections.find(s => s.id === section.id)
         await saveB200Section({ ...section, updatedBy: user.id }, user.id)
         setSections(prev => {
