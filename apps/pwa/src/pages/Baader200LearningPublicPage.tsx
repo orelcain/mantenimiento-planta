@@ -130,13 +130,6 @@ export function Baader200LearningPublicPage() {
     return g
   }, [orderedSections])
 
-  const typeLabels: Record<string, string> = {
-    ajuste: 'Ajustes',
-    troubleshooting: 'Problemas',
-    seguridad: 'Seguridad',
-    precaucion: 'Precauciones',
-  }
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen w-screen bg-[#0a1628]">
@@ -183,7 +176,7 @@ export function Baader200LearningPublicPage() {
       {/* Selector de secciones por tipo */}
       <div className="flex items-center gap-2 px-3 flex-shrink-0 overflow-x-auto"
         style={{ height: visualFs ? '0' : '36px', overflow: visualFs ? 'hidden' : 'auto', background: '#0a1628', borderBottom: '1px solid #12243a', transition: 'height .2s' }}>
-        {Object.entries(groups).map(([type, secs]) => secs.length > 0 && secs.map(s => (
+        {Object.entries(groups).map(([, secs]) => secs.length > 0 && secs.map(s => (
           <button key={s.id} onClick={() => switchSection(s.id)}
             className="flex-shrink-0 px-2.5 py-0.5 rounded-full text-[10px] transition-all whitespace-nowrap"
             style={s.id === selected
