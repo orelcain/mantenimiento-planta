@@ -822,5 +822,27 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isSupervisor() && isValidDocSize();
     }
+
+    // ============================================
+    // BAADER 200 — Manual de Ajustes / Aprendizaje
+    // ============================================
+    match /baader200-sections/{sectionId} {
+      // Lectura pública (Modo Aprendizaje vía QR, sin login)
+      allow read: if true;
+      allow create, update: if isSupervisor() && isValidDocSize();
+      allow delete: if isSupervisor();
+    }
+
+    match /baader200-history/{entryId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidDocSize();
+      allow update, delete: if isAdmin();
+    }
+
+    match /baader200-config/{configId} {
+      // Lectura pública para section-order (Modo Aprendizaje)
+      allow read: if true;
+      allow write: if isSupervisor();
+    }
   }
 }
