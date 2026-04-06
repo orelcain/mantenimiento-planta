@@ -47,6 +47,178 @@ interface RepuestosDashboardProps {
   onSearchSimilar?: (query: string) => void
 }
 
+// ══════════════════════════════════════════════
+//  KPI Strip con desglose independiente por KPI
+// ══════════════════════════════════════════════
+
+function KpiStrip({ repuestos, filteredRepuestos, totalCatalogo, conSAP, conStock, valorTotal, kpiFilter, setKpiFilter, filterTipo, setFilterTipo }: {
+  repuestos: Repuesto[]
+  filteredRepuestos: Repuesto[]
+  totalCatalogo: number
+  conSAP: number
+  conStock: number
+  valorTotal: number
+  kpiFilter: string | null
+  setKpiFilter: (v: string | null) => void
+  filterTipo: string | null
+  setFilterTipo: (v: string | null) => void
+}) {
+  const [desglosePages, setDesglosePages] = useState<Record<string, number>>({})
+
+  if (totalCatalogo === 0) return null
+
+  const sinSAP = totalCatalogo - conSAP
+  const conFicha = repuestos.filter(r => r.technicalSpecs).length
+  const conFoto = repuestos.filter(r => (r.fotosReales?.length || 0) + (r.imagenesManual?.length || 0) + (r.gallery?.length || 0) > 0).length
+  const tiposUnicos = new Set(repuestos.map(r => r.tipo).filter(Boolean)).size
+  const coberturaPct = totalCatalogo > 0 ? Math.round((conSAP / totalCatalogo) * 100) : 0
+
+  const kpis: { key: string; label: string; value: string | number; color: string; accent: string }[] = [
+    { key: 'total', label: 'Total', value: totalCatalogo, color: 'text-foreground', accent: 'border-border/40' },
+    { key: 'conSAP', label: 'Con SAP', value: conSAP, color: 'text-blue-400', accent: 'border-blue-500/40' },
+    { key: 'sinSAP', label: 'Sin SAP', value: sinSAP, color: 'text-orange-400', accent: 'border-orange-500/40' },
+    { key: 'conStock', label: 'Con stock', value: conStock, color: 'text-emerald-400', accent: 'border-emerald-500/40' },
+    { key: 'conFicha', label: 'Con ficha', value: conFicha, color: 'text-cyan-400', accent: 'border-cyan-500/40' },
+    { key: 'conFoto', label: 'Con foto', value: conFoto, color: 'text-amber-400', accent: 'border-amber-500/40' },
+    { key: 'tipos', label: 'Tipos', value: tiposUnicos, color: 'text-indigo-400', accent: 'border-indigo-500/40' },
+    { key: 'valor', label: 'Valor ref.', value: `$${valorTotal.toLocaleString('es-CL', { maximumFractionDigits: 0 })}`, color: 'text-violet-400', accent: 'border-violet-500/40' },
+  ]
+
+  // Filterable KPIs (click filtra la tabla)
+  const filterableKeys = new Set(['conSAP', 'sinSAP', 'conStock', 'conFicha', 'conFoto'])
+
+  // Desglose data builder per KPI
+  const buildDesglose = (key: string) => {
+    const source = filterableKeys.has(key) ? filteredRepuestos : repuestos
+    const tipoFreq: Record<string, number> = {}
+    for (const r of source) { tipoFreq[r.tipo || 'SIN TIPO'] = (tipoFreq[r.tipo || 'SIN TIPO'] || 0) + 1 }
+    const byTipo = Object.entries(tipoFreq).sort((a, b) => b[1] - a[1])
+
+    if (key === 'valor') {
+      const valorPorTipo = new Map<string, number>()
+      for (const r of repuestos) {
+        const t = r.tipo || 'SIN TIPO'
+        valorPorTipo.set(t, (valorPorTipo.get(t) || 0) + (r.valorUnitario || 0) * (r.cantidadPorMaquina || 0))
+      }
+      return { type: 'valor' as const, entries: [...valorPorTipo.entries()].filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]) }
+    }
+    return { type: 'tipo' as const, entries: byTipo }
+  }
+
+  const handleKpiClick = (key: string) => {
+    if (kpiFilter === key) {
+      setKpiFilter(null)
+    } else {
+      setKpiFilter(key)
+      setDesglosePages(prev => ({ ...prev, [key]: 1 }))
+    }
+  }
+
+  return (
+    <>
+      {/* Barra cobertura SAP */}
+      <div className="flex items-center gap-3 mb-2">
+        <span className="text-[9px] text-muted-foreground uppercase shrink-0">Cobertura SAP</span>
+        <div className="flex-1 h-2.5 bg-muted/30 rounded-full overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all ${coberturaPct >= 50 ? 'bg-emerald-500' : coberturaPct >= 20 ? 'bg-amber-500' : 'bg-red-500'}`}
+            style={{ width: `${coberturaPct}%` }}
+          />
+        </div>
+        <span className={`text-xs font-bold tabular-nums ${coberturaPct >= 50 ? 'text-emerald-400' : coberturaPct >= 20 ? 'text-amber-400' : 'text-red-400'}`}>
+          {coberturaPct}%
+        </span>
+      </div>
+
+      {/* KPIs grid */}
+      <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
+        {kpis.map(k => {
+          const isActive = kpiFilter === k.key
+          return (
+            <button
+              key={k.key}
+              onClick={() => handleKpiClick(k.key)}
+              className={[
+                'rounded-lg px-2 py-1.5 text-left transition-all cursor-pointer hover:bg-muted/30',
+                isActive ? `bg-primary/10 border-2 ${k.accent} ring-1 ring-primary/20` : 'bg-muted/15 border border-border/40',
+              ].join(' ')}
+            >
+              <p className={`text-sm sm:text-base font-bold tabular-nums leading-tight ${isActive ? 'text-primary' : k.color}`}>{k.value}</p>
+              <p className="text-[7px] sm:text-[8px] text-muted-foreground uppercase leading-tight">{k.label}</p>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Panel desglose independiente por KPI */}
+      {kpiFilter && (() => {
+        const desglose = buildDesglose(kpiFilter)
+        const activeKpi = kpis.find(k => k.key === kpiFilter)
+        const page = desglosePages[kpiFilter] || 1
+        const PAGE_SIZE = 10
+        const visibleCount = page * PAGE_SIZE
+        const visibleEntries = desglose.entries.slice(0, visibleCount)
+        const hasMore = desglose.entries.length > visibleCount
+        const showing = filterableKeys.has(kpiFilter) ? filteredRepuestos.length : repuestos.length
+
+        return (
+          <div className="mt-2 bg-muted/10 border border-border/40 rounded-lg p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase">
+                {activeKpi?.label}: {showing} {desglose.type === 'valor' ? 'tipos con valor' : 'repuestos'}
+              </p>
+              <button onClick={() => setKpiFilter(null)} className="text-[9px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded hover:bg-muted/30">
+                Cerrar
+              </button>
+            </div>
+
+            <div className="flex flex-wrap gap-1.5">
+              {desglose.type === 'valor' ? (
+                visibleEntries.map(([tipo, val]) => (
+                  <button
+                    key={tipo}
+                    onClick={() => setFilterTipo(filterTipo === tipo ? null : tipo)}
+                    className={`text-[9px] px-2 py-0.5 rounded-full border tabular-nums transition-all cursor-pointer ${
+                      filterTipo === tipo
+                        ? 'bg-violet-500/20 border-violet-500/50 text-violet-200 font-bold'
+                        : 'bg-violet-500/10 border-violet-500/20 text-violet-300 hover:border-violet-400/40'
+                    }`}
+                  >
+                    {tipo} <strong>${(val as number).toLocaleString('es-CL', { maximumFractionDigits: 0 })}</strong>
+                  </button>
+                ))
+              ) : (
+                visibleEntries.map(([tipo, count]) => (
+                  <button
+                    key={tipo}
+                    onClick={() => setFilterTipo(filterTipo === tipo ? null : tipo)}
+                    className={`text-[9px] px-2 py-0.5 rounded-full border tabular-nums transition-all cursor-pointer ${
+                      filterTipo === tipo
+                        ? 'bg-primary/15 border-primary/40 text-primary font-bold'
+                        : 'bg-muted/30 border-border/30 text-muted-foreground hover:border-primary/30 hover:text-foreground'
+                    }`}
+                  >
+                    {tipo} <strong className={filterTipo === tipo ? '' : 'text-foreground'}>{count}</strong>
+                  </button>
+                ))
+              )}
+            </div>
+
+            {hasMore && (
+              <button
+                onClick={() => setDesglosePages(prev => ({ ...prev, [kpiFilter]: page + 1 }))}
+                className="text-[10px] text-primary hover:text-primary/80 font-medium transition-colors"
+              >
+                Ver + ({desglose.entries.length - visibleCount} más)
+              </button>
+            )}
+          </div>
+        )
+      })()}
+    </>
+  )
+}
+
 export function RepuestosDashboard({
   jumpMachineId,
   onJumpConsumed,
@@ -570,126 +742,19 @@ export function RepuestosDashboard({
                 {isFav && <Star className="h-4 w-4 text-yellow-400 fill-yellow-400 shrink-0" />}
               </div>
 
-              {/* KPI strip — interactivo (click filtra + panel desglose) */}
-              {totalCatalogo > 0 && (() => {
-                const sinSAP = totalCatalogo - conSAP
-                const conFicha = repuestos.filter(r => r.technicalSpecs).length
-                const conFoto = repuestos.filter(r => (r.fotosReales?.length || 0) + (r.imagenesManual?.length || 0) + (r.gallery?.length || 0) > 0).length
-                const tiposUnicos = new Set(repuestos.map(r => r.tipo).filter(Boolean)).size
-                const coberturaPct = totalCatalogo > 0 ? Math.round((conSAP / totalCatalogo) * 100) : 0
-
-                const kpis: { key: string | null; label: string; value: string | number; color: string; accent: string }[] = [
-                  { key: null, label: 'Total', value: totalCatalogo, color: 'text-foreground', accent: 'border-border/40' },
-                  { key: 'conSAP', label: 'Con SAP', value: conSAP, color: 'text-blue-400', accent: 'border-blue-500/40' },
-                  { key: 'sinSAP', label: 'Sin SAP', value: sinSAP, color: 'text-orange-400', accent: 'border-orange-500/40' },
-                  { key: 'conStock', label: 'Con stock', value: conStock, color: 'text-emerald-400', accent: 'border-emerald-500/40' },
-                  { key: 'conFicha', label: 'Con ficha', value: conFicha, color: 'text-cyan-400', accent: 'border-cyan-500/40' },
-                  { key: 'conFoto', label: 'Con foto', value: conFoto, color: 'text-amber-400', accent: 'border-amber-500/40' },
-                  { key: null, label: 'Tipos', value: tiposUnicos, color: 'text-indigo-400', accent: 'border-border/40' },
-                  { key: null, label: 'Valor ref.', value: `$${valorTotal.toLocaleString('es-CL', { maximumFractionDigits: 0 })}`, color: 'text-violet-400', accent: 'border-border/40' },
-                ]
-
-                // Desglose por tipo para el panel expandido
-                const tipoFreq: Record<string, number> = {}
-                const sourceItems = kpiFilter ? filteredRepuestos : repuestos
-                for (const r of sourceItems) { tipoFreq[r.tipo || 'SIN TIPO'] = (tipoFreq[r.tipo || 'SIN TIPO'] || 0) + 1 }
-                const tipoEntries = Object.entries(tipoFreq).sort((a, b) => b[1] - a[1])
-
-                return (
-                  <>
-                    {/* Barra cobertura SAP */}
-                    <div className="flex items-center gap-3 mb-2">
-                      <span className="text-[9px] text-muted-foreground uppercase shrink-0">Cobertura SAP</span>
-                      <div className="flex-1 h-2.5 bg-muted/30 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all ${coberturaPct >= 50 ? 'bg-emerald-500' : coberturaPct >= 20 ? 'bg-amber-500' : 'bg-red-500'}`}
-                          style={{ width: `${coberturaPct}%` }}
-                        />
-                      </div>
-                      <span className={`text-xs font-bold tabular-nums ${coberturaPct >= 50 ? 'text-emerald-400' : coberturaPct >= 20 ? 'text-amber-400' : 'text-red-400'}`}>
-                        {coberturaPct}%
-                      </span>
-                    </div>
-
-                    {/* KPIs grid */}
-                    <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
-                      {kpis.map(k => {
-                        const isActive = k.key !== null && kpiFilter === k.key
-                        const isClickable = k.key !== null
-                        return (
-                          <button
-                            key={k.label}
-                            onClick={() => isClickable ? setKpiFilter(kpiFilter === k.key ? null : k.key) : undefined}
-                            className={[
-                              'rounded-lg px-2 py-1.5 text-left transition-all',
-                              isActive ? `bg-primary/10 border-2 ${k.accent} ring-1 ring-primary/20` : 'bg-muted/15 border border-border/40',
-                              isClickable ? 'cursor-pointer hover:bg-muted/30' : 'cursor-default',
-                            ].join(' ')}
-                          >
-                            <p className={`text-sm sm:text-base font-bold tabular-nums leading-tight ${isActive ? 'text-primary' : k.color}`}>{k.value}</p>
-                            <p className="text-[7px] sm:text-[8px] text-muted-foreground uppercase leading-tight">{k.label}</p>
-                          </button>
-                        )
-                      })}
-                    </div>
-
-                    {/* Panel desglose — visible cuando hay filtro KPI activo */}
-                    {kpiFilter && (
-                      <div className="mt-2 bg-muted/10 border border-border/40 rounded-lg p-3 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <p className="text-[10px] font-semibold text-muted-foreground uppercase">
-                            Desglose: {kpis.find(k => k.key === kpiFilter)?.label} ({filteredRepuestos.length} de {totalCatalogo})
-                          </p>
-                          <button onClick={() => setKpiFilter(null)} className="text-[9px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded hover:bg-muted/30">
-                            Cerrar
-                          </button>
-                        </div>
-                        {/* Chips por tipo — clickeables para filtrar */}
-                        {tipoEntries.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5">
-                            {tipoEntries.map(([tipo, count]) => (
-                              <button
-                                key={tipo}
-                                onClick={() => setFilterTipo(filterTipo === tipo ? null : tipo)}
-                                className={`text-[9px] px-2 py-0.5 rounded-full border tabular-nums transition-all cursor-pointer ${
-                                  filterTipo === tipo
-                                    ? 'bg-primary/15 border-primary/40 text-primary font-bold'
-                                    : 'bg-muted/30 border-border/30 text-muted-foreground hover:border-primary/30 hover:text-foreground'
-                                }`}
-                              >
-                                {tipo} <strong className={filterTipo === tipo ? '' : 'text-foreground'}>{count}</strong>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                        {/* Desglose de valor por tipo (solo visible en filtros con items) */}
-                        {filteredRepuestos.length > 0 && (() => {
-                          const valorPorTipo = new Map<string, number>()
-                          for (const r of filteredRepuestos) {
-                            const t = r.tipo || 'SIN TIPO'
-                            valorPorTipo.set(t, (valorPorTipo.get(t) || 0) + (r.valorUnitario || 0) * (r.cantidadPorMaquina || 0))
-                          }
-                          const valorEntries = [...valorPorTipo.entries()].filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1])
-                          const totalVal = valorEntries.reduce((s, [, v]) => s + v, 0)
-                          if (totalVal === 0) return null
-                          return (
-                            <div className="pt-1.5 border-t border-border/20">
-                              <p className="text-[9px] text-muted-foreground/60 uppercase mb-1">Valor por tipo</p>
-                              <div className="flex flex-wrap gap-1.5">
-                                {valorEntries.slice(0, 10).map(([tipo, val]) => (
-                                  <span key={tipo} className="text-[9px] px-2 py-0.5 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-300 tabular-nums">
-                                    {tipo} <strong>${val.toLocaleString('es-CL', { maximumFractionDigits: 0 })}</strong>
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )
-                        })()}
-                      </div>
-                    )}
-                  </>
-                )
-              })()}
+              {/* KPI strip — cada uno con desglose independiente */}
+              <KpiStrip
+                repuestos={repuestos}
+                filteredRepuestos={filteredRepuestos}
+                totalCatalogo={totalCatalogo}
+                conSAP={conSAP}
+                conStock={conStock}
+                valorTotal={valorTotal}
+                kpiFilter={kpiFilter}
+                setKpiFilter={setKpiFilter}
+                filterTipo={filterTipo}
+                setFilterTipo={setFilterTipo}
+              />
             </div>
           )
         })()}

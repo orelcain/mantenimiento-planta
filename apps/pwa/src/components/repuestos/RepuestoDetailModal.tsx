@@ -144,6 +144,10 @@ export function RepuestoDetailModal({
   const [aliasValue, setAliasValue] = useState(rep.alias || '')
   const [savingAlias, setSavingAlias] = useState(false)
   const aliasInputRef = useRef<HTMLInputElement>(null)
+  const [editingTipo, setEditingTipo] = useState(false)
+  const [tipoValue, setTipoValue] = useState(rep.tipo || '')
+  const [savingTipo, setSavingTipo] = useState(false)
+  const tipoInputRef = useRef<HTMLInputElement>(null)
 
   const saveAlias = async () => {
     if (!machineId) return
@@ -160,6 +164,23 @@ export function RepuestoDetailModal({
       console.error('Error saving alias:', err)
     } finally {
       setSavingAlias(false)
+    }
+  }
+
+  const saveTipo = async () => {
+    if (!machineId) return
+    const trimmed = tipoValue.trim().toUpperCase()
+    setSavingTipo(true)
+    try {
+      await updateDoc(doc(db, `machines/${machineId}/repuestos/${rep.id}`), {
+        tipo: trimmed || null,
+      })
+      ;(rep as any).tipo = trimmed || undefined
+      setEditingTipo(false)
+    } catch (err) {
+      console.error('Error saving tipo:', err)
+    } finally {
+      setSavingTipo(false)
     }
   }
 
@@ -301,6 +322,37 @@ export function RepuestoDetailModal({
                   </div>
                 )}
                 <InfoRow label="Posición en diagrama" value={rep.posicionManual} mono />
+                {/* Tipo — editable */}
+                <div className="py-1.5 border-b border-border/30 flex items-center justify-between gap-2">
+                  <span className="text-xs text-muted-foreground shrink-0">Tipo</span>
+                  {editingTipo ? (
+                    <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                      <input
+                        ref={tipoInputRef}
+                        value={tipoValue}
+                        onChange={e => setTipoValue(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') saveTipo(); if (e.key === 'Escape') setEditingTipo(false) }}
+                        placeholder="Ej: SENSOR, ANILLO, CORREA"
+                        className="h-6 px-2 text-xs rounded border border-primary/50 bg-background text-foreground uppercase placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary/50 w-40"
+                        autoFocus
+                      />
+                      <button onClick={saveTipo} disabled={savingTipo} className="h-6 w-6 flex items-center justify-center rounded bg-primary/20 hover:bg-primary/30 text-primary">
+                        <Check className="h-3 w-3" />
+                      </button>
+                      <button onClick={() => setEditingTipo(false)} className="h-6 w-6 flex items-center justify-center rounded hover:bg-muted/50 text-muted-foreground">
+                        <XIcon className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => { setTipoValue(rep.tipo || ''); setEditingTipo(true); setTimeout(() => tipoInputRef.current?.focus(), 50) }}
+                      className="flex items-center gap-1 text-sm text-foreground hover:text-primary transition-colors group"
+                    >
+                      <span>{rep.tipo || <span className="text-muted-foreground/50">Sin tipo</span>}</span>
+                      <Pencil className="h-3 w-3 text-muted-foreground/30 group-hover:text-primary transition-colors" />
+                    </button>
+                  )}
+                </div>
               </div>
             </Section>
 

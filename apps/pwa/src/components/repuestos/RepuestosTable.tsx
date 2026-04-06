@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Package, ImageIcon, X, BookOpen, Eye, ClipboardList, Camera, Pencil, Trash2, ArrowRightLeft, ArrowUpDown, ArrowUp, ArrowDown, MessageSquareText } from 'lucide-react'
+import { Package, ImageIcon, X, BookOpen, Eye, Camera, Pencil, Trash2, ArrowRightLeft, ArrowUpDown, ArrowUp, ArrowDown, MessageSquareText } from 'lucide-react'
 import type { Repuesto } from '@/types/repuestos'
 import { RepuestoActionsMenu } from './RepuestoActionsMenu'
 import { InlineEditName } from './InlineEditName'
@@ -479,34 +479,7 @@ export function RepuestosTable({
                   <td className="px-3 py-2.5">
                     <div className="flex items-center justify-end gap-0.5 flex-wrap">
                       {/* ── Ficha Técnica (separada) ── */}
-                      {onViewSpecs && (
-                        <Tip label="Ficha Técnica">
-                          <button onClick={() => onViewSpecs(rep)}
-                            className="h-7 w-7 inline-flex items-center justify-center rounded-md text-blue-400/60 hover:text-blue-400 hover:bg-blue-500/10 transition-colors">
-                            <ClipboardList className="h-3.5 w-3.5" />
-                          </button>
-                        </Tip>
-                      )}
-
-                      {/* Separador visual */}
-                      {onViewSpecs && onViewGallery && (
-                        <span className="w-px h-4 bg-border mx-0.5" />
-                      )}
-
-                      {/* ── Galería ── */}
-                      {onViewGallery && (
-                        <Tip label="Galería">
-                          <button onClick={() => onViewGallery(rep)}
-                            className="h-7 w-7 inline-flex items-center justify-center rounded-md text-indigo-400/60 hover:text-indigo-400 hover:bg-indigo-500/10 transition-colors">
-                            <Camera className="h-3.5 w-3.5" />
-                          </button>
-                        </Tip>
-                      )}
-
-                      {/* Separador visual */}
-                      {(onViewGallery || onViewSpecs) && (onSearchInManual || onViewInManual) && (
-                        <span className="w-px h-4 bg-border mx-0.5" />
-                      )}
+                      {/* Ficha técnica y galería se acceden desde el thumbnail (izq) y nombre */}
 
                       {/* ── Manual ── */}
                       {onSearchInManual && rep.codigoFabricante && (
