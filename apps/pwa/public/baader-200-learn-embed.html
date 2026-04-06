@@ -265,8 +265,12 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
       </div>
       <div class="form-row">
         <label>Imágenes</label>
-        <textarea id="f-images" rows="3" placeholder="url|descripción&#10;https://ejemplo.com/foto1.jpg|Vista frontal del ajuste&#10;https://ejemplo.com/foto2.jpg|Detalle de chapaletas"></textarea>
-        <div class="form-hint">Formato: url|descripción (una por línea). Sube las imágenes a Firebase Storage o usa URLs públicas.</div>
+        <div style="display:flex;gap:8px;margin-bottom:6px;">
+          <button type="button" id="f-upload-btn" class="btn-save" style="font-size:11px;padding:5px 12px;">&#128247; Subir imagen</button>
+          <span id="f-upload-status" style="font-size:11px;color:var(--text-dim);align-self:center;"></span>
+        </div>
+        <textarea id="f-images" rows="3" placeholder="url|descripción&#10;Las imágenes subidas aparecen aquí automáticamente"></textarea>
+        <div class="form-hint">Formato: url|descripción (una por línea). Usa el botón para subir o pega URLs manualmente.</div>
       </div>
     </div>
     <div id="modal-ftr">
@@ -589,6 +593,33 @@ byId('modal-cancel-btn').addEventListener('click', closeModal);
 byId('modal-save-btn').addEventListener('click', saveModal);
 byId('modal-overlay').addEventListener('click', function(e){ if(e.target===this) closeModal(); });
 byId('nav-add-btn').addEventListener('click', function(){ openModal(null); });
+
+// ── Image upload (bridge to React) ──
+byId('f-upload-btn').addEventListener('click', function(){
+  send('b200:request-upload');
+  byId('f-upload-status').textContent = 'Selecciona una imagen...';
+});
+
+window.addEventListener('message', function(e){
+  var d = e.data;
+  if(!d) return;
+  if(d.type === 'b200:upload-result' && d.url){
+    var textarea = byId('f-images');
+    var current = textarea.value.trim();
+    var newLine = d.url + (d.caption ? '|' + d.caption : '');
+    textarea.value = current ? current + '\n' + newLine : newLine;
+    byId('f-upload-status').textContent = 'Imagen subida correctamente';
+    setTimeout(function(){ byId('f-upload-status').textContent = ''; }, 3000);
+  }
+  if(d.type === 'b200:upload-error'){
+    byId('f-upload-status').textContent = 'Error: ' + (d.error || 'fallo al subir');
+    byId('f-upload-status').style.color = '#ff6666';
+    setTimeout(function(){ byId('f-upload-status').textContent = ''; byId('f-upload-status').style.color = ''; }, 4000);
+  }
+  if(d.type === 'b200:upload-progress'){
+    byId('f-upload-status').textContent = 'Subiendo... ' + (d.percent || 0) + '%';
+  }
+});
 
 // ── Lightbox ──
 window.openLightbox = function(url, caption){

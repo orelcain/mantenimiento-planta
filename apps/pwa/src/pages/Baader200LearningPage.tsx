@@ -3,6 +3,8 @@ import { History, BookOpen, RefreshCw, X, ChevronDown, ChevronUp, QrCode, Copy, 
 import { QRCodeSVG } from 'qrcode.react'
 import { useAuthStore } from '@/store'
 import { cn } from '@/lib/utils'
+import { storage } from '@/services/firebase'
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage'
 import {
   getB200Sections,
   saveB200Section,
@@ -18,6 +20,7 @@ import { Button } from '@/components/ui'
 export function Baader200LearningPage() {
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const iframeReadyRef = useRef(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const user = useAuthStore(state => state.user)
 
   const [sections, setSections] = useState<B200Section[]>([])
@@ -122,10 +125,39 @@ export function Baader200LearningPage() {
         }
         return
       }
+
+      if (type === 'b200:request-upload') {
+        fileInputRef.current?.click()
+        return
+      }
     }
     window.addEventListener('message', handleMessage)
     return () => window.removeEventListener('message', handleMessage)
   }, [user, sections, sendInitData])
+
+  const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !iframeRef.current?.contentWindow) return
+    const iframe = iframeRef.current.contentWindow
+    const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+    const path = `baader200-images/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`
+    const storageRef = ref(storage, path)
+    const task = uploadBytesResumable(storageRef, file)
+    task.on('state_changed',
+      (snap) => {
+        const pct = Math.round((snap.bytesTransferred / snap.totalBytes) * 100)
+        iframe.postMessage({ type: 'b200:upload-progress', percent: pct }, '*')
+      },
+      (err) => {
+        iframe.postMessage({ type: 'b200:upload-error', error: err.message }, '*')
+      },
+      async () => {
+        const url = await getDownloadURL(task.snapshot.ref)
+        iframe.postMessage({ type: 'b200:upload-result', url, caption: file.name.replace(/\.[^.]+$/, '') }, '*')
+      }
+    )
+    e.target.value = ''
+  }, [])
 
   const refreshIframe = () => {
     if (!iframeRef.current) return
@@ -195,6 +227,13 @@ export function Baader200LearningPage() {
           className="w-full h-full border-0"
           allow="fullscreen"
           sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-modals"
+        />
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleFileUpload}
         />
       </div>
 
