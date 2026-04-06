@@ -673,9 +673,10 @@ export function EquipmentNavigator({
       if (!eq || eq.length === 0) return false
       const map = new Map<string, { nombre: string; equipmentId: string; listName?: string }>()
       for (const e of eq) {
-        if (e.linkedMachineId && favMachineIds.has(e.linkedMachineId) && !map.has(e.linkedMachineId)) {
-          const listName = isMachineInAnyList(favLists, e.linkedMachineId)
-          map.set(e.linkedMachineId, { nombre: e.alias || e.nombre, equipmentId: e.id, listName: listName || undefined })
+        const favKey = e.linkedMachineId || e.id
+        if (favMachineIds.has(favKey) && !map.has(favKey)) {
+          const listName = isMachineInAnyList(favLists, favKey)
+          map.set(favKey, { nombre: e.alias || e.nombre, equipmentId: e.id, listName: listName || undefined })
         }
       }
       onFavoriteMachinesChange(map)
@@ -1578,7 +1579,7 @@ export function EquipmentNavigator({
                   onMoveDown={() => handleMoveEquipment(eq.id, 'down')}
                   onToggleHidden={handleToggleHidden}
                   onDeleteEquipment={isAdmin ? handleDeleteEquipment : undefined}
-                  isFavoriteMachine={!!eq.linkedMachineId && favMachineIds.has(eq.linkedMachineId)}
+                  isFavoriteMachine={favMachineIds.has(eq.linkedMachineId || eq.id)}
                   onToggleFavoriteMachine={handleFavStarClick}
                 />
               ))}

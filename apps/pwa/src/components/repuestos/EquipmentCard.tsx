@@ -467,10 +467,10 @@ export function EquipmentCard({
                 0 rep.
               </span>
             ) : null}
-            {/* Star favorito — solo en equipos con máquina vinculada */}
-            {hasLinkedMachine && onToggleFavoriteMachine && (
+            {/* Star favorito — disponible para todos los equipos */}
+            {onToggleFavoriteMachine && (
               <button
-                onClick={ev => { ev.stopPropagation(); onToggleFavoriteMachine(equipment.linkedMachineId!, ev) }}
+                onClick={ev => { ev.stopPropagation(); onToggleFavoriteMachine(equipment.linkedMachineId || equipment.id, ev) }}
                 className={`shrink-0 p-0.5 rounded transition-colors ${
                   isFavoriteMachine
                     ? 'text-yellow-400'
