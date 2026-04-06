@@ -28,6 +28,7 @@ import {
   BarChart3,
   Bot,
   CloudSun,
+  BookOpen,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, Button } from '@/components/ui'
 import { useAuthStore, useIsAdmin, useAppStore, usePermissionsStore } from '@/store'
@@ -73,6 +74,7 @@ const adminNavigation = [
   { name: 'ETT', href: '/admin/ett', icon: FileText },
   { name: 'Clima Puerto', href: '/clima-puerto', icon: CloudSun, module: 'climaPuerto' as AppModule },
   { name: 'HMI Knuro', href: '/hmi-knuro', icon: Cpu },
+  { name: 'Baader 200', href: '/baader-200', icon: BookOpen },
 ]
 
 export function MainLayout() {
