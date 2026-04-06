@@ -667,7 +667,6 @@ export function EquipmentNavigator({
       return next
     })
     setFavDropdown(null)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resolveEquipName])
 
 
