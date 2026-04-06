@@ -155,6 +155,7 @@ export const DEFAULT_B200_SECTIONS: Omit<B200Section, 'updatedAt' | 'updatedBy'>
       'No ajustar siempre a la medida del catálogo — usar la medida que corresponda a las condiciones reales.',
       'Con temperatura de materia prima bajo 0°C se requiere mayor presión en el resorte.',
     ],
+    images: [],
   },
   {
     id: 'segunda-alimentacion',
@@ -178,6 +179,7 @@ export const DEFAULT_B200_SECTIONS: Omit<B200Section, 'updatedAt' | 'updatedBy'>
     notes: [
       'Al cambiar cuchillos nuevos, al bajar el mando dorsal los cuchillos en trabajo normal rozarían con las chapaletas. Reajustar siempre con pernos M10.',
     ],
+    images: [],
   },
   {
     id: 'levantadores-aletas',
@@ -201,6 +203,7 @@ export const DEFAULT_B200_SECTIONS: Omit<B200Section, 'updatedAt' | 'updatedBy'>
     notes: [
       'El 2do levantador no tiene chapas guías de aleta, por lo tanto se baja más de lo normal.',
     ],
+    images: [],
   },
   {
     id: 'cuchillos-ventrales',
@@ -223,6 +226,7 @@ export const DEFAULT_B200_SECTIONS: Omit<B200Section, 'updatedAt' | 'updatedBy'>
     notes: [
       'Los pernos de fijación pos 1-2 SOLO se mueven en mantención anual.',
     ],
+    images: [],
   },
   {
     id: 'guias-flotantes',
@@ -245,6 +249,7 @@ export const DEFAULT_B200_SECTIONS: Omit<B200Section, 'updatedAt' | 'updatedBy'>
       'SIEMPRE realizar con silleta en posición de reposo.',
       'Ajustar siempre después de los cuchillos ventrales.',
     ],
+    images: [],
   },
   {
     id: 'cuchillos-dorsales',
@@ -263,6 +268,7 @@ export const DEFAULT_B200_SECTIONS: Omit<B200Section, 'updatedAt' | 'updatedBy'>
     notes: [
       'La cruz patrón asegura que los cuchillos ventrales y dorsales queden exactamente alineados entre sí.',
     ],
+    images: [],
   },
   {
     id: 'medidas-cuchillos',
@@ -281,6 +287,7 @@ export const DEFAULT_B200_SECTIONS: Omit<B200Section, 'updatedAt' | 'updatedBy'>
     notes: [
       'Verificar SIEMPRE al cambiar cuchillos nuevos para evitar que rocen con las chapaletas.',
     ],
+    images: [],
   },
   {
     id: 'mando-cuchillos-dorsales',
@@ -301,6 +308,7 @@ export const DEFAULT_B200_SECTIONS: Omit<B200Section, 'updatedAt' | 'updatedBy'>
     notes: [
       'Si no hay levantamiento: 1ro verificar trinquete, 2do verificar bulón con gollete en carter de levas.',
     ],
+    images: [],
   },
 ]
 
@@ -327,6 +335,7 @@ export const DEFAULT_B200_SECTIONS_PART2: Omit<B200Section, 'updatedAt' | 'updat
       { name: 'Perno separador vs guía superior', value: '0.5', unit: 'mm' },
     ],
     notes: [],
+    images: [],
   },
   {
     id: 'cuchillos-punzones',
@@ -356,6 +365,7 @@ export const DEFAULT_B200_SECTIONS_PART2: Omit<B200Section, 'updatedAt' | 'updat
       'Cuchillos muy altos → gay ping en el filete a lo largo del esquelon.',
       'Cuchillos muy bajos → corta espina del flanco y cuchillos rascadores no funcionan.',
     ],
+    images: [],
   },
   {
     id: 'cuchillos-rascadores-ajuste',
@@ -374,6 +384,7 @@ export const DEFAULT_B200_SECTIONS_PART2: Omit<B200Section, 'updatedAt' | 'updat
     notes: [
       'Este ajuste SOLO se puede realizar con la silleta en posición 1350mm.',
     ],
+    images: [],
   },
   {
     id: 'cuchillos-rascadores-altura',
@@ -392,6 +403,7 @@ export const DEFAULT_B200_SECTIONS_PART2: Omit<B200Section, 'updatedAt' | 'updat
       { name: 'Abertura cuchillos rascadores', value: '17-18', unit: 'mm' },
     ],
     notes: [],
+    images: [],
   },
   {
     id: 'cuchillos-cola-contrabancadas',
@@ -412,6 +424,7 @@ export const DEFAULT_B200_SECTIONS_PART2: Omit<B200Section, 'updatedAt' | 'updat
     notes: [
       'Si el rodillo biela pos 11 toca el tope pos 12, regular primero con biela pos 5 antes del perno tope pos 1.',
     ],
+    images: [],
   },
   {
     id: 'embrague',
@@ -436,6 +449,7 @@ export const DEFAULT_B200_SECTIONS_PART2: Omit<B200Section, 'updatedAt' | 'updat
     notes: [
       'Reajuste solo cuando no hay causal justificada de bloqueo (no hay objeto interpuesto).',
     ],
+    images: [],
   },
   {
     id: 'sistema-seguridad',
@@ -458,6 +472,7 @@ export const DEFAULT_B200_SECTIONS_PART2: Omit<B200Section, 'updatedAt' | 'updat
     notes: [
       'El circuito de control incluye: límites, sensores y botoneras.',
     ],
+    images: [],
   },
   {
     id: 'precauciones-cambio-cuchillos',
@@ -479,6 +494,7 @@ export const DEFAULT_B200_SECTIONS_PART2: Omit<B200Section, 'updatedAt' | 'updat
       'Con cuchillos nuevos SIEMPRE verificar y reajustar la distancia de 12mm.',
       'SIEMPRE reajustar guías flotantes con cuchillos nuevos.',
     ],
+    images: [],
   },
 ]
 
@@ -497,6 +513,7 @@ export const DEFAULT_B200_TROUBLESHOOTING: Omit<B200Section, 'updatedAt' | 'upda
     ],
     measurements: [],
     notes: [],
+    images: [],
   },
   {
     id: 'ts-gay-ping-filete',
@@ -515,6 +532,7 @@ export const DEFAULT_B200_TROUBLESHOOTING: Omit<B200Section, 'updatedAt' | 'upda
     notes: [
       'Si el gay ping es solo en un lado del filete, verificar nivelación individual del cuchillo de punta de ese lado.',
     ],
+    images: [],
   },
   {
     id: 'ts-espina-belly',
@@ -528,6 +546,7 @@ export const DEFAULT_B200_TROUBLESHOOTING: Omit<B200Section, 'updatedAt' | 'upda
     ],
     measurements: [],
     notes: [],
+    images: [],
   },
   {
     id: 'ts-trim-d-e',
@@ -543,6 +562,7 @@ export const DEFAULT_B200_TROUBLESHOOTING: Omit<B200Section, 'updatedAt' | 'upda
     notes: [
       'El ajuste rápido Trim D/E depende de la condición de la materia prima en ese momento.',
     ],
+    images: [],
   },
   {
     id: 'ts-gay-ping-cola',
@@ -566,6 +586,7 @@ export const DEFAULT_B200_TROUBLESHOOTING: Omit<B200Section, 'updatedAt' | 'upda
     notes: [
       'Los cuchillos ventrales de mayor diámetro deben estar instalados (más cercano a 200mm).',
     ],
+    images: [],
   },
   {
     id: 'ts-colgajo-esquelon',
@@ -580,6 +601,7 @@ export const DEFAULT_B200_TROUBLESHOOTING: Omit<B200Section, 'updatedAt' | 'upda
     ],
     measurements: [],
     notes: [],
+    images: [],
   },
   {
     id: 'ts-exceso-aleta-anal',
@@ -594,6 +616,7 @@ export const DEFAULT_B200_TROUBLESHOOTING: Omit<B200Section, 'updatedAt' | 'upda
     ],
     measurements: [],
     notes: [],
+    images: [],
   },
   {
     id: 'ts-entrada-rapida',
@@ -608,6 +631,7 @@ export const DEFAULT_B200_TROUBLESHOOTING: Omit<B200Section, 'updatedAt' | 'upda
     ],
     measurements: [],
     notes: [],
+    images: [],
   },
 ]
 
