@@ -484,7 +484,7 @@ export function EquipmentCard({
               </button>
             )}
             {/* Eliminar equipo (admin) */}
-            {onDeleteEquipment && totalRepCount === 0 && (
+            {onDeleteEquipment && (
               <button
                 onClick={ev => { ev.stopPropagation(); onDeleteEquipment(equipment.id, displayName) }}
                 className="shrink-0 p-0.5 rounded text-muted-foreground/20 hover:text-red-400 hidden group-hover:inline-flex transition-colors"

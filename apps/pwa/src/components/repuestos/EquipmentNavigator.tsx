@@ -920,25 +920,39 @@ export function EquipmentNavigator({
     }
   }, [selectedTreeNodeId])
 
-  // ── Eliminar equipo SAP (con clave admin) ──
-  const handleDeleteEquipment = useCallback(async (equipmentId: string, name: string) => {
-    const clave = prompt(`Para eliminar "${name}", ingresa la clave de administrador:`)
-    if (!clave) return
+  // ── Eliminar equipo SAP (con modal de clave admin) ──
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
+  const [deleteClave, setDeleteClave] = useState('')
+  const [deleteError, setDeleteError] = useState('')
+  const [deleting, setDeleting] = useState(false)
+
+  const handleDeleteEquipment = useCallback((equipmentId: string, name: string) => {
+    setDeleteTarget({ id: equipmentId, name })
+    setDeleteClave('')
+    setDeleteError('')
+  }, [])
+
+  const confirmDelete = useCallback(async () => {
+    if (!deleteTarget || !deleteClave.trim()) return
+    setDeleting(true)
+    setDeleteError('')
     try {
       const correctPwd = await getHmiTooltipPwd()
-      if (clave !== correctPwd) {
-        alert('Clave incorrecta')
+      if (deleteClave.trim() !== correctPwd) {
+        setDeleteError('Clave incorrecta')
+        setDeleting(false)
         return
       }
-      if (!confirm(`¿Estás seguro de eliminar "${name}" permanentemente?`)) return
-      await deleteDoc(doc(db, 'hierarchy', equipmentId))
+      await deleteDoc(doc(db, 'hierarchy', deleteTarget.id))
       invalidateEquipmentCache(selectedTreeNodeId ?? undefined)
       setRefreshKey(k => k + 1)
+      setDeleteTarget(null)
     } catch (err) {
       console.error('Error deleting equipment', err)
-      alert('Error al eliminar')
+      setDeleteError('Error al eliminar')
     }
-  }, [selectedTreeNodeId])
+    setDeleting(false)
+  }, [deleteTarget, deleteClave, selectedTreeNodeId])
 
   // ── Reordenar equipos ──
   const [reorderMode, setReorderMode] = useState(false)
@@ -1663,6 +1677,40 @@ export function EquipmentNavigator({
       </div>
 
       {/* Modal de vinculación — deshabilitado (todas las máquinas ya vinculadas) */}
+
+      {/* Modal de confirmación de eliminación con clave */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setDeleteTarget(null)}>
+          <div className="bg-card border border-border rounded-xl shadow-2xl w-96 p-5" onClick={e => e.stopPropagation()}>
+            <h3 className="text-sm font-bold text-foreground mb-1">Eliminar equipo</h3>
+            <p className="text-xs text-muted-foreground mb-4">
+              ¿Eliminar <strong className="text-foreground">{deleteTarget.name}</strong> permanentemente? Ingresa la clave de edición para confirmar.
+            </p>
+            <input
+              type="password"
+              value={deleteClave}
+              onChange={e => { setDeleteClave(e.target.value); setDeleteError('') }}
+              onKeyDown={e => { if (e.key === 'Enter') confirmDelete() }}
+              placeholder="Clave de edición..."
+              className="w-full h-9 px-3 text-sm bg-muted/30 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/40 text-foreground placeholder:text-muted-foreground/50 mb-2"
+              autoFocus
+            />
+            {deleteError && <p className="text-xs text-red-400 mb-2">{deleteError}</p>}
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setDeleteTarget(null)} className="px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted/30 transition-colors">
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={deleting || !deleteClave.trim()}
+                className="px-4 py-1.5 text-xs font-medium bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg hover:bg-red-500/20 transition-colors disabled:opacity-50"
+              >
+                {deleting ? 'Eliminando...' : 'Eliminar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Dropdown de selección de lista de favoritos */}
       {favDropdown && (

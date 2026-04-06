@@ -960,12 +960,12 @@ function HmiTooltipPwdCard() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Key className="h-5 w-5" />
-          Clave Edición Tooltips HMI Knuro
+          Clave de Edición
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Clave requerida para editar los tooltips del HMI Knuro. Se guarda en Firestore y aplica en todos los dispositivos.
+          Clave de edición para acciones sensibles (eliminar equipos, editar tooltips HMI, etc.). Se guarda en Firestore y aplica en todos los dispositivos.
         </p>
         {loading ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
