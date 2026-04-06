@@ -16,13 +16,26 @@ import { BarcodeScannerModal } from './BarcodeScannerModal'
 
 export type RepuestoFormMode = 'create' | 'edit'
 
+interface SiblingNode {
+  id: string
+  nombre: string
+}
+
 interface RepuestoFormModalProps {
   open: boolean
   mode: RepuestoFormMode
   machineName?: string
   initialData?: Repuesto | null
   onClose: () => void
-  onSubmit: (payload: RepuestoFormData) => Promise<void>
+  onSubmit: (payload: RepuestoFormData, target?: 'own' | 'shared') => Promise<void>
+  /** Para crear en múltiples equipos hermanos */
+  onSubmitMultiple?: (payload: RepuestoFormData, nodeIds: string[]) => Promise<void>
+  /** Si hay máquina vinculada, permite toggle compartir */
+  hasLinkedMachine?: boolean
+  /** Nodos hermanos SAP (para checkbox "Agregar a...") */
+  siblingNodes?: SiblingNode[]
+  /** Nombre del equipo actual (nodo SAP) */
+  equipmentName?: string
   loading?: boolean
 }
 
@@ -44,11 +57,17 @@ export function RepuestoFormModal({
   initialData,
   onClose,
   onSubmit,
+  onSubmitMultiple,
+  hasLinkedMachine,
+  siblingNodes,
+  equipmentName,
   loading = false,
 }: RepuestoFormModalProps) {
   const [form, setForm] = useState<RepuestoFormData>(defaultForm)
   const [error, setError] = useState<string | null>(null)
   const [scannerOpen, setScannerOpen] = useState(false)
+  const [target, setTarget] = useState<'own' | 'shared'>('own')
+  const [selectedSiblings, setSelectedSiblings] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (open) {
@@ -91,7 +110,13 @@ export function RepuestoFormModal({
         return
       }
 
-      await onSubmit(payload)
+      await onSubmit(payload, target)
+
+      // Crear en hermanos seleccionados
+      if (mode === 'create' && selectedSiblings.size > 0 && onSubmitMultiple) {
+        await onSubmitMultiple(payload, [...selectedSiblings])
+      }
+
       onClose()
     } catch (err) {
       const message = err instanceof Error ? err.message : 'No se pudo guardar el repuesto.'
@@ -216,6 +241,51 @@ export function RepuestoFormModal({
               />
             </div>
           </div>
+
+          {/* Destino y multi-equipo (solo en crear) */}
+          {mode === 'create' && (
+            <div className="space-y-3 rounded-lg border border-border p-3 bg-muted/10">
+              {/* Toggle: propio vs compartido */}
+              {hasLinkedMachine && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Destino</Label>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => setTarget('own')}
+                      className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium border transition-all ${target === 'own' ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400' : 'border-border bg-card text-muted-foreground hover:bg-muted/20'}`}>
+                      Propio de {equipmentName || 'este equipo'}
+                    </button>
+                    <button type="button" onClick={() => setTarget('shared')}
+                      className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium border transition-all ${target === 'shared' ? 'border-blue-500/40 bg-blue-500/10 text-blue-400' : 'border-border bg-card text-muted-foreground hover:bg-muted/20'}`}>
+                      Compartido ({machineName || 'máquina'})
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Agregar a hermanos */}
+              {siblingNodes && siblingNodes.length > 0 && target === 'own' && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Agregar también a:</Label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {siblingNodes.map(s => {
+                      const checked = selectedSiblings.has(s.id)
+                      return (
+                        <button key={s.id} type="button"
+                          onClick={() => setSelectedSiblings(prev => {
+                            const next = new Set(prev)
+                            if (checked) next.delete(s.id); else next.add(s.id)
+                            return next
+                          })}
+                          className={`px-2 py-1 rounded-md text-[11px] font-medium border transition-all ${checked ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border bg-card text-muted-foreground hover:bg-muted/20'}`}>
+                          {s.nombre}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
 

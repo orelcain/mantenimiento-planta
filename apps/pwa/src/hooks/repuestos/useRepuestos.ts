@@ -14,9 +14,11 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { db } from '@/services/firebase';
-import type { 
-  Repuesto, 
-  HistorialCambio, 
+import { useAuthStore } from '@/store/authStore';
+import { writeAuditLog, moveToTrash } from '@/services/auditLog';
+import type {
+  Repuesto,
+  HistorialCambio,
   RepuestoFormData,
   ImportCatalogoRow,
 } from '@/types/repuestos';
@@ -44,6 +46,7 @@ export function useRepuestos(machineId: string | null) {
   const [repuestos, setRepuestos] = useState<Repuesto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const authUser = useAuthStore((s) => s.user);
 
   // Escuchar cambios en tiempo real
   useEffect(() => {
@@ -133,13 +136,25 @@ export function useRepuestos(machineId: string | null) {
 
       const docRef = await addDoc(collection(db, collectionPath), newRepuesto);
       await addHistorial(docRef.id, 'creacion', null, JSON.stringify(data));
-      
+
+      // Audit log
+      writeAuditLog({
+        action: 'create',
+        collection: collectionPath,
+        documentId: docRef.id,
+        documentLabel: `${data.codigoSAP} — ${data.textoBreve}`,
+        userId: authUser?.id || '',
+        userName: `${authUser?.nombre || ''} ${authUser?.apellido || ''}`.trim(),
+        after: newRepuesto as Record<string, unknown>,
+        metadata: { machineId: machineId! },
+      });
+
       return docRef.id;
     } catch (err) {
       console.error('Error creating repuesto:', err);
       throw err;
     }
-  }, [machineId, addHistorial]);
+  }, [machineId, addHistorial, authUser]);
 
   // Actualizar repuesto
   const updateRepuesto = useCallback(async (
@@ -163,43 +178,80 @@ export function useRepuestos(machineId: string | null) {
         for (const key of Object.keys(data) as (keyof Repuesto)[]) {
           if (data[key] !== originalData[key]) {
             await addHistorial(
-              id, 
-              key, 
-              originalData[key] as string | number | null, 
+              id,
+              key,
+              originalData[key] as string | number | null,
               data[key] as string | number | null
             );
           }
         }
+
+        // Audit log
+        writeAuditLog({
+          action: 'update',
+          collection: collectionPath,
+          documentId: id,
+          documentLabel: `${originalData.codigoSAP} — ${originalData.textoBreve}`,
+          userId: authUser?.id || '',
+          userName: `${authUser?.nombre || ''} ${authUser?.apellido || ''}`.trim(),
+          before: originalData as unknown as Record<string, unknown>,
+          after: data as unknown as Record<string, unknown>,
+          metadata: { machineId: machineId! },
+        });
       }
     } catch (err) {
       console.error('Error updating repuesto:', err);
       throw err;
     }
-  }, [machineId, addHistorial]);
+  }, [machineId, addHistorial, authUser]);
 
-  // Eliminar repuesto
+  // Eliminar repuesto (soft delete → papelera + hard delete)
   const deleteRepuesto = useCallback(async (id: string) => {
     if (!machineId) throw new Error('Machine ID is required');
-    
+
     try {
       const collectionPath = getCollectionPath(machineId);
-      // Primero eliminar el historial
+
+      // 1. Leer snapshot del doc
+      const docRef = doc(db, collectionPath, id);
+      const snap = await getDoc(docRef);
+      if (!snap.exists()) throw new Error('Repuesto no encontrado');
+      const data = snap.data();
+
+      // 2. Leer historial (subcolección)
       const historialRef = collection(db, `${collectionPath}/${id}/historial`);
       const historialSnapshot = await getDocs(historialRef);
-      
-      const batch = writeBatch(db);
-      historialSnapshot.docs.forEach(doc => {
-        batch.delete(doc.ref);
-      });
-      await batch.commit();
+      const historialData = historialSnapshot.docs.map(h => ({
+        id: h.id,
+        ...h.data(),
+      }));
 
-      // Luego eliminar el repuesto
-      await deleteDoc(doc(db, collectionPath, id));
+      // 3. Mover a papelera
+      await moveToTrash({
+        originalCollection: collectionPath,
+        originalId: id,
+        documentLabel: `${data.codigoSAP || ''} — ${data.textoBreve || ''}`,
+        data: data as Record<string, unknown>,
+        subcollections: historialData.length > 0 ? { historial: historialData } : undefined,
+        userId: authUser?.id || '',
+        userName: `${authUser?.nombre || ''} ${authUser?.apellido || ''}`.trim(),
+        metadata: { machineId },
+      });
+
+      // 4. Hard delete historial
+      if (!historialSnapshot.empty) {
+        const batch = writeBatch(db);
+        historialSnapshot.docs.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+      }
+
+      // 5. Hard delete repuesto
+      await deleteDoc(docRef);
     } catch (err) {
       console.error('Error deleting repuesto:', err);
       throw err;
     }
-  }, [machineId]);
+  }, [machineId, authUser]);
 
   // Obtener historial de un repuesto
   const getHistorial = useCallback(async (repuestoId: string): Promise<HistorialCambio[]> => {
@@ -413,8 +465,21 @@ export function useRepuestos(machineId: string | null) {
     }
     await deleteDoc(sourceRef);
 
+    // 6. Audit log — reubicación
+    writeAuditLog({
+      action: 'relocate',
+      collection: sourcePath,
+      documentId: repuestoId,
+      documentLabel: `${data.codigoSAP || ''} — ${data.textoBreve || ''}`,
+      userId: authUser?.id || '',
+      userName: `${authUser?.nombre || ''} ${authUser?.apellido || ''}`.trim(),
+      before: { machineId },
+      after: { machineId: targetMachineId, newDocId: newDocRef.id },
+      metadata: { sourceMachineId: machineId!, targetMachineId },
+    });
+
     return newDocRef.id;
-  }, [machineId]);
+  }, [machineId, authUser]);
 
   // Reubicar múltiples repuestos a otra máquina
   const bulkRelocateRepuestos = useCallback(async (repuestoIds: string[], targetMachineId: string): Promise<number> => {

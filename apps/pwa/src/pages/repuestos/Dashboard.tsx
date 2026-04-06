@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, useRef } from 'react'
-import { AlertTriangle, Plus, FileText, Upload, Package, ArrowRightLeft, Copy as CopyDuplicateIcon, Globe, ExternalLink, Search, X, WifiOff, Star, ChevronDown, Camera, ChevronLeft, ChevronRight as ChevronRightIcon, ZoomIn } from 'lucide-react'
+import { useEffect, useMemo, useState, useRef, useCallback } from 'react'
+import { AlertTriangle, Plus, FileText, Upload, Package, ArrowRightLeft, Copy as CopyDuplicateIcon, Globe, ExternalLink, Search, X, WifiOff, Star, ChevronDown, Camera, ChevronLeft, ChevronRight as ChevronRightIcon, ZoomIn, Trash2, History } from 'lucide-react'
 import { uploadEquipmentPhoto, deleteEquipmentPhoto, listEquipmentPhotos } from '@/services/storage'
 import { RepuestosTable } from '@/components/repuestos/RepuestosTable'
 import { RepuestoFormModal } from '@/components/repuestos/RepuestoForm'
@@ -15,12 +15,13 @@ import { RepuestoDetailModal } from '@/components/repuestos/RepuestoDetailModal'
 import { ManualSearchModal } from '@/components/repuestos/ManualSearchModal'
 import { MachineManualPanel } from '@/components/repuestos/MachineManualPanel'
 import { useRepuestos } from '@/hooks/repuestos/useRepuestos'
+import { useEquipmentRepuestos } from '@/hooks/repuestos/useEquipmentRepuestos'
 import { useRepuestosCounts } from '@/hooks/repuestos/useRepuestosCounts'
 import { useMachineCategories } from '@/hooks/repuestos/useMachineCategories'
 import { useToast } from '@/hooks/useToast'
 import { useMachineContext, useCurrentMachine } from '@/contexts/MachineContext'
 import { useAuthStore, useIsAdmin } from '@/store/authStore'
-import type { Repuesto, RepuestoFormData, TechnicalSpecs, MachineImage } from '@/types/repuestos'
+import type { Repuesto, EquipmentRepuesto, RepuestoFormData, TechnicalSpecs, MachineImage } from '@/types/repuestos'
 // CategoryManager ahora se renderiza dentro de EquipmentNavigator
 import { ImportRepuestosModal } from './ImportRepuestosModal'
 import { ExportReportModal } from '@/components/repuestos/ExportReportModal'
@@ -28,6 +29,9 @@ import { RelocateRepuestoModal } from '@/components/repuestos/RelocateRepuestoMo
 import { BulkRelocateModal } from '@/components/repuestos/BulkRelocateModal'
 import { DuplicatesModal } from '@/components/repuestos/DuplicatesModal'
 import { useOnlineStatus } from '@/hooks/useOnlineStatus'
+import { TrashPanel } from '@/components/repuestos/TrashPanel'
+import { AuditLogPanel } from '@/components/repuestos/AuditLogPanel'
+import { getTrashCount } from '@/services/auditLog'
 import {
   Button,
   Dialog,
@@ -300,7 +304,7 @@ function FavChipsPanel({ favMachines, currentMachineId, onSelect }: {
               <ChevronDown className={`h-3 w-3 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
             </button>
             {!isCollapsed && (
-              <div className="flex items-center gap-1.5 flex-wrap ml-4">
+              <div className="flex items-center gap-1.5 overflow-x-auto sm:flex-wrap ml-4 pb-1 no-scrollbar">
                 {items.map(({ machineId, nombre, equipmentId }, idx) => {
                   const isActive = currentMachineId === machineId
                   const isDragTarget = dragOver?.listName === listName && dragOver.idx === idx
@@ -314,7 +318,7 @@ function FavChipsPanel({ favMachines, currentMachineId, onSelect }: {
                       onDragEnd={() => { setDragItem(null); setDragOver(null) }}
                       onClick={() => onSelect(machineId, equipmentId, nombre)}
                       className={[
-                        'text-[10px] font-medium px-2.5 py-1 rounded-lg border transition-all cursor-grab active:cursor-grabbing',
+                        'text-[10px] font-medium px-2.5 py-1 rounded-lg border transition-all cursor-grab active:cursor-grabbing whitespace-nowrap shrink-0 sm:shrink',
                         isActive
                           ? 'bg-primary/10 border-primary/30 text-primary'
                           : 'bg-muted/20 border-border/50 text-muted-foreground hover:border-primary/30 hover:text-foreground',
@@ -418,7 +422,7 @@ function KpiStrip({ repuestos, filteredRepuestos, totalCatalogo, conSAP, conStoc
       </div>
 
       {/* KPIs grid */}
-      <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
+      <div className="grid grid-cols-3 sm:grid-cols-8 gap-1.5">
         {kpis.map(k => {
           const isActive = kpiFilter === k.key
           return (
@@ -544,6 +548,14 @@ export function RepuestosDashboard({
   const equipmentDetailRef = useRef<HTMLDivElement | null>(null)
   const [favMachines, setFavMachines] = useState<Map<string, { nombre: string; equipmentId: string; listName?: string }>>(new Map())
 
+  // ── Audit Log + Papelera ──
+  const [trashOpen, setTrashOpen] = useState(false)
+  const [auditLogOpen, setAuditLogOpen] = useState(false)
+  const [trashCount, setTrashCount] = useState(0)
+  useEffect(() => {
+    if (isAdmin) getTrashCount().then(setTrashCount)
+  }, [isAdmin, trashOpen])
+
   // Scroll al detalle del equipo cuando se selecciona
   useEffect(() => {
     if (selectedEquipmentInfo && equipmentDetailRef.current) {
@@ -562,17 +574,37 @@ export function RepuestosDashboard({
   const [sortColumn, setSortColumn] = useState<string | null>(null)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
 
+  // Hook combinado: repuestos propios (nodo SAP) + heredados (máquina vinculada)
   const {
     repuestos,
     loading: repuestosLoading,
     error: repuestosError,
-    createRepuesto,
-    updateRepuesto,
-    deleteRepuesto,
+    hasOwnPath: _hasOwnPath,
+    hasSharedPath: _hasSharedPath,
+    createRepuesto: createEquipmentRepuesto,
+    createInMultipleNodes: _createInMultipleNodes,
+    updateRepuesto: updateEquipmentRepuesto,
+    deleteRepuesto: deleteEquipmentRepuesto,
+    getHistorial: _getHistorial,
+  } = useEquipmentRepuestos(selectedEquipmentInfo?.id || null, selectedEquipmentInfo?.linkedMachineId || currentMachine?.id)
+
+  // Hook legacy: import masivo y reubicación (operan sobre machines/{id}/repuestos)
+  const {
     importCatalogoDesdeExcel,
     relocateRepuesto,
     bulkRelocateRepuestos,
   } = useRepuestos(currentMachine?.id || null)
+
+  // Wrappers para mantener compatibilidad con los componentes existentes
+  const createRepuesto = createEquipmentRepuesto
+  const updateRepuesto = useCallback(async (id: string, data: Partial<Repuesto>, originalData?: Repuesto) => {
+    const rep = repuestos.find(r => r.id === id) as EquipmentRepuesto | undefined
+    await updateEquipmentRepuesto(id, data, rep?.source || 'own', originalData)
+  }, [repuestos, updateEquipmentRepuesto])
+  const deleteRepuesto = useCallback(async (id: string) => {
+    const rep = repuestos.find(r => r.id === id) as EquipmentRepuesto | undefined
+    await deleteEquipmentRepuesto(id, rep?.source || 'own')
+  }, [repuestos, deleteEquipmentRepuesto])
 
   const handleSaveSpecs = async (repuestoId: string, specs: TechnicalSpecs, _gallery: MachineImage[]) => {
     try {
@@ -932,10 +964,24 @@ export function RepuestosDashboard({
   return (
     <div className="flex flex-col h-full bg-background">
       <div className="flex-1 p-3 sm:p-6 space-y-4 sm:space-y-5 overflow-x-hidden overflow-y-auto">
-        {/* Page title */}
-        <div>
-          <h1 className="text-lg sm:text-xl font-bold text-foreground">Catálogo de Repuestos</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">Selecciona un equipo para ver su listado</p>
+        {/* Page title + audit buttons — compacto en mobile */}
+        <div className="flex items-center justify-between gap-2">
+          <h1 className="text-base sm:text-xl font-bold text-foreground">Repuestos</h1>
+          {isAdmin && (
+            <div className="flex items-center gap-1 shrink-0">
+              <button onClick={() => setAuditLogOpen(true)} className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" title="Historial de cambios">
+                <History className="h-4 w-4" />
+              </button>
+              <button onClick={() => setTrashOpen(true)} className="relative p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" title="Papelera">
+                <Trash2 className="h-4 w-4" />
+                {trashCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center h-3.5 min-w-[14px] px-0.5 rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground">
+                    {trashCount > 99 ? '99+' : trashCount}
+                  </span>
+                )}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Banner offline — visible solo sin conexión */}
@@ -1032,7 +1078,7 @@ export function RepuestosDashboard({
           )
         })()}
 
-        <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="flex items-center gap-1.5 sm:gap-2 mb-4 overflow-x-auto no-scrollbar">
             {isAdmin && (
               <Button variant="outline" size="sm" onClick={() => setImportOpen(true)} className="gap-1.5" title="Importar">
                 <Upload className="h-3.5 w-3.5" />
@@ -1407,6 +1453,10 @@ export function RepuestosDashboard({
           machineName={currentMachine?.nombre}
         />
       )}
+
+      {/* Audit Log + Papelera (admin/supervisor) */}
+      <TrashPanel open={trashOpen} onOpenChange={setTrashOpen} />
+      <AuditLogPanel open={auditLogOpen} onOpenChange={setAuditLogOpen} />
     </div>
   )
 }

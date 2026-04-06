@@ -697,6 +697,131 @@ exports.groqProxy = onCall(
   }
 )
 
+// ==================== GEMINI PROXY ====================
+
+exports.geminiProxy = onCall(
+  {
+    secrets: ['GEMINI_API_KEY'],
+    enforceAppCheck: false,
+    maxInstances: 10,
+  },
+  async (request) => {
+    if (!request.auth) {
+      throw new Error('Se requiere autenticación para usar la IA')
+    }
+
+    const { messages, model, temperature, max_tokens, systemInstruction } = request.data
+
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      throw new Error('Se requiere al menos un mensaje')
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY
+    if (!apiKey) {
+      logger.error('GEMINI_API_KEY not configured in Firebase secrets')
+      throw new Error('Servicio Gemini no configurado')
+    }
+
+    const geminiModel = model || 'gemini-2.5-flash'
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${apiKey}`
+
+    // Convertir formato OpenAI → Gemini
+    const contents = messages
+      .filter(m => m.role !== 'system')
+      .map(m => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.content }],
+      }))
+
+    const body = { contents }
+    if (systemInstruction || messages.find(m => m.role === 'system')) {
+      body.systemInstruction = { parts: [{ text: systemInstruction || messages.find(m => m.role === 'system')?.content || '' }] }
+    }
+    if (temperature !== undefined) {
+      body.generationConfig = { temperature, maxOutputTokens: max_tokens || 2048 }
+    }
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        logger.error('Gemini API error', { status: response.status, body: errorText })
+        throw new Error(`Error del servicio Gemini (${response.status})`)
+      }
+
+      const data = await response.json()
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+      return { content: text, usage: data.usageMetadata }
+    } catch (error) {
+      logger.error('Gemini proxy error:', error)
+      throw new Error('Error al procesar la solicitud de Gemini')
+    }
+  }
+)
+
+// ==================== DEEPSEEK PROXY ====================
+
+exports.deepseekProxy = onCall(
+  {
+    secrets: ['DEEPSEEK_API_KEY'],
+    enforceAppCheck: false,
+    maxInstances: 5,
+  },
+  async (request) => {
+    if (!request.auth) {
+      throw new Error('Se requiere autenticación para usar la IA')
+    }
+
+    const { messages, model, temperature, max_tokens } = request.data
+
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      throw new Error('Se requiere al menos un mensaje')
+    }
+
+    const apiKey = process.env.DEEPSEEK_API_KEY
+    if (!apiKey) {
+      logger.error('DEEPSEEK_API_KEY not configured in Firebase secrets')
+      throw new Error('Servicio DeepSeek no configurado')
+    }
+
+    try {
+      const response = await fetch('https://api.deepseek.com/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: model || 'deepseek-chat',
+          messages,
+          temperature: temperature ?? 0.3,
+          max_tokens: max_tokens || 2048,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        logger.error('DeepSeek API error', { status: response.status, body: errorText })
+        throw new Error(`Error del servicio DeepSeek (${response.status})`)
+      }
+
+      const data = await response.json()
+      return {
+        content: data.choices?.[0]?.message?.content || '',
+        usage: data.usage,
+      }
+    } catch (error) {
+      logger.error('DeepSeek proxy error:', error)
+      throw new Error('Error al procesar la solicitud de DeepSeek')
+    }
+  }
+)
+
 // ==================== SENSOR READINGS PURGE ====================
 
 /**

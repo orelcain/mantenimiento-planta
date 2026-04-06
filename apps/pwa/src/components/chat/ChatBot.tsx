@@ -6,6 +6,7 @@
 import { useState, useRef, useEffect, useCallback, type KeyboardEvent, type ChangeEvent, type MouseEvent as ReactMouseEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { MessageCircle, X, Send, Trash2, Loader2, Bot, User, Mic, MicOff, ExternalLink, AlertTriangle, CheckCircle, XCircle, Camera, GripVertical, ThumbsUp, ThumbsDown, Copy, Check, Database, Volume2, VolumeX, RotateCcw, Star, ChevronUp, ChevronDown, Brain, Cpu } from 'lucide-react'
+import DOMPurify from 'dompurify'
 import { useChatBot } from '@/hooks/useChatBot'
 import type { ChatMessage, ChatAction, MiniChartData } from '@/services/chatbot'
 import { saveFeedback } from '@/services/ariaLearning'
@@ -333,7 +334,7 @@ function MessageBubble({
       <div className={`max-w-[85%] rounded-lg px-3 py-2 text-sm leading-relaxed ${
         isUser ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground'
       }`}>
-        <div dangerouslySetInnerHTML={{ __html: formatMessage(msg.content) }} />
+        <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(formatMessage(msg.content)) }} />
         {msg.photoUrls && msg.photoUrls.length > 0 && <MessagePhotos urls={msg.photoUrls} />}
         {/* #2 — Mini-chart inline */}
         {!isUser && msg.chartData && <MiniChart data={msg.chartData} />}
@@ -448,7 +449,7 @@ function StreamingBubble({ content }: { content: string }) {
         <Bot className="w-3.5 h-3.5" />
       </div>
       <div className="max-w-[85%] rounded-lg px-3 py-2 text-sm leading-relaxed bg-muted text-foreground">
-        <div dangerouslySetInnerHTML={{ __html: formatMessage(content) }} />
+        <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(formatMessage(content)) }} />
         <span className="inline-block w-1.5 h-4 bg-primary/60 animate-pulse ml-0.5 align-text-bottom" />
       </div>
     </div>

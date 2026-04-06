@@ -39,6 +39,19 @@ export interface HistorialCambio {
   fecha: Date;
 }
 
+/** Origen del repuesto en vista combinada equipo+máquina */
+export type RepuestoSource = 'shared' | 'own'
+
+/**
+ * Repuesto con origen — para vista combinada por equipo
+ * `shared` = heredado de la máquina vinculada (machines/{id}/repuestos)
+ * `own` = propio del equipo SAP individual (hierarchy/{nodeId}/repuestos)
+ */
+export interface EquipmentRepuesto extends Repuesto {
+  source: RepuestoSource
+  sourceCollection: string
+}
+
 /**
  * Repuesto principal — Catálogo puro
  * "Esta máquina usa estos repuestos"

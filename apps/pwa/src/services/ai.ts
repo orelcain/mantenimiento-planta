@@ -24,17 +24,18 @@ function parseRetryAfter(response: Response): number {
   return 60_000
 }
 
-const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY || ''
-const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
-const MODEL = 'llama-3.3-70b-versatile' // Gratis, 14,400 req/día
+// Modelo por defecto (usado como parámetro a Cloud Functions, no para llamadas directas)
+const MODEL = 'llama-3.3-70b-versatile'
 
-// ─── Gemini 2.5 Flash (Google) — Gratis: 15 RPM, 1500 RPD ──────────
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || ''
+// Las API keys ya NO se usan en el cliente — todo pasa por Cloud Functions
+// Estas constantes se mantienen SOLO para referencia interna (convertToGeminiFormat, etc.)
+const GEMINI_API_KEY = '' // BLOQUEADO: usar Cloud Function geminiProxy
 const GEMINI_MODEL = 'gemini-2.5-flash'
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}`
 
-export const isAIConfigured = () => !!GROQ_API_KEY || !!GEMINI_API_KEY || useCloudProxy;
-export const isGeminiConfigured = () => !!GEMINI_API_KEY
+// Cloud Functions siempre disponibles si están deployadas
+export const isAIConfigured = () => true
+export const isGeminiConfigured = () => true
 
 // Intentar usar Cloud Function proxy (más seguro, key no expuesta)
 let useCloudProxy = true
@@ -84,37 +85,8 @@ export async function callGroq(messages: Array<{ role: string; content: string }
     }
   }
 
-  // Fallback: llamada directa (API key en cliente)
-  if (!GROQ_API_KEY) {
-    throw new Error('IA no configurada: ni Cloud Function ni API key disponible')
-  }
-
-  const response = await fetch(GROQ_API_URL, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${GROQ_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      messages,
-      temperature: opts?.temperature ?? 0.3,
-      max_tokens: opts?.max_tokens || 2048,
-    }),
-  })
-
-  if (!response.ok) {
-    if (response.status === 429) {
-      throw new RateLimitError(parseRetryAfter(response), 'Groq')
-    }
-    throw new Error(`Groq API error: ${response.status}`)
-  }
-
-  const data = await response.json()
-  return {
-    content: data.choices?.[0]?.message?.content || '',
-    tokens: data.usage?.total_tokens || 0,
-  }
+  // Seguridad: NO hacer fallback directo con API key en cliente
+  throw new Error('IA no disponible: Cloud Function groqProxy no configurada. Contacta al administrador.')
 }
 
 /**
@@ -126,72 +98,13 @@ export async function callGroqStream(
   onChunk: (text: string) => void,
   opts?: { temperature?: number; max_tokens?: number }
 ): Promise<{ content: string; tokens: number }> {
-  // If no direct API key, fall back to non-streaming
-  if (!GROQ_API_KEY) {
-    const result = await callGroq(messages, opts)
-    onChunk(result.content)
-    return result
-  }
-
-  const response = await fetch(GROQ_API_URL, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${GROQ_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      messages,
-      temperature: opts?.temperature ?? 0.3,
-      max_tokens: opts?.max_tokens || 2048,
-      stream: true,
-    }),
-  })
-
-  if (!response.ok) {
-    if (response.status === 429) {
-      throw new RateLimitError(parseRetryAfter(response), 'Groq')
-    }
-    throw new Error(`Groq API error: ${response.status}`)
-  }
-
-  const reader = response.body?.getReader()
-  if (!reader) {
-    throw new Error('No readable stream available')
-  }
-
-  const decoder = new TextDecoder()
-  let fullContent = ''
-  let buffer = ''
-
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-
-    buffer += decoder.decode(value, { stream: true })
-    const lines = buffer.split('\n')
-    buffer = lines.pop() || ''
-
-    for (const line of lines) {
-      const trimmed = line.trim()
-      if (!trimmed || trimmed === 'data: [DONE]') continue
-      if (!trimmed.startsWith('data: ')) continue
-
-      try {
-        const json = JSON.parse(trimmed.slice(6))
-        const delta = json.choices?.[0]?.delta?.content
-        if (delta) {
-          fullContent += delta
-          onChunk(fullContent)
-        }
-      } catch {
-        // skip malformed chunks
-      }
-    }
-  }
-
-  return { content: fullContent, tokens: 0 }
+  // Seguridad: streaming no disponible via Cloud Function, usar non-streaming
+  const result = await callGroq(messages, opts)
+  onChunk(result.content)
+  return result
 }
+
+// Direct API calls REMOVED for security — all AI calls go through Cloud Functions
 
 // ─── Gemini 2.0 Flash ───────────────────────────────────────────────
 
@@ -240,42 +153,31 @@ export async function callGemini(
   messages: Array<{ role: string; content: string }>,
   opts?: { temperature?: number; max_tokens?: number; thinkingBudget?: number },
 ): Promise<{ content: string; tokens: number }> {
-  if (!GEMINI_API_KEY) throw new Error('Gemini API key not configured')
+  // Seguridad: usar Cloud Function proxy (key nunca llega al browser)
+  try {
+    const { getFunctions } = await import('firebase/functions')
+    const { default: app } = await import('@/services/firebase')
+    const functions = getFunctions(app)
+    const geminiProxyFn = httpsCallable(functions, 'geminiProxy')
 
-  const { systemInstruction, contents } = convertToGeminiFormat(messages)
+    const { systemInstruction } = convertToGeminiFormat(messages)
 
-  const generationConfig: Record<string, unknown> = {
-    temperature: opts?.temperature ?? 0.1,
-    maxOutputTokens: opts?.max_tokens || 2048,
-  }
-  if (opts?.thinkingBudget && opts.thinkingBudget > 0) {
-    generationConfig.thinkingConfig = { thinkingBudget: opts.thinkingBudget }
-  }
-
-  const body: Record<string, unknown> = { contents, generationConfig }
-  if (systemInstruction) body.systemInstruction = systemInstruction
-
-  const response = await fetch(
-    `${GEMINI_API_URL}:generateContent?key=${GEMINI_API_KEY}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    },
-  )
-
-  if (!response.ok) {
-    if (response.status === 429) {
-      throw new RateLimitError(parseRetryAfter(response), 'Gemini')
+    const result = await geminiProxyFn({
+      messages,
+      model: 'gemini-2.5-flash',
+      temperature: opts?.temperature ?? 0.1,
+      max_tokens: opts?.max_tokens || 2048,
+      systemInstruction: systemInstruction?.parts?.[0]?.text,
+    })
+    const data = result.data as { content: string; usage?: { totalTokenCount?: number } }
+    return { content: data.content, tokens: data.usage?.totalTokenCount || 0 }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    if (msg.includes('not-found') || msg.includes('NOT_FOUND')) {
+      throw new Error('IA Gemini no disponible: Cloud Function geminiProxy no desplegada.')
     }
-    const errText = await response.text().catch(() => '')
-    throw new Error(`Gemini API error: ${response.status} ${errText.slice(0, 200)}`)
+    throw err
   }
-
-  const data = await response.json()
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-  const tokens = data.usageMetadata?.totalTokenCount || 0
-  return { content: text, tokens }
 }
 
 /**
@@ -352,81 +254,17 @@ export async function callGeminiVision(
 }
 
 /**
- * Streaming Gemini 2.0 Flash — para respuestas principales
+ * Gemini Stream — redirigido a Cloud Function (non-streaming seguro)
  */
 export async function callGeminiStream(
   messages: Array<{ role: string; content: string }>,
   onChunk: (text: string) => void,
   opts?: { temperature?: number; max_tokens?: number; thinkingBudget?: number },
 ): Promise<{ content: string; tokens: number }> {
-  if (!GEMINI_API_KEY) {
-    // Fallback a Groq si no hay Gemini configurado
-    return callGroqStream(messages, onChunk, opts)
-  }
-
-  const { systemInstruction, contents } = convertToGeminiFormat(messages)
-
-  const generationConfigStream: Record<string, unknown> = {
-    temperature: opts?.temperature ?? 0.3,
-    maxOutputTokens: opts?.max_tokens || 2048,
-  }
-  if (opts?.thinkingBudget && opts.thinkingBudget > 0) {
-    generationConfigStream.thinkingConfig = { thinkingBudget: opts.thinkingBudget }
-  }
-
-  const body: Record<string, unknown> = { contents, generationConfig: generationConfigStream }
-  if (systemInstruction) body.systemInstruction = systemInstruction
-
-  const response = await fetch(
-    `${GEMINI_API_URL}:streamGenerateContent?alt=sse&key=${GEMINI_API_KEY}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    },
-  )
-
-  if (!response.ok) {
-    if (response.status === 429) {
-      throw new RateLimitError(parseRetryAfter(response), 'Gemini')
-    }
-    const errText = await response.text().catch(() => '')
-    throw new Error(`Gemini stream error: ${response.status} ${errText.slice(0, 200)}`)
-  }
-
-  const reader = response.body?.getReader()
-  if (!reader) throw new Error('No readable stream available')
-
-  const decoder = new TextDecoder()
-  let fullContent = ''
-  let buffer = ''
-
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-
-    buffer += decoder.decode(value, { stream: true })
-    const lines = buffer.split('\n')
-    buffer = lines.pop() || ''
-
-    for (const line of lines) {
-      const trimmed = line.trim()
-      if (!trimmed || !trimmed.startsWith('data: ')) continue
-
-      try {
-        const json = JSON.parse(trimmed.slice(6))
-        const delta = json.candidates?.[0]?.content?.parts?.[0]?.text
-        if (delta) {
-          fullContent += delta
-          onChunk(fullContent)
-        }
-      } catch {
-        // skip malformed chunks
-      }
-    }
-  }
-
-  return { content: fullContent, tokens: 0 }
+  // Seguridad: streaming via proxy no soportado, usamos non-streaming
+  const result = await callGemini(messages, opts)
+  onChunk(result.content)
+  return result
 }
 
 export type SensorForecast = {

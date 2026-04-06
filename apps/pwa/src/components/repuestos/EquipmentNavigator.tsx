@@ -24,14 +24,16 @@ import {
   ArrowUpDown,
   EyeOff,
   Eye,
+  ChevronDown,
 } from 'lucide-react'
 import { useCurrentMachine, useActiveMachines, useMachineContext } from '@/contexts/MachineContext'
 import { useIsAdmin } from '@/store/authStore'
 import { MachineManager } from '@/components/repuestos/MachineManager'
 import { Button, Input } from '@/components/ui'
-import { doc, updateDoc, deleteDoc, addDoc, collection as firestoreCollection, Timestamp } from 'firebase/firestore'
+import { doc, getDoc, updateDoc, deleteDoc, addDoc, collection as firestoreCollection, Timestamp } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import { getHmiTooltipPwd } from '@/services/hmiKnuro'
+import { moveToTrash } from '@/services/auditLog'
 import { getUserPreferences, saveFavoriteLists, type FavList } from '@/services/userPreferences'
 import { useAuthStore } from '@/store/authStore'
 import type { Machine } from '@/types/repuestos'
@@ -50,6 +52,7 @@ export interface SelectedEquipmentInfo {
   nombre: string
   alias?: string
   codigo: string
+  linkedMachineId?: string
 }
 
 interface EquipmentNavigatorProps {
@@ -480,13 +483,21 @@ const GlobalSearchDropdown = forwardRef<HTMLDivElement, {
   repuestosCounts: Record<string, number>
   onSelect: (r: GlobalEquipmentResult) => void
 }>(({ anchorRef, results, loading, searchQuery, sidebarNodeMap, repuestosCounts, onSelect }, ref) => {
-  const [pos, setPos] = useState({ top: 0, left: 0, width: 0 })
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 0, maxH: 0 })
 
   useEffect(() => {
     const update = () => {
       if (!anchorRef.current) return
       const rect = anchorRef.current.getBoundingClientRect()
-      setPos({ top: rect.bottom + 4, left: rect.left, width: Math.min(Math.max(rect.width, 480), window.innerWidth - rect.left - 16) })
+      const isMobile = window.innerWidth < 640
+      if (isMobile) {
+        // Mobile: full-width, debajo del input, limitado para no tapar el input
+        const maxH = window.innerHeight - rect.bottom - 60 // dejar espacio para bottom nav
+        setPos({ top: rect.bottom + 4, left: 8, width: window.innerWidth - 16, maxH: Math.max(maxH, 200) } as any)
+      } else {
+        // Desktop: anclado al input, ancho mínimo 480
+        setPos({ top: rect.bottom + 4, left: rect.left, width: Math.min(Math.max(rect.width, 480), window.innerWidth - rect.left - 16), maxH: 320 })
+      }
     }
     update()
     window.addEventListener('scroll', update, true)
@@ -500,8 +511,8 @@ const GlobalSearchDropdown = forwardRef<HTMLDivElement, {
   return (
     <div
       ref={ref}
-      className="bg-popover border border-border rounded-lg shadow-xl max-h-80 overflow-y-auto"
-      style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width, zIndex: 9999 }}
+      className="bg-popover border border-border rounded-xl sm:rounded-lg shadow-xl overflow-y-auto"
+      style={{ position: 'fixed', top: pos.top, left: pos.left, width: pos.width, maxHeight: pos.maxH || 320, zIndex: 9999 }}
     >
       {loading ? (
         <div className="flex items-center gap-2 px-3 py-3 text-xs text-muted-foreground">
@@ -744,6 +755,7 @@ export function EquipmentNavigator({
   const [searchQuery, setSearchQuery] = useState('')
   const [searchFocused, setSearchFocused] = useState(false)
   const searchContainerRef = useRef<HTMLDivElement>(null)
+  const mobileSearchContainerRef = useRef<HTMLDivElement>(null)
   const searchDropdownRef = useRef<HTMLDivElement>(null)
   const { results: globalSearchResults, loading: globalSearchLoading } = useGlobalEquipmentSearch(searchQuery)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -945,7 +957,24 @@ export function EquipmentNavigator({
         setDeleting(false)
         return
       }
-      await deleteDoc(doc(db, 'hierarchy', deleteTarget.id))
+
+      // Leer snapshot antes de borrar → papelera
+      const docRef = doc(db, 'hierarchy', deleteTarget.id)
+      const snap = await getDoc(docRef)
+      if (snap.exists()) {
+        const data = snap.data()
+        await moveToTrash({
+          originalCollection: 'hierarchy',
+          originalId: deleteTarget.id,
+          documentLabel: deleteTarget.name,
+          data: data as Record<string, unknown>,
+          userId: currentUser?.id || '',
+          userName: `${currentUser?.nombre || ''} ${currentUser?.apellido || ''}`.trim(),
+          metadata: { parentId: data.parentId || '' },
+        })
+      }
+
+      await deleteDoc(docRef)
       invalidateEquipmentCache(selectedTreeNodeId ?? undefined)
       setRefreshKey(k => k + 1)
       setDeleteTarget(null)
@@ -954,7 +983,7 @@ export function EquipmentNavigator({
       setDeleteError('Error al eliminar')
     }
     setDeleting(false)
-  }, [deleteTarget, deleteClave, selectedTreeNodeId])
+  }, [deleteTarget, deleteClave, selectedTreeNodeId, currentUser])
 
   // ── Reordenar equipos ──
   const [reorderMode, setReorderMode] = useState(false)
@@ -1115,14 +1144,24 @@ export function EquipmentNavigator({
 
   // Handler para click en equipo SAP
   const [selectedEquipment, setSelectedEquipment] = useState<EquipmentDisplayNode | null>(null)
+  const [mobileNavExpanded, setMobileNavExpanded] = useState(true)
+
+  // Auto-colapsar en mobile cuando se selecciona cualquier equipo (incluso desde favoritos)
+  useEffect(() => {
+    if (currentMachine && window.innerWidth < 640) {
+      setMobileNavExpanded(false)
+    }
+  }, [currentMachine])
   const handleSelectEquipment = useCallback((eq: EquipmentDisplayNode) => {
     setSelectedEquipment(eq)
-    onEquipmentSelect?.({ id: eq.id, nombre: eq.nombre, alias: eq.alias, codigo: eq.codigo })
+    onEquipmentSelect?.({ id: eq.id, nombre: eq.nombre, alias: eq.alias, codigo: eq.codigo, linkedMachineId: eq.linkedMachineId })
     if (eq.linkedMachineId) {
       setCurrentMachine(eq.linkedMachineId)
     } else {
       clearCurrentMachine()
     }
+    // Auto-colapsar navigator en mobile al seleccionar equipo
+    if (window.innerWidth < 640) setMobileNavExpanded(false)
   }, [setCurrentMachine, clearCurrentMachine, onEquipmentSelect])
 
   // Helper: buscar equipo en el árbol por ID
@@ -1185,7 +1224,7 @@ export function EquipmentNavigator({
       } else {
         clearCurrentMachine()
       }
-      onEquipmentSelect?.({ id: result.id, nombre: result.nombre, alias: result.alias, codigo: result.codigo })
+      onEquipmentSelect?.({ id: result.id, nombre: result.nombre, alias: result.alias, codigo: result.codigo, linkedMachineId: result.linkedMachineId })
     }
   }, [sidebarNodeMap, getNodePath, onCategoryChange, setCurrentMachine, clearCurrentMachine, onEquipmentSelect, areaEquipment, handleSelectEquipment])
 
@@ -1217,6 +1256,7 @@ export function EquipmentNavigator({
     const handler = (e: MouseEvent) => {
       const target = e.target as Node
       if (searchContainerRef.current?.contains(target)) return
+      if (mobileSearchContainerRef.current?.contains(target)) return
       if (searchDropdownRef.current?.contains(target)) return
       setSearchFocused(false)
     }
@@ -1261,16 +1301,136 @@ export function EquipmentNavigator({
   }
 
   /* ═══ BROWSE MODE ═══ */
-  return (
-    <div className={`rounded-xl border border-border bg-card overflow-hidden ${className}`}>
 
-      {/* ── HEADER (siempre visible) ── */}
-      <div className="flex items-center gap-2 px-2 py-2 border-b border-border bg-muted/10 flex-wrap">
+  // Breadcrumb compacto para mobile colapsado
+  const mobileBreadcrumb = selectedTreeNodeId
+    ? getNodePath(selectedTreeNodeId).map(n => n.nombre).join(' > ')
+    : ''
+
+  return (
+    <div className={`rounded-xl border border-border bg-card overflow-visible sm:overflow-hidden ${className}`}>
+
+      {/* ── MOBILE COLAPSADO: 1 línea con equipo seleccionado ── */}
+      {!mobileNavExpanded && (selectedEquipment || currentMachine) && (
+        <div className="sm:hidden">
+          <button
+            onClick={() => setMobileNavExpanded(true)}
+            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-muted/20 transition-colors"
+          >
+            <Package className="h-4 w-4 text-primary shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-foreground truncate">
+                {selectedEquipment?.alias || selectedEquipment?.nombre || currentMachine?.nombre || '—'}
+              </p>
+              {mobileBreadcrumb && (
+                <p className="text-[10px] text-muted-foreground truncate">{mobileBreadcrumb}</p>
+              )}
+            </div>
+            <span className="text-[10px] font-bold bg-primary/10 text-primary px-1.5 py-0.5 rounded-full shrink-0">
+              {areaEquipment.length}
+            </span>
+            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          </button>
+        </div>
+      )}
+
+      {/* ── HEADER MOBILE EXPANDIDO: búsqueda + pills ── */}
+      <div className={`sm:hidden flex items-center gap-2 px-3 py-2 border-b border-border bg-muted/10 sticky top-0 z-30 ${!mobileNavExpanded && (selectedEquipment || currentMachine) ? 'hidden' : ''}`}>
+        <div ref={mobileSearchContainerRef} className="relative flex-1 min-w-0">
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none z-10" />
+          <Input
+            value={searchQuery}
+            onChange={e => { setSearchQuery(e.target.value); setSearchFocused(true) }}
+            onFocus={() => {
+              setSearchFocused(true)
+              // Mobile: scroll para que el input quede visible arriba
+              if (window.innerWidth < 640) {
+                mobileSearchContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+              }
+            }}
+            placeholder="Buscar equipo…"
+            className="h-8 pl-7 pr-7 text-xs"
+          />
+          {searchQuery && (
+            <button onClick={() => { setSearchQuery(''); setSearchFocused(false) }} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground z-10">
+              <X className="h-3 w-3" />
+            </button>
+          )}
+          {/* Mobile only: overlay full-screen con input fijo arriba + resultados abajo */}
+          {searchFocused && searchQuery.trim().length >= 2 && typeof window !== 'undefined' && window.innerWidth < 640 && createPortal(
+            <div className="fixed inset-0 z-[9999] bg-background flex flex-col" onClick={() => setSearchFocused(false)}>
+              {/* Input fijo arriba */}
+              <div className="flex items-center gap-2 px-3 py-3 border-b border-border bg-card" onClick={e => e.stopPropagation()}>
+                <div className="relative flex-1">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  <input
+                    autoFocus
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    placeholder="Buscar equipo…"
+                    className="w-full h-10 pl-9 pr-9 text-sm bg-muted/30 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground"
+                  />
+                  {searchQuery && (
+                    <button onClick={() => { setSearchQuery(''); setSearchFocused(false) }} className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1">
+                      <X className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  )}
+                </div>
+                <button onClick={() => setSearchFocused(false)} className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 shrink-0">
+                  Cancelar
+                </button>
+              </div>
+              {/* Resultados scrollables */}
+              <div ref={searchDropdownRef} className="flex-1 overflow-y-auto" onClick={e => e.stopPropagation()}>
+                {globalSearchLoading ? (
+                  <div className="flex items-center gap-2 px-4 py-6 text-sm text-muted-foreground justify-center">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Buscando…
+                  </div>
+                ) : globalSearchResults.length === 0 ? (
+                  <div className="px-4 py-6 text-sm text-muted-foreground text-center">
+                    Sin resultados para "{searchQuery}"
+                  </div>
+                ) : (
+                  <>
+                    <div className="px-4 py-2 text-[10px] font-medium text-muted-foreground uppercase tracking-wider border-b border-border bg-muted/20 sticky top-0">
+                      {globalSearchResults.length} equipo{globalSearchResults.length !== 1 ? 's' : ''} encontrado{globalSearchResults.length !== 1 ? 's' : ''}
+                    </div>
+                    {globalSearchResults.map(r => {
+                      const breadcrumb = (r.path ?? []).map(id => sidebarNodeMap.get(id)?.nombre).filter(Boolean).join(' › ')
+                      const repCount = r.linkedMachineId ? (repuestosCounts[r.linkedMachineId] || 0) : 0
+                      return (
+                        <button key={r.id} onClick={() => { handleGlobalSearchSelect(r); setSearchQuery(''); setSearchFocused(false) }}
+                          className="w-full text-left px-4 py-3 hover:bg-accent/50 active:bg-accent transition-colors border-b border-border/50">
+                          <div className="flex items-center gap-2">
+                            <Package className="h-4 w-4 text-muted-foreground shrink-0" />
+                            <span className="text-sm font-semibold text-foreground truncate">{r.nombre}</span>
+                            <span className="text-[10px] text-muted-foreground font-mono shrink-0">{r.codigo}</span>
+                            {repCount > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 font-bold shrink-0">{repCount} rep.</span>}
+                          </div>
+                          {breadcrumb && <p className="text-[10px] text-muted-foreground/60 mt-0.5 ml-6 truncate">{breadcrumb}</p>}
+                        </button>
+                      )
+                    })}
+                  </>
+                )}
+              </div>
+            </div>,
+            document.body,
+          )}
+        </div>
+        <span className="text-[10px] font-bold bg-primary/10 text-primary border border-primary/20 px-1.5 py-0.5 rounded-full tabular-nums shrink-0">{areaEquipment.length}</span>
+        <button onClick={() => setFavoritesMode(v => !v)} className={['flex items-center justify-center w-7 h-7 rounded transition-colors shrink-0', favoritesMode ? 'text-amber-400 bg-amber-400/10' : 'text-muted-foreground hover:text-amber-400'].join(' ')}>
+          <Star className={`h-4 w-4 ${favoritesMode ? 'fill-amber-400' : ''}`} />
+        </button>
+      </div>
+
+      {/* ── HEADER DESKTOP: búsqueda + breadcrumb + controles ── */}
+      <div className="hidden sm:flex items-center gap-2 px-2 py-2 border-b border-border bg-muted/10 flex-wrap">
 
         {/* Toggle sidebar (desktop) */}
         <button
           onClick={() => setSidebarCollapsed(v => !v)}
-          className="hidden sm:flex items-center justify-center w-6 h-6 rounded text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors shrink-0"
+          className="flex items-center justify-center w-6 h-6 rounded text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors shrink-0"
           title={sidebarCollapsed ? 'Mostrar áreas' : 'Ocultar áreas'}
         >
           {sidebarCollapsed
@@ -1290,26 +1450,13 @@ export function EquipmentNavigator({
             className="h-7 pl-7 pr-7 text-xs"
           />
           {searchQuery && (
-            <button
-              onClick={() => { setSearchQuery(''); setSearchFocused(false) }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground z-10"
-            >
+            <button onClick={() => { setSearchQuery(''); setSearchFocused(false) }} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground z-10">
               <X className="h-3 w-3" />
             </button>
           )}
-
-          {/* Global search dropdown (portal para escapar overflow-hidden) */}
-          {searchFocused && searchQuery.trim().length >= 2 && createPortal(
-            <GlobalSearchDropdown
-              ref={searchDropdownRef}
-              anchorRef={searchContainerRef}
-              results={globalSearchResults}
-              loading={globalSearchLoading}
-              searchQuery={searchQuery}
-              sidebarNodeMap={sidebarNodeMap}
-              repuestosCounts={repuestosCounts}
-              onSelect={handleGlobalSearchSelect}
-            />,
+          {/* Desktop only — mobile usa overlay full-screen */}
+          {searchFocused && searchQuery.trim().length >= 2 && typeof window !== 'undefined' && window.innerWidth >= 640 && createPortal(
+            <GlobalSearchDropdown ref={searchDropdownRef} anchorRef={searchContainerRef} results={globalSearchResults} loading={globalSearchLoading} searchQuery={searchQuery} sidebarNodeMap={sidebarNodeMap} repuestosCounts={repuestosCounts} onSelect={handleGlobalSearchSelect} />,
             document.body,
           )}
         </div>
@@ -1372,12 +1519,10 @@ export function EquipmentNavigator({
         >
           <Star className={`h-3.5 w-3.5 ${favoritesMode ? 'fill-amber-400' : ''}`} />
         </button>
-
-        {/* Botón Administrar estructura — deshabilitado (máquinas manuales ya vinculadas) */}
       </div>
 
-      {/* ── MOBILE: pills de navegación jerárquica ── */}
-      <div className="sm:hidden border-b border-border">
+      {/* ── MOBILE: pills de navegación — ocultas (navegación via búsqueda + favoritos) ── */}
+      <div className="hidden">
         <div className="flex gap-1.5 px-3 py-2 overflow-x-auto scrollbar-hide">
           <MobilePill
             label="Todos"
@@ -1434,8 +1579,8 @@ export function EquipmentNavigator({
         })()}
       </div>
 
-      {/* ── BODY: sidebar + content ── */}
-      <div className="flex">
+      {/* ── BODY: sidebar + content (SOLO desktop — en mobile la navegación es via búsqueda + pills) ── */}
+      <div className="hidden sm:flex">
 
         {/* ── SIDEBAR (desktop) ── */}
         <div
@@ -1494,9 +1639,9 @@ export function EquipmentNavigator({
         </div>
 
         {/* ── CONTENT: equipos SAP del área seleccionada ── */}
-        <div className="flex-1 min-w-0 flex flex-col max-h-[65vh]">
+        <div className="flex-1 min-w-0 flex flex-col max-h-[40vh] sm:max-h-[65vh]">
 
-          {/* Cabecera de contexto */}
+          {/* Cabecera de contexto (oculta en mobile — las pills ya muestran el área) */}
           {(() => {
             const selNode = selectedTreeNodeId ? sidebarNodeMap.get(selectedTreeNodeId) : null
             const areaName = showAllAreas
@@ -1506,7 +1651,7 @@ export function EquipmentNavigator({
               ? getNodePath(selectedTreeNodeId).map(n => n.nombre)
               : []
             return (
-              <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border/30 bg-muted/5">
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 border-b border-border/30 bg-muted/5">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1 flex-wrap">
                     {path.length > 1 && path.slice(0, -1).map((p, i) => (
@@ -1609,16 +1754,11 @@ export function EquipmentNavigator({
               <span className="text-xs text-muted-foreground">Cargando equipos...</span>
             </div>
           ) : filteredEquipment.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2 py-10 px-4 text-center">
-              <Package className="h-7 w-7 text-muted-foreground/30" />
-              <p className="text-xs text-muted-foreground">
-                Sin equipos en esta área
+            <div className="flex flex-col items-center justify-center gap-1.5 py-4 sm:py-10 px-4 text-center">
+              <Package className="h-5 w-5 sm:h-7 sm:w-7 text-muted-foreground/30" />
+              <p className="text-[11px] sm:text-xs text-muted-foreground">
+                Sin equipos — selecciona un sub-área
               </p>
-              {selectedTreeNodeId && (
-                <p className="text-[10px] text-muted-foreground/50">
-                  Selecciona un sub-área con equipos
-                </p>
-              )}
             </div>
           ) : (
             /* ── LISTA DE EQUIPOS SAP ── */

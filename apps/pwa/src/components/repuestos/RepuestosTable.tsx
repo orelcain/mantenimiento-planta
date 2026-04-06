@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Package, ImageIcon, X, BookOpen, Eye, Camera, Pencil, Trash2, ArrowRightLeft, ArrowUpDown, ArrowUp, ArrowDown, MessageSquareText } from 'lucide-react'
-import type { Repuesto } from '@/types/repuestos'
+import type { Repuesto, EquipmentRepuesto } from '@/types/repuestos'
 import { RepuestoActionsMenu } from './RepuestoActionsMenu'
 
 /** Tooltip ligero para botones de acción (CSS puro, sin deps) */
@@ -281,95 +281,57 @@ export function RepuestosTable({
           onAddPhoto={onViewGallery && preview.rep ? () => { const r = preview.rep!; setPreview(null); onViewGallery(r) } : undefined} />
       )}
 
-      {/* Mobile Card View */}
-      <div className="grid grid-cols-1 gap-3 sm:hidden">
+      {/* Mobile Card View — compacto */}
+      <div className="grid grid-cols-1 gap-2 sm:hidden">
         {repuestos.map((rep) => {
+          const hasMedia = (rep.imagenesManual?.length || 0) + (rep.fotosReales?.length || 0) + (rep.gallery?.length || 0) > 0
           return (
-            <div key={rep.id} id={`repuesto-${rep.id}`} className={`bg-card border rounded-xl p-4 space-y-3 shadow-sm hover:shadow-md transition-shadow ${highlightedRepuestoId === rep.id ? 'ring-2 ring-emerald-500 bg-emerald-500/10 animate-pulse' : ''}`}>
-              <div className="flex gap-3 items-start">
-                <RepuestoThumbnail rep={rep} onPreview={(url, name, imgs) => setPreview({ url, name, allImages: imgs, rep })} onOpenGallery={onViewGallery} />
-                <div className="flex-1 min-w-0">
-                  <div className="text-[11px] font-mono text-muted-foreground">{rep.codigoSAP || 'S/C'}</div>
-                  <button
-                    onClick={() => onViewDetail?.(rep)}
-                    className="font-medium text-foreground line-clamp-2 text-sm text-left hover:text-primary hover:underline transition-colors"
-                  >{rep.textoBreve || rep.descripcion || 'Sin nombre'}</button>
-                  {rep.tipo && (
-                    <span className={`inline-block text-[9px] px-1 py-0 rounded font-medium uppercase tracking-wide mt-0.5 ${tipoBadgeClass(rep.tipo)}`}>
-                      {rep.tipo}
-                    </span>
-                  )}
-                </div>
-                <RepuestoActionsMenu
-                  repuesto={rep}
-                  onEdit={onEdit}
-                  onDelete={onDelete}
-                  onViewManual={onViewManual}
-                  onViewPhotos={onViewPhotos}
-                  onViewSpecs={onViewSpecs}
-                  onViewGallery={onViewGallery}
-                  onSearchInManual={onSearchInManual}
-                  onViewInManual={onViewInManual}
-                  onRelocate={onRelocate}
-                />
-              </div>
-
-              {/* Código fabricante + buscar en manual */}
-              {rep.codigoFabricante && (
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-muted-foreground">Cód. Fab:</span>
-                  <span className="font-mono text-xs text-foreground bg-muted/40 px-1.5 py-0.5 rounded">{rep.codigoFabricante}</span>
-                  {onSearchInManual && (
-                    <button
-                      onClick={() => onSearchInManual(rep)}
-                      className="inline-flex items-center gap-1 text-[10px] text-purple-400 hover:text-purple-300 transition-colors"
-                    >
-                      <BookOpen className="h-3 w-3" />
-                      <span>Buscar en manual</span>
-                    </button>
-                  )}
-                  {onViewInManual && (rep.vinculosManual?.length ?? 0) > 0 && (
-                    <button
-                      onClick={() => onViewInManual(rep)}
-                      className="inline-flex items-center gap-1 text-[10px] text-green-400 hover:text-green-300 transition-colors"
-                    >
-                      <Eye className="h-3 w-3" />
-                      <span>Ver en manual</span>
-                    </button>
-                  )}
-                </div>
-              )}
-             
-              {rep.descripcion && rep.descripcion !== (rep.textoBreve || '') && (
-                <p className="text-xs text-muted-foreground line-clamp-2 bg-muted/20 p-2 rounded-lg">
-                  {rep.descripcion}
-                </p>
-              )}
-
-              {rep.ubicacionEnPlanta && (
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-muted-foreground">Ubic:</span>
-                  <span className="text-xs text-foreground/80 truncate">{rep.ubicacionEnPlanta}</span>
-                </div>
-              )}
-
-              {rep.observaciones && (
-                <div className="flex items-start gap-2 bg-amber-500/5 p-2 rounded-lg">
-                  <MessageSquareText className="h-3 w-3 text-amber-400/60 shrink-0 mt-0.5" />
-                  <span className="text-xs text-muted-foreground line-clamp-2">{rep.observaciones}</span>
-                </div>
-              )}
-
-              <div className="flex items-center justify-between pt-2 border-t border-border/50">
-                <div className="flex flex-col">
-                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Valor Unit.</span>
-                  <span className="font-semibold text-sm">${formatNumber(rep.valorUnitario || 0)}</span>
-                </div>
-                {(rep.cantidadPorMaquina || 0) > 0 && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-500/15 text-blue-400 ring-1 ring-blue-500/20">
-                    {rep.cantidadPorMaquina} por máq.
-                  </span>
+            <div
+              key={rep.id}
+              id={`repuesto-${rep.id}`}
+              onClick={() => onViewDetail?.(rep)}
+              className={`bg-card border rounded-xl p-3 transition-all active:scale-[0.99] ${highlightedRepuestoId === rep.id ? 'ring-2 ring-emerald-500 bg-emerald-500/10' : ''}`}
+            >
+              <div className="flex gap-2.5 items-start">
+                {/* Thumbnail compacto */}
+                {hasMedia && (
+                  <RepuestoThumbnail rep={rep} onPreview={(url, name, imgs) => setPreview({ url, name, allImages: imgs, rep })} onOpenGallery={onViewGallery} />
                 )}
+                <div className="flex-1 min-w-0">
+                  {/* Nombre — tap abre ficha */}
+                  <p className="font-medium text-foreground text-[13px] leading-tight line-clamp-1">{rep.textoBreve || rep.descripcion || 'Sin nombre'}</p>
+                  {/* Badges inline */}
+                  <div className="flex items-center gap-1 mt-1 flex-wrap">
+                    <span className="text-[9px] font-mono text-blue-400 bg-blue-500/10 px-1 py-0 rounded">{rep.codigoSAP || 'S/C'}</span>
+                    {rep.codigoFabricante && <span className="text-[9px] font-mono text-violet-400 bg-violet-500/10 px-1 py-0 rounded">{rep.codigoFabricante}</span>}
+                    {rep.tipo && <span className={`text-[8px] px-1 py-0 rounded font-semibold uppercase ${tipoBadgeClass(rep.tipo)}`}>{rep.tipo}</span>}
+                    {(rep as EquipmentRepuesto).source && (
+                      <span className={`text-[8px] px-1 py-0 rounded font-medium ${(rep as EquipmentRepuesto).source === 'own' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-blue-500/10 text-blue-400'}`}>
+                        {(rep as EquipmentRepuesto).source === 'own' ? 'Propio' : 'Comp.'}
+                      </span>
+                    )}
+                  </div>
+                  {/* Valor + cantidad en 1 línea */}
+                  <div className="flex items-center gap-3 mt-1">
+                    {(rep.valorUnitario || 0) > 0 && <span className="text-[10px] font-semibold text-foreground">${formatNumber(rep.valorUnitario)}</span>}
+                    {(rep.cantidadPorMaquina || 0) > 0 && <span className="text-[9px] text-blue-400">{rep.cantidadPorMaquina}/máq</span>}
+                  </div>
+                </div>
+                {/* Menu acciones */}
+                <div onClick={e => e.stopPropagation()}>
+                  <RepuestoActionsMenu
+                    repuesto={rep}
+                    onEdit={onEdit}
+                    onDelete={onDelete}
+                    onViewManual={onViewManual}
+                    onViewPhotos={onViewPhotos}
+                    onViewSpecs={onViewSpecs}
+                    onViewGallery={onViewGallery}
+                    onSearchInManual={onSearchInManual}
+                    onViewInManual={onViewInManual}
+                    onRelocate={onRelocate}
+                  />
+                </div>
               </div>
             </div>
           )
@@ -426,6 +388,11 @@ export function RepuestosTable({
                         {rep.tipo && (
                           <span className={`inline-block text-[9px] px-1 py-0 rounded font-medium uppercase tracking-wide mt-0.5 ${tipoBadgeClass(rep.tipo)}`}>
                             {rep.tipo}
+                          </span>
+                        )}
+                        {(rep as EquipmentRepuesto).source && (
+                          <span className={`inline-block text-[9px] px-1 py-0 rounded font-medium tracking-wide mt-0.5 ml-1 ${(rep as EquipmentRepuesto).source === 'own' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-blue-500/10 text-blue-400'}`}>
+                            {(rep as EquipmentRepuesto).source === 'own' ? 'Propio' : 'Compartido'}
                           </span>
                         )}
                       </div>

@@ -104,7 +104,7 @@ export function BodegaView({ onViewInEquipo, onSearchSimilar }: BodegaViewProps 
     }))
   }, [hierarchyNames])
 
-  const { allRepuestos, loadAll, loaded, loading: catalogLoading } = useGlobalSearch(machines)
+  const { allRepuestos, loadAll, loaded, loading: catalogLoading, progress } = useGlobalSearch(machines)
 
   useEffect(() => {
     if (!loaded && machines.length > 0) loadAll()
@@ -114,12 +114,22 @@ export function BodegaView({ onViewInEquipo, onSearchSimilar }: BodegaViewProps 
   const isLoading = catalogLoading || (bodega.loading && allRepuestos.length === 0)
 
   if (isLoading) {
+    const pct = progress.total > 0 ? Math.round((progress.loaded / progress.total) * 100) : 0
     return (
-      <div className="flex flex-col items-center justify-center py-20 gap-3">
+      <div className="flex flex-col items-center justify-center py-16 gap-3 px-6">
         <Loader2 className="h-6 w-6 text-primary animate-spin" />
         <span className="text-sm text-muted-foreground">
-          {catalogLoading ? 'Cargando catálogo…' : 'Cargando bodega…'}
+          {progress.phase === 'machines' && progress.total > 0
+            ? `Cargando equipos… ${progress.loaded}/${progress.total}`
+            : progress.phase === 'hierarchy'
+              ? 'Indexando jerarquía…'
+              : 'Cargando bodega…'}
         </span>
+        {progress.total > 0 && (
+          <div className="w-full max-w-[200px] h-1.5 rounded-full bg-muted/40 overflow-hidden">
+            <div className="h-full rounded-full bg-primary transition-all duration-300" style={{ width: `${pct}%` }} />
+          </div>
+        )}
       </div>
     )
   }
@@ -133,8 +143,8 @@ export function BodegaView({ onViewInEquipo, onSearchSimilar }: BodegaViewProps 
 
   return (
     <div className="flex flex-col gap-3 p-3 sm:p-6 max-w-6xl mx-auto">
-      {/* Sub-tabs */}
-      <div className="flex items-center gap-1 bg-muted/20 p-1 rounded-lg w-fit">
+      {/* Sub-tabs (scrollable en mobile) */}
+      <div className="flex items-center gap-1 bg-muted/20 p-1 rounded-lg w-fit overflow-x-auto no-scrollbar">
         {SUB_TABS.map(t => {
           const Icon = t.icon
           const active = subTab === t.id
@@ -250,7 +260,7 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
   return (
     <>
       {/* Stats */}
-      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
         <StatCard icon={Package} label="Con SAP" value={stats.total} color="text-blue-400" bg="bg-blue-500/10" onClick={() => setStockFilter('todos')} active={stockFilter === 'todos'} />
         <StatCard icon={PackageCheck} label="Configurados" value={stats.conStock} color="text-emerald-400" bg="bg-emerald-500/10" onClick={() => setStockFilter('configurados')} active={stockFilter === 'configurados'} />
         <StatCard icon={TrendingDown} label="Bajo stock" value={stats.bajoStock} color="text-amber-400" bg="bg-amber-500/10" onClick={() => setStockFilter('bajo')} active={stockFilter === 'bajo'} />
@@ -285,29 +295,29 @@ function StockTab({ bodega, user, onViewInEquipo, onSearchSimilar }: { bodega: R
         <AlertPanel alertas={stats.alertas} onFilter={(f: StockFilter) => setStockFilter(f)} />
       )}
 
-      {/* List */}
+      {/* Sort bar */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Ordenar:</span>
+        {([['nombre', 'Nombre'], ['stock', 'Stock'], ['valor', 'Valor'], ['equipos', 'Equipos']] as [SortField, string][]).map(([field, label]) => (
+          <button key={field} onClick={() => toggleSort(field)}
+            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-colors ${sortField === field ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'}`}>
+            {label} <SortIcon field={field} />
+          </button>
+        ))}
+        <span className="ml-auto text-[10px] text-muted-foreground tabular-nums">{filtered.length} de {items.length}</span>
+      </div>
+
+      {/* Cards grid */}
       {filtered.length === 0 ? (
         <EmptyState message={items.length === 0 ? 'No hay repuestos con código SAP' : 'Sin resultados'} />
       ) : (
-        <div className="border border-border rounded-xl overflow-hidden bg-card">
-          <div className="hidden sm:grid grid-cols-[1fr_60px_70px_70px_70px_110px_120px] gap-2 px-4 py-2 bg-muted/20 border-b border-border text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
-            <button onClick={() => toggleSort('nombre')} className="flex items-center gap-1 hover:text-foreground transition-colors">Repuesto <SortIcon field="nombre" /></button>
-            <button onClick={() => toggleSort('equipos')} className="flex items-center gap-1 justify-center hover:text-foreground transition-colors"><Layers className="h-3 w-3" /> <SortIcon field="equipos" /></button>
-            <button onClick={() => toggleSort('stock')} className="flex items-center gap-1 justify-center hover:text-foreground transition-colors">Stock <SortIcon field="stock" /></button>
-            <span className="text-center">Mín</span>
-            <button onClick={() => toggleSort('valor')} className="flex items-center gap-1 justify-center hover:text-foreground transition-colors">Valor <SortIcon field="valor" /></button>
-            <span>Ubicación</span>
-            <span className="text-right">Acciones</span>
-          </div>
-          <div className="divide-y divide-border/50 max-h-[55vh] overflow-y-auto">
-            {filtered.map(item => (
-              <BodegaRow key={item.codigoSAP} item={item}
-                onEdit={() => setEditingItem(item)} onMovimiento={() => setMovimientoItem(item)}
-                onHistorial={() => setHistorialItem(item)} onToggleWatch={() => toggleWatch(item.codigoSAP)}
-                onOpenDrawer={() => setDrawerItem(item)} />
-            ))}
-          </div>
-          <div className="px-4 py-2 bg-muted/10 border-t border-border text-xs text-muted-foreground">{filtered.length} de {items.length} repuestos</div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-[60vh] overflow-y-auto pr-1">
+          {filtered.map(item => (
+            <BodegaRow key={item.codigoSAP} item={item}
+              onEdit={() => setEditingItem(item)} onMovimiento={() => setMovimientoItem(item)}
+              onHistorial={() => setHistorialItem(item)} onToggleWatch={() => toggleWatch(item.codigoSAP)}
+              onOpenDrawer={() => setDrawerItem(item)} />
+          ))}
         </div>
       )}
 
@@ -1346,6 +1356,21 @@ function Sparkline({ data, width = 80, height = 24, color = '#3b82f6' }: { data:
   )
 }
 
+/** Barra de progreso de stock con semáforo visual */
+function StockBar({ actual, minimo, maximo }: { actual: number; minimo: number; maximo?: number }) {
+  const tope = maximo && maximo > 0 ? maximo : Math.max(minimo * 2, actual, 1)
+  const pct = Math.min(100, (actual / tope) * 100)
+  const color = actual === 0 ? 'bg-red-500' : actual <= minimo ? 'bg-amber-500' : 'bg-emerald-500'
+  const minimoPct = tope > 0 ? Math.min(100, (minimo / tope) * 100) : 0
+
+  return (
+    <div className="relative h-1.5 w-full rounded-full bg-muted/40 overflow-hidden">
+      <div className={`absolute inset-y-0 left-0 rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
+      {minimo > 0 && <div className="absolute inset-y-0 w-px bg-amber-400/60" style={{ left: `${minimoPct}%` }} />}
+    </div>
+  )
+}
+
 function BodegaRow({ item, onEdit, onMovimiento, onHistorial, onToggleWatch, onOpenDrawer }: {
   item: BodegaMergedItem; onEdit: () => void; onMovimiento: () => void; onHistorial: () => void; onToggleWatch: () => void; onOpenDrawer: () => void
 }) {
@@ -1353,50 +1378,100 @@ function BodegaRow({ item, onEdit, onMovimiento, onHistorial, onToggleWatch, onO
   const isBajo = has && item.stockMinimo > 0 && item.stockActual <= item.stockMinimo && item.stockActual > 0
   const isSin = has && item.stockActual === 0 && item.stockMinimo > 0
   const valorTotal = item.stockActual * (item.costoCompra ?? item.valorUnitario ?? 0)
+  const foto = item.fotos?.[0]
 
   return (
-    <div className={`sm:grid sm:grid-cols-[1fr_60px_70px_70px_70px_110px_120px] gap-2 px-4 py-2.5 transition-colors cursor-pointer ${isSin ? 'bg-red-500/5 hover:bg-red-500/10 border-l-2 border-l-red-500/40' : isBajo ? 'bg-amber-500/5 hover:bg-amber-500/10 border-l-2 border-l-amber-500/40' : 'hover:bg-muted/10'}`}
-      onClick={onOpenDrawer}>
-      <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <p className="text-sm font-medium text-foreground truncate">{item.textoBreve}</p>
-          {isSin && <span className="shrink-0 text-[9px] px-1.5 py-0.5 rounded bg-red-500/15 text-red-400 font-semibold uppercase">Sin stock</span>}
-          {isBajo && <span className="shrink-0 text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 font-semibold uppercase">Bajo</span>}
-          {!has && <span className="shrink-0 text-[9px] px-1.5 py-0.5 rounded bg-zinc-500/15 text-zinc-400 font-medium">Sin config.</span>}
+    <div
+      className={[
+        'group relative rounded-xl border transition-all cursor-pointer',
+        isSin ? 'border-red-500/30 bg-red-500/5 hover:bg-red-500/10' :
+        isBajo ? 'border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10' :
+        'border-border bg-card hover:bg-muted/20',
+      ].join(' ')}
+      onClick={onOpenDrawer}
+    >
+      <div className="flex gap-3 p-3">
+        {/* Thumbnail */}
+        <div className="shrink-0 h-14 w-14 rounded-lg bg-muted/30 overflow-hidden flex items-center justify-center">
+          {foto ? (
+            <img src={foto} alt="" className="h-full w-full object-cover" loading="lazy" />
+          ) : (
+            <Package className="h-6 w-6 text-muted-foreground/30" />
+          )}
         </div>
-        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 font-mono">{item.codigoSAP}</span>
-          {item.codigoFabricante && <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400 font-mono">{item.codigoFabricante}</span>}
-          {item.tipo && <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold uppercase ${tipoBadgeColor(item.tipo)}`}>{item.tipo}</span>}
+
+        {/* Contenido */}
+        <div className="flex-1 min-w-0">
+          {/* Nombre + status */}
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-sm font-medium text-foreground truncate leading-tight">{item.textoBreve}</p>
+            <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+              <button onClick={onToggleWatch} className="p-1 rounded hover:bg-yellow-500/10 transition-colors">
+                <Star className={`h-3.5 w-3.5 ${item.isWatched ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground/30 group-hover:text-muted-foreground/60'}`} />
+              </button>
+            </div>
+          </div>
+
+          {/* Badges */}
+          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 font-mono">{item.codigoSAP}</span>
+            {item.tipo && <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold uppercase ${tipoBadgeColor(item.tipo)}`}>{item.tipo}</span>}
+            {item.equipos.length > 0 && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground flex items-center gap-0.5" title={item.equipos.map(e => e.machineName).join(', ')}>
+                <Layers className="h-2.5 w-2.5" />{item.equipos.length}
+              </span>
+            )}
+            {item.ubicacionBodega && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground flex items-center gap-0.5 truncate max-w-[100px]">
+                <MapPin className="h-2.5 w-2.5 shrink-0" />{item.ubicacionBodega}
+              </span>
+            )}
+          </div>
+
+          {/* Stock bar + números */}
+          {has ? (
+            <div className="mt-2 space-y-1">
+              <StockBar actual={item.stockActual} minimo={item.stockMinimo} maximo={item.stockMaximo} />
+              <div className="flex items-center justify-between text-[10px]">
+                <div className="flex items-center gap-2">
+                  <span className={`font-bold tabular-nums ${isSin ? 'text-red-400' : isBajo ? 'text-amber-400' : 'text-emerald-400'}`}>
+                    {item.stockActual} {item.unidad}
+                  </span>
+                  <span className="text-muted-foreground">mín {item.stockMinimo}</span>
+                </div>
+                {valorTotal > 0 && (
+                  <span className="text-violet-400 font-medium tabular-nums">
+                    ${valorTotal.toLocaleString('es-CL', { maximumFractionDigits: 0 })}
+                  </span>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="mt-2">
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-500/10 text-zinc-400">Sin configurar</span>
+            </div>
+          )}
         </div>
       </div>
-      <div className="hidden sm:flex items-center justify-center" title={item.equipos.map(e => e.machineName).join(', ')}>
-        <span className="text-xs font-medium text-muted-foreground tabular-nums flex items-center gap-0.5"><Layers className="h-3 w-3 opacity-50" />{item.equipos.length}</span>
-      </div>
-      <div className="flex sm:flex-col items-center justify-center gap-1 mt-2 sm:mt-0">
-        <span className="sm:hidden text-xs text-muted-foreground">Stock:</span>
-        {has ? <span className={`text-sm font-bold tabular-nums ${isSin ? 'text-red-400' : isBajo ? 'text-amber-400' : 'text-foreground'}`}>{item.stockActual}</span>
-          : <span className="text-sm text-muted-foreground/30">—</span>}
-      </div>
-      <div className="hidden sm:flex items-center justify-center"><span className="text-sm text-muted-foreground tabular-nums">{has && item.stockMinimo > 0 ? item.stockMinimo : '—'}</span></div>
-      <div className="hidden sm:flex items-center justify-center">
-        {has && valorTotal > 0 ? <span className="text-xs font-medium text-violet-400 tabular-nums">${valorTotal.toLocaleString('es-CL', { maximumFractionDigits: 0 })}</span>
-          : <span className="text-xs text-muted-foreground/30">—</span>}
-      </div>
-      <div className="hidden sm:flex items-center">
-        {item.ubicacionBodega ? <span className="text-xs text-muted-foreground truncate flex items-center gap-1"><MapPin className="h-3 w-3 shrink-0" />{item.ubicacionBodega}</span>
-          : <span className="text-xs text-muted-foreground/30">—</span>}
-      </div>
-      <div className="flex items-center justify-end gap-1 mt-2 sm:mt-0" onClick={e => e.stopPropagation()}>
-        <button onClick={onToggleWatch} title={item.isWatched ? 'Quitar favorito' : 'Agregar favorito'} className="p-1.5 rounded-md hover:bg-yellow-500/10 transition-colors">
-          <Star className={`h-3.5 w-3.5 ${item.isWatched ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground/40'}`} />
+
+      {/* Acciones (hover en desktop, siempre visible mobile) */}
+      <div className="flex items-center justify-end gap-0.5 px-3 pb-2 sm:pb-2 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
+        <button onClick={onMovimiento} title="Movimiento" className="p-1.5 rounded-md hover:bg-emerald-500/10 text-emerald-400 transition-colors">
+          <ArrowDownCircle className="h-3.5 w-3.5" />
         </button>
-        <button onClick={onMovimiento} title="Movimiento" className="p-1.5 rounded-md hover:bg-emerald-500/10 text-emerald-400 transition-colors"><ArrowDownCircle className="h-4 w-4" /></button>
-        {has && <button onClick={onHistorial} title="Historial" className="p-1.5 rounded-md hover:bg-blue-500/10 text-blue-400 transition-colors"><History className="h-4 w-4" /></button>}
+        {has && (
+          <button onClick={onHistorial} title="Historial" className="p-1.5 rounded-md hover:bg-blue-500/10 text-blue-400 transition-colors">
+            <History className="h-3.5 w-3.5" />
+          </button>
+        )}
         <button onClick={onEdit} title={has ? 'Editar' : 'Configurar'} className="p-1.5 rounded-md hover:bg-muted/50 text-muted-foreground transition-colors">
-          {has ? <Pencil className="h-4 w-4" /> : <Settings2 className="h-4 w-4" />}
+          {has ? <Pencil className="h-3.5 w-3.5" /> : <Settings2 className="h-3.5 w-3.5" />}
         </button>
       </div>
+
+      {/* Status indicators */}
+      {isSin && <div className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 animate-pulse" />}
+      {isBajo && !isSin && <div className="absolute top-2 right-2 h-2 w-2 rounded-full bg-amber-500" />}
     </div>
   )
 }
@@ -1465,7 +1540,7 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
   return (
     <div className="fixed inset-0 z-50 flex justify-end" onClick={onClose}>
       <div className="absolute inset-0 bg-black/40" />
-      <div className="relative w-full max-w-md bg-card border-l border-border shadow-2xl overflow-y-auto animate-in slide-in-from-right" onClick={e => e.stopPropagation()}>
+      <div className="relative w-full sm:max-w-md bg-card border-l border-border shadow-2xl overflow-y-auto animate-in slide-in-from-right" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="sticky top-0 bg-card border-b border-border px-5 py-4 z-10">
           <div className="flex items-start justify-between">
@@ -1496,6 +1571,13 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
         </div>
 
         <div className="px-5 py-4 space-y-4">
+          {/* Foto principal */}
+          {item.fotos && item.fotos.length > 0 && (
+            <div className="rounded-lg overflow-hidden border border-border bg-muted/20">
+              <img src={item.fotos[0]} alt={item.textoBreve} className="w-full h-32 object-contain" />
+            </div>
+          )}
+
           {/* Stock actual */}
           <div className="grid grid-cols-3 gap-3">
             <div className="rounded-lg border border-border p-3 text-center">
@@ -1511,6 +1593,18 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
               <p className="text-[9px] text-muted-foreground">Valor</p>
             </div>
           </div>
+
+          {/* Barra de progreso de stock */}
+          {has && item.stockMinimo > 0 && (
+            <div className="space-y-1">
+              <StockBar actual={item.stockActual} minimo={item.stockMinimo} maximo={item.stockMaximo} />
+              <div className="flex items-center justify-between text-[9px] text-muted-foreground">
+                <span>0</span>
+                <span>Mín: {item.stockMinimo}</span>
+                <span>{item.stockMaximo || item.stockMinimo * 2}</span>
+              </div>
+            </div>
+          )}
 
           {/* Sparkline */}
           {sparkData.length >= 2 && (
@@ -1737,8 +1831,8 @@ function AlertPanel({ alertas, onFilter }: { alertas: BodegaMergedItem[]; onFilt
 
 function ModalBackdrop({ onClose, children, wide }: { onClose: () => void; children: React.ReactNode; wide?: boolean }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div className={`bg-card border border-border rounded-2xl shadow-2xl w-full ${wide ? 'max-w-2xl' : 'max-w-lg'} max-h-[85vh] overflow-y-auto`} onClick={e => e.stopPropagation()}>{children}</div>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div className={`bg-card border border-border rounded-t-2xl sm:rounded-2xl shadow-2xl w-full ${wide ? 'max-w-2xl' : 'max-w-lg'} max-h-[90dvh] sm:max-h-[85vh] overflow-y-auto`} onClick={e => e.stopPropagation()}>{children}</div>
     </div>
   )
 }

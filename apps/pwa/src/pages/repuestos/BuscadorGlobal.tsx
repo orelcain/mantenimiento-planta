@@ -335,7 +335,7 @@ export function BuscadorGlobal({ initialQuery, onQueryConsumed, onViewInCatalog 
   }, [hierarchyNames])
 
   const globalSearch = useGlobalSearch(machines)
-  const { allRepuestos, search, loadAll, loaded, loading } = globalSearch
+  const { allRepuestos, search, loadAll, loaded, loading, progress } = globalSearch
 
   const [query, setQuery] = useState(initialQuery ?? '')
   const [filterTipo, setFilterTipo] = useState<string | null>(null)
@@ -482,13 +482,24 @@ export function BuscadorGlobal({ initialQuery, onQueryConsumed, onViewInCatalog 
           )}
         </div>
 
-        {/* Estado del índice */}
+        {/* Estado del índice con progreso */}
         <div className="flex items-center gap-2 mt-1.5">
           {loading ? (
-            <span className="text-[10px] text-muted-foreground animate-pulse flex items-center gap-1">
-              <span className="h-1 w-1 rounded-full bg-primary animate-bounce" />
-              Indexando {totalRepuestos > 0 ? `${totalRepuestos} repuestos…` : '…'}
-            </span>
+            <div className="flex items-center gap-2 flex-1">
+              <span className="text-[10px] text-muted-foreground animate-pulse flex items-center gap-1">
+                <span className="h-1 w-1 rounded-full bg-primary animate-bounce" />
+                {progress.phase === 'machines' && progress.total > 0
+                  ? `Cargando ${progress.loaded}/${progress.total} equipos…`
+                  : progress.phase === 'hierarchy'
+                    ? 'Indexando jerarquía…'
+                    : 'Indexando…'}
+              </span>
+              {progress.total > 0 && (
+                <div className="flex-1 max-w-[120px] h-1 rounded-full bg-muted/40 overflow-hidden">
+                  <div className="h-full rounded-full bg-primary transition-all duration-300" style={{ width: `${Math.round((progress.loaded / progress.total) * 100)}%` }} />
+                </div>
+              )}
+            </div>
           ) : loaded ? (
             <span className="text-[10px] text-muted-foreground">
               {totalRepuestos.toLocaleString()} repuestos · {totalMaquinas} equipos indexados
@@ -528,7 +539,7 @@ export function BuscadorGlobal({ initialQuery, onQueryConsumed, onViewInCatalog 
       {/* Sin query → stats */}
       {!query.trim() && (
         <div className="space-y-3">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 sm:grid sm:grid-cols-4 sm:gap-3 sm:pb-0">
             <StatCard icon={Package} label="Total repuestos" value={totalRepuestos.toLocaleString()} color="bg-blue-500/10 text-blue-400" />
             <StatCard icon={Layers} label="Equipos" value={totalMaquinas} color="bg-emerald-500/10 text-emerald-400" />
             <StatCard icon={Tag} label="Tipos" value={totalTipos} color="bg-purple-500/10 text-purple-400" />

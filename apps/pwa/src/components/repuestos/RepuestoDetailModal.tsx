@@ -220,7 +220,7 @@ export function RepuestoDetailModal({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0">
+        <DialogContent className="max-w-2xl max-h-[100dvh] sm:max-h-[90vh] overflow-y-auto p-0 rounded-t-2xl sm:rounded-2xl">
           {/* Header */}
           <div className="sticky top-0 z-10 bg-card border-b px-6 py-4">
             <div className="flex items-start gap-3">

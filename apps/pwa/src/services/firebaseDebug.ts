@@ -4,12 +4,12 @@
 
 export function debugFirebaseConfig() {
   const config = {
-    apiKey: "AIzaSyBsJSh6x3ZGEyuXsM18dSWsJKyU7--KJss",
-    authDomain: "mantenimiento-planta-771a3.firebaseapp.com",
-    projectId: "mantenimiento-planta-771a3",
-    storageBucket: "mantenimiento-planta-771a3.firebasestorage.app",
-    messagingSenderId: "1019421112530",
-    appId: "1:1019421112530:web:9afd9962e0b53152f8d50b",
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '(not set)',
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '(not set)',
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || '(not set)',
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '(not set)',
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '(not set)',
+    appId: import.meta.env.VITE_FIREBASE_APP_ID || '(not set)',
   }
   
   console.group('🔧 Firebase Configuration Debug')
@@ -22,7 +22,7 @@ export function debugFirebaseConfig() {
 }
 
 export function debugVAPIDKey() {
-  const vapidKey = 'BPZESYrTn48vEfVxnGp1uZsGTBoNgQMcS-4LB040Oh08rWlPbZK7zgHTEfc5sJBQZvtMiBsvAKZfCSVM0avCz2o'
+  const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY || '(not set)'
   
   console.group('🔑 VAPID Key Debug')
   console.log('Key length:', vapidKey.length)
