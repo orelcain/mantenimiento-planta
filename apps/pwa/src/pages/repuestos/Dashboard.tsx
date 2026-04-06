@@ -64,6 +64,7 @@ function FavChipsPanel({ favMachines, currentMachineId, onSelect }: {
   })
   const [dragItem, setDragItem] = useState<{ listName: string; idx: number } | null>(null)
   const [dragOver, setDragOver] = useState<{ listName: string; idx: number } | null>(null)
+  const [orderVersion, setOrderVersion] = useState(0)
 
   // Agrupar por lista manteniendo orden del localStorage
   const byList = useMemo(() => {
@@ -92,7 +93,7 @@ function FavChipsPanel({ favMachines, currentMachineId, onSelect }: {
       }
     } catch { /* noop */ }
     return map
-  }, [favMachines])
+  }, [favMachines, orderVersion])
 
   const toggleCollapse = (listName: string) => {
     setCollapsed(prev => {
@@ -136,6 +137,7 @@ function FavChipsPanel({ favMachines, currentMachineId, onSelect }: {
     } catch { /* noop */ }
     setDragItem(null)
     setDragOver(null)
+    setOrderVersion(v => v + 1)
   }
 
   return (

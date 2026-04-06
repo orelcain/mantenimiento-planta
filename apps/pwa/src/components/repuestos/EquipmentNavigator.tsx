@@ -575,7 +575,7 @@ const GlobalSearchDropdown = forwardRef<HTMLDivElement, {
 const FAV_MACHINES_KEY = 'equipment-favorite-machines'
 const FAV_LISTS_KEY = 'equipment-favorite-lists'
 
-export interface FavList { name: string; machineIds: string[] }
+export interface FavList { name: string; machineIds: string[]; machineNames?: Record<string, string> }
 
 function loadFavLists(): FavList[] {
   try {
@@ -641,15 +641,27 @@ export function EquipmentNavigator({
     }
   }, [favLists])
 
+  // Resolver nombre de equipo desde cache global (alias tiene prioridad)
+  const resolveEquipName = useCallback((machineId: string): string => {
+    const eq = getGlobalEquipmentCache()
+    if (eq) {
+      const e = eq.find(x => (x.linkedMachineId || x.id) === machineId)
+      if (e) return e.alias || e.nombre
+    }
+    return machineId
+  }, [])
+
   const addToList = useCallback((listName: string, machineId: string) => {
+    const displayName = resolveEquipName(machineId)
     setFavLists(prev => {
       const existing = prev.find(l => l.name === listName)
       let next: FavList[]
       if (existing) {
         if (existing.machineIds.includes(machineId)) return prev
-        next = prev.map(l => l.name === listName ? { ...l, machineIds: [...l.machineIds, machineId] } : l)
+        const names = { ...existing.machineNames, [machineId]: displayName }
+        next = prev.map(l => l.name === listName ? { ...l, machineIds: [...l.machineIds, machineId], machineNames: names } : l)
       } else {
-        next = [...prev, { name: listName, machineIds: [machineId] }]
+        next = [...prev, { name: listName, machineIds: [machineId], machineNames: { [machineId]: displayName } }]
       }
       saveFavLists(next)
       return next
@@ -671,12 +683,21 @@ export function EquipmentNavigator({
     const notify = () => {
       const eq = getGlobalEquipmentCache()
       if (!eq || eq.length === 0) return false
+      // Construir lookup de nombres guardados en listas
+      const savedNames = new Map<string, string>()
+      for (const list of favLists) {
+        if (list.machineNames) {
+          for (const [id, name] of Object.entries(list.machineNames)) savedNames.set(id, name)
+        }
+      }
       const map = new Map<string, { nombre: string; equipmentId: string; listName?: string }>()
       for (const e of eq) {
         const favKey = e.linkedMachineId || e.id
         if (favMachineIds.has(favKey) && !map.has(favKey)) {
           const listName = isMachineInAnyList(favLists, favKey)
-          map.set(favKey, { nombre: e.alias || e.nombre, equipmentId: e.id, listName: listName || undefined })
+          // Prioridad: alias fresco > nombre guardado > nombre SAP
+          const nombre = e.alias || savedNames.get(favKey) || e.nombre
+          map.set(favKey, { nombre, equipmentId: e.id, listName: listName || undefined })
         }
       }
       onFavoriteMachinesChange(map)
