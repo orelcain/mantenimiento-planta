@@ -93,6 +93,7 @@ function FavChipsPanel({ favMachines, currentMachineId, onSelect }: {
       }
     } catch { /* noop */ }
     return map
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [favMachines, orderVersion])
 
   const toggleCollapse = (listName: string) => {

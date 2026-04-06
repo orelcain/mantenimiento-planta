@@ -667,7 +667,8 @@ export function EquipmentNavigator({
       return next
     })
     setFavDropdown(null)
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resolveEquipName])
 
 
   // Notificar al padre cuando cambian favoritos (con nombres de equipos + listas)
