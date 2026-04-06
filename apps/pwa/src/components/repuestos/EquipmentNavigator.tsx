@@ -659,21 +659,32 @@ export function EquipmentNavigator({
 
 
   // Notificar al padre cuando cambian favoritos (con nombres de equipos + listas)
+  // Se re-ejecuta con un timer para esperar que el cache global se llene
+  const favNotifiedRef = useRef(false)
   useEffect(() => {
-    if (!onFavoriteMachinesChange || favMachineIds.size === 0) {
-      onFavoriteMachinesChange?.(new Map())
+    if (!onFavoriteMachinesChange) return
+    if (favMachineIds.size === 0) {
+      onFavoriteMachinesChange(new Map())
+      favNotifiedRef.current = true
       return
     }
-    const eq = getGlobalEquipmentCache()
-    if (!eq) return
-    const map = new Map<string, { nombre: string; equipmentId: string; listName?: string }>()
-    for (const e of eq) {
-      if (e.linkedMachineId && favMachineIds.has(e.linkedMachineId) && !map.has(e.linkedMachineId)) {
-        const listName = isMachineInAnyList(favLists, e.linkedMachineId)
-        map.set(e.linkedMachineId, { nombre: e.alias || e.nombre, equipmentId: e.id, listName: listName || undefined })
+    const notify = () => {
+      const eq = getGlobalEquipmentCache()
+      if (!eq || eq.length === 0) return false
+      const map = new Map<string, { nombre: string; equipmentId: string; listName?: string }>()
+      for (const e of eq) {
+        if (e.linkedMachineId && favMachineIds.has(e.linkedMachineId) && !map.has(e.linkedMachineId)) {
+          const listName = isMachineInAnyList(favLists, e.linkedMachineId)
+          map.set(e.linkedMachineId, { nombre: e.alias || e.nombre, equipmentId: e.id, listName: listName || undefined })
+        }
       }
+      onFavoriteMachinesChange(map)
+      return true
     }
-    onFavoriteMachinesChange(map)
+    if (notify()) { favNotifiedRef.current = true; return }
+    // Cache no listo aún — reintentar
+    const timer = setInterval(() => { if (notify()) { favNotifiedRef.current = true; clearInterval(timer) } }, 500)
+    return () => clearInterval(timer)
   }, [favMachineIds, favLists, onFavoriteMachinesChange])
 
   // Hooks nuevos: árbol de áreas + equipos del área seleccionada
