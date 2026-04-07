@@ -831,8 +831,8 @@ function bindImageControls(container){
   var mv = {active:false, card:null, idx:-1, sx:0, sy:0, ox:0, oy:0};
 
   function startMove(e){
-    // Don't start move from resize handle or buttons
-    if(e.target.closest('.img-resize-handle') || e.target.closest('.img-ebtn') || e.target.tagName==='IMG') return;
+    if(ann.active) return;
+    if(e.target.closest('.img-resize-handle') || e.target.closest('.img-ebtn') || e.target.closest('.ann-toolbar') || e.target.tagName==='IMG') return;
     e.preventDefault();
     var card = this;
     mv.active = true;
@@ -888,6 +888,7 @@ function bindImageControls(container){
   var rs = {active:false, card:null, idx:-1, sx:0, sy:0, sw:0, sh:0};
 
   function startResize(e){
+    if(ann.active) return;
     e.preventDefault();
     e.stopPropagation();
     var card = this.closest('.img-card');
@@ -978,6 +979,7 @@ function bindImageZoomPan(container){
 
     // Scroll zoom
     body.addEventListener('wheel', function(e){
+      if(ann.active) return;
       e.preventDefault();
       e.stopPropagation();
       var rect = body.getBoundingClientRect();
@@ -996,7 +998,7 @@ function bindImageZoomPan(container){
 
     // Drag pan
     function startPan(px,py){
-      if(zs.z <= 1.05) return false;
+      if(ann.active || zs.z <= 1.05) return false;
       zs.panning=true; zs.sx=px; zs.sy=py; zs.stx=zs.tx; zs.sty=zs.ty;
       body.classList.add('panning');
       window._imgEditing = true;
