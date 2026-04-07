@@ -165,11 +165,16 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 .img-card img{width:100%;display:block;cursor:pointer;object-fit:cover;max-height:180px;background:#0a0c12;}
 .img-caption{font-size:11px;color:#99a0b0;padding:6px 8px;text-align:center;border-top:1px solid #1e2230;}
 .img-placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:24px 12px;border:2px dashed #252a38;border-radius:8px;color:#556;font-size:12px;cursor:default;}
-/* lightbox */
-#lightbox{display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:200;align-items:center;justify-content:center;cursor:zoom-out;}
-#lightbox.open{display:flex;}
-#lightbox img{max-width:90vw;max-height:90vh;border-radius:6px;box-shadow:0 10px 40px rgba(0,0,0,.5);}
-#lightbox-caption{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);color:#ccc;font-size:13px;background:rgba(0,0,0,.6);padding:6px 16px;border-radius:6px;}
+/* lightbox with zoom & pan */
+#lightbox{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:200;overflow:hidden;cursor:grab;}
+#lightbox.open{display:block;}
+#lightbox.dragging{cursor:grabbing;}
+#lightbox-img{position:absolute;top:50%;left:50%;transform-origin:0 0;transition:none;user-select:none;-webkit-user-drag:none;border-radius:4px;box-shadow:0 10px 40px rgba(0,0,0,.5);}
+#lightbox-caption{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);color:#ccc;font-size:13px;background:rgba(0,0,0,.7);padding:6px 16px;border-radius:6px;z-index:201;pointer-events:none;}
+#lightbox-controls{position:fixed;top:16px;right:16px;display:flex;gap:8px;z-index:201;}
+#lightbox-controls button{background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.15);color:#ccc;width:36px;height:36px;border-radius:8px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;}
+#lightbox-controls button:hover{background:rgba(255,255,255,.15);color:#fff;}
+#lightbox-hint{position:fixed;bottom:60px;left:50%;transform:translateX(-50%);color:#666;font-size:11px;z-index:201;pointer-events:none;}
 .hidden{display:none!important;}
 
 /* ── RESPONSIVE: mobile ── */
@@ -236,7 +241,17 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 </div>
 
 <!-- LIGHTBOX -->
-<div id="lightbox"><img id="lightbox-img" src="" alt=""><div id="lightbox-caption"></div></div>
+<div id="lightbox">
+  <img id="lightbox-img" src="" alt="">
+  <div id="lightbox-caption"></div>
+  <div id="lightbox-controls">
+    <button id="lb-zin" title="Acercar (+)">+</button>
+    <button id="lb-zout" title="Alejar (-)">−</button>
+    <button id="lb-reset" title="Restablecer (0)">⟲</button>
+    <button id="lb-close" title="Cerrar (Esc)">✕</button>
+  </div>
+  <div id="lightbox-hint">Scroll = zoom · Arrastrar = mover · Doble click = restablecer</div>
+</div>
 
 <!-- MODAL -->
 <div id="modal-overlay">
@@ -648,18 +663,112 @@ window.addEventListener('message', function(e){
   }
 });
 
-// ── Lightbox ──
+// ── Lightbox with zoom & pan ──
+var lb = {
+  el: byId('lightbox'),
+  img: byId('lightbox-img'),
+  scale: 1, x: 0, y: 0,
+  dragging: false, startX: 0, startY: 0, startPanX: 0, startPanY: 0,
+  natW: 0, natH: 0
+};
+
+function lbApply(){
+  var vw = window.innerWidth, vh = window.innerHeight;
+  var fitScale = Math.min(vw * 0.9 / lb.natW, vh * 0.9 / lb.natH, 1);
+  var w = lb.natW * fitScale * lb.scale;
+  var h = lb.natH * fitScale * lb.scale;
+  lb.img.style.width = w + 'px';
+  lb.img.style.height = h + 'px';
+  lb.img.style.left = (vw / 2 - w / 2 + lb.x) + 'px';
+  lb.img.style.top = (vh / 2 - h / 2 + lb.y) + 'px';
+}
+
+function lbReset(){ lb.scale = 1; lb.x = 0; lb.y = 0; lbApply(); }
+
 window.openLightbox = function(url, caption){
-  var lb = byId('lightbox');
-  byId('lightbox-img').src = url;
+  lb.img.src = url;
   byId('lightbox-caption').textContent = caption || '';
   byId('lightbox-caption').style.display = caption ? 'block' : 'none';
-  lb.classList.add('open');
+  byId('lightbox-hint').style.display = 'block';
+  lb.scale = 1; lb.x = 0; lb.y = 0;
+  var tmp = new Image();
+  tmp.onload = function(){ lb.natW = tmp.naturalWidth; lb.natH = tmp.naturalHeight; lbApply(); };
+  tmp.src = url;
+  lb.el.classList.add('open');
 };
-byId('lightbox').addEventListener('click', function(){
-  this.classList.remove('open');
-  byId('lightbox-img').src = '';
+
+function lbClose(){
+  lb.el.classList.remove('open');
+  lb.el.classList.remove('dragging');
+  lb.img.src = '';
+}
+
+// Close
+byId('lb-close').addEventListener('click', function(e){ e.stopPropagation(); lbClose(); });
+document.addEventListener('keydown', function(e){ if(e.key === 'Escape' && lb.el.classList.contains('open')) lbClose(); });
+
+// Zoom buttons
+byId('lb-zin').addEventListener('click', function(e){ e.stopPropagation(); lb.scale = Math.min(lb.scale * 1.3, 10); lbApply(); });
+byId('lb-zout').addEventListener('click', function(e){ e.stopPropagation(); lb.scale = Math.max(lb.scale / 1.3, 0.2); lbApply(); });
+byId('lb-reset').addEventListener('click', function(e){ e.stopPropagation(); lbReset(); });
+
+// Scroll zoom
+lb.el.addEventListener('wheel', function(e){
+  e.preventDefault();
+  var delta = e.deltaY > 0 ? 0.85 : 1.18;
+  lb.scale = Math.min(Math.max(lb.scale * delta, 0.2), 10);
+  byId('lightbox-hint').style.display = 'none';
+  lbApply();
+}, {passive: false});
+
+// Pan with drag
+lb.el.addEventListener('mousedown', function(e){
+  if(e.target.closest('#lightbox-controls')) return;
+  lb.dragging = true;
+  lb.startX = e.clientX; lb.startY = e.clientY;
+  lb.startPanX = lb.x; lb.startPanY = lb.y;
+  lb.el.classList.add('dragging');
+  e.preventDefault();
 });
+window.addEventListener('mousemove', function(e){
+  if(!lb.dragging) return;
+  lb.x = lb.startPanX + (e.clientX - lb.startX);
+  lb.y = lb.startPanY + (e.clientY - lb.startY);
+  lbApply();
+});
+window.addEventListener('mouseup', function(){
+  if(!lb.dragging) return;
+  lb.dragging = false;
+  lb.el.classList.remove('dragging');
+  // If didn't drag much, treat as click to close (only if zoom = 1)
+  var moved = Math.abs(lb.x - lb.startPanX) + Math.abs(lb.y - lb.startPanY);
+  if(moved < 5 && lb.scale <= 1) lbClose();
+});
+
+// Double click to reset
+lb.el.addEventListener('dblclick', function(e){
+  if(e.target.closest('#lightbox-controls')) return;
+  if(lb.scale > 1.05) lbReset();
+  else { lb.scale = 2.5; lb.x = 0; lb.y = 0; lbApply(); }
+});
+
+// Touch: pinch zoom + pan
+lb.el.addEventListener('touchstart', function(e){
+  if(e.touches.length === 1){
+    lb.dragging = true;
+    lb.startX = e.touches[0].clientX; lb.startY = e.touches[0].clientY;
+    lb.startPanX = lb.x; lb.startPanY = lb.y;
+  }
+}, {passive: true});
+lb.el.addEventListener('touchmove', function(e){
+  if(lb.dragging && e.touches.length === 1){
+    lb.x = lb.startPanX + (e.touches[0].clientX - lb.startX);
+    lb.y = lb.startPanY + (e.touches[0].clientY - lb.startY);
+    lbApply();
+    e.preventDefault();
+  }
+}, {passive: false});
+lb.el.addEventListener('touchend', function(){ lb.dragging = false; });
 
 // ── Init ──
 send('b200:ready');
