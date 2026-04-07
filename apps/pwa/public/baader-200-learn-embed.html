@@ -307,8 +307,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
   .note-item{font-size:12px;}
   /* Images flow naturally in mobile (no absolute, no flex column) */
   .img-card{position:relative!important;left:auto!important;top:auto!important;width:100%!important;height:auto!important;margin-bottom:10px;border-radius:10px;display:block!important;}
-  .img-body{min-height:auto!important;overflow:visible!important;position:relative!important;}
-  .img-body img{width:100%!important;height:auto!important;max-height:60vh;object-fit:contain!important;position:static!important;}
+  .img-body{min-height:auto!important;overflow:hidden!important;position:relative!important;}
+  .img-body img{width:100%!important;height:auto!important;max-height:60vh;object-fit:contain!important;position:static!important;left:auto!important;top:auto!important;}
+  /* Crop on mobile: clip-path applied by JS (applyMobileCrop) */
+  .img-body.cropped img{position:static!important;width:100%!important;height:auto!important;max-height:none!important;}
   .img-edit-bar{position:relative;opacity:1;}
   .img-resize-handle{display:none!important;}
   .img-caption{font-size:12px;padding:8px 10px;}
@@ -756,22 +758,27 @@ function renderSectionContent(sec){
       html += '</div>';
       var hasCrop = im.crop && im.crop.w > 0.01 && im.crop.h > 0.01;
       var imgStyle = '';
+      var clipStyle = '';
       var bodyClass = 'img-body';
       if(hasCrop){
-        // Scale image so crop region fills container
-        // width = 100% / crop.w, height = 100% / crop.h
-        // offset: left = -crop.x / crop.w * 100%, top = -crop.y / crop.h * 100%
         var sw = (100 / im.crop.w).toFixed(2);
         var sh = (100 / im.crop.h).toFixed(2);
         var ox = (-im.crop.x / im.crop.w * 100).toFixed(2);
         var oy = (-im.crop.y / im.crop.h * 100).toFixed(2);
         imgStyle = 'width:'+sw+'%;height:'+sh+'%;left:'+ox+'%;top:'+oy+'%;object-fit:fill';
+        // clip-path for mobile (applied via data attribute + JS)
+        var ct = (im.crop.y * 100).toFixed(1);
+        var cr = ((1 - im.crop.x - im.crop.w) * 100).toFixed(1);
+        var cb = ((1 - im.crop.y - im.crop.h) * 100).toFixed(1);
+        var cl = (im.crop.x * 100).toFixed(1);
+        clipStyle = 'inset('+ct+'% '+cr+'% '+cb+'% '+cl+'%)';
         bodyClass += ' cropped';
       }
       var lbUrl = esc(im.url).replace(/'/g,"\\'");
       var lbCap = esc(im.caption||'').replace(/'/g,"\\'");
       html += '<div class="'+bodyClass+'">';
       html += '<img src="'+esc(im.url)+'" alt="'+esc(im.caption||sec.title)+'" loading="lazy"';
+      if(clipStyle) html += ' data-clip="'+clipStyle+'"';
       if(imgStyle) html += ' style="'+imgStyle+'"';
       html += ' onload="if(typeof updateCanvasHeight===\'function\')updateCanvasHeight()"';
       html += ' data-lb-url="'+esc(im.url)+'" data-lb-cap="'+esc(im.caption||'')+'"/>';
@@ -859,8 +866,22 @@ function showSection(id){
   // Bind image management events
   bindImageControls(el);
   bindImageZoomPan(el);
+  applyMobileCrop(el);
   // Set canvas min-height based on image positions
   updateCanvasHeight();
+}
+
+function applyMobileCrop(container){
+  if(!isMobile()) return;
+  container.querySelectorAll('.img-body.cropped img[data-clip]').forEach(function(img){
+    // On mobile: remove the overflow-based crop inline styles, use clip-path instead
+    img.style.width = '100%';
+    img.style.height = 'auto';
+    img.style.left = 'auto';
+    img.style.top = 'auto';
+    img.style.position = 'static';
+    img.style.clipPath = img.dataset.clip;
+  });
 }
 
 function updateCanvasHeight(){
