@@ -75,6 +75,9 @@ importers:
       '@react-three/fiber':
         specifier: 8.17.10
         version: 8.17.10(@types/react@18.3.27)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(three@0.182.0)
+      '@types/dompurify':
+        specifier: ^3.0.5
+        version: 3.2.0
       '@types/leaflet':
         specifier: ^1.9.21
         version: 1.9.21
@@ -114,6 +117,9 @@ importers:
       docxtemplater:
         specifier: ^3.67.6
         version: 3.67.6
+      dompurify:
+        specifier: ^3.3.3
+        version: 3.3.3
       echarts:
         specifier: ^6.0.0
         version: 6.0.0
@@ -2143,6 +2149,10 @@ packages:
   '@types/debounce@1.2.4':
     resolution: {integrity: sha512-jBqiORIzKDOToaF63Fm//haOCHuwQuLa2202RK4MozpA6lh93eCBc+/8+wZn5OzjJt3ySdc+74SXWXB55Ewtyw==}
 
+  '@types/dompurify@3.2.0':
+    resolution: {integrity: sha512-Fgg31wv9QbLDA0SpTOXO3MaxySc4DKGLi8sna4/Utjo4r3ZRPdCt4UQee8BWr+Q5z21yifghREPJGYaEOEIACg==}
+    deprecated: This is a stub types definition. dompurify provides its own type definitions, so you do not need this installed.
+
   '@types/draco3d@1.4.10':
     resolution: {integrity: sha512-AX22jp8Y7wwaBgAixaSvkoG4M/+PlAcm3Qs4OW8yT9DM4xUpWKeFhLueTAyZF39pviAdcDdeJoACapiAceqNcw==}
 
@@ -2850,8 +2860,8 @@ packages:
     resolution: {integrity: sha512-IvdTz9druTlQrsB0zlqvAqrImEydFgtvHp0uUnx+hQ9W4hmBsorrJIBJKCfkhK6QRz/jpJnA6BaTd6rEK6/Usw==}
     engines: {node: '>=0.10'}
 
-  dompurify@3.3.1:
-    resolution: {integrity: sha512-qkdCKzLNtrgPFP1Vo+98FRzJnBRGe4ffyCea9IwHB1fyxPOeNTHpLKYGd4Uk9xvNoH0ZoOjwZxNptyMwqrId1Q==}
+  dompurify@3.3.3:
+    resolution: {integrity: sha512-Oj6pzI2+RqBfFG+qOaOLbFXLQ90ARpcGG6UePL82bJLtdsa6CYJD7nmiU8MW9nQNOtCHV3lZ/Bzq1X0QYbBZCA==}
 
   draco3d@1.5.7:
     resolution: {integrity: sha512-m6WCKt/erDXcw+70IJXnG7M3awwQPAsZvJGX5zY7beBqpELw6RDGkYVU0W43AFxye4pDZ5i2Lbyc/NNGqwjUVQ==}
@@ -7300,6 +7310,10 @@ snapshots:
 
   '@types/debounce@1.2.4': {}
 
+  '@types/dompurify@3.2.0':
+    dependencies:
+      dompurify: 3.3.3
+
   '@types/draco3d@1.4.10': {}
 
   '@types/echarts@5.0.0':
@@ -8061,10 +8075,9 @@ snapshots:
     dependencies:
       '@xmldom/xmldom': 0.9.8
 
-  dompurify@3.3.1:
+  dompurify@3.3.3:
     optionalDependencies:
       '@types/trusted-types': 2.0.7
-    optional: true
 
   draco3d@1.5.7: {}
 
@@ -9046,7 +9059,7 @@ snapshots:
     optionalDependencies:
       canvg: 3.0.11
       core-js: 3.47.0
-      dompurify: 3.3.1
+      dompurify: 3.3.3
       html2canvas: 1.4.1
 
   jszip@3.10.1:
