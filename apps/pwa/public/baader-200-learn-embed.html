@@ -104,9 +104,14 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 .sec-block-title::after{content:'';flex:1;height:1px;background:var(--bdr);}
 
 /* 2-column layout: text left, images right */
-.sec-two-col{display:flex;gap:16px;height:100%;overflow:auto;padding:12px;}
-.sec-col-left{flex:1;min-width:0;padding-right:0;}
-.sec-col-right{flex:0 0 auto;width:clamp(280px, 45%, 600px);display:flex;flex-direction:column;gap:8px;align-self:flex-start;position:sticky;top:12px;}
+.sec-two-col{display:flex;gap:0;height:100%;overflow:auto;padding:12px;}
+.sec-col-left{flex:none;min-width:0;padding-right:0;overflow-y:auto;}
+.sec-col-right{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px;align-self:flex-start;position:sticky;top:12px;padding-left:12px;}
+/* Draggable column divider */
+.col-divider{width:6px;flex-shrink:0;cursor:col-resize;position:relative;background:transparent;transition:background .15s;}
+.col-divider::after{content:'';position:absolute;left:2px;top:0;bottom:0;width:2px;background:var(--bdr);border-radius:1px;transition:background .15s,width .15s;}
+.col-divider:hover::after,.col-divider.dragging::after{background:var(--ac);width:3px;left:1px;box-shadow:0 0 8px rgba(68,153,255,.3);}
+.col-divider.dragging{background:rgba(68,153,255,.05);}
 
 /* steps */
 .steps-list{display:flex;flex-direction:column;gap:5px;}
@@ -290,8 +295,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 
 /* ── RESPONSIVE: tablet (701-900px) — single column with large images ── */
 @media(max-width:900px) and (min-width:701px){
+  .col-divider{display:none!important;}
   .sec-two-col{flex-direction:column;height:auto!important;overflow:auto!important;gap:12px;}
-  .sec-col-left{width:100%;flex:none;}
+  .sec-col-left{width:100%!important;flex:none;}
   .sec-col-right{width:100%;position:static;flex:none;max-height:none;display:flex;flex-direction:row;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;}
   .sec-col-right .img-card{flex-shrink:0;scroll-snap-align:start;width:clamp(300px,60%,500px)!important;min-height:auto;max-height:450px;}
 }
@@ -312,7 +318,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
   #section-content{overflow:visible!important;flex:none!important;}
   /* Stack layout: text then images */
   .sec-two-col{display:flex;flex-direction:column;height:auto!important;overflow:visible!important;padding:12px;gap:16px;position:static!important;}
-  .sec-col-left{width:100%;padding-right:0;flex:none;overflow-y:visible;}
+  .sec-col-left{width:100%!important;padding-right:0;flex:none;overflow-y:visible;}
+  .col-divider{display:none!important;}
   .sec-title{font-size:18px;}
   .sec-desc{font-size:13px;line-height:1.5;}
   .step-item{padding:10px 12px;font-size:15px;line-height:1.5;}
@@ -780,6 +787,7 @@ function renderSectionContent(sec){
   if(hasImages){
     var useAbsolute = state.unlocked; // Admin edit mode uses absolute positioning
     if(!useAbsolute && !isMobile()){
+      html += '<div class="col-divider" title="Arrastra para ajustar"></div>';
       html += '<div class="sec-col-right">';
     }
     var stackY = 0;
@@ -922,6 +930,7 @@ function showSection(id){
   bindImageControls(el);
   bindImageZoomPan(el);
   applyMobileCrop(el);
+  bindColumnDivider(el);
   // Tap-to-mark: let technicians mark their current step
   el.querySelectorAll('.step-item').forEach(function(step){
     step.style.cursor = 'pointer';
@@ -931,6 +940,52 @@ function showSection(id){
   });
   // Set canvas min-height based on image positions
   updateCanvasHeight();
+}
+
+function bindColumnDivider(container){
+  if(isMobile()) return;
+  var divider = container.querySelector('.col-divider');
+  if(!divider) return;
+  var colLeft = container.querySelector('.sec-col-left');
+  var twoCol = container.closest('.sec-two-col') || container.querySelector('.sec-two-col') || container;
+  if(!colLeft) return;
+  // Restore saved split
+  var saved = localStorage.getItem('b200-col-split');
+  if(saved){
+    var pct = parseFloat(saved);
+    if(pct >= 25 && pct <= 75) colLeft.style.width = pct + '%';
+  }
+  var dragging = false;
+  function onStart(e){
+    e.preventDefault();
+    dragging = true;
+    divider.classList.add('dragging');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }
+  function onMove(e){
+    if(!dragging) return;
+    var clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    var rect = twoCol.getBoundingClientRect();
+    var pct = ((clientX - rect.left) / rect.width) * 100;
+    pct = Math.max(25, Math.min(75, pct));
+    colLeft.style.width = pct + '%';
+  }
+  function onEnd(){
+    if(!dragging) return;
+    dragging = false;
+    divider.classList.remove('dragging');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    var w = parseFloat(colLeft.style.width);
+    if(w) localStorage.setItem('b200-col-split', w.toFixed(1));
+  }
+  divider.addEventListener('mousedown', onStart);
+  divider.addEventListener('touchstart', onStart, {passive:false});
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('touchmove', onMove, {passive:false});
+  document.addEventListener('mouseup', onEnd);
+  document.addEventListener('touchend', onEnd);
 }
 
 function applyMobileCrop(container){
