@@ -783,26 +783,25 @@ function renderSectionContent(sec){
   }
   html += '</div>'; // end sec-col-left
 
-  // IMAGES — right column (flow layout for readonly, absolute for edit mode)
+  // IMAGES — right column (always use col-right in desktop, absolute only in edit-mode via CSS)
   if(hasImages){
-    var useAbsolute = state.unlocked; // Admin edit mode uses absolute positioning
-    if(!useAbsolute && !isMobile()){
+    if(!isMobile()){
       html += '<div class="col-divider" title="Arrastra para ajustar"></div>';
       html += '<div class="sec-col-right">';
     }
     var stackY = 0;
     imgs.forEach(function(im, idx){
       var posStyle = '';
-      if(useAbsolute){
+      if(state.unlocked){
+        // Store layout data for edit-mode absolute positioning (applied via CSS .edit-mode .img-card)
         var lo = im.layout || {};
         var hasPos = lo.x != null && lo.y != null;
         if(hasPos){
           posStyle += 'left:'+lo.x+'px;top:'+lo.y+'px;';
         } else {
-          posStyle += 'left:36%;top:'+stackY+'px;';
+          posStyle += 'left:0;top:'+stackY+'px;';
         }
         if(lo.w) posStyle += 'width:'+lo.w+'px;';
-        else posStyle += 'width:58%;';
         if(lo.h) posStyle += 'height:'+lo.h+'px;';
         stackY += (lo.h || 280) + 8;
       }
@@ -908,7 +907,7 @@ function renderSectionContent(sec){
   } else if(state.isAdminPage){
     html += '<div class="img-placeholder-box"><span style="font-size:24px;opacity:.3;">&#128444;</span><span>Sin imagenes</span></div>';
   }
-  if(hasImages && !useAbsolute && !isMobile()){
+  if(hasImages && !isMobile()){
     html += '</div>'; // end sec-col-right
   }
 
