@@ -155,7 +155,7 @@ export const DEFAULT_B200_SECTIONS: Omit<B200Section, 'updatedAt' | 'updatedBy'>
       'No ajustar siempre a la medida del catálogo — usar la medida que corresponda a las condiciones reales.',
       'Con temperatura de materia prima bajo 0°C se requiere mayor presión en el resorte.',
     ],
-    images: [],
+    images: [{ url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-03.jpg', caption: '1ra Alimentación — Ajuste chapaletas y silleta' }],
   },
   {
     id: 'segunda-alimentacion',
@@ -179,7 +179,7 @@ export const DEFAULT_B200_SECTIONS: Omit<B200Section, 'updatedAt' | 'updatedBy'>
     notes: [
       'Al cambiar cuchillos nuevos, al bajar el mando dorsal los cuchillos en trabajo normal rozarían con las chapaletas. Reajustar siempre con pernos M10.',
     ],
-    images: [],
+    images: [{ url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-04.jpg', caption: '2da Alimentación — Posición leva y chapaletas' }],
   },
   {
     id: 'levantadores-aletas',
@@ -203,7 +203,7 @@ export const DEFAULT_B200_SECTIONS: Omit<B200Section, 'updatedAt' | 'updatedBy'>
     notes: [
       'El 2do levantador no tiene chapas guías de aleta, por lo tanto se baja más de lo normal.',
     ],
-    images: [],
+    images: [{ url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-05.jpg', caption: 'Levantadores de aletas — 1er y 2do levantador' }],
   },
   {
     id: 'cuchillos-ventrales',
@@ -226,7 +226,7 @@ export const DEFAULT_B200_SECTIONS: Omit<B200Section, 'updatedAt' | 'updatedBy'>
     notes: [
       'Los pernos de fijación pos 1-2 SOLO se mueven en mantención anual.',
     ],
-    images: [],
+    images: [{ url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-06.jpg', caption: 'Cuchillos ventrales — Medida y calibración' }, { url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-07.jpg', caption: 'Principio de corte ventrales y dorsales' }],
   },
   {
     id: 'guias-flotantes',
@@ -249,7 +249,7 @@ export const DEFAULT_B200_SECTIONS: Omit<B200Section, 'updatedAt' | 'updatedBy'>
       'SIEMPRE realizar con silleta en posición de reposo.',
       'Ajustar siempre después de los cuchillos ventrales.',
     ],
-    images: [],
+    images: [{ url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-08.jpg', caption: 'Guías flotantes — Ajuste de abertura' }],
   },
   {
     id: 'cuchillos-dorsales',
@@ -268,7 +268,7 @@ export const DEFAULT_B200_SECTIONS: Omit<B200Section, 'updatedAt' | 'updatedBy'>
     notes: [
       'La cruz patrón asegura que los cuchillos ventrales y dorsales queden exactamente alineados entre sí.',
     ],
-    images: [],
+    images: [{ url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-09.jpg', caption: 'Cuchillos dorsales — Abertura y alineamiento' }],
   },
   {
     id: 'medidas-cuchillos',
@@ -287,7 +287,7 @@ export const DEFAULT_B200_SECTIONS: Omit<B200Section, 'updatedAt' | 'updatedBy'>
     notes: [
       'Verificar SIEMPRE al cambiar cuchillos nuevos para evitar que rocen con las chapaletas.',
     ],
-    images: [],
+    images: [{ url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-10.jpg', caption: 'Medidas entre cuchillos ventrales y dorsales' }],
   },
   {
     id: 'mando-cuchillos-dorsales',
@@ -308,7 +308,7 @@ export const DEFAULT_B200_SECTIONS: Omit<B200Section, 'updatedAt' | 'updatedBy'>
     notes: [
       'Si no hay levantamiento: 1ro verificar trinquete, 2do verificar bulón con gollete en carter de levas.',
     ],
-    images: [],
+    images: [{ url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-11.jpg', caption: 'Mando de cuchillos dorsales — Palanca trinquete' }],
   },
 ]
 
@@ -335,7 +335,7 @@ export const DEFAULT_B200_SECTIONS_PART2: Omit<B200Section, 'updatedAt' | 'updat
       { name: 'Perno separador vs guía superior', value: '0.5', unit: 'mm' },
     ],
     notes: [],
-    images: [],
+    images: [{ url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-12.jpg', caption: 'Guías de espinas superiores — Ajuste pos 3' }],
   },
   {
     id: 'cuchillos-punzones',
@@ -365,7 +365,7 @@ export const DEFAULT_B200_SECTIONS_PART2: Omit<B200Section, 'updatedAt' | 'updat
       'Cuchillos muy altos → gay ping en el filete a lo largo del esquelon.',
       'Cuchillos muy bajos → corta espina del flanco y cuchillos rascadores no funcionan.',
     ],
-    images: [],
+    images: [{ url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-13.jpg', caption: 'Cuchillos punzones — Ajuste caída y altura' }, { url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-14.jpg', caption: 'Principio de corte cuchillos de punta' }],
   },
   {
     id: 'cuchillos-rascadores-ajuste',
@@ -384,7 +384,7 @@ export const DEFAULT_B200_SECTIONS_PART2: Omit<B200Section, 'updatedAt' | 'updat
     notes: [
       'Este ajuste SOLO se puede realizar con la silleta en posición 1350mm.',
     ],
-    images: [],
+    images: [{ url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-15.jpg', caption: 'Cuchillos rascadores — Ajuste posición' }],
   },
   {
     id: 'cuchillos-rascadores-altura',
@@ -403,7 +403,7 @@ export const DEFAULT_B200_SECTIONS_PART2: Omit<B200Section, 'updatedAt' | 'updat
       { name: 'Abertura cuchillos rascadores', value: '17-18', unit: 'mm' },
     ],
     notes: [],
-    images: [],
+    images: [{ url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-16.jpg', caption: 'Altura de trabajo cuchillos rascadores' }, { url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-17.jpg', caption: 'Abertura cuchillos rascadores' }, { url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-18.jpg', caption: 'Principio de corte cuchillos rascadores' }],
   },
   {
     id: 'cuchillos-cola-contrabancadas',
@@ -424,7 +424,7 @@ export const DEFAULT_B200_SECTIONS_PART2: Omit<B200Section, 'updatedAt' | 'updat
     notes: [
       'Si el rodillo biela pos 11 toca el tope pos 12, regular primero con biela pos 5 antes del perno tope pos 1.',
     ],
-    images: [],
+    images: [{ url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-19.jpg', caption: 'Cuchillos de cola y contrabancadas' }, { url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-20.jpg', caption: 'Principio de corte cuchillos de cola' }],
   },
   {
     id: 'embrague',
@@ -449,7 +449,7 @@ export const DEFAULT_B200_SECTIONS_PART2: Omit<B200Section, 'updatedAt' | 'updat
     notes: [
       'Reajuste solo cuando no hay causal justificada de bloqueo (no hay objeto interpuesto).',
     ],
-    images: [],
+    images: [{ url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-21.jpg', caption: 'Embrague — Ajuste y reajuste' }],
   },
   {
     id: 'sistema-seguridad',
@@ -472,7 +472,7 @@ export const DEFAULT_B200_SECTIONS_PART2: Omit<B200Section, 'updatedAt' | 'updat
     notes: [
       'El circuito de control incluye: límites, sensores y botoneras.',
     ],
-    images: [],
+    images: [{ url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-34.jpg', caption: 'Sistema de seguridad — 9 puntos' }, { url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-35.jpg', caption: 'Circuito de control eléctrico' }],
   },
   {
     id: 'precauciones-cambio-cuchillos',
@@ -494,7 +494,7 @@ export const DEFAULT_B200_SECTIONS_PART2: Omit<B200Section, 'updatedAt' | 'updat
       'Con cuchillos nuevos SIEMPRE verificar y reajustar la distancia de 12mm.',
       'SIEMPRE reajustar guías flotantes con cuchillos nuevos.',
     ],
-    images: [],
+    images: [{ url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-36.jpg', caption: 'Precauciones cambio cuchillos nuevos' }, { url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-37.jpg', caption: 'Ajuste de guías flotantes post-cambio' }],
   },
 ]
 
@@ -513,7 +513,7 @@ export const DEFAULT_B200_TROUBLESHOOTING: Omit<B200Section, 'updatedAt' | 'upda
     ],
     measurements: [],
     notes: [],
-    images: [],
+    images: [{ url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-22.jpg', caption: 'Detalles o cortes en filetes' }, { url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-23.jpg', caption: 'Ajustes para hueso esquelón' }, { url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-24.jpg', caption: 'Tabla de ajustes' }],
   },
   {
     id: 'ts-gay-ping-filete',
@@ -532,7 +532,7 @@ export const DEFAULT_B200_TROUBLESHOOTING: Omit<B200Section, 'updatedAt' | 'upda
     notes: [
       'Si el gay ping es solo en un lado del filete, verificar nivelación individual del cuchillo de punta de ese lado.',
     ],
-    images: [],
+    images: [{ url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-25.jpg', caption: 'Gay ping en mitad del filete' }, { url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-26.jpg', caption: 'Ajustes correctivos' }],
   },
   {
     id: 'ts-espina-belly',
@@ -546,7 +546,7 @@ export const DEFAULT_B200_TROUBLESHOOTING: Omit<B200Section, 'updatedAt' | 'upda
     ],
     measurements: [],
     notes: [],
-    images: [],
+    images: [{ url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-27.jpg', caption: 'Espina Belly — Verificación' }],
   },
   {
     id: 'ts-trim-d-e',
@@ -562,7 +562,7 @@ export const DEFAULT_B200_TROUBLESHOOTING: Omit<B200Section, 'updatedAt' | 'upda
     notes: [
       'El ajuste rápido Trim D/E depende de la condición de la materia prima en ese momento.',
     ],
-    images: [],
+    images: [{ url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-28.jpg', caption: 'Ajuste normal y rápido Trim D' }, { url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-29.jpg', caption: 'Ajuste Trim E' }],
   },
   {
     id: 'ts-gay-ping-cola',
@@ -586,7 +586,7 @@ export const DEFAULT_B200_TROUBLESHOOTING: Omit<B200Section, 'updatedAt' | 'upda
     notes: [
       'Los cuchillos ventrales de mayor diámetro deben estar instalados (más cercano a 200mm).',
     ],
-    images: [],
+    images: [{ url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-30.jpg', caption: 'Gay ping zona cola / aleta anal' }],
   },
   {
     id: 'ts-colgajo-esquelon',
@@ -601,7 +601,7 @@ export const DEFAULT_B200_TROUBLESHOOTING: Omit<B200Section, 'updatedAt' | 'upda
     ],
     measurements: [],
     notes: [],
-    images: [],
+    images: [{ url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-31.jpg', caption: 'Colgajo en línea del esquelón' }],
   },
   {
     id: 'ts-exceso-aleta-anal',
@@ -616,7 +616,7 @@ export const DEFAULT_B200_TROUBLESHOOTING: Omit<B200Section, 'updatedAt' | 'upda
     ],
     measurements: [],
     notes: [],
-    images: [],
+    images: [{ url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-32.jpg', caption: 'Exceso de aleta anal' }],
   },
   {
     id: 'ts-entrada-rapida',
@@ -631,7 +631,7 @@ export const DEFAULT_B200_TROUBLESHOOTING: Omit<B200Section, 'updatedAt' | 'upda
     ],
     measurements: [],
     notes: [],
-    images: [],
+    images: [{ url: (import.meta.env.BASE_URL || '/') + 'baader200-manual/page-33.jpg', caption: 'Entrada pescado demasiado rápida' }],
   },
 ]
 
