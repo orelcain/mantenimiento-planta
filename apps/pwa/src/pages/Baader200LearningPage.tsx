@@ -225,18 +225,16 @@ export function Baader200LearningPage() {
         </div>
 
         <div className="flex items-center gap-1 flex-shrink-0">
-          {currentSectionId && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setQrSection(currentSectionId)}
-              className="h-7 gap-1 text-xs"
-              title="Compartir sección por QR"
-            >
-              <QrCode className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Compartir</span>
-            </Button>
-          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setQrSection(currentSectionId || sections[0]?.id || null)}
+            className="h-7 gap-1 text-xs"
+            title="Compartir sección por QR"
+          >
+            <QrCode className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Compartir</span>
+          </Button>
           <Button
             variant={historyOpen ? 'default' : 'ghost'}
             size="sm"
