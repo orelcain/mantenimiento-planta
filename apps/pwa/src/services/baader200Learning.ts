@@ -41,7 +41,7 @@ export interface B200Image {
   url: string
   caption?: string
   crop?: B200ImageCrop
-  widthPct?: number
+  layout?: { x: number, y: number, w?: number, h?: number }
 }
 
 export interface B200Section {

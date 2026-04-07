@@ -171,34 +171,34 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 #lightbox-controls button{background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.15);color:#ccc;width:36px;height:36px;border-radius:8px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;}
 #lightbox-controls button:hover{background:rgba(255,255,255,.15);color:#fff;}
 #lightbox-hint{position:fixed;bottom:60px;left:50%;transform:translateX(-50%);color:#666;font-size:11px;z-index:201;pointer-events:none;}
-/* ── IMAGE LAYOUT ── */
-.sec-col-right{flex:0 0 calc(65% - 12px);min-width:0;display:flex;flex-wrap:wrap;gap:6px;overflow-y:auto;align-content:start;}
-.sec-col-right .img-card{border-radius:6px;overflow:visible;border:1px solid #252a38;background:#0a0c12;transition:border-color .15s,opacity .15s,box-shadow .2s;position:relative;overflow:hidden;}
+/* ── IMAGE CANVAS (free position) ── */
+.sec-col-right{flex:0 0 calc(65% - 12px);min-width:0;position:relative;overflow-y:auto;overflow-x:hidden;background:#0d0f15;}
+.sec-col-right .img-card{border-radius:6px;border:1px solid #252a38;background:#0a0c12;position:absolute;overflow:hidden;transition:border-color .15s,box-shadow .2s;}
 .sec-col-right .img-card:hover{border-color:var(--ac);}
 .sec-col-right .img-card img{width:100%;display:block;cursor:pointer;background:#0a0c12;}
 .sec-col-right .img-caption{font-size:11px;color:#99a0b0;padding:5px 8px;text-align:center;border-top:1px solid #1e2230;flex-shrink:0;}
-.sec-col-right .img-placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:30px 12px;border:2px dashed #252a38;border-radius:8px;color:#556;font-size:12px;width:100%;}
+.sec-col-right .img-placeholder{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;border:2px dashed #252a38;border-radius:8px;color:#556;font-size:12px;}
 
-/* drag states */
-.sec-col-right .img-card.dragging{opacity:.3;border:2px dashed var(--ac);}
-.sec-col-right .img-card.drag-over{box-shadow:inset 0 0 0 3px var(--ac);border-color:var(--ac);}
-.sec-col-right.edit-mode .img-card{cursor:grab;}
+/* edit mode */
+.sec-col-right.edit-mode .img-card{cursor:move;border-color:#333;}
+.sec-col-right.edit-mode .img-card:hover{border-color:var(--ac);box-shadow:0 0 12px rgba(68,153,255,.2);}
+.sec-col-right.edit-mode .img-card.moving{opacity:.85;box-shadow:0 8px 30px rgba(0,0,0,.5);z-index:10;border-color:var(--ac);}
 
-/* ── IMAGE EDIT OVERLAY ── */
-.img-edit-bar{display:flex;align-items:center;gap:4px;padding:4px 6px;background:rgba(13,15,21,.92);border-bottom:1px solid #252a38;flex-shrink:0;}
+/* ── IMAGE EDIT BAR ── */
+.img-edit-bar{display:flex;align-items:center;gap:4px;padding:3px 6px;background:rgba(13,15,21,.92);border-bottom:1px solid #252a38;flex-shrink:0;}
 .sec-col-right:not(.edit-mode) .img-edit-bar{display:none;}
 .img-ebtn{background:rgba(30,34,48,.9);border:1px solid #3a3e4a;color:#aab;font-size:10px;padding:3px 8px;border-radius:4px;cursor:pointer;line-height:1;transition:all .12s;white-space:nowrap;}
 .img-ebtn:hover{background:var(--ac2);border-color:var(--ac);color:#fff;}
-.img-ebtn.active{background:var(--ac2);border-color:var(--ac);color:#fff;}
 .img-ebtn.del{border-color:#552222;color:#ff8888;}
 .img-ebtn.del:hover{background:#441515;}
 .img-edit-spacer{flex:1;}
-.img-width-label{font-size:9px;color:#556;font-family:'Courier New',monospace;}
+.img-size-label{font-size:9px;color:#556;font-family:'Courier New',monospace;}
 
-/* ── RESIZE HANDLE ── */
-.img-resize-handle{position:absolute;bottom:0;right:0;width:18px;height:18px;cursor:se-resize;z-index:3;opacity:0;transition:opacity .15s;}
-.sec-col-right.edit-mode .img-resize-handle{opacity:1;}
-.img-resize-handle::after{content:'';position:absolute;bottom:3px;right:3px;width:10px;height:10px;border-right:2px solid var(--ac);border-bottom:2px solid var(--ac);border-radius:0 0 2px 0;}
+/* ── RESIZE HANDLE (corner) ── */
+.img-resize-handle{position:absolute;bottom:0;right:0;width:20px;height:20px;cursor:se-resize;z-index:3;display:none;}
+.sec-col-right.edit-mode .img-resize-handle{display:block;}
+.img-resize-handle::after{content:'';position:absolute;bottom:3px;right:3px;width:12px;height:12px;border-right:2px solid var(--ac);border-bottom:2px solid var(--ac);border-radius:0 0 3px 0;opacity:.7;}
+.img-resize-handle:hover::after{opacity:1;}
 
 /* ── CROP OVERLAY ── */
 #crop-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:300;flex-direction:column;}
@@ -242,8 +242,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
   .meas-table th,.meas-table td{padding:6px 8px;}
   .note-item{font-size:12px;}
   #modal-box{width:95vw;max-height:90vh;}
-  .sec-col-right{flex:none;width:100%;margin-top:10px;}
-  .sec-col-right .img-card{width:100%!important;flex:none!important;}
+  .sec-col-right{flex:none;width:100%;margin-top:10px;min-height:300px;}
   .sec-col-right .img-card img{max-height:50vh;object-fit:contain;}
   #lock-btn{font-size:10px;padding:3px 7px;}
   #content-area{padding:10px 8px;}
@@ -632,24 +631,36 @@ function renderSectionContent(sec){
   }
   html += '</div>'; // end sec-col-left
 
-  // RIGHT COLUMN — images
+  // RIGHT COLUMN — free-position image canvas
+  var anyHasLayout = imgs.some(function(im){ return im.layout && im.layout.x != null; });
   if(hasImages || state.isAdminPage){
-    html += '<div class="sec-col-right'+(state.unlocked?' edit-mode':'')+'">';
+    html += '<div class="sec-col-right'+(state.unlocked?' edit-mode':'')+'" id="img-canvas">';
     if(hasImages){
+      var stackY = 0;
       imgs.forEach(function(im, idx){
-        var wpct = im.widthPct || 100;
-        var cardStyle = 'width:calc('+wpct+'% - '+(wpct<100?'3':'0')+'px)';
-        html += '<div class="img-card" data-img-idx="'+idx+'" style="'+cardStyle+'" '+(state.unlocked?'draggable="true"':'')+'>';
-        // Admin edit bar
-        if(state.unlocked){
-          html += '<div class="img-edit-bar">';
-          html += '<span style="font-size:10px;color:#556;cursor:grab;" title="Arrastra para reordenar">&#9776;</span>';
-          html += '<button class="img-ebtn" data-action="crop" data-idx="'+idx+'">&#9986; Recortar</button>';
-          html += '<span class="img-edit-spacer"></span>';
-          html += '<span class="img-width-label">'+wpct+'%</span>';
-          html += '<button class="img-ebtn del" data-action="remove-img" data-idx="'+idx+'" title="Quitar imagen">&#10005;</button>';
-          html += '</div>';
+        var lo = im.layout || {};
+        var hasPos = lo.x != null && lo.y != null;
+        var posStyle = '';
+        if(hasPos){
+          posStyle += 'left:'+lo.x+'px;top:'+lo.y+'px;';
+        } else {
+          posStyle += 'left:0;top:'+stackY+'px;';
         }
+        if(lo.w) posStyle += 'width:'+lo.w+'px;';
+        else posStyle += 'width:92%;';
+        if(lo.h) posStyle += 'height:'+lo.h+'px;';
+        // Estimate stack height for unpositioned images
+        stackY += (lo.h || 280) + 8;
+        html += '<div class="img-card" data-img-idx="'+idx+'" style="'+posStyle+'">';
+        // Edit bar (visible in edit-mode)
+        html += '<div class="img-edit-bar">';
+        html += '<span style="font-size:11px;color:#556;cursor:move;" title="Arrastra para mover">&#9776;</span>';
+        html += '<button class="img-ebtn" data-action="crop" data-idx="'+idx+'">&#9986; Recortar</button>';
+        html += '<button class="img-ebtn" data-action="reset-pos" data-idx="'+idx+'" title="Auto-posicionar">&#8634;</button>';
+        html += '<span class="img-edit-spacer"></span>';
+        html += '<span class="img-size-label" data-idx="'+idx+'"></span>';
+        html += '<button class="img-ebtn del" data-action="remove-img" data-idx="'+idx+'" title="Quitar">&#10005;</button>';
+        html += '</div>';
         // Image with crop via clip-path
         var cropStyle = '';
         if(im.crop && im.crop.w > 0 && im.crop.h > 0){
@@ -662,19 +673,18 @@ function renderSectionContent(sec){
         var lbUrl = esc(im.url).replace(/'/g,"\\'");
         var lbCap = esc(im.caption||'').replace(/'/g,"\\'");
         html += '<img src="'+esc(im.url)+'" alt="'+esc(im.caption||sec.title)+'" loading="lazy"';
-        html += ' style="'+cropStyle+'"';
-        html += ' onclick="openLightbox(\''+lbUrl+'\',\''+lbCap+'\')"/>';
+        if(cropStyle) html += ' style="'+cropStyle+'"';
+        html += ' onload="if(typeof updateCanvasHeight===\'function\')updateCanvasHeight()"';
+        html += ' onclick="if(!window._imgEditing)openLightbox(\''+lbUrl+'\',\''+lbCap+'\')"/>';
         if(im.caption) html += '<div class="img-caption">'+esc(im.caption)+'</div>';
         // Resize handle
-        if(state.unlocked){
-          html += '<div class="img-resize-handle" data-idx="'+idx+'" title="Arrastra para redimensionar"></div>';
-        }
+        html += '<div class="img-resize-handle" data-idx="'+idx+'" title="Arrastra para redimensionar"></div>';
         html += '</div>';
       });
     } else {
       html += '<div class="img-placeholder"><span style="font-size:24px;opacity:.3;">&#128444;</span><span>Sin imagenes</span></div>';
     }
-    html += '</div>'; // end sec-col-right
+    html += '</div>';
   }
 
   html += '</div>'; // end sec-two-col
@@ -693,9 +703,31 @@ function showSection(id){
   renderNavTree();
   // Bind image management events
   bindImageControls(el);
+  // Set canvas min-height based on image positions
+  updateCanvasHeight();
 }
 
+function updateCanvasHeight(){
+  var canvas = byId('img-canvas');
+  if(!canvas) return;
+  var maxBottom = 300;
+  canvas.querySelectorAll('.img-card').forEach(function(card){
+    var b = card.offsetTop + card.offsetHeight + 10;
+    if(b > maxBottom) maxBottom = b;
+  });
+  canvas.style.minHeight = maxBottom + 'px';
+}
+
+window._imgEditing = false;
+
 function bindImageControls(container){
+  if(!state.unlocked) return;
+  var canvas = container.querySelector('#img-canvas');
+  if(!canvas) return;
+
+  // Auto-layout images that have no position yet
+  autoLayoutNewImages(canvas);
+
   // ── Button actions ──
   container.querySelectorAll('.img-ebtn').forEach(function(btn){
     btn.addEventListener('click', function(ev){
@@ -703,7 +735,7 @@ function bindImageControls(container){
       var action = btn.dataset.action;
       var idx = parseInt(btn.dataset.idx, 10);
       var sec = state.sections.find(function(s){ return s.id===state.currentId; });
-      if(!sec || !Array.isArray(sec.images)) return;
+      if(!sec || !sec.images) return;
       if(action === 'crop'){
         openCropTool(idx);
       } else if(action === 'remove-img'){
@@ -711,87 +743,60 @@ function bindImageControls(container){
         sec.images.splice(idx, 1);
         saveCurrentSection();
         showSection(state.currentId);
+      } else if(action === 'reset-pos'){
+        delete sec.images[idx].layout;
+        saveCurrentSection();
+        showSection(state.currentId);
       }
     });
   });
 
-  // ── Drag & Drop reorder ──
-  var dragSrcIdx = -1;
-  container.querySelectorAll('.img-card[draggable]').forEach(function(card){
-    card.addEventListener('dragstart', function(e){
-      dragSrcIdx = parseInt(card.dataset.imgIdx, 10);
-      card.classList.add('dragging');
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', '');
-    });
-    card.addEventListener('dragend', function(){
-      card.classList.remove('dragging');
-      container.querySelectorAll('.img-card').forEach(function(c){ c.classList.remove('drag-over'); });
-    });
-    card.addEventListener('dragover', function(e){
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-      container.querySelectorAll('.img-card').forEach(function(c){ c.classList.remove('drag-over'); });
-      card.classList.add('drag-over');
-    });
-    card.addEventListener('dragleave', function(){ card.classList.remove('drag-over'); });
-    card.addEventListener('drop', function(e){
-      e.preventDefault();
-      card.classList.remove('drag-over');
-      var targetIdx = parseInt(card.dataset.imgIdx, 10);
-      if(dragSrcIdx < 0 || dragSrcIdx === targetIdx) return;
-      var sec = state.sections.find(function(s){ return s.id===state.currentId; });
-      if(!sec || !sec.images) return;
-      var moved = sec.images.splice(dragSrcIdx, 1)[0];
-      sec.images.splice(targetIdx, 0, moved);
-      dragSrcIdx = -1;
-      saveCurrentSection();
-      showSection(state.currentId);
-    });
+  // ── Free MOVE (drag card by edit-bar / body) ──
+  canvas.querySelectorAll('.img-card').forEach(function(card){
+    card.addEventListener('mousedown', startMove);
+    card.addEventListener('touchstart', startMove, {passive:false});
   });
 
-  // ── Resize handles (drag to change widthPct) ──
-  container.querySelectorAll('.img-resize-handle').forEach(function(handle){
-    handle.addEventListener('mousedown', startResize);
-    handle.addEventListener('touchstart', startResize, {passive:false});
-  });
+  var mv = {active:false, card:null, idx:-1, sx:0, sy:0, ox:0, oy:0};
 
-  var resizeState = {active:false, idx:-1, startX:0, startW:0, colW:0};
-
-  function startResize(e){
+  function startMove(e){
+    // Don't start move from resize handle or buttons
+    if(e.target.closest('.img-resize-handle') || e.target.closest('.img-ebtn') || e.target.tagName==='IMG') return;
     e.preventDefault();
-    e.stopPropagation();
-    var idx = parseInt(this.dataset.idx, 10);
-    var card = this.closest('.img-card');
-    var colEl = container.querySelector('.sec-col-right');
-    if(!colEl) colEl = card.parentElement;
-    resizeState.active = true;
-    resizeState.idx = idx;
-    resizeState.startX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
-    resizeState.startW = card.offsetWidth;
-    resizeState.colW = colEl.offsetWidth;
-    card.style.transition = 'none';
+    var card = this;
+    mv.active = true;
+    mv.card = card;
+    mv.idx = parseInt(card.dataset.imgIdx, 10);
+    var px = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
+    var py = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
+    mv.sx = px; mv.sy = py;
+    mv.ox = card.offsetLeft; mv.oy = card.offsetTop;
+    card.classList.add('moving');
+    window._imgEditing = true;
 
     function onMove(ev){
-      if(!resizeState.active) return;
-      var cx = ev.type === 'touchmove' ? ev.touches[0].clientX : ev.clientX;
-      var newW = resizeState.startW + (cx - resizeState.startX);
-      var pct = Math.round(Math.max(20, Math.min(100, (newW / resizeState.colW) * 100)));
-      card.style.width = 'calc('+pct+'% - '+(pct<100?'3':'0')+'px)';
-      var label = card.querySelector('.img-width-label');
-      if(label) label.textContent = pct + '%';
+      if(!mv.active) return;
+      var cx = ev.type==='touchmove' ? ev.touches[0].clientX : ev.clientX;
+      var cy = ev.type==='touchmove' ? ev.touches[0].clientY : ev.clientY;
+      card.style.left = (mv.ox + cx - mv.sx) + 'px';
+      card.style.top = (mv.oy + cy - mv.sy) + 'px';
+      ev.preventDefault();
     }
     function onUp(){
-      if(!resizeState.active) return;
-      resizeState.active = false;
-      card.style.transition = '';
+      if(!mv.active) return;
+      mv.active = false;
+      card.classList.remove('moving');
+      // Save position
       var sec = state.sections.find(function(s){ return s.id===state.currentId; });
-      if(sec && sec.images && sec.images[resizeState.idx]){
-        var finalW = card.offsetWidth;
-        var pct = Math.round(Math.max(20, Math.min(100, (finalW / resizeState.colW) * 100)));
-        sec.images[resizeState.idx].widthPct = pct;
+      if(sec && sec.images && sec.images[mv.idx]){
+        if(!sec.images[mv.idx].layout) sec.images[mv.idx].layout = {};
+        sec.images[mv.idx].layout.x = card.offsetLeft;
+        sec.images[mv.idx].layout.y = card.offsetTop;
+        sec.images[mv.idx].layout.w = card.offsetWidth;
+        sec.images[mv.idx].layout.h = card.offsetHeight;
         saveCurrentSection();
       }
+      setTimeout(function(){ window._imgEditing = false; }, 100);
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
       window.removeEventListener('touchmove', onMove);
@@ -802,6 +807,87 @@ function bindImageControls(container){
     window.addEventListener('touchmove', onMove, {passive:false});
     window.addEventListener('touchend', onUp);
   }
+
+  // ── Free RESIZE (drag corner handle) ──
+  canvas.querySelectorAll('.img-resize-handle').forEach(function(handle){
+    handle.addEventListener('mousedown', startResize);
+    handle.addEventListener('touchstart', startResize, {passive:false});
+  });
+
+  var rs = {active:false, card:null, idx:-1, sx:0, sy:0, sw:0, sh:0};
+
+  function startResize(e){
+    e.preventDefault();
+    e.stopPropagation();
+    var card = this.closest('.img-card');
+    rs.active = true;
+    rs.card = card;
+    rs.idx = parseInt(this.dataset.idx, 10);
+    rs.sx = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
+    rs.sy = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
+    rs.sw = card.offsetWidth;
+    rs.sh = card.offsetHeight;
+    window._imgEditing = true;
+
+    function onMove(ev){
+      if(!rs.active) return;
+      var cx = ev.type==='touchmove' ? ev.touches[0].clientX : ev.clientX;
+      var cy = ev.type==='touchmove' ? ev.touches[0].clientY : ev.clientY;
+      var nw = Math.max(80, rs.sw + cx - rs.sx);
+      var nh = Math.max(60, rs.sh + cy - rs.sy);
+      card.style.width = nw + 'px';
+      card.style.height = nh + 'px';
+      card.querySelector('img').style.height = 'calc(100% - 30px)';
+      card.querySelector('img').style.objectFit = 'contain';
+      var label = card.querySelector('.img-size-label');
+      if(label) label.textContent = nw+'×'+nh;
+      ev.preventDefault();
+    }
+    function onUp(){
+      if(!rs.active) return;
+      rs.active = false;
+      var sec = state.sections.find(function(s){ return s.id===state.currentId; });
+      if(sec && sec.images && sec.images[rs.idx]){
+        if(!sec.images[rs.idx].layout) sec.images[rs.idx].layout = {};
+        sec.images[rs.idx].layout.x = card.offsetLeft;
+        sec.images[rs.idx].layout.y = card.offsetTop;
+        sec.images[rs.idx].layout.w = card.offsetWidth;
+        sec.images[rs.idx].layout.h = card.offsetHeight;
+        saveCurrentSection();
+      }
+      setTimeout(function(){ window._imgEditing = false; }, 100);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('touchmove', onMove);
+      window.removeEventListener('touchend', onUp);
+    }
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    window.addEventListener('touchmove', onMove, {passive:false});
+    window.addEventListener('touchend', onUp);
+  }
+}
+
+function autoLayoutNewImages(canvas){
+  var sec = state.sections.find(function(s){ return s.id===state.currentId; });
+  if(!sec || !sec.images) return;
+  var cw = canvas.offsetWidth || 400;
+  var y = 0;
+  var changed = false;
+  sec.images.forEach(function(im, i){
+    if(im.url && (!im.layout || im.layout.x == null)){
+      if(!im.layout) im.layout = {};
+      im.layout.x = 0;
+      im.layout.y = y;
+      im.layout.w = Math.round(cw * 0.9);
+      changed = true;
+    }
+    // Stack: estimate height from previous cards or use 250
+    var h = (im.layout && im.layout.h) ? im.layout.h : 250;
+    if(im.layout && im.layout.y != null) y = im.layout.y + h + 8;
+    else y += h + 8;
+  });
+  if(changed) saveCurrentSection();
 }
 
 function saveCurrentSection(){
@@ -873,7 +959,7 @@ function saveModal(){
     var prev = existingImgs.find(function(ei){ return ei.url === url; });
     var im = {url:url, caption:caption};
     if(prev && prev.crop) im.crop = prev.crop;
-    if(prev && prev.widthPct) im.widthPct = prev.widthPct;
+    if(prev && prev.layout) im.layout = prev.layout;
     return im;
   }).filter(function(im){ return im.url; });
   var existing = state.editingId ? state.sections.find(function(s){ return s.id===state.editingId; }) : null;
