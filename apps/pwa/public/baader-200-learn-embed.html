@@ -177,7 +177,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 .img-body{flex:1;min-height:0;overflow:hidden;position:relative;cursor:zoom-in;}
 .img-body.zoomed{cursor:grab;}
 .img-body.zoomed.panning{cursor:grabbing;}
-.img-body img{width:100%;height:100%;display:block;background:#0a0c12;object-fit:fill;transform-origin:0 0;}
+.img-body img{width:100%;height:100%;display:block;background:#0a0c12;object-fit:fill;}
 .img-body.cropped img{position:absolute;object-fit:fill;}
 .img-zoom-hint{position:absolute;bottom:4px;right:4px;font-size:9px;color:#556;background:rgba(0,0,0,.6);padding:2px 6px;border-radius:3px;pointer-events:none;z-index:3;opacity:0;transition:opacity .2s;}
 .img-body:hover .img-zoom-hint{opacity:1;}
@@ -882,36 +882,35 @@ function bindImageZoomPan(container){
     var zs = {z:1, tx:0, ty:0, panning:false, sx:0, sy:0, stx:0, sty:0};
     body._zs = zs;
 
+    // Create an inner wrapper for zoom transform (keeps overflow:hidden on body)
+    var zoomWrap = document.createElement('div');
+    zoomWrap.style.cssText = 'position:absolute;inset:0;transform-origin:0 0;';
+    while(body.firstChild && body.firstChild !== body.querySelector('.img-zoom-hint')){
+      zoomWrap.appendChild(body.firstChild);
+    }
+    body.insertBefore(zoomWrap, body.firstChild);
+
     function applyZoom(){
-      img.style.transform = 'translate('+zs.tx+'px,'+zs.ty+'px) scale('+zs.z+')';
+      zoomWrap.style.transform = 'translate('+zs.tx+'px,'+zs.ty+'px) scale('+zs.z+')';
       body.classList.toggle('zoomed', zs.z > 1.05);
       var hint = body.querySelector('.img-zoom-hint');
       if(hint) hint.textContent = zs.z > 1.05 ? Math.round(zs.z*100)+'%' : 'Scroll=zoom';
     }
 
     function clampPan(){
-      // Prevent showing empty space outside the visible image area
+      // At z=1 the image (or crop region) fills the container exactly.
+      // At z>1 the image is larger than container by factor z.
+      // tx/ty can range from 0 to -(container_size * (z-1))
+      // so the zoomed image stays within the container bounds.
       var bw = body.offsetWidth, bh = body.offsetHeight;
-      // Effective image bounds after scale
-      // For uncropped: img fills body at z=1, so scaled = bw*z, bh*z
-      // For cropped: img is larger, positioned with left/top offsets
-      var isCropped = body.classList.contains('cropped');
-      var baseLeft = isCropped ? parseFloat(img.style.left)||0 : 0;
-      var baseTop = isCropped ? parseFloat(img.style.top)||0 : 0;
-      // Convert % to px
-      if(String(img.style.left).indexOf('%')>-1) baseLeft = parseFloat(img.style.left)/100*bw;
-      if(String(img.style.top).indexOf('%')>-1) baseTop = parseFloat(img.style.top)/100*bh;
-      var imgW = img.offsetWidth * zs.z;
-      var imgH = img.offsetHeight * zs.z;
-      var visLeft = baseLeft * zs.z + zs.tx;
-      var visTop = baseTop * zs.z + zs.ty;
-      // Don't let right edge go left of container right
-      if(visLeft + imgW < bw) zs.tx = bw - imgW - baseLeft*zs.z;
-      // Don't let left edge go right of container left
-      if(visLeft > 0) zs.tx = -baseLeft*zs.z;
-      // Same for vertical
-      if(visTop + imgH < bh) zs.ty = bh - imgH - baseTop*zs.z;
-      if(visTop > 0) zs.ty = -baseTop*zs.z;
+      var maxTx = 0;
+      var minTx = -bw * (zs.z - 1);
+      var maxTy = 0;
+      var minTy = -bh * (zs.z - 1);
+      if(zs.tx > maxTx) zs.tx = maxTx;
+      if(zs.tx < minTx) zs.tx = minTx;
+      if(zs.ty > maxTy) zs.ty = maxTy;
+      if(zs.ty < minTy) zs.ty = minTy;
     }
 
     // Scroll zoom
