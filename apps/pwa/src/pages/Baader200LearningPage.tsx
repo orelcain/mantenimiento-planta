@@ -136,26 +136,40 @@ export function Baader200LearningPage() {
   }, [user, sections, sendInitData])
 
   const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file || !iframeRef.current?.contentWindow) return
+    const files = e.target.files
+    if (!files || files.length === 0 || !iframeRef.current?.contentWindow) return
     const iframe = iframeRef.current.contentWindow
-    const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
-    const path = `baader200-images/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`
-    const storageRef = ref(storage, path)
-    const task = uploadBytesResumable(storageRef, file)
-    task.on('state_changed',
-      (snap) => {
-        const pct = Math.round((snap.bytesTransferred / snap.totalBytes) * 100)
-        iframe.postMessage({ type: 'b200:upload-progress', percent: pct }, '*')
-      },
-      (err) => {
-        iframe.postMessage({ type: 'b200:upload-error', error: err.message }, '*')
-      },
-      async () => {
-        const url = await getDownloadURL(task.snapshot.ref)
-        iframe.postMessage({ type: 'b200:upload-result', url, caption: file.name.replace(/\.[^.]+$/, '') }, '*')
-      }
-    )
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]!
+      const defaultName = file.name.replace(/\.[^.]+$/, '')
+      const caption = prompt(`Nombre/descripción para la imagen${files.length > 1 ? ` (${i + 1} de ${files.length})` : ''}:`, defaultName)
+      if (caption === null) continue // user cancelled
+
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+      const path = `baader200-images/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`
+      const storageRef = ref(storage, path)
+      const task = uploadBytesResumable(storageRef, file)
+
+      await new Promise<void>((resolve, reject) => {
+        task.on('state_changed',
+          (snap) => {
+            const pct = Math.round((snap.bytesTransferred / snap.totalBytes) * 100)
+            iframe.postMessage({ type: 'b200:upload-progress', percent: pct, current: i + 1, total: files.length }, '*')
+          },
+          (err) => {
+            iframe.postMessage({ type: 'b200:upload-error', error: err.message }, '*')
+            reject(err)
+          },
+          async () => {
+            const url = await getDownloadURL(task.snapshot.ref)
+            iframe.postMessage({ type: 'b200:upload-result', url, caption: caption || defaultName }, '*')
+            resolve()
+          }
+        )
+      }).catch(() => {})
+    }
+    iframe.postMessage({ type: 'b200:upload-done' }, '*')
     e.target.value = ''
   }, [])
 
@@ -232,6 +246,7 @@ export function Baader200LearningPage() {
           ref={fileInputRef}
           type="file"
           accept="image/*"
+          multiple
           className="hidden"
           onChange={handleFileUpload}
         />

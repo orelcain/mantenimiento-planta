@@ -638,7 +638,13 @@ window.addEventListener('message', function(e){
     setTimeout(function(){ byId('f-upload-status').textContent = ''; byId('f-upload-status').style.color = ''; }, 4000);
   }
   if(d.type === 'b200:upload-progress'){
-    byId('f-upload-status').textContent = 'Subiendo... ' + (d.percent || 0) + '%';
+    var label = d.total > 1 ? ('Subiendo ' + d.current + '/' + d.total + '... ') : 'Subiendo... ';
+    byId('f-upload-status').textContent = label + (d.percent || 0) + '%';
+  }
+  if(d.type === 'b200:upload-done'){
+    byId('f-upload-status').textContent = 'Todas las imágenes subidas';
+    byId('f-upload-status').style.color = '#88ff88';
+    setTimeout(function(){ byId('f-upload-status').textContent = ''; byId('f-upload-status').style.color = ''; }, 3000);
   }
 });
 
