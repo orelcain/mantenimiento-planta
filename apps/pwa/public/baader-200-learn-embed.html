@@ -305,10 +305,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
   .meas-table{font-size:11px;}
   .meas-table th,.meas-table td{padding:6px 8px;}
   .note-item{font-size:12px;}
-  /* Images flow naturally in mobile (no absolute positioning) */
-  .img-card{position:relative!important;left:auto!important;top:auto!important;width:100%!important;height:auto!important;margin-bottom:10px;border-radius:10px;}
-  .img-body{min-height:auto!important;}
-  .img-body img{height:auto!important;max-height:60vh;object-fit:contain!important;}
+  /* Images flow naturally in mobile (no absolute, no flex column) */
+  .img-card{position:relative!important;left:auto!important;top:auto!important;width:100%!important;height:auto!important;margin-bottom:10px;border-radius:10px;display:block!important;}
+  .img-body{min-height:auto!important;overflow:visible!important;position:relative!important;}
+  .img-body img{width:100%!important;height:auto!important;max-height:60vh;object-fit:contain!important;position:static!important;}
   .img-edit-bar{position:relative;opacity:1;}
   .img-resize-handle{display:none!important;}
   .img-caption{font-size:12px;padding:8px 10px;}
