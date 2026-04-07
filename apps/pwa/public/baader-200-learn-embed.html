@@ -181,6 +181,24 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 .img-body.cropped img{position:absolute;object-fit:fill;}
 .img-zoom-hint{position:absolute;bottom:4px;right:4px;font-size:9px;color:#556;background:rgba(0,0,0,.6);padding:2px 6px;border-radius:3px;pointer-events:none;z-index:3;opacity:0;transition:opacity .2s;}
 .img-body:hover .img-zoom-hint{opacity:1;}
+/* ── ANNOTATIONS SVG ── */
+.ann-svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:4;}
+.ann-svg.drawing{pointer-events:all;cursor:crosshair;}
+.ann-svg circle,.ann-svg rect,.ann-svg line,.ann-svg polygon,.ann-svg text{pointer-events:visiblePainted;}
+.ann-svg .ann-shape{stroke-width:2;fill-opacity:.12;cursor:pointer;}
+.ann-svg .ann-shape:hover{stroke-width:3;fill-opacity:.25;}
+.ann-svg .ann-label{font-size:11px;font-weight:700;paint-order:stroke;stroke:#000;stroke-width:3px;fill:#fff;pointer-events:none;}
+.ann-svg .ann-point{fill:var(--ac);stroke:#fff;stroke-width:1.5;cursor:move;r:4;}
+.ann-svg .ann-point:hover{r:6;}
+/* annotation toolbar */
+.ann-toolbar{display:none;align-items:center;gap:3px;padding:2px 6px;background:rgba(13,15,21,.95);border-top:1px solid #252a38;flex-shrink:0;}
+.ann-toolbar.active{display:flex;}
+.ann-tool{background:none;border:1px solid #2a2e3a;color:#8890a0;font-size:10px;padding:3px 7px;border-radius:4px;cursor:pointer;transition:all .12s;white-space:nowrap;}
+.ann-tool:hover{border-color:var(--ac);color:var(--text);}
+.ann-tool.selected{background:var(--ac2);border-color:var(--ac);color:#fff;}
+.ann-color{width:16px;height:16px;border-radius:3px;border:1px solid #444;cursor:pointer;padding:0;}
+.ann-color.selected{border:2px solid #fff;box-shadow:0 0 4px var(--ac);}
+
 .img-caption{font-size:11px;color:#99a0b0;padding:5px 8px;text-align:center;border-top:1px solid #1e2230;flex-shrink:0;}
 .img-placeholder-box{position:absolute;right:0;top:0;width:60%;height:200px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;border:2px dashed #252a38;border-radius:8px;color:#556;font-size:12px;}
 
@@ -658,6 +676,7 @@ function renderSectionContent(sec){
       html += '<div class="img-edit-bar">';
       html += '<span style="font-size:11px;color:#556;cursor:move;" title="Arrastra para mover">&#9776;</span>';
       html += '<button class="img-ebtn" data-action="crop" data-idx="'+idx+'">&#9986; Recortar</button>';
+      html += '<button class="img-ebtn" data-action="annotate" data-idx="'+idx+'" title="Dibujar anotaciones">&#9998; Anotar</button>';
       html += '<button class="img-ebtn" data-action="reset-pos" data-idx="'+idx+'" title="Auto-posicionar">&#8634;</button>';
       html += '<span class="img-edit-spacer"></span>';
       html += '<span class="img-size-label" data-idx="'+idx+'"></span>';
@@ -684,7 +703,49 @@ function renderSectionContent(sec){
       if(imgStyle) html += ' style="'+imgStyle+'"';
       html += ' onload="if(typeof updateCanvasHeight===\'function\')updateCanvasHeight()"';
       html += ' data-lb-url="'+esc(im.url)+'" data-lb-cap="'+esc(im.caption||'')+'"/>';
-      html += '<div class="img-zoom-hint">Scroll=zoom · Doble click=reset</div>';
+      // SVG annotation layer
+      html += '<svg class="ann-svg" data-idx="'+idx+'" viewBox="0 0 100 100" preserveAspectRatio="none">';
+      html += '<defs><marker id="ah'+idx+'" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="context-stroke"/></marker></defs>';
+      var anns = Array.isArray(im.annotations) ? im.annotations : [];
+      anns.forEach(function(a){
+        var c = a.color || '#ff4444';
+        if(a.type==='circle'){
+          html += '<circle class="ann-shape" cx="'+a.x+'" cy="'+a.y+'" r="'+(a.r||3)+'" stroke="'+esc(c)+'" fill="'+esc(c)+'" data-ann-id="'+esc(a.id)+'"/>';
+        } else if(a.type==='rect'){
+          html += '<rect class="ann-shape" x="'+a.x+'" y="'+a.y+'" width="'+(a.w||10)+'" height="'+(a.h||10)+'" stroke="'+esc(c)+'" fill="'+esc(c)+'" data-ann-id="'+esc(a.id)+'"/>';
+        } else if(a.type==='arrow'){
+          html += '<line class="ann-shape" x1="'+a.x+'" y1="'+a.y+'" x2="'+(a.x2||a.x+10)+'" y2="'+(a.y2||a.y)+'" stroke="'+esc(c)+'" fill="none" marker-end="url(#ah'+idx+')" data-ann-id="'+esc(a.id)+'"/>';
+        } else if(a.type==='polygon' && a.points && a.points.length > 1){
+          var pts = a.points.map(function(p){return p.x+','+p.y;}).join(' ');
+          html += '<polygon class="ann-shape" points="'+pts+'" stroke="'+esc(c)+'" fill="'+esc(c)+'" data-ann-id="'+esc(a.id)+'"/>';
+          a.points.forEach(function(p,pi){
+            html += '<circle class="ann-point" cx="'+p.x+'" cy="'+p.y+'" data-ann-id="'+esc(a.id)+'" data-pt="'+pi+'"/>';
+          });
+        }
+        if(a.label){
+          var lx = a.type==='circle'? a.x : (a.type==='rect'? a.x+((a.w||10)/2) : a.x);
+          var ly = a.type==='circle'? (a.y-(a.r||3)-1) : (a.type==='rect'? (a.y-1) : (a.y-1.5));
+          html += '<text class="ann-label" x="'+lx+'" y="'+ly+'" text-anchor="middle" fill="'+esc(c)+'">'+esc(a.label)+'</text>';
+        }
+      });
+      html += '</svg>';
+      html += '<div class="img-zoom-hint">Scroll=zoom</div>';
+      html += '</div>';
+      // Annotation toolbar (below img-body, above caption)
+      html += '<div class="ann-toolbar" data-idx="'+idx+'">';
+      html += '<button class="ann-tool" data-tool="circle" title="Circulo">&#9679;</button>';
+      html += '<button class="ann-tool" data-tool="rect" title="Rectangulo">&#9634;</button>';
+      html += '<button class="ann-tool" data-tool="arrow" title="Flecha">&#10140;</button>';
+      html += '<button class="ann-tool" data-tool="polygon" title="Poligono de puntos">&#11206;</button>';
+      html += '<button class="ann-tool" data-tool="text" title="Etiqueta">T</button>';
+      html += '<span style="width:1px;height:14px;background:#333;margin:0 2px;"></span>';
+      var colors = ['#ff4444','#44aaff','#44ff44','#ffaa00','#ff44ff','#ffffff'];
+      colors.forEach(function(clr){
+        html += '<button class="ann-color'+(clr==='#ff4444'?' selected':'')+'" data-color="'+clr+'" style="background:'+clr+';" title="'+clr+'"></button>';
+      });
+      html += '<span style="flex:1;"></span>';
+      html += '<button class="ann-tool" data-tool="undo" title="Deshacer ultimo">&#8630; Deshacer</button>';
+      html += '<button class="ann-tool" data-tool="done" title="Listo">&#10003; Listo</button>';
       html += '</div>';
       if(im.caption) html += '<div class="img-caption">'+esc(im.caption)+'</div>';
       html += '<div class="img-resize-handle" data-idx="'+idx+'" title="Arrastra para redimensionar"></div>';
@@ -755,6 +816,8 @@ function bindImageControls(container){
         delete sec.images[idx].layout;
         saveCurrentSection();
         showSection(state.currentId);
+      } else if(action === 'annotate'){
+        toggleAnnotationMode(idx);
       }
     });
   });
@@ -999,6 +1062,261 @@ function bindImageZoomPan(container){
   });
 }
 
+// ── Annotation Drawing System ──
+var ann = {
+  active: false, imgIdx: -1, tool: 'circle', color: '#ff4444',
+  drawing: false, startX: 0, startY: 0, tempEl: null, polyPoints: []
+};
+
+function toggleAnnotationMode(idx){
+  var toolbar = document.querySelector('.ann-toolbar[data-idx="'+idx+'"]');
+  var svg = document.querySelector('.ann-svg[data-idx="'+idx+'"]');
+  if(!toolbar || !svg) return;
+  if(ann.active && ann.imgIdx === idx){
+    // Deactivate
+    ann.active = false;
+    toolbar.classList.remove('active');
+    svg.classList.remove('drawing');
+    ann.imgIdx = -1;
+    finishPolygon();
+    return;
+  }
+  // Deactivate previous if any
+  document.querySelectorAll('.ann-toolbar.active').forEach(function(t){ t.classList.remove('active'); });
+  document.querySelectorAll('.ann-svg.drawing').forEach(function(s){ s.classList.remove('drawing'); });
+  ann.active = true;
+  ann.imgIdx = idx;
+  ann.tool = 'circle';
+  ann.polyPoints = [];
+  toolbar.classList.add('active');
+  svg.classList.add('drawing');
+  // Highlight selected tool
+  toolbar.querySelectorAll('.ann-tool').forEach(function(t){ t.classList.toggle('selected', t.dataset.tool === ann.tool); });
+
+  // Toolbar events
+  toolbar.querySelectorAll('.ann-tool').forEach(function(btn){
+    btn.onclick = function(e){
+      e.stopPropagation();
+      var t = btn.dataset.tool;
+      if(t === 'done'){ toggleAnnotationMode(idx); return; }
+      if(t === 'undo'){ undoAnnotation(idx); return; }
+      finishPolygon();
+      ann.tool = t;
+      toolbar.querySelectorAll('.ann-tool').forEach(function(b){ b.classList.toggle('selected', b.dataset.tool === t); });
+    };
+  });
+  toolbar.querySelectorAll('.ann-color').forEach(function(btn){
+    btn.onclick = function(e){
+      e.stopPropagation();
+      ann.color = btn.dataset.color;
+      toolbar.querySelectorAll('.ann-color').forEach(function(b){ b.classList.toggle('selected', b.dataset.color === ann.color); });
+    };
+  });
+
+  // SVG drawing events
+  svg.onmousedown = function(e){ annPointerDown(e, svg); };
+  svg.onmousemove = function(e){ annPointerMove(e, svg); };
+  svg.onmouseup = function(e){ annPointerUp(e, svg); };
+  svg.ontouchstart = function(e){
+    if(e.touches.length===1) annPointerDown(e.touches[0], svg);
+  };
+  svg.ontouchmove = function(e){
+    if(e.touches.length===1){ annPointerMove(e.touches[0], svg); e.preventDefault(); }
+  };
+  svg.ontouchend = function(){ annPointerUp(null, svg); };
+}
+
+function svgCoords(clientX, clientY, svg){
+  var r = svg.getBoundingClientRect();
+  return { x: (clientX - r.left) / r.width * 100, y: (clientY - r.top) / r.height * 100 };
+}
+
+function annPointerDown(e, svg){
+  if(!ann.active) return;
+  var p = svgCoords(e.clientX, e.clientY, svg);
+
+  // Click on existing shape to delete it
+  if(e.target && e.target.closest('.ann-shape')){
+    var id = e.target.closest('.ann-shape').getAttribute('data-ann-id');
+    if(id && confirm('¿Eliminar esta anotación?')){
+      deleteAnnotation(ann.imgIdx, id);
+    }
+    return;
+  }
+
+  if(ann.tool === 'polygon'){
+    ann.polyPoints.push({x: Math.round(p.x*10)/10, y: Math.round(p.y*10)/10});
+    renderTempPolygon(svg);
+    return;
+  }
+  if(ann.tool === 'text'){
+    var label = prompt('Texto de la etiqueta:');
+    if(!label) return;
+    addAnnotation(ann.imgIdx, {
+      id:'a'+Date.now(), type:'text', x:Math.round(p.x*10)/10, y:Math.round(p.y*10)/10,
+      label:label, color:ann.color
+    });
+    return;
+  }
+  ann.drawing = true;
+  ann.startX = p.x;
+  ann.startY = p.y;
+}
+
+function annPointerMove(e, svg){
+  if(!ann.drawing || !ann.active) return;
+  var p = svgCoords(e.clientX, e.clientY, svg);
+  // Preview shape
+  removeTempEl(svg);
+  var ns = 'http://www.w3.org/2000/svg';
+  if(ann.tool === 'circle'){
+    var r = Math.sqrt(Math.pow(p.x-ann.startX,2)+Math.pow(p.y-ann.startY,2));
+    ann.tempEl = document.createElementNS(ns,'circle');
+    ann.tempEl.setAttribute('cx', ann.startX);
+    ann.tempEl.setAttribute('cy', ann.startY);
+    ann.tempEl.setAttribute('r', r);
+  } else if(ann.tool === 'rect'){
+    ann.tempEl = document.createElementNS(ns,'rect');
+    ann.tempEl.setAttribute('x', Math.min(ann.startX, p.x));
+    ann.tempEl.setAttribute('y', Math.min(ann.startY, p.y));
+    ann.tempEl.setAttribute('width', Math.abs(p.x - ann.startX));
+    ann.tempEl.setAttribute('height', Math.abs(p.y - ann.startY));
+  } else if(ann.tool === 'arrow'){
+    ann.tempEl = document.createElementNS(ns,'line');
+    ann.tempEl.setAttribute('x1', ann.startX);
+    ann.tempEl.setAttribute('y1', ann.startY);
+    ann.tempEl.setAttribute('x2', p.x);
+    ann.tempEl.setAttribute('y2', p.y);
+    ann.tempEl.setAttribute('marker-end', 'url(#ah'+ann.imgIdx+')');
+  }
+  if(ann.tempEl){
+    ann.tempEl.setAttribute('stroke', ann.color);
+    ann.tempEl.setAttribute('fill', ann.tool==='arrow'?'none':ann.color);
+    ann.tempEl.setAttribute('fill-opacity', '.15');
+    ann.tempEl.setAttribute('stroke-width', '2');
+    ann.tempEl.classList.add('ann-temp');
+    svg.appendChild(ann.tempEl);
+  }
+}
+
+function annPointerUp(e, svg){
+  if(!ann.drawing) return;
+  ann.drawing = false;
+  removeTempEl(svg);
+  if(!e) return;
+  var p = svgCoords(e.clientX, e.clientY, svg);
+  var dx = Math.abs(p.x - ann.startX), dy = Math.abs(p.y - ann.startY);
+  if(dx < 1 && dy < 1 && ann.tool !== 'circle') return; // too small
+
+  var a = { id:'a'+Date.now(), type:ann.tool, color:ann.color,
+    x:Math.round(ann.startX*10)/10, y:Math.round(ann.startY*10)/10 };
+
+  if(ann.tool === 'circle'){
+    a.r = Math.round(Math.max(1.5, Math.sqrt(dx*dx+dy*dy))*10)/10;
+    var label = prompt('Etiqueta (opcional):','');
+    if(label !== null) a.label = label;
+  } else if(ann.tool === 'rect'){
+    a.x = Math.round(Math.min(ann.startX, p.x)*10)/10;
+    a.y = Math.round(Math.min(ann.startY, p.y)*10)/10;
+    a.w = Math.round(Math.max(2, dx)*10)/10;
+    a.h = Math.round(Math.max(2, dy)*10)/10;
+    var label2 = prompt('Etiqueta (opcional):','');
+    if(label2 !== null) a.label = label2;
+  } else if(ann.tool === 'arrow'){
+    a.x2 = Math.round(p.x*10)/10;
+    a.y2 = Math.round(p.y*10)/10;
+  }
+  addAnnotation(ann.imgIdx, a);
+}
+
+function removeTempEl(svg){
+  if(ann.tempEl){ try{svg.removeChild(ann.tempEl);}catch(e){} ann.tempEl=null; }
+  svg.querySelectorAll('.ann-temp').forEach(function(el){el.remove();});
+}
+
+function renderTempPolygon(svg){
+  svg.querySelectorAll('.ann-temp-poly').forEach(function(el){el.remove();});
+  if(ann.polyPoints.length < 1) return;
+  var ns = 'http://www.w3.org/2000/svg';
+  ann.polyPoints.forEach(function(pt){
+    var c = document.createElementNS(ns,'circle');
+    c.setAttribute('cx',pt.x); c.setAttribute('cy',pt.y); c.setAttribute('r','1.5');
+    c.setAttribute('fill',ann.color); c.setAttribute('stroke','#fff'); c.setAttribute('stroke-width','0.5');
+    c.classList.add('ann-temp-poly');
+    svg.appendChild(c);
+  });
+  if(ann.polyPoints.length > 1){
+    var pts = ann.polyPoints.map(function(p){return p.x+','+p.y;}).join(' ');
+    var pg = document.createElementNS(ns,'polyline');
+    pg.setAttribute('points', pts);
+    pg.setAttribute('stroke', ann.color);
+    pg.setAttribute('fill', 'none');
+    pg.setAttribute('stroke-width', '1.5');
+    pg.setAttribute('stroke-dasharray', '2,1');
+    pg.classList.add('ann-temp-poly');
+    svg.appendChild(pg);
+  }
+}
+
+function finishPolygon(){
+  if(ann.polyPoints.length < 3) { ann.polyPoints = []; return; }
+  var svg = document.querySelector('.ann-svg[data-idx="'+ann.imgIdx+'"]');
+  if(svg) svg.querySelectorAll('.ann-temp-poly').forEach(function(el){el.remove();});
+  var label = prompt('Etiqueta del polígono (opcional):','');
+  addAnnotation(ann.imgIdx, {
+    id:'a'+Date.now(), type:'polygon', color:ann.color,
+    x: ann.polyPoints[0].x, y: ann.polyPoints[0].y,
+    points: ann.polyPoints.slice(), label: label||''
+  });
+  ann.polyPoints = [];
+}
+
+function addAnnotation(imgIdx, a){
+  var sec = state.sections.find(function(s){ return s.id===state.currentId; });
+  if(!sec || !sec.images || !sec.images[imgIdx]) return;
+  if(!sec.images[imgIdx].annotations) sec.images[imgIdx].annotations = [];
+  sec.images[imgIdx].annotations.push(a);
+  saveCurrentSection();
+  showSection(state.currentId);
+  // Re-enter annotation mode
+  setTimeout(function(){ toggleAnnotationMode(imgIdx); }, 50);
+}
+
+function deleteAnnotation(imgIdx, annId){
+  var sec = state.sections.find(function(s){ return s.id===state.currentId; });
+  if(!sec || !sec.images || !sec.images[imgIdx]) return;
+  sec.images[imgIdx].annotations = (sec.images[imgIdx].annotations||[]).filter(function(a){ return a.id!==annId; });
+  saveCurrentSection();
+  showSection(state.currentId);
+  setTimeout(function(){ toggleAnnotationMode(imgIdx); }, 50);
+}
+
+function undoAnnotation(imgIdx){
+  var sec = state.sections.find(function(s){ return s.id===state.currentId; });
+  if(!sec || !sec.images || !sec.images[imgIdx] || !sec.images[imgIdx].annotations) return;
+  sec.images[imgIdx].annotations.pop();
+  saveCurrentSection();
+  showSection(state.currentId);
+  setTimeout(function(){ toggleAnnotationMode(imgIdx); }, 50);
+}
+
+// Double-click on polygon tool = finish polygon
+document.addEventListener('dblclick', function(e){
+  if(ann.active && ann.tool === 'polygon' && ann.polyPoints.length >= 3){
+    finishPolygon();
+    e.stopPropagation();
+    e.preventDefault();
+  }
+}, true);
+
+// Escape exits annotation mode
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape' && ann.active){
+    finishPolygon();
+    toggleAnnotationMode(ann.imgIdx);
+  }
+});
+
 function autoLayoutNewImages(canvas){
   var sec = state.sections.find(function(s){ return s.id===state.currentId; });
   if(!sec || !sec.images) return;
@@ -1091,6 +1409,7 @@ function saveModal(){
     var im = {url:url, caption:caption};
     if(prev && prev.crop) im.crop = prev.crop;
     if(prev && prev.layout) im.layout = prev.layout;
+    if(prev && prev.annotations) im.annotations = prev.annotations;
     return im;
   }).filter(function(im){ return im.url; });
   var existing = state.editingId ? state.sections.find(function(s){ return s.id===state.editingId; }) : null;
