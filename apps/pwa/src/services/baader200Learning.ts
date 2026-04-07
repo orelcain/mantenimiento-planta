@@ -112,6 +112,17 @@ export async function addB200History(
   })
 }
 
+/** Obtiene la clave de edición de Baader 200 desde Firestore */
+export async function getB200EditPwd(): Promise<string> {
+  const snap = await getDoc(doc(db, CONFIG_COL, 'edit-pwd'))
+  return snap.exists() ? (snap.data().pwd as string) || 'admin' : 'admin'
+}
+
+/** Guarda la clave de edición de Baader 200 en Firestore */
+export async function saveB200EditPwd(pwd: string): Promise<void> {
+  await setDoc(doc(db, CONFIG_COL, 'edit-pwd'), { pwd, updatedAt: serverTimestamp() })
+}
+
 export async function getB200History(limitCount = 50): Promise<B200HistoryEntry[]> {
   const q = query(
     collection(db, HISTORY_COL),

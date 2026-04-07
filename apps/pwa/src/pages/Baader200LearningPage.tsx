@@ -13,6 +13,7 @@ import {
   addB200History,
   getB200History,
   seedB200Sections,
+  getB200EditPwd,
 } from '@/services/baader200Learning'
 import type { B200Section, B200HistoryEntry } from '@/services/baader200Learning'
 import { Button } from '@/components/ui'
@@ -122,6 +123,25 @@ export function Baader200LearningPage() {
             userId: user.id,
             userName: ((user.nombre ?? '') + ' ' + (user.apellido ?? '')).trim() || user.email,
           })
+        }
+        return
+      }
+
+      if (type === 'b200:request-unlock') {
+        const pwd = prompt('Ingrese clave de administrador:')
+        if (!pwd) {
+          iframeRef.current?.contentWindow?.postMessage({ type: 'b200:lock-fail', message: 'Operación cancelada' }, '*')
+          return
+        }
+        try {
+          const correctPwd = await getB200EditPwd()
+          if (pwd === correctPwd) {
+            iframeRef.current?.contentWindow?.postMessage({ type: 'b200:unlock' }, '*')
+          } else {
+            iframeRef.current?.contentWindow?.postMessage({ type: 'b200:lock-fail', message: 'Clave incorrecta' }, '*')
+          }
+        } catch {
+          iframeRef.current?.contentWindow?.postMessage({ type: 'b200:lock-fail', message: 'Error verificando clave' }, '*')
         }
         return
       }
