@@ -212,11 +212,12 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 #lightbox-hint{position:fixed;bottom:60px;left:50%;transform:translateX(-50%);color:#666;font-size:11px;z-index:201;pointer-events:none;}
 /* ── IMAGES: flow in col-right, absolute in edit mode ── */
 .img-card{border-radius:6px;border:1px solid #252a38;background:#0a0c12;overflow:hidden;transition:border-color .15s,box-shadow .2s;display:flex;flex-direction:column;}
-.sec-col-right .img-card{position:relative;width:100%!important;left:auto!important;top:auto!important;min-height:280px;max-height:500px;}
-.sec-col-right .img-body{flex:1;min-height:200px;}
-/* Edit mode: images absolute within sec-col-right (not the whole two-col) */
-.sec-two-col.edit-mode .sec-col-right{position:relative;min-height:500px;}
-.sec-two-col.edit-mode .sec-col-right .img-card{position:absolute;z-index:2;width:auto!important;left:0!important;top:auto!important;min-height:auto;max-height:none;}
+/* Readonly: images flow in right column */
+.sec-two-col:not(.edit-mode) .sec-col-right .img-card{position:relative;width:100%;left:auto;top:auto;min-height:280px;max-height:500px;}
+.sec-two-col:not(.edit-mode) .sec-col-right .img-body{flex:1;min-height:200px;}
+/* Edit mode: images freely draggable/resizable within sec-col-right */
+.sec-two-col.edit-mode .sec-col-right{position:relative;min-height:500px;overflow:visible;}
+.sec-two-col.edit-mode .img-card{position:absolute;z-index:2;}
 .img-card:hover{border-color:var(--ac);}
 .img-body{flex:1;min-height:0;overflow:hidden;position:relative;cursor:zoom-in;}
 .img-body.zoomed{cursor:grab;}
