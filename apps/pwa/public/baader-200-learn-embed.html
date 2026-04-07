@@ -714,16 +714,16 @@ function renderSectionContent(sec){
         var sw = a.strokeW || 2;
         var op = a.opacity != null ? a.opacity : 0.15;
         var sk = a.noStroke ? 'none' : esc(c);
-        var styl = 'stroke-width:'+sw+';fill-opacity:'+op;
+        var commonAttr = ' stroke="'+sk+'" fill="'+esc(c)+'" fill-opacity="'+op+'" stroke-width="'+sw+'" data-ann-id="'+esc(a.id)+'"';
         if(a.type==='circle'){
-          html += '<circle class="ann-shape" cx="'+a.x+'" cy="'+a.y+'" r="'+(a.r||3)+'" stroke="'+sk+'" fill="'+esc(c)+'" style="'+styl+'" data-ann-id="'+esc(a.id)+'"/>';
+          html += '<circle class="ann-shape" cx="'+a.x+'" cy="'+a.y+'" r="'+(a.r||3)+'"'+commonAttr+'/>';
         } else if(a.type==='rect'){
-          html += '<rect class="ann-shape" x="'+a.x+'" y="'+a.y+'" width="'+(a.w||10)+'" height="'+(a.h||10)+'" stroke="'+sk+'" fill="'+esc(c)+'" style="'+styl+'" data-ann-id="'+esc(a.id)+'"/>';
+          html += '<rect class="ann-shape" x="'+a.x+'" y="'+a.y+'" width="'+(a.w||10)+'" height="'+(a.h||10)+'"'+commonAttr+'/>';
         } else if(a.type==='arrow'){
-          html += '<line class="ann-shape" x1="'+a.x+'" y1="'+a.y+'" x2="'+(a.x2||a.x+10)+'" y2="'+(a.y2||a.y)+'" stroke="'+esc(c)+'" fill="none" style="stroke-width:'+sw+'" marker-end="url(#ah'+idx+')" data-ann-id="'+esc(a.id)+'"/>';
+          html += '<line class="ann-shape" x1="'+a.x+'" y1="'+a.y+'" x2="'+(a.x2||a.x+10)+'" y2="'+(a.y2||a.y)+'" stroke="'+esc(c)+'" fill="none" stroke-width="'+sw+'" marker-end="url(#ah'+idx+')" data-ann-id="'+esc(a.id)+'"/>';
         } else if(a.type==='polygon' && a.points && a.points.length > 1){
           var pts = a.points.map(function(p){return p.x+','+p.y;}).join(' ');
-          html += '<polygon class="ann-shape" points="'+pts+'" stroke="'+sk+'" fill="'+esc(c)+'" style="'+styl+'" data-ann-id="'+esc(a.id)+'"/>';
+          html += '<polygon class="ann-shape" points="'+pts+'"'+commonAttr+'/>';
           a.points.forEach(function(p,pi){
             html += '<circle class="ann-point" cx="'+p.x+'" cy="'+p.y+'" data-ann-id="'+esc(a.id)+'" data-pt="'+pi+'"/>';
           });
