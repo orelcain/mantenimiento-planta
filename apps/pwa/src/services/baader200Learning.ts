@@ -37,11 +37,28 @@ export interface B200ImageCrop {
   h: number
 }
 
+export interface B200Annotation {
+  id: string
+  type: 'circle' | 'rect' | 'arrow' | 'text' | 'polygon'
+  /** Coordinates as % of image (0-100) for resolution independence */
+  x: number
+  y: number
+  x2?: number
+  y2?: number
+  w?: number
+  h?: number
+  r?: number
+  points?: { x: number, y: number }[]
+  label?: string
+  color?: string
+}
+
 export interface B200Image {
   url: string
   caption?: string
   crop?: B200ImageCrop
   layout?: { x: number, y: number, w?: number, h?: number }
+  annotations?: B200Annotation[]
 }
 
 export interface B200Section {
