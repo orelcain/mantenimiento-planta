@@ -98,9 +98,11 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 .sec-block-title::after{content:'';flex:1;height:1px;background:var(--bdr);}
 
 /* 2-column layout: text left, images right */
-.sec-two-col{display:flex;gap:20px;margin-top:10px;}
+.sec-two-col{display:flex;gap:16px;}
 .sec-col-left{flex:1;min-width:0;}
-.sec-col-right{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px;position:sticky;top:0;align-self:flex-start;}
+.sec-col-right{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px;}
+.sec-col-right.single .img-card{flex:1;display:flex;flex-direction:column;}
+.sec-col-right.single .img-card img{flex:1;min-height:0;}
 .sec-col-right .img-card{border-radius:8px;overflow:hidden;border:1px solid #252a38;background:#12141c;transition:border-color .15s;}
 .sec-col-right .img-card:hover{border-color:var(--ac);}
 .sec-col-right .img-card img{width:100%;display:block;cursor:pointer;object-fit:contain;background:#0a0c12;}
@@ -462,16 +464,14 @@ function renderSectionContent(sec){
   var hasImages = imgs.length > 0;
   var html = '';
 
-  // Header (badge + title + description) — full width
-  html += '<span class="sec-badge '+esc(sec.type||'ajuste')+'">'+(TYPE_ICONS[sec.type]||'')+' '+esc(TYPE_LABELS[sec.type]||sec.type)+'</span>';
-  html += '<div class="sec-title">'+esc(sec.title)+'</div>';
-  if(sec.description) html += '<div class="sec-desc">'+esc(sec.description)+'</div>';
-
   // 2-column layout: instructions left, images right
   html += '<div class="sec-two-col">';
 
   // LEFT COLUMN — instructions
   html += '<div class="sec-col-left">';
+  html += '<span class="sec-badge '+esc(sec.type||'ajuste')+'">'+(TYPE_ICONS[sec.type]||'')+' '+esc(TYPE_LABELS[sec.type]||sec.type)+'</span>';
+  html += '<div class="sec-title">'+esc(sec.title)+'</div>';
+  if(sec.description) html += '<div class="sec-desc">'+esc(sec.description)+'</div>';
   if(steps.length){
     html += '<div class="sec-block-title">Procedimiento</div>';
     html += '<div class="steps-list">';
@@ -511,7 +511,7 @@ function renderSectionContent(sec){
 
   // RIGHT COLUMN — images
   if(hasImages || !state.readonly){
-    html += '<div class="sec-col-right">';
+    html += '<div class="sec-col-right'+(imgs.length===1?' single':'')+'">';
     if(hasImages){
       imgs.forEach(function(im){
         html += '<div class="img-card">';
