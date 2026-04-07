@@ -42,6 +42,11 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 #search-clear{position:absolute;right:6px;background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:14px;display:none;padding:0 2px;line-height:1;}
 #search-clear:hover{color:var(--text);}
 
+/* ── LOCK/UNLOCK BTN ── */
+#lock-btn{display:none;background:none;border:1px solid var(--bdr2);color:var(--text-dim);font-size:11px;padding:4px 10px;border-radius:6px;cursor:pointer;white-space:nowrap;gap:5px;align-items:center;transition:all .15s;flex-shrink:0;}
+#lock-btn:hover{border-color:var(--ac);color:var(--text);}
+#lock-btn.unlocked{border-color:#2a6a2a;color:#88ff88;}
+
 /* ── BODY SPLIT ── */
 #body-split{display:flex;flex:1;overflow:hidden;position:relative;}
 
@@ -215,6 +220,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
     <span class="hdr-title">BAADER 200</span>
     <span class="hdr-sub">— Manual de Ajustes Técnicos</span>
     <div class="hdr-spacer"></div>
+    <button id="lock-btn" title="Desbloquear edición">&#128274; Bloqueado</button>
     <div id="search-wrap">
       <span id="search-icon">&#128269;</span>
       <input id="search-input" type="text" placeholder="Buscar..." autocomplete="off">
@@ -319,6 +325,9 @@ var state = {
   sections: [],
   currentId: null,
   readonly: true,
+  isAdminPage: false,
+  unlocked: false,
+  pendingAction: null,
   editingId: null,
   searchQuery: '',
   collapsed: {},
@@ -348,6 +357,40 @@ function toggleNav(open){
 byId('nav-toggle').addEventListener('click', function(){ toggleNav(); });
 byId('nav-overlay').addEventListener('click', function(){ toggleNav(false); });
 
+// ── Lock/Unlock ──
+function updateLockBtn(){
+  var btn = byId('lock-btn');
+  if(!state.isAdminPage){ btn.style.display='none'; return; }
+  btn.style.display='inline-flex';
+  if(state.unlocked){
+    btn.innerHTML='&#128275; Desbloqueado';
+    btn.classList.add('unlocked');
+    btn.title='Edición habilitada';
+  } else {
+    btn.innerHTML='&#128274; Bloqueado';
+    btn.classList.remove('unlocked');
+    btn.title='Click para desbloquear edición';
+  }
+}
+
+function requestUnlock(pendingAction){
+  if(state.unlocked){ return true; }
+  state.pendingAction = pendingAction || null;
+  send('b200:request-unlock');
+  return false;
+}
+
+byId('lock-btn').addEventListener('click', function(){
+  if(state.unlocked){
+    state.unlocked = false;
+    state.readonly = true;
+    updateLockBtn();
+    renderAll();
+  } else {
+    requestUnlock(null);
+  }
+});
+
 // ── postMessage ──
 window.addEventListener('message', function(e){
   var d = e.data;
@@ -355,10 +398,28 @@ window.addEventListener('message', function(e){
   if(d.type === 'b200:init'){
     state.sections = Array.isArray(d.sections) ? d.sections : [];
     state.currentId = d.currentId || null;
-    state.readonly = d.readonly !== false;
+    state.isAdminPage = d.readonly === false;
+    state.readonly = true;
+    state.unlocked = false;
+    updateLockBtn();
     renderAll();
     if(state.currentId) showSection(state.currentId);
     else if(state.sections.length) showSection(state.sections[0].id);
+  } else if(d.type === 'b200:unlock'){
+    state.unlocked = true;
+    state.readonly = false;
+    updateLockBtn();
+    renderAll();
+    if(state.pendingAction){
+      var action = state.pendingAction;
+      state.pendingAction = null;
+      if(action.type === 'edit') openModal(action.id);
+      else if(action.type === 'create') openModal(null);
+      else if(action.type === 'delete') doDelete(action.id);
+    }
+  } else if(d.type === 'b200:lock-fail'){
+    state.pendingAction = null;
+    alert(d.message || 'Clave incorrecta');
   } else if(d.type === 'b200:select-section'){
     if(d.id) showSection(d.id);
   }
@@ -401,7 +462,7 @@ function renderNavTree(){
       html += '<div class="nav-item'+(isActive?' active':'')+'" data-id="'+esc(sec.id)+'">';
       html += '<span class="nav-item-num">'+(idx+1)+'</span>';
       html += '<span class="nav-item-text" title="'+esc(sec.title)+'">'+esc(sec.title)+'</span>';
-      if(!state.readonly){
+      if(state.isAdminPage){
         html += '<span class="nav-item-actions">';
         html += '<button class="nav-action-btn" data-edit="'+esc(sec.id)+'" title="Editar">&#9998;</button>';
         html += '<button class="nav-action-btn" data-del="'+esc(sec.id)+'" title="Eliminar">&#128465;</button>';
@@ -431,28 +492,21 @@ function renderNavTree(){
   scroll.querySelectorAll('[data-edit]').forEach(function(btn){
     btn.addEventListener('click', function(ev){
       ev.stopPropagation();
-      openModal(btn.getAttribute('data-edit'));
+      var editId = btn.getAttribute('data-edit');
+      if(!state.unlocked){ requestUnlock({type:'edit',id:editId}); return; }
+      openModal(editId);
     });
   });
   scroll.querySelectorAll('[data-del]').forEach(function(btn){
     btn.addEventListener('click', function(ev){
       ev.stopPropagation();
       var id = btn.getAttribute('data-del');
-      var sec = state.sections.find(function(s){ return s.id===id; });
-      if(confirm('¿Eliminar sección "'+(sec?sec.title:id)+'"?')){
-        send('b200:delete-section',{id:id});
-        state.sections = state.sections.filter(function(s){ return s.id!==id; });
-        if(state.currentId===id){
-          state.currentId=null;
-          byId('content-placeholder').classList.remove('hidden');
-          byId('section-content').classList.add('hidden');
-        }
-        renderNavTree();
-      }
+      if(!state.unlocked){ requestUnlock({type:'delete',id:id}); return; }
+      doDelete(id);
     });
   });
   var addBtn = byId('nav-add-btn');
-  if(addBtn) addBtn.classList.toggle('hidden', state.readonly);
+  if(addBtn) addBtn.classList.toggle('hidden', !state.isAdminPage);
 }
 
 // ── Section content ──
@@ -510,7 +564,7 @@ function renderSectionContent(sec){
   html += '</div>'; // end sec-col-left
 
   // RIGHT COLUMN — images
-  if(hasImages || !state.readonly){
+  if(hasImages || state.isAdminPage){
     html += '<div class="sec-col-right'+(imgs.length===1?' single':'')+'">';
     if(hasImages){
       imgs.forEach(function(im){
@@ -548,6 +602,21 @@ function selectSection(id){
 }
 
 function renderAll(){ renderNavTree(); if(state.currentId) showSection(state.currentId); }
+
+// ── Delete helper ──
+function doDelete(id){
+  var sec = state.sections.find(function(s){ return s.id===id; });
+  if(confirm('¿Eliminar sección "'+(sec?sec.title:id)+'"?')){
+    send('b200:delete-section',{id:id});
+    state.sections = state.sections.filter(function(s){ return s.id!==id; });
+    if(state.currentId===id){
+      state.currentId=null;
+      byId('content-placeholder').classList.remove('hidden');
+      byId('section-content').classList.add('hidden');
+    }
+    renderNavTree();
+  }
+}
 
 // ── Modal ──
 function openModal(editId){
@@ -628,7 +697,10 @@ byId('modal-close').addEventListener('click', closeModal);
 byId('modal-cancel-btn').addEventListener('click', closeModal);
 byId('modal-save-btn').addEventListener('click', saveModal);
 byId('modal-overlay').addEventListener('click', function(e){ if(e.target===this) closeModal(); });
-byId('nav-add-btn').addEventListener('click', function(){ openModal(null); });
+byId('nav-add-btn').addEventListener('click', function(){
+  if(!state.unlocked){ requestUnlock({type:'create'}); return; }
+  openModal(null);
+});
 
 // ── Image upload (bridge to React) ──
 byId('f-upload-btn').addEventListener('click', function(){
