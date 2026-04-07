@@ -152,39 +152,43 @@ export function Baader200LearningPublicPage() {
     )
   }
 
+  const selectedTitle = sections.find(s => s.id === selected)?.title ?? ''
+
   return (
     <div ref={containerRef} className="flex flex-col w-screen bg-[#0a1628]" style={{ height: '100dvh' }}>
-      {/* Header */}
+      {/* Header — compact on mobile */}
       <div className="flex items-center gap-2 px-3 flex-shrink-0 border-b border-[#1e3a5f]"
-        style={{ height: visualFs ? '0' : '40px', overflow: 'hidden', background: '#0d1f3c', transition: 'height .2s' }}>
+        style={{ height: visualFs ? '0' : '44px', overflow: 'hidden', background: 'linear-gradient(180deg, #0d1f3c 0%, #0a1628 100%)', transition: 'height .2s' }}>
         <BookOpen className="h-4 w-4 text-blue-400 flex-shrink-0" />
-        <span className="text-blue-300 text-xs font-semibold tracking-wide uppercase">Modo Aprendizaje</span>
-        <span className="text-[#3a5a7a] text-xs hidden sm:inline">— Baader 200</span>
-        <div className="flex-1" />
+        <div className="flex flex-col min-w-0 flex-1">
+          <span className="text-blue-300 text-[11px] font-bold tracking-wide uppercase truncate">BAADER 200</span>
+          <span className="text-[#3a6a9a] text-[9px] truncate hidden xs:block">{selectedTitle || 'Manual de Ajustes'}</span>
+        </div>
         <button onClick={toggleFullscreen}
-          className="flex items-center gap-1 text-[10px] text-blue-400 hover:text-blue-200 transition-colors px-2 py-1 rounded border border-[#1e3a5f] hover:border-blue-400"
-          title={(isFullscreen || visualFs) ? 'Salir de pantalla completa' : 'Pantalla completa'}>
-          {(isFullscreen || visualFs) ? <Minimize className="h-3 w-3" /> : <Maximize className="h-3 w-3" />}
+          className="flex items-center justify-center w-8 h-8 text-blue-400 hover:text-blue-200 transition-colors rounded-lg border border-[#1e3a5f] hover:border-blue-400 flex-shrink-0"
+          title={(isFullscreen || visualFs) ? 'Salir' : 'Pantalla completa'}>
+          {(isFullscreen || visualFs) ? <Minimize className="h-3.5 w-3.5" /> : <Maximize className="h-3.5 w-3.5" />}
         </button>
         <button onClick={() => setQrOpen(true)}
-          className="flex items-center gap-1 text-[10px] text-blue-400 hover:text-blue-200 transition-colors px-2 py-1 rounded border border-[#1e3a5f] hover:border-blue-400">
-          <QrCode className="h-3 w-3" />
-          <span className="hidden sm:inline">Compartir</span>
+          className="flex items-center justify-center w-8 h-8 text-blue-400 hover:text-blue-200 transition-colors rounded-lg border border-[#1e3a5f] hover:border-blue-400 flex-shrink-0">
+          <QrCode className="h-3.5 w-3.5" />
         </button>
       </div>
 
-      {/* Selector de secciones por tipo */}
-      <div className="flex items-center gap-2 px-3 flex-shrink-0 overflow-x-auto"
-        style={{ height: visualFs ? '0' : '36px', overflow: visualFs ? 'hidden' : 'auto', background: '#0a1628', borderBottom: '1px solid #12243a', transition: 'height .2s' }}>
-        {Object.entries(groups).map(([, secs]) => secs.length > 0 && secs.map(s => (
-          <button key={s.id} onClick={() => switchSection(s.id)}
-            className="flex-shrink-0 px-2.5 py-0.5 rounded-full text-[10px] transition-all whitespace-nowrap"
-            style={s.id === selected
-              ? { background: '#1a4a8a', color: '#7ec8ff', border: '1px solid #2a6abf', fontWeight: 600 }
-              : { background: '#0d1f3c', color: '#4a7aaa', border: '1px solid #1e3a5f' }}>
-            {s.title}
-          </button>
-        )))}
+      {/* Section tabs — horizontal scroll, touch-friendly */}
+      <div className="flex-shrink-0 overflow-x-auto scrollbar-hide"
+        style={{ height: visualFs ? '0' : '40px', overflow: visualFs ? 'hidden' : 'auto', background: '#0a1628', borderBottom: '1px solid #12243a', transition: 'height .2s', WebkitOverflowScrolling: 'touch' }}>
+        <div className="flex items-center gap-1.5 px-2 h-full" style={{ minWidth: 'max-content' }}>
+          {Object.entries(groups).map(([, secs]) => secs.length > 0 && secs.map(s => (
+            <button key={s.id} onClick={() => switchSection(s.id)}
+              className="flex-shrink-0 rounded-lg text-[11px] transition-all whitespace-nowrap"
+              style={s.id === selected
+                ? { background: '#1a4a8a', color: '#7ec8ff', border: '1px solid #2a6abf', fontWeight: 700, padding: '6px 12px' }
+                : { background: 'transparent', color: '#4a7aaa', border: '1px solid #1e3a5f', padding: '6px 12px' }}>
+              {s.title}
+            </button>
+          )))}
+        </div>
       </div>
 
       {/* iframe */}
@@ -195,8 +199,8 @@ export function Baader200LearningPublicPage() {
       </div>
 
       {!visualFs && (
-        <div className="flex-shrink-0 text-center" style={{ padding: '3px 0', background: '#0d1f3c', borderTop: '1px solid #12243a' }}>
-          <p className="text-[9px] text-[#2a4a6a] uppercase tracking-wider">Baader 200 — Manual de Ajustes — Solo lectura</p>
+        <div className="flex-shrink-0 text-center flex-shrink-0" style={{ padding: '4px 0', background: '#0d1f3c', borderTop: '1px solid #12243a' }}>
+          <p className="text-[9px] text-[#2a4a6a] uppercase tracking-wider">Solo lectura — No requiere login</p>
         </div>
       )}
 
