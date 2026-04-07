@@ -176,6 +176,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 .sec-col-right .img-card{border-radius:6px;border:1px solid #252a38;background:#0a0c12;position:absolute;overflow:hidden;transition:border-color .15s,box-shadow .2s;}
 .sec-col-right .img-card:hover{border-color:var(--ac);}
 .sec-col-right .img-card img{width:100%;display:block;cursor:pointer;background:#0a0c12;}
+.sec-col-right .img-card.has-h{display:flex;flex-direction:column;}
+.sec-col-right .img-card.has-h img{flex:1;min-height:0;object-fit:contain;}
 .sec-col-right .img-caption{font-size:11px;color:#99a0b0;padding:5px 8px;text-align:center;border-top:1px solid #1e2230;flex-shrink:0;}
 .sec-col-right .img-placeholder{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;border:2px dashed #252a38;border-radius:8px;color:#556;font-size:12px;}
 
@@ -648,10 +650,11 @@ function renderSectionContent(sec){
         }
         if(lo.w) posStyle += 'width:'+lo.w+'px;';
         else posStyle += 'width:92%;';
-        if(lo.h) posStyle += 'height:'+lo.h+'px;';
+        var hasH = false;
+        if(lo.h){ posStyle += 'height:'+lo.h+'px;'; hasH = true; }
         // Estimate stack height for unpositioned images
         stackY += (lo.h || 280) + 8;
-        html += '<div class="img-card" data-img-idx="'+idx+'" style="'+posStyle+'">';
+        html += '<div class="img-card'+(hasH?' has-h':'')+'" data-img-idx="'+idx+'" style="'+posStyle+'">';
         // Edit bar (visible in edit-mode)
         html += '<div class="img-edit-bar">';
         html += '<span style="font-size:11px;color:#556;cursor:move;" title="Arrastra para mover">&#9776;</span>';
@@ -837,8 +840,7 @@ function bindImageControls(container){
       var nh = Math.max(60, rs.sh + cy - rs.sy);
       card.style.width = nw + 'px';
       card.style.height = nh + 'px';
-      card.querySelector('img').style.height = 'calc(100% - 30px)';
-      card.querySelector('img').style.objectFit = 'contain';
+      card.classList.add('has-h');
       var label = card.querySelector('.img-size-label');
       if(label) label.textContent = nw+'×'+nh;
       ev.preventDefault();
