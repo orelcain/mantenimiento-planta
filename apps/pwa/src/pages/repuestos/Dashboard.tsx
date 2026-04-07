@@ -604,31 +604,30 @@ export function RepuestosDashboard({
       return lists
     })
     setFavModalRepId(null)
-  }, [currentUser?.id, repFavEquipId])
+  }, [currentUser, repFavEquipId])
 
   const removeRepFromList = useCallback((listName: string, repuestoId: string) => {
     if (!currentUser?.id || !repFavEquipId) return
     setRepFavLists(prev => {
       const lists = prev.map(l => l.name === listName ? { ...l, repuestoIds: l.repuestoIds.filter(id => id !== repuestoId) } : l)
-      saveRepuestoFavLists(currentUser!.id, repFavEquipId, lists)
+      saveRepuestoFavLists(currentUser.id, repFavEquipId, lists)
       return lists
     })
-  }, [currentUser?.id, repFavEquipId])
+  }, [currentUser, repFavEquipId])
 
   // Toggle rápido: si ya es favorito en alguna lista, quita. Si no, abre modal.
   const toggleRepFavorite = useCallback((repuestoId: string) => {
     if (repFavIds.has(repuestoId)) {
-      // Quitar de todas las listas
       if (!currentUser?.id || !repFavEquipId) return
       setRepFavLists(prev => {
         const lists = prev.map(l => ({ ...l, repuestoIds: l.repuestoIds.filter(id => id !== repuestoId) }))
-        saveRepuestoFavLists(currentUser!.id, repFavEquipId, lists)
+        saveRepuestoFavLists(currentUser.id, repFavEquipId, lists)
         return lists
       })
     } else {
       openFavModal(repuestoId)
     }
-  }, [repFavIds, currentUser?.id, repFavEquipId, openFavModal])
+  }, [repFavIds, currentUser, repFavEquipId, openFavModal])
 
   // Scroll al detalle del equipo cuando se selecciona
   useEffect(() => {
