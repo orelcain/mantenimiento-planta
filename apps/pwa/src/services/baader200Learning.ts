@@ -30,9 +30,18 @@ export interface B200Measurement {
   note?: string
 }
 
+export interface B200ImageCrop {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
 export interface B200Image {
   url: string
   caption?: string
+  crop?: B200ImageCrop
+  size?: 'sm' | 'md' | 'lg' | 'full'
 }
 
 export interface B200Section {

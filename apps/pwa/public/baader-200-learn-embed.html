@@ -113,9 +113,13 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 .sec-col-right .img-caption{font-size:11px;color:#99a0b0;padding:5px 8px;text-align:center;border-top:1px solid #1e2230;flex-shrink:0;}
 .sec-col-right .img-placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:30px 12px;border:2px dashed #252a38;border-radius:8px;color:#556;font-size:12px;flex:1;}
 @media(max-width:700px){
-  .sec-two-col{flex-direction:column;height:auto;}
-  .sec-col-left{flex:none;width:100%;}
-  .sec-col-right{flex:none;width:100%;}
+  .sec-two-col{flex-direction:column;height:auto;overflow-y:auto;}
+  .sec-col-left{flex:none;width:100%;overflow-y:visible;}
+  .sec-col-right{flex:none;width:100%;margin-top:10px;}
+  .sec-col-right .img-card img{max-height:50vh;object-fit:contain;}
+  .img-crop-wrap{max-height:50vh;}
+  #crop-toolbar{flex-wrap:wrap;gap:6px;}
+  #crop-toolbar span{width:100%;font-size:11px;}
 }
 
 /* steps */
@@ -182,6 +186,40 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 #lightbox-controls button{background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.15);color:#ccc;width:36px;height:36px;border-radius:8px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;}
 #lightbox-controls button:hover{background:rgba(255,255,255,.15);color:#fff;}
 #lightbox-hint{position:fixed;bottom:60px;left:50%;transform:translateX(-50%);color:#666;font-size:11px;z-index:201;pointer-events:none;}
+/* ── IMAGE GRID LAYOUT ── */
+.sec-col-right.grid-layout{display:grid;grid-template-columns:1fr 1fr;gap:6px;align-content:start;}
+.sec-col-right.grid-layout .img-card.size-full,.sec-col-right.grid-layout .img-card.size-lg{grid-column:span 2;}
+.sec-col-right.grid-layout .img-card.size-sm img{max-height:160px;object-fit:cover;}
+.sec-col-right.grid-layout .img-card.size-md img{max-height:280px;object-fit:cover;}
+
+/* ── IMAGE CROP CONTAINER ── */
+.img-crop-wrap{overflow:hidden;position:relative;line-height:0;}
+.img-crop-wrap img{display:block;max-width:none;}
+
+/* ── IMAGE MANAGEMENT CONTROLS ── */
+.img-ctrl-bar{display:flex;align-items:center;gap:4px;padding:4px 6px;background:#0d0f15;border-bottom:1px solid #1e2230;flex-wrap:wrap;}
+.img-ctrl-btn{background:none;border:1px solid #2a2e3a;color:#8890a0;font-size:10px;padding:3px 7px;border-radius:4px;cursor:pointer;line-height:1;transition:all .12s;white-space:nowrap;}
+.img-ctrl-btn:hover{border-color:var(--ac);color:var(--text);}
+.img-ctrl-btn.active{border-color:var(--ac);color:var(--ac);background:#141e34;}
+.img-ctrl-spacer{flex:1;}
+
+/* ── CROP OVERLAY ── */
+#crop-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:300;flex-direction:column;}
+#crop-overlay.open{display:flex;}
+#crop-toolbar{display:flex;align-items:center;gap:10px;padding:10px 16px;background:#0d0f15;border-bottom:1px solid #252a38;flex-shrink:0;}
+#crop-toolbar span{font-size:12px;color:var(--text-dim);flex:1;}
+.crop-tb-btn{background:none;border:1px solid #2a2e3a;color:#888;font-size:12px;padding:6px 14px;border-radius:6px;cursor:pointer;transition:all .15s;}
+.crop-tb-btn:hover{border-color:#555;color:var(--text);}
+.crop-tb-btn.primary{background:var(--ac2);border-color:#3366aa;color:#fff;font-weight:600;}
+.crop-tb-btn.primary:hover{background:#3377ee;}
+.crop-tb-btn.danger{border-color:#552222;color:#ff8888;}
+.crop-tb-btn.danger:hover{background:#331515;}
+#crop-canvas{flex:1;position:relative;overflow:hidden;cursor:crosshair;}
+#crop-canvas img{position:absolute;user-select:none;-webkit-user-drag:none;}
+#crop-selection{position:absolute;border:2px dashed rgba(255,255,255,.9);box-shadow:0 0 0 9999px rgba(0,0,0,.6);pointer-events:none;display:none;z-index:1;}
+#crop-selection.visible{display:block;}
+#crop-info{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);font-size:11px;color:#666;z-index:2;pointer-events:none;}
+
 .hidden{display:none!important;}
 
 /* ── RESPONSIVE: mobile ── */
@@ -202,6 +240,14 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
   .meas-table th,.meas-table td{padding:6px 8px;}
   .note-item{font-size:12px;}
   #modal-box{width:95vw;max-height:90vh;}
+  .sec-col-right.grid-layout{grid-template-columns:1fr;}
+  .sec-col-right.grid-layout .img-card.size-full,.sec-col-right.grid-layout .img-card.size-lg{grid-column:span 1;}
+  .img-ctrl-bar{padding:3px 4px;}
+  .img-ctrl-btn{font-size:9px;padding:2px 5px;}
+  #lock-btn{font-size:10px;padding:3px 7px;}
+  #content-area{padding:10px 8px;}
+  .sec-col-left{overflow-y:visible;}
+  .sec-two-col{overflow-y:auto;}
 }
 @media(max-width:400px){
   .hdr-title{font-size:11px;letter-spacing:1px;}
@@ -314,6 +360,21 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
       <button class="btn-cancel" id="modal-cancel-btn">Cancelar</button>
       <button class="btn-save" id="modal-save-btn">Guardar sección</button>
     </div>
+  </div>
+</div>
+
+<!-- CROP OVERLAY -->
+<div id="crop-overlay">
+  <div id="crop-toolbar">
+    <span>Arrastra sobre la imagen para seleccionar el área a recortar</span>
+    <button class="crop-tb-btn danger" id="crop-reset-btn">Sin recorte</button>
+    <button class="crop-tb-btn" id="crop-cancel-btn">Cancelar</button>
+    <button class="crop-tb-btn primary" id="crop-confirm-btn">&#10003; Aplicar recorte</button>
+  </div>
+  <div id="crop-canvas">
+    <img id="crop-img" src="" alt="">
+    <div id="crop-selection"></div>
+    <div id="crop-info">Click y arrastra para seleccionar · Scroll = zoom</div>
   </div>
 </div>
 
@@ -518,7 +579,6 @@ function renderSectionContent(sec){
   var hasImages = imgs.length > 0;
   var html = '';
 
-  // 2-column layout: instructions left, images right
   html += '<div class="sec-two-col">';
 
   // LEFT COLUMN — instructions
@@ -563,14 +623,37 @@ function renderSectionContent(sec){
   }
   html += '</div>'; // end sec-col-left
 
-  // RIGHT COLUMN — images
+  // RIGHT COLUMN — images with grid layout
+  var hasGrid = imgs.some(function(im){ return im.size && im.size !== 'full'; });
   if(hasImages || state.isAdminPage){
-    html += '<div class="sec-col-right'+(imgs.length===1?' single':'')+'">';
+    html += '<div class="sec-col-right'+(hasGrid?' grid-layout':'')+'">';
     if(hasImages){
-      imgs.forEach(function(im){
-        html += '<div class="img-card">';
-        html += '<img src="'+esc(im.url)+'" alt="'+esc(im.caption||sec.title)+'" loading="lazy" onclick="openLightbox(\''+esc(im.url).replace(/'/g,"\\'")+'\',\''+esc(im.caption||'').replace(/'/g,"\\'")+'\')"/>';
-        if(im.caption) html += '<div class="img-caption">'+esc(im.caption)+'</div>';
+      imgs.forEach(function(im, idx){
+        var sizeClass = im.size ? ' size-'+im.size : ' size-full';
+        html += '<div class="img-card'+sizeClass+'" data-img-idx="'+idx+'">';
+        // Admin controls
+        if(state.unlocked){
+          html += '<div class="img-ctrl-bar">';
+          html += '<button class="img-ctrl-btn" data-action="crop" data-idx="'+idx+'" title="Recortar">&#9986; Recortar</button>';
+          if(idx>0) html += '<button class="img-ctrl-btn" data-action="move-up" data-idx="'+idx+'" title="Mover arriba">&#9650;</button>';
+          if(idx<imgs.length-1) html += '<button class="img-ctrl-btn" data-action="move-down" data-idx="'+idx+'" title="Mover abajo">&#9660;</button>';
+          html += '<span class="img-ctrl-spacer"></span>';
+          var sizes = [{k:'sm',l:'S'},{k:'md',l:'M'},{k:'lg',l:'L'},{k:'full',l:'Full'}];
+          var curSize = im.size || 'full';
+          sizes.forEach(function(s){
+            html += '<button class="img-ctrl-btn'+(curSize===s.k?' active':'')+'" data-action="size" data-idx="'+idx+'" data-size="'+s.k+'">'+s.l+'</button>';
+          });
+          html += '</div>';
+        }
+        // Image with crop
+        if(im.crop && im.crop.w > 0 && im.crop.h > 0){
+          html += '<div class="img-crop-wrap" data-crop=\''+JSON.stringify(im.crop)+'\' style="cursor:pointer;" onclick="openLightbox(\''+esc(im.url).replace(/'/g,"\\'")+'\',\''+esc(im.caption||'').replace(/'/g,"\\'")+'\')">';
+          html += '<img src="'+esc(im.url)+'" alt="'+esc(im.caption||sec.title)+'" loading="lazy" onload="applyCrop(this)"/>';
+          html += '</div>';
+        } else {
+          html += '<img src="'+esc(im.url)+'" alt="'+esc(im.caption||sec.title)+'" loading="lazy" onclick="openLightbox(\''+esc(im.url).replace(/'/g,"\\'")+'\',\''+esc(im.caption||'').replace(/'/g,"\\'")+'\')"/>';
+        }
+        if(im.caption) html += '<div class="img-caption">'+esc(im.caption)+(im.crop?'  &#9986;':'')+'</div>';
         html += '</div>';
       });
     } else {
@@ -583,6 +666,27 @@ function renderSectionContent(sec){
   return html;
 }
 
+// ── Apply crop to image after load ──
+window.applyCrop = function(img){
+  var wrap = img.closest('.img-crop-wrap');
+  if(!wrap || !wrap.dataset.crop) return;
+  try {
+    var c = JSON.parse(wrap.dataset.crop);
+    var nw = img.naturalWidth, nh = img.naturalHeight;
+    if(!nw || !nh || !c.w || !c.h) return;
+    var cw = wrap.offsetWidth || wrap.parentElement.offsetWidth;
+    if(!cw) cw = 400;
+    var dispW = cw / c.w;
+    var dispH = dispW * nh / nw;
+    img.style.width = dispW + 'px';
+    img.style.maxWidth = 'none';
+    img.style.marginLeft = (-c.x * dispW) + 'px';
+    img.style.marginTop = (-c.y * dispH) + 'px';
+    wrap.style.height = (c.h * dispH) + 'px';
+    wrap.style.overflow = 'hidden';
+  } catch(e){}
+};
+
 function showSection(id){
   var sec = state.sections.find(function(s){ return s.id===id; });
   if(!sec) return;
@@ -593,6 +697,48 @@ function showSection(id){
   el.innerHTML = renderSectionContent(sec);
   el.scrollTop = 0;
   renderNavTree();
+  // Bind image management events
+  bindImageControls(el);
+}
+
+function bindImageControls(container){
+  container.querySelectorAll('.img-ctrl-btn').forEach(function(btn){
+    btn.addEventListener('click', function(ev){
+      ev.stopPropagation();
+      var action = btn.dataset.action;
+      var idx = parseInt(btn.dataset.idx, 10);
+      var sec = state.sections.find(function(s){ return s.id===state.currentId; });
+      if(!sec || !Array.isArray(sec.images)) return;
+      var imgs = sec.images.filter(function(im){ return im.url; });
+
+      if(action === 'crop'){
+        openCropTool(idx);
+      } else if(action === 'move-up' && idx > 0){
+        var tmp = sec.images[idx];
+        sec.images[idx] = sec.images[idx-1];
+        sec.images[idx-1] = tmp;
+        saveCurrentSection();
+        showSection(state.currentId);
+      } else if(action === 'move-down' && idx < imgs.length-1){
+        var tmp2 = sec.images[idx];
+        sec.images[idx] = sec.images[idx+1];
+        sec.images[idx+1] = tmp2;
+        saveCurrentSection();
+        showSection(state.currentId);
+      } else if(action === 'size'){
+        var newSize = btn.dataset.size;
+        sec.images[idx].size = newSize;
+        saveCurrentSection();
+        showSection(state.currentId);
+      }
+    });
+  });
+}
+
+function saveCurrentSection(){
+  var sec = state.sections.find(function(s){ return s.id===state.currentId; });
+  if(!sec) return;
+  send('b200:save-section', {section: sec});
 }
 
 function selectSection(id){
@@ -651,9 +797,15 @@ function saveModal(){
     return {name:(p[0]||'').trim(),value:(p[1]||'').trim(),unit:(p[2]||'').trim(),note:(p[3]||'').trim()};
   });
   var notes = byId('f-notes').value.split('\n').filter(function(l){ return l.trim(); }).map(function(l){ return l.trim(); });
+  var existingImgs = state.editingId ? (state.sections.find(function(s){ return s.id===state.editingId; })||{}).images||[] : [];
   var images = byId('f-images').value.split('\n').filter(function(l){ return l.trim(); }).map(function(l){
     var p = l.split('|');
-    return {url:(p[0]||'').trim(), caption:(p[1]||'').trim()};
+    var url = (p[0]||'').trim(), caption = (p[1]||'').trim();
+    var prev = existingImgs.find(function(ei){ return ei.url === url; });
+    var im = {url:url, caption:caption};
+    if(prev && prev.crop) im.crop = prev.crop;
+    if(prev && prev.size) im.size = prev.size;
+    return im;
   }).filter(function(im){ return im.url; });
   var existing = state.editingId ? state.sections.find(function(s){ return s.id===state.editingId; }) : null;
   var sec = {
@@ -733,6 +885,192 @@ window.addEventListener('message', function(e){
     byId('f-upload-status').style.color = '#88ff88';
     setTimeout(function(){ byId('f-upload-status').textContent = ''; byId('f-upload-status').style.color = ''; }, 3000);
   }
+});
+
+// ── Crop Tool ──
+var crop = {
+  overlay: null,
+  img: null,
+  sel: null,
+  drawing: false,
+  startX: 0, startY: 0,
+  rect: null,
+  imgIdx: -1,
+  imgRect: null
+};
+
+function openCropTool(idx){
+  var sec = state.sections.find(function(s){ return s.id===state.currentId; });
+  if(!sec || !sec.images || !sec.images[idx]) return;
+  var im = sec.images[idx];
+  crop.imgIdx = idx;
+  crop.overlay = byId('crop-overlay');
+  crop.img = byId('crop-img');
+  crop.sel = byId('crop-selection');
+
+  crop.img.src = im.url;
+  crop.sel.classList.remove('visible');
+  crop.rect = null;
+
+  crop.img.onload = function(){
+    var canvas = byId('crop-canvas');
+    var cw = canvas.offsetWidth, ch = canvas.offsetHeight;
+    var nw = crop.img.naturalWidth, nh = crop.img.naturalHeight;
+    var scale = Math.min(cw * 0.95 / nw, ch * 0.95 / nh, 1);
+    var w = nw * scale, h = nh * scale;
+    crop.img.style.width = w + 'px';
+    crop.img.style.height = h + 'px';
+    crop.img.style.left = ((cw - w) / 2) + 'px';
+    crop.img.style.top = ((ch - h) / 2) + 'px';
+    crop.imgRect = { left: (cw - w) / 2, top: (ch - h) / 2, width: w, height: h };
+
+    // Show existing crop
+    if(im.crop && im.crop.w > 0 && im.crop.h > 0){
+      crop.rect = {
+        x: crop.imgRect.left + im.crop.x * w,
+        y: crop.imgRect.top + im.crop.y * h,
+        w: im.crop.w * w,
+        h: im.crop.h * h
+      };
+      updateCropSelection();
+    }
+  };
+  crop.overlay.classList.add('open');
+}
+
+function closeCropTool(){
+  crop.overlay.classList.remove('open');
+  crop.img.src = '';
+  crop.sel.classList.remove('visible');
+  crop.imgIdx = -1;
+}
+
+function updateCropSelection(){
+  if(!crop.rect){
+    crop.sel.classList.remove('visible');
+    return;
+  }
+  crop.sel.style.left = crop.rect.x + 'px';
+  crop.sel.style.top = crop.rect.y + 'px';
+  crop.sel.style.width = crop.rect.w + 'px';
+  crop.sel.style.height = crop.rect.h + 'px';
+  crop.sel.classList.add('visible');
+}
+
+// Crop drawing
+byId('crop-canvas').addEventListener('mousedown', function(e){
+  if(e.target.closest('.crop-tb-btn') || !crop.imgRect) return;
+  var canvasRect = byId('crop-canvas').getBoundingClientRect();
+  crop.drawing = true;
+  crop.startX = e.clientX - canvasRect.left;
+  crop.startY = e.clientY - canvasRect.top;
+  crop.rect = { x: crop.startX, y: crop.startY, w: 0, h: 0 };
+  updateCropSelection();
+  e.preventDefault();
+});
+
+byId('crop-canvas').addEventListener('mousemove', function(e){
+  if(!crop.drawing) return;
+  var canvasRect = byId('crop-canvas').getBoundingClientRect();
+  var cx = e.clientX - canvasRect.left;
+  var cy = e.clientY - canvasRect.top;
+  crop.rect = {
+    x: Math.min(crop.startX, cx),
+    y: Math.min(crop.startY, cy),
+    w: Math.abs(cx - crop.startX),
+    h: Math.abs(cy - crop.startY)
+  };
+  updateCropSelection();
+});
+
+window.addEventListener('mouseup', function(){
+  if(!crop.drawing) return;
+  crop.drawing = false;
+  // Remove tiny accidental clicks
+  if(crop.rect && (crop.rect.w < 10 || crop.rect.h < 10)){
+    crop.rect = null;
+    updateCropSelection();
+  }
+});
+
+// Touch support for crop
+byId('crop-canvas').addEventListener('touchstart', function(e){
+  if(e.touches.length !== 1 || !crop.imgRect) return;
+  var canvasRect = byId('crop-canvas').getBoundingClientRect();
+  crop.drawing = true;
+  crop.startX = e.touches[0].clientX - canvasRect.left;
+  crop.startY = e.touches[0].clientY - canvasRect.top;
+  crop.rect = { x: crop.startX, y: crop.startY, w: 0, h: 0 };
+  updateCropSelection();
+}, {passive: true});
+
+byId('crop-canvas').addEventListener('touchmove', function(e){
+  if(!crop.drawing || e.touches.length !== 1) return;
+  var canvasRect = byId('crop-canvas').getBoundingClientRect();
+  var cx = e.touches[0].clientX - canvasRect.left;
+  var cy = e.touches[0].clientY - canvasRect.top;
+  crop.rect = {
+    x: Math.min(crop.startX, cx),
+    y: Math.min(crop.startY, cy),
+    w: Math.abs(cx - crop.startX),
+    h: Math.abs(cy - crop.startY)
+  };
+  updateCropSelection();
+  e.preventDefault();
+}, {passive: false});
+
+byId('crop-canvas').addEventListener('touchend', function(){
+  if(!crop.drawing) return;
+  crop.drawing = false;
+  if(crop.rect && (crop.rect.w < 10 || crop.rect.h < 10)){
+    crop.rect = null;
+    updateCropSelection();
+  }
+});
+
+// Crop toolbar buttons
+byId('crop-confirm-btn').addEventListener('click', function(){
+  if(!crop.rect || !crop.imgRect || crop.imgIdx < 0) { closeCropTool(); return; }
+  var sec = state.sections.find(function(s){ return s.id===state.currentId; });
+  if(!sec || !sec.images[crop.imgIdx]) { closeCropTool(); return; }
+  // Convert pixel rect to fractions relative to displayed image
+  var ir = crop.imgRect;
+  var cropData = {
+    x: Math.max(0, (crop.rect.x - ir.left) / ir.width),
+    y: Math.max(0, (crop.rect.y - ir.top) / ir.height),
+    w: Math.min(1, crop.rect.w / ir.width),
+    h: Math.min(1, crop.rect.h / ir.height)
+  };
+  // Clamp to image bounds
+  if(cropData.x + cropData.w > 1) cropData.w = 1 - cropData.x;
+  if(cropData.y + cropData.h > 1) cropData.h = 1 - cropData.y;
+  if(cropData.x < 0) cropData.x = 0;
+  if(cropData.y < 0) cropData.y = 0;
+
+  sec.images[crop.imgIdx].crop = cropData;
+  saveCurrentSection();
+  closeCropTool();
+  showSection(state.currentId);
+});
+
+byId('crop-cancel-btn').addEventListener('click', function(){
+  closeCropTool();
+});
+
+byId('crop-reset-btn').addEventListener('click', function(){
+  if(crop.imgIdx < 0) { closeCropTool(); return; }
+  var sec = state.sections.find(function(s){ return s.id===state.currentId; });
+  if(sec && sec.images[crop.imgIdx]){
+    delete sec.images[crop.imgIdx].crop;
+    saveCurrentSection();
+  }
+  closeCropTool();
+  showSection(state.currentId);
+});
+
+// Close crop on Escape
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape' && crop.overlay && crop.overlay.classList.contains('open')) closeCropTool();
 });
 
 // ── Lightbox with zoom & pan ──
