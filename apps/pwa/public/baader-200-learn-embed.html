@@ -174,9 +174,13 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 /* ── FREE-FLOAT IMAGES (absolute over content) ── */
 .img-card{border-radius:6px;border:1px solid #252a38;background:#0a0c12;position:absolute;overflow:hidden;transition:border-color .15s,box-shadow .2s;z-index:2;display:flex;flex-direction:column;}
 .img-card:hover{border-color:var(--ac);}
-.img-body{flex:1;min-height:0;overflow:hidden;position:relative;}
-.img-body img{width:100%;height:100%;display:block;cursor:pointer;background:#0a0c12;object-fit:fill;}
+.img-body{flex:1;min-height:0;overflow:hidden;position:relative;cursor:zoom-in;}
+.img-body.zoomed{cursor:grab;}
+.img-body.zoomed.panning{cursor:grabbing;}
+.img-body img{width:100%;height:100%;display:block;background:#0a0c12;object-fit:fill;transform-origin:0 0;}
 .img-body.cropped img{position:absolute;object-fit:fill;}
+.img-zoom-hint{position:absolute;bottom:4px;right:4px;font-size:9px;color:#556;background:rgba(0,0,0,.6);padding:2px 6px;border-radius:3px;pointer-events:none;z-index:3;opacity:0;transition:opacity .2s;}
+.img-body:hover .img-zoom-hint{opacity:1;}
 .img-caption{font-size:11px;color:#99a0b0;padding:5px 8px;text-align:center;border-top:1px solid #1e2230;flex-shrink:0;}
 .img-placeholder-box{position:absolute;right:0;top:0;width:60%;height:200px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;border:2px dashed #252a38;border-radius:8px;color:#556;font-size:12px;}
 
@@ -679,7 +683,8 @@ function renderSectionContent(sec){
       html += '<img src="'+esc(im.url)+'" alt="'+esc(im.caption||sec.title)+'" loading="lazy"';
       if(imgStyle) html += ' style="'+imgStyle+'"';
       html += ' onload="if(typeof updateCanvasHeight===\'function\')updateCanvasHeight()"';
-      html += ' onclick="if(!window._imgEditing)openLightbox(\''+lbUrl+'\',\''+lbCap+'\')"/>';
+      html += ' data-lb-url="'+esc(im.url)+'" data-lb-cap="'+esc(im.caption||'')+'"/>';
+      html += '<div class="img-zoom-hint">Scroll=zoom · Doble click=reset</div>';
       html += '</div>';
       if(im.caption) html += '<div class="img-caption">'+esc(im.caption)+'</div>';
       html += '<div class="img-resize-handle" data-idx="'+idx+'" title="Arrastra para redimensionar"></div>';
@@ -705,6 +710,7 @@ function showSection(id){
   renderNavTree();
   // Bind image management events
   bindImageControls(el);
+  bindImageZoomPan(el);
   // Set canvas min-height based on image positions
   updateCanvasHeight();
 }
@@ -866,6 +872,132 @@ function bindImageControls(container){
     window.addEventListener('touchmove', onMove, {passive:false});
     window.addEventListener('touchend', onUp);
   }
+}
+
+// ── Inline zoom & pan for images ──
+function bindImageZoomPan(container){
+  container.querySelectorAll('.img-body').forEach(function(body){
+    var img = body.querySelector('img');
+    if(!img) return;
+    var zs = {z:1, tx:0, ty:0, panning:false, sx:0, sy:0, stx:0, sty:0};
+    body._zs = zs;
+
+    function applyZoom(){
+      img.style.transform = 'translate('+zs.tx+'px,'+zs.ty+'px) scale('+zs.z+')';
+      body.classList.toggle('zoomed', zs.z > 1.05);
+      var hint = body.querySelector('.img-zoom-hint');
+      if(hint) hint.textContent = zs.z > 1.05 ? Math.round(zs.z*100)+'%' : 'Scroll=zoom';
+    }
+
+    function clampPan(){
+      // Prevent showing empty space outside the visible image area
+      var bw = body.offsetWidth, bh = body.offsetHeight;
+      // Effective image bounds after scale
+      // For uncropped: img fills body at z=1, so scaled = bw*z, bh*z
+      // For cropped: img is larger, positioned with left/top offsets
+      var isCropped = body.classList.contains('cropped');
+      var baseLeft = isCropped ? parseFloat(img.style.left)||0 : 0;
+      var baseTop = isCropped ? parseFloat(img.style.top)||0 : 0;
+      // Convert % to px
+      if(String(img.style.left).indexOf('%')>-1) baseLeft = parseFloat(img.style.left)/100*bw;
+      if(String(img.style.top).indexOf('%')>-1) baseTop = parseFloat(img.style.top)/100*bh;
+      var imgW = img.offsetWidth * zs.z;
+      var imgH = img.offsetHeight * zs.z;
+      var visLeft = baseLeft * zs.z + zs.tx;
+      var visTop = baseTop * zs.z + zs.ty;
+      // Don't let right edge go left of container right
+      if(visLeft + imgW < bw) zs.tx = bw - imgW - baseLeft*zs.z;
+      // Don't let left edge go right of container left
+      if(visLeft > 0) zs.tx = -baseLeft*zs.z;
+      // Same for vertical
+      if(visTop + imgH < bh) zs.ty = bh - imgH - baseTop*zs.z;
+      if(visTop > 0) zs.ty = -baseTop*zs.z;
+    }
+
+    // Scroll zoom
+    body.addEventListener('wheel', function(e){
+      e.preventDefault();
+      e.stopPropagation();
+      var rect = body.getBoundingClientRect();
+      var mx = e.clientX - rect.left;
+      var my = e.clientY - rect.top;
+      var oldZ = zs.z;
+      var factor = e.deltaY > 0 ? 0.85 : 1.18;
+      zs.z = Math.min(Math.max(zs.z * factor, 1), 15);
+      // Adjust tx/ty to zoom centered on cursor
+      zs.tx = mx - (mx - zs.tx) * (zs.z / oldZ);
+      zs.ty = my - (my - zs.ty) * (zs.z / oldZ);
+      if(zs.z <= 1.01){ zs.z=1; zs.tx=0; zs.ty=0; }
+      else clampPan();
+      applyZoom();
+    }, {passive:false});
+
+    // Drag pan
+    function startPan(px,py){
+      if(zs.z <= 1.05) return false;
+      zs.panning=true; zs.sx=px; zs.sy=py; zs.stx=zs.tx; zs.sty=zs.ty;
+      body.classList.add('panning');
+      window._imgEditing = true;
+      return true;
+    }
+    function movePan(px,py){
+      if(!zs.panning) return;
+      zs.tx = zs.stx + (px - zs.sx);
+      zs.ty = zs.sty + (py - zs.sy);
+      clampPan();
+      applyZoom();
+    }
+    function endPan(){
+      if(!zs.panning) return;
+      zs.panning=false;
+      body.classList.remove('panning');
+      setTimeout(function(){ window._imgEditing=false; },100);
+    }
+
+    body.addEventListener('mousedown', function(e){
+      if(e.target.closest('.img-edit-bar')) return;
+      if(startPan(e.clientX, e.clientY)) e.preventDefault();
+    });
+    window.addEventListener('mousemove', function(e){ movePan(e.clientX, e.clientY); });
+    window.addEventListener('mouseup', function(){ endPan(); });
+
+    body.addEventListener('touchstart', function(e){
+      if(e.touches.length===1 && zs.z>1.05){
+        startPan(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    }, {passive:true});
+    body.addEventListener('touchmove', function(e){
+      if(zs.panning && e.touches.length===1){
+        movePan(e.touches[0].clientX, e.touches[0].clientY);
+        e.preventDefault();
+      }
+    }, {passive:false});
+    body.addEventListener('touchend', function(){ endPan(); });
+
+    // Double click → reset or open lightbox
+    body.addEventListener('dblclick', function(e){
+      if(e.target.closest('.img-edit-bar')) return;
+      if(zs.z > 1.05){
+        zs.z=1; zs.tx=0; zs.ty=0;
+        applyZoom();
+      } else {
+        var url = img.dataset.lbUrl;
+        var cap = img.dataset.lbCap;
+        if(url) openLightbox(url, cap||'');
+      }
+    });
+
+    // Single click at z=1 → open lightbox
+    body.addEventListener('click', function(e){
+      if(e.target.closest('.img-edit-bar')) return;
+      if(window._imgEditing) return;
+      if(zs.z <= 1.05){
+        var url = img.dataset.lbUrl;
+        var cap = img.dataset.lbCap;
+        if(url) openLightbox(url, cap||'');
+      }
+    });
+  });
 }
 
 function autoLayoutNewImages(canvas){
