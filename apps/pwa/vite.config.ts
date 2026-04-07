@@ -13,6 +13,15 @@ export default defineConfig({
     }
   },
   base: process.env.VITE_BASE_URL || '/mantenimiento-planta/',
+  server: {
+    proxy: {
+      '/mantenimiento-planta/baader200-manual': {
+        target: 'https://orelcain.github.io',
+        changeOrigin: true,
+        secure: true,
+      },
+    },
+  },
   build: {
     outDir: 'dist',
     sourcemap: false,

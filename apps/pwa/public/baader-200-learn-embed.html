@@ -103,15 +103,18 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 .sec-block-title{font-size:11px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px;margin-top:20px;display:flex;align-items:center;gap:8px;}
 .sec-block-title::after{content:'';flex:1;height:1px;background:var(--bdr);}
 
-/* 2-column layout: text left, images float freely */
-.sec-two-col{position:relative;height:100%;overflow:auto;}
-.sec-col-left{width:35%;min-width:0;padding-right:12px;}
+/* 2-column layout: text left, images right */
+.sec-two-col{display:flex;gap:16px;height:100%;overflow:auto;padding:12px;}
+.sec-col-left{flex:1;min-width:0;padding-right:0;}
+.sec-col-right{flex:0 0 auto;width:clamp(280px, 45%, 600px);display:flex;flex-direction:column;gap:8px;align-self:flex-start;position:sticky;top:12px;}
 
 /* steps */
 .steps-list{display:flex;flex-direction:column;gap:5px;}
 .step-item{display:flex;align-items:flex-start;gap:10px;padding:8px 12px;border-radius:6px;font-size:13px;line-height:1.6;color:var(--text);}
 .step-item:hover{background:rgba(255,255,255,.02);}
+.step-item.step-active{background:rgba(68,153,255,.08);border-left:3px solid var(--ac);padding-left:9px;}
 .step-item.important{background:var(--step-imp-bg);border:1px solid var(--step-imp-border);color:#ffd080;}
+.step-item.important.step-active{border-left:3px solid var(--ac);}
 .step-num{font-size:11px;color:var(--text-dim);flex-shrink:0;min-width:20px;padding-top:2px;font-family:'Courier New',monospace;font-weight:700;}
 .step-imp-icon{flex-shrink:0;font-size:14px;}
 .step-text{flex:1;}
@@ -199,17 +202,20 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 #lightbox-img{position:absolute;top:50%;left:50%;transform-origin:0 0;transition:none;user-select:none;-webkit-user-drag:none;border-radius:4px;box-shadow:0 10px 40px rgba(0,0,0,.5);}
 #lightbox-caption{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);color:#ccc;font-size:13px;background:rgba(0,0,0,.7);padding:6px 16px;border-radius:6px;z-index:201;pointer-events:none;}
 #lightbox-controls{position:fixed;top:16px;right:16px;display:flex;gap:8px;z-index:201;}
-#lightbox-controls button{background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.15);color:#ccc;width:36px;height:36px;border-radius:8px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;}
+#lightbox-controls button{background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.15);color:#ccc;width:48px;height:48px;border-radius:10px;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;}
 #lightbox-controls button:hover{background:rgba(255,255,255,.15);color:#fff;}
 #lightbox-hint{position:fixed;bottom:60px;left:50%;transform:translateX(-50%);color:#666;font-size:11px;z-index:201;pointer-events:none;}
-/* ── FREE-FLOAT IMAGES (absolute over content) ── */
-.img-card{border-radius:6px;border:1px solid #252a38;background:#0a0c12;position:absolute;overflow:hidden;transition:border-color .15s,box-shadow .2s;z-index:2;display:flex;flex-direction:column;}
+/* ── IMAGES: flow in col-right, absolute in edit mode ── */
+.img-card{border-radius:6px;border:1px solid #252a38;background:#0a0c12;overflow:hidden;transition:border-color .15s,box-shadow .2s;display:flex;flex-direction:column;}
+.sec-col-right .img-card{position:relative;width:100%!important;left:auto!important;top:auto!important;min-height:280px;max-height:500px;}
+.sec-col-right .img-body{flex:1;min-height:200px;}
+.sec-two-col.edit-mode .img-card{position:absolute;z-index:2;}
 .img-card:hover{border-color:var(--ac);}
 .img-body{flex:1;min-height:0;overflow:hidden;position:relative;cursor:zoom-in;}
 .img-body.zoomed{cursor:grab;}
 .img-body.zoomed.panning{cursor:grabbing;}
-.img-body img{width:100%;height:100%;display:block;background:#0a0c12;object-fit:fill;}
-.img-body.cropped img{position:absolute;object-fit:fill;}
+.img-body img{width:100%;height:100%;display:block;background:#0a0c12;object-fit:contain;}
+.img-body.cropped img{position:absolute;object-fit:fill;} /* crop needs fill to scale correctly */
 .img-zoom-hint{position:absolute;bottom:4px;right:4px;font-size:9px;color:#556;background:rgba(0,0,0,.6);padding:2px 6px;border-radius:3px;pointer-events:none;z-index:3;opacity:0;transition:opacity .2s;}
 .img-body:hover .img-zoom-hint{opacity:1;}
 /* ── ANNOTATIONS SVG ── */
@@ -282,6 +288,14 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 
 .hidden{display:none!important;}
 
+/* ── RESPONSIVE: tablet (701-900px) — single column with large images ── */
+@media(max-width:900px) and (min-width:701px){
+  .sec-two-col{flex-direction:column;height:auto!important;overflow:auto!important;gap:12px;}
+  .sec-col-left{width:100%;flex:none;}
+  .sec-col-right{width:100%;position:static;flex:none;max-height:none;display:flex;flex-direction:row;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;}
+  .sec-col-right .img-card{flex-shrink:0;scroll-snap-align:start;width:clamp(300px,60%,500px)!important;min-height:auto;max-height:450px;}
+}
+
 /* ── RESPONSIVE: mobile ── */
 @media(max-width:700px){
   :root{--nav-w:280px;}
@@ -299,21 +313,30 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
   /* Stack layout: text then images */
   .sec-two-col{display:flex;flex-direction:column;height:auto!important;overflow:visible!important;padding:12px;gap:16px;position:static!important;}
   .sec-col-left{width:100%;padding-right:0;flex:none;overflow-y:visible;}
-  .sec-title{font-size:17px;}
-  .sec-desc{font-size:12px;}
-  .step-item{padding:6px 8px;font-size:12px;}
-  .meas-table{font-size:11px;}
-  .meas-table th,.meas-table td{padding:6px 8px;}
-  .note-item{font-size:12px;}
-  /* Images flow naturally in mobile (no absolute, no flex column) */
-  .img-card{position:relative!important;left:auto!important;top:auto!important;width:100%!important;height:auto!important;margin-bottom:10px;border-radius:10px;display:block!important;}
-  .img-body{min-height:auto!important;overflow:hidden!important;position:relative!important;}
-  .img-body img{width:100%!important;height:auto!important;max-height:60vh;object-fit:contain!important;position:static!important;left:auto!important;top:auto!important;}
-  /* Crop on mobile: clip-path applied by JS (applyMobileCrop) */
-  .img-body.cropped img{position:static!important;width:100%!important;height:auto!important;max-height:none!important;}
+  .sec-title{font-size:18px;}
+  .sec-desc{font-size:13px;line-height:1.5;}
+  .step-item{padding:10px 12px;font-size:15px;line-height:1.5;}
+  .step-num{font-size:13px;min-width:24px;}
+  .meas-table{font-size:13px;}
+  .meas-table th,.meas-table td{padding:8px 10px;}
+  .meas-val{font-size:15px;}
+  .note-item{font-size:14px;line-height:1.5;}
+  .nav-item{padding:12px 14px!important;font-size:13px!important;min-height:44px;}
+  /* Hide desktop floating images on mobile — replaced by .mobile-img-strip thumbnails */
+  .img-card{display:none!important;}
   .img-edit-bar{position:relative;opacity:1;}
   .img-resize-handle{display:none!important;}
   .img-caption{font-size:12px;padding:8px 10px;}
+  /* Mobile image strip — thumbnails before content */
+  .mobile-img-strip{display:flex;gap:8px;padding:0 0 8px;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+  .mobile-img-strip::-webkit-scrollbar{display:none;}
+  .mobile-img-strip .mobile-thumb{flex-shrink:0;scroll-snap-align:start;position:relative;border-radius:8px;overflow:hidden;border:1px solid #252a38;background:#0a0c12;cursor:pointer;transition:border-color .15s;}
+  .mobile-img-strip .mobile-thumb:active{border-color:var(--ac);}
+  .mobile-img-strip .mobile-thumb img{display:block;height:280px;width:auto;max-width:85vw;object-fit:contain;background:#0a0c12;}
+  .mobile-img-strip.single .mobile-thumb{width:100%;}
+  .mobile-img-strip.single .mobile-thumb img{width:100%;height:auto;max-height:350px;}
+  .mobile-img-strip .thumb-zoom{position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,.7);color:#aab;font-size:11px;padding:3px 8px;border-radius:4px;pointer-events:none;display:flex;align-items:center;gap:4px;}
+  .mobile-img-strip .thumb-caption{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.8));color:#ccc;font-size:10px;padding:16px 8px 6px;pointer-events:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   /* Annotations visible but smaller */
   .ann-svg{pointer-events:none;}
   .ann-toolbar{display:none!important;}
@@ -692,6 +715,30 @@ function renderSectionContent(sec){
   html += '<span class="sec-badge '+esc(sec.type||'ajuste')+'">'+(TYPE_ICONS[sec.type]||'')+' '+esc(TYPE_LABELS[sec.type]||sec.type)+'</span>';
   html += '<div class="sec-title">'+esc(sec.title)+'</div>';
   if(sec.description) html += '<div class="sec-desc">'+esc(sec.description)+'</div>';
+  // MOBILE: image thumbnails right after title/description
+  if(isMobile() && hasImages){
+    html += '<div class="mobile-img-strip'+(imgs.length===1?' single':'')+'">';
+    imgs.forEach(function(im, idx){
+      var hasCrop = im.crop && im.crop.w > 0.01 && im.crop.h > 0.01;
+      html += '<div class="mobile-thumb" data-thumb-idx="'+idx+'" data-url="'+esc(im.url)+'" data-caption="'+esc(im.caption||'')+'"';
+      if(hasCrop) html += ' data-crop-x="'+im.crop.x+'" data-crop-y="'+im.crop.y+'" data-crop-w="'+im.crop.w+'" data-crop-h="'+im.crop.h+'"';
+      html += '>';
+      // Apply clip-path to thumbnail so it shows the cropped diagram, not full scan
+      var thumbStyle = '';
+      if(hasCrop){
+        var ct = (im.crop.y * 100).toFixed(1);
+        var cr = ((1 - im.crop.x - im.crop.w) * 100).toFixed(1);
+        var cb = ((1 - im.crop.y - im.crop.h) * 100).toFixed(1);
+        var cl = (im.crop.x * 100).toFixed(1);
+        thumbStyle = 'clip-path:inset('+ct+'% '+cr+'% '+cb+'% '+cl+'%);';
+      }
+      html += '<img src="'+esc(im.url)+'" alt="'+esc(im.caption||sec.title)+'"'+(thumbStyle?' style="'+thumbStyle+'"':'')+'>';
+      if(im.caption) html += '<div class="thumb-caption">'+esc(im.caption)+'</div>';
+      html += '<div class="thumb-zoom">&#128269; Ampliar</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+  }
   if(steps.length){
     html += '<div class="sec-block-title">Procedimiento</div>';
     html += '<div class="steps-list">';
@@ -729,23 +776,28 @@ function renderSectionContent(sec){
   }
   html += '</div>'; // end sec-col-left
 
-  // IMAGES — float freely over the entire content area
+  // IMAGES — right column (flow layout for readonly, absolute for edit mode)
   if(hasImages){
+    var useAbsolute = state.unlocked; // Admin edit mode uses absolute positioning
+    if(!useAbsolute && !isMobile()){
+      html += '<div class="sec-col-right">';
+    }
     var stackY = 0;
     imgs.forEach(function(im, idx){
-      var lo = im.layout || {};
-      var hasPos = lo.x != null && lo.y != null;
       var posStyle = '';
-      if(hasPos){
-        posStyle += 'left:'+lo.x+'px;top:'+lo.y+'px;';
-      } else {
-        // Default: right side, stacked
-        posStyle += 'left:36%;top:'+stackY+'px;';
+      if(useAbsolute){
+        var lo = im.layout || {};
+        var hasPos = lo.x != null && lo.y != null;
+        if(hasPos){
+          posStyle += 'left:'+lo.x+'px;top:'+lo.y+'px;';
+        } else {
+          posStyle += 'left:36%;top:'+stackY+'px;';
+        }
+        if(lo.w) posStyle += 'width:'+lo.w+'px;';
+        else posStyle += 'width:58%;';
+        if(lo.h) posStyle += 'height:'+lo.h+'px;';
+        stackY += (lo.h || 280) + 8;
       }
-      if(lo.w) posStyle += 'width:'+lo.w+'px;';
-      else posStyle += 'width:58%;';
-      if(lo.h) posStyle += 'height:'+lo.h+'px;';
-      stackY += (lo.h || 280) + 8;
       html += '<div class="img-card" data-img-idx="'+idx+'" style="'+posStyle+'">';
       html += '<div class="img-edit-bar">';
       html += '<span style="font-size:11px;color:#556;cursor:move;" title="Arrastra para mover">&#9776;</span>';
@@ -848,6 +900,9 @@ function renderSectionContent(sec){
   } else if(state.isAdminPage){
     html += '<div class="img-placeholder-box"><span style="font-size:24px;opacity:.3;">&#128444;</span><span>Sin imagenes</span></div>';
   }
+  if(hasImages && !useAbsolute && !isMobile()){
+    html += '</div>'; // end sec-col-right
+  }
 
   html += '</div>'; // end sec-two-col
   return html;
@@ -867,20 +922,36 @@ function showSection(id){
   bindImageControls(el);
   bindImageZoomPan(el);
   applyMobileCrop(el);
+  // Tap-to-mark: let technicians mark their current step
+  el.querySelectorAll('.step-item').forEach(function(step){
+    step.style.cursor = 'pointer';
+    step.addEventListener('click', function(){
+      step.classList.toggle('step-active');
+    });
+  });
   // Set canvas min-height based on image positions
   updateCanvasHeight();
 }
 
 function applyMobileCrop(container){
   if(!isMobile()) return;
-  container.querySelectorAll('.img-body.cropped img[data-clip]').forEach(function(img){
-    // On mobile: remove the overflow-based crop inline styles, use clip-path instead
-    img.style.width = '100%';
-    img.style.height = 'auto';
-    img.style.left = 'auto';
-    img.style.top = 'auto';
-    img.style.position = 'static';
-    img.style.clipPath = img.dataset.clip;
+  // Bind tap on mobile thumbnails to open lightbox with crop zoom
+  container.querySelectorAll('.mobile-thumb').forEach(function(thumb){
+    thumb.addEventListener('click', function(){
+      var url = thumb.dataset.url;
+      var caption = thumb.dataset.caption || '';
+      var hasCrop = thumb.dataset.cropW != null;
+      if(hasCrop){
+        // Open lightbox zoomed to crop area
+        var cx = parseFloat(thumb.dataset.cropX);
+        var cy = parseFloat(thumb.dataset.cropY);
+        var cw = parseFloat(thumb.dataset.cropW);
+        var ch = parseFloat(thumb.dataset.cropH);
+        openLightboxCropped(url, caption, cx, cy, cw, ch);
+      } else {
+        openLightbox(url, caption);
+      }
+    });
   });
 }
 
@@ -2036,6 +2107,32 @@ window.openLightbox = function(url, caption){
   lb.scale = 1; lb.x = 0; lb.y = 0;
   var tmp = new Image();
   tmp.onload = function(){ lb.natW = tmp.naturalWidth; lb.natH = tmp.naturalHeight; lbApply(); };
+  tmp.src = url;
+  lb.el.classList.add('open');
+};
+
+window.openLightboxCropped = function(url, caption, cx, cy, cw, ch){
+  lb.img.src = url;
+  byId('lightbox-caption').textContent = caption || '';
+  byId('lightbox-caption').style.display = caption ? 'block' : 'none';
+  byId('lightbox-hint').style.display = 'block';
+  var tmp = new Image();
+  tmp.onload = function(){
+    lb.natW = tmp.naturalWidth;
+    lb.natH = tmp.naturalHeight;
+    var vw = window.innerWidth;
+    var vh = window.innerHeight;
+    var fitScale = Math.min(vw / lb.natW, vh / lb.natH);
+    var cropPxW = cw * lb.natW * fitScale;
+    var cropPxH = ch * lb.natH * fitScale;
+    var zoomForCrop = Math.min(vw / cropPxW, vh / cropPxH) * 0.9;
+    lb.scale = zoomForCrop;
+    var w = lb.natW * fitScale * lb.scale;
+    var h = lb.natH * fitScale * lb.scale;
+    lb.x = (vw / 2) - (cx + cw / 2) * w;
+    lb.y = (vh / 2) - (cy + ch / 2) * h;
+    lbApply();
+  };
   tmp.src = url;
   lb.el.classList.add('open');
 };
