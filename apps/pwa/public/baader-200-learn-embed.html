@@ -187,6 +187,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 .ann-svg circle,.ann-svg rect,.ann-svg line,.ann-svg polygon,.ann-svg text{pointer-events:visiblePainted;}
 .ann-svg .ann-shape{cursor:pointer;}
 .ann-svg .ann-shape:hover{filter:brightness(1.3);}
+.ann-svg .ann-shape.selected{stroke-dasharray:2,1;filter:brightness(1.4);animation:ann-pulse 1s ease infinite;}
+@keyframes ann-pulse{0%,100%{filter:brightness(1.4);}50%{filter:brightness(1.8);}}
 .ann-svg .ann-label{font-size:11px;font-weight:700;paint-order:stroke;stroke:#000;stroke-width:3px;fill:#fff;pointer-events:none;}
 .ann-svg .ann-point{fill:var(--ac);stroke:#fff;stroke-width:1.5;cursor:move;r:4;}
 .ann-svg .ann-point:hover{r:6;}
@@ -728,10 +730,12 @@ function renderSectionContent(sec){
             html += '<circle class="ann-point" cx="'+p.x+'" cy="'+p.y+'" data-ann-id="'+esc(a.id)+'" data-pt="'+pi+'"/>';
           });
         }
-        if(a.label){
+        if(a.type==='text'){
+          html += '<text class="ann-shape ann-label" x="'+a.x+'" y="'+a.y+'" text-anchor="middle" fill="'+esc(c)+'" data-ann-id="'+esc(a.id)+'" style="pointer-events:all;cursor:pointer;">'+esc(a.label||'?')+'</text>';
+        } else if(a.label){
           var lx = a.type==='circle'? a.x : (a.type==='rect'? a.x+((a.w||10)/2) : a.x);
           var ly = a.type==='circle'? (a.y-(a.r||3)-1) : (a.type==='rect'? (a.y-1) : (a.y-1.5));
-          html += '<text class="ann-label" x="'+lx+'" y="'+ly+'" text-anchor="middle" fill="'+esc(c)+'">'+esc(a.label)+'</text>';
+          html += '<text class="ann-label" x="'+lx+'" y="'+ly+'" text-anchor="middle" fill="'+esc(c)+'" data-ann-id="'+esc(a.id)+'">'+esc(a.label)+'</text>';
         }
       });
       html += '</svg>';
@@ -1083,7 +1087,8 @@ function bindImageZoomPan(container){
 var ann = {
   active: false, imgIdx: -1, tool: 'circle', color: '#ff4444',
   strokeW: 2, opacity: 0.15, noStroke: false,
-  drawing: false, startX: 0, startY: 0, tempEl: null, polyPoints: []
+  drawing: false, startX: 0, startY: 0, tempEl: null, polyPoints: [],
+  selId: null, moving: false, moveSX: 0, moveSY: 0
 };
 
 function toggleAnnotationMode(idx){
@@ -1164,18 +1169,87 @@ function svgCoords(clientX, clientY, svg){
   return { x: (clientX - r.left) / r.width * 100, y: (clientY - r.top) / r.height * 100 };
 }
 
+function selectAnnotation(id, svg){
+  ann.selId = id;
+  svg.querySelectorAll('.ann-shape').forEach(function(el){
+    el.classList.toggle('selected', el.getAttribute('data-ann-id') === id);
+  });
+  // Show edit controls in toolbar
+  var toolbar = document.querySelector('.ann-toolbar[data-idx="'+ann.imgIdx+'"]');
+  if(!toolbar) return;
+  var old = toolbar.querySelector('.ann-sel-panel');
+  if(old) old.remove();
+  if(!id) return;
+  var sec = state.sections.find(function(s){ return s.id===state.currentId; });
+  var a = sec && sec.images[ann.imgIdx] ? (sec.images[ann.imgIdx].annotations||[]).find(function(x){return x.id===id;}) : null;
+  if(!a) return;
+  var panel = document.createElement('div');
+  panel.className = 'ann-sel-panel';
+  panel.style.cssText = 'display:flex;align-items:center;gap:4px;padding:2px 6px;background:#1a1520;border-top:1px solid #4499ff;width:100%;';
+  panel.innerHTML = '<span style="font-size:9px;color:#4499ff;">Editando:</span>'
+    +(a.type!=='arrow'?'<span style="font-size:9px;color:#667;">Opac.</span><select class="ann-sel" data-ed="opacity"><option value="0"'+(a.opacity===0?' selected':'')+'>0%</option><option value="0.15"'+((a.opacity||0.15)===0.15?' selected':'')+'>15%</option><option value="0.3"'+(a.opacity===0.3?' selected':'')+'>30%</option><option value="0.5"'+(a.opacity===0.5?' selected':'')+'>50%</option><option value="0.8"'+(a.opacity===0.8?' selected':'')+'>80%</option><option value="1"'+(a.opacity===1?' selected':'')+'>100%</option></select>':'')
+    +'<span style="font-size:9px;color:#667;">Grosor</span><select class="ann-sel" data-ed="strokeW"><option value="1"'+((a.strokeW||2)===1?' selected':'')+'>1</option><option value="2"'+((a.strokeW||2)===2?' selected':'')+'>2</option><option value="3"'+((a.strokeW||2)===3?' selected':'')+'>3</option><option value="5"'+((a.strokeW||2)===5?' selected':'')+'>5</option><option value="8"'+((a.strokeW||2)===8?' selected':'')+'>8</option></select>'
+    +'<button class="ann-tool" data-ed="label">&#9998; Texto</button>'
+    +'<button class="ann-tool" data-ed="color">&#127912; Color</button>'
+    +'<span style="flex:1;"></span>'
+    +'<button class="ann-tool" style="border-color:#552222;color:#ff8888;" data-ed="delete">&#128465; Eliminar</button>'
+    +'<button class="ann-tool" data-ed="deselect">&#10003; OK</button>';
+  toolbar.appendChild(panel);
+  panel.querySelectorAll('[data-ed]').forEach(function(el){
+    if(el.tagName==='SELECT'){
+      el.onchange = function(){ editAnnotationProp(ann.imgIdx, id, el.dataset.ed, parseFloat(el.value)); };
+    } else {
+      el.onclick = function(ev){
+        ev.stopPropagation();
+        var ed = el.dataset.ed;
+        if(ed==='delete'){ deleteAnnotation(ann.imgIdx, id); }
+        else if(ed==='deselect'){ selectAnnotation(null, svg); }
+        else if(ed==='label'){
+          var cur = a.label || '';
+          var txt = prompt('Texto:', cur);
+          if(txt !== null) editAnnotationProp(ann.imgIdx, id, 'label', txt);
+        } else if(ed==='color'){
+          var colors = ['#ff4444','#44aaff','#44ff44','#ffaa00','#ff44ff','#ffffff'];
+          var ci = colors.indexOf(a.color||'#ff4444');
+          var nc = colors[(ci+1)%colors.length];
+          editAnnotationProp(ann.imgIdx, id, 'color', nc);
+        }
+      };
+    }
+  });
+}
+
+function editAnnotationProp(imgIdx, annId, prop, value){
+  var sec = state.sections.find(function(s){ return s.id===state.currentId; });
+  if(!sec || !sec.images[imgIdx]) return;
+  var a = (sec.images[imgIdx].annotations||[]).find(function(x){return x.id===annId;});
+  if(!a) return;
+  a[prop] = value;
+  saveCurrentSection();
+  showSection(state.currentId);
+  setTimeout(function(){ toggleAnnotationMode(imgIdx); setTimeout(function(){ selectAnnotation(annId, document.querySelector('.ann-svg[data-idx="'+imgIdx+'"]')); },50); }, 50);
+}
+
 function annPointerDown(e, svg){
   if(!ann.active) return;
   var p = svgCoords(e.clientX, e.clientY, svg);
 
-  // Click on existing shape to delete it
+  // Click on existing shape → select it (or start moving if already selected)
   if(e.target && e.target.closest('.ann-shape')){
     var id = e.target.closest('.ann-shape').getAttribute('data-ann-id');
-    if(id && confirm('¿Eliminar esta anotación?')){
-      deleteAnnotation(ann.imgIdx, id);
+    if(id === ann.selId){
+      // Already selected → start moving
+      ann.moving = true;
+      ann.moveSX = p.x;
+      ann.moveSY = p.y;
+    } else {
+      selectAnnotation(id, svg);
     }
     return;
   }
+
+  // Click on empty area → deselect
+  if(ann.selId){ selectAnnotation(null, svg); return; }
 
   if(ann.tool === 'polygon'){
     ann.polyPoints.push({x: Math.round(p.x*10)/10, y: Math.round(p.y*10)/10});
@@ -1197,7 +1271,46 @@ function annPointerDown(e, svg){
 }
 
 function annPointerMove(e, svg){
-  if(!ann.drawing || !ann.active) return;
+  if(!ann.active) return;
+  // Move selected annotation
+  if(ann.moving && ann.selId){
+    var p = svgCoords(e.clientX, e.clientY, svg);
+    var dx = p.x - ann.moveSX, dy = p.y - ann.moveSY;
+    var sec = state.sections.find(function(s){ return s.id===state.currentId; });
+    var a = sec && sec.images[ann.imgIdx] ? (sec.images[ann.imgIdx].annotations||[]).find(function(x){return x.id===ann.selId;}) : null;
+    if(a){
+      // Move shape elements visually
+      svg.querySelectorAll('[data-ann-id="'+ann.selId+'"]').forEach(function(el){
+        if(el.tagName==='circle' && !el.classList.contains('ann-point')){
+          el.setAttribute('cx', parseFloat(el.getAttribute('cx'))+dx);
+          el.setAttribute('cy', parseFloat(el.getAttribute('cy'))+dy);
+        } else if(el.tagName==='rect'){
+          el.setAttribute('x', parseFloat(el.getAttribute('x'))+dx);
+          el.setAttribute('y', parseFloat(el.getAttribute('y'))+dy);
+        } else if(el.tagName==='line'){
+          el.setAttribute('x1', parseFloat(el.getAttribute('x1'))+dx);
+          el.setAttribute('y1', parseFloat(el.getAttribute('y1'))+dy);
+          el.setAttribute('x2', parseFloat(el.getAttribute('x2'))+dx);
+          el.setAttribute('y2', parseFloat(el.getAttribute('y2'))+dy);
+        } else if(el.tagName==='polygon'){
+          var pts = el.getAttribute('points').split(/\s+/).map(function(s){
+            var xy=s.split(','); return (parseFloat(xy[0])+dx)+','+(parseFloat(xy[1])+dy);
+          }).join(' ');
+          el.setAttribute('points', pts);
+        } else if(el.tagName==='text'){
+          el.setAttribute('x', parseFloat(el.getAttribute('x'))+dx);
+          el.setAttribute('y', parseFloat(el.getAttribute('y'))+dy);
+        } else if(el.classList.contains('ann-point')){
+          el.setAttribute('cx', parseFloat(el.getAttribute('cx'))+dx);
+          el.setAttribute('cy', parseFloat(el.getAttribute('cy'))+dy);
+        }
+      });
+      ann.moveSX = p.x;
+      ann.moveSY = p.y;
+    }
+    return;
+  }
+  if(!ann.drawing) return;
   var p = svgCoords(e.clientX, e.clientY, svg);
   // Preview shape
   removeTempEl(svg);
@@ -1233,6 +1346,31 @@ function annPointerMove(e, svg){
 }
 
 function annPointerUp(e, svg){
+  // Finish moving selected annotation
+  if(ann.moving && ann.selId){
+    ann.moving = false;
+    var p = e ? svgCoords(e.clientX, e.clientY, svg) : null;
+    var sec = state.sections.find(function(s){ return s.id===state.currentId; });
+    var a = sec && sec.images[ann.imgIdx] ? (sec.images[ann.imgIdx].annotations||[]).find(function(x){return x.id===ann.selId;}) : null;
+    if(a && p){
+      var totalDx = p.x - ann.moveSX, totalDy = p.y - ann.moveSY;
+      // Read final positions from SVG elements (already moved visually)
+      var el = svg.querySelector('.ann-shape[data-ann-id="'+ann.selId+'"]');
+      if(el){
+        if(a.type==='circle'){ a.x = Math.round(parseFloat(el.getAttribute('cx'))*10)/10; a.y = Math.round(parseFloat(el.getAttribute('cy'))*10)/10; }
+        else if(a.type==='rect'){ a.x = Math.round(parseFloat(el.getAttribute('x'))*10)/10; a.y = Math.round(parseFloat(el.getAttribute('y'))*10)/10; }
+        else if(a.type==='arrow'){ a.x = Math.round(parseFloat(el.getAttribute('x1'))*10)/10; a.y = Math.round(parseFloat(el.getAttribute('y1'))*10)/10; a.x2 = Math.round(parseFloat(el.getAttribute('x2'))*10)/10; a.y2 = Math.round(parseFloat(el.getAttribute('y2'))*10)/10; }
+        else if(a.type==='polygon' && a.points){
+          var pts = el.getAttribute('points').split(/\s+/);
+          a.points = pts.map(function(s){ var xy=s.split(','); return {x:Math.round(parseFloat(xy[0])*10)/10, y:Math.round(parseFloat(xy[1])*10)/10}; });
+          a.x = a.points[0].x; a.y = a.points[0].y;
+        }
+        else if(a.type==='text'){ a.x = Math.round(parseFloat(el.getAttribute('x'))*10)/10; a.y = Math.round(parseFloat(el.getAttribute('y'))*10)/10; }
+      }
+      saveCurrentSection();
+    }
+    return;
+  }
   if(!ann.drawing) return;
   ann.drawing = false;
   removeTempEl(svg);
