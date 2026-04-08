@@ -341,7 +341,7 @@ service cloud.firestore {
     match /failurePredictions/{predictionId} {
       allow read: if isAuthenticated();
       allow create: if isAdmin();
-      allow update: if isAuthenticated();
+      allow update: if isTechnician();
       allow delete: if isAdmin();
     }
 
@@ -361,7 +361,7 @@ service cloud.firestore {
     match /spareParts/{partId} {
       allow read: if isAuthenticated();
       allow create: if isAdmin() || isSupervisor();
-      allow update: if isAuthenticated();
+      allow update: if isTechnician();
       allow delete: if isAdmin();
     }
 
@@ -393,14 +393,14 @@ service cloud.firestore {
     match /bodega_inventarios/{inventarioId} {
       allow read: if isAuthenticated();
       allow create: if isSupervisor();
-      allow update: if isAuthenticated();
+      allow update: if isTechnician();
       allow delete: if isAdmin();
 
       // Conteos individuales por SAP
       match /conteos/{conteoId} {
         allow read: if isAuthenticated();
-        allow create: if isAuthenticated();
-        allow update: if isAuthenticated();
+        allow create: if isTechnician();
+        allow update: if isTechnician();
         allow delete: if isAdmin();
       }
     }
@@ -444,9 +444,9 @@ service cloud.firestore {
         && request.resource.data.reportadoPor == request.auth.uid
         && request.resource.data.fotosBefore is list;
       
-      allow update: if isAuthenticated();
-        
-      allow delete: if isAdmin() || (isAuthenticated() && resource.data.reportadoPor == request.auth.uid);
+      allow update: if isTechnician();
+
+      allow delete: if isAdmin() || (isTechnician() && resource.data.reportadoPor == request.auth.uid);
     }
 
     // ============================================
@@ -758,7 +758,7 @@ service cloud.firestore {
     // ============================================
     match /calendario_mantencion_state/{docId} {
       allow read: if isAuthenticated();
-      allow create, update: if isAuthenticated();
+      allow create, update: if isTechnician();
       allow delete: if isAdmin();
     }
 
