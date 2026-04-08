@@ -1,9 +1,3 @@
-/** Escapa HTML para prevenir XSS en innerHTML */
-function esc(str: string | undefined | null): string {
-  if (!str) return ''
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-}
-
 export type TelemetryAuditMeta = {
   generatedAtMs: number
   generatedAtIso: string
@@ -236,6 +230,7 @@ export function exportTelemetryAsHtml(meta: TelemetryAuditMeta, events: Telemetr
   </div>
 
 <script>
+function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 const payload = ${JSON.stringify(payload)};
 const all = payload.events;
 const q = document.getElementById('q');
