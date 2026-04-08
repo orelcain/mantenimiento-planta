@@ -115,6 +115,21 @@ ett, inviteCodes, roles, mapLocations
 - GitHub: `orelcain/mantenimiento-planta`
 - Produccion: `https://orelcain.github.io/mantenimiento-planta/`
 
+## Cambios recientes (sesion 2026-04-07)
+
+- Baader 200 movil: thumbnails con crop + lightbox zoom, font 15px, tap-to-mark pasos
+- Baader 200 desktop: columna derecha responsive con divisor draggable (25%-75%)
+- Breakpoint tablet 900px: layout 1 columna con imagenes grandes
+- Posiciones de imagenes admin persisten entre lock/unlock
+- Proxy Vite para imagenes baader200-manual desde GitHub Pages
+- Fix navegacion pestañas en /learn (ruta absoluta)
+- Targets tactiles 48px para uso con guantes industriales
+- **Centro de Aprendizaje** (`/aprendizaje`): hub con cards para Baader 200 y HMI Knuro
+- **Sidebar agrupado**: 6 categorias colapsables con persistencia en localStorage
+- Boton "Ir a la App" en hub de aprendizaje
+- CLAUDE.md creado como memoria persistente del proyecto
+- Skills: `cerrar-sesion`, `agregar-modulo-aprendizaje` (renombrada a español)
+
 ## Pendientes priorizados
 
 ### P0 — Proxima sesion
@@ -124,11 +139,13 @@ ett, inviteCodes, roles, mapLocations
 - [ ] **Modulo Seguridad en Planta**: activar placeholder en /aprendizaje, crear pagina con protocolos EPP, bloqueo/etiquetado
 - [ ] **Modulo Marel**: activar placeholder, crear guias de equipos Marel
 - [ ] **Vulnerabilidades npm**: 92 reportadas por Dependabot (3 criticas). Ejecutar `npm audit fix`
+- [ ] **Deploy a produccion**: los cambios de esta sesion estan en main pero no en gh-pages
 
 ### P2 — Mejoras UX
 - [ ] **Modo alto contraste**: toggle en header para ambientes con luz intensa (planta)
 - [ ] **Precargar imagenes lightbox**: `<link rel="preload">` en thumbnails movil
 - [ ] **Proteccion scroll pantallas mojadas**: `overscroll-behavior: contain` en carruseles
+- [ ] **Quitar proxy Vite**: las imagenes baader200-manual ya estan en public/ (el proxy es fallback innecesario)
 
 ## Notas para sesiones nuevas
 
