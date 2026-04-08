@@ -91,8 +91,22 @@ ett, inviteCodes, roles, mapLocations
 
 | Skill | Uso |
 |-------|-----|
+| `cerrar-sesion` | **USAR AL FINAL DE CADA SESION.** Actualiza CLAUDE.md, sugiere skills, crea memoria |
 | `agregar-modulo-aprendizaje` | Agregar sub-modulo al Centro de Aprendizaje |
 | `floating-image-editor` | Componente de imagenes con crop, zoom, anotaciones SVG |
+
+## Mentalidad de mejora continua
+
+**En cada sesion, Claude debe pensar activamente en:**
+1. ¿Hay patrones que se repiten y podrian ser una skill?
+2. ¿Hay procesos complejos que necesitan una guia paso a paso?
+3. ¿Estamos haciendo algo manualmente que podria automatizarse?
+4. ¿El CLAUDE.md tiene toda la info que la proxima sesion necesitaria?
+
+**Al detectar una oportunidad de skill, sugerirla al usuario** con formato:
+> "Detecte que hicimos X varias veces. Sugiero crear una skill `nombre-skill` que automatice esto."
+
+**Al cerrar sesion**: ejecutar `/cerrar-sesion` para actualizar contexto y sugerir mejoras.
 
 ## Version actual
 
@@ -125,3 +139,5 @@ Al iniciar una nueva sesion de Claude Code en este proyecto:
 4. Siempre editar en `D:\a\APP leventamiento de insidencias en planta\`
 5. Vite dev server: `cd apps/pwa && npm run dev -- --port 5174 --host`
 6. Preview: usar `.claude/launch.json` con `preview_start`
+7. **Al terminar la sesion**: ejecutar skill `cerrar-sesion` para actualizar este archivo
+8. **Durante la sesion**: pensar en oportunidades de crear skills nuevas
