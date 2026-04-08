@@ -70,12 +70,14 @@ export interface MissionLog {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// KEYS DE PROVIDERS
+// KEYS DE PROVIDERS (solo se usan si Cloud Functions no están disponibles)
+// SECURITY: las keys no se envían al browser en producción si VITE_*
+// no están configuradas. Preferir siempre Cloud Functions.
 // ═══════════════════════════════════════════════════════════════════════
 
-const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY || ''
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || ''
-const DEEPSEEK_API_KEY = import.meta.env.VITE_DEEPSEEK_API_KEY || ''
+const GROQ_API_KEY = ''   // BLOQUEADO: usar Cloud Function groqProxy
+const GEMINI_API_KEY = '' // BLOQUEADO: usar Cloud Function geminiProxy
+const DEEPSEEK_API_KEY = '' // BLOQUEADO: usar Cloud Function deepseekProxy
 
 // ═══════════════════════════════════════════════════════════════════════
 // REGISTRO DE AGENTES
@@ -405,9 +407,23 @@ export async function callAgent(
     let result: { content: string; tokens: number }
 
     if (agent.provider === 'gemini') {
-      // Usar funciones existentes de ai.ts
       const { callGemini } = await import('./ai')
       result = await callGemini(messages, opts)
+    } else if (agent.provider === 'groq' || agent.provider === 'deepseek') {
+      // Usar Cloud Functions proxy (no exponer keys en el browser)
+      const { httpsCallable, getFunctions } = await import('firebase/functions')
+      const firebaseApp = (await import('@/services/firebase')).default
+      const functions = getFunctions(firebaseApp)
+      const proxyName = agent.provider === 'groq' ? 'groqProxy' : 'deepseekProxy'
+      const proxy = httpsCallable(functions, proxyName)
+      const cfResult = await proxy({
+        messages,
+        model: agent.model,
+        temperature: opts.temperature ?? 0.3,
+        max_tokens: opts.max_tokens || 2048,
+      })
+      const data = cfResult.data as { content: string; tokens?: number }
+      result = { content: data.content || '', tokens: data.tokens || 0 }
     } else {
       const url = PROVIDER_URLS[agent.provider]
       const key = PROVIDER_KEYS[agent.provider]

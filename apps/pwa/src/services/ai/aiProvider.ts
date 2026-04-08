@@ -269,42 +269,10 @@ async function callGroqAPI(userPrompt: string): Promise<string> {
     if (data.content) return data.content
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
-    if (!msg.includes('not-found') && !msg.includes('NOT_FOUND') && !msg.includes('not found')) {
-      console.warn('Cloud Function groqProxy error, trying direct:', msg)
-    }
+    throw new Error('IA no disponible (Cloud Function): ' + msg)
   }
 
-  // 2. Fallback: direct API call
-  const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY || ''
-  if (!GROQ_API_KEY) {
-    throw new Error('IA no configurada: ni Cloud Function ni API key disponible. Configura VITE_GROQ_API_KEY en .env')
-  }
-
-  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': 'Bearer ' + GROQ_API_KEY,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'llama-3.3-70b-versatile',
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: userPrompt },
-      ],
-      temperature: 0.2,
-      max_tokens: 3000,
-      response_format: { type: 'json_object' },
-    }),
-  })
-
-  if (!response.ok) {
-    const errBody = await response.text().catch(() => '')
-    throw new Error('Groq API error ' + response.status + ': ' + errBody.slice(0, 200))
-  }
-
-  const data = await response.json()
-  return data.choices?.[0]?.message?.content || ''
+  return ''
 }
 
 // ============================================================================
