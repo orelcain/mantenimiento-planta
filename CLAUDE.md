@@ -136,10 +136,12 @@ ett, inviteCodes, roles, mapLocations
 - [ ] **Editor de sidebar admin**: drag & drop modulos entre categorias, persistir en Firestore. Ver `.claude/memory/session_sidebar_editor_pending.md`
 
 ### P1 — Corto plazo
+- [ ] **Deploy Cloud Functions**: CORS restringido pendiente de deploy. Ejecutar `firebase deploy --only functions` o arreglar secret `FIREBASE_SERVICE_ACCOUNT` en GitHub
 - [ ] **Modulo Seguridad en Planta**: activar placeholder en /aprendizaje, crear pagina con protocolos EPP, bloqueo/etiquetado
 - [ ] **Modulo Marel**: activar placeholder, crear guias de equipos Marel
 - [x] **Vulnerabilidades npm**: 69→10 (2 criticas resueltas, 51 overrides). Restantes son devDeps y xlsx sin fix
 - [x] **Deploy a produccion**: mergeado a main, GitHub Actions despliega automaticamente
+- [x] **Auditoria de seguridad**: 8 puntos revisados, fixes aplicados (CORS, redirects, console.log, Firestore rules, rate limit)
 
 ### P2 — Mejoras UX
 - [ ] **Modo alto contraste**: toggle en header para ambientes con luz intensa (planta)
