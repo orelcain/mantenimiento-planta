@@ -1,6 +1,6 @@
 ---
 name: auditar-seguridad
-description: Auditoria de seguridad completa de la app. Revisa CORS, redirects, storage, console.log, webhooks, permisos Firestore, dependencias npm y rate limiting. Basada en checklist de @gbauzap + vulnerabilidades npm.
+description: Auditoria de seguridad completa (18 puntos). Nivel 1 (8 pts): CORS, redirects, storage, console.log, webhooks, permisos Firestore, dependencias npm, rate limiting. Nivel 2 (10 pts): API keys, XSS, CSP headers, localStorage, uploads, App Check, secrets, SW, input sanitization, HTTPS.
 ---
 
 # Auditoria de Seguridad — Checklist completo
@@ -121,12 +121,139 @@ Al finalizar, generar tabla resumen:
 | 8 | Rate limit auth     | OK / VULN | ...                            |
 ```
 
+## Checklist nivel 2 (10 puntos avanzados)
+
+### 9. API Keys expuestas en el bundle
+**Buscar en:** `apps/pwa/src/services/ai*.ts`, `apps/pwa/src/services/chatbot.ts`
+**Patron peligroso:** `import.meta.env.VITE_*_API_KEY` usado en fetch directo al proveedor
+**Fix:** Eliminar fallback directo a APIs externas, usar solo Cloud Functions proxy
+
+```
+Grep: VITE_.*API_KEY en apps/pwa/src/ — verificar que no se usen en Authorization headers
+Grep: Bearer.*API_KEY|key=.*API_KEY — llamadas directas con keys
+```
+
+### 10. XSS — dangerouslySetInnerHTML e innerHTML
+**Buscar en:** `apps/pwa/src/**/*.{ts,tsx}`
+**Patron peligroso:** `dangerouslySetInnerHTML` sin DOMPurify, `innerHTML = ` con datos de usuario
+**Aceptable:** `dangerouslySetInnerHTML` con DOMPurify.sanitize()
+
+```
+Grep: dangerouslySetInnerHTML en apps/pwa/src/
+Grep: \.innerHTML\s*= en apps/pwa/src/
+Grep: eval\(|new Function\( en apps/pwa/src/
+Verificar: cada uso si el dato viene de usuario/Firestore sin sanitizar
+```
+
+### 11. CSP Headers — Content Security Policy
+**Buscar en:** `firebase.json`, `apps/pwa/index.html`
+**Verificar headers:** CSP, X-Content-Type-Options, X-Frame-Options, HSTS, Referrer-Policy
+**Fix:** Agregar headers en firebase.json seccion hosting.headers
+
+```
+Grep: Content-Security-Policy|X-Frame-Options|X-Content-Type en firebase.json
+Grep: http-equiv.*Content-Security en apps/pwa/index.html
+```
+
+### 12. Datos sensibles en localStorage
+**Buscar en:** `apps/pwa/src/**/*.{ts,tsx}`
+**Patron peligroso:** Tokens, passwords, user data completo en localStorage
+**Aceptable:** Preferencias UI, estado de sidebar, tema
+
+```
+Grep: localStorage\.setItem|sessionStorage\.setItem en apps/pwa/src/
+Grep: persist.*middleware en apps/pwa/src/store/
+Verificar: que datos guardan los stores con persist()
+```
+
+### 13. Validacion de uploads (tipo + tamaño)
+**Buscar en:** `storage.rules`, `apps/pwa/src/services/storage.ts`
+**Patron peligroso:** Paths sin `request.resource.contentType.matches()` o sin size limit
+**Fix:** Agregar validacion de tipo en storage.rules para paths sin restriccion
+
+```
+Leer: storage.rules — buscar paths sin contentType.matches()
+Grep: uploadBytes|uploadString en apps/pwa/src/ — verificar que llamen validateFile()
+```
+
+### 14. Firebase App Check
+**Buscar en:** `apps/pwa/src/services/firebase.ts`, `functions/index.js`
+**Patron peligroso:** `enforceAppCheck: false` o ausencia total de App Check
+**Fix:** Inicializar App Check con ReCaptchaV3Provider + enforceAppCheck en funciones
+
+```
+Grep: appCheck|initializeAppCheck|ReCaptcha en apps/pwa/src/
+Grep: enforceAppCheck en functions/
+```
+
+### 15. Secrets en codigo
+**Buscar en:** Todo el proyecto (excluir node_modules)
+**Patron peligroso:** Passwords hardcodeados, API keys en strings, .env commiteados
+**Fix:** Mover a env vars o Cloud Functions secrets
+
+```
+Grep: password.*=.*'|secret.*=.*'|apiKey.*=.*' en apps/pwa/src/ y functions/
+Grep: sk-|AIza|ghp_|ghu_ — patrones comunes de keys
+Verificar: .gitignore excluye .env, .env.local, serviceAccountKey.json
+```
+
+### 16. Service Worker — Cache e integridad
+**Buscar en:** `apps/pwa/public/sw.js` o `firebase-messaging-sw.js`
+**Patron peligroso:** importScripts sin SRI, cache sin validacion de respuesta
+**Aceptable:** Stale-while-revalidate con check de res.ok
+
+```
+Leer: apps/pwa/public/firebase-messaging-sw.js
+Grep: importScripts en apps/pwa/public/ — verificar si tienen integrity
+Grep: cache\.put|caches\.open — estrategia de cache
+```
+
+### 17. Input sanitization en Firestore
+**Buscar en:** `firestore.rules`, `apps/pwa/src/services/*.ts`
+**Patron peligroso:** Write rules sin validacion de tipos (is string, .size(), etc.)
+**Fix:** Agregar validacion de tipos en rules + usar Zod en service layer
+
+```
+Contar: rules con validacion de tipos vs rules sin validacion en firestore.rules
+Grep: setDoc|updateDoc|addDoc en apps/pwa/src/services/ — verificar si validan
+Grep: safeParse|validateOrThrow en apps/pwa/src/ — donde se usa Zod
+```
+
+### 18. HTTPS y URLs seguras
+**Buscar en:** `apps/pwa/src/**/*.{ts,tsx}`
+**Patron peligroso:** URLs `http://` (excepto localhost y SVG namespaces)
+**Fix:** Cambiar a https:// donde aplique
+
+```
+Grep: http:// en apps/pwa/src/ — filtrar localhost y xmlns
+```
+
+## Formato del reporte nivel 2
+
+```
+| #  | Punto               | Estado    | Detalle                        |
+|----|---------------------|-----------|--------------------------------|
+| 9  | API Keys bundle     | OK / VULN | ...                            |
+| 10 | XSS                 | OK / VULN | ...                            |
+| 11 | CSP Headers         | OK / VULN | ...                            |
+| 12 | localStorage        | OK / VULN | ...                            |
+| 13 | Upload validation   | OK / VULN | ...                            |
+| 14 | App Check           | OK / VULN | ...                            |
+| 15 | Secrets en codigo   | OK / VULN | ...                            |
+| 16 | Service Worker      | OK / VULN | ...                            |
+| 17 | Input sanitization  | OK / VULN | ...                            |
+| 18 | HTTPS               | OK / VULN | ...                            |
+```
+
 ## Ejecucion optima
 
-Lanzar los 8 puntos en **paralelo** usando agentes Explore (puntos 1,2,3,5,6) y Grep/Read directos (puntos 4,7,8).
+**Nivel 1 (rapido):** Lanzar los 8 puntos en paralelo con Grep/Read directos.
+**Nivel 2 (profundo):** Lanzar los 10 puntos adicionales con agentes Explore en paralelo.
 
 Aplicar fixes automaticamente solo para:
 - vite.config.ts (console.log drop) — seguro, no rompe nada
 - Redirect validation — seguro, solo agrega validacion
 
-Para los demas, reportar y pedir confirmacion antes de aplicar.
+Para los demas, reportar hallazgos y pedir confirmacion antes de aplicar.
+
+Al finalizar, generar tablas resumen de nivel 1 y nivel 2 con estado de cada punto.
