@@ -31,11 +31,19 @@ export default defineConfig({
         entryFileNames: 'assets/[name]-[hash].js',
         chunkFileNames: 'assets/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash][extname]',
-        manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router-dom'],
-          firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/storage', 'firebase/database', 'firebase/messaging'],
-          ui: ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-select'],
-          echarts: ['echarts', 'echarts-for-react'],
+        manualChunks(id) {
+          if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/') || id.includes('node_modules/react-router-dom')) {
+            return 'vendor';
+          }
+          if (id.includes('node_modules/firebase/')) {
+            return 'firebase';
+          }
+          if (id.includes('node_modules/@radix-ui/')) {
+            return 'ui';
+          }
+          if (id.includes('node_modules/echarts')) {
+            return 'echarts';
+          }
           // Three.js se carga dinámicamente via lazy import de Visor3D (~1MB)
         }
       }
