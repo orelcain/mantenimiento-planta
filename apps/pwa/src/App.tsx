@@ -87,6 +87,7 @@ const CalendarioMantencionPage = lazyWithReload(() => import('@/pages/Calendario
 const HmiKnuroPage = lazyWithReload(() => import('@/pages/HmiKnuroPage').then((mod) => ({ default: mod.HmiKnuroPage })))
 const Baader200LearningPublicPage = lazyWithReload(() => import('@/pages/Baader200LearningPublicPage').then((mod) => ({ default: mod.Baader200LearningPublicPage })))
 const Baader200LearningPage = lazyWithReload(() => import('@/pages/Baader200LearningPage').then((mod) => ({ default: mod.Baader200LearningPage })))
+const LearningHubPage = lazyWithReload(() => import('@/pages/LearningHubPage').then((mod) => ({ default: mod.LearningHubPage })))
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuthStore()
@@ -250,9 +251,17 @@ export function App() {
             }
           />
 
-          {/* Public Baader 200 learning mode (no auth required) */}
+          {/* Learning Hub — Centro de Aprendizaje (no auth required) */}
           <Route
-            path="/baader-200/learn/:sectionId"
+            path="/aprendizaje"
+            element={
+              <Suspense fallback={<LoadingScreen />}>
+                <LearningHubPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/aprendizaje/baader-200/:sectionId"
             element={
               <Suspense fallback={<LoadingScreen />}>
                 <Baader200LearningPublicPage />
@@ -260,13 +269,37 @@ export function App() {
             }
           />
           <Route
-            path="/baader-200/learn"
+            path="/aprendizaje/baader-200"
             element={
               <Suspense fallback={<LoadingScreen />}>
                 <Baader200LearningPublicPage />
               </Suspense>
             }
           />
+          <Route
+            path="/aprendizaje/hmi-knuro/:presetId"
+            element={
+              <Suspense fallback={<LoadingScreen />}>
+                <HmiKnuroPublicPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/aprendizaje/hmi-knuro"
+            element={
+              <Suspense fallback={<LoadingScreen />}>
+                <HmiKnuroPublicPage />
+              </Suspense>
+            }
+          />
+
+          {/* Legacy redirects — keep old URLs working */}
+          <Route path="/baader-200/learn/:sectionId" element={
+            <Suspense fallback={<LoadingScreen />}><Baader200LearningPublicPage /></Suspense>
+          } />
+          <Route path="/baader-200/learn" element={
+            <Suspense fallback={<LoadingScreen />}><Baader200LearningPublicPage /></Suspense>
+          } />
 
           {/* Public equipment view (no auth required) */}
           <Route

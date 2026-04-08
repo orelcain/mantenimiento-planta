@@ -113,7 +113,8 @@ export function Baader200LearningPublicPage() {
 
   const switchSection = (id: string) => {
     setSelected(id)
-    navigate(`/baader-200/learn/${encodeURIComponent(id)}`, { replace: true })
+    const basePath = window.location.pathname.includes('/aprendizaje/') ? '/aprendizaje/baader-200' : '/baader-200/learn'
+    navigate(`${basePath}/${encodeURIComponent(id)}`, { replace: true })
     if (iframeReadyRef.current) {
       iframeRef.current?.contentWindow?.postMessage({ type: 'b200:select-section', id }, '*')
     }

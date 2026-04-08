@@ -29,6 +29,7 @@ import {
   Bot,
   CloudSun,
   BookOpen,
+  GraduationCap,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, Button } from '@/components/ui'
 import { useAuthStore, useIsAdmin, useAppStore, usePermissionsStore } from '@/store'
@@ -65,6 +66,7 @@ const navigation: Array<{ name: string; href: string; icon: React.ElementType; m
   { name: 'Repuestos', href: '/repuestos', icon: Package, module: 'repuestos' },
   { name: 'Visor 3D', href: '/visor-3d', icon: Box },
   { name: 'Análisis Grader', href: '/analisis-grader', icon: BarChart3, module: 'analisisGrader' },
+  { name: 'Aprendizaje', href: '/aprendizaje', icon: GraduationCap },
   { name: 'Configuración', href: '/settings', icon: Settings, module: 'configuracion' },
 ]
 
@@ -107,6 +109,7 @@ export function MainLayout() {
   const isClimaRoute = location.pathname.startsWith('/clima-puerto')
   const isHmiKnuroRoute = location.pathname.startsWith('/hmi-knuro')
   const isBaader200Route = location.pathname.startsWith('/baader-200')
+  const isAprendizajeRoute = location.pathname.startsWith('/aprendizaje')
   const shouldHideDesktopSidebar =
     sidebarCollapsed || (isGanttRoute && ganttFocusMode && !sidebarPeekOpen)
 
