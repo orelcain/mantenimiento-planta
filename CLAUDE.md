@@ -138,14 +138,39 @@ ett, inviteCodes, roles, mapLocations
 ### P1 — Corto plazo
 - [ ] **Modulo Seguridad en Planta**: activar placeholder en /aprendizaje, crear pagina con protocolos EPP, bloqueo/etiquetado
 - [ ] **Modulo Marel**: activar placeholder, crear guias de equipos Marel
-- [ ] **Vulnerabilidades npm**: 92 reportadas por Dependabot (3 criticas). Ejecutar `npm audit fix`
-- [ ] **Deploy a produccion**: los cambios de esta sesion estan en main pero no en gh-pages
+- [x] **Vulnerabilidades npm**: 69→10 (2 criticas resueltas, 51 overrides). Restantes son devDeps y xlsx sin fix
+- [x] **Deploy a produccion**: mergeado a main, GitHub Actions despliega automaticamente
 
 ### P2 — Mejoras UX
 - [ ] **Modo alto contraste**: toggle en header para ambientes con luz intensa (planta)
 - [ ] **Precargar imagenes lightbox**: `<link rel="preload">` en thumbnails movil
 - [ ] **Proteccion scroll pantallas mojadas**: `overscroll-behavior: contain` en carruseles
 - [ ] **Quitar proxy Vite**: las imagenes baader200-manual ya estan en public/ (el proxy es fallback innecesario)
+
+## Flujo: Fix vulnerabilidades + Deploy a produccion
+
+Procedimiento optimizado para resolver vulnerabilidades npm y deployar:
+
+```
+1. pnpm audit                          # Ver estado actual
+2. pnpm audit --fix                    # Agrega overrides en pnpm-workspace.yaml
+3. pnpm install                        # Aplicar los overrides
+4. pnpm audit                          # Verificar cuantas se resolvieron
+5. pnpm run build                      # Verificar que compila (si falla, revisar vite.config.ts)
+6. git add + commit + push a branch
+7. git checkout main && git reset --hard origin/main   # Sincronizar main local
+8. git merge <feature-branch> --no-edit                # Fast-forward merge
+9. git push origin main                                # Dispara GitHub Actions deploy
+10. git checkout <feature-branch>                      # Volver a branch de trabajo
+```
+
+**Notas importantes:**
+- Los overrides van en `pnpm-workspace.yaml` (formato pnpm 10+)
+- CI en `.github/workflows/deploy.yml` debe usar pnpm 10+ (compatible con overrides)
+- `manualChunks` en `vite.config.ts` debe ser **funcion** (no objeto) para Vite 8+/rolldown
+- `xlsx` no tiene fix disponible (SheetJS paso a modelo de pago, patched: `<0.0.0>`)
+- Vulnerabilidades en devDeps (eslint, tailwindcss) no afectan produccion
+- Deploy se dispara automaticamente con push a main via GitHub Actions
 
 ## Notas para sesiones nuevas
 
