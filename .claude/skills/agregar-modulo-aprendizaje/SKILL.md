@@ -1,10 +1,10 @@
 ---
-name: add-learning-module
-description: Add a new knowledge sub-module to the Learning Hub (/aprendizaje). Use when adding new training content for plant technicians — manuals, simulators, guides, troubleshooting, etc.
-argument-hint: "<module-name> <module-type: manual|simulator|guide>"
+name: agregar-modulo-aprendizaje
+description: Agregar un nuevo sub-modulo de conocimiento al Centro de Aprendizaje (/aprendizaje). Usar cuando se necesite agregar contenido de capacitacion para tecnicos — manuales, simuladores, guias, troubleshooting, etc.
+argument-hint: "<nombre-modulo> <tipo: manual|simulador|guia>"
 ---
 
-# Add Learning Module — Procedimiento
+# Agregar Modulo de Aprendizaje — Procedimiento
 
 Agregar un nuevo sub-modulo al Centro de Aprendizaje para tecnicos de planta.
 
