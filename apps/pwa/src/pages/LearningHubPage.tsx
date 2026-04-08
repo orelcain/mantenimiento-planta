@@ -4,7 +4,7 @@
  * Ruta: /aprendizaje (pública, sin autenticación)
  */
 import { useNavigate } from 'react-router-dom'
-import { BookOpen, Cpu, Shield, Fish, GraduationCap, ArrowRight, Lock } from 'lucide-react'
+import { BookOpen, Cpu, Shield, Fish, GraduationCap, ArrowRight, Lock, Home } from 'lucide-react'
 
 interface LearningModule {
   id: string
@@ -70,14 +70,24 @@ export function LearningHubPage() {
     <div className="min-h-screen w-full" style={{ background: 'linear-gradient(135deg, #0a1628 0%, #0d1f3c 50%, #0a1628 100%)' }}>
       {/* Header */}
       <div className="max-w-5xl mx-auto px-4 pt-10 pb-6 sm:px-6 sm:pt-16 sm:pb-10">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="flex items-center justify-center w-11 h-11 rounded-xl" style={{ background: 'rgba(68,153,255,.12)', border: '1px solid rgba(68,153,255,.2)' }}>
-            <GraduationCap className="h-6 w-6 text-blue-400" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-11 h-11 rounded-xl" style={{ background: 'rgba(68,153,255,.12)', border: '1px solid rgba(68,153,255,.2)' }}>
+              <GraduationCap className="h-6 w-6 text-blue-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">Centro de Aprendizaje</h1>
+              <p className="text-sm text-[#5a7a9a] mt-0.5">Conocimiento práctico para técnicos de planta</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">Centro de Aprendizaje</h1>
-            <p className="text-sm text-[#5a7a9a] mt-0.5">Conocimiento práctico para técnicos de planta</p>
-          </div>
+          <button
+            onClick={() => navigate('/')}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all"
+            style={{ background: 'rgba(68,153,255,.08)', border: '1px solid rgba(68,153,255,.2)', color: '#7ab8ff' }}
+          >
+            <Home className="h-4 w-4" />
+            <span className="hidden sm:inline">Ir a la App</span>
+          </button>
         </div>
       </div>
 
