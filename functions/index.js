@@ -17,7 +17,9 @@ const ALLOWED_ORIGINS = [
   'https://orelcain.github.io',
   'https://mantenimiento-planta-771a3.web.app',
   'https://mantenimiento-planta-771a3.firebaseapp.com',
-  /^http:\/\/localhost(:\d+)?$/,
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:4173',
 ]
 
 // RTDB se inicializa lazy (getDatabase() requiere FIREBASE_CONFIG, solo disponible en Cloud Functions runtime)
