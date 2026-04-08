@@ -94,6 +94,8 @@ ett, inviteCodes, roles, mapLocations
 | `cerrar-sesion` | **USAR AL FINAL DE CADA SESION.** Actualiza CLAUDE.md, sugiere skills, crea memoria |
 | `agregar-modulo-aprendizaje` | Agregar sub-modulo al Centro de Aprendizaje |
 | `floating-image-editor` | Componente de imagenes con crop, zoom, anotaciones SVG |
+| `auditar-seguridad` | **Auditoria de seguridad 18 puntos** (CORS, XSS, CSP, keys, storage, Firestore rules, deps, etc.) |
+| `deploy-produccion` | Procedimiento de deploy a produccion (GitHub Pages) |
 
 ## Mentalidad de mejora continua
 
@@ -115,20 +117,28 @@ ett, inviteCodes, roles, mapLocations
 - GitHub: `orelcain/mantenimiento-planta`
 - Produccion: `https://orelcain.github.io/mantenimiento-planta/`
 
-## Cambios recientes (sesion 2026-04-07)
+## Cambios recientes (sesion 2026-04-08)
 
-- Baader 200 movil: thumbnails con crop + lightbox zoom, font 15px, tap-to-mark pasos
-- Baader 200 desktop: columna derecha responsive con divisor draggable (25%-75%)
-- Breakpoint tablet 900px: layout 1 columna con imagenes grandes
-- Posiciones de imagenes admin persisten entre lock/unlock
-- Proxy Vite para imagenes baader200-manual desde GitHub Pages
-- Fix navegacion pestañas en /learn (ruta absoluta)
-- Targets tactiles 48px para uso con guantes industriales
-- **Centro de Aprendizaje** (`/aprendizaje`): hub con cards para Baader 200 y HMI Knuro
-- **Sidebar agrupado**: 6 categorias colapsables con persistencia en localStorage
-- Boton "Ir a la App" en hub de aprendizaje
-- CLAUDE.md creado como memoria persistente del proyecto
-- Skills: `cerrar-sesion`, `agregar-modulo-aprendizaje` (renombrada a español)
+### Vulnerabilidades npm
+- 69→10 vulnerabilidades (2 criticas resueltas, 49 overrides en pnpm-workspace.yaml)
+- Overrides de ajv y pdfjs-dist removidos (rompian ESLint y tsc)
+- CI actualizado a pnpm 10.33.0, campo `packageManager` agregado
+- `manualChunks` convertido de objeto a funcion (compatibilidad Vite 8/rolldown)
+
+### Auditoria de seguridad — 15/18 puntos resueltos
+- **CORS**: 3 Cloud Functions restringidas a `ALLOWED_ORIGINS` (pendiente deploy Firebase)
+- **Redirects**: Validacion anti-phishing en App.tsx y LoginPage.tsx
+- **console.log**: Eliminados del build con `esbuild.pure`
+- **Firestore rules**: 14 colecciones endurecidas con roles (`isTechnician/isSupervisor/isAdmin`)
+- **Rate limit**: 5 intentos / 2 min en login con `RateLimiter`
+- **CSP headers**: X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy
+- **XSS**: innerHTML sanitizado con `esc()` en exportETTPDF.ts y telemetryAuditExport.ts
+- **Upload validation**: contentType en storage.rules para graderUploads y models3d
+- **Password OTA**: Removido `'12345678'` hardcodeado, movido a env var
+- **API Keys**: Eliminado fallback directo a Groq/Gemini/DeepSeek, todo via Cloud Functions
+
+### Skills creadas
+- `/auditar-seguridad` — 18 puntos (nivel 1 + nivel 2), ejecuta en paralelo con agentes
 
 ## Pendientes priorizados
 
@@ -141,7 +151,12 @@ ett, inviteCodes, roles, mapLocations
 - [ ] **Modulo Marel**: activar placeholder, crear guias de equipos Marel
 - [x] **Vulnerabilidades npm**: 69→10 (2 criticas resueltas, 51 overrides). Restantes son devDeps y xlsx sin fix
 - [x] **Deploy a produccion**: mergeado a main, GitHub Actions despliega automaticamente
-- [x] **Auditoria de seguridad**: 8 puntos revisados, fixes aplicados (CORS, redirects, console.log, Firestore rules, rate limit)
+- [x] **Auditoria de seguridad**: 15/18 puntos resueltos (nivel 1 + nivel 2). Usar `/auditar-seguridad` para re-ejecutar
+
+### P1.5 — Seguridad pendiente
+- [ ] **App Check**: Implementar ReCaptchaV3 + enforceAppCheck en Cloud Functions (necesita key de Firebase Console)
+- [ ] **SW SRI**: Self-host Firebase SDK en public/vendor/ en vez de CDN. Ejecutar desde PC: `curl -o apps/pwa/public/vendor/firebase-app-compat.js https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js`
+- [ ] **Input sanitization Firestore**: Agregar validacion de tipos a 25 rules sin validacion en firestore.rules
 
 ### P2 — Mejoras UX
 - [ ] **Modo alto contraste**: toggle en header para ambientes con luz intensa (planta)
