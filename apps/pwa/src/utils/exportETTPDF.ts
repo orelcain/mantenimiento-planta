@@ -8,6 +8,12 @@ import jsPDF from 'jspdf'
 import type { ETT } from '@/types'
 import { logger } from '@/lib/logger'
 
+/** Escapa HTML para prevenir XSS en template literals */
+function esc(str: string | undefined | null): string {
+  if (!str) return ''
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
 /**
  * Crea HTML con formato exacto de AquaChile
  */
@@ -41,15 +47,15 @@ function createETTHTML(ett: ETT): HTMLElement {
       </tr>
       <tr>
         <td style="border: 1px solid #5B9BD5; padding: 6px 10px; background-color: #F2F2F2; font-weight: bold;">PROYECTO O SERVICIO</td>
-        <td style="border: 1px solid #5B9BD5; padding: 6px 10px;">${ett.general.titulo}</td>
+        <td style="border: 1px solid #5B9BD5; padding: 6px 10px;">${esc(ett.general.titulo)}</td>
       </tr>
       <tr>
         <td style="border: 1px solid #5B9BD5; padding: 6px 10px; background-color: #F2F2F2; font-weight: bold;">USUARIO SOLICITANTE</td>
-        <td style="border: 1px solid #5B9BD5; padding: 6px 10px;">${ett.general.solicitante}</td>
+        <td style="border: 1px solid #5B9BD5; padding: 6px 10px;">${esc(ett.general.solicitante)}</td>
       </tr>
       <tr>
         <td style="border: 1px solid #5B9BD5; padding: 6px 10px; background-color: #F2F2F2; font-weight: bold;">SECTOR DE REALIZACIÓN</td>
-        <td style="border: 1px solid #5B9BD5; padding: 6px 10px;">${ett.general.area || 'Planta de Procesos'}</td>
+        <td style="border: 1px solid #5B9BD5; padding: 6px 10px;">${esc(ett.general.area) || 'Planta de Procesos'}</td>
       </tr>
       <tr>
         <td style="border: 1px solid #5B9BD5; padding: 6px 10px; background-color: #F2F2F2; font-weight: bold;">FECHA INICIO DEL SERVICIO</td>
@@ -82,8 +88,8 @@ function createETTHTML(ett: ETT): HTMLElement {
     <div style="margin-bottom: 15px;">
       <h2 style="color: #1F4E79; font-size: 12pt; margin-bottom: 10px;">ESPECIFICACIÓN SERVICIO:</h2>
       <p style="font-weight: bold; margin-bottom: 5px;">Área de intervención:</p>
-      ${ett.general.descripcion_general ? `<p style="margin-bottom: 10px;">${ett.general.descripcion_general}</p>` : ''}
-      ${ett.trabajo_descripcion ? `<p style="margin-bottom: 15px; white-space: pre-wrap;">${ett.trabajo_descripcion}</p>` : ''}
+      ${ett.general.descripcion_general ? `<p style="margin-bottom: 10px;">${esc(ett.general.descripcion_general)}</p>` : ''}
+      ${ett.trabajo_descripcion ? `<p style="margin-bottom: 15px; white-space: pre-wrap;">${esc(ett.trabajo_descripcion)}</p>` : ''}
     </div>
   `
 
@@ -103,9 +109,9 @@ function createETTHTML(ett: ETT): HTMLElement {
           <tbody>
             ${ett.materiales.map(mat => `
               <tr>
-                <td style="border: 1px solid #5B9BD5; padding: 5px;">${mat.nombre}</td>
-                <td style="border: 1px solid #5B9BD5; padding: 5px; text-align: center;">${mat.cantidad} ${mat.unidad}</td>
-                <td style="border: 1px solid #5B9BD5; padding: 5px;">${mat.especificaciones || ''}</td>
+                <td style="border: 1px solid #5B9BD5; padding: 5px;">${esc(mat.nombre)}</td>
+                <td style="border: 1px solid #5B9BD5; padding: 5px; text-align: center;">${esc(String(mat.cantidad))} ${esc(mat.unidad)}</td>
+                <td style="border: 1px solid #5B9BD5; padding: 5px;">${esc(mat.especificaciones)}</td>
               </tr>
             `).join('')}
           </tbody>
@@ -123,9 +129,9 @@ function createETTHTML(ett: ETT): HTMLElement {
           .sort((a, b) => a.numero - b.numero)
           .map(proc => `
             <div style="margin-bottom: 10px;">
-              <p style="font-weight: bold; margin-bottom: 3px;">Paso ${proc.numero}: ${proc.titulo}</p>
-              <p style="margin-bottom: 3px;">${proc.descripcion}</p>
-              ${proc.precauciones ? `<p style="font-size: 9pt; font-style: italic;">⚠️ Precauciones: ${proc.precauciones}</p>` : ''}
+              <p style="font-weight: bold; margin-bottom: 3px;">Paso ${proc.numero}: ${esc(proc.titulo)}</p>
+              <p style="margin-bottom: 3px;">${esc(proc.descripcion)}</p>
+              ${proc.precauciones ? `<p style="font-size: 9pt; font-style: italic;">⚠️ Precauciones: ${esc(proc.precauciones)}</p>` : ''}
             </div>
           `).join('')}
       </div>
@@ -148,9 +154,9 @@ function createETTHTML(ett: ETT): HTMLElement {
           <tbody>
             ${ett.riesgos.map(riesgo => `
               <tr>
-                <td style="border: 1px solid #5B9BD5; padding: 5px;">${riesgo.peligro}</td>
-                <td style="border: 1px solid #5B9BD5; padding: 5px; text-align: center;">${riesgo.probabilidad}</td>
-                <td style="border: 1px solid #5B9BD5; padding: 5px;">${riesgo.medidas_preventivas}</td>
+                <td style="border: 1px solid #5B9BD5; padding: 5px;">${esc(riesgo.peligro)}</td>
+                <td style="border: 1px solid #5B9BD5; padding: 5px; text-align: center;">${esc(riesgo.probabilidad)}</td>
+                <td style="border: 1px solid #5B9BD5; padding: 5px;">${esc(riesgo.medidas_preventivas)}</td>
               </tr>
             `).join('')}
           </tbody>
@@ -164,7 +170,7 @@ function createETTHTML(ett: ETT): HTMLElement {
     html += `
       <div style="margin-bottom: 15px;">
         <h2 style="color: #1F4E79; font-size: 12pt; margin-bottom: 10px;">OBSERVACIONES</h2>
-        <p style="white-space: pre-wrap;">${ett.general.observaciones}</p>
+        <p style="white-space: pre-wrap;">${esc(ett.general.observaciones)}</p>
       </div>
     `
   }

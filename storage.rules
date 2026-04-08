@@ -73,7 +73,10 @@ service firebase.storage {
     // Uploads Grader (Excel)
     match /graderUploads/{uploadId}/{fileName} {
       allow create, update: if request.auth != null
-        && request.resource.size < 50 * 1024 * 1024;
+        && request.resource.size < 50 * 1024 * 1024
+        && (request.resource.contentType.matches('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            || request.resource.contentType.matches('application/vnd.ms-excel')
+            || request.resource.contentType.matches('text/csv'));
       allow read, delete: if request.auth != null;
     }
     
@@ -102,7 +105,10 @@ service firebase.storage {
     match /models3d/{allPaths=**} {
       allow read: if true;
       allow write: if request.auth != null
-        && request.resource.size < 50 * 1024 * 1024;
+        && request.resource.size < 50 * 1024 * 1024
+        && (request.resource.contentType.matches('model/.*')
+            || request.resource.contentType.matches('application/octet-stream')
+            || request.resource.contentType.matches('image/.*'));
     }
 
     // Imágenes Baader 200 — Manual de Ajustes (lectura pública, subida autenticados, max 10MB)

@@ -1,3 +1,9 @@
+/** Escapa HTML para prevenir XSS en innerHTML */
+function esc(str: string | undefined | null): string {
+  if (!str) return ''
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
 export type TelemetryAuditMeta = {
   generatedAtMs: number
   generatedAtIso: string
@@ -263,13 +269,13 @@ function render(){
     const hum = (typeof e.humidity === 'number') ? e.humidity.toFixed(2) : '';
     return (
       '<tr>' +
-      '<td>' + (e.timestampLocal || '') + '</td>' +
-      '<td>' + (e.deviceId || '') + '</td>' +
-      '<td>' + equipo + '</td>' +
-      '<td>' + temp + '</td>' +
-      '<td>' + hum + '</td>' +
-      '<td>' + estado + '</td>' +
-      '<td>' + (e.source || '') + '</td>' +
+      '<td>' + esc(e.timestampLocal) + '</td>' +
+      '<td>' + esc(e.deviceId) + '</td>' +
+      '<td>' + esc(equipo) + '</td>' +
+      '<td>' + esc(temp) + '</td>' +
+      '<td>' + esc(hum) + '</td>' +
+      '<td>' + esc(estado) + '</td>' +
+      '<td>' + esc(e.source) + '</td>' +
       '</tr>'
     );
   }).join('');

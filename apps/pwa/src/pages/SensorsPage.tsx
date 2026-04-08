@@ -246,7 +246,7 @@ export function SensorsPage() {
 
   const otaHostname = selectedDevice?.deviceId ? `esp32-${selectedDevice.deviceId.slice(-6)}` : ''
   const otaHostLabel = otaHostname ? `${otaHostname}.local` : ''
-  const otaPassword = '12345678'
+  const otaPassword = import.meta.env.VITE_OTA_PASSWORD || ''
 
   const getRssiQuality = (rssi: number | undefined, online: boolean | undefined) => {
     if (!online) return 'Sin señal'
