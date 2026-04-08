@@ -139,7 +139,6 @@ export function MainLayout() {
   const isClimaRoute = location.pathname.startsWith('/clima-puerto')
   const isHmiKnuroRoute = location.pathname.startsWith('/hmi-knuro')
   const isBaader200Route = location.pathname.startsWith('/baader-200')
-  const isAprendizajeRoute = location.pathname.startsWith('/aprendizaje')
   const shouldHideDesktopSidebar =
     sidebarCollapsed || (isGanttRoute && ganttFocusMode && !sidebarPeekOpen)
 
