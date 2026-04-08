@@ -113,7 +113,9 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 
   if (isAuthenticated) {
     // Si hay un redirect query param (ej. desde QR), ir ahí en vez de /
-    const redirectTo = searchParams.get('redirect') || '/'
+    // Solo permitir rutas internas (empiezan con /) y no URLs externas
+    const raw = searchParams.get('redirect') || '/'
+    const redirectTo = raw.startsWith('/') && !raw.startsWith('//') ? raw : '/'
     return <Navigate to={redirectTo} replace />
   }
 

@@ -538,7 +538,8 @@ service cloud.firestore {
       // Configuración por máquina (tags, etc.)
       match /settings/{settingId} {
         allow read: if isAuthenticated();
-        allow create, update, delete: if isAuthenticated();
+        allow create, update: if isTechnician();
+        allow delete: if isAdmin();
       }
 
       // Repuestos por máquina
@@ -559,10 +560,13 @@ service cloud.firestore {
     // Compatibilidad legacy (Baader 200)
     match /repuestosBaader200/{repuestoId} {
       allow read: if isAuthenticated();
-      allow create, update, delete: if isAuthenticated();
+      allow create, update: if isTechnician();
+      allow delete: if isAdmin();
 
       match /historial/{historialId} {
-        allow read, create, update, delete: if isAuthenticated();
+        allow read: if isAuthenticated();
+        allow create: if isTechnician();
+        allow update, delete: if isAdmin();
       }
     }
 
@@ -571,7 +575,8 @@ service cloud.firestore {
     // ============================================
     match /plantAssets/{assetId} {
       allow read: if isAuthenticated();
-      allow create, update, delete: if isAuthenticated();
+      allow create, update: if isTechnician();
+      allow delete: if isAdmin();
     }
 
     match /plantMaps/{mapId} {
@@ -594,7 +599,8 @@ service cloud.firestore {
 
     match /mapMarkers/{markerId} {
       allow read: if isAuthenticated();
-      allow create, update, delete: if isAuthenticated();
+      allow create, update: if isTechnician();
+      allow delete: if isSupervisor();
     }
 
     match /inspections/{inspectionId} {
@@ -603,14 +609,17 @@ service cloud.firestore {
       allow delete: if isSupervisor();
 
       match /items/{itemId} {
-        allow read, write: if isAuthenticated();
+        allow read: if isAuthenticated();
+        allow create, update: if isTechnician();
+        allow delete: if isSupervisor();
       }
     }
 
     // Colección separada de items de inspección
     match /inspectionItems/{itemId} {
       allow read: if isAuthenticated();
-      allow create, update, delete: if isAuthenticated();
+      allow create, update: if isTechnician();
+      allow delete: if isSupervisor();
     }
 
     // ============================================
@@ -755,7 +764,8 @@ service cloud.firestore {
 
     match /ganttTasks/{taskId} {
       allow read: if isAuthenticated();
-      allow create, update, delete: if isAuthenticated();
+      allow create, update: if isTechnician();
+      allow delete: if isSupervisor();
     }
 
     match /ganttProjects/{projectId} {
@@ -765,7 +775,8 @@ service cloud.firestore {
 
     match /ganttTaskComments/{commentId} {
       allow read: if isAuthenticated();
-      allow create, update, delete: if isAuthenticated();
+      allow create: if isTechnician();
+      allow update, delete: if isSupervisor();
     }
 
     // ============================================

@@ -23,14 +23,20 @@ import {
 import { useAuthStore } from '@/store'
 import { loginSchema, signUpSchema } from '@/lib/validation'
 import { logger } from '@/lib/logger'
+import { RateLimiter } from '@/lib/rate-limit'
 import { APP_VERSION } from '@/constants/version'
+
+// Max 5 intentos de login/registro cada 2 minutos
+const authRateLimiter = new RateLimiter(5, 2 * 60 * 1000)
 
 type AuthMode = 'login' | 'register'
 
 export function LoginPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const redirectTo = searchParams.get('redirect') || '/'
+  const rawRedirect = searchParams.get('redirect') || '/'
+  // Solo permitir rutas internas (empiezan con /) y no URLs externas (// o proto://)
+  const redirectTo = rawRedirect.startsWith('/') && !rawRedirect.startsWith('//') ? rawRedirect : '/'
   const setUser = useAuthStore((state) => state.setUser)
   
   const [mode, setMode] = useState<AuthMode>('login')
@@ -94,6 +100,14 @@ export function LoginPage() {
     e.preventDefault()
     setError(null)
     setValidationErrors({})
+
+    // Rate limit: max 5 intentos cada 2 min
+    if (!authRateLimiter.canExecute()) {
+      const waitSec = Math.ceil(authRateLimiter.timeUntilNext() / 1000)
+      setError(`Demasiados intentos. Espera ${waitSec}s antes de intentar de nuevo.`)
+      return
+    }
+
     setIsLoading(true)
 
     try {

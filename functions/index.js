@@ -12,6 +12,14 @@ initializeApp()
 
 const db = getFirestore()
 
+// Dominios permitidos para CORS (produccion + dev)
+const ALLOWED_ORIGINS = [
+  'https://orelcain.github.io',
+  'https://mantenimiento-planta-771a3.web.app',
+  'https://mantenimiento-planta-771a3.firebaseapp.com',
+  /^http:\/\/localhost(:\d+)?$/,
+]
+
 // RTDB se inicializa lazy (getDatabase() requiere FIREBASE_CONFIG, solo disponible en Cloud Functions runtime)
 let _rtdb = null
 function getRtdb() {
@@ -1000,7 +1008,7 @@ exports.purgeSensorReadingsManual = onCall(
  * en Firestore, y así checkClimaPortoAlert los puede leer.
  */
 exports.cacheDmStatus = onRequest(
-  { region: 'us-central1', cors: true, maxInstances: 5 },
+  { region: 'us-central1', cors: ALLOWED_ORIGINS, maxInstances: 5 },
   async (req, res) => {
     if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' })
     const d = req.body
@@ -1431,7 +1439,7 @@ exports.checkClimaPortoAlert = onSchedule(
 
 // Endpoint HTTP para ejecutar manualmente el chequeo (testing / backup del scheduler)
 exports.runClimaPortoCheck = onRequest(
-  { region: 'us-central1', cors: true, timeoutSeconds: 30, memory: '256MiB' },
+  { region: 'us-central1', cors: ALLOWED_ORIGINS, timeoutSeconds: 30, memory: '256MiB' },
   async (req, res) => {
     const result = await _runClimaCheck('http')
     res.json({ ok: !result?.error, ...result })
@@ -1567,7 +1575,7 @@ exports.scheduleClimaPortoTestNotification = onCall(
 exports.sitportProxy = onRequest(
   {
     region: 'us-central1',
-    cors: true,
+    cors: ALLOWED_ORIGINS,
     timeoutSeconds: 30,
     memory: '256MiB',
   },
