@@ -50,33 +50,63 @@ import { saveUserPermissionsOverride, getUserPermissionsOverride } from '@/servi
 import type { AppModule } from '@/types/permissions'
 import { ChatBot } from '@/components/chat/ChatBot'
 
-const navigation: Array<{ name: string; href: string; icon: React.ElementType; module?: AppModule }> = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard, module: 'dashboard' },
-  { name: 'Incidencias', href: '/incidents', icon: AlertTriangle, module: 'incidencias' },
-  { name: 'Evidencias', href: '/photo-evidence', icon: Camera, module: 'fotoevidencia' },
-  { name: 'Inspecciones', href: '/inspections', icon: Route, module: 'inspecciones' },
-  { name: 'Preventivo', href: '/preventive', icon: CalendarClock, module: 'preventivo' },
-  { name: 'Planificador Gantt', href: '/gantt', icon: CalendarClock, module: 'gantt' },
-  { name: 'Calendario Mantención', href: '/calendario-mantencion', icon: CalendarClock, module: 'calendarioMantencion' },
-  { name: 'Predictivo', href: '/predictive', icon: Activity },
-  { name: 'Sensores', href: '/sensors', icon: Cpu, module: 'sensores' },
-  { name: 'Panel Sensores', href: '/sensors/monitor', icon: Activity, module: 'sensores' },
-  { name: 'Visor de Mapas', href: '/map', icon: Map, module: 'mapa' },
-  { name: 'Equipos', href: '/equipment', icon: Wrench, module: 'equipos' },
-  { name: 'Repuestos', href: '/repuestos', icon: Package, module: 'repuestos' },
-  { name: 'Visor 3D', href: '/visor-3d', icon: Box },
-  { name: 'Análisis Grader', href: '/analisis-grader', icon: BarChart3, module: 'analisisGrader' },
-  { name: 'Aprendizaje', href: '/aprendizaje', icon: GraduationCap },
-  { name: 'Configuración', href: '/settings', icon: Settings, module: 'configuracion' },
-]
+interface NavItem { name: string; href: string; icon: React.ElementType; module?: AppModule }
+interface NavGroup { id: string; label: string; items: NavItem[]; defaultOpen?: boolean; adminOnly?: boolean }
 
-const adminNavigation = [
-  { name: 'Jerarquías', href: '/hierarchy', icon: FolderTree },
-  { name: 'Mapas', href: '/admin/maps', icon: MapPin },
-  { name: 'ETT', href: '/admin/ett', icon: FileText },
-  { name: 'Clima Puerto', href: '/clima-puerto', icon: CloudSun, module: 'climaPuerto' as AppModule },
-  { name: 'HMI Knuro', href: '/hmi-knuro', icon: Cpu },
-  { name: 'Baader 200', href: '/baader-200', icon: BookOpen },
+const navGroups: NavGroup[] = [
+  {
+    id: 'principal', label: 'Principal', defaultOpen: true,
+    items: [
+      { name: 'Dashboard', href: '/', icon: LayoutDashboard, module: 'dashboard' },
+      { name: 'Incidencias', href: '/incidents', icon: AlertTriangle, module: 'incidencias' },
+      { name: 'Evidencias', href: '/photo-evidence', icon: Camera, module: 'fotoevidencia' },
+    ],
+  },
+  {
+    id: 'planificacion', label: 'Planificación',
+    items: [
+      { name: 'Inspecciones', href: '/inspections', icon: Route, module: 'inspecciones' },
+      { name: 'Preventivo', href: '/preventive', icon: CalendarClock, module: 'preventivo' },
+      { name: 'Predictivo', href: '/predictive', icon: Activity },
+      { name: 'Planificador Gantt', href: '/gantt', icon: CalendarClock, module: 'gantt' },
+      { name: 'Calendario Mantención', href: '/calendario-mantencion', icon: CalendarClock, module: 'calendarioMantencion' },
+    ],
+  },
+  {
+    id: 'equipamiento', label: 'Equipamiento',
+    items: [
+      { name: 'Equipos', href: '/equipment', icon: Wrench, module: 'equipos' },
+      { name: 'Repuestos', href: '/repuestos', icon: Package, module: 'repuestos' },
+      { name: 'Sensores', href: '/sensors', icon: Cpu, module: 'sensores' },
+      { name: 'Panel Sensores', href: '/sensors/monitor', icon: Activity, module: 'sensores' },
+    ],
+  },
+  {
+    id: 'herramientas', label: 'Herramientas',
+    items: [
+      { name: 'Visor de Mapas', href: '/map', icon: Map, module: 'mapa' },
+      { name: 'Visor 3D', href: '/visor-3d', icon: Box },
+      { name: 'Análisis Grader', href: '/analisis-grader', icon: BarChart3, module: 'analisisGrader' },
+    ],
+  },
+  {
+    id: 'aprendizaje', label: 'Aprendizaje',
+    items: [
+      { name: 'Centro de Aprendizaje', href: '/aprendizaje', icon: GraduationCap },
+    ],
+  },
+  {
+    id: 'admin', label: 'Administración', adminOnly: true,
+    items: [
+      { name: 'Configuración', href: '/settings', icon: Settings, module: 'configuracion' },
+      { name: 'Jerarquías', href: '/hierarchy', icon: FolderTree },
+      { name: 'Mapas', href: '/admin/maps', icon: MapPin },
+      { name: 'ETT', href: '/admin/ett', icon: FileText },
+      { name: 'Clima Puerto', href: '/clima-puerto', icon: CloudSun, module: 'climaPuerto' as AppModule },
+      { name: 'HMI Knuro', href: '/hmi-knuro', icon: Cpu },
+      { name: 'Baader 200', href: '/baader-200', icon: BookOpen },
+    ],
+  },
 ]
 
 export function MainLayout() {
@@ -258,18 +288,47 @@ export function MainLayout() {
     }
   }
 
-  // Filter navigation by module visibility permissions
-  const filteredNavigation = navigation.filter((item) => {
-    if (!item.module) return true // no module mapping = always visible
-    return canSee(item.module)
-  })
+  // Filter groups by admin status and module permissions
+  const visibleGroups = navGroups
+    .filter(g => !g.adminOnly || isAdmin)
+    .map(g => ({
+      ...g,
+      items: g.items.filter(item => !item.module || canSee(item.module)),
+    }))
+    .filter(g => g.items.length > 0)
 
-  const allNavigation = isAdmin
-    ? [...filteredNavigation, ...adminNavigation.filter((item) => {
-        if (!item.module) return true
-        return canSee(item.module)
-      })]
-    : filteredNavigation
+  // Flat list for compatibility (currentPageName, etc.)
+  const allNavigation = visibleGroups.flatMap(g => g.items)
+
+  // Collapsible group state (persisted in localStorage)
+  const [groupOpen, setGroupOpen] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem('sidebar-groups')
+      if (saved) return JSON.parse(saved)
+    } catch { /* ignore */ }
+    // Default: all open initially
+    return Object.fromEntries(navGroups.map(g => [g.id, g.defaultOpen ?? true]))
+  })
+  const toggleGroup = (id: string) => {
+    setGroupOpen(prev => {
+      const next = { ...prev, [id]: !prev[id] }
+      localStorage.setItem('sidebar-groups', JSON.stringify(next))
+      return next
+    })
+  }
+  // Auto-expand group containing active route
+  useEffect(() => {
+    const activeGroup = visibleGroups.find(g =>
+      g.items.some(item => item.href === '/' ? location.pathname === '/' : location.pathname.startsWith(item.href))
+    )
+    if (activeGroup && !groupOpen[activeGroup.id]) {
+      setGroupOpen(prev => {
+        const next = { ...prev, [activeGroup.id]: true }
+        localStorage.setItem('sidebar-groups', JSON.stringify(next))
+        return next
+      })
+    }
+  }, [location.pathname]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Bottom nav: rutas principales para móvil (máx 4 + "Más")
   const bottomNavDef: Array<{ name: string; href: string; icon: React.ElementType; module?: AppModule }> = [
@@ -347,29 +406,40 @@ export function MainLayout() {
             </button>
           </div>
 
-          {/* Navigation */}
-          <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-            {allNavigation.map((item) => (
-              <NavLink
-                key={item.href}
-                to={item.href}
-                onClick={() => {
-                  setSidebarOpen(false)
-                  setSidebarPeekOpen(false)
-                }}
-                className={({ isActive }) =>
-                  cn(
-                    'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-                    isActive
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                  )
-                }
-              >
-                <item.icon className="h-5 w-5" />
-                {item.name}
-              </NavLink>
-            ))}
+          {/* Navigation — grouped */}
+          <nav className="flex-1 px-3 py-2 overflow-y-auto space-y-0.5">
+            {visibleGroups.map((group) => {
+              const isOpen = groupOpen[group.id] ?? group.defaultOpen ?? false
+              return (
+                <div key={group.id}>
+                  <button
+                    onClick={() => toggleGroup(group.id)}
+                    className="flex items-center justify-between w-full px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 hover:text-muted-foreground transition-colors rounded"
+                  >
+                    <span>{group.label}</span>
+                    <ChevronDown className={cn('h-3 w-3 transition-transform duration-200', isOpen && 'rotate-180')} />
+                  </button>
+                  <div className={cn('overflow-hidden transition-all duration-200', isOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0')}>
+                    {group.items.map((item) => (
+                      <NavLink
+                        key={item.href}
+                        to={item.href}
+                        onClick={() => { setSidebarOpen(false); setSidebarPeekOpen(false) }}
+                        className={({ isActive }) =>
+                          cn(
+                            'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                            isActive ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                          )
+                        }
+                      >
+                        <item.icon className="h-5 w-5" />
+                        {item.name}
+                      </NavLink>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
           </nav>
 
           {/* Version label */}
@@ -474,29 +544,40 @@ export function MainLayout() {
                 </button>
               </div>
 
-              {/* Navigation */}
-              <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-                {allNavigation.map((item) => (
-                  <NavLink
-                    key={item.href}
-                    to={item.href}
-                    onClick={() => {
-                      setSidebarOpen(false)
-                      setSidebarPeekOpen(false)
-                    }}
-                    className={({ isActive }) =>
-                      cn(
-                        'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-                        isActive
-                          ? 'bg-primary text-primary-foreground'
-                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                      )
-                    }
-                  >
-                    <item.icon className="h-5 w-5" />
-                    {item.name}
-                  </NavLink>
-                ))}
+              {/* Navigation — grouped (mobile) */}
+              <nav className="flex-1 px-3 py-2 overflow-y-auto space-y-0.5">
+                {visibleGroups.map((group) => {
+                  const isOpen = groupOpen[group.id] ?? group.defaultOpen ?? false
+                  return (
+                    <div key={group.id}>
+                      <button
+                        onClick={() => toggleGroup(group.id)}
+                        className="flex items-center justify-between w-full px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 hover:text-muted-foreground transition-colors rounded"
+                      >
+                        <span>{group.label}</span>
+                        <ChevronDown className={cn('h-3 w-3 transition-transform duration-200', isOpen && 'rotate-180')} />
+                      </button>
+                      <div className={cn('overflow-hidden transition-all duration-200', isOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0')}>
+                        {group.items.map((item) => (
+                          <NavLink
+                            key={item.href}
+                            to={item.href}
+                            onClick={() => { setSidebarOpen(false); setSidebarPeekOpen(false) }}
+                            className={({ isActive }) =>
+                              cn(
+                                'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                                isActive ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                              )
+                            }
+                          >
+                            <item.icon className="h-5 w-5" />
+                            {item.name}
+                          </NavLink>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
               </nav>
 
               {/* Version label */}
