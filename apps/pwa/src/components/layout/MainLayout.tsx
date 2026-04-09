@@ -144,6 +144,7 @@ export function MainLayout() {
   const isClimaRoute = location.pathname.startsWith('/clima-puerto')
   const isHmiKnuroRoute = location.pathname.startsWith('/hmi-knuro')
   const isBaader200Route = location.pathname.startsWith('/baader-200')
+  const isAprendizajeRoute = location.pathname.startsWith('/aprendizaje')
   const shouldHideDesktopSidebar =
     sidebarCollapsed || (isGanttRoute && ganttFocusMode && !sidebarPeekOpen)
 
@@ -1012,6 +1013,8 @@ export function MainLayout() {
           className={`${
             isClimaRoute || isHmiKnuroRoute || isBaader200Route
               ? 'h-[calc(100vh-3.5rem-4rem)] lg:h-[calc(100vh-3.5rem)] p-0 overflow-hidden'
+              : isAprendizajeRoute
+              ? 'p-0 w-full max-w-[100vw] overflow-x-hidden pb-16 lg:pb-0'
               : 'p-3 lg:p-6 w-full max-w-[100vw] overflow-x-hidden pb-20 [@media(max-height:500px)]:pb-12 lg:pb-6'
           } ${
             isReadOnly ? 'pointer-events-none opacity-70' : ''

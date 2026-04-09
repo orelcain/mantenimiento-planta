@@ -5,6 +5,7 @@
  */
 import { useNavigate } from 'react-router-dom'
 import { Cpu, GraduationCap, ArrowRight } from 'lucide-react'
+import { useAuthStore } from '@/store'
 import {
   countEnabledSections,
   groupMachinesByArea,
@@ -39,11 +40,16 @@ const SPECIAL_MODULES: SpecialModule[] = [
 
 export function LearningHubPage() {
   const navigate = useNavigate()
+  const { isAuthenticated } = useAuthStore()
   const machinesByArea = groupMachinesByArea()
+
+  // Dentro de MainLayout (autenticado): usar min-h-full para no generar doble scroll
+  // Publico (standalone): usar min-h-dvh para ocupar toda la pantalla
+  const heightClass = isAuthenticated ? 'min-h-full' : 'min-h-dvh'
 
   return (
     <div
-      className="min-h-dvh w-full flex flex-col"
+      className={`${heightClass} w-full flex flex-col`}
       style={{ background: 'linear-gradient(135deg, #0a1628 0%, #0d1f3c 50%, #0a1628 100%)' }}
     >
       {/* Header */}

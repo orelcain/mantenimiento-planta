@@ -1,5 +1,5 @@
 import { useEffect, lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, useSearchParams } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useSearchParams } from 'react-router-dom'
 import { onAuthChange, getUserById, signOut as signOutService } from '@/services/auth'
 import { useAuthStore, usePermissionsStore } from '@/store'
 import { logger } from '@/lib/logger'
@@ -103,6 +103,18 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
   }
 
   return <>{children}</>
+}
+
+/**
+ * Layout adaptativo: renderiza MainLayout (con sidebar) si el usuario esta
+ * autenticado, o un Outlet directo si no lo esta. Permite que una misma ruta
+ * publica muestre el sidebar cuando el tecnico esta logueado.
+ */
+function PublicOrPrivateLayout() {
+  const { isAuthenticated, isLoading } = useAuthStore()
+  if (isLoading) return <LoadingScreen />
+  if (isAuthenticated) return <MainLayout />
+  return <Outlet />
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
@@ -255,56 +267,57 @@ export function App() {
             }
           />
 
-          {/* Learning Hub — Centro de Aprendizaje (no auth required) */}
-          <Route
-            path="/aprendizaje"
-            element={
-              <Suspense fallback={<LoadingScreen />}>
-                <LearningHubPage />
-              </Suspense>
-            }
-          />
-          <Route
-            path="/aprendizaje/baader-200/:sectionId"
-            element={
-              <Suspense fallback={<LoadingScreen />}>
-                <Baader200LearningPublicPage />
-              </Suspense>
-            }
-          />
-          <Route
-            path="/aprendizaje/baader-200"
-            element={
-              <Suspense fallback={<LoadingScreen />}>
-                <Baader200LearningPublicPage />
-              </Suspense>
-            }
-          />
-          <Route
-            path="/aprendizaje/hmi-knuro/:presetId"
-            element={
-              <Suspense fallback={<LoadingScreen />}>
-                <HmiKnuroPublicPage />
-              </Suspense>
-            }
-          />
-          <Route
-            path="/aprendizaje/hmi-knuro"
-            element={
-              <Suspense fallback={<LoadingScreen />}>
-                <HmiKnuroPublicPage />
-              </Suspense>
-            }
-          />
-
-          <Route
-            path="/aprendizaje/maquina/:slug"
-            element={
-              <Suspense fallback={<LoadingScreen />}>
-                <MachineLearningPage />
-              </Suspense>
-            }
-          />
+          {/* Learning Hub — Centro de Aprendizaje (publico, con sidebar si el usuario esta autenticado) */}
+          <Route element={<PublicOrPrivateLayout />}>
+            <Route
+              path="/aprendizaje"
+              element={
+                <Suspense fallback={<LoadingScreen />}>
+                  <LearningHubPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/aprendizaje/maquina/:slug"
+              element={
+                <Suspense fallback={<LoadingScreen />}>
+                  <MachineLearningPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/aprendizaje/baader-200/:sectionId"
+              element={
+                <Suspense fallback={<LoadingScreen />}>
+                  <Baader200LearningPublicPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/aprendizaje/baader-200"
+              element={
+                <Suspense fallback={<LoadingScreen />}>
+                  <Baader200LearningPublicPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/aprendizaje/hmi-knuro/:presetId"
+              element={
+                <Suspense fallback={<LoadingScreen />}>
+                  <HmiKnuroPublicPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/aprendizaje/hmi-knuro"
+              element={
+                <Suspense fallback={<LoadingScreen />}>
+                  <HmiKnuroPublicPage />
+                </Suspense>
+              }
+            />
+          </Route>
 
           {/* Legacy redirects — keep old URLs working */}
           <Route path="/baader-200/learn/:sectionId" element={

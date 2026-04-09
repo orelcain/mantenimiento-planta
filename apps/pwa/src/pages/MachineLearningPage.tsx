@@ -10,6 +10,7 @@ import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft, BookOpen, ListChecks, GitBranch, AlertTriangle, Clock,
 } from 'lucide-react'
+import { useAuthStore } from '@/store'
 import { findMachineBySlug, type LearningSection } from '@/data/learningMachines'
 
 interface TabDef {
@@ -54,6 +55,7 @@ const TABS: TabDef[] = [
 export function MachineLearningPage() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
+  const { isAuthenticated } = useAuthStore()
   const [activeTab, setActiveTab] = useState<LearningSection>('manual')
 
   const machine = slug ? findMachineBySlug(slug) : undefined
@@ -71,9 +73,12 @@ export function MachineLearningPage() {
   const activeTabData = TABS.find(t => t.id === activeTab)!
   const sectionEnabled = machine.sections[activeTab]
 
+  // Altura adaptativa: dentro de MainLayout usar min-h-full, publico usar min-h-dvh
+  const heightClass = isAuthenticated ? 'min-h-full' : 'min-h-dvh'
+
   return (
     <div
-      className="min-h-dvh w-full"
+      className={`${heightClass} w-full`}
       style={{ background: 'linear-gradient(135deg, #0a1628 0%, #0d1f3c 50%, #0a1628 100%)' }}
     >
       {/* Header */}
