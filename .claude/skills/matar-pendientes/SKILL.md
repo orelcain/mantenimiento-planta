@@ -6,7 +6,20 @@ argument-hint: ""
 
 # Matar Pendientes — Plan de Ataque
 
-Al ejecutar esta skill, leer el CLAUDE.md, analizar los pendientes y proponer un plan de ataque ordenado para la sesion.
+Al ejecutar esta skill, leer el CLAUDE.md, auditar el estado de los deploys, analizar los pendientes y proponer un plan de ataque ordenado para la sesion.
+
+---
+
+## Paso 0: Health check de CI/CD (OBLIGATORIO)
+
+**Antes de cualquier otra cosa**, ejecutar la skill `auditar-deploys` para detectar workflows bloqueados. Esta skill fue agregada despues de un incidente de 18 dias con `deploy-functions.yml` bloqueado sin que nadie lo notara porque las skills de revision solo miraban el ultimo commit, no el historial de CI.
+
+```bash
+# Equivalente manual (si no se invoca la skill completa):
+gh run list --limit 30 --json workflowName,status,conclusion,createdAt,displayTitle,databaseId
+```
+
+Agrupar por `workflowName` y verificar que el ultimo run de cada workflow sea `success`. Si alguno tiene fallas consecutivas, **documentarlo como item 0 del plan de ataque** (antes de cualquier feature).
 
 ---
 

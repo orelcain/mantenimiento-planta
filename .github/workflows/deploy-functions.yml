@@ -40,22 +40,12 @@ jobs:
         # Versión fija para evitar cambios inesperados
         run: npm install -g firebase-tools@15.11.0
 
-      # NOTA: Las scheduled functions (checkClimaPortoAlert, purgeSensorReadings)
-      # estan excluidas porque el service account del CI no tiene el rol
-      # "Cloud Scheduler Admin" necesario para actualizar los jobs de Cloud Scheduler.
-      # Para re-habilitarlas:
-      #   1. Firebase Console -> IAM -> SA del CI -> agregar rol
-      #      "Cloud Scheduler Admin" (roles/cloudscheduler.admin)
-      #   2. Eliminar el flag --only de esta linea y volver a "--only functions"
-      - name: Deploy Cloud Functions (excluye scheduled sin permisos IAM)
+      - name: Deploy Cloud Functions
         working-directory: .
         run: |
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/sa.json
-          GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json firebase deploy \
-            --only "functions:sendGanttAlert,functions:onIncidentCreated,functions:onIncidentUpdated,functions:sendTestNotification,functions:onPreventiveTaskCreated,functions:onPreventiveExecutionCreated,functions:groqProxy,functions:geminiProxy,functions:deepseekProxy,functions:purgeSensorReadingsManual,functions:cacheDmStatus,functions:runClimaPortoCheck,functions:scheduleClimaPortoTestNotification,functions:sitportProxy" \
-            --non-interactive
+          GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json firebase deploy --only functions --non-interactive
           rm -f /tmp/sa.json
-          echo "::warning title=Scheduled functions omitidas::checkClimaPortoAlert y purgeSensorReadings no se deployaron. Requiere rol 'Cloud Scheduler Admin' en el SA del CI."
 
       - name: Notificar deploy exitoso
         if: success()
