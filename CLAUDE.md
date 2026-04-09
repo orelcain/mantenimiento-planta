@@ -174,6 +174,8 @@ sidebarConfig  ← nuevo: orden personalizado del sidebar admin
 - [ ] **Contenido real Marel**: agregar guias por equipo (MX, Stork Trim, Scanvaegt) con fotos
 - [ ] **Modo alto contraste en calendario**: la tabla del calendario no reacciona al `.high-contrast` (colores hardcoded en bg-zinc-800, bg-cyan-500/5, etc.)
 - [ ] **Editor sidebar — reordenar grupos en mobile**: el TouchSensor funciona pero puede ser mejorado
+- [ ] **UX Aprendizaje — icono hub**: `GraduationCap` → `Wrench` o `BookOpen` (comunica mejor "manuales tecnicos" a un mecanico industrial) — auditoria 2026-04-09
+- [ ] **UX Aprendizaje — navegacion cruzada**: agregar franja "Otros modulos" al fondo de cada sub-pagina (chips de navegacion rapida sin volver al hub) — auditoria 2026-04-09
 
 ## Flujo: Fix vulnerabilidades + Deploy a produccion
 
