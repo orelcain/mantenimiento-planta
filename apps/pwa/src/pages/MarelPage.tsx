@@ -3,7 +3,7 @@
  * Ruta pública: /aprendizaje/marel
  */
 import { useNavigate } from 'react-router-dom'
-import { Fish, ArrowLeft, Wrench, Settings, BookOpen, Clock, Scale } from 'lucide-react'
+import { Fish, ArrowLeft, Settings, BookOpen, Clock, Scale } from 'lucide-react'
 
 const EQUIPOS = [
   {
@@ -55,7 +55,7 @@ export function MarelPage() {
 
   return (
     <div
-      className="min-h-screen w-full"
+      className="min-h-dvh w-full"
       style={{ background: 'linear-gradient(135deg, #0a1628 0%, #0d1f3c 50%, #0a1628 100%)' }}
     >
       {/* Header */}
@@ -85,7 +85,7 @@ export function MarelPage() {
           </div>
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-white">Equipos Marel</h1>
-            <p className="text-sm mt-0.5" style={{ color: '#5a7a9a' }}>
+            <p className="text-sm mt-0.5" style={{ color: '#7a9ab8' }}>
               Operación · Ajuste · Mantenimiento · Diagnóstico
             </p>
           </div>
@@ -111,13 +111,13 @@ export function MarelPage() {
         </h2>
 
         <div className="flex flex-col gap-5">
-          {EQUIPOS.map(({ id, color, icon: Icon, title, subtitle, items }) => (
+          {EQUIPOS.map(({ id, color, icon: Icon, title, subtitle }) => (
             <div
               key={id}
               className="rounded-xl overflow-hidden"
               style={{ background: 'rgba(22,28,42,0.8)', border: '1px solid #1e3a5f' }}
             >
-              <div className="h-1" style={{ background: color, opacity: 0.6 }} />
+              <div className="h-1.5" style={{ background: color, opacity: 0.9 }} />
               <div className="p-5">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
@@ -133,22 +133,16 @@ export function MarelPage() {
                     </div>
                   </div>
                   <span
-                    className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                    className="text-xs px-2 py-1 rounded-full font-medium"
                     style={{ background: `${color}18`, color, border: `1px solid ${color}30` }}
                   >
                     Próximamente
                   </span>
                 </div>
 
-                <p className="text-xs mb-3" style={{ color: '#5a7a9a' }}>Temas que cubrirá esta guía:</p>
-                <ul className="flex flex-col gap-2">
-                  {items.map((item, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm" style={{ color: '#8a9aaa' }}>
-                      <Wrench className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" style={{ color }} />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
+                <p className="text-sm" style={{ color: '#6a90b8' }}>
+                  Guía en preparación — cubrirá ajuste, limpieza, diagnóstico de fallas y procedimientos de seguridad específicos del equipo.
+                </p>
               </div>
             </div>
           ))}

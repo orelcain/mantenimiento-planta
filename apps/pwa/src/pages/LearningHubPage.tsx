@@ -101,6 +101,7 @@ export function LearningHubPage() {
                 borderColor: mod.enabled ? '#1e3a5f' : '#151a28',
                 opacity: mod.enabled ? 1 : 0.55,
                 cursor: mod.enabled ? 'pointer' : 'default',
+                minHeight: '80px',
               }}
             >
               {/* Línea top — opacidad completa para visibilidad en planta */}
@@ -124,7 +125,7 @@ export function LearningHubPage() {
                 </div>
 
                 {/* Descripción */}
-                <p className="text-sm text-[#8a9aaa] leading-relaxed mb-4 line-clamp-2">
+                <p className="text-sm text-[#8a9aaa] leading-relaxed mb-4">
                   {mod.enabled ? mod.description : 'Próximamente — Este módulo está en desarrollo.'}
                 </p>
 

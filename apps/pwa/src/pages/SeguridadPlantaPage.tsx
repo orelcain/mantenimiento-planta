@@ -18,20 +18,6 @@ const EPP_ITEMS = [
 
 const SECTIONS = [
   {
-    id: 'loto',
-    color: '#f59e0b',
-    icon: Zap,
-    title: 'LOTO — Bloqueo y Etiquetado',
-    subtitle: 'Lockout / Tagout',
-    items: [
-      'Desenergizar completamente el equipo antes de intervenir',
-      'Aplicar candado personal en el punto de corte de energía',
-      'Colocar tarjeta de advertencia con nombre y fecha',
-      'Verificar ausencia de energía antes de trabajar',
-      'Retirar el candado solo quien lo instaló',
-    ],
-  },
-  {
     id: 'emergencia',
     color: '#ef4444',
     icon: Flame,
@@ -43,6 +29,20 @@ const SECTIONS = [
       'Uso de extintores CO₂ (equipos eléctricos) o ABC (resto)',
       'Primeros auxilios: botiquín en acceso planta y sala de máquinas',
       'Punto de reunión: estacionamiento principal (señal verde)',
+    ],
+  },
+  {
+    id: 'loto',
+    color: '#f59e0b',
+    icon: Zap,
+    title: 'LOTO — Bloqueo y Etiquetado',
+    subtitle: 'Lockout / Tagout',
+    items: [
+      'Desenergizar completamente el equipo antes de intervenir',
+      'Aplicar candado personal en el punto de corte de energía',
+      'Colocar tarjeta de advertencia con nombre y fecha',
+      'Verificar ausencia de energía antes de trabajar',
+      'Retirar el candado solo quien lo instaló',
     ],
   },
   {
@@ -66,7 +66,7 @@ export function SeguridadPlantaPage() {
 
   return (
     <div
-      className="min-h-screen w-full"
+      className="min-h-dvh w-full"
       style={{ background: 'linear-gradient(135deg, #0a1628 0%, #0d1f3c 50%, #0a1628 100%)' }}
     >
       {/* Header */}
@@ -96,7 +96,7 @@ export function SeguridadPlantaPage() {
           </div>
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-white">Seguridad en Planta</h1>
-            <p className="text-sm mt-0.5" style={{ color: '#5a7a9a' }}>
+            <p className="text-sm mt-0.5" style={{ color: '#7a9ab8' }}>
               Protocolos · EPP · Emergencias · Riesgos críticos
             </p>
           </div>
@@ -138,7 +138,7 @@ export function SeguridadPlantaPage() {
               className="rounded-xl overflow-hidden"
               style={{ background: 'rgba(22,28,42,0.8)', border: '1px solid #1e3a5f' }}
             >
-              <div className="h-1" style={{ background: color, opacity: 0.6 }} />
+              <div className="h-1.5" style={{ background: color, opacity: 0.9 }} />
               <div className="p-5">
                 <div className="flex items-center gap-3 mb-4">
                   <div
@@ -154,7 +154,7 @@ export function SeguridadPlantaPage() {
                 </div>
                 <ul className="flex flex-col gap-2">
                   {items.map((item, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm" style={{ color: '#8a9aaa' }}>
+                    <li key={i} className="flex items-start gap-2 text-sm" style={{ color: '#aab8c8' }}>
                       <span className="mt-1.5 h-1.5 w-1.5 rounded-full flex-shrink-0" style={{ background: color }} />
                       {item}
                     </li>
@@ -168,7 +168,7 @@ export function SeguridadPlantaPage() {
         {/* WIP note */}
         <div
           className="mt-6 rounded-lg px-4 py-3 flex items-center gap-3 text-xs"
-          style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.15)', color: '#ca8a04' }}
+          style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.25)', color: '#f59e0b' }}
         >
           <Clock className="h-3.5 w-3.5 shrink-0" />
           <span>Se agregarán fichas PDF descargables y videos de EPP próximamente.</span>
