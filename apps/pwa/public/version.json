@@ -1,7 +1,7 @@
 {
-  "version": "2.72.0",
-  "buildDate": "2026-04-06",
-  "buildTimestamp": 1775500000000,
+  "version": "2.72.1",
+  "buildDate": "2026-04-09",
+  "buildTimestamp": 1775723776248,
   "features": [
     "Audit Log: registro inmutable de operaciones CRUD en colección audit_log",
     "Papelera: soft delete restaurable con 30 días de retención y clave de edición",
