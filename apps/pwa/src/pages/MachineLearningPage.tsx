@@ -5,13 +5,14 @@
  * Muestra 4 secciones (tabs): Manual, Procedimientos, Flujos, Diagnostico.
  * Si la seccion esta vacia, muestra empty state.
  */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import {
-  ArrowLeft, BookOpen, ListChecks, GitBranch, AlertTriangle, Clock,
+  ArrowLeft, BookOpen, ListChecks, GitBranch, AlertTriangle, Clock, Loader2,
 } from 'lucide-react'
 import { useAuthStore } from '@/store'
 import { findMachineBySlug, type LearningSection } from '@/data/learningMachines'
+import { listProcedures, type Procedure } from '@/services/learningContent'
 
 interface TabDef {
   id: LearningSection
@@ -57,8 +58,23 @@ export function MachineLearningPage() {
   const navigate = useNavigate()
   const { isAuthenticated } = useAuthStore()
   const [activeTab, setActiveTab] = useState<LearningSection>('manual')
+  const [procedures, setProcedures] = useState<Procedure[]>([])
+  const [loadingProcedures, setLoadingProcedures] = useState(false)
 
   const machine = slug ? findMachineBySlug(slug) : undefined
+
+  // Cargar procedimientos de Firestore cuando se abre la tab
+  useEffect(() => {
+    if (!machine || machine.customRoute) return
+    if (activeTab !== 'procedures') return
+    let cancelled = false
+    setLoadingProcedures(true)
+    listProcedures(machine.slug)
+      .then(list => { if (!cancelled) setProcedures(list) })
+      .catch(() => { if (!cancelled) setProcedures([]) })
+      .finally(() => { if (!cancelled) setLoadingProcedures(false) })
+    return () => { cancelled = true }
+  }, [machine, activeTab])
 
   if (!machine) {
     return <Navigate to="/aprendizaje" replace />
@@ -71,7 +87,10 @@ export function MachineLearningPage() {
 
   const Icon = machine.icon
   const activeTabData = TABS.find(t => t.id === activeTab)!
-  const sectionEnabled = machine.sections[activeTab]
+  // Procedimientos: habilitado si hay items en Firestore
+  // Otras secciones: habilitado segun el flag estatico
+  const sectionEnabled =
+    activeTab === 'procedures' ? procedures.length > 0 : machine.sections[activeTab]
 
   // Altura adaptativa: dentro de MainLayout usar min-h-full, publico usar min-h-dvh
   const heightClass = isAuthenticated ? 'min-h-full' : 'min-h-dvh'
@@ -172,8 +191,22 @@ export function MachineLearningPage() {
           </p>
         </div>
 
-        {sectionEnabled ? (
-          <ContentPlaceholder color={machine.color} />
+        {activeTab === 'procedures' && loadingProcedures ? (
+          <div className="flex items-center justify-center py-12" style={{ color: '#6a90b8' }}>
+            <Loader2 className="h-5 w-5 animate-spin mr-2" />
+            Cargando procedimientos...
+          </div>
+        ) : activeTab === 'procedures' && procedures.length > 0 ? (
+          <ProceduresList procedures={procedures} color={machine.color} />
+        ) : sectionEnabled ? (
+          <div
+            className="rounded-xl p-6"
+            style={{ background: 'rgba(22,28,42,0.8)', border: '1px solid #1e3a5f' }}
+          >
+            <p className="text-sm" style={{ color: '#aab8c8' }}>
+              Contenido disponible — proximamente cargado desde Firestore.
+            </p>
+          </div>
         ) : (
           <EmptySection
             color={machine.color}
@@ -186,18 +219,46 @@ export function MachineLearningPage() {
   )
 }
 
-function ContentPlaceholder({ color }: { color: string }) {
+function ProceduresList({ procedures, color }: { procedures: Procedure[]; color: string }) {
   return (
-    <div
-      className="rounded-xl p-6"
-      style={{ background: 'rgba(22,28,42,0.8)', border: '1px solid #1e3a5f' }}
-    >
-      <p className="text-sm" style={{ color: '#aab8c8' }}>
-        Contenido disponible — pendiente de conexion a Firestore.
-      </p>
-      <p className="text-xs mt-2" style={{ color: '#6a90b8' }}>
-        (Color de referencia: <span style={{ color }}>{color}</span>)
-      </p>
+    <div className="space-y-4">
+      {procedures.map(proc => (
+        <article
+          key={proc.id}
+          className="rounded-xl overflow-hidden"
+          style={{ background: 'rgba(22,28,42,0.8)', border: '1px solid #1e3a5f' }}
+        >
+          <div className="h-1" style={{ background: color, opacity: 0.9 }} />
+          <div className="p-5">
+            <h3 className="text-base font-semibold text-white mb-1">{proc.title}</h3>
+            {proc.description && (
+              <p className="text-sm mb-4" style={{ color: '#aab8c8' }}>
+                {proc.description}
+              </p>
+            )}
+            <ol className="space-y-3 mt-4">
+              {proc.steps.map(step => (
+                <li key={step.order} className="flex gap-3">
+                  <span
+                    className="flex items-center justify-center w-7 h-7 rounded-full font-bold text-xs flex-shrink-0"
+                    style={{ background: `${color}25`, color }}
+                  >
+                    {step.order}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-white">{step.title}</p>
+                    {step.description && (
+                      <p className="text-xs mt-1 leading-relaxed" style={{ color: '#aab8c8' }}>
+                        {step.description}
+                      </p>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </article>
+      ))}
     </div>
   )
 }

@@ -110,6 +110,7 @@ const navGroups: NavGroup[] = [
       { name: 'HMI Knuro', href: '/hmi-knuro', icon: Cpu },
       { name: 'Baader 200', href: '/baader-200', icon: BookOpen },
       { name: 'Editor Sidebar', href: '/admin/sidebar', icon: GripVertical },
+      { name: 'Editor Aprendizaje', href: '/aprendizaje/admin', icon: GraduationCap },
     ],
   },
 ]
