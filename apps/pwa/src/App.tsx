@@ -89,8 +89,7 @@ const HmiKnuroPage = lazyWithReload(() => import('@/pages/HmiKnuroPage').then((m
 const Baader200LearningPublicPage = lazyWithReload(() => import('@/pages/Baader200LearningPublicPage').then((mod) => ({ default: mod.Baader200LearningPublicPage })))
 const Baader200LearningPage = lazyWithReload(() => import('@/pages/Baader200LearningPage').then((mod) => ({ default: mod.Baader200LearningPage })))
 const LearningHubPage = lazyWithReload(() => import('@/pages/LearningHubPage').then((mod) => ({ default: mod.LearningHubPage })))
-const SeguridadPlantaPage = lazyWithReload(() => import('@/pages/SeguridadPlantaPage').then((mod) => ({ default: mod.SeguridadPlantaPage })))
-const MarelPage = lazyWithReload(() => import('@/pages/MarelPage').then((mod) => ({ default: mod.MarelPage })))
+const MachineLearningPage = lazyWithReload(() => import('@/pages/MachineLearningPage').then((mod) => ({ default: mod.MachineLearningPage })))
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuthStore()
@@ -299,18 +298,10 @@ export function App() {
           />
 
           <Route
-            path="/aprendizaje/seguridad"
+            path="/aprendizaje/maquina/:slug"
             element={
               <Suspense fallback={<LoadingScreen />}>
-                <SeguridadPlantaPage />
-              </Suspense>
-            }
-          />
-          <Route
-            path="/aprendizaje/marel"
-            element={
-              <Suspense fallback={<LoadingScreen />}>
-                <MarelPage />
+                <MachineLearningPage />
               </Suspense>
             }
           />

@@ -1,161 +1,251 @@
 /**
  * LearningHubPage — Centro de Aprendizaje
- * Hub con sub-módulos de capacitación para técnicos
- * Ruta: /aprendizaje (pública, sin autenticación)
+ * Hub principal con catalogo de maquinas + herramientas adicionales
+ * Ruta: /aprendizaje (publica, sin autenticacion)
  */
 import { useNavigate } from 'react-router-dom'
-import { BookOpen, Cpu, Shield, Fish, GraduationCap, ArrowRight, Lock } from 'lucide-react'
+import { Cpu, GraduationCap, ArrowRight } from 'lucide-react'
+import {
+  countEnabledSections,
+  groupMachinesByArea,
+  type LearningMachine,
+} from '@/data/learningMachines'
 
-interface LearningModule {
+/** Modulos especiales (no son maquinas fisicas) */
+interface SpecialModule {
   id: string
   title: string
   subtitle: string
   description: string
   icon: React.ElementType
   href: string
-  enabled: boolean
-  stats?: string
   color: string
+  stats: string
 }
 
-const modules: LearningModule[] = [
-  {
-    id: 'baader-200',
-    title: 'Baader 200',
-    subtitle: 'Manual de Ajustes Técnicos',
-    description: 'Procedimientos paso a paso para ajuste y calibración de la máquina fileteadora Baader 200. Incluye diagramas técnicos, medidas clave y notas de experiencia.',
-    icon: BookOpen,
-    href: '/aprendizaje/baader-200',
-    enabled: true,
-    stats: '23 secciones · Diagramas interactivos',
-    color: '#4499ff',
-  },
+const SPECIAL_MODULES: SpecialModule[] = [
   {
     id: 'hmi-knuro',
     title: 'HMI Knuro B2',
     subtitle: 'Simulador de Parámetros',
-    description: 'Simulador interactivo del panel HMI Knuro para máquinas Baader. Presets de planta configurados, referencias de fábrica y modo de práctica.',
+    description:
+      'Simulador interactivo del panel HMI Knuro para máquinas Baader. Presets de planta configurados y modo de práctica.',
     icon: Cpu,
     href: '/aprendizaje/hmi-knuro',
-    enabled: true,
-    stats: '6 presets · Modo práctica',
     color: '#44ddaa',
-  },
-  {
-    id: 'seguridad',
-    title: 'Seguridad en Planta',
-    subtitle: 'Protocolos y Procedimientos',
-    description: 'Protocolos de seguridad industrial, uso de EPP, procedimientos de emergencia y bloqueo/etiquetado de equipos.',
-    icon: Shield,
-    href: '/aprendizaje/seguridad',
-    enabled: true,
-    stats: 'EPP · LOTO · Emergencias · Riesgos',
-    color: '#ff6644',
-  },
-  {
-    id: 'marel',
-    title: 'Marel',
-    subtitle: 'Equipos de Procesamiento',
-    description: 'Guías de operación y mantenimiento de equipos Marel instalados en planta.',
-    icon: Fish,
-    href: '/aprendizaje/marel',
-    enabled: true,
-    stats: 'MX · Stork Trim · Scanvaegt',
-    color: '#aa66ff',
+    stats: '6 presets · Modo práctica',
   },
 ]
 
 export function LearningHubPage() {
   const navigate = useNavigate()
+  const machinesByArea = groupMachinesByArea()
 
   return (
-    // min-h-dvh: respeta barras de navegación mobile (iOS/Android)
-    // flex flex-col: permite centrar verticalmente el contenido en desktop
-    <div className="min-h-dvh w-full flex flex-col" style={{ background: 'linear-gradient(135deg, #0a1628 0%, #0d1f3c 50%, #0a1628 100%)' }}>
-
-      {/* Header — centrado, sin div vacío */}
+    <div
+      className="min-h-dvh w-full flex flex-col"
+      style={{ background: 'linear-gradient(135deg, #0a1628 0%, #0d1f3c 50%, #0a1628 100%)' }}
+    >
+      {/* Header */}
       <div className="max-w-5xl w-full mx-auto px-4 pt-8 pb-6 sm:px-6 sm:pt-12 sm:pb-8 flex flex-col items-center text-center gap-3">
-        <div className="flex items-center justify-center w-14 h-14 rounded-2xl"
-          style={{ background: 'rgba(68,153,255,.14)', border: '1px solid rgba(68,153,255,.28)' }}>
+        <div
+          className="flex items-center justify-center w-14 h-14 rounded-2xl"
+          style={{ background: 'rgba(68,153,255,.14)', border: '1px solid rgba(68,153,255,.28)' }}
+        >
           <GraduationCap className="h-8 w-8 text-blue-400" />
         </div>
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">Centro de Aprendizaje</h1>
-          <p className="text-sm text-[#7a9ab8] mt-1">Conocimiento práctico para técnicos de planta</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+            Centro de Aprendizaje
+          </h1>
+          <p className="text-sm text-[#7a9ab8] mt-1">
+            Manuales, procedimientos y diagnóstico por máquina
+          </p>
         </div>
       </div>
 
-      {/* Module cards — flex-1 centra verticalmente en desktop */}
-      <main className="flex-1 flex flex-col justify-center max-w-5xl w-full mx-auto px-4 pb-6 sm:px-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
-          {modules.map((mod) => (
-            <button
-              key={mod.id}
-              onClick={() => mod.enabled && navigate(mod.href)}
-              disabled={!mod.enabled}
-              className="group text-left rounded-xl border transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"
-              style={{
-                background: mod.enabled
-                  ? 'linear-gradient(135deg, rgba(22,28,42,0.9) 0%, rgba(18,24,38,0.95) 100%)'
-                  : 'rgba(16,20,30,0.6)',
-                borderColor: mod.enabled ? '#1e3a5f' : '#151a28',
-                opacity: mod.enabled ? 1 : 0.55,
-                cursor: mod.enabled ? 'pointer' : 'default',
-                minHeight: '80px',
-              }}
-            >
-              {/* Línea top — opacidad completa para visibilidad en planta */}
-              <div className="h-1.5 rounded-t-xl transition-all duration-200"
-                style={{ background: mod.enabled ? mod.color : '#222', opacity: mod.enabled ? 0.9 : 0.3 }} />
+      <main className="flex-1 max-w-5xl w-full mx-auto px-4 pb-6 sm:px-6">
+        {/* Machines by area */}
+        {Object.entries(machinesByArea).map(([area, machines]) => (
+          <section key={area} className="mb-8">
+            <h2 className="text-xs uppercase tracking-widest font-semibold mb-3 text-[#6a90b8]">
+              {area}
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+              {machines.map(machine => (
+                <MachineCard
+                  key={machine.slug}
+                  machine={machine}
+                  onClick={() => {
+                    const route = machine.customRoute || `/aprendizaje/maquina/${machine.slug}`
+                    navigate(route)
+                  }}
+                />
+              ))}
+            </div>
+          </section>
+        ))}
 
-              <div className="p-5 sm:p-6">
-                {/* Icon + Title */}
-                <div className="flex items-start gap-3 mb-3">
-                  <div className="flex items-center justify-center w-11 h-11 rounded-xl flex-shrink-0 transition-colors"
-                    style={{ background: `${mod.color}18`, border: `1px solid ${mod.color}40` }}>
-                    <mod.icon className="h-6 w-6" style={{ color: mod.color }} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-base sm:text-lg font-semibold text-white truncate">{mod.title}</h2>
-                      {!mod.enabled && <Lock className="h-3.5 w-3.5 text-[#3a4a5a] flex-shrink-0" />}
+        {/* Special modules (simuladores, herramientas) */}
+        <section className="mb-8">
+          <h2 className="text-xs uppercase tracking-widest font-semibold mb-3 text-[#6a90b8]">
+            Herramientas adicionales
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            {SPECIAL_MODULES.map(mod => {
+              const Icon = mod.icon
+              return (
+                <button
+                  key={mod.id}
+                  onClick={() => navigate(mod.href)}
+                  className="group text-left rounded-xl border transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"
+                  style={{
+                    background:
+                      'linear-gradient(135deg, rgba(22,28,42,0.9) 0%, rgba(18,24,38,0.95) 100%)',
+                    borderColor: '#1e3a5f',
+                    minHeight: '80px',
+                  }}
+                >
+                  <div
+                    className="h-1.5 rounded-t-xl"
+                    style={{ background: mod.color, opacity: 0.9 }}
+                  />
+                  <div className="p-5">
+                    <div className="flex items-start gap-3 mb-3">
+                      <div
+                        className="flex items-center justify-center w-11 h-11 rounded-xl flex-shrink-0"
+                        style={{
+                          background: `${mod.color}18`,
+                          border: `1px solid ${mod.color}40`,
+                        }}
+                      >
+                        <Icon className="h-6 w-6" style={{ color: mod.color }} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-base sm:text-lg font-semibold text-white">
+                          {mod.title}
+                        </h3>
+                        <p className="text-xs text-[#7a9ab8] mt-0.5">{mod.subtitle}</p>
+                      </div>
                     </div>
-                    <p className="text-xs text-[#7a9ab8] mt-0.5">{mod.subtitle}</p>
+                    <p className="text-sm text-[#aab8c8] leading-relaxed mb-4">
+                      {mod.description}
+                    </p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-[#6a90b8]">{mod.stats}</span>
+                      <span
+                        className="flex items-center gap-1.5 text-sm font-semibold py-2 px-4 rounded-lg"
+                        style={{ background: `${mod.color}25`, color: mod.color }}
+                      >
+                        Abrir <ArrowRight className="h-4 w-4" />
+                      </span>
+                    </div>
                   </div>
-                </div>
-
-                {/* Descripción */}
-                <p className="text-sm text-[#8a9aaa] leading-relaxed mb-4">
-                  {mod.enabled ? mod.description : 'Próximamente — Este módulo está en desarrollo.'}
-                </p>
-
-                {/* Footer: stats + pill acción — py-2 px-4 para touch con guantes */}
-                <div className="flex items-center justify-between">
-                  {mod.stats && mod.enabled ? (
-                    <span className="text-xs text-[#6a90b8]">{mod.stats}</span>
-                  ) : (
-                    <span />
-                  )}
-                  {mod.enabled && (
-                    <span className="flex items-center gap-1.5 text-sm font-semibold py-2 px-4 rounded-lg transition-colors"
-                      style={{ background: `${mod.color}25`, color: mod.color }}>
-                      Abrir <ArrowRight className="h-4 w-4" />
-                    </span>
-                  )}
-                </div>
-              </div>
-            </button>
-          ))}
-        </div>
+                </button>
+              )
+            })}
+          </div>
+        </section>
       </main>
 
-      {/* Footer fijo al bottom del flex container */}
+      {/* Footer */}
       <div className="pb-6 sm:pb-8 text-center">
         <p className="text-xs text-[#4a7aaa] uppercase tracking-wider">
           No requiere inicio de sesión · Acceso libre para técnicos
         </p>
       </div>
-
     </div>
+  )
+}
+
+/** Card de maquina con indicadores de secciones disponibles */
+function MachineCard({
+  machine,
+  onClick,
+}: {
+  machine: LearningMachine
+  onClick: () => void
+}) {
+  const Icon = machine.icon
+  const enabledCount = countEnabledSections(machine)
+  const hasContent = enabledCount > 0
+
+  return (
+    <button
+      onClick={onClick}
+      className="group text-left rounded-xl border transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"
+      style={{
+        background:
+          'linear-gradient(135deg, rgba(22,28,42,0.9) 0%, rgba(18,24,38,0.95) 100%)',
+        borderColor: hasContent ? machine.color + '35' : '#1e3a5f',
+        minHeight: '120px',
+      }}
+    >
+      <div
+        className="h-1 rounded-t-xl"
+        style={{ background: machine.color, opacity: hasContent ? 0.9 : 0.4 }}
+      />
+      <div className="p-4">
+        <div className="flex items-start gap-3 mb-3">
+          <div
+            className="flex items-center justify-center w-10 h-10 rounded-lg flex-shrink-0"
+            style={{
+              background: `${machine.color}18`,
+              border: `1px solid ${machine.color}40`,
+            }}
+          >
+            <Icon className="h-5 w-5" style={{ color: machine.color }} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-sm font-semibold text-white leading-tight">{machine.name}</h3>
+            <p
+              className="text-xs uppercase tracking-wider mt-1"
+              style={{ color: hasContent ? machine.color : '#6a90b8' }}
+            >
+              {hasContent ? `${enabledCount}/4 secciones` : 'En preparación'}
+            </p>
+          </div>
+        </div>
+
+        {/* Section indicators */}
+        <div className="flex items-center gap-1.5 mt-3">
+          <SectionDot enabled={machine.sections.manual} color={machine.color} label="M" title="Manual" />
+          <SectionDot enabled={machine.sections.procedures} color={machine.color} label="P" title="Procedimientos" />
+          <SectionDot enabled={machine.sections.flows} color={machine.color} label="F" title="Flujos" />
+          <SectionDot enabled={machine.sections.diagnosis} color={machine.color} label="D" title="Diagnóstico" />
+          <span className="flex-1" />
+          <ArrowRight
+            className="h-4 w-4 transition-transform group-hover:translate-x-0.5"
+            style={{ color: hasContent ? machine.color : '#4a6a8a' }}
+          />
+        </div>
+      </div>
+    </button>
+  )
+}
+
+function SectionDot({
+  enabled,
+  color,
+  label,
+  title,
+}: {
+  enabled: boolean
+  color: string
+  label: string
+  title: string
+}) {
+  return (
+    <span
+      title={title}
+      className="flex items-center justify-center w-6 h-6 rounded text-[10px] font-bold"
+      style={{
+        background: enabled ? `${color}28` : 'rgba(255,255,255,0.02)',
+        color: enabled ? color : '#3a4a5a',
+        border: `1px solid ${enabled ? color + '50' : '#1e3a5f'}`,
+      }}
+    >
+      {label}
+    </span>
   )
 }
