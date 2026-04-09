@@ -22,14 +22,15 @@ import type { Machine } from '@/types/repuestos'
 import { ref, listAll, getDownloadURL } from 'firebase/storage'
 import { storage } from '@/services/firebase'
 
-// Asegurar que el worker esté configurado
+// Worker self-hosted en public/vendor/pdfjs/ — evita CDN externa, compatible con pdfjs-dist 4+/5+
 if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc =
-    `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `${import.meta.env.BASE_URL}vendor/pdfjs/pdf.worker.min.mjs`
 }
 
 // ─── Config ────────────────────────────────────────────────
-const CMAPS_URL = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/cmaps/`
+// cmaps: pdfjs los necesita para fuentes CJK. El paquete los trae en node_modules/pdfjs-dist/cmaps/
+// Los copiamos a public/vendor/pdfjs/cmaps/ via script de build (o se pueden omitir si no hay PDFs CJK).
+const CMAPS_URL = `${import.meta.env.BASE_URL}vendor/pdfjs/cmaps/`
 const CACHE_NAME = 'pdf-manuals-v1'
 const MAX_MEMORY_ENTRIES = 10 // evitar memory leaks con muchos PDFs grandes
 

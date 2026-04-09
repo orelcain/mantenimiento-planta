@@ -1,8 +1,19 @@
 // Firebase Cloud Messaging Service Worker
 // Este archivo debe estar en la raíz public/ para que Firebase pueda accederlo
+//
+// Firebase SDK self-hosted (vendor/firebase/10.7.1/) para:
+//   1. Eliminar dependencia de 3rd-party script (gstatic.com)
+//   2. Integridad: el SDK no puede cambiar bajo nuestros pies
+//   3. Offline: funciona sin acceso a CDN externo
+// Descargado desde https://www.gstatic.com/firebasejs/10.7.1/ (2026-04-09)
+// Para actualizar: re-descargar los archivos y bumpear el path de version.
 
-importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js')
-importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js')
+// Path relativo al scope del service worker (raíz del deploy).
+// En GitHub Pages: /mantenimiento-planta/vendor/...
+// En desarrollo: /vendor/...
+// Usamos ruta relativa al propio SW para que funcione en ambos contextos.
+importScripts('./vendor/firebase/10.7.1/firebase-app-compat.js')
+importScripts('./vendor/firebase/10.7.1/firebase-messaging-compat.js')
 
 // Configuración de Firebase (debe coincidir con firebase.ts)
 const firebaseConfig = {

@@ -45,7 +45,8 @@ import { MARKER_COLORS } from '@/types/vinculos'
 
 // PDF.js worker
 if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
+  // Worker self-hosted en public/vendor/pdfjs/ — evita CDN externa, compatible con pdfjs-dist 4+/5+
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `${import.meta.env.BASE_URL}vendor/pdfjs/pdf.worker.min.mjs`
 }
 
 // ─── Types ──────────────────────────────────────────────────
