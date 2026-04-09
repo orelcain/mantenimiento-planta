@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.72.0' as const
+export const APP_VERSION = '2.72.1' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -11,12 +11,12 @@ export const APP_VERSION = '2.72.0' as const
 /**
  * Fecha de la versión actual
  */
-export const VERSION_DATE = '2026-04-08' as const
+export const VERSION_DATE = '2026-04-09' as const
 
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Audit Log, Fase 2 Repuestos, Seguridad, Mobile UX' as const
+export const VERSION_NAME = 'Calendario UX: landscape, 4-color hours, dark header, Ley 40h' as const
 
 /**
  * Nota:
