@@ -175,19 +175,20 @@ match /<modulo>-images/{allPaths=**} {
 
 ## Colores disponibles para cards (no repetir)
 
-| Modulo | Color | Hex |
-|--------|-------|-----|
-| Baader 200 | Azul | `#4499ff` |
-| HMI Knuro | Verde | `#44ddaa` |
-| Seguridad (placeholder) | Naranja | `#ff6644` |
-| Marel (placeholder) | Morado | `#aa66ff` |
-| *Disponibles* | Amarillo `#ffcc44`, Rosa `#ff66aa`, Cyan `#44ccdd` |
+| Modulo | Color | Hex | Estado |
+|--------|-------|-----|--------|
+| Baader 200 | Azul | `#4499ff` | ✅ Activo |
+| HMI Knuro | Verde | `#44ddaa` | ✅ Activo |
+| Seguridad en Planta | Naranja | `#ff6644` | ✅ Activo (`/aprendizaje/seguridad`) |
+| Marel | Morado | `#aa66ff` | ✅ Activo (`/aprendizaje/marel`) |
+| *Disponibles* | Amarillo `#ffcc44`, Rosa `#ff66aa`, Cyan `#44ccdd` | — | Libres |
 
 ---
 
-## Ejemplo rapido: Agregar modulo "Seguridad en Planta" (Tipo C - Guia simple)
+## Ejemplo rapido: Agregar modulo nuevo (Tipo C - Guia simple)
 
-1. Crear `apps/pwa/src/pages/SeguridadPlantaPage.tsx` — pagina React con secciones estaticas
-2. En `LearningHubPage.tsx`: cambiar `enabled: false` → `true` en la card "Seguridad en Planta"
-3. En `App.tsx`: agregar `<Route path="/aprendizaje/seguridad" element={...} />`
-4. No necesita Firestore ni embed HTML — contenido directo en React
+1. Crear `apps/pwa/src/pages/<Nombre>Page.tsx` — pagina React con secciones
+2. En `LearningHubPage.tsx`: agregar card al array `modules[]` con `enabled: true`
+3. En `App.tsx`: agregar `<Route path="/aprendizaje/<slug>" element={...} />`
+4. Elegir color libre de la tabla (no repetir los ya usados)
+5. Si no usa Firestore ni iframe: sin servicios adicionales

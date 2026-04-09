@@ -93,15 +93,35 @@ sidebarConfig  ← nuevo: orden personalizado del sidebar admin
 
 ## Skills disponibles (.claude/skills/)
 
+### Flujo de sesion
 | Skill | Uso |
 |-------|-----|
-| `cerrar-sesion` | **USAR AL FINAL DE CADA SESION.** Actualiza CLAUDE.md, sugiere skills, crea memoria |
-| `deploy-produccion` | Deploy a GitHub Pages con bump de version |
-| `agregar-modulo-aprendizaje` | Agregar sub-modulo al Centro de Aprendizaje |
-| `floating-image-editor` | Componente de imagenes con crop, zoom, anotaciones SVG |
-| `auditar-seguridad` | **Auditoria de seguridad 18 puntos** (CORS, XSS, CSP, keys, storage, Firestore rules, deps, etc.) |
-| `auditar-ux-modulo` | Revisar UX de un modulo y proponer mejoras |
-| `revisar-responsive` | Verificar responsive de una pagina en mobile/tablet/desktop |
+| `matar-pendientes` | **USAR AL INICIO.** Leer CLAUDE.md, clasificar pendientes, proponer plan de ataque |
+| `cerrar-sesion` | **USAR AL FINAL.** Actualiza CLAUDE.md, sugiere skills, crea memoria |
+
+### Deploy y CI
+| Skill | Uso |
+|-------|-----|
+| `deploy-produccion` | Deploy completo a GitHub Pages con bump de version |
+| `fix-ci` | Diagnosticar y reparar fallos de CI (tsc, eslint, build, GitHub Actions) |
+
+### Auditorias
+| Skill | Uso |
+|-------|-----|
+| `auditar-seguridad` | Auditoria 18 puntos (CORS, XSS, CSP, keys, Firestore rules, deps, etc.) |
+| `auditar-ux-modulo` | Revisar UX de un modulo y proponer mejoras concretas |
+| `revisar-responsive` | Verificar mobile/tablet/desktop con screenshots automaticos |
+
+### Contenido y componentes
+| Skill | Uso |
+|-------|-----|
+| `agregar-modulo-aprendizaje` | Agregar sub-modulo al Centro de Aprendizaje (`/aprendizaje/<slug>`) |
+| `floating-image-editor` | Componente de imagenes con crop, zoom, libre posicionamiento, anotaciones SVG |
+
+### Referencia
+| Skill | Uso |
+|-------|-----|
+| `baul` | Ver catalogo completo de skills disponibles (proyecto + personales) |
 
 ## Mentalidad de mejora continua
 
