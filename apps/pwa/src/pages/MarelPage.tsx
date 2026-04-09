@@ -1,0 +1,169 @@
+/**
+ * MarelPage — Módulo de Equipos Marel
+ * Ruta pública: /aprendizaje/marel
+ */
+import { useNavigate } from 'react-router-dom'
+import { Fish, ArrowLeft, Wrench, Settings, BookOpen, Clock, AlertCircle, Scale } from 'lucide-react'
+
+const EQUIPOS = [
+  {
+    id: 'mx',
+    color: '#aa66ff',
+    icon: Scale,
+    title: 'Marel MX',
+    subtitle: 'Sistema de pesaje y clasificación',
+    status: 'proxim' as const,
+    items: [
+      'Calibración de celdas de carga',
+      'Ajuste de tolerancias por rango de peso',
+      'Limpieza y sanitización de platos',
+      'Diagnóstico de errores de pesaje',
+    ],
+  },
+  {
+    id: 'stork',
+    color: '#4499ff',
+    icon: Settings,
+    title: 'Marel Stork Trim',
+    subtitle: 'Cortadora de porciones',
+    status: 'proxim' as const,
+    items: [
+      'Ajuste de cuchilla y espesor de corte',
+      'Limpieza diaria y semanal',
+      'Cambio de cuchillas — procedimiento seguro',
+      'Alarmas frecuentes y solución',
+    ],
+  },
+  {
+    id: 'scanvagt',
+    color: '#44ddaa',
+    icon: BookOpen,
+    title: 'Marel Scanvaegt',
+    subtitle: 'Sistema de control de producción',
+    status: 'proxim' as const,
+    items: [
+      'Configuración de líneas y recetas',
+      'Gestión de operadores y turnos',
+      'Exportación de reportes de producción',
+      'Reset y reinicio del sistema',
+    ],
+  },
+]
+
+export function MarelPage() {
+  const navigate = useNavigate()
+
+  return (
+    <div
+      className="min-h-screen w-full"
+      style={{ background: 'linear-gradient(135deg, #0a1628 0%, #0d1f3c 50%, #0a1628 100%)' }}
+    >
+      {/* Header */}
+      <div className="max-w-3xl mx-auto px-4 pt-8 pb-4 sm:px-6 sm:pt-12">
+        <button
+          onClick={() => navigate('/aprendizaje')}
+          className="flex items-center gap-2 text-sm mb-6 transition-colors"
+          style={{ color: '#5a7a9a' }}
+          onMouseEnter={e => (e.currentTarget.style.color = '#7ab8ff')}
+          onMouseLeave={e => (e.currentTarget.style.color = '#5a7a9a')}
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Centro de Aprendizaje
+        </button>
+
+        <div className="flex items-center gap-4 mb-2">
+          <div
+            className="flex items-center justify-center w-12 h-12 rounded-xl flex-shrink-0"
+            style={{ background: 'rgba(170,102,255,.12)', border: '1px solid rgba(170,102,255,.25)' }}
+          >
+            <Fish className="h-6 w-6" style={{ color: '#aa66ff' }} />
+          </div>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-white">Equipos Marel</h1>
+            <p className="text-sm mt-0.5" style={{ color: '#5a7a9a' }}>
+              Operación · Ajuste · Mantenimiento · Diagnóstico
+            </p>
+          </div>
+        </div>
+
+        {/* Work-in-progress banner */}
+        <div
+          className="mt-5 rounded-lg px-4 py-3 flex items-center gap-3 text-sm"
+          style={{ background: 'rgba(170,102,255,.08)', border: '1px solid rgba(170,102,255,.2)', color: '#c084fc' }}
+        >
+          <Clock className="h-4 w-4 shrink-0" />
+          <span>
+            Módulo en desarrollo — Las guías de cada equipo se irán publicando con fotos y videos de referencia.
+          </span>
+        </div>
+
+        {/* Note */}
+        <div
+          className="mt-3 rounded-lg px-4 py-3 flex items-start gap-3 text-sm"
+          style={{ background: 'rgba(68,153,255,.06)', border: '1px solid rgba(68,153,255,.15)', color: '#7ab8ff' }}
+        >
+          <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+          <span>
+            Para agregar guías o documentación de un equipo, contactar al responsable de mantenimiento
+            o usar el módulo de <strong>Evidencias</strong> en la app.
+          </span>
+        </div>
+      </div>
+
+      {/* Equipment cards */}
+      <div className="max-w-3xl mx-auto px-4 pb-10 sm:px-6">
+        <h2 className="text-sm uppercase tracking-widest font-semibold mb-4 mt-2" style={{ color: '#4a6a8a' }}>
+          Equipos instalados en planta
+        </h2>
+
+        <div className="flex flex-col gap-5">
+          {EQUIPOS.map(({ id, color, icon: Icon, title, subtitle, items }) => (
+            <div
+              key={id}
+              className="rounded-xl overflow-hidden"
+              style={{ background: 'rgba(22,28,42,0.8)', border: '1px solid #1e3a5f' }}
+            >
+              <div className="h-1" style={{ background: color, opacity: 0.6 }} />
+              <div className="p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="flex items-center justify-center w-9 h-9 rounded-lg flex-shrink-0"
+                      style={{ background: `${color}18`, border: `1px solid ${color}35` }}
+                    >
+                      <Icon className="h-5 w-5" style={{ color }} />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-semibold text-white">{title}</h3>
+                      <p className="text-xs" style={{ color: '#5a7a9a' }}>{subtitle}</p>
+                    </div>
+                  </div>
+                  <span
+                    className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                    style={{ background: `${color}18`, color, border: `1px solid ${color}30` }}
+                  >
+                    Próximamente
+                  </span>
+                </div>
+
+                <p className="text-xs mb-3" style={{ color: '#5a7a9a' }}>Contenido planificado:</p>
+                <ul className="flex flex-col gap-2">
+                  {items.map((item, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm" style={{ color: '#8a9aaa' }}>
+                      <Wrench className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" style={{ color }} />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <p className="text-center text-[10px] mt-8 uppercase tracking-wider" style={{ color: '#2a4a6a' }}>
+          No requiere inicio de sesión · Acceso libre para técnicos
+        </p>
+      </div>
+    </div>
+  )
+}

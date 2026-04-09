@@ -47,8 +47,9 @@ const modules: LearningModule[] = [
     subtitle: 'Protocolos y Procedimientos',
     description: 'Protocolos de seguridad industrial, uso de EPP, procedimientos de emergencia y bloqueo/etiquetado de equipos.',
     icon: Shield,
-    href: '#',
-    enabled: false,
+    href: '/aprendizaje/seguridad',
+    enabled: true,
+    stats: 'EPP · LOTO · Emergencias · Riesgos',
     color: '#ff6644',
   },
   {
@@ -57,8 +58,9 @@ const modules: LearningModule[] = [
     subtitle: 'Equipos de Procesamiento',
     description: 'Guías de operación y mantenimiento de equipos Marel instalados en planta.',
     icon: Fish,
-    href: '#',
-    enabled: false,
+    href: '/aprendizaje/marel',
+    enabled: true,
+    stats: 'MX · Stork Trim · Scanvaegt',
     color: '#aa66ff',
   },
 ]
