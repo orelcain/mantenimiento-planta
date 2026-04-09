@@ -1911,9 +1911,9 @@ export function CalendarioMantencionPage() {
               </div>
             ) : (
               <table className={`border-collapse text-[11px] ${isLandscape ? 'w-full table-fixed' : 'min-w-max'}`}>
-                <thead>
-                  <tr className="bg-zinc-800/90 text-zinc-200 border-b border-zinc-600/50">
-                    <th className="sticky left-0 z-10 bg-zinc-800 px-1.5 py-1.5 text-left font-semibold"
+                <thead className="sticky top-0 z-[15]">
+                  <tr className="bg-zinc-800 text-zinc-200 border-b border-zinc-600/50">
+                    <th className="sticky left-0 z-[25] bg-zinc-800 px-1.5 py-1.5 text-left font-semibold"
                       style={isLandscape ? { width: '25%' } : { width: 110, minWidth: 110, maxWidth: 110 }}>
                       {mobileEditMode ? <span className="text-emerald-300 text-[10px]">✏ Toca un día</span> : <span className="text-zinc-400 text-[10px] uppercase tracking-wide">Técnico</span>}
                     </th>
@@ -1927,7 +1927,7 @@ export function CalendarioMantencionPage() {
                         </th>
                       )
                     })}
-                    <th className="sticky right-0 z-10 bg-zinc-800 px-1 py-1.5 border-l border-zinc-600/30"
+                    <th className="sticky right-0 z-[25] bg-zinc-800 px-1 py-1.5 border-l border-zinc-600/30"
                       style={isLandscape ? { width: '25%' } : { width: 50, minWidth: 50 }}
                       title="Horas trabajadas esta semana · este mes">
                       {isLandscape ? (
@@ -1948,11 +1948,13 @@ export function CalendarioMantencionPage() {
                 <tbody>
                   {techRows.map((tech, idx) => {
                     const turnoKey = tech.turno.trim().toUpperCase()
+                    const nextTurno = techRows[idx + 1]?.turno.trim().toUpperCase()
+                    const isLastOfGroup = nextTurno && nextTurno !== turnoKey
                     const rowBg = turnoKey === 'A' ? 'bg-cyan-500/5' : turnoKey === 'B' ? 'bg-amber-500/5' : turnoKey === 'C' ? 'bg-violet-500/5' : idx % 2 === 1 ? 'bg-zinc-900/30' : ''
                     const stickyBg = turnoKey === 'A' ? 'bg-cyan-950/60' : turnoKey === 'B' ? 'bg-amber-950/60' : turnoKey === 'C' ? 'bg-violet-950/60' : 'bg-card'
                     const cellPy = isLandscape ? 'py-0' : 'py-1.5'
                     return (
-                    <tr key={tech.r} className={`border-b border-border/40 ${rowBg}`}>
+                    <tr key={tech.r} className={`${isLastOfGroup ? 'border-b-2 border-zinc-600/60' : 'border-b border-border/40'} ${rowBg}`}>
                       <td className={`sticky left-0 z-[5] ${stickyBg} border-r border-border/30 px-1.5 ${cellPy}`}
                         style={isLandscape ? { width: '25%' } : { width: 110, minWidth: 110, maxWidth: 110 }}>
                         <div className="flex items-center gap-1.5">
