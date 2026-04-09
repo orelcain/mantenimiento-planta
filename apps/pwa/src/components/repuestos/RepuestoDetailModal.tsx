@@ -66,15 +66,15 @@ function ImageLightbox({
   onPrev: () => void
   onNext: () => void
 }) {
-  const img = images[index]
-  if (!img) return null
-
-  // Precargar vecinas
+  // Precargar vecinas (debe estar antes de cualquier early return)
   useEffect(() => {
     [images[index - 1]?.url, images[index + 1]?.url].forEach(src => {
       if (src) { const i = new Image(); i.src = src }
     })
   }, [index, images])
+
+  const img = images[index]
+  if (!img) return null
   return (
     <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4" onClick={onClose}>
       <div className="relative max-w-3xl max-h-[85vh] flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
