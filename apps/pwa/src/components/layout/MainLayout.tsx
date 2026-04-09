@@ -617,11 +617,18 @@ export function MainLayout() {
                 })}
               </nav>
 
-              {/* Version label */}
-              <div className="px-4 pb-2">
-                <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground py-1.5 px-2 bg-muted/50 rounded">
+              {/* Version label + alto contraste (mobile) */}
+              <div className="px-4 pb-2 flex items-center gap-2">
+                <div className="flex-1 flex items-center justify-center gap-2 text-xs text-muted-foreground py-1.5 px-2 bg-muted/50 rounded">
                   <span>v{APP_VERSION}</span>
                 </div>
+                <button
+                  onClick={toggleHighContrast}
+                  title={highContrast ? 'Desactivar alto contraste' : 'Alto contraste'}
+                  className={`p-1.5 rounded-lg transition-colors shrink-0 ${highContrast ? 'bg-yellow-500/20 text-yellow-400' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+                >
+                  <Sun className="h-4 w-4" />
+                </button>
               </div>
 
               {/* User section */}

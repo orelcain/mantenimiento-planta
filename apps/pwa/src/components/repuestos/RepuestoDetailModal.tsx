@@ -12,7 +12,7 @@
  * Accesible para TODOS los usuarios (no solo admin).
  */
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   X, Package, MapPin, DollarSign, Hash, Tag,
   ClipboardList, Camera, BookOpen, MessageSquareText,
@@ -68,6 +68,13 @@ function ImageLightbox({
 }) {
   const img = images[index]
   if (!img) return null
+
+  // Precargar vecinas
+  useEffect(() => {
+    [images[index - 1]?.url, images[index + 1]?.url].forEach(src => {
+      if (src) { const i = new Image(); i.src = src }
+    })
+  }, [index, images])
   return (
     <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4" onClick={onClose}>
       <div className="relative max-w-3xl max-h-[85vh] flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
