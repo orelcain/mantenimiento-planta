@@ -1742,14 +1742,7 @@ export function CalendarioMantencionPage() {
     return { letter: '·', cls: 'text-zinc-700' }
   }
 
-  function isReducedShift(shift: string | undefined): boolean {
-    if (!shift || !shift.match(/\d{1,2}:\d{2}/)) return false
-    const norm = (t: string) => t.trim().replace(/\s+/g, ' ')
-    const n = norm(shift)
-    if (n === norm(shortcuts.dia) || n === norm(shortcuts.tarde) || n === norm(shortcuts.noche)) return false
-    const startTime = shift.match(/^(\d{1,2}:\d{2})/)?.[1]
-    return startTime === shiftConfig.diaInicio || startTime === shiftConfig.tardeInicio || startTime === shiftConfig.nocheInicio
-  }
+  // isReducedShift ya definida arriba (línea ~1286)
 
   function shiftTimeCompact(shift: string | undefined): { start: string; end: string } | null {
     if (!shift) return null
@@ -1873,7 +1866,7 @@ export function CalendarioMantencionPage() {
                     {isCurrentWeek && <span className="ml-1 text-[9px] text-yellow-400 font-normal">● hoy</span>}
                   </div>
                   <div className="text-[9px] text-muted-foreground/70 leading-tight">
-                    {weekDays[0] ? formatDate(weekDays[0].dateObj) : '—'}–{weekDays[weekDays.length - 1] ? formatDate(weekDays[weekDays.length - 1].dateObj) : '—'}
+                    {weekDays[0] ? formatDate(weekDays[0].dateObj) : '—'}–{weekDays.length > 0 ? formatDate(weekDays[weekDays.length - 1]!.dateObj) : '—'}
                   </div>
                 </div>
                 {!isCurrentWeek && weekKeys.includes(todayWeekKey) && (
@@ -1904,10 +1897,10 @@ export function CalendarioMantencionPage() {
           {/* Grilla semanal */}
           <div
             className="flex-1 min-h-0 overflow-auto rounded-lg border bg-card"
-            onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX }}
+            onTouchStart={(e) => { touchStartX.current = e.touches[0]?.clientX ?? null }}
             onTouchEnd={(e) => {
               if (touchStartX.current === null) return
-              handleSwipe(touchStartX.current - e.changedTouches[0].clientX)
+              handleSwipe(touchStartX.current - (e.changedTouches[0]?.clientX ?? touchStartX.current))
               touchStartX.current = null
             }}
           >
@@ -1976,7 +1969,7 @@ export function CalendarioMantencionPage() {
                         const isT = isSameDate(d.dateObj, todayDayCol?.dateObj ?? null)
                         const isTapped = mobileTappedCell?.techR === tech.r && mobileTappedCell?.dayC === d.c
                         const isEditing = mobileEditCell?.techR === tech.r && mobileEditCell?.dayC === d.c
-                        const isReduced = isReducedShift(shift)
+                        const isReduced = isReducedShift(shift ?? '')
 
                         // Ancho de celda: landscape = 100%, portrait = fijo
                         const cellW = isLandscape ? 'w-full' : 'w-10'
@@ -2063,20 +2056,19 @@ export function CalendarioMantencionPage() {
                       {/* Columna de horas sticky derecha */}
                       {(() => {
                         const hr = hoursRows[idx]
+                        if (!hr) return null
                         const tol = Math.max(hoursConfig.toleranceHours || 0.5, 0.5)
                         const wDelta = hr.deltaWeek
                         const mDelta = hr.deltaMonth
                         // 4 zonas: sobretiempo | en rango | bajo | muy bajo
-                        const wCls = wDelta > tol * 4 ? 'text-orange-400'   // Sobretiempo (>2h sobre)
-                                   : wDelta >= -tol ? 'text-emerald-400'    // En rango (cumple ±tol)
-                                   : wDelta >= -tol * 6 ? 'text-amber-400'  // Bajo (hasta -3h)
-                                   : 'text-red-400'                         // Muy bajo (>-3h)
-                        const mCls = mDelta > tol * 16 ? 'text-orange-400'  // Sobretiempo mensual
-                                   : mDelta >= -tol * 4 ? 'text-emerald-400' // En rango
-                                   : mDelta >= -tol * 24 ? 'text-amber-400'  // Bajo
-                                   : 'text-red-400'                          // Muy bajo
-                        const wSign = wDelta >= 0 ? '+' : ''
-                        const mSign = mDelta >= 0 ? '+' : ''
+                        const wCls = wDelta > tol * 4 ? 'text-orange-400'
+                                   : wDelta >= -tol ? 'text-emerald-400'
+                                   : wDelta >= -tol * 6 ? 'text-amber-400'
+                                   : 'text-red-400'
+                        const mCls = mDelta > tol * 16 ? 'text-orange-400'
+                                   : mDelta >= -tol * 4 ? 'text-emerald-400'
+                                   : mDelta >= -tol * 24 ? 'text-amber-400'
+                                   : 'text-red-400'
                         return (
                           <td className={`sticky right-0 z-[5] border-l border-border/30 px-1 ${cellPy} ${stickyBg}`}
                             style={isLandscape ? { width: '25%' } : { width: 50, minWidth: 50 }}>
