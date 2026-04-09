@@ -59,20 +59,83 @@ service cloud.firestore {
     
     // Validar string no vacío
     function isNonEmptyString(value, minLen, maxLen) {
-      return value is string 
-        && value.size() >= minLen 
+      return value is string
+        && value.size() >= minLen
         && value.size() <= maxLen
         && value.trim().size() > 0; // No solo espacios
     }
-    
+
     // Validar timestamp futuro
     function isFutureTimestamp(ts) {
       return ts > request.time;
     }
-    
+
     // Validar timestamp pasado o presente
     function isPastOrPresentTimestamp(ts) {
       return ts <= request.time;
+    }
+
+    // ── Validaciones de tipos por colección ──────────────────
+
+    function isValidGanttTask() {
+      let d = request.resource.data;
+      return d.name is string && d.name.size() >= 1 && d.name.size() <= 500
+        && d.projectId is string && d.projectId.size() > 0
+        && d.status is string
+        && d.status in ['pendiente', 'en_progreso', 'completada', 'cancelada', 'bloqueada']
+        && (!('progressPercent' in d) || (d.progressPercent is int && d.progressPercent >= 0 && d.progressPercent <= 100))
+        && (!('description' in d) || d.description is string)
+        && (!('assignedTo' in d) || d.assignedTo is string || d.assignedTo is list);
+    }
+
+    function isValidGanttComment() {
+      let d = request.resource.data;
+      return d.taskId is string && d.taskId.size() > 0
+        && d.content is string && d.content.size() >= 1 && d.content.size() <= 5000
+        && d.authorId is string && d.authorId == request.auth.uid
+        && (!('reportedProgress' in d) || (d.reportedProgress is int && d.reportedProgress >= 0 && d.reportedProgress <= 100))
+        && (!('photos' in d) || d.photos is list);
+    }
+
+    function isValidGanttProject() {
+      let d = request.resource.data;
+      return d.name is string && d.name.size() >= 1 && d.name.size() <= 200
+        && (!('description' in d) || d.description is string)
+        && (!('active' in d) || d.active is bool)
+        && d.createdBy is string && d.createdBy == request.auth.uid;
+    }
+
+    function isValidInventoryMovement() {
+      let d = request.resource.data;
+      return d.tipo is string && d.tipo in ['entrada', 'salida', 'ajuste', 'transferencia', 'devolucion']
+        && (d.cantidad is int || d.cantidad is float) && d.cantidad != 0
+        && d.codigoSAP is string && d.codigoSAP.size() > 0
+        && (!('motivo' in d) || d.motivo is string)
+        && (!('referencia' in d) || d.referencia is string);
+    }
+
+    function isValidInspection() {
+      let d = request.resource.data;
+      return d.titulo is string && d.titulo.size() >= 2 && d.titulo.size() <= 300
+        && d.estado is string && d.estado in ['pendiente', 'en_progreso', 'completada', 'cancelada']
+        && (!('descripcion' in d) || d.descripcion is string)
+        && (!('equipmentId' in d) || d.equipmentId is string)
+        && (!('asignadoA' in d) || d.asignadoA is string || d.asignadoA is list);
+    }
+
+    function isValidAriaFeedback() {
+      let d = request.resource.data;
+      return d.tipo is string && d.tipo in ['positivo', 'negativo', 'thumbs_up', 'thumbs_down', 'correction']
+        && d.userId is string && d.userId == request.auth.uid
+        && (!('comentario' in d) || d.comentario is string)
+        && (!('missionId' in d) || d.missionId is string);
+    }
+
+    function isValidSidebarConfig() {
+      let d = request.resource.data;
+      return d.groupOrder is list
+        && d.groups is list
+        && d.updatedAt is int;
     }
 
     // ============================================
@@ -368,7 +431,7 @@ service cloud.firestore {
     // Movimientos de inventario
     match /inventoryMovements/{movementId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidInventoryMovement();
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
@@ -495,7 +558,7 @@ service cloud.firestore {
     // ARIA – Feedback (thumbs up/down)
     match /ariaFeedback/{docId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidAriaFeedback();
       allow update, delete: if isAdmin();
     }
 
@@ -605,7 +668,8 @@ service cloud.firestore {
 
     match /inspections/{inspectionId} {
       allow read: if isAuthenticated();
-      allow create, update: if isTechnician();
+      allow create: if isTechnician() && isValidInspection();
+      allow update: if isTechnician();
       allow delete: if isSupervisor();
 
       match /items/{itemId} {
@@ -764,18 +828,20 @@ service cloud.firestore {
 
     match /ganttTasks/{taskId} {
       allow read: if isAuthenticated();
-      allow create, update: if isTechnician();
+      allow create: if isTechnician() && isValidGanttTask();
+      allow update: if isTechnician();
       allow delete: if isSupervisor();
     }
 
     match /ganttProjects/{projectId} {
       allow read: if isAuthenticated();
-      allow create, update, delete: if isSupervisor();
+      allow create: if isSupervisor() && isValidGanttProject();
+      allow update, delete: if isSupervisor();
     }
 
     match /ganttTaskComments/{commentId} {
       allow read: if isAuthenticated();
-      allow create: if isTechnician();
+      allow create: if isTechnician() && isValidGanttComment();
       allow update, delete: if isSupervisor();
     }
 
@@ -854,6 +920,15 @@ service cloud.firestore {
       // Lectura pública para section-order (Modo Aprendizaje)
       allow read: if true;
       allow write: if isSupervisor();
+    }
+
+    // ============================================
+    // SIDEBAR CONFIG — Orden personalizado del sidebar
+    // ============================================
+    match /sidebarConfig/{docId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAdmin() && isValidSidebarConfig();
+      allow delete: if isAdmin();
     }
   }
 }

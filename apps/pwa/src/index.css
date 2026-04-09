@@ -69,6 +69,74 @@
   }
 }
 
+/* ── Modo Alto Contraste (planta industrial / luz intensa) ───────────────── */
+.high-contrast {
+  /* Fondos más oscuros y puros */
+  --hc-bg: #000000;
+  --hc-card: #0d0d0d;
+  --hc-border: #666666;
+  --hc-muted-fg: #d8d8d8;
+  --hc-primary: #60b4ff;
+}
+
+.high-contrast body {
+  background-color: var(--hc-bg) !important;
+  color: #ffffff !important;
+}
+
+.high-contrast .bg-background,
+.high-contrast [class*="bg-background"] {
+  background-color: var(--hc-bg) !important;
+}
+
+.high-contrast .bg-card,
+.high-contrast [class*="bg-card"] {
+  background-color: var(--hc-card) !important;
+}
+
+.high-contrast .bg-muted,
+.high-contrast [class*="bg-muted/"] {
+  background-color: #1a1a1a !important;
+}
+
+.high-contrast .border,
+.high-contrast [class*="border-border"],
+.high-contrast [class*="border-border/"] {
+  border-color: var(--hc-border) !important;
+}
+
+.high-contrast .text-muted-foreground,
+.high-contrast [class*="text-muted-foreground"] {
+  color: var(--hc-muted-fg) !important;
+}
+
+.high-contrast .text-primary,
+.high-contrast [class*="text-primary"] {
+  color: var(--hc-primary) !important;
+}
+
+/* Texto base más grande en alto contraste */
+.high-contrast {
+  font-size: 92% !important;
+  letter-spacing: 0.01em;
+}
+
+/* Sidebar y header */
+.high-contrast aside,
+.high-contrast header {
+  background-color: #000 !important;
+  border-color: var(--hc-border) !important;
+}
+
+/* Inputs y selects */
+.high-contrast input,
+.high-contrast select,
+.high-contrast textarea {
+  background-color: #111 !important;
+  border-color: var(--hc-border) !important;
+  color: #fff !important;
+}
+
 @layer utilities {
   /* Animaciones */
   .animate-fade-in {

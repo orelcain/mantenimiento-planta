@@ -18,6 +18,7 @@ import {
   FolderTree,
   RefreshCw,
   Camera,
+  Sun,
   Activity,
   Cpu,
   MapPin,
@@ -48,6 +49,7 @@ import { initUploadQueue } from '@/services/offlineUploadQueue'
 import { useUploadQueueStore } from '@/store/uploadQueueStore'
 import { saveUserPermissionsOverride, getUserPermissionsOverride } from '@/services/permissions'
 import { loadSidebarConfig } from '@/services/sidebarConfig'
+import { useHighContrast } from '@/hooks/useHighContrast'
 
 import type { AppModule } from '@/types/permissions'
 import { ChatBot } from '@/components/chat/ChatBot'
@@ -289,6 +291,8 @@ export function MainLayout() {
       toast({ title: 'Error', description: 'No se pudo activar ARIA', variant: 'destructive' })
     }
   }
+
+  const { enabled: highContrast, toggle: toggleHighContrast } = useHighContrast()
 
   // Orden dinámico del sidebar (cargado desde Firestore una vez)
   const [sidebarOrder, setSidebarOrder] = useState<{ groupOrder: string[]; itemOrders: Record<string, string[]> } | null>(null)
@@ -752,6 +756,13 @@ export function MainLayout() {
                 </Button>
               )}
             </div>
+            <button
+              onClick={toggleHighContrast}
+              title={highContrast ? 'Desactivar alto contraste' : 'Activar alto contraste (luz intensa)'}
+              className={`p-1.5 rounded-lg transition-colors ${highContrast ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+            >
+              <Sun className="h-4 w-4" />
+            </button>
             <HelpButton />
             <span className="text-sm text-muted-foreground">
               {user?.nombre} {user?.apellido}

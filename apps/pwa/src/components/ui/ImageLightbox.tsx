@@ -47,6 +47,15 @@ export function ImageLightbox({ photos, initialIndex = 0, onClose }: ImageLightb
     resetView()
   }, [index, resetView])
 
+  // Precargar imágenes vecinas (anterior + siguiente)
+  useEffect(() => {
+    const toPreload = [photos[index - 1], photos[index + 1]].filter(Boolean)
+    toPreload.forEach(src => {
+      const img = new Image()
+      img.src = src
+    })
+  }, [index, photos])
+
   // Keyboard controls
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
