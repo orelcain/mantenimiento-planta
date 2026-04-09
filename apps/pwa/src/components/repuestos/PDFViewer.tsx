@@ -151,8 +151,9 @@ export function PDFViewer({
         canvas.style.width = `${viewport.width}px`;
         canvas.style.height = `${viewport.height}px`;
 
-        // Renderizar
+        // Renderizar (pdfjs-dist >=4.2 requiere 'canvas' en RenderParameters)
         const renderContext = {
+          canvas,
           canvasContext: ctx,
           viewport: viewport,
         };
