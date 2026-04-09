@@ -50,7 +50,7 @@ apps/pwa/src/
 | **Equipamiento** | Equipos, Repuestos, Sensores, Panel Sensores |
 | **Herramientas** | Visor de Mapas, Visor 3D, Analisis Grader |
 | **Aprendizaje** | Centro de Aprendizaje (/aprendizaje) |
-| **Admin** | Configuracion, Jerarquias, Mapas, ETT, Clima Puerto, HMI Knuro, Baader 200 |
+| **Admin** | Configuracion, Jerarquias, Mapas, ETT, Clima Puerto, HMI Knuro, Baader 200, Editor Sidebar |
 
 ### Rutas publicas (sin auth)
 
@@ -59,6 +59,8 @@ apps/pwa/src/
 | `/aprendizaje` | LearningHubPage (hub de sub-modulos) |
 | `/aprendizaje/baader-200` | Manual de ajustes Baader 200 |
 | `/aprendizaje/hmi-knuro` | Simulador HMI Knuro |
+| `/aprendizaje/seguridad` | Protocolos EPP, LOTO, emergencias, riesgos |
+| `/aprendizaje/marel` | Guias equipos Marel (MX, Stork Trim, Scanvaegt) |
 | `/v/:modelId` | Visor 3D publico |
 | `/public/equipment` | Vista publica de equipos |
 
@@ -71,6 +73,7 @@ apps/pwa/src/
 | `/hierarchy` | Jerarquia de maquinas |
 | `/admin/maps` | Editor de mapas |
 | `/admin/ett` | Especificaciones tecnicas |
+| `/admin/sidebar` | Editor drag & drop del sidebar (solo admin) |
 
 ## Firestore — Colecciones principales
 
@@ -85,6 +88,7 @@ models3d (subcol: annotations)
 auditLog, trash
 ariaMissionLogs, ariaKnowledgeBase, ariaPatterns
 ett, inviteCodes, roles, mapLocations
+sidebarConfig  ← nuevo: orden personalizado del sidebar admin
 ```
 
 ## Skills disponibles (.claude/skills/)
@@ -114,55 +118,42 @@ ett, inviteCodes, roles, mapLocations
 
 ## Version actual
 
-- **v2.72.0** (2026-04-07)
+- **v2.72.1** (2026-04-09)
 - Proyecto Firebase: `mantenimiento-planta-771a3`
 - GitHub: `orelcain/mantenimiento-planta`
 - Produccion: `https://orelcain.github.io/mantenimiento-planta/`
 
-## Cambios recientes (sesion 2026-04-08)
+## Cambios recientes (sesion 2026-04-09)
 
-### Calendario Mantencion — UX mobile/landscape/desktop
-- **Landscape mobile**: control bar compacta, table-fixed 25/50/25%, swipe semanas, boton "Ir a hoy"
-- **Admin PIN gate**: requiere clave (`getHmiTooltipPwd()`) para activar modo edicion mobile
-- **Horas sem/mes**: lado a lado con header horizontal `h·sem | h·mes`
-- **4 colores horas**: verde=cumple, naranja=sobretiempo, amarillo=bajo, rojo=muy bajo
-- **Ley 40h Chile**: ya implementada (42h desde 26/04/2026, cambio automatico)
-- **shortName mejorado**: detecta formato "APELLIDO1 APELLIDO2, NOMBRE1 NOMBRE2" → "NOMBRE APELLIDO1 A."
-- **Placeholders tecnicos**: boton "Placeholders turno" agrega automaticamente los que faltan para 4/turno
-- **Header dark**: `bg-zinc-800` reemplaza `bg-primary` (celeste) en mobile + desktop
-- **Desktop turno rows**: filas coloreadas A=cyan B=amber C=violet, border-b separacion
-- **Vista D/T/N**: solo letra sin hora en landscape
-- **Vista HH:MM**: celdas con color de fondo por tipo turno
-- **ChatBot Aria**: oculto en landscape mobile (`.landscape-mobile-hidden`)
-- **Top header**: oculto en mobile (`hidden lg:flex`)
+### Deploy v2.72.1 — Pendientes masivos resueltos
+- **Calendario**: `<thead>` sticky top-0 (header visible al scrollear con 12-13 tecnicos), separador `border-b-2` entre grupos A/B/C
+- **Modulos aprendizaje**: `/aprendizaje/seguridad` (EPP, LOTO, emergencias, riesgos) y `/aprendizaje/marel` (MX, Stork Trim, Scanvaegt) — activados en LearningHubPage
+- **Editor Sidebar** (`/admin/sidebar`): drag & drop de grupos e items con @dnd-kit, persiste en Firestore `sidebarConfig/default`, MainLayout carga el orden dinamicamente al iniciar
+- **Alto contraste**: hook `useHighContrast`, CSS `.high-contrast`, toggle boton Sol en header desktop Y en drawer mobile (junto al badge de version), persiste en localStorage
+- **Preload lightbox**: `new Image()` en vecinos tanto en `ImageLightbox.tsx` como en `RepuestoDetailModal.tsx`
+- **overscroll-contain**: regla global CSS para todos los `.overflow-x-auto` / `.overflow-x-scroll`
+- **Proxy Vite eliminado**: server.proxy removido de `vite.config.ts`
+- **Firestore input validation**: funciones de validacion para ganttTasks, ganttProjects, ganttComments, inventoryMovements, inspections, ariaFeedback, sidebarConfig
+- **Fix CI**: errores TypeScript en ImageLightbox (type guard) y SidebarEditorPage (reduce + unused vars)
 
-### Sesion 2026-04-07
-- Vulnerabilidades npm: 69→10, overrides en pnpm-workspace.yaml
-- Auditoria seguridad: 15/18 puntos (CORS, XSS, CSP, Firestore rules, rate limit, etc.)
-- Baader 200 movil/desktop, Centro de Aprendizaje, Sidebar agrupado
+### Sesion 2026-04-08
+- Calendario UX landscape/mobile completo, seguridad nivel 2, Baader 200 movil
 
 ## Pendientes priorizados
 
-### P0 — Proxima sesion
-- [ ] **Deploy a produccion**: cambios calendario UX pendientes de deploy (`pnpm deploy --patch`)
-- [ ] **Probar calendario con 12-13 tecnicos**: agregar placeholders y verificar scroll/layout
-- [ ] **Editor de sidebar admin**: drag & drop modulos entre categorias, persistir en Firestore
-
-### P1 — Corto plazo
-- [ ] **Deploy Cloud Functions**: CORS restringido pendiente de deploy
-- [ ] **Modulo Seguridad en Planta**: activar placeholder en /aprendizaje, crear pagina con protocolos EPP
-- [ ] **Modulo Marel**: activar placeholder, crear guias de equipos Marel
+### P1 — Requiere Firebase CLI (hacer en maquina local)
+- [ ] **Deploy Cloud Functions**: CORS restringido pendiente de deploy (`firebase deploy --only functions`)
+- [ ] **App Check**: ReCaptchaV3 + enforceAppCheck en Cloud Functions
 
 ### P1.5 — Seguridad pendiente
-- [ ] **App Check**: ReCaptchaV3 + enforceAppCheck en Cloud Functions
-- [ ] **SW SRI**: Self-host Firebase SDK en public/vendor/
-- [ ] **Input sanitization Firestore**: validacion de tipos en 25 rules
+- [ ] **SW SRI**: Self-host Firebase SDK en public/vendor/ (evitar 3rd-party scripts)
+- [ ] **Input sanitization Firestore**: quedan ~18 colecciones sin validacion de tipos (spareParts, bodega, machineCategories, machines, ariaLearning, etc.)
 
-### P2 — Mejoras UX
-- [ ] **Modo alto contraste**: toggle en header para ambientes con luz intensa (planta)
-- [ ] **Precargar imagenes lightbox**: `<link rel="preload">` en thumbnails movil
-- [ ] **Proteccion scroll pantallas mojadas**: `overscroll-behavior: contain` en carruseles
-- [ ] **Quitar proxy Vite**: las imagenes baader200-manual ya estan en public/ (el proxy es fallback innecesario)
+### P2 — Mejoras UX futuras
+- [ ] **Contenido real Seguridad**: agregar fichas PDF descargables, videos de EPP al modulo `/aprendizaje/seguridad`
+- [ ] **Contenido real Marel**: agregar guias por equipo (MX, Stork Trim, Scanvaegt) con fotos
+- [ ] **Modo alto contraste en calendario**: la tabla del calendario no reacciona al `.high-contrast` (colores hardcoded en bg-zinc-800, bg-cyan-500/5, etc.)
+- [ ] **Editor sidebar — reordenar grupos en mobile**: el TouchSensor funciona pero puede ser mejorado
 
 ## Flujo: Fix vulnerabilidades + Deploy a produccion
 
