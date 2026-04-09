@@ -44,6 +44,12 @@
     -webkit-overflow-scrolling: touch;
   }
 
+  /* Protección scroll pantallas mojadas: contener scroll horizontal en carruseles */
+  .overflow-x-auto,
+  .overflow-x-scroll {
+    overscroll-behavior-x: contain;
+  }
+
   /* Scrollbar personalizada para modo oscuro */
   ::-webkit-scrollbar {
     width: 8px;

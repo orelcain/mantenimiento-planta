@@ -30,6 +30,7 @@ import {
   CloudSun,
   BookOpen,
   GraduationCap,
+  GripVertical,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, Button } from '@/components/ui'
 import { useAuthStore, useIsAdmin, useAppStore, usePermissionsStore } from '@/store'
@@ -46,6 +47,7 @@ import { useToast } from '@/hooks/useToast'
 import { initUploadQueue } from '@/services/offlineUploadQueue'
 import { useUploadQueueStore } from '@/store/uploadQueueStore'
 import { saveUserPermissionsOverride, getUserPermissionsOverride } from '@/services/permissions'
+import { loadSidebarConfig } from '@/services/sidebarConfig'
 
 import type { AppModule } from '@/types/permissions'
 import { ChatBot } from '@/components/chat/ChatBot'
@@ -105,6 +107,7 @@ const navGroups: NavGroup[] = [
       { name: 'Clima Puerto', href: '/clima-puerto', icon: CloudSun, module: 'climaPuerto' as AppModule },
       { name: 'HMI Knuro', href: '/hmi-knuro', icon: Cpu },
       { name: 'Baader 200', href: '/baader-200', icon: BookOpen },
+      { name: 'Editor Sidebar', href: '/admin/sidebar', icon: GripVertical },
     ],
   },
 ]
@@ -287,8 +290,39 @@ export function MainLayout() {
     }
   }
 
+  // Orden dinámico del sidebar (cargado desde Firestore una vez)
+  const [sidebarOrder, setSidebarOrder] = useState<{ groupOrder: string[]; itemOrders: Record<string, string[]> } | null>(null)
+  useEffect(() => {
+    loadSidebarConfig().then(config => {
+      if (!config) return
+      setSidebarOrder({
+        groupOrder: config.groupOrder,
+        itemOrders: Object.fromEntries(config.groups.map(g => [g.id, g.itemOrder])),
+      })
+    })
+  }, [])
+
   // Filter groups by admin status and module permissions
-  const visibleGroups = navGroups
+  const orderedNavGroups = sidebarOrder
+    ? [
+        ...sidebarOrder.groupOrder
+          .map(gid => navGroups.find(g => g.id === gid))
+          .filter((g): g is NonNullable<typeof g> => Boolean(g))
+          .map(g => {
+            const itemOrder = sidebarOrder.itemOrders[g.id]
+            if (!itemOrder) return g
+            const ordered = itemOrder
+              .map(href => g.items.find(i => i.href === href))
+              .filter((i): i is NonNullable<typeof i> => Boolean(i))
+            const rest = g.items.filter(i => !itemOrder.includes(i.href))
+            return { ...g, items: [...ordered, ...rest] }
+          }),
+        // Grupos que no están en el config guardado (nuevos)
+        ...navGroups.filter(g => !sidebarOrder.groupOrder.includes(g.id)),
+      ]
+    : navGroups
+
+  const visibleGroups = orderedNavGroups
     .filter(g => !g.adminOnly || isAdmin)
     .map(g => ({
       ...g,
