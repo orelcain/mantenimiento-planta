@@ -4,7 +4,7 @@
  * Ruta: /aprendizaje (pública, sin autenticación)
  */
 import { useNavigate } from 'react-router-dom'
-import { BookOpen, Cpu, Shield, Fish, GraduationCap, ArrowRight, Lock, Home } from 'lucide-react'
+import { BookOpen, Cpu, Shield, Fish, GraduationCap, ArrowRight, Lock } from 'lucide-react'
 
 interface LearningModule {
   id: string
@@ -82,14 +82,7 @@ export function LearningHubPage() {
               <p className="text-sm text-[#5a7a9a] mt-0.5">Conocimiento práctico para técnicos de planta</p>
             </div>
           </div>
-          <button
-            onClick={() => navigate('/')}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all"
-            style={{ background: 'rgba(68,153,255,.08)', border: '1px solid rgba(68,153,255,.2)', color: '#7ab8ff' }}
-          >
-            <Home className="h-4 w-4" />
-            <span className="hidden sm:inline">Ir a la App</span>
-          </button>
+          <div />
         </div>
       </div>
 
@@ -139,14 +132,14 @@ export function LearningHubPage() {
                 {/* Footer: stats + action */}
                 <div className="flex items-center justify-between">
                   {mod.stats && mod.enabled ? (
-                    <span className="text-xs text-[#4a6a8a]">{mod.stats}</span>
+                    <span className="text-xs text-[#6a90b8]">{mod.stats}</span>
                   ) : (
                     <span />
                   )}
                   {mod.enabled && (
-                    <span className="flex items-center gap-1 text-xs font-medium transition-all group-hover:gap-2"
-                      style={{ color: mod.color }}>
-                      Abrir <ArrowRight className="h-3.5 w-3.5" />
+                    <span className="flex items-center gap-1.5 text-sm font-semibold py-1 px-3 rounded-lg"
+                      style={{ background: `${mod.color}20`, color: mod.color }}>
+                      Abrir <ArrowRight className="h-4 w-4" />
                     </span>
                   )}
                 </div>
@@ -156,7 +149,7 @@ export function LearningHubPage() {
         </div>
 
         {/* Footer note */}
-        <p className="text-center text-[10px] text-[#2a4a6a] mt-8 uppercase tracking-wider">
+        <p className="text-center text-xs text-[#4a7aaa] mt-8 uppercase tracking-wider">
           No requiere inicio de sesión · Acceso libre para técnicos
         </p>
       </div>

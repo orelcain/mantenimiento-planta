@@ -3,7 +3,7 @@
  * Ruta pública: /aprendizaje/marel
  */
 import { useNavigate } from 'react-router-dom'
-import { Fish, ArrowLeft, Wrench, Settings, BookOpen, Clock, AlertCircle, Scale } from 'lucide-react'
+import { Fish, ArrowLeft, Wrench, Settings, BookOpen, Clock, Scale } from 'lucide-react'
 
 const EQUIPOS = [
   {
@@ -62,14 +62,19 @@ export function MarelPage() {
       <div className="max-w-3xl mx-auto px-4 pt-8 pb-4 sm:px-6 sm:pt-12">
         <button
           onClick={() => navigate('/aprendizaje')}
-          className="flex items-center gap-2 text-sm mb-6 transition-colors"
-          style={{ color: '#5a7a9a' }}
+          className="flex items-center gap-2 text-sm mb-3 -ml-2 px-2 py-3 rounded-lg transition-colors"
+          style={{ color: '#5a7a9a', minHeight: '44px' }}
           onMouseEnter={e => (e.currentTarget.style.color = '#7ab8ff')}
           onMouseLeave={e => (e.currentTarget.style.color = '#5a7a9a')}
         >
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeft className="h-5 w-5" />
           Centro de Aprendizaje
         </button>
+        <div className="flex items-center gap-1.5 text-xs mb-4" style={{ color: '#6a90b8' }}>
+          <span>Aprendizaje</span>
+          <span>/</span>
+          <span style={{ color: '#aa66ff' }}>Marel</span>
+        </div>
 
         <div className="flex items-center gap-4 mb-2">
           <div
@@ -88,31 +93,20 @@ export function MarelPage() {
 
         {/* Work-in-progress banner */}
         <div
-          className="mt-5 rounded-lg px-4 py-3 flex items-center gap-3 text-sm"
+          className="mt-5 rounded-lg px-4 py-3 flex items-start gap-3 text-sm"
           style={{ background: 'rgba(170,102,255,.08)', border: '1px solid rgba(170,102,255,.2)', color: '#c084fc' }}
         >
-          <Clock className="h-4 w-4 shrink-0" />
+          <Clock className="h-4 w-4 shrink-0 mt-0.5" />
           <span>
-            Módulo en desarrollo — Las guías de cada equipo se irán publicando con fotos y videos de referencia.
-          </span>
-        </div>
-
-        {/* Note */}
-        <div
-          className="mt-3 rounded-lg px-4 py-3 flex items-start gap-3 text-sm"
-          style={{ background: 'rgba(68,153,255,.06)', border: '1px solid rgba(68,153,255,.15)', color: '#7ab8ff' }}
-        >
-          <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-          <span>
-            Para agregar guías o documentación de un equipo, contactar al responsable de mantenimiento
-            o usar el módulo de <strong>Evidencias</strong> en la app.
+            Guías en desarrollo — Se publicarán con fotos y videos de referencia.
+            Para agregar documentación, usar el módulo de <strong>Evidencias</strong> en la app.
           </span>
         </div>
       </div>
 
       {/* Equipment cards */}
       <div className="max-w-3xl mx-auto px-4 pb-10 sm:px-6">
-        <h2 className="text-sm uppercase tracking-widest font-semibold mb-4 mt-2" style={{ color: '#4a6a8a' }}>
+        <h2 className="text-sm uppercase tracking-widest font-semibold mb-4 mt-2" style={{ color: '#6a90b8' }}>
           Equipos instalados en planta
         </h2>
 
@@ -146,7 +140,7 @@ export function MarelPage() {
                   </span>
                 </div>
 
-                <p className="text-xs mb-3" style={{ color: '#5a7a9a' }}>Contenido planificado:</p>
+                <p className="text-xs mb-3" style={{ color: '#5a7a9a' }}>Temas que cubrirá esta guía:</p>
                 <ul className="flex flex-col gap-2">
                   {items.map((item, i) => (
                     <li key={i} className="flex items-start gap-2 text-sm" style={{ color: '#8a9aaa' }}>
@@ -160,7 +154,7 @@ export function MarelPage() {
           ))}
         </div>
 
-        <p className="text-center text-[10px] mt-8 uppercase tracking-wider" style={{ color: '#2a4a6a' }}>
+        <p className="text-center text-xs mt-8 uppercase tracking-wider" style={{ color: '#4a7aaa' }}>
           No requiere inicio de sesión · Acceso libre para técnicos
         </p>
       </div>

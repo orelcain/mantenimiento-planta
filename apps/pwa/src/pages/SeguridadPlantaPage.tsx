@@ -73,14 +73,19 @@ export function SeguridadPlantaPage() {
       <div className="max-w-3xl mx-auto px-4 pt-8 pb-4 sm:px-6 sm:pt-12">
         <button
           onClick={() => navigate('/aprendizaje')}
-          className="flex items-center gap-2 text-sm mb-6 transition-colors"
-          style={{ color: '#5a7a9a' }}
+          className="flex items-center gap-2 text-sm mb-3 -ml-2 px-2 py-3 rounded-lg transition-colors"
+          style={{ color: '#5a7a9a', minHeight: '44px' }}
           onMouseEnter={e => (e.currentTarget.style.color = '#7ab8ff')}
           onMouseLeave={e => (e.currentTarget.style.color = '#5a7a9a')}
         >
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeft className="h-5 w-5" />
           Centro de Aprendizaje
         </button>
+        <div className="flex items-center gap-1.5 text-xs mb-4" style={{ color: '#6a90b8' }}>
+          <span>Aprendizaje</span>
+          <span>/</span>
+          <span style={{ color: '#7ab8ff' }}>Seguridad</span>
+        </div>
 
         <div className="flex items-center gap-4 mb-2">
           <div
@@ -97,28 +102,18 @@ export function SeguridadPlantaPage() {
           </div>
         </div>
 
-        {/* Work-in-progress banner */}
-        <div
-          className="mt-5 rounded-lg px-4 py-3 flex items-center gap-3 text-sm"
-          style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.2)', color: '#fbbf24' }}
-        >
-          <Clock className="h-4 w-4 shrink-0" />
-          <span>
-            Módulo en desarrollo — El contenido completo con fichas PDF y videos estará disponible próximamente.
-          </span>
-        </div>
       </div>
 
       {/* EPP Section */}
       <div className="max-w-3xl mx-auto px-4 pb-6 sm:px-6">
-        <h2 className="text-sm uppercase tracking-widest font-semibold mb-3" style={{ color: '#4a6a8a' }}>
+        <h2 className="text-sm uppercase tracking-widest font-semibold mb-3" style={{ color: '#6a90b8' }}>
           Equipos de Protección Personal (EPP)
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
-          {EPP_ITEMS.map(({ icon: Icon, label, desc }) => (
+          {EPP_ITEMS.map(({ icon: Icon, label, desc }, idx) => (
             <div
               key={label}
-              className="flex items-start gap-3 rounded-xl p-4"
+              className={`flex items-start gap-3 rounded-xl p-4${EPP_ITEMS.length % 2 !== 0 && idx === EPP_ITEMS.length - 1 ? ' sm:col-span-2' : ''}`}
               style={{ background: 'rgba(22,28,42,0.8)', border: '1px solid #1e3a5f' }}
             >
               <div
@@ -170,8 +165,17 @@ export function SeguridadPlantaPage() {
           ))}
         </div>
 
+        {/* WIP note */}
+        <div
+          className="mt-6 rounded-lg px-4 py-3 flex items-center gap-3 text-xs"
+          style={{ background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.15)', color: '#ca8a04' }}
+        >
+          <Clock className="h-3.5 w-3.5 shrink-0" />
+          <span>Se agregarán fichas PDF descargables y videos de EPP próximamente.</span>
+        </div>
+
         {/* Footer */}
-        <div className="flex items-center gap-2 mt-8 text-xs" style={{ color: '#2a4a6a' }}>
+        <div className="flex items-center gap-2 mt-4 text-xs" style={{ color: '#4a7aaa' }}>
           <FileText className="h-3.5 w-3.5" />
           <span>Contenido sujeto a los procedimientos internos vigentes de la planta.</span>
         </div>
