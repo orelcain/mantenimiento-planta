@@ -98,14 +98,9 @@ function flatItems(groups: Group[]): Item[] {
   return groups.flatMap(g => g.items)
 }
 
-// Obtener grupo al que pertenece un item
-function findGroupOfItem(groups: Group[], itemId: string): Group | undefined {
-  return groups.find(g => g.items.some(i => i.id === itemId))
-}
-
 // ── Item sortable ────────────────────────────────────────────
 function SortableItem({ item, isDragging }: { item: Item; isDragging?: boolean }) {
-  const { attributes, listeners, setNodeRef, transform, transition, over } = useSortable({ id: item.id })
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: item.id })
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -186,26 +181,20 @@ export function SidebarEditorPage() {
       if (config) {
         // Reconstruir grupos con el orden guardado
         const groupMap = Object.fromEntries(DEFAULT_GROUPS.map(g => [g.id, g]))
-        const allItems = Object.fromEntries(flatItems(DEFAULT_GROUPS).map(i => [i.id, i]))
 
-        const rebuilt: Group[] = config.groupOrder
-          .filter(gid => groupMap[gid])
-          .map(gid => {
+        const rebuilt: Group[] = config.groupOrder.reduce<Group[]>((acc, gid) => {
             const def = groupMap[gid]
+            if (!def) return acc
             const savedGroup = config.groups.find(g => g.id === gid)
-            if (!savedGroup) return def
-            // Orden guardado de items, agregar nuevos que no estén guardados al final
+            if (!savedGroup) { acc.push(def); return acc }
             const savedIds = new Set(savedGroup.itemOrder)
             const orderedItems = savedGroup.itemOrder
-              .filter(href => {
-                // Buscar item por href
-                return def.items.some(i => i.href === href)
-              })
-              .map(href => def.items.find(i => i.href === href)!)
-              .filter(Boolean)
+              .map(href => def.items.find(i => i.href === href))
+              .filter((i): i is Item => i !== undefined)
             const rest = def.items.filter(i => !savedIds.has(i.href))
-            return { ...def, items: [...orderedItems, ...rest] }
-          })
+            acc.push({ ...def, items: [...orderedItems, ...rest] })
+            return acc
+          }, [])
 
         // Agregar grupos nuevos que no estén en el config guardado
         DEFAULT_GROUPS.forEach(dg => {

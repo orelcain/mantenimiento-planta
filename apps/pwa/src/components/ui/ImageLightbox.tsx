@@ -49,7 +49,7 @@ export function ImageLightbox({ photos, initialIndex = 0, onClose }: ImageLightb
 
   // Precargar imágenes vecinas (anterior + siguiente)
   useEffect(() => {
-    const toPreload = [photos[index - 1], photos[index + 1]].filter(Boolean)
+    const toPreload = [photos[index - 1], photos[index + 1]].filter((s): s is string => typeof s === 'string')
     toPreload.forEach(src => {
       const img = new Image()
       img.src = src
