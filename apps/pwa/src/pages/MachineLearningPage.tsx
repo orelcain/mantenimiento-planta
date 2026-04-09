@@ -12,7 +12,17 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '@/store'
 import { findMachineBySlug, type LearningSection } from '@/data/learningMachines'
-import { listProcedures, type Procedure } from '@/services/learningContent'
+import {
+  listProcedures,
+  listManualSections,
+  listFlows,
+  listDiagnosis,
+  type Procedure,
+  type ManualSection,
+  type Flow,
+  type DiagnosisEntry,
+} from '@/services/learningContent'
+import { OtherLearningModulesStrip } from '@/components/learning/OtherLearningModulesStrip'
 
 interface TabDef {
   id: LearningSection
@@ -59,21 +69,47 @@ export function MachineLearningPage() {
   const { isAuthenticated } = useAuthStore()
   const [activeTab, setActiveTab] = useState<LearningSection>('manual')
   const [procedures, setProcedures] = useState<Procedure[]>([])
-  const [loadingProcedures, setLoadingProcedures] = useState(false)
+  const [manualSections, setManualSections] = useState<ManualSection[]>([])
+  const [flows, setFlows] = useState<Flow[]>([])
+  const [diagnosis, setDiagnosis] = useState<DiagnosisEntry[]>([])
+  const [loadingTab, setLoadingTab] = useState(false)
 
   const machine = slug ? findMachineBySlug(slug) : undefined
 
-  // Cargar procedimientos de Firestore cuando se abre la tab
+  // Cargar contenido de Firestore segun tab activo
   useEffect(() => {
     if (!machine || machine.customRoute) return
-    if (activeTab !== 'procedures') return
     let cancelled = false
-    setLoadingProcedures(true)
-    listProcedures(machine.slug)
-      .then(list => { if (!cancelled) setProcedures(list) })
-      .catch(() => { if (!cancelled) setProcedures([]) })
-      .finally(() => { if (!cancelled) setLoadingProcedures(false) })
-    return () => { cancelled = true }
+    setLoadingTab(true)
+
+    const loader =
+      activeTab === 'procedures'
+        ? listProcedures(machine.slug).then(list => {
+            if (!cancelled) setProcedures(list)
+          })
+        : activeTab === 'manual'
+        ? listManualSections(machine.slug).then(list => {
+            if (!cancelled) setManualSections(list)
+          })
+        : activeTab === 'flows'
+        ? listFlows(machine.slug).then(list => {
+            if (!cancelled) setFlows(list)
+          })
+        : listDiagnosis(machine.slug).then(list => {
+            if (!cancelled) setDiagnosis(list)
+          })
+
+    loader
+      .catch(() => {
+        // En silencio: mantiene empty state
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingTab(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
   }, [machine, activeTab])
 
   if (!machine) {
@@ -87,10 +123,16 @@ export function MachineLearningPage() {
 
   const Icon = machine.icon
   const activeTabData = TABS.find(t => t.id === activeTab)!
-  // Procedimientos: habilitado si hay items en Firestore
-  // Otras secciones: habilitado segun el flag estatico
-  const sectionEnabled =
-    activeTab === 'procedures' ? procedures.length > 0 : machine.sections[activeTab]
+  // Habilitado si hay items reales en Firestore para ese tab
+  const activeCount =
+    activeTab === 'procedures'
+      ? procedures.length
+      : activeTab === 'manual'
+      ? manualSections.length
+      : activeTab === 'flows'
+      ? flows.length
+      : diagnosis.length
+  const sectionEnabled = activeCount > 0 || machine.sections[activeTab]
 
   // Altura adaptativa: dentro de MainLayout usar min-h-full, publico usar min-h-dvh
   const heightClass = isAuthenticated ? 'min-h-full' : 'min-h-dvh'
@@ -145,7 +187,15 @@ export function MachineLearningPage() {
           {TABS.map(tab => {
             const TabIcon = tab.icon
             const isActive = activeTab === tab.id
-            const hasContent = machine.sections[tab.id]
+            const tabCount =
+              tab.id === 'procedures'
+                ? procedures.length
+                : tab.id === 'manual'
+                ? manualSections.length
+                : tab.id === 'flows'
+                ? flows.length
+                : diagnosis.length
+            const hasContent = tabCount > 0 || machine.sections[tab.id]
             return (
               <button
                 key={tab.id}
@@ -191,13 +241,19 @@ export function MachineLearningPage() {
           </p>
         </div>
 
-        {activeTab === 'procedures' && loadingProcedures ? (
+        {loadingTab ? (
           <div className="flex items-center justify-center py-12" style={{ color: '#6a90b8' }}>
             <Loader2 className="h-5 w-5 animate-spin mr-2" />
-            Cargando procedimientos...
+            Cargando...
           </div>
         ) : activeTab === 'procedures' && procedures.length > 0 ? (
           <ProceduresList procedures={procedures} color={machine.color} />
+        ) : activeTab === 'manual' && manualSections.length > 0 ? (
+          <ManualList sections={manualSections} color={machine.color} />
+        ) : activeTab === 'flows' && flows.length > 0 ? (
+          <FlowsList flows={flows} color={machine.color} />
+        ) : activeTab === 'diagnosis' && diagnosis.length > 0 ? (
+          <DiagnosisList entries={diagnosis} color={machine.color} />
         ) : sectionEnabled ? (
           <div
             className="rounded-xl p-6"
@@ -214,6 +270,8 @@ export function MachineLearningPage() {
             machineName={machine.name}
           />
         )}
+
+        <OtherLearningModulesStrip currentSlug={machine.slug} accent={machine.color} />
       </div>
     </div>
   )
@@ -236,7 +294,7 @@ function ProceduresList({ procedures, color }: { procedures: Procedure[]; color:
                 {proc.description}
               </p>
             )}
-            <ol className="space-y-3 mt-4">
+            <ol className="space-y-4 mt-4">
               {proc.steps.map(step => (
                 <li key={step.order} className="flex gap-3">
                   <span
@@ -248,14 +306,163 @@ function ProceduresList({ procedures, color }: { procedures: Procedure[]; color:
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-white">{step.title}</p>
                     {step.description && (
-                      <p className="text-xs mt-1 leading-relaxed" style={{ color: '#aab8c8' }}>
+                      <p className="text-xs mt-1 leading-relaxed whitespace-pre-wrap" style={{ color: '#aab8c8' }}>
                         {step.description}
                       </p>
+                    )}
+                    {step.imageUrl && (
+                      <a
+                        href={step.imageUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block mt-2"
+                      >
+                        <img
+                          src={step.imageUrl}
+                          alt={step.title}
+                          loading="lazy"
+                          className="max-h-60 rounded-lg border"
+                          style={{ borderColor: `${color}40` }}
+                        />
+                      </a>
                     )}
                   </div>
                 </li>
               ))}
             </ol>
+          </div>
+        </article>
+      ))}
+    </div>
+  )
+}
+
+function ManualList({ sections, color }: { sections: ManualSection[]; color: string }) {
+  return (
+    <div className="space-y-4">
+      {sections.map(sec => (
+        <article
+          key={sec.id}
+          className="rounded-xl overflow-hidden"
+          style={{ background: 'rgba(22,28,42,0.8)', border: '1px solid #1e3a5f' }}
+        >
+          <div className="h-1" style={{ background: color, opacity: 0.9 }} />
+          <div className="p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <span
+                className="flex items-center justify-center w-6 h-6 rounded-full font-bold text-[11px]"
+                style={{ background: `${color}25`, color }}
+              >
+                {sec.order}
+              </span>
+              <h3 className="text-base font-semibold text-white">{sec.title}</h3>
+            </div>
+            <p
+              className="text-sm leading-relaxed whitespace-pre-wrap"
+              style={{ color: '#c0d0e0' }}
+            >
+              {sec.content}
+            </p>
+          </div>
+        </article>
+      ))}
+    </div>
+  )
+}
+
+function FlowsList({ flows, color }: { flows: Flow[]; color: string }) {
+  return (
+    <div className="space-y-4">
+      {flows.map(flow => (
+        <article
+          key={flow.id}
+          className="rounded-xl overflow-hidden"
+          style={{ background: 'rgba(22,28,42,0.8)', border: '1px solid #1e3a5f' }}
+        >
+          <div className="h-1" style={{ background: color, opacity: 0.9 }} />
+          <div className="p-5">
+            <h3 className="text-base font-semibold text-white mb-2">{flow.title}</h3>
+            <div
+              className="rounded-lg p-3 mb-4"
+              style={{ background: `${color}10`, border: `1px solid ${color}30` }}
+            >
+              <p className="text-[10px] uppercase tracking-wider font-semibold mb-1" style={{ color }}>
+                Cuando sucede
+              </p>
+              <p className="text-sm whitespace-pre-wrap" style={{ color: '#d0dce8' }}>
+                {flow.trigger}
+              </p>
+            </div>
+            <p className="text-[10px] uppercase tracking-wider font-semibold mb-2" style={{ color: '#6a90b8' }}>
+              Acciones a seguir
+            </p>
+            <ol className="space-y-2">
+              {flow.actions.map((action, idx) => (
+                <li key={idx} className="flex gap-3">
+                  <span
+                    className="flex items-center justify-center w-6 h-6 rounded-full font-bold text-[11px] flex-shrink-0"
+                    style={{ background: `${color}25`, color }}
+                  >
+                    {idx + 1}
+                  </span>
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap flex-1" style={{ color: '#c0d0e0' }}>
+                    {action}
+                  </p>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </article>
+      ))}
+    </div>
+  )
+}
+
+function DiagnosisList({ entries, color }: { entries: DiagnosisEntry[]; color: string }) {
+  return (
+    <div className="space-y-4">
+      {entries.map(entry => (
+        <article
+          key={entry.id}
+          className="rounded-xl overflow-hidden"
+          style={{ background: 'rgba(22,28,42,0.8)', border: '1px solid #1e3a5f' }}
+        >
+          <div className="h-1" style={{ background: '#ff8844', opacity: 0.9 }} />
+          <div className="p-5">
+            <div className="mb-3">
+              <p className="text-[10px] uppercase tracking-wider font-semibold mb-1 text-orange-400">
+                Síntoma
+              </p>
+              <h3 className="text-base font-semibold text-white leading-snug whitespace-pre-wrap">
+                {entry.symptom}
+              </h3>
+            </div>
+
+            <div className="mb-3">
+              <p className="text-[10px] uppercase tracking-wider font-semibold mb-1.5 text-orange-400">
+                Causas posibles
+              </p>
+              <ul className="space-y-1.5">
+                {entry.possibleCauses.map((cause, idx) => (
+                  <li key={idx} className="flex gap-2 text-sm" style={{ color: '#c0d0e0' }}>
+                    <span className="text-orange-400 flex-shrink-0">•</span>
+                    <span className="flex-1 whitespace-pre-wrap">{cause}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div
+              className="rounded-lg p-3"
+              style={{ background: `${color}10`, border: `1px solid ${color}30` }}
+            >
+              <p className="text-[10px] uppercase tracking-wider font-semibold mb-1" style={{ color }}>
+                Solución
+              </p>
+              <p className="text-sm whitespace-pre-wrap" style={{ color: '#d0dce8' }}>
+                {entry.solution}
+              </p>
+            </div>
           </div>
         </article>
       ))}

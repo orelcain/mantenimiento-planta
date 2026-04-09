@@ -11,12 +11,12 @@ export const APP_VERSION = '2.73.0' as const
 /**
  * Fecha de la versión actual
  */
-export const VERSION_DATE = '2026-04-09b' as const
+export const VERSION_DATE = '2026-04-09c' as const
 
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'UX audit: aprendizaje — targets tactiles, contraste, breadcrumbs' as const
+export const VERSION_NAME = 'Learning Hub: editores admin Manual/Flujos/Diagnóstico + upload imágenes + counts dinámicos' as const
 
 /**
  * Nota:

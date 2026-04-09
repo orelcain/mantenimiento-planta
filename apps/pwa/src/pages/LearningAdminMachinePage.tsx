@@ -2,32 +2,49 @@
  * LearningAdminMachinePage — Editor de contenido de una maquina
  * Ruta: /aprendizaje/admin/:slug (requiere admin)
  *
- * Permite crear/editar/eliminar procedimientos paso a paso.
- * A futuro: manual, flujos y diagnosticos.
+ * Tabs:
+ *   - Procedimientos (con upload de imagenes por paso)
+ *   - Manual (secciones de texto ordenadas)
+ *   - Flujos (trigger + lista de acciones)
+ *   - Diagnostico (sintoma -> causas -> solucion)
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft, Plus, Trash2, Edit3, Save, X, ChevronUp, ChevronDown, Loader2,
-  ListChecks, BookOpen, GitBranch, AlertTriangle,
+  ListChecks, BookOpen, GitBranch, AlertTriangle, ImagePlus,
 } from 'lucide-react'
 import { findMachineBySlug } from '@/data/learningMachines'
 import {
   listProcedures,
   saveProcedure,
   deleteProcedure,
+  listManualSections,
+  saveManualSection,
+  deleteManualSection,
+  listFlows,
+  saveFlow,
+  deleteFlow,
+  listDiagnosis,
+  saveDiagnosis,
+  deleteDiagnosis,
   generateContentId,
+  uploadLearningImage,
+  deleteLearningImage,
   type Procedure,
   type ProcedureStep,
+  type ManualSection,
+  type Flow,
+  type DiagnosisEntry,
 } from '@/services/learningContent'
 
 type AdminTab = 'procedures' | 'manual' | 'flows' | 'diagnosis'
 
-const TAB_DEFS: { id: AdminTab; label: string; icon: React.ElementType; enabled: boolean }[] = [
-  { id: 'procedures', label: 'Procedimientos', icon: ListChecks, enabled: true },
-  { id: 'manual', label: 'Manual', icon: BookOpen, enabled: false },
-  { id: 'flows', label: 'Flujos', icon: GitBranch, enabled: false },
-  { id: 'diagnosis', label: 'Diagnóstico', icon: AlertTriangle, enabled: false },
+const TAB_DEFS: { id: AdminTab; label: string; icon: React.ElementType }[] = [
+  { id: 'procedures', label: 'Procedimientos', icon: ListChecks },
+  { id: 'manual', label: 'Manual', icon: BookOpen },
+  { id: 'flows', label: 'Flujos', icon: GitBranch },
+  { id: 'diagnosis', label: 'Diagnóstico', icon: AlertTriangle },
 ]
 
 export function LearningAdminMachinePage() {
@@ -78,19 +95,15 @@ export function LearningAdminMachinePage() {
           return (
             <button
               key={tab.id}
-              onClick={() => tab.enabled && setActiveTab(tab.id)}
-              disabled={!tab.enabled}
+              onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                 isActive
                   ? 'border-primary text-primary'
-                  : tab.enabled
-                  ? 'border-transparent text-muted-foreground hover:text-foreground'
-                  : 'border-transparent text-muted-foreground/40 cursor-not-allowed'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
               <TabIcon className="h-4 w-4" />
               {tab.label}
-              {!tab.enabled && <span className="text-[10px] opacity-60">(próximo)</span>}
             </button>
           )
         })}
@@ -98,20 +111,16 @@ export function LearningAdminMachinePage() {
 
       {/* Tab content */}
       {activeTab === 'procedures' && <ProceduresEditor machineSlug={machine.slug} />}
-      {activeTab !== 'procedures' && (
-        <div className="p-8 text-center rounded-xl border border-dashed border-border bg-accent/10">
-          <p className="text-sm text-muted-foreground">
-            Esta sección estará disponible en la próxima iteración del admin.
-          </p>
-        </div>
-      )}
+      {activeTab === 'manual' && <ManualEditor machineSlug={machine.slug} />}
+      {activeTab === 'flows' && <FlowsEditor machineSlug={machine.slug} />}
+      {activeTab === 'diagnosis' && <DiagnosisEditor machineSlug={machine.slug} />}
     </div>
   )
 }
 
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════
 // PROCEDURES EDITOR
-// ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════
 
 function ProceduresEditor({ machineSlug }: { machineSlug: string }) {
   const [procedures, setProcedures] = useState<Procedure[]>([])
@@ -159,6 +168,7 @@ function ProceduresEditor({ machineSlug }: { machineSlug: string }) {
   if (editing) {
     return (
       <ProcedureForm
+        machineSlug={machineSlug}
         initial={editing}
         onSave={handleSave}
         onCancel={() => setEditing(null)}
@@ -167,90 +177,38 @@ function ProceduresEditor({ machineSlug }: { machineSlug: string }) {
   }
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-sm text-muted-foreground">
-          {procedures.length === 0
-            ? 'Aún no hay procedimientos.'
-            : `${procedures.length} procedimiento${procedures.length !== 1 ? 's' : ''}`}
-        </p>
-        <button
-          onClick={handleNew}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
-          style={{ minHeight: '40px' }}
-        >
-          <Plus className="h-4 w-4" />
-          Nuevo procedimiento
-        </button>
-      </div>
-
-      {loading ? (
-        <div className="flex items-center justify-center py-12 text-muted-foreground">
-          <Loader2 className="h-5 w-5 animate-spin mr-2" />
-          Cargando...
-        </div>
-      ) : procedures.length === 0 ? (
-        <div className="p-8 text-center rounded-xl border border-dashed border-border bg-accent/10">
-          <ListChecks className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-50" />
-          <p className="text-sm font-medium mb-1">Sin procedimientos aún</p>
-          <p className="text-xs text-muted-foreground">
-            Crea el primer procedimiento paso a paso para esta máquina.
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {procedures.map(proc => (
-            <div
-              key={proc.id}
-              className="p-4 rounded-xl border border-border bg-card hover:border-primary/30 transition-colors"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-sm">{proc.title}</h3>
-                  {proc.description && (
-                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                      {proc.description}
-                    </p>
-                  )}
-                  <p className="text-[11px] text-muted-foreground mt-1.5">
-                    {proc.steps.length} paso{proc.steps.length !== 1 ? 's' : ''} ·{' '}
-                    Actualizado {formatDate(proc.updatedAt)}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setEditing(proc)}
-                    className="p-2 rounded hover:bg-accent transition-colors"
-                    title="Editar"
-                  >
-                    <Edit3 className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(proc.id)}
-                    className="p-2 rounded hover:bg-destructive/20 text-destructive transition-colors"
-                    title="Eliminar"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+    <CollectionListView
+      emptyIcon={ListChecks}
+      emptyTitle="Sin procedimientos aún"
+      emptyHint="Crea el primer procedimiento paso a paso para esta máquina."
+      newLabel="Nuevo procedimiento"
+      loading={loading}
+      count={procedures.length}
+      onNew={handleNew}
+      singular="procedimiento"
+      plural="procedimientos"
+    >
+      {procedures.map(proc => (
+        <ItemCard
+          key={proc.id}
+          title={proc.title}
+          subtitle={proc.description || undefined}
+          meta={`${proc.steps.length} paso${proc.steps.length !== 1 ? 's' : ''} · Actualizado ${formatDate(proc.updatedAt)}`}
+          onEdit={() => setEditing(proc)}
+          onDelete={() => handleDelete(proc.id)}
+        />
+      ))}
+    </CollectionListView>
   )
 }
 
-// ─────────────────────────────────────────────────────────────
-// PROCEDURE FORM
-// ─────────────────────────────────────────────────────────────
-
 function ProcedureForm({
+  machineSlug,
   initial,
   onSave,
   onCancel,
 }: {
+  machineSlug: string
   initial: Procedure
   onSave: (p: Procedure) => void | Promise<void>
   onCancel: () => void
@@ -309,10 +267,7 @@ function ProcedureForm({
   return (
     <div className="space-y-4">
       {/* Title */}
-      <div>
-        <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5 text-muted-foreground">
-          Título del procedimiento <span className="text-destructive">*</span>
-        </label>
+      <FormField label="Título del procedimiento" required>
         <input
           type="text"
           value={procedure.title}
@@ -320,13 +275,9 @@ function ProcedureForm({
           placeholder="Ej: Calibración de celdas de carga"
           className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
         />
-      </div>
+      </FormField>
 
-      {/* Description */}
-      <div>
-        <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5 text-muted-foreground">
-          Descripción breve (opcional)
-        </label>
+      <FormField label="Descripción breve (opcional)">
         <textarea
           value={procedure.description || ''}
           onChange={e => setProcedure({ ...procedure, description: e.target.value })}
@@ -334,7 +285,7 @@ function ProcedureForm({
           rows={2}
           className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/40"
         />
-      </div>
+      </FormField>
 
       {/* Steps */}
       <div>
@@ -353,10 +304,7 @@ function ProcedureForm({
 
         <div className="space-y-3">
           {procedure.steps.map((step, index) => (
-            <div
-              key={index}
-              className="p-3 rounded-lg border border-border bg-card/50"
-            >
+            <div key={index} className="p-3 rounded-lg border border-border bg-card/50">
               <div className="flex items-start gap-2">
                 <div className="flex flex-col items-center gap-1">
                   <span className="flex items-center justify-center w-7 h-7 rounded-full bg-primary/15 text-primary font-bold text-xs">
@@ -396,6 +344,12 @@ function ProcedureForm({
                     rows={2}
                     className="w-full px-2.5 py-1.5 rounded border border-border bg-background text-xs resize-none focus:outline-none focus:ring-1 focus:ring-primary/40"
                   />
+                  <StepImageUploader
+                    machineSlug={machineSlug}
+                    procedureId={procedure.id}
+                    imageUrl={step.imageUrl || null}
+                    onChange={url => updateStep(index, { imageUrl: url })}
+                  />
                 </div>
                 <button
                   onClick={() => removeStep(index)}
@@ -411,25 +365,814 @@ function ProcedureForm({
         </div>
       </div>
 
-      {/* Actions */}
-      <div className="flex items-center justify-end gap-2 pt-4 border-t border-border">
+      <FormActions saving={saving} canSave={canSave} onCancel={onCancel} onSave={handleSubmit} />
+    </div>
+  )
+}
+
+/** Uploader de imagen para un paso — usa Firebase Storage */
+function StepImageUploader({
+  machineSlug,
+  procedureId,
+  imageUrl,
+  onChange,
+}: {
+  machineSlug: string
+  procedureId: string
+  imageUrl: string | null
+  onChange: (url: string | null) => void
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleFile(file: File) {
+    setUploading(true)
+    setError(null)
+    try {
+      const url = await uploadLearningImage(machineSlug, 'procedures', procedureId, file)
+      // Si habia una imagen previa, borrarla del storage
+      if (imageUrl) {
+        await deleteLearningImage(imageUrl)
+      }
+      onChange(url)
+    } catch (e) {
+      console.error(e)
+      setError('Error al subir imagen')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  async function handleRemove() {
+    if (!imageUrl) return
+    if (!confirm('¿Eliminar imagen de este paso?')) return
+    const previous = imageUrl
+    onChange(null)
+    await deleteLearningImage(previous)
+  }
+
+  return (
+    <div className="mt-1">
+      {imageUrl ? (
+        <div className="relative inline-block">
+          <img
+            src={imageUrl}
+            alt="Imagen del paso"
+            className="max-h-32 rounded border border-border"
+          />
+          <button
+            onClick={handleRemove}
+            className="absolute -top-2 -right-2 flex items-center justify-center w-6 h-6 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            title="Eliminar imagen"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      ) : (
         <button
-          onClick={onCancel}
-          disabled={saving}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-sm hover:bg-accent transition-colors"
+          onClick={() => inputRef.current?.click()}
+          disabled={uploading}
+          className="flex items-center gap-1.5 text-xs text-primary hover:bg-primary/10 px-2 py-1 rounded disabled:opacity-50"
         >
-          <X className="h-4 w-4" />
-          Cancelar
+          {uploading ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Subiendo…
+            </>
+          ) : (
+            <>
+              <ImagePlus className="h-3.5 w-3.5" />
+              Añadir imagen
+            </>
+          )}
         </button>
+      )}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={e => {
+          const file = e.target.files?.[0]
+          if (file) void handleFile(file)
+          e.target.value = ''
+        }}
+      />
+      {error && <p className="text-[11px] text-destructive mt-1">{error}</p>}
+    </div>
+  )
+}
+
+// ═════════════════════════════════════════════════════════════
+// MANUAL EDITOR
+// ═════════════════════════════════════════════════════════════
+
+function ManualEditor({ machineSlug }: { machineSlug: string }) {
+  const [sections, setSections] = useState<ManualSection[]>([])
+  const [loading, setLoading] = useState(true)
+  const [editing, setEditing] = useState<ManualSection | null>(null)
+
+  async function load() {
+    setLoading(true)
+    try {
+      const list = await listManualSections(machineSlug)
+      setSections(list)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [machineSlug])
+
+  function handleNew() {
+    setEditing({
+      id: generateContentId('sec_'),
+      title: '',
+      content: '',
+      order: sections.length + 1,
+      createdAt: 0,
+      updatedAt: 0,
+    })
+  }
+
+  async function handleSave(section: ManualSection) {
+    await saveManualSection(machineSlug, section)
+    setEditing(null)
+    await load()
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm('¿Eliminar esta sección del manual?')) return
+    await deleteManualSection(machineSlug, id)
+    await load()
+  }
+
+  if (editing) {
+    return (
+      <ManualSectionForm
+        initial={editing}
+        onSave={handleSave}
+        onCancel={() => setEditing(null)}
+      />
+    )
+  }
+
+  return (
+    <CollectionListView
+      emptyIcon={BookOpen}
+      emptyTitle="Sin secciones de manual"
+      emptyHint="Crea la primera sección con texto explicativo (ajustes, medidas, notas)."
+      newLabel="Nueva sección"
+      loading={loading}
+      count={sections.length}
+      onNew={handleNew}
+      singular="sección"
+      plural="secciones"
+    >
+      {sections.map(sec => (
+        <ItemCard
+          key={sec.id}
+          title={`${sec.order}. ${sec.title}`}
+          subtitle={sec.content.slice(0, 140) + (sec.content.length > 140 ? '…' : '')}
+          meta={`Actualizado ${formatDate(sec.updatedAt)}`}
+          onEdit={() => setEditing(sec)}
+          onDelete={() => handleDelete(sec.id)}
+        />
+      ))}
+    </CollectionListView>
+  )
+}
+
+function ManualSectionForm({
+  initial,
+  onSave,
+  onCancel,
+}: {
+  initial: ManualSection
+  onSave: (s: ManualSection) => void | Promise<void>
+  onCancel: () => void
+}) {
+  const [section, setSection] = useState<ManualSection>(initial)
+  const [saving, setSaving] = useState(false)
+  const canSave = section.title.trim().length > 0 && section.content.trim().length > 0
+
+  async function handleSubmit() {
+    if (!canSave) return
+    setSaving(true)
+    try {
+      await onSave(section)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-3">
+        <FormField label="Orden" className="w-24 flex-shrink-0">
+          <input
+            type="number"
+            min={1}
+            value={section.order}
+            onChange={e => setSection({ ...section, order: Number(e.target.value) || 1 })}
+            className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+          />
+        </FormField>
+        <FormField label="Título de la sección" required className="flex-1">
+          <input
+            type="text"
+            value={section.title}
+            onChange={e => setSection({ ...section, title: e.target.value })}
+            placeholder="Ej: Ajuste de cuchillas"
+            className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+          />
+        </FormField>
+      </div>
+
+      <FormField label="Contenido" required>
+        <textarea
+          value={section.content}
+          onChange={e => setSection({ ...section, content: e.target.value })}
+          placeholder="Texto del manual. Soporta saltos de línea."
+          rows={10}
+          className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-sm resize-y focus:outline-none focus:ring-2 focus:ring-primary/40"
+        />
+      </FormField>
+
+      <FormActions saving={saving} canSave={canSave} onCancel={onCancel} onSave={handleSubmit} />
+    </div>
+  )
+}
+
+// ═════════════════════════════════════════════════════════════
+// FLOWS EDITOR
+// ═════════════════════════════════════════════════════════════
+
+function FlowsEditor({ machineSlug }: { machineSlug: string }) {
+  const [flows, setFlows] = useState<Flow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [editing, setEditing] = useState<Flow | null>(null)
+
+  async function load() {
+    setLoading(true)
+    try {
+      setFlows(await listFlows(machineSlug))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [machineSlug])
+
+  function handleNew() {
+    setEditing({
+      id: generateContentId('flow_'),
+      title: '',
+      trigger: '',
+      actions: [''],
+      createdAt: 0,
+      updatedAt: 0,
+    })
+  }
+
+  async function handleSave(flow: Flow) {
+    // Filtrar acciones vacias antes de guardar
+    const clean = { ...flow, actions: flow.actions.filter(a => a.trim().length > 0) }
+    await saveFlow(machineSlug, clean)
+    setEditing(null)
+    await load()
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm('¿Eliminar este flujo?')) return
+    await deleteFlow(machineSlug, id)
+    await load()
+  }
+
+  if (editing) {
+    return (
+      <FlowForm initial={editing} onSave={handleSave} onCancel={() => setEditing(null)} />
+    )
+  }
+
+  return (
+    <CollectionListView
+      emptyIcon={GitBranch}
+      emptyTitle="Sin flujos aún"
+      emptyHint="Crea flujos tipo '¿Qué hago cuando…?' con trigger + acciones."
+      newLabel="Nuevo flujo"
+      loading={loading}
+      count={flows.length}
+      onNew={handleNew}
+      singular="flujo"
+      plural="flujos"
+    >
+      {flows.map(flow => (
+        <ItemCard
+          key={flow.id}
+          title={flow.title}
+          subtitle={flow.trigger}
+          meta={`${flow.actions.length} acción${flow.actions.length !== 1 ? 'es' : ''} · Actualizado ${formatDate(flow.updatedAt)}`}
+          onEdit={() => setEditing(flow)}
+          onDelete={() => handleDelete(flow.id)}
+        />
+      ))}
+    </CollectionListView>
+  )
+}
+
+function FlowForm({
+  initial,
+  onSave,
+  onCancel,
+}: {
+  initial: Flow
+  onSave: (f: Flow) => void | Promise<void>
+  onCancel: () => void
+}) {
+  const [flow, setFlow] = useState<Flow>(initial)
+  const [saving, setSaving] = useState(false)
+
+  function updateAction(index: number, value: string) {
+    setFlow(f => ({ ...f, actions: f.actions.map((a, i) => (i === index ? value : a)) }))
+  }
+
+  function addAction() {
+    setFlow(f => ({ ...f, actions: [...f.actions, ''] }))
+  }
+
+  function removeAction(index: number) {
+    setFlow(f => {
+      if (f.actions.length <= 1) return f
+      return { ...f, actions: f.actions.filter((_, i) => i !== index) }
+    })
+  }
+
+  function moveAction(index: number, direction: -1 | 1) {
+    setFlow(f => {
+      const newIndex = index + direction
+      if (newIndex < 0 || newIndex >= f.actions.length) return f
+      const next = [...f.actions]
+      const tmp = next[index]!
+      next[index] = next[newIndex]!
+      next[newIndex] = tmp
+      return { ...f, actions: next }
+    })
+  }
+
+  const canSave =
+    flow.title.trim().length > 0 &&
+    flow.trigger.trim().length > 0 &&
+    flow.actions.some(a => a.trim().length > 0)
+
+  async function handleSubmit() {
+    if (!canSave) return
+    setSaving(true)
+    try {
+      await onSave(flow)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <FormField label="Título del flujo" required>
+        <input
+          type="text"
+          value={flow.title}
+          onChange={e => setFlow({ ...flow, title: e.target.value })}
+          placeholder="Ej: ¿Qué hago cuando el motor se detiene?"
+          className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+        />
+      </FormField>
+
+      <FormField label="Trigger / Situación" required>
+        <textarea
+          value={flow.trigger}
+          onChange={e => setFlow({ ...flow, trigger: e.target.value })}
+          placeholder="Condición que dispara este flujo (ej: alarma de sobretemperatura)"
+          rows={2}
+          className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/40"
+        />
+      </FormField>
+
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Acciones a seguir <span className="text-destructive">*</span>
+          </label>
+          <button
+            onClick={addAction}
+            className="flex items-center gap-1 text-xs font-medium text-primary hover:bg-primary/10 px-2 py-1 rounded"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Añadir acción
+          </button>
+        </div>
+
+        <div className="space-y-2">
+          {flow.actions.map((action, index) => (
+            <div key={index} className="flex items-start gap-2">
+              <div className="flex flex-col items-center pt-1.5">
+                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/15 text-primary font-bold text-[11px]">
+                  {index + 1}
+                </span>
+                <div className="flex flex-col">
+                  <button
+                    onClick={() => moveAction(index, -1)}
+                    disabled={index === 0}
+                    className="p-0.5 hover:bg-accent rounded disabled:opacity-30"
+                  >
+                    <ChevronUp className="h-3 w-3" />
+                  </button>
+                  <button
+                    onClick={() => moveAction(index, 1)}
+                    disabled={index === flow.actions.length - 1}
+                    className="p-0.5 hover:bg-accent rounded disabled:opacity-30"
+                  >
+                    <ChevronDown className="h-3 w-3" />
+                  </button>
+                </div>
+              </div>
+              <textarea
+                value={action}
+                onChange={e => updateAction(index, e.target.value)}
+                placeholder="Describir acción"
+                rows={2}
+                className="flex-1 px-3 py-2 rounded-lg border border-border bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/40"
+              />
+              <button
+                onClick={() => removeAction(index)}
+                disabled={flow.actions.length <= 1}
+                className="p-1.5 hover:bg-destructive/20 text-destructive rounded disabled:opacity-30"
+                title="Eliminar acción"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <FormActions saving={saving} canSave={canSave} onCancel={onCancel} onSave={handleSubmit} />
+    </div>
+  )
+}
+
+// ═════════════════════════════════════════════════════════════
+// DIAGNOSIS EDITOR
+// ═════════════════════════════════════════════════════════════
+
+function DiagnosisEditor({ machineSlug }: { machineSlug: string }) {
+  const [entries, setEntries] = useState<DiagnosisEntry[]>([])
+  const [loading, setLoading] = useState(true)
+  const [editing, setEditing] = useState<DiagnosisEntry | null>(null)
+
+  async function load() {
+    setLoading(true)
+    try {
+      setEntries(await listDiagnosis(machineSlug))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [machineSlug])
+
+  function handleNew() {
+    setEditing({
+      id: generateContentId('diag_'),
+      symptom: '',
+      possibleCauses: [''],
+      solution: '',
+      createdAt: 0,
+      updatedAt: 0,
+    })
+  }
+
+  async function handleSave(entry: DiagnosisEntry) {
+    const clean = { ...entry, possibleCauses: entry.possibleCauses.filter(c => c.trim().length > 0) }
+    await saveDiagnosis(machineSlug, clean)
+    setEditing(null)
+    await load()
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm('¿Eliminar este diagnóstico?')) return
+    await deleteDiagnosis(machineSlug, id)
+    await load()
+  }
+
+  if (editing) {
+    return (
+      <DiagnosisForm initial={editing} onSave={handleSave} onCancel={() => setEditing(null)} />
+    )
+  }
+
+  return (
+    <CollectionListView
+      emptyIcon={AlertTriangle}
+      emptyTitle="Sin diagnósticos aún"
+      emptyHint="Crea entradas tipo Síntoma → Causas posibles → Solución."
+      newLabel="Nuevo diagnóstico"
+      loading={loading}
+      count={entries.length}
+      onNew={handleNew}
+      singular="diagnóstico"
+      plural="diagnósticos"
+    >
+      {entries.map(entry => (
+        <ItemCard
+          key={entry.id}
+          title={entry.symptom}
+          subtitle={entry.possibleCauses.slice(0, 2).join(' · ')}
+          meta={`${entry.possibleCauses.length} causa${entry.possibleCauses.length !== 1 ? 's' : ''} · Actualizado ${formatDate(entry.updatedAt)}`}
+          onEdit={() => setEditing(entry)}
+          onDelete={() => handleDelete(entry.id)}
+        />
+      ))}
+    </CollectionListView>
+  )
+}
+
+function DiagnosisForm({
+  initial,
+  onSave,
+  onCancel,
+}: {
+  initial: DiagnosisEntry
+  onSave: (e: DiagnosisEntry) => void | Promise<void>
+  onCancel: () => void
+}) {
+  const [entry, setEntry] = useState<DiagnosisEntry>(initial)
+  const [saving, setSaving] = useState(false)
+
+  function updateCause(index: number, value: string) {
+    setEntry(e => ({
+      ...e,
+      possibleCauses: e.possibleCauses.map((c, i) => (i === index ? value : c)),
+    }))
+  }
+
+  function addCause() {
+    setEntry(e => ({ ...e, possibleCauses: [...e.possibleCauses, ''] }))
+  }
+
+  function removeCause(index: number) {
+    setEntry(e => {
+      if (e.possibleCauses.length <= 1) return e
+      return { ...e, possibleCauses: e.possibleCauses.filter((_, i) => i !== index) }
+    })
+  }
+
+  const canSave =
+    entry.symptom.trim().length > 0 &&
+    entry.solution.trim().length > 0 &&
+    entry.possibleCauses.some(c => c.trim().length > 0)
+
+  async function handleSubmit() {
+    if (!canSave) return
+    setSaving(true)
+    try {
+      await onSave(entry)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <FormField label="Síntoma" required>
+        <textarea
+          value={entry.symptom}
+          onChange={e => setEntry({ ...entry, symptom: e.target.value })}
+          placeholder="Ej: La máquina vibra excesivamente al arrancar"
+          rows={2}
+          className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/40"
+        />
+      </FormField>
+
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Causas posibles <span className="text-destructive">*</span>
+          </label>
+          <button
+            onClick={addCause}
+            className="flex items-center gap-1 text-xs font-medium text-primary hover:bg-primary/10 px-2 py-1 rounded"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Añadir causa
+          </button>
+        </div>
+
+        <div className="space-y-2">
+          {entry.possibleCauses.map((cause, index) => (
+            <div key={index} className="flex items-start gap-2">
+              <span className="flex items-center justify-center w-6 h-6 mt-2 rounded-full bg-orange-500/15 text-orange-500 font-bold text-[11px]">
+                {index + 1}
+              </span>
+              <input
+                type="text"
+                value={cause}
+                onChange={e => updateCause(index, e.target.value)}
+                placeholder="Causa probable"
+                className="flex-1 px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+              />
+              <button
+                onClick={() => removeCause(index)}
+                disabled={entry.possibleCauses.length <= 1}
+                className="p-1.5 hover:bg-destructive/20 text-destructive rounded disabled:opacity-30"
+                title="Eliminar causa"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <FormField label="Solución" required>
+        <textarea
+          value={entry.solution}
+          onChange={e => setEntry({ ...entry, solution: e.target.value })}
+          placeholder="Procedimiento de corrección recomendado"
+          rows={4}
+          className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-sm resize-y focus:outline-none focus:ring-2 focus:ring-primary/40"
+        />
+      </FormField>
+
+      <FormActions saving={saving} canSave={canSave} onCancel={onCancel} onSave={handleSubmit} />
+    </div>
+  )
+}
+
+// ═════════════════════════════════════════════════════════════
+// SHARED UI PRIMITIVES
+// ═════════════════════════════════════════════════════════════
+
+function CollectionListView({
+  emptyIcon: EmptyIcon,
+  emptyTitle,
+  emptyHint,
+  newLabel,
+  loading,
+  count,
+  onNew,
+  singular,
+  plural,
+  children,
+}: {
+  emptyIcon: React.ElementType
+  emptyTitle: string
+  emptyHint: string
+  newLabel: string
+  loading: boolean
+  count: number
+  onNew: () => void
+  singular: string
+  plural: string
+  children: React.ReactNode
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-sm text-muted-foreground">
+          {count === 0 ? `Aún no hay ${plural}.` : `${count} ${count !== 1 ? plural : singular}`}
+        </p>
         <button
-          onClick={handleSubmit}
-          disabled={!canSave || saving}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+          onClick={onNew}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+          style={{ minHeight: '40px' }}
         >
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          Guardar procedimiento
+          <Plus className="h-4 w-4" />
+          {newLabel}
         </button>
       </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center py-12 text-muted-foreground">
+          <Loader2 className="h-5 w-5 animate-spin mr-2" />
+          Cargando...
+        </div>
+      ) : count === 0 ? (
+        <div className="p-8 text-center rounded-xl border border-dashed border-border bg-accent/10">
+          <EmptyIcon className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-50" />
+          <p className="text-sm font-medium mb-1">{emptyTitle}</p>
+          <p className="text-xs text-muted-foreground">{emptyHint}</p>
+        </div>
+      ) : (
+        <div className="space-y-3">{children}</div>
+      )}
+    </div>
+  )
+}
+
+function ItemCard({
+  title,
+  subtitle,
+  meta,
+  onEdit,
+  onDelete,
+}: {
+  title: string
+  subtitle?: string
+  meta?: string
+  onEdit: () => void
+  onDelete: () => void
+}) {
+  return (
+    <div className="p-4 rounded-xl border border-border bg-card hover:border-primary/30 transition-colors">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <h3 className="font-semibold text-sm">{title}</h3>
+          {subtitle && (
+            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{subtitle}</p>
+          )}
+          {meta && <p className="text-[11px] text-muted-foreground mt-1.5">{meta}</p>}
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={onEdit}
+            className="p-2 rounded hover:bg-accent transition-colors"
+            title="Editar"
+          >
+            <Edit3 className="h-4 w-4" />
+          </button>
+          <button
+            onClick={onDelete}
+            className="p-2 rounded hover:bg-destructive/20 text-destructive transition-colors"
+            title="Eliminar"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function FormField({
+  label,
+  required,
+  className,
+  children,
+}: {
+  label: string
+  required?: boolean
+  className?: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className={className}>
+      <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5 text-muted-foreground">
+        {label} {required && <span className="text-destructive">*</span>}
+      </label>
+      {children}
+    </div>
+  )
+}
+
+function FormActions({
+  saving,
+  canSave,
+  onCancel,
+  onSave,
+}: {
+  saving: boolean
+  canSave: boolean
+  onCancel: () => void
+  onSave: () => void
+}) {
+  return (
+    <div className="flex items-center justify-end gap-2 pt-4 border-t border-border">
+      <button
+        onClick={onCancel}
+        disabled={saving}
+        className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-sm hover:bg-accent transition-colors"
+      >
+        <X className="h-4 w-4" />
+        Cancelar
+      </button>
+      <button
+        onClick={onSave}
+        disabled={!canSave || saving}
+        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+      >
+        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+        Guardar
+      </button>
     </div>
   )
 }

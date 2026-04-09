@@ -18,7 +18,9 @@ import {
   setDoc,
   Timestamp,
 } from 'firebase/firestore'
-import { db } from './firebase'
+import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage'
+import { db, storage } from './firebase'
+import { compressImage } from './storage'
 
 // ─────────────────────────────────────────────────────────────
 // TIPOS
@@ -236,4 +238,39 @@ export async function getMachineContentCounts(
 /** Genera un ID unico basado en timestamp + random */
 export function generateContentId(prefix = ''): string {
   return `${prefix}${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+}
+
+// ─────────────────────────────────────────────────────────────
+// UPLOAD DE IMAGENES (Storage)
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Sube una imagen a Firebase Storage comprimida como WebP y devuelve la URL publica.
+ * Path: learningContent/{machineSlug}/{section}/{entityId}/{imageId}.webp
+ */
+export async function uploadLearningImage(
+  machineSlug: string,
+  section: LearningSectionKey,
+  entityId: string,
+  file: File
+): Promise<string> {
+  const compressed = await compressImage(file, 1600, 0.82, true)
+  const imageId = `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+  const ext = compressed.type.includes('webp') ? 'webp' : 'jpg'
+  const path = `learningContent/${machineSlug}/${section}/${entityId}/${imageId}.${ext}`
+  const storageRef = ref(storage, path)
+  await uploadBytes(storageRef, compressed, {
+    contentType: compressed.type || 'image/webp',
+  })
+  return getDownloadURL(storageRef)
+}
+
+/** Elimina una imagen previamente subida (ignora errores si ya no existe) */
+export async function deleteLearningImage(url: string): Promise<void> {
+  try {
+    const storageRef = ref(storage, url)
+    await deleteObject(storageRef)
+  } catch {
+    // Si la URL no es parseable o el objeto ya no existe, ignorar
+  }
 }

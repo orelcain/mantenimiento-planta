@@ -1,8 +1,14 @@
 {
-  "version": "2.72.1",
-  "buildDate": "2026-04-09",
-  "buildTimestamp": 1775723776248,
+  "version": "2.73.0",
+  "buildDate": "2026-04-09c",
+  "buildTimestamp": 1775770000000,
   "features": [
+    "Centro de Aprendizaje: editores admin completos para Manual, Flujos y Diagnóstico",
+    "Centro de Aprendizaje: upload de imágenes en pasos de procedimientos con Firebase Storage",
+    "Centro de Aprendizaje: vista pública renderiza Manual/Flujos/Diagnóstico desde Firestore",
+    "Centro de Aprendizaje: navegación cruzada entre máquinas (chips 'Otros módulos')",
+    "Centro de Aprendizaje: counts dinámicos de secciones en el hub (badges numéricos)",
+    "Centro de Aprendizaje: ícono BookOpen en lugar de GraduationCap",
     "Audit Log: registro inmutable de operaciones CRUD en colección audit_log",
     "Papelera: soft delete restaurable con 30 días de retención y clave de edición",
     "Fase 2 Repuestos: repuestos propios por nodo SAP (hierarchy/{nodeId}/repuestos)",

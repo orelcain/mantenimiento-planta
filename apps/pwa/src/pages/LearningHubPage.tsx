@@ -3,14 +3,18 @@
  * Hub principal con catalogo de maquinas + herramientas adicionales
  * Ruta: /aprendizaje (publica, sin autenticacion)
  */
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Cpu, GraduationCap, ArrowRight } from 'lucide-react'
+import { Cpu, BookOpen, ArrowRight } from 'lucide-react'
 import { useAuthStore } from '@/store'
 import {
-  countEnabledSections,
   groupMachinesByArea,
   type LearningMachine,
 } from '@/data/learningMachines'
+import {
+  getMachineContentCounts,
+  type MachineContentCounts,
+} from '@/services/learningContent'
 
 /** Modulos especiales (no son maquinas fisicas) */
 interface SpecialModule {
@@ -42,6 +46,34 @@ export function LearningHubPage() {
   const navigate = useNavigate()
   const { isAuthenticated } = useAuthStore()
   const machinesByArea = groupMachinesByArea()
+  const [countsMap, setCountsMap] = useState<Record<string, MachineContentCounts>>({})
+
+  // Carga counts reales desde Firestore (no bloquea renderizado — fallback a flags estaticas)
+  useEffect(() => {
+    let cancelled = false
+    const slugs = Object.values(machinesByArea).flat().map(m => m.slug)
+    Promise.all(
+      slugs.map(async slug => {
+        try {
+          const counts = await getMachineContentCounts(slug)
+          return [slug, counts] as const
+        } catch {
+          return null
+        }
+      })
+    ).then(results => {
+      if (cancelled) return
+      const map: Record<string, MachineContentCounts> = {}
+      for (const r of results) {
+        if (r) map[r[0]] = r[1]
+      }
+      setCountsMap(map)
+    })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Dentro de MainLayout (autenticado): usar min-h-full para no generar doble scroll
   // Publico (standalone): usar min-h-dvh para ocupar toda la pantalla
@@ -58,7 +90,7 @@ export function LearningHubPage() {
           className="flex items-center justify-center w-14 h-14 rounded-2xl"
           style={{ background: 'rgba(68,153,255,.14)', border: '1px solid rgba(68,153,255,.28)' }}
         >
-          <GraduationCap className="h-8 w-8 text-blue-400" />
+          <BookOpen className="h-8 w-8 text-blue-400" />
         </div>
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
@@ -82,6 +114,7 @@ export function LearningHubPage() {
                 <MachineCard
                   key={machine.slug}
                   machine={machine}
+                  counts={countsMap[machine.slug]}
                   onClick={() => {
                     const route = machine.customRoute || `/aprendizaje/maquina/${machine.slug}`
                     navigate(route)
@@ -167,13 +200,25 @@ export function LearningHubPage() {
 /** Card de maquina con indicadores de secciones disponibles */
 function MachineCard({
   machine,
+  counts,
   onClick,
 }: {
   machine: LearningMachine
+  counts?: MachineContentCounts
   onClick: () => void
 }) {
   const Icon = machine.icon
-  const enabledCount = countEnabledSections(machine)
+  // Si hay counts reales de Firestore, usar esos. Sino fallback a flags estaticas.
+  const hasCounts = counts !== undefined
+  const sectionFlags = hasCounts
+    ? {
+        manual: counts.manual > 0 || machine.sections.manual,
+        procedures: counts.procedures > 0,
+        flows: counts.flows > 0,
+        diagnosis: counts.diagnosis > 0,
+      }
+    : machine.sections
+  const enabledCount = Object.values(sectionFlags).filter(Boolean).length
   const hasContent = enabledCount > 0
 
   return (
@@ -215,10 +260,34 @@ function MachineCard({
 
         {/* Section indicators */}
         <div className="flex items-center gap-1.5 mt-3">
-          <SectionDot enabled={machine.sections.manual} color={machine.color} label="M" title="Manual" />
-          <SectionDot enabled={machine.sections.procedures} color={machine.color} label="P" title="Procedimientos" />
-          <SectionDot enabled={machine.sections.flows} color={machine.color} label="F" title="Flujos" />
-          <SectionDot enabled={machine.sections.diagnosis} color={machine.color} label="D" title="Diagnóstico" />
+          <SectionDot
+            enabled={sectionFlags.manual}
+            count={counts?.manual}
+            color={machine.color}
+            label="M"
+            title="Manual"
+          />
+          <SectionDot
+            enabled={sectionFlags.procedures}
+            count={counts?.procedures}
+            color={machine.color}
+            label="P"
+            title="Procedimientos"
+          />
+          <SectionDot
+            enabled={sectionFlags.flows}
+            count={counts?.flows}
+            color={machine.color}
+            label="F"
+            title="Flujos"
+          />
+          <SectionDot
+            enabled={sectionFlags.diagnosis}
+            count={counts?.diagnosis}
+            color={machine.color}
+            label="D"
+            title="Diagnóstico"
+          />
           <span className="flex-1" />
           <ArrowRight
             className="h-4 w-4 transition-transform group-hover:translate-x-0.5"
@@ -232,19 +301,22 @@ function MachineCard({
 
 function SectionDot({
   enabled,
+  count,
   color,
   label,
   title,
 }: {
   enabled: boolean
+  count?: number
   color: string
   label: string
   title: string
 }) {
+  const tooltip = count !== undefined && count > 0 ? `${title}: ${count}` : title
   return (
     <span
-      title={title}
-      className="flex items-center justify-center w-6 h-6 rounded text-[10px] font-bold"
+      title={tooltip}
+      className="relative flex items-center justify-center w-6 h-6 rounded text-[10px] font-bold"
       style={{
         background: enabled ? `${color}28` : 'rgba(255,255,255,0.02)',
         color: enabled ? color : '#3a4a5a',
@@ -252,6 +324,18 @@ function SectionDot({
       }}
     >
       {label}
+      {count !== undefined && count > 0 && (
+        <span
+          className="absolute -top-1 -right-1 min-w-[14px] h-[14px] px-[3px] rounded-full text-[9px] font-bold flex items-center justify-center"
+          style={{
+            background: color,
+            color: '#0a1628',
+            lineHeight: 1,
+          }}
+        >
+          {count > 9 ? '9+' : count}
+        </span>
+      )}
     </span>
   )
 }
