@@ -161,8 +161,8 @@ sidebarConfig  ← nuevo: orden personalizado del sidebar admin
 
 ## Pendientes priorizados
 
-### P1 — Requiere Firebase CLI (hacer en maquina local)
-- [ ] **Deploy Cloud Functions**: CORS restringido pendiente de deploy (`firebase deploy --only functions`)
+### P1 — Requiere acceso a Firebase Console / IAM
+- [ ] **Fix IAM Cloud Scheduler**: 2 scheduled functions (`checkClimaPortoAlert`, `purgeSensorReadings`) excluidas del deploy por falta de rol. Fix: Firebase Console → IAM → SA del CI → agregar `Cloud Scheduler Admin` (`roles/cloudscheduler.admin`). Luego revertir `.github/workflows/deploy-functions.yml` al `--only functions` original. Las 2 funciones siguen corriendo con código del 2026-03-22.
 - [ ] **App Check**: ReCaptchaV3 + enforceAppCheck en Cloud Functions
 
 ### P1.5 — Seguridad pendiente
