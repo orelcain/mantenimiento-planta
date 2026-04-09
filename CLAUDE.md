@@ -92,10 +92,12 @@ ett, inviteCodes, roles, mapLocations
 | Skill | Uso |
 |-------|-----|
 | `cerrar-sesion` | **USAR AL FINAL DE CADA SESION.** Actualiza CLAUDE.md, sugiere skills, crea memoria |
+| `deploy-produccion` | Deploy a GitHub Pages con bump de version |
 | `agregar-modulo-aprendizaje` | Agregar sub-modulo al Centro de Aprendizaje |
 | `floating-image-editor` | Componente de imagenes con crop, zoom, anotaciones SVG |
 | `auditar-seguridad` | **Auditoria de seguridad 18 puntos** (CORS, XSS, CSP, keys, storage, Firestore rules, deps, etc.) |
-| `deploy-produccion` | Procedimiento de deploy a produccion (GitHub Pages) |
+| `auditar-ux-modulo` | Revisar UX de un modulo y proponer mejoras |
+| `revisar-responsive` | Verificar responsive de una pagina en mobile/tablet/desktop |
 
 ## Mentalidad de mejora continua
 
@@ -119,44 +121,42 @@ ett, inviteCodes, roles, mapLocations
 
 ## Cambios recientes (sesion 2026-04-08)
 
-### Vulnerabilidades npm
-- 69→10 vulnerabilidades (2 criticas resueltas, 49 overrides en pnpm-workspace.yaml)
-- Overrides de ajv y pdfjs-dist removidos (rompian ESLint y tsc)
-- CI actualizado a pnpm 10.33.0, campo `packageManager` agregado
-- `manualChunks` convertido de objeto a funcion (compatibilidad Vite 8/rolldown)
+### Calendario Mantencion — UX mobile/landscape/desktop
+- **Landscape mobile**: control bar compacta, table-fixed 25/50/25%, swipe semanas, boton "Ir a hoy"
+- **Admin PIN gate**: requiere clave (`getHmiTooltipPwd()`) para activar modo edicion mobile
+- **Horas sem/mes**: lado a lado con header horizontal `h·sem | h·mes`
+- **4 colores horas**: verde=cumple, naranja=sobretiempo, amarillo=bajo, rojo=muy bajo
+- **Ley 40h Chile**: ya implementada (42h desde 26/04/2026, cambio automatico)
+- **shortName mejorado**: detecta formato "APELLIDO1 APELLIDO2, NOMBRE1 NOMBRE2" → "NOMBRE APELLIDO1 A."
+- **Placeholders tecnicos**: boton "Placeholders turno" agrega automaticamente los que faltan para 4/turno
+- **Header dark**: `bg-zinc-800` reemplaza `bg-primary` (celeste) en mobile + desktop
+- **Desktop turno rows**: filas coloreadas A=cyan B=amber C=violet, border-b separacion
+- **Vista D/T/N**: solo letra sin hora en landscape
+- **Vista HH:MM**: celdas con color de fondo por tipo turno
+- **ChatBot Aria**: oculto en landscape mobile (`.landscape-mobile-hidden`)
+- **Top header**: oculto en mobile (`hidden lg:flex`)
 
-### Auditoria de seguridad — 15/18 puntos resueltos
-- **CORS**: 3 Cloud Functions restringidas a `ALLOWED_ORIGINS` (pendiente deploy Firebase)
-- **Redirects**: Validacion anti-phishing en App.tsx y LoginPage.tsx
-- **console.log**: Eliminados del build con `esbuild.pure`
-- **Firestore rules**: 14 colecciones endurecidas con roles (`isTechnician/isSupervisor/isAdmin`)
-- **Rate limit**: 5 intentos / 2 min en login con `RateLimiter`
-- **CSP headers**: X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy
-- **XSS**: innerHTML sanitizado con `esc()` en exportETTPDF.ts y telemetryAuditExport.ts
-- **Upload validation**: contentType en storage.rules para graderUploads y models3d
-- **Password OTA**: Removido `'12345678'` hardcodeado, movido a env var
-- **API Keys**: Eliminado fallback directo a Groq/Gemini/DeepSeek, todo via Cloud Functions
-
-### Skills creadas
-- `/auditar-seguridad` — 18 puntos (nivel 1 + nivel 2), ejecuta en paralelo con agentes
+### Sesion 2026-04-07
+- Vulnerabilidades npm: 69→10, overrides en pnpm-workspace.yaml
+- Auditoria seguridad: 15/18 puntos (CORS, XSS, CSP, Firestore rules, rate limit, etc.)
+- Baader 200 movil/desktop, Centro de Aprendizaje, Sidebar agrupado
 
 ## Pendientes priorizados
 
 ### P0 — Proxima sesion
-- [ ] **Editor de sidebar admin**: drag & drop modulos entre categorias, persistir en Firestore. Ver `.claude/memory/session_sidebar_editor_pending.md`
+- [ ] **Deploy a produccion**: cambios calendario UX pendientes de deploy (`pnpm deploy --patch`)
+- [ ] **Probar calendario con 12-13 tecnicos**: agregar placeholders y verificar scroll/layout
+- [ ] **Editor de sidebar admin**: drag & drop modulos entre categorias, persistir en Firestore
 
 ### P1 — Corto plazo
-- [ ] **Deploy Cloud Functions**: CORS restringido pendiente de deploy. Ejecutar `firebase deploy --only functions` o arreglar secret `FIREBASE_SERVICE_ACCOUNT` en GitHub
-- [ ] **Modulo Seguridad en Planta**: activar placeholder en /aprendizaje, crear pagina con protocolos EPP, bloqueo/etiquetado
+- [ ] **Deploy Cloud Functions**: CORS restringido pendiente de deploy
+- [ ] **Modulo Seguridad en Planta**: activar placeholder en /aprendizaje, crear pagina con protocolos EPP
 - [ ] **Modulo Marel**: activar placeholder, crear guias de equipos Marel
-- [x] **Vulnerabilidades npm**: 69→10 (2 criticas resueltas, 51 overrides). Restantes son devDeps y xlsx sin fix
-- [x] **Deploy a produccion**: mergeado a main, GitHub Actions despliega automaticamente
-- [x] **Auditoria de seguridad**: 15/18 puntos resueltos (nivel 1 + nivel 2). Usar `/auditar-seguridad` para re-ejecutar
 
 ### P1.5 — Seguridad pendiente
-- [ ] **App Check**: Implementar ReCaptchaV3 + enforceAppCheck en Cloud Functions (necesita key de Firebase Console)
-- [ ] **SW SRI**: Self-host Firebase SDK en public/vendor/ en vez de CDN. Ejecutar desde PC: `curl -o apps/pwa/public/vendor/firebase-app-compat.js https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js`
-- [ ] **Input sanitization Firestore**: Agregar validacion de tipos a 25 rules sin validacion en firestore.rules
+- [ ] **App Check**: ReCaptchaV3 + enforceAppCheck en Cloud Functions
+- [ ] **SW SRI**: Self-host Firebase SDK en public/vendor/
+- [ ] **Input sanitization Firestore**: validacion de tipos en 25 rules
 
 ### P2 — Mejoras UX
 - [ ] **Modo alto contraste**: toggle en header para ambientes con luz intensa (planta)

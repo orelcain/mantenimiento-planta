@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Ocultar elementos en landscape móvil (celular horizontal) */
+@media (orientation: landscape) and (max-height: 500px) {
+  .landscape-mobile-hidden { display: none !important; }
+}
+
 @layer base {
   * {
     @apply border-border;

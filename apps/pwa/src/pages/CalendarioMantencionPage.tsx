@@ -1,9 +1,10 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+﻿import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import * as XLSX from 'xlsx'
 import { doc, getDoc, serverTimestamp } from 'firebase/firestore'
 import { db } from '../services/firebase'
 import { setDoc as trackedSetDoc } from '../services/firestoreTracked'
 import { getCurrentUser } from '../services/auth'
+import { getHmiTooltipPwd } from '../services/hmiKnuro'
 
 type DayCol = {
   c: number
@@ -56,6 +57,7 @@ const WEEKDAY_HEADER = new Set(['lunes', 'martes', 'miércoles', 'miercoles', 'j
 const META_COLS = ['TURNO', 'Área', 'CeCo', 'Cargo', 'DIRECCIÓN', 'RUT', 'Personal']
 const META_COL_WIDTHS = [56, 80, 100, 108, 98, 100, 220]
 const HIDEABLE_COLS = new Set([2, 3, 4, 5]) // CeCo, Cargo, DIRECCIÓN, RUT
+const MOBILE_ALWAYS_HIDDEN = new Set([1]) // Área - ocultar automáticamente en móvil
 const CALENDAR_FIRESTORE_PATH = ['calendario_mantencion_state', 'current'] as const
 
 type TabId = 'edicion' | 'plantillas' | 'horas' | 'tecnicos' | 'control'
@@ -299,12 +301,12 @@ function formatDelta(delta: number): string {
   return `${delta > 0 ? '+' : ''}${delta.toFixed(1)}`
 }
 
-function metaLeftFiltered(index: number, visibleIndices: number[]): number {
+function metaLeftFiltered(index: number, visibleIndices: number[], widths: number[] = META_COL_WIDTHS): number {
   let total = 0
   for (let i = 0; i < index; i++) {
     const colIndex = visibleIndices[i]
     if (colIndex === undefined) break
-    total += META_COL_WIDTHS[colIndex] ?? 90
+    total += widths[colIndex] ?? 90
   }
   return total
 }
@@ -398,6 +400,18 @@ export function CalendarioMantencionPage() {
   const [historyVersion, setHistoryVersion] = useState(0)
   const [calendarShortcutsActive, setCalendarShortcutsActive] = useState(false)
   const [todayTick, setTodayTick] = useState(() => Date.now())
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768 || (window.innerWidth < 1100 && window.innerHeight < 500))
+  const [isLandscape, setIsLandscape] = useState(() => window.innerHeight < 500 && (window.innerWidth < 768 || window.innerWidth < 1100))
+  const [mobileViewMode, setMobileViewMode] = useState<'badges' | 'times' | 'reduced'>('badges')
+  const [mobileEditMode, setMobileEditMode] = useState(false)
+  const [mobileEditCell, setMobileEditCell] = useState<{ techR: number; dayC: number } | null>(null)
+  const [mobileEditStart, setMobileEditStart] = useState('')
+  const [mobileEditEnd, setMobileEditEnd] = useState('')
+  const [mobileTappedCell, setMobileTappedCell] = useState<{ techR: number; dayC: number } | null>(null)
+  const [mobileAdminGateOpen, setMobileAdminGateOpen] = useState(false)
+  const [mobileAdminGateInput, setMobileAdminGateInput] = useState('')
+  const [mobileAdminGateError, setMobileAdminGateError] = useState('')
+  const touchStartX = useRef<number | null>(null)
 
   const shortcuts = useMemo(() => {
     const dia = `${shiftConfig.diaInicio} - ${shiftConfig.diaFin}`
@@ -478,6 +492,16 @@ export function CalendarioMantencionPage() {
     return groups
   }, [techRows])
   const baseGroupOptions = useMemo(() => Array.from(new Set([...techGroups, 'A', 'B', 'C'])), [techGroups])
+
+  useEffect(() => {
+    const handler = () => {
+      const mob = window.innerWidth < 768 || (window.innerWidth < 1100 && window.innerHeight < 500)
+      setIsMobile(mob)
+      setIsLandscape(mob && window.innerHeight < 500)
+    }
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
 
   useEffect(() => {
     if (!techGroups.includes(newTechGroup)) {
@@ -1286,8 +1310,17 @@ export function CalendarioMantencionPage() {
   }
 
   const visibleMetaIndices = useMemo(() => {
-    return META_COLS.map((_, i) => i).filter((i) => showAllCols || !HIDEABLE_COLS.has(i))
-  }, [showAllCols])
+    return META_COLS.map((_, i) => i).filter((i) => {
+      if (isMobile && MOBILE_ALWAYS_HIDDEN.has(i)) return false
+      return showAllCols || !HIDEABLE_COLS.has(i)
+    })
+  }, [showAllCols, isMobile])
+
+  const effectiveMetaWidths = useMemo(() => {
+    if (!isMobile) return META_COL_WIDTHS
+    // En móvil reducimos Personal (índice 6) a 140px para dejar espacio a las columnas de días
+    return META_COL_WIDTHS.map((w, i) => (i === 6 ? 140 : w))
+  }, [isMobile])
 
   const weekDays = dayCols.filter((d) => d.dateObj && isoWeekKey(d.dateObj) === selectedWeek)
   const monthDays = dayCols.filter((d) => d.dateObj && monthKey(d.dateObj) === selectedMonth)
@@ -1623,6 +1656,42 @@ export function CalendarioMantencionPage() {
     setStatus(`Técnico agregado: ${name} (Grupo ${newTech.turno}).`) 
   }
 
+  function handleAddPlaceholders() {
+    // Detectar cuántos faltan por turno para llegar a 4
+    const turnoCount: Record<string, number> = {}
+    techRows.forEach((t) => { turnoCount[t.turno.trim().toUpperCase()] = (turnoCount[t.turno.trim().toUpperCase()] || 0) + 1 })
+    const placeholders: { turno: string; name: string }[] = []
+    for (const turno of ['A', 'B', 'C']) {
+      const actual = turnoCount[turno] || 0
+      for (let i = actual + 1; i <= 4; i++) {
+        placeholders.push({ turno, name: `NUEVO ${turno}${i}, POR ASIGNAR` })
+      }
+    }
+    const libreLabel = shiftConfig.libreLabel || 'LIBRE'
+    const baseRow = (techRows.reduce((max, t) => Math.max(max, t.r), 2) || 2) + 1
+    const newTechs: TechRow[] = placeholders.map((p, i) => {
+      const shifts: Record<number, string> = {}
+      dayCols.forEach((d) => { shifts[d.c] = libreLabel })
+      return { r: baseRow + i, turno: p.turno, area: 'Mantención', ceco: '', cargo: 'TÉCNICO MANTENCIÓN', direccion: '', rut: '', name: p.name, shifts }
+    })
+    setTechRows((prev) => {
+      // No agregar si ya existen
+      const existing = new Set(prev.map((t) => t.name))
+      return [...prev, ...newTechs.filter((t) => !existing.has(t.name))]
+    })
+    newTechs.forEach((tech) => {
+      setCellValue(tech.r, 0, tech.turno)
+      setCellValue(tech.r, 1, tech.area)
+      setCellValue(tech.r, 6, tech.name)
+      dayCols.forEach((d) => setCellValue(tech.r, d.c, libreLabel))
+    })
+    if (placeholders.length === 0) {
+      setStatus('Ya hay 4 técnicos por turno, no se agregaron placeholders.')
+      return
+    }
+    setStatus(`${placeholders.length} placeholder(s) agregados: ${placeholders.map(p => p.name.split(',')[0]).join(', ')}.`)
+  }
+
   function handleUpdateTechnicianField(row: number, field: 'turno' | 'area', value: string) {
     const normalizedValue = field === 'turno' ? value.trim().toUpperCase() : value.trim()
     const current = techRows.find((tech) => tech.r === row)
@@ -1647,13 +1716,100 @@ export function CalendarioMantencionPage() {
     const dayIndex = dayCols.findIndex((d) => d.c === todayCol.c)
     if (dayIndex < 0) return
 
-    const metaWidth = visibleMetaIndices.reduce((sum, gi) => sum + (META_COL_WIDTHS[gi] || 90), 0)
+    const metaWidth = visibleMetaIndices.reduce((sum, gi) => sum + (effectiveMetaWidths[gi] || 90), 0)
     const colStart = metaWidth + (dayIndex * DAY_COL_WIDTH)
     const targetLeft = Math.max(0, colStart - ((container.clientWidth - DAY_COL_WIDTH) / 2))
 
     container.scrollTo({ left: targetLeft, behavior: 'smooth' })
     setSelectedCol(todayCol.c)
     setStatus(`Vista centrada en hoy: ${todayCol.dayLabel} ${formatDate(todayCol.dateObj)}`)
+  }
+
+  // ── Helpers vista móvil ──
+  function shiftToMobileBadge(shift: string | undefined): { letter: string; cls: string } {
+    if (!shift || shift.trim() === '' || shift.trim() === '0') return { letter: '–', cls: 'text-zinc-700' }
+    const s = shift.trim().toUpperCase()
+    if (s === 'VACACIONES') return { letter: 'V', cls: 'bg-sky-500/25 text-sky-300' }
+    if (s === 'FERIADO')    return { letter: 'F', cls: 'bg-amber-500/20 text-amber-300' }
+    if (s.includes('LIBRE')) return { letter: 'L', cls: 'bg-zinc-700/60 text-zinc-400' }
+    // Detectar por hora de inicio (robusto ante turnos reducidos y variantes)
+    const startTime = shift.match(/^(\d{1,2}:\d{2})/)?.[1]
+    if (startTime) {
+      if (startTime === shiftConfig.nocheInicio) return { letter: 'N', cls: 'bg-violet-500/25 text-violet-300' }
+      if (startTime === shiftConfig.tardeInicio) return { letter: 'T', cls: 'bg-amber-500/25 text-amber-200' }
+      if (startTime === shiftConfig.diaInicio)   return { letter: 'D', cls: 'bg-blue-500/25 text-blue-300' }
+    }
+    return { letter: '·', cls: 'text-zinc-700' }
+  }
+
+  function isReducedShift(shift: string | undefined): boolean {
+    if (!shift || !shift.match(/\d{1,2}:\d{2}/)) return false
+    const norm = (t: string) => t.trim().replace(/\s+/g, ' ')
+    const n = norm(shift)
+    if (n === norm(shortcuts.dia) || n === norm(shortcuts.tarde) || n === norm(shortcuts.noche)) return false
+    const startTime = shift.match(/^(\d{1,2}:\d{2})/)?.[1]
+    return startTime === shiftConfig.diaInicio || startTime === shiftConfig.tardeInicio || startTime === shiftConfig.nocheInicio
+  }
+
+  function shiftTimeCompact(shift: string | undefined): { start: string; end: string } | null {
+    if (!shift) return null
+    const m = shift.match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/)
+    if (!m || !m[1] || !m[2]) return null
+    return { start: m[1], end: m[2] }
+  }
+
+  function openMobileEdit(tech: TechRow, d: DayCol) {
+    const shift = tech.shifts[d.c] || ''
+    const times = shiftTimeCompact(shift)
+    setMobileEditCell({ techR: tech.r, dayC: d.c })
+    setMobileEditStart(times?.start || shiftConfig.diaInicio)
+    setMobileEditEnd(times?.end || shiftConfig.diaFin)
+  }
+
+  function saveMobileEdit() {
+    if (!mobileEditCell || !mobileEditStart || !mobileEditEnd) return
+    applyShift(mobileEditCell.techR, mobileEditCell.dayC, `${mobileEditStart} - ${mobileEditEnd}`)
+    setMobileEditCell(null)
+  }
+
+  function shortName(name: string): string {
+    // Formato Excel: "APELLIDO1 APELLIDO2, NOMBRE1 NOMBRE2"
+    if (name.includes(',')) {
+      const [apellidos, nombres] = name.split(',').map((s) => s.trim())
+      const aps = (apellidos ?? '').split(/\s+/).filter(Boolean)
+      const nms = (nombres ?? '').split(/\s+/).filter(Boolean)
+      const primerNombre = nms[0] ?? ''
+      const ap1 = aps[0] ?? ''
+      const ap2Ini = aps[1] ? ` ${aps[1][0]}.` : ''
+      return `${primerNombre} ${ap1}${ap2Ini}`
+    }
+    // Sin coma: mostrar primeras 2-3 palabras
+    const parts = name.trim().split(/\s+/).filter(Boolean)
+    if (parts.length <= 2) return name.trim()
+    return `${parts[0]} ${parts[1]} ${parts[2]![0]}.`
+  }
+
+  function shortWeekday(date: Date | null): string {
+    if (!date) return ''
+    return (['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá'] as const)[date.getDay()] ?? ''
+  }
+
+  const weekKeys = useMemo(() => Object.keys(weeks).sort(), [weeks])
+  const currentWeekIdx = useMemo(() => weekKeys.indexOf(selectedWeek), [weekKeys, selectedWeek])
+  const prevWeekKey = weekKeys[currentWeekIdx - 1] ?? null
+  const nextWeekKey = weekKeys[currentWeekIdx + 1] ?? null
+  const todayWeekKey = useMemo(() => isoWeekKey(new Date(todayTick)), [todayTick])
+  const isCurrentWeek = selectedWeek === todayWeekKey
+
+  const mobileWeekLabel = useMemo(() => {
+    const parts = selectedWeek.split('-W')
+    return parts.length === 2 ? `Sem ${parts[1]} · ${parts[0]}` : (selectedWeek || 'Semana actual')
+  }, [selectedWeek])
+
+  function handleSwipe(deltaX: number) {
+    // deltaX = startX - endX: positivo = dedo movió izquierda = ir a semana siguiente
+    if (deltaX > 50 && nextWeekKey) setSelectedWeek(nextWeekKey)
+    else if (deltaX < -50 && prevWeekKey) setSelectedWeek(prevWeekKey)
   }
 
   const TAB_ITEMS: { id: TabId; label: string }[] = [
@@ -1666,7 +1822,469 @@ export function CalendarioMantencionPage() {
 
   return (
     <div className="h-full min-h-0 flex flex-col gap-2">
-      <section className="sticky top-0 z-20 rounded-lg border bg-card p-2">
+
+      {/* ══════════════════════════════════════════
+          VISTA MÓVIL — lectura de turnos por semana
+          ══════════════════════════════════════════ */}
+      {isMobile && (
+        <div className="h-full min-h-0 flex flex-col gap-1">
+
+          {isLandscape ? (
+            /* ── LANDSCAPE: una sola fila compacta ── */
+            <div className="flex items-center gap-1 rounded-lg border bg-card px-1.5 py-0.5 shrink-0">
+              <button onClick={() => prevWeekKey && setSelectedWeek(prevWeekKey)} disabled={!prevWeekKey}
+                className="h-6 w-6 shrink-0 flex items-center justify-center rounded border border-border text-sm text-muted-foreground disabled:opacity-30 active:bg-muted select-none">‹</button>
+              <div className="text-center min-w-0 flex-1">
+                <span className="text-[10px] font-semibold text-foreground">{mobileWeekLabel}</span>
+                {isCurrentWeek
+                  ? <span className="ml-1 text-[8px] text-yellow-400">● hoy</span>
+                  : weekKeys.includes(todayWeekKey) && (
+                    <button onClick={() => setSelectedWeek(todayWeekKey)}
+                      className="ml-1.5 h-5 px-1.5 text-[9px] font-medium text-yellow-300 border border-yellow-500/50 rounded bg-yellow-500/15 active:bg-yellow-500/25 select-none">↩ Ir a hoy</button>
+                  )
+                }
+              </div>
+              <button onClick={() => nextWeekKey && setSelectedWeek(nextWeekKey)} disabled={!nextWeekKey}
+                className="h-6 w-6 shrink-0 flex items-center justify-center rounded border border-border text-sm text-muted-foreground disabled:opacity-30 active:bg-muted select-none">›</button>
+              <div className="w-px h-4 bg-border/50 mx-0.5 shrink-0" />
+              {([
+                { id: 'badges',  label: 'D/T/N' },
+                { id: 'times',   label: 'HH:MM' },
+                { id: 'reduced', label: '↓R' },
+              ] as const).map(v => (
+                <button key={v.id} onClick={() => { setMobileViewMode(v.id); setMobileTappedCell(null) }}
+                  className={`h-6 px-2 rounded border text-[10px] font-medium transition-colors select-none ${mobileViewMode === v.id ? 'bg-primary border-primary text-primary-foreground' : 'border-border text-muted-foreground active:bg-muted'}`}>
+                  {v.label}</button>
+              ))}
+              <button
+                onClick={() => { if (mobileEditMode) { setMobileEditMode(false); setMobileEditCell(null); setMobileTappedCell(null) } else { setMobileAdminGateInput(''); setMobileAdminGateError(''); setMobileAdminGateOpen(true) } }}
+                className={`h-6 px-2 rounded border text-[10px] font-medium transition-colors select-none ${mobileEditMode ? 'bg-emerald-600 border-emerald-500 text-white' : 'border-border text-muted-foreground active:bg-muted'}`}>✏</button>
+              <span title={syncIndicator.label} className={`w-1.5 h-1.5 rounded-full shrink-0 ml-0.5 ${syncState === 'saving' ? 'bg-amber-400' : syncState === 'synced' ? 'bg-emerald-400' : syncState === 'error' ? 'bg-red-400' : 'bg-zinc-600'}`} />
+            </div>
+          ) : (
+            /* ── PORTRAIT: dos filas ── */
+            <>
+              <div className="flex items-center gap-1.5 rounded-lg border bg-card px-2 py-1 shrink-0">
+                <button onClick={() => prevWeekKey && setSelectedWeek(prevWeekKey)} disabled={!prevWeekKey}
+                  className="h-7 w-7 shrink-0 flex items-center justify-center rounded border border-border text-base text-muted-foreground disabled:opacity-30 active:bg-muted select-none">‹</button>
+                <div className="flex-1 text-center min-w-0">
+                  <div className="text-[11px] font-semibold text-foreground truncate leading-tight">
+                    {mobileWeekLabel}
+                    {isCurrentWeek && <span className="ml-1 text-[9px] text-yellow-400 font-normal">● hoy</span>}
+                  </div>
+                  <div className="text-[9px] text-muted-foreground/70 leading-tight">
+                    {weekDays[0] ? formatDate(weekDays[0].dateObj) : '—'}–{weekDays[weekDays.length - 1] ? formatDate(weekDays[weekDays.length - 1].dateObj) : '—'}
+                  </div>
+                </div>
+                {!isCurrentWeek && weekKeys.includes(todayWeekKey) && (
+                  <button onClick={() => setSelectedWeek(todayWeekKey)}
+                    className="shrink-0 h-6 px-1.5 rounded border border-yellow-500/50 bg-yellow-500/15 text-[9px] font-medium text-yellow-300 active:bg-yellow-500/25 select-none">↩ Hoy</button>
+                )}
+                <span title={syncIndicator.label} className={`w-2 h-2 rounded-full shrink-0 ${syncState === 'saving' ? 'bg-amber-400' : syncState === 'synced' ? 'bg-emerald-400' : syncState === 'error' ? 'bg-red-400' : 'bg-zinc-600'}`} />
+                <button onClick={() => nextWeekKey && setSelectedWeek(nextWeekKey)} disabled={!nextWeekKey}
+                  className="h-7 w-7 shrink-0 flex items-center justify-center rounded border border-border text-base text-muted-foreground disabled:opacity-30 active:bg-muted select-none">›</button>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                {([
+                  { id: 'badges',  label: 'D/T/N',   title: 'Vista de letras — tap para ver hora' },
+                  { id: 'times',   label: 'HH:MM',   title: 'Muestra el horario de cada turno' },
+                  { id: 'reduced', label: '↓Reducc', title: 'Destaca solo los turnos con reducción horaria' },
+                ] as const).map(v => (
+                  <button key={v.id} title={v.title} onClick={() => { setMobileViewMode(v.id); setMobileTappedCell(null) }}
+                    className={`flex-1 h-6 rounded border text-[11px] font-medium transition-colors select-none ${mobileViewMode === v.id ? 'bg-primary border-primary text-primary-foreground' : 'border-border text-muted-foreground hover:text-foreground active:bg-muted'}`}>
+                    {v.label}</button>
+                ))}
+                <button
+                  onClick={() => { if (mobileEditMode) { setMobileEditMode(false); setMobileEditCell(null); setMobileTappedCell(null) } else { setMobileAdminGateInput(''); setMobileAdminGateError(''); setMobileAdminGateOpen(true) } }}
+                  className={`h-6 px-2.5 rounded border text-[11px] font-medium transition-colors select-none ${mobileEditMode ? 'bg-emerald-600 border-emerald-500 text-white' : 'border-border text-muted-foreground hover:text-foreground active:bg-muted'}`}>✏</button>
+              </div>
+            </>
+          )}
+
+          {/* Grilla semanal */}
+          <div
+            className="flex-1 min-h-0 overflow-auto rounded-lg border bg-card"
+            onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX }}
+            onTouchEnd={(e) => {
+              if (touchStartX.current === null) return
+              handleSwipe(touchStartX.current - e.changedTouches[0].clientX)
+              touchStartX.current = null
+            }}
+          >
+            {weekDays.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full gap-2 text-xs text-muted-foreground p-6 text-center">
+                <span className="text-2xl">📅</span>
+                <span>No hay datos cargados.<br/>Usa <strong>"Editar"</strong> para cargar el calendario.</span>
+              </div>
+            ) : (
+              <table className={`border-collapse text-[11px] ${isLandscape ? 'w-full table-fixed' : 'min-w-max'}`}>
+                <thead>
+                  <tr className="bg-zinc-800/90 text-zinc-200 border-b border-zinc-600/50">
+                    <th className="sticky left-0 z-10 bg-zinc-800 px-1.5 py-1.5 text-left font-semibold"
+                      style={isLandscape ? { width: '25%' } : { width: 110, minWidth: 110, maxWidth: 110 }}>
+                      {mobileEditMode ? <span className="text-emerald-300 text-[10px]">✏ Toca un día</span> : <span className="text-zinc-400 text-[10px] uppercase tracking-wide">Técnico</span>}
+                    </th>
+                    {weekDays.map((d) => {
+                      const isT = isSameDate(d.dateObj, todayDayCol?.dateObj ?? null)
+                      return (
+                        <th key={d.c} className={`px-1 py-1 text-center ${isT ? 'bg-yellow-500/20 text-yellow-300' : ''}`}
+                          style={isLandscape ? undefined : { minWidth: 46 }}>
+                          <div className="text-[9px] font-normal text-zinc-500">{shortWeekday(d.dateObj)}</div>
+                          <div className="font-bold leading-tight text-zinc-200">{d.dateObj?.getDate()}</div>
+                        </th>
+                      )
+                    })}
+                    <th className="sticky right-0 z-10 bg-zinc-800 px-1 py-1.5 border-l border-zinc-600/30"
+                      style={isLandscape ? { width: '25%' } : { width: 50, minWidth: 50 }}
+                      title="Horas trabajadas esta semana · este mes">
+                      {isLandscape ? (
+                        <div className="flex items-center justify-around text-[8px] font-normal opacity-90 px-1 gap-0.5">
+                          <span className="whitespace-nowrap">h·sem</span>
+                          <span className="opacity-40">|</span>
+                          <span className="whitespace-nowrap opacity-70">h·mes</span>
+                        </div>
+                      ) : (
+                        <div className="text-[9px] font-normal opacity-90 text-right pr-0.5 leading-tight">
+                          <div>h.sem</div>
+                          <div className="opacity-70">h.mes</div>
+                        </div>
+                      )}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {techRows.map((tech, idx) => {
+                    const turnoKey = tech.turno.trim().toUpperCase()
+                    const rowBg = turnoKey === 'A' ? 'bg-cyan-500/5' : turnoKey === 'B' ? 'bg-amber-500/5' : turnoKey === 'C' ? 'bg-violet-500/5' : idx % 2 === 1 ? 'bg-zinc-900/30' : ''
+                    const stickyBg = turnoKey === 'A' ? 'bg-cyan-950/60' : turnoKey === 'B' ? 'bg-amber-950/60' : turnoKey === 'C' ? 'bg-violet-950/60' : 'bg-card'
+                    const cellPy = isLandscape ? 'py-0' : 'py-1.5'
+                    return (
+                    <tr key={tech.r} className={`border-b border-border/40 ${rowBg}`}>
+                      <td className={`sticky left-0 z-[5] ${stickyBg} border-r border-border/30 px-1.5 ${cellPy}`}
+                        style={isLandscape ? { width: '25%' } : { width: 110, minWidth: 110, maxWidth: 110 }}>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`shrink-0 inline-flex h-5 w-5 items-center justify-center rounded border text-[9px] font-bold ${turnoBadgeClass(tech.turno)}`}>
+                            {tech.turno || '·'}
+                          </span>
+                          <span className="truncate font-medium text-foreground">{shortName(tech.name)}</span>
+                        </div>
+                      </td>
+                      {weekDays.map((d) => {
+                        const shift = tech.shifts[d.c]
+                        const badge = shiftToMobileBadge(shift)
+                        const times = shiftTimeCompact(shift)
+                        const isT = isSameDate(d.dateObj, todayDayCol?.dateObj ?? null)
+                        const isTapped = mobileTappedCell?.techR === tech.r && mobileTappedCell?.dayC === d.c
+                        const isEditing = mobileEditCell?.techR === tech.r && mobileEditCell?.dayC === d.c
+                        const isReduced = isReducedShift(shift)
+
+                        // Ancho de celda: landscape = 100%, portrait = fijo
+                        const cellW = isLandscape ? 'w-full' : 'w-10'
+                        const cellH = isLandscape ? 'h-6' : 'h-8'
+
+                        // Contenido de la celda según la vista activa
+                        let cellContent: ReactNode
+                        if (mobileEditMode) {
+                          cellContent = (
+                            <button
+                              onClick={() => openMobileEdit(tech, d)}
+                              className={`inline-flex flex-col items-center justify-center ${cellW} ${cellH} rounded border text-[10px] font-bold transition-colors ${
+                                isEditing
+                                  ? 'border-emerald-400 bg-emerald-500/20 text-emerald-300'
+                                  : 'border-dashed border-border/60 hover:border-primary/60 active:bg-muted'
+                              } ${badge.cls}`}
+                            >
+                              {times ? (
+                                <>
+                                  <span className="text-[8px] leading-none">{times.start}</span>
+                                  <span className="text-[8px] leading-none opacity-60">{times.end}</span>
+                                </>
+                              ) : badge.letter}
+                            </button>
+                          )
+                        } else if (mobileViewMode === 'badges') {
+                          if (isLandscape) {
+                            // Landscape D/T/N: solo letra, sin hora
+                            cellContent = (
+                              <span className={`inline-flex items-center justify-center ${cellW} ${cellH} rounded font-bold ${badge.cls}`}>
+                                <span className="text-[12px] leading-none">{badge.letter}</span>
+                              </span>
+                            )
+                          } else if (isTapped && times) {
+                            // Portrait tapped: muestra hora
+                            cellContent = (
+                              <button
+                                onClick={() => setMobileTappedCell(null)}
+                                className={`inline-flex flex-col items-center justify-center ${cellW} ${cellH} rounded bg-zinc-800 text-foreground`}
+                              >
+                                <span className="text-[8px] leading-none">{times.start}</span>
+                                <span className="text-[8px] leading-none opacity-70">{times.end}</span>
+                              </button>
+                            )
+                          } else {
+                            // Portrait normal: solo letra, tap para ver hora
+                            cellContent = (
+                              <button
+                                onClick={() => times && setMobileTappedCell({ techR: tech.r, dayC: d.c })}
+                                className={`inline-flex items-center justify-center ${cellW} ${cellH} rounded font-bold ${badge.cls} ${times ? 'active:opacity-70' : ''}`}
+                              >
+                                {badge.letter}
+                              </button>
+                            )
+                          }
+                        } else if (mobileViewMode === 'times') {
+                          // Vista HH:MM — horarios con color de turno
+                          cellContent = times ? (
+                            <span className={`inline-flex flex-col items-center justify-center ${cellW} ${cellH} rounded ${badge.cls}`}>
+                              <span className="text-[9px] font-bold leading-tight">{times.start}</span>
+                              <span className="text-[9px] leading-tight opacity-70">{times.end}</span>
+                            </span>
+                          ) : (
+                            <span className={`inline-flex items-center justify-center ${cellW} ${cellH} rounded font-bold ${badge.cls}`}>{badge.letter}</span>
+                          )
+                        } else {
+                          // Vista C — reducidos destacados, normales como letra
+                          cellContent = isReduced && times ? (
+                            <span className={`inline-flex flex-col items-center justify-center ${cellW} ${cellH} rounded bg-orange-500/10 border border-orange-500/30`}>
+                              <span className="text-[9px] font-semibold text-orange-300 leading-tight">{times.start}</span>
+                              <span className="text-[9px] text-orange-400/70 leading-tight">{times.end}</span>
+                            </span>
+                          ) : (
+                            <span className={`inline-flex items-center justify-center ${cellW} ${cellH} rounded font-bold ${badge.cls}`}>{badge.letter}</span>
+                          )
+                        }
+
+                        return (
+                          <td key={d.c} className={`${isLandscape ? 'px-1' : 'px-0.5'} ${cellPy} text-center ${isT ? 'bg-yellow-400/8' : ''}`}>
+                            {cellContent}
+                          </td>
+                        )
+                      })}
+                      {/* Columna de horas sticky derecha */}
+                      {(() => {
+                        const hr = hoursRows[idx]
+                        const tol = Math.max(hoursConfig.toleranceHours || 0.5, 0.5)
+                        const wDelta = hr.deltaWeek
+                        const mDelta = hr.deltaMonth
+                        // 4 zonas: sobretiempo | en rango | bajo | muy bajo
+                        const wCls = wDelta > tol * 4 ? 'text-orange-400'   // Sobretiempo (>2h sobre)
+                                   : wDelta >= -tol ? 'text-emerald-400'    // En rango (cumple ±tol)
+                                   : wDelta >= -tol * 6 ? 'text-amber-400'  // Bajo (hasta -3h)
+                                   : 'text-red-400'                         // Muy bajo (>-3h)
+                        const mCls = mDelta > tol * 16 ? 'text-orange-400'  // Sobretiempo mensual
+                                   : mDelta >= -tol * 4 ? 'text-emerald-400' // En rango
+                                   : mDelta >= -tol * 24 ? 'text-amber-400'  // Bajo
+                                   : 'text-red-400'                          // Muy bajo
+                        const wSign = wDelta >= 0 ? '+' : ''
+                        const mSign = mDelta >= 0 ? '+' : ''
+                        return (
+                          <td className={`sticky right-0 z-[5] border-l border-border/30 px-1 ${cellPy} ${stickyBg}`}
+                            style={isLandscape ? { width: '25%' } : { width: 50, minWidth: 50 }}>
+                            {isLandscape ? (
+                              /* Landscape: sem | mes lado a lado */
+                              <div className="flex items-center justify-around px-1 h-full gap-1">
+                                <div className="flex flex-col items-center">
+                                  <span className={`text-[12px] font-bold leading-none ${wCls}`}>{hr.weekHours.toFixed(0)}</span>
+                                  <span className="text-[7px] text-muted-foreground/40 leading-tight">h·sem</span>
+                                </div>
+                                <div className="w-px self-stretch bg-border/30 my-1" />
+                                <div className="flex flex-col items-center">
+                                  <span className={`text-[12px] font-bold leading-none ${mCls}`}>{hr.monthHours.toFixed(0)}</span>
+                                  <span className="text-[7px] text-muted-foreground/40 leading-tight">h·mes</span>
+                                </div>
+                              </div>
+                            ) : (
+                              /* Portrait: icono + número compacto */
+                              <div className="flex flex-col items-end pr-0.5 leading-none gap-0.5">
+                                <div className="flex items-center gap-0.5">
+                                  <span className={`text-[8px] ${wCls}`}>{wDelta > tol * 4 ? '⚡' : wDelta >= -tol ? '✓' : wDelta >= -tol * 6 ? '⚠' : '✗'}</span>
+                                  <span className={`text-[10px] font-bold ${wCls}`}>{hr.weekHours.toFixed(0)}</span>
+                                  <span className="text-[8px] text-muted-foreground/50">h·s</span>
+                                </div>
+                                <div className="flex items-center gap-0.5">
+                                  <span className={`text-[8px] ${mCls}`}>{mDelta > tol * 16 ? '⚡' : mDelta >= -tol * 4 ? '✓' : mDelta >= -tol * 24 ? '⚠' : '✗'}</span>
+                                  <span className={`text-[10px] font-bold ${mCls}`}>{hr.monthHours.toFixed(0)}</span>
+                                  <span className="text-[8px] text-muted-foreground/50">h·m</span>
+                                </div>
+                              </div>
+                            )}
+                          </td>
+                        )
+                      })()}
+                    </tr>
+                    )
+                  })}
+                  {/* Fila resumen: personal trabajando por día */}
+                  <tr className="border-t border-border/40 bg-zinc-900/60">
+                    <td className="sticky left-0 z-[5] bg-zinc-900 border-r border-border/30 px-1.5 py-1" style={{ minWidth: 110, maxWidth: 110 }}>
+                      <span className="text-[9px] text-muted-foreground font-medium">Trabajando</span>
+                    </td>
+                    {weekDays.map((d) => {
+                      const isT = isSameDate(d.dateObj, todayDayCol?.dateObj ?? null)
+                      const count = techRows.filter(t => isWorkingShift(t.shifts[d.c] || '')).length
+                      const libre = techRows.filter(t => !isWorkingShift(t.shifts[d.c] || '') && !isVacationShift(t.shifts[d.c] || '') && !isHolidayShift(t.shifts[d.c] || '')).length
+                      const pct = techRows.length > 0 ? count / techRows.length : 0
+                      const countCls = pct >= 0.8 ? 'text-emerald-400' : pct >= 0.5 ? 'text-amber-400' : 'text-red-400'
+                      return (
+                        <td key={d.c} className={`${isLandscape ? 'px-1' : 'px-0.5'} py-1 text-center ${isT ? 'bg-yellow-400/8' : ''}`}>
+                          <span className={`text-[10px] font-bold ${countCls}`}>{count}</span>
+                          {isLandscape && libre > 0 && <span className="text-[8px] text-zinc-500 ml-0.5">/{libre}L</span>}
+                        </td>
+                      )
+                    })}
+                    <td className="sticky right-0 z-[5] bg-zinc-900 border-l border-border/30 px-1 py-1 text-center"
+                      style={isLandscape ? { width: '25%' } : { width: 50, minWidth: 50 }}>
+                      <span className="text-[9px] text-muted-foreground/50">/{techRows.length}</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          {/* Leyenda (solo en vista badges) + collapse editar — oculto en landscape */}
+          <div className={`shrink-0 space-y-1.5 ${isLandscape ? 'hidden' : ''}`}>
+            {mobileViewMode === 'badges' && !mobileEditMode && (
+              <div className="flex items-center gap-2 px-1 flex-wrap">
+                {([
+                  { letter: 'D', cls: 'bg-blue-500/25 text-blue-300', label: 'Día' },
+                  { letter: 'T', cls: 'bg-amber-500/25 text-amber-200', label: 'Tarde' },
+                  { letter: 'N', cls: 'bg-violet-500/25 text-violet-300', label: 'Noche' },
+                  { letter: 'L', cls: 'bg-zinc-700/60 text-zinc-400', label: 'Libre' },
+                  { letter: 'V', cls: 'bg-sky-500/25 text-sky-300', label: 'Vac.' },
+                ] as const).map(({ letter, cls, label }) => (
+                  <div key={letter} className="flex items-center gap-1">
+                    <span className={`inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold ${cls}`}>{letter}</span>
+                    <span className="text-[10px] text-muted-foreground">{label}</span>
+                  </div>
+                ))}
+                <span className="text-[10px] text-zinc-600 ml-1">· Tap celda = ver hora</span>
+              </div>
+            )}
+            {mobileViewMode === 'reduced' && !mobileEditMode && (
+              <div className="flex items-center gap-2 px-1">
+                <span className="inline-flex items-center justify-center h-5 px-1.5 rounded border border-orange-500/30 bg-orange-500/10 text-[9px] text-orange-300">08:00 / 15:00</span>
+                <span className="text-[10px] text-muted-foreground">= turno con reducción horaria</span>
+              </div>
+            )}
+            {mobileEditMode && (
+              <div className="flex items-center gap-2 px-1">
+                <span className="text-[10px] text-emerald-400">✏ Modo edición activo — toca cualquier día para ajustar su horario</span>
+              </div>
+            )}
+
+            <details className="rounded-lg border bg-card group">
+              <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground select-none">
+                <span>⚙ Editar calendario</span>
+                <span className="text-sm leading-none transition-transform group-open:rotate-180">⌄</span>
+              </summary>
+              <div className="border-t border-border p-2 space-y-2">
+                <div className="text-[11px] text-muted-foreground">Para configurar horarios base, técnicos o exportar Excel, accede desde escritorio o tablet.</div>
+                <div className={`rounded border px-2 py-1 text-[11px] ${syncIndicator.className}`}>{syncIndicator.label}</div>
+                <div className="text-[10px] text-zinc-500">{originalFilename}</div>
+              </div>
+            </details>
+          </div>
+
+          {/* Panel de edición de celda (bottom sheet) */}
+          {mobileEditMode && mobileEditCell && (
+            <div className="fixed bottom-10 left-0 right-0 z-50 bg-card border-t border-primary/40 shadow-2xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="text-xs font-semibold text-foreground">
+                  {techRows.find(t => t.r === mobileEditCell.techR)?.name?.split(/[\s,]+/)[0] ?? ''}
+                  {' · '}
+                  {weekDays.find(d => d.c === mobileEditCell.dayC)?.dayLabel ?? ''}
+                </div>
+                <button onClick={() => setMobileEditCell(null)} className="text-muted-foreground text-sm px-2">✕</button>
+              </div>
+              <div className="flex gap-3">
+                <div className="flex-1 space-y-1">
+                  <label className="text-[10px] text-muted-foreground">Hora inicio</label>
+                  <input
+                    type="time"
+                    className="w-full h-10 rounded border border-border bg-background px-2 text-sm text-foreground [color-scheme:dark]"
+                    value={mobileEditStart}
+                    onChange={(e) => setMobileEditStart(e.target.value)}
+                  />
+                </div>
+                <div className="flex-1 space-y-1">
+                  <label className="text-[10px] text-muted-foreground">Hora fin</label>
+                  <input
+                    type="time"
+                    className="w-full h-10 rounded border border-border bg-background px-2 text-sm text-foreground [color-scheme:dark]"
+                    value={mobileEditEnd}
+                    onChange={(e) => setMobileEditEnd(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={saveMobileEdit}
+                  className="flex-1 h-10 rounded bg-primary text-sm font-medium text-primary-foreground active:opacity-90"
+                >Guardar</button>
+                <button
+                  onClick={() => setMobileEditCell(null)}
+                  className="flex-1 h-10 rounded border border-border text-sm text-muted-foreground active:bg-muted"
+                >Cancelar</button>
+              </div>
+            </div>
+          )}
+
+        </div>
+      )}
+
+      {/* ── Modal: Clave de edición (móvil) ── */}
+      {mobileAdminGateOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-6">
+          <div className="w-full max-w-xs rounded-xl border border-border bg-card p-5 shadow-2xl">
+            <p className="mb-3 text-sm font-semibold text-foreground">Clave de edición</p>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault()
+                const correctPwd = await getHmiTooltipPwd()
+                if (mobileAdminGateInput.trim() !== correctPwd) {
+                  setMobileAdminGateError('Clave incorrecta')
+                  return
+                }
+                setMobileAdminGateOpen(false)
+                setMobileEditMode(true)
+                setMobileEditCell(null)
+                setMobileTappedCell(null)
+              }}
+              className="space-y-3"
+            >
+              <input
+                type="password"
+                autoFocus
+                value={mobileAdminGateInput}
+                onChange={(e) => { setMobileAdminGateInput(e.target.value); setMobileAdminGateError('') }}
+                placeholder="Ingresa la clave…"
+                className="w-full h-10 px-3 text-sm bg-muted/30 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40 text-foreground [color-scheme:dark]"
+              />
+              {mobileAdminGateError && (
+                <p className="text-xs text-destructive">{mobileAdminGateError}</p>
+              )}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMobileAdminGateOpen(false)}
+                  className="flex-1 h-10 rounded border border-border text-sm text-muted-foreground active:bg-muted"
+                >Cancelar</button>
+                <button
+                  type="submit"
+                  disabled={!mobileAdminGateInput.trim()}
+                  className="flex-1 h-10 rounded bg-primary text-sm font-medium text-primary-foreground disabled:opacity-40 active:opacity-90"
+                >Confirmar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════
+          VISTA DESKTOP — panel de tabs + tabla
+          ══════════════════════════════════════════ */}
+      {!isMobile && <section className="sticky top-0 z-20 rounded-lg border bg-card p-2">
         {/* ── Tab bar ── */}
         <div className="flex items-center gap-1 border-b border-border pb-1 mb-2">
           {TAB_ITEMS.map((tab) => (
@@ -1865,11 +2483,50 @@ export function CalendarioMantencionPage() {
               </div>
             </div>
 
-            <div className="flex justify-end">
+            <div className="flex items-center justify-end gap-2">
+              <button className="h-8 rounded border border-border px-3 text-xs text-muted-foreground hover:bg-muted" onClick={handleAddPlaceholders} title="Agrega 6 placeholders: A3/A4, B3/B4, C3/C4">+ Placeholders turno</button>
               <button className="h-8 rounded bg-primary px-3 text-xs text-primary-foreground" onClick={handleAddTechnician}>Agregar técnico</button>
             </div>
 
-            <div className="rounded border overflow-auto">
+            {/* Cards — móvil */}
+            <div className="md:hidden space-y-2">
+              {techRows.map((tech) => (
+                <div key={tech.r} className="rounded border border-border bg-muted/20 p-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className={`shrink-0 inline-flex h-6 w-6 items-center justify-center rounded border text-xs font-bold ${turnoBadgeClass(tech.turno)}`}>
+                      {tech.turno || '-'}
+                    </span>
+                    <span className="text-sm font-medium text-foreground truncate">{tech.name}</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">{tech.rut || 'Sin RUT'}</div>
+                  <div className="flex gap-2">
+                    <div className="flex-1 grid gap-1">
+                      <label className="text-[10px] text-muted-foreground">Grupo</label>
+                      <select
+                        className={CONTROL_CLASS + ' w-full'}
+                        value={tech.turno || ''}
+                        onChange={(e) => handleUpdateTechnicianField(tech.r, 'turno', e.target.value)}
+                      >
+                        {Array.from(new Set([...baseGroupOptions, tech.turno].filter(Boolean))).map((group) => (
+                          <option key={group} value={group}>{group}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex-1 grid gap-1">
+                      <label className="text-[10px] text-muted-foreground">Área</label>
+                      <input
+                        className={CONTROL_CLASS + ' w-full'}
+                        value={tech.area || ''}
+                        onChange={(e) => handleUpdateTechnicianField(tech.r, 'area', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Tabla — desktop */}
+            <div className="hidden md:block rounded border overflow-auto">
               <table className="w-full text-[11px]">
                 <thead className="bg-muted text-foreground">
                   <tr>
@@ -1941,7 +2598,7 @@ export function CalendarioMantencionPage() {
               <table className="w-full text-[11px] border-collapse">
                 <thead>
                   <tr>
-                    <th rowSpan={2} className="sticky left-0 z-20 border-b border-r border-border/30 bg-zinc-900 px-3 py-2 text-left text-xs font-semibold text-foreground" style={{ minWidth: 200 }}>
+                    <th rowSpan={2} className="sticky left-0 z-20 border-b border-r border-border/30 bg-zinc-900 px-2 md:px-3 py-2 text-left text-xs font-semibold text-foreground" style={{ minWidth: 140 }}>
                       Técnico
                     </th>
                     <th colSpan={6} className="border-b border-l border-border/30 bg-gradient-to-r from-blue-950/80 to-blue-900/40 px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider text-blue-300">
@@ -1986,14 +2643,20 @@ export function CalendarioMantencionPage() {
                   {sortedHoursRows.map((row, idx) => {
                     const pctW = pctBar(row.weekHours, row.weekExpected)
                     const pctM = pctBar(row.monthHours, row.monthExpected)
-                    const riskW = row.deltaWeek < -hoursConfig.toleranceHours
-                    const riskM = row.deltaMonth < -hoursConfig.toleranceHours
-                    const isRisk = riskW || riskM
+                    const tolC = Math.max(hoursConfig.toleranceHours || 0.5, 0.5)
+                    const wUnder = row.deltaWeek < -tolC
+                    const wOver = row.deltaWeek > tolC * 4
+                    const mUnder = row.deltaMonth < -tolC * 4
+                    const mOver = row.deltaMonth > tolC * 16
+                    const riskW = wUnder
+                    const riskM = mUnder
+                    const isRisk = wUnder || mUnder
+                    const isOvertime = wOver || mOver
                     const zebra = idx % 2 === 1 ? 'bg-zinc-900/30' : ''
-                    const rowBg = isRisk ? 'bg-red-950/15 hover:bg-red-950/25' : `${zebra} hover:bg-zinc-800/50`
+                    const rowBg = isRisk ? 'bg-red-950/15 hover:bg-red-950/25' : isOvertime ? 'bg-orange-950/15 hover:bg-orange-950/25' : `${zebra} hover:bg-zinc-800/50`
                     return (
                       <tr key={row.tech.r} className={`border-t border-border/20 transition-colors ${rowBg}`}>
-                        <td className="sticky left-0 z-10 border-r border-border/20 bg-inherit px-3 py-1.5" style={{ minWidth: 200, maxWidth: 240 }}>
+                        <td className="sticky left-0 z-10 border-r border-border/20 bg-inherit px-2 md:px-3 py-1.5" style={{ minWidth: 140, maxWidth: 200 }}>
                           <div className="flex items-center gap-1.5">
                             {row.tech.turno && (
                               <span className={`shrink-0 inline-flex h-[18px] w-[18px] items-center justify-center rounded text-[9px] font-bold border ${turnoBadgeClass(row.tech.turno)}`}>
@@ -2011,9 +2674,9 @@ export function CalendarioMantencionPage() {
                         <td className="px-1 py-1" style={{ minWidth: 90 }}>
                           <div className="flex items-center gap-1">
                             <div className="flex-1 h-[5px] rounded-full bg-zinc-800 overflow-hidden">
-                              <div className={`h-full rounded-full transition-all ${riskW ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${pctW}%` }} />
+                              <div className={`h-full rounded-full transition-all ${wOver ? 'bg-orange-500' : riskW ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${pctW}%` }} />
                             </div>
-                            <span className={`shrink-0 inline-block min-w-[38px] rounded-md px-1 py-[1px] text-center text-[10px] tabular-nums font-bold ${riskW ? 'bg-red-500/15 text-red-400' : row.deltaWeek > 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-zinc-800 text-zinc-400'}`}>
+                            <span className={`shrink-0 inline-block min-w-[38px] rounded-md px-1 py-[1px] text-center text-[10px] tabular-nums font-bold ${wOver ? 'bg-orange-500/15 text-orange-400' : riskW ? 'bg-red-500/15 text-red-400' : row.deltaWeek > 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-zinc-800 text-zinc-400'}`}>
                               {formatDelta(row.deltaWeek)}
                             </span>
                           </div>
@@ -2040,9 +2703,9 @@ export function CalendarioMantencionPage() {
                         <td className="px-1 py-1" style={{ minWidth: 90 }}>
                           <div className="flex items-center gap-1">
                             <div className="flex-1 h-[5px] rounded-full bg-zinc-800 overflow-hidden">
-                              <div className={`h-full rounded-full transition-all ${riskM ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${pctM}%` }} />
+                              <div className={`h-full rounded-full transition-all ${mOver ? 'bg-orange-500' : riskM ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${pctM}%` }} />
                             </div>
-                            <span className={`shrink-0 inline-block min-w-[38px] rounded-md px-1 py-[1px] text-center text-[10px] tabular-nums font-bold ${riskM ? 'bg-red-500/15 text-red-400' : row.deltaMonth > 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-zinc-800 text-zinc-400'}`}>
+                            <span className={`shrink-0 inline-block min-w-[38px] rounded-md px-1 py-[1px] text-center text-[10px] tabular-nums font-bold ${mOver ? 'bg-orange-500/15 text-orange-400' : riskM ? 'bg-red-500/15 text-red-400' : row.deltaMonth > 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-zinc-800 text-zinc-400'}`}>
                               {formatDelta(row.deltaMonth)}
                             </span>
                           </div>
@@ -2082,9 +2745,9 @@ export function CalendarioMantencionPage() {
             {syncIndicator.label}
           </div>
         </div>
-      </section>
+      </section>}
 
-      <section className="min-h-0 flex-1 rounded-lg border bg-card p-2">
+      {!isMobile && <section className="min-h-0 flex-1 rounded-lg border bg-card p-2">
         <div className="mb-1 flex items-center justify-between gap-2">
           <div className="text-sm font-semibold">Calendario Mantención</div>
           <div className="flex items-center gap-1">
@@ -2092,7 +2755,9 @@ export function CalendarioMantencionPage() {
               className="h-7 rounded border px-2 text-xs"
               onClick={() => setShowAllCols((p) => !p)}
             >
-              {showAllCols ? 'Ocultar CeCo/Cargo/Dirección/RUT' : 'Mostrar CeCo/Cargo/Dirección/RUT'}
+              {isMobile
+                ? (showAllCols ? 'Ocultar meta' : 'Ver meta')
+                : (showAllCols ? 'Ocultar CeCo/Cargo/Dirección/RUT' : 'Mostrar CeCo/Cargo/Dirección/RUT')}
             </button>
             <button
               className="h-7 rounded border px-2 text-xs disabled:opacity-50"
@@ -2103,7 +2768,7 @@ export function CalendarioMantencionPage() {
             </button>
           </div>
         </div>
-        <div className="mb-1 flex items-center justify-between gap-2">
+        {!isMobile && <div className="mb-1 flex items-center justify-between gap-2">
           <div className="text-xs text-muted-foreground">Atajos (click en calendario para activar): D/T/N/L/V/F = Día/Tarde/Noche/Libre/Vacaciones/Feriado · Shift+D/T/N = Turno reducido · Flechas ←↑↓→ = Navegar · Ctrl+Z = Deshacer · Ctrl+Y / Ctrl+Shift+Z = Rehacer</div>
           <div className="flex items-center gap-1">
             <div className="shrink-0 rounded border border-border bg-muted px-2 py-0.5 text-[11px] text-muted-foreground" title={`Historial de cambios (actualizado: ${historyVersion})`}>
@@ -2113,25 +2778,25 @@ export function CalendarioMantencionPage() {
               Atajos: {calendarShortcutsActive ? 'Activos' : 'Inactivos'}
             </div>
           </div>
-        </div>
+        </div>}
         <div ref={calendarSectionRef}>
         <div ref={calendarScrollRef} className="relative h-[calc(100%-2.5rem)] overflow-auto rounded border">
           <table className="border-collapse text-[11px] min-w-max">
             <thead>
-              <tr className="bg-primary text-primary-foreground">
+              <tr className="bg-zinc-800 text-zinc-200">
                 {visibleMetaIndices.map((gi, vi) => (
                   <th
                     key={`head1-${META_COLS[gi]}`}
-                    className="sticky top-0 z-[60] border border-primary/70 !bg-primary bg-opacity-100 px-1 py-1 backdrop-blur-none"
-                    style={{ left: `${metaLeftFiltered(vi, visibleMetaIndices)}px`, minWidth: `${META_COL_WIDTHS[gi]}px`, maxWidth: `${META_COL_WIDTHS[gi]}px` }}
+                    className="sticky top-0 z-[60] border border-zinc-700/50 !bg-zinc-800 bg-opacity-100 px-1 py-1 backdrop-blur-none"
+                    style={{ left: `${metaLeftFiltered(vi, visibleMetaIndices, effectiveMetaWidths)}px`, minWidth: `${effectiveMetaWidths[gi]}px`, maxWidth: `${effectiveMetaWidths[gi]}px` }}
                   >
-                    {gi === 0 ? 'PLANTA' : ''}
+                    {gi === 0 ? <span className="text-zinc-400 text-[10px] uppercase tracking-wide">Planta</span> : ''}
                   </th>
                 ))}
                 {dayCols.map((d, idx) => (
                   <th
                     key={`day-${d.c}`}
-                    className={`sticky top-0 z-20 border border-primary/70 !bg-primary bg-opacity-100 px-1 py-1 backdrop-blur-none cursor-pointer ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-4 border-yellow-200 shadow-[inset_0_0_0_1px_rgba(253,224,71,0.8)]' : ''} ${selectedCol === d.c ? 'ring-2 ring-white/80 ring-inset' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-300' : ''}`}
+                    className={`sticky top-0 z-20 border border-zinc-700/50 !bg-zinc-800 bg-opacity-100 px-1 py-1 backdrop-blur-none cursor-pointer ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-4 border-yellow-400/60 shadow-[inset_0_0_0_1px_rgba(253,224,71,0.4)]' : ''} ${selectedCol === d.c ? 'ring-2 ring-white/80 ring-inset' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-400/60' : ''}`}
                     style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px` }}
                     onClick={() => {
                       setSelectedCol(d.c)
@@ -2139,18 +2804,18 @@ export function CalendarioMantencionPage() {
                     }}
                   >
                     <div className="flex items-center justify-between gap-1">
-                      <span>{d.dayLabel}</span>
-                      {isWeekStart(idx) ? <span className="rounded bg-cyan-100/20 px-1 text-[9px]">{weekNumberLabel(d.dateObj)}</span> : null}
+                      <span className="text-zinc-300">{d.dayLabel}</span>
+                      {isWeekStart(idx) ? <span className="rounded bg-cyan-500/15 px-1 text-[9px] text-cyan-400">{weekNumberLabel(d.dateObj)}</span> : null}
                     </div>
                   </th>
                 ))}
               </tr>
-              <tr className="bg-primary text-primary-foreground">
+              <tr className="bg-zinc-800 text-zinc-200">
                 {visibleMetaIndices.map((gi, vi) => (
                   <th
                     key={`head2-${META_COLS[gi]}`}
-                    className="sticky top-[30px] z-[60] border border-primary/70 !bg-primary bg-opacity-100 px-1 py-1 backdrop-blur-none"
-                    style={{ left: `${metaLeftFiltered(vi, visibleMetaIndices)}px`, minWidth: `${META_COL_WIDTHS[gi]}px`, maxWidth: `${META_COL_WIDTHS[gi]}px` }}
+                    className="sticky top-[30px] z-[60] border border-zinc-700/50 !bg-zinc-800 bg-opacity-100 px-1 py-1 backdrop-blur-none text-zinc-400 text-[10px] uppercase tracking-wide"
+                    style={{ left: `${metaLeftFiltered(vi, visibleMetaIndices, effectiveMetaWidths)}px`, minWidth: `${effectiveMetaWidths[gi]}px`, maxWidth: `${effectiveMetaWidths[gi]}px` }}
                   >
                     {META_COLS[gi]}
                   </th>
@@ -2158,7 +2823,7 @@ export function CalendarioMantencionPage() {
                 {dayCols.map((d, idx) => (
                   <th
                     key={`date-${d.c}`}
-                    className={`sticky top-[30px] z-20 border border-primary/70 !bg-primary bg-opacity-100 px-1 py-1 backdrop-blur-none cursor-pointer ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-4 border-b-2 border-yellow-200 font-semibold shadow-[inset_0_0_0_1px_rgba(253,224,71,0.8)]' : ''} ${selectedCol === d.c ? 'ring-2 ring-white/80 ring-inset' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-300' : ''}`}
+                    className={`sticky top-[30px] z-20 border border-zinc-700/50 !bg-zinc-800 bg-opacity-100 px-1 py-1 backdrop-blur-none cursor-pointer text-zinc-300 ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-4 border-b-2 border-yellow-400/60 font-semibold text-yellow-300 shadow-[inset_0_0_0_1px_rgba(253,224,71,0.4)]' : ''} ${selectedCol === d.c ? 'ring-2 ring-white/80 ring-inset' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-400/60' : ''}`}
                     style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px` }}
                     onClick={() => {
                       setSelectedCol(d.c)
@@ -2171,16 +2836,18 @@ export function CalendarioMantencionPage() {
               </tr>
             </thead>
             <tbody>
-              {techRows.map((tech) => {
+              {techRows.map((tech, idx) => {
                 const isSelectedRow = selectedRow === tech.r
                 const metaValues = [tech.turno, tech.area, tech.ceco, tech.cargo, tech.direccion, tech.rut, tech.name]
+                const dtk = tech.turno.trim().toUpperCase()
+                const dRowBg = dtk === 'A' ? 'bg-cyan-500/5' : dtk === 'B' ? 'bg-amber-500/5' : dtk === 'C' ? 'bg-violet-500/5' : idx % 2 === 1 ? 'bg-zinc-900/20' : ''
                 return (
-                  <tr key={tech.r} className={isSelectedRow ? 'outline outline-2 outline-blue-500 -outline-offset-2' : ''}>
+                  <tr key={tech.r} className={`border-b border-border/20 ${dRowBg} ${isSelectedRow ? 'outline outline-2 outline-blue-500 -outline-offset-2' : ''}`}>
                     {visibleMetaIndices.map((gi, vi) => (
                       <td
                         key={`meta-${tech.r}-${gi}`}
                         className="sticky z-[35] border !bg-card bg-opacity-100 px-1 py-1 text-left truncate text-foreground backdrop-blur-none"
-                        style={{ left: `${metaLeftFiltered(vi, visibleMetaIndices)}px`, minWidth: `${META_COL_WIDTHS[gi]}px`, maxWidth: `${META_COL_WIDTHS[gi]}px` }}
+                        style={{ left: `${metaLeftFiltered(vi, visibleMetaIndices, effectiveMetaWidths)}px`, minWidth: `${effectiveMetaWidths[gi]}px`, maxWidth: `${effectiveMetaWidths[gi]}px` }}
                         title={metaValues[gi]}
                       >
                         {gi === 0 ? (
@@ -2197,7 +2864,7 @@ export function CalendarioMantencionPage() {
                       return (
                         <td
                           key={`shift-${tech.r}-${d.c}`}
-                          className={`border px-1 py-1 text-center cursor-pointer ${cellStyle.className} ${isSelectedCell ? 'ring-2 ring-primary ring-inset shadow-[inset_0_0_0_1px_rgba(255,255,255,0.85)]' : ''} ${selectedCol === d.c ? 'bg-primary/10' : ''} ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-4 border-yellow-300/90' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-300/80' : ''}`}
+                          className={`border px-1 py-1 text-center cursor-pointer ${cellStyle.className} ${isSelectedCell ? 'ring-2 ring-primary ring-inset shadow-[inset_0_0_0_1px_rgba(255,255,255,0.85)]' : ''} ${selectedCol === d.c ? 'bg-zinc-600/15' : ''} ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-4 border-yellow-300/90' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-300/80' : ''}`}
                           style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px`, ...cellStyle.style }}
                           title={value}
                           onClick={() => {
@@ -2217,7 +2884,8 @@ export function CalendarioMantencionPage() {
           </table>
         </div>
         </div>
-      </section>
+      </section>}
+
     </div>
   )
 }

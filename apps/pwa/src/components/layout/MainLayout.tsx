@@ -656,7 +656,7 @@ export function MainLayout() {
       {/* ══════ MAIN CONTENT AREA ══════ */}
       <div className="flex-1 min-w-0 flex flex-col min-h-screen">
         {/* Top bar */}
-        <header className="sticky top-0 z-30 flex items-center h-14 px-4 bg-background/80 backdrop-blur border-b">
+        <header className="hidden lg:flex sticky top-0 z-30 items-center h-14 px-4 bg-background/80 backdrop-blur border-b">
           {/* Mobile: title centrado + hamburgesa para rutas secundarias */}
           <div className="flex-1 flex items-center lg:hidden">
             {currentPageName && (
@@ -960,7 +960,7 @@ export function MainLayout() {
           className={`${
             isClimaRoute || isHmiKnuroRoute || isBaader200Route
               ? 'h-[calc(100vh-3.5rem-4rem)] lg:h-[calc(100vh-3.5rem)] p-0 overflow-hidden'
-              : 'p-3 lg:p-6 w-full max-w-[100vw] overflow-x-hidden pb-20 lg:pb-6'
+              : 'p-3 lg:p-6 w-full max-w-[100vw] overflow-x-hidden pb-20 [@media(max-height:500px)]:pb-12 lg:pb-6'
           } ${
             isReadOnly ? 'pointer-events-none opacity-70' : ''
           }`}
@@ -1022,7 +1022,7 @@ export function MainLayout() {
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         aria-label="Navegación principal"
       >
-        <div className="flex items-stretch h-16">
+        <div className="flex items-stretch h-16 [@media(max-height:500px)]:h-10">
           {bottomNavItems.map(item => {
             const isActive = item.href === '/'
               ? location.pathname === '/'
@@ -1038,8 +1038,8 @@ export function MainLayout() {
                 )}
                 aria-label={item.name}
               >
-                <item.icon className={cn('h-5 w-5', isActive && 'stroke-[2.5px]')} />
-                <span>{item.name}</span>
+                <item.icon className={cn('h-5 w-5 [@media(max-height:500px)]:h-4 [@media(max-height:500px)]:w-4', isActive && 'stroke-[2.5px]')} />
+                <span className="[@media(max-height:500px)]:hidden">{item.name}</span>
               </NavLink>
             )
           })}
@@ -1048,8 +1048,8 @@ export function MainLayout() {
             className="flex-1 flex flex-col items-center justify-center gap-0.5 text-[0.65rem] font-medium text-muted-foreground transition-colors active:scale-95"
             aria-label="Más opciones"
           >
-            <Menu className="h-5 w-5" />
-            <span>Más</span>
+            <Menu className="h-5 w-5 [@media(max-height:500px)]:h-4 [@media(max-height:500px)]:w-4" />
+            <span className="[@media(max-height:500px)]:hidden">Más</span>
           </button>
         </div>
       </nav>
