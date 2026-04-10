@@ -730,7 +730,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
           </Button>
         )}
         <Button onClick={() => onComplete(gates, config)}>
-          Ver Dashboard
+          Aplicar configuración
           <ChevronRight className="h-4 w-4 ml-1" />
         </Button>
       </div>

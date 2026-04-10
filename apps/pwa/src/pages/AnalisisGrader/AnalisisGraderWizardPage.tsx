@@ -1,51 +1,32 @@
 /**
- * Wizard principal de Análisis Grader (2 pasos):
- *  P1) Configuración: Carga de archivos + Calendario + Config Gates
- *  P2) Dashboard
+ * Página principal de Análisis Grader — flujo simplificado.
+ *
+ * Página única (sin stepper):
+ *  1. Upload de archivos (siempre visible)
+ *  2. Configuración de gates (colapsable)
+ *  3. Alertas + Dashboard (aparecen automáticamente al cargar archivos)
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
-import { Card, CardContent, Button, Badge, InfoTooltip } from '@/components/ui'
-import { Settings2, BarChart3, ChevronRight, FolderOpen, Calendar, Loader2 } from 'lucide-react'
+import { Card, CardContent, Button, Badge } from '@/components/ui'
+import { Settings2, BarChart3, FolderOpen, Calendar, Loader2, ChevronDown, ChevronUp, AlertTriangle, CheckCircle } from 'lucide-react'
 import { useAuthStore, usePermissionsStore } from '@/store'
 import { AnalisisGraderUploadPage, type FileParsed } from './AnalisisGraderUploadPage'
 import { AnalisisGraderGatesConfigPage } from './AnalisisGraderGatesConfigPage'
 import { AnalisisGraderDashboardPage } from './AnalisisGraderDashboardPage'
 import { getLatestGraderAutosaveDraft, saveGraderAutosaveDraft } from '@/services/grader/graderSession.service'
+import { computeAnalytics } from '@/services/grader/graderAnalytics'
+import { computeDeterministicInsights } from '@/services/grader/graderInsights'
 import type { ParsedMatrixData, GateAssignment, GraderAnalysisConfig } from '@/services/grader/types'
 
-const STEPS = [
-  { id: 'config', label: 'Configuración', icon: Settings2 },
-  { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
-] as const
-
-type StepId = typeof STEPS[number]['id']
-type AutosaveMode = 'normal' | 'ahorro'
 const GRADER_WIZARD_DRAFT_KEY = 'grader_wizard_draft_v1'
-const AUTOSAVE_MODE_KEY = 'grader_autosave_mode_v1'
-const AUTOSAVE_POLICY: Record<AutosaveMode, { debounceMs: number; minIntervalMs: number; configIdleMs: number }> = {
-  normal: {
-    debounceMs: 4_000,
-    minIntervalMs: 20_000,
-    configIdleMs: 8_000,
-  },
-  ahorro: {
-    debounceMs: 8_000,
-    minIntervalMs: 45_000,
-    configIdleMs: 30_000,
-  },
-}
 
-function estimateWritesPerHour(mode: AutosaveMode): number {
-  const policy = AUTOSAVE_POLICY[mode]
-  return Math.max(1, Math.floor(3_600_000 / policy.minIntervalMs))
-}
-
-function getDefaultAutosaveModeByEnv(): AutosaveMode {
-  const useEmulators = String(import.meta.env.VITE_USE_EMULATORS || '').toLowerCase() === 'true'
-  if (useEmulators) return 'ahorro'
-  return import.meta.env.PROD ? 'normal' : 'ahorro'
+// Autosave conservador — el usuario no necesita controlar esto
+const AUTOSAVE_POLICY = {
+  debounceMs: 8_000,
+  minIntervalMs: 45_000,
+  configIdleMs: 30_000,
 }
 
 export function AnalisisGraderWizardPage() {
@@ -53,7 +34,7 @@ export function AnalisisGraderWizardPage() {
   const user = useAuthStore((s) => s.user)
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const [currentStep, setCurrentStep] = useState<StepId>('config')
+
   const [parsedData, setParsedData] = useState<ParsedMatrixData | null>(null)
   const [uploadedFiles, setUploadedFiles] = useState<FileParsed[]>([])
   const [gates, setGates] = useState<GateAssignment[]>(getDefaultGates())
@@ -66,167 +47,110 @@ export function AnalisisGraderWizardPage() {
       pointZeroPctCritical: 3.5,
     },
   })
-  const [autosaveMode, setAutosaveMode] = useState<AutosaveMode>(getDefaultAutosaveModeByEnv)
+  const [gatesOpen, setGatesOpen] = useState(false)
   const [autosaveState, setAutosaveState] = useState<'idle' | 'queued' | 'saving' | 'saved' | 'error'>('idle')
   const [autosaveUpdatedAt, setAutosaveUpdatedAt] = useState<string | null>(null)
-  const gatesRef = useRef<HTMLDivElement>(null)
+
   const localDraftLoadedRef = useRef(false)
   const cloudDraftHydratedRef = useRef(false)
   const lastCloudSaveAtRef = useRef<number>(0)
   const lastCloudFingerprintRef = useRef<string>('')
   const lastConfigMutationAtRef = useRef<number>(Date.now())
-  const previousStepRef = useRef<StepId>('config')
 
-  useEffect(() => {
+  // Alertas calculadas desde los datos cargados
+  const alertInsights = useMemo(() => {
+    if (!parsedData || parsedData.pieceRecords.length === 0) return []
     try {
-      const savedMode = localStorage.getItem(AUTOSAVE_MODE_KEY)
-      if (savedMode === 'normal' || savedMode === 'ahorro') {
-        setAutosaveMode(savedMode)
-      }
+      const result = computeAnalytics(parsedData, config, gates)
+      return computeDeterministicInsights(result)
     } catch {
-      // localStorage no disponible
+      return []
     }
-  }, [])
+  }, [parsedData, config, gates])
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(AUTOSAVE_MODE_KEY, autosaveMode)
-    } catch {
-      // localStorage no disponible
-    }
-  }, [autosaveMode])
-
+  // Restaurar draft local
   useEffect(() => {
     try {
       const raw = localStorage.getItem(GRADER_WIZARD_DRAFT_KEY)
       if (!raw) return
       localDraftLoadedRef.current = true
-      const parsed = JSON.parse(raw) as {
-        gates?: GateAssignment[]
-        config?: GraderAnalysisConfig
-        currentStep?: StepId
-      }
-      if (Array.isArray(parsed.gates) && parsed.gates.length > 0) {
-        setGates(parsed.gates)
-      }
-      if (parsed.config && typeof parsed.config === 'object') {
-        const parsedConfig = parsed.config
+      const saved = JSON.parse(raw) as { gates?: GateAssignment[]; config?: GraderAnalysisConfig }
+      if (Array.isArray(saved.gates) && saved.gates.length > 0) setGates(saved.gates)
+      if (saved.config && typeof saved.config === 'object') {
+        const c = saved.config
         setConfig((prev) => ({
           ...prev,
-          ...parsedConfig,
+          ...c,
           errorThresholds: {
-            photocellPctWarn: parsedConfig.errorThresholds?.photocellPctWarn ?? prev.errorThresholds?.photocellPctWarn ?? 1,
-            outOfLimitsPctWarn: parsedConfig.errorThresholds?.outOfLimitsPctWarn ?? prev.errorThresholds?.outOfLimitsPctWarn ?? 3,
-            pointZeroPctWarn: parsedConfig.errorThresholds?.pointZeroPctWarn ?? prev.errorThresholds?.pointZeroPctWarn ?? 2,
-            pointZeroPctCritical: parsedConfig.errorThresholds?.pointZeroPctCritical ?? prev.errorThresholds?.pointZeroPctCritical ?? 3.5,
+            photocellPctWarn: c.errorThresholds?.photocellPctWarn ?? prev.errorThresholds?.photocellPctWarn ?? 1,
+            outOfLimitsPctWarn: c.errorThresholds?.outOfLimitsPctWarn ?? prev.errorThresholds?.outOfLimitsPctWarn ?? 3,
+            pointZeroPctWarn: c.errorThresholds?.pointZeroPctWarn ?? prev.errorThresholds?.pointZeroPctWarn ?? 2,
+            pointZeroPctCritical: c.errorThresholds?.pointZeroPctCritical ?? prev.errorThresholds?.pointZeroPctCritical ?? 3.5,
           },
         }))
       }
-      if (parsed.currentStep === 'config' || parsed.currentStep === 'dashboard') {
-        setCurrentStep(parsed.currentStep)
-      }
-    } catch {
-      // localStorage no disponible o dato inválido
-    }
+    } catch { /* localStorage no disponible */ }
   }, [])
 
+  // Persistir draft local
   useEffect(() => {
     try {
-      const draft = {
-        gates,
-        config,
-        currentStep,
-        updatedAt: new Date().toISOString(),
-      }
-      localStorage.setItem(GRADER_WIZARD_DRAFT_KEY, JSON.stringify(draft))
-    } catch {
-      // localStorage no disponible
-    }
-  }, [config, currentStep, gates])
+      localStorage.setItem(GRADER_WIZARD_DRAFT_KEY, JSON.stringify({ gates, config, updatedAt: new Date().toISOString() }))
+    } catch { /* localStorage no disponible */ }
+  }, [config, gates])
 
+  // Seguimiento de mutaciones para autosave
   useEffect(() => {
-    if (currentStep === 'config') {
-      lastConfigMutationAtRef.current = Date.now()
-    }
-  }, [config, currentStep, gates])
+    lastConfigMutationAtRef.current = Date.now()
+  }, [config, gates])
 
+  // Restaurar draft desde cloud
   useEffect(() => {
-    if (!user?.id) return
-    if (localDraftLoadedRef.current) return
-    if (cloudDraftHydratedRef.current) return
-
+    if (!user?.id || localDraftLoadedRef.current || cloudDraftHydratedRef.current) return
     let cancelled = false
     ;(async () => {
       try {
         const draft = await getLatestGraderAutosaveDraft(user.id)
         if (!draft || cancelled) return
-
-        if (Array.isArray(draft.gatesConfigSnapshot) && draft.gatesConfigSnapshot.length > 0) {
-          setGates(draft.gatesConfigSnapshot)
-        }
+        if (Array.isArray(draft.gatesConfigSnapshot) && draft.gatesConfigSnapshot.length > 0) setGates(draft.gatesConfigSnapshot)
         if (draft.config && typeof draft.config === 'object') {
+          const c = draft.config
           setConfig((prev) => ({
             ...prev,
-            ...draft.config,
+            ...c,
             errorThresholds: {
-              photocellPctWarn: draft.config.errorThresholds?.photocellPctWarn ?? prev.errorThresholds?.photocellPctWarn ?? 1,
-              outOfLimitsPctWarn: draft.config.errorThresholds?.outOfLimitsPctWarn ?? prev.errorThresholds?.outOfLimitsPctWarn ?? 3,
-              pointZeroPctWarn: draft.config.errorThresholds?.pointZeroPctWarn ?? prev.errorThresholds?.pointZeroPctWarn ?? 2,
-              pointZeroPctCritical: draft.config.errorThresholds?.pointZeroPctCritical ?? prev.errorThresholds?.pointZeroPctCritical ?? 3.5,
+              photocellPctWarn: c.errorThresholds?.photocellPctWarn ?? prev.errorThresholds?.photocellPctWarn ?? 1,
+              outOfLimitsPctWarn: c.errorThresholds?.outOfLimitsPctWarn ?? prev.errorThresholds?.outOfLimitsPctWarn ?? 3,
+              pointZeroPctWarn: c.errorThresholds?.pointZeroPctWarn ?? prev.errorThresholds?.pointZeroPctWarn ?? 2,
+              pointZeroPctCritical: c.errorThresholds?.pointZeroPctCritical ?? prev.errorThresholds?.pointZeroPctCritical ?? 3.5,
             },
           }))
         }
-        if (draft.currentStep === 'config' || draft.currentStep === 'dashboard') {
-          setCurrentStep(draft.currentStep)
-        }
         setAutosaveUpdatedAt(draft.updatedAt || null)
         setAutosaveState('saved')
-      } catch {
-        // fallback silencioso
-      } finally {
-        cloudDraftHydratedRef.current = true
-      }
+      } catch { /* fallback silencioso */ }
+      finally { cloudDraftHydratedRef.current = true }
     })()
-
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [user?.id])
 
+  // Autosave cloud
   useEffect(() => {
     if (!user?.id) return
-    const policy = AUTOSAVE_POLICY[autosaveMode]
     const sessionDate = config.startAt?.slice(0, 10)
     const hasMeaningfulContext = Boolean(config.deviceId || config.shiftId || config.startAt || parsedData?.files.length)
-    if (!hasMeaningfulContext) {
-      setAutosaveState('idle')
-      return
-    }
+    if (!hasMeaningfulContext) { setAutosaveState('idle'); return }
 
-    const fingerprint = JSON.stringify({
-      config,
-      gates,
-      sessionDate,
-      deviceId: config.deviceId,
-      shiftId: config.shiftId,
-    })
-
-    if (fingerprint === lastCloudFingerprintRef.current) {
-      return
-    }
+    const fingerprint = JSON.stringify({ config, gates, sessionDate })
+    if (fingerprint === lastCloudFingerprintRef.current) return
 
     const elapsed = Date.now() - lastCloudSaveAtRef.current
-    const throttleWait = Math.max(0, policy.minIntervalMs - elapsed)
+    const throttleWait = Math.max(0, AUTOSAVE_POLICY.minIntervalMs - elapsed)
     const configIdleElapsed = Date.now() - lastConfigMutationAtRef.current
-    const configIdleWait = currentStep === 'dashboard'
-      ? 0
-      : Math.max(0, policy.configIdleMs - configIdleElapsed)
-    const waitMs = Math.max(policy.debounceMs, throttleWait, configIdleWait)
+    const configIdleWait = Math.max(0, AUTOSAVE_POLICY.configIdleMs - configIdleElapsed)
+    const waitMs = Math.max(AUTOSAVE_POLICY.debounceMs, throttleWait, configIdleWait)
 
-    if (waitMs > policy.debounceMs || currentStep === 'config') {
-      setAutosaveState('queued')
-    }
-
+    setAutosaveState('queued')
     const timer = window.setTimeout(() => {
       setAutosaveState('saving')
       saveGraderAutosaveDraft({
@@ -236,7 +160,7 @@ export function AnalisisGraderWizardPage() {
         sessionDate,
         config,
         gatesConfigSnapshot: gates,
-        currentStep,
+        currentStep: 'config',
       })
         .then((draft) => {
           lastCloudSaveAtRef.current = Date.now()
@@ -244,69 +168,19 @@ export function AnalisisGraderWizardPage() {
           setAutosaveUpdatedAt(draft.updatedAt)
           setAutosaveState('saved')
         })
-        .catch(() => {
-          setAutosaveState('error')
-          // fallback silencioso: existe draft local
-        })
+        .catch(() => setAutosaveState('error'))
     }, waitMs)
+    return () => window.clearTimeout(timer)
+  }, [config, gates, parsedData?.files.length, user?.id])
 
-    return () => {
-      window.clearTimeout(timer)
-    }
-  }, [autosaveMode, config, currentStep, gates, parsedData?.files.length, user?.id])
-
+  // Restaurar último turno desde localStorage
   useEffect(() => {
-    if (!user?.id) return
-    const previousStep = previousStepRef.current
-    previousStepRef.current = currentStep
-
-    if (!(previousStep === 'config' && currentStep === 'dashboard')) return
-
-    const sessionDate = config.startAt?.slice(0, 10)
-    const hasMeaningfulContext = Boolean(config.deviceId || config.shiftId || config.startAt || parsedData?.files.length)
-    if (!hasMeaningfulContext) return
-
-    const fingerprint = JSON.stringify({
-      config,
-      gates,
-      sessionDate,
-      deviceId: config.deviceId,
-      shiftId: config.shiftId,
-    })
-
-    if (fingerprint === lastCloudFingerprintRef.current) return
-
-    setAutosaveState('saving')
-    saveGraderAutosaveDraft({
-      createdBy: user.id,
-      deviceId: config.deviceId,
-      shiftId: config.shiftId,
-      sessionDate,
-      config,
-      gatesConfigSnapshot: gates,
-      currentStep,
-    })
-      .then((draft) => {
-        lastCloudSaveAtRef.current = Date.now()
-        lastCloudFingerprintRef.current = fingerprint
-        setAutosaveUpdatedAt(draft.updatedAt)
-        setAutosaveState('saved')
-      })
-      .catch(() => {
-        setAutosaveState('error')
-      })
-  }, [config, currentStep, gates, parsedData?.files.length, user?.id])
-
-  // Restaurar último turno desde localStorage al iniciar
-  useEffect(() => {
-    // Si hay params en URL, no restaurar
     if (searchParams.get('date') || searchParams.get('autoload')) return
     try {
       const saved = localStorage.getItem('grader_last_session')
       if (saved) {
         const { date, shiftId } = JSON.parse(saved)
         if (date && shiftId) {
-          // Inyectar en URL para que UploadPage los use
           const newParams = new URLSearchParams(searchParams)
           newParams.set('date', date)
           newParams.set('shift', shiftId)
@@ -318,51 +192,31 @@ export function AnalisisGraderWizardPage() {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fallbackParsedData: ParsedMatrixData = parsedData || {
-    files: [],
-    pieceRecords: [],
-    gate0Records: [],
-    folioRecords: [],
-    qualitySummary: [],
-    productionSummary: [],
-    inferred: {},
+    files: [], pieceRecords: [], gate0Records: [], folioRecords: [], qualitySummary: [], productionSummary: [], inferred: {},
   }
 
   const handleUploadComplete = useCallback((data: ParsedMatrixData) => {
     setParsedData(data)
-    // Auto-fill config from inferred data
     setConfig((prev) => ({
       ...prev,
       startAt: data.inferred.startAt || prev.startAt,
       endAt: data.inferred.endAt || prev.endAt,
     }))
-    // Scroll hacia la configuración de gates
-    setTimeout(() => {
-      gatesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, 100)
   }, [])
 
-  const handleGatesComplete = useCallback(
-    (updatedGates: GateAssignment[], updatedConfig: GraderAnalysisConfig) => {
-      setGates(updatedGates)
-      setConfig(updatedConfig)
-      setCurrentStep('dashboard')
-    },
-    [],
-  )
+  const handleGatesApply = useCallback((updatedGates: GateAssignment[], updatedConfig: GraderAnalysisConfig) => {
+    setGates(updatedGates)
+    setConfig(updatedConfig)
+    setGatesOpen(false)
+  }, [])
 
   const handleApplyGateSuggestion = useCallback((payload: { gateNumber: number; calibre: string; quality: string }) => {
     setGates((prev) => prev.map((gate) => {
       if (gate.gateNumber !== payload.gateNumber) return gate
-      return {
-        ...gate,
-        assignedCalibre: payload.calibre,
-        assignedQuality: payload.quality as GateAssignment['assignedQuality'],
-      }
+      return { ...gate, assignedCalibre: payload.calibre, assignedQuality: payload.quality as GateAssignment['assignedQuality'] }
     }))
-    setCurrentStep('config')
-    setTimeout(() => {
-      gatesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, 50)
+    setGatesOpen(true)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [])
 
   const handleUpdatePointZeroWarnThreshold = useCallback((value: number) => {
@@ -389,10 +243,11 @@ export function AnalisisGraderWizardPage() {
     }))
   }, [])
 
-  // Permission gate: redirect if user cannot see this module
-  if (!canSee('analisisGrader')) {
-    return <Navigate to="/" replace />
-  }
+  if (!canSee('analisisGrader')) return <Navigate to="/" replace />
+
+  const hasData = Boolean(parsedData && parsedData.pieceRecords.length > 0)
+  const criticalInsights = alertInsights.filter((i) => i.severity === 'critical')
+  const warnInsights = alertInsights.filter((i) => i.severity === 'warn')
 
   return (
     <div className="space-y-4">
@@ -403,136 +258,121 @@ export function AnalisisGraderWizardPage() {
             <BarChart3 className="h-6 w-6" />
             Análisis Grader
           </h1>
-          <div className="flex items-center flex-wrap gap-2 mt-1">
-            <p className="text-sm text-muted-foreground">
-              Análisis de datos de clasificadora de salmones
-            </p>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Clasificadora de salmones — análisis en tiempo real
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {autosaveState !== 'idle' && (
             <Badge
               variant="outline"
               className={
-                autosaveState === 'saved'
-                  ? 'text-emerald-600 border-emerald-500/40'
-                  : autosaveState === 'queued'
-                  ? 'text-amber-600 border-amber-500/40'
-                  : autosaveState === 'saving'
-                  ? 'text-sky-600 border-sky-500/40'
-                  : autosaveState === 'error'
-                  ? 'text-amber-600 border-amber-500/40'
-                  : 'text-muted-foreground'
+                autosaveState === 'saved' ? 'text-emerald-600 border-emerald-500/40' :
+                autosaveState === 'saving' ? 'text-sky-600 border-sky-500/40' :
+                autosaveState === 'error' ? 'text-amber-600 border-amber-500/40' :
+                'text-muted-foreground border-muted'
               }
             >
-              {autosaveState === 'saving' ? (
-                <><Loader2 className="h-3 w-3 animate-spin mr-1" />Autoguardando…</>
-              ) : autosaveState === 'queued' ? (
-                <>Autoguardado pendiente ({autosaveMode === 'ahorro' ? 'modo ahorro' : 'modo normal'})</>
-              ) : autosaveState === 'saved' ? (
-                <>Autoguardado {autosaveUpdatedAt ? new Date(autosaveUpdatedAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) : 'OK'}</>
-              ) : autosaveState === 'error' ? (
-                <>Autoguardado nube con error (respaldo local activo)</>
-              ) : (
-                <>Autoguardado en espera</>
-              )}
+              {autosaveState === 'saving' && <><Loader2 className="h-3 w-3 animate-spin mr-1" />Guardando…</>}
+              {autosaveState === 'saved' && <>Guardado {autosaveUpdatedAt ? new Date(autosaveUpdatedAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) : ''}</>}
+              {autosaveState === 'error' && <>Error al guardar (respaldo local activo)</>}
+              {autosaveState === 'queued' && <>Guardado pendiente</>}
             </Badge>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="hidden sm:flex items-center gap-1 rounded-md border p-1">
-            <Button
-              type="button"
-              size="sm"
-              variant={autosaveMode === 'normal' ? 'default' : 'ghost'}
-              onClick={() => setAutosaveMode('normal')}
-              className="h-7 px-2 text-[11px]"
-            >
-              Modo normal
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={autosaveMode === 'ahorro' ? 'default' : 'ghost'}
-              onClick={() => setAutosaveMode('ahorro')}
-              className="h-7 px-2 text-[11px]"
-            >
-              Modo ahorro
-            </Button>
-          </div>
-          <InfoTooltip
-            iconSize={12}
-            position="bottom"
-            title="Modo de autoguardado"
-            text={`Normal: debounce ${Math.round(AUTOSAVE_POLICY.normal.debounceMs / 1000)}s, intervalo mín ${Math.round(AUTOSAVE_POLICY.normal.minIntervalMs / 1000)}s, inactividad config ${Math.round(AUTOSAVE_POLICY.normal.configIdleMs / 1000)}s, tope teórico ${estimateWritesPerHour('normal')} writes/h. Ahorro: debounce ${Math.round(AUTOSAVE_POLICY.ahorro.debounceMs / 1000)}s, intervalo mín ${Math.round(AUTOSAVE_POLICY.ahorro.minIntervalMs / 1000)}s, inactividad config ${Math.round(AUTOSAVE_POLICY.ahorro.configIdleMs / 1000)}s, tope teórico ${estimateWritesPerHour('ahorro')} writes/h.`}
-            className="hidden sm:inline-flex"
-          />
-          <Button variant="outline" size="sm" onClick={() => navigate('/analisis-grader/calendario')}>
+          )}
+          <Button variant="ghost" size="sm" onClick={() => navigate('/analisis-grader/calendario')}>
             <Calendar className="h-4 w-4 mr-1" />
             Calendario
           </Button>
-          <Button variant="outline" size="sm" onClick={() => navigate('/analisis-grader/sesiones')}>
+          <Button variant="ghost" size="sm" onClick={() => navigate('/analisis-grader/sesiones')}>
             <FolderOpen className="h-4 w-4 mr-1" />
-            Sesiones Guardadas
+            Historial
           </Button>
         </div>
       </div>
 
-      {/* Stepper */}
+      {/* Upload de archivos */}
+      <AnalisisGraderUploadPage
+        onComplete={handleUploadComplete}
+        initialFiles={uploadedFiles}
+        onFilesChange={setUploadedFiles}
+      />
+
+      {/* Configuración de gates — colapsable */}
       <Card>
-        <CardContent className="pt-4">
-          <div className="flex items-center justify-center gap-1 sm:gap-3">
-            {STEPS.map((step, idx) => {
-              const Icon = step.icon
-              const isActive = step.id === currentStep
-
-              return (
-                <div key={step.id} className="flex items-center gap-1 sm:gap-2">
-                  <button
-                    onClick={() => setCurrentStep(step.id)}
-                    className={`flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors ${
-                      isActive
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted text-muted-foreground'
-                    }`}
-                  >
-                    <Icon className="h-4 w-4" />
-                    <span className="hidden sm:inline">{step.label}</span>
-                  </button>
-                  {idx < STEPS.length - 1 && (
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Step Content */}
-      {currentStep === 'config' && (
-        <>
-          {/* Carga de archivos + calendario */}
-          <AnalisisGraderUploadPage
-            onComplete={handleUploadComplete}
-            initialFiles={uploadedFiles}
-            onFilesChange={setUploadedFiles}
-          />
-
-          {/* Configuración de Gates — siempre visible debajo */}
-          <div ref={gatesRef}>
+        <button
+          type="button"
+          onClick={() => setGatesOpen((o) => !o)}
+          className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium hover:bg-muted/50 transition-colors rounded-lg"
+        >
+          <span className="flex items-center gap-2">
+            <Settings2 className="h-4 w-4 text-muted-foreground" />
+            Configurar compuertas
+            <Badge variant="outline" className="text-xs font-normal">
+              {gates.filter((g) => g.active).length} activas
+            </Badge>
+          </span>
+          {gatesOpen
+            ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
+            : <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          }
+        </button>
+        {gatesOpen && (
+          <CardContent className="pt-0 pb-4">
             <AnalisisGraderGatesConfigPage
               gates={gates}
               config={config}
               parsedData={fallbackParsedData}
-              onComplete={handleGatesComplete}
+              onComplete={handleGatesApply}
             />
-          </div>
-        </>
+          </CardContent>
+        )}
+      </Card>
+
+      {/* Alertas — visibles en cuanto hay datos */}
+      {hasData && alertInsights.length > 0 && (
+        <div className="space-y-2">
+          {criticalInsights.map((insight) => (
+            <div key={insight.id} className="flex items-start gap-3 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3">
+              <AlertTriangle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-red-600 dark:text-red-400">{insight.title}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{insight.evidence[0]}</p>
+                {insight.recommendations[0] && (
+                  <p className="text-xs text-red-600/80 dark:text-red-400/80 mt-1">→ {insight.recommendations[0]}</p>
+                )}
+              </div>
+            </div>
+          ))}
+          {warnInsights.map((insight) => (
+            <div key={insight.id} className="flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+              <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">{insight.title}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{insight.evidence[0]}</p>
+                {insight.recommendations[0] && (
+                  <p className="text-xs text-amber-600/80 dark:text-amber-400/80 mt-1">→ {insight.recommendations[0]}</p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {hasData && alertInsights.length === 0 && (
+        <div className="flex items-center gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3">
+          <CheckCircle className="h-5 w-5 text-emerald-500 shrink-0" />
+          <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
+            Todo dentro de parámetros normales
+          </p>
+        </div>
       )}
 
-      {currentStep === 'dashboard' && (
+      {/* Dashboard — aparece automáticamente al cargar archivos */}
+      {hasData && (
         <AnalisisGraderDashboardPage
           parsedData={fallbackParsedData}
           gates={gates}
           config={config}
-          onBack={() => setCurrentStep('config')}
+          onBack={() => {}}
           onApplyGateSuggestion={handleApplyGateSuggestion}
           onUpdatePointZeroWarnThreshold={handleUpdatePointZeroWarnThreshold}
           onUpdatePointZeroCriticalThreshold={handleUpdatePointZeroCriticalThreshold}
