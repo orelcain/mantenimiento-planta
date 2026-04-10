@@ -268,7 +268,6 @@ interface PinnedPatternPoint {
 }
 
 const PIN_CARD_WIDTH = 224
-const PIN_CARD_PADDING = 8
 
 export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack, onApplyGateSuggestion, onUpdatePointZeroWarnThreshold, onUpdatePointZeroCriticalThreshold, analyticsOverride, insightsOverride, initialAIOutput }: Props) {
   const user = useAuthStore((s) => s.user)
@@ -289,11 +288,10 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
   const [trendWarnThreshold, setTrendWarnThreshold] = useState<number>(config.errorThresholds?.pointZeroPctWarn ?? 2)
   const [trendCriticalThreshold, setTrendCriticalThreshold] = useState<number>(config.errorThresholds?.pointZeroPctCritical ?? round2(Math.max((config.errorThresholds?.pointZeroPctWarn ?? 2) + 0.5, (config.errorThresholds?.pointZeroPctWarn ?? 2) * 1.5)))
   const [pinnedPatternPoints, setPinnedPatternPoints] = useState<PinnedPatternPoint[]>([])
-  const [draggingPinnedId, setDraggingPinnedId] = useState<string | null>(null)
+  const [showAIHistory, setShowAIHistory] = useState(false)
   const dashRef = useRef<HTMLDivElement>(null)
   const patternLineChartRef = useRef<ChartJS<'line'> | null>(null)
   const patternChartContainerRef = useRef<HTMLDivElement>(null)
-  const draggingPinnedOffsetRef = useRef<{ id: string; offsetX: number; offsetY: number } | null>(null)
 
   useEffect(() => {
     const warn = config.errorThresholds?.pointZeroPctWarn ?? 2
@@ -730,54 +728,6 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
     setPinnedPatternPoints((prev) => prev.filter((pin) => pin.id !== id))
   }
 
-  const startDraggingPinnedPoint = (event: React.MouseEvent<HTMLDivElement>, pinId: string) => {
-    const target = event.currentTarget
-    const rect = target.getBoundingClientRect()
-    draggingPinnedOffsetRef.current = {
-      id: pinId,
-      offsetX: event.clientX - rect.left,
-      offsetY: event.clientY - rect.top,
-    }
-    setDraggingPinnedId(pinId)
-  }
-
-  useEffect(() => {
-    if (!draggingPinnedId) return
-
-    const onMouseMove = (event: MouseEvent) => {
-      const dragInfo = draggingPinnedOffsetRef.current
-      const container = patternChartContainerRef.current
-      if (!dragInfo || !container || dragInfo.id !== draggingPinnedId) return
-
-      const containerRect = container.getBoundingClientRect()
-      const rawX = event.clientX - containerRect.left - dragInfo.offsetX
-      const rawY = event.clientY - containerRect.top - dragInfo.offsetY
-
-      setPinnedPatternPoints((prev) => prev.map((pin) => {
-        if (pin.id !== draggingPinnedId) return pin
-        const cardHeight = estimatePinnedCardHeight(pin)
-        const maxX = Math.max(PIN_CARD_PADDING, containerRect.width - PIN_CARD_WIDTH - PIN_CARD_PADDING)
-        const maxY = Math.max(PIN_CARD_PADDING, containerRect.height - cardHeight - PIN_CARD_PADDING)
-        return {
-          ...pin,
-          x: Math.min(maxX, Math.max(PIN_CARD_PADDING, rawX)),
-          y: Math.min(maxY, Math.max(PIN_CARD_PADDING, rawY)),
-        }
-      }))
-    }
-
-    const onMouseUp = () => {
-      draggingPinnedOffsetRef.current = null
-      setDraggingPinnedId(null)
-    }
-
-    window.addEventListener('mousemove', onMouseMove)
-    window.addEventListener('mouseup', onMouseUp)
-    return () => {
-      window.removeEventListener('mousemove', onMouseMove)
-      window.removeEventListener('mouseup', onMouseUp)
-    }
-  }, [draggingPinnedId])
 
   useEffect(() => {
     setPinnedPatternPoints((prev) => {
@@ -1981,12 +1931,11 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
       <Tabs defaultValue="punto-cero" className="w-full">
         <TabsList className="w-full flex gap-1 overflow-x-auto whitespace-nowrap">
           <TabsTrigger value="punto-cero" className="text-xs shrink-0">Punto Cero</TabsTrigger>
-          <TabsTrigger value="distribuciones" className="text-xs shrink-0">Distribuciones</TabsTrigger>
           <TabsTrigger value="lotes" className="text-xs shrink-0">Lotes</TabsTrigger>
           <TabsTrigger value="tendencia" className="text-xs shrink-0">Tendencia</TabsTrigger>
           <TabsTrigger value="matriz" className="text-xs shrink-0">Matriz Q×C</TabsTrigger>
-          <TabsTrigger value="balance" className="text-xs shrink-0">Balance Gates</TabsTrigger>
-          <TabsTrigger value="insights" className="text-xs shrink-0">Diagnóstico</TabsTrigger>
+          <TabsTrigger value="balance" className="text-xs shrink-0">Compuertas</TabsTrigger>
+          <TabsTrigger value="insights" className="text-xs shrink-0">Sugerencias</TabsTrigger>
         </TabsList>
 
         {/* PUNTO CERO */}
@@ -2409,12 +2358,8 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
                       {pinnedPatternPoints.map((pin) => (
                         <div
                           key={pin.id}
-                          className={cn(
-                            'absolute z-20 w-56 rounded border bg-card/95 shadow-sm p-2 text-[11px] cursor-move select-none',
-                            draggingPinnedId === pin.id && 'ring-1 ring-primary/60',
-                          )}
+                          className="absolute z-20 w-56 rounded border bg-card/95 shadow-sm p-2 text-[11px] select-none"
                           style={{ left: pin.x, top: pin.y }}
-                          onMouseDown={(event) => startDraggingPinnedPoint(event, pin.id)}
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div>
@@ -2894,12 +2839,8 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
         </TabsContent>
 
         {/* DISTRIBUCIONES */}
-        <TabsContent value="distribuciones" className="space-y-4">
-          <Card className="border-primary/20">
-            <CardContent className="pt-4 text-xs text-muted-foreground">
-              Vista optimizada para lectura rápida: se prioriza dato expuesto (tablas y porcentajes visibles) y el hover queda como apoyo.
-            </CardContent>
-          </Card>
+        {/* Tab Distribuciones eliminado — contenido integrado en Matriz Q×C y KPIs */}
+        <div className="hidden">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <Card>
               <CardHeader><CardTitle className="text-sm">Distribución por Calibre</CardTitle></CardHeader>
@@ -3010,7 +2951,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
               </CardContent>
             </Card>
           </div>
-        </TabsContent>
+        </div>
 
         {/* LOTES */}
         <TabsContent value="lotes" className="space-y-4 relative z-10">
@@ -3450,101 +3391,126 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
                       </Button>
                     </div>
 
-                    {trendAIConsistency && (
-                      <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/20 px-2 py-1.5">
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            'text-[10px]',
-                            trendAIConsistency.level === 'alta' && 'border-emerald-500/40 text-emerald-600',
-                            trendAIConsistency.level === 'media' && 'border-amber-500/40 text-amber-600',
-                            trendAIConsistency.level === 'baja' && 'border-red-500/40 text-red-600',
-                          )}
-                        >
-                          Consistencia IA: {trendAIConsistency.level.toUpperCase()} ({trendAIConsistency.score}%)
-                        </Badge>
-                        <p className="text-[11px] text-muted-foreground">{trendAIConsistency.note}</p>
-                      </div>
-                    )}
-
-                    {trendAIDiffRows.length > 0 && (
-                      <div className="rounded-md border bg-muted/20 p-2">
-                        <p className="text-[11px] font-medium mb-1">Comparación corrida anterior vs actual</p>
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-[11px]">
-                            <thead>
-                              <tr className="border-b text-left text-muted-foreground">
-                                <th className="py-1 px-1.5">Ítem</th>
-                                <th className="py-1 px-1.5">Anterior</th>
-                                <th className="py-1 px-1.5">Actual</th>
-                                <th className="py-1 px-1.5">Cambio</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {trendAIDiffRows.map((row) => (
-                                <tr key={row.slot} className="border-b align-top">
-                                  <td className="py-1 px-1.5 font-medium whitespace-nowrap">{row.slot}</td>
-                                  <td className="py-1 px-1.5">
-                                    <p>{row.prevAction}</p>
-                                    <p className="text-muted-foreground">{row.prevWhy}</p>
-                                  </td>
-                                  <td className="py-1 px-1.5">
-                                    <p>{row.newAction}</p>
-                                    <p className="text-muted-foreground">{row.newWhy}</p>
-                                  </td>
-                                  <td className="py-1 px-1.5">
-                                    <Badge
-                                      variant="outline"
-                                      className={cn(
-                                        'text-[10px]',
-                                        row.changeType === 'igual' && 'border-emerald-500/40 text-emerald-600',
-                                        row.changeType === 'ajustada' && 'border-amber-500/40 text-amber-600',
-                                        row.changeType === 'nueva' && 'border-sky-500/40 text-sky-600',
-                                        row.changeType === 'eliminada' && 'border-red-500/40 text-red-600',
-                                      )}
-                                    >
-                                      {row.changeType}
-                                    </Badge>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-
-                    {trendAIRuns.length > 0 ? (
+                    {/* Última corrida — siempre visible */}
+                    {trendAIRuns.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">Sin análisis IA — presiona "Analizar ahora".</p>
+                    ) : (
                       <div className="space-y-2">
-                        {trendAIRuns.map((run) => (
-                          <div key={run.id} className="rounded-md border bg-muted/20 p-2 space-y-1.5">
-                            <p className="text-[11px] text-muted-foreground">
-                              {run.runLabel} · {new Date(run.createdAtIso).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
-                            </p>
-                            {run.recommendations.length > 0 ? (
-                              run.recommendations.map((action, idx) => {
-                                const pr = action.priority === 'high' ? 'alta' : action.priority === 'medium' ? 'media' : 'baja'
-                                const hasSource = hasExplicitSourceInWhy(action.why)
-                                return (
-                                  <div key={`${run.id}-${idx}`} className="text-xs space-y-0.5">
-                                    <p>• Prioridad {pr}: {action.action}</p>
-                                    <p className="text-muted-foreground">{action.why}</p>
-                                    {!hasSource && (
-                                      <p className="text-[11px] text-amber-600">
-                                        ⚠ Falta fuente explícita de datos en la justificación; vuelva a analizar si necesita mayor trazabilidad.
-                                      </p>
-                                    )}
+                        {(() => {
+                          const run = trendAIRuns[0]
+                          if (!run) return null
+                          return (
+                            <div className="rounded-md border bg-muted/20 p-2 space-y-1.5">
+                              <p className="text-[11px] text-muted-foreground font-medium">
+                                Última corrida · {new Date(run.createdAtIso).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                              {run.recommendations.length > 0 ? (
+                                run.recommendations.map((action, idx) => {
+                                  const pr = action.priority === 'high' ? 'alta' : action.priority === 'medium' ? 'media' : 'baja'
+                                  return (
+                                    <div key={`last-${idx}`} className="text-xs space-y-0.5">
+                                      <p>• Prioridad {pr}: {action.action}</p>
+                                      <p className="text-muted-foreground">{action.why}</p>
+                                    </div>
+                                  )
+                                })
+                              ) : (
+                                <p className="text-xs text-muted-foreground">Sin acciones sugeridas.</p>
+                              )}
+                            </div>
+                          )
+                        })()}
+
+                        {/* Historial + comparación — colapsable */}
+                        {trendAIRuns.length >= 2 && (
+                          <div>
+                            <button
+                              type="button"
+                              className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors mt-1"
+                              onClick={() => setShowAIHistory((v) => !v)}
+                            >
+                              <ChevronDown className={cn('h-3 w-3 transition-transform', showAIHistory && 'rotate-180')} />
+                              {showAIHistory ? 'Ocultar historial' : `Ver historial (${trendAIRuns.length - 1} corrida${trendAIRuns.length > 2 ? 's' : ''} anterior${trendAIRuns.length > 2 ? 'es' : ''})`}
+                            </button>
+                            {showAIHistory && (
+                              <div className="space-y-2 mt-2">
+                                {trendAIConsistency && (
+                                  <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/20 px-2 py-1.5">
+                                    <Badge variant="outline" className={cn(
+                                      'text-[10px]',
+                                      trendAIConsistency.level === 'alta' && 'border-emerald-500/40 text-emerald-600',
+                                      trendAIConsistency.level === 'media' && 'border-amber-500/40 text-amber-600',
+                                      trendAIConsistency.level === 'baja' && 'border-red-500/40 text-red-600',
+                                    )}>
+                                      Consistencia: {trendAIConsistency.level.toUpperCase()} ({trendAIConsistency.score}%)
+                                    </Badge>
+                                    <p className="text-[11px] text-muted-foreground">{trendAIConsistency.note}</p>
                                   </div>
-                                )
-                              })
-                            ) : (
-                              <p className="text-xs text-muted-foreground">Sin acciones sugeridas en esta corrida.</p>
+                                )}
+                                {trendAIDiffRows.length > 0 && (
+                                  <div className="rounded-md border bg-muted/20 p-2">
+                                    <p className="text-[11px] font-medium mb-1">Comparación corrida anterior vs actual</p>
+                                    <div className="overflow-x-auto">
+                                      <table className="w-full text-[11px]">
+                                        <thead>
+                                          <tr className="border-b text-left text-muted-foreground">
+                                            <th className="py-1 px-1.5">Ítem</th>
+                                            <th className="py-1 px-1.5">Anterior</th>
+                                            <th className="py-1 px-1.5">Actual</th>
+                                            <th className="py-1 px-1.5">Cambio</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {trendAIDiffRows.map((row) => (
+                                            <tr key={row.slot} className="border-b align-top">
+                                              <td className="py-1 px-1.5 font-medium whitespace-nowrap">{row.slot}</td>
+                                              <td className="py-1 px-1.5">
+                                                <p>{row.prevAction}</p>
+                                                <p className="text-muted-foreground">{row.prevWhy}</p>
+                                              </td>
+                                              <td className="py-1 px-1.5">
+                                                <p>{row.newAction}</p>
+                                                <p className="text-muted-foreground">{row.newWhy}</p>
+                                              </td>
+                                              <td className="py-1 px-1.5">
+                                                <Badge variant="outline" className={cn(
+                                                  'text-[10px]',
+                                                  row.changeType === 'igual' && 'border-emerald-500/40 text-emerald-600',
+                                                  row.changeType === 'ajustada' && 'border-amber-500/40 text-amber-600',
+                                                  row.changeType === 'nueva' && 'border-sky-500/40 text-sky-600',
+                                                  row.changeType === 'eliminada' && 'border-red-500/40 text-red-600',
+                                                )}>
+                                                  {row.changeType}
+                                                </Badge>
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  </div>
+                                )}
+                                {trendAIRuns.slice(1).map((run) => (
+                                  <div key={run.id} className="rounded-md border bg-muted/20 p-2 space-y-1.5">
+                                    <p className="text-[11px] text-muted-foreground">
+                                      {run.runLabel} · {new Date(run.createdAtIso).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
+                                    </p>
+                                    {run.recommendations.map((action, idx) => {
+                                      const pr = action.priority === 'high' ? 'alta' : action.priority === 'medium' ? 'media' : 'baja'
+                                      return (
+                                        <div key={`${run.id}-${idx}`} className="text-xs space-y-0.5">
+                                          <p>• Prioridad {pr}: {action.action}</p>
+                                          <p className="text-muted-foreground">{action.why}</p>
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
+                                ))}
+                              </div>
                             )}
                           </div>
-                        ))}
+                        )}
                       </div>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">Aún no hay recomendación IA para este turno.</p>
                     )}
                   </div>
                 </CardContent>
@@ -3850,8 +3816,16 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
               </CardTitle>
               {analytics.matrixEnhanced.globalHHI > 0 && (
                 <div className="flex flex-wrap gap-2 mt-1">
-                  <Badge variant="outline" className="text-[10px]">
-                    HHI Global: {analytics.matrixEnhanced.globalHHI.toFixed(3)}
+                  <Badge variant="outline" className={cn(
+                    'text-[10px]',
+                    analytics.matrixEnhanced.globalHHI > 0.5 && 'text-red-600 border-red-300',
+                    analytics.matrixEnhanced.globalHHI > 0.25 && analytics.matrixEnhanced.globalHHI <= 0.5 && 'text-amber-600 border-amber-300',
+                    analytics.matrixEnhanced.globalHHI <= 0.25 && 'text-emerald-600 border-emerald-300',
+                  )}>
+                    Concentración: {
+                      analytics.matrixEnhanced.globalHHI > 0.5 ? 'Alta ⚠' :
+                      analytics.matrixEnhanced.globalHHI > 0.25 ? 'Media' : 'Baja ✓'
+                    }
                     <InfoTooltip {...getTooltipProps('matrix.hhi')} iconSize={11} className="ml-1" />
                   </Badge>
                   <Badge variant="outline" className={cn(
@@ -3865,7 +3839,6 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
                   {analytics.matrixEnhanced.maxCell && (
                     <Badge variant="outline" className="text-[10px]">
                       Celda Max: {analytics.matrixEnhanced.maxCell.quality}×{analytics.matrixEnhanced.maxCell.calibre} ({analytics.matrixEnhanced.maxCell.pct}%)
-                      <InfoTooltip {...getTooltipProps('matrix.maxCell')} iconSize={11} className="ml-1" />
                     </Badge>
                   )}
                 </div>
@@ -3883,7 +3856,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
                         ))}
                         <th className="py-2 px-2 text-center">
                           <span className="flex items-center justify-center gap-1">
-                            HHI
+                            Conc.
                             <InfoTooltip {...getTooltipProps('matrix.hhiQuality')} iconSize={11} />
                           </span>
                         </th>
@@ -3922,10 +3895,12 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
                             <td className="py-2 px-2 text-center text-xs">
                               {hhiRow ? (
                                 <span className={cn(
-                                  hhiRow.hhi > 0.5 && 'text-red-600 font-medium',
+                                  'font-medium',
+                                  hhiRow.hhi > 0.5 && 'text-red-600',
                                   hhiRow.hhi > 0.25 && hhiRow.hhi <= 0.5 && 'text-amber-600',
+                                  hhiRow.hhi <= 0.25 && 'text-emerald-600',
                                 )}>
-                                  {hhiRow.hhi.toFixed(3)}
+                                  {hhiRow.hhi > 0.5 ? 'Alta' : hhiRow.hhi > 0.25 ? 'Media' : 'Baja'}
                                 </span>
                               ) : '—'}
                             </td>
@@ -3937,7 +3912,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
                         <tr className="border-t-2 bg-muted/30">
                           <td className="py-2 px-2 font-medium text-xs">
                             <span className="flex items-center gap-1">
-                              HHI
+                              Conc.
                               <InfoTooltip {...getTooltipProps('matrix.hhiCalibre')} iconSize={11} />
                             </span>
                           </td>
@@ -3947,17 +3922,19 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
                               <td key={c} className="py-2 px-2 text-center text-xs">
                                 {hhiCol ? (
                                   <span className={cn(
-                                    hhiCol.hhi > 0.5 && 'text-red-600 font-medium',
+                                    'font-medium',
+                                    hhiCol.hhi > 0.5 && 'text-red-600',
                                     hhiCol.hhi > 0.25 && hhiCol.hhi <= 0.5 && 'text-amber-600',
+                                    hhiCol.hhi <= 0.25 && 'text-emerald-600',
                                   )}>
-                                    {hhiCol.hhi.toFixed(3)}
+                                    {hhiCol.hhi > 0.5 ? 'Alta' : hhiCol.hhi > 0.25 ? 'Media' : 'Baja'}
                                   </span>
                                 ) : '—'}
                               </td>
                             )
                           })}
                           <td className="py-2 px-2 text-center text-xs font-bold">
-                            {analytics.matrixEnhanced.globalHHI.toFixed(3)}
+                            {analytics.matrixEnhanced.globalHHI > 0.5 ? 'Alta' : analytics.matrixEnhanced.globalHHI > 0.25 ? 'Media' : 'Baja'}
                           </td>
                         </tr>
                       )}
