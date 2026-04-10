@@ -280,6 +280,45 @@ service cloud.firestore {
         && (!('relatedSpares' in d) || d.relatedSpares is list);
     }
 
+    function isValidAriaCorrection() {
+      let d = request.resource.data;
+      return d.userQuery is string && d.userQuery.size() >= 1 && d.userQuery.size() <= 2000
+        && d.wrongResponse is string && d.wrongResponse.size() > 0
+        && d.correctResponse is string && d.correctResponse.size() > 0
+        && d.category is string && d.category.size() > 0
+        && d.createdBy is string && d.createdBy == request.auth.uid
+        && d.usageCount is int && d.usageCount >= 0
+        && d.active is bool
+        && (!('equipmentName' in d) || d.equipmentName is string);
+    }
+
+    function isValidMapLocation() {
+      let d = request.resource.data;
+      return d.nombre is string && d.nombre.size() >= 1 && d.nombre.size() <= 100
+        && d.activo is bool
+        && d.orden is int
+        && d.createdBy is string && d.createdBy.size() > 0
+        && (!('descripcion' in d) || d.descripcion is string);
+    }
+
+    function isValidRole() {
+      let d = request.resource.data;
+      return d.nombre is string && d.nombre.size() >= 1 && d.nombre.size() <= 100
+        && d.descripcion is string && d.descripcion.size() > 0
+        && d.permisos is map
+        && d.esDefault is bool;
+    }
+
+    function isValidInviteCode() {
+      let d = request.resource.data;
+      return d.code is string && d.code.size() >= 4 && d.code.size() <= 50
+        && d.rol in ['admin', 'supervisor', 'tecnico', 'usuario']
+        && d.usosMaximos is int && d.usosMaximos > 0
+        && d.usosActuales is int && d.usosActuales >= 0
+        && d.activo is bool
+        && d.createdBy is string && d.createdBy.size() > 0;
+    }
+
     // ============================================
     // JERARQUÍAS ORGANIZACIONALES (8 niveles)
     // ============================================
@@ -723,7 +762,7 @@ service cloud.firestore {
     // ARIA – User corrections
     match /ariaCorrections/{docId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidAriaCorrection();
       allow update, delete: if isAdmin();
     }
 
@@ -798,7 +837,8 @@ service cloud.firestore {
     // ============================================
     match /mapLocations/{locationId} {
       allow read: if isAuthenticated();
-      allow create, update, delete: if isAdmin();
+      allow create: if isAdmin() && isValidMapLocation();
+      allow update, delete: if isAdmin();
     }
 
     match /mapVersions/{versionId} {
@@ -996,7 +1036,7 @@ service cloud.firestore {
     // ============================================
     match /inviteCodes/{codeId} {
       allow read: if isAuthenticated();
-      allow create: if isAdmin();
+      allow create: if isAdmin() && isValidInviteCode();
       allow update: if isAuthenticated(); // mark as used on registration
       allow delete: if isAdmin();
     }
@@ -1006,7 +1046,8 @@ service cloud.firestore {
     // ============================================
     match /roles/{roleId} {
       allow read: if isAuthenticated();
-      allow create, update, delete: if isAdmin();
+      allow create: if isAdmin() && isValidRole();
+      allow update, delete: if isAdmin();
     }
 
     // ============================================
