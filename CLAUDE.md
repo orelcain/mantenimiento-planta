@@ -3,6 +3,20 @@
 > Sistema de mantenimiento industrial para plantas de procesamiento de pescado.
 > PWA con soporte offline, monorepo Turbo, React + Vite + Firebase.
 
+## Rutina de inicio de sesión (OBLIGATORIO)
+
+Cuando el usuario envíe un saludo como primer mensaje (`hola`, `buenas`, `buenos días`, `hi`, etc.), responder **SIEMPRE** con este menú exacto, sin agregar texto extra antes ni después:
+
+**¿Por dónde empezamos?**
+1. 🔍 Auditar deploys
+2. 📋 Revisar pendientes
+3. 🔄 Sync rápido con GitHub
+4. 💬 Otra cosa
+
+Esperar la elección del usuario antes de hacer cualquier acción.
+
+---
+
 ## Reglas de desarrollo
 
 - **Idioma**: Siempre responder en **ESPAÑOL**. Ahorrar tokens.
