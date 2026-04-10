@@ -138,6 +138,61 @@ service cloud.firestore {
         && d.updatedAt is int;
     }
 
+    function isValidSparePart() {
+      let d = request.resource.data;
+      return d.codigo is string && d.codigo.size() >= 1 && d.codigo.size() <= 50
+        && d.nombre is string && d.nombre.size() >= 1 && d.nombre.size() <= 200
+        && d.categoria is string && d.categoria.size() > 0
+        && d.unidad is string && d.unidad.size() > 0
+        && (d.stockActual is int || d.stockActual is float) && d.stockActual >= 0
+        && (d.stockMinimo is int || d.stockMinimo is float) && d.stockMinimo >= 0
+        && d.equiposCompatibles is list
+        && (!('descripcion' in d) || d.descripcion is string)
+        && (!('stockMaximo' in d) || (d.stockMaximo is number && d.stockMaximo >= 0))
+        && (!('ubicacion' in d) || d.ubicacion is string)
+        && (!('proveedor' in d) || d.proveedor is string)
+        && (!('costoUnitario' in d) || d.costoUnitario is number);
+    }
+
+    function isValidBodega() {
+      let d = request.resource.data;
+      return d.codigoSAP is string && d.codigoSAP.size() >= 1 && d.codigoSAP.size() <= 50
+        && (d.stockActual is int || d.stockActual is float) && d.stockActual >= 0
+        && (d.stockMinimo is int || d.stockMinimo is float) && d.stockMinimo >= 0
+        && d.ubicacionBodega is string && d.ubicacionBodega.size() > 0
+        && d.unidad is string && d.unidad.size() > 0
+        && (!('stockMaximo' in d) || (d.stockMaximo is number && d.stockMaximo >= 0))
+        && (!('proveedor' in d) || d.proveedor is string)
+        && (!('costoCompra' in d) || d.costoCompra is number)
+        && (!('leadTime' in d) || d.leadTime is int)
+        && (!('categoria' in d) || d.categoria in ['A', 'B', 'C'])
+        && (!('observaciones' in d) || d.observaciones is string)
+        && (!('fotos' in d) || d.fotos is list);
+    }
+
+    function isValidBodegaInventario() {
+      let d = request.resource.data;
+      return d.nombre is string && d.nombre.size() >= 1 && d.nombre.size() <= 200
+        && d.estado in ['en_curso', 'finalizado']
+        && d.creadoPor is string && d.creadoPor.size() > 0
+        && d.creadoPorNombre is string && d.creadoPorNombre.size() > 0
+        && d.totalItems is int && d.totalItems >= 0
+        && d.contados is int && d.contados >= 0
+        && d.conDiferencia is int && d.conDiferencia >= 0;
+    }
+
+    function isValidMachineCategory() {
+      let d = request.resource.data;
+      return d.nombre is string && d.nombre.size() >= 1 && d.nombre.size() <= 100
+        && d.icono is string && d.icono.size() > 0
+        && d.orden is int
+        && d.activa is bool
+        && d.visible is bool
+        && (!('descripcion' in d) || d.descripcion is string)
+        && (!('parentId' in d) || d.parentId is string || d.parentId == null)
+        && (!('nivel' in d) || d.nivel is int);
+    }
+
     // ============================================
     // JERARQUÍAS ORGANIZACIONALES (8 niveles)
     // ============================================
@@ -423,7 +478,7 @@ service cloud.firestore {
     // Repuestos
     match /spareParts/{partId} {
       allow read: if isAuthenticated();
-      allow create: if isAdmin() || isSupervisor();
+      allow create: if (isAdmin() || isSupervisor()) && isValidSparePart();
       allow update: if isTechnician();
       allow delete: if isAdmin();
     }
@@ -439,7 +494,7 @@ service cloud.firestore {
     // Bodega de repuestos — stock overlay por código SAP
     match /bodega/{codigoSAP} {
       allow read: if isAuthenticated();
-      allow create: if isTechnician();
+      allow create: if isTechnician() && isValidBodega();
       allow update: if isTechnician();
       allow delete: if isAdmin();
 
@@ -455,7 +510,7 @@ service cloud.firestore {
     // Inventarios periódicos de bodega
     match /bodega_inventarios/{inventarioId} {
       allow read: if isAuthenticated();
-      allow create: if isSupervisor();
+      allow create: if isSupervisor() && isValidBodegaInventario();
       allow update: if isTechnician();
       allow delete: if isAdmin();
 
@@ -588,7 +643,8 @@ service cloud.firestore {
     // ============================================
     match /machineCategories/{categoryId} {
       allow read: if isAuthenticated();
-      allow create, update, delete: if isAdmin();
+      allow create: if isAdmin() && isValidMachineCategory();
+      allow update, delete: if isAdmin();
     }
 
     // ============================================
