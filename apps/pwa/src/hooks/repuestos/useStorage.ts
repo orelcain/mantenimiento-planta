@@ -179,7 +179,7 @@ export function useStorage(machineId: string | null, manualStoragePath?: string)
       setUploading(false);
       // Mantener el progreso visible (p.ej. 100%) hasta el próximo upload
     }
-  }, [machineId]);
+  }, [machineId, manualStoragePath]);
 
   // Obtener URL del manual - busca cualquier PDF en las carpetas usando listAll()
   const getManualURL = useCallback(async (): Promise<string | null> => {
@@ -207,7 +207,7 @@ export function useStorage(machineId: string | null, manualStoragePath?: string)
 
     // Silenciosamente retornar null (normal para máquinas nuevas sin manual)
     return null;
-  }, [machineId]);
+  }, [machineId, manualStoragePath]);
 
   // Subir infografía/diagrama (imagen, PDF, modelo 3D)
   const uploadInfografia = useCallback(async (file: File, fileName?: string): Promise<string> => {

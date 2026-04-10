@@ -310,7 +310,9 @@ export function BuscadorGlobal({ initialQuery, onQueryConsumed, onViewInCatalog 
       orden: 0,
       createdAt: new Date(),
     }))
-  }, [hierarchyNames]) // re-calc when hierarchy loads
+    // Trigger re-calc cuando la jerarquía carga (cache global no es reactivo)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hierarchyNames])
 
   // Lookup: machineId → { equipmentName, breadcrumb }
   const machineInfoMap = useMemo(() => {

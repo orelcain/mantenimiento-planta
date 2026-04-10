@@ -357,7 +357,7 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
       realizadoPor: userId, realizadoPorNombre: userName, createdAt: serverTimestamp(),
     })
     await reloadBodega()
-  }, [bodegaOverlays, reloadBodega])
+  }, [reloadBodega])
 
   // ── Cargar movimientos ──
   const loadMovimientos = useCallback(async (bodegaDocId: string, max = 30): Promise<MovimientoBodega[]> => {

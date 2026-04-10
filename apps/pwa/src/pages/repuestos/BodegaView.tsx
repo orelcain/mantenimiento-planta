@@ -102,6 +102,8 @@ export function BodegaView({ onViewInEquipo, onSearchSimilar }: BodegaViewProps 
       id, nombre: info.nombre, marca: '', modelo: '',
       activa: true, color: '#6b7280', orden: 0, createdAt: new Date(),
     }))
+    // Trigger re-calc cuando la jerarquía carga (cache global no es reactivo)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hierarchyNames])
 
   const { allRepuestos, loadAll, loaded, loading: catalogLoading, progress } = useGlobalSearch(machines)
@@ -690,13 +692,14 @@ function MovimientosTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
   const [filtroTipo, setFiltroTipo] = useState<MovFilter>('todos')
   const [searchMov, setSearchMov] = useState('')
 
+  const { loadAllMovimientos } = bodega
   useEffect(() => {
     setLoading(true)
-    bodega.loadAllMovimientos(50).then(data => {
+    loadAllMovimientos(50).then(data => {
       setMovimientos(data)
       setLoading(false)
     }).catch(() => setLoading(false))
-  }, [bodega.loadAllMovimientos])
+  }, [loadAllMovimientos])
 
   const filtered = useMemo(() => {
     let result = movimientos
@@ -801,17 +804,17 @@ function MovimientosTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
 // ══════════════════════════════════════════════
 
 function EstadisticasTab({ bodega }: { bodega: ReturnType<typeof useBodega> }) {
-  const { items, stats } = bodega
+  const { items, stats, loadAllMovimientos } = bodega
   const [movimientos, setMovimientos] = useState<MovimientoBodega[]>([])
   const [movLoading, setMovLoading] = useState(true)
 
   useEffect(() => {
     setMovLoading(true)
-    bodega.loadAllMovimientos(30).then(data => {
+    loadAllMovimientos(30).then(data => {
       setMovimientos(data)
       setMovLoading(false)
     }).catch(() => setMovLoading(false))
-  }, [bodega.loadAllMovimientos])
+  }, [loadAllMovimientos])
 
   // Rotación por ítem (salidas / stock promedio)
   const rotacionData = useMemo(() => {

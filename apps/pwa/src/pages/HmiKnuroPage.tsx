@@ -286,7 +286,7 @@ export function HmiKnuroPage() {
     setPresets(presetsData)
     setCurrentPresetName(current)
     iframeRef.current?.contentWindow?.postMessage({ type: 'hmi:init', presets: presetsData, current, refs, order: presetOrder }, '*')
-  }, [user])
+  }, [user, presetOrder])
 
   const saveAsDefaults = useCallback(async () => {
     if (!user) return

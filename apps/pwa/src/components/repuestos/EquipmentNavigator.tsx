@@ -64,6 +64,16 @@ interface EquipmentNavigatorProps {
 }
 
 /** Verdadero si el nodo o alguno de sus descendientes tiene el id dado */
+// Helper top-level: buscar equipo en el árbol por ID (estable, no depende del closure)
+function findEquipmentInTree(nodes: EquipmentDisplayNode[], id: string): EquipmentDisplayNode | null {
+  for (const eq of nodes) {
+    if (eq.id === id) return eq
+    const found = findEquipmentInTree(eq.children, id)
+    if (found) return found
+  }
+  return null
+}
+
 function nodeContains(node: AreaTreeNode, targetId: string): boolean {
   if (node.id === targetId) return true
   return node.children.some(c => nodeContains(c, targetId))
@@ -1163,16 +1173,6 @@ export function EquipmentNavigator({
     // Auto-colapsar navigator en mobile al seleccionar equipo
     if (window.innerWidth < 640) setMobileNavExpanded(false)
   }, [setCurrentMachine, clearCurrentMachine, onEquipmentSelect])
-
-  // Helper: buscar equipo en el árbol por ID
-  function findEquipmentInTree(nodes: EquipmentDisplayNode[], id: string): EquipmentDisplayNode | null {
-    for (const eq of nodes) {
-      if (eq.id === id) return eq
-      const found = findEquipmentInTree(eq.children, id)
-      if (found) return found
-    }
-    return null
-  }
 
   // Handler para seleccionar un equipo desde la búsqueda global
   const handleGlobalSearchSelect = useCallback((result: GlobalEquipmentResult) => {
