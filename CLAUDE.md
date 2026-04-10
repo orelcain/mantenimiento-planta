@@ -3,17 +3,46 @@
 > Sistema de mantenimiento industrial para plantas de procesamiento de pescado.
 > PWA con soporte offline, monorepo Turbo, React + Vite + Firebase.
 
-## Rutina de inicio de sesión (OBLIGATORIO)
+## Rutina de sesión (OBLIGATORIO — aplica a Claude Code desktop y claude.ai web)
 
-Cuando el usuario envíe un saludo como primer mensaje (`hola`, `buenas`, `buenos días`, `hi`, etc.), responder **SIEMPRE** con este menú exacto, sin agregar texto extra antes ni después:
+### 🟢 INICIO — Flujo de 2 pasos
+
+**Paso 1** — Cuando el usuario envíe un saludo o mensaje genérico (`hola`, `buenas`, `hi`, etc.) como primer mensaje, responder SIEMPRE con `AskUserQuestion` preguntando:
+
+**¿Qué hacemos hoy?**
+1. Proyecto mantenimiento-planta — continuar desarrollo
+2. Otro proyecto de desarrollo
+3. Conversación libre — consulta, brainstorming, sin contexto de proyecto
+
+Si el primer mensaje YA es una instrucción específica (`arregla X`, `agrega Y`) → saltarse el menú y ejecutar directo.
+
+**Paso 2A — Si elige mantenimiento-planta**, preguntar inmediatamente con otro `AskUserQuestion`:
 
 **¿Por dónde empezamos?**
-1. 🔍 Auditar deploys
-2. 📋 Revisar pendientes
-3. 🔄 Sync rápido con GitHub
-4. 💬 Otra cosa
+1. Sync rápido — `git pull` + resumen commits nuevos (Claude Code desktop) / revisar últimos commits en GitHub (claude.ai web)
+2. Auditar deploys — `gh run list --limit 20` o revisar GitHub Actions
+3. Revisar pendientes — leer sección "Pendientes priorizados" de este archivo
+4. Otra cosa — el usuario describe
 
-Esperar la elección del usuario antes de hacer cualquier acción.
+Si elige múltiples opciones (`los 3`, `todos`, `1 y 2`) → ejecutarlas EN PARALELO en un solo bloque multi-tool y presentar resumen unificado: SYNC (commits nuevos) / DEPLOYS (estado por workflow) / PENDIENTES (P0/P1 activos).
+
+**Paso 2B — Si elige otro proyecto** → preguntar cuál es y su ruta/repo, aplicar la misma lógica.
+
+**Paso 2C — Si elige conversación libre** → proceder normalmente sin cargar contexto de proyecto.
+
+### 🔴 CIERRE
+
+Cuando el usuario diga `cerrar`, `terminar`, `ya está`, `gracias`, `hasta luego` o similar, ofrecer vía `AskUserQuestion`:
+
+1. **Cierre formal** (skill `cerrar-sesion`) — actualizar CLAUDE.md (pendientes completados/nuevos, notas) + commit descriptivo + push
+2. **Solo commit + push** — sync sin actualizar docs
+3. **Cerrar sin sincronizar** — si los cambios son experimentales o ya están en GitHub
+
+### Notas
+
+- Esta rutina es la fuente única de verdad para ambos entornos (Claude Code desktop y claude.ai web).
+- En claude.ai web, Claude lee este CLAUDE.md automáticamente al abrir el proyecto conectado a GitHub.
+- En Claude Code desktop, el hook `SessionStart` en `~/.claude/hooks/session-start-rutina.json` refuerza la misma rutina.
 
 ---
 
