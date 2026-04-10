@@ -175,7 +175,56 @@ sidebarConfig  ← nuevo: orden personalizado del sidebar admin
 - CI status: 4/4 workflows 🟢 (Deploy PWA, Deploy Functions, Deploy Firestore Rules, Daily Sync)
 - Seguridad: 23 colecciones Firestore validadas, 0 vulnerabilidades runtime prod
 
-## Cambios recientes (sesion 2026-04-10 — P3 completo)
+## Cambios recientes (sesion 2026-04-10 tarde — Grader refactor + CI fix, 7 commits)
+
+### Módulo Análisis Grader — rediseño completo para uso diario en planta
+
+**fix(grader): parser bugs con datos reales de Matrix** (`1afd476`)
+- `normalizeQuality`: 'CALIDAD D' (formato Matrix) → 'D' (antes → 'Unknown')
+- `parseNum`: strip sufijos de unidad ('kg', 'g', 'lb') antes de parsear → fix pesos como '10,91 kg'
+- `normalizeCalibre`: '12 - Up lb' → '10-12 lb'; regex generalizado de hardcoded '10-UP' a cualquier 'N-UP'
+
+**feat(grader): single-page flow** (`2064738`)
+- Elimina wizard de 2 pasos. Página única: upload visible, gates colapsable, alertas + dashboard automáticos
+- Alertas (critical/warn) aparecen de inmediato al cargar archivos sin necesidad de navegar
+- `onApplyGateSuggestion` ahora abre el acordeón de compuertas en lugar de cambiar de paso
+
+**refactor(grader): dropzone unificado + auto-análisis** (`8722053`)
+- Una sola zona de drop para PP y P0 simultáneos (auto-detección por columnas)
+- Auto-análisis: `useRef` estable para `onComplete` + `useEffect` en `files` — se dispara solo al detectar PIEZA_PIEZA
+- Banner de turno con estilo emerald, warning "Sin Puerta 0" mejorado
+- Elimina `dragOverP0` state, `inputRefP0` ref, botón "Usar archivos cargados"
+
+**refactor(grader): UI facelift** (`075863b`)
+- Dashboard: `onBack` opcional, botón de volver oculto cuando está embebido en WizardPage
+- Action bar: Guardar Sesión primero, exports agrupados, JSON reducido a solo ícono
+- KPIs: `text-xl` + `tabular-nums` para lectura rápida
+- WizardPage: alertas muestran TODAS las evidencias y recomendaciones, estado OK mejorado
+
+**refactor(grader): simplify dashboard** (`32e7086`)
+- **Drag removido** de pin cards: sin state `draggingPinnedId`, sin `useEffect` global de mouse (~50 líneas)
+- **Tab "Distribuciones" ocultado** (redundante con KPIs + Matriz Q×C). Tabs: 7 → 6
+- **Tabs renombrados** al lenguaje del operador: "Balance Gates" → "Compuertas", "Diagnóstico" → "Sugerencias"
+- **HHI humanizado**: badge "Concentración: Alta ⚠ / Media / Baja ✓", celdas muestran texto no número
+- **Historial IA colapsado**: última corrida siempre visible, corridas anteriores tras toggle "Ver historial (N)"
+
+**fix(ci)**: 2 commits (`77099a3`, `fd2d5cb`) para corregir 2 funciones huérfanas + TypeScript versión
+
+### Gotcha crítico: TypeScript version mismatch local vs CI
+- **Entorno local**: TypeScript 6.0.2 instalado globalmente (`npx tsc`)
+- **CI**: TypeScript 5.7.x (lo que pide `package.json: "^5.7.2"`)
+- TS 6 trata `baseUrl` como error TS5101 (exit code 2). TS 5.7 solo warning → CI pasaba.
+- `ignoreDeprecations: "6.0"` es inválido para TS 5.7 (no conoce deprecaciones de la v6) → rompe CI.
+- **Regla**: no agregar opciones tsconfig que solo existan en versiones > la del package.json.
+- **Para diagnosticar errores CI reales**: buscar variables/funciones declaradas pero no usadas tras quitar código.
+
+### Gotcha: funciones huérfanas tras refactors
+- Al eliminar código (drag handlers, secciones enteras), siempre buscar helpers que SOLO se usaban ahí.
+- `estimatePinnedCardHeight`: calculaba altura para drag bounds — quedó sin uso al quitar drag.
+- `hasExplicitSourceInWhy`: validación AI — estaba declarada pero nunca llamada (bug previo al refactor).
+- `noUnusedLocals: true` en tsconfig lo detecta en CI. Grep: `grep -n "nombreFuncion"` para confirmar.
+
+## Cambios recientes (sesion 2026-04-10 mañana — P3 completo)
 
 ### P3 finalizado — Node 24, fast-refresh, lockfile seguridad
 - **Node.js 20 → 24** en los 4 workflows: `deploy.yml`, `deploy-functions.yml`, `daily-sync.yml`, `deploy-firestore-rules.yml` (este último no tenía setup-node explícito, se agregó).
@@ -332,6 +381,15 @@ sidebarConfig  ← nuevo: orden personalizado del sidebar admin
 
 ## Pendientes priorizados
 
+### P0 — Grader: mejoras para uso diario en producción (próxima sesión)
+- [ ] **Panel proyección turno** (tab Tendencia): tarjeta prominente al top con tiempo restante, P0 proyectado al cierre (color-coded), piezas proyectadas, tendencia ↑↓→ del peso
+- [ ] **Chart de peso simplificado**: toggle "Modo simple" (observed+projected) / "Modo detallado" (+MA5+σ) — por defecto simple
+- [ ] **Badge P0 cierre prominente**: mover "Proyección Punto Cero cierre: X piezas (Y%)" de texto pequeño bajo chart → badge/KPI destacado en el header de la card
+- [ ] **Umbrales colapsables**: wrappear inputs de P0 warn/crítico en sección "Ajustar umbrales" colapsable por defecto
+- [ ] **IA Tendencia**: mejorar visualización de sugerencias automáticas, integrar análisis de patrones multisesión
+- [ ] **Comparativa turno día/noche**: detectar si hay datos de ambos turnos y mostrar diferencias de P0, calibre, peso
+- [ ] **Degradación de sensores**: detectar si un mismo error (fotocélula, fuera de límites) se repite creciendo en el tiempo
+
 ### P1 — Requiere acceso a Firebase Console / IAM
 - [ ] **App Check**: ReCaptchaV3 + enforceAppCheck en Cloud Functions
 
@@ -383,3 +441,31 @@ Al iniciar una nueva sesion de Claude Code en este proyecto:
 6. Preview: usar `.claude/launch.json` con `preview_start`
 7. **Al terminar la sesion**: ejecutar skill `cerrar-sesion` para actualizar este archivo
 8. **Durante la sesion**: pensar en oportunidades de crear skills nuevas
+
+### Módulo Análisis Grader — contexto para próxima sesión
+
+**Objetivo del módulo**: Soporte de decisiones en tiempo real para operadores de clasificadora (grader) de salmones durante un turno activo. Se sube un Excel exportado del software Matrix y el sistema sugiere cambios de compuertas, limpieza de sensores, recalibración.
+
+**Arquitectura de datos**:
+- `PIEZA_PIEZA`: fuente de verdad (peso, calibre, calidad, gate, lote, timestamp)
+- `PUERTA_0`: enriquece razones de rechazo (fotocélula, fuera de límites, etc.)
+- Gate 0 = "Punto Cero" = rechazados. 12 gates activas.
+- El % de P0 es el KPI principal del turno.
+
+**Archivos clave**:
+- `AnalisisGraderWizardPage.tsx` — página contenedora (upload + gates + dashboard)
+- `AnalisisGraderUploadPage.tsx` — dropzone unificado con auto-análisis
+- `AnalisisGraderDashboardPage.tsx` — dashboard completo (~4500 líneas)
+- `services/grader/graderAnalytics.ts` — motor de cálculo KPIs, distribuciones, HHI
+- `services/grader/graderInsights.ts` — insights deterministas + tendencia P0
+- `services/grader/types.ts` — tipos (ParsedMatrixData, GateAssignment, etc.)
+
+**Tab Tendencia** (foco principal próxima sesión):
+- `trendForecastView` useMemo: proyección turno completo via regresión lineal
+  - Produce: `projectedPointZeroPct`, `projectedTotalPieces`, `completionPct`, `shiftStart/EndLabel`
+- `trendAutoRecommendations`: sugerencias de gate swap basadas en P0 proyectado vs umbrales
+- Mejoras pendientes: ver sección P0 en pendientes priorizados
+
+**TypeScript gotcha (IMPORTANTE)**:
+- Localmente hay TS 6.0.2. El proyecto usa TS 5.7.x. NO agregar `ignoreDeprecations: "6.0"` al tsconfig.
+- Siempre verificar que `noUnusedLocals` pase: al eliminar código buscar helpers huérfanos con grep.
