@@ -12,37 +12,15 @@ import { useMemo } from 'react'
 import * as THREE from 'three'
 import type { TerrainTile, IsometricMapConfig } from '@/types/isometricMap'
 import {
-  buildElevationMap,
-  computeTerrainMetrics,
-  computeTerrainDataBounds,
   buildTerrainSolidGeometry,
   buildTerrainContourGeometry,
 } from '@/lib/terrainGeometry'
+import { useTerrainData } from './useTerrainData'
 
 export interface TerrainMeshProps {
   terrain: TerrainTile[]
   config: IsometricMapConfig
   satelliteTextureCanvas?: HTMLCanvasElement | null
-}
-
-/** Re-export computed terrain helpers for consumers that need raw data (e.g. OSMOverlay3D). */
-export function useTerrainData(terrain: TerrainTile[] | undefined) {
-  const elevationMap = useMemo(
-    () => buildElevationMap(terrain ?? []),
-    [terrain],
-  )
-
-  const metrics = useMemo(
-    () => computeTerrainMetrics(terrain ?? []),
-    [terrain],
-  )
-
-  const dataBounds = useMemo(
-    () => computeTerrainDataBounds(terrain ?? []),
-    [terrain],
-  )
-
-  return { elevationMap, metrics, dataBounds }
 }
 
 export function TerrainMesh({ terrain, config, satelliteTextureCanvas }: TerrainMeshProps) {

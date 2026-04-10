@@ -175,6 +175,24 @@ sidebarConfig  ← nuevo: orden personalizado del sidebar admin
 - CI status: 4/4 workflows 🟢 (Deploy PWA, Deploy Functions, Deploy Firestore Rules, Daily Sync)
 - Seguridad: 23 colecciones Firestore validadas, 0 vulnerabilidades runtime prod
 
+## Cambios recientes (sesion 2026-04-10 — P3 completo)
+
+### P3 finalizado — Node 24, fast-refresh, lockfile seguridad
+- **Node.js 20 → 24** en los 4 workflows: `deploy.yml`, `deploy-functions.yml`, `daily-sync.yml`, `deploy-firestore-rules.yml` (este último no tenía setup-node explícito, se agregó).
+- **TerrainMesh fast-refresh**: `useTerrainData` extraído a `useTerrainData.ts` propio. `TerrainMesh.tsx` ahora solo exporta el componente → 0 warnings fast-refresh.
+- **Dependabot lockfile 7→1**: edición quirúrgica directa del `pnpm-lock.yaml` (sin `pnpm install` por CDN SheetJS 403 en entorno web):
+  - `@xmldom/xmldom` 0.9.8 → 0.9.9 (mammoth; override ya definido, lockfile no se había regenerado)
+  - `minimatch` 10.1.1 → 10.2.5 (4 paquetes de eslint)
+  - `picomatch` 4.0.3 → 4.0.4 (anymatch, micromatch, readdirp)
+  - Restante: `rollup@4.54.0` HIGH via vite-plugin-pwa (devDep build-only)
+- **CLAUDE.md limpiado**: P2 contenido Seguridad/Marel removido (decidido no continuar), P3 totalmente marcado.
+
+### Gotcha: SheetJS CDN 403 en entorno web
+- `https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz` retorna 403 en Claude Code Web.
+- `pnpm install --no-frozen-lockfile` falla en entorno web por este motivo.
+- **Workaround**: editar el lockfile directamente cuando los paquetes de reemplazo ya existen en él.
+- **En PC local / CI**: el CDN es accesible y `pnpm install` funciona normalmente.
+
 ## Cambios recientes (sesion 2026-04-09 tarde — P1.5 + P2/P3, 8 commits)
 
 ### Sesión P1.5 completada + P2/P3 quick wins
@@ -251,16 +269,15 @@ sidebarConfig  ← nuevo: orden personalizado del sidebar admin
 - ✅ **Input sanitization Firestore**: 16 colecciones validadas en 4 lotes (162e0d1e, 78908d73, 35262779, 601d7a00). Total: 23 colecciones con isValid*() en firestore.rules. Deploy Firestore Rules 🟢.
 
 ### P2 — Mejoras UX futuras
-- [ ] **Contenido real Seguridad** (`/aprendizaje/seguridad`): PDFs EPP, videos LOTO — requiere material del usuario
-- [ ] **Contenido real Marel** (`/aprendizaje/marel`): guias por equipo MX, Stork Trim, Scanvaegt — requiere material del usuario
 - ✅ **Modo alto contraste en calendario** (57345d13): override CSS `.high-contrast` para clases hardcoded `bg-zinc-*`, `text-zinc-*`, `bg-cyan/amber/violet-500/5`, `bg-*-950/60`. Verificado con 9/9 tests programáticos.
 - ✅ **Editor sidebar mobile** (55b81fbc): touch target handles 20px → 44×44px (WCAG), TouchSensor delay 250→200ms, tolerance 5→8px, aria-label en handles.
 
 ### P3 — Mantenimiento menor no urgente
-- ✅ **Warnings React Hook exhaustive-deps** (f9bf1779): 10 → 1 warning. Margen CI 9. Arreglos en `BodegaView.tsx` (extraer loadAllMovimientos), `BuscadorGlobal.tsx` (eslint-disable justificado), `useStorage.ts` (agregar manualStoragePath), `HmiKnuroPage.tsx` (agregar presetOrder), `EquipmentNavigator.tsx` (mover findEquipmentInTree a top-level), `useBodega.ts` (quitar bodegaOverlays).
-- [ ] Node.js 20 deprecation en GitHub Actions — forzaran Node 24 desde junio 2026 (~2 meses margen)
-- [ ] `TerrainMesh.tsx` fast-refresh warning (solo DX, único warning restante)
-- [ ] 8 alertas Dependabot restantes en devDeps y transitivas de `pnpm-lock.yaml` (no afectan runtime prod)
+- ✅ **Warnings React Hook exhaustive-deps** (f9bf1779): 10 → 1 warning. Margen CI 9.
+- ✅ **Node.js 20 → 24** en los 4 workflows GitHub Actions (sesion 2026-04-10).
+- ✅ **TerrainMesh fast-refresh warning**: `useTerrainData` movido a `useTerrainData.ts` propio (sesion 2026-04-10).
+- ✅ **Dependabot 8→1**: xmldom, minimatch, picomatch corregidos en lockfile. Restante: rollup@4.54.0 HIGH vía vite-plugin-pwa (devDep build-only, requiere hashes de red para actualizar).
+- [ ] Rollup 4.54.0 → >=4.59.0 (devDep, via vite-plugin-pwa>workbox-build — requiere `pnpm install` con red para regenerar lockfile)
 
 ### Resueltos en sesion 2026-04-09 noche (no volver aca)
 <!-- completados
