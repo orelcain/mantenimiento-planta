@@ -331,27 +331,66 @@ export function AnalisisGraderWizardPage() {
       {/* Alertas — visibles en cuanto hay datos */}
       {hasData && alertInsights.length > 0 && (
         <div className="space-y-2">
+          {/* Encabezado resumen */}
+          <div className="flex items-center gap-2 px-1">
+            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium text-muted-foreground">
+              {criticalInsights.length > 0 && `${criticalInsights.length} crítica${criticalInsights.length > 1 ? 's' : ''}`}
+              {criticalInsights.length > 0 && warnInsights.length > 0 && ' · '}
+              {warnInsights.length > 0 && `${warnInsights.length} advertencia${warnInsights.length > 1 ? 's' : ''}`}
+            </span>
+          </div>
           {criticalInsights.map((insight) => (
-            <div key={insight.id} className="flex items-start gap-3 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3">
-              <AlertTriangle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-red-600 dark:text-red-400">{insight.title}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{insight.evidence[0]}</p>
-                {insight.recommendations[0] && (
-                  <p className="text-xs text-red-600/80 dark:text-red-400/80 mt-1">→ {insight.recommendations[0]}</p>
-                )}
+            <div key={insight.id} className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-red-600 dark:text-red-400">{insight.title}</p>
+                  {insight.evidence.length > 0 && (
+                    <div className="mt-1 space-y-0.5">
+                      {insight.evidence.map((e, i) => (
+                        <p key={i} className="text-xs text-muted-foreground">{e}</p>
+                      ))}
+                    </div>
+                  )}
+                  {insight.recommendations.length > 0 && (
+                    <div className="mt-2 space-y-1 border-t border-red-500/20 pt-2">
+                      {insight.recommendations.map((r, i) => (
+                        <p key={i} className="text-xs text-red-600/90 dark:text-red-400/90 flex items-start gap-1.5">
+                          <span className="shrink-0 mt-0.5">→</span>
+                          {r}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           ))}
           {warnInsights.map((insight) => (
-            <div key={insight.id} className="flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3">
-              <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">{insight.title}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{insight.evidence[0]}</p>
-                {insight.recommendations[0] && (
-                  <p className="text-xs text-amber-600/80 dark:text-amber-400/80 mt-1">→ {insight.recommendations[0]}</p>
-                )}
+            <div key={insight.id} className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">{insight.title}</p>
+                  {insight.evidence.length > 0 && (
+                    <div className="mt-1 space-y-0.5">
+                      {insight.evidence.map((e, i) => (
+                        <p key={i} className="text-xs text-muted-foreground">{e}</p>
+                      ))}
+                    </div>
+                  )}
+                  {insight.recommendations.length > 0 && (
+                    <div className="mt-2 space-y-1 border-t border-amber-500/20 pt-2">
+                      {insight.recommendations.map((r, i) => (
+                        <p key={i} className="text-xs text-amber-600/90 dark:text-amber-400/90 flex items-start gap-1.5">
+                          <span className="shrink-0 mt-0.5">→</span>
+                          {r}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           ))}
@@ -361,7 +400,7 @@ export function AnalisisGraderWizardPage() {
         <div className="flex items-center gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3">
           <CheckCircle className="h-5 w-5 text-emerald-500 shrink-0" />
           <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
-            Todo dentro de parámetros normales
+            Todo dentro de parámetros — operación normal
           </p>
         </div>
       )}
@@ -372,7 +411,6 @@ export function AnalisisGraderWizardPage() {
           parsedData={fallbackParsedData}
           gates={gates}
           config={config}
-          onBack={() => {}}
           onApplyGateSuggestion={handleApplyGateSuggestion}
           onUpdatePointZeroWarnThreshold={handleUpdatePointZeroWarnThreshold}
           onUpdatePointZeroCriticalThreshold={handleUpdatePointZeroCriticalThreshold}

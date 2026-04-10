@@ -244,7 +244,7 @@ interface Props {
   parsedData: ParsedMatrixData
   gates: GateAssignment[]
   config: GraderAnalysisConfig
-  onBack: () => void
+  onBack?: () => void
   onApplyGateSuggestion?: (payload: { gateNumber: number; calibre: string; quality: string }) => void
   onUpdatePointZeroWarnThreshold?: (value: number) => void
   onUpdatePointZeroCriticalThreshold?: (value: number) => void
@@ -1813,32 +1813,14 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
       className={cn('space-y-4 max-w-screen-xl mx-auto', reportMode === 'light' && 'grader-light-mode')}
     >
       {/* Top actions */}
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <Button variant="outline" size="sm" onClick={onBack}>
-          <ChevronLeft className="h-4 w-4 mr-1" />
-          Volver a Config
-        </Button>
-        <div className="flex gap-2 flex-wrap">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setReportMode(reportMode === 'dark' ? 'light' : 'dark')}
-            title={reportMode === 'dark' ? 'Cambiar a modo día' : 'Cambiar a modo noche'}
-          >
-            {reportMode === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+      <div className={cn('flex items-center flex-wrap gap-2', onBack ? 'justify-between' : 'justify-end')}>
+        {onBack && (
+          <Button variant="outline" size="sm" onClick={onBack}>
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            Volver a Config
           </Button>
-          <Button variant="outline" size="sm" onClick={handleExport}>
-            <Download className="h-4 w-4 mr-1" />
-            JSON
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleExportExcel}>
-            <FileSpreadsheet className="h-4 w-4 mr-1" />
-            Excel
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleExportPDF}>
-            <FileText className="h-4 w-4 mr-1" />
-            PDF
-          </Button>
+        )}
+        <div className="flex gap-2 flex-wrap items-center">
           <Button size="sm" onClick={handleSave} disabled={saving || saved}>
             {saving ? (
               <Loader2 className="h-4 w-4 animate-spin mr-1" />
@@ -1848,6 +1830,26 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
               <Save className="h-4 w-4 mr-1" />
             )}
             {saved ? 'Guardado' : 'Guardar Sesión'}
+          </Button>
+          <div className="w-px h-5 bg-border mx-1" />
+          <Button variant="outline" size="sm" onClick={handleExportExcel}>
+            <FileSpreadsheet className="h-4 w-4 mr-1" />
+            Excel
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExportPDF}>
+            <FileText className="h-4 w-4 mr-1" />
+            PDF
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExport} title="Exportar JSON">
+            <Download className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setReportMode(reportMode === 'dark' ? 'light' : 'dark')}
+            title={reportMode === 'dark' ? 'Cambiar a modo día' : 'Cambiar a modo noche'}
+          >
+            {reportMode === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
         </div>
         {saveError && (
@@ -4355,7 +4357,7 @@ function KPICard({
         </div>
         <p
           className={cn(
-            'text-lg font-bold',
+            'text-xl font-bold tabular-nums leading-tight',
             severity === 'critical' && 'text-red-600',
             severity === 'warn' && 'text-amber-600',
           )}
@@ -4363,7 +4365,7 @@ function KPICard({
           {value}
         </p>
         {secondaryText && (
-          <p className="text-[11px] text-muted-foreground mt-0.5">{secondaryText}</p>
+          <p className="text-[11px] text-muted-foreground mt-1">{secondaryText}</p>
         )}
       </CardContent>
     </Card>
