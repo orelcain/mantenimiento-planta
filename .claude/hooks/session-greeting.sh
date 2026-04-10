@@ -1,10 +1,11 @@
 #!/bin/bash
-# UserPromptSubmit hook: detecta saludos y presenta el menú de inicio de sesión
-# Para proyecto: orelcain/mantenimiento-planta
+# UserPromptSubmit hook — proyecto mantenimiento-planta
+# Nota: la rutina de inicio de sesión (router de proyectos) está en el hook
+# global SessionStart (~/.claude/hooks/session-start-rutina.json).
+# Este hook agrega contexto específico del proyecto cuando ya se está dentro de él.
 
 set -euo pipefail
 
-# Leer input JSON desde stdin
 INPUT=$(cat)
 
 # Extraer el prompt del usuario
@@ -17,22 +18,18 @@ except:
     print('')
 " 2>/dev/null || echo "")
 
-# Detectar si es un saludo simple de inicio de sesión
-if echo "$PROMPT" | grep -qiE "^(hola|hi|hey|buenas|buenos (dias|tardes|noches)|good (morning|afternoon|evening)|saludos|inicio|start|comenzar)[!.,\s]*$"; then
+# Si el usuario menciona trabajar en este proyecto, inyectar contexto de ruta
+if echo "$PROMPT" | grep -qiE "(mantenimiento|planta|grader|repuesto|equipo|firestore|deploy|pwa)"; then
   python3 -c "
 import json
-menu = {
+ctx = {
     'additionalContext': (
-        'El usuario acaba de saludar al inicio de una sesión nueva en el proyecto mantenimiento-planta. '
-        'Responde SIEMPRE con este menú exacto (en español, conciso):\n\n'
-        '**¿Por dónde empezamos?**\n'
-        '1. 🔍 Auditar deploys\n'
-        '2. 📋 Revisar pendientes\n'
-        '3. 🔄 Sync rápido con GitHub\n'
-        '4. 💬 Otra cosa\n\n'
-        'Espera la elección del usuario antes de hacer cualquier otra acción.'
+        'Contexto del proyecto activo: mantenimiento-planta (PWA React/TypeScript).\n'
+        'Ruta local: D:/a/APP leventamiento de insidencias en planta/\n'
+        'Subcarpeta front: apps/pwa/src/\n'
+        'Para editar código usar siempre la ruta D:/a/, nunca OneDrive.'
     )
 }
-print(json.dumps(menu))
+print(json.dumps(ctx))
 "
 fi
