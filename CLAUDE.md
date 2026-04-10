@@ -199,8 +199,8 @@ sidebarConfig  ← nuevo: orden personalizado del sidebar admin
 ### P1 — Requiere acceso a Firebase Console / IAM
 - [ ] **App Check**: ReCaptchaV3 + enforceAppCheck en Cloud Functions (requiere key de ReCaptcha desde Firebase Console)
 
-### P1.5 — Ultimo gran pendiente de seguridad estructural
-- [ ] **Input sanitization Firestore**: ~18 colecciones sin validacion de tipos (spareParts, bodega, bodega_inventarios, machineCategories, machines, failurePredictions, rootCauseAnalysis, ariaLearning, ariaActions, ariaKnowledge, ariaEquipmentPatterns, ariaCorrections, users, equipment, models3d, mapLocations, roles, inviteCodes). Cualquier autenticado puede escribir JSON arbitrario hoy. Patron conocido: isValid*() en firestore.rules. Ya hicimos 7 antes (ganttTasks, ganttProjects, etc.), ~2-3h para el resto.
+### P1.5 — ✅ COMPLETADO 2026-04-09 (sesión siguiente)
+- ✅ **Input sanitization Firestore**: 16 colecciones validadas en 4 lotes (162e0d1e, 78908d73, 35262779, 601d7a00). Total: 23 colecciones con isValid*() en firestore.rules. Deploy Firestore Rules 🟢.
 
 ### P2 — Mejoras UX futuras
 - [ ] **Contenido real Seguridad** (`/aprendizaje/seguridad`): PDFs EPP, videos LOTO — requiere material del usuario
