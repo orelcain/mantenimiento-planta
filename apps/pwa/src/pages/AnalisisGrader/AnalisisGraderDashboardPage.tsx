@@ -230,10 +230,6 @@ function computeRecommendationConsistency(
   return { score, level: 'baja', note: 'Cambió mucho entre corridas; tomar como hipótesis y corroborar con datos de planta.' }
 }
 
-function hasExplicitSourceInWhy(why: string): boolean {
-  return /(fuente|origen|dato|datos|m[eé]trica|mismatch|cv|proyecci[oó]n|gate|punto cero|serie temporal|evidencia)/i.test(why)
-}
-
 interface AITrendRun {
   id: string
   createdAtIso: string
@@ -680,12 +676,6 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
     const point = pointEl.getProps(['x', 'y'], true)
     if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) return null
     return { x: point.x, y: point.y }
-  }
-
-  const estimatePinnedCardHeight = (pin: Pick<PinnedPatternPoint, 'calibres' | 'qualities'>): number => {
-    const calibreRows = pin.calibres.length
-    const qualityRows = pin.qualities.length
-    return 86 + (calibreRows + qualityRows) * 14
   }
 
   const handlePinPatternPoint = (dataIndex: number) => {
