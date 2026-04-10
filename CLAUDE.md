@@ -96,7 +96,7 @@ sidebarConfig  ← nuevo: orden personalizado del sidebar admin
 ### Flujo de sesion
 | Skill | Uso |
 |-------|-----|
-| `matar-pendientes` | **USAR AL INICIO.** Leer CLAUDE.md, clasificar pendientes, proponer plan de ataque |
+| `matar-pendientes` | **USAR AL INICIO.** Leer CLAUDE.md, clasificar pendientes, proponer plan de ataque. **Paso 0 obligatorio**: invoca `auditar-deploys` antes de cualquier feature |
 | `cerrar-sesion` | **USAR AL FINAL.** Actualiza CLAUDE.md, sugiere skills, crea memoria |
 
 ### Deploy y CI
@@ -104,6 +104,7 @@ sidebarConfig  ← nuevo: orden personalizado del sidebar admin
 |-------|-----|
 | `deploy-produccion` | Deploy completo a GitHub Pages con bump de version |
 | `fix-ci` | Diagnosticar y reparar fallos de CI (tsc, eslint, build, GitHub Actions) |
+| `auditar-deploys` | **Health check standalone** de todos los workflows CI/CD. Detecta workflows bloqueados, degradados o inactivos. Existe porque en 2026-04-09 hubo 18 dias con `deploy-functions` bloqueado sin notarlo |
 
 ### Auditorias
 | Skill | Uso |
@@ -138,12 +139,117 @@ sidebarConfig  ← nuevo: orden personalizado del sidebar admin
 
 ## Version actual
 
-- **v2.72.1** (2026-04-09)
+- **v2.73.0** (2026-04-09c) — "Learning Hub: editores admin Manual/Flujos/Diagnostico + upload imagenes + counts dinamicos"
 - Proyecto Firebase: `mantenimiento-planta-771a3`
 - GitHub: `orelcain/mantenimiento-planta`
 - Produccion: `https://orelcain.github.io/mantenimiento-planta/`
 
-## Cambios recientes (sesion 2026-04-09)
+## Cambios recientes (sesion 2026-04-09 noche — maratónica, 8 commits)
+
+### v2.73.0 — Learning Hub admin + seguridad completa + CI desbloqueado
+
+**Commit 123d5244 — Editores admin Centro de Aprendizaje**
+- `LearningAdminMachinePage.tsx`: 4 tabs activos (Procedimientos + Manual + Flujos + Diagnostico). Antes solo Procedimientos.
+- Nuevos editores: `ManualEditor`, `FlowsEditor`, `DiagnosisEditor` con formularios completos
+- Primitives compartidas: `CollectionListView`, `ItemCard`, `FormField`, `FormActions` (~40% menos codigo duplicado)
+- `StepImageUploader` en procedimientos: upload a Firebase Storage con compresion WebP + cleanup on delete
+- `learningContent.ts`: helpers `uploadLearningImage()` + `deleteLearningImage()`
+- `MachineLearningPage.tsx`: renderiza las 4 secciones desde Firestore (Manual/Flujos/Diagnostico tenian placeholder)
+- `LearningHubPage.tsx`: counts dinamicos M/P/F/D con badges numericos (antes flags estaticos), icono `GraduationCap` → `BookOpen`
+- `OtherLearningModulesStrip.tsx`: componente nuevo con chips navegacion cruzada al fondo de sub-paginas
+- Bump 2.72.1 → 2.73.0 (buildDate 2026-04-09c)
+
+**Commits ebe4642c + 17d5ee58 — Fix IAM Cloud Scheduler (18 dias bloqueado)**
+- Deploy Firebase Functions fallaba desde 2026-03-22 por error HTTP 403 `cloudscheduler.jobs.update`
+- Causa raiz: SA del CI (`firebase-adminsdk-fbsvc@...`) sin rol `Cloud Scheduler Admin`
+- **Fix aplicado via gcloud directo** (usuario autentico con `gcloud auth login`, asistente ejecuto `add-iam-policy-binding`)
+- `checkClimaPortoAlert` y `purgeSensorReadings` (2 scheduled functions) volvieron al deploy automatico
+- Workflow restaurado a `firebase deploy --only functions` simple (antes tenia workaround con deploy selectivo)
+- **Ultimo deploy exitoso de functions antes era 2026-03-22** — 18 dias de deploys silenciosamente fallidos
+
+**Commit 17d5ee58 — Skill `auditar-deploys` + integracion**
+- Nueva skill `.claude/skills/auditar-deploys/` — health check standalone de TODOS los workflows del repo
+- Clasifica cada workflow: 🟢 sano / 🟡 degradado / 🔴 bloqueado (2+ fallas consecutivas)
+- Usa `gh run list --limit 30 --json` agrupando por `workflowName`
+- Integrada como **Paso 0 obligatorio en `matar-pendientes`** → asi el proximo bloqueo no pasa 18 dias sin detectarse
+- El propio skill detecto inmediatamente un workflow `Daily Sync` bloqueado por error de pnpm version mismatch
+
+**Commit 271fbc4a — Bloque A seguridad (CRITICAL + 8 HIGH eliminadas)**
+- `daily-sync.yml`: pnpm `9` → `10.33.0` (fix "Multiple versions of pnpm specified")
+- `pnpm-workspace.yaml`: agregado override `pdfjs-dist@<4.2.67: '>=4.2.67'` (CVE-2024-4367 arbitrary JS execution)
+- `functions/package.json`: nuevo bloque `overrides` con `fast-xml-parser >=5.5.7` (elimina la UNICA CRITICAL del repo), `node-forge >=1.4.0` (4 HIGH), `path-to-regexp >=0.1.13` (1 HIGH), `qs >=6.14.2`, `@tootallnate/once >=3.0.1`
+- `apps/pwa/package-lock.json` ELIMINADO: era un lockfile duplicado huerfano del monorepo pnpm que Dependabot escaneaba como fuente de verdad (13k+ lineas de ruido)
+- `PDFViewer.tsx` + `ManualSearchModal.tsx`: breaking change de `pdfjs-dist >=4.2` → `page.render()` ahora requiere `canvas` en el parametro
+- Regenero `pnpm-lock.yaml` y `functions/package-lock.json` (este ultimo con `--ignore-scripts` porque firebase-admin 13.6.0 intenta rebuildar con gulp)
+
+**Commit 7246b17b — Bloque B seguridad (xlsx + Firebase SDK + pdf.js self-host)**
+- **xlsx self-host**: 0.18.5 → 0.20.3 desde `https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz` en ambos `package.json` (root + apps/pwa). Elimina CVE-2023-30533 (Prototype Pollution) y CVE-2024-22363 (ReDoS). SheetJS paso a modelo de pago en npm pero mantiene el tgz publico en su CDN oficial
+- **Firebase SDK self-host** (Item SW SRI): `apps/pwa/public/vendor/firebase/10.7.1/` con `firebase-app-compat.js` (29 KB) + `firebase-messaging-compat.js` (38 KB) descargados desde `gstatic.com`. `firebase-messaging-sw.js` ahora usa `importScripts('./vendor/firebase/10.7.1/...')`. Elimina dependencia de 3rd-party CDN en el service worker
+- **pdf.js self-host**: `apps/pwa/public/vendor/pdfjs/pdf.worker.min.mjs` (1.2 MB) + 168 archivos `cmaps/*.bcmap` para fuentes CJK. `PDFViewer.tsx`, `ManualSearchModal.tsx`, `pdfCache.ts` todos apuntan a `${import.meta.env.BASE_URL}vendor/pdfjs/pdf.worker.min.mjs`. Fix runtime: `cdnjs.cloudflare.com` no tiene el worker `.mjs` para `pdfjs-dist` 5.6.x, por eso los PDFs no renderizaban tras el upgrade del Bloque A
+
+**Commit 6e388f6b — Fix ESLint vendor ignore**
+- `eslint.config.js`: agregado `'public/vendor/**'` al `ignores` — el lint intentaba escanear el Firebase SDK minificado como si fuera codigo del proyecto, fallando por globals `define`/`module` no definidos
+- Sin este fix el CI #1592 fallo en el step de lint (no llego a deploy — produccion nunca estuvo rota)
+
+### Antes de esta sesion (2026-04-09 manana) — v2.72.1
+- Calendario `<thead>` sticky top-0, modulos aprendizaje Seguridad y Marel activados, Editor Sidebar (`/admin/sidebar`) con @dnd-kit, modo alto contraste, preload lightbox, input validation 7 colecciones
+
+## Pendientes priorizados
+
+### P1 — Requiere acceso a Firebase Console / IAM
+- [ ] **App Check**: ReCaptchaV3 + enforceAppCheck en Cloud Functions (requiere key de ReCaptcha desde Firebase Console)
+
+### P1.5 — Ultimo gran pendiente de seguridad estructural
+- [ ] **Input sanitization Firestore**: ~18 colecciones sin validacion de tipos (spareParts, bodega, bodega_inventarios, machineCategories, machines, failurePredictions, rootCauseAnalysis, ariaLearning, ariaActions, ariaKnowledge, ariaEquipmentPatterns, ariaCorrections, users, equipment, models3d, mapLocations, roles, inviteCodes). Cualquier autenticado puede escribir JSON arbitrario hoy. Patron conocido: isValid*() en firestore.rules. Ya hicimos 7 antes (ganttTasks, ganttProjects, etc.), ~2-3h para el resto.
+
+### P2 — Mejoras UX futuras
+- [ ] **Contenido real Seguridad** (`/aprendizaje/seguridad`): PDFs EPP, videos LOTO — requiere material del usuario
+- [ ] **Contenido real Marel** (`/aprendizaje/marel`): guias por equipo MX, Stork Trim, Scanvaegt — requiere material del usuario
+- [ ] **Modo alto contraste en calendario**: `CalendarioMantencionPage.tsx` tiene colores hardcoded (`bg-zinc-800`, `bg-cyan-500/5`, etc.) que no reaccionan al toggle `.high-contrast`
+- [ ] **Editor sidebar — reordenar grupos en mobile**: el TouchSensor de @dnd-kit funciona pero puede ser mejorado
+
+### P3 — Mantenimiento menor no urgente
+- [ ] ~10 warnings React Hook exhaustive-deps en `BodegaView.tsx`, `BuscadorGlobal.tsx`, `useStorage.ts`, `EquipmentNavigator.tsx` — en el limite del CI (`--max-warnings 10`)
+- [ ] Node.js 20 deprecation en GitHub Actions — forzaran Node 24 desde junio 2026 (~2 meses margen)
+- [ ] `TerrainMesh.tsx` fast-refresh warning (solo DX)
+- [ ] 8 alertas Dependabot restantes en devDeps y transitivas de `pnpm-lock.yaml` (no afectan runtime prod)
+
+### Resueltos en sesion 2026-04-09 noche (no volver aca)
+<!-- completados
+- ✅ Fix IAM Cloud Scheduler (18 dias bloqueado — resuelto via gcloud directo)
+- ✅ Deploy Firebase Functions desbloqueado
+- ✅ Editor Diagnostico / Flujos / Manual (antes solo Procedimientos)
+- ✅ Upload imagenes en pasos de procedimientos (Firebase Storage con compresion WebP)
+- ✅ SW SRI: Self-host Firebase SDK en public/vendor/
+- ✅ xlsx CVE-2023-30533 + CVE-2024-22363 (self-host 0.20.3 desde cdn.sheetjs.com)
+- ✅ fast-xml-parser CRITICAL + node-forge HIGH + path-to-regexp HIGH en functions/
+- ✅ pdfjs-dist CVE-2024-4367 HIGH
+- ✅ Counts dinamicos hub (antes flags estaticos)
+- ✅ Icono hub GraduationCap → BookOpen
+- ✅ Strip navegacion cruzada entre sub-paginas aprendizaje
+- ✅ Daily Sync workflow (pnpm version mismatch)
+- ✅ Skill auditar-deploys + integracion como Paso 0 de matar-pendientes
+-->
+
+## Recursos externos importantes
+
+### Service Accounts IAM (Google Cloud)
+- **SA del CI**: `firebase-adminsdk-fbsvc@mantenimiento-planta-771a3.iam.gserviceaccount.com`
+- **Roles actuales clave**: `firebase.admin`, `cloudbuild.builds.builder`, `iam.serviceAccountTokenCreator`, `storage.admin`, **`cloudscheduler.admin`** (agregado 2026-04-09 para desbloquear deploy de scheduled functions)
+
+### gcloud CLI local
+- Ruta: `C:/Users/pc hp/AppData/Local/Google/Cloud SDK/google-cloud-sdk/bin/gcloud`
+- Usuario autenticado: `orelcain23@gmail.com` (autenticado 2026-04-09)
+- Proyecto activo: `mantenimiento-planta-771a3`
+- **Claude puede ejecutar comandos gcloud desde Bash** (IAM, Firestore, etc.) — no se requiere Firebase Console para la mayoria de operaciones
+
+### Self-hosted assets en `apps/pwa/public/vendor/`
+- `firebase/10.7.1/` — Firebase SDK para el service worker (2 archivos, ~67 KB)
+- `pdfjs/pdf.worker.min.mjs` — pdf.js worker (1.2 MB, pdfjs-dist 5.6.x)
+- `pdfjs/cmaps/` — 168 bcmaps para fuentes CJK (~200 KB total)
+- **IMPORTANTE**: estos estan en `eslint.config.js` ignore. NO deben ser lintados ni modificados manualmente. Para actualizar: re-descargar desde CDN oficial y bumpear path de version.
+
+## Cambios recientes (sesion anterior — v2.72.1, 2026-04-09 manana)
 
 ### Deploy v2.72.1 — Pendientes masivos resueltos
 - **Calendario**: `<thead>` sticky top-0 (header visible al scrollear con 12-13 tecnicos), separador `border-b-2` entre grupos A/B/C
