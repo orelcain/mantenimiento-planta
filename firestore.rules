@@ -193,6 +193,57 @@ service cloud.firestore {
         && (!('nivel' in d) || d.nivel is int);
     }
 
+    function isValidMachine() {
+      let d = request.resource.data;
+      return d.nombre is string && d.nombre.size() >= 1 && d.nombre.size() <= 200
+        && d.marca is string && d.marca.size() > 0
+        && d.modelo is string && d.modelo.size() > 0
+        && d.activa is bool
+        && d.color is string && d.color.size() > 0
+        && d.orden is int
+        && (!('descripcion' in d) || d.descripcion is string)
+        && (!('categoryId' in d) || d.categoryId is string || d.categoryId == null)
+        && (!('hierarchyNodeId' in d) || d.hierarchyNodeId is string)
+        && (!('manuals' in d) || d.manuals is list)
+        && (!('infografias' in d) || d.infografias is list);
+    }
+
+    function isValidFailurePrediction() {
+      let d = request.resource.data;
+      return d.equipmentId is string && d.equipmentId.size() > 0
+        && d.nivelRiesgo in ['bajo', 'medio', 'alto', 'critico']
+        && d.confianza is number && d.confianza >= 0 && d.confianza <= 1
+        && d.indicadores is list
+        && d.recomendacion is string && d.recomendacion.size() > 0
+        && d.atendido is bool
+        && (!('modelVersion' in d) || d.modelVersion is string)
+        && (!('atendidoPor' in d) || d.atendidoPor is string);
+    }
+
+    function isValidRootCauseAnalysis() {
+      let d = request.resource.data;
+      return d.incidentId is string && d.incidentId.size() > 0
+        && d.metodo in ['ishikawa', '5porques']
+        && d.causas is list
+        && d.causaRaizIdentificada is string && d.causaRaizIdentificada.size() > 0
+        && d.acciones is list
+        && d.createdBy is string && d.createdBy.size() > 0
+        && (!('efectividad' in d) || d.efectividad is number);
+    }
+
+    function isValidModel3D() {
+      let d = request.resource.data;
+      return d.name is string && d.name.size() >= 1 && d.name.size() <= 200
+        && d.originalFileName is string && d.originalFileName.size() > 0
+        && d.contentType is string && d.contentType.size() > 0
+        && d.format in ['glb', 'gltf', 'obj', 'fbx']
+        && d.sizeBytes is number && d.sizeBytes > 0
+        && d.storagePath is string && d.storagePath.size() > 0
+        && d.downloadURL is string && d.downloadURL.size() > 0
+        && d.createdBy is string && d.createdBy.size() > 0
+        && (!('visibility' in d) || d.visibility in ['public', 'admin']);
+    }
+
     // ============================================
     // JERARQUÍAS ORGANIZACIONALES (8 niveles)
     // ============================================
@@ -458,7 +509,7 @@ service cloud.firestore {
     // Predicciones de falla
     match /failurePredictions/{predictionId} {
       allow read: if isAuthenticated();
-      allow create: if isAdmin();
+      allow create: if isAdmin() && isValidFailurePrediction();
       allow update: if isTechnician();
       allow delete: if isAdmin();
     }
@@ -466,7 +517,7 @@ service cloud.firestore {
     // Análisis de causa raíz
     match /rootCauseAnalysis/{analysisId} {
       allow read: if isAuthenticated();
-      allow create: if isSupervisor();
+      allow create: if isSupervisor() && isValidRootCauseAnalysis();
       allow update: if isSupervisor();
       allow delete: if isAdmin();
     }
@@ -652,7 +703,8 @@ service cloud.firestore {
     // ============================================
     match /machines/{machineId} {
       allow read: if isAuthenticated();
-      allow create, update, delete: if isAdmin();
+      allow create: if isAdmin() && isValidMachine();
+      allow update, delete: if isAdmin();
 
       // Configuración por máquina (tags, etc.)
       match /settings/{settingId} {
@@ -758,7 +810,7 @@ service cloud.firestore {
     match /models3d/{modelId} {
       // Lectura pública (QR sin login)
       allow read: if true;
-      allow create: if isAdmin();
+      allow create: if isAdmin() && isValidModel3D();
       allow update: if isAdmin();
       allow delete: if isAdmin();
 
