@@ -10,16 +10,34 @@ Al ejecutar esta skill, leer el CLAUDE.md, auditar el estado de los deploys, ana
 
 ---
 
-## Paso 0: Health check de CI/CD (OBLIGATORIO)
-
-**Antes de cualquier otra cosa**, ejecutar la skill `auditar-deploys` para detectar workflows bloqueados. Esta skill fue agregada despues de un incidente de 18 dias con `deploy-functions.yml` bloqueado sin que nadie lo notara porque las skills de revision solo miraban el ultimo commit, no el historial de CI.
+## Paso 0a: Sync con GitHub (OBLIGATORIO si hubo trabajo en otro PC o claude.ai)
 
 ```bash
-# Equivalente manual (si no se invoca la skill completa):
-gh run list --limit 30 --json workflowName,status,conclusion,createdAt,displayTitle,databaseId
+cd "D:/a/APP leventamiento de insidencias en planta"
+git pull origin main
+# Ver qué llegó:
+git log --oneline ORIG_HEAD..HEAD 2>/dev/null || git log --oneline -5
+```
+
+Mostrar resumen de commits nuevos y archivos clave cambiados.
+
+---
+
+## Paso 0b: Health check de CI/CD (OBLIGATORIO)
+
+**Antes de cualquier otra cosa**, verificar que los 4 workflows esten verdes. Esta skill fue agregada despues de un incidente de 18 dias con `deploy-functions.yml` bloqueado sin que nadie lo notara.
+
+```bash
+cd "D:/a/APP leventamiento de insidencias en planta"
+gh run list --limit 20
 ```
 
 Agrupar por `workflowName` y verificar que el ultimo run de cada workflow sea `success`. Si alguno tiene fallas consecutivas, **documentarlo como item 0 del plan de ataque** (antes de cualquier feature).
+
+**TIP — Si se eligen sync + deploys + pendientes juntos**: ejecutar los 3 en paralelo (multi-tool en una sola respuesta):
+- `git pull origin main`
+- `gh run list --limit 20`
+- `grep -A 200 'Pendientes priorizados' CLAUDE.md | head -80`
 
 ---
 
@@ -27,7 +45,7 @@ Agrupar por `workflowName` y verificar que el ultimo run de cada workflow sea `s
 
 ```bash
 # Leer CLAUDE.md para ver pendientes
-cat CLAUDE.md | grep -A 100 "Pendientes priorizados"
+grep -A 200 "Pendientes priorizados" CLAUDE.md | head -80
 
 # Ver commits recientes para entender qué se hizo ultimo
 git log --oneline -10
