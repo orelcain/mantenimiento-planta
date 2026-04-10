@@ -137,6 +137,69 @@
   color: #fff !important;
 }
 
+/* ── Override de clases Tailwind hardcoded (zinc/gray) ──
+   Necesario para páginas con colores hardcoded como
+   CalendarioMantencionPage, que no usan las variables del tema. */
+
+/* Fondos zinc: mapear a escala de negro puro */
+.high-contrast [class*="bg-zinc-900"] {
+  background-color: #000 !important;
+}
+.high-contrast [class*="bg-zinc-800"] {
+  background-color: #0d0d0d !important;
+}
+.high-contrast [class*="bg-zinc-700"] {
+  background-color: #1a1a1a !important;
+}
+.high-contrast [class*="bg-zinc-600"] {
+  background-color: #262626 !important;
+}
+
+/* Texto zinc: subir luminosidad para legibilidad en planta */
+.high-contrast [class*="text-zinc-700"],
+.high-contrast [class*="text-zinc-600"] {
+  color: #a0a0a0 !important;
+}
+.high-contrast [class*="text-zinc-500"] {
+  color: #c8c8c8 !important;
+}
+.high-contrast [class*="text-zinc-400"] {
+  color: #e0e0e0 !important;
+}
+.high-contrast [class*="text-zinc-300"],
+.high-contrast [class*="text-zinc-200"],
+.high-contrast [class*="text-zinc-100"] {
+  color: #ffffff !important;
+}
+
+/* Bordes zinc */
+.high-contrast [class*="border-zinc-700"],
+.high-contrast [class*="border-zinc-600"] {
+  border-color: var(--hc-border) !important;
+}
+
+/* Tints de turno (bg-cyan/amber/violet-500/5) → aumentar opacidad para visibilidad */
+.high-contrast [class*="bg-cyan-500/5"] {
+  background-color: rgba(34, 211, 238, 0.18) !important;
+}
+.high-contrast [class*="bg-amber-500/5"] {
+  background-color: rgba(251, 191, 36, 0.18) !important;
+}
+.high-contrast [class*="bg-violet-500/5"] {
+  background-color: rgba(167, 139, 250, 0.18) !important;
+}
+
+/* Fila sticky del turno en dark bg-*-950/60 → fondo más contrastado con tinte */
+.high-contrast [class*="bg-cyan-950/60"] {
+  background-color: rgba(34, 211, 238, 0.28) !important;
+}
+.high-contrast [class*="bg-amber-950/60"] {
+  background-color: rgba(251, 191, 36, 0.28) !important;
+}
+.high-contrast [class*="bg-violet-950/60"] {
+  background-color: rgba(167, 139, 250, 0.28) !important;
+}
+
 @layer utilities {
   /* Animaciones */
   .animate-fade-in {
