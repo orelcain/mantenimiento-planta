@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.73.0' as const
+export const APP_VERSION = '2.74.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-04-10' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Grader P0: panel proyección + toggle simple/detallado + badge P0 header + umbrales colapsables' as const
+export const VERSION_NAME = 'Grader P0 completo: panel proyección + toggle chart + badge P0 + umbrales + patrones multisesión + comparativa día/noche + degradación sensores' as const
 
 /**
  * Nota:

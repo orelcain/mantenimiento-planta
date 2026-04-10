@@ -104,6 +104,11 @@ export function AnalisisGraderSessionPage() {
         analyticsOverride={session.aggregates}
         insightsOverride={session.insights}
         initialAIOutput={session.aiOutput ?? null}
+        currentSessionMeta={{
+          sessionId: session.id,
+          shiftId: session.shiftId,
+          sessionDate: session.sessionDate,
+        }}
       />
     </div>
   )

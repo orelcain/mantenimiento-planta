@@ -62,7 +62,7 @@ import { CALIBRE_WEIGHT_RANGES, computeAnalytics } from '@/services/grader/grade
 import { computeDeterministicInsights, computePointZeroTrend } from '@/services/grader/graderInsights'
 import { DEFAULT_SHIFT_SCHEDULE } from '@/services/grader/graderShiftSchedule'
 import { analyzeGrader, parseAIResponse } from '@/services/ai/aiProvider'
-import { saveGraderSession } from '@/services/grader/graderSession.service'
+import { saveGraderSession, listGraderSessions } from '@/services/grader/graderSession.service'
 import { getTooltip, getTooltipProps } from '@/services/grader/graderTooltips'
 import type {
   ParsedMatrixData,
@@ -73,6 +73,7 @@ import type {
   AIGraderInput,
   AIGraderOutput,
   GateSwapSuggestion,
+  GraderSession,
 } from '@/services/grader/types'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, ArcElement, Title, Tooltip, Legend, TimeScale, Filler)
@@ -247,6 +248,12 @@ interface Props {
   analyticsOverride?: GraderAnalyticsResult
   insightsOverride?: DeterministicInsight[]
   initialAIOutput?: AIGraderOutput | null
+  /** Metadata de la sesión actual — usado para buscar sesiones hermanas (comparativa día/noche, IA multisesión) */
+  currentSessionMeta?: {
+    sessionId?: string
+    shiftId?: string
+    sessionDate?: string
+  }
 }
 
 interface PinnedPatternPoint {
@@ -265,7 +272,7 @@ interface PinnedPatternPoint {
 
 const PIN_CARD_WIDTH = 224
 
-export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack, onApplyGateSuggestion, onUpdatePointZeroWarnThreshold, onUpdatePointZeroCriticalThreshold, analyticsOverride, insightsOverride, initialAIOutput }: Props) {
+export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack, onApplyGateSuggestion, onUpdatePointZeroWarnThreshold, onUpdatePointZeroCriticalThreshold, analyticsOverride, insightsOverride, initialAIOutput, currentSessionMeta }: Props) {
   const user = useAuthStore((s) => s.user)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -288,6 +295,8 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
   const [nowTs, setNowTs] = useState<number>(() => Date.now())
   const [weightChartMode, setWeightChartMode] = useState<'simple' | 'detailed'>('simple')
   const [showThresholds, setShowThresholds] = useState<boolean>(false)
+  const [siblingSessions, setSiblingSessions] = useState<GraderSession[]>([])
+  const [recentSessions, setRecentSessions] = useState<GraderSession[]>([])
   const dashRef = useRef<HTMLDivElement>(null)
   const patternLineChartRef = useRef<ChartJS<'line'> | null>(null)
   const patternChartContainerRef = useRef<HTMLDivElement>(null)
@@ -304,6 +313,38 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
     const id = window.setInterval(() => setNowTs(Date.now()), 60_000)
     return () => window.clearInterval(id)
   }, [])
+
+  // Cargar sesiones hermanas (mismo día, turno distinto) + sesiones recientes para multisesión
+  useEffect(() => {
+    let cancelled = false
+    const load = async () => {
+      try {
+        const all = await listGraderSessions(50)
+        if (cancelled) return
+        const currentId = currentSessionMeta?.sessionId
+        const currentDate = currentSessionMeta?.sessionDate
+        const currentShift = currentSessionMeta?.shiftId
+        // Sesiones hermanas: mismo día, turno distinto
+        const siblings = currentDate
+          ? all.filter((s) =>
+              s.id !== currentId &&
+              s.sessionDate === currentDate &&
+              (!currentShift || s.shiftId !== currentShift),
+            )
+          : []
+        // Sesiones recientes (últimas 10 excluyendo la actual) para análisis multisesión
+        const recent = all.filter((s) => s.id !== currentId).slice(0, 10)
+        setSiblingSessions(siblings)
+        setRecentSessions(recent)
+      } catch (err) {
+        console.warn('[grader] no se pudieron cargar sesiones hermanas:', err)
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [currentSessionMeta?.sessionId, currentSessionMeta?.sessionDate, currentSessionMeta?.shiftId])
 
   const pointZeroWarnThreshold = trendWarnThreshold
   const pointZeroCriticalThreshold = Math.max(trendCriticalThreshold, round2(pointZeroWarnThreshold + 0.1))
@@ -1701,6 +1742,199 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
       isShiftClosed: remainingMs === 0,
     }
   }, [trendForecastView, nowTs])
+
+  // Detección de degradación de sensores: analiza si un error P0 específico crece en el tiempo.
+  // Divide el turno en 4 cuartos y compara conteo de piezas por causa. Si el último cuarto
+  // es significativamente mayor al primero, flagea como "creciente" (posible degradación).
+  const sensorDegradationView = useMemo(() => {
+    // Combinar records de pieza-pieza (gate===0) + gate0Records (puerta 0)
+    const errorRecords: Array<{ ts: number; error: string; pieces: number }> = []
+    for (const r of parsedData.pieceRecords) {
+      if (r.gate !== 0 || !r.error) continue
+      const ts = new Date(r.ts).getTime()
+      if (Number.isFinite(ts)) errorRecords.push({ ts, error: r.error, pieces: r.pieces })
+    }
+    // Si NO hay pieceRecords gate-0, usar gate0Records (evitar doble-conteo)
+    if (errorRecords.length === 0) {
+      for (const r of parsedData.gate0Records) {
+        const ts = new Date(r.ts).getTime()
+        if (Number.isFinite(ts) && r.error) errorRecords.push({ ts, error: r.error, pieces: r.pieces })
+      }
+    }
+    if (errorRecords.length < 8) return null // datos insuficientes
+
+    const minTs = Math.min(...errorRecords.map((r) => r.ts))
+    const maxTs = Math.max(...errorRecords.map((r) => r.ts))
+    const spanMs = maxTs - minTs
+    if (spanMs < 30 * 60_000) return null // menos de 30 min no es suficiente para detectar tendencia
+
+    const quarterMs = spanMs / 4
+    // Agrupar por causa → cuarto [Q1, Q2, Q3, Q4]
+    const byErrorQuarter = new Map<string, [number, number, number, number]>()
+    for (const r of errorRecords) {
+      const q = Math.min(3, Math.max(0, Math.floor((r.ts - minTs) / quarterMs))) as 0 | 1 | 2 | 3
+      const cur: [number, number, number, number] = byErrorQuarter.get(r.error) ?? [0, 0, 0, 0]
+      cur[q] = cur[q] + r.pieces
+      byErrorQuarter.set(r.error, cur)
+    }
+
+    // Evaluar cada causa: si Q4 > Q1 * 1.5 y Q4 >= 5 piezas → creciente (posible degradación)
+    const degradations: Array<{
+      error: string
+      quarters: [number, number, number, number]
+      total: number
+      growthRatio: number
+      severity: 'warn' | 'critical'
+    }> = []
+    for (const [error, quarters] of byErrorQuarter.entries()) {
+      const q1 = quarters[0]
+      const q4 = quarters[3]
+      const total = quarters.reduce((s, v) => s + v, 0)
+      if (total < 8 || q4 < 5) continue
+      // Si Q1 es 0, usar 1 para evitar division por cero
+      const baseline = Math.max(q1, 1)
+      const ratio = q4 / baseline
+      if (ratio < 1.5) continue
+      const severity: 'warn' | 'critical' = ratio >= 3 ? 'critical' : 'warn'
+      degradations.push({ error, quarters, total, growthRatio: round2(ratio), severity })
+    }
+    // Ordenar por severidad + ratio
+    degradations.sort((a, b) => {
+      if (a.severity !== b.severity) return a.severity === 'critical' ? -1 : 1
+      return b.growthRatio - a.growthRatio
+    })
+
+    return {
+      degradations,
+      spanMinutes: Math.round(spanMs / 60_000),
+      startIso: new Date(minTs).toISOString(),
+      endIso: new Date(maxTs).toISOString(),
+    }
+  }, [parsedData.pieceRecords, parsedData.gate0Records])
+
+  // Patrones multisesión: analiza las últimas N sesiones para dar contexto histórico a la actual
+  const multiSessionInsightsView = useMemo(() => {
+    if (recentSessions.length < 2) return null
+
+    const withAggregates = recentSessions.filter((s) => s.aggregates != null)
+    if (withAggregates.length === 0) return null
+
+    // Promedio histórico
+    const avgP0 = withAggregates.reduce((sum, s) => sum + (s.aggregates.kpis.pointZeroPct ?? 0), 0) / withAggregates.length
+    const avgPieces = withAggregates.reduce((sum, s) => sum + (s.aggregates.kpis.totalPieces ?? 0), 0) / withAggregates.length
+    const avgWeight = withAggregates.reduce((sum, s) => sum + (s.aggregates.kpis.avgWeightGrams ?? 0), 0) / withAggregates.length
+
+    const currentP0 = analytics.kpis.pointZeroPct
+    const currentPieces = analytics.kpis.totalPieces
+    const currentWeight = analytics.kpis.avgWeightGrams ?? 0
+
+    // Top errores recurrentes: contar cuántas sesiones mencionan cada error en topPointZeroErrors
+    const errorFrequency = new Map<string, { sessions: number; totalPieces: number }>()
+    for (const s of withAggregates) {
+      const topErrors = s.aggregates.kpis.topPointZeroErrors ?? []
+      for (const err of topErrors) {
+        const cur = errorFrequency.get(err.error) ?? { sessions: 0, totalPieces: 0 }
+        cur.sessions += 1
+        cur.totalPieces += err.pieces
+        errorFrequency.set(err.error, cur)
+      }
+    }
+    const recurrentErrors = Array.from(errorFrequency.entries())
+      .filter(([, v]) => v.sessions >= 2) // aparece en al menos 2 sesiones
+      .map(([error, v]) => ({
+        error,
+        sessions: v.sessions,
+        totalPieces: v.totalPieces,
+        frequency: round2((v.sessions / withAggregates.length) * 100),
+      }))
+      .sort((a, b) => b.frequency - a.frequency)
+      .slice(0, 5)
+
+    // Detectar si el error más frecuente también está en la actual
+    const currentTopErrors = analytics.kpis.topPointZeroErrors ?? []
+    const recurrentInCurrent = recurrentErrors.filter((re) =>
+      currentTopErrors.some((ce) => ce.error === re.error),
+    )
+
+    // Posición de la sesión actual: percentil P0 vs histórico
+    const sortedP0 = [...withAggregates.map((s) => s.aggregates.kpis.pointZeroPct ?? 0)].sort((a, b) => a - b)
+    const worseThanCurrent = sortedP0.filter((p) => p < currentP0).length
+    const percentileP0 = round2((worseThanCurrent / sortedP0.length) * 100)
+
+    const deltaP0 = round2(currentP0 - avgP0)
+    const deltaPieces = Math.round(currentPieces - avgPieces)
+    const deltaWeight = round2(currentWeight - avgWeight)
+
+    return {
+      sampleSize: withAggregates.length,
+      avgP0: round2(avgP0),
+      avgPieces: Math.round(avgPieces),
+      avgWeight: round2(avgWeight),
+      deltaP0,
+      deltaPieces,
+      deltaWeight,
+      percentileP0,
+      recurrentErrors,
+      recurrentInCurrent,
+    }
+  }, [recentSessions, analytics.kpis])
+
+  // Comparativa día/noche: compara la sesión actual vs la primera sesión hermana (turno contrario del mismo día)
+  const shiftComparisonView = useMemo(() => {
+    if (siblingSessions.length === 0) return null
+    const sibling = siblingSessions[0]
+    if (!sibling) return null
+    const siblingAgg = sibling.aggregates
+    if (!siblingAgg) return null
+
+    const currentP0 = analytics.kpis.pointZeroPct
+    const siblingP0 = siblingAgg.kpis.pointZeroPct
+    const currentPieces = analytics.kpis.totalPieces
+    const siblingPieces = siblingAgg.kpis.totalPieces
+    const currentAvgWeight = analytics.kpis.avgWeightGrams ?? 0
+    const siblingAvgWeight = siblingAgg.kpis.avgWeightGrams ?? 0
+    const currentCalibre = analytics.kpis.dominantCalibre?.calibre ?? '—'
+    const siblingCalibre = siblingAgg.kpis.dominantCalibre?.calibre ?? '—'
+
+    const deltaP0 = round2(currentP0 - siblingP0)
+    const deltaPieces = currentPieces - siblingPieces
+    const deltaAvgWeight = round2(currentAvgWeight - siblingAvgWeight)
+    const deltaAvgWeightPct = siblingAvgWeight > 0 ? round2((deltaAvgWeight / siblingAvgWeight) * 100) : 0
+
+    // Identificar qué sesión es "día" y cuál "noche" por shiftId o por hora de inicio
+    const isCurrentDay = (currentSessionMeta?.shiftId ?? '').toLowerCase().includes('dia') || (currentSessionMeta?.shiftId ?? '').toLowerCase().includes('day')
+    const currentLabel = isCurrentDay ? 'Día (actual)' : currentSessionMeta?.shiftId ? `${currentSessionMeta.shiftId} (actual)` : 'Actual'
+    const siblingLabel = sibling.shiftId
+      ? sibling.shiftId.toLowerCase().includes('dia') || sibling.shiftId.toLowerCase().includes('day') ? 'Día'
+      : sibling.shiftId.toLowerCase().includes('noche') || sibling.shiftId.toLowerCase().includes('night') ? 'Noche'
+      : sibling.shiftId
+      : 'Turno hermano'
+
+    return {
+      currentLabel,
+      siblingLabel,
+      sessionDate: sibling.sessionDate,
+      siblingId: sibling.id,
+      current: {
+        p0: currentP0,
+        pieces: currentPieces,
+        avgWeight: currentAvgWeight,
+        calibre: currentCalibre,
+      },
+      sibling: {
+        p0: siblingP0,
+        pieces: siblingPieces,
+        avgWeight: siblingAvgWeight,
+        calibre: siblingCalibre,
+      },
+      delta: {
+        p0: deltaP0,
+        pieces: deltaPieces,
+        avgWeight: deltaAvgWeight,
+        avgWeightPct: deltaAvgWeightPct,
+      },
+    }
+  }, [siblingSessions, analytics.kpis, currentSessionMeta?.shiftId])
 
   const trendAutoRecommendations = useMemo(() => {
     if (!trendForecastView) return [] as Array<{
@@ -3458,6 +3692,252 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
                   </Card>
                 )
               })()}
+
+              {/* Comparativa turno día/noche: muestra diferencias con una sesión hermana */}
+              {shiftComparisonView && (() => {
+                const cmp = shiftComparisonView
+                const p0Dir = cmp.delta.p0 > 0 ? 'up' : cmp.delta.p0 < 0 ? 'down' : 'flat'
+                const weightDir = cmp.delta.avgWeightPct > 0 ? 'up' : cmp.delta.avgWeightPct < 0 ? 'down' : 'flat'
+                // Para P0, subir es malo (rojo), bajar es bueno (verde)
+                const p0Color = p0Dir === 'up' ? 'text-red-600 dark:text-red-400' : p0Dir === 'down' ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'
+                const weightColor = weightDir === 'up' ? 'text-blue-600 dark:text-blue-400' : weightDir === 'down' ? 'text-orange-600 dark:text-orange-400' : 'text-muted-foreground'
+                const P0Icon = p0Dir === 'up' ? TrendingUp : p0Dir === 'down' ? TrendingDown : Minus
+                const WeightIcon = weightDir === 'up' ? TrendingUp : weightDir === 'down' ? TrendingDown : Minus
+                return (
+                  <Card className="border-sky-500/40 bg-sky-500/5">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <ArrowRightLeft className="h-4 w-4 text-sky-500" />
+                        Comparativa con Turno Hermano
+                      </CardTitle>
+                      <p className="text-xs text-muted-foreground">
+                        {cmp.currentLabel} vs {cmp.siblingLabel} · {cmp.sessionDate ?? 'mismo día'}
+                      </p>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                        {/* P0 */}
+                        <div className="flex flex-col gap-1 p-3 rounded-lg bg-background/60 border">
+                          <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Punto Cero</p>
+                          <div className="flex items-baseline gap-1.5">
+                            <p className="text-xl font-bold tabular-nums">{cmp.current.p0.toFixed(2)}%</p>
+                            <P0Icon className={cn('h-4 w-4', p0Color)} />
+                          </div>
+                          <p className="text-[10px] text-muted-foreground">
+                            {cmp.siblingLabel}: {cmp.sibling.p0.toFixed(2)}%
+                          </p>
+                          <p className={cn('text-[10px] font-medium tabular-nums', p0Color)}>
+                            Δ {cmp.delta.p0 >= 0 ? '+' : ''}{cmp.delta.p0.toFixed(2)} pp
+                          </p>
+                        </div>
+                        {/* Piezas */}
+                        <div className="flex flex-col gap-1 p-3 rounded-lg bg-background/60 border">
+                          <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Piezas</p>
+                          <p className="text-xl font-bold tabular-nums">{cmp.current.pieces.toLocaleString('es-CL')}</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {cmp.siblingLabel}: {cmp.sibling.pieces.toLocaleString('es-CL')}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground tabular-nums">
+                            Δ {cmp.delta.pieces >= 0 ? '+' : ''}{cmp.delta.pieces.toLocaleString('es-CL')}
+                          </p>
+                        </div>
+                        {/* Peso promedio */}
+                        <div className="flex flex-col gap-1 p-3 rounded-lg bg-background/60 border">
+                          <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Peso promedio</p>
+                          <div className="flex items-baseline gap-1.5">
+                            <p className="text-xl font-bold tabular-nums">{cmp.current.avgWeight.toFixed(0)} g</p>
+                            <WeightIcon className={cn('h-4 w-4', weightColor)} />
+                          </div>
+                          <p className="text-[10px] text-muted-foreground">
+                            {cmp.siblingLabel}: {cmp.sibling.avgWeight.toFixed(0)} g
+                          </p>
+                          <p className={cn('text-[10px] font-medium tabular-nums', weightColor)}>
+                            Δ {cmp.delta.avgWeight >= 0 ? '+' : ''}{cmp.delta.avgWeight.toFixed(0)} g ({cmp.delta.avgWeightPct >= 0 ? '+' : ''}{cmp.delta.avgWeightPct.toFixed(1)}%)
+                          </p>
+                        </div>
+                        {/* Calibre dominante */}
+                        <div className="flex flex-col gap-1 p-3 rounded-lg bg-background/60 border">
+                          <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Calibre dominante</p>
+                          <p className="text-xl font-bold tabular-nums">{cmp.current.calibre}</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {cmp.siblingLabel}: {cmp.sibling.calibre}
+                          </p>
+                          {cmp.current.calibre !== cmp.sibling.calibre && (
+                            <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">Diferente</p>
+                          )}
+                        </div>
+                      </div>
+                      {siblingSessions.length > 1 && (
+                        <p className="text-[10px] text-muted-foreground mt-2">
+                          Mostrando vs 1 de {siblingSessions.length} sesiones hermanas disponibles.
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                )
+              })()}
+
+              {/* Patrones multisesión: contexto histórico de la sesión actual */}
+              {multiSessionInsightsView && (() => {
+                const m = multiSessionInsightsView
+                const p0Better = m.deltaP0 < 0
+                const p0Worse = m.deltaP0 > 0
+                const p0Color = p0Better ? 'text-emerald-600 dark:text-emerald-400' : p0Worse ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'
+                const p0BgClass = p0Better ? 'bg-emerald-500/10 border-emerald-500/40' : p0Worse ? 'bg-red-500/10 border-red-500/40' : 'bg-muted/20'
+                const percentileLabel = m.percentileP0 >= 75 ? 'peor 25%' : m.percentileP0 >= 50 ? 'peor 50%' : m.percentileP0 >= 25 ? 'mejor 50%' : 'mejor 25%'
+                return (
+                  <Card className="border-violet-500/40 bg-violet-500/5">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <Brain className="h-4 w-4 text-violet-500" />
+                        Patrones Multisesión
+                      </CardTitle>
+                      <p className="text-xs text-muted-foreground">
+                        Contexto histórico basado en las últimas {m.sampleSize} sesiones guardadas.
+                      </p>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {/* Resumen vs promedio histórico */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <div className={cn('p-2.5 rounded-md border', p0BgClass)}>
+                          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">P0 vs promedio</p>
+                          <p className={cn('text-lg font-bold tabular-nums', p0Color)}>
+                            {m.deltaP0 >= 0 ? '+' : ''}{m.deltaP0.toFixed(2)} pp
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">
+                            hist. {m.avgP0.toFixed(2)}% · posición {percentileLabel}
+                          </p>
+                        </div>
+                        <div className="p-2.5 rounded-md border bg-muted/20">
+                          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Piezas vs promedio</p>
+                          <p className="text-lg font-bold tabular-nums">
+                            {m.deltaPieces >= 0 ? '+' : ''}{m.deltaPieces.toLocaleString('es-CL')}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">hist. {m.avgPieces.toLocaleString('es-CL')}</p>
+                        </div>
+                        <div className="p-2.5 rounded-md border bg-muted/20">
+                          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Peso vs promedio</p>
+                          <p className="text-lg font-bold tabular-nums">
+                            {m.deltaWeight >= 0 ? '+' : ''}{m.deltaWeight.toFixed(0)} g
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">hist. {m.avgWeight.toFixed(0)} g</p>
+                        </div>
+                      </div>
+
+                      {/* Errores recurrentes */}
+                      {m.recurrentErrors.length > 0 && (
+                        <div>
+                          <p className="text-xs font-medium mb-1.5">Errores P0 recurrentes en el histórico</p>
+                          <div className="space-y-1">
+                            {m.recurrentErrors.map((re) => {
+                              const isInCurrent = m.recurrentInCurrent.some((r) => r.error === re.error)
+                              return (
+                                <div
+                                  key={re.error}
+                                  className={cn(
+                                    'flex items-center justify-between gap-2 p-1.5 rounded border text-xs',
+                                    isInCurrent
+                                      ? 'border-amber-500/50 bg-amber-500/10'
+                                      : 'border-border bg-muted/10',
+                                  )}
+                                >
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    {isInCurrent && <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />}
+                                    <span className="truncate">{re.error}</span>
+                                  </div>
+                                  <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">
+                                    {re.frequency.toFixed(0)}% sesiones · {re.totalPieces.toLocaleString('es-CL')} pz
+                                  </span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                          {m.recurrentInCurrent.length > 0 && (
+                            <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1.5">
+                              ⚠ {m.recurrentInCurrent.length} error{m.recurrentInCurrent.length > 1 ? 'es' : ''} recurrente{m.recurrentInCurrent.length > 1 ? 's' : ''} presente{m.recurrentInCurrent.length > 1 ? 's' : ''} en esta sesión — problema crónico.
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )
+              })()}
+
+              {/* Degradación de sensores: alertas de errores P0 crecientes en el tiempo */}
+              {sensorDegradationView && sensorDegradationView.degradations.length > 0 && (
+                <Card className="border-amber-500/40 bg-amber-500/5">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-amber-500" />
+                      Degradación de Sensores Detectada
+                    </CardTitle>
+                    <p className="text-xs text-muted-foreground">
+                      Errores P0 cuyo volumen crece significativamente a lo largo del turno
+                      ({sensorDegradationView.spanMinutes} min analizados). Posible falla progresiva de sensores o compuertas.
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {sensorDegradationView.degradations.map((deg) => {
+                        const isCritical = deg.severity === 'critical'
+                        return (
+                          <div
+                            key={deg.error}
+                            className={cn(
+                              'flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-md border',
+                              isCritical ? 'border-red-500/50 bg-red-500/10' : 'border-amber-500/40 bg-amber-500/5',
+                            )}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    'text-[10px] shrink-0',
+                                    isCritical
+                                      ? 'border-red-500/60 text-red-600 dark:text-red-400'
+                                      : 'border-amber-500/60 text-amber-600 dark:text-amber-400',
+                                  )}
+                                >
+                                  {isCritical ? 'CRÍTICO' : 'ALERTA'}
+                                </Badge>
+                                <p className="text-xs font-medium truncate">{deg.error}</p>
+                              </div>
+                              <p className="text-[11px] text-muted-foreground mt-1">
+                                Crecimiento {deg.growthRatio.toFixed(1)}× entre inicio y fin del turno
+                                · {deg.total.toLocaleString('es-CL')} piezas P0 acumuladas
+                              </p>
+                            </div>
+                            {/* Mini-barras por cuarto */}
+                            <div className="flex items-end gap-1 h-10 shrink-0">
+                              {deg.quarters.map((q, idx) => {
+                                const maxQ = Math.max(...deg.quarters, 1)
+                                const heightPct = (q / maxQ) * 100
+                                return (
+                                  <div key={idx} className="flex flex-col items-center gap-0.5" title={`Q${idx + 1}: ${q} piezas`}>
+                                    <div
+                                      className={cn(
+                                        'w-4 rounded-sm transition-all',
+                                        isCritical ? 'bg-red-500/70' : 'bg-amber-500/70',
+                                      )}
+                                      style={{ height: `${Math.max(heightPct, 4)}%` }}
+                                    />
+                                    <span className="text-[8px] text-muted-foreground tabular-nums">Q{idx + 1}</span>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-3">
+                      Análisis: turno dividido en 4 cuartos; se flagea cuando Q4 ≥ 1.5× Q1 (alerta) o ≥ 3× Q1 (crítico).
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
 
               <Card>
                 <CardHeader>
