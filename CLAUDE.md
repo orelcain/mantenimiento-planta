@@ -139,10 +139,29 @@ sidebarConfig  ← nuevo: orden personalizado del sidebar admin
 
 ## Version actual
 
-- **v2.73.0** (2026-04-09c) — "Learning Hub: editores admin Manual/Flujos/Diagnostico + upload imagenes + counts dinamicos"
+- **v2.73.0** (2026-04-09c) — "Learning Hub + P1.5 input validation + P2/P3 quick wins"
 - Proyecto Firebase: `mantenimiento-planta-771a3`
 - GitHub: `orelcain/mantenimiento-planta`
 - Produccion: `https://orelcain.github.io/mantenimiento-planta/`
+- CI status: 4/4 workflows 🟢 (Deploy PWA, Deploy Functions, Deploy Firestore Rules, Daily Sync)
+- Seguridad: 23 colecciones Firestore validadas, 0 vulnerabilidades runtime prod
+
+## Cambios recientes (sesion 2026-04-09 tarde — P1.5 + P2/P3, 8 commits)
+
+### Sesión P1.5 completada + P2/P3 quick wins
+- **P1.5 — Input validation Firestore completo**: 4 lotes × 4 colecciones = 16 nuevas colecciones con `isValid*()` en `firestore.rules` (spareParts, bodega, bodega_inventarios, machineCategories, machines, failurePredictions, rootCauseAnalysis, models3d, ariaLearning, ariaActions, ariaKnowledge, ariaEquipmentPatterns, ariaCorrections, mapLocations, roles, inviteCodes). Total project: 23 colecciones validadas (7 previas + 16 nuevas). Commits `162e0d1e`, `78908d73`, `35262779`, `601d7a00`.
+- **P2 — Alto contraste calendario** (`57345d13`): override CSS `.high-contrast` para clases zinc/cyan/amber/violet hardcoded. Beneficio colateral: cualquier otra página con colores hardcoded también mejora. Verificado con 9/9 tests programáticos en preview server.
+- **P3 — Warnings exhaustive-deps 10→1** (`f9bf1779`): CI margen pasó de 0 a 9. Arreglados bugs reales (missing deps en useStorage y HmiKnuroPage) + refactors limpios (mover findEquipmentInTree a top-level, extraer loadAllMovimientos del objeto bodega). Único warning restante: TerrainMesh fast-refresh (DX).
+- **P2 — Editor sidebar mobile** (`55b81fbc`): handles touch de ~20px → 44×44px (estándar WCAG mobile), TouchSensor delay 250→200ms para drag más responsivo, tolerance 5→8px para permitir jitter del dedo sin cancelar, aria-label en cada handle.
+
+### Gotchas descubiertos esta sesión
+1. **CSS hardcoded vs tema**: `CalendarioMantencionPage.tsx` usaba `bg-zinc-*`, `bg-cyan-500/5`, etc. hardcoded en lugar de variables del tema. En lugar de tocar 2885 líneas de JSX, se agregaron overrides CSS scoped a `.high-contrast`. Esto deja el calendario igual en modo normal pero responde al toggle de alto contraste. Regla: cualquier clase Tailwind hardcoded fuera del tema debería tener override en `.high-contrast` si afecta legibilidad.
+
+2. **`git add -A` peligroso en este repo**: hay archivos sueltos de sesiones pasadas en D:\a\ (scripts/*.js, PDFs, HTMLs de experimentos) que nunca se commitearon. Al hacer `git add -A` se agregan todos. Patrón seguro: agregar archivos por nombre explícito, o revisar `git status` antes de cada commit.
+
+3. **ESLint exhaustive-deps con objetos**: cuando un `useEffect` depende de `objeto.metodo`, ESLint sugiere agregar `objeto` completo. La solución limpia es extraer `const { metodo } = objeto` antes del effect, así ESLint detecta la dep correctamente sin causar re-renders innecesarios.
+
+4. **Helper functions dentro de componentes**: ESLint marca como dep faltante. Solución: moverlas a top-level del archivo si no dependen del closure. Patrón: `findEquipmentInTree` ahora vive fuera del componente.
 
 ## Cambios recientes (sesion 2026-04-09 noche — maratónica, 8 commits)
 
@@ -205,13 +224,13 @@ sidebarConfig  ← nuevo: orden personalizado del sidebar admin
 ### P2 — Mejoras UX futuras
 - [ ] **Contenido real Seguridad** (`/aprendizaje/seguridad`): PDFs EPP, videos LOTO — requiere material del usuario
 - [ ] **Contenido real Marel** (`/aprendizaje/marel`): guias por equipo MX, Stork Trim, Scanvaegt — requiere material del usuario
-- [ ] **Modo alto contraste en calendario**: `CalendarioMantencionPage.tsx` tiene colores hardcoded (`bg-zinc-800`, `bg-cyan-500/5`, etc.) que no reaccionan al toggle `.high-contrast`
-- [ ] **Editor sidebar — reordenar grupos en mobile**: el TouchSensor de @dnd-kit funciona pero puede ser mejorado
+- ✅ **Modo alto contraste en calendario** (57345d13): override CSS `.high-contrast` para clases hardcoded `bg-zinc-*`, `text-zinc-*`, `bg-cyan/amber/violet-500/5`, `bg-*-950/60`. Verificado con 9/9 tests programáticos.
+- ✅ **Editor sidebar mobile** (55b81fbc): touch target handles 20px → 44×44px (WCAG), TouchSensor delay 250→200ms, tolerance 5→8px, aria-label en handles.
 
 ### P3 — Mantenimiento menor no urgente
-- [ ] ~10 warnings React Hook exhaustive-deps en `BodegaView.tsx`, `BuscadorGlobal.tsx`, `useStorage.ts`, `EquipmentNavigator.tsx` — en el limite del CI (`--max-warnings 10`)
+- ✅ **Warnings React Hook exhaustive-deps** (f9bf1779): 10 → 1 warning. Margen CI 9. Arreglos en `BodegaView.tsx` (extraer loadAllMovimientos), `BuscadorGlobal.tsx` (eslint-disable justificado), `useStorage.ts` (agregar manualStoragePath), `HmiKnuroPage.tsx` (agregar presetOrder), `EquipmentNavigator.tsx` (mover findEquipmentInTree a top-level), `useBodega.ts` (quitar bodegaOverlays).
 - [ ] Node.js 20 deprecation en GitHub Actions — forzaran Node 24 desde junio 2026 (~2 meses margen)
-- [ ] `TerrainMesh.tsx` fast-refresh warning (solo DX)
+- [ ] `TerrainMesh.tsx` fast-refresh warning (solo DX, único warning restante)
 - [ ] 8 alertas Dependabot restantes en devDeps y transitivas de `pnpm-lock.yaml` (no afectan runtime prod)
 
 ### Resueltos en sesion 2026-04-09 noche (no volver aca)
