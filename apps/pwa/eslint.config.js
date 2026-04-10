@@ -6,7 +6,9 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'node_modules/**'],
+    // Third-party vendored code: self-host de Firebase SDK y pdf.js worker.
+    // No debe ser lintado — es código minificado/UMD que trae sus propios globals (define, module, etc.)
+    ignores: ['dist/**', 'node_modules/**', 'public/vendor/**'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
