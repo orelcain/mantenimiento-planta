@@ -407,7 +407,6 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
   const [parsing, setParsing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
-  const [dragOverP0, setDragOverP0] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [uploads, setUploads] = useState<GraderUpload[]>([])
   const [currentTurnoDate, setCurrentTurnoDate] = useState<string | null>(null)
@@ -415,7 +414,6 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
   const [loadingTurno, setLoadingTurno] = useState(false)
   const [shiftSchedule, setShiftSchedule] = useState(DEFAULT_SHIFT_SCHEDULE)
   const inputRef = useRef<HTMLInputElement>(null)
-  const inputRefP0 = useRef<HTMLInputElement>(null)
   const [searchParams] = useSearchParams()
   const autoLoadRef = useRef(false)
   const user = useAuthStore((s) => s.user)
@@ -679,104 +677,103 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
     handleLoadTurno()
   }, [uploads.length, currentTurnoDate, currentTurnoShift, loadingTurno, handleLoadTurno])
 
+  // Auto-análisis: cada vez que cambian los archivos y hay PIEZA_PIEZA, disparar análisis
+  const onCompleteRef = useRef(onComplete)
+  useEffect(() => { onCompleteRef.current = onComplete }, [onComplete])
+  useEffect(() => {
+    const hasPP = files.some((f) => f.fileMeta.kind === 'PIEZA_PIEZA')
+    if (!hasPP) return
+    const merged = mergeParsedData(files)
+    onCompleteRef.current(merged)
+  }, [files]) // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <div className="space-y-3">
-      {/* Zonas de carga separadas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {/* Drop zone Pieza-Pieza */}
-        <Card>
-          <CardContent className="pt-4 pb-4 space-y-2">
-            <div className="flex items-center gap-2">
-              <Badge className={cn('text-xs', KIND_COLORS.PIEZA_PIEZA)}>Pieza-Pieza</Badge>
-              <span className="text-xs text-muted-foreground">Obligatorio</span>
-            </div>
-            <div
-              onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files) }}
-              onClick={() => inputRef.current?.click()}
-              className={cn(
-                'border-2 border-dashed rounded-lg p-3 text-center cursor-pointer transition-colors',
-                dragOver ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-primary/50',
-              )}
-            >
-              <div className="flex items-center gap-2 justify-center">
-                <FileSpreadsheet className="h-5 w-5 text-blue-500 shrink-0" />
-                <p className="text-xs">Arrastra o haz clic para cargar</p>
-              </div>
-              {parsing && (
-                <div className="flex items-center justify-center gap-2 mt-2">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  <span className="text-xs">Parseando...</span>
-                </div>
-              )}
-            </div>
-            <input ref={inputRef} type="file" multiple accept=".xlsx,.xls" className="hidden"
-              onChange={(e) => e.target.files && handleFiles(e.target.files)} />
-            {/* Archivos PP cargados */}
-            {files.filter((f) => f.fileMeta.kind === 'PIEZA_PIEZA').map((f) => (
-              <div key={f.fileMeta.id} className="flex items-center gap-2 bg-muted/50 rounded px-2 py-1.5 text-xs">
-                <CheckCircle className="h-3.5 w-3.5 text-green-500 shrink-0" />
-                <span className="truncate flex-1">{f.fileMeta.name}</span>
-                <span className="text-muted-foreground shrink-0">
-                  {f.partialData.pieceRecords?.length.toLocaleString()} reg
-                </span>
-                <button type="button" onClick={() => handleRemoveFile(f.fileMeta.id)}
-                  className="text-muted-foreground hover:text-destructive shrink-0">
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+      {/* Zona de carga unificada */}
+      <Card>
+        <CardContent className="pt-4 pb-4 space-y-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Badge className={cn('text-xs', KIND_COLORS.PIEZA_PIEZA)}>Pieza-Pieza</Badge>
+            <Badge className={cn('text-xs', KIND_COLORS.PUERTA_0)}>Puerta 0</Badge>
+            <span className="text-xs text-muted-foreground">
+              Arrastra uno o ambos archivos — se detectan automáticamente
+            </span>
+          </div>
 
-        {/* Drop zone Puerta 0 */}
-        <Card>
-          <CardContent className="pt-4 pb-4 space-y-2">
-            <div className="flex items-center gap-2">
-              <Badge className={cn('text-xs', KIND_COLORS.PUERTA_0)}>Puerta 0</Badge>
-              <span className="text-xs text-muted-foreground">Recomendado</span>
-            </div>
-            <div
-              onDragOver={(e) => { e.preventDefault(); setDragOverP0(true) }}
-              onDragLeave={() => setDragOverP0(false)}
-              onDrop={(e) => { e.preventDefault(); setDragOverP0(false); handleFiles(e.dataTransfer.files) }}
-              onClick={() => inputRefP0.current?.click()}
-              className={cn(
-                'border-2 border-dashed rounded-lg p-3 text-center cursor-pointer transition-colors',
-                dragOverP0 ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-primary/50',
-              )}
-            >
-              <div className="flex items-center gap-2 justify-center">
-                <FileSpreadsheet className="h-5 w-5 text-red-500 shrink-0" />
-                <p className="text-xs">Arrastra o haz clic para cargar</p>
-              </div>
-            </div>
-            <input ref={inputRefP0} type="file" multiple accept=".xlsx,.xls" className="hidden"
-              onChange={(e) => e.target.files && handleFiles(e.target.files)} />
-            {/* Archivos P0 cargados */}
-            {files.filter((f) => f.fileMeta.kind === 'PUERTA_0').map((f) => (
-              <div key={f.fileMeta.id} className="flex items-center gap-2 bg-muted/50 rounded px-2 py-1.5 text-xs">
-                <CheckCircle className="h-3.5 w-3.5 text-green-500 shrink-0" />
-                <span className="truncate flex-1">{f.fileMeta.name}</span>
-                <span className="text-muted-foreground shrink-0">
-                  {f.partialData.gate0Records?.length.toLocaleString()} reg P0
-                </span>
-                <button type="button" onClick={() => handleRemoveFile(f.fileMeta.id)}
-                  className="text-muted-foreground hover:text-destructive shrink-0">
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
-            ))}
-            {files.filter((f) => f.fileMeta.kind === 'PUERTA_0').length === 0 && hasPiezaPieza && (
-              <p className="text-[11px] text-amber-600 flex items-center gap-1">
-                <Info className="h-3 w-3" />
-                Carga el archivo Puerta 0 para datos completos de punto cero
-              </p>
+          <div
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files) }}
+            onClick={() => inputRef.current?.click()}
+            className={cn(
+              'border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors',
+              dragOver ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-primary/50',
             )}
-          </CardContent>
-        </Card>
-      </div>
+          >
+            <FileSpreadsheet className={cn('h-8 w-8 mx-auto mb-2', dragOver ? 'text-primary' : 'text-muted-foreground')} />
+            <p className="text-sm font-medium">
+              {parsing ? 'Procesando...' : 'Arrastra los Excel de Matrix aquí'}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">.xlsx o .xls — puedes agregar más archivos durante el turno</p>
+            {parsing && <Loader2 className="h-4 w-4 animate-spin mx-auto mt-2 text-muted-foreground" />}
+          </div>
+          <input
+            ref={inputRef}
+            type="file"
+            multiple
+            accept=".xlsx,.xls"
+            className="hidden"
+            onChange={(e) => e.target.files && handleFiles(e.target.files)}
+          />
+
+          {/* Archivos cargados */}
+          {files.length > 0 && (
+            <div className="space-y-1.5">
+              {files.map((f) => (
+                <div key={f.fileMeta.id} className="flex items-center gap-2 bg-muted/50 rounded px-2 py-1.5 text-xs">
+                  <CheckCircle className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                  <Badge className={cn('text-[9px] h-4 px-1 shrink-0', KIND_COLORS[f.fileMeta.kind])}>
+                    {KIND_LABELS[f.fileMeta.kind]}
+                  </Badge>
+                  <span className="truncate flex-1">{f.fileMeta.name}</span>
+                  <span className="text-muted-foreground shrink-0 tabular-nums">
+                    {f.fileMeta.kind === 'PIEZA_PIEZA'
+                      ? `${(f.partialData.pieceRecords?.length ?? 0).toLocaleString()} reg`
+                      : f.fileMeta.kind === 'PUERTA_0'
+                        ? `${(f.partialData.gate0Records?.length ?? 0).toLocaleString()} reg P0`
+                        : ''}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveFile(f.fileMeta.id)}
+                    className="text-muted-foreground hover:text-destructive shrink-0"
+                    title="Eliminar"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Turno detectado */}
+          {turnoRange && (
+            <div className="flex items-center gap-3 flex-wrap text-xs bg-emerald-500/10 border border-emerald-500/20 rounded-md px-3 py-2">
+              <CheckCircle className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <span className="font-medium">{turnoRange.date} · {turnoRange.start}–{turnoRange.end}</span>
+              <span className="text-muted-foreground">{turnoRange.durationMin} min · {turnoRange.totalPieces.toLocaleString()} piezas</span>
+            </div>
+          )}
+
+          {/* Aviso Puerta 0 faltante */}
+          {hasPiezaPieza && files.filter((f) => f.fileMeta.kind === 'PUERTA_0').length === 0 && (
+            <p className="text-[11px] text-amber-600 flex items-center gap-1">
+              <Info className="h-3 w-3" />
+              Sin Puerta 0: el desglose de errores será inferido desde los pesos
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Errores */}
       {error && (
@@ -789,42 +786,6 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
         <div className="flex items-center gap-2 text-xs text-amber-700">
           <AlertCircle className="h-3.5 w-3.5" />
           {uploadError}
-        </div>
-      )}
-
-      {/* Turno detectado compacto */}
-      {turnoRange && (
-        <div className="flex items-center gap-3 flex-wrap text-xs px-1">
-          <Clock className="h-4 w-4 text-green-600 dark:text-green-400" />
-          <span className="font-medium">Turno detectado: {turnoRange.date}</span>
-          <span className="text-muted-foreground">
-            {turnoRange.start} – {turnoRange.end} · {turnoRange.durationMin} min · {turnoRange.totalPieces.toLocaleString()} piezas
-          </span>
-        </div>
-      )}
-
-      {/* Auto-merge: cuando hay archivos cargados, notificar al padre */}
-      {files.length > 0 && hasPiezaPieza && (
-        <div className="flex justify-end">
-          <Button
-            size="sm"
-            onClick={() => {
-              const merged = mergeParsedData(files)
-              // Guardar sesión
-              if (currentTurnoDate && currentTurnoShift) {
-                try {
-                  localStorage.setItem('grader_last_session', JSON.stringify({
-                    date: currentTurnoDate,
-                    shiftId: currentTurnoShift,
-                  }))
-                } catch { /* */ }
-              }
-              onComplete(merged)
-            }}
-          >
-            <ChevronRight className="h-4 w-4 mr-1" />
-            Usar archivos cargados
-          </Button>
         </div>
       )}
 
