@@ -50,6 +50,23 @@ cd apps/pwa && pnpm run build
 error TS6133: 'nombreVariable' is declared but its value is never read.
 ```
 **Fix:** Eliminar la variable o prefijarla con `_` si es un param de callback que no se usa.
+Tras refactors grandes, buscar funciones helper que solo se usaban en el código eliminado:
+```bash
+grep -n "nombreFuncion" archivo.tsx
+# Si solo aparece en su declaración → huérfana → eliminar
+```
+Ver skill `/audit-unused-locals` para el flujo completo.
+
+### GOTCHA: TypeScript version mismatch local vs CI
+```
+Entorno local:  TypeScript 6.0.2 (npx usa la versión global)
+CI:             TypeScript 5.7.x (la del package.json: "^5.7.2")
+```
+- TS 6 trata `baseUrl` como error TS5101 con exit code 2.
+- TS 5.7 lo trata como warning — el CI pasaba igual con `baseUrl`.
+- **NO agregar** `ignoreDeprecations: "6.0"` al tsconfig para "arreglarlo" — TS 5.7 no
+  reconoce ese valor → rompe el CI inmediatamente (falla en segundos).
+- Si ves TS5101 localmente pero el CI pasaba antes → es el mismatch. Ignorar.
 
 ### Error: Tipo posiblemente undefined
 ```

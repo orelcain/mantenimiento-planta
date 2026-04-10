@@ -148,6 +148,16 @@ sidebarConfig  ← nuevo: orden personalizado del sidebar admin
 | `agregar-modulo-aprendizaje` | Agregar sub-modulo al Centro de Aprendizaje (`/aprendizaje/<slug>`) |
 | `floating-image-editor` | Componente de imagenes con crop, zoom, libre posicionamiento, anotaciones SVG |
 
+### Módulos específicos
+| Skill | Uso |
+|-------|-----|
+| `grader-diario` | Guia de trabajo con el modulo Grader en turno real: flujo Matrix→análisis, KPIs, Tendencia, IA, cuándo actuar |
+
+### Calidad de código
+| Skill | Uso |
+|-------|-----|
+| `audit-unused-locals` | Detectar y eliminar vars/funciones huérfanas tras refactors. Previene fallos CI por `noUnusedLocals`. Incluye gotcha TypeScript 6 vs 5.7 |
+
 ### Referencia
 | Skill | Uso |
 |-------|-----|
