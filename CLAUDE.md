@@ -6,11 +6,26 @@
 ## Reglas de desarrollo
 
 - **Idioma**: Siempre responder en **ESPAÑOL**. Ahorrar tokens.
-- **Ruta de trabajo**: Editar SIEMPRE en `D:\a\APP leventamiento de insidencias en planta\` (NO en OneDrive). Vite corre desde `D:\a\`.
+- **Ruta única**: `D:\a\APP leventamiento de insidencias en planta\` — único clon git local. NO existe clon en OneDrive (eliminado 2026-04-09, era legacy con drift de 240 commits).
+- **Sync**: solo `git push origin main` — el otro PC del trabajo accede via claude.ai conectado a GitHub directamente, no necesita carpeta sincronizada.
 - **Commits**: En inglés, prefijos convencionales (`feat:`, `fix:`, `docs:`, etc.)
 - **No crear README.md ni docs** salvo que se pida explicitamente.
 - **Base URL**: `/mantenimiento-planta/` (GitHub Pages)
 - **Deploy**: GitHub Pages via `gh-pages` branch + Firebase Hosting
+
+### Arquitectura de almacenamiento
+
+```
+GitHub (orelcain/mantenimiento-planta) ← FUENTE DE VERDAD ÚNICA
+              ▲
+              │ git push (al cerrar sesión)
+              │
+        D:\a\... (este PC, único clon local)
+```
+
+- **Backup**: GitHub. Si el PC se corrompe, `git clone` y listo.
+- **PC trabajo**: claude.ai accede directo a GitHub, sin carpeta local ni OneDrive.
+- **No usar OneDrive para código**: rompe `node_modules` y pelea con `.git/objects`. Si quieres backup extra, usar 1 zip mensual del proyecto sin node_modules.
 
 ## Stack
 
