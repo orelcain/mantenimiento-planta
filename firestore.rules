@@ -244,6 +244,42 @@ service cloud.firestore {
         && (!('visibility' in d) || d.visibility in ['public', 'admin']);
     }
 
+    function isValidAriaAction() {
+      let d = request.resource.data;
+      return d.userId is string && d.userId.size() > 0
+        && d.actionType is string && d.actionType.size() > 0
+        && d.description is string && d.description.size() > 0
+        && d.success is bool
+        && (!('userName' in d) || d.userName is string)
+        && (!('resultId' in d) || d.resultId is string)
+        && (!('metadata' in d) || d.metadata is map);
+    }
+
+    function isValidAriaKnowledge() {
+      let d = request.resource.data;
+      return d.type in ['faq', 'solution', 'procedure', 'fact']
+        && d.question is string && d.question.size() >= 1 && d.question.size() <= 2000
+        && d.answer is string && d.answer.size() >= 1 && d.answer.size() <= 5000
+        && d.category is string && d.category.size() > 0
+        && d.confidence is number && d.confidence >= 0 && d.confidence <= 100
+        && d.usageCount is int && d.usageCount >= 0
+        && d.source in ['feedback', 'interaction', 'manual']
+        && d.createdBy is string && d.createdBy.size() > 0
+        && (!('equipmentId' in d) || d.equipmentId is string)
+        && (!('equipmentName' in d) || d.equipmentName is string);
+    }
+
+    function isValidAriaEquipmentPattern() {
+      let d = request.resource.data;
+      return d.equipmentId is string && d.equipmentId.size() > 0
+        && d.equipmentName is string && d.equipmentName.size() > 0
+        && d.problemType is string && d.problemType.size() > 0
+        && d.occurrences is int && d.occurrences >= 0
+        && (!('commonSolution' in d) || d.commonSolution is string)
+        && (!('avgResolutionHours' in d) || d.avgResolutionHours is number)
+        && (!('relatedSpares' in d) || d.relatedSpares is list);
+    }
+
     // ============================================
     // JERARQUÍAS ORGANIZACIONALES (8 niveles)
     // ============================================
@@ -647,17 +683,17 @@ service cloud.firestore {
       allow read, write: if isAdmin() || request.auth.uid == userId;
     }
 
-    // ARIA – Collective learning entries
+    // ARIA – Collective learning entries (escrito principalmente por admin SDK / Cloud Functions)
     match /ariaLearning/{docId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidDocSize();
       allow update, delete: if isAdmin();
     }
 
     // ARIA – Acciones ejecutadas por ARIA (historial)
     match /ariaActions/{docId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidAriaAction();
       allow update, delete: if isAdmin();
     }
 
@@ -671,14 +707,16 @@ service cloud.firestore {
     // ARIA – Knowledge base (reinforceKnowledge/weakenKnowledge necesita update para todos)
     match /ariaKnowledge/{docId} {
       allow read: if isAuthenticated();
-      allow create, update: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidAriaKnowledge();
+      allow update: if isAuthenticated();
       allow delete: if isAdmin();
     }
 
     // ARIA – Equipment problem patterns (trackEquipmentProblem necesita update para todos)
     match /ariaEquipmentPatterns/{docId} {
       allow read: if isAuthenticated();
-      allow create, update: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidAriaEquipmentPattern();
+      allow update: if isAuthenticated();
       allow delete: if isAdmin();
     }
 
