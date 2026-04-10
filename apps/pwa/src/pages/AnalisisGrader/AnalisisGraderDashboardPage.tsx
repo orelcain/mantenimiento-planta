@@ -285,6 +285,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
   const [trendCriticalThreshold, setTrendCriticalThreshold] = useState<number>(config.errorThresholds?.pointZeroPctCritical ?? round2(Math.max((config.errorThresholds?.pointZeroPctWarn ?? 2) + 0.5, (config.errorThresholds?.pointZeroPctWarn ?? 2) * 1.5)))
   const [pinnedPatternPoints, setPinnedPatternPoints] = useState<PinnedPatternPoint[]>([])
   const [showAIHistory, setShowAIHistory] = useState(false)
+  const [nowTs, setNowTs] = useState<number>(() => Date.now())
   const dashRef = useRef<HTMLDivElement>(null)
   const patternLineChartRef = useRef<ChartJS<'line'> | null>(null)
   const patternChartContainerRef = useRef<HTMLDivElement>(null)
@@ -295,6 +296,12 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
     setTrendWarnThreshold(warn)
     setTrendCriticalThreshold(Math.max(critical, round2(warn + 0.1)))
   }, [config.errorThresholds?.pointZeroPctCritical, config.errorThresholds?.pointZeroPctWarn])
+
+  // Auto-actualiza el reloj cada 60s para recalcular "tiempo restante" del turno
+  useEffect(() => {
+    const id = window.setInterval(() => setNowTs(Date.now()), 60_000)
+    return () => window.clearInterval(id)
+  }, [])
 
   const pointZeroWarnThreshold = trendWarnThreshold
   const pointZeroCriticalThreshold = Math.max(trendCriticalThreshold, round2(pointZeroWarnThreshold + 0.1))
@@ -1640,8 +1647,58 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
       shiftEndLabel: formatDateToHHMM(shiftWindow.end),
       shiftStartIso: shiftWindow.start.toISOString(),
       shiftEndIso: shiftWindow.end.toISOString(),
+      shiftStartMs,
+      shiftEndMs,
+      observedAvgPoints,
     }
   }, [analytics.kpis.pointZeroPieces, analytics.kpis.totalPieces, analytics.weightTrendSeries, config])
+
+  // Vista de progreso del turno en tiempo real: tiempo restante + tendencia del peso
+  const shiftProgressView = useMemo(() => {
+    if (!trendForecastView) return null
+    const { shiftStartMs, shiftEndMs, observedAvgPoints } = trendForecastView
+    const totalMs = shiftEndMs - shiftStartMs
+    if (totalMs <= 0) return null
+
+    // Clampear nowTs entre inicio y fin del turno (si ya cerró, mostrar 0 restante)
+    const clampedNow = Math.min(Math.max(nowTs, shiftStartMs), shiftEndMs)
+    const elapsedMs = clampedNow - shiftStartMs
+    const remainingMs = Math.max(0, shiftEndMs - clampedNow)
+    const elapsedPct = round2((elapsedMs / totalMs) * 100)
+
+    const remainingHours = Math.floor(remainingMs / 3_600_000)
+    const remainingMinutes = Math.floor((remainingMs % 3_600_000) / 60_000)
+    const remainingLabel = remainingMs === 0
+      ? 'Turno cerrado'
+      : `${remainingHours}h ${remainingMinutes.toString().padStart(2, '0')}m`
+
+    // Tendencia del peso: slope de la regresión lineal sobre puntos observados
+    let weightTrend: 'up' | 'down' | 'flat' = 'flat'
+    let weightDeltaGrams = 0
+    let weightDeltaPct = 0
+    if (observedAvgPoints.length >= 2) {
+      const first = observedAvgPoints[0]
+      const last = observedAvgPoints[observedAvgPoints.length - 1]
+      if (first && last) {
+        weightDeltaGrams = round2(last.y - first.y)
+        weightDeltaPct = first.y > 0 ? round2((weightDeltaGrams / first.y) * 100) : 0
+        // Umbral: variación >0.5% se considera significativa
+        if (weightDeltaPct > 0.5) weightTrend = 'up'
+        else if (weightDeltaPct < -0.5) weightTrend = 'down'
+        else weightTrend = 'flat'
+      }
+    }
+
+    return {
+      remainingMs,
+      remainingLabel,
+      elapsedPct,
+      weightTrend,
+      weightDeltaGrams,
+      weightDeltaPct,
+      isShiftClosed: remainingMs === 0,
+    }
+  }, [trendForecastView, nowTs])
 
   const trendAutoRecommendations = useMemo(() => {
     if (!trendForecastView) return [] as Array<{
@@ -3295,6 +3352,111 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
         <TabsContent value="tendencia" className="space-y-4">
           {analytics.weightTrendSeries.length > 0 ? (
             <>
+              {/* Panel de proyección de turno — KPIs en tiempo real */}
+              {trendForecastView && shiftProgressView && (() => {
+                const severity = getPointZeroSeverity(trendForecastView.projectedPointZeroPct)
+                const severityBorder =
+                  severity === 'critical' ? 'border-red-500/60 bg-red-500/5' :
+                  severity === 'warn' ? 'border-amber-500/60 bg-amber-500/5' :
+                  'border-emerald-500/60 bg-emerald-500/5'
+                const severityText =
+                  severity === 'critical' ? 'text-red-600 dark:text-red-400' :
+                  severity === 'warn' ? 'text-amber-600 dark:text-amber-400' :
+                  'text-emerald-600 dark:text-emerald-400'
+                const severityLabel =
+                  severity === 'critical' ? 'CRÍTICO' :
+                  severity === 'warn' ? 'ALERTA' :
+                  'OK'
+                const TrendIcon =
+                  shiftProgressView.weightTrend === 'up' ? TrendingUp :
+                  shiftProgressView.weightTrend === 'down' ? TrendingDown :
+                  Minus
+                const trendColor =
+                  shiftProgressView.weightTrend === 'up' ? 'text-blue-600 dark:text-blue-400' :
+                  shiftProgressView.weightTrend === 'down' ? 'text-orange-600 dark:text-orange-400' :
+                  'text-muted-foreground'
+                const trendLabel =
+                  shiftProgressView.weightTrend === 'up' ? 'Subiendo' :
+                  shiftProgressView.weightTrend === 'down' ? 'Bajando' :
+                  'Estable'
+                return (
+                  <Card className={cn('border-2', severityBorder)}>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <Target className="h-4 w-4 text-purple-500" />
+                        Proyección de Turno en Curso
+                      </CardTitle>
+                      <p className="text-xs text-muted-foreground">
+                        {trendForecastView.shiftStartLabel} → {trendForecastView.shiftEndLabel} · Cobertura {trendForecastView.completionPct.toFixed(1)}%
+                      </p>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                        {/* Tiempo restante */}
+                        <div className="flex flex-col gap-1 p-3 rounded-lg bg-background/60 border">
+                          <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Tiempo restante</p>
+                          <p className="text-2xl font-bold tabular-nums">{shiftProgressView.remainingLabel}</p>
+                          <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden mt-1">
+                            <div
+                              className="h-full bg-purple-500 transition-all"
+                              style={{ width: `${Math.min(100, shiftProgressView.elapsedPct)}%` }}
+                            />
+                          </div>
+                          <p className="text-[10px] text-muted-foreground">{shiftProgressView.elapsedPct.toFixed(0)}% del turno</p>
+                        </div>
+
+                        {/* P0 proyectado al cierre */}
+                        <div className={cn('flex flex-col gap-1 p-3 rounded-lg bg-background/60 border-2', severityBorder)}>
+                          <div className="flex items-center justify-between">
+                            <p className="text-[11px] text-muted-foreground uppercase tracking-wide">P0 al cierre</p>
+                            <Badge variant="outline" className={cn('text-[9px] px-1.5 py-0', severityText, 'border-current')}>
+                              {severityLabel}
+                            </Badge>
+                          </div>
+                          <p className={cn('text-2xl font-bold tabular-nums', severityText)}>
+                            {trendForecastView.projectedPointZeroPct.toFixed(2)}%
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {trendForecastView.projectedPointZeroPieces.toLocaleString('es-CL')} piezas proyectadas
+                          </p>
+                          <p className="text-[9px] text-muted-foreground">
+                            umbral warn {pointZeroWarnThreshold}% / crítico {pointZeroCriticalThreshold}%
+                          </p>
+                        </div>
+
+                        {/* Piezas proyectadas al cierre */}
+                        <div className="flex flex-col gap-1 p-3 rounded-lg bg-background/60 border">
+                          <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Piezas al cierre</p>
+                          <p className="text-2xl font-bold tabular-nums">
+                            {trendForecastView.projectedTotalPieces.toLocaleString('es-CL')}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">
+                            observadas: {trendForecastView.observedPieces.toLocaleString('es-CL')}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">
+                            proyectadas: {(trendForecastView.projectedTotalPieces - trendForecastView.observedPieces).toLocaleString('es-CL')}
+                          </p>
+                        </div>
+
+                        {/* Tendencia del peso */}
+                        <div className="flex flex-col gap-1 p-3 rounded-lg bg-background/60 border">
+                          <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Tendencia peso</p>
+                          <div className="flex items-center gap-2">
+                            <TrendIcon className={cn('h-6 w-6', trendColor)} />
+                            <p className={cn('text-2xl font-bold', trendColor)}>{trendLabel}</p>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground">
+                            Δ {shiftProgressView.weightDeltaGrams >= 0 ? '+' : ''}{shiftProgressView.weightDeltaGrams.toFixed(1)} g
+                            {' '}({shiftProgressView.weightDeltaPct >= 0 ? '+' : ''}{shiftProgressView.weightDeltaPct.toFixed(2)}%)
+                          </p>
+                          <p className="text-[9px] text-muted-foreground">inicio vs último observado</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })()}
+
               <Card>
                 <CardHeader>
                   <CardTitle className="text-sm flex items-center gap-2">
