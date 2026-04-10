@@ -115,9 +115,10 @@ function SortableItem({ item, isDragging }: { item: Item; isDragging?: boolean }
       <button
         {...attributes}
         {...listeners}
-        className="text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing touch-none p-0.5"
+        aria-label={`Mover ${item.name}`}
+        className="text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing touch-none flex items-center justify-center min-w-[44px] min-h-[44px] -m-2 p-2"
       >
-        <GripVertical className="h-4 w-4" />
+        <GripVertical className="h-5 w-5" />
       </button>
       <span className="flex-1 truncate">{item.name}</span>
       <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">{item.href}</span>
@@ -143,9 +144,10 @@ function SortableGroup({
         <button
           {...attributes}
           {...listeners}
-          className="text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing touch-none p-0.5"
+          aria-label={`Mover grupo ${group.label}`}
+          className="text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing touch-none flex items-center justify-center min-w-[44px] min-h-[44px] -m-2 p-2"
         >
-          <GripVertical className="h-4 w-4" />
+          <GripVertical className="h-5 w-5" />
         </button>
         <span className="font-semibold text-sm text-foreground flex-1">{group.label}</span>
         <span className="text-[10px] text-muted-foreground">{group.items.length} módulos</span>
@@ -209,7 +211,8 @@ export function SidebarEditorPage() {
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
+    // delay 200ms (más responsivo que 250) + tolerance 8px (permite jitter del dedo sin cancelar)
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
   )
 
   const handleDragStart = (event: DragStartEvent) => {
