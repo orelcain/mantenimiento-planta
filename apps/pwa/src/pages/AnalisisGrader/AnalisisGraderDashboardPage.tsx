@@ -286,6 +286,8 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
   const [pinnedPatternPoints, setPinnedPatternPoints] = useState<PinnedPatternPoint[]>([])
   const [showAIHistory, setShowAIHistory] = useState(false)
   const [nowTs, setNowTs] = useState<number>(() => Date.now())
+  const [weightChartMode, setWeightChartMode] = useState<'simple' | 'detailed'>('simple')
+  const [showThresholds, setShowThresholds] = useState<boolean>(false)
   const dashRef = useRef<HTMLDivElement>(null)
   const patternLineChartRef = useRef<ChartJS<'line'> | null>(null)
   const patternChartContainerRef = useRef<HTMLDivElement>(null)
@@ -3468,43 +3470,60 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
                   </p>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-2 rounded-md border bg-muted/20">
-                    <div>
-                      <label className="text-[11px] text-muted-foreground">Umbral P0 Warn (%)</label>
-                      <Input
-                        type="number"
-                        min={0}
-                        max={100}
-                        step={0.1}
-                        value={trendWarnThreshold}
-                        onChange={(e) => {
-                          const next = Number(e.target.value)
-                          if (!Number.isFinite(next)) return
-                          const clamped = round2(Math.min(100, Math.max(0, next)))
-                          setTrendWarnThreshold(clamped)
-                          onUpdatePointZeroWarnThreshold?.(clamped)
-                        }}
-                        className="h-8 text-xs"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[11px] text-muted-foreground">Umbral P0 Crítico (%)</label>
-                      <Input
-                        type="number"
-                        min={0}
-                        max={100}
-                        step={0.1}
-                        value={trendCriticalThreshold}
-                        onChange={(e) => {
-                          const next = Number(e.target.value)
-                          if (!Number.isFinite(next)) return
-                          const clamped = round2(Math.min(100, Math.max(0, next)))
-                          setTrendCriticalThreshold(clamped)
-                          onUpdatePointZeroCriticalThreshold?.(clamped)
-                        }}
-                        className="h-8 text-xs"
-                      />
-                    </div>
+                  <div className="rounded-md border bg-muted/20">
+                    <button
+                      type="button"
+                      onClick={() => setShowThresholds((v) => !v)}
+                      className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left hover:bg-muted/30 transition-colors rounded-md"
+                    >
+                      <div className="flex items-center gap-2">
+                        <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', showThresholds && 'rotate-180')} />
+                        <span className="text-[11px] font-medium">Ajustar umbrales P0</span>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground tabular-nums">
+                        warn {pointZeroWarnThreshold}% · crítico {pointZeroCriticalThreshold}%
+                      </span>
+                    </button>
+                    {showThresholds && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-2 border-t">
+                        <div>
+                          <label className="text-[11px] text-muted-foreground">Umbral P0 Warn (%)</label>
+                          <Input
+                            type="number"
+                            min={0}
+                            max={100}
+                            step={0.1}
+                            value={trendWarnThreshold}
+                            onChange={(e) => {
+                              const next = Number(e.target.value)
+                              if (!Number.isFinite(next)) return
+                              const clamped = round2(Math.min(100, Math.max(0, next)))
+                              setTrendWarnThreshold(clamped)
+                              onUpdatePointZeroWarnThreshold?.(clamped)
+                            }}
+                            className="h-8 text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] text-muted-foreground">Umbral P0 Crítico (%)</label>
+                          <Input
+                            type="number"
+                            min={0}
+                            max={100}
+                            step={0.1}
+                            value={trendCriticalThreshold}
+                            onChange={(e) => {
+                              const next = Number(e.target.value)
+                              if (!Number.isFinite(next)) return
+                              const clamped = round2(Math.min(100, Math.max(0, next)))
+                              setTrendCriticalThreshold(clamped)
+                              onUpdatePointZeroCriticalThreshold?.(clamped)
+                            }}
+                            className="h-8 text-xs"
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-1.5">
@@ -3670,16 +3689,48 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <Activity className="h-4 w-4 text-purple-500" />
-                    Tendencia de Peso en el Tiempo
-                    <InfoTooltip {...getTooltipProps('wt.trend')} />
-                  </CardTitle>
-                  <p className="text-xs text-muted-foreground">
-                    Turno completo: datos observados + tendencia probable con datos parciales
-                  </p>
+                  <div className="flex items-start justify-between gap-2 flex-wrap">
+                    <div className="min-w-0">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <Activity className="h-4 w-4 text-purple-500" />
+                        Tendencia de Peso en el Tiempo
+                        <InfoTooltip {...getTooltipProps('wt.trend')} />
+                      </CardTitle>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {weightChartMode === 'simple'
+                          ? 'Modo simple: solo peso observado + proyección'
+                          : 'Modo detallado: incluye media móvil y bandas ±1σ'}
+                      </p>
+                    </div>
+                    <div className="inline-flex rounded-md border bg-muted/30 p-0.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setWeightChartMode('simple')}
+                        className={cn(
+                          'px-2.5 py-1 text-[11px] rounded transition-colors',
+                          weightChartMode === 'simple'
+                            ? 'bg-background shadow-sm font-medium'
+                            : 'text-muted-foreground hover:text-foreground',
+                        )}
+                      >
+                        Simple
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setWeightChartMode('detailed')}
+                        className={cn(
+                          'px-2.5 py-1 text-[11px] rounded transition-colors',
+                          weightChartMode === 'detailed'
+                            ? 'bg-background shadow-sm font-medium'
+                            : 'text-muted-foreground hover:text-foreground',
+                        )}
+                      >
+                        Detallado
+                      </button>
+                    </div>
+                  </div>
                   {trendForecastView && (
-                    <div className="flex flex-wrap gap-2 mt-1">
+                    <div className="flex flex-wrap gap-2 mt-2">
                       <Badge variant="outline" className="text-[10px]">
                         Cobertura: {trendForecastView.completionPct.toFixed(1)}% ({trendForecastView.observedBuckets}/{trendForecastView.totalBuckets} intervalos)
                       </Badge>
@@ -3717,34 +3768,36 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
                               pointRadius: 2,
                             }]
                           : []),
-                        {
-                          label: 'Media Móvil 5',
-                          data: trendForecastView?.realMovingAvgData ?? analytics.weightTrendSeries.map((b) => b.movingAvg5 ?? null),
-                          borderColor: 'rgba(139,92,246,0.8)',
-                          borderDash: [6, 3],
-                          fill: false,
-                          tension: 0.4,
-                          pointRadius: 0,
-                        },
-                        {
-                          label: '+1σ',
-                          data: trendForecastView?.realUpperBand ?? analytics.weightTrendSeries.map((b) => b.avgWeightGrams + b.stdDevWeightGrams),
-                          borderColor: 'rgba(16,185,129,0.3)',
-                          backgroundColor: 'rgba(16,185,129,0.05)',
-                          fill: '+1',
-                          tension: 0.3,
-                          pointRadius: 0,
-                          borderWidth: 1,
-                        },
-                        {
-                          label: '−1σ',
-                          data: trendForecastView?.realLowerBand ?? analytics.weightTrendSeries.map((b) => Math.max(0, b.avgWeightGrams - b.stdDevWeightGrams)),
-                          borderColor: 'rgba(16,185,129,0.3)',
-                          fill: false,
-                          tension: 0.3,
-                          pointRadius: 0,
-                          borderWidth: 1,
-                        },
+                        ...(weightChartMode === 'detailed' ? [
+                          {
+                            label: 'Media Móvil 5',
+                            data: trendForecastView?.realMovingAvgData ?? analytics.weightTrendSeries.map((b) => b.movingAvg5 ?? null),
+                            borderColor: 'rgba(139,92,246,0.8)',
+                            borderDash: [6, 3],
+                            fill: false,
+                            tension: 0.4,
+                            pointRadius: 0,
+                          },
+                          {
+                            label: '+1σ',
+                            data: trendForecastView?.realUpperBand ?? analytics.weightTrendSeries.map((b) => b.avgWeightGrams + b.stdDevWeightGrams),
+                            borderColor: 'rgba(16,185,129,0.3)',
+                            backgroundColor: 'rgba(16,185,129,0.05)',
+                            fill: '+1' as const,
+                            tension: 0.3,
+                            pointRadius: 0,
+                            borderWidth: 1,
+                          },
+                          {
+                            label: '−1σ',
+                            data: trendForecastView?.realLowerBand ?? analytics.weightTrendSeries.map((b) => Math.max(0, b.avgWeightGrams - b.stdDevWeightGrams)),
+                            borderColor: 'rgba(16,185,129,0.3)',
+                            fill: false,
+                            tension: 0.3,
+                            pointRadius: 0,
+                            borderWidth: 1,
+                          },
+                        ] : []),
                       ],
                     }}
                     options={{
@@ -3784,56 +3837,76 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
                 </CardContent>
               </Card>
 
-              {trendForecastView && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-sm">Proyección de Piezas por Intervalo</CardTitle>
-                    <p className="text-xs text-muted-foreground">
-                      Si cargó 1-2 horas, se mantiene el eje completo del turno y se proyecta el tramo faltante.
-                    </p>
-                  </CardHeader>
-                  <CardContent>
-                    <Line
-                      data={{
-                        labels: trendForecastView.labels,
-                        datasets: [
-                          {
-                            label: 'Piezas observadas',
-                            data: trendForecastView.realPiecesData,
-                            borderColor: 'rgba(37,99,235,0.95)',
-                            backgroundColor: 'rgba(37,99,235,0.12)',
-                            fill: false,
-                            tension: 0.25,
-                            pointRadius: 2,
+              {trendForecastView && (() => {
+                const projSeverity = getPointZeroSeverity(trendForecastView.projectedPointZeroPct)
+                const projBadgeClass =
+                  projSeverity === 'critical' ? 'border-red-500/60 text-red-600 dark:text-red-400 bg-red-500/10' :
+                  projSeverity === 'warn' ? 'border-amber-500/60 text-amber-600 dark:text-amber-400 bg-amber-500/10' :
+                  'border-emerald-500/60 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10'
+                return (
+                  <Card>
+                    <CardHeader>
+                      <div className="flex items-start justify-between gap-3 flex-wrap">
+                        <div className="min-w-0">
+                          <CardTitle className="text-sm">Proyección de Piezas por Intervalo</CardTitle>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Si cargó 1-2 horas, se mantiene el eje completo del turno y se proyecta el tramo faltante.
+                          </p>
+                        </div>
+                        <div className={cn(
+                          'flex flex-col items-end gap-0.5 px-3 py-1.5 rounded-lg border-2 shrink-0',
+                          projBadgeClass,
+                        )}>
+                          <p className="text-[9px] uppercase tracking-wide opacity-80">P0 al cierre</p>
+                          <p className="text-lg font-bold tabular-nums leading-none">
+                            {trendForecastView.projectedPointZeroPct.toFixed(2)}%
+                          </p>
+                          <p className="text-[10px] tabular-nums opacity-90">
+                            {trendForecastView.projectedPointZeroPieces.toLocaleString('es-CL')} piezas
+                          </p>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <Line
+                        data={{
+                          labels: trendForecastView.labels,
+                          datasets: [
+                            {
+                              label: 'Piezas observadas',
+                              data: trendForecastView.realPiecesData,
+                              borderColor: 'rgba(37,99,235,0.95)',
+                              backgroundColor: 'rgba(37,99,235,0.12)',
+                              fill: false,
+                              tension: 0.25,
+                              pointRadius: 2,
+                            },
+                            {
+                              label: 'Piezas proyectadas',
+                              data: trendForecastView.projectedPiecesData,
+                              borderColor: 'rgba(217,70,239,0.95)',
+                              borderDash: [6, 4],
+                              fill: false,
+                              tension: 0.2,
+                              pointRadius: 2,
+                            },
+                          ],
+                        }}
+                        options={{
+                          responsive: true,
+                          plugins: {
+                            legend: { position: 'bottom', labels: { font: { size: 11 } } },
                           },
-                          {
-                            label: 'Piezas proyectadas',
-                            data: trendForecastView.projectedPiecesData,
-                            borderColor: 'rgba(217,70,239,0.95)',
-                            borderDash: [6, 4],
-                            fill: false,
-                            tension: 0.2,
-                            pointRadius: 2,
+                          scales: {
+                            x: { type: 'time', time: { unit: config.intervalMinutes === 60 ? 'hour' : 'minute' } },
+                            y: { beginAtZero: true, title: { display: true, text: 'Piezas / intervalo' } },
                           },
-                        ],
-                      }}
-                      options={{
-                        responsive: true,
-                        plugins: {
-                          legend: { position: 'bottom', labels: { font: { size: 11 } } },
-                        },
-                        scales: {
-                          x: { type: 'time', time: { unit: config.intervalMinutes === 60 ? 'hour' : 'minute' } },
-                          y: { beginAtZero: true, title: { display: true, text: 'Piezas / intervalo' } },
-                        },
-                      }}
-                    />
-                    <p className="text-[11px] text-muted-foreground mt-2">
-                      Proyección Punto Cero cierre: {trendForecastView.projectedPointZeroPieces.toLocaleString('es-CL')} piezas ({trendForecastView.projectedPointZeroPct.toFixed(2)}%).
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
+                        }}
+                      />
+                    </CardContent>
+                  </Card>
+                )
+              })()}
 
               {/* Weight trend table */}
               <Card>
