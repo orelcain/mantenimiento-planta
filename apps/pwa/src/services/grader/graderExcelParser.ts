@@ -35,11 +35,16 @@ function norm(s: unknown): string {
     .replace(/[\u0300-\u036f]/g, '')
 }
 
-/** Parsea número (acepta coma decimal) */
+/** Parsea número (acepta coma decimal y sufijos de unidad como "kg", "g", "lb") */
 function parseNum(v: unknown): number | undefined {
   if (v == null || v === '') return undefined
   if (typeof v === 'number') return v
-  const s = String(v).replace(/\s/g, '').replace(',', '.')
+  // Strip unidades al final: "10,91 kg" → "10,91", "4750 g" → "4750"
+  const s = String(v)
+    .trim()
+    .replace(/\s*(kg|lbs?|g)\s*$/i, '')
+    .replace(/\s/g, '')
+    .replace(',', '.')
   const n = Number(s)
   return isNaN(n) ? undefined : n
 }
@@ -107,7 +112,8 @@ function normalizeQuality(v: unknown): GraderQuality {
   if (s.includes('premium')) return 'Premium'
   if (s.includes('grado') || s === 'grade') return 'Grado'
   if (s.includes('industrial') || s.includes('ind')) return 'Industrial'
-  if (s === 'd' || s.includes('descarte')) return 'D'
+  // Acepta 'D', 'Descarte', 'CALIDAD D' (formato Matrix)
+  if (s === 'd' || s.includes('descarte') || s.includes('calidad d') || s.endsWith(' d')) return 'D'
   return 'Unknown'
 }
 
@@ -127,8 +133,8 @@ function normalizeCalibre(v: unknown): CalibreRange {
   // Strip "HG" / "hg" prefix (e.g. "HG 6-8" → "6-8")
   const stripped = s.replace(/^hg/i, '')
 
-  // Handle "10-UP", "10-up", "10+", "10-mas"
-  if (/10\s*[-]?\s*(up|mas|\+)/i.test(stripped) || /10\s*-\s*12/.test(stripped)) return '10-12 lb'
+  // Handle "10-UP", "12-Up", "N-UP", "10+", "10-mas" — todos al calibre máximo
+  if (/\d+\s*[-]?\s*(up|mas|\+)/i.test(stripped) || /10\s*-\s*12/.test(stripped)) return '10-12 lb'
   // E.g. "6-8", "6-8 lb", "6-8lb"
   const m = stripped.match(/(\d+)\s*-\s*(\d+)/)
   if (m) {
