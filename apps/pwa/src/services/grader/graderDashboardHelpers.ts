@@ -1,7 +1,9 @@
 /**
  * Helpers compartidos por el Dashboard del Grader y sus hooks de análisis.
- * Extraídos de AnalisisGraderDashboardPage.tsx en la iteración de refactor 2026-04-10.
+ * Extraídos de AnalisisGraderDashboardPage.tsx en las iteraciones de refactor 2026-04-10
+ * (iter 2) y ampliados con helpers de patterns/calibres en iter 5.
  */
+import { CALIBRE_WEIGHT_RANGES } from './graderAnalytics'
 import { DEFAULT_SHIFT_SCHEDULE } from './graderShiftSchedule'
 import type { GraderAnalysisConfig } from './types'
 
@@ -13,6 +15,60 @@ export function formatDateToHHMM(value: Date): string {
   const hh = String(value.getHours()).padStart(2, '0')
   const mm = String(value.getMinutes()).padStart(2, '0')
   return `${hh}:${mm}`
+}
+
+/** Porcentaje con 2 decimales. */
+export function pctCalc(part: number, total: number): number {
+  return total === 0 ? 0 : Math.round((part / total) * 10000) / 100
+}
+
+/** Devuelve el calibre al que pertenece un peso según los rangos oficiales. */
+export function getCalibreByWeightGrams(weightGrams?: number | null): string {
+  if (weightGrams == null || !Number.isFinite(weightGrams) || weightGrams <= 0) return 'N/D'
+  const match = CALIBRE_WEIGHT_RANGES.find((rng) => weightGrams >= rng.minGrams && weightGrams < rng.maxGrams)
+  if (match) return match.calibre
+  const lastRange = CALIBRE_WEIGHT_RANGES[CALIBRE_WEIGHT_RANGES.length - 1]
+  if (lastRange && weightGrams >= lastRange.maxGrams) return 'Sobre rango'
+  return 'Fuera de rango'
+}
+
+/**
+ * Devuelve el label de calibre crudo si está definido, o lo infiere desde
+ * el peso si el valor crudo está vacío o es un guion.
+ */
+export function resolveCalibreLabel(rawCalibre?: string | null, weightGrams?: number | null): string {
+  const normalizedCalibre = (rawCalibre ?? '').trim()
+  if (normalizedCalibre && normalizedCalibre !== '-' && normalizedCalibre !== '—') {
+    return normalizedCalibre
+  }
+  return getCalibreByWeightGrams(weightGrams)
+}
+
+/** Convierte un string HH:MM en minutos desde medianoche, o null si es inválido. */
+export function parseTimeHHMMToMinutes(value?: string): number | null {
+  if (!value) return null
+  const m = value.match(/^(\d{2}):(\d{2})$/)
+  if (!m) return null
+  const hh = Number(m[1])
+  const mm = Number(m[2])
+  if (!Number.isFinite(hh) || !Number.isFinite(mm) || hh < 0 || hh > 23 || mm < 0 || mm > 59) return null
+  return (hh * 60) + mm
+}
+
+/**
+ * Determina si un minuto del día cae dentro de un rango [from, to] expresado
+ * en minutos desde medianoche. Soporta rangos que cruzan medianoche.
+ */
+export function isMinuteWithinRange(minuteOfDay: number, fromMinute: number | null, toMinute: number | null): boolean {
+  if (fromMinute == null && toMinute == null) return true
+  if (fromMinute != null && toMinute != null) {
+    if (fromMinute <= toMinute) {
+      return minuteOfDay >= fromMinute && minuteOfDay <= toMinute
+    }
+    return minuteOfDay >= fromMinute || minuteOfDay <= toMinute
+  }
+  if (fromMinute != null) return minuteOfDay >= fromMinute
+  return minuteOfDay <= (toMinute as number)
 }
 
 /**

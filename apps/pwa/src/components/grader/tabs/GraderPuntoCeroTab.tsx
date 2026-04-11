@@ -23,32 +23,8 @@ import type { ChartData } from 'chart.js'
 import { Chart as ChartJS } from 'chart.js'
 import { cn } from '@/lib/utils'
 import { getTooltipProps } from '@/services/grader/graderTooltips'
-import { CALIBRE_WEIGHT_RANGES } from '@/services/grader/graderAnalytics'
+import { pctCalc, resolveCalibreLabel } from '@/services/grader/graderDashboardHelpers'
 import type { GraderAnalyticsResult, GraderAnalysisConfig } from '@/services/grader/types'
-
-// ─── Helpers locales ───────────────────────────────────────────────────────
-
-/** Helper: porcentaje con 2 decimales */
-function pctCalc(part: number, total: number): number {
-  return total === 0 ? 0 : Math.round((part / total) * 10000) / 100
-}
-
-function getCalibreByWeightGrams(weightGrams?: number | null): string {
-  if (weightGrams == null || !Number.isFinite(weightGrams) || weightGrams <= 0) return 'N/D'
-  const match = CALIBRE_WEIGHT_RANGES.find((rng) => weightGrams >= rng.minGrams && weightGrams < rng.maxGrams)
-  if (match) return match.calibre
-  const lastRange = CALIBRE_WEIGHT_RANGES[CALIBRE_WEIGHT_RANGES.length - 1]
-  if (lastRange && weightGrams >= lastRange.maxGrams) return 'Sobre rango'
-  return 'Fuera de rango'
-}
-
-function resolveCalibreLabel(rawCalibre?: string | null, weightGrams?: number | null): string {
-  const normalizedCalibre = (rawCalibre ?? '').trim()
-  if (normalizedCalibre && normalizedCalibre !== '-' && normalizedCalibre !== '—') {
-    return normalizedCalibre
-  }
-  return getCalibreByWeightGrams(weightGrams)
-}
 
 // ─── Tipos locales ─────────────────────────────────────────────────────────
 
