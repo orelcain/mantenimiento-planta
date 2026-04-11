@@ -57,21 +57,24 @@ export const CALIBRE_WEIGHT_RANGES: CalibreWeightRange[] = [
 
 /**
  * Configuración física por defecto de la clasificadora.
- * Basada en el layout real de la planta:
- *   Pocket (1-4) → Zeta elevadora → Accel 1 → Accel 2 [fotocélula al final]
- *   → Cinta larga clasificadora (~13 m, 12 flippers)
+ *
+ * Máquina: Marelec MS4/12 (S/N 3943, Marelec Z2)
+ *   ❶ Static Weighing System (pockets 1-4, donde se pesa el salmón)
+ *   ❷ Z-Conveyor (cinta elevadora, sube el salmón hacia las cintas de aceleración)
+ *   ❸ Acceleration Belt 1 + Acceleration Belt 2 [fotocélula al final de la 2]
+ *   ❹ Grading Belt (~13 m, 12 flippers/compuertas)
  *
  * Los valores de distancias de flippers son aproximados (espaciado uniforme).
- * El operador puede ajustarlos en la sección "Configuración Física".
+ * El operador puede ajustarlos en la sección "Configuración Física" de la grader.
  */
 export const DEFAULT_PHYSICAL_CONFIG = {
   avgSalmonLengthCm: 50,
   pocketCount: 4,
   belts: [
-    { beltId: 'zeta'  as const, label: 'Cinta Zeta (elevadora)',             lengthMeters: 3.0,  speedMps: 0.40 },
-    { beltId: 'accel1'as const, label: 'Cinta Aceleración 1',                lengthMeters: 1.5,  speedMps: 0.60 },
-    { beltId: 'accel2'as const, label: 'Cinta Aceleración 2 (fotocélula)',   lengthMeters: 2.5,  speedMps: 0.80 },
-    { beltId: 'main'  as const, label: 'Cinta Clasificadora (larga, ~13 m)', lengthMeters: 13.0, speedMps: 0.70 },
+    { beltId: 'zeta'  as const, label: 'Z-Conveyor ❷ (cinta elevadora)',              lengthMeters: 3.0,  speedMps: 0.40 },
+    { beltId: 'accel1'as const, label: 'Acceleration Belt 1 ❸',                       lengthMeters: 1.5,  speedMps: 0.60 },
+    { beltId: 'accel2'as const, label: 'Acceleration Belt 2 ❸ (fotocélula al final)', lengthMeters: 2.5,  speedMps: 0.80 },
+    { beltId: 'main'  as const, label: 'Grading Belt ❹ (~13 m, 12 compuertas)',       lengthMeters: 13.0, speedMps: 0.70 },
   ],
   flipperPositions: [
     { gateNumber:  1, distanceFromSensorMeters:  0.80 },

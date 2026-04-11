@@ -784,8 +784,8 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
         {showPhysicalConfig && (
           <CardContent className="space-y-6">
             <p className="text-xs text-muted-foreground">
-              Parámetros físicos reales de la clasificadora. Usados para calcular separación entre peces,
-              timing de flippers y enriquecer el contexto de la IA.
+              Parámetros físicos de la <span className="font-medium text-foreground">Marelec MS4/12</span> (S/N 3943, controlador Z2).
+              Usados para calcular separación entre peces, timing de flippers y enriquecer el contexto de la IA.
             </p>
 
             {/* Dimensiones del salmón y pockets */}
@@ -836,8 +836,8 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
             <div>
               <p className="text-sm font-medium mb-3">Cintas transportadoras</p>
               <p className="text-xs text-muted-foreground mb-2">
-                Flujo: Pocket → Zeta (elevadora) → Aceleración 1 → Aceleración 2
-                <span className="text-primary"> [fotocélula aquí]</span> → Cinta Clasificadora
+                Flujo MS4/12: Static Weighing ❶ (pockets) → Z-Conveyor ❷ → Accel Belt 1 ❸ → Accel Belt 2 ❸
+                <span className="text-primary font-medium"> [fotocélula]</span> → Grading Belt ❹
               </p>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
