@@ -152,10 +152,10 @@ export function AnalisisGraderCargaMasivaPage() {
         fileNames.push(file.name)
 
         if (partialData.pieceRecords?.length) {
-          allPiece.push(...partialData.pieceRecords)
+          for (let j = 0; j < partialData.pieceRecords.length; j++) allPiece.push(partialData.pieceRecords[j]!)
         }
         if (partialData.gate0Records?.length) {
-          allGate0.push(...partialData.gate0Records)
+          for (let j = 0; j < partialData.gate0Records.length; j++) allGate0.push(partialData.gate0Records[j]!)
         }
       }
 

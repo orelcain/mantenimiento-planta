@@ -10,7 +10,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, Button, Badge } from '@/components/ui'
-import { Settings2, BarChart3, FolderOpen, Calendar, Loader2, ChevronDown, ChevronUp, Upload } from 'lucide-react'
+import { Settings2, BarChart3, FolderOpen, Calendar, Loader2, ChevronDown, ChevronUp, Upload, CheckCircle2 } from 'lucide-react'
 import { useAuthStore, usePermissionsStore } from '@/store'
 import { AnalisisGraderUploadPage, type FileParsed } from './AnalisisGraderUploadPage'
 import { AnalisisGraderGatesConfigPage } from './AnalisisGraderGatesConfigPage'
@@ -20,6 +20,8 @@ import { getLatestGraderAutosaveDraft, saveGraderAutosaveDraft } from '@/service
 import { getModuleRanges } from '@/services/grader/graderModuleConfig.service'
 import { computeAnalytics, DEFAULT_PHYSICAL_CONFIG } from '@/services/grader/graderAnalytics'
 import { computeDeterministicInsights } from '@/services/grader/graderInsights'
+import { segmentByDayAndShift, computeShiftSummary, sortedSegmentEntries } from '@/services/grader/graderSegmenter'
+import { saveDailySummaryBatch } from '@/services/grader/graderDailySummary.service'
 import type { ParsedMatrixData, GateAssignment, GraderAnalysisConfig } from '@/services/grader/types'
 
 const GRADER_WIZARD_DRAFT_KEY = 'grader_wizard_draft_v1'
@@ -58,6 +60,9 @@ export function AnalisisGraderWizardPage() {
     Object.fromEntries(DEFAULT_PHYSICAL_CONFIG.belts.map((b) => [b.beltId, b.speedMps])),
   )
 
+  const [savingToCalendar, setSavingToCalendar] = useState(false)
+  const [savedToCalendar, setSavedToCalendar] = useState(false)
+
   const dashboardRef = useRef<HTMLDivElement>(null)
   const localDraftLoadedRef = useRef(false)
   const cloudDraftHydratedRef = useRef(false)
@@ -95,6 +100,16 @@ export function AnalisisGraderWizardPage() {
       return []
     }
   }, [analyticsResult])
+
+  // Detectar si el archivo cargado cubre múltiples días → mostrar banner "Guardar en Calendario"
+  const multiDayInfo = useMemo(() => {
+    if (!parsedData || parsedData.pieceRecords.length === 0) return null
+    const segmentMap = segmentByDayAndShift(parsedData.pieceRecords, parsedData.gate0Records)
+    const entries = sortedSegmentEntries(segmentMap)
+    const uniqueDays = new Set(entries.map(([, s]) => s.sessionDate)).size
+    if (uniqueDays <= 1) return null
+    return { entries, uniqueDays, totalSegments: entries.length }
+  }, [parsedData])
 
   // Cargar physicalConfig guardado desde Firestore al iniciar
   // → así el widget de velocidad arranca con el valor real guardado, no con el default
@@ -304,6 +319,26 @@ export function AnalisisGraderWizardPage() {
     }))
   }, [])
 
+  const handleSaveToCalendar = useCallback(async () => {
+    if (!multiDayInfo || !user?.id) return
+    setSavingToCalendar(true)
+    try {
+      const batchId = crypto.randomUUID()
+      const sourceNames = parsedData?.files.map((f) => f.name) ?? []
+      const summaries = multiDayInfo.entries.map(([, segment]) =>
+        computeShiftSummary(segment, batchId, sourceNames, user.id),
+      )
+      await saveDailySummaryBatch(summaries)
+      setSavedToCalendar(true)
+      const latestDate = summaries.map((s) => s.dateKey).sort().slice(-1)[0]
+      if (latestDate) {
+        setTimeout(() => navigate(`/analisis-grader/calendario?goto=${latestDate}`), 1400)
+      }
+    } catch {
+      setSavingToCalendar(false)
+    }
+  }, [multiDayInfo, parsedData, user?.id, navigate])
+
   if (!canSee('analisisGrader')) return <Navigate to="/" replace />
 
   const hasData = Boolean(parsedData && parsedData.pieceRecords.length > 0)
@@ -359,6 +394,44 @@ export function AnalisisGraderWizardPage() {
         initialFiles={uploadedFiles}
         onFilesChange={setUploadedFiles}
       />
+
+      {/* Banner multi-día — aparece cuando el archivo cubre más de 1 día */}
+      {multiDayInfo && !savedToCalendar && (
+        <Card className="border-sky-500/30 bg-sky-500/5">
+          <CardContent className="py-3 px-4 flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-sky-500 shrink-0" />
+              <p className="text-sm">
+                <span className="font-medium">Archivo multi-día detectado</span>
+                <span className="text-muted-foreground ml-2">
+                  {multiDayInfo.uniqueDays} días · {multiDayInfo.totalSegments} turnos
+                </span>
+              </p>
+            </div>
+            <Button
+              size="sm"
+              disabled={savingToCalendar}
+              onClick={handleSaveToCalendar}
+              className="bg-sky-600 hover:bg-sky-700 text-white shrink-0"
+            >
+              {savingToCalendar
+                ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Guardando…</>
+                : <><Calendar className="h-3.5 w-3.5 mr-1.5" />Guardar en Calendario</>
+              }
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+      {multiDayInfo && savedToCalendar && (
+        <Card className="border-emerald-500/30 bg-emerald-500/5">
+          <CardContent className="py-3 px-4 flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+            <p className="text-sm text-emerald-700 dark:text-emerald-400 font-medium">
+              {multiDayInfo.totalSegments} turnos guardados — redirigiendo al calendario…
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Configuración de gates — colapsable */}
       <Card>

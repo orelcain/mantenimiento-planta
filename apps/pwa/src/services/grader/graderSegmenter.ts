@@ -165,7 +165,7 @@ export function computeShiftSummary(
   const { sessionDate, shiftId, pieceRecords, gate0Records } = segment
 
   // ── Timestamps ──────────────────────────────────────────────────────────────
-  const allTs = [...pieceRecords.map((x) => x.ts), ...gate0Records.map((x) => x.ts)]
+  const allTs = pieceRecords.map((x) => x.ts).concat(gate0Records.map((x) => x.ts))
     .filter(Boolean)
     .sort()
   const startAt = allTs[0] ?? `${sessionDate}T00:00:00`

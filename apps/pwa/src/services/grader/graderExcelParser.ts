@@ -5,6 +5,16 @@
  * Maneja cabeceras desplazadas, tildes, decimales con coma/punto, etc.
  */
 
+/**
+ * Alternativa segura a `target.push(...source)` para arrays grandes (> 50k elementos).
+ * `Function.prototype.apply` y el spread operator expanden los elementos como argumentos
+ * de función, lo que puede desbordlar el call stack con arrays de 100k+ elementos.
+ * Esta función hace push de elementos uno a uno en un loop O(n) sin overhead de stack.
+ */
+function pushAll<T>(target: T[], source: readonly T[]): void {
+  for (let i = 0, len = source.length; i < len; i++) target.push(source[i]!)
+}
+
 import * as XLSX from 'xlsx'
 import { generateId } from '@/lib/utils'
 import { CALIBRE_WEIGHT_RANGES } from './graderAnalytics'
@@ -774,7 +784,7 @@ export function mergeParsedData(
 
       // Tomar gate0Records del P0 (para clasificación de errores)
       if (partialData.gate0Records && partialData.gate0Records.length > 0) {
-        realGate0Records.push(...partialData.gate0Records)
+        pushAll(realGate0Records, partialData.gate0Records)
       }
       // Si P0 fue parseado como PP, convertir pieceRecords a gate0Records
       if (partialData.pieceRecords && partialData.pieceRecords.length > 0
@@ -793,14 +803,14 @@ export function mergeParsedData(
     } else {
       // PP: agregar TODOS los pieceRecords (incluyendo gate=0)
       if (partialData.pieceRecords) {
-        merged.pieceRecords.push(...partialData.pieceRecords)
+        pushAll(merged.pieceRecords, partialData.pieceRecords)
       }
       console.info(`[grader merge] "${fileMeta.name}" → PP (${partialData.pieceRecords?.length ?? 0} pieceRecords)`)
     }
 
-    if (partialData.folioRecords) merged.folioRecords.push(...partialData.folioRecords)
-    if (partialData.qualitySummary) merged.qualitySummary.push(...partialData.qualitySummary)
-    if (partialData.productionSummary) merged.productionSummary.push(...partialData.productionSummary)
+    if (partialData.folioRecords) pushAll(merged.folioRecords, partialData.folioRecords)
+    if (partialData.qualitySummary) pushAll(merged.qualitySummary, partialData.qualitySummary)
+    if (partialData.productionSummary) pushAll(merged.productionSummary, partialData.productionSummary)
   }
 
   // ─── Paso 2: gate0Records para CLASIFICACIÓN de errores (NO para conteo) ───
