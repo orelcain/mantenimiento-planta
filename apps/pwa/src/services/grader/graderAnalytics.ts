@@ -151,14 +151,14 @@ export const DEFAULT_PHYSICAL_CONFIG = {
     {
       beltId:       'accel1' as const,
       label:        'Acceleration Belt 1 ❸',
-      lengthMeters: 1.5,
+      lengthMeters: 3.65,    // 365 cm — medición en terreno 2026-04-11
       widthMeters:  0.30,    // 300mm — especificación del fabricante
       speedMps:     1.03,    // Z2 lectura: 1313 units × 0.000786 = 1.032 m/s
     },
     {
       beltId:       'accel2' as const,
       label:        'Acceleration Belt 2 ❸ (fotocélula al final)',
-      lengthMeters: 1.5,
+      lengthMeters: 1.70,    // 170 cm — medición en terreno 2026-04-11
       widthMeters:  0.30,    // 300mm — especificación del fabricante
       speedMps:     1.23,    // Z2 lectura: 1560 units × 0.000786 = 1.227 m/s
     },
