@@ -5,15 +5,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, Navigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from '@/components/ui'
-import { Calendar, ChevronLeft, ChevronRight, Loader2, ArrowLeft, Clock } from 'lucide-react'
+import { Calendar, ChevronLeft, ChevronRight, Loader2, ArrowLeft, Clock, Upload, Database } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { usePermissionsStore } from '@/store'
 import { listGraderUploads } from '@/services/grader/graderUpload.service'
 import { getModuleRanges } from '@/services/grader/graderModuleConfig.service'
-import { getDailySummary, saveDailySummary } from '@/services/grader/graderDailySummary.service'
+import { getDailySummary, saveDailySummary, listDailySummariesByRange } from '@/services/grader/graderDailySummary.service'
 import { parseFile, mergeParsedData } from '@/services/grader/graderExcelParser'
 import { DEFAULT_SHIFT_SCHEDULE, inferShiftIdFromSchedule, normalizeShiftSchedule } from '@/services/grader/graderShiftSchedule'
-import type { GraderUpload } from '@/services/grader/types'
+import type { GraderUpload, GraderDailySummary } from '@/services/grader/types'
 import { useAuthStore } from '@/store'
 
 interface TurnoSummary {
@@ -108,6 +108,7 @@ export function AnalisisGraderCalendarPage() {
   const [error, setError] = useState<string | null>(null)
   const [summaries, setSummaries] = useState<Record<string, SummaryState>>({})
   const [shiftSchedule, setShiftSchedule] = useState(DEFAULT_SHIFT_SCHEDULE)
+  const [historicalByDate, setHistoricalByDate] = useState<Map<string, GraderDailySummary[]>>(new Map())
   const autoSelectedRef = useRef(false)
 
   useEffect(() => {
@@ -134,6 +135,26 @@ export function AnalisisGraderCalendarPage() {
     if (uploads.length === 0) return
     setUploads((prev) => normalizeUploads(prev, shiftSchedule))
   }, [shiftSchedule, uploads.length])
+
+  // Cargar summaries históricos para el mes visible
+  useEffect(() => {
+    const year = currentMonth.getFullYear()
+    const month = currentMonth.getMonth()
+    const startDate = `${year}-${String(month + 1).padStart(2, '0')}-01`
+    const lastDay = new Date(year, month + 1, 0).getDate()
+    const endDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+    listDailySummariesByRange(startDate, endDate)
+      .then((list) => {
+        const map = new Map<string, GraderDailySummary[]>()
+        for (const s of list) {
+          const existing = map.get(s.dateKey) ?? []
+          existing.push(s)
+          map.set(s.dateKey, existing)
+        }
+        setHistoricalByDate(map)
+      })
+      .catch(() => { /* silent: historial no crítico */ })
+  }, [currentMonth])
 
   useEffect(() => {
     if (autoSelectedRef.current) return
@@ -328,7 +349,7 @@ export function AnalisisGraderCalendarPage() {
         <div className="flex items-center gap-3">
           <Button variant="outline" size="sm" onClick={() => navigate('/analisis-grader')}>
             <ArrowLeft className="h-4 w-4 mr-1" />
-            Volver a Analisis
+            Volver
           </Button>
           <div>
             <h1 className="text-xl font-bold flex items-center gap-2">
@@ -336,10 +357,14 @@ export function AnalisisGraderCalendarPage() {
               Calendario Grader
             </h1>
             <p className="text-xs text-muted-foreground">
-              Archivos guardados por dia y turno
+              Archivos guardados por día y turno · datos históricos
             </p>
           </div>
         </div>
+        <Button variant="outline" size="sm" onClick={() => navigate('/analisis-grader/carga-masiva')}>
+          <Upload className="h-4 w-4 mr-1" />
+          Carga masiva
+        </Button>
       </div>
 
       {loading && (
@@ -387,14 +412,21 @@ export function AnalisisGraderCalendarPage() {
                   const dayKey = day.toISOString().slice(0, 10)
                   const dayUploads = uploadsByDate.get(dayKey) || []
                   const turnosCount = new Set(dayUploads.map((u) => u.shiftId || inferShiftIdFromSchedule(u.inferred?.startAt, shiftSchedule))).size
+                  const dayHistorical = historicalByDate.get(dayKey) || []
+                  const avgHistP0 = dayHistorical.length > 0
+                    ? dayHistorical.reduce((t, s) => t + s.pointZeroPct, 0) / dayHistorical.length
+                    : null
 
                   return (
                     <button
                       key={dayKey}
                       className={cn(
-                        'h-20 p-2 border rounded-lg text-left transition-colors',
+                        'h-20 p-2 border rounded-lg text-left transition-colors flex flex-col',
                         isToday(day) && 'bg-primary/5 border-primary',
                         selectedDate?.toDateString() === day.toDateString() && 'ring-2 ring-primary',
+                        avgHistP0 !== null && avgHistP0 >= 3.5 && 'border-red-400/50',
+                        avgHistP0 !== null && avgHistP0 >= 2 && avgHistP0 < 3.5 && 'border-amber-400/50',
+                        avgHistP0 !== null && avgHistP0 < 2 && 'border-emerald-400/50',
                       )}
                       onClick={() => setSelectedDate(day)}
                     >
@@ -409,8 +441,18 @@ export function AnalisisGraderCalendarPage() {
                         )}
                       </div>
                       {dayUploads.length > 0 && (
-                        <div className="mt-1 text-[10px] text-muted-foreground">
+                        <div className="text-[10px] text-muted-foreground">
                           {turnosCount} turno(s)
+                        </div>
+                      )}
+                      {avgHistP0 !== null && (
+                        <div className={cn(
+                          'mt-auto text-[9px] font-bold text-center rounded-sm px-0.5 leading-4',
+                          avgHistP0 >= 3.5 ? 'bg-red-500/20 text-red-600' :
+                          avgHistP0 >= 2   ? 'bg-amber-500/20 text-amber-600' :
+                                             'bg-emerald-500/20 text-emerald-600',
+                        )}>
+                          P0 {avgHistP0.toFixed(1)}%
                         </div>
                       )}
                     </button>
@@ -427,9 +469,91 @@ export function AnalisisGraderCalendarPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {selectedUploads.length === 0 && (
-                <div className="text-sm text-muted-foreground">No hay archivos para este dia.</div>
+              {selectedUploads.length === 0 && (historicalByDate.get(selectedKey ?? '') ?? []).length === 0 && (
+                <div className="text-sm text-muted-foreground">No hay datos para este día.</div>
               )}
+              {/* ── Datos históricos (carga masiva) ── */}
+              {selectedKey && (historicalByDate.get(selectedKey) ?? []).length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 uppercase tracking-wide">
+                    <Database className="h-3.5 w-3.5" />
+                    Historial guardado
+                  </p>
+                  {(historicalByDate.get(selectedKey) ?? [])
+                    .sort((a, b) => {
+                      const order: Record<string, number> = { 'Turno día': 0, 'Turno tarde': 1, 'Turno noche': 2 }
+                      return (order[a.shiftId] ?? 9) - (order[b.shiftId] ?? 9)
+                    })
+                    .map((hist) => (
+                      <div
+                        key={hist.id}
+                        className={cn(
+                          'rounded-lg border px-3 py-2.5 space-y-2',
+                          hist.pointZeroPct >= 3.5 ? 'border-red-500/30 bg-red-500/5' :
+                          hist.pointZeroPct >= 2   ? 'border-amber-500/30 bg-amber-500/5' :
+                                                     'border-emerald-500/20 bg-emerald-500/5',
+                        )}
+                      >
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium">{hist.shiftId}</p>
+                          <span className={cn(
+                            'text-lg font-bold tabular-nums',
+                            hist.pointZeroPct >= 3.5 ? 'text-red-500' :
+                            hist.pointZeroPct >= 2   ? 'text-amber-500' :
+                                                       'text-emerald-600',
+                          )}>
+                            {hist.pointZeroPct}%
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-1.5 text-xs">
+                          <div className="rounded bg-background/60 px-2 py-1">
+                            <p className="text-muted-foreground">Piezas</p>
+                            <p className="font-semibold">{hist.totalPieces.toLocaleString('es-CL')}</p>
+                          </div>
+                          <div className="rounded bg-background/60 px-2 py-1">
+                            <p className="text-muted-foreground">P0 piezas</p>
+                            <p className="font-semibold">{hist.pointZeroPieces.toLocaleString('es-CL')}</p>
+                          </div>
+                          {hist.totalWeightKg != null && (
+                            <div className="rounded bg-background/60 px-2 py-1">
+                              <p className="text-muted-foreground">Peso</p>
+                              <p className="font-semibold">
+                                {hist.totalWeightKg >= 1000
+                                  ? `${(hist.totalWeightKg / 1000).toFixed(1)} t`
+                                  : `${hist.totalWeightKg.toFixed(0)} kg`}
+                              </p>
+                            </div>
+                          )}
+                          {hist.productionRatePerHour != null && (
+                            <div className="rounded bg-background/60 px-2 py-1">
+                              <p className="text-muted-foreground">pz/hora</p>
+                              <p className="font-semibold">{Math.round(hist.productionRatePerHour).toLocaleString('es-CL')}</p>
+                            </div>
+                          )}
+                        </div>
+                        {hist.topP0Causes && hist.topP0Causes.length > 0 && (
+                          <div className="text-xs space-y-0.5">
+                            <p className="text-muted-foreground font-medium">Top causas P0:</p>
+                            {hist.topP0Causes.slice(0, 3).map((c, i) => (
+                              <div key={i} className="flex justify-between">
+                                <span className="text-muted-foreground truncate max-w-[70%]">{c.error}</span>
+                                <span className="font-semibold tabular-nums">{c.pct}%</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {hist.durationMinutes != null && hist.durationMinutes > 0 && (
+                          <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {Math.floor(hist.durationMinutes / 60)}h {hist.durationMinutes % 60}m
+                            {hist.startAt && ` · ${new Date(hist.startAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}–${hist.endAt ? new Date(hist.endAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) : '?'}`}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                </div>
+              )}
+
               {selectedUploads.length > 0 && (
                 <div className="space-y-3">
                   {Array.from(turnos.entries()).map(([shiftId, items]) => {

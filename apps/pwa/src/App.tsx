@@ -81,6 +81,7 @@ const AnalisisGraderWizardPage = lazyWithReload(() => import('@/pages/AnalisisGr
 const AnalisisGraderSessionPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderSessionPage').then((mod) => ({ default: mod.AnalisisGraderSessionPage })))
 const AnalisisGraderSessionsListPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderSessionsListPage').then((mod) => ({ default: mod.AnalisisGraderSessionsListPage })))
 const AnalisisGraderCalendarPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderCalendarPage').then((mod) => ({ default: mod.AnalisisGraderCalendarPage })))
+const AnalisisGraderCargaMasivaPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderCargaMasivaPage').then((mod) => ({ default: mod.AnalisisGraderCargaMasivaPage })))
 const GanttModulePage = lazyWithReload(() => import('@/pages/gantt/GanttModulePage').then((mod) => ({ default: mod.GanttModulePage })))
 const AriaActionsPage = lazyWithReload(() => import('@/pages/AriaActionsPage').then((mod) => ({ default: mod.AriaActionsPage })))
 const ClimaPortPage = lazyWithReload(() => import('@/pages/ClimaPortPage').then((mod) => ({ default: mod.ClimaPortPage })))
@@ -493,6 +494,11 @@ export function App() {
             <Route path="analisis-grader/sesion/:sessionId" element={
               <Suspense fallback={<LoadingScreen />}>
                 <AnalisisGraderSessionPage />
+              </Suspense>
+            } />
+            <Route path="analisis-grader/carga-masiva" element={
+              <Suspense fallback={<LoadingScreen />}>
+                <AnalisisGraderCargaMasivaPage />
               </Suspense>
             } />
             <Route path="gantt" element={

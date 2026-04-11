@@ -1,5 +1,12 @@
 /**
  * Persistencia de KPIs diarios por turno para Grader.
+ *
+ * Colección: `graderDailySummaries`
+ * ID doc: `${dateKey}__${shiftId}` (ej: "2025-12-14__Turno noche")
+ *
+ * Funciones de escritura individual: saveDailySummary, deleteDailySummary
+ * Funciones de carga masiva: saveDailySummaryBatch, listDailySummariesByRange,
+ *                             deleteDailySummariesByBatch
  */
 
 import {
@@ -9,10 +16,20 @@ import {
   deleteDoc,
   serverTimestamp,
 } from '@/services/firestoreTracked'
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  getDocs,
+  writeBatch,
+} from 'firebase/firestore'
 import { db } from '../firebase'
 import type { GraderDailySummary } from './types'
 
 const COLLECTION = 'graderDailySummaries'
+/** Firestore permite máx. 500 ops por batch; usamos 400 para margen */
+const FIRESTORE_BATCH_LIMIT = 400
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (Object.prototype.toString.call(value) !== '[object Object]') return false
@@ -83,4 +100,67 @@ export async function saveDailySummary(params: {
 export async function deleteDailySummary(dateKey: string, shiftId: string): Promise<void> {
   const id = buildDailySummaryId(dateKey, shiftId)
   await deleteDoc(doc(db, COLLECTION, id))
+}
+
+// ============================================================================
+// Funciones para carga masiva histórica
+// ============================================================================
+
+/**
+ * Guarda múltiples resúmenes de turno en Firestore en lotes de 400.
+ * Sobreescribe si ya existe un doc con el mismo ID (setDoc merge: false).
+ */
+export async function saveDailySummaryBatch(
+  summaries: GraderDailySummary[],
+): Promise<void> {
+  if (summaries.length === 0) return
+
+  for (let i = 0; i < summaries.length; i += FIRESTORE_BATCH_LIMIT) {
+    const chunk = summaries.slice(i, i + FIRESTORE_BATCH_LIMIT)
+    const batch = writeBatch(db)
+    for (const s of chunk) {
+      const ref = doc(db, COLLECTION, s.id)
+      batch.set(ref, deepCleanUndefined({ ...s, _updatedAt: new Date().toISOString() }))
+    }
+    await batch.commit()
+  }
+}
+
+/**
+ * Consulta resúmenes diarios en un rango de fechas (inclusive).
+ * startDate / endDate: 'YYYY-MM-DD'
+ */
+export async function listDailySummariesByRange(
+  startDate: string,
+  endDate: string,
+): Promise<GraderDailySummary[]> {
+  const q = query(
+    collection(db, COLLECTION),
+    where('dateKey', '>=', startDate),
+    where('dateKey', '<=', endDate),
+    orderBy('dateKey'),
+  )
+  const snap = await getDocs(q)
+  return snap.docs.map((d) => d.data() as GraderDailySummary)
+}
+
+/**
+ * Elimina todos los resúmenes de un lote de carga masiva dado su batchUploadId.
+ */
+export async function deleteDailySummariesByBatch(
+  batchUploadId: string,
+): Promise<void> {
+  const q = query(
+    collection(db, COLLECTION),
+    where('batchUploadId', '==', batchUploadId),
+  )
+  const snap = await getDocs(q)
+  if (snap.empty) return
+
+  for (let i = 0; i < snap.docs.length; i += FIRESTORE_BATCH_LIMIT) {
+    const chunk = snap.docs.slice(i, i + FIRESTORE_BATCH_LIMIT)
+    const batch = writeBatch(db)
+    for (const d of chunk) batch.delete(d.ref)
+    await batch.commit()
+  }
 }

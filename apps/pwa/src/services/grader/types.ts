@@ -450,6 +450,28 @@ export interface GraderDailySummary {
   endAt?: string;
   updatedBy: string;
   updatedAt: string;
+
+  // ── Campos enriquecidos — generados por carga masiva histórica ──────────────
+  /** Duración del turno en minutos (del primer al último registro) */
+  durationMinutes?: number;
+  /** Peso clasificado (gates 1-12) en kg */
+  totalWeightKg?: number;
+  /** Peso promedio por pieza en gramos */
+  avgWeightGrams?: number;
+  /** Piezas producidas por hora (excluye P0) */
+  productionRatePerHour?: number;
+  /** Top causas de P0 con conteo y % */
+  topP0Causes?: Array<{ error: string; pieces: number; pct: number }>;
+  /** Distribución por calibre (gates 1-12) */
+  calibreDistribution?: Array<{ calibre: string; pieces: number; pct: number }>;
+  /** Distribución por calidad (gates 1-12) */
+  qualityDistribution?: Array<{ quality: string; pieces: number; pct: number }>;
+  /** Distribución de piezas por gate */
+  gateDistribution?: Array<{ gate: number; pieces: number; pct: number }>;
+  /** Nombres de los archivos Excel fuente */
+  sourceFileNames?: string[];
+  /** ID del lote de carga masiva que generó este resumen */
+  batchUploadId?: string;
 }
 
 // ============================================================================
