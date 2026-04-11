@@ -1070,6 +1070,98 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
               </p>
             </div>
 
+            {/* Velocidad cintas Z2 */}
+            <div>
+              <p className="text-sm font-medium mb-1">Velocidad cintas Z2 (snapshot de turno)</p>
+              <p className="text-xs text-muted-foreground mb-3">
+                Registrar los valores que muestra la pantalla Z2 <span className="font-medium text-foreground">"Velocidad cintas"</span> al inicio del turno.
+                Factor de conversión: <span className="font-mono text-foreground">1 unit = 0.000786 m/s</span> (basado en Sorting Belt máx. 1781 units = 1.4 m/s).
+              </p>
+              {(() => {
+                const k = 0.000786
+                type SpeedKey = 'zBeltUnits' | 'accel1Units' | 'accel2Units' | 'sortingUnits'
+                const readings = physicalConfig.z2BeltSpeedReadings
+                const fields: { key: SpeedKey; label: string; refUnits: number; beltId: string }[] = [
+                  { key: 'zBeltUnits',   label: 'Z-Belt (elevadora)',         refUnits: 494,  beltId: 'zeta'   },
+                  { key: 'accel1Units',  label: 'Acceleration Belt 1',        refUnits: 1313, beltId: 'accel1' },
+                  { key: 'accel2Units',  label: 'Acceleration Belt 2 (foto)', refUnits: 1560, beltId: 'accel2' },
+                  { key: 'sortingUnits', label: 'Sorting Belt (cinta larga)', refUnits: 1631, beltId: 'main'   },
+                ]
+                return (
+                  <div className="space-y-2">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b text-left">
+                            <th className="py-2 px-2">Cinta</th>
+                            <th className="py-2 px-2">Unidades Z2</th>
+                            <th className="py-2 px-2 text-right text-muted-foreground text-xs">Calculado (m/s)</th>
+                            <th className="py-2 px-2 text-right text-muted-foreground text-xs">Config actual</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {fields.map(({ key, label, refUnits, beltId }) => {
+                            const rawVal: number | undefined = readings?.[key]
+                            const units = rawVal ?? refUnits
+                            const calcMps = units * k
+                            const configBelt = physicalConfig.belts.find((b) => b.beltId === beltId)
+                            const configMps = configBelt?.speedMps ?? 0
+                            const drift = Math.abs(calcMps - configMps) > 0.05
+                            return (
+                              <tr key={key} className="border-b hover:bg-muted/30">
+                                <td className="py-2 px-2 text-xs">{label}</td>
+                                <td className="py-2 px-2">
+                                  <Input
+                                    type="number"
+                                    step="1"
+                                    min="0"
+                                    value={rawVal ?? ''}
+                                    placeholder={`ref: ${refUnits}`}
+                                    onChange={(e) => {
+                                      const v = e.target.value ? Number(e.target.value) : undefined
+                                      setPhysicalConfig((p) => ({
+                                        ...p,
+                                        z2BeltSpeedReadings: { ...(p.z2BeltSpeedReadings ?? {}), [key]: v },
+                                      }))
+                                    }}
+                                    className="h-8 text-xs w-24 font-mono"
+                                  />
+                                </td>
+                                <td className="py-2 px-2 text-right font-mono text-xs">
+                                  {calcMps.toFixed(3)} m/s
+                                </td>
+                                <td className="py-2 px-2 text-right font-mono text-xs">
+                                  <span className={cn(drift ? 'text-amber-600 font-medium' : 'text-muted-foreground')}>
+                                    {configMps.toFixed(2)} m/s
+                                    {drift && <span className="ml-1 text-amber-600">⚠</span>}
+                                  </span>
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Input
+                        type="text"
+                        placeholder="Etiqueta (ej. 12/07/2025 turno día)"
+                        value={readings?.readingLabel ?? ''}
+                        onChange={(e) => setPhysicalConfig((p) => ({
+                          ...p,
+                          z2BeltSpeedReadings: { ...(p.z2BeltSpeedReadings ?? {}), readingLabel: e.target.value },
+                        }))}
+                        className="h-8 text-xs flex-1 min-w-40 max-w-72"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Columna "⚠" = diferencia &gt;0.05 m/s entre lectura Z2 y configuración de cinta.
+                      </p>
+                    </div>
+                  </div>
+                )
+              })()}
+            </div>
+
             {/* Guardar */}
             <div className="flex items-center justify-between gap-2 flex-wrap pt-2 border-t">
               <div className="flex items-center gap-2">

@@ -248,18 +248,21 @@ function buildPrompt(p: AIGraderInput): string {
       lines.push('  Tiempo mínimo que el flipper debe estar abierto (salmón de ' + pc.avgSalmonLengthCm + 'cm): ' +
         (pc.avgSalmonLengthCm / 100 / mainSpeedMps).toFixed(2) + ' s')
     }
-    lines.push('  Especificaciones técnicas del fabricante (Marelec MS4/12):')
-    lines.push('    - Velocidad máxima: 1.4 m/s (no superar)')
+    lines.push('  Especificaciones técnicas del fabricante (Marelec MS4/12, S/N 3943):')
+    lines.push('    - Velocidad máxima: 1.4 m/s (no superar). Operativa normal: 1.28 m/s (Sorting Belt, casi constante).')
+    lines.push('    - Cintas: Z-Belt 0.39 m/s → Accel 1 1.03 m/s → Accel 2 1.23 m/s → Sorting Belt 1.28 m/s')
     lines.push('    - Producto máximo admitido: 1100mm largo, 290mm ancho, 15kg')
     lines.push('    - Precisión del pesaje: ±20g (0-5kg) / ±50g (5-15kg)')
-    lines.push('    - 12 salidas a la derecha, sin batching')
-    lines.push('    - Gate 1 a 1370mm del sensor, pitch 800mm entre compuertas')
+    lines.push('    - 12 salidas a la derecha. Gate 1 a 1300mm del sensor, pitch 1370mm entre pivots.')
+    lines.push('    - Z2 dis1-dis12: 50mm menos que físico (anticipación neumática ≈ 39ms a 1.28 m/s)')
+    lines.push('    - Causas de rechazo P0 en pantalla Z2: "Fuera de límites" (dimensiones/parámetros), "No leído por fotocélula" (sensor sucio/desalineado), "Too close or too long" (congestionamiento o pez > 110cm), "Puerta no preparada" (timing/sincronización falla)')
     lines.push('  Notas para la IA:')
-    lines.push('    1. "too close/too long" puede ser congestionamiento (sep. < 1.4× largo salmón) o producto > 110cm.')
-    lines.push('    2. "puerta no preparada" en gates 1-3 puede indicar velocidad de cinta demasiado alta.')
-    lines.push('    3. "fuera de límites" puede incluir peces > 110cm o > 29cm ancho (límites físicos de la cinta).')
-    lines.push('    4. La imprecisión del pesaje (±20-50g) puede causar errores de clasificación en bordes de calibre.')
-    lines.push('    5. Si separación < 1.4× largo del salmón, priorizar reducción de alimentación antes de ajustar gates.')
+    lines.push('    1. A 1.28 m/s, Gate 1 (1.30m) tiene solo 1.02s de reacción → timing muy ajustado.')
+    lines.push('    2. "too close/too long" indica congestionamiento (sep. < 1.4× largo salmón) o producto > 110cm.')
+    lines.push('    3. "puerta no preparada" en gates iniciales puede indicar velocidad de Sorting Belt demasiado alta para el volumen actual.')
+    lines.push('    4. "fuera de límites" incluye peces > 110cm o > 29cm ancho (límites físicos de la cinta, no configurables).')
+    lines.push('    5. La imprecisión del pesaje (±20-50g) puede causar errores de clasificación en bordes de calibre.')
+    lines.push('    6. Si separación < 1.4× largo del salmón, priorizar reducción de alimentación antes de ajustar gates.')
   }
 
   if (p.trendForecast) {

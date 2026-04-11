@@ -213,6 +213,26 @@ export interface GraderPhysicalConfig {
    * Unidad: milímetros. Array de 12 valores (index 0 = Gate 1).
    */
   z2ProgrammedDistancesMm?: number[]
+  /**
+   * Lecturas de velocidad de cintas desde la pantalla Z2 "Velocidad cintas".
+   * Unidad: unidades internas del Z2 (1 unit = 0.000786 m/s basado en sorting belt max).
+   * Factor de conversión: 1.4 m/s / 1781 unidades máx. = 0.000786 m/s por unidad.
+   * Registrar periódicamente al inicio del turno. Referencia: 26/12/2025 turno normal.
+   *
+   * Para convertir a m/s: units × 0.000786
+   */
+  z2BeltSpeedReadings?: {
+    /** Z-Belt (cinta elevadora). Ref: 494 units = 0.39 m/s */
+    zBeltUnits?: number
+    /** Acceleration Belt 1. Ref: 1313 units = 1.03 m/s */
+    accel1Units?: number
+    /** Acceleration Belt 2 (con fotocélula). Ref: 1560 units = 1.23 m/s */
+    accel2Units?: number
+    /** Sorting Belt / Grading Belt (cinta larga). Ref: 1631 units = 1.28 m/s. Casi constante. */
+    sortingUnits?: number
+    /** Fecha/turno de la lectura (ej. "26/12/2025 turno día") */
+    readingLabel?: string
+  }
 }
 
 // ============================================================================

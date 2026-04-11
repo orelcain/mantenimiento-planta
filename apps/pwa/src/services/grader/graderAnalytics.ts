@@ -104,7 +104,19 @@ export const MARELEC_MS4_12_SPECS = {
   z2Calibration: {
     sensorToGate1Mm:    1250,   // dis1 en el Z2
     gatePitchMm:        1370,   // mismo pitch que físico
-    offsetFromPhysical:  -50,   // Z2 dispara 50mm antes (≈ 71ms anticipo a 0.7 m/s)
+    offsetFromPhysical:  -50,   // Z2 dispara 50mm antes (≈ 39ms anticipo a 1.28 m/s)
+  },
+  // Escala de velocidades de cintas según pantalla Z2 "Velocidad cintas"
+  // Derivada de: Sorting belt max 1s = 1781 unidades = 1.4 m/s (spec manual)
+  // Factor k = 1.4/1781 = 0.000786 m/s por unidad — mismo para las 4 cintas
+  // (verificado: ratio max100ms/max1s ≈ 1.787 uniforme en todas las cintas)
+  z2BeltSpeedScale: {
+    conversionFactorMpsPerUnit: 0.000786,
+    maxUnits1s: { zBelt: 554, accel1: 1432, accel2: 1702, sorting: 1781 },
+    // Lectura de referencia operativa (26/12/2025, turno normal):
+    referenceReadings: { zBelt: 494, accel1: 1313, accel2: 1560, sorting: 1631 },
+    // Velocidades calculadas de la referencia (en m/s):
+    referenceMps:      { zBelt: 0.39, accel1: 1.03, accel2: 1.23, sorting: 1.28 },
   },
 } as const
 
@@ -125,34 +137,36 @@ export const DEFAULT_PHYSICAL_CONFIG = {
   avgSalmonLengthCm: 55,      // promedio conservador (máx. admitido: 110cm)
   avgSalmonWidthCm:  20,      // promedio (máx. admitido: 29cm = casi el ancho de la cinta)
   pocketCount: 4,
+  // Velocidades calibradas desde la pantalla Z2 "Velocidad cintas" (26/12/2025)
+  // Factor de conversión k = 1.4 m/s / 1781 unidades (max sorting) = 0.000786 m/s/unit
   belts: [
     {
       beltId:       'zeta'   as const,
       label:        'Z-Conveyor ❷ (cinta elevadora)',
       lengthMeters: 3.0,
       widthMeters:  1.20,    // 1200mm — especificación del fabricante
-      speedMps:     0.40,
+      speedMps:     0.39,    // Z2 lectura: 494 units × 0.000786 = 0.388 m/s
     },
     {
       beltId:       'accel1' as const,
       label:        'Acceleration Belt 1 ❸',
       lengthMeters: 1.5,
       widthMeters:  0.30,    // 300mm — especificación del fabricante
-      speedMps:     0.80,
+      speedMps:     1.03,    // Z2 lectura: 1313 units × 0.000786 = 1.032 m/s
     },
     {
       beltId:       'accel2' as const,
       label:        'Acceleration Belt 2 ❸ (fotocélula al final)',
       lengthMeters: 1.5,
       widthMeters:  0.30,    // 300mm — especificación del fabricante
-      speedMps:     1.00,
+      speedMps:     1.23,    // Z2 lectura: 1560 units × 0.000786 = 1.227 m/s
     },
     {
       beltId:       'main'   as const,
       label:        'Grading Belt ❹ (17.2 m, 12 compuertas)',
       lengthMeters: 17.179,  // 17179mm — plano exterior manual MS4_12
       widthMeters:  0.30,    // 300mm — especificación del fabricante
-      speedMps:     0.70,    // velocidad operativa (máx. fabricante: 1.4 m/s)
+      speedMps:     1.28,    // Z2 lectura: 1631 units × 0.000786 = 1.282 m/s (casi constante en turno)
     },
   ],
   // Mediciones en terreno (2026-04-11, cinta métrica):
@@ -180,16 +194,54 @@ export const DEFAULT_PHYSICAL_CONFIG = {
   // Nota: dis1=1250 vs físico=1300 → 50mm menos = anticipo de actuación neumática
   // Verificar: capturar pantalla completa del Z2 con los 12 valores dis
   z2ProgrammedDistancesMm: [1250, 2620, 3990, 5360, 6730, 8100, 9470, 10840, 12210, 13580, 14950, 16320],
+  // Lectura de velocidades Z2 de referencia (26/12/2025, turno normal)
+  // Factor: 1 unit = 0.000786 m/s (1.4 m/s / 1781 unidades máx. sorting belt)
+  z2BeltSpeedReadings: {
+    zBeltUnits:   494,    // → 0.39 m/s
+    accel1Units:  1313,   // → 1.03 m/s
+    accel2Units:  1560,   // → 1.23 m/s
+    sortingUnits: 1631,   // → 1.28 m/s (casi constante en turno)
+    readingLabel: '26/12/2025 turno día',
+  },
 }
 
-/** Causas estandarizadas con labels y descripciones */
+/**
+ * Causas estandarizadas de rechazo a Gate 0 / Punto Cero.
+ *
+ * Las 4 causas principales provienen directamente de la pantalla "Resultados Clasificación"
+ * del controlador Z2 (Marelec MS4/12). Se muestran como porcentaje del total de piezas
+ * sin clasificar ("Total unsorted pcs").
+ *
+ * Ejemplo real registrado en planta (14/07/2025):
+ *   Fuera de límites: 10.27% | No leído fotocélula: 1.73%
+ *   Too close or too long: 0.00% | Puerta no preparada: 0.13%
+ *   Total unsorted pcs: 287 | Peso total clasificado: 7488 kg | Cajas: 12
+ */
 const CAUSE_META: Record<PointZeroCause, { label: string; description: string }> = {
-  fuera_de_rango:       { label: 'Fuera de rango',          description: 'Pieza con peso fuera de los rangos de calibre definidos' },
-  fuera_de_limites:     { label: 'Fuera de límites',        description: `Pieza fuera de dimensiones del sistema (máx. ${MARELEC_MS4_12_SPECS.maxProductDimensions.lengthMm}mm largo, ${MARELEC_MS4_12_SPECS.maxProductDimensions.widthMm}mm ancho)` },
-  no_leido_fotocelula:  { label: 'No leído por fotocélula', description: 'Sensor óptico no detectó correctamente la pieza' },
-  too_close_too_long:   { label: 'Too close or too long',   description: `Piezas demasiado cerca entre sí, o longitud superior a ${MARELEC_MS4_12_SPECS.maxProductDimensions.lengthMm}mm` },
-  puerta_no_preparada:  { label: 'Puerta no preparada',     description: 'Compuerta no estaba lista al momento de operar' },
-  otro:                 { label: 'Otro / Desconocido',      description: 'Causa no clasificada en las categorías estándar' },
+  fuera_de_rango: {
+    label: 'Fuera de rango',
+    description: 'Pieza con peso fuera de todos los rangos de calibre configurados en las compuertas activas.',
+  },
+  fuera_de_limites: {
+    label: 'Fuera de límites',
+    description: `Objeto fuera de los parámetros dimensionales del sistema (máx. ${MARELEC_MS4_12_SPECS.maxProductDimensions.lengthMm}mm largo, ${MARELEC_MS4_12_SPECS.maxProductDimensions.widthMm}mm ancho). La pieza va directo a Gate 0. Causas típicas: pez demasiado largo, salmón mal alineado, doble pieza.`,
+  },
+  no_leido_fotocelula: {
+    label: 'No leído por fotocélula',
+    description: 'El Detection Eye (fotocélula al final de Accel Belt 2) no detectó correctamente la pieza. Puede deberse a suciedad en el lente del sensor, mala calibración, o posicionamiento incorrecto de la pieza. La pieza pasa sin clasificar y va a Gate 0.',
+  },
+  too_close_too_long: {
+    label: 'Too close or too long',
+    description: `Piezas demasiado cerca entre sí en la cinta (superan el mínimo de separación del sistema), o la pieza supera la longitud máxima admitida (${MARELEC_MS4_12_SPECS.maxProductDimensions.lengthMm}mm). Alta tasa indica congestionamiento: reducir alimentación de pockets o aumentar velocidad de cintas de aceleración.`,
+  },
+  puerta_no_preparada: {
+    label: 'Puerta no preparada',
+    description: 'Una compuerta (flipper) no estaba lista cuando el sistema intentó activarla. Ocurre cuando la pieza anterior aún está pasando por el flipper (problema de timing/sincronización), o por falla mecánica del cilindro neumático. La pieza va a Gate 0 o a la siguiente compuerta.',
+  },
+  otro: {
+    label: 'Otro / Desconocido',
+    description: 'Causa de rechazo no clasificada en las categorías estándar del Z2.',
+  },
 }
 
 // ============================================================================
