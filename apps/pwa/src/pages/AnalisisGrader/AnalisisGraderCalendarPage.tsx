@@ -3,7 +3,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, Navigate } from 'react-router-dom'
+import { useNavigate, useSearchParams, Navigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from '@/components/ui'
 import { Calendar, ChevronLeft, ChevronRight, Loader2, ArrowLeft, Clock, Upload, Database } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -101,15 +101,32 @@ export function AnalisisGraderCalendarPage() {
   const { canSee } = usePermissionsStore()
   const user = useAuthStore((s) => s.user)
   const navigate = useNavigate()
-  const [currentMonth, setCurrentMonth] = useState(new Date())
-  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date())
+  const [searchParams] = useSearchParams()
+
+  // Parámetro ?goto=YYYY-MM-DD — viene de la carga masiva para saltar al mes correcto
+  const gotoDate = searchParams.get('goto')
+
+  const [currentMonth, setCurrentMonth] = useState(() => {
+    if (gotoDate) {
+      const d = new Date(`${gotoDate}T00:00:00`)
+      if (!isNaN(d.getTime())) return new Date(d.getFullYear(), d.getMonth(), 1)
+    }
+    return new Date()
+  })
+  const [selectedDate, setSelectedDate] = useState<Date | null>(() => {
+    if (gotoDate) {
+      const d = new Date(`${gotoDate}T00:00:00`)
+      if (!isNaN(d.getTime())) return d
+    }
+    return new Date()
+  })
   const [uploads, setUploads] = useState<GraderUpload[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [summaries, setSummaries] = useState<Record<string, SummaryState>>({})
   const [shiftSchedule, setShiftSchedule] = useState(DEFAULT_SHIFT_SCHEDULE)
   const [historicalByDate, setHistoricalByDate] = useState<Map<string, GraderDailySummary[]>>(new Map())
-  const autoSelectedRef = useRef(false)
+  const autoSelectedRef = useRef(!!gotoDate) // Si hay goto, no sobreescribir la selección
 
   useEffect(() => {
     setLoading(true)
@@ -152,9 +169,28 @@ export function AnalisisGraderCalendarPage() {
           map.set(s.dateKey, existing)
         }
         setHistoricalByDate(map)
+
+        // Si el mes actual no tiene datos y no hay parámetro goto, buscar el último mes con datos
+        if (list.length === 0 && !gotoDate && !autoSelectedRef.current) {
+          const today = new Date()
+          const lookback = `${today.getFullYear() - 1}-${String(today.getMonth() + 1).padStart(2, '0')}-01`
+          const lookbackEnd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()).padStart(2, '0')}`
+          listDailySummariesByRange(lookback, lookbackEnd)
+            .then((allList) => {
+              if (allList.length > 0) {
+                const latestKey = allList.map((s) => s.dateKey).sort().slice(-1)[0]
+                if (latestKey) {
+                  const d = new Date(`${latestKey}T00:00:00`)
+                  setSelectedDate(d)
+                  setCurrentMonth(new Date(d.getFullYear(), d.getMonth(), 1))
+                }
+              }
+            })
+            .catch(() => {/* silent */})
+        }
       })
       .catch(() => { /* silent: historial no crítico */ })
-  }, [currentMonth])
+  }, [currentMonth, gotoDate])
 
   useEffect(() => {
     if (autoSelectedRef.current) return

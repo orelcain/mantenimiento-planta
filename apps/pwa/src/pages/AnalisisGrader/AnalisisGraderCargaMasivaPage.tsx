@@ -192,11 +192,19 @@ export function AnalisisGraderCargaMasivaPage() {
       await saveDailySummaryBatch(segments.map((s) => s.summary))
       setSavedCount(segments.length)
       setPageState('done')
+      // Navegar al calendario en el mes más reciente guardado
+      const latestDate = segments
+        .map((s) => s.summary.dateKey)
+        .sort()
+        .slice(-1)[0]
+      if (latestDate) {
+        setTimeout(() => navigate(`/analisis-grader/calendario?goto=${latestDate}`), 1200)
+      }
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Error al guardar en Firestore.')
       setPageState('error')
     }
-  }, [segments])
+  }, [segments, navigate])
 
   // ─── Estadísticas de previsualización ────────────────────────────────────────
 
