@@ -14,26 +14,36 @@
  * Toda la data viene del summary guardado en Firestore — no re-parsea Excel.
  */
 
-import { useMemo } from 'react'
+import { useMemo, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from '@/components/ui'
-import { ArrowRight, Clock, Database } from 'lucide-react'
-import { Bar, Doughnut } from 'react-chartjs-2'
+import { ArrowRight, Clock, Database, Brain, Loader2, XCircle, Zap, AlertTriangle, Info, TrendingUp } from 'lucide-react'
+import { Bar, Doughnut, Line } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
   BarElement,
+  PointElement,
+  LineElement,
   ArcElement,
   Title,
   Tooltip,
   Legend,
+  Filler,
 } from 'chart.js'
 import { cn } from '@/lib/utils'
 import type { GraderDailySummary } from '@/services/grader/types'
+import type { AIGraderOutput } from '@/services/grader/types'
+import { computeInsightsFromSummary } from '@/services/grader/graderSummaryInsights'
+import { analyzeGraderFromSummary } from '@/services/grader/graderSummaryAI'
+import { AIOutputPanel } from '@/components/grader/GraderInlinePanels'
 
 // Registrar los elementos de Chart.js necesarios (idempotente si ya están)
-ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend)
+ChartJS.register(
+  CategoryScale, LinearScale, BarElement, PointElement, LineElement,
+  ArcElement, Title, Tooltip, Legend, Filler,
+)
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -88,12 +98,38 @@ const DOUGHNUT_COLORS = [
 
 interface Props {
   summary: GraderDailySummary
+  /** Turnos anteriores para contexto de tendencia e insights. */
+  recentTurns?: GraderDailySummary[]
   /** Si true, oculta el botón "Abrir dashboard completo" (útil si se embebe donde no tiene sentido navegar). */
   hideDashboardButton?: boolean
 }
 
-export function GraderTurnoDetailView({ summary, hideDashboardButton }: Props) {
+export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButton }: Props) {
   const navigate = useNavigate()
+
+  // ── Estado IA ────────────────────────────────────────────────────────────
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiOutput, setAiOutput] = useState<AIGraderOutput | null>(null)
+  const [aiError, setAiError] = useState<string | null>(null)
+
+  const handleAnalyzeAI = useCallback(async () => {
+    setAiLoading(true)
+    setAiError(null)
+    try {
+      const result = await analyzeGraderFromSummary(summary, recentTurns)
+      setAiOutput(result)
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : 'Error al analizar con IA')
+    } finally {
+      setAiLoading(false)
+    }
+  }, [summary, recentTurns])
+
+  // ── Insights determinísticos ─────────────────────────────────────────────
+  const insights = useMemo(
+    () => computeInsightsFromSummary(summary, recentTurns),
+    [summary, recentTurns],
+  )
 
   // ── Datos de gráficos (memoizados) ───────────────────────────────────────
 
@@ -154,6 +190,47 @@ export function GraderTurnoDetailView({ summary, hideDashboardButton }: Props) {
     const e = new Date(summary.endAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })
     return `${s} – ${e}`
   }, [summary.startAt, summary.endAt])
+
+  // ── Tendencia P0% (turnos recientes + actual) ────────────────────────────
+  const tendenciaChartData = useMemo(() => {
+    const prior = (recentTurns ?? [])
+      .filter((t) => t.totalPieces >= 200)
+      .sort((a, b) => a.dateKey.localeCompare(b.dateKey) || a.shiftId.localeCompare(b.shiftId))
+      .slice(-19) // últimos 19 + actual = 20 puntos máx
+
+    const points = [...prior, summary]
+    if (points.length < 2) return null
+
+    const labels = points.map((t) => {
+      const d = new Date(`${t.dateKey}T12:00:00`)
+      const dayLabel = d.toLocaleDateString('es-CL', { day: '2-digit', month: 'short' })
+      const shiftShort = t.shiftId.includes('día') ? 'D' : 'N'
+      return `${dayLabel} ${shiftShort}`
+    })
+
+    const isCurrentIndex = points.length - 1
+
+    return {
+      labels,
+      datasets: [
+        {
+          label: 'P0%',
+          data: points.map((t) => t.pointZeroPct),
+          borderColor: 'rgba(99,102,241,0.7)',
+          backgroundColor: 'rgba(99,102,241,0.08)',
+          pointBackgroundColor: points.map((_, i) =>
+            i === isCurrentIndex ? 'rgba(239,68,68,1)' : 'rgba(99,102,241,0.9)'
+          ),
+          pointBorderColor: points.map((_, i) =>
+            i === isCurrentIndex ? 'rgba(239,68,68,1)' : 'rgba(99,102,241,0.9)'
+          ),
+          pointRadius: points.map((_, i) => (i === isCurrentIndex ? 8 : 4)),
+          tension: 0.3,
+          fill: true,
+        },
+      ],
+    }
+  }, [recentTurns, summary])
 
   // ── Render ───────────────────────────────────────────────────────────────
 
@@ -260,6 +337,108 @@ export function GraderTurnoDetailView({ summary, hideDashboardButton }: Props) {
           </CardContent>
         </Card>
       </div>
+
+      {/* ── Tendencia P0% (últimos turnos) ───────────────────────────────────── */}
+      {tendenciaChartData && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              Tendencia P0% — últimos turnos
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Punto rojo = turno actual. Escala: warn {'>'}2%, crítico {'>'}3.5%
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="h-52">
+              <Line
+                data={tendenciaChartData}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                    legend: { display: false },
+                    annotation: undefined,
+                    tooltip: {
+                      callbacks: {
+                        label: (ctx) => `P0%: ${ctx.parsed.y}%`,
+                      },
+                    },
+                  },
+                  scales: {
+                    y: {
+                      min: 0,
+                      suggestedMax: Math.max(5, summary.pointZeroPct + 1),
+                      ticks: { callback: (v) => `${v}%` },
+                    },
+                    x: {
+                      ticks: { font: { size: 10 }, maxRotation: 45 },
+                    },
+                  },
+                }}
+              />
+            </div>
+            {/* Líneas de referencia como leyenda visual */}
+            <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <span className="inline-block w-4 h-0.5 bg-amber-400" />
+                Warn 2%
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="inline-block w-4 h-0.5 bg-red-500" />
+                Crítico 3.5%
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Alertas automáticas (insights determinísticos) ───────────────────── */}
+      {insights.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Zap className="h-4 w-4 text-muted-foreground" />
+              Alertas automáticas
+              <Badge variant="outline" className="text-[10px] ml-auto">
+                {insights.length} alerta{insights.length !== 1 ? 's' : ''}
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {insights.map((ins) => {
+              const sev = ins.severity
+              const borderCls = sev === 'critical' ? 'border-red-400/40 bg-red-500/5'
+                : sev === 'warn' ? 'border-amber-400/40 bg-amber-500/5'
+                : 'border-blue-400/30 bg-blue-500/5'
+              const icon = sev === 'critical' ? <AlertTriangle className="h-3.5 w-3.5 text-red-500 shrink-0 mt-0.5" />
+                : sev === 'warn' ? <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
+                : <Info className="h-3.5 w-3.5 text-blue-500 shrink-0 mt-0.5" />
+              return (
+                <div key={ins.id} className={cn('rounded-md border p-3 space-y-1.5', borderCls)}>
+                  <div className="flex items-start gap-2">
+                    {icon}
+                    <p className="text-sm font-medium">{ins.title}</p>
+                  </div>
+                  <ul className="pl-5 space-y-0.5">
+                    {ins.evidence.map((e, i) => (
+                      <li key={i} className="text-xs text-muted-foreground list-disc">{e}</li>
+                    ))}
+                  </ul>
+                  {ins.recommendations.length > 0 && (
+                    <ul className="pl-5 space-y-0.5 pt-1 border-t border-dashed border-muted">
+                      {ins.recommendations.map((r, i) => (
+                        <li key={i} className="text-xs list-disc">{r}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )
+            })}
+          </CardContent>
+        </Card>
+      )}
 
       {/* ── Distribuciones en grid ─────────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -417,6 +596,49 @@ export function GraderTurnoDetailView({ summary, hideDashboardButton }: Props) {
           </CardContent>
         </Card>
       )}
+
+      {/* ── Diagnóstico IA ────────────────────────────────────────────────────── */}
+      <Card>
+        <CardHeader className="flex flex-row items-start justify-between gap-3 flex-wrap pb-2">
+          <div>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Brain className="h-4 w-4 text-muted-foreground" />
+              Diagnóstico IA — Sugerencias de configuración
+            </CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">
+              Analiza causas raíz de P0%, balance de compuertas y plan de acción con inteligencia artificial
+            </p>
+          </div>
+          <Button
+            size="sm"
+            onClick={handleAnalyzeAI}
+            disabled={aiLoading}
+            className="shrink-0"
+          >
+            {aiLoading
+              ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Analizando…</>
+              : <><Brain className="h-3.5 w-3.5 mr-1.5" />Analizar con IA</>
+            }
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {!aiOutput && !aiError && !aiLoading && (
+            <p className="text-sm text-muted-foreground text-center py-6">
+              Presiona "Analizar con IA" para obtener diagnóstico y recomendaciones de configuración.
+            </p>
+          )}
+          {aiError && (
+            <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/10 border border-red-300 text-sm">
+              <div className="flex items-center gap-2 text-red-600">
+                <XCircle className="h-4 w-4" />
+                <span className="font-medium">Error de análisis IA</span>
+              </div>
+              <p className="mt-1 text-xs text-red-500">{aiError}</p>
+            </div>
+          )}
+          {aiOutput && <AIOutputPanel output={aiOutput} />}
+        </CardContent>
+      </Card>
 
       {/* ── Botón opcional de dashboard completo ───────────────────────────── */}
       {!hideDashboardButton && (

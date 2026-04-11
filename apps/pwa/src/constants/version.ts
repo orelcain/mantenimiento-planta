@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.79.0' as const
+export const APP_VERSION = '2.80.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-04-11' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Grader iter 11: 2 turnos (A=día 07-19, B=noche 19-07) + migración legacy tarde→noche' as const
+export const VERSION_NAME = 'Grader iter 12: tendencia + insights + IA desde historial Firestore' as const
 
 /**
  * Nota:

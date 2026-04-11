@@ -12,9 +12,18 @@ import { useNavigate, useSearchParams, Navigate } from 'react-router-dom'
 import { Card, CardContent, Button } from '@/components/ui'
 import { ArrowLeft, Calendar, Loader2, AlertCircle } from 'lucide-react'
 import { usePermissionsStore } from '@/store'
-import { getDailySummary } from '@/services/grader/graderDailySummary.service'
+import { getDailySummary, listDailySummariesByRange } from '@/services/grader/graderDailySummary.service'
 import type { GraderDailySummary } from '@/services/grader/types'
 import { GraderTurnoDetailView } from '@/components/grader/GraderTurnoDetailView'
+
+// Cuántos días hacia atrás buscar para el contexto de tendencia
+const CONTEXT_DAYS = 45
+
+function subtractDays(dateKey: string, days: number): string {
+  const d = new Date(`${dateKey}T12:00:00`)
+  d.setDate(d.getDate() - days)
+  return d.toISOString().slice(0, 10)
+}
 
 export function AnalisisGraderDetallePage() {
   const { canSee } = usePermissionsStore()
@@ -25,6 +34,7 @@ export function AnalisisGraderDetallePage() {
   const shiftId = searchParams.get('shift')
 
   const [summary, setSummary] = useState<GraderDailySummary | null>(null)
+  const [recentTurns, setRecentTurns] = useState<GraderDailySummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -36,12 +46,18 @@ export function AnalisisGraderDetallePage() {
     }
     setLoading(true)
     setError(null)
-    getDailySummary(dateKey, shiftId)
-      .then((s) => {
+    const contextStart = subtractDays(dateKey, CONTEXT_DAYS)
+    Promise.all([
+      getDailySummary(dateKey, shiftId),
+      listDailySummariesByRange(contextStart, dateKey).catch(() => []),
+    ])
+      .then(([s, recent]) => {
         if (!s) {
           setError(`No se encontró el turno ${shiftId} del ${dateKey} en el historial.`)
         } else {
           setSummary(s)
+          // excluir el propio turno del contexto (puede estar duplicado)
+          setRecentTurns(recent.filter((t) => t.id !== s.id))
         }
       })
       .catch((err) => {
@@ -88,7 +104,7 @@ export function AnalisisGraderDetallePage() {
       )}
 
       {!loading && !error && summary && (
-        <GraderTurnoDetailView summary={summary} />
+        <GraderTurnoDetailView summary={summary} recentTurns={recentTurns} />
       )}
     </div>
   )

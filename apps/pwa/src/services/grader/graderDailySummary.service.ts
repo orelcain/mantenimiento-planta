@@ -262,14 +262,13 @@ function mergeTwoSummaries(base: GraderDailySummary, legacy: GraderDailySummary)
   const totalWeightKg =
     (base.totalWeightKg ?? 0) + (legacy.totalWeightKg ?? 0) || undefined
 
-  // Duración: calcular desde el rango nuevo [min startAt, max endAt]
+  // Duración: sumar ambas duraciones (no calcular desde span — daría ~24h si los turnos
+  // empiezan en horas distintas del mismo día, como ocurrió en la migración tarde→noche)
   const starts = [base.startAt, legacy.startAt].filter(Boolean).sort()
   const ends = [base.endAt, legacy.endAt].filter(Boolean).sort()
   const startAt = starts[0] ?? base.startAt
   const endAt = ends[ends.length - 1] ?? base.endAt
-  const durationMinutes = startAt && endAt
-    ? Math.round((new Date(endAt).getTime() - new Date(startAt).getTime()) / 60_000)
-    : base.durationMinutes
+  const durationMinutes = ((base.durationMinutes ?? 0) + (legacy.durationMinutes ?? 0)) || undefined
 
   const avgWeightGrams = totalWeightKg && totalPieces > 0
     ? r((totalWeightKg * 1000) / totalPieces, 0)

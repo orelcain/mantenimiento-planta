@@ -1,24 +1,12 @@
 {
-  "version": "2.79.0",
+  "version": "2.80.0",
   "buildDate": "2026-04-11",
-  "buildTimestamp": 1775930315919,
+  "buildTimestamp": 1775930315920,
   "features": [
-    "Grader: configuración física real de Marelec MS4/12 (mediciones en terreno)",
-    "Grader: Gate 1 a 1300mm del sensor, pitch 1370mm entre pivots, paleta 475mm",
-    "Grader: Grading Belt 17179mm con 12 flippers calibrados individualmente",
-    "Grader: Z2 dis1-dis12 reales [1250,2200,3800,5200,6550,7850,9150,10400,11700,13175,14800,15850]",
-    "Grader: velocidades de cintas reales desde Z2 (Sorting Belt 1.28 m/s)",
-    "Grader: Accel Belt 1 3.65m y Accel Belt 2 1.70m medidos en planta",
-    "Grader: Resumen Ejecutivo al cargar Excel (P0%, KPIs, top problemas, acciones)",
-    "Grader: widget inline velocidad Sorting Belt editable desde resumen",
-    "Grader: insight #14 separación entre peces con riesgo de congestionamiento",
-    "Grader: insight #15 precisión del pesaje en bordes de calibre (±20g/±50g)",
-    "Grader: insight #16 flippers con tiempo de reacción crítico",
-    "Grader: insight #17 gate sobrecargada (>35% del tráfico) con sugerencia de duplicación",
-    "Grader: insight #18 conflicto timing Z2 entre gates adyacentes activas",
-    "Grader: definiciones reales de causas P0 desde pantalla Z2 (fuera límites/fotocélula/too close/puerta)",
-    "Grader: IA recibe contexto físico completo (specs MS4/12 + dis Z2 + timings)",
-    "Grader: UI config física con tablas editables de cintas, flippers, Z2 dis, velocidades",
-    "Grader: persiste physicalConfig en Firestore y lo carga al montar el wizard"
+    "Grader iter 12: fix durationMinutes inflado en summaries fusionados (tarde→noche)",
+    "Grader iter 12: tendencia P0% últimos turnos en vista detalle (sin re-parsear Excel)",
+    "Grader iter 12: alertas automáticas desde GraderDailySummary (P0 elevado, causa dominante, muestra pequeña, tendencia ascendente)",
+    "Grader iter 12: diagnóstico IA desde historial Firestore (Groq) con sugerencias de gates y configuración",
+    "Grader iter 12: contexto histórico 45 días en página de detalle de turno"
   ]
 }
