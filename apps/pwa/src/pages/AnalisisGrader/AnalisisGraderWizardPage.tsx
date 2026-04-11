@@ -10,7 +10,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, Button, Badge } from '@/components/ui'
-import { Settings2, BarChart3, FolderOpen, Loader2, ChevronDown, ChevronUp, CheckCircle2, Calendar } from 'lucide-react'
+import { Settings2, BarChart3, Loader2, ChevronDown, ChevronUp, CheckCircle2, Calendar } from 'lucide-react'
 import { useAuthStore, usePermissionsStore } from '@/store'
 import { AnalisisGraderUploadPage, type FileParsed } from './AnalisisGraderUploadPage'
 import { AnalisisGraderGatesConfigPage } from './AnalisisGraderGatesConfigPage'
@@ -368,14 +368,12 @@ export function AnalisisGraderWizardPage() {
       )
       await saveDailySummaryBatch(summaries)
       setSavedToCalendar(true)
-      const latestDate = summaries.map((s) => s.dateKey).sort().slice(-1)[0]
-      if (latestDate) {
-        setTimeout(() => navigate(`/analisis-grader/calendario?goto=${latestDate}`), 1400)
-      }
+      // El calendario embebido abajo se actualiza solo en el siguiente render.
+      // No necesitamos navegar a otra página (ya no hay /analisis-grader/calendario).
     } catch {
       setSavingToCalendar(false)
     }
-  }, [multiDayInfo, parsedData, user?.id, navigate])
+  }, [multiDayInfo, parsedData, user?.id])
 
   if (!canSee('analisisGrader')) return <Navigate to="/" replace />
 
@@ -414,10 +412,6 @@ export function AnalisisGraderWizardPage() {
           <Button variant="ghost" size="sm" onClick={() => navigate('/analisis-grader/periodo')}>
             <BarChart3 className="h-4 w-4 mr-1" />
             Análisis período
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => navigate('/analisis-grader/sesiones')}>
-            <FolderOpen className="h-4 w-4 mr-1" />
-            Historial
           </Button>
         </div>
       </div>

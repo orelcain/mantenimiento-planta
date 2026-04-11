@@ -1,9 +1,11 @@
 {
-  "version": "2.82.0",
+  "version": "2.83.0",
   "buildDate": "2026-04-12",
   "buildTimestamp": 1775930315920,
   "features": [
-    "Grader iter 14: ocultar upload card si el turno ya tiene historial guardado",
-    "Grader iter 14: al eliminar summary, también limpiar upload del state local (sin tarjeta huérfana)"
+    "Grader iter 15: eliminadas 4 páginas legacy del módulo (Calendar, CargaMasiva, SessionsList, Session)",
+    "Grader iter 15: 4 rutas removidas, ahorro ~1,209 líneas de código",
+    "Grader iter 15: navegación simplificada — el home Wizard embebe el calendario, ya no hay página dedicada",
+    "Grader iter 15: botones Historial y Calendario del header Wizard eliminados (redundantes)"
   ]
 }

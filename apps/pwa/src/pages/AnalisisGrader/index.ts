@@ -1,7 +1,4 @@
 export { AnalisisGraderWizardPage } from './AnalisisGraderWizardPage'
-export { AnalisisGraderSessionPage } from './AnalisisGraderSessionPage'
-export { AnalisisGraderSessionsListPage } from './AnalisisGraderSessionsListPage'
-export { AnalisisGraderCalendarPage } from './AnalisisGraderCalendarPage'
 export { AnalisisGraderUploadPage } from './AnalisisGraderUploadPage'
 export { AnalisisGraderGatesConfigPage } from './AnalisisGraderGatesConfigPage'
 export { AnalisisGraderDashboardPage } from './AnalisisGraderDashboardPage'

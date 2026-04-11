@@ -78,10 +78,6 @@ const HmiKnuroPublicPage = lazyWithReload(() => import('@/pages/HmiKnuroPublicPa
 const Visor3DInteractiveToboganPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DInteractiveToboganPage').then((mod) => ({ default: mod.Visor3DInteractiveToboganPage })))
 const Visor3DInteractiveBaader142Page = lazyWithReload(() => import('@/pages/Visor3D/Visor3DInteractiveBaader142Page').then((mod) => ({ default: mod.Visor3DInteractiveBaader142Page })))
 const AnalisisGraderWizardPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderWizardPage').then((mod) => ({ default: mod.AnalisisGraderWizardPage })))
-const AnalisisGraderSessionPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderSessionPage').then((mod) => ({ default: mod.AnalisisGraderSessionPage })))
-const AnalisisGraderSessionsListPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderSessionsListPage').then((mod) => ({ default: mod.AnalisisGraderSessionsListPage })))
-const AnalisisGraderCalendarPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderCalendarPage').then((mod) => ({ default: mod.AnalisisGraderCalendarPage })))
-const AnalisisGraderCargaMasivaPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderCargaMasivaPage').then((mod) => ({ default: mod.AnalisisGraderCargaMasivaPage })))
 const AnalisisGraderDetallePage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderDetallePage').then((mod) => ({ default: mod.AnalisisGraderDetallePage })))
 const AnalisisGraderPeriodoPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderPeriodoPage').then((mod) => ({ default: mod.AnalisisGraderPeriodoPage })))
 const GanttModulePage = lazyWithReload(() => import('@/pages/gantt/GanttModulePage').then((mod) => ({ default: mod.GanttModulePage })))
@@ -481,26 +477,6 @@ export function App() {
             <Route path="analisis-grader" element={
               <Suspense fallback={<LoadingScreen />}>
                 <AnalisisGraderWizardPage />
-              </Suspense>
-            } />
-            <Route path="analisis-grader/sesiones" element={
-              <Suspense fallback={<LoadingScreen />}>
-                <AnalisisGraderSessionsListPage />
-              </Suspense>
-            } />
-            <Route path="analisis-grader/calendario" element={
-              <Suspense fallback={<LoadingScreen />}>
-                <AnalisisGraderCalendarPage />
-              </Suspense>
-            } />
-            <Route path="analisis-grader/sesion/:sessionId" element={
-              <Suspense fallback={<LoadingScreen />}>
-                <AnalisisGraderSessionPage />
-              </Suspense>
-            } />
-            <Route path="analisis-grader/carga-masiva" element={
-              <Suspense fallback={<LoadingScreen />}>
-                <AnalisisGraderCargaMasivaPage />
               </Suspense>
             } />
             <Route path="analisis-grader/detalle" element={

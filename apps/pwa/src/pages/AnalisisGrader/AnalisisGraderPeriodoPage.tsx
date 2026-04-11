@@ -134,9 +134,9 @@ export function AnalisisGraderPeriodoPage() {
             </p>
           </div>
         </div>
-        <Button variant="outline" size="sm" onClick={() => navigate('/analisis-grader/calendario')}>
+        <Button variant="outline" size="sm" onClick={() => navigate('/analisis-grader')}>
           <Calendar className="h-4 w-4 mr-1" />
-          Calendario
+          Volver
         </Button>
       </div>
 

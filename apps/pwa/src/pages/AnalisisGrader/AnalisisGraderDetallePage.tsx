@@ -75,9 +75,9 @@ export function AnalisisGraderDetallePage() {
       {/* Header con Volver */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={() => navigate('/analisis-grader/calendario')}>
+          <Button variant="outline" size="sm" onClick={() => navigate('/analisis-grader')}>
             <ArrowLeft className="h-4 w-4 mr-1" />
-            Volver al calendario
+            Volver
           </Button>
         </div>
       </div>
@@ -94,9 +94,9 @@ export function AnalisisGraderDetallePage() {
             <AlertCircle className="h-8 w-8 text-red-500 mx-auto" />
             <p className="text-sm text-destructive">{error}</p>
             <div className="flex justify-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => navigate('/analisis-grader/calendario')}>
+              <Button variant="outline" size="sm" onClick={() => navigate('/analisis-grader')}>
                 <Calendar className="h-4 w-4 mr-1" />
-                Ir al calendario
+                Ir al inicio
               </Button>
             </div>
           </CardContent>
