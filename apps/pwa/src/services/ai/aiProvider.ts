@@ -254,7 +254,7 @@ function buildPrompt(p: AIGraderInput): string {
     lines.push('    - Producto máximo admitido: 1100mm largo, 290mm ancho, 15kg')
     lines.push('    - Precisión del pesaje: ±20g (0-5kg) / ±50g (5-15kg)')
     lines.push('    - 12 salidas a la derecha. Gate 1 a 1300mm del sensor, pitch 1370mm entre pivots.')
-    lines.push('    - Z2 dis1-dis12: 50mm menos que físico (anticipación neumática ≈ 39ms a 1.28 m/s)')
+    lines.push('    - Z2 dis1-dis12: offsets variables vs físico (-50 a -560mm) — cada flipper calibrado individualmente según respuesta neumática real')
     lines.push('    - Causas de rechazo P0 en pantalla Z2: "Fuera de límites" (dimensiones/parámetros), "No leído por fotocélula" (sensor sucio/desalineado), "Too close or too long" (congestionamiento o pez > 110cm), "Puerta no preparada" (timing/sincronización falla)')
     lines.push('  Notas para la IA:')
     lines.push('    1. A 1.28 m/s, Gate 1 (1.30m) tiene solo 1.02s de reacción → timing muy ajustado.')

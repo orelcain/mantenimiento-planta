@@ -98,13 +98,14 @@ export const MARELEC_MS4_12_SPECS = {
     gatePitchMm:              1370,  // medición real pivot-a-pivot (vs 800mm estimado del plano)
     flipperPaddleLengthMm:     475,  // medición real 2026-04-11
   },
-  // Parámetros dis1-dis12 del controlador Z2
-  // dis1=1250 → el Z2 dispara 50mm antes que la posición física (compensación neumática)
-  // Pitch Z2 = 1370mm (mismo que físico, offset uniforme de 50mm)
+  // Parámetros dis1-dis12 del controlador Z2 (valores reales, foto 2026-04-11)
+  // dis1=1250 → físico=1300mm → -50mm anticipo (gate 1)
+  // Los offsets Z2 vs físico NO son uniformes — calibración individual por flipper:
+  //   offsets (mm): [-50,-470,-240,-210,-230,-300,-370,-490,-560,-455,-200,-520]
+  // Ver valores completos en DEFAULT_PHYSICAL_CONFIG.z2ProgrammedDistancesMm
   z2Calibration: {
-    sensorToGate1Mm:    1250,   // dis1 en el Z2
-    gatePitchMm:        1370,   // mismo pitch que físico
-    offsetFromPhysical:  -50,   // Z2 dispara 50mm antes (≈ 39ms anticipo a 1.28 m/s)
+    sensorToGate1Mm:      1250,   // dis1 real del Z2
+    gate1OffsetFromPhysical: -50, // Z2 dispara 50mm antes del pivot físico (gate 1)
   },
   // Escala de velocidades de cintas según pantalla Z2 "Velocidad cintas"
   // Derivada de: Sorting belt max 1s = 1781 unidades = 1.4 m/s (spec manual)
@@ -193,7 +194,11 @@ export const DEFAULT_PHYSICAL_CONFIG = {
   // (leídos desde "Cambiar Parámetros" → 2026-04-11)
   // Nota: dis1=1250 vs físico=1300 → 50mm menos = anticipo de actuación neumática
   // Verificar: capturar pantalla completa del Z2 con los 12 valores dis
-  z2ProgrammedDistancesMm: [1250, 2620, 3990, 5360, 6730, 8100, 9470, 10840, 12210, 13580, 14950, 16320],
+  // Valores reales leídos de la pantalla Z2 (foto 2026-04-11).
+  // NOTA: NO son uniformes — cada flipper está calibrado individualmente
+  // según su respuesta neumática real (distancias Z2 < físico = anticipo variable).
+  // Pitches reales entre gates: 950, 1600, 1400, 1350, 1300, 1300, 1250, 1300, 1475, 1625, 1050 mm
+  z2ProgrammedDistancesMm: [1250, 2200, 3800, 5200, 6550, 7850, 9150, 10400, 11700, 13175, 14800, 15850],
   // Lectura de velocidades Z2 de referencia (26/12/2025, turno normal)
   // Factor: 1 unit = 0.000786 m/s (1.4 m/s / 1781 unidades máx. sorting belt)
   z2BeltSpeedReadings: {
