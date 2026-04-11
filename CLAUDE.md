@@ -207,12 +207,61 @@ sidebarConfig  ← nuevo: orden personalizado del sidebar admin
 
 ## Version actual
 
-- **v2.74.0** (2026-04-11) — "Grader iter 6: config física real (Marelec MS4/12) + Z2 dis1-12 + velocidades reales + resumen ejecutivo + insights físicos"
+- **v2.75.0** (2026-04-11) — "Grader iter 7: carga masiva histórica + calendario por día y turno + indicadores PP/P0 por turno"
 - Proyecto Firebase: `mantenimiento-planta-771a3`
 - GitHub: `orelcain/mantenimiento-planta`
 - Produccion: `https://orelcain.github.io/mantenimiento-planta/`
 - CI status: 4/4 workflows 🟢 (Deploy PWA, Deploy Functions, Deploy Firestore Rules, Daily Sync)
 - Seguridad: 23 colecciones Firestore validadas, 0 vulnerabilidades runtime prod
+
+## Cambios recientes (sesion 2026-04-11 tarde — Grader iter 7: carga masiva histórica + calendario, v2.75.0)
+
+### Grader iter 7 — Historial de producción persistente en calendario
+
+**Objetivo**: Construir un archivo histórico de datos Grader subiendo los Excel exportados de Matrix (uno a uno o en batch). Cada archivo se distribuye por día+turno y queda guardado en Firestore. El calendario muestra cada día con sus KPIs y badges "Falta PP"/"Falta P0".
+
+**Archivos nuevos:**
+- `AnalisisGraderCargaMasivaPage.tsx` — página dedicada para subir múltiples archivos Excel históricos a la vez. Preview de segmentos antes de guardar. Navega al calendario tras guardar.
+- `graderSegmenter.ts` (nuevo) — `segmentByDayAndShift()` + `computeShiftSummary()` + `sortedSegmentEntries()`. Agrupa registros por {sessionDate × shiftId}, maneja turno noche que cruza medianoche.
+
+**Archivos modificados:**
+- `AnalisisGraderCalendarPage.tsx` — accept `?goto=YYYY-MM-DD` param para navegar directo al mes correcto; auto-discovery de datos en últimos 12 meses; badges "Falta PP"/"Falta P0" en celdas del calendario (solo cuando falta algo); panel derecho por turno con "Falta PIEZA_PIEZA"/"Falta PUERTA_0"
+- `AnalisisGraderWizardPage.tsx` — banner azul automático cuando archivo cubre > 1 día. Botón "Guardar en Calendario" que segmenta y guarda directamente. También funciona para archivos P0-puros.
+- `graderDailySummary.service.ts` — `saveDailySummaryBatch` ahora usa merge inteligente: upload P0-solo (hasPieceData: false) hace `{ merge: true }` en Firestore → preserva KPIs del PP existente. Upload PP hace overwrite completo.
+- `graderExcelParser.ts` — función `pushAll()` helper que reemplaza `push(...largeArray)`. Fix crítico: `push(...)` con 200k+ elementos desborda el call stack de V8.
+- `types.ts` — `GraderDailySummary` tiene `hasPieceData?: boolean` y `hasGate0Data?: boolean`
+
+**Flujo de carga incremental que funciona:**
+1. Subir archivo PP multi-día → banner "Guardar en Calendario" → días poblados con "Falta P0"
+2. Subir archivo P0 multi-día → banner "Archivo P0 multi-día — actualizará causas P0 sin borrar datos PP" → merge, badges desaparecen
+3. Pinchar en un día del calendario → panel derecho muestra KPIs del turno
+
+**Gotchas críticos de esta sesión:**
+
+**`push(...largeArray)` — stack overflow con 200k+ registros:**
+- V8 expande los elementos como argumentos de función. Límite efectivo ~65k argumentos.
+- Con 206k registros de PUERTA_0: "Maximum call stack size exceeded"
+- Fix: `pushAll(target, source)` que hace loop `for (let i = 0; i < source.length; i++) target.push(source[i]!)`
+- También aplica a `[...a, ...b]` para arrays gigantes → usar `.concat()`
+- Afectaba: `graderExcelParser.ts` (4 lugares) + `CargaMasivaPage.tsx` (2 lugares) + `graderSegmenter.ts` (1 spread)
+
+**`react-hooks/rules-of-hooks` es ERROR, no warning — bloquea CI:**
+- `if (!canSee('X')) return <Navigate />` antes de `useCallback` hooks → ESLint error level → CI falla aunque no llegue al límite de 10 warnings
+- Fix: mover TODOS los hooks antes de cualquier return condicional
+
+**`sync:version` prebuild script:**
+- El script lee `apps/pwa/package.json` y escribe `version.ts`. Si bumpeás `version.ts` sin bumpar `package.json`, el siguiente build lo revierte.
+- Fix: siempre bumpar AMBOS archivos o solo `package.json` (el script lo propaga)
+
+**PWA chunk loading error después de deploy:**
+- "Failed to fetch dynamically imported module: .../AnalisisGraderCalendarPage-B42qwyE-.js"
+- Causa: browser cargó la app con el service worker viejo, luego intentó importar un chunk con hash nuevo
+- Fix del usuario: clic en "Recargar página". Los datos SÍ se guardaron correctamente.
+- Los datos se guardan ANTES de la navegación al calendario, así que el error no borra nada.
+
+**`useState(() => { sideEffect() })` es bug:**
+- Usar `useState` como contenedor de side effects es incorrecto y viola las reglas de React
+- Fix: usar `useEffect(() => { sideEffect() }, [])`
 
 ## Cambios recientes (sesion 2026-04-11 — Grader iter 6: config física real + insights físicos, v2.74.0)
 
@@ -521,9 +570,13 @@ Arco cerrado. Dashboard pasó de **5262 → 1485 líneas (-72%)** y score global
 - [ ] Partir `GraderTendenciaTab` (1053 líneas) en sub-cards por card P0 (#1-#7)
 - [ ] Partir `GraderPuntoCeroTab` (1157 líneas) en sub-cards (Clasificación, Patrones, Pivote, Fuera de rango, Serie temporal)
 - [ ] Unit tests de los 2 hooks de analytics
-- [ ] **Iter 7: asignación óptima de calibres a gates** — algoritmo que sugiere qué calibre/calidad va a qué gate según % distribución + layout físico
-- [ ] **Iter 7: semáforo tiempo de reacción por gate** — columna verde/amarillo/rojo en tab Compuertas (t_disponible vs t_requerido)
-- [ ] **Iter 7: ajustar umbrales** insight #17 (35%) e insight #18 (150ms) según feedback de producción real
+- ✅ **Iter 7: carga masiva histórica** — `AnalisisGraderCargaMasivaPage.tsx` + `graderSegmenter.ts` + calendario con badges PP/P0 (sesion 2026-04-11 tarde)
+- ✅ **Iter 7: banner multi-día en wizard** — detecta archivos multi-día y ofrece "Guardar en Calendario" inline (sesion 2026-04-11 tarde)
+- ✅ **Iter 7: merge inteligente PP+P0** — subir PP y P0 por separado no borra datos del otro (sesion 2026-04-11 tarde)
+- [ ] **Iter 7 pendiente: asignación óptima de calibres a gates** — algoritmo que sugiere qué calibre/calidad va a qué gate según % distribución + layout físico
+- [ ] **Iter 7 pendiente: semáforo tiempo de reacción por gate** — columna verde/amarillo/rojo en tab Compuertas (t_disponible vs t_requerido)
+- [ ] **Iter 7 pendiente: ajustar umbrales** insight #17 (35%) e insight #18 (150ms) según feedback de producción real
+- [ ] **Iter 7 pendiente: validar con datos reales** — usuario está cargando archivos históricos de julio 2025+; verificar que el flujo PP→P0 incremental funcione end-to-end sin errores
 
 <!-- completados sesión 2026-04-11 (iter 4 + iter 5)
 - ✅ Refactor iter 4: extraer GraderPuntoCeroTab — commit 81db31a6
@@ -598,36 +651,44 @@ Al iniciar una nueva sesion de Claude Code en este proyecto:
 
 ### Módulo Análisis Grader — contexto para próxima sesión
 
-**Objetivo del módulo**: Soporte de decisiones en tiempo real para operadores de clasificadora (grader) de salmones durante un turno activo. Se sube un Excel exportado del software Matrix y el sistema sugiere cambios de compuertas, limpieza de sensores, recalibración.
+**Objetivo del módulo**: Soporte de decisiones en tiempo real para operadores de clasificadora (grader) de salmones durante un turno activo. También tiene un módulo de historial donde se acumulan turnos pasados para análisis tendencial.
+
+**Dos modos de uso:**
+1. **Turno activo**: subir Excel del turno en curso → análisis en tiempo real → sugerencias
+2. **Historial**: subir archivos históricos PP+P0 → se acumulan en calendario → ver tendencias por día
 
 **Arquitectura de datos**:
 - `PIEZA_PIEZA`: fuente de verdad (peso, calibre, calidad, gate, lote, timestamp)
 - `PUERTA_0`: enriquece razones de rechazo (fotocélula, fuera de límites, etc.)
 - Gate 0 = "Punto Cero" = rechazados. 12 gates activas.
 - El % de P0 es el KPI principal del turno.
+- `graderDailySummaries` Firestore: `${dateKey}__${shiftId}` — resúmenes persistidos por turno
 
 **Archivos clave**:
-- `AnalisisGraderWizardPage.tsx` — página contenedora (upload + gates + dashboard)
+- `AnalisisGraderWizardPage.tsx` — página principal (upload + banner multi-día + dashboard)
+- `AnalisisGraderCargaMasivaPage.tsx` — batch upload de múltiples archivos históricos
+- `AnalisisGraderCalendarPage.tsx` — calendario histórico con badges PP/P0 + `?goto=YYYY-MM-DD`
 - `AnalisisGraderUploadPage.tsx` — dropzone unificado con auto-análisis
-- `AnalisisGraderDashboardPage.tsx` — dashboard completo (~4500 líneas)
-- `services/grader/graderAnalytics.ts` — motor de cálculo KPIs, distribuciones, HHI
+- `AnalisisGraderDashboardPage.tsx` — dashboard completo
+- `services/grader/graderSegmenter.ts` — segmenta registros por {día × turno}, `hasPieceData`/`hasGate0Data`
+- `services/grader/graderDailySummary.service.ts` — merge inteligente PP vs P0-only
+- `services/grader/graderAnalytics.ts` — motor de cálculo KPIs
 - `services/grader/graderInsights.ts` — insights deterministas + tendencia P0
-- `services/grader/types.ts` — tipos (ParsedMatrixData, GateAssignment, etc.)
+- `services/grader/types.ts` — tipos (ParsedMatrixData, GraderDailySummary, etc.)
 
-**Config física real (iter 6, actualizado 2026-04-11)**:
+**Flujo incremental PP+P0 (iter 7):**
+- Subir PP solo: `hasPieceData: true, hasGate0Data: false` → "Falta P0" en calendario
+- Subir P0 solo después: merge parcial en Firestore (`{ merge: true }`) → solo actualiza `topP0Causes` + `hasGate0Data: true`, preserva KPIs del PP
+- El banner en WizardPage se activa con `multiDayInfo` useMemo (detecta > 1 día único)
+- `multiDayInfo.isP0Only` = true cuando solo hay gate0Records → banner dice "actualizará causas P0 sin borrar datos PP"
+
+**Config física real (iter 6)**:
 - `DEFAULT_PHYSICAL_CONFIG` en `graderAnalytics.ts` tiene los valores reales de la MS4/12
 - Factor conversión Z2: `z2BeltSpeedScale = 0.000786` m/s por unidad (anchor: 1781 unidades = 1.4 m/s)
-- `z2ProgrammedDistancesMm`: 12 valores individuales, no uniformes (offset variable por flipper)
-- Insight #17 usa `result.gateAdvancedStats` (no `result.gateBalance` — tipos diferentes)
-- `GraderResumenRapido.tsx` en `pages/AnalisisGrader/` — card de resumen instantáneo
-- `sortingBeltMps` state en WizardPage controla velocidad en tiempo real (persiste en analytics)
-
-**Tab Tendencia**:
-- `trendForecastView` useMemo: proyección turno completo via regresión lineal
-  - Produce: `projectedPointZeroPct`, `projectedTotalPieces`, `completionPct`, `shiftStart/EndLabel`
-- `trendAutoRecommendations`: sugerencias de gate swap basadas en P0 proyectado vs umbrales
+- `z2ProgrammedDistancesMm`: 12 valores individuales, no uniformes
 
 **TypeScript gotchas (IMPORTANTES)**:
 - Localmente hay TS 6.0.2. El proyecto usa TS 5.7.x. NO agregar `ignoreDeprecations: "6.0"` al tsconfig.
 - Siempre verificar que `noUnusedLocals` pase: al eliminar código buscar helpers huérfanos con grep.
-- `noUncheckedIndexedAccess: true` → `array[i]` devuelve `T | undefined`. Usar `array[i]!` cuando el contexto garantiza existencia. Guardar `const el = array[0]` y usar `el !== undefined` como condición.
+- `noUncheckedIndexedAccess: true` → `array[i]` devuelve `T | undefined`. Usar `array[i]!` cuando el contexto garantiza existencia.
+- **NUNCA** usar `push(...largeArray)` — desborda call stack con 100k+ elementos. Usar `pushAll()` o loop.
