@@ -415,6 +415,10 @@ export function AnalisisGraderWizardPage() {
             <Calendar className="h-4 w-4 mr-1" />
             Calendario
           </Button>
+          <Button variant="ghost" size="sm" onClick={() => navigate('/analisis-grader/periodo')}>
+            <BarChart3 className="h-4 w-4 mr-1" />
+            Análisis período
+          </Button>
           <Button variant="ghost" size="sm" onClick={() => navigate('/analisis-grader/sesiones')}>
             <FolderOpen className="h-4 w-4 mr-1" />
             Historial

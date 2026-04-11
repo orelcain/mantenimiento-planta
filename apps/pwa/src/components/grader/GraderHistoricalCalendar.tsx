@@ -19,7 +19,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from '@/components/ui'
-import { ChevronLeft, ChevronRight, Loader2, Clock, Database } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, Clock, Database, Eye } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { listGraderUploads } from '@/services/grader/graderUpload.service'
 import { getModuleRanges } from '@/services/grader/graderModuleConfig.service'
@@ -640,6 +640,17 @@ export function GraderHistoricalCalendar({
                         {hist.startAt && ` · ${new Date(hist.startAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}–${hist.endAt ? new Date(hist.endAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) : '?'}`}
                       </p>
                     )}
+                    <div className="pt-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-[11px] w-full"
+                        onClick={() => navigate(`/analisis-grader/detalle?date=${hist.dateKey}&shift=${encodeURIComponent(hist.shiftId)}`)}
+                      >
+                        <Eye className="h-3 w-3 mr-1" />
+                        Ver detalle completo
+                      </Button>
+                    </div>
                   </div>
                 ))}
             </div>
@@ -669,12 +680,20 @@ export function GraderHistoricalCalendar({
                           {items.length} archivo(s)
                         </p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         {summary?.source && (
                           <Badge variant="secondary" className="text-[10px]">
                             {summary.source === 'cached' ? 'Guardado' : 'Calculado'}
                           </Badge>
                         )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => navigate(`/analisis-grader/detalle?date=${selectedKey}&shift=${encodeURIComponent(shiftId)}`)}
+                        >
+                          <Eye className="h-3 w-3 mr-1" />
+                          Ver detalle
+                        </Button>
                         <Button size="sm" variant="outline" onClick={() => handleLoadTurno(selectedKey!, shiftId)}>
                           Cargar
                         </Button>
