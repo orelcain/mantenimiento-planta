@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.81.0' as const
+export const APP_VERSION = '2.82.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -11,12 +11,12 @@ export const APP_VERSION = '2.81.0' as const
 /**
  * Fecha de la versión actual
  */
-export const VERSION_DATE = '2026-04-11' as const
+export const VERSION_DATE = '2026-04-12' as const
 
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Grader iter 13: UI calendar mejorado + fix duración anómala + delete registro' as const
+export const VERSION_NAME = 'Grader iter 14: ocultar upload card si ya hay historial o si se borra summary' as const
 
 /**
  * Nota:

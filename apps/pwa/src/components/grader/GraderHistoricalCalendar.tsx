@@ -431,6 +431,12 @@ export function GraderHistoricalCalendar({
         else next.delete(dateKey)
         return next
       })
+      // Quitar también la upload correspondiente del state local (evita card huérfana)
+      setUploads((prev) => prev.filter((u) => {
+        const uDate = u.sessionDate || toDateKey(u.inferred?.startAt)
+        const uShift = u.shiftId || inferShiftIdFromSchedule(u.inferred?.startAt, shiftSchedule)
+        return !(uDate === dateKey && uShift === shiftId)
+      }))
     } catch {
       // silent — retry on next load
     } finally {
@@ -737,9 +743,14 @@ export function GraderHistoricalCalendar({
             </div>
           )}
 
-          {selectedUploads.length > 0 && (
+          {selectedUploads.length > 0 && (() => {
+            // Ocultar turnos que ya tienen resumen en historial guardado
+            const histShifts = new Set((historicalByDate.get(selectedKey ?? '') ?? []).map((h) => h.shiftId))
+            const entries = Array.from(turnos.entries()).filter(([s]) => !histShifts.has(s))
+            if (entries.length === 0) return null
+            return (
             <div className="space-y-3">
-              {Array.from(turnos.entries()).map(([shiftId, items]) => {
+              {entries.map(([shiftId, items]) => {
                 const key = `${selectedKey}::${shiftId}`
                 const summary = summaries[key]
                 const minStart = items
@@ -820,7 +831,8 @@ export function GraderHistoricalCalendar({
                 )
               })}
             </div>
-          )}
+            )
+          })()}
         </CardContent>
       </Card>
     </div>

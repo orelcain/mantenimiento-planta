@@ -1,11 +1,9 @@
 {
-  "version": "2.81.0",
-  "buildDate": "2026-04-11",
+  "version": "2.82.0",
+  "buildDate": "2026-04-12",
   "buildTimestamp": 1775930315920,
   "features": [
-    "Grader iter 13: UI calendar mejorado con badges P0% por turno (D/N)",
-    "Grader iter 13: fix visualización duración anómala en summaries fusionados",
-    "Grader iter 13: botón delete para eliminar registros erróneos del calendario",
-    "Grader iter 13: botones redundantes eliminados del header (Calendario, Carga masiva)"
+    "Grader iter 14: ocultar upload card si el turno ya tiene historial guardado",
+    "Grader iter 14: al eliminar summary, también limpiar upload del state local (sin tarjeta huérfana)"
   ]
 }
