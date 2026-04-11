@@ -10,7 +10,7 @@
  *  - Tabla ordenable de todos los turnos del rango con botón "Ver"
  */
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, Badge } from '@/components/ui'
 import { Bar, Line } from 'react-chartjs-2'
@@ -26,11 +26,12 @@ import {
   Legend,
   Filler,
 } from 'chart.js'
-import { ArrowUpDown, ExternalLink, TrendingUp, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import zoomPlugin from 'chartjs-plugin-zoom'
+import { ArrowUpDown, ExternalLink, TrendingUp, AlertTriangle, CheckCircle2, RotateCcw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { PeriodAggregate } from '@/services/grader/graderPeriodAggregate'
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend, Filler)
+ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend, Filler, zoomPlugin)
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -71,8 +72,11 @@ function shiftShortName(shiftId: string): string {
 
 // ── Colores de gráficos ──────────────────────────────────────────────────────
 
-const P0_LINE_COLOR = 'rgba(59, 130, 246, 1)'
-const P0_FILL_COLOR = 'rgba(59, 130, 246, 0.15)'
+// Turno día = ámbar (asociado al sol), turno noche = índigo (asociado a la noche)
+const DIA_LINE_COLOR = 'rgba(251, 191, 36, 1)'
+const DIA_FILL_COLOR = 'rgba(251, 191, 36, 0.12)'
+const NOCHE_LINE_COLOR = 'rgba(129, 140, 248, 1)'
+const NOCHE_FILL_COLOR = 'rgba(129, 140, 248, 0.12)'
 const WARN_LINE = 'rgba(245, 158, 11, 0.5)'
 const CRITICAL_LINE = 'rgba(239, 68, 68, 0.5)'
 const BAR_BLUE = 'rgba(59, 130, 246, 0.7)'
@@ -93,24 +97,37 @@ export function GraderPeriodView({ data }: Props) {
   const navigate = useNavigate()
   const [sortKey, setSortKey] = useState<SortKey>('dateKey')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
+  const trendChartRef = useRef<any>(null)
 
   const { stats, dailyP0Series, shiftBreakdown, calibreDistribution, topP0Causes, shifts, range } = data
 
-  // ── Chart: tendencia P0% diaria ──────────────────────────────────────────
+  // ── Chart: tendencia P0% diaria SEPARADA por turno día/noche ─────────────
   const trendChartData = useMemo(() => {
     if (dailyP0Series.length === 0) return null
     return {
       labels: dailyP0Series.map((d) => formatShortDate(d.dateKey)),
       datasets: [
         {
-          label: 'P0% diario',
-          data: dailyP0Series.map((d) => d.p0Pct),
-          borderColor: P0_LINE_COLOR,
-          backgroundColor: P0_FILL_COLOR,
-          fill: true,
+          label: 'Turno día',
+          data: dailyP0Series.map((d) => d.dia ? d.dia.p0Pct : null),
+          borderColor: DIA_LINE_COLOR,
+          backgroundColor: DIA_FILL_COLOR,
+          fill: false,
           tension: 0.2,
           pointRadius: dailyP0Series.length > 60 ? 1 : 3,
           pointHoverRadius: 5,
+          spanGaps: true,
+        },
+        {
+          label: 'Turno noche',
+          data: dailyP0Series.map((d) => d.noche ? d.noche.p0Pct : null),
+          borderColor: NOCHE_LINE_COLOR,
+          backgroundColor: NOCHE_FILL_COLOR,
+          fill: false,
+          tension: 0.2,
+          pointRadius: dailyP0Series.length > 60 ? 1 : 3,
+          pointHoverRadius: 5,
+          spanGaps: true,
         },
       ],
     }
@@ -119,7 +136,7 @@ export function GraderPeriodView({ data }: Props) {
   const trendChartOptions = useMemo(() => ({
     responsive: true,
     maintainAspectRatio: false,
-    interaction: { mode: 'index' as const, intersect: false },
+    interaction: { mode: 'nearest' as const, intersect: false, axis: 'x' as const },
     onHover: (event: any, chartElement: any[]) => {
       const target = event?.native?.target as HTMLElement | undefined
       if (target) target.style.cursor = chartElement.length > 0 ? 'pointer' : 'default'
@@ -133,7 +150,11 @@ export function GraderPeriodView({ data }: Props) {
       navigate(`/analisis-grader?goto=${entry.dateKey}`)
     },
     plugins: {
-      legend: { display: false },
+      legend: {
+        display: true,
+        position: 'top' as const,
+        labels: { font: { size: 11 }, usePointStyle: true, boxWidth: 10 },
+      },
       tooltip: {
         callbacks: {
           title: (items: any[]) => {
@@ -146,11 +167,30 @@ export function GraderPeriodView({ data }: Props) {
             const idx = ctx.dataIndex
             const entry = dailyP0Series[idx]
             if (!entry) return ''
-            return `${entry.p0Pct}% · ${entry.totalPieces.toLocaleString('es-CL')} piezas  ·  clic para ver día`
+            const isDia = ctx.datasetIndex === 0
+            const shift = isDia ? entry.dia : entry.noche
+            if (!shift) return `${ctx.dataset.label}: sin datos`
+            return `${ctx.dataset.label}: ${shift.p0Pct}% · ${shift.totalPieces.toLocaleString('es-CL')} pz`
           },
+          afterBody: () => 'clic para ver día en calendario',
         },
       },
-      annotation: undefined,
+      zoom: {
+        pan: {
+          enabled: true,
+          mode: 'x' as const,
+          modifierKey: undefined,
+        },
+        zoom: {
+          wheel: { enabled: true, speed: 0.1 },
+          pinch: { enabled: true },
+          drag: { enabled: false },
+          mode: 'x' as const,
+        },
+        limits: {
+          x: { min: 'original' as const, max: 'original' as const },
+        },
+      },
     },
     scales: {
       y: {
@@ -167,6 +207,10 @@ export function GraderPeriodView({ data }: Props) {
       },
     },
   }), [dailyP0Series, navigate])
+
+  const handleResetZoom = () => {
+    trendChartRef.current?.resetZoom?.()
+  }
 
   // ── Chart: calibre consolidado (top 8 horizontal) ────────────────────────
   const calibreChartData = useMemo(() => {
@@ -368,15 +412,28 @@ export function GraderPeriodView({ data }: Props) {
       {/* ── Tendencia P0% diaria ─────────────────────────────────────────── */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center gap-2">
-            <TrendingUp className="h-4 w-4" />
-            Tendencia P0% diaria
-          </CardTitle>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" />
+              Tendencia P0% diaria · día vs noche
+            </CardTitle>
+            <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+              <span>Scroll para zoom · arrastra para panear</span>
+              <button
+                type="button"
+                onClick={handleResetZoom}
+                className="inline-flex items-center gap-1 rounded border border-muted-foreground/20 px-2 py-0.5 hover:bg-muted/40 transition-colors"
+              >
+                <RotateCcw className="h-3 w-3" />
+                Reset zoom
+              </button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {trendChartData ? (
             <div className="h-72">
-              <Line data={trendChartData} options={trendChartOptions as any} />
+              <Line ref={trendChartRef} data={trendChartData} options={trendChartOptions as any} />
             </div>
           ) : (
             <p className="text-xs text-muted-foreground py-8 text-center">Sin datos diarios</p>

@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.84.0' as const
+export const APP_VERSION = '2.85.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-04-11' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Grader iter 16: drill-down desde gráfico de período al día en calendario' as const
+export const VERSION_NAME = 'Grader iter 17: tendencia separada día/noche + zoom/pan en gráfico' as const
 
 /**
  * Nota:

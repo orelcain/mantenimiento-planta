@@ -1,11 +1,11 @@
 {
-  "version": "2.84.0",
+  "version": "2.85.0",
   "buildDate": "2026-04-12",
   "buildTimestamp": 1775930315920,
   "features": [
-    "Grader iter 16: clic en gráfico de tendencia de período → navega al día en calendario",
-    "Grader iter 16: cards Mejor día / Peor día son clickeables para drill-down",
-    "Grader iter 16: calendario soporta ?goto=YYYY-MM-DD y scroll automático",
-    "Grader iter 16: fix botón duplicado Volver en header de análisis período"
+    "Grader iter 17: gráfico Tendencia P0% separa Turno día (ámbar) y Turno noche (índigo)",
+    "Grader iter 17: zoom con scroll del mouse y pan arrastrando en el gráfico",
+    "Grader iter 17: botón Reset zoom para volver a la vista completa",
+    "Grader iter 17: tooltip identifica el turno y muestra piezas del turno específico"
   ]
 }

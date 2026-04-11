@@ -39,9 +39,14 @@ export interface PeriodStats {
 
 export interface DailyP0Point {
   dateKey: string
+  /** P0% agregado del día (ambos turnos combinados, ponderado) */
   p0Pct: number
   totalPieces: number
   p0Pieces: number
+  /** Turno día — null si no hay registro de ese turno en el día */
+  dia: { p0Pct: number; totalPieces: number; p0Pieces: number } | null
+  /** Turno noche — null si no hay registro de ese turno en el día */
+  noche: { p0Pct: number; totalPieces: number; p0Pieces: number } | null
 }
 
 export interface ShiftGroupStat {
@@ -122,7 +127,11 @@ export function aggregateDailySummaries(
   let totalDurationMinutes = 0
 
   const uniqueDays = new Set<string>()
-  const dailyByDate = new Map<string, { totalPieces: number; p0Pieces: number }>()
+  const dailyByDate = new Map<string, {
+    totalPieces: number; p0Pieces: number
+    dia: { totalPieces: number; p0Pieces: number } | null
+    noche: { totalPieces: number; p0Pieces: number } | null
+  }>()
   const shiftGroups = new Map<string, { count: number; totalPieces: number; totalP0Pieces: number }>()
 
   let minP0Day: { dateKey: string; p0Pct: number } | null = null
@@ -142,10 +151,19 @@ export function aggregateDailySummaries(
     if (s.durationMinutes != null) totalDurationMinutes += s.durationMinutes
     uniqueDays.add(s.dateKey)
 
-    // Serie diaria — acumular por dateKey
-    const dayEntry = dailyByDate.get(s.dateKey) ?? { totalPieces: 0, p0Pieces: 0 }
+    // Serie diaria — acumular por dateKey, separando por turno
+    const dayEntry = dailyByDate.get(s.dateKey) ?? { totalPieces: 0, p0Pieces: 0, dia: null, noche: null }
     dayEntry.totalPieces += s.totalPieces ?? 0
     dayEntry.p0Pieces += s.pointZeroPieces ?? 0
+    if (s.shiftId === 'Turno día') {
+      dayEntry.dia = dayEntry.dia ?? { totalPieces: 0, p0Pieces: 0 }
+      dayEntry.dia.totalPieces += s.totalPieces ?? 0
+      dayEntry.dia.p0Pieces += s.pointZeroPieces ?? 0
+    } else if (s.shiftId === 'Turno noche') {
+      dayEntry.noche = dayEntry.noche ?? { totalPieces: 0, p0Pieces: 0 }
+      dayEntry.noche.totalPieces += s.totalPieces ?? 0
+      dayEntry.noche.p0Pieces += s.pointZeroPieces ?? 0
+    }
     dailyByDate.set(s.dateKey, dayEntry)
 
     // Breakdown por turno
@@ -188,6 +206,16 @@ export function aggregateDailySummaries(
       p0Pct: safePct(v.p0Pieces, v.totalPieces),
       totalPieces: v.totalPieces,
       p0Pieces: v.p0Pieces,
+      dia: v.dia ? {
+        p0Pct: safePct(v.dia.p0Pieces, v.dia.totalPieces),
+        totalPieces: v.dia.totalPieces,
+        p0Pieces: v.dia.p0Pieces,
+      } : null,
+      noche: v.noche ? {
+        p0Pct: safePct(v.noche.p0Pieces, v.noche.totalPieces),
+        totalPieces: v.noche.totalPieces,
+        p0Pieces: v.noche.p0Pieces,
+      } : null,
     }))
     .sort((a, b) => (a.dateKey < b.dateKey ? -1 : 1))
 
