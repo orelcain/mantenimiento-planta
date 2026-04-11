@@ -472,6 +472,10 @@ export interface GraderDailySummary {
   sourceFileNames?: string[];
   /** ID del lote de carga masiva que generó este resumen */
   batchUploadId?: string;
+  /** Si el segmento contiene registros PIEZA_PIEZA (para indicador de completitud) */
+  hasPieceData?: boolean;
+  /** Si el segmento contiene registros PUERTA_0 (para indicador de completitud) */
+  hasGate0Data?: boolean;
 }
 
 // ============================================================================

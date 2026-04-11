@@ -275,6 +275,8 @@ export function computeShiftSummary(
     gateDistribution,
     sourceFileNames,
     batchUploadId,
+    hasPieceData: pieceRecords.length > 0,
+    hasGate0Data: gate0Records.length > 0,
     updatedBy: createdBy,
     updatedAt: new Date().toISOString(),
   }

@@ -158,19 +158,20 @@ export function AnalisisGraderCalendarPage() {
 
   useEffect(() => {
     if (autoSelectedRef.current) return
-    if (uploads.length === 0) return
-    const latest = uploads
-      .map((u) => u.sessionDate || toDateKey(u.inferred?.startAt))
-      .filter(Boolean)
-      .sort()
-      .slice(-1)[0]
+    // Preferir la fecha más reciente del historial; fallback a uploads
+    const histKeys = Array.from(historicalByDate.keys()).sort()
+    const latestHist = histKeys[histKeys.length - 1]
+    const latestUpload = uploads.length > 0
+      ? uploads.map((u) => u.sessionDate || toDateKey(u.inferred?.startAt)).filter(Boolean).sort().slice(-1)[0]
+      : undefined
+    const latest = latestHist ?? latestUpload
     if (latest) {
       const latestDate = new Date(`${latest}T00:00:00`)
       setSelectedDate(latestDate)
       setCurrentMonth(new Date(latestDate.getFullYear(), latestDate.getMonth(), 1))
       autoSelectedRef.current = true
     }
-  }, [uploads])
+  }, [historicalByDate, uploads])
 
   const days = getDaysInMonth(currentMonth)
 
@@ -411,22 +412,31 @@ export function AnalisisGraderCalendarPage() {
 
                   const dayKey = day.toISOString().slice(0, 10)
                   const dayUploads = uploadsByDate.get(dayKey) || []
-                  const turnosCount = new Set(dayUploads.map((u) => u.shiftId || inferShiftIdFromSchedule(u.inferred?.startAt, shiftSchedule))).size
                   const dayHistorical = historicalByDate.get(dayKey) || []
-                  const avgHistP0 = dayHistorical.length > 0
+                  const hasData = dayHistorical.length > 0
+
+                  // Promedio P0 entre todos los turnos del día
+                  const avgHistP0 = hasData
                     ? dayHistorical.reduce((t, s) => t + s.pointZeroPct, 0) / dayHistorical.length
                     : null
+
+                  // Completitud de datos del día: ¿falta PP o P0 en algún turno?
+                  const missingPiece = hasData && dayHistorical.some((s) => s.hasPieceData === false)
+                  const missingGate0 = hasData && dayHistorical.some((s) => s.hasGate0Data === false)
+                  // Si hasPieceData/hasGate0Data no está definido (registros legacy), no mostrar alerta
+                  const anyTracked = hasData && dayHistorical.some((s) => s.hasPieceData !== undefined)
 
                   return (
                     <button
                       key={dayKey}
                       className={cn(
-                        'h-20 p-2 border rounded-lg text-left transition-colors flex flex-col',
+                        'h-20 p-1.5 border rounded-lg text-left transition-colors flex flex-col',
                         isToday(day) && 'bg-primary/5 border-primary',
                         selectedDate?.toDateString() === day.toDateString() && 'ring-2 ring-primary',
-                        avgHistP0 !== null && avgHistP0 >= 3.5 && 'border-red-400/50',
-                        avgHistP0 !== null && avgHistP0 >= 2 && avgHistP0 < 3.5 && 'border-amber-400/50',
-                        avgHistP0 !== null && avgHistP0 < 2 && 'border-emerald-400/50',
+                        !hasData && 'opacity-60',
+                        avgHistP0 !== null && avgHistP0 >= 3.5 && 'border-red-400/60',
+                        avgHistP0 !== null && avgHistP0 >= 2 && avgHistP0 < 3.5 && 'border-amber-400/60',
+                        avgHistP0 !== null && avgHistP0 < 2 && 'border-emerald-400/60',
                       )}
                       onClick={() => setSelectedDate(day)}
                     >
@@ -434,25 +444,48 @@ export function AnalisisGraderCalendarPage() {
                         <span className={cn('text-sm font-medium', isToday(day) && 'text-primary')}>
                           {day.getDate()}
                         </span>
-                        {dayUploads.length > 0 && (
-                          <Badge variant="outline" className="text-[10px]">
+                        {hasData && (
+                          <span className="text-[9px] text-muted-foreground leading-none">
+                            {dayHistorical.length}T
+                          </span>
+                        )}
+                        {!hasData && dayUploads.length > 0 && (
+                          <Badge variant="outline" className="text-[9px] h-3.5 px-1">
                             {dayUploads.length}
                           </Badge>
                         )}
                       </div>
-                      {dayUploads.length > 0 && (
-                        <div className="text-[10px] text-muted-foreground">
-                          {turnosCount} turno(s)
-                        </div>
-                      )}
+
                       {avgHistP0 !== null && (
                         <div className={cn(
-                          'mt-auto text-[9px] font-bold text-center rounded-sm px-0.5 leading-4',
+                          'text-[9px] font-bold text-center rounded-sm px-0.5 leading-4',
                           avgHistP0 >= 3.5 ? 'bg-red-500/20 text-red-600' :
                           avgHistP0 >= 2   ? 'bg-amber-500/20 text-amber-600' :
                                              'bg-emerald-500/20 text-emerald-600',
                         )}>
                           P0 {avgHistP0.toFixed(1)}%
+                        </div>
+                      )}
+
+                      {/* Indicadores de completitud PP / P0 */}
+                      {anyTracked && (
+                        <div className="mt-auto flex gap-0.5">
+                          <span className={cn(
+                            'text-[8px] leading-3 px-0.5 rounded',
+                            missingPiece
+                              ? 'bg-orange-500/15 text-orange-600'
+                              : 'bg-emerald-500/15 text-emerald-700',
+                          )}>
+                            PP{missingPiece ? '?' : '✓'}
+                          </span>
+                          <span className={cn(
+                            'text-[8px] leading-3 px-0.5 rounded',
+                            missingGate0
+                              ? 'bg-orange-500/15 text-orange-600'
+                              : 'bg-emerald-500/15 text-emerald-700',
+                          )}>
+                            P0{missingGate0 ? '?' : '✓'}
+                          </span>
                         </div>
                       )}
                     </button>
@@ -495,7 +528,30 @@ export function AnalisisGraderCalendarPage() {
                         )}
                       >
                         <div className="flex items-center justify-between">
-                          <p className="text-sm font-medium">{hist.shiftId}</p>
+                          <div>
+                            <p className="text-sm font-medium">{hist.shiftId}</p>
+                            {/* Indicadores de completitud */}
+                            {hist.hasPieceData !== undefined && (
+                              <div className="flex gap-1 mt-0.5">
+                                <span className={cn(
+                                  'text-[9px] px-1 py-0.5 rounded',
+                                  hist.hasPieceData
+                                    ? 'bg-emerald-500/15 text-emerald-700'
+                                    : 'bg-orange-500/15 text-orange-600',
+                                )}>
+                                  PP {hist.hasPieceData ? '✓' : '✗ sin datos'}
+                                </span>
+                                <span className={cn(
+                                  'text-[9px] px-1 py-0.5 rounded',
+                                  hist.hasGate0Data
+                                    ? 'bg-emerald-500/15 text-emerald-700'
+                                    : 'bg-orange-500/15 text-orange-600',
+                                )}>
+                                  P0 {hist.hasGate0Data ? '✓' : '✗ sin datos'}
+                                </span>
+                              </div>
+                            )}
+                          </div>
                           <span className={cn(
                             'text-lg font-bold tabular-nums',
                             hist.pointZeroPct >= 3.5 ? 'text-red-500' :
