@@ -17,6 +17,7 @@ import { AnalisisGraderGatesConfigPage } from './AnalisisGraderGatesConfigPage'
 import { AnalisisGraderDashboardPage } from './AnalisisGraderDashboardPage'
 import { GraderResumenRapido } from './GraderResumenRapido'
 import { getLatestGraderAutosaveDraft, saveGraderAutosaveDraft } from '@/services/grader/graderSession.service'
+import { getModuleRanges } from '@/services/grader/graderModuleConfig.service'
 import { computeAnalytics, DEFAULT_PHYSICAL_CONFIG } from '@/services/grader/graderAnalytics'
 import { computeDeterministicInsights } from '@/services/grader/graderInsights'
 import type { ParsedMatrixData, GateAssignment, GraderAnalysisConfig } from '@/services/grader/types'
@@ -93,6 +94,26 @@ export function AnalisisGraderWizardPage() {
       return []
     }
   }, [analyticsResult])
+
+  // Cargar physicalConfig guardado desde Firestore al iniciar
+  // → así el widget de velocidad arranca con el valor real guardado, no con el default
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const cfg = await getModuleRanges()
+        if (cancelled || !cfg?.physicalConfig) return
+        // Sincronizar velocidad de Sorting Belt desde el config guardado
+        const mainBelt = cfg.physicalConfig.belts.find((b) => b.beltId === 'main')
+        if (mainBelt && mainBelt.speedMps > 0) {
+          setSortingBeltMps(mainBelt.speedMps)
+        }
+        // Incorporar el physicalConfig completo al state de config (para insights físicos)
+        setConfig((prev) => ({ ...prev, physicalConfig: cfg.physicalConfig }))
+      } catch { /* fallback silencioso: usa DEFAULT_PHYSICAL_CONFIG */ }
+    })()
+    return () => { cancelled = true }
+  }, [])
 
   // Restaurar draft local
   useEffect(() => {
