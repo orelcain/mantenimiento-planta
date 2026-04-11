@@ -277,9 +277,9 @@ export function AnalisisGraderWizardPage() {
     return () => window.clearTimeout(timer)
   }, [config, gates, parsedData?.files.length, user?.id])
 
-  // Restaurar último turno desde localStorage
+  // Restaurar último turno desde localStorage (skip si venimos con ?goto=)
   useEffect(() => {
-    if (searchParams.get('date') || searchParams.get('autoload')) return
+    if (searchParams.get('date') || searchParams.get('autoload') || searchParams.get('goto')) return
     try {
       const saved = localStorage.getItem('grader_last_session')
       if (saved) {
@@ -294,6 +294,17 @@ export function AnalisisGraderWizardPage() {
       }
     } catch { /* localStorage no disponible */ }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Scroll automático al calendario cuando llegamos con ?goto=
+  useEffect(() => {
+    if (!searchParams.get('goto')) return
+    // Esperar un render para que el calendario ya esté montado
+    const t = window.setTimeout(() => {
+      const calEl = document.querySelector('[data-grader-calendar]')
+      if (calEl) calEl.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 300)
+    return () => window.clearTimeout(t)
+  }, [searchParams])
 
   const fallbackParsedData: ParsedMatrixData = parsedData || {
     files: [], pieceRecords: [], gate0Records: [], folioRecords: [], qualitySummary: [], productionSummary: [], inferred: {},

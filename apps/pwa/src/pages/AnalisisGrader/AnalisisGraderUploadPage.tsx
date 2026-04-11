@@ -478,13 +478,16 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
         </div>
       )}
 
-      {/* Calendario histórico unificado: mismo componente que la página
-          `/analisis-grader/calendario`. Muestra `graderDailySummaries` con
+      {/* Calendario histórico unificado. Muestra `graderDailySummaries` con
           P0% por día, KPIs por turno y top causas. El botón "Cargar" navega
-          a la misma ruta con `?date=…&shift=…&autoload=1`; el efecto de
-          `searchParams` (arriba) detecta los params y dispara handleLoadTurno
-          vía autoLoadRef → reusa archivos ya guardados en Storage. */}
-      <GraderHistoricalCalendar />
+          al home con `?date=…&shift=…&autoload=1`; el efecto de `searchParams`
+          (arriba) detecta los params y dispara handleLoadTurno vía autoLoadRef
+          → reusa archivos ya guardados en Storage.
+          Acepta `?goto=YYYY-MM-DD` para saltar a un día específico (desde el
+          gráfico de tendencia en `/analisis-grader/periodo`). */}
+      <div data-grader-calendar>
+        <GraderHistoricalCalendar />
+      </div>
     </div>
   )
 }

@@ -120,6 +120,18 @@ export function GraderPeriodView({ data }: Props) {
     responsive: true,
     maintainAspectRatio: false,
     interaction: { mode: 'index' as const, intersect: false },
+    onHover: (event: any, chartElement: any[]) => {
+      const target = event?.native?.target as HTMLElement | undefined
+      if (target) target.style.cursor = chartElement.length > 0 ? 'pointer' : 'default'
+    },
+    onClick: (_event: any, elements: any[]) => {
+      if (!elements || elements.length === 0) return
+      const idx = elements[0].index
+      const entry = dailyP0Series[idx]
+      if (!entry) return
+      // Navegar al home con el día seleccionado en el calendario embebido
+      navigate(`/analisis-grader?goto=${entry.dateKey}`)
+    },
     plugins: {
       legend: { display: false },
       tooltip: {
@@ -134,7 +146,7 @@ export function GraderPeriodView({ data }: Props) {
             const idx = ctx.dataIndex
             const entry = dailyP0Series[idx]
             if (!entry) return ''
-            return `${entry.p0Pct}% · ${entry.totalPieces.toLocaleString('es-CL')} piezas`
+            return `${entry.p0Pct}% · ${entry.totalPieces.toLocaleString('es-CL')} piezas  ·  clic para ver día`
           },
         },
       },
@@ -154,7 +166,7 @@ export function GraderPeriodView({ data }: Props) {
         },
       },
     },
-  }), [dailyP0Series])
+  }), [dailyP0Series, navigate])
 
   // ── Chart: calibre consolidado (top 8 horizontal) ────────────────────────
   const calibreChartData = useMemo(() => {
@@ -313,7 +325,10 @@ export function GraderPeriodView({ data }: Props) {
       {(stats.minP0Day || stats.maxP0Day) && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {stats.minP0Day && (
-            <Card className="border-emerald-500/30 bg-emerald-500/5">
+            <Card
+              className="border-emerald-500/30 bg-emerald-500/5 cursor-pointer hover:bg-emerald-500/10 transition-colors"
+              onClick={() => navigate(`/analisis-grader?goto=${stats.minP0Day!.dateKey}`)}
+            >
               <CardContent className="pt-3 pb-3 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
@@ -329,7 +344,10 @@ export function GraderPeriodView({ data }: Props) {
             </Card>
           )}
           {stats.maxP0Day && (
-            <Card className="border-red-500/30 bg-red-500/5">
+            <Card
+              className="border-red-500/30 bg-red-500/5 cursor-pointer hover:bg-red-500/10 transition-colors"
+              onClick={() => navigate(`/analisis-grader?goto=${stats.maxP0Day!.dateKey}`)}
+            >
               <CardContent className="pt-3 pb-3 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <AlertTriangle className="h-5 w-5 text-red-500 shrink-0" />

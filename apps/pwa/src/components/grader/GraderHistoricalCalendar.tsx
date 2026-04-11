@@ -17,7 +17,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from '@/components/ui'
 import { ChevronLeft, ChevronRight, Loader2, Clock, Database, Eye, Trash2, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -138,18 +138,23 @@ export function GraderHistoricalCalendar({
   initialDateKey,
 }: GraderHistoricalCalendarProps) {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const user = useAuthStore((s) => s.user)
 
+  // Si el URL trae ?goto=YYYY-MM-DD úsalo como initialDateKey (prioridad sobre prop)
+  const gotoParam = searchParams.get('goto')
+  const effectiveInitialKey = gotoParam || initialDateKey || null
+
   const [currentMonth, setCurrentMonth] = useState(() => {
-    if (initialDateKey) {
-      const d = new Date(`${initialDateKey}T00:00:00`)
+    if (effectiveInitialKey) {
+      const d = new Date(`${effectiveInitialKey}T00:00:00`)
       if (!isNaN(d.getTime())) return new Date(d.getFullYear(), d.getMonth(), 1)
     }
     return new Date()
   })
   const [selectedDate, setSelectedDate] = useState<Date | null>(() => {
-    if (initialDateKey) {
-      const d = new Date(`${initialDateKey}T00:00:00`)
+    if (effectiveInitialKey) {
+      const d = new Date(`${effectiveInitialKey}T00:00:00`)
       if (!isNaN(d.getTime())) return d
     }
     return new Date()
@@ -161,7 +166,7 @@ export function GraderHistoricalCalendar({
   const [shiftSchedule, setShiftSchedule] = useState(DEFAULT_SHIFT_SCHEDULE)
   const [historicalByDate, setHistoricalByDate] = useState<Map<string, GraderDailySummary[]>>(new Map())
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  const autoSelectedRef = useRef(!!initialDateKey)
+  const autoSelectedRef = useRef(!!effectiveInitialKey)
 
   useEffect(() => {
     setLoading(true)
@@ -206,7 +211,7 @@ export function GraderHistoricalCalendar({
         setHistoricalByDate(map)
 
         // Si el mes actual no tiene datos y no hay initialDateKey, buscar el último mes con datos
-        if (list.length === 0 && !initialDateKey && !autoSelectedRef.current) {
+        if (list.length === 0 && !effectiveInitialKey && !autoSelectedRef.current) {
           const today = new Date()
           const lookback = `${today.getFullYear() - 1}-${String(today.getMonth() + 1).padStart(2, '0')}-01`
           const lookbackEnd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()).padStart(2, '0')}`
@@ -229,7 +234,7 @@ export function GraderHistoricalCalendar({
       .catch(() => {
         /* silent: historial no crítico */
       })
-  }, [currentMonth, initialDateKey])
+  }, [currentMonth, effectiveInitialKey])
 
   useEffect(() => {
     if (autoSelectedRef.current) return

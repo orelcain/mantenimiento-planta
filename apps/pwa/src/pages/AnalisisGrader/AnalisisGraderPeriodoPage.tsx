@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, Navigate } from 'react-router-dom'
 import { Card, CardContent, Button } from '@/components/ui'
-import { ArrowLeft, BarChart3, Loader2, Calendar, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, BarChart3, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { usePermissionsStore } from '@/store'
 import {
@@ -134,10 +134,6 @@ export function AnalisisGraderPeriodoPage() {
             </p>
           </div>
         </div>
-        <Button variant="outline" size="sm" onClick={() => navigate('/analisis-grader')}>
-          <Calendar className="h-4 w-4 mr-1" />
-          Volver
-        </Button>
       </div>
 
       {/* ── Banner de migración 'Turno tarde' → 'Turno noche' ──────────────

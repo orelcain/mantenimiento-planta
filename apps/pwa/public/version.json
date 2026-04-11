@@ -1,11 +1,11 @@
 {
-  "version": "2.83.0",
+  "version": "2.84.0",
   "buildDate": "2026-04-12",
   "buildTimestamp": 1775930315920,
   "features": [
-    "Grader iter 15: eliminadas 4 páginas legacy del módulo (Calendar, CargaMasiva, SessionsList, Session)",
-    "Grader iter 15: 4 rutas removidas, ahorro ~1,209 líneas de código",
-    "Grader iter 15: navegación simplificada — el home Wizard embebe el calendario, ya no hay página dedicada",
-    "Grader iter 15: botones Historial y Calendario del header Wizard eliminados (redundantes)"
+    "Grader iter 16: clic en gráfico de tendencia de período → navega al día en calendario",
+    "Grader iter 16: cards Mejor día / Peor día son clickeables para drill-down",
+    "Grader iter 16: calendario soporta ?goto=YYYY-MM-DD y scroll automático",
+    "Grader iter 16: fix botón duplicado Volver en header de análisis período"
   ]
 }
