@@ -19,13 +19,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from '@/components/ui'
-import { ChevronLeft, ChevronRight, Loader2, Clock, Database, Eye } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, Clock, Database, Eye, Trash2, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { listGraderUploads } from '@/services/grader/graderUpload.service'
 import { getModuleRanges } from '@/services/grader/graderModuleConfig.service'
 import {
   getDailySummary,
   saveDailySummary,
+  deleteDailySummary,
   listDailySummariesByRange,
 } from '@/services/grader/graderDailySummary.service'
 import { parseFile, mergeParsedData } from '@/services/grader/graderExcelParser'
@@ -159,6 +160,7 @@ export function GraderHistoricalCalendar({
   const [summaries, setSummaries] = useState<Record<string, SummaryState>>({})
   const [shiftSchedule, setShiftSchedule] = useState(DEFAULT_SHIFT_SCHEDULE)
   const [historicalByDate, setHistoricalByDate] = useState<Map<string, GraderDailySummary[]>>(new Map())
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const autoSelectedRef = useRef(!!initialDateKey)
 
   useEffect(() => {
@@ -416,6 +418,47 @@ export function GraderHistoricalCalendar({
     }
   }
 
+  const handleDeleteSummary = async (dateKey: string, shiftId: string) => {
+    const id = `${dateKey}__${shiftId}`
+    if (!window.confirm(`¿Eliminar el registro "${shiftId}" del ${dateKey}? Esta acción no se puede deshacer.`)) return
+    setDeletingId(id)
+    try {
+      await deleteDailySummary(dateKey, shiftId)
+      setHistoricalByDate((prev) => {
+        const next = new Map(prev)
+        const dayList = (next.get(dateKey) ?? []).filter((s) => s.id !== id)
+        if (dayList.length > 0) next.set(dateKey, dayList)
+        else next.delete(dateKey)
+        return next
+      })
+    } catch {
+      // silent — retry on next load
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  /** Duración defensiva: si durationMinutes > 1440 (>24h, claramente anómalo),
+   *  deriva de endAt–startAt y limita a 720 min (12h = turno completo máximo). */
+  function safeDisplayMinutes(hist: GraderDailySummary): number | undefined {
+    if (hist.durationMinutes == null || hist.durationMinutes <= 0) return undefined
+    if (hist.durationMinutes > 1440 && hist.startAt && hist.endAt) {
+      const span = Math.round(
+        (new Date(hist.endAt).getTime() - new Date(hist.startAt).getTime()) / 60_000,
+      )
+      if (span > 0 && span <= 1440) return span
+      return undefined // span también inválido → no mostrar
+    }
+    return hist.durationMinutes
+  }
+
+  /** Tasa de producción defensiva: recalcula desde piezas / duraciónDisplay. */
+  function safeRate(hist: GraderDailySummary): number | undefined {
+    const mins = safeDisplayMinutes(hist)
+    if (!mins || mins <= 0) return undefined
+    return Math.round(hist.totalPieces / (mins / 60))
+  }
+
   if (loading) {
     return (
       <div className={cn('flex items-center justify-center py-12', className)}>
@@ -467,66 +510,79 @@ export function GraderHistoricalCalendar({
               const dayHistorical = historicalByDate.get(dayKey) || []
               const hasData = dayHistorical.length > 0
 
-              const avgHistP0 = hasData
-                ? dayHistorical.reduce((t, s) => t + s.pointZeroPct, 0) / dayHistorical.length
+              const worstP0 = hasData
+                ? Math.max(...dayHistorical.map((s) => s.pointZeroPct))
                 : null
 
               const missingPiece = hasData && dayHistorical.some((s) => s.hasPieceData === false)
               const missingGate0 = hasData && dayHistorical.some((s) => s.hasGate0Data === false)
-              const anyTracked = hasData && dayHistorical.some((s) => s.hasPieceData !== undefined)
+              const isSelected = selectedDate?.toDateString() === day.toDateString()
+
+              // Ordenar día antes que noche para mostrar en el cell
+              const sortedHistory = hasData
+                ? [...dayHistorical].sort((a, b) => {
+                    const order: Record<string, number> = { 'Turno día': 0, 'Turno noche': 1 }
+                    return (order[a.shiftId] ?? 9) - (order[b.shiftId] ?? 9)
+                  })
+                : []
 
               return (
                 <button
                   key={dayKey}
                   className={cn(
-                    'h-20 p-1.5 border rounded-lg text-left transition-colors flex flex-col',
-                    isToday(day) && 'bg-primary/5 border-primary',
-                    selectedDate?.toDateString() === day.toDateString() && 'ring-2 ring-primary',
-                    !hasData && 'opacity-60',
-                    avgHistP0 !== null && avgHistP0 >= 3.5 && 'border-red-400/60',
-                    avgHistP0 !== null && avgHistP0 >= 2 && avgHistP0 < 3.5 && 'border-amber-400/60',
-                    avgHistP0 !== null && avgHistP0 < 2 && 'border-emerald-400/60',
+                    'h-24 p-1.5 border rounded-lg text-left transition-all flex flex-col gap-0.5',
+                    isToday(day) && !isSelected && 'border-primary/60 bg-primary/5',
+                    isSelected && 'ring-2 ring-primary border-primary bg-primary/8',
+                    !hasData && dayUploads.length === 0 && 'opacity-40',
+                    hasData && worstP0 !== null && worstP0 >= 3.5 && 'border-red-400/50 bg-red-500/3',
+                    hasData && worstP0 !== null && worstP0 >= 2 && worstP0 < 3.5 && 'border-amber-400/50',
+                    hasData && worstP0 !== null && worstP0 < 2 && 'border-emerald-400/40',
                   )}
                   onClick={() => setSelectedDate(day)}
                 >
                   <div className="flex items-center justify-between">
-                    <span className={cn('text-sm font-medium', isToday(day) && 'text-primary')}>
+                    <span className={cn(
+                      'text-sm font-semibold leading-none',
+                      isToday(day) && 'text-primary',
+                      isSelected && 'text-primary',
+                    )}>
                       {day.getDate()}
                     </span>
-                    {hasData && (
-                      <span className="text-[9px] text-muted-foreground leading-none">
-                        {dayHistorical.length}T
-                      </span>
-                    )}
                     {!hasData && dayUploads.length > 0 && (
-                      <Badge variant="outline" className="text-[9px] h-3.5 px-1">
-                        {dayUploads.length}
-                      </Badge>
+                      <span className="text-[8px] text-muted-foreground leading-none border rounded px-0.5">
+                        {dayUploads.length}f
+                      </span>
                     )}
                   </div>
 
-                  {avgHistP0 !== null && (
-                    <div className={cn(
-                      'text-[9px] font-bold text-center rounded-sm px-0.5 leading-4',
-                      avgHistP0 >= 3.5 ? 'bg-red-500/20 text-red-600' :
-                      avgHistP0 >= 2   ? 'bg-amber-500/20 text-amber-600' :
-                                         'bg-emerald-500/20 text-emerald-600',
-                    )}>
-                      P0 {avgHistP0.toFixed(1)}%
-                    </div>
-                  )}
+                  {/* Per-shift P0% badges */}
+                  {sortedHistory.map((s) => {
+                    const shiftLabel = s.shiftId === 'Turno día' ? 'D' : 'N'
+                    const p0 = s.pointZeroPct
+                    return (
+                      <div
+                        key={s.id}
+                        className={cn(
+                          'flex items-center justify-between rounded px-1 py-0.5 leading-none',
+                          p0 >= 3.5 ? 'bg-red-500/18 text-red-600' :
+                          p0 >= 2   ? 'bg-amber-500/18 text-amber-600' :
+                                      'bg-emerald-500/18 text-emerald-600',
+                        )}
+                      >
+                        <span className="text-[8px] font-medium opacity-70">{shiftLabel}</span>
+                        <span className="text-[9px] font-bold tabular-nums">{p0.toFixed(1)}%</span>
+                      </div>
+                    )
+                  })}
 
-                  {anyTracked && (missingPiece || missingGate0) && (
-                    <div className="mt-auto flex gap-0.5 flex-wrap">
+                  {/* Missing data badges */}
+                  {(missingPiece || missingGate0) && (
+                    <div className="mt-auto flex gap-0.5">
                       {missingPiece && (
-                        <span className="text-[8px] leading-3 px-1 rounded bg-red-500/20 text-red-600 font-medium">
-                          Falta PP
-                        </span>
+                        <span className="text-[7px] leading-3 px-0.5 rounded bg-red-500/20 text-red-600 font-medium">PP</span>
                       )}
                       {missingGate0 && (
-                        <span className="text-[8px] leading-3 px-1 rounded bg-red-500/20 text-red-600 font-medium">
-                          Falta P0
-                        </span>
+                        <span className="text-[7px] leading-3 px-0.5 rounded bg-red-500/20 text-red-600 font-medium">P0</span>
                       )}
                     </div>
                   )}
@@ -615,12 +671,15 @@ export function GraderHistoricalCalendar({
                           </p>
                         </div>
                       )}
-                      {hist.productionRatePerHour != null && (
-                        <div className="rounded bg-background/60 px-2 py-1">
-                          <p className="text-muted-foreground">pz/hora</p>
-                          <p className="font-semibold">{Math.round(hist.productionRatePerHour).toLocaleString('es-CL')}</p>
-                        </div>
-                      )}
+                      {(() => {
+                        const rate = safeRate(hist)
+                        return rate != null ? (
+                          <div className="rounded bg-background/60 px-2 py-1">
+                            <p className="text-muted-foreground">pz/hora</p>
+                            <p className="font-semibold">{rate.toLocaleString('es-CL')}</p>
+                          </div>
+                        ) : null
+                      })()}
                     </div>
                     {hist.topP0Causes && hist.topP0Causes.length > 0 && (
                       <div className="text-xs space-y-0.5">
@@ -633,22 +692,44 @@ export function GraderHistoricalCalendar({
                         ))}
                       </div>
                     )}
-                    {hist.durationMinutes != null && hist.durationMinutes > 0 && (
-                      <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {Math.floor(hist.durationMinutes / 60)}h {hist.durationMinutes % 60}m
-                        {hist.startAt && ` · ${new Date(hist.startAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}–${hist.endAt ? new Date(hist.endAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) : '?'}`}
-                      </p>
-                    )}
-                    <div className="pt-1">
+                    {(() => {
+                      const mins = safeDisplayMinutes(hist)
+                      const anomalous = hist.durationMinutes != null && hist.durationMinutes > 1440
+                      return mins != null && mins > 0 ? (
+                        <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {Math.floor(mins / 60)}h {mins % 60}m
+                          {hist.startAt && ` · ${new Date(hist.startAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}–${hist.endAt ? new Date(hist.endAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) : '?'}`}
+                          {anomalous && <span title="Duración almacenada anómala — se muestra estimación"><AlertTriangle className="h-3 w-3 text-amber-500 ml-1" /></span>}
+                        </p>
+                      ) : anomalous ? (
+                        <p className="text-[10px] text-amber-500 flex items-center gap-1">
+                          <AlertTriangle className="h-3 w-3" />
+                          Duración anómala — registro posiblemente fusionado
+                        </p>
+                      ) : null
+                    })()}
+                    <div className="pt-1 flex gap-1.5">
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-7 text-[11px] w-full"
+                        className="h-7 text-[11px] flex-1"
                         onClick={() => navigate(`/analisis-grader/detalle?date=${hist.dateKey}&shift=${encodeURIComponent(hist.shiftId)}`)}
                       >
                         <Eye className="h-3 w-3 mr-1" />
-                        Ver detalle completo
+                        Ver detalle
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-[11px] text-red-600 hover:text-red-600 border-red-500/30 hover:bg-red-500/10"
+                        disabled={deletingId === hist.id}
+                        onClick={() => handleDeleteSummary(hist.dateKey, hist.shiftId)}
+                      >
+                        {deletingId === hist.id
+                          ? <Loader2 className="h-3 w-3 animate-spin" />
+                          : <Trash2 className="h-3 w-3" />
+                        }
                       </Button>
                     </div>
                   </div>

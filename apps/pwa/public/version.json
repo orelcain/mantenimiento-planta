@@ -1,12 +1,11 @@
 {
-  "version": "2.80.0",
+  "version": "2.81.0",
   "buildDate": "2026-04-11",
   "buildTimestamp": 1775930315920,
   "features": [
-    "Grader iter 12: fix durationMinutes inflado en summaries fusionados (tarde→noche)",
-    "Grader iter 12: tendencia P0% últimos turnos en vista detalle (sin re-parsear Excel)",
-    "Grader iter 12: alertas automáticas desde GraderDailySummary (P0 elevado, causa dominante, muestra pequeña, tendencia ascendente)",
-    "Grader iter 12: diagnóstico IA desde historial Firestore (Groq) con sugerencias de gates y configuración",
-    "Grader iter 12: contexto histórico 45 días en página de detalle de turno"
+    "Grader iter 13: UI calendar mejorado con badges P0% por turno (D/N)",
+    "Grader iter 13: fix visualización duración anómala en summaries fusionados",
+    "Grader iter 13: botón delete para eliminar registros erróneos del calendario",
+    "Grader iter 13: botones redundantes eliminados del header (Calendario, Carga masiva)"
   ]
 }

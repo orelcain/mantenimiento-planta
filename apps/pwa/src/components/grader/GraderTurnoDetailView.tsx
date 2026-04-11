@@ -59,6 +59,21 @@ function p0BorderClass(pct: number): string {
   return 'border-emerald-500/30 bg-emerald-500/5'
 }
 
+/** Duración defensiva: si durationMinutes > 1440 (anomalía por merge),
+ *  deriva de endAt–startAt con máximo de 720 min (12h = turno completo). */
+function safeMinutes(summary: { durationMinutes?: number; startAt?: string; endAt?: string }): number | undefined {
+  const dm = summary.durationMinutes
+  if (dm == null || dm <= 0) return undefined
+  if (dm > 1440 && summary.startAt && summary.endAt) {
+    const span = Math.round(
+      (new Date(summary.endAt).getTime() - new Date(summary.startAt).getTime()) / 60_000,
+    )
+    if (span > 0 && span <= 1440) return span
+    return undefined
+  }
+  return dm
+}
+
 function formatDuration(minutes?: number): string {
   if (minutes == null || minutes <= 0) return '—'
   const h = Math.floor(minutes / 60)
@@ -184,6 +199,12 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
     }
   }, [summary.gateDistribution])
 
+  const displayMinutes = useMemo(() => safeMinutes(summary), [summary])
+  const displayRate = useMemo(() => {
+    if (displayMinutes && displayMinutes > 0) return Math.round(summary.totalPieces / (displayMinutes / 60))
+    return summary.productionRatePerHour
+  }, [summary, displayMinutes])
+
   const timeRangeLabel = useMemo(() => {
     if (!summary.startAt || !summary.endAt) return null
     const s = new Date(summary.startAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })
@@ -256,8 +277,8 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
                     {timeRangeLabel}
                   </span>
                 )}
-                {summary.durationMinutes != null && summary.durationMinutes > 0 && (
-                  <span className="ml-2">· {formatDuration(summary.durationMinutes)}</span>
+                {displayMinutes != null && displayMinutes > 0 && (
+                  <span className="ml-2">· {formatDuration(displayMinutes)}</span>
                 )}
               </p>
               {/* Indicadores de completitud */}
@@ -316,9 +337,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
           <CardContent className="pt-4 pb-3 text-center">
             <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Tasa producción</p>
             <p className="text-2xl font-bold tabular-nums mt-0.5">
-              {summary.productionRatePerHour != null
-                ? summary.productionRatePerHour.toLocaleString('es-CL')
-                : '—'}
+              {displayRate != null ? displayRate.toLocaleString('es-CL') : '—'}
             </p>
             <p className="text-[10px] text-muted-foreground mt-0.5">pz/hora</p>
           </CardContent>
@@ -327,11 +346,11 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
           <CardContent className="pt-4 pb-3 text-center">
             <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Duración turno</p>
             <p className="text-2xl font-bold tabular-nums mt-0.5">
-              {formatDuration(summary.durationMinutes)}
+              {formatDuration(displayMinutes)}
             </p>
-            {summary.durationMinutes != null && summary.durationMinutes > 0 && (
+            {displayMinutes != null && displayMinutes > 0 && (
               <p className="text-[10px] text-muted-foreground mt-0.5">
-                {summary.durationMinutes} min
+                {displayMinutes} min
               </p>
             )}
           </CardContent>

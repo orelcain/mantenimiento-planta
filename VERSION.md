@@ -1,14 +1,27 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.79.0**
+## Versión Actual: **v2.81.0**
 
-**Fecha de lanzamiento**: 23 de marzo de 2026  \
+**Fecha de lanzamiento**: 11 de abril de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
 **Build**: ✅ Stable
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.81.0 — Grader iter 13: UI calendar mejorado + fix duración anómala + delete registro (11/04/2026)
+- 📅 **Badges P0% por turno en calendario**: cada celda del mes muestra etiquetas "D" y "N" con color propio según P0% real del turno (verde/amarillo/rojo), reemplazando el promedio único anterior
+- 🗑️ **Botón eliminar registro**: en el panel lateral del calendario, cada turno tiene un botón rojo Trash2 para borrar summaries erróneos directamente de Firestore sin salir de la vista
+- ⏱️ **Fix duración anómala en display**: cuando `durationMinutes` almacenado supera 1440 min (bug de fusión tarde→noche), se deriva la duración desde `endAt - startAt` con cap de 24h — aplica tanto en el calendario como en la vista detalle
+- 🧹 **Header simplificado**: botones "Calendario" y "Carga masiva" eliminados del header del Wizard (redundantes en el flujo diario actual)
+
+### v2.80.0 — Grader iter 12: fix durationMinutes + tendencia + alertas + IA desde Firestore (11/04/2026)
+- 🔧 **Fix `durationMinutes` inflado en summaries fusionados**: `mergeTwoSummaries` usaba span de timestamps en vez de suma de duraciones — corregido a `base.durationMinutes + legacy.durationMinutes`
+- 📈 **Gráfico de tendencia P0%**: la vista detalle de turno muestra los últimos 20 turnos como línea Chart.js (sin re-parsear Excel), con el turno actual destacado en rojo
+- 🔔 **Alertas automáticas determinísticas**: 5 reglas sobre el summary guardado (P0 elevado, causa dominante, muestra pequeña, tendencia ascendente, duración >13h)
+- 🤖 **Diagnóstico IA desde historial**: `analyzeGraderFromSummary` construye `AIGraderInput` desde `GraderDailySummary` y llama a Groq — sin necesidad de re-cargar Excel
+- 🕐 **Contexto 45 días**: `AnalisisGraderDetallePage` trae turnos recientes de Firestore para nutrir tendencia, alertas e IA
 
 ### v2.70.66 — Persistencia real de markup admin en mapas isométricos (16/03/2026)
 - 🗂️ **Guardado en documento real**: la base georreferenciada ahora persiste coordenadas, sample step y marcas admin de caminos/estructuras dentro del mapa isométrico guardado

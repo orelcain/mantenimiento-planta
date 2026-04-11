@@ -10,7 +10,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, Button, Badge } from '@/components/ui'
-import { Settings2, BarChart3, FolderOpen, Calendar, Loader2, ChevronDown, ChevronUp, Upload, CheckCircle2 } from 'lucide-react'
+import { Settings2, BarChart3, FolderOpen, Loader2, ChevronDown, ChevronUp, CheckCircle2, Calendar } from 'lucide-react'
 import { useAuthStore, usePermissionsStore } from '@/store'
 import { AnalisisGraderUploadPage, type FileParsed } from './AnalisisGraderUploadPage'
 import { AnalisisGraderGatesConfigPage } from './AnalisisGraderGatesConfigPage'
@@ -411,10 +411,6 @@ export function AnalisisGraderWizardPage() {
               {autosaveState === 'queued' && <>Guardado pendiente</>}
             </Badge>
           )}
-          <Button variant="ghost" size="sm" onClick={() => navigate('/analisis-grader/calendario')}>
-            <Calendar className="h-4 w-4 mr-1" />
-            Calendario
-          </Button>
           <Button variant="ghost" size="sm" onClick={() => navigate('/analisis-grader/periodo')}>
             <BarChart3 className="h-4 w-4 mr-1" />
             Análisis período
@@ -422,10 +418,6 @@ export function AnalisisGraderWizardPage() {
           <Button variant="ghost" size="sm" onClick={() => navigate('/analisis-grader/sesiones')}>
             <FolderOpen className="h-4 w-4 mr-1" />
             Historial
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => navigate('/analisis-grader/carga-masiva')}>
-            <Upload className="h-4 w-4 mr-1" />
-            Carga masiva
           </Button>
         </div>
       </div>
