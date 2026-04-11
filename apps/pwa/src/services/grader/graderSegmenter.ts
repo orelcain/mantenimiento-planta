@@ -33,6 +33,27 @@ export interface ShiftSegment {
 
 type SegmentKey = string  // `${sessionDate}|${shiftId}`
 
+// ── Normalización del turno desde columna Excel ───────────────────────────────
+
+/**
+ * Normaliza el valor bruto de la columna "Turno" del Excel.
+ * Ejemplos: "A" → "Turno A", "turno b" → "Turno B", "Turno día" → "Turno día"
+ */
+export function normalizeShiftLabel(raw: string): string {
+  const s = raw.trim()
+  if (/^a$/i.test(s))            return 'Turno A'
+  if (/^b$/i.test(s))            return 'Turno B'
+  if (/^c$/i.test(s))            return 'Turno C'
+  if (/^turno\s+a$/i.test(s))    return 'Turno A'
+  if (/^turno\s+b$/i.test(s))    return 'Turno B'
+  if (/^turno\s+c$/i.test(s))    return 'Turno C'
+  if (/^turno\s+d[ií]a$/i.test(s))  return 'Turno día'
+  if (/^turno\s+tarde$/i.test(s))   return 'Turno tarde'
+  if (/^turno\s+noche$/i.test(s))   return 'Turno noche'
+  // Devolver tal cual si no coincide con ningún patrón conocido
+  return s
+}
+
 // ── Asignación de turno ───────────────────────────────────────────────────────
 
 /**
@@ -82,6 +103,12 @@ export function assignShiftAndDate(
 
 /**
  * Agrupa todos los registros en segmentos por {sessionDate, shiftId}.
+ *
+ * Estrategia de segmentación (en orden de prioridad):
+ *  1. Si el registro tiene columna "Turno" → usar ese valor (más confiable).
+ *     La fecha se toma directamente del timestamp (columna Fecha del Excel).
+ *  2. Si no hay columna Turno → inferir turno desde timestamp + schedule.
+ *
  * Los registros sin timestamp válido se descartan.
  */
 export function segmentByDayAndShift(
@@ -99,15 +126,24 @@ export function segmentByDayAndShift(
     return map.get(key)!
   }
 
+  const resolveShiftAndDate = (ts: string, shift?: string): { sessionDate: string; shiftId: string } => {
+    if (shift) {
+      // Fuente primaria: columna Turno del Excel
+      return { sessionDate: ts.slice(0, 10), shiftId: normalizeShiftLabel(shift) }
+    }
+    // Fallback: inferir desde timestamp + horarios configurados
+    return assignShiftAndDate(ts, schedule)
+  }
+
   for (const rec of pieceRecords) {
     if (!rec.ts) continue
-    const { sessionDate, shiftId } = assignShiftAndDate(rec.ts, schedule)
+    const { sessionDate, shiftId } = resolveShiftAndDate(rec.ts, rec.shift)
     getOrCreate(sessionDate, shiftId).pieceRecords.push(rec)
   }
 
   for (const rec of gate0Records) {
     if (!rec.ts) continue
-    const { sessionDate, shiftId } = assignShiftAndDate(rec.ts, schedule)
+    const { sessionDate, shiftId } = resolveShiftAndDate(rec.ts, rec.shift)
     getOrCreate(sessionDate, shiftId).gate0Records.push(rec)
   }
 

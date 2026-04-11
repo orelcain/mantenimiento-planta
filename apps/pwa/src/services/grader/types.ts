@@ -521,6 +521,8 @@ export interface PieceRecord {
   error?: string; // available for gate 0 records (from pieza-pieza or Puerta 0)
   lot?: string;
   product?: string;
+  /** Turno leído directo de la columna "Turno" del Excel (ej: "A", "B", "Turno A") */
+  shift?: string;
   raw?: Record<string, unknown>;
 }
 
@@ -535,6 +537,8 @@ export interface Gate0Record {
   quality?: GraderQuality;
   calibre?: CalibreRange;
   lot?: string;
+  /** Turno leído directo de la columna "Turno" del Excel (ej: "A", "B", "Turno A") */
+  shift?: string;
   raw?: Record<string, unknown>;
 }
 

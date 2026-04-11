@@ -362,6 +362,7 @@ function parsePiezaPieza(rows: unknown[][], headerIdx: number, colMap: ColumnMap
   const iTime = col(colMap, 'hora', 'time')
   const iLot = col(colMap, 'lote', 'lot', 'folio')
   const iProduct = col(colMap, 'producto', 'product')
+  const iShift = col(colMap, 'turno', 'shift')
 
   for (let r = headerIdx + 1; r < rows.length; r++) {
     const row = rows[r]
@@ -397,6 +398,7 @@ function parsePiezaPieza(rows: unknown[][], headerIdx: number, colMap: ColumnMap
       weightKg = (weightPerPieceGrams * pieces) / 1000
     }
 
+    const shiftRaw = iShift != null && row[iShift] != null ? String(row[iShift]).trim() : undefined
     const rec: PieceRecord = {
       ts,
       gate: Math.round(gate),
@@ -408,6 +410,7 @@ function parsePiezaPieza(rows: unknown[][], headerIdx: number, colMap: ColumnMap
       error: errorStr,
       lot: iLot != null ? (row[iLot] != null ? String(row[iLot]).trim() : undefined) : undefined,
       product: iProduct != null ? (row[iProduct] != null ? String(row[iProduct]).trim() : undefined) : undefined,
+      shift: shiftRaw || undefined,
       raw: rawCalibreStr ? { rawCalibre: rawCalibreStr } : undefined,
     }
     records.push(rec)
@@ -426,6 +429,7 @@ function parsePuerta0(rows: unknown[][], headerIdx: number, colMap: ColumnMap): 
   const iQuality = col(colMap, 'calidad', 'quality')
   const iCalibre = col(colMap, 'calibre', 'size', 'tamano')
   const iLot = col(colMap, 'lote', 'lot', 'folio')
+  const iShift = col(colMap, 'turno', 'shift')
 
   for (let r = headerIdx + 1; r < rows.length; r++) {
     const row = rows[r]
@@ -462,6 +466,7 @@ function parsePuerta0(rows: unknown[][], headerIdx: number, colMap: ColumnMap): 
     }
     const rawCalibreStr = iCalibre != null ? extractRawCalibre(row[iCalibre]) : undefined
 
+    const shiftRaw = iShift != null && row[iShift] != null ? String(row[iShift]).trim() : undefined
     const rec: Gate0Record = {
       ts,
       gate: 0,
@@ -472,6 +477,7 @@ function parsePuerta0(rows: unknown[][], headerIdx: number, colMap: ColumnMap): 
       quality: iQuality != null ? normalizeQuality(row[iQuality]) : undefined,
       calibre: iCalibre != null ? normalizeCalibre(row[iCalibre]) : undefined,
       lot: iLot != null ? (row[iLot] != null ? String(row[iLot]).trim() : undefined) : undefined,
+      shift: shiftRaw || undefined,
       raw: rawCalibreStr ? { rawCalibre: rawCalibreStr } : undefined,
     }
     records.push(rec)
