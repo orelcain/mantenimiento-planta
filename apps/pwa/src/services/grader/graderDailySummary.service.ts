@@ -108,7 +108,12 @@ export async function deleteDailySummary(dateKey: string, shiftId: string): Prom
 
 /**
  * Guarda múltiples resúmenes de turno en Firestore en lotes de 400.
- * Sobreescribe si ya existe un doc con el mismo ID (setDoc merge: false).
+ *
+ * Estrategia de merge inteligente:
+ * - Upload PP (hasPieceData: true):  full overwrite — establece todos los KPIs del turno.
+ * - Upload P0 solo (hasPieceData: false, hasGate0Data: true):  merge parcial — solo
+ *   actualiza topP0Causes y hasGate0Data, preservando los KPIs de producción existentes.
+ *   Así subir PP primero y P0 después no borra los datos de producción.
  */
 export async function saveDailySummaryBatch(
   summaries: GraderDailySummary[],
@@ -120,7 +125,27 @@ export async function saveDailySummaryBatch(
     const batch = writeBatch(db)
     for (const s of chunk) {
       const ref = doc(db, COLLECTION, s.id)
-      batch.set(ref, deepCleanUndefined({ ...s, _updatedAt: new Date().toISOString() }))
+      const isP0Only = s.hasPieceData === false && s.hasGate0Data === true
+
+      if (isP0Only) {
+        // Solo actualiza campos de P0 — preserva los KPIs del PP si ya existen
+        const p0Patch = deepCleanUndefined({
+          id: s.id,
+          dateKey: s.dateKey,
+          shiftId: s.shiftId,
+          hasGate0Data: true,
+          topP0Causes: s.topP0Causes,
+          batchUploadId: s.batchUploadId,
+          sourceFileNames: s.sourceFileNames,
+          updatedBy: s.updatedBy,
+          updatedAt: s.updatedAt,
+          _updatedAt: new Date().toISOString(),
+        })
+        batch.set(ref, p0Patch, { merge: true })
+      } else {
+        // Upload PP o mixto: overwrite completo para tener KPIs actualizados
+        batch.set(ref, deepCleanUndefined({ ...s, _updatedAt: new Date().toISOString() }))
+      }
     }
     await batch.commit()
   }

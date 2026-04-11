@@ -102,13 +102,17 @@ export function AnalisisGraderWizardPage() {
   }, [analyticsResult])
 
   // Detectar si el archivo cargado cubre múltiples días → mostrar banner "Guardar en Calendario"
+  // También aplica a archivos P0-solo (gate0Records sin pieceRecords)
   const multiDayInfo = useMemo(() => {
-    if (!parsedData || parsedData.pieceRecords.length === 0) return null
+    if (!parsedData) return null
+    const totalRecords = parsedData.pieceRecords.length + parsedData.gate0Records.length
+    if (totalRecords === 0) return null
     const segmentMap = segmentByDayAndShift(parsedData.pieceRecords, parsedData.gate0Records)
     const entries = sortedSegmentEntries(segmentMap)
     const uniqueDays = new Set(entries.map(([, s]) => s.sessionDate)).size
     if (uniqueDays <= 1) return null
-    return { entries, uniqueDays, totalSegments: entries.length }
+    const isP0Only = parsedData.pieceRecords.length === 0
+    return { entries, uniqueDays, totalSegments: entries.length, isP0Only }
   }, [parsedData])
 
   // Cargar physicalConfig guardado desde Firestore al iniciar
@@ -402,9 +406,12 @@ export function AnalisisGraderWizardPage() {
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-sky-500 shrink-0" />
               <p className="text-sm">
-                <span className="font-medium">Archivo multi-día detectado</span>
+                <span className="font-medium">
+                  {multiDayInfo.isP0Only ? 'Archivo P0 multi-día' : 'Archivo multi-día detectado'}
+                </span>
                 <span className="text-muted-foreground ml-2">
                   {multiDayInfo.uniqueDays} días · {multiDayInfo.totalSegments} turnos
+                  {multiDayInfo.isP0Only && ' — actualizará causas P0 sin borrar datos PP'}
                 </span>
               </p>
             </div>
