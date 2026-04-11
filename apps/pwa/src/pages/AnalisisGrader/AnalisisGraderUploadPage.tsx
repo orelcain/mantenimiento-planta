@@ -8,7 +8,7 @@
 
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from '@/components/ui'
+import { Card, CardContent, Badge } from '@/components/ui'
 import {
   FileSpreadsheet,
   CheckCircle,
@@ -16,11 +16,6 @@ import {
   X,
   Loader2,
   Info,
-  ChevronRight,
-  ChevronLeft,
-  Clock,
-  Calendar,
-  Trash2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store'
@@ -29,6 +24,7 @@ import { getModuleRanges } from '@/services/grader/graderModuleConfig.service'
 import { deleteDailySummary } from '@/services/grader/graderDailySummary.service'
 import { listGraderUploads, saveGraderUpload, updateGraderUpload, uploadGraderFile, deleteGraderUpload } from '@/services/grader/graderUpload.service'
 import { DEFAULT_SHIFT_SCHEDULE, inferShiftIdFromSchedule, normalizeShiftSchedule, shiftIdToKey } from '@/services/grader/graderShiftSchedule'
+import { GraderHistoricalCalendar } from '@/components/grader/GraderHistoricalCalendar'
 import type {
   ParsedMatrixData,
   UploadedMatrixFile,
@@ -105,302 +101,10 @@ function toDateKey(iso?: string): string {
   return iso.slice(0, 10)
 }
 
-const monthNames = [
-  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
-]
+/* Nota: el calendario inline fue reemplazado por `<GraderHistoricalCalendar />`
+   que lee de `graderDailySummaries` (datos históricos unificados). Las helpers
+   de fecha locales se eliminaron porque viven dentro del componente compartido. */
 
-const dayNames = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab']
-
-function getDaysInMonth(date: Date): (Date | null)[] {
-  const year = date.getFullYear()
-  const month = date.getMonth()
-  const firstDay = new Date(year, month, 1)
-  const lastDay = new Date(year, month + 1, 0)
-  const daysInMonth = lastDay.getDate()
-  const startDayOfWeek = firstDay.getDay()
-
-  const days: (Date | null)[] = []
-  for (let i = 0; i < startDayOfWeek; i += 1) days.push(null)
-  for (let i = 1; i <= daysInMonth; i += 1) days.push(new Date(year, month, i))
-  return days
-}
-
-function isToday(date: Date): boolean {
-  const today = new Date()
-  return (
-    date.getDate() === today.getDate() &&
-    date.getMonth() === today.getMonth() &&
-    date.getFullYear() === today.getFullYear()
-  )
-}
-
-/* ─── Calendario inline para archivos guardados ─── */
-interface InlineCalendarProps {
-  uploads: GraderUpload[]
-  shiftSchedule: Parameters<typeof inferShiftIdFromSchedule>[1]
-  currentTurnoDate: string | null
-  currentTurnoShift: string
-  onSelectTurno: (date: string, shift: string) => void
-  onLoadTurno: () => void
-  onDeleteUpload: (upload: GraderUpload) => Promise<void>
-  loadingTurno: boolean
-}
-
-function GraderInlineCalendar({ uploads, shiftSchedule, currentTurnoDate, currentTurnoShift, onSelectTurno, onLoadTurno, onDeleteUpload, loadingTurno }: InlineCalendarProps) {
-  const [currentMonth, setCurrentMonth] = useState(() => {
-    if (currentTurnoDate) return new Date(currentTurnoDate + 'T00:00:00')
-    return new Date()
-  })
-  const [selectedDate, setSelectedDate] = useState<string | null>(currentTurnoDate)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
-
-  // Sincronizar selectedDate y mes del calendario cuando cambia currentTurnoDate
-  useEffect(() => {
-    if (currentTurnoDate) {
-      setSelectedDate(currentTurnoDate)
-      const d = new Date(currentTurnoDate + 'T00:00:00')
-      setCurrentMonth((prev) => {
-        if (prev.getMonth() !== d.getMonth() || prev.getFullYear() !== d.getFullYear()) {
-          return d
-        }
-        return prev
-      })
-    }
-  }, [currentTurnoDate])
-
-  const days = getDaysInMonth(currentMonth)
-
-  const uploadsByDate = useMemo(() => {
-    const map = new Map<string, GraderUpload[]>()
-    for (const u of uploads) {
-      const key = u.sessionDate || toDateKey(u.inferred?.startAt)
-      if (!map.has(key)) map.set(key, [])
-      map.get(key)!.push(u)
-    }
-    return map
-  }, [uploads])
-
-  const selectedUploads = useMemo(() => {
-    if (!selectedDate) return []
-    return uploadsByDate.get(selectedDate) || []
-  }, [selectedDate, uploadsByDate])
-
-  const turnosForDay = useMemo(() => {
-    const map = new Map<string, GraderUpload[]>()
-    for (const u of selectedUploads) {
-      const shift = u.shiftId || inferShiftIdFromSchedule(u.inferred?.startAt, shiftSchedule)
-      if (!map.has(shift)) map.set(shift, [])
-      map.get(shift)!.push(u)
-    }
-    return map
-  }, [selectedUploads, shiftSchedule])
-
-  const handleDateClick = (dayKey: string) => {
-    setSelectedDate(dayKey)
-    // Auto-select first available turno
-    const dayUploads = uploadsByDate.get(dayKey) || []
-    const first = dayUploads[0]
-    if (first) {
-      const shift = first.shiftId || inferShiftIdFromSchedule(first.inferred?.startAt, shiftSchedule)
-      onSelectTurno(dayKey, shift)
-    }
-  }
-
-  const handleTurnoClick = (dateKey: string, shiftId: string) => {
-    onSelectTurno(dateKey, shiftId)
-  }
-
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
-          <Calendar className="h-4 w-4" />
-          Calendario de Archivos
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* Calendario */}
-          <div className="lg:col-span-2">
-            <div className="flex items-center justify-between mb-3">
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-7 w-7"
-                onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="text-sm font-medium">
-                {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
-              </span>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-7 w-7"
-                onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="grid grid-cols-7 gap-1 mb-1">
-              {dayNames.map((day) => (
-                <div key={day} className="text-center text-[10px] font-medium text-muted-foreground py-1">
-                  {day}
-                </div>
-              ))}
-            </div>
-            <div className="grid grid-cols-7 gap-1">
-              {days.map((day, index) => {
-                if (!day) return <div key={`empty-${index}`} className="h-14" />
-                const dayKey = day.toISOString().slice(0, 10)
-                const dayUploads = uploadsByDate.get(dayKey) || []
-                const turnosCount = new Set(dayUploads.map((u) => u.shiftId || inferShiftIdFromSchedule(u.inferred?.startAt, shiftSchedule))).size
-
-                return (
-                  <button
-                    key={dayKey}
-                    className={cn(
-                      'h-14 p-1 border rounded-md text-left transition-colors text-xs',
-                      isToday(day) && 'bg-primary/5 border-primary',
-                      selectedDate === dayKey && 'ring-2 ring-primary',
-                      dayUploads.length > 0 && 'hover:bg-muted/50',
-                    )}
-                    onClick={() => handleDateClick(dayKey)}
-                  >
-                    <div className="flex items-start justify-between">
-                      <span className={cn('text-xs font-medium', isToday(day) && 'text-primary')}>
-                        {day.getDate()}
-                      </span>
-                      {dayUploads.length > 0 && (
-                        <Badge variant="outline" className="text-[9px] h-4 px-1">
-                          {dayUploads.length}
-                        </Badge>
-                      )}
-                    </div>
-                    {turnosCount > 0 && (
-                      <div className="text-[9px] text-muted-foreground mt-0.5">
-                        {turnosCount} turno(s)
-                      </div>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* Panel lateral de resumen del día seleccionado */}
-          <div className="border-l border-muted/60 pl-4">
-            {selectedDate ? (
-              <div className="space-y-3">
-                <p className="text-sm font-medium">Resumen {selectedDate}</p>
-                {selectedUploads.length === 0 && (
-                  <p className="text-xs text-muted-foreground">No hay archivos para este día.</p>
-                )}
-                {Array.from(turnosForDay.entries()).map(([shiftId, items]) => {
-                  const minStart = items
-                    .map((i) => i.inferred?.startAt)
-                    .filter(Boolean)
-                    .sort()[0]
-                  const maxEnd = items
-                    .map((i) => i.inferred?.endAt)
-                    .filter(Boolean)
-                    .sort()
-                    .slice(-1)[0]
-                  const isSelected = currentTurnoDate === selectedDate && currentTurnoShift === shiftId
-
-                  return (
-                    <div
-                      key={shiftId}
-                      className={cn(
-                        'border rounded-lg p-3 space-y-2 transition-colors',
-                        isSelected ? 'border-primary bg-primary/5' : 'border-muted/60',
-                      )}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium">{shiftId}</p>
-                          <p className="text-[11px] text-muted-foreground">
-                            {items.length} archivo(s)
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            size="sm"
-                            variant={isSelected ? 'default' : 'outline'}
-                            className="h-7 text-xs"
-                            onClick={() => handleTurnoClick(selectedDate, shiftId)}
-                          >
-                            Seleccionar
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 text-xs"
-                            disabled={loadingTurno}
-                            onClick={() => {
-                              onSelectTurno(selectedDate, shiftId)
-                              setTimeout(onLoadTurno, 50)
-                            }}
-                          >
-                            {loadingTurno ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Cargar'}
-                          </Button>
-                        </div>
-                      </div>
-                      <div className="text-[11px] text-muted-foreground flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {minStart && maxEnd
-                          ? `${new Date(minStart).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })} - ${new Date(maxEnd).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}`
-                          : 'Horario no detectado'}
-                      </div>
-                      {/* Lista de archivos individuales */}
-                      <div className="space-y-1 mt-1">
-                        {items.map((u) => (
-                          <div
-                            key={u.id}
-                            className="flex items-center gap-2 text-[11px] bg-muted/40 rounded px-2 py-1"
-                          >
-                            <FileSpreadsheet className="h-3 w-3 shrink-0 text-muted-foreground" />
-                            <span className="truncate flex-1">{u.fileMeta.name}</span>
-                            <Badge className={cn('text-[9px] h-4 px-1 shrink-0', KIND_COLORS[u.fileMeta.kind])}>
-                              {KIND_LABELS[u.fileMeta.kind]}
-                            </Badge>
-                            <button
-                              type="button"
-                              className="text-muted-foreground hover:text-destructive transition-colors shrink-0 disabled:opacity-40"
-                              title="Eliminar archivo"
-                              disabled={deletingId === u.id}
-                              onClick={async (e) => {
-                                e.stopPropagation()
-                                setDeletingId(u.id)
-                                try {
-                                  await onDeleteUpload(u)
-                                } finally {
-                                  setDeletingId(null)
-                                }
-                              }}
-                            >
-                              {deletingId === u.id
-                                ? <Loader2 className="h-3 w-3 animate-spin" />
-                                : <Trash2 className="h-3 w-3" />}
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground">Selecciona un día en el calendario.</p>
-            )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
 
 export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChange }: Props) {
   const [files, setFiles] = useState<FileParsed[]>(initialFiles || [])
@@ -594,24 +298,9 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
     updateFiles((prev) => prev.filter((f) => f.fileMeta.id !== id))
   }, [uploads, updateFiles])
 
-  const handleDeleteUpload = useCallback(async (upload: GraderUpload) => {
-    try {
-      await deleteGraderUpload(upload)
-      setUploads((prev) => prev.filter((u) => u.id !== upload.id))
-      // Quitar de archivos locales si coincide
-      updateFiles((prev) => prev.filter((f) => f.fileMeta.id !== upload.id))
-      // Invalidar resumen diario
-      const dateKey = upload.sessionDate || toDateKey(upload.inferred?.startAt)
-      const shiftId = upload.shiftId || inferShiftIdFromSchedule(upload.inferred?.startAt, shiftSchedule)
-      try {
-        await deleteDailySummary(dateKey, shiftId)
-      } catch {
-        // No bloquear si falla la invalidación
-      }
-    } catch {
-      setUploadError('No se pudo eliminar el archivo.')
-    }
-  }, [shiftSchedule, updateFiles])
+  // handleDeleteUpload fue removido junto con el GraderInlineCalendar local.
+  // Si más adelante se necesita borrar un upload desde el Wizard, se puede
+  // pasar un `onDeleteUpload` opcional al GraderHistoricalCalendar.
 
   const handleLoadTurno = useCallback(async () => {
     if (!currentTurnoDate || !currentTurnoShift) return
@@ -789,20 +478,13 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
         </div>
       )}
 
-      {/* Calendario visual de uploads */}
-      <GraderInlineCalendar
-        uploads={uploads}
-        shiftSchedule={shiftSchedule}
-        currentTurnoDate={currentTurnoDate}
-        currentTurnoShift={currentTurnoShift}
-        onSelectTurno={(date, shift) => {
-          setCurrentTurnoDate(date)
-          setCurrentTurnoShift(shift)
-        }}
-        onLoadTurno={handleLoadTurno}
-        onDeleteUpload={handleDeleteUpload}
-        loadingTurno={loadingTurno}
-      />
+      {/* Calendario histórico unificado: mismo componente que la página
+          `/analisis-grader/calendario`. Muestra `graderDailySummaries` con
+          P0% por día, KPIs por turno y top causas. El botón "Cargar" navega
+          a la misma ruta con `?date=…&shift=…&autoload=1`; el efecto de
+          `searchParams` (arriba) detecta los params y dispara handleLoadTurno
+          vía autoLoadRef → reusa archivos ya guardados en Storage. */}
+      <GraderHistoricalCalendar />
     </div>
   )
 }

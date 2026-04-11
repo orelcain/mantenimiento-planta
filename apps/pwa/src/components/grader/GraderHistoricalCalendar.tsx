@@ -1,0 +1,728 @@
+/**
+ * Calendario histórico del Grader reusable.
+ *
+ * Muestra los `graderDailySummaries` guardados por día y turno con:
+ *  - Celdas de mes coloreadas por P0% promedio (verde/amber/rojo)
+ *  - Indicadores "Falta PP/P0" por día incompleto
+ *  - Panel lateral con KPIs del día seleccionado: piezas, P0%, peso, pz/h, top causas
+ *  - Botón "Cargar" que (por defecto) navega al Wizard con autoload del turno
+ *
+ * Uso:
+ *  - En `/analisis-grader/calendario` (página completa con header propio)
+ *  - Embebido dentro del Wizard para dar visibilidad del histórico en el home
+ *
+ * Props:
+ *  - `onLoadTurno`: override del comportamiento del botón "Cargar" (útil cuando
+ *    ya estamos en el Wizard y queremos actualizar el state en lugar de navegar).
+ */
+
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from '@/components/ui'
+import { ChevronLeft, ChevronRight, Loader2, Clock, Database } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { listGraderUploads } from '@/services/grader/graderUpload.service'
+import { getModuleRanges } from '@/services/grader/graderModuleConfig.service'
+import {
+  getDailySummary,
+  saveDailySummary,
+  listDailySummariesByRange,
+} from '@/services/grader/graderDailySummary.service'
+import { parseFile, mergeParsedData } from '@/services/grader/graderExcelParser'
+import {
+  DEFAULT_SHIFT_SCHEDULE,
+  inferShiftIdFromSchedule,
+  normalizeShiftSchedule,
+} from '@/services/grader/graderShiftSchedule'
+import type { GraderUpload, GraderDailySummary } from '@/services/grader/types'
+import { useAuthStore } from '@/store'
+
+interface TurnoSummary {
+  totalPieces: number
+  pointZeroPieces: number
+  pointZeroPct: number
+  startAt?: string
+  endAt?: string
+}
+
+interface SummaryState {
+  loading: boolean
+  error: string | null
+  data?: TurnoSummary
+  source?: 'cached' | 'computed'
+}
+
+interface GraderHistoricalCalendarProps {
+  /**
+   * Callback invocado cuando el usuario clickea "Cargar" sobre un turno.
+   * Si se omite, se navega a `/analisis-grader?date=…&shift=…&autoload=1`
+   * (comportamiento default cuando el componente se renderiza en la página
+   * dedicada `AnalisisGraderCalendarPage`).
+   */
+  onLoadTurno?: (dateKey: string, shiftId: string) => void
+  /** Clase extra para el contenedor raíz */
+  className?: string
+  /** Fecha inicial a seleccionar (opcional, ej. de ?goto=YYYY-MM-DD) */
+  initialDateKey?: string | null
+}
+
+const monthNames = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+]
+
+const dayNames = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab']
+
+function toDateKey(iso?: string): string {
+  if (!iso) return new Date().toISOString().slice(0, 10)
+  return iso.slice(0, 10)
+}
+
+function getUploadTimestamp(upload: GraderUpload): number {
+  const ts = upload.updatedAt || upload.createdAt || upload.fileMeta.parsedAt
+  return ts ? new Date(ts).getTime() : 0
+}
+
+function getUploadKey(
+  upload: GraderUpload,
+  schedule: Parameters<typeof inferShiftIdFromSchedule>[1],
+): string {
+  const dateKey = upload.sessionDate || toDateKey(upload.inferred?.startAt)
+  const shiftId = upload.shiftId || inferShiftIdFromSchedule(upload.inferred?.startAt, schedule)
+  const shiftKey = shiftId === 'Turno día' ? 'dia' : shiftId === 'Turno tarde' ? 'tarde' : 'noche'
+  return `${dateKey}__${shiftKey}__${upload.fileMeta.kind}`
+}
+
+function normalizeUploads(
+  list: GraderUpload[],
+  schedule: Parameters<typeof inferShiftIdFromSchedule>[1],
+): GraderUpload[] {
+  const map = new Map<string, GraderUpload>()
+  for (const u of list) {
+    const key = getUploadKey(u, schedule)
+    const existing = map.get(key)
+    if (!existing || getUploadTimestamp(u) >= getUploadTimestamp(existing)) {
+      map.set(key, u)
+    }
+  }
+  return Array.from(map.values())
+}
+
+function isToday(date: Date): boolean {
+  const today = new Date()
+  return (
+    date.getDate() === today.getDate() &&
+    date.getMonth() === today.getMonth() &&
+    date.getFullYear() === today.getFullYear()
+  )
+}
+
+function getDaysInMonth(date: Date): (Date | null)[] {
+  const year = date.getFullYear()
+  const month = date.getMonth()
+  const firstDay = new Date(year, month, 1)
+  const lastDay = new Date(year, month + 1, 0)
+  const daysInMonth = lastDay.getDate()
+  const startDayOfWeek = firstDay.getDay()
+
+  const days: (Date | null)[] = []
+  for (let i = 0; i < startDayOfWeek; i += 1) days.push(null)
+  for (let i = 1; i <= daysInMonth; i += 1) days.push(new Date(year, month, i))
+  return days
+}
+
+export function GraderHistoricalCalendar({
+  onLoadTurno,
+  className,
+  initialDateKey,
+}: GraderHistoricalCalendarProps) {
+  const navigate = useNavigate()
+  const user = useAuthStore((s) => s.user)
+
+  const [currentMonth, setCurrentMonth] = useState(() => {
+    if (initialDateKey) {
+      const d = new Date(`${initialDateKey}T00:00:00`)
+      if (!isNaN(d.getTime())) return new Date(d.getFullYear(), d.getMonth(), 1)
+    }
+    return new Date()
+  })
+  const [selectedDate, setSelectedDate] = useState<Date | null>(() => {
+    if (initialDateKey) {
+      const d = new Date(`${initialDateKey}T00:00:00`)
+      if (!isNaN(d.getTime())) return d
+    }
+    return new Date()
+  })
+  const [uploads, setUploads] = useState<GraderUpload[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [summaries, setSummaries] = useState<Record<string, SummaryState>>({})
+  const [shiftSchedule, setShiftSchedule] = useState(DEFAULT_SHIFT_SCHEDULE)
+  const [historicalByDate, setHistoricalByDate] = useState<Map<string, GraderDailySummary[]>>(new Map())
+  const autoSelectedRef = useRef(!!initialDateKey)
+
+  useEffect(() => {
+    setLoading(true)
+    setError(null)
+    listGraderUploads()
+      .then((list) => setUploads(normalizeUploads(list, DEFAULT_SHIFT_SCHEDULE)))
+      .catch((err) => setError(err instanceof Error ? err.message : 'Error al cargar uploads'))
+      .finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => {
+    getModuleRanges()
+      .then((cfg) => {
+        const schedule = normalizeShiftSchedule(cfg?.shiftSchedule)
+        setShiftSchedule(schedule)
+      })
+      .catch(() => {
+        setShiftSchedule(DEFAULT_SHIFT_SCHEDULE)
+      })
+  }, [])
+
+  useEffect(() => {
+    if (uploads.length === 0) return
+    setUploads((prev) => normalizeUploads(prev, shiftSchedule))
+  }, [shiftSchedule, uploads.length])
+
+  // Cargar summaries históricos para el mes visible
+  useEffect(() => {
+    const year = currentMonth.getFullYear()
+    const month = currentMonth.getMonth()
+    const startDate = `${year}-${String(month + 1).padStart(2, '0')}-01`
+    const lastDay = new Date(year, month + 1, 0).getDate()
+    const endDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+    listDailySummariesByRange(startDate, endDate)
+      .then((list) => {
+        const map = new Map<string, GraderDailySummary[]>()
+        for (const s of list) {
+          const existing = map.get(s.dateKey) ?? []
+          existing.push(s)
+          map.set(s.dateKey, existing)
+        }
+        setHistoricalByDate(map)
+
+        // Si el mes actual no tiene datos y no hay initialDateKey, buscar el último mes con datos
+        if (list.length === 0 && !initialDateKey && !autoSelectedRef.current) {
+          const today = new Date()
+          const lookback = `${today.getFullYear() - 1}-${String(today.getMonth() + 1).padStart(2, '0')}-01`
+          const lookbackEnd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()).padStart(2, '0')}`
+          listDailySummariesByRange(lookback, lookbackEnd)
+            .then((allList) => {
+              if (allList.length > 0) {
+                const latestKey = allList.map((s) => s.dateKey).sort().slice(-1)[0]
+                if (latestKey) {
+                  const d = new Date(`${latestKey}T00:00:00`)
+                  setSelectedDate(d)
+                  setCurrentMonth(new Date(d.getFullYear(), d.getMonth(), 1))
+                }
+              }
+            })
+            .catch(() => {
+              /* silent */
+            })
+        }
+      })
+      .catch(() => {
+        /* silent: historial no crítico */
+      })
+  }, [currentMonth, initialDateKey])
+
+  useEffect(() => {
+    if (autoSelectedRef.current) return
+    const histKeys = Array.from(historicalByDate.keys()).sort()
+    const latestHist = histKeys[histKeys.length - 1]
+    const latestUpload = uploads.length > 0
+      ? uploads.map((u) => u.sessionDate || toDateKey(u.inferred?.startAt)).filter(Boolean).sort().slice(-1)[0]
+      : undefined
+    const latest = latestHist ?? latestUpload
+    if (latest) {
+      const latestDate = new Date(`${latest}T00:00:00`)
+      setSelectedDate(latestDate)
+      setCurrentMonth(new Date(latestDate.getFullYear(), latestDate.getMonth(), 1))
+      autoSelectedRef.current = true
+    }
+  }, [historicalByDate, uploads])
+
+  const days = getDaysInMonth(currentMonth)
+
+  const uploadsByDate = useMemo(() => {
+    const map = new Map<string, GraderUpload[]>()
+    for (const u of uploads) {
+      const key = u.sessionDate || toDateKey(u.inferred?.startAt)
+      if (!map.has(key)) map.set(key, [])
+      map.get(key)!.push(u)
+    }
+    return map
+  }, [uploads])
+
+  const selectedKey = selectedDate ? selectedDate.toISOString().slice(0, 10) : null
+  const selectedUploads = useMemo(() => {
+    if (!selectedKey) return []
+    return uploadsByDate.get(selectedKey) || []
+  }, [selectedKey, uploadsByDate])
+
+  const turnos = useMemo(() => {
+    const map = new Map<string, GraderUpload[]>()
+    for (const u of selectedUploads) {
+      const shift = u.shiftId || inferShiftIdFromSchedule(u.inferred?.startAt, shiftSchedule)
+      if (!map.has(shift)) map.set(shift, [])
+      map.get(shift)!.push(u)
+    }
+    return map
+  }, [selectedUploads, shiftSchedule])
+
+  useEffect(() => {
+    if (!selectedKey) return
+    const shifts = Array.from(turnos.keys())
+    if (shifts.length === 0) return
+
+    Promise.all(
+      shifts.map(async (shiftId) => {
+        const key = `${selectedKey}::${shiftId}`
+        if (summaries[key]?.data) return
+        const cached = await getDailySummary(selectedKey, shiftId)
+        if (cached) {
+          setSummaries((prev) => ({
+            ...prev,
+            [key]: {
+              loading: false,
+              error: null,
+              source: 'cached',
+              data: {
+                totalPieces: cached.totalPieces,
+                pointZeroPieces: cached.pointZeroPieces,
+                pointZeroPct: cached.pointZeroPct,
+                startAt: cached.startAt,
+                endAt: cached.endAt,
+              },
+            },
+          }))
+        }
+      }),
+    ).catch(() => {})
+  }, [selectedKey, turnos, summaries])
+
+  const handlePrevMonth = () => {
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))
+  }
+
+  const handleNextMonth = () => {
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))
+  }
+
+  const handleLoadTurno = (dateKey: string, shiftId: string) => {
+    if (onLoadTurno) {
+      onLoadTurno(dateKey, shiftId)
+    } else {
+      navigate(`/analisis-grader?date=${dateKey}&shift=${encodeURIComponent(shiftId)}&autoload=1`)
+    }
+  }
+
+  const handleComputeSummary = async (dateKey: string, shiftId: string) => {
+    const key = `${dateKey}::${shiftId}`
+    if (summaries[key]?.loading) return
+
+    const cached = await getDailySummary(dateKey, shiftId)
+    if (cached) {
+      setSummaries((prev) => ({
+        ...prev,
+        [key]: {
+          loading: false,
+          error: null,
+          source: 'cached',
+          data: {
+            totalPieces: cached.totalPieces,
+            pointZeroPieces: cached.pointZeroPieces,
+            pointZeroPct: cached.pointZeroPct,
+            startAt: cached.startAt,
+            endAt: cached.endAt,
+          },
+        },
+      }))
+      return
+    }
+
+    setSummaries((prev) => ({
+      ...prev,
+      [key]: { loading: true, error: null },
+    }))
+
+    try {
+      const turnoUploads = (uploadsByDate.get(dateKey) || []).filter((u) => {
+        const shift = u.shiftId || inferShiftIdFromSchedule(u.inferred?.startAt, shiftSchedule)
+        return shift === shiftId
+      })
+
+      const parsed: Array<{ fileMeta: any; partialData: any }> = []
+      for (const u of turnoUploads) {
+        if (!u.fileMeta.downloadURL) continue
+        const res = await fetch(u.fileMeta.downloadURL)
+        const blob = await res.blob()
+        const file = new File([blob], u.fileMeta.name, {
+          type: blob.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        })
+        const result = await parseFile(file)
+        parsed.push(result)
+      }
+
+      if (parsed.length === 0) {
+        setSummaries((prev) => ({
+          ...prev,
+          [key]: { loading: false, error: 'No hay archivos con URL en Storage.' },
+        }))
+        return
+      }
+
+      const merged = mergeParsedData(parsed)
+      const totalPieces = merged.pieceRecords.reduce((sum, r) => sum + r.pieces, 0)
+      const pointZeroPieces = merged.gate0Records.reduce((sum, r) => sum + r.pieces, 0)
+      const pointZeroPct = totalPieces > 0 ? Math.round((pointZeroPieces / totalPieces) * 10000) / 100 : 0
+
+      if (user) {
+        await saveDailySummary({
+          dateKey,
+          shiftId,
+          totalPieces,
+          pointZeroPieces,
+          pointZeroPct,
+          startAt: merged.inferred.startAt,
+          endAt: merged.inferred.endAt,
+          updatedBy: user.id,
+        })
+      }
+
+      setSummaries((prev) => ({
+        ...prev,
+        [key]: {
+          loading: false,
+          error: null,
+          source: 'computed',
+          data: {
+            totalPieces,
+            pointZeroPieces,
+            pointZeroPct,
+            startAt: merged.inferred.startAt,
+            endAt: merged.inferred.endAt,
+          },
+        },
+      }))
+    } catch {
+      setSummaries((prev) => ({
+        ...prev,
+        [key]: { loading: false, error: 'Error al generar resumen.' },
+      }))
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className={cn('flex items-center justify-center py-12', className)}>
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <Card className={cn('border-red-300', className)}>
+        <CardContent className="pt-6 text-center">
+          <p className="text-sm text-destructive">{error}</p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <div className={cn('grid grid-cols-1 lg:grid-cols-3 gap-4', className)}>
+      <Card className="lg:col-span-2">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+          <div className="flex items-center gap-4">
+            <Button variant="outline" size="icon" onClick={handlePrevMonth}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <CardTitle className="text-lg">
+              {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+            </CardTitle>
+            <Button variant="outline" size="icon" onClick={handleNextMonth}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-7 gap-1 mb-2">
+            {dayNames.map((day) => (
+              <div key={day} className="text-center text-xs font-medium text-muted-foreground py-2">
+                {day}
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-1">
+            {days.map((day, index) => {
+              if (!day) return <div key={`empty-${index}`} className="h-20" />
+
+              const dayKey = day.toISOString().slice(0, 10)
+              const dayUploads = uploadsByDate.get(dayKey) || []
+              const dayHistorical = historicalByDate.get(dayKey) || []
+              const hasData = dayHistorical.length > 0
+
+              const avgHistP0 = hasData
+                ? dayHistorical.reduce((t, s) => t + s.pointZeroPct, 0) / dayHistorical.length
+                : null
+
+              const missingPiece = hasData && dayHistorical.some((s) => s.hasPieceData === false)
+              const missingGate0 = hasData && dayHistorical.some((s) => s.hasGate0Data === false)
+              const anyTracked = hasData && dayHistorical.some((s) => s.hasPieceData !== undefined)
+
+              return (
+                <button
+                  key={dayKey}
+                  className={cn(
+                    'h-20 p-1.5 border rounded-lg text-left transition-colors flex flex-col',
+                    isToday(day) && 'bg-primary/5 border-primary',
+                    selectedDate?.toDateString() === day.toDateString() && 'ring-2 ring-primary',
+                    !hasData && 'opacity-60',
+                    avgHistP0 !== null && avgHistP0 >= 3.5 && 'border-red-400/60',
+                    avgHistP0 !== null && avgHistP0 >= 2 && avgHistP0 < 3.5 && 'border-amber-400/60',
+                    avgHistP0 !== null && avgHistP0 < 2 && 'border-emerald-400/60',
+                  )}
+                  onClick={() => setSelectedDate(day)}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className={cn('text-sm font-medium', isToday(day) && 'text-primary')}>
+                      {day.getDate()}
+                    </span>
+                    {hasData && (
+                      <span className="text-[9px] text-muted-foreground leading-none">
+                        {dayHistorical.length}T
+                      </span>
+                    )}
+                    {!hasData && dayUploads.length > 0 && (
+                      <Badge variant="outline" className="text-[9px] h-3.5 px-1">
+                        {dayUploads.length}
+                      </Badge>
+                    )}
+                  </div>
+
+                  {avgHistP0 !== null && (
+                    <div className={cn(
+                      'text-[9px] font-bold text-center rounded-sm px-0.5 leading-4',
+                      avgHistP0 >= 3.5 ? 'bg-red-500/20 text-red-600' :
+                      avgHistP0 >= 2   ? 'bg-amber-500/20 text-amber-600' :
+                                         'bg-emerald-500/20 text-emerald-600',
+                    )}>
+                      P0 {avgHistP0.toFixed(1)}%
+                    </div>
+                  )}
+
+                  {anyTracked && (missingPiece || missingGate0) && (
+                    <div className="mt-auto flex gap-0.5 flex-wrap">
+                      {missingPiece && (
+                        <span className="text-[8px] leading-3 px-1 rounded bg-red-500/20 text-red-600 font-medium">
+                          Falta PP
+                        </span>
+                      )}
+                      {missingGate0 && (
+                        <span className="text-[8px] leading-3 px-1 rounded bg-red-500/20 text-red-600 font-medium">
+                          Falta P0
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">
+            {selectedKey ? `Resumen ${selectedKey}` : 'Resumen diario'}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {selectedUploads.length === 0 && (historicalByDate.get(selectedKey ?? '') ?? []).length === 0 && (
+            <div className="text-sm text-muted-foreground">No hay datos para este día.</div>
+          )}
+          {/* ── Datos históricos (carga masiva) ── */}
+          {selectedKey && (historicalByDate.get(selectedKey) ?? []).length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 uppercase tracking-wide">
+                <Database className="h-3.5 w-3.5" />
+                Historial guardado
+              </p>
+              {(historicalByDate.get(selectedKey) ?? [])
+                .sort((a, b) => {
+                  const order: Record<string, number> = { 'Turno día': 0, 'Turno tarde': 1, 'Turno noche': 2 }
+                  return (order[a.shiftId] ?? 9) - (order[b.shiftId] ?? 9)
+                })
+                .map((hist) => (
+                  <div
+                    key={hist.id}
+                    className={cn(
+                      'rounded-lg border px-3 py-2.5 space-y-2',
+                      hist.pointZeroPct >= 3.5 ? 'border-red-500/30 bg-red-500/5' :
+                      hist.pointZeroPct >= 2   ? 'border-amber-500/30 bg-amber-500/5' :
+                                                 'border-emerald-500/20 bg-emerald-500/5',
+                    )}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium">{hist.shiftId}</p>
+                        {hist.hasPieceData !== undefined && (!hist.hasPieceData || !hist.hasGate0Data) && (
+                          <div className="flex flex-wrap gap-1 mt-0.5">
+                            {!hist.hasPieceData && (
+                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/15 text-red-600 font-medium">
+                                Falta PIEZA_PIEZA
+                              </span>
+                            )}
+                            {!hist.hasGate0Data && (
+                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/15 text-red-600 font-medium">
+                                Falta PUERTA_0
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <span className={cn(
+                        'text-lg font-bold tabular-nums',
+                        hist.pointZeroPct >= 3.5 ? 'text-red-500' :
+                        hist.pointZeroPct >= 2   ? 'text-amber-500' :
+                                                   'text-emerald-600',
+                      )}>
+                        {hist.pointZeroPct}%
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5 text-xs">
+                      <div className="rounded bg-background/60 px-2 py-1">
+                        <p className="text-muted-foreground">Piezas</p>
+                        <p className="font-semibold">{hist.totalPieces.toLocaleString('es-CL')}</p>
+                      </div>
+                      <div className="rounded bg-background/60 px-2 py-1">
+                        <p className="text-muted-foreground">P0 piezas</p>
+                        <p className="font-semibold">{hist.pointZeroPieces.toLocaleString('es-CL')}</p>
+                      </div>
+                      {hist.totalWeightKg != null && (
+                        <div className="rounded bg-background/60 px-2 py-1">
+                          <p className="text-muted-foreground">Peso</p>
+                          <p className="font-semibold">
+                            {hist.totalWeightKg >= 1000
+                              ? `${(hist.totalWeightKg / 1000).toFixed(1)} t`
+                              : `${hist.totalWeightKg.toFixed(0)} kg`}
+                          </p>
+                        </div>
+                      )}
+                      {hist.productionRatePerHour != null && (
+                        <div className="rounded bg-background/60 px-2 py-1">
+                          <p className="text-muted-foreground">pz/hora</p>
+                          <p className="font-semibold">{Math.round(hist.productionRatePerHour).toLocaleString('es-CL')}</p>
+                        </div>
+                      )}
+                    </div>
+                    {hist.topP0Causes && hist.topP0Causes.length > 0 && (
+                      <div className="text-xs space-y-0.5">
+                        <p className="text-muted-foreground font-medium">Top causas P0:</p>
+                        {hist.topP0Causes.slice(0, 3).map((c, i) => (
+                          <div key={i} className="flex justify-between">
+                            <span className="text-muted-foreground truncate max-w-[70%]">{c.error}</span>
+                            <span className="font-semibold tabular-nums">{c.pct}%</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {hist.durationMinutes != null && hist.durationMinutes > 0 && (
+                      <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {Math.floor(hist.durationMinutes / 60)}h {hist.durationMinutes % 60}m
+                        {hist.startAt && ` · ${new Date(hist.startAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}–${hist.endAt ? new Date(hist.endAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) : '?'}`}
+                      </p>
+                    )}
+                  </div>
+                ))}
+            </div>
+          )}
+
+          {selectedUploads.length > 0 && (
+            <div className="space-y-3">
+              {Array.from(turnos.entries()).map(([shiftId, items]) => {
+                const key = `${selectedKey}::${shiftId}`
+                const summary = summaries[key]
+                const minStart = items
+                  .map((i) => i.inferred?.startAt)
+                  .filter(Boolean)
+                  .sort()[0]
+                const maxEnd = items
+                  .map((i) => i.inferred?.endAt)
+                  .filter(Boolean)
+                  .sort()
+                  .slice(-1)[0]
+
+                return (
+                  <div key={shiftId} className="border border-muted/60 rounded-lg p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium">{shiftId}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {items.length} archivo(s)
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {summary?.source && (
+                          <Badge variant="secondary" className="text-[10px]">
+                            {summary.source === 'cached' ? 'Guardado' : 'Calculado'}
+                          </Badge>
+                        )}
+                        <Button size="sm" variant="outline" onClick={() => handleLoadTurno(selectedKey!, shiftId)}>
+                          Cargar
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => handleComputeSummary(selectedKey!, shiftId)}>
+                          Resumen
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="text-xs text-muted-foreground flex items-center gap-2">
+                      <Clock className="h-3 w-3" />
+                      {minStart && maxEnd
+                        ? `${new Date(minStart).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })} - ${new Date(maxEnd).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}`
+                        : 'Horario no detectado'}
+                    </div>
+
+                    {summary?.loading && (
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Calculando resumen...
+                      </div>
+                    )}
+                    {summary?.error && (
+                      <div className="text-xs text-destructive">{summary.error}</div>
+                    )}
+                    {summary?.data && (
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="p-2 rounded bg-muted/40">
+                          <div className="text-muted-foreground">Piezas</div>
+                          <div className="font-semibold">{summary.data.totalPieces.toLocaleString()}</div>
+                        </div>
+                        <div className="p-2 rounded bg-muted/40">
+                          <div className="text-muted-foreground">P0 %</div>
+                          <div className="font-semibold">{summary.data.pointZeroPct}%</div>
+                        </div>
+                        <div className="p-2 rounded bg-muted/40 col-span-2">
+                          <div className="text-muted-foreground">P0 piezas</div>
+                          <div className="font-semibold">{summary.data.pointZeroPieces.toLocaleString()}</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
