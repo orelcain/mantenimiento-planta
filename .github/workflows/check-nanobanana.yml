@@ -1,0 +1,33 @@
+name: Weekly NanoBanana Check
+
+on:
+  schedule:
+    # Domingo 15:00 UTC = 12:00 mediodía Argentina (UTC-3)
+    - cron: '0 15 * * 0'
+  workflow_dispatch: # Permite dispararlo manualmente para probar
+
+jobs:
+  check-image-generation:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Check Gemini image generation
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: python .github/scripts/check_nanobanana.py
