@@ -420,14 +420,24 @@ sidebarConfig  ← nuevo: orden personalizado del sidebar admin
 
 ## Pendientes priorizados
 
-### P0 — Grader: mejoras para uso diario en producción (próxima sesión)
-- [ ] **Panel proyección turno** (tab Tendencia): tarjeta prominente al top con tiempo restante, P0 proyectado al cierre (color-coded), piezas proyectadas, tendencia ↑↓→ del peso
-- [ ] **Chart de peso simplificado**: toggle "Modo simple" (observed+projected) / "Modo detallado" (+MA5+σ) — por defecto simple
-- [ ] **Badge P0 cierre prominente**: mover "Proyección Punto Cero cierre: X piezas (Y%)" de texto pequeño bajo chart → badge/KPI destacado en el header de la card
-- [ ] **Umbrales colapsables**: wrappear inputs de P0 warn/crítico en sección "Ajustar umbrales" colapsable por defecto
-- [ ] **IA Tendencia**: mejorar visualización de sugerencias automáticas, integrar análisis de patrones multisesión
-- [ ] **Comparativa turno día/noche**: detectar si hay datos de ambos turnos y mostrar diferencias de P0, calibre, peso
-- [ ] **Degradación de sensores**: detectar si un mismo error (fotocélula, fuera de límites) se repite creciendo en el tiempo
+### P0 — Grader: refactor iter 4 (próxima sesión)
+- [ ] **Extraer `GraderPuntoCeroTab`**: último tab inline en dashboard (~900 líneas). Requiere mapeo previo de >15 dependencias: `patternByCalibre/Quality/Hour`, `patternCalibreChartData`, `classificationChartData`, helpers `getCauseColor`/`resolveCalibreLabel`/`handlePinPatternPoint`, refs de Chart, etc. Ver `.claude/skills/evaluar-modulo/reportes/grader-2026-04-10-iter3.md` sección "Meta iteración 4".
+- **Target iter 4**: dashboard ≤1900 líneas (hoy 2836), hooks ≤30 (hoy ~50).
+
+### ✅ Completados en sesión 2026-04-10 (no volver acá)
+<!-- completados
+- ✅ Grader P0 #1: Panel proyección turno (tab Tendencia) — commit 15661e59
+- ✅ Grader P0 #2: Chart peso toggle Simple/Detallado — commit 50831677
+- ✅ Grader P0 #3: Badge P0 cierre prominente en header — commit 50831677
+- ✅ Grader P0 #4: Umbrales P0 warn/crítico colapsables — commit 50831677
+- ✅ Grader P0 #5: IA Tendencia mejorada con patrones multisesión — commit 72f6cd0d
+- ✅ Grader P0 #6: Comparativa turno día/noche — commit 72f6cd0d
+- ✅ Grader P0 #7: Detección degradación de sensores — commit 72f6cd0d
+- ✅ Refactor iter 2: extraer useGraderDashboardAnalytics + helpers + inline panels — commit 161d7945
+- ✅ Refactor iter 3: extraer 5/6 sub-tabs (Matriz, Compuertas, Sugerencias, Lotes, Tendencia) — commit ee7d7f8d
+- ✅ Skill evaluar-modulo (auditoría integral 360° con scorecard + meta iterativa) — commit e9c17806
+- ✅ Rutina de sesión 2 pasos (proyecto/conversación + sync/deploys/pendientes) — commit c2834d96
+-->
 
 ### P1 — Requiere acceso a Firebase Console / IAM
 - [ ] **App Check**: ReCaptchaV3 + enforceAppCheck en Cloud Functions
