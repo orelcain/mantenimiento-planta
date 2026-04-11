@@ -1434,9 +1434,31 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
 
                   return (
                     <div key={belt.beltId} className={cn('rounded-lg border p-3 text-xs', hasDiscrepancy && 'border-amber-400 bg-amber-50 dark:bg-amber-950/20')}>
-                      <div className="flex items-center gap-2 mb-2">
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
                         <span className="font-medium text-sm">{belt.label}</span>
-                        {belt.vfd?.label && <Badge variant="outline" className="text-[10px]">VFD: {belt.vfd.label}</Badge>}
+                        {belt.vfd?.label && (
+                          <div className="flex items-center gap-1">
+                            <Badge variant="outline" className="text-[10px]">VFD: {belt.vfd.label}</Badge>
+                            <Select
+                              value={belt.vfd.assignedBeltId ?? belt.beltId}
+                              onValueChange={(v) => setPhysicalConfig((p) => ({
+                                ...p,
+                                belts: p.belts.map((b) => b.beltId === belt.beltId
+                                  ? { ...b, vfd: b.vfd ? { ...b.vfd, assignedBeltId: v as 'zeta' | 'accel1' | 'accel2' | 'main' } : b.vfd }
+                                  : b),
+                              }))}>
+                              <SelectTrigger className="h-5 text-[10px] w-36 px-1">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="zeta">Z-Belt (elevadora)</SelectItem>
+                                <SelectItem value="accel1">Accel Belt 1</SelectItem>
+                                <SelectItem value="accel2">Accel Belt 2</SelectItem>
+                                <SelectItem value="main">Grading Belt</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
                         {hasDiscrepancy && <Badge className="text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">⚠ Discrepancia {discrepancyPct.toFixed(0)}%</Badge>}
                         <span className="ml-auto font-mono font-semibold">{belt.speedMps.toFixed(3)} m/s actual</span>
                       </div>

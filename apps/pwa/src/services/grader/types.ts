@@ -170,8 +170,14 @@ export interface GraderBeltConfig {
  * Una vez calibrado: belt_speed = vfdCurrentRpm × effectiveMpsPerRpm
  */
 export interface BeltVfdData {
-  /** Texto o etiqueta visible en el frente del variador */
+  /** Texto o etiqueta visible en el frente del variador (ej: "Grader", "CintaZ", "IF 2.") */
   label?: string
+  /**
+   * Cinta a la que está asignado este variador.
+   * Se puede corregir desde la app si la asignación visual de la foto era incorrecta.
+   * La asignación en DEFAULT_PHYSICAL_CONFIG es ESTIMADA — confirmar en planta.
+   */
+  assignedBeltId?: 'zeta' | 'accel1' | 'accel2' | 'main'
   /** RPM actual mostrado en el display del variador */
   vfdCurrentRpm?: number
   /** Frecuencia actual mostrada en el display del variador (Hz) */
