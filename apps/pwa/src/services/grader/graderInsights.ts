@@ -454,6 +454,7 @@ export function computeDeterministicInsights(
         // Gates con utilización < 40% del promedio → candidatas para absorber carga
         const underloaded = activeStats
           .filter((u) => u.gateNumber !== g.gateNumber && u.utilizationPct < avgUtilization * 0.45)
+        const topCandidate = underloaded[0]
 
         insights.push({
           id: nextId(),
@@ -463,14 +464,14 @@ export function computeDeterministicInsights(
             `Gate ${g.gateNumber}: ${g.pieces.toLocaleString()} pz = ${g.utilizationPct.toFixed(1)}% del total clasificado`,
             `Promedio esperado por gate activa: ${avgUtilization.toFixed(1)}%`,
             `Calibre: ${g.assignedCalibre} / ${g.assignedQuality}`,
-            underloaded.length > 0
+            topCandidate !== undefined
               ? `Gates con baja carga: ${underloaded.map((u) => `Gate ${u.gateNumber} (${u.utilizationPct.toFixed(1)}%)`).join(', ')}`
               : 'Todas las gates activas trabajan a nivel elevado.',
           ],
           recommendations: [
             `Asignar ${g.assignedCalibre} / ${g.assignedQuality} a una gate adicional para distribuir la carga.`,
-            ...(underloaded.length > 0
-              ? [`Gate ${underloaded[0].gateNumber} tiene capacidad disponible (${underloaded[0].utilizationPct.toFixed(1)}% de utilización actual).`]
+            ...(topCandidate !== undefined
+              ? [`Gate ${topCandidate.gateNumber} tiene capacidad disponible (${topCandidate.utilizationPct.toFixed(1)}% de utilización actual).`]
               : []),
             'Ir a "Configurar compuertas" → duplicar el calibre en otra gate cercana.',
             'Esto reduce el riesgo de "puerta no preparada" y mejora el throughput.',
@@ -499,8 +500,8 @@ export function computeDeterministicInsights(
       .sort((a, b) => a - b)
 
     for (let i = 0; i < activeGateNums.length - 1; i++) {
-      const g1 = activeGateNums[i]
-      const g2 = activeGateNums[i + 1]
+      const g1 = activeGateNums[i]!
+      const g2 = activeGateNums[i + 1]!
       if (g2 !== g1 + 1) continue   // solo gates ADYACENTES (consecutivas en número)
 
       const dis1 = physicalConfig.z2ProgrammedDistancesMm[g1 - 1]
