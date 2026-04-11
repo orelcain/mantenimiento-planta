@@ -8,17 +8,33 @@
  * También incluye el widget de velocidad de cinta para ajuste rápido.
  */
 
-import { AlertTriangle, CheckCircle, ChevronDown, Gauge } from 'lucide-react'
+import { useState } from 'react'
+import { AlertTriangle, CheckCircle, ChevronDown, ChevronUp, Gauge } from 'lucide-react'
 import { Badge, Input } from '@/components/ui'
 import { cn } from '@/lib/utils'
+import { DEFAULT_PHYSICAL_CONFIG } from '@/services/grader/graderAnalytics'
 import type { GraderAnalyticsResult, DeterministicInsight } from '@/services/grader/types'
+
+const BELT_SHORT_NAMES: Record<string, string> = {
+  zeta: 'Z-Belt',
+  accel1: 'Accel 1',
+  accel2: 'Accel 2',
+  main: 'Sorting',
+}
+
+const BELT_SPEED_RANGES: Record<string, { min: number; max: number }> = {
+  zeta:   { min: 0.1, max: 0.8 },
+  accel1: { min: 0.5, max: 1.5 },
+  accel2: { min: 0.5, max: 1.5 },
+  main:   { min: 0.5, max: 1.4 },
+}
 
 interface Props {
   analytics: GraderAnalyticsResult
   insights: DeterministicInsight[]
-  /** Velocidad actual de la Sorting Belt en m/s (editable inline) */
-  sortingBeltMps: number
-  onChangeSortingBeltMps: (v: number) => void
+  /** Velocidades actuales de las 4 cintas en m/s (editables inline) */
+  effectiveSpeeds: Record<string, number>
+  onChangeEffectiveSpeeds: (beltId: string, mps: number) => void
   /** Callback para hacer scroll al dashboard completo */
   onScrollToDashboard: () => void
 }
@@ -26,11 +42,13 @@ interface Props {
 export function GraderResumenRapido({
   analytics,
   insights,
-  sortingBeltMps,
-  onChangeSortingBeltMps,
+  effectiveSpeeds,
+  onChangeEffectiveSpeeds,
   onScrollToDashboard,
 }: Props) {
+  const [beltSpeedsOpen, setBeltSpeedsOpen] = useState(true)
   const { kpis, config } = analytics
+  const belts = analytics.config.physicalConfig?.belts ?? DEFAULT_PHYSICAL_CONFIG.belts
   const p0Pct = kpis.pointZeroPct
   const warnTh = config.errorThresholds?.pointZeroPctWarn ?? 2
   const critTh = config.errorThresholds?.pointZeroPctCritical ?? 3.5
@@ -175,28 +193,60 @@ export function GraderResumenRapido({
         </div>
       )}
 
-      {/* ─── Widget velocidad cinta ─── */}
-      <div className="flex items-center gap-3 bg-background/40 border border-border/50 rounded-md px-3 py-2">
-        <Gauge className="h-4 w-4 text-muted-foreground shrink-0" />
-        <span className="text-xs text-muted-foreground">Sorting Belt actual:</span>
-        <div className="flex items-center gap-1.5">
-          <Input
-            type="number"
-            step="0.01"
-            min="0.5"
-            max="1.4"
-            value={sortingBeltMps}
-            onChange={(e) => {
-              const v = parseFloat(e.target.value)
-              if (!isNaN(v) && v >= 0.5 && v <= 1.4) onChangeSortingBeltMps(v)
-            }}
-            className="h-7 w-20 text-xs font-mono text-center"
-          />
-          <span className="text-xs text-muted-foreground">m/s</span>
-        </div>
-        <span className="text-xs text-muted-foreground/60 hidden sm:inline">
-          (leer de pantalla Z2 "Velocidad cintas" → Sorting Belt)
-        </span>
+      {/* ─── Velocidades de cintas ─── */}
+      <div className="bg-background/40 border border-border/50 rounded-md overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setBeltSpeedsOpen((o) => !o)}
+          className="w-full flex items-center justify-between px-3 py-2 hover:bg-muted/30 transition-colors"
+        >
+          <span className="flex items-center gap-2">
+            <Gauge className="h-4 w-4 text-muted-foreground shrink-0" />
+            <span className="text-xs font-medium">Velocidades cintas (m/s)</span>
+            <span className="text-xs text-muted-foreground/60 hidden sm:inline">
+              — leer pantalla Z2 "Velocidad cintas" al inicio del turno
+            </span>
+          </span>
+          {beltSpeedsOpen
+            ? <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
+            : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+          }
+        </button>
+        {beltSpeedsOpen && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-px border-t border-border/40 bg-border/20">
+            {belts.map((belt) => {
+              const range = BELT_SPEED_RANGES[belt.beltId] ?? { min: 0.1, max: 2.0 }
+              const currentMps = effectiveSpeeds[belt.beltId] ?? belt.speedMps
+              return (
+                <div key={belt.beltId} className="bg-background/80 px-3 py-2 space-y-1">
+                  <p className="text-xs font-medium text-foreground truncate">
+                    {BELT_SHORT_NAMES[belt.beltId] ?? belt.beltId}
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min={range.min}
+                      max={range.max}
+                      value={currentMps}
+                      onChange={(e) => {
+                        const v = parseFloat(e.target.value)
+                        if (!isNaN(v) && v >= range.min && v <= range.max) {
+                          onChangeEffectiveSpeeds(belt.beltId, v)
+                        }
+                      }}
+                      className="h-7 w-16 text-xs font-mono text-center"
+                    />
+                    <span className="text-xs text-muted-foreground">m/s</span>
+                  </div>
+                  {belt.z2Units != null && (
+                    <p className="text-xs text-muted-foreground/60">Z2: {belt.z2Units}u</p>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {/* ─── Top problemas + acciones ─── */}

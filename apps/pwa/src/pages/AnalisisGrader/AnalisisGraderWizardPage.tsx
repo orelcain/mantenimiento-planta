@@ -52,10 +52,10 @@ export function AnalisisGraderWizardPage() {
   const [gatesOpen, setGatesOpen] = useState(false)
   const [autosaveState, setAutosaveState] = useState<'idle' | 'queued' | 'saving' | 'saved' | 'error'>('idle')
   const [autosaveUpdatedAt, setAutosaveUpdatedAt] = useState<string | null>(null)
-  // Velocidad de la Sorting Belt — editable inline desde el resumen rápido
-  // Se inicializa con el default y se sincroniza si el usuario edita la config física completa
-  const [sortingBeltMps, setSortingBeltMps] = useState<number>(
-    DEFAULT_PHYSICAL_CONFIG.belts.find((b) => b.beltId === 'main')!.speedMps,
+  // Velocidades de las 4 cintas — editables inline desde el resumen rápido
+  // Se inicializan con los defaults y se sincronizan cuando se guarda la config física
+  const [effectiveSpeeds, setEffectiveSpeeds] = useState<Record<string, number>>(() =>
+    Object.fromEntries(DEFAULT_PHYSICAL_CONFIG.belts.map((b) => [b.beltId, b.speedMps])),
   )
 
   const dashboardRef = useRef<HTMLDivElement>(null)
@@ -74,16 +74,17 @@ export function AnalisisGraderWizardPage() {
         ...config,
         physicalConfig: {
           ...basePhysical,
-          belts: basePhysical.belts.map((b) =>
-            b.beltId === 'main' ? { ...b, speedMps: sortingBeltMps } : b,
-          ),
+          belts: basePhysical.belts.map((b) => ({
+            ...b,
+            speedMps: effectiveSpeeds[b.beltId] ?? b.speedMps,
+          })),
         },
       }
       return computeAnalytics(parsedData, effectiveConfig, gates)
     } catch {
       return null
     }
-  }, [parsedData, config, gates, sortingBeltMps])
+  }, [parsedData, config, gates, effectiveSpeeds])
 
   // Insights derivados del analytics (usados tanto por ResumenRapido como para el badge del header)
   const alertInsights = useMemo(() => {
@@ -103,11 +104,14 @@ export function AnalisisGraderWizardPage() {
       try {
         const cfg = await getModuleRanges()
         if (cancelled || !cfg?.physicalConfig) return
-        // Sincronizar velocidad de Sorting Belt desde el config guardado
-        const mainBelt = cfg.physicalConfig.belts.find((b) => b.beltId === 'main')
-        if (mainBelt && mainBelt.speedMps > 0) {
-          setSortingBeltMps(mainBelt.speedMps)
-        }
+        // Sincronizar velocidades de todas las cintas desde el config guardado
+        setEffectiveSpeeds((prev) => {
+          const updated = { ...prev }
+          for (const b of cfg.physicalConfig!.belts) {
+            if (b.speedMps > 0) updated[b.beltId] = b.speedMps
+          }
+          return updated
+        })
         // Incorporar el physicalConfig completo al state de config (para insights físicos)
         setConfig((prev) => ({ ...prev, physicalConfig: cfg.physicalConfig }))
       } catch { /* fallback silencioso: usa DEFAULT_PHYSICAL_CONFIG */ }
@@ -255,9 +259,16 @@ export function AnalisisGraderWizardPage() {
     setGates(updatedGates)
     setConfig(updatedConfig)
     setGatesOpen(false)
-    // Sincronizar velocidad de Sorting Belt si el usuario la cambió en la config física
-    const mainBelt = updatedConfig.physicalConfig?.belts.find((b) => b.beltId === 'main')
-    if (mainBelt && mainBelt.speedMps > 0) setSortingBeltMps(mainBelt.speedMps)
+    // Sincronizar velocidades de todas las cintas si el usuario cambió la config física
+    if (updatedConfig.physicalConfig) {
+      setEffectiveSpeeds((prev) => {
+        const updated = { ...prev }
+        for (const b of updatedConfig.physicalConfig!.belts) {
+          if (b.speedMps > 0) updated[b.beltId] = b.speedMps
+        }
+        return updated
+      })
+    }
   }, [])
 
   const handleApplyGateSuggestion = useCallback((payload: { gateNumber: number; calibre: string; quality: string }) => {
@@ -381,8 +392,10 @@ export function AnalisisGraderWizardPage() {
         <GraderResumenRapido
           analytics={analyticsResult}
           insights={alertInsights}
-          sortingBeltMps={sortingBeltMps}
-          onChangeSortingBeltMps={setSortingBeltMps}
+          effectiveSpeeds={effectiveSpeeds}
+          onChangeEffectiveSpeeds={(beltId, mps) =>
+            setEffectiveSpeeds((prev) => ({ ...prev, [beltId]: mps }))
+          }
           onScrollToDashboard={() =>
             dashboardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
           }
