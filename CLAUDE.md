@@ -48,6 +48,7 @@ Cuando el usuario diga `cerrar`, `terminar`, `ya está`, `gracias`, `hasta luego
 
 ## Reglas de desarrollo
 
+- **Debugging proactivo**: Al encontrar cualquier bug o error, aplicar automáticamente el framework `systematic-debugging` SIN esperar que el usuario lo invoque. Nunca parchear síntomas sin investigar causa raíz primero. Si 3 fixes consecutivos fallan → STOP y consultar.
 - **Idioma**: Siempre responder en **ESPAÑOL**. Ahorrar tokens.
 - **Ruta única**: `D:\a\APP leventamiento de insidencias en planta\` — único clon git local. NO existe clon en OneDrive (eliminado 2026-04-09, era legacy con drift de 240 commits).
 - **Sync**: solo `git push origin main` — el otro PC del trabajo accede via claude.ai conectado a GitHub directamente, no necesita carpeta sincronizada.
