@@ -503,25 +503,19 @@ export function AnalisisGraderCalendarPage() {
                         </div>
                       )}
 
-                      {/* Indicadores de completitud PP / P0 */}
-                      {anyTracked && (
-                        <div className="mt-auto flex gap-0.5">
-                          <span className={cn(
-                            'text-[8px] leading-3 px-0.5 rounded',
-                            missingPiece
-                              ? 'bg-orange-500/15 text-orange-600'
-                              : 'bg-emerald-500/15 text-emerald-700',
-                          )}>
-                            PP{missingPiece ? '?' : '✓'}
-                          </span>
-                          <span className={cn(
-                            'text-[8px] leading-3 px-0.5 rounded',
-                            missingGate0
-                              ? 'bg-orange-500/15 text-orange-600'
-                              : 'bg-emerald-500/15 text-emerald-700',
-                          )}>
-                            P0{missingGate0 ? '?' : '✓'}
-                          </span>
+                      {/* Indicadores de completitud — solo si falta algo */}
+                      {anyTracked && (missingPiece || missingGate0) && (
+                        <div className="mt-auto flex gap-0.5 flex-wrap">
+                          {missingPiece && (
+                            <span className="text-[8px] leading-3 px-1 rounded bg-red-500/20 text-red-600 font-medium">
+                              Falta PP
+                            </span>
+                          )}
+                          {missingGate0 && (
+                            <span className="text-[8px] leading-3 px-1 rounded bg-red-500/20 text-red-600 font-medium">
+                              Falta P0
+                            </span>
+                          )}
                         </div>
                       )}
                     </button>
@@ -566,25 +560,19 @@ export function AnalisisGraderCalendarPage() {
                         <div className="flex items-center justify-between">
                           <div>
                             <p className="text-sm font-medium">{hist.shiftId}</p>
-                            {/* Indicadores de completitud */}
-                            {hist.hasPieceData !== undefined && (
-                              <div className="flex gap-1 mt-0.5">
-                                <span className={cn(
-                                  'text-[9px] px-1 py-0.5 rounded',
-                                  hist.hasPieceData
-                                    ? 'bg-emerald-500/15 text-emerald-700'
-                                    : 'bg-orange-500/15 text-orange-600',
-                                )}>
-                                  PP {hist.hasPieceData ? '✓' : '✗ sin datos'}
-                                </span>
-                                <span className={cn(
-                                  'text-[9px] px-1 py-0.5 rounded',
-                                  hist.hasGate0Data
-                                    ? 'bg-emerald-500/15 text-emerald-700'
-                                    : 'bg-orange-500/15 text-orange-600',
-                                )}>
-                                  P0 {hist.hasGate0Data ? '✓' : '✗ sin datos'}
-                                </span>
+                            {/* Indicadores de completitud — solo si falta algún archivo */}
+                            {hist.hasPieceData !== undefined && (!hist.hasPieceData || !hist.hasGate0Data) && (
+                              <div className="flex flex-wrap gap-1 mt-0.5">
+                                {!hist.hasPieceData && (
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/15 text-red-600 font-medium">
+                                    Falta PIEZA_PIEZA
+                                  </span>
+                                )}
+                                {!hist.hasGate0Data && (
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/15 text-red-600 font-medium">
+                                    Falta PUERTA_0
+                                  </span>
+                                )}
                               </div>
                             )}
                           </div>
