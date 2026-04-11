@@ -147,9 +147,20 @@ export const DEFAULT_PHYSICAL_CONFIG = {
       label:              'Z-Conveyor ❷ (cinta elevadora)',
       lengthMeters:       3.0,
       widthMeters:        1.20,    // 1200mm — especificación del fabricante
-      speedMps:           0.39,    // Z2: 494u × 0.000786 — VER TAMBIÉN zetaDrive para cálculo por RPM
+      speedMps:           0.39,    // Z2: 494u × 0.000786
       z2Units:            494,
       calibrationStatus:  'estimated' as const,
+      // VFD: VLT AutomationDrive, label "CintaZ" (foto 2026-04-11)
+      // Motor: 1.5 kW, 1488 RPM nom., motoreductor i=24 → ver zetaDrive para cálculo preciso
+      vfd: {
+        label:             'CintaZ',
+        vfdMinRpm:         1400,
+        vfdMaxRpm:         1600,
+        // vfdCurrentRpm: leer del display Danfoss al inicio turno
+        // effectiveMpsPerRpm: 0.39 / 1470 ≈ 0.000265 (ESTIMADO — mucho menor por reductor i=24)
+        effectiveMpsPerRpm: 0.000265,
+        effectiveStatus:   'estimated' as const,
+      },
     },
     {
       beltId:             'accel1' as const,
@@ -159,6 +170,15 @@ export const DEFAULT_PHYSICAL_CONFIG = {
       speedMps:           1.03,    // Z2: 1313u × 0.000786
       z2Units:            1313,
       calibrationStatus:  'estimated' as const,
+      // VFD: VLT Midi Drive (foto 2026-04-11), mostrando 43.5 Hz ≈ 1305 RPM
+      vfd: {
+        label:             'Midi Drive',
+        vfdCurrentHz:      43.5,
+        vfdCurrentRpm:     1305,   // 43.5 Hz × 30 (4-pole motor: 1500rpm/50Hz × 43.5Hz)
+        // effectiveMpsPerRpm: 1.03 / 1305 ≈ 0.000789 (ESTIMADO — verificar con tachómetro)
+        effectiveMpsPerRpm: 0.000789,
+        effectiveStatus:   'estimated' as const,
+      },
     },
     {
       beltId:             'accel2' as const,
@@ -168,6 +188,18 @@ export const DEFAULT_PHYSICAL_CONFIG = {
       speedMps:           1.23,    // Z2: 1560u × 0.000786
       z2Units:            1560,
       calibrationStatus:  'estimated' as const,
+      // VFD: VLT AutomationDrive, label "IF 2." (foto 2026-04-11)
+      // Mostrando: 1470 RPM, 49.1 Hz, rango 1400-1600 RPM
+      vfd: {
+        label:             'IF 2.',
+        vfdCurrentRpm:     1470,
+        vfdCurrentHz:      49.1,
+        vfdMinRpm:         1400,
+        vfdMaxRpm:         1600,
+        // effectiveMpsPerRpm: 1.23 / 1470 ≈ 0.000837 (ESTIMADO)
+        effectiveMpsPerRpm: 0.000837,
+        effectiveStatus:   'estimated' as const,
+      },
     },
     {
       beltId:             'main'   as const,
@@ -177,6 +209,18 @@ export const DEFAULT_PHYSICAL_CONFIG = {
       speedMps:           1.28,    // Z2: 1631u × 0.000786 (casi constante en turno)
       z2Units:            1631,
       calibrationStatus:  'estimated' as const,
+      // VFD: VLT AutomationDrive, label "Grader" (foto 2026-04-11)
+      // Mostrando: 1500 RPM, rango 1400-1500 RPM, 0.61 kW
+      vfd: {
+        label:             'Grader',
+        vfdCurrentRpm:     1500,
+        vfdCurrentKw:      0.61,
+        vfdMinRpm:         1400,
+        vfdMaxRpm:         1500,
+        // effectiveMpsPerRpm: 1.28 / 1500 ≈ 0.000853 (ESTIMADO)
+        effectiveMpsPerRpm: 0.000853,
+        effectiveStatus:   'estimated' as const,
+      },
     },
   ],
   // Mediciones en terreno (2026-04-11, cinta métrica):
@@ -241,6 +285,23 @@ export const DEFAULT_PHYSICAL_CONFIG = {
   // Tiempo de reset neumático del flipper (ESTIMADO — cronometrar en planta)
   // Usado en insight #18: t_disponible debe superar t_salmon_pasa + flipperResetTimeSec
   flipperResetTimeSec: 0.45,
+}
+
+/**
+ * Calcula la velocidad de una cinta desde el RPM del variador y el factor efectivo.
+ * El factor effectiveMpsPerRpm = belt_speed_mps / motor_rpm (absorbe reducción + polea).
+ *
+ * Para Z-Belt con datos de motor/gearbox: usar computeZetaBeltSpeedMps().
+ * Para otras cintas: usar este helper con el factor calibrado.
+ *
+ * Retorna null si falta el factor o el RPM actual.
+ */
+export function computeBeltSpeedFromVfd(vfd: {
+  vfdCurrentRpm?: number
+  effectiveMpsPerRpm?: number
+}): number | null {
+  if (!vfd.vfdCurrentRpm || !vfd.effectiveMpsPerRpm) return null
+  return vfd.vfdCurrentRpm * vfd.effectiveMpsPerRpm
 }
 
 /**

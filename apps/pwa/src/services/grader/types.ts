@@ -152,6 +152,76 @@ export interface GraderBeltConfig {
   calibrationStatus?: CalibrationStatus
   /** Lectura Z2 (unidades internas) que corresponde a speedMps */
   z2Units?: number
+  /**
+   * Datos del variador Danfoss para esta cinta.
+   * Cada cinta tiene su propio variador (foto 2026-04-11, 4 VFDs en tablero).
+   * VFD labels visibles: "CintaZ", "Grader", "IF 2.", Midi Drive.
+   */
+  vfd?: BeltVfdData
+}
+
+/**
+ * Datos del variador Danfoss (VLT) de una cinta.
+ *
+ * Factor clave: `effectiveMpsPerRpm` = belt_speed_mps / motor_rpm
+ * Absorbe la reducción + diámetro de polea en un único número.
+ * Se calibra UNA VEZ (medir RPM + velocidad simultáneamente) y queda fijo.
+ *
+ * Una vez calibrado: belt_speed = vfdCurrentRpm × effectiveMpsPerRpm
+ */
+export interface BeltVfdData {
+  /** Texto o etiqueta visible en el frente del variador */
+  label?: string
+  /** RPM actual mostrado en el display del variador */
+  vfdCurrentRpm?: number
+  /** Frecuencia actual mostrada en el display del variador (Hz) */
+  vfdCurrentHz?: number
+  /** Potencia actual mostrada en el display del variador (kW) */
+  vfdCurrentKw?: number
+  /** RPM mínimo de operación configurado en el variador */
+  vfdMinRpm?: number
+  /** RPM máximo de operación configurado en el variador */
+  vfdMaxRpm?: number
+  /**
+   * Factor de transmisión efectivo: m/s de cinta por RPM de motor.
+   * Derivado de: belt_speed_mps / motor_rpm en un punto de operación conocido.
+   * Este único valor resume la relación de reducción + diámetro de polea.
+   *
+   * Ejemplos aproximados (basados en Z2 units × k + foto VFDs 2026-04-11):
+   *   Sorting Belt: 1.28 m/s / 1500 RPM = 0.000853 m/(s·RPM)
+   *   Accel1:       1.03 m/s / 1305 RPM = 0.000789 m/(s·RPM)
+   *   Accel2:       1.23 m/s / 1470 RPM = 0.000837 m/(s·RPM)
+   *   Z-Belt:       0.39 m/s / 1470 RPM = 0.000265 m/(s·RPM)  ← reductor i=24
+   */
+  effectiveMpsPerRpm?: number
+  /** Estado de calibración del factor effectiveMpsPerRpm */
+  effectiveStatus?: CalibrationStatus
+
+  // ── Mediciones directas para verificación (ingresar con tachómetro en planta) ──
+
+  /**
+   * RPM medido en el eje de salida de la cinta con tachómetro de contacto/óptico.
+   * Combinado con effectiveMpsPerRpm → permite verificar coherencia con VFD display.
+   * Si el eje es accesible: pegar cinta reflectante + tachómetro óptico.
+   */
+  measuredShaftRpm?: number
+  /**
+   * Velocidad lineal medida directamente sobre la superficie de la cinta (m/s).
+   * Con tachómetro de contacto (rueda sobre la cinta) o cronometrando una marca.
+   * Es la medición más directa y confiable. Si difiere de Z2 y VFD → hay drift.
+   */
+  measuredBeltMps?: number
+  /** Fecha de la medición directa para validez histórica */
+  measuredAt?: string
+  /**
+   * Fuente de verdad seleccionada para speedMps en los cálculos.
+   * 'z2'     = Z2 units × k (default actual)
+   * 'vfd'    = VFD RPM × effectiveMpsPerRpm
+   * 'tachShaft' = measuredShaftRpm × effectiveMpsPerRpm
+   * 'tachLinear' = measuredBeltMps (medición directa)
+   * 'manual' = valor ingresado manualmente en la tabla de cintas
+   */
+  truthSource?: 'z2' | 'vfd' | 'tachShaft' | 'tachLinear' | 'manual'
 }
 
 /**
