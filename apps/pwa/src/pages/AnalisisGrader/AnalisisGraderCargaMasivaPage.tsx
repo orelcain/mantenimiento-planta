@@ -10,7 +10,7 @@
  *  5. El calendario los muestra con color según P0%
  */
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, Navigate } from 'react-router-dom'
 import { Button, Badge, Card, CardContent } from '@/components/ui'
 import {
@@ -29,7 +29,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { usePermissionsStore, useAuthStore } from '@/store'
-import { parseFile, mergeParsedData } from '@/services/grader/graderExcelParser'
+import { parseFile } from '@/services/grader/graderExcelParser'
 import { getModuleRanges } from '@/services/grader/graderModuleConfig.service'
 import { DEFAULT_SHIFT_SCHEDULE, normalizeShiftSchedule, formatShiftTime, parseShiftTime } from '@/services/grader/graderShiftSchedule'
 import {
@@ -105,13 +105,13 @@ export function AnalisisGraderCargaMasivaPage() {
   const inputRef = useRef<HTMLInputElement>(null)
 
   // Cargar horarios del config guardado al montar
-  useState(() => {
+  useEffect(() => {
     getModuleRanges()
       .then((cfg) => {
         if (cfg?.shiftSchedule) setShiftSchedule(normalizeShiftSchedule(cfg.shiftSchedule))
       })
       .catch(() => {/* usa defaults */})
-  })
+  }, [])
 
   if (!canSee('analisisGrader')) return <Navigate to="/" replace />
 
