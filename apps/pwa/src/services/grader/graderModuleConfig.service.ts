@@ -9,7 +9,7 @@ import {
   serverTimestamp,
 } from '@/services/firestoreTracked'
 import { db } from '../firebase'
-import type { CalibreWeightRange, GraderModuleConfig, GraderShiftSchedule } from './types'
+import type { CalibreWeightRange, GraderModuleConfig, GraderPhysicalConfig, GraderShiftSchedule } from './types'
 
 const COLLECTION = 'graderModuleConfigs'
 const GLOBAL_ID = 'global'
@@ -76,6 +76,20 @@ export async function saveModuleShiftSchedule(params: {
     updatedBy: params.updatedBy,
     updatedAt: new Date().toISOString(),
   }
+}
+
+export async function saveModulePhysicalConfig(params: {
+  physicalConfig: GraderPhysicalConfig
+  updatedBy: string
+}): Promise<void> {
+  const firestoreData = deepCleanUndefined({
+    id: 'global',
+    physicalConfig: params.physicalConfig,
+    updatedBy: params.updatedBy,
+    updatedAt: new Date().toISOString(),
+    _updatedAt: serverTimestamp(),
+  })
+  await setDoc(doc(db, COLLECTION, GLOBAL_ID), firestoreData, { merge: true })
 }
 
 export async function getModuleRanges(): Promise<GraderModuleConfig | null> {

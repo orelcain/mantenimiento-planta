@@ -313,6 +313,79 @@ export function computeDeterministicInsights(
     }
   }
 
+  // ——— 14. Análisis físico: separación entre peces en la cinta ———
+  const physicalConfig = result.config.physicalConfig
+  if (physicalConfig && result.kpis.productionRatePerHour && result.kpis.productionRatePerHour > 0) {
+    const mainBelt = physicalConfig.belts.find((b) => b.beltId === 'main')
+    if (mainBelt && mainBelt.speedMps > 0) {
+      // Separación entre peces: distancia = velocidad / (piezas/segundo)
+      const ratePerSec = result.kpis.productionRatePerHour / 3600
+      const spacingMeters = mainBelt.speedMps / ratePerSec
+      const spacingCm = spacingMeters * 100
+      const salmonLengthCm = physicalConfig.avgSalmonLengthCm
+      const gapCm = spacingCm - salmonLengthCm
+      const ratioToLength = spacingCm / salmonLengthCm
+
+      if (ratioToLength < 1.4) {
+        const tooCloseCause = result.pointZeroClassification.causes.find(
+          (c) => c.cause === 'too_close_too_long',
+        )
+        const evidence: string[] = [
+          `Velocidad cinta clasificadora: ${mainBelt.speedMps} m/s`,
+          `Tasa de producción: ${result.kpis.productionRatePerHour.toFixed(0)} pz/h`,
+          `Separación estimada entre peces: ${spacingCm.toFixed(1)} cm`,
+          `Largo promedio salmón configurado: ${salmonLengthCm} cm`,
+          `Espacio libre entre peces: ${gapCm.toFixed(1)} cm (${((gapCm / salmonLengthCm) * 100).toFixed(0)}% del largo)`,
+        ]
+        if (tooCloseCause && tooCloseCause.pieces > 0) {
+          evidence.push(`Errores "too close/too long" detectados: ${tooCloseCause.pieces.toLocaleString()} pz (${tooCloseCause.pctOfTotal}% del total)`)
+        }
+        insights.push({
+          id: nextId(),
+          severity: ratioToLength < 1.2 ? 'critical' : 'warn',
+          title: 'Congestionamiento físico: separación insuficiente entre peces',
+          evidence,
+          recommendations: [
+            `La separación estimada (${spacingCm.toFixed(1)} cm) es menor al mínimo recomendado (1.4× largo del salmón = ${(salmonLengthCm * 1.4).toFixed(0)} cm).`,
+            'Reducir la tasa de alimentación de los pockets para aumentar la separación.',
+            'Considerar aumentar la velocidad de las cintas de aceleración.',
+            ...(ratioToLength < 1.2 ? ['URGENTE: riesgo alto de errores "too close" en cascada — acción inmediata recomendada.'] : []),
+          ],
+        })
+      }
+    }
+  }
+
+  // ——— 15. Flippers con tiempo de reacción crítico (< 1 s desde fotocélula) ———
+  if (physicalConfig && physicalConfig.flipperPositions.length > 0) {
+    const mainBelt = physicalConfig.belts.find((b) => b.beltId === 'main')
+    if (mainBelt && mainBelt.speedMps > 0) {
+      const criticalFlippers = physicalConfig.flipperPositions
+        .filter((fp) => fp.distanceFromSensorMeters / mainBelt.speedMps < 1.0)
+        .map((fp) => ({
+          gateNumber: fp.gateNumber,
+          distanceM: fp.distanceFromSensorMeters,
+          timeSec: fp.distanceFromSensorMeters / mainBelt.speedMps,
+        }))
+
+      if (criticalFlippers.length > 0) {
+        insights.push({
+          id: nextId(),
+          severity: 'info',
+          title: `${criticalFlippers.length} flippers con tiempo de reacción < 1 s`,
+          evidence: criticalFlippers.map(
+            (fp) => `Gate ${fp.gateNumber}: ${fp.distanceM.toFixed(2)} m → ${fp.timeSec.toFixed(2)} s desde fotocélula`,
+          ),
+          recommendations: [
+            'Estos gates tienen menos de 1 segundo entre detección por fotocélula y accionamiento del flipper.',
+            'Verificar que el tiempo de actuación del solenoide/actuador sea inferior al tiempo disponible.',
+            'Si aparecen errores "puerta no preparada" en estos gates, revisar el timing de la señal de control.',
+          ],
+        })
+      }
+    }
+  }
+
   return insights
 }
 

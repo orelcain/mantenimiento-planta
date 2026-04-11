@@ -15,17 +15,18 @@ import {
   deleteGatesTemplate,
   type GatesTemplate,
 } from '@/services/grader/graderSession.service'
-import { getModuleRanges, saveModuleRanges, saveModuleShiftSchedule } from '@/services/grader/graderModuleConfig.service'
+import { getModuleRanges, saveModuleRanges, saveModuleShiftSchedule, saveModulePhysicalConfig } from '@/services/grader/graderModuleConfig.service'
 import { DEFAULT_SHIFT_SCHEDULE, formatShiftTime, normalizeShiftSchedule, parseShiftTime } from '@/services/grader/graderShiftSchedule'
 import type {
   GateAssignment,
   GraderAnalysisConfig,
+  GraderPhysicalConfig,
   ParsedMatrixData,
   GraderQuality,
   CalibreRange,
   CalibreWeightRange,
 } from '@/services/grader/types'
-import { CALIBRE_WEIGHT_RANGES } from '@/services/grader/graderAnalytics'
+import { CALIBRE_WEIGHT_RANGES, DEFAULT_PHYSICAL_CONFIG } from '@/services/grader/graderAnalytics'
 
 interface Props {
   gates: GateAssignment[]
@@ -61,6 +62,10 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
   const [savingRanges, setSavingRanges] = useState(false)
   const [rangesError, setRangesError] = useState<string | null>(null)
   const [shiftSchedule, setShiftSchedule] = useState(DEFAULT_SHIFT_SCHEDULE)
+  const [showPhysicalConfig, setShowPhysicalConfig] = useState(false)
+  const [physicalConfig, setPhysicalConfig] = useState<GraderPhysicalConfig>(DEFAULT_PHYSICAL_CONFIG)
+  const [savingPhysical, setSavingPhysical] = useState(false)
+  const [physicalError, setPhysicalError] = useState<string | null>(null)
   const [savingSchedule, setSavingSchedule] = useState(false)
   const [scheduleError, setScheduleError] = useState<string | null>(null)
   const user = useAuthStore((s) => s.user)
@@ -164,6 +169,10 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
           setConfig((c) => ({ ...c, customWeightRanges: cfg.customWeightRanges }))
         }
         setShiftSchedule(normalizeShiftSchedule(cfg?.shiftSchedule))
+        if (cfg?.physicalConfig) {
+          setPhysicalConfig(cfg.physicalConfig)
+          setConfig((c) => ({ ...c, physicalConfig: cfg.physicalConfig }))
+        }
       })
       .catch(() => {})
   }, [])
@@ -235,6 +244,43 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
   const handleDeleteTemplate = async (id: string) => {
     await deleteGatesTemplate(id)
     setTemplates((prev) => prev.filter((t) => t.id !== id))
+  }
+
+  const updateFlipperDistance = (gateNumber: number, distanceMeters: number) => {
+    setPhysicalConfig((prev) => ({
+      ...prev,
+      flipperPositions: prev.flipperPositions.map((fp) =>
+        fp.gateNumber === gateNumber ? { ...fp, distanceFromSensorMeters: distanceMeters } : fp,
+      ),
+    }))
+  }
+
+  const updateBeltSpeed = (beltId: string, speedMps: number) => {
+    setPhysicalConfig((prev) => ({
+      ...prev,
+      belts: prev.belts.map((b) => b.beltId === beltId ? { ...b, speedMps } : b),
+    }))
+  }
+
+  const updateBeltLength = (beltId: string, lengthMeters: number) => {
+    setPhysicalConfig((prev) => ({
+      ...prev,
+      belts: prev.belts.map((b) => b.beltId === beltId ? { ...b, lengthMeters } : b),
+    }))
+  }
+
+  const handleSavePhysicalConfig = async () => {
+    if (!user) return
+    setSavingPhysical(true)
+    setPhysicalError(null)
+    try {
+      await saveModulePhysicalConfig({ physicalConfig, updatedBy: user.id })
+      setConfig((c) => ({ ...c, physicalConfig }))
+    } catch {
+      setPhysicalError('No se pudo guardar la configuración física.')
+    } finally {
+      setSavingPhysical(false)
+    }
   }
 
   const handleQuickSaveRanges = async () => {
@@ -715,6 +761,229 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                   <RotateCcw className="h-3 w-3 mr-1" />
                   Restaurar valores originales
                 </Button>
+              )}
+            </div>
+          </CardContent>
+        )}
+      </Card>
+
+      {/* Configuración Física de la Máquina */}
+      <Card>
+        <CardHeader
+          className="cursor-pointer select-none"
+          onClick={() => setShowPhysicalConfig(!showPhysicalConfig)}
+        >
+          <CardTitle className="text-base flex items-center gap-2">
+            <ChevronDown className={`h-4 w-4 transition-transform ${showPhysicalConfig ? '' : '-rotate-90'}`} />
+            Configuración Física de la Máquina
+            <Badge variant="outline" className="text-[10px] font-normal text-muted-foreground">
+              Mejora las recomendaciones de IA
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        {showPhysicalConfig && (
+          <CardContent className="space-y-6">
+            <p className="text-xs text-muted-foreground">
+              Parámetros físicos reales de la clasificadora. Usados para calcular separación entre peces,
+              timing de flippers y enriquecer el contexto de la IA.
+            </p>
+
+            {/* Dimensiones del salmón y pockets */}
+            <div>
+              <p className="text-sm font-medium mb-3">Producto y alimentación</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div>
+                  <Label className="text-xs">Largo prom. salmón (cm)</Label>
+                  <Input
+                    type="number"
+                    step="1"
+                    min="20"
+                    max="120"
+                    value={physicalConfig.avgSalmonLengthCm}
+                    onChange={(e) => setPhysicalConfig((p) => ({ ...p, avgSalmonLengthCm: Number(e.target.value) }))}
+                    className="mt-1 font-mono"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Ancho prom. salmón (cm)</Label>
+                  <Input
+                    type="number"
+                    step="0.5"
+                    min="5"
+                    max="40"
+                    value={physicalConfig.avgSalmonWidthCm ?? ''}
+                    onChange={(e) => setPhysicalConfig((p) => ({ ...p, avgSalmonWidthCm: e.target.value ? Number(e.target.value) : undefined }))}
+                    placeholder="—"
+                    className="mt-1 font-mono"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Cantidad de Pockets</Label>
+                  <Input
+                    type="number"
+                    step="1"
+                    min="1"
+                    max="8"
+                    value={physicalConfig.pocketCount}
+                    onChange={(e) => setPhysicalConfig((p) => ({ ...p, pocketCount: Number(e.target.value) }))}
+                    className="mt-1 font-mono"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Cintas */}
+            <div>
+              <p className="text-sm font-medium mb-3">Cintas transportadoras</p>
+              <p className="text-xs text-muted-foreground mb-2">
+                Flujo: Pocket → Zeta (elevadora) → Aceleración 1 → Aceleración 2
+                <span className="text-primary"> [fotocélula aquí]</span> → Cinta Clasificadora
+              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left">
+                      <th className="py-2 px-2">Cinta</th>
+                      <th className="py-2 px-2 text-right">Largo (m)</th>
+                      <th className="py-2 px-2 text-right">Velocidad (m/s)</th>
+                      <th className="py-2 px-2 text-right text-muted-foreground text-xs">Tiempo de tránsito</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {physicalConfig.belts.map((belt) => {
+                      const transitSec = belt.speedMps > 0 ? belt.lengthMeters / belt.speedMps : 0
+                      return (
+                        <tr key={belt.beltId} className={cn('border-b hover:bg-muted/30', belt.beltId === 'main' && 'bg-primary/5')}>
+                          <td className="py-2 px-2 text-xs font-medium">
+                            {belt.label}
+                            {belt.beltId === 'main' && (
+                              <Badge className="ml-2 text-[10px] bg-primary/10 text-primary border-primary/30">Principal</Badge>
+                            )}
+                          </td>
+                          <td className="py-2 px-2 text-right">
+                            <Input
+                              type="number"
+                              step="0.1"
+                              min="0.1"
+                              value={belt.lengthMeters}
+                              onChange={(e) => updateBeltLength(belt.beltId, Number(e.target.value))}
+                              className="h-8 text-xs w-20 font-mono ml-auto"
+                            />
+                          </td>
+                          <td className="py-2 px-2 text-right">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0.01"
+                              value={belt.speedMps}
+                              onChange={(e) => updateBeltSpeed(belt.beltId, Number(e.target.value))}
+                              className="h-8 text-xs w-24 font-mono ml-auto"
+                            />
+                          </td>
+                          <td className="py-2 px-2 text-right text-xs text-muted-foreground font-mono">
+                            {transitSec.toFixed(1)} s
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Distancias de flippers */}
+            <div>
+              <p className="text-sm font-medium mb-1">Distancias de flippers desde fotocélula</p>
+              <p className="text-xs text-muted-foreground mb-3">
+                Distancia física en metros desde el sensor fotocélula (final de Aceleración 2) hasta cada flipper en la cinta clasificadora.
+              </p>
+              {(() => {
+                const mainBelt = physicalConfig.belts.find((b) => b.beltId === 'main')
+                const speedMps = mainBelt?.speedMps ?? 0.7
+                return (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b text-left">
+                          <th className="py-2 px-2 w-16">Gate</th>
+                          <th className="py-2 px-2">Distancia desde sensor (m)</th>
+                          <th className="py-2 px-2 text-right text-muted-foreground text-xs">Tiempo de reacción</th>
+                          <th className="py-2 px-2 text-right text-muted-foreground text-xs">Alerta</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {physicalConfig.flipperPositions
+                          .slice()
+                          .sort((a, b) => a.gateNumber - b.gateNumber)
+                          .map((fp) => {
+                            const timeSec = speedMps > 0 ? fp.distanceFromSensorMeters / speedMps : 0
+                            const isCritical = timeSec < 0.8
+                            const isWarning = timeSec >= 0.8 && timeSec < 1.2
+                            return (
+                              <tr key={fp.gateNumber} className={cn('border-b hover:bg-muted/30', isCritical && 'bg-red-500/5')}>
+                                <td className="py-2 px-2 text-center">
+                                  <Badge variant="outline" className="text-xs">{fp.gateNumber}</Badge>
+                                </td>
+                                <td className="py-2 px-2">
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    min="0.1"
+                                    value={fp.distanceFromSensorMeters}
+                                    onChange={(e) => updateFlipperDistance(fp.gateNumber, Number(e.target.value))}
+                                    className="h-8 text-xs w-28 font-mono"
+                                  />
+                                </td>
+                                <td className="py-2 px-2 text-right font-mono text-xs">
+                                  {timeSec.toFixed(2)} s
+                                </td>
+                                <td className="py-2 px-2 text-right">
+                                  {isCritical && (
+                                    <Badge className="text-[10px] bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">Crítico</Badge>
+                                  )}
+                                  {isWarning && (
+                                    <Badge className="text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">Ajustado</Badge>
+                                  )}
+                                </td>
+                              </tr>
+                            )
+                          })}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+              })()}
+            </div>
+
+            {/* Guardar */}
+            <div className="flex items-center justify-between gap-2 flex-wrap pt-2 border-t">
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleSavePhysicalConfig}
+                  disabled={savingPhysical || !user}
+                >
+                  <Save className="h-3 w-3 mr-1" />
+                  {savingPhysical ? 'Guardando...' : 'Guardar config. física'}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setPhysicalConfig(DEFAULT_PHYSICAL_CONFIG)}
+                  title="Restaurar valores por defecto"
+                >
+                  <RotateCcw className="h-3 w-3 mr-1" />
+                  Valores por defecto
+                </Button>
+              </div>
+              {physicalError && (
+                <span className="text-xs text-destructive">{physicalError}</span>
+              )}
+              {!physicalError && !savingPhysical && (
+                <p className="text-xs text-muted-foreground">
+                  Al guardar, la IA usará estos parámetros en próximas sesiones.
+                </p>
               )}
             </div>
           </CardContent>

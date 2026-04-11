@@ -223,6 +223,29 @@ function buildPrompt(p: AIGraderInput): string {
     }
   }
 
+  if (p.physicalContext) {
+    const pc = p.physicalContext
+    lines.push('')
+    lines.push('=== CONTEXTO FÍSICO DE LA MÁQUINA ===')
+    lines.push('  Velocidad cinta clasificadora (principal): ' + pc.mainBeltSpeedMps + ' m/s')
+    lines.push('  Largo promedio del salmón configurado: ' + pc.avgSalmonLengthCm + ' cm')
+    if (pc.estimatedSpacingCm > 0) {
+      lines.push('  Separación estimada entre peces en cinta: ' + pc.estimatedSpacingCm + ' cm')
+      lines.push('  Espacio libre entre peces: ' + (pc.estimatedSpacingCm - pc.avgSalmonLengthCm).toFixed(1) + ' cm')
+      lines.push('  Riesgo "too close/too long": ' + pc.tooCloseRiskLevel.toUpperCase())
+    }
+    if (pc.flipperTimings.length > 0) {
+      lines.push('  Tiempo de reacción por gate (desde fotocélula):')
+      for (const ft of pc.flipperTimings) {
+        const flag = ft.timeFromSensorSeconds < 0.8 ? ' ⚠ CRÍTICO' : ft.timeFromSensorSeconds < 1.2 ? ' ⚡ ajustado' : ''
+        lines.push('    Gate ' + ft.gateNumber + ': ' + ft.distanceMeters.toFixed(2) + ' m → ' + ft.timeFromSensorSeconds.toFixed(2) + ' s' + flag)
+      }
+    }
+    lines.push('  Notas para la IA: Usa estos parámetros para contextualizar errores "too close/too long"')
+    lines.push('  y "puerta no preparada". Si la separación es menor que 1.4× el largo del salmón,')
+    lines.push('  considerar reducir alimentación en lugar de ajustar parámetros de clasificación.')
+  }
+
   if (p.trendForecast) {
     lines.push('')
     lines.push('=== PROYECCIÓN DE CIERRE DE TURNO (datos parciales) ===')

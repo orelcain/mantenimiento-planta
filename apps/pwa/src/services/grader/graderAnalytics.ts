@@ -55,6 +55,40 @@ export const CALIBRE_WEIGHT_RANGES: CalibreWeightRange[] = [
   { calibre: '10-12 lb', label: '10+ lb (4581–9163 g)',   minGrams: 4581, maxGrams: 9163 },
 ]
 
+/**
+ * Configuración física por defecto de la clasificadora.
+ * Basada en el layout real de la planta:
+ *   Pocket (1-4) → Zeta elevadora → Accel 1 → Accel 2 [fotocélula al final]
+ *   → Cinta larga clasificadora (~13 m, 12 flippers)
+ *
+ * Los valores de distancias de flippers son aproximados (espaciado uniforme).
+ * El operador puede ajustarlos en la sección "Configuración Física".
+ */
+export const DEFAULT_PHYSICAL_CONFIG = {
+  avgSalmonLengthCm: 50,
+  pocketCount: 4,
+  belts: [
+    { beltId: 'zeta'  as const, label: 'Cinta Zeta (elevadora)',             lengthMeters: 3.0,  speedMps: 0.40 },
+    { beltId: 'accel1'as const, label: 'Cinta Aceleración 1',                lengthMeters: 1.5,  speedMps: 0.60 },
+    { beltId: 'accel2'as const, label: 'Cinta Aceleración 2 (fotocélula)',   lengthMeters: 2.5,  speedMps: 0.80 },
+    { beltId: 'main'  as const, label: 'Cinta Clasificadora (larga, ~13 m)', lengthMeters: 13.0, speedMps: 0.70 },
+  ],
+  flipperPositions: [
+    { gateNumber:  1, distanceFromSensorMeters:  0.80 },
+    { gateNumber:  2, distanceFromSensorMeters:  1.85 },
+    { gateNumber:  3, distanceFromSensorMeters:  2.91 },
+    { gateNumber:  4, distanceFromSensorMeters:  3.96 },
+    { gateNumber:  5, distanceFromSensorMeters:  5.01 },
+    { gateNumber:  6, distanceFromSensorMeters:  6.07 },
+    { gateNumber:  7, distanceFromSensorMeters:  7.12 },
+    { gateNumber:  8, distanceFromSensorMeters:  8.17 },
+    { gateNumber:  9, distanceFromSensorMeters:  9.23 },
+    { gateNumber: 10, distanceFromSensorMeters: 10.28 },
+    { gateNumber: 11, distanceFromSensorMeters: 11.33 },
+    { gateNumber: 12, distanceFromSensorMeters: 12.39 },
+  ],
+}
+
 /** Causas estandarizadas con labels y descripciones */
 const CAUSE_META: Record<PointZeroCause, { label: string; description: string }> = {
   fuera_de_rango:       { label: 'Fuera de rango',          description: 'Pieza con peso fuera de los rangos de calibre definidos' },

@@ -133,6 +133,57 @@ export interface GraderUpload {
 }
 
 // ============================================================================
+// CONFIGURACIÓN FÍSICA DE LA MÁQUINA
+// ============================================================================
+
+/** Configuración de una cinta transportadora de la grader */
+export interface GraderBeltConfig {
+  /** Identificador de la cinta en el flujo de la máquina */
+  beltId: 'zeta' | 'accel1' | 'accel2' | 'main'
+  /** Nombre visible para el operador */
+  label: string
+  /** Largo de la cinta en metros */
+  lengthMeters: number
+  /** Ancho de la cinta en metros (opcional) */
+  widthMeters?: number
+  /** Velocidad de la cinta en metros/segundo */
+  speedMps: number
+}
+
+/** Distancia física de un flipper/compuerta respecto a la fotocélula de entrada */
+export interface GraderFlipperPosition {
+  /** Número de compuerta (1..12) */
+  gateNumber: number
+  /** Distancia desde la fotocélula al flipper en metros */
+  distanceFromSensorMeters: number
+}
+
+/**
+ * Parámetros físicos reales de la clasificadora grader.
+ * Usado para calcular separación entre peces, timing de flippers
+ * y mejorar las recomendaciones de la IA.
+ *
+ * Flujo del salmón:
+ *   Pocket (1-4)
+ *     → Cinta Zeta (elevadora)
+ *     → Cinta Aceleración 1
+ *     → Cinta Aceleración 2  [fotocélula al final]
+ *     → Cinta Larga (clasificadora, ~13 m, 12 flippers)
+ */
+export interface GraderPhysicalConfig {
+  /** Largo promedio del salmón en centímetros */
+  avgSalmonLengthCm: number
+  /** Ancho promedio del salmón en centímetros (opcional) */
+  avgSalmonWidthCm?: number
+  /** Número de pockets de alimentación */
+  pocketCount: number
+  /** Configuración de las 4 cintas del sistema */
+  belts: GraderBeltConfig[]
+  /** Distancias físicas de cada flipper desde la fotocélula */
+  flipperPositions: GraderFlipperPosition[]
+}
+
+// ============================================================================
 // CONFIGURACION POR DISPOSITIVO (RANGOS PERSISTENTES)
 // ============================================================================
 
@@ -152,6 +203,8 @@ export interface GraderModuleConfig {
   id: 'global';
   customWeightRanges: CalibreWeightRange[];
   shiftSchedule?: GraderShiftSchedule[];
+  /** Configuración física de la máquina grader */
+  physicalConfig?: GraderPhysicalConfig;
   updatedBy: string;
   updatedAt: string;
 }
@@ -208,6 +261,8 @@ export interface GraderAnalysisConfig {
   };
   /** Rangos de peso por calibre personalizados (sobreescriben los default) */
   customWeightRanges?: CalibreWeightRange[];
+  /** Parámetros físicos de la máquina (cintas, flippers, dimensiones del salmón) */
+  physicalConfig?: GraderPhysicalConfig;
 }
 
 // ============================================================================
@@ -535,6 +590,26 @@ export interface AIGraderInput {
     distributionByQuality: Array<{ key: string; pieces: number; pct: number }>;
     hourlyDistribution?: Array<{ hour: string; pieces: number; pct: number }>;
   };
+  /**
+   * Contexto físico de la máquina — enriquece las recomendaciones de la IA
+   * con métricas derivadas de la configuración física real.
+   */
+  physicalContext?: {
+    /** Velocidad de la cinta clasificadora principal (m/s) */
+    mainBeltSpeedMps: number
+    /** Largo promedio del salmón configurado (cm) */
+    avgSalmonLengthCm: number
+    /** Separación estimada entre peces en la cinta principal (cm) */
+    estimatedSpacingCm: number
+    /** Nivel de riesgo de errores "too close": low (<40% margen), medium, high (>80% saturación) */
+    tooCloseRiskLevel: 'low' | 'medium' | 'high'
+    /** Tiempo desde fotocélula hasta cada flipper a la velocidad actual */
+    flipperTimings: Array<{
+      gateNumber: number
+      distanceMeters: number
+      timeFromSensorSeconds: number
+    }>
+  }
   /** Proyección opcional de cierre de turno basada en datos parciales */
   trendForecast?: {
     shiftStart: string;
