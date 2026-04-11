@@ -10,10 +10,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, Navigate } from 'react-router-dom'
 import { Card, CardContent, Button } from '@/components/ui'
-import { ArrowLeft, BarChart3, Loader2, Calendar } from 'lucide-react'
+import { ArrowLeft, BarChart3, Loader2, Calendar, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { usePermissionsStore } from '@/store'
-import { listDailySummariesByRange } from '@/services/grader/graderDailySummary.service'
+import {
+  listDailySummariesByRange,
+  countLegacyTardeShifts,
+  migrateTardeShiftsToNoche,
+  type MigrationResult,
+} from '@/services/grader/graderDailySummary.service'
 import {
   aggregateDailySummaries,
   type PeriodAggregate,
@@ -50,6 +55,11 @@ export function AnalisisGraderPeriodoPage() {
   const [error, setError] = useState<string | null>(null)
   const [aggregate, setAggregate] = useState<PeriodAggregate | null>(null)
 
+  // Migración legacy 'Turno tarde' → 'Turno noche' (iter 8 mapeaba B incorrectamente)
+  const [legacyCount, setLegacyCount] = useState<number | null>(null)
+  const [migrating, setMigrating] = useState(false)
+  const [migrationResult, setMigrationResult] = useState<MigrationResult | null>(null)
+
   // ── Fetch + agregar cada vez que cambia el rango ─────────────────────────
   useEffect(() => {
     setLoading(true)
@@ -63,6 +73,30 @@ export function AnalisisGraderPeriodoPage() {
       })
       .finally(() => setLoading(false))
   }, [range.start, range.end, range.label])
+
+  // ── Detectar turnos legacy al montar ─────────────────────────────────────
+  useEffect(() => {
+    countLegacyTardeShifts()
+      .then(setLegacyCount)
+      .catch(() => setLegacyCount(null))
+  }, [])
+
+  const handleMigrate = async () => {
+    setMigrating(true)
+    setMigrationResult(null)
+    try {
+      const result = await migrateTardeShiftsToNoche()
+      setMigrationResult(result)
+      setLegacyCount(0)
+      // Recargar el período actual para que se refleje
+      const list = await listDailySummariesByRange(range.start, range.end)
+      setAggregate(aggregateDailySummaries(list, range))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al migrar turnos')
+    } finally {
+      setMigrating(false)
+    }
+  }
 
   const handlePresetClick = (key: Exclude<PeriodPresetKey, 'custom'>) => {
     setActivePreset(key)
@@ -105,6 +139,56 @@ export function AnalisisGraderPeriodoPage() {
           Calendario
         </Button>
       </div>
+
+      {/* ── Banner de migración 'Turno tarde' → 'Turno noche' ──────────────
+          Aparece si todavía hay docs legacy en Firestore del iter 8 donde
+          B (noche) se mapeaba incorrectamente a 'Turno tarde'. */}
+      {legacyCount !== null && legacyCount > 0 && !migrationResult && (
+        <Card className="border-amber-500/40 bg-amber-500/5">
+          <CardContent className="py-3 px-4 flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-start gap-2 min-w-0">
+              <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+              <div className="text-sm min-w-0">
+                <p className="font-medium text-amber-700 dark:text-amber-400">
+                  {legacyCount} turno{legacyCount !== 1 ? 's' : ''} legacy con etiqueta "Turno tarde" detectado{legacyCount !== 1 ? 's' : ''}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  La planta sólo tiene 2 turnos (A = día, B = noche). Los turnos cargados antes del iter 9 tienen la etiqueta "tarde" por error —
+                  al migrar se convierten a "Turno noche" y se fusionan con el turno noche del mismo día si existe.
+                </p>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              onClick={handleMigrate}
+              disabled={migrating}
+              className="bg-amber-600 hover:bg-amber-700 text-white shrink-0"
+            >
+              {migrating
+                ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Migrando…</>
+                : 'Migrar a "Turno noche"'}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Confirmación post-migración */}
+      {migrationResult && (
+        <Card className="border-emerald-500/40 bg-emerald-500/5">
+          <CardContent className="py-3 px-4 flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+            <p className="text-sm text-emerald-700 dark:text-emerald-400">
+              <span className="font-medium">Migración completa:</span>{' '}
+              {migrationResult.processed} turnos procesados ·{' '}
+              {migrationResult.merged} fusionados con noche existente ·{' '}
+              {migrationResult.renamed} renombrados
+              {migrationResult.errors > 0 && (
+                <span className="text-red-600 ml-2">· {migrationResult.errors} errores</span>
+              )}
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* ── Selector de rango ───────────────────────────────────────────── */}
       <Card>

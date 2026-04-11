@@ -538,7 +538,6 @@ export function AnalisisGraderCargaMasivaPage() {
                           className={cn(
                             'text-xs',
                             summary.shiftId === 'Turno día'   && 'border-amber-500/40 text-amber-600',
-                            summary.shiftId === 'Turno tarde' && 'border-orange-500/40 text-orange-600',
                             summary.shiftId === 'Turno noche' && 'border-indigo-500/40 text-indigo-600',
                             summary.shiftId === 'Sin turno'   && 'border-muted text-muted-foreground',
                           )}

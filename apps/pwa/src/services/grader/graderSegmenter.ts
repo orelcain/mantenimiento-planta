@@ -38,34 +38,40 @@ type SegmentKey = string  // `${sessionDate}|${shiftId}`
 /**
  * Normaliza el valor bruto de la columna "Turno" del Excel a una etiqueta canónica.
  *
- * Todas las variantes conocidas se colapsan a uno de tres valores:
- *   - 'Turno día'
- *   - 'Turno tarde'
- *   - 'Turno noche'
+ * La planta opera con sólo DOS turnos (no existe "Turno tarde"):
+ *   - 'Turno día'   → A, día, ~09:00 a 17:30
+ *   - 'Turno noche' → B, noche, ~21:00 a 06:00 (cruza medianoche)
  *
- * Mapeo asumido (ajustable si la planta usa otra convención):
- *   A / Turno A   → Turno día
- *   B / Turno B   → Turno tarde
- *   C / Turno C   → Turno noche
+ * Mapeo:
+ *   A / Turno A  → Turno día
+ *   B / Turno B  → Turno noche
+ *   día          → Turno día
+ *   noche        → Turno noche
+ *   tarde (legacy del iter 8 que tenía el mapeo B→tarde) → Turno noche
  *
  * Si el valor no matchea ninguna variante conocida → devuelve null para que
  * el caller caiga al fallback por timestamp + schedule. Nunca devolvemos el
- * string crudo, porque eso genera duplicación en el calendario (dos docs
- * Firestore con IDs distintos apuntando al mismo turno físico).
+ * string crudo, porque eso genera duplicación en Firestore (dos docs con
+ * IDs distintos apuntando al mismo turno físico).
  */
 export function normalizeShiftLabel(raw: string): string | null {
   const s = raw.trim()
   if (!s) return null
 
-  // A/B/C (letra suelta o "Turno A/B/C") → día/tarde/noche
+  // A / Turno A → Turno día (letra asumida como código de turno)
   if (/^a$/i.test(s) || /^turno\s+a$/i.test(s)) return 'Turno día'
-  if (/^b$/i.test(s) || /^turno\s+b$/i.test(s)) return 'Turno tarde'
-  if (/^c$/i.test(s) || /^turno\s+c$/i.test(s)) return 'Turno noche'
 
-  // Variantes con acento / sin acento / case-insensitive
+  // B / Turno B → Turno noche (letra asumida como código de turno)
+  // NOTA: en iter 8 este mapeaba a 'Turno tarde' por error.
+  if (/^b$/i.test(s) || /^turno\s+b$/i.test(s)) return 'Turno noche'
+
+  // Variantes por nombre con acento / sin acento / case-insensitive
   if (/^(turno\s+)?d[ií]a$/i.test(s))   return 'Turno día'
-  if (/^(turno\s+)?tarde$/i.test(s))    return 'Turno tarde'
   if (/^(turno\s+)?noche$/i.test(s))    return 'Turno noche'
+
+  // Legacy: 'tarde' / 'Turno tarde' ahora se remapea a noche (compatibilidad
+  // con datos ya cargados antes del cambio de convención).
+  if (/^(turno\s+)?tarde$/i.test(s))    return 'Turno noche'
 
   // No matchea → caller debe usar fallback por timestamp
   return null
@@ -306,15 +312,14 @@ export function computeShiftSummary(
 
 // ── Helpers de presentación ───────────────────────────────────────────────────
 
-/** Ordena los segmentos por fecha + turno (día → tarde → noche) */
+/** Ordena los segmentos por fecha + turno (día → noche) */
 export function sortedSegmentEntries(
   map: Map<string, ShiftSegment>,
 ): Array<[string, ShiftSegment]> {
   const shiftOrder: Record<string, number> = {
     'Turno día': 0,
-    'Turno tarde': 1,
-    'Turno noche': 2,
-    'Sin turno': 3,
+    'Turno noche': 1,
+    'Sin turno': 2,
   }
   return Array.from(map.entries()).sort(([, a], [, b]) => {
     if (a.sessionDate !== b.sessionDate) return a.sessionDate < b.sessionDate ? -1 : 1

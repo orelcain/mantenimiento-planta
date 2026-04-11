@@ -198,11 +198,10 @@ export function aggregateDailySummaries(
     if (!maxP0Day || d.p0Pct > maxP0Day.p0Pct) maxP0Day = { dateKey: d.dateKey, p0Pct: d.p0Pct }
   }
 
-  // ── Breakdown por turno ordenado día → tarde → noche ─────────────────────
+  // ── Breakdown por turno ordenado día → noche ─────────────────────────────
   const shiftOrder: Record<string, number> = {
     'Turno día': 0,
-    'Turno tarde': 1,
-    'Turno noche': 2,
+    'Turno noche': 1,
   }
   const shiftBreakdown: ShiftGroupStat[] = Array.from(shiftGroups.entries())
     .map(([shiftId, g]) => ({

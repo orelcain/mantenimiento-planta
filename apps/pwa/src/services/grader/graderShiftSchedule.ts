@@ -5,10 +5,24 @@
 
 import type { GraderShiftSchedule } from './types'
 
+/**
+ * Horarios por defecto de turnos del Grader.
+ *
+ * La planta opera con 2 turnos (A y B) que cubren las ~24h sin solapamiento:
+ *   - Turno día (A):   ~09:00 – 17:30 real, ventana ancha 07:00 – 19:00
+ *   - Turno noche (B): ~21:00 – 06:00 real, ventana ancha 19:00 – 07:00
+ *
+ * La ventana ancha absorbe variaciones (±1h) en las horas reales de operación
+ * sin fragmentar un turno en dos IDs distintos en Firestore. Un registro de
+ * las 18:00 cae naturalmente en "día"; uno de las 19:30 cae en "noche".
+ *
+ * Nota: NO hay "Turno tarde". Si un Excel legacy tiene ese label se remapea a
+ * "Turno noche" desde `normalizeShiftLabel`, y los documentos antiguos en
+ * Firestore se pueden consolidar con `migrateTardeShiftsToNoche()`.
+ */
 export const DEFAULT_SHIFT_SCHEDULE: GraderShiftSchedule[] = [
-  { shiftId: 'Turno día', startHour: 7, startMinute: 0, endHour: 15, endMinute: 0 },
-  { shiftId: 'Turno tarde', startHour: 15, startMinute: 0, endHour: 23, endMinute: 0 },
-  { shiftId: 'Turno noche', startHour: 23, startMinute: 0, endHour: 7, endMinute: 0 },
+  { shiftId: 'Turno día', startHour: 7, startMinute: 0, endHour: 19, endMinute: 0 },
+  { shiftId: 'Turno noche', startHour: 19, startMinute: 0, endHour: 7, endMinute: 0 },
 ]
 
 function clampHour(value: number): number {
@@ -78,6 +92,5 @@ export function inferShiftIdFromSchedule(startAt: string | undefined, schedule?:
 
 export function shiftIdToKey(shiftId?: string): string {
   if (shiftId === 'Turno día') return 'dia'
-  if (shiftId === 'Turno tarde') return 'tarde'
   return 'noche'
 }

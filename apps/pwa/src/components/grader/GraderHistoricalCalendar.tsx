@@ -89,7 +89,7 @@ function getUploadKey(
 ): string {
   const dateKey = upload.sessionDate || toDateKey(upload.inferred?.startAt)
   const shiftId = upload.shiftId || inferShiftIdFromSchedule(upload.inferred?.startAt, schedule)
-  const shiftKey = shiftId === 'Turno día' ? 'dia' : shiftId === 'Turno tarde' ? 'tarde' : 'noche'
+  const shiftKey = shiftId === 'Turno día' ? 'dia' : 'noche'
   return `${dateKey}__${shiftKey}__${upload.fileMeta.kind}`
 }
 
@@ -556,7 +556,7 @@ export function GraderHistoricalCalendar({
               </p>
               {(historicalByDate.get(selectedKey) ?? [])
                 .sort((a, b) => {
-                  const order: Record<string, number> = { 'Turno día': 0, 'Turno tarde': 1, 'Turno noche': 2 }
+                  const order: Record<string, number> = { 'Turno día': 0, 'Turno noche': 1 }
                   return (order[a.shiftId] ?? 9) - (order[b.shiftId] ?? 9)
                 })
                 .map((hist) => (

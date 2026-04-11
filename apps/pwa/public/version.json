@@ -1,7 +1,7 @@
 {
-  "version": "2.78.0",
+  "version": "2.79.0",
   "buildDate": "2026-04-11",
-  "buildTimestamp": 1775919629183,
+  "buildTimestamp": 1775930315919,
   "features": [
     "Grader: configuración física real de Marelec MS4/12 (mediciones en terreno)",
     "Grader: Gate 1 a 1300mm del sensor, pitch 1370mm entre pivots, paleta 475mm",

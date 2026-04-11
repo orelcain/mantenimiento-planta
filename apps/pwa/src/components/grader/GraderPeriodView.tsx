@@ -550,7 +550,6 @@ export function GraderPeriodView({ data }: Props) {
                         className={cn(
                           'text-[10px]',
                           s.shiftId === 'Turno día'   && 'border-amber-500/40 text-amber-600',
-                          s.shiftId === 'Turno tarde' && 'border-orange-500/40 text-orange-600',
                           s.shiftId === 'Turno noche' && 'border-indigo-500/40 text-indigo-600',
                         )}
                       >

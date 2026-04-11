@@ -215,3 +215,231 @@ export async function deleteDailySummariesByBatch(
     await batch.commit()
   }
 }
+
+// ============================================================================
+// Migración de turnos legacy: 'Turno tarde' → 'Turno noche'
+// ============================================================================
+
+/**
+ * Cuenta cuántos documentos tienen `shiftId === 'Turno tarde'` (turnos
+ * legacy del iter 8 cuando B se mapeaba a 'Turno tarde' en vez de 'Turno
+ * noche'). Se usa para mostrar un banner en la UI que ofrezca migrarlos.
+ */
+export async function countLegacyTardeShifts(): Promise<number> {
+  const q = query(
+    collection(db, COLLECTION),
+    where('shiftId', '==', 'Turno tarde'),
+  )
+  const snap = await getDocs(q)
+  return snap.size
+}
+
+/**
+ * Consolida KPIs de un summary legacy 'Turno tarde' dentro de un summary
+ * 'Turno noche' ya existente para el mismo día. Devuelve el summary
+ * fusionado listo para escribir.
+ *
+ * Reglas de merge:
+ *  - Piezas y pesos se suman
+ *  - P0% recalculado desde totales sumados (ponderado)
+ *  - startAt = min de ambos, endAt = max
+ *  - durationMinutes se recalcula desde el rango real (no suma, porque
+ *    si los turnos solapan darían resultado erróneo)
+ *  - Distribuciones: merge por key → suma de piezas → recalcular pct
+ *  - topP0Causes: igual que distribuciones
+ *  - hasPieceData / hasGate0Data: OR lógico
+ */
+function mergeTwoSummaries(base: GraderDailySummary, legacy: GraderDailySummary): GraderDailySummary {
+  const r = (v: number, dec: number) => {
+    const f = 10 ** dec
+    return Math.round(v * f) / f
+  }
+
+  const totalPieces = (base.totalPieces ?? 0) + (legacy.totalPieces ?? 0)
+  const pointZeroPieces = (base.pointZeroPieces ?? 0) + (legacy.pointZeroPieces ?? 0)
+  const pointZeroPct = totalPieces > 0 ? r((pointZeroPieces / totalPieces) * 100, 2) : 0
+
+  const totalWeightKg =
+    (base.totalWeightKg ?? 0) + (legacy.totalWeightKg ?? 0) || undefined
+
+  // Duración: calcular desde el rango nuevo [min startAt, max endAt]
+  const starts = [base.startAt, legacy.startAt].filter(Boolean).sort()
+  const ends = [base.endAt, legacy.endAt].filter(Boolean).sort()
+  const startAt = starts[0] ?? base.startAt
+  const endAt = ends[ends.length - 1] ?? base.endAt
+  const durationMinutes = startAt && endAt
+    ? Math.round((new Date(endAt).getTime() - new Date(startAt).getTime()) / 60_000)
+    : base.durationMinutes
+
+  const avgWeightGrams = totalWeightKg && totalPieces > 0
+    ? r((totalWeightKg * 1000) / totalPieces, 0)
+    : undefined
+
+  const productionRatePerHour = durationMinutes && durationMinutes > 0 && totalPieces > 0
+    ? r(totalPieces / (durationMinutes / 60), 0)
+    : undefined
+
+  // Merge de distribuciones: map por key, suma piezas, recalcula pct
+  const mergeDist = <T extends { pieces: number; pct: number }>(
+    a: T[] | undefined,
+    b: T[] | undefined,
+    keyField: keyof T,
+  ): T[] => {
+    const map = new Map<string, T>()
+    for (const item of [...(a ?? []), ...(b ?? [])]) {
+      const key = String(item[keyField])
+      const existing = map.get(key)
+      if (existing) {
+        (existing as any).pieces = existing.pieces + item.pieces
+      } else {
+        map.set(key, { ...item })
+      }
+    }
+    const total = Array.from(map.values()).reduce((s, x) => s + x.pieces, 0)
+    return Array.from(map.values())
+      .map((x) => ({ ...x, pct: total > 0 ? r((x.pieces / total) * 100, 1) : 0 }))
+      .sort((a, b) => b.pieces - a.pieces)
+  }
+
+  const calibreDistribution = mergeDist(
+    base.calibreDistribution, legacy.calibreDistribution, 'calibre' as any,
+  ) as GraderDailySummary['calibreDistribution']
+  const qualityDistribution = mergeDist(
+    base.qualityDistribution, legacy.qualityDistribution, 'quality' as any,
+  ) as GraderDailySummary['qualityDistribution']
+  const gateDistribution = mergeDist(
+    base.gateDistribution, legacy.gateDistribution, 'gate' as any,
+  ) as GraderDailySummary['gateDistribution']
+
+  // topP0Causes: merge por error, recalcula pct sobre el total P0 fusionado
+  const causesMap = new Map<string, number>()
+  for (const c of [...(base.topP0Causes ?? []), ...(legacy.topP0Causes ?? [])]) {
+    causesMap.set(c.error, (causesMap.get(c.error) ?? 0) + c.pieces)
+  }
+  const topP0Causes = Array.from(causesMap.entries())
+    .map(([error, pieces]) => ({
+      error,
+      pieces,
+      pct: pointZeroPieces > 0 ? r((pieces / pointZeroPieces) * 100, 1) : 0,
+    }))
+    .sort((a, b) => b.pieces - a.pieces)
+    .slice(0, 10)
+
+  return {
+    ...base,
+    totalPieces,
+    pointZeroPieces,
+    pointZeroPct,
+    startAt,
+    endAt,
+    durationMinutes,
+    totalWeightKg,
+    avgWeightGrams,
+    productionRatePerHour,
+    calibreDistribution,
+    qualityDistribution,
+    gateDistribution,
+    topP0Causes,
+    hasPieceData: (base.hasPieceData ?? false) || (legacy.hasPieceData ?? false),
+    hasGate0Data: (base.hasGate0Data ?? false) || (legacy.hasGate0Data ?? false),
+    updatedAt: new Date().toISOString(),
+  }
+}
+
+export interface MigrationResult {
+  processed: number // total de 'Turno tarde' detectados
+  merged: number    // casos donde ya existía noche y se fusionaron
+  renamed: number   // casos donde sólo se movió tarde → noche
+  errors: number
+}
+
+/**
+ * Migra todos los summaries con `shiftId === 'Turno tarde'` a `'Turno noche'`.
+ *
+ * Para cada documento legacy:
+ *  1. Busca si ya existe `${dateKey}__Turno noche` en Firestore.
+ *  2. Si existe → fusiona los KPIs (ver `mergeTwoSummaries`) y escribe el
+ *     resultado en el doc de noche. Luego borra el doc de tarde.
+ *  3. Si NO existe → crea un nuevo doc con id `${dateKey}__Turno noche`
+ *     copiando los campos del legacy (cambiando shiftId y id). Luego borra
+ *     el doc de tarde.
+ *
+ * Todas las operaciones se hacen en batches de 400 ops (límite de Firestore).
+ * Retorna un objeto con el conteo de cada tipo de operación.
+ */
+export async function migrateTardeShiftsToNoche(): Promise<MigrationResult> {
+  const result: MigrationResult = { processed: 0, merged: 0, renamed: 0, errors: 0 }
+
+  // 1. Leer todos los 'Turno tarde'
+  const tardeQuery = query(
+    collection(db, COLLECTION),
+    where('shiftId', '==', 'Turno tarde'),
+  )
+  const tardeSnap = await getDocs(tardeQuery)
+  if (tardeSnap.empty) return result
+
+  const tardeDocs: GraderDailySummary[] = tardeSnap.docs.map((d) => d.data() as GraderDailySummary)
+  result.processed = tardeDocs.length
+
+  // 2. Para cada uno, verificar si existe el 'Turno noche' gemelo
+  //    y preparar la operación correspondiente
+  const operations: Array<{
+    type: 'merge' | 'rename'
+    legacyId: string         // id del doc tarde que se borra
+    nocheId: string          // id del doc noche que se escribe
+    data: GraderDailySummary // datos finales a escribir en nocheId
+  }> = []
+
+  for (const legacy of tardeDocs) {
+    try {
+      const nocheId = buildDailySummaryId(legacy.dateKey, 'Turno noche')
+      const existingNoche = await getDailySummary(legacy.dateKey, 'Turno noche')
+      if (existingNoche) {
+        // Fusionar
+        const merged = mergeTwoSummaries(existingNoche, legacy)
+        merged.id = nocheId
+        merged.shiftId = 'Turno noche'
+        operations.push({ type: 'merge', legacyId: legacy.id, nocheId, data: merged })
+      } else {
+        // Renombrar: copiar legacy con shiftId='Turno noche'
+        const renamed: GraderDailySummary = {
+          ...legacy,
+          id: nocheId,
+          shiftId: 'Turno noche',
+          updatedAt: new Date().toISOString(),
+        }
+        operations.push({ type: 'rename', legacyId: legacy.id, nocheId, data: renamed })
+      }
+    } catch {
+      result.errors += 1
+    }
+  }
+
+  // 3. Ejecutar en batches: primero escribe noche, luego borra tarde.
+  //    Cada operación consume 2 writes (1 set + 1 delete), así que el límite
+  //    efectivo es 200 operaciones por batch (FIRESTORE_BATCH_LIMIT=400).
+  const OPS_PER_ENTRY = 2
+  const ENTRIES_PER_BATCH = Math.floor(FIRESTORE_BATCH_LIMIT / OPS_PER_ENTRY)
+
+  for (let i = 0; i < operations.length; i += ENTRIES_PER_BATCH) {
+    const chunk = operations.slice(i, i + ENTRIES_PER_BATCH)
+    const batch = writeBatch(db)
+    for (const op of chunk) {
+      const nocheRef = doc(db, COLLECTION, op.nocheId)
+      const legacyRef = doc(db, COLLECTION, op.legacyId)
+      batch.set(nocheRef, deepCleanUndefined({ ...op.data, _updatedAt: new Date().toISOString() }))
+      batch.delete(legacyRef)
+    }
+    try {
+      await batch.commit()
+      for (const op of chunk) {
+        if (op.type === 'merge') result.merged += 1
+        else result.renamed += 1
+      }
+    } catch {
+      result.errors += chunk.length
+    }
+  }
+
+  return result
+}

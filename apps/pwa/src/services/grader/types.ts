@@ -428,7 +428,7 @@ export interface GraderModuleConfig {
 }
 
 export interface GraderShiftSchedule {
-  shiftId: 'Turno día' | 'Turno tarde' | 'Turno noche';
+  shiftId: 'Turno día' | 'Turno noche';
   startHour: number;   // 0-23
   startMinute: number; // 0-59
   endHour: number;     // 0-23 (puede ser menor si cruza medianoche)
