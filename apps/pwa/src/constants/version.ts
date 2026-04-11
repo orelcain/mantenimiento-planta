@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.74.0' as const
+export const APP_VERSION = '2.75.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -11,12 +11,12 @@ export const APP_VERSION = '2.74.0' as const
 /**
  * Fecha de la versión actual
  */
-export const VERSION_DATE = '2026-04-11' as const
+export const VERSION_DATE = '2026-04-12' as const
 
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Grader iter 6: config física real (Marelec MS4/12) + Z2 dis1-12 + velocidades reales + resumen ejecutivo + insights físicos (gate sobrecargada, timing Z2 adyacente)' as const
+export const VERSION_NAME = 'Grader iter 7: carga masiva histórica + calendario por día y turno + indicadores PP/P0 por turno' as const
 
 /**
  * Nota:
