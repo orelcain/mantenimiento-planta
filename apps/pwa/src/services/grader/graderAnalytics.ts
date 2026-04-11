@@ -87,14 +87,24 @@ export const MARELEC_MS4_12_SPECS = {
   // Salidas (sección 2.3.2)
   outputs: 12,
   outputsSide: 'right' as const,
-  // Layout del Grading Belt según plano exterior (sección 2.3.3)
-  //   Distancia sensor → Gate 1: ~1370mm
-  //   Pitch entre compuertas consecutivas: ~800mm
-  //   Largo total Grading Belt: ~17179mm
+  // Layout del Grading Belt — combinación de plano del manual + mediciones en terreno
+  //   Largo total: 17179mm (manual sección 2.3.3 — confirmado en planta)
+  //   Sensor (Detection Eye, final Accel Belt 2) → Gate 1 pivot: 1300mm (medición 2026-04-11)
+  //   Pitch entre pivots consecutivos: 1370mm uniforme (medición 2026-04-11)
+  //   Largo paleta flipper: 475mm (medición 2026-04-11)
   gradingBeltLayout: {
-    totalLengthMm:       17179,
-    sensorToGate1Mm:      1370,
-    gatePitchMm:           800,
+    totalLengthMm:           17179,  // confirmado en planta
+    sensorToGate1Mm:          1300,  // medición real (vs 1370mm estimado del plano)
+    gatePitchMm:              1370,  // medición real pivot-a-pivot (vs 800mm estimado del plano)
+    flipperPaddleLengthMm:     475,  // medición real 2026-04-11
+  },
+  // Parámetros dis1-dis12 del controlador Z2
+  // dis1=1250 → el Z2 dispara 50mm antes que la posición física (compensación neumática)
+  // Pitch Z2 = 1370mm (mismo que físico, offset uniforme de 50mm)
+  z2Calibration: {
+    sensorToGate1Mm:    1250,   // dis1 en el Z2
+    gatePitchMm:        1370,   // mismo pitch que físico
+    offsetFromPhysical:  -50,   // Z2 dispara 50mm antes (≈ 71ms anticipo a 0.7 m/s)
   },
 } as const
 
@@ -145,21 +155,31 @@ export const DEFAULT_PHYSICAL_CONFIG = {
       speedMps:     0.70,    // velocidad operativa (máx. fabricante: 1.4 m/s)
     },
   ],
-  // Posiciones basadas en plano exterior: Gate 1 a 1370mm, pitch 800mm
+  // Mediciones en terreno (2026-04-11, cinta métrica):
+  //   - Detection Eye (fotocélula accel2) → Gate 1 pivot: 1300 mm
+  //   - Pitch entre pivots: 1370 mm uniforme (gates 1-12)
+  //   → Gate N = 1300 + (N-1) × 1370 mm
   flipperPositions: [
-    { gateNumber:  1, distanceFromSensorMeters: 1.370 },
-    { gateNumber:  2, distanceFromSensorMeters: 2.170 },
-    { gateNumber:  3, distanceFromSensorMeters: 2.970 },
-    { gateNumber:  4, distanceFromSensorMeters: 3.770 },
-    { gateNumber:  5, distanceFromSensorMeters: 4.570 },
-    { gateNumber:  6, distanceFromSensorMeters: 5.370 },
-    { gateNumber:  7, distanceFromSensorMeters: 6.170 },
-    { gateNumber:  8, distanceFromSensorMeters: 6.970 },
-    { gateNumber:  9, distanceFromSensorMeters: 7.770 },
-    { gateNumber: 10, distanceFromSensorMeters: 8.570 },
-    { gateNumber: 11, distanceFromSensorMeters: 9.370 },
-    { gateNumber: 12, distanceFromSensorMeters: 10.170 },
+    { gateNumber:  1, distanceFromSensorMeters:  1.300 },  //  1300 mm
+    { gateNumber:  2, distanceFromSensorMeters:  2.670 },  //  2670 mm
+    { gateNumber:  3, distanceFromSensorMeters:  4.040 },  //  4040 mm
+    { gateNumber:  4, distanceFromSensorMeters:  5.410 },  //  5410 mm
+    { gateNumber:  5, distanceFromSensorMeters:  6.780 },  //  6780 mm
+    { gateNumber:  6, distanceFromSensorMeters:  8.150 },  //  8150 mm
+    { gateNumber:  7, distanceFromSensorMeters:  9.520 },  //  9520 mm
+    { gateNumber:  8, distanceFromSensorMeters: 10.890 },  // 10890 mm
+    { gateNumber:  9, distanceFromSensorMeters: 12.260 },  // 12260 mm
+    { gateNumber: 10, distanceFromSensorMeters: 13.630 },  // 13630 mm
+    { gateNumber: 11, distanceFromSensorMeters: 15.000 },  // 15000 mm
+    { gateNumber: 12, distanceFromSensorMeters: 16.370 },  // 16370 mm (belt end: 17179mm)
   ],
+  // Paleta del flipper: medición en terreno 2026-04-11 = 475 mm
+  flipperPaddleLengthMm: 475,
+  // Valores dis1-dis12 programados en el controlador Marelec Z2
+  // (leídos desde "Cambiar Parámetros" → 2026-04-11)
+  // Nota: dis1=1250 vs físico=1300 → 50mm menos = anticipo de actuación neumática
+  // Verificar: capturar pantalla completa del Z2 con los 12 valores dis
+  z2ProgrammedDistancesMm: [1250, 2620, 3990, 5360, 6730, 8100, 9470, 10840, 12210, 13580, 14950, 16320],
 }
 
 /** Causas estandarizadas con labels y descripciones */

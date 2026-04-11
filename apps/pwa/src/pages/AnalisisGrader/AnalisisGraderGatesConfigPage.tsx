@@ -991,6 +991,85 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
               })()}
             </div>
 
+            {/* Valores Z2 — dis1..dis12 */}
+            <div>
+              <p className="text-sm font-medium mb-1">Distancias Z2 programadas (dis1–dis12)</p>
+              <p className="text-xs text-muted-foreground mb-3">
+                Valores leídos desde el controlador Z2 en <span className="font-medium text-foreground">Cambiar Parámetros → dis1..dis12</span>.
+                El Z2 dispara el solenoide cuando la cinta avanza esta distancia (en mm) desde el pesaje.
+                Bajar = abre antes. Subir = abre después. Estos valores incluyen compensación neumática.
+              </p>
+              {(() => {
+                const z2Vals = physicalConfig.z2ProgrammedDistancesMm ?? []
+                const mainBelt = physicalConfig.belts.find((b) => b.beltId === 'main')
+                const speedMps = mainBelt?.speedMps ?? 0.7
+                const physPos = physicalConfig.flipperPositions.slice().sort((a, b) => a.gateNumber - b.gateNumber)
+                return (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b text-left">
+                          <th className="py-2 px-2 w-14">Gate</th>
+                          <th className="py-2 px-2">Dist. Z2 (mm)</th>
+                          <th className="py-2 px-2 text-right text-muted-foreground text-xs">Timing Z2</th>
+                          <th className="py-2 px-2 text-right text-muted-foreground text-xs">Físico</th>
+                          <th className="py-2 px-2 text-right text-muted-foreground text-xs">Δ anticipo</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Array.from({ length: 12 }, (_, i) => {
+                          const gateNum = i + 1
+                          const z2Val = z2Vals[i] ?? null
+                          const physDist = physPos.find((fp) => fp.gateNumber === gateNum)?.distanceFromSensorMeters ?? null
+                          const z2TimeSec = z2Val != null && speedMps > 0 ? z2Val / 1000 / speedMps : null
+                          const physTimeSec = physDist != null && speedMps > 0 ? physDist / speedMps : null
+                          const deltaMm = z2Val != null && physDist != null ? z2Val - physDist * 1000 : null
+                          return (
+                            <tr key={gateNum} className="border-b hover:bg-muted/30">
+                              <td className="py-2 px-2 text-center">
+                                <Badge variant="outline" className="text-xs">{gateNum}</Badge>
+                              </td>
+                              <td className="py-2 px-2">
+                                <Input
+                                  type="number"
+                                  step="25"
+                                  min="100"
+                                  value={z2Val ?? ''}
+                                  placeholder="—"
+                                  onChange={(e) => {
+                                    const newVals = [...(physicalConfig.z2ProgrammedDistancesMm ?? Array(12).fill(null))]
+                                    newVals[i] = e.target.value ? Number(e.target.value) : 0
+                                    setPhysicalConfig((p) => ({ ...p, z2ProgrammedDistancesMm: newVals as number[] }))
+                                  }}
+                                  className="h-8 text-xs w-28 font-mono"
+                                />
+                              </td>
+                              <td className="py-2 px-2 text-right font-mono text-xs text-muted-foreground">
+                                {z2TimeSec != null ? `${z2TimeSec.toFixed(2)} s` : '—'}
+                              </td>
+                              <td className="py-2 px-2 text-right font-mono text-xs text-muted-foreground">
+                                {physTimeSec != null ? `${physTimeSec.toFixed(2)} s` : '—'}
+                              </td>
+                              <td className="py-2 px-2 text-right font-mono text-xs">
+                                {deltaMm != null ? (
+                                  <span className={cn(deltaMm < 0 ? 'text-amber-600' : 'text-muted-foreground')}>
+                                    {deltaMm > 0 ? '+' : ''}{deltaMm.toFixed(0)} mm
+                                  </span>
+                                ) : '—'}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+              })()}
+              <p className="text-xs text-muted-foreground mt-2">
+                Δ negativo = Z2 dispara antes que la posición física del pivot (compensación neumática normal).
+              </p>
+            </div>
+
             {/* Guardar */}
             <div className="flex items-center justify-between gap-2 flex-wrap pt-2 border-t">
               <div className="flex items-center gap-2">
