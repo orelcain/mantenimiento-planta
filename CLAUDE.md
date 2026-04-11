@@ -181,6 +181,7 @@ sidebarConfig  ← nuevo: orden personalizado del sidebar admin
 | Skill | Uso |
 |-------|-----|
 | `grader-diario` | Guia de trabajo con el modulo Grader en turno real: flujo Matrix→análisis, KPIs, Tendencia, IA, cuándo actuar |
+| `grader-historico` | Construir el archivo histórico Grader desde cero: qué exportar de Matrix, orden de carga PP→P0, verificar calendario, troubleshooting de errores comunes |
 
 ### Calidad de código
 | Skill | Uso |
