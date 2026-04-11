@@ -440,6 +440,105 @@ export function computeDeterministicInsights(
     }
   }
 
+  // ——— 17. Gate sobrecargada (>35% del tráfico en 1 sola compuerta) ———
+  // Si un gate acumula demasiado % del total, el flipper puede no resetear a tiempo
+  // y aparecen errores "puerta no preparada". La solución: duplicar ese calibre en otra gate.
+  if (result.gateAdvancedStats && result.gateAdvancedStats.length > 0 && result.kpis.totalPieces > 100) {
+    const activeStats = result.gateAdvancedStats.filter((g) => g.pieces > 0)
+    if (activeStats.length >= 2) {
+      const avgUtilization = 100 / activeStats.length
+
+      for (const g of activeStats) {
+        if (g.utilizationPct < 35) continue
+
+        // Gates con utilización < 40% del promedio → candidatas para absorber carga
+        const underloaded = activeStats
+          .filter((u) => u.gateNumber !== g.gateNumber && u.utilizationPct < avgUtilization * 0.45)
+
+        insights.push({
+          id: nextId(),
+          severity: g.utilizationPct >= 50 ? 'critical' : 'warn',
+          title: `Gate ${g.gateNumber} concentra el ${g.utilizationPct.toFixed(1)}% del tráfico`,
+          evidence: [
+            `Gate ${g.gateNumber}: ${g.pieces.toLocaleString()} pz = ${g.utilizationPct.toFixed(1)}% del total clasificado`,
+            `Promedio esperado por gate activa: ${avgUtilization.toFixed(1)}%`,
+            `Calibre: ${g.assignedCalibre} / ${g.assignedQuality}`,
+            underloaded.length > 0
+              ? `Gates con baja carga: ${underloaded.map((u) => `Gate ${u.gateNumber} (${u.utilizationPct.toFixed(1)}%)`).join(', ')}`
+              : 'Todas las gates activas trabajan a nivel elevado.',
+          ],
+          recommendations: [
+            `Asignar ${g.assignedCalibre} / ${g.assignedQuality} a una gate adicional para distribuir la carga.`,
+            ...(underloaded.length > 0
+              ? [`Gate ${underloaded[0].gateNumber} tiene capacidad disponible (${underloaded[0].utilizationPct.toFixed(1)}% de utilización actual).`]
+              : []),
+            'Ir a "Configurar compuertas" → duplicar el calibre en otra gate cercana.',
+            'Esto reduce el riesgo de "puerta no preparada" y mejora el throughput.',
+          ],
+        })
+      }
+    }
+  }
+
+  // ——— 18. Conflicto de timing entre gates adyacentes activas (Z2) ———
+  // Si dos gates consecutivas están activas, el tiempo entre sus dis Z2 debe ser
+  // suficiente para que el salmón pase y el flipper se resetee antes del siguiente.
+  // t_disponible = (dis_n+1 - dis_n) / vel_cinta
+  // t_requerido  = t_salmón_pasa + t_reset_neumático (~0.45s estimado)
+  if (physicalConfig && physicalConfig.z2ProgrammedDistancesMm && physicalConfig.z2ProgrammedDistancesMm.length >= 12) {
+    const mainBelt2 = physicalConfig.belts.find((b) => b.beltId === 'main')
+    const speedMps = mainBelt2?.speedMps ?? 1.28
+    const salmonLenM = physicalConfig.avgSalmonLengthCm / 100
+    const tSalmonPass = salmonLenM / speedMps
+    const tReset = 0.45   // tiempo estimado de reset del cilindro neumático (s)
+    const tRequired = tSalmonPass + tReset
+
+    const activeGateNums = result.gates
+      .filter((g) => g.active)
+      .map((g) => g.gateNumber)
+      .sort((a, b) => a - b)
+
+    for (let i = 0; i < activeGateNums.length - 1; i++) {
+      const g1 = activeGateNums[i]
+      const g2 = activeGateNums[i + 1]
+      if (g2 !== g1 + 1) continue   // solo gates ADYACENTES (consecutivas en número)
+
+      const dis1 = physicalConfig.z2ProgrammedDistancesMm[g1 - 1]
+      const dis2 = physicalConfig.z2ProgrammedDistancesMm[g2 - 1]
+      if (!dis1 || !dis2 || dis2 <= dis1) continue
+
+      const tAvailable = (dis2 - dis1) / 1000 / speedMps
+      const margin = tAvailable - tRequired
+
+      if (margin < 0.15) {   // margen < 150ms → riesgo real
+        // Verificar si "puerta no preparada" aparece en la data real
+        const doorNotReadyCause = result.pointZeroClassification.causes.find(
+          (c) => c.cause === 'puerta_no_preparada',
+        )
+        insights.push({
+          id: nextId(),
+          severity: margin < 0 ? 'warn' : 'info',
+          title: `Gate ${g1}→${g2}: timing Z2 muy ajustado entre gates adyacentes`,
+          evidence: [
+            `Tiempo disponible entre dis${g1}=${dis1}mm y dis${g2}=${dis2}mm: ${tAvailable.toFixed(2)} s`,
+            `Tiempo requerido (salmón ${physicalConfig.avgSalmonLengthCm}cm + reset neumático ~0.45s): ${tRequired.toFixed(2)} s`,
+            `Margen: ${margin >= 0 ? '+' : ''}${margin.toFixed(2)} s`,
+            ...(doorNotReadyCause && doorNotReadyCause.pieces > 0
+              ? [`"Puerta no preparada" en datos: ${doorNotReadyCause.pieces} pz (${doorNotReadyCause.pctOfTotal}%)`]
+              : []),
+          ],
+          recommendations: [
+            margin < 0
+              ? `El flipper de Gate ${g1} puede no estar reseteado cuando Gate ${g2} deba activarse — causa probable de "puerta no preparada".`
+              : `Margen reducido — monitorear si aparecen errores "puerta no preparada" en estos gates.`,
+            `Alternativa: bajar dis${g2} en el Z2 para aumentar el tiempo disponible (actualmente ${dis2} mm).`,
+            `Alternativa: reducir velocidad Sorting Belt — actualmente ${speedMps} m/s.`,
+          ],
+        })
+      }
+    }
+  }
+
   return insights
 }
 
