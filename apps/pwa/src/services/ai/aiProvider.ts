@@ -241,9 +241,18 @@ function buildPrompt(p: AIGraderInput): string {
         lines.push('    Gate ' + ft.gateNumber + ': ' + ft.distanceMeters.toFixed(2) + ' m → ' + ft.timeFromSensorSeconds.toFixed(2) + ' s' + flag)
       }
     }
-    lines.push('  Notas para la IA: Usa estos parámetros para contextualizar errores "too close/too long"')
-    lines.push('  y "puerta no preparada". Si la separación es menor que 1.4× el largo del salmón,')
-    lines.push('  considerar reducir alimentación en lugar de ajustar parámetros de clasificación.')
+    lines.push('  Especificaciones técnicas del fabricante (Marelec MS4/12):')
+    lines.push('    - Velocidad máxima: 1.4 m/s (no superar)')
+    lines.push('    - Producto máximo admitido: 1100mm largo, 290mm ancho, 15kg')
+    lines.push('    - Precisión del pesaje: ±20g (0-5kg) / ±50g (5-15kg)')
+    lines.push('    - 12 salidas a la derecha, sin batching')
+    lines.push('    - Gate 1 a 1370mm del sensor, pitch 800mm entre compuertas')
+    lines.push('  Notas para la IA:')
+    lines.push('    1. "too close/too long" puede ser congestionamiento (sep. < 1.4× largo salmón) o producto > 110cm.')
+    lines.push('    2. "puerta no preparada" en gates 1-3 puede indicar velocidad de cinta demasiado alta.')
+    lines.push('    3. "fuera de límites" puede incluir peces > 110cm o > 29cm ancho (límites físicos de la cinta).')
+    lines.push('    4. La imprecisión del pesaje (±20-50g) puede causar errores de clasificación en bordes de calibre.')
+    lines.push('    5. Si separación < 1.4× largo del salmón, priorizar reducción de alimentación antes de ajustar gates.')
   }
 
   if (p.trendForecast) {

@@ -56,48 +56,118 @@ export const CALIBRE_WEIGHT_RANGES: CalibreWeightRange[] = [
 ]
 
 /**
+ * Especificaciones técnicas reales de la Marelec MS4/12 (S/N 3943)
+ * Fuente: Instruction Manual MS4_12 (Marelec / MFT, Bélgica)
+ *
+ * Usadas para validación y contexto IA — NO editables por el operador.
+ */
+export const MARELEC_MS4_12_SPECS = {
+  model: 'MS4/12',
+  serialNumber: '3943',
+  controller: 'Marelec Z2',
+  // Anchos de cintas (sección 2.3.2)
+  beltWidths: {
+    zConveyor:       1200, // mm
+    accelerationBelt: 300, // mm (ambas cintas de aceleración)
+    gradingBelt:      300, // mm
+  },
+  // Dimensiones máximas de producto aceptadas (sección 2.3.2)
+  maxProductDimensions: {
+    lengthMm: 1100, // mm — peces > 110cm → "too long"
+    widthMm:   290, // mm — casi el ancho total de la cinta (300mm)
+  },
+  // Velocidad máxima de cintas (sección 2.3.2)
+  maxBeltSpeedMps: 1.4,
+  // Rango y precisión del sistema de pesaje (sección 2.3.2)
+  weighingRangeKg: { min: 0, max: 15 },
+  weighingPrecision: [
+    { rangeKg: { min: 0,  max: 5  }, stdevGrams: 20 },
+    { rangeKg: { min: 5,  max: 15 }, stdevGrams: 50 },
+  ],
+  // Salidas (sección 2.3.2)
+  outputs: 12,
+  outputsSide: 'right' as const,
+  // Layout del Grading Belt según plano exterior (sección 2.3.3)
+  //   Distancia sensor → Gate 1: ~1370mm
+  //   Pitch entre compuertas consecutivas: ~800mm
+  //   Largo total Grading Belt: ~17179mm
+  gradingBeltLayout: {
+    totalLengthMm:       17179,
+    sensorToGate1Mm:      1370,
+    gatePitchMm:           800,
+  },
+} as const
+
+/**
  * Configuración física por defecto de la clasificadora.
  *
- * Máquina: Marelec MS4/12 (S/N 3943, Marelec Z2)
+ * Máquina: Marelec MS4/12 (S/N 3943, controlador Z2)
  *   ❶ Static Weighing System (pockets 1-4, donde se pesa el salmón)
  *   ❷ Z-Conveyor (cinta elevadora, sube el salmón hacia las cintas de aceleración)
  *   ❸ Acceleration Belt 1 + Acceleration Belt 2 [fotocélula al final de la 2]
- *   ❹ Grading Belt (~13 m, 12 flippers/compuertas)
+ *   ❹ Grading Belt (~17.2 m, 12 compuertas/flippers)
  *
- * Los valores de distancias de flippers son aproximados (espaciado uniforme).
- * El operador puede ajustarlos en la sección "Configuración Física" de la grader.
+ * Valores de flippers basados en el plano exterior del manual:
+ *   Gate 1 a 1370mm del sensor, pitch 800mm entre compuertas.
+ * Velocidades: defaults operativos (máx. del fabricante = 1.4 m/s).
  */
 export const DEFAULT_PHYSICAL_CONFIG = {
-  avgSalmonLengthCm: 50,
+  avgSalmonLengthCm: 55,      // promedio conservador (máx. admitido: 110cm)
+  avgSalmonWidthCm:  20,      // promedio (máx. admitido: 29cm = casi el ancho de la cinta)
   pocketCount: 4,
   belts: [
-    { beltId: 'zeta'  as const, label: 'Z-Conveyor ❷ (cinta elevadora)',              lengthMeters: 3.0,  speedMps: 0.40 },
-    { beltId: 'accel1'as const, label: 'Acceleration Belt 1 ❸',                       lengthMeters: 1.5,  speedMps: 0.60 },
-    { beltId: 'accel2'as const, label: 'Acceleration Belt 2 ❸ (fotocélula al final)', lengthMeters: 2.5,  speedMps: 0.80 },
-    { beltId: 'main'  as const, label: 'Grading Belt ❹ (~13 m, 12 compuertas)',       lengthMeters: 13.0, speedMps: 0.70 },
+    {
+      beltId:       'zeta'   as const,
+      label:        'Z-Conveyor ❷ (cinta elevadora)',
+      lengthMeters: 3.0,
+      widthMeters:  1.20,    // 1200mm — especificación del fabricante
+      speedMps:     0.40,
+    },
+    {
+      beltId:       'accel1' as const,
+      label:        'Acceleration Belt 1 ❸',
+      lengthMeters: 1.5,
+      widthMeters:  0.30,    // 300mm — especificación del fabricante
+      speedMps:     0.80,
+    },
+    {
+      beltId:       'accel2' as const,
+      label:        'Acceleration Belt 2 ❸ (fotocélula al final)',
+      lengthMeters: 1.5,
+      widthMeters:  0.30,    // 300mm — especificación del fabricante
+      speedMps:     1.00,
+    },
+    {
+      beltId:       'main'   as const,
+      label:        'Grading Belt ❹ (17.2 m, 12 compuertas)',
+      lengthMeters: 17.179,  // 17179mm — plano exterior manual MS4_12
+      widthMeters:  0.30,    // 300mm — especificación del fabricante
+      speedMps:     0.70,    // velocidad operativa (máx. fabricante: 1.4 m/s)
+    },
   ],
+  // Posiciones basadas en plano exterior: Gate 1 a 1370mm, pitch 800mm
   flipperPositions: [
-    { gateNumber:  1, distanceFromSensorMeters:  0.80 },
-    { gateNumber:  2, distanceFromSensorMeters:  1.85 },
-    { gateNumber:  3, distanceFromSensorMeters:  2.91 },
-    { gateNumber:  4, distanceFromSensorMeters:  3.96 },
-    { gateNumber:  5, distanceFromSensorMeters:  5.01 },
-    { gateNumber:  6, distanceFromSensorMeters:  6.07 },
-    { gateNumber:  7, distanceFromSensorMeters:  7.12 },
-    { gateNumber:  8, distanceFromSensorMeters:  8.17 },
-    { gateNumber:  9, distanceFromSensorMeters:  9.23 },
-    { gateNumber: 10, distanceFromSensorMeters: 10.28 },
-    { gateNumber: 11, distanceFromSensorMeters: 11.33 },
-    { gateNumber: 12, distanceFromSensorMeters: 12.39 },
+    { gateNumber:  1, distanceFromSensorMeters: 1.370 },
+    { gateNumber:  2, distanceFromSensorMeters: 2.170 },
+    { gateNumber:  3, distanceFromSensorMeters: 2.970 },
+    { gateNumber:  4, distanceFromSensorMeters: 3.770 },
+    { gateNumber:  5, distanceFromSensorMeters: 4.570 },
+    { gateNumber:  6, distanceFromSensorMeters: 5.370 },
+    { gateNumber:  7, distanceFromSensorMeters: 6.170 },
+    { gateNumber:  8, distanceFromSensorMeters: 6.970 },
+    { gateNumber:  9, distanceFromSensorMeters: 7.770 },
+    { gateNumber: 10, distanceFromSensorMeters: 8.570 },
+    { gateNumber: 11, distanceFromSensorMeters: 9.370 },
+    { gateNumber: 12, distanceFromSensorMeters: 10.170 },
   ],
 }
 
 /** Causas estandarizadas con labels y descripciones */
 const CAUSE_META: Record<PointZeroCause, { label: string; description: string }> = {
   fuera_de_rango:       { label: 'Fuera de rango',          description: 'Pieza con peso fuera de los rangos de calibre definidos' },
-  fuera_de_limites:     { label: 'Fuera de límites',        description: 'Pieza fuera de dimensiones o parámetros del sistema' },
+  fuera_de_limites:     { label: 'Fuera de límites',        description: `Pieza fuera de dimensiones del sistema (máx. ${MARELEC_MS4_12_SPECS.maxProductDimensions.lengthMm}mm largo, ${MARELEC_MS4_12_SPECS.maxProductDimensions.widthMm}mm ancho)` },
   no_leido_fotocelula:  { label: 'No leído por fotocélula', description: 'Sensor óptico no detectó correctamente la pieza' },
-  too_close_too_long:   { label: 'Too close or too long',   description: 'Piezas demasiado cerca entre sí o longitud fuera de rango' },
+  too_close_too_long:   { label: 'Too close or too long',   description: `Piezas demasiado cerca entre sí, o longitud superior a ${MARELEC_MS4_12_SPECS.maxProductDimensions.lengthMm}mm` },
   puerta_no_preparada:  { label: 'Puerta no preparada',     description: 'Compuerta no estaba lista al momento de operar' },
   otro:                 { label: 'Otro / Desconocido',      description: 'Causa no clasificada en las categorías estándar' },
 }

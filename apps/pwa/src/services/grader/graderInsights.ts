@@ -356,30 +356,84 @@ export function computeDeterministicInsights(
     }
   }
 
-  // ——— 15. Flippers con tiempo de reacción crítico (< 1 s desde fotocélula) ———
+  // ——— 15. Precisión de pesaje en bordes de calibre ———
+  // La MS4/12 tiene ±20g (0-5kg) y ±50g (5-15kg). Si el peso promedio de un gate
+  // cae cerca del límite entre dos calibres, hay riesgo de clasificación incorrecta.
+  if (result.gateAdvancedStats && result.gateAdvancedStats.length > 0) {
+    const customRanges = result.config.customWeightRanges
+    if (customRanges && customRanges.length > 1) {
+      const sortedRanges = [...customRanges].sort((a, b) => a.minGrams - b.minGrams)
+      for (const gs of result.gateAdvancedStats) {
+        if (gs.pieces < 20 || gs.avgWeightGrams <= 0) continue
+        // Precisión del pesaje según rango: ±20g (0-5000g) / ±50g (5001-15000g)
+        const precision = gs.avgWeightGrams <= 5000 ? 20 : 50
+        // Buscar si el promedio del gate está dentro de [precisionZone] de un límite de calibre
+        const boundary = sortedRanges.find((r) => {
+          const distToMin = Math.abs(gs.avgWeightGrams - r.minGrams)
+          const distToMax = Math.abs(gs.avgWeightGrams - r.maxGrams)
+          return distToMin <= precision * 3 || distToMax <= precision * 3
+        })
+        if (boundary) {
+          const distToMin = Math.abs(gs.avgWeightGrams - boundary.minGrams)
+          const distToMax = Math.abs(gs.avgWeightGrams - boundary.maxGrams)
+          const closestBoundaryDist = Math.min(distToMin, distToMax)
+          if (closestBoundaryDist <= precision * 2) {
+            insights.push({
+              id: nextId(),
+              severity: 'info',
+              title: `Gate ${gs.gateNumber}: peso promedio muy cercano al límite de calibre`,
+              evidence: [
+                `Peso promedio: ${gs.avgWeightGrams}g (calibre ${gs.assignedCalibre})`,
+                `Límite de calibre más cercano: ${boundary.calibre} (${boundary.minGrams}-${boundary.maxGrams}g)`,
+                `Distancia al límite: ${closestBoundaryDist}g`,
+                `Precisión del pesaje (MS4/12): ±${precision}g stdev en este rango`,
+              ],
+              recommendations: [
+                `Con ±${precision}g de precisión, piezas de este gate pueden ser asignadas al calibre adyacente.`,
+                'Esto es una limitación física del sensor de pesaje, no un error de configuración.',
+                'Considerar ampliar el rango de este calibre o agregar un gate de margen.',
+              ],
+            })
+          }
+        }
+      }
+    }
+  }
+
+  // ——— 16. Flippers con tiempo de reacción crítico a vel. máx. del fabricante ———
+  // La MS4/12 puede operar hasta 1.4 m/s. A esa velocidad, Gate 1 (1.37m) tiene
+  // 1.37 / 1.4 = 0.98s — casi 1 segundo. Alertamos cuando < 1.5s a vel. actual.
   if (physicalConfig && physicalConfig.flipperPositions.length > 0) {
     const mainBelt = physicalConfig.belts.find((b) => b.beltId === 'main')
     if (mainBelt && mainBelt.speedMps > 0) {
+      // Calcular también a vel. máx. del fabricante para contexto
+      const maxSpeedMps = 1.4
       const criticalFlippers = physicalConfig.flipperPositions
-        .filter((fp) => fp.distanceFromSensorMeters / mainBelt.speedMps < 1.0)
+        .filter((fp) => fp.distanceFromSensorMeters / mainBelt.speedMps < 1.5)
         .map((fp) => ({
           gateNumber: fp.gateNumber,
           distanceM: fp.distanceFromSensorMeters,
           timeSec: fp.distanceFromSensorMeters / mainBelt.speedMps,
+          timeSecAtMaxSpeed: fp.distanceFromSensorMeters / maxSpeedMps,
         }))
 
       if (criticalFlippers.length > 0) {
         insights.push({
           id: nextId(),
-          severity: 'info',
-          title: `${criticalFlippers.length} flippers con tiempo de reacción < 1 s`,
+          severity: criticalFlippers.some((f) => f.timeSec < 0.9) ? 'warn' : 'info',
+          title: `${criticalFlippers.length} flippers con tiempo de reacción ajustado`,
           evidence: criticalFlippers.map(
-            (fp) => `Gate ${fp.gateNumber}: ${fp.distanceM.toFixed(2)} m → ${fp.timeSec.toFixed(2)} s desde fotocélula`,
+            (fp) =>
+              `Gate ${fp.gateNumber}: ${fp.distanceM.toFixed(3)} m → ${fp.timeSec.toFixed(2)} s @ ${mainBelt.speedMps} m/s` +
+              (mainBelt.speedMps < maxSpeedMps
+                ? ` (${fp.timeSecAtMaxSpeed.toFixed(2)} s a vel. máx. 1.4 m/s)`
+                : ''),
           ),
           recommendations: [
-            'Estos gates tienen menos de 1 segundo entre detección por fotocélula y accionamiento del flipper.',
-            'Verificar que el tiempo de actuación del solenoide/actuador sea inferior al tiempo disponible.',
-            'Si aparecen errores "puerta no preparada" en estos gates, revisar el timing de la señal de control.',
+            'Estos gates tienen menos de 1.5 segundos entre detección y accionamiento del flipper.',
+            'Verificar que el actuador neumático responda dentro del tiempo disponible.',
+            'Si hay errores "puerta no preparada" en estos gates, reducir la velocidad de la cinta.',
+            'Vel. máxima del fabricante (MS4/12): 1.4 m/s — no superar.',
           ],
         })
       }
