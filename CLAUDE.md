@@ -186,6 +186,7 @@ sidebarConfig  ← nuevo: orden personalizado del sidebar admin
 | Skill | Uso |
 |-------|-----|
 | `audit-unused-locals` | Detectar y eliminar vars/funciones huérfanas tras refactors. Previene fallos CI por `noUnusedLocals`. Incluye gotcha TypeScript 6 vs 5.7 |
+| `systematic-debugging` | Debugging con causa raíz primero — 4 fases: investigación, análisis de patrones, hipótesis/test, implementación. Regla: 3 fixes fallidos = STOP y rediscutir. |
 
 ### Referencia
 | Skill | Uso |
