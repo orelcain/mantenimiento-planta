@@ -148,6 +148,54 @@ export interface GraderBeltConfig {
   widthMeters?: number
   /** Velocidad de la cinta en metros/segundo */
   speedMps: number
+  /** Estado de calibración de speedMps */
+  calibrationStatus?: CalibrationStatus
+  /** Lectura Z2 (unidades internas) que corresponde a speedMps */
+  z2Units?: number
+}
+
+/**
+ * Estado de calibración de un parámetro físico.
+ * verified  = medido con instrumento (tachómetro, cinta métrica, cronómetro)
+ * estimated = derivado de spec del fabricante o cálculo teórico
+ * unknown   = no se tiene el dato, usar valor por defecto con cautela
+ */
+export type CalibrationStatus = 'verified' | 'estimated' | 'unknown'
+
+/**
+ * Datos del variador Danfoss y motoreductor de la cinta elevadora (Z-Belt).
+ * Permite calcular la velocidad real de la cinta desde el setpoint RPM del variador.
+ *
+ * Fórmula: belt_speed_mps = (vfdCurrentRpm / gearRatio / 60) × π × (sprocketDiameterMm / 1000)
+ *
+ * Datos conocidos (2026-04-11):
+ *   Motor: 1.5 kW, 1488 RPM nominal (placa del motor)
+ *   Reducción: i = 24:1
+ *   VFD Danfoss: setpoint 1400–1600 RPM en turno normal
+ *   Sprocket: ~120 mm derivado (FALTA MEDIR con calibre)
+ */
+export interface ZetaBeltDrive {
+  /** Velocidad nominal del motor (placa). Ref: 1488 RPM */
+  motorNominalRpm: number
+  /** Potencia del motor (placa). Ref: 1.5 kW */
+  motorKw?: number
+  /** Relación de reducción del motoreductor (i). Ref: 24 */
+  gearRatio: number
+  /**
+   * Diámetro del sprocket o polea motriz en mm.
+   * FALTA MEDIR: usar pie de metro/calibre en la polea de la cinta elevadora.
+   * Valor derivado teórico: ~120 mm (calculado de 0.39 m/s @ 1488 RPM, i=24).
+   */
+  sprocketDiameterMm?: number
+  /** RPM mínimo práctico del variador Danfoss. Ref: ~1400 RPM */
+  vfdMinRpm?: number
+  /** RPM máximo práctico del variador Danfoss. Ref: ~1600 RPM */
+  vfdMaxRpm?: number
+  /**
+   * RPM actual que ingresa el operador al inicio del turno.
+   * Leer de la pantalla del variador Danfoss.
+   */
+  vfdCurrentRpm?: number
 }
 
 /** Distancia física de un flipper/compuerta respecto a la fotocélula de entrada */
@@ -215,11 +263,8 @@ export interface GraderPhysicalConfig {
   z2ProgrammedDistancesMm?: number[]
   /**
    * Lecturas de velocidad de cintas desde la pantalla Z2 "Velocidad cintas".
-   * Unidad: unidades internas del Z2 (1 unit = 0.000786 m/s basado en sorting belt max).
-   * Factor de conversión: 1.4 m/s / 1781 unidades máx. = 0.000786 m/s por unidad.
-   * Registrar periódicamente al inicio del turno. Referencia: 26/12/2025 turno normal.
-   *
-   * Para convertir a m/s: units × 0.000786
+   * Unidad: unidades internas del Z2 (1 unit = factorMpsPerUnit m/s).
+   * Registrar al inicio de cada turno. Referencia: 26/12/2025 turno normal.
    */
   z2BeltSpeedReadings?: {
     /** Z-Belt (cinta elevadora). Ref: 494 units = 0.39 m/s */
@@ -233,6 +278,51 @@ export interface GraderPhysicalConfig {
     /** Fecha/turno de la lectura (ej. "26/12/2025 turno día") */
     readingLabel?: string
   }
+  /**
+   * Factor de conversión de unidades Z2 a m/s.
+   *
+   * Estado actual: ESTIMADO — derivado del máximo del fabricante (1781 unidades = 1.4 m/s).
+   * Para VERIFICAR: medir velocidad real con tachómetro en una cinta mientras el Z2
+   * muestra N unidades en "Velocidad cintas" → k_real = medidoMps / z2Units.
+   */
+  z2SpeedScale?: {
+    /** Factor de conversión: 1 unidad Z2 = factorMpsPerUnit m/s */
+    factorMpsPerUnit: number
+    /** Estado de calibración del factor */
+    anchorStatus: CalibrationStatus
+    /** Cinta usada para el punto de anclaje (al verificar con tachómetro) */
+    anchorBelt?: 'main' | 'accel1' | 'accel2' | 'zeta'
+    /** Unidades Z2 leídas en pantalla al momento de la medición */
+    anchorUnits?: number
+    /** Velocidad real medida con tachómetro (m/s) al mismo momento */
+    anchorActualMps?: number
+    /** Fecha de la medición de verificación */
+    anchorDate?: string
+  }
+  /**
+   * Datos del variador Danfoss y motoreductor de la cinta elevadora (Z-Belt).
+   * Ver interface ZetaBeltDrive para detalles.
+   */
+  zetaDrive?: ZetaBeltDrive
+  /**
+   * Tiempo de reset del cilindro neumático del flipper (segundos).
+   * Tiempo desde que el salmón pasa el flipper hasta que el flipper
+   * está listo para el siguiente pez.
+   *
+   * Estado: ESTIMADO en 0.45s.
+   * Para MEDIR: cronometrar en planta a velocidad normal de turno.
+   * Usado en insight #18 (timing Z2 entre gates adyacentes).
+   */
+  flipperResetTimeSec?: number
+  /**
+   * Espaciado promedio entre centros de peces en la cinta elevadora (metros).
+   * Necesario para calcular el caudal (peces/min) desde la velocidad Z-Belt.
+   *
+   * Estado: DESCONOCIDO — medir en planta o derivar del Excel.
+   * Forma de medir: contar peces/min en la salida de la elevadora a velocidad conocida.
+   * Derivar del Excel: (total_piezas / duración_turno_min) / (zeta_speed / spacing)
+   */
+  avgFishSpacingOnZetaBeltM?: number
 }
 
 // ============================================================================

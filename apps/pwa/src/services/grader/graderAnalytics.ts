@@ -140,34 +140,43 @@ export const DEFAULT_PHYSICAL_CONFIG = {
   pocketCount: 4,
   // Velocidades calibradas desde la pantalla Z2 "Velocidad cintas" (26/12/2025)
   // Factor de conversión k = 1.4 m/s / 1781 unidades (max sorting) = 0.000786 m/s/unit
+  // calibrationStatus: 'estimated' = derivado de spec fabricante, pendiente verificar con tachómetro
   belts: [
     {
-      beltId:       'zeta'   as const,
-      label:        'Z-Conveyor ❷ (cinta elevadora)',
-      lengthMeters: 3.0,
-      widthMeters:  1.20,    // 1200mm — especificación del fabricante
-      speedMps:     0.39,    // Z2 lectura: 494 units × 0.000786 = 0.388 m/s
+      beltId:             'zeta'   as const,
+      label:              'Z-Conveyor ❷ (cinta elevadora)',
+      lengthMeters:       3.0,
+      widthMeters:        1.20,    // 1200mm — especificación del fabricante
+      speedMps:           0.39,    // Z2: 494u × 0.000786 — VER TAMBIÉN zetaDrive para cálculo por RPM
+      z2Units:            494,
+      calibrationStatus:  'estimated' as const,
     },
     {
-      beltId:       'accel1' as const,
-      label:        'Acceleration Belt 1 ❸',
-      lengthMeters: 3.65,    // 365 cm — medición en terreno 2026-04-11
-      widthMeters:  0.30,    // 300mm — especificación del fabricante
-      speedMps:     1.03,    // Z2 lectura: 1313 units × 0.000786 = 1.032 m/s
+      beltId:             'accel1' as const,
+      label:              'Acceleration Belt 1 ❸',
+      lengthMeters:       3.65,    // 365 cm — medición en terreno 2026-04-11
+      widthMeters:        0.30,    // 300mm — especificación del fabricante
+      speedMps:           1.03,    // Z2: 1313u × 0.000786
+      z2Units:            1313,
+      calibrationStatus:  'estimated' as const,
     },
     {
-      beltId:       'accel2' as const,
-      label:        'Acceleration Belt 2 ❸ (fotocélula al final)',
-      lengthMeters: 1.70,    // 170 cm — medición en terreno 2026-04-11
-      widthMeters:  0.30,    // 300mm — especificación del fabricante
-      speedMps:     1.23,    // Z2 lectura: 1560 units × 0.000786 = 1.227 m/s
+      beltId:             'accel2' as const,
+      label:              'Acceleration Belt 2 ❸ (fotocélula al final)',
+      lengthMeters:       1.70,    // 170 cm — medición en terreno 2026-04-11
+      widthMeters:        0.30,    // 300mm — especificación del fabricante
+      speedMps:           1.23,    // Z2: 1560u × 0.000786
+      z2Units:            1560,
+      calibrationStatus:  'estimated' as const,
     },
     {
-      beltId:       'main'   as const,
-      label:        'Grading Belt ❹ (17.2 m, 12 compuertas)',
-      lengthMeters: 17.179,  // 17179mm — plano exterior manual MS4_12
-      widthMeters:  0.30,    // 300mm — especificación del fabricante
-      speedMps:     1.28,    // Z2 lectura: 1631 units × 0.000786 = 1.282 m/s (casi constante en turno)
+      beltId:             'main'   as const,
+      label:              'Grading Belt ❹ (17.2 m, 12 compuertas)',
+      lengthMeters:       17.179,  // 17179mm — plano exterior manual MS4_12
+      widthMeters:        0.30,    // 300mm — especificación del fabricante
+      speedMps:           1.28,    // Z2: 1631u × 0.000786 (casi constante en turno)
+      z2Units:            1631,
+      calibrationStatus:  'estimated' as const,
     },
   ],
   // Mediciones en terreno (2026-04-11, cinta métrica):
@@ -208,6 +217,56 @@ export const DEFAULT_PHYSICAL_CONFIG = {
     sortingUnits: 1631,   // → 1.28 m/s (casi constante en turno)
     readingLabel: '26/12/2025 turno día',
   },
+  // Factor de conversión Z2 → m/s (estado: ESTIMADO — derivado de spec fabricante)
+  // Para verificar: medir velocidad real con tachómetro en sorting belt mientras Z2 muestra N unidades
+  z2SpeedScale: {
+    factorMpsPerUnit: 0.000786,
+    anchorBelt:       'main' as const,
+    anchorUnits:      1781,   // unidades máx. vistas en pantalla Z2 (foto turno)
+    anchorActualMps:  1.40,   // velocidad máx. spec fabricante MS4/12
+    anchorStatus:     'estimated' as const,
+    anchorDate:       '2026-04-11',
+  },
+  // Variador y motoreductor de la cinta elevadora (datos placa motor 2026-04-11)
+  zetaDrive: {
+    motorNominalRpm: 1488,   // placa motor
+    motorKw:         1.5,    // placa motor
+    gearRatio:       24,     // relación de reducción i = 24:1
+    // sprocketDiameterMm: FALTA MEDIR con pie de metro en polea motriz
+    // Valor derivado teórico: 120 mm (calculado de 0.39 m/s @ 1488 RPM, i=24)
+    vfdMinRpm:       1400,   // setpoint mínimo observado en turno
+    vfdMaxRpm:       1600,   // setpoint máximo observado en turno
+    // vfdCurrentRpm: operador ingresa al inicio de cada turno
+  },
+  // Tiempo de reset neumático del flipper (ESTIMADO — cronometrar en planta)
+  // Usado en insight #18: t_disponible debe superar t_salmon_pasa + flipperResetTimeSec
+  flipperResetTimeSec: 0.45,
+}
+
+/**
+ * Calcula la velocidad de la cinta elevadora (Z-Belt) desde el setpoint RPM del variador.
+ * Retorna null si faltan datos (sprocketDiameterMm no medido aún).
+ *
+ * Fórmula: v = (vfdRpm / gearRatio / 60) × π × (sprocketDiameterMm / 1000)
+ */
+export function computeZetaBeltSpeedMps(
+  drive: { motorNominalRpm: number; gearRatio: number; sprocketDiameterMm?: number; vfdCurrentRpm?: number },
+): number | null {
+  if (!drive.sprocketDiameterMm) return null
+  const rpm = drive.vfdCurrentRpm ?? drive.motorNominalRpm
+  return (rpm / drive.gearRatio / 60) * Math.PI * (drive.sprocketDiameterMm / 1000)
+}
+
+/**
+ * Estima el caudal de la cinta elevadora en peces/minuto.
+ * Retorna null si falta el espaciado entre peces.
+ */
+export function estimateZetaThroughput(
+  zetaSpeedMps: number,
+  avgFishSpacingM: number | undefined,
+): number | null {
+  if (!avgFishSpacingM || avgFishSpacingM <= 0) return null
+  return (zetaSpeedMps * 60) / avgFishSpacingM
 }
 
 /**

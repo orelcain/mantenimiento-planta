@@ -491,7 +491,7 @@ export function computeDeterministicInsights(
     const speedMps = mainBelt2?.speedMps ?? 1.28
     const salmonLenM = physicalConfig.avgSalmonLengthCm / 100
     const tSalmonPass = salmonLenM / speedMps
-    const tReset = 0.45   // tiempo estimado de reset del cilindro neumático (s)
+    const tReset = physicalConfig.flipperResetTimeSec ?? 0.45  // reset cilindro neumático (s)
     const tRequired = tSalmonPass + tReset
 
     const activeGateNums = result.gates

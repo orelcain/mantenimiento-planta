@@ -25,8 +25,9 @@ import type {
   GraderQuality,
   CalibreRange,
   CalibreWeightRange,
+  CalibrationStatus,
 } from '@/services/grader/types'
-import { CALIBRE_WEIGHT_RANGES, DEFAULT_PHYSICAL_CONFIG } from '@/services/grader/graderAnalytics'
+import { CALIBRE_WEIGHT_RANGES, DEFAULT_PHYSICAL_CONFIG, computeZetaBeltSpeedMps, estimateZetaThroughput } from '@/services/grader/graderAnalytics'
 
 interface Props {
   gates: GateAssignment[]
@@ -49,6 +50,15 @@ function calibreRangeLookup(calibre: string, ranges: CalibreWeightRange[]): stri
   const r = ranges.find((w) => w.calibre === calibre)
   if (!r) return '—'
   return r.label || buildRangeLabel(r.calibre, r.minGrams, r.maxGrams)
+}
+
+/** Badge de estado de calibración para parámetros físicos */
+function CalibBadge({ status }: { status: CalibrationStatus | undefined }) {
+  if (status === 'verified')
+    return <Badge className="text-[10px] bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 whitespace-nowrap">✓ Verificado</Badge>
+  if (status === 'estimated')
+    return <Badge className="text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 whitespace-nowrap">⚠ Estimado</Badge>
+  return <Badge className="text-[10px] bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400 whitespace-nowrap">? Falta</Badge>
 }
 
 export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: initialConfig, parsedData, onComplete, onBack }: Props) {
@@ -831,7 +841,23 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                     placeholder="Medir en terreno"
                     className="mt-1 font-mono"
                   />
-                  <p className="text-[10px] text-muted-foreground mt-1">Desde eje hasta extremo</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">Desde eje hasta extremo. Medido: 475 mm.</p>
+                </div>
+                <div>
+                  <div className="flex items-center gap-1">
+                    <Label className="text-xs">Reset flipper (s)</Label>
+                    <CalibBadge status={physicalConfig.flipperResetTimeSec !== undefined && physicalConfig.flipperResetTimeSec !== 0.45 ? 'verified' : 'estimated'} />
+                  </div>
+                  <Input
+                    type="number"
+                    step="0.05"
+                    min="0.1"
+                    max="2.0"
+                    value={physicalConfig.flipperResetTimeSec ?? 0.45}
+                    onChange={(e) => setPhysicalConfig((p) => ({ ...p, flipperResetTimeSec: Number(e.target.value) }))}
+                    className="mt-1 font-mono"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">Tiempo reset cilindro neumático. Cronometrar en planta.</p>
                 </div>
                 <div>
                   <Label className="text-xs">Cantidad de Pockets</Label>
@@ -882,7 +908,8 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                       <th className="py-2 px-2">Cinta</th>
                       <th className="py-2 px-2 text-right">Largo (m)</th>
                       <th className="py-2 px-2 text-right">Velocidad (m/s)</th>
-                      <th className="py-2 px-2 text-right text-muted-foreground text-xs">Tiempo de tránsito</th>
+                      <th className="py-2 px-2 text-right text-muted-foreground text-xs">Tránsito</th>
+                      <th className="py-2 px-2 text-right text-muted-foreground text-xs">Estado</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -919,13 +946,140 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                           <td className="py-2 px-2 text-right text-xs text-muted-foreground font-mono">
                             {transitSec.toFixed(1)} s
                           </td>
+                          <td className="py-2 px-2 text-right">
+                            <CalibBadge status={belt.calibrationStatus} />
+                          </td>
                         </tr>
                       )
                     })}
                   </tbody>
                 </table>
               </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                <span className="text-amber-600 font-medium">⚠ Estimado</span> = derivado de unidades Z2 × factor k (pendiente verificar con tachómetro). Ver sección "Calibración".
+              </p>
             </div>
+
+            {/* Z-Belt variador Danfoss */}
+            {physicalConfig.zetaDrive && (() => {
+              const drive = physicalConfig.zetaDrive!
+              const computed = computeZetaBeltSpeedMps(drive)
+              const throughput = estimateZetaThroughput(computed ?? 0, physicalConfig.avgFishSpacingOnZetaBeltM)
+              return (
+                <div>
+                  <p className="text-sm font-medium mb-1">Z-Belt — Variador Danfoss (cinta elevadora)</p>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Calcula velocidad real desde el setpoint RPM del variador.
+                    Formula: v = (RPM / {drive.gearRatio} / 60) × π × (sprocket_mm / 1000)
+                  </p>
+                  <div className="space-y-3">
+                    {/* Datos fijos del motor */}
+                    <div className="grid grid-cols-3 gap-2 text-xs">
+                      <div className="bg-muted/30 rounded p-2">
+                        <p className="text-muted-foreground">Motor</p>
+                        <p className="font-mono font-medium">{drive.motorKw} kW · {drive.motorNominalRpm} RPM</p>
+                        <CalibBadge status="verified" />
+                      </div>
+                      <div className="bg-muted/30 rounded p-2">
+                        <p className="text-muted-foreground">Reducción</p>
+                        <p className="font-mono font-medium">i = {drive.gearRatio}:1</p>
+                        <CalibBadge status="verified" />
+                      </div>
+                      <div className="bg-muted/30 rounded p-2">
+                        <p className="text-muted-foreground">Rango VFD</p>
+                        <p className="font-mono font-medium">{drive.vfdMinRpm}–{drive.vfdMaxRpm} RPM</p>
+                        <CalibBadge status="estimated" />
+                      </div>
+                    </div>
+                    {/* Campos a ingresar */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <label className="text-xs w-44 shrink-0">
+                          Diámetro sprocket (mm)
+                          <span className="block text-muted-foreground">MEDIR con calibre en polea motriz</span>
+                        </label>
+                        <Input
+                          type="number" step="1" min="50" max="300"
+                          value={drive.sprocketDiameterMm ?? ''}
+                          placeholder="~120 (derivado teórico)"
+                          onChange={(e) => setPhysicalConfig((p) => ({
+                            ...p,
+                            zetaDrive: { ...(p.zetaDrive ?? drive), sprocketDiameterMm: e.target.value ? Number(e.target.value) : undefined },
+                          }))}
+                          className="h-8 text-xs w-32 font-mono"
+                        />
+                        <CalibBadge status={drive.sprocketDiameterMm ? 'verified' : 'unknown'} />
+                      </div>
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <label className="text-xs w-44 shrink-0">
+                          Setpoint variador (RPM)
+                          <span className="block text-muted-foreground">Leer del display Danfoss al inicio turno</span>
+                        </label>
+                        <Input
+                          type="number" step="10"
+                          min={drive.vfdMinRpm ?? 1000} max={drive.vfdMaxRpm ?? 2000}
+                          value={drive.vfdCurrentRpm ?? ''}
+                          placeholder={`ref: ${drive.motorNominalRpm}`}
+                          onChange={(e) => {
+                            const v = e.target.value ? Number(e.target.value) : undefined
+                            setPhysicalConfig((p) => ({
+                              ...p,
+                              zetaDrive: { ...(p.zetaDrive ?? drive), vfdCurrentRpm: v },
+                            }))
+                          }}
+                          className="h-8 text-xs w-32 font-mono"
+                        />
+                        <span className="text-xs text-muted-foreground">rango {drive.vfdMinRpm}–{drive.vfdMaxRpm} RPM</span>
+                      </div>
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <label className="text-xs w-44 shrink-0">
+                          Espaciado peces en Z-Belt (m)
+                          <span className="block text-muted-foreground">MEDIR: distancia centro a centro</span>
+                        </label>
+                        <Input
+                          type="number" step="0.05" min="0.1"
+                          value={physicalConfig.avgFishSpacingOnZetaBeltM ?? ''}
+                          placeholder="ej: 1.0"
+                          onChange={(e) => setPhysicalConfig((p) => ({
+                            ...p,
+                            avgFishSpacingOnZetaBeltM: e.target.value ? Number(e.target.value) : undefined,
+                          }))}
+                          className="h-8 text-xs w-32 font-mono"
+                        />
+                        <CalibBadge status={physicalConfig.avgFishSpacingOnZetaBeltM ? 'verified' : 'unknown'} />
+                      </div>
+                    </div>
+                    {/* Resultado calculado */}
+                    {computed !== null ? (
+                      <div className="bg-primary/5 border border-primary/20 rounded p-3 text-sm space-y-1">
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <span className="text-xs text-muted-foreground">@ {drive.vfdCurrentRpm ?? drive.motorNominalRpm} RPM →</span>
+                          <span className="font-mono font-semibold text-primary">{computed.toFixed(3)} m/s</span>
+                          {throughput !== null && (
+                            <span className="text-xs text-muted-foreground">· ~{throughput.toFixed(0)} pz/min</span>
+                          )}
+                        </div>
+                        <Button
+                          size="sm" variant="outline" className="text-xs h-7"
+                          onClick={() => setPhysicalConfig((p) => ({
+                            ...p,
+                            belts: p.belts.map((b) =>
+                              b.beltId === 'zeta' ? { ...b, speedMps: Math.round(computed * 1000) / 1000, calibrationStatus: 'verified' as const } : b,
+                            ),
+                          }))}
+                        >
+                          Aplicar como velocidad Z-Belt ✓
+                        </Button>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground italic">
+                        Ingresa el diámetro del sprocket para calcular velocidad desde RPM.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )
+            })()}
 
             {/* Distancias de flippers */}
             <div>
@@ -1075,10 +1229,87 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
               <p className="text-sm font-medium mb-1">Velocidad cintas Z2 (snapshot de turno)</p>
               <p className="text-xs text-muted-foreground mb-3">
                 Registrar los valores que muestra la pantalla Z2 <span className="font-medium text-foreground">"Velocidad cintas"</span> al inicio del turno.
-                Factor de conversión: <span className="font-mono text-foreground">1 unit = 0.000786 m/s</span> (basado en Sorting Belt máx. 1781 units = 1.4 m/s).
+                El sistema los convierte a m/s usando el factor de calibración.
               </p>
+              {/* Factor de calibración Z2 → m/s */}
               {(() => {
-                const k = 0.000786
+                const scale = physicalConfig.z2SpeedScale
+                const k = scale?.factorMpsPerUnit ?? 0.000786
+                return (
+                  <div className="mb-3 p-3 rounded-lg bg-muted/30 border text-xs space-y-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium">Factor conversión Z2 → m/s:</span>
+                      <span className="font-mono bg-background rounded px-2 py-0.5 border">{k.toFixed(6)} m/s/unit</span>
+                      <CalibBadge status={scale?.anchorStatus ?? 'estimated'} />
+                    </div>
+                    <p className="text-muted-foreground">
+                      Anclaje actual: {scale?.anchorUnits ?? 1781} units → {scale?.anchorActualMps ?? 1.40} m/s
+                      ({scale?.anchorBelt === 'main' ? 'Sorting Belt' : scale?.anchorBelt ?? 'Sorting Belt'}) —
+                      derivado de <span className="italic">especificación fabricante</span>.
+                    </p>
+                    <div className="border-t pt-2 space-y-2">
+                      <p className="font-medium text-foreground">Para verificar con tachómetro:</p>
+                      <p className="text-muted-foreground">
+                        Medir velocidad real de la Sorting Belt mientras el Z2 muestra N unidades.
+                        Ingresar aquí → k_real = velocidad_medida / unidades_Z2.
+                      </p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <label className="w-36 shrink-0">Unidades Z2 (leídas):</label>
+                        <Input
+                          type="number" step="1" min="0"
+                          value={scale?.anchorUnits ?? ''}
+                          placeholder="ej: 1631"
+                          onChange={(e) => {
+                            const units = e.target.value ? Number(e.target.value) : undefined
+                            setPhysicalConfig((p) => ({
+                              ...p,
+                              z2SpeedScale: {
+                                factorMpsPerUnit: units && p.z2SpeedScale?.anchorActualMps
+                                  ? p.z2SpeedScale.anchorActualMps / units
+                                  : (p.z2SpeedScale?.factorMpsPerUnit ?? 0.000786),
+                                anchorBelt: 'main' as const,
+                                anchorUnits: units,
+                                anchorActualMps: p.z2SpeedScale?.anchorActualMps,
+                                anchorStatus: (units && p.z2SpeedScale?.anchorActualMps) ? 'verified' as const : 'estimated' as const,
+                              },
+                            }))
+                          }}
+                          className="h-7 text-xs w-24 font-mono"
+                        />
+                        <label className="shrink-0">Velocidad medida (m/s):</label>
+                        <Input
+                          type="number" step="0.01" min="0" max="2"
+                          value={scale?.anchorActualMps ?? ''}
+                          placeholder="ej: 1.28"
+                          onChange={(e) => {
+                            const mps = e.target.value ? Number(e.target.value) : undefined
+                            setPhysicalConfig((p) => ({
+                              ...p,
+                              z2SpeedScale: {
+                                factorMpsPerUnit: mps && p.z2SpeedScale?.anchorUnits
+                                  ? mps / p.z2SpeedScale.anchorUnits
+                                  : (p.z2SpeedScale?.factorMpsPerUnit ?? 0.000786),
+                                anchorBelt: 'main' as const,
+                                anchorUnits: p.z2SpeedScale?.anchorUnits,
+                                anchorActualMps: mps,
+                                anchorStatus: (mps && p.z2SpeedScale?.anchorUnits) ? 'verified' as const : 'estimated' as const,
+                              },
+                            }))
+                          }}
+                          className="h-7 text-xs w-24 font-mono"
+                        />
+                        {scale?.anchorUnits && scale?.anchorActualMps && (
+                          <span className="font-mono text-green-600 font-medium">
+                            k = {(scale.anchorActualMps / scale.anchorUnits).toFixed(6)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })()}
+              {(() => {
+                const k = physicalConfig.z2SpeedScale?.factorMpsPerUnit ?? 0.000786
                 type SpeedKey = 'zBeltUnits' | 'accel1Units' | 'accel2Units' | 'sortingUnits'
                 const readings = physicalConfig.z2BeltSpeedReadings
                 const fields: { key: SpeedKey; label: string; refUnits: number; beltId: string }[] = [
