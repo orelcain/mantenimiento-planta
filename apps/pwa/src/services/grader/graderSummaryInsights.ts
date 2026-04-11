@@ -59,23 +59,21 @@ export function computeInsightsFromSummary(
 
   // ── 2. Concentración de causa P0 ────────────────────────────────────────────
   const causes = summary.topP0Causes ?? []
-  if (causes.length > 0 && summary.pointZeroPieces > 0) {
-    const top = causes[0]
-    if (top.pct >= CAUSE_CONCENTRATION) {
-      insights.push({
-        id: nextId(),
-        severity: 'warn',
-        title: `Causa dominante: "${top.error}"`,
-        evidence: [
-          `${top.error}: ${top.pieces.toLocaleString('es-CL')} piezas (${top.pct}% del total P0)`,
-          `Concentración sobre ${CAUSE_CONCENTRATION}% en una sola causa.`,
-        ],
-        recommendations: [
-          'Concentrar revisión en esta causa específica.',
-          'Verificar la sección del equipo relacionada con este tipo de error.',
-        ],
-      })
-    }
+  const top = causes[0]
+  if (top && summary.pointZeroPieces > 0 && top.pct >= CAUSE_CONCENTRATION) {
+    insights.push({
+      id: nextId(),
+      severity: 'warn',
+      title: `Causa dominante: "${top.error}"`,
+      evidence: [
+        `${top.error}: ${top.pieces.toLocaleString('es-CL')} piezas (${top.pct}% del total P0)`,
+        `Concentración sobre ${CAUSE_CONCENTRATION}% en una sola causa.`,
+      ],
+      recommendations: [
+        'Concentrar revisión en esta causa específica.',
+        'Verificar la sección del equipo relacionada con este tipo de error.',
+      ],
+    })
   }
 
   // ── 3. Muestra pequeña ──────────────────────────────────────────────────────

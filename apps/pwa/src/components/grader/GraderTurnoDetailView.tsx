@@ -359,7 +359,6 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
                   maintainAspectRatio: false,
                   plugins: {
                     legend: { display: false },
-                    annotation: undefined,
                     tooltip: {
                       callbacks: {
                         label: (ctx) => `P0%: ${ctx.parsed.y}%`,
