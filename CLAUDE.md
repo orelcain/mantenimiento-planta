@@ -420,12 +420,35 @@ sidebarConfig  ← nuevo: orden personalizado del sidebar admin
 
 ## Pendientes priorizados
 
-### P0 — Grader: refactor iter 4 (próxima sesión)
-- [ ] **Extraer `GraderPuntoCeroTab`**: último tab inline en dashboard (~900 líneas). Requiere mapeo previo de >15 dependencias: `patternByCalibre/Quality/Hour`, `patternCalibreChartData`, `classificationChartData`, helpers `getCauseColor`/`resolveCalibreLabel`/`handlePinPatternPoint`, refs de Chart, etc. Ver `.claude/skills/evaluar-modulo/reportes/grader-2026-04-10-iter3.md` sección "Meta iteración 4".
-- **Target iter 4**: dashboard ≤1900 líneas (hoy 2836), hooks ≤30 (hoy ~50).
+### ✅ Grader — refactor COMPLETADO (iter 1 → iter 5, 2026-04-10/11)
 
-### ✅ Completados en sesión 2026-04-10 (no volver acá)
-<!-- completados
+Arco cerrado. Dashboard pasó de **5262 → 1485 líneas (-72%)** y score global **61.4 → 88.0 (+43%)**.
+
+| iter | Dashboard | Score | Cambio clave | Commit |
+|---:|---:|---:|---|---|
+| 1 (baseline) | 5262 | 61.4 | Mega-componente inicial | — |
+| 2 | 4495 | 71.4 | Helpers + `useGraderDashboardAnalytics` + inline panels | `161d7945` |
+| 3 | 2836 | 78.6 | Extraer 5/6 tabs por componente | `ee7d7f8d` |
+| 4 | 1817 | 84.2 | Extraer `GraderPuntoCeroTab` | `81db31a6` |
+| **5** | **1485** | **88.0** | **Extraer `useGraderPatternAnalytics` + unificar helpers** | `94067ad7` |
+
+**Arquitectura final del módulo Grader:**
+- Dashboard (1485 líneas): orquestador puro
+- 2 hooks de analytics: `useGraderDashboardAnalytics` + `useGraderPatternAnalytics`
+- 6 sub-tabs autocontenidos: Matriz (162), Compuertas (270), Sugerencias (107), Lotes (413), Tendencia (1053), Punto Cero (1157)
+- Helpers compartidos en `services/grader/graderDashboardHelpers.ts`
+
+**Iteraciones futuras opcionales (baja prioridad, no bloqueantes):**
+- [ ] Partir `GraderTendenciaTab` (1053 líneas) en sub-cards por card P0 (#1-#7)
+- [ ] Partir `GraderPuntoCeroTab` (1157 líneas) en sub-cards (Clasificación, Patrones, Pivote, Fuera de rango, Serie temporal)
+- [ ] Unit tests de los 2 hooks de analytics
+
+<!-- completados sesión 2026-04-11 (iter 4 + iter 5)
+- ✅ Refactor iter 4: extraer GraderPuntoCeroTab — commit 81db31a6
+- ✅ Refactor iter 5: extraer useGraderPatternAnalytics hook + unificar helpers — commit 94067ad7
+-->
+
+<!-- completados sesión 2026-04-10
 - ✅ Grader P0 #1: Panel proyección turno (tab Tendencia) — commit 15661e59
 - ✅ Grader P0 #2: Chart peso toggle Simple/Detallado — commit 50831677
 - ✅ Grader P0 #3: Badge P0 cierre prominente en header — commit 50831677
@@ -434,9 +457,9 @@ sidebarConfig  ← nuevo: orden personalizado del sidebar admin
 - ✅ Grader P0 #6: Comparativa turno día/noche — commit 72f6cd0d
 - ✅ Grader P0 #7: Detección degradación de sensores — commit 72f6cd0d
 - ✅ Refactor iter 2: extraer useGraderDashboardAnalytics + helpers + inline panels — commit 161d7945
-- ✅ Refactor iter 3: extraer 5/6 sub-tabs (Matriz, Compuertas, Sugerencias, Lotes, Tendencia) — commit ee7d7f8d
-- ✅ Skill evaluar-modulo (auditoría integral 360° con scorecard + meta iterativa) — commit e9c17806
-- ✅ Rutina de sesión 2 pasos (proyecto/conversación + sync/deploys/pendientes) — commit c2834d96
+- ✅ Refactor iter 3: extraer 5/6 sub-tabs — commit ee7d7f8d
+- ✅ Skill evaluar-modulo — commit e9c17806
+- ✅ Rutina de sesión 2 pasos — commit c2834d96
 -->
 
 ### P1 — Requiere acceso a Firebase Console / IAM
