@@ -241,6 +241,13 @@ function buildPrompt(p: AIGraderInput): string {
         lines.push('    Gate ' + ft.gateNumber + ': ' + ft.distanceMeters.toFixed(2) + ' m → ' + ft.timeFromSensorSeconds.toFixed(2) + ' s' + flag)
       }
     }
+    if (pc.flipperTimings.length > 0) {
+      const mainSpeedMps = pc.mainBeltSpeedMps
+      // flipperPaddleLengthMm no está en physicalContext, pero lo calculamos
+      // si el campo está disponible en el future. Por ahora nota general.
+      lines.push('  Tiempo mínimo que el flipper debe estar abierto (salmón de ' + pc.avgSalmonLengthCm + 'cm): ' +
+        (pc.avgSalmonLengthCm / 100 / mainSpeedMps).toFixed(2) + ' s')
+    }
     lines.push('  Especificaciones técnicas del fabricante (Marelec MS4/12):')
     lines.push('    - Velocidad máxima: 1.4 m/s (no superar)')
     lines.push('    - Producto máximo admitido: 1100mm largo, 290mm ancho, 15kg')

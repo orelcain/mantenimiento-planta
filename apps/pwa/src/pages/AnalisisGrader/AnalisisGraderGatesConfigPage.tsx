@@ -788,9 +788,9 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
               Usados para calcular separación entre peces, timing de flippers y enriquecer el contexto de la IA.
             </p>
 
-            {/* Dimensiones del salmón y pockets */}
+            {/* Dimensiones del salmón, flipper y pockets */}
             <div>
-              <p className="text-sm font-medium mb-3">Producto y alimentación</p>
+              <p className="text-sm font-medium mb-3">Producto y flipper</p>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div>
                   <Label className="text-xs">Largo prom. salmón (cm)</Label>
@@ -803,6 +803,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                     onChange={(e) => setPhysicalConfig((p) => ({ ...p, avgSalmonLengthCm: Number(e.target.value) }))}
                     className="mt-1 font-mono"
                   />
+                  <p className="text-[10px] text-muted-foreground mt-1">Máx. admitido: 110 cm</p>
                 </div>
                 <div>
                   <Label className="text-xs">Ancho prom. salmón (cm)</Label>
@@ -816,6 +817,21 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                     placeholder="—"
                     className="mt-1 font-mono"
                   />
+                  <p className="text-[10px] text-muted-foreground mt-1">Máx. admitido: 29 cm</p>
+                </div>
+                <div>
+                  <Label className="text-xs">Largo paleta flipper (mm)</Label>
+                  <Input
+                    type="number"
+                    step="1"
+                    min="50"
+                    max="500"
+                    value={physicalConfig.flipperPaddleLengthMm ?? ''}
+                    onChange={(e) => setPhysicalConfig((p) => ({ ...p, flipperPaddleLengthMm: e.target.value ? Number(e.target.value) : undefined }))}
+                    placeholder="Medir en terreno"
+                    className="mt-1 font-mono"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">Desde eje hasta extremo</p>
                 </div>
                 <div>
                   <Label className="text-xs">Cantidad de Pockets</Label>
@@ -830,6 +846,26 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                   />
                 </div>
               </div>
+              {physicalConfig.flipperPaddleLengthMm && (() => {
+                const mainBelt = physicalConfig.belts.find((b) => b.beltId === 'main')
+                const speedMps = mainBelt?.speedMps ?? 0.7
+                const minOpenTimeSec = (physicalConfig.flipperPaddleLengthMm / 1000) / speedMps
+                const salmonPassTimeSec = physicalConfig.avgSalmonLengthCm / 100 / speedMps
+                return (
+                  <div className="mt-3 p-3 rounded-lg bg-sky-500/10 border border-sky-500/20 text-xs space-y-1">
+                    <p className="font-medium text-sky-700 dark:text-sky-300">Timing calculado con datos actuales</p>
+                    <p className="text-muted-foreground">
+                      Tiempo mínimo que el flipper debe estar abierto (paleta pasa): <span className="font-mono font-medium text-foreground">{minOpenTimeSec.toFixed(3)} s</span>
+                    </p>
+                    <p className="text-muted-foreground">
+                      Tiempo que un salmón de {physicalConfig.avgSalmonLengthCm} cm tarda en pasar el flipper: <span className="font-mono font-medium text-foreground">{salmonPassTimeSec.toFixed(3)} s</span>
+                    </p>
+                    <p className="text-muted-foreground">
+                      Ventana de cierre mínima después que el salmón pasó: <span className="font-mono font-medium text-foreground">{Math.max(0, salmonPassTimeSec - minOpenTimeSec).toFixed(3)} s</span>
+                    </p>
+                  </div>
+                )
+              })()}
             </div>
 
             {/* Cintas */}

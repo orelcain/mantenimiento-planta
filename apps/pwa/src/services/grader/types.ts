@@ -163,12 +163,15 @@ export interface GraderFlipperPosition {
  * Usado para calcular separación entre peces, timing de flippers
  * y mejorar las recomendaciones de la IA.
  *
- * Flujo del salmón:
- *   Pocket (1-4)
- *     → Cinta Zeta (elevadora)
- *     → Cinta Aceleración 1
- *     → Cinta Aceleración 2  [fotocélula al final]
- *     → Cinta Larga (clasificadora, ~13 m, 12 flippers)
+ * Flujo del salmón (Marelec MS4/12):
+ *   ❶ Static Weighing System (Pockets 1-4)
+ *   ❷ Z-Conveyor (cinta elevadora)
+ *   ❸ Acceleration Belt 1 → Acceleration Belt 2 [Detection Eye / fotocélula al final]
+ *   ❹ Grading Belt (17.2 m, 12 flipper modules)
+ *
+ * El timing de cada flipper se calcula como:
+ *   t_señal = distanceFromSensorMeters / velocidad_cinta_principal
+ *   t_apertura_mínima = avgSalmonLengthCm / 100 / velocidad_cinta_principal
  */
 export interface GraderPhysicalConfig {
   /** Largo promedio del salmón en centímetros */
@@ -179,8 +182,17 @@ export interface GraderPhysicalConfig {
   pocketCount: number
   /** Configuración de las 4 cintas del sistema */
   belts: GraderBeltConfig[]
-  /** Distancias físicas de cada flipper desde la fotocélula */
+  /**
+   * Distancias físicas de cada flipper desde la fotocélula (Detection Eye).
+   * Medir desde el lente del sensor hasta el eje de rotación (pivot) del flipper.
+   */
   flipperPositions: GraderFlipperPosition[]
+  /**
+   * Largo de la paleta del flipper en milímetros (desde el eje de rotación hasta el extremo).
+   * Determina el tiempo mínimo de apertura: t_min = flipperPaddleLengthMm / 1000 / velocidad_cinta.
+   * Medir en terreno con cinta métrica.
+   */
+  flipperPaddleLengthMm?: number
 }
 
 // ============================================================================
