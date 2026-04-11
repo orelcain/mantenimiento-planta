@@ -133,6 +133,109 @@ export interface GraderUpload {
 }
 
 // ============================================================================
+// CONFIGURACIÓN FÍSICA DE LA MÁQUINA
+// ============================================================================
+
+/** Configuración de una cinta transportadora de la grader */
+export interface GraderBeltConfig {
+  /** Identificador de la cinta en el flujo de la máquina */
+  beltId: 'zeta' | 'accel1' | 'accel2' | 'main'
+  /** Nombre visible para el operador */
+  label: string
+  /** Largo de la cinta en metros */
+  lengthMeters: number
+  /** Ancho de la cinta en metros (opcional) */
+  widthMeters?: number
+  /** Velocidad de la cinta en metros/segundo */
+  speedMps: number
+}
+
+/** Distancia física de un flipper/compuerta respecto a la fotocélula de entrada */
+export interface GraderFlipperPosition {
+  /** Número de compuerta (1..12) */
+  gateNumber: number
+  /** Distancia desde la fotocélula al flipper en metros */
+  distanceFromSensorMeters: number
+}
+
+/**
+ * Parámetros físicos reales de la clasificadora grader.
+ * Usado para calcular separación entre peces, timing de flippers
+ * y mejorar las recomendaciones de la IA.
+ *
+ * Flujo del salmón (Marelec MS4/12, S/N 3943):
+ *   ❶ Static Weighing System (Pockets 1-4) — referencia de pesaje del Z2
+ *   ❷ Z-Conveyor (cinta elevadora, 1200mm ancho)
+ *   ❸ Acceleration Belt 1 → Acceleration Belt 2 [Detection Eye ❸ al final]
+ *   ❹ Grading Belt (17179mm, 300mm ancho, 12 flipper modules)
+ *
+ * Timing de cada flipper:
+ *   t_señal = distanceFromSensorMeters / velocidad_cinta_principal
+ *   t_apertura_mínima = (flipperPaddleLengthMm / 1000) / velocidad_cinta
+ *   t_pez_pasa = avgSalmonLengthCm / 100 / velocidad_cinta
+ *
+ * Mediciones en terreno (2026-04-11):
+ *   - Sensor (Detection Eye) → Gate 1 pivot: 1300 mm
+ *   - Pitch entre pivots consecutivos: 1370 mm (uniforme gates 1-12)
+ *   - Largo paleta flipper: 475 mm
+ *
+ * Nota Z2: los parámetros dis1-dis12 del controlador Z2 pueden diferir
+ * de las distancias físicas porque incluyen compensación del tiempo de
+ * actuación del solenoide neumático (dis1=1250 vs físico=1300: 50mm ≈ 71ms anticipo).
+ */
+export interface GraderPhysicalConfig {
+  /** Largo promedio del salmón en centímetros */
+  avgSalmonLengthCm: number
+  /** Ancho promedio del salmón en centímetros (opcional) */
+  avgSalmonWidthCm?: number
+  /** Número de pockets de alimentación (Static Weighing System ❶) */
+  pocketCount: number
+  /** Configuración de las 4 cintas del sistema */
+  belts: GraderBeltConfig[]
+  /**
+   * Distancias físicas de cada flipper desde el Detection Eye (fotocélula ❸).
+   * Medidas desde el lente del sensor hasta el eje de rotación (pivot) del flipper.
+   * Mediciones reales: Gate 1 = 1300mm, pitch uniforme = 1370mm.
+   */
+  flipperPositions: GraderFlipperPosition[]
+  /**
+   * Largo de la paleta del flipper en milímetros (desde eje de rotación hasta extremo).
+   * Medición en terreno 2026-04-11: 475 mm.
+   * t_apertura_mínima = flipperPaddleLengthMm / 1000 / velocidad_cinta
+   */
+  flipperPaddleLengthMm?: number
+  /**
+   * Distancias programadas en el controlador Marelec Z2 (parámetros dis1-dis12).
+   * Leídas desde "Cambiar Parámetros" → dis1..dis12 en el Z2.
+   * Son más precisas que las mediciones físicas para calcular el timing real,
+   * ya que incluyen la compensación de actuación del solenoide neumático.
+   * Bajar dis = flipper abre antes. Subir dis = flipper abre después.
+   * Unidad: milímetros. Array de 12 valores (index 0 = Gate 1).
+   */
+  z2ProgrammedDistancesMm?: number[]
+  /**
+   * Lecturas de velocidad de cintas desde la pantalla Z2 "Velocidad cintas".
+   * Unidad: unidades internas del Z2 (1 unit = 0.000786 m/s basado en sorting belt max).
+   * Factor de conversión: 1.4 m/s / 1781 unidades máx. = 0.000786 m/s por unidad.
+   * Registrar periódicamente al inicio del turno. Referencia: 26/12/2025 turno normal.
+   *
+   * Para convertir a m/s: units × 0.000786
+   */
+  z2BeltSpeedReadings?: {
+    /** Z-Belt (cinta elevadora). Ref: 494 units = 0.39 m/s */
+    zBeltUnits?: number
+    /** Acceleration Belt 1. Ref: 1313 units = 1.03 m/s */
+    accel1Units?: number
+    /** Acceleration Belt 2 (con fotocélula). Ref: 1560 units = 1.23 m/s */
+    accel2Units?: number
+    /** Sorting Belt / Grading Belt (cinta larga). Ref: 1631 units = 1.28 m/s. Casi constante. */
+    sortingUnits?: number
+    /** Fecha/turno de la lectura (ej. "26/12/2025 turno día") */
+    readingLabel?: string
+  }
+}
+
+// ============================================================================
 // CONFIGURACION POR DISPOSITIVO (RANGOS PERSISTENTES)
 // ============================================================================
 
@@ -152,6 +255,8 @@ export interface GraderModuleConfig {
   id: 'global';
   customWeightRanges: CalibreWeightRange[];
   shiftSchedule?: GraderShiftSchedule[];
+  /** Configuración física de la máquina grader */
+  physicalConfig?: GraderPhysicalConfig;
   updatedBy: string;
   updatedAt: string;
 }
@@ -208,6 +313,8 @@ export interface GraderAnalysisConfig {
   };
   /** Rangos de peso por calibre personalizados (sobreescriben los default) */
   customWeightRanges?: CalibreWeightRange[];
+  /** Parámetros físicos de la máquina (cintas, flippers, dimensiones del salmón) */
+  physicalConfig?: GraderPhysicalConfig;
 }
 
 // ============================================================================
@@ -535,6 +642,26 @@ export interface AIGraderInput {
     distributionByQuality: Array<{ key: string; pieces: number; pct: number }>;
     hourlyDistribution?: Array<{ hour: string; pieces: number; pct: number }>;
   };
+  /**
+   * Contexto físico de la máquina — enriquece las recomendaciones de la IA
+   * con métricas derivadas de la configuración física real.
+   */
+  physicalContext?: {
+    /** Velocidad de la cinta clasificadora principal (m/s) */
+    mainBeltSpeedMps: number
+    /** Largo promedio del salmón configurado (cm) */
+    avgSalmonLengthCm: number
+    /** Separación estimada entre peces en la cinta principal (cm) */
+    estimatedSpacingCm: number
+    /** Nivel de riesgo de errores "too close": low (<40% margen), medium, high (>80% saturación) */
+    tooCloseRiskLevel: 'low' | 'medium' | 'high'
+    /** Tiempo desde fotocélula hasta cada flipper a la velocidad actual */
+    flipperTimings: Array<{
+      gateNumber: number
+      distanceMeters: number
+      timeFromSensorSeconds: number
+    }>
+  }
   /** Proyección opcional de cierre de turno basada en datos parciales */
   trendForecast?: {
     shiftStart: string;

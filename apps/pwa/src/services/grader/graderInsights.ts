@@ -313,6 +313,232 @@ export function computeDeterministicInsights(
     }
   }
 
+  // ——— 14. Análisis físico: separación entre peces en la cinta ———
+  const physicalConfig = result.config.physicalConfig
+  if (physicalConfig && result.kpis.productionRatePerHour && result.kpis.productionRatePerHour > 0) {
+    const mainBelt = physicalConfig.belts.find((b) => b.beltId === 'main')
+    if (mainBelt && mainBelt.speedMps > 0) {
+      // Separación entre peces: distancia = velocidad / (piezas/segundo)
+      const ratePerSec = result.kpis.productionRatePerHour / 3600
+      const spacingMeters = mainBelt.speedMps / ratePerSec
+      const spacingCm = spacingMeters * 100
+      const salmonLengthCm = physicalConfig.avgSalmonLengthCm
+      const gapCm = spacingCm - salmonLengthCm
+      const ratioToLength = spacingCm / salmonLengthCm
+
+      if (ratioToLength < 1.4) {
+        const tooCloseCause = result.pointZeroClassification.causes.find(
+          (c) => c.cause === 'too_close_too_long',
+        )
+        const evidence: string[] = [
+          `Velocidad cinta clasificadora: ${mainBelt.speedMps} m/s`,
+          `Tasa de producción: ${result.kpis.productionRatePerHour.toFixed(0)} pz/h`,
+          `Separación estimada entre peces: ${spacingCm.toFixed(1)} cm`,
+          `Largo promedio salmón configurado: ${salmonLengthCm} cm`,
+          `Espacio libre entre peces: ${gapCm.toFixed(1)} cm (${((gapCm / salmonLengthCm) * 100).toFixed(0)}% del largo)`,
+        ]
+        if (tooCloseCause && tooCloseCause.pieces > 0) {
+          evidence.push(`Errores "too close/too long" detectados: ${tooCloseCause.pieces.toLocaleString()} pz (${tooCloseCause.pctOfTotal}% del total)`)
+        }
+        insights.push({
+          id: nextId(),
+          severity: ratioToLength < 1.2 ? 'critical' : 'warn',
+          title: 'Congestionamiento físico: separación insuficiente entre peces',
+          evidence,
+          recommendations: [
+            `La separación estimada (${spacingCm.toFixed(1)} cm) es menor al mínimo recomendado (1.4× largo del salmón = ${(salmonLengthCm * 1.4).toFixed(0)} cm).`,
+            'Reducir la tasa de alimentación de los pockets para aumentar la separación.',
+            'Considerar aumentar la velocidad de las cintas de aceleración.',
+            ...(ratioToLength < 1.2 ? ['URGENTE: riesgo alto de errores "too close" en cascada — acción inmediata recomendada.'] : []),
+          ],
+        })
+      }
+    }
+  }
+
+  // ——— 15. Precisión de pesaje en bordes de calibre ———
+  // La MS4/12 tiene ±20g (0-5kg) y ±50g (5-15kg). Si el peso promedio de un gate
+  // cae cerca del límite entre dos calibres, hay riesgo de clasificación incorrecta.
+  if (result.gateAdvancedStats && result.gateAdvancedStats.length > 0) {
+    const customRanges = result.config.customWeightRanges
+    if (customRanges && customRanges.length > 1) {
+      const sortedRanges = [...customRanges].sort((a, b) => a.minGrams - b.minGrams)
+      for (const gs of result.gateAdvancedStats) {
+        if (gs.pieces < 20 || gs.avgWeightGrams <= 0) continue
+        // Precisión del pesaje según rango: ±20g (0-5000g) / ±50g (5001-15000g)
+        const precision = gs.avgWeightGrams <= 5000 ? 20 : 50
+        // Buscar si el promedio del gate está dentro de [precisionZone] de un límite de calibre
+        const boundary = sortedRanges.find((r) => {
+          const distToMin = Math.abs(gs.avgWeightGrams - r.minGrams)
+          const distToMax = Math.abs(gs.avgWeightGrams - r.maxGrams)
+          return distToMin <= precision * 3 || distToMax <= precision * 3
+        })
+        if (boundary) {
+          const distToMin = Math.abs(gs.avgWeightGrams - boundary.minGrams)
+          const distToMax = Math.abs(gs.avgWeightGrams - boundary.maxGrams)
+          const closestBoundaryDist = Math.min(distToMin, distToMax)
+          if (closestBoundaryDist <= precision * 2) {
+            insights.push({
+              id: nextId(),
+              severity: 'info',
+              title: `Gate ${gs.gateNumber}: peso promedio muy cercano al límite de calibre`,
+              evidence: [
+                `Peso promedio: ${gs.avgWeightGrams}g (calibre ${gs.assignedCalibre})`,
+                `Límite de calibre más cercano: ${boundary.calibre} (${boundary.minGrams}-${boundary.maxGrams}g)`,
+                `Distancia al límite: ${closestBoundaryDist}g`,
+                `Precisión del pesaje (MS4/12): ±${precision}g stdev en este rango`,
+              ],
+              recommendations: [
+                `Con ±${precision}g de precisión, piezas de este gate pueden ser asignadas al calibre adyacente.`,
+                'Esto es una limitación física del sensor de pesaje, no un error de configuración.',
+                'Considerar ampliar el rango de este calibre o agregar un gate de margen.',
+              ],
+            })
+          }
+        }
+      }
+    }
+  }
+
+  // ——— 16. Flippers con tiempo de reacción crítico a vel. máx. del fabricante ———
+  // La MS4/12 puede operar hasta 1.4 m/s. A esa velocidad, Gate 1 (1.37m) tiene
+  // 1.37 / 1.4 = 0.98s — casi 1 segundo. Alertamos cuando < 1.5s a vel. actual.
+  if (physicalConfig && physicalConfig.flipperPositions.length > 0) {
+    const mainBelt = physicalConfig.belts.find((b) => b.beltId === 'main')
+    if (mainBelt && mainBelt.speedMps > 0) {
+      // Calcular también a vel. máx. del fabricante para contexto
+      const maxSpeedMps = 1.4
+      const criticalFlippers = physicalConfig.flipperPositions
+        .filter((fp) => fp.distanceFromSensorMeters / mainBelt.speedMps < 1.5)
+        .map((fp) => ({
+          gateNumber: fp.gateNumber,
+          distanceM: fp.distanceFromSensorMeters,
+          timeSec: fp.distanceFromSensorMeters / mainBelt.speedMps,
+          timeSecAtMaxSpeed: fp.distanceFromSensorMeters / maxSpeedMps,
+        }))
+
+      if (criticalFlippers.length > 0) {
+        insights.push({
+          id: nextId(),
+          severity: criticalFlippers.some((f) => f.timeSec < 0.9) ? 'warn' : 'info',
+          title: `${criticalFlippers.length} flippers con tiempo de reacción ajustado`,
+          evidence: criticalFlippers.map(
+            (fp) =>
+              `Gate ${fp.gateNumber}: ${fp.distanceM.toFixed(3)} m → ${fp.timeSec.toFixed(2)} s @ ${mainBelt.speedMps} m/s` +
+              (mainBelt.speedMps < maxSpeedMps
+                ? ` (${fp.timeSecAtMaxSpeed.toFixed(2)} s a vel. máx. 1.4 m/s)`
+                : ''),
+          ),
+          recommendations: [
+            'Estos gates tienen menos de 1.5 segundos entre detección y accionamiento del flipper.',
+            'Verificar que el actuador neumático responda dentro del tiempo disponible.',
+            'Si hay errores "puerta no preparada" en estos gates, reducir la velocidad de la cinta.',
+            'Vel. máxima del fabricante (MS4/12): 1.4 m/s — no superar.',
+          ],
+        })
+      }
+    }
+  }
+
+  // ——— 17. Gate sobrecargada (>35% del tráfico en 1 sola compuerta) ———
+  // Si un gate acumula demasiado % del total, el flipper puede no resetear a tiempo
+  // y aparecen errores "puerta no preparada". La solución: duplicar ese calibre en otra gate.
+  if (result.gateAdvancedStats && result.gateAdvancedStats.length > 0 && result.kpis.totalPieces > 100) {
+    const activeStats = result.gateAdvancedStats.filter((g) => g.pieces > 0)
+    if (activeStats.length >= 2) {
+      const avgUtilization = 100 / activeStats.length
+
+      for (const g of activeStats) {
+        if (g.utilizationPct < 35) continue
+
+        // Gates con utilización < 40% del promedio → candidatas para absorber carga
+        const underloaded = activeStats
+          .filter((u) => u.gateNumber !== g.gateNumber && u.utilizationPct < avgUtilization * 0.45)
+
+        insights.push({
+          id: nextId(),
+          severity: g.utilizationPct >= 50 ? 'critical' : 'warn',
+          title: `Gate ${g.gateNumber} concentra el ${g.utilizationPct.toFixed(1)}% del tráfico`,
+          evidence: [
+            `Gate ${g.gateNumber}: ${g.pieces.toLocaleString()} pz = ${g.utilizationPct.toFixed(1)}% del total clasificado`,
+            `Promedio esperado por gate activa: ${avgUtilization.toFixed(1)}%`,
+            `Calibre: ${g.assignedCalibre} / ${g.assignedQuality}`,
+            underloaded.length > 0
+              ? `Gates con baja carga: ${underloaded.map((u) => `Gate ${u.gateNumber} (${u.utilizationPct.toFixed(1)}%)`).join(', ')}`
+              : 'Todas las gates activas trabajan a nivel elevado.',
+          ],
+          recommendations: [
+            `Asignar ${g.assignedCalibre} / ${g.assignedQuality} a una gate adicional para distribuir la carga.`,
+            ...(underloaded.length > 0
+              ? [`Gate ${underloaded[0].gateNumber} tiene capacidad disponible (${underloaded[0].utilizationPct.toFixed(1)}% de utilización actual).`]
+              : []),
+            'Ir a "Configurar compuertas" → duplicar el calibre en otra gate cercana.',
+            'Esto reduce el riesgo de "puerta no preparada" y mejora el throughput.',
+          ],
+        })
+      }
+    }
+  }
+
+  // ——— 18. Conflicto de timing entre gates adyacentes activas (Z2) ———
+  // Si dos gates consecutivas están activas, el tiempo entre sus dis Z2 debe ser
+  // suficiente para que el salmón pase y el flipper se resetee antes del siguiente.
+  // t_disponible = (dis_n+1 - dis_n) / vel_cinta
+  // t_requerido  = t_salmón_pasa + t_reset_neumático (~0.45s estimado)
+  if (physicalConfig && physicalConfig.z2ProgrammedDistancesMm && physicalConfig.z2ProgrammedDistancesMm.length >= 12) {
+    const mainBelt2 = physicalConfig.belts.find((b) => b.beltId === 'main')
+    const speedMps = mainBelt2?.speedMps ?? 1.28
+    const salmonLenM = physicalConfig.avgSalmonLengthCm / 100
+    const tSalmonPass = salmonLenM / speedMps
+    const tReset = 0.45   // tiempo estimado de reset del cilindro neumático (s)
+    const tRequired = tSalmonPass + tReset
+
+    const activeGateNums = result.gates
+      .filter((g) => g.active)
+      .map((g) => g.gateNumber)
+      .sort((a, b) => a - b)
+
+    for (let i = 0; i < activeGateNums.length - 1; i++) {
+      const g1 = activeGateNums[i]
+      const g2 = activeGateNums[i + 1]
+      if (g2 !== g1 + 1) continue   // solo gates ADYACENTES (consecutivas en número)
+
+      const dis1 = physicalConfig.z2ProgrammedDistancesMm[g1 - 1]
+      const dis2 = physicalConfig.z2ProgrammedDistancesMm[g2 - 1]
+      if (!dis1 || !dis2 || dis2 <= dis1) continue
+
+      const tAvailable = (dis2 - dis1) / 1000 / speedMps
+      const margin = tAvailable - tRequired
+
+      if (margin < 0.15) {   // margen < 150ms → riesgo real
+        // Verificar si "puerta no preparada" aparece en la data real
+        const doorNotReadyCause = result.pointZeroClassification.causes.find(
+          (c) => c.cause === 'puerta_no_preparada',
+        )
+        insights.push({
+          id: nextId(),
+          severity: margin < 0 ? 'warn' : 'info',
+          title: `Gate ${g1}→${g2}: timing Z2 muy ajustado entre gates adyacentes`,
+          evidence: [
+            `Tiempo disponible entre dis${g1}=${dis1}mm y dis${g2}=${dis2}mm: ${tAvailable.toFixed(2)} s`,
+            `Tiempo requerido (salmón ${physicalConfig.avgSalmonLengthCm}cm + reset neumático ~0.45s): ${tRequired.toFixed(2)} s`,
+            `Margen: ${margin >= 0 ? '+' : ''}${margin.toFixed(2)} s`,
+            ...(doorNotReadyCause && doorNotReadyCause.pieces > 0
+              ? [`"Puerta no preparada" en datos: ${doorNotReadyCause.pieces} pz (${doorNotReadyCause.pctOfTotal}%)`]
+              : []),
+          ],
+          recommendations: [
+            margin < 0
+              ? `El flipper de Gate ${g1} puede no estar reseteado cuando Gate ${g2} deba activarse — causa probable de "puerta no preparada".`
+              : `Margen reducido — monitorear si aparecen errores "puerta no preparada" en estos gates.`,
+            `Alternativa: bajar dis${g2} en el Z2 para aumentar el tiempo disponible (actualmente ${dis2} mm).`,
+            `Alternativa: reducir velocidad Sorting Belt — actualmente ${speedMps} m/s.`,
+          ],
+        })
+      }
+    }
+  }
+
   return insights
 }
 

@@ -368,6 +368,31 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
             projectedPointZeroPieces: trendForecastView.projectedPointZeroPieces,
           }
         : undefined,
+      physicalContext: (() => {
+        const pc = config.physicalConfig
+        if (!pc) return undefined
+        const mainBelt = pc.belts.find((b) => b.beltId === 'main')
+        if (!mainBelt || mainBelt.speedMps <= 0) return undefined
+        const ratePerHour = analytics.kpis.productionRatePerHour ?? 0
+        const ratePerSec = ratePerHour / 3600
+        const spacingCm = ratePerSec > 0 ? (mainBelt.speedMps / ratePerSec) * 100 : 0
+        const ratioToLength = spacingCm > 0 && pc.avgSalmonLengthCm > 0
+          ? spacingCm / pc.avgSalmonLengthCm
+          : 99
+        const tooCloseRiskLevel: 'low' | 'medium' | 'high' =
+          ratioToLength < 1.2 ? 'high' : ratioToLength < 1.4 ? 'medium' : 'low'
+        return {
+          mainBeltSpeedMps: mainBelt.speedMps,
+          avgSalmonLengthCm: pc.avgSalmonLengthCm,
+          estimatedSpacingCm: Math.round(spacingCm * 10) / 10,
+          tooCloseRiskLevel,
+          flipperTimings: pc.flipperPositions.map((fp) => ({
+            gateNumber: fp.gateNumber,
+            distanceMeters: fp.distanceFromSensorMeters,
+            timeFromSensorSeconds: Math.round((fp.distanceFromSensorMeters / mainBelt.speedMps) * 100) / 100,
+          })),
+        }
+      })(),
     }
 
     try {

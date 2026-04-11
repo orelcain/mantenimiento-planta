@@ -223,6 +223,48 @@ function buildPrompt(p: AIGraderInput): string {
     }
   }
 
+  if (p.physicalContext) {
+    const pc = p.physicalContext
+    lines.push('')
+    lines.push('=== CONTEXTO FÍSICO DE LA MÁQUINA ===')
+    lines.push('  Velocidad cinta clasificadora (principal): ' + pc.mainBeltSpeedMps + ' m/s')
+    lines.push('  Largo promedio del salmón configurado: ' + pc.avgSalmonLengthCm + ' cm')
+    if (pc.estimatedSpacingCm > 0) {
+      lines.push('  Separación estimada entre peces en cinta: ' + pc.estimatedSpacingCm + ' cm')
+      lines.push('  Espacio libre entre peces: ' + (pc.estimatedSpacingCm - pc.avgSalmonLengthCm).toFixed(1) + ' cm')
+      lines.push('  Riesgo "too close/too long": ' + pc.tooCloseRiskLevel.toUpperCase())
+    }
+    if (pc.flipperTimings.length > 0) {
+      lines.push('  Tiempo de reacción por gate (desde fotocélula):')
+      for (const ft of pc.flipperTimings) {
+        const flag = ft.timeFromSensorSeconds < 0.8 ? ' ⚠ CRÍTICO' : ft.timeFromSensorSeconds < 1.2 ? ' ⚡ ajustado' : ''
+        lines.push('    Gate ' + ft.gateNumber + ': ' + ft.distanceMeters.toFixed(2) + ' m → ' + ft.timeFromSensorSeconds.toFixed(2) + ' s' + flag)
+      }
+    }
+    if (pc.flipperTimings.length > 0) {
+      const mainSpeedMps = pc.mainBeltSpeedMps
+      // flipperPaddleLengthMm no está en physicalContext, pero lo calculamos
+      // si el campo está disponible en el future. Por ahora nota general.
+      lines.push('  Tiempo mínimo que el flipper debe estar abierto (salmón de ' + pc.avgSalmonLengthCm + 'cm): ' +
+        (pc.avgSalmonLengthCm / 100 / mainSpeedMps).toFixed(2) + ' s')
+    }
+    lines.push('  Especificaciones técnicas del fabricante (Marelec MS4/12, S/N 3943):')
+    lines.push('    - Velocidad máxima: 1.4 m/s (no superar). Operativa normal: 1.28 m/s (Sorting Belt, casi constante).')
+    lines.push('    - Cintas: Z-Belt 0.39 m/s → Accel 1 1.03 m/s → Accel 2 1.23 m/s → Sorting Belt 1.28 m/s')
+    lines.push('    - Producto máximo admitido: 1100mm largo, 290mm ancho, 15kg')
+    lines.push('    - Precisión del pesaje: ±20g (0-5kg) / ±50g (5-15kg)')
+    lines.push('    - 12 salidas a la derecha. Gate 1 a 1300mm del sensor, pitch 1370mm entre pivots.')
+    lines.push('    - Z2 dis1-dis12: offsets variables vs físico (-50 a -560mm) — cada flipper calibrado individualmente según respuesta neumática real')
+    lines.push('    - Causas de rechazo P0 en pantalla Z2: "Fuera de límites" (dimensiones/parámetros), "No leído por fotocélula" (sensor sucio/desalineado), "Too close or too long" (congestionamiento o pez > 110cm), "Puerta no preparada" (timing/sincronización falla)')
+    lines.push('  Notas para la IA:')
+    lines.push('    1. A 1.28 m/s, Gate 1 (1.30m) tiene solo 1.02s de reacción → timing muy ajustado.')
+    lines.push('    2. "too close/too long" indica congestionamiento (sep. < 1.4× largo salmón) o producto > 110cm.')
+    lines.push('    3. "puerta no preparada" en gates iniciales puede indicar velocidad de Sorting Belt demasiado alta para el volumen actual.')
+    lines.push('    4. "fuera de límites" incluye peces > 110cm o > 29cm ancho (límites físicos de la cinta, no configurables).')
+    lines.push('    5. La imprecisión del pesaje (±20-50g) puede causar errores de clasificación en bordes de calibre.')
+    lines.push('    6. Si separación < 1.4× largo del salmón, priorizar reducción de alimentación antes de ajustar gates.')
+  }
+
   if (p.trendForecast) {
     lines.push('')
     lines.push('=== PROYECCIÓN DE CIERRE DE TURNO (datos parciales) ===')

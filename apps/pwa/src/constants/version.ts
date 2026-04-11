@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-04-11' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Grader P0 completo: panel proyección + toggle chart + badge P0 + umbrales + patrones multisesión + comparativa día/noche + degradación sensores' as const
+export const VERSION_NAME = 'Grader iter 6: config física real (Marelec MS4/12) + Z2 dis1-12 + velocidades reales + resumen ejecutivo + insights físicos (gate sobrecargada, timing Z2 adyacente)' as const
 
 /**
  * Nota:

@@ -10,13 +10,15 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, Button, Badge } from '@/components/ui'
-import { Settings2, BarChart3, FolderOpen, Calendar, Loader2, ChevronDown, ChevronUp, AlertTriangle, CheckCircle } from 'lucide-react'
+import { Settings2, BarChart3, FolderOpen, Calendar, Loader2, ChevronDown, ChevronUp } from 'lucide-react'
 import { useAuthStore, usePermissionsStore } from '@/store'
 import { AnalisisGraderUploadPage, type FileParsed } from './AnalisisGraderUploadPage'
 import { AnalisisGraderGatesConfigPage } from './AnalisisGraderGatesConfigPage'
 import { AnalisisGraderDashboardPage } from './AnalisisGraderDashboardPage'
+import { GraderResumenRapido } from './GraderResumenRapido'
 import { getLatestGraderAutosaveDraft, saveGraderAutosaveDraft } from '@/services/grader/graderSession.service'
-import { computeAnalytics } from '@/services/grader/graderAnalytics'
+import { getModuleRanges } from '@/services/grader/graderModuleConfig.service'
+import { computeAnalytics, DEFAULT_PHYSICAL_CONFIG } from '@/services/grader/graderAnalytics'
 import { computeDeterministicInsights } from '@/services/grader/graderInsights'
 import type { ParsedMatrixData, GateAssignment, GraderAnalysisConfig } from '@/services/grader/types'
 
@@ -50,23 +52,68 @@ export function AnalisisGraderWizardPage() {
   const [gatesOpen, setGatesOpen] = useState(false)
   const [autosaveState, setAutosaveState] = useState<'idle' | 'queued' | 'saving' | 'saved' | 'error'>('idle')
   const [autosaveUpdatedAt, setAutosaveUpdatedAt] = useState<string | null>(null)
+  // Velocidad de la Sorting Belt — editable inline desde el resumen rápido
+  // Se inicializa con el default y se sincroniza si el usuario edita la config física completa
+  const [sortingBeltMps, setSortingBeltMps] = useState<number>(
+    DEFAULT_PHYSICAL_CONFIG.belts.find((b) => b.beltId === 'main')!.speedMps,
+  )
 
+  const dashboardRef = useRef<HTMLDivElement>(null)
   const localDraftLoadedRef = useRef(false)
   const cloudDraftHydratedRef = useRef(false)
   const lastCloudSaveAtRef = useRef<number>(0)
   const lastCloudFingerprintRef = useRef<string>('')
   const lastConfigMutationAtRef = useRef<number>(Date.now())
 
-  // Alertas calculadas desde los datos cargados
-  const alertInsights = useMemo(() => {
-    if (!parsedData || parsedData.pieceRecords.length === 0) return []
+  // Analytics completo con physicalConfig efectivo (incluye velocidad cinta editable)
+  const analyticsResult = useMemo(() => {
+    if (!parsedData || parsedData.pieceRecords.length === 0) return null
     try {
-      const result = computeAnalytics(parsedData, config, gates)
-      return computeDeterministicInsights(result)
+      const basePhysical = config.physicalConfig ?? DEFAULT_PHYSICAL_CONFIG
+      const effectiveConfig: GraderAnalysisConfig = {
+        ...config,
+        physicalConfig: {
+          ...basePhysical,
+          belts: basePhysical.belts.map((b) =>
+            b.beltId === 'main' ? { ...b, speedMps: sortingBeltMps } : b,
+          ),
+        },
+      }
+      return computeAnalytics(parsedData, effectiveConfig, gates)
+    } catch {
+      return null
+    }
+  }, [parsedData, config, gates, sortingBeltMps])
+
+  // Insights derivados del analytics (usados tanto por ResumenRapido como para el badge del header)
+  const alertInsights = useMemo(() => {
+    if (!analyticsResult) return []
+    try {
+      return computeDeterministicInsights(analyticsResult)
     } catch {
       return []
     }
-  }, [parsedData, config, gates])
+  }, [analyticsResult])
+
+  // Cargar physicalConfig guardado desde Firestore al iniciar
+  // → así el widget de velocidad arranca con el valor real guardado, no con el default
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const cfg = await getModuleRanges()
+        if (cancelled || !cfg?.physicalConfig) return
+        // Sincronizar velocidad de Sorting Belt desde el config guardado
+        const mainBelt = cfg.physicalConfig.belts.find((b) => b.beltId === 'main')
+        if (mainBelt && mainBelt.speedMps > 0) {
+          setSortingBeltMps(mainBelt.speedMps)
+        }
+        // Incorporar el physicalConfig completo al state de config (para insights físicos)
+        setConfig((prev) => ({ ...prev, physicalConfig: cfg.physicalConfig }))
+      } catch { /* fallback silencioso: usa DEFAULT_PHYSICAL_CONFIG */ }
+    })()
+    return () => { cancelled = true }
+  }, [])
 
   // Restaurar draft local
   useEffect(() => {
@@ -208,6 +255,9 @@ export function AnalisisGraderWizardPage() {
     setGates(updatedGates)
     setConfig(updatedConfig)
     setGatesOpen(false)
+    // Sincronizar velocidad de Sorting Belt si el usuario la cambió en la config física
+    const mainBelt = updatedConfig.physicalConfig?.belts.find((b) => b.beltId === 'main')
+    if (mainBelt && mainBelt.speedMps > 0) setSortingBeltMps(mainBelt.speedMps)
   }, [])
 
   const handleApplyGateSuggestion = useCallback((payload: { gateNumber: number; calibre: string; quality: string }) => {
@@ -246,8 +296,6 @@ export function AnalisisGraderWizardPage() {
   if (!canSee('analisisGrader')) return <Navigate to="/" replace />
 
   const hasData = Boolean(parsedData && parsedData.pieceRecords.length > 0)
-  const criticalInsights = alertInsights.filter((i) => i.severity === 'critical')
-  const warnInsights = alertInsights.filter((i) => i.severity === 'warn')
 
   return (
     <div className="space-y-4">
@@ -328,93 +376,31 @@ export function AnalisisGraderWizardPage() {
         )}
       </Card>
 
-      {/* Alertas — visibles en cuanto hay datos */}
-      {hasData && alertInsights.length > 0 && (
-        <div className="space-y-2">
-          {/* Encabezado resumen */}
-          <div className="flex items-center gap-2 px-1">
-            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium text-muted-foreground">
-              {criticalInsights.length > 0 && `${criticalInsights.length} crítica${criticalInsights.length > 1 ? 's' : ''}`}
-              {criticalInsights.length > 0 && warnInsights.length > 0 && ' · '}
-              {warnInsights.length > 0 && `${warnInsights.length} advertencia${warnInsights.length > 1 ? 's' : ''}`}
-            </span>
-          </div>
-          {criticalInsights.map((insight) => (
-            <div key={insight.id} className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-red-600 dark:text-red-400">{insight.title}</p>
-                  {insight.evidence.length > 0 && (
-                    <div className="mt-1 space-y-0.5">
-                      {insight.evidence.map((e, i) => (
-                        <p key={i} className="text-xs text-muted-foreground">{e}</p>
-                      ))}
-                    </div>
-                  )}
-                  {insight.recommendations.length > 0 && (
-                    <div className="mt-2 space-y-1 border-t border-red-500/20 pt-2">
-                      {insight.recommendations.map((r, i) => (
-                        <p key={i} className="text-xs text-red-600/90 dark:text-red-400/90 flex items-start gap-1.5">
-                          <span className="shrink-0 mt-0.5">→</span>
-                          {r}
-                        </p>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
-          {warnInsights.map((insight) => (
-            <div key={insight.id} className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">{insight.title}</p>
-                  {insight.evidence.length > 0 && (
-                    <div className="mt-1 space-y-0.5">
-                      {insight.evidence.map((e, i) => (
-                        <p key={i} className="text-xs text-muted-foreground">{e}</p>
-                      ))}
-                    </div>
-                  )}
-                  {insight.recommendations.length > 0 && (
-                    <div className="mt-2 space-y-1 border-t border-amber-500/20 pt-2">
-                      {insight.recommendations.map((r, i) => (
-                        <p key={i} className="text-xs text-amber-600/90 dark:text-amber-400/90 flex items-start gap-1.5">
-                          <span className="shrink-0 mt-0.5">→</span>
-                          {r}
-                        </p>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-      {hasData && alertInsights.length === 0 && (
-        <div className="flex items-center gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3">
-          <CheckCircle className="h-5 w-5 text-emerald-500 shrink-0" />
-          <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
-            Todo dentro de parámetros — operación normal
-          </p>
-        </div>
+      {/* Resumen ejecutivo — reemplaza las alertas individuales */}
+      {hasData && analyticsResult && (
+        <GraderResumenRapido
+          analytics={analyticsResult}
+          insights={alertInsights}
+          sortingBeltMps={sortingBeltMps}
+          onChangeSortingBeltMps={setSortingBeltMps}
+          onScrollToDashboard={() =>
+            dashboardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }
+        />
       )}
 
-      {/* Dashboard — aparece automáticamente al cargar archivos */}
+      {/* Dashboard completo — aparece automáticamente al cargar archivos */}
       {hasData && (
-        <AnalisisGraderDashboardPage
-          parsedData={fallbackParsedData}
-          gates={gates}
-          config={config}
-          onApplyGateSuggestion={handleApplyGateSuggestion}
-          onUpdatePointZeroWarnThreshold={handleUpdatePointZeroWarnThreshold}
-          onUpdatePointZeroCriticalThreshold={handleUpdatePointZeroCriticalThreshold}
-        />
+        <div ref={dashboardRef}>
+          <AnalisisGraderDashboardPage
+            parsedData={fallbackParsedData}
+            gates={gates}
+            config={config}
+            onApplyGateSuggestion={handleApplyGateSuggestion}
+            onUpdatePointZeroWarnThreshold={handleUpdatePointZeroWarnThreshold}
+            onUpdatePointZeroCriticalThreshold={handleUpdatePointZeroCriticalThreshold}
+          />
+        </div>
       )}
     </div>
   )

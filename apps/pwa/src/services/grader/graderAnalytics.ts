@@ -55,14 +55,198 @@ export const CALIBRE_WEIGHT_RANGES: CalibreWeightRange[] = [
   { calibre: '10-12 lb', label: '10+ lb (4581–9163 g)',   minGrams: 4581, maxGrams: 9163 },
 ]
 
-/** Causas estandarizadas con labels y descripciones */
+/**
+ * Especificaciones técnicas reales de la Marelec MS4/12 (S/N 3943)
+ * Fuente: Instruction Manual MS4_12 (Marelec / MFT, Bélgica)
+ *
+ * Usadas para validación y contexto IA — NO editables por el operador.
+ */
+export const MARELEC_MS4_12_SPECS = {
+  model: 'MS4/12',
+  serialNumber: '3943',
+  controller: 'Marelec Z2',
+  // Anchos de cintas (sección 2.3.2)
+  beltWidths: {
+    zConveyor:       1200, // mm
+    accelerationBelt: 300, // mm (ambas cintas de aceleración)
+    gradingBelt:      300, // mm
+  },
+  // Dimensiones máximas de producto aceptadas (sección 2.3.2)
+  maxProductDimensions: {
+    lengthMm: 1100, // mm — peces > 110cm → "too long"
+    widthMm:   290, // mm — casi el ancho total de la cinta (300mm)
+  },
+  // Velocidad máxima de cintas (sección 2.3.2)
+  maxBeltSpeedMps: 1.4,
+  // Rango y precisión del sistema de pesaje (sección 2.3.2)
+  weighingRangeKg: { min: 0, max: 15 },
+  weighingPrecision: [
+    { rangeKg: { min: 0,  max: 5  }, stdevGrams: 20 },
+    { rangeKg: { min: 5,  max: 15 }, stdevGrams: 50 },
+  ],
+  // Salidas (sección 2.3.2)
+  outputs: 12,
+  outputsSide: 'right' as const,
+  // Layout del Grading Belt — combinación de plano del manual + mediciones en terreno
+  //   Largo total: 17179mm (manual sección 2.3.3 — confirmado en planta)
+  //   Sensor (Detection Eye, final Accel Belt 2) → Gate 1 pivot: 1300mm (medición 2026-04-11)
+  //   Pitch entre pivots consecutivos: 1370mm uniforme (medición 2026-04-11)
+  //   Largo paleta flipper: 475mm (medición 2026-04-11)
+  gradingBeltLayout: {
+    totalLengthMm:           17179,  // confirmado en planta
+    sensorToGate1Mm:          1300,  // medición real (vs 1370mm estimado del plano)
+    gatePitchMm:              1370,  // medición real pivot-a-pivot (vs 800mm estimado del plano)
+    flipperPaddleLengthMm:     475,  // medición real 2026-04-11
+  },
+  // Parámetros dis1-dis12 del controlador Z2 (valores reales, foto 2026-04-11)
+  // dis1=1250 → físico=1300mm → -50mm anticipo (gate 1)
+  // Los offsets Z2 vs físico NO son uniformes — calibración individual por flipper:
+  //   offsets (mm): [-50,-470,-240,-210,-230,-300,-370,-490,-560,-455,-200,-520]
+  // Ver valores completos en DEFAULT_PHYSICAL_CONFIG.z2ProgrammedDistancesMm
+  z2Calibration: {
+    sensorToGate1Mm:      1250,   // dis1 real del Z2
+    gate1OffsetFromPhysical: -50, // Z2 dispara 50mm antes del pivot físico (gate 1)
+  },
+  // Escala de velocidades de cintas según pantalla Z2 "Velocidad cintas"
+  // Derivada de: Sorting belt max 1s = 1781 unidades = 1.4 m/s (spec manual)
+  // Factor k = 1.4/1781 = 0.000786 m/s por unidad — mismo para las 4 cintas
+  // (verificado: ratio max100ms/max1s ≈ 1.787 uniforme en todas las cintas)
+  z2BeltSpeedScale: {
+    conversionFactorMpsPerUnit: 0.000786,
+    maxUnits1s: { zBelt: 554, accel1: 1432, accel2: 1702, sorting: 1781 },
+    // Lectura de referencia operativa (26/12/2025, turno normal):
+    referenceReadings: { zBelt: 494, accel1: 1313, accel2: 1560, sorting: 1631 },
+    // Velocidades calculadas de la referencia (en m/s):
+    referenceMps:      { zBelt: 0.39, accel1: 1.03, accel2: 1.23, sorting: 1.28 },
+  },
+} as const
+
+/**
+ * Configuración física por defecto de la clasificadora.
+ *
+ * Máquina: Marelec MS4/12 (S/N 3943, controlador Z2)
+ *   ❶ Static Weighing System (pockets 1-4, donde se pesa el salmón)
+ *   ❷ Z-Conveyor (cinta elevadora, sube el salmón hacia las cintas de aceleración)
+ *   ❸ Acceleration Belt 1 + Acceleration Belt 2 [fotocélula al final de la 2]
+ *   ❹ Grading Belt (~17.2 m, 12 compuertas/flippers)
+ *
+ * Valores de flippers basados en el plano exterior del manual:
+ *   Gate 1 a 1370mm del sensor, pitch 800mm entre compuertas.
+ * Velocidades: defaults operativos (máx. del fabricante = 1.4 m/s).
+ */
+export const DEFAULT_PHYSICAL_CONFIG = {
+  avgSalmonLengthCm: 55,      // promedio conservador (máx. admitido: 110cm)
+  avgSalmonWidthCm:  20,      // promedio (máx. admitido: 29cm = casi el ancho de la cinta)
+  pocketCount: 4,
+  // Velocidades calibradas desde la pantalla Z2 "Velocidad cintas" (26/12/2025)
+  // Factor de conversión k = 1.4 m/s / 1781 unidades (max sorting) = 0.000786 m/s/unit
+  belts: [
+    {
+      beltId:       'zeta'   as const,
+      label:        'Z-Conveyor ❷ (cinta elevadora)',
+      lengthMeters: 3.0,
+      widthMeters:  1.20,    // 1200mm — especificación del fabricante
+      speedMps:     0.39,    // Z2 lectura: 494 units × 0.000786 = 0.388 m/s
+    },
+    {
+      beltId:       'accel1' as const,
+      label:        'Acceleration Belt 1 ❸',
+      lengthMeters: 3.65,    // 365 cm — medición en terreno 2026-04-11
+      widthMeters:  0.30,    // 300mm — especificación del fabricante
+      speedMps:     1.03,    // Z2 lectura: 1313 units × 0.000786 = 1.032 m/s
+    },
+    {
+      beltId:       'accel2' as const,
+      label:        'Acceleration Belt 2 ❸ (fotocélula al final)',
+      lengthMeters: 1.70,    // 170 cm — medición en terreno 2026-04-11
+      widthMeters:  0.30,    // 300mm — especificación del fabricante
+      speedMps:     1.23,    // Z2 lectura: 1560 units × 0.000786 = 1.227 m/s
+    },
+    {
+      beltId:       'main'   as const,
+      label:        'Grading Belt ❹ (17.2 m, 12 compuertas)',
+      lengthMeters: 17.179,  // 17179mm — plano exterior manual MS4_12
+      widthMeters:  0.30,    // 300mm — especificación del fabricante
+      speedMps:     1.28,    // Z2 lectura: 1631 units × 0.000786 = 1.282 m/s (casi constante en turno)
+    },
+  ],
+  // Mediciones en terreno (2026-04-11, cinta métrica):
+  //   - Detection Eye (fotocélula accel2) → Gate 1 pivot: 1300 mm
+  //   - Pitch entre pivots: 1370 mm uniforme (gates 1-12)
+  //   → Gate N = 1300 + (N-1) × 1370 mm
+  flipperPositions: [
+    { gateNumber:  1, distanceFromSensorMeters:  1.300 },  //  1300 mm
+    { gateNumber:  2, distanceFromSensorMeters:  2.670 },  //  2670 mm
+    { gateNumber:  3, distanceFromSensorMeters:  4.040 },  //  4040 mm
+    { gateNumber:  4, distanceFromSensorMeters:  5.410 },  //  5410 mm
+    { gateNumber:  5, distanceFromSensorMeters:  6.780 },  //  6780 mm
+    { gateNumber:  6, distanceFromSensorMeters:  8.150 },  //  8150 mm
+    { gateNumber:  7, distanceFromSensorMeters:  9.520 },  //  9520 mm
+    { gateNumber:  8, distanceFromSensorMeters: 10.890 },  // 10890 mm
+    { gateNumber:  9, distanceFromSensorMeters: 12.260 },  // 12260 mm
+    { gateNumber: 10, distanceFromSensorMeters: 13.630 },  // 13630 mm
+    { gateNumber: 11, distanceFromSensorMeters: 15.000 },  // 15000 mm
+    { gateNumber: 12, distanceFromSensorMeters: 16.370 },  // 16370 mm (belt end: 17179mm)
+  ],
+  // Paleta del flipper: medición en terreno 2026-04-11 = 475 mm
+  flipperPaddleLengthMm: 475,
+  // Valores dis1-dis12 programados en el controlador Marelec Z2
+  // (leídos desde "Cambiar Parámetros" → 2026-04-11)
+  // Nota: dis1=1250 vs físico=1300 → 50mm menos = anticipo de actuación neumática
+  // Verificar: capturar pantalla completa del Z2 con los 12 valores dis
+  // Valores reales leídos de la pantalla Z2 (foto 2026-04-11).
+  // NOTA: NO son uniformes — cada flipper está calibrado individualmente
+  // según su respuesta neumática real (distancias Z2 < físico = anticipo variable).
+  // Pitches reales entre gates: 950, 1600, 1400, 1350, 1300, 1300, 1250, 1300, 1475, 1625, 1050 mm
+  z2ProgrammedDistancesMm: [1250, 2200, 3800, 5200, 6550, 7850, 9150, 10400, 11700, 13175, 14800, 15850],
+  // Lectura de velocidades Z2 de referencia (26/12/2025, turno normal)
+  // Factor: 1 unit = 0.000786 m/s (1.4 m/s / 1781 unidades máx. sorting belt)
+  z2BeltSpeedReadings: {
+    zBeltUnits:   494,    // → 0.39 m/s
+    accel1Units:  1313,   // → 1.03 m/s
+    accel2Units:  1560,   // → 1.23 m/s
+    sortingUnits: 1631,   // → 1.28 m/s (casi constante en turno)
+    readingLabel: '26/12/2025 turno día',
+  },
+}
+
+/**
+ * Causas estandarizadas de rechazo a Gate 0 / Punto Cero.
+ *
+ * Las 4 causas principales provienen directamente de la pantalla "Resultados Clasificación"
+ * del controlador Z2 (Marelec MS4/12). Se muestran como porcentaje del total de piezas
+ * sin clasificar ("Total unsorted pcs").
+ *
+ * Ejemplo real registrado en planta (14/07/2025):
+ *   Fuera de límites: 10.27% | No leído fotocélula: 1.73%
+ *   Too close or too long: 0.00% | Puerta no preparada: 0.13%
+ *   Total unsorted pcs: 287 | Peso total clasificado: 7488 kg | Cajas: 12
+ */
 const CAUSE_META: Record<PointZeroCause, { label: string; description: string }> = {
-  fuera_de_rango:       { label: 'Fuera de rango',          description: 'Pieza con peso fuera de los rangos de calibre definidos' },
-  fuera_de_limites:     { label: 'Fuera de límites',        description: 'Pieza fuera de dimensiones o parámetros del sistema' },
-  no_leido_fotocelula:  { label: 'No leído por fotocélula', description: 'Sensor óptico no detectó correctamente la pieza' },
-  too_close_too_long:   { label: 'Too close or too long',   description: 'Piezas demasiado cerca entre sí o longitud fuera de rango' },
-  puerta_no_preparada:  { label: 'Puerta no preparada',     description: 'Compuerta no estaba lista al momento de operar' },
-  otro:                 { label: 'Otro / Desconocido',      description: 'Causa no clasificada en las categorías estándar' },
+  fuera_de_rango: {
+    label: 'Fuera de rango',
+    description: 'Pieza con peso fuera de todos los rangos de calibre configurados en las compuertas activas.',
+  },
+  fuera_de_limites: {
+    label: 'Fuera de límites',
+    description: `Objeto fuera de los parámetros dimensionales del sistema (máx. ${MARELEC_MS4_12_SPECS.maxProductDimensions.lengthMm}mm largo, ${MARELEC_MS4_12_SPECS.maxProductDimensions.widthMm}mm ancho). La pieza va directo a Gate 0. Causas típicas: pez demasiado largo, salmón mal alineado, doble pieza.`,
+  },
+  no_leido_fotocelula: {
+    label: 'No leído por fotocélula',
+    description: 'El Detection Eye (fotocélula al final de Accel Belt 2) no detectó correctamente la pieza. Puede deberse a suciedad en el lente del sensor, mala calibración, o posicionamiento incorrecto de la pieza. La pieza pasa sin clasificar y va a Gate 0.',
+  },
+  too_close_too_long: {
+    label: 'Too close or too long',
+    description: `Piezas demasiado cerca entre sí en la cinta (superan el mínimo de separación del sistema), o la pieza supera la longitud máxima admitida (${MARELEC_MS4_12_SPECS.maxProductDimensions.lengthMm}mm). Alta tasa indica congestionamiento: reducir alimentación de pockets o aumentar velocidad de cintas de aceleración.`,
+  },
+  puerta_no_preparada: {
+    label: 'Puerta no preparada',
+    description: 'Una compuerta (flipper) no estaba lista cuando el sistema intentó activarla. Ocurre cuando la pieza anterior aún está pasando por el flipper (problema de timing/sincronización), o por falla mecánica del cilindro neumático. La pieza va a Gate 0 o a la siguiente compuerta.',
+  },
+  otro: {
+    label: 'Otro / Desconocido',
+    description: 'Causa de rechazo no clasificada en las categorías estándar del Z2.',
+  },
 }
 
 // ============================================================================
