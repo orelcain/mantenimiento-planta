@@ -47,7 +47,7 @@ export function GraderResumenRapido({
   // Top 3 acciones: primera recomendación de cada insight top
   const topActions = topInsights
     .filter((i) => i.recommendations.length > 0)
-    .map((i) => ({ severity: i.severity, action: i.recommendations[0], from: i.title }))
+    .map((i) => ({ severity: i.severity, action: i.recommendations[0] }))
 
   // Colores según estado P0
   const borderColor =
