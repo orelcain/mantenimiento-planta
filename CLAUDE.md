@@ -207,12 +207,77 @@ sidebarConfig  ← nuevo: orden personalizado del sidebar admin
 
 ## Version actual
 
-- **v2.73.0** (2026-04-09c) — "Learning Hub + P1.5 input validation + P2/P3 quick wins"
+- **v2.74.0** (2026-04-11) — "Grader iter 6: config física real (Marelec MS4/12) + Z2 dis1-12 + velocidades reales + resumen ejecutivo + insights físicos"
 - Proyecto Firebase: `mantenimiento-planta-771a3`
 - GitHub: `orelcain/mantenimiento-planta`
 - Produccion: `https://orelcain.github.io/mantenimiento-planta/`
 - CI status: 4/4 workflows 🟢 (Deploy PWA, Deploy Functions, Deploy Firestore Rules, Daily Sync)
 - Seguridad: 23 colecciones Firestore validadas, 0 vulnerabilidades runtime prod
+
+## Cambios recientes (sesion 2026-04-11 — Grader iter 6: config física real + insights físicos, v2.74.0)
+
+### Grader iter 6 — Calibración física real de la Marelec MS4/12
+
+**Datos reales capturados en planta** (foto pantalla Z2):
+- `z2ProgrammedDistancesMm`: `[1250, 2200, 3800, 5200, 6550, 7850, 9150, 10400, 11700, 13175, 14800, 15850]` — valores individuales por flipper, no pitch uniforme
+- Velocidades cintas (factor k = 0.000786 m/s/unidad, anchor: 1781 unidades = 1.4 m/s spec):
+  - Z-Belt: 494 unidades → 0.39 m/s
+  - Accel1: 1313 → 1.03 m/s (largo físico medido: 3.65 m)
+  - Accel2: 1560 → 1.23 m/s (largo físico medido: 1.70 m)
+  - Sorting Belt: 1631 → 1.28 m/s (el KPI principal de velocidad)
+- Gate 1 a 1300mm del sensor, pitch nominal 1370mm entre pivots, paleta 475mm
+- Offset de Z2 vs físico: varía por flipper, rango -50mm (gate 1) a -560mm (gate 9)
+
+**Causas reales P0 desde pantalla "Resultados Clasificación" Z2:**
+- `fuera_limites`: "Fuera de límites"
+- `fotocelula`: "No leído por fotocélula"
+- `too_close`: "Too close or too long"
+- `puerta_no_preparada`: "Puerta no preparada"
+
+**Nuevas features implementadas (`feat(grader): iter 6`):**
+- `GraderResumenRapido.tsx` — Resumen Ejecutivo al cargar Excel: P0% en grande con color, KPIs, causas P0, top 3 problemas, top 3 acciones, widget inline velocidad Sorting Belt (editable 0.5–1.4 m/s)
+- `analyticsResult` centralizado en `WizardPage` → `alertInsights` deriva del mismo resultado (evita doble cómputo)
+- `physicalConfig` se carga de Firestore al montar (`getModuleRanges()`) para que esté disponible antes de que el usuario abra Gates Config
+- `handleGatesApply` sincroniza `sortingBeltMps` del config guardado
+- `dashboardRef` + scroll button en ResumenRapido para bajar al dashboard completo
+
+**Insight #17 — Gate sobrecargada** (`graderInsights.ts`):
+- Usa `result.gateAdvancedStats` (no `gateBalance` que no tiene `gateNumber`/`pieces`)
+- Si 1 gate > 35% del tráfico → warn; > 50% → critical
+- Sugiere duplicar calibre en gate con baja carga (< 45% del promedio)
+
+**Insight #18 — Timing Z2 entre gates adyacentes**:
+- Compara tiempo disponible `(dis_n+1 - dis_n) / vel_sorting` vs tiempo requerido `(largo_salmón / vel) + 0.45s (reset neumático)`
+- Solo checks gates ADYACENTES (consecutivas en número, ej: gate 3 y 4)
+- Si margen < 150ms → insight warn/info con referencia a causa "puerta no preparada"
+
+**Tabla velocidades Z2** en `AnalisisGraderGatesConfigPage.tsx`:
+- Muestra unidades Z2 raw + m/s calculados con factor k = 0.000786
+- TypeScript fix: declarar `type SpeedKey = 'zBeltUnits' | 'accel1Units' | 'accel2Units' | 'sortingUnits'` (evita `keyof typeof readings` = `never` cuando `readings` = `{}`)
+
+**Deploy v2.74.0** (commits principales):
+- `feat(grader)`: iter 6 completo
+- `fix(version)`: merge conflict → daily-sync bot había revertido 2.74.0 → 2.73.0 en main; fixed con commit explícito
+- `fix(grader)`: `noUncheckedIndexedAccess` errors en insights #17 y #18 (`32710b2`)
+
+### Gotchas nuevos de esta sesión
+
+**`noUncheckedIndexedAccess: true` en tsconfig — patterns seguros:**
+- `array[i]` devuelve `T | undefined` aunque el loop tenga `i < array.length - 1`
+- Fix: usar `array[i]!` cuando el loop garantiza existencia
+- Fix: no usar `underloaded.length > 0 ? underloaded[0].x` — TypeScript no narrowea el elemento. Guardar `const el = underloaded[0]` y usar `el !== undefined ? el.x`
+- `keyof typeof obj` = `never` cuando `obj` puede ser `{}` (undefined coalesced). Usar un tipo explícito en su lugar.
+
+**Merge conflict con daily-sync bot:**
+- El bot de daily-sync hizo commit en main cambiando version.ts 2.74.0 → 2.73.0
+- Al hacer `git merge feature-branch`, la 3-way merge mantuvo el cambio del bot
+- Fix: después del merge, commitear explícitamente la versión correcta
+- Prevención: bumpar version SOLO en el commit final antes del push a main
+
+**Factor de conversión velocidad Z2:**
+- Unidades Z2 del controlador Marelec → m/s: factor k = 0.000786 m/s/unidad
+- Derivado anclando: 1781 unidades (max del campo "Sorting Belt") = 1.4 m/s (spec máxima MS4/12)
+- Mismo factor aplica a todas las cintas (verificado: ratio unidades/spec consistente en las 4 cintas)
 
 ## Cambios recientes (sesion 2026-04-10 tarde — Grader refactor + CI fix, 7 commits)
 
@@ -438,10 +503,27 @@ Arco cerrado. Dashboard pasó de **5262 → 1485 líneas (-72%)** y score global
 - 6 sub-tabs autocontenidos: Matriz (162), Compuertas (270), Sugerencias (107), Lotes (413), Tendencia (1053), Punto Cero (1157)
 - Helpers compartidos en `services/grader/graderDashboardHelpers.ts`
 
+### ✅ Grader iter 6 — Config física real + insights físicos (2026-04-11, v2.74.0)
+
+**Completado:**
+- ✅ `DEFAULT_PHYSICAL_CONFIG` con velocidades reales desde Z2 (Z-Belt 0.39, Accel1 1.03, Accel2 1.23, Sorting 1.28 m/s)
+- ✅ `z2ProgrammedDistancesMm` reales (12 valores no uniformes medidos en terreno)
+- ✅ Longitudes cintas aceleración reales (Accel1 3.65m, Accel2 1.70m)
+- ✅ Causas P0 reales desde pantalla Z2 ("Fuera de límites", "No leído por fotocélula", etc.)
+- ✅ `GraderResumenRapido` — Resumen Ejecutivo al cargar Excel
+- ✅ Widget inline velocidad Sorting Belt editable (persiste en analytics en tiempo real)
+- ✅ `physicalConfig` cargado de Firestore al montar (no requiere abrir Gates Config antes)
+- ✅ Insight #17: gate sobrecargada (>35% tráfico)
+- ✅ Insight #18: conflicto timing Z2 entre gates adyacentes
+- ✅ Tabla velocidades Z2 en UI de configuración física
+
 **Iteraciones futuras opcionales (baja prioridad, no bloqueantes):**
 - [ ] Partir `GraderTendenciaTab` (1053 líneas) en sub-cards por card P0 (#1-#7)
 - [ ] Partir `GraderPuntoCeroTab` (1157 líneas) en sub-cards (Clasificación, Patrones, Pivote, Fuera de rango, Serie temporal)
 - [ ] Unit tests de los 2 hooks de analytics
+- [ ] **Iter 7: asignación óptima de calibres a gates** — algoritmo que sugiere qué calibre/calidad va a qué gate según % distribución + layout físico
+- [ ] **Iter 7: semáforo tiempo de reacción por gate** — columna verde/amarillo/rojo en tab Compuertas (t_disponible vs t_requerido)
+- [ ] **Iter 7: ajustar umbrales** insight #17 (35%) e insight #18 (150ms) según feedback de producción real
 
 <!-- completados sesión 2026-04-11 (iter 4 + iter 5)
 - ✅ Refactor iter 4: extraer GraderPuntoCeroTab — commit 81db31a6
@@ -532,12 +614,20 @@ Al iniciar una nueva sesion de Claude Code en este proyecto:
 - `services/grader/graderInsights.ts` — insights deterministas + tendencia P0
 - `services/grader/types.ts` — tipos (ParsedMatrixData, GateAssignment, etc.)
 
-**Tab Tendencia** (foco principal próxima sesión):
+**Config física real (iter 6, actualizado 2026-04-11)**:
+- `DEFAULT_PHYSICAL_CONFIG` en `graderAnalytics.ts` tiene los valores reales de la MS4/12
+- Factor conversión Z2: `z2BeltSpeedScale = 0.000786` m/s por unidad (anchor: 1781 unidades = 1.4 m/s)
+- `z2ProgrammedDistancesMm`: 12 valores individuales, no uniformes (offset variable por flipper)
+- Insight #17 usa `result.gateAdvancedStats` (no `result.gateBalance` — tipos diferentes)
+- `GraderResumenRapido.tsx` en `pages/AnalisisGrader/` — card de resumen instantáneo
+- `sortingBeltMps` state en WizardPage controla velocidad en tiempo real (persiste en analytics)
+
+**Tab Tendencia**:
 - `trendForecastView` useMemo: proyección turno completo via regresión lineal
   - Produce: `projectedPointZeroPct`, `projectedTotalPieces`, `completionPct`, `shiftStart/EndLabel`
 - `trendAutoRecommendations`: sugerencias de gate swap basadas en P0 proyectado vs umbrales
-- Mejoras pendientes: ver sección P0 en pendientes priorizados
 
-**TypeScript gotcha (IMPORTANTE)**:
+**TypeScript gotchas (IMPORTANTES)**:
 - Localmente hay TS 6.0.2. El proyecto usa TS 5.7.x. NO agregar `ignoreDeprecations: "6.0"` al tsconfig.
 - Siempre verificar que `noUnusedLocals` pase: al eliminar código buscar helpers huérfanos con grep.
+- `noUncheckedIndexedAccess: true` → `array[i]` devuelve `T | undefined`. Usar `array[i]!` cuando el contexto garantiza existencia. Guardar `const el = array[0]` y usar `el !== undefined` como condición.
