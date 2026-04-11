@@ -23,6 +23,7 @@ import {
   orderBy,
   getDocs,
   writeBatch,
+  documentId,
 } from 'firebase/firestore'
 import { db } from '../firebase'
 import type { GraderDailySummary } from './types'
@@ -167,6 +168,31 @@ export async function listDailySummariesByRange(
   )
   const snap = await getDocs(q)
   return snap.docs.map((d) => d.data() as GraderDailySummary)
+}
+
+/**
+ * Dados un conjunto de IDs (`${dateKey}__${shiftId}`), devuelve cuáles ya
+ * existen en Firestore. Se usa para marcar en el preview de la carga masiva
+ * los turnos que serían reemplazados vs. los que son nuevos.
+ *
+ * Firestore permite hasta 30 valores en un `in` / `where(documentId, 'in', ...)`
+ * (era 10 antes del 2023). Para estar seguros usamos chunks de 30.
+ */
+export async function fetchExistingSummaryIds(ids: string[]): Promise<Set<string>> {
+  const existing = new Set<string>()
+  if (ids.length === 0) return existing
+
+  const CHUNK = 30
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const chunk = ids.slice(i, i + CHUNK)
+    const q = query(
+      collection(db, COLLECTION),
+      where(documentId(), 'in', chunk),
+    )
+    const snap = await getDocs(q)
+    snap.forEach((d) => existing.add(d.id))
+  }
+  return existing
 }
 
 /**

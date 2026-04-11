@@ -36,22 +36,39 @@ type SegmentKey = string  // `${sessionDate}|${shiftId}`
 // ── Normalización del turno desde columna Excel ───────────────────────────────
 
 /**
- * Normaliza el valor bruto de la columna "Turno" del Excel.
- * Ejemplos: "A" → "Turno A", "turno b" → "Turno B", "Turno día" → "Turno día"
+ * Normaliza el valor bruto de la columna "Turno" del Excel a una etiqueta canónica.
+ *
+ * Todas las variantes conocidas se colapsan a uno de tres valores:
+ *   - 'Turno día'
+ *   - 'Turno tarde'
+ *   - 'Turno noche'
+ *
+ * Mapeo asumido (ajustable si la planta usa otra convención):
+ *   A / Turno A   → Turno día
+ *   B / Turno B   → Turno tarde
+ *   C / Turno C   → Turno noche
+ *
+ * Si el valor no matchea ninguna variante conocida → devuelve null para que
+ * el caller caiga al fallback por timestamp + schedule. Nunca devolvemos el
+ * string crudo, porque eso genera duplicación en el calendario (dos docs
+ * Firestore con IDs distintos apuntando al mismo turno físico).
  */
-export function normalizeShiftLabel(raw: string): string {
+export function normalizeShiftLabel(raw: string): string | null {
   const s = raw.trim()
-  if (/^a$/i.test(s))            return 'Turno A'
-  if (/^b$/i.test(s))            return 'Turno B'
-  if (/^c$/i.test(s))            return 'Turno C'
-  if (/^turno\s+a$/i.test(s))    return 'Turno A'
-  if (/^turno\s+b$/i.test(s))    return 'Turno B'
-  if (/^turno\s+c$/i.test(s))    return 'Turno C'
-  if (/^turno\s+d[ií]a$/i.test(s))  return 'Turno día'
-  if (/^turno\s+tarde$/i.test(s))   return 'Turno tarde'
-  if (/^turno\s+noche$/i.test(s))   return 'Turno noche'
-  // Devolver tal cual si no coincide con ningún patrón conocido
-  return s
+  if (!s) return null
+
+  // A/B/C (letra suelta o "Turno A/B/C") → día/tarde/noche
+  if (/^a$/i.test(s) || /^turno\s+a$/i.test(s)) return 'Turno día'
+  if (/^b$/i.test(s) || /^turno\s+b$/i.test(s)) return 'Turno tarde'
+  if (/^c$/i.test(s) || /^turno\s+c$/i.test(s)) return 'Turno noche'
+
+  // Variantes con acento / sin acento / case-insensitive
+  if (/^(turno\s+)?d[ií]a$/i.test(s))   return 'Turno día'
+  if (/^(turno\s+)?tarde$/i.test(s))    return 'Turno tarde'
+  if (/^(turno\s+)?noche$/i.test(s))    return 'Turno noche'
+
+  // No matchea → caller debe usar fallback por timestamp
+  return null
 }
 
 // ── Asignación de turno ───────────────────────────────────────────────────────
@@ -128,8 +145,13 @@ export function segmentByDayAndShift(
 
   const resolveShiftAndDate = (ts: string, shift?: string): { sessionDate: string; shiftId: string } => {
     if (shift) {
-      // Fuente primaria: columna Turno del Excel
-      return { sessionDate: ts.slice(0, 10), shiftId: normalizeShiftLabel(shift) }
+      // Fuente primaria: columna Turno del Excel → si normaliza a uno de los
+      // canónicos día/tarde/noche lo usamos; si no, caemos al fallback por
+      // timestamp + schedule para evitar duplicación en Firestore.
+      const canonical = normalizeShiftLabel(shift)
+      if (canonical) {
+        return { sessionDate: ts.slice(0, 10), shiftId: canonical }
+      }
     }
     // Fallback: inferir desde timestamp + horarios configurados
     return assignShiftAndDate(ts, schedule)
@@ -298,4 +320,54 @@ export function sortedSegmentEntries(
     if (a.sessionDate !== b.sessionDate) return a.sessionDate < b.sessionDate ? -1 : 1
     return (shiftOrder[a.shiftId] ?? 9) - (shiftOrder[b.shiftId] ?? 9)
   })
+}
+
+// ── Dedupe de registros ───────────────────────────────────────────────────────
+
+/**
+ * Quita registros duplicados entre archivos con rangos de fecha solapados.
+ *
+ * Contexto: Matrix a veces exporta archivos PP con rangos que se tocan
+ * (ej. un archivo cubre 20251231→20260115 y otro 20260115→20260125).
+ * El 15 de enero aparece en ambos con exactamente los mismos eventos.
+ * Si juntamos ambos sin dedupear → las piezas se duplican y el P0% queda mal.
+ *
+ * La llave de dedupe usa los campos que identifican únicamente un evento de
+ * clasificación en Matrix: `ts + gate + pieces + quality + calibre`. Dos
+ * filas con exactamente esos 5 campos son el mismo evento físico.
+ */
+export function dedupePieceRecords(records: PieceRecord[]): {
+  unique: PieceRecord[]
+  duplicatesRemoved: number
+} {
+  const seen = new Set<string>()
+  const unique: PieceRecord[] = []
+  for (let i = 0; i < records.length; i++) {
+    const r = records[i]!
+    const key = `${r.ts}|${r.gate}|${r.pieces}|${r.quality ?? ''}|${r.calibre ?? ''}|${r.weightKg ?? ''}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    unique.push(r)
+  }
+  return { unique, duplicatesRemoved: records.length - unique.length }
+}
+
+/**
+ * Quita registros duplicados de Gate 0 (archivos de P0 con rangos solapados).
+ * Llave: `ts + pieces + error + quality + calibre`.
+ */
+export function dedupeGate0Records(records: Gate0Record[]): {
+  unique: Gate0Record[]
+  duplicatesRemoved: number
+} {
+  const seen = new Set<string>()
+  const unique: Gate0Record[] = []
+  for (let i = 0; i < records.length; i++) {
+    const r = records[i]!
+    const key = `${r.ts}|${r.pieces}|${r.error ?? ''}|${r.quality ?? ''}|${r.calibre ?? ''}|${r.weightKg ?? ''}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    unique.push(r)
+  }
+  return { unique, duplicatesRemoved: records.length - unique.length }
 }

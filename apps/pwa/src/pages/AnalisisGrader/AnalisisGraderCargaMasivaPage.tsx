@@ -36,9 +36,11 @@ import {
   segmentByDayAndShift,
   computeShiftSummary,
   sortedSegmentEntries,
+  dedupePieceRecords,
+  dedupeGate0Records,
   type ShiftSegment,
 } from '@/services/grader/graderSegmenter'
-import { saveDailySummaryBatch } from '@/services/grader/graderDailySummary.service'
+import { saveDailySummaryBatch, fetchExistingSummaryIds } from '@/services/grader/graderDailySummary.service'
 import type { PieceRecord, Gate0Record, GraderShiftSchedule, GraderDailySummary } from '@/services/grader/types'
 
 // ─── Tipos internos ────────────────────────────────────────────────────────────
@@ -101,6 +103,15 @@ export function AnalisisGraderCargaMasivaPage() {
   const [errorMsg, setErrorMsg]   = useState<string | null>(null)
   const [savedCount, setSavedCount] = useState(0)
   const [batchId]  = useState(() => crypto.randomUUID())
+  // IDs de turnos que ya existen en Firestore → se mostrarán como "Reemplaza"
+  const [existingIds, setExistingIds] = useState<Set<string>>(new Set())
+  // Estadísticas del dedupe aplicado antes de segmentar
+  const [dedupeStats, setDedupeStats] = useState<{
+    pieceRemoved: number
+    gate0Removed: number
+    pieceTotal: number
+    gate0Total: number
+  } | null>(null)
 
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -139,6 +150,8 @@ export function AnalisisGraderCargaMasivaPage() {
     if (files.length === 0) return
     setPageState('parsing')
     setErrorMsg(null)
+    setDedupeStats(null)
+    setExistingIds(new Set())
 
     try {
       const allPiece: PieceRecord[]  = []
@@ -163,12 +176,28 @@ export function AnalisisGraderCargaMasivaPage() {
         throw new Error('No se encontraron registros válidos. Verifique que los archivos sean PIEZA_PIEZA o PUERTA_0.')
       }
 
-      setProgress(`Segmentando ${(allPiece.length + allGate0.length).toLocaleString('es-CL')} registros por día y turno…`)
+      // Dedupe entre archivos con rangos de fecha solapados (ej. Matrix exporta
+      // el 15-ene en 2 archivos → el mismo evento aparecería 2 veces).
+      setProgress(`Eliminando duplicados entre archivos…`)
+      await new Promise<void>((res) => setTimeout(res, 20))
+      const pieceBefore = allPiece.length
+      const gate0Before = allGate0.length
+      const pieceDedupe = dedupePieceRecords(allPiece)
+      const gate0Dedupe = dedupeGate0Records(allGate0)
+      const uniquePiece = pieceDedupe.unique
+      const uniqueGate0 = gate0Dedupe.unique
 
-      // Dar un tick al browser para que renderice el progreso antes del cómputo pesado
+      setDedupeStats({
+        pieceRemoved: pieceDedupe.duplicatesRemoved,
+        gate0Removed: gate0Dedupe.duplicatesRemoved,
+        pieceTotal: pieceBefore,
+        gate0Total: gate0Before,
+      })
+
+      setProgress(`Segmentando ${(uniquePiece.length + uniqueGate0.length).toLocaleString('es-CL')} registros por día y turno…`)
       await new Promise<void>((res) => setTimeout(res, 20))
 
-      const segMap = segmentByDayAndShift(allPiece, allGate0, shiftSchedule)
+      const segMap = segmentByDayAndShift(uniquePiece, uniqueGate0, shiftSchedule)
       const createdBy = user?.email || user?.id || 'unknown'
 
       const previews: SegmentPreview[] = sortedSegmentEntries(segMap).map(([key, seg]) => ({
@@ -176,6 +205,18 @@ export function AnalisisGraderCargaMasivaPage() {
         segment: seg,
         summary: computeShiftSummary(seg, batchId, fileNames, createdBy),
       }))
+
+      // Consultar Firestore: qué turnos de los detectados ya están guardados
+      setProgress(`Consultando turnos ya existentes…`)
+      await new Promise<void>((res) => setTimeout(res, 20))
+      try {
+        const ids = previews.map((p) => p.summary.id)
+        const existing = await fetchExistingSummaryIds(ids)
+        setExistingIds(existing)
+      } catch {
+        // Si falla la consulta no bloqueamos — seguimos con el preview.
+        setExistingIds(new Set())
+      }
 
       setSegments(previews)
       setPageState('preview')
@@ -213,6 +254,10 @@ export function AnalisisGraderCargaMasivaPage() {
     pieces: segments.reduce((t, s) => t + s.summary.totalPieces, 0),
     avgP0:  segments.reduce((t, s) => t + s.summary.pointZeroPct, 0) / segments.length,
   } : null
+
+  // Conteo de nuevos vs reemplazos (usado por el botón y el texto resumen)
+  const replaceCount = segments.filter((s) => existingIds.has(s.summary.id)).length
+  const newCount = segments.length - replaceCount
 
   // Guard de permisos — después de todos los hooks
   if (!canSee('analisisGrader')) return <Navigate to="/" replace />
@@ -408,9 +453,33 @@ export function AnalisisGraderCargaMasivaPage() {
       {pageState === 'preview' && segments.length > 0 && (
         <div className="space-y-3">
 
+          {/* Banner de dedupe de registros — sólo si se eliminaron duplicados entre archivos */}
+          {dedupeStats && (dedupeStats.pieceRemoved > 0 || dedupeStats.gate0Removed > 0) && (
+            <div className="rounded border border-sky-500/30 bg-sky-500/10 px-4 py-2.5 text-xs">
+              <p className="text-sky-700 dark:text-sky-300">
+                <span className="font-medium">Duplicados entre archivos eliminados:</span>
+                {dedupeStats.pieceRemoved > 0 && (
+                  <span className="ml-2">
+                    {dedupeStats.pieceRemoved.toLocaleString('es-CL')} registros PP
+                    ({((dedupeStats.pieceRemoved / Math.max(dedupeStats.pieceTotal, 1)) * 100).toFixed(1)}%)
+                  </span>
+                )}
+                {dedupeStats.gate0Removed > 0 && (
+                  <span className="ml-2">
+                    · {dedupeStats.gate0Removed.toLocaleString('es-CL')} registros P0
+                    ({((dedupeStats.gate0Removed / Math.max(dedupeStats.gate0Total, 1)) * 100).toFixed(1)}%)
+                  </span>
+                )}
+              </p>
+              <p className="text-sky-600/80 dark:text-sky-400/80 mt-0.5">
+                Tus archivos cubren rangos de fecha solapados — eventos idénticos se contaron una sola vez.
+              </p>
+            </div>
+          )}
+
           {/* Resumen de lo encontrado */}
           {previewStats && (
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-4 gap-3">
               <div className="rounded border bg-background/60 px-4 py-3 text-center">
                 <p className="text-2xl font-bold tabular-nums">{previewStats.days}</p>
                 <p className="text-xs text-muted-foreground">días</p>
@@ -425,6 +494,19 @@ export function AnalisisGraderCargaMasivaPage() {
                 </p>
                 <p className="text-xs text-muted-foreground">piezas totales</p>
               </div>
+              <div className="rounded border bg-background/60 px-4 py-3 text-center">
+                <p className="text-2xl font-bold tabular-nums">
+                  <span className="text-emerald-600">{newCount}</span>
+                  {replaceCount > 0 && (
+                    <span className="text-muted-foreground text-base font-normal">
+                      {' '}+ <span className="text-amber-600 font-bold">{replaceCount}</span>
+                    </span>
+                  )}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {replaceCount > 0 ? 'nuevos + reemplazos' : 'nuevos'}
+                </p>
+              </div>
             </div>
           )}
 
@@ -436,6 +518,7 @@ export function AnalisisGraderCargaMasivaPage() {
                   <tr className="border-b bg-muted/50">
                     <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Fecha</th>
                     <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Turno</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Estado</th>
                     <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground">Piezas</th>
                     <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground">P0%</th>
                     <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground">Peso</th>
@@ -444,7 +527,9 @@ export function AnalisisGraderCargaMasivaPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {segments.map(({ key, summary }) => (
+                  {segments.map(({ key, summary }) => {
+                    const isReplace = existingIds.has(summary.id)
+                    return (
                     <tr key={key} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
                       <td className="px-3 py-2 font-medium">{fmtDate(summary.dateKey)}</td>
                       <td className="px-3 py-2">
@@ -460,6 +545,17 @@ export function AnalisisGraderCargaMasivaPage() {
                         >
                           {summary.shiftId.replace('Turno ', '')}
                         </Badge>
+                      </td>
+                      <td className="px-3 py-2">
+                        {isReplace ? (
+                          <Badge className="text-[10px] bg-amber-500/15 text-amber-700 border-amber-500/30 hover:bg-amber-500/15">
+                            Reemplaza
+                          </Badge>
+                        ) : (
+                          <Badge className="text-[10px] bg-emerald-500/15 text-emerald-700 border-emerald-500/30 hover:bg-emerald-500/15">
+                            Nuevo
+                          </Badge>
+                        )}
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums">
                         {summary.totalPieces.toLocaleString('es-CL')}
@@ -483,7 +579,8 @@ export function AnalisisGraderCargaMasivaPage() {
                           : '—'}
                       </td>
                     </tr>
-                  ))}
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -491,27 +588,42 @@ export function AnalisisGraderCargaMasivaPage() {
 
           {/* P0 overview — miniatura visual */}
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-1.5">
-            {segments.map(({ key, summary }) => (
-              <div
-                key={key}
-                className={cn(
-                  'rounded border px-2 py-1.5 text-center text-xs',
-                  p0BgColor(summary.pointZeroPct),
-                )}
-              >
-                <p className="font-medium truncate">{fmtDate(summary.dateKey)}</p>
-                <p className="text-xs text-muted-foreground">{summary.shiftId.replace('Turno ', '')}</p>
-                <p className={cn('font-bold tabular-nums mt-0.5', p0Color(summary.pointZeroPct))}>
-                  {summary.pointZeroPct}%
-                </p>
-              </div>
-            ))}
+            {segments.map(({ key, summary }) => {
+              const isReplace = existingIds.has(summary.id)
+              return (
+                <div
+                  key={key}
+                  className={cn(
+                    'rounded border px-2 py-1.5 text-center text-xs relative',
+                    p0BgColor(summary.pointZeroPct),
+                    isReplace && 'ring-1 ring-amber-500/50',
+                  )}
+                >
+                  {isReplace && (
+                    <span
+                      title="Reemplaza un turno ya guardado"
+                      className="absolute top-0 right-0 text-[7px] px-1 bg-amber-500/80 text-white rounded-bl"
+                    >
+                      R
+                    </span>
+                  )}
+                  <p className="font-medium truncate">{fmtDate(summary.dateKey)}</p>
+                  <p className="text-xs text-muted-foreground">{summary.shiftId.replace('Turno ', '')}</p>
+                  <p className={cn('font-bold tabular-nums mt-0.5', p0Color(summary.pointZeroPct))}>
+                    {summary.pointZeroPct}%
+                  </p>
+                </div>
+              )
+            })}
           </div>
 
           {/* Botones de acción */}
           <div className="flex gap-3 flex-wrap">
             <Button onClick={saveAll} className="flex-1 sm:flex-none">
-              Guardar {segments.length} turnos en historial
+              Guardar {segments.length} turnos
+              {replaceCount > 0
+                ? ` (${newCount} nuevos · ${replaceCount} reemplazos)`
+                : ''}
             </Button>
             <Button
               variant="outline"

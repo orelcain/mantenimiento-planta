@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.75.0' as const
+export const APP_VERSION = '2.76.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-04-11' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Grader iter 7: carga masiva histórica + calendario por día y turno + indicadores PP/P0 por turno' as const
+export const VERSION_NAME = 'Grader iter 8: dedupe de carga masiva (labels turno canónicos + registros solapados + badge Reemplaza)' as const
 
 /**
  * Nota:

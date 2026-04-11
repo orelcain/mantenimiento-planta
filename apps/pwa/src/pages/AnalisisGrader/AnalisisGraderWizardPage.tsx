@@ -20,8 +20,14 @@ import { getLatestGraderAutosaveDraft, saveGraderAutosaveDraft } from '@/service
 import { getModuleRanges } from '@/services/grader/graderModuleConfig.service'
 import { computeAnalytics, DEFAULT_PHYSICAL_CONFIG } from '@/services/grader/graderAnalytics'
 import { computeDeterministicInsights } from '@/services/grader/graderInsights'
-import { segmentByDayAndShift, computeShiftSummary, sortedSegmentEntries } from '@/services/grader/graderSegmenter'
-import { saveDailySummaryBatch } from '@/services/grader/graderDailySummary.service'
+import {
+  segmentByDayAndShift,
+  computeShiftSummary,
+  sortedSegmentEntries,
+  dedupePieceRecords,
+  dedupeGate0Records,
+} from '@/services/grader/graderSegmenter'
+import { saveDailySummaryBatch, fetchExistingSummaryIds } from '@/services/grader/graderDailySummary.service'
 import type { ParsedMatrixData, GateAssignment, GraderAnalysisConfig } from '@/services/grader/types'
 
 const GRADER_WIZARD_DRAFT_KEY = 'grader_wizard_draft_v1'
@@ -62,6 +68,8 @@ export function AnalisisGraderWizardPage() {
 
   const [savingToCalendar, setSavingToCalendar] = useState(false)
   const [savedToCalendar, setSavedToCalendar] = useState(false)
+  // IDs de turnos del banner multi-día que ya existen en Firestore
+  const [multiDayExistingIds, setMultiDayExistingIds] = useState<Set<string>>(new Set())
 
   const dashboardRef = useRef<HTMLDivElement>(null)
   const localDraftLoadedRef = useRef(false)
@@ -107,13 +115,39 @@ export function AnalisisGraderWizardPage() {
     if (!parsedData) return null
     const totalRecords = parsedData.pieceRecords.length + parsedData.gate0Records.length
     if (totalRecords === 0) return null
-    const segmentMap = segmentByDayAndShift(parsedData.pieceRecords, parsedData.gate0Records)
+    // Dedupe por si el archivo viene con registros repetidos internamente
+    const pieceUnique = dedupePieceRecords(parsedData.pieceRecords).unique
+    const gate0Unique = dedupeGate0Records(parsedData.gate0Records).unique
+    const segmentMap = segmentByDayAndShift(pieceUnique, gate0Unique)
     const entries = sortedSegmentEntries(segmentMap)
     const uniqueDays = new Set(entries.map(([, s]) => s.sessionDate)).size
     if (uniqueDays <= 1) return null
     const isP0Only = parsedData.pieceRecords.length === 0
     return { entries, uniqueDays, totalSegments: entries.length, isP0Only }
   }, [parsedData])
+
+  // Consultar Firestore: cuántos de los turnos detectados ya existen
+  useEffect(() => {
+    setMultiDayExistingIds(new Set())
+    if (!multiDayInfo) return
+    let cancelled = false
+    const ids = multiDayInfo.entries.map(([, seg]) => `${seg.sessionDate}__${seg.shiftId}`)
+    fetchExistingSummaryIds(ids)
+      .then((set) => { if (!cancelled) setMultiDayExistingIds(set) })
+      .catch(() => { /* silencioso — no bloqueamos el banner */ })
+    return () => { cancelled = true }
+  }, [multiDayInfo])
+
+  const multiDayCounts = useMemo(() => {
+    if (!multiDayInfo) return null
+    const replaceCount = multiDayInfo.entries.filter(
+      ([, seg]) => multiDayExistingIds.has(`${seg.sessionDate}__${seg.shiftId}`),
+    ).length
+    return {
+      replace: replaceCount,
+      new: multiDayInfo.totalSegments - replaceCount,
+    }
+  }, [multiDayInfo, multiDayExistingIds])
 
   // Cargar physicalConfig guardado desde Firestore al iniciar
   // → así el widget de velocidad arranca con el valor real guardado, no con el default
@@ -403,17 +437,27 @@ export function AnalisisGraderWizardPage() {
       {multiDayInfo && !savedToCalendar && (
         <Card className="border-sky-500/30 bg-sky-500/5">
           <CardContent className="py-3 px-4 flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-0">
               <Calendar className="h-4 w-4 text-sky-500 shrink-0" />
-              <p className="text-sm">
-                <span className="font-medium">
-                  {multiDayInfo.isP0Only ? 'Archivo P0 multi-día' : 'Archivo multi-día detectado'}
-                </span>
-                <span className="text-muted-foreground ml-2">
-                  {multiDayInfo.uniqueDays} días · {multiDayInfo.totalSegments} turnos
-                  {multiDayInfo.isP0Only && ' — actualizará causas P0 sin borrar datos PP'}
-                </span>
-              </p>
+              <div className="text-sm min-w-0">
+                <p>
+                  <span className="font-medium">
+                    {multiDayInfo.isP0Only ? 'Archivo P0 multi-día' : 'Archivo multi-día detectado'}
+                  </span>
+                  <span className="text-muted-foreground ml-2">
+                    {multiDayInfo.uniqueDays} días · {multiDayInfo.totalSegments} turnos
+                    {multiDayInfo.isP0Only && ' — actualizará causas P0 sin borrar datos PP'}
+                  </span>
+                </p>
+                {multiDayCounts && multiDayCounts.replace > 0 && (
+                  <p className="text-xs mt-0.5">
+                    <span className="text-emerald-600 font-medium">{multiDayCounts.new} nuevos</span>
+                    <span className="text-muted-foreground"> · </span>
+                    <span className="text-amber-600 font-medium">{multiDayCounts.replace} reemplazos</span>
+                    <span className="text-muted-foreground"> (se sobrescribirán)</span>
+                  </p>
+                )}
+              </div>
             </div>
             <Button
               size="sm"
