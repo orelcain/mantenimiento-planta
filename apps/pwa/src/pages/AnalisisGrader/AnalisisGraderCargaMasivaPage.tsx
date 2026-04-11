@@ -113,9 +113,9 @@ export function AnalisisGraderCargaMasivaPage() {
       .catch(() => {/* usa defaults */})
   }, [])
 
-  if (!canSee('analisisGrader')) return <Navigate to="/" replace />
-
   // ─── Manejo de archivos ──────────────────────────────────────────────────────
+  // IMPORTANTE: todos los useCallback deben ir ANTES del early return para no
+  // violar react-hooks/rules-of-hooks.
 
   const handleFiles = useCallback((newFiles: File[]) => {
     const valid = newFiles.filter((f) =>
@@ -205,6 +205,9 @@ export function AnalisisGraderCargaMasivaPage() {
     pieces: segments.reduce((t, s) => t + s.summary.totalPieces, 0),
     avgP0:  segments.reduce((t, s) => t + s.summary.pointZeroPct, 0) / segments.length,
   } : null
+
+  // Guard de permisos — después de todos los hooks
+  if (!canSee('analisisGrader')) return <Navigate to="/" replace />
 
   // ─── Render ───────────────────────────────────────────────────────────────────
 
