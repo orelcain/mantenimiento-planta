@@ -1,11 +1,12 @@
 {
-  "version": "2.85.0",
+  "version": "2.86.0",
   "buildDate": "2026-04-12",
   "buildTimestamp": 1775930315920,
   "features": [
-    "Grader iter 17: gráfico Tendencia P0% separa Turno día (ámbar) y Turno noche (índigo)",
-    "Grader iter 17: zoom con scroll del mouse y pan arrastrando en el gráfico",
-    "Grader iter 17: botón Reset zoom para volver a la vista completa",
-    "Grader iter 17: tooltip identifica el turno y muestra piezas del turno específico"
+    "Grader iter 18: segmenter usa timestamp como fuente primaria (ignora label A/B del Excel)",
+    "Grader iter 18: GraderDailySummary incluye hourlyBuckets para drill-down dentro del turno",
+    "Grader iter 18: rebuild completo de toda la temporada 2025-2026 desde los 30 Excel locales",
+    "Grader iter 18: 0 segmentos >13h (antes había 41 registros anómalos)",
+    "Grader iter 18: 5.37M registros PP + 206k P0 deduplicados → 379 summaries limpios"
   ]
 }

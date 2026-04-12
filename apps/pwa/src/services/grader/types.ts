@@ -476,6 +476,18 @@ export interface GraderDailySummary {
   hasPieceData?: boolean;
   /** Si el segmento contiene registros PUERTA_0 (para indicador de completitud) */
   hasGate0Data?: boolean;
+  /**
+   * Buckets por hora del día (0-23) con piezas totales y piezas P0.
+   * Permite drill-down "dentro del turno" en el gráfico de tendencia
+   * sin tener que re-parsear el Excel original.
+   * Solo incluye horas con actividad.
+   */
+  hourlyBuckets?: Array<{
+    /** Hora del día en formato HH (0-23) */
+    hour: number;
+    totalPieces: number;
+    p0Pieces: number;
+  }>;
 }
 
 // ============================================================================

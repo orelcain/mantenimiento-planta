@@ -127,12 +127,19 @@ export function assignShiftAndDate(
 /**
  * Agrupa todos los registros en segmentos por {sessionDate, shiftId}.
  *
- * Estrategia de segmentación (en orden de prioridad):
- *  1. Si el registro tiene columna "Turno" → usar ese valor (más confiable).
- *     La fecha se toma directamente del timestamp (columna Fecha del Excel).
- *  2. Si no hay columna Turno → inferir turno desde timestamp + schedule.
+ * Estrategia de segmentación (timestamp-first, iter 18):
+ *  1. SIEMPRE usar el timestamp (columna Fecha/Hora del Excel) como fuente
+ *     primaria de shift + sessionDate, aplicando el schedule configurado.
+ *  2. La columna "Turno" del Excel se IGNORA para segmentación porque:
+ *     - Los equipos A/B pueden rotar entre día/noche
+ *     - Operarios a veces etiquetan toda la jornada con una sola letra,
+ *       creando segmentos ficticios de 20-24h
+ *     - El timestamp es 100% confiable y siempre coincide con la realidad
  *
- * Los registros sin timestamp válido se descartan.
+ *  El label A/B sigue disponible en el campo `shift` de los PieceRecord,
+ *  por si se quiere analizar performance por equipo (separado del turno).
+ *
+ *  Los registros sin timestamp válido se descartan.
  */
 export function segmentByDayAndShift(
   pieceRecords: PieceRecord[],
@@ -149,29 +156,15 @@ export function segmentByDayAndShift(
     return map.get(key)!
   }
 
-  const resolveShiftAndDate = (ts: string, shift?: string): { sessionDate: string; shiftId: string } => {
-    if (shift) {
-      // Fuente primaria: columna Turno del Excel → si normaliza a uno de los
-      // canónicos día/tarde/noche lo usamos; si no, caemos al fallback por
-      // timestamp + schedule para evitar duplicación en Firestore.
-      const canonical = normalizeShiftLabel(shift)
-      if (canonical) {
-        return { sessionDate: ts.slice(0, 10), shiftId: canonical }
-      }
-    }
-    // Fallback: inferir desde timestamp + horarios configurados
-    return assignShiftAndDate(ts, schedule)
-  }
-
   for (const rec of pieceRecords) {
     if (!rec.ts) continue
-    const { sessionDate, shiftId } = resolveShiftAndDate(rec.ts, rec.shift)
+    const { sessionDate, shiftId } = assignShiftAndDate(rec.ts, schedule)
     getOrCreate(sessionDate, shiftId).pieceRecords.push(rec)
   }
 
   for (const rec of gate0Records) {
     if (!rec.ts) continue
-    const { sessionDate, shiftId } = resolveShiftAndDate(rec.ts, rec.shift)
+    const { sessionDate, shiftId } = assignShiftAndDate(rec.ts, schedule)
     getOrCreate(sessionDate, shiftId).gate0Records.push(rec)
   }
 
@@ -284,6 +277,44 @@ export function computeShiftSummary(
       pct: r(pieces / (prodPieces || 1) * 100, 1),
     }))
 
+  // ── Buckets por hora del día (para drill-down en gráfico de tendencia) ─────
+  // Usa getUTCHours porque el parser no aplica timezone — los ts están en
+  // hora local del grader, marcados como Z pero sin conversión.
+  const hourMap = new Map<number, { total: number; p0: number }>()
+  for (const rec of pieceRecords) {
+    if (!rec.ts) continue
+    const d = new Date(rec.ts)
+    if (isNaN(d.getTime())) continue
+    const h = d.getUTCHours()
+    const b = hourMap.get(h) ?? { total: 0, p0: 0 }
+    b.total += rec.pieces
+    if (rec.gate === 0) b.p0 += rec.pieces
+    hourMap.set(h, b)
+  }
+  // Si hay PUERTA_0 dedicado, usar sus counts como P0 (más confiables)
+  if (gate0Records.length > 0) {
+    for (const h of hourMap.keys()) {
+      const b = hourMap.get(h)!
+      b.p0 = 0 // reset, vamos a recalcular
+    }
+    for (const rec of gate0Records) {
+      if (!rec.ts) continue
+      const d = new Date(rec.ts)
+      if (isNaN(d.getTime())) continue
+      const h = d.getUTCHours()
+      const b = hourMap.get(h) ?? { total: 0, p0: 0 }
+      b.p0 += rec.pieces
+      hourMap.set(h, b)
+    }
+  }
+  const hourlyBuckets = Array.from(hourMap.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([hour, v]) => ({
+      hour,
+      totalPieces: v.total,
+      p0Pieces: v.p0,
+    }))
+
   return {
     id: `${sessionDate}__${shiftId}`,
     dateKey: sessionDate,
@@ -301,6 +332,7 @@ export function computeShiftSummary(
     calibreDistribution,
     qualityDistribution,
     gateDistribution,
+    hourlyBuckets,
     sourceFileNames,
     batchUploadId,
     hasPieceData: pieceRecords.length > 0,
