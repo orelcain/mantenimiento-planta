@@ -1,20 +1,50 @@
 /**
  * Tab "Compuertas" (balance de gates + stats avanzadas + sugerencias swap)
  * del Dashboard del Grader. Extraído en la iter 3 de refactor 2026-04-10.
+ *
+ * Iter 19 / P0.5:
+ *  - Semáforo de tiempo de reacción por gate (usando `computeGateTimingSignals`)
+ *  - Asignación óptima de calibres a gates (usando `computeOptimalGateAssignment`)
  */
+import { useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, Badge, InfoTooltip } from '@/components/ui'
-import { AlertTriangle, Info, Zap, BarChart3, ArrowRightLeft } from 'lucide-react'
+import { AlertTriangle, Info, Zap, BarChart3, ArrowRightLeft, Clock, Target, CheckCircle2, XCircle } from 'lucide-react'
 import { Bar } from 'react-chartjs-2'
 import { cn } from '@/lib/utils'
 import { getTooltipProps } from '@/services/grader/graderTooltips'
 import { SwapSuggestionCard } from '@/components/grader/GraderInlinePanels'
-import type { GraderAnalyticsResult } from '@/services/grader/types'
+import {
+  computeGateTimingSignals,
+  computeOptimalGateAssignment,
+} from '@/services/grader/graderGateTiming'
+import type {
+  GateAssignment,
+  GraderAnalyticsResult,
+  GraderPhysicalConfig,
+} from '@/services/grader/types'
 
 interface Props {
   analytics: GraderAnalyticsResult
+  physicalConfig?: GraderPhysicalConfig
+  gates: GateAssignment[]
 }
 
-export function GraderCompuertasTab({ analytics }: Props) {
+export function GraderCompuertasTab({ analytics, physicalConfig, gates }: Props) {
+  // Semáforo tiempo de reacción por gate
+  const timingSignals = useMemo(
+    () => computeGateTimingSignals(physicalConfig, gates),
+    [physicalConfig, gates],
+  )
+  // Asignación óptima de calibres a gates
+  const optimalAssignment = useMemo(
+    () => computeOptimalGateAssignment(
+      analytics.gateBalance,
+      analytics.gateAdvancedStats,
+      timingSignals,
+      gates,
+    ),
+    [analytics.gateBalance, analytics.gateAdvancedStats, timingSignals, gates],
+  )
   return (
     <>
       {/* Allocation Score KPI */}
@@ -262,6 +292,177 @@ export function GraderCompuertasTab({ analytics }: Props) {
             {analytics.gateSwapSuggestions.map((s, i) => (
               <SwapSuggestionCard key={i} suggestion={s} />
             ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Semáforo tiempo de reacción por gate (iter 19 / P0.5) ───────── */}
+      {timingSignals.length > 0 && (
+        <Card className="border-sky-500/30">
+          <CardHeader>
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Clock className="h-4 w-4 text-sky-500" />
+              Tiempo de Reacción por Compuerta
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Tiempo disponible (distancia sensor → flipper / velocidad cinta) vs tiempo requerido
+              (salmón {physicalConfig?.avgSalmonLengthCm ?? '—'}cm cruzando + reset neumático 0.45s).
+              Verde = margen holgado (≥ 0.5s), amarillo = ajustado, rojo = insuficiente (&lt; 0.15s).
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left">
+                    <th className="py-2 px-2">Gate</th>
+                    <th className="py-2 px-2 text-right">Distancia (m)</th>
+                    <th className="py-2 px-2 text-right">t_disponible</th>
+                    <th className="py-2 px-2 text-right">t_requerido</th>
+                    <th className="py-2 px-2 text-right">Margen</th>
+                    <th className="py-2 px-2 text-center">Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {timingSignals.map((t) => {
+                    const color =
+                      t.status === 'ok' ? 'text-emerald-600 dark:text-emerald-400' :
+                      t.status === 'warn' ? 'text-amber-600 dark:text-amber-400' :
+                      t.status === 'critical' ? 'text-red-600 dark:text-red-400' :
+                      'text-muted-foreground'
+                    const bg =
+                      t.status === 'ok' ? 'bg-emerald-500/5' :
+                      t.status === 'warn' ? 'bg-amber-500/5' :
+                      t.status === 'critical' ? 'bg-red-500/5' :
+                      ''
+                    const label =
+                      t.status === 'ok' ? 'OK' :
+                      t.status === 'warn' ? 'AJUSTADO' :
+                      t.status === 'critical' ? 'CRÍTICO' :
+                      'INACTIVO'
+                    return (
+                      <tr key={t.gateNumber} className={cn('border-b hover:bg-muted/30', bg)} title={t.hint}>
+                        <td className="py-2 px-2 font-medium">Gate {t.gateNumber}</td>
+                        <td className="py-2 px-2 text-right tabular-nums">{t.distanceMeters.toFixed(2)}</td>
+                        <td className="py-2 px-2 text-right tabular-nums">{t.tAvailableSec.toFixed(2)}s</td>
+                        <td className="py-2 px-2 text-right tabular-nums text-muted-foreground">{t.tRequiredSec.toFixed(2)}s</td>
+                        <td className={cn('py-2 px-2 text-right tabular-nums font-semibold', color)}>
+                          {t.marginSec >= 0 ? '+' : ''}{t.marginSec.toFixed(2)}s
+                        </td>
+                        <td className="py-2 px-2 text-center">
+                          <Badge variant="outline" className={cn('text-[10px]', color, 'border-current')}>
+                            {label}
+                          </Badge>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex items-center gap-4 mt-3 text-[10px] text-muted-foreground flex-wrap">
+              <span>Velocidad Sorting Belt: {timingSignals[0]?.beltSpeedMps.toFixed(2)} m/s</span>
+              <span>·</span>
+              <span>Reset neumático: {(physicalConfig?.flipperResetTimeSec ?? 0.45).toFixed(2)}s</span>
+              <span>·</span>
+              <span className="italic">Bajar velocidad del Sorting Belt aumenta el margen de todas las gates.</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Asignación óptima de calibres a gates (iter 19 / P0.5) ──────── */}
+      {optimalAssignment.length > 0 && (
+        <Card className="border-purple-500/30">
+          <CardHeader>
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Target className="h-4 w-4 text-purple-500" />
+              Asignación Óptima Sugerida
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Heurística: calibres con mayor demanda → gates con mejor tiempo de reacción. No reemplaza
+              las sugerencias de swap; es una vista "desde cero" útil al reconfigurar para un nuevo lote.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left">
+                    <th className="py-2 px-2">Gate</th>
+                    <th className="py-2 px-2 text-right">Timing</th>
+                    <th className="py-2 px-2">Actual</th>
+                    <th className="py-2 px-2">Óptimo</th>
+                    <th className="py-2 px-2 text-center">Match</th>
+                    <th className="py-2 px-2">Razón</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {optimalAssignment.map((o) => (
+                    <tr
+                      key={o.gateNumber}
+                      className={cn(
+                        'border-b hover:bg-muted/30',
+                        !o.isMatch && o.suggestedCalibre != null && 'bg-purple-500/5',
+                      )}
+                    >
+                      <td className="py-2 px-2 font-medium">Gate {o.gateNumber}</td>
+                      <td className="py-2 px-2 text-right tabular-nums text-muted-foreground">
+                        {o.timingScore}/100
+                      </td>
+                      <td className="py-2 px-2">
+                        {o.currentCalibre ? (
+                          <Badge variant="outline" className="text-[10px]">
+                            {o.currentCalibre}
+                          </Badge>
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="py-2 px-2">
+                        {o.suggestedCalibre ? (
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              'text-[10px]',
+                              o.isMatch
+                                ? 'border-emerald-500/40 text-emerald-600 dark:text-emerald-400'
+                                : 'border-purple-500/40 text-purple-600 dark:text-purple-400',
+                            )}
+                          >
+                            {o.suggestedCalibre}
+                          </Badge>
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground italic">desactivar</span>
+                        )}
+                      </td>
+                      <td className="py-2 px-2 text-center">
+                        {o.isMatch ? (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 inline" />
+                        ) : o.suggestedCalibre != null ? (
+                          <XCircle className="h-3.5 w-3.5 text-purple-500 inline" />
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="py-2 px-2 text-[11px] text-muted-foreground">{o.reason}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {(() => {
+              const mismatchCount = optimalAssignment.filter(
+                (o) => !o.isMatch && o.suggestedCalibre != null,
+              ).length
+              return (
+                <p className="text-[10px] text-muted-foreground mt-3">
+                  {mismatchCount === 0
+                    ? '✓ Todas las gates coinciden con la asignación óptima sugerida.'
+                    : `${mismatchCount} gate${mismatchCount !== 1 ? 's' : ''} con asignación sub-óptima — revisar razón y validar con el operador antes de aplicar.`}
+                </p>
+              )
+            })()}
           </CardContent>
         </Card>
       )}

@@ -1425,7 +1425,11 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
 
         {/* BALANCE GATES */}
         <TabsContent value="balance" className="space-y-4">
-          <GraderCompuertasTab analytics={analytics} />
+          <GraderCompuertasTab
+            analytics={analytics}
+            physicalConfig={config.physicalConfig}
+            gates={gates}
+          />
         </TabsContent>
 
         {/* DIAGNÓSTICO */}
