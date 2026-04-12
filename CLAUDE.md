@@ -567,6 +567,17 @@ Si se necesita re-procesar o corregir algo, usar `scripts/iter18-full-season-reb
 - [ ] **KPIs dinámicos según zoom visible del chart**: recalcular Piezas, P0%, Peso, Tasa promedio en vivo según el rango visible tras aplicar zoom/pan. Hoy quedan fijos al preset inicial.
 - [ ] **Selectores específicos de semana/mes** en análisis de período: agregar prev/next arrows o dropdown para navegar a semanas/meses históricos específicos (no solo "últimos 7/30 días"). Alternativa actual: usar "Personalizado".
 
+### P0.5 — Grader iter 7 pendiente (validación con datos reales)
+- [ ] **Validar flujo PP→P0 incremental** end-to-end con archivos históricos reales cargados por el usuario (julio 2025+)
+- [ ] **Asignación óptima de calibres a gates**: algoritmo que sugiere qué calibre/calidad va a qué gate según % distribución + layout físico
+- [ ] **Semáforo tiempo de reacción por gate**: columna verde/amarillo/rojo en tab Compuertas (`t_disponible` vs `t_requerido`)
+- [ ] **Ajustar umbrales** insight #17 (35% gate sobrecargada) e insight #18 (150ms conflicto timing) según feedback de producción real
+
+### P1.8 — Refactor Grader opcional (baja prioridad, no bloqueante)
+- [ ] Partir `GraderTendenciaTab` (1053 líneas) en sub-cards por card P0 (#1-#7)
+- [ ] Partir `GraderPuntoCeroTab` (1157 líneas) en sub-cards (Clasificación, Patrones, Pivote, Fuera de rango, Serie temporal)
+- [ ] Unit tests de `useGraderDashboardAnalytics` + `useGraderPatternAnalytics`
+
 ### P1 — Requiere acceso a Firebase Console / IAM
 - [ ] **App Check**: ReCaptchaV3 + enforceAppCheck en Cloud Functions (requiere key de ReCaptcha desde Firebase Console)
 
@@ -635,85 +646,42 @@ Si se necesita re-procesar o corregir algo, usar `scripts/iter18-full-season-reb
 ### Sesion 2026-04-08
 - Calendario UX landscape/mobile completo, seguridad nivel 2, Baader 200 movil
 
-## Pendientes priorizados
+## Histórico Grader — arco de iteraciones completadas
 
-### ✅ Grader — refactor COMPLETADO (iter 1 → iter 5, 2026-04-10/11)
+### Pendientes vivos sin dueño de prioridad (P2 contenido)
+- [ ] **Contenido real Seguridad**: agregar fichas PDF descargables, videos de EPP al módulo `/aprendizaje/seguridad`
+- [ ] **Contenido real Marel**: agregar guías por equipo (MX, Stork Trim, Scanvaegt) con fotos
 
-Arco cerrado. Dashboard pasó de **5262 → 1485 líneas (-72%)** y score global **61.4 → 88.0 (+43%)**.
+### Refactor iter 1 → iter 5 (2026-04-10/11) ✅
+
+Arco cerrado. Dashboard **5262 → 1485 líneas (-72%)**, score global **61.4 → 88.0 (+43%)**.
 
 | iter | Dashboard | Score | Cambio clave | Commit |
 |---:|---:|---:|---|---|
 | 1 (baseline) | 5262 | 61.4 | Mega-componente inicial | — |
-| 2 | 4495 | 71.4 | Helpers + `useGraderDashboardAnalytics` + inline panels | `161d7945` |
-| 3 | 2836 | 78.6 | Extraer 5/6 tabs por componente | `ee7d7f8d` |
+| 2 | 4495 | 71.4 | `useGraderDashboardAnalytics` + helpers + inline panels | `161d7945` |
+| 3 | 2836 | 78.6 | Extraer 5/6 sub-tabs | `ee7d7f8d` |
 | 4 | 1817 | 84.2 | Extraer `GraderPuntoCeroTab` | `81db31a6` |
-| **5** | **1485** | **88.0** | **Extraer `useGraderPatternAnalytics` + unificar helpers** | `94067ad7` |
+| **5** | **1485** | **88.0** | `useGraderPatternAnalytics` + unificar helpers | `94067ad7` |
 
-**Arquitectura final del módulo Grader:**
-- Dashboard (1485 líneas): orquestador puro
-- 2 hooks de analytics: `useGraderDashboardAnalytics` + `useGraderPatternAnalytics`
-- 6 sub-tabs autocontenidos: Matriz (162), Compuertas (270), Sugerencias (107), Lotes (413), Tendencia (1053), Punto Cero (1157)
-- Helpers compartidos en `services/grader/graderDashboardHelpers.ts`
+**Arquitectura actual**: Dashboard orquestador (1485) + 2 hooks analytics + 6 sub-tabs autocontenidos (Matriz 162, Compuertas 270, Sugerencias 107, Lotes 413, Tendencia 1053, Punto Cero 1157) + `graderDashboardHelpers.ts`.
 
-### ✅ Grader iter 6 — Config física real + insights físicos (2026-04-11, v2.74.0)
+### Iter 6 — Config física real + insights físicos (2026-04-11, v2.74.0) ✅
 
-**Completado:**
-- ✅ `DEFAULT_PHYSICAL_CONFIG` con velocidades reales desde Z2 (Z-Belt 0.39, Accel1 1.03, Accel2 1.23, Sorting 1.28 m/s)
-- ✅ `z2ProgrammedDistancesMm` reales (12 valores no uniformes medidos en terreno)
-- ✅ Longitudes cintas aceleración reales (Accel1 3.65m, Accel2 1.70m)
-- ✅ Causas P0 reales desde pantalla Z2 ("Fuera de límites", "No leído por fotocélula", etc.)
-- ✅ `GraderResumenRapido` — Resumen Ejecutivo al cargar Excel
-- ✅ Widget inline velocidad Sorting Belt editable (persiste en analytics en tiempo real)
-- ✅ `physicalConfig` cargado de Firestore al montar (no requiere abrir Gates Config antes)
-- ✅ Insight #17: gate sobrecargada (>35% tráfico)
-- ✅ Insight #18: conflicto timing Z2 entre gates adyacentes
-- ✅ Tabla velocidades Z2 en UI de configuración física
+`DEFAULT_PHYSICAL_CONFIG` con velocidades Z2 reales (Z-Belt 0.39, Accel1 1.03, Accel2 1.23, Sorting 1.28 m/s), `z2ProgrammedDistancesMm` reales (12 valores no uniformes), longitudes cintas aceleración reales, causas P0 reales desde pantalla Z2, `GraderResumenRapido`, widget inline velocidad Sorting Belt editable, `physicalConfig` cargado de Firestore al montar, insights #17 (gate sobrecargada >35%) y #18 (conflicto timing Z2), tabla velocidades Z2 en UI.
 
-**Iteraciones futuras opcionales (baja prioridad, no bloqueantes):**
-- [ ] Partir `GraderTendenciaTab` (1053 líneas) en sub-cards por card P0 (#1-#7)
-- [ ] Partir `GraderPuntoCeroTab` (1157 líneas) en sub-cards (Clasificación, Patrones, Pivote, Fuera de rango, Serie temporal)
-- [ ] Unit tests de los 2 hooks de analytics
-- ✅ **Iter 7: carga masiva histórica** — `AnalisisGraderCargaMasivaPage.tsx` + `graderSegmenter.ts` + calendario con badges PP/P0 (sesion 2026-04-11 tarde)
-- ✅ **Iter 7: banner multi-día en wizard** — detecta archivos multi-día y ofrece "Guardar en Calendario" inline (sesion 2026-04-11 tarde)
-- ✅ **Iter 7: merge inteligente PP+P0** — subir PP y P0 por separado no borra datos del otro (sesion 2026-04-11 tarde)
-- [ ] **Iter 7 pendiente: asignación óptima de calibres a gates** — algoritmo que sugiere qué calibre/calidad va a qué gate según % distribución + layout físico
-- [ ] **Iter 7 pendiente: semáforo tiempo de reacción por gate** — columna verde/amarillo/rojo en tab Compuertas (t_disponible vs t_requerido)
-- [ ] **Iter 7 pendiente: ajustar umbrales** insight #17 (35%) e insight #18 (150ms) según feedback de producción real
-- [ ] **Iter 7 pendiente: validar con datos reales** — usuario está cargando archivos históricos de julio 2025+; verificar que el flujo PP→P0 incremental funcione end-to-end sin errores
+### Iter 7 — Carga masiva histórica (2026-04-11 tarde) ✅
 
-<!-- completados sesión 2026-04-11 (iter 4 + iter 5)
-- ✅ Refactor iter 4: extraer GraderPuntoCeroTab — commit 81db31a6
-- ✅ Refactor iter 5: extraer useGraderPatternAnalytics hook + unificar helpers — commit 94067ad7
+`AnalisisGraderCargaMasivaPage` + `graderSegmenter.ts` + calendario con badges PP/P0, banner multi-día en wizard, merge inteligente PP+P0 (subir PP y P0 por separado no borra datos del otro).
+
+### Iters 8 → 18.1 — Maratón 2026-04-12 (v2.76 → v2.86.1) ✅
+
+13 commits. Rebuild total de temporada desde 30 Excel locales (5.37M PP + 206k P0 → 379 summaries limpios), fix segmenter timestamp-first, hourlyBuckets agregados a summaries, fix TZ display, minutos activos reales. Commits `24292*`–`24295*`.
+
+<!-- completados anteriores (sesión 2026-04-10)
+- Grader P0 #1-#7: proyección turno, chart peso toggle, badge P0 header, umbrales colapsables, IA tendencia multisesión, comparativa día/noche, detección degradación sensores
+- Skill evaluar-modulo + rutina de sesión 2 pasos
 -->
-
-<!-- completados sesión 2026-04-10
-- ✅ Grader P0 #1: Panel proyección turno (tab Tendencia) — commit 15661e59
-- ✅ Grader P0 #2: Chart peso toggle Simple/Detallado — commit 50831677
-- ✅ Grader P0 #3: Badge P0 cierre prominente en header — commit 50831677
-- ✅ Grader P0 #4: Umbrales P0 warn/crítico colapsables — commit 50831677
-- ✅ Grader P0 #5: IA Tendencia mejorada con patrones multisesión — commit 72f6cd0d
-- ✅ Grader P0 #6: Comparativa turno día/noche — commit 72f6cd0d
-- ✅ Grader P0 #7: Detección degradación de sensores — commit 72f6cd0d
-- ✅ Refactor iter 2: extraer useGraderDashboardAnalytics + helpers + inline panels — commit 161d7945
-- ✅ Refactor iter 3: extraer 5/6 sub-tabs — commit ee7d7f8d
-- ✅ Skill evaluar-modulo — commit e9c17806
-- ✅ Rutina de sesión 2 pasos — commit c2834d96
--->
-
-### P1 — Requiere acceso a Firebase Console / IAM
-- [ ] **App Check**: ReCaptchaV3 + enforceAppCheck en Cloud Functions
-
-### P1.5 — Seguridad pendiente
-- [ ] **SW SRI**: Self-host Firebase SDK en public/vendor/ (evitar 3rd-party scripts)
-- [ ] **Input sanitization Firestore**: quedan ~18 colecciones sin validacion de tipos (spareParts, bodega, machineCategories, machines, ariaLearning, etc.)
-
-### P2 — Mejoras UX futuras
-- [ ] **Contenido real Seguridad**: agregar fichas PDF descargables, videos de EPP al modulo `/aprendizaje/seguridad`
-- [ ] **Contenido real Marel**: agregar guias por equipo (MX, Stork Trim, Scanvaegt) con fotos
-- [ ] **Modo alto contraste en calendario**: la tabla del calendario no reacciona al `.high-contrast` (colores hardcoded en bg-zinc-800, bg-cyan-500/5, etc.)
-- [ ] **Editor sidebar — reordenar grupos en mobile**: el TouchSensor funciona pero puede ser mejorado
-- [ ] **UX Aprendizaje — icono hub**: `GraduationCap` → `Wrench` o `BookOpen` (comunica mejor "manuales tecnicos" a un mecanico industrial) — auditoria 2026-04-09
-- [ ] **UX Aprendizaje — navegacion cruzada**: agregar franja "Otros modulos" al fondo de cada sub-pagina (chips de navegacion rapida sin volver al hub) — auditoria 2026-04-09
 
 ## Flujo: Fix vulnerabilidades + Deploy a produccion
 

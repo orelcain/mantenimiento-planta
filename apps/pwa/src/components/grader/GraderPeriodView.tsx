@@ -10,7 +10,7 @@
  *  - Tabla ordenable de todos los turnos del rango con botón "Ver"
  */
 
-import { useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, Badge } from '@/components/ui'
 import { Bar, Line } from 'react-chartjs-2'
@@ -27,9 +27,10 @@ import {
   Filler,
 } from 'chart.js'
 import zoomPlugin from 'chartjs-plugin-zoom'
-import { ArrowUpDown, ExternalLink, TrendingUp, AlertTriangle, CheckCircle2, RotateCcw } from 'lucide-react'
+import { ArrowUpDown, ExternalLink, TrendingUp, AlertTriangle, CheckCircle2, RotateCcw, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { PeriodAggregate } from '@/services/grader/graderPeriodAggregate'
+import type { PeriodAggregate, PeriodStats } from '@/services/grader/graderPeriodAggregate'
+import { computeStatsFromSummaries } from '@/services/grader/graderPeriodAggregate'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend, Filler, zoomPlugin)
 
@@ -99,7 +100,62 @@ export function GraderPeriodView({ data }: Props) {
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const trendChartRef = useRef<any>(null)
 
-  const { stats, dailyP0Series, shiftBreakdown, calibreDistribution, topP0Causes, shifts, range } = data
+  // Rango visible del chart tras zoom/pan (null = rango completo)
+  const [visibleIdxRange, setVisibleIdxRange] = useState<{ start: number; end: number } | null>(null)
+
+  const { stats, dailyP0Series, hourlySeries, shiftBreakdown, calibreDistribution, topP0Causes, shifts, range } = data
+
+  // Reset de zoom cuando cambia el rango del padre (nuevo preset)
+  useEffect(() => {
+    setVisibleIdxRange(null)
+  }, [range.start, range.end, range.label])
+
+  const updateVisibleRange = useCallback(() => {
+    const chart = trendChartRef.current
+    if (!chart) return
+    const scale = chart.scales?.x
+    if (!scale) return
+    const rawMin = typeof scale.min === 'number' ? scale.min : 0
+    const rawMax = typeof scale.max === 'number' ? scale.max : dailyP0Series.length - 1
+    const start = Math.max(0, Math.round(rawMin))
+    const end = Math.min(dailyP0Series.length - 1, Math.round(rawMax))
+    if (start <= 0 && end >= dailyP0Series.length - 1) {
+      setVisibleIdxRange(null)
+    } else {
+      setVisibleIdxRange({ start, end })
+    }
+  }, [dailyP0Series.length])
+
+  // Summaries filtrados al rango visible (para KPIs dinámicos)
+  const visibleSummaries = useMemo(() => {
+    if (!visibleIdxRange) return shifts
+    const startDate = dailyP0Series[visibleIdxRange.start]?.dateKey
+    const endDate = dailyP0Series[visibleIdxRange.end]?.dateKey
+    if (!startDate || !endDate) return shifts
+    return shifts.filter((s) => s.dateKey >= startDate && s.dateKey <= endDate)
+  }, [shifts, dailyP0Series, visibleIdxRange])
+
+  // Stats recalculados al rango visible (o los originales si no hay zoom)
+  const visibleStats: PeriodStats = useMemo(() => {
+    if (!visibleIdxRange) return stats
+    return computeStatsFromSummaries(visibleSummaries)
+  }, [stats, visibleSummaries, visibleIdxRange])
+
+  // Días visibles tras zoom (para decidir drill-down hourly)
+  const visibleDaysSpan = visibleIdxRange
+    ? visibleIdxRange.end - visibleIdxRange.start + 1
+    : dailyP0Series.length
+
+  // Activar drill-down cuando zoom ≤ 2 días Y hay hourlyBuckets en esos días
+  const hourlyFiltered = useMemo(() => {
+    if (!visibleIdxRange || visibleDaysSpan > 2 || hourlySeries.length === 0) return []
+    const startDate = dailyP0Series[visibleIdxRange.start]?.dateKey
+    const endDate = dailyP0Series[visibleIdxRange.end]?.dateKey
+    if (!startDate || !endDate) return []
+    return hourlySeries.filter((h) => h.dateKey >= startDate && h.dateKey <= endDate)
+  }, [visibleIdxRange, visibleDaysSpan, hourlySeries, dailyP0Series])
+
+  const useHourlyView = hourlyFiltered.length > 0
 
   // ── Chart: tendencia P0% diaria SEPARADA por turno día/noche ─────────────
   const trendChartData = useMemo(() => {
@@ -180,12 +236,14 @@ export function GraderPeriodView({ data }: Props) {
           enabled: true,
           mode: 'x' as const,
           modifierKey: undefined,
+          onPanComplete: () => updateVisibleRange(),
         },
         zoom: {
           wheel: { enabled: true, speed: 0.1 },
           pinch: { enabled: true },
           drag: { enabled: false },
           mode: 'x' as const,
+          onZoomComplete: () => updateVisibleRange(),
         },
         limits: {
           x: { min: 'original' as const, max: 'original' as const },
@@ -206,10 +264,75 @@ export function GraderPeriodView({ data }: Props) {
         },
       },
     },
-  }), [dailyP0Series, navigate])
+  }), [dailyP0Series, navigate, updateVisibleRange])
+
+  // ── Chart hourly (drill-down cuando zoom ≤ 2 días) ───────────────────────
+  const hourlyChartData = useMemo(() => {
+    if (!useHourlyView) return null
+    return {
+      labels: hourlyFiltered.map((h) => h.label),
+      datasets: [
+        {
+          label: 'P0% por hora',
+          data: hourlyFiltered.map((h) => h.p0Pct),
+          borderColor: 'rgba(168, 85, 247, 1)',
+          backgroundColor: 'rgba(168, 85, 247, 0.15)',
+          fill: true,
+          tension: 0.25,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          pointBackgroundColor: hourlyFiltered.map((h) =>
+            h.shiftId === 'Turno día' ? DIA_LINE_COLOR : NOCHE_LINE_COLOR,
+          ),
+          pointBorderColor: hourlyFiltered.map((h) =>
+            h.shiftId === 'Turno día' ? DIA_LINE_COLOR : NOCHE_LINE_COLOR,
+          ),
+        },
+      ],
+    }
+  }, [useHourlyView, hourlyFiltered])
+
+  const hourlyChartOptions = useMemo(() => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'nearest' as const, intersect: false, axis: 'x' as const },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          title: (items: any[]) => {
+            const idx = items[0]?.dataIndex
+            const entry = typeof idx === 'number' ? hourlyFiltered[idx] : undefined
+            return entry ? `${entry.dateKey} · ${entry.hour.toString().padStart(2, '0')}h · ${entry.shiftId}` : ''
+          },
+          label: (ctx: any) => {
+            const entry = hourlyFiltered[ctx.dataIndex]
+            if (!entry) return ''
+            return `P0%: ${entry.p0Pct}% · ${entry.totalPieces.toLocaleString('es-CL')} pz · P0: ${entry.p0Pieces.toLocaleString('es-CL')}`
+          },
+        },
+      },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        ticks: { callback: (v: any) => `${v}%` },
+      },
+      x: {
+        ticks: {
+          maxRotation: 50,
+          minRotation: 20,
+          autoSkip: true,
+          maxTicksLimit: 16,
+          font: { size: 10 },
+        },
+      },
+    },
+  }), [hourlyFiltered])
 
   const handleResetZoom = () => {
     trendChartRef.current?.resetZoom?.()
+    setVisibleIdxRange(null)
   }
 
   // ── Chart: calibre consolidado (top 8 horizontal) ────────────────────────
@@ -282,14 +405,23 @@ export function GraderPeriodView({ data }: Props) {
     )
   }
 
+  // Rango visible en fechas legibles (para el badge del header)
+  const visibleRangeLabel = useMemo(() => {
+    if (!visibleIdxRange) return null
+    const startDate = dailyP0Series[visibleIdxRange.start]?.dateKey
+    const endDate = dailyP0Series[visibleIdxRange.end]?.dateKey
+    if (!startDate || !endDate) return null
+    return startDate === endDate ? startDate : `${startDate} → ${endDate}`
+  }, [visibleIdxRange, dailyP0Series])
+
   // ── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
       {/* ── Header del rango ──────────────────────────────────────────────── */}
-      <Card className={cn('border-l-4', p0BorderClass(stats.p0PctWeighted))}>
+      <Card className={cn('border-l-4', p0BorderClass(visibleStats.p0PctWeighted))}>
         <CardContent className="pt-4 pb-4">
           <div className="flex items-start justify-between flex-wrap gap-3">
-            <div>
+            <div className="min-w-0">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                 Período analizado
               </p>
@@ -297,44 +429,61 @@ export function GraderPeriodView({ data }: Props) {
               <p className="text-xs text-muted-foreground mt-0.5">
                 {range.start} → {range.end} · {stats.daysCount} días · {stats.shiftsCount} turnos
               </p>
+              {visibleRangeLabel && (
+                <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+                  <Badge variant="outline" className="text-[10px] border-purple-500/40 text-purple-600 dark:text-purple-400">
+                    🔍 Filtrado a zoom: {visibleRangeLabel}
+                  </Badge>
+                  <span className="text-[10px] text-muted-foreground">
+                    {visibleStats.daysCount} día{visibleStats.daysCount !== 1 ? 's' : ''} · {visibleStats.shiftsCount} turno{visibleStats.shiftsCount !== 1 ? 's' : ''}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleResetZoom}
+                    className="text-[10px] text-purple-600 dark:text-purple-400 hover:underline"
+                  >
+                    limpiar
+                  </button>
+                </div>
+              )}
             </div>
-            <div className="text-right">
+            <div className="text-right shrink-0">
               <p className="text-[10px] text-muted-foreground uppercase tracking-wide">P0% ponderado</p>
-              <p className={cn('text-4xl font-bold tabular-nums', p0Color(stats.p0PctWeighted))}>
-                {stats.p0PctWeighted}%
+              <p className={cn('text-4xl font-bold tabular-nums', p0Color(visibleStats.p0PctWeighted))}>
+                {visibleStats.p0PctWeighted}%
               </p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* ── KPIs row ─────────────────────────────────────────────────────── */}
+      {/* ── KPIs row (dinámicos según zoom visible) ────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <Card>
           <CardContent className="pt-4 pb-3 text-center">
             <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Piezas</p>
             <p className="text-xl font-bold tabular-nums mt-0.5">
-              {stats.totalPieces >= 1e6
-                ? `${(stats.totalPieces / 1e6).toFixed(1)}M`
-                : `${(stats.totalPieces / 1e3).toFixed(1)}k`}
+              {visibleStats.totalPieces >= 1e6
+                ? `${(visibleStats.totalPieces / 1e6).toFixed(1)}M`
+                : `${(visibleStats.totalPieces / 1e3).toFixed(1)}k`}
             </p>
-            <p className="text-[9px] text-muted-foreground mt-0.5">{formatNumber(stats.totalPieces)}</p>
+            <p className="text-[9px] text-muted-foreground mt-0.5">{formatNumber(visibleStats.totalPieces)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 pb-3 text-center">
             <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">P0 piezas</p>
-            <p className={cn('text-xl font-bold tabular-nums mt-0.5', p0Color(stats.p0PctWeighted))}>
-              {(stats.totalP0Pieces / 1e3).toFixed(1)}k
+            <p className={cn('text-xl font-bold tabular-nums mt-0.5', p0Color(visibleStats.p0PctWeighted))}>
+              {(visibleStats.totalP0Pieces / 1e3).toFixed(1)}k
             </p>
-            <p className="text-[9px] text-muted-foreground mt-0.5">{formatNumber(stats.totalP0Pieces)}</p>
+            <p className="text-[9px] text-muted-foreground mt-0.5">{formatNumber(visibleStats.totalP0Pieces)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 pb-3 text-center">
             <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Peso total</p>
             <p className="text-xl font-bold tabular-nums mt-0.5">
-              {formatWeight(stats.totalWeightKg)}
+              {formatWeight(visibleStats.totalWeightKg)}
             </p>
           </CardContent>
         </Card>
@@ -342,7 +491,7 @@ export function GraderPeriodView({ data }: Props) {
           <CardContent className="pt-4 pb-3 text-center">
             <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Tasa promedio</p>
             <p className="text-xl font-bold tabular-nums mt-0.5">
-              {formatNumber(stats.avgProductionRatePerHour)}
+              {formatNumber(visibleStats.avgProductionRatePerHour)}
             </p>
             <p className="text-[9px] text-muted-foreground mt-0.5">pz/hora</p>
           </CardContent>
@@ -351,7 +500,7 @@ export function GraderPeriodView({ data }: Props) {
           <CardContent className="pt-4 pb-3 text-center">
             <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Duración total</p>
             <p className="text-xl font-bold tabular-nums mt-0.5">
-              {formatDurationH(stats.totalDurationMinutes)}
+              {formatDurationH(visibleStats.totalDurationMinutes)}
             </p>
           </CardContent>
         </Card>
@@ -359,49 +508,49 @@ export function GraderPeriodView({ data }: Props) {
           <CardContent className="pt-4 pb-3 text-center">
             <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Días · Turnos</p>
             <p className="text-xl font-bold tabular-nums mt-0.5">
-              {stats.daysCount} · {stats.shiftsCount}
+              {visibleStats.daysCount} · {visibleStats.shiftsCount}
             </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* ── Min/Max P0 del período ───────────────────────────────────────── */}
-      {(stats.minP0Day || stats.maxP0Day) && (
+      {/* ── Min/Max P0 del período (dinámicos según zoom) ──────────────────── */}
+      {(visibleStats.minP0Day || visibleStats.maxP0Day) && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {stats.minP0Day && (
+          {visibleStats.minP0Day && (
             <Card
               className="border-emerald-500/30 bg-emerald-500/5 cursor-pointer hover:bg-emerald-500/10 transition-colors"
-              onClick={() => navigate(`/analisis-grader?goto=${stats.minP0Day!.dateKey}`)}
+              onClick={() => navigate(`/analisis-grader?goto=${visibleStats.minP0Day!.dateKey}`)}
             >
               <CardContent className="pt-3 pb-3 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
                   <div>
                     <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Mejor día</p>
-                    <p className="text-sm font-semibold">{stats.minP0Day.dateKey}</p>
+                    <p className="text-sm font-semibold">{visibleStats.minP0Day.dateKey}</p>
                   </div>
                 </div>
                 <p className="text-2xl font-bold tabular-nums text-emerald-600">
-                  {stats.minP0Day.p0Pct}%
+                  {visibleStats.minP0Day.p0Pct}%
                 </p>
               </CardContent>
             </Card>
           )}
-          {stats.maxP0Day && (
+          {visibleStats.maxP0Day && (
             <Card
               className="border-red-500/30 bg-red-500/5 cursor-pointer hover:bg-red-500/10 transition-colors"
-              onClick={() => navigate(`/analisis-grader?goto=${stats.maxP0Day!.dateKey}`)}
+              onClick={() => navigate(`/analisis-grader?goto=${visibleStats.maxP0Day!.dateKey}`)}
             >
               <CardContent className="pt-3 pb-3 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <AlertTriangle className="h-5 w-5 text-red-500 shrink-0" />
                   <div>
                     <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Peor día</p>
-                    <p className="text-sm font-semibold">{stats.maxP0Day.dateKey}</p>
+                    <p className="text-sm font-semibold">{visibleStats.maxP0Day.dateKey}</p>
                   </div>
                 </div>
                 <p className="text-2xl font-bold tabular-nums text-red-500">
-                  {stats.maxP0Day.p0Pct}%
+                  {visibleStats.maxP0Day.p0Pct}%
                 </p>
               </CardContent>
             </Card>
@@ -414,8 +563,17 @@ export function GraderPeriodView({ data }: Props) {
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <CardTitle className="text-base flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Tendencia P0% diaria · día vs noche
+              {useHourlyView ? (
+                <>
+                  <Clock className="h-4 w-4 text-purple-500" />
+                  Drill-down horario · P0% por hora del día
+                </>
+              ) : (
+                <>
+                  <TrendingUp className="h-4 w-4" />
+                  Tendencia P0% diaria · día vs noche
+                </>
+              )}
             </CardTitle>
             <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
               <span>Scroll para zoom · arrastra para panear</span>
@@ -429,22 +587,50 @@ export function GraderPeriodView({ data }: Props) {
               </button>
             </div>
           </div>
+          {useHourlyView && (
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Zoom ≤ 2 días detectado — mostrando buckets horarios del rango visible ({hourlyFiltered.length} puntos).
+            </p>
+          )}
         </CardHeader>
         <CardContent>
-          {trendChartData ? (
+          {useHourlyView && hourlyChartData ? (
+            <div className="h-72">
+              <Line data={hourlyChartData} options={hourlyChartOptions as any} />
+            </div>
+          ) : trendChartData ? (
             <div className="h-72">
               <Line ref={trendChartRef} data={trendChartData} options={trendChartOptions as any} />
             </div>
           ) : (
             <p className="text-xs text-muted-foreground py-8 text-center">Sin datos diarios</p>
           )}
-          <div className="flex items-center gap-4 mt-2 text-[10px] text-muted-foreground">
-            <span className="flex items-center gap-1">
-              <span className="inline-block w-3 h-0.5" style={{ background: WARN_LINE }} /> Warn ≥2%
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="inline-block w-3 h-0.5" style={{ background: CRITICAL_LINE }} /> Critical ≥3.5%
-            </span>
+          <div className="flex items-center gap-4 mt-2 text-[10px] text-muted-foreground flex-wrap">
+            {useHourlyView ? (
+              <>
+                <span className="flex items-center gap-1">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: DIA_LINE_COLOR }} /> Turno día
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: NOCHE_LINE_COLOR }} /> Turno noche
+                </span>
+                <span>{hourlyFiltered.length > 0 ? `${Math.round(hourlyFiltered.reduce((a, h) => a + h.totalPieces, 0) / 1000)}k piezas en rango` : ''}</span>
+              </>
+            ) : (
+              <>
+                <span className="flex items-center gap-1">
+                  <span className="inline-block w-3 h-0.5" style={{ background: WARN_LINE }} /> Warn ≥2%
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="inline-block w-3 h-0.5" style={{ background: CRITICAL_LINE }} /> Critical ≥3.5%
+                </span>
+                {hourlySeries.length > 0 && (
+                  <span className="text-purple-600 dark:text-purple-400">
+                    💡 Haz zoom ≤ 2 días para ver drill-down horario
+                  </span>
+                )}
+              </>
+            )}
           </div>
         </CardContent>
       </Card>

@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, Navigate } from 'react-router-dom'
 import { Card, CardContent, Button } from '@/components/ui'
-import { ArrowLeft, BarChart3, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, BarChart3, Loader2, AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Circle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { usePermissionsStore } from '@/store'
 import {
@@ -27,6 +27,8 @@ import {
   PERIOD_PRESETS,
   PRESET_ORDER,
   getDefaultPreset,
+  getWeekRangeByOffset,
+  getMonthRangeByOffset,
   type PeriodPresetKey,
   type PeriodRange,
 } from '@/services/grader/graderPeriodPresets'
@@ -50,6 +52,9 @@ export function AnalisisGraderPeriodoPage() {
   const [customOpen, setCustomOpen] = useState(false)
   const [customStart, setCustomStart] = useState(defaultPreset.range.start)
   const [customEnd, setCustomEnd] = useState(defaultPreset.range.end)
+  // Offset para navegación prev/next de semana/mes (0 = actual, -1 = anterior, +1 = siguiente)
+  const [weekOffset, setWeekOffset] = useState(0)
+  const [monthOffset, setMonthOffset] = useState(0)
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -100,8 +105,16 @@ export function AnalisisGraderPeriodoPage() {
 
   const handlePresetClick = (key: Exclude<PeriodPresetKey, 'custom'>) => {
     setActivePreset(key)
-    setRange(PERIOD_PRESETS[key]())
     setCustomOpen(false)
+    if (key === 'week') {
+      setWeekOffset(0)
+      setRange(getWeekRangeByOffset(0))
+    } else if (key === 'month') {
+      setMonthOffset(0)
+      setRange(getMonthRangeByOffset(0))
+    } else {
+      setRange(PERIOD_PRESETS[key]())
+    }
   }
 
   const handleApplyCustom = () => {
@@ -109,6 +122,20 @@ export function AnalisisGraderPeriodoPage() {
     if (customStart > customEnd) return
     setActivePreset('custom')
     setRange(buildCustomRange(customStart, customEnd))
+  }
+
+  const handleWeekStep = (delta: number) => {
+    const next = weekOffset + delta
+    setWeekOffset(next)
+    setActivePreset('week')
+    setRange(getWeekRangeByOffset(next))
+  }
+
+  const handleMonthStep = (delta: number) => {
+    const next = monthOffset + delta
+    setMonthOffset(next)
+    setActivePreset('month')
+    setRange(getMonthRangeByOffset(next))
   }
 
   if (!canSee('analisisGrader')) {
@@ -221,6 +248,50 @@ export function AnalisisGraderPeriodoPage() {
               {range.label} · {range.start} → {range.end}
             </div>
           </div>
+
+          {/* Navegación prev/next específica para semana/mes */}
+          {(activePreset === 'week' || activePreset === 'month') && (
+            <div className="flex items-center gap-2 flex-wrap pt-2 border-t">
+              <span className="text-xs text-muted-foreground">
+                Navegar {activePreset === 'week' ? 'semanas' : 'meses'}:
+              </span>
+              <button
+                type="button"
+                onClick={() => activePreset === 'week' ? handleWeekStep(-1) : handleMonthStep(-1)}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium border border-border bg-background hover:bg-muted/50 transition-colors"
+                title={activePreset === 'week' ? 'Semana anterior' : 'Mes anterior'}
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+                Anterior
+              </button>
+              <button
+                type="button"
+                onClick={() => activePreset === 'week' ? handleWeekStep(0 - weekOffset) : handleMonthStep(0 - monthOffset)}
+                disabled={(activePreset === 'week' && weekOffset === 0) || (activePreset === 'month' && monthOffset === 0)}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium border border-border bg-background hover:bg-muted/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title={activePreset === 'week' ? 'Volver a semana actual' : 'Volver al mes actual'}
+              >
+                <Circle className="h-3 w-3" />
+                Hoy
+              </button>
+              <button
+                type="button"
+                onClick={() => activePreset === 'week' ? handleWeekStep(1) : handleMonthStep(1)}
+                disabled={(activePreset === 'week' && weekOffset >= 0) || (activePreset === 'month' && monthOffset >= 0)}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium border border-border bg-background hover:bg-muted/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title={activePreset === 'week' ? 'Semana siguiente' : 'Mes siguiente'}
+              >
+                Siguiente
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+              <span className="text-[11px] text-muted-foreground ml-1">
+                {activePreset === 'week'
+                  ? (weekOffset === 0 ? 'semana actual' : `${weekOffset < 0 ? 'hace' : 'en'} ${Math.abs(weekOffset)} semana${Math.abs(weekOffset) !== 1 ? 's' : ''}`)
+                  : (monthOffset === 0 ? 'mes actual' : `${monthOffset < 0 ? 'hace' : 'en'} ${Math.abs(monthOffset)} mes${Math.abs(monthOffset) !== 1 ? 'es' : ''}`)
+                }
+              </span>
+            </div>
+          )}
 
           {/* Inputs de rango personalizado */}
           {customOpen && (

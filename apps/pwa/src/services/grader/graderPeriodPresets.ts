@@ -77,3 +77,53 @@ export const PRESET_ORDER: Array<{ key: Exclude<PeriodPresetKey, 'custom'>; labe
   { key: 'quarter', label: 'Trimestre' },
   { key: 'season',  label: 'Temporada' },
 ]
+
+// ── Navegación por offset (semana/mes específicos) ──────────────────────────
+
+/**
+ * Semana específica por offset: 0 = esta semana (últimos 7 días relativos),
+ * -1 = semana anterior, +1 = siguiente, etc. Semana = 7 días consecutivos
+ * terminando en domingo (o el día del offset).
+ */
+export function getWeekRangeByOffset(offset: number): PeriodRange {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  // Base: inicio de la semana actual (lunes local)
+  const dow = today.getDay() // 0=dom, 1=lun...
+  const mondayOffset = dow === 0 ? -6 : 1 - dow
+  const monday = new Date(today)
+  monday.setDate(today.getDate() + mondayOffset)
+  // Aplicar offset en semanas
+  monday.setDate(monday.getDate() + offset * 7)
+  const sunday = new Date(monday)
+  sunday.setDate(monday.getDate() + 6)
+  const label = offset === 0
+    ? 'Esta semana'
+    : `Semana del ${toDateKey(monday)}`
+  return {
+    start: toDateKey(monday),
+    end: toDateKey(sunday),
+    label,
+  }
+}
+
+/**
+ * Mes calendario específico por offset: 0 = mes actual, -1 = mes anterior,
+ * +1 = siguiente, etc. Devuelve rango completo de 1 a último día del mes.
+ */
+export function getMonthRangeByOffset(offset: number): PeriodRange {
+  const today = new Date()
+  const y = today.getFullYear()
+  const m = today.getMonth() + offset
+  const first = new Date(y, m, 1)
+  const last = new Date(y, m + 1, 0)
+  const monthLabel = first.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' })
+  const label = offset === 0
+    ? 'Este mes'
+    : monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)
+  return {
+    start: toDateKey(first),
+    end: toDateKey(last),
+    label,
+  }
+}

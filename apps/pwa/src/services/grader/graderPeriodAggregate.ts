@@ -49,6 +49,27 @@ export interface DailyP0Point {
   noche: { p0Pct: number; totalPieces: number; p0Pieces: number } | null
 }
 
+/**
+ * Punto del drill-down por hora del día. Cada punto es una hora de un turno
+ * específico, ordenado cronológicamente. Turno noche que cruza medianoche:
+ * las horas < 12 se desplazan a `dateKey + 1` para ordenamiento correcto.
+ */
+export interface HourlyPoint {
+  /** Timestamp ms del inicio de la hora, útil solo para ordenar */
+  tsMs: number
+  /** Día del turno (YYYY-MM-DD) */
+  dateKey: string
+  /** "Turno día" o "Turno noche" */
+  shiftId: string
+  /** Hora del día (0-23) en zona horaria del grader */
+  hour: number
+  totalPieces: number
+  p0Pieces: number
+  p0Pct: number
+  /** Label humano "DD/MM HHh D/N" para el eje X del chart */
+  label: string
+}
+
 export interface ShiftGroupStat {
   shiftId: string
   count: number
@@ -74,6 +95,12 @@ export interface PeriodAggregate {
   shifts: GraderDailySummary[]
   stats: PeriodStats
   dailyP0Series: DailyP0Point[]
+  /**
+   * Serie por hora × turno para drill-down cuando zoom ≤ 2 días.
+   * Construida desde `hourlyBuckets` de cada summary. Vacía si ningún
+   * summary en el rango tiene hourlyBuckets (legacy pre-iter 18).
+   */
+  hourlySeries: HourlyPoint[]
   shiftBreakdown: ShiftGroupStat[]
   calibreDistribution: DistEntry[]
   qualityDistribution: DistEntry[]
@@ -133,6 +160,7 @@ export function aggregateDailySummaries(
     noche: { totalPieces: number; p0Pieces: number } | null
   }>()
   const shiftGroups = new Map<string, { count: number; totalPieces: number; totalP0Pieces: number }>()
+  const hourlySeries: HourlyPoint[] = []
 
   let minP0Day: { dateKey: string; p0Pct: number } | null = null
   let maxP0Day: { dateKey: string; p0Pct: number } | null = null
@@ -197,7 +225,42 @@ export function aggregateDailySummaries(
         totalCausesPieces += c.pieces
       }
     }
+
+    // ── Hourly buckets → hourlySeries ───────────────────────────────────────
+    // Para turno noche, horas 0-11 pertenecen al día siguiente calendario
+    // (el turno arranca tarde en el dateKey y cruza medianoche).
+    if (s.hourlyBuckets && s.hourlyBuckets.length > 0) {
+      const [ystr, mstr, dstr] = s.dateKey.split('-')
+      const y = Number(ystr)
+      const m = Number(mstr)
+      const d = Number(dstr)
+      if (Number.isFinite(y) && Number.isFinite(m) && Number.isFinite(d)) {
+        const baseTime = new Date(y, m - 1, d).getTime()
+        const isNoche = s.shiftId === 'Turno noche'
+        const shiftTag = isNoche ? 'N' : 'D'
+        for (const b of s.hourlyBuckets) {
+          const dayOffset = isNoche && b.hour < 12 ? 86_400_000 : 0
+          const tsMs = baseTime + dayOffset + b.hour * 3_600_000
+          const dd = String(d).padStart(2, '0')
+          const mm = String(m).padStart(2, '0')
+          const hh = String(b.hour).padStart(2, '0')
+          hourlySeries.push({
+            tsMs,
+            dateKey: s.dateKey,
+            shiftId: s.shiftId,
+            hour: b.hour,
+            totalPieces: b.totalPieces,
+            p0Pieces: b.p0Pieces,
+            p0Pct: safePct(b.p0Pieces, b.totalPieces),
+            label: `${dd}/${mm} ${hh}h ${shiftTag}`,
+          })
+        }
+      }
+    }
   }
+
+  // Ordenar cronológicamente (tsMs incluye offset para noche post-medianoche)
+  hourlySeries.sort((a, b) => a.tsMs - b.tsMs)
 
   // ── Serie diaria final ordenada por fecha ────────────────────────────────
   const dailyP0Series: DailyP0Point[] = Array.from(dailyByDate.entries())
@@ -277,10 +340,66 @@ export function aggregateDailySummaries(
       maxP0Day,
     },
     dailyP0Series,
+    hourlySeries,
     shiftBreakdown,
     calibreDistribution: calibreDist,
     qualityDistribution: qualityDist,
     gateDistribution: gateDist,
     topP0Causes,
+  }
+}
+
+// ── Recomputar stats desde un subset de summaries (para KPIs dinámicos) ─────
+
+/**
+ * Recomputa solo los KPIs básicos ({@link PeriodStats}) a partir de un
+ * subset de summaries. Útil para actualizar el header de KPIs cuando el
+ * usuario hace zoom/pan en el gráfico y quiere ver los números del rango
+ * visible sin recomputar distribuciones ni causas completas.
+ */
+export function computeStatsFromSummaries(
+  summaries: GraderDailySummary[],
+): PeriodStats {
+  let totalPieces = 0
+  let totalP0Pieces = 0
+  let totalWeightKg = 0
+  let totalDurationMinutes = 0
+  const uniqueDays = new Set<string>()
+  const dayMap = new Map<string, { total: number; p0: number }>()
+
+  for (const s of summaries) {
+    totalPieces += s.totalPieces ?? 0
+    totalP0Pieces += s.pointZeroPieces ?? 0
+    if (s.totalWeightKg != null) totalWeightKg += s.totalWeightKg
+    if (s.durationMinutes != null) totalDurationMinutes += s.durationMinutes
+    uniqueDays.add(s.dateKey)
+    const agg = dayMap.get(s.dateKey) ?? { total: 0, p0: 0 }
+    agg.total += s.totalPieces ?? 0
+    agg.p0 += s.pointZeroPieces ?? 0
+    dayMap.set(s.dateKey, agg)
+  }
+
+  let minP0Day: { dateKey: string; p0Pct: number } | null = null
+  let maxP0Day: { dateKey: string; p0Pct: number } | null = null
+  for (const [dateKey, v] of dayMap.entries()) {
+    if (v.total === 0) continue
+    const p0Pct = safePct(v.p0, v.total)
+    if (!minP0Day || p0Pct < minP0Day.p0Pct) minP0Day = { dateKey, p0Pct }
+    if (!maxP0Day || p0Pct > maxP0Day.p0Pct) maxP0Day = { dateKey, p0Pct }
+  }
+
+  return {
+    totalPieces,
+    totalP0Pieces,
+    p0PctWeighted: safePct(totalP0Pieces, totalPieces),
+    totalWeightKg: r(totalWeightKg, 2),
+    avgProductionRatePerHour: totalDurationMinutes > 0
+      ? r(totalPieces / (totalDurationMinutes / 60), 0)
+      : 0,
+    totalDurationMinutes,
+    daysCount: uniqueDays.size,
+    shiftsCount: summaries.length,
+    minP0Day,
+    maxP0Day,
   }
 }

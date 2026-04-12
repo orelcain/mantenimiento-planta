@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.86.1' as const
+export const APP_VERSION = '2.87.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-04-11' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Grader iter 18.1: fix TZ display en horarios + minutos activos' as const
+export const VERSION_NAME = 'Grader iter 19: drill-down hourly + KPIs dinámicos por zoom + selectores semana/mes' as const
 
 /**
  * Nota:
