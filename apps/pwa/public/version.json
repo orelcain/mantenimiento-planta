@@ -1,7 +1,7 @@
 {
-  "version": "2.88.0",
-  "buildDate": "2026-04-11",
-  "buildTimestamp": 1775958947452,
+  "version": "2.89.0",
+  "buildDate": "2026-04-12",
+  "buildTimestamp": 1775976450234,
   "features": [
     "Grader iter 18.1: fix display de horarios (ya no aparece 04:00am cuando en realidad es 07:00)",
     "Grader iter 18.1: durationMinutes = minutos activos reales (excluye colación y paradas)",
