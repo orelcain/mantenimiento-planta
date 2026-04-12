@@ -1008,7 +1008,7 @@ export function GraderTendenciaTab({
                                     <span aria-hidden>{signal.emoji}</span>
                                     <InfoTooltip
                                       iconSize={11}
-                                      title={`σ intervalo ${new Date(b.bucketStart).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}`}
+                                      title={`σ intervalo ${new Date(b.bucketStart).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })}`}
                                       text="Este valor sale al medir qué tan alejados están los pesos del intervalo respecto a su media."
                                       formula="σ = √[ Σ(xᵢ − x̄)² / N ]"
                                       example={`x̄=${b.avgWeightGrams.toLocaleString('es-CL', { maximumFractionDigits: 2 })}g, σ=${b.stdDevWeightGrams.toLocaleString('es-CL', { maximumFractionDigits: 2 })}g, N=${b.pieces.toLocaleString('es-CL')}. Rango típico aprox.: ${minBand.toLocaleString('es-CL', { maximumFractionDigits: 0 })}g a ${maxBand.toLocaleString('es-CL', { maximumFractionDigits: 0 })}g. CV≈${cv.toLocaleString('es-CL', { maximumFractionDigits: 1 })}% (${signal.emoji} dispersión ${signal.label}).`}

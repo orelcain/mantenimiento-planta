@@ -207,8 +207,8 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
 
   const timeRangeLabel = useMemo(() => {
     if (!summary.startAt || !summary.endAt) return null
-    const s = new Date(summary.startAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })
-    const e = new Date(summary.endAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })
+    const s = new Date(summary.startAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })
+    const e = new Date(summary.endAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })
     return `${s} – ${e}`
   }, [summary.startAt, summary.endAt])
 

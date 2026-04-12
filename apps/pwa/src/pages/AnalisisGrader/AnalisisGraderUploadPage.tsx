@@ -184,8 +184,8 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
 
     const startDate = new Date(minTs)
     const endDate = new Date(maxTs)
-    const fmt = (d: Date) => d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })
-    const fmtDate = (d: Date) => d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    const fmt = (d: Date) => d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })
+    const fmtDate = (d: Date) => d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' })
 
     return {
       start: fmt(startDate),

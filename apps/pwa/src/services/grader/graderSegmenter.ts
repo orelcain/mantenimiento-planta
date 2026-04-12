@@ -191,9 +191,14 @@ export function computeShiftSummary(
     .sort()
   const startAt = allTs[0] ?? `${sessionDate}T00:00:00`
   const endAt   = allTs[allTs.length - 1] ?? startAt
-  const durationMinutes = allTs.length > 1
-    ? Math.round((new Date(endAt).getTime() - new Date(startAt).getTime()) / 60_000)
-    : 0
+  // Duración ACTIVA: cuenta minutos únicos con al menos un registro.
+  // Esto excluye automáticamente gaps de colación, paradas y mantenimiento,
+  // reflejando el tiempo REAL que la grader estuvo operando.
+  const activeMinutesSet = new Set<string>()
+  for (const ts of allTs) {
+    activeMinutesSet.add(ts.slice(0, 16)) // YYYY-MM-DDTHH:MM
+  }
+  const durationMinutes = activeMinutesSet.size
 
   // ── Piezas ─────────────────────────────────────────────────────────────────
   const totalPieces = pieceRecords.reduce((s, rec) => s + rec.pieces, 0)

@@ -536,7 +536,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
       const detailRows = [
         ['Hora', 'Causa', 'Error', 'Pzas', 'Peso/pza (g)', 'Calidad', 'Calibre', 'Lote'],
         ...pointZeroDetailRecords.map((r) => [
-          new Date(r.ts).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+          new Date(r.ts).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'UTC' }),
           r.causeLabel,
           r.error,
           r.pieces,
@@ -767,7 +767,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
         startY: y,
         head: [['Hora', 'Causa', 'Error', 'Pzas', 'Peso/pza (g)', 'Calidad', 'Calibre', 'Lote']],
         body: pointZeroDetailRecords.map((r) => [
-          new Date(r.ts).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+          new Date(r.ts).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'UTC' }),
           r.causeLabel,
           r.error,
           r.pieces.toLocaleString(),

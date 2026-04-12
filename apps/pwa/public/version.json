@@ -1,12 +1,10 @@
 {
-  "version": "2.86.0",
+  "version": "2.86.1",
   "buildDate": "2026-04-12",
   "buildTimestamp": 1775930315920,
   "features": [
-    "Grader iter 18: segmenter usa timestamp como fuente primaria (ignora label A/B del Excel)",
-    "Grader iter 18: GraderDailySummary incluye hourlyBuckets para drill-down dentro del turno",
-    "Grader iter 18: rebuild completo de toda la temporada 2025-2026 desde los 30 Excel locales",
-    "Grader iter 18: 0 segmentos >13h (antes había 41 registros anómalos)",
-    "Grader iter 18: 5.37M registros PP + 206k P0 deduplicados → 379 summaries limpios"
+    "Grader iter 18.1: fix display de horarios (ya no aparece 04:00am cuando en realidad es 07:00)",
+    "Grader iter 18.1: durationMinutes = minutos activos reales (excluye colación y paradas)",
+    "Grader iter 18.1: rebuild completo de temporada con las nuevas métricas correctas"
   ]
 }

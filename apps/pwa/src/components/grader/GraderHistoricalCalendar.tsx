@@ -710,7 +710,7 @@ export function GraderHistoricalCalendar({
                         <p className="text-[10px] text-muted-foreground flex items-center gap-1">
                           <Clock className="h-3 w-3" />
                           {Math.floor(mins / 60)}h {mins % 60}m
-                          {hist.startAt && ` · ${new Date(hist.startAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}–${hist.endAt ? new Date(hist.endAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) : '?'}`}
+                          {hist.startAt && ` · ${new Date(hist.startAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })}–${hist.endAt ? new Date(hist.endAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }) : '?'}`}
                           {anomalous && <span title="Duración almacenada anómala — se muestra estimación"><AlertTriangle className="h-3 w-3 text-amber-500 ml-1" /></span>}
                         </p>
                       ) : anomalous ? (
@@ -803,7 +803,7 @@ export function GraderHistoricalCalendar({
                     <div className="text-xs text-muted-foreground flex items-center gap-2">
                       <Clock className="h-3 w-3" />
                       {minStart && maxEnd
-                        ? `${new Date(minStart).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })} - ${new Date(maxEnd).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}`
+                        ? `${new Date(minStart).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })} - ${new Date(maxEnd).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })}`
                         : 'Horario no detectado'}
                     </div>
 

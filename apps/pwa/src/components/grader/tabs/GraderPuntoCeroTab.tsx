@@ -399,7 +399,7 @@ export function GraderPuntoCeroTab({
                                       {c.records.map((r, j) => (
                                         <tr key={j} className="border-b border-muted/25 hover:bg-muted/20">
                                           <td className="py-0.5 px-1 font-mono text-muted-foreground">
-                                            {new Date(r.ts).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                            {new Date(r.ts).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'UTC' })}
                                           </td>
                                           <td className="py-0.5 px-1">{r.error}</td>
                                           <td className="py-0.5 px-1 text-right">{r.pieces}</td>
