@@ -84,6 +84,41 @@ Claude opera con **Sonnet como orquestador principal**. Los subagentes (Agent to
 
 Siempre que se lance un `Agent` con `subagent_type: "Explore"` o cuyo único propósito sea búsqueda/lectura sin razonamiento → agregar `model: "haiku"`. Esto hace la exploración 3-5x más rápida y más barata.
 
+### Bloque de uso al final de respuesta
+
+**Cuándo mostrarlo**: siempre que se hayan usado subagentes con modelo distinto al orquestador principal (Sonnet), O cuando la respuesta haya involucrado múltiples pasos complejos.
+
+**Cuándo NO mostrarlo**: respuestas simples de solo Sonnet sin subagentes (preguntas, explicaciones, edits directos).
+
+**Formato obligatorio** — bloque compacto al final, separado por `---`:
+
+```
+---
+💸 Uso estimado esta respuesta
+  🟡 Haiku   — 2 búsquedas      ~3k tokens   ~$0.003
+  🔵 Sonnet  — orquestación     ~2k tokens   ~$0.010
+  🟣 Opus    — consulta arq.    ~5k tokens   ~$0.120
+  ─────────────────────────────────────────────────
+  Total estimado                              ~$0.133
+  ⚠️ Estimación aproximada, no conteo real de tokens
+```
+
+**Precios de referencia** (aproximados, pueden variar):
+
+| Modelo | Input | Output |
+|--------|-------|--------|
+| Haiku 4.5 | $0.80 / 1M tokens | $4.00 / 1M tokens |
+| Sonnet 4.6 | $3.00 / 1M tokens | $15.00 / 1M tokens |
+| Opus 4.6 | $15.00 / 1M tokens | $75.00 / 1M tokens |
+
+**Estimación de tokens por operación** (referencia para calcular):
+- Haiku Explore / búsqueda simple: ~2,000–4,000 tokens totales
+- Haiku lectura de archivo: ~1,000–3,000 tokens
+- Sonnet respuesta directa corta: ~1,000–2,000 tokens
+- Sonnet respuesta con edits de código: ~3,000–8,000 tokens
+- Opus consulta puntual: ~4,000–10,000 tokens
+- Opus análisis arquitectural completo: ~8,000–20,000 tokens
+
 ---
 
 ## Reglas de desarrollo
