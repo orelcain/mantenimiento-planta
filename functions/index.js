@@ -34,7 +34,51 @@ function getRtdb() {
 /** Retención máxima de lecturas de sensores en RTDB: 30 días */
 const SENSOR_RETENTION_DAYS = 30
 
+/** Base URL de la Telegram Bot API */
+const TELEGRAM_API_BASE = 'https://api.telegram.org'
+
 // ==================== HELPERS ====================
+
+/**
+ * Enviar un mensaje a Telegram.
+ * @param {string} text  - Texto del mensaje (HTML permitido)
+ * @param {string} [chatId] - Chat destino. Si se omite usa process.env.TELEGRAM_CHAT_ID
+ */
+async function sendTelegramMessage(text, chatId) {
+  const token = process.env.TELEGRAM_BOT_TOKEN
+  if (!token) {
+    logger.warn('TELEGRAM_BOT_TOKEN no configurado — mensaje omitido')
+    return
+  }
+
+  const target = chatId || process.env.TELEGRAM_CHAT_ID
+  if (!target) {
+    logger.warn('TELEGRAM_CHAT_ID no configurado — mensaje omitido')
+    return
+  }
+
+  try {
+    const response = await fetch(`${TELEGRAM_API_BASE}/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: target,
+        text,
+        parse_mode: 'HTML',
+        disable_web_page_preview: true,
+      }),
+    })
+
+    if (!response.ok) {
+      const err = await response.text()
+      logger.error('Telegram sendMessage error', { status: response.status, err })
+    }
+  } catch (error) {
+    logger.error('Telegram fetch error', error)
+  }
+}
+
+
 
 /**
  * Obtener tokens de un usuario específico
@@ -270,6 +314,17 @@ exports.onIncidentCreated = onDocumentCreated('incidents/{incidentId}', async (e
     prioridad: incident.prioridad,
     url: `/mantenimiento-planta/incidents/${incidentId}`,
   })
+
+  // Telegram: alertar para incidencias criticas y altas
+  if (incident.prioridad === 'critica' || incident.prioridad === 'alta') {
+    const origenLabel = incident.origen === 'telegram' ? ' <i>(vía Telegram)</i>' : ''
+    await sendTelegramMessage(
+      `${priorityEmoji} <b>Nueva incidencia ${incident.prioridad}${origenLabel}</b>\n\n` +
+      `📋 ${incident.titulo || 'Sin título'}\n` +
+      `👤 ${incident.creadoPorNombre || 'Desconocido'}\n` +
+      `🔗 <a href="https://orelcain.github.io/mantenimiento-planta/incidents/${incidentId}">Ver detalle</a>`
+    )
+  }
 })
 
 /**
@@ -1632,4 +1687,189 @@ exports.sitportProxy = onRequest(
     }
   }
 )
+
+// ==================== TELEGRAM BOT ====================
+
+const PRIORITY_EMOJI = { critica: '🔴', alta: '🟠', media: '🟡', baja: '⚪' }
+const PRIORITY_LABELS = ['critica', 'alta', 'media', 'baja']
+
+/**
+ * Handlers internos de comandos Telegram
+ */
+async function tgHandleAyuda(chatId) {
+  await sendTelegramMessage(
+    '🤖 <b>Bot Mantenimiento Planta</b>\n\n' +
+    '<b>Comandos:</b>\n' +
+    '/incidencia [desc] — Reportar problema (prioridad media)\n' +
+    '/incidencia alta [desc] — Prioridad alta\n' +
+    '/incidencia critica [desc] — Prioridad crítica 🔴\n' +
+    '/estado — Ver incidencias activas\n' +
+    '/ayuda — Este menú\n\n' +
+    '💡 También podés escribir el problema directamente sin comandos.',
+    chatId
+  )
+}
+
+async function tgHandleEstado(chatId) {
+  const snapshot = await db
+    .collection('incidents')
+    .where('status', 'in', ['pendiente', 'confirmada', 'en_proceso'])
+    .orderBy('createdAt', 'desc')
+    .limit(5)
+    .get()
+
+  if (snapshot.empty) {
+    await sendTelegramMessage('✅ No hay incidencias activas.', chatId)
+    return
+  }
+
+  const statusLabel = { pendiente: 'Pendiente', confirmada: 'Confirmada', en_proceso: 'En proceso' }
+  let msg = '<b>📊 Incidencias activas</b>\n\n'
+
+  snapshot.forEach((docSnap) => {
+    const d = docSnap.data()
+    const emoji = PRIORITY_EMOJI[d.prioridad] || '📋'
+    msg += `${emoji} <b>${d.titulo || 'Sin título'}</b>\n`
+    msg += `   ${statusLabel[d.status] || d.status} · ${d.prioridad}\n\n`
+  })
+
+  if (snapshot.size === 5) {
+    msg += '<i>Mostrando las últimas 5.</i>'
+  }
+
+  await sendTelegramMessage(msg, chatId)
+}
+
+async function tgHandleIncidencia(chatId, rawText, fromName, telegramUserId) {
+  // /incidencia [prioridad?] descripción
+  const body = rawText.replace(/^\/incidencia\s*/i, '').trim()
+  const parts = body.split(' ')
+
+  let prioridad = 'media'
+  let descripcion = body
+
+  if (PRIORITY_LABELS.includes(parts[0]?.toLowerCase())) {
+    prioridad = parts[0].toLowerCase()
+    descripcion = parts.slice(1).join(' ').trim()
+  }
+
+  if (!descripcion) {
+    await sendTelegramMessage(
+      '⚠️ Incluí una descripción.\n\nEjemplo:\n' +
+      '<code>/incidencia bomba rota sala 2</code>\n' +
+      '<code>/incidencia alta fuga de aceite prensa</code>',
+      chatId
+    )
+    return
+  }
+
+  const id = `tg_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`
+  await db.collection('incidents').doc(id).set({
+    id,
+    tipo: 'correctivo',
+    titulo: descripcion.substring(0, 100),
+    descripcion,
+    prioridad,
+    status: 'pendiente',
+    fotos: [],
+    reportadoPor: `telegram:${telegramUserId}`,
+    creadoPor: `telegram:${telegramUserId}`,
+    creadoPorNombre: fromName,
+    origen: 'telegram',
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  })
+
+  const emoji = PRIORITY_EMOJI[prioridad]
+  await sendTelegramMessage(
+    `${emoji} <b>Incidencia creada</b>\n\n` +
+    `📋 ${descripcion}\n` +
+    `🎯 Prioridad: ${prioridad}\n` +
+    `🔗 <a href="https://orelcain.github.io/mantenimiento-planta/incidents/${id}">Ver en el sistema</a>`,
+    chatId
+  )
+}
+
+/**
+ * Webhook de Telegram — recibe mensajes/comandos del bot.
+ * Registrar con: GET /setTelegramWebhook (una sola vez tras deploy)
+ */
+exports.telegramWebhook = onRequest({ region: 'us-central1' }, async (req, res) => {
+  if (req.method !== 'POST') {
+    res.status(405).send('Method Not Allowed')
+    return
+  }
+
+  const update = req.body
+  const message = update?.message || update?.edited_message
+
+  if (!message?.text) {
+    res.status(200).send('ok')
+    return
+  }
+
+  const chatId = String(message.chat?.id)
+  const text = message.text.trim()
+  const fromName = message.from?.first_name || 'Técnico'
+  const telegramUserId = String(message.from?.id || 'unknown')
+
+  // Verificar chat autorizado (si TELEGRAM_CHAT_ID está configurado)
+  const allowedChatId = process.env.TELEGRAM_CHAT_ID
+  if (allowedChatId && chatId !== allowedChatId) {
+    logger.warn('Telegram message from unauthorized chat', { chatId })
+    res.status(200).send('ok')
+    return
+  }
+
+  try {
+    if (/^\/incidencia/i.test(text)) {
+      await tgHandleIncidencia(chatId, text, fromName, telegramUserId)
+    } else if (/^\/estado/i.test(text)) {
+      await tgHandleEstado(chatId)
+    } else if (/^\/(ayuda|start|help)/i.test(text)) {
+      await tgHandleAyuda(chatId)
+    } else if (!text.startsWith('/')) {
+      // Texto libre → crear incidencia con prioridad media
+      if (text.length >= 10) {
+        await tgHandleIncidencia(chatId, `/incidencia ${text}`, fromName, telegramUserId)
+      } else {
+        await sendTelegramMessage('ℹ️ Usá /ayuda para ver los comandos disponibles.', chatId)
+      }
+    } else {
+      await sendTelegramMessage('❓ Comando no reconocido. Usá /ayuda para ver los comandos.', chatId)
+    }
+  } catch (error) {
+    logger.error('Error handling Telegram command', error)
+    await sendTelegramMessage('❌ Error procesando el comando. Intentá de nuevo.', chatId)
+  }
+
+  res.status(200).send('ok')
+})
+
+/**
+ * Registra el webhook de Telegram. Llamar UNA SOLA VEZ tras el deploy:
+ * GET https://us-central1-mantenimiento-planta-771a3.cloudfunctions.net/setTelegramWebhook
+ */
+exports.setTelegramWebhook = onRequest({ region: 'us-central1' }, async (req, res) => {
+  const token = process.env.TELEGRAM_BOT_TOKEN
+  if (!token) {
+    res.status(500).json({ error: 'TELEGRAM_BOT_TOKEN no configurado' })
+    return
+  }
+
+  const webhookUrl =
+    'https://us-central1-mantenimiento-planta-771a3.cloudfunctions.net/telegramWebhook'
+
+  try {
+    const response = await fetch(`${TELEGRAM_API_BASE}/bot${token}/setWebhook`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: webhookUrl }),
+    })
+    const result = await response.json()
+    res.json({ webhookUrl, telegram: result })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
 
