@@ -390,6 +390,16 @@ export function GraderPeriodView({ data }: Props) {
     }
   }
 
+  // Rango visible en fechas legibles (para el badge del header)
+  // Debe declararse ANTES del early return para respetar rules of hooks.
+  const visibleRangeLabel = useMemo(() => {
+    if (!visibleIdxRange) return null
+    const startDate = dailyP0Series[visibleIdxRange.start]?.dateKey
+    const endDate = dailyP0Series[visibleIdxRange.end]?.dateKey
+    if (!startDate || !endDate) return null
+    return startDate === endDate ? startDate : `${startDate} → ${endDate}`
+  }, [visibleIdxRange, dailyP0Series])
+
   // ── Estado vacío ─────────────────────────────────────────────────────────
   if (shifts.length === 0) {
     return (
@@ -404,15 +414,6 @@ export function GraderPeriodView({ data }: Props) {
       </Card>
     )
   }
-
-  // Rango visible en fechas legibles (para el badge del header)
-  const visibleRangeLabel = useMemo(() => {
-    if (!visibleIdxRange) return null
-    const startDate = dailyP0Series[visibleIdxRange.start]?.dateKey
-    const endDate = dailyP0Series[visibleIdxRange.end]?.dateKey
-    if (!startDate || !endDate) return null
-    return startDate === endDate ? startDate : `${startDate} → ${endDate}`
-  }, [visibleIdxRange, dailyP0Series])
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (

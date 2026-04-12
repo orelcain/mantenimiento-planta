@@ -77,7 +77,7 @@ export function AnalisisGraderPeriodoPage() {
         setError(err instanceof Error ? err.message : 'Error al cargar el período')
       })
       .finally(() => setLoading(false))
-  }, [range.start, range.end, range.label])
+  }, [range])
 
   // ── Detectar turnos legacy al montar ─────────────────────────────────────
   useEffect(() => {
