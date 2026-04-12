@@ -208,12 +208,109 @@ sidebarConfig  ← nuevo: orden personalizado del sidebar admin
 
 ## Version actual
 
-- **v2.75.0** (2026-04-11) — "Grader iter 7: carga masiva histórica + calendario por día y turno + indicadores PP/P0 por turno"
+- **v2.86.1** (2026-04-12) — "Grader iter 18.1: fix TZ display + minutos activos + rebuild completo temporada"
 - Proyecto Firebase: `mantenimiento-planta-771a3`
 - GitHub: `orelcain/mantenimiento-planta`
 - Produccion: `https://orelcain.github.io/mantenimiento-planta/`
-- CI status: 4/4 workflows 🟢 (Deploy PWA, Deploy Functions, Deploy Firestore Rules, Daily Sync)
+- CI status: 4/4 workflows 🟢
 - Seguridad: 23 colecciones Firestore validadas, 0 vulnerabilidades runtime prod
+
+## Cambios recientes (sesion 2026-04-11/12 maratónica — Grader iter 8 al 18.1, v2.80.0 → v2.86.1)
+
+Sesión larga con 13 iteraciones consecutivas del módulo Grader. Cubre desde limpieza de data hasta rebuild completo de la temporada con nuevas métricas de tiempo activo.
+
+### Resumen por iter
+
+- **iter 8 v2.76.0** — dedupe carga masiva (labels canónicos + records solapados)
+- **iter 9 v2.77.0** — calendario histórico unificado en el home
+- **iter 10 v2.78.0** — detalle de turno + análisis de período
+- **iter 11 v2.79.0** — 2 turnos reales (A=día, B=noche) + migración legacy tarde→noche
+- **iter 12 v2.80.0** — tendencia P0% + alertas determinísticas + IA desde historial Firestore (drill del detalle de turno)
+- **iter 13 v2.81.0** — UI calendar mejorado + fix duración anómala + delete registro
+- **iter 14 v2.82.0** — ocultar upload card si ya hay historial o si se borra el summary
+- **iter 15 v2.83.0** — eliminadas 4 páginas legacy (Calendar, CargaMasiva, SessionsList, Session) = -1,209 líneas, -4 rutas
+- **iter 16 v2.84.0** — drill-down desde gráfico de período al día con `?goto=YYYY-MM-DD`; cards Mejor/Peor día clickeables
+- **iter 17 v2.85.0** — gráfico Tendencia separa Turno día (ámbar) y Turno noche (índigo); zoom/pan con chartjs-plugin-zoom; botón Reset zoom
+- **iter 18 v2.86.0** — segmenter timestamp-first (ignora label A/B del Excel); hourlyBuckets en summary; rebuild completo de 5.37M PP + 206k P0 → 379 summaries limpios; 0 anómalos
+- **iter 18.1 v2.86.1** — fix TZ display (timeZone: 'UTC' en toLocaleTimeString); durationMinutes = minutos activos reales (excluye colación)
+
+### Limpieza de data masiva (scripts Node + firebase-admin)
+
+Se ejecutaron varios scripts en `scripts/` usando `serviceAccountKey.json`:
+
+1. **cleanup-grader-bad-records.js** — borró 1 upload duplicado mal etiquetado (Feb 6 era data jul 2025), 7 ghost records y 3 registros gigantes
+2. **migrate-grader-legacy-shifts.js** — consolidó 16 summaries con shiftId "Turno A/B" → canónicos (9 merged, 7 renamed) + borró 3 corruptos con p0 > total
+3. **iter18-full-season-rebuild.js** — WIPE + REBUILD completo desde 30 Excel locales en `C:/Users/pc hp/OneDrive/ANTARFOOD/⚙️ GRADER/temporada 2025-2026/`. Processing: 5.37M PP + 206k P0 deduplicados → 383 segmentos → 379 summaries válidos (skipped 4 tiny <100pz)
+
+Distribución final de duración (post iter 18.1): `<6h: 34, 6-10h: 306, 10-13h: 39, >13h: 0` ✅
+
+### Correcciones técnicas críticas
+
+**Timestamp-first segmentation** (`graderSegmenter.ts`):
+- Antes: `resolveShiftAndDate` usaba la columna "Turno" del Excel como fuente primaria
+- Problema: operarios a veces etiquetan 20-24h seguidas con la misma letra A/B → segmentos ficticios de 24h
+- Ahora: `segmentByDayAndShift` SIEMPRE llama `assignShiftAndDate(rec.ts)` basado en el timestamp real
+- La columna "Turno" del Excel queda disponible en `rec.shift` por si después se quiere analizar performance por equipo (separado del turno)
+
+**durationMinutes = minutos activos**:
+- Antes: `Math.round((new Date(endAt) - new Date(startAt)) / 60_000)` → incluía colación/pausas
+- Ahora: `Set<string>` con `ts.slice(0, 16)` (YYYY-MM-DDTHH:MM) → cuenta únicos → tiempo real de operación
+- Turno 08:00-18:00 con colación 13-14: antes 10h, ahora 9h reales
+
+**Timezone display bug** (6 archivos):
+- El parser guarda timestamps como `"2026-02-16T07:00:03.000Z"` (fake-UTC — son horas locales con sufijo Z)
+- `toLocaleTimeString('es-CL')` sin `timeZone` convertía de "UTC" a Chile local, restando 3-4h
+- Resultado: "07:00" del Excel aparecía como "04:00 am" en la UI
+- Fix: agregar `timeZone: 'UTC'` a todos los `toLocaleTimeString` del grader para mostrar las horas tal cual están guardadas
+- Archivos: `GraderHistoricalCalendar.tsx`, `GraderTurnoDetailView.tsx`, `AnalisisGraderUploadPage.tsx`, `AnalisisGraderDashboardPage.tsx`, `GraderPuntoCeroTab.tsx`, `GraderTendenciaTab.tsx`
+
+**Stack overflow en arrays gigantes**:
+- `allPP.push(...records)` con 229k elementos → RangeError en V8
+- Fix: `for (let i = 0; i < records.length; i++) allPP.push(records[i])`
+- Aplicado en scripts y ya existía helper `pushAll()` en el parser del app
+
+### Nuevo campo en GraderDailySummary
+
+```typescript
+hourlyBuckets?: Array<{
+  hour: number        // 0-23
+  totalPieces: number
+  p0Pieces: number
+}>
+```
+
+Permite drill-down "dentro del turno" en el gráfico de tendencia (pendiente UI iter 19). Todos los 379 summaries ya lo tienen (generado en el rebuild).
+
+### Pendientes de esta sesión (para retomar)
+
+1. **Iter 19 — Drill-down hourly en gráfico de tendencia**: cuando el zoom del chart del período muestre ≤ 2 días, cambiar automáticamente a vista "por hora del día" usando los `hourlyBuckets` de los summaries visibles. Permite ver cómo evoluciona el P0% dentro de un turno específico.
+
+2. **KPIs dinámicos según zoom visible**: los KPIs del header del análisis de período (Piezas totales, P0% ponderado, Peso total, etc.) deben recalcularse según el rango visible del chart, no quedarse fijos al rango inicial del preset.
+
+3. **Selectores específicos semana/mes**: los presets actuales son "últimos 7 días / últimos 30 días" (relativos). El usuario pide poder navegar a una semana/mes específico histórico sin tener que usar "Personalizado" (ej. prev/next arrows entre semanas del año).
+
+4. **Deploy iter 12 failed** (ya resuelto): run 24291493515 falló, commit siguiente (`fix TS errors en GraderTurnoDetailView`) deployó sin problemas. La funcionalidad del iter 12 está en producción.
+
+### Gotchas críticos de esta sesión
+
+**Firebase Storage bucket name**:
+- Bucket correcto es `mantenimiento-planta-771a3.firebasestorage.app`, NO `.appspot.com`
+- Está en `apps/pwa/.env.local` como `VITE_FIREBASE_STORAGE_BUCKET`
+
+**Parser timestamps son fake-UTC**:
+- Los Excel tienen horas locales sin timezone info
+- El parser genera `"YYYY-MM-DDTHH:MM:SS.000Z"` → el sufijo Z es un artefacto, son horas locales
+- Regla de oro: para display usar `timeZone: 'UTC'`, para segmentación usar `getUTCHours()` / `getUTCMinutes()`
+
+**`normalizeShiftLabel` está exportado pero ya no se usa en segmenter** (solo legacy doc comment en graderShiftSchedule.ts). Se mantiene export por si se quiere habilitar análisis por equipo A/B después.
+
+**Excel files de la temporada completa** están en:
+```
+C:/Users/pc hp/OneDrive/ANTARFOOD/⚙️ GRADER/temporada 2025-2026/
+  pieza a pieza/{mes}/*.xlsx   — 30 archivos PP
+  punto 0/{mes}/*.xlsx         — 9 archivos P0 + 1 consolidado temporada
+```
+Si se necesita re-procesar o corregir algo, usar `scripts/iter18-full-season-rebuild.js` (ya tiene el parser, segmenter y computeSummary portados a plain JS).
 
 ## Cambios recientes (sesion 2026-04-11 tarde — Grader iter 7: carga masiva histórica + calendario, v2.75.0)
 
@@ -464,6 +561,11 @@ sidebarConfig  ← nuevo: orden personalizado del sidebar admin
 - Calendario `<thead>` sticky top-0, modulos aprendizaje Seguridad y Marel activados, Editor Sidebar (`/admin/sidebar`) con @dnd-kit, modo alto contraste, preload lightbox, input validation 7 colecciones
 
 ## Pendientes priorizados
+
+### P0 — Próxima iteración Grader (iter 19)
+- [ ] **Drill-down hourly en gráfico de tendencia del período**: cuando zoom ≤ 2 días, cambiar a vista "por hora del día" usando `hourlyBuckets` de los summaries visibles. Ya hay data en Firestore (campo agregado en iter 18).
+- [ ] **KPIs dinámicos según zoom visible del chart**: recalcular Piezas, P0%, Peso, Tasa promedio en vivo según el rango visible tras aplicar zoom/pan. Hoy quedan fijos al preset inicial.
+- [ ] **Selectores específicos de semana/mes** en análisis de período: agregar prev/next arrows o dropdown para navegar a semanas/meses históricos específicos (no solo "últimos 7/30 días"). Alternativa actual: usar "Personalizado".
 
 ### P1 — Requiere acceso a Firebase Console / IAM
 - [ ] **App Check**: ReCaptchaV3 + enforceAppCheck en Cloud Functions (requiere key de ReCaptcha desde Firebase Console)
