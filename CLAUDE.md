@@ -46,6 +46,46 @@ Cuando el usuario diga `cerrar`, `terminar`, `ya está`, `gracias`, `hasta luego
 
 ---
 
+## Estrategia de modelos (Model Awareness)
+
+Claude opera con **Sonnet como orquestador principal**. Los subagentes (Agent tool) se lanzan con el modelo óptimo según la tarea, sin que el usuario tenga que especificarlo.
+
+### Regla de asignación de modelos
+
+| Tarea | Modelo del subagente | Criterio |
+|-------|---------------------|----------|
+| Búsqueda de archivos, Glob, Grep, lectura rápida | **haiku** | Mecánica, sin razonamiento profundo |
+| Exploración de codebase (subagent_type: Explore) | **haiku** | Volumen alto, coste bajo |
+| Implementación, edits, features, bugfixes | **sonnet** (directo, sin subagente) | Balance calidad/coste |
+| Diseño arquitectural, rediseño de módulos | **opus** | Requiere razonamiento profundo |
+| Auditorías de seguridad, revisión crítica de código | **opus** | Alto impacto, requiere exhaustividad |
+| Consulta cuando Sonnet está dando vueltas en un bug | **opus** | Segunda opinión de alta capacidad |
+| Revisión de PR, análisis de tradeoffs técnicos complejos | **opus** | Decisión que afecta arquitectura |
+
+### Regla de escalado obligatorio — IMPORTANTE
+
+**Si Sonnet evalúa que la tarea solicitada supera su capacidad de razonamiento** (rediseño sistémico, bug muy complejo, decisión arquitectural de alto impacto), debe:
+
+1. **En la PRIMERA respuesta**, antes de intentar resolver, avisar explícitamente:
+   > "Esta tarea requiere razonamiento profundo. Recomiendo reiniciar la sesión con **Opus como modelo principal** (`/model opus` en Claude Code desktop, o seleccionando Opus al iniciar en claude.ai) para que sea el orquestador. ¿Continuamos con Sonnet de todas formas o cambiamos?"
+
+2. Si el usuario confirma continuar con Sonnet → proceder usando `Agent(model: "opus")` como consultor puntual para las partes más complejas.
+
+### Señales de que una tarea necesita Opus como orquestador
+
+- Rediseñar la arquitectura completa de un módulo (no solo un ajuste)
+- Resolver un bug que persiste tras 2+ intentos fallidos de Sonnet
+- Decidir entre opciones con tradeoffs técnicos profundos (ej: cambiar motor de estado, migrar base de datos)
+- Auditoría de seguridad completa del sistema
+- Diseñar un algoritmo nuevo no trivial (ej: segmentación temporal, análisis estadístico complejo)
+- Cualquier tarea donde el usuario diga "piensa bien esto" o "necesito la mejor solución posible"
+
+### Uso de Haiku para exploración
+
+Siempre que se lance un `Agent` con `subagent_type: "Explore"` o cuyo único propósito sea búsqueda/lectura sin razonamiento → agregar `model: "haiku"`. Esto hace la exploración 3-5x más rápida y más barata.
+
+---
+
 ## Reglas de desarrollo
 
 - **Idioma**: Siempre responder en **ESPAÑOL**. Ahorrar tokens.
