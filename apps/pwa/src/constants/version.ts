@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.88.0' as const
+export const APP_VERSION = '2.89.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -11,12 +11,12 @@ export const APP_VERSION = '2.88.0' as const
 /**
  * Fecha de la versión actual
  */
-export const VERSION_DATE = '2026-04-11' as const
+export const VERSION_DATE = '2026-04-12' as const
 
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Grader iter 19 extras: semáforo timing gates + asignación óptima + refactor Tendencia 1053→191 líneas' as const
+export const VERSION_NAME = 'Fix calendario histórico: upload 756 turnos a Storage + graderUploads limit 200→1000' as const
 
 /**
  * Nota:

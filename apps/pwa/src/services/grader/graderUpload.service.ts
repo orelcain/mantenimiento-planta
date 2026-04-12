@@ -95,7 +95,7 @@ export async function updateGraderUpload(id: string, patch: Partial<GraderUpload
   await setDoc(doc(db, COLLECTION, id), firestoreData, { merge: true })
 }
 
-export async function listGraderUploads(max = 200): Promise<GraderUpload[]> {
+export async function listGraderUploads(max = 1000): Promise<GraderUpload[]> {
   const q = query(
     collection(db, COLLECTION),
     orderBy('_createdAt', 'desc'),
