@@ -82,22 +82,23 @@ function classifyTask(message) {
   const msg = message.trim()
   const len = msg.length
 
-  // Opus: mensajes largos con keywords de alta complejidad
-  if (len > 350 && OPUS_PATTERNS.some(p => p.test(msg))) {
+  // Opus: keywords de alta complejidad (sin mínimo de longitud estricto)
+  if (OPUS_PATTERNS.some(p => p.test(msg))) {
     return { model: 'opus', reason: 'tarea compleja de arquitectura / análisis profundo' }
   }
 
-  // Haiku: mensajes cortos o con keywords de consulta simple
-  if (len < 100 || HAIKU_PATTERNS.some(p => p.test(msg))) {
-    return { model: 'haiku', reason: 'consulta simple o mensaje corto' }
-  }
-
-  // Sonnet: código, análisis medio, la mayoría de las tareas
+  // Sonnet: código — tiene prioridad sobre el check de longitud
+  // "arregla el bug en X" es código aunque sea corto
   if (CODE_PATTERNS.some(p => p.test(msg))) {
     return { model: 'sonnet', reason: 'tarea de código / análisis técnico' }
   }
 
-  // Default sonnet para todo lo demás
+  // Haiku: solo si es muy corto O tiene keywords de consulta simple Y no es código
+  if (len < 80 || HAIKU_PATTERNS.some(p => p.test(msg))) {
+    return { model: 'haiku', reason: 'consulta simple o mensaje corto' }
+  }
+
+  // Default sonnet para todo lo demás (análisis, planning, etc.)
   return { model: 'sonnet', reason: 'tarea de complejidad media' }
 }
 
