@@ -577,7 +577,8 @@ Si se necesita re-procesar o corregir algo, usar `scripts/iter18-full-season-reb
 - ✅ Partir `GraderTendenciaTab` (1053 → 191 líneas) en 6 sub-cards bajo `tabs/tendencia/` (iter 19, pre-sesión)
 - ✅ Partir `GraderPuntoCeroTab` (1157 → ~80 líneas) en 5 sub-cards bajo `tabs/puntocero/` (sesión 2026-04-13)
 - ✅ Unit tests de `graderGateTiming` (32 tests vitest — física neumática + semáforo). Setup vitest + happy-dom.
-- [ ] Unit tests de `useGraderDashboardAnalytics` + `useGraderPatternAnalytics` (hooks React — requieren fixtures)
+- ✅ Unit tests de `useGraderDashboardAnalytics` (13 tests: forecast, progress, degradation, multiSession, shiftComparison)
+- ✅ Unit tests de `useGraderPatternAnalytics` (13 tests: filtros causa/tiempo, aggregados, chartData, causeTrend)
 
 ### P1 — Requiere acceso a Firebase Console / IAM
 - [ ] **App Check**: ReCaptchaV3 + enforceAppCheck en Cloud Functions (requiere key de ReCaptcha desde Firebase Console)
