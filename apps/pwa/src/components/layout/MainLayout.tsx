@@ -400,7 +400,7 @@ export function MainLayout() {
     { name: 'Alertas',   href: '/incidents',   icon: AlertTriangle, module: 'incidencias' },
   ]
   const activeContext = Object.keys(contextualTabsMap).find(prefix => location.pathname.startsWith(prefix))
-  const contextualTabs = activeContext ? contextualTabsMap[activeContext] : defaultContextual
+  const contextualTabs = (activeContext ? contextualTabsMap[activeContext] : undefined) ?? defaultContextual
   const bottomNavItems = [...fixedTabs, ...contextualTabs].filter(item => !item.module || canSee(item.module))
 
   const currentPageName = allNavigation.find(item =>
