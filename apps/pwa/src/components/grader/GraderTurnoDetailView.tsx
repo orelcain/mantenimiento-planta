@@ -234,43 +234,43 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
 
   return (
     <div className="space-y-4">
-      {/* ── Navegación entre turnos ──────────────────────────────────────── */}
+      {/* ── Navegación entre turnos (mas visible + swipe-ready) ──────────── */}
       {sortedAllTurns.length > 1 && (
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between bg-muted/30 rounded-lg px-2 py-1.5">
           <button
             type="button"
             disabled={!prevTurn}
             onClick={() => prevTurn && goToTurn(prevTurn)}
-            className={cn('flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-colors', prevTurn ? 'text-muted-foreground hover:bg-muted/50 hover:text-foreground' : 'opacity-30 cursor-not-allowed')}
+            className={cn('flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg font-medium transition-all', prevTurn ? 'text-foreground hover:bg-background/80 active:scale-95' : 'opacity-20 cursor-not-allowed')}
           >
-            <ChevronLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">{prevTurn ? `${prevTurn.dateKey} · ${prevTurn.shiftId.replace('Turno ', '')}` : 'Inicio'}</span>
+            <ChevronLeft className="h-5 w-5" />
+            <span className="hidden sm:inline">{prevTurn ? `${prevTurn.shiftId.includes('día') ? '☀️' : '🌙'} ${prevTurn.dateKey.slice(5)} ${prevTurn.shiftId.replace('Turno ', '')}` : ''}</span>
             <span className="sm:hidden">Anterior</span>
           </button>
-          <span className="text-[10px] text-muted-foreground tabular-nums">
-            {currentIdx + 1} / {sortedAllTurns.length}
+          <span className="text-xs text-muted-foreground tabular-nums font-medium">
+            {currentIdx + 1} de {sortedAllTurns.length}
           </span>
           <button
             type="button"
             disabled={!nextTurn}
             onClick={() => nextTurn && goToTurn(nextTurn)}
-            className={cn('flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-colors', nextTurn ? 'text-muted-foreground hover:bg-muted/50 hover:text-foreground' : 'opacity-30 cursor-not-allowed')}
+            className={cn('flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg font-medium transition-all', nextTurn ? 'text-foreground hover:bg-background/80 active:scale-95' : 'opacity-20 cursor-not-allowed')}
           >
-            <span className="hidden sm:inline">{nextTurn ? `${nextTurn.dateKey} · ${nextTurn.shiftId.replace('Turno ', '')}` : 'Final'}</span>
-            <span className="sm:hidden">Siguiente</span>
-            <ChevronRight className="h-4 w-4" />
+            <span className="hidden sm:inline">{nextTurn ? `${nextTurn.shiftId.includes('día') ? '☀️' : '🌙'} ${nextTurn.dateKey.slice(5)} ${nextTurn.shiftId.replace('Turno ', '')}` : ''}</span>
+            <span className="sm:hidden">{nextTurn ? 'Siguiente' : ''}</span>
+            <ChevronRight className="h-5 w-5" />
           </button>
         </div>
       )}
 
-      {/* ── Header con fecha + turno + indicadores de completitud ─────────── */}
+      {/* ── Header con fecha + turno + icono dia/noche ────────────────────── */}
       <Card className={cn('border-2', p0BorderClass(summary.pointZeroPct))}>
         <CardContent className="pt-4 pb-4">
           <div className="flex items-start justify-between flex-wrap gap-3">
             <div>
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-                <Database className="h-3 w-3" />
-                Detalle del turno
+                <span className="text-base">{summary.shiftId.includes('día') ? '☀️' : '🌙'}</span>
+                {summary.shiftId} · {summary.totalPieces.toLocaleString('es-CL')} piezas
               </p>
               <h2 className="text-xl font-bold capitalize mt-0.5">
                 {formatFullDate(summary.dateKey)}
