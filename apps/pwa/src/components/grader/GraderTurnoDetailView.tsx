@@ -537,7 +537,8 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
               </Badge>
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             {insights.map((ins) => {
               const sev = ins.severity
               const borderCls = sev === 'critical' ? 'border-red-400/40 bg-red-500/5'
@@ -547,42 +548,60 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
                 : sev === 'warn' ? <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
                 : <Info className="h-3.5 w-3.5 text-blue-500 shrink-0 mt-0.5" />
               return (
-                <div key={ins.id} className={cn('rounded-md border p-3 space-y-1.5', borderCls)}>
+                <div key={ins.id} className={cn('rounded-lg border p-3 space-y-1.5', borderCls)}>
                   <div className="flex items-start gap-2">
                     {icon}
-                    <p className="text-sm font-medium">{ins.title}</p>
+                    <p className="text-xs font-semibold">{ins.title}</p>
                   </div>
                   <ul className="pl-5 space-y-0.5">
                     {ins.evidence.map((e, i) => (
-                      <li key={i} className="text-xs text-muted-foreground list-disc">{e}</li>
+                      <li key={i} className="text-[11px] text-muted-foreground list-disc">{e}</li>
                     ))}
                   </ul>
                   {ins.recommendations.length > 0 && (
                     <ul className="pl-5 space-y-0.5 pt-1 border-t border-dashed border-muted">
                       {ins.recommendations.map((r, i) => (
-                        <li key={i} className="text-xs list-disc">{r}</li>
+                        <li key={i} className="text-[11px] list-disc">{r}</li>
                       ))}
                     </ul>
                   )}
                 </div>
               )
             })}
+            </div>
           </CardContent>
         </Card>
       )}
 
-      {/* ── Distribuciones en grid ─────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* ── Distribuciones en grid (mejoradas) ─────────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Distribución por Calibre */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Distribución por Calibre</CardTitle>
+        <Card className="lg:col-span-2">
+          <CardHeader className="pb-1">
+            <CardTitle className="text-sm flex items-center gap-2">Distribución por Calibre
+              <Badge variant="outline" className="text-[10px] font-normal">{summary.totalPieces.toLocaleString('es-CL')} pz</Badge>
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {calibreChartData ? (
-              <div className="h-64">
+              <div className="h-52 lg:h-64">
                 <Bar
-                  data={calibreChartData}
+                  data={{
+                    ...calibreChartData,
+                    datasets: calibreChartData.datasets.map((ds: any) => ({
+                      ...ds,
+                      backgroundColor: (calibreChartData.labels as string[]).map((_: string, i: number) => {
+                        const colors = ['rgba(59,130,246,0.7)', 'rgba(16,185,129,0.7)', 'rgba(245,158,11,0.7)', 'rgba(168,85,247,0.7)', 'rgba(239,68,68,0.7)', 'rgba(107,114,128,0.7)']
+                        return colors[i % colors.length]
+                      }),
+                      borderColor: (calibreChartData.labels as string[]).map((_: string, i: number) => {
+                        const colors = ['rgba(59,130,246,1)', 'rgba(16,185,129,1)', 'rgba(245,158,11,1)', 'rgba(168,85,247,1)', 'rgba(239,68,68,1)', 'rgba(107,114,128,1)']
+                        return colors[i % colors.length]
+                      }),
+                      borderWidth: 1,
+                      borderRadius: 4,
+                    })),
+                  }}
                   options={{
                     indexAxis: 'y' as const,
                     responsive: true,
@@ -601,8 +620,8 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
                       },
                     },
                     scales: {
-                      x: { ticks: { callback: (v) => Number(v).toLocaleString('es-CL') } },
-                      y: { ticks: { font: { size: 11 } } },
+                      x: { ticks: { callback: (v) => Number(v).toLocaleString('es-CL') }, grid: { color: 'rgba(255,255,255,0.04)' } },
+                      y: { ticks: { font: { size: 11, weight: 'bold' as const } } },
                     },
                   }}
                 />
@@ -615,21 +634,31 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
 
         {/* Distribución por Calidad */}
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Distribución por Calidad</CardTitle>
+          <CardHeader className="pb-1">
+            <CardTitle className="text-sm">Calidad</CardTitle>
           </CardHeader>
           <CardContent>
             {qualityChartData ? (
-              <div className="h-64 flex items-center justify-center">
+              <div className="h-52 lg:h-64 flex items-center justify-center">
                 <Doughnut
-                  data={qualityChartData}
+                  data={{
+                    ...qualityChartData,
+                    datasets: qualityChartData.datasets.map((ds: any) => ({
+                      ...ds,
+                      borderWidth: 2,
+                      borderColor: 'rgba(0,0,0,0.3)',
+                      hoverBorderWidth: 3,
+                      hoverOffset: 8,
+                    })),
+                  }}
                   options={{
                     responsive: true,
                     maintainAspectRatio: false,
+                    cutout: '55%',
                     plugins: {
                       legend: {
-                        position: 'right' as const,
-                        labels: { font: { size: 11 }, boxWidth: 12 },
+                        position: 'bottom' as const,
+                        labels: { font: { size: 11 }, boxWidth: 12, padding: 12 },
                       },
                       tooltip: {
                         callbacks: {
@@ -646,21 +675,38 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
                 />
               </div>
             ) : (
-              <p className="text-xs text-muted-foreground py-8 text-center">Sin datos de calidad</p>
+              <p className="text-xs text-muted-foreground py-8 text-center">Sin datos</p>
             )}
           </CardContent>
         </Card>
 
-        {/* Distribución por Compuerta */}
-        <Card className="lg:col-span-2">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Distribución por Compuerta (G0–G12)</CardTitle>
+        {/* Distribución por Compuerta — full width con colores por gate */}
+        <Card className="lg:col-span-3">
+          <CardHeader className="pb-1">
+            <CardTitle className="text-sm flex items-center gap-2">Distribución por Compuerta (G1–G12)
+              <Badge variant="outline" className="text-[10px] font-normal">12 gates</Badge>
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {gateChartData ? (
-              <div className="h-56">
+              <div className="h-48 lg:h-56">
                 <Bar
-                  data={gateChartData}
+                  data={{
+                    ...gateChartData,
+                    datasets: gateChartData.datasets.map((ds: any) => ({
+                      ...ds,
+                      backgroundColor: (gateChartData.labels as string[]).map((_: string, i: number) => {
+                        const h = (i * 30) % 360
+                        return `hsla(${h}, 65%, 55%, 0.7)`
+                      }),
+                      borderColor: (gateChartData.labels as string[]).map((_: string, i: number) => {
+                        const h = (i * 30) % 360
+                        return `hsla(${h}, 65%, 55%, 1)`
+                      }),
+                      borderWidth: 1,
+                      borderRadius: 4,
+                    })),
+                  }}
                   options={{
                     responsive: true,
                     maintainAspectRatio: false,
@@ -678,7 +724,8 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
                       },
                     },
                     scales: {
-                      y: { ticks: { callback: (v) => Number(v).toLocaleString('es-CL') } },
+                      y: { ticks: { callback: (v) => Number(v).toLocaleString('es-CL') }, grid: { color: 'rgba(255,255,255,0.04)' } },
+                      x: { ticks: { font: { size: 11, weight: 'bold' as const } } },
                     },
                   }}
                 />
@@ -690,35 +737,39 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
         </Card>
       </div>
 
-      {/* ── Top causas P0 ─────────────────────────────────────────────────── */}
+      {/* ── Top causas P0 (% del total, no % del P0) ────────────────────── */}
       {summary.topP0Causes && summary.topP0Causes.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              Top causas de Punto Cero
+            <CardTitle className="text-sm flex items-center gap-2">
+              Desglose Punto Cero
               <Badge variant="outline" className="text-[10px]">
-                {summary.pointZeroPieces.toLocaleString('es-CL')} piezas
+                P0: {summary.pointZeroPct}% ({summary.pointZeroPieces.toLocaleString('es-CL')} de {summary.totalPieces.toLocaleString('es-CL')})
               </Badge>
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="space-y-3">
             {summary.topP0Causes.map((cause, i) => {
-              const color = cause.pct >= 50 ? 'bg-red-500' : cause.pct >= 25 ? 'bg-amber-500' : 'bg-blue-500'
+              // % del TOTAL de piezas (no del P0)
+              const pctOfTotal = summary.totalPieces > 0 ? +((cause.pieces / summary.totalPieces) * 100).toFixed(2) : 0
+              const pctOfP0 = cause.pct
+              const barColor = pctOfTotal >= 2 ? 'bg-red-500' : pctOfTotal >= 1 ? 'bg-amber-500' : 'bg-blue-500'
               return (
                 <div key={i} className="space-y-1">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-medium truncate max-w-[70%]">{cause.error}</span>
-                    <span className="tabular-nums">
-                      <span className="font-semibold">{cause.pct}%</span>
+                  <div className="flex items-center justify-between text-xs gap-2">
+                    <span className="font-medium truncate">{cause.error}</span>
+                    <span className="tabular-nums shrink-0 text-right">
+                      <span className="font-bold">{pctOfTotal}%</span>
+                      <span className="text-muted-foreground ml-1">del total</span>
                       <span className="text-muted-foreground ml-2">
-                        ({cause.pieces.toLocaleString('es-CL')} pz)
+                        ({pctOfP0}% del P0 · {cause.pieces.toLocaleString('es-CL')} pz)
                       </span>
                     </span>
                   </div>
-                  <div className="h-2 rounded-full bg-muted overflow-hidden">
+                  <div className="h-1.5 rounded-full bg-muted overflow-hidden">
                     <div
-                      className={cn('h-full rounded-full', color)}
-                      style={{ width: `${Math.min(100, cause.pct)}%` }}
+                      className={cn('h-full rounded-full transition-all', barColor)}
+                      style={{ width: `${Math.min(100, pctOfTotal * 20)}%` }}
                     />
                   </div>
                 </div>
