@@ -402,125 +402,167 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
         </Card>
       </div>
 
-      {/* ── Desglose horario del turno (protagonista) ────────────────────────── */}
-      {summary.hourlyBuckets && summary.hourlyBuckets.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Clock className="h-4 w-4 text-primary" />
-              Desglose horario del turno
-            </CardTitle>
-            <p className="text-xs text-muted-foreground">
-              P0% y piezas por hora — {summary.hourlyBuckets.length} horas con actividad
-            </p>
-          </CardHeader>
-          <CardContent>
-            <div className="h-56 lg:h-72">
-              <Bar
-                data={{
-                  labels: summary.hourlyBuckets.map(b => `${b.hour.toString().padStart(2, '0')}:00`),
-                  datasets: [
-                    {
-                      label: 'Piezas totales',
-                      data: summary.hourlyBuckets.map(b => b.totalPieces),
-                      backgroundColor: 'rgba(59, 130, 246, 0.6)',
-                      borderColor: 'rgba(59, 130, 246, 1)',
-                      borderWidth: 1,
-                      borderRadius: 3,
-                      yAxisID: 'y',
-                    },
-                    {
-                      label: 'Piezas P0',
-                      data: summary.hourlyBuckets.map(b => b.p0Pieces),
-                      backgroundColor: 'rgba(239, 68, 68, 0.7)',
-                      borderColor: 'rgba(239, 68, 68, 1)',
-                      borderWidth: 1,
-                      borderRadius: 3,
-                      yAxisID: 'y',
-                    },
-                  ],
-                }}
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  plugins: {
-                    legend: { display: true, position: 'top' as const, labels: { font: { size: 10 }, boxWidth: 10, usePointStyle: true } },
-                    tooltip: {
-                      callbacks: {
-                        afterBody: (items) => {
-                          const idx = items[0]?.dataIndex
-                          const bucket = typeof idx === 'number' ? summary.hourlyBuckets![idx] : undefined
-                          if (!bucket || bucket.totalPieces === 0) return ''
-                          const p0Pct = ((bucket.p0Pieces / bucket.totalPieces) * 100).toFixed(1)
-                          return `P0%: ${p0Pct}%`
+      {/* ── Gráfico principal del turno — P0% horario + producción + causas ── */}
+      {summary.hourlyBuckets && summary.hourlyBuckets.length > 0 && (() => {
+        const buckets = summary.hourlyBuckets!
+        const hourLabels = buckets.map(b => `${b.hour.toString().padStart(2, '0')}:00`)
+        const p0PctData = buckets.map(b => b.totalPieces > 0 ? +((b.p0Pieces / b.totalPieces) * 100).toFixed(1) : 0)
+        const topCauses = summary.topP0Causes ?? []
+
+        return (
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-primary" />
+                    Análisis del turno — hora por hora
+                  </CardTitle>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {summary.shiftId} · {buckets.length} horas con actividad · {summary.totalPieces.toLocaleString('es-CL')} piezas
+                  </p>
+                </div>
+              </div>
+              {/* Causas P0 como badges informativos */}
+              {topCauses.length > 0 && (
+                <div className="flex items-center gap-1.5 flex-wrap mt-2">
+                  <span className="text-[10px] text-muted-foreground">Causas P0:</span>
+                  {topCauses.slice(0, 4).map((c, i) => (
+                    <Badge
+                      key={i}
+                      variant="outline"
+                      className={cn(
+                        'text-[9px] py-0',
+                        c.pct >= 50 ? 'border-red-500/40 text-red-500' :
+                        c.pct >= 25 ? 'border-amber-500/40 text-amber-500' :
+                        'border-muted-foreground/30 text-muted-foreground'
+                      )}
+                    >
+                      {c.error} {c.pct}%
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </CardHeader>
+            <CardContent>
+              <div className="h-60 lg:h-80">
+                <Line
+                  data={{
+                    labels: hourLabels,
+                    datasets: [
+                      {
+                        label: 'P0%',
+                        data: p0PctData,
+                        borderColor: 'rgba(239, 68, 68, 1)',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        borderWidth: 2.5,
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 5,
+                        pointHoverRadius: 7,
+                        pointBackgroundColor: p0PctData.map(v => v >= 3.5 ? 'rgba(239,68,68,1)' : v >= 2 ? 'rgba(245,158,11,1)' : 'rgba(16,185,129,1)'),
+                        pointBorderColor: 'rgba(255,255,255,0.8)',
+                        pointBorderWidth: 2,
+                        yAxisID: 'yP0',
+                      },
+                      {
+                        label: 'Piezas/hora',
+                        data: buckets.map(b => b.totalPieces),
+                        borderColor: 'rgba(59, 130, 246, 0.6)',
+                        backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                        borderWidth: 1.5,
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 3,
+                        pointHoverRadius: 5,
+                        yAxisID: 'yProd',
+                      },
+                      {
+                        label: 'Piezas P0',
+                        data: buckets.map(b => b.p0Pieces),
+                        borderColor: 'rgba(239, 68, 68, 0.4)',
+                        backgroundColor: 'transparent',
+                        borderWidth: 1,
+                        borderDash: [4, 4],
+                        tension: 0.3,
+                        pointRadius: 2,
+                        pointHoverRadius: 4,
+                        yAxisID: 'yProd',
+                      },
+                    ],
+                  }}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index' as const, intersect: false },
+                    plugins: {
+                      legend: {
+                        display: true,
+                        position: 'top' as const,
+                        labels: { font: { size: 10 }, boxWidth: 10, usePointStyle: true },
+                      },
+                      tooltip: {
+                        callbacks: {
+                          afterBody: (items) => {
+                            const idx = items[0]?.dataIndex
+                            if (typeof idx !== 'number') return ''
+                            const bucket = buckets[idx]
+                            if (!bucket) return ''
+                            const lines = [`Hora: ${bucket.hour.toString().padStart(2, '0')}:00 - ${bucket.hour.toString().padStart(2, '0')}:59`]
+                            if (topCauses.length > 0) {
+                              lines.push('', 'Causas P0 del turno:')
+                              topCauses.slice(0, 3).forEach(c => lines.push(`  ${c.error}: ${c.pct}% (${c.count} pz)`))
+                            }
+                            return lines
+                          },
                         },
                       },
                     },
-                  },
-                  scales: {
-                    y: { beginAtZero: true, ticks: { callback: (v) => Number(v).toLocaleString('es-CL') } },
-                    x: { ticks: { font: { size: 10 } } },
-                  },
-                }}
-              />
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* ── Tendencia P0% — contexto (secundario) ────────────────────────────── */}
-      {tendenciaChartData && (
-        <Card className="opacity-90">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2 text-muted-foreground">
-              <TrendingUp className="h-3.5 w-3.5" />
-              Contexto: tendencia P0% — últimos turnos
-            </CardTitle>
-            <p className="text-[11px] text-muted-foreground">
-              Punto rojo = turno actual. Warn {'>'}2%, crítico {'>'}3.5%
-            </p>
-          </CardHeader>
-          <CardContent>
-            <div className="h-40 lg:h-48">
-              <Line
-                data={tendenciaChartData}
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                      callbacks: {
-                        label: (ctx) => `P0%: ${ctx.parsed.y}%`,
+                    scales: {
+                      yP0: {
+                        type: 'linear' as const,
+                        position: 'left' as const,
+                        min: 0,
+                        suggestedMax: Math.max(5, Math.max(...p0PctData) + 1),
+                        ticks: { callback: (v: any) => `${v}%`, font: { size: 10 } },
+                        title: { display: true, text: 'P0%', font: { size: 10 } },
+                        grid: { color: 'rgba(239, 68, 68, 0.08)' },
+                      },
+                      yProd: {
+                        type: 'linear' as const,
+                        position: 'right' as const,
+                        min: 0,
+                        ticks: { callback: (v: any) => Number(v).toLocaleString('es-CL'), font: { size: 10 } },
+                        title: { display: true, text: 'Piezas', font: { size: 10 } },
+                        grid: { display: false },
+                      },
+                      x: {
+                        ticks: { font: { size: 10 } },
                       },
                     },
-                  },
-                  scales: {
-                    y: {
-                      min: 0,
-                      suggestedMax: Math.max(5, summary.pointZeroPct + 1),
-                      ticks: { callback: (v) => `${v}%`, font: { size: 10 } },
-                    },
-                    x: {
-                      ticks: { font: { size: 9 }, maxRotation: 45 },
-                    },
-                  },
-                }}
-              />
-            </div>
-            <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <span className="inline-block w-4 h-0.5 bg-amber-400" />
-                Warn 2%
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="inline-block w-4 h-0.5 bg-red-500" />
-                Crítico 3.5%
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                  }}
+                />
+              </div>
+              {/* Leyenda de colores P0 */}
+              <div className="flex items-center gap-4 mt-2 text-[10px] text-muted-foreground flex-wrap">
+                <span className="flex items-center gap-1">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                  P0% {'<'} 2% (OK)
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-500" />
+                  2-3.5% (Warn)
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500" />
+                  {'>'} 3.5% (Crítico)
+                </span>
+                <span className="text-muted-foreground/50 ml-auto">Detalle pieza a pieza disponible en "Abrir dashboard completo"</span>
+              </div>
+            </CardContent>
+          </Card>
+        )
+      })()}
 
       {/* ── Alertas automáticas (insights determinísticos) ───────────────────── */}
       {insights.length > 0 && (
