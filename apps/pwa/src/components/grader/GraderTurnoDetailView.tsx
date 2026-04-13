@@ -212,46 +212,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
     return `${s} – ${e}`
   }, [summary.startAt, summary.endAt])
 
-  // ── Tendencia P0% (turnos recientes + actual) ────────────────────────────
-  const tendenciaChartData = useMemo(() => {
-    const prior = (recentTurns ?? [])
-      .filter((t) => t.totalPieces >= 200)
-      .sort((a, b) => a.dateKey.localeCompare(b.dateKey) || a.shiftId.localeCompare(b.shiftId))
-      .slice(-19) // últimos 19 + actual = 20 puntos máx
-
-    const points = [...prior, summary]
-    if (points.length < 2) return null
-
-    const labels = points.map((t) => {
-      const d = new Date(`${t.dateKey}T12:00:00`)
-      const dayLabel = d.toLocaleDateString('es-CL', { day: '2-digit', month: 'short' })
-      const shiftShort = t.shiftId.includes('día') ? 'D' : 'N'
-      return `${dayLabel} ${shiftShort}`
-    })
-
-    const isCurrentIndex = points.length - 1
-
-    return {
-      labels,
-      datasets: [
-        {
-          label: 'P0%',
-          data: points.map((t) => t.pointZeroPct),
-          borderColor: 'rgba(99,102,241,0.7)',
-          backgroundColor: 'rgba(99,102,241,0.08)',
-          pointBackgroundColor: points.map((_, i) =>
-            i === isCurrentIndex ? 'rgba(239,68,68,1)' : 'rgba(99,102,241,0.9)'
-          ),
-          pointBorderColor: points.map((_, i) =>
-            i === isCurrentIndex ? 'rgba(239,68,68,1)' : 'rgba(99,102,241,0.9)'
-          ),
-          pointRadius: points.map((_, i) => (i === isCurrentIndex ? 8 : 4)),
-          tension: 0.3,
-          fill: true,
-        },
-      ],
-    }
-  }, [recentTurns, summary])
+  // tendenciaChartData eliminado — reemplazado por gráfico horario unificado
 
   // ── Render ───────────────────────────────────────────────────────────────
 
@@ -511,7 +472,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
                             const lines = [`Hora: ${bucket.hour.toString().padStart(2, '0')}:00 - ${bucket.hour.toString().padStart(2, '0')}:59`]
                             if (topCauses.length > 0) {
                               lines.push('', 'Causas P0 del turno:')
-                              topCauses.slice(0, 3).forEach(c => lines.push(`  ${c.error}: ${c.pct}% (${c.count} pz)`))
+                              topCauses.slice(0, 3).forEach(c => lines.push(`  ${c.error}: ${c.pct}% (${c.pieces} pz)`))
                             }
                             return lines
                           },
