@@ -6,7 +6,7 @@ import { collection, getDocs, getDoc, setDoc, doc, query, where, orderBy, limit,
 import { db } from './firebase'
 import { callGroq, callGemini, isAIConfigured, isGeminiConfigured, RateLimitError } from './ai'
 import { checkThinkingAllowance, recordThinkingUsage, getAriaConfig } from './ariaThinkingTracker'
-import { orchestrateStream, detectTaskType, type AgentStatusEvent } from './ariaOrchestrator'
+import { orchestrate, orchestrateStream, detectTaskType, type AgentStatusEvent } from './ariaOrchestrator'
 import { logger } from '@/lib/logger'
 import { buildLearningContext, trackEquipmentProblem } from './ariaLearning'
 import type { Incident } from '@/types'
@@ -1899,7 +1899,7 @@ export interface ChatResponse {
 // ─── #4 Resumen ejecutivo diario ─────────────────────────────────────
 
 /** Genera un resumen proactivo de la planta al abrir el chat por primera vez en el día */
-export async function generateDailySummary(): Promise<string | null> {
+export async function generateDailySummary(): Promise<{ content: string; agentInfo: NonNullable<ChatMessage['agentInfo']> } | null> {
   if (!isAIConfigured()) return null
 
   try {
@@ -1928,10 +1928,24 @@ Formato EXACTO (usa emojis y negritas):
       { role: 'user', content: 'Dame el resumen de la planta de hoy.' },
     ]
 
-    const callFn = isGeminiConfigured() ? callGemini : callGroq
-    const result = await callFn(messages, { temperature: 0.2, max_tokens: 400 })
-    // Limpiar tag de sugerencias si se cuela
-    return result.content.replace(/\n?\[SUGERENCIAS\]\s*:.*$/im, '').trim()
+    const orchResult = await orchestrate({
+      messages,
+      taskType: 'analysis',
+      taskPreview: 'Resumen diario planta',
+      opts: { temperature: 0.2, max_tokens: 400 },
+    })
+    const content = orchResult.content.replace(/\n?\[SUGERENCIAS\]\s*:.*$/im, '').trim()
+    return {
+      content,
+      agentInfo: {
+        agentId: orchResult.agentId,
+        agentName: orchResult.agentName,
+        agentEmoji: orchResult.agentEmoji,
+        latencyMs: orchResult.latencyMs,
+        fallbackUsed: orchResult.fallbackUsed,
+        taskType: 'analysis',
+      },
+    }
   } catch (err) {
     logger.error('ARIA daily summary error', err instanceof Error ? err : undefined)
     return null
@@ -1941,7 +1955,7 @@ Formato EXACTO (usa emojis y negritas):
 // ─── #4 Resumen semanal con tendencias ───────────────────────────────
 
 /** Genera resumen semanal comparativo (se ejecuta los lunes) */
-export async function generateWeeklySummary(): Promise<string | null> {
+export async function generateWeeklySummary(): Promise<{ content: string; agentInfo: NonNullable<ChatMessage['agentInfo']> } | null> {
   if (!isAIConfigured()) return null
 
   try {
@@ -1973,9 +1987,24 @@ Formato (conciso, max 10 líneas):
       { role: 'user', content: 'Genera el resumen semanal de la planta.' },
     ]
 
-    const callFn = isGeminiConfigured() ? callGemini : callGroq
-    const result = await callFn(messages, { temperature: 0.2, max_tokens: 600 })
-    return result.content.replace(/\n?\[SUGERENCIAS\]\s*:.*$/im, '').trim()
+    const orchResult = await orchestrate({
+      messages,
+      taskType: 'analysis',
+      taskPreview: 'Resumen semanal planta',
+      opts: { temperature: 0.2, max_tokens: 600 },
+    })
+    const content = orchResult.content.replace(/\n?\[SUGERENCIAS\]\s*:.*$/im, '').trim()
+    return {
+      content,
+      agentInfo: {
+        agentId: orchResult.agentId,
+        agentName: orchResult.agentName,
+        agentEmoji: orchResult.agentEmoji,
+        latencyMs: orchResult.latencyMs,
+        fallbackUsed: orchResult.fallbackUsed,
+        taskType: 'analysis',
+      },
+    }
   } catch (err) {
     logger.error('ARIA weekly summary error', err instanceof Error ? err : undefined)
     return null

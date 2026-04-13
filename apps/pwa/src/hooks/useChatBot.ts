@@ -142,8 +142,9 @@ export function useChatBot() {
           const weeklyMsg: ChatMessage = {
             id: generateId(),
             role: 'assistant',
-            content: `📊 ${weeklySummary}`,
+            content: `📊 ${weeklySummary.content}`,
             timestamp: new Date(),
+            agentInfo: weeklySummary.agentInfo,
           }
           setMessages(prev => [...prev, weeklyMsg])
           localStorage.setItem(weeklyKey, '1')
@@ -155,8 +156,9 @@ export function useChatBot() {
         const summaryMsg: ChatMessage = {
           id: generateId(),
           role: 'assistant',
-          content: `📋 **Resumen del día — ${new Date().toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })}**\n\n${summary}`,
+          content: `📋 **Resumen del día — ${new Date().toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })}**\n\n${summary.content}`,
           timestamp: new Date(),
+          agentInfo: summary.agentInfo,
         }
         setMessages(prev => [...prev, summaryMsg])
         localStorage.setItem(todayKey, '1')
