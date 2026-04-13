@@ -16,12 +16,13 @@ import { getDailySummary, listDailySummariesByRange } from '@/services/grader/gr
 import type { GraderDailySummary } from '@/services/grader/types'
 import { GraderTurnoDetailView } from '@/components/grader/GraderTurnoDetailView'
 
-// Cuántos días hacia atrás buscar para el contexto de tendencia
-const CONTEXT_DAYS = 45
+// Cuántos días antes/después buscar para navegación + tendencia
+const CONTEXT_DAYS_BEFORE = 45
+const CONTEXT_DAYS_AFTER = 45
 
-function subtractDays(dateKey: string, days: number): string {
+function offsetDays(dateKey: string, days: number): string {
   const d = new Date(`${dateKey}T12:00:00`)
-  d.setDate(d.getDate() - days)
+  d.setDate(d.getDate() + days)
   return d.toISOString().slice(0, 10)
 }
 
@@ -46,10 +47,11 @@ export function AnalisisGraderDetallePage() {
     }
     setLoading(true)
     setError(null)
-    const contextStart = subtractDays(dateKey, CONTEXT_DAYS)
+    const contextStart = offsetDays(dateKey, -CONTEXT_DAYS_BEFORE)
+    const contextEnd = offsetDays(dateKey, CONTEXT_DAYS_AFTER)
     Promise.all([
       getDailySummary(dateKey, shiftId),
-      listDailySummariesByRange(contextStart, dateKey).catch(() => []),
+      listDailySummariesByRange(contextStart, contextEnd).catch(() => []),
     ])
       .then(([s, recent]) => {
         if (!s) {

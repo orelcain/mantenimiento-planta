@@ -18,12 +18,14 @@ import {
 } from '@/services/firestoreTracked'
 import {
   collection,
+  doc as firestoreDoc,
   query,
   where,
   orderBy,
   getDocs,
   writeBatch,
   documentId,
+  getCountFromServer,
 } from 'firebase/firestore'
 import { db } from '../firebase'
 import type { GraderDailySummary } from './types'
@@ -441,4 +443,100 @@ export async function migrateTardeShiftsToNoche(): Promise<MigrationResult> {
   }
 
   return result
+}
+
+// ============================================================================
+// Subcollection pieceRecords — registros pieza a pieza
+// ============================================================================
+
+const PIECE_RECORDS_SUB = 'pieceRecords'
+
+export interface FirestorePieceRecord {
+  ts: string
+  gate: number
+  pieces: number
+  weightKg?: number
+  weightPerPieceGrams?: number
+  quality?: string
+  calibre?: string
+  error?: string
+  dedupeKey: string
+}
+
+function pieceRecordsCol(summaryId: string) {
+  return collection(db, COLLECTION, summaryId, PIECE_RECORDS_SUB)
+}
+
+/**
+ * Genera un dedupeKey a partir de los campos de un registro.
+ * Mismo criterio que graderSegmenter.ts dedupePieceRecords().
+ */
+export function buildDedupeKey(r: { ts: string; gate: number; pieces: number; quality?: string; calibre?: string; weightKg?: number }): string {
+  return `${r.ts}|${r.gate}|${r.pieces}|${r.quality ?? ''}|${r.calibre ?? ''}|${r.weightKg ?? ''}`
+}
+
+/**
+ * Guarda registros pieza a pieza como subcollection de un summary.
+ * Si `dedup = true`, lee las claves existentes primero y solo escribe los nuevos.
+ * Retorna cuántos registros nuevos se escribieron.
+ */
+export async function savePieceRecordsBatch(
+  summaryId: string,
+  records: FirestorePieceRecord[],
+  dedup = true,
+): Promise<{ written: number; skipped: number }> {
+  if (records.length === 0) return { written: 0, skipped: 0 }
+
+  let toWrite = records
+  let skipped = 0
+
+  if (dedup) {
+    const existing = await fetchExistingDedupeKeys(summaryId)
+    if (existing.size > 0) {
+      toWrite = records.filter((r) => !existing.has(r.dedupeKey))
+      skipped = records.length - toWrite.length
+    }
+  }
+
+  const colRef = pieceRecordsCol(summaryId)
+  for (let i = 0; i < toWrite.length; i += FIRESTORE_BATCH_LIMIT) {
+    const chunk = toWrite.slice(i, i + FIRESTORE_BATCH_LIMIT)
+    const batch = writeBatch(db)
+    for (const rec of chunk) {
+      const docRef = firestoreDoc(colRef)
+      batch.set(docRef, rec)
+    }
+    await batch.commit()
+  }
+  return { written: toWrite.length, skipped }
+}
+
+/**
+ * Lee solo las dedupeKeys de los pieceRecords existentes (minimiza transfer).
+ */
+async function fetchExistingDedupeKeys(summaryId: string): Promise<Set<string>> {
+  const snap = await getDocs(pieceRecordsCol(summaryId))
+  const keys = new Set<string>()
+  snap.forEach((d) => {
+    const key = d.data().dedupeKey
+    if (typeof key === 'string') keys.add(key)
+  })
+  return keys
+}
+
+/**
+ * Lee todos los pieceRecords de un turno, ordenados por timestamp.
+ */
+export async function listPieceRecords(summaryId: string): Promise<FirestorePieceRecord[]> {
+  const q = query(pieceRecordsCol(summaryId), orderBy('ts'))
+  const snap = await getDocs(q)
+  return snap.docs.map((d) => d.data() as FirestorePieceRecord)
+}
+
+/**
+ * Cuenta cuántos pieceRecords tiene un turno (sin descargar data).
+ */
+export async function countPieceRecords(summaryId: string): Promise<number> {
+  const snap = await getCountFromServer(pieceRecordsCol(summaryId))
+  return snap.data().count
 }

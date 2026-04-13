@@ -14,7 +14,7 @@
  * Toda la data viene del summary guardado en Firestore — no re-parsea Excel.
  */
 
-import { useMemo, useState, useCallback } from 'react'
+import { useMemo, useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from '@/components/ui'
 import { ArrowRight, ChevronLeft, ChevronRight, Clock, Brain, Loader2, XCircle, Zap, AlertTriangle, Info, TrendingUp } from 'lucide-react'
@@ -38,6 +38,8 @@ import type { AIGraderOutput } from '@/services/grader/types'
 import { computeInsightsFromSummary } from '@/services/grader/graderSummaryInsights'
 import { analyzeGraderFromSummary } from '@/services/grader/graderSummaryAI'
 import { AIOutputPanel } from '@/components/grader/GraderInlinePanels'
+import { listPieceRecords, type FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
+import { GraderTimelineChart } from '@/components/grader/GraderTimelineChart'
 
 // Registrar los elementos de Chart.js necesarios (idempotente si ya están)
 ChartJS.register(
@@ -98,8 +100,6 @@ function formatFullDate(dateKey: string): string {
 }
 
 // Paleta para gráficos (consistente con el dashboard principal del Grader)
-const BAR_BLUE = 'rgba(59, 130, 246, 0.7)'
-const BAR_BLUE_BORDER = 'rgba(59, 130, 246, 1)'
 const DOUGHNUT_COLORS = [
   'rgba(16, 185, 129, 0.75)',  // emerald
   'rgba(59, 130, 246, 0.75)',  // blue
@@ -108,6 +108,35 @@ const DOUGHNUT_COLORS = [
   'rgba(139, 92, 246, 0.75)',  // violet
   'rgba(107, 114, 128, 0.75)', // gray
 ]
+
+/**
+ * Gradiente mapa de calor: AZUL (valor bajo) → VERDE (medio) → ROJO (valor alto)
+ * t=0 → azul frío (59,130,246)
+ * t=0.5 → verde (16,185,129)
+ * t=1 → rojo caliente (239,68,68)
+ */
+function heatColor(value: number, min: number, max: number, alpha = 0.78): string {
+  const t = max > min ? Math.max(0, Math.min(1, (value - min) / (max - min))) : 0.5
+  let r: number, g: number, b: number
+  if (t <= 0.5) {
+    // azul → verde
+    const s = t / 0.5
+    r = Math.round(59 * (1 - s) + 16 * s)
+    g = Math.round(130 * (1 - s) + 185 * s)
+    b = Math.round(246 * (1 - s) + 129 * s)
+  } else {
+    // verde → rojo
+    const s = (t - 0.5) / 0.5
+    r = Math.round(16 * (1 - s) + 239 * s)
+    g = Math.round(185 * (1 - s) + 68 * s)
+    b = Math.round(129 * (1 - s) + 68 * s)
+  }
+  return `rgba(${r},${g},${b},${alpha})`
+}
+
+function heatBorder(value: number, min: number, max: number): string {
+  return heatColor(value, min, max, 1)
+}
 
 // ── Componente ───────────────────────────────────────────────────────────────
 
@@ -126,6 +155,23 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
   const [aiLoading, setAiLoading] = useState(false)
   const [aiOutput, setAiOutput] = useState<AIGraderOutput | null>(null)
   const [aiError, setAiError] = useState<string | null>(null)
+
+  // ── Estado timeline pieza a pieza ───────────────────────────────────────
+  const [timelineRecords, setTimelineRecords] = useState<FirestorePieceRecord[] | null>(null)
+  const [timelineLoading, setTimelineLoading] = useState(false)
+
+  const handleLoadTimeline = useCallback(async () => {
+    const summaryId = `${summary.dateKey}__${summary.shiftId}`
+    setTimelineLoading(true)
+    try {
+      const recs = await listPieceRecords(summaryId)
+      setTimelineRecords(recs)
+    } catch {
+      setTimelineRecords([])
+    } finally {
+      setTimelineLoading(false)
+    }
+  }, [summary.dateKey, summary.shiftId])
 
   const handleAnalyzeAI = useCallback(async () => {
     setAiLoading(true)
@@ -152,13 +198,16 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
     const dist = summary.calibreDistribution ?? []
     if (dist.length === 0) return null
     const sorted = [...dist].sort((a, b) => b.pieces - a.pieces).slice(0, 10)
+    const values = sorted.map((d) => d.pieces)
+    const min = Math.min(...values)
+    const max = Math.max(...values)
     return {
       labels: sorted.map((d) => d.calibre),
       datasets: [{
         label: 'Piezas',
-        data: sorted.map((d) => d.pieces),
-        backgroundColor: BAR_BLUE,
-        borderColor: BAR_BLUE_BORDER,
+        data: values,
+        backgroundColor: values.map((v) => heatColor(v, min, max)),
+        borderColor: values.map((v) => heatBorder(v, min, max)),
         borderWidth: 1,
       }],
     }
@@ -183,16 +232,20 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
     const dist = summary.gateDistribution ?? []
     if (dist.length === 0) return null
     const sorted = [...dist].sort((a, b) => a.gate - b.gate)
+    const values = sorted.map((d) => d.pieces)
+    const nonZeroValues = sorted.filter((d) => d.gate !== 0).map((d) => d.pieces)
+    const min = nonZeroValues.length > 0 ? Math.min(...nonZeroValues) : 0
+    const max = nonZeroValues.length > 0 ? Math.max(...nonZeroValues) : 1
     return {
       labels: sorted.map((d) => `G${d.gate}`),
       datasets: [{
         label: 'Piezas',
-        data: sorted.map((d) => d.pieces),
+        data: values,
         backgroundColor: sorted.map((d) =>
-          d.gate === 0 ? 'rgba(239, 68, 68, 0.7)' : BAR_BLUE,
+          d.gate === 0 ? 'rgba(239, 68, 68, 0.7)' : heatColor(d.pieces, min, max),
         ),
         borderColor: sorted.map((d) =>
-          d.gate === 0 ? 'rgba(239, 68, 68, 1)' : BAR_BLUE_BORDER,
+          d.gate === 0 ? 'rgba(239, 68, 68, 1)' : heatBorder(d.pieces, min, max),
         ),
         borderWidth: 1,
       }],
@@ -232,9 +285,24 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
     navigate(`/analisis-grader/detalle?date=${turn.dateKey}&shift=${encodeURIComponent(turn.shiftId)}`)
   }
 
+  // ── Swipe touch para navegar turnos en mobile ─────────────────────────
+  const touchStartX = useRef<number | null>(null)
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0]?.clientX ?? null
+  }, [])
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (touchStartX.current === null) return
+    const dx = (e.changedTouches[0]?.clientX ?? touchStartX.current) - touchStartX.current
+    touchStartX.current = null
+    const MIN_SWIPE = 60
+    if (dx > MIN_SWIPE && prevTurn) goToTurn(prevTurn)
+    else if (dx < -MIN_SWIPE && nextTurn) goToTurn(nextTurn)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prevTurn, nextTurn])
+
   return (
-    <div className="space-y-4">
-      {/* ── Navegación entre turnos (mas visible + swipe-ready) ──────────── */}
+    <div className="space-y-4" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+      {/* ── Navegación entre turnos (mas visible + swipe) ──────────── */}
       {sortedAllTurns.length > 1 && (
         <div className="flex items-center justify-between bg-muted/30 rounded-lg px-2 py-1.5">
           <button
@@ -257,7 +325,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
             className={cn('flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg font-medium transition-all', nextTurn ? 'text-foreground hover:bg-background/80 active:scale-95' : 'opacity-20 cursor-not-allowed')}
           >
             <span className="hidden sm:inline">{nextTurn ? `${nextTurn.shiftId.includes('día') ? '☀️' : '🌙'} ${nextTurn.dateKey.slice(5)} ${nextTurn.shiftId.replace('Turno ', '')}` : ''}</span>
-            <span className="sm:hidden">{nextTurn ? 'Siguiente' : ''}</span>
+            <span className="sm:hidden">{nextTurn ? 'Siguiente' : 'Final'}</span>
             <ChevronRight className="h-5 w-5" />
           </button>
         </div>
@@ -363,6 +431,42 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
         </Card>
       </div>
 
+      {/* ── Timeline segundo a segundo (pieceRecords desde Firestore) ──── */}
+      {timelineRecords !== null && timelineRecords.length > 0 ? (
+        <GraderTimelineChart
+          records={timelineRecords}
+          shiftId={summary.shiftId}
+          dateKey={summary.dateKey}
+        />
+      ) : (
+        <Card>
+          <CardContent className="pt-4 pb-4 flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <p className="text-sm font-medium">Timeline segundo a segundo</p>
+              <p className="text-xs text-muted-foreground">
+                {timelineRecords === null
+                  ? 'Carga los registros pieza a pieza desde Firestore'
+                  : 'Este turno no tiene registros pieza a pieza guardados'}
+              </p>
+            </div>
+            {timelineRecords === null && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleLoadTimeline}
+                disabled={timelineLoading}
+              >
+                {timelineLoading ? (
+                  <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Cargando...</>
+                ) : (
+                  'Cargar timeline'
+                )}
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* ── Gráfico principal del turno — P0% horario + producción + causas ── */}
       {summary.hourlyBuckets && summary.hourlyBuckets.length > 0 && (() => {
         const buckets = summary.hourlyBuckets!
@@ -388,20 +492,23 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
               {topCauses.length > 0 && (
                 <div className="flex items-center gap-1.5 flex-wrap mt-2">
                   <span className="text-[10px] text-muted-foreground">Causas P0:</span>
-                  {topCauses.slice(0, 4).map((c, i) => (
-                    <Badge
-                      key={i}
-                      variant="outline"
-                      className={cn(
-                        'text-[9px] py-0',
-                        c.pct >= 50 ? 'border-red-500/40 text-red-500' :
-                        c.pct >= 25 ? 'border-amber-500/40 text-amber-500' :
-                        'border-muted-foreground/30 text-muted-foreground'
-                      )}
-                    >
-                      {c.error} {c.pct}%
-                    </Badge>
-                  ))}
+                  {topCauses.slice(0, 4).map((c, i) => {
+                    const pctTotal = summary.totalPieces > 0 ? +((c.pieces / summary.totalPieces) * 100).toFixed(2) : 0
+                    return (
+                      <Badge
+                        key={i}
+                        variant="outline"
+                        className={cn(
+                          'text-[9px] py-0',
+                          c.pct >= 50 ? 'border-red-500/40 text-red-500' :
+                          c.pct >= 25 ? 'border-amber-500/40 text-amber-500' :
+                          'border-muted-foreground/30 text-muted-foreground'
+                        )}
+                      >
+                        {c.error} {pctTotal}% del total ({c.pct}% del P0)
+                      </Badge>
+                    )
+                  })}
                 </div>
               )}
             </CardHeader>
@@ -586,22 +693,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
             {calibreChartData ? (
               <div className="h-52 lg:h-64">
                 <Bar
-                  data={{
-                    ...calibreChartData,
-                    datasets: calibreChartData.datasets.map((ds: any) => ({
-                      ...ds,
-                      backgroundColor: (calibreChartData.labels as string[]).map((_: string, i: number) => {
-                        const colors = ['rgba(59,130,246,0.7)', 'rgba(16,185,129,0.7)', 'rgba(245,158,11,0.7)', 'rgba(168,85,247,0.7)', 'rgba(239,68,68,0.7)', 'rgba(107,114,128,0.7)']
-                        return colors[i % colors.length]
-                      }),
-                      borderColor: (calibreChartData.labels as string[]).map((_: string, i: number) => {
-                        const colors = ['rgba(59,130,246,1)', 'rgba(16,185,129,1)', 'rgba(245,158,11,1)', 'rgba(168,85,247,1)', 'rgba(239,68,68,1)', 'rgba(107,114,128,1)']
-                        return colors[i % colors.length]
-                      }),
-                      borderWidth: 1,
-                      borderRadius: 4,
-                    })),
-                  }}
+                  data={calibreChartData}
                   options={{
                     indexAxis: 'y' as const,
                     responsive: true,
@@ -695,14 +787,6 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
                     ...gateChartData,
                     datasets: gateChartData.datasets.map((ds: any) => ({
                       ...ds,
-                      backgroundColor: (gateChartData.labels as string[]).map((_: string, i: number) => {
-                        const h = (i * 30) % 360
-                        return `hsla(${h}, 65%, 55%, 0.7)`
-                      }),
-                      borderColor: (gateChartData.labels as string[]).map((_: string, i: number) => {
-                        const h = (i * 30) % 360
-                        return `hsla(${h}, 65%, 55%, 1)`
-                      }),
                       borderWidth: 1,
                       borderRadius: 4,
                     })),

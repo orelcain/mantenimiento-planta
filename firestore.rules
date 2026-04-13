@@ -990,6 +990,13 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create, update: if isSupervisor();
       allow delete: if isSupervisor();
+
+      // Registros pieza a pieza (subcollection)
+      match /pieceRecords/{recordId} {
+        allow read: if isAuthenticated();
+        allow create: if isSupervisor();
+        allow delete: if isSupervisor();
+      }
     }
 
     // ============================================

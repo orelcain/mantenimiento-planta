@@ -23,6 +23,7 @@ import {
   type DiagnosisEntry,
 } from '@/services/learningContent'
 import { OtherLearningModulesStrip } from '@/components/learning/OtherLearningModulesStrip'
+import { FlowDiagramViewer } from '@/components/learning/FlowDiagramViewer'
 
 interface TabDef {
   id: LearningSection
@@ -251,7 +252,7 @@ export function MachineLearningPage() {
         ) : activeTab === 'manual' && manualSections.length > 0 ? (
           <ManualList sections={manualSections} color={machine.color} />
         ) : activeTab === 'flows' && flows.length > 0 ? (
-          <FlowsList flows={flows} color={machine.color} />
+          <FlowDiagramViewer flows={flows} color={machine.color} />
         ) : activeTab === 'diagnosis' && diagnosis.length > 0 ? (
           <DiagnosisList entries={diagnosis} color={machine.color} />
         ) : sectionEnabled ? (
@@ -370,53 +371,6 @@ function ManualList({ sections, color }: { sections: ManualSection[]; color: str
   )
 }
 
-function FlowsList({ flows, color }: { flows: Flow[]; color: string }) {
-  return (
-    <div className="space-y-4">
-      {flows.map(flow => (
-        <article
-          key={flow.id}
-          className="rounded-xl overflow-hidden"
-          style={{ background: 'rgba(22,28,42,0.8)', border: '1px solid #1e3a5f' }}
-        >
-          <div className="h-1" style={{ background: color, opacity: 0.9 }} />
-          <div className="p-5">
-            <h3 className="text-base font-semibold text-white mb-2">{flow.title}</h3>
-            <div
-              className="rounded-lg p-3 mb-4"
-              style={{ background: `${color}10`, border: `1px solid ${color}30` }}
-            >
-              <p className="text-[10px] uppercase tracking-wider font-semibold mb-1" style={{ color }}>
-                Cuando sucede
-              </p>
-              <p className="text-sm whitespace-pre-wrap" style={{ color: '#d0dce8' }}>
-                {flow.trigger}
-              </p>
-            </div>
-            <p className="text-[10px] uppercase tracking-wider font-semibold mb-2" style={{ color: '#6a90b8' }}>
-              Acciones a seguir
-            </p>
-            <ol className="space-y-2">
-              {flow.actions.map((action, idx) => (
-                <li key={idx} className="flex gap-3">
-                  <span
-                    className="flex items-center justify-center w-6 h-6 rounded-full font-bold text-[11px] flex-shrink-0"
-                    style={{ background: `${color}25`, color }}
-                  >
-                    {idx + 1}
-                  </span>
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap flex-1" style={{ color: '#c0d0e0' }}>
-                    {action}
-                  </p>
-                </li>
-              ))}
-            </ol>
-          </div>
-        </article>
-      ))}
-    </div>
-  )
-}
 
 function DiagnosisList({ entries, color }: { entries: DiagnosisEntry[]; color: string }) {
   return (

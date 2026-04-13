@@ -562,10 +562,10 @@ Si se necesita re-procesar o corregir algo, usar `scripts/iter18-full-season-reb
 
 ## Pendientes priorizados
 
-### P0 — Próxima iteración Grader (iter 19)
-- [ ] **Drill-down hourly en gráfico de tendencia del período**: cuando zoom ≤ 2 días, cambiar a vista "por hora del día" usando `hourlyBuckets` de los summaries visibles. Ya hay data en Firestore (campo agregado en iter 18).
-- [ ] **KPIs dinámicos según zoom visible del chart**: recalcular Piezas, P0%, Peso, Tasa promedio en vivo según el rango visible tras aplicar zoom/pan. Hoy quedan fijos al preset inicial.
-- [ ] **Selectores específicos de semana/mes** en análisis de período: agregar prev/next arrows o dropdown para navegar a semanas/meses históricos específicos (no solo "últimos 7/30 días"). Alternativa actual: usar "Personalizado".
+### P0 — ✅ COMPLETADO iter 19 (Grader PeriodView)
+- ✅ **Drill-down hourly**: `hourlyFiltered` + `hourlyChartData` cuando zoom ≤ 2 días (GraderPeriodView L149-296). Implementado en iter 18.1.
+- ✅ **KPIs dinámicos según zoom**: `visibleStats` recalculado via `computeStatsFromSummaries(visibleSummaries)` (L130-142). KPI cards usan `visibleStats`.
+- ✅ **Selectores semana/mes**: `getWeekRangeByOffset`/`getMonthRangeByOffset` + botones prev/next en AnalisisGraderPeriodoPage (L127-139, L252-290).
 
 ### P0.5 — Grader iter 7 pendiente (validación con datos reales)
 - [ ] **Validar flujo PP→P0 incremental** end-to-end con archivos históricos reales cargados por el usuario (julio 2025+)
@@ -573,9 +573,9 @@ Si se necesita re-procesar o corregir algo, usar `scripts/iter18-full-season-reb
 - [ ] **Semáforo tiempo de reacción por gate**: columna verde/amarillo/rojo en tab Compuertas (`t_disponible` vs `t_requerido`)
 - [ ] **Ajustar umbrales** insight #17 (35% gate sobrecargada) e insight #18 (150ms conflicto timing) según feedback de producción real
 
-### P1.8 — Refactor Grader opcional (baja prioridad, no bloqueante)
-- [ ] Partir `GraderTendenciaTab` (1053 líneas) en sub-cards por card P0 (#1-#7)
-- [ ] Partir `GraderPuntoCeroTab` (1157 líneas) en sub-cards (Clasificación, Patrones, Pivote, Fuera de rango, Serie temporal)
+### P1.8 — Refactor Grader
+- ✅ Partir `GraderTendenciaTab` (1053 → 191 líneas) en 6 sub-cards bajo `tabs/tendencia/` (iter 19, pre-sesión)
+- ✅ Partir `GraderPuntoCeroTab` (1157 → ~80 líneas) en 5 sub-cards bajo `tabs/puntocero/` (sesión 2026-04-13)
 - [ ] Unit tests de `useGraderDashboardAnalytics` + `useGraderPatternAnalytics`
 
 ### P1 — Requiere acceso a Firebase Console / IAM
@@ -587,6 +587,7 @@ Si se necesita re-procesar o corregir algo, usar `scripts/iter18-full-season-reb
 ### P2 — Mejoras UX futuras
 - ✅ **Modo alto contraste en calendario** (57345d13): override CSS `.high-contrast` para clases hardcoded `bg-zinc-*`, `text-zinc-*`, `bg-cyan/amber/violet-500/5`, `bg-*-950/60`. Verificado con 9/9 tests programáticos.
 - ✅ **Editor sidebar mobile** (55b81fbc): touch target handles 20px → 44×44px (WCAG), TouchSensor delay 250→200ms, tolerance 5→8px, aria-label en handles.
+- ✅ **Visor interactivo de flujos** (sesión 2026-04-13): `FlowDiagramViewer` con nodos clicables (trigger → pasos → fin), tooltips expandibles, conectores animados. Reemplaza `FlowsList` plano en MachineLearningPage.
 
 ### P3 — Mantenimiento menor no urgente
 - ✅ **Warnings React Hook exhaustive-deps** (f9bf1779): 10 → 1 warning. Margen CI 9.

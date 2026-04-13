@@ -27,7 +27,7 @@ import {
   dedupePieceRecords,
   dedupeGate0Records,
 } from '@/services/grader/graderSegmenter'
-import { saveDailySummaryBatch, fetchExistingSummaryIds } from '@/services/grader/graderDailySummary.service'
+import { saveDailySummaryBatch, fetchExistingSummaryIds, savePieceRecordsBatch, buildDedupeKey, type FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
 import type { ParsedMatrixData, GateAssignment, GraderAnalysisConfig } from '@/services/grader/types'
 
 const GRADER_WIZARD_DRAFT_KEY = 'grader_wizard_draft_v1'
@@ -378,6 +378,28 @@ export function AnalisisGraderWizardPage() {
         computeShiftSummary(segment, batchId, sourceNames, user.id),
       )
       await saveDailySummaryBatch(summaries)
+
+      // Guardar pieceRecords en subcollection (dedup automática)
+      for (const [key, segment] of multiDayInfo.entries) {
+        const [dateKey, shiftId] = key.split('|')
+        if (!dateKey || !shiftId) continue
+        const summaryId = `${dateKey}__${shiftId}`
+        const allRecs = [...segment.pieceRecords, ...segment.gate0Records]
+        if (allRecs.length === 0) continue
+        const firestoreRecs: FirestorePieceRecord[] = allRecs.map((r) => ({
+          ts: r.ts,
+          gate: r.gate,
+          pieces: r.pieces,
+          ...(r.weightKg != null && { weightKg: r.weightKg }),
+          ...(r.weightPerPieceGrams != null && { weightPerPieceGrams: r.weightPerPieceGrams }),
+          ...(r.quality && { quality: r.quality }),
+          ...(r.calibre && { calibre: r.calibre }),
+          ...('error' in r && r.error && { error: r.error }),
+          dedupeKey: buildDedupeKey(r),
+        }))
+        await savePieceRecordsBatch(summaryId, firestoreRecs)
+      }
+
       setSavedToCalendar(true)
       // El calendario embebido abajo se actualiza solo en el siguiente render.
       // No necesitamos navegar a otra página (ya no hay /analisis-grader/calendario).

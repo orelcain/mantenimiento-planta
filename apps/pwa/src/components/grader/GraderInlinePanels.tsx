@@ -55,51 +55,66 @@ export function InsightCard({ insight }: { insight: DeterministicInsight }) {
 }
 
 export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
+  const confidenceLabel: Record<string, string> = { high: 'Alta', medium: 'Media', low: 'Baja' }
+  const priorityLabel: Record<string, string> = { high: 'Alta', medium: 'Media', low: 'Baja' }
+
   return (
     <div className="space-y-4">
-      {/* Summary */}
-      <div>
-        <h4 className="text-sm font-medium mb-2">Resumen</h4>
+      {/* Resumen compacto en card destacada */}
+      <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/10 p-3">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-1.5">
+          Resumen del an&aacute;lisis
+        </p>
         <ul className="space-y-1">
           {output.summaryBullets.map((b, i) => (
-            <li key={i} className="text-sm text-muted-foreground flex gap-2">
-              <span className="shrink-0">•</span>
-              {b}
+            <li key={i} className="text-sm flex gap-2">
+              <span className="text-blue-500 shrink-0 mt-0.5">&#8226;</span>
+              <span>{b}</span>
             </li>
           ))}
         </ul>
       </div>
 
-      {/* Causes */}
+      {/* Causas probables en grid 2 cols */}
       {output.likelyCauses.length > 0 && (
         <div>
-          <h4 className="text-sm font-medium mb-2">Causas Probables</h4>
-          <div className="space-y-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+            Causas probables
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {output.likelyCauses.map((c, i) => (
-              <div key={i} className="p-2 rounded-lg bg-muted/50">
-                <div className="flex items-center gap-2">
+              <div
+                key={i}
+                className={cn(
+                  'p-3 rounded-lg border-l-4',
+                  c.confidence === 'high'
+                    ? 'border-l-red-500 bg-red-50/50 dark:bg-red-900/10'
+                    : c.confidence === 'medium'
+                    ? 'border-l-amber-500 bg-amber-50/50 dark:bg-amber-900/10'
+                    : 'border-l-blue-400 bg-muted/30',
+                )}
+              >
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <span className="text-sm font-semibold leading-tight">{c.cause}</span>
                   <Badge
                     variant="outline"
                     className={cn(
-                      'text-[10px]',
-                      c.confidence === 'high' && 'text-red-600',
-                      c.confidence === 'medium' && 'text-amber-600',
+                      'text-[9px] shrink-0',
+                      c.confidence === 'high' && 'text-red-600 border-red-300',
+                      c.confidence === 'medium' && 'text-amber-600 border-amber-300',
                     )}
                   >
-                    {c.confidence}
+                    {confidenceLabel[c.confidence] || c.confidence}
                   </Badge>
-                  <span className="text-sm font-medium">{c.cause}</span>
                 </div>
                 {c.evidence.length > 0 ? (
-                  <div className="mt-1 space-y-0.5">
+                  <div className="space-y-0.5">
                     {c.evidence.map((e, j) => (
-                      <p key={j} className="text-xs text-muted-foreground ml-4">📊 {e}</p>
+                      <p key={j} className="text-[11px] text-muted-foreground">{e}</p>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-amber-500 mt-1 ml-4">
-                    ⚠ Sin evidencia numérica
-                  </p>
+                  <p className="text-[11px] text-amber-500">Sin evidencia num&eacute;rica</p>
                 )}
               </div>
             ))}
@@ -107,26 +122,45 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
         </div>
       )}
 
-      {/* Recommended Actions */}
+      {/* Acciones recomendadas como checklist visual con prioridad */}
       {output.recommendedActions.length > 0 && (
         <div>
-          <h4 className="text-sm font-medium mb-2">Acciones Recomendadas</h4>
-          <div className="space-y-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+            Acciones recomendadas
+          </p>
+          <div className="space-y-1.5">
             {output.recommendedActions.map((a, i) => (
-              <div key={i} className="flex items-start gap-2 text-sm">
-                <Badge
-                  variant="outline"
+              <div
+                key={i}
+                className={cn(
+                  'flex items-start gap-3 p-2.5 rounded-lg border',
+                  a.priority === 'high'
+                    ? 'border-red-200 dark:border-red-800 bg-red-50/30 dark:bg-red-900/5'
+                    : a.priority === 'medium'
+                    ? 'border-amber-200 dark:border-amber-800 bg-amber-50/30 dark:bg-amber-900/5'
+                    : 'border-muted bg-muted/20',
+                )}
+              >
+                <div
                   className={cn(
-                    'text-[10px] mt-0.5',
-                    a.priority === 'high' && 'text-red-600 border-red-300',
-                    a.priority === 'medium' && 'text-amber-600 border-amber-300',
+                    'flex items-center justify-center w-6 h-6 rounded-full shrink-0 text-[10px] font-bold',
+                    a.priority === 'high'
+                      ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                      : a.priority === 'medium'
+                      ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                      : 'bg-muted text-muted-foreground',
                   )}
                 >
-                  {a.priority}
-                </Badge>
-                <div>
-                  <span className="font-medium">{a.action}</span>
-                  <p className="text-xs text-muted-foreground">{a.why}</p>
+                  {i + 1}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">{a.action}</span>
+                    <Badge variant="outline" className="text-[9px] shrink-0">
+                      {priorityLabel[a.priority] || a.priority}
+                    </Badge>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">{a.why}</p>
                 </div>
               </div>
             ))}
@@ -134,26 +168,32 @@ export function AIOutputPanel({ output }: { output: AIGraderOutput }) {
         </div>
       )}
 
-      {/* Checklist */}
+      {/* Qu&eacute; verificar — card prominente con checklist */}
       {output.whatToCheckNext.length > 0 && (
-        <div>
-          <h4 className="text-sm font-medium mb-2">Qué Verificar</h4>
-          <ul className="space-y-1">
+        <div className="rounded-lg border-2 border-emerald-300 dark:border-emerald-700 bg-emerald-50/50 dark:bg-emerald-900/10 p-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-2">
+            Qu&eacute; verificar ahora
+          </p>
+          <div className="space-y-1.5">
             {output.whatToCheckNext.map((c, i) => (
-              <li key={i} className="text-sm text-muted-foreground flex gap-2">
-                <span>☐</span> {c}
-              </li>
+              <label key={i} className="flex items-start gap-2.5 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  className="mt-1 h-4 w-4 rounded border-emerald-400 text-emerald-600 focus:ring-emerald-500 shrink-0"
+                />
+                <span className="text-sm group-hover:text-foreground transition-colors">{c}</span>
+              </label>
             ))}
-          </ul>
+          </div>
         </div>
       )}
 
-      {/* Disclaimers */}
+      {/* Advertencias */}
       {output.disclaimers && output.disclaimers.length > 0 && (
-        <div className="p-2 bg-amber-50 dark:bg-amber-900/10 rounded-lg">
-          <p className="text-xs font-medium text-amber-700 mb-1">Advertencias:</p>
+        <div className="p-2.5 bg-amber-50 dark:bg-amber-900/10 rounded-lg border border-amber-200 dark:border-amber-800">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-600 mb-1">Advertencias</p>
           {output.disclaimers.map((d, i) => (
-            <p key={i} className="text-xs text-amber-600">{d}</p>
+            <p key={i} className="text-[11px] text-amber-700 dark:text-amber-400">{d}</p>
           ))}
         </div>
       )}
