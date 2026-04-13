@@ -46,6 +46,25 @@ Cuando el usuario diga `cerrar`, `terminar`, `ya está`, `gracias`, `hasta luego
 
 ---
 
+## Orquestador de modelos Claude (optimización de tokens)
+
+El hook `task-classifier.sh` clasifica cada prompt automáticamente y agrega un hint de modelo como `additionalContext`. **Seguir siempre estas reglas:**
+
+| Hint recibido | Acción |
+|---------------|--------|
+| `🐦 ORQUESTADOR (haiku)` | Usar `Agent(model='haiku')` para esta sub-tarea. Haiku es ~19x más barato que Opus. |
+| `🎵 ORQUESTADOR (sonnet)` | Usar `Agent(model='sonnet')` para sub-tareas delegables (código, ediciones, análisis). Sonnet es ~5x más barato que Opus. |
+| `🎭 ORQUESTADOR (opus)` | Procesar con Opus. La tarea justifica el costo. |
+
+**Regla general:** Opus para razonamiento de alto nivel (qué hacer, cómo estructurar). Sonnet/Haiku para la ejecución concreta (escribir código, editar archivos, resumir). Cuando sea posible paralelizar sub-tareas en múltiples Agent calls, usar el modelo apropiado para cada una.
+
+**Ver tokens usados:** `node .claude/scripts/claude-orchestrator.js status`
+**Llamar modelo específico:** `node .claude/scripts/claude-orchestrator.js "tarea" --model haiku`
+**Pipeline paralelo:** `node .claude/scripts/claude-orchestrator.js pipeline '[{"id":"a","prompt":"...","model":"sonnet"},{"id":"b","prompt":"..."}]'`
+→ Divide una tarea en fases independientes y las ejecuta en paralelo, cada una con su modelo óptimo.
+
+---
+
 ## Reglas de desarrollo
 
 - **Idioma**: Siempre responder en **ESPAÑOL**. Ahorrar tokens.
@@ -156,6 +175,7 @@ sidebarConfig  ← nuevo: orden personalizado del sidebar admin
 |-------|-----|
 | `matar-pendientes` | **USAR AL INICIO.** Leer CLAUDE.md, clasificar pendientes, proponer plan de ataque. **Paso 0 obligatorio**: invoca `auditar-deploys` antes de cualquier feature |
 | `cerrar-sesion` | **USAR AL FINAL.** Actualiza CLAUDE.md, sugiere skills, crea memoria |
+| `claude-orquestador` | Ver tokens por modelo (haiku/sonnet/opus), llamar al modelo óptimo, entender la clasificación automática |
 
 ### Deploy y CI
 | Skill | Uso |
