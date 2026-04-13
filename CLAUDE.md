@@ -567,16 +567,17 @@ Si se necesita re-procesar o corregir algo, usar `scripts/iter18-full-season-reb
 - ✅ **KPIs dinámicos según zoom**: `visibleStats` recalculado via `computeStatsFromSummaries(visibleSummaries)` (L130-142). KPI cards usan `visibleStats`.
 - ✅ **Selectores semana/mes**: `getWeekRangeByOffset`/`getMonthRangeByOffset` + botones prev/next en AnalisisGraderPeriodoPage (L127-139, L252-290).
 
-### P0.5 — Grader iter 7 pendiente (validación con datos reales)
+### P0.5 — Grader iter 19 (modelo neumático + umbrales) — sesión 2026-04-13
 - [ ] **Validar flujo PP→P0 incremental** end-to-end con archivos históricos reales cargados por el usuario (julio 2025+)
-- [ ] **Asignación óptima de calibres a gates**: algoritmo que sugiere qué calibre/calidad va a qué gate según % distribución + layout físico
-- [ ] **Semáforo tiempo de reacción por gate**: columna verde/amarillo/rojo en tab Compuertas (`t_disponible` vs `t_requerido`)
-- [ ] **Ajustar umbrales** insight #17 (35% gate sobrecargada) e insight #18 (150ms conflicto timing) según feedback de producción real
+- ✅ **Asignación óptima de calibres a gates**: `computeOptimalGateAssignment` en graderGateTiming.ts — heurística greedy timing×demanda
+- ✅ **Semáforo tiempo de reacción por gate**: modelo neumático per-gate Darcy-Weisbach (`computeGateTimingSignals` + `PneumaticBreakdown`), columnas Válv/Línea/Cil ms + P_eff en CompuertasTab, sección "Configuración Neumática" en GatesConfigPage con preview en vivo
+- ✅ **Ajustar umbrales** insight #17/#18: `gateOverloadWarnPct/CriticalPct`, `timingMarginOkSec/WarnSec` configurables vía errorThresholds + card inline en CompuertasTab. 18 tooltips neumáticos nuevos.
 
 ### P1.8 — Refactor Grader
 - ✅ Partir `GraderTendenciaTab` (1053 → 191 líneas) en 6 sub-cards bajo `tabs/tendencia/` (iter 19, pre-sesión)
 - ✅ Partir `GraderPuntoCeroTab` (1157 → ~80 líneas) en 5 sub-cards bajo `tabs/puntocero/` (sesión 2026-04-13)
-- [ ] Unit tests de `useGraderDashboardAnalytics` + `useGraderPatternAnalytics`
+- ✅ Unit tests de `graderGateTiming` (32 tests vitest — física neumática + semáforo). Setup vitest + happy-dom.
+- [ ] Unit tests de `useGraderDashboardAnalytics` + `useGraderPatternAnalytics` (hooks React — requieren fixtures)
 
 ### P1 — Requiere acceso a Firebase Console / IAM
 - [ ] **App Check**: ReCaptchaV3 + enforceAppCheck en Cloud Functions (requiere key de ReCaptcha desde Firebase Console)
@@ -594,7 +595,7 @@ Si se necesita re-procesar o corregir algo, usar `scripts/iter18-full-season-reb
 - ✅ **Node.js 20 → 24** en los 4 workflows GitHub Actions (sesion 2026-04-10).
 - ✅ **TerrainMesh fast-refresh warning**: `useTerrainData` movido a `useTerrainData.ts` propio (sesion 2026-04-10).
 - ✅ **Dependabot 8→1**: xmldom, minimatch, picomatch corregidos en lockfile. Restante: rollup@4.54.0 HIGH vía vite-plugin-pwa (devDep build-only, requiere hashes de red para actualizar).
-- [ ] Rollup 4.54.0 → >=4.59.0 (devDep, via vite-plugin-pwa>workbox-build — requiere `pnpm install` con red para regenerar lockfile)
+- ✅ Rollup 4.54.0 → 4.60.1 (sesión 2026-04-13, pnpm update rollup --recursive)
 
 ### Resueltos en sesion 2026-04-09 noche (no volver aca)
 <!-- completados
