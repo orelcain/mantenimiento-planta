@@ -3,6 +3,10 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 
 export default defineConfig({
+  test: {
+    environment: 'happy-dom',
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+  },
   plugins: [
     react(),
     // VitePWA eliminado - usamos manifest.json y sw.js manuales en public/
