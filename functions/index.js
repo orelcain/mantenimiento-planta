@@ -40,11 +40,13 @@ const TELEGRAM_API_BASE = 'https://api.telegram.org'
 // ==================== HELPERS ====================
 
 /**
- * Enviar un mensaje a Telegram.
+ * Enviar un mensaje a Telegram (con soporte de Forum Topics).
  * @param {string} text  - Texto del mensaje (HTML permitido)
  * @param {string} [chatId] - Chat destino. Si se omite usa process.env.TELEGRAM_CHAT_ID
+ * @param {object} [opts] - Opciones extra
+ * @param {number} [opts.topicId] - message_thread_id para enviar a un topic específico
  */
-async function sendTelegramMessage(text, chatId) {
+async function sendTelegramMessage(text, chatId, opts = {}) {
   const token = process.env.TELEGRAM_BOT_TOKEN
   if (!token) {
     logger.warn('TELEGRAM_BOT_TOKEN no configurado — mensaje omitido')
@@ -57,16 +59,23 @@ async function sendTelegramMessage(text, chatId) {
     return
   }
 
+  const payload = {
+    chat_id: target,
+    text,
+    parse_mode: 'HTML',
+    disable_web_page_preview: true,
+  }
+
+  // Soporte de Forum Topics
+  if (opts.topicId) {
+    payload.message_thread_id = opts.topicId
+  }
+
   try {
     const response = await fetch(`${TELEGRAM_API_BASE}/bot${token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: target,
-        text,
-        parse_mode: 'HTML',
-        disable_web_page_preview: true,
-      }),
+      body: JSON.stringify(payload),
     })
 
     if (!response.ok) {
@@ -315,14 +324,16 @@ exports.onIncidentCreated = onDocumentCreated('incidents/{incidentId}', async (e
     url: `/mantenimiento-planta/incidents/${incidentId}`,
   })
 
-  // Telegram: alertar para incidencias criticas y altas
+  // Telegram: alertar para incidencias criticas y altas (rutear al topic de incidencias)
   if (incident.prioridad === 'critica' || incident.prioridad === 'alta') {
     const origenLabel = incident.origen === 'telegram' ? ' <i>(vía Telegram)</i>' : ''
+    const incTopicId = getTopicId('incidencias')
     await sendTelegramMessage(
       `${priorityEmoji} <b>Nueva incidencia ${incident.prioridad}${origenLabel}</b>\n\n` +
       `📋 ${incident.titulo || 'Sin título'}\n` +
       `👤 ${incident.creadoPorNombre || 'Desconocido'}\n` +
-      `🔗 <a href="https://orelcain.github.io/mantenimiento-planta/incidents/${incidentId}">Ver detalle</a>`
+      `🔗 <a href="https://orelcain.github.io/mantenimiento-planta/incidents/${incidentId}">Ver detalle</a>`,
+      undefined, { topicId: incTopicId }
     )
   }
 })
@@ -1694,32 +1705,57 @@ const PRIORITY_EMOJI = { critica: '🔴', alta: '🟠', media: '🟡', baja: '�
 const PRIORITY_LABELS = ['critica', 'alta', 'media', 'baja']
 
 /**
+ * Mapa de Forum Topics de Telegram.
+ * Los IDs se configuran vía variables de entorno (se obtienen al crear los topics en el grupo).
+ * Si un topicId no está configurado, el mensaje se envía al hilo General.
+ */
+function getTopicId(category) {
+  const map = {
+    incidencias: process.env.TELEGRAM_TOPIC_INCIDENCIAS,
+    repuestos: process.env.TELEGRAM_TOPIC_REPUESTOS,
+    equipos: process.env.TELEGRAM_TOPIC_EQUIPOS,
+    general: process.env.TELEGRAM_TOPIC_GENERAL,
+  }
+  const id = map[category]
+  return id ? Number(id) : undefined
+}
+
+/**
  * Handlers internos de comandos Telegram
  */
-async function tgHandleAyuda(chatId) {
+async function tgHandleAyuda(chatId, topicId) {
   await sendTelegramMessage(
     '🤖 <b>Bot Mantenimiento Planta</b>\n\n' +
-    '<b>Comandos:</b>\n' +
-    '/incidencia [desc] — Reportar problema (prioridad media)\n' +
+    '<b>📋 Incidencias</b>\n' +
+    '/incidencia [desc] — Reportar (prioridad media)\n' +
     '/incidencia alta [desc] — Prioridad alta\n' +
-    '/incidencia critica [desc] — Prioridad crítica 🔴\n' +
-    '/estado — Ver incidencias activas\n' +
+    '/incidencia critica [desc] — Prioridad crítica\n' +
+    '/estado — Incidencias activas\n\n' +
+    '<b>🔧 Equipos y Repuestos</b>\n' +
+    '/equipo [nombre] — Info de un equipo\n' +
+    '/equipo — Lista de equipos registrados\n' +
+    '/repuesto [código o nombre] — Buscar repuesto\n' +
+    '/repuestos [máquina] — Repuestos de una máquina\n\n' +
+    '<b>📊 Turno</b>\n' +
+    '/turno — Resumen del turno actual\n' +
+    '/kpi — Indicadores del día\n\n' +
+    '<b>ℹ️ General</b>\n' +
     '/ayuda — Este menú\n\n' +
     '💡 También podés escribir el problema directamente sin comandos.',
-    chatId
+    chatId, { topicId }
   )
 }
 
-async function tgHandleEstado(chatId) {
+async function tgHandleEstado(chatId, topicId) {
   const snapshot = await db
     .collection('incidents')
     .where('status', 'in', ['pendiente', 'confirmada', 'en_proceso'])
     .orderBy('createdAt', 'desc')
-    .limit(5)
+    .limit(10)
     .get()
 
   if (snapshot.empty) {
-    await sendTelegramMessage('✅ No hay incidencias activas.', chatId)
+    await sendTelegramMessage('✅ No hay incidencias activas.', chatId, { topicId })
     return
   }
 
@@ -1733,15 +1769,14 @@ async function tgHandleEstado(chatId) {
     msg += `   ${statusLabel[d.status] || d.status} · ${d.prioridad}\n\n`
   })
 
-  if (snapshot.size === 5) {
-    msg += '<i>Mostrando las últimas 5.</i>'
+  if (snapshot.size === 10) {
+    msg += '<i>Mostrando las últimas 10.</i>'
   }
 
-  await sendTelegramMessage(msg, chatId)
+  await sendTelegramMessage(msg, chatId, { topicId })
 }
 
-async function tgHandleIncidencia(chatId, rawText, fromName, telegramUserId) {
-  // /incidencia [prioridad?] descripción
+async function tgHandleIncidencia(chatId, rawText, fromName, telegramUserId, topicId) {
   const body = rawText.replace(/^\/incidencia\s*/i, '').trim()
   const parts = body.split(' ')
 
@@ -1758,7 +1793,7 @@ async function tgHandleIncidencia(chatId, rawText, fromName, telegramUserId) {
       '⚠️ Incluí una descripción.\n\nEjemplo:\n' +
       '<code>/incidencia bomba rota sala 2</code>\n' +
       '<code>/incidencia alta fuga de aceite prensa</code>',
-      chatId
+      chatId, { topicId }
     )
     return
   }
@@ -1780,14 +1815,300 @@ async function tgHandleIncidencia(chatId, rawText, fromName, telegramUserId) {
     updatedAt: FieldValue.serverTimestamp(),
   })
 
+  const incTopicId = getTopicId('incidencias') || topicId
   const emoji = PRIORITY_EMOJI[prioridad]
   await sendTelegramMessage(
     `${emoji} <b>Incidencia creada</b>\n\n` +
     `📋 ${descripcion}\n` +
     `🎯 Prioridad: ${prioridad}\n` +
+    `👤 ${fromName}\n` +
     `🔗 <a href="https://orelcain.github.io/mantenimiento-planta/incidents/${id}">Ver en el sistema</a>`,
-    chatId
+    chatId, { topicId: incTopicId }
   )
+}
+
+// ---- /equipo [nombre] ----
+async function tgHandleEquipo(chatId, rawText, topicId) {
+  const query = rawText.replace(/^\/equipo\s*/i, '').trim().toLowerCase()
+
+  if (!query) {
+    // Listar equipos registrados (max 15)
+    const snapshot = await db.collection('equipment').orderBy('nombre').limit(15).get()
+    if (snapshot.empty) {
+      await sendTelegramMessage('📭 No hay equipos registrados.', chatId, { topicId })
+      return
+    }
+    let msg = '<b>🔧 Equipos registrados</b>\n\n'
+    snapshot.forEach((docSnap) => {
+      const d = docSnap.data()
+      const estado = d.estado === 'operativo' ? '🟢' : d.estado === 'en_mantenimiento' ? '🟡' : '🔴'
+      msg += `${estado} <b>${d.nombre || d.codigo}</b>`
+      if (d.codigo) msg += ` (${d.codigo})`
+      msg += '\n'
+    })
+    if (snapshot.size === 15) msg += '\n<i>Mostrando los primeros 15.</i>'
+    await sendTelegramMessage(msg, chatId, { topicId })
+    return
+  }
+
+  // Buscar equipo por nombre o código (case-insensitive con bounds)
+  const upper = query.toUpperCase()
+  let snapshot = await db.collection('equipment')
+    .where('nombre', '>=', upper)
+    .where('nombre', '<=', upper + '\uf8ff')
+    .limit(5)
+    .get()
+
+  // Fallback: buscar por código
+  if (snapshot.empty) {
+    snapshot = await db.collection('equipment')
+      .where('codigo', '>=', upper)
+      .where('codigo', '<=', upper + '\uf8ff')
+      .limit(5)
+      .get()
+  }
+
+  if (snapshot.empty) {
+    await sendTelegramMessage(`🔍 No encontré equipos con "<b>${query}</b>".`, chatId, { topicId })
+    return
+  }
+
+  const eqTopicId = getTopicId('equipos') || topicId
+  let msg = ''
+  snapshot.forEach((docSnap) => {
+    const d = docSnap.data()
+    const estado = d.estado === 'operativo' ? '🟢 Operativo' : d.estado === 'en_mantenimiento' ? '🟡 En mantenimiento' : '🔴 Fuera de servicio'
+    msg += `<b>🔧 ${d.nombre || 'Sin nombre'}</b>\n`
+    if (d.codigo) msg += `📌 Código: ${d.codigo}\n`
+    msg += `📍 Estado: ${estado}\n`
+    msg += `⚡ Criticidad: ${d.criticidad || 'N/A'}\n`
+    if (d.marca) msg += `🏭 Marca: ${d.marca}\n`
+    if (d.modelo) msg += `📋 Modelo: ${d.modelo}\n`
+    if (d.hierarchyPath) msg += `📂 Ubicación: ${d.hierarchyPath}\n`
+    msg += '\n'
+  })
+
+  await sendTelegramMessage(msg.trim(), chatId, { topicId: eqTopicId })
+}
+
+// ---- /repuesto [código o nombre] ----
+async function tgHandleRepuesto(chatId, rawText, topicId) {
+  const query = rawText.replace(/^\/repuesto\s*/i, '').trim()
+
+  if (!query) {
+    await sendTelegramMessage(
+      '⚠️ Indicá qué repuesto buscás.\n\nEjemplo:\n' +
+      '<code>/repuesto 12345</code> (código SAP)\n' +
+      '<code>/repuesto rodamiento</code> (nombre)\n' +
+      '<code>/repuestos baader</code> (repuestos de una máquina)',
+      chatId, { topicId }
+    )
+    return
+  }
+
+  const repTopicId = getTopicId('repuestos') || topicId
+  const upper = query.toUpperCase()
+
+  // Buscar en todas las máquinas activas
+  const machinesSnap = await db.collection('machines').where('activa', '==', true).get()
+  const results = []
+
+  for (const machineDoc of machinesSnap.docs) {
+    const machineName = machineDoc.data().nombre
+    const repSnap = await db.collection(`machines/${machineDoc.id}/repuestos`).get()
+
+    repSnap.forEach((repDoc) => {
+      const r = repDoc.data()
+      const matchSAP = (r.codigoSAP || '').toUpperCase().includes(upper)
+      const matchTexto = (r.textoBreve || '').toUpperCase().includes(upper)
+      const matchDesc = (r.descripcion || '').toUpperCase().includes(upper)
+      const matchAlias = (r.alias || '').toUpperCase().includes(upper)
+      if (matchSAP || matchTexto || matchDesc || matchAlias) {
+        results.push({ ...r, _machineName: machineName })
+      }
+    })
+
+    if (results.length >= 10) break
+  }
+
+  if (results.length === 0) {
+    await sendTelegramMessage(`🔍 No encontré repuestos con "<b>${query}</b>".`, chatId, { topicId: repTopicId })
+    return
+  }
+
+  let msg = `<b>🔩 Repuestos encontrados (${results.length})</b>\n\n`
+  for (const r of results.slice(0, 10)) {
+    msg += `<b>${r.textoBreve || r.descripcion || 'Sin nombre'}</b>\n`
+    if (r.codigoSAP) msg += `  SAP: <code>${r.codigoSAP}</code>\n`
+    if (r.codigoFabricante) msg += `  Fab: ${r.codigoFabricante}\n`
+    if (r.cantidadPorMaquina) msg += `  Cantidad/máquina: ${r.cantidadPorMaquina}\n`
+    if (r.valorUnitario) msg += `  Valor: $${r.valorUnitario.toLocaleString()}\n`
+    msg += `  Máquina: ${r._machineName}\n\n`
+  }
+
+  await sendTelegramMessage(msg.trim(), chatId, { topicId: repTopicId })
+}
+
+// ---- /repuestos [máquina] — lista repuestos de una máquina ----
+async function tgHandleRepuestosMaquina(chatId, rawText, topicId) {
+  const query = rawText.replace(/^\/repuestos\s*/i, '').trim().toLowerCase()
+
+  const repTopicId = getTopicId('repuestos') || topicId
+
+  if (!query) {
+    // Listar máquinas disponibles
+    const machinesSnap = await db.collection('machines').where('activa', '==', true).orderBy('orden').get()
+    if (machinesSnap.empty) {
+      await sendTelegramMessage('📭 No hay máquinas registradas.', chatId, { topicId: repTopicId })
+      return
+    }
+    let msg = '<b>🏭 Máquinas disponibles</b>\n\n'
+    machinesSnap.forEach((doc) => {
+      msg += `• <b>${doc.data().nombre}</b>\n`
+    })
+    msg += '\nUsá: <code>/repuestos baader</code>'
+    await sendTelegramMessage(msg, chatId, { topicId: repTopicId })
+    return
+  }
+
+  // Buscar máquina por nombre parcial
+  const machinesSnap = await db.collection('machines').where('activa', '==', true).get()
+  const machine = machinesSnap.docs.find((doc) => {
+    const name = (doc.data().nombre || '').toLowerCase()
+    return name.includes(query)
+  })
+
+  if (!machine) {
+    await sendTelegramMessage(`🔍 No encontré máquina "<b>${query}</b>".\nUsá /repuestos para ver la lista.`, chatId, { topicId: repTopicId })
+    return
+  }
+
+  const repSnap = await db.collection(`machines/${machine.id}/repuestos`).orderBy('codigoSAP').limit(20).get()
+
+  if (repSnap.empty) {
+    await sendTelegramMessage(`📭 <b>${machine.data().nombre}</b> no tiene repuestos cargados.`, chatId, { topicId: repTopicId })
+    return
+  }
+
+  let msg = `<b>🔩 Repuestos — ${machine.data().nombre}</b> (${repSnap.size})\n\n`
+  repSnap.forEach((doc) => {
+    const r = doc.data()
+    msg += `• <code>${r.codigoSAP || '—'}</code> ${r.textoBreve || r.descripcion || 'Sin nombre'}\n`
+  })
+  if (repSnap.size === 20) msg += '\n<i>Mostrando los primeros 20.</i>'
+
+  await sendTelegramMessage(msg, chatId, { topicId: repTopicId })
+}
+
+// ---- /turno — resumen del turno actual ----
+async function tgHandleTurno(chatId, topicId) {
+  // Incidencias abiertas
+  const incSnap = await db.collection('incidents')
+    .where('status', 'in', ['pendiente', 'confirmada', 'en_proceso'])
+    .get()
+
+  const criticas = incSnap.docs.filter((d) => d.data().prioridad === 'critica').length
+  const altas = incSnap.docs.filter((d) => d.data().prioridad === 'alta').length
+  const otras = incSnap.size - criticas - altas
+
+  // Preventivos próximos (hoy)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const tomorrow = new Date(today)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+
+  let prevCount = 0
+  try {
+    const prevSnap = await db.collection('preventive_tasks')
+      .where('nextExecution', '>=', today)
+      .where('nextExecution', '<', tomorrow)
+      .get()
+    prevCount = prevSnap.size
+  } catch (_) { /* collection may not exist */ }
+
+  let msg = '<b>📋 Resumen del turno</b>\n\n'
+  msg += '<b>Incidencias abiertas:</b>\n'
+  if (incSnap.empty) {
+    msg += '  ✅ Ninguna\n'
+  } else {
+    if (criticas > 0) msg += `  🔴 Críticas: ${criticas}\n`
+    if (altas > 0) msg += `  🟠 Altas: ${altas}\n`
+    if (otras > 0) msg += `  🟡 Media/Baja: ${otras}\n`
+    msg += `  📊 Total: ${incSnap.size}\n`
+  }
+
+  msg += `\n<b>Preventivos hoy:</b> ${prevCount > 0 ? prevCount + ' pendientes' : '✅ Ninguno'}\n`
+
+  // Equipos fuera de servicio
+  try {
+    const eqSnap = await db.collection('equipment')
+      .where('estado', '==', 'fuera_servicio')
+      .get()
+    if (!eqSnap.empty) {
+      msg += `\n<b>⚠️ Equipos fuera de servicio:</b>\n`
+      eqSnap.forEach((doc) => {
+        msg += `  🔴 ${doc.data().nombre || doc.data().codigo}\n`
+      })
+    }
+  } catch (_) { /* ignore */ }
+
+  await sendTelegramMessage(msg, chatId, { topicId })
+}
+
+// ---- /kpi — indicadores del día ----
+async function tgHandleKpi(chatId, topicId) {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  // Incidencias creadas hoy
+  let creadasHoy = 0
+  try {
+    const snap = await db.collection('incidents')
+      .where('createdAt', '>=', today)
+      .get()
+    creadasHoy = snap.size
+  } catch (_) { /* ignore */ }
+
+  // Incidencias resueltas hoy
+  let resueltasHoy = 0
+  try {
+    const snap = await db.collection('incidents')
+      .where('status', 'in', ['resuelta', 'cerrada'])
+      .where('updatedAt', '>=', today)
+      .get()
+    resueltasHoy = snap.size
+  } catch (_) { /* ignore */ }
+
+  // Abiertas total
+  const abiertasSnap = await db.collection('incidents')
+    .where('status', 'in', ['pendiente', 'confirmada', 'en_proceso'])
+    .get()
+
+  // Equipos por estado
+  let operativos = 0, enMant = 0, fuera = 0
+  try {
+    const eqSnap = await db.collection('equipment').get()
+    eqSnap.forEach((doc) => {
+      const e = doc.data().estado
+      if (e === 'operativo') operativos++
+      else if (e === 'en_mantenimiento') enMant++
+      else if (e === 'fuera_servicio') fuera++
+    })
+  } catch (_) { /* ignore */ }
+
+  let msg = '<b>📊 KPIs del día</b>\n\n'
+  msg += `📥 Incidencias creadas hoy: <b>${creadasHoy}</b>\n`
+  msg += `✅ Resueltas hoy: <b>${resueltasHoy}</b>\n`
+  msg += `📋 Abiertas total: <b>${abiertasSnap.size}</b>\n\n`
+
+  if (operativos + enMant + fuera > 0) {
+    msg += '<b>Equipos:</b>\n'
+    msg += `  🟢 Operativos: ${operativos}\n`
+    if (enMant > 0) msg += `  🟡 En mantenimiento: ${enMant}\n`
+    if (fuera > 0) msg += `  🔴 Fuera de servicio: ${fuera}\n`
+  }
+
+  await sendTelegramMessage(msg, chatId, { topicId })
 }
 
 /**
@@ -1812,6 +2133,8 @@ exports.telegramWebhook = onRequest({ region: 'us-central1' }, async (req, res) 
   const text = message.text.trim()
   const fromName = message.from?.first_name || 'Técnico'
   const telegramUserId = String(message.from?.id || 'unknown')
+  // Forum topic del mensaje entrante (si el grupo tiene topics habilitados)
+  const incomingTopicId = message.message_thread_id || undefined
 
   // Verificar chat autorizado (si TELEGRAM_CHAT_ID está configurado)
   const allowedChatId = process.env.TELEGRAM_CHAT_ID
@@ -1823,24 +2146,34 @@ exports.telegramWebhook = onRequest({ region: 'us-central1' }, async (req, res) 
 
   try {
     if (/^\/incidencia/i.test(text)) {
-      await tgHandleIncidencia(chatId, text, fromName, telegramUserId)
+      await tgHandleIncidencia(chatId, text, fromName, telegramUserId, incomingTopicId)
     } else if (/^\/estado/i.test(text)) {
-      await tgHandleEstado(chatId)
+      await tgHandleEstado(chatId, incomingTopicId)
     } else if (/^\/(ayuda|start|help)/i.test(text)) {
-      await tgHandleAyuda(chatId)
+      await tgHandleAyuda(chatId, incomingTopicId)
+    } else if (/^\/equipo/i.test(text)) {
+      await tgHandleEquipo(chatId, text, incomingTopicId)
+    } else if (/^\/repuestos/i.test(text)) {
+      await tgHandleRepuestosMaquina(chatId, text, incomingTopicId)
+    } else if (/^\/repuesto/i.test(text)) {
+      await tgHandleRepuesto(chatId, text, incomingTopicId)
+    } else if (/^\/turno/i.test(text)) {
+      await tgHandleTurno(chatId, incomingTopicId)
+    } else if (/^\/kpi/i.test(text)) {
+      await tgHandleKpi(chatId, incomingTopicId)
     } else if (!text.startsWith('/')) {
       // Texto libre → crear incidencia con prioridad media
       if (text.length >= 10) {
-        await tgHandleIncidencia(chatId, `/incidencia ${text}`, fromName, telegramUserId)
+        await tgHandleIncidencia(chatId, `/incidencia ${text}`, fromName, telegramUserId, incomingTopicId)
       } else {
-        await sendTelegramMessage('ℹ️ Usá /ayuda para ver los comandos disponibles.', chatId)
+        await sendTelegramMessage('ℹ️ Usá /ayuda para ver los comandos disponibles.', chatId, { topicId: incomingTopicId })
       }
     } else {
-      await sendTelegramMessage('❓ Comando no reconocido. Usá /ayuda para ver los comandos.', chatId)
+      await sendTelegramMessage('❓ Comando no reconocido. Usá /ayuda para ver los comandos.', chatId, { topicId: incomingTopicId })
     }
   } catch (error) {
     logger.error('Error handling Telegram command', error)
-    await sendTelegramMessage('❌ Error procesando el comando. Intentá de nuevo.', chatId)
+    await sendTelegramMessage('❌ Error procesando el comando. Intentá de nuevo.', chatId, { topicId: incomingTopicId })
   }
 
   res.status(200).send('ok')
@@ -1871,5 +2204,66 @@ exports.setTelegramWebhook = onRequest({ region: 'us-central1' }, async (req, re
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
+})
+
+/**
+ * Crea los Forum Topics en el grupo y guarda los IDs en Firestore (colección config).
+ * GET /setupTelegramTopics — ejecutar UNA VEZ después de habilitar Temas en el grupo.
+ * Pre-req: el grupo debe tener "Temas" habilitados y el bot debe ser admin.
+ */
+exports.setupTelegramTopics = onRequest({ region: 'us-central1' }, async (req, res) => {
+  const token = process.env.TELEGRAM_BOT_TOKEN
+  const chatId = process.env.TELEGRAM_CHAT_ID
+  if (!token || !chatId) {
+    res.status(500).json({ error: 'TELEGRAM_BOT_TOKEN o TELEGRAM_CHAT_ID no configurados' })
+    return
+  }
+
+  const topicsToCreate = [
+    { name: '🔴 Incidencias', icon_color: 0xFF0000, key: 'incidencias' },
+    { name: '🔩 Repuestos', icon_color: 0x6FB9F0, key: 'repuestos' },
+    { name: '🔧 Equipos', icon_color: 0xFFD67E, key: 'equipos' },
+  ]
+
+  const created = {}
+
+  for (const topic of topicsToCreate) {
+    try {
+      const response = await fetch(`${TELEGRAM_API_BASE}/bot${token}/createForumTopic`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          name: topic.name,
+          icon_color: topic.icon_color,
+        }),
+      })
+      const result = await response.json()
+      if (result.ok) {
+        created[topic.key] = result.result.message_thread_id
+      } else {
+        created[topic.key] = { error: result.description }
+      }
+    } catch (error) {
+      created[topic.key] = { error: error.message }
+    }
+  }
+
+  // Guardar IDs en Firestore para referencia
+  await db.collection('config').doc('telegram_topics').set({
+    topics: created,
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true })
+
+  // Instrucciones para el .env
+  const envLines = Object.entries(created)
+    .filter(([, v]) => typeof v === 'number')
+    .map(([k, v]) => `TELEGRAM_TOPIC_${k.toUpperCase()}=${v}`)
+
+  res.json({
+    created,
+    instructions: 'Agregá estas líneas a functions/.env y re-deployer:',
+    envLines,
+  })
 })
 
