@@ -168,10 +168,11 @@ export function GraderPeriodView({ data }: Props) {
           data: dailyP0Series.map((d) => d.dia ? d.dia.p0Pct : null),
           borderColor: DIA_LINE_COLOR,
           backgroundColor: DIA_FILL_COLOR,
+          borderWidth: typeof window !== 'undefined' && window.innerWidth < 768 ? 1.5 : 2,
           fill: false,
           tension: 0.2,
-          pointRadius: dailyP0Series.length > 60 ? 1 : 3,
-          pointHoverRadius: 5,
+          pointRadius: dailyP0Series.length > 60 ? 0 : (typeof window !== 'undefined' && window.innerWidth < 768 ? 2 : 3),
+          pointHoverRadius: 4,
           spanGaps: true,
         },
         {
@@ -179,10 +180,11 @@ export function GraderPeriodView({ data }: Props) {
           data: dailyP0Series.map((d) => d.noche ? d.noche.p0Pct : null),
           borderColor: NOCHE_LINE_COLOR,
           backgroundColor: NOCHE_FILL_COLOR,
+          borderWidth: typeof window !== 'undefined' && window.innerWidth < 768 ? 1.5 : 2,
           fill: false,
           tension: 0.2,
-          pointRadius: dailyP0Series.length > 60 ? 1 : 3,
-          pointHoverRadius: 5,
+          pointRadius: dailyP0Series.length > 60 ? 0 : (typeof window !== 'undefined' && window.innerWidth < 768 ? 2 : 3),
+          pointHoverRadius: 4,
           spanGaps: true,
         },
       ],
@@ -246,7 +248,7 @@ export function GraderPeriodView({ data }: Props) {
           onZoomComplete: () => updateVisibleRange(),
         },
         limits: {
-          x: { min: 'original' as const, max: 'original' as const },
+          x: { min: 'original' as const, max: 'original' as const, minRange: 1 },
         },
       },
     },
@@ -277,10 +279,11 @@ export function GraderPeriodView({ data }: Props) {
           data: hourlyFiltered.map((h) => h.p0Pct),
           borderColor: 'rgba(168, 85, 247, 1)',
           backgroundColor: 'rgba(168, 85, 247, 0.15)',
+          borderWidth: typeof window !== 'undefined' && window.innerWidth < 768 ? 1.5 : 2,
           fill: true,
           tension: 0.25,
-          pointRadius: 4,
-          pointHoverRadius: 6,
+          pointRadius: typeof window !== 'undefined' && window.innerWidth < 768 ? 3 : 4,
+          pointHoverRadius: 5,
           pointBackgroundColor: hourlyFiltered.map((h) =>
             h.shiftId === 'Turno día' ? DIA_LINE_COLOR : NOCHE_LINE_COLOR,
           ),
@@ -303,13 +306,26 @@ export function GraderPeriodView({ data }: Props) {
           title: (items: any[]) => {
             const idx = items[0]?.dataIndex
             const entry = typeof idx === 'number' ? hourlyFiltered[idx] : undefined
-            return entry ? `${entry.dateKey} · ${entry.hour.toString().padStart(2, '0')}h · ${entry.shiftId}` : ''
+            return entry ? `${entry.dateKey} · ${entry.hour.toString().padStart(2, '0')}:00 - ${entry.hour.toString().padStart(2, '0')}:59 · ${entry.shiftId}` : ''
           },
           label: (ctx: any) => {
             const entry = hourlyFiltered[ctx.dataIndex]
             if (!entry) return ''
-            return `P0%: ${entry.p0Pct}% · ${entry.totalPieces.toLocaleString('es-CL')} pz · P0: ${entry.p0Pieces.toLocaleString('es-CL')}`
+            return `P0%: ${entry.p0Pct}% · ${entry.totalPieces.toLocaleString('es-CL')} piezas · P0: ${entry.p0Pieces.toLocaleString('es-CL')} piezas`
           },
+          afterLabel: () => 'Detalle minuto a minuto requiere cargar Excel del turno',
+        },
+      },
+      zoom: {
+        pan: { enabled: true, mode: 'x' as const },
+        zoom: {
+          wheel: { enabled: true, speed: 0.1 },
+          pinch: { enabled: true },
+          drag: { enabled: false },
+          mode: 'x' as const,
+        },
+        limits: {
+          x: { min: 'original' as const, max: 'original' as const, minRange: 2 },
         },
       },
     },
@@ -323,8 +339,8 @@ export function GraderPeriodView({ data }: Props) {
           maxRotation: 50,
           minRotation: 20,
           autoSkip: true,
-          maxTicksLimit: 16,
-          font: { size: 10 },
+          maxTicksLimit: typeof window !== 'undefined' && window.innerWidth < 768 ? 8 : 16,
+          font: { size: typeof window !== 'undefined' && window.innerWidth < 768 ? 9 : 10 },
         },
       },
     },
@@ -590,17 +606,18 @@ export function GraderPeriodView({ data }: Props) {
           </div>
           {useHourlyView && (
             <p className="text-[11px] text-muted-foreground mt-1">
-              Zoom ≤ 2 días detectado — mostrando buckets horarios del rango visible ({hourlyFiltered.length} puntos).
+              <Clock className="inline h-3 w-3 mr-1" />
+              Vista horaria activada — {hourlyFiltered.length} horas en rango. Zoom y panea para navegar. Para detalle minuto a minuto, abre el turno con "Ver detalle".
             </p>
           )}
         </CardHeader>
         <CardContent>
           {useHourlyView && hourlyChartData ? (
-            <div className="h-72">
+            <div className="h-64 lg:h-80">
               <Line data={hourlyChartData} options={hourlyChartOptions as any} />
             </div>
           ) : trendChartData ? (
-            <div className="h-72">
+            <div className="h-64 lg:h-80">
               <Line ref={trendChartRef} data={trendChartData} options={trendChartOptions as any} />
             </div>
           ) : (

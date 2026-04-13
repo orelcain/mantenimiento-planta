@@ -379,7 +379,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
   return (
     <div className="space-y-3">
       {/* Zona de carga unificada */}
-      <Card>
+      <Card className="lg:border-l-4 lg:border-l-blue-500/40 lg:hover:shadow-md lg:transition-shadow">
         <CardContent className="pt-4 pb-4 space-y-3">
           <div className="flex items-center gap-2 flex-wrap">
             <Badge className={cn('text-xs', KIND_COLORS.PIEZA_PIEZA)}>Pieza-Pieza</Badge>
@@ -395,15 +395,25 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
             onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files) }}
             onClick={() => inputRef.current?.click()}
             className={cn(
-              'border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors',
-              dragOver ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-primary/50',
+              'border-2 border-dashed rounded-xl p-5 lg:p-8 text-center cursor-pointer transition-all duration-200 group',
+              dragOver
+                ? 'border-primary bg-primary/10 scale-[1.02] shadow-lg shadow-primary/10'
+                : 'border-muted-foreground/20 hover:border-primary/40 hover:bg-primary/[0.02]',
             )}
           >
-            <FileSpreadsheet className={cn('h-8 w-8 mx-auto mb-2', dragOver ? 'text-primary' : 'text-muted-foreground')} />
-            <p className="text-sm font-medium">
+            <div className={cn(
+              'h-10 w-10 lg:h-12 lg:w-12 mx-auto mb-2 lg:mb-3 rounded-full flex items-center justify-center transition-colors',
+              dragOver ? 'bg-primary/20' : 'bg-muted/50 group-hover:bg-primary/10',
+            )}>
+              <FileSpreadsheet className={cn('h-5 w-5 lg:h-6 lg:w-6', dragOver ? 'text-primary' : 'text-muted-foreground group-hover:text-primary/70')} />
+            </div>
+            <p className="text-sm font-semibold">
               {parsing ? 'Procesando...' : 'Arrastra los Excel de Matrix aquí'}
             </p>
-            <p className="text-xs text-muted-foreground mt-1">.xlsx o .xls — puedes agregar más archivos durante el turno</p>
+            <p className="text-[11px] lg:text-xs text-muted-foreground mt-1">.xlsx o .xls (grader Pieza-Pieza / Punto Cero)</p>
+            {!parsing && (
+              <p className="text-[10px] text-primary/60 mt-2 hidden lg:block">o haz clic para seleccionar archivos</p>
+            )}
             {parsing && <Loader2 className="h-4 w-4 animate-spin mx-auto mt-2 text-muted-foreground" />}
           </div>
           <input

@@ -503,9 +503,10 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
       {/* Quick navigation visible */}
       <div className="sticky top-14 z-20">
         <Card className="border-primary/30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-          <CardContent className="py-2 px-3 flex items-center justify-between gap-2">
-            <p className="text-xs text-muted-foreground">Datos cargados: puede ir al dashboard en cualquier momento.</p>
-            <Button size="sm" onClick={() => onComplete(gates, config)}>
+          <CardContent className="py-2.5 px-4 flex items-center justify-between gap-3">
+            <p className="text-xs text-muted-foreground hidden sm:block">Datos cargados — puede ir al dashboard en cualquier momento</p>
+            <p className="text-xs text-muted-foreground sm:hidden">Datos listos</p>
+            <Button size="sm" onClick={() => onComplete(gates, config)} className="bg-primary hover:bg-primary/90 shadow-sm">
               Ver Dashboard
               <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
@@ -595,18 +596,18 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b text-left">
-                  <th className="py-2 px-2 w-16">Gate</th>
-                  <th className="py-2 px-2">Calibre</th>
-                  <th className="py-2 px-2 text-center">Rango (g)</th>
-                  <th className="py-2 px-2">Calidad</th>
-                  <th className="py-2 px-2 w-20 text-center">Activo</th>
-                  <th className="py-2 px-2">Nota</th>
+                <tr className="border-b border-border/60 text-left text-xs uppercase tracking-wider text-muted-foreground">
+                  <th className="py-2.5 px-2 w-16">Gate</th>
+                  <th className="py-2.5 px-2">Calibre</th>
+                  <th className="py-2.5 px-2 text-center">Rango (g)</th>
+                  <th className="py-2.5 px-2">Calidad</th>
+                  <th className="py-2.5 px-2 w-20 text-center">Activo</th>
+                  <th className="py-2.5 px-2">Nota</th>
                 </tr>
               </thead>
               <tbody>
                 {gates.map((gate, idx) => (
-                  <tr key={gate.gateNumber} className="border-b hover:bg-muted/30">
+                  <tr key={gate.gateNumber} className={`border-b border-border/30 hover:bg-muted/40 transition-colors ${idx % 2 === 1 ? 'bg-muted/10' : ''}`}>
                     <td className="py-2 px-2 font-medium text-center">
                       <Badge variant="outline">{gate.gateNumber}</Badge>
                     </td>
@@ -1640,7 +1641,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
             Volver
           </Button>
         )}
-        <Button onClick={() => onComplete(gates, config)}>
+        <Button onClick={() => onComplete(gates, config)} className="bg-emerald-600 hover:bg-emerald-700 shadow-sm">
           Aplicar configuración
           <ChevronRight className="h-4 w-4 ml-1" />
         </Button>

@@ -87,6 +87,86 @@ async function sendTelegramMessage(text, chatId, opts = {}) {
   }
 }
 
+/**
+ * Helper genérico para llamar cualquier método de la Telegram Bot API.
+ */
+async function callTelegramApi(method, body) {
+  const token = process.env.TELEGRAM_BOT_TOKEN
+  if (!token) return null
+  try {
+    const response = await fetch(`${TELEGRAM_API_BASE}/bot${token}/${method}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const result = await response.json()
+    if (!result.ok) logger.error(`Telegram ${method} error`, result)
+    return result
+  } catch (error) {
+    logger.error(`Telegram ${method} fetch error`, error)
+    return null
+  }
+}
+
+/**
+ * Enviar mensaje con inline keyboard (botones interactivos).
+ * @param {string} text - Texto HTML
+ * @param {string} chatId
+ * @param {Array<Array<object>>} buttons - Filas de botones [{text, callback_data} o {text, web_app:{url}}]
+ * @param {object} [opts] - {topicId}
+ */
+async function sendTelegramButtons(text, chatId, buttons, opts = {}) {
+  const payload = {
+    chat_id: chatId || process.env.TELEGRAM_CHAT_ID,
+    text,
+    parse_mode: 'HTML',
+    disable_web_page_preview: true,
+    reply_markup: { inline_keyboard: buttons },
+  }
+  if (opts.topicId) payload.message_thread_id = opts.topicId
+  return callTelegramApi('sendMessage', payload)
+}
+
+/**
+ * Editar un mensaje existente (para navegación in-place sin spam).
+ */
+async function editTelegramMessage(chatId, messageId, text, buttons) {
+  const payload = {
+    chat_id: chatId,
+    message_id: messageId,
+    text,
+    parse_mode: 'HTML',
+    disable_web_page_preview: true,
+  }
+  if (buttons) payload.reply_markup = { inline_keyboard: buttons }
+  return callTelegramApi('editMessageText', payload)
+}
+
+/**
+ * Enviar una foto con caption y botones opcionales.
+ */
+async function sendTelegramPhoto(chatId, photoUrl, caption, buttons, opts = {}) {
+  const payload = {
+    chat_id: chatId || process.env.TELEGRAM_CHAT_ID,
+    photo: photoUrl,
+    caption,
+    parse_mode: 'HTML',
+  }
+  if (buttons) payload.reply_markup = { inline_keyboard: buttons }
+  if (opts.topicId) payload.message_thread_id = opts.topicId
+  return callTelegramApi('sendPhoto', payload)
+}
+
+/**
+ * Responder a un callback query (quita el "loading" del botón).
+ */
+async function answerCallbackQuery(callbackQueryId, text) {
+  return callTelegramApi('answerCallbackQuery', {
+    callback_query_id: callbackQueryId,
+    text: text || undefined,
+  })
+}
+
 
 
 /**
@@ -2111,6 +2191,328 @@ async function tgHandleKpi(chatId, topicId) {
   await sendTelegramMessage(msg, chatId, { topicId })
 }
 
+// ==================== MENÚ INTERACTIVO (INLINE KEYBOARDS) ====================
+
+const PWA_URL = 'https://orelcain.github.io/mantenimiento-planta/'
+
+/**
+ * /menu — Menú principal con botones interactivos
+ */
+async function tgHandleMenu(chatId, topicId) {
+  const buttons = [
+    [
+      { text: '⭐ Acceso Rápido', callback_data: 'fav:list' },
+      { text: '🔧 Equipos', callback_data: 'eq:list' },
+    ],
+    [
+      { text: '🏭 Máquinas', callback_data: 'maq:list' },
+      { text: '📋 Incidencias', callback_data: 'inc:list' },
+    ],
+    [
+      { text: '📊 Turno', callback_data: 'cmd:turno' },
+      { text: '📈 KPIs', callback_data: 'cmd:kpi' },
+    ],
+    [
+      { text: '🌐 Abrir App Completa', web_app: { url: PWA_URL } },
+    ],
+  ]
+  await sendTelegramButtons(
+    '🏭 <b>Menú Mantenimiento</b>\n\nElegí una opción:',
+    chatId, buttons, { topicId }
+  )
+}
+
+/**
+ * Handler principal de callback queries (botones inline).
+ */
+async function tgHandleCallback(chatId, messageId, data, topicId) {
+  const [action, ...params] = data.split(':')
+
+  switch (action) {
+    case 'menu':
+      return cbMenu(chatId, messageId)
+    case 'eq':
+      return cbEquipo(chatId, messageId, params)
+    case 'maq':
+      return cbMaquina(chatId, messageId, params)
+    case 'rep':
+      return cbRepuesto(chatId, messageId, params, topicId)
+    case 'fav':
+      return cbFavoritos(chatId, messageId, params)
+    case 'inc':
+      return cbIncidencias(chatId, messageId, params)
+    case 'cmd':
+      return cbComando(chatId, messageId, params, topicId)
+    default:
+      return editTelegramMessage(chatId, messageId, '❓ Acción no reconocida.', [[{ text: '← Menú', callback_data: 'menu' }]])
+  }
+}
+
+// ---- Callback: Menú principal ----
+async function cbMenu(chatId, messageId) {
+  const buttons = [
+    [
+      { text: '⭐ Acceso Rápido', callback_data: 'fav:list' },
+      { text: '🔧 Equipos', callback_data: 'eq:list' },
+    ],
+    [
+      { text: '🏭 Máquinas', callback_data: 'maq:list' },
+      { text: '📋 Incidencias', callback_data: 'inc:list' },
+    ],
+    [
+      { text: '📊 Turno', callback_data: 'cmd:turno' },
+      { text: '📈 KPIs', callback_data: 'cmd:kpi' },
+    ],
+    [
+      { text: '🌐 Abrir App Completa', web_app: { url: PWA_URL } },
+    ],
+  ]
+  return editTelegramMessage(chatId, messageId,
+    '🏭 <b>Menú Mantenimiento</b>\n\nElegí una opción:', buttons)
+}
+
+// ---- Callback: Equipos ----
+async function cbEquipo(chatId, messageId, params) {
+  const sub = params[0]
+
+  if (sub === 'list') {
+    const snapshot = await db.collection('equipment').orderBy('nombre').limit(12).get()
+    if (snapshot.empty) {
+      return editTelegramMessage(chatId, messageId, '📭 No hay equipos registrados.',
+        [[{ text: '← Menú', callback_data: 'menu' }]])
+    }
+    const buttons = []
+    const docs = snapshot.docs
+    for (let i = 0; i < docs.length; i += 2) {
+      const row = []
+      row.push({ text: `${docs[i].data().nombre || docs[i].id}`, callback_data: `eq:d:${docs[i].id}` })
+      if (docs[i + 1]) {
+        row.push({ text: `${docs[i + 1].data().nombre || docs[i + 1].id}`, callback_data: `eq:d:${docs[i + 1].id}` })
+      }
+      buttons.push(row)
+    }
+    buttons.push([{ text: '← Menú', callback_data: 'menu' }])
+    return editTelegramMessage(chatId, messageId, '<b>🔧 Equipos</b>\n\nSeleccioná uno:', buttons)
+  }
+
+  if (sub === 'd') {
+    const eqId = params.slice(1).join(':')
+    const docSnap = await db.collection('equipment').doc(eqId).get()
+    if (!docSnap.exists) {
+      return editTelegramMessage(chatId, messageId, '❌ Equipo no encontrado.',
+        [[{ text: '← Equipos', callback_data: 'eq:list' }]])
+    }
+    const d = docSnap.data()
+    const estado = d.estado === 'operativo' ? '🟢 Operativo' : d.estado === 'en_mantenimiento' ? '🟡 En mantenimiento' : '🔴 Fuera de servicio'
+    let msg = `<b>🔧 ${d.nombre || 'Sin nombre'}</b>\n\n`
+    if (d.codigo) msg += `📌 Código: ${d.codigo}\n`
+    msg += `📍 Estado: ${estado}\n`
+    msg += `⚡ Criticidad: ${d.criticidad || 'N/A'}\n`
+    if (d.marca) msg += `🏭 Marca: ${d.marca}\n`
+    if (d.modelo) msg += `📋 Modelo: ${d.modelo}\n`
+    if (d.hierarchyPath) msg += `📂 ${d.hierarchyPath}\n`
+
+    const buttons = [
+      [{ text: '← Equipos', callback_data: 'eq:list' }, { text: '← Menú', callback_data: 'menu' }],
+    ]
+    return editTelegramMessage(chatId, messageId, msg, buttons)
+  }
+}
+
+// ---- Callback: Máquinas ----
+async function cbMaquina(chatId, messageId, params) {
+  const sub = params[0]
+
+  if (sub === 'list') {
+    const snapshot = await db.collection('machines').where('activa', '==', true).orderBy('orden').get()
+    if (snapshot.empty) {
+      return editTelegramMessage(chatId, messageId, '📭 No hay máquinas registradas.',
+        [[{ text: '← Menú', callback_data: 'menu' }]])
+    }
+    const buttons = []
+    snapshot.docs.forEach((doc) => {
+      buttons.push([{ text: `🏭 ${doc.data().nombre}`, callback_data: `maq:rep:${doc.id}` }])
+    })
+    buttons.push([{ text: '← Menú', callback_data: 'menu' }])
+    return editTelegramMessage(chatId, messageId, '<b>🏭 Máquinas</b>\n\nElegí una para ver repuestos:', buttons)
+  }
+
+  if (sub === 'rep') {
+    const machineId = params.slice(1).join(':')
+    const machineDoc = await db.collection('machines').doc(machineId).get()
+    const machineName = machineDoc.exists ? machineDoc.data().nombre : machineId
+
+    const repSnap = await db.collection(`machines/${machineId}/repuestos`).orderBy('codigoSAP').limit(15).get()
+    if (repSnap.empty) {
+      return editTelegramMessage(chatId, messageId, `📭 <b>${machineName}</b> no tiene repuestos.`,
+        [[{ text: '← Máquinas', callback_data: 'maq:list' }]])
+    }
+    const buttons = []
+    repSnap.docs.forEach((doc) => {
+      const r = doc.data()
+      const label = `${r.codigoSAP || '—'} ${(r.textoBreve || r.descripcion || '').substring(0, 30)}`
+      buttons.push([{ text: label, callback_data: `rep:d:${machineId}:${doc.id}` }])
+    })
+    buttons.push([{ text: '← Máquinas', callback_data: 'maq:list' }, { text: '← Menú', callback_data: 'menu' }])
+    return editTelegramMessage(chatId, messageId,
+      `<b>🔩 Repuestos — ${machineName}</b> (${repSnap.size})\n\nElegí uno:`, buttons)
+  }
+}
+
+// ---- Callback: Repuesto detalle + foto ----
+async function cbRepuesto(chatId, messageId, params, topicId) {
+  const sub = params[0]
+
+  if (sub === 'd') {
+    const machineId = params[1]
+    const repId = params.slice(2).join(':')
+    const repDoc = await db.collection(`machines/${machineId}/repuestos`).doc(repId).get()
+    if (!repDoc.exists) {
+      return editTelegramMessage(chatId, messageId, '❌ Repuesto no encontrado.',
+        [[{ text: '← Máquinas', callback_data: 'maq:list' }]])
+    }
+    const r = repDoc.data()
+    const repTopicId = getTopicId('repuestos') || topicId
+    let msg = `<b>🔩 ${r.textoBreve || r.descripcion || 'Sin nombre'}</b>\n\n`
+    if (r.codigoSAP) msg += `📌 SAP: <code>${r.codigoSAP}</code>\n`
+    if (r.codigoFabricante) msg += `🏭 Fabricante: ${r.codigoFabricante}\n`
+    if (r.cantidadPorMaquina) msg += `📦 Cantidad/máquina: ${r.cantidadPorMaquina}\n`
+    if (r.valorUnitario) msg += `💰 Valor: $${r.valorUnitario.toLocaleString()}\n`
+    if (r.ubicacionEnPlanta) msg += `📍 Ubicación: ${r.ubicacionEnPlanta}\n`
+    if (r.tipo) msg += `🏷️ Tipo: ${r.tipo}\n`
+    if (r.observaciones) msg += `📝 ${r.observaciones}\n`
+
+    const buttons = []
+    // Botón de foto si tiene imágenes
+    const hasPhotos = (r.fotosReales && r.fotosReales.length > 0) || (r.imagenesManual && r.imagenesManual.length > 0)
+    if (hasPhotos) {
+      buttons.push([{ text: '📸 Ver foto', callback_data: `rep:f:${machineId}:${repId}` }])
+    }
+    buttons.push([
+      { text: '← Repuestos', callback_data: `maq:rep:${machineId}` },
+      { text: '← Menú', callback_data: 'menu' },
+    ])
+    return editTelegramMessage(chatId, messageId, msg, buttons)
+  }
+
+  if (sub === 'f') {
+    const machineId = params[1]
+    const repId = params.slice(2).join(':')
+    const repDoc = await db.collection(`machines/${machineId}/repuestos`).doc(repId).get()
+    if (!repDoc.exists) return
+
+    const r = repDoc.data()
+    const repTopicId = getTopicId('repuestos') || topicId
+    // Priorizar fotos reales, luego manual
+    const photos = [...(r.fotosReales || []), ...(r.imagenesManual || [])]
+    if (photos.length === 0) return
+
+    const photo = photos[0]
+    const caption = `📸 <b>${r.textoBreve || r.descripcion || ''}</b>\nSAP: ${r.codigoSAP || '—'}`
+    const buttons = [[
+      { text: '← Detalle', callback_data: `rep:d:${machineId}:${repId}` },
+      { text: '← Menú', callback_data: 'menu' },
+    ]]
+    // Enviar foto como mensaje nuevo (no se puede editar a foto)
+    return sendTelegramPhoto(chatId, photo.url, caption, buttons, { topicId: repTopicId })
+  }
+}
+
+// ---- Callback: Acceso Rápido (máquinas activas como favoritos globales) ----
+async function cbFavoritos(chatId, messageId, params) {
+  const sub = params[0]
+
+  if (sub === 'list') {
+    // Mostrar máquinas activas como acceso rápido
+    const snapshot = await db.collection('machines').where('activa', '==', true).orderBy('orden').get()
+    if (snapshot.empty) {
+      return editTelegramMessage(chatId, messageId, '📭 No hay máquinas configuradas.',
+        [[{ text: '← Menú', callback_data: 'menu' }]])
+    }
+    const buttons = []
+    snapshot.docs.forEach((doc) => {
+      buttons.push([{ text: `⭐ ${doc.data().nombre}`, callback_data: `fav:maq:${doc.id}` }])
+    })
+    buttons.push([{ text: '← Menú', callback_data: 'menu' }])
+    return editTelegramMessage(chatId, messageId,
+      '<b>⭐ Acceso Rápido</b>\n\nMáquinas activas — elegí una:', buttons)
+  }
+
+  if (sub === 'maq') {
+    const machineId = params.slice(1).join(':')
+    const machineDoc = await db.collection('machines').doc(machineId).get()
+    const machineName = machineDoc.exists ? machineDoc.data().nombre : machineId
+
+    const buttons = [
+      [{ text: '🔩 Repuestos', callback_data: `maq:rep:${machineId}` }],
+      [{ text: '📋 Info', callback_data: `fav:info:${machineId}` }],
+      [{ text: '← Acceso Rápido', callback_data: 'fav:list' }, { text: '← Menú', callback_data: 'menu' }],
+    ]
+    return editTelegramMessage(chatId, messageId,
+      `<b>⭐ ${machineName}</b>\n\n¿Qué querés ver?`, buttons)
+  }
+
+  if (sub === 'info') {
+    const machineId = params.slice(1).join(':')
+    const machineDoc = await db.collection('machines').doc(machineId).get()
+    if (!machineDoc.exists) {
+      return editTelegramMessage(chatId, messageId, '❌ Máquina no encontrada.',
+        [[{ text: '← Menú', callback_data: 'menu' }]])
+    }
+    const m = machineDoc.data()
+    let msg = `<b>🏭 ${m.nombre}</b>\n\n`
+    if (m.marca) msg += `🏭 Marca: ${m.marca}\n`
+    if (m.modelo) msg += `📋 Modelo: ${m.modelo}\n`
+    if (m.descripcion) msg += `📝 ${m.descripcion}\n`
+    if (m.hierarchyPath) msg += `📂 ${m.hierarchyPath}\n`
+
+    const buttons = [
+      [{ text: '🔩 Repuestos', callback_data: `maq:rep:${machineId}` }],
+      [{ text: '← Acceso Rápido', callback_data: 'fav:list' }, { text: '← Menú', callback_data: 'menu' }],
+    ]
+    return editTelegramMessage(chatId, messageId, msg, buttons)
+  }
+}
+
+// ---- Callback: Incidencias ----
+async function cbIncidencias(chatId, messageId, params) {
+  const sub = params[0]
+
+  if (sub === 'list') {
+    const snapshot = await db.collection('incidents')
+      .where('status', 'in', ['pendiente', 'confirmada', 'en_proceso'])
+      .orderBy('createdAt', 'desc').limit(8).get()
+
+    if (snapshot.empty) {
+      return editTelegramMessage(chatId, messageId, '✅ No hay incidencias activas.',
+        [[{ text: '← Menú', callback_data: 'menu' }]])
+    }
+
+    const statusLabel = { pendiente: 'Pend', confirmada: 'Conf', en_proceso: 'EnProc' }
+    let msg = '<b>📋 Incidencias activas</b>\n\n'
+    snapshot.forEach((docSnap) => {
+      const d = docSnap.data()
+      const emoji = PRIORITY_EMOJI[d.prioridad] || '📋'
+      msg += `${emoji} <b>${(d.titulo || 'Sin título').substring(0, 40)}</b>\n`
+      msg += `   ${statusLabel[d.status] || d.status} · ${d.prioridad}\n\n`
+    })
+
+    return editTelegramMessage(chatId, messageId, msg,
+      [[{ text: '← Menú', callback_data: 'menu' }]])
+  }
+}
+
+// ---- Callback: Comandos directos (turno, kpi) ----
+async function cbComando(chatId, messageId, params, topicId) {
+  const cmd = params[0]
+  // Estos comandos generan contenido largo, mejor como mensaje nuevo
+  if (cmd === 'turno') {
+    await tgHandleTurno(chatId, topicId)
+  } else if (cmd === 'kpi') {
+    await tgHandleKpi(chatId, topicId)
+  }
+}
+
 /**
  * Webhook de Telegram — recibe mensajes/comandos del bot.
  * Registrar con: GET /setTelegramWebhook (una sola vez tras deploy)
@@ -2122,6 +2524,26 @@ exports.telegramWebhook = onRequest({ region: 'us-central1' }, async (req, res) 
   }
 
   const update = req.body
+
+  // ---- Callback queries (botones inline) ----
+  const callbackQuery = update?.callback_query
+  if (callbackQuery) {
+    const cbChatId = String(callbackQuery.message?.chat?.id)
+    const cbMessageId = callbackQuery.message?.message_id
+    const cbData = callbackQuery.data || ''
+    const cbTopicId = callbackQuery.message?.message_thread_id || undefined
+
+    try {
+      await tgHandleCallback(cbChatId, cbMessageId, cbData, cbTopicId)
+    } catch (error) {
+      logger.error('Error handling Telegram callback', error)
+    }
+    await answerCallbackQuery(callbackQuery.id)
+    res.status(200).send('ok')
+    return
+  }
+
+  // ---- Mensajes de texto / comandos ----
   const message = update?.message || update?.edited_message
 
   if (!message?.text) {
@@ -2133,10 +2555,9 @@ exports.telegramWebhook = onRequest({ region: 'us-central1' }, async (req, res) 
   const text = message.text.trim()
   const fromName = message.from?.first_name || 'Técnico'
   const telegramUserId = String(message.from?.id || 'unknown')
-  // Forum topic del mensaje entrante (si el grupo tiene topics habilitados)
   const incomingTopicId = message.message_thread_id || undefined
 
-  // Verificar chat autorizado (si TELEGRAM_CHAT_ID está configurado)
+  // Verificar chat autorizado
   const allowedChatId = process.env.TELEGRAM_CHAT_ID
   if (allowedChatId && chatId !== allowedChatId) {
     logger.warn('Telegram message from unauthorized chat', { chatId })
@@ -2145,11 +2566,13 @@ exports.telegramWebhook = onRequest({ region: 'us-central1' }, async (req, res) 
   }
 
   try {
-    if (/^\/incidencia/i.test(text)) {
+    if (/^\/(menu|start)/i.test(text)) {
+      await tgHandleMenu(chatId, incomingTopicId)
+    } else if (/^\/incidencia/i.test(text)) {
       await tgHandleIncidencia(chatId, text, fromName, telegramUserId, incomingTopicId)
     } else if (/^\/estado/i.test(text)) {
       await tgHandleEstado(chatId, incomingTopicId)
-    } else if (/^\/(ayuda|start|help)/i.test(text)) {
+    } else if (/^\/(ayuda|help)/i.test(text)) {
       await tgHandleAyuda(chatId, incomingTopicId)
     } else if (/^\/equipo/i.test(text)) {
       await tgHandleEquipo(chatId, text, incomingTopicId)
@@ -2162,14 +2585,13 @@ exports.telegramWebhook = onRequest({ region: 'us-central1' }, async (req, res) 
     } else if (/^\/kpi/i.test(text)) {
       await tgHandleKpi(chatId, incomingTopicId)
     } else if (!text.startsWith('/')) {
-      // Texto libre → crear incidencia con prioridad media
       if (text.length >= 10) {
         await tgHandleIncidencia(chatId, `/incidencia ${text}`, fromName, telegramUserId, incomingTopicId)
       } else {
-        await sendTelegramMessage('ℹ️ Usá /ayuda para ver los comandos disponibles.', chatId, { topicId: incomingTopicId })
+        await sendTelegramMessage('ℹ️ Usá /menu o /ayuda para ver los comandos.', chatId, { topicId: incomingTopicId })
       }
     } else {
-      await sendTelegramMessage('❓ Comando no reconocido. Usá /ayuda para ver los comandos.', chatId, { topicId: incomingTopicId })
+      await sendTelegramMessage('❓ Comando no reconocido. Usá /menu o /ayuda.', chatId, { topicId: incomingTopicId })
     }
   } catch (error) {
     logger.error('Error handling Telegram command', error)

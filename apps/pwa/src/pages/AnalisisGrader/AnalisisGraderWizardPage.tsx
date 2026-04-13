@@ -393,13 +393,13 @@ export function AnalisisGraderWizardPage() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-2">
+      <div className="flex items-center justify-between flex-wrap gap-2 pb-3 border-b border-border/50">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <BarChart3 className="h-6 w-6" />
+          <h1 className="text-xl lg:text-2xl font-bold flex items-center gap-2">
+            <BarChart3 className="h-5 w-5 lg:h-6 lg:w-6 text-primary" />
             Análisis Grader
           </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
+          <p className="text-xs lg:text-sm text-muted-foreground mt-0.5">
             Clasificadora de salmones — análisis en tiempo real
           </p>
         </div>
@@ -420,21 +420,68 @@ export function AnalisisGraderWizardPage() {
               {autosaveState === 'queued' && <>Guardado pendiente</>}
             </Badge>
           )}
-          <Button variant="ghost" size="sm" onClick={() => navigate('/analisis-grader/periodo')}>
-            <BarChart3 className="h-4 w-4 mr-1" />
+          <Button variant="outline" size="sm" onClick={() => navigate('/analisis-grader/periodo')} className="border-primary/30 text-primary hover:bg-primary/10">
+            <BarChart3 className="h-4 w-4 mr-1.5" />
             Análisis período
           </Button>
         </div>
       </div>
 
-      {/* Upload de archivos */}
-      <AnalisisGraderUploadPage
-        onComplete={handleUploadComplete}
-        initialFiles={uploadedFiles}
-        onFilesChange={setUploadedFiles}
-      />
+      {/* ═══ PANTALLA 1: Setup del turno (Z1 Upload | Z2 Gates) ═══ */}
+      <div className="lg:grid lg:grid-cols-2 lg:gap-8 space-y-4 lg:space-y-0">
+        {/* Z1: Cargar archivos del turno */}
+        <AnalisisGraderUploadPage
+          onComplete={handleUploadComplete}
+          initialFiles={uploadedFiles}
+          onFilesChange={setUploadedFiles}
+        />
 
-      {/* Banner multi-día — aparece cuando el archivo cubre más de 1 día */}
+        {/* Z2: Configurar compuertas — expandido en desktop, colapsable en mobile */}
+        <div className="space-y-3">
+          <Card className="lg:border-l-4 lg:border-l-emerald-500/40 lg:hover:shadow-md lg:transition-shadow">
+            <button
+              type="button"
+              onClick={() => setGatesOpen((o) => !o)}
+              className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium hover:bg-muted/50 transition-colors rounded-lg lg:hidden"
+            >
+              <span className="flex items-center gap-2">
+                <Settings2 className="h-4 w-4 text-muted-foreground" />
+                Configurar compuertas
+                <Badge variant="outline" className="text-xs font-normal">
+                  {gates.filter((g) => g.active).length} activas
+                </Badge>
+              </span>
+              {gatesOpen
+                ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                : <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              }
+            </button>
+            {/* Desktop: siempre visible con header verde */}
+            <div className="hidden lg:flex items-center justify-between px-4 py-3 border-b border-emerald-500/20 bg-emerald-500/[0.03]">
+              <span className="flex items-center gap-2 text-sm font-medium">
+                <Settings2 className="h-4 w-4 text-emerald-500" />
+                Configurar compuertas
+                <Badge className="text-[10px] font-normal bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
+                  {gates.filter((g) => g.active).length} activas
+                </Badge>
+              </span>
+            </div>
+            {/* Mobile: colapsable / Desktop: siempre visible */}
+            <div className={`${gatesOpen ? 'block' : 'hidden'} lg:block`}>
+              <CardContent className="pt-3 pb-4">
+                <AnalisisGraderGatesConfigPage
+                  gates={gates}
+                  config={config}
+                  parsedData={fallbackParsedData}
+                  onComplete={handleGatesApply}
+                />
+              </CardContent>
+            </div>
+          </Card>
+        </div>
+      </div>
+
+      {/* Banner multi-día */}
       {multiDayInfo && !savedToCalendar && (
         <Card className="border-sky-500/30 bg-sky-500/5">
           <CardContent className="py-3 px-4 flex items-center justify-between gap-3 flex-wrap">
@@ -485,38 +532,40 @@ export function AnalisisGraderWizardPage() {
         </Card>
       )}
 
-      {/* Configuración de gates — colapsable */}
-      <Card>
-        <button
-          type="button"
-          onClick={() => setGatesOpen((o) => !o)}
-          className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium hover:bg-muted/50 transition-colors rounded-lg"
-        >
-          <span className="flex items-center gap-2">
-            <Settings2 className="h-4 w-4 text-muted-foreground" />
-            Configurar compuertas
-            <Badge variant="outline" className="text-xs font-normal">
-              {gates.filter((g) => g.active).length} activas
-            </Badge>
-          </span>
-          {gatesOpen
-            ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
-            : <ChevronDown className="h-4 w-4 text-muted-foreground" />
-          }
-        </button>
-        {gatesOpen && (
-          <CardContent className="pt-0 pb-4">
-            <AnalisisGraderGatesConfigPage
-              gates={gates}
-              config={config}
-              parsedData={fallbackParsedData}
-              onComplete={handleGatesApply}
-            />
+      {/* ═══ Estado: progreso hacia el análisis ═══ */}
+      {!hasData && (
+        <Card className="border-dashed border-muted-foreground/15">
+          <CardContent className="py-6 lg:py-10">
+            <div className="flex flex-col lg:flex-row items-center justify-center gap-6 lg:gap-10">
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">1</div>
+                <div className="text-left">
+                  <p className="text-sm font-medium">Cargar archivos</p>
+                  <p className="text-[11px] text-muted-foreground">Excel Pieza-Pieza y/o Punto Cero</p>
+                </div>
+              </div>
+              <div className="hidden lg:block w-8 h-px bg-muted-foreground/20" />
+              <div className="flex items-center gap-3 opacity-40">
+                <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-sm font-bold text-muted-foreground">2</div>
+                <div className="text-left">
+                  <p className="text-sm font-medium">Configurar gates</p>
+                  <p className="text-[11px] text-muted-foreground">Calibres, calidad, umbrales</p>
+                </div>
+              </div>
+              <div className="hidden lg:block w-8 h-px bg-muted-foreground/20" />
+              <div className="flex items-center gap-3 opacity-40">
+                <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-sm font-bold text-muted-foreground">3</div>
+                <div className="text-left">
+                  <p className="text-sm font-medium">Analizar turno</p>
+                  <p className="text-[11px] text-muted-foreground">KPIs, distribuciones, alertas</p>
+                </div>
+              </div>
+            </div>
           </CardContent>
-        )}
-      </Card>
+        </Card>
+      )}
 
-      {/* Resumen ejecutivo — reemplaza las alertas individuales */}
+      {/* ═══ PANTALLA 2: Dashboard de análisis (full width) ═══ */}
       {hasData && analyticsResult && (
         <GraderResumenRapido
           analytics={analyticsResult}
@@ -531,7 +580,6 @@ export function AnalisisGraderWizardPage() {
         />
       )}
 
-      {/* Dashboard completo — aparece automáticamente al cargar archivos */}
       {hasData && (
         <div ref={dashboardRef}>
           <AnalisisGraderDashboardPage

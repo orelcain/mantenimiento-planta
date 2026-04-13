@@ -17,7 +17,7 @@
 import { useMemo, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from '@/components/ui'
-import { ArrowRight, Clock, Database, Brain, Loader2, XCircle, Zap, AlertTriangle, Info, TrendingUp } from 'lucide-react'
+import { ArrowRight, ArrowLeft, ChevronLeft, ChevronRight, Clock, Database, Brain, Loader2, XCircle, Zap, AlertTriangle, Info, TrendingUp } from 'lucide-react'
 import { Bar, Doughnut, Line } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
@@ -255,8 +255,53 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
 
   // ── Render ───────────────────────────────────────────────────────────────
 
+  // ── Navegación prev/next entre turnos ────────────────────────────────
+  const sortedAllTurns = useMemo(() => {
+    const all = [...(recentTurns ?? []), summary]
+      .filter((t, i, arr) => arr.findIndex(x => x.dateKey === t.dateKey && x.shiftId === t.shiftId) === i)
+      .sort((a, b) => a.dateKey.localeCompare(b.dateKey) || a.shiftId.localeCompare(b.shiftId))
+    return all
+  }, [recentTurns, summary])
+
+  const currentIdx = sortedAllTurns.findIndex(t => t.dateKey === summary.dateKey && t.shiftId === summary.shiftId)
+  const prevTurn = currentIdx > 0 ? sortedAllTurns[currentIdx - 1] : null
+  const nextTurn = currentIdx < sortedAllTurns.length - 1 ? sortedAllTurns[currentIdx + 1] : null
+
+  const goToTurn = (turn: GraderDailySummary) => {
+    navigate(`/analisis-grader/detalle?date=${turn.dateKey}&shift=${encodeURIComponent(turn.shiftId)}`)
+  }
+
   return (
     <div className="space-y-4">
+      {/* ── Navegación entre turnos ──────────────────────────────────────── */}
+      {sortedAllTurns.length > 1 && (
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            disabled={!prevTurn}
+            onClick={() => prevTurn && goToTurn(prevTurn)}
+            className={cn('flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-colors', prevTurn ? 'text-muted-foreground hover:bg-muted/50 hover:text-foreground' : 'opacity-30 cursor-not-allowed')}
+          >
+            <ChevronLeft className="h-4 w-4" />
+            <span className="hidden sm:inline">{prevTurn ? `${prevTurn.dateKey} · ${prevTurn.shiftId.replace('Turno ', '')}` : 'Inicio'}</span>
+            <span className="sm:hidden">Anterior</span>
+          </button>
+          <span className="text-[10px] text-muted-foreground tabular-nums">
+            {currentIdx + 1} / {sortedAllTurns.length}
+          </span>
+          <button
+            type="button"
+            disabled={!nextTurn}
+            onClick={() => nextTurn && goToTurn(nextTurn)}
+            className={cn('flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-colors', nextTurn ? 'text-muted-foreground hover:bg-muted/50 hover:text-foreground' : 'opacity-30 cursor-not-allowed')}
+          >
+            <span className="hidden sm:inline">{nextTurn ? `${nextTurn.dateKey} · ${nextTurn.shiftId.replace('Turno ', '')}` : 'Final'}</span>
+            <span className="sm:hidden">Siguiente</span>
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       {/* ── Header con fecha + turno + indicadores de completitud ─────────── */}
       <Card className={cn('border-2', p0BorderClass(summary.pointZeroPct))}>
         <CardContent className="pt-4 pb-4">
@@ -357,20 +402,86 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
         </Card>
       </div>
 
-      {/* ── Tendencia P0% (últimos turnos) ───────────────────────────────────── */}
-      {tendenciaChartData && (
+      {/* ── Desglose horario del turno (protagonista) ────────────────────────── */}
+      {summary.hourlyBuckets && summary.hourlyBuckets.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              Tendencia P0% — últimos turnos
+              <Clock className="h-4 w-4 text-primary" />
+              Desglose horario del turno
             </CardTitle>
             <p className="text-xs text-muted-foreground">
-              Punto rojo = turno actual. Escala: warn {'>'}2%, crítico {'>'}3.5%
+              P0% y piezas por hora — {summary.hourlyBuckets.length} horas con actividad
             </p>
           </CardHeader>
           <CardContent>
-            <div className="h-52">
+            <div className="h-56 lg:h-72">
+              <Bar
+                data={{
+                  labels: summary.hourlyBuckets.map(b => `${b.hour.toString().padStart(2, '0')}:00`),
+                  datasets: [
+                    {
+                      label: 'Piezas totales',
+                      data: summary.hourlyBuckets.map(b => b.totalPieces),
+                      backgroundColor: 'rgba(59, 130, 246, 0.6)',
+                      borderColor: 'rgba(59, 130, 246, 1)',
+                      borderWidth: 1,
+                      borderRadius: 3,
+                      yAxisID: 'y',
+                    },
+                    {
+                      label: 'Piezas P0',
+                      data: summary.hourlyBuckets.map(b => b.p0Pieces),
+                      backgroundColor: 'rgba(239, 68, 68, 0.7)',
+                      borderColor: 'rgba(239, 68, 68, 1)',
+                      borderWidth: 1,
+                      borderRadius: 3,
+                      yAxisID: 'y',
+                    },
+                  ],
+                }}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                    legend: { display: true, position: 'top' as const, labels: { font: { size: 10 }, boxWidth: 10, usePointStyle: true } },
+                    tooltip: {
+                      callbacks: {
+                        afterBody: (items) => {
+                          const idx = items[0]?.dataIndex
+                          const bucket = typeof idx === 'number' ? summary.hourlyBuckets![idx] : undefined
+                          if (!bucket || bucket.totalPieces === 0) return ''
+                          const p0Pct = ((bucket.p0Pieces / bucket.totalPieces) * 100).toFixed(1)
+                          return `P0%: ${p0Pct}%`
+                        },
+                      },
+                    },
+                  },
+                  scales: {
+                    y: { beginAtZero: true, ticks: { callback: (v) => Number(v).toLocaleString('es-CL') } },
+                    x: { ticks: { font: { size: 10 } } },
+                  },
+                }}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Tendencia P0% — contexto (secundario) ────────────────────────────── */}
+      {tendenciaChartData && (
+        <Card className="opacity-90">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2 text-muted-foreground">
+              <TrendingUp className="h-3.5 w-3.5" />
+              Contexto: tendencia P0% — últimos turnos
+            </CardTitle>
+            <p className="text-[11px] text-muted-foreground">
+              Punto rojo = turno actual. Warn {'>'}2%, crítico {'>'}3.5%
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="h-40 lg:h-48">
               <Line
                 data={tendenciaChartData}
                 options={{
@@ -388,16 +499,15 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
                     y: {
                       min: 0,
                       suggestedMax: Math.max(5, summary.pointZeroPct + 1),
-                      ticks: { callback: (v) => `${v}%` },
+                      ticks: { callback: (v) => `${v}%`, font: { size: 10 } },
                     },
                     x: {
-                      ticks: { font: { size: 10 }, maxRotation: 45 },
+                      ticks: { font: { size: 9 }, maxRotation: 45 },
                     },
                   },
                 }}
               />
             </div>
-            {/* Líneas de referencia como leyenda visual */}
             <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
                 <span className="inline-block w-4 h-0.5 bg-amber-400" />

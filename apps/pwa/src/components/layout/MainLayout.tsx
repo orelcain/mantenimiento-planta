@@ -32,6 +32,8 @@ import {
   BookOpen,
   GraduationCap,
   GripVertical,
+  Upload,
+  History,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, Button } from '@/components/ui'
 import { useAuthStore, useIsAdmin, useAppStore, usePermissionsStore } from '@/store'
@@ -369,14 +371,37 @@ export function MainLayout() {
     }
   }, [location.pathname]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Bottom nav: rutas principales para móvil (máx 4 + "Más")
-  const bottomNavDef: Array<{ name: string; href: string; icon: React.ElementType; module?: AppModule }> = [
-    { name: 'Inicio',     href: '/',           icon: LayoutDashboard, module: 'dashboard' },
-    { name: 'Alertas',   href: '/incidents',   icon: AlertTriangle,   module: 'incidencias' },
-    { name: 'Repuestos', href: '/repuestos',   icon: Package,         module: 'repuestos' },
-    { name: 'Equipos',   href: '/equipment',   icon: Wrench,          module: 'equipos' },
+  // Bottom nav: 3 fijas + 2 contextuales según módulo activo
+  type BottomNavItem = { name: string; href: string; icon: React.ElementType; module?: AppModule }
+  const fixedTabs: BottomNavItem[] = [
+    { name: 'Inicio',   href: '/',           icon: LayoutDashboard, module: 'dashboard' },
+    { name: 'Equipos',  href: '/equipment',  icon: Wrench,          module: 'equipos' },
   ]
-  const bottomNavItems = bottomNavDef.filter(item => !item.module || canSee(item.module))
+  const contextualTabsMap: Record<string, BottomNavItem[]> = {
+    '/analisis-grader': [
+      { name: 'Grader',    href: '/analisis-grader',          icon: Upload },
+      { name: 'Historial', href: '/analisis-grader/periodo',  icon: History },
+    ],
+    '/repuestos': [
+      { name: 'Repuestos', href: '/repuestos',   icon: Package,  module: 'repuestos' },
+      { name: 'Alertas',   href: '/incidents',   icon: AlertTriangle, module: 'incidencias' },
+    ],
+    '/equipment': [
+      { name: 'Repuestos', href: '/repuestos',   icon: Package,  module: 'repuestos' },
+      { name: 'Alertas',   href: '/incidents',   icon: AlertTriangle, module: 'incidencias' },
+    ],
+    '/incidents': [
+      { name: 'Alertas',   href: '/incidents',   icon: AlertTriangle, module: 'incidencias' },
+      { name: 'Repuestos', href: '/repuestos',   icon: Package,  module: 'repuestos' },
+    ],
+  }
+  const defaultContextual: BottomNavItem[] = [
+    { name: 'Repuestos', href: '/repuestos',   icon: Package,  module: 'repuestos' },
+    { name: 'Alertas',   href: '/incidents',   icon: AlertTriangle, module: 'incidencias' },
+  ]
+  const activeContext = Object.keys(contextualTabsMap).find(prefix => location.pathname.startsWith(prefix))
+  const contextualTabs = activeContext ? contextualTabsMap[activeContext] : defaultContextual
+  const bottomNavItems = [...fixedTabs, ...contextualTabs].filter(item => !item.module || canSee(item.module))
 
   const currentPageName = allNavigation.find(item =>
     item.href === '/'
@@ -1089,11 +1114,12 @@ export function MainLayout() {
                 to={item.href}
                 onClick={() => setSidebarOpen(false)}
                 className={cn(
-                  'flex-1 flex flex-col items-center justify-center gap-0.5 text-[0.65rem] font-medium transition-colors active:scale-95',
+                  'flex-1 flex flex-col items-center justify-center gap-0.5 text-[0.65rem] font-medium transition-colors active:scale-95 relative',
                   isActive ? 'text-primary' : 'text-muted-foreground'
                 )}
                 aria-label={item.name}
               >
+                {isActive && <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-primary rounded-full" />}
                 <item.icon className={cn('h-5 w-5 [@media(max-height:500px)]:h-4 [@media(max-height:500px)]:w-4', isActive && 'stroke-[2.5px]')} />
                 <span className="[@media(max-height:500px)]:hidden">{item.name}</span>
               </NavLink>

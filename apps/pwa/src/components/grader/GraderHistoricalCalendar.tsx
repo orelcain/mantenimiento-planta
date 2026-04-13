@@ -723,8 +723,7 @@ export function GraderHistoricalCalendar({
                     <div className="pt-1 flex gap-1.5">
                       <Button
                         size="sm"
-                        variant="outline"
-                        className="h-7 text-[11px] flex-1"
+                        className="h-7 text-[11px] flex-1 bg-primary/90 hover:bg-primary text-primary-foreground"
                         onClick={() => navigate(`/analisis-grader/detalle?date=${hist.dateKey}&shift=${encodeURIComponent(hist.shiftId)}`)}
                       >
                         <Eye className="h-3 w-3 mr-1" />

@@ -66,8 +66,8 @@ export const PERIOD_PRESETS: Record<Exclude<PeriodPresetKey, 'custom'>, () => Pe
 
 /** Devuelve el preset default cuando se abre la página. */
 export function getDefaultPreset(): { key: PeriodPresetKey; range: PeriodRange } {
-  // Por defecto: temporada completa (es lo que el usuario quiere ver para análisis general).
-  return { key: 'season', range: PERIOD_PRESETS.season() }
+  // Por defecto: último mes (más útil para operación diaria).
+  return { key: 'month', range: PERIOD_PRESETS.month() }
 }
 
 /** Lista de presets para renderizar como botones tab-style. */
