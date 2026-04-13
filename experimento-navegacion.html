@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Propuesta G — Columnas por Planta · Estilo App</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ══════════════════════════════════════════
+   TOKENS EXACTOS DE tailwind.config.js
+══════════════════════════════════════════ */
+:root {
+  --bg:        #121212;
+  --card:      #1e1e1e;
+  --muted:     #2a2a2a;
+  --muted-fg:  #a0a0a0;
+  --border:    #333333;
+  --fg:        #ffffff;
+  --primary:   #2196f3;
+  --success:   #4caf50;
+  --warning:   #ff9800;
+  --danger:    #f44336;
+  --r-lg: .75rem; --r-md: .5rem; --r-sm: .25rem;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 87.5%; }
+@media (max-width: 640px) { html { font-size: 85%; } }
+body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--fg); height: 100dvh; display: flex; flex-direction: column; -webkit-font-smoothing: antialiased; }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 999px; }
+
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hidden { display: none !important; }
+.chev { display: inline-block; transition: transform .18s ease; font-size: 9px; color: var(--muted-fg); }
+.chev.open { transform: rotate(90deg); }
+
+/* ══════════════════════════════════════════
+   TOP BAR  (igual al header de la app)
+══════════════════════════════════════════ */
+.topbar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 14px; background: var(--card);
+  border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.topbar-title  { font-size: 13px; font-weight: 700; }
+.topbar-sub    { font-size: 11px; color: var(--muted-fg); }
+.topbar .actions { margin-left: auto; display: flex; gap: 6px; }
+.btn { display: inline-flex; align-items: center; gap: 5px; padding: 5px 11px; border-radius: var(--r-md); font-size: 11px; font-weight: 500; border: none; cursor: pointer; font-family: inherit; transition: all .15s; }
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { background: #1e88e5; }
+.btn-ghost  { background: transparent; color: var(--muted-fg); border: 1px solid var(--border); }
+.btn-ghost:hover { background: var(--muted); color: var(--fg); }
+
+/* ══════════════════════════════════════════
+   SWITCH PC / MÓVIL
+══════════════════════════════════════════ */
+.view-switch {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--muted); border-radius: var(--r-md); padding: 3px;
+}
+.vs-btn { padding: 4px 10px; border-radius: var(--r-sm); font-size: 11px; font-weight: 500; border: none; cursor: pointer; font-family: inherit; background: transparent; color: var(--muted-fg); transition: all .15s; }
+.vs-btn.active { background: var(--card); color: var(--fg); box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+
+/* ══════════════════════════════════════════
+   WRAPPER DE VISTAS
+══════════════════════════════════════════ */
+.view { display: none; flex: 1; overflow: hidden; flex-direction: column; }
+.view.active { display: flex; }
+
+/* ══════════════════════════════════════════
+   PC — 4 COLUMNAS HORIZONTALES
+══════════════════════════════════════════ */
+.pc-root-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 14px; background: var(--muted);
+  border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.pc-root-icon { font-size: 15px; }
+.pc-root-name { font-size: 11px; font-weight: 600; color: var(--muted-fg); text-transform: uppercase; letter-spacing: .06em; }
+.pc-expand-btns { margin-left: auto; display: flex; gap: 4px; }
+.pc-expand-btn { padding: 3px 8px; font-size: 10px; border-radius: var(--r-sm); border: 1px solid var(--border); background: transparent; color: var(--muted-fg); cursor: pointer; font-family: inherit; }
+.pc-expand-btn:hover { background: var(--muted); color: var(--fg); }
+
+.cols-wrap { flex: 1; display: flex; overflow-x: auto; overflow-y: hidden; background: var(--bg); }
+
+/* ── Columna planta ── */
+.plant-col {
+  display: flex; flex-direction: column;
+  border-right: 1px solid var(--border);
+  flex-shrink: 0; min-width: 230px; width: 25%;
+}
+.plant-col:last-child { border-right: none; }
+
+.col-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 12px; border-bottom: 1px solid var(--border);
+  flex-shrink: 0; position: sticky; top: 0; z-index: 2;
+}
+.col-head-icon { font-size: 15px; flex-shrink: 0; }
+.col-head-text { flex: 1; min-width: 0; }
+.col-head-name { font-size: 12px; font-weight: 700; }
+.col-head-sub  { font-size: 10px; color: var(--muted-fg); margin-top: 1px; }
+.col-head-add  {
+  flex-shrink: 0; padding: 3px 7px; border-radius: var(--r-sm);
+  font-size: 10px; border: 1px solid; background: transparent;
+  cursor: pointer; font-family: inherit; transition: all .15s;
+}
+
+.col-body { flex: 1; overflow-y: auto; padding: 6px; }
+
+/* Estado vacío */
+.col-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 24px; text-align: center; }
+.col-empty-icon { font-size: 26px; opacity: .35; }
+.col-empty-text { font-size: 11px; color: var(--muted-fg); }
+
+/* ── Grupo (Proceso / Patio…) ── */
+.group {
+  border: 1px solid var(--border); border-radius: var(--r-md);
+  overflow: hidden; margin-bottom: 6px;
+}
+.group-head {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 10px; background: var(--muted);
+  cursor: pointer; border: none; width: 100%; text-align: left;
+  font-family: inherit; transition: background .12s;
+}
+.group-head:hover { background: #323232; }
+.group-icon  { font-size: 13px; }
+.group-label { font-size: 12px; font-weight: 600; color: var(--fg); flex: 1; }
+.group-cnt   { font-size: 10px; color: var(--muted-fg); background: var(--bg); padding: 1px 6px; border-radius: 999px; }
+
+/* ── Sub-área ── */
+.subarea { border-top: 1px solid var(--border); }
+.subarea-head {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 10px 6px 16px;
+  cursor: pointer; border: none; width: 100%; text-align: left;
+  font-family: inherit; background: transparent; transition: background .12s;
+}
+.subarea-head:hover { background: rgba(255,255,255,.03); }
+.area-dot   { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.area-label { font-size: 11px; font-weight: 500; flex: 1; }
+.area-cnt   { font-size: 10px; color: var(--muted-fg); background: var(--bg); padding: 1px 5px; border-radius: 999px; }
+
+/* ── Máquinas dentro de sub-área ── */
+.machine-list { background: rgba(0,0,0,.25); border-top: 1px solid var(--border); padding: 3px 6px; }
+.machine-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 5px; border-radius: var(--r-sm);
+  cursor: pointer; transition: background .1s; min-height: 30px;
+}
+.machine-row:hover { background: var(--muted); }
+.m-dot   { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.m-name  { font-size: 11px; color: #ccc; flex: 1; min-width: 0; }
+.m-parts { font-size: 10px; color: var(--muted-fg); flex-shrink: 0; }
+
+/* ── Progress bar (igual que MachineCard en la app) ── */
+.m-bar-wrap { width: 32px; height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; flex-shrink: 0; }
+.m-bar      { height: 100%; border-radius: 2px; transition: width .3s; }
+
+/* ── Badge de estado ── */
+.badge { display: inline-flex; align-items: center; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 999px; flex-shrink: 0; letter-spacing: .02em; }
+.b-op { background: rgba(76,175,80,.15);  color: #4caf50; border: 1px solid rgba(76,175,80,.25); }
+.b-mn { background: rgba(255,152,0,.15);  color: #ff9800; border: 1px solid rgba(255,152,0,.25); }
+.b-dt { background: rgba(244,67,54,.15);  color: #f44336; border: 1px solid rgba(244,67,54,.25); }
+
+/* ══════════════════════════════════════════
+   MÓVIL — ACORDEÓN VERTICAL
+══════════════════════════════════════════ */
+.mob-scroll { flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+
+/* Planta como acordeón */
+.mob-plant {
+  border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden;
+}
+.mob-plant-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 14px; cursor: pointer;
+  border: none; width: 100%; text-align: left; font-family: inherit;
+  transition: background .12s;
+}
+.mob-plant-head:hover { filter: brightness(1.08); }
+.mob-plant-icon { font-size: 16px; flex-shrink: 0; }
+.mob-plant-info { flex: 1; min-width: 0; }
+.mob-plant-name { font-size: 13px; font-weight: 700; }
+.mob-plant-sub  { font-size: 10px; color: var(--muted-fg); margin-top: 1px; }
+.mob-plant-chev { font-size: 10px; flex-shrink: 0; }
+
+.mob-plant-body { border-top: 1px solid var(--border); background: rgba(0,0,0,.2); padding: 6px; display: flex; flex-direction: column; gap: 4px; }
+
+/* Sub-área dentro del acordeón móvil */
+.mob-subarea { border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; }
+.mob-sub-head {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 12px; cursor: pointer;
+  border: none; width: 100%; text-align: left; font-family: inherit;
+  background: var(--muted); transition: background .12s;
+}
+.mob-sub-head:hover { background: #323232; }
+.mob-sub-dot   { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.mob-sub-label { font-size: 12px; font-weight: 500; flex: 1; }
+.mob-sub-cnt   { font-size: 10px; background: var(--bg); color: var(--muted-fg); padding: 1px 6px; border-radius: 999px; }
+
+.mob-machine-list { border-top: 1px solid var(--border); background: rgba(0,0,0,.3); padding: 4px 8px; }
+.mob-machine-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 4px; border-radius: var(--r-sm);
+  cursor: pointer; min-height: 36px; transition: background .1s;
+}
+.mob-machine-row:hover { background: var(--muted); }
+.mob-m-dot   { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.mob-m-name  { font-size: 12px; color: #ccc; flex: 1; min-width: 0; }
+.mob-m-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.mob-m-parts { font-size: 10px; color: var(--muted-fg); }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div>
+    <div class="topbar-title">🏢 ANTARFOOD · Equipos</div>
+    <div class="topbar-sub">Propuesta G — Columnas por planta/zona</div>
+  </div>
+  <div class="actions">
+    <!-- Switch PC / Móvil -->
+    <div class="view-switch">
+      <button class="vs-btn active" onclick="setView('pc', this)">💻 PC</button>
+      <button class="vs-btn" onclick="setView('mob', this)">📱 Móvil</button>
+    </div>
+    <button class="btn btn-ghost" onclick="allExpand()">Expandir todo</button>
+    <button class="btn btn-ghost" onclick="allCollapse()">Colapsar todo</button>
+    <button class="btn btn-primary">+ Agregar equipo</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     VISTA PC
+══════════════════════════════════════════ -->
+<div id="view-pc" class="view active">
+
+  <div class="pc-root-bar">
+    <span class="pc-root-icon">🏢</span>
+    <span class="pc-root-name">ANTARFOOD / Todas las plantas y zonas</span>
+    <div class="pc-expand-btns">
+      <button class="pc-expand-btn" onclick="allExpand()">＋ Todo</button>
+      <button class="pc-expand-btn" onclick="allCollapse()">－ Todo</button>
+    </div>
+  </div>
+
+  <div class="cols-wrap">
+
+    <!-- ══ COLUMNA 1: Planta Chonchi ══ -->
+    <div class="plant-col">
+      <div class="col-head" style="background:#182a3e;">
+        <span class="col-head-icon">🏗️</span>
+        <div class="col-head-text">
+          <div class="col-head-name" style="color:#64b5f6;">Planta Chonchi</div>
+          <div class="col-head-sub">19 equipos · 4 áreas</div>
+        </div>
+        <button class="col-head-add" style="color:#64b5f6;border-color:#1e3a5f;">+ Equipo</button>
+      </div>
+      <div class="col-body">
+
+        <!-- Grupo: Proceso -->
+        <div class="group">
+          <button class="group-head toggle" data-t="pc-proc">
+            <span class="chev" id="cv-pc-proc">▶</span>
+            <span class="group-icon">⚙️</span>
+            <span class="group-label">Proceso</span>
+            <span class="group-cnt">14 eq.</span>
+          </button>
+          <div id="pc-proc" class="hidden">
+
+            <!-- Eviscerado -->
+            <div class="subarea">
+              <button class="subarea-head toggle" data-t="pc-evis">
+                <span class="chev" id="cv-pc-evis">▶</span>
+                <span class="area-dot" style="background:#2196f3;"></span>
+                <span class="area-label" style="color:#64b5f6;">Eviscerado</span>
+                <span class="area-cnt">5</span>
+              </button>
+              <div id="pc-evis" class="machine-list hidden">
+                <div class="machine-row"><span class="m-dot" style="background:#2196f3"></span><span class="m-name truncate">Baader 142</span><div class="m-bar-wrap"><div class="m-bar" style="width:80%;background:#4caf50;"></div></div><span class="m-parts">12 rep.</span><span class="badge b-op">Op.</span></div>
+                <div class="machine-row"><span class="m-dot" style="background:#2196f3"></span><span class="m-name truncate">Knuro</span><div class="m-bar-wrap"><div class="m-bar" style="width:35%;background:#ff9800;"></div></div><span class="m-parts">7 rep.</span><span class="badge b-mn">Mant.</span></div>
+                <div class="machine-row"><span class="m-dot" style="background:#2196f3"></span><span class="m-name truncate">Marel Eviscerado HG</span><div class="m-bar-wrap"><div class="m-bar" style="width:100%;background:#4caf50;"></div></div><span class="m-parts">23 rep.</span><span class="badge b-op">Op.</span></div>
+                <div class="machine-row"><span class="m-dot" style="background:#2196f3"></span><span class="m-name truncate">Cinta Elevadora 1</span><div class="m-bar-wrap"><div class="m-bar" style="width:20%;background:#ff9800;"></div></div><span class="m-parts">4 rep.</span><span class="badge b-op">Op.</span></div>
+                <div class="machine-row"><span class="m-dot" style="background:#2196f3"></span><span class="m-name truncate">Cinta Elevadora 2 Zeta</span><div class="m-bar-wrap"><div class="m-bar" style="width:10%;background:#a0a0a0;"></div></div><span class="m-parts">2 rep.</span><span class="badge b-dt">Det.</span></div>
+              </div>
+            </div>
+
+            <!-- Filete -->
+            <div class="subarea">
+              <button class="subarea-head toggle" data-t="pc-file">
+                <span class="chev" id="cv-pc-file">▶</span>
+                <span class="area-dot" style="background:#4caf50;"></span>
+                <span class="area-label" style="color:#81c784;">Filete</span>
+                <span class="area-cnt">5</span>
+              </button>
+              <div id="pc-file" class="machine-list hidden">
+                <div class="machine-row"><span class="m-dot" style="background:#4caf50"></span><span class="m-name truncate">Baader 200</span><div class="m-bar-wrap"><div class="m-bar" style="width:75%;background:#4caf50;"></div></div><span class="m-parts">18 rep.</span><span class="badge b-op">Op.</span></div>
+                <div class="machine-row"><span class="m-dot" style="background:#4caf50"></span><span class="m-name truncate">GEA V2 (Multivac)</span><div class="m-bar-wrap"><div class="m-bar" style="width:40%;background:#4caf50;"></div></div><span class="m-parts">9 rep.</span><span class="badge b-op">Op.</span></div>
+                <div class="machine-row"><span class="m-dot" style="background:#4caf50"></span><span class="m-name truncate">Marel Filete HG</span><div class="m-bar-wrap"><div class="m-bar" style="width:65%;background:#4caf50;"></div></div><span class="m-parts">15 rep.</span><span class="badge b-op">Op.</span></div>
+                <div class="machine-row"><span class="m-dot" style="background:#4caf50"></span><span class="m-name truncate">Videojet</span><div class="m-bar-wrap"><div class="m-bar" style="width:15%;background:#ff9800;"></div></div><span class="m-parts">3 rep.</span><span class="badge b-op">Op.</span></div>
+                <div class="machine-row"><span class="m-dot" style="background:#4caf50"></span><span class="m-name truncate">Cinta Curva</span><div class="m-bar-wrap"><div class="m-bar" style="width:25%;background:#ff9800;"></div></div><span class="m-parts">5 rep.</span><span class="badge b-op">Op.</span></div>
+              </div>
+            </div>
+
+            <!-- Emparrillado -->
+            <div class="subarea">
+              <button class="subarea-head toggle" data-t="pc-empa">
+                <span class="chev" id="cv-pc-empa">▶</span>
+                <span class="area-dot" style="background:#ff9800;"></span>
+                <span class="area-label" style="color:#ffb74d;">Emparrillado</span>
+                <span class="area-cnt">1</span>
+              </button>
+              <div id="pc-empa" class="machine-list hidden">
+                <div class="machine-row"><span class="m-dot" style="background:#ff9800"></span><span class="m-name">Grader</span><div class="m-bar-wrap"><div class="m-bar" style="width:30%;background:#4caf50;"></div></div><span class="m-parts">6 rep.</span><span class="badge b-op">Op.</span></div>
+              </div>
+            </div>
+
+            <!-- Empaque -->
+            <div class="subarea">
+              <button class="subarea-head toggle" data-t="pc-empq">
+                <span class="chev" id="cv-pc-empq">▶</span>
+                <span class="area-dot" style="background:#9c27b0;"></span>
+                <span class="area-label" style="color:#ce93d8;">Empaque</span>
+                <span class="area-cnt">3</span>
+              </button>
+              <div id="pc-empq" class="machine-list hidden">
+                <div class="machine-row"><span class="m-dot" style="background:#9c27b0"></span><span class="m-name">Garibaldi</span><div class="m-bar-wrap"><div class="m-bar" style="width:50%;background:#4caf50;"></div></div><span class="m-parts">11 rep.</span><span class="badge b-op">Op.</span></div>
+                <div class="machine-row"><span class="m-dot" style="background:#9c27b0"></span><span class="m-name">Detector de Metales</span><div class="m-bar-wrap"><div class="m-bar" style="width:20%;background:#ff9800;"></div></div><span class="m-parts">4 rep.</span><span class="badge b-op">Op.</span></div>
+                <div class="machine-row"><span class="m-dot" style="background:#9c27b0"></span><span class="m-name">Fishken</span><div class="m-bar-wrap"><div class="m-bar" style="width:37%;background:#ff9800;"></div></div><span class="m-parts">8 rep.</span><span class="badge b-mn">Mant.</span></div>
+              </div>
+            </div>
+
+          </div><!-- /pc-proc -->
+        </div><!-- /group Proceso -->
+
+      </div><!-- /col-body -->
+    </div><!-- /col Chonchi -->
+
+    <!-- ══ COLUMNA 2: Planta Yal ══ -->
+    <div class="plant-col">
+      <div class="col-head" style="background:#182e1e;">
+        <span class="col-head-icon">🏗️</span>
+        <div class="col-head-text">
+          <div class="col-head-name" style="color:#81c784;">Planta Yal</div>
+          <div class="col-head-sub">0 equipos · sin datos</div>
+        </div>
+        <button class="col-head-add" style="color:#81c784;border-color:#1e5a3a;">+ Equipo</button>
+      </div>
+      <div class="col-empty">
+        <span class="col-empty-icon">🏗️</span>
+        <span class="col-empty-text">Sin equipos registrados</span>
+        <span style="font-size:10px;color:var(--muted-fg);margin-top:2px;">Agregá la primera máquina</span>
+        <button class="btn btn-ghost" style="margin-top:10px;font-size:10px;color:#81c784;border-color:#1e5a3a;">+ Agregar equipo</button>
+      </div>
+    </div>
+
+    <!-- ══ COLUMNA 3: Patio y Servicios Exteriores ══ -->
+    <div class="plant-col">
+      <div class="col-head" style="background:#18302e;">
+        <span class="col-head-icon">🌿</span>
+        <div class="col-head-text">
+          <div class="col-head-name" style="color:#80cbc4;">Patio y Serv. Ext.</div>
+          <div class="col-head-sub">5 equipos · 2 áreas</div>
+        </div>
+        <button class="col-head-add" style="color:#80cbc4;border-color:#1e5a54;">+ Equipo</button>
+      </div>
+      <div class="col-body">
+
+        <!-- Bombas Agua Mar N2 -->
+        <div class="group">
+          <button class="group-head toggle" data-t="pc-bomb" style="background:#182e2e;">
+            <span class="chev" id="cv-pc-bomb">▶</span>
+            <span class="group-icon">💧</span>
+            <span class="group-label" style="color:#80cbc4;">Bombas Agua Mar N2</span>
+            <span class="group-cnt">4 eq.</span>
+          </button>
+          <div id="pc-bomb" class="machine-list hidden">
+            <div class="machine-row"><span class="m-dot" style="background:#00bcd4"></span><span class="m-name truncate">Motor Bomba Caseta AM 40/26</span><div class="m-bar-wrap"><div class="m-bar" style="width:25%;background:#ff9800;"></div></div><span class="m-parts">5 rep.</span><span class="badge b-op">Op.</span></div>
+            <div class="machine-row"><span class="m-dot" style="background:#00bcd4"></span><span class="m-name truncate">Bomba Caseta 40/26 (A)</span><div class="m-bar-wrap"><div class="m-bar" style="width:25%;background:#ff9800;"></div></div><span class="m-parts">5 rep.</span><span class="badge b-op">Op.</span></div>
+            <div class="machine-row"><span class="m-dot" style="background:#00bcd4"></span><span class="m-name truncate">Bomba Caseta Mar 40/26 (B)</span><div class="m-bar-wrap"><div class="m-bar" style="width:25%;background:#ff9800;"></div></div><span class="m-parts">5 rep.</span><span class="badge b-op">Op.</span></div>
+            <div class="machine-row"><span class="m-dot" style="background:#00bcd4"></span><span class="m-name truncate">Bomba 40/26 Caseta AM (C)</span><div class="m-bar-wrap"><div class="m-bar" style="width:25%;background:#ff9800;"></div></div><span class="m-parts">5 rep.</span><span class="badge b-op">Op.</span></div>
+          </div>
+        </div>
+
+        <!-- Estanque Transferencia AM -->
+        <div class="group">
+          <button class="group-head toggle" data-t="pc-estr" style="background:#182e2e;">
+            <span class="chev" id="cv-pc-estr">▶</span>
+            <span class="group-icon">🛢️</span>
+            <span class="group-label" style="color:#80cbc4;">Estanque Transferencia AM</span>
+            <span class="group-cnt">1 eq.</span>
+          </button>
+          <div id="pc-estr" class="machine-list hidden">
+            <div class="machine-row"><span class="m-dot" style="background:#009688"></span><span class="m-name truncate">Bomba Estanque Inox 40/26</span><div class="m-bar-wrap"><div class="m-bar" style="width:25%;background:#ff9800;"></div></div><span class="m-parts">5 rep.</span><span class="badge b-op">Op.</span></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══ COLUMNA 4: Acopio ══ -->
+    <div class="plant-col">
+      <div class="col-head" style="background:#2e2018;">
+        <span class="col-head-icon">📦</span>
+        <div class="col-head-text">
+          <div class="col-head-name" style="color:#ffb74d;">Acopio</div>
+          <div class="col-head-sub">0 equipos · sin datos</div>
+        </div>
+        <button class="col-head-add" style="color:#ffb74d;border-color:#5a3a1e;">+ Equipo</button>
+      </div>
+      <div class="col-empty">
+        <span class="col-empty-icon">📦</span>
+        <span class="col-empty-text">Sin equipos registrados</span>
+        <button class="btn btn-ghost" style="margin-top:10px;font-size:10px;color:#ffb74d;border-color:#5a3a1e;">+ Agregar equipo</button>
+      </div>
+    </div>
+
+  </div><!-- /cols-wrap -->
+</div><!-- /view-pc -->
+
+
+<!-- ══════════════════════════════════════════
+     VISTA MÓVIL — ACORDEÓN VERTICAL
+══════════════════════════════════════════ -->
+<div id="view-mob" class="view">
+  <div class="mob-scroll">
+
+    <!-- Planta Chonchi -->
+    <div class="mob-plant">
+      <button class="mob-plant-head toggle" data-t="mob-chonchi" style="background:#182a3e;">
+        <span class="mob-plant-icon">🏗️</span>
+        <div class="mob-plant-info">
+          <div class="mob-plant-name" style="color:#64b5f6;">Planta Chonchi</div>
+          <div class="mob-plant-sub">19 equipos · 4 áreas</div>
+        </div>
+        <span class="chev mob-plant-chev" id="cv-mob-chonchi">▶</span>
+      </button>
+      <div id="mob-chonchi" class="mob-plant-body hidden">
+
+        <!-- Sub: Eviscerado -->
+        <div class="mob-subarea">
+          <button class="mob-sub-head toggle" data-t="mob-evis">
+            <span class="chev" id="cv-mob-evis">▶</span>
+            <span class="mob-sub-dot" style="background:#2196f3;"></span>
+            <span class="mob-sub-label" style="color:#64b5f6;">Eviscerado</span>
+            <span class="mob-sub-cnt">5</span>
+          </button>
+          <div id="mob-evis" class="mob-machine-list hidden">
+            <div class="mob-machine-row"><span class="mob-m-dot" style="background:#2196f3"></span><span class="mob-m-name truncate">Baader 142</span><div class="mob-m-right"><span class="m-parts">12 rep.</span><span class="badge b-op">Op.</span></div></div>
+            <div class="mob-machine-row"><span class="mob-m-dot" style="background:#2196f3"></span><span class="mob-m-name truncate">Knuro</span><div class="mob-m-right"><span class="m-parts">7 rep.</span><span class="badge b-mn">Mant.</span></div></div>
+            <div class="mob-machine-row"><span class="mob-m-dot" style="background:#2196f3"></span><span class="mob-m-name truncate">Marel Eviscerado HG</span><div class="mob-m-right"><span class="m-parts">23 rep.</span><span class="badge b-op">Op.</span></div></div>
+            <div class="mob-machine-row"><span class="mob-m-dot" style="background:#2196f3"></span><span class="mob-m-name truncate">Cinta Elevadora 1</span><div class="mob-m-right"><span class="m-parts">4 rep.</span><span class="badge b-op">Op.</span></div></div>
+            <div class="mob-machine-row"><span class="mob-m-dot" style="background:#2196f3"></span><span class="mob-m-name truncate">Cinta Elevadora 2 Zeta</span><div class="mob-m-right"><span class="m-parts">2 rep.</span><span class="badge b-dt">Det.</span></div></div>
+          </div>
+        </div>
+
+        <!-- Sub: Filete -->
+        <div class="mob-subarea">
+          <button class="mob-sub-head toggle" data-t="mob-file">
+            <span class="chev" id="cv-mob-file">▶</span>
+            <span class="mob-sub-dot" style="background:#4caf50;"></span>
+            <span class="mob-sub-label" style="color:#81c784;">Filete</span>
+            <span class="mob-sub-cnt">5</span>
+          </button>
+          <div id="mob-file" class="mob-machine-list hidden">
+            <div class="mob-machine-row"><span class="mob-m-dot" style="background:#4caf50"></span><span class="mob-m-name truncate">Baader 200</span><div class="mob-m-right"><span class="m-parts">18 rep.</span><span class="badge b-op">Op.</span></div></div>
+            <div class="mob-machine-row"><span class="mob-m-dot" style="background:#4caf50"></span><span class="mob-m-name truncate">GEA V2 (Multivac)</span><div class="mob-m-right"><span class="m-parts">9 rep.</span><span class="badge b-op">Op.</span></div></div>
+            <div class="mob-machine-row"><span class="mob-m-dot" style="background:#4caf50"></span><span class="mob-m-name truncate">Marel Filete HG</span><div class="mob-m-right"><span class="m-parts">15 rep.</span><span class="badge b-op">Op.</span></div></div>
+            <div class="mob-machine-row"><span class="mob-m-dot" style="background:#4caf50"></span><span class="mob-m-name truncate">Videojet</span><div class="mob-m-right"><span class="m-parts">3 rep.</span><span class="badge b-op">Op.</span></div></div>
+            <div class="mob-machine-row"><span class="mob-m-dot" style="background:#4caf50"></span><span class="mob-m-name truncate">Cinta Curva</span><div class="mob-m-right"><span class="m-parts">5 rep.</span><span class="badge b-op">Op.</span></div></div>
+          </div>
+        </div>
+
+        <!-- Sub: Emparrillado -->
+        <div class="mob-subarea">
+          <button class="mob-sub-head toggle" data-t="mob-empa">
+            <span class="chev" id="cv-mob-empa">▶</span>
+            <span class="mob-sub-dot" style="background:#ff9800;"></span>
+            <span class="mob-sub-label" style="color:#ffb74d;">Emparrillado</span>
+            <span class="mob-sub-cnt">1</span>
+          </button>
+          <div id="mob-empa" class="mob-machine-list hidden">
+            <div class="mob-machine-row"><span class="mob-m-dot" style="background:#ff9800"></span><span class="mob-m-name">Grader</span><div class="mob-m-right"><span class="m-parts">6 rep.</span><span class="badge b-op">Op.</span></div></div>
+          </div>
+        </div>
+
+        <!-- Sub: Empaque -->
+        <div class="mob-subarea">
+          <button class="mob-sub-head toggle" data-t="mob-empq">
+            <span class="chev" id="cv-mob-empq">▶</span>
+            <span class="mob-sub-dot" style="background:#9c27b0;"></span>
+            <span class="mob-sub-label" style="color:#ce93d8;">Empaque</span>
+            <span class="mob-sub-cnt">3</span>
+          </button>
+          <div id="mob-empq" class="mob-machine-list hidden">
+            <div class="mob-machine-row"><span class="mob-m-dot" style="background:#9c27b0"></span><span class="mob-m-name">Garibaldi</span><div class="mob-m-right"><span class="m-parts">11 rep.</span><span class="badge b-op">Op.</span></div></div>
+            <div class="mob-machine-row"><span class="mob-m-dot" style="background:#9c27b0"></span><span class="mob-m-name">Detector Metales</span><div class="mob-m-right"><span class="m-parts">4 rep.</span><span class="badge b-op">Op.</span></div></div>
+            <div class="mob-machine-row"><span class="mob-m-dot" style="background:#9c27b0"></span><span class="mob-m-name">Fishken</span><div class="mob-m-right"><span class="m-parts">8 rep.</span><span class="badge b-mn">Mant.</span></div></div>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /Chonchi -->
+
+    <!-- Patio y Servicios Exteriores -->
+    <div class="mob-plant">
+      <button class="mob-plant-head toggle" data-t="mob-ext" style="background:#18302e;">
+        <span class="mob-plant-icon">🌿</span>
+        <div class="mob-plant-info">
+          <div class="mob-plant-name" style="color:#80cbc4;">Patio y Serv. Exteriores</div>
+          <div class="mob-plant-sub">5 equipos · 2 áreas</div>
+        </div>
+        <span class="chev mob-plant-chev" id="cv-mob-ext">▶</span>
+      </button>
+      <div id="mob-ext" class="mob-plant-body hidden">
+        <div class="mob-subarea">
+          <button class="mob-sub-head toggle" data-t="mob-bomb">
+            <span class="chev" id="cv-mob-bomb">▶</span>
+            <span class="mob-sub-dot" style="background:#00bcd4;"></span>
+            <span class="mob-sub-label" style="color:#80cbc4;">Bombas Agua Mar N2</span>
+            <span class="mob-sub-cnt">4</span>
+          </button>
+          <div id="mob-bomb" class="mob-machine-list hidden">
+            <div class="mob-machine-row"><span class="mob-m-dot" style="background:#00bcd4"></span><span class="mob-m-name truncate">Motor Bomba Caseta AM 40/26</span><div class="mob-m-right"><span class="m-parts">5 rep.</span><span class="badge b-op">Op.</span></div></div>
+            <div class="mob-machine-row"><span class="mob-m-dot" style="background:#00bcd4"></span><span class="mob-m-name truncate">Bomba Caseta 40/26 (A)</span><div class="mob-m-right"><span class="m-parts">5 rep.</span><span class="badge b-op">Op.</span></div></div>
+            <div class="mob-machine-row"><span class="mob-m-dot" style="background:#00bcd4"></span><span class="mob-m-name truncate">Bomba Caseta 40/26 (B)</span><div class="mob-m-right"><span class="m-parts">5 rep.</span><span class="badge b-op">Op.</span></div></div>
+            <div class="mob-machine-row"><span class="mob-m-dot" style="background:#00bcd4"></span><span class="mob-m-name truncate">Bomba 40/26 Caseta AM (C)</span><div class="mob-m-right"><span class="m-parts">5 rep.</span><span class="badge b-op">Op.</span></div></div>
+          </div>
+        </div>
+        <div class="mob-subarea">
+          <button class="mob-sub-head toggle" data-t="mob-estr">
+            <span class="chev" id="cv-mob-estr">▶</span>
+            <span class="mob-sub-dot" style="background:#009688;"></span>
+            <span class="mob-sub-label" style="color:#80cbc4;">Estanque Transferencia AM</span>
+            <span class="mob-sub-cnt">1</span>
+          </button>
+          <div id="mob-estr" class="mob-machine-list hidden">
+            <div class="mob-machine-row"><span class="mob-m-dot" style="background:#009688"></span><span class="mob-m-name">Bomba Estanque Inox 40/26</span><div class="mob-m-right"><span class="m-parts">5 rep.</span><span class="badge b-op">Op.</span></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Planta Yal (vacía) -->
+    <div class="mob-plant" style="opacity:.6;">
+      <div class="mob-plant-head" style="background:#182e1e;cursor:default;">
+        <span class="mob-plant-icon">🏗️</span>
+        <div class="mob-plant-info">
+          <div class="mob-plant-name" style="color:#81c784;">Planta Yal</div>
+          <div class="mob-plant-sub">Sin equipos registrados</div>
+        </div>
+        <button class="btn btn-ghost" style="font-size:10px;padding:4px 8px;color:#81c784;border-color:#1e5a3a;margin-left:auto;">+ Equipo</button>
+      </div>
+    </div>
+
+    <!-- Acopio (vacío) -->
+    <div class="mob-plant" style="opacity:.6;">
+      <div class="mob-plant-head" style="background:#2e2018;cursor:default;">
+        <span class="mob-plant-icon">📦</span>
+        <div class="mob-plant-info">
+          <div class="mob-plant-name" style="color:#ffb74d;">Acopio</div>
+          <div class="mob-plant-sub">Sin equipos registrados</div>
+        </div>
+        <button class="btn btn-ghost" style="font-size:10px;padding:4px 8px;color:#ffb74d;border-color:#5a3a1e;margin-left:auto;">+ Equipo</button>
+      </div>
+    </div>
+
+  </div><!-- /mob-scroll -->
+</div><!-- /view-mob -->
+
+<script>
+/* ── Toggle expandir/colapsar ── */
+document.addEventListener('click', e => {
+  const btn = e.target.closest('.toggle')
+  if (!btn) return
+  const id = btn.dataset.t
+  const body = document.getElementById(id)
+  const chev = document.getElementById('cv-' + id)
+  if (body) body.classList.toggle('hidden')
+  if (chev) chev.classList.toggle('open')
+})
+
+/* ── Switch PC / Móvil ── */
+function setView(v, btn) {
+  document.querySelectorAll('.view').forEach(el => el.classList.remove('active'))
+  document.getElementById('view-' + v).classList.add('active')
+  document.querySelectorAll('.vs-btn').forEach(b => b.classList.remove('active'))
+  btn.classList.add('active')
+}
+
+/* ── Expandir / Colapsar todo ── */
+function allExpand() {
+  document.querySelectorAll('[id^="pc-"],[id^="mob-"]').forEach(el => el.classList.remove('hidden'))
+  document.querySelectorAll('.chev').forEach(c => c.classList.add('open'))
+}
+function allCollapse() {
+  document.querySelectorAll('[id^="pc-"],[id^="mob-"]').forEach(el => el.classList.add('hidden'))
+  document.querySelectorAll('.chev').forEach(c => c.classList.remove('open'))
+}
+</script>
+</body>
+</html>

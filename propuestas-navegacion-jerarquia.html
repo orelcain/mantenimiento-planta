@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Catálogo de Repuestos — Prototipo</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #121212;
+  --card:     #1e1e1e;
+  --muted:    #2a2a2a;
+  --muted-fg: #a0a0a0;
+  --border:   #333333;
+  --fg:       #ffffff;
+  --primary:  #2196f3;
+  --success:  #4caf50;
+  --warn:     #ff9800;
+  --danger:   #f44336;
+  --r:        .75rem;
+  --r-md:     .5rem;
+  --r-sm:     .25rem;
+  --sidebar-w: 240px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:87.5%}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--fg);height:100dvh;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased;overflow:hidden}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--muted);border-radius:999px}
+::-webkit-scrollbar-thumb:hover{background:#444}
+.hidden{display:none!important}
+.truncate{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+
+/* ── TOPBAR ── */
+.topbar{
+  display:flex;align-items:center;gap:10px;
+  padding:8px 14px;
+  background:var(--card);
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+  z-index:10;
+}
+.topbar-title{font-size:13px;font-weight:700;flex-shrink:0}
+.topbar-sub{font-size:11px;color:var(--muted-fg);flex-shrink:0}
+.topbar-sep{width:1px;height:16px;background:var(--border);flex-shrink:0}
+
+/* search global */
+.search-wrap{flex:1;max-width:420px;position:relative;display:flex;align-items:center}
+.search-wrap svg{position:absolute;left:9px;color:var(--muted-fg);pointer-events:none;flex-shrink:0}
+.search-input{
+  width:100%;
+  background:var(--muted);
+  border:1px solid var(--border);
+  border-radius:var(--r-md);
+  padding:5px 9px 5px 30px;
+  color:var(--fg);font-size:11px;font-family:inherit;outline:none;
+}
+.search-input:focus{border-color:var(--primary);box-shadow:0 0 0 2px rgba(33,150,243,.18)}
+.search-input::placeholder{color:var(--muted-fg)}
+.search-clear{position:absolute;right:7px;background:none;border:none;color:var(--muted-fg);cursor:pointer;font-size:14px;line-height:1;padding:2px;display:none}
+.search-input:not(:placeholder-shown) + .search-clear{display:block}
+
+.topbar-actions{margin-left:auto;display:flex;gap:6px;flex-shrink:0}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:var(--r-md);font-size:11px;font-weight:500;border:none;cursor:pointer;font-family:inherit;transition:all .15s;white-space:nowrap}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover{background:#1e88e5}
+.btn-ghost{background:transparent;color:var(--muted-fg);border:1px solid var(--border)}
+.btn-ghost:hover{background:var(--muted);color:var(--fg)}
+.btn-icon{padding:5px;background:transparent;border:1px solid var(--border);cursor:pointer;color:var(--muted-fg);border-radius:var(--r-md);transition:all .12s;display:inline-flex;align-items:center;justify-content:center}
+.btn-icon:hover{background:var(--muted);color:var(--fg)}
+
+/* ── BODY LAYOUT ── */
+.body{flex:1;display:flex;overflow:hidden}
+
+/* ── SIDEBAR ── */
+.sidebar{
+  width:var(--sidebar-w);
+  flex-shrink:0;
+  background:var(--card);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;
+  overflow:hidden;
+  transition:width .2s;
+}
+.sidebar.collapsed{width:0;border-right:none}
+
+.sidebar-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 12px 8px;
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.sidebar-label{font-size:10px;font-weight:700;color:var(--muted-fg);text-transform:uppercase;letter-spacing:.07em}
+
+.tree{flex:1;overflow-y:auto;padding:6px 0}
+
+/* plant group */
+.plant-group{}
+.plant-header{
+  display:flex;align-items:center;gap:7px;
+  padding:7px 12px 5px;
+  cursor:pointer;
+  user-select:none;
+}
+.plant-header:hover{background:var(--muted)}
+.plant-chevron{
+  width:14px;height:14px;flex-shrink:0;
+  transition:transform .2s;
+  color:var(--muted-fg);
+}
+.plant-group.open .plant-chevron{transform:rotate(90deg)}
+.plant-icon{font-size:13px;flex-shrink:0}
+.plant-name{font-size:11px;font-weight:600;flex:1;min-width:0}
+.plant-count{font-size:10px;font-weight:600;color:var(--muted-fg);background:var(--muted);padding:1px 6px;border-radius:999px;flex-shrink:0}
+
+/* areas inside plant */
+.plant-areas{display:none;padding-bottom:4px}
+.plant-group.open .plant-areas{display:block}
+
+.area-item{
+  display:flex;align-items:center;gap:8px;
+  padding:5px 12px 5px 32px;
+  cursor:pointer;
+  border-left:3px solid transparent;
+  transition:all .12s;
+}
+.area-item:hover{background:var(--muted)}
+.area-item.active{
+  background:rgba(33,150,243,.1);
+  border-left-color:var(--primary);
+  color:var(--primary);
+}
+.area-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;background:var(--muted-fg)}
+.area-item.active .area-dot{background:var(--primary)}
+.area-name{font-size:11px;flex:1;min-width:0}
+.area-count{
+  font-size:9px;font-weight:700;
+  padding:1px 5px;border-radius:999px;
+  background:var(--muted);color:var(--muted-fg);
+  flex-shrink:0;
+}
+.area-item.active .area-count{background:rgba(33,150,243,.18);color:var(--primary)}
+
+/* sin area */
+.sinarea-item{
+  display:flex;align-items:center;gap:8px;
+  padding:6px 12px;
+  cursor:pointer;
+  border-left:3px solid transparent;
+  margin-top:4px;
+  border-top:1px solid var(--border);
+}
+.sinarea-item:hover{background:var(--muted)}
+.sinarea-item.active{background:rgba(255,152,0,.08);border-left-color:var(--warn);color:var(--warn)}
+
+/* ── MAIN PANEL ── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+
+/* breadcrumb + toolbar */
+.panel-header{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 14px;
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+  flex-wrap:wrap;
+  gap:6px;
+}
+.breadcrumb{display:flex;align-items:center;gap:5px;flex:1;min-width:0;font-size:11px;color:var(--muted-fg)}
+.breadcrumb span{color:var(--fg);font-weight:500}
+.bc-sep{color:var(--border)}
+
+/* view toggles */
+.view-tabs{display:flex;gap:2px;background:var(--muted);padding:2px;border-radius:var(--r-md);flex-shrink:0}
+.view-tab{padding:3px 8px;border-radius:calc(var(--r-md) - 2px);font-size:10px;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--muted-fg);font-family:inherit;display:flex;align-items:center;gap:3px;transition:all .12s}
+.view-tab.on{background:var(--card);color:var(--fg);box-shadow:0 1px 2px rgba(0,0,0,.3)}
+
+.sort-select{
+  background:var(--muted);border:1px solid var(--border);border-radius:var(--r-md);
+  padding:4px 7px;color:var(--fg);font-size:10px;font-family:inherit;outline:none;cursor:pointer;
+}
+
+/* count info */
+.panel-info{
+  padding:6px 14px;
+  font-size:10px;color:var(--muted-fg);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:10px;flex-shrink:0;
+}
+.panel-info strong{color:var(--fg)}
+.info-dot{width:6px;height:6px;border-radius:50%;display:inline-block}
+
+/* ── EQUIPMENT LIST VIEW ── */
+.eq-list{flex:1;overflow-y:auto;padding:10px 14px;display:flex;flex-direction:column;gap:6px}
+
+.eq-row{
+  display:flex;align-items:center;gap:10px;
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:var(--r);
+  padding:10px 12px;
+  cursor:pointer;
+  transition:all .15s;
+}
+.eq-row:hover{border-color:#555;background:#222}
+.eq-row.selected{border-color:var(--primary);background:rgba(33,150,243,.07)}
+
+.eq-type-dot{
+  width:32px;height:32px;border-radius:var(--r-md);
+  display:flex;align-items:center;justify-content:center;
+  font-size:14px;flex-shrink:0;
+}
+.eq-info{flex:1;min-width:0}
+.eq-name{font-size:12px;font-weight:600;margin-bottom:2px}
+.eq-meta{font-size:10px;color:var(--muted-fg);display:flex;gap:8px;align-items:center}
+.eq-area-tag{
+  display:inline-flex;align-items:center;gap:3px;
+  background:var(--muted);padding:1px 6px;border-radius:999px;
+  font-size:9px;font-weight:500;white-space:nowrap;
+}
+
+/* stock mini bars */
+.eq-stocks{display:flex;flex-direction:column;gap:3px;align-items:flex-end;flex-shrink:0;min-width:80px}
+.stock-bar-wrap{display:flex;align-items:center;gap:6px;width:100%}
+.stock-bar-label{font-size:9px;color:var(--muted-fg);white-space:nowrap;min-width:22px;text-align:right}
+.stock-bar{height:4px;border-radius:99px;background:var(--muted);flex:1;overflow:hidden}
+.stock-fill{height:100%;border-radius:99px;background:var(--success);transition:width .3s}
+.stock-fill.warn{background:var(--warn)}
+.stock-fill.danger{background:var(--danger)}
+
+.eq-rep-count{
+  flex-shrink:0;text-align:center;min-width:52px;
+}
+.rep-num{font-size:18px;font-weight:700;line-height:1;color:var(--fg)}
+.rep-label{font-size:9px;color:var(--muted-fg)}
+
+.eq-arrow{color:var(--muted-fg);flex-shrink:0}
+
+/* ── EQUIPMENT GRID VIEW ── */
+.eq-grid{flex:1;overflow-y:auto;padding:10px 14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;align-content:start}
+
+.eq-card{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--r);
+  padding:14px;cursor:pointer;transition:all .15s;
+  display:flex;flex-direction:column;gap:8px;
+}
+.eq-card:hover{border-color:#555;background:#222}
+.eq-card.selected{border-color:var(--primary);background:rgba(33,150,243,.07)}
+
+.eq-card-top{display:flex;align-items:flex-start;gap:8px}
+.eq-card-icon{
+  width:36px;height:36px;border-radius:var(--r-md);
+  display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;
+}
+.eq-card-info{flex:1;min-width:0}
+.eq-card-name{font-size:12px;font-weight:600;line-height:1.3;margin-bottom:3px}
+.eq-card-area{font-size:9px;color:var(--muted-fg);display:flex;align-items:center;gap:3px}
+
+.eq-card-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px}
+.eq-stat{
+  background:var(--muted);border-radius:var(--r-sm);padding:5px 4px;text-align:center;
+}
+.eq-stat-val{font-size:13px;font-weight:700;line-height:1}
+.eq-stat-lbl{font-size:8px;color:var(--muted-fg);margin-top:1px}
+.eq-stat.ok .eq-stat-val{color:var(--success)}
+.eq-stat.low .eq-stat-val{color:var(--warn)}
+.eq-stat.out .eq-stat-val{color:var(--danger)}
+
+.eq-card-bar{height:3px;border-radius:99px;background:var(--muted);overflow:hidden}
+.eq-card-fill{height:100%;border-radius:99px;background:var(--success)}
+
+/* ── REPUESTOS DRAWER ── */
+.rep-drawer{
+  border-top:1px solid var(--border);
+  background:var(--bg);
+  display:flex;flex-direction:column;
+  overflow:hidden;
+  transition:height .25s cubic-bezier(.4,0,.2,1);
+  height:0;
+  flex-shrink:0;
+}
+.rep-drawer.open{height:340px}
+
+.rep-drawer-header{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 14px;
+  border-bottom:1px solid var(--border);
+  background:var(--card);
+  flex-shrink:0;
+}
+.rep-eq-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.rep-eq-name{font-size:13px;font-weight:700}
+.rep-eq-area{font-size:10px;color:var(--muted-fg);margin-left:2px}
+.rep-count-badge{
+  background:rgba(33,150,243,.15);color:var(--primary);
+  font-size:10px;font-weight:700;
+  padding:2px 8px;border-radius:999px;
+  border:1px solid rgba(33,150,243,.25);
+  margin-left:2px;
+}
+.rep-drawer-actions{margin-left:auto;display:flex;gap:5px;align-items:center}
+
+.rep-search-bar{
+  display:flex;align-items:center;gap:6px;
+  padding:6px 14px;
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.rep-search-bar .search-wrap{max-width:260px}
+
+/* table */
+.rep-table-wrap{flex:1;overflow-y:auto}
+.rep-table{width:100%;border-collapse:collapse;font-size:11px}
+.rep-table th{
+  padding:6px 10px;text-align:left;
+  font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--muted-fg);
+  background:var(--muted);
+  border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:1;white-space:nowrap;
+}
+.rep-table td{padding:7px 10px;border-bottom:1px solid rgba(51,51,51,.5);vertical-align:middle}
+.rep-table tr:hover td{background:var(--muted)}
+.rep-table tr:last-child td{border-bottom:none}
+
+.thumb{
+  width:36px;height:36px;border-radius:var(--r-sm);object-fit:cover;
+  background:var(--muted);display:flex;align-items:center;justify-content:center;
+  font-size:16px;border:1px solid var(--border);flex-shrink:0;
+}
+.thumb img{width:100%;height:100%;object-fit:cover;border-radius:var(--r-sm)}
+.sap-code{font-size:10px;font-weight:600;font-family:monospace;color:var(--muted-fg)}
+.desc-cell{max-width:220px}
+.desc-name{font-weight:500;margin-bottom:1px;line-height:1.2}
+.desc-sub{font-size:9px;color:var(--muted-fg)}
+.loc-cell{font-size:10px;color:var(--muted-fg)}
+.stock-num{font-size:12px;font-weight:700}
+.stock-num.ok{color:var(--success)}
+.stock-num.low{color:var(--warn)}
+.stock-num.out{color:var(--danger)}
+.price-cell{font-size:11px;font-weight:600;white-space:nowrap}
+.action-cell{display:flex;gap:3px;align-items:center}
+.tbl-icon{width:24px;height:24px;border-radius:var(--r-sm);background:transparent;border:none;cursor:pointer;color:var(--muted-fg);display:flex;align-items:center;justify-content:center;transition:all .12s}
+.tbl-icon:hover{background:var(--muted);color:var(--fg)}
+
+/* ── MOBILE OVERRIDES ── */
+@media(max-width:700px){
+  :root{--sidebar-w:100%}
+  .body{flex-direction:column}
+  .sidebar{
+    width:100%!important;
+    height:auto;
+    flex-shrink:0;
+    border-right:none;
+    border-bottom:1px solid var(--border);
+    overflow:visible;
+  }
+  .sidebar.collapsed{height:0;overflow:hidden;border-bottom:none}
+  .tree{max-height:45vh;overflow-y:auto}
+  .main{min-height:0;flex:1}
+  .eq-grid{grid-template-columns:1fr 1fr}
+  .eq-stocks{display:none}
+  .rep-drawer.open{height:auto;max-height:55vh}
+  .rep-table{display:none}
+  .rep-cards{display:flex!important;flex-direction:column;gap:6px;padding:8px}
+}
+
+/* mobile rep cards (hidden on desktop) */
+.rep-cards{display:none}
+.rep-card-item{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--r-md);
+  padding:10px;display:flex;gap:10px;align-items:flex-start;
+}
+.rep-card-info{flex:1;min-width:0}
+.rep-card-name{font-size:11px;font-weight:600;margin-bottom:3px}
+.rep-card-meta{font-size:10px;color:var(--muted-fg);display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.rep-card-stock{font-size:13px;font-weight:700}
+
+/* ── EMPTY STATE ── */
+.empty{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:10px;padding:40px;color:var(--muted-fg);text-align:center;flex:1;
+}
+.empty-icon{font-size:36px;opacity:.4}
+.empty-title{font-size:13px;font-weight:600;color:var(--fg)}
+.empty-sub{font-size:11px;max-width:260px;line-height:1.5}
+
+/* ── VIEW MODE SWITCH (demo) ── */
+.demo-tabs{display:flex;gap:4px;padding:6px 12px;background:var(--bg);border-bottom:1px solid var(--border);flex-shrink:0}
+.demo-tab{padding:4px 12px;border-radius:var(--r-md);font-size:11px;font-weight:500;cursor:pointer;border:none;background:var(--muted);color:var(--muted-fg);font-family:inherit;transition:all .15s}
+.demo-tab.on{background:var(--primary);color:#fff}
+
+/* sidebar toggle btn */
+.sidebar-toggle{
+  display:flex;align-items:center;justify-content:center;
+  width:26px;height:26px;border-radius:var(--r-sm);
+  background:transparent;border:1px solid var(--border);
+  cursor:pointer;color:var(--muted-fg);flex-shrink:0;transition:all .12s;
+}
+.sidebar-toggle:hover{background:var(--muted);color:var(--fg)}
+
+/* highlight search match */
+mark{background:rgba(33,150,243,.3);color:var(--fg);border-radius:2px;padding:0 1px}
+</style>
+</head>
+<body>
+
+<!-- DEMO TABS -->
+<div class="demo-tabs">
+  <button class="demo-tab on" onclick="setView('list')">Vista Lista</button>
+  <button class="demo-tab" onclick="setView('grid')">Vista Tarjetas</button>
+  <button class="demo-tab" onclick="setView('mobile')">📱 Simular Móvil</button>
+</div>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="Ocultar/mostrar árbol de áreas">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+  </button>
+  <span class="topbar-title">Catálogo de Repuestos</span>
+  <div class="topbar-sep"></div>
+  <div class="search-wrap">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input class="search-input" id="globalSearch" placeholder="Buscar repuesto o equipo en toda la planta..." oninput="onGlobalSearch(this.value)">
+    <button class="search-clear" onclick="clearSearch()">✕</button>
+  </div>
+  <div class="topbar-actions">
+    <button class="btn btn-ghost btn-icon" title="Importar">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/></svg>
+    </button>
+    <button class="btn btn-ghost btn-icon" title="Exportar">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="8 7 12 3 16 7"/><line x1="12" y1="3" x2="12" y2="15"/><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/></svg>
+    </button>
+    <button class="btn btn-primary">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Nuevo repuesto
+    </button>
+  </div>
+</div>
+
+<!-- BODY -->
+<div class="body" id="bodyRoot">
+
+  <!-- SIDEBAR: árbol de jerarquía -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <span class="sidebar-label">Áreas de planta</span>
+      <button class="btn-icon" onclick="toggleSidebar()" style="width:20px;height:20px;padding:2px">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <nav class="tree" id="areaTree"></nav>
+  </aside>
+
+  <!-- MAIN PANEL -->
+  <div class="main" id="mainPanel">
+    <div class="panel-header">
+      <div class="breadcrumb" id="breadcrumb">
+        <span style="color:var(--muted-fg)">Todos los equipos</span>
+      </div>
+      <div class="view-tabs" id="viewTabsInner">
+        <button class="view-tab on" id="vList" onclick="setInnerView('list')">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3" cy="6" r="1.5"/><circle cx="3" cy="12" r="1.5"/><circle cx="3" cy="18" r="1.5"/></svg>
+          Lista
+        </button>
+        <button class="view-tab" id="vGrid" onclick="setInnerView('grid')">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          Tarjetas
+        </button>
+      </div>
+      <select class="sort-select" onchange="sortEquipment(this.value)">
+        <option value="name">A → Z</option>
+        <option value="count_desc">Más repuestos</option>
+        <option value="count_asc">Menos repuestos</option>
+        <option value="stock">Con stock bajo</option>
+      </select>
+    </div>
+
+    <div class="panel-info" id="panelInfo">
+      <strong id="infoCount">26</strong> equipos &nbsp;·&nbsp;
+      <span class="info-dot" style="background:var(--success)"></span> <span id="infoOk">18</span> OK &nbsp;
+      <span class="info-dot" style="background:var(--warn)"></span> <span id="infoLow">6</span> Stock bajo &nbsp;
+      <span class="info-dot" style="background:var(--danger)"></span> <span id="infoOut">2</span> Sin stock
+    </div>
+
+    <!-- LIST VIEW -->
+    <div class="eq-list" id="eqList"></div>
+    <!-- GRID VIEW -->
+    <div class="eq-grid hidden" id="eqGrid"></div>
+
+    <!-- REPUESTOS DRAWER (panel inferior al seleccionar equipo) -->
+    <div class="rep-drawer" id="repDrawer">
+      <div class="rep-drawer-header">
+        <div class="rep-eq-dot" id="repDot" style="background:var(--primary)"></div>
+        <span class="rep-eq-name" id="repName">—</span>
+        <span class="rep-eq-area" id="repArea"></span>
+        <span class="rep-count-badge" id="repBadge">0 repuestos</span>
+        <div class="rep-drawer-actions">
+          <button class="btn btn-ghost" style="font-size:10px">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Ficha
+          </button>
+          <button class="btn btn-primary" style="font-size:10px">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Repuesto
+          </button>
+          <button class="btn-icon" onclick="closeDrawer()" style="border:1px solid var(--border)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="rep-search-bar">
+        <div class="search-wrap" style="max-width:280px">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input class="search-input" id="repSearch" placeholder="Buscar en este equipo..." oninput="filterRepuestos(this.value)">
+          <button class="search-clear" onclick="document.getElementById('repSearch').value='';filterRepuestos('')">✕</button>
+        </div>
+        <button class="btn btn-ghost" style="margin-left:auto">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/></svg>
+          Exportar
+        </button>
+        <button class="btn btn-ghost">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 7 12 3 8 7"/><line x1="12" y1="3" x2="12" y2="15"/><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/></svg>
+          Importar
+        </button>
+      </div>
+      <div class="rep-table-wrap">
+        <table class="rep-table">
+          <thead>
+            <tr>
+              <th style="width:44px"></th>
+              <th>Código SAP</th>
+              <th>Descripción</th>
+              <th>Ubicación</th>
+              <th>Stock</th>
+              <th>Mín.</th>
+              <th>Precio</th>
+              <th style="width:80px"></th>
+            </tr>
+          </thead>
+          <tbody id="repTableBody"></tbody>
+        </table>
+        <!-- Mobile cards -->
+        <div class="rep-cards" id="repMobileCards"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════
+   DATA
+═══════════════════════════════════ */
+const HIERARCHY = [
+  {
+    id:'pcho', name:'Planta Chonchi', icon:'🏭', areas:[
+      {id:'EVIS', name:'Eviscerado', color:'#42a5f5'},
+      {id:'FILE', name:'Filete', color:'#66bb6a'},
+      {id:'EMPA', name:'Emparrillado', color:'#ff7043'},
+      {id:'EMPQ', name:'Empaque', color:'#ab47bc'},
+    ]
+  },
+  {
+    id:'pyal', name:'Planta Yal', icon:'🏭', areas:[
+      {id:'YAL-PROC', name:'Procesamiento Yal', color:'#26c6da'},
+      {id:'YAL-FRIG', name:'Frigorífico Yal', color:'#5c6bc0'},
+    ]
+  },
+  {
+    id:'pext', name:'Patio y Serv. Ext.', icon:'🏗️', areas:[
+      {id:'BOMB', name:'Bombas Agua Mar N2', color:'#78909c'},
+      {id:'ESTR', name:'Estanque Transferencia AM', color:'#8d6e63'},
+      {id:'COMP', name:'Compresor Central', color:'#546e7a'},
+    ]
+  },
+  {
+    id:'acop', name:'Acopio', icon:'📦', areas:[
+      {id:'ACOP-ALM', name:'Almacén Acopio', color:'#ffa726'},
+    ]
+  }
+];
+
+const EQUIPMENT = [
+  // EVISCERADO
+  {id:'eq1', name:'Baader 142', type:'machine', icon:'⚙️', areaId:'EVIS', total:419, ok:380, low:30, out:9, color:'#42a5f5'},
+  {id:'eq2', name:'Cinta Aceleración 1 Marel', type:'conveyor', icon:'📏', areaId:'EVIS', total:28, ok:22, low:5, out:1, color:'#42a5f5'},
+  {id:'eq3', name:'Cinta Marel HG', type:'conveyor', icon:'📏', areaId:'EVIS', total:19, ok:16, low:2, out:1, color:'#42a5f5'},
+  {id:'eq4', name:'Cinta Transversal Salida B142', type:'conveyor', icon:'📏', areaId:'EVIS', total:14, ok:12, low:2, out:0, color:'#42a5f5'},
+  {id:'eq5', name:'Volcador Bins', type:'machine', icon:'⚙️', areaId:'EVIS', total:8, ok:7, low:1, out:0, color:'#42a5f5'},
+  {id:'eq6', name:'Marel HG Eviscerado', type:'machine', icon:'⚙️', areaId:'EVIS', total:67, ok:55, low:8, out:4, color:'#42a5f5'},
+  {id:'eq7', name:'Knuro HMI', type:'machine', icon:'🖥️', areaId:'EVIS', total:23, ok:20, low:3, out:0, color:'#42a5f5'},
+  {id:'eq8', name:'Cinta Azul Alimentación B142', type:'conveyor', icon:'📏', areaId:'EVIS', total:11, ok:9, low:2, out:0, color:'#42a5f5'},
+  // FILETE
+  {id:'eq9', name:'Baader 200', type:'machine', icon:'⚙️', areaId:'FILE', total:182, ok:165, low:15, out:2, color:'#66bb6a'},
+  {id:'eq10', name:'Knuro Filete', type:'machine', icon:'🖥️', areaId:'FILE', total:31, ok:28, low:2, out:1, color:'#66bb6a'},
+  {id:'eq11', name:'Cinta Clasificadora', type:'conveyor', icon:'📏', areaId:'FILE', total:22, ok:20, low:2, out:0, color:'#66bb6a'},
+  {id:'eq12', name:'Grader Filete', type:'machine', icon:'⚖️', areaId:'FILE', total:56, ok:50, low:4, out:2, color:'#66bb6a'},
+  {id:'eq13', name:'Mesa Inspección', type:'machine', icon:'⚙️', areaId:'FILE', total:9, ok:9, low:0, out:0, color:'#66bb6a'},
+  {id:'eq14', name:'Marel iCut', type:'machine', icon:'⚙️', areaId:'FILE', total:44, ok:38, low:5, out:1, color:'#66bb6a'},
+  // EMPARRILLADO
+  {id:'eq15', name:'Emparrilladora 1', type:'machine', icon:'⚙️', areaId:'EMPA', total:37, ok:30, low:5, out:2, color:'#ff7043'},
+  {id:'eq16', name:'Emparrilladora 2', type:'machine', icon:'⚙️', areaId:'EMPA', total:37, ok:32, low:4, out:1, color:'#ff7043'},
+  {id:'eq17', name:'Cinta Empaque', type:'conveyor', icon:'📏', areaId:'EMPA', total:18, ok:16, low:2, out:0, color:'#ff7043'},
+  {id:'eq18', name:'Túnel Congelado', type:'machine', icon:'❄️', areaId:'EMPA', total:91, ok:80, low:8, out:3, color:'#ff7043'},
+  {id:'eq19', name:'Balanza Empaque', type:'machine', icon:'⚖️', areaId:'EMPA', total:14, ok:14, low:0, out:0, color:'#ff7043'},
+  {id:'eq20', name:'Selladora Vacío', type:'machine', icon:'⚙️', areaId:'EMPA', total:29, ok:25, low:3, out:1, color:'#ff7043'},
+  // BOMBAS
+  {id:'eq21', name:'Motor Bomba Caseta AM', type:'motor', icon:'🔄', areaId:'BOMB', total:12, ok:8, low:3, out:1, color:'#78909c'},
+  {id:'eq22', name:'Bomba Caseta 40/26', type:'pump', icon:'💧', areaId:'BOMB', total:7, ok:5, low:1, out:1, color:'#78909c'},
+  // ESTANQUE
+  {id:'eq23', name:'Bomba Estanque Inox 40/26', type:'pump', icon:'💧', areaId:'ESTR', total:5, ok:3, low:1, out:1, color:'#8d6e63'},
+  // SIN AREA
+  {id:'eq24', name:'Compresor Frío 1', type:'machine', icon:'❄️', areaId:null, total:43, ok:38, low:4, out:1, color:'#a0a0a0'},
+  {id:'eq25', name:'Caldera Principal', type:'machine', icon:'🔥', areaId:null, total:67, ok:60, low:5, out:2, color:'#a0a0a0'},
+];
+
+const REPUESTOS = {
+  eq1:[
+    {id:'r1', sap:'SAP-1001423', desc:'Cuchilla Baader 142 M18', sub:'Acero inoxidable AISI 304', loc:'A-03-2', stock:12, min:5, price:18400, img:null},
+    {id:'r2', sap:'SAP-1001424', desc:'Rodamiento SKF 6205-2RS', sub:'Rodamiento rígido de bolas', loc:'B-01-4', stock:3, min:4, price:8750, img:null},
+    {id:'r3', sap:'SAP-1001425', desc:'Correa B-52 Gates', sub:'Correa trapezoidal', loc:'A-05-1', stock:0, min:2, price:4200, img:null},
+    {id:'r4', sap:'SAP-1001426', desc:'Sello mecánico Baader', sub:'Sello de eje DN40', loc:'C-02-1', stock:8, min:3, price:31000, img:null},
+    {id:'r5', sap:'SAP-1001427', desc:'Cadena transmisión 08B-2', sub:'DIN 8187 - 1m', loc:'B-02-3', stock:6, min:2, price:9600, img:null},
+    {id:'r6', sap:'SAP-1001428', desc:'Motor reductor 0.37kW', sub:'Bonfiglioli 0.37kW 14rpm', loc:'A-01-1', stock:1, min:1, price:245000, img:null},
+    {id:'r7', sap:'SAP-1001429', desc:'Junta tórica NBR 40x3', sub:'NBR 70 Shore A', loc:'C-01-2', stock:24, min:10, price:450, img:null},
+    {id:'r8', sap:'SAP-1001430', desc:'Filtro aceite hidráulico', sub:'Retorno 10 micras', loc:'A-04-2', stock:4, min:2, price:12800, img:null},
+    {id:'r9', sap:'SAP-1001431', desc:'Sensor inductivo M12', sub:'PNP NO 4mm detección', loc:'B-03-1', stock:5, min:2, price:18000, img:null},
+    {id:'r10', sap:'SAP-1001432', desc:'Interruptor fin de carrera', sub:'IP67 Metálico', loc:'B-03-2', stock:7, min:3, price:9200, img:null},
+    {id:'r11', sap:'SAP-1001433', desc:'Tornillo hex M10x40 DIN933', sub:'Acero 8.8 galvanizado', loc:'D-01-1', stock:85, min:20, price:180, img:null},
+    {id:'r12', sap:'SAP-1001434', desc:'Banda transportadora 300mm', sub:'PVC liso blanco alimentario', loc:'A-06-1', stock:2, min:1, price:87000, img:null},
+  ],
+  eq7:[
+    {id:'r20', sap:'SAP-2100001', desc:'Pantalla táctil 15" Knuro', sub:'PCAP multi-touch IP65', loc:'E-01-1', stock:1, min:1, price:380000, img:null},
+    {id:'r21', sap:'SAP-2100002', desc:'Fuente poder 24V 5A', sub:'Rail DIN Meanwell', loc:'E-01-2', stock:3, min:2, price:45000, img:null},
+    {id:'r22', sap:'SAP-2100003', desc:'Cable Ethernet Cat6 blindado', sub:'Superflex 2m', loc:'E-02-1', stock:5, min:2, price:8500, img:null},
+    {id:'r23', sap:'SAP-2100004', desc:'Módulo I/O digital Siemens', sub:'SM 1223 8DI/8DO', loc:'E-01-3', stock:2, min:1, price:125000, img:null},
+    {id:'r24', sap:'SAP-2100005', desc:'Batería UPS 12V 7Ah', sub:'AGM sellada', loc:'E-02-2', stock:4, min:2, price:22000, img:null},
+    {id:'r25', sap:'SAP-2100006', desc:'Fusible 5A rápido 5x20', sub:'Cerámico 250V', loc:'D-02-1', stock:20, min:10, price:350, img:null},
+    {id:'r26', sap:'SAP-2100007', desc:'Disipador térmico aluminio', sub:'Para panel 300x300mm', loc:'E-01-4', stock:1, min:1, price:18000, img:null},
+  ],
+  eq21:[
+    {id:'r40', sap:'SAP-3000001', desc:'Rodamiento 6308-2RS SKF', sub:'Rodamiento rígido d40 D90', loc:'F-01-1', stock:2, min:2, price:22000, img:null},
+    {id:'r41', sap:'SAP-3000002', desc:'Sello de aceite 40x62x10', sub:'NBR doble labio', loc:'F-01-2', stock:0, min:2, price:3500, img:null},
+    {id:'r42', sap:'SAP-3000003', desc:'Condensador arranque 150µF', sub:'250V AC electrolítico', loc:'F-02-1', stock:3, min:2, price:8900, img:null},
+    {id:'r43', sap:'SAP-3000004', desc:'Bobina contactor 24V', sub:'Schneider LC1D09', loc:'F-02-2', stock:4, min:2, price:15600, img:null},
+    {id:'r44', sap:'SAP-3000005', desc:'Grasa rodamientos EP2', sub:'Lithium NLGI2 500g', loc:'G-01-1', stock:6, min:3, price:4200, img:null},
+  ],
+};
+// Default repuestos for equipment without specific data
+const DEFAULT_REP = [
+  {id:'d1', sap:'SAP-GEN-001', desc:'Rodamiento genérico', sub:'Según modelo equipo', loc:'A-01-1', stock:2, min:2, price:12000, img:null},
+  {id:'d2', sap:'SAP-GEN-002', desc:'Sello de eje', sub:'NBR estándar', loc:'A-01-2', stock:1, min:2, price:8500, img:null},
+  {id:'d3', sap:'SAP-GEN-003', desc:'Kit filtros', sub:'Mantenimiento preventivo', loc:'B-01-1', stock:0, min:1, price:35000, img:null},
+];
+
+/* ═══════════════════════════════════
+   STATE
+═══════════════════════════════════ */
+let selectedAreaId = null;   // null = todos
+let selectedEqId = null;
+let currentView = 'list';    // list | grid
+let sidebarOpen = true;
+let globalQuery = '';
+
+/* ═══════════════════════════════════
+   INIT
+═══════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', ()=>{
+  buildTree();
+  renderEquipment();
+});
+
+/* ═══════════════════════════════════
+   TREE
+═══════════════════════════════════ */
+function buildTree(){
+  const nav = document.getElementById('areaTree');
+  nav.innerHTML = '';
+
+  // "Todos" option
+  const all = document.createElement('div');
+  all.style.cssText = 'display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;border-left:3px solid '+(selectedAreaId===null?'var(--primary)':'transparent')+';background:'+(selectedAreaId===null?'rgba(33,150,243,.1)':'transparent')+';transition:all .12s;color:'+(selectedAreaId===null?'var(--primary)':'var(--fg)');
+  all.innerHTML = `<span style="font-size:11px;font-weight:600;flex:1">Todos los equipos</span><span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:999px;background:${selectedAreaId===null?'rgba(33,150,243,.18)':'var(--muted)'};color:${selectedAreaId===null?'var(--primary)':'var(--muted-fg)'}">${EQUIPMENT.length}</span>`;
+  all.onmouseenter = e=>{ if(selectedAreaId!==null) e.currentTarget.style.background='var(--muted)'; };
+  all.onmouseleave = e=>{ if(selectedAreaId!==null) e.currentTarget.style.background='transparent'; };
+  all.onclick = ()=>{ selectedAreaId=null; selectedEqId=null; buildTree(); renderEquipment(); updateBreadcrumb(); };
+  nav.appendChild(all);
+
+  HIERARCHY.forEach(plant=>{
+    const areas = plant.areas.filter(a=> EQUIPMENT.some(e=>e.areaId===a.id));
+    if(!areas.length) return;
+
+    const group = document.createElement('div');
+    group.className = 'plant-group';
+
+    // Check if any area in this plant is selected → start open
+    const hasSelected = areas.some(a=>a.id===selectedAreaId);
+    if(hasSelected || selectedAreaId===null) group.classList.add('open');
+
+    const plantCount = areas.reduce((s,a)=>s+EQUIPMENT.filter(e=>e.areaId===a.id).length,0);
+
+    group.innerHTML = `
+      <div class="plant-header" onclick="this.parentElement.classList.toggle('open')">
+        <svg class="plant-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+        <span class="plant-icon">${plant.icon}</span>
+        <span class="plant-name">${plant.name}</span>
+        <span class="plant-count">${plantCount}</span>
+      </div>
+      <div class="plant-areas">
+        ${areas.map(area=>{
+          const cnt = EQUIPMENT.filter(e=>e.areaId===area.id).length;
+          const isActive = area.id===selectedAreaId;
+          return `<div class="area-item${isActive?' active':''}" onclick="selectArea('${area.id}')">
+            <span class="area-dot" style="background:${area.color}"></span>
+            <span class="area-name">${area.name}</span>
+            <span class="area-count">${cnt}</span>
+          </div>`;
+        }).join('')}
+      </div>`;
+    nav.appendChild(group);
+  });
+
+  // Sin área asignada
+  const sinArea = EQUIPMENT.filter(e=>!e.areaId);
+  if(sinArea.length){
+    const sa = document.createElement('div');
+    sa.className = 'sinarea-item'+(selectedAreaId==='__sin__'?' active':'');
+    sa.innerHTML = `<span style="font-size:12px">⚠️</span><span style="font-size:11px;flex:1">Sin área asignada</span><span class="area-count">${sinArea.length}</span>`;
+    sa.onclick = ()=>selectArea('__sin__');
+    nav.appendChild(sa);
+  }
+}
+
+function selectArea(areaId){
+  selectedAreaId = areaId;
+  selectedEqId = null;
+  closeDrawer();
+  buildTree();
+  renderEquipment();
+  updateBreadcrumb();
+}
+
+/* ═══════════════════════════════════
+   EQUIPMENT RENDER
+═══════════════════════════════════ */
+function getFilteredEquipment(query){
+  let list = EQUIPMENT;
+  if(selectedAreaId === '__sin__') list = list.filter(e=>!e.areaId);
+  else if(selectedAreaId) list = list.filter(e=>e.areaId===selectedAreaId);
+
+  if(query){
+    const q = query.toLowerCase();
+    list = list.filter(e=>e.name.toLowerCase().includes(q) || (REPUESTOS[e.id]||DEFAULT_REP).some(r=>r.desc.toLowerCase().includes(q)||r.sap.toLowerCase().includes(q)));
+  }
+  return list;
+}
+
+function renderEquipment(){
+  const list = getFilteredEquipment(globalQuery);
+  updatePanelInfo(list);
+  if(currentView==='list') renderList(list);
+  else renderGrid(list);
+}
+
+function updatePanelInfo(list){
+  document.getElementById('infoCount').textContent = list.length;
+  document.getElementById('infoOk').textContent = list.filter(e=>e.out===0&&e.low===0).length;
+  document.getElementById('infoLow').textContent = list.filter(e=>e.low>0&&e.out===0).length;
+  document.getElementById('infoOut').textContent = list.filter(e=>e.out>0).length;
+}
+
+function stockColor(e){
+  if(e.out>0) return 'var(--danger)';
+  if(e.low>0) return 'var(--warn)';
+  return 'var(--success)';
+}
+
+function renderList(list){
+  const el = document.getElementById('eqList');
+  if(!list.length){ el.innerHTML = emptyState(); return; }
+
+  el.innerHTML = list.map(e=>{
+    const pct = Math.round((e.ok/e.total)*100);
+    const area = findArea(e.areaId);
+    const isSelected = e.id===selectedEqId;
+    return `<div class="eq-row${isSelected?' selected':''}" id="eqrow-${e.id}" onclick="selectEquipment('${e.id}')">
+      <div class="eq-type-dot" style="background:${e.color}22;color:${e.color}">${e.icon}</div>
+      <div class="eq-info">
+        <div class="eq-name">${hl(e.name)}</div>
+        <div class="eq-meta">
+          ${area?`<span class="eq-area-tag"><span style="width:5px;height:5px;border-radius:50%;background:${area.color};display:inline-block"></span>${area.name}</span>`:'<span class="eq-area-tag" style="color:var(--warn)">⚠ Sin área</span>'}
+          <span style="color:var(--muted-fg)">${e.total} repuestos</span>
+        </div>
+      </div>
+      <div class="eq-stocks">
+        <div class="stock-bar-wrap">
+          <span class="stock-bar-label" style="color:var(--success)">${e.ok}</span>
+          <div class="stock-bar"><div class="stock-fill" style="width:${Math.round((e.ok/e.total)*100)}%"></div></div>
+        </div>
+        ${e.low?`<div class="stock-bar-wrap">
+          <span class="stock-bar-label" style="color:var(--warn)">${e.low}</span>
+          <div class="stock-bar"><div class="stock-fill warn" style="width:${Math.round((e.low/e.total)*100)}%"></div></div>
+        </div>`:''}
+        ${e.out?`<div class="stock-bar-wrap">
+          <span class="stock-bar-label" style="color:var(--danger)">${e.out}</span>
+          <div class="stock-bar"><div class="stock-fill danger" style="width:${Math.round((e.out/e.total)*100)}%"></div></div>
+        </div>`:''}
+      </div>
+      <div class="eq-rep-count">
+        <div class="rep-num" style="color:${stockColor(e)}">${e.total}</div>
+        <div class="rep-label">repuestos</div>
+      </div>
+      <svg class="eq-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+    </div>`;
+  }).join('');
+}
+
+function renderGrid(list){
+  const el = document.getElementById('eqGrid');
+  if(!list.length){ el.innerHTML = emptyState(); return; }
+
+  el.innerHTML = list.map(e=>{
+    const area = findArea(e.areaId);
+    const isSelected = e.id===selectedEqId;
+    const pct = Math.round((e.ok/e.total)*100);
+    return `<div class="eq-card${isSelected?' selected':''}" id="eqcard-${e.id}" onclick="selectEquipment('${e.id}')">
+      <div class="eq-card-top">
+        <div class="eq-card-icon" style="background:${e.color}22;color:${e.color}">${e.icon}</div>
+        <div class="eq-card-info">
+          <div class="eq-card-name">${hl(e.name)}</div>
+          <div class="eq-card-area">${area?`<span style="width:5px;height:5px;border-radius:50%;background:${area.color};display:inline-block;flex-shrink:0"></span>${area.name}`:'⚠ Sin área'}</div>
+        </div>
+      </div>
+      <div class="eq-card-stats">
+        <div class="eq-stat ok">
+          <div class="eq-stat-val">${e.ok}</div>
+          <div class="eq-stat-lbl">OK</div>
+        </div>
+        <div class="eq-stat${e.low>0?' low':''}">
+          <div class="eq-stat-val">${e.low}</div>
+          <div class="eq-stat-lbl">Bajo</div>
+        </div>
+        <div class="eq-stat${e.out>0?' out':''}">
+          <div class="eq-stat-val">${e.out}</div>
+          <div class="eq-stat-lbl">Cero</div>
+        </div>
+      </div>
+      <div class="eq-card-bar"><div class="eq-card-fill" style="width:${pct}%;background:${stockColor(e)}"></div></div>
+    </div>`;
+  }).join('');
+}
+
+function emptyState(){
+  return `<div class="empty">
+    <div class="empty-icon">🔍</div>
+    <div class="empty-title">Sin resultados</div>
+    <div class="empty-sub">No hay equipos que coincidan con tu búsqueda</div>
+  </div>`;
+}
+
+/* ═══════════════════════════════════
+   SEARCH
+═══════════════════════════════════ */
+function hl(text){
+  if(!globalQuery) return text;
+  const re = new RegExp('('+globalQuery.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi');
+  return text.replace(re,'<mark>$1</mark>');
+}
+
+function onGlobalSearch(val){
+  globalQuery = val.trim();
+  renderEquipment();
+}
+
+function clearSearch(){
+  document.getElementById('globalSearch').value='';
+  globalQuery='';
+  renderEquipment();
+}
+
+/* ═══════════════════════════════════
+   EQUIPMENT SELECTION
+═══════════════════════════════════ */
+function selectEquipment(id){
+  if(selectedEqId===id){ closeDrawer(); return; }
+  selectedEqId=id;
+  const eq=EQUIPMENT.find(e=>e.id===id);
+  const area=findArea(eq.areaId);
+  renderEquipment(); // re-render to update selected state
+
+  // populate drawer
+  document.getElementById('repDot').style.background = eq.color;
+  document.getElementById('repName').textContent = eq.name;
+  document.getElementById('repArea').textContent = area?' · '+area.name:'';
+  const reps = REPUESTOS[id]||DEFAULT_REP;
+  document.getElementById('repBadge').textContent = reps.length+' repuestos';
+  document.getElementById('repSearch').value='';
+  renderRepTable(reps,'');
+
+  const drawer=document.getElementById('repDrawer');
+  drawer.classList.add('open');
+
+  // scroll drawer into view
+  setTimeout(()=>{ drawer.scrollIntoView({behavior:'smooth',block:'nearest'}); },100);
+}
+
+function closeDrawer(){
+  selectedEqId=null;
+  document.getElementById('repDrawer').classList.remove('open');
+  renderEquipment();
+}
+
+/* ═══════════════════════════════════
+   REPUESTOS TABLE
+═══════════════════════════════════ */
+function filterRepuestos(q){
+  const reps = REPUESTOS[selectedEqId]||DEFAULT_REP;
+  const filt = q ? reps.filter(r=>r.desc.toLowerCase().includes(q.toLowerCase())||r.sap.toLowerCase().includes(q.toLowerCase())) : reps;
+  renderRepTable(filt,q);
+}
+
+function renderRepTable(reps,q){
+  const tbody=document.getElementById('repTableBody');
+  const mobile=document.getElementById('repMobileCards');
+
+  // Desktop table
+  tbody.innerHTML=reps.map(r=>{
+    const sc = r.stock===0?'out':r.stock<r.min?'low':'ok';
+    const scColor = sc==='out'?'var(--danger)':sc==='low'?'var(--warn)':'var(--success)';
+    return `<tr>
+      <td><div class="thumb">📦</div></td>
+      <td><span class="sap-code">${r.sap}</span></td>
+      <td class="desc-cell">
+        <div class="desc-name">${r.desc}</div>
+        <div class="desc-sub">${r.sub}</div>
+      </td>
+      <td class="loc-cell">📍 ${r.loc}</td>
+      <td><span class="stock-num ${sc}" style="color:${scColor}">${r.stock}</span><span style="font-size:9px;color:var(--muted-fg)"> / ${r.min}</span></td>
+      <td style="font-size:10px;color:var(--muted-fg)">${r.min}</td>
+      <td class="price-cell">$${r.price.toLocaleString('es-CL')}</td>
+      <td><div class="action-cell">
+        <button class="tbl-icon" title="Ver detalle"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+        <button class="tbl-icon" title="Fotos"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></button>
+        <button class="tbl-icon" title="Editar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+      </div></td>
+    </tr>`;
+  }).join('');
+
+  // Mobile cards
+  mobile.innerHTML=reps.map(r=>{
+    const sc = r.stock===0?'out':r.stock<r.min?'low':'ok';
+    const scColor = sc==='out'?'var(--danger)':sc==='low'?'var(--warn)':'var(--success)';
+    return `<div class="rep-card-item">
+      <div class="thumb">📦</div>
+      <div class="rep-card-info">
+        <div class="rep-card-name">${r.desc}</div>
+        <div class="rep-card-meta">
+          <span class="sap-code">${r.sap}</span>
+          <span>📍 ${r.loc}</span>
+          <span style="color:${scColor};font-weight:700">${r.stock} / ${r.min}</span>
+          <span>$${r.price.toLocaleString('es-CL')}</span>
+        </div>
+      </div>
+      <button class="tbl-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+    </div>`;
+  }).join('');
+
+  if(!reps.length){
+    tbody.innerHTML=`<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--muted-fg)">Sin resultados</td></tr>`;
+    mobile.innerHTML=`<div style="text-align:center;padding:20px;color:var(--muted-fg)">Sin resultados</div>`;
+  }
+}
+
+/* ═══════════════════════════════════
+   BREADCRUMB
+═══════════════════════════════════ */
+function updateBreadcrumb(){
+  const bc=document.getElementById('breadcrumb');
+  if(!selectedAreaId){
+    bc.innerHTML='<span style="color:var(--muted-fg)">Todos los equipos</span>';
+    return;
+  }
+  if(selectedAreaId==='__sin__'){
+    bc.innerHTML='<span style="color:var(--muted-fg)">Repuestos</span><span class="bc-sep">/</span><span style="color:var(--warn)">Sin área asignada</span>';
+    return;
+  }
+  const area=findArea(selectedAreaId);
+  const plant=HIERARCHY.find(p=>p.areas.some(a=>a.id===selectedAreaId));
+  bc.innerHTML=`<span style="cursor:pointer" onclick="selectArea(null)">Todos</span><span class="bc-sep">/</span><span>${plant?.name||''}</span><span class="bc-sep">/</span><span style="color:${area?.color}">${area?.name||selectedAreaId}</span>`;
+}
+
+/* ═══════════════════════════════════
+   UTILS
+═══════════════════════════════════ */
+function findArea(areaId){
+  if(!areaId) return null;
+  for(const p of HIERARCHY){ const a=p.areas.find(a=>a.id===areaId); if(a) return a; }
+  return null;
+}
+
+function toggleSidebar(){
+  sidebarOpen=!sidebarOpen;
+  document.getElementById('sidebar').classList.toggle('collapsed',!sidebarOpen);
+}
+
+function setInnerView(v){
+  currentView=v;
+  document.getElementById('eqList').classList.toggle('hidden',v!=='list');
+  document.getElementById('eqGrid').classList.toggle('hidden',v!=='grid');
+  document.getElementById('vList').classList.toggle('on',v==='list');
+  document.getElementById('vGrid').classList.toggle('on',v!=='list');
+  renderEquipment();
+}
+
+function setView(v){
+  document.querySelectorAll('.demo-tab').forEach(t=>t.classList.remove('on'));
+  event.target.classList.add('on');
+  if(v==='mobile'){
+    document.body.style.maxWidth='390px';
+    document.body.style.margin='0 auto';
+    document.body.style.border='2px solid var(--primary)';
+  } else {
+    document.body.style.maxWidth='';
+    document.body.style.margin='';
+    document.body.style.border='';
+    setInnerView(v);
+  }
+}
+
+function sortEquipment(val){
+  if(val==='name') EQUIPMENT.sort((a,b)=>a.name.localeCompare(b.name));
+  else if(val==='count_desc') EQUIPMENT.sort((a,b)=>b.total-a.total);
+  else if(val==='count_asc') EQUIPMENT.sort((a,b)=>a.total-b.total);
+  else if(val==='stock') EQUIPMENT.sort((a,b)=>(b.out*100+b.low)-(a.out*100+a.low));
+  renderEquipment();
+}
+</script>
+</body>
+</html>
