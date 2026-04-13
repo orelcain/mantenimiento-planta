@@ -568,7 +568,7 @@ Si se necesita re-procesar o corregir algo, usar `scripts/iter18-full-season-reb
 - ✅ **Selectores semana/mes**: `getWeekRangeByOffset`/`getMonthRangeByOffset` + botones prev/next en AnalisisGraderPeriodoPage (L127-139, L252-290).
 
 ### P0.5 — Grader iter 19 (modelo neumático + umbrales) — sesión 2026-04-13
-- [ ] **Validar flujo PP→P0 incremental** end-to-end con archivos históricos reales cargados por el usuario (julio 2025+)
+- ✅ **Validar flujo PP→P0 incremental** end-to-end con Excel reales julio 2025 (5 tests integración: parse PP, parse P0, merge sin duplicar, inferencia sin P0, totales consistentes)
 - ✅ **Asignación óptima de calibres a gates**: `computeOptimalGateAssignment` en graderGateTiming.ts — heurística greedy timing×demanda
 - ✅ **Semáforo tiempo de reacción por gate**: modelo neumático per-gate Darcy-Weisbach (`computeGateTimingSignals` + `PneumaticBreakdown`), columnas Válv/Línea/Cil ms + P_eff en CompuertasTab, sección "Configuración Neumática" en GatesConfigPage con preview en vivo
 - ✅ **Ajustar umbrales** insight #17/#18: `gateOverloadWarnPct/CriticalPct`, `timingMarginOkSec/WarnSec` configurables vía errorThresholds + card inline en CompuertasTab. 18 tooltips neumáticos nuevos.
