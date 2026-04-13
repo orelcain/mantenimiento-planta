@@ -195,6 +195,107 @@ export const GRADER_TOOLTIPS: Record<string, TooltipEntry> = {
     example: 'Si 6-8lb tiene 53% demanda y 5 gates (ideal: 6), busca un calibre con superávit para donar 1 gate.',
   },
 
+  // ─── Neumática / Timing ────────────────────────────────────
+  'pneum.responseTime': {
+    title: 'Tiempo de respuesta neumático (por gate)',
+    text: 'Tiempo total que tarda la compuerta en activarse desde que el controlador Z2 envía la señal eléctrica al solenoide. Cada gate tiene un tiempo distinto porque la línea neumática es más larga.',
+    formula: 't_respuesta = t_válvula + t_carga_línea + t_carrera_cilindro',
+    example: 'Gate 1 (2m línea): ~90ms. Gate 12 (18m línea): ~250ms. La diferencia viene de la carga de la línea.',
+  },
+  'pneum.valveSwitch': {
+    title: 'Tiempo de conmutación del solenoide',
+    text: 'Retardo fijo de la electroválvula 5/2 vías al cambiar de estado. Es constante para todas las gates (misma válvula en el manifold).',
+    formula: 't_válvula = constante (dato del datasheet)',
+    example: 'Válvula Festo MFH-5/2: 25ms. SMC SY3000: 35ms. Parker: 20ms.',
+  },
+  'pneum.lineCharge': {
+    title: 'Tiempo de carga de línea neumática',
+    text: 'Tiempo para llenar el tubo desde el manifold hasta la compuerta con aire a presión de trabajo. Depende críticamente del largo y diámetro del tubo.',
+    formula: 't_carga = V_tubo / Q_efectivo\nV_tubo = π × (d/2)² × L\nQ_eff = Cv × Kv × √(P_suministro − P_atm)',
+    example: 'Tubo 4mm ID × 2m = 25cm³ → ~15ms. Tubo 4mm ID × 18m = 226cm³ → ~140ms a 6 bar.',
+  },
+  'pneum.cylinderStroke': {
+    title: 'Tiempo de carrera del cilindro',
+    text: 'Tiempo para que el pistón complete su carrera (extender o retraer el flipper). Depende del bore, stroke y presión efectiva después de las pérdidas en la línea.',
+    formula: 't_carrera = stroke / v_pistón\nv_pistón = Q_disponible / A_pistón',
+    example: 'Cilindro Ø32mm × 50mm @ 5.5 bar: ~40ms. A menor presión (gate lejana) → más lento.',
+  },
+  'pneum.pressureDrop': {
+    title: 'Caída de presión en la línea',
+    text: 'Pérdida de presión entre el manifold y la compuerta por fricción del aire con las paredes del tubo. Crece con la longitud y baja con el diámetro (proporcional a d⁴).',
+    formula: 'ΔP ∝ L / d⁴ (Darcy-Weisbach para flujo compresible)',
+    example: 'Gate 1 (2m): ΔP ≈ 0.1 bar. Gate 12 (18m): ΔP ≈ 0.8 bar. Duplicar el diámetro reduce ΔP 16×.',
+  },
+  'pneum.effectivePressure': {
+    title: 'Presión efectiva en la compuerta',
+    text: 'Presión disponible en el cilindro después de las pérdidas en la línea. Menor presión = cilindro más lento y con menos fuerza.',
+    formula: 'P_efectiva = P_suministro − ΔP_línea',
+    example: 'FRL a 6 bar, ΔP = 0.5 bar → P_eff = 5.5 bar. Si P_eff < 3 bar → riesgo de falla.',
+  },
+  'pneum.supplyPressure': {
+    title: 'Presión de suministro (FRL)',
+    text: 'Presión regulada en el Filter-Regulator-Lubricator. Leer del manómetro del regulador en el panel neumático. Subir presión = más rápido pero más desgaste.',
+    example: 'Típico planta: 5-7 bar. Mínimo recomendado: 4 bar. Máximo: 8 bar (límite del regulador).',
+  },
+  'pneum.tubeDiameter': {
+    title: 'Diámetro interno del tubo',
+    text: 'Diámetro INTERNO (ID), no el externo (OD). Tubo PU estándar: 6mm OD = 4mm ID. El flujo escala con d⁴, así que un tubo ligeramente más grueso tiene efecto dramático.',
+    formula: 'Flujo ∝ d⁴ (Hagen-Poiseuille)',
+    example: '4mm ID → 256 (d⁴). 6mm ID → 1296 (d⁴). ¡5× más flujo con solo 2mm más de diámetro!',
+  },
+  'pneum.lineLengthM': {
+    title: 'Largo de línea por gate',
+    text: 'Distancia del tubo neumático desde el manifold (bloque de electroválvulas) hasta cada flipper. Medir en planta siguiendo el tubo real (no en línea recta).',
+    example: 'Si el manifold está al inicio de la grader: Gate 1 ≈ 2m, Gate 12 ≈ 18-20m.',
+  },
+  'pneum.cylinderBore': {
+    title: 'Bore (diámetro del pistón)',
+    text: 'Diámetro del pistón del cilindro neumático. Determina la fuerza: F = P × π(d/2)². Un bore mayor da más fuerza pero necesita más aire (más lento si la línea es larga).',
+    formula: 'F = P × π × (bore/2)²',
+    example: 'Ø25mm @ 6 bar → 295N. Ø32mm @ 6 bar → 483N. Ø50mm @ 6 bar → 1178N.',
+  },
+  'pneum.cylinderStrokeMm': {
+    title: 'Carrera del cilindro',
+    text: 'Distancia que viaja el pistón de un extremo al otro. Más largo = más tiempo de actuación.',
+    example: 'Flipper típico grader: 30-80mm de carrera.',
+  },
+  'pneum.valveCv': {
+    title: 'Coeficiente de flujo (Cv)',
+    text: 'Capacidad de flujo de la electroválvula. Dato del datasheet del fabricante. Mayor Cv = más caudal = más rápido.',
+    example: 'Válvula 1/8": Cv ≈ 0.3. Válvula 1/4": Cv ≈ 0.7. Válvula 3/8": Cv ≈ 1.5.',
+  },
+  'pneum.margin': {
+    title: 'Margen de timing por gate',
+    text: 'Tiempo disponible después de que la compuerta actúa y antes de que llegue la siguiente pieza. Un margen negativo significa que el flipper no alcanza a resetear.',
+    formula: 'Margen = t_disponible − t_paso_salmón − t_respuesta_neumático',
+    example: 'Margen > 500ms = OK (verde). 150-500ms = Ajustado (amarillo). < 150ms = Crítico (rojo). Umbrales configurables.',
+  },
+  'gate.timingSemaphore': {
+    title: 'Semáforo de timing',
+    text: 'Indicador visual del margen de tiempo de cada compuerta. Verde = holgado, Amarillo = ajustado (monitorear), Rojo = crítico (riesgo de "puerta no preparada").',
+    example: 'Los umbrales son configurables. Cambiar en "Ajustes de umbrales" arriba de esta tabla.',
+  },
+  'threshold.timingOk': {
+    title: 'Umbral verde (OK)',
+    text: 'Margen mínimo para que el semáforo sea verde. Margen ≥ este valor = la compuerta trabaja con holgura.',
+    example: 'Default: 0.5s. Si la producción es estable, puede bajarse a 0.3s.',
+  },
+  'threshold.timingWarn': {
+    title: 'Umbral amarillo (Ajustado)',
+    text: 'Margen mínimo para que el semáforo sea amarillo (warn). Por debajo de este valor = rojo (crítico).',
+    example: 'Default: 0.15s (150ms). Bajar si la máquina opera sin errores a márgenes menores.',
+  },
+  'threshold.overloadWarn': {
+    title: 'Umbral sobrecarga (warn)',
+    text: 'Porcentaje máximo de tráfico que debería manejar una sola compuerta antes de generar alerta. Si se supera, el flipper puede no resetear a tiempo.',
+    example: 'Default: 35%. Con 12 gates activas, el promedio es ~8.3% por gate.',
+  },
+  'threshold.overloadCritical': {
+    title: 'Umbral sobrecarga (critical)',
+    text: 'Porcentaje de tráfico que genera alerta CRÍTICA. A este nivel, errores de "puerta no preparada" son casi seguros.',
+    example: 'Default: 50%. Significa que una sola gate maneja la mitad de la producción.',
+  },
+
   // ─── Diagnóstico ──────────────────────────────────────────
   'insights.deterministic': 'Alertas automáticas generadas por reglas estadísticas: Punto Cero alto, mismatch, variabilidad, cambios de lote, etc. No requieren IA.',
   'insights.ai': {

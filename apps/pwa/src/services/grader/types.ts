@@ -399,6 +399,54 @@ export interface GraderPhysicalConfig {
    * Derivar del Excel: (total_piezas / duración_turno_min) / (zeta_speed / spacing)
    */
   avgFishSpacingOnZetaBeltM?: number
+  /**
+   * Configuración del sistema neumático para cálculo per-gate del tiempo
+   * de respuesta del flipper. Si presente, reemplaza el `flipperResetTimeSec`
+   * plano con un modelo físico que considera longitud de línea, caída de
+   * presión y características del cilindro por cada gate individual.
+   *
+   * Ver `computePerGateResponseTime()` en graderGateTiming.ts para las fórmulas.
+   */
+  pneumaticConfig?: PneumaticConfig
+}
+
+/**
+ * Configuración del sistema neumático de la clasificadora.
+ *
+ * El manifold (bloque de electroválvulas) alimenta las 12 compuertas vía
+ * tubos de poliuretano. Cada gate tiene una longitud de línea diferente,
+ * lo que causa distintos tiempos de respuesta y caídas de presión.
+ *
+ * Modelo: t_respuesta(gate) = t_válvula + t_carga_línea(L) + t_carrera_cilindro(P_eff)
+ */
+export interface PneumaticConfig {
+  /** Presión de suministro en el FRL (Filter-Regulator-Lubricator) en bar.
+   *  Medir en el manómetro del regulador. Típico: 5-7 bar. */
+  supplyPressureBar: number
+  /** Tiempo de conmutación del solenoide de la electroválvula 5/2 en segundos.
+   *  Dato del datasheet de la válvula. Típico: 0.020-0.050s. */
+  valveSwitchTimeSec: number
+  /** Diámetro INTERNO del tubo neumático en mm (no el OD).
+   *  Tubo estándar 6mm OD = 4mm ID; 8mm OD = 5.5mm ID.
+   *  Flujo escala con d⁴ → pequeños cambios tienen gran efecto. */
+  tubeInnerDiameterMm: number
+  /** Diámetro del bore (pistón) del cilindro del flipper en mm.
+   *  Determina la fuerza de actuación: F = P × π(d/2)². Típico: 25-50mm. */
+  cylinderBoreMm: number
+  /** Carrera del cilindro (distancia de viaje del pistón) en mm.
+   *  Típico para flippers de grader: 30-80mm. */
+  cylinderStrokeMm: number
+  /** Coeficiente de flujo de la electroválvula (Cv, adimensional).
+   *  Dato del datasheet. Típico para válvulas 1/4": 0.5-1.2. */
+  valveCv: number
+  /** Factor de eficiencia del cilindro (fricción de sellos, carga).
+   *  0.85 = típico para cilindros estándar con sellos nuevos.
+   *  Bajar si hay fricción alta o sellos desgastados. */
+  cylinderEfficiency?: number
+  /** Largo de línea neumática desde el manifold hasta cada flipper (metros).
+   *  Gate 1 = línea más corta (manifold cerca del sensor), Gate 12 = más larga.
+   *  Medir en planta o estimar: ~1.5m + gateNumber × 1.5m. */
+  gateLineLengthsM: Partial<Record<number, number>>
 }
 
 // ============================================================================
@@ -514,6 +562,14 @@ export interface GraderAnalysisConfig {
     outOfLimitsPctWarn: number;    // e.g., 3
     pointZeroPctWarn: number;      // e.g., 2
     pointZeroPctCritical?: number; // e.g., 3.5
+    /** Margen timing semáforo verde (segundos). Default: 0.5 */
+    timingMarginOkSec?: number;
+    /** Margen timing semáforo amarillo (segundos). Default: 0.15 */
+    timingMarginWarnSec?: number;
+    /** Umbral gate sobrecargada warn (%). Default: 35 */
+    gateOverloadWarnPct?: number;
+    /** Umbral gate sobrecargada critical (%). Default: 50 */
+    gateOverloadCriticalPct?: number;
   };
   /** Rangos de peso por calibre personalizados (sobreescriben los default) */
   customWeightRanges?: CalibreWeightRange[];

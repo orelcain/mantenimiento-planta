@@ -9,6 +9,7 @@ import type {
   GraderAnalyticsResult,
   DeterministicInsight,
 } from './types'
+import { computePerGateResponseTime } from './graderGateTiming'
 
 let insightCounter = 0
 function nextId(): string {
@@ -440,16 +441,18 @@ export function computeDeterministicInsights(
     }
   }
 
-  // ——— 17. Gate sobrecargada (>35% del tráfico en 1 sola compuerta) ———
+  // ——— 17. Gate sobrecargada (umbral configurable, default >35%) ———
   // Si un gate acumula demasiado % del total, el flipper puede no resetear a tiempo
   // y aparecen errores "puerta no preparada". La solución: duplicar ese calibre en otra gate.
   if (result.gateAdvancedStats && result.gateAdvancedStats.length > 0 && result.kpis.totalPieces > 100) {
+    const overloadWarn = result.config.errorThresholds?.gateOverloadWarnPct ?? 35
+    const overloadCritical = result.config.errorThresholds?.gateOverloadCriticalPct ?? 50
     const activeStats = result.gateAdvancedStats.filter((g) => g.pieces > 0)
     if (activeStats.length >= 2) {
       const avgUtilization = 100 / activeStats.length
 
       for (const g of activeStats) {
-        if (g.utilizationPct < 35) continue
+        if (g.utilizationPct < overloadWarn) continue
 
         // Gates con utilización < 40% del promedio → candidatas para absorber carga
         const underloaded = activeStats
@@ -458,10 +461,11 @@ export function computeDeterministicInsights(
 
         insights.push({
           id: nextId(),
-          severity: g.utilizationPct >= 50 ? 'critical' : 'warn',
+          severity: g.utilizationPct >= overloadCritical ? 'critical' : 'warn',
           title: `Gate ${g.gateNumber} concentra el ${g.utilizationPct.toFixed(1)}% del tráfico`,
           evidence: [
             `Gate ${g.gateNumber}: ${g.pieces.toLocaleString()} pz = ${g.utilizationPct.toFixed(1)}% del total clasificado`,
+            `Umbral warn: ${overloadWarn}% · Umbral critical: ${overloadCritical}%`,
             `Promedio esperado por gate activa: ${avgUtilization.toFixed(1)}%`,
             `Calibre: ${g.assignedCalibre} / ${g.assignedQuality}`,
             topCandidate !== undefined
@@ -485,14 +489,17 @@ export function computeDeterministicInsights(
   // Si dos gates consecutivas están activas, el tiempo entre sus dis Z2 debe ser
   // suficiente para que el salmón pase y el flipper se resetee antes del siguiente.
   // t_disponible = (dis_n+1 - dis_n) / vel_cinta
-  // t_requerido  = t_salmón_pasa + t_reset_neumático (~0.45s estimado)
+  // t_requerido  = t_salmón_pasa + t_reset_neumático (per-gate si pneumaticConfig disponible)
   if (physicalConfig && physicalConfig.z2ProgrammedDistancesMm && physicalConfig.z2ProgrammedDistancesMm.length >= 12) {
     const mainBelt2 = physicalConfig.belts.find((b) => b.beltId === 'main')
     const speedMps = mainBelt2?.speedMps ?? 1.28
     const salmonLenM = physicalConfig.avgSalmonLengthCm / 100
     const tSalmonPass = salmonLenM / speedMps
-    const tReset = physicalConfig.flipperResetTimeSec ?? 0.45  // reset cilindro neumático (s)
-    const tRequired = tSalmonPass + tReset
+    const marginThreshold = result.config.errorThresholds?.timingMarginWarnSec ?? 0.15
+
+    // Usar modelo neumático per-gate si disponible, si no flat
+    const hasPneu = !!physicalConfig.pneumaticConfig
+    const flatReset = physicalConfig.flipperResetTimeSec ?? 0.45
 
     const activeGateNums = result.gates
       .filter((g) => g.active)
@@ -509,9 +516,22 @@ export function computeDeterministicInsights(
       if (!dis1 || !dis2 || dis2 <= dis1) continue
 
       const tAvailable = (dis2 - dis1) / 1000 / speedMps
+
+      // Reset time per-gate: neumático si disponible
+      let tReset: number
+      let pneumDetail = ''
+      if (hasPneu) {
+        const breakdown = computePerGateResponseTime(g1, physicalConfig.pneumaticConfig!)
+        tReset = breakdown.totalResponseSec
+        pneumDetail = ` (válvula ${(breakdown.valveSwitchSec * 1000).toFixed(0)}ms + línea ${(breakdown.lineChargeSec * 1000).toFixed(0)}ms + cilindro ${(breakdown.cylinderStrokeSec * 1000).toFixed(0)}ms, P_eff ${breakdown.effectivePressureBar.toFixed(1)} bar)`
+      } else {
+        tReset = flatReset
+        pneumDetail = ' (valor plano estimado)'
+      }
+      const tRequired = tSalmonPass + tReset
       const margin = tAvailable - tRequired
 
-      if (margin < 0.15) {   // margen < 150ms → riesgo real
+      if (margin < marginThreshold) {
         // Verificar si "puerta no preparada" aparece en la data real
         const doorNotReadyCause = result.pointZeroClassification.causes.find(
           (c) => c.cause === 'puerta_no_preparada',
@@ -522,8 +542,8 @@ export function computeDeterministicInsights(
           title: `Gate ${g1}→${g2}: timing Z2 muy ajustado entre gates adyacentes`,
           evidence: [
             `Tiempo disponible entre dis${g1}=${dis1}mm y dis${g2}=${dis2}mm: ${tAvailable.toFixed(2)} s`,
-            `Tiempo requerido (salmón ${physicalConfig.avgSalmonLengthCm}cm + reset neumático ~0.45s): ${tRequired.toFixed(2)} s`,
-            `Margen: ${margin >= 0 ? '+' : ''}${margin.toFixed(2)} s`,
+            `Tiempo requerido (salmón ${physicalConfig.avgSalmonLengthCm}cm + reset ${tReset.toFixed(3)}s${pneumDetail}): ${tRequired.toFixed(2)} s`,
+            `Margen: ${margin >= 0 ? '+' : ''}${(margin * 1000).toFixed(0)} ms (umbral: ${(marginThreshold * 1000).toFixed(0)} ms)`,
             ...(doorNotReadyCause && doorNotReadyCause.pieces > 0
               ? [`"Puerta no preparada" en datos: ${doorNotReadyCause.pieces} pz (${doorNotReadyCause.pctOfTotal}%)`]
               : []),

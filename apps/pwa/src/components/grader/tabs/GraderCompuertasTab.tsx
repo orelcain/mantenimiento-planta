@@ -21,19 +21,31 @@ import type {
   GateAssignment,
   GraderAnalyticsResult,
   GraderPhysicalConfig,
+  GraderAnalysisConfig,
 } from '@/services/grader/types'
+import type { TimingThresholdOverrides } from '@/services/grader/graderGateTiming'
 
 interface Props {
   analytics: GraderAnalyticsResult
   physicalConfig?: GraderPhysicalConfig
   gates: GateAssignment[]
+  /** Umbrales actuales del config (para edición inline) */
+  errorThresholds?: GraderAnalysisConfig['errorThresholds']
+  /** Callback para cambiar umbrales desde la UI */
+  onThresholdsChange?: (patch: Partial<NonNullable<GraderAnalysisConfig['errorThresholds']>>) => void
 }
 
-export function GraderCompuertasTab({ analytics, physicalConfig, gates }: Props) {
-  // Semáforo tiempo de reacción por gate
+export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThresholds, onThresholdsChange }: Props) {
+  // Umbrales de timing (del config o defaults)
+  const thresholdOverrides: TimingThresholdOverrides = useMemo(() => ({
+    marginOkSec: errorThresholds?.timingMarginOkSec,
+    marginWarnSec: errorThresholds?.timingMarginWarnSec,
+  }), [errorThresholds])
+
+  // Semáforo tiempo de reacción por gate (con umbrales configurables)
   const timingSignals = useMemo(
-    () => computeGateTimingSignals(physicalConfig, gates),
-    [physicalConfig, gates],
+    () => computeGateTimingSignals(physicalConfig, gates, thresholdOverrides),
+    [physicalConfig, gates, thresholdOverrides],
   )
   // Asignación óptima de calibres a gates
   const optimalAssignment = useMemo(
@@ -296,18 +308,77 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates }: Props)
         </Card>
       )}
 
-      {/* ── Semáforo tiempo de reacción por gate (iter 19 / P0.5) ───────── */}
+      {/* ── Ajustes de umbrales (inline, configurable) ─────────────────── */}
+      {onThresholdsChange && (
+        <Card className="border-dashed border-muted-foreground/20">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs flex items-center gap-2 text-muted-foreground">
+              <Info className="h-3.5 w-3.5" />
+              Ajustes de Umbrales
+              <InfoTooltip {...getTooltipProps('gate.timingSemaphore')} />
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div>
+                <label className="text-[10px] text-muted-foreground flex items-center gap-1">
+                  Margen OK (s) <InfoTooltip {...getTooltipProps('threshold.timingOk')} iconSize={10} />
+                </label>
+                <input type="number" step="0.05" min="0.1" max="2"
+                  className="w-full mt-0.5 px-2 py-1 text-xs bg-background border rounded"
+                  value={errorThresholds?.timingMarginOkSec ?? 0.5}
+                  onChange={(e) => onThresholdsChange({ timingMarginOkSec: Number(e.target.value) })}
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-muted-foreground flex items-center gap-1">
+                  Margen Warn (s) <InfoTooltip {...getTooltipProps('threshold.timingWarn')} iconSize={10} />
+                </label>
+                <input type="number" step="0.05" min="0" max="1"
+                  className="w-full mt-0.5 px-2 py-1 text-xs bg-background border rounded"
+                  value={errorThresholds?.timingMarginWarnSec ?? 0.15}
+                  onChange={(e) => onThresholdsChange({ timingMarginWarnSec: Number(e.target.value) })}
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-muted-foreground flex items-center gap-1">
+                  Sobrecarga Warn (%) <InfoTooltip {...getTooltipProps('threshold.overloadWarn')} iconSize={10} />
+                </label>
+                <input type="number" step="5" min="10" max="80"
+                  className="w-full mt-0.5 px-2 py-1 text-xs bg-background border rounded"
+                  value={errorThresholds?.gateOverloadWarnPct ?? 35}
+                  onChange={(e) => onThresholdsChange({ gateOverloadWarnPct: Number(e.target.value) })}
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-muted-foreground flex items-center gap-1">
+                  Sobrecarga Critical (%) <InfoTooltip {...getTooltipProps('threshold.overloadCritical')} iconSize={10} />
+                </label>
+                <input type="number" step="5" min="20" max="100"
+                  className="w-full mt-0.5 px-2 py-1 text-xs bg-background border rounded"
+                  value={errorThresholds?.gateOverloadCriticalPct ?? 50}
+                  onChange={(e) => onThresholdsChange({ gateOverloadCriticalPct: Number(e.target.value) })}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Semáforo timing + desglose neumático por gate ───────────────── */}
       {timingSignals.length > 0 && (
         <Card className="border-sky-500/30">
           <CardHeader>
             <CardTitle className="text-sm flex items-center gap-2">
               <Clock className="h-4 w-4 text-sky-500" />
               Tiempo de Reacción por Compuerta
+              <InfoTooltip {...getTooltipProps('pneum.responseTime')} />
             </CardTitle>
             <p className="text-xs text-muted-foreground">
-              Tiempo disponible (distancia sensor → flipper / velocidad cinta) vs tiempo requerido
-              (salmón {physicalConfig?.avgSalmonLengthCm ?? '—'}cm cruzando + reset neumático 0.45s).
-              Verde = margen holgado (≥ 0.5s), amarillo = ajustado, rojo = insuficiente (&lt; 0.15s).
+              {timingSignals[0]?.pneumaticBreakdown
+                ? 'Modelo neumático real: t_válvula + t_carga_línea + t_cilindro por gate. Presión y timing varían por longitud de línea.'
+                : `Tiempo disponible (dist / vel) vs requerido (salmón ${physicalConfig?.avgSalmonLengthCm ?? '—'}cm + reset ${(physicalConfig?.flipperResetTimeSec ?? 0.45).toFixed(2)}s plano). Configurar neumática para desglose per-gate.`
+              }
             </p>
           </CardHeader>
           <CardContent>
@@ -316,11 +387,31 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates }: Props)
                 <thead>
                   <tr className="border-b text-left">
                     <th className="py-2 px-2">Gate</th>
-                    <th className="py-2 px-2 text-right">Distancia (m)</th>
-                    <th className="py-2 px-2 text-right">t_disponible</th>
-                    <th className="py-2 px-2 text-right">t_requerido</th>
+                    <th className="py-2 px-2 text-right">Dist (m)</th>
+                    <th className="py-2 px-2 text-right">
+                      t_disp <InfoTooltip text="Tiempo disponible = distancia / velocidad cinta" iconSize={10} />
+                    </th>
+                    {timingSignals[0]?.pneumaticBreakdown && (
+                      <>
+                        <th className="py-2 px-2 text-right">
+                          Válv <InfoTooltip {...getTooltipProps('pneum.valveSwitch')} iconSize={10} />
+                        </th>
+                        <th className="py-2 px-2 text-right">
+                          Línea <InfoTooltip {...getTooltipProps('pneum.lineCharge')} iconSize={10} />
+                        </th>
+                        <th className="py-2 px-2 text-right">
+                          Cil <InfoTooltip {...getTooltipProps('pneum.cylinderStroke')} iconSize={10} />
+                        </th>
+                        <th className="py-2 px-2 text-right">
+                          P_eff <InfoTooltip {...getTooltipProps('pneum.effectivePressure')} iconSize={10} />
+                        </th>
+                      </>
+                    )}
+                    <th className="py-2 px-2 text-right">t_req</th>
                     <th className="py-2 px-2 text-right">Margen</th>
-                    <th className="py-2 px-2 text-center">Estado</th>
+                    <th className="py-2 px-2 text-center">
+                      Estado <InfoTooltip {...getTooltipProps('gate.timingSemaphore')} iconSize={10} />
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -340,14 +431,28 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates }: Props)
                       t.status === 'warn' ? 'AJUSTADO' :
                       t.status === 'critical' ? 'CRÍTICO' :
                       'INACTIVO'
+                    const pb = t.pneumaticBreakdown
+                    const pEffColor = pb
+                      ? pb.effectivePressureBar >= 5 ? 'text-emerald-600 dark:text-emerald-400'
+                        : pb.effectivePressureBar >= 3 ? 'text-amber-600 dark:text-amber-400'
+                        : 'text-red-600 dark:text-red-400'
+                      : ''
                     return (
                       <tr key={t.gateNumber} className={cn('border-b hover:bg-muted/30', bg)} title={t.hint}>
                         <td className="py-2 px-2 font-medium">Gate {t.gateNumber}</td>
                         <td className="py-2 px-2 text-right tabular-nums">{t.distanceMeters.toFixed(2)}</td>
                         <td className="py-2 px-2 text-right tabular-nums">{t.tAvailableSec.toFixed(2)}s</td>
+                        {pb && (
+                          <>
+                            <td className="py-2 px-2 text-right tabular-nums text-muted-foreground">{(pb.valveSwitchSec * 1000).toFixed(0)}ms</td>
+                            <td className="py-2 px-2 text-right tabular-nums text-muted-foreground">{(pb.lineChargeSec * 1000).toFixed(0)}ms</td>
+                            <td className="py-2 px-2 text-right tabular-nums text-muted-foreground">{(pb.cylinderStrokeSec * 1000).toFixed(0)}ms</td>
+                            <td className={cn('py-2 px-2 text-right tabular-nums', pEffColor)}>{pb.effectivePressureBar.toFixed(1)}</td>
+                          </>
+                        )}
                         <td className="py-2 px-2 text-right tabular-nums text-muted-foreground">{t.tRequiredSec.toFixed(2)}s</td>
                         <td className={cn('py-2 px-2 text-right tabular-nums font-semibold', color)}>
-                          {t.marginSec >= 0 ? '+' : ''}{t.marginSec.toFixed(2)}s
+                          {t.marginSec >= 0 ? '+' : ''}{(t.marginSec * 1000).toFixed(0)}ms
                         </td>
                         <td className="py-2 px-2 text-center">
                           <Badge variant="outline" className={cn('text-[10px]', color, 'border-current')}>
@@ -361,11 +466,24 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates }: Props)
               </table>
             </div>
             <div className="flex items-center gap-4 mt-3 text-[10px] text-muted-foreground flex-wrap">
-              <span>Velocidad Sorting Belt: {timingSignals[0]?.beltSpeedMps.toFixed(2)} m/s</span>
-              <span>·</span>
-              <span>Reset neumático: {(physicalConfig?.flipperResetTimeSec ?? 0.45).toFixed(2)}s</span>
-              <span>·</span>
-              <span className="italic">Bajar velocidad del Sorting Belt aumenta el margen de todas las gates.</span>
+              <span>Sorting Belt: {timingSignals[0]?.beltSpeedMps.toFixed(2)} m/s</span>
+              {timingSignals[0]?.pneumaticBreakdown ? (
+                <>
+                  <span>·</span>
+                  <span>FRL: {physicalConfig?.pneumaticConfig?.supplyPressureBar ?? '—'} bar</span>
+                  <span>·</span>
+                  <span>Tubo: Ø{physicalConfig?.pneumaticConfig?.tubeInnerDiameterMm ?? '—'}mm ID</span>
+                  <span>·</span>
+                  <span>Cilindro: Ø{physicalConfig?.pneumaticConfig?.cylinderBoreMm ?? '—'}×{physicalConfig?.pneumaticConfig?.cylinderStrokeMm ?? '—'}mm</span>
+                </>
+              ) : (
+                <>
+                  <span>·</span>
+                  <span>Reset plano: {(physicalConfig?.flipperResetTimeSec ?? 0.45).toFixed(2)}s</span>
+                  <span>·</span>
+                  <span className="italic text-amber-600">Configurar neumática en "Configurar compuertas" para desglose per-gate.</span>
+                </>
+              )}
             </div>
           </CardContent>
         </Card>
