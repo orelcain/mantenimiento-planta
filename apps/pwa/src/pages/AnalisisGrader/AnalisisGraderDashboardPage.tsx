@@ -173,6 +173,13 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
   const [nowTs, setNowTs] = useState<number>(() => Date.now())
   const [weightChartMode, setWeightChartMode] = useState<'simple' | 'detailed'>('simple')
   const [showThresholds, setShowThresholds] = useState<boolean>(false)
+  const [gateThresholds, setGateThresholds] = useState<NonNullable<GraderAnalysisConfig['errorThresholds']>>(() => ({
+    ...(config.errorThresholds ?? { photocellPctWarn: 5, outOfLimitsPctWarn: 5, pointZeroPctWarn: 2 }),
+    timingMarginOkSec: config.errorThresholds?.timingMarginOkSec ?? 0.5,
+    timingMarginWarnSec: config.errorThresholds?.timingMarginWarnSec ?? 0.15,
+    gateOverloadWarnPct: config.errorThresholds?.gateOverloadWarnPct ?? 35,
+    gateOverloadCriticalPct: config.errorThresholds?.gateOverloadCriticalPct ?? 50,
+  }))
   const [siblingSessions, setSiblingSessions] = useState<GraderSession[]>([])
   const [recentSessions, setRecentSessions] = useState<GraderSession[]>([])
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -1429,6 +1436,8 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
             analytics={analytics}
             physicalConfig={config.physicalConfig}
             gates={gates}
+            errorThresholds={gateThresholds}
+            onThresholdsChange={(patch) => setGateThresholds((prev) => ({ ...prev, ...patch }))}
           />
         </TabsContent>
 
