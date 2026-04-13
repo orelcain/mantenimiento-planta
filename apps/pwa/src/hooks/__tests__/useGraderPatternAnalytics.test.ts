@@ -70,13 +70,13 @@ function makeAnalytics(causes: Array<{ label: string; records: ReturnType<typeof
 }
 
 const EMPTY_PARSED: ParsedMatrixData = {
+  files: [],
   pieceRecords: [],
   gate0Records: [],
-  summaryRows: [],
-  qualities: [],
-  calibres: [],
-  errors: [],
-  lots: [],
+  folioRecords: [],
+  qualitySummary: [],
+  productionSummary: [],
+  inferred: {},
 }
 
 function makeParsedWithPieces(count: number): ParsedMatrixData {

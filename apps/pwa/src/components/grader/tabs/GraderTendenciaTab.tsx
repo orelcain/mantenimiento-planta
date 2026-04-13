@@ -14,6 +14,7 @@ import type {
   GraderAnalysisConfig,
   GraderAnalyticsResult,
   GraderSession,
+  PieceRecord,
   WeightTrendBucket,
 } from '@/services/grader/types'
 import type { useGraderDashboardAnalytics } from '@/hooks/useGraderDashboardAnalytics'
@@ -23,6 +24,7 @@ import { TendenciaMultiSessionCard } from './tendencia/TendenciaMultiSessionCard
 import { TendenciaSensorDegradationCard } from './tendencia/TendenciaSensorDegradationCard'
 import { TendenciaEarlyReactionCard } from './tendencia/TendenciaEarlyReactionCard'
 import { TendenciaWeightCard } from './tendencia/TendenciaWeightCard'
+import { TendenciaTimelineCard } from './tendencia/TendenciaTimelineCard'
 
 type DashboardViews = ReturnType<typeof useGraderDashboardAnalytics>
 
@@ -84,6 +86,10 @@ interface Props {
   onApplyGateAction: (action: GateAction) => void
   onAnalyzeAI: () => void
   onApplyGateSuggestion?: (payload: { gateNumber: number; calibre: string; quality: string }) => void
+  // Timeline segundo a segundo
+  pieceRecords?: PieceRecord[]
+  shiftId?: string
+  dateKey?: string
 }
 
 export function GraderTendenciaTab({
@@ -121,6 +127,9 @@ export function GraderTendenciaTab({
   onApplyGateAction,
   onAnalyzeAI,
   onApplyGateSuggestion,
+  pieceRecords,
+  shiftId,
+  dateKey,
 }: Props) {
   if (analytics.weightTrendSeries.length === 0) {
     return (
@@ -186,6 +195,13 @@ export function GraderTendenciaTab({
         onSetWeightChartMode={onSetWeightChartMode}
         getPointZeroSeverity={getPointZeroSeverity}
       />
+      {pieceRecords && pieceRecords.length > 0 && shiftId && dateKey && (
+        <TendenciaTimelineCard
+          pieceRecords={pieceRecords}
+          shiftId={shiftId}
+          dateKey={dateKey}
+        />
+      )}
     </>
   )
 }

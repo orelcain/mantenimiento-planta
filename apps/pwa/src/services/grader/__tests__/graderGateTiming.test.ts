@@ -22,15 +22,15 @@ import type { GraderPhysicalConfig, GateAssignment } from '../types'
 function makePhysicalConfig(overrides?: Partial<GraderPhysicalConfig>): GraderPhysicalConfig {
   return {
     avgSalmonLengthCm: 55,
+    pocketCount: 12,
     flipperResetTimeSec: 0.45,
-    belts: [{ beltId: 'main', speedMps: 1.28, widthCm: 30 }],
+    belts: [{ beltId: 'main', label: 'Main', lengthMeters: 10, speedMps: 1.28 }],
     flipperPositions: [
       { gateNumber: 1, distanceFromSensorMeters: 1.30 },
       { gateNumber: 2, distanceFromSensorMeters: 2.45 },
       { gateNumber: 6, distanceFromSensorMeters: 8.15 },
       { gateNumber: 12, distanceFromSensorMeters: 15.80 },
     ],
-    z2DistancesM: {},
     ...overrides,
   }
 }
@@ -38,8 +38,8 @@ function makePhysicalConfig(overrides?: Partial<GraderPhysicalConfig>): GraderPh
 const MOCK_GATES: GateAssignment[] = [
   { gateNumber: 1, assignedCalibre: '6-8lb', assignedQuality: 'Premium', active: true },
   { gateNumber: 2, assignedCalibre: '8-10lb', assignedQuality: 'Premium', active: true },
-  { gateNumber: 6, assignedCalibre: '10-12lb', assignedQuality: 'A', active: true },
-  { gateNumber: 12, assignedCalibre: '4-6lb', assignedQuality: 'B', active: false },
+  { gateNumber: 6, assignedCalibre: '10-12lb', assignedQuality: 'Industrial', active: true },
+  { gateNumber: 12, assignedCalibre: '4-6lb', assignedQuality: 'Grado', active: false },
 ]
 
 // ── computeTubeVolume ──────────────────────────────────────────────────────

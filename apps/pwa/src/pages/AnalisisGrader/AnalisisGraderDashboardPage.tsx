@@ -1418,6 +1418,9 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
             onApplyGateAction={handleApplyGateAction}
             onAnalyzeAI={handleAnalyzeAI}
             onApplyGateSuggestion={onApplyGateSuggestion}
+            pieceRecords={parsedData.pieceRecords}
+            shiftId={config.shiftId ?? currentSessionMeta?.shiftId ?? 'Sin turno'}
+            dateKey={currentSessionMeta?.sessionDate ?? analytics.config.startAt?.slice(0, 10) ?? ''}
           />
         </TabsContent>
 

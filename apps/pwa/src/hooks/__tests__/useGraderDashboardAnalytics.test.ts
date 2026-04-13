@@ -14,7 +14,6 @@ import type {
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
 
-const BASE_DATE = '2025-07-15T06:00:00.000Z' // turno noche ~22:00 hora local
 const SHIFT_START_ISO = '2025-07-15T02:00:00.000Z' // 22:00 hora Chile
 const INTERVAL_MS = 15 * 60_000
 
@@ -92,13 +91,13 @@ function makeConfig(overrides?: Partial<GraderAnalysisConfig>): GraderAnalysisCo
 }
 
 const EMPTY_PARSED: ParsedMatrixData = {
+  files: [],
   pieceRecords: [],
   gate0Records: [],
-  summaryRows: [],
-  qualities: [],
-  calibres: [],
-  errors: [],
-  lots: [],
+  folioRecords: [],
+  qualitySummary: [],
+  productionSummary: [],
+  inferred: {},
 }
 
 function makeSession(id: string, overrides?: Partial<GraderSession>): GraderSession {
@@ -309,8 +308,8 @@ describe('multiSessionInsightsView', () => {
   it('calcula promedios y deltas con sesiones históricas', () => {
     const sessions = [
       makeSession('s1'),
-      makeSession('s2', { aggregates: { kpis: { totalPieces: 1200, pointZeroPct: 3, avgWeightGrams: 3300, pointZeroPieces: 36, productivePieces: 1164, topPointZeroErrors: [] } } } as Partial<GraderSession>),
-      makeSession('s3', { aggregates: { kpis: { totalPieces: 900, pointZeroPct: 6, avgWeightGrams: 2900, pointZeroPieces: 54, productivePieces: 846, topPointZeroErrors: [] } } } as Partial<GraderSession>),
+      makeSession('s2', { aggregates: { kpis: { totalPieces: 1200, pointZeroPct: 3, avgWeightGrams: 3300, pointZeroPieces: 36, productivePieces: 1164, topPointZeroErrors: [] } } } as unknown as Partial<GraderSession>),
+      makeSession('s3', { aggregates: { kpis: { totalPieces: 900, pointZeroPct: 6, avgWeightGrams: 2900, pointZeroPieces: 54, productivePieces: 846, topPointZeroErrors: [] } } } as unknown as Partial<GraderSession>),
     ]
     const { result } = renderHook(() =>
       useGraderDashboardAnalytics({
@@ -381,7 +380,7 @@ describe('shiftComparisonView', () => {
           dominantCalibre: { calibre: '8-10lb', pieces: 500, pct: 45 },
         },
       },
-    } as Partial<GraderSession>)
+    } as unknown as Partial<GraderSession>)
     const { result } = renderHook(() =>
       useGraderDashboardAnalytics({
         analytics: makeMinimalAnalytics(),
