@@ -36,7 +36,7 @@ if (DRY_RUN) console.log('🔍 DRY RUN — no se escribirá nada\n')
 const BASE_DIR = 'C:/Users/pc hp/OneDrive/ANTARFOOD/⚙️ GRADER/temporada 2025-2026'
 const PP_DIR = path.join(BASE_DIR, 'pieza a pieza')
 const P0_DIR = path.join(BASE_DIR, 'punto 0')
-const BATCH_SIZE = 400
+const BATCH_SIZE = 200  // Reducido de 400 para evitar deadline exceeded en wifi lento
 
 // ── Helpers (copiados de iter18-full-season-rebuild.js) ───────────────────
 function norm(s) {
@@ -312,14 +312,27 @@ async function main() {
       continue
     }
 
-    // Batch write
+    // Batch write with retry (wifi lento puede causar deadline exceeded)
     for (let i = 0; i < toWrite.length; i += BATCH_SIZE) {
       const chunk = toWrite.slice(i, i + BATCH_SIZE)
-      const batch = db.batch()
-      for (const rec of chunk) {
-        batch.set(pieceRecordsCol.doc(), rec)
+      let attempts = 0
+      const maxRetries = 5
+      while (attempts < maxRetries) {
+        try {
+          const batch = db.batch()
+          for (const rec of chunk) {
+            batch.set(pieceRecordsCol.doc(), rec)
+          }
+          await batch.commit()
+          break
+        } catch (err) {
+          attempts++
+          if (attempts >= maxRetries) throw err
+          const delaySec = Math.min(2 ** attempts, 30)
+          console.log(`    ⚠️ Retry ${attempts}/${maxRetries} en ${delaySec}s (${err.code || err.message})`)
+          await new Promise(r => setTimeout(r, delaySec * 1000))
+        }
       }
-      await batch.commit()
     }
 
     // Marcar summary como que tiene pieceRecords
