@@ -52,6 +52,7 @@ Cuando el usuario diga `cerrar`, `terminar`, `ya está`, `gracias`, `hasta luego
 - **Ruta única**: `D:\a\APP leventamiento de insidencias en planta\` — único clon git local. NO existe clon en OneDrive (eliminado 2026-04-09, era legacy con drift de 240 commits).
 - **Sync**: solo `git push origin main` — el otro PC del trabajo accede via claude.ai conectado a GitHub directamente, no necesita carpeta sincronizada.
 - **Commits**: En inglés, prefijos convencionales (`feat:`, `fix:`, `docs:`, etc.)
+- **Pre-push obligatorio**: SIEMPRE correr `/pre-push-check` antes de `git push origin main`. Previene el patrón de commits fallidos en CI seguidos de `fix:` commits. One-liner: `cd apps/pwa && pnpm exec tsc --noEmit && pnpm exec eslint . --max-warnings 10`
 - **No crear README.md ni docs** salvo que se pida explicitamente.
 - **Base URL**: `/mantenimiento-planta/` (GitHub Pages)
 - **Deploy**: GitHub Pages via `gh-pages` branch + Firebase Hosting
@@ -160,6 +161,7 @@ sidebarConfig  ← nuevo: orden personalizado del sidebar admin
 ### Deploy y CI
 | Skill | Uso |
 |-------|-----|
+| `pre-push-check` | **CORRER ANTES DE CADA PUSH.** Verifica tsc + eslint localmente para evitar commits fallidos en CI. Previene el patrón "feature commit ❌ → fix commit ✅" que genera ruido en el historial |
 | `deploy-produccion` | Deploy completo a GitHub Pages con bump de version |
 | `fix-ci` | Diagnosticar y reparar fallos de CI (tsc, eslint, build, GitHub Actions) |
 | `auditar-deploys` | **Health check standalone** de todos los workflows CI/CD. Detecta workflows bloqueados, degradados o inactivos. Existe porque en 2026-04-09 hubo 18 dias con `deploy-functions` bloqueado sin notarlo |
@@ -212,7 +214,7 @@ sidebarConfig  ← nuevo: orden personalizado del sidebar admin
 - Proyecto Firebase: `mantenimiento-planta-771a3`
 - GitHub: `orelcain/mantenimiento-planta`
 - Produccion: `https://orelcain.github.io/mantenimiento-planta/`
-- CI status: 4/4 workflows 🟢
+- CI status: 5/5 workflows 🟢 (`deploy.yml`, `deploy-functions.yml`, `deploy-firestore-rules.yml`, `daily-sync.yml`, `check-nanobanana.yml`)
 - Seguridad: 23 colecciones Firestore validadas, 0 vulnerabilidades runtime prod
 
 ## Cambios recientes (sesion 2026-04-11/12 maratónica — Grader iter 8 al 18.1, v2.80.0 → v2.86.1)

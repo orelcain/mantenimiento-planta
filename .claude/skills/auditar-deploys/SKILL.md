@@ -19,11 +19,12 @@ Revisar el estado real de TODOS los workflows del repo para detectar deploys blo
 ls .github/workflows/*.yml
 ```
 
-Anotar cuantos workflows existen. Para este repo son tipicamente 4:
+Anotar cuantos workflows existen. Para este repo son 5:
 - `deploy.yml` → Deploy PWA to GitHub Pages
 - `deploy-firestore-rules.yml` → Deploy Firestore Rules & Indexes
-- `deploy-functions.yml` → Deploy Firebase Functions
-- `daily-sync.yml` → Daily Sync (versions)
+- `deploy-functions.yml` → Deploy Firebase Functions (path filter: solo si cambia `functions/`)
+- `daily-sync.yml` → Daily Sync (versions, cron diario 06:15 UTC)
+- `check-nanobanana.yml` → Weekly NanoBanana Check (cron dominical 15:00 UTC — sin runs recientes es normal)
 
 ---
 

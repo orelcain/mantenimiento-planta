@@ -12,13 +12,19 @@ argument-hint: ""
 
 ## Procedimiento
 
-### 1. Verificar estado limpio
+### 1. Pre-push check (OBLIGATORIO — no saltear)
+```bash
+cd apps/pwa && pnpm exec tsc --noEmit && pnpm exec eslint . --max-warnings 10 && echo "✅ LISTO"
+```
+Si falla → corregir antes de continuar. Ver `/fix-ci`.
+
+### 2. Verificar estado limpio
 ```bash
 git status
 git log --oneline -5  # verificar ultimos commits
 ```
 
-### 2. Build de produccion
+### 3. Build de produccion
 ```bash
 cd apps/pwa
 pnpm run build

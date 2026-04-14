@@ -83,6 +83,17 @@ Con un resumen de:
 - Decisiones tomadas y por que
 - Contexto que podria ser util en el futuro
 
+## Paso 4.5: Pre-push check (OBLIGATORIO antes del commit final)
+
+Antes de pushear, verificar que no hay errores que vayan a romper el CI:
+
+```bash
+cd apps/pwa && pnpm exec tsc --noEmit && pnpm exec eslint . --max-warnings 10 && echo "✅ LISTO"
+```
+
+Si falla → corregir antes de continuar. Ver skill `/fix-ci` o `/audit-unused-locals`.
+Si pasa → continuar con el commit.
+
 ## Paso 5: Commit final
 
 ```bash

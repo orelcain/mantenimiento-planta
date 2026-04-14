@@ -25,7 +25,14 @@ Mostrar resumen de commits nuevos y archivos clave cambiados.
 
 ## Paso 0b: Health check de CI/CD (OBLIGATORIO)
 
-**Antes de cualquier otra cosa**, verificar que los 4 workflows esten verdes. Esta skill fue agregada despues de un incidente de 18 dias con `deploy-functions.yml` bloqueado sin que nadie lo notara.
+**Antes de cualquier otra cosa**, verificar que los 5 workflows esten verdes. Esta skill fue agregada despues de un incidente de 18 dias con `deploy-functions.yml` bloqueado sin que nadie lo notara.
+
+Workflows a monitorear:
+- `deploy.yml` → Deploy PWA to GitHub Pages
+- `deploy-functions.yml` → Deploy Firebase Functions (solo corre si cambia `functions/`)
+- `deploy-firestore-rules.yml` → Deploy Firestore Rules
+- `daily-sync.yml` → Daily Sync (versiones, cron diario)
+- `check-nanobanana.yml` → Weekly NanoBanana Check (cron dominical, ignora si no hay runs recientes)
 
 ```bash
 cd "D:/a/APP leventamiento de insidencias en planta"
