@@ -2,194 +2,250 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
-<meta name="mobile-web-app-capable" content="yes">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Grader HMI">
 <meta name="theme-color" content="#1A5276">
-<title>Grader HMI — StaticGrader</title>
+<title>RC 172.27.12.12</title>
 <style>
-/*
-  ═══════════════════════════════════════════════════════
-  HMI GRADER — Clon exacto Marelec StaticGrader
-  Plan de 100 cambios aplicados (20 cuadrantes × revisión)
-  ═══════════════════════════════════════════════════════
-
-  PALETA DEFINITIVA:
-  bg_primary  : #1A5276   ← fondo principal
-  bg_title_tab: #2980B9   ← tab StaticGrader
-  bg_dark_band: #041a55   ← banda oscura detrás del tab
-  gate_fill   : #071840   ← interior bolsillos (navy oscuro)
-  yellow      : #F1C40F   ← bordes pockets + UNDER texto/borde
-  yb_bright   : #FFFF00   ← borde display peso
-  btn_bg      : #1F618D   ← fondo botones
-  btn_bdr     : #5D9CEC   ← borde botones
-  log_sel     : #000099   ← línea log seleccionada
-*/
-
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* ═══════════════════════════════════════════
+   PALETA EXACTA — Brief StaticGrader HMI
+   bg-global:       #1A5276
+   bg-titlebar-sg:  #2980B9
+   bg-buttons:      #1F618D
+   bg-menubar:      #1F618D
+   border-pockets:  #F1C40F
+   border-under:    #FFFFFF
+   border-weight:   #F1C40F
+   bg-weight:       #F0F0F0
+   bg-log-sel:      #2980B9
+   btn-border:      #5D9CEC
+═══════════════════════════════════════════ */
+
 html, body {
-  height: 100%;
-  background: #101018;
+  min-height: 100vh;
+  background: #1a1a2e;
   font-family: Arial, sans-serif;
-  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: auto;
 }
 
-#screen {
+/* ══════════════════════════════════════
+   VENTANA RC (simula cliente VNC/RDP)
+══════════════════════════════════════ */
+#rc-window {
   width: 640px;
-  height: 480px;
-  background: #1A5276;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 2px 2px 12px rgba(0,0,0,0.8);
+}
+
+/* ── Barra de título Windows ── */
+.win-titlebar {
+  height: 22px;
+  background: #2D2D2D;
+  display: flex;
+  align-items: center;
+  padding: 0 4px 0 6px;
+  gap: 5px;
+  flex-shrink: 0;
+  user-select: none;
+}
+.win-title-icon { font-size: 12px; }
+.win-title-text {
+  flex: 1;
+  font-size: 11px;
+  color: #ffffff;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  letter-spacing: 0.3px;
+}
+.win-controls { display: flex; gap: 1px; }
+.win-btn {
+  width: 22px;
+  height: 16px;
+  background: #555;
+  border: none;
   color: #fff;
+  font-size: 9px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: Arial, sans-serif;
+  border-radius: 2px;
+}
+.win-btn:hover { background: #777; }
+.win-btn.close:hover { background: #c0392b; }
+
+/* ── Barra de menú (Connection / Mode / Help) ── */
+.menubar {
+  height: 20px;
+  background: #1F618D;
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  gap: 16px;
+  flex-shrink: 0;
+}
+.menubar span {
+  font-size: 11px;
+  color: #ffffff;
+  cursor: pointer;
+  padding: 0 2px;
+  font-family: Arial, sans-serif;
+}
+.menubar span:hover { background: rgba(255,255,255,0.15); }
+
+/* ══════════════════════════════════════
+   PANTALLA HMI — todo en #1A5276
+══════════════════════════════════════ */
+#screen {
+  background: #1A5276;
+  color: #ffffff;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   position: relative;
+  flex: 1;
 }
 
-/* ══════════════════════════════════════════
-   HEADER
-   C1: font 11px (era 14px)
-   C2: line-height ajustado
-   C4/C5: UNDER<- AMARILLO no blanco
-   C6/C7: cajas UNDER más anchas y altas
-══════════════════════════════════════════ */
+/* ══════════════════════════════════════
+   HEADER — fecha/hora izquierda · indicadores derecha
+   Fondo: #1A5276 (no hay banda separada)
+══════════════════════════════════════ */
 .hdr {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 5px 6px 4px 8px;
+  padding: 4px 6px 4px 8px;
+  background: #1A5276;
   flex-shrink: 0;
 }
 
-/* C1/C2/C3: fecha-hora-contador: 11px, mismo color blanco, monospace */
 .hdr-left {
   font-family: 'Courier New', monospace;
-  font-size: 11px;          /* C1: era 13-14px */
-  line-height: 1.6;         /* C2: ajuste spacing */
+  font-size: 11px;
+  line-height: 1.55;
   color: #ffffff;
 }
 
-/* Grid 2×2 indicadores */
+/* Grid 2×2 de indicadores */
 .hdr-right {
   display: grid;
   grid-template-columns: auto auto;
-  gap: 4px;                 /* C19: ligero aumento de gap */
+  gap: 3px;
+  align-items: center;
 }
 
-/* C4/C5/C6/C7: UNDER<- → AMARILLO, más grandes */
+/* UNDER<- : fondo azul, borde BLANCO, texto BLANCO */
 .ind {
-  border: 2px solid #F1C40F;  /* C4: era #ffffff */
-  color: #F1C40F;              /* C5: era #ffffff */
+  background: #1A5276;
+  border: 2px solid #ffffff;
+  color: #ffffff;
   font-size: 13px;
   font-weight: bold;
-  padding: 3px 10px;
-  min-width: 95px;             /* C6: era 80px */
-  height: 30px;                /* C7: era 28px */
+  width: 80px;
+  height: 28px;
   text-align: center;
-  background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: Arial, sans-serif;
-  letter-spacing: 0.5px;
-}
-
-/* C8: Display peso — fondo claro, borde amarillo brillante, texto negro */
-.ind.wt {
-  background: #F0F0F0;
-  border: 2px solid #FFFF00;   /* C8: borde amarillo brillante */
-  color: #000000;
-  font-size: 14px;
-  font-weight: bold;
-  min-width: 100px;            /* C8: ligeramente más ancho */
-  font-family: 'Courier New', monospace;
-  letter-spacing: 0.5px;
-}
-
-/* ══════════════════════════════════════════
-   BANDA OSCURA — contiene título + status
-   La banda oscura es más oscura que el bg principal.
-   Dentro va el tab redondeado "StaticGrader"
-   y debajo el status "7: CONTRASTACION"
-══════════════════════════════════════════ */
-.title-band {
-  background: #0a1d45;          /* banda oscura navy */
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  padding: 3px 0 0 8px;
-}
-
-/* Tab "StaticGrader" dentro de la banda oscura */
-.title-tab {
-  display: inline-block;
-  background: #1F618D;          /* azul medio — contrasta con la banda */
-  color: #ffffff;
-  font-size: 16px;
-  font-weight: bold;
-  padding: 4px 20px 4px 10px;
-  border-radius: 6px 6px 0 0;  /* esquinas superiores redondeadas */
-  min-width: 145px;
   font-family: Arial, sans-serif;
   letter-spacing: 0.3px;
 }
 
-/* Status dentro de la misma banda oscura */
-.status {
-  font-size: 11px;
+/* Display de peso — ÚNICO elemento con fondo claro */
+.ind.wt {
+  background: #F0F0F0;
+  border: 2px solid #F1C40F;
+  color: #000000;
+  font-size: 14px;
+  font-weight: bold;
+  width: 90px;
+  font-family: 'Courier New', monospace;
+  justify-content: flex-end;
+  padding-right: 4px;
+  letter-spacing: 0.3px;
+}
+.ind.wt .deg { font-size: 9px; vertical-align: super; margin-right: 1px; }
+.ind.wt .unit { font-size: 10px; }
+
+/* ══════════════════════════════════════
+   BARRA TÍTULO "StaticGrader"
+   Full-width, #2980B9, 28px, 16px bold
+══════════════════════════════════════ */
+.title-bar {
+  background: #2980B9;
   color: #ffffff;
-  padding: 3px 8px 4px;
-  background: #0a1d45;          /* misma banda oscura */
+  font-size: 16px;
+  font-weight: bold;
+  height: 28px;
+  padding: 0 0 0 8px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  font-family: Arial, sans-serif;
+  width: 100%;
+}
+
+/* ══════════════════════════════════════
+   STATUS "7: CONTRASTACION"
+   Fondo: #1A5276, 11px
+══════════════════════════════════════ */
+.status {
+  background: #1A5276;
+  color: #ffffff;
+  font-size: 11px;
+  padding: 3px 0 3px 8px;
   flex-shrink: 0;
   font-family: Arial, sans-serif;
 }
 
-/* ══════════════════════════════════════════
-   GRILLA DE BOLSILLOS (pockets)
-   C11: fill oscuro
-   C12: ancho fijo no flex:1
-   C13: height 82px
-   C14: gap 6px
-   C15: padding lateral visible
-══════════════════════════════════════════ */
+/* ══════════════════════════════════════
+   GRILLA DE BOLSILLOS (pocket grid)
+   12 bolsillos: 2 filas × 6 columnas
+   padding: 6px, gap: 4px
+══════════════════════════════════════ */
 .gate-grid {
   flex: 1;
+  background: #1A5276;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  gap: 6px;                     /* C14: era 5px */
-  padding: 6px 5px;             /* C15: padding lateral */
+  gap: 4px;
+  padding: 6px;
 }
 
 .gate-row {
   display: flex;
-  gap: 6px;                     /* C14: era 4px */
-  justify-content: center;
+  gap: 4px;
   width: 100%;
+  justify-content: center;
 }
 
-/* Gate: tamaño fijo, fill = mismo que el bg */
+/* Tamaño de bolsillo: ~80×75px (aproximado según brief) */
 .gate {
-  width: 98px;
-  height: 82px;
+  width: 80px;
+  height: 75px;
   position: relative;
   cursor: pointer;
   flex-shrink: 0;
 }
 .gate svg { display: block; width: 100%; height: 100%; }
-.gate:hover   path { fill: #154360; }
-.gate:active  path { fill: #0d2f50; }
+/* Hover: leve darkening del fill */
+.gate:hover path   { fill: #154360; }
+.gate:active path  { fill: #0d2f50; }
 
-/* C16: número en top-right del pocket, justo en la muesca */
+/* Número: top-right interior, 10px, #F1C40F */
 .gn {
   position: absolute;
-  top: 3px;
-  right: 6px;
+  top: 2px;
+  right: 5px;
   font-size: 10px;
   font-weight: bold;
   color: #F1C40F;
@@ -198,70 +254,61 @@ html, body {
   line-height: 1;
 }
 
-/* ══════════════════════════════════════════
-   CONSOLA DE LOG
-   C17: height 90px (era 70px)
-   C18: línea sel = azul navy oscuro
-══════════════════════════════════════════ */
+/* ══════════════════════════════════════
+   LOG CONSOLE
+   fondo blanco, texto negro
+   altura fija 70px, overflow scroll
+   línea sel: #2980B9 + texto blanco
+══════════════════════════════════════ */
 .log {
   background: #ffffff;
   border: 1px solid #999999;
-  padding: 3px 5px;
+  height: 70px;
+  overflow-y: auto;
+  flex-shrink: 0;
+  padding: 2px 4px;
   font-family: 'Courier New', monospace;
   font-size: 11px;
   color: #000000;
-  flex-shrink: 0;
-  height: 90px;                 /* C17: era 70px */
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start; /* alineado top para mostrar espacio abajo */
+  justify-content: flex-end;
 }
+.ll { padding: 1px 2px; background: #ffffff; color: #000000; white-space: nowrap; line-height: 1.35; }
+.ll.hl { background: #2980B9; color: #ffffff; }
 
-.ll {
-  padding: 1px 3px;
-  background: #ffffff;
-  color: #000000;
-  white-space: nowrap;
-  line-height: 1.45;
-}
-.ll.hl {
-  background: #000099;          /* C18: era #2980B9 → navy oscuro */
-  color: #ffffff;
-}
-
-/* ══════════════════════════════════════════
-   BARRA DE BOTONES
-   C19: botones más altos (padding 12px)
-   C20: font 13px (era 12px)
-══════════════════════════════════════════ */
+/* ══════════════════════════════════════
+   BOTONES FOOTER
+   gap: 0, height: 36px, border-radius: 0
+   bg: #1F618D, border: #5D9CEC, text white 12px
+══════════════════════════════════════ */
 .btn-bar {
   display: flex;
-  gap: 2px;
+  gap: 0;
   flex-shrink: 0;
   background: #1A5276;
-  padding: 3px 2px 5px;
+  padding: 2px 0 0;
 }
-
 .btn {
   flex: 1;
+  height: 36px;
   background: #1F618D;
   border: 1px solid #5D9CEC;
+  border-radius: 0;
   color: #ffffff;
   font-family: Arial, sans-serif;
-  font-size: 13px;              /* C20: era 12px */
+  font-size: 12px;
   font-weight: normal;
-  padding: 11px 4px;            /* C19: era 9px → 11px */
   cursor: pointer;
   text-align: center;
-  border-radius: 0;
+  padding: 0 4px;
 }
 .btn:hover  { background: #2471A3; }
 .btn:active { background: #154360; }
 
-/* ══════════════════════════════════════════
-   PANELES OVERLAY (pantallas futuras)
-══════════════════════════════════════════ */
+/* ══════════════════════════════════════
+   PANELES (siguientes pantallas)
+══════════════════════════════════════ */
 .panel {
   display: none;
   position: absolute;
@@ -271,9 +318,8 @@ html, body {
   z-index: 20;
 }
 .panel.active { display: flex; }
-
 .ph {
-  background: #041a55;
+  background: #0a1d45;
   border-bottom: 1px solid #2980B9;
   padding: 6px 10px;
   font-size: 14px;
@@ -283,132 +329,130 @@ html, body {
   align-items: center;
   flex-shrink: 0;
 }
-.pb { flex:1; display:flex; align-items:center; justify-content:center; color:#88bbee; font-size:14px; }
-.pf { display:flex; gap:2px; padding:3px 2px 5px; background:#1A5276; flex-shrink:0; }
-
+.pb { flex: 1; display: flex; align-items: center; justify-content: center; color: #88bbee; font-size: 14px; }
+.pf { display: flex; gap: 0; padding: 2px 0 0; background: #1A5276; flex-shrink: 0; }
 .cx {
-  display: inline-block;
-  border: 1px solid rgba(255,255,255,0.35);
+  border: 1px solid rgba(255,255,255,0.3);
   padding: 2px 8px;
   font-size: 11px;
   cursor: pointer;
   color: #aaddff;
   background: transparent;
-  border-radius: 2px;
 }
 .cx:hover { background: rgba(255,255,255,0.1); }
 </style>
 </head>
 <body>
 
-<div id="screen">
+<div id="rc-window">
 
-  <!-- ══ HEADER ══ -->
-  <div class="hdr">
-    <div class="hdr-left">
-      <div id="dd">14/04/2026</div>
-      <div id="td">18:44:00</div>
-      <div id="cd">123.34</div>
-    </div>
-    <div class="hdr-right">
-      <div class="ind">UNDER&lt;-</div>
-      <div class="ind">UNDER&lt;-</div>
-      <div class="ind wt"><sup style="font-size:9px;vertical-align:super">°</sup>&thinsp;0.00<span style="font-size:10px">kg</span></div>
-      <div class="ind">UNDER&lt;-</div>
+  <!-- ══ BARRA TÍTULO WINDOWS ══ -->
+  <div class="win-titlebar">
+    <span class="win-title-icon">🖥</span>
+    <span class="win-title-text">RC 172.27.12.12</span>
+    <div class="win-controls">
+      <button class="win-btn">—</button>
+      <button class="win-btn">□</button>
+      <button class="win-btn close">✕</button>
     </div>
   </div>
 
-  <!-- ══ TÍTULO TAB ══ -->
-  <div class="title-band">
-    <div class="title-tab">StaticGrader</div>
+  <!-- ══ MENUBAR ══ -->
+  <div class="menubar">
+    <span>Connection</span>
+    <span>Mode</span>
+    <span>Help</span>
   </div>
 
-  <!-- ══ STATUS ══ -->
-  <div class="status" id="sl">7: CONTRASTACION (17:36:17)</div>
+  <!-- ══ HMI CONTENT ══ -->
+  <div id="screen">
 
-  <!-- ══ GRILLA BOLSILLOS ══ -->
-  <div class="gate-grid">
-    <div class="gate-row" id="ro"></div>
-    <div class="gate-row" id="re"></div>
-  </div>
+    <!-- HEADER -->
+    <div class="hdr">
+      <div class="hdr-left">
+        <div id="dd">14/04/2026</div>
+        <div id="td">18:44:00</div>
+        <div id="cd">123.34</div>
+      </div>
+      <div class="hdr-right">
+        <div class="ind">UNDER&lt;-</div>
+        <div class="ind">UNDER&lt;-</div>
+        <div class="ind wt"><span class="deg">°</span>0.00<span class="unit">kg</span></div>
+        <div class="ind">UNDER&lt;-</div>
+      </div>
+    </div>
 
-  <!-- ══ LOG ══ -->
-  <div class="log" id="log">
-    <div class="ll">Comenzando Autochequeo</div>
-    <div class="ll">Grader runtime is 5825 hours</div>
-    <div class="ll hl">Autochequeo realizado!</div>
-  </div>
+    <!-- TÍTULO -->
+    <div class="title-bar">StaticGrader</div>
 
-  <!-- ══ BOTONES ══ -->
-  <div class="btn-bar">
-    <button class="btn" onclick="sp('pp')">Cambiar programa</button>
-    <button class="btn" onclick="sp('pm')">Modo presentación</button>
-    <button class="btn" onclick="al('Centrando -> 0 <-')">-&gt; 0 &lt;-</button>
-    <button class="btn" onclick="sp('mn')">Menu</button>
-  </div>
+    <!-- STATUS -->
+    <div class="status" id="sl">7: CONTRASTACION (17:36:17)</div>
 
-  <!-- Paneles -->
-  <div class="panel" id="pp">
-    <div class="ph"><span>Cambiar programa</span><span class="cx" onclick="cp('pp')">✕ Volver</span></div>
-    <div class="pb">— Próxima iteración —</div>
-    <div class="pf"><button class="btn" style="flex:0 0 120px" onclick="cp('pp')">← Volver</button></div>
-  </div>
-  <div class="panel" id="pm">
-    <div class="ph"><span>Modo presentación</span><span class="cx" onclick="cp('pm')">✕ Volver</span></div>
-    <div class="pb">— Próxima iteración —</div>
-    <div class="pf"><button class="btn" style="flex:0 0 120px" onclick="cp('pm')">← Volver</button></div>
-  </div>
-  <div class="panel" id="mn">
-    <div class="ph"><span>Menu</span><span class="cx" onclick="cp('mn')">✕ Volver</span></div>
-    <div class="pb">— Próxima iteración —</div>
-    <div class="pf"><button class="btn" style="flex:0 0 120px" onclick="cp('mn')">← Volver</button></div>
-  </div>
+    <!-- BOLSILLOS -->
+    <div class="gate-grid">
+      <div class="gate-row" id="ro"></div>
+      <div class="gate-row" id="re"></div>
+    </div>
 
-</div>
+    <!-- LOG -->
+    <div class="log" id="log">
+      <div class="ll">Comenzando Autochequeo</div>
+      <div class="ll">Grader runtime is 5825 hours</div>
+      <div class="ll hl">Autochequeo realizado!</div>
+    </div>
+
+    <!-- BOTONES -->
+    <div class="btn-bar">
+      <button class="btn" onclick="sp('pp')">Cambiar programa</button>
+      <button class="btn" onclick="sp('pm')">Modo presentación</button>
+      <button class="btn" onclick="al('Centrando -> 0 <-')">-&gt; 0 &lt;-</button>
+      <button class="btn" onclick="sp('mn')">Menu</button>
+    </div>
+
+    <!-- PANELES -->
+    <div class="panel" id="pp">
+      <div class="ph"><span>Cambiar programa</span><span class="cx" onclick="cp('pp')">✕ Volver</span></div>
+      <div class="pb">— Próxima iteración —</div>
+      <div class="pf"><button class="btn" style="flex:0 0 120px" onclick="cp('pp')">← Volver</button></div>
+    </div>
+    <div class="panel" id="pm">
+      <div class="ph"><span>Modo presentación</span><span class="cx" onclick="cp('pm')">✕ Volver</span></div>
+      <div class="pb">— Próxima iteración —</div>
+      <div class="pf"><button class="btn" style="flex:0 0 120px" onclick="cp('pm')">← Volver</button></div>
+    </div>
+    <div class="panel" id="mn">
+      <div class="ph"><span>Menu</span><span class="cx" onclick="cp('mn')">✕ Volver</span></div>
+      <div class="pb">— Próxima iteración —</div>
+      <div class="pf"><button class="btn" style="flex:0 0 120px" onclick="cp('mn')">← Volver</button></div>
+    </div>
+
+  </div><!-- #screen -->
+</div><!-- #rc-window -->
 
 <script>
-/*
-  ════════════════════════════════════════════
-  POCKET SVG — forma exacta del original Marelec:
+/* ══════════════════════════════════════════════════
+   POCKET SVG
+   ViewBox: 0 0 80 75
+   Muesca escalón-L en esquina SUPERIOR-IZQUIERDA:
+     NW=13, NH=13 (más pequeño según brief: 12-15px)
+   Esquinas exteriores redondeadas R=6
+   Fill: #1A5276 (igual al fondo)
+   Stroke: #F1C40F 2px
 
-  - Muesca ESCALÓN-L en esquina SUPERIOR-IZQUIERDA
-    (no diagonal: paso horizontal + vertical)
-  - Las otras 3 esquinas son REDONDEADAS (R=9)
-  - Fill: mismo color que el fondo (#1A5276)
-  - Stroke: #F1C40F 2px
+   Path (clockwise):
+   M NW,1 → top-right(R) → bottom-right(R) →
+   bottom-left(R) → up-left → L NW,NH → Z (vertical notch)
+══════════════════════════════════════════════════ */
+const GW=80, GH=75, NW=13, NH=13, R=6;
 
-  Path explicado (clockwise):
-    Desde el top de la muesca (NW,0)
-    → top-right (con radio)
-    → bottom-right (con radio)
-    → bottom-left (con radio)
-    → sube por left hasta nivel de muesca
-    → horizontal hacia adentro (NW,NH)  ← el escalón
-    → sube a (NW,0)                      ← Z cierra verticalmente
-  ════════════════════════════════════════════
-*/
-const GW = 80, GH = 75;
-const NW = 18, NH = 18;  // notch width y height (escalón L)
-const R  = 9;             // radio de las 3 esquinas redondeadas
-
-function pocketPath() {
+function pp() {
   return [
-    // Inicio: top edge justo después del escalón
     `M ${NW},1`,
-    // Top edge → top-right redondeada
-    `L ${GW-R},1`,
-    `Q ${GW-1},1 ${GW-1},${R+1}`,
-    // Right edge → bottom-right redondeada
-    `L ${GW-1},${GH-R}`,
-    `Q ${GW-1},${GH-1} ${GW-R},${GH-1}`,
-    // Bottom edge → bottom-left redondeada
-    `L ${R},${GH-1}`,
-    `Q 1,${GH-1} 1,${GH-R}`,
-    // Left edge sube hasta la altura del escalón
+    `L ${GW-R},1`,     `Q ${GW-1},1 ${GW-1},${R+1}`,
+    `L ${GW-1},${GH-R}`, `Q ${GW-1},${GH-1} ${GW-R},${GH-1}`,
+    `L ${R},${GH-1}`,   `Q 1,${GH-1} 1,${GH-R}`,
     `L 1,${NH}`,
-    // ESCALÓN HORIZONTAL — el "piso" de la muesca
     `L ${NW},${NH}`,
-    // Z cierra dibujando la parte VERTICAL del escalón: (NW,NH) → (NW,1)
     'Z'
   ].join(' ');
 }
@@ -421,7 +465,7 @@ function buildGates() {
     d.className = 'gate';
     d.innerHTML =
       `<svg viewBox="0 0 ${GW} ${GH}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">` +
-        `<path d="${pocketPath()}" fill="#1A5276" stroke="#F1C40F" stroke-width="2.2" stroke-linejoin="round"/>` +
+        `<path d="${pp()}" fill="#1A5276" stroke="#F1C40F" stroke-width="2" stroke-linejoin="round"/>` +
       `</svg>` +
       `<span class="gn">${g}</span>`;
     d.addEventListener('click', () => al(`Pocket ${g}`));
@@ -430,28 +474,20 @@ function buildGates() {
 }
 buildGates();
 
-/* ══ RELOJ + CONTADOR DINÁMICO ══ */
-function pad(n) { return String(n).padStart(2, '0'); }
-let ctr = 123.00;
-
+/* Reloj */
+function pad(n) { return String(n).padStart(2,'0'); }
 function tick() {
   const n = new Date();
-  document.getElementById('dd').textContent =
-    `${pad(n.getDate())}/${pad(n.getMonth()+1)}/${n.getFullYear()}`;
-  document.getElementById('td').textContent =
-    `${pad(n.getHours())}:${pad(n.getMinutes())}:${pad(n.getSeconds())}`;
-  // C3: contador decimal dinámico
-  ctr += 0.01;
-  if (ctr > 999.99) ctr = 0;
-  document.getElementById('cd').textContent = ctr.toFixed(2);
+  document.getElementById('dd').textContent = `${pad(n.getDate())}/${pad(n.getMonth()+1)}/${n.getFullYear()}`;
+  document.getElementById('td').textContent = `${pad(n.getHours())}:${pad(n.getMinutes())}:${pad(n.getSeconds())}`;
 }
 tick(); setInterval(tick, 1000);
 
-/* ══ NAVEGACIÓN ══ */
+/* Navegación */
 function sp(id) { document.getElementById(id).classList.add('active'); }
 function cp(id) { document.getElementById(id).classList.remove('active'); }
 
-/* ══ LOG ══ */
+/* Log */
 function al(msg) {
   const a = document.getElementById('log');
   a.querySelectorAll('.hl').forEach(e => e.classList.remove('hl'));
