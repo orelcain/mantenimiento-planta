@@ -580,6 +580,19 @@ Si se necesita re-procesar o corregir algo, usar `scripts/iter18-full-season-reb
 - ✅ Unit tests de `useGraderDashboardAnalytics` (13 tests: forecast, progress, degradation, multiSession, shiftComparison)
 - ✅ Unit tests de `useGraderPatternAnalytics` (13 tests: filtros causa/tiempo, aggregados, chartData, causeTrend)
 
+### P0.6 — Timeline segundo a segundo (sesión 2026-04-14)
+- ✅ **TendenciaTimelineCard**: card colapsable con GraderTimelineChart en tab Tendencia del dashboard
+- ✅ **Bulk upload 5.37M pieceRecords** → Firestore (383 segmentos, julio 2025–feb 2026, script idempotente con retry)
+- ✅ **25 rondas UX** del timeline:
+  - R1-R5: ejes separados, tooltip enriquecido, leyenda, scatter opacity, header badges
+  - R6-R10: producción dual grid, moving avg dorado, bandas calibre, gaps ☕, zoom stats
+  - R11-R15: crosshair, dark theme polish, errores markLine, labels pausas
+  - R16-R20: P0% clamp 100%, labels calibre en bandas, glow shadow, producción line+area
+  - R21-R25: P0% acumulado + target 2%, gates stacked area (5ta capa), leyenda completa
+- ✅ **5 capas toggleables**: Pesos(g), P0%(5min), Errores P0, Pzas/min, Gates
+- ✅ **Fallback weightKg→weightPerPieceGrams** cuando falta columna "peso en Gr" en Excel
+- [ ] **Agregar campo `lot` al script bulk upload** para detectar cambios de lote en el timeline
+
 ### P1 — Requiere acceso a Firebase Console / IAM
 - [ ] **App Check**: ReCaptchaV3 + enforceAppCheck en Cloud Functions (requiere key de ReCaptcha desde Firebase Console)
 
