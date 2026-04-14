@@ -2095,28 +2095,22 @@ function getTopicId(category) {
  */
 async function tgHandleAyuda(chatId, topicId) {
   await sendTelegramMessage(
-    '🤖 <b>Bot Mantenimiento Planta</b>\n\n' +
-    '<b>📋 Incidencias</b>\n' +
-    '/incidencia [desc] — Reportar (prioridad media)\n' +
+    '🔩 <b>Bot Repuestos — Planta Antarfood</b>\n\n' +
+    '<b>Acceso rápido</b>\n' +
+    '/menu — Ver máquinas y buscar repuestos\n\n' +
+    '<b>🔍 Búsqueda</b>\n' +
+    '/repuesto [SAP o nombre] — Buscar en todas las máquinas\n' +
+    '/repuestos [máquina] — Repuestos de una máquina específica\n' +
+    'O tocá 🔍 en el menú y escribí directamente\n\n' +
+    '<b>📸 Fotos de repuestos</b>\n' +
+    'Tocar el botón 📸 en el detalle muestra todas las fotos del repuesto\n\n' +
+    '<b>📋 Incidencias (secundario)</b>\n' +
+    '/incidencia [desc] — Reportar falla\n' +
     '/incidencia alta [desc] — Prioridad alta\n' +
-    '/incidencia critica [desc] — Prioridad crítica\n' +
-    '/estado — Incidencias activas\n\n' +
-    '<b>📸 Evidencia fotográfica</b>\n' +
-    'Mandá una foto directamente — el bot te pregunta a qué incidencia adjuntarla\n' +
-    'Podés mandar varias fotos seguidas antes de adjuntar\n\n' +
-    '<b>🔧 Equipos y Repuestos</b>\n' +
-    '/equipo [nombre] — Info de un equipo\n' +
-    '/equipo — Lista de equipos registrados\n' +
-    '/repuesto [código o nombre] — Buscar repuesto\n' +
-    '/repuestos [máquina] — Repuestos de una máquina\n\n' +
-    '<b>📊 Turno</b>\n' +
-    '/turno — Resumen del turno actual\n' +
-    '/kpi — Indicadores del día\n\n' +
-    '<b>📡 Sensores</b>\n' +
-    '/sensores — Lecturas en tiempo real con semáforo\n\n' +
-    '<b>ℹ️ General</b>\n' +
-    '/ayuda — Este menú\n\n' +
-    '💡 También podés escribir el problema directamente sin comandos.',
+    'Mandá una foto directamente para adjuntarla a una incidencia\n\n' +
+    '<b>📊 Otros</b>\n' +
+    '/turno · /kpi · /sensores\n\n' +
+    '/ayuda — Este menú',
     chatId, { topicId }
   )
 }
@@ -2488,32 +2482,94 @@ async function tgHandleKpi(chatId, topicId) {
 
 // ==================== MENÚ INTERACTIVO (INLINE KEYBOARDS) ====================
 
-const PWA_URL = 'https://orelcain.github.io/mantenimiento-planta/'
+// ==================== SESIÓN DE BÚSQUEDA ====================
+
+async function getCommandSession(chatId) {
+  const snap = await db.collection('telegramCommandSessions').doc(String(chatId)).get()
+  if (!snap.exists) return null
+  const data = snap.data()
+  const expMs = data.expiresAt instanceof Date
+    ? data.expiresAt.getTime()
+    : (data.expiresAt?.toMillis?.() ?? 0)
+  if (expMs < Date.now()) { await snap.ref.delete(); return null }
+  return data
+}
+
+async function setCommandSession(chatId, data) {
+  await db.collection('telegramCommandSessions').doc(String(chatId)).set({
+    ...data,
+    expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+  })
+}
+
+async function clearCommandSession(chatId) {
+  await db.collection('telegramCommandSessions').doc(String(chatId)).delete().catch(() => {})
+}
+
+/** Búsqueda global de repuestos en todas las máquinas activas */
+async function tgHandleRepuestoSearchSession(chatId, query, topicId) {
+  const upper = query.trim().toUpperCase()
+  if (!upper || upper.length < 2) {
+    return sendTelegramButtons('⚠️ Escribí al menos 2 caracteres.', chatId,
+      [[{ text: '← Menú', callback_data: 'menu' }]], { topicId })
+  }
+
+  const repTopicId = getTopicId('repuestos') || topicId
+  const machinesSnap = await db.collection('machines').where('activa', '==', true).orderBy('orden').get()
+  const results = []
+
+  for (const machineDoc of machinesSnap.docs) {
+    if (results.length >= 8) break
+    const repSnap = await db.collection(`machines/${machineDoc.id}/repuestos`).get()
+    repSnap.forEach((repDoc) => {
+      if (results.length >= 8) return
+      const r = repDoc.data()
+      const hit =
+        (r.codigoSAP || '').toUpperCase().includes(upper) ||
+        (r.textoBreve || '').toUpperCase().includes(upper) ||
+        (r.descripcion || '').toUpperCase().includes(upper) ||
+        (r.alias || '').toUpperCase().includes(upper)
+      if (hit) results.push({ ...r, _machineId: machineDoc.id, _machineName: machineDoc.data().nombre, _repId: repDoc.id })
+    })
+  }
+
+  if (results.length === 0) {
+    return sendTelegramButtons(
+      `🔍 Sin resultados para "<b>${query}</b>".\n\nIntentá con otro término:`,
+      chatId,
+      [[{ text: '🔍 Nueva búsqueda', callback_data: 'rep:search' }, { text: '← Menú', callback_data: 'menu' }]],
+      { topicId: repTopicId }
+    )
+  }
+
+  const buttons = results.map((r) => {
+    const sap = r.codigoSAP ? `${r.codigoSAP} · ` : ''
+    const nombre = (r.textoBreve || r.descripcion || 'Sin nombre').substring(0, 26)
+    const foto = ((r.fotosReales?.length || 0) + (r.imagenesManual?.length || 0)) > 0 ? ' 📸' : ''
+    return [{ text: `${sap}${nombre}${foto}`, callback_data: `rep:d:${r._machineId}:${r._repId}` }]
+  })
+  buttons.push([{ text: '🔍 Nueva búsqueda', callback_data: 'rep:search' }, { text: '← Menú', callback_data: 'menu' }])
+
+  return sendTelegramButtons(
+    `🔍 <b>${results.length} resultado${results.length > 1 ? 's' : ''}</b> para "<b>${query}</b>":`,
+    chatId, buttons, { topicId: repTopicId }
+  )
+}
+
+
 
 /**
- * /menu — Menú principal con botones interactivos
+ * /menu — Menú enfocado en repuestos: máquinas directas + búsqueda
  */
 async function tgHandleMenu(chatId, topicId) {
-  const buttons = [
-    [
-      { text: '⭐ Acceso Rápido', callback_data: 'fav:list' },
-      { text: '🔧 Equipos', callback_data: 'eq:list' },
-    ],
-    [
-      { text: '🏭 Máquinas', callback_data: 'maq:list' },
-      { text: '📋 Incidencias', callback_data: 'inc:list' },
-    ],
-    [
-      { text: '📊 Turno', callback_data: 'cmd:turno' },
-      { text: '📈 KPIs', callback_data: 'cmd:kpi' },
-      { text: '📡 Sensores', callback_data: 'cmd:sensores' },
-    ],
-    [
-      { text: '🌐 Abrir App Completa', url: PWA_URL },
-    ],
-  ]
+  const snap = await db.collection('machines').where('activa', '==', true).orderBy('orden').limit(12).get()
+  const buttons = [[{ text: '🔍 Buscar por SAP o nombre', callback_data: 'rep:search' }]]
+  snap.docs.forEach((doc) => {
+    buttons.push([{ text: `🏭 ${doc.data().nombre}`, callback_data: `maq:rep:${doc.id}` }])
+  })
+  buttons.push([{ text: '🌐 Abrir App', url: PWA_URL }])
   await sendTelegramButtons(
-    '🏭 <b>Menú Mantenimiento</b>\n\nElegí una opción:',
+    '🔩 <b>Repuestos Planta</b>\n\nElegí una máquina o buscá por SAP/nombre:',
     chatId, buttons, { topicId }
   )
 }
@@ -2548,26 +2604,14 @@ async function tgHandleCallback(chatId, messageId, data, topicId) {
 
 // ---- Callback: Menú principal ----
 async function cbMenu(chatId, messageId) {
-  const buttons = [
-    [
-      { text: '⭐ Acceso Rápido', callback_data: 'fav:list' },
-      { text: '🔧 Equipos', callback_data: 'eq:list' },
-    ],
-    [
-      { text: '🏭 Máquinas', callback_data: 'maq:list' },
-      { text: '📋 Incidencias', callback_data: 'inc:list' },
-    ],
-    [
-      { text: '📊 Turno', callback_data: 'cmd:turno' },
-      { text: '📈 KPIs', callback_data: 'cmd:kpi' },
-      { text: '📡 Sensores', callback_data: 'cmd:sensores' },
-    ],
-    [
-      { text: '🌐 Abrir App Completa', url: PWA_URL },
-    ],
-  ]
+  const snap = await db.collection('machines').where('activa', '==', true).orderBy('orden').limit(12).get()
+  const buttons = [[{ text: '🔍 Buscar por SAP o nombre', callback_data: 'rep:search' }]]
+  snap.docs.forEach((doc) => {
+    buttons.push([{ text: `🏭 ${doc.data().nombre}`, callback_data: `maq:rep:${doc.id}` }])
+  })
+  buttons.push([{ text: '🌐 Abrir App', url: PWA_URL }])
   return editTelegramMessage(chatId, messageId,
-    '🏭 <b>Menú Mantenimiento</b>\n\nElegí una opción:', buttons)
+    '🔩 <b>Repuestos Planta</b>\n\nElegí una máquina o buscá por SAP/nombre:', buttons)
 }
 
 // ---- Callback: Equipos ----
@@ -2618,82 +2662,131 @@ async function cbEquipo(chatId, messageId, params) {
   }
 }
 
-// ---- Callback: Máquinas ----
+// ---- Callback: Máquinas → lista repuestos con paginación ----
 async function cbMaquina(chatId, messageId, params) {
   const sub = params[0]
 
+  // sub === 'list' ya no se usa desde el menú pero se mantiene por compatibilidad
   if (sub === 'list') {
     const snapshot = await db.collection('machines').where('activa', '==', true).orderBy('orden').get()
-    if (snapshot.empty) {
-      return editTelegramMessage(chatId, messageId, '📭 No hay máquinas registradas.',
-        [[{ text: '← Menú', callback_data: 'menu' }]])
-    }
     const buttons = []
     snapshot.docs.forEach((doc) => {
       buttons.push([{ text: `🏭 ${doc.data().nombre}`, callback_data: `maq:rep:${doc.id}` }])
     })
     buttons.push([{ text: '← Menú', callback_data: 'menu' }])
-    return editTelegramMessage(chatId, messageId, '<b>🏭 Máquinas</b>\n\nElegí una para ver repuestos:', buttons)
+    return editTelegramMessage(chatId, messageId, '🔩 <b>Repuestos Planta</b>\n\nElegí una máquina:', buttons)
   }
 
   if (sub === 'rep') {
-    const machineId = params.slice(1).join(':')
-    const machineDoc = await db.collection('machines').doc(machineId).get()
-    const machineName = machineDoc.exists ? machineDoc.data().nombre : machineId
+    const PAGE = 12
+    const machineId = params[1]
+    const offset = parseInt(params[2] || '0')
 
-    const repSnap = await db.collection(`machines/${machineId}/repuestos`).orderBy('codigoSAP').limit(15).get()
-    if (repSnap.empty) {
-      return editTelegramMessage(chatId, messageId, `📭 <b>${machineName}</b> no tiene repuestos.`,
-        [[{ text: '← Máquinas', callback_data: 'maq:list' }]])
+    const [machineDoc, allSnap] = await Promise.all([
+      db.collection('machines').doc(machineId).get(),
+      db.collection(`machines/${machineId}/repuestos`).orderBy('codigoSAP').get(),
+    ])
+
+    const machineName = machineDoc.exists ? machineDoc.data().nombre : machineId
+    const total = allSnap.size
+
+    if (total === 0) {
+      return editTelegramMessage(chatId, messageId,
+        `📭 <b>${machineName}</b> no tiene repuestos cargados.`,
+        [[{ text: '← Menú', callback_data: 'menu' }]])
     }
+
+    const page = allSnap.docs.slice(offset, offset + PAGE)
     const buttons = []
-    repSnap.docs.forEach((doc) => {
+
+    page.forEach((doc) => {
       const r = doc.data()
-      const label = `${r.codigoSAP || '—'} ${(r.textoBreve || r.descripcion || '').substring(0, 30)}`
-      buttons.push([{ text: label, callback_data: `rep:d:${machineId}:${doc.id}` }])
+      const totalFotos = (r.fotosReales?.length || 0) + (r.imagenesManual?.length || 0)
+      const fotoIcon = totalFotos > 0 ? ' 📸' : ''
+      const sap = r.codigoSAP ? `${r.codigoSAP} · ` : ''
+      const nombre = (r.textoBreve || r.descripcion || 'Sin nombre').substring(0, 28)
+      buttons.push([{ text: `${sap}${nombre}${fotoIcon}`, callback_data: `rep:d:${machineId}:${doc.id}` }])
     })
-    buttons.push([{ text: '← Máquinas', callback_data: 'maq:list' }, { text: '← Menú', callback_data: 'menu' }])
+
+    // Navegación
+    const navRow = []
+    if (offset > 0) navRow.push({ text: '◀ Anterior', callback_data: `maq:rep:${machineId}:${offset - PAGE}` })
+    if (offset + PAGE < total) navRow.push({ text: 'Siguiente ▶', callback_data: `maq:rep:${machineId}:${offset + PAGE}` })
+    if (navRow.length > 0) buttons.push(navRow)
+    buttons.push([
+      { text: '🔍 Buscar', callback_data: 'rep:search' },
+      { text: '← Menú', callback_data: 'menu' },
+    ])
+
+    const rango = `${offset + 1}–${Math.min(offset + PAGE, total)} de ${total}`
     return editTelegramMessage(chatId, messageId,
-      `<b>🔩 Repuestos — ${machineName}</b> (${repSnap.size})\n\nElegí uno:`, buttons)
+      `<b>🏭 ${machineName}</b>  📦 ${rango}\n\nElegí un repuesto:`, buttons)
   }
 }
 
-// ---- Callback: Repuesto detalle + foto ----
+// ---- Callback: Repuesto detalle + foto + búsqueda ----
 async function cbRepuesto(chatId, messageId, params, topicId) {
   const sub = params[0]
 
+  // ---- Búsqueda: prompt al usuario ----
+  if (sub === 'search') {
+    await setCommandSession(chatId, { step: 'buscar_repuesto', topicId })
+    return editTelegramMessage(chatId, messageId,
+      '🔍 <b>Buscar repuesto</b>\n\nEscribí el código SAP o nombre:',
+      [[{ text: '❌ Cancelar', callback_data: 'menu' }]])
+  }
+
+  // ---- Detalle de repuesto ----
   if (sub === 'd') {
     const machineId = params[1]
     const repId = params.slice(2).join(':')
-    const repDoc = await db.collection(`machines/${machineId}/repuestos`).doc(repId).get()
+
+    const [repDoc, machineDoc] = await Promise.all([
+      db.collection(`machines/${machineId}/repuestos`).doc(repId).get(),
+      db.collection('machines').doc(machineId).get(),
+    ])
+
     if (!repDoc.exists) {
       return editTelegramMessage(chatId, messageId, '❌ Repuesto no encontrado.',
-        [[{ text: '← Máquinas', callback_data: 'maq:list' }]])
+        [[{ text: '← Menú', callback_data: 'menu' }]])
     }
+
     const r = repDoc.data()
-    const repTopicId = getTopicId('repuestos') || topicId
-    let msg = `<b>🔩 ${r.textoBreve || r.descripcion || 'Sin nombre'}</b>\n\n`
-    if (r.codigoSAP) msg += `📌 SAP: <code>${r.codigoSAP}</code>\n`
-    if (r.codigoFabricante) msg += `🏭 Fabricante: ${r.codigoFabricante}\n`
-    if (r.cantidadPorMaquina) msg += `📦 Cantidad/máquina: ${r.cantidadPorMaquina}\n`
-    if (r.valorUnitario) msg += `💰 Valor: $${r.valorUnitario.toLocaleString()}\n`
-    if (r.ubicacionEnPlanta) msg += `📍 Ubicación: ${r.ubicacionEnPlanta}\n`
-    if (r.tipo) msg += `🏷️ Tipo: ${r.tipo}\n`
-    if (r.observaciones) msg += `📝 ${r.observaciones}\n`
+    const machineName = machineDoc.exists ? machineDoc.data().nombre : '—'
+    const nombre = r.textoBreve || r.descripcion || 'Sin nombre'
+    const totalFotos = (r.fotosReales?.length || 0) + (r.imagenesManual?.length || 0)
+
+    let msg = `🔩 <b>${nombre.toUpperCase()}</b>\n`
+    msg += `🏭 ${machineName}\n`
+    msg += '─────────────────\n'
+    if (r.codigoSAP)        msg += `SAP    <code>${r.codigoSAP}</code>\n`
+    if (r.codigoFabricante) msg += `Fab    <code>${r.codigoFabricante}</code>\n`
+
+    const hayDetalle = r.cantidadPorMaquina || r.ubicacionEnPlanta || r.valorUnitario || r.tipo
+    if (hayDetalle) {
+      msg += '─────────────────\n'
+      if (r.cantidadPorMaquina) msg += `📦 Cant/máq   <b>${r.cantidadPorMaquina} uds</b>\n`
+      if (r.ubicacionEnPlanta)  msg += `📍 Bodega     <b>${r.ubicacionEnPlanta}</b>\n`
+      if (r.valorUnitario)      msg += `💰 Valor      $${Number(r.valorUnitario).toLocaleString('es-CL')}\n`
+      if (r.tipo)               msg += `🏷️ Tipo       ${r.tipo}\n`
+    }
+    if (r.observaciones) {
+      msg += '─────────────────\n'
+      msg += `📝 ${r.observaciones}\n`
+    }
 
     const buttons = []
-    // Botón de foto si tiene imágenes
-    const hasPhotos = (r.fotosReales && r.fotosReales.length > 0) || (r.imagenesManual && r.imagenesManual.length > 0)
-    if (hasPhotos) {
-      buttons.push([{ text: '📸 Ver foto', callback_data: `rep:f:${machineId}:${repId}` }])
+    if (totalFotos > 0) {
+      buttons.push([{ text: `📸 Ver foto${totalFotos > 1 ? 's' : ''} (${totalFotos})`, callback_data: `rep:f:${machineId}:${repId}` }])
     }
     buttons.push([
-      { text: '← Repuestos', callback_data: `maq:rep:${machineId}` },
+      { text: `← ${machineName}`, callback_data: `maq:rep:${machineId}` },
       { text: '← Menú', callback_data: 'menu' },
     ])
     return editTelegramMessage(chatId, messageId, msg, buttons)
   }
 
+  // ---- Fotos del repuesto ----
   if (sub === 'f') {
     const machineId = params[1]
     const repId = params.slice(2).join(':')
@@ -2702,18 +2795,22 @@ async function cbRepuesto(chatId, messageId, params, topicId) {
 
     const r = repDoc.data()
     const repTopicId = getTopicId('repuestos') || topicId
-    // Priorizar fotos reales, luego manual
     const photos = [...(r.fotosReales || []), ...(r.imagenesManual || [])]
     if (photos.length === 0) return
 
-    const photo = photos[0]
-    const caption = `📸 <b>${r.textoBreve || r.descripcion || ''}</b>\nSAP: ${r.codigoSAP || '—'}`
-    const buttons = [[
-      { text: '← Detalle', callback_data: `rep:d:${machineId}:${repId}` },
-      { text: '← Menú', callback_data: 'menu' },
-    ]]
-    // Enviar foto como mensaje nuevo (no se puede editar a foto)
-    return sendTelegramPhoto(chatId, photo.url, caption, buttons, { topicId: repTopicId })
+    // Enviar todas las fotos como mensajes nuevos
+    for (let i = 0; i < Math.min(photos.length, 5); i++) {
+      const isLast = i === Math.min(photos.length, 5) - 1
+      const caption = isLast
+        ? `📸 <b>${r.textoBreve || r.descripcion || ''}</b>\nSAP: <code>${r.codigoSAP || '—'}</code>`
+        : null
+      const btnRow = isLast ? [[
+        { text: '← Detalle', callback_data: `rep:d:${machineId}:${repId}` },
+        { text: '← Menú', callback_data: 'menu' },
+      ]] : null
+      await sendTelegramPhoto(chatId, photos[i].url, caption, btnRow, { topicId: repTopicId })
+    }
+    return
   }
 }
 
@@ -2877,6 +2974,17 @@ exports.telegramWebhook = onRequest({ region: 'us-central1' }, async (req, res) 
     if (!text) {
       res.status(200).send('ok')
       return
+    }
+
+    // ---- Sesión de búsqueda activa: el texto es el término a buscar ----
+    if (!text.startsWith('/')) {
+      const cmdSession = await getCommandSession(chatId)
+      if (cmdSession?.step === 'buscar_repuesto') {
+        await clearCommandSession(chatId)
+        await tgHandleRepuestoSearchSession(chatId, text, cmdSession.topicId || incomingTopicId)
+        res.status(200).send('ok')
+        return
+      }
     }
 
     if (/^\/(menu|start)/i.test(text)) {
