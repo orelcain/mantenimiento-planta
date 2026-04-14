@@ -6,28 +6,28 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Grader HMI">
-<meta name="theme-color" content="#1a70d0">
+<meta name="theme-color" content="#0c5598">
 <title>Grader HMI — StaticGrader</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  /* Paleta exacta Marelec StaticGrader */
-  --bg:        #1a70d0;   /* azul principal (mismo del original) */
-  --bg-title:  #0c55b8;   /* barra StaticGrader – azul ligeramente más oscuro */
-  --bg-status: #1465c8;   /* línea estado – tono intermedio */
-  --bg-gate:   #1260c0;   /* fill de gates – apenas más oscuro q el bg */
-  --yellow:    #ffcc00;   /* bordes/texto indicadores */
+  /* Paleta — clon exacto del Marelec StaticGrader */
+  --bg:        #0c5598;   /* azul principal (medio-oscuro, saturación baja) */
+  --bg-title:  #041a55;   /* banda navy donde emerge el tab StaticGrader */
+  --bg-gate:   #001a48;   /* fill del gate (navy muy oscuro) */
+  --yellow:    #ffcc00;
   --white:     #ffffff;
-  --log-bg:    #ffffff;   /* área log = BLANCO con texto negro */
+  --log-bg:    #ffffff;   /* log = blanco con texto negro */
   --log-text:  #111111;
-  --log-sel:   #00008b;   /* línea seleccionada – azul navy */
-  --btn-bg:    #d0d0d8;   /* botones Windows-style */
+  --log-sel:   #000099;   /* línea seleccionada – azul navy */
+  --btn-bg:    #d0d0d0;
+  --btn-bdr:   #808080;
 }
 
 html, body {
   height: 100%;
-  background: #1a1a2e;
+  background: #10101a;
   font-family: Arial, Helvetica, sans-serif;
   overflow: hidden;
   display: flex;
@@ -47,85 +47,102 @@ html, body {
   position: relative;
 }
 
-/* ─────────────────────────────────────
-   HEADER: fecha/hora izq · indicadores der
-   Sin banda oscura – mismo azul que el bg
-───────────────────────────────────── */
+/* ═════════════════════════════════════════
+   HEADER — sin banda oscura, mismo azul
+═════════════════════════════════════════ */
 .hdr {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 5px 8px 4px 10px;
+  padding: 6px 8px 5px 12px;
   flex-shrink: 0;
-  /* mismo background que el body – sin separación */
 }
 
 .hdr-left {
   font-family: 'Courier New', monospace;
-  font-size: 13px;
-  line-height: 1.55;
+  font-size: 14px;
+  line-height: 1.5;
   color: #ffffff;
 }
 
-/* Grid 2×2 de indicadores (derecha del header) */
 .hdr-right {
   display: grid;
   grid-template-columns: 1fr 1fr;
   grid-template-rows: auto auto;
-  gap: 3px;
+  gap: 4px;
 }
 
 .ind-box {
   border: 2px solid var(--yellow);
   color: var(--yellow);
   font-family: 'Courier New', monospace;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: bold;
-  padding: 3px 10px;
-  min-width: 92px;
+  padding: 3px 12px;
+  min-width: 100px;
   text-align: center;
   background: transparent;
   white-space: nowrap;
   letter-spacing: 0.5px;
 }
 
-/* Display de peso – fondo negro interior como el original */
+/* Display de peso — interior levemente más oscuro */
 .ind-box.weight {
-  background: #000c30;
-  font-size: 14px;
-  letter-spacing: 1px;
+  background: #041a55;
+  font-size: 15px;
+  letter-spacing: 0.5px;
+  padding: 3px 8px;
 }
+.ind-box.weight .deg { font-size: 10px; vertical-align: super; }
+.ind-box.weight .unit { font-size: 10px; }
 
-/* ── BARRA TÍTULO ── */
-.title-bar {
+/* ═════════════════════════════════════════
+   BANDA NAVY CON TAB "StaticGrader"
+   + línea status "7: CONTRASTACION" dentro
+═════════════════════════════════════════ */
+.title-section {
   background: var(--bg-title);
-  padding: 5px 10px;
-  font-size: 18px;
-  font-weight: bold;
   flex-shrink: 0;
-  border-top:    1px solid rgba(255,255,255,0.12);
-  border-bottom: 1px solid rgba(0,0,0,0.25);
+  display: flex;
+  flex-direction: column;
 }
 
-/* ── LÍNEA ESTADO ── */
-.status-line {
-  background: var(--bg-status);
-  padding: 3px 10px;
-  font-size: 13px;
+.tab-wrap {
+  padding: 0 0 0 8px;
+}
+
+.tab {
+  display: inline-block;
+  background: var(--bg);
+  color: #ffffff;
   font-family: Arial, sans-serif;
-  flex-shrink: 0;
-  border-bottom: 1px solid rgba(0,0,0,0.18);
+  font-size: 17px;
+  font-weight: bold;
+  padding: 4px 24px 5px 14px;
+  border-radius: 6px 6px 0 0;
+  min-width: 140px;
+  margin-top: 3px;
+  position: relative;
 }
 
-/* ── GRID DE GATES ── */
+.status-strip {
+  padding: 4px 12px 5px;
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+  color: #ffffff;
+}
+
+/* ═════════════════════════════════════════
+   GRID DE GATES
+═════════════════════════════════════════ */
 .gate-grid {
   flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  gap: 8px;
-  padding: 6px 18px;
+  gap: 9px;
+  padding: 10px 16px 6px;
 }
 
 .gate-row {
@@ -135,32 +152,34 @@ html, body {
 }
 
 .gate {
-  width: 90px;
-  height: 86px;
+  width: 94px;
+  height: 84px;
   position: relative;
   cursor: pointer;
 }
-.gate:hover path { fill: #1870e0; }
-.gate:active path { fill: #2288ff; }
+.gate:hover path { fill: #082c78; }
+.gate:active path { fill: #10408c; }
 .gate svg { width: 100%; height: 100%; display: block; }
 
-/* Número del gate – esquina superior derecha, encima de la muesca */
+/* Número del gate — dentro de la muesca, arriba-derecha */
 .gate-num {
   position: absolute;
-  top: 5px;
-  right: 8px;
+  top: 2px;
+  right: 6px;
   font-size: 11px;
   font-weight: bold;
   font-family: 'Courier New', monospace;
   color: var(--yellow);
   pointer-events: none;
+  line-height: 1;
 }
 
-/* ── ÁREA DE LOG ── */
-/* BLANCO con texto negro; línea activa resaltada azul marino */
+/* ═════════════════════════════════════════
+   LOG — blanco con texto negro
+═════════════════════════════════════════ */
 .log-area {
   background: var(--log-bg);
-  border: 1px solid #6688aa;
+  border: 1px solid #7088a8;
   margin: 0 6px 4px;
   padding: 3px 6px;
   font-family: 'Courier New', monospace;
@@ -175,46 +194,57 @@ html, body {
 }
 
 .log-line {
-  padding: 1px 3px;
+  padding: 1px 4px;
   white-space: nowrap;
   color: var(--log-text);
   background: var(--log-bg);
+  line-height: 1.35;
 }
 .log-line.hl {
   background: var(--log-sel);
   color: #ffffff;
 }
 
-/* ── BARRA DE BOTONES ── */
+/* ═════════════════════════════════════════
+   BOTONES — Windows-style, planos
+═════════════════════════════════════════ */
 .btn-bar {
   display: flex;
   gap: 2px;
-  padding: 3px 3px 5px;
+  padding: 4px 4px 6px;
   flex-shrink: 0;
-  background: #b8b8c8;
-  border-top: 2px solid #a0a0b4;
+  background: #a8a8b8;
+  border-top: 2px solid #8890a0;
 }
 
 .btn-hmi {
   flex: 1;
   background: var(--btn-bg);
-  border: 2px outset #c0c0cc;
-  border-bottom-width: 3px;
-  color: #111;
+  border: 1px solid var(--btn-bdr);
+  border-top-color: #eeeeee;
+  border-left-color: #eeeeee;
+  border-right-color: #606060;
+  border-bottom-color: #606060;
+  color: #000000;
   font-family: Arial, sans-serif;
-  font-size: 13px;
-  padding: 7px 4px;
+  font-size: 14px;
+  padding: 10px 4px;
   cursor: pointer;
   text-align: center;
   user-select: none;
 }
-.btn-hmi:hover  { background: #dcdce8; }
-.btn-hmi:active { border-style: inset; background: #b8b8cc; }
+.btn-hmi:hover  { background: #dcdcdc; }
+.btn-hmi:active {
+  border-top-color: #606060;
+  border-left-color: #606060;
+  border-right-color: #eeeeee;
+  border-bottom-color: #eeeeee;
+  background: #c0c0c0;
+}
 
-/* ─────────────────────────────────────
-   PANELES (futuras pantallas – se
-   superponen sobre la pantalla principal)
-───────────────────────────────────── */
+/* ═════════════════════════════════════════
+   PANELES (siguientes pantallas)
+═════════════════════════════════════════ */
 .panel {
   display: none;
   position: absolute;
@@ -227,8 +257,7 @@ html, body {
 
 .panel-hdr {
   background: var(--bg-title);
-  border-bottom: 2px solid #0044cc;
-  padding: 6px 10px;
+  padding: 6px 12px;
   font-size: 14px;
   font-weight: bold;
   display: flex;
@@ -245,15 +274,15 @@ html, body {
 .panel-footer {
   display: flex;
   gap: 2px;
-  padding: 3px 3px 5px;
-  background: #b8b8c8;
-  border-top: 2px solid #a0a0b4;
+  padding: 4px 4px 6px;
+  background: #a8a8b8;
+  border-top: 2px solid #8890a0;
   flex-shrink: 0;
 }
 
 .chip {
   display: inline-block;
-  background: rgba(0,0,0,0.25);
+  background: rgba(0,0,0,0.3);
   border: 1px solid rgba(255,255,255,0.3);
   color: #ddeeff;
   font-size: 11px;
@@ -261,7 +290,7 @@ html, body {
   border-radius: 3px;
   cursor: pointer;
 }
-.chip:hover { background: rgba(0,0,0,0.4); }
+.chip:hover { background: rgba(0,0,0,0.5); }
 </style>
 </head>
 <body>
@@ -272,22 +301,24 @@ html, body {
   <div class="hdr">
     <div class="hdr-left">
       <div id="date-disp">14/04/2026</div>
-      <div id="time-disp">18:18:12</div>
-      <div id="ctr-disp" style="font-size:12px">123...</div>
+      <div id="time-disp">18:27:12</div>
+      <div id="ctr-disp">123...</div>
     </div>
     <div class="hdr-right">
       <div class="ind-box">UNDER&lt;-</div>
       <div class="ind-box">UNDER&lt;-</div>
-      <div class="ind-box weight"><sup style="font-size:9px;vertical-align:super">°</sup>&nbsp;0.00<span style="font-size:10px">kg</span></div>
+      <div class="ind-box weight"><span class="deg">°</span>&nbsp;0.00<span class="unit">kg</span></div>
       <div class="ind-box">UNDER&lt;-</div>
     </div>
   </div>
 
-  <!-- ══ TÍTULO ══ -->
-  <div class="title-bar">StaticGrader</div>
-
-  <!-- ══ ESTADO ══ -->
-  <div class="status-line" id="status-line">7: CONTRASTACION (17:36:17)</div>
+  <!-- ══ BANDA TÍTULO + STATUS ══ -->
+  <div class="title-section">
+    <div class="tab-wrap">
+      <div class="tab">StaticGrader</div>
+    </div>
+    <div class="status-strip" id="status-line">7: CONTRASTACION (17:36:17)</div>
+  </div>
 
   <!-- ══ GATES ══ -->
   <div class="gate-grid">
@@ -307,10 +338,10 @@ html, body {
     <button class="btn-hmi" onclick="showPanel('panel-prog')">Cambiar programa</button>
     <button class="btn-hmi" onclick="showPanel('panel-pres')">Modo presentación</button>
     <button class="btn-hmi" onclick="goCenter()">-&gt; 0 &lt;-</button>
-    <button class="btn-hmi" onclick="showPanel('panel-menu')">Menú</button>
+    <button class="btn-hmi" onclick="showPanel('panel-menu')">Menu</button>
   </div>
 
-  <!-- ══ PANEL: Cambiar programa ══ -->
+  <!-- ══ PANELES ══ -->
   <div class="panel" id="panel-prog">
     <div class="panel-hdr">
       <span>Cambiar programa</span>
@@ -324,7 +355,6 @@ html, body {
     </div>
   </div>
 
-  <!-- ══ PANEL: Modo presentación ══ -->
   <div class="panel" id="panel-pres">
     <div class="panel-hdr">
       <span>Modo presentación</span>
@@ -338,7 +368,6 @@ html, body {
     </div>
   </div>
 
-  <!-- ══ PANEL: Menú ══ -->
   <div class="panel" id="panel-menu">
     <div class="panel-hdr">
       <span>Menú principal</span>
@@ -355,30 +384,24 @@ html, body {
 </div><!-- #screen -->
 
 <script>
-/* ══════════════════════════════════════════════════════
+/* ═════════════════════════════════════════
    GATE SVG
-   Rectángulo con esquinas redondeadas (R=10)
-   + muesca diagonal en esquina superior-derecha (N=18px)
-   Borde amarillo, fill levemente más oscuro que el bg
-══════════════════════════════════════════════════════ */
-const GW = 90, GH = 86, R = 10, N = 18;
+   Esquinas con radio pequeño (R=4) +
+   muesca diagonal arriba-derecha (N=16)
+═════════════════════════════════════════ */
+const GW = 94, GH = 84, R = 4, N = 16;
 
 function gatePath() {
-  // Empezar después del radio en esquina sup-izq
-  // → derecho hasta inicio de muesca
-  // → diagonal de muesca (esquina sup-der)
-  // → bajar lado der hasta esquina inf-der redondeada
-  // → arco inf-der → izquierda → arco inf-izq → subir → arco sup-izq → cerrar
   return [
-    `M ${R},2`,
-    `L ${GW - N},2`,
-    `L ${GW - 2},${N}`,
-    `L ${GW - 2},${GH - R}`,
-    `Q ${GW - 2},${GH - 2} ${GW - R},${GH - 2}`,
-    `L ${R},${GH - 2}`,
-    `Q 2,${GH - 2} 2,${GH - R}`,
-    `L 2,${R}`,
-    `Q 2,2 ${R},2`,
+    `M ${R},1.5`,
+    `L ${GW - N},1.5`,
+    `L ${GW - 1.5},${N}`,
+    `L ${GW - 1.5},${GH - R}`,
+    `Q ${GW - 1.5},${GH - 1.5} ${GW - R},${GH - 1.5}`,
+    `L ${R},${GH - 1.5}`,
+    `Q 1.5,${GH - 1.5} 1.5,${GH - R}`,
+    `L 1.5,${R}`,
+    `Q 1.5,1.5 ${R},1.5`,
     'Z'
   ].join(' ');
 }
@@ -394,7 +417,7 @@ function buildGates() {
 
     div.innerHTML =
       `<svg viewBox="0 0 ${GW} ${GH}" xmlns="http://www.w3.org/2000/svg">` +
-        `<path d="${gatePath()}" fill="#1260c0" stroke="#ffcc00" stroke-width="2" stroke-linejoin="round"/>` +
+        `<path d="${gatePath()}" fill="#001a48" stroke="#ffcc00" stroke-width="2" stroke-linejoin="miter"/>` +
       `</svg>` +
       `<span class="gate-num">${g}</span>`;
 
