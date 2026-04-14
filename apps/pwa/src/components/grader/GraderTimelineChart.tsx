@@ -177,7 +177,9 @@ export function GraderTimelineChart({ records, shiftId, dateKey }: Props) {
         left++
       }
       if (windowTotal > 0) {
-        p0Pts.push([tsR, +((windowP0 / windowTotal) * 100).toFixed(2)])
+        const pct = Math.min(100, +((windowP0 / windowTotal) * 100).toFixed(2))
+        // Ignorar primeros 30 registros (arranque ruidoso con pocos datos en ventana)
+        if (right >= 30) p0Pts.push([tsR, pct])
       }
     }
 
@@ -293,9 +295,20 @@ export function GraderTimelineChart({ records, shiftId, dateKey }: Props) {
         max: (v: any) => v.max + 200,
       })
 
-      // Bandas de calibre (markArea)
+      // Bandas de calibre (markArea) con labels al borde derecho
       const markAreaData = CALIBRE_BANDS.map((b) => ([
-        { yAxis: b.min, itemStyle: { color: b.color } },
+        {
+          yAxis: b.min,
+          itemStyle: { color: b.color },
+          label: {
+            show: true,
+            position: 'insideTopRight',
+            formatter: b.label,
+            fontSize: 9,
+            color: 'rgba(148,163,184,0.5)',
+            padding: [2, 4],
+          },
+        },
         { yAxis: b.max },
       ]))
 
@@ -313,16 +326,31 @@ export function GraderTimelineChart({ records, shiftId, dateKey }: Props) {
         markArea: { silent: true, data: markAreaData },
       })
 
-      // Moving average
+      // Moving average con glow para contraste
       if (weightMovingAvg.length > 0) {
+        // Shadow layer (glow effect)
+        series.push({
+          name: '_shadow',
+          type: 'line',
+          xAxisIndex: 0, yAxisIndex: yIdx,
+          data: weightMovingAvg,
+          smooth: true,
+          lineStyle: { width: 6, color: 'rgba(0,0,0,0.5)' },
+          itemStyle: { color: 'transparent' },
+          showSymbol: false,
+          z: 4,
+          silent: true,
+          tooltip: { show: false },
+        })
+        // Main line
         series.push({
           name: 'Peso promedio',
           type: 'line',
           xAxisIndex: 0, yAxisIndex: yIdx,
           data: weightMovingAvg,
           smooth: true,
-          lineStyle: { width: 2, color: '#f8fafc' },
-          itemStyle: { color: '#f8fafc' },
+          lineStyle: { width: 2.5, color: '#fbbf24', shadowColor: 'rgba(251,191,36,0.4)', shadowBlur: 6 },
+          itemStyle: { color: '#fbbf24' },
           showSymbol: false,
           z: 5,
         })
@@ -380,13 +408,28 @@ export function GraderTimelineChart({ records, shiftId, dateKey }: Props) {
       }
     }
 
-    // ── Gap markers (paradas/colación) ──
+    // ── Gap markers (paradas/colación) con labels ──
     if (gaps.length > 0 && series.length > 0) {
-      const gapAreas = gaps.map((g) => ([
-        { xAxis: g.start, itemStyle: { color: 'rgba(100,116,139,0.08)' } },
-        { xAxis: g.end },
-      ]))
-      // Agregar al primer eje X
+      const gapAreas = gaps.map((g) => {
+        const label = g.durationMin >= 60
+          ? `${Math.floor(g.durationMin / 60)}h ${g.durationMin % 60}m`
+          : `${g.durationMin}min`
+        return [
+          {
+            xAxis: g.start,
+            itemStyle: { color: 'rgba(100,116,139,0.1)' },
+            label: {
+              show: true,
+              position: 'insideTop',
+              formatter: `☕ ${label}`,
+              fontSize: 9,
+              color: 'rgba(148,163,184,0.6)',
+              padding: [4, 0],
+            },
+          },
+          { xAxis: g.end },
+        ]
+      })
       if (!series[0].markArea) series[0].markArea = { silent: true, data: [] }
       series[0].markArea.data.push(...gapAreas)
     }
@@ -411,12 +454,22 @@ export function GraderTimelineChart({ records, shiftId, dateKey }: Props) {
       })
       series.push({
         name: 'Producción/min',
-        type: 'bar',
+        type: 'line',
         xAxisIndex: 1, yAxisIndex: yIdx,
         data: productionSeries,
-        barMaxWidth: 4,
-        itemStyle: { color: 'rgba(16,185,129,0.5)', borderRadius: [1, 1, 0, 0] },
-        emphasis: { itemStyle: { color: '#10b981' } },
+        smooth: 0.3,
+        lineStyle: { width: 1.5, color: '#10b981' },
+        itemStyle: { color: '#10b981' },
+        showSymbol: false,
+        areaStyle: {
+          color: {
+            type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: 'rgba(16,185,129,0.3)' },
+              { offset: 1, color: 'rgba(16,185,129,0.02)' },
+            ],
+          },
+        },
       })
       yIdx++
     }
@@ -571,7 +624,7 @@ export function GraderTimelineChart({ records, shiftId, dateKey }: Props) {
                   </span>
                 ))}
                 <span className="flex items-center gap-1 text-muted-foreground">
-                  <span className="w-6 h-[2px] bg-white/80 rounded" />prom
+                  <span className="w-6 h-[2px] rounded" style={{ backgroundColor: '#fbbf24' }} />prom (50)
                 </span>
               </div>
             )}
