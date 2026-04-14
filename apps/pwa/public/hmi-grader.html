@@ -111,43 +111,39 @@ html, body {
 }
 
 /* ══════════════════════════════════════════
-   TÍTULO "StaticGrader" — TAB DESIGN
-   C9: era barra full-width → ahora tab con rounded top
-   C10: banda oscura detrás del tab
+   BANDA OSCURA — contiene título + status
+   La banda oscura es más oscura que el bg principal.
+   Dentro va el tab redondeado "StaticGrader"
+   y debajo el status "7: CONTRASTACION"
 ══════════════════════════════════════════ */
 .title-band {
-  background: #041a55;          /* C10: banda oscura detrás del tab */
+  background: #0a1d45;          /* banda oscura navy */
   flex-shrink: 0;
   display: flex;
-  align-items: flex-end;
-  padding-left: 8px;
-  padding-bottom: 0;
+  flex-direction: column;
+  padding: 3px 0 0 8px;
 }
 
-/* C9: el tab tiene esquinas superiores redondeadas y no ocupa todo el ancho */
+/* Tab "StaticGrader" dentro de la banda oscura */
 .title-tab {
   display: inline-block;
-  background: #2980B9;          /* C9: tab color más claro que la banda */
+  background: #1F618D;          /* azul medio — contrasta con la banda */
   color: #ffffff;
   font-size: 16px;
   font-weight: bold;
-  padding: 5px 22px 5px 12px;
-  border-radius: 8px 8px 0 0;  /* C9: esquinas superiores redondeadas */
+  padding: 4px 20px 4px 10px;
+  border-radius: 6px 6px 0 0;  /* esquinas superiores redondeadas */
   min-width: 145px;
   font-family: Arial, sans-serif;
   letter-spacing: 0.3px;
-  margin-top: 3px;
 }
 
-/* ══════════════════════════════════════════
-   STATUS LINE "7: CONTRASTACION"
-   Mismo fondo principal, 11px
-══════════════════════════════════════════ */
+/* Status dentro de la misma banda oscura */
 .status {
-  font-size: 11px;              /* C20: ajuste */
+  font-size: 11px;
   color: #ffffff;
   padding: 3px 8px 4px;
-  background: #1A5276;          /* mismo bg */
+  background: #0a1d45;          /* misma banda oscura */
   flex-shrink: 0;
   font-family: Arial, sans-serif;
 }
@@ -177,17 +173,17 @@ html, body {
   width: 100%;
 }
 
-/* C11/C12: tamaño fijo + fill oscuro */
+/* Gate: tamaño fijo, fill = mismo que el bg */
 .gate {
-  width: 98px;                  /* C12: fijo, era flex:1 */
-  height: 82px;                 /* C13: mantener */
+  width: 98px;
+  height: 82px;
   position: relative;
   cursor: pointer;
   flex-shrink: 0;
 }
 .gate svg { display: block; width: 100%; height: 100%; }
-.gate:hover   path { fill: #0d2060; }
-.gate:active  path { fill: #152878; }
+.gate:hover   path { fill: #154360; }
+.gate:active  path { fill: #0d2f50; }
 
 /* C16: número en top-right del pocket, justo en la muesca */
 .gn {
@@ -373,24 +369,46 @@ html, body {
 <script>
 /*
   ════════════════════════════════════════════
-  POCKET SVG
-  ViewBox 80×75
-  Muesca SUPERIOR-IZQUIERDA (15×15px)
-  Fill: #071840 (navy oscuro — C11)
-  Stroke: #F1C40F 2px
+  POCKET SVG — forma exacta del original Marelec:
+
+  - Muesca ESCALÓN-L en esquina SUPERIOR-IZQUIERDA
+    (no diagonal: paso horizontal + vertical)
+  - Las otras 3 esquinas son REDONDEADAS (R=9)
+  - Fill: mismo color que el fondo (#1A5276)
+  - Stroke: #F1C40F 2px
+
+  Path explicado (clockwise):
+    Desde el top de la muesca (NW,0)
+    → top-right (con radio)
+    → bottom-right (con radio)
+    → bottom-left (con radio)
+    → sube por left hasta nivel de muesca
+    → horizontal hacia adentro (NW,NH)  ← el escalón
+    → sube a (NW,0)                      ← Z cierra verticalmente
   ════════════════════════════════════════════
 */
-const GW = 80, GH = 75, NC = 15;
+const GW = 80, GH = 75;
+const NW = 18, NH = 18;  // notch width y height (escalón L)
+const R  = 9;             // radio de las 3 esquinas redondeadas
 
 function pocketPath() {
-  // Pentágono: muesca top-left
-  // Z dibuja la diagonal de cierre → es la muesca
   return [
-    `M ${NC},1.5`,
-    `L ${GW-1.5},1.5`,
-    `L ${GW-1.5},${GH-1.5}`,
-    `L 1.5,${GH-1.5}`,
-    `L 1.5,${NC}`,
+    // Inicio: top edge justo después del escalón
+    `M ${NW},1`,
+    // Top edge → top-right redondeada
+    `L ${GW-R},1`,
+    `Q ${GW-1},1 ${GW-1},${R+1}`,
+    // Right edge → bottom-right redondeada
+    `L ${GW-1},${GH-R}`,
+    `Q ${GW-1},${GH-1} ${GW-R},${GH-1}`,
+    // Bottom edge → bottom-left redondeada
+    `L ${R},${GH-1}`,
+    `Q 1,${GH-1} 1,${GH-R}`,
+    // Left edge sube hasta la altura del escalón
+    `L 1,${NH}`,
+    // ESCALÓN HORIZONTAL — el "piso" de la muesca
+    `L ${NW},${NH}`,
+    // Z cierra dibujando la parte VERTICAL del escalón: (NW,NH) → (NW,1)
     'Z'
   ].join(' ');
 }
@@ -403,7 +421,7 @@ function buildGates() {
     d.className = 'gate';
     d.innerHTML =
       `<svg viewBox="0 0 ${GW} ${GH}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">` +
-        `<path d="${pocketPath()}" fill="#071840" stroke="#F1C40F" stroke-width="2" stroke-linejoin="miter"/>` +
+        `<path d="${pocketPath()}" fill="#1A5276" stroke="#F1C40F" stroke-width="2.2" stroke-linejoin="round"/>` +
       `</svg>` +
       `<span class="gn">${g}</span>`;
     d.addEventListener('click', () => al(`Pocket ${g}`));
