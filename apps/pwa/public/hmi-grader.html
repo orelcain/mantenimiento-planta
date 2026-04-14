@@ -39,9 +39,11 @@ html, body {
 ══════════════════════════════════════ */
 #rc-window {
   width: 640px;
+  height: 480px;
   display: flex;
   flex-direction: column;
   box-shadow: 2px 2px 12px rgba(0,0,0,0.8);
+  overflow: hidden;
 }
 
 /* ── Barra de título Windows ── */
@@ -54,6 +56,7 @@ html, body {
   gap: 5px;
   flex-shrink: 0;
   user-select: none;
+  border-bottom: 1px solid #111;
 }
 .win-title-icon { font-size: 12px; }
 .win-title-text {
@@ -76,7 +79,9 @@ html, body {
   align-items: center;
   justify-content: center;
   font-family: Arial, sans-serif;
-  border-radius: 2px;
+  border-radius: 0;
+  outline: none;
+  line-height: 1;
 }
 .win-btn:hover { background: #777; }
 .win-btn.close:hover { background: #c0392b; }
@@ -87,18 +92,23 @@ html, body {
   background: #1F618D;
   display: flex;
   align-items: center;
-  padding: 0 6px;
-  gap: 16px;
+  padding: 0;
+  gap: 0;
   flex-shrink: 0;
+  border-bottom: 1px solid #154360;
 }
 .menubar span {
   font-size: 11px;
   color: #ffffff;
   cursor: pointer;
-  padding: 0 2px;
+  padding: 0 10px;
+  height: 100%;
+  display: flex;
+  align-items: center;
   font-family: Arial, sans-serif;
+  white-space: nowrap;
 }
-.menubar span:hover { background: rgba(255,255,255,0.15); }
+.menubar span:hover { background: rgba(255,255,255,0.18); }
 
 /* ══════════════════════════════════════
    PANTALLA HMI — todo en #1A5276
@@ -121,7 +131,7 @@ html, body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 4px 6px 4px 8px;
+  padding: 3px 6px 3px 8px;
   background: #1A5276;
   flex-shrink: 0;
 }
@@ -163,16 +173,14 @@ html, body {
   background: #F0F0F0;
   border: 2px solid #F1C40F;
   color: #000000;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: bold;
   width: 90px;
   font-family: 'Courier New', monospace;
-  justify-content: flex-end;
-  padding-right: 4px;
+  justify-content: center;
   letter-spacing: 0.3px;
 }
-.ind.wt .deg { font-size: 9px; vertical-align: super; margin-right: 1px; }
-.ind.wt .unit { font-size: 10px; }
+.ind.wt .unit { font-size: 10px; margin-left: 2px; }
 
 /* ══════════════════════════════════════
    BARRA TÍTULO "StaticGrader"
@@ -208,7 +216,7 @@ html, body {
 /* ══════════════════════════════════════
    GRILLA DE BOLSILLOS (pocket grid)
    12 bolsillos: 2 filas × 6 columnas
-   padding: 6px, gap: 4px
+   padding: 4px, gap: 3px
 ══════════════════════════════════════ */
 .gate-grid {
   flex: 1;
@@ -217,21 +225,21 @@ html, body {
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  gap: 4px;
-  padding: 6px;
+  gap: 3px;
+  padding: 4px 6px;
 }
 
 .gate-row {
   display: flex;
-  gap: 4px;
+  gap: 3px;
   width: 100%;
   justify-content: center;
 }
 
-/* Tamaño de bolsillo: ~80×75px (aproximado según brief) */
+/* Tamaño de bolsillo: 98×92px — 6×98+5×3=603px de 628px inner (96%) */
 .gate {
-  width: 80px;
-  height: 75px;
+  width: 98px;
+  height: 92px;
   position: relative;
   cursor: pointer;
   flex-shrink: 0;
@@ -241,12 +249,12 @@ html, body {
 .gate:hover path   { fill: #154360; }
 .gate:active path  { fill: #0d2f50; }
 
-/* Número: top-right interior, 10px, #F1C40F */
+/* Número: top-right interior, 11px, #F1C40F — 4px from stroke interior */
 .gn {
   position: absolute;
-  top: 2px;
-  right: 5px;
-  font-size: 10px;
+  top: 4px;
+  right: 6px;
+  font-size: 11px;
   font-weight: bold;
   color: #F1C40F;
   pointer-events: none;
@@ -287,22 +295,27 @@ html, body {
   gap: 0;
   flex-shrink: 0;
   background: #1A5276;
-  padding: 2px 0 0;
+  padding: 1px 0 0;
 }
 .btn {
   flex: 1;
-  height: 36px;
+  height: 30px;
   background: #1F618D;
   border: 1px solid #5D9CEC;
   border-radius: 0;
   color: #ffffff;
   font-family: Arial, sans-serif;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: normal;
   cursor: pointer;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  outline: none;
+  white-space: nowrap;
   padding: 0 4px;
 }
+.btn + .btn { border-left: none; }
 .btn:hover  { background: #2471A3; }
 .btn:active { background: #154360; }
 
@@ -372,12 +385,12 @@ html, body {
       <div class="hdr-left">
         <div id="dd">14/04/2026</div>
         <div id="td">18:44:00</div>
-        <div id="cd">123.34</div>
+        <div id="cd">1234</div>
       </div>
       <div class="hdr-right">
         <div class="ind">UNDER&lt;-</div>
         <div class="ind">UNDER&lt;-</div>
-        <div class="ind wt"><span class="deg">°</span>0.00<span class="unit">kg</span></div>
+        <div class="ind wt">0.00<span class="unit">kg</span></div>
         <div class="ind">UNDER&lt;-</div>
       </div>
     </div>
@@ -443,7 +456,7 @@ html, body {
    M NW,1 → top-right(R) → bottom-right(R) →
    bottom-left(R) → up-left → L NW,NH → Z (vertical notch)
 ══════════════════════════════════════════════════ */
-const GW=80, GH=75, NW=13, NH=13, R=6;
+const GW=98, GH=92, NW=16, NH=15, R=7;
 
 function pp() {
   return [
@@ -465,7 +478,7 @@ function buildGates() {
     d.className = 'gate';
     d.innerHTML =
       `<svg viewBox="0 0 ${GW} ${GH}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">` +
-        `<path d="${pp()}" fill="#1A5276" stroke="#F1C40F" stroke-width="2" stroke-linejoin="round"/>` +
+        `<path d="${pp()}" fill="#1A5276" stroke="#F1C40F" stroke-width="2" stroke-linejoin="miter" stroke-miterlimit="10" vector-effect="non-scaling-stroke" shape-rendering="crispEdges"/>` +
       `</svg>` +
       `<span class="gn">${g}</span>`;
     d.addEventListener('click', () => al(`Pocket ${g}`));
