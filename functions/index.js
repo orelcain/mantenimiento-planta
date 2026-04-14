@@ -7,6 +7,8 @@ const { initializeApp } = require('firebase-admin/app')
 const { getFirestore, FieldValue } = require('firebase-admin/firestore')
 const { getDatabase } = require('firebase-admin/database')
 const { getMessaging } = require('firebase-admin/messaging')
+const { getStorage } = require('firebase-admin/storage')
+const { randomUUID } = require('crypto')
 
 initializeApp()
 
@@ -27,6 +29,13 @@ let _rtdb = null
 function getRtdb() {
   if (!_rtdb) _rtdb = getDatabase()
   return _rtdb
+}
+
+// Storage lazy init
+let _bucket = null
+function getStorageBucket() {
+  if (!_bucket) _bucket = getStorage().bucket('mantenimiento-planta-771a3.firebasestorage.app')
+  return _bucket
 }
 
 // ==================== CONSTANTES ====================
@@ -1781,6 +1790,287 @@ exports.sitportProxy = onRequest(
 
 // ==================== TELEGRAM BOT ====================
 
+// ==================== FOTO → INCIDENCIA ====================
+
+const PHOTO_SESSION_TTL_MS = 10 * 60 * 1000 // 10 minutos
+
+async function getPhotoSession(chatId) {
+  const snap = await db.collection('telegramPhotoSessions').doc(String(chatId)).get()
+  if (!snap.exists) return null
+  const data = snap.data()
+  const expMs = data.expiresAt instanceof Date
+    ? data.expiresAt.getTime()
+    : (data.expiresAt?.toMillis?.() ?? 0)
+  if (expMs < Date.now()) {
+    await snap.ref.delete()
+    return null
+  }
+  return data
+}
+
+async function setPhotoSession(chatId, data) {
+  await db.collection('telegramPhotoSessions').doc(String(chatId)).set({
+    ...data,
+    expiresAt: new Date(Date.now() + PHOTO_SESSION_TTL_MS),
+  })
+}
+
+async function clearPhotoSession(chatId) {
+  await db.collection('telegramPhotoSessions').doc(String(chatId)).delete().catch(() => {})
+}
+
+/** Descarga el archivo de mayor resolución de un mensaje de Telegram */
+async function downloadTelegramFile(fileId) {
+  const token = process.env.TELEGRAM_BOT_TOKEN
+  const metaResp = await fetch(`${TELEGRAM_API_BASE}/bot${token}/getFile?file_id=${fileId}`)
+  const meta = await metaResp.json()
+  if (!meta.ok) throw new Error(`getFile failed: ${JSON.stringify(meta)}`)
+  const dlUrl = `${TELEGRAM_API_BASE}/file/bot${token}/${meta.result.file_path}`
+  const resp = await fetch(dlUrl)
+  if (!resp.ok) throw new Error(`Download failed: ${resp.status}`)
+  return Buffer.from(await resp.arrayBuffer())
+}
+
+/** Sube buffer JPEG a Firebase Storage y retorna URL de descarga con token */
+async function uploadPhotoToStorage(incidentId, buffer, idx) {
+  const bucket = getStorageBucket()
+  const token = randomUUID()
+  const filename = `incidents/${incidentId}/telegram_${Date.now()}_${idx + 1}.jpg`
+  const file = bucket.file(filename)
+  await file.save(buffer, {
+    contentType: 'image/jpeg',
+    metadata: { metadata: { firebaseStorageDownloadTokens: token } },
+  })
+  const encodedPath = encodeURIComponent(filename)
+  return `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodedPath}?alt=media&token=${token}`
+}
+
+/** Muestra lista de incidencias activas para seleccionar (mensaje NUEVO) */
+async function tgShowIncidentSelector(chatId, topicId, photoCount) {
+  const snap = await db.collection('incidents')
+    .where('status', 'in', ['pendiente', 'confirmada', 'en_proceso'])
+    .orderBy('createdAt', 'desc').limit(6).get()
+
+  const buttons = []
+  snap.forEach((docSnap) => {
+    const d = docSnap.data()
+    const emoji = { critica: '🔴', alta: '🟠', media: '🟡', baja: '⚪' }[d.prioridad] || '📋'
+    const title = (d.titulo || 'Sin título').substring(0, 38)
+    buttons.push([{ text: `${emoji} ${title}`, callback_data: `photo:inc:${docSnap.id}` }])
+  })
+  if (snap.empty) {
+    buttons.push([{ text: '➕ Crear nueva incidencia', callback_data: 'photo:new_inc' }])
+  } else {
+    buttons.push([{ text: '➕ Crear nueva incidencia', callback_data: 'photo:new_inc' }])
+  }
+  buttons.push([{ text: '❌ Cancelar', callback_data: 'photo:cancel' }])
+
+  const txt = photoCount > 1 ? `${photoCount} fotos recibidas` : '1 foto recibida'
+  return sendTelegramButtons(
+    `📸 <b>${txt}</b>\n\n¿A qué incidencia las adjuntamos?`,
+    chatId, buttons, { topicId }
+  )
+}
+
+/** Edita mensaje existente con lista de incidencias */
+async function tgShowIncidentSelectorEdit(chatId, messageId, photoCount) {
+  const snap = await db.collection('incidents')
+    .where('status', 'in', ['pendiente', 'confirmada', 'en_proceso'])
+    .orderBy('createdAt', 'desc').limit(6).get()
+
+  const buttons = []
+  snap.forEach((docSnap) => {
+    const d = docSnap.data()
+    const emoji = { critica: '🔴', alta: '🟠', media: '🟡', baja: '⚪' }[d.prioridad] || '📋'
+    const title = (d.titulo || 'Sin título').substring(0, 38)
+    buttons.push([{ text: `${emoji} ${title}`, callback_data: `photo:inc:${docSnap.id}` }])
+  })
+  buttons.push([{ text: '➕ Crear nueva incidencia', callback_data: 'photo:new_inc' }])
+  buttons.push([{ text: '❌ Cancelar', callback_data: 'photo:cancel' }])
+
+  const txt = photoCount > 1 ? `${photoCount} fotos` : '1 foto'
+  return editTelegramMessage(chatId, messageId,
+    `📸 ¿A qué incidencia adjuntamos las <b>${txt}</b>?`, buttons)
+}
+
+/** Handler principal cuando llega una foto al grupo */
+async function tgHandlePhoto(chatId, message, fromName, telegramUserId, topicId) {
+  const photos = message.photo || []
+  if (photos.length === 0) return
+  // Tomar la de mayor resolución (último elemento)
+  const best = photos[photos.length - 1]
+  const fileId = best.file_id
+
+  const session = await getPhotoSession(chatId)
+
+  if (session) {
+    // Acumular foto en sesión existente
+    const fileIds = [...(session.fileIds || []), fileId]
+    await setPhotoSession(chatId, { ...session, fileIds })
+    const count = fileIds.length
+    const buttons = [[
+      { text: `📎 Adjuntar ${count} foto${count > 1 ? 's' : ''}`, callback_data: 'photo:select_incident' },
+      { text: '❌ Cancelar', callback_data: 'photo:cancel' },
+    ]]
+    return sendTelegramButtons(
+      `📸 Foto #${count} agregada. Mandá más o tocá <b>Adjuntar</b>.`,
+      chatId, buttons, { topicId }
+    )
+  }
+
+  // Nueva sesión
+  await setPhotoSession(chatId, {
+    chatId: String(chatId),
+    fileIds: [fileId],
+    fromName,
+    telegramUserId,
+    topicId,
+    step: 'selecting_incident',
+  })
+  return tgShowIncidentSelector(chatId, topicId, 1)
+}
+
+/** Callbacks del flujo foto → incidencia */
+async function cbFoto(chatId, messageId, params, topicId) {
+  const sub = params[0]
+
+  if (sub === 'select_incident') {
+    const session = await getPhotoSession(chatId)
+    if (!session) return editTelegramMessage(chatId, messageId,
+      '⏱️ Sesión expirada (10 min). Mandá la foto de nuevo.',
+      [[{ text: '← Menú', callback_data: 'menu' }]])
+    return tgShowIncidentSelectorEdit(chatId, messageId, (session.fileIds || []).length)
+  }
+
+  if (sub === 'cancel') {
+    await clearPhotoSession(chatId)
+    return editTelegramMessage(chatId, messageId, '❌ Cancelado.',
+      [[{ text: '← Menú', callback_data: 'menu' }]])
+  }
+
+  if (sub === 'inc') {
+    const incidentId = params.slice(1).join(':')
+    const session = await getPhotoSession(chatId)
+    if (!session) return editTelegramMessage(chatId, messageId,
+      '⏱️ Sesión expirada. Mandá la foto de nuevo.', [])
+
+    await setPhotoSession(chatId, { ...session, incidentId, step: 'selecting_type' })
+
+    const incDoc = await db.collection('incidents').doc(incidentId).get()
+    const incTitle = incDoc.exists ? (incDoc.data().titulo || incidentId) : incidentId
+    const count = (session.fileIds || []).length
+    const buttons = [
+      [
+        { text: '🔴 ANTES — problema', callback_data: 'photo:type:before' },
+        { text: '🟢 DESPUÉS — solución', callback_data: 'photo:type:after' },
+      ],
+      [
+        { text: '↩ Cambiar incidencia', callback_data: 'photo:select_incident' },
+        { text: '❌ Cancelar', callback_data: 'photo:cancel' },
+      ],
+    ]
+    return editTelegramMessage(chatId, messageId,
+      `📎 <b>${count} foto${count > 1 ? 's' : ''}</b> → <i>${incTitle}</i>\n\n¿Es ANTES o DESPUÉS de la reparación?`,
+      buttons)
+  }
+
+  if (sub === 'type') {
+    const photoType = params[1] // 'before' | 'after'
+    const session = await getPhotoSession(chatId)
+    if (!session || !session.incidentId) return editTelegramMessage(chatId, messageId,
+      '⏱️ Sesión expirada. Mandá la foto de nuevo.', [])
+
+    await editTelegramMessage(chatId, messageId, '⏳ Subiendo foto(s)...', [])
+
+    try {
+      const urls = []
+      for (let i = 0; i < session.fileIds.length; i++) {
+        const buf = await downloadTelegramFile(session.fileIds[i])
+        const url = await uploadPhotoToStorage(session.incidentId, buf, i)
+        urls.push(url)
+      }
+
+      // Agregar URLs al array fotos de la incidencia
+      await db.collection('incidents').doc(session.incidentId).update({
+        fotos: FieldValue.arrayUnion(...urls),
+        updatedAt: FieldValue.serverTimestamp(),
+      })
+
+      await clearPhotoSession(chatId)
+
+      const incDoc = await db.collection('incidents').doc(session.incidentId).get()
+      const incTitle = incDoc.exists ? (incDoc.data().titulo || session.incidentId) : session.incidentId
+      const count = urls.length
+      const typeLabel = photoType === 'before' ? '🔴 Antes (problema)' : '🟢 Después (solución)'
+
+      return editTelegramMessage(chatId, messageId,
+        `✅ <b>${count} foto${count > 1 ? 's' : ''} guardada${count > 1 ? 's' : ''}</b>\n\n📋 ${incTitle}\n📍 ${typeLabel}\n\n💡 Mandá otra foto para seguir agregando evidencias.`,
+        [[{ text: '← Menú', callback_data: 'menu' }]])
+    } catch (err) {
+      logger.error('Error uploading Telegram photo to Storage', err)
+      return editTelegramMessage(chatId, messageId,
+        '❌ Error al subir la foto. Intentá de nuevo.',
+        [[{ text: '← Menú', callback_data: 'menu' }]])
+    }
+  }
+
+  if (sub === 'new_inc') {
+    return editTelegramMessage(chatId, messageId,
+      '📝 <b>Para crear una incidencia con foto:</b>\n\n1. Primero creá la incidencia:\n<code>/incidencia [descripción del problema]</code>\n\n2. Luego mandá la foto — el bot la adjuntará.',
+      [[{ text: '← Cancelar', callback_data: 'photo:cancel' }]])
+  }
+}
+
+// ==================== SENSORES ====================
+
+async function tgHandleSensores(chatId, topicId) {
+  try {
+    const rtdb = getRtdb()
+    const snapshot = await rtdb.ref('sensors').once('value')
+
+    if (!snapshot.exists()) {
+      return sendTelegramMessage('📡 No hay sensores conectados.', chatId, { topicId })
+    }
+
+    const data = snapshot.val()
+    let msg = '<b>📡 Sensores — Tiempo real</b>\n\n'
+    let hasData = false
+
+    for (const [equipId, sensor] of Object.entries(data)) {
+      if (!sensor || typeof sensor !== 'object') continue
+      hasData = true
+
+      const online = sensor.online === true
+      const statusDot = online ? '🟢' : '🔴'
+      const lastSeen = sensor.lastSeen
+        ? new Date(sensor.lastSeen).toLocaleTimeString('es-CL', { timeZone: 'America/Santiago', hour: '2-digit', minute: '2-digit' })
+        : '—'
+
+      msg += `${statusDot} <b>${equipId}</b>`
+      if (!online) msg += ` · última señal ${lastSeen}`
+      msg += '\n'
+
+      if (sensor.temperatura?.value !== undefined) {
+        const { value, unit = '°C', status } = sensor.temperatura
+        const dot = status === 'ok' ? '✅' : status === 'warn' ? '⚠️' : status === 'alert' ? '🔴' : '🌡️'
+        msg += `  ${dot} Temp: <b>${value}${unit}</b>\n`
+      }
+      if (sensor.humedad?.value !== undefined) {
+        const { value, unit = '%', status } = sensor.humedad
+        const dot = status === 'ok' ? '✅' : status === 'warn' ? '⚠️' : status === 'alert' ? '🔴' : '💧'
+        msg += `  ${dot} Humedad: <b>${value}${unit}</b>\n`
+      }
+      msg += '\n'
+    }
+
+    if (!hasData) msg = '📡 No hay datos de sensores disponibles.'
+    await sendTelegramMessage(msg, chatId, { topicId })
+  } catch (err) {
+    logger.error('tgHandleSensores error', err)
+    await sendTelegramMessage('❌ Error al leer sensores.', chatId, { topicId })
+  }
+}
+
 const PRIORITY_EMOJI = { critica: '🔴', alta: '🟠', media: '🟡', baja: '⚪' }
 const PRIORITY_LABELS = ['critica', 'alta', 'media', 'baja']
 
@@ -1811,6 +2101,9 @@ async function tgHandleAyuda(chatId, topicId) {
     '/incidencia alta [desc] — Prioridad alta\n' +
     '/incidencia critica [desc] — Prioridad crítica\n' +
     '/estado — Incidencias activas\n\n' +
+    '<b>📸 Evidencia fotográfica</b>\n' +
+    'Mandá una foto directamente — el bot te pregunta a qué incidencia adjuntarla\n' +
+    'Podés mandar varias fotos seguidas antes de adjuntar\n\n' +
     '<b>🔧 Equipos y Repuestos</b>\n' +
     '/equipo [nombre] — Info de un equipo\n' +
     '/equipo — Lista de equipos registrados\n' +
@@ -1819,6 +2112,8 @@ async function tgHandleAyuda(chatId, topicId) {
     '<b>📊 Turno</b>\n' +
     '/turno — Resumen del turno actual\n' +
     '/kpi — Indicadores del día\n\n' +
+    '<b>📡 Sensores</b>\n' +
+    '/sensores — Lecturas en tiempo real con semáforo\n\n' +
     '<b>ℹ️ General</b>\n' +
     '/ayuda — Este menú\n\n' +
     '💡 También podés escribir el problema directamente sin comandos.',
@@ -2211,6 +2506,7 @@ async function tgHandleMenu(chatId, topicId) {
     [
       { text: '📊 Turno', callback_data: 'cmd:turno' },
       { text: '📈 KPIs', callback_data: 'cmd:kpi' },
+      { text: '📡 Sensores', callback_data: 'cmd:sensores' },
     ],
     [
       { text: '🌐 Abrir App Completa', url: PWA_URL },
@@ -2243,6 +2539,8 @@ async function tgHandleCallback(chatId, messageId, data, topicId) {
       return cbIncidencias(chatId, messageId, params)
     case 'cmd':
       return cbComando(chatId, messageId, params, topicId)
+    case 'photo':
+      return cbFoto(chatId, messageId, params, topicId)
     default:
       return editTelegramMessage(chatId, messageId, '❓ Acción no reconocida.', [[{ text: '← Menú', callback_data: 'menu' }]])
   }
@@ -2262,6 +2560,7 @@ async function cbMenu(chatId, messageId) {
     [
       { text: '📊 Turno', callback_data: 'cmd:turno' },
       { text: '📈 KPIs', callback_data: 'cmd:kpi' },
+      { text: '📡 Sensores', callback_data: 'cmd:sensores' },
     ],
     [
       { text: '🌐 Abrir App Completa', url: PWA_URL },
@@ -2510,6 +2809,8 @@ async function cbComando(chatId, messageId, params, topicId) {
     await tgHandleTurno(chatId, topicId)
   } else if (cmd === 'kpi') {
     await tgHandleKpi(chatId, topicId)
+  } else if (cmd === 'sensores') {
+    await tgHandleSensores(chatId, topicId)
   }
 }
 
@@ -2543,16 +2844,15 @@ exports.telegramWebhook = onRequest({ region: 'us-central1' }, async (req, res) 
     return
   }
 
-  // ---- Mensajes de texto / comandos ----
+  // ---- Mensajes de texto / comandos / fotos ----
   const message = update?.message || update?.edited_message
 
-  if (!message?.text) {
+  if (!message) {
     res.status(200).send('ok')
     return
   }
 
   const chatId = String(message.chat?.id)
-  const text = message.text.trim()
   const fromName = message.from?.first_name || 'Técnico'
   const telegramUserId = String(message.from?.id || 'unknown')
   const incomingTopicId = message.message_thread_id || undefined
@@ -2566,6 +2866,19 @@ exports.telegramWebhook = onRequest({ region: 'us-central1' }, async (req, res) 
   }
 
   try {
+    // ---- Foto ----
+    if (message.photo && message.photo.length > 0) {
+      await tgHandlePhoto(chatId, message, fromName, telegramUserId, incomingTopicId)
+      res.status(200).send('ok')
+      return
+    }
+
+    const text = (message.text || '').trim()
+    if (!text) {
+      res.status(200).send('ok')
+      return
+    }
+
     if (/^\/(menu|start)/i.test(text)) {
       await tgHandleMenu(chatId, incomingTopicId)
     } else if (/^\/incidencia/i.test(text)) {
@@ -2574,6 +2887,8 @@ exports.telegramWebhook = onRequest({ region: 'us-central1' }, async (req, res) 
       await tgHandleEstado(chatId, incomingTopicId)
     } else if (/^\/(ayuda|help)/i.test(text)) {
       await tgHandleAyuda(chatId, incomingTopicId)
+    } else if (/^\/sensores?/i.test(text)) {
+      await tgHandleSensores(chatId, incomingTopicId)
     } else if (/^\/equipo/i.test(text)) {
       await tgHandleEquipo(chatId, text, incomingTopicId)
     } else if (/^\/repuestos/i.test(text)) {
@@ -2599,6 +2914,45 @@ exports.telegramWebhook = onRequest({ region: 'us-central1' }, async (req, res) 
   }
 
   res.status(200).send('ok')
+})
+
+/**
+ * Alerta automática en Telegram cuando el P0% de un turno Grader supera el umbral.
+ * Umbral configurable via env GRADER_P0_ALERT_PCT (default 15%).
+ * Mínimo de piezas via env GRADER_MIN_PIECES (default 500).
+ */
+exports.onGraderSummaryCreated = onDocumentCreated('graderDailySummaries/{summaryId}', async (event) => {
+  const data = event.data?.data()
+  if (!data) return
+
+  const threshold = parseFloat(process.env.GRADER_P0_ALERT_PCT || '15')
+  const minPieces = parseInt(process.env.GRADER_MIN_PIECES || '500')
+
+  const p0Pct = data.p0Pct || 0
+  const totalPieces = data.totalPieces || 0
+
+  if (p0Pct < threshold || totalPieces < minPieces) return
+
+  const shiftLabel = data.shiftId === 'A' ? 'Turno Día ☀️' : data.shiftId === 'B' ? 'Turno Noche 🌙' : (data.shiftId || '')
+  const dateStr = data.sessionDate || event.params.summaryId.split('__')[0] || ''
+
+  let msg = `⚠️ <b>Alerta Grader — P0% elevado</b>\n\n`
+  msg += `📅 ${dateStr} · ${shiftLabel}\n`
+  msg += `📊 P0%: <b>${p0Pct.toFixed(1)}%</b> (umbral: ${threshold}%)\n`
+  msg += `📦 Total: ${totalPieces.toLocaleString('es-CL')} piezas\n`
+  msg += `🔴 P0: ${(data.p0Pieces || 0).toLocaleString('es-CL')} piezas\n`
+
+  if (Array.isArray(data.topP0Causes) && data.topP0Causes.length > 0) {
+    msg += '\n<b>Causas principales:</b>\n'
+    data.topP0Causes.slice(0, 3).forEach((cause) => {
+      if (cause && cause.cause) msg += `  • ${cause.cause}: <b>${cause.count || 0}</b>\n`
+    })
+  }
+
+  msg += '\n💡 Abrí la app para ver el análisis completo.'
+
+  const generalTopicId = getTopicId('general')
+  await sendTelegramMessage(msg, null, { topicId: generalTopicId })
 })
 
 /**
