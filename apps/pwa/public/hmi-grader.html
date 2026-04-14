@@ -6,258 +6,239 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Grader HMI">
-<meta name="theme-color" content="#0c5598">
+<meta name="theme-color" content="#1A5276">
 <title>Grader HMI — StaticGrader</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-:root {
-  /* Paleta — clon exacto del Marelec StaticGrader */
-  --bg:        #0c5598;   /* azul principal (medio-oscuro, saturación baja) */
-  --bg-title:  #041a55;   /* banda navy donde emerge el tab StaticGrader */
-  --bg-gate:   #001a48;   /* fill del gate (navy muy oscuro) */
-  --yellow:    #ffcc00;
-  --white:     #ffffff;
-  --log-bg:    #ffffff;   /* log = blanco con texto negro */
-  --log-text:  #111111;
-  --log-sel:   #000099;   /* línea seleccionada – azul navy */
-  --btn-bg:    #d0d0d0;
-  --btn-bdr:   #808080;
-}
+/*
+  Paleta exacta según análisis JSON del Marelec StaticGrader:
+  bg_primary:        #1A5276
+  bg_panel:          #1F618D
+  bg_titlebar:       #2980B9
+  accent_yellow:     #F1C40F  (pockets y números)
+  accent_blue_btn:   #5D9CEC  (borde botones)
+  weight_bg:         #F0F0F0  (display peso — fondo claro)
+  log_selected_bg:   #2980B9
+  log_normal_bg:     #FFFFFF
+*/
 
 html, body {
   height: 100%;
-  background: #10101a;
-  font-family: Arial, Helvetica, sans-serif;
+  background: #101018;
+  font-family: Arial, sans-serif;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-/* ── PANTALLA PRINCIPAL ── */
 #screen {
   width: 640px;
   height: 480px;
-  background: var(--bg);
-  color: var(--white);
+  background: #1A5276;
+  color: #fff;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   position: relative;
 }
 
-/* ═════════════════════════════════════════
-   HEADER — sin banda oscura, mismo azul
-═════════════════════════════════════════ */
+/* ════════════════════════════════
+   HEADER — mismo fondo #1A5276
+   fecha/hora izquierda · indicadores derecha
+════════════════════════════════ */
 .hdr {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 6px 8px 5px 12px;
+  padding: 5px 6px 4px 8px;
   flex-shrink: 0;
 }
 
+/* Fecha / Hora / Contador */
 .hdr-left {
   font-family: 'Courier New', monospace;
-  font-size: 14px;
-  line-height: 1.5;
-  color: #ffffff;
+  font-size: 11px;
+  line-height: 1.55;
+  color: #fff;
 }
 
+/* Grid 2×2 de indicadores */
 .hdr-right {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: auto auto;
-  gap: 4px;
+  grid-template-columns: auto auto;
+  gap: 3px;
 }
 
-.ind-box {
-  border: 2px solid var(--yellow);
-  color: var(--yellow);
-  font-family: 'Courier New', monospace;
-  font-size: 14px;
+/* Cajas UNDER<- : borde BLANCO, texto BLANCO */
+.ind {
+  border: 2px solid #ffffff;
+  color: #ffffff;
+  font-size: 13px;
   font-weight: bold;
-  padding: 3px 12px;
-  min-width: 100px;
+  padding: 2px 8px;
+  min-width: 80px;
+  height: 28px;
   text-align: center;
   background: transparent;
-  white-space: nowrap;
-  letter-spacing: 0.5px;
-}
-
-/* Display de peso — interior levemente más oscuro */
-.ind-box.weight {
-  background: #041a55;
-  font-size: 15px;
-  letter-spacing: 0.5px;
-  padding: 3px 8px;
-}
-.ind-box.weight .deg { font-size: 10px; vertical-align: super; }
-.ind-box.weight .unit { font-size: 10px; }
-
-/* ═════════════════════════════════════════
-   BANDA NAVY CON TAB "StaticGrader"
-   + línea status "7: CONTRASTACION" dentro
-═════════════════════════════════════════ */
-.title-section {
-  background: var(--bg-title);
-  flex-shrink: 0;
   display: flex;
-  flex-direction: column;
-}
-
-.tab-wrap {
-  padding: 0 0 0 8px;
-}
-
-.tab {
-  display: inline-block;
-  background: var(--bg);
-  color: #ffffff;
+  align-items: center;
+  justify-content: center;
   font-family: Arial, sans-serif;
-  font-size: 17px;
-  font-weight: bold;
-  padding: 4px 24px 5px 14px;
-  border-radius: 6px 6px 0 0;
-  min-width: 140px;
-  margin-top: 3px;
-  position: relative;
+  letter-spacing: 0.3px;
 }
 
-.status-strip {
-  padding: 4px 12px 5px;
-  font-family: Arial, sans-serif;
+/* Display de peso: fondo claro, texto negro, borde amarillo */
+.ind.wt {
+  background: #F0F0F0;
+  border: 2px solid #FFFF00;
+  color: #000000;
   font-size: 14px;
-  color: #ffffff;
+  font-weight: bold;
+  min-width: 90px;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 0.5px;
 }
 
-/* ═════════════════════════════════════════
-   GRID DE GATES
-═════════════════════════════════════════ */
+/* ════════════════════════════════
+   BARRA TÍTULO "StaticGrader"
+   full-width, #2980B9, 16px bold
+════════════════════════════════ */
+.title-bar {
+  background: #2980B9;
+  padding: 5px 8px;
+  font-size: 16px;
+  font-weight: bold;
+  color: #fff;
+  flex-shrink: 0;
+  width: 100%;
+}
+
+/* ════════════════════════════════
+   SUBTÍTULO ESTADO
+   mismo fondo #1A5276, 11px
+════════════════════════════════ */
+.status {
+  font-size: 11px;
+  color: #fff;
+  padding: 3px 8px 4px;
+  background: #1A5276;
+  flex-shrink: 0;
+}
+
+/* ════════════════════════════════
+   GRILLA DE BOLSILLOS (pockets)
+════════════════════════════════ */
 .gate-grid {
   flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  align-items: center;
-  gap: 9px;
-  padding: 10px 16px 6px;
+  align-items: stretch;
+  gap: 5px;
+  padding: 4px 6px 2px;
 }
 
 .gate-row {
   display: flex;
-  gap: 6px;
-  justify-content: center;
+  gap: 4px;
+  width: 100%;
 }
 
+/* Cada pocket: flex-1 para llenar la fila uniformemente */
 .gate {
-  width: 94px;
-  height: 84px;
+  flex: 1;
+  height: 82px;
   position: relative;
   cursor: pointer;
 }
-.gate:hover path { fill: #082c78; }
-.gate:active path { fill: #10408c; }
-.gate svg { width: 100%; height: 100%; display: block; }
+.gate svg { display: block; width: 100%; height: 100%; }
+.gate:hover   path { fill: #154360; }
+.gate:active  path { fill: #0B2545; }
 
-/* Número del gate — dentro de la muesca, arriba-derecha */
-.gate-num {
+/* Número de pocket: top-right interior, 10px, #F1C40F */
+.gn {
   position: absolute;
-  top: 2px;
-  right: 6px;
-  font-size: 11px;
+  top: 3px;
+  right: 5px;
+  font-size: 10px;
   font-weight: bold;
-  font-family: 'Courier New', monospace;
-  color: var(--yellow);
+  color: #F1C40F;
   pointer-events: none;
+  font-family: Arial, sans-serif;
   line-height: 1;
 }
 
-/* ═════════════════════════════════════════
-   LOG — blanco con texto negro
-═════════════════════════════════════════ */
-.log-area {
-  background: var(--log-bg);
-  border: 1px solid #7088a8;
-  margin: 0 6px 4px;
-  padding: 3px 6px;
+/* ════════════════════════════════
+   CONSOLA DE LOG
+   fondo blanco, texto negro
+   línea activa: #2980B9 + texto blanco
+════════════════════════════════ */
+.log {
+  background: #ffffff;
+  border: 1px solid #999999;
+  padding: 2px 5px;
   font-family: 'Courier New', monospace;
-  font-size: 13px;
-  color: var(--log-text);
+  font-size: 11px;
+  color: #000;
   flex-shrink: 0;
-  height: 68px;
+  height: 70px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
 }
 
-.log-line {
-  padding: 1px 4px;
-  white-space: nowrap;
-  color: var(--log-text);
-  background: var(--log-bg);
-  line-height: 1.35;
-}
-.log-line.hl {
-  background: var(--log-sel);
-  color: #ffffff;
-}
+.ll { padding: 1px 2px; background: #fff; color: #000; white-space: nowrap; line-height: 1.4; }
+.ll.hl { background: #2980B9; color: #fff; }
 
-/* ═════════════════════════════════════════
-   BOTONES — Windows-style, planos
-═════════════════════════════════════════ */
+/* ════════════════════════════════
+   BARRA DE BOTONES
+   fondo #1A5276, botones #1F618D
+   borde #5D9CEC, texto blanco 12px
+════════════════════════════════ */
 .btn-bar {
   display: flex;
   gap: 2px;
-  padding: 4px 4px 6px;
   flex-shrink: 0;
-  background: #a8a8b8;
-  border-top: 2px solid #8890a0;
+  background: #1A5276;
+  padding: 3px 2px 4px;
 }
 
-.btn-hmi {
+.btn {
   flex: 1;
-  background: var(--btn-bg);
-  border: 1px solid var(--btn-bdr);
-  border-top-color: #eeeeee;
-  border-left-color: #eeeeee;
-  border-right-color: #606060;
-  border-bottom-color: #606060;
-  color: #000000;
+  background: #1F618D;
+  border: 1px solid #5D9CEC;
+  color: #fff;
   font-family: Arial, sans-serif;
-  font-size: 14px;
-  padding: 10px 4px;
+  font-size: 12px;
+  font-weight: normal;
+  padding: 9px 4px;
   cursor: pointer;
   text-align: center;
-  user-select: none;
+  border-radius: 0;
 }
-.btn-hmi:hover  { background: #dcdcdc; }
-.btn-hmi:active {
-  border-top-color: #606060;
-  border-left-color: #606060;
-  border-right-color: #eeeeee;
-  border-bottom-color: #eeeeee;
-  background: #c0c0c0;
-}
+.btn:hover  { background: #2471A3; }
+.btn:active { background: #154360; }
 
-/* ═════════════════════════════════════════
+/* ════════════════════════════════
    PANELES (siguientes pantallas)
-═════════════════════════════════════════ */
+════════════════════════════════ */
 .panel {
   display: none;
   position: absolute;
   inset: 0;
-  background: var(--bg);
+  background: #1A5276;
   flex-direction: column;
   z-index: 20;
 }
 .panel.active { display: flex; }
 
-.panel-hdr {
-  background: var(--bg-title);
-  padding: 6px 12px;
+.ph {
+  background: #0B2545;
+  border-bottom: 1px solid #2980B9;
+  padding: 6px 10px;
   font-size: 14px;
   font-weight: bold;
   display: flex;
@@ -265,32 +246,19 @@ html, body {
   align-items: center;
   flex-shrink: 0;
 }
-.panel-body {
-  flex: 1;
-  padding: 12px 14px;
-  overflow-y: auto;
-  font-size: 13px;
-}
-.panel-footer {
-  display: flex;
-  gap: 2px;
-  padding: 4px 4px 6px;
-  background: #a8a8b8;
-  border-top: 2px solid #8890a0;
-  flex-shrink: 0;
-}
+.pb { flex:1; display:flex; align-items:center; justify-content:center; color:#88bbee; font-size:14px; }
+.pf { display:flex; gap:2px; padding:3px 2px 4px; background:#1A5276; flex-shrink:0; }
 
-.chip {
+.cx {
   display: inline-block;
-  background: rgba(0,0,0,0.3);
-  border: 1px solid rgba(255,255,255,0.3);
-  color: #ddeeff;
-  font-size: 11px;
+  border: 1px solid rgba(255,255,255,0.35);
   padding: 2px 8px;
-  border-radius: 3px;
+  font-size: 11px;
   cursor: pointer;
+  color: #aaddff;
+  background: transparent;
 }
-.chip:hover { background: rgba(0,0,0,0.5); }
+.cx:hover { background: rgba(255,255,255,0.1); }
 </style>
 </head>
 <body>
@@ -300,161 +268,126 @@ html, body {
   <!-- ══ HEADER ══ -->
   <div class="hdr">
     <div class="hdr-left">
-      <div id="date-disp">14/04/2026</div>
-      <div id="time-disp">18:27:12</div>
-      <div id="ctr-disp">123...</div>
+      <div id="dd">14/04/2026</div>
+      <div id="td">18:36:52</div>
+      <div id="cd">123...</div>
     </div>
     <div class="hdr-right">
-      <div class="ind-box">UNDER&lt;-</div>
-      <div class="ind-box">UNDER&lt;-</div>
-      <div class="ind-box weight"><span class="deg">°</span>&nbsp;0.00<span class="unit">kg</span></div>
-      <div class="ind-box">UNDER&lt;-</div>
+      <div class="ind">UNDER&lt;-</div>
+      <div class="ind">UNDER&lt;-</div>
+      <div class="ind wt"><sup style="font-size:9px;vertical-align:super">°</sup>&thinsp;0.00<span style="font-size:10px">kg</span></div>
+      <div class="ind">UNDER&lt;-</div>
     </div>
   </div>
 
-  <!-- ══ BANDA TÍTULO + STATUS ══ -->
-  <div class="title-section">
-    <div class="tab-wrap">
-      <div class="tab">StaticGrader</div>
-    </div>
-    <div class="status-strip" id="status-line">7: CONTRASTACION (17:36:17)</div>
-  </div>
+  <!-- ══ TÍTULO COMPLETO ══ -->
+  <div class="title-bar">StaticGrader</div>
 
-  <!-- ══ GATES ══ -->
+  <!-- ══ ESTADO ══ -->
+  <div class="status" id="sl">7: CONTRASTACION (17:36:17)</div>
+
+  <!-- ══ GRILLA BOLSILLOS ══ -->
   <div class="gate-grid">
-    <div class="gate-row" id="row-odd"></div>
-    <div class="gate-row" id="row-even"></div>
+    <div class="gate-row" id="ro"></div>
+    <div class="gate-row" id="re"></div>
   </div>
 
   <!-- ══ LOG ══ -->
-  <div class="log-area" id="log-area">
-    <div class="log-line">Comenzando Autochequeo</div>
-    <div class="log-line">Grader runtime is 5825 hours</div>
-    <div class="log-line hl">Autochequeo realizado!</div>
+  <div class="log" id="log">
+    <div class="ll">Comenzando Autochequeo</div>
+    <div class="ll">Grader runtime is 5825 hours</div>
+    <div class="ll hl">Autochequeo realizado!</div>
   </div>
 
   <!-- ══ BOTONES ══ -->
   <div class="btn-bar">
-    <button class="btn-hmi" onclick="showPanel('panel-prog')">Cambiar programa</button>
-    <button class="btn-hmi" onclick="showPanel('panel-pres')">Modo presentación</button>
-    <button class="btn-hmi" onclick="goCenter()">-&gt; 0 &lt;-</button>
-    <button class="btn-hmi" onclick="showPanel('panel-menu')">Menu</button>
+    <button class="btn" onclick="sp('pp')">Cambiar programa</button>
+    <button class="btn" onclick="sp('pm')">Modo presentación</button>
+    <button class="btn" onclick="al('Centrando -> 0 <-')">-&gt; 0 &lt;-</button>
+    <button class="btn" onclick="sp('mn')">Menu</button>
   </div>
 
-  <!-- ══ PANELES ══ -->
-  <div class="panel" id="panel-prog">
-    <div class="panel-hdr">
-      <span>Cambiar programa</span>
-      <span class="chip" onclick="closePanel('panel-prog')">✕ Cerrar</span>
-    </div>
-    <div class="panel-body" style="display:flex;align-items:center;justify-content:center;color:#88bbee;font-size:15px;">
-      — Pantalla próxima iteración —
-    </div>
-    <div class="panel-footer">
-      <button class="btn-hmi" style="flex:0 0 130px" onclick="closePanel('panel-prog')">← Volver</button>
-    </div>
+  <!-- Paneles futuros -->
+  <div class="panel" id="pp">
+    <div class="ph"><span>Cambiar programa</span><span class="cx" onclick="cp('pp')">✕ Volver</span></div>
+    <div class="pb">— Próxima iteración —</div>
+    <div class="pf"><button class="btn" style="flex:0 0 120px" onclick="cp('pp')">← Volver</button></div>
   </div>
-
-  <div class="panel" id="panel-pres">
-    <div class="panel-hdr">
-      <span>Modo presentación</span>
-      <span class="chip" onclick="closePanel('panel-pres')">✕ Cerrar</span>
-    </div>
-    <div class="panel-body" style="display:flex;align-items:center;justify-content:center;color:#88bbee;font-size:15px;">
-      — Pantalla próxima iteración —
-    </div>
-    <div class="panel-footer">
-      <button class="btn-hmi" style="flex:0 0 130px" onclick="closePanel('panel-pres')">← Volver</button>
-    </div>
+  <div class="panel" id="pm">
+    <div class="ph"><span>Modo presentación</span><span class="cx" onclick="cp('pm')">✕ Volver</span></div>
+    <div class="pb">— Próxima iteración —</div>
+    <div class="pf"><button class="btn" style="flex:0 0 120px" onclick="cp('pm')">← Volver</button></div>
   </div>
-
-  <div class="panel" id="panel-menu">
-    <div class="panel-hdr">
-      <span>Menú principal</span>
-      <span class="chip" onclick="closePanel('panel-menu')">✕ Cerrar</span>
-    </div>
-    <div class="panel-body" style="display:flex;align-items:center;justify-content:center;color:#88bbee;font-size:15px;">
-      — Pantalla próxima iteración —
-    </div>
-    <div class="panel-footer">
-      <button class="btn-hmi" style="flex:0 0 130px" onclick="closePanel('panel-menu')">← Volver</button>
-    </div>
+  <div class="panel" id="mn">
+    <div class="ph"><span>Menu</span><span class="cx" onclick="cp('mn')">✕ Volver</span></div>
+    <div class="pb">— Próxima iteración —</div>
+    <div class="pf"><button class="btn" style="flex:0 0 120px" onclick="cp('mn')">← Volver</button></div>
   </div>
 
 </div><!-- #screen -->
 
 <script>
-/* ═════════════════════════════════════════
-   GATE SVG
-   Esquinas con radio pequeño (R=4) +
-   muesca diagonal arriba-derecha (N=16)
-═════════════════════════════════════════ */
-const GW = 94, GH = 84, R = 4, N = 16;
+/*
+  Pocket SVG: 80×75 viewBox
+  Muesca SUPERIOR-IZQUIERDA (15×15px) según JSON
+  Path: pentágono — Z cierra la diagonal de la muesca
+  fill: #1A5276 (igual al fondo → "recorte invisible")
+  stroke: #F1C40F, 2px
+*/
+const GW = 80, GH = 75, NC = 15; // NC = notch cut
 
-function gatePath() {
+function pocketPath() {
+  // Pentágono con corte top-left:
+  // desde el punto tras el corte en el techo → derecha → inf-der → inf-izq → sube → Z (diagonal)
   return [
-    `M ${R},1.5`,
-    `L ${GW - N},1.5`,
-    `L ${GW - 1.5},${N}`,
-    `L ${GW - 1.5},${GH - R}`,
-    `Q ${GW - 1.5},${GH - 1.5} ${GW - R},${GH - 1.5}`,
-    `L ${R},${GH - 1.5}`,
-    `Q 1.5,${GH - 1.5} 1.5,${GH - R}`,
-    `L 1.5,${R}`,
-    `Q 1.5,1.5 ${R},1.5`,
-    'Z'
+    `M ${NC},1.5`,          // techo: después del corte
+    `L ${GW-1.5},1.5`,      // top-right
+    `L ${GW-1.5},${GH-1.5}`, // bottom-right
+    `L 1.5,${GH-1.5}`,      // bottom-left
+    `L 1.5,${NC}`,           // left side up
+    'Z'                       // diagonal de vuelta → cierra la muesca
   ].join(' ');
 }
 
 function buildGates() {
-  const odd  = document.getElementById('row-odd');
-  const even = document.getElementById('row-even');
-
+  const ro = document.getElementById('ro');
+  const re = document.getElementById('re');
   for (let g = 1; g <= 12; g++) {
-    const div = document.createElement('div');
-    div.className = 'gate';
-    div.id = `gate-${g}`;
-
-    div.innerHTML =
-      `<svg viewBox="0 0 ${GW} ${GH}" xmlns="http://www.w3.org/2000/svg">` +
-        `<path d="${gatePath()}" fill="#001a48" stroke="#ffcc00" stroke-width="2" stroke-linejoin="miter"/>` +
+    const d = document.createElement('div');
+    d.className = 'gate';
+    d.innerHTML =
+      `<svg viewBox="0 0 ${GW} ${GH}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">` +
+        `<path d="${pocketPath()}" fill="#1A5276" stroke="#F1C40F" stroke-width="2" stroke-linejoin="miter"/>` +
       `</svg>` +
-      `<span class="gate-num">${g}</span>`;
-
-    div.addEventListener('click', () => { addLog(`Gate ${g} seleccionada`); });
-    (g % 2 === 1 ? odd : even).appendChild(div);
+      `<span class="gn">${g}</span>`;
+    d.addEventListener('click', () => al(`Pocket ${g} — Gate ${g}`));
+    (g % 2 === 1 ? ro : re).appendChild(d);
   }
 }
 buildGates();
 
-/* ══ RELOJ ══ */
+/* Reloj */
 function pad(n) { return String(n).padStart(2, '0'); }
-
 function tick() {
-  const now = new Date();
-  document.getElementById('date-disp').textContent =
-    `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()}`;
-  document.getElementById('time-disp').textContent =
-    `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+  const n = new Date();
+  document.getElementById('dd').textContent = `${pad(n.getDate())}/${pad(n.getMonth()+1)}/${n.getFullYear()}`;
+  document.getElementById('td').textContent = `${pad(n.getHours())}:${pad(n.getMinutes())}:${pad(n.getSeconds())}`;
 }
-tick();
-setInterval(tick, 1000);
+tick(); setInterval(tick, 1000);
 
-/* ══ NAVEGACIÓN ══ */
-function showPanel(id)  { document.getElementById(id).classList.add('active'); }
-function closePanel(id) { document.getElementById(id).classList.remove('active'); }
-function goCenter()     { addLog('Centrando -> 0 <-'); }
+/* Navegación */
+function sp(id) { document.getElementById(id).classList.add('active'); }
+function cp(id) { document.getElementById(id).classList.remove('active'); }
 
-/* ══ LOG ══ */
-function addLog(msg) {
-  const area = document.getElementById('log-area');
-  area.querySelectorAll('.hl').forEach(el => el.classList.remove('hl'));
-  const line = document.createElement('div');
-  line.className = 'log-line hl';
-  line.textContent = msg;
-  area.appendChild(line);
-  while (area.children.length > 50) area.removeChild(area.firstChild);
-  area.scrollTop = area.scrollHeight;
+/* Log */
+function al(msg) {
+  const a = document.getElementById('log');
+  a.querySelectorAll('.hl').forEach(e => e.classList.remove('hl'));
+  const l = document.createElement('div');
+  l.className = 'll hl'; l.textContent = msg;
+  a.appendChild(l);
+  while (a.children.length > 50) a.removeChild(a.firstChild);
+  a.scrollTop = a.scrollHeight;
 }
 </script>
 </body>
