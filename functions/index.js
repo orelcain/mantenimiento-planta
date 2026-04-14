@@ -2213,7 +2213,7 @@ async function tgHandleMenu(chatId, topicId) {
       { text: '📈 KPIs', callback_data: 'cmd:kpi' },
     ],
     [
-      { text: '🌐 Abrir App Completa', web_app: { url: PWA_URL } },
+      { text: '🌐 Abrir App Completa', url: PWA_URL },
     ],
   ]
   await sendTelegramButtons(
@@ -2264,7 +2264,7 @@ async function cbMenu(chatId, messageId) {
       { text: '📈 KPIs', callback_data: 'cmd:kpi' },
     ],
     [
-      { text: '🌐 Abrir App Completa', web_app: { url: PWA_URL } },
+      { text: '🌐 Abrir App Completa', url: PWA_URL },
     ],
   ]
   return editTelegramMessage(chatId, messageId,
