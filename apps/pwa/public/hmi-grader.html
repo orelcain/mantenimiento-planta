@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Grader HMI">
+<meta name="theme-color" content="#0033aa">
+<title>Grader HMI — StaticGrader</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #0044cc;
+  --bg-dark:  #001a66;
+  --bg-gate:  #002080;
+  --yellow:   #ffcc00;
+  --yellow2:  #ffe066;
+  --white:    #ffffff;
+  --log-bg:   #000d40;
+  --btn-bg:   #c4c4dc;
+  --btn-bdr:  #9090b0;
+}
+
+html, body {
+  height: 100%;
+  background: #222;
+  font-family: Arial, Helvetica, sans-serif;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── MAIN SCREEN ── */
+#screen {
+  width: 640px;
+  height: 480px;
+  background: var(--bg);
+  color: var(--white);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ── HEADER ── */
+.hdr {
+  display: flex;
+  justify-content: space-between;
+  align-items: stretch;
+  background: var(--bg-dark);
+  border-bottom: 2px solid #0066ee;
+  flex-shrink: 0;
+  height: 56px;
+}
+
+.hdr-left {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 4px 12px;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #ddeeff;
+}
+.hdr-left span { display: block; }
+.hdr-left .ctr { font-size: 11px; color: #aaccee; }
+
+.hdr-right {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 4px;
+  padding: 5px 8px;
+  align-items: center;
+}
+
+.ind-box {
+  border: 2px solid var(--yellow);
+  color: var(--yellow);
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  font-weight: bold;
+  padding: 2px 6px;
+  text-align: center;
+  white-space: nowrap;
+  letter-spacing: 0.5px;
+}
+.ind-box.weight {
+  background: #000d40;
+  font-size: 13px;
+  letter-spacing: 1px;
+}
+
+/* ── TITLE BAR ── */
+.title-bar {
+  background: #1155dd;
+  border-bottom: 2px solid #0044bb;
+  border-top: 1px solid #3377ff;
+  padding: 4px 12px;
+  font-size: 17px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+/* ── STATUS LINE ── */
+.status-line {
+  background: #003399;
+  border-bottom: 1px solid #0044bb;
+  padding: 3px 12px;
+  font-size: 13px;
+  font-family: 'Courier New', monospace;
+  flex-shrink: 0;
+}
+
+/* ── GATE GRID ── */
+.gate-grid {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+}
+
+.gate-row {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+
+.gate {
+  width: 88px;
+  height: 82px;
+  position: relative;
+  cursor: pointer;
+  transition: filter .1s;
+}
+.gate:hover { filter: brightness(1.25); }
+.gate:active { filter: brightness(1.5); }
+.gate svg { width: 100%; height: 100%; display: block; }
+
+.gate-num {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  font-size: 12px;
+  font-weight: bold;
+  font-family: 'Courier New', monospace;
+  color: var(--yellow);
+  pointer-events: none;
+}
+
+/* ── LOG AREA ── */
+.log-area {
+  background: var(--log-bg);
+  border: 1px solid #0055cc;
+  border-left: 3px solid #0066ff;
+  margin: 0 8px 4px;
+  padding: 4px 8px;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  color: #cce4ff;
+  flex-shrink: 0;
+  height: 66px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 1px;
+}
+
+.log-line { padding: 1px 2px; white-space: nowrap; }
+.log-line.hl { background: #1155cc; color: #ffffff; }
+
+/* ── BUTTON BAR ── */
+.btn-bar {
+  display: flex;
+  gap: 2px;
+  padding: 2px 2px 4px;
+  flex-shrink: 0;
+  background: #001a66;
+  border-top: 2px solid #0033aa;
+}
+
+.btn-hmi {
+  flex: 1;
+  background: var(--btn-bg);
+  border: 2px outset var(--btn-bdr);
+  border-bottom: 3px solid #7070a0;
+  color: #111;
+  font-family: Arial, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 2px;
+  cursor: pointer;
+  text-align: center;
+  user-select: none;
+  letter-spacing: 0.3px;
+}
+.btn-hmi:hover  { background: #d4d4ec; }
+.btn-hmi:active { border-style: inset; background: #acacc4; padding-top: 8px; }
+
+/* ── OVERLAY PANEL (futuras pantallas) ── */
+.panel {
+  display: none;
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--bg);
+  flex-direction: column;
+  z-index: 10;
+}
+.panel.active { display: flex; }
+
+.panel-hdr {
+  background: var(--bg-dark);
+  border-bottom: 2px solid #0066ee;
+  padding: 6px 12px;
+  font-size: 14px;
+  font-weight: bold;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+.panel-body {
+  flex: 1;
+  padding: 10px 14px;
+  overflow-y: auto;
+  font-size: 13px;
+}
+.panel-footer {
+  display: flex;
+  gap: 2px;
+  padding: 2px 2px 4px;
+  background: #001a66;
+  border-top: 2px solid #0033aa;
+  flex-shrink: 0;
+}
+
+/* ── TOOLTIP / STATUS CHIP ── */
+.chip {
+  display: inline-block;
+  background: #001a66;
+  border: 1px solid #0055cc;
+  color: #aaccff;
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 3px;
+}
+</style>
+</head>
+<body>
+
+<div id="screen">
+
+  <!-- ══ HEADER ══ -->
+  <div class="hdr">
+    <div class="hdr-left">
+      <span id="date-disp">14/04/2026</span>
+      <span id="time-disp">18:08:35</span>
+      <span class="ctr" id="ctr-disp">0...</span>
+    </div>
+    <div class="hdr-right">
+      <div class="ind-box">UNDER&lt;-</div>
+      <div class="ind-box">UNDER&lt;-</div>
+      <div class="ind-box weight" id="weight-disp">0.00<small style="font-size:10px">kg</small></div>
+      <div class="ind-box">UNDER&lt;-</div>
+    </div>
+  </div>
+
+  <!-- ══ TITLE ══ -->
+  <div class="title-bar">StaticGrader</div>
+
+  <!-- ══ STATUS ══ -->
+  <div class="status-line" id="status-line">7: CONTRASTACION (17:36:17)</div>
+
+  <!-- ══ GATE GRID ══ -->
+  <div class="gate-grid">
+    <!-- Row 1: gates 1, 3, 5, 7, 9, 11 -->
+    <div class="gate-row" id="row-odd"></div>
+    <!-- Row 2: gates 2, 4, 6, 8, 10, 12 -->
+    <div class="gate-row" id="row-even"></div>
+  </div>
+
+  <!-- ══ LOG ══ -->
+  <div class="log-area" id="log-area">
+    <div class="log-line">Comenzando Autochequeo</div>
+    <div class="log-line">Grader runtime is 5825 hours</div>
+    <div class="log-line hl">Autochequeo realizado!</div>
+  </div>
+
+  <!-- ══ BUTTONS ══ -->
+  <div class="btn-bar">
+    <button class="btn-hmi" onclick="showPanel('panel-prog')">Cambiar programa</button>
+    <button class="btn-hmi" onclick="showPanel('panel-pres')">Modo presentación</button>
+    <button class="btn-hmi" onclick="goCenter()">-&gt; 0 &lt;-</button>
+    <button class="btn-hmi" onclick="showPanel('panel-menu')">Menú</button>
+  </div>
+
+  <!-- ══ PANEL: Cambiar programa (placeholder) ══ -->
+  <div class="panel" id="panel-prog">
+    <div class="panel-hdr">
+      <span>Cambiar programa</span>
+      <span class="chip" onclick="closePanel('panel-prog')" style="cursor:pointer">✕ Cerrar</span>
+    </div>
+    <div class="panel-body" style="display:flex;align-items:center;justify-content:center;color:#5588bb;font-size:15px;">
+      — Pantalla próxima iteración —
+    </div>
+    <div class="panel-footer">
+      <button class="btn-hmi" style="flex:0 0 120px" onclick="closePanel('panel-prog')">← Volver</button>
+    </div>
+  </div>
+
+  <!-- ══ PANEL: Modo presentación (placeholder) ══ -->
+  <div class="panel" id="panel-pres">
+    <div class="panel-hdr">
+      <span>Modo presentación</span>
+      <span class="chip" onclick="closePanel('panel-pres')" style="cursor:pointer">✕ Cerrar</span>
+    </div>
+    <div class="panel-body" style="display:flex;align-items:center;justify-content:center;color:#5588bb;font-size:15px;">
+      — Pantalla próxima iteración —
+    </div>
+    <div class="panel-footer">
+      <button class="btn-hmi" style="flex:0 0 120px" onclick="closePanel('panel-pres')">← Volver</button>
+    </div>
+  </div>
+
+  <!-- ══ PANEL: Menú ══ -->
+  <div class="panel" id="panel-menu">
+    <div class="panel-hdr">
+      <span>Menú principal</span>
+      <span class="chip" onclick="closePanel('panel-menu')" style="cursor:pointer">✕ Cerrar</span>
+    </div>
+    <div class="panel-body" style="display:flex;align-items:center;justify-content:center;color:#5588bb;font-size:15px;">
+      — Pantalla próxima iteración —
+    </div>
+    <div class="panel-footer">
+      <button class="btn-hmi" style="flex:0 0 120px" onclick="closePanel('panel-menu')">← Volver</button>
+    </div>
+  </div>
+
+</div><!-- #screen -->
+
+<script>
+/* ── GATE SVG factory ─────────────────────────────────────────
+   Shape: rectangle 88×82 with top-right corner notched (14px diagonal cut)
+   Yellow border (#ffcc00), dark-blue fill (#001a80)
+──────────────────────────────────────────────────────────── */
+const W = 88, H = 82, N = 14; // notch size
+
+function makeGateSVG() {
+  // polygon points: top-left → notch-start → notch-end → bottom-right → bottom-left
+  const pts = `2,2 ${W-N},2 ${W-2},${N} ${W-2},${H-2} 2,${H-2}`;
+  return `<polygon points="${pts}" fill="#001a80" stroke="#ffcc00" stroke-width="2.5" stroke-linejoin="miter"/>`;
+}
+
+function buildGates() {
+  const odd  = document.getElementById('row-odd');
+  const even = document.getElementById('row-even');
+
+  for (let g = 1; g <= 12; g++) {
+    const div = document.createElement('div');
+    div.className = 'gate';
+    div.id = `gate-${g}`;
+    div.setAttribute('data-gate', g);
+    div.title = `Gate ${g}`;
+
+    div.innerHTML =
+      `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${makeGateSVG()}</svg>` +
+      `<span class="gate-num">${g}</span>`;
+
+    div.addEventListener('click', () => onGateClick(g));
+
+    if (g % 2 === 1) odd.appendChild(div);
+    else             even.appendChild(div);
+  }
+}
+buildGates();
+
+/* ── CLOCK ──────────────────────────────────────────────── */
+function pad(n) { return String(n).padStart(2, '0'); }
+let piece = 0;
+
+function tick() {
+  const now = new Date();
+  const d = `${pad(now.getDate())}/${pad(now.getMonth()+1)}/${now.getFullYear()}`;
+  const t = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+  document.getElementById('date-disp').textContent = d;
+  document.getElementById('time-disp').textContent = t;
+}
+tick();
+setInterval(tick, 1000);
+
+/* ── GATE CLICK ─────────────────────────────────────────── */
+function onGateClick(n) {
+  addLog(`Gate ${n} seleccionada`);
+}
+
+/* ── NAVIGATION ─────────────────────────────────────────── */
+function showPanel(id) {
+  document.getElementById(id).classList.add('active');
+}
+function closePanel(id) {
+  document.getElementById(id).classList.remove('active');
+}
+function goCenter() {
+  addLog('Centrando -> 0 <-');
+  document.getElementById('weight-disp').innerHTML = '0.00<small style="font-size:10px">kg</small>';
+}
+
+/* ── LOG HELPER ─────────────────────────────────────────── */
+function addLog(msg) {
+  const area = document.getElementById('log-area');
+  // remove highlight from last
+  area.querySelectorAll('.hl').forEach(el => el.classList.remove('hl'));
+  const line = document.createElement('div');
+  line.className = 'log-line hl';
+  line.textContent = msg;
+  area.appendChild(line);
+  // keep max 30 lines
+  while (area.children.length > 30) area.removeChild(area.firstChild);
+  area.scrollTop = area.scrollHeight;
+}
+</script>
+</body>
+</html>
