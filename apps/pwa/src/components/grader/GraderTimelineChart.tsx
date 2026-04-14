@@ -121,6 +121,7 @@ export function GraderTimelineChart({ records, shiftId, dateKey }: Props) {
     weights: true,
     p0pct: true,
     errors: true,
+    gates: false,
     production: false,
   })
   const [showLegend, setShowLegend] = useState(false)
