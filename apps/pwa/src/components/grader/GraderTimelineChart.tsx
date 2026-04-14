@@ -78,13 +78,14 @@ interface Props {
   dateKey: string
 }
 
-type LayerKey = 'weights' | 'p0pct' | 'errors' | 'production'
+type LayerKey = 'weights' | 'p0pct' | 'errors' | 'production' | 'gates'
 
 const LAYER_LABELS: Record<LayerKey, string> = {
   weights: 'Pesos (g)',
   p0pct: 'P0% (5 min)',
   errors: 'Errores P0',
   production: 'Pzas/min',
+  gates: 'Gates',
 }
 
 const LAYER_COLORS: Record<LayerKey, string> = {
@@ -92,7 +93,10 @@ const LAYER_COLORS: Record<LayerKey, string> = {
   p0pct: '#ef4444',
   errors: '#f59e0b',
   production: '#10b981',
+  gates: '#8b5cf6',
 }
+
+const GATE_PALETTE = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316','#6366f1','#84cc16','#06b6d4','#e11d48']
 
 // ── Moving average ─────────────────────────────────────────────────────────
 
@@ -126,10 +130,10 @@ export function GraderTimelineChart({ records, shiftId, dateKey }: Props) {
     setLayers((prev) => ({ ...prev, [key]: !prev[key] }))
 
   // Pre-procesar data + stats
-  const { weightSeries, weightMovingAvg, p0PctSeries, errorSeries, productionSeries, gaps, stats } = useMemo(() => {
+  const { weightSeries, weightMovingAvg, p0PctSeries, p0CumulativeSeries, errorSeries, productionSeries, gateTimeSeries, gaps, stats } = useMemo(() => {
     if (records.length === 0) return {
-      weightSeries: [], weightMovingAvg: [], p0PctSeries: [], errorSeries: [], productionSeries: [], gaps: [],
-      stats: { withWeight: 0, avgWeight: 0, minWeight: 0, maxWeight: 0, p0Count: 0, totalPieces: 0, uniqueCalibres: [] as string[], uniqueErrors: [] as string[] },
+      weightSeries: [], weightMovingAvg: [], p0PctSeries: [], p0CumulativeSeries: [], errorSeries: [], productionSeries: [], gateTimeSeries: [] as Array<{ gate: number; data: Array<[number, number]> }>, gaps: [],
+      stats: { withWeight: 0, avgWeight: 0, minWeight: 0, maxWeight: 0, p0Count: 0, totalPieces: 0, uniqueCalibres: [] as string[], uniqueErrors: [] as string[], uniqueGates: [] as number[] },
     }
 
     const sorted = [...records].sort((a, b) => a.ts.localeCompare(b.ts))
@@ -204,6 +208,41 @@ export function GraderTimelineChart({ records, shiftId, dateKey }: Props) {
       }
     }
 
+    // R21: P0% acumulado del turno (running total)
+    const p0CumPts: Array<[number, number]> = []
+    let cumTotal = 0, cumP0 = 0
+    for (const r of sorted) {
+      cumTotal += r.pieces
+      if (r.gate === 0) cumP0 += r.pieces
+      if (cumTotal > 30) {  // skip primeros registros
+        p0CumPts.push([new Date(r.ts).getTime(), +((cumP0 / cumTotal) * 100).toFixed(2)])
+      }
+    }
+    // Downsample acumulado a 1 punto cada 100 registros para no saturar
+    const p0CumDownsampled = p0CumPts.filter((_, i) => i % 100 === 0 || i === p0CumPts.length - 1)
+
+    // R23: Gate distribution over time (buckets 5min)
+    const GATE_BUCKET_MS = 5 * 60_000
+    const gateByBucket = new Map<number, Map<number, number>>()
+    const gateSet = new Set<number>()
+    for (const r of sorted) {
+      if (r.gate === 0) continue  // skip P0
+      gateSet.add(r.gate)
+      const bucket = Math.floor(new Date(r.ts).getTime() / GATE_BUCKET_MS) * GATE_BUCKET_MS
+      const gMap = gateByBucket.get(bucket) ?? new Map<number, number>()
+      gMap.set(r.gate, (gMap.get(r.gate) ?? 0) + r.pieces)
+      gateByBucket.set(bucket, gMap)
+    }
+    const sortedGates = Array.from(gateSet).sort((a, b) => a - b)
+    const gateBuckets = Array.from(gateByBucket.keys()).sort((a, b) => a - b)
+    const gateTS = sortedGates.map((gate) => ({
+      gate,
+      data: gateBuckets.map((bucket) => [bucket, gateByBucket.get(bucket)?.get(gate) ?? 0] as [number, number]),
+    }))
+
+    // R25: Identify P0 spike zones (P0% > 5% in rolling window)
+    // Already available via p0Pts — we'll highlight scatter points in those time ranges
+
     // Stats
     const calibreSet = new Set<string>()
     for (const [, , cal] of wts) calibreSet.add(cal)
@@ -214,8 +253,10 @@ export function GraderTimelineChart({ records, shiftId, dateKey }: Props) {
       weightSeries: wts,
       weightMovingAvg: movAvg,
       p0PctSeries: p0Pts,
+      p0CumulativeSeries: p0CumDownsampled,
       errorSeries: errs,
       productionSeries: prodPts,
+      gateTimeSeries: gateTS,
       gaps: detectedGaps,
       stats: {
         withWeight: wts.length,
@@ -226,6 +267,7 @@ export function GraderTimelineChart({ records, shiftId, dateKey }: Props) {
         totalPieces: sorted.reduce((s, r) => s + r.pieces, 0),
         uniqueCalibres: Array.from(calibreSet).sort(),
         uniqueErrors: Array.from(errorSet).sort(),
+        uniqueGates: sortedGates,
       },
     }
   }, [records])
@@ -258,7 +300,7 @@ export function GraderTimelineChart({ records, shiftId, dateKey }: Props) {
     }
   }, [])
 
-  const useDualGrid = layers.production
+  const useDualGrid = layers.production || layers.gates
 
   const option = useMemo<EChartsOption>(() => {
     const series: any[] = []
@@ -270,7 +312,7 @@ export function GraderTimelineChart({ records, shiftId, dateKey }: Props) {
     // ── Grid principal (peso + P0%) ──
     grids.push({
       left: 55, right: 60, top: 30,
-      bottom: useDualGrid ? '38%' : 70,
+      bottom: useDualGrid ? '40%' : 70,
     })
     xAxes.push({
       type: 'time',
@@ -378,6 +420,34 @@ export function GraderTimelineChart({ records, shiftId, dateKey }: Props) {
         showSymbol: false,
         areaStyle: { color: 'rgba(239,68,68,0.05)' },
       })
+
+      // R21: P0% acumulado del turno (dashed, más suave)
+      if (p0CumulativeSeries.length > 0) {
+        series.push({
+          name: 'P0% acum.',
+          type: 'line',
+          xAxisIndex: 0, yAxisIndex: yIdx,
+          data: p0CumulativeSeries,
+          smooth: true,
+          lineStyle: { width: 1.5, color: '#fb923c', type: 'dashed' as const },
+          itemStyle: { color: '#fb923c' },
+          showSymbol: false,
+        })
+      }
+
+      // Target P0% horizontal (2% = ok threshold)
+      series.push({
+        name: '_target',
+        type: 'line',
+        xAxisIndex: 0, yAxisIndex: yIdx,
+        data: p0PctSeries.length > 0 ? [[p0PctSeries[0]![0], 2], [p0PctSeries[p0PctSeries.length - 1]![0], 2]] : [],
+        lineStyle: { width: 1, color: 'rgba(16,185,129,0.4)', type: 'dotted' as const },
+        itemStyle: { color: 'transparent' },
+        showSymbol: false,
+        silent: true,
+        tooltip: { show: false },
+      })
+
       yIdx++
     }
 
@@ -436,9 +506,11 @@ export function GraderTimelineChart({ records, shiftId, dateKey }: Props) {
 
     // ── Grid inferior: Producción ──
     if (useDualGrid) {
+      const lowerLabel = layers.gates ? 'Gates' : 'pz/min'
+      const lowerColor = layers.gates ? '#8b5cf6' : '#10b981'
       grids.push({
         left: 55, right: 60,
-        top: '68%', bottom: 55,
+        top: '66%', bottom: 45,
       })
       xAxes.push({
         type: 'time', gridIndex: 1,
@@ -447,30 +519,52 @@ export function GraderTimelineChart({ records, shiftId, dateKey }: Props) {
         splitLine: { show: false },
       })
       yAxes.push({
-        type: 'value', name: 'pz/min', position: 'left', gridIndex: 1,
-        axisLabel: { fontSize: 9, color: '#10b981' },
-        nameTextStyle: { fontSize: 9, color: '#10b981' },
+        type: 'value', name: lowerLabel, position: 'left', gridIndex: 1,
+        axisLabel: { fontSize: 9, color: lowerColor },
+        nameTextStyle: { fontSize: 9, color: lowerColor },
         splitLine: { lineStyle: { color: 'rgba(148,163,184,0.06)' } },
       })
-      series.push({
-        name: 'Producción/min',
-        type: 'line',
-        xAxisIndex: 1, yAxisIndex: yIdx,
-        data: productionSeries,
-        smooth: 0.3,
-        lineStyle: { width: 1.5, color: '#10b981' },
-        itemStyle: { color: '#10b981' },
-        showSymbol: false,
-        areaStyle: {
-          color: {
-            type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
-            colorStops: [
-              { offset: 0, color: 'rgba(16,185,129,0.5)' },
-              { offset: 1, color: 'rgba(16,185,129,0.05)' },
-            ],
+      if (layers.production) {
+        series.push({
+          name: 'Producción/min',
+          type: 'line',
+          xAxisIndex: 1, yAxisIndex: yIdx,
+          data: productionSeries,
+          smooth: 0.3,
+          lineStyle: { width: 1.5, color: '#10b981' },
+          itemStyle: { color: '#10b981' },
+          showSymbol: false,
+          areaStyle: {
+            color: {
+              type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+              colorStops: [
+                { offset: 0, color: 'rgba(16,185,129,0.5)' },
+                { offset: 1, color: 'rgba(16,185,129,0.05)' },
+              ],
+            },
           },
-        },
-      })
+        })
+      }
+
+      // R23: Gate distribution as stacked area
+      if (layers.gates && gateTimeSeries.length > 0) {
+        for (const gts of gateTimeSeries) {
+          const color = GATE_PALETTE[(gts.gate - 1) % GATE_PALETTE.length]!
+          series.push({
+            name: `G${gts.gate}`,
+            type: 'line',
+            xAxisIndex: 1, yAxisIndex: yIdx,
+            data: gts.data,
+            stack: 'gates',
+            smooth: 0.2,
+            lineStyle: { width: 0 },
+            itemStyle: { color },
+            showSymbol: false,
+            areaStyle: { opacity: 0.6 },
+            emphasis: { focus: 'series' },
+          })
+        }
+      }
       yIdx++
     }
 
@@ -496,14 +590,21 @@ export function GraderTimelineChart({ records, shiftId, dateKey }: Props) {
             return `<b style="color:${params.color}">● ${cal}</b><br/>⏱ ${time}<br/>⚖ <b>${w.toLocaleString('es-CL')}g</b> (${(w / 453.592).toFixed(1)} lb)`
           }
           if (sn.includes('promedio')) {
-            return `<b style="color:#f8fafc">━ Promedio móvil</b><br/>⏱ ${time}<br/>⚖ <b>${params.value[1].toLocaleString('es-CL')}g</b>`
+            return `<b style="color:#fbbf24">━ Promedio móvil</b><br/>⏱ ${time}<br/>⚖ <b>${params.value[1].toLocaleString('es-CL')}g</b>`
+          }
+          if (sn.includes('acum')) {
+            return `<b style="color:#fb923c">┅ P0% acumulado</b><br/>⏱ ${time}<br/>📊 <b>${params.value[1]}%</b> del turno`
           }
           if (sn.includes('P0%')) {
-            return `<b style="color:#ef4444">● P0%</b><br/>⏱ ${time}<br/>📊 <b>${params.value[1]}%</b> (ventana 5 min)`
+            return `<b style="color:#ef4444">● P0% instantáneo</b><br/>⏱ ${time}<br/>📊 <b>${params.value[1]}%</b> (ventana 5 min)`
           }
           if (sn.includes('Producción')) {
             return `<b style="color:#10b981">▊ Producción</b><br/>⏱ ${time}<br/>🏭 <b>${params.value[1]}</b> pz/min`
           }
+          if (sn.startsWith('G')) {
+            return `<b style="color:${params.color}">■ Gate ${sn.slice(1)}</b><br/>⏱ ${time}<br/>📦 <b>${params.value[1]}</b> pz (5 min)`
+          }
+          if (sn.startsWith('_')) return ''
           return `${sn}: ${params.value[1]}`
         },
       },
@@ -635,6 +736,25 @@ export function GraderTimelineChart({ records, shiftId, dateKey }: Props) {
                   <span key={err} className="flex items-center gap-1">
                     <span className="w-2 h-0.5 rounded" style={{ backgroundColor: getErrorColor(err) }} />
                     {err}
+                  </span>
+                ))}
+              </div>
+            )}
+            {layers.p0pct && (
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5">
+                <span className="text-muted-foreground font-semibold">P0%:</span>
+                <span className="flex items-center gap-1"><span className="w-4 h-[2px] rounded" style={{ backgroundColor: '#ef4444' }} />instantáneo (5min)</span>
+                <span className="flex items-center gap-1"><span className="w-4 h-[2px] rounded border-b border-dashed" style={{ borderColor: '#fb923c' }} />acumulado turno</span>
+                <span className="flex items-center gap-1"><span className="w-4 h-[1px] rounded" style={{ backgroundColor: 'rgba(16,185,129,0.5)', borderTop: '1px dotted rgba(16,185,129,0.5)' }} />target 2%</span>
+              </div>
+            )}
+            {layers.gates && stats.uniqueGates.length > 0 && (
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5">
+                <span className="text-muted-foreground font-semibold">Gates:</span>
+                {stats.uniqueGates.map((g) => (
+                  <span key={g} className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: GATE_PALETTE[(g - 1) % GATE_PALETTE.length] }} />
+                    G{g}
                   </span>
                 ))}
               </div>
