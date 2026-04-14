@@ -6,26 +6,28 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Grader HMI">
-<meta name="theme-color" content="#0033aa">
+<meta name="theme-color" content="#1a70d0">
 <title>Grader HMI — StaticGrader</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg:       #0044cc;
-  --bg-dark:  #001a66;
-  --bg-gate:  #002080;
-  --yellow:   #ffcc00;
-  --yellow2:  #ffe066;
-  --white:    #ffffff;
-  --log-bg:   #000d40;
-  --btn-bg:   #c4c4dc;
-  --btn-bdr:  #9090b0;
+  /* Paleta exacta Marelec StaticGrader */
+  --bg:        #1a70d0;   /* azul principal (mismo del original) */
+  --bg-title:  #0c55b8;   /* barra StaticGrader – azul ligeramente más oscuro */
+  --bg-status: #1465c8;   /* línea estado – tono intermedio */
+  --bg-gate:   #1260c0;   /* fill de gates – apenas más oscuro q el bg */
+  --yellow:    #ffcc00;   /* bordes/texto indicadores */
+  --white:     #ffffff;
+  --log-bg:    #ffffff;   /* área log = BLANCO con texto negro */
+  --log-text:  #111111;
+  --log-sel:   #00008b;   /* línea seleccionada – azul navy */
+  --btn-bg:    #d0d0d8;   /* botones Windows-style */
 }
 
 html, body {
   height: 100%;
-  background: #222;
+  background: #1a1a2e;
   font-family: Arial, Helvetica, sans-serif;
   overflow: hidden;
   display: flex;
@@ -33,7 +35,7 @@ html, body {
   justify-content: center;
 }
 
-/* ── MAIN SCREEN ── */
+/* ── PANTALLA PRINCIPAL ── */
 #screen {
   width: 640px;
   height: 480px;
@@ -45,87 +47,85 @@ html, body {
   position: relative;
 }
 
-/* ── HEADER ── */
+/* ─────────────────────────────────────
+   HEADER: fecha/hora izq · indicadores der
+   Sin banda oscura – mismo azul que el bg
+───────────────────────────────────── */
 .hdr {
   display: flex;
   justify-content: space-between;
-  align-items: stretch;
-  background: var(--bg-dark);
-  border-bottom: 2px solid #0066ee;
+  align-items: center;
+  padding: 5px 8px 4px 10px;
   flex-shrink: 0;
-  height: 56px;
+  /* mismo background que el body – sin separación */
 }
 
 .hdr-left {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: 4px 12px;
   font-family: 'Courier New', monospace;
   font-size: 13px;
-  line-height: 1.5;
-  color: #ddeeff;
+  line-height: 1.55;
+  color: #ffffff;
 }
-.hdr-left span { display: block; }
-.hdr-left .ctr { font-size: 11px; color: #aaccee; }
 
+/* Grid 2×2 de indicadores (derecha del header) */
 .hdr-right {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
-  gap: 4px;
-  padding: 5px 8px;
-  align-items: center;
+  grid-template-rows: auto auto;
+  gap: 3px;
 }
 
 .ind-box {
   border: 2px solid var(--yellow);
   color: var(--yellow);
   font-family: 'Courier New', monospace;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: bold;
-  padding: 2px 6px;
+  padding: 3px 10px;
+  min-width: 92px;
   text-align: center;
+  background: transparent;
   white-space: nowrap;
   letter-spacing: 0.5px;
 }
+
+/* Display de peso – fondo negro interior como el original */
 .ind-box.weight {
-  background: #000d40;
-  font-size: 13px;
+  background: #000c30;
+  font-size: 14px;
   letter-spacing: 1px;
 }
 
-/* ── TITLE BAR ── */
+/* ── BARRA TÍTULO ── */
 .title-bar {
-  background: #1155dd;
-  border-bottom: 2px solid #0044bb;
-  border-top: 1px solid #3377ff;
-  padding: 4px 12px;
-  font-size: 17px;
+  background: var(--bg-title);
+  padding: 5px 10px;
+  font-size: 18px;
   font-weight: bold;
-  letter-spacing: 0.5px;
   flex-shrink: 0;
+  border-top:    1px solid rgba(255,255,255,0.12);
+  border-bottom: 1px solid rgba(0,0,0,0.25);
 }
 
-/* ── STATUS LINE ── */
+/* ── LÍNEA ESTADO ── */
 .status-line {
-  background: #003399;
-  border-bottom: 1px solid #0044bb;
-  padding: 3px 12px;
+  background: var(--bg-status);
+  padding: 3px 10px;
   font-size: 13px;
-  font-family: 'Courier New', monospace;
+  font-family: Arial, sans-serif;
   flex-shrink: 0;
+  border-bottom: 1px solid rgba(0,0,0,0.18);
 }
 
-/* ── GATE GRID ── */
+/* ── GRID DE GATES ── */
 .gate-grid {
   flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
+  gap: 8px;
+  padding: 6px 18px;
 }
 
 .gate-row {
@@ -135,92 +135,100 @@ html, body {
 }
 
 .gate {
-  width: 88px;
-  height: 82px;
+  width: 90px;
+  height: 86px;
   position: relative;
   cursor: pointer;
-  transition: filter .1s;
 }
-.gate:hover { filter: brightness(1.25); }
-.gate:active { filter: brightness(1.5); }
+.gate:hover path { fill: #1870e0; }
+.gate:active path { fill: #2288ff; }
 .gate svg { width: 100%; height: 100%; display: block; }
 
+/* Número del gate – esquina superior derecha, encima de la muesca */
 .gate-num {
   position: absolute;
-  top: 6px;
-  right: 10px;
-  font-size: 12px;
+  top: 5px;
+  right: 8px;
+  font-size: 11px;
   font-weight: bold;
   font-family: 'Courier New', monospace;
   color: var(--yellow);
   pointer-events: none;
 }
 
-/* ── LOG AREA ── */
+/* ── ÁREA DE LOG ── */
+/* BLANCO con texto negro; línea activa resaltada azul marino */
 .log-area {
   background: var(--log-bg);
-  border: 1px solid #0055cc;
-  border-left: 3px solid #0066ff;
-  margin: 0 8px 4px;
-  padding: 4px 8px;
+  border: 1px solid #6688aa;
+  margin: 0 6px 4px;
+  padding: 3px 6px;
   font-family: 'Courier New', monospace;
-  font-size: 12px;
-  color: #cce4ff;
+  font-size: 13px;
+  color: var(--log-text);
   flex-shrink: 0;
-  height: 66px;
+  height: 68px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  gap: 1px;
 }
 
-.log-line { padding: 1px 2px; white-space: nowrap; }
-.log-line.hl { background: #1155cc; color: #ffffff; }
+.log-line {
+  padding: 1px 3px;
+  white-space: nowrap;
+  color: var(--log-text);
+  background: var(--log-bg);
+}
+.log-line.hl {
+  background: var(--log-sel);
+  color: #ffffff;
+}
 
-/* ── BUTTON BAR ── */
+/* ── BARRA DE BOTONES ── */
 .btn-bar {
   display: flex;
   gap: 2px;
-  padding: 2px 2px 4px;
+  padding: 3px 3px 5px;
   flex-shrink: 0;
-  background: #001a66;
-  border-top: 2px solid #0033aa;
+  background: #b8b8c8;
+  border-top: 2px solid #a0a0b4;
 }
 
 .btn-hmi {
   flex: 1;
   background: var(--btn-bg);
-  border: 2px outset var(--btn-bdr);
-  border-bottom: 3px solid #7070a0;
+  border: 2px outset #c0c0cc;
+  border-bottom-width: 3px;
   color: #111;
   font-family: Arial, sans-serif;
-  font-size: 12px;
-  font-weight: 600;
-  padding: 7px 2px;
+  font-size: 13px;
+  padding: 7px 4px;
   cursor: pointer;
   text-align: center;
   user-select: none;
-  letter-spacing: 0.3px;
 }
-.btn-hmi:hover  { background: #d4d4ec; }
-.btn-hmi:active { border-style: inset; background: #acacc4; padding-top: 8px; }
+.btn-hmi:hover  { background: #dcdce8; }
+.btn-hmi:active { border-style: inset; background: #b8b8cc; }
 
-/* ── OVERLAY PANEL (futuras pantallas) ── */
+/* ─────────────────────────────────────
+   PANELES (futuras pantallas – se
+   superponen sobre la pantalla principal)
+───────────────────────────────────── */
 .panel {
   display: none;
   position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
+  inset: 0;
   background: var(--bg);
   flex-direction: column;
-  z-index: 10;
+  z-index: 20;
 }
 .panel.active { display: flex; }
 
 .panel-hdr {
-  background: var(--bg-dark);
-  border-bottom: 2px solid #0066ee;
-  padding: 6px 12px;
+  background: var(--bg-title);
+  border-bottom: 2px solid #0044cc;
+  padding: 6px 10px;
   font-size: 14px;
   font-weight: bold;
   display: flex;
@@ -230,29 +238,30 @@ html, body {
 }
 .panel-body {
   flex: 1;
-  padding: 10px 14px;
+  padding: 12px 14px;
   overflow-y: auto;
   font-size: 13px;
 }
 .panel-footer {
   display: flex;
   gap: 2px;
-  padding: 2px 2px 4px;
-  background: #001a66;
-  border-top: 2px solid #0033aa;
+  padding: 3px 3px 5px;
+  background: #b8b8c8;
+  border-top: 2px solid #a0a0b4;
   flex-shrink: 0;
 }
 
-/* ── TOOLTIP / STATUS CHIP ── */
 .chip {
   display: inline-block;
-  background: #001a66;
-  border: 1px solid #0055cc;
-  color: #aaccff;
+  background: rgba(0,0,0,0.25);
+  border: 1px solid rgba(255,255,255,0.3);
+  color: #ddeeff;
   font-size: 11px;
-  padding: 2px 7px;
+  padding: 2px 8px;
   border-radius: 3px;
+  cursor: pointer;
 }
+.chip:hover { background: rgba(0,0,0,0.4); }
 </style>
 </head>
 <body>
@@ -262,29 +271,27 @@ html, body {
   <!-- ══ HEADER ══ -->
   <div class="hdr">
     <div class="hdr-left">
-      <span id="date-disp">14/04/2026</span>
-      <span id="time-disp">18:08:35</span>
-      <span class="ctr" id="ctr-disp">0...</span>
+      <div id="date-disp">14/04/2026</div>
+      <div id="time-disp">18:18:12</div>
+      <div id="ctr-disp" style="font-size:12px">123...</div>
     </div>
     <div class="hdr-right">
       <div class="ind-box">UNDER&lt;-</div>
       <div class="ind-box">UNDER&lt;-</div>
-      <div class="ind-box weight" id="weight-disp">0.00<small style="font-size:10px">kg</small></div>
+      <div class="ind-box weight"><sup style="font-size:9px;vertical-align:super">°</sup>&nbsp;0.00<span style="font-size:10px">kg</span></div>
       <div class="ind-box">UNDER&lt;-</div>
     </div>
   </div>
 
-  <!-- ══ TITLE ══ -->
+  <!-- ══ TÍTULO ══ -->
   <div class="title-bar">StaticGrader</div>
 
-  <!-- ══ STATUS ══ -->
+  <!-- ══ ESTADO ══ -->
   <div class="status-line" id="status-line">7: CONTRASTACION (17:36:17)</div>
 
-  <!-- ══ GATE GRID ══ -->
+  <!-- ══ GATES ══ -->
   <div class="gate-grid">
-    <!-- Row 1: gates 1, 3, 5, 7, 9, 11 -->
     <div class="gate-row" id="row-odd"></div>
-    <!-- Row 2: gates 2, 4, 6, 8, 10, 12 -->
     <div class="gate-row" id="row-even"></div>
   </div>
 
@@ -295,7 +302,7 @@ html, body {
     <div class="log-line hl">Autochequeo realizado!</div>
   </div>
 
-  <!-- ══ BUTTONS ══ -->
+  <!-- ══ BOTONES ══ -->
   <div class="btn-bar">
     <button class="btn-hmi" onclick="showPanel('panel-prog')">Cambiar programa</button>
     <button class="btn-hmi" onclick="showPanel('panel-pres')">Modo presentación</button>
@@ -303,31 +310,31 @@ html, body {
     <button class="btn-hmi" onclick="showPanel('panel-menu')">Menú</button>
   </div>
 
-  <!-- ══ PANEL: Cambiar programa (placeholder) ══ -->
+  <!-- ══ PANEL: Cambiar programa ══ -->
   <div class="panel" id="panel-prog">
     <div class="panel-hdr">
       <span>Cambiar programa</span>
-      <span class="chip" onclick="closePanel('panel-prog')" style="cursor:pointer">✕ Cerrar</span>
+      <span class="chip" onclick="closePanel('panel-prog')">✕ Cerrar</span>
     </div>
-    <div class="panel-body" style="display:flex;align-items:center;justify-content:center;color:#5588bb;font-size:15px;">
+    <div class="panel-body" style="display:flex;align-items:center;justify-content:center;color:#88bbee;font-size:15px;">
       — Pantalla próxima iteración —
     </div>
     <div class="panel-footer">
-      <button class="btn-hmi" style="flex:0 0 120px" onclick="closePanel('panel-prog')">← Volver</button>
+      <button class="btn-hmi" style="flex:0 0 130px" onclick="closePanel('panel-prog')">← Volver</button>
     </div>
   </div>
 
-  <!-- ══ PANEL: Modo presentación (placeholder) ══ -->
+  <!-- ══ PANEL: Modo presentación ══ -->
   <div class="panel" id="panel-pres">
     <div class="panel-hdr">
       <span>Modo presentación</span>
-      <span class="chip" onclick="closePanel('panel-pres')" style="cursor:pointer">✕ Cerrar</span>
+      <span class="chip" onclick="closePanel('panel-pres')">✕ Cerrar</span>
     </div>
-    <div class="panel-body" style="display:flex;align-items:center;justify-content:center;color:#5588bb;font-size:15px;">
+    <div class="panel-body" style="display:flex;align-items:center;justify-content:center;color:#88bbee;font-size:15px;">
       — Pantalla próxima iteración —
     </div>
     <div class="panel-footer">
-      <button class="btn-hmi" style="flex:0 0 120px" onclick="closePanel('panel-pres')">← Volver</button>
+      <button class="btn-hmi" style="flex:0 0 130px" onclick="closePanel('panel-pres')">← Volver</button>
     </div>
   </div>
 
@@ -335,29 +342,45 @@ html, body {
   <div class="panel" id="panel-menu">
     <div class="panel-hdr">
       <span>Menú principal</span>
-      <span class="chip" onclick="closePanel('panel-menu')" style="cursor:pointer">✕ Cerrar</span>
+      <span class="chip" onclick="closePanel('panel-menu')">✕ Cerrar</span>
     </div>
-    <div class="panel-body" style="display:flex;align-items:center;justify-content:center;color:#5588bb;font-size:15px;">
+    <div class="panel-body" style="display:flex;align-items:center;justify-content:center;color:#88bbee;font-size:15px;">
       — Pantalla próxima iteración —
     </div>
     <div class="panel-footer">
-      <button class="btn-hmi" style="flex:0 0 120px" onclick="closePanel('panel-menu')">← Volver</button>
+      <button class="btn-hmi" style="flex:0 0 130px" onclick="closePanel('panel-menu')">← Volver</button>
     </div>
   </div>
 
 </div><!-- #screen -->
 
 <script>
-/* ── GATE SVG factory ─────────────────────────────────────────
-   Shape: rectangle 88×82 with top-right corner notched (14px diagonal cut)
-   Yellow border (#ffcc00), dark-blue fill (#001a80)
-──────────────────────────────────────────────────────────── */
-const W = 88, H = 82, N = 14; // notch size
+/* ══════════════════════════════════════════════════════
+   GATE SVG
+   Rectángulo con esquinas redondeadas (R=10)
+   + muesca diagonal en esquina superior-derecha (N=18px)
+   Borde amarillo, fill levemente más oscuro que el bg
+══════════════════════════════════════════════════════ */
+const GW = 90, GH = 86, R = 10, N = 18;
 
-function makeGateSVG() {
-  // polygon points: top-left → notch-start → notch-end → bottom-right → bottom-left
-  const pts = `2,2 ${W-N},2 ${W-2},${N} ${W-2},${H-2} 2,${H-2}`;
-  return `<polygon points="${pts}" fill="#001a80" stroke="#ffcc00" stroke-width="2.5" stroke-linejoin="miter"/>`;
+function gatePath() {
+  // Empezar después del radio en esquina sup-izq
+  // → derecho hasta inicio de muesca
+  // → diagonal de muesca (esquina sup-der)
+  // → bajar lado der hasta esquina inf-der redondeada
+  // → arco inf-der → izquierda → arco inf-izq → subir → arco sup-izq → cerrar
+  return [
+    `M ${R},2`,
+    `L ${GW - N},2`,
+    `L ${GW - 2},${N}`,
+    `L ${GW - 2},${GH - R}`,
+    `Q ${GW - 2},${GH - 2} ${GW - R},${GH - 2}`,
+    `L ${R},${GH - 2}`,
+    `Q 2,${GH - 2} 2,${GH - R}`,
+    `L 2,${R}`,
+    `Q 2,2 ${R},2`,
+    'Z'
+  ].join(' ');
 }
 
 function buildGates() {
@@ -368,63 +391,46 @@ function buildGates() {
     const div = document.createElement('div');
     div.className = 'gate';
     div.id = `gate-${g}`;
-    div.setAttribute('data-gate', g);
-    div.title = `Gate ${g}`;
 
     div.innerHTML =
-      `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${makeGateSVG()}</svg>` +
+      `<svg viewBox="0 0 ${GW} ${GH}" xmlns="http://www.w3.org/2000/svg">` +
+        `<path d="${gatePath()}" fill="#1260c0" stroke="#ffcc00" stroke-width="2" stroke-linejoin="round"/>` +
+      `</svg>` +
       `<span class="gate-num">${g}</span>`;
 
-    div.addEventListener('click', () => onGateClick(g));
-
-    if (g % 2 === 1) odd.appendChild(div);
-    else             even.appendChild(div);
+    div.addEventListener('click', () => { addLog(`Gate ${g} seleccionada`); });
+    (g % 2 === 1 ? odd : even).appendChild(div);
   }
 }
 buildGates();
 
-/* ── CLOCK ──────────────────────────────────────────────── */
+/* ══ RELOJ ══ */
 function pad(n) { return String(n).padStart(2, '0'); }
-let piece = 0;
 
 function tick() {
   const now = new Date();
-  const d = `${pad(now.getDate())}/${pad(now.getMonth()+1)}/${now.getFullYear()}`;
-  const t = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-  document.getElementById('date-disp').textContent = d;
-  document.getElementById('time-disp').textContent = t;
+  document.getElementById('date-disp').textContent =
+    `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()}`;
+  document.getElementById('time-disp').textContent =
+    `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
 }
 tick();
 setInterval(tick, 1000);
 
-/* ── GATE CLICK ─────────────────────────────────────────── */
-function onGateClick(n) {
-  addLog(`Gate ${n} seleccionada`);
-}
+/* ══ NAVEGACIÓN ══ */
+function showPanel(id)  { document.getElementById(id).classList.add('active'); }
+function closePanel(id) { document.getElementById(id).classList.remove('active'); }
+function goCenter()     { addLog('Centrando -> 0 <-'); }
 
-/* ── NAVIGATION ─────────────────────────────────────────── */
-function showPanel(id) {
-  document.getElementById(id).classList.add('active');
-}
-function closePanel(id) {
-  document.getElementById(id).classList.remove('active');
-}
-function goCenter() {
-  addLog('Centrando -> 0 <-');
-  document.getElementById('weight-disp').innerHTML = '0.00<small style="font-size:10px">kg</small>';
-}
-
-/* ── LOG HELPER ─────────────────────────────────────────── */
+/* ══ LOG ══ */
 function addLog(msg) {
   const area = document.getElementById('log-area');
-  // remove highlight from last
   area.querySelectorAll('.hl').forEach(el => el.classList.remove('hl'));
   const line = document.createElement('div');
   line.className = 'log-line hl';
   line.textContent = msg;
   area.appendChild(line);
-  // keep max 30 lines
-  while (area.children.length > 30) area.removeChild(area.firstChild);
+  while (area.children.length > 50) area.removeChild(area.firstChild);
   area.scrollTop = area.scrollHeight;
 }
 </script>
