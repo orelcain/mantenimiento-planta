@@ -2096,20 +2096,13 @@ function getTopicId(category) {
 async function tgHandleAyuda(chatId, topicId) {
   await sendTelegramMessage(
     '🔩 <b>Bot Repuestos — Planta Antarfood</b>\n\n' +
-    '<b>Acceso rápido</b>\n' +
-    '/menu — Ver máquinas y buscar repuestos\n\n' +
-    '<b>🔍 Búsqueda</b>\n' +
-    '/repuesto [SAP o nombre] — Buscar en todas las máquinas\n' +
-    '/repuestos [máquina] — Repuestos de una máquina específica\n' +
-    'O tocá 🔍 en el menú y escribí directamente\n\n' +
-    '<b>📸 Fotos de repuestos</b>\n' +
-    'Tocar el botón 📸 en el detalle muestra todas las fotos del repuesto\n\n' +
-    '<b>📋 Incidencias (secundario)</b>\n' +
-    '/incidencia [desc] — Reportar falla\n' +
-    '/incidencia alta [desc] — Prioridad alta\n' +
-    'Mandá una foto directamente para adjuntarla a una incidencia\n\n' +
-    '<b>📊 Otros</b>\n' +
-    '/turno · /kpi · /sensores\n\n' +
+    '/menu — Ver lista de máquinas\n\n' +
+    '<b>🔍 Buscar repuesto</b>\n' +
+    'Tocá 🔍 en el menú → escribí SAP o nombre\n' +
+    '/repuesto [SAP o nombre] — Búsqueda directa\n' +
+    '/repuestos [máquina] — Todos los repuestos de una máquina\n\n' +
+    '<b>📸 Ver fotos</b>\n' +
+    'En el detalle del repuesto tocá el botón 📸\n\n' +
     '/ayuda — Este menú',
     chatId, { topicId }
   )
@@ -2326,14 +2319,17 @@ async function tgHandleRepuestosMaquina(chatId, rawText, topicId) {
 
   if (!query) {
     // Listar máquinas disponibles
-    const machinesSnap = await db.collection('machines').where('activa', '==', true).orderBy('orden').get()
+    const machinesSnap = await db.collection('machines').where('activa', '==', true).get()
     if (machinesSnap.empty) {
       await sendTelegramMessage('📭 No hay máquinas registradas.', chatId, { topicId: repTopicId })
       return
     }
+    const sortedMachines = machinesSnap.docs
+      .map((d) => d.data())
+      .sort((a, b) => (a.orden || 0) - (b.orden || 0))
     let msg = '<b>🏭 Máquinas disponibles</b>\n\n'
-    machinesSnap.forEach((doc) => {
-      msg += `• <b>${doc.data().nombre}</b>\n`
+    sortedMachines.forEach((m) => {
+      msg += `• <b>${m.nombre}</b>\n`
     })
     msg += '\nUsá: <code>/repuestos baader</code>'
     await sendTelegramMessage(msg, chatId, { topicId: repTopicId })
@@ -2515,10 +2511,13 @@ async function tgHandleRepuestoSearchSession(chatId, query, topicId) {
   }
 
   const repTopicId = getTopicId('repuestos') || topicId
-  const machinesSnap = await db.collection('machines').where('activa', '==', true).orderBy('orden').get()
+  const machinesSnap = await db.collection('machines').where('activa', '==', true).get()
+  const machineDocs = machinesSnap.docs
+    .map((d) => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (a.orden || 0) - (b.orden || 0))
   const results = []
 
-  for (const machineDoc of machinesSnap.docs) {
+  for (const machineDoc of machineDocs) {
     if (results.length >= 8) break
     const repSnap = await db.collection(`machines/${machineDoc.id}/repuestos`).get()
     repSnap.forEach((repDoc) => {
@@ -2529,7 +2528,7 @@ async function tgHandleRepuestoSearchSession(chatId, query, topicId) {
         (r.textoBreve || '').toUpperCase().includes(upper) ||
         (r.descripcion || '').toUpperCase().includes(upper) ||
         (r.alias || '').toUpperCase().includes(upper)
-      if (hit) results.push({ ...r, _machineId: machineDoc.id, _machineName: machineDoc.data().nombre, _repId: repDoc.id })
+      if (hit) results.push({ ...r, _machineId: machineDoc.id, _machineName: machineDoc.nombre, _repId: repDoc.id })
     })
   }
 
@@ -2562,10 +2561,14 @@ async function tgHandleRepuestoSearchSession(chatId, query, topicId) {
  * /menu — Menú enfocado en repuestos: máquinas directas + búsqueda
  */
 async function tgHandleMenu(chatId, topicId) {
-  const snap = await db.collection('machines').where('activa', '==', true).orderBy('orden').limit(12).get()
+  const snap = await db.collection('machines').where('activa', '==', true).get()
+  const docs = snap.docs
+    .map((d) => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (a.orden || 0) - (b.orden || 0))
+    .slice(0, 12)
   const buttons = [[{ text: '🔍 Buscar por SAP o nombre', callback_data: 'rep:search' }]]
-  snap.docs.forEach((doc) => {
-    buttons.push([{ text: `🏭 ${doc.data().nombre}`, callback_data: `maq:rep:${doc.id}` }])
+  docs.forEach((m) => {
+    buttons.push([{ text: `🏭 ${m.nombre}`, callback_data: `maq:rep:${m.id}` }])
   })
   buttons.push([{ text: '🌐 Abrir App', url: PWA_URL }])
   await sendTelegramButtons(
@@ -2604,10 +2607,14 @@ async function tgHandleCallback(chatId, messageId, data, topicId) {
 
 // ---- Callback: Menú principal ----
 async function cbMenu(chatId, messageId) {
-  const snap = await db.collection('machines').where('activa', '==', true).orderBy('orden').limit(12).get()
+  const snap = await db.collection('machines').where('activa', '==', true).get()
+  const docs = snap.docs
+    .map((d) => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (a.orden || 0) - (b.orden || 0))
+    .slice(0, 12)
   const buttons = [[{ text: '🔍 Buscar por SAP o nombre', callback_data: 'rep:search' }]]
-  snap.docs.forEach((doc) => {
-    buttons.push([{ text: `🏭 ${doc.data().nombre}`, callback_data: `maq:rep:${doc.id}` }])
+  docs.forEach((m) => {
+    buttons.push([{ text: `🏭 ${m.nombre}`, callback_data: `maq:rep:${m.id}` }])
   })
   buttons.push([{ text: '🌐 Abrir App', url: PWA_URL }])
   return editTelegramMessage(chatId, messageId,
@@ -2668,10 +2675,13 @@ async function cbMaquina(chatId, messageId, params) {
 
   // sub === 'list' ya no se usa desde el menú pero se mantiene por compatibilidad
   if (sub === 'list') {
-    const snapshot = await db.collection('machines').where('activa', '==', true).orderBy('orden').get()
+    const snapshot = await db.collection('machines').where('activa', '==', true).get()
+    const docs = snapshot.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (a.orden || 0) - (b.orden || 0))
     const buttons = []
-    snapshot.docs.forEach((doc) => {
-      buttons.push([{ text: `🏭 ${doc.data().nombre}`, callback_data: `maq:rep:${doc.id}` }])
+    docs.forEach((m) => {
+      buttons.push([{ text: `🏭 ${m.nombre}`, callback_data: `maq:rep:${m.id}` }])
     })
     buttons.push([{ text: '← Menú', callback_data: 'menu' }])
     return editTelegramMessage(chatId, messageId, '🔩 <b>Repuestos Planta</b>\n\nElegí una máquina:', buttons)
