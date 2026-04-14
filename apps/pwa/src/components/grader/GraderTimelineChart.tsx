@@ -2,34 +2,33 @@
  * Gráfico segundo a segundo del turno con ECharts.
  *
  * 4 capas toggleables:
- *  1. Pesos (scatter) — cada pieza con su peso en gramos, coloreado por calibre
- *  2. P0% ventana móvil (line) — calculado en ventana de N minutos
- *  3. Tipos error P0 (scatter) — solo gate=0, color por tipo de error
- *  4. Producción (area) — piezas/minuto suavizado
+ *  1. Pesos (scatter + moving avg) — cada pieza coloreada por calibre + línea promedio móvil
+ *  2. P0% ventana móvil (line) — calculado en ventana de 5 minutos
+ *  3. Errores P0 (markLines verticales) — marcas en el eje X donde ocurren errores
+ *  4. Producción (area) — piezas/minuto en grid inferior separado
  *
- * Zoom: dataZoom nativo de ECharts (turno completo → hora → minuto → segundo)
+ * Zoom: dataZoom nativo, crosshair vertical, stats dinámicos por rango visible.
+ * Layout: dual grid (peso arriba 70%, producción abajo 25%), bandas de calibre.
  *
- * UX iter 20: ejes Y separados, tooltip enriquecido, leyenda colores,
- *             scatter con opacidad, header con stats.
+ * UX iter 20 (rondas 1-15): ejes separados, tooltip enriquecido, leyenda,
+ *   scatter con opacidad, dual grid, moving avg, bandas calibre, gap markers,
+ *   crosshair, dark theme polish.
  */
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useCallback } from 'react'
 import ReactECharts from 'echarts-for-react'
 import type { EChartsOption } from 'echarts'
 import { Card, CardContent, CardHeader, CardTitle, Badge } from '@/components/ui'
-import { Activity } from 'lucide-react'
+import { Activity, Coffee } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
 
 // ── Paleta ──────────────────────────────────────────────────────────────────
 
 const CALIBRE_COLORS: Record<string, string> = {
-  '0-2': '#94a3b8',
-  '1-2': '#94a3b8',
-  '2-3': '#3b82f6',
-  '2-4': '#3b82f6',
+  '0-2': '#94a3b8', '1-2': '#94a3b8',
+  '2-3': '#3b82f6', '2-4': '#3b82f6',
   '3-4': '#10b981',
-  '4-5': '#f59e0b',
-  '4-6': '#f59e0b',
+  '4-5': '#f59e0b', '4-6': '#f59e0b',
   '5-6': '#ef4444',
   '6-8': '#ec4899',
   '8-10': '#8b5cf6',
@@ -49,8 +48,15 @@ const ERROR_COLORS: Record<string, string> = {
 }
 const DEFAULT_ERROR_COLOR = '#6b7280'
 
+// Bandas de peso por calibre (lb→gramos) para markArea
+const CALIBRE_BANDS = [
+  { label: '2-4 lb', min: 907, max: 1814, color: 'rgba(59,130,246,0.04)' },
+  { label: '4-6 lb', min: 1814, max: 2722, color: 'rgba(245,158,11,0.04)' },
+  { label: '6-8 lb', min: 2722, max: 3629, color: 'rgba(236,72,153,0.04)' },
+  { label: '8-10 lb', min: 3629, max: 4536, color: 'rgba(139,92,246,0.04)' },
+]
+
 function getCalibreColor(calibre: string): string {
-  // Buscar match parcial (ej: "6-8 lb" → "6-8")
   for (const [key, color] of Object.entries(CALIBRE_COLORS)) {
     if (calibre.includes(key)) return color
   }
@@ -88,6 +94,22 @@ const LAYER_COLORS: Record<LayerKey, string> = {
   production: '#10b981',
 }
 
+// ── Moving average ─────────────────────────────────────────────────────────
+
+function computeMovingAvg(data: Array<[number, number]>, windowSize: number): Array<[number, number]> {
+  if (data.length < windowSize) return []
+  const result: Array<[number, number]> = []
+  let sum = 0
+  for (let i = 0; i < data.length; i++) {
+    sum += data[i]![1]
+    if (i >= windowSize) sum -= data[i - windowSize]![1]
+    if (i >= windowSize - 1) {
+      result.push([data[i]![0], Math.round(sum / windowSize)])
+    }
+  }
+  return result
+}
+
 // ── Componente ──────────────────────────────────────────────────────────────
 
 export function GraderTimelineChart({ records, shiftId, dateKey }: Props) {
@@ -98,32 +120,29 @@ export function GraderTimelineChart({ records, shiftId, dateKey }: Props) {
     production: false,
   })
   const [showLegend, setShowLegend] = useState(false)
+  const [zoomRange, setZoomRange] = useState<{ start: number; end: number }>({ start: 0, end: 100 })
 
   const toggleLayer = (key: LayerKey) =>
     setLayers((prev) => ({ ...prev, [key]: !prev[key] }))
 
   // Pre-procesar data + stats
-  const { weightSeries, p0PctSeries, errorSeries, productionSeries, stats } = useMemo(() => {
+  const { weightSeries, weightMovingAvg, p0PctSeries, errorSeries, productionSeries, gaps, stats } = useMemo(() => {
     if (records.length === 0) return {
-      weightSeries: [], p0PctSeries: [], errorSeries: [], productionSeries: [],
-      stats: { withWeight: 0, avgWeight: 0, minWeight: 0, maxWeight: 0, p0Count: 0, uniqueCalibres: [] as string[], uniqueErrors: [] as string[] },
+      weightSeries: [], weightMovingAvg: [], p0PctSeries: [], errorSeries: [], productionSeries: [], gaps: [],
+      stats: { withWeight: 0, avgWeight: 0, minWeight: 0, maxWeight: 0, p0Count: 0, totalPieces: 0, uniqueCalibres: [] as string[], uniqueErrors: [] as string[] },
     }
 
     const sorted = [...records].sort((a, b) => a.ts.localeCompare(b.ts))
 
-    // Scatter de pesos (solo piezas con peso)
-    // weightPerPieceGrams puede venir directo del Excel o calculado desde weightKg
+    // Scatter de pesos
     const wts: Array<[number, number, string]> = []
-    let sumW = 0
-    let minW = Infinity
-    let maxW = 0
+    let sumW = 0, minW = Infinity, maxW = 0
     for (const r of sorted) {
       let w = r.weightPerPieceGrams
-      // Fallback: calcular desde weightKg solo si pieces=1 (peso individual real)
       if ((w == null || w <= 0) && r.weightKg != null && r.weightKg > 0) {
         w = r.pieces === 1 ? r.weightKg * 1000 : (r.weightKg * 1000) / r.pieces
       }
-      if (w != null && w > 200 && w < 8000) {  // sanity: salmón 200g–8kg
+      if (w != null && w > 200 && w < 8000) {
         wts.push([new Date(r.ts).getTime(), Math.round(w), r.calibre ?? '?'])
         sumW += w
         if (w < minW) minW = w
@@ -131,7 +150,11 @@ export function GraderTimelineChart({ records, shiftId, dateKey }: Props) {
       }
     }
 
-    // Scatter de errores P0 (solo gate=0 con error)
+    // Moving average (ventana 50 puntos)
+    const wtsForAvg: Array<[number, number]> = wts.map(([ts, w]) => [ts, w])
+    const movAvg = computeMovingAvg(wtsForAvg, 50)
+
+    // Errores P0
     const errs: Array<[number, number, string]> = []
     for (const r of sorted) {
       if (r.gate === 0 && r.error) {
@@ -139,12 +162,10 @@ export function GraderTimelineChart({ records, shiftId, dateKey }: Props) {
       }
     }
 
-    // P0% ventana móvil (5 min = 300000 ms)
+    // P0% ventana móvil (5 min)
     const WINDOW_MS = 5 * 60 * 1000
     const p0Pts: Array<[number, number]> = []
-    let windowTotal = 0
-    let windowP0 = 0
-    let left = 0
+    let windowTotal = 0, windowP0 = 0, left = 0
     for (let right = 0; right < sorted.length; right++) {
       const r = sorted[right]!
       const tsR = new Date(r.ts).getTime()
@@ -160,7 +181,7 @@ export function GraderTimelineChart({ records, shiftId, dateKey }: Props) {
       }
     }
 
-    // Producción: piezas por minuto (buckets de 60s)
+    // Producción: piezas por minuto (buckets 60s)
     const BUCKET_MS = 60_000
     const prodMap = new Map<number, number>()
     for (const r of sorted) {
@@ -169,7 +190,19 @@ export function GraderTimelineChart({ records, shiftId, dateKey }: Props) {
     }
     const prodPts = Array.from(prodMap.entries()).sort((a, b) => a[0] - b[0])
 
-    // Stats para header
+    // Detectar gaps (paradas/colación: >15 min sin datos)
+    const GAP_THRESHOLD_MS = 15 * 60 * 1000
+    const detectedGaps: Array<{ start: number; end: number; durationMin: number }> = []
+    for (let i = 1; i < sorted.length; i++) {
+      const prevTs = new Date(sorted[i - 1]!.ts).getTime()
+      const currTs = new Date(sorted[i]!.ts).getTime()
+      const delta = currTs - prevTs
+      if (delta > GAP_THRESHOLD_MS) {
+        detectedGaps.push({ start: prevTs, end: currTs, durationMin: Math.round(delta / 60_000) })
+      }
+    }
+
+    // Stats
     const calibreSet = new Set<string>()
     for (const [, , cal] of wts) calibreSet.add(cal)
     const errorSet = new Set<string>()
@@ -177,213 +210,283 @@ export function GraderTimelineChart({ records, shiftId, dateKey }: Props) {
 
     return {
       weightSeries: wts,
+      weightMovingAvg: movAvg,
       p0PctSeries: p0Pts,
       errorSeries: errs,
       productionSeries: prodPts,
+      gaps: detectedGaps,
       stats: {
         withWeight: wts.length,
         avgWeight: wts.length > 0 ? Math.round(sumW / wts.length) : 0,
         minWeight: wts.length > 0 ? Math.round(minW) : 0,
         maxWeight: wts.length > 0 ? Math.round(maxW) : 0,
         p0Count: errs.length,
+        totalPieces: sorted.reduce((s, r) => s + r.pieces, 0),
         uniqueCalibres: Array.from(calibreSet).sort(),
         uniqueErrors: Array.from(errorSet).sort(),
       },
     }
   }, [records])
 
+  // Stats dinámicos según zoom visible
+  const visibleStats = useMemo(() => {
+    if (weightSeries.length === 0) return null
+    const allTs = weightSeries.map(([ts]) => ts)
+    const minTs = Math.min(...allTs)
+    const maxTs = Math.max(...allTs)
+    const rangeMs = maxTs - minTs
+    const visStart = minTs + (rangeMs * zoomRange.start / 100)
+    const visEnd = minTs + (rangeMs * zoomRange.end / 100)
+
+    const visible = weightSeries.filter(([ts]) => ts >= visStart && ts <= visEnd)
+    if (visible.length === 0) return null
+    const sum = visible.reduce((s, [, w]) => s + w, 0)
+    return {
+      count: visible.length,
+      avg: Math.round(sum / visible.length),
+      spanHours: ((visEnd - visStart) / 3_600_000).toFixed(1),
+    }
+  }, [weightSeries, zoomRange])
+
+  const handleDataZoom = useCallback((params: any) => {
+    if (params.batch?.[0]) {
+      setZoomRange({ start: params.batch[0].start ?? 0, end: params.batch[0].end ?? 100 })
+    } else if (params.start != null) {
+      setZoomRange({ start: params.start, end: params.end })
+    }
+  }, [])
+
+  const useDualGrid = layers.production
+
   const option = useMemo<EChartsOption>(() => {
     const series: any[] = []
     const yAxes: any[] = []
+    const grids: any[] = []
+    const xAxes: any[] = []
     let yIdx = 0
 
-    // ── Eje Y izquierdo: siempre Peso (g) cuando weights activo ──
+    // ── Grid principal (peso + P0%) ──
+    grids.push({
+      left: 55, right: 60, top: 30,
+      bottom: useDualGrid ? '32%' : 70,
+    })
+    xAxes.push({
+      type: 'time',
+      gridIndex: 0,
+      axisLabel: {
+        formatter: (v: number) => new Date(v).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }),
+        fontSize: 10, color: '#64748b',
+      },
+      axisLine: { lineStyle: { color: 'rgba(100,116,139,0.2)' } },
+      splitLine: { show: false },
+      axisPointer: { show: true, lineStyle: { color: 'rgba(148,163,184,0.3)', type: 'dashed' } },
+    })
+
+    // ── Peso scatter + moving avg + bandas ──
     if (layers.weights && weightSeries.length > 0) {
       yAxes.push({
-        type: 'value',
-        name: 'Peso (g)',
-        position: 'left',
-        axisLabel: { formatter: '{value}', fontSize: 10, color: '#94a3b8' },
-        nameTextStyle: { fontSize: 10, color: '#94a3b8' },
-        splitLine: { lineStyle: { color: 'rgba(148,163,184,0.1)' } },
+        type: 'value', name: 'Peso (g)', position: 'left', gridIndex: 0,
+        axisLabel: { formatter: '{value}', fontSize: 10, color: '#64748b' },
+        nameTextStyle: { fontSize: 10, color: '#64748b', padding: [0, 0, 0, -10] },
+        splitLine: { lineStyle: { color: 'rgba(148,163,184,0.06)' } },
+        min: (v: any) => Math.max(0, v.min - 200),
+        max: (v: any) => v.max + 200,
       })
+
+      // Bandas de calibre (markArea)
+      const markAreaData = CALIBRE_BANDS.map((b) => ([
+        { yAxis: b.min, itemStyle: { color: b.color } },
+        { yAxis: b.max },
+      ]))
+
       series.push({
         name: 'Peso pieza',
         type: 'scatter',
-        yAxisIndex: yIdx,
-        symbolSize: 2.5,
+        xAxisIndex: 0, yAxisIndex: yIdx,
+        symbolSize: 2,
         data: weightSeries.map(([ts, w, cal]) => ({
           value: [ts, w],
-          itemStyle: { color: getCalibreColor(cal), opacity: 0.4 },
+          itemStyle: { color: getCalibreColor(cal), opacity: 0.35 },
         })),
-        large: true,
-        largeThreshold: 2000,
-        emphasis: {
-          itemStyle: { opacity: 1, borderColor: '#fff', borderWidth: 1 },
-          scale: 3,
-        },
+        large: true, largeThreshold: 2000,
+        emphasis: { itemStyle: { opacity: 1, borderColor: '#fff', borderWidth: 1 }, scale: 4 },
+        markArea: { silent: true, data: markAreaData },
       })
+
+      // Moving average
+      if (weightMovingAvg.length > 0) {
+        series.push({
+          name: 'Peso promedio',
+          type: 'line',
+          xAxisIndex: 0, yAxisIndex: yIdx,
+          data: weightMovingAvg,
+          smooth: true,
+          lineStyle: { width: 2, color: '#f8fafc' },
+          itemStyle: { color: '#f8fafc' },
+          showSymbol: false,
+          z: 5,
+        })
+      }
       yIdx++
     }
 
-    // ── Eje Y derecho 1: P0% ──
+    // ── P0% ──
     if (layers.p0pct && p0PctSeries.length > 0) {
       yAxes.push({
-        type: 'value',
-        name: 'P0%',
-        position: 'right',
+        type: 'value', name: 'P0%', position: 'right', gridIndex: 0,
         axisLabel: { formatter: (v: number) => `${Math.round(v)}%`, fontSize: 10, color: '#ef4444' },
         nameTextStyle: { fontSize: 10, color: '#ef4444' },
-        min: 0,
-        max: (v: any) => Math.ceil(Math.max(v.max * 1.1, 5)),
+        min: 0, max: (v: any) => Math.ceil(Math.max(v.max * 1.1, 5)),
         splitLine: { show: false },
       })
       series.push({
         name: 'P0% (5min)',
         type: 'line',
-        yAxisIndex: yIdx,
+        xAxisIndex: 0, yAxisIndex: yIdx,
         data: p0PctSeries,
         smooth: true,
         lineStyle: { width: 2, color: '#ef4444' },
         itemStyle: { color: '#ef4444' },
         showSymbol: false,
-        areaStyle: { color: 'rgba(239,68,68,0.06)' },
+        areaStyle: { color: 'rgba(239,68,68,0.05)' },
       })
       yIdx++
     }
 
-    // ── Errores P0 como markPoints sobre el eje de pesos o propio ──
+    // ── Errores P0 como markLines verticales ──
     if (layers.errors && errorSeries.length > 0) {
-      const errYIdx = layers.weights ? 0 : yIdx
-      if (!layers.weights) {
-        yAxes.push({
-          type: 'value',
-          name: 'Piezas',
-          position: 'left',
-          axisLabel: { fontSize: 10, color: '#94a3b8' },
-          nameTextStyle: { fontSize: 10, color: '#94a3b8' },
-          splitLine: { lineStyle: { color: 'rgba(148,163,184,0.1)' } },
-        })
-        yIdx++
+      const errMarkLines = errorSeries.map(([ts, , err]) => ({
+        xAxis: ts,
+        lineStyle: { color: getErrorColor(err), width: 1, type: 'solid' as const, opacity: 0.6 },
+        label: { show: false },
+      }))
+
+      // Agregar markLine al scatter de peso (o crear serie invisible)
+      if (series.length > 0) {
+        const targetSeries = series[0]
+        targetSeries.markLine = {
+          silent: false,
+          symbol: 'none',
+          data: errMarkLines,
+          tooltip: {
+            formatter: (params: any) => {
+              const ts = params.data.xAxis
+              const match = errorSeries.find(([t]) => t === ts)
+              const time = new Date(ts).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+              return `<b style="color:${params.data.lineStyle.color}">⚠ Error P0</b><br/>⏱ ${time}<br/>${match ? match[2] : '?'} (${match ? match[1] : '?'} pz)`
+            },
+          },
+        }
       }
-      series.push({
-        name: 'Errores P0',
-        type: 'scatter',
-        yAxisIndex: errYIdx,
-        symbolSize: (val: number[]) => Math.max(4, Math.min(12, (val[1] ?? 1) * 2)),
-        data: errorSeries.map(([ts, pcs, err]) => ({
-          value: [ts, layers.weights ? stats.avgWeight : pcs],
-          itemStyle: { color: getErrorColor(err), opacity: 0.85, borderColor: '#fff', borderWidth: 0.5 },
-          _error: err,
-          _pieces: pcs,
-        })),
-        z: 10,
-      })
     }
 
-    // ── Eje Y derecho 2: Producción ──
-    if (layers.production && productionSeries.length > 0) {
-      yAxes.push({
-        type: 'value',
-        name: 'Pzas/min',
-        position: 'right',
-        offset: layers.p0pct ? 55 : 0,
-        axisLabel: { fontSize: 10, color: '#10b981' },
-        nameTextStyle: { fontSize: 10, color: '#10b981' },
+    // ── Gap markers (paradas/colación) ──
+    if (gaps.length > 0 && series.length > 0) {
+      const gapAreas = gaps.map((g) => ([
+        { xAxis: g.start, itemStyle: { color: 'rgba(100,116,139,0.08)' } },
+        { xAxis: g.end },
+      ]))
+      // Agregar al primer eje X
+      if (!series[0].markArea) series[0].markArea = { silent: true, data: [] }
+      series[0].markArea.data.push(...gapAreas)
+    }
+
+    // ── Grid inferior: Producción ──
+    if (useDualGrid) {
+      grids.push({
+        left: 55, right: 60,
+        top: '75%', bottom: 55,
+      })
+      xAxes.push({
+        type: 'time', gridIndex: 1,
+        axisLabel: { show: false },
+        axisLine: { lineStyle: { color: 'rgba(100,116,139,0.2)' } },
         splitLine: { show: false },
+      })
+      yAxes.push({
+        type: 'value', name: 'pz/min', position: 'left', gridIndex: 1,
+        axisLabel: { fontSize: 9, color: '#10b981' },
+        nameTextStyle: { fontSize: 9, color: '#10b981' },
+        splitLine: { lineStyle: { color: 'rgba(148,163,184,0.06)' } },
       })
       series.push({
         name: 'Producción/min',
-        type: 'line',
-        yAxisIndex: yIdx,
+        type: 'bar',
+        xAxisIndex: 1, yAxisIndex: yIdx,
         data: productionSeries,
-        smooth: true,
-        lineStyle: { width: 1.5, color: '#10b981' },
-        itemStyle: { color: '#10b981' },
-        showSymbol: false,
-        areaStyle: { color: 'rgba(16,185,129,0.06)' },
+        barMaxWidth: 4,
+        itemStyle: { color: 'rgba(16,185,129,0.5)', borderRadius: [1, 1, 0, 0] },
+        emphasis: { itemStyle: { color: '#10b981' } },
       })
       yIdx++
     }
 
     if (yAxes.length === 0) {
-      yAxes.push({ type: 'value', name: '', position: 'left' })
+      yAxes.push({ type: 'value', name: '', position: 'left', gridIndex: 0 })
     }
 
     return {
       tooltip: {
         trigger: 'item',
         backgroundColor: 'rgba(15,23,42,0.95)',
-        borderColor: 'rgba(148,163,184,0.2)',
+        borderColor: 'rgba(148,163,184,0.15)',
+        borderWidth: 1,
         textStyle: { fontSize: 11, color: '#e2e8f0' },
         formatter: (params: any) => {
           const d = new Date(params.value[0])
           const time = d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
           const sn = params.seriesName
 
-          if (sn.includes('Peso')) {
+          if (sn.includes('Peso pieza')) {
             const w = params.value[1]
             const cal = weightSeries.find(([ts]) => ts === params.value[0])?.[2] ?? '?'
-            return `<b style="color:${params.color}">● ${cal}</b><br/>` +
-              `⏱ ${time}<br/>` +
-              `⚖ <b>${Math.round(w).toLocaleString('es-CL')}g</b> (${(w / 453.592).toFixed(1)} lb)`
+            return `<b style="color:${params.color}">● ${cal}</b><br/>⏱ ${time}<br/>⚖ <b>${w.toLocaleString('es-CL')}g</b> (${(w / 453.592).toFixed(1)} lb)`
+          }
+          if (sn.includes('promedio')) {
+            return `<b style="color:#f8fafc">━ Promedio móvil</b><br/>⏱ ${time}<br/>⚖ <b>${params.value[1].toLocaleString('es-CL')}g</b>`
           }
           if (sn.includes('P0%')) {
-            return `<b style="color:#ef4444">● P0%</b><br/>` +
-              `⏱ ${time}<br/>` +
-              `📊 <b>${params.value[1]}%</b> (ventana 5 min)`
-          }
-          if (sn.includes('Error')) {
-            const err = params.data._error ?? '?'
-            const pcs = params.data._pieces ?? params.value[1]
-            return `<b style="color:${params.color}">● Error P0</b><br/>` +
-              `⏱ ${time}<br/>` +
-              `⚠ <b>${err}</b><br/>` +
-              `📦 ${pcs} pz`
+            return `<b style="color:#ef4444">● P0%</b><br/>⏱ ${time}<br/>📊 <b>${params.value[1]}%</b> (ventana 5 min)`
           }
           if (sn.includes('Producción')) {
-            return `<b style="color:#10b981">● Producción</b><br/>` +
-              `⏱ ${time}<br/>` +
-              `🏭 <b>${params.value[1]}</b> pz/min`
+            return `<b style="color:#10b981">▊ Producción</b><br/>⏱ ${time}<br/>🏭 <b>${params.value[1]}</b> pz/min`
           }
           return `${sn}: ${params.value[1]}`
         },
       },
-      grid: { left: 55, right: layers.p0pct && layers.production ? 120 : 60, top: 35, bottom: 75 },
-      xAxis: {
-        type: 'time',
-        axisLabel: {
-          formatter: (v: number) => new Date(v).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }),
-          fontSize: 10,
-          color: '#94a3b8',
-        },
-        splitLine: { lineStyle: { color: 'rgba(148,163,184,0.05)' } },
+      axisPointer: {
+        link: [{ xAxisIndex: 'all' }],
+        label: { backgroundColor: '#1e293b' },
       },
+      grid: grids,
+      xAxis: xAxes,
       yAxis: yAxes,
       series,
       dataZoom: [
         {
           type: 'slider',
-          xAxisIndex: 0,
-          start: 0,
-          end: 100,
-          height: 20,
-          bottom: 8,
-          borderColor: 'rgba(148,163,184,0.15)',
-          fillerColor: 'rgba(59,130,246,0.12)',
+          xAxisIndex: useDualGrid ? [0, 1] : [0],
+          start: zoomRange.start, end: zoomRange.end,
+          height: 18, bottom: 6,
+          borderColor: 'rgba(148,163,184,0.1)',
+          fillerColor: 'rgba(59,130,246,0.1)',
           handleStyle: { color: '#3b82f6', borderColor: '#3b82f6' },
-          textStyle: { fontSize: 9, color: '#94a3b8' },
+          textStyle: { fontSize: 9, color: '#64748b' },
           dataBackground: {
-            lineStyle: { color: 'rgba(59,130,246,0.3)' },
-            areaStyle: { color: 'rgba(59,130,246,0.05)' },
+            lineStyle: { color: 'rgba(59,130,246,0.2)', width: 1 },
+            areaStyle: { color: 'rgba(59,130,246,0.03)' },
+          },
+          selectedDataBackground: {
+            lineStyle: { color: '#3b82f6' },
+            areaStyle: { color: 'rgba(59,130,246,0.08)' },
           },
         },
-        { type: 'inside', xAxisIndex: 0 },
+        { type: 'inside', xAxisIndex: useDualGrid ? [0, 1] : [0] },
       ],
       legend: { show: false },
       animation: false,
     }
-  }, [layers, weightSeries, p0PctSeries, errorSeries, productionSeries, stats.avgWeight])
+  }, [layers, weightSeries, weightMovingAvg, p0PctSeries, errorSeries, productionSeries, gaps, useDualGrid, zoomRange])
 
   if (records.length === 0) return null
 
@@ -395,26 +498,42 @@ export function GraderTimelineChart({ records, shiftId, dateKey }: Props) {
             <Activity className="h-4 w-4 text-purple-500" />
             Timeline segundo a segundo
           </CardTitle>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
             {stats.withWeight > 0 && (
               <Badge variant="outline" className="text-[10px] gap-1">
-                ⚖ {stats.avgWeight.toLocaleString('es-CL')}g prom
+                ⚖ {stats.avgWeight.toLocaleString('es-CL')}g
               </Badge>
             )}
             {stats.withWeight > 0 && (
-              <Badge variant="outline" className="text-[10px] gap-1">
+              <Badge variant="outline" className="text-[10px]">
                 {stats.minWeight.toLocaleString('es-CL')}–{stats.maxWeight.toLocaleString('es-CL')}g
               </Badge>
             )}
             <Badge variant="outline" className={cn('text-[10px]', stats.p0Count > 0 ? 'text-red-400' : '')}>
               {stats.p0Count.toLocaleString('es-CL')} P0
             </Badge>
+            {gaps.length > 0 && (
+              <Badge variant="outline" className="text-[10px] text-amber-400 gap-0.5">
+                <Coffee className="h-2.5 w-2.5" />{gaps.length} pausa{gaps.length > 1 ? 's' : ''}
+              </Badge>
+            )}
           </div>
         </div>
-        <p className="text-xs text-muted-foreground">
-          {records.length.toLocaleString('es-CL')} registros · {shiftId} · {dateKey} · Scroll para zoom, arrastra para panear
-        </p>
-        <div className="flex items-center gap-1.5 flex-wrap mt-2">
+
+        {/* Sub-header: registro count + zoom stats */}
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">
+            {records.length.toLocaleString('es-CL')} reg · {shiftId} · {dateKey}
+          </p>
+          {visibleStats && (zoomRange.start > 0 || zoomRange.end < 100) && (
+            <p className="text-[10px] text-sky-400">
+              Zoom: {visibleStats.count.toLocaleString('es-CL')} pts · {visibleStats.avg.toLocaleString('es-CL')}g prom · {visibleStats.spanHours}h
+            </p>
+          )}
+        </div>
+
+        {/* Layer toggles */}
+        <div className="flex items-center gap-1.5 flex-wrap mt-1">
           {(Object.keys(LAYER_LABELS) as LayerKey[]).map((key) => (
             <button
               key={key}
@@ -436,28 +555,32 @@ export function GraderTimelineChart({ records, shiftId, dateKey }: Props) {
             onClick={() => setShowLegend((v) => !v)}
             className="px-2 py-1 rounded-md text-[10px] font-medium border border-border text-muted-foreground hover:bg-muted/50 ml-auto"
           >
-            {showLegend ? 'Ocultar leyenda' : 'Leyenda colores'}
+            {showLegend ? 'Ocultar leyenda' : 'Leyenda'}
           </button>
         </div>
+
         {showLegend && (
-          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 pt-2 border-t border-border/50">
+          <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-2 pt-2 border-t border-border/30 text-[10px]">
             {layers.weights && stats.uniqueCalibres.length > 0 && (
-              <div className="flex flex-wrap gap-x-3 gap-y-0.5">
-                <span className="text-[10px] text-muted-foreground font-medium">Calibres:</span>
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5">
+                <span className="text-muted-foreground font-semibold">Calibres:</span>
                 {stats.uniqueCalibres.map((cal) => (
-                  <span key={cal} className="flex items-center gap-1 text-[10px]">
-                    <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: getCalibreColor(cal) }} />
+                  <span key={cal} className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: getCalibreColor(cal) }} />
                     {cal}
                   </span>
                 ))}
+                <span className="flex items-center gap-1 text-muted-foreground">
+                  <span className="w-6 h-[2px] bg-white/80 rounded" />prom
+                </span>
               </div>
             )}
             {layers.errors && stats.uniqueErrors.length > 0 && (
-              <div className="flex flex-wrap gap-x-3 gap-y-0.5">
-                <span className="text-[10px] text-muted-foreground font-medium">Errores:</span>
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5">
+                <span className="text-muted-foreground font-semibold">Errores:</span>
                 {stats.uniqueErrors.map((err) => (
-                  <span key={err} className="flex items-center gap-1 text-[10px]">
-                    <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: getErrorColor(err) }} />
+                  <span key={err} className="flex items-center gap-1">
+                    <span className="w-2 h-0.5 rounded" style={{ backgroundColor: getErrorColor(err) }} />
                     {err}
                   </span>
                 ))}
@@ -467,12 +590,13 @@ export function GraderTimelineChart({ records, shiftId, dateKey }: Props) {
         )}
       </CardHeader>
       <CardContent>
-        <div className="h-[340px] lg:h-[440px]">
+        <div className={cn('w-full', useDualGrid ? 'h-[420px] lg:h-[520px]' : 'h-[340px] lg:h-[440px]')}>
           <ReactECharts
             option={option}
             style={{ height: '100%', width: '100%' }}
             opts={{ renderer: 'canvas' }}
             notMerge
+            onEvents={{ datazoom: handleDataZoom }}
           />
         </div>
       </CardContent>
