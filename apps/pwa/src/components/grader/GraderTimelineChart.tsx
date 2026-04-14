@@ -270,7 +270,7 @@ export function GraderTimelineChart({ records, shiftId, dateKey }: Props) {
     // ── Grid principal (peso + P0%) ──
     grids.push({
       left: 55, right: 60, top: 30,
-      bottom: useDualGrid ? '32%' : 70,
+      bottom: useDualGrid ? '38%' : 70,
     })
     xAxes.push({
       type: 'time',
@@ -438,7 +438,7 @@ export function GraderTimelineChart({ records, shiftId, dateKey }: Props) {
     if (useDualGrid) {
       grids.push({
         left: 55, right: 60,
-        top: '75%', bottom: 55,
+        top: '68%', bottom: 55,
       })
       xAxes.push({
         type: 'time', gridIndex: 1,
@@ -465,8 +465,8 @@ export function GraderTimelineChart({ records, shiftId, dateKey }: Props) {
           color: {
             type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
             colorStops: [
-              { offset: 0, color: 'rgba(16,185,129,0.3)' },
-              { offset: 1, color: 'rgba(16,185,129,0.02)' },
+              { offset: 0, color: 'rgba(16,185,129,0.5)' },
+              { offset: 1, color: 'rgba(16,185,129,0.05)' },
             ],
           },
         },

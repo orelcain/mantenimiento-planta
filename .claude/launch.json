@@ -3,11 +3,10 @@
   "configurations": [
     {
       "name": "pwa-dev",
-      "runtimeExecutable": "npm",
+      "runtimeExecutable": "pnpm",
       "runtimeArgs": ["run", "dev"],
       "cwd": "apps/pwa",
-      "port": 5173,
-      "autoPort": true
+      "port": 5173
     },
     {
       "name": "propuestas-html",
