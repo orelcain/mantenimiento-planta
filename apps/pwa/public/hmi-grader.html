@@ -11,22 +11,22 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 /* ═══════════════════════════════════════════
-   PALETA EXACTA — Brief StaticGrader HMI
-   bg-global:       #1A5276
-   bg-titlebar-sg:  #2980B9
-   bg-buttons:      #1F618D
+   PALETA EXACTA — StaticGrader HMI
+   bg-hmi:          #1A5276   ← fondo global HMI
+   bg-pocket:       #0A1C36   ← pockets (OSCURO, contraste con fondo)
+   bg-titlebar-sg:  #2980B9   ← barra StaticGrader
    bg-menubar:      #1F618D
-   border-pockets:  #F1C40F
+   bg-buttons:      #2E86C1   ← botones azul medio
+   border-pockets:  #F1C40F   ← amarillo
    border-under:    #FFFFFF
-   border-weight:   #F1C40F
-   bg-weight:       #F0F0F0
-   bg-log-sel:      #2980B9
+   bg-log-sel:      #000099   ← navy oscuro Windows selection
    btn-border:      #5D9CEC
 ═══════════════════════════════════════════ */
 
+/* R30 — body bg más oscuro para contrastar la ventana RC */
 html, body {
   min-height: 100vh;
-  background: #1a1a2e;
+  background: #0d0d0d;
   font-family: Arial, sans-serif;
   display: flex;
   align-items: center;
@@ -36,57 +36,63 @@ html, body {
 
 /* ══════════════════════════════════════
    VENTANA RC (simula cliente VNC/RDP)
+   640×480 = resolución estándar VNC
 ══════════════════════════════════════ */
 #rc-window {
   width: 640px;
   height: 480px;
   display: flex;
   flex-direction: column;
-  box-shadow: 2px 2px 12px rgba(0,0,0,0.8);
+  box-shadow: 3px 3px 16px rgba(0,0,0,0.9);
   overflow: hidden;
 }
 
 /* ── Barra de título Windows ── */
+/* R21 — titlebar más cercana al original: gris oscuro Windows clásico */
 .win-titlebar {
   height: 22px;
-  background: #2D2D2D;
+  background: linear-gradient(to bottom, #3A3A5C 0%, #2A2A48 100%);
   display: flex;
   align-items: center;
-  padding: 0 4px 0 6px;
-  gap: 5px;
+  padding: 0 2px 0 6px;
+  gap: 4px;
   flex-shrink: 0;
   user-select: none;
   border-bottom: 1px solid #111;
 }
-.win-title-icon { font-size: 12px; }
+.win-title-icon { font-size: 11px; line-height: 1; }
 .win-title-text {
   flex: 1;
   font-size: 11px;
   color: #ffffff;
   font-family: 'Segoe UI', Arial, sans-serif;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.2px;
+  font-weight: bold;
 }
-.win-controls { display: flex; gap: 1px; }
+/* R22 — controles Windows más realistas */
+.win-controls { display: flex; gap: 2px; }
 .win-btn {
-  width: 22px;
+  width: 20px;
   height: 16px;
-  background: #555;
-  border: none;
+  background: #5A5A7A;
+  border: 1px solid #888;
   color: #fff;
-  font-size: 9px;
+  font-size: 8px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: Arial, sans-serif;
+  font-family: 'Marlett', Arial, sans-serif;
   border-radius: 0;
   outline: none;
   line-height: 1;
+  font-weight: bold;
 }
-.win-btn:hover { background: #777; }
+.win-btn:hover { background: #7070A0; }
 .win-btn.close:hover { background: #c0392b; }
 
 /* ── Barra de menú (Connection / Mode / Help) ── */
+/* R23 — menubar idéntico al original: bg azul medio, items con padding */
 .menubar {
   height: 20px;
   background: #1F618D;
@@ -107,11 +113,12 @@ html, body {
   align-items: center;
   font-family: Arial, sans-serif;
   white-space: nowrap;
+  letter-spacing: 0.1px;
 }
-.menubar span:hover { background: rgba(255,255,255,0.18); }
+.menubar span:hover { background: rgba(255,255,255,0.2); }
 
 /* ══════════════════════════════════════
-   PANTALLA HMI — todo en #1A5276
+   PANTALLA HMI — fondo #1A5276
 ══════════════════════════════════════ */
 #screen {
   background: #1A5276;
@@ -124,51 +131,54 @@ html, body {
 }
 
 /* ══════════════════════════════════════
-   HEADER — fecha/hora izquierda · indicadores derecha
-   Fondo: #1A5276 (no hay banda separada)
+   HEADER — fecha/hora · indicadores
+   R11 — padding ajustado, line-height compacto
 ══════════════════════════════════════ */
 .hdr {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 3px 6px 3px 8px;
+  padding: 4px 8px 3px 8px;
   background: #1A5276;
   flex-shrink: 0;
 }
 
+/* R12 — hdr-left: Courier 11px, line-height 1.45 */
 .hdr-left {
   font-family: 'Courier New', monospace;
   font-size: 11px;
-  line-height: 1.55;
+  line-height: 1.45;
   color: #ffffff;
 }
 
-/* Grid 2×2 de indicadores */
+/* R29 — hdr-right: gap 4px entre indicadores */
 .hdr-right {
   display: grid;
   grid-template-columns: auto auto;
-  gap: 3px;
+  gap: 4px;
   align-items: center;
 }
 
-/* UNDER<- : fondo azul, borde BLANCO, texto BLANCO */
+/* R7-R8 — UNDER<- : bg igual al fondo HMI, borde BLANCO grueso,
+   texto blanco 12px bold, centrado perfectamente */
 .ind {
   background: #1A5276;
   border: 2px solid #ffffff;
   color: #ffffff;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: bold;
-  width: 80px;
-  height: 28px;
+  width: 82px;
+  height: 27px;
   text-align: center;
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: Arial, sans-serif;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.2px;
+  flex-shrink: 0;
 }
 
-/* Display de peso — ÚNICO elemento con fondo claro */
+/* R9 — Display de peso: fondo claro #F0F0F0, borde amarillo */
 .ind.wt {
   background: #F0F0F0;
   border: 2px solid #F1C40F;
@@ -180,43 +190,45 @@ html, body {
   justify-content: center;
   letter-spacing: 0.3px;
 }
-.ind.wt .unit { font-size: 10px; margin-left: 2px; }
+.ind.wt .unit { font-size: 10px; margin-left: 1px; }
 
 /* ══════════════════════════════════════
    BARRA TÍTULO "StaticGrader"
-   Full-width, #2980B9, 28px, 16px bold
+   R13 — full-width, #2980B9, 26px, 15px bold
 ══════════════════════════════════════ */
 .title-bar {
   background: #2980B9;
   color: #ffffff;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: bold;
-  height: 28px;
+  height: 26px;
   padding: 0 0 0 8px;
   display: flex;
   align-items: center;
   flex-shrink: 0;
   font-family: Arial, sans-serif;
   width: 100%;
+  letter-spacing: 0.2px;
 }
 
 /* ══════════════════════════════════════
    STATUS "7: CONTRASTACION"
-   Fondo: #1A5276, 11px
+   R14 — padding compacto, 11px
 ══════════════════════════════════════ */
 .status {
   background: #1A5276;
   color: #ffffff;
   font-size: 11px;
-  padding: 3px 0 3px 8px;
+  padding: 2px 0 2px 8px;
   flex-shrink: 0;
   font-family: Arial, sans-serif;
+  letter-spacing: 0.1px;
 }
 
 /* ══════════════════════════════════════
    GRILLA DE BOLSILLOS (pocket grid)
    12 bolsillos: 2 filas × 6 columnas
-   padding: 4px, gap: 3px
+   R16 — gap: 3px, padding: 4px 6px
 ══════════════════════════════════════ */
 .gate-grid {
   flex: 1;
@@ -236,7 +248,7 @@ html, body {
   justify-content: center;
 }
 
-/* Tamaño de bolsillo: 98×92px — 6×98+5×3=603px de 628px inner (96%) */
+/* R1 (CRÍTICO) + R17 — pockets 98×92px, cursor pointer */
 .gate {
   width: 98px;
   height: 92px;
@@ -245,33 +257,35 @@ html, body {
   flex-shrink: 0;
 }
 .gate svg { display: block; width: 100%; height: 100%; }
-/* Hover: leve darkening del fill */
-.gate:hover path   { fill: #154360; }
-.gate:active path  { fill: #0d2f50; }
 
-/* Número: top-right interior, 11px, #F1C40F — 4px from stroke interior */
+/* R2-R3 — hover/active sobre pocket fill oscuro */
+.gate:hover path   { fill: #0F2640; }
+.gate:active path  { fill: #061018; }
+
+/* R18-R19 — gate number: 10px, top:3px right:5px */
 .gn {
   position: absolute;
-  top: 4px;
-  right: 6px;
-  font-size: 11px;
+  top: 3px;
+  right: 5px;
+  font-size: 10px;
   font-weight: bold;
   color: #F1C40F;
   pointer-events: none;
   font-family: Arial, sans-serif;
   line-height: 1;
+  letter-spacing: 0.2px;
 }
 
 /* ══════════════════════════════════════
    LOG CONSOLE
-   fondo blanco, texto negro
-   altura fija 70px, overflow scroll
-   línea sel: #2980B9 + texto blanco
+   R3 — highlight: navy oscuro #000099
+   R20 — border-top para separar log del grid
 ══════════════════════════════════════ */
 .log {
   background: #ffffff;
-  border: 1px solid #999999;
-  height: 70px;
+  border-top: 1px solid #888;
+  border-bottom: 0;
+  height: 68px;
   overflow-y: auto;
   flex-shrink: 0;
   padding: 2px 4px;
@@ -282,13 +296,14 @@ html, body {
   flex-direction: column;
   justify-content: flex-end;
 }
-.ll { padding: 1px 2px; background: #ffffff; color: #000000; white-space: nowrap; line-height: 1.35; }
-.ll.hl { background: #2980B9; color: #ffffff; }
+/* R3 (CRÍTICO) — highlight: navy Windows (#000099) no el azul claro */
+.ll { padding: 1px 2px; background: #ffffff; color: #000000; white-space: nowrap; line-height: 1.3; }
+.ll.hl { background: #000099; color: #ffffff; }
 
 /* ══════════════════════════════════════
    BOTONES FOOTER
-   height: 46px, bg: #2E86C1 (azul medio),
-   border: 1px solid #5D9CEC, text 12px bold
+   R4 (CRÍTICO) — height: 60px (+30% vs 46px)
+   R24-R25 — bg: #2E86C1, border top: separador
 ══════════════════════════════════════ */
 .btn-bar {
   display: flex;
@@ -296,10 +311,12 @@ html, body {
   flex-shrink: 0;
   background: #1A5276;
   padding: 2px 0 0;
+  border-top: 1px solid #154360;
 }
+/* R4 — 60px height */
 .btn {
   flex: 1;
-  height: 46px;
+  height: 60px;
   background: #2E86C1;
   border: 1px solid #5D9CEC;
   border-radius: 0;
@@ -364,9 +381,9 @@ html, body {
     <span class="win-title-icon">🖥</span>
     <span class="win-title-text">RC 172.27.12.12</span>
     <div class="win-controls">
-      <button class="win-btn">—</button>
-      <button class="win-btn">□</button>
-      <button class="win-btn close">✕</button>
+      <button class="win-btn">&#8212;</button>
+      <button class="win-btn">&#9633;</button>
+      <button class="win-btn close">&#10005;</button>
     </div>
   </div>
 
@@ -387,6 +404,7 @@ html, body {
         <div id="td">18:44:00</div>
         <div id="cd">1234</div>
       </div>
+      <!-- R10 — UNDER centrados: display:flex + align/justify center -->
       <div class="hdr-right">
         <div class="ind">UNDER&lt;-</div>
         <div class="ind">UNDER&lt;-</div>
@@ -396,9 +414,11 @@ html, body {
     </div>
 
     <!-- TÍTULO -->
+    <!-- R13 — 15px bold, height 26px -->
     <div class="title-bar">StaticGrader</div>
 
     <!-- STATUS -->
+    <!-- R14 — padding 2px arriba/abajo -->
     <div class="status" id="sl">7: CONTRASTACION (17:36:17)</div>
 
     <!-- BOLSILLOS -->
@@ -415,6 +435,7 @@ html, body {
     </div>
 
     <!-- BOTONES -->
+    <!-- R4 — 60px height por CSS -->
     <div class="btn-bar">
       <button class="btn" onclick="sp('pp')">Cambiar programa</button>
       <button class="btn" onclick="sp('pm')">Modo presentación</button>
@@ -444,26 +465,27 @@ html, body {
 
 <script>
 /* ══════════════════════════════════════════════════
-   POCKET SVG
-   ViewBox: 0 0 80 75
-   Muesca escalón-L en esquina SUPERIOR-IZQUIERDA:
-     NW=13, NH=13 (más pequeño según brief: 12-15px)
-   Esquinas exteriores redondeadas R=6
-   Fill: #1A5276 (igual al fondo)
-   Stroke: #F1C40F 2px
+   POCKET SVG — ViewBox 0 0 98 92
+   R1 (CRÍTICO): fill="#0A1C36" — dark navy, distinto del fondo #1A5276
+   Muesca escalón-L en esquina SUPERIOR-IZQUIERDA: NW=16, NH=15
+   Esquinas exteriores redondeadas R=7
+   stroke: #F1C40F 2px, crispEdges + non-scaling-stroke
 
-   Path (clockwise):
+   Path (clockwise desde vértice del escalón):
    M NW,1 → top-right(R) → bottom-right(R) →
-   bottom-left(R) → up-left → L NW,NH → Z (vertical notch)
+   bottom-left(R) → L 1,NH → L NW,NH → Z
 ══════════════════════════════════════════════════ */
 const GW=98, GH=92, NW=16, NH=15, R=7;
 
-function pp() {
+/* R5 — fill pocket: DARK NAVY #0A1C36 (contraste visible contra bg #1A5276) */
+const FILL = '#0A1C36';
+
+function pocketPath() {
   return [
     `M ${NW},1`,
-    `L ${GW-R},1`,     `Q ${GW-1},1 ${GW-1},${R+1}`,
+    `L ${GW-R},1`,       `Q ${GW-1},1 ${GW-1},${R+1}`,
     `L ${GW-1},${GH-R}`, `Q ${GW-1},${GH-1} ${GW-R},${GH-1}`,
-    `L ${R},${GH-1}`,   `Q 1,${GH-1} 1,${GH-R}`,
+    `L ${R},${GH-1}`,    `Q 1,${GH-1} 1,${GH-R}`,
     `L 1,${NH}`,
     `L ${NW},${NH}`,
     'Z'
@@ -473,43 +495,51 @@ function pp() {
 function buildGates() {
   const ro = document.getElementById('ro');
   const re = document.getElementById('re');
+  const path = pocketPath();
   for (let g = 1; g <= 12; g++) {
     const d = document.createElement('div');
     d.className = 'gate';
     d.innerHTML =
       `<svg viewBox="0 0 ${GW} ${GH}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">` +
-        `<path d="${pp()}" fill="#1A5276" stroke="#F1C40F" stroke-width="2" stroke-linejoin="miter" stroke-miterlimit="10" vector-effect="non-scaling-stroke" shape-rendering="crispEdges"/>` +
+        `<path d="${path}" fill="${FILL}" stroke="#F1C40F" stroke-width="2"` +
+        ` stroke-linejoin="miter" stroke-miterlimit="10"` +
+        ` vector-effect="non-scaling-stroke" shape-rendering="crispEdges"/>` +
       `</svg>` +
       `<span class="gn">${g}</span>`;
-    d.addEventListener('click', () => al(`Pocket ${g}`));
+    d.addEventListener('click', () => addLog(`Pocket ${g}`));
     (g % 2 === 1 ? ro : re).appendChild(d);
   }
 }
 buildGates();
 
-/* Reloj */
+/* Reloj en tiempo real */
 function pad(n) { return String(n).padStart(2,'0'); }
 function tick() {
   const n = new Date();
-  document.getElementById('dd').textContent = `${pad(n.getDate())}/${pad(n.getMonth()+1)}/${n.getFullYear()}`;
-  document.getElementById('td').textContent = `${pad(n.getHours())}:${pad(n.getMinutes())}:${pad(n.getSeconds())}`;
+  document.getElementById('dd').textContent =
+    `${pad(n.getDate())}/${pad(n.getMonth()+1)}/${n.getFullYear()}`;
+  document.getElementById('td').textContent =
+    `${pad(n.getHours())}:${pad(n.getMinutes())}:${pad(n.getSeconds())}`;
 }
 tick(); setInterval(tick, 1000);
 
-/* Navegación */
+/* Navegación entre paneles */
 function sp(id) { document.getElementById(id).classList.add('active'); }
 function cp(id) { document.getElementById(id).classList.remove('active'); }
 
-/* Log */
-function al(msg) {
-  const a = document.getElementById('log');
-  a.querySelectorAll('.hl').forEach(e => e.classList.remove('hl'));
+/* Log — nueva línea siempre resaltada en navy */
+function addLog(msg) {
+  const log = document.getElementById('log');
+  log.querySelectorAll('.hl').forEach(e => e.classList.remove('hl'));
   const l = document.createElement('div');
-  l.className = 'll hl'; l.textContent = msg;
-  a.appendChild(l);
-  while (a.children.length > 50) a.removeChild(a.firstChild);
-  a.scrollTop = a.scrollHeight;
+  l.className = 'll hl';
+  l.textContent = msg;
+  log.appendChild(l);
+  while (log.children.length > 50) log.removeChild(log.firstChild);
+  log.scrollTop = log.scrollHeight;
 }
+/* alias para botones inline */
+function al(msg) { addLog(msg); }
 </script>
 </body>
 </html>
