@@ -40,6 +40,14 @@ html, body {
   justify-content: center;
   overflow: auto;
 }
+/* Cuando está embebido en iframe (HmiGraderPage del Learning Hub),
+   alinear al top-left con padding para evitar recortes por centrado flex */
+html.in-iframe, html.in-iframe body {
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 12px;
+  min-height: 0;
+}
 
 /* ══════════════════════════════════════
    VENTANA RC — 640×480px VNC estándar
@@ -997,6 +1005,11 @@ document.querySelectorAll('.fkey').forEach((fk, i) => {
     logEventToParent('fkey-press', 'F' + (i + 1));
   });
 });
+
+/* Detectar si estamos en iframe y aplicar clase para layout adaptado */
+if (window.parent !== window) {
+  document.documentElement.classList.add('in-iframe');
+}
 
 /* Notificar ready al wrapper */
 notifyReady();
