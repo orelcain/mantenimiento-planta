@@ -179,18 +179,19 @@ html, body {
 .ind.wt {
   background: #1A5276;
   border: 2px solid #F1C40F;
+  border-radius: 10px;
   color: #ffffff;
-  font-size: 22px;
+  font-size: 26px;
   font-weight: bold;
-  width: 140px;
-  height: 38px;
+  width: 150px;
+  height: 44px;
   font-family: 'Courier New', monospace;
   justify-content: center;
   letter-spacing: 0.5px;
   position: relative;
 }
-.ind.wt .unit { font-size: 14px; margin-left: 2px; color: #ffffff; }
-.ind.wt .sup { position: absolute; top: 1px; left: 5px; font-size: 11px; color: #ffffff; font-weight: normal; font-family: Arial, sans-serif; }
+.ind.wt .unit { font-size: 16px; margin-left: 3px; color: #ffffff; }
+.ind.wt .sup { position: absolute; top: 2px; left: 8px; font-size: 12px; color: #ffffff; font-weight: normal; font-family: Arial, sans-serif; }
 
 /* ══════════════════════════════════════
    V4: TÍTULO "StaticGrader" — TAB PARCIAL
@@ -236,7 +237,7 @@ html, body {
 ══════════════════════════════════════ */
 .gate-grid {
   flex: 1;
-  background: #1A5276;
+  background: #143965;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -265,11 +266,11 @@ html, body {
 /* V13: gate number 10px, top:3px right:5px */
 .gn {
   position: absolute;
-  top: 2px;
+  top: 3px;
   right: 5px;
   font-size: 16px;
   font-weight: bold;
-  color: #F1C40F;
+  color: #ffffff;
   pointer-events: none;
   font-family: Arial, sans-serif;
   line-height: 1;
@@ -285,7 +286,8 @@ html, body {
   background: #ffffff;
   border: 2px solid #2980B9;
   height: 88px;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   flex-shrink: 0;
   padding: 5px 8px;
   margin: 2px 6px;
@@ -471,7 +473,7 @@ html, body {
    Fill: #0A1C36 (dark navy, visible vs bg #1A5276) ✓
    Stroke: #F1C40F 2px, crispEdges + non-scaling-stroke
 ══════════════════════════════════════════════════ */
-const GW = 116, GH = 108, NW = 24, NH = 20, R = 8;
+const GW = 116, GH = 108, NW = 32, NH = 24, R = 8;
 const FILL = '#143965';
 
 function pocketPath() {
