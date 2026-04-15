@@ -14,7 +14,7 @@
  * Toda la data viene del summary guardado en Firestore — no re-parsea Excel.
  */
 
-import { useMemo, useState, useCallback, useRef } from 'react'
+import { useMemo, useState, useCallback, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from '@/components/ui'
 import { ArrowRight, ChevronLeft, ChevronRight, Clock, Brain, Loader2, XCircle, Zap, AlertTriangle, Info, TrendingUp } from 'lucide-react'
@@ -33,12 +33,12 @@ import {
   Filler,
 } from 'chart.js'
 import { cn } from '@/lib/utils'
-import type { GraderDailySummary } from '@/services/grader/types'
+import type { GraderDailySummary, TimelineBucket } from '@/services/grader/types'
 import type { AIGraderOutput } from '@/services/grader/types'
 import { computeInsightsFromSummary } from '@/services/grader/graderSummaryInsights'
 import { analyzeGraderFromSummary } from '@/services/grader/graderSummaryAI'
 import { AIOutputPanel } from '@/components/grader/GraderInlinePanels'
-import { listPieceRecords, type FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
+import { listPieceRecords, loadTimelineAggregates, type FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
 import { GraderTimelineChart } from '@/components/grader/GraderTimelineChart'
 
 // Registrar los elementos de Chart.js necesarios (idempotente si ya están)
@@ -159,6 +159,27 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
   // ── Estado timeline pieza a pieza ───────────────────────────────────────
   const [timelineRecords, setTimelineRecords] = useState<FirestorePieceRecord[] | null>(null)
   const [timelineLoading, setTimelineLoading] = useState(false)
+
+  // Fase 2: aggregates pre-computados (~40-60 KB) desde sub-collection.
+  // Carga automática al montar — es instantáneo en 2da visita gracias al
+  // cache persistente de Firestore (IndexedDB).
+  const [timelineAggregates, setTimelineAggregates] = useState<TimelineBucket[] | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    const summaryId = `${summary.dateKey}__${summary.shiftId}`
+    setTimelineAggregates(null)
+    loadTimelineAggregates(summaryId)
+      .then((aggs) => {
+        if (!cancelled) setTimelineAggregates(aggs)
+      })
+      .catch(() => {
+        if (!cancelled) setTimelineAggregates(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [summary.dateKey, summary.shiftId])
 
   const handleLoadTimeline = useCallback(async () => {
     const summaryId = `${summary.dateKey}__${summary.shiftId}`
@@ -431,10 +452,21 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
         </Card>
       </div>
 
-      {/* ── Timeline segundo a segundo (pieceRecords desde Firestore) ──── */}
+      {/* ── Timeline segundo a segundo ──────────────────────────────────
+          Prioridad:
+          1. `timelineRecords` raw (si el usuario cargó manualmente para zoom extremo)
+          2. `summary.timelineAggregates` pre-computados (Fase 2: pinta al instante)
+          3. Fallback: card con botón "Cargar timeline" para summaries legacy
+             sin aggregates backfilled. */}
       {timelineRecords !== null && timelineRecords.length > 0 ? (
         <GraderTimelineChart
           records={timelineRecords}
+          shiftId={summary.shiftId}
+          dateKey={summary.dateKey}
+        />
+      ) : timelineAggregates && timelineAggregates.length > 0 ? (
+        <GraderTimelineChart
+          aggregates={timelineAggregates}
           shiftId={summary.shiftId}
           dateKey={summary.dateKey}
         />

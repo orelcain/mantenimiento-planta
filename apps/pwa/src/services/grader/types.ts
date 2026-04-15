@@ -536,6 +536,60 @@ export interface GraderDailySummary {
     totalPieces: number;
     p0Pieces: number;
   }>;
+  // NOTA: Los agregados por minuto para el timeline chart NO viven en este
+  // doc. Están en la sub-collection `graderDailySummaries/{id}/meta/timeline`
+  // (ver saveTimelineAggregates / loadTimelineAggregates). Motivo: las queries
+  // por rango (listDailySummariesByRange) descargarían ~60 KB por summary si
+  // estuvieran acá, haciendo que el calendario y la vista de período bajen
+  // 10× más data de la necesaria. El cliente web Firestore no soporta
+  // field projection, por eso van en sub-coll separada.
+}
+
+/**
+ * Bucket pre-computed por minuto para el timeline chart.
+ * Contiene todas las señales que el `GraderTimelineChart` necesita para
+ * renderizar sus 7 capas (pesos, p0%, errores, producción, gates, etc.)
+ * sin tocar los `pieceRecords` raw.
+ *
+ * Se persiste en `graderDailySummaries/{id}/meta/timeline` (sub-collection),
+ * NO en el doc del summary, para evitar inflar las queries por rango.
+ */
+export interface TimelineBucket {
+  /** Inicio del minuto en ISO (truncado: `YYYY-MM-DDTHH:MM:00.000Z`) */
+  tsMin: string;
+  /** Piezas totales en el minuto (incluye P0) */
+  pieces: number;
+  /** Piezas P0 (gate 0) en el minuto */
+  p0Pieces: number;
+  /** Peso total producción (kg) — solo gates 1-12 con peso válido */
+  weightKg?: number;
+  /** Cuántas piezas aportaron peso válido (para promediar) */
+  weightCount?: number;
+  /** Peso min por pieza (gramos) */
+  weightMinGrams?: number;
+  /** Peso mediano por pieza (gramos) */
+  weightP50Grams?: number;
+  /** Peso max por pieza (gramos) */
+  weightMaxGrams?: number;
+  /**
+   * Conteo de piezas P0 por tipo de error.
+   * Key = error string normalizado, value = piezas.
+   * Usar para renderizar markLines y tooltip de errores en el timeline.
+   */
+  errorCounts?: Record<string, number>;
+  /**
+   * Piezas por gate (solo gates productivos 1-12).
+   * Key = gate number como string (Firestore no acepta number keys).
+   * Se usa para el stacked area chart de gates a lo largo del turno.
+   */
+  gateCounts?: Record<string, number>;
+  /** Calibre dominante del minuto (el más frecuente) */
+  dominantCalibre?: string;
+  /**
+   * Lote dominante del minuto (más frecuente).
+   * Cambios entre minutos consecutivos marcan un cambio de lote en el chart.
+   */
+  lot?: string;
 }
 
 // ============================================================================

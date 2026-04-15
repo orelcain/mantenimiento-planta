@@ -28,7 +28,7 @@ import {
   getCountFromServer,
 } from 'firebase/firestore'
 import { db } from '../firebase'
-import type { GraderDailySummary } from './types'
+import type { GraderDailySummary, TimelineBucket } from './types'
 
 const COLLECTION = 'graderDailySummaries'
 /** Firestore permite máx. 500 ops por batch; usamos 400 para margen */
@@ -460,6 +460,7 @@ export interface FirestorePieceRecord {
   quality?: string
   calibre?: string
   error?: string
+  lot?: string
   dedupeKey: string
 }
 
@@ -539,4 +540,63 @@ export async function listPieceRecords(summaryId: string): Promise<FirestorePiec
 export async function countPieceRecords(summaryId: string): Promise<number> {
   const snap = await getCountFromServer(pieceRecordsCol(summaryId))
   return snap.data().count
+}
+
+// ============================================================================
+// Timeline aggregates — buckets pre-computados por minuto
+// ============================================================================
+//
+// Los `TimelineBucket[]` viven en una sub-collection separada para NO inflar
+// el doc del summary (que se descarga en queries por rango del calendario y
+// vista de período). Solo se cargan cuando el usuario abre un turno específico.
+//
+// Path: `graderDailySummaries/{summaryId}/meta/timeline`
+// Tamaño típico: ~40-60 KB (400-700 buckets × ~100 bytes cada uno)
+
+const TIMELINE_META_SUB = 'meta'
+const TIMELINE_META_DOC = 'timeline'
+
+interface TimelineAggregatesDoc {
+  buckets: TimelineBucket[]
+  updatedAt: string
+  /** Versión del schema para futuras migraciones sin romper readers */
+  schemaVersion: number
+}
+
+const TIMELINE_SCHEMA_VERSION = 1
+
+/**
+ * Guarda los buckets pre-computados del timeline en la sub-collection.
+ * Sobrescribe cualquier versión previa (overwrite intencional: los aggregates
+ * son una función pura del set de pieceRecords).
+ */
+export async function saveTimelineAggregates(
+  summaryId: string,
+  buckets: TimelineBucket[],
+): Promise<void> {
+  const ref = doc(db, COLLECTION, summaryId, TIMELINE_META_SUB, TIMELINE_META_DOC)
+  const payload: TimelineAggregatesDoc = {
+    buckets,
+    updatedAt: new Date().toISOString(),
+    schemaVersion: TIMELINE_SCHEMA_VERSION,
+  }
+  await setDoc(ref, payload)
+}
+
+/**
+ * Lee los timelineAggregates desde la sub-collection. Retorna `null` si el
+ * turno todavía no tiene backfill (summary legacy antes de Fase 2).
+ *
+ * Gracias al cache persistente de Firestore, las visitas repetidas al mismo
+ * turno son instantáneas (hit de IndexedDB, sin round-trip).
+ */
+export async function loadTimelineAggregates(
+  summaryId: string,
+): Promise<TimelineBucket[] | null> {
+  const ref = doc(db, COLLECTION, summaryId, TIMELINE_META_SUB, TIMELINE_META_DOC)
+  const snap = await getDoc(ref)
+  if (!snap.exists()) return null
+  const data = snap.data() as Partial<TimelineAggregatesDoc>
+  if (!Array.isArray(data.buckets)) return null
+  return data.buckets as TimelineBucket[]
 }

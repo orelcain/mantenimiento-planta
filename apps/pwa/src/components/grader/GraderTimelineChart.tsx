@@ -21,6 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle, Badge } from '@/components/ui
 import { Activity, Coffee } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
+import type { TimelineBucket } from '@/services/grader/types'
 
 // ── Paleta ──────────────────────────────────────────────────────────────────
 
@@ -73,9 +74,338 @@ function getErrorColor(error: string): string {
 // ── Tipos ───────────────────────────────────────────────────────────────────
 
 interface Props {
-  records: FirestorePieceRecord[]
+  /** Records crudos (detalle pieza-a-pieza). Opcional si se pasan `aggregates`. */
+  records?: FirestorePieceRecord[]
+  /**
+   * Agregados pre-computados por minuto (desde `summary.timelineAggregates`).
+   * Cuando están presentes, se usan en lugar de `records` para pintar el chart
+   * al instante sin bajar los ~14k registros crudos.
+   */
+  aggregates?: TimelineBucket[]
   shiftId: string
   dateKey: string
+}
+
+// ── Tipo del output del pipeline de procesamiento ─────────────────────────
+interface ChartSeries {
+  weightSeries: Array<[number, number, string]>
+  weightMovingAvg: Array<[number, number]>
+  p0PctSeries: Array<[number, number]>
+  p0CumulativeSeries: Array<[number, number]>
+  errorSeries: Array<[number, number, string]>
+  productionSeries: Array<[number, number]>
+  gateTimeSeries: Array<{ gate: number; data: Array<[number, number]> }>
+  gaps: Array<{ start: number; end: number; durationMin: number }>
+  stats: {
+    withWeight: number
+    avgWeight: number
+    minWeight: number
+    maxWeight: number
+    p0Count: number
+    totalPieces: number
+    uniqueCalibres: string[]
+    uniqueErrors: string[]
+    uniqueGates: number[]
+  }
+}
+
+const EMPTY_CHART_SERIES: ChartSeries = {
+  weightSeries: [],
+  weightMovingAvg: [],
+  p0PctSeries: [],
+  p0CumulativeSeries: [],
+  errorSeries: [],
+  productionSeries: [],
+  gateTimeSeries: [],
+  gaps: [],
+  stats: { withWeight: 0, avgWeight: 0, minWeight: 0, maxWeight: 0, p0Count: 0, totalPieces: 0, uniqueCalibres: [], uniqueErrors: [], uniqueGates: [] },
+}
+
+// ── Pipeline desde records crudos (detalle pieza-a-pieza) ────────────────
+function computeChartSeriesFromRecords(records: FirestorePieceRecord[]): ChartSeries {
+  if (records.length === 0) return EMPTY_CHART_SERIES
+
+  const sorted = [...records].sort((a, b) => a.ts.localeCompare(b.ts))
+
+  // Scatter de pesos
+  const wts: Array<[number, number, string]> = []
+  let sumW = 0, minW = Infinity, maxW = 0
+  for (const r of sorted) {
+    let w = r.weightPerPieceGrams
+    if ((w == null || w <= 0) && r.weightKg != null && r.weightKg > 0) {
+      w = r.pieces === 1 ? r.weightKg * 1000 : (r.weightKg * 1000) / r.pieces
+    }
+    if (w != null && w > 200 && w < 8000) {
+      wts.push([new Date(r.ts).getTime(), Math.round(w), r.calibre ?? '?'])
+      sumW += w
+      if (w < minW) minW = w
+      if (w > maxW) maxW = w
+    }
+  }
+
+  // Moving average (ventana 50 puntos)
+  const wtsForAvg: Array<[number, number]> = wts.map(([ts, w]) => [ts, w])
+  const movAvg = computeMovingAvg(wtsForAvg, 50)
+
+  // Errores P0
+  const errs: Array<[number, number, string]> = []
+  for (const r of sorted) {
+    if (r.gate === 0 && r.error) {
+      errs.push([new Date(r.ts).getTime(), r.pieces, r.error])
+    }
+  }
+
+  // P0% ventana móvil (5 min)
+  const WINDOW_MS = 5 * 60 * 1000
+  const p0Pts: Array<[number, number]> = []
+  let windowTotal = 0, windowP0 = 0, left = 0
+  for (let right = 0; right < sorted.length; right++) {
+    const r = sorted[right]!
+    const tsR = new Date(r.ts).getTime()
+    windowTotal += r.pieces
+    if (r.gate === 0) windowP0 += r.pieces
+    while (left < right && tsR - new Date(sorted[left]!.ts).getTime() > WINDOW_MS) {
+      windowTotal -= sorted[left]!.pieces
+      if (sorted[left]!.gate === 0) windowP0 -= sorted[left]!.pieces
+      left++
+    }
+    if (windowTotal > 0) {
+      const pct = Math.min(100, +((windowP0 / windowTotal) * 100).toFixed(2))
+      if (right >= 30) p0Pts.push([tsR, pct])
+    }
+  }
+
+  // Producción: piezas por minuto (buckets 60s)
+  const BUCKET_MS = 60_000
+  const prodMap = new Map<number, number>()
+  for (const r of sorted) {
+    const bucket = Math.floor(new Date(r.ts).getTime() / BUCKET_MS) * BUCKET_MS
+    prodMap.set(bucket, (prodMap.get(bucket) ?? 0) + r.pieces)
+  }
+  const prodPts = Array.from(prodMap.entries()).sort((a, b) => a[0] - b[0])
+
+  // Detectar gaps (paradas/colación: >15 min sin datos)
+  const GAP_THRESHOLD_MS = 15 * 60 * 1000
+  const detectedGaps: Array<{ start: number; end: number; durationMin: number }> = []
+  for (let i = 1; i < sorted.length; i++) {
+    const prevTs = new Date(sorted[i - 1]!.ts).getTime()
+    const currTs = new Date(sorted[i]!.ts).getTime()
+    const delta = currTs - prevTs
+    if (delta > GAP_THRESHOLD_MS) {
+      detectedGaps.push({ start: prevTs, end: currTs, durationMin: Math.round(delta / 60_000) })
+    }
+  }
+
+  // R21: P0% acumulado del turno (running total)
+  const p0CumPts: Array<[number, number]> = []
+  let cumTotal = 0, cumP0 = 0
+  for (const r of sorted) {
+    cumTotal += r.pieces
+    if (r.gate === 0) cumP0 += r.pieces
+    if (cumTotal > 30) {
+      p0CumPts.push([new Date(r.ts).getTime(), +((cumP0 / cumTotal) * 100).toFixed(2)])
+    }
+  }
+  const p0CumDownsampled = p0CumPts.filter((_, i) => i % 100 === 0 || i === p0CumPts.length - 1)
+
+  // R23: Gate distribution over time (buckets 5min)
+  const GATE_BUCKET_MS = 5 * 60_000
+  const gateByBucket = new Map<number, Map<number, number>>()
+  const gateSet = new Set<number>()
+  for (const r of sorted) {
+    if (r.gate === 0) continue
+    gateSet.add(r.gate)
+    const bucket = Math.floor(new Date(r.ts).getTime() / GATE_BUCKET_MS) * GATE_BUCKET_MS
+    const gMap = gateByBucket.get(bucket) ?? new Map<number, number>()
+    gMap.set(r.gate, (gMap.get(r.gate) ?? 0) + r.pieces)
+    gateByBucket.set(bucket, gMap)
+  }
+  const sortedGates = Array.from(gateSet).sort((a, b) => a - b)
+  const gateBuckets = Array.from(gateByBucket.keys()).sort((a, b) => a - b)
+  const gateTS = sortedGates.map((gate) => ({
+    gate,
+    data: gateBuckets.map((bucket) => [bucket, gateByBucket.get(bucket)?.get(gate) ?? 0] as [number, number]),
+  }))
+
+  // Stats
+  const calibreSet = new Set<string>()
+  for (const [, , cal] of wts) calibreSet.add(cal)
+  const errorSet = new Set<string>()
+  for (const [, , err] of errs) errorSet.add(err)
+
+  return {
+    weightSeries: wts,
+    weightMovingAvg: movAvg,
+    p0PctSeries: p0Pts,
+    p0CumulativeSeries: p0CumDownsampled,
+    errorSeries: errs,
+    productionSeries: prodPts,
+    gateTimeSeries: gateTS,
+    gaps: detectedGaps,
+    stats: {
+      withWeight: wts.length,
+      avgWeight: wts.length > 0 ? Math.round(sumW / wts.length) : 0,
+      minWeight: wts.length > 0 ? Math.round(minW) : 0,
+      maxWeight: wts.length > 0 ? Math.round(maxW) : 0,
+      p0Count: errs.length,
+      totalPieces: sorted.reduce((s, r) => s + r.pieces, 0),
+      uniqueCalibres: Array.from(calibreSet).sort(),
+      uniqueErrors: Array.from(errorSet).sort(),
+      uniqueGates: sortedGates,
+    },
+  }
+}
+
+// ── Pipeline desde aggregates pre-computados (buckets por minuto) ────────
+function computeChartSeriesFromAggregates(aggregates: TimelineBucket[]): ChartSeries {
+  if (aggregates.length === 0) return EMPTY_CHART_SERIES
+
+  const sorted = [...aggregates].sort((a, b) => a.tsMin.localeCompare(b.tsMin))
+
+  // Scatter de pesos: min/p50/max por bucket con dominantCalibre.
+  // ~1500 puntos vs ~14k originales, conserva dispersión visible.
+  const wts: Array<[number, number, string]> = []
+  let sumWeighted = 0
+  let totalWeightCount = 0
+  let minW = Infinity, maxW = 0
+  for (const b of sorted) {
+    const tsMs = new Date(b.tsMin).getTime()
+    const cal = b.dominantCalibre ?? '?'
+    if (b.weightMinGrams != null) {
+      wts.push([tsMs, b.weightMinGrams, cal])
+      if (b.weightMinGrams < minW) minW = b.weightMinGrams
+    }
+    if (b.weightP50Grams != null && b.weightP50Grams !== b.weightMinGrams) {
+      wts.push([tsMs, b.weightP50Grams, cal])
+    }
+    if (b.weightMaxGrams != null && b.weightMaxGrams !== b.weightP50Grams) {
+      wts.push([tsMs, b.weightMaxGrams, cal])
+      if (b.weightMaxGrams > maxW) maxW = b.weightMaxGrams
+    }
+    if (b.weightP50Grams != null && b.weightCount != null && b.weightCount > 0) {
+      sumWeighted += b.weightP50Grams * b.weightCount
+      totalWeightCount += b.weightCount
+    }
+  }
+
+  // Moving avg: ventana 5 buckets (5 min) sobre los p50 por minuto.
+  const p50Series: Array<[number, number]> = []
+  for (const b of sorted) {
+    if (b.weightP50Grams != null) {
+      p50Series.push([new Date(b.tsMin).getTime(), b.weightP50Grams])
+    }
+  }
+  const movAvg = computeMovingAvg(p50Series, Math.min(5, p50Series.length))
+
+  // Errores P0 (markLines): un punto por (bucket × tipo error)
+  const errs: Array<[number, number, string]> = []
+  const errorSet = new Set<string>()
+  for (const b of sorted) {
+    if (!b.errorCounts) continue
+    const tsMs = new Date(b.tsMin).getTime()
+    for (const [err, pieces] of Object.entries(b.errorCounts)) {
+      errs.push([tsMs, pieces, err])
+      errorSet.add(err)
+    }
+  }
+
+  // P0% ventana móvil (5 buckets = 5 min)
+  const p0Pts: Array<[number, number]> = []
+  const WINDOW_BUCKETS = 5
+  for (let i = 0; i < sorted.length; i++) {
+    const start = Math.max(0, i - WINDOW_BUCKETS + 1)
+    let total = 0, p0 = 0
+    for (let j = start; j <= i; j++) {
+      total += sorted[j]!.pieces
+      p0 += sorted[j]!.p0Pieces
+    }
+    if (total > 0 && i >= WINDOW_BUCKETS) {
+      const pct = Math.min(100, +((p0 / total) * 100).toFixed(2))
+      p0Pts.push([new Date(sorted[i]!.tsMin).getTime(), pct])
+    }
+  }
+
+  // Producción: bucket.pieces ya ES piezas/minuto
+  const prodPts: Array<[number, number]> = sorted.map((b) => [new Date(b.tsMin).getTime(), b.pieces])
+
+  // Gaps: minutos faltantes > 15 min entre buckets consecutivos
+  const detectedGaps: Array<{ start: number; end: number; durationMin: number }> = []
+  for (let i = 1; i < sorted.length; i++) {
+    const prevTs = new Date(sorted[i - 1]!.tsMin).getTime()
+    const currTs = new Date(sorted[i]!.tsMin).getTime()
+    const deltaMin = (currTs - prevTs) / 60_000
+    if (deltaMin > 15) {
+      detectedGaps.push({ start: prevTs, end: currTs, durationMin: Math.round(deltaMin) })
+    }
+  }
+
+  // P0% acumulado del turno
+  const p0CumPts: Array<[number, number]> = []
+  let cumTotal = 0, cumP0 = 0
+  for (const b of sorted) {
+    cumTotal += b.pieces
+    cumP0 += b.p0Pieces
+    if (cumTotal > 30) {
+      p0CumPts.push([new Date(b.tsMin).getTime(), +((cumP0 / cumTotal) * 100).toFixed(2)])
+    }
+  }
+
+  // Gates stacked (buckets 5 min agrupando aggregates)
+  const GATE_BUCKET_MS = 5 * 60_000
+  const gateByBucket = new Map<number, Map<number, number>>()
+  const gateSet = new Set<number>()
+  for (const b of sorted) {
+    if (!b.gateCounts) continue
+    const tsMs = new Date(b.tsMin).getTime()
+    const bucket5 = Math.floor(tsMs / GATE_BUCKET_MS) * GATE_BUCKET_MS
+    for (const [gateStr, pieces] of Object.entries(b.gateCounts)) {
+      const gate = Number(gateStr)
+      if (gate === 0) continue
+      gateSet.add(gate)
+      const gMap = gateByBucket.get(bucket5) ?? new Map<number, number>()
+      gMap.set(gate, (gMap.get(gate) ?? 0) + pieces)
+      gateByBucket.set(bucket5, gMap)
+    }
+  }
+  const sortedGates = Array.from(gateSet).sort((a, b) => a - b)
+  const gateBuckets = Array.from(gateByBucket.keys()).sort((a, b) => a - b)
+  const gateTS = sortedGates.map((gate) => ({
+    gate,
+    data: gateBuckets.map((bucket) => [bucket, gateByBucket.get(bucket)?.get(gate) ?? 0] as [number, number]),
+  }))
+
+  // Stats
+  const calibreSet = new Set<string>()
+  for (const b of sorted) if (b.dominantCalibre) calibreSet.add(b.dominantCalibre)
+
+  let totalPieces = 0
+  let totalP0 = 0
+  for (const b of sorted) {
+    totalPieces += b.pieces
+    totalP0 += b.p0Pieces
+  }
+
+  return {
+    weightSeries: wts,
+    weightMovingAvg: movAvg,
+    p0PctSeries: p0Pts,
+    p0CumulativeSeries: p0CumPts,
+    errorSeries: errs,
+    productionSeries: prodPts,
+    gateTimeSeries: gateTS,
+    gaps: detectedGaps,
+    stats: {
+      withWeight: totalWeightCount,
+      avgWeight: totalWeightCount > 0 ? Math.round(sumWeighted / totalWeightCount) : 0,
+      minWeight: minW === Infinity ? 0 : Math.round(minW),
+      maxWeight: Math.round(maxW),
+      p0Count: totalP0,
+      totalPieces,
+      uniqueCalibres: Array.from(calibreSet).sort(),
+      uniqueErrors: Array.from(errorSet).sort(),
+      uniqueGates: sortedGates,
+    },
+  }
 }
 
 type LayerKey = 'weights' | 'p0pct' | 'errors' | 'production' | 'gates'
@@ -116,7 +446,7 @@ function computeMovingAvg(data: Array<[number, number]>, windowSize: number): Ar
 
 // ── Componente ──────────────────────────────────────────────────────────────
 
-export function GraderTimelineChart({ records, shiftId, dateKey }: Props) {
+export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: Props) {
   const [layers, setLayers] = useState<Record<LayerKey, boolean>>({
     weights: true,
     p0pct: true,
@@ -130,148 +460,15 @@ export function GraderTimelineChart({ records, shiftId, dateKey }: Props) {
   const toggleLayer = (key: LayerKey) =>
     setLayers((prev) => ({ ...prev, [key]: !prev[key] }))
 
-  // Pre-procesar data + stats
-  const { weightSeries, weightMovingAvg, p0PctSeries, p0CumulativeSeries, errorSeries, productionSeries, gateTimeSeries, gaps, stats } = useMemo(() => {
-    if (records.length === 0) return {
-      weightSeries: [], weightMovingAvg: [], p0PctSeries: [], p0CumulativeSeries: [], errorSeries: [], productionSeries: [], gateTimeSeries: [] as Array<{ gate: number; data: Array<[number, number]> }>, gaps: [],
-      stats: { withWeight: 0, avgWeight: 0, minWeight: 0, maxWeight: 0, p0Count: 0, totalPieces: 0, uniqueCalibres: [] as string[], uniqueErrors: [] as string[], uniqueGates: [] as number[] },
-    }
-
-    const sorted = [...records].sort((a, b) => a.ts.localeCompare(b.ts))
-
-    // Scatter de pesos
-    const wts: Array<[number, number, string]> = []
-    let sumW = 0, minW = Infinity, maxW = 0
-    for (const r of sorted) {
-      let w = r.weightPerPieceGrams
-      if ((w == null || w <= 0) && r.weightKg != null && r.weightKg > 0) {
-        w = r.pieces === 1 ? r.weightKg * 1000 : (r.weightKg * 1000) / r.pieces
-      }
-      if (w != null && w > 200 && w < 8000) {
-        wts.push([new Date(r.ts).getTime(), Math.round(w), r.calibre ?? '?'])
-        sumW += w
-        if (w < minW) minW = w
-        if (w > maxW) maxW = w
-      }
-    }
-
-    // Moving average (ventana 50 puntos)
-    const wtsForAvg: Array<[number, number]> = wts.map(([ts, w]) => [ts, w])
-    const movAvg = computeMovingAvg(wtsForAvg, 50)
-
-    // Errores P0
-    const errs: Array<[number, number, string]> = []
-    for (const r of sorted) {
-      if (r.gate === 0 && r.error) {
-        errs.push([new Date(r.ts).getTime(), r.pieces, r.error])
-      }
-    }
-
-    // P0% ventana móvil (5 min)
-    const WINDOW_MS = 5 * 60 * 1000
-    const p0Pts: Array<[number, number]> = []
-    let windowTotal = 0, windowP0 = 0, left = 0
-    for (let right = 0; right < sorted.length; right++) {
-      const r = sorted[right]!
-      const tsR = new Date(r.ts).getTime()
-      windowTotal += r.pieces
-      if (r.gate === 0) windowP0 += r.pieces
-      while (left < right && tsR - new Date(sorted[left]!.ts).getTime() > WINDOW_MS) {
-        windowTotal -= sorted[left]!.pieces
-        if (sorted[left]!.gate === 0) windowP0 -= sorted[left]!.pieces
-        left++
-      }
-      if (windowTotal > 0) {
-        const pct = Math.min(100, +((windowP0 / windowTotal) * 100).toFixed(2))
-        // Ignorar primeros 30 registros (arranque ruidoso con pocos datos en ventana)
-        if (right >= 30) p0Pts.push([tsR, pct])
-      }
-    }
-
-    // Producción: piezas por minuto (buckets 60s)
-    const BUCKET_MS = 60_000
-    const prodMap = new Map<number, number>()
-    for (const r of sorted) {
-      const bucket = Math.floor(new Date(r.ts).getTime() / BUCKET_MS) * BUCKET_MS
-      prodMap.set(bucket, (prodMap.get(bucket) ?? 0) + r.pieces)
-    }
-    const prodPts = Array.from(prodMap.entries()).sort((a, b) => a[0] - b[0])
-
-    // Detectar gaps (paradas/colación: >15 min sin datos)
-    const GAP_THRESHOLD_MS = 15 * 60 * 1000
-    const detectedGaps: Array<{ start: number; end: number; durationMin: number }> = []
-    for (let i = 1; i < sorted.length; i++) {
-      const prevTs = new Date(sorted[i - 1]!.ts).getTime()
-      const currTs = new Date(sorted[i]!.ts).getTime()
-      const delta = currTs - prevTs
-      if (delta > GAP_THRESHOLD_MS) {
-        detectedGaps.push({ start: prevTs, end: currTs, durationMin: Math.round(delta / 60_000) })
-      }
-    }
-
-    // R21: P0% acumulado del turno (running total)
-    const p0CumPts: Array<[number, number]> = []
-    let cumTotal = 0, cumP0 = 0
-    for (const r of sorted) {
-      cumTotal += r.pieces
-      if (r.gate === 0) cumP0 += r.pieces
-      if (cumTotal > 30) {  // skip primeros registros
-        p0CumPts.push([new Date(r.ts).getTime(), +((cumP0 / cumTotal) * 100).toFixed(2)])
-      }
-    }
-    // Downsample acumulado a 1 punto cada 100 registros para no saturar
-    const p0CumDownsampled = p0CumPts.filter((_, i) => i % 100 === 0 || i === p0CumPts.length - 1)
-
-    // R23: Gate distribution over time (buckets 5min)
-    const GATE_BUCKET_MS = 5 * 60_000
-    const gateByBucket = new Map<number, Map<number, number>>()
-    const gateSet = new Set<number>()
-    for (const r of sorted) {
-      if (r.gate === 0) continue  // skip P0
-      gateSet.add(r.gate)
-      const bucket = Math.floor(new Date(r.ts).getTime() / GATE_BUCKET_MS) * GATE_BUCKET_MS
-      const gMap = gateByBucket.get(bucket) ?? new Map<number, number>()
-      gMap.set(r.gate, (gMap.get(r.gate) ?? 0) + r.pieces)
-      gateByBucket.set(bucket, gMap)
-    }
-    const sortedGates = Array.from(gateSet).sort((a, b) => a - b)
-    const gateBuckets = Array.from(gateByBucket.keys()).sort((a, b) => a - b)
-    const gateTS = sortedGates.map((gate) => ({
-      gate,
-      data: gateBuckets.map((bucket) => [bucket, gateByBucket.get(bucket)?.get(gate) ?? 0] as [number, number]),
-    }))
-
-    // R25: Identify P0 spike zones (P0% > 5% in rolling window)
-    // Already available via p0Pts — we'll highlight scatter points in those time ranges
-
-    // Stats
-    const calibreSet = new Set<string>()
-    for (const [, , cal] of wts) calibreSet.add(cal)
-    const errorSet = new Set<string>()
-    for (const [, , err] of errs) errorSet.add(err)
-
-    return {
-      weightSeries: wts,
-      weightMovingAvg: movAvg,
-      p0PctSeries: p0Pts,
-      p0CumulativeSeries: p0CumDownsampled,
-      errorSeries: errs,
-      productionSeries: prodPts,
-      gateTimeSeries: gateTS,
-      gaps: detectedGaps,
-      stats: {
-        withWeight: wts.length,
-        avgWeight: wts.length > 0 ? Math.round(sumW / wts.length) : 0,
-        minWeight: wts.length > 0 ? Math.round(minW) : 0,
-        maxWeight: wts.length > 0 ? Math.round(maxW) : 0,
-        p0Count: errs.length,
-        totalPieces: sorted.reduce((s, r) => s + r.pieces, 0),
-        uniqueCalibres: Array.from(calibreSet).sort(),
-        uniqueErrors: Array.from(errorSet).sort(),
-        uniqueGates: sortedGates,
-      },
-    }
-  }, [records])
+  // Pre-procesar data + stats.
+  // Si hay `aggregates` (buckets pre-computados del summary), los usamos para
+  // evitar descargar los ~14k registros crudos. Si hay `records` raw, seguimos
+  // el pipeline detallado pieza-a-pieza.
+  const { weightSeries, weightMovingAvg, p0PctSeries, p0CumulativeSeries, errorSeries, productionSeries, gateTimeSeries, gaps, stats } = useMemo<ChartSeries>(() => {
+    if (aggregates && aggregates.length > 0) return computeChartSeriesFromAggregates(aggregates)
+    if (records && records.length > 0) return computeChartSeriesFromRecords(records)
+    return EMPTY_CHART_SERIES
+  }, [records, aggregates])
 
   // Stats dinámicos según zoom visible
   const visibleStats = useMemo(() => {
@@ -643,7 +840,7 @@ export function GraderTimelineChart({ records, shiftId, dateKey }: Props) {
     }
   }, [layers, weightSeries, weightMovingAvg, p0PctSeries, errorSeries, productionSeries, gaps, useDualGrid, zoomRange])
 
-  if (records.length === 0) return null
+  if (stats.totalPieces === 0) return null
 
   return (
     <Card>
@@ -678,7 +875,7 @@ export function GraderTimelineChart({ records, shiftId, dateKey }: Props) {
         {/* Sub-header: registro count + zoom stats */}
         <div className="flex items-center justify-between">
           <p className="text-xs text-muted-foreground">
-            {records.length.toLocaleString('es-CL')} reg · {shiftId} · {dateKey}
+            {stats.totalPieces.toLocaleString('es-CL')} pzs · {shiftId} · {dateKey}
           </p>
           {visibleStats && (zoomRange.start > 0 || zoomRange.end < 100) && (
             <p className="text-[10px] text-sky-400">

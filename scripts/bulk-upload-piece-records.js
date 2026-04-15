@@ -136,6 +136,7 @@ function parsePP(rows, headerIdx, colMap) {
   const iQuality = col(colMap, 'calidad', 'quality')
   const iCalibre = col(colMap, 'calibre', 'size', 'tamano')
   const iError = col(colMap, 'error', 'motivo', 'causa', 'reason')
+  const iLot = col(colMap, 'lote', 'folio', 'lot', 'batch')
   const iDate = col(colMap, 'fecha', 'date')
   const iTime = col(colMap, 'hora', 'time')
   for (let r = headerIdx + 1; r < rows.length; r++) {
@@ -158,6 +159,7 @@ function parsePP(rows, headerIdx, colMap) {
       quality: iQuality != null && row[iQuality] != null ? String(row[iQuality]).trim() : undefined,
       calibre: iCalibre != null && row[iCalibre] != null ? String(row[iCalibre]).trim() : undefined,
       error: errorStr,
+      lot: iLot != null && row[iLot] != null ? String(row[iLot]).trim() || undefined : undefined,
     })
   }
   return records
