@@ -161,15 +161,6 @@ export function MobileHomeGrid() {
         })}
       </div>
 
-      {/* Divider antes del Dashboard de stats */}
-      <div className="flex items-center gap-3 pt-1">
-        <div className="flex-1 h-px bg-border" />
-        <span className="text-[11px] text-muted-foreground font-medium tracking-wide uppercase">
-          Resumen
-        </span>
-        <div className="flex-1 h-px bg-border" />
-      </div>
-
     </div>
   )
 }
