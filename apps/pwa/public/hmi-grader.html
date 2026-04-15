@@ -36,8 +36,8 @@ html, body {
    VENTANA RC — 640×480px VNC estándar
 ══════════════════════════════════════ */
 #rc-window {
-  width: 640px;
-  height: 480px;
+  width: 760px;
+  height: 640px;
   display: flex;
   flex-direction: column;
   box-shadow: 4px 4px 20px rgba(0,0,0,0.95);
@@ -97,20 +97,20 @@ html, body {
 
 /* ── MENUBAR (Connection / Mode / Help) ── */
 .menubar {
-  height: 20px;
-  background: #1F618D;
+  height: 24px;
+  background: #0E2C4F;
   display: flex;
   align-items: center;
   padding: 0;
   gap: 0;
   flex-shrink: 0;
-  border-bottom: 1px solid #154360;
+  border-bottom: 1px solid #051a30;
 }
 .menubar span {
-  font-size: 11px;
+  font-size: 12px;
   color: #ffffff;
   cursor: pointer;
-  padding: 0 10px;
+  padding: 0 12px;
   height: 100%;
   display: flex;
   align-items: center;
@@ -140,13 +140,13 @@ html, body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 4px 8px 3px 8px;
+  padding: 6px 10px 4px 10px;
   background: #1A5276;
   flex-shrink: 0;
 }
 .hdr-left {
   font-family: 'Courier New', monospace;
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.45;
   color: #ffffff;
 }
@@ -154,7 +154,7 @@ html, body {
 .hdr-right {
   display: grid;
   grid-template-columns: auto auto;
-  gap: 4px;
+  gap: 6px;
   align-items: center;
 }
 /* UNDER<-: bg=hmi, borde blanco 2px, texto blanco 12px bold, centrado */
@@ -162,15 +162,15 @@ html, body {
   background: #1A5276;
   border: 2px solid #ffffff;
   color: #ffffff;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: bold;
-  width: 82px;
-  height: 27px;
+  width: 102px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: Arial, sans-serif;
-  letter-spacing: 0.2px;
+  letter-spacing: 0.3px;
   flex-shrink: 0;
 }
 /* Display peso: fondo claro, borde amarillo */
@@ -178,14 +178,16 @@ html, body {
   background: #F0F0F0;
   border: 2px solid #F1C40F;
   color: #000000;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: bold;
-  width: 90px;
+  width: 112px;
   font-family: 'Courier New', monospace;
   justify-content: center;
   letter-spacing: 0.3px;
+  position: relative;
 }
-.ind.wt .unit { font-size: 10px; margin-left: 1px; }
+.ind.wt .unit { font-size: 11px; margin-left: 1px; }
+.ind.wt .sup { position: absolute; top: 1px; left: 4px; font-size: 9px; color: #555; font-weight: normal; font-family: Arial, sans-serif; }
 
 /* ══════════════════════════════════════
    V4: TÍTULO "StaticGrader" — TAB PARCIAL
@@ -200,24 +202,25 @@ html, body {
 .title-bar {
   background: #2980B9;
   color: #ffffff;
-  font-size: 15px;
+  font-size: 22px;
   font-weight: bold;
-  height: 28px;
-  padding: 0 32px 0 10px;
+  height: 40px;
+  padding: 0 56px 0 14px;
   display: flex;
   align-items: center;
   font-family: Arial, sans-serif;
-  letter-spacing: 0.2px;
+  letter-spacing: 0.3px;
   width: auto;           /* TAB: se ajusta al texto */
   flex-shrink: 0;
+  border-bottom: 4px solid #ffffff;
 }
 
 /* STATUS "7: CONTRASTACION" — full-width */
 .status {
   background: #1A5276;
   color: #ffffff;
-  font-size: 11px;
-  padding: 2px 0 2px 8px;
+  font-size: 13px;
+  padding: 4px 0 4px 10px;
   flex-shrink: 0;
   font-family: Arial, sans-serif;
   letter-spacing: 0.1px;
@@ -235,19 +238,19 @@ html, body {
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  gap: 3px;
-  padding: 4px 6px;
+  gap: 4px;
+  padding: 6px 8px;
 }
 .gate-row {
   display: flex;
-  gap: 3px;
+  gap: 4px;
   width: 100%;
   justify-content: center;
 }
 /* V6: 100×80px (más ancho y más bajo que 98×92) */
 .gate {
-  width: 100px;
-  height: 80px;
+  width: 116px;
+  height: 100px;
   position: relative;
   cursor: pointer;
   flex-shrink: 0;
@@ -259,15 +262,15 @@ html, body {
 /* V13: gate number 10px, top:3px right:5px */
 .gn {
   position: absolute;
-  top: 3px;
-  right: 5px;
-  font-size: 10px;
+  top: 4px;
+  right: 7px;
+  font-size: 13px;
   font-weight: bold;
   color: #F1C40F;
   pointer-events: none;
   font-family: Arial, sans-serif;
   line-height: 1;
-  letter-spacing: 0.2px;
+  letter-spacing: 0.3px;
 }
 
 /* ══════════════════════════════════════
@@ -277,18 +280,18 @@ html, body {
 .log {
   background: #ffffff;
   border-top: 1px solid #888;
-  height: 72px;
-  overflow-y: auto;
+  height: 80px;
+  overflow: hidden;
   flex-shrink: 0;
-  padding: 2px 4px;
+  padding: 3px 5px;
   font-family: 'Courier New', monospace;
-  font-size: 11px;
+  font-size: 13px;
   color: #000000;
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
 }
-.ll { padding: 1px 2px; background: #ffffff; color: #000000; white-space: nowrap; line-height: 1.32; }
+.ll { padding: 1px 2px; background: #ffffff; color: #000000; white-space: nowrap; line-height: 1.42; }
 /* V (ya aplicado): log highlight navy Windows */
 .ll.hl { background: #000099; color: #ffffff; }
 
@@ -305,13 +308,13 @@ html, body {
 }
 .btn {
   flex: 1;
-  height: 60px;
-  background: #2E86C1;
-  border: 1px solid #5D9CEC;
+  height: 80px;
+  background: #1F618D;
+  border: 1px solid #154360;
   border-radius: 0;
   color: #ffffff;
   font-family: Arial, sans-serif;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: normal;
   cursor: pointer;
   display: flex;
@@ -319,11 +322,11 @@ html, body {
   justify-content: center;
   outline: none;
   white-space: nowrap;
-  padding: 0 4px;
+  padding: 0 6px;
 }
 .btn + .btn { border-left: none; }
-.btn:hover  { background: #3498DB; }
-.btn:active { background: #1F618D; }
+.btn:hover  { background: #2874A6; }
+.btn:active { background: #154360; }
 
 /* ══════════════════════════════════════
    PANELES (siguientes pantallas)
@@ -393,12 +396,12 @@ html, body {
         <div id="dd">14/04/2026</div>
         <div id="td">19:59:04</div>
         <!-- V5: counter con decimal como el original -->
-        <div id="cd">123.34</div>
+        <div id="cd">123...</div>
       </div>
       <div class="hdr-right">
         <div class="ind">UNDER&lt;-</div>
         <div class="ind">UNDER&lt;-</div>
-        <div class="ind wt">0.00<span class="unit">kg</span></div>
+        <div class="ind wt"><span class="sup">1</span>0.00<span class="unit">kg</span></div>
         <div class="ind">UNDER&lt;-</div>
       </div>
     </div>
@@ -462,7 +465,7 @@ html, body {
    Fill: #0A1C36 (dark navy, visible vs bg #1A5276) ✓
    Stroke: #F1C40F 2px, crispEdges + non-scaling-stroke
 ══════════════════════════════════════════════════ */
-const GW = 100, GH = 80, NW = 10, NH = 10, R = 6;
+const GW = 116, GH = 100, NW = 13, NH = 12, R = 7;
 const FILL = '#0A1C36';
 
 function pocketPath() {
