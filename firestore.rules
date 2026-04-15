@@ -997,6 +997,12 @@ service cloud.firestore {
         allow create: if isSupervisor();
         allow delete: if isSupervisor();
       }
+
+      // Aggregates pre-computados por minuto (subcollection meta/timeline)
+      match /meta/{docId} {
+        allow read: if isAuthenticated();
+        allow write: if isSupervisor();
+      }
     }
 
     // ============================================
