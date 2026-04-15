@@ -460,138 +460,136 @@ export function AnalisisGraderWizardPage() {
         </div>
       </div>
 
-      {/* ═══ PANTALLA 1: Setup del turno (Z1 Upload | Z2 Gates) ═══ */}
-      <div className="lg:grid lg:grid-cols-2 lg:gap-8 space-y-4 lg:space-y-0">
-        {/* Z1: Cargar archivos del turno */}
+      {/* ═══ PANTALLA 1: Columna centrada — calendario, carga, configuración ═══ */}
+      <div className="max-w-3xl mx-auto space-y-4">
+        {/* Calendario histórico + zona de carga */}
         <AnalisisGraderUploadPage
           onComplete={handleUploadComplete}
           initialFiles={uploadedFiles}
           onFilesChange={setUploadedFiles}
         />
 
-        {/* Z2: Configurar compuertas — colapsable en todos los tamaños */}
-        <div className="space-y-3">
-          <Card className="border-l-4 border-l-emerald-500/40">
-            <button
-              type="button"
-              onClick={() => setGatesOpen((o) => !o)}
-              className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium hover:bg-muted/50 transition-colors rounded-t-lg"
-            >
-              <span className="flex items-center gap-2 flex-wrap">
-                <Settings2 className={`h-4 w-4 ${gatesOpen ? 'text-emerald-500' : 'text-muted-foreground'}`} />
-                Configurar compuertas
-                <Badge variant="outline" className="text-xs font-normal">
-                  {gates.filter((g) => g.active).length} activas
-                </Badge>
-                {!gatesOpen && config.deviceId && (
-                  <span className="text-xs text-muted-foreground hidden sm:inline">· {config.deviceId}</span>
-                )}
-                {!gatesOpen && config.shiftId && (
-                  <span className="text-xs text-muted-foreground hidden sm:inline">· {config.shiftId}</span>
-                )}
-              </span>
-              {gatesOpen
-                ? <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" />
-                : <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
-              }
-            </button>
-            {gatesOpen && (
-              <CardContent className="pt-3 pb-4 border-t border-emerald-500/20">
-                <AnalisisGraderGatesConfigPage
-                  gates={gates}
-                  config={config}
-                  parsedData={fallbackParsedData}
-                  onComplete={handleGatesApply}
-                />
-              </CardContent>
-            )}
-          </Card>
-        </div>
-      </div>
+        {/* Configurar compuertas — colapsable */}
+        <Card className="border-l-4 border-l-emerald-500/40">
+          <button
+            type="button"
+            onClick={() => setGatesOpen((o) => !o)}
+            className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium hover:bg-muted/50 transition-colors rounded-t-lg"
+          >
+            <span className="flex items-center gap-2 flex-wrap">
+              <Settings2 className={`h-4 w-4 ${gatesOpen ? 'text-emerald-500' : 'text-muted-foreground'}`} />
+              Configurar compuertas
+              <Badge variant="outline" className="text-xs font-normal">
+                {gates.filter((g) => g.active).length} activas
+              </Badge>
+              {!gatesOpen && config.deviceId && (
+                <span className="text-xs text-muted-foreground hidden sm:inline">· {config.deviceId}</span>
+              )}
+              {!gatesOpen && config.shiftId && (
+                <span className="text-xs text-muted-foreground hidden sm:inline">· {config.shiftId}</span>
+              )}
+            </span>
+            {gatesOpen
+              ? <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" />
+              : <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+            }
+          </button>
+          {gatesOpen && (
+            <CardContent className="pt-3 pb-4 border-t border-emerald-500/20">
+              <AnalisisGraderGatesConfigPage
+                gates={gates}
+                config={config}
+                parsedData={fallbackParsedData}
+                onComplete={handleGatesApply}
+              />
+            </CardContent>
+          )}
+        </Card>
 
-      {/* Banner multi-día */}
-      {multiDayInfo && !savedToCalendar && (
-        <Card className="border-sky-500/30 bg-sky-500/5">
-          <CardContent className="py-3 px-4 flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-2 min-w-0">
-              <Calendar className="h-4 w-4 text-sky-500 shrink-0" />
-              <div className="text-sm min-w-0">
-                <p>
-                  <span className="font-medium">
-                    {multiDayInfo.isP0Only ? 'Archivo P0 multi-día' : 'Archivo multi-día detectado'}
-                  </span>
-                  <span className="text-muted-foreground ml-2">
-                    {multiDayInfo.uniqueDays} días · {multiDayInfo.totalSegments} turnos
-                    {multiDayInfo.isP0Only && ' — actualizará causas P0 sin borrar datos PP'}
-                  </span>
-                </p>
-                {multiDayCounts && multiDayCounts.replace > 0 && (
-                  <p className="text-xs mt-0.5">
-                    <span className="text-emerald-600 font-medium">{multiDayCounts.new} nuevos</span>
-                    <span className="text-muted-foreground"> · </span>
-                    <span className="text-amber-600 font-medium">{multiDayCounts.replace} reemplazos</span>
-                    <span className="text-muted-foreground"> (se sobrescribirán)</span>
+        {/* Banner multi-día */}
+        {multiDayInfo && !savedToCalendar && (
+          <Card className="border-sky-500/30 bg-sky-500/5">
+            <CardContent className="py-3 px-4 flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2 min-w-0">
+                <Calendar className="h-4 w-4 text-sky-500 shrink-0" />
+                <div className="text-sm min-w-0">
+                  <p>
+                    <span className="font-medium">
+                      {multiDayInfo.isP0Only ? 'Archivo P0 multi-día' : 'Archivo multi-día detectado'}
+                    </span>
+                    <span className="text-muted-foreground ml-2">
+                      {multiDayInfo.uniqueDays} días · {multiDayInfo.totalSegments} turnos
+                      {multiDayInfo.isP0Only && ' — actualizará causas P0 sin borrar datos PP'}
+                    </span>
                   </p>
-                )}
+                  {multiDayCounts && multiDayCounts.replace > 0 && (
+                    <p className="text-xs mt-0.5">
+                      <span className="text-emerald-600 font-medium">{multiDayCounts.new} nuevos</span>
+                      <span className="text-muted-foreground"> · </span>
+                      <span className="text-amber-600 font-medium">{multiDayCounts.replace} reemplazos</span>
+                      <span className="text-muted-foreground"> (se sobrescribirán)</span>
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
-            <Button
-              size="sm"
-              disabled={savingToCalendar}
-              onClick={handleSaveToCalendar}
-              className="bg-sky-600 hover:bg-sky-700 text-white shrink-0"
-            >
-              {savingToCalendar
-                ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Guardando…</>
-                : <><Calendar className="h-3.5 w-3.5 mr-1.5" />Guardar en Calendario</>
-              }
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-      {multiDayInfo && savedToCalendar && (
-        <Card className="border-emerald-500/30 bg-emerald-500/5">
-          <CardContent className="py-3 px-4 flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
-            <p className="text-sm text-emerald-700 dark:text-emerald-400 font-medium">
-              {multiDayInfo.totalSegments} turnos guardados — redirigiendo al calendario…
-            </p>
-          </CardContent>
-        </Card>
-      )}
+              <Button
+                size="sm"
+                disabled={savingToCalendar}
+                onClick={handleSaveToCalendar}
+                className="bg-sky-600 hover:bg-sky-700 text-white shrink-0"
+              >
+                {savingToCalendar
+                  ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Guardando…</>
+                  : <><Calendar className="h-3.5 w-3.5 mr-1.5" />Guardar en Calendario</>
+                }
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+        {multiDayInfo && savedToCalendar && (
+          <Card className="border-emerald-500/30 bg-emerald-500/5">
+            <CardContent className="py-3 px-4 flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+              <p className="text-sm text-emerald-700 dark:text-emerald-400 font-medium">
+                {multiDayInfo.totalSegments} turnos guardados — redirigiendo al calendario…
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
-      {/* ═══ Estado: progreso hacia el análisis ═══ */}
-      {!hasData && (
-        <Card className="border-dashed border-muted-foreground/15">
-          <CardContent className="py-6 lg:py-10">
-            <div className="flex flex-col lg:flex-row items-center justify-center gap-6 lg:gap-10">
-              <div className="flex items-center gap-3">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">1</div>
-                <div className="text-left">
-                  <p className="text-sm font-medium">Cargar archivos</p>
-                  <p className="text-[11px] text-muted-foreground">Excel Pieza-Pieza y/o Punto Cero</p>
+        {/* Stepper — guía de pasos cuando no hay datos cargados */}
+        {!hasData && (
+          <Card className="border-dashed border-muted-foreground/15">
+            <CardContent className="py-5">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-5">
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">1</div>
+                  <div className="text-left">
+                    <p className="text-sm font-medium">Cargar archivos</p>
+                    <p className="text-[11px] text-muted-foreground">Excel Pieza-Pieza y/o Punto Cero</p>
+                  </div>
+                </div>
+                <div className="hidden sm:block w-6 h-px bg-muted-foreground/20" />
+                <div className="flex items-center gap-3 opacity-40">
+                  <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-sm font-bold text-muted-foreground">2</div>
+                  <div className="text-left">
+                    <p className="text-sm font-medium">Configurar gates</p>
+                    <p className="text-[11px] text-muted-foreground">Calibres, calidad, umbrales</p>
+                  </div>
+                </div>
+                <div className="hidden sm:block w-6 h-px bg-muted-foreground/20" />
+                <div className="flex items-center gap-3 opacity-40">
+                  <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-sm font-bold text-muted-foreground">3</div>
+                  <div className="text-left">
+                    <p className="text-sm font-medium">Analizar turno</p>
+                    <p className="text-[11px] text-muted-foreground">KPIs, distribuciones, alertas</p>
+                  </div>
                 </div>
               </div>
-              <div className="hidden lg:block w-8 h-px bg-muted-foreground/20" />
-              <div className="flex items-center gap-3 opacity-40">
-                <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-sm font-bold text-muted-foreground">2</div>
-                <div className="text-left">
-                  <p className="text-sm font-medium">Configurar gates</p>
-                  <p className="text-[11px] text-muted-foreground">Calibres, calidad, umbrales</p>
-                </div>
-              </div>
-              <div className="hidden lg:block w-8 h-px bg-muted-foreground/20" />
-              <div className="flex items-center gap-3 opacity-40">
-                <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-sm font-bold text-muted-foreground">3</div>
-                <div className="text-left">
-                  <p className="text-sm font-medium">Analizar turno</p>
-                  <p className="text-[11px] text-muted-foreground">KPIs, distribuciones, alertas</p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
       {/* ═══ PANTALLA 2: Dashboard de análisis (full width) ═══ */}
       {hasData && analyticsResult && (
