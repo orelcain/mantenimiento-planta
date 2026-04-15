@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.92.0' as const
+export const APP_VERSION = '2.93.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-04-15' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Home Análisis Grader: layout 2 columnas + upload compacto + config tabulada' as const
+export const VERSION_NAME = 'fix(security): pdfjs-dist 3.11.174 → 4.10.38 (CVE-2024-4367)' as const
 
 /**
  * Nota:

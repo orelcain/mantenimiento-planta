@@ -491,7 +491,7 @@ export function ManualSearchModal({
       const viewport = page.getViewport({ scale })
       canvas.height = viewport.height
       canvas.width = viewport.width
-      await page.render({ canvas, canvasContext: ctx, viewport }).promise
+      await page.render({ canvasContext: ctx, viewport }).promise
 
       // Highlight layer
       if (highlightLayerRef.current) {
