@@ -37,7 +37,7 @@ html, body {
 ══════════════════════════════════════ */
 #rc-window {
   width: 760px;
-  height: 720px;
+  height: 660px;
   display: flex;
   flex-direction: column;
   box-shadow: 4px 4px 20px rgba(0,0,0,0.95);
@@ -180,17 +180,17 @@ html, body {
   background: #1A5276;
   border: 2px solid #F1C40F;
   color: #ffffff;
-  font-size: 25px;
+  font-size: 22px;
   font-weight: bold;
-  width: 150px;
-  height: 46px;
+  width: 140px;
+  height: 38px;
   font-family: 'Courier New', monospace;
   justify-content: center;
   letter-spacing: 0.5px;
   position: relative;
 }
-.ind.wt .unit { font-size: 16px; margin-left: 2px; color: #ffffff; }
-.ind.wt .sup { position: absolute; top: 2px; left: 6px; font-size: 12px; color: #ffffff; font-weight: normal; font-family: Arial, sans-serif; }
+.ind.wt .unit { font-size: 14px; margin-left: 2px; color: #ffffff; }
+.ind.wt .sup { position: absolute; top: 1px; left: 5px; font-size: 11px; color: #ffffff; font-weight: normal; font-family: Arial, sans-serif; }
 
 /* ══════════════════════════════════════
    V4: TÍTULO "StaticGrader" — TAB PARCIAL
@@ -218,12 +218,12 @@ html, body {
   flex-shrink: 0;
 }
 
-/* STATUS "7: CONTRASTACION" — full-width */
+/* STATUS "7: CONTRASTACION" — full-width, fondo más oscuro */
 .status {
-  background: #1A5276;
+  background: #154360;
   color: #ffffff;
   font-size: 13px;
-  padding: 4px 0 4px 10px;
+  padding: 5px 0 5px 12px;
   flex-shrink: 0;
   font-family: Arial, sans-serif;
   letter-spacing: 0.1px;
@@ -265,9 +265,9 @@ html, body {
 /* V13: gate number 10px, top:3px right:5px */
 .gn {
   position: absolute;
-  top: -1px;
-  right: 4px;
-  font-size: 14px;
+  top: 2px;
+  right: 5px;
+  font-size: 16px;
   font-weight: bold;
   color: #F1C40F;
   pointer-events: none;
@@ -284,18 +284,18 @@ html, body {
 .log {
   background: #ffffff;
   border-top: 1px solid #888;
-  height: 100px;
+  height: 88px;
   overflow: hidden;
   flex-shrink: 0;
-  padding: 5px 6px;
-  font-family: 'Courier New', monospace;
-  font-size: 13px;
+  padding: 5px 8px;
+  font-family: Arial, 'Segoe UI', sans-serif;
+  font-size: 14px;
   color: #000000;
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
 }
-.ll { padding: 1px 2px; background: #ffffff; color: #000000; white-space: nowrap; line-height: 1.5; }
+.ll { padding: 1px 2px; background: #ffffff; color: #000000; white-space: nowrap; line-height: 1.45; }
 /* V (ya aplicado): log highlight navy Windows */
 .ll.hl { background: #000099; color: #ffffff; }
 
@@ -312,7 +312,7 @@ html, body {
 }
 .btn {
   flex: 1;
-  height: 96px;
+  height: 78px;
   background: #1A5276;
   border: 1px solid #2874A6;
   border-radius: 0;
@@ -470,7 +470,7 @@ html, body {
    Fill: #0A1C36 (dark navy, visible vs bg #1A5276) ✓
    Stroke: #F1C40F 2px, crispEdges + non-scaling-stroke
 ══════════════════════════════════════════════════ */
-const GW = 116, GH = 108, NW = 14, NH = 14, R = 8;
+const GW = 116, GH = 108, NW = 24, NH = 20, R = 8;
 const FILL = '#1A5276';
 
 function pocketPath() {
