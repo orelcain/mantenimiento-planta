@@ -153,7 +153,8 @@ html, body {
 /* V17: gap 4px entre indicadores UNDER */
 .hdr-right {
   display: grid;
-  grid-template-columns: auto auto;
+  grid-template-rows: auto auto;
+  grid-auto-flow: column;
   gap: 6px;
   align-items: center;
   justify-self: center;
@@ -179,16 +180,17 @@ html, body {
   background: #F0F0F0;
   border: 2px solid #F1C40F;
   color: #000000;
-  font-size: 16px;
+  font-size: 19px;
   font-weight: bold;
-  width: 112px;
+  width: 132px;
+  height: 38px;
   font-family: 'Courier New', monospace;
   justify-content: center;
   letter-spacing: 0.3px;
   position: relative;
 }
-.ind.wt .unit { font-size: 11px; margin-left: 1px; }
-.ind.wt .sup { position: absolute; top: 1px; left: 4px; font-size: 9px; color: #555; font-weight: normal; font-family: Arial, sans-serif; }
+.ind.wt .unit { font-size: 13px; margin-left: 2px; }
+.ind.wt .sup { position: absolute; top: 2px; left: 5px; font-size: 11px; color: #555; font-weight: normal; font-family: Arial, sans-serif; }
 
 /* ══════════════════════════════════════
    V4: TÍTULO "StaticGrader" — TAB PARCIAL
@@ -263,15 +265,16 @@ html, body {
 /* V13: gate number 10px, top:3px right:5px */
 .gn {
   position: absolute;
-  top: 4px;
-  left: 8px;
-  font-size: 13px;
+  top: -1px;
+  right: 4px;
+  font-size: 14px;
   font-weight: bold;
   color: #F1C40F;
   pointer-events: none;
   font-family: Arial, sans-serif;
   line-height: 1;
   letter-spacing: 0.3px;
+  z-index: 2;
 }
 
 /* ══════════════════════════════════════
@@ -310,8 +313,8 @@ html, body {
 .btn {
   flex: 1;
   height: 76px;
-  background: #2E86C1;
-  border: 1px solid #5DADE2;
+  background: #1A5276;
+  border: 1px solid #2874A6;
   border-radius: 0;
   color: #ffffff;
   font-family: Arial, sans-serif;
@@ -325,9 +328,9 @@ html, body {
   white-space: nowrap;
   padding: 0 6px;
 }
-.btn + .btn { border-left: 1px solid #5DADE2; }
-.btn:hover  { background: #3498DB; }
-.btn:active { background: #1F618D; }
+.btn + .btn { border-left: 1px solid #2874A6; }
+.btn:hover  { background: #21618C; }
+.btn:active { background: #154360; }
 
 /* ══════════════════════════════════════
    PANELES (siguientes pantallas)
@@ -467,7 +470,7 @@ html, body {
    Stroke: #F1C40F 2px, crispEdges + non-scaling-stroke
 ══════════════════════════════════════════════════ */
 const GW = 116, GH = 108, NW = 14, NH = 14, R = 8;
-const FILL = '#08172C';
+const FILL = '#0E2640';
 
 function pocketPath() {
   /* Notch en TOP-RIGHT (esquina superior derecha) */
