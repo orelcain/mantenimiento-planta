@@ -1,0 +1,22 @@
+# Generated outputs
+output/*/
+output/*.mp4
+
+# TTS model files (large, download separately)
+*.onnx
+voices.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temp files
+*.concat.txt
+_concat_*/
