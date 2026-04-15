@@ -185,13 +185,20 @@ export function HmiGraderPage() {
         </div>
       </div>
 
-      {/* ── iframe ───────────────────────────────────────────────────── */}
-      <div className="flex-1 min-h-0 relative overflow-hidden bg-[#2C3E50]">
+      {/* ── iframe ─────────────────────────────────────────────────────
+          min-height: 880px porque el HMI + teclados necesitan ~854px y no
+          queremos depender solo del flex-1 del MainLayout (que puede colapsar
+          si el layout padre no tiene altura fija) */}
+      <div
+        className="flex-1 min-h-0 relative overflow-auto bg-[#2C3E50]"
+        style={{ minHeight: 880 }}
+      >
         <iframe
           ref={iframeRef}
           src={iframeSrc}
           title="HMI Grader Simulator"
-          className="w-full h-full border-0"
+          className="w-full border-0 block"
+          style={{ height: '100%', minHeight: 880 }}
           allow="fullscreen"
           sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals"
         />
