@@ -198,7 +198,7 @@ html, body {
   background: #1A5276;
   flex-shrink: 0;
   display: flex;
-  border-bottom: 3px solid #ffffff;
+  border-bottom: 4px solid #ffffff;
 }
 .title-bar {
   background: #2980B9;
@@ -238,19 +238,19 @@ html, body {
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  gap: 4px;
-  padding: 6px 8px;
+  gap: 14px;
+  padding: 14px 10px;
 }
 .gate-row {
   display: flex;
-  gap: 4px;
+  gap: 8px;
   width: 100%;
   justify-content: center;
 }
 /* V6: 100×80px (más ancho y más bajo que 98×92) */
 .gate {
   width: 116px;
-  height: 100px;
+  height: 108px;
   position: relative;
   cursor: pointer;
   flex-shrink: 0;
@@ -280,10 +280,10 @@ html, body {
 .log {
   background: #ffffff;
   border-top: 1px solid #888;
-  height: 80px;
+  height: 100px;
   overflow: hidden;
   flex-shrink: 0;
-  padding: 3px 5px;
+  padding: 5px 6px;
   font-family: 'Courier New', monospace;
   font-size: 13px;
   color: #000000;
@@ -291,7 +291,7 @@ html, body {
   flex-direction: column;
   justify-content: flex-start;
 }
-.ll { padding: 1px 2px; background: #ffffff; color: #000000; white-space: nowrap; line-height: 1.42; }
+.ll { padding: 1px 2px; background: #ffffff; color: #000000; white-space: nowrap; line-height: 1.5; }
 /* V (ya aplicado): log highlight navy Windows */
 .ll.hl { background: #000099; color: #ffffff; }
 
@@ -303,14 +303,14 @@ html, body {
   gap: 0;
   flex-shrink: 0;
   background: #1A5276;
-  padding: 2px 0 0;
+  padding: 4px 0 0;
   border-top: 1px solid #154360;
 }
 .btn {
   flex: 1;
-  height: 80px;
+  height: 76px;
   background: #1A5276;
-  border: 1px solid #2874A6;
+  border: 1px solid rgba(255,255,255,0.18);
   border-radius: 0;
   color: #ffffff;
   font-family: Arial, sans-serif;
@@ -324,7 +324,7 @@ html, body {
   white-space: nowrap;
   padding: 0 6px;
 }
-.btn + .btn { border-left: none; }
+.btn + .btn { border-left: 1px solid rgba(255,255,255,0.18); }
 .btn:hover  { background: #21618C; }
 .btn:active { background: #154360; }
 
@@ -465,8 +465,8 @@ html, body {
    Fill: #0A1C36 (dark navy, visible vs bg #1A5276) ✓
    Stroke: #F1C40F 2px, crispEdges + non-scaling-stroke
 ══════════════════════════════════════════════════ */
-const GW = 116, GH = 100, NW = 13, NH = 12, R = 7;
-const FILL = '#0E2C50';
+const GW = 116, GH = 108, NW = 14, NH = 14, R = 8;
+const FILL = '#102B4F';
 
 function pocketPath() {
   return [
