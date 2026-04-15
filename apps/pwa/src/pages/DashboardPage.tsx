@@ -29,6 +29,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { IncidentDetail } from '@/components/incidents/IncidentDetail'
 import type { User, UserRole, Zone } from '@/types'
 import { getUserById } from '@/services/auth'
+import { MobileHomeGrid } from '@/components/home/MobileHomeGrid'
 
 export function DashboardPage() {
   const navigate = useNavigate()
@@ -175,6 +176,10 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6">
+
+      {/* Home mobile — accesos directos por rol (solo visible en mobile) */}
+      <MobileHomeGrid />
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
