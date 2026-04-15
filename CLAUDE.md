@@ -52,12 +52,13 @@ Cuando el usuario diga `cerrar`, `terminar`, `ya está`, `gracias`, `hasta luego
 - **Ruta única**: `D:\a\APP leventamiento de insidencias en planta\` — único clon git local. NO existe clon en OneDrive (eliminado 2026-04-09, era legacy con drift de 240 commits).
 - **Sync**: solo `git push origin main` — el otro PC del trabajo accede via claude.ai conectado a GitHub directamente, no necesita carpeta sincronizada.
 - **Commits**: En inglés, prefijos convencionales (`feat:`, `fix:`, `docs:`, etc.)
-- **Version bump OBLIGATORIO en cada push a producción**: antes de cada `git push origin main`, incrementar la versión en AMBOS archivos:
-  1. `apps/pwa/package.json` → campo `"version"`
-  2. `apps/pwa/src/constants/version.ts` → `APP_VERSION`
+- **Version bump OBLIGATORIO en cada push a producción**: antes de cada `git push origin main`:
+  1. Editar `apps/pwa/package.json` → campo `"version"`
+  2. Editar `apps/pwa/src/constants/version.ts` → `APP_VERSION` + `VERSION_NAME`
+  3. **Correr `node scripts/sync-pwa-version.mjs`** desde la raíz del repo → actualiza `public/version.json` y `VERSION.md` (sin esto el banner de actualización muestra versión incorrecta)
   - Usar versionado semántico: `feat` → minor (2.90 → 2.91), `fix`/`docs` → patch (2.90.0 → 2.90.1)
-  - La versión aparece visible en la UI (header del sidebar). Versión actual: **v2.90.0**
-  - ⚠️ El script `sync:version` prebuild lee `package.json` y escribe `version.ts`. Si bumpeás solo `version.ts`, el siguiente build lo revierte. Bumpar SIEMPRE `package.json` primero.
+  - La versión aparece visible en la UI (header del sidebar). Versión actual: **v2.91.0**
+  - ⚠️ El script `sync:version` corre automático en prebuild del CI, pero NO al hacer commits manuales → siempre correrlo a mano.
 - **No crear README.md ni docs** salvo que se pida explicitamente.
 - **Base URL**: `/mantenimiento-planta/` (GitHub Pages)
 - **Deploy**: GitHub Pages via `gh-pages` branch + Firebase Hosting
