@@ -197,7 +197,9 @@ export function GraderPeriodView({ data }: Props) {
     })
 
     return {
-      labels: dailyP0Series.map((d) => formatShortDate(d.dateKey)),
+      // Índices numéricos → LinearScale en el eje X → zoom proporcional real
+      // (CategoryScale usa integerChange que da saltos fijos de ±2 días por tick)
+      labels: dailyP0Series.map((_, i) => i),
       datasets: [
         {
           label: 'Turno día',
@@ -310,11 +312,20 @@ export function GraderPeriodView({ data }: Props) {
         ticks: { callback: (v: any) => `${v}%` },
       },
       x: {
+        type: 'linear' as const,
+        min: 0,
+        max: dailyP0Series.length - 1,
         ticks: {
           maxRotation: 50,
           minRotation: 0,
           autoSkip: true,
           maxTicksLimit: 20,
+          // Convertir índice numérico → fecha legible
+          callback: (val: any) => {
+            const idx = Math.round(Number(val))
+            const entry = dailyP0Series[idx]
+            return entry ? formatShortDate(entry.dateKey) : ''
+          },
         },
       },
     },
