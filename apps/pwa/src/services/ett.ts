@@ -1,6 +1,11 @@
 /**
- * Servicios para gestión de Especificaciones Técnicas del Trabajo (ETT)
- * Almacenamiento en Firestore con métodos CRUD completos
+ * Servicios Firestore para ETT (Especificaciones Técnicas del Trabajo)
+ *
+ * CRUD completo sobre la colección `ett`.
+ *
+ * El modelo de dominio usa `Date` para los timestamps, mientras que Firestore
+ * usa `Timestamp`. Los helpers `toFirestoreData` / `fromFirestoreData` se
+ * encargan de la conversión en ambos sentidos.
  */
 
 import {
@@ -19,81 +24,168 @@ import {
   QueryConstraint,
 } from '@/services/firestoreTracked'
 import { db } from '@/services/firebase'
-import type { ETT, ETTAdjunto } from '@/types'
+import type { ETT, ETTCabecera, ETTEstado, ETTImagen } from '@/types'
 import { logger } from '@/lib/logger'
 
 const ETT_COLLECTION = 'ett'
 
-/**
- * Crear nueva ETT
- */
-export async function createETT(ett: Omit<ETT, 'id'>): Promise<string> {
+// ============================================================================
+// HELPERS DE CONVERSIÓN (Date ↔ Timestamp)
+// ============================================================================
+
+/** Convierte un Date a Timestamp de Firestore; null/undefined se mantienen. */
+function dateToTs(d: Date | undefined | null): Timestamp | null {
+  return d ? Timestamp.fromDate(d) : null
+}
+
+/** Convierte un Timestamp/objeto de Firestore a Date; null/undefined → undefined. */
+function tsToDate(ts: unknown): Date | undefined {
+  if (!ts) return undefined
+  if (ts instanceof Date) return ts
+  if (typeof (ts as Timestamp).toDate === 'function') {
+    return (ts as Timestamp).toDate()
+  }
+  return undefined
+}
+
+/** Convierte la cabecera del modelo de dominio al formato Firestore. */
+function cabeceraToFirestore(cab: ETTCabecera): Record<string, unknown> {
+  return {
+    ...cab,
+    fecha_requerimiento: dateToTs(cab.fecha_requerimiento),
+    fecha_inicio: dateToTs(cab.fecha_inicio),
+    fecha_termino: dateToTs(cab.fecha_termino),
+  }
+}
+
+/** Convierte la cabecera desde Firestore al modelo de dominio. */
+function cabeceraFromFirestore(data: Record<string, unknown>): ETTCabecera {
+  return {
+    fecha_requerimiento: tsToDate(data.fecha_requerimiento) || new Date(),
+    proyecto: (data.proyecto as string) || '',
+    usuario_solicitante: (data.usuario_solicitante as string) || '',
+    sector_realizacion: (data.sector_realizacion as string) || '',
+    fecha_inicio: tsToDate(data.fecha_inicio),
+    fecha_termino: tsToDate(data.fecha_termino),
+    garantia_texto:
+      (data.garantia_texto as string) || '06 (meses) Garantía Temporada Alta',
+  }
+}
+
+/** Convierte imágenes del modelo al formato Firestore. */
+function imagenesToFirestore(imagenes: ETTImagen[]): Record<string, unknown>[] {
+  return (imagenes || []).map((img) => ({
+    ...img,
+    uploadedAt: dateToTs(img.uploadedAt),
+  }))
+}
+
+/** Convierte imágenes desde Firestore al modelo. */
+function imagenesFromFirestore(data: unknown): ETTImagen[] {
+  if (!Array.isArray(data)) return []
+  return data.map((img: Record<string, unknown>) => ({
+    id: (img.id as string) || '',
+    nombre: (img.nombre as string) || '',
+    url: (img.url as string) || '',
+    descripcion: img.descripcion as string | undefined,
+    uploadedAt: tsToDate(img.uploadedAt) || new Date(),
+  }))
+}
+
+/** Serializa una ETT completa al formato Firestore. */
+function ettToFirestore(ett: Omit<ETT, 'id'>): Record<string, unknown> {
+  return {
+    cabecera: cabeceraToFirestore(ett.cabecera),
+    area_intervencion: ett.area_intervencion,
+    descripcion_trabajos: ett.descripcion_trabajos,
+    responsabilidades_contratista: ett.responsabilidades_contratista,
+    imagenes: imagenesToFirestore(ett.imagenes),
+    estado: ett.estado,
+    createdBy: ett.createdBy,
+    createdAt: dateToTs(ett.createdAt),
+    updatedAt: dateToTs(ett.updatedAt),
+    aprobado_por: ett.aprobado_por || null,
+    fecha_aprobacion: dateToTs(ett.fecha_aprobacion),
+    origen: ett.origen || null,
+    duplicado_de: ett.duplicado_de || null,
+  }
+}
+
+/** Deserializa una ETT desde el formato Firestore al modelo de dominio. */
+function ettFromFirestore(id: string, data: Record<string, unknown>): ETT {
+  return {
+    id,
+    cabecera: cabeceraFromFirestore(
+      (data.cabecera as Record<string, unknown>) || {},
+    ),
+    area_intervencion: (data.area_intervencion as string) || '',
+    descripcion_trabajos: (data.descripcion_trabajos as ETT['descripcion_trabajos']) || [],
+    responsabilidades_contratista:
+      (data.responsabilidades_contratista as string[]) || [],
+    imagenes: imagenesFromFirestore(data.imagenes),
+    estado: ((data.estado as ETTEstado) || 'borrador') as ETTEstado,
+    createdBy: (data.createdBy as string) || '',
+    createdAt: tsToDate(data.createdAt) || new Date(),
+    updatedAt: tsToDate(data.updatedAt) || new Date(),
+    aprobado_por: data.aprobado_por as string | undefined,
+    fecha_aprobacion: tsToDate(data.fecha_aprobacion),
+    origen: data.origen as ETT['origen'],
+    duplicado_de: data.duplicado_de as string | undefined,
+  }
+}
+
+// ============================================================================
+// CRUD
+// ============================================================================
+
+/** Crea una nueva ETT en Firestore. Devuelve el ID generado. */
+export async function createETT(
+  ett: Omit<ETT, 'id' | 'createdAt' | 'updatedAt'>,
+): Promise<string> {
   try {
     const ettRef = doc(collection(db, ETT_COLLECTION))
     const now = new Date()
 
-    const ettData = {
+    const fullETT: Omit<ETT, 'id'> = {
       ...ett,
-      createdAt: Timestamp.fromDate(now),
-      updatedAt: Timestamp.fromDate(now),
-      general: {
-        ...ett.general,
-        fecha: Timestamp.fromDate(ett.general.fecha),
-      },
-      adjuntos: (ett.adjuntos || []).map(adj => ({
-        ...adj,
-        uploadedAt: Timestamp.fromDate(adj.uploadedAt),
-      })),
+      createdAt: now,
+      updatedAt: now,
     }
 
-    await setDoc(ettRef, ettData)
+    await setDoc(ettRef, ettToFirestore(fullETT))
     logger.info('ETT created', { id: ettRef.id })
     return ettRef.id
   } catch (error) {
-    logger.error('Error creating ETT', error instanceof Error ? error : new Error(String(error)))
+    logger.error(
+      'Error creating ETT',
+      error instanceof Error ? error : new Error(String(error)),
+    )
     throw error
   }
 }
 
-/**
- * Obtener ETT por ID
- */
+/** Obtiene una ETT por ID. Devuelve `null` si no existe. */
 export async function getETT(ettId: string): Promise<ETT | null> {
   try {
     const ettRef = doc(db, ETT_COLLECTION, ettId)
     const ettSnap = await getDoc(ettRef)
 
-    if (!ettSnap.exists()) {
-      return null
-    }
+    if (!ettSnap.exists()) return null
 
-    const data = ettSnap.data() as any
-    return {
-      id: ettSnap.id,
-      ...data,
-      createdAt: data.createdAt?.toDate() || new Date(),
-      updatedAt: data.updatedAt?.toDate() || new Date(),
-      general: {
-        ...data.general,
-        fecha: data.general?.fecha?.toDate() || new Date(),
-      },
-      adjuntos: (data.adjuntos || []).map((adj: any) => ({
-        ...adj,
-        uploadedAt: adj.uploadedAt?.toDate() || new Date(),
-      })),
-    } as ETT
+    return ettFromFirestore(ettSnap.id, ettSnap.data() as Record<string, unknown>)
   } catch (error) {
-    logger.error('Error getting ETT', error instanceof Error ? error : new Error(String(error)))
+    logger.error(
+      'Error getting ETT',
+      error instanceof Error ? error : new Error(String(error)),
+    )
     throw error
   }
 }
 
-/**
- * Listar ETT con filtros opcionales
- */
+/** Lista ETTs con filtros opcionales. Ordenadas por createdAt descendente. */
 export async function listETT(filters?: {
   createdBy?: string
-  estado?: string
+  estado?: ETTEstado
   limit?: number
 }): Promise<ETT[]> {
   try {
@@ -102,100 +194,87 @@ export async function listETT(filters?: {
     if (filters?.createdBy) {
       constraints.push(where('createdBy', '==', filters.createdBy))
     }
-
     if (filters?.estado) {
       constraints.push(where('estado', '==', filters.estado))
     }
-
     constraints.push(orderBy('createdAt', 'desc'))
-
     if (filters?.limit) {
       constraints.push(limit(filters.limit))
     }
 
     const q = query(collection(db, ETT_COLLECTION), ...constraints)
-    const querySnapshot = await getDocs(q)
+    const snap = await getDocs(q)
 
-    return querySnapshot.docs.map(doc => {
-      const data = doc.data() as any
-      return {
-        id: doc.id,
-        ...data,
-        createdAt: data.createdAt?.toDate() || new Date(),
-        updatedAt: data.updatedAt?.toDate() || new Date(),
-        general: {
-          ...data.general,
-          fecha: data.general?.fecha?.toDate() || new Date(),
-        },
-        adjuntos: (data.adjuntos || []).map((adj: any) => ({
-          ...adj,
-          uploadedAt: adj.uploadedAt?.toDate() || new Date(),
-        })),
-      } as ETT
-    })
+    return snap.docs.map((d) =>
+      ettFromFirestore(d.id, d.data() as Record<string, unknown>),
+    )
   } catch (error) {
-    logger.error('Error listing ETT', error instanceof Error ? error : new Error(String(error)))
+    logger.error(
+      'Error listing ETT',
+      error instanceof Error ? error : new Error(String(error)),
+    )
     throw error
   }
 }
 
-/**
- * Actualizar ETT
- */
-export async function updateETT(ettId: string, updates: Partial<ETT>): Promise<void> {
+/** Actualiza una ETT existente. El campo `updatedAt` se actualiza automáticamente. */
+export async function updateETT(
+  ettId: string,
+  updates: Partial<Omit<ETT, 'id' | 'createdAt'>>,
+): Promise<void> {
   try {
     const ettRef = doc(db, ETT_COLLECTION, ettId)
 
-    const updateData: any = {
-      ...updates,
+    // Construir el objeto de actualización convirtiendo solo los campos presentes
+    const updateData: Record<string, unknown> = {
       updatedAt: Timestamp.fromDate(new Date()),
     }
 
-    if (updates.general) {
-      updateData.general = {
-        ...updates.general,
-        fecha: Timestamp.fromDate(updates.general.fecha),
-      }
+    if (updates.cabecera) {
+      updateData.cabecera = cabeceraToFirestore(updates.cabecera)
     }
-
-    if (updates.adjuntos) {
-      updateData.adjuntos = updates.adjuntos.map(adj => ({
-        ...adj,
-        uploadedAt: Timestamp.fromDate(adj.uploadedAt),
-      }))
+    if (updates.area_intervencion !== undefined) {
+      updateData.area_intervencion = updates.area_intervencion
+    }
+    if (updates.descripcion_trabajos) {
+      updateData.descripcion_trabajos = updates.descripcion_trabajos
+    }
+    if (updates.responsabilidades_contratista) {
+      updateData.responsabilidades_contratista = updates.responsabilidades_contratista
+    }
+    if (updates.imagenes) {
+      updateData.imagenes = imagenesToFirestore(updates.imagenes)
+    }
+    if (updates.estado) {
+      updateData.estado = updates.estado
+    }
+    if (updates.aprobado_por !== undefined) {
+      updateData.aprobado_por = updates.aprobado_por
+    }
+    if (updates.fecha_aprobacion !== undefined) {
+      updateData.fecha_aprobacion = dateToTs(updates.fecha_aprobacion)
     }
 
     await updateDoc(ettRef, updateData)
     logger.info('ETT updated', { id: ettId })
   } catch (error) {
-    logger.error('Error updating ETT', error instanceof Error ? error : new Error(String(error)))
+    logger.error(
+      'Error updating ETT',
+      error instanceof Error ? error : new Error(String(error)),
+    )
     throw error
   }
 }
 
-/**
- * Cambiar estado de ETT
- */
+/** Cambia el estado de una ETT. */
 export async function updateETTEstado(
   ettId: string,
-  estado: 'borrador' | 'en_revision' | 'aprobada' | 'completada' | 'archivada'
+  estado: ETTEstado,
 ): Promise<void> {
-  try {
-    const ettRef = doc(db, ETT_COLLECTION, ettId)
-    await updateDoc(ettRef, {
-      estado,
-      updatedAt: Timestamp.fromDate(new Date()),
-    })
-    logger.info('ETT estado updated', { id: ettId, estado })
-  } catch (error) {
-    logger.error('Error updating ETT estado', error instanceof Error ? error : new Error(String(error)))
-    throw error
-  }
+  await updateETT(ettId, { estado })
 }
 
-/**
- * Aprobar ETT
- */
+/** Aprueba una ETT (cambia estado a 'aprobada' y registra aprobador). */
 export async function approveETT(ettId: string, approvedBy: string): Promise<void> {
   try {
     const ettRef = doc(db, ETT_COLLECTION, ettId)
@@ -207,59 +286,82 @@ export async function approveETT(ettId: string, approvedBy: string): Promise<voi
     })
     logger.info('ETT approved', { id: ettId, approvedBy })
   } catch (error) {
-    logger.error('Error approving ETT', error instanceof Error ? error : new Error(String(error)))
+    logger.error(
+      'Error approving ETT',
+      error instanceof Error ? error : new Error(String(error)),
+    )
     throw error
   }
 }
 
-/**
- * Eliminar ETT
- */
+/** Elimina una ETT de Firestore. */
 export async function deleteETT(ettId: string): Promise<void> {
   try {
     const ettRef = doc(db, ETT_COLLECTION, ettId)
     await deleteDoc(ettRef)
     logger.info('ETT deleted', { id: ettId })
   } catch (error) {
-    logger.error('Error deleting ETT', error instanceof Error ? error : new Error(String(error)))
+    logger.error(
+      'Error deleting ETT',
+      error instanceof Error ? error : new Error(String(error)),
+    )
     throw error
   }
 }
 
 /**
- * Agregar adjunto a ETT
+ * Duplica una ETT existente creando una copia nueva en estado 'borrador'.
+ * La copia conserva todos los datos de contenido pero resetea metadata.
  */
-export async function addETTAdjunto(ettId: string, adjunto: ETTAdjunto): Promise<void> {
+export async function duplicateETT(
+  ettId: string,
+  newCreatedBy: string,
+): Promise<string> {
   try {
-    const ett = await getETT(ettId)
-    if (!ett) {
-      throw new Error('ETT no encontrada')
+    const original = await getETT(ettId)
+    if (!original) {
+      throw new Error(`ETT no encontrada: ${ettId}`)
     }
 
-    const adjuntos = [...(ett.adjuntos || []), adjunto]
-    await updateETT(ettId, { adjuntos })
-    logger.info('Adjunto added to ETT', { ettId, adjuntoId: adjunto.id })
+    const copia: Omit<ETT, 'id' | 'createdAt' | 'updatedAt'> = {
+      cabecera: {
+        ...original.cabecera,
+        fecha_requerimiento: new Date(),
+        fecha_inicio: undefined,
+        fecha_termino: undefined,
+      },
+      area_intervencion: original.area_intervencion,
+      descripcion_trabajos: original.descripcion_trabajos,
+      responsabilidades_contratista: original.responsabilidades_contratista,
+      imagenes: [], // No duplicamos imágenes, usuario puede adjuntar nuevas
+      estado: 'borrador',
+      createdBy: newCreatedBy,
+      origen: 'duplicado',
+      duplicado_de: ettId,
+    }
+
+    return await createETT(copia)
   } catch (error) {
-    logger.error('Error adding adjunto to ETT', error instanceof Error ? error : new Error(String(error)))
+    logger.error(
+      'Error duplicating ETT',
+      error instanceof Error ? error : new Error(String(error)),
+    )
     throw error
   }
 }
 
-/**
- * Remover adjunto de ETT
- */
-export async function removeETTAdjunto(ettId: string, adjuntoId: string): Promise<void> {
-  try {
-    const ett = await getETT(ettId)
-    if (!ett) {
-      throw new Error('ETT no encontrada')
-    }
+/** Agrega una imagen al array de imágenes de una ETT existente. */
+export async function addETTImagen(ettId: string, imagen: ETTImagen): Promise<void> {
+  const ett = await getETT(ettId)
+  if (!ett) throw new Error(`ETT no encontrada: ${ettId}`)
+  await updateETT(ettId, { imagenes: [...ett.imagenes, imagen] })
+}
 
-    const adjuntos = (ett.adjuntos || []).filter(a => a.id !== adjuntoId)
-    await updateETT(ettId, { adjuntos })
-    logger.info('Adjunto removed from ETT', { ettId, adjuntoId })
-  } catch (error) {
-    logger.error('Error removing adjunto from ETT', error instanceof Error ? error : new Error(String(error)))
-    throw error
-  }
+/** Elimina una imagen del array de imágenes de una ETT existente. */
+export async function removeETTImagen(ettId: string, imagenId: string): Promise<void> {
+  const ett = await getETT(ettId)
+  if (!ett) throw new Error(`ETT no encontrada: ${ettId}`)
+  await updateETT(ettId, {
+    imagenes: ett.imagenes.filter((img) => img.id !== imagenId),
+  })
 }

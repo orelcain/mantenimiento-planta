@@ -1,264 +1,204 @@
 /**
- * Servicios de IA para mejora de ETT
- * Utiliza el proxy centralizado de Groq (Cloud Function o directo)
+ * Servicios de IA para ETT
+ *
+ * Expone DOS funciones:
+ *
+ *   1. `mejorarTexto(texto, contexto)`
+ *        Mejora la redacción de un texto corto (1-5 líneas).
+ *        Usado desde el editor WYSIWYG en el botón "✨ Mejorar" de cada bloque.
+ *
+ *   2. `completarPlantillaIA(ctx)`
+ *        A partir de una plantilla + descripción libre del usuario, devuelve
+ *        un objeto estructurado con los campos rellenos y la lista de campos
+ *        faltantes que la IA no pudo inferir.
+ *
+ * Ambas usan el proxy centralizado de Groq vía Cloud Function `groqProxy`.
  */
 
 import { logger } from '@/lib/logger'
-import type { ETTSugerenciaIA } from '@/types'
+import type { ETTContextoIA, ETTCompletadoIA } from '@/types'
+import { getPlantilla } from '@/data/ettTemplates'
 
-// Re-usar la infraestructura centralizada de ai.ts
-// Import dinámico para evitar dependencias circulares
-async function callGroqAPI(prompt: string, temperature = 0.7): Promise<string> {
+// ============================================================================
+// HELPER: llamada al proxy de Groq
+// ============================================================================
+
+async function callGroqAPI(
+  prompt: string,
+  opts: { temperature?: number; maxTokens?: number; jsonMode?: boolean } = {},
+): Promise<string> {
   try {
-    // Importar dinámicamente callGroq de ai.ts
     const { isAIConfigured } = await import('./ai')
     if (!isAIConfigured()) {
-      logger.warn('IA no configurada, devolviendo texto original')
-      return prompt
+      throw new Error('IA no configurada (falta API key de Groq)')
     }
 
-    // Usar httpsCallable directamente o fallback
-    const { httpsCallable } = await import('firebase/functions')
-    const { getFunctions } = await import('firebase/functions')
+    const { httpsCallable, getFunctions } = await import('firebase/functions')
     const firebaseApp = (await import('@/services/firebase')).default
 
-    try {
-      const functions = getFunctions(firebaseApp)
-      const groqProxy = httpsCallable(functions, 'groqProxy')
-      const result = await groqProxy({
-        messages: [{ role: 'user', content: prompt }],
-        model: 'llama-3.3-70b-versatile',
-        temperature,
-        max_tokens: 1000,
-      })
-      const data = result.data as { content: string }
-      return data.content || ''
-    } catch (cfErr) {
-      throw new Error('IA no disponible (Cloud Function): ' + (cfErr instanceof Error ? cfErr.message : String(cfErr)))
-    }
+    const functions = getFunctions(firebaseApp)
+    const groqProxy = httpsCallable(functions, 'groqProxy')
+
+    const result = await groqProxy({
+      messages: [{ role: 'user', content: prompt }],
+      model: 'llama-3.3-70b-versatile',
+      temperature: opts.temperature ?? 0.5,
+      max_tokens: opts.maxTokens ?? 1500,
+      response_format: opts.jsonMode ? { type: 'json_object' } : undefined,
+    })
+
+    const data = result.data as { content: string }
+    return data.content || ''
   } catch (error) {
-    logger.error('Error calling Groq API', error instanceof Error ? error : new Error(String(error)))
+    logger.error(
+      'Error llamando a Groq',
+      error instanceof Error ? error : new Error(String(error)),
+    )
     throw error
   }
 }
 
+// ============================================================================
+// 1. MEJORAR TEXTO (para botón "✨ Mejorar" de cada bloque)
+// ============================================================================
+
+/** Contexto del texto a mejorar — guía a la IA sobre el tono y formato esperado */
+export type ContextoMejora =
+  | 'parrafo' // Párrafo descriptivo general
+  | 'lista_item' // Item de una lista con viñetas
+  | 'responsabilidad' // Responsabilidad del contratista
+  | 'area' // Descripción del área de intervención
+
 /**
- * Mejora la descripción del trabajo
- * - Agrega tecnicismo
- * - Clarifica objetivos
- * - Enfatiza seguridad
+ * Mejora la redacción técnica de un texto corto.
+ *
+ * La IA:
+ *   - Usa terminología técnica de mantenimiento industrial
+ *   - Mantiene el largo similar al original (no infla el texto)
+ *   - Devuelve SOLO el texto mejorado, sin explicaciones
+ *   - Respeta el contexto (si es lista item, no agrega "En primer lugar...")
  */
-export async function improveTrabajoDescripcion(
-  textoOriginal: string
-): Promise<ETTSugerenciaIA> {
-  const prompt = `Como experto en mantenimiento industrial, mejora la siguiente descripción de trabajo.
-La versión mejorada debe:
-- Ser más técnica y precisa
-- Incluir objetivos claros
-- Destacar consideraciones de seguridad
-- Ser concisa pero completa
+export async function mejorarTexto(
+  textoOriginal: string,
+  contexto: ContextoMejora = 'parrafo',
+): Promise<string> {
+  const instruccionesPorContexto: Record<ContextoMejora, string> = {
+    parrafo:
+      'Mejora este párrafo manteniendo su extensión. Usa terminología técnica precisa de mantenimiento industrial.',
+    lista_item:
+      'Mejora este item de lista. Debe ser conciso (1 línea), empezar con un verbo en infinitivo o sustantivo, sin conectores narrativos.',
+    responsabilidad:
+      'Mejora esta responsabilidad del contratista. Debe empezar con verbo en infinitivo, ser específica y medible.',
+    area:
+      'Mejora esta descripción de área de intervención. Debe ser específica (ubicación, superficie, referencias visuales) pero concisa.',
+  }
+
+  const prompt = `Como experto en ingeniería de mantenimiento industrial, ${instruccionesPorContexto[contexto]}
 
 Texto original:
-"${textoOriginal}"
+"""
+${textoOriginal}
+"""
 
-Responde SOLO con el texto mejorado, sin explicaciones adicionales.`
+Responde SOLO con el texto mejorado, sin comillas, sin prefijos, sin explicaciones.`
 
-  try {
-    const mejorado = await callGroqAPI(prompt, 0.7)
-
-    return {
-      campo: 'trabajo_descripcion',
-      texto_original: textoOriginal,
-      texto_mejorado: mejorado.trim(),
-      mejoras: [
-        'Añadida terminología técnica',
-        'Clarificados objetivos',
-        'Enfatizada seguridad',
-        'Mejorada estructura'
-      ]
-    }
-  } catch (error) {
-    logger.error('Error improving trabajo descripcion', error instanceof Error ? error : new Error(String(error)))
-    throw error
-  }
+  const mejorado = await callGroqAPI(prompt, { temperature: 0.4, maxTokens: 500 })
+  return mejorado.trim().replace(/^["']|["']$/g, '')
 }
 
+// ============================================================================
+// 2. COMPLETAR PLANTILLA CON IA (asistente conversacional)
+// ============================================================================
+
 /**
- * Mejora la especificación de un material
- * - Agrega estándares (ISO, DIN)
- * - Clarifica propiedades técnicas
- * - Añade alternativas comerciales
+ * A partir de una descripción libre del usuario, completa los campos
+ * de una plantilla ETT con structured output (JSON).
+ *
+ * Flujo esperado en la UI:
+ *
+ *   1. Usuario elige "Asistente IA" y dicta/escribe qué trabajo necesita
+ *   2. Se llama esta función con la plantilla base + la descripción
+ *   3. La IA devuelve `ETTCompletadoIA`:
+ *      - Campos que pudo inferir (cabecera, area_intervencion, bloques, ...)
+ *      - Lista de `campos_faltantes` con preguntas concretas
+ *   4. La UI muestra los valores inferidos + lista de preguntas
+ *   5. Usuario responde las preguntas una por una
+ *   6. Al final, el documento se abre en el editor WYSIWYG para ajuste fino
  */
-export async function improveMaterialEspecificacion(
-  textoOriginal: string
-): Promise<ETTSugerenciaIA> {
-  const prompt = `Como experto en procura y especificaciones técnicas, mejora la siguiente especificación de material.
-La versión mejorada debe:
-- Incluir normas aplicables (ISO, DIN, ASTM, etc.)
-- Especificar propiedades técnicas claras
-- Ser comercialmente viable
-- Incluir criterios de aceptación
+export async function completarPlantillaIA(
+  ctx: ETTContextoIA,
+): Promise<ETTCompletadoIA> {
+  const plantilla = getPlantilla(ctx.plantilla_id)
 
-Especificación original:
-"${textoOriginal}"
+  const prompt = `Eres un ingeniero experto en mantenimiento industrial que prepara Especificaciones Técnicas de Trabajo (ETT) para AquaChile - Planta Chonchi.
 
-Responde SOLO con la especificación mejorada, sin explicaciones adicionales.`
+Tu tarea es completar los campos variables de una plantilla ETT a partir de la descripción libre del usuario.
 
-  try {
-    const mejorado = await callGroqAPI(prompt, 0.7)
+PLANTILLA BASE (${plantilla.nombre}):
+${JSON.stringify(plantilla.defaults, null, 2)}
 
-    return {
-      campo: 'material_especificacion',
-      texto_original: textoOriginal,
-      texto_mejorado: mejorado.trim(),
-      mejoras: [
-        'Añadidas normas técnicas',
-        'Clarificadas propiedades',
-        'Mejora comercial',
-        'Criterios de aceptación'
-      ]
-    }
-  } catch (error) {
-    logger.error('Error improving material especificacion', error instanceof Error ? error : new Error(String(error)))
-    throw error
-  }
+DESCRIPCIÓN DEL USUARIO:
+"""
+${ctx.descripcion_usuario}
+"""
+
+PERFIL DEL USUARIO:
+- Departamento: ${ctx.user_profile?.departamento ?? 'Dpto. Mantención Chonchi'}
+- Nombre: ${ctx.user_profile?.nombre ?? '(no informado)'}
+
+INSTRUCCIONES:
+1. Reemplaza los slots con corchetes \`[...]\` por valores concretos basados en la descripción del usuario.
+2. Usa el mismo estilo técnico del ejemplo (frases directas, sin coloquialismos).
+3. Si algún campo NO puede inferirse con certeza, déjalo con su valor original \`[...]\` Y agrégalo a \`campos_faltantes\` con una pregunta clara.
+4. Mantén la ESTRUCTURA de bloques intacta (no cambies tipos, solo reemplaza strings).
+5. Para fechas, usa objetos \`{ "__date__": "YYYY-MM-DD" }\` que serán convertidos a Date por el frontend.
+
+FORMATO DE RESPUESTA (JSON estricto):
+{
+  "cabecera": {
+    "proyecto": "...",
+    "usuario_solicitante": "...",
+    "sector_realizacion": "..."
+  },
+  "area_intervencion": "...",
+  "descripcion_trabajos": [ ... bloques con la misma estructura que la plantilla ... ],
+  "responsabilidades_contratista": [ "...", "..." ],
+  "campos_faltantes": [
+    { "campo": "fecha_inicio", "pregunta": "¿Fecha estimada de inicio?", "tipo": "fecha" },
+    { "campo": "cantidad", "pregunta": "¿Cuántas unidades?", "tipo": "numero" }
+  ]
 }
 
-/**
- * Mejora la descripción de un procedimiento
- * - Estructura paso a paso
- * - Agrega precauciones
- * - Clarifica tiempos y personal
- */
-export async function improveProcedimiento(
-  textoOriginal: string
-): Promise<ETTSugerenciaIA> {
-  const prompt = `Como experto en procesos de mantenimiento, mejora el siguiente procedimiento.
-La versión mejorada debe:
-- Estructurada en pasos claros y numerados
-- Incluir precauciones de seguridad específicas
-- Usar verbos imperativos
-- Ser fácil de seguir para técnicos
+Devuelve SOLO el JSON, sin markdown, sin texto adicional.`
 
-Procedimiento original:
-"${textoOriginal}"
-
-Responde SOLO con el procedimiento mejorado, sin explicaciones adicionales.`
+  const raw = await callGroqAPI(prompt, {
+    temperature: 0.3,
+    maxTokens: 2500,
+    jsonMode: true,
+  })
 
   try {
-    const mejorado = await callGroqAPI(prompt, 0.7)
-
-    return {
-      campo: 'procedimiento',
-      texto_original: textoOriginal,
-      texto_mejorado: mejorado.trim(),
-      mejoras: [
-        'Estructura paso a paso',
-        'Precauciones añadidas',
-        'Verbos imperativos',
-        'Claridad mejorada'
-      ]
+    const parsed = JSON.parse(raw) as ETTCompletadoIA
+    // Garantizar que campos_faltantes siempre sea un array
+    if (!Array.isArray(parsed.campos_faltantes)) {
+      parsed.campos_faltantes = []
     }
-  } catch (error) {
-    logger.error('Error improving procedimiento', error instanceof Error ? error : new Error(String(error)))
-    throw error
-  }
-}
-
-/**
- * Mejora medidas de riesgo
- * - Especifica EPP requerido
- * - Clarifica controles
- * - Cumplimiento normativo
- */
-export async function improveRiesgoMedidas(
-  textoOriginal: string
-): Promise<ETTSugerenciaIA> {
-  const prompt = `Como experto en seguridad y salud en el trabajo, mejora las siguientes medidas de prevención.
-La versión mejorada debe:
-- Especificar EPP (Equipos de Protección Personal)
-- Incluir controles operacionales
-- Referenciar cumplimiento normativo
-- Ser implementable en planta
-
-Medidas originales:
-"${textoOriginal}"
-
-Responde SOLO con las medidas mejoradas, sin explicaciones adicionales.`
-
-  try {
-    const mejorado = await callGroqAPI(prompt, 0.7)
-
+    return parsed
+  } catch (err) {
+    logger.error(
+      'IA devolvió JSON inválido en completarPlantillaIA',
+      err instanceof Error ? err : new Error(String(err)),
+    )
+    // Fallback: devolver solo los campos_faltantes pidiendo al usuario que complete todo
     return {
-      campo: 'riesgo_medidas',
-      texto_original: textoOriginal,
-      texto_mejorado: mejorado.trim(),
-      mejoras: [
-        'EPP especificado',
-        'Controles operacionales añadidos',
-        'Cumplimiento normativo',
-        'Implementabilidad mejorada'
-      ]
+      campos_faltantes: [
+        {
+          campo: 'descripcion',
+          pregunta:
+            'No pude interpretar tu descripción. ¿Podés explicarla con más detalle?',
+          tipo: 'texto',
+        },
+      ],
     }
-  } catch (error) {
-    logger.error('Error improving riesgo medidas', error instanceof Error ? error : new Error(String(error)))
-    throw error
-  }
-}
-
-/**
- * Genera una sección completa cuando está vacía
- */
-export async function generateETTSection(
-  tipoSeccion: 'trabajo' | 'procedimientos' | 'riesgos',
-  contexto: string
-): Promise<ETTSugerenciaIA> {
-  const prompts: Record<string, string> = {
-    trabajo: `Como experto en mantenimiento industrial, genera una descripción técnica completa para:
-"${contexto}"
-
-La descripción debe incluir:
-- Objetivo claro del trabajo
-- Consideraciones técnicas
-- Requisitos de seguridad
-- Tiempo estimado
-
-Responde SOLO con la descripción, sin explicaciones.`,
-
-    procedimientos: `Como experto en procedimientos de mantenimiento, genera un procedimiento detallado para:
-"${contexto}"
-
-Incluye:
-- Pasos numerados y claros
-- Precauciones específicas
-- Tiempo por paso
-- Personal requerido
-
-Responde SOLO con el procedimiento, sin explicaciones.`,
-
-    riesgos: `Como experto en análisis de riesgos, genera un análisis de riesgos completo para:
-"${contexto}"
-
-Incluye:
-- Peligros identificados
-- Probabilidad y consecuencia
-- Medidas preventivas
-- EPP requerido
-
-Responde SOLO con el análisis, sin explicaciones.`
-  }
-
-  try {
-    const resultado = await callGroqAPI(prompts[tipoSeccion] || '', 0.8)
-
-    return {
-      campo: tipoSeccion,
-      texto_original: contexto,
-      texto_mejorado: resultado.trim(),
-      mejoras: [`Sección ${tipoSeccion} generada completamente`]
-    }
-  } catch (error) {
-    logger.error(`Error generating ETT section ${tipoSeccion}`, error instanceof Error ? error : new Error(String(error)))
-    throw error
   }
 }

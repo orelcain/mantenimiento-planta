@@ -509,15 +509,30 @@ export interface AppSettings {
 }
 
 // ETT - Especificaciones Técnicas del Trabajo
-export type { 
-  ETT, 
-  ETTGeneralInfo, 
-  ETTMaterial, 
-  ETProcedimiento, 
-  ETTRiesgo, 
-  ETTAdjunto,
-  ETTSugerenciaIA,
-  ETTCambio
+// Modelo alineado al formato corporativo AquaChile (refactor abril 2026)
+export type {
+  // Documento completo
+  ETT,
+  ETTEstado,
+  // Cabecera editable
+  ETTCabecera,
+  // Bloques de contenido
+  ETTBloque,
+  ETTBloqueParrafo,
+  ETTBloqueLista,
+  ETTBloqueTabla,
+  ETTBloqueSubtitulo,
+  ETTListItem,
+  ETTTablaFila,
+  // Adjuntos
+  ETTImagen,
+  // Plantillas
+  ETTPlantilla,
+  ETTPlantillaId,
+  ETTPlantillaDefaults,
+  // IA
+  ETTContextoIA,
+  ETTCompletadoIA,
 } from './ett'
 
 export type GanttTaskStatus = 'planificada' | 'en_progreso' | 'bloqueada' | 'completada'
