@@ -85,6 +85,7 @@ const AriaActionsPage = lazyWithReload(() => import('@/pages/AriaActionsPage').t
 const ClimaPortPage = lazyWithReload(() => import('@/pages/ClimaPortPage').then((mod) => ({ default: mod.ClimaPortPage })))
 const CalendarioMantencionPage = lazyWithReload(() => import('@/pages/CalendarioMantencionPage').then((mod) => ({ default: mod.CalendarioMantencionPage })))
 const HmiKnuroPage = lazyWithReload(() => import('@/pages/HmiKnuroPage').then((mod) => ({ default: mod.HmiKnuroPage })))
+const HmiGraderPage = lazyWithReload(() => import('@/pages/HmiGraderPage').then((mod) => ({ default: mod.HmiGraderPage })))
 const Baader200LearningPublicPage = lazyWithReload(() => import('@/pages/Baader200LearningPublicPage').then((mod) => ({ default: mod.Baader200LearningPublicPage })))
 const Baader200LearningPage = lazyWithReload(() => import('@/pages/Baader200LearningPage').then((mod) => ({ default: mod.Baader200LearningPage })))
 const LearningHubPage = lazyWithReload(() => import('@/pages/LearningHubPage').then((mod) => ({ default: mod.LearningHubPage })))
@@ -318,6 +319,14 @@ export function App() {
                 </Suspense>
               }
             />
+            <Route
+              path="/aprendizaje/hmi-grader"
+              element={
+                <Suspense fallback={<LoadingScreen />}>
+                  <HmiGraderPage />
+                </Suspense>
+              }
+            />
           </Route>
 
           {/* Legacy redirects — keep old URLs working */}
@@ -515,6 +524,13 @@ export function App() {
               <AdminRoute>
                 <Suspense fallback={<LoadingScreen />}>
                   <HmiKnuroPage />
+                </Suspense>
+              </AdminRoute>
+            } />
+            <Route path="hmi-grader" element={
+              <AdminRoute>
+                <Suspense fallback={<LoadingScreen />}>
+                  <HmiGraderPage />
                 </Suspense>
               </AdminRoute>
             } />
