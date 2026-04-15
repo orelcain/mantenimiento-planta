@@ -380,9 +380,162 @@ html, body {
   outline: none;
 }
 .cx:hover { background: rgba(255,255,255,0.1); }
+
+/* ══════════════════════════════════════
+   MARELEC SHELL — contiene rc-window + teclados
+   Grid: rc + numpad derecha, fkeys abajo
+══════════════════════════════════════ */
+#marelec-shell {
+  display: grid;
+  grid-template-columns: 760px 240px;
+  grid-template-rows: 690px 110px;
+  grid-template-areas:
+    "rcwin numpad"
+    "fkeys numpad";
+  gap: 10px;
+  position: relative;
+  padding-top: 44px; /* espacio para toggle */
+}
+#rc-window { grid-area: rcwin; }
+
+/* Toggle button */
+#toggle-keyboards {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 8px 16px;
+  background: #2C3E50;
+  color: #ecf0f1;
+  border: 2px solid #34495E;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: Arial, sans-serif;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 100;
+}
+#toggle-keyboards:hover { background: #34495E; }
+
+/* FUNCTION KEYS — debajo del footer, 4 columnas */
+.function-keys {
+  grid-area: fkeys;
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  background: #151515;
+  border-radius: 4px;
+}
+.fkey {
+  flex: 1;
+  background: linear-gradient(180deg, #3a3a3a 0%, #1e1e1e 100%);
+  border: 2px solid #4a4a4a;
+  border-radius: 8px;
+  color: #ecf0f1;
+  font-family: Arial, sans-serif;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  outline: none;
+  transition: transform 0.05s, box-shadow 0.05s;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1);
+}
+.fkey:hover {
+  background: linear-gradient(180deg, #4a4a4a 0%, #2a2a2a 100%);
+  border-color: #5a5a5a;
+}
+.fkey:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.4), inset 0 1px 0 rgba(0,0,0,0.2);
+}
+.fkey .fkey-label {
+  font-size: 9px;
+  font-weight: normal;
+  opacity: 0.8;
+  letter-spacing: 0.3px;
+}
+
+/* NUM PAD — grid 3×5 a la derecha */
+.num-pad {
+  grid-area: numpad;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-auto-rows: 1fr;
+  gap: 6px;
+  padding: 10px;
+  background: #151515;
+  border-radius: 4px;
+}
+.nk {
+  background: linear-gradient(180deg, #3a3a3a 0%, #1e1e1e 100%);
+  border: 2px solid #4a4a4a;
+  border-radius: 8px;
+  color: #ecf0f1;
+  font-family: Arial, sans-serif;
+  font-size: 22px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  outline: none;
+  transition: transform 0.05s;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1);
+  min-height: 48px;
+}
+.nk:hover {
+  background: linear-gradient(180deg, #4a4a4a 0%, #2a2a2a 100%);
+  border-color: #5a5a5a;
+}
+.nk:active {
+  transform: translateY(1px);
+}
+.nk.wide { grid-column: span 2; }
+.nk.enter {
+  background: linear-gradient(180deg, #2874A6 0%, #154360 100%);
+  border-color: #2980B9;
+  grid-column: span 3;
+  font-size: 16px;
+}
+.nk.enter:hover {
+  background: linear-gradient(180deg, #3498DB 0%, #2874A6 100%);
+}
+.nk.clear {
+  background: linear-gradient(180deg, #C0392B 0%, #7b241c 100%);
+  border-color: #E74C3C;
+  grid-column: span 3;
+  font-size: 16px;
+}
+.nk.clear:hover {
+  background: linear-gradient(180deg, #E74C3C 0%, #C0392B 100%);
+}
+
+/* Active indicator (display peso seleccionado) */
+.ind.wt.active {
+  border-color: #F39C12;
+  box-shadow: 0 0 0 2px #F39C12, 0 0 8px rgba(243,156,18,0.5);
+}
+
+/* Estado oculto de teclados */
+#marelec-shell.keyboards-hidden {
+  grid-template-columns: 760px 0;
+  grid-template-rows: 690px 0;
+  gap: 0;
+}
+#marelec-shell.keyboards-hidden .function-keys,
+#marelec-shell.keyboards-hidden .num-pad { display: none; }
 </style>
 </head>
 <body>
+
+<div id="marelec-shell">
+  <button id="toggle-keyboards" onclick="toggleKeyboards()">⌨ Ocultar teclados</button>
 
 <div id="rc-window">
 
@@ -473,6 +626,33 @@ html, body {
   </div><!-- #screen -->
 </div><!-- #rc-window -->
 
+  <!-- FUNCTION KEYS: F1-F4 debajo del footer del HMI -->
+  <div class="function-keys">
+    <button class="fkey" data-fn="1">F1<span class="fkey-label">Cambiar programa</span></button>
+    <button class="fkey" data-fn="2">F2<span class="fkey-label">Modo presentación</span></button>
+    <button class="fkey" data-fn="3">F3<span class="fkey-label">→ 0 ←</span></button>
+    <button class="fkey" data-fn="4">F4<span class="fkey-label">Menu</span></button>
+  </div>
+
+  <!-- NUM PAD: a la derecha del rc-window -->
+  <div class="num-pad">
+    <button class="nk">7</button>
+    <button class="nk">8</button>
+    <button class="nk">9</button>
+    <button class="nk">4</button>
+    <button class="nk">5</button>
+    <button class="nk">6</button>
+    <button class="nk">1</button>
+    <button class="nk">2</button>
+    <button class="nk">3</button>
+    <button class="nk wide">0</button>
+    <button class="nk">.</button>
+    <button class="nk enter">Enter</button>
+    <button class="nk clear">C</button>
+  </div>
+
+</div><!-- #marelec-shell -->
+
 <script>
 /* ══════════════════════════════════════════════════
    POCKET SVG  — v4 (20 rondas)
@@ -551,6 +731,125 @@ function addLog(msg) {
   log.scrollTop = log.scrollHeight;
 }
 function al(msg) { addLog(msg); }
+
+/* ══════════════════════════════════════════════════
+   TECLADOS: toggle + F-keys + numpad con active ind
+══════════════════════════════════════════════════ */
+
+/* Toggle show/hide teclados */
+function toggleKeyboards() {
+  const shell = document.getElementById('marelec-shell');
+  const btn   = document.getElementById('toggle-keyboards');
+  shell.classList.toggle('keyboards-hidden');
+  btn.textContent = shell.classList.contains('keyboards-hidden')
+    ? '⌨ Mostrar teclados'
+    : '⌨ Ocultar teclados';
+}
+
+/* Active indicator: click para seleccionar, numpad escribe ahí */
+let activeIndicator = null;
+let inputBuffer = '';
+
+function setActiveIndicator(ind) {
+  if (activeIndicator) activeIndicator.classList.remove('active');
+  activeIndicator = ind;
+  if (ind) ind.classList.add('active');
+  inputBuffer = '';
+}
+
+document.querySelectorAll('.hdr-right .ind.wt').forEach(ind => {
+  ind.addEventListener('click', () => setActiveIndicator(ind));
+});
+/* Inicializar con el indicador 1 activo */
+setActiveIndicator(document.querySelector('.hdr-right .ind.wt'));
+
+/* Helper: reescribe el valor del display manteniendo sup y unit */
+function updateIndicatorValue(ind, valueStr) {
+  const unit = ind.querySelector('.unit');
+  [...ind.childNodes].forEach(n => {
+    if (n.nodeType === Node.TEXT_NODE) ind.removeChild(n);
+  });
+  ind.insertBefore(document.createTextNode(valueStr), unit);
+}
+
+/* F-keys → click en los botones del footer */
+document.querySelectorAll('.fkey').forEach((fk, i) => {
+  fk.addEventListener('click', () => {
+    const footerBtns = document.querySelectorAll('#rc-window .btn-bar .btn');
+    if (footerBtns[i]) {
+      footerBtns[i].click();
+      addLog(`F${i + 1} pressed`);
+    }
+  });
+});
+
+/* Numpad → escribe en el indicador activo */
+document.querySelectorAll('.nk').forEach(key => {
+  key.addEventListener('click', () => {
+    const val = key.textContent.trim();
+
+    /* Enter: confirma y cicla al siguiente indicador */
+    if (val === 'Enter') {
+      const all = [...document.querySelectorAll('.hdr-right .ind.wt')];
+      if (all.length === 0) return;
+      const curr = all.indexOf(activeIndicator);
+      setActiveIndicator(all[(curr + 1) % all.length]);
+      addLog('Enter');
+      return;
+    }
+
+    /* Clear: resetea el indicador activo a 0.00 */
+    if (val === 'C') {
+      if (activeIndicator) {
+        inputBuffer = '';
+        updateIndicatorValue(activeIndicator, '0.00');
+      }
+      addLog('Clear');
+      return;
+    }
+
+    /* Dígitos o punto: acumula en el buffer */
+    if (!activeIndicator) return;
+    if (val === '.') {
+      if (!inputBuffer.includes('.')) inputBuffer += '.';
+    } else if (val.match(/^[0-9]$/)) {
+      inputBuffer += val;
+    } else {
+      return;
+    }
+
+    /* Parsear como número y mostrar con 2 decimales */
+    const num = parseFloat(inputBuffer || '0');
+    updateIndicatorValue(activeIndicator, num.toFixed(2));
+  });
+});
+
+/* Atajos de teclado: F1-F4 + 0-9 + Enter + Esc/Backspace */
+document.addEventListener('keydown', (e) => {
+  /* F1-F4 */
+  const fMatch = e.key.match(/^F([1-4])$/);
+  if (fMatch) {
+    e.preventDefault();
+    const i = parseInt(fMatch[1]) - 1;
+    document.querySelectorAll('.fkey')[i]?.click();
+    return;
+  }
+  /* 0-9 y punto */
+  if (e.key.match(/^[0-9.]$/)) {
+    const keys = [...document.querySelectorAll('.nk')];
+    keys.find(k => k.textContent.trim() === e.key)?.click();
+    return;
+  }
+  /* Enter */
+  if (e.key === 'Enter') {
+    document.querySelector('.nk.enter')?.click();
+    return;
+  }
+  /* Escape / Backspace → Clear */
+  if (e.key === 'Escape' || e.key === 'Backspace' || e.key === 'Delete') {
+    document.querySelector('.nk.clear')?.click();
+  }
+});
 </script>
 </body>
 </html>
