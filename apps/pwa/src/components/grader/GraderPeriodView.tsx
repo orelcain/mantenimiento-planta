@@ -90,6 +90,7 @@ const BAR_AMBER_BORDER = 'rgba(245, 158, 11, 1)'
 
 type SortKey = 'dateKey' | 'shiftId' | 'totalPieces' | 'pointZeroPct' | 'totalWeightKg' | 'productionRatePerHour'
 type SortDir = 'asc' | 'desc'
+const PAGE_SIZE = 25
 
 interface Props {
   data: PeriodAggregate
@@ -99,6 +100,7 @@ export function GraderPeriodView({ data }: Props) {
   const navigate = useNavigate()
   const [sortKey, setSortKey] = useState<SortKey>('dateKey')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
+  const [page, setPage] = useState(0)
   const trendChartRef = useRef<any>(null)
 
   // Rango visible del chart tras zoom/pan (null = rango completo)
@@ -161,6 +163,16 @@ export function GraderPeriodView({ data }: Props) {
   // ── Chart: tendencia P0% diaria SEPARADA por turno día/noche ─────────────
   const trendChartData = useMemo(() => {
     if (dailyP0Series.length === 0) return null
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
+    const showPoints = dailyP0Series.length <= 60
+
+    // Media móvil 7 días — promedio de todos los turnos (día + noche) por ventana
+    const rolling7: (number | null)[] = dailyP0Series.map((_, i) => {
+      const window7 = dailyP0Series.slice(Math.max(0, i - 6), i + 1)
+      const vals = window7.flatMap((d) => [d.dia?.p0Pct, d.noche?.p0Pct].filter((v): v is number => v != null))
+      return vals.length > 0 ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 100) / 100 : null
+    })
+
     return {
       labels: dailyP0Series.map((d) => formatShortDate(d.dateKey)),
       datasets: [
@@ -169,25 +181,41 @@ export function GraderPeriodView({ data }: Props) {
           data: dailyP0Series.map((d) => d.dia ? d.dia.p0Pct : null),
           borderColor: DIA_LINE_COLOR,
           backgroundColor: DIA_FILL_COLOR,
-          borderWidth: typeof window !== 'undefined' && window.innerWidth < 768 ? 1.5 : 2,
+          borderWidth: isMobile ? 1.5 : 2,
           fill: false,
           tension: 0.2,
-          pointRadius: dailyP0Series.length > 60 ? 0 : (typeof window !== 'undefined' && window.innerWidth < 768 ? 2 : 3),
+          pointRadius: showPoints ? (isMobile ? 2 : 3) : 0,
           pointHoverRadius: 4,
           spanGaps: true,
+          order: 2,
         },
         {
           label: 'Turno noche',
           data: dailyP0Series.map((d) => d.noche ? d.noche.p0Pct : null),
           borderColor: NOCHE_LINE_COLOR,
           backgroundColor: NOCHE_FILL_COLOR,
-          borderWidth: typeof window !== 'undefined' && window.innerWidth < 768 ? 1.5 : 2,
+          borderWidth: isMobile ? 1.5 : 2,
           fill: false,
           tension: 0.2,
-          pointRadius: dailyP0Series.length > 60 ? 0 : (typeof window !== 'undefined' && window.innerWidth < 768 ? 2 : 3),
+          pointRadius: showPoints ? (isMobile ? 2 : 3) : 0,
           pointHoverRadius: 4,
           spanGaps: true,
+          order: 2,
         },
+        ...(dailyP0Series.length > 14 ? [{
+          label: 'Media 7d',
+          data: rolling7,
+          borderColor: 'rgba(156, 163, 175, 0.9)',
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          borderDash: [5, 3],
+          fill: false,
+          tension: 0.4,
+          pointRadius: 0,
+          pointHoverRadius: 3,
+          spanGaps: true,
+          order: 1,
+        }] : []),
       ],
     }
   }, [dailyP0Series])
@@ -398,6 +426,9 @@ export function GraderPeriodView({ data }: Props) {
     return arr
   }, [shifts, sortKey, sortDir])
 
+  const totalPages = Math.ceil(sortedShifts.length / PAGE_SIZE)
+  const pagedShifts = sortedShifts.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) {
       setSortDir(sortDir === 'asc' ? 'desc' : 'asc')
@@ -405,6 +436,7 @@ export function GraderPeriodView({ data }: Props) {
       setSortKey(key)
       setSortDir(key === 'dateKey' ? 'asc' : 'desc')
     }
+    setPage(0)
   }
 
   // Rango visible en fechas legibles (para el badge del header)
@@ -821,7 +853,7 @@ export function GraderPeriodView({ data }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {sortedShifts.map((s) => (
+                {pagedShifts.map((s) => (
                   <tr key={s.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
                     <td className="px-3 py-2 tabular-nums font-medium">{formatShortDate(s.dateKey)}</td>
                     <td className="px-3 py-2">
@@ -860,9 +892,34 @@ export function GraderPeriodView({ data }: Props) {
               </tbody>
             </table>
           </div>
-          <p className="text-[10px] text-muted-foreground mt-2 text-right">
-            {sortedShifts.length} turnos mostrados
-          </p>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-3 pt-2 border-t">
+              <p className="text-[11px] text-muted-foreground">
+                {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, sortedShifts.length)} de {sortedShifts.length} turnos
+              </p>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setPage(p => Math.max(0, p - 1))}
+                  disabled={page === 0}
+                  className="px-2.5 py-1 rounded text-xs border border-border bg-background hover:bg-muted/50 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  ‹ Anterior
+                </button>
+                <span className="text-[11px] text-muted-foreground px-2">
+                  {page + 1} / {totalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                  disabled={page >= totalPages - 1}
+                  className="px-2.5 py-1 rounded text-xs border border-border bg-background hover:bg-muted/50 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Siguiente ›
+                </button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
