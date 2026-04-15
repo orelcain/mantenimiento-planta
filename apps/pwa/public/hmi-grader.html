@@ -877,6 +877,129 @@ document.addEventListener('keydown', (e) => {
     numKey('C')?.click();
   }
 });
+
+/* ══════════════════════════════════════════════════
+   POSTMESSAGE BRIDGE — comunicación con React wrapper
+   (HmiGraderPage.tsx) para persistir estado en Firestore
+   Solo se activa si el HMI está cargado dentro de un iframe
+══════════════════════════════════════════════════ */
+
+/** Extrae el estado visual actual del HMI */
+function captureState() {
+  const indicators = {};
+  document.querySelectorAll('.hdr-right .ind.wt').forEach((ind, i) => {
+    const sup = ind.querySelector('.sup');
+    const idx = sup ? sup.textContent.trim() : String(i + 1);
+    const text = [...ind.childNodes]
+      .filter(n => n.nodeType === Node.TEXT_NODE)
+      .map(n => n.textContent.trim())
+      .join('');
+    indicators[idx] = text || '0.00';
+  });
+  const all = [...document.querySelectorAll('.hdr-right .ind.wt')];
+  const activeIdx = activeIndicator ? all.indexOf(activeIndicator) + 1 : 1;
+  const logLines = [...document.querySelectorAll('#log .ll')]
+    .map(l => l.textContent.trim())
+    .filter(Boolean);
+  return { indicators, activeIndicator: activeIdx, logLines };
+}
+
+/** Aplica un estado (desde Firestore) al HMI */
+function applyState(state) {
+  if (!state) return;
+  if (state.indicators) {
+    document.querySelectorAll('.hdr-right .ind.wt').forEach(ind => {
+      const sup = ind.querySelector('.sup');
+      const idx = sup ? sup.textContent.trim() : null;
+      if (idx && state.indicators[idx] !== undefined) {
+        updateIndicatorValue(ind, state.indicators[idx]);
+      }
+    });
+  }
+  if (state.activeIndicator) {
+    const all = [...document.querySelectorAll('.hdr-right .ind.wt')];
+    const target = all[Math.max(0, Math.min(all.length - 1, state.activeIndicator - 1))];
+    if (target) setActiveIndicator(target);
+  }
+  if (Array.isArray(state.logLines) && state.logLines.length > 0) {
+    const log = document.getElementById('log');
+    log.innerHTML = '';
+    state.logLines.forEach((line, i) => {
+      const el = document.createElement('div');
+      el.className = i === state.logLines.length - 1 ? 'll hl' : 'll';
+      el.textContent = line;
+      log.appendChild(el);
+    });
+    log.scrollTop = log.scrollHeight;
+  }
+}
+
+/** Envía el estado actual al wrapper React (solo si estamos en iframe) */
+function sendStateToParent() {
+  if (window.parent === window) return;
+  try {
+    window.parent.postMessage({ type: 'hmi:save-state', state: captureState() }, '*');
+  } catch (err) {
+    console.warn('[HMI Grader] Error enviando estado:', err);
+  }
+}
+
+/** Notifica que el HMI está listo (pide init desde Firestore) */
+function notifyReady() {
+  if (window.parent === window) return;
+  try {
+    window.parent.postMessage({ type: 'hmi:ready' }, '*');
+  } catch (err) {
+    console.warn('[HMI Grader] Error notificando ready:', err);
+  }
+}
+
+/** Log de evento para historial */
+function logEventToParent(action, detail) {
+  if (window.parent === window) return;
+  try {
+    window.parent.postMessage({ type: 'hmi:log-event', action, detail }, '*');
+  } catch (err) {
+    /* silent */
+  }
+}
+
+/* Escuchar mensajes del wrapper React */
+window.addEventListener('message', (event) => {
+  if (!event.data || typeof event.data.type !== 'string') return;
+  if (event.data.type === 'hmi:init') {
+    applyState(event.data.state);
+  }
+});
+
+/* Debounce: escribir a Firestore tras 800ms de inactividad */
+let saveStateTimer = null;
+function scheduleSave() {
+  if (saveStateTimer) clearTimeout(saveStateTimer);
+  saveStateTimer = setTimeout(() => {
+    saveStateTimer = null;
+    sendStateToParent();
+  }, 800);
+}
+
+/* Hookear clicks para disparar save + log de eventos */
+document.querySelectorAll('.nk').forEach(key => {
+  key.addEventListener('click', scheduleSave);
+});
+document.querySelectorAll('.gate').forEach(g => {
+  g.addEventListener('click', () => {
+    logEventToParent('pocket-click', g.querySelector('.gn')?.textContent?.trim() || '?');
+    scheduleSave();
+  });
+});
+document.querySelectorAll('.fkey').forEach((fk, i) => {
+  fk.addEventListener('click', () => {
+    logEventToParent('fkey-press', 'F' + (i + 1));
+  });
+});
+
+/* Notificar ready al wrapper */
+notifyReady();
 </script>
 </body>
 </html>

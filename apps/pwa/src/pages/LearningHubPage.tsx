@@ -5,7 +5,7 @@
  */
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Cpu, BookOpen, ArrowRight } from 'lucide-react'
+import { Cpu, BookOpen, ArrowRight, Scale } from 'lucide-react'
 import { useAuthStore } from '@/store'
 import {
   groupMachinesByArea,
@@ -39,6 +39,17 @@ const SPECIAL_MODULES: SpecialModule[] = [
     href: '/aprendizaje/hmi-knuro',
     color: '#44ddaa',
     stats: '6 presets · Modo práctica',
+  },
+  {
+    id: 'hmi-grader',
+    title: 'HMI Grader',
+    subtitle: 'Simulador StaticGrader Marelec Z2',
+    description:
+      'Simulador interactivo del panel HMI Grader (clasificador automático por peso). Teclado F1-F4 + numpad numérico con funcionalidad real.',
+    icon: Scale,
+    href: '/aprendizaje/hmi-grader',
+    color: '#44dd88',
+    stats: 'Modo práctica · 12 pockets',
   },
 ]
 
