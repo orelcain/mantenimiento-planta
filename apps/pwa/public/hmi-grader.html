@@ -37,7 +37,7 @@ html, body {
 ══════════════════════════════════════ */
 #rc-window {
   width: 760px;
-  height: 640px;
+  height: 720px;
   display: flex;
   flex-direction: column;
   box-shadow: 4px 4px 20px rgba(0,0,0,0.95);
@@ -177,20 +177,20 @@ html, body {
 }
 /* Display peso: fondo claro, borde amarillo */
 .ind.wt {
-  background: #F0F0F0;
+  background: #1A5276;
   border: 2px solid #F1C40F;
-  color: #000000;
-  font-size: 19px;
+  color: #ffffff;
+  font-size: 25px;
   font-weight: bold;
-  width: 132px;
-  height: 38px;
+  width: 150px;
+  height: 46px;
   font-family: 'Courier New', monospace;
   justify-content: center;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.5px;
   position: relative;
 }
-.ind.wt .unit { font-size: 13px; margin-left: 2px; }
-.ind.wt .sup { position: absolute; top: 2px; left: 5px; font-size: 11px; color: #555; font-weight: normal; font-family: Arial, sans-serif; }
+.ind.wt .unit { font-size: 16px; margin-left: 2px; color: #ffffff; }
+.ind.wt .sup { position: absolute; top: 2px; left: 6px; font-size: 12px; color: #ffffff; font-weight: normal; font-family: Arial, sans-serif; }
 
 /* ══════════════════════════════════════
    V4: TÍTULO "StaticGrader" — TAB PARCIAL
@@ -312,13 +312,13 @@ html, body {
 }
 .btn {
   flex: 1;
-  height: 76px;
+  height: 96px;
   background: #1A5276;
   border: 1px solid #2874A6;
   border-radius: 0;
   color: #ffffff;
   font-family: Arial, sans-serif;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: normal;
   cursor: pointer;
   display: flex;
@@ -326,7 +326,8 @@ html, body {
   justify-content: center;
   outline: none;
   white-space: nowrap;
-  padding: 0 6px;
+  padding: 0 8px;
+  line-height: 1;
 }
 .btn + .btn { border-left: 1px solid #2874A6; }
 .btn:hover  { background: #21618C; }
@@ -470,7 +471,7 @@ html, body {
    Stroke: #F1C40F 2px, crispEdges + non-scaling-stroke
 ══════════════════════════════════════════════════ */
 const GW = 116, GH = 108, NW = 14, NH = 14, R = 8;
-const FILL = '#0E2640';
+const FILL = '#1A5276';
 
 function pocketPath() {
   /* Notch en TOP-RIGHT (esquina superior derecha) */
