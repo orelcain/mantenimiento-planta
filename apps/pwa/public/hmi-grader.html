@@ -488,16 +488,18 @@ html, body {
   font-weight: normal;
 }
 
-/* NUM PAD — grid 3×4, botones circulares blancos */
+/* NUM PAD — grid 3×4, botones circulares blancos, centrado vertical */
 .num-pad {
   grid-area: numpad;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  grid-auto-rows: 1fr;
-  gap: 12px;
+  grid-template-columns: repeat(3, auto);
+  grid-auto-rows: auto;
+  gap: 4px;
   padding: 10px;
   background: transparent;
   place-items: center;
+  align-content: center;
+  justify-content: center;
 }
 .nk {
   width: 56px;
