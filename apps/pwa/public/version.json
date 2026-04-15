@@ -1,10 +1,10 @@
 {
-  "version": "2.90.0",
-  "buildDate": "2026-04-12",
-  "buildTimestamp": 1776047008581,
+  "version": "2.91.0",
+  "buildDate": "2026-04-15",
+  "buildTimestamp": 1776284532891,
   "features": [
-    "Grader iter 18.1: fix display de horarios (ya no aparece 04:00am cuando en realidad es 07:00)",
-    "Grader iter 18.1: durationMinutes = minutos activos reales (excluye colación y paradas)",
-    "Grader iter 18.1: rebuild completo de temporada con las nuevas métricas correctas"
+    "Home Análisis Grader: calendario al tope (acción primaria visible de inmediato)",
+    "Home Análisis Grader: panel Configurar compuertas colapsable en desktop (antes siempre expandido)",
+    "Stepper 3-pasos visible sin scrollear"
   ]
 }
