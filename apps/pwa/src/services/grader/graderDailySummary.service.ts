@@ -23,6 +23,7 @@ import {
   where,
   orderBy,
   getDocs,
+  getDocsFromCache,
   writeBatch,
   documentId,
   getCountFromServer,
@@ -530,6 +531,13 @@ async function fetchExistingDedupeKeys(summaryId: string): Promise<Set<string>> 
  */
 export async function listPieceRecords(summaryId: string): Promise<FirestorePieceRecord[]> {
   const q = query(pieceRecordsCol(summaryId), orderBy('ts'))
+  // Intentar desde cache primero — instantáneo en visitas repetidas (IndexedDB)
+  try {
+    const cached = await getDocsFromCache(q)
+    if (!cached.empty) return cached.docs.map((d) => d.data() as FirestorePieceRecord)
+  } catch {
+    // Cache miss — continuar con red
+  }
   const snap = await getDocs(q)
   return snap.docs.map((d) => d.data() as FirestorePieceRecord)
 }
