@@ -591,10 +591,8 @@ Si se necesita re-procesar o corregir algo, usar `scripts/iter18-full-season-reb
   - R21-R25: P0% acumulado + target 2%, gates stacked area (5ta capa), leyenda completa
 - ✅ **5 capas toggleables**: Pesos(g), P0%(5min), Errores P0, Pzas/min, Gates
 - ✅ **Fallback weightKg→weightPerPieceGrams** cuando falta columna "peso en Gr" en Excel
-- [ ] **Agregar campo `lot` al script bulk upload** para detectar cambios de lote en el timeline
-
-### P1 — Requiere acceso a Firebase Console / IAM
-- [ ] **App Check**: ReCaptchaV3 + enforceAppCheck en Cloud Functions (requiere key de ReCaptcha desde Firebase Console)
+- ✅ **Agregar campo `lot` al script bulk upload** — implementado + backfill 383 summaries con `meta/timeline` (sesión 2026-04-15)
+- ✅ **Timeline aggregates pre-computados** (`meta/timeline` sub-colección) — carga automática sin botón, Firestore rules fix
 
 ### P1.5 — ✅ COMPLETADO 2026-04-09 (sesión siguiente)
 - ✅ **Input sanitization Firestore**: 16 colecciones validadas en 4 lotes (162e0d1e, 78908d73, 35262779, 601d7a00). Total: 23 colecciones con isValid*() en firestore.rules. Deploy Firestore Rules 🟢.
@@ -665,8 +663,7 @@ Si se necesita re-procesar o corregir algo, usar `scripts/iter18-full-season-reb
 ## Histórico Grader — arco de iteraciones completadas
 
 ### Pendientes vivos sin dueño de prioridad (P2 contenido)
-- [ ] **Contenido real Seguridad**: agregar fichas PDF descargables, videos de EPP al módulo `/aprendizaje/seguridad`
-- [ ] **Contenido real Marel**: agregar guías por equipo (MX, Stork Trim, Scanvaegt) con fotos
+<!-- Seguridad y Marel descartados — decidido no continuar (sesión 2026-04-15) -->
 
 ### Refactor iter 1 → iter 5 (2026-04-10/11) ✅
 
