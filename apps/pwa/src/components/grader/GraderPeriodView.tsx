@@ -27,10 +27,11 @@ import {
   Filler,
 } from 'chart.js'
 import zoomPlugin from 'chartjs-plugin-zoom'
-import { ArrowUpDown, ExternalLink, TrendingUp, AlertTriangle, CheckCircle2, RotateCcw, Clock } from 'lucide-react'
+import { ArrowUpDown, ExternalLink, TrendingUp, AlertTriangle, CheckCircle2, RotateCcw, Clock, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { PeriodAggregate, PeriodStats } from '@/services/grader/graderPeriodAggregate'
 import { computeStatsFromSummaries } from '@/services/grader/graderPeriodAggregate'
+import type { GraderDailySummary } from '@/services/grader/types'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend, Filler, zoomPlugin)
 
@@ -66,6 +67,28 @@ function formatDurationH(minutes: number): string {
 function formatShortDate(dateKey: string): string {
   const [y, m, d] = dateKey.split('-')
   return `${d}/${m}/${y?.slice(2)}`
+}
+
+function exportToCSV(shifts: GraderDailySummary[], rangeLabel: string): void {
+  const header = ['Fecha', 'Turno', 'Piezas', 'P0 piezas', 'P0%', 'Peso kg', 'Tasa pz/h', 'Duracion min']
+  const rows = shifts.map((s) => [
+    s.dateKey,
+    s.shiftId,
+    s.totalPieces,
+    s.pointZeroPieces,
+    s.pointZeroPct,
+    s.totalWeightKg ?? '',
+    s.productionRatePerHour ?? '',
+    s.durationMinutes ?? '',
+  ])
+  const csv = [header, ...rows].map((r) => r.join(',')).join('\n')
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `grader-${rangeLabel.replace(/[^a-zA-Z0-9-]/g, '-').toLowerCase()}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 function shiftShortName(shiftId: string): string {
@@ -449,6 +472,66 @@ export function GraderPeriodView({ data }: Props) {
     return startDate === endDate ? startDate : `${startDate} → ${endDate}`
   }, [visibleIdxRange, dailyP0Series])
 
+  // ── Insights automáticos ─────────────────────────────────────────────────
+  const insights = useMemo(() => {
+    if (dailyP0Series.length < 7) return null
+    const avg = (arr: number[]) =>
+      arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0
+
+    // Tendencia: primera semana vs última semana del período
+    const firstAvg = avg(dailyP0Series.slice(0, 7).map((d) => d.p0Pct))
+    const lastAvg = avg(dailyP0Series.slice(-7).map((d) => d.p0Pct))
+    const delta = Math.round((lastAvg - firstAvg) * 100) / 100
+    const trendDir: 'better' | 'worse' | 'stable' =
+      delta < -0.3 ? 'better' : delta > 0.3 ? 'worse' : 'stable'
+
+    // Días críticos (P0% >= 3.5%) y racha máxima consecutiva
+    let criticalCount = 0
+    let maxStreak = 0
+    let streak = 0
+    for (const d of dailyP0Series) {
+      if (d.p0Pct >= 3.5) {
+        criticalCount++
+        streak++
+        if (streak > maxStreak) maxStreak = streak
+      } else {
+        streak = 0
+      }
+    }
+
+    // Promedio P0% por tipo de turno
+    const diaVals = dailyP0Series.flatMap((d) => (d.dia ? [d.dia.p0Pct] : []))
+    const nocheVals = dailyP0Series.flatMap((d) => (d.noche ? [d.noche.p0Pct] : []))
+    const diaAvg = diaVals.length > 0 ? Math.round(avg(diaVals) * 100) / 100 : null
+    const nocheAvg = nocheVals.length > 0 ? Math.round(avg(nocheVals) * 100) / 100 : null
+
+    // Semana de 7 días consecutivos con menor P0% promedio
+    let bestWeekStart = ''
+    let bestWeekAvg = Infinity
+    for (let i = 0; i <= dailyP0Series.length - 7; i++) {
+      const wAvg = avg(dailyP0Series.slice(i, i + 7).map((d) => d.p0Pct))
+      if (wAvg < bestWeekAvg) {
+        bestWeekAvg = wAvg
+        bestWeekStart = dailyP0Series[i].dateKey
+      }
+    }
+
+    return {
+      trendDir,
+      firstAvg: Math.round(firstAvg * 100) / 100,
+      lastAvg: Math.round(lastAvg * 100) / 100,
+      delta,
+      criticalCount,
+      criticalPct: Math.round((criticalCount / dailyP0Series.length) * 100),
+      maxStreak,
+      diaAvg,
+      nocheAvg,
+      bestWeekStart,
+      bestWeekAvg: Math.round(bestWeekAvg * 100) / 100,
+      totalDays: dailyP0Series.length,
+    }
+  }, [dailyP0Series])
+
   // ── Estado vacío ─────────────────────────────────────────────────────────
   if (shifts.length === 0) {
     return (
@@ -606,6 +689,77 @@ export function GraderPeriodView({ data }: Props) {
             </Card>
           )}
         </div>
+      )}
+
+      {/* ── Panel de insights automáticos ───────────────────────────────── */}
+      {insights && (
+        <Card className="border-blue-500/20 bg-blue-500/5">
+          <CardHeader className="pb-1">
+            <CardTitle className="text-sm text-blue-600 dark:text-blue-400 flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" />
+              Insights automáticos · {insights.totalDays} días analizados
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+              {/* Tendencia */}
+              <div className="rounded-lg border border-border/50 bg-background/60 px-3 py-2">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Tendencia período</p>
+                <p className={cn(
+                  'font-semibold text-sm',
+                  insights.trendDir === 'better' && 'text-emerald-600',
+                  insights.trendDir === 'worse'  && 'text-red-500',
+                  insights.trendDir === 'stable' && 'text-muted-foreground',
+                )}>
+                  {insights.trendDir === 'better' ? '↓ Mejorando' : insights.trendDir === 'worse' ? '↑ Empeorando' : '→ Estable'}
+                </p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  inicio {insights.firstAvg}% → fin {insights.lastAvg}%
+                  {' '}({insights.delta > 0 ? '+' : ''}{insights.delta}pp)
+                </p>
+              </div>
+              {/* Días críticos */}
+              <div className="rounded-lg border border-border/50 bg-background/60 px-3 py-2">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Días críticos ≥3.5%</p>
+                <p className={cn('font-semibold text-sm', insights.criticalCount > 0 ? 'text-red-500' : 'text-emerald-600')}>
+                  {insights.criticalCount} / {insights.totalDays}
+                </p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  {insights.criticalPct}% del período
+                  {insights.maxStreak > 1 && ` · racha máx ${insights.maxStreak}d`}
+                </p>
+              </div>
+              {/* Día vs Noche */}
+              {insights.diaAvg !== null && insights.nocheAvg !== null && (
+                <div className="rounded-lg border border-border/50 bg-background/60 px-3 py-2">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Día vs Noche (prom.)</p>
+                  <p className="font-semibold text-sm">
+                    <span className="text-amber-500">{insights.diaAvg}%</span>
+                    <span className="text-muted-foreground mx-1">/</span>
+                    <span className="text-indigo-400">{insights.nocheAvg}%</span>
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    {Math.abs(insights.diaAvg - insights.nocheAvg) < 0.2
+                      ? 'Turnos parejos'
+                      : insights.diaAvg < insights.nocheAvg
+                        ? `Día es ${(insights.nocheAvg - insights.diaAvg).toFixed(2)}pp mejor`
+                        : `Noche es ${(insights.diaAvg - insights.nocheAvg).toFixed(2)}pp mejor`}
+                  </p>
+                </div>
+              )}
+              {/* Mejor semana */}
+              {insights.bestWeekStart && (
+                <div className="rounded-lg border border-border/50 bg-background/60 px-3 py-2">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Mejor semana</p>
+                  <p className="font-semibold text-sm text-emerald-600">{insights.bestWeekAvg}% P0 prom.</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    semana del {formatShortDate(insights.bestWeekStart)}
+                  </p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* ── Tendencia P0% diaria ─────────────────────────────────────────── */}
@@ -812,7 +966,17 @@ export function GraderPeriodView({ data }: Props) {
       {/* ── Tabla ordenable de turnos ────────────────────────────────────── */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Turnos del período</CardTitle>
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle className="text-base">Turnos del período</CardTitle>
+            <button
+              type="button"
+              onClick={() => exportToCSV(sortedShifts, range.label)}
+              className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground border border-border/50 rounded px-2 py-1 hover:bg-muted/40 transition-colors shrink-0"
+            >
+              <Download className="h-3 w-3" />
+              Exportar CSV
+            </button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto -mx-4 sm:mx-0">
