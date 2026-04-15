@@ -32,7 +32,7 @@ export function HmiGraderPage() {
   const iframeSrc = useMemo(() => {
     const basePath = import.meta.env.BASE_URL || '/'
     const v = import.meta.env.VITE_APP_VERSION || Date.now().toString().slice(0, 8)
-    return basePath + 'hmi-grader.html?v=' + v
+    return basePath + 'hmi-grader-embed.html?v=' + v
   }, [])
 
   // ── Carga inicial desde Firestore → iframe ──────────────────────────────
