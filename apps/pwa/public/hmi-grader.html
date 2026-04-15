@@ -137,8 +137,8 @@ html, body {
    HEADER: fecha/hora izquierda + UNDER derecha
 ══════════════════════════════════════ */
 .hdr {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
   padding: 6px 10px 4px 10px;
   background: #1A5276;
@@ -156,6 +156,7 @@ html, body {
   grid-template-columns: auto auto;
   gap: 6px;
   align-items: center;
+  justify-self: center;
 }
 /* UNDER<-: bg=hmi, borde blanco 2px, texto blanco 12px bold, centrado */
 .ind {
@@ -263,7 +264,7 @@ html, body {
 .gn {
   position: absolute;
   top: 4px;
-  right: 7px;
+  left: 8px;
   font-size: 13px;
   font-weight: bold;
   color: #F1C40F;
@@ -309,8 +310,8 @@ html, body {
 .btn {
   flex: 1;
   height: 76px;
-  background: #1A5276;
-  border: 1px solid rgba(255,255,255,0.18);
+  background: #2E86C1;
+  border: 1px solid #5DADE2;
   border-radius: 0;
   color: #ffffff;
   font-family: Arial, sans-serif;
@@ -324,9 +325,9 @@ html, body {
   white-space: nowrap;
   padding: 0 6px;
 }
-.btn + .btn { border-left: 1px solid rgba(255,255,255,0.18); }
-.btn:hover  { background: #21618C; }
-.btn:active { background: #154360; }
+.btn + .btn { border-left: 1px solid #5DADE2; }
+.btn:hover  { background: #3498DB; }
+.btn:active { background: #1F618D; }
 
 /* ══════════════════════════════════════
    PANELES (siguientes pantallas)
@@ -399,10 +400,10 @@ html, body {
         <div id="cd">123...</div>
       </div>
       <div class="hdr-right">
-        <div class="ind">UNDER&lt;-</div>
-        <div class="ind">UNDER&lt;-</div>
         <div class="ind wt"><span class="sup">1</span>0.00<span class="unit">kg</span></div>
-        <div class="ind">UNDER&lt;-</div>
+        <div class="ind wt"><span class="sup">2</span>0.00<span class="unit">kg</span></div>
+        <div class="ind wt"><span class="sup">3</span>0.00<span class="unit">kg</span></div>
+        <div class="ind wt"><span class="sup">4</span>0.00<span class="unit">kg</span></div>
       </div>
     </div>
 
@@ -466,16 +467,21 @@ html, body {
    Stroke: #F1C40F 2px, crispEdges + non-scaling-stroke
 ══════════════════════════════════════════════════ */
 const GW = 116, GH = 108, NW = 14, NH = 14, R = 8;
-const FILL = '#102B4F';
+const FILL = '#08172C';
 
 function pocketPath() {
+  /* Notch en TOP-RIGHT (esquina superior derecha) */
   return [
-    `M ${NW},1`,
-    `L ${GW-R},1`,        `Q ${GW-1},1 ${GW-1},${R+1}`,
-    `L ${GW-1},${GH-R}`,  `Q ${GW-1},${GH-1} ${GW-R},${GH-1}`,
-    `L ${R},${GH-1}`,     `Q 1,${GH-1} 1,${GH-R}`,
-    `L 1,${NH}`,
-    `L ${NW},${NH}`,
+    `M ${R},1`,                                    // start (top-left con curva)
+    `L ${GW-NW},1`,                                // ir derecha hasta inicio del notch
+    `L ${GW-NW},${NH}`,                            // bajar al fondo del notch
+    `L ${GW-1},${NH}`,                             // ir derecha hasta el borde
+    `L ${GW-1},${GH-R}`,                           // bajar lado derecho
+    `Q ${GW-1},${GH-1} ${GW-R},${GH-1}`,           // curva esquina bottom-right
+    `L ${R},${GH-1}`,                              // ir izquierda hasta esquina bottom-left
+    `Q 1,${GH-1} 1,${GH-R}`,                       // curva esquina bottom-left
+    `L 1,${R+1}`,                                  // subir lado izquierdo hasta curva top-left
+    `Q 1,1 ${R},1`,                                // curva esquina top-left
     'Z'
   ].join(' ');
 }
