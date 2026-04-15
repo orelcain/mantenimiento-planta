@@ -11,19 +11,17 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 /* ═══════════════════════════════════════════
-   PALETA EXACTA — StaticGrader HMI
-   bg-hmi:          #1A5276   ← fondo global HMI
-   bg-pocket:       #0A1C36   ← pockets (OSCURO, contraste con fondo)
-   bg-titlebar-sg:  #2980B9   ← barra StaticGrader
-   bg-menubar:      #1F618D
-   bg-buttons:      #2E86C1   ← botones azul medio
-   border-pockets:  #F1C40F   ← amarillo
-   border-under:    #FFFFFF
-   bg-log-sel:      #000099   ← navy oscuro Windows selection
-   btn-border:      #5D9CEC
+   PALETA StaticGrader HMI — 20 rondas v4
+   bg-hmi:       #1A5276
+   bg-pocket:    #0A1C36  (dark navy vs bg)
+   titlebar-sg:  #2980B9
+   bg-menubar:   #1F618D
+   bg-buttons:   #2E86C1
+   border-pkt:   #F1C40F
+   border-under: #FFFFFF
+   log-sel:      #000099
 ═══════════════════════════════════════════ */
 
-/* R30 — body bg más oscuro para contrastar la ventana RC */
 html, body {
   min-height: 100vh;
   background: #0d0d0d;
@@ -35,64 +33,69 @@ html, body {
 }
 
 /* ══════════════════════════════════════
-   VENTANA RC (simula cliente VNC/RDP)
-   640×480 = resolución estándar VNC
+   VENTANA RC — 640×480px VNC estándar
 ══════════════════════════════════════ */
 #rc-window {
   width: 640px;
   height: 480px;
   display: flex;
   flex-direction: column;
-  box-shadow: 3px 3px 16px rgba(0,0,0,0.9);
+  box-shadow: 4px 4px 20px rgba(0,0,0,0.95);
   overflow: hidden;
 }
 
-/* ── Barra de título Windows ── */
-/* R21 — titlebar más cercana al original: gris oscuro Windows clásico */
+/* ── V1-V3: BARRA TÍTULO WINDOWS 10 — BLANCA ──
+   El cliente RC usa el chrome estándar de Windows 10:
+   fondo blanco, texto negro, controles transparentes
+   height: 30px (Windows 10 estándar)                 */
 .win-titlebar {
-  height: 22px;
-  background: linear-gradient(to bottom, #3A3A5C 0%, #2A2A48 100%);
+  height: 30px;
+  background: #ffffff;
+  border-bottom: 1px solid #e0e0e0;
   display: flex;
   align-items: center;
-  padding: 0 2px 0 6px;
-  gap: 4px;
+  padding: 0 0 0 8px;
+  gap: 6px;
   flex-shrink: 0;
   user-select: none;
-  border-bottom: 1px solid #111;
 }
-.win-title-icon { font-size: 11px; line-height: 1; }
+.win-title-icon {
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.85;
+}
+/* V2: texto normal (no bold) color oscuro */
 .win-title-text {
   flex: 1;
-  font-size: 11px;
-  color: #ffffff;
+  font-size: 12px;
+  color: #1a1a1a;
   font-family: 'Segoe UI', Arial, sans-serif;
-  letter-spacing: 0.2px;
-  font-weight: bold;
+  font-weight: 400;
+  letter-spacing: 0.1px;
 }
-/* R22 — controles Windows más realistas */
-.win-controls { display: flex; gap: 2px; }
+.win-controls { display: flex; height: 100%; }
+/* V3: controles Windows 10 — ancho 46px, transparente, hover sutil */
 .win-btn {
-  width: 20px;
-  height: 16px;
-  background: #5A5A7A;
-  border: 1px solid #888;
-  color: #fff;
-  font-size: 8px;
+  width: 46px;
+  height: 100%;
+  background: transparent;
+  border: none;
+  color: #333333;
+  font-size: 11px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: 'Marlett', Arial, sans-serif;
+  font-family: 'Segoe UI', Arial, sans-serif;
   border-radius: 0;
   outline: none;
   line-height: 1;
-  font-weight: bold;
 }
-.win-btn:hover { background: #7070A0; }
-.win-btn.close:hover { background: #c0392b; }
+.win-btn:hover { background: rgba(0,0,0,0.07); }
+/* V3b: close button — rojo Windows 10 en hover */
+.win-btn.close:hover { background: #e81123; color: #ffffff; }
 
-/* ── Barra de menú (Connection / Mode / Help) ── */
-/* R23 — menubar idéntico al original: bg azul medio, items con padding */
+/* ── MENUBAR (Connection / Mode / Help) ── */
 .menubar {
   height: 20px;
   background: #1F618D;
@@ -113,12 +116,12 @@ html, body {
   align-items: center;
   font-family: Arial, sans-serif;
   white-space: nowrap;
-  letter-spacing: 0.1px;
 }
 .menubar span:hover { background: rgba(255,255,255,0.2); }
 
 /* ══════════════════════════════════════
    PANTALLA HMI — fondo #1A5276
+   Altura: 480 - 30(titlebar) - 20(menu) = 430px
 ══════════════════════════════════════ */
 #screen {
   background: #1A5276;
@@ -131,8 +134,7 @@ html, body {
 }
 
 /* ══════════════════════════════════════
-   HEADER — fecha/hora · indicadores
-   R11 — padding ajustado, line-height compacto
+   HEADER: fecha/hora izquierda + UNDER derecha
 ══════════════════════════════════════ */
 .hdr {
   display: flex;
@@ -142,25 +144,20 @@ html, body {
   background: #1A5276;
   flex-shrink: 0;
 }
-
-/* R12 — hdr-left: Courier 11px, line-height 1.45 */
 .hdr-left {
   font-family: 'Courier New', monospace;
   font-size: 11px;
   line-height: 1.45;
   color: #ffffff;
 }
-
-/* R29 — hdr-right: gap 4px entre indicadores */
+/* V17: gap 4px entre indicadores UNDER */
 .hdr-right {
   display: grid;
   grid-template-columns: auto auto;
   gap: 4px;
   align-items: center;
 }
-
-/* R7-R8 — UNDER<- : bg igual al fondo HMI, borde BLANCO grueso,
-   texto blanco 12px bold, centrado perfectamente */
+/* UNDER<-: bg=hmi, borde blanco 2px, texto blanco 12px bold, centrado */
 .ind {
   background: #1A5276;
   border: 2px solid #ffffff;
@@ -169,7 +166,6 @@ html, body {
   font-weight: bold;
   width: 82px;
   height: 27px;
-  text-align: center;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -177,8 +173,7 @@ html, body {
   letter-spacing: 0.2px;
   flex-shrink: 0;
 }
-
-/* R9 — Display de peso: fondo claro #F0F0F0, borde amarillo */
+/* Display peso: fondo claro, borde amarillo */
 .ind.wt {
   background: #F0F0F0;
   border: 2px solid #F1C40F;
@@ -193,28 +188,31 @@ html, body {
 .ind.wt .unit { font-size: 10px; margin-left: 1px; }
 
 /* ══════════════════════════════════════
-   BARRA TÍTULO "StaticGrader"
-   R13 — full-width, #2980B9, 26px, 15px bold
+   V4: TÍTULO "StaticGrader" — TAB PARCIAL
+   No es full-width sino un tab que ocupa
+   solo el ancho del texto + padding
 ══════════════════════════════════════ */
+.title-row {
+  background: #1A5276;
+  flex-shrink: 0;
+  display: flex;
+}
 .title-bar {
   background: #2980B9;
   color: #ffffff;
   font-size: 15px;
   font-weight: bold;
-  height: 26px;
-  padding: 0 0 0 8px;
+  height: 28px;
+  padding: 0 32px 0 10px;
   display: flex;
   align-items: center;
-  flex-shrink: 0;
   font-family: Arial, sans-serif;
-  width: 100%;
   letter-spacing: 0.2px;
+  width: auto;           /* TAB: se ajusta al texto */
+  flex-shrink: 0;
 }
 
-/* ══════════════════════════════════════
-   STATUS "7: CONTRASTACION"
-   R14 — padding compacto, 11px
-══════════════════════════════════════ */
+/* STATUS "7: CONTRASTACION" — full-width */
 .status {
   background: #1A5276;
   color: #ffffff;
@@ -226,9 +224,9 @@ html, body {
 }
 
 /* ══════════════════════════════════════
-   GRILLA DE BOLSILLOS (pocket grid)
-   12 bolsillos: 2 filas × 6 columnas
-   R16 — gap: 3px, padding: 4px 6px
+   GRILLA DE BOLSILLOS
+   V6-V11: 100×80px, ratio 1.25:1
+   6 pockets × 100 + 5 × 3px gaps = 615px (628px disponible)
 ══════════════════════════════════════ */
 .gate-grid {
   flex: 1;
@@ -240,29 +238,25 @@ html, body {
   gap: 3px;
   padding: 4px 6px;
 }
-
 .gate-row {
   display: flex;
   gap: 3px;
   width: 100%;
   justify-content: center;
 }
-
-/* R1 (CRÍTICO) + R17 — pockets 98×92px, cursor pointer */
+/* V6: 100×80px (más ancho y más bajo que 98×92) */
 .gate {
-  width: 98px;
-  height: 92px;
+  width: 100px;
+  height: 80px;
   position: relative;
   cursor: pointer;
   flex-shrink: 0;
 }
 .gate svg { display: block; width: 100%; height: 100%; }
+.gate:hover path  { fill: #0F2640; }
+.gate:active path { fill: #061018; }
 
-/* R2-R3 — hover/active sobre pocket fill oscuro */
-.gate:hover path   { fill: #0F2640; }
-.gate:active path  { fill: #061018; }
-
-/* R18-R19 — gate number: 10px, top:3px right:5px */
+/* V13: gate number 10px, top:3px right:5px */
 .gn {
   position: absolute;
   top: 3px;
@@ -278,14 +272,12 @@ html, body {
 
 /* ══════════════════════════════════════
    LOG CONSOLE
-   R3 — highlight: navy oscuro #000099
-   R20 — border-top para separar log del grid
+   V14: log con 4 líneas visibles (~72px)
 ══════════════════════════════════════ */
 .log {
   background: #ffffff;
   border-top: 1px solid #888;
-  border-bottom: 0;
-  height: 68px;
+  height: 72px;
   overflow-y: auto;
   flex-shrink: 0;
   padding: 2px 4px;
@@ -294,16 +286,14 @@ html, body {
   color: #000000;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
-/* R3 (CRÍTICO) — highlight: navy Windows (#000099) no el azul claro */
-.ll { padding: 1px 2px; background: #ffffff; color: #000000; white-space: nowrap; line-height: 1.3; }
+.ll { padding: 1px 2px; background: #ffffff; color: #000000; white-space: nowrap; line-height: 1.32; }
+/* V (ya aplicado): log highlight navy Windows */
 .ll.hl { background: #000099; color: #ffffff; }
 
 /* ══════════════════════════════════════
-   BOTONES FOOTER
-   R4 (CRÍTICO) — height: 60px (+30% vs 46px)
-   R24-R25 — bg: #2E86C1, border top: separador
+   BOTONES FOOTER — 60px, #2E86C1
 ══════════════════════════════════════ */
 .btn-bar {
   display: flex;
@@ -313,7 +303,6 @@ html, body {
   padding: 2px 0 0;
   border-top: 1px solid #154360;
 }
-/* R4 — 60px height */
 .btn {
   flex: 1;
   height: 60px;
@@ -368,6 +357,7 @@ html, body {
   cursor: pointer;
   color: #aaddff;
   background: transparent;
+  outline: none;
 }
 .cx:hover { background: rgba(255,255,255,0.1); }
 </style>
@@ -376,35 +366,35 @@ html, body {
 
 <div id="rc-window">
 
-  <!-- ══ BARRA TÍTULO WINDOWS ══ -->
+  <!-- V1-V3: BARRA TÍTULO WINDOWS 10 (blanca) -->
   <div class="win-titlebar">
     <span class="win-title-icon">🖥</span>
     <span class="win-title-text">RC 172.27.12.12</span>
     <div class="win-controls">
-      <button class="win-btn">&#8212;</button>
-      <button class="win-btn">&#9633;</button>
-      <button class="win-btn close">&#10005;</button>
+      <button class="win-btn" title="Minimizar">&#8722;</button>
+      <button class="win-btn" title="Maximizar">&#9633;</button>
+      <button class="win-btn close" title="Cerrar">&#10005;</button>
     </div>
   </div>
 
-  <!-- ══ MENUBAR ══ -->
+  <!-- MENUBAR -->
   <div class="menubar">
     <span>Connection</span>
     <span>Mode</span>
     <span>Help</span>
   </div>
 
-  <!-- ══ HMI CONTENT ══ -->
+  <!-- HMI CONTENT -->
   <div id="screen">
 
     <!-- HEADER -->
     <div class="hdr">
       <div class="hdr-left">
         <div id="dd">14/04/2026</div>
-        <div id="td">18:44:00</div>
-        <div id="cd">1234</div>
+        <div id="td">19:59:04</div>
+        <!-- V5: counter con decimal como el original -->
+        <div id="cd">123.34</div>
       </div>
-      <!-- R10 — UNDER centrados: display:flex + align/justify center -->
       <div class="hdr-right">
         <div class="ind">UNDER&lt;-</div>
         <div class="ind">UNDER&lt;-</div>
@@ -413,29 +403,29 @@ html, body {
       </div>
     </div>
 
-    <!-- TÍTULO -->
-    <!-- R13 — 15px bold, height 26px -->
-    <div class="title-bar">StaticGrader</div>
+    <!-- V4: TÍTULO TAB PARCIAL -->
+    <div class="title-row">
+      <div class="title-bar">StaticGrader</div>
+    </div>
 
     <!-- STATUS -->
-    <!-- R14 — padding 2px arriba/abajo -->
     <div class="status" id="sl">7: CONTRASTACION (17:36:17)</div>
 
-    <!-- BOLSILLOS -->
+    <!-- BOLSILLOS — V6-V11: 100×80, notch 10×10, R=6 -->
     <div class="gate-grid">
       <div class="gate-row" id="ro"></div>
       <div class="gate-row" id="re"></div>
     </div>
 
-    <!-- LOG -->
+    <!-- LOG — V14: 4 líneas -->
     <div class="log" id="log">
       <div class="ll">Comenzando Autochequeo</div>
       <div class="ll">Grader runtime is 5825 hours</div>
       <div class="ll hl">Autochequeo realizado!</div>
+      <div class="ll">&nbsp;</div>
     </div>
 
     <!-- BOTONES -->
-    <!-- R4 — 60px height por CSS -->
     <div class="btn-bar">
       <button class="btn" onclick="sp('pp')">Cambiar programa</button>
       <button class="btn" onclick="sp('pm')">Modo presentación</button>
@@ -465,27 +455,22 @@ html, body {
 
 <script>
 /* ══════════════════════════════════════════════════
-   POCKET SVG — ViewBox 0 0 98 92
-   R1 (CRÍTICO): fill="#0A1C36" — dark navy, distinto del fondo #1A5276
-   Muesca escalón-L en esquina SUPERIOR-IZQUIERDA: NW=16, NH=15
-   Esquinas exteriores redondeadas R=7
-   stroke: #F1C40F 2px, crispEdges + non-scaling-stroke
-
-   Path (clockwise desde vértice del escalón):
-   M NW,1 → top-right(R) → bottom-right(R) →
-   bottom-left(R) → L 1,NH → L NW,NH → Z
+   POCKET SVG  — v4 (20 rondas)
+   V6:  GW=100, GH=80  (ratio 1.25:1, más ancho/bajo)
+   V7:  NW=10, NH=10   (notch MÁS PEQUEÑO que el original)
+   V10: R=6             (radio esquinas exteriores)
+   Fill: #0A1C36 (dark navy, visible vs bg #1A5276) ✓
+   Stroke: #F1C40F 2px, crispEdges + non-scaling-stroke
 ══════════════════════════════════════════════════ */
-const GW=98, GH=92, NW=16, NH=15, R=7;
-
-/* R5 — fill pocket: DARK NAVY #0A1C36 (contraste visible contra bg #1A5276) */
+const GW = 100, GH = 80, NW = 10, NH = 10, R = 6;
 const FILL = '#0A1C36';
 
 function pocketPath() {
   return [
     `M ${NW},1`,
-    `L ${GW-R},1`,       `Q ${GW-1},1 ${GW-1},${R+1}`,
-    `L ${GW-1},${GH-R}`, `Q ${GW-1},${GH-1} ${GW-R},${GH-1}`,
-    `L ${R},${GH-1}`,    `Q 1,${GH-1} 1,${GH-R}`,
+    `L ${GW-R},1`,        `Q ${GW-1},1 ${GW-1},${R+1}`,
+    `L ${GW-1},${GH-R}`,  `Q ${GW-1},${GH-1} ${GW-R},${GH-1}`,
+    `L ${R},${GH-1}`,     `Q 1,${GH-1} 1,${GH-R}`,
     `L 1,${NH}`,
     `L ${NW},${NH}`,
     'Z'
@@ -493,8 +478,8 @@ function pocketPath() {
 }
 
 function buildGates() {
-  const ro = document.getElementById('ro');
-  const re = document.getElementById('re');
+  const ro  = document.getElementById('ro');
+  const re  = document.getElementById('re');
   const path = pocketPath();
   for (let g = 1; g <= 12; g++) {
     const d = document.createElement('div');
@@ -512,8 +497,8 @@ function buildGates() {
 }
 buildGates();
 
-/* Reloj en tiempo real */
-function pad(n) { return String(n).padStart(2,'0'); }
+/* Reloj */
+function pad(n) { return String(n).padStart(2, '0'); }
 function tick() {
   const n = new Date();
   document.getElementById('dd').textContent =
@@ -523,22 +508,23 @@ function tick() {
 }
 tick(); setInterval(tick, 1000);
 
-/* Navegación entre paneles */
+/* Navegación */
 function sp(id) { document.getElementById(id).classList.add('active'); }
 function cp(id) { document.getElementById(id).classList.remove('active'); }
 
-/* Log — nueva línea siempre resaltada en navy */
+/* Log */
 function addLog(msg) {
   const log = document.getElementById('log');
   log.querySelectorAll('.hl').forEach(e => e.classList.remove('hl'));
   const l = document.createElement('div');
   l.className = 'll hl';
   l.textContent = msg;
-  log.appendChild(l);
-  while (log.children.length > 50) log.removeChild(log.firstChild);
+  /* insertar antes de la línea vacía final */
+  const blank = log.lastElementChild;
+  log.insertBefore(l, blank);
+  while (log.children.length > 51) log.removeChild(log.firstChild);
   log.scrollTop = log.scrollHeight;
 }
-/* alias para botones inline */
 function al(msg) { addLog(msg); }
 </script>
 </body>
