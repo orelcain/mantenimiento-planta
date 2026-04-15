@@ -469,39 +469,34 @@ export function AnalisisGraderWizardPage() {
           onFilesChange={setUploadedFiles}
         />
 
-        {/* Z2: Configurar compuertas — expandido en desktop, colapsable en mobile */}
+        {/* Z2: Configurar compuertas — colapsable en todos los tamaños */}
         <div className="space-y-3">
-          <Card className="lg:border-l-4 lg:border-l-emerald-500/40 lg:hover:shadow-md lg:transition-shadow">
+          <Card className="border-l-4 border-l-emerald-500/40">
             <button
               type="button"
               onClick={() => setGatesOpen((o) => !o)}
-              className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium hover:bg-muted/50 transition-colors rounded-lg lg:hidden"
+              className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium hover:bg-muted/50 transition-colors rounded-t-lg"
             >
-              <span className="flex items-center gap-2">
-                <Settings2 className="h-4 w-4 text-muted-foreground" />
+              <span className="flex items-center gap-2 flex-wrap">
+                <Settings2 className={`h-4 w-4 ${gatesOpen ? 'text-emerald-500' : 'text-muted-foreground'}`} />
                 Configurar compuertas
                 <Badge variant="outline" className="text-xs font-normal">
                   {gates.filter((g) => g.active).length} activas
                 </Badge>
+                {!gatesOpen && config.deviceId && (
+                  <span className="text-xs text-muted-foreground hidden sm:inline">· {config.deviceId}</span>
+                )}
+                {!gatesOpen && config.shiftId && (
+                  <span className="text-xs text-muted-foreground hidden sm:inline">· {config.shiftId}</span>
+                )}
               </span>
               {gatesOpen
-                ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                : <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                ? <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" />
+                : <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
               }
             </button>
-            {/* Desktop: siempre visible con header verde */}
-            <div className="hidden lg:flex items-center justify-between px-4 py-3 border-b border-emerald-500/20 bg-emerald-500/[0.03]">
-              <span className="flex items-center gap-2 text-sm font-medium">
-                <Settings2 className="h-4 w-4 text-emerald-500" />
-                Configurar compuertas
-                <Badge className="text-[10px] font-normal bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
-                  {gates.filter((g) => g.active).length} activas
-                </Badge>
-              </span>
-            </div>
-            {/* Mobile: colapsable / Desktop: siempre visible */}
-            <div className={`${gatesOpen ? 'block' : 'hidden'} lg:block`}>
-              <CardContent className="pt-3 pb-4">
+            {gatesOpen && (
+              <CardContent className="pt-3 pb-4 border-t border-emerald-500/20">
                 <AnalisisGraderGatesConfigPage
                   gates={gates}
                   config={config}
@@ -509,7 +504,7 @@ export function AnalisisGraderWizardPage() {
                   onComplete={handleGatesApply}
                 />
               </CardContent>
-            </div>
+            )}
           </Card>
         </div>
       </div>

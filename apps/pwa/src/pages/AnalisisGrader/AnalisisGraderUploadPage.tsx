@@ -378,7 +378,12 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
 
   return (
     <div className="space-y-3">
-      {/* Zona de carga unificada */}
+      {/* Calendario histórico — primera acción: seleccionar turno histórico o ver contexto */}
+      <div data-grader-calendar>
+        <GraderHistoricalCalendar />
+      </div>
+
+      {/* Zona de carga — acción secundaria: subir archivo nuevo */}
       <Card className="lg:border-l-4 lg:border-l-blue-500/40 lg:hover:shadow-md lg:transition-shadow">
         <CardContent className="pt-4 pb-4 space-y-3">
           <div className="flex items-center gap-2 flex-wrap">
@@ -488,16 +493,6 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
         </div>
       )}
 
-      {/* Calendario histórico unificado. Muestra `graderDailySummaries` con
-          P0% por día, KPIs por turno y top causas. El botón "Cargar" navega
-          al home con `?date=…&shift=…&autoload=1`; el efecto de `searchParams`
-          (arriba) detecta los params y dispara handleLoadTurno vía autoLoadRef
-          → reusa archivos ya guardados en Storage.
-          Acepta `?goto=YYYY-MM-DD` para saltar a un día específico (desde el
-          gráfico de tendencia en `/analisis-grader/periodo`). */}
-      <div data-grader-calendar>
-        <GraderHistoricalCalendar />
-      </div>
     </div>
   )
 }
