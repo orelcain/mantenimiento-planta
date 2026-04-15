@@ -512,7 +512,7 @@ export function GraderPeriodView({ data }: Props) {
       const wAvg = avg(dailyP0Series.slice(i, i + 7).map((d) => d.p0Pct))
       if (wAvg < bestWeekAvg) {
         bestWeekAvg = wAvg
-        bestWeekStart = dailyP0Series[i].dateKey
+        bestWeekStart = dailyP0Series[i]?.dateKey ?? ''
       }
     }
 
