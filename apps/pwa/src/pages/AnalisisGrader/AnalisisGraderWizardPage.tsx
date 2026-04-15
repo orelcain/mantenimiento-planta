@@ -23,11 +23,12 @@ import { computeDeterministicInsights } from '@/services/grader/graderInsights'
 import {
   segmentByDayAndShift,
   computeShiftSummary,
+  computeTimelineAggregates,
   sortedSegmentEntries,
   dedupePieceRecords,
   dedupeGate0Records,
 } from '@/services/grader/graderSegmenter'
-import { saveDailySummaryBatch, fetchExistingSummaryIds, savePieceRecordsBatch, buildDedupeKey, type FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
+import { saveDailySummaryBatch, fetchExistingSummaryIds, savePieceRecordsBatch, buildDedupeKey, saveTimelineAggregates, type FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
 import type { ParsedMatrixData, GateAssignment, GraderAnalysisConfig } from '@/services/grader/types'
 
 const GRADER_WIZARD_DRAFT_KEY = 'grader_wizard_draft_v1'
@@ -379,7 +380,9 @@ export function AnalisisGraderWizardPage() {
       )
       await saveDailySummaryBatch(summaries)
 
-      // Guardar pieceRecords en subcollection (dedup automática)
+      // Guardar pieceRecords en subcollection (dedup automática) + timeline
+      // aggregates en sub-collection `meta/timeline` para que el timeline chart
+      // se pinte al instante al abrir el turno sin bajar los records crudos.
       for (const [key, segment] of multiDayInfo.entries) {
         const [dateKey, shiftId] = key.split('|')
         if (!dateKey || !shiftId) continue
@@ -395,9 +398,17 @@ export function AnalisisGraderWizardPage() {
           ...(r.quality && { quality: r.quality }),
           ...(r.calibre && { calibre: r.calibre }),
           ...('error' in r && r.error && { error: r.error }),
+          ...(r.lot && { lot: r.lot }),
           dedupeKey: buildDedupeKey(r),
         }))
         await savePieceRecordsBatch(summaryId, firestoreRecs)
+
+        // Pre-computar aggregates por minuto y guardar en sub-collection.
+        // Idempotente: se sobrescribe en cada re-upload del mismo turno.
+        const aggregates = computeTimelineAggregates(segment.pieceRecords, segment.gate0Records)
+        if (aggregates.length > 0) {
+          await saveTimelineAggregates(summaryId, aggregates)
+        }
       }
 
       setSavedToCalendar(true)

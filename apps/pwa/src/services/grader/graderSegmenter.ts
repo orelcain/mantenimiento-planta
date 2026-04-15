@@ -12,7 +12,7 @@
  *   4. saveDailySummaryBatch(summaries) → Firestore
  */
 
-import type { PieceRecord, Gate0Record, GraderShiftSchedule, GraderDailySummary } from './types'
+import type { PieceRecord, Gate0Record, GraderShiftSchedule, GraderDailySummary, TimelineBucket } from './types'
 import { DEFAULT_SHIFT_SCHEDULE } from './graderShiftSchedule'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -177,6 +177,186 @@ export function segmentByDayAndShift(
  * Calcula un GraderDailySummary ligero a partir de un segmento.
  * No usa computeAnalytics — es O(n) simple, válido para 230k registros totales.
  */
+// ── Agregados por minuto para el timeline chart ──────────────────────────────
+
+/**
+ * Pre-computa buckets de 1 minuto con todas las señales que el
+ * `GraderTimelineChart` necesita para renderizar sus capas (pesos, P0%,
+ * errores, producción, gates, cambios de lote) sin bajar los `pieceRecords`
+ * crudos de la subcollection.
+ *
+ * Se llama una sola vez durante `computeShiftSummary` y el resultado queda
+ * embebido en el doc `graderDailySummaries/{id}`. El timeline se pinta al
+ * instante leyendo solo el summary — sin query extra a Firestore.
+ *
+ * Filtro de peso por pieza: 200-8000 g (mismo rango que usa el chart para
+ * descartar outliers de calibración).
+ */
+export function computeTimelineAggregates(
+  pieceRecords: PieceRecord[],
+  gate0Records: Gate0Record[],
+): TimelineBucket[] {
+  interface Accum {
+    pieces: number
+    p0Pieces: number
+    weightKgSum: number
+    weightCount: number
+    weights: number[]
+    errorCounts: Map<string, number>
+    gateCounts: Map<number, number>
+    calibres: Map<string, number>
+    lots: Map<string, number>
+  }
+
+  const buckets = new Map<string, Accum>()
+
+  const truncateToMinute = (ts: string): string => ts.slice(0, 16) + ':00.000Z'
+
+  const getBucket = (tsMin: string): Accum => {
+    let b = buckets.get(tsMin)
+    if (!b) {
+      b = {
+        pieces: 0,
+        p0Pieces: 0,
+        weightKgSum: 0,
+        weightCount: 0,
+        weights: [],
+        errorCounts: new Map(),
+        gateCounts: new Map(),
+        calibres: new Map(),
+        lots: new Map(),
+      }
+      buckets.set(tsMin, b)
+    }
+    return b
+  }
+
+  // ── PIEZA_PIEZA ──────────────────────────────────────────────────────────
+  for (const rec of pieceRecords) {
+    if (!rec.ts) continue
+    const tsMin = truncateToMinute(rec.ts)
+    const b = getBucket(tsMin)
+    b.pieces += rec.pieces
+    if (rec.gate === 0) {
+      b.p0Pieces += rec.pieces
+      if (rec.error) {
+        b.errorCounts.set(rec.error, (b.errorCounts.get(rec.error) ?? 0) + rec.pieces)
+      }
+    } else {
+      // Gate productivo: acumular peso + gate count
+      if (rec.weightKg != null && rec.weightKg > 0) {
+        b.weightKgSum += rec.weightKg
+      }
+      // Peso por pieza en gramos (para min/p50/max del scatter)
+      let wGrams = rec.weightPerPieceGrams
+      if ((wGrams == null || wGrams <= 0) && rec.weightKg != null && rec.weightKg > 0) {
+        wGrams = rec.pieces === 1 ? rec.weightKg * 1000 : (rec.weightKg * 1000) / rec.pieces
+      }
+      if (wGrams != null && wGrams > 200 && wGrams < 8000) {
+        b.weights.push(wGrams)
+        b.weightCount += rec.pieces
+      }
+      b.gateCounts.set(rec.gate, (b.gateCounts.get(rec.gate) ?? 0) + rec.pieces)
+    }
+    if (rec.calibre) {
+      b.calibres.set(rec.calibre, (b.calibres.get(rec.calibre) ?? 0) + rec.pieces)
+    }
+    if (rec.lot) {
+      b.lots.set(rec.lot, (b.lots.get(rec.lot) ?? 0) + rec.pieces)
+    }
+  }
+
+  // ── PUERTA_0 dedicado (override p0Pieces + errorCounts del minuto) ───────
+  // Mismo patrón que hourlyBuckets: si hay gate0Records, son más confiables
+  // que los gate=0 de los PIEZA_PIEZA files.
+  if (gate0Records.length > 0) {
+    // Reset p0Pieces y errorCounts en minutos tocados por gate0Records
+    const touched = new Set<string>()
+    for (const rec of gate0Records) {
+      if (!rec.ts) continue
+      touched.add(truncateToMinute(rec.ts))
+    }
+    for (const tsMin of touched) {
+      const b = buckets.get(tsMin)
+      if (b) {
+        b.p0Pieces = 0
+        b.errorCounts.clear()
+      }
+    }
+    // Ahora acumulamos desde gate0Records
+    for (const rec of gate0Records) {
+      if (!rec.ts) continue
+      const tsMin = truncateToMinute(rec.ts)
+      const b = getBucket(tsMin)
+      b.p0Pieces += rec.pieces
+      if (rec.error) {
+        b.errorCounts.set(rec.error, (b.errorCounts.get(rec.error) ?? 0) + rec.pieces)
+      }
+      if (rec.calibre) {
+        b.calibres.set(rec.calibre, (b.calibres.get(rec.calibre) ?? 0) + rec.pieces)
+      }
+      if (rec.lot) {
+        b.lots.set(rec.lot, (b.lots.get(rec.lot) ?? 0) + rec.pieces)
+      }
+    }
+  }
+
+  // ── Convertir a TimelineBucket[] ordenado ───────────────────────────────
+  const result: TimelineBucket[] = Array.from(buckets.entries())
+    .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+    .map(([tsMin, b]) => {
+      const bucket: TimelineBucket = {
+        tsMin,
+        pieces: b.pieces,
+        p0Pieces: b.p0Pieces,
+      }
+
+      if (b.weightKgSum > 0) bucket.weightKg = r(b.weightKgSum, 3)
+      if (b.weightCount > 0) bucket.weightCount = b.weightCount
+
+      if (b.weights.length > 0) {
+        const sorted = [...b.weights].sort((x, y) => x - y)
+        bucket.weightMinGrams = Math.round(sorted[0]!)
+        bucket.weightMaxGrams = Math.round(sorted[sorted.length - 1]!)
+        bucket.weightP50Grams = Math.round(sorted[Math.floor(sorted.length / 2)]!)
+      }
+
+      if (b.errorCounts.size > 0) {
+        const ec: Record<string, number> = {}
+        for (const [k, v] of b.errorCounts) ec[k] = v
+        bucket.errorCounts = ec
+      }
+
+      if (b.gateCounts.size > 0) {
+        const gc: Record<string, number> = {}
+        for (const [k, v] of b.gateCounts) gc[String(k)] = v
+        bucket.gateCounts = gc
+      }
+
+      // Dominante de calibre
+      let maxCalPieces = 0
+      for (const [k, v] of b.calibres) {
+        if (v > maxCalPieces) {
+          maxCalPieces = v
+          bucket.dominantCalibre = k
+        }
+      }
+
+      // Dominante de lote
+      let maxLotPieces = 0
+      for (const [k, v] of b.lots) {
+        if (v > maxLotPieces) {
+          maxLotPieces = v
+          bucket.lot = k
+        }
+      }
+
+      return bucket
+    })
+
+  return result
+}
+
 export function computeShiftSummary(
   segment: ShiftSegment,
   batchUploadId: string,
@@ -319,6 +499,12 @@ export function computeShiftSummary(
       totalPieces: v.total,
       p0Pieces: v.p0,
     }))
+
+  // NOTA: Los timelineAggregates NO se computan acá. El wizard los computa
+  // por separado llamando `computeTimelineAggregates(pieceRecords, gate0Records)`
+  // y los guarda en la sub-collection `graderDailySummaries/{id}/meta/timeline`
+  // via `saveTimelineAggregates()`. Esto mantiene el doc del summary pequeño
+  // (~5 KB) para que las queries por rango sigan siendo baratas.
 
   return {
     id: `${sessionDate}__${shiftId}`,
