@@ -175,10 +175,13 @@ export function DashboardPage() {
   )
 
   return (
-    <div className="space-y-6">
+    <div>
 
-      {/* Home mobile — accesos directos por rol (solo visible en mobile) */}
+      {/* Home mobile — reemplaza el dashboard en mobile */}
       <MobileHomeGrid />
+
+      {/* Dashboard completo — solo desktop */}
+      <div className="hidden md:block space-y-6">
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -551,6 +554,8 @@ export function DashboardPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      </div>{/* /dashboard desktop */}
     </div>
   )
 }
