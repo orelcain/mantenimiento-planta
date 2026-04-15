@@ -11,6 +11,15 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 /* ═══════════════════════════════════════════
+   DESIGN TOKENS — grupo de color "dark-zone"
+   Agrupa: tab StaticGrader + status Contrastacion
+   + gate-grid bg + pockets fill
+═══════════════════════════════════════════ */
+:root {
+  --dark-zone: #0F2C4F;
+}
+
+/* ═══════════════════════════════════════════
    PALETA StaticGrader HMI — 20 rondas v4
    bg-hmi:       #1A5276
    bg-pocket:    #0A1C36  (dark navy vs bg)
@@ -205,7 +214,7 @@ html, body {
   border-bottom: 4px solid #ffffff;
 }
 .title-bar {
-  background: #143965;
+  background: var(--dark-zone);
   color: #ffffff;
   font-size: 22px;
   font-weight: bold;
@@ -219,9 +228,9 @@ html, body {
   flex-shrink: 0;
 }
 
-/* STATUS "7: CONTRASTACION" — full-width, color hover (#143965) */
+/* STATUS "7: CONTRASTACION" — full-width, dark-zone */
 .status {
-  background: #143965;
+  background: var(--dark-zone);
   color: #ffffff;
   font-size: 13px;
   padding: 5px 0 5px 12px;
@@ -237,7 +246,7 @@ html, body {
 ══════════════════════════════════════ */
 .gate-grid {
   flex: 1;
-  background: #143965;
+  background: var(--dark-zone);
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -474,7 +483,7 @@ html, body {
    Stroke: #F1C40F 2px, crispEdges + non-scaling-stroke
 ══════════════════════════════════════════════════ */
 const GW = 116, GH = 108, NW = 32, NH = 24, R = 8;
-const FILL = '#143965';
+const FILL = getComputedStyle(document.documentElement).getPropertyValue('--dark-zone').trim() || '#0F2C4F';
 
 function pocketPath() {
   /* Notch en TOP-RIGHT (esquina superior derecha) */
