@@ -43,9 +43,18 @@ from modules.video_builder import (
 
 def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
-        description="Generate a narrated manhwa-style video from a .txt script."
+        description="Generate a narrated manhwa-style video from a .txt script or a one-line idea."
     )
-    p.add_argument("--script",       required=True, help="Path to .txt script file")
+    # Input: either a pre-written script OR a one-line idea (generates script with Claude)
+    input_group = p.add_mutually_exclusive_group(required=True)
+    input_group.add_argument("--script", help="Path to .txt script file")
+    input_group.add_argument("--idea",   help="One-line story idea — generates script with Claude API")
+
+    p.add_argument("--genre",       default="auto",
+                   choices=["auto", "romance", "action", "fantasy", "horror"],
+                   help="Story genre for --idea mode (default: auto)")
+    p.add_argument("--num-scenes",  type=int, default=6,
+                   help="Number of scenes to generate in --idea mode (default: 6)")
     p.add_argument("--output",       default=None,  help="Output MP4 path (default: output/<title>.mp4)")
     p.add_argument("--skip-images",  action="store_true", help="Skip image generation — reuse existing PNGs")
     p.add_argument("--skip-tts",     action="store_true", help="Skip TTS — reuse existing WAVs")
@@ -59,10 +68,20 @@ def _parse_args() -> argparse.Namespace:
 def main() -> None:
     args = _parse_args()
 
-    script_path = Path(args.script)
-    if not script_path.exists():
-        print(f"[ERROR] Script not found: {script_path}")
-        sys.exit(1)
+    # ── Phase 2: generate script from idea ───────────────────────────────────
+    if args.idea:
+        print("\n── [0/4] Generating script from idea (Claude API) ──────────────────")
+        from modules.story_gen import generate_story
+        script_path = generate_story(
+            idea=args.idea,
+            genre=args.genre,
+            num_scenes=args.num_scenes,
+        )
+    else:
+        script_path = Path(args.script)
+        if not script_path.exists():
+            print(f"[ERROR] Script not found: {script_path}")
+            sys.exit(1)
 
     # ── Job directories ───────────────────────────────────────────────────────
     job_name  = script_path.stem
