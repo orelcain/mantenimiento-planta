@@ -838,7 +838,7 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
       legend: { show: false },
       animation: false,
     }
-  }, [layers, weightSeries, weightMovingAvg, p0PctSeries, errorSeries, productionSeries, gaps, useDualGrid, zoomRange])
+  }, [layers, weightSeries, weightMovingAvg, p0PctSeries, p0CumulativeSeries, errorSeries, productionSeries, gateTimeSeries, gaps, useDualGrid, zoomRange])
 
   if (stats.totalPieces === 0) return null
 
