@@ -53,7 +53,8 @@ function formatWeight(kg: number): string {
   return `${kg.toFixed(0)} kg`
 }
 
-function formatNumber(n: number): string {
+function formatNumber(n: number | undefined | null): string {
+  if (n == null) return '—'
   return n.toLocaleString('es-CL')
 }
 
