@@ -418,65 +418,96 @@ html, body {
 }
 #toggle-keyboards:hover { background: #34495E; }
 
-/* FUNCTION KEYS — debajo del footer, 4 columnas */
+/* ══════════════════════════════════════
+   TECLADOS estilo Marelec Z2 FÍSICO
+   - Panel azul con gradiente floral sutil
+   - Botones CIRCULARES (F-keys plateados, numpad blancos)
+══════════════════════════════════════ */
+
+/* FUNCTION KEYS — 4 botones circulares grises debajo del footer */
 .function-keys {
   grid-area: fkeys;
   display: flex;
-  gap: 6px;
-  padding: 6px;
-  background: #151515;
-  border-radius: 4px;
+  gap: 20px;
+  padding: 14px 20px;
+  background: linear-gradient(180deg, #4a87b8 0%, #2d6390 100%);
+  border-radius: 6px;
+  align-items: center;
+  justify-content: space-around;
 }
 .fkey {
-  flex: 1;
-  background: linear-gradient(180deg, #3a3a3a 0%, #1e1e1e 100%);
-  border: 2px solid #4a4a4a;
-  border-radius: 8px;
-  color: #ecf0f1;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 30%, #e8ecef 0%, #a8b2bc 55%, #5f6b78 100%);
+  border: 3px solid #2a3545;
+  color: #1a2840;
   font-family: Arial, sans-serif;
-  font-size: 18px;
+  font-size: 11px;
   font-weight: bold;
   cursor: pointer;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
   outline: none;
   transition: transform 0.05s, box-shadow 0.05s;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1);
+  box-shadow:
+    inset 0 2px 3px rgba(255,255,255,0.5),
+    inset 0 -2px 3px rgba(0,0,0,0.25),
+    0 4px 8px rgba(0,0,0,0.5),
+    0 2px 4px rgba(0,0,0,0.3);
+  position: relative;
+  flex-shrink: 0;
+}
+.fkey::after {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 40%, rgba(255,255,255,0.2) 0%, transparent 60%);
+  pointer-events: none;
 }
 .fkey:hover {
-  background: linear-gradient(180deg, #4a4a4a 0%, #2a2a2a 100%);
-  border-color: #5a5a5a;
+  background: radial-gradient(ellipse at 50% 30%, #f2f5f7 0%, #b5bfc9 55%, #6a7684 100%);
 }
 .fkey:active {
-  transform: translateY(1px);
-  box-shadow: 0 1px 2px rgba(0,0,0,0.4), inset 0 1px 0 rgba(0,0,0,0.2);
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 2px 6px rgba(0,0,0,0.4),
+    0 1px 2px rgba(0,0,0,0.3);
 }
-.fkey .fkey-label {
+.fkey-tooltip {
+  position: absolute;
+  bottom: -22px;
+  left: 50%;
+  transform: translateX(-50%);
   font-size: 9px;
+  color: #ffffff;
+  white-space: nowrap;
+  opacity: 0.7;
+  pointer-events: none;
   font-weight: normal;
-  opacity: 0.8;
-  letter-spacing: 0.3px;
 }
 
-/* NUM PAD — grid 3×5 a la derecha */
+/* NUM PAD — grid 3×4, botones circulares blancos */
 .num-pad {
   grid-area: numpad;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   grid-auto-rows: 1fr;
-  gap: 6px;
-  padding: 10px;
-  background: #151515;
-  border-radius: 4px;
+  gap: 12px;
+  padding: 18px 14px;
+  background: linear-gradient(180deg, #4a87b8 0%, #2d6390 100%);
+  border-radius: 6px;
+  place-items: center;
 }
 .nk {
-  background: linear-gradient(180deg, #3a3a3a 0%, #1e1e1e 100%);
-  border: 2px solid #4a4a4a;
-  border-radius: 8px;
-  color: #ecf0f1;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 30%, #ffffff 0%, #f0f4f8 50%, #c8d0d8 100%);
+  border: 2px solid #6a7684;
+  color: #1a2840;
   font-family: Arial, sans-serif;
   font-size: 22px;
   font-weight: bold;
@@ -486,34 +517,29 @@ html, body {
   justify-content: center;
   outline: none;
   transition: transform 0.05s;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1);
-  min-height: 48px;
+  box-shadow:
+    inset 0 2px 4px rgba(255,255,255,0.7),
+    inset 0 -2px 3px rgba(0,0,0,0.1),
+    0 3px 6px rgba(0,0,0,0.4),
+    0 1px 3px rgba(0,0,0,0.3);
+  position: relative;
+}
+.nk::after {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 30%, rgba(255,255,255,0.5) 0%, transparent 60%);
+  pointer-events: none;
 }
 .nk:hover {
-  background: linear-gradient(180deg, #4a4a4a 0%, #2a2a2a 100%);
-  border-color: #5a5a5a;
+  background: radial-gradient(ellipse at 50% 30%, #ffffff 0%, #f8fbfe 50%, #d8e0e8 100%);
 }
 .nk:active {
   transform: translateY(1px);
-}
-.nk.wide { grid-column: span 2; }
-.nk.enter {
-  background: linear-gradient(180deg, #2874A6 0%, #154360 100%);
-  border-color: #2980B9;
-  grid-column: span 3;
-  font-size: 16px;
-}
-.nk.enter:hover {
-  background: linear-gradient(180deg, #3498DB 0%, #2874A6 100%);
-}
-.nk.clear {
-  background: linear-gradient(180deg, #C0392B 0%, #7b241c 100%);
-  border-color: #E74C3C;
-  grid-column: span 3;
-  font-size: 16px;
-}
-.nk.clear:hover {
-  background: linear-gradient(180deg, #E74C3C 0%, #C0392B 100%);
+  box-shadow:
+    inset 0 2px 4px rgba(0,0,0,0.2),
+    0 1px 2px rgba(0,0,0,0.3);
 }
 
 /* Active indicator (display peso seleccionado) */
@@ -626,29 +652,28 @@ html, body {
   </div><!-- #screen -->
 </div><!-- #rc-window -->
 
-  <!-- FUNCTION KEYS: F1-F4 debajo del footer del HMI -->
+  <!-- FUNCTION KEYS: 4 botones circulares estilo Z2 físico -->
   <div class="function-keys">
-    <button class="fkey" data-fn="1">F1<span class="fkey-label">Cambiar programa</span></button>
-    <button class="fkey" data-fn="2">F2<span class="fkey-label">Modo presentación</span></button>
-    <button class="fkey" data-fn="3">F3<span class="fkey-label">→ 0 ←</span></button>
-    <button class="fkey" data-fn="4">F4<span class="fkey-label">Menu</span></button>
+    <button class="fkey" data-fn="1" title="Cambiar programa">F1<span class="fkey-tooltip">Cambiar programa</span></button>
+    <button class="fkey" data-fn="2" title="Modo presentación">F2<span class="fkey-tooltip">Modo presentación</span></button>
+    <button class="fkey" data-fn="3" title="→ 0 ←">F3<span class="fkey-tooltip">→ 0 ←</span></button>
+    <button class="fkey" data-fn="4" title="Menu">F4<span class="fkey-tooltip">Menu</span></button>
   </div>
 
-  <!-- NUM PAD: a la derecha del rc-window -->
+  <!-- NUM PAD: estilo Z2 físico, 3×4 con orden 1-9 / C-0-E -->
   <div class="num-pad">
-    <button class="nk">7</button>
-    <button class="nk">8</button>
-    <button class="nk">9</button>
-    <button class="nk">4</button>
-    <button class="nk">5</button>
-    <button class="nk">6</button>
     <button class="nk">1</button>
     <button class="nk">2</button>
     <button class="nk">3</button>
-    <button class="nk wide">0</button>
-    <button class="nk">.</button>
-    <button class="nk enter">Enter</button>
-    <button class="nk clear">C</button>
+    <button class="nk">4</button>
+    <button class="nk">5</button>
+    <button class="nk">6</button>
+    <button class="nk">7</button>
+    <button class="nk">8</button>
+    <button class="nk">9</button>
+    <button class="nk">C</button>
+    <button class="nk">0</button>
+    <button class="nk">E</button>
   </div>
 
 </div><!-- #marelec-shell -->
@@ -783,13 +808,13 @@ document.querySelectorAll('.fkey').forEach((fk, i) => {
   });
 });
 
-/* Numpad → escribe en el indicador activo */
+/* Numpad → escribe en el indicador activo (estilo Z2) */
 document.querySelectorAll('.nk').forEach(key => {
   key.addEventListener('click', () => {
     const val = key.textContent.trim();
 
-    /* Enter: confirma y cicla al siguiente indicador */
-    if (val === 'Enter') {
+    /* E (Enter): confirma y cicla al siguiente indicador */
+    if (val === 'E') {
       const all = [...document.querySelectorAll('.hdr-right .ind.wt')];
       if (all.length === 0) return;
       const curr = all.indexOf(activeIndicator);
@@ -798,7 +823,7 @@ document.querySelectorAll('.nk').forEach(key => {
       return;
     }
 
-    /* Clear: resetea el indicador activo a 0.00 */
+    /* C (Clear): resetea el indicador activo a 0.00 */
     if (val === 'C') {
       if (activeIndicator) {
         inputBuffer = '';
@@ -808,11 +833,9 @@ document.querySelectorAll('.nk').forEach(key => {
       return;
     }
 
-    /* Dígitos o punto: acumula en el buffer */
+    /* Dígitos: acumula en el buffer */
     if (!activeIndicator) return;
-    if (val === '.') {
-      if (!inputBuffer.includes('.')) inputBuffer += '.';
-    } else if (val.match(/^[0-9]$/)) {
+    if (val.match(/^[0-9]$/)) {
       inputBuffer += val;
     } else {
       return;
@@ -824,6 +847,11 @@ document.querySelectorAll('.nk').forEach(key => {
   });
 });
 
+/* Helper para encontrar una tecla del numpad por su label */
+function numKey(label) {
+  return [...document.querySelectorAll('.nk')].find(k => k.textContent.trim() === label);
+}
+
 /* Atajos de teclado: F1-F4 + 0-9 + Enter + Esc/Backspace */
 document.addEventListener('keydown', (e) => {
   /* F1-F4 */
@@ -834,20 +862,19 @@ document.addEventListener('keydown', (e) => {
     document.querySelectorAll('.fkey')[i]?.click();
     return;
   }
-  /* 0-9 y punto */
-  if (e.key.match(/^[0-9.]$/)) {
-    const keys = [...document.querySelectorAll('.nk')];
-    keys.find(k => k.textContent.trim() === e.key)?.click();
+  /* 0-9 */
+  if (e.key.match(/^[0-9]$/)) {
+    numKey(e.key)?.click();
     return;
   }
-  /* Enter */
+  /* Enter → E del numpad */
   if (e.key === 'Enter') {
-    document.querySelector('.nk.enter')?.click();
+    numKey('E')?.click();
     return;
   }
-  /* Escape / Backspace → Clear */
+  /* Escape / Backspace / Delete → C (Clear) del numpad */
   if (e.key === 'Escape' || e.key === 'Backspace' || e.key === 'Delete') {
-    document.querySelector('.nk.clear')?.click();
+    numKey('C')?.click();
   }
 });
 </script>
