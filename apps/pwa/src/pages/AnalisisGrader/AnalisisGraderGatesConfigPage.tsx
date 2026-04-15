@@ -42,6 +42,8 @@ interface Props {
   parsedData: ParsedMatrixData
   onComplete: (gates: GateAssignment[], config: GraderAnalysisConfig) => void
   onBack?: () => void
+  /** Si true, muestra navegación por pestañas en lugar de cards apiladas */
+  tabbed?: boolean
 }
 
 const QUALITIES: GraderQuality[] = ['Premium', 'Grado', 'Industrial', 'D', 'Unknown']
@@ -68,9 +70,10 @@ function CalibBadge({ status }: { status: CalibrationStatus | undefined }) {
   return <Badge className="text-[10px] bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400 whitespace-nowrap">? Falta</Badge>
 }
 
-export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: initialConfig, parsedData, onComplete, onBack }: Props) {
+export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: initialConfig, parsedData, onComplete, onBack, tabbed = false }: Props) {
   const [gates, setGates] = useState<GateAssignment[]>(initialGates)
   const [config, setConfig] = useState<GraderAnalysisConfig>(initialConfig)
+  const [activeTab, setActiveTab] = useState<'analisis' | 'gates' | 'rangos' | 'fisica'>('analisis')
   const [templates, setTemplates] = useState<GatesTemplate[]>([])
   const [templateName, setTemplateName] = useState('')
   const [activeTemplateName, setActiveTemplateName] = useState<string | null>(null)
@@ -317,10 +320,39 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
     }
   }
 
+  const TABS = [
+    { id: 'analisis', label: 'Análisis' },
+    { id: 'gates',   label: '12 Gates' },
+    { id: 'rangos',  label: 'Rangos' },
+    { id: 'fisica',  label: 'Física' },
+  ] as const
+
   return (
     <div className="space-y-4">
-      {/* Metadata */}
-      <Card>
+      {/* Tab bar — solo en modo tabbed */}
+      {tabbed && (
+        <div className="flex border-b border-border">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={cn(
+                'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
+                activeTab === tab.id
+                  ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/40',
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* 3.1 Configuración del Análisis */}
+      {(!tabbed || activeTab === 'analisis') && (
+      <Card className="relative">
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <Settings2 className="h-5 w-5" />
@@ -506,8 +538,10 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
           )}
         </CardContent>
       </Card>
+      )} {/* /3.1 */}
 
-      {/* Quick navigation visible */}
+      {/* Quick navigation visible — solo en modo no-tabbed */}
+      {!tabbed && (
       <div className="sticky top-14 z-20">
         <Card className="border-primary/30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
           <CardContent className="py-2.5 px-4 flex items-center justify-between gap-3">
@@ -520,9 +554,11 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
           </CardContent>
         </Card>
       </div>
+      )} {/* /Quick nav */}
 
-      {/* Gates Table */}
-      <Card>
+      {/* 3.2 Configuración de 12 Gates */}
+      {(!tabbed || activeTab === 'gates') && (
+      <Card className="relative">
         <CardHeader className="flex flex-row items-center justify-between">
           <div className="flex items-center gap-2">
             <CardTitle className="text-base">
@@ -674,9 +710,11 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
           </div>
         </CardContent>
       </Card>
+      )} {/* /3.2 */}
 
-      {/* Editable Weight Ranges */}
-      <Card>
+      {/* 3.3 Rangos de Peso */}
+      {(!tabbed || activeTab === 'rangos') && (
+      <Card className="relative">
         <CardHeader
           className="cursor-pointer select-none"
           onClick={() => setShowWeightRanges(!showWeightRanges)}
@@ -784,9 +822,11 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
           </CardContent>
         )}
       </Card>
+      )} {/* /3.3 */}
 
-      {/* Configuración Física de la Máquina */}
-      <Card>
+      {/* 3.4 Configuración Física de la Máquina */}
+      {(!tabbed || activeTab === 'fisica') && (
+      <Card className="relative">
         <CardHeader
           className="cursor-pointer select-none"
           onClick={() => setShowPhysicalConfig(!showPhysicalConfig)}
@@ -1810,6 +1850,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
           </CardContent>
         )}
       </Card>
+      )} {/* /3.4 */}
 
       {/* Navigation */}
       <div className={onBack ? 'flex justify-between' : 'flex justify-end'}>

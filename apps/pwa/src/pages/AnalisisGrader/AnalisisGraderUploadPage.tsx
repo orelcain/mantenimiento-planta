@@ -38,6 +38,8 @@ interface Props {
   initialFiles?: FileParsed[]
   /** Callback para sincronizar archivos con el padre */
   onFilesChange?: (files: FileParsed[]) => void
+  /** Si true, renderiza solo un botón compacto (sin calendario ni zona drag-drop) */
+  compact?: boolean
 }
 
 export interface FileParsed {
@@ -106,7 +108,7 @@ function toDateKey(iso?: string): string {
    de fecha locales se eliminaron porque viven dentro del componente compartido. */
 
 
-export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChange }: Props) {
+export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChange, compact = false }: Props) {
   const [files, setFiles] = useState<FileParsed[]>(initialFiles || [])
   const [parsing, setParsing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -376,15 +378,55 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
     onCompleteRef.current(merged)
   }, [files]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  if (compact) return (
+      <div className="flex items-center gap-2 flex-wrap">
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          disabled={parsing}
+          className={cn(
+            'flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-sm font-medium transition-colors',
+            'border-blue-500/40 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10',
+            parsing && 'opacity-60 cursor-wait',
+          )}
+        >
+          {parsing
+            ? <Loader2 className="h-4 w-4 animate-spin" />
+            : <FileSpreadsheet className="h-4 w-4" />
+          }
+          Cargar Excel
+          {files.length > 0 && (
+            <Badge className={cn('text-[10px] h-4 px-1 ml-0.5', files.length > 0 ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' : '')}>
+              {files.length}
+            </Badge>
+          )}
+        </button>
+        {turnoRange && (
+          <span className="text-xs text-muted-foreground">
+            {turnoRange.date} · {turnoRange.start}–{turnoRange.end} · {turnoRange.totalPieces.toLocaleString()} pzs
+          </span>
+        )}
+        <input
+          ref={inputRef}
+          type="file"
+          multiple
+          accept=".xlsx,.xls"
+          className="hidden"
+          onChange={(e) => e.target.files && handleFiles(e.target.files)}
+        />
+      </div>
+  )
+
   return (
     <div className="space-y-3">
-      {/* Calendario histórico — primera acción: seleccionar turno histórico o ver contexto */}
+      {/* Calendario histórico */}
       <div data-grader-calendar>
         <GraderHistoricalCalendar />
       </div>
 
-      {/* Zona de carga — acción secundaria: subir archivo nuevo */}
-      <Card className="lg:border-l-4 lg:border-l-blue-500/40 lg:hover:shadow-md lg:transition-shadow">
+      {/* Zona de carga */}
+      <div>
+        <Card className="lg:border-l-4 lg:border-l-blue-500/40 lg:hover:shadow-md lg:transition-shadow">
         <CardContent className="pt-4 pb-4 space-y-3">
           <div className="flex items-center gap-2 flex-wrap">
             <Badge className={cn('text-xs', KIND_COLORS.PIEZA_PIEZA)}>Pieza-Pieza</Badge>
@@ -478,6 +520,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
           )}
         </CardContent>
       </Card>
+      </div>
 
       {/* Errores */}
       {error && (

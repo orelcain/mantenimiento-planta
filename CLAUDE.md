@@ -57,7 +57,7 @@ Cuando el usuario diga `cerrar`, `terminar`, `ya está`, `gracias`, `hasta luego
   2. Editar `apps/pwa/src/constants/version.ts` → `APP_VERSION` + `VERSION_NAME`
   3. **Correr `node scripts/sync-pwa-version.mjs`** desde la raíz del repo → actualiza `public/version.json` y `VERSION.md` (sin esto el banner de actualización muestra versión incorrecta)
   - Usar versionado semántico: `feat` → minor (2.90 → 2.91), `fix`/`docs` → patch (2.90.0 → 2.90.1)
-  - La versión aparece visible en la UI (header del sidebar). Versión actual: **v2.91.0**
+  - La versión aparece visible en la UI (header del sidebar). Versión actual: **v2.92.0**
   - ⚠️ El script `sync:version` corre automático en prebuild del CI, pero NO al hacer commits manuales → siempre correrlo a mano.
 - **No crear README.md ni docs** salvo que se pida explicitamente.
 - **Base URL**: `/mantenimiento-planta/` (GitHub Pages)
@@ -215,12 +215,27 @@ sidebarConfig  ← nuevo: orden personalizado del sidebar admin
 
 ## Version actual
 
-- **v2.90.0** (2026-04-15) — "Grader: LinearScale zoom proporcional + insights automáticos + exportar CSV + media móvil 7d + paginación + fix timeline Firestore rules"
+- **v2.92.0** (2026-04-15) — "Home Análisis Grader: layout 2 columnas + upload compacto + config tabulada"
 - Proyecto Firebase: `mantenimiento-planta-771a3`
 - GitHub: `orelcain/mantenimiento-planta`
 - Produccion: `https://orelcain.github.io/mantenimiento-planta/`
 - CI status: 4/4 workflows 🟢
 - Seguridad: 23 colecciones Firestore validadas, 0 vulnerabilidades runtime prod
+
+## Cambios recientes (sesión 2026-04-15 — Grader home layout 2 columnas, v2.91.0 → v2.92.0)
+
+Refactor visual del home de Análisis Grader (`AnalisisGraderWizardPage`). Sin cambios de lógica ni datos.
+
+### Nuevo layout pantalla completa (2 columnas)
+- **Izquierda (50%)**: `GraderHistoricalCalendar` con nuevo prop `stacked=true` → calendario (1.1) arriba + resumen turno (1.2) abajo, apilados verticalmente
+- **Derecha (50%)**: Card "Configuraciones" con `AnalisisGraderGatesConfigPage` en modo `tabbed=true` → 4 pestañas: Análisis | 12 Gates | Rangos | Física
+- **Header**: `AnalisisGraderUploadPage` con prop `compact=true` → botón compacto "Cargar Excel" + estado turno inline, sin zona drag-drop ni calendario
+- **Eliminado**: stepper de 3 pasos (era solo visual, no aportaba) + todos los badges de debug numerados (1, 1.1, 1.2, 3, 3.1–3.4)
+
+### Props nuevos añadidos
+- `GraderHistoricalCalendar`: `stacked?: boolean` — cuando true usa `flex flex-col` en lugar de grid 3 columnas
+- `AnalisisGraderGatesConfigPage`: `tabbed?: boolean` — tab bar con `useState<'analisis'|'gates'|'rangos'|'fisica'>`, oculta nav sticky en modo tabbed
+- `AnalisisGraderUploadPage`: `compact?: boolean` — early return con botón pequeño en lugar del layout completo
 
 ## Cambios recientes (sesion 2026-04-11/12 maratónica — Grader iter 8 al 18.1, v2.80.0 → v2.86.1)
 

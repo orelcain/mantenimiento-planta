@@ -1,7 +1,7 @@
 {
-  "version": "2.91.0",
+  "version": "2.92.0",
   "buildDate": "2026-04-15",
-  "buildTimestamp": 1776284532891,
+  "buildTimestamp": 1776287670417,
   "features": [
     "Home Análisis Grader: calendario al tope (acción primaria visible de inmediato)",
     "Home Análisis Grader: panel Configurar compuertas colapsable en desktop (antes siempre expandido)",

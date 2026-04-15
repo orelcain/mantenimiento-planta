@@ -65,6 +65,8 @@ interface GraderHistoricalCalendarProps {
   className?: string
   /** Fecha inicial a seleccionar (opcional, ej. de ?goto=YYYY-MM-DD) */
   initialDateKey?: string | null
+  /** Si true, apila 1.1 (calendario) arriba y 1.2 (resumen) abajo en lugar del grid lateral */
+  stacked?: boolean
 }
 
 const monthNames = [
@@ -136,6 +138,7 @@ export function GraderHistoricalCalendar({
   onLoadTurno,
   className,
   initialDateKey,
+  stacked = false,
 }: GraderHistoricalCalendarProps) {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -489,8 +492,8 @@ export function GraderHistoricalCalendar({
   }
 
   return (
-    <div className={cn('grid grid-cols-1 lg:grid-cols-3 gap-4', className)}>
-      <Card className="lg:col-span-2">
+    <div className={cn(stacked ? 'flex flex-col gap-4' : 'grid grid-cols-1 lg:grid-cols-3 gap-4', className)}>
+      <Card className={cn('relative', !stacked && 'lg:col-span-2')}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
           <div className="flex items-center gap-4">
             <Button variant="outline" size="icon" onClick={handlePrevMonth}>
@@ -604,7 +607,7 @@ export function GraderHistoricalCalendar({
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="relative">
         <CardHeader>
           <CardTitle className="text-base">
             {selectedKey ? `Resumen ${selectedKey}` : 'Resumen diario'}
