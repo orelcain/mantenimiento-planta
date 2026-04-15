@@ -300,7 +300,7 @@ export function GraderPeriodView({ data }: Props) {
           onZoomComplete: () => updateVisibleRange(),
         },
         limits: {
-          x: { min: 'original' as const, max: 'original' as const, minRange: 2 },
+          x: { min: 'original' as const, max: 'original' as const, minRange: 1 },
         },
       },
     },
@@ -377,7 +377,7 @@ export function GraderPeriodView({ data }: Props) {
           mode: 'x' as const,
         },
         limits: {
-          x: { min: 'original' as const, max: 'original' as const, minRange: 2 },
+          x: { min: 'original' as const, max: 'original' as const, minRange: 1 },
         },
       },
     },
