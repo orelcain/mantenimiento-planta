@@ -23,6 +23,8 @@ interface Tile {
   color:    TileColor
   /** full = CTA ancho completo al inicio del grupo, half = chip */
   cta?:     boolean
+  /** módulo aún en desarrollo — muestra badge 🚧 */
+  wip?:     boolean
 }
 
 interface TileGroup {
@@ -92,7 +94,7 @@ const GROUPS: Record<UserRole, TileGroup[]> = {
       tiles: [
         { id: 'incidents', label: 'Incidencias',        sublabel: 'Revisar & validar',   icon: AlertTriangle, href: '/incidents',       color: 'red'    },
         { id: 'grader',    label: 'Grader',             sublabel: 'Rendimiento',          icon: BarChart3,     href: '/analisis-grader', color: 'blue'   },
-        { id: 'inspecc',   label: 'Inspecciones',       sublabel: 'Rondas',              icon: Route,         href: '/inspections',     color: 'amber'  },
+        { id: 'inspecc',   label: 'Inspecciones',       sublabel: 'Rondas',              icon: Route,         href: '/inspections',     color: 'amber',  wip: true },
         { id: 'prevntv',   label: 'Preventivo',         sublabel: 'Plan mantención',     icon: CalendarClock, href: '/preventive',      color: 'amber'  },
         { id: 'sensores',  label: 'Sensores',           sublabel: 'Monitor real',        icon: Activity,      href: '/sensors/monitor', color: 'green'  },
       ],
@@ -125,7 +127,7 @@ const GROUPS: Record<UserRole, TileGroup[]> = {
     {
       label: 'Planificación',
       tiles: [
-        { id: 'inspecc',   label: 'Inspecciones',       sublabel: 'Rondas',              icon: ClipboardList, href: '/inspections',     color: 'amber'  },
+        { id: 'inspecc',   label: 'Inspecciones',       sublabel: 'Rondas',              icon: ClipboardList, href: '/inspections',     color: 'amber',  wip: true },
         { id: 'prevntv',   label: 'Preventivo',         sublabel: 'Plan mantención',     icon: CalendarClock, href: '/preventive',      color: 'amber'  },
         { id: 'gantt',     label: 'Gantt',              sublabel: 'Planificador',        icon: TrendingUp,    href: '/gantt',           color: 'orange' },
       ],
@@ -217,7 +219,14 @@ function CtaTile({ tile }: { tile: Tile }) {
         <Icon className={cn('h-5 w-5', c.icon)} />
       </div>
       <div className="flex-1 min-w-0">
-        <p className={cn('font-semibold text-sm leading-tight', c.label)}>{tile.label}</p>
+        <div className="flex items-center gap-1.5">
+          <p className={cn('font-semibold text-sm leading-tight', c.label)}>{tile.label}</p>
+          {tile.wip && (
+            <span className="text-[9px] font-bold uppercase tracking-wide px-1 py-0.5 rounded bg-amber-400/20 text-amber-600 dark:text-amber-400 border border-amber-400/30 leading-none shrink-0">
+              🚧 dev
+            </span>
+          )}
+        </div>
         <p className="text-xs text-muted-foreground mt-0.5">{tile.sublabel}</p>
       </div>
       <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -232,11 +241,16 @@ function Chip({ tile }: { tile: Tile }) {
     <Link
       to={tile.href}
       className={cn(
-        'flex-shrink-0 flex flex-col items-center gap-1.5 p-2.5 rounded-xl border',
+        'flex-shrink-0 flex flex-col items-center gap-1.5 p-2.5 rounded-xl border relative',
         'w-[72px] min-h-[64px] transition-all active:scale-[0.95] touch-manipulation select-none',
         c.bg, c.border,
       )}
     >
+      {tile.wip && (
+        <span className="absolute -top-1.5 -right-1 text-[8px] font-bold px-1 py-px rounded-full bg-amber-400 text-amber-900 leading-none z-10">
+          🚧
+        </span>
+      )}
       <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center', c.bg)}>
         <Icon className={cn('h-3.5 w-3.5', c.icon)} />
       </div>
