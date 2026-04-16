@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>manhwa/video-gen — Dashboard</title>
+<title>manhwa/video-gen</title>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -12,427 +12,525 @@
 :root{
   --bg:#09090b;--bg2:#18181b;--bg3:#27272a;
   --border:#3f3f46;--border2:#52525b;
-  --z2:#d4d4d8;--z3:#71717a;--z4:#a1a1aa;
+  --z1:#fafafa;--z2:#d4d4d8;--z3:#71717a;--z4:#a1a1aa;
   --amber:#f59e0b;--amber2:#fbbf24;
   --a-bg:rgba(245,158,11,.08);--a-bdr:rgba(245,158,11,.25);
   --emerald:#10b981;--e-bg:rgba(16,185,129,.07);--e-bdr:rgba(16,185,129,.3);
   --blue:#60a5fa;--b-bg:rgba(96,165,250,.08);--b-bdr:rgba(96,165,250,.25);
-  --red:#f87171;--r-bg:rgba(248,113,113,.1);
+  --red:#f87171;--r-bg:rgba(248,113,113,.1);--r-bdr:rgba(248,113,113,.3);
+  --violet:#a78bfa;--v-bg:rgba(167,139,250,.08);
 }
 html,body{background:var(--bg);color:var(--z2);font-family:ui-sans-serif,system-ui,sans-serif;min-height:100vh}
-#root{padding:1.25rem;max-width:1000px;margin:0 auto}
+#root{padding:1.25rem;max-width:1100px;margin:0 auto}
 
 /* layout */
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem}
-@media(max-width:700px){.grid{grid-template-columns:1fr}}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem}
+@media(max-width:720px){.grid2{grid-template-columns:1fr}}
 .flex{display:flex}.aic{align-items:center}.aist{align-items:flex-start}
-.jb{justify-content:space-between}.fw{flex-wrap:wrap}.f1{flex:1}
-.gap1{gap:.25rem}.gap2{gap:.5rem}.gap3{gap:.75rem}
-.col{flex-direction:column}.mw0{min-width:0}
+.jb{justify-content:space-between}.jc{justify-content:center}.fw{flex-wrap:wrap}
+.f1{flex:1}.col{flex-direction:column}.gap1{gap:.25rem}.gap2{gap:.5rem}.gap3{gap:.75rem}.gap4{gap:1rem}
+.mw0{min-width:0}
 
 /* spacing */
 .mt1{margin-top:.25rem}.mt2{margin-top:.5rem}.mt3{margin-top:.75rem}
-.mt4{margin-top:1rem}.mt5{margin-top:1.25rem}.mb2{margin-bottom:.5rem}.mb3{margin-bottom:.75rem}
+.mt4{margin-top:1rem}.mt5{margin-top:1.25rem}.mb1{margin-bottom:.25rem}.mb2{margin-bottom:.5rem}.mb3{margin-bottom:.75rem}
 
 /* text */
-.t2xl{font-size:1.4rem;font-weight:700;letter-spacing:-.02em}
+.t3xl{font-size:1.6rem;font-weight:700;letter-spacing:-.025em}
+.t2xl{font-size:1.25rem;font-weight:700}
+.tlg{font-size:1rem;font-weight:600}
 .tsm{font-size:.875rem}.txs{font-size:.75rem}.t10{font-size:.625rem}
 .mono{font-family:ui-monospace,'Cascadia Code',monospace}
 .bold{font-weight:600}.upper{text-transform:uppercase;letter-spacing:.08em}
-.strike{text-decoration:line-through}.nowrap{white-space:nowrap}
 .trunc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nowrap{white-space:nowrap}
 
 /* colors */
-.cz2{color:var(--z2)}.cz3{color:var(--z3)}.cz4{color:var(--z4)}
+.cz1{color:var(--z1)}.cz2{color:var(--z2)}.cz3{color:var(--z3)}.cz4{color:var(--z4)}
 .ca{color:var(--amber)}.ca2{color:var(--amber2)}
-.ce{color:var(--emerald)}.cb{color:var(--blue)}.cr{color:var(--red)}
+.ce{color:var(--emerald)}.cb{color:var(--blue)}.cr{color:var(--red)}.cv{color:var(--violet)}
 
 /* cards */
-.card{background:rgba(24,24,27,.6);border:1px solid var(--border);border-radius:.7rem;padding:.6rem .75rem;transition:border-color .15s}
-.card:hover{border-color:var(--border2)}
-.card-a{background:var(--a-bg);border-color:var(--a-bdr)}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:.75rem;padding:.75rem 1rem}
 .card-e{background:var(--e-bg);border-color:var(--e-bdr)}
+.card-a{background:var(--a-bg);border-color:var(--a-bdr)}
 .card-b{background:var(--b-bg);border-color:var(--b-bdr)}
-.card-dim{background:rgba(24,24,27,.3);border-color:rgba(63,63,70,.4);opacity:.5}
-.card-task{cursor:pointer}.card-task:hover{border-color:var(--border2)}
+.card-r{background:var(--r-bg);border-color:var(--r-bdr)}
+.card-v{background:var(--v-bg);border-color:rgba(167,139,250,.3)}
 
-/* dots */
-.dok{display:inline-flex;align-items:center;justify-content:center;width:1.2rem;height:1.2rem;border-radius:50%;background:rgba(16,185,129,.15);color:var(--emerald);font-size:.65rem;font-weight:700;flex-shrink:0}
-.derr{display:inline-flex;align-items:center;justify-content:center;width:1.2rem;height:1.2rem;border-radius:50%;background:var(--r-bg);color:var(--red);font-size:.65rem;font-weight:700;flex-shrink:0}
-.dpend{display:inline-flex;align-items:center;justify-content:center;width:1.2rem;height:1.2rem;border-radius:50%;border:1px solid var(--border);font-size:.6rem;color:var(--z3);flex-shrink:0}
-.dload span{width:.55rem;height:.55rem;border-radius:50%;background:var(--amber);animation:pulse 1s ease-in-out infinite;display:inline-block}
-.dload{display:inline-flex;align-items:center;justify-content:center;width:1.2rem;height:1.2rem;flex-shrink:0}
+/* form */
+.field{display:flex;flex-direction:column;gap:.3rem}
+.label{font-size:.65rem;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--z4)}
+textarea,input,select{
+  background:var(--bg3);border:1px solid var(--border2);border-radius:.4rem;
+  color:var(--z2);font-family:inherit;font-size:.875rem;padding:.5rem .7rem;
+  outline:none;transition:border-color .15s;width:100%
+}
+textarea:focus,input:focus,select:focus{border-color:var(--blue)}
+textarea{resize:vertical;min-height:3.5rem}
+select{cursor:pointer}
+option{background:var(--bg3)}
+
+/* buttons */
+.btn{
+  font-size:.8rem;font-weight:600;padding:.55rem 1.1rem;border-radius:.45rem;
+  cursor:pointer;border:1px solid;transition:all .15s;display:inline-flex;
+  align-items:center;gap:.4rem;white-space:nowrap
+}
+.btn-run{
+  background:linear-gradient(135deg,rgba(16,185,129,.25),rgba(96,165,250,.15));
+  border-color:var(--e-bdr);color:var(--emerald);font-size:.9rem;padding:.6rem 1.4rem
+}
+.btn-run:hover{background:linear-gradient(135deg,rgba(16,185,129,.35),rgba(96,165,250,.25))}
+.btn-run:disabled{opacity:.4;cursor:not-allowed}
+.btn-stop{background:var(--r-bg);border-color:var(--r-bdr);color:var(--red)}
+.btn-stop:hover{background:rgba(248,113,113,.18)}
+.btn-sm{font-size:.68rem;padding:.25rem .6rem;border-radius:.3rem;background:var(--bg3);border-color:var(--border);color:var(--z4)}
+.btn-sm:hover{background:var(--border);color:var(--z2)}
 
 /* progress */
 .ptrack{height:.35rem;border-radius:9999px;background:var(--bg3);overflow:hidden}
-.pfill{height:100%;border-radius:9999px;transition:width .4s ease}
+.ptrack-lg{height:.55rem}
+.pfill{height:100%;border-radius:9999px;transition:width .5s ease}
 .pfill-e{background:linear-gradient(to right,#059669,var(--emerald))}
 .pfill-a{background:linear-gradient(to right,var(--amber),var(--amber2))}
 .pfill-b{background:linear-gradient(to right,#3b82f6,var(--blue))}
-.pfill-main{background:linear-gradient(to right,var(--amber),var(--amber2),var(--emerald))}
+.pfill-main{background:linear-gradient(90deg,var(--amber),var(--blue),var(--emerald))}
 
-/* badge */
-.badge{font-size:.58rem;font-family:ui-monospace,monospace;padding:.1rem .3rem;border-radius:.2rem;border:1px solid;text-transform:uppercase;letter-spacing:.07em;font-weight:600}
-.bp0{background:var(--r-bg);color:var(--red);border-color:rgba(248,113,113,.3)}
-.bp1{background:var(--a-bg);color:var(--amber);border-color:var(--a-bdr)}
-.bp2{background:rgba(63,63,70,.5);color:var(--z3);border-color:var(--border)}
-
-/* misc */
-code{font-family:ui-monospace,monospace;font-size:.68rem;background:var(--bg3);padding:.1rem .35rem;border-radius:.2rem;color:var(--z4)}
-.pill{font-size:.68rem;font-family:monospace;padding:.15rem .45rem;border-radius:.25rem;background:var(--bg2);border:1px solid var(--border);color:var(--z3)}
-.btn{font-size:.7rem;font-family:monospace;padding:.3rem .8rem;border-radius:.35rem;background:var(--b-bg);border:1px solid var(--b-bdr);color:var(--blue);cursor:pointer;transition:all .15s;font-weight:600}
-.btn:hover{background:rgba(96,165,250,.15)}.btn:disabled{opacity:.4;cursor:not-allowed}
-.cbx{width:.95rem;height:.95rem;border-radius:.2rem;border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:.1rem;transition:all .15s}
-.cbx.on{background:rgba(16,185,129,.2);border-color:rgba(16,185,129,.4)}
-.sechead{font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--z4)}
-.footer{margin-top:2rem;padding-top:.75rem;border-top:1px solid var(--border);font-size:.62rem;font-family:monospace;color:var(--z3)}
-@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.82)}}
+/* status dots */
+.dot{width:.55rem;height:.55rem;border-radius:50%;flex-shrink:0}
+.dot-e{background:var(--emerald)}.dot-a{background:var(--amber)}.dot-r{background:var(--red)}
+.dot-z{background:var(--z3)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.dot-pulse{animation:pulse 1s ease-in-out infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-.spin{display:inline-block;width:.7rem;height:.7rem;border:2px solid rgba(96,165,250,.2);border-top-color:var(--blue);border-radius:50%;animation:spin .6s linear infinite}
-.copybtn{font-size:.58rem;font-family:monospace;padding:.1rem .35rem;border-radius:.2rem;background:var(--bg3);border:1px solid var(--border);color:var(--z3);cursor:pointer;flex-shrink:0;transition:all .15s}
-.copybtn:hover{background:var(--border);color:var(--z2)}
+.spin{display:inline-block;width:.75rem;height:.75rem;border:2px solid rgba(96,165,250,.2);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+
+/* section header */
+.sechead{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--z3)}
+.divider{border:none;border-top:1px solid var(--border);margin:.75rem 0}
+
+/* video */
+.video-wrap{border-radius:.6rem;overflow:hidden;background:#000;width:100%}
+video{width:100%;display:block;max-height:360px;object-fit:contain}
+
+/* pill */
+.pill{font-size:.62rem;font-family:monospace;padding:.15rem .45rem;border-radius:.25rem;background:var(--bg3);border:1px solid var(--border);color:var(--z3)}
+.pill-e{background:var(--e-bg);border-color:var(--e-bdr);color:var(--emerald)}
+.pill-a{background:var(--a-bg);border-color:var(--a-bdr);color:var(--amber)}
+.pill-b{background:var(--b-bg);border-color:var(--b-bdr);color:var(--blue)}
+
+code{font-family:ui-monospace,monospace;font-size:.7rem;background:var(--bg3);padding:.1rem .35rem;border-radius:.2rem;color:var(--z4)}
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const { useState, useEffect, useCallback } = React;
+const { useState, useEffect, useCallback, useRef } = React;
+const API = '';  // mismo origen
 
-// ── Tasks ─────────────────────────────────────────────────────────────────────
-const INIT_TASKS = [
-  {id:'t2',label:'Test Edge TTS + guion IA → ✓ 650KB MP4, 14 WAVs en es-MX', cmd:'', priority:'critical',done:true},
-  {id:'t3',label:'Test compare-backends (jurado IA)',   cmd:'python -X utf8 main.py --idea "un samurai inmortal" --compare-backends --skip-images', priority:'high',done:false},
-  {id:'t4',label:'Instalar ComfyUI + checkpoint',       cmd:'Descargar anything-v5.safetensors → ComfyUI/models/checkpoints/', priority:'high',done:false},
-  {id:'t5',label:'Primer video completo (con imágenes)',cmd:'python -X utf8 main.py --idea "amor prohibido en el futuro"', priority:'high',done:false},
-  {id:'t6',label:'Agregar música de fondo',             cmd:'Copiar ambient_01.mp3 → manhwa-video-gen/assets/music/', priority:'normal',done:false},
-  {id:'t7',label:'Merge PR #36 → main',                cmd:'gh pr merge 36 --squash', priority:'normal',done:false},
+// ── helpers ───────────────────────────────────────────────────────────────────
+async function apiFetch(path, opts={}) {
+  try {
+    const r = await fetch(API + path, opts);
+    return await r.json();
+  } catch(e) {
+    return { error: String(e) };
+  }
+}
+
+function BackendPill({ name, info }) {
+  if (!info) return null;
+  const ok = info.ok;
+  const cls = ok ? 'pill-e' : 'pill';
+  const label = name === 'ollama'
+    ? `ollama ${ok ? '✓' : '○'}`
+    : name === 'anthropic'
+    ? `anthropic ${ok ? '✓' : 'sin key'}`
+    : `gemini ${ok ? '✓' : 'sin key'}`;
+  return <span className={`pill ${cls}`}>{label}</span>;
+}
+
+// ── Stage indicators ──────────────────────────────────────────────────────────
+const STAGES = [
+  { n:0, label:'Guion IA',  icon:'✍' },
+  { n:1, label:'Parseo',    icon:'📋' },
+  { n:2, label:'Imágenes',  icon:'🖼' },
+  { n:3, label:'Audio',     icon:'🔊' },
+  { n:4, label:'Video',     icon:'🎬' },
 ];
 
-const STAGE_NAMES = ['Generando guion','Parseando','Imágenes','Audio','Video'];
-const STAGE_COLORS = ['pfill-a','pfill-a','pfill-b','pfill-b','pfill-e'];
-
-// ── Sub-components ─────────────────────────────────────────────────────────────
-function CopyBtn({text}) {
-  const [ok,setOk]=useState(false);
-  const go=e=>{
-    e.stopPropagation();
-    navigator.clipboard.writeText(text).then(()=>{setOk(true);setTimeout(()=>setOk(false),1400)})
-    .catch(()=>{const t=document.createElement('textarea');t.value=text;document.body.appendChild(t);t.select();document.execCommand('copy');document.body.removeChild(t);setOk(true);setTimeout(()=>setOk(false),1400)});
-  };
-  return <button className="copybtn" onClick={go}>{ok?'✓':'copy'}</button>;
-}
-
-function Pbadge({p}){
-  const c=p==='critical'?'badge bp0':p==='high'?'badge bp1':'badge bp2';
-  return <span className={c}>{p==='critical'?'P0':p==='high'?'P1':'P2'}</span>;
-}
-
-// ── Ollama status (check real) ────────────────────────────────────────────────
-function OllamaStatus({onUpdate}) {
-  const [st,setSt]=useState({running:false,version:null,llama:false,checked:false});
-  const [cd,setCd]=useState(null);
-
-  const check=useCallback(async()=>{
-    const s={running:false,version:null,llama:false,checked:true};
-    try{
-      const r=await fetch('http://localhost:11434/api/version',{signal:AbortSignal.timeout(3000)});
-      if(r.ok){const d=await r.json();s.running=true;s.version=d.version;}
-    }catch(_){}
-    if(s.running){
-      try{
-        const r=await fetch('http://localhost:11434/api/tags',{signal:AbortSignal.timeout(3000)});
-        if(r.ok){const d=await r.json();s.llama=(d.models||[]).some(m=>m.name.includes('llama3.2'));}
-      }catch(_){}
-    }
-    setSt(s);setCd(20);
-    if(onUpdate)onUpdate(s);
-  },[]);
-
-  useEffect(()=>{check();const iv=setInterval(check,20000);return()=>clearInterval(iv);},[check]);
-  useEffect(()=>{const iv=setInterval(()=>setCd(c=>c>0?c-1:0),1000);return()=>clearInterval(iv);},[]);
-
-  if(!st.checked) return null;
-
-  const all=st.running&&st.llama;
-  return (
-    <div className={`card mt3 ${all?'card-e':st.running?'card-b':'card-a'}`}>
-      <div className="flex aic jb gap2">
-        <span className={`txs mono bold ${all?'ce':st.running?'cb':'ca'}`}>
-          {all?'✓ Ollama + llama3.2 listos':st.running?'✓ Ollama activo':'○ Ollama sin respuesta'}
-        </span>
-        <div className="flex aic gap2">
-          {cd!==null&&<span className="t10 mono cz3">{cd}s</span>}
-          <button className="btn" onClick={check}>↻ check</button>
-        </div>
-      </div>
-      <div className="flex col gap1 mt2">
-        <div className="flex aic gap2">
-          <span className={st.running?'ce':'cr'}>{st.running?'✓':'✗'}</span>
-          <span className={`t10 mono ${st.running?'ce':'cz3'}`}>ollama serve · API :11434 {st.running?`activa (v${st.version})`:'no responde'}</span>
-        </div>
-        <div className="flex aic gap2">
-          <span className={st.llama?'ce':'cz3'}>{st.llama?'✓':'○'}</span>
-          <span className={`t10 mono ${st.llama?'ce':'cz3'}`}>llama3.2:3b · {st.llama?'modelo listo':'pendiente'}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Pipeline progress (lee pipeline_status.json) ──────────────────────────────
-function PipelineProgress() {
-  const [st,setSt]=useState(null);
-  const [elapsed,setElapsed]=useState(0);
-  const [startTs,setStartTs]=useState(null);
-
-  const poll=useCallback(async()=>{
-    try{
-      const r=await fetch('/output/pipeline_status.json?t='+Date.now(),{signal:AbortSignal.timeout(2000)});
-      if(r.ok){
-        const d=await r.json();
-        setSt(d);
-        if(!startTs)setStartTs(Date.now());
-      }
-    }catch(_){}
-  },[startTs]);
-
-  useEffect(()=>{
-    poll();
-    const iv=setInterval(poll,2000);
-    return()=>clearInterval(iv);
-  },[poll]);
-
-  useEffect(()=>{
-    if(!startTs)return;
-    const iv=setInterval(()=>setElapsed(Math.floor((Date.now()-startTs)/1000)),1000);
-    return()=>clearInterval(iv);
-  },[startTs]);
-
-  if(!st) return (
-    <div className="card card-dim mt3">
-      <p className="t10 mono cz3">Sin pipeline activo — ejecutá main.py para ver el progreso aquí</p>
+function PipelineStages({ status }) {
+  if (!status || !status.stage_name) return (
+    <div className="card mt3" style={{opacity:.4}}>
+      <p className="t10 mono cz3 text-center" style={{textAlign:'center'}}>
+        Sin pipeline activo — ingresá una idea y presioná Generar
+      </p>
     </div>
   );
 
-  const stages=[
-    {n:0,label:'Guion IA'},
-    {n:1,label:'Parseo'},
-    {n:2,label:'Imágenes'},
-    {n:3,label:'Audio'},
-    {n:4,label:'Video'},
-  ];
-
-  const mins=Math.floor(elapsed/60), secs=elapsed%60;
-  const timeStr=mins>0?`${mins}m ${String(secs).padStart(2,'0')}s`:`${secs}s`;
+  const { stage=0, progress=0, done=false, error='', stage_name='', detail='', idea='' } = status;
 
   return (
-    <div className={`card mt3 ${st.done?'card-e':st.error?'card-a':'card-b'}`}>
+    <div className={`card mt3 ${done ? 'card-e' : error ? 'card-r' : 'card-b'}`}>
       {/* Header */}
       <div className="flex aic jb mb2">
-        <span className={`txs mono bold ${st.done?'ce':st.error?'ca':'cb'}`}>
-          {st.done?'✓ Video completado':st.error?'✗ Error':
-           <><span className="spin" style={{marginRight:'.35rem'}}/>{st.stage_name}</>}
-        </span>
-        <span className="t10 mono cz3">{timeStr}</span>
+        <div className="flex aic gap2">
+          {done ? <span className="ce bold">✓ Listo</span>
+           : error ? <span className="cr bold">✗ Error</span>
+           : <><span className="spin"/><span className="cb bold txs">{stage_name}</span></>}
+        </div>
+        <span className="t10 mono cz3">{progress}%</span>
       </div>
 
       {/* Barra global */}
-      <div className="ptrack mb2">
-        <div className={`pfill ${st.done?'pfill-e':st.error?'pfill-a':'pfill-main'}`}
-             style={{width:`${st.progress}%`}}/>
+      <div className="ptrack ptrack-lg mb3">
+        <div className={`pfill ${done?'pfill-e':error?'pfill-a':'pfill-main'}`}
+             style={{width:`${progress}%`}}/>
       </div>
 
-      {/* Stages */}
-      <div className="flex gap2 mb2" style={{justifyContent:'space-between'}}>
-        {stages.map(s=>{
-          const done=st.stage>s.n||(st.done&&st.stage===s.n);
-          const active=!st.done&&st.stage===s.n;
-          const pending=st.stage<s.n;
+      {/* Stages individuales */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:'.3rem',marginBottom:'.75rem'}}>
+        {STAGES.map(s => {
+          const isDone = done ? stage >= s.n : stage > s.n;
+          const isActive = !done && stage === s.n;
+          const cls = isDone ? 'ce' : isActive ? 'cb' : 'cz3';
           return (
-            <div key={s.n} className="flex col aic gap1" style={{flex:1}}>
-              <div className={`t10 mono ${done?'ce':active?'cb':'cz3'}`}
-                   style={{textAlign:'center',fontSize:'.55rem'}}>
-                {done?'✓':active?'…':'○'}
-              </div>
+            <div key={s.n} className="flex col aic gap1">
+              <span className={`txs ${cls}`}>{isDone ? '✓' : isActive ? '…' : '○'}</span>
               <div className="ptrack" style={{width:'100%',height:'.2rem'}}>
-                <div className={`pfill ${done?'pfill-e':active?'pfill-b':''}`}
-                     style={{width:done?'100%':active?`${st.progress}%`:'0%'}}/>
+                <div className={`pfill ${isDone?'pfill-e':isActive?'pfill-b':''}`}
+                     style={{width: isDone?'100%': isActive?`${progress}%`:'0%'}}/>
               </div>
-              <span className={`t10 mono ${done?'ce':active?'cb':'cz3'}`}
-                    style={{fontSize:'.5rem',textAlign:'center'}}>{s.label}</span>
+              <span className={`t10 mono ${cls}`} style={{fontSize:'.52rem',textAlign:'center'}}>
+                {s.label}
+              </span>
             </div>
           );
         })}
       </div>
 
-      {/* Detail */}
-      <div className="flex aic jb">
-        <span className="t10 mono cz3 trunc">{st.detail||st.idea||''}</span>
-        <span className="t10 mono cb">{st.progress}%</span>
-      </div>
-
-      {st.done&&<p className="t10 mono ce mt2">→ {st.detail}</p>}
-      {st.error&&<p className="t10 mono cr mt2">{st.error}</p>}
+      {/* Detalle */}
+      {(detail || idea) && (
+        <p className="t10 mono cz3 trunc">{detail || idea}</p>
+      )}
+      {error && <p className="t10 mono cr mt1">{error}</p>}
     </div>
   );
 }
 
-// ── Main App ──────────────────────────────────────────────────────────────────
-function App() {
-  const [tasks,setTasks]=useState(INIT_TASKS);
-  const [ollamaSt,setOllamaSt]=useState({running:false,llama:false});
-  const toggle=id=>setTasks(ts=>ts.map(t=>t.id===id?{...t,done:!t.done}:t));
+// ── Video player ──────────────────────────────────────────────────────────────
+function VideoOutput({ videos }) {
+  const [sel, setSel] = useState(0);
+  if (!videos || videos.length === 0) return (
+    <div className="card mt3" style={{opacity:.35,minHeight:'7rem',display:'flex',alignItems:'center',justifyContent:'center'}}>
+      <p className="t10 mono cz3">Sin videos aún</p>
+    </div>
+  );
+  const v = videos[sel] || videos[0];
+  return (
+    <div className="card mt3">
+      <div className="video-wrap mb2">
+        <video key={v.url} controls autoPlay={false}>
+          <source src={v.url} type="video/mp4"/>
+        </video>
+      </div>
+      <div className="flex aic jb fw gap2">
+        <span className="txs mono cz3 trunc">{v.name}</span>
+        <span className="t10 mono cz3">{v.size_kb} KB</span>
+      </div>
+      {videos.length > 1 && (
+        <div className="flex gap2 mt2 fw">
+          {videos.map((vv, i) => (
+            <button key={i} className={`btn btn-sm ${i===sel?'ce':''}`}
+                    onClick={()=>setSel(i)}
+                    style={i===sel?{borderColor:'var(--e-bdr)',color:'var(--emerald)'}:{}}>
+              {vv.name.slice(0,20)}…
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
-  const done=tasks.filter(t=>t.done).length;
-  const total=tasks.length;
+// ── Sistema ───────────────────────────────────────────────────────────────────
+function SystemPanel({ sys }) {
+  if (!sys) return null;
+  const { backends={}, ffmpeg=false } = sys;
+
+  return (
+    <div className="card mt3">
+      <p className="sechead mb2">Sistema</p>
+      <div className="flex col gap1">
+        {[
+          ['FFmpeg + ffprobe', ffmpeg, 'video encoder'],
+          ['Edge TTS es-MX',   true,   'Dalia + Jorge Neural'],
+        ].map(([name, ok, detail]) => (
+          <div key={name} className="flex aic gap2">
+            <div className={`dot ${ok?'dot-e':'dot-r'}`}/>
+            <span className="tsm cz2">{name}</span>
+            <span className="t10 cz3">{detail}</span>
+          </div>
+        ))}
+        <hr className="divider" style={{margin:'.4rem 0'}}/>
+        <p className="sechead mb1">Backends IA</p>
+        {Object.entries(backends).map(([name, info]) => (
+          <div key={name} className="flex aic gap2">
+            <div className={`dot ${info.ok?'dot-e':'dot-z'}`}/>
+            <span className="tsm cz2 bold">{name}</span>
+            {name === 'ollama' && info.ok && (
+              <span className="t10 cz3">{(info.models||[]).join(', ')}</span>
+            )}
+            {name !== 'ollama' && !info.ok && (
+              <span className="t10 cz3">sin API key</span>
+            )}
+            {name !== 'ollama' && info.ok && (
+              <span className="t10 ce">✓ key configurada</span>
+            )}
+          </div>
+        ))}
+        <hr className="divider" style={{margin:'.4rem 0'}}/>
+        <div className="flex aic gap2">
+          <div className="dot dot-z"/>
+          <span className="tsm cz3">ComfyUI</span>
+          <span className="t10 cz3">pendiente — imágenes en placeholder</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Form ──────────────────────────────────────────────────────────────────────
+const GENRES = ['auto','accion','romance','fantasia','horror'];
+const BACKENDS_LIST = ['auto','anthropic','gemini','ollama'];
+
+function GenerateForm({ sys, running, onStart, onStop }) {
+  const [idea, setIdea] = useState('');
+  const [genre, setGenre] = useState('accion');
+  const [backend, setBackend] = useState('auto');
+  const [scenes, setScenes] = useState('4');
+  const [skipImg, setSkipImg] = useState(true);
+  const [noMusic, setNoMusic] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const bestBackend = sys?.best_backend;
+
+  async function handleRun() {
+    if (!idea.trim()) return;
+    setLoading(true);
+    const result = await apiFetch('/api/run', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        idea: idea.trim(),
+        genre,
+        backend,
+        num_scenes: parseInt(scenes)||4,
+        skip_images: skipImg,
+        no_music: noMusic,
+      })
+    });
+    setLoading(false);
+    if (result.started) onStart(result);
+    else alert(result.error || 'Error al iniciar el pipeline');
+  }
+
+  async function handleStop() {
+    await apiFetch('/api/stop', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
+    onStop();
+  }
+
+  const canRun = idea.trim().length > 5 && !running && !loading;
+  const resolvedBackend = backend === 'auto' ? (bestBackend || '?') : backend;
+
+  return (
+    <div className="card card-v">
+      <p className="tlg bold cz1 mb3">▶ Nueva Historia</p>
+
+      <div className="field mb3">
+        <label className="label">Idea (1 línea)</label>
+        <textarea
+          value={idea}
+          onChange={e=>setIdea(e.target.value)}
+          placeholder="ej: un detective cyberpunk descubre que su ciudad es una simulación"
+          rows={2}
+          disabled={running}
+        />
+      </div>
+
+      <div className="flex gap3 fw mb3">
+        <div className="field f1">
+          <label className="label">Género</label>
+          <select value={genre} onChange={e=>setGenre(e.target.value)} disabled={running}>
+            {GENRES.map(g=><option key={g} value={g}>{g}</option>)}
+          </select>
+        </div>
+        <div className="field" style={{width:'5rem'}}>
+          <label className="label">Escenas</label>
+          <select value={scenes} onChange={e=>setScenes(e.target.value)} disabled={running}>
+            {['3','4','5','6'].map(n=><option key={n} value={n}>{n}</option>)}
+          </select>
+        </div>
+        <div className="field f1">
+          <label className="label">Backend IA</label>
+          <select value={backend} onChange={e=>setBackend(e.target.value)} disabled={running}>
+            {BACKENDS_LIST.map(b=>(
+              <option key={b} value={b}>
+                {b==='auto' ? `auto → ${bestBackend||'?'}` : b}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="flex gap3 mb3 fw aic">
+        <label className="flex aic gap2 tsm cz2" style={{cursor:'pointer'}}>
+          <input type="checkbox" checked={skipImg}
+                 onChange={e=>setSkipImg(e.target.checked)} disabled={running}
+                 style={{width:'auto',cursor:'pointer'}}/>
+          Sin imágenes (ComfyUI pendiente)
+        </label>
+        <label className="flex aic gap2 tsm cz2" style={{cursor:'pointer'}}>
+          <input type="checkbox" checked={noMusic}
+                 onChange={e=>setNoMusic(e.target.checked)} disabled={running}
+                 style={{width:'auto',cursor:'pointer'}}/>
+          Sin música
+        </label>
+      </div>
+
+      <div className="flex gap2 aic">
+        {!running ? (
+          <button className="btn btn-run" onClick={handleRun}
+                  disabled={!canRun || loading}>
+            {loading ? <><span className="spin"/> Iniciando…</> : '▶ Generar Video'}
+          </button>
+        ) : (
+          <button className="btn btn-stop" onClick={handleStop}>■ Detener</button>
+        )}
+        {running && (
+          <span className="t10 mono cz3">
+            pipeline corriendo — backend: {resolvedBackend}
+          </span>
+        )}
+        {!running && !canRun && idea.trim().length > 0 && idea.trim().length <= 5 && (
+          <span className="t10 cr">La idea debe tener más de 5 caracteres</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── App principal ─────────────────────────────────────────────────────────────
+function App() {
+  const [sys, setSys]     = useState(null);
+  const [status, setStatus] = useState(null);
+  const [running, setRunning] = useState(false);
+
+  const pollStatus = useCallback(async () => {
+    const st = await apiFetch('/api/status');
+    if (st && !st.error) {
+      setStatus(st);
+      setRunning(st.pipeline_running || (st.running === true));
+    }
+  }, []);
+
+  const pollSystem = useCallback(async () => {
+    const s = await apiFetch('/api/system');
+    if (s && !s.error) setSys(s);
+  }, []);
+
+  useEffect(() => {
+    pollSystem();
+    pollStatus();
+    const iv1 = setInterval(pollStatus, 2000);
+    const iv2 = setInterval(pollSystem, 15000);
+    return () => { clearInterval(iv1); clearInterval(iv2); };
+  }, [pollStatus, pollSystem]);
+
+  const videos = status?.videos || [];
+  const bestBackend = sys?.best_backend;
 
   return (
     <div>
-      {/* Header */}
-      <header className="mb3" style={{marginBottom:'1.5rem'}}>
-        <div className="flex aic jb fw gap2">
-          <div>
-            <h1 className="t2xl">
-              <span className="ca">manhwa</span>
-              <span className="cz3" style={{margin:'0 .3rem'}}>/</span>
-              <span className="cz2">video-gen</span>
-            </h1>
-            <p className="txs cz3 mt1">Fase 1 ✓  ·  Fase 2 activa</p>
-          </div>
-          <div className="flex aic gap2 fw">
-            <span className="pill">PR #36</span>
-            <span className="pill">claude/manhwa-video-generator</span>
-          </div>
+      {/* ── Header ─────────────────────────────────────────────────────── */}
+      <header className="flex aic jb fw gap3 mb4"
+              style={{paddingBottom:'1rem',borderBottom:'1px solid var(--border)'}}>
+        <div>
+          <h1 className="t2xl flex aic gap2">
+            <span className="ca bold">manhwa</span>
+            <span className="cz3">/</span>
+            <span className="cz1">video-gen</span>
+          </h1>
+          <p className="txs cz3 mt1">
+            Idea → Guion IA → TTS español → Video MP4
+          </p>
         </div>
-        {/* Progress global tareas */}
-        <div className="flex aic gap3 mt5">
-          <div className="ptrack f1"><div className="pfill pfill-main" style={{width:`${Math.round(done/total*100)}%`}}/></div>
-          <span className="txs mono cz3 nowrap">{done}/{total} tareas</span>
+        <div className="flex aic gap2 fw">
+          {sys && Object.entries(sys.backends || {}).map(([name, info]) => (
+            <BackendPill key={name} name={name} info={info}/>
+          ))}
+          {running && (
+            <span className="pill pill-b flex aic gap1">
+              <span className="spin" style={{width:'.5rem',height:'.5rem'}}/>
+              generando
+            </span>
+          )}
         </div>
       </header>
 
-      <div className="grid">
-        {/* LEFT — Sistema + Pipeline */}
-        <section>
-          <div className="flex aic jb mb3">
-            <span className="sechead">Sistema</span>
-            <span className="t10 mono ce">
-              {ollamaSt.running&&ollamaSt.llama?'8/8 ✓':'verificando…'}
-            </span>
-          </div>
+      {/* ── Main grid ──────────────────────────────────────────────────── */}
+      <div className="grid2">
 
-          {/* Componentes fijos (todos OK) */}
-          {[
-            ['FFmpeg',        'winget + PATH fallback ✓'],
-            ['Python 3.13',   'PYTHONUTF8=1 ✓'],
-            ['Kokoro TTS',    'v1.0.onnx + voices-v1.0.bin ✓'],
-            ['Edge TTS',      'es-MX-DaliaNeural / JorgeNeural ✓'],
-            ['Anthropic SDK', 'anthropic>=0.40.0 ✓'],
-            ['MoviePy',       'pipeline ensamble MP4 ✓'],
-          ].map(([name,detail])=>(
-            <div key={name} className="card flex aic gap3" style={{marginBottom:'.35rem'}}>
-              <span className="dok">✓</span>
-              <div className="mw0">
-                <span className="tsm bold cz2">{name}</span>
-                <p className="t10 cz3 trunc">{detail}</p>
+        {/* LEFT: Form + Sistema */}
+        <div>
+          <GenerateForm
+            sys={sys}
+            running={running}
+            onStart={() => setRunning(true)}
+            onStop={() => setRunning(false)}
+          />
+          <SystemPanel sys={sys}/>
+        </div>
+
+        {/* RIGHT: Pipeline + Video */}
+        <div>
+          <p className="sechead mb1">Pipeline</p>
+          <PipelineStages status={status}/>
+
+          <p className="sechead mt4 mb1">Resultado</p>
+          <VideoOutput videos={videos}/>
+
+          {/* Instrucción si no hay backend */}
+          {sys && !bestBackend && (
+            <div className="card card-a mt3">
+              <p className="txs bold ca mb1">Sin backend de IA disponible</p>
+              <p className="t10 cz3 mb2">
+                Configurá al menos una de estas opciones:
+              </p>
+              <div className="flex col gap1">
+                <div><code>setx ANTHROPIC_API_KEY sk-ant-...</code></div>
+                <div><code>setx GEMINI_API_KEY AIza...</code></div>
+                <div><code>ollama serve</code> <span className="t10 cz3">(+ ollama pull llama3.2:3b)</span></div>
               </div>
+              <p className="t10 cz3 mt2">Reiniciá el servidor después de setx.</p>
             </div>
-          ))}
-
-          {/* Ollama dinámico */}
-          <div className={`card flex aic gap3 mt2 ${ollamaSt.running?'':'card-a'}`}>
-            {ollamaSt.running?<span className="dok">✓</span>:<span className="dload"><span/></span>}
-            <div className="mw0">
-              <span className={`tsm bold ${ollamaSt.running?'cz2':'ca'}`}>Ollama</span>
-              <p className="t10 cz3 trunc">{ollamaSt.running?`API :11434 activa · llama3.2:3b ${ollamaSt.llama?'✓':'pendiente pull'}`:'esperando — ejecutar ollama serve'}</p>
-            </div>
-          </div>
-
-          {/* Ollama verifier */}
-          <OllamaStatus onUpdate={setOllamaSt}/>
-
-          {/* Pipeline progress */}
-          <div className="flex aic jb mt4 mb2">
-            <span className="sechead">Pipeline activo</span>
-          </div>
-          <PipelineProgress/>
-        </section>
-
-        {/* RIGHT — Pendientes */}
-        <section>
-          <div className="flex aic jb mb3">
-            <span className="sechead">Pendientes</span>
-            <span className="t10 mono cz3">{done}/{total}</span>
-          </div>
-
-          <div style={{display:'flex',flexDirection:'column',gap:'.35rem'}}>
-            {tasks.map(t=>(
-              <div key={t.id}
-                className={`card card-task ${t.done?'card-dim':''}`}
-                onClick={()=>toggle(t.id)}
-                style={{userSelect:'none'}}
-              >
-                <div className="flex aist gap3">
-                  <div className={`cbx ${t.done?'on':''}`}>
-                    {t.done&&<span style={{fontSize:'.55rem',color:'var(--emerald)'}}>✓</span>}
-                  </div>
-                  <div className="f1 mw0">
-                    <div className="flex aic gap2 fw">
-                      <Pbadge p={t.priority}/>
-                      <span className={`tsm ${t.done?'strike cz3':'cz2'}`}>{t.label}</span>
-                    </div>
-                    {t.cmd&&!t.done&&(
-                      <div className="flex aic gap2 mt1 fw" onClick={e=>e.stopPropagation()}>
-                        <code>{t.cmd.length>50?t.cmd.slice(0,50)+'…':t.cmd}</code>
-                        <CopyBtn text={t.cmd}/>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Próximo paso dinámico */}
-          <div className="card card-e mt4">
-            <p className="t10 bold upper ce mb2">► Próximo paso</p>
-            {!ollamaSt.running?(
-              <div className="flex aic gap2">
-                <span className="t10 mono bold" style={{color:'var(--blue)'}}>1</span>
-                <div className="f1 mw0">
-                  <div className="flex aic gap2"><code>ollama serve</code><CopyBtn text="ollama serve"/></div>
-                  <p className="t10 cz3 mt1">levanta la API en :11434</p>
-                </div>
-              </div>
-            ):!ollamaSt.llama?(
-              <div className="flex aic gap2">
-                <span className="t10 mono bold" style={{color:'var(--blue)'}}>1</span>
-                <div className="f1 mw0">
-                  <div className="flex aic gap2"><code>ollama pull llama3.2:3b</code><CopyBtn text="ollama pull llama3.2:3b"/></div>
-                </div>
-              </div>
-            ):(
-              <div className="flex aic gap2">
-                <span style={{width:'1.2rem',height:'1.2rem',borderRadius:'50%',background:'rgba(16,185,129,.15)',color:'var(--emerald)',fontSize:'.65rem',fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>✓</span>
-                <div className="f1 mw0">
-                  <div className="flex aic gap2 fw">
-                    <code style={{fontSize:'.62rem'}}>python -X utf8 main.py --idea "…" --compare-backends --skip-images</code>
-                    <CopyBtn text='python -X utf8 main.py --idea "un samurai inmortal busca la paz" --compare-backends --skip-images'/>
-                  </div>
-                  <p className="t10 cz3 mt1">compare-backends: Ollama vs Gemini vs Anthropic · jurado IA elige el mejor</p>
-                </div>
-              </div>
-            )}
-          </div>
-        </section>
+          )}
+        </div>
       </div>
 
-      <footer className="footer flex aic jb fw gap2">
-        <span>manhwa-video-gen · Fase 1 ✓ · TTS ✓ (4 clips · 650KB MP4 · 14 WAVs) · Fase 2 activa</span>
+      {/* ── Footer ─────────────────────────────────────────────────────── */}
+      <footer style={{marginTop:'2rem',paddingTop:'.75rem',borderTop:'1px solid var(--border)',
+                      display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'.5rem'}}>
+        <span className="t10 mono cz3">manhwa-video-gen · proyecto independiente</span>
         <div className="flex aic gap3">
-          <span className="cz3">Ken Burns: 2160×3840 ✓</span>
-          <span className="cz3">Edge TTS es-MX ✓</span>
-          <span className={ollamaSt.running?'ce':'ca'}>Ollama: {ollamaSt.running?'activo':'esperando'}</span>
+          <span className="t10 mono cz3">puerto :5274</span>
+          <span className={`t10 mono ${sys?.ffmpeg ? 'ce' : 'cr'}`}>
+            ffmpeg: {sys?.ffmpeg ? '✓' : '✗'}
+          </span>
+          <span className={`t10 mono ${bestBackend ? 'ce' : 'ca'}`}>
+            backend: {bestBackend || 'ninguno'}
+          </span>
         </div>
       </footer>
     </div>

@@ -346,28 +346,43 @@ def _call_ollama(prompt: str, model: str) -> str:
                 f"  2. O descargá el modelo: ollama pull {model}"
             )
 
+    # num_predict: script de 4 escenas ≈ 600-900 tokens; 1024 da margen sin exceder RAM
     payload = {
         "model": model,
         "prompt": f"{_SYSTEM_PROMPT}\n\n---\n\n{prompt}",
-        "stream": False,
-        "options": {"temperature": 0.8, "num_predict": 2048},
+        "stream": True,   # streaming: mantiene la conexión viva token a token
+        "options": {"temperature": 0.8, "num_predict": 1024},
     }
-    print(f"  Llamando a Ollama ({model})...")
+    print(f"  Llamando a Ollama ({model})...", end="", flush=True)
     try:
-        resp = requests.post(f"{base}/api/generate", json=payload, timeout=360)
+        resp = requests.post(f"{base}/api/generate", json=payload,
+                             stream=True, timeout=(10, 600))
         resp.raise_for_status()
-        data = resp.json()
-        if "error" in data:
-            raise RuntimeError(f"Ollama error: {data['error']}")
-        return data["response"]
-    except requests.exceptions.ReadTimeout:
+        chunks: list[str] = []
+        tokens = 0
+        for line in resp.iter_lines():
+            if not line:
+                continue
+            import json as _json
+            data = _json.loads(line)
+            if "error" in data:
+                raise RuntimeError(f"Ollama error: {data['error']}")
+            token = data.get("response", "")
+            chunks.append(token)
+            tokens += 1
+            if tokens % 50 == 0:
+                print(".", end="", flush=True)
+            if data.get("done"):
+                break
+        print(f" {tokens} tokens")
+        return "".join(chunks)
+    except requests.exceptions.Timeout:
         raise RuntimeError(
-            f"Ollama tardó más de 6 minutos generando con '{model}'.\n"
-            "  Puede que la máquina esté sobrecargada o el modelo no esté en RAM.\n"
-            "  Intentá cerrar otras apps y volver a correr."
+            f"Ollama tardó demasiado generando con '{model}'.\n"
+            "  Cerrá otras apps para liberar RAM y volvé a correr."
         )
-    except requests.exceptions.ConnectionError:
-        raise RuntimeError("Ollama se desconectó durante la generación. Reiniciá con run_ollama.bat")
+    except requests.exceptions.ConnectionError as e:
+        raise RuntimeError(f"Ollama se desconectó: {e}\n  Reiniciá con run_ollama.bat")
 
 
 def _call_gemini(prompt: str, model: str, api_key: str | None) -> str:
