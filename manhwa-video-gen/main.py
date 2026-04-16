@@ -113,6 +113,77 @@ def _parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
+# ── Placeholder image (modo --skip-images) ────────────────────────────────────
+
+def _make_placeholder_image(img_path: Path, scene, width: int, height: int) -> None:
+    """Genera imagen placeholder estilizada con info de la escena (sin ComfyUI)."""
+    import textwrap
+    from PIL import Image, ImageDraw, ImageFont
+
+    img = Image.new("RGB", (width, height), (8, 8, 18))
+    draw = ImageDraw.Draw(img)
+
+    # Degradado vertical oscuro azul-violeta
+    for y in range(height):
+        t = y / height
+        r = int(8  + t * 14)
+        g = int(8  + t *  6)
+        b = int(18 + t * 28)
+        draw.line([(0, y), (width, y)], fill=(r, g, b))
+
+    # Borde del panel
+    m = 32
+    draw.rectangle([m, m, width - m, height - m], outline=(55, 55, 88), width=2)
+    # Barra decorativa superior
+    draw.rectangle([m, m, width - m, m + 4], fill=(90, 60, 160))
+
+    # Fuentes: intenta Consolas → Arial → default
+    font_big = font_med = font_sm = font_xs = None
+    for fp in [r"C:\Windows\Fonts\consola.ttf",
+               r"C:\Windows\Fonts\arial.ttf",
+               r"C:\Windows\Fonts\segoeui.ttf"]:
+        if Path(fp).exists():
+            try:
+                font_big = ImageFont.truetype(fp, 80)
+                font_med = ImageFont.truetype(fp, 38)
+                font_sm  = ImageFont.truetype(fp, 28)
+                font_xs  = ImageFont.truetype(fp, 22)
+                break
+            except Exception:
+                pass
+    if font_big is None:
+        font_big = font_med = font_sm = font_xs = ImageFont.load_default()
+
+    # Número de escena (grande, centrado)
+    label = f"ESCENA {scene.number}"
+    bb = draw.textbbox((0, 0), label, font=font_big)
+    tw = bb[2] - bb[0]
+    draw.text(((width - tw) // 2, 110), label, fill=(185, 148, 255), font=font_big)
+
+    # Línea separadora
+    draw.line([(m + 24, 225), (width - m - 24, 225)], fill=(48, 48, 72), width=1)
+
+    # Descripción del fondo (wrapped, 28 chars/línea)
+    bg = (scene.background or "").strip()[:220]
+    wrapped = textwrap.fill(bg, width=28)
+    draw.multiline_text((m + 24, 252), wrapped,
+                        fill=(148, 148, 195), font=font_sm, spacing=10)
+
+    # Speakers (abajo del todo)
+    spks = scene.speakers()[:4]
+    if spks:
+        draw.text((m + 24, height - 130),
+                  "  ·  ".join(spks),
+                  fill=(105, 105, 145), font=font_xs)
+
+    draw.text((m + 24, height - 90),
+              "[ imagen pendiente — ComfyUI ]",
+              fill=(48, 48, 68), font=font_xs)
+
+    img_path.parent.mkdir(parents=True, exist_ok=True)
+    img.save(img_path)
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -203,10 +274,8 @@ def main() -> None:
             if img_path.exists():
                 print(f"  Scene {scene.number:>3}: skipped (image exists)")
             else:
-                # Create a black placeholder so TTS + video can still be tested
-                from PIL import Image as _PILImage
-                _PILImage.new("RGB", (config.IMAGE_WIDTH, config.IMAGE_HEIGHT), (0, 0, 0)).save(img_path)
-                print(f"  Scene {scene.number:>3}: placeholder (black) created")
+                _make_placeholder_image(img_path, scene, config.IMAGE_WIDTH, config.IMAGE_HEIGHT)
+                print(f"  Scene {scene.number:>3}: placeholder estilizado creado")
             continue
 
         # Build character appearance dict for speakers in this scene
