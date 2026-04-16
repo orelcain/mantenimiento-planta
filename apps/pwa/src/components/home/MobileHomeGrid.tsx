@@ -67,10 +67,8 @@ const HMI_TILES_BASE: Tile[] = [
   { id: 'hmi-grader', label: 'HMI Grader', sublabel: '', icon: Monitor, href: '/aprendizaje/hmi-grader', color: 'slate' },
 ]
 
-// Para admin: solo HMI Grader en Formación — HMI Knuro ya está en Herramientas
-const HMI_TILES_ADMIN: Tile[] = [
-  { id: 'hmi-grader', label: 'HMI Grader', sublabel: '', icon: Monitor, href: '/aprendizaje/hmi-grader', color: 'slate' },
-]
+// Para admin: sin HMI en Formación — ambos HMI están en Herramientas
+const HMI_TILES_ADMIN: Tile[] = []
 
 const FORMACION_TILES: Tile[] = [
   ...MACHINE_TILES,
@@ -156,9 +154,9 @@ const GROUPS: Record<UserRole, TileGroup[]> = {
     {
       label: 'Herramientas',
       tiles: [
-        { id: 'visor3d',   label: 'Visor 3D',   sublabel: 'Modelos 3D',  icon: Box,     href: '/visor-3d',  color: 'slate' },
-        // HMI Knuro: ruta admin (simulador) — sin duplicar con /aprendizaje/hmi-knuro
-        { id: 'hmi',       label: 'HMI Knuro',  sublabel: 'Simulador',   icon: Cpu,     href: '/hmi-knuro', color: 'slate' },
+        { id: 'visor3d',    label: 'Visor 3D',    sublabel: 'Modelos 3D',  icon: Box,     href: '/visor-3d',              color: 'slate' },
+        { id: 'hmi',        label: 'HMI Knuro',   sublabel: 'Simulador',   icon: Cpu,     href: '/hmi-knuro',             color: 'slate' },
+        { id: 'hmi-grader', label: 'HMI Grader',  sublabel: 'Simulador',   icon: Monitor, href: '/aprendizaje/hmi-grader', color: 'slate' },
         // Baader 200 NO aparece aquí — ya está en Formación via MACHINE_TILES
       ],
     },
