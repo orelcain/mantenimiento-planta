@@ -1041,6 +1041,8 @@ export function MainLayout() {
               ? 'h-[calc(100vh-3.5rem-4rem)] lg:h-[calc(100vh-3.5rem)] p-0 overflow-hidden'
               : isAprendizajeRoute
               ? 'p-0 w-full max-w-[100vw] overflow-x-hidden pb-16 lg:pb-0'
+              : location.pathname === '/'
+              ? 'p-0 w-full max-w-[100vw] overflow-x-hidden'
               : 'p-3 lg:p-6 w-full max-w-[100vw] overflow-x-hidden pb-20 [@media(max-height:500px)]:pb-12 lg:pb-6'
           } ${
             isReadOnly ? 'pointer-events-none opacity-70' : ''
@@ -1098,8 +1100,12 @@ export function MainLayout() {
       )}
 
       {/* ══════ MOBILE BOTTOM NAV BAR ══════ */}
+      {/* Oculto en home (/) — el home mobile tiene su propio botón de menú arriba */}
       <nav
-        className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-card/95 backdrop-blur-md border-t border-border"
+        className={cn(
+          'lg:hidden fixed bottom-0 inset-x-0 z-40 bg-card/95 backdrop-blur-md border-t border-border',
+          location.pathname === '/' && 'hidden',
+        )}
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         aria-label="Navegación principal"
       >
