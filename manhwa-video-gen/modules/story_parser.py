@@ -29,8 +29,6 @@ Rules
   appearance descriptions for image prompts.
 """
 
-from __future__ import annotations
-
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -88,8 +86,53 @@ def parse_script_text(text: str) -> ParsedScript:
 
 _SCENE_RE = re.compile(r"^ESCENA\s+(\d+)\s*$", re.IGNORECASE)
 
+# Comillas tipográficas que los LLMs usan frecuentemente
+_OPEN_QUOTES  = ('"', '\u201c', '\u00ab')   # " « "
+_CLOSE_QUOTES = ('"', '\u201d', '\u00bb')   # " » "
+
+
+def _preprocess_markdown(text: str) -> str:
+    """Normaliza output markdown de LLMs (llama3.2, gemini, etc.) a formato plain-text.
+
+    Transforma:
+      **TÍTULO:** "Mi Historia"   →  TÍTULO: Mi Historia
+      **ESCENA 1**                →  ESCENA 1
+      * **AKIRA**: descripción    →    AKIRA: descripción  (con 2 espacios de indent)
+      FONDO: "texto con comillas" →  FONDO: texto con comillas
+      AKIRA: (en voz baja) "Hola" →  AKIRA: Hola
+    """
+    lines = []
+    for line in text.splitlines():
+        # 1. Líneas con viñeta (bullet) → 2 espacios de indent para bloque PERSONAJES
+        m = re.match(r'^(\s*)[*\-•]\s+(.*)', line)
+        if m:
+            indent = m.group(1) if m.group(1) else '  '
+            line = indent + m.group(2)
+
+        # 2. **negrita** → texto plano
+        line = re.sub(r'\*\*(.+?)\*\*', r'\1', line)
+
+        # 3. Limpiar valor tras ":" (comillas envolventes y stage directions)
+        colon_idx = line.find(':')
+        if colon_idx > 0:
+            key = line[:colon_idx].strip()
+            val = line[colon_idx + 1:].strip()
+            if val:
+                # Quitar dirección de escena tipo (en voz baja) / (con furia)
+                val = re.sub(r'^\s*\([^)]*\)\s*', '', val)
+                # Quitar comillas envolventes
+                if (len(val) >= 2
+                        and val[0] in _OPEN_QUOTES
+                        and val[-1] in _CLOSE_QUOTES):
+                    val = val[1:-1].strip()
+                line = line[:colon_idx + 1] + ' ' + val
+
+        lines.append(line)
+    return '\n'.join(lines)
+
 
 def _parse(text: str) -> ParsedScript:
+    text = _preprocess_markdown(text)
     lines = [ln.rstrip() for ln in text.splitlines()]
     n = len(lines)
     i = 0
@@ -99,7 +142,13 @@ def _parse(text: str) -> ParsedScript:
     while i < n:
         stripped = lines[i].strip()
         if re.match(r"^T[IÍ]TULO\s*:", stripped, re.IGNORECASE):
-            title = stripped.split(":", 1)[1].strip()
+            raw_title = stripped.split(":", 1)[1].strip()
+            # Quitar comillas tipográficas y rectas
+            if (len(raw_title) >= 2
+                    and raw_title[0] in ('"', *_OPEN_QUOTES)
+                    and raw_title[-1] in ('"', *_CLOSE_QUOTES)):
+                raw_title = raw_title[1:-1].strip()
+            title = raw_title
             i += 1
             break
         i += 1

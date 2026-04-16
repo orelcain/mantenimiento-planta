@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>manhwa/video-gen — Dashboard</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#09090b;--bg2:#18181b;--bg3:#27272a;
+  --border:#3f3f46;--border2:#52525b;
+  --z2:#d4d4d8;--z3:#71717a;--z4:#a1a1aa;
+  --amber:#f59e0b;--amber2:#fbbf24;
+  --a-bg:rgba(245,158,11,.08);--a-bdr:rgba(245,158,11,.25);
+  --emerald:#10b981;--e-bg:rgba(16,185,129,.07);--e-bdr:rgba(16,185,129,.3);
+  --blue:#60a5fa;--b-bg:rgba(96,165,250,.08);--b-bdr:rgba(96,165,250,.25);
+  --red:#f87171;--r-bg:rgba(248,113,113,.1);
+}
+html,body{background:var(--bg);color:var(--z2);font-family:ui-sans-serif,system-ui,sans-serif;min-height:100vh}
+#root{padding:1.25rem;max-width:1000px;margin:0 auto}
+
+/* layout */
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem}
+@media(max-width:700px){.grid{grid-template-columns:1fr}}
+.flex{display:flex}.aic{align-items:center}.aist{align-items:flex-start}
+.jb{justify-content:space-between}.fw{flex-wrap:wrap}.f1{flex:1}
+.gap1{gap:.25rem}.gap2{gap:.5rem}.gap3{gap:.75rem}
+.col{flex-direction:column}.mw0{min-width:0}
+
+/* spacing */
+.mt1{margin-top:.25rem}.mt2{margin-top:.5rem}.mt3{margin-top:.75rem}
+.mt4{margin-top:1rem}.mt5{margin-top:1.25rem}.mb2{margin-bottom:.5rem}.mb3{margin-bottom:.75rem}
+
+/* text */
+.t2xl{font-size:1.4rem;font-weight:700;letter-spacing:-.02em}
+.tsm{font-size:.875rem}.txs{font-size:.75rem}.t10{font-size:.625rem}
+.mono{font-family:ui-monospace,'Cascadia Code',monospace}
+.bold{font-weight:600}.upper{text-transform:uppercase;letter-spacing:.08em}
+.strike{text-decoration:line-through}.nowrap{white-space:nowrap}
+.trunc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* colors */
+.cz2{color:var(--z2)}.cz3{color:var(--z3)}.cz4{color:var(--z4)}
+.ca{color:var(--amber)}.ca2{color:var(--amber2)}
+.ce{color:var(--emerald)}.cb{color:var(--blue)}.cr{color:var(--red)}
+
+/* cards */
+.card{background:rgba(24,24,27,.6);border:1px solid var(--border);border-radius:.7rem;padding:.6rem .75rem;transition:border-color .15s}
+.card:hover{border-color:var(--border2)}
+.card-a{background:var(--a-bg);border-color:var(--a-bdr)}
+.card-e{background:var(--e-bg);border-color:var(--e-bdr)}
+.card-b{background:var(--b-bg);border-color:var(--b-bdr)}
+.card-dim{background:rgba(24,24,27,.3);border-color:rgba(63,63,70,.4);opacity:.5}
+.card-task{cursor:pointer}.card-task:hover{border-color:var(--border2)}
+
+/* dots */
+.dok{display:inline-flex;align-items:center;justify-content:center;width:1.2rem;height:1.2rem;border-radius:50%;background:rgba(16,185,129,.15);color:var(--emerald);font-size:.65rem;font-weight:700;flex-shrink:0}
+.derr{display:inline-flex;align-items:center;justify-content:center;width:1.2rem;height:1.2rem;border-radius:50%;background:var(--r-bg);color:var(--red);font-size:.65rem;font-weight:700;flex-shrink:0}
+.dpend{display:inline-flex;align-items:center;justify-content:center;width:1.2rem;height:1.2rem;border-radius:50%;border:1px solid var(--border);font-size:.6rem;color:var(--z3);flex-shrink:0}
+.dload span{width:.55rem;height:.55rem;border-radius:50%;background:var(--amber);animation:pulse 1s ease-in-out infinite;display:inline-block}
+.dload{display:inline-flex;align-items:center;justify-content:center;width:1.2rem;height:1.2rem;flex-shrink:0}
+
+/* progress */
+.ptrack{height:.35rem;border-radius:9999px;background:var(--bg3);overflow:hidden}
+.pfill{height:100%;border-radius:9999px;transition:width .4s ease}
+.pfill-e{background:linear-gradient(to right,#059669,var(--emerald))}
+.pfill-a{background:linear-gradient(to right,var(--amber),var(--amber2))}
+.pfill-b{background:linear-gradient(to right,#3b82f6,var(--blue))}
+.pfill-main{background:linear-gradient(to right,var(--amber),var(--amber2),var(--emerald))}
+
+/* badge */
+.badge{font-size:.58rem;font-family:ui-monospace,monospace;padding:.1rem .3rem;border-radius:.2rem;border:1px solid;text-transform:uppercase;letter-spacing:.07em;font-weight:600}
+.bp0{background:var(--r-bg);color:var(--red);border-color:rgba(248,113,113,.3)}
+.bp1{background:var(--a-bg);color:var(--amber);border-color:var(--a-bdr)}
+.bp2{background:rgba(63,63,70,.5);color:var(--z3);border-color:var(--border)}
+
+/* misc */
+code{font-family:ui-monospace,monospace;font-size:.68rem;background:var(--bg3);padding:.1rem .35rem;border-radius:.2rem;color:var(--z4)}
+.pill{font-size:.68rem;font-family:monospace;padding:.15rem .45rem;border-radius:.25rem;background:var(--bg2);border:1px solid var(--border);color:var(--z3)}
+.btn{font-size:.7rem;font-family:monospace;padding:.3rem .8rem;border-radius:.35rem;background:var(--b-bg);border:1px solid var(--b-bdr);color:var(--blue);cursor:pointer;transition:all .15s;font-weight:600}
+.btn:hover{background:rgba(96,165,250,.15)}.btn:disabled{opacity:.4;cursor:not-allowed}
+.cbx{width:.95rem;height:.95rem;border-radius:.2rem;border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:.1rem;transition:all .15s}
+.cbx.on{background:rgba(16,185,129,.2);border-color:rgba(16,185,129,.4)}
+.sechead{font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--z4)}
+.footer{margin-top:2rem;padding-top:.75rem;border-top:1px solid var(--border);font-size:.62rem;font-family:monospace;color:var(--z3)}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.82)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spin{display:inline-block;width:.7rem;height:.7rem;border:2px solid rgba(96,165,250,.2);border-top-color:var(--blue);border-radius:50%;animation:spin .6s linear infinite}
+.copybtn{font-size:.58rem;font-family:monospace;padding:.1rem .35rem;border-radius:.2rem;background:var(--bg3);border:1px solid var(--border);color:var(--z3);cursor:pointer;flex-shrink:0;transition:all .15s}
+.copybtn:hover{background:var(--border);color:var(--z2)}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useCallback } = React;
+
+// ── Tasks ─────────────────────────────────────────────────────────────────────
+const INIT_TASKS = [
+  {id:'t2',label:'Test Edge TTS + guion IA → ✓ 650KB MP4, 14 WAVs en es-MX', cmd:'', priority:'critical',done:true},
+  {id:'t3',label:'Test compare-backends (jurado IA)',   cmd:'python -X utf8 main.py --idea "un samurai inmortal" --compare-backends --skip-images', priority:'high',done:false},
+  {id:'t4',label:'Instalar ComfyUI + checkpoint',       cmd:'Descargar anything-v5.safetensors → ComfyUI/models/checkpoints/', priority:'high',done:false},
+  {id:'t5',label:'Primer video completo (con imágenes)',cmd:'python -X utf8 main.py --idea "amor prohibido en el futuro"', priority:'high',done:false},
+  {id:'t6',label:'Agregar música de fondo',             cmd:'Copiar ambient_01.mp3 → manhwa-video-gen/assets/music/', priority:'normal',done:false},
+  {id:'t7',label:'Merge PR #36 → main',                cmd:'gh pr merge 36 --squash', priority:'normal',done:false},
+];
+
+const STAGE_NAMES = ['Generando guion','Parseando','Imágenes','Audio','Video'];
+const STAGE_COLORS = ['pfill-a','pfill-a','pfill-b','pfill-b','pfill-e'];
+
+// ── Sub-components ─────────────────────────────────────────────────────────────
+function CopyBtn({text}) {
+  const [ok,setOk]=useState(false);
+  const go=e=>{
+    e.stopPropagation();
+    navigator.clipboard.writeText(text).then(()=>{setOk(true);setTimeout(()=>setOk(false),1400)})
+    .catch(()=>{const t=document.createElement('textarea');t.value=text;document.body.appendChild(t);t.select();document.execCommand('copy');document.body.removeChild(t);setOk(true);setTimeout(()=>setOk(false),1400)});
+  };
+  return <button className="copybtn" onClick={go}>{ok?'✓':'copy'}</button>;
+}
+
+function Pbadge({p}){
+  const c=p==='critical'?'badge bp0':p==='high'?'badge bp1':'badge bp2';
+  return <span className={c}>{p==='critical'?'P0':p==='high'?'P1':'P2'}</span>;
+}
+
+// ── Ollama status (check real) ────────────────────────────────────────────────
+function OllamaStatus({onUpdate}) {
+  const [st,setSt]=useState({running:false,version:null,llama:false,checked:false});
+  const [cd,setCd]=useState(null);
+
+  const check=useCallback(async()=>{
+    const s={running:false,version:null,llama:false,checked:true};
+    try{
+      const r=await fetch('http://localhost:11434/api/version',{signal:AbortSignal.timeout(3000)});
+      if(r.ok){const d=await r.json();s.running=true;s.version=d.version;}
+    }catch(_){}
+    if(s.running){
+      try{
+        const r=await fetch('http://localhost:11434/api/tags',{signal:AbortSignal.timeout(3000)});
+        if(r.ok){const d=await r.json();s.llama=(d.models||[]).some(m=>m.name.includes('llama3.2'));}
+      }catch(_){}
+    }
+    setSt(s);setCd(20);
+    if(onUpdate)onUpdate(s);
+  },[]);
+
+  useEffect(()=>{check();const iv=setInterval(check,20000);return()=>clearInterval(iv);},[check]);
+  useEffect(()=>{const iv=setInterval(()=>setCd(c=>c>0?c-1:0),1000);return()=>clearInterval(iv);},[]);
+
+  if(!st.checked) return null;
+
+  const all=st.running&&st.llama;
+  return (
+    <div className={`card mt3 ${all?'card-e':st.running?'card-b':'card-a'}`}>
+      <div className="flex aic jb gap2">
+        <span className={`txs mono bold ${all?'ce':st.running?'cb':'ca'}`}>
+          {all?'✓ Ollama + llama3.2 listos':st.running?'✓ Ollama activo':'○ Ollama sin respuesta'}
+        </span>
+        <div className="flex aic gap2">
+          {cd!==null&&<span className="t10 mono cz3">{cd}s</span>}
+          <button className="btn" onClick={check}>↻ check</button>
+        </div>
+      </div>
+      <div className="flex col gap1 mt2">
+        <div className="flex aic gap2">
+          <span className={st.running?'ce':'cr'}>{st.running?'✓':'✗'}</span>
+          <span className={`t10 mono ${st.running?'ce':'cz3'}`}>ollama serve · API :11434 {st.running?`activa (v${st.version})`:'no responde'}</span>
+        </div>
+        <div className="flex aic gap2">
+          <span className={st.llama?'ce':'cz3'}>{st.llama?'✓':'○'}</span>
+          <span className={`t10 mono ${st.llama?'ce':'cz3'}`}>llama3.2:3b · {st.llama?'modelo listo':'pendiente'}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Pipeline progress (lee pipeline_status.json) ──────────────────────────────
+function PipelineProgress() {
+  const [st,setSt]=useState(null);
+  const [elapsed,setElapsed]=useState(0);
+  const [startTs,setStartTs]=useState(null);
+
+  const poll=useCallback(async()=>{
+    try{
+      const r=await fetch('/output/pipeline_status.json?t='+Date.now(),{signal:AbortSignal.timeout(2000)});
+      if(r.ok){
+        const d=await r.json();
+        setSt(d);
+        if(!startTs)setStartTs(Date.now());
+      }
+    }catch(_){}
+  },[startTs]);
+
+  useEffect(()=>{
+    poll();
+    const iv=setInterval(poll,2000);
+    return()=>clearInterval(iv);
+  },[poll]);
+
+  useEffect(()=>{
+    if(!startTs)return;
+    const iv=setInterval(()=>setElapsed(Math.floor((Date.now()-startTs)/1000)),1000);
+    return()=>clearInterval(iv);
+  },[startTs]);
+
+  if(!st) return (
+    <div className="card card-dim mt3">
+      <p className="t10 mono cz3">Sin pipeline activo — ejecutá main.py para ver el progreso aquí</p>
+    </div>
+  );
+
+  const stages=[
+    {n:0,label:'Guion IA'},
+    {n:1,label:'Parseo'},
+    {n:2,label:'Imágenes'},
+    {n:3,label:'Audio'},
+    {n:4,label:'Video'},
+  ];
+
+  const mins=Math.floor(elapsed/60), secs=elapsed%60;
+  const timeStr=mins>0?`${mins}m ${String(secs).padStart(2,'0')}s`:`${secs}s`;
+
+  return (
+    <div className={`card mt3 ${st.done?'card-e':st.error?'card-a':'card-b'}`}>
+      {/* Header */}
+      <div className="flex aic jb mb2">
+        <span className={`txs mono bold ${st.done?'ce':st.error?'ca':'cb'}`}>
+          {st.done?'✓ Video completado':st.error?'✗ Error':
+           <><span className="spin" style={{marginRight:'.35rem'}}/>{st.stage_name}</>}
+        </span>
+        <span className="t10 mono cz3">{timeStr}</span>
+      </div>
+
+      {/* Barra global */}
+      <div className="ptrack mb2">
+        <div className={`pfill ${st.done?'pfill-e':st.error?'pfill-a':'pfill-main'}`}
+             style={{width:`${st.progress}%`}}/>
+      </div>
+
+      {/* Stages */}
+      <div className="flex gap2 mb2" style={{justifyContent:'space-between'}}>
+        {stages.map(s=>{
+          const done=st.stage>s.n||(st.done&&st.stage===s.n);
+          const active=!st.done&&st.stage===s.n;
+          const pending=st.stage<s.n;
+          return (
+            <div key={s.n} className="flex col aic gap1" style={{flex:1}}>
+              <div className={`t10 mono ${done?'ce':active?'cb':'cz3'}`}
+                   style={{textAlign:'center',fontSize:'.55rem'}}>
+                {done?'✓':active?'…':'○'}
+              </div>
+              <div className="ptrack" style={{width:'100%',height:'.2rem'}}>
+                <div className={`pfill ${done?'pfill-e':active?'pfill-b':''}`}
+                     style={{width:done?'100%':active?`${st.progress}%`:'0%'}}/>
+              </div>
+              <span className={`t10 mono ${done?'ce':active?'cb':'cz3'}`}
+                    style={{fontSize:'.5rem',textAlign:'center'}}>{s.label}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Detail */}
+      <div className="flex aic jb">
+        <span className="t10 mono cz3 trunc">{st.detail||st.idea||''}</span>
+        <span className="t10 mono cb">{st.progress}%</span>
+      </div>
+
+      {st.done&&<p className="t10 mono ce mt2">→ {st.detail}</p>}
+      {st.error&&<p className="t10 mono cr mt2">{st.error}</p>}
+    </div>
+  );
+}
+
+// ── Main App ──────────────────────────────────────────────────────────────────
+function App() {
+  const [tasks,setTasks]=useState(INIT_TASKS);
+  const [ollamaSt,setOllamaSt]=useState({running:false,llama:false});
+  const toggle=id=>setTasks(ts=>ts.map(t=>t.id===id?{...t,done:!t.done}:t));
+
+  const done=tasks.filter(t=>t.done).length;
+  const total=tasks.length;
+
+  return (
+    <div>
+      {/* Header */}
+      <header className="mb3" style={{marginBottom:'1.5rem'}}>
+        <div className="flex aic jb fw gap2">
+          <div>
+            <h1 className="t2xl">
+              <span className="ca">manhwa</span>
+              <span className="cz3" style={{margin:'0 .3rem'}}>/</span>
+              <span className="cz2">video-gen</span>
+            </h1>
+            <p className="txs cz3 mt1">Fase 1 ✓  ·  Fase 2 activa</p>
+          </div>
+          <div className="flex aic gap2 fw">
+            <span className="pill">PR #36</span>
+            <span className="pill">claude/manhwa-video-generator</span>
+          </div>
+        </div>
+        {/* Progress global tareas */}
+        <div className="flex aic gap3 mt5">
+          <div className="ptrack f1"><div className="pfill pfill-main" style={{width:`${Math.round(done/total*100)}%`}}/></div>
+          <span className="txs mono cz3 nowrap">{done}/{total} tareas</span>
+        </div>
+      </header>
+
+      <div className="grid">
+        {/* LEFT — Sistema + Pipeline */}
+        <section>
+          <div className="flex aic jb mb3">
+            <span className="sechead">Sistema</span>
+            <span className="t10 mono ce">
+              {ollamaSt.running&&ollamaSt.llama?'8/8 ✓':'verificando…'}
+            </span>
+          </div>
+
+          {/* Componentes fijos (todos OK) */}
+          {[
+            ['FFmpeg',        'winget + PATH fallback ✓'],
+            ['Python 3.13',   'PYTHONUTF8=1 ✓'],
+            ['Kokoro TTS',    'v1.0.onnx + voices-v1.0.bin ✓'],
+            ['Edge TTS',      'es-MX-DaliaNeural / JorgeNeural ✓'],
+            ['Anthropic SDK', 'anthropic>=0.40.0 ✓'],
+            ['MoviePy',       'pipeline ensamble MP4 ✓'],
+          ].map(([name,detail])=>(
+            <div key={name} className="card flex aic gap3" style={{marginBottom:'.35rem'}}>
+              <span className="dok">✓</span>
+              <div className="mw0">
+                <span className="tsm bold cz2">{name}</span>
+                <p className="t10 cz3 trunc">{detail}</p>
+              </div>
+            </div>
+          ))}
+
+          {/* Ollama dinámico */}
+          <div className={`card flex aic gap3 mt2 ${ollamaSt.running?'':'card-a'}`}>
+            {ollamaSt.running?<span className="dok">✓</span>:<span className="dload"><span/></span>}
+            <div className="mw0">
+              <span className={`tsm bold ${ollamaSt.running?'cz2':'ca'}`}>Ollama</span>
+              <p className="t10 cz3 trunc">{ollamaSt.running?`API :11434 activa · llama3.2:3b ${ollamaSt.llama?'✓':'pendiente pull'}`:'esperando — ejecutar ollama serve'}</p>
+            </div>
+          </div>
+
+          {/* Ollama verifier */}
+          <OllamaStatus onUpdate={setOllamaSt}/>
+
+          {/* Pipeline progress */}
+          <div className="flex aic jb mt4 mb2">
+            <span className="sechead">Pipeline activo</span>
+          </div>
+          <PipelineProgress/>
+        </section>
+
+        {/* RIGHT — Pendientes */}
+        <section>
+          <div className="flex aic jb mb3">
+            <span className="sechead">Pendientes</span>
+            <span className="t10 mono cz3">{done}/{total}</span>
+          </div>
+
+          <div style={{display:'flex',flexDirection:'column',gap:'.35rem'}}>
+            {tasks.map(t=>(
+              <div key={t.id}
+                className={`card card-task ${t.done?'card-dim':''}`}
+                onClick={()=>toggle(t.id)}
+                style={{userSelect:'none'}}
+              >
+                <div className="flex aist gap3">
+                  <div className={`cbx ${t.done?'on':''}`}>
+                    {t.done&&<span style={{fontSize:'.55rem',color:'var(--emerald)'}}>✓</span>}
+                  </div>
+                  <div className="f1 mw0">
+                    <div className="flex aic gap2 fw">
+                      <Pbadge p={t.priority}/>
+                      <span className={`tsm ${t.done?'strike cz3':'cz2'}`}>{t.label}</span>
+                    </div>
+                    {t.cmd&&!t.done&&(
+                      <div className="flex aic gap2 mt1 fw" onClick={e=>e.stopPropagation()}>
+                        <code>{t.cmd.length>50?t.cmd.slice(0,50)+'…':t.cmd}</code>
+                        <CopyBtn text={t.cmd}/>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Próximo paso dinámico */}
+          <div className="card card-e mt4">
+            <p className="t10 bold upper ce mb2">► Próximo paso</p>
+            {!ollamaSt.running?(
+              <div className="flex aic gap2">
+                <span className="t10 mono bold" style={{color:'var(--blue)'}}>1</span>
+                <div className="f1 mw0">
+                  <div className="flex aic gap2"><code>ollama serve</code><CopyBtn text="ollama serve"/></div>
+                  <p className="t10 cz3 mt1">levanta la API en :11434</p>
+                </div>
+              </div>
+            ):!ollamaSt.llama?(
+              <div className="flex aic gap2">
+                <span className="t10 mono bold" style={{color:'var(--blue)'}}>1</span>
+                <div className="f1 mw0">
+                  <div className="flex aic gap2"><code>ollama pull llama3.2:3b</code><CopyBtn text="ollama pull llama3.2:3b"/></div>
+                </div>
+              </div>
+            ):(
+              <div className="flex aic gap2">
+                <span style={{width:'1.2rem',height:'1.2rem',borderRadius:'50%',background:'rgba(16,185,129,.15)',color:'var(--emerald)',fontSize:'.65rem',fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>✓</span>
+                <div className="f1 mw0">
+                  <div className="flex aic gap2 fw">
+                    <code style={{fontSize:'.62rem'}}>python -X utf8 main.py --idea "…" --compare-backends --skip-images</code>
+                    <CopyBtn text='python -X utf8 main.py --idea "un samurai inmortal busca la paz" --compare-backends --skip-images'/>
+                  </div>
+                  <p className="t10 cz3 mt1">compare-backends: Ollama vs Gemini vs Anthropic · jurado IA elige el mejor</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+      </div>
+
+      <footer className="footer flex aic jb fw gap2">
+        <span>manhwa-video-gen · Fase 1 ✓ · TTS ✓ (4 clips · 650KB MP4 · 14 WAVs) · Fase 2 activa</span>
+        <div className="flex aic gap3">
+          <span className="cz3">Ken Burns: 2160×3840 ✓</span>
+          <span className="cz3">Edge TTS es-MX ✓</span>
+          <span className={ollamaSt.running?'ce':'ca'}>Ollama: {ollamaSt.running?'activo':'esperando'}</span>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
