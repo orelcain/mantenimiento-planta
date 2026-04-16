@@ -24,23 +24,41 @@ from __future__ import annotations
 import json
 import os
 import random
+import sys
 import time
 import urllib.parse
 import urllib.request
 import uuid
 from pathlib import Path
 
+# Importar config para estilos (fallback si no está disponible)
+try:
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    import config as _cfg
+    _STYLES = _cfg.STYLES
+    _DEFAULT_STYLE = _cfg.DEFAULT_STYLE
+except Exception:
+    _STYLES = {
+        "manhwa": {
+            "img_suffix": "manhwa style, korean webtoon art, clean lineart, vibrant colors, cinematic lighting",
+            "negative": "lowres, bad anatomy, blurry, watermark",
+        }
+    }
+    _DEFAULT_STYLE = "manhwa"
 
-# ── Style tags ────────────────────────────────────────────────────────────────
-_STYLE_TAGS = (
-    "manhwa style, korean webtoon art, clean lineart, vibrant colors, "
-    "detailed, high quality, cinematic lighting, dynamic composition"
-)
-_NEGATIVE_TAGS = (
+_NEGATIVE_TAGS_BASE = (
     "lowres, bad anatomy, bad hands, missing fingers, extra limbs, "
     "worst quality, low quality, blurry, watermark, signature, text, "
     "ugly, duplicate, deformed"
 )
+
+
+def _get_style_tags(style: str) -> tuple[str, str]:
+    """Devuelve (prompt_suffix, negative) para el estilo dado."""
+    style_data = _STYLES.get(style, _STYLES.get(_DEFAULT_STYLE, {}))
+    suffix = style_data.get("img_suffix", "")
+    negative = f"{_NEGATIVE_TAGS_BASE}, {style_data.get('negative', '')}"
+    return suffix, negative
 
 
 # ── Router principal ──────────────────────────────────────────────────────────
@@ -49,20 +67,25 @@ def generate_image(
     prompt: str,
     output_path: Path,
     backend: str = "pollinations",
+    style: str = "manhwa",
     character_descriptions: dict[str, str] | None = None,
     width: int = 720,
     height: int = 1280,
     **kwargs,
 ) -> Path:
     """
-    Genera una imagen manhwa y la guarda en output_path.
+    Genera una imagen con el estilo y backend elegidos.
     Hace fallback a placeholder si el backend falla.
     """
-    # Construir prompt completo con personajes
-    full_prompt = prompt
+    style_suffix, negative = _get_style_tags(style)
+
+    # Construir prompt completo con personajes + estilo
+    parts = [prompt]
     if character_descriptions:
-        char_part = ", ".join(character_descriptions.values())
-        full_prompt = f"{char_part}, {prompt}"
+        parts.insert(0, ", ".join(character_descriptions.values()))
+    if style_suffix:
+        parts.append(style_suffix)
+    full_prompt = ", ".join(p for p in parts if p)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
 

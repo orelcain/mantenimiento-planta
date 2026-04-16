@@ -91,14 +91,28 @@ def _check_tool(cmd: list[str]) -> bool:
 
 
 def get_system_status() -> dict:
+    # Cargar config para estilos + free_tier_limits
+    try:
+        import config as _cfg
+        styles_data = {
+            k: {"label": v["label"], "emoji": v.get("emoji", "")}
+            for k, v in _cfg.STYLES.items()
+        }
+        free_limits = _cfg.FREE_TIER_LIMITS
+        voices = _cfg.EDGE_VOICES_ES
+    except Exception:
+        styles_data = {"manhwa": {"label": "Manhwa", "emoji": "📖"}}
+        free_limits = {}
+        voices = {"Jorge (MX)": "es-MX-JorgeNeural"}
+
     backends = {
         "ollama":    _check_backend("ollama"),
         "anthropic": _check_backend("anthropic"),
         "gemini":    _check_backend("gemini"),
     }
-    # Mejor backend disponible para story gen
+    # Mejor backend GRATIS disponible para story gen
     best = next(
-        (b for b in ["anthropic", "gemini", "ollama"] if backends[b]["ok"]),
+        (b for b in ["gemini", "ollama", "anthropic"] if backends[b]["ok"]),
         None
     )
     ffmpeg = _check_tool(["ffmpeg", "-version"])
@@ -109,26 +123,35 @@ def get_system_status() -> dict:
     pollinations_ok = True   # API pública, siempre disponible
     comfyui_ok      = False  # requiere GPU local, se verifica al lanzar pipeline
 
+    image_backends = {
+        "placeholder":  {"ok": True,             "label": "Placeholder estilizado", "free": True,  "limit_key": "placeholder"},
+        "pollinations": {"ok": pollinations_ok,  "label": "Pollinations.AI FLUX",   "free": True,  "limit_key": "pollinations"},
+        "huggingface":  {"ok": True,             "label": "HuggingFace SDXL",       "free": True,  "limit_key": "huggingface"},
+        "gemini":       {"ok": gemini_img_ok,    "label": "Gemini Imagen 3",        "free": False, "limit_key": "gemini_imagen"},
+        "comfyui":      {"ok": comfyui_ok,       "label": "ComfyUI local",          "free": True,  "limit_key": "comfyui"},
+    }
+
+    # Auto-select: mejor gratis disponible (excluye gemini imagen que requiere billing)
+    auto_best_image = "pollinations"  # default gratis sin billing
+    for candidate in ["comfyui", "huggingface", "pollinations"]:
+        if image_backends.get(candidate, {}).get("ok") and image_backends[candidate].get("free"):
+            auto_best_image = candidate
+            break
+
     return {
         "backends":      backends,
         "best_backend":  best,
         "ffmpeg":        ffmpeg,
         "pipeline_running": _pipeline_running(),
-        "image_backends": {
-            "placeholder":  {"ok": True,             "label": "Placeholder estilizado"},
-            "pollinations": {"ok": pollinations_ok,  "label": "Pollinations.AI FLUX (gratis)"},
-            "huggingface":  {"ok": hf_ok or True,    "label": "HuggingFace SDXL"},
-            "gemini":       {"ok": gemini_img_ok,     "label": "Gemini Imagen 3"},
-            "comfyui":      {"ok": comfyui_ok,        "label": "ComfyUI local"},
-        },
-        "tts_voices": {
-            "Dalia (MX)":   "es-MX-DaliaNeural",
-            "Marina (MX)":  "es-MX-MarinaNeural",
-            "Elvira (ES)":  "es-ES-ElviraNeural",
-            "Elena (AR)":   "es-AR-ElenaNeural",
-            "Jorge (MX)":   "es-MX-JorgeNeural",
-            "Alvaro (ES)":  "es-ES-AlvaroNeural",
-            "Tomas (AR)":   "es-AR-TomasNeural",
+        "image_backends": image_backends,
+        "tts_voices": voices,
+        "styles": styles_data,
+        "free_tier_limits": free_limits,
+        "auto_best": {
+            "story": best or "ollama",
+            "image": auto_best_image,
+            "audio": "edge",
+            "style": "realista",  # estilo más realista por defecto para modo auto
         },
     }
 
@@ -268,11 +291,18 @@ class Handler(BaseHTTPRequestHandler):
         skip_images= params.get("skip_images", True)   # default: sin imágenes hasta tener ComfyUI
         no_music   = params.get("no_music", False)
         image_backend = params.get("image_backend", "pollinations")
+        style      = params.get("style", "manhwa")
+        voice_key  = params.get("voice", "")
 
         # Auto-seleccionar backend si se pide
         if backend == "auto":
             sys_st = get_system_status()
             backend = sys_st.get("best_backend") or "ollama"
+
+        # Auto-seleccionar image backend si se pide
+        if image_backend == "auto":
+            sys_st = get_system_status()
+            image_backend = sys_st.get("auto_best", {}).get("image", "pollinations")
 
         cmd = [
             sys.executable, str(BASE / "main.py"),
@@ -280,6 +310,7 @@ class Handler(BaseHTTPRequestHandler):
             "--genre", genre,
             "--backend", backend,
             "--num-scenes", str(num_scenes),
+            "--style", style,
         ]
         if skip_images:
             cmd.append("--skip-images")
@@ -287,6 +318,8 @@ class Handler(BaseHTTPRequestHandler):
             cmd.extend(["--image-backend", image_backend])
         if no_music:
             cmd.append("--no-music")
+        if voice_key:
+            cmd.extend(["--voice", voice_key])
 
         env = {**os.environ,
                "PYTHONUTF8": "1",

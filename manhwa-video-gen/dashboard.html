@@ -306,13 +306,13 @@ function VideoOutput({ videos }) {
 // ── Sistema ───────────────────────────────────────────────────────────────────
 function SystemPanel({ sys }) {
   if (!sys) return null;
-  const { backends={}, ffmpeg=false, image_backends={}, tts_voices={} } = sys;
+  const { backends={}, ffmpeg=false, image_backends={}, auto_best={} } = sys;
   const imgRows = [
-    ['placeholder',  '⚡ instantáneo, sin internet'],
-    ['pollinations', '🆓 FLUX gratis, sin API key'],
-    ['huggingface',  '🤗 SDXL gratis (HF_TOKEN opcional)'],
-    ['gemini',       '✨ Imagen 3 (requiere key)'],
-    ['comfyui',      '💻 local GPU (requiere ComfyUI)'],
+    ['placeholder',  '⚡ instantáneo, sin internet',     'placeholder'],
+    ['pollinations', '🆓 FLUX gratis, sin API key',       'pollinations'],
+    ['huggingface',  '🤗 SDXL gratis (HF_TOKEN opcional)', 'huggingface'],
+    ['gemini',       '⚠ Imagen 3 (requiere billing)',     'gemini_imagen'],
+    ['comfyui',      '💻 local GPU (requiere ComfyUI)',   'comfyui'],
   ];
   return (
     <div className="card mt3">
@@ -320,7 +320,7 @@ function SystemPanel({ sys }) {
       <div className="flex col gap1">
         {[
           ['FFmpeg + ffprobe', ffmpeg,  'encoder video'],
-          ['Edge TTS es-MX',  true,    'Dalia · Jorge Neural'],
+          ['Edge TTS es-MX',  true,    'Dalia · Jorge · Marina · Elvira'],
         ].map(([name,ok,detail]) => (
           <div key={name} className="flex aic gap2">
             <div className={`dot ${ok?'dot-e':'dot-r'}`}/>
@@ -329,40 +329,62 @@ function SystemPanel({ sys }) {
           </div>
         ))}
 
-        <hr className="divider" style={{margin:'.4rem 0'}}/>
-        <p className="sechead mb1">Story backends</p>
-        {Object.entries(backends).map(([name,info]) => (
-          <div key={name} className="flex aic gap2">
-            <div className={`dot ${info.ok?'dot-e':'dot-z'}`}/>
-            <span className="tsm cz2 bold">{name}</span>
-            {name==='ollama' && info.ok && <span className="t10 cz3">{(info.models||[]).join(', ')}</span>}
-            {name!=='ollama' && !info.ok && <span className="t10 cz3">sin API key</span>}
-            {name!=='ollama' && info.ok && <span className="t10 ce">✓ key ok</span>}
-            <span className="t10 cv mono ml-auto">{QUALITY.story[name]||'?'}/100</span>
+        {/* Recomendación auto */}
+        {auto_best.image && (
+          <div className="flex aic gap2 mt2" style={{
+            padding:'.4rem .5rem',background:'rgba(100,200,100,.08)',
+            border:'1px solid rgba(100,200,100,.2)',borderRadius:'6px'}}>
+            <span style={{fontSize:'1rem'}}>🤖</span>
+            <div className="flex col gap1" style={{flex:1}}>
+              <span className="t10 bold ce">Mejor combo gratis recomendado</span>
+              <span className="t10 cz2 mono">
+                story:{auto_best.story} · img:{auto_best.image} · tts:{auto_best.audio}
+              </span>
+            </div>
           </div>
-        ))}
+        )}
 
         <hr className="divider" style={{margin:'.4rem 0'}}/>
-        <p className="sechead mb1">Image backends</p>
-        {imgRows.map(([key,desc]) => {
-          const info = image_backends[key] || {};
-          const ok   = info.ok !== false;
+        <p className="sechead mb1">Story backends</p>
+        {Object.entries(backends).map(([name,info]) => {
+          const lim = FREE_LIMITS[name];
           return (
-            <div key={key} className="flex aic gap2">
-              <div className={`dot ${ok?'dot-e':'dot-z'}`}/>
-              <span className="tsm cz2 bold">{key}</span>
-              <span className="t10 cz3">{desc}</span>
-              <span className="t10 cv mono" style={{marginLeft:'auto'}}>{QUALITY.image[key]||'?'}/100</span>
+            <div key={name} className="flex aic gap2 fw">
+              <div className={`dot ${info.ok?'dot-e':'dot-z'}`}/>
+              <span className="tsm cz2 bold">{name}</span>
+              {name==='ollama' && info.ok && <span className="t10 cz3">{(info.models||[]).join(', ')}</span>}
+              {name!=='ollama' && !info.ok && <span className="t10 cz3">sin API key</span>}
+              {name!=='ollama' && info.ok && <span className="t10 ce">✓ key ok</span>}
+              <span className="t10 cv mono ml-auto">{QUALITY.story[name]||'?'}/100</span>
+              {lim && (
+                <span className={`t10 ${lim.free?'ce':'cr'}`} style={{width:'100%',paddingLeft:'1.2rem'}}>
+                  {lim.free?'✓ gratis':'⚠ requiere pago'} · {lim.text}
+                </span>
+              )}
             </div>
           );
         })}
 
         <hr className="divider" style={{margin:'.4rem 0'}}/>
-        <div className="flex aic gap2">
-          <div className="dot dot-z"/>
-          <span className="tsm cz3">ComfyUI (GPU)</span>
-          <span className="t10 cz3">para imágenes locales manhwa reales</span>
-        </div>
+        <p className="sechead mb1">Image backends</p>
+        {imgRows.map(([key,desc,limKey]) => {
+          const info = image_backends[key] || {};
+          const ok   = info.ok !== false;
+          const lim  = FREE_LIMITS[limKey];
+          return (
+            <div key={key} className="flex aic gap2 fw">
+              <div className={`dot ${ok?'dot-e':'dot-z'}`}/>
+              <span className="tsm cz2 bold">{key}</span>
+              <span className="t10 cz3">{desc}</span>
+              <span className="t10 cv mono" style={{marginLeft:'auto'}}>{QUALITY.image[key]||'?'}/100</span>
+              {lim && (
+                <span className={`t10 ${lim.free?'ce':'cr'}`} style={{width:'100%',paddingLeft:'1.2rem'}}>
+                  {lim.free?'✓ gratis':'⚠ requiere pago'} · {lim.text}
+                </span>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -372,47 +394,90 @@ function SystemPanel({ sys }) {
 const GENRES   = ['auto','accion','romance','fantasia','horror'];
 const BACKENDS = ['auto','anthropic','gemini','ollama'];
 const IMG_BACKENDS = [
-  { v:'placeholder',  l:'Placeholder (instantáneo)' },
-  { v:'pollinations', l:'Pollinations FLUX (gratis)' },
-  { v:'huggingface',  l:'HuggingFace SDXL (gratis)' },
-  { v:'gemini',       l:'Gemini Imagen 3' },
-  { v:'comfyui',      l:'ComfyUI (GPU local)' },
+  { v:'auto',         l:'🤖 Auto (mejor gratis)', free:true,  tier:'Auto' },
+  { v:'placeholder',  l:'Placeholder (instantáneo)', free:true, tier:'Offline, sin límite' },
+  { v:'pollinations', l:'Pollinations FLUX (gratis)', free:true, tier:'Gratis · ~5 req/min' },
+  { v:'huggingface',  l:'HuggingFace SDXL (gratis)',  free:true, tier:'Gratis · 1000 req/mes' },
+  { v:'gemini',       l:'Gemini Imagen 3 ⚠',          free:false,tier:'Requiere billing (no gratis)' },
+  { v:'comfyui',      l:'ComfyUI (GPU local)',        free:true, tier:'Local, sin límite' },
 ];
 const TTS_VOICES = [
-  { v:'es-MX-DaliaNeural',  l:'Dalia (MX femenina)' },
-  { v:'es-MX-JorgeNeural',  l:'Jorge (MX masculina)' },
-  { v:'es-MX-MarinaNeural', l:'Marina (MX femenina)' },
-  { v:'es-ES-ElviraNeural', l:'Elvira (ES femenina)' },
-  { v:'es-ES-AlvaroNeural', l:'Álvaro (ES masculino)' },
-  { v:'es-AR-ElenaNeural',  l:'Elena (AR femenina)' },
-  { v:'es-AR-TomasNeural',  l:'Tomás (AR masculino)' },
-  { v:'es-CO-SalomeNeural', l:'Salomé (CO femenina)' },
+  { v:'es-MX-DaliaNeural',  k:'Dalia (MX)',    l:'Dalia (MX femenina)' },
+  { v:'es-MX-JorgeNeural',  k:'Jorge (MX)',    l:'Jorge (MX masculina)' },
+  { v:'es-MX-MarinaNeural', k:'Marina (MX)',   l:'Marina (MX femenina)' },
+  { v:'es-ES-ElviraNeural', k:'Elvira (ES)',   l:'Elvira (ES femenina)' },
+  { v:'es-ES-AlvaroNeural', k:'Alvaro (ES)',   l:'Álvaro (ES masculino)' },
+  { v:'es-AR-ElenaNeural',  k:'Elena (AR)',    l:'Elena (AR femenina)' },
+  { v:'es-AR-TomasNeural',  k:'Tomas (AR)',    l:'Tomás (AR masculino)' },
+  { v:'es-CO-SalomeNeural', k:'Salome (CO)',   l:'Salomé (CO femenina)' },
 ];
+// 8 estilos visuales — afectan prompt de imagen
+const STYLES_LIST = [
+  { v:'manhwa',          e:'📖', l:'Manhwa/Webtoon' },
+  { v:'anime',           e:'🌸', l:'Anime' },
+  { v:'realista',        e:'📷', l:'Realista (Foto)' },
+  { v:'cinematografico', e:'🎬', l:'Cinematográfico' },
+  { v:'cartoon',         e:'🎨', l:'Cartoon/Pixar' },
+  { v:'pixel_art',       e:'🕹️', l:'Pixel Art Retro' },
+  { v:'noir',            e:'🕶️', l:'Noir (B&N)' },
+  { v:'acuarela',        e:'🖌️', l:'Acuarela' },
+];
+// Límites gratis por clave (para tooltip)
+const FREE_LIMITS = {
+  ollama:        { free:true,  text:'Local · sin límite' },
+  gemini:        { free:true,  text:'Gratis · 15 req/min · 1M tokens/día' },
+  anthropic:     { free:false, text:'Requiere API key o Pro' },
+  placeholder:   { free:true,  text:'Offline · sin límite' },
+  pollinations:  { free:true,  text:'Gratis · ~5 req/min' },
+  huggingface:   { free:true,  text:'Gratis · 1000 req/mes' },
+  gemini_imagen: { free:false, text:'Requiere billing (no gratis)' },
+  comfyui:       { free:true,  text:'Local · sin límite' },
+  edge:          { free:true,  text:'Gratis · sin límite oficial' },
+};
 
 function GenerateForm({ sys, running, onStart, onStop }) {
   const [idea,      setIdea]      = useState('');
   const [genre,     setGenre]     = useState('accion');
   const [backend,   setBackend]   = useState('auto');
-  const [imgBack,   setImgBack]   = useState('pollinations');
+  const [imgBack,   setImgBack]   = useState('auto');
   const [scenes,    setScenes]    = useState('4');
   const [skipImg,   setSkipImg]   = useState(false);
   const [noMusic,   setNoMusic]   = useState(false);
   const [narVoice,  setNarVoice]  = useState('es-MX-JorgeNeural');
+  const [style,     setStyle]     = useState('manhwa');
   const [loading,   setLoading]   = useState(false);
 
   const bestBack    = sys?.best_backend;
+  const autoBest    = sys?.auto_best || {};
   const resolvedBack= backend==='auto' ? (bestBack||'ollama') : backend;
+  // Si imgBack = 'auto', usa sys.auto_best.image; si no, el valor elegido
+  const resolvedImg = imgBack==='auto' ? (autoBest.image || 'pollinations') : imgBack;
   const storyKey    = resolvedBack === 'ollama' ? 'ollama' : resolvedBack;
   const numScenes   = parseInt(scenes)||4;
 
   const quality = useMemo(
-    () => computeQuality(storyKey, imgBack, skipImg, 'edge'),
-    [storyKey, imgBack, skipImg]
+    () => computeQuality(storyKey, resolvedImg, skipImg, 'edge'),
+    [storyKey, resolvedImg, skipImg]
   );
   const eta = useMemo(
-    () => computeETA(storyKey, imgBack, skipImg, 'edge', numScenes),
-    [storyKey, imgBack, skipImg, numScenes]
+    () => computeETA(storyKey, resolvedImg, skipImg, 'edge', numScenes),
+    [storyKey, resolvedImg, skipImg, numScenes]
   );
+
+  // Mapa de narVoice → clave (Jorge (MX), etc.) para pasar al server
+  const voiceKey = useMemo(() => {
+    const v = TTS_VOICES.find(x => x.v === narVoice);
+    return v ? v.k : '';
+  }, [narVoice]);
+
+  // Botón "🤖 Auto Best" — setea todo al mejor gratis
+  function applyAutoBest() {
+    setBackend('auto');        // → usa best_backend
+    setImgBack('auto');        // → usa auto_best.image
+    setStyle('realista');      // realista es lo más "viral" generalmente
+    setSkipImg(false);
+    setNarVoice('es-MX-JorgeNeural');
+  }
 
   async function handleRun() {
     if (!idea.trim()) return;
@@ -427,8 +492,9 @@ function GenerateForm({ sys, running, onStart, onStop }) {
         num_scenes: numScenes,
         skip_images: skipImg,
         no_music: noMusic,
-        image_backend: skipImg ? 'placeholder' : imgBack,
-        narrator_voice: narVoice,
+        image_backend: skipImg ? 'placeholder' : (imgBack === 'auto' ? 'auto' : imgBack),
+        style,
+        voice: voiceKey,
       })
     });
     setLoading(false);
@@ -443,9 +509,20 @@ function GenerateForm({ sys, running, onStart, onStop }) {
 
   const canRun = idea.trim().length > 5 && !running && !loading;
 
+  // Info del backend de imagen seleccionado
+  const imgInfo = IMG_BACKENDS.find(b => b.v === imgBack) || {};
+
   return (
     <div className="card card-v">
-      <p className="tlg bold cz1 mb3">▶ Nueva Historia</p>
+      <div className="flex aic gap2 mb3">
+        <p className="tlg bold cz1" style={{margin:0,flex:1}}>▶ Nueva Historia</p>
+        <button className="btn" type="button"
+                onClick={applyAutoBest} disabled={running}
+                title="Selecciona automáticamente el mejor backend gratuito"
+                style={{padding:'.3rem .6rem',fontSize:'.8rem',background:'#1a1a1a',border:'1px solid #2a2a2a'}}>
+          🤖 Auto Best (gratis)
+        </button>
+      </div>
 
       {/* IDEA */}
       <div className="field mb3">
@@ -478,7 +555,20 @@ function GenerateForm({ sys, running, onStart, onStop }) {
               </option>
             ))}
           </select>
+          {FREE_LIMITS[resolvedBack] && (
+            <div className="t10 cz3 mt1" title={FREE_LIMITS[resolvedBack].text}>
+              {FREE_LIMITS[resolvedBack].free ? '✓' : '⚠'} {FREE_LIMITS[resolvedBack].text}
+            </div>
+          )}
         </div>
+      </div>
+
+      {/* Estilo visual */}
+      <div className="field mb3">
+        <label className="label">Estilo Visual</label>
+        <select value={style} onChange={e=>setStyle(e.target.value)} disabled={running||skipImg}>
+          {STYLES_LIST.map(({v,e,l})=><option key={v} value={v}>{e} {l}</option>)}
+        </select>
       </div>
 
       {/* Imagen backend + Voz narrador */}
@@ -488,12 +578,19 @@ function GenerateForm({ sys, running, onStart, onStop }) {
           <select value={imgBack} onChange={e=>setImgBack(e.target.value)} disabled={running||skipImg}>
             {IMG_BACKENDS.map(({v,l})=><option key={v} value={v}>{l}</option>)}
           </select>
+          {imgInfo.tier && (
+            <div className="t10 cz3 mt1" title={imgInfo.tier}>
+              {imgInfo.free ? '✓' : '⚠'} {imgInfo.tier}
+              {imgBack==='auto' && <span className="cv"> → {resolvedImg}</span>}
+            </div>
+          )}
         </div>
         <div className="field f1">
           <label className="label">Voz narrador</label>
           <select value={narVoice} onChange={e=>setNarVoice(e.target.value)} disabled={running}>
             {TTS_VOICES.map(({v,l})=><option key={v} value={v}>{l}</option>)}
           </select>
+          <div className="t10 cz3 mt1">✓ Edge TTS · gratis sin límite</div>
         </div>
       </div>
 

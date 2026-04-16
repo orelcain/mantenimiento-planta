@@ -113,6 +113,11 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--image-backend", default=None,
                    choices=["placeholder","pollinations","huggingface","gemini","comfyui"],
                    help="Backend de generación de imágenes (default: config.IMAGE_BACKEND)")
+    p.add_argument("--style", default="manhwa",
+                   choices=["manhwa","anime","realista","cinematografico","cartoon","pixel_art","noir","acuarela"],
+                   help="Estilo visual de imágenes (default: manhwa)")
+    p.add_argument("--voice", default=None,
+                   help="Voz del narrador (clave de config.EDGE_VOICES_ES, ej: 'Jorge (MX)')")
     return p.parse_args()
 
 
@@ -194,6 +199,12 @@ def main() -> None:
 
     # Resolver backend de imágenes
     image_backend = args.image_backend or config.IMAGE_BACKEND
+
+    # Resolver voz del narrador — override CHARACTER_VOICES si viene --voice
+    if args.voice and args.voice in config.EDGE_VOICES_ES:
+        voice_id = config.EDGE_VOICES_ES[args.voice]
+        config.CHARACTER_VOICES["NARRADOR"] = voice_id
+        print(f"   Voz narrador: {args.voice} → {voice_id}")
 
     idea_str = args.idea or Path(args.script).stem
 
@@ -300,6 +311,7 @@ def main() -> None:
             prompt=scene.background,
             output_path=img_path,
             backend=image_backend,
+            style=args.style,
             character_descriptions=char_descs or None,
             width=config.IMAGE_WIDTH,
             height=config.IMAGE_HEIGHT,
