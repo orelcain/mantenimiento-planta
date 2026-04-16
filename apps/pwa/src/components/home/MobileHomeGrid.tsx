@@ -1,10 +1,13 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   AlertTriangle, Package, Camera, CalendarClock, Wrench,
   BarChart3, Map, Route, Activity, Settings, FileText,
   GraduationCap, ChevronRight, ClipboardList, CloudSun,
   Box, Cpu, BookOpen, FolderTree, MapPin, TrendingUp, Monitor,
+  QrCode, Share2, ChevronDown, ChevronUp,
 } from 'lucide-react'
+import { QRCodeSVG } from 'qrcode.react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store'
 import type { UserRole } from '@/types'
@@ -78,7 +81,7 @@ const GROUPS: Record<UserRole, TileGroup[]> = {
         { id: 'incidents', label: 'Nueva Incidencia',  sublabel: 'Levantar problema',   icon: AlertTriangle, href: '/incidents',      color: 'red',   cta: true },
         { id: 'repuestos', label: 'Repuestos',          sublabel: 'Piezas & manuales',  icon: Package,       href: '/repuestos',      color: 'blue'  },
         { id: 'equipos',   label: 'Equipos',            sublabel: 'Ficha técnica',      icon: Wrench,        href: '/equipment',      color: 'slate' },
-        { id: 'prevntv',   label: 'Preventivo',         sublabel: 'Mis tareas',         icon: CalendarClock, href: '/preventive',     color: 'amber' },
+        { id: 'prevntv',   label: 'Preventivo',         sublabel: 'Mis tareas',         icon: CalendarClock, href: '/preventive',     color: 'amber',  wip: true },
         { id: 'evidencia', label: 'Foto-evidencia',     sublabel: 'Registrar imagen',   icon: Camera,        href: '/photo-evidence', color: 'slate' },
       ],
     },
@@ -95,8 +98,8 @@ const GROUPS: Record<UserRole, TileGroup[]> = {
         { id: 'incidents', label: 'Incidencias',        sublabel: 'Revisar & validar',   icon: AlertTriangle, href: '/incidents',       color: 'red'    },
         { id: 'grader',    label: 'Grader',             sublabel: 'Rendimiento',          icon: BarChart3,     href: '/analisis-grader', color: 'blue'   },
         { id: 'inspecc',   label: 'Inspecciones',       sublabel: 'Rondas',              icon: Route,         href: '/inspections',     color: 'amber',  wip: true },
-        { id: 'prevntv',   label: 'Preventivo',         sublabel: 'Plan mantención',     icon: CalendarClock, href: '/preventive',      color: 'amber'  },
-        { id: 'sensores',  label: 'Sensores',           sublabel: 'Monitor real',        icon: Activity,      href: '/sensors/monitor', color: 'green'  },
+        { id: 'prevntv',   label: 'Preventivo',         sublabel: 'Plan mantención',     icon: CalendarClock, href: '/preventive',      color: 'amber',  wip: true },
+        { id: 'sensores',  label: 'Sensores',           sublabel: 'Monitor real',        icon: Activity,      href: '/sensors/monitor', color: 'green',  wip: true },
       ],
     },
     {
@@ -128,15 +131,15 @@ const GROUPS: Record<UserRole, TileGroup[]> = {
       label: 'Planificación',
       tiles: [
         { id: 'inspecc',   label: 'Inspecciones',       sublabel: 'Rondas',              icon: ClipboardList, href: '/inspections',     color: 'amber',  wip: true },
-        { id: 'prevntv',   label: 'Preventivo',         sublabel: 'Plan mantención',     icon: CalendarClock, href: '/preventive',      color: 'amber'  },
-        { id: 'gantt',     label: 'Gantt',              sublabel: 'Planificador',        icon: TrendingUp,    href: '/gantt',           color: 'orange' },
+        { id: 'prevntv',   label: 'Preventivo',         sublabel: 'Plan mantención',     icon: CalendarClock, href: '/preventive',      color: 'amber',  wip: true },
+        { id: 'gantt',     label: 'Gantt',              sublabel: 'Planificador',        icon: TrendingUp,    href: '/gantt',           color: 'orange', wip: true },
       ],
     },
     {
       label: 'Análisis & monitoreo',
       tiles: [
         { id: 'grader',    label: 'Grader',             sublabel: 'Análisis de piezas',  icon: BarChart3,     href: '/analisis-grader', color: 'blue'    },
-        { id: 'sensores',  label: 'Sensores',           sublabel: 'Tiempo real',         icon: Activity,      href: '/sensors/monitor', color: 'green'   },
+        { id: 'sensores',  label: 'Sensores',           sublabel: 'Tiempo real',         icon: Activity,      href: '/sensors/monitor', color: 'green',   wip: true },
         { id: 'mapa',      label: 'Mapa Planta',        sublabel: 'Zonas',               icon: Map,           href: '/map',             color: 'emerald' },
         { id: 'clima',     label: 'Clima Puerto',       sublabel: 'Condiciones',         icon: CloudSun,      href: '/clima-puerto',    color: 'slate'   },
       ],
@@ -264,6 +267,67 @@ function Chip({ tile }: { tile: Tile }) {
   )
 }
 
+// ─── QR Compartir App ─────────────────────────────────────────────────────────
+
+function AppShareCard() {
+  const [open, setOpen] = useState(false)
+  const appUrl = `${window.location.origin}${import.meta.env.BASE_URL ?? '/'}`.replace(/([^:])\/\/+/g, '$1/')
+
+  async function handleShare() {
+    if (navigator.share) {
+      await navigator.share({ title: 'App Planta Antarfood', url: appUrl }).catch(() => {/* cancelado */})
+    } else {
+      await navigator.clipboard.writeText(appUrl)
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-border bg-muted/40 overflow-hidden">
+      {/* Header — siempre visible */}
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center gap-2.5 px-4 py-3 active:bg-muted/80 transition-colors touch-manipulation"
+      >
+        <QrCode className="h-4 w-4 text-muted-foreground shrink-0" />
+        <span className="flex-1 text-sm font-medium text-left">Compartir app</span>
+        <span className="text-[10px] text-muted-foreground mr-1">Invitar usuarios</span>
+        {open
+          ? <ChevronUp   className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+        }
+      </button>
+
+      {/* Panel expandible */}
+      {open && (
+        <div className="px-4 pb-4 flex flex-col items-center gap-3 border-t border-border/60 pt-3">
+          {/* QR */}
+          <div className="p-2 bg-white rounded-xl shadow-sm">
+            <QRCodeSVG value={appUrl} size={148} level="M" />
+          </div>
+
+          {/* Instrucción */}
+          <p className="text-xs text-center text-muted-foreground leading-snug max-w-[200px]">
+            Escanea para abrir la app.<br />
+            Inicia sesión con <strong>Google</strong> o con tu cuenta si ya estás registrado.
+          </p>
+
+          {/* URL */}
+          <p className="text-[10px] text-muted-foreground truncate max-w-[240px] font-mono">{appUrl}</p>
+
+          {/* Botón compartir */}
+          <button
+            onClick={handleShare}
+            className="flex items-center gap-2 text-xs font-medium px-4 py-2 rounded-lg bg-primary text-primary-foreground active:opacity-80 transition-opacity touch-manipulation"
+          >
+            <Share2 className="h-3.5 w-3.5" />
+            Compartir enlace
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 export function MobileHomeGrid() {
@@ -314,6 +378,9 @@ export function MobileHomeGrid() {
           </div>
         )
       })}
+
+      {/* Compartir QR */}
+      <AppShareCard />
 
     </div>
   )
