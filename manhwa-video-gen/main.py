@@ -73,7 +73,7 @@ def _write_status(stage: int, stages_total: int, stage_name: str,
         "ts":           datetime.now().isoformat(timespec="seconds"),
     }
     _STATUS_FILE.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
-from modules.image_gen import generate_image, check_comfyui
+from modules.image_gen import generate_image, check_comfyui, check_pollinations
 from modules.story_parser import parse_script
 from modules.tts import get_voice_for_speaker, synthesize
 from modules.video_builder import (
@@ -110,6 +110,9 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--skip-tts",     action="store_true", help="Saltear TTS — reusar WAVs existentes")
     p.add_argument("--no-music",     action="store_true", help="Sin música de fondo")
     p.add_argument("--no-ken-burns", action="store_true", help="Desactivar efecto Ken Burns")
+    p.add_argument("--image-backend", default=None,
+                   choices=["placeholder","pollinations","huggingface","gemini","comfyui"],
+                   help="Backend de generación de imágenes (default: config.IMAGE_BACKEND)")
     return p.parse_args()
 
 
@@ -189,6 +192,9 @@ def _make_placeholder_image(img_path: Path, scene, width: int, height: int) -> N
 def main() -> None:
     args = _parse_args()
 
+    # Resolver backend de imágenes
+    image_backend = args.image_backend or config.IMAGE_BACKEND
+
     idea_str = args.idea or Path(args.script).stem
 
     # ── Fase 2: generar guion con IA ─────────────────────────────────────────
@@ -238,13 +244,18 @@ def main() -> None:
     # ── 0. Pre-flight checks ──────────────────────────────────────────────────
     print("\n── Pre-flight ──────────────────────────────────────────────────────")
     if not args.skip_images:
-        if check_comfyui(config.COMFYUI_URL):
-            print(f"  ComfyUI ✓  {config.COMFYUI_URL}")
-        else:
-            print(
-                f"  [WARN] ComfyUI not reachable at {config.COMFYUI_URL}.\n"
-                "         Start ComfyUI or use --skip-images to reuse existing images."
-            )
+        if image_backend == "comfyui":
+            if check_comfyui(config.COMFYUI_URL):
+                print(f"  ComfyUI ✓  {config.COMFYUI_URL}")
+            else:
+                print(f"  [WARN] ComfyUI no disponible — cambiando a pollinations")
+                image_backend = "pollinations"
+        elif image_backend == "pollinations":
+            print(f"  Imagen: Pollinations.AI FLUX (gratis, sin API key)")
+        elif image_backend == "huggingface":
+            print(f"  Imagen: HuggingFace Inference API")
+        elif image_backend == "gemini":
+            print(f"  Imagen: Gemini Imagen 3")
 
     # ── 1. Parse script ───────────────────────────────────────────────────────
     print(f"\n── [1/4] Parsing script: {script_path.name} ────────────────────────")
@@ -278,17 +289,17 @@ def main() -> None:
                 print(f"  Scene {scene.number:>3}: placeholder estilizado creado")
             continue
 
-        # Build character appearance dict for speakers in this scene
+        # ── Generar imagen con backend seleccionado ─────────────────────────
         char_descs = {
             name: script.characters[name].appearance
             for name in scene.speakers()
             if name in script.characters
         }
-
-        print(f"  Scene {scene.number:>3}: {scene.background[:70]}...")
+        print(f"  Scene {scene.number:>3}: {scene.background[:65]}…")
         generate_image(
             prompt=scene.background,
             output_path=img_path,
+            backend=image_backend,
             character_descriptions=char_descs or None,
             width=config.IMAGE_WIDTH,
             height=config.IMAGE_HEIGHT,

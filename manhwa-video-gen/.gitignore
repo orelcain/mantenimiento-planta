@@ -20,3 +20,7 @@ Thumbs.db
 # Temp files
 *.concat.txt
 _concat_*/
+
+# Secrets
+.env.local
+start_server.py

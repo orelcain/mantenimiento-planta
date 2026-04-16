@@ -1,121 +1,222 @@
 """
-image_gen.py — Generate manhwa-style images via ComfyUI local API.
+image_gen.py — Generación de imágenes manhwa con múltiples backends.
 
-Requirements
-────────────
-- ComfyUI running at http://localhost:8188
-- A checkpoint in ComfyUI/models/checkpoints/
-  Recommended free models:
-    • anything-v5.safetensors  (anime/manhwa, great for characters)
-    • dreamshaper_8.safetensors (versatile, photorealistic + stylized)
-    • meinamix_meinaV11.safetensors (manhwa-specific)
+Backends disponibles
+────────────────────
+  placeholder   → panel oscuro estilizado (sin internet, instantáneo)
+  pollinations  → Pollinations.AI FLUX gratuito (sin API key)
+  huggingface   → HuggingFace Inference API (gratis con HF_TOKEN)
+  gemini        → Google Gemini Imagen 3 (requiere GEMINI_API_KEY)
+  comfyui       → ComfyUI local (requiere GPU + ComfyUI corriendo)
 
-Usage
-─────
+Uso
+───
     from modules.image_gen import generate_image
-    from pathlib import Path
-
     path = generate_image(
-        prompt="young woman standing on rooftop, Seoul city lights background",
+        prompt="cyberpunk detective in neon city",
         output_path=Path("output/scene_001.png"),
-        character_descriptions={"YUNA": "long black hair, gray eyes, school uniform"},
+        backend="pollinations",   # o "huggingface", "gemini", "comfyui"
     )
 """
 
 from __future__ import annotations
 
 import json
+import os
 import random
 import time
+import urllib.parse
+import urllib.request
 import uuid
 from pathlib import Path
 
-import requests
 
-# ── Style tags injected into every prompt ─────────────────────────────────────
+# ── Style tags ────────────────────────────────────────────────────────────────
 _STYLE_TAGS = (
     "manhwa style, korean webtoon art, clean lineart, vibrant colors, "
     "detailed, high quality, cinematic lighting, dynamic composition"
 )
-
 _NEGATIVE_TAGS = (
     "lowres, bad anatomy, bad hands, missing fingers, extra limbs, "
     "worst quality, low quality, blurry, watermark, signature, text, "
-    "ugly, duplicate, deformed, jpeg artifacts"
+    "ugly, duplicate, deformed"
 )
 
 
-# ── ComfyUI workflow builder ──────────────────────────────────────────────────
-
-def _build_workflow(
-    prompt: str,
-    negative_prompt: str,
-    width: int,
-    height: int,
-    steps: int,
-    cfg: float,
-    seed: int,
-    checkpoint: str,
-) -> dict:
-    """Return a minimal ComfyUI workflow dict for SD1.5 / SDXL checkpoints."""
-    return {
-        "4": {
-            "class_type": "CheckpointLoaderSimple",
-            "inputs": {"ckpt_name": checkpoint},
-        },
-        "5": {
-            "class_type": "EmptyLatentImage",
-            "inputs": {"batch_size": 1, "height": height, "width": width},
-        },
-        "6": {
-            "class_type": "CLIPTextEncode",
-            "inputs": {
-                "clip": ["4", 1],
-                "text": f"{_STYLE_TAGS}, {prompt}",
-            },
-        },
-        "7": {
-            "class_type": "CLIPTextEncode",
-            "inputs": {
-                "clip": ["4", 1],
-                "text": f"{_NEGATIVE_TAGS}, {negative_prompt}",
-            },
-        },
-        "3": {
-            "class_type": "KSampler",
-            "inputs": {
-                "cfg": cfg,
-                "denoise": 1,
-                "latent_image": ["5", 0],
-                "model": ["4", 0],
-                "negative": ["7", 0],
-                "positive": ["6", 0],
-                "sampler_name": "euler_ancestral",
-                "scheduler": "normal",
-                "seed": seed,
-                "steps": steps,
-            },
-        },
-        "8": {
-            "class_type": "VAEDecode",
-            "inputs": {"samples": ["3", 0], "vae": ["4", 2]},
-        },
-        "9": {
-            "class_type": "SaveImage",
-            "inputs": {"filename_prefix": "manhwa", "images": ["8", 0]},
-        },
-    }
-
-
-# ── Public API ────────────────────────────────────────────────────────────────
+# ── Router principal ──────────────────────────────────────────────────────────
 
 def generate_image(
     prompt: str,
     output_path: Path,
+    backend: str = "pollinations",
     character_descriptions: dict[str, str] | None = None,
-    negative_prompt: str = "",
     width: int = 720,
     height: int = 1280,
+    **kwargs,
+) -> Path:
+    """
+    Genera una imagen manhwa y la guarda en output_path.
+    Hace fallback a placeholder si el backend falla.
+    """
+    # Construir prompt completo con personajes
+    full_prompt = prompt
+    if character_descriptions:
+        char_part = ", ".join(character_descriptions.values())
+        full_prompt = f"{char_part}, {prompt}"
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        if backend == "pollinations":
+            return _generate_pollinations(full_prompt, output_path, width, height)
+        elif backend == "huggingface":
+            return _generate_huggingface(full_prompt, output_path, width, height)
+        elif backend == "gemini":
+            return _generate_gemini(full_prompt, output_path, width, height)
+        elif backend == "comfyui":
+            return _generate_comfyui(full_prompt, output_path, width, height, **kwargs)
+        else:
+            # placeholder — caller (main.py) ya lo creó con _make_placeholder_image
+            return output_path
+    except Exception as exc:
+        print(f"    [IMG] {backend} falló: {exc} — usando placeholder")
+        _fallback_placeholder(output_path, width, height)
+        return output_path
+
+
+# ── Pollinations.AI (gratis, sin API key) ─────────────────────────────────────
+
+def _generate_pollinations(
+    prompt: str,
+    output_path: Path,
+    width: int,
+    height: int,
+) -> Path:
+    """
+    Genera imagen via Pollinations.AI FLUX model.
+    Completamente gratis, sin autenticación, requiere internet.
+    """
+    import requests  # type: ignore
+
+    encoded = urllib.parse.quote(f"{_STYLE_TAGS}, {prompt}")
+    seed    = random.randint(0, 999999)
+    url     = (
+        f"https://image.pollinations.ai/prompt/{encoded}"
+        f"?width={width}&height={height}&model=flux&nologo=true&seed={seed}"
+    )
+    print(f"    [Pollinations] generando ({width}×{height})…")
+    resp = requests.get(url, timeout=60)
+    resp.raise_for_status()
+    output_path.write_bytes(resp.content)
+    print(f"    [Pollinations] ✓ {output_path.name} ({len(resp.content)//1024} KB)")
+    return output_path
+
+
+# ── HuggingFace Inference API (gratis con token) ──────────────────────────────
+
+_HF_MODELS = [
+    "ogkalu/comic-diffusion",                      # estilo cómic/manhwa
+    "stabilityai/stable-diffusion-xl-base-1.0",    # SDXL genérico
+    "runwayml/stable-diffusion-v1-5",              # SD 1.5 fallback
+]
+
+def _generate_huggingface(
+    prompt: str,
+    output_path: Path,
+    width: int,
+    height: int,
+) -> Path:
+    import requests  # type: ignore
+
+    token = os.environ.get("HF_API_TOKEN", "")
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
+    payload = {
+        "inputs": f"{_STYLE_TAGS}, {prompt}",
+        "parameters": {
+            "negative_prompt": _NEGATIVE_TAGS,
+            "width": min(width, 1024),
+            "height": min(height, 1024),
+        },
+    }
+
+    for model in _HF_MODELS:
+        url = f"https://api-inference.huggingface.co/models/{model}"
+        print(f"    [HuggingFace] {model}…")
+        try:
+            resp = requests.post(url, headers=headers, json=payload, timeout=90)
+            if resp.status_code == 200 and resp.headers.get("content-type", "").startswith("image"):
+                output_path.write_bytes(resp.content)
+                print(f"    [HuggingFace] ✓ {output_path.name}")
+                return output_path
+            elif resp.status_code == 503:
+                print(f"    [HuggingFace] modelo cargando, esperando 20s…")
+                time.sleep(20)
+                # retry
+                resp = requests.post(url, headers=headers, json=payload, timeout=90)
+                if resp.status_code == 200:
+                    output_path.write_bytes(resp.content)
+                    return output_path
+        except Exception as exc:
+            print(f"    [HuggingFace] {model} error: {exc}")
+            continue
+
+    raise RuntimeError("HuggingFace: todos los modelos fallaron")
+
+
+# ── Gemini Imagen (requiere GEMINI_API_KEY + billing) ─────────────────────────
+
+def _generate_gemini(
+    prompt: str,
+    output_path: Path,
+    width: int,
+    height: int,
+) -> Path:
+    import google.generativeai as genai  # type: ignore
+
+    key = os.environ.get("GEMINI_API_KEY", "")
+    if not key:
+        raise RuntimeError("GEMINI_API_KEY no configurada")
+
+    genai.configure(api_key=key)
+    print(f"    [Gemini Imagen] generando…")
+
+    # Intentar Imagen 3
+    try:
+        model = genai.ImageGenerationModel("imagen-3.0-generate-001")
+        result = model.generate_images(
+            prompt=f"{_STYLE_TAGS}, {prompt}",
+            number_of_images=1,
+            aspect_ratio="9:16",
+        )
+        result.images[0].save(str(output_path))
+        print(f"    [Gemini Imagen3] ✓ {output_path.name}")
+        return output_path
+    except Exception as exc:
+        print(f"    [Gemini Imagen3] falló ({exc}), intentando Flash…")
+
+    # Fallback: gemini-2.0-flash-exp con modalidad imagen
+    model = genai.GenerativeModel("gemini-2.0-flash-exp")
+    response = model.generate_content(
+        f"Draw a manhwa-style illustration for this scene: {prompt}. "
+        "Style: korean webtoon, clean lines, vibrant colors.",
+        generation_config={"response_modalities": ["IMAGE"]},
+    )
+    for part in response.candidates[0].content.parts:
+        if hasattr(part, "inline_data") and part.inline_data.mime_type.startswith("image/"):
+            output_path.write_bytes(part.inline_data.data)
+            print(f"    [Gemini Flash] ✓ {output_path.name}")
+            return output_path
+
+    raise RuntimeError("Gemini: no se generó ninguna imagen")
+
+
+# ── ComfyUI (local, requiere GPU) ─────────────────────────────────────────────
+
+def _generate_comfyui(
+    prompt: str,
+    output_path: Path,
+    width: int,
+    height: int,
     steps: int = 25,
     cfg: float = 7.0,
     seed: int = -1,
@@ -123,87 +224,89 @@ def generate_image(
     comfyui_url: str = "http://localhost:8188",
     poll_interval: float = 2.0,
 ) -> Path:
-    """
-    Generate a single manhwa-style image via ComfyUI and save it to output_path.
+    import requests  # type: ignore
 
-    Character descriptions are prepended to the prompt so the model knows
-    what each character looks like. Pass the descriptions of characters that
-    actually appear in this scene.
-
-    Returns the path to the saved PNG.
-    """
     if seed == -1:
         seed = random.randint(0, 2**32 - 1)
 
-    # Build final prompt: character appearances + scene background
-    full_prompt = prompt
-    if character_descriptions:
-        char_part = ", ".join(
-            f"{desc}" for desc in character_descriptions.values()
-        )
-        full_prompt = f"{char_part}, {prompt}"
-
-    workflow = _build_workflow(
-        prompt=full_prompt,
-        negative_prompt=negative_prompt,
-        width=width,
-        height=height,
-        steps=steps,
-        cfg=cfg,
-        seed=seed,
-        checkpoint=checkpoint,
-    )
+    workflow = {
+        "4": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": checkpoint}},
+        "5": {"class_type": "EmptyLatentImage", "inputs": {"batch_size": 1, "height": height, "width": width}},
+        "6": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["4", 1], "text": f"{_STYLE_TAGS}, {prompt}"}},
+        "7": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["4", 1], "text": _NEGATIVE_TAGS}},
+        "3": {
+            "class_type": "KSampler",
+            "inputs": {
+                "cfg": cfg, "denoise": 1, "latent_image": ["5", 0],
+                "model": ["4", 0], "negative": ["7", 0], "positive": ["6", 0],
+                "sampler_name": "euler_ancestral", "scheduler": "normal",
+                "seed": seed, "steps": steps,
+            },
+        },
+        "8": {"class_type": "VAEDecode", "inputs": {"samples": ["3", 0], "vae": ["4", 2]}},
+        "9": {"class_type": "SaveImage", "inputs": {"filename_prefix": "manhwa", "images": ["8", 0]}},
+    }
 
     client_id = str(uuid.uuid4())
-
-    # ── Queue the prompt ──────────────────────────────────────────────────────
-    resp = requests.post(
-        f"{comfyui_url}/prompt",
-        json={"prompt": workflow, "client_id": client_id},
-        timeout=30,
-    )
+    resp = requests.post(f"{comfyui_url}/prompt", json={"prompt": workflow, "client_id": client_id}, timeout=30)
     resp.raise_for_status()
-    prompt_id: str = resp.json()["prompt_id"]
-    print(f"    Queued [{prompt_id[:8]}] seed={seed}")
+    prompt_id = resp.json()["prompt_id"]
 
-    # ── Poll history until done ───────────────────────────────────────────────
     while True:
-        history_resp = requests.get(
-            f"{comfyui_url}/history/{prompt_id}", timeout=10
-        )
-        history = history_resp.json()
+        history = requests.get(f"{comfyui_url}/history/{prompt_id}", timeout=10).json()
         if prompt_id in history:
             outputs = history[prompt_id]["outputs"]
             break
         time.sleep(poll_interval)
 
-    # ── Download the generated image ──────────────────────────────────────────
     image_info = next(
-        img
-        for node_output in outputs.values()
-        for img in node_output.get("images", [])
+        img for node_output in outputs.values() for img in node_output.get("images", [])
     )
-
     img_resp = requests.get(
         f"{comfyui_url}/view",
-        params={
-            "filename": image_info["filename"],
-            "subfolder": image_info.get("subfolder", ""),
-            "type": image_info["type"],
-        },
+        params={"filename": image_info["filename"], "subfolder": image_info.get("subfolder", ""), "type": image_info["type"]},
         timeout=60,
     )
     img_resp.raise_for_status()
-
-    output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_bytes(img_resp.content)
     return output_path
 
 
-def check_comfyui(comfyui_url: str = "http://localhost:8188") -> bool:
-    """Return True if ComfyUI is reachable."""
+# ── Fallback placeholder mínimo ───────────────────────────────────────────────
+
+def _fallback_placeholder(output_path: Path, width: int, height: int) -> None:
     try:
+        from PIL import Image
+        Image.new("RGB", (width, height), (10, 10, 20)).save(output_path)
+    except Exception:
+        pass
+
+
+# ── Check backends ────────────────────────────────────────────────────────────
+
+def check_comfyui(comfyui_url: str = "http://localhost:8188") -> bool:
+    try:
+        import requests  # type: ignore
         requests.get(f"{comfyui_url}/system_stats", timeout=5)
         return True
-    except requests.exceptions.ConnectionError:
+    except Exception:
+        return False
+
+
+def check_pollinations() -> bool:
+    try:
+        import urllib.request
+        with urllib.request.urlopen("https://image.pollinations.ai/", timeout=5) as r:
+            return r.status < 500
+    except Exception:
+        return False
+
+
+def check_huggingface() -> bool:
+    try:
+        import urllib.request
+        req = urllib.request.Request("https://huggingface.co", method="HEAD")
+        with urllib.request.urlopen(req, timeout=5) as r:
+            return r.status < 500
+    except Exception:
         return False

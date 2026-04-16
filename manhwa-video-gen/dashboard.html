@@ -21,11 +21,11 @@
   --violet:#a78bfa;--v-bg:rgba(167,139,250,.08);
 }
 html,body{background:var(--bg);color:var(--z2);font-family:ui-sans-serif,system-ui,sans-serif;min-height:100vh}
-#root{padding:1.25rem;max-width:1100px;margin:0 auto}
+#root{padding:1.25rem;max-width:1140px;margin:0 auto}
 
 /* layout */
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem}
-@media(max-width:720px){.grid2{grid-template-columns:1fr}}
+@media(max-width:740px){.grid2{grid-template-columns:1fr}}
 .flex{display:flex}.aic{align-items:center}.aist{align-items:flex-start}
 .jb{justify-content:space-between}.jc{justify-content:center}.fw{flex-wrap:wrap}
 .f1{flex:1}.col{flex-direction:column}.gap1{gap:.25rem}.gap2{gap:.5rem}.gap3{gap:.75rem}.gap4{gap:1rem}
@@ -119,6 +119,12 @@ video{width:100%;display:block;max-height:360px;object-fit:contain}
 .pill-e{background:var(--e-bg);border-color:var(--e-bdr);color:var(--emerald)}
 .pill-a{background:var(--a-bg);border-color:var(--a-bdr);color:var(--amber)}
 .pill-b{background:var(--b-bg);border-color:var(--b-bdr);color:var(--blue)}
+.pill-v{background:var(--v-bg);border-color:rgba(167,139,250,.3);color:var(--violet)}
+
+/* quality score ring */
+.score-ring{position:relative;width:56px;height:56px;flex-shrink:0}
+.score-ring svg{transform:rotate(-90deg)}
+.score-ring .score-val{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700}
 
 code{font-family:ui-monospace,monospace;font-size:.7rem;background:var(--bg3);padding:.1rem .35rem;border-radius:.2rem;color:var(--z4)}
 </style>
@@ -126,8 +132,8 @@ code{font-family:ui-monospace,monospace;font-size:.7rem;background:var(--bg3);pa
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const { useState, useEffect, useCallback, useRef } = React;
-const API = '';  // mismo origen
+const { useState, useEffect, useCallback, useMemo } = React;
+const API = '';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 async function apiFetch(path, opts={}) {
@@ -139,6 +145,60 @@ async function apiFetch(path, opts={}) {
   }
 }
 
+function fmtSeconds(s) {
+  if (s < 60)  return `${s}s`;
+  if (s < 3600) return `${Math.round(s/60)}min`;
+  return `${(s/3600).toFixed(1)}h`;
+}
+
+// ── Quality + ETA logic ───────────────────────────────────────────────────────
+const QUALITY = {
+  story:  { ollama:65, gemini:88, anthropic:92 },
+  image:  { placeholder:15, pollinations:62, huggingface:72, comfyui:84, gemini:90 },
+  audio:  { edge:84, kokoro:75, pyttsx3:35 },
+};
+
+const ETA = {  // segundos
+  story_total: { ollama:480, gemini:30, anthropic:30 },
+  image_scene: { placeholder:2, pollinations:22, huggingface:48, comfyui:120, gemini:18 },
+  tts_scene:   { edge:10, kokoro:20, pyttsx3:4 },
+  video_scene: 55,
+};
+
+function computeQuality(storyBack, imgBack, skipImg, ttsEng) {
+  const sq = QUALITY.story[storyBack] || 65;
+  const iq = skipImg ? QUALITY.image.placeholder : (QUALITY.image[imgBack] || 15);
+  const aq = QUALITY.audio[ttsEng] || 84;
+  const vq = skipImg ? 25 : 68;
+  return Math.round(sq * 0.30 + iq * 0.40 + aq * 0.15 + vq * 0.15);
+}
+
+function computeETA(storyBack, imgBack, skipImg, ttsEng, scenes) {
+  const st = ETA.story_total[storyBack] || 480;
+  const is = skipImg ? ETA.image_scene.placeholder : (ETA.image_scene[imgBack] || 22);
+  const ts = ETA.tts_scene[ttsEng] || 10;
+  const vs = ETA.video_scene;
+  return st + scenes * (is + ts + vs);
+}
+
+function ScoreRing({ score }) {
+  const r = 22, circ = 2 * Math.PI * r;
+  const fill = circ - (score / 100) * circ;
+  const color = score >= 75 ? '#10b981' : score >= 50 ? '#f59e0b' : '#f87171';
+  return (
+    <div className="score-ring">
+      <svg width="56" height="56" viewBox="0 0 56 56">
+        <circle cx="28" cy="28" r={r} fill="none" stroke="#27272a" strokeWidth="5"/>
+        <circle cx="28" cy="28" r={r} fill="none" stroke={color} strokeWidth="5"
+                strokeDasharray={circ} strokeDashoffset={fill}
+                strokeLinecap="round" style={{transition:'stroke-dashoffset .5s'}}/>
+      </svg>
+      <div className="score-val" style={{color}}>{score}</div>
+    </div>
+  );
+}
+
+// ── Backend pills ──────────────────────────────────────────────────────────────
 function BackendPill({ name, info }) {
   if (!info) return null;
   const ok = info.ok;
@@ -163,17 +223,14 @@ const STAGES = [
 function PipelineStages({ status }) {
   if (!status || !status.stage_name) return (
     <div className="card mt3" style={{opacity:.4}}>
-      <p className="t10 mono cz3 text-center" style={{textAlign:'center'}}>
+      <p className="t10 mono cz3" style={{textAlign:'center'}}>
         Sin pipeline activo — ingresá una idea y presioná Generar
       </p>
     </div>
   );
-
   const { stage=0, progress=0, done=false, error='', stage_name='', detail='', idea='' } = status;
-
   return (
-    <div className={`card mt3 ${done ? 'card-e' : error ? 'card-r' : 'card-b'}`}>
-      {/* Header */}
+    <div className={`card mt3 ${done?'card-e':error?'card-r':'card-b'}`}>
       <div className="flex aic jb mb2">
         <div className="flex aic gap2">
           {done ? <span className="ce bold">✓ Listo</span>
@@ -182,14 +239,10 @@ function PipelineStages({ status }) {
         </div>
         <span className="t10 mono cz3">{progress}%</span>
       </div>
-
-      {/* Barra global */}
       <div className="ptrack ptrack-lg mb3">
         <div className={`pfill ${done?'pfill-e':error?'pfill-a':'pfill-main'}`}
              style={{width:`${progress}%`}}/>
       </div>
-
-      {/* Stages individuales */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:'.3rem',marginBottom:'.75rem'}}>
         {STAGES.map(s => {
           const isDone = done ? stage >= s.n : stage > s.n;
@@ -197,10 +250,10 @@ function PipelineStages({ status }) {
           const cls = isDone ? 'ce' : isActive ? 'cb' : 'cz3';
           return (
             <div key={s.n} className="flex col aic gap1">
-              <span className={`txs ${cls}`}>{isDone ? '✓' : isActive ? '…' : '○'}</span>
+              <span className={`txs ${cls}`}>{isDone?'✓':isActive?'…':'○'}</span>
               <div className="ptrack" style={{width:'100%',height:'.2rem'}}>
                 <div className={`pfill ${isDone?'pfill-e':isActive?'pfill-b':''}`}
-                     style={{width: isDone?'100%': isActive?`${progress}%`:'0%'}}/>
+                     style={{width:isDone?'100%':isActive?`${progress}%`:'0%'}}/>
               </div>
               <span className={`t10 mono ${cls}`} style={{fontSize:'.52rem',textAlign:'center'}}>
                 {s.label}
@@ -209,11 +262,7 @@ function PipelineStages({ status }) {
           );
         })}
       </div>
-
-      {/* Detalle */}
-      {(detail || idea) && (
-        <p className="t10 mono cz3 trunc">{detail || idea}</p>
-      )}
+      {(detail||idea) && <p className="t10 mono cz3 trunc">{detail||idea}</p>}
       {error && <p className="t10 mono cr mt1">{error}</p>}
     </div>
   );
@@ -222,7 +271,7 @@ function PipelineStages({ status }) {
 // ── Video player ──────────────────────────────────────────────────────────────
 function VideoOutput({ videos }) {
   const [sel, setSel] = useState(0);
-  if (!videos || videos.length === 0) return (
+  if (!videos || videos.length===0) return (
     <div className="card mt3" style={{opacity:.35,minHeight:'7rem',display:'flex',alignItems:'center',justifyContent:'center'}}>
       <p className="t10 mono cz3">Sin videos aún</p>
     </div>
@@ -241,7 +290,7 @@ function VideoOutput({ videos }) {
       </div>
       {videos.length > 1 && (
         <div className="flex gap2 mt2 fw">
-          {videos.map((vv, i) => (
+          {videos.map((vv,i) => (
             <button key={i} className={`btn btn-sm ${i===sel?'ce':''}`}
                     onClick={()=>setSel(i)}
                     style={i===sel?{borderColor:'var(--e-bdr)',color:'var(--emerald)'}:{}}>
@@ -257,44 +306,62 @@ function VideoOutput({ videos }) {
 // ── Sistema ───────────────────────────────────────────────────────────────────
 function SystemPanel({ sys }) {
   if (!sys) return null;
-  const { backends={}, ffmpeg=false } = sys;
-
+  const { backends={}, ffmpeg=false, image_backends={}, tts_voices={} } = sys;
+  const imgRows = [
+    ['placeholder',  '⚡ instantáneo, sin internet'],
+    ['pollinations', '🆓 FLUX gratis, sin API key'],
+    ['huggingface',  '🤗 SDXL gratis (HF_TOKEN opcional)'],
+    ['gemini',       '✨ Imagen 3 (requiere key)'],
+    ['comfyui',      '💻 local GPU (requiere ComfyUI)'],
+  ];
   return (
     <div className="card mt3">
       <p className="sechead mb2">Sistema</p>
       <div className="flex col gap1">
         {[
-          ['FFmpeg + ffprobe', ffmpeg, 'video encoder'],
-          ['Edge TTS es-MX',   true,   'Dalia + Jorge Neural'],
-        ].map(([name, ok, detail]) => (
+          ['FFmpeg + ffprobe', ffmpeg,  'encoder video'],
+          ['Edge TTS es-MX',  true,    'Dalia · Jorge Neural'],
+        ].map(([name,ok,detail]) => (
           <div key={name} className="flex aic gap2">
             <div className={`dot ${ok?'dot-e':'dot-r'}`}/>
             <span className="tsm cz2">{name}</span>
             <span className="t10 cz3">{detail}</span>
           </div>
         ))}
+
         <hr className="divider" style={{margin:'.4rem 0'}}/>
-        <p className="sechead mb1">Backends IA</p>
-        {Object.entries(backends).map(([name, info]) => (
+        <p className="sechead mb1">Story backends</p>
+        {Object.entries(backends).map(([name,info]) => (
           <div key={name} className="flex aic gap2">
             <div className={`dot ${info.ok?'dot-e':'dot-z'}`}/>
             <span className="tsm cz2 bold">{name}</span>
-            {name === 'ollama' && info.ok && (
-              <span className="t10 cz3">{(info.models||[]).join(', ')}</span>
-            )}
-            {name !== 'ollama' && !info.ok && (
-              <span className="t10 cz3">sin API key</span>
-            )}
-            {name !== 'ollama' && info.ok && (
-              <span className="t10 ce">✓ key configurada</span>
-            )}
+            {name==='ollama' && info.ok && <span className="t10 cz3">{(info.models||[]).join(', ')}</span>}
+            {name!=='ollama' && !info.ok && <span className="t10 cz3">sin API key</span>}
+            {name!=='ollama' && info.ok && <span className="t10 ce">✓ key ok</span>}
+            <span className="t10 cv mono ml-auto">{QUALITY.story[name]||'?'}/100</span>
           </div>
         ))}
+
+        <hr className="divider" style={{margin:'.4rem 0'}}/>
+        <p className="sechead mb1">Image backends</p>
+        {imgRows.map(([key,desc]) => {
+          const info = image_backends[key] || {};
+          const ok   = info.ok !== false;
+          return (
+            <div key={key} className="flex aic gap2">
+              <div className={`dot ${ok?'dot-e':'dot-z'}`}/>
+              <span className="tsm cz2 bold">{key}</span>
+              <span className="t10 cz3">{desc}</span>
+              <span className="t10 cv mono" style={{marginLeft:'auto'}}>{QUALITY.image[key]||'?'}/100</span>
+            </div>
+          );
+        })}
+
         <hr className="divider" style={{margin:'.4rem 0'}}/>
         <div className="flex aic gap2">
           <div className="dot dot-z"/>
-          <span className="tsm cz3">ComfyUI</span>
-          <span className="t10 cz3">pendiente — imágenes en placeholder</span>
+          <span className="tsm cz3">ComfyUI (GPU)</span>
+          <span className="t10 cz3">para imágenes locales manhwa reales</span>
         </div>
       </div>
     </div>
@@ -302,19 +369,50 @@ function SystemPanel({ sys }) {
 }
 
 // ── Form ──────────────────────────────────────────────────────────────────────
-const GENRES = ['auto','accion','romance','fantasia','horror'];
-const BACKENDS_LIST = ['auto','anthropic','gemini','ollama'];
+const GENRES   = ['auto','accion','romance','fantasia','horror'];
+const BACKENDS = ['auto','anthropic','gemini','ollama'];
+const IMG_BACKENDS = [
+  { v:'placeholder',  l:'Placeholder (instantáneo)' },
+  { v:'pollinations', l:'Pollinations FLUX (gratis)' },
+  { v:'huggingface',  l:'HuggingFace SDXL (gratis)' },
+  { v:'gemini',       l:'Gemini Imagen 3' },
+  { v:'comfyui',      l:'ComfyUI (GPU local)' },
+];
+const TTS_VOICES = [
+  { v:'es-MX-DaliaNeural',  l:'Dalia (MX femenina)' },
+  { v:'es-MX-JorgeNeural',  l:'Jorge (MX masculina)' },
+  { v:'es-MX-MarinaNeural', l:'Marina (MX femenina)' },
+  { v:'es-ES-ElviraNeural', l:'Elvira (ES femenina)' },
+  { v:'es-ES-AlvaroNeural', l:'Álvaro (ES masculino)' },
+  { v:'es-AR-ElenaNeural',  l:'Elena (AR femenina)' },
+  { v:'es-AR-TomasNeural',  l:'Tomás (AR masculino)' },
+  { v:'es-CO-SalomeNeural', l:'Salomé (CO femenina)' },
+];
 
 function GenerateForm({ sys, running, onStart, onStop }) {
-  const [idea, setIdea] = useState('');
-  const [genre, setGenre] = useState('accion');
-  const [backend, setBackend] = useState('auto');
-  const [scenes, setScenes] = useState('4');
-  const [skipImg, setSkipImg] = useState(true);
-  const [noMusic, setNoMusic] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [idea,      setIdea]      = useState('');
+  const [genre,     setGenre]     = useState('accion');
+  const [backend,   setBackend]   = useState('auto');
+  const [imgBack,   setImgBack]   = useState('pollinations');
+  const [scenes,    setScenes]    = useState('4');
+  const [skipImg,   setSkipImg]   = useState(false);
+  const [noMusic,   setNoMusic]   = useState(false);
+  const [narVoice,  setNarVoice]  = useState('es-MX-JorgeNeural');
+  const [loading,   setLoading]   = useState(false);
 
-  const bestBackend = sys?.best_backend;
+  const bestBack    = sys?.best_backend;
+  const resolvedBack= backend==='auto' ? (bestBack||'ollama') : backend;
+  const storyKey    = resolvedBack === 'ollama' ? 'ollama' : resolvedBack;
+  const numScenes   = parseInt(scenes)||4;
+
+  const quality = useMemo(
+    () => computeQuality(storyKey, imgBack, skipImg, 'edge'),
+    [storyKey, imgBack, skipImg]
+  );
+  const eta = useMemo(
+    () => computeETA(storyKey, imgBack, skipImg, 'edge', numScenes),
+    [storyKey, imgBack, skipImg, numScenes]
+  );
 
   async function handleRun() {
     if (!idea.trim()) return;
@@ -326,9 +424,11 @@ function GenerateForm({ sys, running, onStart, onStop }) {
         idea: idea.trim(),
         genre,
         backend,
-        num_scenes: parseInt(scenes)||4,
+        num_scenes: numScenes,
         skip_images: skipImg,
         no_music: noMusic,
+        image_backend: skipImg ? 'placeholder' : imgBack,
+        narrator_voice: narVoice,
       })
     });
     setLoading(false);
@@ -337,28 +437,25 @@ function GenerateForm({ sys, running, onStart, onStop }) {
   }
 
   async function handleStop() {
-    await apiFetch('/api/stop', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
+    await apiFetch('/api/stop', {method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
     onStop();
   }
 
   const canRun = idea.trim().length > 5 && !running && !loading;
-  const resolvedBackend = backend === 'auto' ? (bestBackend || '?') : backend;
 
   return (
     <div className="card card-v">
       <p className="tlg bold cz1 mb3">▶ Nueva Historia</p>
 
+      {/* IDEA */}
       <div className="field mb3">
         <label className="label">Idea (1 línea)</label>
-        <textarea
-          value={idea}
-          onChange={e=>setIdea(e.target.value)}
+        <textarea value={idea} onChange={e=>setIdea(e.target.value)}
           placeholder="ej: un detective cyberpunk descubre que su ciudad es una simulación"
-          rows={2}
-          disabled={running}
-        />
+          rows={2} disabled={running}/>
       </div>
 
+      {/* Género + Escenas + Backend IA */}
       <div className="flex gap3 fw mb3">
         <div className="field f1">
           <label className="label">Género</label>
@@ -373,47 +470,79 @@ function GenerateForm({ sys, running, onStart, onStop }) {
           </select>
         </div>
         <div className="field f1">
-          <label className="label">Backend IA</label>
+          <label className="label">Story AI</label>
           <select value={backend} onChange={e=>setBackend(e.target.value)} disabled={running}>
-            {BACKENDS_LIST.map(b=>(
+            {BACKENDS.map(b=>(
               <option key={b} value={b}>
-                {b==='auto' ? `auto → ${bestBackend||'?'}` : b}
+                {b==='auto'?`auto → ${bestBack||'?'}`:b}
               </option>
             ))}
           </select>
         </div>
       </div>
 
+      {/* Imagen backend + Voz narrador */}
+      <div className="flex gap3 fw mb3">
+        <div className="field f1">
+          <label className="label">Imágenes</label>
+          <select value={imgBack} onChange={e=>setImgBack(e.target.value)} disabled={running||skipImg}>
+            {IMG_BACKENDS.map(({v,l})=><option key={v} value={v}>{l}</option>)}
+          </select>
+        </div>
+        <div className="field f1">
+          <label className="label">Voz narrador</label>
+          <select value={narVoice} onChange={e=>setNarVoice(e.target.value)} disabled={running}>
+            {TTS_VOICES.map(({v,l})=><option key={v} value={v}>{l}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {/* Checkboxes */}
       <div className="flex gap3 mb3 fw aic">
         <label className="flex aic gap2 tsm cz2" style={{cursor:'pointer'}}>
-          <input type="checkbox" checked={skipImg}
-                 onChange={e=>setSkipImg(e.target.checked)} disabled={running}
-                 style={{width:'auto',cursor:'pointer'}}/>
-          Sin imágenes (ComfyUI pendiente)
+          <input type="checkbox" checked={skipImg} onChange={e=>setSkipImg(e.target.checked)}
+                 disabled={running} style={{width:'auto',cursor:'pointer'}}/>
+          Sin imágenes (rápido)
         </label>
         <label className="flex aic gap2 tsm cz2" style={{cursor:'pointer'}}>
-          <input type="checkbox" checked={noMusic}
-                 onChange={e=>setNoMusic(e.target.checked)} disabled={running}
-                 style={{width:'auto',cursor:'pointer'}}/>
+          <input type="checkbox" checked={noMusic} onChange={e=>setNoMusic(e.target.checked)}
+                 disabled={running} style={{width:'auto',cursor:'pointer'}}/>
           Sin música
         </label>
       </div>
 
-      <div className="flex gap2 aic">
+      {/* Quality + ETA + Botón */}
+      <div className="flex aic gap3 fw">
+        <ScoreRing score={quality}/>
+        <div className="flex col gap1 f1">
+          <div className="flex aic gap2">
+            <span className="t10 upper cz3">Calidad estimada</span>
+            <span className={`t10 bold ${quality>=75?'ce':quality>=50?'ca':'cr'}`}>{quality}/100</span>
+          </div>
+          <div className="ptrack" style={{width:'100%'}}>
+            <div className={`pfill ${quality>=75?'pfill-e':quality>=50?'pfill-a':'pfill-b'}`}
+                 style={{width:`${quality}%`}}/>
+          </div>
+          <div className="flex aic gap2 mt1">
+            <span className="t10 cz3">⏱ ETA aprox:</span>
+            <span className="t10 mono ca">{fmtSeconds(eta)}</span>
+            <span className="t10 cz3">·</span>
+            <span className="pill pill-v txs">{skipImg?'placeholder':imgBack}</span>
+            <span className="pill pill-b txs">{resolvedBack}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex gap2 aic mt3">
         {!running ? (
-          <button className="btn btn-run" onClick={handleRun}
-                  disabled={!canRun || loading}>
+          <button className="btn btn-run" onClick={handleRun} disabled={!canRun||loading}>
             {loading ? <><span className="spin"/> Iniciando…</> : '▶ Generar Video'}
           </button>
         ) : (
           <button className="btn btn-stop" onClick={handleStop}>■ Detener</button>
         )}
-        {running && (
-          <span className="t10 mono cz3">
-            pipeline corriendo — backend: {resolvedBackend}
-          </span>
-        )}
-        {!running && !canRun && idea.trim().length > 0 && idea.trim().length <= 5 && (
+        {running && <span className="t10 mono cz3">generando con {resolvedBack}…</span>}
+        {!running && !canRun && idea.trim().length>0 && idea.trim().length<=5 && (
           <span className="t10 cr">La idea debe tener más de 5 caracteres</span>
         )}
       </div>
@@ -423,15 +552,15 @@ function GenerateForm({ sys, running, onStart, onStop }) {
 
 // ── App principal ─────────────────────────────────────────────────────────────
 function App() {
-  const [sys, setSys]     = useState(null);
-  const [status, setStatus] = useState(null);
+  const [sys,     setSys]     = useState(null);
+  const [status,  setStatus]  = useState(null);
   const [running, setRunning] = useState(false);
 
   const pollStatus = useCallback(async () => {
     const st = await apiFetch('/api/status');
     if (st && !st.error) {
       setStatus(st);
-      setRunning(st.pipeline_running || (st.running === true));
+      setRunning(st.pipeline_running || st.running===true);
     }
   }, []);
 
@@ -441,19 +570,18 @@ function App() {
   }, []);
 
   useEffect(() => {
-    pollSystem();
-    pollStatus();
+    pollSystem(); pollStatus();
     const iv1 = setInterval(pollStatus, 2000);
-    const iv2 = setInterval(pollSystem, 15000);
+    const iv2 = setInterval(pollSystem, 20000);
     return () => { clearInterval(iv1); clearInterval(iv2); };
   }, [pollStatus, pollSystem]);
 
-  const videos = status?.videos || [];
-  const bestBackend = sys?.best_backend;
+  const videos     = status?.videos || [];
+  const bestBackend= sys?.best_backend;
 
   return (
     <div>
-      {/* ── Header ─────────────────────────────────────────────────────── */}
+      {/* Header */}
       <header className="flex aic jb fw gap3 mb4"
               style={{paddingBottom:'1rem',borderBottom:'1px solid var(--border)'}}>
         <div>
@@ -462,12 +590,10 @@ function App() {
             <span className="cz3">/</span>
             <span className="cz1">video-gen</span>
           </h1>
-          <p className="txs cz3 mt1">
-            Idea → Guion IA → TTS español → Video MP4
-          </p>
+          <p className="txs cz3 mt1">Idea → Guion IA → Imagen → TTS español → Video MP4</p>
         </div>
         <div className="flex aic gap2 fw">
-          {sys && Object.entries(sys.backends || {}).map(([name, info]) => (
+          {sys && Object.entries(sys.backends||{}).map(([name,info])=>(
             <BackendPill key={name} name={name} info={info}/>
           ))}
           {running && (
@@ -479,58 +605,42 @@ function App() {
         </div>
       </header>
 
-      {/* ── Main grid ──────────────────────────────────────────────────── */}
+      {/* Grid */}
       <div className="grid2">
-
-        {/* LEFT: Form + Sistema */}
         <div>
-          <GenerateForm
-            sys={sys}
-            running={running}
-            onStart={() => setRunning(true)}
-            onStop={() => setRunning(false)}
-          />
+          <GenerateForm sys={sys} running={running}
+                        onStart={()=>setRunning(true)} onStop={()=>setRunning(false)}/>
           <SystemPanel sys={sys}/>
         </div>
-
-        {/* RIGHT: Pipeline + Video */}
         <div>
           <p className="sechead mb1">Pipeline</p>
           <PipelineStages status={status}/>
-
           <p className="sechead mt4 mb1">Resultado</p>
           <VideoOutput videos={videos}/>
-
-          {/* Instrucción si no hay backend */}
           {sys && !bestBackend && (
             <div className="card card-a mt3">
               <p className="txs bold ca mb1">Sin backend de IA disponible</p>
-              <p className="t10 cz3 mb2">
-                Configurá al menos una de estas opciones:
-              </p>
+              <p className="t10 cz3 mb2">Configurá al menos uno:</p>
               <div className="flex col gap1">
-                <div><code>setx ANTHROPIC_API_KEY sk-ant-...</code></div>
                 <div><code>setx GEMINI_API_KEY AIza...</code></div>
-                <div><code>ollama serve</code> <span className="t10 cz3">(+ ollama pull llama3.2:3b)</span></div>
+                <div><code>setx ANTHROPIC_API_KEY sk-ant-...</code></div>
+                <div><code>ollama serve</code> <span className="t10 cz3">+ ollama pull llama3.2:3b</span></div>
               </div>
-              <p className="t10 cz3 mt2">Reiniciá el servidor después de setx.</p>
+              <p className="t10 cz3 mt2">Reiniciá el servidor después.</p>
             </div>
           )}
         </div>
       </div>
 
-      {/* ── Footer ─────────────────────────────────────────────────────── */}
+      {/* Footer */}
       <footer style={{marginTop:'2rem',paddingTop:'.75rem',borderTop:'1px solid var(--border)',
                       display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:'.5rem'}}>
         <span className="t10 mono cz3">manhwa-video-gen · proyecto independiente</span>
         <div className="flex aic gap3">
-          <span className="t10 mono cz3">puerto :5274</span>
-          <span className={`t10 mono ${sys?.ffmpeg ? 'ce' : 'cr'}`}>
-            ffmpeg: {sys?.ffmpeg ? '✓' : '✗'}
-          </span>
-          <span className={`t10 mono ${bestBackend ? 'ce' : 'ca'}`}>
-            backend: {bestBackend || 'ninguno'}
-          </span>
+          <span className="t10 mono cz3">:5274</span>
+          <span className={`t10 mono ${sys?.ffmpeg?'ce':'cr'}`}>ffmpeg:{sys?.ffmpeg?'✓':'✗'}</span>
+          <span className={`t10 mono ${bestBackend?'ce':'ca'}`}>story:{bestBackend||'–'}</span>
+          <span className="t10 mono ce">img:pollinations✓</span>
         </div>
       </footer>
     </div>

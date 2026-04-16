@@ -32,6 +32,15 @@ PORT    = 5274
 BASE    = Path(__file__).parent
 OUTPUT  = BASE / "output"
 
+# ── Cargar .env.local si existe (para desarrollo sin bat file) ────────────────
+_env_file = BASE / ".env.local"
+if _env_file.exists():
+    for _line in _env_file.read_text(encoding="utf-8").splitlines():
+        _line = _line.strip()
+        if _line and not _line.startswith("#") and "=" in _line:
+            _k, _v = _line.split("=", 1)
+            os.environ.setdefault(_k.strip(), _v.strip())
+
 # ── Estado del pipeline en memoria ───────────────────────────────────────────
 _pipeline_proc: subprocess.Popen | None = None
 _pipeline_lock = threading.Lock()
@@ -87,17 +96,40 @@ def get_system_status() -> dict:
         "anthropic": _check_backend("anthropic"),
         "gemini":    _check_backend("gemini"),
     }
-    # Mejor backend disponible (en orden de preferencia para producción)
+    # Mejor backend disponible para story gen
     best = next(
         (b for b in ["anthropic", "gemini", "ollama"] if backends[b]["ok"]),
         None
     )
     ffmpeg = _check_tool(["ffmpeg", "-version"])
+
+    # Backends de imagen — sin network checks (evitan bloquear el handler single-thread)
+    gemini_img_ok   = bool(os.environ.get("GEMINI_API_KEY"))
+    hf_ok           = bool(os.environ.get("HF_API_TOKEN"))
+    pollinations_ok = True   # API pública, siempre disponible
+    comfyui_ok      = False  # requiere GPU local, se verifica al lanzar pipeline
+
     return {
-        "backends": backends,
-        "best_backend": best,
-        "ffmpeg": ffmpeg,
+        "backends":      backends,
+        "best_backend":  best,
+        "ffmpeg":        ffmpeg,
         "pipeline_running": _pipeline_running(),
+        "image_backends": {
+            "placeholder":  {"ok": True,             "label": "Placeholder estilizado"},
+            "pollinations": {"ok": pollinations_ok,  "label": "Pollinations.AI FLUX (gratis)"},
+            "huggingface":  {"ok": hf_ok or True,    "label": "HuggingFace SDXL"},
+            "gemini":       {"ok": gemini_img_ok,     "label": "Gemini Imagen 3"},
+            "comfyui":      {"ok": comfyui_ok,        "label": "ComfyUI local"},
+        },
+        "tts_voices": {
+            "Dalia (MX)":   "es-MX-DaliaNeural",
+            "Marina (MX)":  "es-MX-MarinaNeural",
+            "Elvira (ES)":  "es-ES-ElviraNeural",
+            "Elena (AR)":   "es-AR-ElenaNeural",
+            "Jorge (MX)":   "es-MX-JorgeNeural",
+            "Alvaro (ES)":  "es-ES-AlvaroNeural",
+            "Tomas (AR)":   "es-AR-TomasNeural",
+        },
     }
 
 
@@ -235,6 +267,7 @@ class Handler(BaseHTTPRequestHandler):
         num_scenes = int(params.get("num_scenes", 4))
         skip_images= params.get("skip_images", True)   # default: sin imágenes hasta tener ComfyUI
         no_music   = params.get("no_music", False)
+        image_backend = params.get("image_backend", "pollinations")
 
         # Auto-seleccionar backend si se pide
         if backend == "auto":
@@ -250,6 +283,8 @@ class Handler(BaseHTTPRequestHandler):
         ]
         if skip_images:
             cmd.append("--skip-images")
+        if not skip_images:
+            cmd.extend(["--image-backend", image_backend])
         if no_music:
             cmd.append("--no-music")
 
