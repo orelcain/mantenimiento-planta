@@ -4,12 +4,13 @@ import {
   AlertTriangle, Package, Camera, CalendarClock, Wrench,
   BarChart3, Map, Route, Activity, Settings, FileText,
   GraduationCap, ChevronRight, ClipboardList, CloudSun,
-  Box, Cpu, BookOpen, FolderTree, MapPin, TrendingUp, Monitor,
+  Box, Cpu, FolderTree, MapPin, TrendingUp, Monitor, Menu,
   QrCode, Share2, ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { cn } from '@/lib/utils'
-import { useAuthStore } from '@/store'
+import { useAuthStore, useAppStore } from '@/store'
+import { useWipOverrides } from '@/hooks/useWipOverrides'
 import type { UserRole } from '@/types'
 import { LEARNING_MACHINES } from '@/data/learningMachines'
 
@@ -24,9 +25,8 @@ interface Tile {
   icon:     React.ElementType
   href:     string
   color:    TileColor
-  /** full = CTA ancho completo al inicio del grupo, half = chip */
   cta?:     boolean
-  /** módulo aún en desarrollo — muestra badge 🚧 */
+  /** WIP estático — se mezcla con overrides de Firestore */
   wip?:     boolean
 }
 
@@ -57,18 +57,31 @@ const MACHINE_TILES: Tile[] = LEARNING_MACHINES.map((m) => ({
   icon:     m.icon,
   href:     m.customRoute ?? `/aprendizaje/maquina/${m.slug}`,
   color:    'blue' as TileColor,
-  // WIP si ninguna sección tiene contenido real
+  // WIP automático si ninguna sección tiene contenido
   wip:      !Object.values(m.sections).some(Boolean),
 }))
 
-const HMI_TILES: Tile[] = [
+// HMI tiles para roles NO admin (admin los tiene en Herramientas sin duplicar)
+const HMI_TILES_BASE: Tile[] = [
   { id: 'hmi-knuro',  label: 'HMI Knuro',  sublabel: '', icon: Cpu,     href: '/aprendizaje/hmi-knuro',  color: 'slate' },
+  { id: 'hmi-grader', label: 'HMI Grader', sublabel: '', icon: Monitor, href: '/aprendizaje/hmi-grader', color: 'slate' },
+]
+
+// Para admin: solo HMI Grader en Formación — HMI Knuro ya está en Herramientas
+const HMI_TILES_ADMIN: Tile[] = [
   { id: 'hmi-grader', label: 'HMI Grader', sublabel: '', icon: Monitor, href: '/aprendizaje/hmi-grader', color: 'slate' },
 ]
 
 const FORMACION_TILES: Tile[] = [
   ...MACHINE_TILES,
-  ...HMI_TILES,
+  ...HMI_TILES_BASE,
+  { id: 'hub', label: 'Ver hub →', sublabel: '', icon: GraduationCap, href: '/aprendizaje', color: 'purple' },
+]
+
+// Admin: Baader 200 ya está en MACHINE_TILES via formación — no duplicar en Herramientas
+const FORMACION_TILES_ADMIN: Tile[] = [
+  ...MACHINE_TILES,
+  ...HMI_TILES_ADMIN,
   { id: 'hub', label: 'Ver hub →', sublabel: '', icon: GraduationCap, href: '/aprendizaje', color: 'purple' },
 ]
 
@@ -87,84 +100,77 @@ const GROUPS: Record<UserRole, TileGroup[]> = {
         { id: 'evidencia', label: 'Foto-evidencia',     sublabel: 'Registrar imagen',   icon: Camera,        href: '/photo-evidence', color: 'slate' },
       ],
     },
-    {
-      label: 'Formación',
-      tiles: FORMACION_TILES,
-    },
+    { label: 'Formación', tiles: FORMACION_TILES },
   ],
 
   supervisor: [
     {
       label: 'Seguimiento',
       tiles: [
-        { id: 'incidents', label: 'Incidencias',        sublabel: 'Revisar & validar',   icon: AlertTriangle, href: '/incidents',       color: 'red'    },
-        { id: 'grader',    label: 'Grader',             sublabel: 'Rendimiento',          icon: BarChart3,     href: '/analisis-grader', color: 'blue'   },
-        { id: 'inspecc',   label: 'Inspecciones',       sublabel: 'Rondas',              icon: Route,         href: '/inspections',     color: 'amber',  wip: true },
-        { id: 'prevntv',   label: 'Preventivo',         sublabel: 'Plan mantención',     icon: CalendarClock, href: '/preventive',      color: 'amber',  wip: true },
-        { id: 'sensores',  label: 'Sensores',           sublabel: 'Monitor real',        icon: Activity,      href: '/sensors/monitor', color: 'green',  wip: true },
+        { id: 'incidents', label: 'Incidencias',   sublabel: 'Revisar & validar',  icon: AlertTriangle, href: '/incidents',       color: 'red'    },
+        { id: 'grader',    label: 'Grader',        sublabel: 'Rendimiento',         icon: BarChart3,     href: '/analisis-grader', color: 'blue'   },
+        { id: 'inspecc',   label: 'Inspecciones',  sublabel: 'Rondas',             icon: Route,         href: '/inspections',     color: 'amber',  wip: true },
+        { id: 'prevntv',   label: 'Preventivo',    sublabel: 'Plan mantención',    icon: CalendarClock, href: '/preventive',      color: 'amber',  wip: true },
+        { id: 'sensores',  label: 'Sensores',      sublabel: 'Monitor real',       icon: Activity,      href: '/sensors/monitor', color: 'green',  wip: true },
       ],
     },
     {
       label: 'Recursos',
       tiles: [
-        { id: 'repuestos', label: 'Repuestos',          sublabel: 'Stock & manuales',    icon: Package,       href: '/repuestos',       color: 'blue'    },
-        { id: 'equipos',   label: 'Equipos',            sublabel: 'Ficha técnica',       icon: Wrench,        href: '/equipment',       color: 'slate'   },
-        { id: 'mapa',      label: 'Mapa Planta',        sublabel: 'Vista de zonas',      icon: Map,           href: '/map',             color: 'emerald' },
-        { id: 'clima',     label: 'Clima Puerto',       sublabel: 'Condiciones',         icon: CloudSun,      href: '/clima-puerto',    color: 'slate'   },
+        { id: 'repuestos', label: 'Repuestos',     sublabel: 'Stock & manuales',   icon: Package,       href: '/repuestos',       color: 'blue'    },
+        { id: 'equipos',   label: 'Equipos',       sublabel: 'Ficha técnica',      icon: Wrench,        href: '/equipment',       color: 'slate'   },
+        { id: 'mapa',      label: 'Mapa Planta',   sublabel: 'Vista de zonas',     icon: Map,           href: '/map',             color: 'emerald' },
+        { id: 'clima',     label: 'Clima Puerto',  sublabel: 'Condiciones',        icon: CloudSun,      href: '/clima-puerto',    color: 'slate'   },
       ],
     },
-    {
-      label: 'Formación',
-      tiles: FORMACION_TILES,
-    },
+    { label: 'Formación', tiles: FORMACION_TILES },
   ],
 
   admin: [
     {
       label: 'Operaciones',
       tiles: [
-        { id: 'incidents', label: 'Incidencias',        sublabel: 'Ver todas',           icon: AlertTriangle, href: '/incidents',       color: 'red'    },
-        { id: 'repuestos', label: 'Repuestos',          sublabel: 'Piezas & manuales',   icon: Package,       href: '/repuestos',       color: 'blue'   },
-        { id: 'equipos',   label: 'Equipos',            sublabel: 'Ficha técnica',       icon: Wrench,        href: '/equipment',       color: 'slate'  },
-        { id: 'evidencia', label: 'Foto-evidencia',     sublabel: 'Foto-registros',      icon: Camera,        href: '/photo-evidence',  color: 'slate'  },
+        { id: 'incidents', label: 'Incidencias',     sublabel: 'Ver todas',         icon: AlertTriangle, href: '/incidents',       color: 'red'   },
+        { id: 'repuestos', label: 'Repuestos',        sublabel: 'Piezas & manuales', icon: Package,       href: '/repuestos',       color: 'blue'  },
+        { id: 'equipos',   label: 'Equipos',          sublabel: 'Ficha técnica',     icon: Wrench,        href: '/equipment',       color: 'slate' },
+        { id: 'evidencia', label: 'Foto-evidencia',   sublabel: 'Foto-registros',    icon: Camera,        href: '/photo-evidence',  color: 'slate' },
       ],
     },
     {
       label: 'Planificación',
       tiles: [
-        { id: 'inspecc',   label: 'Inspecciones',       sublabel: 'Rondas',              icon: ClipboardList, href: '/inspections',     color: 'amber',  wip: true },
-        { id: 'prevntv',   label: 'Preventivo',         sublabel: 'Plan mantención',     icon: CalendarClock, href: '/preventive',      color: 'amber',  wip: true },
-        { id: 'gantt',     label: 'Gantt',              sublabel: 'Planificador',        icon: TrendingUp,    href: '/gantt',           color: 'orange', wip: true },
+        { id: 'inspecc',   label: 'Inspecciones',  sublabel: 'Rondas',           icon: ClipboardList, href: '/inspections', color: 'amber',  wip: true },
+        { id: 'prevntv',   label: 'Preventivo',    sublabel: 'Plan mantención',  icon: CalendarClock, href: '/preventive',  color: 'amber',  wip: true },
+        { id: 'gantt',     label: 'Gantt',         sublabel: 'Planificador',     icon: TrendingUp,    href: '/gantt',       color: 'orange', wip: true },
       ],
     },
     {
       label: 'Análisis & monitoreo',
       tiles: [
-        { id: 'grader',    label: 'Grader',             sublabel: 'Análisis de piezas',  icon: BarChart3,     href: '/analisis-grader', color: 'blue'    },
-        { id: 'sensores',  label: 'Sensores',           sublabel: 'Tiempo real',         icon: Activity,      href: '/sensors/monitor', color: 'green',   wip: true },
-        { id: 'mapa',      label: 'Mapa Planta',        sublabel: 'Zonas',               icon: Map,           href: '/map',             color: 'emerald' },
-        { id: 'clima',     label: 'Clima Puerto',       sublabel: 'Condiciones',         icon: CloudSun,      href: '/clima-puerto',    color: 'slate'   },
+        { id: 'grader',   label: 'Grader',        sublabel: 'Análisis de piezas', icon: BarChart3, href: '/analisis-grader', color: 'blue'    },
+        { id: 'sensores', label: 'Sensores',       sublabel: 'Tiempo real',        icon: Activity,  href: '/sensors/monitor', color: 'green',  wip: true },
+        { id: 'mapa',     label: 'Mapa Planta',   sublabel: 'Zonas',              icon: Map,       href: '/map',             color: 'emerald' },
+        { id: 'clima',    label: 'Clima Puerto',  sublabel: 'Condiciones',        icon: CloudSun,  href: '/clima-puerto',    color: 'slate'   },
       ],
     },
     {
       label: 'Herramientas',
       tiles: [
-        { id: 'visor3d',   label: 'Visor 3D',           sublabel: 'Modelos',             icon: Box,           href: '/visor-3d',        color: 'slate'  },
-        { id: 'hmi',       label: 'HMI Knuro',          sublabel: 'Interfaz',            icon: Cpu,           href: '/hmi-knuro',       color: 'slate'  },
-        { id: 'baader',    label: 'Baader 200',         sublabel: 'Guía técnica',        icon: BookOpen,      href: '/baader-200',      color: 'slate'  },
+        { id: 'visor3d',   label: 'Visor 3D',   sublabel: 'Modelos 3D',  icon: Box,     href: '/visor-3d',  color: 'slate' },
+        // HMI Knuro: ruta admin (simulador) — sin duplicar con /aprendizaje/hmi-knuro
+        { id: 'hmi',       label: 'HMI Knuro',  sublabel: 'Simulador',   icon: Cpu,     href: '/hmi-knuro', color: 'slate' },
+        // Baader 200 NO aparece aquí — ya está en Formación via MACHINE_TILES
       ],
     },
-    {
-      label: 'Formación',
-      tiles: FORMACION_TILES,
-    },
+    // Formación admin: sin HMI Knuro (está en Herramientas arriba)
+    { label: 'Formación', tiles: FORMACION_TILES_ADMIN },
     {
       label: 'Administración',
       tiles: [
-        { id: 'ett',       label: 'ETT',                sublabel: 'Evaluaciones',        icon: FileText,      href: '/admin/ett',       color: 'purple'  },
-        { id: 'jerarq',    label: 'Jerarquías',         sublabel: 'Estructura SAP',      icon: FolderTree,    href: '/hierarchy',       color: 'slate'   },
-        { id: 'mapas',     label: 'Editor Mapas',       sublabel: 'Zonas & áreas',       icon: MapPin,        href: '/admin/maps',      color: 'emerald' },
-        { id: 'settings',  label: 'Configuración',      sublabel: 'Permisos',            icon: Settings,      href: '/settings',        color: 'slate'   },
+        { id: 'ett',      label: 'ETT',           sublabel: 'Evaluaciones',   icon: FileText,  href: '/admin/ett',    color: 'purple'  },
+        { id: 'jerarq',   label: 'Jerarquías',    sublabel: 'Estructura SAP', icon: FolderTree, href: '/hierarchy',   color: 'slate'   },
+        { id: 'mapas',    label: 'Editor Mapas',  sublabel: 'Zonas & áreas',  icon: MapPin,    href: '/admin/maps',   color: 'emerald' },
+        { id: 'settings', label: 'Configuración', sublabel: 'Permisos',       icon: Settings,  href: '/settings',    color: 'slate'   },
       ],
     },
   ],
@@ -173,22 +179,19 @@ const GROUPS: Record<UserRole, TileGroup[]> = {
     {
       label: 'Reportar',
       tiles: [
-        { id: 'incidents', label: 'Reportar Incidencia', sublabel: 'Levantar problema',  icon: AlertTriangle, href: '/incidents',      color: 'red',   cta: true },
-        { id: 'evidencia', label: 'Foto-evidencia',      sublabel: 'Registrar imagen',   icon: Camera,        href: '/photo-evidence', color: 'slate' },
-        { id: 'equipos',   label: 'Equipos',             sublabel: 'Ficha de máquina',   icon: Wrench,        href: '/equipment',      color: 'slate' },
+        { id: 'incidents', label: 'Reportar Incidencia', sublabel: 'Levantar problema', icon: AlertTriangle, href: '/incidents',      color: 'red',   cta: true },
+        { id: 'evidencia', label: 'Foto-evidencia',       sublabel: 'Registrar imagen',  icon: Camera,       href: '/photo-evidence', color: 'slate' },
+        { id: 'equipos',   label: 'Equipos',              sublabel: 'Ficha de máquina',  icon: Wrench,       href: '/equipment',      color: 'slate' },
       ],
     },
     {
       label: 'Consultar',
       tiles: [
-        { id: 'repuestos', label: 'Repuestos',           sublabel: 'Piezas & manuales',  icon: Package,       href: '/repuestos',      color: 'blue'  },
-        { id: 'clima',     label: 'Clima Puerto',        sublabel: 'Condiciones',        icon: CloudSun,      href: '/clima-puerto',   color: 'slate' },
+        { id: 'repuestos', label: 'Repuestos',    sublabel: 'Piezas & manuales', icon: Package,  href: '/repuestos',    color: 'blue'  },
+        { id: 'clima',     label: 'Clima Puerto', sublabel: 'Condiciones',       icon: CloudSun, href: '/clima-puerto', color: 'slate' },
       ],
     },
-    {
-      label: 'Formación',
-      tiles: FORMACION_TILES,
-    },
+    { label: 'Formación', tiles: FORMACION_TILES },
   ],
 }
 
@@ -206,28 +209,40 @@ function getGreeting() {
   return 'Buenas noches'
 }
 
-// ─── Sub-componentes ──────────────────────────────────────────────────────────
+// ─── WIP Ribbon ───────────────────────────────────────────────────────────────
 
-function WipRibbon({ variant = 'chip' }: { variant?: 'chip' | 'cta' }) {
+interface WipRibbonProps {
+  variant?: 'chip' | 'cta'
+  /** Admin: callback para iniciar confirmación de liberación */
+  onTap?: (e: React.MouseEvent) => void
+}
+
+function WipRibbon({ variant = 'chip', onTap }: WipRibbonProps) {
   if (variant === 'cta') {
     return (
-      <span className="shrink-0 text-[9px] font-bold tracking-wide px-1.5 py-0.5 rounded-full bg-amber-400 text-amber-950 leading-none">
+      <button
+        onClick={onTap}
+        className={cn(
+          'shrink-0 text-[9px] font-bold tracking-wide px-1.5 py-0.5 rounded-full bg-amber-400 text-amber-950 leading-none',
+          onTap ? 'active:scale-95 cursor-pointer' : 'pointer-events-none',
+        )}
+      >
         🚧 en desarrollo
-      </span>
+      </button>
     )
   }
   // Ribbon diagonal para chips
   return (
-    <div className="absolute inset-0 overflow-hidden rounded-xl pointer-events-none z-10">
+    <div
+      onClick={onTap}
+      className={cn(
+        'absolute inset-0 overflow-hidden rounded-xl z-10',
+        onTap ? 'cursor-pointer' : 'pointer-events-none',
+      )}
+    >
       <div
         className="absolute bg-amber-400 text-amber-950 font-bold text-[6.5px] tracking-tight uppercase text-center leading-none py-[3.5px] shadow-sm"
-        style={{
-          width: '88px',
-          top: '12px',
-          right: '-22px',
-          transform: 'rotate(38deg)',
-          transformOrigin: 'center',
-        }}
+        style={{ width: '88px', top: '12px', right: '-22px', transform: 'rotate(38deg)' }}
       >
         en desarrollo
       </div>
@@ -235,9 +250,74 @@ function WipRibbon({ variant = 'chip' }: { variant?: 'chip' | 'cta' }) {
   )
 }
 
-function CtaTile({ tile }: { tile: Tile }) {
+// ─── Confirmar liberación (overlay sobre el chip) ────────────────────────────
+
+function ReleaseConfirm({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: (e: React.MouseEvent) => void }) {
+  return (
+    <div
+      className="absolute inset-0 bg-background/92 rounded-xl flex flex-col items-center justify-center gap-1.5 z-20"
+      onClick={(e) => e.preventDefault()}
+    >
+      <span className="text-[9px] font-semibold text-center leading-tight px-1">¿Marcar<br/>como listo?</span>
+      <div className="flex gap-1.5">
+        <button
+          onClick={(e) => { e.preventDefault(); onConfirm() }}
+          className="text-[11px] bg-emerald-500 text-white rounded-lg w-7 h-7 flex items-center justify-center active:scale-90 font-bold"
+        >✓</button>
+        <button
+          onClick={onCancel}
+          className="text-[11px] bg-muted text-muted-foreground rounded-lg w-7 h-7 flex items-center justify-center active:scale-90"
+        >✗</button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Chip ─────────────────────────────────────────────────────────────────────
+
+function Chip({ tile, showWip, onRelease }: { tile: Tile; showWip: boolean; onRelease?: () => void }) {
+  const [confirming, setConfirming] = useState(false)
   const c = COLOR[tile.color]
   const Icon = tile.icon
+
+  return (
+    <Link
+      to={tile.href}
+      className={cn(
+        'flex-shrink-0 flex flex-col items-center gap-1.5 p-2.5 rounded-xl border relative overflow-hidden',
+        'w-[72px] min-h-[64px] transition-all active:scale-[0.95] touch-manipulation select-none',
+        c.bg, c.border,
+      )}
+    >
+      {showWip && !confirming && (
+        <WipRibbon
+          variant="chip"
+          onTap={onRelease ? (e) => { e.preventDefault(); setConfirming(true) } : undefined}
+        />
+      )}
+      {confirming && (
+        <ReleaseConfirm
+          onConfirm={() => { onRelease?.(); setConfirming(false) }}
+          onCancel={(e) => { e.preventDefault(); setConfirming(false) }}
+        />
+      )}
+      <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center', c.bg)}>
+        <Icon className={cn('h-3.5 w-3.5', c.icon)} />
+      </div>
+      <span className={cn('text-[10px] font-medium text-center leading-tight line-clamp-2 w-full', c.label)}>
+        {tile.label}
+      </span>
+    </Link>
+  )
+}
+
+// ─── CTA Tile ─────────────────────────────────────────────────────────────────
+
+function CtaTile({ tile, showWip, onRelease }: { tile: Tile; showWip: boolean; onRelease?: () => void }) {
+  const [confirming, setConfirming] = useState(false)
+  const c = COLOR[tile.color]
+  const Icon = tile.icon
+
   return (
     <Link
       to={tile.href}
@@ -254,34 +334,25 @@ function CtaTile({ tile }: { tile: Tile }) {
         <p className={cn('font-semibold text-sm leading-tight', c.label)}>{tile.label}</p>
         <p className="text-xs text-muted-foreground mt-0.5">{tile.sublabel}</p>
       </div>
-      {tile.wip && <WipRibbon variant="cta" />}
-      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-    </Link>
-  )
-}
-
-function Chip({ tile }: { tile: Tile }) {
-  const c = COLOR[tile.color]
-  const Icon = tile.icon
-  return (
-    <Link
-      to={tile.href}
-      className={cn(
-        'flex-shrink-0 flex flex-col items-center gap-1.5 p-2.5 rounded-xl border relative overflow-hidden',
-        'w-[72px] min-h-[64px] transition-all active:scale-[0.95] touch-manipulation select-none',
-        c.bg, c.border,
+      {showWip && !confirming && (
+        <WipRibbon
+          variant="cta"
+          onTap={onRelease ? (e) => { e.preventDefault(); setConfirming(true) } : undefined}
+        />
       )}
-    >
-      {tile.wip && <WipRibbon variant="chip" />}
-      <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center', c.bg)}>
-        <Icon className={cn('h-3.5 w-3.5', c.icon)} />
-      </div>
-      <span className={cn(
-        'text-[10px] font-medium text-center leading-tight line-clamp-2 w-full',
-        c.label,
-      )}>
-        {tile.label}
-      </span>
+      {confirming && (
+        <div className="flex gap-1.5 shrink-0">
+          <button
+            onClick={(e) => { e.preventDefault(); onRelease?.(); setConfirming(false) }}
+            className="text-[11px] bg-emerald-500 text-white rounded-lg w-7 h-7 flex items-center justify-center active:scale-90 font-bold"
+          >✓</button>
+          <button
+            onClick={(e) => { e.preventDefault(); setConfirming(false) }}
+            className="text-[11px] bg-muted text-muted-foreground rounded-lg w-7 h-7 flex items-center justify-center active:scale-90"
+          >✗</button>
+        </div>
+      )}
+      {!confirming && <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />}
     </Link>
   )
 }
@@ -302,7 +373,6 @@ function AppShareCard() {
 
   return (
     <div className="rounded-xl border border-border bg-muted/40 overflow-hidden">
-      {/* Header — siempre visible */}
       <button
         onClick={() => setOpen((v) => !v)}
         className="w-full flex items-center gap-2.5 px-4 py-3 active:bg-muted/80 transition-colors touch-manipulation"
@@ -315,25 +385,16 @@ function AppShareCard() {
           : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
         }
       </button>
-
-      {/* Panel expandible */}
       {open && (
         <div className="px-4 pb-4 flex flex-col items-center gap-3 border-t border-border/60 pt-3">
-          {/* QR */}
           <div className="p-2 bg-white rounded-xl shadow-sm">
             <QRCodeSVG value={appUrl} size={148} level="M" />
           </div>
-
-          {/* Instrucción */}
           <p className="text-xs text-center text-muted-foreground leading-snug max-w-[200px]">
             Escanea para abrir la app.<br />
             Inicia sesión con <strong>Google</strong> o con tu cuenta si ya estás registrado.
           </p>
-
-          {/* URL */}
           <p className="text-[10px] text-muted-foreground truncate max-w-[240px] font-mono">{appUrl}</p>
-
-          {/* Botón compartir */}
           <button
             onClick={handleShare}
             className="flex items-center gap-2 text-xs font-medium px-4 py-2 rounded-lg bg-primary text-primary-foreground active:opacity-80 transition-opacity touch-manipulation"
@@ -350,21 +411,35 @@ function AppShareCard() {
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 export function MobileHomeGrid() {
-  const user  = useAuthStore((s) => s.user)
+  const user           = useAuthStore((s) => s.user)
+  const setSidebarOpen = useAppStore((s) => s.setSidebarOpen)
   const role: UserRole = user?.rol ?? 'usuario'
-  const groups = GROUPS[role] ?? GROUPS.usuario
-  const firstName = user?.nombre?.split(' ')[0] ?? 'Usuario'
+  const groups         = GROUPS[role] ?? GROUPS.usuario
+  const firstName      = user?.nombre?.split(' ')[0] ?? 'Usuario'
+  const { isWip, toggleRelease, isAdmin } = useWipOverrides()
 
   return (
     <div className="md:hidden px-4 pt-4 pb-6 space-y-5">
 
-      {/* Saludo */}
-      <div className="flex items-center justify-between">
-        <div>
+      {/* Saludo + botón menú */}
+      <div className="flex items-center gap-3">
+        {/* Botón Menú — a la izquierda del nombre */}
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center shrink-0 active:scale-90 transition-transform touch-manipulation"
+          aria-label="Menú"
+        >
+          <Menu className="h-4 w-4 text-foreground" />
+        </button>
+
+        {/* Nombre */}
+        <div className="flex-1 min-w-0">
           <p className="text-xs text-muted-foreground">{getGreeting()}</p>
-          <h2 className="text-lg font-semibold leading-tight">{firstName} 👋</h2>
+          <h2 className="text-lg font-semibold leading-tight truncate">{firstName} 👋</h2>
         </div>
-        <span className="text-xs px-2.5 py-1 rounded-full bg-muted text-muted-foreground font-medium">
+
+        {/* Badge de rol */}
+        <span className="text-xs px-2.5 py-1 rounded-full bg-muted text-muted-foreground font-medium shrink-0">
           {ROLE_LABEL[role]}
         </span>
       </div>
@@ -376,24 +451,30 @@ export function MobileHomeGrid() {
 
         return (
           <div key={group.label} className="space-y-1.5">
-
-            {/* Label de grupo */}
             <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground px-0.5">
               {group.label}
             </p>
 
-            {/* CTA ancho completo (si existe) */}
-            {ctaTile && <CtaTile tile={ctaTile} />}
+            {ctaTile && (
+              <CtaTile
+                tile={ctaTile}
+                showWip={isWip(ctaTile.id, ctaTile.wip)}
+                onRelease={isAdmin ? () => toggleRelease(ctaTile.id) : undefined}
+              />
+            )}
 
-            {/* Chips horizontales */}
             {chipTiles.length > 0 && (
               <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-none snap-x snap-mandatory">
                 {chipTiles.map((tile) => (
-                  <Chip key={tile.id} tile={tile} />
+                  <Chip
+                    key={tile.id}
+                    tile={tile}
+                    showWip={isWip(tile.id, tile.wip)}
+                    onRelease={isAdmin ? () => toggleRelease(tile.id) : undefined}
+                  />
                 ))}
               </div>
             )}
-
           </div>
         )
       })}
