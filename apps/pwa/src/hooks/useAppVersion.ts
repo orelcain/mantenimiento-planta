@@ -11,6 +11,16 @@ import { getAssetUrl } from '@/lib/config'
 const VERSION_CHECK_INTERVAL = 60000 // 1 minuto
 const LAST_VERSION_KEY = 'app_last_version'
 
+/** Retorna true solo si serverVer es MAYOR que currentVer (comparación semver simple) */
+function isNewerVersion(serverVer: string, currentVer: string): boolean {
+  const parse = (v: string) => v.split('.').map(Number)
+  const [sM, sm, sp] = parse(serverVer)
+  const [cM, cm, cp] = parse(currentVer)
+  if (sM !== cM) return sM > cM
+  if (sm !== cm) return sm > cm
+  return sp > cp
+}
+
 export function useAppVersion() {
   const [hasUpdate, setHasUpdate] = useState(false)
   const [newVersion, setNewVersion] = useState<string | null>(null)
@@ -53,7 +63,7 @@ export function useAppVersion() {
             hasUpdate: serverVersion !== APP_VERSION
           })
           
-          if (serverVersion && serverVersion !== APP_VERSION) {
+          if (serverVersion && isNewerVersion(serverVersion, APP_VERSION)) {
             logger.info('New app version detected', {
               current: APP_VERSION,
               new: serverVersion,
@@ -61,7 +71,7 @@ export function useAppVersion() {
             setNewVersion(serverVersion)
             setHasUpdate(true)
           } else {
-            // Si las versiones coinciden, ocultar el banner
+            // Versiones iguales o servidor tiene versión más antigua → sin banner
             setHasUpdate(false)
             setNewVersion(null)
           }
