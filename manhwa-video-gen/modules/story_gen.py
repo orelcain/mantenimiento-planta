@@ -19,8 +19,6 @@ Jurado evaluador
   califica cada guion y elige el mejor automáticamente.
 """
 
-from __future__ import annotations
-
 import json
 import os
 import re
@@ -177,8 +175,28 @@ def generate_story(
     print(f"  Idea    : {idea}")
     print(f"  Género  : {genre}  |  Escenas: {num_scenes}")
 
-    raw_text = _dispatch(backend, user_prompt, model, api_key)
-    _validate_script(raw_text, num_scenes)
+    # ── Generar con retry si el modelo no produce escenas válidas ────────────
+    MAX_RETRIES = 2
+    current_prompt = user_prompt
+    script_text = ""
+    for attempt in range(MAX_RETRIES + 1):
+        raw = _dispatch(backend, current_prompt, model, api_key)
+        script_text = _clean_llm_output(raw)
+        if _count_scenes(script_text) > 0:
+            break
+        if attempt < MAX_RETRIES:
+            print(
+                f"  [RETRY {attempt + 1}/{MAX_RETRIES}] Sin escenas en el output "
+                f"— reintentando con prompt reforzado..."
+            )
+            current_prompt = (
+                "IMPORTANTE: Tu respuesta anterior no incluyó bloques ESCENA. "
+                "Debes generar exactamente el formato indicado: ESCENA 1, ESCENA 2, etc. "
+                "SIN markdown, SIN negritas, SIN asteriscos. Sigue el formato EXACTAMENTE.\n\n"
+                + user_prompt
+            )
+
+    _validate_script(script_text, num_scenes)
 
     if output_path is None:
         slug = _to_slug(idea)
@@ -188,7 +206,7 @@ def generate_story(
 
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(raw_text, encoding="utf-8")
+    output_path.write_text(script_text, encoding="utf-8")
     print(f"  Guardado: {output_path}")
     return output_path
 
@@ -297,7 +315,37 @@ def _dispatch(backend: str, prompt: str, model: str | None, api_key: str | None)
 
 def _call_ollama(prompt: str, model: str) -> str:
     import requests  # type: ignore
-    url = "http://localhost:11434/api/generate"
+    base = "http://localhost:11434"
+
+    # ── Pre-flight: verificar que Ollama corre y tiene el modelo ─────────────
+    try:
+        tags = requests.get(f"{base}/api/tags", timeout=5).json()
+        available = [m["name"] for m in tags.get("models", [])]
+    except requests.exceptions.ConnectionError:
+        raise RuntimeError(
+            "Ollama no está corriendo.\n"
+            "  Ejecutá: run_ollama.bat  (o: set OLLAMA_MODELS=D:\\.ollama\\models && ollama serve)"
+        )
+    except Exception:
+        available = []
+
+    # El modelo puede listarse como "llama3.2:3b" o "llama3.2:3b-..."
+    model_found = any(m.split(":")[0] == model.split(":")[0] for m in available)
+    if not model_found:
+        if available:
+            raise RuntimeError(
+                f"Modelo '{model}' no disponible en Ollama.\n"
+                f"  Modelos disponibles: {', '.join(available)}\n"
+                f"  Para descargarlo: ollama pull {model}\n"
+                f"  Si ya está descargado en D:\\.ollama\\models, reiniciá Ollama con run_ollama.bat"
+            )
+        else:
+            raise RuntimeError(
+                f"Ollama no tiene modelos cargados.\n"
+                f"  1. Cerrá Ollama y ejecutá: run_ollama.bat\n"
+                f"  2. O descargá el modelo: ollama pull {model}"
+            )
+
     payload = {
         "model": model,
         "prompt": f"{_SYSTEM_PROMPT}\n\n---\n\n{prompt}",
@@ -306,15 +354,20 @@ def _call_ollama(prompt: str, model: str) -> str:
     }
     print(f"  Llamando a Ollama ({model})...")
     try:
-        resp = requests.post(url, json=payload, timeout=300)
+        resp = requests.post(f"{base}/api/generate", json=payload, timeout=360)
         resp.raise_for_status()
-        return resp.json()["response"]
-    except requests.exceptions.ConnectionError:
+        data = resp.json()
+        if "error" in data:
+            raise RuntimeError(f"Ollama error: {data['error']}")
+        return data["response"]
+    except requests.exceptions.ReadTimeout:
         raise RuntimeError(
-            "Ollama no está corriendo.\n"
-            "  1. Abrí una terminal y ejecutá: ollama serve\n"
-            "  2. Descargá el modelo: ollama pull llama3.2:3b"
+            f"Ollama tardó más de 6 minutos generando con '{model}'.\n"
+            "  Puede que la máquina esté sobrecargada o el modelo no esté en RAM.\n"
+            "  Intentá cerrar otras apps y volver a correr."
         )
+    except requests.exceptions.ConnectionError:
+        raise RuntimeError("Ollama se desconectó durante la generación. Reiniciá con run_ollama.bat")
 
 
 def _call_gemini(prompt: str, model: str, api_key: str | None) -> str:
@@ -397,14 +450,74 @@ def _print_winner(backend: str, path: Path, verdict: dict | None) -> None:
 
 # ── Validación y utilidades ───────────────────────────────────────────────────
 
+# Comillas tipográficas comunes en output de LLMs
+_OQ = ('"', '\u201c', '\u00ab')   # " « "
+_CQ = ('"', '\u201d', '\u00bb')   # " » "
+
+
+def _clean_llm_output(text: str) -> str:
+    """Normaliza el output crudo de cualquier LLM al formato plain-text del parser.
+
+    Transforma:
+      **TÍTULO:** "Mi Historia"   →  TÍTULO: Mi Historia
+      **ESCENA 1**                →  ESCENA 1
+      * **AKIRA**: descripción    →    AKIRA: descripción
+      NARRADOR: "texto"           →  NARRADOR: texto
+      AKIRA: (en voz baja) "txt"  →  AKIRA: txt
+      Nota final del modelo…      →  (eliminada)
+    """
+    lines = []
+    for line in text.splitlines():
+        # 1. Bullet → 2-space indent (para bloque PERSONAJES)
+        m = re.match(r'^(\s*)[*\-•]\s+(.*)', line)
+        if m:
+            line = (m.group(1) or '  ') + m.group(2)
+
+        # 2. **negrita** → texto plano
+        line = re.sub(r'\*\*(.+?)\*\*', r'\1', line)
+
+        # 3. Limpiar valor después de ":"
+        colon_idx = line.find(':')
+        if colon_idx > 0:
+            key = line[:colon_idx].strip()
+            val = line[colon_idx + 1:].strip()
+            if val:
+                # Stage direction (solo en líneas de hablante: clave toda en mayúsculas, sin espacios)
+                if key.upper() == key and ' ' not in key and key not in ('FONDO',):
+                    val = re.sub(r'^\s*\([^)]*\)\s*', '', val)
+                # Quitar comillas tipográficas y rectas envolventes
+                if len(val) >= 2 and val[0] in (*_OQ, '"') and val[-1] in (*_CQ, '"'):
+                    val = val[1:-1].strip()
+                line = line[:colon_idx + 1] + ' ' + val
+
+        lines.append(line)
+
+    # 4. Eliminar comentario final del modelo (texto en prosa sin ":")
+    while lines:
+        last = lines[-1].strip()
+        if (last
+                and ':' not in last
+                and len(last) > 60
+                and not re.match(r'^(?:ESCENA|TITULO|TÍTULO)\s', last, re.IGNORECASE)):
+            lines.pop()
+        else:
+            break
+
+    return '\n'.join(lines).strip()
+
+
+def _count_scenes(text: str) -> int:
+    return len(re.findall(r"^ESCENA\s+\d+", text, re.MULTILINE | re.IGNORECASE))
+
+
 def _validate_script(text: str, expected_scenes: int) -> None:
-    found = len(re.findall(r"^ESCENA\s+\d+", text, re.MULTILINE | re.IGNORECASE))
+    found = _count_scenes(text)
     if found == 0:
-        print("  [WARN] No se encontraron bloques ESCENA.")
+        print("  [WARN] Sin bloques ESCENA detectados.")
     elif found != expected_scenes:
-        print(f"  [WARN] Se esperaban {expected_scenes} escenas, se generaron {found}.")
+        print(f"  [WARN] Esperadas {expected_scenes} escenas, generadas {found}.")
     if not re.search(r"^T[IÍ]TULO\s*:", text, re.MULTILINE | re.IGNORECASE):
-        print("  [WARN] No se encontró línea TÍTULO.")
+        print("  [WARN] Sin línea TÍTULO.")
 
 
 def _to_slug(text: str, max_len: int = 40) -> str:

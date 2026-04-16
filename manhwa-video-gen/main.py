@@ -23,11 +23,56 @@ Full pipeline
 from __future__ import annotations
 
 import argparse
+import json
 import shutil
 import sys
+import types
+import linecache
+from datetime import datetime
 from pathlib import Path
 
+# ── UTF-8 en stdout/stderr (Windows CP1252 rompe los caracteres Unicode) ──────
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        if (sys.stdout.encoding or "").lower().replace("-", "") not in ("utf8",):
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
+# ── Fix Python 3.13.1 linecache bug con 'from __future__ import annotations' ──
+_orig_reg = getattr(linecache, '_register_code', None)
+if _orig_reg:
+    def _safe_register_code(code):
+        if isinstance(code, types.CodeType):
+            try:
+                _orig_reg(code)
+            except AttributeError:
+                pass
+    linecache._register_code = _safe_register_code
+
 import config
+
+# ── Status writer para el dashboard ──────────────────────────────────────────
+_STATUS_FILE = Path(__file__).parent / "output" / "pipeline_status.json"
+
+def _write_status(stage: int, stages_total: int, stage_name: str,
+                  progress: int, detail: str = "", error: str = "",
+                  idea: str = "", done: bool = False) -> None:
+    _STATUS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    data = {
+        "stage":        stage,
+        "stages_total": stages_total,
+        "stage_name":   stage_name,
+        "progress":     progress,
+        "detail":       detail,
+        "idea":         idea,
+        "running":      not done and not error,
+        "done":         done,
+        "error":        error,
+        "ts":           datetime.now().isoformat(timespec="seconds"),
+    }
+    _STATUS_FILE.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
 from modules.image_gen import generate_image, check_comfyui
 from modules.story_parser import parse_script
 from modules.tts import get_voice_for_speaker, synthesize
@@ -73,10 +118,14 @@ def _parse_args() -> argparse.Namespace:
 def main() -> None:
     args = _parse_args()
 
+    idea_str = args.idea or Path(args.script).stem
+
     # ── Fase 2: generar guion con IA ─────────────────────────────────────────
     if args.idea:
         backend = args.backend or config.STORY_BACKEND
         print(f"\n── [0/4] Generando guion con IA ({backend}) ────────────────────────")
+        _write_status(0, 4, f"Generando guion ({backend})", 10,
+                      idea=idea_str, detail="Llamando a Ollama…")
 
         if args.compare_backends:
             from modules.story_gen import compare_and_judge
@@ -128,6 +177,7 @@ def main() -> None:
 
     # ── 1. Parse script ───────────────────────────────────────────────────────
     print(f"\n── [1/4] Parsing script: {script_path.name} ────────────────────────")
+    _write_status(1, 4, "Parseando guion", 25, idea=idea_str, detail=script_path.name)
     script = parse_script(script_path)
     print(f"  Title      : {script.title}")
     print(f"  Characters : {', '.join(script.characters) or '(none defined)'}")
@@ -139,6 +189,8 @@ def main() -> None:
 
     # ── 2. Generate images ────────────────────────────────────────────────────
     print(f"\n── [2/4] Generating images ({len(script.scenes)} scenes) ──────────")
+    _write_status(2, 4, "Generando imágenes", 30, idea=idea_str,
+                  detail=f"0/{len(script.scenes)} escenas")
     scene_images: dict[int, Path] = {}
 
     for scene in script.scenes:
@@ -146,6 +198,8 @@ def main() -> None:
         scene_images[scene.number] = img_path
 
         if args.skip_images:
+            _write_status(2, 4, "Generando imágenes", 30 + int(scene.number / len(script.scenes) * 20),
+                          idea=idea_str, detail=f"{scene.number}/{len(script.scenes)} escenas")
             if img_path.exists():
                 print(f"  Scene {scene.number:>3}: skipped (image exists)")
             else:
@@ -176,6 +230,8 @@ def main() -> None:
 
     # ── 3. Synthesize audio ───────────────────────────────────────────────────
     print(f"\n── [3/4] Synthesizing audio ─────────────────────────────────────────")
+    _write_status(3, 4, "Sintetizando audio (Edge TTS)", 50, idea=idea_str,
+                  detail=f"0/{len(script.scenes)} escenas")
     scene_audio: dict[int, Path] = {}
 
     for scene in script.scenes:
@@ -184,6 +240,9 @@ def main() -> None:
         scene_sub_dir.mkdir(exist_ok=True)
         scene_audio[scene.number] = merged_path
 
+        _write_status(3, 4, "Sintetizando audio (Edge TTS)",
+                      50 + int(scene.number / len(script.scenes) * 25),
+                      idea=idea_str, detail=f"Escena {scene.number}/{len(script.scenes)}")
         if args.skip_tts and merged_path.exists():
             print(f"  Scene {scene.number:>3}: skipped (audio exists)")
             continue
@@ -215,6 +274,8 @@ def main() -> None:
 
     # ── 4. Build video ────────────────────────────────────────────────────────
     print(f"\n── [4/4] Assembling video ───────────────────────────────────────────")
+    _write_status(4, 4, "Ensamblando video (FFmpeg)", 75, idea=idea_str,
+                  detail=f"0/{len(script.scenes)} clips")
     clip_paths: list[Path] = []
     ken_burns = config.KEN_BURNS_EFFECT and not args.no_ken_burns
 
@@ -229,11 +290,15 @@ def main() -> None:
             width=config.IMAGE_WIDTH,
             height=config.IMAGE_HEIGHT,
         )
+        _write_status(4, 4, "Ensamblando video (FFmpeg)",
+                      75 + int(scene.number / len(script.scenes) * 20),
+                      idea=idea_str, detail=f"Clip {scene.number}/{len(script.scenes)}")
         clip_paths.append(clip_path)
 
     # Concatenate clips
     raw_path = job_dir / "raw.mp4"
     print("  Concatenating clips...")
+    _write_status(4, 4, "Ensamblando video (FFmpeg)", 95, idea=idea_str, detail="Concatenando clips…")
     concatenate_videos(clip_paths, raw_path)
 
     # Mix background music
@@ -247,6 +312,8 @@ def main() -> None:
         shutil.copy(raw_path, output_path)
 
     # ── Done ──────────────────────────────────────────────────────────────────
+    _write_status(4, 4, "¡Video listo!", 100, idea=idea_str,
+                  detail=str(output_path.name), done=True)
     print(f"\n{'─'*60}")
     print(f"  Done!  →  {output_path}")
     print(f"{'─'*60}\n")

@@ -28,8 +28,6 @@ Voces Edge TTS para español
   Masculinas: es-MX-JorgeNeural · es-ES-AlvaroNeural · es-AR-TomasNeural
 """
 
-from __future__ import annotations
-
 import asyncio
 import subprocess
 import sys
