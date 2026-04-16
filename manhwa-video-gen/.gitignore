@@ -23,4 +23,9 @@ _concat_*/
 
 # Secrets
 .env.local
+
+# Local dev helpers (not commit)
 start_server.py
+debug_env.py
+test_gemini.py
+_dashboard_server.py
