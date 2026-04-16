@@ -3,16 +3,16 @@ import {
   AlertTriangle, Package, Camera, CalendarClock, Wrench,
   BarChart3, Map, Route, Activity, Settings, FileText,
   GraduationCap, ChevronRight, ClipboardList, CloudSun,
-  Box, Cpu, BookOpen, FolderTree, MapPin, TrendingUp,
+  Box, Cpu, BookOpen, FolderTree, MapPin, TrendingUp, Monitor,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store'
 import type { UserRole } from '@/types'
+import { LEARNING_MACHINES } from '@/data/learningMachines'
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
 type TileColor = 'red' | 'blue' | 'amber' | 'green' | 'purple' | 'slate' | 'emerald' | 'orange'
-type TileSize  = 'half' | 'full'
 
 interface Tile {
   id:       string
@@ -21,7 +21,8 @@ interface Tile {
   icon:     React.ElementType
   href:     string
   color:    TileColor
-  size:     TileSize
+  /** full = CTA ancho completo al inicio del grupo, half = chip */
+  cta?:     boolean
 }
 
 interface TileGroup {
@@ -39,126 +40,147 @@ const COLOR: Record<TileColor, { bg: string; border: string; icon: string; label
   purple:  { bg: 'bg-purple-500/10',  border: 'border-purple-500/30',  icon: 'text-purple-500',  label: 'text-purple-700 dark:text-purple-400' },
   emerald: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', icon: 'text-emerald-500', label: 'text-emerald-700 dark:text-emerald-400' },
   orange:  { bg: 'bg-orange-500/10',  border: 'border-orange-500/30',  icon: 'text-orange-500',  label: 'text-orange-700 dark:text-orange-400' },
-  slate:   { bg: 'bg-muted/60',       border: 'border-border',          icon: 'text-foreground',  label: 'text-foreground' },
+  slate:   { bg: 'bg-muted/60',       border: 'border-border',          icon: 'text-muted-foreground',  label: 'text-foreground' },
 }
+
+// ─── Tiles de formación generados desde el catálogo ──────────────────────────
+
+const MACHINE_TILES: Tile[] = LEARNING_MACHINES.map((m) => ({
+  id:       `m-${m.slug}`,
+  label:    m.name,
+  sublabel: '',
+  icon:     m.icon,
+  href:     m.customRoute ?? `/aprendizaje/maquina/${m.slug}`,
+  color:    'blue' as TileColor,
+}))
+
+const HMI_TILES: Tile[] = [
+  { id: 'hmi-knuro',  label: 'HMI Knuro',  sublabel: '', icon: Cpu,     href: '/aprendizaje/hmi-knuro',  color: 'slate' },
+  { id: 'hmi-grader', label: 'HMI Grader', sublabel: '', icon: Monitor, href: '/aprendizaje/hmi-grader', color: 'slate' },
+]
+
+const FORMACION_TILES: Tile[] = [
+  ...MACHINE_TILES,
+  ...HMI_TILES,
+  { id: 'hub', label: 'Ver hub →', sublabel: '', icon: GraduationCap, href: '/aprendizaje', color: 'purple' },
+]
 
 // ─── Grupos por rol ───────────────────────────────────────────────────────────
 
 const GROUPS: Record<UserRole, TileGroup[]> = {
 
-  // TÉCNICO
   tecnico: [
     {
       label: 'Trabajo en planta',
       tiles: [
-        { id: 'incidents', label: 'Nueva Incidencia',  sublabel: 'Levantar problema',    icon: AlertTriangle, href: '/incidents',      color: 'red',    size: 'full' },
-        { id: 'repuestos', label: 'Repuestos',          sublabel: 'Piezas & manuales',   icon: Package,       href: '/repuestos',      color: 'blue',   size: 'half' },
-        { id: 'equipos',   label: 'Equipos',            sublabel: 'Ficha técnica',       icon: Wrench,        href: '/equipment',      color: 'slate',  size: 'half' },
-        { id: 'prevntv',   label: 'Preventivo',         sublabel: 'Mis tareas',          icon: CalendarClock, href: '/preventive',     color: 'amber',  size: 'half' },
-        { id: 'evidencia', label: 'Foto-evidencia',     sublabel: 'Registrar imagen',    icon: Camera,        href: '/photo-evidence', color: 'slate',  size: 'half' },
+        { id: 'incidents', label: 'Nueva Incidencia',  sublabel: 'Levantar problema',   icon: AlertTriangle, href: '/incidents',      color: 'red',   cta: true },
+        { id: 'repuestos', label: 'Repuestos',          sublabel: 'Piezas & manuales',  icon: Package,       href: '/repuestos',      color: 'blue'  },
+        { id: 'equipos',   label: 'Equipos',            sublabel: 'Ficha técnica',      icon: Wrench,        href: '/equipment',      color: 'slate' },
+        { id: 'prevntv',   label: 'Preventivo',         sublabel: 'Mis tareas',         icon: CalendarClock, href: '/preventive',     color: 'amber' },
+        { id: 'evidencia', label: 'Foto-evidencia',     sublabel: 'Registrar imagen',   icon: Camera,        href: '/photo-evidence', color: 'slate' },
       ],
     },
     {
-      label: 'Formación & herramientas',
-      tiles: [
-        { id: 'aprende',  label: 'Aprendizaje',         sublabel: 'Cursos & guías',      icon: GraduationCap, href: '/aprendizaje',    color: 'purple', size: 'half' },
-        { id: 'visor3d',  label: 'Visor 3D',            sublabel: 'Modelos de equipos',  icon: Box,           href: '/visor-3d',       color: 'slate',  size: 'half' },
-      ],
+      label: 'Formación',
+      tiles: FORMACION_TILES,
     },
   ],
 
-  // SUPERVISOR
   supervisor: [
     {
       label: 'Seguimiento',
       tiles: [
-        { id: 'incidents', label: 'Incidencias',        sublabel: 'Revisar & validar',    icon: AlertTriangle, href: '/incidents',       color: 'red',     size: 'half' },
-        { id: 'grader',    label: 'Análisis Grader',    sublabel: 'Rendimiento piezas',   icon: BarChart3,     href: '/analisis-grader', color: 'blue',    size: 'half' },
-        { id: 'inspecc',   label: 'Inspecciones',       sublabel: 'Rondas pendientes',    icon: Route,         href: '/inspections',     color: 'amber',   size: 'half' },
-        { id: 'prevntv',   label: 'Preventivo',         sublabel: 'Plan mantención',      icon: CalendarClock, href: '/preventive',      color: 'amber',   size: 'half' },
+        { id: 'incidents', label: 'Incidencias',        sublabel: 'Revisar & validar',   icon: AlertTriangle, href: '/incidents',       color: 'red'    },
+        { id: 'grader',    label: 'Grader',             sublabel: 'Rendimiento',          icon: BarChart3,     href: '/analisis-grader', color: 'blue'   },
+        { id: 'inspecc',   label: 'Inspecciones',       sublabel: 'Rondas',              icon: Route,         href: '/inspections',     color: 'amber'  },
+        { id: 'prevntv',   label: 'Preventivo',         sublabel: 'Plan mantención',     icon: CalendarClock, href: '/preventive',      color: 'amber'  },
+        { id: 'sensores',  label: 'Sensores',           sublabel: 'Monitor real',        icon: Activity,      href: '/sensors/monitor', color: 'green'  },
       ],
     },
     {
       label: 'Recursos',
       tiles: [
-        { id: 'repuestos', label: 'Repuestos',          sublabel: 'Stock & manuales',     icon: Package,       href: '/repuestos',       color: 'blue',    size: 'half' },
-        { id: 'mapa',      label: 'Mapa Planta',        sublabel: 'Vista de zonas',       icon: Map,           href: '/map',             color: 'emerald', size: 'half' },
+        { id: 'repuestos', label: 'Repuestos',          sublabel: 'Stock & manuales',    icon: Package,       href: '/repuestos',       color: 'blue'    },
+        { id: 'equipos',   label: 'Equipos',            sublabel: 'Ficha técnica',       icon: Wrench,        href: '/equipment',       color: 'slate'   },
+        { id: 'mapa',      label: 'Mapa Planta',        sublabel: 'Vista de zonas',      icon: Map,           href: '/map',             color: 'emerald' },
+        { id: 'clima',     label: 'Clima Puerto',       sublabel: 'Condiciones',         icon: CloudSun,      href: '/clima-puerto',    color: 'slate'   },
       ],
     },
     {
-      label: 'Información',
-      tiles: [
-        { id: 'aprende',   label: 'Aprendizaje',        sublabel: 'Cursos & guías',       icon: GraduationCap, href: '/aprendizaje',     color: 'purple',  size: 'half' },
-        { id: 'clima',     label: 'Clima Puerto',       sublabel: 'Condiciones actuales', icon: CloudSun,      href: '/clima-puerto',    color: 'slate',   size: 'half' },
-      ],
+      label: 'Formación',
+      tiles: FORMACION_TILES,
     },
   ],
 
-  // ADMIN — acceso completo agrupado
   admin: [
     {
       label: 'Operaciones',
       tiles: [
-        { id: 'incidents', label: 'Incidencias',        sublabel: 'Ver todas',            icon: AlertTriangle, href: '/incidents',       color: 'red',     size: 'half' },
-        { id: 'repuestos', label: 'Repuestos',          sublabel: 'Piezas & manuales',    icon: Package,       href: '/repuestos',       color: 'blue',    size: 'half' },
-        { id: 'equipos',   label: 'Equipos',            sublabel: 'Ficha técnica',        icon: Wrench,        href: '/equipment',       color: 'slate',   size: 'half' },
-        { id: 'evidencia', label: 'Foto-evidencia',     sublabel: 'Foto-registros',       icon: Camera,        href: '/photo-evidence',  color: 'slate',   size: 'half' },
+        { id: 'incidents', label: 'Incidencias',        sublabel: 'Ver todas',           icon: AlertTriangle, href: '/incidents',       color: 'red'    },
+        { id: 'repuestos', label: 'Repuestos',          sublabel: 'Piezas & manuales',   icon: Package,       href: '/repuestos',       color: 'blue'   },
+        { id: 'equipos',   label: 'Equipos',            sublabel: 'Ficha técnica',       icon: Wrench,        href: '/equipment',       color: 'slate'  },
+        { id: 'evidencia', label: 'Foto-evidencia',     sublabel: 'Foto-registros',      icon: Camera,        href: '/photo-evidence',  color: 'slate'  },
       ],
     },
     {
       label: 'Planificación',
       tiles: [
-        { id: 'inspecc',   label: 'Inspecciones',       sublabel: 'Rondas & seguimiento', icon: ClipboardList, href: '/inspections',     color: 'amber',   size: 'half' },
-        { id: 'prevntv',   label: 'Preventivo',         sublabel: 'Plan mantención',      icon: CalendarClock, href: '/preventive',      color: 'amber',   size: 'half' },
-        { id: 'gantt',     label: 'Gantt',              sublabel: 'Planificador',         icon: TrendingUp,    href: '/gantt',           color: 'orange',  size: 'half' },
+        { id: 'inspecc',   label: 'Inspecciones',       sublabel: 'Rondas',              icon: ClipboardList, href: '/inspections',     color: 'amber'  },
+        { id: 'prevntv',   label: 'Preventivo',         sublabel: 'Plan mantención',     icon: CalendarClock, href: '/preventive',      color: 'amber'  },
+        { id: 'gantt',     label: 'Gantt',              sublabel: 'Planificador',        icon: TrendingUp,    href: '/gantt',           color: 'orange' },
       ],
     },
     {
       label: 'Análisis & monitoreo',
       tiles: [
-        { id: 'grader',    label: 'Grader',             sublabel: 'Análisis de piezas',   icon: BarChart3,     href: '/analisis-grader', color: 'blue',    size: 'half' },
-        { id: 'sensores',  label: 'Sensores',           sublabel: 'Monitor tiempo real',  icon: Activity,      href: '/sensors/monitor', color: 'green',   size: 'half' },
-        { id: 'mapa',      label: 'Mapa Planta',        sublabel: 'Vista de zonas',       icon: Map,           href: '/map',             color: 'emerald', size: 'half' },
-        { id: 'clima',     label: 'Clima Puerto',       sublabel: 'Condiciones actuales', icon: CloudSun,      href: '/clima-puerto',    color: 'slate',   size: 'half' },
+        { id: 'grader',    label: 'Grader',             sublabel: 'Análisis de piezas',  icon: BarChart3,     href: '/analisis-grader', color: 'blue'    },
+        { id: 'sensores',  label: 'Sensores',           sublabel: 'Tiempo real',         icon: Activity,      href: '/sensors/monitor', color: 'green'   },
+        { id: 'mapa',      label: 'Mapa Planta',        sublabel: 'Zonas',               icon: Map,           href: '/map',             color: 'emerald' },
+        { id: 'clima',     label: 'Clima Puerto',       sublabel: 'Condiciones',         icon: CloudSun,      href: '/clima-puerto',    color: 'slate'   },
       ],
     },
     {
       label: 'Herramientas',
       tiles: [
-        { id: 'visor3d',   label: 'Visor 3D',           sublabel: 'Modelos de equipos',   icon: Box,           href: '/visor-3d',        color: 'slate',   size: 'half' },
-        { id: 'aprende',   label: 'Aprendizaje',        sublabel: 'Cursos & guías',       icon: GraduationCap, href: '/aprendizaje',     color: 'purple',  size: 'half' },
-        { id: 'hmi',       label: 'HMI Knuro',          sublabel: 'Interfaz máquina',     icon: Cpu,           href: '/hmi-knuro',       color: 'slate',   size: 'half' },
-        { id: 'baader',    label: 'Baader 200',         sublabel: 'Guía de operación',    icon: BookOpen,      href: '/baader-200',      color: 'slate',   size: 'half' },
+        { id: 'visor3d',   label: 'Visor 3D',           sublabel: 'Modelos',             icon: Box,           href: '/visor-3d',        color: 'slate'  },
+        { id: 'hmi',       label: 'HMI Knuro',          sublabel: 'Interfaz',            icon: Cpu,           href: '/hmi-knuro',       color: 'slate'  },
+        { id: 'baader',    label: 'Baader 200',         sublabel: 'Guía técnica',        icon: BookOpen,      href: '/baader-200',      color: 'slate'  },
       ],
+    },
+    {
+      label: 'Formación',
+      tiles: FORMACION_TILES,
     },
     {
       label: 'Administración',
       tiles: [
-        { id: 'ett',       label: 'ETT',                sublabel: 'Evaluaciones',         icon: FileText,      href: '/admin/ett',       color: 'purple',  size: 'half' },
-        { id: 'jerarq',    label: 'Jerarquías',         sublabel: 'Estructura SAP',       icon: FolderTree,    href: '/hierarchy',       color: 'slate',   size: 'half' },
-        { id: 'mapas',     label: 'Editor Mapas',       sublabel: 'Zonas & áreas',        icon: MapPin,        href: '/admin/maps',      color: 'emerald', size: 'half' },
-        { id: 'settings',  label: 'Configuración',      sublabel: 'Permisos & módulos',   icon: Settings,      href: '/settings',        color: 'slate',   size: 'half' },
+        { id: 'ett',       label: 'ETT',                sublabel: 'Evaluaciones',        icon: FileText,      href: '/admin/ett',       color: 'purple'  },
+        { id: 'jerarq',    label: 'Jerarquías',         sublabel: 'Estructura SAP',      icon: FolderTree,    href: '/hierarchy',       color: 'slate'   },
+        { id: 'mapas',     label: 'Editor Mapas',       sublabel: 'Zonas & áreas',       icon: MapPin,        href: '/admin/maps',      color: 'emerald' },
+        { id: 'settings',  label: 'Configuración',      sublabel: 'Permisos',            icon: Settings,      href: '/settings',        color: 'slate'   },
       ],
     },
   ],
 
-  // USUARIO BÁSICO
   usuario: [
     {
       label: 'Reportar',
       tiles: [
-        { id: 'incidents', label: 'Reportar Incidencia', sublabel: 'Levantar problema',   icon: AlertTriangle, href: '/incidents',      color: 'red',    size: 'full' },
-        { id: 'evidencia', label: 'Foto-evidencia',      sublabel: 'Registrar imagen',    icon: Camera,        href: '/photo-evidence', color: 'slate',  size: 'half' },
-        { id: 'equipos',   label: 'Equipos',             sublabel: 'Ficha de máquina',    icon: Wrench,        href: '/equipment',      color: 'slate',  size: 'half' },
+        { id: 'incidents', label: 'Reportar Incidencia', sublabel: 'Levantar problema',  icon: AlertTriangle, href: '/incidents',      color: 'red',   cta: true },
+        { id: 'evidencia', label: 'Foto-evidencia',      sublabel: 'Registrar imagen',   icon: Camera,        href: '/photo-evidence', color: 'slate' },
+        { id: 'equipos',   label: 'Equipos',             sublabel: 'Ficha de máquina',   icon: Wrench,        href: '/equipment',      color: 'slate' },
       ],
     },
     {
       label: 'Consultar',
       tiles: [
-        { id: 'repuestos', label: 'Repuestos',           sublabel: 'Piezas & manuales',   icon: Package,       href: '/repuestos',      color: 'blue',   size: 'half' },
-        { id: 'aprende',   label: 'Aprendizaje',         sublabel: 'Cursos & guías',      icon: GraduationCap, href: '/aprendizaje',    color: 'purple', size: 'half' },
-        { id: 'clima',     label: 'Clima Puerto',        sublabel: 'Condiciones actuales',icon: CloudSun,      href: '/clima-puerto',   color: 'slate',  size: 'half' },
+        { id: 'repuestos', label: 'Repuestos',           sublabel: 'Piezas & manuales',  icon: Package,       href: '/repuestos',      color: 'blue'  },
+        { id: 'clima',     label: 'Clima Puerto',        sublabel: 'Condiciones',        icon: CloudSun,      href: '/clima-puerto',   color: 'slate' },
       ],
+    },
+    {
+      label: 'Formación',
+      tiles: FORMACION_TILES,
     },
   ],
 }
@@ -177,10 +199,61 @@ function getGreeting() {
   return 'Buenas noches'
 }
 
-// ─── Componente ───────────────────────────────────────────────────────────────
+// ─── Sub-componentes ──────────────────────────────────────────────────────────
+
+function CtaTile({ tile }: { tile: Tile }) {
+  const c = COLOR[tile.color]
+  const Icon = tile.icon
+  return (
+    <Link
+      to={tile.href}
+      className={cn(
+        'flex items-center gap-3 px-4 py-3.5 rounded-xl border mb-2',
+        'transition-all active:scale-[0.98] touch-manipulation select-none',
+        c.bg, c.border,
+      )}
+    >
+      <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center shrink-0', c.bg)}>
+        <Icon className={cn('h-5 w-5', c.icon)} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className={cn('font-semibold text-sm leading-tight', c.label)}>{tile.label}</p>
+        <p className="text-xs text-muted-foreground mt-0.5">{tile.sublabel}</p>
+      </div>
+      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+    </Link>
+  )
+}
+
+function Chip({ tile }: { tile: Tile }) {
+  const c = COLOR[tile.color]
+  const Icon = tile.icon
+  return (
+    <Link
+      to={tile.href}
+      className={cn(
+        'flex-shrink-0 flex flex-col items-center gap-1.5 p-2.5 rounded-xl border',
+        'w-[72px] min-h-[64px] transition-all active:scale-[0.95] touch-manipulation select-none',
+        c.bg, c.border,
+      )}
+    >
+      <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center', c.bg)}>
+        <Icon className={cn('h-3.5 w-3.5', c.icon)} />
+      </div>
+      <span className={cn(
+        'text-[10px] font-medium text-center leading-tight line-clamp-2 w-full',
+        c.label,
+      )}>
+        {tile.label}
+      </span>
+    </Link>
+  )
+}
+
+// ─── Componente principal ─────────────────────────────────────────────────────
 
 export function MobileHomeGrid() {
-  const user = useAuthStore((s) => s.user)
+  const user  = useAuthStore((s) => s.user)
   const role: UserRole = user?.rol ?? 'usuario'
   const groups = GROUPS[role] ?? GROUPS.usuario
   const firstName = user?.nombre?.split(' ')[0] ?? 'Usuario'
@@ -200,59 +273,33 @@ export function MobileHomeGrid() {
       </div>
 
       {/* Grupos */}
-      {groups.map((group) => (
-        <div key={group.label} className="space-y-2">
+      {groups.map((group) => {
+        const ctaTile   = group.tiles.find((t) => t.cta)
+        const chipTiles = group.tiles.filter((t) => !t.cta)
 
-          {/* Label de grupo */}
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground px-0.5">
-            {group.label}
-          </p>
+        return (
+          <div key={group.label} className="space-y-1.5">
 
-          {/* Grid de tiles */}
-          <div className="grid grid-cols-2 gap-2.5">
-            {group.tiles.map((tile) => {
-              const c = COLOR[tile.color]
-              const Icon = tile.icon
-              const isFull = tile.size === 'full'
+            {/* Label de grupo */}
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground px-0.5">
+              {group.label}
+            </p>
 
-              return (
-                <Link
-                  key={tile.id}
-                  to={tile.href}
-                  className={cn(
-                    'flex rounded-2xl border transition-all active:scale-[0.97] touch-manipulation select-none',
-                    c.bg, c.border,
-                    isFull
-                      ? 'col-span-2 flex-row items-center gap-4 px-5 py-4 min-h-[68px]'
-                      : 'flex-col gap-2 p-4 min-h-[84px]',
-                  )}
-                >
-                  <div className={cn(
-                    'rounded-xl flex items-center justify-center shrink-0',
-                    isFull ? 'w-10 h-10' : 'w-8 h-8',
-                    c.bg,
-                  )}>
-                    <Icon className={cn('h-4 w-4', c.icon)} />
-                  </div>
+            {/* CTA ancho completo (si existe) */}
+            {ctaTile && <CtaTile tile={ctaTile} />}
 
-                  <div className="flex-1 min-w-0">
-                    <p className={cn('font-semibold text-sm leading-tight', c.label)}>
-                      {tile.label}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5 leading-tight">
-                      {tile.sublabel}
-                    </p>
-                  </div>
+            {/* Chips horizontales */}
+            {chipTiles.length > 0 && (
+              <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-none snap-x snap-mandatory">
+                {chipTiles.map((tile) => (
+                  <Chip key={tile.id} tile={tile} />
+                ))}
+              </div>
+            )}
 
-                  {isFull && (
-                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                  )}
-                </Link>
-              )
-            })}
           </div>
-        </div>
-      ))}
+        )
+      })}
 
     </div>
   )
