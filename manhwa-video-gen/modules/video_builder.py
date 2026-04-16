@@ -144,9 +144,13 @@ def build_scene_video(
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     if ken_burns:
-        # zoompan: start at 1.0x, zoom to 1.5x over the clip duration
+        # Pre-scale to 3× target before zoompan so zoom quality is preserved
+        # while avoiding OOM from scale=8000:-1 (113M px/frame → crash on clip 3+)
+        pre_w = width * 3   # 2160 for 720p target
+        pre_h = height * 3  # 3840 for 1280p target
         vf = (
-            f"scale=8000:-1,"
+            f"scale={pre_w}:{pre_h}:force_original_aspect_ratio=increase,"
+            f"crop={pre_w}:{pre_h},"
             f"zoompan="
             f"z='min(zoom+0.0008,1.5)':"
             f"d={frames}:"

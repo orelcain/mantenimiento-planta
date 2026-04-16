@@ -35,8 +35,9 @@ DEFAULT_VOICE  = "af_heart"     # default character voice
 NARRATOR_VOICE = "am_michael"   # voice for NARRADOR lines
 
 # Path to Kokoro model files (relative to project root)
-_ONNX_MODEL = Path(__file__).parent.parent / "kokoro-v0_19.onnx"
-_VOICES_JSON = Path(__file__).parent.parent / "voices.json"
+# kokoro-onnx v0.5.0 uses kokoro-v1.0.onnx + voices-v1.0.bin
+_ONNX_MODEL = Path(__file__).parent.parent / "kokoro-v1.0.onnx"
+_VOICES_BIN = Path(__file__).parent.parent / "voices-v1.0.bin"
 
 # Module-level cache so we don't reload the model on every call
 _kokoro_instance = None
@@ -108,7 +109,9 @@ def _synthesize_kokoro(
     if _kokoro_instance is None:
         if not _ONNX_MODEL.exists():
             raise FileNotFoundError(_ONNX_MODEL)
-        _kokoro_instance = Kokoro(str(_ONNX_MODEL), str(_VOICES_JSON))
+        if not _VOICES_BIN.exists():
+            raise FileNotFoundError(_VOICES_BIN)
+        _kokoro_instance = Kokoro(str(_ONNX_MODEL), str(_VOICES_BIN))
 
     samples, sample_rate = _kokoro_instance.create(
         text, voice=voice, speed=speed, lang=lang

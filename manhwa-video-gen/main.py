@@ -128,8 +128,14 @@ def main() -> None:
         img_path = img_dir / f"scene_{scene.number:03d}.png"
         scene_images[scene.number] = img_path
 
-        if args.skip_images and img_path.exists():
-            print(f"  Scene {scene.number:>3}: skipped (image exists)")
+        if args.skip_images:
+            if img_path.exists():
+                print(f"  Scene {scene.number:>3}: skipped (image exists)")
+            else:
+                # Create a black placeholder so TTS + video can still be tested
+                from PIL import Image as _PILImage
+                _PILImage.new("RGB", (config.IMAGE_WIDTH, config.IMAGE_HEIGHT), (0, 0, 0)).save(img_path)
+                print(f"  Scene {scene.number:>3}: placeholder (black) created")
             continue
 
         # Build character appearance dict for speakers in this scene

@@ -23,10 +23,10 @@ KEN_BURNS_EFFECT = True   # Slow zoom on each panel
 
 # ── TTS (Kokoro) ──────────────────────────────────────────────────────────────
 # Install: pip install kokoro-onnx soundfile
-# Models:  https://github.com/thewh1teagle/kokoro-onnx/releases
-# Place kokoro-v0_19.onnx and voices.json next to this file.
+# Models:  https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0
+# Files needed: kokoro-v1.0.onnx + voices-v1.0.bin (place next to this file)
 TTS_SPEED = 1.0
-TTS_LANG  = "e"   # 'e' = English. Change to 'es' for Spanish if available.
+TTS_LANG  = "en-us"   # kokoro-onnx v0.5.0 codes: 'en-us', 'en-gb', 'es'
 
 # Map speaker names (uppercase) to Kokoro voice IDs.
 # Female EN: af_heart, af_bella, af_nicole, af_sky
