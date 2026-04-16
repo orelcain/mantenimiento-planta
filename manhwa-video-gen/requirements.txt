@@ -1,21 +1,31 @@
-# Manhwa Video Generator — Python dependencies
-# Install with: pip install -r requirements.txt
+# Manhwa Video Generator — Dependencias Python
+# Instalar con: pip install -r requirements.txt
 
-# Video assembly
+# Ensamble de video
 moviepy>=1.0.3
 
-# HTTP (ComfyUI API)
+# HTTP (API de ComfyUI)
 requests>=2.31.0
 
-# TTS — primary (local, free, high quality)
+# TTS en español — Edge TTS (voces neurales Microsoft, requiere internet)
+edge-tts>=6.1.9
+
+# TTS en inglés — Kokoro ONNX (offline, alta calidad)
+# Modelos: kokoro-v1.0.onnx + voices-v1.0.bin desde:
+# https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0
 kokoro-onnx>=0.3.0
 soundfile>=0.12.1
 
-# TTS — fallback (no model files needed)
+# TTS fallback (sin modelos adicionales)
 pyttsx3>=2.90
 
-# Image utilities
+# Utilidades de imagen
 Pillow>=10.0.0
 
-# Phase 2 — Story generation with Claude API
+# Fase 2 — Generación de historias con IA
+# backend 'anthropic' (recomendado, ~$0.001/historia):
 anthropic>=0.40.0
+# backend 'gemini' (gratis 1500 req/día):
+# pip install google-generativeai
+# backend 'ollama' (100% local, gratis):
+# Instalar desde https://ollama.com + ejecutar: ollama pull llama3.2:3b

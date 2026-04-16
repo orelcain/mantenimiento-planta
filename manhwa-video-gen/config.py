@@ -1,10 +1,10 @@
 """
-Manhwa Video Generator — Configuration
-Edit this file to match your local setup.
+Manhwa Video Generator — Configuración
+Editá este archivo para ajustar a tu setup local.
 """
 from pathlib import Path
 
-# ── Directories ───────────────────────────────────────────────────────────────
+# ── Directorios ───────────────────────────────────────────────────────────────
 ROOT_DIR   = Path(__file__).parent
 OUTPUT_DIR = ROOT_DIR / "output"
 ASSETS_DIR = ROOT_DIR / "assets"
@@ -12,32 +12,40 @@ MUSIC_DIR  = ASSETS_DIR / "music"
 
 # ── ComfyUI ───────────────────────────────────────────────────────────────────
 COMFYUI_URL        = "http://localhost:8188"
-# Name of the checkpoint file inside ComfyUI/models/checkpoints/
-# Good free options: anything-v5.safetensors, dreamshaper_8.safetensors
+# Nombre del checkpoint dentro de ComfyUI/models/checkpoints/
+# Opciones gratuitas recomendadas: anything-v5.safetensors, dreamshaper_8.safetensors
 COMFYUI_CHECKPOINT = "anything-v5.safetensors"
 
-# ── Image ─────────────────────────────────────────────────────────────────────
+# ── Imagen ────────────────────────────────────────────────────────────────────
 IMAGE_WIDTH      = 720
-IMAGE_HEIGHT     = 1280   # 9:16 vertical — ideal for YouTube Shorts & mobile
-KEN_BURNS_EFFECT = True   # Slow zoom on each panel
+IMAGE_HEIGHT     = 1280   # 9:16 vertical — ideal para YouTube Shorts y mobile
+KEN_BURNS_EFFECT = True   # Zoom lento en cada panel
 
-# ── TTS (Kokoro) ──────────────────────────────────────────────────────────────
-# Install: pip install kokoro-onnx soundfile
-# Models:  https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0
-# Files needed: kokoro-v1.0.onnx + voices-v1.0.bin (place next to this file)
-TTS_SPEED = 1.0
-TTS_LANG  = "en-us"   # kokoro-onnx v0.5.0 codes: 'en-us', 'en-gb', 'es'
+# ── TTS — Motor de voz ────────────────────────────────────────────────────────
+# Opciones: "edge" (español nativo, requiere internet) | "kokoro" (offline, solo inglés)
+TTS_ENGINE = "edge"
+TTS_SPEED  = 1.0
+TTS_LANG   = "es"   # "es" para español, "en-us" para inglés
 
-# Map speaker names (uppercase) to Kokoro voice IDs.
-# Female EN: af_heart, af_bella, af_nicole, af_sky
-# Male EN:   am_adam, am_michael
+# Voces por personaje (MAYÚSCULAS = nombre del personaje)
+# Edge TTS español: es-MX-DaliaNeural, es-MX-JorgeNeural, es-ES-ElviraNeural,
+#                   es-AR-ElenaNeural, es-CO-SalomeNeural, es-ES-AlvaroNeural
+# Kokoro (inglés):  af_heart, af_bella, am_michael, am_adam
 CHARACTER_VOICES: dict[str, str] = {
-    "NARRADOR": "am_michael",
-    # Add per-character overrides here:
-    # "YUNA":   "af_heart",
-    # "SOMBRA": "am_adam",
+    "NARRADOR": "es-MX-JorgeNeural",     # voz masculina mexicana para narración
+    # Agregá overrides por personaje:
+    # "YUNA":   "es-MX-DaliaNeural",
+    # "SOMBRA": "es-ES-AlvaroNeural",
 }
 
-# ── Audio / Music ─────────────────────────────────────────────────────────────
-MUSIC_VOLUME        = 0.12          # 0.0–1.0, background music level
-DEFAULT_MUSIC_TRACK = "ambient_01.mp3"   # file inside assets/music/
+# ── Generación de historias (Fase 2) ──────────────────────────────────────────
+# Backend de IA para generar guiones: "ollama" | "gemini" | "anthropic"
+# ollama    → 100% local, gratis, sin internet (requiere Ollama corriendo)
+# gemini    → Google Gemini Flash, gratis 1500 req/día (setx GEMINI_API_KEY tu-clave)
+# anthropic → Claude Haiku, ~$0.001/historia (setx ANTHROPIC_API_KEY tu-clave)
+STORY_BACKEND = "ollama"
+STORY_MODEL   = "llama3.2:3b"   # Modelo de Ollama a usar
+
+# ── Audio / Música ────────────────────────────────────────────────────────────
+MUSIC_VOLUME        = 0.12          # 0.0–1.0, nivel de música de fondo
+DEFAULT_MUSIC_TRACK = "ambient_01.mp3"   # archivo dentro de assets/music/

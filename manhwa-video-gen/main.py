@@ -43,23 +43,28 @@ from modules.video_builder import (
 
 def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
-        description="Generate a narrated manhwa-style video from a .txt script or a one-line idea."
+        description="Genera un video manhwa narrado en español desde un guion .txt o una idea de 1 línea."
     )
-    # Input: either a pre-written script OR a one-line idea (generates script with Claude)
+    # Entrada: guion existente O idea (genera el guion con IA)
     input_group = p.add_mutually_exclusive_group(required=True)
-    input_group.add_argument("--script", help="Path to .txt script file")
-    input_group.add_argument("--idea",   help="One-line story idea — generates script with Claude API")
+    input_group.add_argument("--script", help="Ruta al archivo .txt del guion")
+    input_group.add_argument("--idea",   help="Idea de una línea — genera el guion con IA")
 
-    p.add_argument("--genre",       default="auto",
-                   choices=["auto", "romance", "action", "fantasy", "horror"],
-                   help="Story genre for --idea mode (default: auto)")
-    p.add_argument("--num-scenes",  type=int, default=6,
-                   help="Number of scenes to generate in --idea mode (default: 6)")
-    p.add_argument("--output",       default=None,  help="Output MP4 path (default: output/<title>.mp4)")
-    p.add_argument("--skip-images",  action="store_true", help="Skip image generation — reuse existing PNGs")
-    p.add_argument("--skip-tts",     action="store_true", help="Skip TTS — reuse existing WAVs")
-    p.add_argument("--no-music",     action="store_true", help="Skip background music mixing")
-    p.add_argument("--no-ken-burns", action="store_true", help="Disable Ken Burns zoom effect")
+    p.add_argument("--genre",    default="auto",
+                   choices=["auto", "romance", "accion", "fantasia", "horror"],
+                   help="Género de la historia para modo --idea (default: auto)")
+    p.add_argument("--num-scenes", type=int, default=6,
+                   help="Número de escenas a generar (default: 6)")
+    p.add_argument("--backend",  default=None,
+                   choices=["ollama", "gemini", "anthropic"],
+                   help="Backend de IA para generar historia (default: config.STORY_BACKEND)")
+    p.add_argument("--compare-backends", action="store_true",
+                   help="Genera con los 3 backends, el jurado IA elige el mejor")
+    p.add_argument("--output",       default=None,  help="Ruta del MP4 de salida")
+    p.add_argument("--skip-images",  action="store_true", help="Saltear generación de imágenes")
+    p.add_argument("--skip-tts",     action="store_true", help="Saltear TTS — reusar WAVs existentes")
+    p.add_argument("--no-music",     action="store_true", help="Sin música de fondo")
+    p.add_argument("--no-ken-burns", action="store_true", help="Desactivar efecto Ken Burns")
     return p.parse_args()
 
 
@@ -68,19 +73,31 @@ def _parse_args() -> argparse.Namespace:
 def main() -> None:
     args = _parse_args()
 
-    # ── Phase 2: generate script from idea ───────────────────────────────────
+    # ── Fase 2: generar guion con IA ─────────────────────────────────────────
     if args.idea:
-        print("\n── [0/4] Generating script from idea (Claude API) ──────────────────")
-        from modules.story_gen import generate_story
-        script_path = generate_story(
-            idea=args.idea,
-            genre=args.genre,
-            num_scenes=args.num_scenes,
-        )
+        backend = args.backend or config.STORY_BACKEND
+        print(f"\n── [0/4] Generando guion con IA ({backend}) ────────────────────────")
+
+        if args.compare_backends:
+            from modules.story_gen import compare_and_judge
+            script_path = compare_and_judge(
+                idea=args.idea,
+                genre=args.genre,
+                num_scenes=args.num_scenes,
+            )
+        else:
+            from modules.story_gen import generate_story
+            script_path = generate_story(
+                idea=args.idea,
+                genre=args.genre,
+                num_scenes=args.num_scenes,
+                backend=backend,
+                model=config.STORY_MODEL if backend == "ollama" else None,
+            )
     else:
         script_path = Path(args.script)
         if not script_path.exists():
-            print(f"[ERROR] Script not found: {script_path}")
+            print(f"[ERROR] Guion no encontrado: {script_path}")
             sys.exit(1)
 
     # ── Job directories ───────────────────────────────────────────────────────
@@ -174,15 +191,18 @@ def main() -> None:
         line_paths: list[Path] = []
         for j, line in enumerate(scene.dialogue):
             line_path = scene_sub_dir / f"line_{j:03d}.wav"
-            voice     = get_voice_for_speaker(line.speaker, config.CHARACTER_VOICES)
+            voice     = get_voice_for_speaker(
+                line.speaker, config.CHARACTER_VOICES, lang=config.TTS_LANG
+            )
             label     = line.text[:55] + ("…" if len(line.text) > 55 else "")
-            print(f"  Scene {scene.number:>3} [{line.speaker:<10}]: {label}")
+            print(f"  Escena {scene.number:>3} [{line.speaker:<10}]: {label}")
             synthesize(
                 text=line.text,
                 output_path=line_path,
                 voice=voice,
                 speed=config.TTS_SPEED,
                 lang=config.TTS_LANG,
+                engine=config.TTS_ENGINE,
             )
             line_paths.append(line_path)
 

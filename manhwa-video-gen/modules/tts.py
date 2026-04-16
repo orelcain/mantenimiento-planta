@@ -1,99 +1,175 @@
 """
-tts.py — Text-to-speech synthesis (local, free).
+tts.py — Text-to-speech synthesis (local, gratis).
 
-Primary engine : Kokoro ONNX  (high quality, ~80 MB model)
-Fallback engine: pyttsx3       (no model files needed, lower quality)
+Motores disponibles
+───────────────────
+  1. Edge TTS   (Microsoft Neural, sin costo, requiere internet)
+     → Voces en ESPAÑOL nativo: es-MX-DaliaNeural, es-MX-JorgeNeural,
+       es-ES-ElviraNeural, es-AR-ElenaNeural, etc.
+     → pip install edge-tts
 
-── Setup Kokoro ────────────────────────────────────────────────────────────────
-1. pip install kokoro-onnx soundfile
-2. Download model files and place them next to config.py:
-   • kokoro-v0_19.onnx
-   • voices.json
-   Releases: https://github.com/thewh1teagle/kokoro-onnx/releases
+  2. Kokoro ONNX (alta calidad, 100% offline)
+     → Solo inglés, francés, japonés, chino
+     → pip install kokoro-onnx soundfile
+     → Modelos: kokoro-v1.0.onnx + voices-v1.0.bin
 
-── Available Kokoro voices ─────────────────────────────────────────────────────
-  Female (EN): af_heart · af_bella · af_nicole · af_sky
-  Male   (EN): am_adam  · am_michael
-  (Spanish voices may not be available in all releases)
+  3. pyttsx3 (fallback, calidad básica)
+     → pip install pyttsx3
 
-── Usage ────────────────────────────────────────────────────────────────────────
-    from modules.tts import synthesize, get_voice_for_speaker
+Configuración en config.py
+──────────────────────────
+  TTS_ENGINE = "edge"    # "edge" | "kokoro" | "pyttsx3"
+  TTS_LANG   = "es"      # "es" | "en-us"
 
-    audio_path = synthesize(
-        text="The city never sleeps, but Yuna needed rest.",
-        output_path=Path("output/job/audio/scene_001/line_000.wav"),
-        voice="am_michael",
-    )
+Voces Edge TTS para español
+────────────────────────────
+  Femeninas: es-MX-DaliaNeural · es-ES-ElviraNeural · es-AR-ElenaNeural
+             es-MX-MarinaNeural · es-CO-SalomeNeural
+  Masculinas: es-MX-JorgeNeural · es-ES-AlvaroNeural · es-AR-TomasNeural
 """
 
 from __future__ import annotations
 
+import asyncio
+import subprocess
+import sys
 from pathlib import Path
 
-# ── Voice defaults ────────────────────────────────────────────────────────────
-DEFAULT_VOICE  = "af_heart"     # default character voice
-NARRATOR_VOICE = "am_michael"   # voice for NARRADOR lines
+# ── Valores por defecto ───────────────────────────────────────────────────────
+# Edge TTS — voces para español latinoamericano
+DEFAULT_VOICE_ES  = "es-MX-DaliaNeural"    # personajes femeninos / default
+NARRATOR_VOICE_ES = "es-MX-JorgeNeural"    # NARRADOR
 
-# Path to Kokoro model files (relative to project root)
-# kokoro-onnx v0.5.0 uses kokoro-v1.0.onnx + voices-v1.0.bin
+# Kokoro (inglés, fallback)
+DEFAULT_VOICE_EN  = "af_heart"
+NARRATOR_VOICE_EN = "am_michael"
+
+# Rutas de modelos Kokoro
 _ONNX_MODEL = Path(__file__).parent.parent / "kokoro-v1.0.onnx"
 _VOICES_BIN = Path(__file__).parent.parent / "voices-v1.0.bin"
 
-# Module-level cache so we don't reload the model on every call
+# Cache del modelo Kokoro
 _kokoro_instance = None
 
 
-# ── Public API ────────────────────────────────────────────────────────────────
+# ── API pública ───────────────────────────────────────────────────────────────
 
 def synthesize(
     text: str,
     output_path: Path,
-    voice: str = DEFAULT_VOICE,
+    voice: str = DEFAULT_VOICE_ES,
     speed: float = 1.0,
-    lang: str = "e",
+    lang: str = "es",
+    engine: str = "edge",
 ) -> Path:
     """
-    Synthesize *text* to a WAV file at *output_path*.
+    Sintetiza *text* y guarda el audio en *output_path* (.wav o .mp3).
 
     Args:
-        text:        Text to speak.
-        output_path: Destination .wav file.
-        voice:       Kokoro voice ID (e.g. "af_heart", "am_michael").
-        speed:       Playback speed multiplier (0.5–2.0).
-        lang:        Language code: 'e' = English, 'es' = Spanish.
-
-    Returns the path to the saved WAV.
+        text:        Texto a narrar.
+        output_path: Archivo destino (.wav).
+        voice:       ID de voz (Edge: "es-MX-DaliaNeural" / Kokoro: "af_heart").
+        speed:       Multiplicador de velocidad (0.5–2.0).
+        lang:        Código de idioma: "es", "en-us".
+        engine:      Motor TTS: "edge", "kokoro", "pyttsx3".
     """
-    try:
-        return _synthesize_kokoro(text, output_path, voice, speed, lang)
-    except ImportError:
-        print("    [TTS] kokoro-onnx not installed — falling back to pyttsx3")
-        return _synthesize_pyttsx3(text, output_path)
-    except FileNotFoundError as exc:
-        print(f"    [TTS] Kokoro model files missing ({exc}) — falling back to pyttsx3")
+    if engine == "edge":
+        try:
+            return _synthesize_edge(text, output_path, voice, speed)
+        except Exception as exc:
+            print(f"    [TTS] Edge TTS falló ({exc}) — usando pyttsx3")
+            return _synthesize_pyttsx3(text, output_path)
+
+    elif engine == "kokoro":
+        try:
+            return _synthesize_kokoro(text, output_path, voice, speed, lang)
+        except (ImportError, FileNotFoundError) as exc:
+            print(f"    [TTS] Kokoro no disponible ({exc}) — usando Edge TTS")
+            return _synthesize_edge(text, output_path, DEFAULT_VOICE_ES, speed)
+
+    else:  # pyttsx3
         return _synthesize_pyttsx3(text, output_path)
 
 
 def get_voice_for_speaker(
     speaker: str,
     character_voices: dict[str, str] | None = None,
+    lang: str = "es",
 ) -> str:
     """
-    Resolve the Kokoro voice ID for a given speaker name.
+    Resuelve la voz para un personaje dado.
 
-    Lookup order:
-      1. character_voices override (from config.py)
-      2. NARRADOR  → NARRATOR_VOICE
-      3. Anything else → DEFAULT_VOICE
+    Orden de prioridad:
+      1. character_voices (override manual en config.py)
+      2. NARRADOR → voz de narrador según idioma
+      3. Cualquier otro → voz default según idioma
     """
     if character_voices and speaker in character_voices:
         return character_voices[speaker]
     if speaker == "NARRADOR":
-        return NARRATOR_VOICE
-    return DEFAULT_VOICE
+        return NARRATOR_VOICE_ES if lang.startswith("es") else NARRATOR_VOICE_EN
+    return DEFAULT_VOICE_ES if lang.startswith("es") else DEFAULT_VOICE_EN
 
 
-# ── Kokoro engine ─────────────────────────────────────────────────────────────
+# ── Motor Edge TTS ────────────────────────────────────────────────────────────
+
+def _synthesize_edge(
+    text: str,
+    output_path: Path,
+    voice: str,
+    speed: float = 1.0,
+) -> Path:
+    """Sintetiza con Microsoft Edge TTS (requiere internet)."""
+    import edge_tts  # type: ignore
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Edge TTS exporta MP3 — lo convertimos a WAV con FFmpeg
+    mp3_path = output_path.with_suffix(".mp3")
+
+    # Convertir speed a porcentaje de Edge TTS (+0%, +10%, -5%, etc.)
+    rate_pct = int((speed - 1.0) * 100)
+    rate_str = f"{rate_pct:+d}%"
+
+    async def _run():
+        communicate = edge_tts.Communicate(text, voice, rate=rate_str)
+        await communicate.save(str(mp3_path))
+
+    asyncio.run(_run())
+
+    # Convertir MP3 → WAV para mantener compatibilidad con el pipeline
+    _mp3_to_wav(mp3_path, output_path)
+    mp3_path.unlink(missing_ok=True)
+
+    return output_path
+
+
+def _mp3_to_wav(mp3_path: Path, wav_path: Path) -> None:
+    """Convierte MP3 a WAV usando FFmpeg."""
+    # Buscar ffmpeg en PATH + ubicación de winget
+    ffmpeg_candidates = [
+        "ffmpeg",
+        r"C:\Users\pc hp\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-8.1-full_build\bin\ffmpeg.exe",
+    ]
+    ffmpeg_exe = next(
+        (f for f in ffmpeg_candidates
+         if _is_executable(f)),
+        "ffmpeg"
+    )
+    subprocess.run(
+        [ffmpeg_exe, "-y", "-i", str(mp3_path), str(wav_path)],
+        capture_output=True, check=True
+    )
+
+
+def _is_executable(path: str) -> bool:
+    from shutil import which
+    if which(path):
+        return True
+    return Path(path).is_file()
+
+
+# ── Motor Kokoro ──────────────────────────────────────────────────────────────
 
 def _synthesize_kokoro(
     text: str,
@@ -116,7 +192,6 @@ def _synthesize_kokoro(
     samples, sample_rate = _kokoro_instance.create(
         text, voice=voice, speed=speed, lang=lang
     )
-
     output_path.parent.mkdir(parents=True, exist_ok=True)
     sf.write(str(output_path), samples, sample_rate)
     return output_path
@@ -128,9 +203,8 @@ def _synthesize_pyttsx3(text: str, output_path: Path) -> Path:
     import pyttsx3  # type: ignore
 
     engine = pyttsx3.init()
-    engine.setProperty("rate", 155)   # words per minute
+    engine.setProperty("rate", 150)
     engine.setProperty("volume", 1.0)
-
     output_path.parent.mkdir(parents=True, exist_ok=True)
     engine.save_to_file(text, str(output_path))
     engine.runAndWait()
