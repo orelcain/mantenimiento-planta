@@ -14,8 +14,8 @@ const LAST_VERSION_KEY = 'app_last_version'
 /** Retorna true solo si serverVer es MAYOR que currentVer (comparación semver simple) */
 function isNewerVersion(serverVer: string, currentVer: string): boolean {
   const parse = (v: string) => v.split('.').map(Number)
-  const [sM, sm, sp] = parse(serverVer)
-  const [cM, cm, cp] = parse(currentVer)
+  const [sM = 0, sm = 0, sp = 0] = parse(serverVer)
+  const [cM = 0, cm = 0, cp = 0] = parse(currentVer)
   if (sM !== cM) return sM > cM
   if (sm !== cm) return sm > cm
   return sp > cp

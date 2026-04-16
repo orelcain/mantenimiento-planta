@@ -2,7 +2,8 @@ import { Link } from 'react-router-dom'
 import {
   AlertTriangle, Package, Camera, CalendarClock, Wrench,
   BarChart3, Map, Route, Activity, Settings, FileText,
-  GraduationCap, ChevronRight, ClipboardList,
+  GraduationCap, ChevronRight, ClipboardList, CloudSun,
+  Box, Cpu, BookOpen, FolderTree, MapPin, TrendingUp,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store'
@@ -39,41 +40,65 @@ const COLOR: Record<TileColor, { bg: string; border: string; icon: string; label
 // ─── Tiles por rol ────────────────────────────────────────────────────────────
 
 const TILES: Record<UserRole, Tile[]> = {
-  // TÉCNICO — trabaja en planta, necesita reportar rápido y acceder a manuales/repuestos
+  // TÉCNICO — trabaja en planta, reporta, consulta manuales y aprende
   tecnico: [
-    { id: 'incidents', label: 'Nueva Incidencia',   sublabel: 'Levantar problema',    icon: AlertTriangle, href: '/incidents',      color: 'red',     size: 'full'  },
-    { id: 'repuestos', label: 'Repuestos',           sublabel: 'Piezas & manuales',   icon: Package,       href: '/repuestos',      color: 'blue',    size: 'half'  },
-    { id: 'evidencia', label: 'Foto-evidencia',      sublabel: 'Registrar imagen',    icon: Camera,        href: '/photo-evidence', color: 'slate',   size: 'half'  },
-    { id: 'prevntv',   label: 'Preventivo',          sublabel: 'Mis tareas',          icon: CalendarClock, href: '/preventive',     color: 'amber',   size: 'half'  },
-    { id: 'equipos',   label: 'Equipos',             sublabel: 'Ficha técnica',       icon: Wrench,        href: '/equipment',      color: 'slate',   size: 'half'  },
+    { id: 'incidents', label: 'Nueva Incidencia',   sublabel: 'Levantar problema',     icon: AlertTriangle, href: '/incidents',      color: 'red',     size: 'full'  },
+    { id: 'repuestos', label: 'Repuestos',           sublabel: 'Piezas & manuales',    icon: Package,       href: '/repuestos',      color: 'blue',    size: 'half'  },
+    { id: 'aprende',   label: 'Aprendizaje',         sublabel: 'Cursos & guías',       icon: GraduationCap, href: '/aprendizaje',    color: 'purple',  size: 'half'  },
+    { id: 'prevntv',   label: 'Preventivo',          sublabel: 'Mis tareas',           icon: CalendarClock, href: '/preventive',     color: 'amber',   size: 'half'  },
+    { id: 'equipos',   label: 'Equipos',             sublabel: 'Ficha técnica',        icon: Wrench,        href: '/equipment',      color: 'slate',   size: 'half'  },
+    { id: 'evidencia', label: 'Foto-evidencia',      sublabel: 'Registrar imagen',     icon: Camera,        href: '/photo-evidence', color: 'slate',   size: 'half'  },
+    { id: 'visor3d',   label: 'Visor 3D',            sublabel: 'Modelos de equipos',   icon: Box,           href: '/visor-3d',       color: 'slate',   size: 'half'  },
   ],
 
-  // SUPERVISOR — valida incidencias, monitorea rendimiento y planifica
+  // SUPERVISOR — valida, monitorea, planifica
   supervisor: [
-    { id: 'incidents', label: 'Incidencias',         sublabel: 'Revisar & validar',   icon: AlertTriangle, href: '/incidents',          color: 'red',     size: 'half'  },
-    { id: 'grader',    label: 'Análisis Grader',     sublabel: 'Rendimiento piezas',  icon: BarChart3,     href: '/analisis-grader',    color: 'blue',    size: 'half'  },
-    { id: 'inspecc',   label: 'Inspecciones',        sublabel: 'Rondas pendientes',   icon: Route,         href: '/inspections',         color: 'amber',   size: 'half'  },
-    { id: 'mapa',      label: 'Mapa Planta',         sublabel: 'Vista de zonas',      icon: Map,           href: '/map',                color: 'emerald', size: 'half'  },
-    { id: 'prevntv',   label: 'Plan Preventivo',     sublabel: 'Mantención programada', icon: CalendarClock, href: '/preventive',       color: 'slate',   size: 'full'  },
+    { id: 'incidents', label: 'Incidencias',         sublabel: 'Revisar & validar',    icon: AlertTriangle, href: '/incidents',        color: 'red',     size: 'half'  },
+    { id: 'grader',    label: 'Análisis Grader',     sublabel: 'Rendimiento piezas',   icon: BarChart3,     href: '/analisis-grader',  color: 'blue',    size: 'half'  },
+    { id: 'repuestos', label: 'Repuestos',           sublabel: 'Stock & manuales',     icon: Package,       href: '/repuestos',        color: 'blue',    size: 'half'  },
+    { id: 'inspecc',   label: 'Inspecciones',        sublabel: 'Rondas pendientes',    icon: Route,         href: '/inspections',      color: 'amber',   size: 'half'  },
+    { id: 'prevntv',   label: 'Preventivo',          sublabel: 'Mantención programada',icon: CalendarClock, href: '/preventive',       color: 'amber',   size: 'half'  },
+    { id: 'mapa',      label: 'Mapa Planta',         sublabel: 'Vista de zonas',       icon: Map,           href: '/map',              color: 'emerald', size: 'half'  },
+    { id: 'aprende',   label: 'Aprendizaje',         sublabel: 'Cursos & guías',       icon: GraduationCap, href: '/aprendizaje',      color: 'purple',  size: 'half'  },
+    { id: 'clima',     label: 'Clima Puerto',        sublabel: 'Condiciones actuales', icon: CloudSun,      href: '/clima-puerto',     color: 'slate',   size: 'half'  },
   ],
 
-  // ADMIN — control total: alertas, sensores, config y análisis
+  // ADMIN — acceso completo a todos los módulos
   admin: [
-    { id: 'incidents', label: 'Incidencias',         sublabel: 'Ver todas',           icon: AlertTriangle, href: '/incidents',          color: 'red',     size: 'half'  },
-    { id: 'sensores',  label: 'Sensores',            sublabel: 'Monitor tiempo real', icon: Activity,      href: '/sensors/monitor',    color: 'green',   size: 'half'  },
-    { id: 'grader',    label: 'Grader',              sublabel: 'Análisis de piezas',  icon: BarChart3,     href: '/analisis-grader',    color: 'blue',    size: 'half'  },
-    { id: 'ett',       label: 'ETT',                 sublabel: 'Evaluaciones',        icon: FileText,      href: '/admin/ett',          color: 'purple',  size: 'half'  },
-    { id: 'inspecc',   label: 'Inspecciones',        sublabel: 'Rondas & seguimiento', icon: ClipboardList, href: '/inspections',        color: 'amber',   size: 'half'  },
-    { id: 'settings',  label: 'Configuración',       sublabel: 'Permisos & módulos',  icon: Settings,      href: '/settings',           color: 'slate',   size: 'half'  },
+    // Operaciones
+    { id: 'incidents', label: 'Incidencias',         sublabel: 'Ver todas',            icon: AlertTriangle, href: '/incidents',        color: 'red',     size: 'half'  },
+    { id: 'repuestos', label: 'Repuestos',           sublabel: 'Piezas & manuales',    icon: Package,       href: '/repuestos',        color: 'blue',    size: 'half'  },
+    { id: 'equipos',   label: 'Equipos',             sublabel: 'Ficha técnica',        icon: Wrench,        href: '/equipment',        color: 'slate',   size: 'half'  },
+    { id: 'evidencia', label: 'Foto-evidencia',      sublabel: 'Foto-registros',       icon: Camera,        href: '/photo-evidence',   color: 'slate',   size: 'half'  },
+    // Planificación
+    { id: 'inspecc',   label: 'Inspecciones',        sublabel: 'Rondas & seguimiento', icon: ClipboardList, href: '/inspections',      color: 'amber',   size: 'half'  },
+    { id: 'prevntv',   label: 'Preventivo',          sublabel: 'Plan mantención',      icon: CalendarClock, href: '/preventive',       color: 'amber',   size: 'half'  },
+    { id: 'gantt',     label: 'Gantt',               sublabel: 'Planificador',         icon: TrendingUp,    href: '/gantt',            color: 'orange',  size: 'half'  },
+    // Análisis & monitoreo
+    { id: 'grader',    label: 'Grader',              sublabel: 'Análisis de piezas',   icon: BarChart3,     href: '/analisis-grader',  color: 'blue',    size: 'half'  },
+    { id: 'sensores',  label: 'Sensores',            sublabel: 'Monitor tiempo real',  icon: Activity,      href: '/sensors/monitor',  color: 'green',   size: 'half'  },
+    { id: 'mapa',      label: 'Mapa Planta',         sublabel: 'Vista de zonas',       icon: Map,           href: '/map',              color: 'emerald', size: 'half'  },
+    { id: 'clima',     label: 'Clima Puerto',        sublabel: 'Condiciones actuales', icon: CloudSun,      href: '/clima-puerto',     color: 'slate',   size: 'half'  },
+    // Herramientas
+    { id: 'visor3d',   label: 'Visor 3D',            sublabel: 'Modelos de equipos',   icon: Box,           href: '/visor-3d',         color: 'slate',   size: 'half'  },
+    { id: 'aprende',   label: 'Aprendizaje',         sublabel: 'Cursos & guías',       icon: GraduationCap, href: '/aprendizaje',      color: 'purple',  size: 'half'  },
+    { id: 'hmi',       label: 'HMI Knuro',           sublabel: 'Interfaz máquina',     icon: Cpu,           href: '/hmi-knuro',        color: 'slate',   size: 'half'  },
+    { id: 'baader',    label: 'Baader 200',          sublabel: 'Guía de operación',    icon: BookOpen,      href: '/baader-200',       color: 'slate',   size: 'half'  },
+    // Admin
+    { id: 'ett',       label: 'ETT',                 sublabel: 'Evaluaciones',         icon: FileText,      href: '/admin/ett',        color: 'purple',  size: 'half'  },
+    { id: 'jerarq',    label: 'Jerarquías',          sublabel: 'Estructura SAP',       icon: FolderTree,    href: '/hierarchy',        color: 'slate',   size: 'half'  },
+    { id: 'mapas',     label: 'Editor Mapas',        sublabel: 'Zonas & áreas',        icon: MapPin,        href: '/admin/maps',       color: 'emerald', size: 'half'  },
+    { id: 'settings',  label: 'Configuración',       sublabel: 'Permisos & módulos',   icon: Settings,      href: '/settings',         color: 'slate',   size: 'half'  },
   ],
 
-  // USUARIO BÁSICO — solo reporta y consulta
+  // USUARIO BÁSICO — reporta y consulta
   usuario: [
-    { id: 'incidents', label: 'Reportar Incidencia', sublabel: 'Levantar problema',   icon: AlertTriangle, href: '/incidents',      color: 'red',     size: 'full'  },
-    { id: 'repuestos', label: 'Repuestos',           sublabel: 'Piezas & manuales',   icon: Package,       href: '/repuestos',      color: 'blue',    size: 'half'  },
-    { id: 'equipos',   label: 'Equipos',             sublabel: 'Ficha de máquina',    icon: Wrench,        href: '/equipment',      color: 'slate',   size: 'half'  },
-    { id: 'aprende',   label: 'Aprendizaje',         sublabel: 'Cursos & guías',      icon: GraduationCap, href: '/aprendizaje',    color: 'purple',  size: 'half'  },
-    { id: 'evidencia', label: 'Evidencia',           sublabel: 'Foto-registros',      icon: Camera,        href: '/photo-evidence', color: 'slate',   size: 'half'  },
+    { id: 'incidents', label: 'Reportar Incidencia', sublabel: 'Levantar problema',    icon: AlertTriangle, href: '/incidents',      color: 'red',     size: 'full'  },
+    { id: 'repuestos', label: 'Repuestos',           sublabel: 'Piezas & manuales',    icon: Package,       href: '/repuestos',      color: 'blue',    size: 'half'  },
+    { id: 'equipos',   label: 'Equipos',             sublabel: 'Ficha de máquina',     icon: Wrench,        href: '/equipment',      color: 'slate',   size: 'half'  },
+    { id: 'aprende',   label: 'Aprendizaje',         sublabel: 'Cursos & guías',       icon: GraduationCap, href: '/aprendizaje',    color: 'purple',  size: 'half'  },
+    { id: 'clima',     label: 'Clima Puerto',        sublabel: 'Condiciones actuales', icon: CloudSun,      href: '/clima-puerto',   color: 'slate',   size: 'half'  },
+    { id: 'evidencia', label: 'Evidencia',           sublabel: 'Foto-registros',       icon: Camera,        href: '/photo-evidence', color: 'slate',   size: 'half'  },
   ],
 }
 
