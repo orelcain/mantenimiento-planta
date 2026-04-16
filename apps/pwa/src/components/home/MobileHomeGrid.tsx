@@ -57,6 +57,8 @@ const MACHINE_TILES: Tile[] = LEARNING_MACHINES.map((m) => ({
   icon:     m.icon,
   href:     m.customRoute ?? `/aprendizaje/maquina/${m.slug}`,
   color:    'blue' as TileColor,
+  // WIP si ninguna sección tiene contenido real
+  wip:      !Object.values(m.sections).some(Boolean),
 }))
 
 const HMI_TILES: Tile[] = [
@@ -206,6 +208,33 @@ function getGreeting() {
 
 // ─── Sub-componentes ──────────────────────────────────────────────────────────
 
+function WipRibbon({ variant = 'chip' }: { variant?: 'chip' | 'cta' }) {
+  if (variant === 'cta') {
+    return (
+      <span className="shrink-0 text-[9px] font-bold tracking-wide px-1.5 py-0.5 rounded-full bg-amber-400 text-amber-950 leading-none">
+        🚧 en desarrollo
+      </span>
+    )
+  }
+  // Ribbon diagonal para chips
+  return (
+    <div className="absolute inset-0 overflow-hidden rounded-xl pointer-events-none z-10">
+      <div
+        className="absolute bg-amber-400 text-amber-950 font-bold text-[6.5px] tracking-tight uppercase text-center leading-none py-[3.5px] shadow-sm"
+        style={{
+          width: '88px',
+          top: '12px',
+          right: '-22px',
+          transform: 'rotate(38deg)',
+          transformOrigin: 'center',
+        }}
+      >
+        en desarrollo
+      </div>
+    </div>
+  )
+}
+
 function CtaTile({ tile }: { tile: Tile }) {
   const c = COLOR[tile.color]
   const Icon = tile.icon
@@ -213,7 +242,7 @@ function CtaTile({ tile }: { tile: Tile }) {
     <Link
       to={tile.href}
       className={cn(
-        'flex items-center gap-3 px-4 py-3.5 rounded-xl border mb-2',
+        'flex items-center gap-3 px-4 py-3.5 rounded-xl border mb-2 overflow-hidden relative',
         'transition-all active:scale-[0.98] touch-manipulation select-none',
         c.bg, c.border,
       )}
@@ -222,16 +251,10 @@ function CtaTile({ tile }: { tile: Tile }) {
         <Icon className={cn('h-5 w-5', c.icon)} />
       </div>
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5">
-          <p className={cn('font-semibold text-sm leading-tight', c.label)}>{tile.label}</p>
-          {tile.wip && (
-            <span className="text-[9px] font-bold uppercase tracking-wide px-1 py-0.5 rounded bg-amber-400/20 text-amber-600 dark:text-amber-400 border border-amber-400/30 leading-none shrink-0">
-              🚧 dev
-            </span>
-          )}
-        </div>
+        <p className={cn('font-semibold text-sm leading-tight', c.label)}>{tile.label}</p>
         <p className="text-xs text-muted-foreground mt-0.5">{tile.sublabel}</p>
       </div>
+      {tile.wip && <WipRibbon variant="cta" />}
       <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
     </Link>
   )
@@ -244,16 +267,12 @@ function Chip({ tile }: { tile: Tile }) {
     <Link
       to={tile.href}
       className={cn(
-        'flex-shrink-0 flex flex-col items-center gap-1.5 p-2.5 rounded-xl border relative',
+        'flex-shrink-0 flex flex-col items-center gap-1.5 p-2.5 rounded-xl border relative overflow-hidden',
         'w-[72px] min-h-[64px] transition-all active:scale-[0.95] touch-manipulation select-none',
         c.bg, c.border,
       )}
     >
-      {tile.wip && (
-        <span className="absolute -top-1.5 -right-1 text-[8px] font-bold px-1 py-px rounded-full bg-amber-400 text-amber-900 leading-none z-10">
-          🚧
-        </span>
-      )}
+      {tile.wip && <WipRibbon variant="chip" />}
       <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center', c.bg)}>
         <Icon className={cn('h-3.5 w-3.5', c.icon)} />
       </div>
