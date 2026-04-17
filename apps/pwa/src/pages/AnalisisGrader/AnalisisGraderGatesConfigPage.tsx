@@ -84,6 +84,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
   const [shiftSchedule, setShiftSchedule] = useState(DEFAULT_SHIFT_SCHEDULE)
   const [showPhysicalConfig, setShowPhysicalConfig] = useState(false)
   const [editingEquipo, setEditingEquipo] = useState(false)
+  const [fisicaSubTab, setFisicaSubTab] = useState<'producto' | 'cintas' | 'distancias' | 'calibracion'>('producto')
   const [physicalConfig, setPhysicalConfig] = useState<GraderPhysicalConfig>(DEFAULT_PHYSICAL_CONFIG)
   const [savingPhysical, setSavingPhysical] = useState(false)
   const [physicalError, setPhysicalError] = useState<string | null>(null)
@@ -900,7 +901,32 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
               Usados para calcular separación entre peces, timing de flippers y enriquecer el contexto de la IA.
             </p>
 
+            {/* Sub-tabs Física */}
+            <div className="flex gap-0 border-b border-border/50">
+              {([
+                { id: 'producto',     label: 'Producto' },
+                { id: 'cintas',       label: 'Cintas' },
+                { id: 'distancias',   label: 'Distancias' },
+                { id: 'calibracion',  label: 'Calibración' },
+              ] as const).map(({ id, label }) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setFisicaSubTab(id)}
+                  className={cn(
+                    'px-3 py-1.5 text-xs font-medium border-b-2 -mb-px transition-colors',
+                    fisicaSubTab === id
+                      ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
+                      : 'border-transparent text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
             {/* Dimensiones del salmón, flipper y pockets */}
+            {fisicaSubTab === 'producto' && (
             <div>
               <p className="text-sm font-medium mb-3">Producto y flipper</p>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -995,8 +1021,10 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                 )
               })()}
             </div>
+            )}
 
             {/* Cintas */}
+            {fisicaSubTab === 'cintas' && (
             <div>
               <p className="text-sm font-medium mb-3">Cintas transportadoras</p>
               <p className="text-xs text-muted-foreground mb-2">
@@ -1061,9 +1089,10 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                 <span className="text-amber-600 font-medium">⚠ Estimado</span> = derivado de unidades Z2 × factor k (pendiente verificar con tachómetro). Ver sección "Calibración".
               </p>
             </div>
+            )}
 
             {/* Z-Belt variador Danfoss */}
-            {physicalConfig.zetaDrive && (() => {
+            {fisicaSubTab === 'calibracion' && physicalConfig.zetaDrive && (() => {
               const drive = physicalConfig.zetaDrive!
               const computed = computeZetaBeltSpeedMps(drive)
               const throughput = estimateZetaThroughput(computed ?? 0, physicalConfig.avgFishSpacingOnZetaBeltM)
@@ -1189,6 +1218,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
             })()}
 
             {/* Distancias de flippers */}
+            {fisicaSubTab === 'distancias' && (
             <div>
               <p className="text-sm font-medium mb-1">Distancias de flippers desde fotocélula</p>
               <p className="text-xs text-muted-foreground mb-3">
@@ -1251,8 +1281,10 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                 )
               })()}
             </div>
+            )}
 
             {/* ── Configuración Neumática ──────────────────────────────── */}
+            {fisicaSubTab === 'calibracion' && (
             <details className="rounded-lg border border-border/40 bg-muted/5">
               <summary className="flex cursor-pointer select-none items-center gap-2 px-4 py-3 text-sm font-medium hover:bg-muted/20 rounded-lg">
                 Configuración Neumática
@@ -1424,8 +1456,10 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
               </p>
               </div>
             </details>
+            )}
 
             {/* Valores Z2 — dis1..dis12 */}
+            {fisicaSubTab === 'distancias' && (
             <div>
               <p className="text-sm font-medium mb-1">Distancias Z2 programadas (dis1–dis12)</p>
               <p className="text-xs text-muted-foreground mb-3">
@@ -1503,8 +1537,10 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                 Δ negativo = Z2 dispara antes que la posición física del pivot (compensación neumática normal).
               </p>
             </div>
+            )}
 
             {/* Verificación multi-fuente de velocidades */}
+            {fisicaSubTab === 'calibracion' && (
             <details className="rounded-lg border border-border/40 bg-muted/5">
               <summary className="flex cursor-pointer select-none items-center gap-2 px-4 py-3 text-sm font-medium hover:bg-muted/20 rounded-lg">
                 Verificación de velocidades — comparar fuentes
@@ -1710,6 +1746,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
               </div>
               </div>
             </details>
+            )}
 
             {/* Guardar */}
             <div className="flex items-center justify-between gap-2 flex-wrap pt-2 border-t">
