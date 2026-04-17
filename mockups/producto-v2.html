@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grader · Producto v2 (mockup)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { background:#0a0f14; color:#e5e7eb; font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; }
+  .card { background:#0f172a; border:1px solid #1e293b; border-radius: 12px; }
+  .subcard { background:#0b1220; border:1px solid #1e293b; border-radius: 10px; }
+  .label { color:#94a3b8; font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
+  input, select { background:#0b1220; border:1px solid #334155; color:#e5e7eb; border-radius:8px; padding:6px 10px; }
+  input:focus, select:focus { outline:2px solid #10b981; outline-offset:1px; }
+  .pill { display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:999px; font-size:12px; font-weight:500; }
+  .pill-green { background: rgba(16,185,129,.15); color:#6ee7b7; border:1px solid rgba(16,185,129,.35); }
+  .pill-amber { background: rgba(245,158,11,.15); color:#fcd34d; border:1px solid rgba(245,158,11,.35); }
+  .pill-red   { background: rgba(239,68,68,.15);  color:#fca5a5; border:1px solid rgba(239,68,68,.35); }
+  .pill-info  { background: rgba(56,189,248,.12); color:#7dd3fc; border:1px solid rgba(56,189,248,.35); }
+  .chip { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:6px; font-size:11px; background:#1e293b; color:#94a3b8; }
+  details > summary { list-style:none; cursor:pointer; }
+  details > summary::-webkit-details-marker { display:none; }
+  details[open] .caret { transform: rotate(90deg); }
+  .caret { display:inline-block; transition:transform .2s; }
+  .switch { position:relative; display:inline-flex; width:36px; height:20px; background:#334155; border-radius:999px; transition: background .2s; cursor:pointer; }
+  .switch::after { content:""; position:absolute; top:2px; left:2px; width:16px; height:16px; background:white; border-radius:50%; transition: transform .2s; }
+  .switch.on { background:#10b981; }
+  .switch.on::after { transform: translateX(16px); }
+  .divider { height:1px; background: linear-gradient(to right, transparent, #1e293b, transparent); }
+  /* Cota (dimension arrows) */
+  .cota-top { stroke:#38bdf8; stroke-width:1.4; fill:none; }
+  .cota-bottom-fish { stroke:#fb923c; stroke-width:1.4; fill:none; }
+  .cota-bottom-gap  { stroke:#10b981; stroke-width:1.4; fill:none; }
+</style>
+</head>
+<body class="p-6">
+<div class="max-w-3xl mx-auto">
+
+  <!-- Tabs header -->
+  <div class="flex gap-6 border-b border-slate-800 mb-6">
+    <div class="pb-3 text-slate-400">Análisis</div>
+    <div class="pb-3 text-slate-400">12 Gates</div>
+    <div class="pb-3 text-slate-400">Rangos</div>
+    <div class="pb-3 text-emerald-400 border-b-2 border-emerald-400 font-medium">Física</div>
+  </div>
+
+  <!-- Física sub-tabs -->
+  <div class="flex gap-5 mb-6 text-sm">
+    <div class="text-emerald-400 border-b-2 border-emerald-400 pb-2 font-medium">Producto</div>
+    <div class="text-slate-500 pb-2">Cintas</div>
+    <div class="text-slate-500 pb-2">Distancias</div>
+    <div class="text-slate-500 pb-2">Calibración</div>
+  </div>
+
+  <!-- =================== CAPA 1: HERO =================== -->
+  <section class="card p-5 mb-4">
+
+    <!-- Header: especie + peso + verdict -->
+    <div class="flex items-start justify-between gap-4 mb-4 flex-wrap">
+      <div class="flex items-center gap-3">
+        <span class="text-3xl">🐟</span>
+        <div>
+          <div class="text-lg font-semibold text-white">Salmón Coho</div>
+          <div class="text-xs text-slate-400">Lote noche · 2026-02-18 · <span class="text-emerald-400">4.26 kg</span></div>
+        </div>
+      </div>
+      <span class="pill pill-green">🟢 Setup seguro · gap 1.89 m · ratio 0.28</span>
+    </div>
+
+    <!-- DIAGRAMA DE CINTA (subido arriba) -->
+    <div class="subcard p-4 mb-5">
+      <div class="flex items-center justify-between mb-2 text-xs text-slate-400">
+        <span class="font-medium text-slate-300">Diagrama de distancias · escala real</span>
+        <span>cinta <b class="text-slate-200">1.28 m/s</b> · tiempo entre peces <b class="text-slate-200">2.05 s</b></span>
+      </div>
+      <svg viewBox="0 0 640 180" class="w-full h-auto" style="background:rgba(16,185,129,.04); border-radius:6px;">
+        <!-- cinta -->
+        <rect x="20" y="85" width="600" height="16" fill="#1e293b" rx="2"/>
+        <!-- peces -->
+        <ellipse cx="90" cy="93" rx="42" ry="10" fill="#fb923c"/>
+        <ellipse cx="520" cy="93" rx="42" ry="10" fill="#fb923c"/>
+        <!-- cota superior (paso) -->
+        <line x1="90" y1="40" x2="520" y2="40" class="cota-top"/>
+        <line x1="90" y1="35" x2="90" y2="45" class="cota-top"/>
+        <line x1="520" y1="35" x2="520" y2="45" class="cota-top"/>
+        <text x="305" y="32" fill="#7dd3fc" font-size="11" text-anchor="middle">paso 262 cm (centro a centro)</text>
+        <!-- cota pez (largo) -->
+        <line x1="48" y1="130" x2="132" y2="130" class="cota-bottom-fish"/>
+        <line x1="48" y1="125" x2="48" y2="135" class="cota-bottom-fish"/>
+        <line x1="132" y1="125" x2="132" y2="135" class="cota-bottom-fish"/>
+        <text x="90" y="148" fill="#fb923c" font-size="11" text-anchor="middle">pez 73 cm</text>
+        <!-- cota gap libre -->
+        <line x1="132" y1="130" x2="478" y2="130" class="cota-bottom-gap"/>
+        <line x1="132" y1="125" x2="132" y2="135" class="cota-bottom-gap"/>
+        <line x1="478" y1="125" x2="478" y2="135" class="cota-bottom-gap"/>
+        <text x="305" y="148" fill="#10b981" font-size="11" text-anchor="middle" font-weight="600">gap libre 189 cm</text>
+        <!-- escala -->
+        <g stroke="#475569" stroke-width=".5">
+          <line x1="20" y1="165" x2="620" y2="165"/>
+          <line x1="20" y1="160" x2="20" y2="170"/>
+          <line x1="135" y1="162" x2="135" y2="168"/>
+          <line x1="250" y1="162" x2="250" y2="168"/>
+          <line x1="365" y1="162" x2="365" y2="168"/>
+          <line x1="480" y1="162" x2="480" y2="168"/>
+          <line x1="620" y1="160" x2="620" y2="170"/>
+        </g>
+        <text x="620" y="178" fill="#64748b" font-size="9" text-anchor="end">cm</text>
+      </svg>
+    </div>
+
+    <!-- Inputs esenciales -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+      <!-- Especie -->
+      <div>
+        <div class="label mb-1">Especie</div>
+        <select class="w-full">
+          <option>Salmón Coho</option>
+          <option>Salmón Atlántico (Salar)</option>
+        </select>
+        <div class="text-[11px] text-slate-500 mt-1">
+          FishBase LWR ℹ️
+        </div>
+      </div>
+
+      <!-- Peso mediano (en gramos — constraint del usuario) -->
+      <div>
+        <div class="label mb-1">Peso mediano lote (g)</div>
+        <input class="w-full" value="4257">
+        <div class="text-[11px] text-emerald-400 mt-1">📅 Desde calendario · 4.26 kg</div>
+      </div>
+
+      <!-- Pockets activos -->
+      <div>
+        <div class="label mb-1">Pockets activos</div>
+        <input class="w-full" value="4">
+        <div class="text-[11px] text-slate-500 mt-1">de 4 físicos</div>
+      </div>
+    </div>
+
+    <div class="divider my-4"></div>
+
+    <!-- Velocidad cinta editable + link a modal de medición -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <div class="flex items-center justify-between mb-1">
+          <div class="label">Velocidad cinta (m/s)</div>
+          <button class="pill pill-info" onclick="document.getElementById('tachModal').classList.remove('hidden')">⚙️ Medir con tacómetro</button>
+        </div>
+        <input class="w-full" value="0.70">
+        <div class="text-[11px] text-amber-400 mt-1">⚠️ Z2 config maxSpeed=700 mm/s. Recomendado medir en terreno — la velocidad real puede variar por programa activo.</div>
+      </div>
+      <div>
+        <div class="label mb-1">Última medición</div>
+        <div class="text-sm text-slate-300">— sin medición registrada —</div>
+        <div class="text-[11px] text-slate-500 mt-1">registra con tacómetro SKF para activar histórico de degradación</div>
+      </div>
+    </div>
+
+    <div class="divider my-5"></div>
+
+    <!-- Largo + Ancho con AutoField por campo (constraint del usuario) -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <div class="flex items-center justify-between mb-1">
+          <div class="label">Largo prom. salmón (cm)</div>
+          <div class="flex items-center gap-2">
+            <span class="switch on"></span>
+            <span class="text-[11px] font-medium text-emerald-400">Auto</span>
+          </div>
+        </div>
+        <input class="w-full" value="73" disabled style="opacity:.75">
+        <div class="text-[11px] text-slate-500 mt-1">Sugerido FishBase: <b class="text-slate-300">73 cm</b></div>
+      </div>
+      <div>
+        <div class="flex items-center justify-between mb-1">
+          <div class="label">Ancho prom. salmón (cm)</div>
+          <div class="flex items-center gap-2">
+            <span class="switch"></span>
+            <span class="text-[11px] text-slate-400">Manual</span>
+          </div>
+        </div>
+        <input class="w-full" value="18">
+        <div class="text-[11px] text-amber-400 mt-1">Sugerido: ~13 cm · <a href="#" class="underline">Aplicar</a></div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- =================== CAPA 2: EQUIPO (colapsable) =================== -->
+  <details class="card p-0 mb-4" open>
+    <summary class="p-5 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <span class="caret text-slate-500">▶</span>
+        <span class="font-medium text-slate-200">⚙️ Equipo flipper</span>
+        <span class="chip">ciclo 650 ms · paleta 475 mm</span>
+      </div>
+      <span class="text-[11px] text-slate-500">Parámetros Z2 + medición mecánica</span>
+    </summary>
+    <div class="px-5 pb-5 space-y-4">
+
+      <!-- A) CICLO FLIPPER (software Z2) -->
+      <div class="subcard p-4">
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <div class="text-sm font-medium text-slate-200">🖥️ Ciclo flipper (software Z2)</div>
+            <div class="text-[11px] text-slate-500">suma de los 3 parámetros del HMI Marelec · menú Servicio [8620]</div>
+          </div>
+          <span class="pill pill-info">fuente: Z2</span>
+        </div>
+        <div class="grid grid-cols-3 gap-3">
+          <div>
+            <div class="label mb-1">delayOpen (ms)</div>
+            <input class="w-full" value="150">
+            <div class="text-[10px] text-slate-500 mt-1">anticipa apertura</div>
+          </div>
+          <div>
+            <div class="label mb-1">minOpenTime (ms)</div>
+            <input class="w-full" value="350">
+            <div class="text-[10px] text-slate-500 mt-1">tiempo mín. abierto</div>
+          </div>
+          <div>
+            <div class="label mb-1">delayClose (ms)</div>
+            <input class="w-full" value="150">
+            <div class="text-[10px] text-slate-500 mt-1">retarda cierre</div>
+          </div>
+        </div>
+        <div class="mt-3 flex items-center justify-between text-[13px] border-t border-slate-800 pt-3">
+          <span class="text-slate-400">Ciclo total software:</span>
+          <span class="text-emerald-400 font-semibold text-base">650 ms <span class="text-slate-500 text-xs">(0.65 s)</span></span>
+        </div>
+        <div class="text-[11px] text-slate-500 mt-2">
+          💡 Este es el <b class="text-slate-300">ciclo de control</b> del PLC. La velocidad real del cilindro (mecánica) puede diferir — medirla aparte.
+        </div>
+      </div>
+
+      <!-- B) RESET MECÁNICO CILINDRO -->
+      <div class="subcard p-4">
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <div class="text-sm font-medium text-slate-200">🔩 Reset mecánico cilindro neumático</div>
+            <div class="text-[11px] text-slate-500">tiempo físico del cilindro · se ajusta con tornillo flow regulator (mecánico)</div>
+          </div>
+          <button class="pill pill-info" onclick="document.getElementById('slowMoModal').classList.remove('hidden')">🎥 Medir con slow-mo</button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <div class="label mb-1">Tiempo reset (s)</div>
+            <input class="w-full" value="0.45">
+            <div class="text-[10px] text-amber-400 mt-1">⚠️ Estimado — medir en planta</div>
+          </div>
+          <div>
+            <div class="label mb-1">Última medición</div>
+            <div class="text-sm text-slate-300">— sin registros —</div>
+            <div class="text-[10px] text-slate-500 mt-1">activa histórico de degradación</div>
+          </div>
+        </div>
+        <div class="text-[11px] text-slate-500 mt-3">
+          💡 <b class="text-slate-300">¿Por qué ambos?</b>
+          El <b>software</b> controla cuándo comanda abrir/cerrar. El <b>mecánico</b> determina la velocidad real del pistón neumático. Si el cilindro se pone lento (válvula sucia, menos presión, desgaste), el "minOpenTime" puede no ser suficiente para asegurar apertura completa.
+        </div>
+      </div>
+
+      <!-- C) PALETA FLIPPER FÍSICA -->
+      <div class="subcard p-4">
+        <div class="text-sm font-medium text-slate-200 mb-3">📏 Paleta flipper (física)</div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <div class="label mb-1">Largo paleta (mm)</div>
+            <input class="w-full" value="475">
+            <div class="text-[10px] text-slate-500 mt-1">Desde eje hasta extremo</div>
+          </div>
+          <div>
+            <div class="label mb-1">Altura sobre cinta (mm)</div>
+            <input class="w-full" value="0.5">
+            <div class="text-[10px] text-slate-500 mt-1">gap paleta-cinta (manual MS4/12)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </details>
+
+  <!-- =================== CAPA 3: DIAGNÓSTICO (colapsable) =================== -->
+  <details class="card p-0 mb-4">
+    <summary class="p-5 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <span class="caret text-slate-500">▶</span>
+        <span class="font-medium text-slate-200">📐 Diagnóstico técnico</span>
+        <span class="chip">cadencia 29 pz/min</span>
+      </div>
+      <span class="text-[11px] text-slate-500">Timing + cadencia + fórmula</span>
+    </summary>
+    <div class="px-5 pb-5 space-y-4">
+
+      <!-- Análisis de pockets -->
+      <div class="subcard p-3">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-sm font-medium text-slate-200">Análisis de pockets (4 activos)</span>
+          <span class="pill pill-green text-[10px]">cadencia histórica real</span>
+        </div>
+        <ul class="text-[12px] text-slate-300 space-y-1">
+          <li>Cadencia promedio: <b>29 pz/min</b></li>
+          <li>Gap libre entre peces: <b class="text-emerald-400">1.89 m</b> · paso 262 cm</li>
+          <li>Ratio pez/paso: <b class="text-emerald-400">0.28</b> (28% del paso ocupado)</li>
+          <li class="text-slate-500 pt-1">Alternativa con 3 pockets: 22 pz/min · gap 2.76 m · ratio 0.21</li>
+        </ul>
+      </div>
+
+      <!-- Timing flipper -->
+      <div class="subcard p-3">
+        <div class="text-sm font-medium text-slate-200 mb-2">Timing flipper (calculado)</div>
+        <ul class="text-[12px] text-slate-300 space-y-1">
+          <li>Tiempo mínimo flipper abierto: <b>0.371 s</b></li>
+          <li>Tiempo pez en pasar flipper: <b>0.570 s</b></li>
+          <li>Ventana cierre mínima: <b>0.199 s</b></li>
+        </ul>
+      </div>
+
+      <!-- Fórmula -->
+      <div class="subcard p-3">
+        <div class="text-sm font-medium text-slate-200 mb-2">Fórmula FishBase</div>
+        <div class="text-[12px] text-slate-400 font-mono">W = 0.00933 × L^3.04 · ancho = 18% largo</div>
+        <div class="text-[11px] text-slate-500 mt-1">Froese, Thorson & Reyes 2014. Coho: a=0.00933, b=3.04</div>
+      </div>
+
+    </div>
+  </details>
+
+  <!-- =================== RESUMEN COMPARATIVO =================== -->
+  <section class="card p-5 mt-8 border-dashed border-emerald-600/40">
+    <div class="text-xs uppercase text-emerald-400 tracking-widest mb-3">📊 Comparación vs actual</div>
+    <div class="grid grid-cols-2 gap-6 text-sm">
+      <div>
+        <div class="font-semibold text-slate-400 mb-2">ANTES (v2.112.1)</div>
+        <ul class="space-y-1 text-slate-400 text-[12px]">
+          <li>🔴 Fórmula visible: <code>L = (4257/0.00933)^(1/3.04)</code></li>
+          <li>🔴 "Sugerencias alométricas" duplicada con AutoField</li>
+          <li>🔴 Diagrama enterrado al final</li>
+          <li>🔴 Timing técnico desplegado siempre</li>
+          <li>🔴 Reset 0.45s "Estimado" sin camino para medirlo</li>
+          <li>🔴 Sin verdict: usuario lee "ratio 0.28" sin saber qué significa</li>
+          <li>🟡 Peso en gramos (se respeta por constraint)</li>
+        </ul>
+      </div>
+      <div>
+        <div class="font-semibold text-emerald-400 mb-2">DESPUÉS (mockup)</div>
+        <ul class="space-y-1 text-slate-300 text-[12px]">
+          <li>🟢 Fórmula solo en tooltip (ℹ️)</li>
+          <li>🟢 Una sola sugerencia por campo (AutoField limpio)</li>
+          <li>🟢 Diagrama arriba, a la vista</li>
+          <li>🟢 Equipo y Diagnóstico colapsables</li>
+          <li>🟢 Botón "⏱️ Cronometrar" para reset flipper</li>
+          <li>🟢 Pill verdict 🟢🟡🔴 arriba con mensaje claro</li>
+          <li>🟢 Hero reducido de ~850px a ~500px</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <div class="text-center text-xs text-slate-600 mt-8 mb-4">
+    Mockup estático · no conectado a estado real · tailwind CDN
+  </div>
+</div>
+
+<!-- ================= MODAL: Slow-mo reset flipper mecánico ================= -->
+<div id="slowMoModal" class="hidden fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4" style="background:rgba(0,0,0,.7)">
+  <div class="card max-w-2xl w-full my-8 p-6">
+    <div class="flex items-start justify-between mb-4">
+      <div>
+        <div class="text-lg font-semibold text-white">🎥 Medir reset mecánico con slow-mo</div>
+        <div class="text-xs text-slate-400 mt-1">iPhone 6s+ graba 240 fps gratis · 1 frame = ~4 ms</div>
+      </div>
+      <button class="text-slate-400 hover:text-white text-2xl leading-none" onclick="document.getElementById('slowMoModal').classList.add('hidden')">×</button>
+    </div>
+
+    <!-- SVG mini-guía -->
+    <div class="subcard p-3 mb-4">
+      <svg viewBox="0 0 500 180" class="w-full h-auto" style="background:rgba(59,130,246,.03); border-radius:6px;">
+        <!-- iPhone -->
+        <rect x="30" y="30" width="90" height="130" rx="12" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+        <rect x="38" y="42" width="74" height="100" rx="2" fill="#0f172a"/>
+        <circle cx="75" cy="152" r="4" fill="#64748b"/>
+        <text x="75" y="65" fill="#fca5a5" font-size="9" text-anchor="middle" font-weight="600">● REC</text>
+        <text x="75" y="82" fill="#fbbf24" font-size="8" text-anchor="middle">240 fps</text>
+        <text x="75" y="100" fill="#7dd3fc" font-size="7" text-anchor="middle">slow-mo</text>
+        <!-- lente -->
+        <circle cx="75" cy="125" r="8" fill="#0a0f14" stroke="#475569" stroke-width="1"/>
+
+        <!-- Flecha a flipper -->
+        <path d="M 130 95 Q 200 60 280 90" stroke="#10b981" stroke-width="1.8" fill="none" marker-end="url(#arrEmerald)" stroke-dasharray="4 3"/>
+
+        <!-- Flipper cerrando (2 frames overlay) -->
+        <g transform="translate(300,70)">
+          <!-- cinta -->
+          <rect x="0" y="60" width="180" height="14" fill="#334155"/>
+          <!-- flipper posición abierta (traslúcido) -->
+          <rect x="30" y="10" width="10" height="55" rx="2" fill="#fbbf24" opacity="0.3"/>
+          <text x="35" y="8" fill="#fbbf24" font-size="8" text-anchor="middle" opacity="0.7">t=0</text>
+          <!-- flipper posición media -->
+          <g transform="translate(75,40) rotate(30)">
+            <rect x="-5" y="-30" width="10" height="55" rx="2" fill="#fb923c" opacity="0.6"/>
+          </g>
+          <!-- flipper posición cerrada -->
+          <rect x="120" y="45" width="55" height="10" rx="2" fill="#10b981"/>
+          <text x="148" y="42" fill="#10b981" font-size="8" text-anchor="middle" font-weight="600">t=fin</text>
+          <!-- dimension -->
+          <line x1="35" y1="90" x2="148" y2="90" stroke="#7dd3fc" stroke-width="1"/>
+          <line x1="35" y1="85" x2="35" y2="95" stroke="#7dd3fc" stroke-width="1"/>
+          <line x1="148" y1="85" x2="148" y2="95" stroke="#7dd3fc" stroke-width="1"/>
+          <text x="91" y="103" fill="#7dd3fc" font-size="9" text-anchor="middle">movimiento del flipper</text>
+        </g>
+
+        <text x="250" y="175" fill="#64748b" font-size="9" text-anchor="middle">contar frames entre t=0 y t=fin · dividir entre 240 = segundos</text>
+      </svg>
+    </div>
+
+    <!-- Pasos -->
+    <div class="space-y-2 mb-4 text-sm">
+      <div class="flex gap-3"><span class="pill pill-info flex-shrink-0">1</span><div class="text-slate-300">En el HMI Z2 ir a: <b class="text-white">Servicio → Probar salidas</b> (o aislar 1 flipper cerrando los demás pockets)</div></div>
+      <div class="flex gap-3"><span class="pill pill-info flex-shrink-0">2</span><div class="text-slate-300">iPhone en <b class="text-white">modo Slow-mo</b> (240 fps). Encuadrar 1 flipper lateral.</div></div>
+      <div class="flex gap-3"><span class="pill pill-info flex-shrink-0">3</span><div class="text-slate-300">Grabar <b>5-10 segundos</b> mientras se acciona el flipper (1 ciclo completo).</div></div>
+      <div class="flex gap-3"><span class="pill pill-info flex-shrink-0">4</span><div class="text-slate-300">En la galería del iPhone: tocar el video → <b>"Editar"</b> → arrastrar los handles amarillos para aislar sólo el ciclo a medir.</div></div>
+      <div class="flex gap-3"><span class="pill pill-info flex-shrink-0">5</span><div class="text-slate-300">Contar frames desde el primer movimiento hasta que el flipper se detiene por completo. iMovie/Photos muestra duración en la línea de tiempo.</div></div>
+      <div class="flex gap-3"><span class="pill pill-info flex-shrink-0">6</span><div class="text-slate-300">Dividir frames / 240 = segundos. Ejemplo: 96 frames = 0.40 s.</div></div>
+    </div>
+
+    <!-- Input -->
+    <div class="subcard p-4 mb-4">
+      <div class="grid grid-cols-3 gap-3">
+        <div>
+          <div class="label mb-1">Frames contados</div>
+          <input class="w-full" placeholder="96" type="number">
+        </div>
+        <div>
+          <div class="label mb-1">Tasa fps</div>
+          <input class="w-full" value="240" type="number">
+        </div>
+        <div>
+          <div class="label mb-1">Resultado (s)</div>
+          <div class="text-lg text-emerald-400 font-semibold pt-1">0.400</div>
+        </div>
+      </div>
+      <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <div class="label mb-1">Pocket / flipper N°</div>
+          <input class="w-full" placeholder="ej: flipper 3">
+        </div>
+        <div>
+          <div class="label mb-1">Presión aire (bar)</div>
+          <input class="w-full" placeholder="6.0" type="number" step="0.1">
+        </div>
+      </div>
+    </div>
+
+    <div class="flex justify-end gap-2">
+      <button class="pill pill-amber" onclick="document.getElementById('slowMoModal').classList.add('hidden')">Cancelar</button>
+      <button class="pill pill-green">Guardar medición</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MODAL: Medir velocidad con tacómetro SKF ================= -->
+<div id="tachModal" class="hidden fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4" style="background:rgba(0,0,0,.7)">
+  <div class="card max-w-3xl w-full my-8 p-6">
+    <div class="flex items-start justify-between mb-4">
+      <div>
+        <div class="text-lg font-semibold text-white">⚙️ Medir velocidad de cinta con tacómetro SKF</div>
+        <div class="text-xs text-slate-400 mt-1">Tacómetro contacto rotativo · modelo SKF TMRT-1, CMAS 100-SL o equivalente</div>
+      </div>
+      <button class="text-slate-400 hover:text-white text-2xl leading-none" onclick="document.getElementById('tachModal').classList.add('hidden')">×</button>
+    </div>
+
+    <!-- SVG guía de medición -->
+    <div class="subcard p-4 mb-4">
+      <div class="text-sm font-medium text-slate-300 mb-2">Procedimiento correcto · vista lateral</div>
+      <svg viewBox="0 0 720 380" class="w-full h-auto" style="background:rgba(56,189,248,.03); border-radius:6px;">
+
+        <!-- Base / estructura de cinta -->
+        <rect x="40" y="260" width="640" height="60" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+        <text x="60" y="300" fill="#64748b" font-size="10">Estructura grader</text>
+
+        <!-- Rodillos (tambor motor + tensor) -->
+        <circle cx="90" cy="220" r="28" fill="#334155" stroke="#475569" stroke-width="1.5"/>
+        <circle cx="90" cy="220" r="6" fill="#64748b"/>
+        <text x="90" y="265" fill="#94a3b8" font-size="9" text-anchor="middle">rodillo motor</text>
+
+        <circle cx="630" cy="220" r="28" fill="#334155" stroke="#475569" stroke-width="1.5"/>
+        <circle cx="630" cy="220" r="6" fill="#64748b"/>
+        <text x="630" y="265" fill="#94a3b8" font-size="9" text-anchor="middle">rodillo tensor</text>
+
+        <!-- Cinta superior -->
+        <rect x="90" y="200" width="540" height="14" fill="#475569"/>
+        <!-- Cinta inferior -->
+        <rect x="90" y="226" width="540" height="14" fill="#3f4c5e"/>
+
+        <!-- Flechas dirección cinta -->
+        <g stroke="#10b981" stroke-width="2" fill="none" marker-end="url(#arrEmerald)">
+          <line x1="200" y1="207" x2="280" y2="207"/>
+          <line x1="380" y1="207" x2="460" y2="207"/>
+        </g>
+        <defs>
+          <marker id="arrEmerald" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <polygon points="0 0, 8 4, 0 8" fill="#10b981"/>
+          </marker>
+          <marker id="arrAmber" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <polygon points="0 0, 8 4, 0 8" fill="#fbbf24"/>
+          </marker>
+          <marker id="arrRed" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <polygon points="0 0, 8 4, 0 8" fill="#ef4444"/>
+          </marker>
+        </defs>
+        <text x="360" y="195" fill="#10b981" font-size="11" text-anchor="middle" font-weight="600">← dirección de la cinta →</text>
+
+        <!-- Tacómetro SKF -->
+        <!-- Cuerpo del tacómetro (mango cilíndrico) -->
+        <g transform="translate(360,60)">
+          <!-- grip / cuerpo -->
+          <rect x="-22" y="0" width="44" height="85" rx="6" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5"/>
+          <!-- pantalla LCD -->
+          <rect x="-16" y="8" width="32" height="22" rx="2" fill="#0f172a" stroke="#38bdf8" stroke-width="1"/>
+          <text x="0" y="22" fill="#38bdf8" font-size="9" text-anchor="middle" font-family="monospace">0.70</text>
+          <text x="0" y="30" fill="#38bdf8" font-size="6" text-anchor="middle" font-family="monospace">m/s</text>
+          <!-- botones -->
+          <rect x="-14" y="40" width="12" height="5" rx="1" fill="#10b981"/>
+          <rect x="2" y="40" width="12" height="5" rx="1" fill="#475569"/>
+          <text x="-8" y="49" fill="#10b981" font-size="4" text-anchor="middle">START</text>
+          <text x="8" y="49" fill="#94a3b8" font-size="4" text-anchor="middle">HOLD</text>
+          <!-- brand label -->
+          <text x="0" y="68" fill="#94a3b8" font-size="7" text-anchor="middle" font-weight="600">SKF</text>
+          <text x="0" y="77" fill="#64748b" font-size="5" text-anchor="middle">TMRT-1</text>
+          <!-- eje / vástago -->
+          <rect x="-3" y="85" width="6" height="45" fill="#64748b"/>
+          <!-- Rueda de contacto -->
+          <circle cx="0" cy="138" r="12" fill="none" stroke="#fbbf24" stroke-width="2.5"/>
+          <circle cx="0" cy="138" r="3" fill="#fbbf24"/>
+          <!-- radios -->
+          <line x1="0" y1="126" x2="0" y2="150" stroke="#fbbf24" stroke-width=".8"/>
+          <line x1="-12" y1="138" x2="12" y2="138" stroke="#fbbf24" stroke-width=".8"/>
+          <!-- indicador de rotación (flecha curva) -->
+          <path d="M -14 130 A 14 14 0 0 0 -14 146" stroke="#fbbf24" stroke-width="1.2" fill="none" marker-end="url(#arrAmber)"/>
+        </g>
+
+        <!-- Mano sugerida (óvalo) -->
+        <ellipse cx="360" cy="85" rx="34" ry="22" fill="none" stroke="#64748b" stroke-width="1" stroke-dasharray="4 3"/>
+        <text x="360" y="45" fill="#94a3b8" font-size="10" text-anchor="middle">↑ agarre firme, tacómetro vertical</text>
+
+        <!-- Punto de contacto entre rueda y cinta -->
+        <circle cx="360" cy="200" r="4" fill="#10b981"/>
+        <line x1="360" y1="190" x2="360" y2="200" stroke="#10b981" stroke-width="2"/>
+
+        <!-- Callouts a la izquierda: DO's -->
+        <g>
+          <rect x="20" y="100" width="120" height="60" rx="4" fill="rgba(16,185,129,.08)" stroke="#10b981" stroke-width="1"/>
+          <text x="28" y="115" fill="#6ee7b7" font-size="10" font-weight="600">✓ HACER</text>
+          <text x="28" y="128" fill="#cbd5e1" font-size="8">• Contacto firme y</text>
+          <text x="28" y="138" fill="#cbd5e1" font-size="8">  perpendicular</text>
+          <text x="28" y="148" fill="#cbd5e1" font-size="8">• 3 mediciones en</text>
+          <text x="28" y="156" fill="#cbd5e1" font-size="8">  zonas distintas</text>
+          <line x1="140" y1="130" x2="340" y2="180" stroke="#10b981" stroke-width="1" stroke-dasharray="3 2" marker-end="url(#arrEmerald)"/>
+        </g>
+
+        <!-- Callouts a la derecha: DON'Ts -->
+        <g>
+          <rect x="570" y="100" width="130" height="60" rx="4" fill="rgba(239,68,68,.08)" stroke="#ef4444" stroke-width="1"/>
+          <text x="578" y="115" fill="#fca5a5" font-size="10" font-weight="600">✗ EVITAR</text>
+          <text x="578" y="128" fill="#cbd5e1" font-size="8">• Rueda inclinada</text>
+          <text x="578" y="138" fill="#cbd5e1" font-size="8">• Deslizamiento</text>
+          <text x="578" y="148" fill="#cbd5e1" font-size="8">• Medir en zona</text>
+          <text x="578" y="156" fill="#cbd5e1" font-size="8">  sucia o dañada</text>
+          <line x1="570" y1="130" x2="380" y2="180" stroke="#ef4444" stroke-width="1" stroke-dasharray="3 2" marker-end="url(#arrRed)"/>
+        </g>
+
+        <!-- Indicador 3 zonas de medición -->
+        <g>
+          <line x1="150" y1="345" x2="150" y2="330" stroke="#38bdf8" stroke-width="1.5"/>
+          <circle cx="150" cy="335" r="3" fill="#38bdf8"/>
+          <text x="150" y="360" fill="#7dd3fc" font-size="9" text-anchor="middle">zona 1</text>
+
+          <line x1="360" y1="345" x2="360" y2="330" stroke="#38bdf8" stroke-width="1.5"/>
+          <circle cx="360" cy="335" r="3" fill="#38bdf8"/>
+          <text x="360" y="360" fill="#7dd3fc" font-size="9" text-anchor="middle">zona 2</text>
+
+          <line x1="570" y1="345" x2="570" y2="330" stroke="#38bdf8" stroke-width="1.5"/>
+          <circle cx="570" cy="335" r="3" fill="#38bdf8"/>
+          <text x="570" y="360" fill="#7dd3fc" font-size="9" text-anchor="middle">zona 3</text>
+
+          <text x="360" y="378" fill="#64748b" font-size="9" text-anchor="middle">tomar 3 lecturas → promediar</text>
+        </g>
+
+      </svg>
+    </div>
+
+    <!-- Pasos -->
+    <div class="space-y-3 mb-4">
+      <div class="flex gap-3">
+        <div class="pill pill-info flex-shrink-0">1</div>
+        <div class="text-sm text-slate-300">
+          Pon el grader en <b class="text-white">modo producción normal</b> con cinta corriendo. No uses modo servicio/test — debe estar en velocidad operativa real.
+        </div>
+      </div>
+      <div class="flex gap-3">
+        <div class="pill pill-info flex-shrink-0">2</div>
+        <div class="text-sm text-slate-300">
+          Enciende el tacómetro <b class="text-white">SKF TMRT-1</b> en modo <b>m/s</b> (o m/min ÷ 60 al registrar). Presiona <b>START</b>.
+        </div>
+      </div>
+      <div class="flex gap-3">
+        <div class="pill pill-info flex-shrink-0">3</div>
+        <div class="text-sm text-slate-300">
+          Apoya la <b class="text-amber-300">rueda de contacto perpendicular</b> sobre la superficie de la cinta <b class="text-white">superior</b> (donde corre el producto), con presión firme pero sin frenar. La rueda debe girar libremente con la cinta.
+        </div>
+      </div>
+      <div class="flex gap-3">
+        <div class="pill pill-info flex-shrink-0">4</div>
+        <div class="text-sm text-slate-300">
+          Mantén 5-10 segundos hasta que el valor se estabilice. Presiona <b>HOLD</b> y registra.
+        </div>
+      </div>
+      <div class="flex gap-3">
+        <div class="pill pill-info flex-shrink-0">5</div>
+        <div class="text-sm text-slate-300">
+          Repite en <b class="text-cyan-300">3 zonas</b> diferentes (inicio, medio, final del tramo). El promedio es el valor real.
+        </div>
+      </div>
+    </div>
+
+    <!-- Inputs de registro -->
+    <div class="subcard p-4 mb-4">
+      <div class="text-sm font-medium text-slate-200 mb-3">Registrar 3 lecturas (m/s)</div>
+      <div class="grid grid-cols-3 gap-3">
+        <div>
+          <div class="label mb-1">Zona 1</div>
+          <input class="w-full" placeholder="0.70" type="number" step="0.01">
+        </div>
+        <div>
+          <div class="label mb-1">Zona 2</div>
+          <input class="w-full" placeholder="0.69" type="number" step="0.01">
+        </div>
+        <div>
+          <div class="label mb-1">Zona 3</div>
+          <input class="w-full" placeholder="0.71" type="number" step="0.01">
+        </div>
+      </div>
+      <div class="mt-3 text-sm">
+        <span class="text-slate-400">Promedio:</span>
+        <b class="text-emerald-400 ml-2">0.70 m/s</b>
+        <span class="text-slate-500 ml-2 text-xs">(desvío estándar 0.01)</span>
+      </div>
+      <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <div class="label mb-1">Programa Z2 activo</div>
+          <input class="w-full" placeholder="ej: Salar Premium 4-5kg">
+        </div>
+        <div>
+          <div class="label mb-1">Observaciones</div>
+          <input class="w-full" placeholder="ej: cinta recién lavada">
+        </div>
+      </div>
+    </div>
+
+    <!-- Warnings -->
+    <div class="subcard p-3 mb-4" style="background:rgba(245,158,11,.06); border-color:rgba(245,158,11,.3)">
+      <div class="text-xs text-amber-300 font-medium mb-1">⚠️ Precauciones</div>
+      <ul class="text-[12px] text-slate-300 space-y-1">
+        <li>• No acerques la mano a rodillos motores ni sprockets</li>
+        <li>• Evita zonas con producto en tránsito</li>
+        <li>• Si la cinta tiene humedad, seca la rueda de contacto entre lecturas</li>
+        <li>• La calibración del tacómetro debe estar vigente (&lt;12 meses)</li>
+      </ul>
+    </div>
+
+    <div class="flex justify-end gap-2">
+      <button class="pill pill-amber" onclick="document.getElementById('tachModal').classList.add('hidden')">Cancelar</button>
+      <button class="pill pill-green">Guardar medición</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

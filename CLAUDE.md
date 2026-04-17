@@ -664,6 +664,140 @@ Si se necesita re-procesar o corregir algo, usar `scripts/iter18-full-season-reb
 - ✅ **Agregar campo `lot` al script bulk upload** — implementado + backfill 383 summaries con `meta/timeline` (sesión 2026-04-15)
 - ✅ **Timeline aggregates pre-computados** (`meta/timeline` sub-colección) — carga automática sin botón, Firestore rules fix
 
+### P1.9 — Grader Producto UX + Sugerencias IA trazables (sesión 2026-04-17, planificado Opus 4.7)
+Objetivo: rediseñar tab `Producto` con progressive disclosure + motor de sugerencias explicables.
+- ⏳ **Hero rediseñado**: diagrama de cinta subido arriba, pill verdict 🟢🟡🔴, especie+peso+pockets en 3 columnas, largo/ancho con AutoField independiente (constraint usuario)
+- ⏳ **Capas colapsables**: `⚙️ Equipo flipper` (abierto) + `📐 Diagnóstico técnico` (cerrado). Saca el timing denso del hero.
+- ⏳ **Motor IA sugerencias punto cero** — cards expandibles con: valor actual→sugerido, origen (FishBase/histórico/batch/geométrico), datos usados, confianza (high/med/low basado en n+CV), impacto, botón Aplicar por card. Ver spec completa en `mockups/producto-v2.html`.
+  - Archivos nuevos: `suggestFishBaseLength.ts`, `suggestFishBaseWidth.ts`, `suggestHistoricalCadence.ts`, `suggestPocketCount.ts`, `suggestResetFreshness.ts`, orquestador `useSuggestionEngine()`, componente `SuggestionCard.tsx`
+  - Audit trail Firestore: colección `graderConfigChangeLog` (timestamp, userId, parameter, previous/newValue, source, suggestionMetadata)
+- ⏳ **Constraint a respetar**: peso sigue en gramos (no kg), AutoField por campo (no toggle global)
+- ⏳ **Mockup navegable**: `apps/pwa/public/producto-v2-mockup.html` (servido vía Vite en dev como `/producto-v2-mockup.html`)
+
+### P1.10 — Cronometrar reset flipper (investigado 2026-04-17 con docs internos Z2)
+**Modelo real**: Marelec **MS4/12** (estático + z-conveyor + 2 cintas aceleración + grading belt de 12 salidas). El "Z2" es el NOMBRE DEL COMPUTADOR/HMI, no del grader.
+**Specs**: belt max 1.4 m/s · producto max 1100×290 mm · peso 0-15 kg · precisión ±20g (0-5kg), ±50g (5-15kg) · aire min 600 L @ 0.7 MPa (7 bar).
+**Distribuidor**: Marelec Chile Ltda. · Avenida Austral 1746 · Jardín Oriente · Puerto Montt · tel +32 58 222 111 · support@marelec.com.
+
+**Hallazgo clave — reset flipper NO es parámetro software**:
+Cada cilindro neumático tiene **válvula con regulador de flujo mecánico**. La velocidad se ajusta **físicamente con un tornillo** (CCW aumenta velocidad, CW reduce). Solo se ajusta el **flujo de escape**, no el de fuerza. Meta: "abrir/cerrar rápido sin ruido vibrante". Esto explica el amber "Estimado" — el valor deriva mecánicamente con el tiempo.
+
+**Acceso a menú servicio del Z2**:
+- Password documentada: **8620** (Menú principal → Servicio → Cambiar parámetros → [8620])
+- Confirmada en instructivo CH-MT-ME-0002 (validado 24.10.2024)
+- Menús visibles en el PDF interno de 418 páginas:
+  - Velocidades de cintas
+  - Mostrar resultados de clasificación
+  - Probar entradas / Probar salidas (activa flippers uno por uno — útil para cronometrar)
+  - Monitor CPU
+  - **Explorar CAN bus** (actuadores conectados por CAN — potencial de leer timing si hay log)
+  - Localizar IDs aleatorias (CAN devices)
+- Calibración báscula: `>0<` para tarar + peso patrón + parámetro `fsWc` (1 pocket × 10-15 min)
+
+**Plan de medición (prioridad)**:
+1. Usar "Probar salidas" del menú Servicio → activa flipper aislado → slow-mo 240fps iPhone → contar frames desde inicio movimiento hasta detención completa → `frames / 240 = segundos`
+2. Si el CAN bus expone timing en "Explorar canbus" → capturar trama + timestamps (requiere adaptador CAN-USB, nice-to-have)
+3. Registrar en UI con: método usado, timestamp, presión aire al momento, usuario
+
+**Archivos docs internos (OneDrive `⚙️ GRADER/`)**:
+- `instruction manual Grader.pdf` — manual oficial MS4/12, 59 pág (texto extraíble)
+- `parametros grader.pdf` — 418 pág **screenshots HMI** menú servicio (no extraíble con pdftoppm, revisar manual)
+- `parametros grader.docx` — versión Word (8 MB, pendiente parsear)
+- `CH-MT-ME-0002 Instructivo Calibración Grader.pdf` — 2 pág flujo calibración con clave 8620
+- `Basculas Grader.pdf/docx` — info pesaje
+- Carpeta `temporada 2025-2026/` — Excel PP y P0 (ya migrados a Firestore)
+
+**PARÁMETROS Z2 REALES extraídos 2026-04-17 (DOCX `parametros grader.docx`)**:
+
+Flipper timing (¡todo configurable por software en el Z2!):
+- `delayFlipperOpen = 150 ms` — ms delay to open flipper before product
+- `delayFlipperClose = 150 ms` — ms delay to close flipper after product
+- `minFlipperOpenTime = 350 ms` — ms, minimum open flipper time for product
+- `fixedOpenFlipper = 0`, `triggerPointFlipper = 0`
+
+Dinámica cinta:
+- `minSpeed = 50 mm/s`, **`maxSpeed = 700 mm/s` (= 0.70 m/s — NO 1.28 m/s como asume nuestra app)**
+- `acceleration/deceleration = 100 mm/s²`
+- `numGates = 12`, `posGate1 = 2`
+
+Eye sync (detección):
+- `disEyeSync = 425 mm` (distancia desde inicio cinta al ojo sync)
+- `inpEyeSync = 3`, `eyeSyncMinLength = 10`, `eyeSyncMaxDender = 400`, `maxDif = 1800`
+
+Identificación:
+- `sernr = 3943` (coincide con manual, fabricación sept 2012)
+- **IP red: 172.27.12.12** modo "RC = Remote Connection" (potencial de integración futura)
+- Runtime: 5825 horas acumuladas (a la fecha del screenshot)
+
+**Implicaciones para la app**:
+1. El "Reset flipper 0.45s" de la app NO es estimado — es interpretación ambigua. Posibles equivalencias:
+   - minFlipperOpenTime = 350 ms = 0.35 s (tiempo mínimo abierto)
+   - Ciclo total software = 150+350+150 = 650 ms = 0.65 s
+   - Reset mecánico puro del cilindro (tornillo flow regulator) — solo por slow-mo
+   - **Pendiente: decidir con el usuario qué semántica usar y renombrar el campo**
+2. Velocidad cinta configurada 0.70 m/s, NO 1.28 m/s — ajustar cálculos en tab Producto/Cintas
+3. Agregar en app inputs explícitos para `delayFlipperOpen/Close` (nuevos) + `minFlipperOpenTime` (renombrar "Reset flipper")
+
+**Implementación pendiente**:
+- ⏳ Renombrar campo "Reset flipper" → `minFlipperOpenTime` con tooltip de la definición Z2
+- ⏳ Agregar inputs `delayFlipperOpen`/`delayFlipperClose` (150 ms default)
+- ⏳ Actualizar `maxSpeed` cinta a 0.70 m/s (revisar tab Cintas)
+- ⏳ Modal "Capturar desde Z2": formulario para que operador transcriba valores del HMI (menú Servicio → 8620)
+- ⏳ Firestore: colección `flipperTimingMeasurements` (timestamp, pocket, values snapshot, operador)
+- 🔮 **Futuro big bet**: driver Remote Connection Marelec en IP 172.27.12.12 para lectura en vivo de parámetros (requiere reverse-engineering del protocolo RC o contacto con soporte Marelec)
+
+**Docs parseados (barrido 2026-04-17 representativo ~25 imágenes del DOCX 418 total)**:
+- `parametros grader.docx` (8 MB, 418 PNG screenshots HMI)
+- **Doc completo con mapa de parámetros**: [`docs/marelec-z2/parameters.md`](docs/marelec-z2/parameters.md)
+
+**Hallazgos adicionales del barrido profundo**:
+
+Canales de comunicación:
+- `modbusId = 0` en HMI — Modbus **soportado pero deshabilitado**. Poner a ≥1 para habilitar integración Modbus TCP desde app vía IP 172.27.12.12.
+- `ftpLogServer = "ftp.marelec.com"` — Z2 puede subir logs a servidor Marelec externo (investigar)
+- CAN bus: `canIdIo1-7 = 51-57` (8-port mode), `canIoType` define modo 8 vs 12 outputs
+- Remote Connection (RC) — protocolo propio Marelec usado por HMI remoto (potencial reverse-engineering)
+
+Múltiples cintas con timings propios (CRÍTICO — nuestra app asume 1 sola):
+- **Grading belt (static grader)**: `maxSpeed = 700 mm/s` (0.70 m/s)
+- **Z-belt**: `maxSpeed = 420 mm/s` (0.42 m/s)
+- **Acceleration belts 1 y 2**: config con `inpPulse`, `deltaI=52000`, `deltaIdiv=39623`, `length=1000mm`
+- **NO todas corren a la misma velocidad** — nuestra app asumía 1.28 m/s único
+
+Distinción crítica: **Pocket ≠ Flipper** (sistemas mecánicos DIFERENTES):
+- **Pockets (balanza)**: `pos=550mm`, `minOpen=600ms`, `delayClose=700ms`, `canId=11`, loadcell calibrado con `fsWc=273947`, `zpWc=864997`
+- **Flippers (grading belt)**: `delayFlipperOpen=150ms`, `minFlipperOpenTime=350ms`, `delayFlipperClose=150ms`, `outpFlipper1-12=133-152`
+
+Gate/Batch timing (separados del flipper):
+- `delayBeforeGateClose = 400 ms`, `delayGateClose = 500 ms`, `minGateOpen = 0 ms`, `maxBinWeight = 25000 g`
+
+Sensores y seguridad:
+- `inpEmergency`, `inpAirSupply`, `inpCleaningMode`, `rejectNoSync = 1`
+- 3 eye sync posibles (solo 1 usado: `disEyeSync=425mm`, `inpEyeSync=3`)
+- Weight feedback: `wFeedbackMaxStabilizationTime=2000ms`, `wFeedbackSimulStdev=10`
+
+Calibración:
+- Password servicio: **8620**
+- `fsWc` = fullscale weight correction (instructivo CH-MT-ME-0002)
+- `tSteady = 300 ms`, `trackZero = 1`, `minWeight = 300 g`, `dispRes = 10`
+- FIR filters per pocket: `filter1=60`, `filter2=70`
+
+**Implementación actualizada en mockup `producto-v2-mockup.html`**:
+- ✅ Sección "⚙️ Equipo flipper" reestructurada en 3 sub-cards:
+  - A) **Ciclo flipper (software Z2)** — inputs delayOpen/minOpenTime/delayClose + total 650 ms
+  - B) **Reset mecánico cilindro neumático** — medición slow-mo + badge estimado
+  - C) **Paleta flipper (física)** — largo 475mm + altura 0.5mm
+- ✅ Modal "🎥 Medir con slow-mo" — guía paso-a-paso + SVG iPhone 240fps + frames/240=s
+- ✅ Modal "⚙️ Medir velocidad cinta con tacómetro SKF" — SVG vista lateral con rueda de contacto, DOs/DON'Ts, 3 zonas, promedio
+- ✅ Velocidad cinta editable con badge "Z2 config maxSpeed=700 mm/s · medir en terreno"
+
+**Nuevas oportunidades big bet** (ordenadas por impacto/esfuerzo):
+1. 🎯 **Habilitar Modbus TCP en Z2** y leer parámetros en vivo (esfuerzo medio — cambiar `modbusId=0→1` + cliente Modbus TCP en PWA apuntando a 172.27.12.12)
+2. 🎯 **Múltiples cintas separadas en app** (esfuerzo bajo — agregar Z-belt, Acc 1, Acc 2 al modelo)
+3. 🎯 **Pocket timing separado de flipper** (esfuerzo bajo — renombrar y separar análisis)
+4. 🔮 **Reverse-engineer protocolo RC Marelec** (esfuerzo alto — pedir SDK a soporte Marelec)
+5. 🔮 **FTP log sync con ftp.marelec.com** (requiere permiso Marelec)
+
 ### P1.5 — ✅ COMPLETADO 2026-04-09 (sesión siguiente)
 - ✅ **Input sanitization Firestore**: 16 colecciones validadas en 4 lotes (162e0d1e, 78908d73, 35262779, 601d7a00). Total: 23 colecciones con isValid*() en firestore.rules. Deploy Firestore Rules 🟢.
 

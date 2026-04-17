@@ -1341,294 +1341,395 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
               </div>
             )}
 
-            {/* Dimensiones del salmón, flipper y pockets */}
-            {fisicaSubTab === 'producto' && (
-            <div>
-              <p className="text-sm font-medium mb-3">Producto y flipper</p>
+            {/* ── TAB PRODUCTO ── */}
+            {fisicaSubTab === 'producto' && (() => {
+              // Cálculos compartidos entre Hero, Equipo y Diagnóstico
+              const mainBelt = physicalConfig.belts.find((b) => b.beltId === 'main')
+              const speedMps = mainBelt?.speedMps ?? 0.7
+              const salmonLengthM = physicalConfig.avgSalmonLengthCm / 100
+              const cadenceFromHistorical = historicalMedianG?.productionRatePerHour
+                ? historicalMedianG.productionRatePerHour / 60
+                : historicalMedianG?.durationMinutes && historicalMedianG.durationMinutes > 0
+                  ? historicalMedianG.totalPieces / historicalMedianG.durationMinutes
+                  : null
+              const cadenceObserved = batchStats?.throughputPzPerMin ?? cadenceFromHistorical
+              const pocketCycleSec = 3.0
+              const cadenceTheoretical = (physicalConfig.pocketCount * 60) / pocketCycleSec
+              const cadencePiecesPerMin = cadenceObserved ?? cadenceTheoretical
+              const cadenceSource: 'excel' | 'historical' | 'theoretical' =
+                batchStats?.throughputPzPerMin ? 'excel'
+                : cadenceFromHistorical ? 'historical'
+                : 'theoretical'
+              const spacingM = speedMps * (60 / cadencePiecesPerMin)
+              const gapM = Math.max(0, spacingM - salmonLengthM)
+              const lengthToSpacingRatio = salmonLengthM / spacingM
+              const overlapping = lengthToSpacingRatio >= 1
+              const pocketCountAlt = physicalConfig.pocketCount === 4 ? 3 : 4
+              const cadenceAlt = cadencePiecesPerMin * (pocketCountAlt / physicalConfig.pocketCount)
+              const spacingAlt = speedMps * (60 / cadenceAlt)
+              const minOpenTimeSec = physicalConfig.flipperPaddleLengthMm
+                ? (physicalConfig.flipperPaddleLengthMm / 1000) / speedMps
+                : null
+              const salmonPassTimeSec = salmonLengthM / speedMps
+              const verdictColor = overlapping
+                ? 'bg-red-500/20 text-red-400 border-red-500/40'
+                : lengthToSpacingRatio > 0.7
+                  ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                  : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+              const verdictEmoji = overlapping ? '🔴' : lengthToSpacingRatio > 0.7 ? '🟡' : '🟢'
+              const verdictText = overlapping
+                ? 'Solapamiento — peces se pisan'
+                : lengthToSpacingRatio > 0.7
+                  ? `Gap estrecho (${(gapM * 100).toFixed(0)} cm)`
+                  : `OK · gap libre ${(gapM * 100).toFixed(0)} cm`
 
-              {/* Selector de especie + peso mediano del lote */}
-              <div className="mb-4 space-y-2">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <Label className="text-xs whitespace-nowrap">Especie</Label>
-                  <Select
-                    value={physicalConfig.species ?? ''}
-                    onValueChange={(v) => setPhysicalConfig((p) => ({ ...p, species: v as 'salar' | 'coho' }))}
-                  >
-                    <SelectTrigger className="h-8 text-xs w-56">
-                      <SelectValue placeholder="Seleccionar especie…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(Object.entries(SPECIES_ALLOMETRY) as [keyof typeof SPECIES_ALLOMETRY, typeof SPECIES_ALLOMETRY[keyof typeof SPECIES_ALLOMETRY]][]).map(([key, s]) => (
-                        <SelectItem key={key} value={key} className="text-xs">{s.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {physicalConfig.species && (() => {
-                    const s = SPECIES_ALLOMETRY[physicalConfig.species]
-                    const fishBaseId = physicalConfig.species === 'salar' ? 236 : 245
-                    const scientific = physicalConfig.species === 'salar' ? 'Salmo salar' : 'Oncorhynchus kisutch'
-                    return (
-                      <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                        <span className="font-mono">W = {s.a} × L^{s.b} · ancho ≈ {(s.widthRatio * 100).toFixed(0)}% largo</span>
-                        <InfoTooltip
-                          title={`${s.label} · ${scientific}`}
-                          text={`Relación Largo-Peso oficial de FishBase (Bayesian LWR). Peso W en gramos, largo L en cm (longitud total). El ancho es empírico — validar en planta.`}
-                          formula={`W(g) = ${s.a} × L(cm)^${s.b}\nAncho ≈ ${(s.widthRatio * 100).toFixed(0)}% × Largo\n\nFuente: Froese, Thorson & Reyes 2014\nJ. Applied Ichthyology 30(1):78-85\nFishBase ID: ${fishBaseId}`}
-                          example={physicalConfig.species === 'salar' ? '5 kg → ~72 cm largo · ~14 cm ancho' : '3.5 kg → ~66 cm largo · ~12 cm ancho'}
-                          position="right"
-                        />
-                      </div>
-                    )
-                  })()}
-                </div>
-
-                {physicalConfig.species && !medianWeightG && historicalMedianG && (
-                  <p className="text-[10px] text-muted-foreground flex items-center gap-1.5">
-                    <span>💡 Tip: haz click en una tarjeta de turno del calendario para usar ese día/turno como base de sugerencias.</span>
-                  </p>
-                )}
-
-                {physicalConfig.species && (
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <Label className="text-xs whitespace-nowrap">Peso mediano lote (g)</Label>
-                    <Input
-                      type="number"
-                      step="50"
-                      min="100"
-                      max="15000"
-                      value={medianWeightG ?? manualMedianG ?? (historicalMedianG?.value ?? '')}
-                      onChange={(e) => setManualMedianG(e.target.value ? Number(e.target.value) : undefined)}
-                      disabled={medianWeightG != null}
-                      placeholder="ej: 3500"
-                      className={cn('h-8 text-xs w-32 font-mono', medianWeightG != null && 'opacity-70')}
-                    />
-                    {medianSource === 'excel' && (
-                      <Badge className="text-[10px] bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 px-1.5 py-0">
-                        Auto desde Excel · {(medianWeightG! / 1000).toFixed(2)} kg
-                      </Badge>
-                    )}
-                    {medianSource === 'manual' && (
-                      <Badge className="text-[10px] bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300 px-1.5 py-0">
-                        Manual · {(manualMedianG! / 1000).toFixed(2)} kg
-                      </Badge>
-                    )}
-                    {medianSource === 'historical' && historicalMedianG && (
-                      <Badge className={cn(
-                        'text-[10px] px-1.5 py-0',
-                        historicalMedianG.fromCalendar
-                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
-                          : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
-                      )}>
-                        {historicalMedianG.fromCalendar ? '📅 Desde calendario · ' : 'Último registro · '}
-                        {historicalMedianG.dateKey} {historicalMedianG.shiftId} · {(historicalMedianG.value / 1000).toFixed(2)} kg
-                      </Badge>
-                    )}
-                    {medianSource === null && (
-                      <span className="text-[10px] text-muted-foreground">
-                        Ingresa peso o carga Excel para ver sugerencias
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                {suggestedDimensions && physicalConfig.species && (
-                  <div className="p-2 rounded bg-sky-500/10 border border-sky-500/20 text-xs">
-                    <span className="font-medium text-sky-700 dark:text-sky-300">
-                      Sugerencias alométricas
-                    </span>
-                    {': '}
-                    <span>Largo </span>
-                    <span className="font-mono font-medium">{suggestedDimensions.lengthCm} cm</span>
-                    <span>, Ancho </span>
-                    <span className="font-mono font-medium">{suggestedDimensions.widthCm} cm</span>
-                    <div className="text-[10px] text-muted-foreground mt-0.5 font-mono">
-                      L = ({suggestedDimensions.medianWeightG}/{SPECIES_ALLOMETRY[physicalConfig.species].a})^(1/{SPECIES_ALLOMETRY[physicalConfig.species].b}) = {suggestedDimensions.lengthCm} cm
+              return (
+                <div className="space-y-4">
+                  {/* ══ HERO ════════════════════════════════════════════ */}
+                  <div className="space-y-3">
+                    {/* Fila 1: Especie + Peso mediano */}
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <Label className="text-xs whitespace-nowrap">Especie</Label>
+                      <Select
+                        value={physicalConfig.species ?? ''}
+                        onValueChange={(v) => setPhysicalConfig((p) => ({ ...p, species: v as 'salar' | 'coho' }))}
+                      >
+                        <SelectTrigger className="h-8 text-xs w-48">
+                          <SelectValue placeholder="Seleccionar especie…" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(Object.entries(SPECIES_ALLOMETRY) as [keyof typeof SPECIES_ALLOMETRY, typeof SPECIES_ALLOMETRY[keyof typeof SPECIES_ALLOMETRY]][]).map(([key, s]) => (
+                            <SelectItem key={key} value={key} className="text-xs">{s.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {physicalConfig.species && (
+                        <>
+                          <Label className="text-xs whitespace-nowrap">Peso mediano (g)</Label>
+                          <Input
+                            type="number"
+                            step="50"
+                            min="100"
+                            max="15000"
+                            value={medianWeightG ?? manualMedianG ?? (historicalMedianG?.value ?? '')}
+                            onChange={(e) => setManualMedianG(e.target.value ? Number(e.target.value) : undefined)}
+                            disabled={medianWeightG != null}
+                            placeholder="ej: 3500"
+                            className={cn('h-8 text-xs w-28 font-mono', medianWeightG != null && 'opacity-70')}
+                          />
+                          {medianSource === 'excel' && (
+                            <Badge className="text-[10px] bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 px-1.5 py-0">
+                              Excel · {(medianWeightG! / 1000).toFixed(2)} kg
+                            </Badge>
+                          )}
+                          {medianSource === 'manual' && (
+                            <Badge className="text-[10px] bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300 px-1.5 py-0">
+                              Manual
+                            </Badge>
+                          )}
+                          {medianSource === 'historical' && historicalMedianG && (
+                            <Badge className={cn(
+                              'text-[10px] px-1.5 py-0',
+                              historicalMedianG.fromCalendar
+                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                                : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+                            )}>
+                              {historicalMedianG.fromCalendar ? '📅 ' : ''}{historicalMedianG.dateKey} {historicalMedianG.shiftId}
+                            </Badge>
+                          )}
+                          {medianSource === null && (
+                            <span className="text-[10px] text-muted-foreground">Ingresa peso o carga Excel</span>
+                          )}
+                        </>
+                      )}
                     </div>
-                  </div>
-                )}
-              </div>
 
-              <BatchStatsCard stats={batchStats} />
+                    {physicalConfig.species && !medianWeightG && historicalMedianG && !historicalMedianG.fromCalendar && (
+                      <p className="text-[10px] text-muted-foreground">
+                        💡 Haz click en una tarjeta de turno del calendario para usar datos específicos.
+                      </p>
+                    )}
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <AutoField
-                  label="Largo prom. salmón (cm)"
-                  value={physicalConfig.avgSalmonLengthCm}
-                  onChange={(v) => setPhysicalConfig((p) => ({ ...p, avgSalmonLengthCm: v }))}
-                  auto={physicalConfig.autoSuggestions?.avgSalmonLengthCm ?? false}
-                  onAutoChange={(v) => setPhysicalConfig((p) => ({ ...p, autoSuggestions: { ...p.autoSuggestions, avgSalmonLengthCm: v } }))}
-                  suggested={suggestedDimensions?.lengthCm ?? null}
-                  hint="Máx. admitido: 110 cm"
-                  step={1}
-                  min={20}
-                  max={120}
-                  unit="cm"
-                />
-                <AutoField
-                  label="Ancho prom. salmón (cm)"
-                  value={physicalConfig.avgSalmonWidthCm ?? ''}
-                  onChange={(v) => setPhysicalConfig((p) => ({ ...p, avgSalmonWidthCm: v || undefined }))}
-                  auto={physicalConfig.autoSuggestions?.avgSalmonWidthCm ?? false}
-                  onAutoChange={(v) => setPhysicalConfig((p) => ({ ...p, autoSuggestions: { ...p.autoSuggestions, avgSalmonWidthCm: v } }))}
-                  suggested={suggestedDimensions?.widthCm ?? null}
-                  hint="Máx. admitido: 29 cm"
-                  step={0.5}
-                  min={5}
-                  max={40}
-                  placeholder="—"
-                  unit="cm"
-                />
-                <div>
-                  <Label className="text-xs">Largo paleta flipper (mm)</Label>
-                  <Input
-                    type="number"
-                    step="1"
-                    min="50"
-                    max="500"
-                    value={physicalConfig.flipperPaddleLengthMm ?? ''}
-                    onChange={(e) => setPhysicalConfig((p) => ({ ...p, flipperPaddleLengthMm: e.target.value ? Number(e.target.value) : undefined }))}
-                    placeholder="Medir en terreno"
-                    className="mt-1 font-mono"
-                  />
-                  <p className="text-[10px] text-muted-foreground mt-1">Desde eje hasta extremo. Medido: 475 mm.</p>
-                </div>
-                <div>
-                  <div className="flex items-center gap-1">
-                    <Label className="text-xs">Reset flipper (s)</Label>
-                    <CalibBadge status={physicalConfig.flipperResetTimeSec !== undefined && physicalConfig.flipperResetTimeSec !== 0.45 ? 'verified' : 'estimated'} />
-                  </div>
-                  <Input
-                    type="number"
-                    step="0.05"
-                    min="0.1"
-                    max="2.0"
-                    value={physicalConfig.flipperResetTimeSec ?? 0.45}
-                    onChange={(e) => setPhysicalConfig((p) => ({ ...p, flipperResetTimeSec: Number(e.target.value) }))}
-                    className="mt-1 font-mono"
-                  />
-                  <p className="text-[10px] text-muted-foreground mt-1">Tiempo reset cilindro neumático. Cronometrar en planta.</p>
-                </div>
-                <div>
-                  <Label className="text-xs">Cantidad de Pockets</Label>
-                  <Input
-                    type="number"
-                    step="1"
-                    min="1"
-                    max="8"
-                    value={physicalConfig.pocketCount}
-                    onChange={(e) => setPhysicalConfig((p) => ({ ...p, pocketCount: Number(e.target.value) }))}
-                    className="mt-1 font-mono"
-                  />
-                </div>
-              </div>
-              {physicalConfig.flipperPaddleLengthMm && (() => {
-                const mainBelt = physicalConfig.belts.find((b) => b.beltId === 'main')
-                const speedMps = mainBelt?.speedMps ?? 0.7
-                const minOpenTimeSec = (physicalConfig.flipperPaddleLengthMm / 1000) / speedMps
-                const salmonLengthM = physicalConfig.avgSalmonLengthCm / 100
-                const salmonPassTimeSec = salmonLengthM / speedMps
-                // Cadencia REAL: prioriza datos observados (Excel > histórico > teórico)
-                //   - Excel en memoria: batchStats.throughputPzPerMin
-                //   - Histórico: productionRatePerHour/60 o totalPieces/durationMinutes
-                //   - Fallback teórico: ciclo_pocket=3s × pocketCount (más realista)
-                const cadenceFromHistorical = historicalMedianG?.productionRatePerHour
-                  ? historicalMedianG.productionRatePerHour / 60
-                  : historicalMedianG?.durationMinutes && historicalMedianG.durationMinutes > 0
-                    ? historicalMedianG.totalPieces / historicalMedianG.durationMinutes
-                    : null
-                const cadenceObserved = batchStats?.throughputPzPerMin ?? cadenceFromHistorical
-                const pocketCycleSec = 3.0 // ciclo realista de static weighing + descarga
-                const cadenceTheoretical = (physicalConfig.pocketCount * 60) / pocketCycleSec
-                const cadencePiecesPerMin = cadenceObserved ?? cadenceTheoretical
-                const cadenceSource: 'excel' | 'historical' | 'theoretical' =
-                  batchStats?.throughputPzPerMin ? 'excel'
-                  : cadenceFromHistorical ? 'historical'
-                  : 'theoretical'
-                const spacingM = speedMps * (60 / cadencePiecesPerMin)
-                const lengthToSpacingRatio = salmonLengthM / spacingM
-                const pocketCountAlt = physicalConfig.pocketCount === 4 ? 3 : 4
-                // Escalar la cadencia proporcional al cambio de pockets
-                const cadenceAlt = cadencePiecesPerMin * (pocketCountAlt / physicalConfig.pocketCount)
-                const spacingAlt = speedMps * (60 / cadenceAlt)
-                const overlapping = lengthToSpacingRatio >= 1
-                return (
-                  <div className="mt-3 p-3 rounded-lg bg-sky-500/10 border border-sky-500/20 text-xs space-y-1">
-                    <p className="font-medium text-sky-700 dark:text-sky-300">Timing calculado con datos actuales</p>
-                    <p className="text-muted-foreground">
-                      Tiempo mínimo que el flipper debe estar abierto (paleta pasa): <span className="font-mono font-medium text-foreground">{minOpenTimeSec.toFixed(3)} s</span>
-                    </p>
-                    <p className="text-muted-foreground">
-                      Tiempo que un salmón de {physicalConfig.avgSalmonLengthCm} cm tarda en pasar el flipper: <span className="font-mono font-medium text-foreground">{salmonPassTimeSec.toFixed(3)} s</span>
-                    </p>
-                    <p className="text-muted-foreground">
-                      Ventana de cierre mínima después que el salmón pasó: <span className="font-mono font-medium text-foreground">{Math.max(0, salmonPassTimeSec - minOpenTimeSec).toFixed(3)} s</span>
-                    </p>
-                    <div className="mt-2 pt-2 border-t border-sky-500/20 space-y-1">
-                      <div className="flex items-center gap-1.5">
-                        <p className="font-medium text-sky-700 dark:text-sky-300">
-                          Análisis de pockets ({physicalConfig.pocketCount} activos)
-                        </p>
-                        <InfoTooltip
-                          title="Flujo real del alimentado"
-                          text={`4 clasificadoras manuales operan los pockets: cada una toma una pieza, presiona el botón de calidad y deposita la pieza en su pocket. El Static Weighing pesa y descarga a la cinta Z.\n\nLa cadencia NO es teórica (1 pieza/pocket/seg) sino limitada por la velocidad humana. Típico máximo observado: 66–70 pz/min en salida Z-belt.`}
-                          example="Turno saludable: 40–55 pz/min promedio · picos 65–70"
-                          position="top"
-                        />
-                        {cadenceSource === 'excel' && <span className="text-[10px] text-emerald-500">· cadencia real del Excel cargado</span>}
-                        {cadenceSource === 'historical' && <span className="text-[10px] text-amber-500">· cadencia real del histórico {historicalMedianG?.dateKey} {historicalMedianG?.shiftId}</span>}
-                        {cadenceSource === 'theoretical' && <span className="text-[10px] text-muted-foreground">· cadencia teórica (sin datos)</span>}
-                      </div>
-                      <p className="text-muted-foreground">
-                        Cadencia promedio: <span className="font-mono font-medium text-foreground">{cadencePiecesPerMin.toFixed(0)} pz/min</span>
-                        {batchStats?.peakPzPerMin != null && (
-                          <span className="text-[10px]"> · pico observado: <span className="font-mono font-medium text-foreground">{batchStats.peakPzPerMin} pz/min</span></span>
-                        )}
-                      </p>
-                      <p className="text-muted-foreground">
-                        Gap libre entre peces: <span className={cn('font-mono font-medium', overlapping ? 'text-red-500' : lengthToSpacingRatio > 0.7 ? 'text-amber-500' : 'text-emerald-500')}>
-                          {Math.max(0, spacingM - salmonLengthM).toFixed(2)} m
-                        </span>
-                        <span className="text-[10px] text-muted-foreground"> · Pez {physicalConfig.avgSalmonLengthCm} cm + aire {(Math.max(0, spacingM - salmonLengthM) * 100).toFixed(0)} cm = paso {(spacingM * 100).toFixed(0)} cm</span>
-                        <InfoTooltip
-                          title="Cómo se calcula"
-                          text={`1) La cadencia dice cuántos peces pasan por minuto por un punto fijo.\n2) Paso total = velocidad × tiempo entre peces (centro a centro).\n3) Gap libre = paso total − largo del pez.\n\nSi el gap es ≤ 0, dos peces se solapan y la fotocélula los ve como uno solo → marca "fuera de límites".`}
-                          formula={`tiempo entre peces = 60 / ${cadencePiecesPerMin.toFixed(0)} = ${(60 / cadencePiecesPerMin).toFixed(2)} s\npaso total = ${speedMps.toFixed(2)} m/s × ${(60 / cadencePiecesPerMin).toFixed(2)} s = ${spacingM.toFixed(2)} m\ngap libre = ${spacingM.toFixed(2)} − ${salmonLengthM.toFixed(2)} = ${Math.max(0, spacingM - salmonLengthM).toFixed(2)} m\nratio pez/paso = ${salmonLengthM.toFixed(2)} / ${spacingM.toFixed(2)} = ${lengthToSpacingRatio.toFixed(2)}`}
-                          position="top"
-                        />
-                      </p>
-                      <p className="text-[10px] text-muted-foreground">
-                        Ratio pez/paso: <span className={cn('font-mono font-medium', overlapping ? 'text-red-500' : lengthToSpacingRatio > 0.7 ? 'text-amber-500' : 'text-emerald-500')}>
-                          {lengthToSpacingRatio.toFixed(2)}
-                        </span>
-                        <span> (el pez ocupa el {(lengthToSpacingRatio * 100).toFixed(0)}% del paso entre peces consecutivos)</span>
-                      </p>
-                      {overlapping && (
-                        <p className="text-[10px] text-red-500">
-                          ⚠ El pez ({physicalConfig.avgSalmonLengthCm} cm) es más largo que el paso ({(spacingM * 100).toFixed(0)} cm) → peces se solapan, fotocélula marca "fuera de límites".
-                          Con {pocketCountAlt} pockets el gap libre sube a {Math.max(0, spacingAlt - salmonLengthM).toFixed(2)} m.
-                        </p>
-                      )}
-                      {!overlapping && lengthToSpacingRatio > 0.7 && (
-                        <p className="text-[10px] text-amber-500">
-                          ⚠ Gap libre estrecho ({Math.max(0, spacingM - salmonLengthM).toFixed(2)} m). Con {pocketCountAlt} pockets sube a {Math.max(0, spacingAlt - salmonLengthM).toFixed(2)} m.
-                        </p>
-                      )}
-                      <p className="text-[10px] text-muted-foreground">
-                        Alternativa con {pocketCountAlt} pockets: {cadenceAlt.toFixed(0)} pz/min · gap libre {Math.max(0, spacingAlt - salmonLengthM).toFixed(2)} m · ratio {(salmonLengthM / spacingAlt).toFixed(2)}
-                      </p>
-                      <BeltVisualizer
-                        speedMps={speedMps}
-                        salmonLengthM={salmonLengthM}
-                        spacingM={spacingM}
-                        cadencePiecesPerMin={cadencePiecesPerMin}
-                        overlapping={overlapping}
+                    {/* Fila 2: Largo / Ancho / Pockets (compactos) */}
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                      <AutoField
+                        label="Largo prom. (cm)"
+                        value={physicalConfig.avgSalmonLengthCm}
+                        onChange={(v) => setPhysicalConfig((p) => ({ ...p, avgSalmonLengthCm: v }))}
+                        auto={physicalConfig.autoSuggestions?.avgSalmonLengthCm ?? false}
+                        onAutoChange={(v) => setPhysicalConfig((p) => ({ ...p, autoSuggestions: { ...p.autoSuggestions, avgSalmonLengthCm: v } }))}
+                        suggested={suggestedDimensions?.lengthCm ?? null}
+                        hint="Máx. 110 cm"
+                        step={1}
+                        min={20}
+                        max={120}
+                        unit="cm"
                       />
+                      <AutoField
+                        label="Ancho prom. (cm)"
+                        value={physicalConfig.avgSalmonWidthCm ?? ''}
+                        onChange={(v) => setPhysicalConfig((p) => ({ ...p, avgSalmonWidthCm: v || undefined }))}
+                        auto={physicalConfig.autoSuggestions?.avgSalmonWidthCm ?? false}
+                        onAutoChange={(v) => setPhysicalConfig((p) => ({ ...p, autoSuggestions: { ...p.autoSuggestions, avgSalmonWidthCm: v } }))}
+                        suggested={suggestedDimensions?.widthCm ?? null}
+                        hint="Máx. 29 cm"
+                        step={0.5}
+                        min={5}
+                        max={40}
+                        placeholder="—"
+                        unit="cm"
+                      />
+                      <div>
+                        <Label className="text-xs">Pockets activos</Label>
+                        <Input
+                          type="number"
+                          step="1"
+                          min="1"
+                          max="8"
+                          value={physicalConfig.pocketCount}
+                          onChange={(e) => setPhysicalConfig((p) => ({ ...p, pocketCount: Number(e.target.value) }))}
+                          className="mt-1 font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    {/* BeltVisualizer arriba */}
+                    <BeltVisualizer
+                      speedMps={speedMps}
+                      salmonLengthM={salmonLengthM}
+                      spacingM={spacingM}
+                      cadencePiecesPerMin={cadencePiecesPerMin}
+                      overlapping={overlapping}
+                    />
+
+                    {/* Pill verdict */}
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className={cn(
+                        'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border',
+                        verdictColor,
+                      )}>
+                        {verdictEmoji} {verdictText}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">
+                        ratio pez/paso: <span className="font-mono">{lengthToSpacingRatio.toFixed(2)}</span>
+                        {cadenceSource === 'excel' && <span className="text-emerald-500 ml-1">· cadencia Excel</span>}
+                        {cadenceSource === 'historical' && <span className="text-amber-500 ml-1">· cadencia histórica</span>}
+                        {cadenceSource === 'theoretical' && <span className="ml-1">· cadencia teórica</span>}
+                      </span>
                     </div>
                   </div>
-                )
-              })()}
-            </div>
-            )}
+
+                  {/* ══ EQUIPO FLIPPER (collapsible, abierto) ═══════════════════════ */}
+                  <details open className="group rounded-lg border border-slate-700/60 bg-slate-900/40">
+                    <summary className="flex cursor-pointer items-center justify-between px-4 py-2.5 text-sm font-medium select-none hover:bg-slate-800/40 rounded-lg list-none">
+                      <span>⚙️ Equipo flipper</span>
+                      <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180 text-muted-foreground" />
+                    </summary>
+                    <div className="px-4 pb-4 pt-2 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {/* Sub-card A: Ciclo software Z2 */}
+                      <div className="rounded-lg border border-slate-700/50 bg-slate-950/60 p-3 space-y-2">
+                        <p className="text-xs font-semibold text-sky-400">Ciclo flipper software Z2</p>
+                        <div className="space-y-1.5 text-xs text-muted-foreground">
+                          <div className="flex justify-between">
+                            <span>Delay apertura</span>
+                            <span className="font-mono text-foreground">150 ms</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Mín. tiempo abierto</span>
+                            <span className="font-mono text-foreground">350 ms</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Delay cierre</span>
+                            <span className="font-mono text-foreground">150 ms</span>
+                          </div>
+                          <div className="flex justify-between border-t border-slate-700/50 pt-1.5 mt-1">
+                            <span className="font-semibold text-foreground">Ciclo total</span>
+                            <span className="font-mono font-bold text-sky-400">650 ms</span>
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground/60">
+                          Parámetros Z2: delayFlipperOpen / minFlipperOpenTime / delayFlipperClose
+                        </p>
+                      </div>
+
+                      {/* Sub-card B: Reset mecánico cilindro */}
+                      <div className="rounded-lg border border-slate-700/50 bg-slate-950/60 p-3 space-y-2">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="text-xs font-semibold text-amber-400">Reset mecánico cilindro</p>
+                          <CalibBadge status={
+                            physicalConfig.flipperResetTimeSec !== undefined && physicalConfig.flipperResetTimeSec !== 0.45
+                              ? 'verified'
+                              : 'estimated'
+                          } />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Tiempo reset (s)</Label>
+                          <Input
+                            type="number"
+                            step="0.05"
+                            min="0.1"
+                            max="2.0"
+                            value={physicalConfig.flipperResetTimeSec ?? 0.45}
+                            onChange={(e) => setPhysicalConfig((p) => ({ ...p, flipperResetTimeSec: Number(e.target.value) }))}
+                            className="mt-1 font-mono h-8"
+                          />
+                        </div>
+                        <p className="text-[10px] text-muted-foreground">
+                          Cronometrar con cámara slow-mo en{' '}
+                          <span className="font-mono text-foreground text-[10px]">Servicio → Probar salidas [8620]</span>
+                        </p>
+                      </div>
+
+                      {/* Sub-card C: Paleta flipper física */}
+                      <div className="rounded-lg border border-slate-700/50 bg-slate-950/60 p-3 space-y-2">
+                        <p className="text-xs font-semibold text-violet-400">Paleta flipper física</p>
+                        <div>
+                          <Label className="text-xs">Largo paleta (mm)</Label>
+                          <Input
+                            type="number"
+                            step="1"
+                            min="50"
+                            max="600"
+                            value={physicalConfig.flipperPaddleLengthMm ?? ''}
+                            onChange={(e) => setPhysicalConfig((p) => ({ ...p, flipperPaddleLengthMm: e.target.value ? Number(e.target.value) : undefined }))}
+                            placeholder="Medir en terreno"
+                            className="mt-1 font-mono h-8"
+                          />
+                          <p className="text-[10px] text-muted-foreground mt-1">Medido: 475 mm. Desde eje hasta extremo.</p>
+                        </div>
+                        {minOpenTimeSec != null && (
+                          <div className="text-[10px] text-muted-foreground pt-1 border-t border-slate-700/50">
+                            Apertura mínima calculada:{' '}
+                            <span className="font-mono text-foreground">{minOpenTimeSec.toFixed(3)} s</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </details>
+
+                  {/* ══ DIAGNÓSTICO TÉCNICO (collapsible, cerrado) ═══════════════════ */}
+                  <details className="group rounded-lg border border-slate-700/40 bg-slate-900/20">
+                    <summary className="flex cursor-pointer items-center justify-between px-4 py-2.5 text-sm font-medium select-none hover:bg-slate-800/30 rounded-lg list-none text-muted-foreground">
+                      <span>📐 Diagnóstico técnico</span>
+                      <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+                    </summary>
+                    <div className="px-4 pb-4 pt-2 space-y-3 text-xs">
+                      <BatchStatsCard stats={batchStats} />
+
+                      {/* Timing flipper */}
+                      {minOpenTimeSec != null && (
+                        <div className="p-3 rounded-lg bg-sky-500/10 border border-sky-500/20 space-y-1">
+                          <p className="font-medium text-sky-700 dark:text-sky-300">Timing flipper calculado</p>
+                          <p className="text-muted-foreground">
+                            Apertura mínima (paleta pasa):{' '}
+                            <span className="font-mono font-medium text-foreground">{minOpenTimeSec.toFixed(3)} s</span>
+                          </p>
+                          <p className="text-muted-foreground">
+                            Tiempo pez {physicalConfig.avgSalmonLengthCm} cm en pasar:{' '}
+                            <span className="font-mono font-medium text-foreground">{salmonPassTimeSec.toFixed(3)} s</span>
+                          </p>
+                          <p className="text-muted-foreground">
+                            Ventana cierre mínima:{' '}
+                            <span className="font-mono font-medium text-foreground">
+                              {Math.max(0, salmonPassTimeSec - minOpenTimeSec).toFixed(3)} s
+                            </span>
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Análisis pockets */}
+                      <div className="p-3 rounded-lg bg-sky-500/10 border border-sky-500/20 space-y-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="font-medium text-sky-700 dark:text-sky-300">
+                            Análisis pockets ({physicalConfig.pocketCount} activos)
+                          </p>
+                          <InfoTooltip
+                            title="Flujo real del alimentado"
+                            text={`4 clasificadoras manuales operan los pockets: cada una toma una pieza, presiona el bot\u00f3n de calidad y deposita la pieza en su pocket. El Static Weighing pesa y descarga a la cinta Z.\n\nLa cadencia NO es te\u00f3rica sino limitada por la velocidad humana. T\u00edpico m\u00e1ximo observado: 66\u201370 pz/min en salida Z-belt.`}
+                            example="Turno saludable: 40–55 pz/min promedio · picos 65–70"
+                            position="top"
+                          />
+                          {cadenceSource === 'excel' && <span className="text-[10px] text-emerald-500">· cadencia real del Excel</span>}
+                          {cadenceSource === 'historical' && (
+                            <span className="text-[10px] text-amber-500">
+                              · histórico {historicalMedianG?.dateKey} {historicalMedianG?.shiftId}
+                            </span>
+                          )}
+                          {cadenceSource === 'theoretical' && <span className="text-[10px] text-muted-foreground">· cadencia teórica</span>}
+                        </div>
+                        <p className="text-muted-foreground">
+                          Cadencia promedio:{' '}
+                          <span className="font-mono font-medium text-foreground">{cadencePiecesPerMin.toFixed(0)} pz/min</span>
+                          {batchStats?.peakPzPerMin != null && (
+                            <span className="text-[10px]">
+                              {' '}· pico: <span className="font-mono font-medium text-foreground">{batchStats.peakPzPerMin} pz/min</span>
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-muted-foreground">
+                          Gap libre entre peces:{' '}
+                          <span className={cn(
+                            'font-mono font-medium',
+                            overlapping ? 'text-red-500' : lengthToSpacingRatio > 0.7 ? 'text-amber-500' : 'text-emerald-500',
+                          )}>
+                            {(gapM * 100).toFixed(0)} cm
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">
+                            {' '}· Pez {physicalConfig.avgSalmonLengthCm} cm + aire = paso {(spacingM * 100).toFixed(0)} cm
+                          </span>
+                          <InfoTooltip
+                            title="Cómo se calcula"
+                            text={`1) La cadencia dice cu\u00e1ntos peces pasan por minuto.\n2) Paso total = velocidad \u00d7 tiempo entre peces (centro a centro).\n3) Gap libre = paso total \u2212 largo del pez.\n\nSi el gap es \u2264 0, dos peces se solapan y la fotoc\u00e9lula los ve como uno solo \u2192 marca "fuera de l\u00edmites".`}
+                            formula={`tiempo entre peces = 60 / ${cadencePiecesPerMin.toFixed(0)} = ${(60 / cadencePiecesPerMin).toFixed(2)} s\npaso total = ${speedMps.toFixed(2)} m/s \u00d7 ${(60 / cadencePiecesPerMin).toFixed(2)} s = ${spacingM.toFixed(2)} m\ngap libre = ${spacingM.toFixed(2)} \u2212 ${salmonLengthM.toFixed(2)} = ${gapM.toFixed(2)} m\nratio pez/paso = ${salmonLengthM.toFixed(2)} / ${spacingM.toFixed(2)} = ${lengthToSpacingRatio.toFixed(2)}`}
+                            position="top"
+                          />
+                        </p>
+                        {overlapping && (
+                          <p className="text-[10px] text-red-500">
+                            ⚠ El pez ({physicalConfig.avgSalmonLengthCm} cm) es más largo que el paso ({(spacingM * 100).toFixed(0)} cm) → peces se solapan.
+                            Con {pocketCountAlt} pockets el gap sube a {Math.max(0, spacingAlt - salmonLengthM).toFixed(2)} m.
+                          </p>
+                        )}
+                        {!overlapping && lengthToSpacingRatio > 0.7 && (
+                          <p className="text-[10px] text-amber-500">
+                            ⚠ Gap libre estrecho. Con {pocketCountAlt} pockets sube a {Math.max(0, spacingAlt - salmonLengthM).toFixed(2)} m.
+                          </p>
+                        )}
+                        <p className="text-[10px] text-muted-foreground">
+                          Alternativa {pocketCountAlt} pockets: {cadenceAlt.toFixed(0)} pz/min · gap {Math.max(0, spacingAlt - salmonLengthM).toFixed(2)} m · ratio {(salmonLengthM / spacingAlt).toFixed(2)}
+                        </p>
+                      </div>
+
+                      {/* Fórmula FishBase */}
+                      {physicalConfig.species && (() => {
+                        const s = SPECIES_ALLOMETRY[physicalConfig.species]
+                        const fishBaseId = physicalConfig.species === 'salar' ? 236 : 245
+                        const scientific = physicalConfig.species === 'salar' ? 'Salmo salar' : 'Oncorhynchus kisutch'
+                        return (
+                          <div className="p-2 rounded bg-slate-800/60 border border-slate-700/40 text-[10px] space-y-1">
+                            <p className="font-medium text-muted-foreground">
+                              {s.label} · {scientific} · FishBase ID {fishBaseId}
+                            </p>
+                            <p className="font-mono text-foreground">W(g) = {s.a} × L(cm)^{s.b}</p>
+                            <p className="text-muted-foreground">
+                              Ancho ≈ {(s.widthRatio * 100).toFixed(0)}% × largo (empírico — validar en planta)
+                            </p>
+                            {suggestedDimensions && (
+                              <p className="text-muted-foreground font-mono">
+                                L = ({suggestedDimensions.medianWeightG}/{s.a})^(1/{s.b}) = {suggestedDimensions.lengthCm} cm
+                              </p>
+                            )}
+                            <p className="text-muted-foreground/60">
+                              Froese, Thorson & Reyes 2014 · J. Applied Ichthyology 30(1):78-85
+                            </p>
+                          </div>
+                        )
+                      })()}
+                    </div>
+                  </details>
+                </div>
+              )
+            })()}
 
             {/* Cintas */}
             {fisicaSubTab === 'cintas' && (
