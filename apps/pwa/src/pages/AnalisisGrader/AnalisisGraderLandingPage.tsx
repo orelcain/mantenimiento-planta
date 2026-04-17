@@ -95,7 +95,7 @@ export function AnalisisGraderLandingPage() {
   }
 
   return (
-    <div className="container mx-auto p-4 space-y-6 max-w-5xl">
+    <div className="container mx-auto p-4 space-y-6 max-w-screen-xl">
       {/* Hero */}
       <Card className="border-primary/20">
         <CardContent className="p-6">
