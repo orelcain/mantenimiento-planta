@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.98.0' as const
+export const APP_VERSION = '2.99.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-04-16' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'feat(ux): Grader Config R4 — shift gap warning + validacion inputs' as const
+export const VERSION_NAME = 'feat(ux): Grader Config R6+R7 — chip contrast + microcopy labels' as const
 
 /**
  * Nota:

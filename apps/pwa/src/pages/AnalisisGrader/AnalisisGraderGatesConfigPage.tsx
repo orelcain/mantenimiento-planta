@@ -404,7 +404,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
               </Select>
             </div>
             <div>
-              <Label className="text-xs">Intervalo Serie Temporal</Label>
+              <Label className="text-xs">Intervalo de análisis</Label>
               <Select
                 value={String(config.intervalMinutes ?? 15)}
                 onValueChange={(v) => setConfig((c) => ({ ...c, intervalMinutes: Number(v) as 5 | 15 | 60 }))}
@@ -420,7 +420,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
               </Select>
             </div>
             <div>
-              <Label className="text-xs">Timezone</Label>
+              <Label className="text-xs">Zona horaria</Label>
               <Input
                 value={config.timezone || ''}
                 onChange={(e) => setConfig((c) => ({ ...c, timezone: e.target.value }))}
@@ -525,7 +525,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
             <div className="mt-3 grid gap-2">
               {shiftSchedule.map((shift, idx) => (
                 <div key={shift.shiftId} className="flex items-center gap-3 flex-wrap">
-                  <Badge variant="outline" className="text-xs">{shift.shiftId}</Badge>
+                  <Badge variant="outline" className="text-xs bg-zinc-800 ring-1 ring-zinc-700 whitespace-nowrap">{shift.shiftId}</Badge>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground">Inicio</span>
                     <Input
