@@ -377,6 +377,13 @@ export interface GraderPhysicalConfig {
    * Calibrar midiendo velocidad real y ajustando hasta que coincida.
    */
   kFactor?: number
+  /**
+   * Especie procesada. Determina los coeficientes alométricos usados para
+   * estimar largo/ancho del producto a partir del peso mediano del lote.
+   * - salar: Salmo salar (Salmón Atlántico)
+   * - coho: Oncorhynchus kisutch (Salmón Coho/Plateado)
+   */
+  species?: 'salar' | 'coho'
 }
 
 /**

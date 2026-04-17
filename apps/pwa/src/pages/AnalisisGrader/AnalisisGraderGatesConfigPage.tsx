@@ -6,7 +6,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch, Label } from '@/components/ui'
-import { Save, FolderOpen, ChevronRight, Trash2, ChevronDown, RotateCcw, Plus, Lock, Pencil } from 'lucide-react'
+import { Save, FolderOpen, ChevronRight, Trash2, ChevronDown, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore, useIsAdmin } from '@/store'
 import {
@@ -47,7 +47,12 @@ interface Props {
 
 const QUALITIES: GraderQuality[] = ['Premium', 'Grado', 'Industrial', 'D', 'Unknown']
 const DEFAULT_CALIBRES: CalibreRange[] = ['0-2 lb', '2-4 lb', '4-6 lb', '6-8 lb', '8-10 lb', '10-12 lb', 'Other']
-const SHIFT_OPTIONS = ['Turno día', 'Turno noche'] as const
+
+// Coeficientes alométricos W(g) = a × L(cm)^b — fuente FishBase + literatura acuicultura
+const SPECIES_ALLOMETRY = {
+  salar: { label: 'Salmón Atlántico (Salar)', a: 0.0096, b: 3.0, widthRatio: 0.22 },
+  coho:  { label: 'Salmón Coho',              a: 0.0077, b: 3.05, widthRatio: 0.19 },
+} as const
 
 function buildRangeLabel(calibre: string, minGrams: number, maxGrams: number): string {
   return `${calibre} (${minGrams.toLocaleString()}-${maxGrams.toLocaleString()} g)`
@@ -99,7 +104,6 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
   const [showWeightRanges, setShowWeightRanges] = useState(true)
   const [shiftSchedule, setShiftSchedule] = useState(DEFAULT_SHIFT_SCHEDULE)
   const [showPhysicalConfig, setShowPhysicalConfig] = useState(false)
-  const [editingEquipo, setEditingEquipo] = useState(false)
   const [fisicaSubTab, setFisicaSubTab] = useState<'producto' | 'cintas' | 'distancias' | 'calibracion'>('producto')
   const [calibracionSubTab, setCalibracionSubTab] = useState<'danfoss' | 'neumatica' | 'verificacion'>('danfoss')
   const [physicalConfig, setPhysicalConfig] = useState<GraderPhysicalConfig>(DEFAULT_PHYSICAL_CONFIG)
@@ -130,6 +134,25 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
 
   const isCustomRanges = !!(config.customWeightRanges && config.customWeightRanges.length > 0)
 
+  // Peso mediano del lote actual (gramos) — desde pieceRecords del Excel cargado
+  const medianWeightG = useMemo(() => {
+    const weights = parsedData.pieceRecords
+      .map((r) => r.weightPerPieceGrams ?? (r.weightKg != null ? r.weightKg * 1000 : null))
+      .filter((w): w is number => w != null && w > 50 && w < 15000)
+    if (weights.length < 10) return null
+    weights.sort((a, b) => a - b)
+    return weights[Math.floor(weights.length / 2)]
+  }, [parsedData.pieceRecords])
+
+  // Dimensiones sugeridas por alometría según especie y peso mediano
+  const suggestedDimensions = useMemo(() => {
+    if (!medianWeightG || !physicalConfig.species) return null
+    const { a, b, widthRatio } = SPECIES_ALLOMETRY[physicalConfig.species]
+    const lengthCm = Math.round((medianWeightG / a) ** (1 / b))
+    const widthCm = Math.round(lengthCm * widthRatio)
+    return { lengthCm, widthCm, medianWeightG }
+  }, [medianWeightG, physicalConfig.species])
+
   const updateWeightRange = (idx: number, patch: Partial<CalibreWeightRange>) => {
     const ranges: CalibreWeightRange[] = activeRanges.map((r, i) => {
       if (i !== idx) return r
@@ -158,9 +181,6 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
     setConfig((c) => ({ ...c, customWeightRanges: ranges }))
   }
 
-  const resetWeightRanges = () => {
-    setConfig((c) => ({ ...c, customWeightRanges: undefined }))
-  }
 
   const updateShiftSchedule = (idx: number, patch: Partial<typeof shiftSchedule[number]>) => {
     setShiftSchedule((prev) => {
@@ -394,88 +414,6 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Parámetros de turno</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <Label className="text-xs">Turno activo</Label>
-              <Select
-                value={config.shiftId || 'Turno noche'}
-                onValueChange={(v) => setConfig((c) => ({ ...c, shiftId: v }))}
-              >
-                <SelectTrigger className="mt-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {SHIFT_OPTIONS.map((opt) => (
-                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-xs">Intervalo de análisis</Label>
-              <Select
-                value={String(config.intervalMinutes ?? 15)}
-                onValueChange={(v) => setConfig((c) => ({ ...c, intervalMinutes: Number(v) as 5 | 15 | 60 }))}
-              >
-                <SelectTrigger className="mt-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="5">5 minutos</SelectItem>
-                  <SelectItem value="15">15 minutos</SelectItem>
-                  <SelectItem value="60">1 hora</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="border-t border-zinc-800 my-4" />
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Equipo</h3>
-            <button
-              type="button"
-              onClick={() => setEditingEquipo((v) => !v)}
-              className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
-            >
-              {editingEquipo ? <Pencil size={12} /> : <Lock size={12} />}
-              {editingEquipo ? 'Bloquear' : 'Editar'}
-            </button>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <Label className="text-xs">Dispositivo</Label>
-              {editingEquipo ? (
-                <Input
-                  value={config.deviceId || ''}
-                  onChange={(e) => setConfig((c) => ({ ...c, deviceId: e.target.value }))}
-                  placeholder="STATICGRADER1"
-                  className="mt-1"
-                />
-              ) : (
-                <p className="mt-1 h-10 flex items-center px-3 rounded-md border border-border/40 bg-muted/30 text-sm font-mono text-muted-foreground">
-                  {config.deviceId || <span className="italic opacity-50">sin dispositivo</span>}
-                </p>
-              )}
-            </div>
-            <div>
-              <Label className="text-xs">Zona horaria</Label>
-              {editingEquipo ? (
-                <Input
-                  value={config.timezone || ''}
-                  onChange={(e) => setConfig((c) => ({ ...c, timezone: e.target.value }))}
-                  placeholder="America/Santiago"
-                  className="mt-1"
-                />
-              ) : (
-                <p className="mt-1 h-10 flex items-center px-3 rounded-md border border-border/40 bg-muted/30 text-sm font-mono text-muted-foreground">
-                  {config.timezone || <span className="italic opacity-50">America/Santiago</span>}
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div className="border-t border-zinc-800 my-5" />
           <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Umbrales de alerta</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
@@ -874,12 +812,6 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                   Agregar calibre
                 </Button>
               </div>
-              {isCustomRanges && (
-                <Button variant="outline" size="sm" onClick={resetWeightRanges}>
-                  <RotateCcw className="h-3 w-3 mr-1" />
-                  Restaurar valores originales
-                </Button>
-              )}
             </div>
           </CardContent>
         )}
@@ -958,6 +890,30 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
             {fisicaSubTab === 'producto' && (
             <div>
               <p className="text-sm font-medium mb-3">Producto y flipper</p>
+
+              {/* Selector de especie */}
+              <div className="mb-4 flex items-center gap-3">
+                <Label className="text-xs whitespace-nowrap">Especie</Label>
+                <Select
+                  value={physicalConfig.species ?? ''}
+                  onValueChange={(v) => setPhysicalConfig((p) => ({ ...p, species: v as 'salar' | 'coho' }))}
+                >
+                  <SelectTrigger className="h-8 text-xs w-56">
+                    <SelectValue placeholder="Seleccionar especie…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(Object.entries(SPECIES_ALLOMETRY) as [keyof typeof SPECIES_ALLOMETRY, typeof SPECIES_ALLOMETRY[keyof typeof SPECIES_ALLOMETRY]][]).map(([key, s]) => (
+                      <SelectItem key={key} value={key} className="text-xs">{s.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {suggestedDimensions && (
+                  <span className="text-[10px] text-muted-foreground">
+                    Peso mediano lote: <span className="font-mono">{(suggestedDimensions.medianWeightG / 1000).toFixed(2)} kg</span>
+                  </span>
+                )}
+              </div>
+
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div>
                   <Label className="text-xs">Largo prom. salmón (cm)</Label>
@@ -970,7 +926,20 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                     onChange={(e) => setPhysicalConfig((p) => ({ ...p, avgSalmonLengthCm: Number(e.target.value) }))}
                     className="mt-1 font-mono"
                   />
-                  <p className="text-[10px] text-muted-foreground mt-1">Máx. admitido: 110 cm</p>
+                  {suggestedDimensions ? (
+                    <p className="text-[10px] mt-1 flex items-center gap-1">
+                      <span className="text-sky-500">Sugerido: ~{suggestedDimensions.lengthCm} cm</span>
+                      {physicalConfig.avgSalmonLengthCm !== suggestedDimensions.lengthCm && (
+                        <button
+                          type="button"
+                          onClick={() => setPhysicalConfig((p) => ({ ...p, avgSalmonLengthCm: suggestedDimensions.lengthCm }))}
+                          className="underline text-sky-400 hover:text-sky-300"
+                        >Aplicar</button>
+                      )}
+                    </p>
+                  ) : (
+                    <p className="text-[10px] text-muted-foreground mt-1">Máx. admitido: 110 cm</p>
+                  )}
                 </div>
                 <div>
                   <Label className="text-xs">Ancho prom. salmón (cm)</Label>
@@ -984,7 +953,20 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                     placeholder="—"
                     className="mt-1 font-mono"
                   />
-                  <p className="text-[10px] text-muted-foreground mt-1">Máx. admitido: 29 cm</p>
+                  {suggestedDimensions ? (
+                    <p className="text-[10px] mt-1 flex items-center gap-1">
+                      <span className="text-sky-500">Sugerido: ~{suggestedDimensions.widthCm} cm</span>
+                      {(physicalConfig.avgSalmonWidthCm ?? 0) !== suggestedDimensions.widthCm && (
+                        <button
+                          type="button"
+                          onClick={() => setPhysicalConfig((p) => ({ ...p, avgSalmonWidthCm: suggestedDimensions.widthCm }))}
+                          className="underline text-sky-400 hover:text-sky-300"
+                        >Aplicar</button>
+                      )}
+                    </p>
+                  ) : (
+                    <p className="text-[10px] text-muted-foreground mt-1">Máx. admitido: 29 cm</p>
+                  )}
                 </div>
                 <div>
                   <Label className="text-xs">Largo paleta flipper (mm)</Label>
