@@ -155,6 +155,17 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
 
   const isScheduleDirty = JSON.stringify(shiftSchedule) !== JSON.stringify(loadedSchedule)
 
+  const shiftGapMinutes = useMemo(() => {
+    const toMin = (h: number, m: number) => h * 60 + m
+    const covered = shiftSchedule.reduce((sum, s) => {
+      const start = toMin(s.startHour, s.startMinute)
+      const end = toMin(s.endHour, s.endMinute)
+      const dur = end <= start ? 1440 - start + end : end - start
+      return sum + dur
+    }, 0)
+    return Math.max(0, 1440 - covered)
+  }, [shiftSchedule])
+
   const handleApplyAll = async () => {
     if (user) {
       setApplyingSaving(true)
@@ -542,6 +553,15 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                 </div>
               ))}
             </div>
+            {shiftGapMinutes > 0 && (
+              <div className="mt-3 flex items-start gap-2 rounded-md bg-amber-500/10 border border-amber-500/30 px-3 py-2">
+                <span className="text-amber-400 mt-px">⚠</span>
+                <p className="text-xs text-amber-300">
+                  Hay <strong>{Math.floor(shiftGapMinutes / 60)}h {shiftGapMinutes % 60}min</strong> sin turno asignado en el día.
+                  Revisa que los horarios cubran el período operativo completo.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Period inferred */}
