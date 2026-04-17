@@ -12,12 +12,16 @@ import { Button, Card, CardContent, Spinner } from '@/components/ui'
 import { ArrowLeft, Settings2, AlertCircle } from 'lucide-react'
 import { usePermissionsStore } from '@/store'
 import { getDailySummary } from '@/services/grader/graderDailySummary.service'
+import { getShiftDoc } from '@/services/grader/graderShifts.service'
 import { computeShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import { DEFAULT_SHIFT_SCHEDULE } from '@/services/grader/graderShiftSchedule'
 import { parseMatrixErrorString } from '@/services/grader/graderMatrixP0Causes'
 import { HeroScorecard } from '@/components/grader/HeroScorecard'
 import { P0CausesPanel } from '@/components/grader/P0CausesPanel'
+import { ShiftTimelineView } from '@/components/grader/ShiftTimelineView'
+import { ActionPlanPanel, deriveSuggestions } from '@/components/grader/ActionPlanPanel'
 import type { GraderDailySummary, MatrixP0Cause, PointZeroClassification } from '@/services/grader/types'
+import type { GraderShiftDoc } from '@/services/grader/graderShifts.service'
 
 /** Parsea `YYYY-MM-DD__Turno día` → [dateKey, shiftLabel] */
 function parseShiftId(raw: string | undefined): [string, string] {
@@ -39,8 +43,6 @@ function deriveByMatrixCause(
   const acc = Object.fromEntries(ALL.map(mc => [mc, { pieces: 0, pct: 0, subCauses: [] as PointZeroClassification['byMatrixCause'][MatrixP0Cause]['subCauses'] }])) as PointZeroClassification['byMatrixCause']
 
   for (const c of topP0Causes ?? []) {
-    // topP0Causes.error puede ser la causa Matrix string del Excel ("Fuera de límites")
-    // o el label interno ("Fuera de rango", "Too close or too long", etc.)
     const mc = labelToMatrixCause(c.error)
     acc[mc].pieces += c.pieces
   }
@@ -55,13 +57,24 @@ function deriveByMatrixCause(
 /** Clasifica strings de causa tanto del Excel Matrix como los internos */
 function labelToMatrixCause(label: string): MatrixP0Cause {
   const s = (label ?? '').toLowerCase()
-  // Intentar primero con parseMatrixErrorString (cubre strings del Excel)
   const fromMatrix = parseMatrixErrorString(label)
   if (fromMatrix !== 'otro') return fromMatrix
-  // Fallback para labels internos
   if (s.includes('rango')) return 'fuera_de_limites'
   if (s.includes('close') || s.includes('long')) return 'no_leido_fotocelula'
   return 'otro'
+}
+
+/** Causa Matrix dominante desde byMatrixCause */
+function dominantCause(
+  byMatrixCause: PointZeroClassification['byMatrixCause'] | null,
+): MatrixP0Cause | null {
+  if (!byMatrixCause) return null
+  let top: MatrixP0Cause | null = null
+  let max = 0
+  for (const [mc, v] of Object.entries(byMatrixCause) as [MatrixP0Cause, { pieces: number }][]) {
+    if (v.pieces > max) { max = v.pieces; top = mc }
+  }
+  return top
 }
 
 export function AnalisisGraderTurnoPage() {
@@ -79,6 +92,7 @@ export function AnalisisGraderTurnoPage() {
   )
 
   const [summary, setSummary] = useState<GraderDailySummary | null>(null)
+  const [shiftDoc, setShiftDoc] = useState<GraderShiftDoc | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -90,24 +104,37 @@ export function AnalisisGraderTurnoPage() {
     }
     setLoading(true)
     setError(null)
-    getDailySummary(dateKey, shiftLabel)
-      .then(s => {
+
+    Promise.all([
+      getDailySummary(dateKey, shiftLabel),
+      getShiftDoc(dateKey, shiftLabel).catch(() => null),
+    ])
+      .then(([s, sd]) => {
         if (!s) setError(`Turno ${shiftLabel} del ${dateKey} no encontrado en el historial.`)
         else setSummary(s)
+        setShiftDoc(sd)
       })
       .catch(err => setError(err instanceof Error ? err.message : 'Error al cargar el turno.'))
       .finally(() => setLoading(false))
   }, [dateKey, shiftLabel])
 
-  if (!canSee('analisisGrader')) return <Navigate to="/" replace />
-
+  // Todos los useMemo ANTES del early return condicional (regla de hooks)
   const byMatrixCause = useMemo(() => {
     if (!summary?.topP0Causes?.length) return null
     return deriveByMatrixCause(summary.topP0Causes, summary.pointZeroPieces)
   }, [summary])
 
+  const suggestions = useMemo(
+    () => deriveSuggestions(summary?.pointZeroPct ?? 0, dominantCause(byMatrixCause)),
+    [summary, byMatrixCause],
+  )
+
+  const shiftDocId = `${dateKey}__${shiftLabel}`
+
+  if (!canSee('analisisGrader')) return <Navigate to="/" replace />
+
   return (
-    <div className="container mx-auto p-4 space-y-4 max-w-4xl">
+    <div className="container mx-auto p-4 space-y-4 max-w-screen-xl">
       {/* Header */}
       <div className="flex items-center gap-3">
         <Button
@@ -146,11 +173,31 @@ export function AnalisisGraderTurnoPage() {
       {/* Contenido principal */}
       {summary && shiftWindow && (
         <>
-          <HeroScorecard summary={summary} shiftWindow={shiftWindow} />
+          {/* Fila superior: scorecard + acciones */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="lg:col-span-2 space-y-4">
+              <HeroScorecard summary={summary} shiftWindow={shiftWindow} />
+              <P0CausesPanel
+                byMatrixCause={byMatrixCause}
+                totalP0Pct={summary.pointZeroPct}
+              />
+            </div>
 
-          <P0CausesPanel
-            byMatrixCause={byMatrixCause}
-            totalP0Pct={summary.pointZeroPct}
+            <div className="space-y-4">
+              <ActionPlanPanel
+                shiftDocId={shiftDocId}
+                suggestions={suggestions}
+                status={shiftWindow.status}
+              />
+            </div>
+          </div>
+
+          {/* Timeline — full width */}
+          {/* Timeline: buckets viven en sub-colección (carga diferida en FASE 14+) */}
+          <ShiftTimelineView
+            timelineBuckets={[]}
+            shiftDoc={shiftDoc}
+            shiftWindow={shiftWindow}
           />
 
           {/* Link a configuración avanzada */}
@@ -163,7 +210,7 @@ export function AnalisisGraderTurnoPage() {
             </Card>
           </Link>
 
-          {/* Link al análisis completo (WizardPage/Dashboard) */}
+          {/* Link al análisis completo */}
           <div className="text-center">
             <Button
               variant="link"

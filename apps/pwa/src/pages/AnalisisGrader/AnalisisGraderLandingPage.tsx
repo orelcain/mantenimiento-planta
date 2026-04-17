@@ -8,7 +8,7 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import { useNavigate, Navigate } from 'react-router-dom'
-import { Card, CardContent, CardHeader, CardTitle, Badge, Button } from '@/components/ui'
+import { Card, CardContent, Badge, Button } from '@/components/ui'
 import { Upload, Activity, BarChart3, Settings2, TrendingUp, Clock } from 'lucide-react'
 import { usePermissionsStore } from '@/store'
 import { listDailySummariesByRange } from '@/services/grader/graderDailySummary.service'

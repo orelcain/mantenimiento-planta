@@ -1005,6 +1005,13 @@ service cloud.firestore {
       }
     }
 
+    // ANÁLISIS GRADER - Turnos (uploads + acciones live)
+    match /graderShifts/{shiftId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isSupervisor();
+      allow delete: if isAdmin();
+    }
+
     // ============================================
     // ANÁLISIS GRADER - Plantillas de Gates
     // ============================================
