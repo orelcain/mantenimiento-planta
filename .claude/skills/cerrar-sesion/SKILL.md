@@ -25,7 +25,9 @@ Esto da la lista de commits de la sesion actual.
 Abrir `CLAUDE.md` en la raiz del proyecto y actualizar:
 
 ### 2.1 — Version
-Si cambio la version en `apps/pwa/src/constants/version.ts`, actualizar la seccion "Version actual".
+Si la sesion incluyó features shipiables, ejecutar `/bump-version` antes de continuar.
+La skill actualiza los 3 archivos sincronizados (`version.ts`, `package.json`, `public/version.json`) y el encabezado de CLAUDE.md en un solo paso.
+Si la sesion fue solo docs/fixes menores, actualizar solo `VERSION_NAME` y `VERSION_DATE` en `version.ts`.
 
 ### 2.2 — Modulos
 Si se agregaron nuevos modulos, rutas o paginas:
@@ -104,7 +106,8 @@ Mostrar:
 ## Checklist rapido
 
 - [ ] `git log` de la sesion revisado
-- [ ] CLAUDE.md version actualizada
+- [ ] `/bump-version` ejecutado (si hay features shipiables)
+- [ ] CLAUDE.md version actualizada (lo hace bump-version automáticamente)
 - [ ] CLAUDE.md modulos/rutas actualizados
 - [ ] CLAUDE.md pendientes actualizados
 - [ ] CLAUDE.md skills actualizadas

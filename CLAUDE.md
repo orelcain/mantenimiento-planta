@@ -163,6 +163,7 @@ sidebarConfig  ← nuevo: orden personalizado del sidebar admin
 |-------|-----|
 | `matar-pendientes` | **USAR AL INICIO.** Leer CLAUDE.md, clasificar pendientes, proponer plan de ataque. **Paso 0 obligatorio**: invoca `auditar-deploys` antes de cualquier feature |
 | `cerrar-sesion` | **USAR AL FINAL.** Actualiza CLAUDE.md, sugiere skills, crea memoria |
+| `bump-version` | **Llamar desde cerrar-sesion.** Sincroniza versión en `version.ts` + `package.json` + `version.json` + CLAUDE.md en un paso |
 
 ### Deploy y CI
 | Skill | Uso |
