@@ -1016,6 +1016,27 @@ service cloud.firestore {
       allow delete: if isAdmin() || (isSupervisor() && resource.data.createdBy == request.auth.uid);
     }
 
+    // ANÁLISIS GRADER - Mediciones de velocidad de cintas (FASE 5)
+    match /beltSpeedMeasurements/{measurementId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isSupervisor();
+      allow delete: if isAdmin();
+    }
+
+    // ANÁLISIS GRADER - Mediciones de flipper con slow-mo (FASE 5)
+    match /flipperTimingMeasurements/{measurementId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isSupervisor();
+      allow delete: if isAdmin();
+    }
+
+    // ANÁLISIS GRADER - Audit trail de cambios de configuración física (FASE 6)
+    match /graderConfigChangeLog/{entryId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isSupervisor();
+      allow delete: if isAdmin();
+    }
+
     // ============================================
     // GANTT - Planificación de mantenimiento
     // ============================================

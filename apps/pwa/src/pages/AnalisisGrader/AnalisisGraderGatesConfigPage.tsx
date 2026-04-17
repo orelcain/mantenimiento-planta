@@ -448,9 +448,12 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
   const [showPhysicalConfig, setShowPhysicalConfig] = useState(false)
   const [fisicaSubTab, setFisicaSubTab] = useState<'producto' | 'cintas' | 'distancias' | 'calibracion'>('producto')
   const [calibracionSubTab, setCalibracionSubTab] = useState<'danfoss' | 'neumatica' | 'verificacion'>('danfoss')
+  // Guard: autosave no dispara hasta que la carga inicial desde Firestore complete.
+  // Previene sobreescribir datos reales con DEFAULTs si la red es lenta.
+  const moduleConfigLoadedRef = useRef(false)
   const [physicalConfig, _setPhysicalConfigRaw] = useState<GraderPhysicalConfig>(DEFAULT_PHYSICAL_CONFIG)
   // FASE 6 — logger de cambios: cada setPhysicalConfig persiste diff en Firestore
-  const setPhysicalConfig = useConfigChangeLogger(physicalConfig, _setPhysicalConfigRaw)
+  const setPhysicalConfig = useConfigChangeLogger(physicalConfig, _setPhysicalConfigRaw, { enabledRef: moduleConfigLoadedRef })
   const [loadedSchedule, setLoadedSchedule] = useState(DEFAULT_SHIFT_SCHEDULE)
   // FASE 5 — Modales de medición
   const [tachModalBelt, setTachModalBelt] = useState<GraderBeltId | null>(null)
@@ -460,9 +463,6 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
   const [changeLogLoading, setChangeLogLoading] = useState(false)
   const user = useAuthStore((s) => s.user)
   const isAdmin = useIsAdmin()
-  // Guard: autosave no dispara hasta que la carga inicial desde Firestore complete.
-  // Previene sobreescribir datos reales con DEFAULTs si la red es lenta.
-  const moduleConfigLoadedRef = useRef(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
 
   // FASE 6 — recargar historial cuando se entra al tab Producto o cambian datos
@@ -475,7 +475,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
       .catch((err) => console.warn('[changeLog] error cargando:', err))
       .finally(() => { if (!cancelled) setChangeLogLoading(false) })
     return () => { cancelled = true }
-  }, [fisicaSubTab, physicalConfig])
+  }, [fisicaSubTab])
 
   const sortRanges = (ranges: CalibreWeightRange[]) =>
     [...ranges].sort((a, b) => a.minGrams - b.minGrams)

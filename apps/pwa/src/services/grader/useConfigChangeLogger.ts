@@ -14,7 +14,7 @@
  */
 
 import { useCallback, useRef } from 'react'
-import type { Dispatch, SetStateAction } from 'react'
+import type { Dispatch, SetStateAction, MutableRefObject } from 'react'
 import { useAuthStore } from '@/store'
 import { diffPhysicalConfig, logConfigChanges } from './graderConfigChangeLog.service'
 import type { GraderPhysicalConfig } from './types'
@@ -24,19 +24,17 @@ type Setter = Dispatch<SetStateAction<GraderPhysicalConfig>>
 export function useConfigChangeLogger(
   current: GraderPhysicalConfig,
   rawSetter: Setter,
-  options?: { reason?: string; enabled?: boolean },
+  options?: { reason?: string; enabledRef?: MutableRefObject<boolean> },
 ): Setter {
   const user = useAuthStore((s) => s.user)
   const prevRef = useRef(current)
   prevRef.current = current
 
-  const enabled = options?.enabled ?? true
-
   return useCallback<Setter>(
     (update) => {
       rawSetter((prev) => {
         const next = typeof update === 'function' ? (update as (p: GraderPhysicalConfig) => GraderPhysicalConfig)(prev) : update
-
+        const enabled = options?.enabledRef ? options.enabledRef.current : true
         if (enabled && user && next !== prev) {
           // best-effort: no await
           const diffs = diffPhysicalConfig(prev as unknown as Record<string, unknown>, next as unknown as Record<string, unknown>)
@@ -57,6 +55,6 @@ export function useConfigChangeLogger(
         return next
       })
     },
-    [rawSetter, user, enabled, options?.reason],
+    [rawSetter, user, options?.reason],
   )
 }
