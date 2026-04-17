@@ -266,6 +266,19 @@ export const DEFAULT_PHYSICAL_CONFIG = {
   // Tiempo de reset neumático del flipper (ESTIMADO — cronometrar en planta)
   // Usado en insight #18: t_disponible debe superar t_salmon_pasa + flipperResetTimeSec
   flipperResetTimeSec: 0.45,
+
+  // Timing flipper software Z2 (extraídos de 418 imágenes HMI, 2026-04-17)
+  flipperDelayOpenMs:    150,   // Z2: delayFlipperOpen
+  flipperMinOpenTimeMs:  350,   // Z2: minFlipperOpenTime
+  flipperDelayCloseMs:   150,   // Z2: delayFlipperClose
+  // Reset mecánico: sin default — debe medirse con slow-mo en terreno
+  flipperHeightAboveBeltMm: 0.5,
+
+  // Gate/batch timing Z2
+  delayBeforeGateCloseMs: 400,  // Z2: delayBeforeGateClose
+  delayGateCloseMs:       500,  // Z2: delayGateClose
+  minGateOpenMs:            0,  // Z2: minGateOpen
+  maxBinWeightG:        25000,  // Z2: maxBinWeight (25 kg)
 }
 
 /**

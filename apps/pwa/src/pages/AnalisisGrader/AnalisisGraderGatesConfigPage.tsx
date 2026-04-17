@@ -1527,30 +1527,47 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                     </summary>
                     <div className="px-4 pb-4 pt-2 grid grid-cols-1 sm:grid-cols-3 gap-3">
                       {/* Sub-card A: Ciclo software Z2 */}
-                      <div className="rounded-lg border border-slate-700/50 bg-slate-950/60 p-3 space-y-2">
-                        <p className="text-xs font-semibold text-sky-400">Ciclo flipper software Z2</p>
-                        <div className="space-y-1.5 text-xs text-muted-foreground">
-                          <div className="flex justify-between">
-                            <span>Delay apertura</span>
-                            <span className="font-mono text-foreground">150 ms</span>
+                      {(() => {
+                        const delayOpen  = physicalConfig.flipperDelayOpenMs    ?? 150
+                        const minOpen    = physicalConfig.flipperMinOpenTimeMs   ?? 350
+                        const delayClose = physicalConfig.flipperDelayCloseMs    ?? 150
+                        const cycleTotal = delayOpen + minOpen + delayClose
+                        return (
+                          <div className="rounded-lg border border-slate-700/50 bg-slate-950/60 p-3 space-y-2">
+                            <p className="text-xs font-semibold text-sky-400">Ciclo flipper software Z2</p>
+                            <div className="space-y-1.5 text-xs">
+                              {([
+                                { label: 'Delay apertura',    field: 'flipperDelayOpenMs',   val: delayOpen,  z2: 'delayFlipperOpen' },
+                                { label: 'Mín. tiempo abierto', field: 'flipperMinOpenTimeMs', val: minOpen,   z2: 'minFlipperOpenTime' },
+                                { label: 'Delay cierre',      field: 'flipperDelayCloseMs',  val: delayClose, z2: 'delayFlipperClose' },
+                              ] as const).map(({ label, field, val, z2 }) => (
+                                <div key={field} className="flex items-center justify-between gap-2">
+                                  <span className="text-muted-foreground whitespace-nowrap">{label}</span>
+                                  <div className="flex items-center gap-1">
+                                    <Input
+                                      type="number"
+                                      step="10"
+                                      min="0"
+                                      max="2000"
+                                      value={val}
+                                      onChange={(e) => setPhysicalConfig((p) => ({ ...p, [field]: Number(e.target.value) }))}
+                                      className="h-6 w-16 text-xs font-mono px-1.5 py-0"
+                                    />
+                                    <span className="text-muted-foreground text-[10px]">ms</span>
+                                  </div>
+                                </div>
+                              ))}
+                              <div className="flex justify-between border-t border-slate-700/50 pt-1.5 mt-1">
+                                <span className="font-semibold text-foreground text-xs">Ciclo total</span>
+                                <span className="font-mono font-bold text-sky-400 text-xs">{cycleTotal} ms</span>
+                              </div>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground/60">
+                              Z2: delayFlipperOpen / minFlipperOpenTime / delayFlipperClose
+                            </p>
                           </div>
-                          <div className="flex justify-between">
-                            <span>Mín. tiempo abierto</span>
-                            <span className="font-mono text-foreground">350 ms</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Delay cierre</span>
-                            <span className="font-mono text-foreground">150 ms</span>
-                          </div>
-                          <div className="flex justify-between border-t border-slate-700/50 pt-1.5 mt-1">
-                            <span className="font-semibold text-foreground">Ciclo total</span>
-                            <span className="font-mono font-bold text-sky-400">650 ms</span>
-                          </div>
-                        </div>
-                        <p className="text-[10px] text-muted-foreground/60">
-                          Parámetros Z2: delayFlipperOpen / minFlipperOpenTime / delayFlipperClose
-                        </p>
-                      </div>
+                        )
+                      })()}
 
                       {/* Sub-card B: Reset mecánico cilindro */}
                       <div className="rounded-lg border border-slate-700/50 bg-slate-950/60 p-3 space-y-2">

@@ -392,6 +392,38 @@ export interface GraderPhysicalConfig {
     avgSalmonLengthCm?: boolean
     avgSalmonWidthCm?: boolean
   }
+
+  // ── Timing flipper software Z2 ──────────────────────────────────────────
+  /** Delay antes de activar el solenoide de apertura (ms). Z2: delayFlipperOpen. Default 150. */
+  flipperDelayOpenMs?: number
+  /** Tiempo mínimo que el flipper debe permanecer abierto (ms). Z2: minFlipperOpenTime. Default 350. */
+  flipperMinOpenTimeMs?: number
+  /** Delay antes de activar el solenoide de cierre (ms). Z2: delayFlipperClose. Default 150. */
+  flipperDelayCloseMs?: number
+
+  // ── Reset mecánico cilindro neumático ────────────────────────────────────
+  /**
+   * Tiempo de reset mecánico del cilindro neumático (segundos) — medido con slow-mo.
+   * Distinto de flipperResetTimeSec (que es el tiempo usado en cálculos legacy).
+   * Medir: Servicio → Probar salidas [8620], grabar 240fps, contar frames / fps.
+   */
+  flipperMechanicalResetS?: number
+  /** Timestamp (ms epoch) de la última medición slow-mo del reset mecánico. */
+  flipperMechanicalMeasuredAt?: number
+
+  // ── Paleta flipper ───────────────────────────────────────────────────────
+  /** Altura de la paleta sobre la cinta (mm). Afecta si el pez puede pasar por debajo. Default 0.5. */
+  flipperHeightAboveBeltMm?: number
+
+  // ── Gate/batch timing Z2 ────────────────────────────────────────────────
+  /** Delay antes del cierre del gate de destino (ms). Z2: delayBeforeGateClose. Default 400. */
+  delayBeforeGateCloseMs?: number
+  /** Duración del pulso de cierre del gate (ms). Z2: delayGateClose. Default 500. */
+  delayGateCloseMs?: number
+  /** Tiempo mínimo que el gate debe estar abierto (ms). Z2: minGateOpen. Default 0. */
+  minGateOpenMs?: number
+  /** Peso máximo de un bin antes de cerrar automáticamente (g). Z2: maxBinWeight. Default 25000. */
+  maxBinWeightG?: number
 }
 
 /**
