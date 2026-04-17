@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.114.2' as const
+export const APP_VERSION = '2.114.3' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-04-17' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'feat(grader): FASE 8 — sub-tabs Producto (Resumen/Flipper/Análisis/Historial)' as const
+export const VERSION_NAME = 'feat(grader): FASE 8-9 — sub-tab Sugerencias + Distancias 12 cards combinadas' as const
 
 /**
  * Nota:

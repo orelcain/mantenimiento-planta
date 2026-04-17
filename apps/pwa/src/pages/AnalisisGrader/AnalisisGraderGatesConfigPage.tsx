@@ -448,7 +448,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
   const [showPhysicalConfig, setShowPhysicalConfig] = useState(false)
   const [fisicaSubTab, setFisicaSubTab] = useState<'producto' | 'cintas' | 'distancias' | 'calibracion'>('producto')
   const [calibracionSubTab, setCalibracionSubTab] = useState<'danfoss' | 'neumatica' | 'verificacion'>('danfoss')
-  const [productoSubTab, setProductoSubTab] = useState<'resumen' | 'flipper' | 'analisis' | 'historial'>('resumen')
+  const [productoSubTab, setProductoSubTab] = useState<'resumen' | 'flipper' | 'analisis' | 'sugerencias' | 'historial'>('resumen')
   // Guard: autosave no dispara hasta que la carga inicial desde Firestore complete.
   // Previene sobreescribir datos reales con DEFAULTs si la red es lenta.
   const moduleConfigLoadedRef = useRef(false)
@@ -1405,10 +1405,11 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
             {fisicaSubTab === 'producto' && (
               <div className="flex gap-0 border-b border-border/30 -mt-2">
                 {([
-                  { id: 'resumen',   label: 'Resumen' },
-                  { id: 'flipper',   label: 'Flipper' },
-                  { id: 'analisis',  label: 'Análisis' },
-                  { id: 'historial', label: 'Historial' },
+                  { id: 'resumen',     label: 'Resumen' },
+                  { id: 'flipper',     label: 'Flipper' },
+                  { id: 'analisis',    label: 'Análisis' },
+                  { id: 'sugerencias', label: 'Sugerencias' },
+                  { id: 'historial',   label: 'Historial' },
                 ] as const).map(({ id, label }) => (
                   <button
                     key={id}
@@ -1608,8 +1609,6 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                     </div>
                   </div>
 
-                  {/* ══ SUGERENCIAS IA ═══════════════════════════════════════════════ */}
-                  <SuggestionsPanel suggestions={suggestions} />
                   </div>
                   )}
 
@@ -1834,6 +1833,11 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                         )
                       })()}
                   </div>
+                  )}
+
+                  {/* ── SUB-TAB SUGERENCIAS ── */}
+                  {productoSubTab === 'sugerencias' && (
+                  <SuggestionsPanel suggestions={suggestions} />
                   )}
 
                   {/* ── SUB-TAB HISTORIAL ── */}
@@ -2141,83 +2145,118 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
               )
             })()}
 
-            {/* Distancias de flippers */}
-            {fisicaSubTab === 'distancias' && (
-            <div>
-              <p className="text-sm font-medium mb-1">Distancias de flippers desde fotocélula</p>
-              <p className="text-xs text-muted-foreground mb-3">
-                Distancia física en metros desde el sensor fotocélula (final de Aceleración 2) hasta cada flipper en la cinta clasificadora.
-              </p>
-              {(() => {
-                const mainBelt = getGradingBelt(physicalConfig)
-                const speedMps = mainBelt?.speedMps ?? GRADING_BELT_DEFAULT_MPS
-                return (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b text-left">
-                          <th className="py-2 px-2 w-16">Gate</th>
-                          <th className="py-2 px-2">Distancia desde sensor (m)</th>
-                          <th className="py-2 px-2 text-right text-muted-foreground text-xs">Tiempo de reacción</th>
-                          <th className="py-2 px-2 text-right text-muted-foreground text-xs">Alerta</th>
-                          <th className="py-2 px-2 text-right text-muted-foreground text-xs w-20">Slow-mo</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {physicalConfig.flipperPositions
-                          .slice()
-                          .sort((a, b) => a.gateNumber - b.gateNumber)
-                          .map((fp) => {
-                            const timeSec = speedMps > 0 ? fp.distanceFromSensorMeters / speedMps : 0
-                            const isCritical = timeSec < 0.8
-                            const isWarning = timeSec >= 0.8 && timeSec < 1.2
-                            return (
-                              <tr key={fp.gateNumber} className={cn('border-b hover:bg-muted/30', isCritical && 'bg-red-500/5')}>
-                                <td className="py-2 px-2 text-center">
-                                  <Badge variant="outline" className="text-xs">{fp.gateNumber}</Badge>
-                                </td>
-                                <td className="py-2 px-2">
-                                  <Input
-                                    type="number"
-                                    step="0.01"
-                                    min="0.1"
-                                    value={fp.distanceFromSensorMeters}
-                                    onChange={(e) => updateFlipperDistance(fp.gateNumber, Number(e.target.value))}
-                                    className="h-8 text-xs w-28 font-mono"
-                                  />
-                                </td>
-                                <td className="py-2 px-2 text-right font-mono text-xs">
-                                  {timeSec.toFixed(2)} s
-                                </td>
-                                <td className="py-2 px-2 text-right">
-                                  {isCritical && (
-                                    <Badge className="text-[10px] bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">Crítico</Badge>
-                                  )}
-                                  {isWarning && (
-                                    <Badge className="text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">Ajustado</Badge>
-                                  )}
-                                </td>
-                                <td className="py-2 px-2 text-right">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-6 text-[10px] px-2"
-                                    onClick={() => setSlowMoModalGate(fp.gateNumber)}
-                                    title="Medir reset mecánico con slow-mo 240fps"
-                                  >
-                                    <Camera className="w-3 h-3" />
-                                  </Button>
-                                </td>
-                              </tr>
-                            )
-                          })}
-                      </tbody>
-                    </table>
+            {/* Distancias de flippers — 12 cards */}
+            {fisicaSubTab === 'distancias' && (() => {
+              const mainBelt = getGradingBelt(physicalConfig)
+              const speedMps = mainBelt?.speedMps ?? GRADING_BELT_DEFAULT_MPS
+              const z2Vals = physicalConfig.z2ProgrammedDistancesMm ?? []
+              const physPositions = physicalConfig.flipperPositions.slice().sort((a, b) => a.gateNumber - b.gateNumber)
+              return (
+              <div>
+                <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                  <div>
+                    <p className="text-sm font-medium">Distancias de flippers</p>
+                    <p className="text-xs text-muted-foreground">
+                      Distancia física desde fotocélula (m) y valor Z2 programado (mm) por gate.
+                    </p>
                   </div>
-                )
-              })()}
-            </div>
-            )}
+                  <Badge variant="outline" className="text-[10px]">
+                    Δ negativo = Z2 dispara antes (normal)
+                  </Badge>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                  {Array.from({ length: 12 }, (_, i) => {
+                    const gateNum = i + 1
+                    const fp = physPositions.find((p) => p.gateNumber === gateNum)
+                    const physDist = fp?.distanceFromSensorMeters ?? 0
+                    const z2Val = z2Vals[i] ?? null
+                    const physTimeSec = speedMps > 0 ? physDist / speedMps : 0
+                    const z2TimeSec = z2Val != null && speedMps > 0 ? z2Val / 1000 / speedMps : null
+                    const deltaMm = z2Val != null ? z2Val - physDist * 1000 : null
+                    const isCritical = physTimeSec < 0.8
+                    const isWarning = physTimeSec >= 0.8 && physTimeSec < 1.2
+                    return (
+                      <div
+                        key={gateNum}
+                        className={cn(
+                          'rounded-lg border bg-slate-900/40 p-3 space-y-2',
+                          isCritical ? 'border-red-500/50 bg-red-500/5' : 'border-slate-700/60',
+                        )}
+                      >
+                        {/* Header */}
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-foreground">Gate {gateNum}</span>
+                          <div className="flex items-center gap-1">
+                            {isCritical && <Badge className="text-[9px] px-1 py-0 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">Crítico</Badge>}
+                            {isWarning && <Badge className="text-[9px] px-1 py-0 bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">Ajustado</Badge>}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground"
+                              onClick={() => setSlowMoModalGate(gateNum)}
+                              title="Medir con slow-mo 240fps"
+                            >
+                              <Camera className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Físico */}
+                        <div className="space-y-0.5">
+                          <p className="text-[10px] text-sky-400 font-medium">Físico</p>
+                          <div className="flex items-center gap-1.5">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0.1"
+                              value={physDist}
+                              onChange={(e) => fp && updateFlipperDistance(gateNum, Number(e.target.value))}
+                              className="h-6 text-xs font-mono px-1.5 py-0 w-20"
+                            />
+                            <span className="text-[10px] text-muted-foreground">m</span>
+                          </div>
+                          <p className="text-[10px] font-mono text-muted-foreground">
+                            {physTimeSec.toFixed(2)} s reacción
+                          </p>
+                        </div>
+
+                        {/* Z2 */}
+                        <div className="space-y-0.5 border-t border-slate-700/40 pt-1.5">
+                          <p className="text-[10px] text-violet-400 font-medium">Z2 programado</p>
+                          <div className="flex items-center gap-1.5">
+                            <Input
+                              type="number"
+                              step="25"
+                              min="100"
+                              value={z2Val ?? ''}
+                              placeholder="—"
+                              onChange={(e) => {
+                                const newVals = [...(physicalConfig.z2ProgrammedDistancesMm ?? Array(12).fill(null))]
+                                newVals[i] = e.target.value ? Number(e.target.value) : 0
+                                setPhysicalConfig((p) => ({ ...p, z2ProgrammedDistancesMm: newVals as number[] }))
+                              }}
+                              className="h-6 text-xs font-mono px-1.5 py-0 w-20"
+                            />
+                            <span className="text-[10px] text-muted-foreground">mm</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <p className="text-[10px] font-mono text-muted-foreground">
+                              {z2TimeSec != null ? `${z2TimeSec.toFixed(2)} s` : '—'}
+                            </p>
+                            {deltaMm != null && (
+                              <p className={cn('text-[10px] font-mono', deltaMm < 0 ? 'text-amber-500' : 'text-muted-foreground')}>
+                                {deltaMm > 0 ? '+' : ''}{deltaMm.toFixed(0)} mm
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+              )
+            })()}
 
             {/* ── Configuración Neumática ──────────────────────────────── */}
             {fisicaSubTab === 'calibracion' && calibracionSubTab === 'neumatica' && (
@@ -2388,86 +2427,6 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
             </div>
             )}
 
-            {/* Valores Z2 — dis1..dis12 */}
-            {fisicaSubTab === 'distancias' && (
-            <div>
-              <p className="text-sm font-medium mb-1">Distancias Z2 programadas (dis1–dis12)</p>
-              <p className="text-xs text-muted-foreground mb-3">
-                Valores leídos desde el controlador Z2 en <span className="font-medium text-foreground">Cambiar Parámetros → dis1..dis12</span>.
-                El Z2 dispara el solenoide cuando la cinta avanza esta distancia (en mm) desde el pesaje.
-                Bajar = abre antes. Subir = abre después. Estos valores incluyen compensación neumática.
-              </p>
-              {(() => {
-                const z2Vals = physicalConfig.z2ProgrammedDistancesMm ?? []
-                const mainBelt = getGradingBelt(physicalConfig)
-                const speedMps = mainBelt?.speedMps ?? GRADING_BELT_DEFAULT_MPS
-                const physPos = physicalConfig.flipperPositions.slice().sort((a, b) => a.gateNumber - b.gateNumber)
-                return (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b text-left">
-                          <th className="py-2 px-2 w-14">Gate</th>
-                          <th className="py-2 px-2">Dist. Z2 (mm)</th>
-                          <th className="py-2 px-2 text-right text-muted-foreground text-xs">Timing Z2</th>
-                          <th className="py-2 px-2 text-right text-muted-foreground text-xs">Físico</th>
-                          <th className="py-2 px-2 text-right text-muted-foreground text-xs">Δ anticipo</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {Array.from({ length: 12 }, (_, i) => {
-                          const gateNum = i + 1
-                          const z2Val = z2Vals[i] ?? null
-                          const physDist = physPos.find((fp) => fp.gateNumber === gateNum)?.distanceFromSensorMeters ?? null
-                          const z2TimeSec = z2Val != null && speedMps > 0 ? z2Val / 1000 / speedMps : null
-                          const physTimeSec = physDist != null && speedMps > 0 ? physDist / speedMps : null
-                          const deltaMm = z2Val != null && physDist != null ? z2Val - physDist * 1000 : null
-                          return (
-                            <tr key={gateNum} className="border-b hover:bg-muted/30">
-                              <td className="py-2 px-2 text-center">
-                                <Badge variant="outline" className="text-xs">{gateNum}</Badge>
-                              </td>
-                              <td className="py-2 px-2">
-                                <Input
-                                  type="number"
-                                  step="25"
-                                  min="100"
-                                  value={z2Val ?? ''}
-                                  placeholder="—"
-                                  onChange={(e) => {
-                                    const newVals = [...(physicalConfig.z2ProgrammedDistancesMm ?? Array(12).fill(null))]
-                                    newVals[i] = e.target.value ? Number(e.target.value) : 0
-                                    setPhysicalConfig((p) => ({ ...p, z2ProgrammedDistancesMm: newVals as number[] }))
-                                  }}
-                                  className="h-8 text-xs w-28 font-mono"
-                                />
-                              </td>
-                              <td className="py-2 px-2 text-right font-mono text-xs text-muted-foreground">
-                                {z2TimeSec != null ? `${z2TimeSec.toFixed(2)} s` : '—'}
-                              </td>
-                              <td className="py-2 px-2 text-right font-mono text-xs text-muted-foreground">
-                                {physTimeSec != null ? `${physTimeSec.toFixed(2)} s` : '—'}
-                              </td>
-                              <td className="py-2 px-2 text-right font-mono text-xs">
-                                {deltaMm != null ? (
-                                  <span className={cn(deltaMm < 0 ? 'text-amber-600' : 'text-muted-foreground')}>
-                                    {deltaMm > 0 ? '+' : ''}{deltaMm.toFixed(0)} mm
-                                  </span>
-                                ) : '—'}
-                              </td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )
-              })()}
-              <p className="text-xs text-muted-foreground mt-2">
-                Δ negativo = Z2 dispara antes que la posición física del pivot (compensación neumática normal).
-              </p>
-            </div>
-            )}
 
             {/* Verificación multi-fuente de velocidades */}
             {fisicaSubTab === 'calibracion' && calibracionSubTab === 'verificacion' && (
