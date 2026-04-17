@@ -1068,8 +1068,12 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
               const computed = computeZetaBeltSpeedMps(drive)
               const throughput = estimateZetaThroughput(computed ?? 0, physicalConfig.avgFishSpacingOnZetaBeltM)
               return (
-                <div>
-                  <p className="text-sm font-medium mb-1">Z-Belt — Variador Danfoss (cinta elevadora)</p>
+                <details className="rounded-lg border border-border/40 bg-muted/5">
+                  <summary className="flex cursor-pointer select-none items-center gap-2 px-4 py-3 text-sm font-medium hover:bg-muted/20 rounded-lg">
+                    Z-Belt — Variador Danfoss
+                    <span className="text-[10px] text-muted-foreground font-normal ml-1">(cinta elevadora)</span>
+                  </summary>
+                  <div className="px-4 pb-4">
                   <p className="text-xs text-muted-foreground mb-3">
                     Calcula velocidad real desde el setpoint RPM del variador.
                     Formula: v = (RPM / {drive.gearRatio} / 60) × π × (sprocket_mm / 1000)
@@ -1179,7 +1183,8 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                       </p>
                     )}
                   </div>
-                </div>
+                  </div>
+                </details>
               )
             })()}
 
@@ -1248,11 +1253,12 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
             </div>
 
             {/* ── Configuración Neumática ──────────────────────────────── */}
-            <div>
-              <p className="text-sm font-medium mb-1 flex items-center gap-2">
+            <details className="rounded-lg border border-border/40 bg-muted/5">
+              <summary className="flex cursor-pointer select-none items-center gap-2 px-4 py-3 text-sm font-medium hover:bg-muted/20 rounded-lg">
                 Configuración Neumática
                 <InfoTooltip {...getTooltipProps('pneum.responseTime')} />
-              </p>
+              </summary>
+              <div className="px-4 pb-4">
               <p className="text-xs text-muted-foreground mb-3">
                 Parámetros del sistema neumático para calcular el tiempo de respuesta real de cada flipper.
                 Sin estos datos se usa un valor plano de {(physicalConfig.flipperResetTimeSec ?? 0.45).toFixed(2)}s para todos los gates.
@@ -1416,7 +1422,8 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                 Medir largo de tubo real desde manifold (bloque de electroválvulas) siguiendo el recorrido del tubo hasta cada flipper.
                 Default: estimación lineal (1.5m base + 1.5m × gate).
               </p>
-            </div>
+              </div>
+            </details>
 
             {/* Valores Z2 — dis1..dis12 */}
             <div>
@@ -1667,8 +1674,11 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
             </div>
 
             {/* Verificación multi-fuente de velocidades */}
-            <div>
-              <p className="text-sm font-medium mb-1">Verificación de velocidades — comparar fuentes</p>
+            <details className="rounded-lg border border-border/40 bg-muted/5">
+              <summary className="flex cursor-pointer select-none items-center gap-2 px-4 py-3 text-sm font-medium hover:bg-muted/20 rounded-lg">
+                Verificación de velocidades — comparar fuentes
+              </summary>
+              <div className="px-4 pb-4">
               <p className="text-xs text-muted-foreground mb-3">
                 Cada cinta tiene 4 fuentes posibles. Ingresar mediciones directas (tachómetro) para verificar.
                 Diferencia &gt;5% entre fuentes indica drift o error de calibración.
@@ -1868,7 +1878,8 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                   )
                 })}
               </div>
-            </div>
+              </div>
+            </details>
 
             {/* Guardar */}
             <div className="flex items-center justify-between gap-2 flex-wrap pt-2 border-t">
