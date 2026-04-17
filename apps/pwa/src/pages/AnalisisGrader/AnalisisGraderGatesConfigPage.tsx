@@ -86,8 +86,9 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
   const [physicalConfig, setPhysicalConfig] = useState<GraderPhysicalConfig>(DEFAULT_PHYSICAL_CONFIG)
   const [savingPhysical, setSavingPhysical] = useState(false)
   const [physicalError, setPhysicalError] = useState<string | null>(null)
-  const [savingSchedule, setSavingSchedule] = useState(false)
-  const [scheduleError, setScheduleError] = useState<string | null>(null)
+  const [loadedSchedule, setLoadedSchedule] = useState(DEFAULT_SHIFT_SCHEDULE)
+  const [applyingSaving, setApplyingSaving] = useState(false)
+  const [applyError, setApplyError] = useState<string | null>(null)
   const user = useAuthStore((s) => s.user)
   const isAdmin = useIsAdmin()
 
@@ -152,20 +153,23 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
     })
   }
 
-  const handleSaveShiftSchedule = async () => {
-    if (!user) return
-    setSavingSchedule(true)
-    setScheduleError(null)
-    try {
-      await saveModuleShiftSchedule({
-        schedule: shiftSchedule,
-        updatedBy: user.id,
-      })
-    } catch {
-      setScheduleError('No se pudo guardar el horario de turnos.')
-    } finally {
-      setSavingSchedule(false)
+  const isScheduleDirty = JSON.stringify(shiftSchedule) !== JSON.stringify(loadedSchedule)
+
+  const handleApplyAll = async () => {
+    if (user) {
+      setApplyingSaving(true)
+      setApplyError(null)
+      try {
+        await saveModuleShiftSchedule({ schedule: shiftSchedule, updatedBy: user.id })
+        setLoadedSchedule(shiftSchedule)
+      } catch {
+        setApplyError('No se pudo guardar el horario de turnos. Intenta de nuevo.')
+        setApplyingSaving(false)
+        return
+      }
+      setApplyingSaving(false)
     }
+    onComplete(gates, config)
   }
 
   useEffect(() => {
@@ -188,7 +192,9 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
         if (cfg?.customWeightRanges && cfg.customWeightRanges.length > 0) {
           setConfig((c) => ({ ...c, customWeightRanges: cfg.customWeightRanges }))
         }
-        setShiftSchedule(normalizeShiftSchedule(cfg?.shiftSchedule))
+        const normalized = normalizeShiftSchedule(cfg?.shiftSchedule)
+        setShiftSchedule(normalized)
+        setLoadedSchedule(normalized)
         if (cfg?.physicalConfig) {
           setPhysicalConfig(cfg.physicalConfig)
           setConfig((c) => ({ ...c, physicalConfig: cfg.physicalConfig }))
@@ -480,17 +486,11 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
 
           <div className="border-t border-zinc-800 my-5" />
           <div>
-            <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
+            <div className="flex items-center gap-2 mb-1">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Horarios de turnos</h3>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleSaveShiftSchedule}
-                disabled={savingSchedule || !user}
-              >
-                <Save className="h-4 w-4 mr-1" />
-                {savingSchedule ? 'Guardando...' : 'Guardar horarios'}
-              </Button>
+              {isScheduleDirty && (
+                <span className="text-[10px] text-amber-400 font-medium">● sin guardar</span>
+              )}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Formato HH:MM. El turno noche puede cruzar medianoche (fin menor que inicio).
@@ -526,9 +526,6 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                 </div>
               ))}
             </div>
-            {scheduleError && (
-              <div className="mt-2 text-xs text-destructive">{scheduleError}</div>
-            )}
           </div>
 
           {/* Period inferred */}
@@ -1855,17 +1852,26 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
       )} {/* /3.4 */}
 
       {/* Navigation */}
-      <div className={onBack ? 'flex justify-between' : 'flex justify-end'}>
-        {onBack && (
-          <Button variant="outline" onClick={onBack}>
-            <ChevronLeft className="h-4 w-4 mr-1" />
-            Volver
-          </Button>
+      <div className="space-y-2">
+        {applyError && (
+          <p className="text-xs text-destructive text-right">{applyError}</p>
         )}
-        <Button onClick={() => onComplete(gates, config)} className="bg-emerald-600 hover:bg-emerald-700 shadow-sm">
-          Aplicar configuración
-          <ChevronRight className="h-4 w-4 ml-1" />
-        </Button>
+        <div className={onBack ? 'flex justify-between' : 'flex justify-end'}>
+          {onBack && (
+            <Button variant="outline" onClick={onBack}>
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              Volver
+            </Button>
+          )}
+          <Button
+            onClick={handleApplyAll}
+            disabled={applyingSaving}
+            className="bg-emerald-600 hover:bg-emerald-700 shadow-sm"
+          >
+            {applyingSaving ? 'Guardando...' : 'Aplicar configuración'}
+            {!applyingSaving && <ChevronRight className="h-4 w-4 ml-1" />}
+          </Button>
+        </div>
       </div>
     </div>
   )
