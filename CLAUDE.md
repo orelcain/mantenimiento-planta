@@ -215,12 +215,36 @@ sidebarConfig  ← nuevo: orden personalizado del sidebar admin
 
 ## Version actual
 
-- **v2.92.0** (2026-04-15) — "Home Análisis Grader: layout 2 columnas + upload compacto + config tabulada"
+- **v2.94.0** (2026-04-16) — "Mobile home: WIP ribbons + QR share + menú home + HMI Grader en herramientas"
 - Proyecto Firebase: `mantenimiento-planta-771a3`
 - GitHub: `orelcain/mantenimiento-planta`
 - Produccion: `https://orelcain.github.io/mantenimiento-planta/`
 - CI status: 4/4 workflows 🟢
 - Seguridad: 23 colecciones Firestore validadas, 0 vulnerabilidades runtime prod
+
+## Cambios recientes (sesión 2026-04-16 — Mobile home WIP ribbons + QR share, v2.93.0 → v2.94.0)
+
+### Nuevos componentes y hooks
+- **`WipRibbon`** (en `MobileHomeGrid.tsx`): banda diagonal amarilla `rotate(38deg)` con texto "EN DESARROLLO". Admin puede tocarla para marcar como lista (overlay de confirmación ✓/✗). Variante `cta` = pill badge inline.
+- **`AppShareCard`** (en `MobileHomeGrid.tsx`): accordion al fondo del home móvil. Muestra QR con `QRCodeSVG` de `qrcode.react`, URL de la app, botón "Compartir enlace" (Web Share API + clipboard fallback).
+- **`wipOverrides.ts`** (`apps/pwa/src/services/`): servicio Firestore para el doc `appConfig/wipOverrides`. `releaseModule()` / `unReleaseModule()` / `subscribeWipReleased()`.
+- **`useWipOverrides.ts`** (`apps/pwa/src/hooks/`): hook con `onSnapshot` reactivo. `isWip(id, staticWip)` = true si staticWip && no está en el set de released. `toggleRelease()` sólo para admin.
+
+### Cambios en MobileHomeGrid.tsx
+- **WIP automático de formación**: `wip: !Object.values(m.sections).some(Boolean)` derivado desde `LEARNING_MACHINES` — sin hardcodear, se actualiza solo cuando el admin añade contenido real.
+- **Admin sin duplicados**: `HMI_TILES_ADMIN = []` para evitar HMI en Formación. HMI Knuro + HMI Grader sólo en Herramientas.
+- **Botón ≡ Menú** en el header del home, a la izquierda del saludo. Llama `useAppStore(s => s.setSidebarOpen)(true)`.
+
+### Cambios en MainLayout.tsx
+- **Bottom nav oculto en `/`**: clase `hidden` cuando `location.pathname === '/'`.
+- **Sin padding en home**: main usa `p-0 w-full max-w-[100vw] overflow-x-hidden` en `/`, sin `pb-20`.
+
+### Firestore
+- Nueva colección: `appConfig/wipOverrides` con campo `released: string[]` — persistencia de módulos liberados por admin.
+
+### Gotchas
+- Cherry-pick con refs relativas (`HEAD~1`) puede capturar commits equivocados si el branch tiene commits extras. Usar siempre hash explícito.
+- `qrcode.react` v4 ya estaba en package.json (`^4.2.0`) — no requirió instalación extra.
 
 ## Cambios recientes (sesión 2026-04-15 — Grader home layout 2 columnas, v2.91.0 → v2.92.0)
 
