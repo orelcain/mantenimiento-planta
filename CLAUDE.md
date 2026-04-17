@@ -46,6 +46,29 @@ Cuando el usuario diga `cerrar`, `terminar`, `ya está`, `gracias`, `hasta luego
 
 ---
 
+## División de trabajo Opus 4.7 ⇄ Sonnet (establecido 2026-04-16)
+
+**Opus 4.7 = planificador. Sonnet = ejecutor.** El usuario alterna manualmente entre modelos.
+
+| Tarea | Modelo |
+|---|---|
+| Análisis UX/UI con screenshots | Opus |
+| Planes de iteración (R1, R2… con P0/P1/P2) | Opus |
+| Decisiones arquitectónicas, refactors grandes, ADRs | Opus |
+| Brainstorming, trade-offs, auditorías | Opus |
+| Revisión de PRs / código | Opus |
+| **Implementar** planes ya cerrados | Sonnet |
+| Escribir código, tests, commits, deploys | Sonnet |
+| Bug fixes mecánicos con diagnóstico claro | Sonnet |
+| Iteraciones rápidas sobre plan existente | Sonnet |
+
+**Protocolo de handoff**:
+- Cuando Opus termina un plan → dice explícitamente "listo para Sonnet" y el plan queda auto-contenido (archivos, líneas, criterios de aceptación, orden de rondas).
+- Cuando Sonnet recibe un plan exploratorio sin cerrar → sugiere volver a Opus.
+- Excepciones (cualquier modelo): cambios <5 líneas, bug fixes urgentes, preguntas directas.
+
+---
+
 ## Reglas de desarrollo
 
 - **Idioma**: Siempre responder en **ESPAÑOL**. Ahorrar tokens.

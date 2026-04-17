@@ -4,9 +4,9 @@
  * Tabla editable, guardar/cargar plantillas, configuración del análisis.
  */
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch, Label } from '@/components/ui'
-import { Save, FolderOpen, ChevronRight, ChevronLeft, Trash2, ChevronDown, RotateCcw, Plus, Lock, Pencil } from 'lucide-react'
+import { Save, FolderOpen, ChevronRight, Trash2, ChevronDown, RotateCcw, Plus, Lock, Pencil } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore, useIsAdmin } from '@/store'
 import {
@@ -15,7 +15,7 @@ import {
   deleteGatesTemplate,
   type GatesTemplate,
 } from '@/services/grader/graderSession.service'
-import { getModuleRanges, saveModuleRanges, saveModuleShiftSchedule, saveModulePhysicalConfig } from '@/services/grader/graderModuleConfig.service'
+import { getModuleRanges, saveModuleRanges, saveModulePhysicalConfig, saveModuleShiftSchedule } from '@/services/grader/graderModuleConfig.service'
 import { DEFAULT_SHIFT_SCHEDULE, formatShiftTime, normalizeShiftSchedule, parseShiftTime } from '@/services/grader/graderShiftSchedule'
 import type {
   GateAssignment,
@@ -41,7 +41,6 @@ interface Props {
   config: GraderAnalysisConfig
   parsedData: ParsedMatrixData
   onComplete: (gates: GateAssignment[], config: GraderAnalysisConfig) => void
-  onBack?: () => void
   /** Si true, muestra navegación por pestañas en lugar de cards apiladas */
   tabbed?: boolean
 }
@@ -61,6 +60,25 @@ function calibreRangeLookup(calibre: string, ranges: CalibreWeightRange[]): stri
   return r.label || buildRangeLabel(r.calibre, r.minGrams, r.maxGrams)
 }
 
+/** Indicador global de estado de auto-guardado. */
+function SaveIndicator({ status }: { status: 'idle' | 'saving' | 'saved' }) {
+  if (status === 'idle') return null
+  if (status === 'saving') {
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] text-amber-500 dark:text-amber-400 font-medium">
+        <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+        Guardando…
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center gap-1 text-[10px] text-emerald-500 dark:text-emerald-400 font-medium">
+      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+      Guardado
+    </span>
+  )
+}
+
 /** Badge de estado de calibración para parámetros físicos */
 function CalibBadge({ status }: { status: CalibrationStatus | undefined }) {
   if (status === 'verified')
@@ -70,7 +88,7 @@ function CalibBadge({ status }: { status: CalibrationStatus | undefined }) {
   return <Badge className="text-[10px] bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400 whitespace-nowrap">? Falta</Badge>
 }
 
-export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: initialConfig, parsedData, onComplete, onBack, tabbed = false }: Props) {
+export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: initialConfig, parsedData, onComplete, tabbed = false }: Props) {
   const [gates, setGates] = useState<GateAssignment[]>(initialGates)
   const [config, setConfig] = useState<GraderAnalysisConfig>(initialConfig)
   const [activeTab, setActiveTab] = useState<'analisis' | 'gates' | 'rangos' | 'fisica'>('analisis')
@@ -79,20 +97,19 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
   const [activeTemplateName, setActiveTemplateName] = useState<string | null>(null)
   const [showTemplates, setShowTemplates] = useState(false)
   const [showWeightRanges, setShowWeightRanges] = useState(true)
-  const [savingRanges, setSavingRanges] = useState(false)
-  const [rangesError, setRangesError] = useState<string | null>(null)
   const [shiftSchedule, setShiftSchedule] = useState(DEFAULT_SHIFT_SCHEDULE)
   const [showPhysicalConfig, setShowPhysicalConfig] = useState(false)
   const [editingEquipo, setEditingEquipo] = useState(false)
   const [fisicaSubTab, setFisicaSubTab] = useState<'producto' | 'cintas' | 'distancias' | 'calibracion'>('producto')
+  const [calibracionSubTab, setCalibracionSubTab] = useState<'danfoss' | 'neumatica' | 'verificacion'>('danfoss')
   const [physicalConfig, setPhysicalConfig] = useState<GraderPhysicalConfig>(DEFAULT_PHYSICAL_CONFIG)
-  const [savingPhysical, setSavingPhysical] = useState(false)
-  const [physicalError, setPhysicalError] = useState<string | null>(null)
   const [loadedSchedule, setLoadedSchedule] = useState(DEFAULT_SHIFT_SCHEDULE)
-  const [applyingSaving, setApplyingSaving] = useState(false)
-  const [applyError, setApplyError] = useState<string | null>(null)
   const user = useAuthStore((s) => s.user)
   const isAdmin = useIsAdmin()
+  // Guard: autosave no dispara hasta que la carga inicial desde Firestore complete.
+  // Previene sobreescribir datos reales con DEFAULTs si la red es lenta.
+  const moduleConfigLoadedRef = useRef(false)
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
 
   const sortRanges = (ranges: CalibreWeightRange[]) =>
     [...ranges].sort((a, b) => a.minGrams - b.minGrams)
@@ -168,23 +185,6 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
     return Math.max(0, 1440 - covered)
   }, [shiftSchedule])
 
-  const handleApplyAll = async () => {
-    if (user) {
-      setApplyingSaving(true)
-      setApplyError(null)
-      try {
-        await saveModuleShiftSchedule({ schedule: shiftSchedule, updatedBy: user.id })
-        setLoadedSchedule(shiftSchedule)
-      } catch {
-        setApplyError('No se pudo guardar el horario de turnos. Intenta de nuevo.')
-        setApplyingSaving(false)
-        return
-      }
-      setApplyingSaving(false)
-    }
-    onComplete(gates, config)
-  }
-
   useEffect(() => {
     listGatesTemplates().then((list) => {
       setTemplates(list)
@@ -214,24 +214,68 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
         }
       })
       .catch(() => {})
+      .finally(() => {
+        moduleConfigLoadedRef.current = true
+      })
   }, [])
 
   // Autosave rangos globales (debounce)
   useEffect(() => {
-    if (!user) return
+    if (!user || !moduleConfigLoadedRef.current) return
     if (!config.customWeightRanges || config.customWeightRanges.length === 0) return
-
+    setSaveStatus('saving')
     const timer = setTimeout(() => {
-      saveModuleRanges({
-        ranges: config.customWeightRanges || [],
-        updatedBy: user.id,
-      }).catch(() => {
-        setRangesError('No se pudo guardar rangos del modulo.')
-      })
+      saveModuleRanges({ ranges: config.customWeightRanges || [], updatedBy: user.id })
+        .then(() => setSaveStatus('saved'))
+        .catch(() => setSaveStatus('idle'))
     }, 800)
-
     return () => clearTimeout(timer)
   }, [config.customWeightRanges, user])
+
+  // Autosave physicalConfig (debounce)
+  useEffect(() => {
+    if (!user || !moduleConfigLoadedRef.current) return
+    setSaveStatus('saving')
+    const timer = setTimeout(() => {
+      saveModulePhysicalConfig({ physicalConfig, updatedBy: user.id })
+        .then(() => setSaveStatus('saved'))
+        .catch(() => setSaveStatus('idle'))
+    }, 1000)
+    return () => clearTimeout(timer)
+  }, [physicalConfig, user])
+
+  // Autosave shiftSchedule (debounce)
+  useEffect(() => {
+    if (!user || !moduleConfigLoadedRef.current) return
+    setSaveStatus('saving')
+    const timer = setTimeout(() => {
+      saveModuleShiftSchedule({ schedule: shiftSchedule, updatedBy: user.id })
+        .then(() => {
+          setLoadedSchedule(shiftSchedule)
+          setSaveStatus('saved')
+        })
+        .catch(() => setSaveStatus('idle'))
+    }, 1000)
+    return () => clearTimeout(timer)
+  }, [shiftSchedule, user])
+
+  // Auto-clear: 'saved' vuelve a 'idle' tras 2s para que el indicador se oculte
+  useEffect(() => {
+    if (saveStatus !== 'saved') return
+    const timer = setTimeout(() => setSaveStatus('idle'), 2000)
+    return () => clearTimeout(timer)
+  }, [saveStatus])
+
+  // Propagar cambios al parent (debounce) — reemplaza al antiguo botón "Aplicar configuración".
+  // El parent (Wizard) necesita gates + config + physicalConfig actualizados para que el
+  // Dashboard y analyticsResult reflejen los cambios del usuario en la sesión actual.
+  useEffect(() => {
+    if (!moduleConfigLoadedRef.current) return
+    const timer = setTimeout(() => {
+      onComplete(gates, { ...config, physicalConfig })
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [gates, config, physicalConfig, onComplete])
 
   const updateGate = (idx: number, patch: Partial<GateAssignment>) => {
     setGates((prev) => prev.map((g, i) => (i === idx ? { ...g, ...patch } : g)))
@@ -308,37 +352,6 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
     }))
   }
 
-  const handleSavePhysicalConfig = async () => {
-    if (!user) return
-    setSavingPhysical(true)
-    setPhysicalError(null)
-    try {
-      await saveModulePhysicalConfig({ physicalConfig, updatedBy: user.id })
-      setConfig((c) => ({ ...c, physicalConfig }))
-    } catch {
-      setPhysicalError('No se pudo guardar la configuración física.')
-    } finally {
-      setSavingPhysical(false)
-    }
-  }
-
-  const handleQuickSaveRanges = async () => {
-    if (!user) return
-    if (!config.customWeightRanges || config.customWeightRanges.length === 0) return
-    setSavingRanges(true)
-    setRangesError(null)
-    try {
-      await saveModuleRanges({
-        ranges: config.customWeightRanges,
-        updatedBy: user.id,
-      })
-    } catch {
-      setRangesError('No se pudo guardar los rangos del modulo.')
-    } finally {
-      setSavingRanges(false)
-    }
-  }
-
   const TABS = [
     { id: 'analisis', label: 'Análisis' },
     { id: 'gates',   label: '12 Gates' },
@@ -350,7 +363,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
     <div className="space-y-4">
       {/* Tab bar — solo en modo tabbed */}
       {tabbed && (
-        <div className="flex border-b border-border">
+        <div className="flex items-center border-b border-border">
           {TABS.map((tab) => (
             <button
               key={tab.id}
@@ -366,6 +379,9 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
               {tab.label}
             </button>
           ))}
+          <div className="ml-auto pr-2">
+            <SaveIndicator status={saveStatus} />
+          </div>
         </div>
       )}
 
@@ -609,8 +625,11 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
       <div className="sticky top-14 z-20">
         <Card className="border-primary/30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
           <CardContent className="py-2.5 px-4 flex items-center justify-between gap-3">
-            <p className="text-xs text-muted-foreground hidden sm:block">Datos cargados — puede ir al dashboard en cualquier momento</p>
-            <p className="text-xs text-muted-foreground sm:hidden">Datos listos</p>
+            <div className="flex items-center gap-3 min-w-0">
+              <p className="text-xs text-muted-foreground hidden sm:block">Datos cargados — puede ir al dashboard en cualquier momento</p>
+              <p className="text-xs text-muted-foreground sm:hidden">Datos listos</p>
+              <SaveIndicator status={saveStatus} />
+            </div>
             <Button size="sm" onClick={() => onComplete(gates, config)} className="bg-primary hover:bg-primary/90 shadow-sm">
               Ver Dashboard
               <ChevronRight className="h-4 w-4 ml-1" />
@@ -854,19 +873,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                   <Plus className="h-3 w-3 mr-1" />
                   Agregar calibre
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleQuickSaveRanges}
-                  disabled={!isCustomRanges || savingRanges}
-                >
-                  <Save className="h-3 w-3 mr-1" />
-                  Guardar rangos
-                </Button>
               </div>
-              {rangesError && (
-                <span className="text-xs text-destructive">{rangesError}</span>
-              )}
               {isCustomRanges && (
                 <Button variant="outline" size="sm" onClick={resetWeightRanges}>
                   <RotateCcw className="h-3 w-3 mr-1" />
@@ -898,11 +905,6 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
         )}
         {(tabbed || showPhysicalConfig) && (
           <CardContent className="space-y-6">
-            <p className="text-xs text-muted-foreground">
-              Parámetros físicos de la <span className="font-medium text-foreground">Marelec MS4/12</span> (S/N 3943, controlador Z2).
-              Usados para calcular separación entre peces, timing de flippers y enriquecer el contexto de la IA.
-            </p>
-
             {/* Sub-tabs Física */}
             <div className="flex gap-0 border-b border-border/50">
               {([
@@ -926,6 +928,31 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                 </button>
               ))}
             </div>
+
+            {/* Sub-tabs Calibración */}
+            {fisicaSubTab === 'calibracion' && (
+              <div className="flex gap-0 border-b border-border/30 -mt-2">
+                {([
+                  { id: 'danfoss',      label: 'Danfoss VFD' },
+                  { id: 'neumatica',    label: 'Neumática' },
+                  { id: 'verificacion', label: 'Verificación' },
+                ] as const).map(({ id, label }) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setCalibracionSubTab(id)}
+                    className={cn(
+                      'px-3 py-1.5 text-xs font-medium border-b-2 -mb-px transition-colors',
+                      calibracionSubTab === id
+                        ? 'border-sky-400 text-sky-500 dark:text-sky-400'
+                        : 'border-transparent text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Dimensiones del salmón, flipper y pockets */}
             {fisicaSubTab === 'producto' && (
@@ -1094,17 +1121,12 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
             )}
 
             {/* Z-Belt variador Danfoss */}
-            {fisicaSubTab === 'calibracion' && physicalConfig.zetaDrive && (() => {
+            {fisicaSubTab === 'calibracion' && calibracionSubTab === 'danfoss' && physicalConfig.zetaDrive && (() => {
               const drive = physicalConfig.zetaDrive!
               const computed = computeZetaBeltSpeedMps(drive)
               const throughput = estimateZetaThroughput(computed ?? 0, physicalConfig.avgFishSpacingOnZetaBeltM)
               return (
-                <details className="rounded-lg border border-border/40 bg-muted/5">
-                  <summary className="flex cursor-pointer select-none items-center gap-2 px-4 py-3 text-sm font-medium hover:bg-muted/20 rounded-lg">
-                    Z-Belt — Variador Danfoss
-                    <span className="text-[10px] text-muted-foreground font-normal ml-1">(cinta elevadora)</span>
-                  </summary>
-                  <div className="px-4 pb-4">
+                <div>
                   <p className="text-xs text-muted-foreground mb-3">
                     Calcula velocidad real desde el setpoint RPM del variador.
                     Formula: v = (RPM / {drive.gearRatio} / 60) × π × (sprocket_mm / 1000)
@@ -1214,8 +1236,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                       </p>
                     )}
                   </div>
-                  </div>
-                </details>
+                </div>
               )
             })()}
 
@@ -1286,13 +1307,8 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
             )}
 
             {/* ── Configuración Neumática ──────────────────────────────── */}
-            {fisicaSubTab === 'calibracion' && (
-            <details className="rounded-lg border border-border/40 bg-muted/5">
-              <summary className="flex cursor-pointer select-none items-center gap-2 px-4 py-3 text-sm font-medium hover:bg-muted/20 rounded-lg">
-                Configuración Neumática
-                <InfoTooltip {...getTooltipProps('pneum.responseTime')} />
-              </summary>
-              <div className="px-4 pb-4">
+            {fisicaSubTab === 'calibracion' && calibracionSubTab === 'neumatica' && (
+            <div>
               <p className="text-xs text-muted-foreground mb-3">
                 Parámetros del sistema neumático para calcular el tiempo de respuesta real de cada flipper.
                 Sin estos datos se usa un valor plano de {(physicalConfig.flipperResetTimeSec ?? 0.45).toFixed(2)}s para todos los gates.
@@ -1456,8 +1472,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                 Medir largo de tubo real desde manifold (bloque de electroválvulas) siguiendo el recorrido del tubo hasta cada flipper.
                 Default: estimación lineal (1.5m base + 1.5m × gate).
               </p>
-              </div>
-            </details>
+            </div>
             )}
 
             {/* Valores Z2 — dis1..dis12 */}
@@ -1542,12 +1557,8 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
             )}
 
             {/* Verificación multi-fuente de velocidades */}
-            {fisicaSubTab === 'calibracion' && (
-            <details className="rounded-lg border border-border/40 bg-muted/5">
-              <summary className="flex cursor-pointer select-none items-center gap-2 px-4 py-3 text-sm font-medium hover:bg-muted/20 rounded-lg">
-                Verificación de velocidades — comparar fuentes
-              </summary>
-              <div className="px-4 pb-4">
+            {fisicaSubTab === 'calibracion' && calibracionSubTab === 'verificacion' && (
+            <div>
               <p className="text-xs text-muted-foreground mb-3">
                 Cada cinta tiene 4 fuentes posibles. Ingresar mediciones directas (tachómetro) para verificar.
                 Diferencia &gt;5% entre fuentes indica drift o error de calibración.
@@ -1746,68 +1757,14 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                   )
                 })}
               </div>
-              </div>
-            </details>
+            </div>
             )}
 
-            {/* Guardar */}
-            <div className="flex items-center justify-between gap-2 flex-wrap pt-2 border-t">
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleSavePhysicalConfig}
-                  disabled={savingPhysical || !user}
-                >
-                  <Save className="h-3 w-3 mr-1" />
-                  {savingPhysical ? 'Guardando...' : 'Guardar config. física'}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setPhysicalConfig(DEFAULT_PHYSICAL_CONFIG)}
-                  title="Restaurar valores por defecto"
-                >
-                  <RotateCcw className="h-3 w-3 mr-1" />
-                  Valores por defecto
-                </Button>
-              </div>
-              {physicalError && (
-                <span className="text-xs text-destructive">{physicalError}</span>
-              )}
-              {!physicalError && !savingPhysical && (
-                <p className="text-xs text-muted-foreground">
-                  Al guardar, la IA usará estos parámetros en próximas sesiones.
-                </p>
-              )}
-            </div>
           </CardContent>
         )}
       </Card>
       )} {/* /3.4 */}
 
-      {/* Navigation */}
-      <div className="space-y-2">
-        {applyError && (
-          <p className="text-xs text-destructive text-right">{applyError}</p>
-        )}
-        <div className={onBack ? 'flex justify-between' : 'flex justify-end'}>
-          {onBack && (
-            <Button variant="outline" onClick={onBack}>
-              <ChevronLeft className="h-4 w-4 mr-1" />
-              Volver
-            </Button>
-          )}
-          <Button
-            onClick={handleApplyAll}
-            disabled={applyingSaving}
-            className="bg-emerald-600 hover:bg-emerald-700 shadow-sm"
-          >
-            {applyingSaving ? 'Guardando...' : 'Aplicar configuración'}
-            {!applyingSaving && <ChevronRight className="h-4 w-4 ml-1" />}
-          </Button>
-        </div>
-      </div>
     </div>
   )
 }
