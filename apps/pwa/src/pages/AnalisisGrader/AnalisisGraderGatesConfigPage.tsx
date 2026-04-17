@@ -105,8 +105,9 @@ function SaveIndicator({ status }: { status: 'idle' | 'saving' | 'saved' }) {
 }
 
 /**
- * Visualizador dinámico de la cinta: peces animados en escala real,
- * con etiquetas de largo pez, gap libre y paso total.
+ * Diagrama técnico estático de la cinta: 2 peces con cotas acotadas
+ * al estilo plano de ingeniería. Las proporciones se ajustan en tiempo
+ * real cuando cambian los parámetros (largo pez, cadencia, velocidad).
  */
 function BeltVisualizer({
   speedMps,
@@ -122,30 +123,44 @@ function BeltVisualizer({
   overlapping: boolean
 }) {
   if (spacingM <= 0 || salmonLengthM <= 0) return null
-  const visibleMeters = Math.max(4, spacingM * 2.4)
-  const svgW = 600
-  const svgH = 100
-  const scale = svgW / visibleMeters
+  const gapM = Math.max(0, spacingM - salmonLengthM)
+  const secondsBetweenFish = 60 / Math.max(cadencePiecesPerMin, 0.01)
+
+  // Layout: el SVG representa exactamente "paso + 1 pez" para encajar 2 peces en el viewbox.
+  // Así, el pez #1 arranca al inicio y el pez #2 arranca en posición `spacingM`.
+  // El ancho total visualmente ocupado es spacingM + salmonLengthM (paso + largo pez final).
+  const svgW = 640
+  const marginX = 40
+  const totalMeters = spacingM + salmonLengthM
+  const scale = (svgW - marginX * 2) / totalMeters
   const fishLenPx = salmonLengthM * scale
   const spacingPx = spacingM * scale
   const gapPx = Math.max(0, spacingPx - fishLenPx)
-  const beltY = 55
-  const beltH = 24
+
+  const svgH = 180
+  const beltY = 72
+  const beltH = 26
   const fishCY = beltY + beltH / 2
   const fishRy = beltH / 2 - 2
-  const nFish = Math.ceil(svgW / Math.max(spacingPx, 20)) + 2
-  const fishArr = Array.from({ length: nFish }, (_, i) => i * spacingPx)
-  // Duración de animación: tiempo para avanzar 1 paso
-  const duration = spacingM / Math.max(speedMps, 0.01)
+
+  const fish1X = marginX
+  const fish2X = marginX + spacingPx
+
+  // Colores de estado
+  const gapColor = overlapping ? '#ef4444' : gapM < salmonLengthM * 0.5 ? '#f59e0b' : '#10b981'
+  const gapBg = overlapping ? 'rgba(239,68,68,0.15)' : gapM < salmonLengthM * 0.5 ? 'rgba(245,158,11,0.15)' : 'rgba(16,185,129,0.12)'
+
+  // Escala métrica: ticks cada 50 cm
+  const maxCm = Math.ceil(totalMeters * 100 / 50) * 50
+  const ticks = Array.from({ length: Math.floor(maxCm / 50) + 1 }, (_, i) => i * 50)
+
   return (
     <div className="mt-3 p-3 rounded-lg bg-slate-900/60 border border-slate-700/50">
-      <p className="text-[10px] text-muted-foreground mb-2 flex items-center justify-between">
-        <span>
-          Visualización en escala real — cinta {speedMps.toFixed(2)} m/s · cadencia {cadencePiecesPerMin.toFixed(0)} pz/min
-        </span>
-        <span className="text-[9px] text-muted-foreground/70">(ventana visible: {visibleMeters.toFixed(1)} m)</span>
-      </p>
-      <svg width="100%" viewBox={`0 0 ${svgW} ${svgH}`} preserveAspectRatio="xMidYMid meet" style={{ overflow: 'hidden' }}>
+      <div className="flex items-center justify-between mb-2 text-[10px] text-muted-foreground">
+        <span className="font-medium text-sky-300">Diagrama de distancias (escala real)</span>
+        <span>cinta <span className="font-mono text-foreground">{speedMps.toFixed(2)} m/s</span> · tiempo entre peces <span className="font-mono text-foreground">{secondsBetweenFish.toFixed(2)} s</span></span>
+      </div>
+      <svg width="100%" viewBox={`0 0 ${svgW} ${svgH}`} preserveAspectRatio="xMidYMid meet" style={{ display: 'block' }}>
         <defs>
           <linearGradient id="bv-belt" x1="0%" y1="0%" x2="0%" y2="100%">
             <stop offset="0%" stopColor="#1e293b" />
@@ -160,107 +175,122 @@ function BeltVisualizer({
             <stop offset="0%" stopColor="#ef4444" />
             <stop offset="100%" stopColor="#991b1b" />
           </linearGradient>
-          <clipPath id="bv-clip">
-            <rect x="0" y="0" width={svgW} height={svgH} />
-          </clipPath>
+          <marker id="bv-arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8" />
+          </marker>
+          <marker id="bv-arrow-orange" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#fb923c" />
+          </marker>
+          <marker id="bv-arrow-gap" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill={gapColor} />
+          </marker>
         </defs>
 
-        {/* Etiqueta paso total (barra medidora arriba del primer pez) */}
-        {spacingPx > 40 && (
-          <g opacity="0.9">
-            <line x1="20" y1="20" x2={20 + spacingPx} y2="20" stroke="#64748b" strokeWidth="1" strokeDasharray="2 2" />
-            <line x1="20" y1="16" x2="20" y2="24" stroke="#64748b" strokeWidth="1" />
-            <line x1={20 + spacingPx} y1="16" x2={20 + spacingPx} y2="24" stroke="#64748b" strokeWidth="1" />
-            <text x={20 + spacingPx / 2} y="14" textAnchor="middle" fontSize="9" fill="#94a3b8">
-              paso {(spacingM * 100).toFixed(0)} cm
-            </text>
-          </g>
+        {/* Fondo resaltando el gap */}
+        {gapPx > 0 && (
+          <rect
+            x={fish1X + fishLenPx}
+            y={beltY - 3}
+            width={gapPx}
+            height={beltH + 6}
+            fill={gapBg}
+            rx="2"
+          />
         )}
 
-        {/* Cinta */}
+        {/* ═══ Cota superior: paso completo (centro-a-centro) ═══ */}
+        <g>
+          {/* línea guía desde cada pez hacia la cota */}
+          <line x1={fish1X + fishLenPx / 2} y1={fishCY - fishRy - 2} x2={fish1X + fishLenPx / 2} y2={36} stroke="#64748b" strokeWidth="0.5" strokeDasharray="2 2" />
+          <line x1={fish2X + fishLenPx / 2} y1={fishCY - fishRy - 2} x2={fish2X + fishLenPx / 2} y2={36} stroke="#64748b" strokeWidth="0.5" strokeDasharray="2 2" />
+          {/* línea de cota con flechas */}
+          <line x1={fish1X + fishLenPx / 2} y1={36} x2={fish2X + fishLenPx / 2} y2={36} stroke="#94a3b8" strokeWidth="1" markerStart="url(#bv-arrow)" markerEnd="url(#bv-arrow)" />
+          <rect x={fish1X + fishLenPx / 2 + spacingPx / 2 - 52} y={22} width="104" height="14" fill="#0f172a" rx="2" />
+          <text x={fish1X + fishLenPx / 2 + spacingPx / 2} y={32} textAnchor="middle" fontSize="10" fill="#cbd5e1" fontWeight="600">
+            paso {(spacingM * 100).toFixed(0)} cm (centro a centro)
+          </text>
+        </g>
+
+        {/* ═══ Cinta ═══ */}
         <rect x="0" y={beltY} width={svgW} height={beltH} fill="url(#bv-belt)" />
         <line x1="0" y1={beltY} x2={svgW} y2={beltY} stroke="#475569" strokeWidth="1" />
         <line x1="0" y1={beltY + beltH} x2={svgW} y2={beltY + beltH} stroke="#475569" strokeWidth="1" />
-        {/* Líneas de dirección (tracks) */}
-        {Array.from({ length: 10 }).map((_, i) => (
-          <line
-            key={`tr-${i}`}
-            x1={i * 60}
-            y1={beltY + beltH / 2}
-            x2={i * 60 + 20}
-            y2={beltY + beltH / 2}
-            stroke="#475569"
-            strokeWidth="0.5"
-            opacity="0.6"
-          />
-        ))}
 
-        {/* Peces animados */}
-        <g clipPath="url(#bv-clip)">
-          {fishArr.map((initialX, i) => (
-            <g key={i}>
-              <ellipse
-                cx={initialX + fishLenPx / 2}
-                cy={fishCY}
-                rx={fishLenPx / 2}
-                ry={fishRy}
-                fill={overlapping ? 'url(#bv-fish-warn)' : 'url(#bv-fish)'}
-                opacity="0.95"
-              >
-                <animateTransform
-                  attributeName="transform"
-                  type="translate"
-                  from="0 0"
-                  to={`${-spacingPx} 0`}
-                  dur={`${duration}s`}
-                  repeatCount="indefinite"
-                />
-              </ellipse>
-              {/* Ojito para dar dirección visual */}
-              <circle
-                cx={initialX + fishLenPx * 0.82}
-                cy={fishCY - 2}
-                r="1.5"
-                fill="#1f2937"
-              >
-                <animateTransform
-                  attributeName="transform"
-                  type="translate"
-                  from="0 0"
-                  to={`${-spacingPx} 0`}
-                  dur={`${duration}s`}
-                  repeatCount="indefinite"
-                />
-              </circle>
-            </g>
-          ))}
+        {/* ═══ Pez 1 + ojito ═══ */}
+        <ellipse
+          cx={fish1X + fishLenPx / 2}
+          cy={fishCY}
+          rx={fishLenPx / 2}
+          ry={fishRy}
+          fill={overlapping ? 'url(#bv-fish-warn)' : 'url(#bv-fish)'}
+        />
+        <circle cx={fish1X + fishLenPx * 0.82} cy={fishCY - 2} r="1.8" fill="#1f2937" />
+        <path d={`M ${fish1X + 2} ${fishCY} Q ${fish1X - 6} ${fishCY - 5} ${fish1X - 8} ${fishCY} Q ${fish1X - 6} ${fishCY + 5} ${fish1X + 2} ${fishCY} Z`} fill={overlapping ? '#991b1b' : '#c2410c'} />
+
+        {/* ═══ Pez 2 + ojito ═══ */}
+        <ellipse
+          cx={fish2X + fishLenPx / 2}
+          cy={fishCY}
+          rx={fishLenPx / 2}
+          ry={fishRy}
+          fill={overlapping ? 'url(#bv-fish-warn)' : 'url(#bv-fish)'}
+        />
+        <circle cx={fish2X + fishLenPx * 0.82} cy={fishCY - 2} r="1.8" fill="#1f2937" />
+        <path d={`M ${fish2X + 2} ${fishCY} Q ${fish2X - 6} ${fishCY - 5} ${fish2X - 8} ${fishCY} Q ${fish2X - 6} ${fishCY + 5} ${fish2X + 2} ${fishCY} Z`} fill={overlapping ? '#991b1b' : '#c2410c'} />
+
+        {/* Flecha de dirección de movimiento sobre la cinta */}
+        <g transform={`translate(${svgW - 52}, ${beltY - 8})`}>
+          <line x1="0" y1="0" x2="35" y2="0" stroke="#38bdf8" strokeWidth="1.5" markerEnd="url(#bv-arrow)" />
+          <text x="40" y="3" fontSize="9" fill="#38bdf8">cinta</text>
         </g>
 
-        {/* Etiquetas fijas: largo pez + gap libre */}
-        {fishLenPx > 20 && (
-          <g>
-            <line x1={20} y1={beltY + beltH + 12} x2={20 + fishLenPx} y2={beltY + beltH + 12} stroke="#fb923c" strokeWidth="1.5" />
-            <line x1="20" y1={beltY + beltH + 8} x2="20" y2={beltY + beltH + 16} stroke="#fb923c" strokeWidth="1.5" />
-            <line x1={20 + fishLenPx} y1={beltY + beltH + 8} x2={20 + fishLenPx} y2={beltY + beltH + 16} stroke="#fb923c" strokeWidth="1.5" />
-            <text x={20 + fishLenPx / 2} y={beltY + beltH + 28} textAnchor="middle" fontSize="10" fill="#fb923c" fontWeight="600">
-              pez {(salmonLengthM * 100).toFixed(0)} cm
-            </text>
-          </g>
-        )}
+        {/* ═══ Cota inferior 1: largo pez (bajo el pez 1) ═══ */}
+        <g>
+          <line x1={fish1X} y1={fishCY + fishRy + 2} x2={fish1X} y2={beltY + beltH + 18} stroke="#fb923c" strokeWidth="0.5" strokeDasharray="2 2" />
+          <line x1={fish1X + fishLenPx} y1={fishCY + fishRy + 2} x2={fish1X + fishLenPx} y2={beltY + beltH + 18} stroke="#fb923c" strokeWidth="0.5" strokeDasharray="2 2" />
+          <line x1={fish1X} y1={beltY + beltH + 18} x2={fish1X + fishLenPx} y2={beltY + beltH + 18} stroke="#fb923c" strokeWidth="1" markerStart="url(#bv-arrow-orange)" markerEnd="url(#bv-arrow-orange)" />
+          <text x={fish1X + fishLenPx / 2} y={beltY + beltH + 32} textAnchor="middle" fontSize="10" fill="#fb923c" fontWeight="600">
+            pez {(salmonLengthM * 100).toFixed(0)} cm
+          </text>
+        </g>
+
+        {/* ═══ Cota inferior 2: gap libre (entre pez 1 cola y pez 2 cabeza) ═══ */}
         {gapPx > 20 && (
           <g>
-            <line x1={20 + fishLenPx} y1={beltY + beltH + 12} x2={20 + spacingPx} y2={beltY + beltH + 12} stroke={overlapping ? '#ef4444' : '#10b981'} strokeWidth="1.5" />
-            <line x1={20 + fishLenPx} y1={beltY + beltH + 8} x2={20 + fishLenPx} y2={beltY + beltH + 16} stroke={overlapping ? '#ef4444' : '#10b981'} strokeWidth="1.5" />
-            <line x1={20 + spacingPx} y1={beltY + beltH + 8} x2={20 + spacingPx} y2={beltY + beltH + 16} stroke={overlapping ? '#ef4444' : '#10b981'} strokeWidth="1.5" />
-            <text x={20 + fishLenPx + gapPx / 2} y={beltY + beltH + 28} textAnchor="middle" fontSize="10" fill={overlapping ? '#ef4444' : '#10b981'} fontWeight="600">
-              gap {((spacingM - salmonLengthM) * 100).toFixed(0)} cm
+            <line x1={fish1X + fishLenPx} y1={fishCY + fishRy + 2} x2={fish1X + fishLenPx} y2={beltY + beltH + 42} stroke={gapColor} strokeWidth="0.5" strokeDasharray="2 2" />
+            <line x1={fish2X} y1={fishCY + fishRy + 2} x2={fish2X} y2={beltY + beltH + 42} stroke={gapColor} strokeWidth="0.5" strokeDasharray="2 2" />
+            <line x1={fish1X + fishLenPx} y1={beltY + beltH + 42} x2={fish2X} y2={beltY + beltH + 42} stroke={gapColor} strokeWidth="1.2" markerStart="url(#bv-arrow-gap)" markerEnd="url(#bv-arrow-gap)" />
+            <text x={fish1X + fishLenPx + gapPx / 2} y={beltY + beltH + 56} textAnchor="middle" fontSize="10" fill={gapColor} fontWeight="700">
+              gap libre {(gapM * 100).toFixed(0)} cm
             </text>
           </g>
         )}
+        {/* Cuando el gap es muy chico o negativo, mostrarlo como advertencia */}
+        {gapPx <= 20 && gapPx > 0 && (
+          <text x={fish1X + fishLenPx + gapPx / 2} y={beltY + beltH + 56} textAnchor="middle" fontSize="10" fill={gapColor} fontWeight="700">
+            gap {(gapM * 100).toFixed(0)} cm ⚠
+          </text>
+        )}
+        {gapPx <= 0 && (
+          <text x={fish1X + fishLenPx} y={beltY + beltH + 56} textAnchor="middle" fontSize="10" fill="#ef4444" fontWeight="700">
+            ⚠ solapamiento — peces se pisan
+          </text>
+        )}
 
-        {/* Flecha dirección */}
-        <g transform={`translate(${svgW - 45}, ${beltY - 6})`}>
-          <text fontSize="9" fill="#94a3b8">→ {speedMps.toFixed(2)} m/s</text>
+        {/* ═══ Escala métrica al fondo (ticks cada 50 cm) ═══ */}
+        <g transform={`translate(${marginX}, ${svgH - 14})`}>
+          <line x1="0" y1="0" x2={totalMeters * scale} y2="0" stroke="#475569" strokeWidth="0.5" />
+          {ticks.map((cm) => {
+            const x = (cm / 100) * scale
+            if (x > totalMeters * scale) return null
+            return (
+              <g key={cm}>
+                <line x1={x} y1="-2" x2={x} y2="2" stroke="#64748b" strokeWidth="0.5" />
+                <text x={x} y="10" textAnchor="middle" fontSize="7" fill="#64748b">{cm}</text>
+              </g>
+            )
+          })}
+          <text x={totalMeters * scale + 10} y="3" fontSize="7" fill="#64748b">cm</text>
         </g>
       </svg>
     </div>
