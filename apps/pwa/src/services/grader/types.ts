@@ -601,7 +601,6 @@ export interface GateAssignment {
   assignedQuality: GraderQuality;
   assignedCalibre: CalibreRange;
   active: boolean;
-  note?: string;
 }
 
 export interface GraderAnalysisConfig {

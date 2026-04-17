@@ -680,7 +680,6 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                   <th className="py-2.5 px-2 text-center">Rango (g)</th>
                   <th className="py-2.5 px-2">Calidad</th>
                   <th className="py-2.5 px-2 w-20 text-center">Activo</th>
-                  <th className="py-2.5 px-2">Nota</th>
                 </tr>
               </thead>
               <tbody>
@@ -728,14 +727,6 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                       <Switch
                         checked={gate.active}
                         onCheckedChange={(v) => updateGate(idx, { active: v })}
-                      />
-                    </td>
-                    <td className="py-2 px-2">
-                      <Input
-                        value={gate.note || ''}
-                        onChange={(e) => updateGate(idx, { note: e.target.value })}
-                        placeholder="—"
-                        className="h-8 text-xs"
                       />
                     </td>
                   </tr>
