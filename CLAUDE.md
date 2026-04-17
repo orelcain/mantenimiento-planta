@@ -239,12 +239,42 @@ sidebarConfig  ← nuevo: orden personalizado del sidebar admin
 
 ## Version actual
 
-- **v2.94.0** (2026-04-16) — "Mobile home: WIP ribbons + QR share + menú home + HMI Grader en herramientas"
+- **v2.113.0** (2026-04-17) — "feat(grader): motor IA sugerencias punto cero + tab Producto 3 capas + campos físicos Z2"
 - Proyecto Firebase: `mantenimiento-planta-771a3`
 - GitHub: `orelcain/mantenimiento-planta`
 - Produccion: `https://orelcain.github.io/mantenimiento-planta/`
 - CI status: 4/4 workflows 🟢
 - Seguridad: 23 colecciones Firestore validadas, 0 vulnerabilidades runtime prod
+
+## Cambios recientes (sesión 2026-04-17 tarde — Grader Producto 3 capas + motor IA sugerencias, v2.112.1 → v2.113.0)
+
+### FASE 1 — Tab Producto rediseñado (progressive disclosure)
+- **Hero card**: métricas clave (longitud, peso, cadencia, ratio L/spacing, verdict pill 🟢🟡🔴)
+- **`⚙️ Equipo flipper`** (sub-card colapsable, abierta por defecto): timing Z2 + visualizador ciclo
+- **`📐 Diagnóstico técnico`** (sub-card colapsable, cerrada por defecto): fórmulas con fuentes + ratios
+
+### FASE 2 — Campos físicos Z2 editables en GraderPhysicalConfig
+Nuevos campos opcionales con defaults Z2 reales:
+- `flipperDelayOpenMs` (150), `flipperMinOpenTimeMs` (350), `flipperDelayCloseMs` (150)
+- `flipperHeightAboveBeltMm` (0.5), `flipperMechanicalResetS`, `flipperMechanicalMeasuredAt`
+- `delayBeforeGateCloseMs` (400), `delayGateCloseMs` (500), `minGateOpenMs` (0), `maxBinWeightG` (25000)
+- Sub-card A (ciclo flipper) convertida a inputs editables con IIFE pattern
+
+### FASE 3 — Motor IA de sugerencias punto cero (PointZeroSuggestion engine)
+Archivos nuevos bajo `src/services/grader/suggestions/`:
+- `types.ts` — interfaz `PointZeroSuggestion` (source, formula, dataPoints, confidence, applyFn/ignoreFn)
+- `suggestFishBaseLength.ts` — LWR FishBase Salar (a=0.0136 b=2.979) y Coho (a=0.0091 b=3.07)
+- `suggestFishBaseWidth.ts` — anchura alométrica (widthRatio 0.26 Salar / 0.24 Coho)
+- `suggestPocketCount.ts` — detecta solapamiento L/spacing ≥ 1 + ratio > 0.7
+- `suggestResetFreshness.ts` — alerta reset mecánico nunca medido o medido hace >30 días
+- `suggestHistoricalCadence.ts` — compara cadencia actual vs avg de últimos N turnos (≥10 required)
+- `useSuggestionEngine.ts` — hook orquestador con ignoredIds (useState Set)
+Componentes nuevos bajo `src/components/grader/`:
+- `SuggestionCard.tsx` — card expandible: 🧠 Por qué / 📊 Datos / 🔬 Fórmula / 🎯 Confianza / ⚠️ Impacto + botones Aplicar/Ignorar
+- `SuggestionsPanel.tsx` — panel ordenado warnings→recommended→info con contador
+
+### Nota runtime
+Error `Cannot access 'batchStats' before initialization` era HMR stale cache (TSC exit 0, orden correcto: batchStats L548, hook L610). Desaparece al reiniciar Vite dev server.
 
 ## Cambios recientes (sesión 2026-04-16 — Mobile home WIP ribbons + QR share, v2.93.0 → v2.94.0)
 
@@ -664,15 +694,25 @@ Si se necesita re-procesar o corregir algo, usar `scripts/iter18-full-season-reb
 - ✅ **Agregar campo `lot` al script bulk upload** — implementado + backfill 383 summaries con `meta/timeline` (sesión 2026-04-15)
 - ✅ **Timeline aggregates pre-computados** (`meta/timeline` sub-colección) — carga automática sin botón, Firestore rules fix
 
-### P1.9 — Grader Producto UX + Sugerencias IA trazables (sesión 2026-04-17, planificado Opus 4.7)
-Objetivo: rediseñar tab `Producto` con progressive disclosure + motor de sugerencias explicables.
-- ⏳ **Hero rediseñado**: diagrama de cinta subido arriba, pill verdict 🟢🟡🔴, especie+peso+pockets en 3 columnas, largo/ancho con AutoField independiente (constraint usuario)
-- ⏳ **Capas colapsables**: `⚙️ Equipo flipper` (abierto) + `📐 Diagnóstico técnico` (cerrado). Saca el timing denso del hero.
-- ⏳ **Motor IA sugerencias punto cero** — cards expandibles con: valor actual→sugerido, origen (FishBase/histórico/batch/geométrico), datos usados, confianza (high/med/low basado en n+CV), impacto, botón Aplicar por card. Ver spec completa en `mockups/producto-v2.html`.
-  - Archivos nuevos: `suggestFishBaseLength.ts`, `suggestFishBaseWidth.ts`, `suggestHistoricalCadence.ts`, `suggestPocketCount.ts`, `suggestResetFreshness.ts`, orquestador `useSuggestionEngine()`, componente `SuggestionCard.tsx`
-  - Audit trail Firestore: colección `graderConfigChangeLog` (timestamp, userId, parameter, previous/newValue, source, suggestionMetadata)
-- ⏳ **Constraint a respetar**: peso sigue en gramos (no kg), AutoField por campo (no toggle global)
-- ⏳ **Mockup navegable**: `apps/pwa/public/producto-v2-mockup.html` (servido vía Vite en dev como `/producto-v2-mockup.html`)
+### P1.9 — Grader Producto UX + Sugerencias IA trazables (sesión 2026-04-17, commit 5375a412)
+- ✅ **FASE 1**: Tab Producto rediseñado en 3 capas (Hero + ⚙️ Equipo flipper colapsable + 📐 Diagnóstico técnico colapsable)
+- ✅ **FASE 2**: 10 nuevos campos GraderPhysicalConfig (timing flippers, gates, maxBinWeight). Sub-card A editable con inputs reales.
+- ✅ **FASE 3**: Motor IA sugerencias (5 generadores + SuggestionCard + SuggestionsPanel + useSuggestionEngine)
+
+**Pendiente FASE 4 — Modelo multi-cinta**
+- ⏳ Separar grading belt / z-belt / acceleration 1 / acceleration 2 como entidades independientes en `GraderPhysicalConfig`
+- ⏳ Actualizar tab Cintas con selector por nombre de cinta y sus parámetros individuales
+- ⏳ Recalcular todos los ratios usando la cinta correspondiente (grading = 0.70 m/s, z-belt = 0.42 m/s)
+
+**Pendiente FASE 5 — Modales de medición**
+- ⏳ `slowMoModal`: guía paso a paso con SVG iPhone 240fps → ingresar frames → calcula segundos → guarda en Firestore `flipperTimingMeasurements`
+- ⏳ `tachModal`: guía tacómetro SKF con SVG vista lateral, DOs/DON'Ts, 3 zonas, promedio → guarda en Firestore `beltSpeedMeasurements`
+- ⏳ Integrar badge "Medido el DD/MM" + botón "Re-medir" en sub-cards de Equipo flipper
+
+**Pendiente FASE 6 — Audit trail configuración**
+- ⏳ Colección Firestore `graderConfigChangeLog` (timestamp, userId, parameter, previousValue, newValue, source, suggestionId?)
+- ⏳ Hook `useConfigChangeLogger` que wrappea `setPhysicalConfig` y registra automáticamente cada cambio
+- ⏳ Vista mini "Historial de cambios" en tab Producto (últimos 10 cambios con quién/cuándo/qué)
 
 ### P1.10 — Cronometrar reset flipper (investigado 2026-04-17 con docs internos Z2)
 **Modelo real**: Marelec **MS4/12** (estático + z-conveyor + 2 cintas aceleración + grading belt de 12 salidas). El "Z2" es el NOMBRE DEL COMPUTADOR/HMI, no del grader.
