@@ -252,25 +252,6 @@ export const DEFAULT_PHYSICAL_CONFIG = {
   // según su respuesta neumática real (distancias Z2 < físico = anticipo variable).
   // Pitches reales entre gates: 950, 1600, 1400, 1350, 1300, 1300, 1250, 1300, 1475, 1625, 1050 mm
   z2ProgrammedDistancesMm: [1250, 2200, 3800, 5200, 6550, 7850, 9150, 10400, 11700, 13175, 14800, 15850],
-  // Lectura de velocidades Z2 de referencia (26/12/2025, turno normal)
-  // Factor: 1 unit = 0.000786 m/s (1.4 m/s / 1781 unidades máx. sorting belt)
-  z2BeltSpeedReadings: {
-    zBeltUnits:   494,    // → 0.39 m/s
-    accel1Units:  1313,   // → 1.03 m/s
-    accel2Units:  1560,   // → 1.23 m/s
-    sortingUnits: 1631,   // → 1.28 m/s (casi constante en turno)
-    readingLabel: '26/12/2025 turno día',
-  },
-  // Factor de conversión Z2 → m/s (estado: ESTIMADO — derivado de spec fabricante)
-  // Para verificar: medir velocidad real con tachómetro en sorting belt mientras Z2 muestra N unidades
-  z2SpeedScale: {
-    factorMpsPerUnit: 0.000786,
-    anchorBelt:       'main' as const,
-    anchorUnits:      1781,   // unidades máx. vistas en pantalla Z2 (foto turno)
-    anchorActualMps:  1.40,   // velocidad máx. spec fabricante MS4/12
-    anchorStatus:     'estimated' as const,
-    anchorDate:       '2026-04-11',
-  },
   // Variador y motoreductor de la cinta elevadora (datos placa motor 2026-04-11)
   zetaDrive: {
     motorNominalRpm: 1488,   // placa motor

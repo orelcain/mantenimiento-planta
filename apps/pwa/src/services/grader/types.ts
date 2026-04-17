@@ -338,44 +338,6 @@ export interface GraderPhysicalConfig {
    */
   z2ProgrammedDistancesMm?: number[]
   /**
-   * Lecturas de velocidad de cintas desde la pantalla Z2 "Velocidad cintas".
-   * Unidad: unidades internas del Z2 (1 unit = factorMpsPerUnit m/s).
-   * Registrar al inicio de cada turno. Referencia: 26/12/2025 turno normal.
-   */
-  z2BeltSpeedReadings?: {
-    /** Z-Belt (cinta elevadora). Ref: 494 units = 0.39 m/s */
-    zBeltUnits?: number
-    /** Acceleration Belt 1. Ref: 1313 units = 1.03 m/s */
-    accel1Units?: number
-    /** Acceleration Belt 2 (con fotocélula). Ref: 1560 units = 1.23 m/s */
-    accel2Units?: number
-    /** Sorting Belt / Grading Belt (cinta larga). Ref: 1631 units = 1.28 m/s. Casi constante. */
-    sortingUnits?: number
-    /** Fecha/turno de la lectura (ej. "26/12/2025 turno día") */
-    readingLabel?: string
-  }
-  /**
-   * Factor de conversión de unidades Z2 a m/s.
-   *
-   * Estado actual: ESTIMADO — derivado del máximo del fabricante (1781 unidades = 1.4 m/s).
-   * Para VERIFICAR: medir velocidad real con tachómetro en una cinta mientras el Z2
-   * muestra N unidades en "Velocidad cintas" → k_real = medidoMps / z2Units.
-   */
-  z2SpeedScale?: {
-    /** Factor de conversión: 1 unidad Z2 = factorMpsPerUnit m/s */
-    factorMpsPerUnit: number
-    /** Estado de calibración del factor */
-    anchorStatus: CalibrationStatus
-    /** Cinta usada para el punto de anclaje (al verificar con tachómetro) */
-    anchorBelt?: 'main' | 'accel1' | 'accel2' | 'zeta'
-    /** Unidades Z2 leídas en pantalla al momento de la medición */
-    anchorUnits?: number
-    /** Velocidad real medida con tachómetro (m/s) al mismo momento */
-    anchorActualMps?: number
-    /** Fecha de la medición de verificación */
-    anchorDate?: string
-  }
-  /**
    * Datos del variador Danfoss y motoreductor de la cinta elevadora (Z-Belt).
    * Ver interface ZetaBeltDrive para detalles.
    */
