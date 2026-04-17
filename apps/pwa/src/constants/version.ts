@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.107.0' as const
+export const APP_VERSION = '2.108.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -11,12 +11,12 @@ export const APP_VERSION = '2.107.0' as const
 /**
  * Fecha de la versión actual
  */
-export const VERSION_DATE = '2026-04-16' as const
+export const VERSION_DATE = '2026-04-17' as const
 
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'feat(grader): autosave Firestore + indicador guardado + 4 bug fixes' as const
+export const VERSION_NAME = 'feat(grader): AutoField Auto/Manual + BatchStatsCard + sync autoSuggestions' as const
 
 /**
  * Nota:

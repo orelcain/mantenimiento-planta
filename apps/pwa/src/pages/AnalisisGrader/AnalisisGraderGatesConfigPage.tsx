@@ -84,6 +84,126 @@ function SaveIndicator({ status }: { status: 'idle' | 'saving' | 'saved' }) {
   )
 }
 
+interface BatchStats {
+  n: number
+  p10: number
+  p50: number
+  p90: number
+  cv: number
+  dominantCalibre: string
+  throughputPzPerMin: number | null
+  windowMinutes: number | null
+}
+
+function BatchStatsCard({ stats }: { stats: BatchStats | null }) {
+  if (!stats) return null
+  return (
+    <div className="mb-4 p-3 rounded-lg bg-muted/50 border grid grid-cols-3 sm:grid-cols-4 gap-2 text-xs">
+      <div className="text-center">
+        <p className="text-muted-foreground">Piezas</p>
+        <p className="font-mono font-medium">{stats.n.toLocaleString()}</p>
+      </div>
+      <div className="text-center">
+        <p className="text-muted-foreground">p10 / med / p90 kg</p>
+        <p className="font-mono font-medium">{stats.p10.toFixed(2)} · {stats.p50.toFixed(2)} · {stats.p90.toFixed(2)}</p>
+      </div>
+      <div className="text-center">
+        <p className="text-muted-foreground">CV%</p>
+        <p className="font-mono font-medium">{stats.cv.toFixed(1)}%</p>
+      </div>
+      <div className="text-center">
+        <p className="text-muted-foreground">Calibre dominante</p>
+        <p className="font-mono font-medium truncate">{stats.dominantCalibre}</p>
+      </div>
+      {stats.throughputPzPerMin != null && (
+        <div className="text-center">
+          <p className="text-muted-foreground">Throughput</p>
+          <p className="font-mono font-medium">{stats.throughputPzPerMin.toFixed(1)} pz/min</p>
+        </div>
+      )}
+      {stats.windowMinutes != null && (
+        <div className="text-center">
+          <p className="text-muted-foreground">Ventana</p>
+          <p className="font-mono font-medium">{Math.round(stats.windowMinutes)} min</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+interface AutoFieldProps {
+  label: string
+  value: number | string
+  onChange: (v: number) => void
+  auto: boolean
+  onAutoChange: (v: boolean) => void
+  suggested: number | null
+  hint?: string
+  step?: number
+  min?: number
+  max?: number
+  placeholder?: string
+  unit?: string
+}
+
+function AutoField({ label, value, onChange, auto, onAutoChange, suggested, hint, step, min, max, placeholder, unit }: AutoFieldProps) {
+  const hasData = suggested !== null
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <Label className="text-xs">{label}</Label>
+        <div
+          className={cn('flex items-center gap-1', !hasData && 'opacity-40')}
+          title={!hasData ? 'Requiere datos cargados' : undefined}
+        >
+          <Switch
+            checked={auto && hasData}
+            onCheckedChange={hasData ? onAutoChange : undefined}
+            disabled={!hasData}
+            className="scale-75 origin-right"
+          />
+          <span className="text-[10px] text-muted-foreground">Auto</span>
+        </div>
+      </div>
+      <div className="relative">
+        <Input
+          type="number"
+          step={step}
+          min={min}
+          max={max}
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+          disabled={auto && hasData}
+          placeholder={placeholder}
+          className={cn('mt-1 font-mono', auto && hasData && 'opacity-60 pr-14')}
+        />
+        {auto && hasData && (
+          <Badge className="absolute right-2 top-1/2 -translate-y-1/2 mt-0.5 text-[9px] bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 px-1.5 py-0 pointer-events-none">
+            Auto
+          </Badge>
+        )}
+      </div>
+      {!auto && suggested !== null && (
+        <p className="text-[10px] mt-1 flex items-center gap-1">
+          <span className="text-sky-500">Sugerido: ~{suggested}{unit ? ` ${unit}` : ''}</span>
+          {Number(value) !== suggested && (
+            <button
+              type="button"
+              onClick={() => onChange(suggested)}
+              className="underline text-sky-400 hover:text-sky-300"
+            >
+              Aplicar
+            </button>
+          )}
+        </p>
+      )}
+      {hint && !auto && suggested === null && (
+        <p className="text-[10px] text-muted-foreground mt-1">{hint}</p>
+      )}
+    </div>
+  )
+}
+
 /** Badge de estado de calibración para parámetros físicos */
 function CalibBadge({ status }: { status: CalibrationStatus | undefined }) {
   if (status === 'verified')
@@ -152,6 +272,41 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
     const widthCm = Math.round(lengthCm * widthRatio)
     return { lengthCm, widthCm, medianWeightG }
   }, [medianWeightG, physicalConfig.species])
+
+  // Estadísticas del lote: percentiles, CV, calibre dominante, throughput
+  const batchStats = useMemo((): BatchStats | null => {
+    const records = parsedData.pieceRecords
+    if (records.length === 0) return null
+    const weights = records
+      .map((r) => r.weightPerPieceGrams ?? (r.weightKg != null ? r.weightKg * 1000 : null))
+      .filter((w): w is number => w != null && w > 50 && w < 15000)
+    if (weights.length < 2) return null
+    weights.sort((a, b) => a - b)
+    const n = weights.length
+    const p10 = weights[Math.floor(n * 0.1)]! / 1000
+    const p50 = weights[Math.floor(n * 0.5)]! / 1000
+    const p90 = weights[Math.floor(n * 0.9)]! / 1000
+    const mean = weights.reduce((s, v) => s + v, 0) / n
+    const variance = weights.reduce((s, v) => s + (v - mean) ** 2, 0) / n
+    const cv = (Math.sqrt(variance) / mean) * 100
+    const calibreCounts: Record<string, number> = {}
+    for (const r of records) {
+      if (r.calibre) calibreCounts[r.calibre] = (calibreCounts[r.calibre] ?? 0) + 1
+    }
+    const dominantCalibre = Object.entries(calibreCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? '—'
+    const timestamps = records
+      .map((r) => new Date(r.ts).getTime())
+      .filter((t) => !isNaN(t))
+      .sort((a, b) => a - b)
+    let throughputPzPerMin: number | null = null
+    let windowMinutes: number | null = null
+    if (timestamps.length >= 2) {
+      const spanMs = timestamps[timestamps.length - 1]! - timestamps[0]!
+      windowMinutes = spanMs / 60000
+      if (windowMinutes > 0) throughputPzPerMin = records.length / windowMinutes
+    }
+    return { n: records.length, p10, p50, p90, cv, dominantCalibre, throughputPzPerMin, windowMinutes }
+  }, [parsedData.pieceRecords])
 
   const updateWeightRange = (idx: number, patch: Partial<CalibreWeightRange>) => {
     const ranges: CalibreWeightRange[] = activeRanges.map((r, i) => {
@@ -285,6 +440,24 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
     const timer = setTimeout(() => setSaveStatus('idle'), 2000)
     return () => clearTimeout(timer)
   }, [saveStatus])
+
+  // Sync auto-sugeridas: cuando auto=true, aplicar suggestedDimensions al physicalConfig
+  useEffect(() => {
+    if (!suggestedDimensions) return
+    setPhysicalConfig((p) => {
+      let changed = false
+      const next = { ...p }
+      if (p.autoSuggestions?.avgSalmonLengthCm && p.avgSalmonLengthCm !== suggestedDimensions.lengthCm) {
+        next.avgSalmonLengthCm = suggestedDimensions.lengthCm
+        changed = true
+      }
+      if (p.autoSuggestions?.avgSalmonWidthCm && p.avgSalmonWidthCm !== suggestedDimensions.widthCm) {
+        next.avgSalmonWidthCm = suggestedDimensions.widthCm
+        changed = true
+      }
+      return changed ? next : p
+    })
+  }, [suggestedDimensions])
 
   // Propagar cambios al parent (debounce) — reemplaza al antiguo botón "Aplicar configuración".
   // El parent (Wizard) necesita gates + config + physicalConfig actualizados para que el
@@ -914,60 +1087,36 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                 )}
               </div>
 
+              <BatchStatsCard stats={batchStats} />
+
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div>
-                  <Label className="text-xs">Largo prom. salmón (cm)</Label>
-                  <Input
-                    type="number"
-                    step="1"
-                    min="20"
-                    max="120"
-                    value={physicalConfig.avgSalmonLengthCm}
-                    onChange={(e) => setPhysicalConfig((p) => ({ ...p, avgSalmonLengthCm: Number(e.target.value) }))}
-                    className="mt-1 font-mono"
-                  />
-                  {suggestedDimensions ? (
-                    <p className="text-[10px] mt-1 flex items-center gap-1">
-                      <span className="text-sky-500">Sugerido: ~{suggestedDimensions.lengthCm} cm</span>
-                      {physicalConfig.avgSalmonLengthCm !== suggestedDimensions.lengthCm && (
-                        <button
-                          type="button"
-                          onClick={() => setPhysicalConfig((p) => ({ ...p, avgSalmonLengthCm: suggestedDimensions.lengthCm }))}
-                          className="underline text-sky-400 hover:text-sky-300"
-                        >Aplicar</button>
-                      )}
-                    </p>
-                  ) : (
-                    <p className="text-[10px] text-muted-foreground mt-1">Máx. admitido: 110 cm</p>
-                  )}
-                </div>
-                <div>
-                  <Label className="text-xs">Ancho prom. salmón (cm)</Label>
-                  <Input
-                    type="number"
-                    step="0.5"
-                    min="5"
-                    max="40"
-                    value={physicalConfig.avgSalmonWidthCm ?? ''}
-                    onChange={(e) => setPhysicalConfig((p) => ({ ...p, avgSalmonWidthCm: e.target.value ? Number(e.target.value) : undefined }))}
-                    placeholder="—"
-                    className="mt-1 font-mono"
-                  />
-                  {suggestedDimensions ? (
-                    <p className="text-[10px] mt-1 flex items-center gap-1">
-                      <span className="text-sky-500">Sugerido: ~{suggestedDimensions.widthCm} cm</span>
-                      {(physicalConfig.avgSalmonWidthCm ?? 0) !== suggestedDimensions.widthCm && (
-                        <button
-                          type="button"
-                          onClick={() => setPhysicalConfig((p) => ({ ...p, avgSalmonWidthCm: suggestedDimensions.widthCm }))}
-                          className="underline text-sky-400 hover:text-sky-300"
-                        >Aplicar</button>
-                      )}
-                    </p>
-                  ) : (
-                    <p className="text-[10px] text-muted-foreground mt-1">Máx. admitido: 29 cm</p>
-                  )}
-                </div>
+                <AutoField
+                  label="Largo prom. salmón (cm)"
+                  value={physicalConfig.avgSalmonLengthCm}
+                  onChange={(v) => setPhysicalConfig((p) => ({ ...p, avgSalmonLengthCm: v }))}
+                  auto={physicalConfig.autoSuggestions?.avgSalmonLengthCm ?? false}
+                  onAutoChange={(v) => setPhysicalConfig((p) => ({ ...p, autoSuggestions: { ...p.autoSuggestions, avgSalmonLengthCm: v } }))}
+                  suggested={suggestedDimensions?.lengthCm ?? null}
+                  hint="Máx. admitido: 110 cm"
+                  step={1}
+                  min={20}
+                  max={120}
+                  unit="cm"
+                />
+                <AutoField
+                  label="Ancho prom. salmón (cm)"
+                  value={physicalConfig.avgSalmonWidthCm ?? ''}
+                  onChange={(v) => setPhysicalConfig((p) => ({ ...p, avgSalmonWidthCm: v || undefined }))}
+                  auto={physicalConfig.autoSuggestions?.avgSalmonWidthCm ?? false}
+                  onAutoChange={(v) => setPhysicalConfig((p) => ({ ...p, autoSuggestions: { ...p.autoSuggestions, avgSalmonWidthCm: v } }))}
+                  suggested={suggestedDimensions?.widthCm ?? null}
+                  hint="Máx. admitido: 29 cm"
+                  step={0.5}
+                  min={5}
+                  max={40}
+                  placeholder="—"
+                  unit="cm"
+                />
                 <div>
                   <Label className="text-xs">Largo paleta flipper (mm)</Label>
                   <Input

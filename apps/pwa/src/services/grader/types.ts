@@ -384,6 +384,14 @@ export interface GraderPhysicalConfig {
    * - coho: Oncorhynchus kisutch (Salmón Coho/Plateado)
    */
   species?: 'salar' | 'coho'
+  /**
+   * Campos con sugerencia automática activa.
+   * Cuando true, el valor se sincroniza automáticamente desde los datos del lote.
+   */
+  autoSuggestions?: {
+    avgSalmonLengthCm?: boolean
+    avgSalmonWidthCm?: boolean
+  }
 }
 
 /**
