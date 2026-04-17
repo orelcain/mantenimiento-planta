@@ -1,4 +1,5 @@
 import type { GraderPhysicalConfig } from '../types'
+import { getGradingBeltSpeedMps } from '../graderBeltHelpers'
 import type { PointZeroSuggestion } from './types'
 
 const SPECIES_ALLOMETRY = {
@@ -64,7 +65,7 @@ export function suggestFishBaseLength({
     ],
     confidence,
     confidenceReason,
-    impactText: `Gap libre cambia en ~${((diff / 100) * (physicalConfig.belts.find(b => b.beltId === 'main')?.speedMps ?? 0.7) * 60 / Math.max(1, 40)).toFixed(0)} cm. El timing del flipper también se ajusta.`,
+    impactText: `Gap libre cambia en ~${((diff / 100) * getGradingBeltSpeedMps(physicalConfig) * 60 / Math.max(1, 40)).toFixed(0)} cm. El timing del flipper también se ajusta.`,
     severity,
     applyFn: () => setPhysicalConfig((p) => ({ ...p, avgSalmonLengthCm: suggestedCm })),
   }

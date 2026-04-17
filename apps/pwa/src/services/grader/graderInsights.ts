@@ -10,6 +10,7 @@ import type {
   DeterministicInsight,
 } from './types'
 import { computePerGateResponseTime } from './graderGateTiming'
+import { getGradingBelt } from './graderBeltHelpers'
 
 let insightCounter = 0
 function nextId(): string {
@@ -317,7 +318,7 @@ export function computeDeterministicInsights(
   // ——— 14. Análisis físico: separación entre peces en la cinta ———
   const physicalConfig = result.config.physicalConfig
   if (physicalConfig && result.kpis.productionRatePerHour && result.kpis.productionRatePerHour > 0) {
-    const mainBelt = physicalConfig.belts.find((b) => b.beltId === 'main')
+    const mainBelt = getGradingBelt(physicalConfig)
     if (mainBelt && mainBelt.speedMps > 0) {
       // Separación entre peces: distancia = velocidad / (piezas/segundo)
       const ratePerSec = result.kpis.productionRatePerHour / 3600
@@ -405,7 +406,7 @@ export function computeDeterministicInsights(
   // La MS4/12 puede operar hasta 1.4 m/s. A esa velocidad, Gate 1 (1.37m) tiene
   // 1.37 / 1.4 = 0.98s — casi 1 segundo. Alertamos cuando < 1.5s a vel. actual.
   if (physicalConfig && physicalConfig.flipperPositions.length > 0) {
-    const mainBelt = physicalConfig.belts.find((b) => b.beltId === 'main')
+    const mainBelt = getGradingBelt(physicalConfig)
     if (mainBelt && mainBelt.speedMps > 0) {
       // Calcular también a vel. máx. del fabricante para contexto
       const maxSpeedMps = 1.4
@@ -491,8 +492,8 @@ export function computeDeterministicInsights(
   // t_disponible = (dis_n+1 - dis_n) / vel_cinta
   // t_requerido  = t_salmón_pasa + t_reset_neumático (per-gate si pneumaticConfig disponible)
   if (physicalConfig && physicalConfig.z2ProgrammedDistancesMm && physicalConfig.z2ProgrammedDistancesMm.length >= 12) {
-    const mainBelt2 = physicalConfig.belts.find((b) => b.beltId === 'main')
-    const speedMps = mainBelt2?.speedMps ?? 1.28
+    const mainBelt2 = getGradingBelt(physicalConfig)
+    const speedMps = mainBelt2?.speedMps ?? 0.70
     const salmonLenM = physicalConfig.avgSalmonLengthCm / 100
     const tSalmonPass = salmonLenM / speedMps
     const marginThreshold = result.config.errorThresholds?.timingMarginWarnSec ?? 0.15

@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.113.0' as const
+export const APP_VERSION = '2.114.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-04-17' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'feat(grader): motor IA de sugerencias punto cero + tab Producto 3 capas + campos físicos Z2' as const
+export const VERSION_NAME = 'feat(grader): FASES 4-5-6 — modelo multi-cinta tipado + modales de medición SKF/slow-mo + audit trail' as const
 
 /**
  * Nota:

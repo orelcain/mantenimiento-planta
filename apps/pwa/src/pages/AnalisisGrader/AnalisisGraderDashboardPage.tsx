@@ -51,6 +51,7 @@ import 'chartjs-adapter-date-fns'
 import { useAuthStore } from '@/store'
 import { cn } from '@/lib/utils'
 import { computeAnalytics } from '@/services/grader/graderAnalytics'
+import { getGradingBelt } from '@/services/grader/graderBeltHelpers'
 import { computeDeterministicInsights, computePointZeroTrend } from '@/services/grader/graderInsights'
 import { analyzeGrader, parseAIResponse } from '@/services/ai/aiProvider'
 import { saveGraderSession, listGraderSessions } from '@/services/grader/graderSession.service'
@@ -378,7 +379,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
       physicalContext: (() => {
         const pc = config.physicalConfig
         if (!pc) return undefined
-        const mainBelt = pc.belts.find((b) => b.beltId === 'main')
+        const mainBelt = getGradingBelt(pc)
         if (!mainBelt || mainBelt.speedMps <= 0) return undefined
         const ratePerHour = analytics.kpis.productionRatePerHour ?? 0
         const ratePerSec = ratePerHour / 3600

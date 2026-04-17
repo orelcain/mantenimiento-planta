@@ -26,6 +26,7 @@ import type {
   GraderQuality,
   PneumaticConfig,
 } from './types'
+import { getGradingBelt } from './graderBeltHelpers'
 
 // ── Tipos públicos ──────────────────────────────────────────────────────────
 
@@ -323,8 +324,8 @@ export function computeGateTimingSignals(
   if (!physicalConfig || !physicalConfig.flipperPositions || physicalConfig.flipperPositions.length === 0) {
     return []
   }
-  const mainBelt = physicalConfig.belts.find((b) => b.beltId === 'main')
-  const beltSpeedMps = mainBelt?.speedMps ?? 1.28
+  const mainBelt = getGradingBelt(physicalConfig)
+  const beltSpeedMps = mainBelt?.speedMps ?? 0.70
   if (beltSpeedMps <= 0) return []
 
   const marginOk = thresholdOverrides?.marginOkSec ?? DEFAULT_MARGIN_OK_SEC

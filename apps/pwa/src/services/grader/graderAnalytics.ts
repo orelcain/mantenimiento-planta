@@ -147,7 +147,7 @@ export const DEFAULT_PHYSICAL_CONFIG = {
       label:              'Z-Conveyor ❷ (cinta elevadora)',
       lengthMeters:       3.0,
       widthMeters:        1.20,    // 1200mm — especificación del fabricante
-      speedMps:           0.39,    // Z2: 494u × 0.000786
+      speedMps:           0.42,    // Operativo típico — ajustable via TachModal (SKF). Z2 calc = 0.39 (494u × 0.000786)
       z2Units:            494,
       calibrationStatus:  'estimated' as const,
       // VFD: VLT AutomationDrive, label "CintaZ" (foto 2026-04-11)
@@ -206,7 +206,7 @@ export const DEFAULT_PHYSICAL_CONFIG = {
       label:              'Grading Belt ❹ (17.2 m, 12 compuertas)',
       lengthMeters:       17.179,  // 17179mm — plano exterior manual MS4_12
       widthMeters:        0.30,    // 300mm — especificación del fabricante
-      speedMps:           1.28,    // Z2: 1631u × 0.000786 (casi constante en turno)
+      speedMps:           0.70,    // Operativo típico — ajustable via TachModal (SKF). Z2 calc típico = 1.28 (1631u × 0.000786); planta opera más lento
       z2Units:            1631,
       calibrationStatus:  'estimated' as const,
       // VFD: VLT AutomationDrive, label "Grader" (foto 2026-04-11)

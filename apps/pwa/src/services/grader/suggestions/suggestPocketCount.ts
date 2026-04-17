@@ -1,4 +1,5 @@
 import type { GraderPhysicalConfig } from '../types'
+import { getGradingBeltSpeedMps } from '../graderBeltHelpers'
 import type { PointZeroSuggestion } from './types'
 
 interface Params {
@@ -21,7 +22,7 @@ export function suggestPocketCount({
   ignoredIds,
 }: Params): PointZeroSuggestion | null {
   const currentCount = physicalConfig.pocketCount
-  const speedMps = physicalConfig.belts.find((b) => b.beltId === 'main')?.speedMps ?? 0.7
+  const speedMps = getGradingBeltSpeedMps(physicalConfig)
   const salmonLengthM = physicalConfig.avgSalmonLengthCm / 100
 
   // Caso 1: solapamiento → sugerir menos pockets si hay ≥ 3

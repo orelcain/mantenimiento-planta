@@ -8,7 +8,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { useSuggestionEngine } from '@/services/grader/suggestions/useSuggestionEngine'
 import { SuggestionsPanel } from '@/components/grader/SuggestionsPanel'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch, Label } from '@/components/ui'
-import { Save, FolderOpen, ChevronRight, Trash2, ChevronDown, Plus } from 'lucide-react'
+import { Save, FolderOpen, ChevronRight, Trash2, ChevronDown, Plus, Gauge, Camera } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore, useIsAdmin } from '@/store'
 import {
@@ -33,7 +33,13 @@ import type {
   CalibrationStatus,
 } from '@/services/grader/types'
 import { CALIBRE_WEIGHT_RANGES, DEFAULT_PHYSICAL_CONFIG, computeZetaBeltSpeedMps, computeBeltSpeedFromVfd, estimateZetaThroughput } from '@/services/grader/graderAnalytics'
+import { getGradingBelt, GRADING_BELT_DEFAULT_MPS, Z_BELT_DEFAULT_MPS, BELT_FLOW_ORDER, getBeltLabel } from '@/services/grader/graderBeltHelpers'
+import type { GraderBeltId } from '@/services/grader/graderBeltHelpers'
 import { DEFAULT_PNEUMATIC_CONFIG, computeLinePressureDrop, computeLineChargeTime, computeCylinderStrokeTime } from '@/services/grader/graderGateTiming'
+import { TachMeasurementModal } from '@/components/grader/modals/TachMeasurementModal'
+import { SlowMoMeasurementModal } from '@/components/grader/modals/SlowMoMeasurementModal'
+import { useConfigChangeLogger } from '@/services/grader/useConfigChangeLogger'
+import { listRecentConfigChanges, labelForField, type ConfigChangeEntry } from '@/services/grader/graderConfigChangeLog.service'
 import { InfoTooltip } from '@/components/ui'
 import { getTooltipProps } from '@/services/grader/graderTooltips'
 import type { PneumaticConfig } from '@/services/grader/types'
@@ -442,14 +448,34 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
   const [showPhysicalConfig, setShowPhysicalConfig] = useState(false)
   const [fisicaSubTab, setFisicaSubTab] = useState<'producto' | 'cintas' | 'distancias' | 'calibracion'>('producto')
   const [calibracionSubTab, setCalibracionSubTab] = useState<'danfoss' | 'neumatica' | 'verificacion'>('danfoss')
-  const [physicalConfig, setPhysicalConfig] = useState<GraderPhysicalConfig>(DEFAULT_PHYSICAL_CONFIG)
+  const [physicalConfig, _setPhysicalConfigRaw] = useState<GraderPhysicalConfig>(DEFAULT_PHYSICAL_CONFIG)
+  // FASE 6 — logger de cambios: cada setPhysicalConfig persiste diff en Firestore
+  const setPhysicalConfig = useConfigChangeLogger(physicalConfig, _setPhysicalConfigRaw)
   const [loadedSchedule, setLoadedSchedule] = useState(DEFAULT_SHIFT_SCHEDULE)
+  // FASE 5 — Modales de medición
+  const [tachModalBelt, setTachModalBelt] = useState<GraderBeltId | null>(null)
+  const [slowMoModalGate, setSlowMoModalGate] = useState<number | null>(null)
+  // FASE 6 — historial de cambios (últimos 10)
+  const [changeLog, setChangeLog] = useState<ConfigChangeEntry[]>([])
+  const [changeLogLoading, setChangeLogLoading] = useState(false)
   const user = useAuthStore((s) => s.user)
   const isAdmin = useIsAdmin()
   // Guard: autosave no dispara hasta que la carga inicial desde Firestore complete.
   // Previene sobreescribir datos reales con DEFAULTs si la red es lenta.
   const moduleConfigLoadedRef = useRef(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
+
+  // FASE 6 — recargar historial cuando se entra al tab Producto o cambian datos
+  useEffect(() => {
+    if (fisicaSubTab !== 'producto') return
+    let cancelled = false
+    setChangeLogLoading(true)
+    listRecentConfigChanges(10)
+      .then((entries) => { if (!cancelled) setChangeLog(entries) })
+      .catch((err) => console.warn('[changeLog] error cargando:', err))
+      .finally(() => { if (!cancelled) setChangeLogLoading(false) })
+    return () => { cancelled = true }
+  }, [fisicaSubTab, physicalConfig])
 
   const sortRanges = (ranges: CalibreWeightRange[]) =>
     [...ranges].sort((a, b) => a.minGrams - b.minGrams)
@@ -589,8 +615,8 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
   }, [parsedData.pieceRecords])
 
   // Cálculos de cadencia/ratio para el motor de sugerencias (misma lógica que tab Producto)
-  const _sgBelt = physicalConfig.belts.find((b) => b.beltId === 'main')
-  const _sgSpeed = _sgBelt?.speedMps ?? 0.7
+  const _sgBelt = getGradingBelt(physicalConfig)
+  const _sgSpeed = _sgBelt?.speedMps ?? GRADING_BELT_DEFAULT_MPS
   const _sgLengthM = physicalConfig.avgSalmonLengthCm / 100
   const _sgCadenceHistorical = historicalMedianG?.productionRatePerHour
     ? historicalMedianG.productionRatePerHour / 60
@@ -1377,8 +1403,8 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
             {/* ── TAB PRODUCTO ── */}
             {fisicaSubTab === 'producto' && (() => {
               // Cálculos compartidos entre Hero, Equipo y Diagnóstico
-              const mainBelt = physicalConfig.belts.find((b) => b.beltId === 'main')
-              const speedMps = mainBelt?.speedMps ?? 0.7
+              const mainBelt = getGradingBelt(physicalConfig)
+              const speedMps = mainBelt?.speedMps ?? GRADING_BELT_DEFAULT_MPS
               const salmonLengthM = physicalConfig.avgSalmonLengthCm / 100
               const cadenceFromHistorical = historicalMedianG?.productionRatePerHour
                 ? historicalMedianG.productionRatePerHour / 60
@@ -1784,70 +1810,194 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
               )
             })()}
 
-            {/* Cintas */}
+            {/* Historial de cambios — visible cuando se está en Producto */}
+            {fisicaSubTab === 'producto' && (
+              <div className="mt-4 border-t pt-3">
+                <details>
+                  <summary className="text-xs font-medium cursor-pointer select-none flex items-center gap-2 text-muted-foreground hover:text-foreground">
+                    <ChevronRight className="w-3 h-3 transition-transform group-open:rotate-90" />
+                    Historial de cambios
+                    {changeLog.length > 0 && (
+                      <Badge variant="outline" className="text-[10px] ml-1">
+                        {changeLogLoading ? '…' : `últimos ${changeLog.length}`}
+                      </Badge>
+                    )}
+                  </summary>
+                  <div className="mt-2 space-y-1">
+                    {changeLog.length === 0 && !changeLogLoading && (
+                      <p className="text-xs text-muted-foreground italic">Sin cambios registrados aún.</p>
+                    )}
+                    {changeLog.map((entry) => {
+                      const when = new Date(entry.changedAt)
+                      const timeStr = when.toLocaleString('es-CL', {
+                        day: '2-digit', month: '2-digit',
+                        hour: '2-digit', minute: '2-digit',
+                      })
+                      const pv = entry.prevValue
+                      const nv = entry.nextValue
+                      const fmt = (v: unknown): string => {
+                        if (v === undefined || v === null) return '—'
+                        if (typeof v === 'number') return String(Math.round(v * 1000) / 1000)
+                        if (typeof v === 'boolean') return v ? 'sí' : 'no'
+                        if (typeof v === 'string') return v
+                        return JSON.stringify(v).slice(0, 40)
+                      }
+                      return (
+                        <div key={entry.id} className="flex items-center gap-2 text-[11px] py-1 border-b border-muted/50 last:border-0">
+                          <span className="text-[10px] text-muted-foreground font-mono tabular-nums min-w-[80px]">
+                            {timeStr}
+                          </span>
+                          <span className="font-medium text-xs flex-1 truncate" title={entry.field}>
+                            {labelForField(entry.field)}
+                          </span>
+                          <span className="text-[10px] font-mono text-muted-foreground">
+                            {fmt(pv)} → <span className="text-foreground">{fmt(nv)}</span>
+                          </span>
+                          {entry.reason && (
+                            <Badge variant="outline" className="text-[9px]">{entry.reason}</Badge>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </details>
+              </div>
+            )}
+
+            {/* Cintas — 4 cards individuales en orden de flujo */}
             {fisicaSubTab === 'cintas' && (
             <div>
-              <p className="text-sm font-medium mb-3">Cintas transportadoras</p>
-              <p className="text-xs text-muted-foreground mb-2">
-                Flujo MS4/12: Static Weighing ❶ (pockets) → Z-Conveyor ❷ → Accel Belt 1 ❸ → Accel Belt 2 ❸
-                <span className="text-primary font-medium"> [fotocélula]</span> → Grading Belt ❹
-              </p>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-left">
-                      <th className="py-2 px-2">Cinta</th>
-                      <th className="py-2 px-2 text-right">Largo (m)</th>
-                      <th className="py-2 px-2 text-right">Velocidad (m/s)</th>
-                      <th className="py-2 px-2 text-right text-muted-foreground text-xs">Tránsito</th>
-                      <th className="py-2 px-2 text-right text-muted-foreground text-xs">Estado</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {physicalConfig.belts.map((belt) => {
-                      const transitSec = belt.speedMps > 0 ? belt.lengthMeters / belt.speedMps : 0
-                      return (
-                        <tr key={belt.beltId} className={cn('border-b hover:bg-muted/30', belt.beltId === 'main' && 'bg-primary/5')}>
-                          <td className="py-2 px-2 text-xs font-medium">
-                            {belt.label}
-                            {belt.beltId === 'main' && (
-                              <Badge className="ml-2 text-[10px] bg-primary/10 text-primary border-primary/30">Principal</Badge>
+              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                <div>
+                  <p className="text-sm font-medium">Cintas transportadoras</p>
+                  <p className="text-xs text-muted-foreground">
+                    Flujo: Pockets ❶ → <span className="font-mono">Z-Belt</span> ❷ → <span className="font-mono">Accel 1</span> → <span className="font-mono">Accel 2</span>
+                    <span className="text-primary font-medium"> [fotocélula]</span> → <span className="font-mono font-semibold">Grading ❹</span>
+                  </p>
+                </div>
+                <Badge variant="outline" className="text-[10px]">
+                  Medir con tach SKF para calibrar
+                </Badge>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {BELT_FLOW_ORDER.map((beltId, idx) => {
+                  const belt = physicalConfig.belts.find((b) => b.beltId === beltId)
+                  if (!belt) return null
+                  const transitSec = belt.speedMps > 0 ? belt.lengthMeters / belt.speedMps : 0
+
+                  // Ratio vs cinta anterior en el flujo (excepto zBelt que es la primera)
+                  const prevBeltId = BELT_FLOW_ORDER[idx - 1]
+                  const prevBelt = prevBeltId ? physicalConfig.belts.find((b) => b.beltId === prevBeltId) : undefined
+                  const ratio = prevBelt && prevBelt.speedMps > 0 ? belt.speedMps / prevBelt.speedMps : null
+
+                  // Responsabilidad por cinta
+                  const responsibility: Record<GraderBeltId, { icon: string; role: string; accent: string }> = {
+                    zeta:   { icon: '❷', role: 'Elevadora',    accent: 'bg-blue-500/5 border-blue-500/30' },
+                    accel1: { icon: '❸', role: 'Aceleración 1', accent: 'bg-amber-500/5 border-amber-500/30' },
+                    accel2: { icon: '❸', role: 'Aceleración 2 [Detection Eye]', accent: 'bg-amber-500/10 border-amber-500/40' },
+                    main:   { icon: '❹', role: 'Clasificadora principal',  accent: 'bg-primary/5 border-primary/40' },
+                  }
+                  const resp = responsibility[beltId]
+
+                  return (
+                    <Card key={beltId} className={cn('border', resp.accent)}>
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <CardTitle className="text-sm flex items-center gap-2">
+                            <span className="text-xs opacity-70">{resp.icon}</span>
+                            {getBeltLabel(beltId)}
+                            {beltId === 'main' && (
+                              <Badge className="text-[10px] bg-primary/10 text-primary border-primary/30">Principal</Badge>
                             )}
-                          </td>
-                          <td className="py-2 px-2 text-right">
+                          </CardTitle>
+                          <CalibBadge status={belt.calibrationStatus} />
+                        </div>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">{resp.role}</p>
+                      </CardHeader>
+                      <CardContent className="pt-0 space-y-2">
+                        {/* Largo + velocidad en grid 2-col */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <Label className="text-[10px] text-muted-foreground">Largo (m)</Label>
                             <Input
                               type="number"
                               step="0.1"
                               min="0.1"
                               value={belt.lengthMeters}
                               onChange={(e) => updateBeltLength(belt.beltId, Number(e.target.value))}
-                              className="h-8 text-xs w-20 font-mono ml-auto"
+                              className="h-8 text-xs font-mono"
                             />
-                          </td>
-                          <td className="py-2 px-2 text-right">
+                          </div>
+                          <div>
+                            <Label className="text-[10px] text-muted-foreground">Velocidad (m/s)</Label>
                             <Input
                               type="number"
                               step="0.01"
                               min="0.01"
                               value={belt.speedMps}
                               onChange={(e) => updateBeltSpeed(belt.beltId, Number(e.target.value))}
-                              className="h-8 text-xs w-24 font-mono ml-auto"
+                              className="h-8 text-xs font-mono"
                             />
-                          </td>
-                          <td className="py-2 px-2 text-right text-xs text-muted-foreground font-mono">
-                            {transitSec.toFixed(1)} s
-                          </td>
-                          <td className="py-2 px-2 text-right">
-                            <CalibBadge status={belt.calibrationStatus} />
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
+                          </div>
+                        </div>
+
+                        {/* Métricas derivadas */}
+                        <div className="flex items-center gap-3 text-[10px] text-muted-foreground flex-wrap">
+                          <span className="font-mono">Tránsito {transitSec.toFixed(1)}s</span>
+                          {belt.widthMeters && (
+                            <span className="font-mono">Ancho {(belt.widthMeters * 1000).toFixed(0)}mm</span>
+                          )}
+                          {belt.z2Units && (
+                            <span className="font-mono">Z2 {belt.z2Units}u</span>
+                          )}
+                          {ratio !== null && (
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                'text-[10px]',
+                                ratio >= 2 ? 'border-green-500/40 text-green-700 dark:text-green-400' :
+                                ratio >= 1.2 ? 'border-amber-500/40 text-amber-700 dark:text-amber-400' :
+                                'border-red-500/40 text-red-700 dark:text-red-400',
+                              )}
+                            >
+                              ×{ratio.toFixed(2)} vs {getBeltLabel(prevBeltId!)}
+                            </Badge>
+                          )}
+                        </div>
+
+                        {/* Medición tach SKF */}
+                        <div className="flex items-center justify-between gap-2 border-t pt-1.5">
+                          {belt.vfd?.measuredAt ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                              <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                              Medido {new Date(belt.vfd.measuredAt).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' })}
+                              {belt.vfd.measuredBeltMps && (
+                                <span className="font-mono ml-1">{belt.vfd.measuredBeltMps.toFixed(3)} m/s</span>
+                              )}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-muted-foreground italic">Sin medición tach</span>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 text-[10px] px-2"
+                            onClick={() => setTachModalBelt(beltId)}
+                          >
+                            <Gauge className="w-3 h-3 mr-1" /> SKF
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                <span className="text-amber-600 font-medium">⚠ Estimado</span> = derivado de unidades Z2 × factor k (pendiente verificar con tachómetro). Ver sección "Calibración".
+
+              <p className="text-xs text-muted-foreground mt-3">
+                <span className="text-amber-600 font-medium">⚠ Estimado</span> = derivado de unidades Z2 × factor k.
+                Defaults operativos: grading {GRADING_BELT_DEFAULT_MPS} m/s · Z-belt {Z_BELT_DEFAULT_MPS} m/s.
+                Para verificar en planta usa el <strong>tachómetro SKF</strong> en cada cinta y registra la medición (FASE 5).
               </p>
             </div>
             )}
@@ -1980,8 +2130,8 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                 Distancia física en metros desde el sensor fotocélula (final de Aceleración 2) hasta cada flipper en la cinta clasificadora.
               </p>
               {(() => {
-                const mainBelt = physicalConfig.belts.find((b) => b.beltId === 'main')
-                const speedMps = mainBelt?.speedMps ?? 0.7
+                const mainBelt = getGradingBelt(physicalConfig)
+                const speedMps = mainBelt?.speedMps ?? GRADING_BELT_DEFAULT_MPS
                 return (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
@@ -1991,6 +2141,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                           <th className="py-2 px-2">Distancia desde sensor (m)</th>
                           <th className="py-2 px-2 text-right text-muted-foreground text-xs">Tiempo de reacción</th>
                           <th className="py-2 px-2 text-right text-muted-foreground text-xs">Alerta</th>
+                          <th className="py-2 px-2 text-right text-muted-foreground text-xs w-20">Slow-mo</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -2026,6 +2177,17 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                                   {isWarning && (
                                     <Badge className="text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">Ajustado</Badge>
                                   )}
+                                </td>
+                                <td className="py-2 px-2 text-right">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-6 text-[10px] px-2"
+                                    onClick={() => setSlowMoModalGate(fp.gateNumber)}
+                                    title="Medir reset mecánico con slow-mo 240fps"
+                                  >
+                                    <Camera className="w-3 h-3" />
+                                  </Button>
                                 </td>
                               </tr>
                             )
@@ -2218,8 +2380,8 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
               </p>
               {(() => {
                 const z2Vals = physicalConfig.z2ProgrammedDistancesMm ?? []
-                const mainBelt = physicalConfig.belts.find((b) => b.beltId === 'main')
-                const speedMps = mainBelt?.speedMps ?? 0.7
+                const mainBelt = getGradingBelt(physicalConfig)
+                const speedMps = mainBelt?.speedMps ?? GRADING_BELT_DEFAULT_MPS
                 const physPos = physicalConfig.flipperPositions.slice().sort((a, b) => a.gateNumber - b.gateNumber)
                 return (
                   <div className="overflow-x-auto">
@@ -2529,6 +2691,47 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
       </Card>
       )} {/* /3.4 */}
 
+      {/* ── FASE 5: Modales de medición ── */}
+      {tachModalBelt && (
+        <TachMeasurementModal
+          open={!!tachModalBelt}
+          onOpenChange={(open) => { if (!open) setTachModalBelt(null) }}
+          beltId={tachModalBelt}
+          currentSpeedMps={physicalConfig.belts.find((b) => b.beltId === tachModalBelt)?.speedMps ?? 0}
+          effectiveMpsPerRpm={physicalConfig.belts.find((b) => b.beltId === tachModalBelt)?.vfd?.effectiveMpsPerRpm}
+          onApply={(patch) => setPhysicalConfig((p) => ({ ...p, ...patch }))}
+          applyPatchBuilder={(beltMps, measuredAt) => ({
+            belts: physicalConfig.belts.map((b) =>
+              b.beltId === tachModalBelt
+                ? {
+                    ...b,
+                    speedMps: Math.round(beltMps * 1000) / 1000,
+                    calibrationStatus: 'verified' as const,
+                    vfd: {
+                      ...(b.vfd ?? {}),
+                      measuredBeltMps: Math.round(beltMps * 1000) / 1000,
+                      measuredAt,
+                      truthSource: 'tachLinear' as const,
+                    },
+                  }
+                : b,
+            ),
+          })}
+        />
+      )}
+      {slowMoModalGate !== null && (
+        <SlowMoMeasurementModal
+          open={slowMoModalGate !== null}
+          onOpenChange={(open) => { if (!open) setSlowMoModalGate(null) }}
+          gateNumber={slowMoModalGate}
+          currentResetSec={physicalConfig.flipperMechanicalResetS}
+          onApply={(seconds, measuredAtMs) => setPhysicalConfig((p) => ({
+            ...p,
+            flipperMechanicalResetS: Math.round(seconds * 1000) / 1000,
+            flipperMechanicalMeasuredAt: measuredAtMs,
+          }))}
+        />
+      )}
     </div>
   )
 }
