@@ -441,7 +441,11 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
     return () => clearTimeout(timer)
   }, [saveStatus])
 
-  // Sync auto-sugeridas: cuando auto=true, aplicar suggestedDimensions al physicalConfig
+  // Sync auto-sugeridas: aplicar suggestedDimensions al physicalConfig cuando:
+  //   a) suggestedDimensions cambia (especie o peso mediano)
+  //   b) el usuario toggle Auto ON (autoSuggestions.* → true)
+  //   c) physicalConfig se carga de Firestore con autoSuggestions=true y ya hay datos
+  // Sin loop: si el valor ya está sincronizado, setPhysicalConfig retorna el mismo objeto.
   useEffect(() => {
     if (!suggestedDimensions) return
     setPhysicalConfig((p) => {
@@ -457,7 +461,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
       }
       return changed ? next : p
     })
-  }, [suggestedDimensions])
+  }, [suggestedDimensions, physicalConfig.autoSuggestions?.avgSalmonLengthCm, physicalConfig.autoSuggestions?.avgSalmonWidthCm])
 
   // Propagar cambios al parent (debounce) — reemplaza al antiguo botón "Aplicar configuración".
   // El parent (Wizard) necesita gates + config + physicalConfig actualizados para que el
