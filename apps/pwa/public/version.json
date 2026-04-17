@@ -1,7 +1,7 @@
 {
-  "version": "2.96.0",
+  "version": "2.97.0",
   "buildDate": "2026-04-16",
-  "buildTimestamp": 1776389475330,
+  "buildTimestamp": 1776389582217,
   "features": [
     "Home móvil: bandas 'EN DESARROLLO' en módulos incompletos con liberación admin via Firestore",
     "Home móvil: QR para compartir app + botón menú en header",

@@ -13,6 +13,28 @@ export interface RichTooltip {
 export type TooltipEntry = string | RichTooltip
 
 export const GRADER_TOOLTIPS: Record<string, TooltipEntry> = {
+  // ─── Umbrales de configuración ─────────────────────────────
+  'cfg.photocellWarn': {
+    title: 'Umbral Fotocélula',
+    text: 'Porcentaje de piezas no detectadas por la fotocélula de entrada. Si supera este umbral, el análisis emite una alerta de calidad de lectura.',
+    example: 'Valor típico: 1%. >3% indica suciedad en el sensor o velocidad excesiva.',
+  },
+  'cfg.outOfLimitsWarn': {
+    title: 'Umbral Fuera de Límites',
+    text: 'Porcentaje de piezas rechazadas por estar fuera de todos los rangos de calibre configurados. Indica pescado fuera de especificación.',
+    example: 'Valor típico: 3%. >5% puede indicar mezcla de lotes o calibrado incorrecto.',
+  },
+  'cfg.pointZeroWarn': {
+    title: 'Umbral Punto Cero — Alerta',
+    text: 'Porcentaje de piezas en Gate 0 (descarte) que activa la alerta amarilla. La meta operacional es mantenerlo por debajo de este valor.',
+    example: 'Valor típico: 2%. Revisar configuración de gates si supera este límite.',
+  },
+  'cfg.pointZeroCritical': {
+    title: 'Umbral Punto Cero — Crítico',
+    text: 'Porcentaje de piezas en Gate 0 que activa la alerta roja. Requiere intervención inmediata del operador o técnico.',
+    example: 'Valor típico: 3.5%. Debe ser mayor que el umbral de alerta.',
+  },
+
   // ─── KPIs ──────────────────────────────────────────────────
   'kpi.totalPieces': 'Total de piezas procesadas por la grader en el período analizado, incluyendo productivas y Punto Cero.',
   'kpi.pointZero': 'Piezas que no fueron clasificadas y cayeron al Gate 0 (cinta de descarte). Se busca que sea < 2%.',

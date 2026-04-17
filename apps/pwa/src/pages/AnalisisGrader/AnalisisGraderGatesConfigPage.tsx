@@ -377,7 +377,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
               />
             </div>
             <div>
-              <Label className="text-xs">Turno / Shift ID</Label>
+              <Label className="text-xs">Turno activo</Label>
               <Select
                 value={config.shiftId || 'Turno noche'}
                 onValueChange={(v) => setConfig((c) => ({ ...c, shiftId: v }))}
@@ -423,10 +423,13 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
           <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Umbrales de alerta</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
-              <Label className="text-xs">Umbral Fotocélula (%)</Label>
+              <div className="flex items-center gap-1">
+                <Label className="text-xs">Umbral Fotocélula (%)</Label>
+                <InfoTooltip {...getTooltipProps('cfg.photocellWarn')} iconSize={11} />
+              </div>
               <Input
                 type="number"
-                step="0.5"
+                min={0} max={100} step={0.5}
                 value={config.errorThresholds?.photocellPctWarn ?? 1}
                 onChange={(e) =>
                   setConfig((c) => ({
@@ -436,12 +439,16 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                 }
                 className="mt-1"
               />
+              <p className="text-[10px] text-muted-foreground mt-1">Típico: 1–3%</p>
             </div>
             <div>
-              <Label className="text-xs">Umbral Fuera de Límites (%)</Label>
+              <div className="flex items-center gap-1">
+                <Label className="text-xs">Fuera de Límites (%)</Label>
+                <InfoTooltip {...getTooltipProps('cfg.outOfLimitsWarn')} iconSize={11} />
+              </div>
               <Input
                 type="number"
-                step="0.5"
+                min={0} max={100} step={0.5}
                 value={config.errorThresholds?.outOfLimitsPctWarn ?? 3}
                 onChange={(e) =>
                   setConfig((c) => ({
@@ -451,12 +458,16 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                 }
                 className="mt-1"
               />
+              <p className="text-[10px] text-muted-foreground mt-1">Típico: 3–5%</p>
             </div>
             <div>
-              <Label className="text-xs">Umbral Punto Cero (%)</Label>
+              <div className="flex items-center gap-1">
+                <Label className="text-xs">Punto Cero — Alerta (%)</Label>
+                <InfoTooltip {...getTooltipProps('cfg.pointZeroWarn')} iconSize={11} />
+              </div>
               <Input
                 type="number"
-                step="0.5"
+                min={0} max={100} step={0.5}
                 value={config.errorThresholds?.pointZeroPctWarn ?? 2}
                 onChange={(e) =>
                   setConfig((c) => ({
@@ -466,12 +477,16 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                 }
                 className="mt-1"
               />
+              <p className="text-[10px] text-muted-foreground mt-1">Meta: &lt;2%</p>
             </div>
             <div>
-              <Label className="text-xs">Umbral Punto Cero Crítico (%)</Label>
+              <div className="flex items-center gap-1">
+                <Label className="text-xs">Punto Cero — Crítico (%)</Label>
+                <InfoTooltip {...getTooltipProps('cfg.pointZeroCritical')} iconSize={11} />
+              </div>
               <Input
                 type="number"
-                step="0.5"
+                min={0} max={100} step={0.5}
                 value={config.errorThresholds?.pointZeroPctCritical ?? Math.max((config.errorThresholds?.pointZeroPctWarn ?? 2) + 0.5, (config.errorThresholds?.pointZeroPctWarn ?? 2) * 1.5)}
                 onChange={(e) =>
                   setConfig((c) => ({
@@ -481,6 +496,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                 }
                 className="mt-1"
               />
+              <p className="text-[10px] text-muted-foreground mt-1">Debe ser &gt; alerta</p>
             </div>
           </div>
 
