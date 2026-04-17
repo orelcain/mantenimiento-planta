@@ -882,6 +882,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
       {/* 3.4 Configuración Física de la Máquina */}
       {(!tabbed || activeTab === 'fisica') && (
       <Card className="relative">
+        {!tabbed && (
         <CardHeader
           className="cursor-pointer select-none"
           onClick={() => setShowPhysicalConfig(!showPhysicalConfig)}
@@ -894,7 +895,8 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
             </Badge>
           </CardTitle>
         </CardHeader>
-        {showPhysicalConfig && (
+        )}
+        {(tabbed || showPhysicalConfig) && (
           <CardContent className="space-y-6">
             <p className="text-xs text-muted-foreground">
               Parámetros físicos de la <span className="font-medium text-foreground">Marelec MS4/12</span> (S/N 3943, controlador Z2).
