@@ -1,10 +1,10 @@
 {
-  "version": "2.112.1",
+  "version": "2.113.0",
   "buildDate": "2026-04-17",
-  "buildTimestamp": 1776412986944,
+  "buildTimestamp": 1776449684532,
   "features": [
-    "Home móvil: bandas 'EN DESARROLLO' en módulos incompletos con liberación admin via Firestore",
-    "Home móvil: QR para compartir app + botón menú en header",
-    "HMI Grader movido a Herramientas (sin duplicados en Formación)"
+    "Grader: tab Producto rediseñado en 3 capas progresivas (Hero + Equipo + Diagnóstico)",
+    "Grader: motor IA de sugerencias punto cero con 5 generadores (FishBase, anchura, pockets, reset, cadencia)",
+    "Grader: 10 nuevos campos físicos Z2 editables (timing flippers, gates, max bin weight)"
   ]
 }

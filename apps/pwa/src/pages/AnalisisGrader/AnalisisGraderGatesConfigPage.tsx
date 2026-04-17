@@ -5,6 +5,8 @@
  */
 
 import { useState, useEffect, useMemo, useRef } from 'react'
+import { useSuggestionEngine } from '@/services/grader/suggestions/useSuggestionEngine'
+import { SuggestionsPanel } from '@/components/grader/SuggestionsPanel'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch, Label } from '@/components/ui'
 import { Save, FolderOpen, ChevronRight, Trash2, ChevronDown, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -585,6 +587,37 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
     }
     return { n: records.length, p10, p50, p90, cv, dominantCalibre, throughputPzPerMin, peakPzPerMin, windowMinutes }
   }, [parsedData.pieceRecords])
+
+  // Cálculos de cadencia/ratio para el motor de sugerencias (misma lógica que tab Producto)
+  const _sgBelt = physicalConfig.belts.find((b) => b.beltId === 'main')
+  const _sgSpeed = _sgBelt?.speedMps ?? 0.7
+  const _sgLengthM = physicalConfig.avgSalmonLengthCm / 100
+  const _sgCadenceHistorical = historicalMedianG?.productionRatePerHour
+    ? historicalMedianG.productionRatePerHour / 60
+    : historicalMedianG?.durationMinutes && historicalMedianG.durationMinutes > 0
+      ? historicalMedianG.totalPieces / historicalMedianG.durationMinutes
+      : null
+  const _sgCadence = batchStats?.throughputPzPerMin
+    ?? _sgCadenceHistorical
+    ?? (physicalConfig.pocketCount * 60) / 3.0
+  const _sgSpacing = _sgSpeed * (60 / _sgCadence)
+  const _sgRatio = _sgLengthM / _sgSpacing
+  const _sgCadenceSource: 'excel' | 'historical' | 'theoretical' =
+    batchStats?.throughputPzPerMin ? 'excel'
+    : _sgCadenceHistorical ? 'historical'
+    : 'theoretical'
+
+  const { suggestions } = useSuggestionEngine({
+    physicalConfig,
+    setPhysicalConfig,
+    medianWeightG: effectiveMedianG,
+    medianSource,
+    lengthToSpacingRatio: _sgRatio,
+    overlapping: _sgRatio >= 1,
+    cadencePiecesPerMin: _sgCadence,
+    cadenceSource: _sgCadenceSource,
+    historicalSummaries: fallbackSummaries,
+  })
 
   const updateWeightRange = (idx: number, patch: Partial<CalibreWeightRange>) => {
     const ranges: CalibreWeightRange[] = activeRanges.map((r, i) => {
@@ -1519,6 +1552,9 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                     </div>
                   </div>
 
+                  {/* ══ SUGERENCIAS IA ═══════════════════════════════════════════════ */}
+                  <SuggestionsPanel suggestions={suggestions} />
+
                   {/* ══ EQUIPO FLIPPER (collapsible, abierto) ═══════════════════════ */}
                   <details open className="group rounded-lg border border-slate-700/60 bg-slate-900/40">
                     <summary className="flex cursor-pointer items-center justify-between px-4 py-2.5 text-sm font-medium select-none hover:bg-slate-800/40 rounded-lg list-none">
@@ -1540,7 +1576,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                                 { label: 'Delay apertura',    field: 'flipperDelayOpenMs',   val: delayOpen,  z2: 'delayFlipperOpen' },
                                 { label: 'Mín. tiempo abierto', field: 'flipperMinOpenTimeMs', val: minOpen,   z2: 'minFlipperOpenTime' },
                                 { label: 'Delay cierre',      field: 'flipperDelayCloseMs',  val: delayClose, z2: 'delayFlipperClose' },
-                              ] as const).map(({ label, field, val, z2 }) => (
+                              ] as const).map(({ label, field, val }) => (
                                 <div key={field} className="flex items-center justify-between gap-2">
                                   <span className="text-muted-foreground whitespace-nowrap">{label}</span>
                                   <div className="flex items-center gap-1">

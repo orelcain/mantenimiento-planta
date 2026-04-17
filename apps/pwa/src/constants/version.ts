@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.112.1' as const
+export const APP_VERSION = '2.113.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-04-17' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'fix(grader): BeltVisualizer rediseñado como plano técnico con cotas acotadas' as const
+export const VERSION_NAME = 'feat(grader): motor IA de sugerencias punto cero + tab Producto 3 capas + campos físicos Z2' as const
 
 /**
  * Nota:
