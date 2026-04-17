@@ -104,6 +104,169 @@ function SaveIndicator({ status }: { status: 'idle' | 'saving' | 'saved' }) {
   )
 }
 
+/**
+ * Visualizador dinámico de la cinta: peces animados en escala real,
+ * con etiquetas de largo pez, gap libre y paso total.
+ */
+function BeltVisualizer({
+  speedMps,
+  salmonLengthM,
+  spacingM,
+  cadencePiecesPerMin,
+  overlapping,
+}: {
+  speedMps: number
+  salmonLengthM: number
+  spacingM: number
+  cadencePiecesPerMin: number
+  overlapping: boolean
+}) {
+  if (spacingM <= 0 || salmonLengthM <= 0) return null
+  const visibleMeters = Math.max(4, spacingM * 2.4)
+  const svgW = 600
+  const svgH = 100
+  const scale = svgW / visibleMeters
+  const fishLenPx = salmonLengthM * scale
+  const spacingPx = spacingM * scale
+  const gapPx = Math.max(0, spacingPx - fishLenPx)
+  const beltY = 55
+  const beltH = 24
+  const fishCY = beltY + beltH / 2
+  const fishRy = beltH / 2 - 2
+  const nFish = Math.ceil(svgW / Math.max(spacingPx, 20)) + 2
+  const fishArr = Array.from({ length: nFish }, (_, i) => i * spacingPx)
+  // Duración de animación: tiempo para avanzar 1 paso
+  const duration = spacingM / Math.max(speedMps, 0.01)
+  return (
+    <div className="mt-3 p-3 rounded-lg bg-slate-900/60 border border-slate-700/50">
+      <p className="text-[10px] text-muted-foreground mb-2 flex items-center justify-between">
+        <span>
+          Visualización en escala real — cinta {speedMps.toFixed(2)} m/s · cadencia {cadencePiecesPerMin.toFixed(0)} pz/min
+        </span>
+        <span className="text-[9px] text-muted-foreground/70">(ventana visible: {visibleMeters.toFixed(1)} m)</span>
+      </p>
+      <svg width="100%" viewBox={`0 0 ${svgW} ${svgH}`} preserveAspectRatio="xMidYMid meet" style={{ overflow: 'hidden' }}>
+        <defs>
+          <linearGradient id="bv-belt" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#1e293b" />
+            <stop offset="50%" stopColor="#334155" />
+            <stop offset="100%" stopColor="#1e293b" />
+          </linearGradient>
+          <linearGradient id="bv-fish" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#fb923c" />
+            <stop offset="100%" stopColor="#c2410c" />
+          </linearGradient>
+          <linearGradient id="bv-fish-warn" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#ef4444" />
+            <stop offset="100%" stopColor="#991b1b" />
+          </linearGradient>
+          <clipPath id="bv-clip">
+            <rect x="0" y="0" width={svgW} height={svgH} />
+          </clipPath>
+        </defs>
+
+        {/* Etiqueta paso total (barra medidora arriba del primer pez) */}
+        {spacingPx > 40 && (
+          <g opacity="0.9">
+            <line x1="20" y1="20" x2={20 + spacingPx} y2="20" stroke="#64748b" strokeWidth="1" strokeDasharray="2 2" />
+            <line x1="20" y1="16" x2="20" y2="24" stroke="#64748b" strokeWidth="1" />
+            <line x1={20 + spacingPx} y1="16" x2={20 + spacingPx} y2="24" stroke="#64748b" strokeWidth="1" />
+            <text x={20 + spacingPx / 2} y="14" textAnchor="middle" fontSize="9" fill="#94a3b8">
+              paso {(spacingM * 100).toFixed(0)} cm
+            </text>
+          </g>
+        )}
+
+        {/* Cinta */}
+        <rect x="0" y={beltY} width={svgW} height={beltH} fill="url(#bv-belt)" />
+        <line x1="0" y1={beltY} x2={svgW} y2={beltY} stroke="#475569" strokeWidth="1" />
+        <line x1="0" y1={beltY + beltH} x2={svgW} y2={beltY + beltH} stroke="#475569" strokeWidth="1" />
+        {/* Líneas de dirección (tracks) */}
+        {Array.from({ length: 10 }).map((_, i) => (
+          <line
+            key={`tr-${i}`}
+            x1={i * 60}
+            y1={beltY + beltH / 2}
+            x2={i * 60 + 20}
+            y2={beltY + beltH / 2}
+            stroke="#475569"
+            strokeWidth="0.5"
+            opacity="0.6"
+          />
+        ))}
+
+        {/* Peces animados */}
+        <g clipPath="url(#bv-clip)">
+          {fishArr.map((initialX, i) => (
+            <g key={i}>
+              <ellipse
+                cx={initialX + fishLenPx / 2}
+                cy={fishCY}
+                rx={fishLenPx / 2}
+                ry={fishRy}
+                fill={overlapping ? 'url(#bv-fish-warn)' : 'url(#bv-fish)'}
+                opacity="0.95"
+              >
+                <animateTransform
+                  attributeName="transform"
+                  type="translate"
+                  from="0 0"
+                  to={`${-spacingPx} 0`}
+                  dur={`${duration}s`}
+                  repeatCount="indefinite"
+                />
+              </ellipse>
+              {/* Ojito para dar dirección visual */}
+              <circle
+                cx={initialX + fishLenPx * 0.82}
+                cy={fishCY - 2}
+                r="1.5"
+                fill="#1f2937"
+              >
+                <animateTransform
+                  attributeName="transform"
+                  type="translate"
+                  from="0 0"
+                  to={`${-spacingPx} 0`}
+                  dur={`${duration}s`}
+                  repeatCount="indefinite"
+                />
+              </circle>
+            </g>
+          ))}
+        </g>
+
+        {/* Etiquetas fijas: largo pez + gap libre */}
+        {fishLenPx > 20 && (
+          <g>
+            <line x1={20} y1={beltY + beltH + 12} x2={20 + fishLenPx} y2={beltY + beltH + 12} stroke="#fb923c" strokeWidth="1.5" />
+            <line x1="20" y1={beltY + beltH + 8} x2="20" y2={beltY + beltH + 16} stroke="#fb923c" strokeWidth="1.5" />
+            <line x1={20 + fishLenPx} y1={beltY + beltH + 8} x2={20 + fishLenPx} y2={beltY + beltH + 16} stroke="#fb923c" strokeWidth="1.5" />
+            <text x={20 + fishLenPx / 2} y={beltY + beltH + 28} textAnchor="middle" fontSize="10" fill="#fb923c" fontWeight="600">
+              pez {(salmonLengthM * 100).toFixed(0)} cm
+            </text>
+          </g>
+        )}
+        {gapPx > 20 && (
+          <g>
+            <line x1={20 + fishLenPx} y1={beltY + beltH + 12} x2={20 + spacingPx} y2={beltY + beltH + 12} stroke={overlapping ? '#ef4444' : '#10b981'} strokeWidth="1.5" />
+            <line x1={20 + fishLenPx} y1={beltY + beltH + 8} x2={20 + fishLenPx} y2={beltY + beltH + 16} stroke={overlapping ? '#ef4444' : '#10b981'} strokeWidth="1.5" />
+            <line x1={20 + spacingPx} y1={beltY + beltH + 8} x2={20 + spacingPx} y2={beltY + beltH + 16} stroke={overlapping ? '#ef4444' : '#10b981'} strokeWidth="1.5" />
+            <text x={20 + fishLenPx + gapPx / 2} y={beltY + beltH + 28} textAnchor="middle" fontSize="10" fill={overlapping ? '#ef4444' : '#10b981'} fontWeight="600">
+              gap {((spacingM - salmonLengthM) * 100).toFixed(0)} cm
+            </text>
+          </g>
+        )}
+
+        {/* Flecha dirección */}
+        <g transform={`translate(${svgW - 45}, ${beltY - 6})`}>
+          <text fontSize="9" fill="#94a3b8">→ {speedMps.toFixed(2)} m/s</text>
+        </g>
+      </svg>
+    </div>
+  )
+}
+
 interface BatchStats {
   n: number
   p10: number
@@ -1423,6 +1586,13 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                       <p className="text-[10px] text-muted-foreground">
                         Alternativa con {pocketCountAlt} pockets: {cadenceAlt.toFixed(0)} pz/min · gap libre {Math.max(0, spacingAlt - salmonLengthM).toFixed(2)} m · ratio {(salmonLengthM / spacingAlt).toFixed(2)}
                       </p>
+                      <BeltVisualizer
+                        speedMps={speedMps}
+                        salmonLengthM={salmonLengthM}
+                        spacingM={spacingM}
+                        cadencePiecesPerMin={cadencePiecesPerMin}
+                        overlapping={overlapping}
+                      />
                     </div>
                   </div>
                 )

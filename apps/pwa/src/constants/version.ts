@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.111.1' as const
+export const APP_VERSION = '2.112.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-04-17' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'fix(grader): análisis pockets muestra gap libre (cola-a-cabeza) en vez de centro-a-centro' as const
+export const VERSION_NAME = 'feat(grader): BeltVisualizer SVG — peces animados en escala real con medidas dinámicas' as const
 
 /**
  * Nota:
