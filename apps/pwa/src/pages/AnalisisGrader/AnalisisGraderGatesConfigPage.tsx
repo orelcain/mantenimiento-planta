@@ -6,7 +6,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch, Label } from '@/components/ui'
-import { Save, FolderOpen, ChevronRight, ChevronLeft, Trash2, ChevronDown, RotateCcw, Plus } from 'lucide-react'
+import { Save, FolderOpen, ChevronRight, ChevronLeft, Trash2, ChevronDown, RotateCcw, Plus, Lock, Pencil } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore, useIsAdmin } from '@/store'
 import {
@@ -83,6 +83,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
   const [rangesError, setRangesError] = useState<string | null>(null)
   const [shiftSchedule, setShiftSchedule] = useState(DEFAULT_SHIFT_SCHEDULE)
   const [showPhysicalConfig, setShowPhysicalConfig] = useState(false)
+  const [editingEquipo, setEditingEquipo] = useState(false)
   const [physicalConfig, setPhysicalConfig] = useState<GraderPhysicalConfig>(DEFAULT_PHYSICAL_CONFIG)
   const [savingPhysical, setSavingPhysical] = useState(false)
   const [physicalError, setPhysicalError] = useState<string | null>(null)
@@ -376,17 +377,8 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Identificación</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
-              <Label className="text-xs">Dispositivo</Label>
-              <Input
-                value={config.deviceId || ''}
-                onChange={(e) => setConfig((c) => ({ ...c, deviceId: e.target.value }))}
-                placeholder="STATICGRADER1"
-                className="mt-1"
-              />
-            </div>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Parámetros de turno</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Label className="text-xs">Turno activo</Label>
               <Select
@@ -419,14 +411,50 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div className="border-t border-zinc-800 my-4" />
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Equipo</h3>
+            <button
+              type="button"
+              onClick={() => setEditingEquipo((v) => !v)}
+              className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {editingEquipo ? <Pencil size={12} /> : <Lock size={12} />}
+              {editingEquipo ? 'Bloquear' : 'Editar'}
+            </button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <Label className="text-xs">Dispositivo</Label>
+              {editingEquipo ? (
+                <Input
+                  value={config.deviceId || ''}
+                  onChange={(e) => setConfig((c) => ({ ...c, deviceId: e.target.value }))}
+                  placeholder="STATICGRADER1"
+                  className="mt-1"
+                />
+              ) : (
+                <p className="mt-1 h-10 flex items-center px-3 rounded-md border border-border/40 bg-muted/30 text-sm font-mono text-muted-foreground">
+                  {config.deviceId || <span className="italic opacity-50">sin dispositivo</span>}
+                </p>
+              )}
+            </div>
             <div>
               <Label className="text-xs">Zona horaria</Label>
-              <Input
-                value={config.timezone || ''}
-                onChange={(e) => setConfig((c) => ({ ...c, timezone: e.target.value }))}
-                placeholder="America/Santiago"
-                className="mt-1"
-              />
+              {editingEquipo ? (
+                <Input
+                  value={config.timezone || ''}
+                  onChange={(e) => setConfig((c) => ({ ...c, timezone: e.target.value }))}
+                  placeholder="America/Santiago"
+                  className="mt-1"
+                />
+              ) : (
+                <p className="mt-1 h-10 flex items-center px-3 rounded-md border border-border/40 bg-muted/30 text-sm font-mono text-muted-foreground">
+                  {config.timezone || <span className="italic opacity-50">America/Santiago</span>}
+                </p>
+              )}
             </div>
           </div>
 
