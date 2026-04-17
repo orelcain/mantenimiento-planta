@@ -6,7 +6,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch, Label } from '@/components/ui'
-import { Settings2, Save, FolderOpen, ChevronRight, ChevronLeft, Trash2, ChevronDown, RotateCcw, Plus } from 'lucide-react'
+import { Save, FolderOpen, ChevronRight, ChevronLeft, Trash2, ChevronDown, RotateCcw, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore, useIsAdmin } from '@/store'
 import {
@@ -354,12 +354,12 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
       {(!tabbed || activeTab === 'analisis') && (
       <Card className="relative">
         <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Settings2 className="h-5 w-5" />
+          <CardTitle className="text-base">
             Configuración del Análisis
           </CardTitle>
         </CardHeader>
         <CardContent>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Identificación</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <Label className="text-xs">Dispositivo</Label>
@@ -413,8 +413,9 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
             </div>
           </div>
 
-          {/* Thresholds */}
-          <div className="mt-4 grid grid-cols-1 sm:grid-cols-4 gap-4">
+          <div className="border-t border-zinc-800 my-5" />
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Umbrales de alerta</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <Label className="text-xs">Umbral Fotocélula (%)</Label>
               <Input
@@ -477,9 +478,10 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
             </div>
           </div>
 
-          <div className="mt-6">
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <Label className="text-sm">Horarios de turnos</Label>
+          <div className="border-t border-zinc-800 my-5" />
+          <div>
+            <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Horarios de turnos</h3>
               <Button
                 size="sm"
                 variant="outline"
