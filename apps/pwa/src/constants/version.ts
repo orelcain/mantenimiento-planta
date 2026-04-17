@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.101.0' as const
+export const APP_VERSION = '2.102.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-04-16' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'feat(ux): Grader Config v2 R1 — split Identificacion into turno + equipo' as const
+export const VERSION_NAME = 'feat(ux): Grader Config v2 R3 — rangos open by default no collapse in tabbed' as const
 
 /**
  * Nota:

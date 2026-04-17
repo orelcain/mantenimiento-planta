@@ -78,7 +78,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
   const [templateName, setTemplateName] = useState('')
   const [activeTemplateName, setActiveTemplateName] = useState<string | null>(null)
   const [showTemplates, setShowTemplates] = useState(false)
-  const [showWeightRanges, setShowWeightRanges] = useState(false)
+  const [showWeightRanges, setShowWeightRanges] = useState(true)
   const [savingRanges, setSavingRanges] = useState(false)
   const [rangesError, setRangesError] = useState<string | null>(null)
   const [shiftSchedule, setShiftSchedule] = useState(DEFAULT_SHIFT_SCHEDULE)
@@ -770,11 +770,11 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
       {(!tabbed || activeTab === 'rangos') && (
       <Card className="relative">
         <CardHeader
-          className="cursor-pointer select-none"
-          onClick={() => setShowWeightRanges(!showWeightRanges)}
+          className={tabbed ? '' : 'cursor-pointer select-none'}
+          onClick={tabbed ? undefined : () => setShowWeightRanges(!showWeightRanges)}
         >
           <CardTitle className="text-base flex items-center gap-2">
-            <ChevronDown className={`h-4 w-4 transition-transform ${showWeightRanges ? '' : '-rotate-90'}`} />
+            {!tabbed && <ChevronDown className={`h-4 w-4 transition-transform ${showWeightRanges ? '' : '-rotate-90'}`} />}
             Rangos de Peso por Calibre
             {isCustomRanges && (
               <Badge className="text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
@@ -783,7 +783,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
             )}
           </CardTitle>
         </CardHeader>
-        {showWeightRanges && (
+        {(tabbed || showWeightRanges) && (
           <CardContent>
             <p className="text-xs text-muted-foreground mb-3">
               Define los rangos de peso (en gramos) para cada calibre.
