@@ -1392,30 +1392,36 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                         )}
                       </p>
                       <p className="text-muted-foreground">
-                        Espaciado en cinta: <span className="font-mono font-medium text-foreground">{spacingM.toFixed(2)} m</span>
-                        <span className="text-[10px]"> · Ratio largo/espacio: </span>
-                        <span className={cn('font-mono font-medium', overlapping ? 'text-red-500' : lengthToSpacingRatio > 0.7 ? 'text-amber-500' : 'text-emerald-500')}>
-                          {lengthToSpacingRatio.toFixed(2)}
+                        Gap libre entre peces: <span className={cn('font-mono font-medium', overlapping ? 'text-red-500' : lengthToSpacingRatio > 0.7 ? 'text-amber-500' : 'text-emerald-500')}>
+                          {Math.max(0, spacingM - salmonLengthM).toFixed(2)} m
                         </span>
+                        <span className="text-[10px] text-muted-foreground"> · Pez {physicalConfig.avgSalmonLengthCm} cm + aire {(Math.max(0, spacingM - salmonLengthM) * 100).toFixed(0)} cm = paso {(spacingM * 100).toFixed(0)} cm</span>
                         <InfoTooltip
-                          text={`Espaciado = velocidad_cinta × (60 / cadencia). Si el largo del salmón supera el espaciado, dos piezas se solapan y la fotocélula marca "fuera de límites".`}
-                          formula={`espaciado = ${speedMps.toFixed(2)} m/s × (60 / ${cadencePiecesPerMin.toFixed(0)} pz·min⁻¹)\n           = ${spacingM.toFixed(2)} m\n\nratio = ${salmonLengthM.toFixed(2)} m / ${spacingM.toFixed(2)} m = ${lengthToSpacingRatio.toFixed(2)}`}
+                          title="Cómo se calcula"
+                          text={`1) La cadencia dice cuántos peces pasan por minuto por un punto fijo.\n2) Paso total = velocidad × tiempo entre peces (centro a centro).\n3) Gap libre = paso total − largo del pez.\n\nSi el gap es ≤ 0, dos peces se solapan y la fotocélula los ve como uno solo → marca "fuera de límites".`}
+                          formula={`tiempo entre peces = 60 / ${cadencePiecesPerMin.toFixed(0)} = ${(60 / cadencePiecesPerMin).toFixed(2)} s\npaso total = ${speedMps.toFixed(2)} m/s × ${(60 / cadencePiecesPerMin).toFixed(2)} s = ${spacingM.toFixed(2)} m\ngap libre = ${spacingM.toFixed(2)} − ${salmonLengthM.toFixed(2)} = ${Math.max(0, spacingM - salmonLengthM).toFixed(2)} m\nratio pez/paso = ${salmonLengthM.toFixed(2)} / ${spacingM.toFixed(2)} = ${lengthToSpacingRatio.toFixed(2)}`}
                           position="top"
                         />
                       </p>
+                      <p className="text-[10px] text-muted-foreground">
+                        Ratio pez/paso: <span className={cn('font-mono font-medium', overlapping ? 'text-red-500' : lengthToSpacingRatio > 0.7 ? 'text-amber-500' : 'text-emerald-500')}>
+                          {lengthToSpacingRatio.toFixed(2)}
+                        </span>
+                        <span> (el pez ocupa el {(lengthToSpacingRatio * 100).toFixed(0)}% del paso entre peces consecutivos)</span>
+                      </p>
                       {overlapping && (
                         <p className="text-[10px] text-red-500">
-                          ⚠ El salmón ({physicalConfig.avgSalmonLengthCm} cm) supera el espaciado ({(spacingM * 100).toFixed(0)} cm) — fuera de límites probable.
-                          Con {pocketCountAlt} pockets el espaciado sube a {spacingAlt.toFixed(2)} m.
+                          ⚠ El pez ({physicalConfig.avgSalmonLengthCm} cm) es más largo que el paso ({(spacingM * 100).toFixed(0)} cm) → peces se solapan, fotocélula marca "fuera de límites".
+                          Con {pocketCountAlt} pockets el gap libre sube a {Math.max(0, spacingAlt - salmonLengthM).toFixed(2)} m.
                         </p>
                       )}
                       {!overlapping && lengthToSpacingRatio > 0.7 && (
                         <p className="text-[10px] text-amber-500">
-                          ⚠ Ratio {lengthToSpacingRatio.toFixed(2)} cerca del límite. Con {pocketCountAlt} pockets baja a {(salmonLengthM / spacingAlt).toFixed(2)}.
+                          ⚠ Gap libre estrecho ({Math.max(0, spacingM - salmonLengthM).toFixed(2)} m). Con {pocketCountAlt} pockets sube a {Math.max(0, spacingAlt - salmonLengthM).toFixed(2)} m.
                         </p>
                       )}
                       <p className="text-[10px] text-muted-foreground">
-                        Alternativa con {pocketCountAlt} pockets: {cadenceAlt.toFixed(0)} pz/min · espaciado {spacingAlt.toFixed(2)} m · ratio {(salmonLengthM / spacingAlt).toFixed(2)}
+                        Alternativa con {pocketCountAlt} pockets: {cadenceAlt.toFixed(0)} pz/min · gap libre {Math.max(0, spacingAlt - salmonLengthM).toFixed(2)} m · ratio {(salmonLengthM / spacingAlt).toFixed(2)}
                       </p>
                     </div>
                   </div>
