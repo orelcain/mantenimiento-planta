@@ -624,6 +624,7 @@ export function GraderHistoricalCalendar({
                 <Database className="h-3.5 w-3.5" />
                 Historial guardado
               </p>
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
               {(historicalByDate.get(selectedKey) ?? [])
                 .sort((a, b) => {
                   const order: Record<string, number> = { 'Turno día': 0, 'Turno noche': 1 }
@@ -747,6 +748,7 @@ export function GraderHistoricalCalendar({
                     </div>
                   </div>
                 ))}
+              </div>
             </div>
           )}
 
