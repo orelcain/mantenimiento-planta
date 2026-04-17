@@ -370,6 +370,13 @@ export interface GraderPhysicalConfig {
    * Ver `computePerGateResponseTime()` en graderGateTiming.ts para las fórmulas.
    */
   pneumaticConfig?: PneumaticConfig
+  /**
+   * Factor de conversión unidades Z2 → m/s.
+   * Fórmula: velocidad_mps = z2Units * kFactor
+   * Valor default en Marelec Z2: 0.000786 m/s por unidad.
+   * Calibrar midiendo velocidad real y ajustando hasta que coincida.
+   */
+  kFactor?: number
 }
 
 /**

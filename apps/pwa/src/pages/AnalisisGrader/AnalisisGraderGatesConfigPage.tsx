@@ -1564,9 +1564,41 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                 Diferencia &gt;5% entre fuentes indica drift o error de calibración.
                 Seleccionar la fuente más confiable como "verdad" para los cálculos.
               </p>
+              {/* Factor k configurable */}
+              <div className="flex items-center gap-3 mb-4 p-2.5 rounded-md bg-muted/40 border border-border">
+                <label className="text-xs text-muted-foreground whitespace-nowrap">
+                  Factor k (unidades Z2 → m/s)
+                </label>
+                <input
+                  type="number"
+                  step="0.000001"
+                  min="0.0001"
+                  max="0.01"
+                  value={physicalConfig.kFactor ?? 0.000786}
+                  onChange={(e) => {
+                    const v = parseFloat(e.target.value)
+                    if (!isNaN(v) && v > 0) {
+                      setPhysicalConfig((p) => ({ ...p, kFactor: v }))
+                    }
+                  }}
+                  className="w-28 h-7 rounded border border-input bg-background px-2 text-xs font-mono text-right"
+                />
+                <span className="text-[10px] text-muted-foreground">
+                  Default: 0.000786 · Ajustar hasta que Z2 coincida con tachómetro
+                </span>
+                {(physicalConfig.kFactor ?? 0.000786) !== 0.000786 && (
+                  <button
+                    type="button"
+                    onClick={() => setPhysicalConfig((p) => { const { kFactor: _, ...rest } = p; return rest as typeof p })}
+                    className="ml-auto text-[10px] text-muted-foreground hover:text-foreground underline"
+                  >
+                    Restaurar default
+                  </button>
+                )}
+              </div>
               <div className="space-y-4">
                 {physicalConfig.belts.map((belt) => {
-                  const k = 0.000786
+                  const k = physicalConfig.kFactor ?? 0.000786
                   const z2Units = belt.z2Units
                   const speedFromZ2 = z2Units ? z2Units * k : null
                   const speedFromVfd = belt.vfd ? computeBeltSpeedFromVfd(belt.vfd) : null
