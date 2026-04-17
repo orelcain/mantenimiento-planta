@@ -1,10 +1,10 @@
 {
-  "version": "2.113.0",
+  "version": "2.115.0",
   "buildDate": "2026-04-17",
-  "buildTimestamp": 1776449684532,
+  "buildTimestamp": 1776460792048,
   "features": [
-    "Grader: tab Producto rediseñado en 3 capas progresivas (Hero + Equipo + Diagnóstico)",
-    "Grader: motor IA de sugerencias punto cero con 5 generadores (FishBase, anchura, pockets, reset, cadencia)",
-    "Grader: 10 nuevos campos físicos Z2 editables (timing flippers, gates, max bin weight)"
+    "Grader: GatesConfigPage dividido en 6 sub-componentes (2715→1200 líneas, -56%)",
+    "Grader: ProductoTab, CintasTab, DistanciasTab, DanfossTab, NeumaticaTab, VerificacionTab",
+    "Grader: FASE 7 — fix Firestore rules + useConfigChangeLogger enabledRef + historial deps"
   ]
 }

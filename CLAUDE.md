@@ -239,7 +239,7 @@ sidebarConfig  ← nuevo: orden personalizado del sidebar admin
 
 ## Version actual
 
-- **v2.113.0** (2026-04-17) — "feat(grader): motor IA sugerencias punto cero + tab Producto 3 capas + campos físicos Z2"
+- **v2.115.0** (2026-04-17) — "feat(grader): FASE 10 — split GatesConfigPage 6 sub-componentes (2715→1200 líneas)"
 - Proyecto Firebase: `mantenimiento-planta-771a3`
 - GitHub: `orelcain/mantenimiento-planta`
 - Produccion: `https://orelcain.github.io/mantenimiento-planta/`
