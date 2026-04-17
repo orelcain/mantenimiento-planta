@@ -448,6 +448,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
   const [showPhysicalConfig, setShowPhysicalConfig] = useState(false)
   const [fisicaSubTab, setFisicaSubTab] = useState<'producto' | 'cintas' | 'distancias' | 'calibracion'>('producto')
   const [calibracionSubTab, setCalibracionSubTab] = useState<'danfoss' | 'neumatica' | 'verificacion'>('danfoss')
+  const [productoSubTab, setProductoSubTab] = useState<'resumen' | 'flipper' | 'analisis' | 'historial'>('resumen')
   // Guard: autosave no dispara hasta que la carga inicial desde Firestore complete.
   // Previene sobreescribir datos reales con DEFAULTs si la red es lenta.
   const moduleConfigLoadedRef = useRef(false)
@@ -465,9 +466,9 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
   const isAdmin = useIsAdmin()
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
 
-  // FASE 6 — recargar historial cuando se entra al tab Producto o cambian datos
+  // FASE 6 — recargar historial al entrar al sub-tab Historial (lazy)
   useEffect(() => {
-    if (fisicaSubTab !== 'producto') return
+    if (fisicaSubTab !== 'producto' || productoSubTab !== 'historial') return
     let cancelled = false
     setChangeLogLoading(true)
     listRecentConfigChanges(10)
@@ -475,7 +476,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
       .catch((err) => console.warn('[changeLog] error cargando:', err))
       .finally(() => { if (!cancelled) setChangeLogLoading(false) })
     return () => { cancelled = true }
-  }, [fisicaSubTab])
+  }, [fisicaSubTab, productoSubTab])
 
   const sortRanges = (ranges: CalibreWeightRange[]) =>
     [...ranges].sort((a, b) => a.minGrams - b.minGrams)
@@ -1400,6 +1401,32 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
               </div>
             )}
 
+            {/* Sub-tabs Producto */}
+            {fisicaSubTab === 'producto' && (
+              <div className="flex gap-0 border-b border-border/30 -mt-2">
+                {([
+                  { id: 'resumen',   label: 'Resumen' },
+                  { id: 'flipper',   label: 'Flipper' },
+                  { id: 'analisis',  label: 'Análisis' },
+                  { id: 'historial', label: 'Historial' },
+                ] as const).map(({ id, label }) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setProductoSubTab(id)}
+                    className={cn(
+                      'px-3 py-1.5 text-xs font-medium border-b-2 -mb-px transition-colors',
+                      productoSubTab === id
+                        ? 'border-sky-400 text-sky-500 dark:text-sky-400'
+                        : 'border-transparent text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* ── TAB PRODUCTO ── */}
             {fisicaSubTab === 'producto' && (() => {
               // Cálculos compartidos entre Hero, Equipo y Diagnóstico
@@ -1443,7 +1470,10 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                   : `OK · gap libre ${(gapM * 100).toFixed(0)} cm`
 
               return (
-                <div className="space-y-4">
+                <>
+                  {/* ── SUB-TAB RESUMEN ── */}
+                  {productoSubTab === 'resumen' && (
+                  <div className="space-y-4">
                   {/* ══ HERO ════════════════════════════════════════════ */}
                   <div className="space-y-3">
                     {/* Fila 1: Especie + Peso mediano */}
@@ -1580,14 +1610,16 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
 
                   {/* ══ SUGERENCIAS IA ═══════════════════════════════════════════════ */}
                   <SuggestionsPanel suggestions={suggestions} />
+                  </div>
+                  )}
 
-                  {/* ══ EQUIPO FLIPPER (collapsible, abierto) ═══════════════════════ */}
-                  <details open className="group rounded-lg border border-slate-700/60 bg-slate-900/40">
-                    <summary className="flex cursor-pointer items-center justify-between px-4 py-2.5 text-sm font-medium select-none hover:bg-slate-800/40 rounded-lg list-none">
-                      <span>⚙️ Equipo flipper</span>
-                      <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180 text-muted-foreground" />
-                    </summary>
-                    <div className="px-4 pb-4 pt-2 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* ── SUB-TAB FLIPPER ── */}
+                  {productoSubTab === 'flipper' && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Tiempos de ciclo software (Z2), reset mecánico del cilindro y dimensiones de la paleta.
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       {/* Sub-card A: Ciclo software Z2 */}
                       {(() => {
                         const delayOpen  = physicalConfig.flipperDelayOpenMs    ?? 150
@@ -1684,15 +1716,12 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                         )}
                       </div>
                     </div>
-                  </details>
+                  </div>
+                  )}
 
-                  {/* ══ DIAGNÓSTICO TÉCNICO (collapsible, cerrado) ═══════════════════ */}
-                  <details className="group rounded-lg border border-slate-700/40 bg-slate-900/20">
-                    <summary className="flex cursor-pointer items-center justify-between px-4 py-2.5 text-sm font-medium select-none hover:bg-slate-800/30 rounded-lg list-none text-muted-foreground">
-                      <span>📐 Diagnóstico técnico</span>
-                      <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
-                    </summary>
-                    <div className="px-4 pb-4 pt-2 space-y-3 text-xs">
+                  {/* ── SUB-TAB ANÁLISIS ── */}
+                  {productoSubTab === 'analisis' && (
+                  <div className="space-y-3 text-xs">
                       <BatchStatsCard stats={batchStats} />
 
                       {/* Timing flipper */}
@@ -1804,26 +1833,15 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                           </div>
                         )
                       })()}
-                    </div>
-                  </details>
-                </div>
-              )
-            })()}
+                  </div>
+                  )}
 
-            {/* Historial de cambios — visible cuando se está en Producto */}
-            {fisicaSubTab === 'producto' && (
-              <div className="mt-4 border-t pt-3">
-                <details>
-                  <summary className="text-xs font-medium cursor-pointer select-none flex items-center gap-2 text-muted-foreground hover:text-foreground">
-                    <ChevronRight className="w-3 h-3 transition-transform group-open:rotate-90" />
-                    Historial de cambios
-                    {changeLog.length > 0 && (
-                      <Badge variant="outline" className="text-[10px] ml-1">
-                        {changeLogLoading ? '…' : `últimos ${changeLog.length}`}
-                      </Badge>
+                  {/* ── SUB-TAB HISTORIAL ── */}
+                  {productoSubTab === 'historial' && (
+                  <div className="space-y-1">
+                    {changeLogLoading && (
+                      <p className="text-xs text-muted-foreground">Cargando historial…</p>
                     )}
-                  </summary>
-                  <div className="mt-2 space-y-1">
                     {changeLog.length === 0 && !changeLogLoading && (
                       <p className="text-xs text-muted-foreground italic">Sin cambios registrados aún.</p>
                     )}
@@ -1860,9 +1878,10 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                       )
                     })}
                   </div>
-                </details>
-              </div>
-            )}
+                  )}
+                </>
+              )
+            })()}
 
             {/* Cintas — 4 cards individuales en orden de flujo */}
             {fisicaSubTab === 'cintas' && (
