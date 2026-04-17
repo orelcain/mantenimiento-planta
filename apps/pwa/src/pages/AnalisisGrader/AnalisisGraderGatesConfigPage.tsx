@@ -16,6 +16,7 @@ import {
   type GatesTemplate,
 } from '@/services/grader/graderSession.service'
 import { getModuleRanges, saveModuleRanges, saveModulePhysicalConfig, saveModuleShiftSchedule } from '@/services/grader/graderModuleConfig.service'
+import { listDailySummariesByRange } from '@/services/grader/graderDailySummary.service'
 import { DEFAULT_SHIFT_SCHEDULE, formatShiftTime, normalizeShiftSchedule, parseShiftTime } from '@/services/grader/graderShiftSchedule'
 import type {
   GateAssignment,
@@ -264,14 +265,46 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
     return weights[Math.floor(weights.length / 2)]
   }, [parsedData.pieceRecords])
 
+  // Peso mediano manual (gramos) — cuando no hay Excel, el usuario puede ingresarlo
+  const [manualMedianG, setManualMedianG] = useState<number | undefined>(undefined)
+
+  // Peso mediano derivado del historial Firestore (último summary con avgWeightGrams)
+  const [historicalMedianG, setHistoricalMedianG] = useState<{ value: number; dateKey: string; shiftId: string } | null>(null)
+
+  // Cargar avgWeightGrams del summary más reciente con data como fallback cuando no hay Excel ni manual
+  useEffect(() => {
+    const today = new Date()
+    const end = today.toISOString().slice(0, 10)
+    const startDate = new Date(today)
+    startDate.setDate(today.getDate() - 60)
+    const start = startDate.toISOString().slice(0, 10)
+    listDailySummariesByRange(start, end)
+      .then((summaries) => {
+        const withWeight = summaries.filter((s) => typeof s.avgWeightGrams === 'number' && s.avgWeightGrams > 50 && s.avgWeightGrams < 15000)
+        if (withWeight.length === 0) return
+        withWeight.sort((a, b) => b.dateKey.localeCompare(a.dateKey))
+        const latest = withWeight[0]!
+        setHistoricalMedianG({ value: Math.round(latest.avgWeightGrams!), dateKey: latest.dateKey, shiftId: latest.shiftId })
+      })
+      .catch(() => {})
+  }, [])
+
+  // Peso efectivo para el cálculo alométrico: prioriza Excel, luego manual, luego histórico
+  const effectiveMedianG = medianWeightG ?? manualMedianG ?? historicalMedianG?.value ?? null
+  const medianSource: 'excel' | 'manual' | 'historical' | null =
+    medianWeightG != null ? 'excel'
+    : manualMedianG != null ? 'manual'
+    : historicalMedianG != null ? 'historical'
+    : null
+
   // Dimensiones sugeridas por alometría según especie y peso mediano
   const suggestedDimensions = useMemo(() => {
-    if (!medianWeightG || !physicalConfig.species) return null
+    if (!effectiveMedianG || !physicalConfig.species) return null
     const { a, b, widthRatio } = SPECIES_ALLOMETRY[physicalConfig.species]
-    const lengthCm = Math.round((medianWeightG / a) ** (1 / b))
+    const lengthCm = Math.round((effectiveMedianG / a) ** (1 / b))
     const widthCm = Math.round(lengthCm * widthRatio)
-    return { lengthCm, widthCm, medianWeightG }
-  }, [medianWeightG, physicalConfig.species])
+    return { lengthCm, widthCm, medianWeightG: effectiveMedianG }
+  }, [effectiveMedianG, physicalConfig.species])
 
   // Estadísticas del lote: percentiles, CV, calibre dominante, throughput
   const batchStats = useMemo((): BatchStats | null => {
@@ -1068,26 +1101,84 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
             <div>
               <p className="text-sm font-medium mb-3">Producto y flipper</p>
 
-              {/* Selector de especie */}
-              <div className="mb-4 flex items-center gap-3">
-                <Label className="text-xs whitespace-nowrap">Especie</Label>
-                <Select
-                  value={physicalConfig.species ?? ''}
-                  onValueChange={(v) => setPhysicalConfig((p) => ({ ...p, species: v as 'salar' | 'coho' }))}
-                >
-                  <SelectTrigger className="h-8 text-xs w-56">
-                    <SelectValue placeholder="Seleccionar especie…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(Object.entries(SPECIES_ALLOMETRY) as [keyof typeof SPECIES_ALLOMETRY, typeof SPECIES_ALLOMETRY[keyof typeof SPECIES_ALLOMETRY]][]).map(([key, s]) => (
-                      <SelectItem key={key} value={key} className="text-xs">{s.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {suggestedDimensions && (
-                  <span className="text-[10px] text-muted-foreground">
-                    Peso mediano lote: <span className="font-mono">{(suggestedDimensions.medianWeightG / 1000).toFixed(2)} kg</span>
-                  </span>
+              {/* Selector de especie + peso mediano del lote */}
+              <div className="mb-4 space-y-2">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <Label className="text-xs whitespace-nowrap">Especie</Label>
+                  <Select
+                    value={physicalConfig.species ?? ''}
+                    onValueChange={(v) => setPhysicalConfig((p) => ({ ...p, species: v as 'salar' | 'coho' }))}
+                  >
+                    <SelectTrigger className="h-8 text-xs w-56">
+                      <SelectValue placeholder="Seleccionar especie…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(Object.entries(SPECIES_ALLOMETRY) as [keyof typeof SPECIES_ALLOMETRY, typeof SPECIES_ALLOMETRY[keyof typeof SPECIES_ALLOMETRY]][]).map(([key, s]) => (
+                        <SelectItem key={key} value={key} className="text-xs">{s.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {physicalConfig.species && (() => {
+                    const s = SPECIES_ALLOMETRY[physicalConfig.species]
+                    return (
+                      <span className="text-[10px] text-muted-foreground font-mono">
+                        W = {s.a} × L^{s.b} · ancho ≈ {(s.widthRatio * 100).toFixed(0)}% largo
+                      </span>
+                    )
+                  })()}
+                </div>
+
+                {physicalConfig.species && (
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <Label className="text-xs whitespace-nowrap">Peso mediano lote (g)</Label>
+                    <Input
+                      type="number"
+                      step="50"
+                      min="100"
+                      max="15000"
+                      value={medianWeightG ?? manualMedianG ?? (historicalMedianG?.value ?? '')}
+                      onChange={(e) => setManualMedianG(e.target.value ? Number(e.target.value) : undefined)}
+                      disabled={medianWeightG != null}
+                      placeholder="ej: 3500"
+                      className={cn('h-8 text-xs w-32 font-mono', medianWeightG != null && 'opacity-70')}
+                    />
+                    {medianSource === 'excel' && (
+                      <Badge className="text-[10px] bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 px-1.5 py-0">
+                        Auto desde Excel · {(medianWeightG! / 1000).toFixed(2)} kg
+                      </Badge>
+                    )}
+                    {medianSource === 'manual' && (
+                      <Badge className="text-[10px] bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300 px-1.5 py-0">
+                        Manual · {(manualMedianG! / 1000).toFixed(2)} kg
+                      </Badge>
+                    )}
+                    {medianSource === 'historical' && historicalMedianG && (
+                      <Badge className="text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 px-1.5 py-0">
+                        Histórico · {historicalMedianG.dateKey} {historicalMedianG.shiftId} · {(historicalMedianG.value / 1000).toFixed(2)} kg
+                      </Badge>
+                    )}
+                    {medianSource === null && (
+                      <span className="text-[10px] text-muted-foreground">
+                        Ingresa peso o carga Excel para ver sugerencias
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {suggestedDimensions && physicalConfig.species && (
+                  <div className="p-2 rounded bg-sky-500/10 border border-sky-500/20 text-xs">
+                    <span className="font-medium text-sky-700 dark:text-sky-300">
+                      Sugerencias alométricas
+                    </span>
+                    {': '}
+                    <span>Largo </span>
+                    <span className="font-mono font-medium">{suggestedDimensions.lengthCm} cm</span>
+                    <span>, Ancho </span>
+                    <span className="font-mono font-medium">{suggestedDimensions.widthCm} cm</span>
+                    <div className="text-[10px] text-muted-foreground mt-0.5 font-mono">
+                      L = ({suggestedDimensions.medianWeightG}/{SPECIES_ALLOMETRY[physicalConfig.species].a})^(1/{SPECIES_ALLOMETRY[physicalConfig.species].b}) = {suggestedDimensions.lengthCm} cm
+                    </div>
+                  </div>
                 )}
               </div>
 
