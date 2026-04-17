@@ -27,6 +27,7 @@ import type {
   PneumaticConfig,
 } from './types'
 import { getGradingBelt } from './graderBeltHelpers'
+import { TIMING_THRESHOLDS } from './graderThresholds'
 
 // ── Tipos públicos ──────────────────────────────────────────────────────────
 
@@ -102,8 +103,8 @@ export interface OptimalGateAssignment {
  *  - Gate 1 @ 1.30 m → tAvailable 1.02 s, tRequired ~0.95 s, margin ~0.07 s
  *  - Gate 6 @ 8.15 m → tAvailable 6.37 s, margin ~5.4 s (holgado)
  */
-const DEFAULT_MARGIN_OK_SEC = 0.5
-const DEFAULT_MARGIN_WARN_SEC = 0.15
+const DEFAULT_MARGIN_OK_SEC = TIMING_THRESHOLDS.marginOkSec
+const DEFAULT_MARGIN_WARN_SEC = TIMING_THRESHOLDS.marginWarnSec
 
 /** Fallback plano cuando no hay pneumaticConfig (backward compatible) */
 const DEFAULT_FLIPPER_RESET_SEC = 0.45

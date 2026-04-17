@@ -25,6 +25,17 @@ export type PointZeroCause =
   | 'puerta_no_preparada'
   | 'otro';
 
+/**
+ * Las 3 causas oficiales que Matrix muestra en la columna "Error" del Excel P0,
+ * más "otro" para registros ambiguos. Se usan como agrupador de nivel 1 en UI.
+ * Las 6 sub-causas internas (PointZeroCause) son el drill-down de nivel 2.
+ */
+export type MatrixP0Cause =
+  | 'fuera_de_limites'
+  | 'no_leido_fotocelula'
+  | 'puerta_no_preparada'
+  | 'otro';
+
 /** Rango de peso en gramos para cada calibre */
 export interface CalibreWeightRange {
   calibre: string;
@@ -88,6 +99,15 @@ export interface PointZeroClassification {
   outOfRangeByWeight: OutOfRangeWeightDetail[];
   /** Rangos de referencia usados */
   calibreWeightRanges: CalibreWeightRange[];
+  /**
+   * Agregado por las 3 causas oficiales Matrix (nivel 1 de UI).
+   * Cada bucket incluye el desglose de sub-causas internas.
+   */
+  byMatrixCause: Record<MatrixP0Cause, {
+    pieces: number;
+    pct: number;
+    subCauses: Array<{ cause: PointZeroCause; pieces: number; pct: number }>;
+  }>;
 }
 
 export type MatrixFileKind =

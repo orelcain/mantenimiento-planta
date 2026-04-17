@@ -29,7 +29,10 @@ import type {
   MatrixQCEnhanced,
   GateAdvancedStats,
   GateSwapSuggestion,
+  MatrixP0Cause,
 } from './types'
+
+import { toMatrixCause } from './graderMatrixP0Causes'
 
 import {
   median as calcMedian,
@@ -681,12 +684,39 @@ function computePointZeroClassification(
       return b.pieces - a.pieces
     })
 
+  // Agregar sub-causas con desglose por causa Matrix (3 niveles UI)
+  const ALL_MATRIX_CAUSES: MatrixP0Cause[] = [
+    'fuera_de_limites', 'no_leido_fotocelula', 'puerta_no_preparada', 'otro',
+  ]
+  const matrixMap = new Map<MatrixP0Cause, { pieces: number; subs: Array<{ cause: PointZeroCause; pieces: number; pct: number }> }>(
+    ALL_MATRIX_CAUSES.map(mc => [mc, { pieces: 0, subs: [] }]),
+  )
+  for (const c of causes) {
+    const mc = toMatrixCause(c.cause)
+    const entry = matrixMap.get(mc)!
+    entry.pieces += c.pieces
+    if (c.pieces > 0) {
+      entry.subs.push({ cause: c.cause, pieces: c.pieces, pct: c.pctOfPointZero })
+    }
+  }
+  const byMatrixCause = Object.fromEntries(
+    ALL_MATRIX_CAUSES.map(mc => {
+      const v = matrixMap.get(mc)!
+      return [mc, {
+        pieces: v.pieces,
+        pct: pointZeroPieces > 0 ? pct(v.pieces, pointZeroPieces) : 0,
+        subCauses: v.subs.sort((a, b) => b.pieces - a.pieces),
+      }]
+    }),
+  ) as Record<MatrixP0Cause, { pieces: number; pct: number; subCauses: Array<{ cause: PointZeroCause; pieces: number; pct: number }> }>
+
   return {
     totalPointZeroPieces: pointZeroPieces,
     causes,
     hierarchy,
     outOfRangeByWeight,
     calibreWeightRanges: weightRanges,
+    byMatrixCause,
   }
 }
 

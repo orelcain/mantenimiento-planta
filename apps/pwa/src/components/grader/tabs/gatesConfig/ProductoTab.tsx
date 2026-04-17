@@ -3,6 +3,7 @@ import { Badge, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, 
 import { InfoTooltip } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { getGradingBelt, GRADING_BELT_DEFAULT_MPS } from '@/services/grader/graderBeltHelpers'
+import { GAP_THRESHOLDS } from '@/services/grader/graderThresholds'
 import type { GraderPhysicalConfig } from '@/services/grader/types'
 import { labelForField, type ConfigChangeEntry } from '@/services/grader/graderConfigChangeLog.service'
 import { SuggestionsPanel } from '@/components/grader/SuggestionsPanel'
@@ -68,7 +69,7 @@ export function ProductoTab({
   const spacingM = speedMps * (60 / cadencePiecesPerMin)
   const gapM = Math.max(0, spacingM - salmonLengthM)
   const lengthToSpacingRatio = salmonLengthM / spacingM
-  const overlapping = lengthToSpacingRatio >= 1
+  const overlapping = lengthToSpacingRatio >= GAP_THRESHOLDS.ratioCritical
   const pocketCountAlt = physicalConfig.pocketCount === 4 ? 3 : 4
   const cadenceAlt = cadencePiecesPerMin * (pocketCountAlt / physicalConfig.pocketCount)
   const spacingAlt = speedMps * (60 / cadenceAlt)
@@ -78,13 +79,13 @@ export function ProductoTab({
   const salmonPassTimeSec = salmonLengthM / speedMps
   const verdictColor = overlapping
     ? 'bg-red-500/20 text-red-400 border-red-500/40'
-    : lengthToSpacingRatio > 0.7
+    : lengthToSpacingRatio > GAP_THRESHOLDS.ratioWarn
       ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
       : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
-  const verdictEmoji = overlapping ? '🔴' : lengthToSpacingRatio > 0.7 ? '🟡' : '🟢'
+  const verdictEmoji = overlapping ? '🔴' : lengthToSpacingRatio > GAP_THRESHOLDS.ratioWarn ? '🟡' : '🟢'
   const verdictText = overlapping
     ? 'Solapamiento — peces se pisan'
-    : lengthToSpacingRatio > 0.7
+    : lengthToSpacingRatio > GAP_THRESHOLDS.ratioWarn
       ? `Gap estrecho (${(gapM * 100).toFixed(0)} cm)`
       : `OK · gap libre ${(gapM * 100).toFixed(0)} cm`
 
@@ -391,7 +392,7 @@ export function ProductoTab({
               Gap libre entre peces:{' '}
               <span className={cn(
                 'font-mono font-medium',
-                overlapping ? 'text-red-500' : lengthToSpacingRatio > 0.7 ? 'text-amber-500' : 'text-emerald-500',
+                overlapping ? 'text-red-500' : lengthToSpacingRatio > GAP_THRESHOLDS.ratioWarn ? 'text-amber-500' : 'text-emerald-500',
               )}>
                 {(gapM * 100).toFixed(0)} cm
               </span>
@@ -411,7 +412,7 @@ export function ProductoTab({
                 Con {pocketCountAlt} pockets el gap sube a {Math.max(0, spacingAlt - salmonLengthM).toFixed(2)} m.
               </p>
             )}
-            {!overlapping && lengthToSpacingRatio > 0.7 && (
+            {!overlapping && lengthToSpacingRatio > GAP_THRESHOLDS.ratioWarn && (
               <p className="text-[10px] text-amber-500">
                 ⚠ Gap libre estrecho. Con {pocketCountAlt} pockets sube a {Math.max(0, spacingAlt - salmonLengthM).toFixed(2)} m.
               </p>

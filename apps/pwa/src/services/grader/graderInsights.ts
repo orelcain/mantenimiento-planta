@@ -11,6 +11,7 @@ import type {
 } from './types'
 import { computePerGateResponseTime } from './graderGateTiming'
 import { getGradingBelt } from './graderBeltHelpers'
+import { MACHINE_LIMITS, TIMING_THRESHOLDS } from './graderThresholds'
 
 let insightCounter = 0
 function nextId(): string {
@@ -409,7 +410,7 @@ export function computeDeterministicInsights(
     const mainBelt = getGradingBelt(physicalConfig)
     if (mainBelt && mainBelt.speedMps > 0) {
       // Calcular también a vel. máx. del fabricante para contexto
-      const maxSpeedMps = 1.4
+      const maxSpeedMps = MACHINE_LIMITS.maxBeltSpeedMps
       const criticalFlippers = physicalConfig.flipperPositions
         .filter((fp) => fp.distanceFromSensorMeters / mainBelt.speedMps < 1.5)
         .map((fp) => ({
@@ -496,7 +497,7 @@ export function computeDeterministicInsights(
     const speedMps = mainBelt2?.speedMps ?? 0.70
     const salmonLenM = physicalConfig.avgSalmonLengthCm / 100
     const tSalmonPass = salmonLenM / speedMps
-    const marginThreshold = result.config.errorThresholds?.timingMarginWarnSec ?? 0.15
+    const marginThreshold = result.config.errorThresholds?.timingMarginWarnSec ?? TIMING_THRESHOLDS.marginWarnSec
 
     // Usar modelo neumático per-gate si disponible, si no flat
     const hasPneu = !!physicalConfig.pneumaticConfig
