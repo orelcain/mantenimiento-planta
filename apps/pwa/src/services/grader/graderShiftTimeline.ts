@@ -187,16 +187,18 @@ export function buildShiftTimeline(input: {
 
   checkpoints.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
 
-  // Calcular outcomes para cada acción
-  for (let i = 0; i < checkpoints.length; i++) {
-    const cp = checkpoints[i]
-    if (cp.kind !== 'action') continue
+  type ActionCp = Extract<TimelineCheckpoint, { kind: 'action' }>
 
-    const prevAt = i > 0 ? checkpoints[i - 1].at : shiftWindow.startAt
-    const nextAt = i < checkpoints.length - 1 ? checkpoints[i + 1].at : shiftWindow.endAt
+  // Calcular outcomes para cada acción usando filter tipado
+  const allActionCps = checkpoints.filter((cp): cp is ActionCp => cp.kind === 'action')
 
-    const preAnalysis = analyzeSegment(pieceRecords, gate0Records, prevAt, cp.at)
-    const postAnalysis = analyzeSegment(pieceRecords, gate0Records, cp.at, nextAt)
+  for (const actionCp of allActionCps) {
+    const idx = checkpoints.indexOf(actionCp)
+    const prevAt = idx > 0 ? (checkpoints[idx - 1]?.at ?? shiftWindow.startAt) : shiftWindow.startAt
+    const nextAt = idx < checkpoints.length - 1 ? (checkpoints[idx + 1]?.at ?? shiftWindow.endAt) : shiftWindow.endAt
+
+    const preAnalysis = analyzeSegment(pieceRecords, gate0Records, prevAt, actionCp.at)
+    const postAnalysis = analyzeSegment(pieceRecords, gate0Records, actionCp.at, nextAt)
 
     let verdict: ActionOutcome['verdict'] = 'insufficient-data'
     if (postAnalysis.totalPieces >= INTRA_SHIFT_THRESHOLDS.minPiecesPostAction) {
@@ -206,7 +208,7 @@ export function buildShiftTimeline(input: {
       else verdict = 'neutral'
     }
 
-    cp.outcome = {
+    actionCp.outcome = {
       p0BeforePct: preAnalysis.p0Pct,
       p0AfterPct: postAnalysis.p0Pct,
       piecesAfter: postAnalysis.totalPieces,
@@ -222,15 +224,13 @@ export function buildShiftTimeline(input: {
   )
 
   // Segmentos pre/post por cada acción
-  const actionCps = checkpoints.filter((cp): cp is Extract<TimelineCheckpoint, { kind: 'action' }> =>
-    cp.kind === 'action',
-  )
+  const actionCps = allActionCps
 
   const segmentsPrePostActions: ShiftSegmentAnalysis[] = []
   for (let i = 0; i < actionCps.length; i++) {
-    const action = actionCps[i]
-    const prevAt = i === 0 ? shiftWindow.startAt : actionCps[i - 1].at
-    const nextAt = i < actionCps.length - 1 ? actionCps[i + 1].at : shiftWindow.endAt
+    const action = actionCps[i] as ActionCp
+    const prevAt = i === 0 ? shiftWindow.startAt : (actionCps[i - 1]?.at ?? shiftWindow.startAt)
+    const nextAt = i < actionCps.length - 1 ? (actionCps[i + 1]?.at ?? shiftWindow.endAt) : shiftWindow.endAt
 
     segmentsPrePostActions.push(
       analyzeSegment(pieceRecords, gate0Records, prevAt, action.at),

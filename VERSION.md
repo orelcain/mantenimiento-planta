@@ -1,14 +1,22 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.114.0**
+## Versión Actual: **v2.115.0**
 
-**Fecha de lanzamiento**: 11 de abril de 2026  \
+**Fecha de lanzamiento**: 17 de abril de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
 **Build**: ✅ Stable
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.115.0 — FASE 12: Landing unificado + Vista Turno /turno/:shiftId (17/04/2026)
+- 🏠 **Nueva Landing `/analisis-grader`**: hero con botón upload + live shift detector + grid de turnos recientes (14 días) + calendario histórico + accesos rápidos
+- 📊 **HeroScorecard**: scorecard principal del turno con P0%, piezas, pz/min, kg, badge live/closed y barra de progreso para turnos activos
+- 🔴 **P0CausesPanel**: panel expandible de causas Matrix (fuera_de_límites / no_leido_fotocelula / puerta_no_preparada / otro) con graceful degradation si no hay Excel P0
+- 🔀 **Nueva ruta `/analisis-grader/turno/:shiftId`**: vista unificada del turno, carga directa desde Firestore sin re-parsear Excel
+- 🔁 **Redirect `/detalle` → `/turno/:shiftId`**: compatibilidad hacia atrás con links anteriores
+- 📅 **GraderHistoricalCalendar actualizado**: navega a la nueva ruta `/turno/` en vez de `/detalle`
 
 ### v2.81.0 — Grader iter 13: UI calendar mejorado + fix duración anómala + delete registro (11/04/2026)
 - 📅 **Badges P0% por turno en calendario**: cada celda del mes muestra etiquetas "D" y "N" con color propio según P0% real del turno (verde/amarillo/rojo), reemplazando el promedio único anterior

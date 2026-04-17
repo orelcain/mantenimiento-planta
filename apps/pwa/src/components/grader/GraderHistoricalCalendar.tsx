@@ -762,7 +762,7 @@ export function GraderHistoricalCalendar({
                         className="h-7 text-[11px] flex-1 bg-primary/90 hover:bg-primary text-primary-foreground"
                         onClick={(e) => {
                           e.stopPropagation()
-                          navigate(`/analisis-grader/detalle?date=${hist.dateKey}&shift=${encodeURIComponent(hist.shiftId)}`)
+                          navigate(`/analisis-grader/turno/${hist.dateKey}__${encodeURIComponent(hist.shiftId)}`)
                         }}
                       >
                         <Eye className="h-3 w-3 mr-1" />
@@ -828,7 +828,7 @@ export function GraderHistoricalCalendar({
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => navigate(`/analisis-grader/detalle?date=${selectedKey}&shift=${encodeURIComponent(shiftId)}`)}
+                          onClick={() => navigate(`/analisis-grader/turno/${selectedKey}__${encodeURIComponent(shiftId)}`)}
                         >
                           <Eye className="h-3 w-3 mr-1" />
                           Ver detalle

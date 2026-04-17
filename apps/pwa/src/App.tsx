@@ -77,6 +77,8 @@ const Visor3DPublicPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DPu
 const HmiKnuroPublicPage = lazyWithReload(() => import('@/pages/HmiKnuroPublicPage').then((mod) => ({ default: mod.HmiKnuroPublicPage })))
 const Visor3DInteractiveToboganPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DInteractiveToboganPage').then((mod) => ({ default: mod.Visor3DInteractiveToboganPage })))
 const Visor3DInteractiveBaader142Page = lazyWithReload(() => import('@/pages/Visor3D/Visor3DInteractiveBaader142Page').then((mod) => ({ default: mod.Visor3DInteractiveBaader142Page })))
+const AnalisisGraderLandingPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderLandingPage').then((mod) => ({ default: mod.AnalisisGraderLandingPage })))
+const AnalisisGraderTurnoPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderTurnoPage').then((mod) => ({ default: mod.AnalisisGraderTurnoPage })))
 const AnalisisGraderWizardPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderWizardPage').then((mod) => ({ default: mod.AnalisisGraderWizardPage })))
 const AnalisisGraderDetallePage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderDetallePage').then((mod) => ({ default: mod.AnalisisGraderDetallePage })))
 const AnalisisGraderPeriodoPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderPeriodoPage').then((mod) => ({ default: mod.AnalisisGraderPeriodoPage })))
@@ -485,7 +487,17 @@ export function App() {
             } />
             <Route path="analisis-grader" element={
               <Suspense fallback={<LoadingScreen />}>
+                <AnalisisGraderLandingPage />
+              </Suspense>
+            } />
+            <Route path="analisis-grader/wizard" element={
+              <Suspense fallback={<LoadingScreen />}>
                 <AnalisisGraderWizardPage />
+              </Suspense>
+            } />
+            <Route path="analisis-grader/turno/:shiftId" element={
+              <Suspense fallback={<LoadingScreen />}>
+                <AnalisisGraderTurnoPage />
               </Suspense>
             } />
             <Route path="analisis-grader/detalle" element={

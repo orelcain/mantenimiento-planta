@@ -42,8 +42,10 @@ describe('analyzeSegment', () => {
       mkG0('2026-04-17T08:01:00.000Z', 'Fuera de límites', 2),
     ]
     const result = analyzeSegment(pieces, g0, '2026-04-17T07:00:00.000Z', '2026-04-17T19:00:00.000Z')
-    expect(result.topCauses[0].cause).toBe('no_leido_fotocelula')
-    expect(result.topCauses[0].pieces).toBe(8)
+    const top = result.topCauses[0]
+    expect(top).toBeDefined()
+    expect(top?.cause).toBe('no_leido_fotocelula')
+    expect(top?.pieces).toBe(8)
   })
 
   it('excluye registros fuera de la ventana', () => {
@@ -127,7 +129,11 @@ describe('buildShiftTimeline', () => {
     })
     const times = result.checkpoints.map(c => new Date(c.at).getTime())
     for (let i = 1; i < times.length; i++) {
-      expect(times[i]).toBeGreaterThanOrEqual(times[i - 1])
+      const prev = times[i - 1]
+      const curr = times[i]
+      if (prev !== undefined && curr !== undefined) {
+        expect(curr).toBeGreaterThanOrEqual(prev)
+      }
     }
   })
 })
