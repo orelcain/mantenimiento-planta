@@ -156,81 +156,59 @@ export function AnalisisGraderLandingPage() {
         )}
       </section>
 
-      {/* Calendario + links rápidos */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card className="lg:col-span-2">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Calendario del mes</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <GraderHistoricalCalendar
-              onLoadTurno={goToTurno}
-            />
-          </CardContent>
-        </Card>
+      {/* Accesos rápidos — fila horizontal */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <button className="text-left" onClick={() => navigate('/analisis-grader/periodo')}>
+          <Card className="hover:bg-muted/40 transition-colors h-full">
+            <CardContent className="p-3 flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-primary shrink-0" />
+              <div>
+                <div className="font-medium text-xs">Análisis de período</div>
+                <div className="text-xs text-muted-foreground">Tendencia multi-turno</div>
+              </div>
+            </CardContent>
+          </Card>
+        </button>
 
-        <div className="space-y-3">
-          <button
-            className="w-full text-left"
-            onClick={() => navigate('/analisis-grader/periodo')}
-          >
-            <Card className="hover:bg-muted/40 transition-colors cursor-pointer">
-              <CardContent className="p-4 flex items-center gap-3">
-                <TrendingUp className="w-5 h-5 text-primary shrink-0" />
-                <div>
-                  <div className="font-medium text-sm">Análisis de período</div>
-                  <div className="text-xs text-muted-foreground">Tendencia multi-turno</div>
-                </div>
-              </CardContent>
-            </Card>
-          </button>
+        <button className="text-left" onClick={() => navigate('/analisis-grader/wizard')}>
+          <Card className="hover:bg-muted/40 transition-colors h-full">
+            <CardContent className="p-3 flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-primary shrink-0" />
+              <div>
+                <div className="font-medium text-xs">Análisis rápido</div>
+                <div className="text-xs text-muted-foreground">Upload + dashboard</div>
+              </div>
+            </CardContent>
+          </Card>
+        </button>
 
-          <button
-            className="w-full text-left"
-            onClick={() => navigate('/analisis-grader/wizard')}
-          >
-            <Card className="hover:bg-muted/40 transition-colors cursor-pointer">
-              <CardContent className="p-4 flex items-center gap-3">
-                <BarChart3 className="w-5 h-5 text-primary shrink-0" />
-                <div>
-                  <div className="font-medium text-sm">Análisis rápido</div>
-                  <div className="text-xs text-muted-foreground">Upload + dashboard</div>
-                </div>
-              </CardContent>
-            </Card>
-          </button>
+        <button className="text-left" onClick={() => navigate('/analisis-grader/gates-config')}>
+          <Card className="hover:bg-muted/40 transition-colors h-full">
+            <CardContent className="p-3 flex items-center gap-2">
+              <Settings2 className="w-4 h-4 text-muted-foreground shrink-0" />
+              <div>
+                <div className="font-medium text-xs">Configuración avanzada</div>
+                <div className="text-xs text-muted-foreground">Gates, cintas, distancias</div>
+              </div>
+            </CardContent>
+          </Card>
+        </button>
 
-          <button
-            className="w-full text-left"
-            onClick={() => navigate('/analisis-grader/gates-config')}
-          >
-            <Card className="hover:bg-muted/40 transition-colors cursor-pointer">
-              <CardContent className="p-4 flex items-center gap-3">
-                <Settings2 className="w-5 h-5 text-muted-foreground shrink-0" />
-                <div>
-                  <div className="font-medium text-sm">Configuración avanzada</div>
-                  <div className="text-xs text-muted-foreground">Gates, cintas, distancias</div>
-                </div>
-              </CardContent>
-            </Card>
-          </button>
-
-          <button
-            className="w-full text-left"
-            onClick={() => navigate('/analisis-grader/ayuda')}
-          >
-            <Card className="hover:bg-muted/40 transition-colors cursor-pointer opacity-60 cursor-not-allowed">
-              <CardContent className="p-4 flex items-center gap-3">
-                <Clock className="w-5 h-5 text-muted-foreground shrink-0" />
-                <div>
-                  <div className="font-medium text-sm">Manual y runbooks</div>
-                  <div className="text-xs text-muted-foreground">Próximamente (FASE 14)</div>
-                </div>
-              </CardContent>
-            </Card>
-          </button>
+        <div className="opacity-50 cursor-not-allowed">
+          <Card className="h-full">
+            <CardContent className="p-3 flex items-center gap-2">
+              <Clock className="w-4 h-4 text-muted-foreground shrink-0" />
+              <div>
+                <div className="font-medium text-xs">Manual y runbooks</div>
+                <div className="text-xs text-muted-foreground">Próximamente (FASE 14)</div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
+
+      {/* Calendario — full width para que el panel de detalle no se apile */}
+      <GraderHistoricalCalendar onLoadTurno={goToTurno} />
     </div>
   )
 }
