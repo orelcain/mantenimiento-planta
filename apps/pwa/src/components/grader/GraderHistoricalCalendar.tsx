@@ -37,6 +37,7 @@ import {
 } from '@/services/grader/graderShiftSchedule'
 import type { GraderUpload, GraderDailySummary } from '@/services/grader/types'
 import { useAuthStore } from '@/store'
+import { useGraderSelectionStore } from '@/store/graderSelectionStore'
 
 interface TurnoSummary {
   totalPieces: number
@@ -143,6 +144,8 @@ export function GraderHistoricalCalendar({
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const user = useAuthStore((s) => s.user)
+  const selectedHistorical = useGraderSelectionStore((s) => s.selectedHistorical)
+  const setSelectedHistorical = useGraderSelectionStore((s) => s.setSelectedHistorical)
 
   // Si el URL trae ?goto=YYYY-MM-DD úsalo como initialDateKey (prioridad sobre prop)
   const gotoParam = searchParams.get('goto')
@@ -268,6 +271,23 @@ export function GraderHistoricalCalendar({
   }, [uploads])
 
   const selectedKey = selectedDate ? selectedDate.toISOString().slice(0, 10) : null
+
+  // Auto-selección del turno para el store compartido:
+  //   - Cuando cambia el día seleccionado, si la selección actual no pertenece a este día,
+  //     elegir el primer turno (día > noche) del día si existe. Si no hay turnos, limpiar.
+  useEffect(() => {
+    if (!selectedKey) return
+    const turnosDelDia = historicalByDate.get(selectedKey) ?? []
+    if (turnosDelDia.length === 0) {
+      if (selectedHistorical) setSelectedHistorical(null)
+      return
+    }
+    const currentBelongsToDay = selectedHistorical && turnosDelDia.some((t) => t.id === selectedHistorical.id)
+    if (currentBelongsToDay) return
+    const order: Record<string, number> = { 'Turno día': 0, 'Turno noche': 1 }
+    const sorted = [...turnosDelDia].sort((a, b) => (order[a.shiftId] ?? 9) - (order[b.shiftId] ?? 9))
+    setSelectedHistorical(sorted[0] ?? null)
+  }, [selectedKey, historicalByDate, selectedHistorical, setSelectedHistorical])
   const selectedUploads = useMemo(() => {
     if (!selectedKey) return []
     return uploadsByDate.get(selectedKey) || []
@@ -630,14 +650,26 @@ export function GraderHistoricalCalendar({
                   const order: Record<string, number> = { 'Turno día': 0, 'Turno noche': 1 }
                   return (order[a.shiftId] ?? 9) - (order[b.shiftId] ?? 9)
                 })
-                .map((hist) => (
+                .map((hist) => {
+                  const isActiveForConfig = selectedHistorical?.id === hist.id
+                  return (
                   <div
                     key={hist.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setSelectedHistorical(isActiveForConfig ? null : hist)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        setSelectedHistorical(isActiveForConfig ? null : hist)
+                      }
+                    }}
                     className={cn(
-                      'rounded-lg border px-3 py-2.5 space-y-2',
-                      hist.pointZeroPct >= 3.5 ? 'border-red-500/30 bg-red-500/5' :
-                      hist.pointZeroPct >= 2   ? 'border-amber-500/30 bg-amber-500/5' :
-                                                 'border-emerald-500/20 bg-emerald-500/5',
+                      'rounded-lg border px-3 py-2.5 space-y-2 cursor-pointer transition-all',
+                      hist.pointZeroPct >= 3.5 ? 'border-red-500/30 bg-red-500/5 hover:border-red-500/50' :
+                      hist.pointZeroPct >= 2   ? 'border-amber-500/30 bg-amber-500/5 hover:border-amber-500/50' :
+                                                 'border-emerald-500/20 bg-emerald-500/5 hover:border-emerald-500/40',
+                      isActiveForConfig && 'ring-2 ring-emerald-500 ring-offset-1 ring-offset-background',
                     )}
                   >
                     <div className="flex items-center justify-between">
@@ -728,7 +760,10 @@ export function GraderHistoricalCalendar({
                       <Button
                         size="sm"
                         className="h-7 text-[11px] flex-1 bg-primary/90 hover:bg-primary text-primary-foreground"
-                        onClick={() => navigate(`/analisis-grader/detalle?date=${hist.dateKey}&shift=${encodeURIComponent(hist.shiftId)}`)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          navigate(`/analisis-grader/detalle?date=${hist.dateKey}&shift=${encodeURIComponent(hist.shiftId)}`)
+                        }}
                       >
                         <Eye className="h-3 w-3 mr-1" />
                         Ver detalle
@@ -738,7 +773,10 @@ export function GraderHistoricalCalendar({
                         variant="outline"
                         className="h-7 text-[11px] text-red-600 hover:text-red-600 border-red-500/30 hover:bg-red-500/10"
                         disabled={deletingId === hist.id}
-                        onClick={() => handleDeleteSummary(hist.dateKey, hist.shiftId)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDeleteSummary(hist.dateKey, hist.shiftId)
+                        }}
                       >
                         {deletingId === hist.id
                           ? <Loader2 className="h-3 w-3 animate-spin" />
@@ -747,7 +785,7 @@ export function GraderHistoricalCalendar({
                       </Button>
                     </div>
                   </div>
-                ))}
+                )})}
               </div>
             </div>
           )}

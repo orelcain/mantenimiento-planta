@@ -17,6 +17,7 @@ import {
 } from '@/services/grader/graderSession.service'
 import { getModuleRanges, saveModuleRanges, saveModulePhysicalConfig, saveModuleShiftSchedule } from '@/services/grader/graderModuleConfig.service'
 import { listDailySummariesByRange } from '@/services/grader/graderDailySummary.service'
+import { useGraderSelectionStore } from '@/store/graderSelectionStore'
 import type { GraderDailySummary } from '@/services/grader/types'
 import { DEFAULT_SHIFT_SCHEDULE, formatShiftTime, normalizeShiftSchedule, parseShiftTime } from '@/services/grader/graderShiftSchedule'
 import type {
@@ -111,6 +112,7 @@ interface BatchStats {
   cv: number
   dominantCalibre: string
   throughputPzPerMin: number | null
+  peakPzPerMin: number | null
   windowMinutes: number | null
 }
 
@@ -286,10 +288,10 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
   // Peso mediano manual (gramos) — cuando no hay Excel, el usuario puede ingresarlo
   const [manualMedianG, setManualMedianG] = useState<number | undefined>(undefined)
 
-  // Summaries históricos disponibles (últimos 60 días con avgWeightGrams)
-  const [historicalSummaries, setHistoricalSummaries] = useState<GraderDailySummary[]>([])
-  // ID del summary elegido por el usuario como base para las sugerencias (null = usar más reciente)
-  const [selectedHistoricalId, setSelectedHistoricalId] = useState<string | null>(null)
+  // Summary histórico seleccionado en el calendario (store compartido).
+  // Fallback: si nada seleccionado, usa el summary más reciente de los últimos 60 días.
+  const selectedFromCalendar = useGraderSelectionStore((s) => s.selectedHistorical)
+  const [fallbackSummaries, setFallbackSummaries] = useState<GraderDailySummary[]>([])
 
   useEffect(() => {
     const today = new Date()
@@ -302,24 +304,20 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
         const withWeight = summaries.filter(
           (s) => typeof s.avgWeightGrams === 'number' && s.avgWeightGrams > 50 && s.avgWeightGrams < 15000,
         )
-        // Orden: fecha descendente, día antes que noche dentro del mismo día
         withWeight.sort((a, b) => {
           const byDate = b.dateKey.localeCompare(a.dateKey)
           if (byDate !== 0) return byDate
           const order: Record<string, number> = { 'Turno día': 0, 'Turno noche': 1 }
           return (order[a.shiftId] ?? 9) - (order[b.shiftId] ?? 9)
         })
-        setHistoricalSummaries(withWeight)
+        setFallbackSummaries(withWeight)
       })
       .catch(() => {})
   }, [])
 
-  // Summary histórico efectivamente seleccionado (explícito del user o el más reciente)
+  // Summary efectivamente usado: prioriza el del calendario, cae al más reciente
   const historicalMedianG = useMemo(() => {
-    if (historicalSummaries.length === 0) return null
-    const chosen = selectedHistoricalId
-      ? historicalSummaries.find((s) => s.id === selectedHistoricalId)
-      : historicalSummaries[0]
+    const chosen = selectedFromCalendar ?? fallbackSummaries[0] ?? null
     if (!chosen || !chosen.avgWeightGrams) return null
     return {
       value: Math.round(chosen.avgWeightGrams),
@@ -330,8 +328,9 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
       totalWeightKg: chosen.totalWeightKg,
       durationMinutes: chosen.durationMinutes,
       productionRatePerHour: chosen.productionRatePerHour,
+      fromCalendar: selectedFromCalendar !== null,
     }
-  }, [historicalSummaries, selectedHistoricalId])
+  }, [selectedFromCalendar, fallbackSummaries])
 
   // Peso efectivo para el cálculo alométrico: prioriza Excel, luego manual, luego histórico
   const effectiveMedianG = medianWeightG ?? manualMedianG ?? historicalMedianG?.value ?? null
@@ -377,12 +376,21 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
       .sort((a, b) => a - b)
     let throughputPzPerMin: number | null = null
     let windowMinutes: number | null = null
+    let peakPzPerMin: number | null = null
     if (timestamps.length >= 2) {
       const spanMs = timestamps[timestamps.length - 1]! - timestamps[0]!
       windowMinutes = spanMs / 60000
       if (windowMinutes > 0) throughputPzPerMin = records.length / windowMinutes
+      // Pico: máximo N piezas en cualquier ventana rodante de 60s
+      const minuteBuckets: Record<number, number> = {}
+      for (const ts of timestamps) {
+        const minuteKey = Math.floor(ts / 60000)
+        minuteBuckets[minuteKey] = (minuteBuckets[minuteKey] ?? 0) + 1
+      }
+      const counts = Object.values(minuteBuckets)
+      if (counts.length > 0) peakPzPerMin = Math.max(...counts)
     }
-    return { n: records.length, p10, p50, p90, cv, dominantCalibre, throughputPzPerMin, windowMinutes }
+    return { n: records.length, p10, p50, p90, cv, dominantCalibre, throughputPzPerMin, peakPzPerMin, windowMinutes }
   }, [parsedData.pieceRecords])
 
   const updateWeightRange = (idx: number, patch: Partial<CalibreWeightRange>) => {
@@ -1164,33 +1172,27 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                   </Select>
                   {physicalConfig.species && (() => {
                     const s = SPECIES_ALLOMETRY[physicalConfig.species]
+                    const fishBaseId = physicalConfig.species === 'salar' ? 236 : 245
+                    const scientific = physicalConfig.species === 'salar' ? 'Salmo salar' : 'Oncorhynchus kisutch'
                     return (
-                      <span className="text-[10px] text-muted-foreground font-mono">
-                        W = {s.a} × L^{s.b} · ancho ≈ {(s.widthRatio * 100).toFixed(0)}% largo
-                      </span>
+                      <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                        <span className="font-mono">W = {s.a} × L^{s.b} · ancho ≈ {(s.widthRatio * 100).toFixed(0)}% largo</span>
+                        <InfoTooltip
+                          title={`${s.label} · ${scientific}`}
+                          text={`Relación Largo-Peso oficial de FishBase (Bayesian LWR). Peso W en gramos, largo L en cm (longitud total). El ancho es empírico — validar en planta.`}
+                          formula={`W(g) = ${s.a} × L(cm)^${s.b}\nAncho ≈ ${(s.widthRatio * 100).toFixed(0)}% × Largo\n\nFuente: Froese, Thorson & Reyes 2014\nJ. Applied Ichthyology 30(1):78-85\nFishBase ID: ${fishBaseId}`}
+                          example={physicalConfig.species === 'salar' ? '5 kg → ~72 cm largo · ~14 cm ancho' : '3.5 kg → ~66 cm largo · ~12 cm ancho'}
+                          position="right"
+                        />
+                      </div>
                     )
                   })()}
                 </div>
 
-                {physicalConfig.species && !medianWeightG && historicalSummaries.length > 0 && (
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <Label className="text-xs whitespace-nowrap">Día/turno base</Label>
-                    <Select
-                      value={selectedHistoricalId ?? historicalSummaries[0]!.id}
-                      onValueChange={(v) => setSelectedHistoricalId(v)}
-                    >
-                      <SelectTrigger className="h-8 text-xs w-80">
-                        <SelectValue placeholder="Elegir día/turno…" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {historicalSummaries.map((s) => (
-                          <SelectItem key={s.id} value={s.id} className="text-xs">
-                            {s.dateKey} · {s.shiftId} · {((s.avgWeightGrams ?? 0) / 1000).toFixed(2)} kg · {s.totalPieces.toLocaleString('es-CL')} pz
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                {physicalConfig.species && !medianWeightG && historicalMedianG && (
+                  <p className="text-[10px] text-muted-foreground flex items-center gap-1.5">
+                    <span>💡 Tip: haz click en una tarjeta de turno del calendario para usar ese día/turno como base de sugerencias.</span>
+                  </p>
                 )}
 
                 {physicalConfig.species && (
@@ -1218,8 +1220,14 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                       </Badge>
                     )}
                     {medianSource === 'historical' && historicalMedianG && (
-                      <Badge className="text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 px-1.5 py-0">
-                        Histórico · {historicalMedianG.dateKey} {historicalMedianG.shiftId} · {(historicalMedianG.value / 1000).toFixed(2)} kg
+                      <Badge className={cn(
+                        'text-[10px] px-1.5 py-0',
+                        historicalMedianG.fromCalendar
+                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                          : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+                      )}>
+                        {historicalMedianG.fromCalendar ? '📅 Desde calendario · ' : 'Último registro · '}
+                        {historicalMedianG.dateKey} {historicalMedianG.shiftId} · {(historicalMedianG.value / 1000).toFixed(2)} kg
                       </Badge>
                     )}
                     {medianSource === null && (
@@ -1363,20 +1371,37 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                       Ventana de cierre mínima después que el salmón pasó: <span className="font-mono font-medium text-foreground">{Math.max(0, salmonPassTimeSec - minOpenTimeSec).toFixed(3)} s</span>
                     </p>
                     <div className="mt-2 pt-2 border-t border-sky-500/20 space-y-1">
-                      <p className="font-medium text-sky-700 dark:text-sky-300">
-                        Análisis de pockets ({physicalConfig.pocketCount} activos)
-                        {cadenceSource === 'excel' && <span className="text-[10px] text-emerald-500 ml-2">· cadencia del Excel</span>}
-                        {cadenceSource === 'historical' && <span className="text-[10px] text-amber-500 ml-2">· cadencia del histórico {historicalMedianG?.dateKey} {historicalMedianG?.shiftId}</span>}
-                        {cadenceSource === 'theoretical' && <span className="text-[10px] text-muted-foreground ml-2">· cadencia teórica (estimada)</span>}
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-medium text-sky-700 dark:text-sky-300">
+                          Análisis de pockets ({physicalConfig.pocketCount} activos)
+                        </p>
+                        <InfoTooltip
+                          title="Flujo real del alimentado"
+                          text={`4 clasificadoras manuales operan los pockets: cada una toma una pieza, presiona el botón de calidad y deposita la pieza en su pocket. El Static Weighing pesa y descarga a la cinta Z.\n\nLa cadencia NO es teórica (1 pieza/pocket/seg) sino limitada por la velocidad humana. Típico máximo observado: 66–70 pz/min en salida Z-belt.`}
+                          example="Turno saludable: 40–55 pz/min promedio · picos 65–70"
+                          position="top"
+                        />
+                        {cadenceSource === 'excel' && <span className="text-[10px] text-emerald-500">· cadencia real del Excel cargado</span>}
+                        {cadenceSource === 'historical' && <span className="text-[10px] text-amber-500">· cadencia real del histórico {historicalMedianG?.dateKey} {historicalMedianG?.shiftId}</span>}
+                        {cadenceSource === 'theoretical' && <span className="text-[10px] text-muted-foreground">· cadencia teórica (sin datos)</span>}
+                      </div>
+                      <p className="text-muted-foreground">
+                        Cadencia promedio: <span className="font-mono font-medium text-foreground">{cadencePiecesPerMin.toFixed(0)} pz/min</span>
+                        {batchStats?.peakPzPerMin != null && (
+                          <span className="text-[10px]"> · pico observado: <span className="font-mono font-medium text-foreground">{batchStats.peakPzPerMin} pz/min</span></span>
+                        )}
                       </p>
                       <p className="text-muted-foreground">
-                        Cadencia: <span className="font-mono font-medium text-foreground">{cadencePiecesPerMin.toFixed(0)} pz/min</span>
-                        <span className="text-[10px]"> · Espaciado en cinta: </span>
-                        <span className="font-mono font-medium text-foreground">{spacingM.toFixed(2)} m</span>
+                        Espaciado en cinta: <span className="font-mono font-medium text-foreground">{spacingM.toFixed(2)} m</span>
                         <span className="text-[10px]"> · Ratio largo/espacio: </span>
                         <span className={cn('font-mono font-medium', overlapping ? 'text-red-500' : lengthToSpacingRatio > 0.7 ? 'text-amber-500' : 'text-emerald-500')}>
                           {lengthToSpacingRatio.toFixed(2)}
                         </span>
+                        <InfoTooltip
+                          text={`Espaciado = velocidad_cinta × (60 / cadencia). Si el largo del salmón supera el espaciado, dos piezas se solapan y la fotocélula marca "fuera de límites".`}
+                          formula={`espaciado = ${speedMps.toFixed(2)} m/s × (60 / ${cadencePiecesPerMin.toFixed(0)} pz·min⁻¹)\n           = ${spacingM.toFixed(2)} m\n\nratio = ${salmonLengthM.toFixed(2)} m / ${spacingM.toFixed(2)} m = ${lengthToSpacingRatio.toFixed(2)}`}
+                          position="top"
+                        />
                       </p>
                       {overlapping && (
                         <p className="text-[10px] text-red-500">
