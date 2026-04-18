@@ -722,20 +722,20 @@ Si se necesita re-procesar o corregir algo, usar `scripts/iter18-full-season-reb
 - ✅ **FASE 2**: 10 nuevos campos GraderPhysicalConfig (timing flippers, gates, maxBinWeight). Sub-card A editable con inputs reales.
 - ✅ **FASE 3**: Motor IA sugerencias (5 generadores + SuggestionCard + SuggestionsPanel + useSuggestionEngine)
 
-**Pendiente FASE 4 — Modelo multi-cinta**
-- ⏳ Separar grading belt / z-belt / acceleration 1 / acceleration 2 como entidades independientes en `GraderPhysicalConfig`
-- ⏳ Actualizar tab Cintas con selector por nombre de cinta y sus parámetros individuales
-- ⏳ Recalcular todos los ratios usando la cinta correspondiente (grading = 0.70 m/s, z-belt = 0.42 m/s)
+**✅ FASE 4 — Modelo multi-cinta (verificado en sesión 2026-04-18)**
+- ✅ Grading belt / z-belt / acceleration 1 / acceleration 2 independientes en `GraderBeltConfig` con `BELT_FLOW_ORDER` en `graderBeltHelpers.ts`
+- ✅ Tab Cintas con `CintasTab.tsx` + selector por nombre + parámetros individuales
+- ✅ Ratios calculados por cinta correspondiente (grading = 0.70 m/s, z-belt = 0.42 m/s)
 
-**Pendiente FASE 5 — Modales de medición**
-- ⏳ `slowMoModal`: guía paso a paso con SVG iPhone 240fps → ingresar frames → calcula segundos → guarda en Firestore `flipperTimingMeasurements`
-- ⏳ `tachModal`: guía tacómetro SKF con SVG vista lateral, DOs/DON'Ts, 3 zonas, promedio → guarda en Firestore `beltSpeedMeasurements`
-- ⏳ Integrar badge "Medido el DD/MM" + botón "Re-medir" en sub-cards de Equipo flipper
+**✅ FASE 5 — Modales de medición (verificado en sesión 2026-04-18)**
+- ✅ `SlowMoMeasurementModal.tsx`: guía paso-a-paso + SVG iPhone 240fps + frames/240=s → Firestore `flipperTimingMeasurements`
+- ✅ `TachMeasurementModal.tsx`: guía tacómetro SKF con SVG vista lateral, DOs/DON'Ts, 3 zonas, promedio → Firestore `beltSpeedMeasurements`
+- ✅ Badge "Medido el DD/MM" + botón "Re-medir" integrado en sub-cards de Equipo flipper
 
-**Pendiente FASE 6 — Audit trail configuración**
-- ⏳ Colección Firestore `graderConfigChangeLog` (timestamp, userId, parameter, previousValue, newValue, source, suggestionId?)
-- ⏳ Hook `useConfigChangeLogger` que wrappea `setPhysicalConfig` y registra automáticamente cada cambio
-- ⏳ Vista mini "Historial de cambios" en tab Producto (últimos 10 cambios con quién/cuándo/qué)
+**✅ FASE 6 — Audit trail configuración (verificado en sesión 2026-04-18)**
+- ✅ Colección Firestore `graderConfigChangeLog` + regla en `firestore.rules`
+- ✅ Hook `useConfigChangeLogger` que wrappea `setPhysicalConfig` y registra cambios automáticamente
+- ✅ Vista mini "Historial de cambios" en tab Producto (últimos 10 cambios con quién/cuándo/qué)
 
 ### P1.10 — Cronometrar reset flipper (investigado 2026-04-17 con docs internos Z2)
 **Modelo real**: Marelec **MS4/12** (estático + z-conveyor + 2 cintas aceleración + grading belt de 12 salidas). El "Z2" es el NOMBRE DEL COMPUTADOR/HMI, no del grader.
@@ -801,12 +801,12 @@ Identificación:
 2. Velocidad cinta configurada 0.70 m/s, NO 1.28 m/s — ajustar cálculos en tab Producto/Cintas
 3. Agregar en app inputs explícitos para `delayFlipperOpen/Close` (nuevos) + `minFlipperOpenTime` (renombrar "Reset flipper")
 
-**Implementación pendiente**:
-- ⏳ Renombrar campo "Reset flipper" → `minFlipperOpenTime` con tooltip de la definición Z2
-- ⏳ Agregar inputs `delayFlipperOpen`/`delayFlipperClose` (150 ms default)
-- ⏳ Actualizar `maxSpeed` cinta a 0.70 m/s (revisar tab Cintas)
-- ⏳ Modal "Capturar desde Z2": formulario para que operador transcriba valores del HMI (menú Servicio → 8620)
-- ⏳ Firestore: colección `flipperTimingMeasurements` (timestamp, pocket, values snapshot, operador)
+**✅ Implementación P1.10 completada (sesión 2026-04-18)**:
+- ✅ Renombrado campo "Reset flipper" → `minFlipperOpenTime` con tooltip Z2 (v2.128.0)
+- ✅ Inputs `delayFlipperOpen`/`delayFlipperClose` (150 ms default) en Sub-card A de ProductoTab
+- ✅ `maxSpeed` cinta = 0.70 m/s en GraderPhysicalConfig
+- ✅ `Z2CaptureModal.tsx` — modal completo: guía Cambiar Parámetros→8620, 3 inputs ms con Δ vs actual, badge color-coded, notas opcionales, checkbox "Aplicar a config". Botón "📟 Leer Z2" en ProductoTab. (v2.131.0)
+- ✅ Firestore: colección `flipperZ2Captures` (delayFlipperOpenMs, minFlipperOpenTimeMs, delayFlipperCloseMs, cycleTotalMs, notes?, measuredBy, measuredAt). Reglas en `firestore.rules` con validación de campos.
 - 🔮 **Futuro big bet**: driver Remote Connection Marelec en IP 172.27.12.12 para lectura en vivo de parámetros (requiere reverse-engineering del protocolo RC o contacto con soporte Marelec)
 
 **Docs parseados (barrido 2026-04-17 representativo ~25 imágenes del DOCX 418 total)**:

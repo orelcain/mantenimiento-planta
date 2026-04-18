@@ -1051,6 +1051,19 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ANÁLISIS GRADER - Capturas de timing de flipper desde HMI Marelec Z2
+    match /flipperZ2Captures/{captureId} {
+      allow read: if isAuthenticated();
+      allow create: if isSupervisor()
+        && request.resource.data.measuredBy == request.auth.uid
+        && request.resource.data.delayFlipperOpenMs is number
+        && request.resource.data.minFlipperOpenTimeMs is number
+        && request.resource.data.delayFlipperCloseMs is number
+        && request.resource.data.cycleTotalMs is number;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
     // ============================================
     // GANTT - Planificación de mantenimiento
     // ============================================
