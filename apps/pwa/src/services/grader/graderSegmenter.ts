@@ -406,9 +406,9 @@ export function computeShiftSummary(
     : undefined
 
   // ── Causas P0 ──────────────────────────────────────────────────────────────
-  const p0Source: Array<{ pieces: number; error?: string }> = gate0Records.length > 0
+  const p0Source: Gate0Record[] = gate0Records.length > 0
     ? gate0Records
-    : pieceRecords.filter((rec) => rec.gate === 0)
+    : (pieceRecords.filter((rec) => rec.gate === 0) as unknown as Gate0Record[])
 
   const causeMap = new Map<string, number>()
   const activeGates = (gates ?? []).filter(g => g.active)

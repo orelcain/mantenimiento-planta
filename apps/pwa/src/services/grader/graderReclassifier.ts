@@ -212,7 +212,7 @@ export async function reclassifyShift(
   for (const r of g0Records) {
     const gatesAtTs = getGatesAtTs(r.ts).filter(g => g.active)
     const cause = classifyRecordToMatrix(
-      { ...r, error: r.error ?? 'Fuera de límites', gate: 0 as const },
+      { ...r, error: r.error ?? 'Fuera de límites', gate: 0 as const, quality: r.quality as GraderQuality | undefined },
       gatesAtTs,
       CALIBRE_WEIGHT_RANGES,
     )
