@@ -194,17 +194,17 @@ export function AnalisisGraderLandingPage() {
           </Card>
         </button>
 
-        <div className="opacity-50 cursor-not-allowed">
-          <Card className="h-full">
+        <button className="text-left" onClick={() => navigate('/analisis-grader/ayuda')}>
+          <Card className="hover:bg-muted/40 transition-colors h-full">
             <CardContent className="p-3 flex items-center gap-2">
               <Clock className="w-4 h-4 text-muted-foreground shrink-0" />
               <div>
                 <div className="font-medium text-xs">Manual y runbooks</div>
-                <div className="text-xs text-muted-foreground">Próximamente (FASE 14)</div>
+                <div className="text-xs text-muted-foreground">Procedimientos Z2 · 10 runbooks</div>
               </div>
             </CardContent>
           </Card>
-        </div>
+        </button>
       </div>
 
       {/* Calendario — full width para que el panel de detalle no se apile */}

@@ -20,6 +20,7 @@ import { HeroScorecard } from '@/components/grader/HeroScorecard'
 import { P0CausesPanel } from '@/components/grader/P0CausesPanel'
 import { ShiftTimelineView } from '@/components/grader/ShiftTimelineView'
 import { ActionPlanPanel, deriveSuggestions } from '@/components/grader/ActionPlanPanel'
+import { findTriggeredRunbooks } from '@/services/grader/graderRunbooks'
 import type { GraderDailySummary, MatrixP0Cause, PointZeroClassification } from '@/services/grader/types'
 import type { GraderShiftDoc } from '@/services/grader/graderShifts.service'
 
@@ -129,6 +130,11 @@ export function AnalisisGraderTurnoPage() {
     [summary, byMatrixCause],
   )
 
+  const triggeredRunbooks = useMemo(
+    () => findTriggeredRunbooks(dominantCause(byMatrixCause), summary?.pointZeroPct ?? 0),
+    [summary, byMatrixCause],
+  )
+
   const shiftDocId = `${dateKey}__${shiftLabel}`
 
   if (!canSee('analisisGrader')) return <Navigate to="/" replace />
@@ -188,6 +194,7 @@ export function AnalisisGraderTurnoPage() {
                 shiftDocId={shiftDocId}
                 suggestions={suggestions}
                 status={shiftWindow.status}
+                relatedRunbooks={triggeredRunbooks}
               />
             </div>
           </div>
