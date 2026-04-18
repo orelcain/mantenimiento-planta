@@ -6,12 +6,12 @@
  * (React Router decodifica automáticamente → `YYYY-MM-DD__Turno día`)
  */
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useParams, useNavigate, Navigate } from 'react-router-dom'
-import { Button, Card, CardContent, Spinner } from '@/components/ui'
-import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2 } from 'lucide-react'
+import { Button, Card, CardContent, Spinner, Badge } from '@/components/ui'
+import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { usePermissionsStore } from '@/store'
-import { getDailySummary, loadTimelineAggregates } from '@/services/grader/graderDailySummary.service'
+import { getDailySummary, loadTimelineAggregates, listDailySummariesByRange } from '@/services/grader/graderDailySummary.service'
 import { getShiftDoc } from '@/services/grader/graderShifts.service'
 import { computeShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import type { ShiftTimeWindow } from '@/services/grader/graderShiftStatus'
@@ -136,6 +136,63 @@ export function AnalisisGraderTurnoPage() {
     loadSeasonBenchmark('2025-2026').then(setBenchmark).catch(() => setBenchmark(null))
   }, [])
 
+  // ── Navegación contextual prev/next ─────────────────────────────────────
+  // Carga shifts del rango ±20 días para construir cadena de navegación
+  const [adjacentShifts, setAdjacentShifts] = useState<{ prev: { dateKey: string; shiftId: string } | null; next: { dateKey: string; shiftId: string } | null }>({ prev: null, next: null })
+
+  useEffect(() => {
+    if (!dateKey || !shiftLabel) return
+    const fromDate = (() => {
+      const d = new Date(`${dateKey}T12:00:00`); d.setDate(d.getDate() - 20)
+      return d.toISOString().slice(0, 10)
+    })()
+    const toDate = (() => {
+      const d = new Date(`${dateKey}T12:00:00`); d.setDate(d.getDate() + 20)
+      return d.toISOString().slice(0, 10)
+    })()
+    listDailySummariesByRange(fromDate, toDate)
+      .then(list => {
+        // Orden cronológico ascendente por dateKey, luego día antes que noche
+        const sorted = [...list].sort((a, b) => {
+          if (a.dateKey !== b.dateKey) return a.dateKey.localeCompare(b.dateKey)
+          // 'Turno día' antes que 'Turno noche'
+          const aIsDay = a.shiftId.includes('día') ? 0 : 1
+          const bIsDay = b.shiftId.includes('día') ? 0 : 1
+          return aIsDay - bIsDay
+        })
+        const idx = sorted.findIndex(s => s.dateKey === dateKey && s.shiftId === shiftLabel)
+        if (idx === -1) {
+          setAdjacentShifts({ prev: null, next: null })
+          return
+        }
+        setAdjacentShifts({
+          prev: idx > 0 ? { dateKey: sorted[idx - 1].dateKey, shiftId: sorted[idx - 1].shiftId } : null,
+          next: idx < sorted.length - 1 ? { dateKey: sorted[idx + 1].dateKey, shiftId: sorted[idx + 1].shiftId } : null,
+        })
+      })
+      .catch(() => setAdjacentShifts({ prev: null, next: null }))
+  }, [dateKey, shiftLabel])
+
+  const goToShift = useCallback((target: { dateKey: string; shiftId: string }) => {
+    navigate(`/analisis-grader/turno/${target.dateKey}__${encodeURIComponent(target.shiftId)}`)
+  }, [navigate])
+
+  // Atajos de teclado: ← / → para navegar entre turnos
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      if (e.key === 'ArrowLeft' && adjacentShifts.prev) {
+        e.preventDefault()
+        goToShift(adjacentShifts.prev)
+      } else if (e.key === 'ArrowRight' && adjacentShifts.next) {
+        e.preventDefault()
+        goToShift(adjacentShifts.next)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [adjacentShifts, goToShift])
+
   const handleGenerateAI = async () => {
     if (!summary) return
     setAiLoading(true)
@@ -215,24 +272,81 @@ export function AnalisisGraderTurnoPage() {
 
   if (!canSee('analisisGrader')) return <Navigate to="/" replace />
 
+  // Fecha legible para el header ("vie 27 feb")
+  const dateLabel = useMemo(() => {
+    if (!dateKey) return ''
+    const d = new Date(`${dateKey}T12:00:00`)
+    const dayName = d.toLocaleDateString('es-CL', { weekday: 'short' }).replace('.', '')
+    const dayNum = d.getDate()
+    const monthName = d.toLocaleDateString('es-CL', { month: 'short' }).replace('.', '')
+    return `${dayName} ${dayNum} ${monthName}`
+  }, [dateKey])
+
   return (
-    <div className="container mx-auto p-4 space-y-4 max-w-screen-xl">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => navigate('/analisis-grader')}
-          className="gap-1.5"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Análisis Grader
-        </Button>
-        {dateKey && shiftLabel && (
-          <span className="text-sm text-muted-foreground">
-            {shiftLabel} · {dateKey}
-          </span>
-        )}
+    <div className="container mx-auto p-3 sm:p-4 space-y-4 max-w-screen-xl">
+      {/* ── Header con navegación contextual ──────────────────────────── */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        {/* Izquierda: back + título */}
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate('/analisis-grader')}
+            className="gap-1.5 shrink-0"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span className="hidden sm:inline">Análisis Grader</span>
+          </Button>
+          {dateKey && shiftLabel && (
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-sm font-medium truncate">
+                {shiftLabel}
+              </span>
+              <span className="text-sm text-muted-foreground hidden sm:inline">·</span>
+              <span className="text-sm text-muted-foreground truncate">
+                {dateLabel}
+              </span>
+              {shiftWindow && (
+                <Badge
+                  variant="outline"
+                  className={`text-[10px] px-1.5 py-0 shrink-0 ${
+                    shiftWindow.status === 'live'
+                      ? 'border-red-500/50 text-red-400'
+                      : 'border-muted-foreground/30 text-muted-foreground'
+                  }`}
+                >
+                  {shiftWindow.status === 'live' ? 'EN VIVO' : 'CERRADO'}
+                </Badge>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Derecha: prev/next navigation */}
+        <div className="flex items-center gap-1 shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => adjacentShifts.prev && goToShift(adjacentShifts.prev)}
+            disabled={!adjacentShifts.prev}
+            className="gap-1"
+            title={adjacentShifts.prev ? `Turno anterior (←)` : 'Sin turno anterior'}
+          >
+            <ChevronLeft className="w-4 h-4" />
+            <span className="hidden md:inline text-xs">Anterior</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => adjacentShifts.next && goToShift(adjacentShifts.next)}
+            disabled={!adjacentShifts.next}
+            className="gap-1"
+            title={adjacentShifts.next ? `Turno siguiente (→)` : 'Sin turno siguiente'}
+          >
+            <span className="hidden md:inline text-xs">Siguiente</span>
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+        </div>
       </div>
 
       {/* Estados */}
