@@ -10,7 +10,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, Button, Badge } from '@/components/ui'
-import { Settings2, BarChart3, Loader2, CheckCircle2, Calendar } from 'lucide-react'
+import { Settings2, BarChart3, Loader2, CheckCircle2, Calendar, BookOpen } from 'lucide-react'
 import { useAuthStore, usePermissionsStore } from '@/store'
 import { AnalisisGraderUploadPage, type FileParsed } from './AnalisisGraderUploadPage'
 import { GraderHistoricalCalendar } from '@/components/grader/GraderHistoricalCalendar'
@@ -462,7 +462,11 @@ export function AnalisisGraderWizardPage() {
           )}
           <Button variant="outline" size="sm" onClick={() => navigate('/analisis-grader/periodo')} className="border-primary/30 text-primary hover:bg-primary/10">
             <BarChart3 className="h-4 w-4 mr-1.5" />
-            Análisis período
+            <span className="hidden sm:inline">Análisis </span>período
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => navigate('/analisis-grader/ayuda')} className="border-muted-foreground/30 hover:bg-muted/50">
+            <BookOpen className="h-4 w-4 mr-1.5" />
+            <span className="hidden sm:inline">Manual &amp; </span>runbooks
           </Button>
         </div>
       </div>
