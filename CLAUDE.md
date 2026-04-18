@@ -838,6 +838,43 @@ Calibración:
 4. 🔮 **Reverse-engineer protocolo RC Marelec** (esfuerzo alto — pedir SDK a soporte Marelec)
 5. 🔮 **FTP log sync con ftp.marelec.com** (requiere permiso Marelec)
 
+### P1.11 — ✅ COMPLETADO 2026-04-17/18 — FASES 11-14 Análisis Grader refactor + auditoría P0
+
+**Plan de referencia**: `docs/PLAN-ANALISIS-GRADER-FASES-11-16.md`
+
+**FASE 12 — Landing unificado + vista TurnoPage**
+- ✅ `AnalisisGraderLandingPage`: hero + últimos turnos (8) + 4 accesos rápidos en fila + calendario full-width. `max-w-screen-xl`.
+- ✅ `AnalisisGraderTurnoPage`: scorecard HeroScorecard + P0CausesPanel (2/3) + ActionPlanPanel (1/3) + ShiftTimelineView full-width. Ruta: `/analisis-grader/turno/YYYY-MM-DD__Turno%20día`
+- ✅ Fix critical: todos los `useMemo` antes del early return (react-hooks/rules-of-hooks).
+- ✅ Firestore rules: colección `graderShifts` (read auth / create+update supervisor / delete admin).
+
+**FASE 13 — Timeline + panel acciones**
+- ✅ `ShiftTimelineView`: gráfico ECharts P0%/minuto + markLines uploads/acciones + checkpoints cronológicos.
+- ✅ `ActionPlanPanel`: sugerencias tripartitas terreno/oficina/verificar derivadas de causa dominante P0. Checked-state en localStorage.
+- ✅ `deriveSuggestions()`: lógica rule-based para `fuera_de_limites`, `no_leido_fotocelula`, `puerta_no_preparada`.
+- ✅ `graderShifts.service.ts`: `GraderShiftDoc` con `uploads[]` y `actions[]`.
+
+**FASE 14 — Runbooks Z2 + página Ayuda + glosario**
+- ✅ `graderRunbooks.ts`: 10 runbooks oficiales (contrastacion/calibracion/mantencion/limpieza/troubleshooting). Triggers, fórmulas, Z2 paths, serviceKey.
+- ✅ `graderGlossary.ts`: 16 términos Marelec Z2.
+- ✅ `RunbookCard.tsx`: expandible con check de pasos por sesión, fórmula monospace, badge Z2 path.
+- ✅ `AnalisisGraderAyudaPage`: buscador + filtros categoría + glosario colapsable + PDFs. Ruta: `/analisis-grader/ayuda`.
+- ✅ `ActionPlanPanel`: prop `relatedRunbooks` — muestra RunbookCards contextuales vía `findTriggeredRunbooks`.
+
+**Auditoría Opus 4.7 + fixes P0/P1 (2026-04-18)**
+- ✅ **P0**: Timeline carga desde sub-collection real (`loadTimelineAggregates`) en vez de `[]` hardcodeado.
+- ✅ **P0**: `findTriggeredRunbooks` cubre las 4 causas P0 (lookup table `causeMetricMap`). Triggers agregados a `slow-mo-flipper`, `presion-aire`, `reset-boton-azul`.
+- ✅ **P0**: Turno en vivo sin datos → empty-state con CTA "Cargar Excel" en lugar de error confuso.
+- ✅ **P1**: `shiftWindow` convertido a `useState` + `setInterval(60s)` cuando status=live — progress bar actualiza en tiempo real.
+- ✅ **P1**: Acciones marcadas se persisten en Firestore (`graderShifts.actions[]`) vía `appendShiftAction` fire-and-forget.
+- ✅ **P1**: `dominantCause` calculado una sola vez via `useMemo dominant` (era llamado 2× por render).
+
+**Commits sesión**: `510fffd2`, `138740bc`, `382f768a`, `c51b1f3c`, `2f5ccba2`, `5ee6d773`
+**CI**: FASE 12 deploy ❌ (ESLint rules-of-hooks, corregido en FASE 13). FASE 13 y 14 ✅ verdes.
+
+**PENDIENTE — FASE 15**: análisis de período multi-turno (ruta `/analisis-grader/periodo`)
+**PENDIENTE — FASE 16**: limpieza rutas legacy (wizard, detalle), eliminar componentes obsoletos.
+
 ### P1.5 — ✅ COMPLETADO 2026-04-09 (sesión siguiente)
 - ✅ **Input sanitization Firestore**: 16 colecciones validadas en 4 lotes (162e0d1e, 78908d73, 35262779, 601d7a00). Total: 23 colecciones con isValid*() en firestore.rules. Deploy Firestore Rules 🟢.
 
