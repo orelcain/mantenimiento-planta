@@ -193,6 +193,38 @@ export function AnalisisGraderTurnoPage() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [adjacentShifts, goToShift])
 
+  // Swipe horizontal (mobile) — mismo comportamiento que ← / →
+  useEffect(() => {
+    let startX = 0
+    let startY = 0
+    let startTarget: EventTarget | null = null
+    const onTouchStart = (e: TouchEvent) => {
+      startX = e.touches[0].clientX
+      startY = e.touches[0].clientY
+      startTarget = e.target
+    }
+    const onTouchEnd = (e: TouchEvent) => {
+      // Ignorar swipes que empezaron dentro de elementos scrollables horizontal
+      // (charts ECharts, carousels), inputs, o botones.
+      if (startTarget instanceof Element) {
+        if (startTarget.closest('input, textarea, button, canvas, [data-no-swipe]')) return
+      }
+      const dx = e.changedTouches[0].clientX - startX
+      const dy = e.changedTouches[0].clientY - startY
+      // Solo swipe claramente horizontal: |dx|>80px y dominante sobre vertical
+      if (Math.abs(dx) > 80 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+        if (dx > 0 && adjacentShifts.prev) goToShift(adjacentShifts.prev)
+        else if (dx < 0 && adjacentShifts.next) goToShift(adjacentShifts.next)
+      }
+    }
+    window.addEventListener('touchstart', onTouchStart, { passive: true })
+    window.addEventListener('touchend', onTouchEnd, { passive: true })
+    return () => {
+      window.removeEventListener('touchstart', onTouchStart)
+      window.removeEventListener('touchend', onTouchEnd)
+    }
+  }, [adjacentShifts, goToShift])
+
   const handleGenerateAI = async () => {
     if (!summary) return
     setAiLoading(true)
@@ -284,8 +316,12 @@ export function AnalisisGraderTurnoPage() {
 
   return (
     <div className="container mx-auto p-3 sm:p-4 space-y-4 max-w-screen-xl">
-      {/* ── Header con navegación contextual ──────────────────────────── */}
-      <div className="flex items-center justify-between gap-2 flex-wrap">
+      {/* ── Header sticky con navegación contextual ───────────────────── */}
+      <div className="sticky top-0 z-20 -mx-3 sm:-mx-4 px-3 sm:px-4 py-2 bg-background/85 backdrop-blur-md border-b border-border/40 flex items-center justify-between gap-2 flex-wrap">
+        {/* Sub-helper visual: tip de swipe en mobile */}
+        {(adjacentShifts.prev || adjacentShifts.next) && (
+          <span className="sr-only">Desliza ← → o usa teclado flechas para navegar turnos</span>
+        )}
         {/* Izquierda: back + título */}
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <Button
@@ -383,25 +419,32 @@ export function AnalisisGraderTurnoPage() {
         </Card>
       )}
 
-      {/* Contenido principal */}
+      {/* Contenido principal
+          Mobile (stack vertical): Scorecard → Acciones → Causas (acciones arriba del todo)
+          Desktop (grid 3-col 2 filas): Scorecard + Causas izq (2 cols apilados), Acciones der (col 3 × 2 filas) */}
       {summary && shiftWindow && (
         <>
-          {/* Fila superior: scorecard + acciones */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2 space-y-4">
+            {/* Scorecard — mobile row 1 */}
+            <div className="lg:col-span-2 lg:row-start-1">
               <HeroScorecard summary={summary} shiftWindow={shiftWindow} />
-              <P0CausesPanel
-                byMatrixCause={byMatrixCause}
-                totalP0Pct={summary.pointZeroPct}
-              />
             </div>
 
-            <div className="space-y-4">
+            {/* Acciones — mobile row 2 (protagonismo), desktop derecha full-height */}
+            <div className="lg:col-start-3 lg:row-span-2 space-y-4" data-no-swipe>
               <ActionPlanPanel
                 shiftDocId={shiftDocId}
                 suggestions={suggestions}
                 status={shiftWindow.status}
                 relatedRunbooks={triggeredRunbooks}
+              />
+            </div>
+
+            {/* Causas — mobile row 3 (contexto), desktop izquierda abajo */}
+            <div className="lg:col-span-2 lg:row-start-2">
+              <P0CausesPanel
+                byMatrixCause={byMatrixCause}
+                totalP0Pct={summary.pointZeroPct}
               />
             </div>
           </div>

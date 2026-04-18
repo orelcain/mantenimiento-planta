@@ -192,20 +192,14 @@ export function AnalisisGraderLandingPage() {
         </CardContent>
       </Card>
 
-      {/* ── Accesos rápidos: tira compacta ─────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+      {/* ── Accesos rápidos: tira compacta (3 en mobile, 3 en desktop) ── */}
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
         <QuickAccess
           icon={TrendingUp}
-          title="Análisis de período"
-          subtitle="Tendencia multi-turno"
+          title="Período"
+          subtitle="Tendencia multi-turno · benchmark"
           onClick={() => navigate('/analisis-grader/periodo')}
           accent
-        />
-        <QuickAccess
-          icon={BarChart3}
-          title="Dashboard clásico"
-          subtitle="Upload + análisis detallado"
-          onClick={goToUpload}
         />
         <QuickAccess
           icon={Settings2}
@@ -215,8 +209,8 @@ export function AnalisisGraderLandingPage() {
         />
         <QuickAccess
           icon={BookOpen}
-          title="Manual y runbooks"
-          subtitle="10 procedimientos Z2"
+          title="Manual"
+          subtitle="10 runbooks Z2 + glosario"
           onClick={() => navigate('/analisis-grader/ayuda')}
         />
       </div>
