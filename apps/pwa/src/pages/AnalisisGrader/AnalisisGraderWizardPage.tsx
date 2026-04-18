@@ -374,7 +374,7 @@ export function AnalisisGraderWizardPage() {
       const batchId = crypto.randomUUID()
       const sourceNames = parsedData?.files.map((f) => f.name) ?? []
       const summaries = multiDayInfo.entries.map(([, segment]) =>
-        computeShiftSummary(segment, batchId, sourceNames, user.id),
+        computeShiftSummary(segment, batchId, sourceNames, user.id, gates),
       )
       await saveDailySummaryBatch(summaries)
 

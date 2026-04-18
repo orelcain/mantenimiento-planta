@@ -73,6 +73,13 @@ function deriveByMatrixCause(
  * summaries históricos pre-schema-change.
  */
 function labelToMatrixCause(label: string): MatrixP0Cause {
+  // Claves canónicas almacenadas por el segmenter (post-FASE 30) — reconocimiento directo
+  const ALL_CAUSES: MatrixP0Cause[] = [
+    'fuera_de_limites', 'no_leido_fotocelula', 'too_close_too_long', 'puerta_no_preparada',
+    'fuera_de_calibre', 'fuera_de_calidad', 'fuera_de_conservacion', 'fuera_de_producto', 'otro',
+  ]
+  if (ALL_CAUSES.includes(label as MatrixP0Cause)) return label as MatrixP0Cause
+  // Compat con summaries históricos que almacenan strings crudos del Excel Matrix
   const s = (label ?? '').toLowerCase()
   const fromMatrix = parseMatrixErrorString(label)
   if (fromMatrix !== 'otro') return fromMatrix

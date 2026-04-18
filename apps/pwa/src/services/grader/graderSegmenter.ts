@@ -12,8 +12,9 @@
  *   4. saveDailySummaryBatch(summaries) → Firestore
  */
 
-import type { PieceRecord, Gate0Record, GraderShiftSchedule, GraderDailySummary, TimelineBucket } from './types'
+import type { PieceRecord, Gate0Record, GraderShiftSchedule, GraderDailySummary, TimelineBucket, GateAssignment } from './types'
 import { DEFAULT_SHIFT_SCHEDULE } from './graderShiftSchedule'
+import { classifyRecordToMatrix, CALIBRE_WEIGHT_RANGES } from './graderAnalytics'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -362,6 +363,7 @@ export function computeShiftSummary(
   batchUploadId: string,
   sourceFileNames: string[],
   createdBy: string,
+  gates?: GateAssignment[],
 ): GraderDailySummary {
   const { sessionDate, shiftId, pieceRecords, gate0Records } = segment
 
@@ -409,13 +411,24 @@ export function computeShiftSummary(
     : pieceRecords.filter((rec) => rec.gate === 0)
 
   const causeMap = new Map<string, number>()
+  const activeGates = (gates ?? []).filter(g => g.active)
   for (const rec of p0Source) {
-    const e = rec.error || 'Sin causa'
-    causeMap.set(e, (causeMap.get(e) ?? 0) + rec.pieces)
+    let causeKey: string
+    if (activeGates.length > 0) {
+      // Clasificar con la lógica de 9 causas Matrix usando la config de gates activa
+      causeKey = classifyRecordToMatrix(
+        { ...rec, error: rec.error ?? '', gate: 0 as const },
+        activeGates,
+        CALIBRE_WEIGHT_RANGES,
+      )
+    } else {
+      causeKey = rec.error || 'Sin causa'
+    }
+    causeMap.set(causeKey, (causeMap.get(causeKey) ?? 0) + rec.pieces)
   }
   const topP0Causes = Array.from(causeMap.entries())
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 5)
+    .slice(0, 9) // hasta 9 causas Matrix
     .map(([error, pieces]) => ({
       error,
       pieces,
