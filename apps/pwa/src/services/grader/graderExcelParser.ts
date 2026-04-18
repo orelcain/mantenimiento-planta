@@ -28,6 +28,8 @@ import type {
   QualitySummaryRow,
   ProductionSummaryRow,
   GraderQuality,
+  GraderConservation,
+  GraderProduct,
   CalibreRange,
 } from './types'
 
@@ -153,6 +155,24 @@ function normalizeCalibre(v: unknown): CalibreRange {
     return valid.includes(lb as CalibreRange) ? (lb as CalibreRange) : 'Other'
   }
   return 'Other'
+}
+
+function normalizeConservation(v: unknown): GraderConservation | undefined {
+  const s = norm(v)
+  if (!s || s === '-') return undefined
+  if (s === 'congelado' || s === 'frozen') return 'CONGELADO'
+  if (s === 'fresco' || s === 'fresh') return 'FRESCO'
+  return 'OTRO'
+}
+
+function normalizeProduct(v: unknown): GraderProduct | string | undefined {
+  if (v == null) return undefined
+  const s = String(v).trim()
+  if (!s || s === '-') return undefined
+  const u = s.toUpperCase()
+  if (u === 'HG') return 'HG'
+  if (u === 'DESTINO FILETE' || u === 'FILETE') return 'DESTINO FILETE'
+  return s // preservar string legacy/desconocido
 }
 
 /** Extrae el calibre original ("HG 6-8", "Fuera de Rango") para mostrar en reportes */
@@ -372,6 +392,7 @@ function parsePiezaPieza(rows: unknown[][], headerIdx: number, colMap: ColumnMap
   const iTime = col(colMap, 'hora', 'time')
   const iLot = col(colMap, 'lote', 'lot', 'folio')
   const iProduct = col(colMap, 'producto', 'product')
+  const iConservation = col(colMap, 'conservacion', 'conservation', 'conservación')
   const iShift = col(colMap, 'turno', 'shift')
 
   for (let r = headerIdx + 1; r < rows.length; r++) {
@@ -419,7 +440,8 @@ function parsePiezaPieza(rows: unknown[][], headerIdx: number, colMap: ColumnMap
       calibre: iCalibre != null ? normalizeCalibre(row[iCalibre]) : undefined,
       error: errorStr,
       lot: iLot != null ? (row[iLot] != null ? String(row[iLot]).trim() : undefined) : undefined,
-      product: iProduct != null ? (row[iProduct] != null ? String(row[iProduct]).trim() : undefined) : undefined,
+      product: iProduct != null ? normalizeProduct(row[iProduct]) : undefined,
+      conservation: iConservation != null ? normalizeConservation(row[iConservation]) : undefined,
       shift: shiftRaw || undefined,
       raw: rawCalibreStr ? { rawCalibre: rawCalibreStr } : undefined,
     }

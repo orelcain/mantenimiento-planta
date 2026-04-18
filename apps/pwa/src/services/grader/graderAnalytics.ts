@@ -492,8 +492,32 @@ function classifyRecordToMatrix(
       )
       if (!comboActive) return 'fuera_de_calidad'
     }
-    // (2d/2e) Conservación y producto: preparado para cuando GateAssignment
-    // soporte esas 2 dimensiones. Hoy devolvemos fuera_de_limites como residual.
+    // (2d) Calidad OK — chequear conservación si alguna gate la tiene configurada
+    if (record.conservation) {
+      const anyGateHasConservation = activeGates.some(g => g.assignedConservation != null)
+      if (anyGateHasConservation) {
+        const conservationActive = activeGates.some(
+          g => g.assignedCalibre === matchedRange.calibre
+            && g.assignedQuality === record.quality
+            && g.assignedConservation === record.conservation,
+        )
+        if (!conservationActive) return 'fuera_de_conservacion'
+      }
+    }
+
+    // (2e) Conservación OK — chequear producto si alguna gate lo tiene configurado
+    if (record.product) {
+      const anyGateHasProduct = activeGates.some(g => g.assignedProduct != null)
+      if (anyGateHasProduct) {
+        const productActive = activeGates.some(
+          g => g.assignedCalibre === matchedRange.calibre
+            && g.assignedQuality === record.quality
+            && (!record.conservation || g.assignedConservation === record.conservation)
+            && g.assignedProduct === record.product,
+        )
+        if (!productActive) return 'fuera_de_producto'
+      }
+    }
   }
 
   // (2f) Residual físico genuino

@@ -11,6 +11,9 @@
 
 export type GraderQuality = 'D' | 'Industrial' | 'Grado' | 'Premium' | 'Unknown';
 
+export type GraderConservation = 'CONGELADO' | 'FRESCO' | 'OTRO';
+export type GraderProduct = 'HG' | 'DESTINO FILETE' | 'OTRO';
+
 export type CalibreRange = string;
 
 /**
@@ -652,6 +655,8 @@ export interface GateAssignment {
   gateNumber: number; // 1..12
   assignedQuality: GraderQuality;
   assignedCalibre: CalibreRange;
+  assignedConservation?: GraderConservation; // opcional — backward compat
+  assignedProduct?: GraderProduct;           // opcional — backward compat
   active: boolean;
 }
 
@@ -697,7 +702,8 @@ export interface PieceRecord {
   calibre?: CalibreRange;
   error?: string; // available for gate 0 records (from pieza-pieza or Puerta 0)
   lot?: string;
-  product?: string;
+  product?: GraderProduct | string; // columna "Producto" del Excel
+  conservation?: GraderConservation; // columna "Conservacion" del Excel
   /** Turno leído directo de la columna "Turno" del Excel (ej: "A", "B", "Turno A") */
   shift?: string;
   raw?: Record<string, unknown>;
@@ -714,6 +720,8 @@ export interface Gate0Record {
   quality?: GraderQuality;
   calibre?: CalibreRange;
   lot?: string;
+  product?: GraderProduct | string; // columna "Producto" del Excel (pieza-pieza P0)
+  conservation?: GraderConservation; // columna "Conservacion" del Excel (pieza-pieza P0)
   /** Turno leído directo de la columna "Turno" del Excel (ej: "A", "B", "Turno A") */
   shift?: string;
   raw?: Record<string, unknown>;

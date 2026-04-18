@@ -28,6 +28,8 @@ import type {
   GraderPhysicalConfig,
   ParsedMatrixData,
   GraderQuality,
+  GraderConservation,
+  GraderProduct,
   CalibreRange,
   CalibreWeightRange,
 } from '@/services/grader/types'
@@ -862,6 +864,8 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                   <th className="py-2.5 px-2">Calibre</th>
                   <th className="py-2.5 px-2 text-center">Rango (g)</th>
                   <th className="py-2.5 px-2">Calidad</th>
+                  <th className="py-2.5 px-2">Conservación</th>
+                  <th className="py-2.5 px-2">Producto</th>
                   <th className="py-2.5 px-2 w-20 text-center">Activo</th>
                 </tr>
               </thead>
@@ -903,6 +907,36 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                           {QUALITIES.map((q) => (
                             <SelectItem key={q} value={q}>{q}</SelectItem>
                           ))}
+                        </SelectContent>
+                      </Select>
+                    </td>
+                    <td className="py-2 px-2">
+                      <Select
+                        value={gate.assignedConservation ?? '__any'}
+                        onValueChange={(v) => updateGate(idx, { assignedConservation: v === '__any' ? undefined : v as GraderConservation })}
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__any">Cualquiera</SelectItem>
+                          <SelectItem value="CONGELADO">Congelado</SelectItem>
+                          <SelectItem value="FRESCO">Fresco</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </td>
+                    <td className="py-2 px-2">
+                      <Select
+                        value={gate.assignedProduct ?? '__any'}
+                        onValueChange={(v) => updateGate(idx, { assignedProduct: v === '__any' ? undefined : v as GraderProduct })}
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__any">Cualquiera</SelectItem>
+                          <SelectItem value="HG">HG</SelectItem>
+                          <SelectItem value="DESTINO FILETE">Destino Filete</SelectItem>
                         </SelectContent>
                       </Select>
                     </td>
