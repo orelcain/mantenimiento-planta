@@ -178,13 +178,13 @@ export function AnalisisGraderPeriodoPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="container mx-auto p-3 sm:p-4 space-y-4 max-w-screen-xl">
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={() => navigate('/analisis-grader')}>
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Volver
+          <Button variant="outline" size="sm" onClick={() => navigate('/analisis-grader')} className="gap-1.5">
+            <ArrowLeft className="h-4 w-4" />
+            Análisis Grader
           </Button>
           <div>
             <h1 className="text-xl font-bold flex items-center gap-2">
@@ -372,18 +372,20 @@ export function AnalisisGraderPeriodoPage() {
         <>
           <GraderPeriodView data={aggregate} />
 
-          {/* ── FASE 15: Benchmark + Attribution ──────────────────────── */}
-          {benchmark && comparison && (
-            <BenchmarkComparisonCard
-              period={aggregate}
-              benchmark={benchmark}
-              comparison={comparison}
-            />
-          )}
+          {/* ── FASE 15: Benchmark + Attribution lado a lado en desktop ─ */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {benchmark && comparison && (
+              <BenchmarkComparisonCard
+                period={aggregate}
+                benchmark={benchmark}
+                comparison={comparison}
+              />
+            )}
 
-          {attribution && (
-            <TopActionsCard attribution={attribution} />
-          )}
+            {attribution && (
+              <TopActionsCard attribution={attribution} />
+            )}
+          </div>
         </>
       )}
     </div>

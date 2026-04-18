@@ -872,8 +872,27 @@ Calibración:
 **Commits sesión**: `510fffd2`, `138740bc`, `382f768a`, `c51b1f3c`, `2f5ccba2`, `5ee6d773`
 **CI**: FASE 12 deploy ❌ (ESLint rules-of-hooks, corregido en FASE 13). FASE 13 y 14 ✅ verdes.
 
-**PENDIENTE — FASE 15**: análisis de período multi-turno (ruta `/analisis-grader/periodo`)
-**PENDIENTE — FASE 16**: limpieza rutas legacy (wizard, detalle), eliminar componentes obsoletos.
+**✅ FASE 15 (2026-04-18, `e45d3a2d`)** — Benchmark + Attribution en PeriodoPage
+- `graderBenchmarks.ts`: `SeasonBenchmark` + `compareAgainstBenchmark` (verdict better/similar/worse + delta por causa)
+- `graderAttribution.ts`: `computeShiftAttribution` por turno + `aggregateAttribution` cross-shift
+- `BenchmarkComparisonCard` + `TopActionsCard`: muestra comparativa vs temporada 2025-2026 (5.37M PP, 206k P0, 3.84% base)
+- Benchmark JSON estático: `data/benchmarks/temporada-2025-2026.json`
+
+**✅ FASE 16 (2026-04-18, `01d5a4ba`)** — IA integrada en TurnoPage + prompt enriquecido
+- `analyzeGraderFromSummary(summary, recentTurns?, ctx?)` acepta `SummaryAIContext` con `actions[]` y `benchmarkDelta`
+- `TurnoPage`: botón "Generar análisis IA" con loading state + `AIOutputPanel` inline
+- WARN: el cleanup de `WizardPage → Navigate` rompió el golden path de upload; corregido en FASE 17.
+
+**✅ FASE 17 (2026-04-18, `f2df58a3`)** — Rediseño Landing responsive + fix golden path roto
+- Restaurado `WizardPage` original (FASE 16 lo había convertido prematuramente en redirect sin reemplazo real)
+- `AnalisisGraderLandingPage` rediseñado: hero inteligente con turno vivo, grid xl:12-col asimétrico (5/7) con recientes + calendario lado a lado, mobile scroll-horizontal con snap, tablet/mobile calendar colapsable
+- Eliminado `AnalisisGraderDetallePage.tsx`; ruta `/detalle` resuelve con redirect inline en `App.tsx` preservando compat con links externos
+- 7 call-sites migrados de `/analisis-grader?date=X&shift=Y&autoload=1` (ignorados por Landing) a `/turno/:id` directo
+- Eliminado link `/turno/:id/setup` inexistente y botón "Ver análisis completo (dashboard)" obsoleto
+- `TurnoPage` carga `SeasonBenchmark` y pasa `benchmarkDelta` al prompt IA (el param estaba muerto)
+- Fix ESLint warning exhaustive-deps en TurnoPage:118 con justificación documentada
+- Rutas finales: `/analisis-grader` (Landing), `/analisis-grader/turno/:shiftId`, `/analisis-grader/periodo`, `/analisis-grader/ayuda`, `/analisis-grader/wizard` (carga legacy + gates config), `/analisis-grader/detalle` (→ redirect)
+- PeriodoPage: container unificado + botón back consistente + BenchmarkCard/TopActionsCard en grid 2-cols desktop
 
 ### P1.5 — ✅ COMPLETADO 2026-04-09 (sesión siguiente)
 - ✅ **Input sanitization Firestore**: 16 colecciones validadas en 4 lotes (162e0d1e, 78908d73, 35262779, 601d7a00). Total: 23 colecciones con isValid*() en firestore.rules. Deploy Firestore Rules 🟢.
