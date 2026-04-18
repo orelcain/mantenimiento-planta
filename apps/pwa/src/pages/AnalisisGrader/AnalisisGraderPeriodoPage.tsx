@@ -153,22 +153,30 @@ export function AnalisisGraderPeriodoPage() {
     if (allSummaries.length === 0) return
     setReclassifying(true)
     setReclassifyReport(null)
-    const results: Array<ReclassifyResult & { error?: string }> = []
-    for (let i = 0; i < allSummaries.length; i++) {
-      setReclassifyProgress({ current: i + 1, total: allSummaries.length })
-      try {
-        const r = await reclassifyShift(allSummaries[i]!.id, { writeSyntheticSnapshots: true })
-        results.push(r)
-      } catch (err) {
-        results.push({
-          shiftDocId: allSummaries[i]!.id,
-          topP0CausesBefore: [],
-          topP0CausesAfter: [],
-          inferredSnapshotsCount: 0,
-          confidence: 'low',
-          error: err instanceof Error ? err.message : String(err),
-        })
-      }
+    const BATCH = 5
+    const results: Array<ReclassifyResult & { error?: string }> = new Array(allSummaries.length)
+    let completed = 0
+    for (let i = 0; i < allSummaries.length; i += BATCH) {
+      const slice = allSummaries.slice(i, i + BATCH)
+      await Promise.all(
+        slice.map(async (summary, idx) => {
+          try {
+            results[i + idx] = await reclassifyShift(summary.id, { writeSyntheticSnapshots: true })
+          } catch (err) {
+            results[i + idx] = {
+              shiftDocId: summary.id,
+              topP0CausesBefore: [],
+              topP0CausesAfter: [],
+              inferredSnapshotsCount: 0,
+              confidence: 'low',
+              error: err instanceof Error ? err.message : String(err),
+            }
+          } finally {
+            completed++
+            setReclassifyProgress({ current: completed, total: allSummaries.length })
+          }
+        }),
+      )
     }
     setReclassifyReport({
       ok: results.filter(r => !r.error && r.confidence !== 'low').length,
