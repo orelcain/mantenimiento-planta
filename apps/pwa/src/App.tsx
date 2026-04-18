@@ -80,9 +80,20 @@ const Visor3DInteractiveBaader142Page = lazyWithReload(() => import('@/pages/Vis
 const AnalisisGraderLandingPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderLandingPage').then((mod) => ({ default: mod.AnalisisGraderLandingPage })))
 const AnalisisGraderTurnoPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderTurnoPage').then((mod) => ({ default: mod.AnalisisGraderTurnoPage })))
 const AnalisisGraderWizardPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderWizardPage').then((mod) => ({ default: mod.AnalisisGraderWizardPage })))
-const AnalisisGraderDetallePage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderDetallePage').then((mod) => ({ default: mod.AnalisisGraderDetallePage })))
 const AnalisisGraderAyudaPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderAyudaPage').then((mod) => ({ default: mod.AnalisisGraderAyudaPage })))
 const AnalisisGraderPeriodoPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderPeriodoPage').then((mod) => ({ default: mod.AnalisisGraderPeriodoPage })))
+
+// Redirect legacy `/analisis-grader/detalle?date=X&shift=Y` → `/analisis-grader/turno/:id`
+// Conservado para no romper links externos existentes tras la eliminación de DetallePage (2.118.0).
+function AnalisisGraderDetalleRedirect() {
+  const [searchParams] = useSearchParams()
+  const dateKey = searchParams.get('date')
+  const shiftId = searchParams.get('shift')
+  if (dateKey && shiftId) {
+    return <Navigate to={`/analisis-grader/turno/${dateKey}__${encodeURIComponent(shiftId)}`} replace />
+  }
+  return <Navigate to="/analisis-grader" replace />
+}
 const GanttModulePage = lazyWithReload(() => import('@/pages/gantt/GanttModulePage').then((mod) => ({ default: mod.GanttModulePage })))
 const AriaActionsPage = lazyWithReload(() => import('@/pages/AriaActionsPage').then((mod) => ({ default: mod.AriaActionsPage })))
 const ClimaPortPage = lazyWithReload(() => import('@/pages/ClimaPortPage').then((mod) => ({ default: mod.ClimaPortPage })))
@@ -501,11 +512,7 @@ export function App() {
                 <AnalisisGraderTurnoPage />
               </Suspense>
             } />
-            <Route path="analisis-grader/detalle" element={
-              <Suspense fallback={<LoadingScreen />}>
-                <AnalisisGraderDetallePage />
-              </Suspense>
-            } />
+            <Route path="analisis-grader/detalle" element={<AnalisisGraderDetalleRedirect />} />
             <Route path="analisis-grader/periodo" element={
               <Suspense fallback={<LoadingScreen />}>
                 <AnalisisGraderPeriodoPage />

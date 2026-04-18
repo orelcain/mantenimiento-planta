@@ -258,8 +258,8 @@ export function GraderPeriodView({ data }: Props) {
       const idx = elements[0].index
       const entry = dailyP0Series[idx]
       if (!entry) return
-      // Navegar al home con el día seleccionado en el calendario embebido
-      navigate(`/analisis-grader?goto=${entry.dateKey}`)
+      // Navegar al turno día (el usuario puede navegar al noche con prev/next)
+      navigate(`/analisis-grader/turno/${entry.dateKey}__${encodeURIComponent('Turno día')}`)
     },
     plugins: {
       legend: {
@@ -664,7 +664,7 @@ export function GraderPeriodView({ data }: Props) {
           {visibleStats.minP0Day && (
             <Card
               className="border-emerald-500/30 bg-emerald-500/5 cursor-pointer hover:bg-emerald-500/10 transition-colors"
-              onClick={() => navigate(`/analisis-grader?goto=${visibleStats.minP0Day!.dateKey}`)}
+              onClick={() => navigate(`/analisis-grader/turno/${visibleStats.minP0Day!.dateKey}__${encodeURIComponent('Turno día')}`)}
             >
               <CardContent className="pt-3 pb-3 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
@@ -683,7 +683,7 @@ export function GraderPeriodView({ data }: Props) {
           {visibleStats.maxP0Day && (
             <Card
               className="border-red-500/30 bg-red-500/5 cursor-pointer hover:bg-red-500/10 transition-colors"
-              onClick={() => navigate(`/analisis-grader?goto=${visibleStats.maxP0Day!.dateKey}`)}
+              onClick={() => navigate(`/analisis-grader/turno/${visibleStats.maxP0Day!.dateKey}__${encodeURIComponent('Turno día')}`)}
             >
               <CardContent className="pt-3 pb-3 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
@@ -1056,7 +1056,7 @@ export function GraderPeriodView({ data }: Props) {
                     <td className="px-3 py-2">
                       <button
                         type="button"
-                        onClick={() => navigate(`/analisis-grader/detalle?date=${s.dateKey}&shift=${encodeURIComponent(s.shiftId)}`)}
+                        onClick={() => navigate(`/analisis-grader/turno/${s.dateKey}__${encodeURIComponent(s.shiftId)}`)}
                         className="text-primary hover:underline text-[11px] flex items-center gap-1"
                       >
                         Ver <ExternalLink className="h-3 w-3" />

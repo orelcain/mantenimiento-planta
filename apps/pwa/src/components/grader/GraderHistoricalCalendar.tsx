@@ -346,7 +346,7 @@ export function GraderHistoricalCalendar({
     if (onLoadTurno) {
       onLoadTurno(dateKey, shiftId)
     } else {
-      navigate(`/analisis-grader?date=${dateKey}&shift=${encodeURIComponent(shiftId)}&autoload=1`)
+      navigate(`/analisis-grader/turno/${dateKey}__${encodeURIComponent(shiftId)}`)
     }
   }
 

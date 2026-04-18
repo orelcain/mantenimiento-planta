@@ -303,7 +303,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
   const nextTurn = currentIdx < sortedAllTurns.length - 1 ? sortedAllTurns[currentIdx + 1] : null
 
   const goToTurn = (turn: GraderDailySummary) => {
-    navigate(`/analisis-grader/detalle?date=${turn.dateKey}&shift=${encodeURIComponent(turn.shiftId)}`)
+    navigate(`/analisis-grader/turno/${turn.dateKey}__${encodeURIComponent(turn.shiftId)}`)
   }
 
   // ── Swipe touch para navegar turnos en mobile ─────────────────────────
@@ -943,7 +943,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
         <div className="flex justify-end pt-2">
           <Button
             variant="outline"
-            onClick={() => navigate(`/analisis-grader?date=${summary.dateKey}&shift=${encodeURIComponent(summary.shiftId)}&autoload=1`)}
+            onClick={() => navigate(`/analisis-grader/turno/${summary.dateKey}__${encodeURIComponent(summary.shiftId)}`)}
           >
             Abrir dashboard completo
             <ArrowRight className="h-4 w-4 ml-1.5" />

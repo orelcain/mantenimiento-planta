@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useState, useMemo } from 'react'
-import { useParams, useNavigate, Navigate, Link } from 'react-router-dom'
+import { useParams, useNavigate, Navigate } from 'react-router-dom'
 import { Button, Card, CardContent, Spinner } from '@/components/ui'
 import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2 } from 'lucide-react'
 import { usePermissionsStore } from '@/store'
@@ -23,6 +23,7 @@ import { ShiftTimelineView } from '@/components/grader/ShiftTimelineView'
 import { ActionPlanPanel, deriveSuggestions } from '@/components/grader/ActionPlanPanel'
 import { findTriggeredRunbooks } from '@/services/grader/graderRunbooks'
 import { analyzeGraderFromSummary } from '@/services/grader/graderSummaryAI'
+import { loadSeasonBenchmark, type SeasonBenchmark } from '@/services/grader/graderBenchmarks'
 import { AIOutputPanel } from '@/components/grader/GraderInlinePanels'
 import type { GraderDailySummary, MatrixP0Cause, PointZeroClassification, TimelineBucket } from '@/services/grader/types'
 import type { GraderShiftDoc } from '@/services/grader/graderShifts.service'
@@ -105,6 +106,8 @@ export function AnalisisGraderTurnoPage() {
   }, [dateKey, shiftLabel])
 
   // Auto-refresh cada minuto si el turno está en vivo
+  // Solo dependemos de `status` para evitar resetear el interval en cada tick
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!shiftWindow || shiftWindow.status !== 'live') return
     const id = setInterval(() => {
@@ -127,14 +130,23 @@ export function AnalisisGraderTurnoPage() {
   const [aiOutput, setAiOutput] = useState<AIGraderOutput | null>(null)
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState<string | null>(null)
+  const [benchmark, setBenchmark] = useState<SeasonBenchmark | null>(null)
+
+  useEffect(() => {
+    loadSeasonBenchmark('2025-2026').then(setBenchmark).catch(() => setBenchmark(null))
+  }, [])
 
   const handleGenerateAI = async () => {
     if (!summary) return
     setAiLoading(true)
     setAiError(null)
     try {
+      const benchmarkDelta = benchmark
+        ? +(summary.pointZeroPct - benchmark.p0Pct).toFixed(2)
+        : undefined
       const result = await analyzeGraderFromSummary(summary, undefined, {
         actions: shiftDoc?.actions,
+        benchmarkDelta,
       })
       setAiOutput(result)
     } catch (err) {
@@ -315,26 +327,17 @@ export function AnalisisGraderTurnoPage() {
           {aiOutput && <AIOutputPanel output={aiOutput} />}
 
           {/* Link a configuración avanzada */}
-          <Link to={`/analisis-grader/turno/${rawShiftId}/setup`}>
+          <button
+            onClick={() => navigate('/analisis-grader/wizard?tab=gates')}
+            className="w-full text-left"
+          >
             <Card className="border-dashed hover:bg-muted/30 transition-colors">
               <CardContent className="py-3 px-4 flex items-center gap-2 text-sm text-muted-foreground">
                 <Settings2 className="w-4 h-4" />
                 Abrir configuración física avanzada (12 Gates, Cintas, Distancias…)
               </CardContent>
             </Card>
-          </Link>
-
-          {/* Link al análisis completo */}
-          <div className="text-center">
-            <Button
-              variant="link"
-              size="sm"
-              className="text-xs text-muted-foreground"
-              onClick={() => navigate(`/analisis-grader?date=${dateKey}&shift=${encodeURIComponent(shiftLabel)}&autoload=1`)}
-            >
-              Ver análisis completo (dashboard)
-            </Button>
-          </div>
+          </button>
         </>
       )}
     </div>
