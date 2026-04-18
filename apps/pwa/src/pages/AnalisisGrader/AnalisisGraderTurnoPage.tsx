@@ -14,6 +14,7 @@ import { usePermissionsStore } from '@/store'
 import { getDailySummary, loadTimelineAggregates } from '@/services/grader/graderDailySummary.service'
 import { getShiftDoc } from '@/services/grader/graderShifts.service'
 import { computeShiftTimeWindow } from '@/services/grader/graderShiftStatus'
+import type { ShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import { DEFAULT_SHIFT_SCHEDULE } from '@/services/grader/graderShiftSchedule'
 import { parseMatrixErrorString } from '@/services/grader/graderMatrixP0Causes'
 import { HeroScorecard } from '@/components/grader/HeroScorecard'
@@ -85,12 +86,33 @@ export function AnalisisGraderTurnoPage() {
 
   const [dateKey, shiftLabel] = useMemo(() => parseShiftId(rawShiftId), [rawShiftId])
 
-  const shiftWindow = useMemo(
+  const [shiftWindow, setShiftWindow] = useState<ShiftTimeWindow | null>(
     () => dateKey && shiftLabel
       ? computeShiftTimeWindow(dateKey, shiftLabel, DEFAULT_SHIFT_SCHEDULE)
       : null,
-    [dateKey, shiftLabel],
   )
+
+  // Sincronizar cuando cambia la URL
+  useEffect(() => {
+    setShiftWindow(
+      dateKey && shiftLabel
+        ? computeShiftTimeWindow(dateKey, shiftLabel, DEFAULT_SHIFT_SCHEDULE)
+        : null,
+    )
+  }, [dateKey, shiftLabel])
+
+  // Auto-refresh cada minuto si el turno está en vivo
+  useEffect(() => {
+    if (!shiftWindow || shiftWindow.status !== 'live') return
+    const id = setInterval(() => {
+      setShiftWindow(
+        dateKey && shiftLabel
+          ? computeShiftTimeWindow(dateKey, shiftLabel, DEFAULT_SHIFT_SCHEDULE)
+          : null,
+      )
+    }, 60_000)
+    return () => clearInterval(id)
+  }, [shiftWindow?.status, dateKey, shiftLabel])
 
   const [summary, setSummary] = useState<GraderDailySummary | null>(null)
   const [shiftDoc, setShiftDoc] = useState<GraderShiftDoc | null>(null)
@@ -141,14 +163,16 @@ export function AnalisisGraderTurnoPage() {
     return deriveByMatrixCause(summary.topP0Causes, summary.pointZeroPieces)
   }, [summary])
 
+  const dominant = useMemo(() => dominantCause(byMatrixCause), [byMatrixCause])
+
   const suggestions = useMemo(
-    () => deriveSuggestions(summary?.pointZeroPct ?? 0, dominantCause(byMatrixCause)),
-    [summary, byMatrixCause],
+    () => deriveSuggestions(summary?.pointZeroPct ?? 0, dominant),
+    [summary, dominant],
   )
 
   const triggeredRunbooks = useMemo(
-    () => findTriggeredRunbooks(dominantCause(byMatrixCause), summary?.pointZeroPct ?? 0),
-    [summary, byMatrixCause],
+    () => findTriggeredRunbooks(dominant, summary?.pointZeroPct ?? 0),
+    [dominant, summary],
   )
 
   const shiftDocId = `${dateKey}__${shiftLabel}`

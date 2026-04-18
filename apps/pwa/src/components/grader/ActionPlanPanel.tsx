@@ -4,10 +4,12 @@
  * El estado checked persiste en localStorage por turno.
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui'
 import { Wrench, Monitor, Eye, CheckSquare, Square, ChevronDown, AlertTriangle, Info } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useAuthStore } from '@/store'
+import { appendShiftAction } from '@/services/grader/graderShifts.service'
 import type { MatrixP0Cause } from '@/services/grader/types'
 import type { ShiftStatus } from '@/services/grader/graderShiftStatus'
 import type { Runbook } from '@/services/grader/graderRunbooks'
@@ -231,6 +233,13 @@ function ActionItem({
 
 export function ActionPlanPanel({ shiftDocId, suggestions, status, relatedRunbooks = [] }: ActionPlanPanelProps) {
   const storageKey = `grader-actions-checked-${shiftDocId}`
+  const user = useAuthStore(s => s.user)
+
+  // Parsear dateKey / shiftId desde shiftDocId (formato: YYYY-MM-DD__Turno día)
+  const [fsDateKey, fsShiftId] = (() => {
+    const idx = shiftDocId.indexOf('__')
+    return idx > -1 ? [shiftDocId.slice(0, idx), shiftDocId.slice(idx + 2)] : ['', '']
+  })()
 
   const [checked, setChecked] = useState<Set<string>>(() => {
     try {
@@ -241,6 +250,10 @@ export function ActionPlanPanel({ shiftDocId, suggestions, status, relatedRunboo
     }
   })
 
+  // Ref estable para acceder a checked en toggle sin recrear el callback
+  const checkedRef = useRef(checked)
+  useEffect(() => { checkedRef.current = checked }, [checked])
+
   // Sync to localStorage on change
   useEffect(() => {
     try {
@@ -249,13 +262,31 @@ export function ActionPlanPanel({ shiftDocId, suggestions, status, relatedRunboo
   }, [checked, storageKey])
 
   const toggle = useCallback((id: string) => {
+    const isNewCheck = !checkedRef.current.has(id)
+
     setChecked(prev => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
       return next
     })
-  }, [])
+
+    // Persistir en Firestore solo al marcar (no al desmarcar)
+    if (isNewCheck && fsDateKey && fsShiftId) {
+      const action = suggestions.find(s => s.id === id)
+      if (action) {
+        appendShiftAction(fsDateKey, fsShiftId, {
+          id: `${id}-${Date.now()}`,
+          at: new Date().toISOString(),
+          by: user?.id ?? 'sistema',
+          byName: user ? `${user.nombre} ${user.apellido}` : 'Sistema',
+          field: action.title,
+          before: null,
+          after: 'done',
+        }).catch(() => { /* silencioso — localStorage ya persiste localmente */ })
+      }
+    }
+  }, [fsDateKey, fsShiftId, suggestions, user])
 
   const grouped = (
     ['terreno', 'oficina', 'verificar'] as const
