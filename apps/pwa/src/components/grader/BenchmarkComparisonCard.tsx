@@ -13,10 +13,14 @@ interface Props {
 }
 
 const CAUSE_KEYS: MatrixP0Cause[] = [
-  'fuera_de_rangos',
   'fuera_de_limites',
   'no_leido_fotocelula',
+  'too_close_too_long',
   'puerta_no_preparada',
+  'fuera_de_calibre',
+  'fuera_de_calidad',
+  'fuera_de_conservacion',
+  'fuera_de_producto',
   'otro',
 ]
 
@@ -44,7 +48,11 @@ const VERDICT_CONFIG = {
 const DOT_COLOR: Record<string, string> = {
   red: 'bg-red-500',
   orange: 'bg-orange-500',
+  purple: 'bg-purple-500',
+  cyan: 'bg-cyan-500',
+  emerald: 'bg-emerald-500',
   amber: 'bg-amber-500',
+  brown: 'bg-amber-800',
   blue: 'bg-blue-500',
   zinc: 'bg-zinc-400',
 }

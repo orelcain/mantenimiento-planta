@@ -23,10 +23,17 @@ export interface BenchmarkComparison {
 }
 
 const CAUSE_KEYS: MatrixP0Cause[] = [
-  'fuera_de_rangos',
+  // oficiales Matrix
   'fuera_de_limites',
   'no_leido_fotocelula',
+  'too_close_too_long',
   'puerta_no_preparada',
+  // derivadas nuestras
+  'fuera_de_calibre',
+  'fuera_de_calidad',
+  'fuera_de_conservacion',
+  'fuera_de_producto',
+  // residual
   'otro',
 ]
 

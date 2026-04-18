@@ -45,7 +45,12 @@ function deriveByMatrixCause(
   topP0Causes: GraderDailySummary['topP0Causes'],
   totalP0Pieces: number,
 ): PointZeroClassification['byMatrixCause'] {
-  const ALL: MatrixP0Cause[] = ['fuera_de_rangos', 'fuera_de_limites', 'no_leido_fotocelula', 'puerta_no_preparada', 'otro']
+  // 9 causas Matrix (4 oficiales + 5 derivadas)
+  const ALL: MatrixP0Cause[] = [
+    'fuera_de_limites', 'no_leido_fotocelula', 'too_close_too_long', 'puerta_no_preparada',
+    'fuera_de_calibre', 'fuera_de_calidad', 'fuera_de_conservacion', 'fuera_de_producto',
+    'otro',
+  ]
   const acc = Object.fromEntries(ALL.map(mc => [mc, { pieces: 0, pct: 0, subCauses: [] as PointZeroClassification['byMatrixCause'][MatrixP0Cause]['subCauses'] }])) as PointZeroClassification['byMatrixCause']
 
   for (const c of topP0Causes ?? []) {
@@ -60,13 +65,18 @@ function deriveByMatrixCause(
   return acc
 }
 
-/** Clasifica strings de causa tanto del Excel Matrix como los internos */
+/**
+ * Clasifica strings de causa (tanto del Excel Matrix como los internos
+ * normalizados en `topP0Causes`). Fallback: si el string contiene "rango"
+ * se mapea a fuera_de_calibre (causa derivada más común) por compat con
+ * summaries históricos pre-schema-change.
+ */
 function labelToMatrixCause(label: string): MatrixP0Cause {
   const s = (label ?? '').toLowerCase()
   const fromMatrix = parseMatrixErrorString(label)
   if (fromMatrix !== 'otro') return fromMatrix
-  if (s.includes('rango')) return 'fuera_de_rangos'
-  if (s.includes('close') || s.includes('long')) return 'no_leido_fotocelula'
+  if (s.includes('rango')) return 'fuera_de_calibre'
+  if (s.includes('close') || s.includes('long')) return 'too_close_too_long'
   return 'otro'
 }
 
@@ -452,6 +462,7 @@ export function AnalisisGraderTurnoPage() {
               <P0CausesPanel
                 byMatrixCause={byMatrixCause}
                 totalP0Pct={summary.pointZeroPct}
+                unsortedPcs={summary.pointZeroPieces}
               />
             </div>
           </div>

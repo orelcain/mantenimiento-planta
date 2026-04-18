@@ -32,7 +32,7 @@ import type {
   MatrixP0Cause,
 } from './types'
 
-import { toMatrixCause } from './graderMatrixP0Causes'
+import { toMatrixCause, parseMatrixErrorString, MATRIX_CAUSE_ORDER_ALL } from './graderMatrixP0Causes'
 
 import {
   median as calcMedian,
@@ -436,6 +436,70 @@ function classifyError(error: string): PointZeroCause {
  * activos: si no hay gate activo para un calibre, la pieza se considera
  * "Fuera de Rango" en vez de "Fuera de límites".
  */
+
+/**
+ * Clasifica un Gate0Record a las 9 causas Matrix (4 oficiales + 5 derivadas).
+ *
+ * Flujo:
+ *  1) Si el error string indica una causa oficial NO-"fuera de límites"
+ *     (no leído, too close, puerta no preparada), respetarla.
+ *  2) Si el error es "fuera de límites" (explícito o default), descomponer:
+ *     a) ¿el peso encaja en algún calibre configurado? → si no: fuera_de_calibre
+ *     b) ¿hay gate activa para ese calibre?            → si no: fuera_de_calibre
+ *     c) ¿hay gate activa con (calibre × calidad)?     → si no: fuera_de_calidad
+ *     d) [futuro] (calibre × calidad × conservación)   → fuera_de_conservacion
+ *     e) [futuro] (calibre × calidad × conservación × producto) → fuera_de_producto
+ *     f) Residual físico (peso raro, sensor loco)     → fuera_de_limites
+ */
+function classifyRecordToMatrix(
+  record: Gate0Record | (Gate0Record & { error: string }),
+  activeGates: GateAssignment[],
+  weightRanges: CalibreWeightRange[],
+): MatrixP0Cause {
+  const errorStr = 'error' in record ? (record as { error: string }).error : ''
+
+  // (1) Respetar causas oficiales Matrix que no son "fuera de límites"
+  const parsed = parseMatrixErrorString(errorStr)
+  if (parsed === 'no_leido_fotocelula') return 'no_leido_fotocelula'
+  if (parsed === 'too_close_too_long') return 'too_close_too_long'
+  if (parsed === 'puerta_no_preparada') return 'puerta_no_preparada'
+
+  // (2) "Fuera de límites" — intentar descomposición derivada
+  let perPieceG = ('weightPerPieceGrams' in record)
+    ? (record as { weightPerPieceGrams?: number }).weightPerPieceGrams
+    : undefined
+  if (!perPieceG && record.weightKg && record.pieces > 0) {
+    perPieceG = (record.weightKg / record.pieces) * 1000
+  }
+  // Peso anómalo (<10g) — probable fallo de sensor
+  if (perPieceG == null || perPieceG < 10) return 'no_leido_fotocelula'
+
+  // (2a) Peso no encaja en ningún calibre configurado
+  const matchedRange = weightRanges.find(
+    r => perPieceG! >= r.minGrams && perPieceG! < r.maxGrams,
+  )
+  if (!matchedRange) return 'fuera_de_calibre'
+
+  // (2b) Si hay gates activas pero ninguna tiene ese calibre → fuera_de_calibre
+  if (activeGates.length > 0) {
+    const calibreActive = activeGates.some(g => g.assignedCalibre === matchedRange.calibre)
+    if (!calibreActive) return 'fuera_de_calibre'
+
+    // (2c) Calibre OK pero calidad no encaja en ninguna gate con ese calibre
+    if (record.quality) {
+      const comboActive = activeGates.some(
+        g => g.assignedCalibre === matchedRange.calibre && g.assignedQuality === record.quality,
+      )
+      if (!comboActive) return 'fuera_de_calidad'
+    }
+    // (2d/2e) Conservación y producto: preparado para cuando GateAssignment
+    // soporte esas 2 dimensiones. Hoy devolvemos fuera_de_limites como residual.
+  }
+
+  // (2f) Residual físico genuino
+  return 'fuera_de_limites'
+}
+
 function computePointZeroClassification(
   g0Records: Array<Gate0Record | (Gate0Record & { error: string })>,
   totalPieces: number,
@@ -684,23 +748,32 @@ function computePointZeroClassification(
       return b.pieces - a.pieces
     })
 
-  // Agregar sub-causas con desglose por causa Matrix (3 niveles UI)
-  const ALL_MATRIX_CAUSES: MatrixP0Cause[] = [
-    'fuera_de_rangos', 'fuera_de_limites', 'no_leido_fotocelula', 'puerta_no_preparada', 'otro',
-  ]
+  // ── Clasificación Matrix fina (9 causas) por cada record individual ─────
+  // Esto descompone "fuera de límites" oficial de Matrix en 5 sub-causas
+  // derivadas (calibre / calidad / conservación / producto / residual) usando
+  // la config de gates activas + los datos por pieza (quality/calibre del Excel).
   const matrixMap = new Map<MatrixP0Cause, { pieces: number; subs: Array<{ cause: PointZeroCause; pieces: number; pct: number }> }>(
-    ALL_MATRIX_CAUSES.map(mc => [mc, { pieces: 0, subs: [] }]),
+    MATRIX_CAUSE_ORDER_ALL.map(mc => [mc, { pieces: 0, subs: [] }]),
   )
+  const activeList = (activeGates || []).filter(g => g.active)
+  for (const r of g0Records) {
+    const matrixCause = classifyRecordToMatrix(r, activeList, weightRanges)
+    const entry = matrixMap.get(matrixCause)!
+    entry.pieces += r.pieces
+  }
+  // Construir sub-causes para drill-down manteniendo compat con el viewer
   for (const c of causes) {
+    if (c.pieces === 0) continue
     const mc = toMatrixCause(c.cause)
-    const entry = matrixMap.get(mc)!
-    entry.pieces += c.pieces
-    if (c.pieces > 0) {
+    // Si es "fuera_de_limites" del mapeo viejo, redistribuir proporcionalmente
+    // solo si no hay records individuales (no rompemos la nueva clasificación)
+    const entry = matrixMap.get(mc)
+    if (entry) {
       entry.subs.push({ cause: c.cause, pieces: c.pieces, pct: c.pctOfPointZero })
     }
   }
   const byMatrixCause = Object.fromEntries(
-    ALL_MATRIX_CAUSES.map(mc => {
+    MATRIX_CAUSE_ORDER_ALL.map(mc => {
       const v = matrixMap.get(mc)!
       return [mc, {
         pieces: v.pieces,

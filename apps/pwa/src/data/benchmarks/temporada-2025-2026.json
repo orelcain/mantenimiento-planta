@@ -4,11 +4,15 @@
   "totalP0": 206000,
   "p0Pct": 3.84,
   "byMatrixCause": {
-    "fuera_de_rangos":    { "pieces": 79310,  "pct": 38.50 },
-    "fuera_de_limites":   { "pieces": 33990,  "pct": 16.50 },
-    "no_leido_fotocelula":{ "pieces": 57680,  "pct": 27.99 },
-    "puerta_no_preparada":{ "pieces": 24720,  "pct": 12.00 },
-    "otro":               { "pieces": 10300,  "pct": 5.00  }
+    "fuera_de_limites":       { "pieces": 15450,  "pct": 7.50  },
+    "no_leido_fotocelula":    { "pieces": 57680,  "pct": 27.99 },
+    "too_close_too_long":     { "pieces": 4120,   "pct": 2.00  },
+    "puerta_no_preparada":    { "pieces": 24720,  "pct": 12.00 },
+    "fuera_de_calibre":       { "pieces": 56650,  "pct": 27.50 },
+    "fuera_de_calidad":       { "pieces": 22660,  "pct": 11.00 },
+    "fuera_de_conservacion":  { "pieces": 8240,   "pct": 4.00  },
+    "fuera_de_producto":      { "pieces": 6180,   "pct": 3.00  },
+    "otro":                   { "pieces": 10300,  "pct": 5.00  }
   },
   "bySpecies": {
     "SALAR": { "pieces": 3490500, "p0Pct": 3.50 },

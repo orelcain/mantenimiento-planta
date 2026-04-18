@@ -30,12 +30,27 @@ export type PointZeroCause =
  * más "otro" para registros ambiguos. Se usan como agrupador de nivel 1 en UI.
  * Las 6 sub-causas internas (PointZeroCause) son el drill-down de nivel 2.
  */
+/**
+ * 9 causas P0 del Grader Marelec. 4 son causas OFICIALES que reporta el HMI
+ * Matrix directamente; 5 son DERIVADAS (nuestro análisis agrega inteligencia
+ * sobre "fuera de límites" usando la config de gates + datos de pieza).
+ */
 export type MatrixP0Cause =
-  | 'fuera_de_rangos'     // Peso fuera de los calibres configurados por el usuario en gates
-  | 'fuera_de_limites'    // Peso fuera de los límites físicos del sistema (rango total hardware)
-  | 'no_leido_fotocelula'
-  | 'puerta_no_preparada'
+  // OFICIALES Matrix (reportadas directamente por el HMI)
+  | 'fuera_de_limites'         // Out of limits — peso fuera del hardware físico
+  | 'no_leido_fotocelula'      // Not read by photocell — sensor óptico falló
+  | 'too_close_too_long'       // Too close or too long — piezas solapadas / pieza muy larga
+  | 'puerta_no_preparada'      // Door not ready — flipper ocupado / timing
+  // DERIVADAS (sub-clasificaciones nuestras de "fuera de límites" usando config de gates)
+  | 'fuera_de_calibre'         // No hay calibre configurado que cubra ese peso
+  | 'fuera_de_calidad'         // Calibre existe pero no hay gate activa para esa calidad
+  | 'fuera_de_conservacion'    // Calidad existe pero no hay gate para esa conservación
+  | 'fuera_de_producto'        // Conservación OK pero no hay gate para ese producto/destino
+  // Residual (no clasificable)
   | 'otro';
+
+/** Nivel de la causa: oficial Matrix vs derivada del análisis */
+export type MatrixP0Level = 'official' | 'derived';
 
 /** Rango de peso en gramos para cada calibre */
 export interface CalibreWeightRange {
