@@ -105,11 +105,11 @@ export function AnalisisGraderTurnoPage() {
     )
   }, [dateKey, shiftLabel])
 
-  // Auto-refresh cada minuto si el turno está en vivo
-  // Solo dependemos de `status` para evitar resetear el interval en cada tick
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Auto-refresh cada minuto si el turno está en vivo.
+  // Depende solo de `shiftWindow?.status` para evitar resetear el interval
+  // en cada tick (el callback re-lee dateKey/shiftLabel via closure estable).
   useEffect(() => {
-    if (!shiftWindow || shiftWindow.status !== 'live') return
+    if (shiftWindow?.status !== 'live') return
     const id = setInterval(() => {
       setShiftWindow(
         dateKey && shiftLabel
@@ -308,9 +308,8 @@ export function AnalisisGraderTurnoPage() {
 
   const shiftDocId = `${dateKey}__${shiftLabel}`
 
-  if (!canSee('analisisGrader')) return <Navigate to="/" replace />
-
   // Fecha legible para el header ("vie 27 feb")
+  // IMPORTANTE: todos los hooks ANTES del early return (rules-of-hooks)
   const dateLabel = useMemo(() => {
     if (!dateKey) return ''
     const d = new Date(`${dateKey}T12:00:00`)
@@ -319,6 +318,8 @@ export function AnalisisGraderTurnoPage() {
     const monthName = d.toLocaleDateString('es-CL', { month: 'short' }).replace('.', '')
     return `${dayName} ${dayNum} ${monthName}`
   }, [dateKey])
+
+  if (!canSee('analisisGrader')) return <Navigate to="/" replace />
 
   return (
     <div className="container mx-auto p-3 sm:p-4 space-y-4 max-w-screen-xl">

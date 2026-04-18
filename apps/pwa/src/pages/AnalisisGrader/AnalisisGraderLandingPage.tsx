@@ -101,15 +101,9 @@ export function AnalisisGraderLandingPage() {
     return null
   }, [])
 
-  if (!canSee('analisisGrader')) return <Navigate to="/" replace />
-
-  const goToTurno = (dateKey: string, shiftId: string) => {
-    navigate(`/analisis-grader/turno/${dateKey}__${encodeURIComponent(shiftId)}`)
-  }
-
-  const goToUpload = () => navigate('/analisis-grader/wizard')
-
   // Formatear fecha corta del último turno ("lun 27 feb")
+  // IMPORTANTE: todos los hooks deben ir ANTES del early return de canSee
+  // para respetar rules-of-hooks.
   const lastShiftLabel = useMemo(() => {
     if (!lastClosedShift) return null
     const d = new Date(`${lastClosedShift.dateKey}T12:00:00`)
@@ -119,6 +113,14 @@ export function AnalisisGraderLandingPage() {
     const shortShift = lastClosedShift.shiftId.includes('día') ? 'día' : 'noche'
     return `${dayName} ${dayNum} ${monthName} · ${shortShift}`
   }, [lastClosedShift])
+
+  if (!canSee('analisisGrader')) return <Navigate to="/" replace />
+
+  const goToTurno = (dateKey: string, shiftId: string) => {
+    navigate(`/analisis-grader/turno/${dateKey}__${encodeURIComponent(shiftId)}`)
+  }
+
+  const goToUpload = () => navigate('/analisis-grader/wizard')
 
   const lastShiftVerdict = lastClosedShift ? verdictFromP0Pct(lastClosedShift.pointZeroPct) : 'ok'
 
