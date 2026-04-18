@@ -5,6 +5,7 @@
  */
 
 import { useState, useEffect, useMemo, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useSuggestionEngine } from '@/services/grader/suggestions/useSuggestionEngine'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch, Label } from '@/components/ui'
 import { Save, FolderOpen, ChevronRight, Trash2, ChevronDown, Plus } from 'lucide-react'
@@ -91,10 +92,35 @@ function SaveIndicator({ status }: { status: 'idle' | 'saving' | 'saved' }) {
   )
 }
 
+const VALID_TABS = ['analisis', 'gates', 'rangos', 'fisica'] as const
+type ConfigTab = (typeof VALID_TABS)[number]
+
 export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: initialConfig, parsedData, onComplete, tabbed = false }: Props) {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [gates, setGates] = useState<GateAssignment[]>(initialGates)
   const [config, setConfig] = useState<GraderAnalysisConfig>(initialConfig)
-  const [activeTab, setActiveTab] = useState<'analisis' | 'gates' | 'rangos' | 'fisica'>('analisis')
+  // Tab inicial: lee ?tab= de la URL si está presente y es válido, sino 'analisis'
+  const initialTabFromUrl = useMemo<ConfigTab>(() => {
+    const t = searchParams.get('tab')
+    return (VALID_TABS as readonly string[]).includes(t ?? '') ? (t as ConfigTab) : 'analisis'
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // solo al montar
+  const [activeTab, setActiveTab] = useState<ConfigTab>(initialTabFromUrl)
+
+  // Sync URL ← state cuando user cambia tab manualmente (solo en modo tabbed)
+  useEffect(() => {
+    if (!tabbed) return
+    const current = searchParams.get('tab')
+    if (activeTab !== 'analisis' && current !== activeTab) {
+      const next = new URLSearchParams(searchParams)
+      next.set('tab', activeTab)
+      setSearchParams(next, { replace: true })
+    } else if (activeTab === 'analisis' && current) {
+      const next = new URLSearchParams(searchParams)
+      next.delete('tab')
+      setSearchParams(next, { replace: true })
+    }
+  }, [activeTab, tabbed, searchParams, setSearchParams])
   const [templates, setTemplates] = useState<GatesTemplate[]>([])
   const [templateName, setTemplateName] = useState('')
   const [activeTemplateName, setActiveTemplateName] = useState<string | null>(null)

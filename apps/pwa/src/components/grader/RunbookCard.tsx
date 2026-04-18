@@ -20,10 +20,20 @@ interface RunbookCardProps {
   runbook: Runbook
   compact?: boolean
   defaultExpanded?: boolean
+  /** Modo controlado: si se pasa, reemplaza el estado interno */
+  expanded?: boolean
+  onExpandedChange?: (expanded: boolean) => void
 }
 
-export function RunbookCard({ runbook, compact = false, defaultExpanded = false }: RunbookCardProps) {
-  const [expanded, setExpanded] = useState(defaultExpanded)
+export function RunbookCard({ runbook, compact = false, defaultExpanded = false, expanded: expandedProp, onExpandedChange }: RunbookCardProps) {
+  const [expandedState, setExpandedState] = useState(defaultExpanded)
+  const isControlled = expandedProp !== undefined
+  const expanded = isControlled ? expandedProp : expandedState
+  const setExpanded = (next: boolean | ((prev: boolean) => boolean)) => {
+    const nextValue = typeof next === 'function' ? next(expanded) : next
+    if (!isControlled) setExpandedState(nextValue)
+    onExpandedChange?.(nextValue)
+  }
   const [checkedSteps, setCheckedSteps] = useState<Set<number>>(new Set())
 
   const meta = CATEGORY_META[runbook.category]

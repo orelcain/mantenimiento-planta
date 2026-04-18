@@ -30,6 +30,7 @@ import {
   listDailySummariesByRange,
 } from '@/services/grader/graderDailySummary.service'
 import { parseFile, mergeParsedData } from '@/services/grader/graderExcelParser'
+import { parseMatrixErrorString, MATRIX_P0_CAUSES } from '@/services/grader/graderMatrixP0Causes'
 import {
   DEFAULT_SHIFT_SCHEDULE,
   inferShiftIdFromSchedule,
@@ -731,12 +732,21 @@ export function GraderHistoricalCalendar({
                     {hist.topP0Causes && hist.topP0Causes.length > 0 && (
                       <div className="text-xs space-y-0.5">
                         <p className="text-muted-foreground font-medium">Top causas P0:</p>
-                        {hist.topP0Causes.slice(0, 3).map((c, i) => (
-                          <div key={i} className="flex justify-between">
-                            <span className="text-muted-foreground truncate max-w-[70%]">{c.error}</span>
-                            <span className="font-semibold tabular-nums">{c.pct}%</span>
-                          </div>
-                        ))}
+                        {hist.topP0Causes.slice(0, 3).map((c, i) => {
+                          // Label bonito Matrix + % del total (intuitivo) en lugar de % del P0
+                          const matrixCause = parseMatrixErrorString(c.error)
+                          const label = MATRIX_P0_CAUSES[matrixCause]?.label ?? c.error
+                          const pctOfTotal = (c.pct * hist.pointZeroPct) / 100
+                          return (
+                            <div key={i} className="flex justify-between gap-2">
+                              <span className="text-muted-foreground truncate flex-1">{label}</span>
+                              <span className="font-semibold tabular-nums shrink-0">
+                                {pctOfTotal.toFixed(2)}%
+                                <span className="text-muted-foreground/70 font-normal text-[10px]"> ({c.pct.toFixed(0)}% P0)</span>
+                              </span>
+                            </div>
+                          )
+                        })}
                       </div>
                     )}
                     {(() => {
