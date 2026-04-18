@@ -451,7 +451,7 @@ function classifyError(error: string): PointZeroCause {
  *     e) [futuro] (calibre × calidad × conservación × producto) → fuera_de_producto
  *     f) Residual físico (peso raro, sensor loco)     → fuera_de_limites
  */
-function classifyRecordToMatrix(
+export function classifyRecordToMatrix(
   record: Gate0Record | (Gate0Record & { error: string }),
   activeGates: GateAssignment[],
   weightRanges: CalibreWeightRange[],

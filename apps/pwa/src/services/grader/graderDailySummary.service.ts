@@ -14,6 +14,7 @@ import {
   getDoc,
   setDoc,
   deleteDoc,
+  updateDoc,
   serverTimestamp,
 } from '@/services/firestoreTracked'
 import {
@@ -104,6 +105,19 @@ export async function saveDailySummary(params: {
 export async function deleteDailySummary(dateKey: string, shiftId: string): Promise<void> {
   const id = buildDailySummaryId(dateKey, shiftId)
   await deleteDoc(doc(db, COLLECTION, id))
+}
+
+/**
+ * Actualiza campos parciales de un summary existente.
+ * Usado por el reclasificador (FASE 26) para actualizar topP0Causes y schemaVersion
+ * sin sobreescribir el resto del doc.
+ */
+export async function updateDailySummary(
+  summaryId: string,
+  patch: Partial<GraderDailySummary> & Record<string, unknown>,
+): Promise<void> {
+  const ref = doc(db, COLLECTION, summaryId)
+  await updateDoc(ref, { ...deepCleanUndefined(patch), updatedAt: new Date().toISOString() })
 }
 
 // ============================================================================

@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, Navigate } from 'react-router-dom'
 import { Card, CardContent, Button } from '@/components/ui'
-import { ArrowLeft, BarChart3, Loader2, AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Circle } from 'lucide-react'
+import { ArrowLeft, BarChart3, Loader2, AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Circle, RefreshCcw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { usePermissionsStore } from '@/store'
 import {
@@ -43,6 +43,9 @@ import {
 } from '@/services/grader/graderBenchmarks'
 import { listShiftsByRange, type GraderShiftDoc } from '@/services/grader/graderShifts.service'
 import { aggregateAttribution, type AggregatedAttribution } from '@/services/grader/graderAttribution'
+import { reclassifyShift, type ReclassifyResult } from '@/services/grader/graderReclassifier'
+import { useIsAdmin } from '@/store'
+import type { GraderDailySummary } from '@/services/grader/types'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -54,6 +57,7 @@ function buildCustomRange(start: string, end: string): PeriodRange {
 
 export function AnalisisGraderPeriodoPage() {
   const { canSee } = usePermissionsStore()
+  const isAdmin = useIsAdmin()
   const navigate = useNavigate()
 
   const defaultPreset = useMemo(() => getDefaultPreset(), [])
@@ -80,6 +84,12 @@ export function AnalisisGraderPeriodoPage() {
   const [migrating, setMigrating] = useState(false)
   const [migrationResult, setMigrationResult] = useState<MigrationResult | null>(null)
 
+  // Reclasificador histórico (FASE 26) — admin only
+  const [allSummaries, setAllSummaries] = useState<GraderDailySummary[]>([])
+  const [reclassifying, setReclassifying] = useState(false)
+  const [reclassifyProgress, setReclassifyProgress] = useState<{ current: number; total: number } | null>(null)
+  const [reclassifyReport, setReclassifyReport] = useState<{ ok: number; warnings: number; errors: number; details: Array<ReclassifyResult & { error?: string }> } | null>(null)
+
   // Cargar benchmark una sola vez al montar
   useEffect(() => {
     loadSeasonBenchmark('2025-2026').then((bm) => setBenchmark(bm))
@@ -97,6 +107,7 @@ export function AnalisisGraderPeriodoPage() {
       .then(([list, shifts]: [Parameters<typeof aggregateDailySummaries>[0], GraderShiftDoc[]]) => {
         const agg = aggregateDailySummaries(list, range)
         setAggregate(agg)
+        setAllSummaries(list)
         setAttribution(aggregateAttribution(shifts))
       })
       .catch((err) => {
@@ -136,6 +147,37 @@ export function AnalisisGraderPeriodoPage() {
     } finally {
       setMigrating(false)
     }
+  }
+
+  const handleReclassify = async () => {
+    if (allSummaries.length === 0) return
+    setReclassifying(true)
+    setReclassifyReport(null)
+    const results: Array<ReclassifyResult & { error?: string }> = []
+    for (let i = 0; i < allSummaries.length; i++) {
+      setReclassifyProgress({ current: i + 1, total: allSummaries.length })
+      try {
+        const r = await reclassifyShift(allSummaries[i]!.id, { writeSyntheticSnapshots: true })
+        results.push(r)
+      } catch (err) {
+        results.push({
+          shiftDocId: allSummaries[i]!.id,
+          topP0CausesBefore: [],
+          topP0CausesAfter: [],
+          inferredSnapshotsCount: 0,
+          confidence: 'low',
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
+    }
+    setReclassifyReport({
+      ok: results.filter(r => !r.error && r.confidence !== 'low').length,
+      warnings: results.filter(r => !r.error && r.confidence === 'low').length,
+      errors: results.filter(r => !!r.error).length,
+      details: results,
+    })
+    setReclassifying(false)
+    setReclassifyProgress(null)
   }
 
   const handlePresetClick = (key: Exclude<PeriodPresetKey, 'custom'>) => {
@@ -244,6 +286,44 @@ export function AnalisisGraderPeriodoPage() {
                 <span className="text-red-600 ml-2">· {migrationResult.errors} errores</span>
               )}
             </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Reclasificador histórico (solo admin) ───────────────────────── */}
+      {isAdmin && allSummaries.length > 0 && (
+        <Card className="border-cyan-500/40 bg-cyan-500/5">
+          <CardContent className="py-3 px-4 flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-start gap-2 min-w-0">
+              <RefreshCcw className="h-4 w-4 text-cyan-500 shrink-0 mt-0.5" />
+              <div className="text-sm min-w-0">
+                <p className="font-medium text-cyan-700 dark:text-cyan-400">
+                  Reclasificación histórica (FASE 26)
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Re-procesa {allSummaries.length} turno{allSummaries.length !== 1 ? 's' : ''} del rango actual con la lógica de 9 causas Matrix. Infiere config de gates desde pieceRecords almacenados.
+                </p>
+                {reclassifyReport && (
+                  <div className="mt-2 text-xs space-y-1">
+                    <p>✅ {reclassifyReport.ok} ok · ⚠️ {reclassifyReport.warnings} baja confianza · ❌ {reclassifyReport.errors} errores</p>
+                    <details>
+                      <summary className="cursor-pointer text-muted-foreground">Ver detalle</summary>
+                      <pre className="text-[10px] bg-muted/40 p-2 rounded mt-1 overflow-x-auto max-h-40">{JSON.stringify(reclassifyReport.details.map(r => ({ id: r.shiftDocId, confidence: r.confidence, n: r.inferredSnapshotsCount, error: r.error })), null, 2)}</pre>
+                    </details>
+                  </div>
+                )}
+              </div>
+            </div>
+            <Button
+              size="sm"
+              onClick={handleReclassify}
+              disabled={reclassifying}
+              className="bg-cyan-600 hover:bg-cyan-700 text-white shrink-0"
+            >
+              {reclassifying && reclassifyProgress
+                ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Reclasificando {reclassifyProgress.current}/{reclassifyProgress.total}…</>
+                : <><RefreshCcw className="h-3.5 w-3.5 mr-1.5" />Reclasificar</>}
+            </Button>
           </CardContent>
         </Card>
       )}
