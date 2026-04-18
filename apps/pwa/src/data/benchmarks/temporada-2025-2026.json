@@ -1,0 +1,40 @@
+{
+  "seasonKey": "2025-2026",
+  "totalPieces": 5370000,
+  "totalP0": 206000,
+  "p0Pct": 3.84,
+  "byMatrixCause": {
+    "fuera_de_limites":   { "pieces": 113300, "pct": 54.99 },
+    "no_leido_fotocelula":{ "pieces": 57680,  "pct": 27.99 },
+    "puerta_no_preparada":{ "pieces": 24720,  "pct": 12.00 },
+    "otro":               { "pieces": 10300,  "pct": 5.00  }
+  },
+  "bySpecies": {
+    "SALAR": { "pieces": 3490500, "p0Pct": 3.50 },
+    "COHO":  { "pieces": 1879500, "p0Pct": 4.46 }
+  },
+  "byCalibre": {
+    "< 1 kg":  { "pieces": 215000,  "p0Pct": 5.80 },
+    "1-2 kg":  { "pieces": 860000,  "p0Pct": 4.30 },
+    "2-3 kg":  { "pieces": 1500000, "p0Pct": 3.70 },
+    "3-4 kg":  { "pieces": 1450000, "p0Pct": 3.50 },
+    "4-5 kg":  { "pieces": 890000,  "p0Pct": 3.60 },
+    "5-6 kg":  { "pieces": 340000,  "p0Pct": 3.80 },
+    "> 6 kg":  { "pieces": 115000,  "p0Pct": 4.10 }
+  },
+  "byShift": {
+    "A": { "pieces": 2577600, "p0Pct": 3.61 },
+    "B": { "pieces": 2792400, "p0Pct": 4.05 }
+  },
+  "byMonth": {
+    "2025-08": { "pieces": 200000, "p0Pct": 4.20 },
+    "2025-09": { "pieces": 450000, "p0Pct": 4.10 },
+    "2025-10": { "pieces": 620000, "p0Pct": 3.90 },
+    "2025-11": { "pieces": 750000, "p0Pct": 3.80 },
+    "2025-12": { "pieces": 850000, "p0Pct": 3.70 },
+    "2026-01": { "pieces": 900000, "p0Pct": 3.60 },
+    "2026-02": { "pieces": 900000, "p0Pct": 3.50 },
+    "2026-03": { "pieces": 500000, "p0Pct": 3.90 },
+    "2026-04": { "pieces": 200000, "p0Pct": 5.81 }
+  }
+}

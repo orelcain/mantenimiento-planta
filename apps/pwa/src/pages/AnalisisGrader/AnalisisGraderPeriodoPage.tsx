@@ -33,6 +33,16 @@ import {
   type PeriodRange,
 } from '@/services/grader/graderPeriodPresets'
 import { GraderPeriodView } from '@/components/grader/GraderPeriodView'
+import { BenchmarkComparisonCard } from '@/components/grader/BenchmarkComparisonCard'
+import { TopActionsCard } from '@/components/grader/TopActionsCard'
+import {
+  loadSeasonBenchmark,
+  compareAgainstBenchmark,
+  type SeasonBenchmark,
+  type BenchmarkComparison,
+} from '@/services/grader/graderBenchmarks'
+import { listShiftsByRange, type GraderShiftDoc } from '@/services/grader/graderShifts.service'
+import { aggregateAttribution, type AggregatedAttribution } from '@/services/grader/graderAttribution'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -60,24 +70,49 @@ export function AnalisisGraderPeriodoPage() {
   const [error, setError] = useState<string | null>(null)
   const [aggregate, setAggregate] = useState<PeriodAggregate | null>(null)
 
+  // Benchmark + attribution (FASE 15)
+  const [benchmark, setBenchmark] = useState<SeasonBenchmark | null>(null)
+  const [comparison, setComparison] = useState<BenchmarkComparison | null>(null)
+  const [attribution, setAttribution] = useState<AggregatedAttribution | null>(null)
+
   // Migración legacy 'Turno tarde' → 'Turno noche' (iter 8 mapeaba B incorrectamente)
   const [legacyCount, setLegacyCount] = useState<number | null>(null)
   const [migrating, setMigrating] = useState(false)
   const [migrationResult, setMigrationResult] = useState<MigrationResult | null>(null)
 
+  // Cargar benchmark una sola vez al montar
+  useEffect(() => {
+    loadSeasonBenchmark('2025-2026').then((bm) => setBenchmark(bm))
+  }, [])
+
   // ── Fetch + agregar cada vez que cambia el rango ─────────────────────────
   useEffect(() => {
     setLoading(true)
     setError(null)
-    listDailySummariesByRange(range.start, range.end)
-      .then((list) => {
-        setAggregate(aggregateDailySummaries(list, range))
+    setAttribution(null)
+    Promise.all([
+      listDailySummariesByRange(range.start, range.end),
+      listShiftsByRange(range.start, range.end),
+    ])
+      .then(([list, shifts]: [Parameters<typeof aggregateDailySummaries>[0], GraderShiftDoc[]]) => {
+        const agg = aggregateDailySummaries(list, range)
+        setAggregate(agg)
+        setAttribution(aggregateAttribution(shifts))
       })
       .catch((err) => {
         setError(err instanceof Error ? err.message : 'Error al cargar el período')
       })
       .finally(() => setLoading(false))
   }, [range])
+
+  // Recalcular comparativa cuando cambia el período o el benchmark
+  useEffect(() => {
+    if (aggregate && benchmark) {
+      setComparison(compareAgainstBenchmark(aggregate, benchmark))
+    } else {
+      setComparison(null)
+    }
+  }, [aggregate, benchmark])
 
   // ── Detectar turnos legacy al montar ─────────────────────────────────────
   useEffect(() => {
@@ -334,7 +369,22 @@ export function AnalisisGraderPeriodoPage() {
       )}
 
       {!loading && !error && aggregate && (
-        <GraderPeriodView data={aggregate} />
+        <>
+          <GraderPeriodView data={aggregate} />
+
+          {/* ── FASE 15: Benchmark + Attribution ──────────────────────── */}
+          {benchmark && comparison && (
+            <BenchmarkComparisonCard
+              period={aggregate}
+              benchmark={benchmark}
+              comparison={comparison}
+            />
+          )}
+
+          {attribution && (
+            <TopActionsCard attribution={attribution} />
+          )}
+        </>
       )}
     </div>
   )
