@@ -13,11 +13,14 @@ import { cn } from '@/lib/utils'
 import type { TimelineBucket } from '@/services/grader/types'
 import type { GraderShiftDoc } from '@/services/grader/graderShifts.service'
 import type { ShiftTimeWindow } from '@/services/grader/graderShiftStatus'
+import type { GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
 
 interface ShiftTimelineViewProps {
   timelineBuckets: TimelineBucket[]
   shiftDoc: GraderShiftDoc | null
   shiftWindow: ShiftTimeWindow
+  /** Historial de cambios de config de gates (FASE 27) */
+  configSnapshots?: GateConfigSnapshot[]
 }
 
 function fmtTime(iso: string): string {
@@ -25,7 +28,7 @@ function fmtTime(iso: string): string {
 }
 
 
-export function ShiftTimelineView({ timelineBuckets, shiftDoc, shiftWindow }: ShiftTimelineViewProps) {
+export function ShiftTimelineView({ timelineBuckets, shiftDoc, shiftWindow, configSnapshots }: ShiftTimelineViewProps) {
   const chartOption = useMemo(() => {
     const buckets = timelineBuckets.filter(b => b.pieces > 0)
     const times = buckets.map(b => fmtTime(b.tsMin))
@@ -44,6 +47,14 @@ export function ShiftTimelineView({ timelineBuckets, shiftDoc, shiftWindow }: Sh
       xAxis: fmtTime(a.at),
       lineStyle: { color: '#f59e0b', type: 'dashed' as const, width: 1.5 },
       label: { show: true, formatter: '⚙', color: '#f59e0b', fontSize: 10 },
+    }))
+
+    // Markers de cambio de config de gates (FASE 27) — skip primer snapshot (config inicial)
+    const configChangeLines = (configSnapshots ?? []).slice(1).map(s => ({
+      name: `Config gates\n${fmtTime(s.at)}`,
+      xAxis: fmtTime(s.at),
+      lineStyle: { color: '#06b6d4', type: 'dashed' as const, width: 1.5 },
+      label: { show: true, formatter: '🔧', color: '#06b6d4', fontSize: 10 },
     }))
 
     return {
@@ -114,7 +125,7 @@ export function ShiftTimelineView({ timelineBuckets, shiftDoc, shiftWindow }: Sh
           markLine: {
             silent: false,
             animation: false,
-            data: [...uploadLines, ...actionLines],
+            data: [...uploadLines, ...actionLines, ...configChangeLines],
           },
         },
       ],

@@ -12,6 +12,7 @@ import { Button, Card, CardContent, Spinner, Badge } from '@/components/ui'
 import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { usePermissionsStore } from '@/store'
 import { getDailySummary, loadTimelineAggregates, listDailySummariesByRange } from '@/services/grader/graderDailySummary.service'
+import { listSnapshots, type GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
 import { getShiftDoc } from '@/services/grader/graderShifts.service'
 import { computeShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import type { ShiftTimeWindow } from '@/services/grader/graderShiftStatus'
@@ -133,6 +134,7 @@ export function AnalisisGraderTurnoPage() {
   const [summary, setSummary] = useState<GraderDailySummary | null>(null)
   const [shiftDoc, setShiftDoc] = useState<GraderShiftDoc | null>(null)
   const [timelineBuckets, setTimelineBuckets] = useState<TimelineBucket[]>([])
+  const [configSnapshots, setConfigSnapshots] = useState<GateConfigSnapshot[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -296,6 +298,14 @@ export function AnalisisGraderTurnoPage() {
     loadTimelineAggregates(`${dateKey}__${shiftLabel}`)
       .then(buckets => setTimelineBuckets(buckets ?? []))
       .catch(() => {})
+  }, [dateKey, shiftLabel])
+
+  // Carga historial de config de gates (FASE 27)
+  useEffect(() => {
+    if (!dateKey || !shiftLabel) return
+    listSnapshots(`${dateKey}__${shiftLabel}`)
+      .then(setConfigSnapshots)
+      .catch(() => setConfigSnapshots([]))
   }, [dateKey, shiftLabel])
 
   // Todos los useMemo ANTES del early return condicional (regla de hooks)
@@ -472,6 +482,7 @@ export function AnalisisGraderTurnoPage() {
             timelineBuckets={timelineBuckets}
             shiftDoc={shiftDoc}
             shiftWindow={shiftWindow}
+            configSnapshots={configSnapshots}
           />
 
           {/* ── Sección IA ─────────────────────────────────────────────── */}
@@ -500,6 +511,13 @@ export function AnalisisGraderTurnoPage() {
             </CardContent>
           </Card>
           {aiOutput && <AIOutputPanel output={aiOutput} />}
+
+          {/* Cambios de config de gates en el turno (FASE 27) */}
+          {configSnapshots.length > 0 && (
+            <p className="text-xs text-muted-foreground px-1">
+              Cambios de config registrados en este turno: <span className="font-medium text-foreground">{configSnapshots.length}</span>
+            </p>
+          )}
 
           {/* Link a configuración avanzada */}
           <button

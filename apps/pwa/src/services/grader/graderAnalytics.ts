@@ -531,6 +531,7 @@ function computePointZeroClassification(
   activeGates?: GateAssignment[],
   weightRanges: CalibreWeightRange[] = CALIBRE_WEIGHT_RANGES,
   hasRealP0Data = false,
+  getGatesAtTs?: (ts: string) => GateAssignment[],
 ): PointZeroClassification {
   // Calibres con al menos un gate activo
   const activeCalibres = new Set<string>(
@@ -781,7 +782,9 @@ function computePointZeroClassification(
   )
   const activeList = (activeGates || []).filter(g => g.active)
   for (const r of g0Records) {
-    const matrixCause = classifyRecordToMatrix(r, activeList, weightRanges)
+    // Si hay resolver por timestamp (FASE 27), usarlo; si no, config final del turno
+    const gatesForRecord = getGatesAtTs ? getGatesAtTs(r.ts).filter(g => g.active) : activeList
+    const matrixCause = classifyRecordToMatrix(r, gatesForRecord, weightRanges)
     const entry = matrixMap.get(matrixCause)!
     entry.pieces += r.pieces
   }
@@ -825,6 +828,7 @@ export function computeAnalytics(
   data: ParsedMatrixData,
   config: GraderAnalysisConfig,
   gates: GateAssignment[],
+  getGatesAtTs?: (ts: string) => GateAssignment[],
 ): GraderAnalyticsResult {
   const notes: string[] = []
   const interval = config.intervalMinutes ?? 15
@@ -913,6 +917,7 @@ export function computeAnalytics(
     gates,
     weightRanges,
     hasRealP0Data,
+    getGatesAtTs,
   )
 
   // ——————— DISTRIBUCIÓN POR CALIBRE ———————

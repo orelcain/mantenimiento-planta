@@ -18,6 +18,7 @@ import {
   type GatesTemplate,
 } from '@/services/grader/graderSession.service'
 import { getModuleRanges, saveModuleRanges, saveModulePhysicalConfig, saveModuleShiftSchedule } from '@/services/grader/graderModuleConfig.service'
+import { saveConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
 import { listDailySummariesByRange } from '@/services/grader/graderDailySummary.service'
 import { useGraderSelectionStore } from '@/store/graderSelectionStore'
 import type { GraderDailySummary } from '@/services/grader/types'
@@ -492,9 +493,17 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
     if (!moduleConfigLoadedRef.current) return
     const timer = setTimeout(() => {
       onComplete(gates, { ...config, physicalConfig })
+      // Snapshot cronológico: solo si hay turno histórico activo (FASE 27)
+      if (selectedFromCalendar && user) {
+        saveConfigSnapshot(
+          selectedFromCalendar.id,
+          gates,
+          { uid: user.id, name: `${user.nombre} ${user.apellido}`.trim() },
+        ).catch(err => console.warn('[FASE 27] snapshot gates falló, continuando', err))
+      }
     }, 500)
     return () => clearTimeout(timer)
-  }, [gates, config, physicalConfig, onComplete])
+  }, [gates, config, physicalConfig, onComplete, selectedFromCalendar, user])
 
   const updateGate = (idx: number, patch: Partial<GateAssignment>) => {
     setGates((prev) => prev.map((g, i) => (i === idx ? { ...g, ...patch } : g)))

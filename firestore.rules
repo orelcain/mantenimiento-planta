@@ -1010,6 +1010,13 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create, update: if isSupervisor();
       allow delete: if isAdmin();
+
+      // Log cronológico de cambios de configuración de gates (FASE 27)
+      match /configHistory/{snapshotId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated();
+        allow update, delete: if isAdmin(); // snapshots son inmutables una vez creados
+      }
     }
 
     // ============================================
