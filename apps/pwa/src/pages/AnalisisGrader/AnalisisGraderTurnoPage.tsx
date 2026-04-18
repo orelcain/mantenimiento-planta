@@ -9,7 +9,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useParams, useNavigate, Navigate, Link } from 'react-router-dom'
 import { Button, Card, CardContent, Spinner } from '@/components/ui'
-import { ArrowLeft, Settings2, AlertCircle, Upload, Activity } from 'lucide-react'
+import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2 } from 'lucide-react'
 import { usePermissionsStore } from '@/store'
 import { getDailySummary, loadTimelineAggregates } from '@/services/grader/graderDailySummary.service'
 import { getShiftDoc } from '@/services/grader/graderShifts.service'
@@ -22,8 +22,11 @@ import { P0CausesPanel } from '@/components/grader/P0CausesPanel'
 import { ShiftTimelineView } from '@/components/grader/ShiftTimelineView'
 import { ActionPlanPanel, deriveSuggestions } from '@/components/grader/ActionPlanPanel'
 import { findTriggeredRunbooks } from '@/services/grader/graderRunbooks'
+import { analyzeGraderFromSummary } from '@/services/grader/graderSummaryAI'
+import { AIOutputPanel } from '@/components/grader/GraderInlinePanels'
 import type { GraderDailySummary, MatrixP0Cause, PointZeroClassification, TimelineBucket } from '@/services/grader/types'
 import type { GraderShiftDoc } from '@/services/grader/graderShifts.service'
+import type { AIGraderOutput } from '@/services/grader/types'
 
 /** Parsea `YYYY-MM-DD__Turno día` → [dateKey, shiftLabel] */
 function parseShiftId(raw: string | undefined): [string, string] {
@@ -119,6 +122,27 @@ export function AnalisisGraderTurnoPage() {
   const [timelineBuckets, setTimelineBuckets] = useState<TimelineBucket[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // ── IA (FASE 16) ─────────────────────────────────────────────────────────
+  const [aiOutput, setAiOutput] = useState<AIGraderOutput | null>(null)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
+
+  const handleGenerateAI = async () => {
+    if (!summary) return
+    setAiLoading(true)
+    setAiError(null)
+    try {
+      const result = await analyzeGraderFromSummary(summary, undefined, {
+        actions: shiftDoc?.actions,
+      })
+      setAiOutput(result)
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : 'Error al analizar con IA')
+    } finally {
+      setAiLoading(false)
+    }
+  }
 
   useEffect(() => {
     if (!dateKey || !shiftLabel) {
@@ -262,6 +286,33 @@ export function AnalisisGraderTurnoPage() {
             shiftDoc={shiftDoc}
             shiftWindow={shiftWindow}
           />
+
+          {/* ── Sección IA ─────────────────────────────────────────────── */}
+          <Card>
+            <CardContent className="py-3 px-4 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-violet-500" />
+                  <span className="text-sm font-medium">Análisis IA</span>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleGenerateAI}
+                  disabled={aiLoading || !summary}
+                  className="text-xs"
+                >
+                  {aiLoading
+                    ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Analizando…</>
+                    : <><Sparkles className="h-3.5 w-3.5 mr-1.5" />{aiOutput ? 'Regenerar' : 'Generar análisis'}</>}
+                </Button>
+              </div>
+              {aiError && (
+                <p className="text-xs text-destructive">{aiError}</p>
+              )}
+            </CardContent>
+          </Card>
+          {aiOutput && <AIOutputPanel output={aiOutput} />}
 
           {/* Link a configuración avanzada */}
           <Link to={`/analisis-grader/turno/${rawShiftId}/setup`}>
