@@ -46,26 +46,49 @@ Cuando el usuario diga `cerrar`, `terminar`, `ya está`, `gracias`, `hasta luego
 
 ---
 
-## División de trabajo Opus 4.7 ⇄ Sonnet (establecido 2026-04-16)
+## Gestión dinámica de modelo — Haiku 4.5 ⇄ Sonnet 4.6 ⇄ Opus 4.7 (v0.1 — 2026-04-18)
 
-**Opus 4.7 = planificador. Sonnet = ejecutor.** El usuario alterna manualmente entre modelos.
+**Nivel de esfuerzo va según naturaleza de tarea.** El asistente auto-clasifica cada turno y **sugiere al usuario** cambiar modelo (`/model haiku|sonnet|opus`) cuando conviene. Si el modelo actual es óptimo, ejecuta en silencio.
 
-| Tarea | Modelo |
-|---|---|
-| Análisis UX/UI con screenshots | Opus |
-| Planes de iteración (R1, R2… con P0/P1/P2) | Opus |
-| Decisiones arquitectónicas, refactors grandes, ADRs | Opus |
-| Brainstorming, trade-offs, auditorías | Opus |
-| Revisión de PRs / código | Opus |
-| **Implementar** planes ya cerrados | Sonnet |
-| Escribir código, tests, commits, deploys | Sonnet |
-| Bug fixes mecánicos con diagnóstico claro | Sonnet |
-| Iteraciones rápidas sobre plan existente | Sonnet |
+| Naturaleza de la tarea | Modelo | Esfuerzo |
+|---|---|---|
+| Diseño arquitectura / UX / plan técnico | **Opus 4.7** | normal |
+| Debug complejo (root cause, race conditions) | **Opus 4.7** | normal |
+| Brainstorming, trade-offs, auditorías | **Opus 4.7** | normal |
+| Refactor con decisiones | **Opus 4.7** planea → Sonnet ejecuta | — |
+| Review de PRs / código | **Opus 4.7** | normal |
+| Implementar un plan ya escrito (DoD claro) | **Sonnet 4.6** | normal |
+| Edits mecánicos (migrar tipos, renombrar) | **Sonnet 4.6** | normal |
+| Tests unitarios simples | **Sonnet 4.6** | normal |
+| Commits + push + verificar CI | **Sonnet 4.6** | normal |
+| Bug fixes mecánicos con diagnóstico claro | **Sonnet 4.6** | normal |
+| Batch de ediciones en cadena | **Sonnet 4.6** | normal |
+| Lectura exploratoria simple (¿existe X?) | **Haiku 4.5** | — |
+| Queries de estado corto (git status, ¿CI?, versión) | **Haiku 4.5** | — |
+| Formatear / convertir | **Haiku 4.5** | — |
 
-**Protocolo de handoff**:
-- Cuando Opus termina un plan → dice explícitamente "listo para Sonnet" y el plan queda auto-contenido (archivos, líneas, criterios de aceptación, orden de rondas).
-- Cuando Sonnet recibe un plan exploratorio sin cerrar → sugiere volver a Opus.
-- Excepciones (cualquier modelo): cambios <5 líneas, bug fixes urgentes, preguntas directas.
+### Batching — agrupar tareas del mismo tipo
+
+Para reducir cambios de modelo: al planear una fase, identificar bloques contiguos del mismo modelo y ejecutarlos juntos. Ejemplo típico:
+
+```
+Batch 1 (Opus 4.7, ~20 min)   Diseño + doc del plan
+         ↓ handoff: "plan listo, `/model sonnet`"
+Batch 2 (Sonnet 4.6, ~2h)     Implementación + commits + push
+         ↓ handoff: "código verde, `/model haiku`"
+Batch 3 (Haiku 4.5, ~5 min)   Verificar CI + confirmar deploy
+```
+
+### Restricciones
+
+- El asistente **no puede** invocar `/model` ni `/fast` — son comandos del cliente Claude Code. Solo **sugiere con aviso breve**.
+- Prompt cache se pierde al cambiar modelo → vale la pena sólo cuando el batch siguiente es suficientemente largo.
+
+### Evolución del framework
+
+**v0.1 (hoy):** tabla estática + avisos manuales. Lo iteramos sesión tras sesión observando qué avisos fueron útiles vs ruidosos.
+
+**Detalle completo + protocolo paso a paso:** ver memoria global `feedback_modelo_por_tarea.md`.
 
 ---
 
