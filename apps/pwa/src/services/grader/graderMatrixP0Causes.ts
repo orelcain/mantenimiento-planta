@@ -10,17 +10,25 @@ export const MATRIX_P0_CAUSES: Record<MatrixP0Cause, {
   label: string
   description: string
   icon: string
-  color: 'red' | 'amber' | 'blue' | 'zinc'
+  color: 'red' | 'orange' | 'amber' | 'blue' | 'zinc'
   subCauses: PointZeroCause[]
   defaultActionHint: string
 }> = {
+  fuera_de_rangos: {
+    label: 'Fuera de rangos',
+    description: 'Peso de la pieza no encaja en ningún calibre configurado en gates',
+    icon: 'SlidersHorizontal',
+    color: 'orange',
+    subCauses: ['fuera_de_rango'],
+    defaultActionHint: 'Ajustar rangos de calibres en configuración de gates para cubrir la distribución real de peso',
+  },
   fuera_de_limites: {
     label: 'Fuera de límites',
-    description: 'Peso fuera del rango de los calibres configurados',
+    description: 'Peso fuera de los límites físicos del sistema Marelec (hardware)',
     icon: 'ScaleOff',
     color: 'red',
-    subCauses: ['fuera_de_rango', 'fuera_de_limites'],
-    defaultActionHint: 'Revisar rangos de calibres configurados y verificar contrastación de balanza',
+    subCauses: ['fuera_de_limites'],
+    defaultActionHint: 'Verificar contrastación de balanza y calibración del sensor de peso',
   },
   no_leido_fotocelula: {
     label: 'No leído por fotocélula',
@@ -61,11 +69,18 @@ export function toMatrixCause(subCause: PointZeroCause): MatrixP0Cause {
 /**
  * Parsea el string de error de la columna "Error" del Excel P0 de Matrix
  * a una causa oficial.
+ *
+ * Distingue:
+ *  - "fuera de rango/rangos" → `fuera_de_rangos` (config de calibres en gates)
+ *  - "fuera de límites" → `fuera_de_limites` (hardware físico)
+ * Si el string menciona ambos o es ambiguo, prioriza "rangos" (config) porque
+ * es la causa más común que el operador puede corregir directamente.
  */
 export function parseMatrixErrorString(raw: string): MatrixP0Cause {
   const s = (raw ?? '').toLowerCase().trim()
-  if ((s.includes('fuera de') || s.includes('fuera del')) &&
-      (s.includes('límit') || s.includes('limit'))) return 'fuera_de_limites'
+  const isFuera = s.includes('fuera de') || s.includes('fuera del')
+  if (isFuera && (s.includes('rango'))) return 'fuera_de_rangos'
+  if (isFuera && (s.includes('límit') || s.includes('limit'))) return 'fuera_de_limites'
   if (s.includes('fotoc') || s.includes('no le') || s.includes('fotocelula')) return 'no_leido_fotocelula'
   if (s.includes('puerta') && s.includes('prepar')) return 'puerta_no_preparada'
   return 'otro'

@@ -48,7 +48,36 @@ export function ShiftTimelineView({ timelineBuckets, shiftDoc, shiftWindow }: Sh
 
     return {
       backgroundColor: 'transparent',
-      grid: { left: 40, right: 16, top: 20, bottom: 40 },
+      // Más margen bajo para el slider de zoom
+      grid: { left: 40, right: 16, top: 20, bottom: 60 },
+      toolbox: {
+        right: 10,
+        top: 0,
+        feature: {
+          dataZoom: { yAxisIndex: false, title: { zoom: 'Zoom', back: 'Reset zoom' } },
+          restore: { title: 'Resetear' },
+        },
+        iconStyle: { borderColor: '#6b7280' },
+        emphasis: { iconStyle: { borderColor: '#f9fafb' } },
+      },
+      // Zoom: rueda para pan, slider visible, pinch-zoom en móvil
+      dataZoom: [
+        { type: 'inside', start: 0, end: 100, zoomOnMouseWheel: true, moveOnMouseMove: true, moveOnMouseWheel: false },
+        {
+          type: 'slider',
+          start: 0,
+          end: 100,
+          height: 18,
+          bottom: 10,
+          backgroundColor: '#1f2937',
+          fillerColor: 'rgba(239,68,68,0.2)',
+          borderColor: '#374151',
+          handleStyle: { color: '#ef4444' },
+          moveHandleStyle: { color: '#ef4444' },
+          emphasis: { handleStyle: { color: '#f87171' } },
+          textStyle: { color: '#6b7280', fontSize: 9 },
+        },
+      ],
       xAxis: {
         type: 'category' as const,
         data: times,

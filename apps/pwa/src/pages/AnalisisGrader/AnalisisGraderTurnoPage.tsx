@@ -45,7 +45,7 @@ function deriveByMatrixCause(
   topP0Causes: GraderDailySummary['topP0Causes'],
   totalP0Pieces: number,
 ): PointZeroClassification['byMatrixCause'] {
-  const ALL: MatrixP0Cause[] = ['fuera_de_limites', 'no_leido_fotocelula', 'puerta_no_preparada', 'otro']
+  const ALL: MatrixP0Cause[] = ['fuera_de_rangos', 'fuera_de_limites', 'no_leido_fotocelula', 'puerta_no_preparada', 'otro']
   const acc = Object.fromEntries(ALL.map(mc => [mc, { pieces: 0, pct: 0, subCauses: [] as PointZeroClassification['byMatrixCause'][MatrixP0Cause]['subCauses'] }])) as PointZeroClassification['byMatrixCause']
 
   for (const c of topP0Causes ?? []) {
@@ -65,7 +65,7 @@ function labelToMatrixCause(label: string): MatrixP0Cause {
   const s = (label ?? '').toLowerCase()
   const fromMatrix = parseMatrixErrorString(label)
   if (fromMatrix !== 'otro') return fromMatrix
-  if (s.includes('rango')) return 'fuera_de_limites'
+  if (s.includes('rango')) return 'fuera_de_rangos'
   if (s.includes('close') || s.includes('long')) return 'no_leido_fotocelula'
   return 'otro'
 }
@@ -165,9 +165,11 @@ export function AnalisisGraderTurnoPage() {
           setAdjacentShifts({ prev: null, next: null })
           return
         }
+        const prevEntry = idx > 0 ? sorted[idx - 1] : null
+        const nextEntry = idx < sorted.length - 1 ? sorted[idx + 1] : null
         setAdjacentShifts({
-          prev: idx > 0 ? { dateKey: sorted[idx - 1].dateKey, shiftId: sorted[idx - 1].shiftId } : null,
-          next: idx < sorted.length - 1 ? { dateKey: sorted[idx + 1].dateKey, shiftId: sorted[idx + 1].shiftId } : null,
+          prev: prevEntry ? { dateKey: prevEntry.dateKey, shiftId: prevEntry.shiftId } : null,
+          next: nextEntry ? { dateKey: nextEntry.dateKey, shiftId: nextEntry.shiftId } : null,
         })
       })
       .catch(() => setAdjacentShifts({ prev: null, next: null }))
@@ -199,8 +201,10 @@ export function AnalisisGraderTurnoPage() {
     let startY = 0
     let startTarget: EventTarget | null = null
     const onTouchStart = (e: TouchEvent) => {
-      startX = e.touches[0].clientX
-      startY = e.touches[0].clientY
+      const t = e.touches[0]
+      if (!t) return
+      startX = t.clientX
+      startY = t.clientY
       startTarget = e.target
     }
     const onTouchEnd = (e: TouchEvent) => {
@@ -209,8 +213,10 @@ export function AnalisisGraderTurnoPage() {
       if (startTarget instanceof Element) {
         if (startTarget.closest('input, textarea, button, canvas, [data-no-swipe]')) return
       }
-      const dx = e.changedTouches[0].clientX - startX
-      const dy = e.changedTouches[0].clientY - startY
+      const t = e.changedTouches[0]
+      if (!t) return
+      const dx = t.clientX - startX
+      const dy = t.clientY - startY
       // Solo swipe claramente horizontal: |dx|>80px y dominante sobre vertical
       if (Math.abs(dx) > 80 && Math.abs(dx) > Math.abs(dy) * 1.5) {
         if (dx > 0 && adjacentShifts.prev) goToShift(adjacentShifts.prev)

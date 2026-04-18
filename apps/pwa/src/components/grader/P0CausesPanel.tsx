@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronDown, Scale, EyeOff, Clock, HelpCircle } from 'lucide-react'
+import { ChevronDown, Scale, EyeOff, Clock, HelpCircle, SlidersHorizontal } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { MATRIX_P0_CAUSES } from '@/services/grader/graderMatrixP0Causes'
@@ -10,6 +10,7 @@ import type { LucideProps } from 'lucide-react'
 type IconComponent = (props: Pick<LucideProps, 'className'>) => JSX.Element
 
 const CAUSE_ICONS: Record<MatrixP0Cause, IconComponent> = {
+  fuera_de_rangos: ({ className }) => <SlidersHorizontal className={className} />,
   fuera_de_limites: ({ className }) => <Scale className={className} />,
   no_leido_fotocelula: ({ className }) => <EyeOff className={className} />,
   puerta_no_preparada: ({ className }) => <Clock className={className} />,
@@ -18,10 +19,11 @@ const CAUSE_ICONS: Record<MatrixP0Cause, IconComponent> = {
 
 const FALLBACK_COLOR = { badge: 'bg-zinc-500/15 text-zinc-400', bar: 'bg-zinc-500' }
 const COLOR_CLASSES: Record<string, { badge: string; bar: string }> = {
-  red:   { badge: 'bg-red-500/15 text-red-400',   bar: 'bg-red-500'   },
-  amber: { badge: 'bg-amber-500/15 text-amber-400', bar: 'bg-amber-500' },
-  blue:  { badge: 'bg-blue-500/15 text-blue-400',  bar: 'bg-blue-500'  },
-  zinc:  FALLBACK_COLOR,
+  red:    { badge: 'bg-red-500/15 text-red-400',       bar: 'bg-red-500'    },
+  orange: { badge: 'bg-orange-500/15 text-orange-400', bar: 'bg-orange-500' },
+  amber:  { badge: 'bg-amber-500/15 text-amber-400',   bar: 'bg-amber-500'  },
+  blue:   { badge: 'bg-blue-500/15 text-blue-400',     bar: 'bg-blue-500'   },
+  zinc:   FALLBACK_COLOR,
 }
 
 const SUB_CAUSE_LABELS: Record<string, string> = {
@@ -49,7 +51,7 @@ export function P0CausesPanel({ byMatrixCause, totalP0Pct, onClickCause }: P0Cau
         <CardTitle className="text-base">¿Por qué hubo P0?</CardTitle>
         <CardDescription>
           {hasCauseData
-            ? `${totalP0Pct.toFixed(1)}% de piezas rechazadas — estas son las causas Matrix`
+            ? `${totalP0Pct.toFixed(1)}% de piezas rechazadas — cada causa suma al total`
             : `${totalP0Pct.toFixed(1)}% de piezas rechazadas — cargá el Excel P0 para ver las causas`}
         </CardDescription>
       </CardHeader>
@@ -68,6 +70,9 @@ export function P0CausesPanel({ byMatrixCause, totalP0Pct, onClickCause }: P0Cau
           const colors = COLOR_CLASSES[def.color] ?? FALLBACK_COLOR
           const Icon = CAUSE_ICONS[cause]
           const isExpanded = expanded === cause
+          // % del total de piezas = % dentro del P0 × P0% / 100
+          // Ej: P0=1.9% + fuera_limites=91.8% → 1.74% del total (lo que el operario entiende)
+          const pctOfTotal = (stats.pct * totalP0Pct) / 100
 
           return (
             <div key={cause} className="border rounded-lg overflow-hidden">
@@ -85,7 +90,7 @@ export function P0CausesPanel({ byMatrixCause, totalP0Pct, onClickCause }: P0Cau
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-sm">{def.label}</div>
                   <div className="text-xs text-muted-foreground truncate">{def.description}</div>
-                  {/* Barra de proporción */}
+                  {/* Barra = proporción dentro del P0 total (permite comparar causas) */}
                   <div className="mt-1.5 h-1 bg-muted rounded-full overflow-hidden w-full">
                     <div
                       className={cn('h-full rounded-full transition-all', colors.bar)}
@@ -94,8 +99,15 @@ export function P0CausesPanel({ byMatrixCause, totalP0Pct, onClickCause }: P0Cau
                   </div>
                 </div>
 
-                <div className="text-right shrink-0">
-                  <div className="font-mono font-bold text-sm">{stats.pct.toFixed(1)}%</div>
+                {/* Primary: % del total | Secondary: % dentro del P0 + piezas */}
+                <div className="text-right shrink-0 min-w-[68px]">
+                  <div className="font-mono font-bold text-sm">
+                    {pctOfTotal.toFixed(2)}%
+                    <span className="text-[9px] font-normal text-muted-foreground/80 ml-0.5">total</span>
+                  </div>
+                  <div className="text-[10px] text-muted-foreground font-mono">
+                    {stats.pct.toFixed(1)}% del P0
+                  </div>
                   <div className="text-xs text-muted-foreground">{stats.pieces.toLocaleString('es-CL')} pzas</div>
                 </div>
 

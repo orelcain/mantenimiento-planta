@@ -686,7 +686,7 @@ function computePointZeroClassification(
 
   // Agregar sub-causas con desglose por causa Matrix (3 niveles UI)
   const ALL_MATRIX_CAUSES: MatrixP0Cause[] = [
-    'fuera_de_limites', 'no_leido_fotocelula', 'puerta_no_preparada', 'otro',
+    'fuera_de_rangos', 'fuera_de_limites', 'no_leido_fotocelula', 'puerta_no_preparada', 'otro',
   ]
   const matrixMap = new Map<MatrixP0Cause, { pieces: number; subs: Array<{ cause: PointZeroCause; pieces: number; pct: number }> }>(
     ALL_MATRIX_CAUSES.map(mc => [mc, { pieces: 0, subs: [] }]),

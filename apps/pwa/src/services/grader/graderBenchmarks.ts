@@ -23,6 +23,7 @@ export interface BenchmarkComparison {
 }
 
 const CAUSE_KEYS: MatrixP0Cause[] = [
+  'fuera_de_rangos',
   'fuera_de_limites',
   'no_leido_fotocelula',
   'puerta_no_preparada',

@@ -31,7 +31,8 @@ export type PointZeroCause =
  * Las 6 sub-causas internas (PointZeroCause) son el drill-down de nivel 2.
  */
 export type MatrixP0Cause =
-  | 'fuera_de_limites'
+  | 'fuera_de_rangos'     // Peso fuera de los calibres configurados por el usuario en gates
+  | 'fuera_de_limites'    // Peso fuera de los límites físicos del sistema (rango total hardware)
   | 'no_leido_fotocelula'
   | 'puerta_no_preparada'
   | 'otro';

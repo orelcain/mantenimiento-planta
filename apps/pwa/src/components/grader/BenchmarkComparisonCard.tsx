@@ -13,6 +13,7 @@ interface Props {
 }
 
 const CAUSE_KEYS: MatrixP0Cause[] = [
+  'fuera_de_rangos',
   'fuera_de_limites',
   'no_leido_fotocelula',
   'puerta_no_preparada',
@@ -42,6 +43,7 @@ const VERDICT_CONFIG = {
 
 const DOT_COLOR: Record<string, string> = {
   red: 'bg-red-500',
+  orange: 'bg-orange-500',
   amber: 'bg-amber-500',
   blue: 'bg-blue-500',
   zinc: 'bg-zinc-400',
