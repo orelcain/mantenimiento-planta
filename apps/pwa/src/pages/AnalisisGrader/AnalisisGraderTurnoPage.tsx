@@ -9,9 +9,9 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useParams, useNavigate, Navigate, Link } from 'react-router-dom'
 import { Button, Card, CardContent, Spinner } from '@/components/ui'
-import { ArrowLeft, Settings2, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Settings2, AlertCircle, Upload, Activity } from 'lucide-react'
 import { usePermissionsStore } from '@/store'
-import { getDailySummary } from '@/services/grader/graderDailySummary.service'
+import { getDailySummary, loadTimelineAggregates } from '@/services/grader/graderDailySummary.service'
 import { getShiftDoc } from '@/services/grader/graderShifts.service'
 import { computeShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import { DEFAULT_SHIFT_SCHEDULE } from '@/services/grader/graderShiftSchedule'
@@ -21,7 +21,7 @@ import { P0CausesPanel } from '@/components/grader/P0CausesPanel'
 import { ShiftTimelineView } from '@/components/grader/ShiftTimelineView'
 import { ActionPlanPanel, deriveSuggestions } from '@/components/grader/ActionPlanPanel'
 import { findTriggeredRunbooks } from '@/services/grader/graderRunbooks'
-import type { GraderDailySummary, MatrixP0Cause, PointZeroClassification } from '@/services/grader/types'
+import type { GraderDailySummary, MatrixP0Cause, PointZeroClassification, TimelineBucket } from '@/services/grader/types'
 import type { GraderShiftDoc } from '@/services/grader/graderShifts.service'
 
 /** Parsea `YYYY-MM-DD__Turno día` → [dateKey, shiftLabel] */
@@ -94,6 +94,7 @@ export function AnalisisGraderTurnoPage() {
 
   const [summary, setSummary] = useState<GraderDailySummary | null>(null)
   const [shiftDoc, setShiftDoc] = useState<GraderShiftDoc | null>(null)
+  const [timelineBuckets, setTimelineBuckets] = useState<TimelineBucket[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -111,12 +112,27 @@ export function AnalisisGraderTurnoPage() {
       getShiftDoc(dateKey, shiftLabel).catch(() => null),
     ])
       .then(([s, sd]) => {
-        if (!s) setError(`Turno ${shiftLabel} del ${dateKey} no encontrado en el historial.`)
-        else setSummary(s)
+        if (!s) {
+          const win = computeShiftTimeWindow(dateKey, shiftLabel, DEFAULT_SHIFT_SCHEDULE)
+          if (win.status !== 'live') {
+            setError(`Turno ${shiftLabel} del ${dateKey} no encontrado en el historial.`)
+          }
+          // Si es live: summary=null + error=null → renderiza empty-state con CTA de upload
+        } else {
+          setSummary(s)
+        }
         setShiftDoc(sd)
       })
       .catch(err => setError(err instanceof Error ? err.message : 'Error al cargar el turno.'))
       .finally(() => setLoading(false))
+  }, [dateKey, shiftLabel])
+
+  // Carga timeline sub-collection (graderDailySummaries/{id}/meta/timeline)
+  useEffect(() => {
+    if (!dateKey || !shiftLabel) return
+    loadTimelineAggregates(`${dateKey}__${shiftLabel}`)
+      .then(buckets => setTimelineBuckets(buckets ?? []))
+      .catch(() => {})
   }, [dateKey, shiftLabel])
 
   // Todos los useMemo ANTES del early return condicional (regla de hooks)
@@ -176,6 +192,23 @@ export function AnalisisGraderTurnoPage() {
         </Card>
       )}
 
+      {/* Turno en vivo sin datos aún */}
+      {!loading && !error && !summary && shiftWindow?.status === 'live' && (
+        <Card className="border-dashed">
+          <CardContent className="p-8 flex flex-col items-center gap-3 text-center">
+            <Activity className="w-8 h-8 text-red-400 animate-pulse" />
+            <p className="font-medium">Turno en curso — sin datos cargados aún</p>
+            <p className="text-sm text-muted-foreground">
+              Cargá el primer Excel de Matrix para ver el estado del proceso.
+            </p>
+            <Button onClick={() => navigate('/analisis-grader/wizard')} className="gap-2 mt-1">
+              <Upload className="w-4 h-4" />
+              Cargar Excel
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Contenido principal */}
       {summary && shiftWindow && (
         <>
@@ -200,9 +233,8 @@ export function AnalisisGraderTurnoPage() {
           </div>
 
           {/* Timeline — full width */}
-          {/* Timeline: buckets viven en sub-colección (carga diferida en FASE 14+) */}
           <ShiftTimelineView
-            timelineBuckets={[]}
+            timelineBuckets={timelineBuckets}
             shiftDoc={shiftDoc}
             shiftWindow={shiftWindow}
           />

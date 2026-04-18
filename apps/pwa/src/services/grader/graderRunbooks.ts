@@ -125,6 +125,7 @@ export const RUNBOOKS: Record<string, Runbook> = {
     ],
     successCriteria: ['Presión ≥ 7 bar estable', 'Aire seco (sin condensación visible en líneas)'],
     triggers: [
+      { condition: 'P0 "Puerta no preparada" > 2 % (indicio falla neumática)', metric: 'puerta_no_preparada_pct', comparator: '>' as const, threshold: 2 },
       { condition: 'P0 "Fuera de límites" simultáneo en 3+ pockets (indicio de falla neumática)' },
       { condition: 'Flippers no actuando correctamente (piezas cayendo en buchaca incorrecta)' },
     ],
@@ -148,6 +149,7 @@ export const RUNBOOKS: Record<string, Runbook> = {
     ],
     successCriteria: ['Flipper actúa en < 100 ms al comando del Z2', 'Sin piezas desviadas incorrectamente en prueba manual'],
     triggers: [
+      { condition: 'P0 "Puerta no preparada" > 1 %', metric: 'puerta_no_preparada_pct', comparator: '>' as const, threshold: 1 },
       { condition: 'Quejas de calibres mezclados en buchacas' },
       { condition: 'P0 elevado sin causa clara de peso (piezas con peso OK pero rechazadas)' },
     ],
@@ -282,6 +284,7 @@ export const RUNBOOKS: Record<string, Runbook> = {
     ],
     successCriteria: ['Z2 vuelve a modo producción sin alarmas', 'P0 se estabiliza en valor previo a la alarma'],
     triggers: [
+      { condition: 'P0 causa "otro" > 1 % (sin causa identificada)', metric: 'otro_pct', comparator: '>' as const, threshold: 1 },
       { condition: 'Alarma de clasificación en pantalla Z2' },
       { condition: 'P0 súbito al 100 % sin causa física aparente' },
     ],
@@ -311,15 +314,19 @@ export function filterRunbooks(
 }
 
 export function findTriggeredRunbooks(dominantMatrixCause: string | null, p0Pct: number): Runbook[] {
+  const causeMetricMap: Record<string, string> = {
+    fuera_de_limites:     'fuera_de_limites_pct',
+    no_leido_fotocelula:  'no_leido_fotocelula_pct',
+    puerta_no_preparada:  'puerta_no_preparada_pct',
+    otro:                 'otro_pct',
+  }
+  const expectedMetric = dominantMatrixCause ? causeMetricMap[dominantMatrixCause] : null
+
   return Object.values(RUNBOOKS).filter(rb =>
     rb.triggers.some(t => {
-      if (t.metric === 'fuera_de_limites_pct' && dominantMatrixCause === 'fuera_de_limites') {
-        return p0Pct >= (t.threshold ?? 0)
-      }
-      if (t.metric === 'no_leido_fotocelula_pct' && dominantMatrixCause === 'no_leido_fotocelula') {
-        return p0Pct >= (t.threshold ?? 0)
-      }
-      return false
+      if (!t.metric || !expectedMetric) return false
+      if (t.metric !== expectedMetric) return false
+      return p0Pct >= (t.threshold ?? 0)
     }),
   ).slice(0, 3)
 }
