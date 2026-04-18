@@ -39,6 +39,7 @@ import { getGradingBelt, GRADING_BELT_DEFAULT_MPS } from '@/services/grader/grad
 import type { GraderBeltId } from '@/services/grader/graderBeltHelpers'
 import { TachMeasurementModal } from '@/components/grader/modals/TachMeasurementModal'
 import { SlowMoMeasurementModal } from '@/components/grader/modals/SlowMoMeasurementModal'
+import { Z2CaptureModal } from '@/components/grader/modals/Z2CaptureModal'
 import { useConfigChangeLogger } from '@/services/grader/useConfigChangeLogger'
 import { listRecentConfigChanges, type ConfigChangeEntry } from '@/services/grader/graderConfigChangeLog.service'
 import { InfoTooltip } from '@/components/ui'
@@ -144,6 +145,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
   // FASE 5 — Modales de medición
   const [tachModalBelt, setTachModalBelt] = useState<GraderBeltId | null>(null)
   const [slowMoModalGate, setSlowMoModalGate] = useState<number | null>(null)
+  const [z2CaptureOpen, setZ2CaptureOpen] = useState(false)
   // FASE 6 — historial de cambios (últimos 10)
   const [changeLog, setChangeLog] = useState<ConfigChangeEntry[]>([])
   const [changeLogLoading, setChangeLogLoading] = useState(false)
@@ -1169,6 +1171,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                 changeLog={changeLog}
                 changeLogLoading={changeLogLoading}
                 productoSubTab={productoSubTab}
+                onOpenZ2Capture={() => setZ2CaptureOpen(true)}
               />
 
             )}
@@ -1264,6 +1267,21 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
           }))}
         />
       )}
+      <Z2CaptureModal
+        open={z2CaptureOpen}
+        onOpenChange={setZ2CaptureOpen}
+        currentValues={{
+          delayFlipperOpenMs:   physicalConfig.flipperDelayOpenMs   ?? 150,
+          minFlipperOpenTimeMs: physicalConfig.flipperMinOpenTimeMs ?? 350,
+          delayFlipperCloseMs:  physicalConfig.flipperDelayCloseMs  ?? 150,
+        }}
+        onApply={(values) => setPhysicalConfig((p) => ({
+          ...p,
+          flipperDelayOpenMs:   values.delayFlipperOpenMs,
+          flipperMinOpenTimeMs: values.minFlipperOpenTimeMs,
+          flipperDelayCloseMs:  values.delayFlipperCloseMs,
+        }))}
+      />
     </div>
   )
 }

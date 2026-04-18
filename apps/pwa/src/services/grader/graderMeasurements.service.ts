@@ -29,6 +29,7 @@ import type { GraderBeltId } from './graderBeltHelpers'
 
 const BELT_COLLECTION = 'beltSpeedMeasurements'
 const FLIPPER_COLLECTION = 'flipperTimingMeasurements'
+const Z2_CAPTURE_COLLECTION = 'flipperZ2Captures'
 
 // ============================================================================
 // TIPOS
@@ -194,5 +195,54 @@ export async function getLatestFlipperMeasurement(
   gateNumber: number,
 ): Promise<FlipperTimingMeasurement | null> {
   const list = await listFlipperTimingMeasurements(gateNumber, 1)
+  return list[0] ?? null
+}
+
+// ============================================================================
+// FLIPPER Z2 CAPTURES
+// ============================================================================
+
+/**
+ * Captura de parámetros de timing del flipper leídos directamente del HMI Z2.
+ * Ruta en Z2: Cambiar Parámetros → código 8620 → delayFlipperOpen / minFlipperOpenTime / delayFlipperClose.
+ */
+export interface FlipperZ2Capture {
+  id: string
+  /** Delay antes de activar el solenoide de apertura (ms). Z2: delayFlipperOpen. */
+  delayFlipperOpenMs: number
+  /** Tiempo mínimo que el flipper permanece abierto (ms). Z2: minFlipperOpenTime. */
+  minFlipperOpenTimeMs: number
+  /** Delay antes de activar el solenoide de cierre (ms). Z2: delayFlipperClose. */
+  delayFlipperCloseMs: number
+  /** Suma de los 3 tiempos — ciclo total software (ms). */
+  cycleTotalMs: number
+  /** Notas del operador (ej: "turno noche, producto HG Coho"). */
+  notes?: string
+  measuredBy: string
+  measuredAt: string
+}
+
+export async function saveFlipperZ2Capture(
+  input: Omit<FlipperZ2Capture, 'id' | 'cycleTotalMs' | 'measuredAt'> & { measuredAt?: string },
+): Promise<FlipperZ2Capture> {
+  const id = newId('z2c')
+  const measuredAt = input.measuredAt ?? new Date().toISOString()
+  const cycleTotalMs = input.delayFlipperOpenMs + input.minFlipperOpenTimeMs + input.delayFlipperCloseMs
+  const record: FlipperZ2Capture = { ...input, id, cycleTotalMs, measuredAt }
+  await setDoc(
+    doc(db, Z2_CAPTURE_COLLECTION, id),
+    deepCleanUndefined({ ...record, _createdAt: serverTimestamp() }),
+  )
+  return record
+}
+
+export async function listFlipperZ2Captures(max = 10): Promise<FlipperZ2Capture[]> {
+  const qRef = query(collection(db, Z2_CAPTURE_COLLECTION), orderBy('measuredAt', 'desc'), limit(max))
+  const snap = await getDocs(qRef)
+  return snap.docs.map((d) => d.data() as FlipperZ2Capture)
+}
+
+export async function getLatestFlipperZ2Capture(): Promise<FlipperZ2Capture | null> {
+  const list = await listFlipperZ2Captures(1)
   return list[0] ?? null
 }

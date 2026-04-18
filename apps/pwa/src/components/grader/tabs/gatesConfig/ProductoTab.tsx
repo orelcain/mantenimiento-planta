@@ -32,6 +32,7 @@ interface ProductoTabProps {
   changeLog: ConfigChangeEntry[]
   changeLogLoading: boolean
   productoSubTab: 'resumen' | 'flipper' | 'analisis' | 'sugerencias' | 'historial'
+  onOpenZ2Capture?: () => void
 }
 
 export function ProductoTab({
@@ -48,6 +49,7 @@ export function ProductoTab({
   changeLog,
   changeLogLoading,
   productoSubTab,
+  onOpenZ2Capture,
 }: ProductoTabProps) {
   // Cálculos compartidos entre Hero, Equipo y Diagnóstico
   const mainBelt = getGradingBelt(physicalConfig)
@@ -246,7 +248,18 @@ export function ProductoTab({
             const cycleTotal = delayOpen + minOpen + delayClose
             return (
               <div className="rounded-lg border border-slate-700/50 bg-slate-950/60 p-3 space-y-2">
-                <p className="text-xs font-semibold text-sky-400">Ciclo flipper software Z2</p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-semibold text-sky-400">Ciclo flipper software Z2</p>
+                  {onOpenZ2Capture && (
+                    <button
+                      type="button"
+                      onClick={onOpenZ2Capture}
+                      className="inline-flex items-center gap-1 text-[10px] border border-sky-500/30 text-sky-400 rounded px-1.5 py-0.5 hover:bg-sky-500/10 transition-colors"
+                    >
+                      📟 Leer Z2
+                    </button>
+                  )}
+                </div>
                 <div className="space-y-1.5 text-xs">
                   {([
                     { label: 'Delay apertura',    field: 'flipperDelayOpenMs',   val: delayOpen,  z2: 'delayFlipperOpen' },
