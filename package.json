@@ -32,5 +32,13 @@
   "dependencies": {
     "firebase-admin": "^13.6.0",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  },
+  "pnpm": {
+    "overrides": {
+      "protobufjs": ">=7.5.5",
+      "protocol-buffers-schema": ">=3.6.1",
+      "serialize-javascript": ">=7.0.5",
+      "@tootallnate/once": ">=3.0.1"
+    }
   }
 }
