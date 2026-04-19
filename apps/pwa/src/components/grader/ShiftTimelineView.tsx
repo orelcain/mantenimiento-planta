@@ -359,6 +359,8 @@ export function ShiftTimelineView({
             style={{ height: scatterAxisShow ? 240 : 180 }}
             theme="dark"
             opts={{ renderer: 'svg' }}
+            notMerge={true}
+            lazyUpdate={false}
           />
         )}
 
