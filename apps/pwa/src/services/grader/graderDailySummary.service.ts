@@ -477,6 +477,8 @@ export interface FirestorePieceRecord {
   error?: string
   lot?: string
   dedupeKey: string
+  /** Origen del record cuando fue enriquecido por Excel P0 del Marelec */
+  source?: 'P0_EXCEL'
 }
 
 function pieceRecordsCol(summaryId: string) {
@@ -554,6 +556,29 @@ export async function listPieceRecords(summaryId: string): Promise<FirestorePiec
   }
   const snap = await getDocs(q)
   return snap.docs.map((d) => d.data() as FirestorePieceRecord)
+}
+
+/**
+ * Lee solo los pieceRecords con gate=0 (P0) de un turno, ordenados por timestamp.
+ * Úsalo cuando solo interesan los eventos de rechazo (mucho menos que listPieceRecords completo).
+ *
+ * Nota: el ordenamiento se hace en memoria para evitar un índice compuesto
+ * (gate ASC + ts ASC). Con ~900 records por turno el overhead es despreciable.
+ */
+export async function listGate0PieceRecords(summaryId: string): Promise<FirestorePieceRecord[]> {
+  const q = query(pieceRecordsCol(summaryId), where('gate', '==', 0))
+  let records: FirestorePieceRecord[] = []
+  try {
+    const cached = await getDocsFromCache(q)
+    if (!cached.empty) records = cached.docs.map((d) => d.data() as FirestorePieceRecord)
+  } catch {
+    // Cache miss — continuar con red
+  }
+  if (records.length === 0) {
+    const snap = await getDocs(q)
+    records = snap.docs.map((d) => d.data() as FirestorePieceRecord)
+  }
+  return records.sort((a, b) => a.ts.localeCompare(b.ts))
 }
 
 /**

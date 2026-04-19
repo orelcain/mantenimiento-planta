@@ -74,6 +74,8 @@ interface P0CausesPanelProps {
   /** Total "unsorted pcs" de Matrix (= totalP0Pieces) — footer informativo */
   unsortedPcs?: number
   onClickCause?: (cause: MatrixP0Cause) => void
+  /** Causa activa actualmente resaltada (ej. filtrando el timeline). */
+  selectedCause?: MatrixP0Cause | null
 }
 
 interface CauseRowProps {
@@ -276,7 +278,7 @@ function SubCauseRow({
   )
 }
 
-export function P0CausesPanel({ byMatrixCause, totalP0Pct, unsortedPcs, onClickCause }: P0CausesPanelProps) {
+export function P0CausesPanel({ byMatrixCause, totalP0Pct, unsortedPcs, onClickCause, selectedCause }: P0CausesPanelProps) {
   const [expanded, setExpanded] = useState<MatrixP0Cause | null>(null)
   const hasCauseData = byMatrixCause != null
 

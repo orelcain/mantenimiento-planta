@@ -11,7 +11,7 @@ import { useParams, useNavigate, Navigate } from 'react-router-dom'
 import { Button, Card, CardContent, Spinner, Badge } from '@/components/ui'
 import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { usePermissionsStore } from '@/store'
-import { getDailySummary, loadTimelineAggregates, listDailySummariesByRange } from '@/services/grader/graderDailySummary.service'
+import { getDailySummary, loadTimelineAggregates, listDailySummariesByRange, listGate0PieceRecords, type FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
 import { listSnapshots, type GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
 import { getShiftDoc } from '@/services/grader/graderShifts.service'
 import { computeShiftTimeWindow } from '@/services/grader/graderShiftStatus'
@@ -142,6 +142,8 @@ export function AnalisisGraderTurnoPage() {
   const [shiftDoc, setShiftDoc] = useState<GraderShiftDoc | null>(null)
   const [timelineBuckets, setTimelineBuckets] = useState<TimelineBucket[]>([])
   const [configSnapshots, setConfigSnapshots] = useState<GateConfigSnapshot[]>([])
+  const [gate0Pieces, setGate0Pieces] = useState<FirestorePieceRecord[]>([])
+  const [selectedCause, setSelectedCause] = useState<MatrixP0Cause | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -305,6 +307,15 @@ export function AnalisisGraderTurnoPage() {
     loadTimelineAggregates(`${dateKey}__${shiftLabel}`)
       .then(buckets => setTimelineBuckets(buckets ?? []))
       .catch(() => {})
+  }, [dateKey, shiftLabel])
+
+  // Carga pieceRecords gate=0 para drill-down en timeline
+  useEffect(() => {
+    if (!dateKey || !shiftLabel) return
+    setSelectedCause(null)  // reset al cambiar de turno
+    listGate0PieceRecords(`${dateKey}__${shiftLabel}`)
+      .then(setGate0Pieces)
+      .catch(() => setGate0Pieces([]))
   }, [dateKey, shiftLabel])
 
   // Carga historial de config de gates (FASE 27)
@@ -480,6 +491,8 @@ export function AnalisisGraderTurnoPage() {
                 byMatrixCause={byMatrixCause}
                 totalP0Pct={summary.pointZeroPct}
                 unsortedPcs={summary.pointZeroPieces}
+                selectedCause={selectedCause}
+                onClickCause={(cause) => setSelectedCause(prev => prev === cause ? null : cause)}
               />
             </div>
           </div>
@@ -490,6 +503,9 @@ export function AnalisisGraderTurnoPage() {
             shiftDoc={shiftDoc}
             shiftWindow={shiftWindow}
             configSnapshots={configSnapshots}
+            gate0Pieces={gate0Pieces}
+            selectedCause={selectedCause}
+            onClearSelectedCause={() => setSelectedCause(null)}
           />
 
           {/* ── Sección IA ─────────────────────────────────────────────── */}
