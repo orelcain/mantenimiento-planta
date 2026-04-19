@@ -1,11 +1,16 @@
 /**
  * Panel "¿Por qué hubo P0?" con descomposición jerárquica.
  *
- * 2 secciones:
- *  · Matrix oficial — 4 causas que el HMI reporta directamente (Out of limits,
- *    Not read by photocell, Too close or too long, Door not ready)
- *  · Desglose de "Fuera de límites" — nuestras 5 sub-causas derivadas
- *    (calibre, calidad, conservación, producto, residual físico)
+ * Vista unificada de 4 filas oficiales del HMI:
+ *  1. Fuera de límites — PARAGUAS EXPANDIBLE (suma fuera_de_limites estricto
+ *     + 5 sub-causas derivadas: calibre, calidad, conservación, producto, otro)
+ *  2. No leído por fotocélula
+ *  3. Too close / Too long
+ *  4. Puerta no preparada
+ *
+ * Al expandir "Fuera de límites" muestra el desglose de las 6 causas que
+ * suman al paraguas. Así el usuario ve coherencia matemática:
+ * paraguas_pct === sum(sub_causas_pct).
  *
  * Cada causa tiene tooltip con metadata rica (translation, how detected,
  * action, example). Los % primary son del total de piezas (intuitivo).
@@ -145,6 +150,128 @@ function CauseRow({ cause, stats, totalP0Pct, expanded, onToggle }: CauseRowProp
   )
 }
 
+/**
+ * Paraguas expandible: suma propio + derivadas. Al expandir muestra cada
+ * sub-causa (fuera_de_limites estricto + 5 derivadas) como mini-fila.
+ */
+interface UmbrellaCauseRowProps {
+  umbrellaStats: PointZeroClassification['byMatrixCause'][MatrixP0Cause]
+  selfStats: PointZeroClassification['byMatrixCause'][MatrixP0Cause]
+  derivedStats: Array<{
+    cause: MatrixP0Cause
+    stats: PointZeroClassification['byMatrixCause'][MatrixP0Cause]
+  }>
+  totalP0Pct: number
+  expanded: boolean
+  onToggle: () => void
+}
+
+function UmbrellaCauseRow({
+  umbrellaStats, selfStats, derivedStats, totalP0Pct, expanded, onToggle,
+}: UmbrellaCauseRowProps) {
+  const def = MATRIX_P0_CAUSES.fuera_de_limites
+  const colors = COLOR_CLASSES[def.color] ?? FALLBACK_COLOR
+  const Icon = CAUSE_ICONS.fuera_de_limites
+  const pctOfTotal = (umbrellaStats.pct * totalP0Pct) / 100
+  const hasPieces = umbrellaStats.pieces > 0
+
+  return (
+    <div className={cn('border rounded-lg overflow-hidden transition-opacity', !hasPieces && 'opacity-40')}>
+      <div className="w-full flex items-center gap-3 px-3 py-2 hover:bg-muted/40 transition-colors">
+        <button
+          className="flex items-center gap-3 flex-1 min-w-0 text-left"
+          onClick={onToggle}
+          type="button"
+        >
+          <span className={cn('p-1.5 rounded-md', colors.badge)}>
+            <Icon className="w-4 h-4" />
+          </span>
+          <div className="flex-1 min-w-0">
+            <div className="font-medium text-sm flex items-center gap-1.5 min-w-0">
+              <span className="truncate">{def.label}</span>
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted font-mono text-muted-foreground shrink-0">
+                paraguas · 6 sub
+              </span>
+            </div>
+            <div className="text-xs text-muted-foreground truncate">{def.description}</div>
+            <div className="mt-1.5 h-1 bg-muted rounded-full overflow-hidden w-full">
+              <div
+                className={cn('h-full rounded-full transition-all', colors.bar)}
+                style={{ width: `${Math.min(100, umbrellaStats.pct)}%` }}
+              />
+            </div>
+          </div>
+          <div className="text-right shrink-0 min-w-[68px]">
+            <div className="font-mono font-bold text-sm">
+              {pctOfTotal.toFixed(2)}%
+              <span className="text-[9px] font-normal text-muted-foreground/80 ml-0.5">total</span>
+            </div>
+            <div className="text-[10px] text-muted-foreground font-mono">
+              {umbrellaStats.pct.toFixed(1)}% del P0
+            </div>
+            <div className="text-xs text-muted-foreground">{umbrellaStats.pieces.toLocaleString('es-CL')} pzas</div>
+          </div>
+          <ChevronDown className={cn('w-4 h-4 text-muted-foreground transition-transform shrink-0', expanded && 'rotate-180')} />
+        </button>
+        <div className="shrink-0">
+          <CauseTooltip meta={def} />
+        </div>
+      </div>
+      {expanded && hasPieces && (
+        <div className="px-3 pb-3 pt-1 bg-muted/20 border-t space-y-2">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+            Desglose — análisis nuestro con config gates
+          </p>
+          <div className="space-y-1">
+            {/* Primera sub-fila: fuera_de_limites estricto (el propio) */}
+            <SubCauseRow cause="fuera_de_limites" stats={selfStats} isStrict />
+            {/* Resto: las 5 derivadas */}
+            {derivedStats.map(({ cause, stats }) => (
+              <SubCauseRow key={cause} cause={cause} stats={stats} />
+            ))}
+          </div>
+          <p className="text-[10px] text-muted-foreground italic pt-1 border-t border-border/40">
+            El paraguas suma exactamente la suma del desglose.
+            Si una causa no se identifica, cae en "Otro".
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Sub-fila compacta para el desglose del paraguas */
+function SubCauseRow({
+  cause, stats, isStrict = false,
+}: {
+  cause: MatrixP0Cause
+  stats: PointZeroClassification['byMatrixCause'][MatrixP0Cause]
+  isStrict?: boolean
+}) {
+  const def = MATRIX_P0_CAUSES[cause]
+  const colors = COLOR_CLASSES[def.color] ?? FALLBACK_COLOR
+  const Icon = CAUSE_ICONS[cause]
+  const hasPieces = stats.pieces > 0
+
+  return (
+    <div className={cn(
+      'flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-opacity',
+      hasPieces ? 'bg-background/50' : 'opacity-40',
+    )}>
+      <span className={cn('p-1 rounded', colors.badge)}>
+        <Icon className="w-3 h-3" />
+      </span>
+      <span className="flex-1 min-w-0 truncate">
+        {isStrict ? `${def.label} (estricto)` : def.label}
+      </span>
+      <div className="text-right shrink-0 font-mono tabular-nums">
+        <span className="font-semibold">{stats.pct.toFixed(1)}%</span>
+        <span className="text-muted-foreground ml-2">{stats.pieces.toLocaleString('es-CL')} pzas</span>
+      </div>
+    </div>
+  )
+}
+
 export function P0CausesPanel({ byMatrixCause, totalP0Pct, unsortedPcs, onClickCause }: P0CausesPanelProps) {
   const [expanded, setExpanded] = useState<MatrixP0Cause | null>(null)
   const hasCauseData = byMatrixCause != null
@@ -175,7 +302,7 @@ export function P0CausesPanel({ byMatrixCause, totalP0Pct, unsortedPcs, onClickC
 
         {hasCauseData && (
           <>
-            {/* ─── Sección 1: Vista Matrix oficial ─────────────────────── */}
+            {/* ─── Vista Matrix oficial — 4 filas, paraguas expandible ─ */}
             <section>
               <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-2">
                 <span>Vista Matrix oficial</span>
@@ -183,37 +310,46 @@ export function P0CausesPanel({ byMatrixCause, totalP0Pct, unsortedPcs, onClickC
                 <span className="text-[9px] font-normal normal-case tracking-normal">como aparece en el HMI</span>
               </h3>
               <div className="space-y-2">
-                {MATRIX_CAUSE_ORDER_OFFICIAL.map(cause => (
-                  <CauseRow
-                    key={cause}
-                    cause={cause}
-                    stats={byMatrixCause[cause]}
-                    totalP0Pct={totalP0Pct}
-                    expanded={expanded === cause}
-                    onToggle={() => toggle(cause)}
-                  />
-                ))}
-              </div>
-            </section>
-
-            {/* ─── Sección 2: Desglose derivado ────────────────────────── */}
-            <section>
-              <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-2">
-                <span>Desglose de "Fuera de límites"</span>
-                <span className="h-px flex-1 bg-border" />
-                <span className="text-[9px] font-normal normal-case tracking-normal">análisis nuestro (config gates)</span>
-              </h3>
-              <div className="space-y-2">
-                {MATRIX_CAUSE_ORDER_DERIVED.map(cause => (
-                  <CauseRow
-                    key={cause}
-                    cause={cause}
-                    stats={byMatrixCause[cause]}
-                    totalP0Pct={totalP0Pct}
-                    expanded={expanded === cause}
-                    onToggle={() => toggle(cause)}
-                  />
-                ))}
+                {MATRIX_CAUSE_ORDER_OFFICIAL.map(cause => {
+                  // "fuera_de_limites" es paraguas: suma propio + 5 derivadas
+                  if (cause === 'fuera_de_limites') {
+                    const selfStats = byMatrixCause[cause]
+                    const derivedStats = MATRIX_CAUSE_ORDER_DERIVED.map(c => ({
+                      cause: c,
+                      stats: byMatrixCause[c],
+                    }))
+                    const umbrellaPieces = selfStats.pieces
+                      + derivedStats.reduce((s, d) => s + d.stats.pieces, 0)
+                    const umbrellaPct = selfStats.pct
+                      + derivedStats.reduce((s, d) => s + d.stats.pct, 0)
+                    const umbrellaStats = {
+                      ...selfStats,
+                      pieces: umbrellaPieces,
+                      pct: umbrellaPct,
+                    }
+                    return (
+                      <UmbrellaCauseRow
+                        key={cause}
+                        umbrellaStats={umbrellaStats}
+                        selfStats={selfStats}
+                        derivedStats={derivedStats}
+                        totalP0Pct={totalP0Pct}
+                        expanded={expanded === cause}
+                        onToggle={() => toggle(cause)}
+                      />
+                    )
+                  }
+                  return (
+                    <CauseRow
+                      key={cause}
+                      cause={cause}
+                      stats={byMatrixCause[cause]}
+                      totalP0Pct={totalP0Pct}
+                      expanded={expanded === cause}
+                      onToggle={() => toggle(cause)}
+                    />
+                  )
+                })}
               </div>
             </section>
 
