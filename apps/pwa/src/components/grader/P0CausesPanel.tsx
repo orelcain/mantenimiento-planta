@@ -224,10 +224,10 @@ function UmbrellaCauseRow({
           </p>
           <div className="space-y-1">
             {/* Primera sub-fila: fuera_de_limites estricto (el propio) */}
-            <SubCauseRow cause="fuera_de_limites" stats={selfStats} isStrict />
+            <SubCauseRow cause="fuera_de_limites" stats={selfStats} totalP0Pct={totalP0Pct} isStrict />
             {/* Resto: las 5 derivadas */}
             {derivedStats.map(({ cause, stats }) => (
-              <SubCauseRow key={cause} cause={cause} stats={stats} />
+              <SubCauseRow key={cause} cause={cause} stats={stats} totalP0Pct={totalP0Pct} />
             ))}
           </div>
           <p className="text-[10px] text-muted-foreground italic pt-1 border-t border-border/40">
@@ -242,16 +242,18 @@ function UmbrellaCauseRow({
 
 /** Sub-fila compacta para el desglose del paraguas */
 function SubCauseRow({
-  cause, stats, isStrict = false,
+  cause, stats, totalP0Pct, isStrict = false,
 }: {
   cause: MatrixP0Cause
   stats: PointZeroClassification['byMatrixCause'][MatrixP0Cause]
+  totalP0Pct: number
   isStrict?: boolean
 }) {
   const def = MATRIX_P0_CAUSES[cause]
   const colors = COLOR_CLASSES[def.color] ?? FALLBACK_COLOR
   const Icon = CAUSE_ICONS[cause]
   const hasPieces = stats.pieces > 0
+  const pctOfTotal = (stats.pct * totalP0Pct) / 100
 
   return (
     <div className={cn(
@@ -265,7 +267,9 @@ function SubCauseRow({
         {isStrict ? `${def.label} (estricto)` : def.label}
       </span>
       <div className="text-right shrink-0 font-mono tabular-nums">
-        <span className="font-semibold">{stats.pct.toFixed(1)}%</span>
+        <span className="font-semibold">{pctOfTotal.toFixed(2)}%</span>
+        <span className="text-[9px] font-normal text-muted-foreground/80 ml-0.5">total</span>
+        <span className="text-muted-foreground ml-2">({stats.pct.toFixed(1)}% del P0)</span>
         <span className="text-muted-foreground ml-2">{stats.pieces.toLocaleString('es-CL')} pzas</span>
       </div>
     </div>
