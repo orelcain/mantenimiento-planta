@@ -68,31 +68,47 @@ function ConfigChangeRow({ snap, isFirst }: RowProps) {
   const grouped = useMemo(() => groupChangesByGate(snap.changes), [snap.changes])
   const isSynthetic = snap.synthetic === true
 
+  // Para snapshots synthetic la hora exacta no es la hora real del cambio
+  // (es cuando corrió el reclassify). Mostramos guion + tooltip explicativo.
+  const timeDisplay = isSynthetic ? '—' : fmtTime(snap.at)
+  const timeTitle   = isSynthetic
+    ? 'Snapshot inferido — la hora exacta del cambio no se conoce, se aplicó retroactivamente al inicio del turno'
+    : `Cambio registrado a las ${fmtTime(snap.at)}`
+
+  // Label principal según tipo
+  const titleLabel = isSynthetic
+    ? 'Config inicial inferida (reclassify)'
+    : isFirst
+      ? 'Config inicial del turno'
+      : `${grouped.size} ${grouped.size === 1 ? 'gate cambiada' : 'gates cambiadas'}`
+
   return (
     <li className="flex items-start gap-3 py-2.5 border-b border-border/40 last:border-b-0">
       {/* Indicador timeline lateral */}
-      <div className="flex flex-col items-center pt-1">
+      <div className="flex flex-col items-center pt-1" title={isSynthetic ? 'Inferido' : 'Registrado manualmente'}>
         {isSynthetic
           ? <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
           : <Wrench className="w-3.5 h-3.5 text-amber-500" />}
       </div>
 
       {/* Hora */}
-      <div className="text-xs font-mono tabular-nums shrink-0 w-12 text-muted-foreground pt-0.5">
-        {fmtTime(snap.at)}
+      <div
+        className={cn(
+          'text-xs font-mono tabular-nums shrink-0 w-12 pt-0.5',
+          isSynthetic ? 'text-muted-foreground/50 italic' : 'text-muted-foreground',
+        )}
+        title={timeTitle}
+      >
+        {timeDisplay}
       </div>
 
       {/* Contenido principal */}
       <div className="flex-1 min-w-0 space-y-1">
         <div className="flex items-baseline gap-2 flex-wrap">
-          <span className="text-sm font-medium">
-            {isFirst
-              ? 'Config inicial del turno'
-              : isSynthetic
-                ? 'Inferido por reclassify'
-                : `${grouped.size} ${grouped.size === 1 ? 'gate cambiada' : 'gates cambiadas'}`}
+          <span className={cn('text-sm font-medium', isSynthetic && 'text-muted-foreground')}>
+            {titleLabel}
           </span>
-          {snap.changedBy?.name && (
+          {snap.changedBy?.name && !isSynthetic && (
             <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
               <User className="w-2.5 h-2.5" />
               {snap.changedBy.name}

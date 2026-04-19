@@ -178,24 +178,29 @@ export function ShiftTimelineView({
         axisLabel: { color: '#6b7280', fontSize: 10, interval: Math.floor(times.length / 8) },
       },
       yAxis: [
-        {
-          type: 'value' as const,
-          name: 'P0%',
-          nameTextStyle: { color: '#6b7280', fontSize: 10 },
-          axisLabel: { color: '#6b7280', fontSize: 10, formatter: '{value}%' },
-          splitLine: { lineStyle: { color: '#1f2937' } },
-          min: 0,
+        (() => {
           // Escala dinámica: techo = max(10, p98 + 20%) para que la línea se lea
           // bien cuando el P0% es bajo, sin que outliers iniciales (turnos
           // arrancando con 100% si sólo hubo 1 pieza) aplasten todo el chart.
-          max: (() => {
-            const sorted = [...p0Pcts].filter(v => v > 0).sort((a, b) => a - b)
-            if (sorted.length === 0) return 10
-            const p98 = sorted[Math.floor(sorted.length * 0.98)] ?? sorted[sorted.length - 1] ?? 10
-            const ceil = Math.ceil(p98 * 1.2 / 5) * 5  // redondear a múltiplo de 5
-            return Math.max(10, ceil)
-          })(),
-        },
+          const sorted = [...p0Pcts].filter(v => v > 0).sort((a, b) => a - b)
+          const p98 = sorted.length > 0
+            ? (sorted[Math.floor(sorted.length * 0.98)] ?? sorted[sorted.length - 1] ?? 10)
+            : 10
+          const max = Math.max(10, Math.ceil(p98 * 1.2 / 5) * 5)
+          // Interval uniforme (cada 2/5/10 según el max), evita ticks erráticos
+          // tipo "0, 10, 15, 20" que ECharts a veces produce con auto-tick.
+          const interval = max <= 10 ? 2 : max <= 30 ? 5 : 10
+          return {
+            type: 'value' as const,
+            name: 'P0%',
+            nameTextStyle: { color: '#6b7280', fontSize: 10 },
+            axisLabel: { color: '#6b7280', fontSize: 10, formatter: '{value}%' },
+            splitLine: { lineStyle: { color: '#1f2937' } },
+            min: 0,
+            max,
+            interval,
+          }
+        })(),
         {
           type: 'value' as const,
           name: 'Peso (g)',

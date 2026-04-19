@@ -19,7 +19,7 @@
  */
 
 import { useEffect, useState } from 'react'
-import { Settings2, Save, Loader2 } from 'lucide-react'
+import { Settings2, Save, Loader2, AlertCircle } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Button, Input, Label } from '@/components/ui'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
@@ -51,6 +51,7 @@ export function QuickGateChangeButton({ shiftDocId, variant = 'default', classNa
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [latestGates, setLatestGates] = useState<GateAssignment[] | null>(null)
+  const [noChangeWarning, setNoChangeWarning] = useState(false)
 
   const [gateNumber, setGateNumber] = useState(1)
   const [calibre, setCalibre] = useState<string>(CALIBRE_WEIGHT_RANGES[0]?.calibre ?? '4-6 lb')
@@ -63,10 +64,14 @@ export function QuickGateChangeButton({ shiftDocId, variant = 'default', classNa
   // Cargar último snapshot al abrir
   useEffect(() => {
     if (!open) return
+    setNoChangeWarning(false) // reset al abrir
     getLatestSnapshot(shiftDocId)
       .then(snap => setLatestGates(snap?.gates ?? null))
       .catch(() => setLatestGates(null))
   }, [open, shiftDocId])
+
+  // Limpiar warning si el user toca cualquier campo
+  useEffect(() => { setNoChangeWarning(false) }, [gateNumber, calibre, quality, conservation, product, active])
 
   // Prellenar form con valores actuales del gate seleccionado
   useEffect(() => {
@@ -112,10 +117,9 @@ export function QuickGateChangeButton({ shiftDocId, variant = 'default', classNa
       )
 
       if (saved === null) {
-        toast({
-          title: 'Sin cambios',
-          description: 'La configuración propuesta es idéntica al último snapshot.',
-        })
+        // No cerrar el dialog — mostrar warning inline para que el user
+        // entienda que tiene que cambiar al menos un valor.
+        setNoChangeWarning(true)
       } else {
         toast({
           title: 'Cambio registrado',
@@ -157,6 +161,19 @@ export function QuickGateChangeButton({ shiftDocId, variant = 'default', classNa
               Las próximas piezas que entren se clasificarán con esta configuración.
             </DialogDescription>
           </DialogHeader>
+
+          {noChangeWarning && (
+            <div className="flex items-start gap-2 p-2.5 rounded-md bg-amber-500/10 border border-amber-500/30 text-xs">
+              <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-medium text-amber-300">Configuración idéntica al último snapshot</p>
+                <p className="text-amber-200/80 mt-0.5">
+                  Cambiá al menos un valor (calibre, calidad, conservación, producto o estado activa)
+                  para registrar un nuevo cambio. El motivo solo no cuenta como cambio.
+                </p>
+              </div>
+            </div>
+          )}
 
           <div className="space-y-3">
             <div>
