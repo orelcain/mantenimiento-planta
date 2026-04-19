@@ -21,6 +21,7 @@ import { parseMatrixErrorString } from '@/services/grader/graderMatrixP0Causes'
 import { HeroScorecard } from '@/components/grader/HeroScorecard'
 import { P0CausesPanel } from '@/components/grader/P0CausesPanel'
 import { ShiftTimelineView } from '@/components/grader/ShiftTimelineView'
+import { ConfigChangeHistory } from '@/components/grader/ConfigChangeHistory'
 import { ActionPlanPanel, deriveSuggestions } from '@/components/grader/ActionPlanPanel'
 import { findTriggeredRunbooks } from '@/services/grader/graderRunbooks'
 import { analyzeGraderFromSummary } from '@/services/grader/graderSummaryAI'
@@ -319,12 +320,15 @@ export function AnalisisGraderTurnoPage() {
   }, [dateKey, shiftLabel])
 
   // Carga historial de config de gates (FASE 27)
-  useEffect(() => {
+  // Extraído como callback para poder refrescarse tras un nuevo cambio
+  const reloadConfigSnapshots = useCallback(() => {
     if (!dateKey || !shiftLabel) return
     listSnapshots(`${dateKey}__${shiftLabel}`)
       .then(setConfigSnapshots)
       .catch(() => setConfigSnapshots([]))
   }, [dateKey, shiftLabel])
+
+  useEffect(() => { reloadConfigSnapshots() }, [reloadConfigSnapshots])
 
   // Todos los useMemo ANTES del early return condicional (regla de hooks)
   const byMatrixCause = useMemo(() => {
@@ -511,6 +515,13 @@ export function AnalisisGraderTurnoPage() {
             gate0Pieces={gate0Pieces}
             selectedCauses={selectedCauses}
             onClearSelectedCauses={() => setSelectedCauses(new Set())}
+          />
+
+          {/* Historial de cambios de configuración del turno */}
+          <ConfigChangeHistory
+            shiftDocId={`${dateKey}__${shiftLabel}`}
+            snapshots={configSnapshots}
+            onChange={reloadConfigSnapshots}
           />
 
           {/* ── Sección IA ─────────────────────────────────────────────── */}
