@@ -19,7 +19,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from '@/components/ui'
-import { ChevronLeft, ChevronRight, Loader2, Clock, Database, Eye, Trash2, AlertTriangle } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, Clock, Database, Eye, Trash2, AlertTriangle, Sun, Moon } from 'lucide-react'
+import { QuickGateChangeButton } from './QuickGateChangeButton'
 import { cn } from '@/lib/utils'
 import { listGraderUploads } from '@/services/grader/graderUpload.service'
 import { getModuleRanges } from '@/services/grader/graderModuleConfig.service'
@@ -635,8 +636,38 @@ export function GraderHistoricalCalendar({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {selectedUploads.length === 0 && (historicalByDate.get(selectedKey ?? '') ?? []).length === 0 && (
-            <div className="text-sm text-muted-foreground">No hay datos para este día.</div>
+          {/* Sin uploads ni historial: placeholders por turno con botón cambio de gate */}
+          {selectedKey && selectedUploads.length === 0 && (historicalByDate.get(selectedKey) ?? []).length === 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 uppercase tracking-wide">
+                <Clock className="h-3.5 w-3.5" />
+                Sin Excel cargado todavía
+              </p>
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
+                {(['Turno día', 'Turno noche'] as const).map(shiftId => (
+                  <div
+                    key={shiftId}
+                    className="rounded-lg border border-dashed border-muted-foreground/30 p-3 space-y-2 bg-background/30"
+                  >
+                    <div className="flex items-center gap-2">
+                      {shiftId === 'Turno día'
+                        ? <Sun className="h-4 w-4 text-amber-500" />
+                        : <Moon className="h-4 w-4 text-indigo-400" />}
+                      <p className="text-sm font-medium">{shiftId}</p>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground leading-snug">
+                      Sin registros. Podés ir guardando los cambios de gate que reporta control de producción —
+                      al subir el Excel se cruzarán con tu historial.
+                    </p>
+                    <QuickGateChangeButton
+                      shiftDocId={`${selectedKey}__${shiftId}`}
+                      variant="compact"
+                      className="w-full h-7 text-[11px]"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
           {/* ── Datos históricos (carga masiva) ── */}
           {selectedKey && (historicalByDate.get(selectedKey) ?? []).length > 0 && (
@@ -766,33 +797,34 @@ export function GraderHistoricalCalendar({
                         </p>
                       ) : null
                     })()}
-                    <div className="pt-1 flex gap-1.5">
-                      <Button
-                        size="sm"
-                        className="h-7 text-[11px] flex-1 bg-primary/90 hover:bg-primary text-primary-foreground"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          navigate(`/analisis-grader/turno/${hist.dateKey}__${encodeURIComponent(hist.shiftId)}`)
-                        }}
-                      >
-                        <Eye className="h-3 w-3 mr-1" />
-                        Ver detalle
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 text-[11px] text-red-600 hover:text-red-600 border-red-500/30 hover:bg-red-500/10"
-                        disabled={deletingId === hist.id}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleDeleteSummary(hist.dateKey, hist.shiftId)
-                        }}
-                      >
-                        {deletingId === hist.id
-                          ? <Loader2 className="h-3 w-3 animate-spin" />
-                          : <Trash2 className="h-3 w-3" />
-                        }
-                      </Button>
+                    <div className="pt-1 space-y-1.5" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex gap-1.5">
+                        <Button
+                          size="sm"
+                          className="h-7 text-[11px] flex-1 bg-primary/90 hover:bg-primary text-primary-foreground"
+                          onClick={() => navigate(`/analisis-grader/turno/${hist.dateKey}__${encodeURIComponent(hist.shiftId)}`)}
+                        >
+                          <Eye className="h-3 w-3 mr-1" />
+                          Ver detalle
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-[11px] text-red-600 hover:text-red-600 border-red-500/30 hover:bg-red-500/10"
+                          disabled={deletingId === hist.id}
+                          onClick={() => handleDeleteSummary(hist.dateKey, hist.shiftId)}
+                        >
+                          {deletingId === hist.id
+                            ? <Loader2 className="h-3 w-3 animate-spin" />
+                            : <Trash2 className="h-3 w-3" />
+                          }
+                        </Button>
+                      </div>
+                      <QuickGateChangeButton
+                        shiftDocId={`${hist.dateKey}__${hist.shiftId}`}
+                        variant="compact"
+                        className="w-full h-7 text-[11px]"
+                      />
                     </div>
                   </div>
                 )})}
