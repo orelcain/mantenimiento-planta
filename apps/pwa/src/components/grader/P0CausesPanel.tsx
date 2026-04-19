@@ -46,6 +46,19 @@ const CAUSE_ICONS: Record<MatrixP0Cause, IconComponent> = {
   otro: ({ className }) => <HelpCircle className={className} />,
 }
 
+/** Hex de cada causa para el ring del checkbox (consistente con scatter del timeline). */
+const CAUSE_HEX_BORDERS: Record<MatrixP0Cause, string> = {
+  fuera_de_limites:     '#ef4444',
+  no_leido_fotocelula:  '#f97316',
+  too_close_too_long:   '#a855f7',
+  puerta_no_preparada:  '#06b6d4',
+  fuera_de_calibre:     '#6366f1',
+  fuera_de_calidad:     '#10b981',
+  fuera_de_conservacion:'#f59e0b',
+  fuera_de_producto:    '#92400e',
+  otro:                 '#71717a',
+}
+
 const FALLBACK_COLOR = { badge: 'bg-zinc-500/15 text-zinc-400', bar: 'bg-zinc-500' }
 const COLOR_CLASSES: Record<string, { badge: string; bar: string }> = {
   red:     { badge: 'bg-red-500/15 text-red-400',       bar: 'bg-red-500'   },
@@ -73,9 +86,10 @@ interface P0CausesPanelProps {
   totalP0Pct: number
   /** Total "unsorted pcs" de Matrix (= totalP0Pieces) — footer informativo */
   unsortedPcs?: number
-  onClickCause?: (cause: MatrixP0Cause) => void
-  /** Causa activa actualmente resaltada (ej. filtrando el timeline). */
-  selectedCause?: MatrixP0Cause | null
+  /** Causas seleccionadas (multi-select para filtrar timeline). */
+  selectedCauses?: Set<MatrixP0Cause>
+  /** Toggle add/remove una causa del set seleccionado. */
+  onToggleCause?: (cause: MatrixP0Cause) => void
 }
 
 interface CauseRowProps {
@@ -83,10 +97,12 @@ interface CauseRowProps {
   stats: PointZeroClassification['byMatrixCause'][MatrixP0Cause]
   totalP0Pct: number
   expanded: boolean
+  selected: boolean
   onToggle: () => void
+  onSelectChange: () => void
 }
 
-function CauseRow({ cause, stats, totalP0Pct, expanded, onToggle }: CauseRowProps) {
+function CauseRow({ cause, stats, totalP0Pct, expanded, selected, onToggle, onSelectChange }: CauseRowProps) {
   const def = MATRIX_P0_CAUSES[cause]
   const colors = COLOR_CLASSES[def.color] ?? FALLBACK_COLOR
   const Icon = CAUSE_ICONS[cause]
@@ -94,8 +110,25 @@ function CauseRow({ cause, stats, totalP0Pct, expanded, onToggle }: CauseRowProp
   const hasPieces = stats.pieces > 0
 
   return (
-    <div className={cn('border rounded-lg overflow-hidden transition-opacity', !hasPieces && 'opacity-40')}>
+    <div
+      className={cn(
+        'border rounded-lg overflow-hidden transition-all',
+        !hasPieces && 'opacity-40',
+        selected && 'ring-2 ring-offset-1 ring-offset-background',
+      )}
+      style={selected ? { '--tw-ring-color': CAUSE_HEX_BORDERS[cause] ?? '#ef4444' } as React.CSSProperties : undefined}
+    >
       <div className="w-full flex items-center gap-3 px-3 py-2 hover:bg-muted/40 transition-colors">
+        {hasPieces && (
+          <input
+            type="checkbox"
+            className="shrink-0 w-3.5 h-3.5 cursor-pointer accent-primary"
+            checked={selected}
+            onChange={onSelectChange}
+            onClick={e => e.stopPropagation()}
+            aria-label={`Seleccionar ${def.label} para filtrar timeline`}
+          />
+        )}
         <button
           className="flex items-center gap-3 flex-1 min-w-0 text-left"
           onClick={onToggle}
@@ -165,11 +198,15 @@ interface UmbrellaCauseRowProps {
   }>
   totalP0Pct: number
   expanded: boolean
+  selected: boolean
+  selectedCauses: Set<MatrixP0Cause>
   onToggle: () => void
+  onSelectChange: () => void
+  onSelectSubCause: (cause: MatrixP0Cause) => void
 }
 
 function UmbrellaCauseRow({
-  umbrellaStats, selfStats, derivedStats, totalP0Pct, expanded, onToggle,
+  umbrellaStats, selfStats, derivedStats, totalP0Pct, expanded, selected, selectedCauses, onToggle, onSelectChange, onSelectSubCause,
 }: UmbrellaCauseRowProps) {
   const def = MATRIX_P0_CAUSES.fuera_de_limites
   const colors = COLOR_CLASSES[def.color] ?? FALLBACK_COLOR
@@ -178,8 +215,25 @@ function UmbrellaCauseRow({
   const hasPieces = umbrellaStats.pieces > 0
 
   return (
-    <div className={cn('border rounded-lg overflow-hidden transition-opacity', !hasPieces && 'opacity-40')}>
+    <div
+      className={cn(
+        'border rounded-lg overflow-hidden transition-all',
+        !hasPieces && 'opacity-40',
+        selected && 'ring-2 ring-offset-1 ring-offset-background',
+      )}
+      style={selected ? { '--tw-ring-color': CAUSE_HEX_BORDERS.fuera_de_limites } as React.CSSProperties : undefined}
+    >
       <div className="w-full flex items-center gap-3 px-3 py-2 hover:bg-muted/40 transition-colors">
+        {hasPieces && (
+          <input
+            type="checkbox"
+            className="shrink-0 w-3.5 h-3.5 cursor-pointer accent-primary"
+            checked={selected}
+            onChange={onSelectChange}
+            onClick={e => e.stopPropagation()}
+            aria-label="Seleccionar Fuera de límites para filtrar timeline"
+          />
+        )}
         <button
           className="flex items-center gap-3 flex-1 min-w-0 text-left"
           onClick={onToggle}
@@ -226,10 +280,24 @@ function UmbrellaCauseRow({
           </p>
           <div className="space-y-1">
             {/* Primera sub-fila: fuera_de_limites estricto (el propio) */}
-            <SubCauseRow cause="fuera_de_limites" stats={selfStats} totalP0Pct={totalP0Pct} isStrict />
+            <SubCauseRow
+              cause="fuera_de_limites"
+              stats={selfStats}
+              totalP0Pct={totalP0Pct}
+              isStrict
+              selected={selectedCauses.has('fuera_de_limites')}
+              onToggle={() => onSelectSubCause('fuera_de_limites')}
+            />
             {/* Resto: las 5 derivadas */}
             {derivedStats.map(({ cause, stats }) => (
-              <SubCauseRow key={cause} cause={cause} stats={stats} totalP0Pct={totalP0Pct} />
+              <SubCauseRow
+                key={cause}
+                cause={cause}
+                stats={stats}
+                totalP0Pct={totalP0Pct}
+                selected={selectedCauses.has(cause)}
+                onToggle={() => onSelectSubCause(cause)}
+              />
             ))}
           </div>
           <p className="text-[10px] text-muted-foreground italic pt-1 border-t border-border/40">
@@ -244,12 +312,14 @@ function UmbrellaCauseRow({
 
 /** Sub-fila compacta para el desglose del paraguas */
 function SubCauseRow({
-  cause, stats, totalP0Pct, isStrict = false,
+  cause, stats, totalP0Pct, isStrict = false, selected = false, onToggle,
 }: {
   cause: MatrixP0Cause
   stats: PointZeroClassification['byMatrixCause'][MatrixP0Cause]
   totalP0Pct: number
   isStrict?: boolean
+  selected?: boolean
+  onToggle?: () => void
 }) {
   const def = MATRIX_P0_CAUSES[cause]
   const colors = COLOR_CLASSES[def.color] ?? FALLBACK_COLOR
@@ -258,10 +328,23 @@ function SubCauseRow({
   const pctOfTotal = (stats.pct * totalP0Pct) / 100
 
   return (
-    <div className={cn(
-      'flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-opacity',
-      hasPieces ? 'bg-background/50' : 'opacity-40',
-    )}>
+    <div
+      className={cn(
+        'flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-all',
+        hasPieces ? 'bg-background/50' : 'opacity-40',
+        selected && 'ring-1 ring-offset-1 ring-offset-background',
+      )}
+      style={selected ? { '--tw-ring-color': CAUSE_HEX_BORDERS[cause] ?? '#ef4444' } as React.CSSProperties : undefined}
+    >
+      {hasPieces && onToggle && (
+        <input
+          type="checkbox"
+          className="shrink-0 w-3 h-3 cursor-pointer accent-primary"
+          checked={selected}
+          onChange={onToggle}
+          aria-label={`Seleccionar ${def.label} para filtrar timeline`}
+        />
+      )}
       <span className={cn('p-1 rounded', colors.badge)}>
         <Icon className="w-3 h-3" />
       </span>
@@ -278,13 +361,13 @@ function SubCauseRow({
   )
 }
 
-export function P0CausesPanel({ byMatrixCause, totalP0Pct, unsortedPcs, onClickCause, selectedCause }: P0CausesPanelProps) {
+export function P0CausesPanel({ byMatrixCause, totalP0Pct, unsortedPcs, selectedCauses, onToggleCause }: P0CausesPanelProps) {
   const [expanded, setExpanded] = useState<MatrixP0Cause | null>(null)
   const hasCauseData = byMatrixCause != null
+  const selSet = selectedCauses ?? new Set<MatrixP0Cause>()
 
-  const toggle = (cause: MatrixP0Cause) => {
+  const toggleExpand = (cause: MatrixP0Cause) => {
     setExpanded(expanded === cause ? null : cause)
-    onClickCause?.(cause)
   }
 
   return (
@@ -341,7 +424,11 @@ export function P0CausesPanel({ byMatrixCause, totalP0Pct, unsortedPcs, onClickC
                         derivedStats={derivedStats}
                         totalP0Pct={totalP0Pct}
                         expanded={expanded === cause}
-                        onToggle={() => toggle(cause)}
+                        selected={selSet.has(cause)}
+                        selectedCauses={selSet}
+                        onToggle={() => toggleExpand(cause)}
+                        onSelectChange={() => onToggleCause?.(cause)}
+                        onSelectSubCause={(c) => onToggleCause?.(c)}
                       />
                     )
                   }
@@ -352,7 +439,9 @@ export function P0CausesPanel({ byMatrixCause, totalP0Pct, unsortedPcs, onClickC
                       stats={byMatrixCause[cause]}
                       totalP0Pct={totalP0Pct}
                       expanded={expanded === cause}
-                      onToggle={() => toggle(cause)}
+                      selected={selSet.has(cause)}
+                      onToggle={() => toggleExpand(cause)}
+                      onSelectChange={() => onToggleCause?.(cause)}
                     />
                   )
                 })}

@@ -19,7 +19,8 @@ import type { GraderShiftDoc } from '@/services/grader/graderShifts.service'
 import type { ShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import type { GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
 import type { FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
-import { parseMatrixErrorString, MATRIX_P0_CAUSES, MATRIX_CAUSE_ORDER_DERIVED } from '@/services/grader/graderMatrixP0Causes'
+import { MATRIX_P0_CAUSES } from '@/services/grader/graderMatrixP0Causes'
+import { classifyRecordToMatrix, CALIBRE_WEIGHT_RANGES } from '@/services/grader/graderAnalytics'
 
 interface ShiftTimelineViewProps {
   timelineBuckets: TimelineBucket[]
@@ -29,10 +30,10 @@ interface ShiftTimelineViewProps {
   configSnapshots?: GateConfigSnapshot[]
   /** Piezas gate=0 del turno (enriquecidas con peso+error por P0_EXCEL) */
   gate0Pieces?: FirestorePieceRecord[]
-  /** Causa seleccionada en el P0CausesPanel — filtra el scatter */
-  selectedCause?: MatrixP0Cause | null
-  /** Callback para limpiar la selección desde el badge */
-  onClearSelectedCause?: () => void
+  /** Causas seleccionadas (multi-select) en el P0CausesPanel — filtran el scatter */
+  selectedCauses?: Set<MatrixP0Cause>
+  /** Callback para limpiar todas las selecciones desde el badge */
+  onClearSelectedCauses?: () => void
 }
 
 function fmtTime(iso: string): string {
@@ -53,51 +54,61 @@ const CAUSE_HEX: Record<MatrixP0Cause, string> = {
 }
 
 /**
- * ¿El record pertenece a la causa seleccionada?
- * Lógica MVP:
- *  - Causas OFICIALES (no_leido_fotocelula, too_close_too_long, puerta_no_preparada):
- *    match directo por error string via parseMatrixErrorString.
- *  - "fuera_de_limites" (paraguas): todas las piezas con error "Fuera de límites"
- *    (incluye las sub-causas derivadas; no distinguimos aún en el front).
- *  - Sub-causas DERIVADAS (fuera_de_calidad, fuera_de_calibre, etc.):
- *    mismo bucket que el paraguas por ahora (se mostrarán todas las "Fuera de límites").
- *    TODO futuro: clasificar con classifyRecordToMatrix + config de gates del momento.
+ * Clasifica una pieza gate=0 a su MatrixP0Cause final, usando la config de
+ * gates más reciente del turno (la última snapshot disponible, o la única si
+ * sólo hay una). Para piezas sin error explícito o con "Fuera de límites" hace
+ * descomposición en sub-causa (calidad/calibre/etc.) cuando hay datos por pieza.
+ *
+ * Si no hay configSnapshots, las sub-causas no se distinguen — el paraguas
+ * "Fuera de límites" agrupa todo.
  */
-function pieceMatchesCause(piece: FirestorePieceRecord, cause: MatrixP0Cause): boolean {
-  const parsed = parseMatrixErrorString(piece.error ?? '')
-  if (cause === 'fuera_de_limites' || MATRIX_CAUSE_ORDER_DERIVED.includes(cause)) {
-    // Paraguas o sub-causa derivada → todas las "Fuera de límites"
-    return parsed === 'fuera_de_limites' || parsed == null
+function classifyPiece(piece: FirestorePieceRecord, configSnapshots?: GateConfigSnapshot[]): MatrixP0Cause {
+  // Encontrar el snapshot más reciente con at <= piece.ts (o el último si todos son posteriores)
+  let activeGates: GateConfigSnapshot['gates'] = []
+  if (configSnapshots && configSnapshots.length > 0) {
+    const eligible = configSnapshots.filter(s => s.at <= piece.ts)
+    activeGates = (eligible[eligible.length - 1] ?? configSnapshots[configSnapshots.length - 1]).gates
   }
-  return parsed === cause
+  // El record para classifyRecordToMatrix debe verse como Gate0Record
+  const gate0Record = {
+    ts: piece.ts,
+    pieces: piece.pieces,
+    weightKg: piece.weightKg,
+    weightPerPieceGrams: piece.weightPerPieceGrams,
+    quality: piece.quality,
+    calibre: piece.calibre,
+    error: piece.error ?? '',
+  } as Parameters<typeof classifyRecordToMatrix>[0]
+  return classifyRecordToMatrix(gate0Record, activeGates, CALIBRE_WEIGHT_RANGES)
 }
 
 
 export function ShiftTimelineView({
   timelineBuckets, shiftDoc, shiftWindow, configSnapshots,
-  gate0Pieces, selectedCause, onClearSelectedCause,
+  gate0Pieces, selectedCauses, onClearSelectedCauses,
 }: ShiftTimelineViewProps) {
-  // Piezas filtradas por causa seleccionada → scatter points
-  const scatterPoints = useMemo(() => {
-    if (!selectedCause || !gate0Pieces || gate0Pieces.length === 0) return []
-    const filtered = gate0Pieces.filter(p => pieceMatchesCause(p, selectedCause))
-    return filtered
-      .filter(p => p.weightPerPieceGrams != null || p.weightKg != null)
-      .map(p => {
-        const grams = p.weightPerPieceGrams ?? (p.weightKg ? p.weightKg * 1000 : 0)
-        return {
-          time: fmtTime(p.ts),
-          grams,
-          ts: p.ts,
-          calibre: p.calibre,
-          quality: p.quality,
-          error: p.error,
-        }
-      })
-  }, [selectedCause, gate0Pieces])
+  const causesArr = useMemo(() => [...(selectedCauses ?? new Set<MatrixP0Cause>())], [selectedCauses])
+  const hasSelection = causesArr.length > 0
 
-  const scatterColor = selectedCause ? CAUSE_HEX[selectedCause] ?? '#ef4444' : '#ef4444'
-  const scatterLabel = selectedCause ? MATRIX_P0_CAUSES[selectedCause].label : null
+  // Indexar piezas con peso por su causa clasificada (cliente-side)
+  const piecesByCause = useMemo(() => {
+    type Point = { time: string; grams: number; ts: string; calibre?: string; quality?: string; error?: string }
+    const map = new Map<MatrixP0Cause, Point[]>()
+    if (!hasSelection || !gate0Pieces || gate0Pieces.length === 0) return map
+    for (const p of gate0Pieces) {
+      const grams = p.weightPerPieceGrams ?? (p.weightKg ? p.weightKg * 1000 : 0)
+      if (grams <= 0) continue
+      const cause = classifyPiece(p, configSnapshots)
+      if (!causesArr.includes(cause)) continue
+      const pt: Point = { time: fmtTime(p.ts), grams, ts: p.ts, calibre: p.calibre, quality: p.quality, error: p.error }
+      if (!map.has(cause)) map.set(cause, [])
+      map.get(cause)!.push(pt)
+    }
+    return map
+  }, [causesArr, hasSelection, gate0Pieces, configSnapshots])
+
+  const totalScatterPts = [...piecesByCause.values()].reduce((s, arr) => s + arr.length, 0)
+  const scatterAxisShow = totalScatterPts > 0
 
   const chartOption = useMemo(() => {
     const buckets = timelineBuckets.filter(b => b.pieces > 0)
@@ -173,15 +184,25 @@ export function ShiftTimelineView({
           axisLabel: { color: '#6b7280', fontSize: 10, formatter: '{value}%' },
           splitLine: { lineStyle: { color: '#1f2937' } },
           min: 0,
+          // Escala dinámica: techo = max(10, p98 + 20%) para que la línea se lea
+          // bien cuando el P0% es bajo, sin que outliers iniciales (turnos
+          // arrancando con 100% si sólo hubo 1 pieza) aplasten todo el chart.
+          max: (() => {
+            const sorted = [...p0Pcts].filter(v => v > 0).sort((a, b) => a - b)
+            if (sorted.length === 0) return 10
+            const p98 = sorted[Math.floor(sorted.length * 0.98)] ?? sorted[sorted.length - 1] ?? 10
+            const ceil = Math.ceil(p98 * 1.2 / 5) * 5  // redondear a múltiplo de 5
+            return Math.max(10, ceil)
+          })(),
         },
         {
           type: 'value' as const,
           name: 'Peso (g)',
           nameTextStyle: { color: '#6b7280', fontSize: 10 },
-          axisLabel: { color: scatterColor, fontSize: 10, formatter: '{value} g' },
+          axisLabel: { color: '#6b7280', fontSize: 10, formatter: '{value} g' },
           splitLine: { show: false },
           min: 0,
-          show: scatterPoints.length > 0,
+          show: scatterAxisShow,
         },
       ],
       tooltip: {
@@ -191,7 +212,7 @@ export function ShiftTimelineView({
         textStyle: { color: '#f9fafb', fontSize: 11 },
         formatter: (params: unknown[]) => {
           if (!Array.isArray(params) || params.length === 0) return ''
-          const arr = params as Array<{ name: string; value: number | [string, number]; seriesName: string; seriesType: string; dataIndex: number }>
+          const arr = params as Array<{ name: string; value: number | [string, number]; seriesName: string; seriesType: string; dataIndex: number; color?: string }>
           const linePt = arr.find(p => p.seriesType === 'line')
           const scatterPts = arr.filter(p => p.seriesType === 'scatter')
           const time = linePt?.name ?? (Array.isArray(scatterPts[0]?.value) ? scatterPts[0].value[0] : '')
@@ -199,9 +220,7 @@ export function ShiftTimelineView({
           if (linePt) lines.push(`P0: <b>${linePt.value}%</b>`)
           for (const sp of scatterPts) {
             const v = Array.isArray(sp.value) ? sp.value[1] : sp.value
-            const pt = scatterPoints[sp.dataIndex]
-            const extra = pt ? ` · ${pt.calibre ?? '?'} · ${pt.quality ?? '?'}` : ''
-            lines.push(`<span style="color:${scatterColor}">●</span> ${v}g${extra}`)
+            lines.push(`<span style="color:${sp.color}">●</span> ${sp.seriesName}: ${v}g`)
           }
           return lines.join('<br/>')
         },
@@ -223,24 +242,29 @@ export function ShiftTimelineView({
             data: [...uploadLines, ...actionLines, ...configChangeLines],
           },
         },
-        ...(scatterPoints.length > 0 ? [{
-          name: scatterLabel ?? 'Piezas',
-          type: 'scatter' as const,
-          yAxisIndex: 1,
-          data: scatterPoints.map(p => [p.time, p.grams]),
-          symbolSize: 6,
-          itemStyle: {
-            color: scatterColor,
-            opacity: 0.7,
-            borderColor: '#1f2937',
-            borderWidth: 0.5,
-          },
-          emphasis: { itemStyle: { opacity: 1, borderWidth: 2, borderColor: '#f9fafb' } },
-          z: 5,
-        }] : []),
+        // Una serie scatter por cada causa seleccionada (multi-select)
+        ...causesArr.map(cause => {
+          const pts = piecesByCause.get(cause) ?? []
+          const color = CAUSE_HEX[cause] ?? '#ef4444'
+          return {
+            name: MATRIX_P0_CAUSES[cause].label,
+            type: 'scatter' as const,
+            yAxisIndex: 1,
+            data: pts.map(p => [p.time, p.grams]),
+            symbolSize: 6,
+            itemStyle: {
+              color,
+              opacity: 0.75,
+              borderColor: '#1f2937',
+              borderWidth: 0.5,
+            },
+            emphasis: { itemStyle: { opacity: 1, borderWidth: 2, borderColor: '#f9fafb' } },
+            z: 5,
+          }
+        }),
       ],
     }
-  }, [timelineBuckets, shiftDoc, scatterPoints, scatterColor, scatterLabel, configSnapshots])
+  }, [timelineBuckets, shiftDoc, configSnapshots, causesArr, piecesByCause, scatterAxisShow])
 
   // Lista cronológica de checkpoints
   const checkpoints = useMemo(() => {
@@ -290,23 +314,34 @@ export function ShiftTimelineView({
       </CardHeader>
 
       <CardContent className="space-y-4">
-        {selectedCause && scatterLabel && (
-          <div
-            className="flex items-center gap-2 px-3 py-2 rounded-md border text-xs"
-            style={{ borderColor: scatterColor + '40', backgroundColor: scatterColor + '10' }}
-          >
-            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: scatterColor }} />
-            <span className="text-muted-foreground">Mostrando:</span>
-            <span className="font-medium" style={{ color: scatterColor }}>{scatterLabel}</span>
-            <span className="text-muted-foreground">
-              — {scatterPoints.length.toLocaleString('es-CL')} pzas con peso
+        {hasSelection && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-border/60 bg-muted/30 text-xs flex-wrap">
+            <span className="text-muted-foreground shrink-0">Mostrando:</span>
+            {causesArr.map(cause => {
+              const color = CAUSE_HEX[cause] ?? '#ef4444'
+              const label = MATRIX_P0_CAUSES[cause].label
+              const count = (piecesByCause.get(cause) ?? []).length
+              return (
+                <span
+                  key={cause}
+                  className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[11px] font-medium"
+                  style={{ borderColor: color + '60', backgroundColor: color + '15', color }}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
+                  {label}
+                  <span className="text-muted-foreground/80 font-normal">{count.toLocaleString('es-CL')}</span>
+                </span>
+              )
+            })}
+            <span className="text-muted-foreground ml-1">
+              · {totalScatterPts.toLocaleString('es-CL')} pzas con peso
             </span>
-            {onClearSelectedCause && (
+            {onClearSelectedCauses && (
               <Button
                 variant="ghost"
                 size="sm"
                 className="ml-auto h-6 px-2 text-xs"
-                onClick={onClearSelectedCause}
+                onClick={onClearSelectedCauses}
               >
                 <X className="w-3 h-3 mr-1" />
                 Limpiar
@@ -321,7 +356,7 @@ export function ShiftTimelineView({
         ) : (
           <ReactECharts
             option={chartOption}
-            style={{ height: scatterPoints.length > 0 ? 240 : 180 }}
+            style={{ height: scatterAxisShow ? 240 : 180 }}
             theme="dark"
             opts={{ renderer: 'svg' }}
           />

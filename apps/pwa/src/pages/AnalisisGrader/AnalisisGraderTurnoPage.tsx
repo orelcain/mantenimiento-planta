@@ -143,7 +143,7 @@ export function AnalisisGraderTurnoPage() {
   const [timelineBuckets, setTimelineBuckets] = useState<TimelineBucket[]>([])
   const [configSnapshots, setConfigSnapshots] = useState<GateConfigSnapshot[]>([])
   const [gate0Pieces, setGate0Pieces] = useState<FirestorePieceRecord[]>([])
-  const [selectedCause, setSelectedCause] = useState<MatrixP0Cause | null>(null)
+  const [selectedCauses, setSelectedCauses] = useState<Set<MatrixP0Cause>>(new Set())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -312,7 +312,7 @@ export function AnalisisGraderTurnoPage() {
   // Carga pieceRecords gate=0 para drill-down en timeline
   useEffect(() => {
     if (!dateKey || !shiftLabel) return
-    setSelectedCause(null)  // reset al cambiar de turno
+    setSelectedCauses(new Set())  // reset al cambiar de turno
     listGate0PieceRecords(`${dateKey}__${shiftLabel}`)
       .then(setGate0Pieces)
       .catch(() => setGate0Pieces([]))
@@ -491,8 +491,13 @@ export function AnalisisGraderTurnoPage() {
                 byMatrixCause={byMatrixCause}
                 totalP0Pct={summary.pointZeroPct}
                 unsortedPcs={summary.pointZeroPieces}
-                selectedCause={selectedCause}
-                onClickCause={(cause) => setSelectedCause(prev => prev === cause ? null : cause)}
+                selectedCauses={selectedCauses}
+                onToggleCause={(cause) => setSelectedCauses(prev => {
+                  const next = new Set(prev)
+                  if (next.has(cause)) next.delete(cause)
+                  else next.add(cause)
+                  return next
+                })}
               />
             </div>
           </div>
@@ -504,8 +509,8 @@ export function AnalisisGraderTurnoPage() {
             shiftWindow={shiftWindow}
             configSnapshots={configSnapshots}
             gate0Pieces={gate0Pieces}
-            selectedCause={selectedCause}
-            onClearSelectedCause={() => setSelectedCause(null)}
+            selectedCauses={selectedCauses}
+            onClearSelectedCauses={() => setSelectedCauses(new Set())}
           />
 
           {/* ── Sección IA ─────────────────────────────────────────────── */}
