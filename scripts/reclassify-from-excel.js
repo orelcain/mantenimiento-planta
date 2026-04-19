@@ -77,6 +77,35 @@ function normalizeCalibre(s) {
   return t
 }
 
+// ─── Dedupe ───────────────────────────────────────────────────────────────────
+// Clave canónica por pieza: evita doble conteo cuando coexisten archivos Excel
+// mensuales + un consolidado del mismo período (o solapamientos como nov 2025).
+function buildDedupeKey(r) {
+  return `${r.ts}|${r.gate}|${r.pieces}|${r.weightPerPieceGrams ?? ''}|${r.weightKg ?? ''}|${r.error ?? ''}|${r.calibre ?? ''}|${r.quality ?? ''}`
+}
+function dedupeByKey(records) {
+  const seen = new Set()
+  const out  = []
+  for (const r of records) {
+    const k = buildDedupeKey(r)
+    if (seen.has(k)) continue
+    seen.add(k)
+    out.push(r)
+  }
+  return out
+}
+
+// Detecta archivos "consolidados" del Marelec (rango >40 días en el nombre).
+// Estos solapan 100% con los mensuales y duplican conteos si se leen juntos.
+function isConsolidatedFile(filePath) {
+  const m = path.basename(filePath).match(/\((\d{8})_\d{6}\s*-\s*(\d{8})_\d{6}\)\.xlsx$/i)
+  if (!m) return false
+  const d1 = new Date(`${m[1].slice(0,4)}-${m[1].slice(4,6)}-${m[1].slice(6,8)}`)
+  const d2 = new Date(`${m[2].slice(0,4)}-${m[2].slice(4,6)}-${m[2].slice(6,8)}`)
+  const diffDays = (d2 - d1) / 86400000
+  return diffDays > 40
+}
+
 // ─── Helpers parser (reutilizado de bulk-upload-piece-records.js) ─────────────
 const norm = (v) => v == null ? '' : String(v).trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 
@@ -342,27 +371,49 @@ async function main() {
       return byShift.get(id)
     }
 
-    const ppFiles = walkXlsx(PP_DIR)
-    console.log(`   PP: ${ppFiles.length} archivos`)
-    for (const f of ppFiles) {
+    const ppFilesAll = walkXlsx(PP_DIR)
+    const ppFiles    = ppFilesAll.filter(f => !isConsolidatedFile(f))
+    const ppSkipped  = ppFilesAll.length - ppFiles.length
+    console.log(`   PP: ${ppFiles.length} archivos${ppSkipped ? ` (${ppSkipped} consolidados omitidos)` : ''}`)
+    for (let i = 0; i < ppFiles.length; i++) {
+      const f = ppFiles[i]
+      const t0 = Date.now()
       const { records } = parseXlsx(f)
       for (const r of records) {
         const { shiftId, dateKey } = assignShift(r.ts)
         ensure(`${dateKey}__${shiftId}`).pp.push(r)
       }
+      console.log(`     [${i+1}/${ppFiles.length}] ${path.basename(f).slice(0,60)} → ${records.length} recs (${((Date.now()-t0)/1000).toFixed(1)}s)`)
     }
     console.log('   ✓ PP cargados')
 
-    const p0Files = walkXlsx(P0_DIR)
-    console.log(`   P0: ${p0Files.length} archivos`)
-    for (const f of p0Files) {
+    const p0FilesAll = walkXlsx(P0_DIR)
+    const p0Files    = p0FilesAll.filter(f => !isConsolidatedFile(f))
+    const p0Skipped  = p0FilesAll.length - p0Files.length
+    console.log(`   P0: ${p0Files.length} archivos${p0Skipped ? ` (${p0Skipped} consolidados omitidos)` : ''}`)
+    for (let i = 0; i < p0Files.length; i++) {
+      const f = p0Files[i]
+      const t0 = Date.now()
       const { records } = parseXlsx(f)
       for (const r of records) {
         const { shiftId, dateKey } = assignShift(r.ts)
         ensure(`${dateKey}__${shiftId}`).p0.push(r)
       }
+      console.log(`     [${i+1}/${p0Files.length}] ${path.basename(f).slice(0,60)} → ${records.length} recs (${((Date.now()-t0)/1000).toFixed(1)}s)`)
     }
     console.log('   ✓ P0 cargados (fuente única — con columna Error del Marelec)')
+
+    // Dedupe por turno: protege contra solapamientos residuales (ej. nov 2025 PP)
+    let dedupPP = 0, dedupP0 = 0
+    for (const [, data] of byShift) {
+      const ppBefore = data.pp.length, p0Before = data.p0.length
+      data.pp = dedupeByKey(data.pp)
+      data.p0 = dedupeByKey(data.p0)
+      dedupPP += ppBefore - data.pp.length
+      dedupP0 += p0Before - data.p0.length
+    }
+    console.log(`   🧹 Dedupe: -${dedupPP} PP, -${dedupP0} P0`)
+
     console.log(`   📋 ${byShift.size} turnos en Excel`)
     saveCache(byShift)
     console.log(`   💾 Cache guardado en ${CACHE_FILE}\n`)

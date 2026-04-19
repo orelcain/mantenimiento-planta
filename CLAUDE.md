@@ -431,9 +431,11 @@ Permite drill-down "dentro del turno" en el gráfico de tendencia (pendiente UI 
 ```
 C:/Users/pc hp/OneDrive/ANTARFOOD/⚙️ GRADER/temporada 2025-2026/
   pieza a pieza/{mes}/*.xlsx   — 30 archivos PP
-  punto 0/{mes}/*.xlsx         — 9 archivos P0 + 1 consolidado temporada
+  punto 0/{mes}/*.xlsx         — 8 archivos P0 mensuales + 1 consolidado jul-feb (se descarta)
 ```
 Si se necesita re-procesar o corregir algo, usar `scripts/iter18-full-season-rebuild.js` (ya tiene el parser, segmenter y computeSummary portados a plain JS).
+
+**⚠️ TRAMPA — archivos Excel consolidados del Marelec**: el Marelec exporta un archivo "consolidado" que cubre toda la temporada (ej. `(20250701_000000 - 20260228_000000).xlsx`). Ese archivo **solapa 100% con los mensuales** → si se leen ambos, se cuenta cada pieza 2×. `scripts/reclassify-from-excel.js` y cualquier parser batch debe filtrar archivos con rango >40 días vía `isConsolidatedFile()`. Además deduplicar por `dedupeKey = ts|gate|pieces|weight|error|calibre|quality` para casos de solapamiento residual (noviembre 2025 tiene solapes de 5 días entre archivos semanales).
 
 ## Cambios recientes (sesion 2026-04-11 tarde — Grader iter 7: carga masiva histórica + calendario, v2.75.0)
 
