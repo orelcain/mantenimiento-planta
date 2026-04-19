@@ -154,14 +154,27 @@ export function AnalisisGraderPeriodoPage() {
     setReclassifying(true)
     setReclassifyReport(null)
     const BATCH = 5
+    const TIMEOUT_MS = 25_000
+    const INTER_BATCH_MS = 150
     const results: Array<ReclassifyResult & { error?: string }> = new Array(allSummaries.length)
     let completed = 0
+
+    const withTimeout = (summary: GraderDailySummary) =>
+      Promise.race([
+        // writeSyntheticSnapshots:false — clasifica en memoria sin escribir snapshots a Firestore
+        // (evita N writes secuenciales + re-lectura por turno que causaban throttling)
+        reclassifyShift(summary.id, { writeSyntheticSnapshots: false }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Timeout 25s')), TIMEOUT_MS),
+        ),
+      ])
+
     for (let i = 0; i < allSummaries.length; i += BATCH) {
       const slice = allSummaries.slice(i, i + BATCH)
       await Promise.all(
         slice.map(async (summary, idx) => {
           try {
-            results[i + idx] = await reclassifyShift(summary.id, { writeSyntheticSnapshots: true })
+            results[i + idx] = await withTimeout(summary)
           } catch (err) {
             results[i + idx] = {
               shiftDocId: summary.id,
@@ -177,6 +190,10 @@ export function AnalisisGraderPeriodoPage() {
           }
         }),
       )
+      // Pequeña pausa entre batches para no saturar Firestore
+      if (i + BATCH < allSummaries.length) {
+        await new Promise((r) => setTimeout(r, INTER_BATCH_MS))
+      }
     }
     setReclassifyReport({
       ok: results.filter(r => !r.error && r.confidence !== 'low').length,
