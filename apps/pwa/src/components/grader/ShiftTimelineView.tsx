@@ -67,7 +67,8 @@ function classifyPiece(piece: FirestorePieceRecord, configSnapshots?: GateConfig
   let activeGates: GateConfigSnapshot['gates'] = []
   if (configSnapshots && configSnapshots.length > 0) {
     const eligible = configSnapshots.filter(s => s.at <= piece.ts)
-    activeGates = (eligible[eligible.length - 1] ?? configSnapshots[configSnapshots.length - 1]).gates
+    const snap = eligible[eligible.length - 1] ?? configSnapshots[configSnapshots.length - 1]
+    activeGates = snap?.gates ?? []
   }
   // El record para classifyRecordToMatrix debe verse como Gate0Record
   const gate0Record = {
