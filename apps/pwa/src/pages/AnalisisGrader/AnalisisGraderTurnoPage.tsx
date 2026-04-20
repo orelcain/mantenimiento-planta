@@ -551,12 +551,9 @@ export function AnalisisGraderTurnoPage() {
           </Card>
           {aiOutput && <AIOutputPanel output={aiOutput} />}
 
-          {/* Cambios de config de gates en el turno (FASE 27) */}
-          {configSnapshots.length > 0 && (
-            <p className="text-xs text-muted-foreground px-1">
-              Cambios de config registrados en este turno: <span className="font-medium text-foreground">{configSnapshots.length}</span>
-            </p>
-          )}
+          {/* Nota: el contador de cambios de config (FASE 27) ya vive en
+              el badge del panel ConfigChangeHistory de arriba — eliminado
+              para evitar duplicación con conteos divergentes. */}
 
           {/* Link a configuración avanzada */}
           <button

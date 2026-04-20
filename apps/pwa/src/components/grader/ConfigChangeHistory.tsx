@@ -147,9 +147,13 @@ function ConfigChangeRow({ snap, isFirst }: RowProps) {
 }
 
 export function ConfigChangeHistory({ shiftDocId, snapshots, onChange }: Props) {
-  // Ordenar por at asc (deberían venir así, pero por seguridad)
+  // Filtrar snapshots "ruido": manuales sin cambios reales (changes=0 && !synthetic)
+  // suelen quedar al abrir el wizard de config sin tocar nada — no aportan info.
+  // Synthetic con changes=0 SÍ se muestran (representan la config inicial inferida).
   const sorted = useMemo(
-    () => [...snapshots].sort((a, b) => a.at.localeCompare(b.at)),
+    () => snapshots
+      .filter(s => s.synthetic === true || (s.changes?.length ?? 0) > 0)
+      .sort((a, b) => a.at.localeCompare(b.at)),
     [snapshots],
   )
 
