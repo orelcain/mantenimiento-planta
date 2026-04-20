@@ -521,6 +521,7 @@ export function AnalisisGraderTurnoPage() {
           <ConfigChangeHistory
             shiftDocId={`${dateKey}__${shiftLabel}`}
             snapshots={configSnapshots}
+            timelineBuckets={timelineBuckets}
             onChange={reloadConfigSnapshots}
           />
 

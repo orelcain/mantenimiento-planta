@@ -16,15 +16,19 @@
  */
 
 import { useMemo } from 'react'
-import { Wrench, Sparkles, User, Clock, AlertTriangle } from 'lucide-react'
+import { Wrench, Sparkles, User, Clock, AlertTriangle, TrendingDown, TrendingUp, Minus, Hourglass } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, Badge } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { QuickGateChangeButton } from './QuickGateChangeButton'
+import { computeSegmentVerdicts, type SegmentVerdict } from '@/services/grader/graderP0Segmentation'
 import type { GateConfigSnapshot, ConfigDiff } from '@/services/grader/graderConfigSnapshot.service'
+import type { TimelineBucket } from '@/services/grader/types'
 
 interface Props {
   shiftDocId: string
   snapshots: GateConfigSnapshot[]
+  /** Buckets P0% por minuto del turno — necesario para calcular verdicts antes/después de cada cambio */
+  timelineBuckets?: TimelineBucket[]
   /** Callback tras guardar un nuevo cambio — el caller refresca snapshots */
   onChange?: () => void
 }
@@ -62,9 +66,50 @@ function groupChangesByGate(changes: ConfigDiff[]): Map<number, ConfigDiff[]> {
 interface RowProps {
   snap: GateConfigSnapshot
   isFirst: boolean
+  verdict?: SegmentVerdict
 }
 
-function ConfigChangeRow({ snap, isFirst }: RowProps) {
+/** Mini badge debajo del diff con el resultado del cambio (Fase C). */
+function VerdictBadge({ v }: { v: SegmentVerdict }) {
+  if (v.status === 'insufficient-data') {
+    return (
+      <div className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground bg-muted/40 rounded px-2 py-1 mt-1">
+        <Hourglass className="w-3 h-3" />
+        Esperando más datos
+        {v.afterPieces > 0 && (
+          <span className="text-muted-foreground/70">
+            ({v.afterPieces} pzas hasta ahora — esperá ≥30)
+          </span>
+        )}
+      </div>
+    )
+  }
+
+  const cfg = {
+    improved: { Icon: TrendingDown, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', label: 'Mejoró' },
+    worsened: { Icon: TrendingUp,   color: 'text-red-400',     bg: 'bg-red-500/10',     border: 'border-red-500/30',     label: 'Empeoró' },
+    neutral:  { Icon: Minus,        color: 'text-zinc-400',    bg: 'bg-zinc-500/10',    border: 'border-zinc-500/30',    label: 'Sin cambio significativo' },
+  }[v.status]
+
+  const sign = v.delta > 0 ? '+' : ''
+  return (
+    <div
+      className={cn('inline-flex items-center gap-1.5 text-[11px] rounded px-2 py-1 mt-1 border', cfg.bg, cfg.border)}
+      title={`Antes ${v.beforePct.toFixed(2)}% → Después ${v.afterPct.toFixed(2)}% (${v.afterPieces.toLocaleString('es-CL')} piezas en ${v.afterMinutes} min)`}
+    >
+      <cfg.Icon className={cn('w-3 h-3', cfg.color)} />
+      <span className={cn('font-medium', cfg.color)}>{cfg.label}</span>
+      <span className={cfg.color}>
+        {sign}{v.delta.toFixed(2)}pts
+      </span>
+      <span className="text-muted-foreground/80">
+        en {v.afterMinutes} min · {v.afterPieces.toLocaleString('es-CL')} pzas
+      </span>
+    </div>
+  )
+}
+
+function ConfigChangeRow({ snap, isFirst, verdict }: RowProps) {
   const grouped = useMemo(() => groupChangesByGate(snap.changes), [snap.changes])
   const isSynthetic = snap.synthetic === true
 
@@ -161,12 +206,17 @@ function ConfigChangeRow({ snap, isFirst }: RowProps) {
             "{snap.reason}"
           </div>
         )}
+
+        {/* Verdict del cambio (Fase C) — solo para snapshots manuales */}
+        {verdict && !isSynthetic && (
+          <div><VerdictBadge v={verdict} /></div>
+        )}
       </div>
     </li>
   )
 }
 
-export function ConfigChangeHistory({ shiftDocId, snapshots, onChange }: Props) {
+export function ConfigChangeHistory({ shiftDocId, snapshots, timelineBuckets, onChange }: Props) {
   // Filtrar snapshots "ruido": manuales sin cambios reales (changes=0 && !synthetic)
   // suelen quedar al abrir el wizard de config sin tocar nada — no aportan info.
   // Synthetic con changes=0 SÍ se muestran (representan la config inicial inferida).
@@ -175,6 +225,14 @@ export function ConfigChangeHistory({ shiftDocId, snapshots, onChange }: Props) 
       .filter(s => s.synthetic === true || (s.changes?.length ?? 0) > 0)
       .sort((a, b) => a.at.localeCompare(b.at)),
     [snapshots],
+  )
+
+  // Calcular verdict de cada cambio manual (P0% antes vs después)
+  const verdicts = useMemo(
+    () => timelineBuckets && timelineBuckets.length > 0
+      ? computeSegmentVerdicts(snapshots, timelineBuckets)
+      : new Map(),
+    [snapshots, timelineBuckets],
   )
 
   return (
@@ -209,7 +267,12 @@ export function ConfigChangeHistory({ shiftDocId, snapshots, onChange }: Props) 
         ) : (
           <ul className="divide-y divide-border/40">
             {sorted.map((snap, i) => (
-              <ConfigChangeRow key={snap.id} snap={snap} isFirst={i === 0} />
+              <ConfigChangeRow
+                key={snap.id}
+                snap={snap}
+                isFirst={i === 0}
+                verdict={verdicts.get(snap.id)}
+              />
             ))}
           </ul>
         )}
