@@ -53,8 +53,15 @@ export function computeSegmentVerdicts(
     const snap = manualSnaps[i]
     if (!snap) continue
     const nextAt = manualSnaps[i + 1]?.at
+    // El "antes" es el segmento entre el snapshot manual previo (o inicio del
+    // turno si es el primero) y este snapshot. Comparar contra "todo el turno
+    // hasta acá" sería sesgado si hubo varios cambios cercanos.
+    const prevAt = manualSnaps[i - 1]?.at
 
-    const beforeBuckets = timelineBuckets.filter(b => b.tsMin < snap.at)
+    const beforeBuckets = timelineBuckets.filter(b => {
+      if (prevAt && b.tsMin < prevAt) return false
+      return b.tsMin < snap.at
+    })
     const afterBuckets  = timelineBuckets.filter(b => {
       if (b.tsMin < snap.at) return false
       if (nextAt && b.tsMin >= nextAt) return false
