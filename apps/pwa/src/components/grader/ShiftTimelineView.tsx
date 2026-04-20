@@ -1,5 +1,6 @@
 /**
- * Visualización del timeline de turno: pulso P0% minuto a minuto +
+ * Visualización del timeline de turno: pulso P0% minuto a minuto,
+ * tiempos muertos, cambios de lote, y marcadores de configuración.
  * checkpoints de uploads y acciones marcados como líneas verticales.
  *
  * Cuando el usuario clica una causa del P0CausesPanel, el timeline agrega
@@ -214,6 +215,62 @@ export function ShiftTimelineView({
       label: { show: true, formatter: '🔧', color: '#06b6d4', fontSize: 10 },
     }))
 
+    // Cambios de lote: cuando el lot dominante cambia entre buckets consecutivos
+    // con actividad (pieces > 0). Un cambio de lote puede indicar nueva bandeja.
+    const lotChangeLines: object[] = []
+    const activeBuckets = buckets  // ya filtrados: pieces > 0
+    for (let i = 1; i < activeBuckets.length; i++) {
+      const prev = activeBuckets[i - 1]
+      const curr = activeBuckets[i]
+      if (prev?.lot && curr?.lot && prev.lot !== curr.lot) {
+        const t = fmtTime(curr.tsMin)
+        lotChangeLines.push({
+          name: `Lote ${curr.lot}`,
+          xAxis: t,
+          lineStyle: { color: '#8b5cf6', type: 'dotted' as const, width: 1.5 },
+          label: { show: true, formatter: '📦', color: '#8b5cf6', fontSize: 9, position: 'insideEndBottom' as const },
+        })
+      }
+    }
+
+    // Tiempos muertos: solo mostramos gaps largos (≥ 8 min).
+    // Los gaps 3-8 min (ejercicios compensatorios) se ocultan porque se
+    // confunden con tiempos muertos normales del flujo y generan ruido.
+    //   8–30 min  → pausa genérica (naranja) — parada productiva real
+    //   > 30 min  → colación (azul) — en este lapso NO deben pasar piezas
+    //   < 8 min   → ignorado
+    const deadTimeAreas: Array<[object, object]> = []
+    const allBuckets = timelineBuckets
+    const GAP_MIN_VISIBLE = 8
+    const GAP_MAX_PAUSA = 30
+    for (let i = 1; i < allBuckets.length; i++) {
+      const a = allBuckets[i - 1]
+      const b = allBuckets[i]
+      if (!a || !b) continue
+      const gapMs = new Date(b.tsMin).getTime() - new Date(a.tsMin).getTime()
+      const gapMin = gapMs / 60_000
+      if (gapMin < GAP_MIN_VISIBLE) continue
+      const tA = fmtTime(a.tsMin)
+      const tB = fmtTime(b.tsMin)
+      const rounded = Math.round(gapMin)
+      let label: string
+      let areaColor: string
+      let labelColor: string
+      if (gapMin > GAP_MAX_PAUSA) {
+        label = `Colación (~${rounded}min)`
+        areaColor = 'rgba(59,130,246,0.12)'
+        labelColor = '#60a5fa'
+      } else {
+        label = `Pausa (~${rounded}min)`
+        areaColor = 'rgba(249,115,22,0.08)'
+        labelColor = '#fb923c'
+      }
+      deadTimeAreas.push([
+        { xAxis: tA, itemStyle: { color: areaColor }, label: { show: true, formatter: label, color: labelColor, fontSize: 9, position: 'insideTopRight' as const } },
+        { xAxis: tB },
+      ])
+    }
+
     return {
       backgroundColor: 'transparent',
       // Más margen bajo para el slider de zoom
@@ -329,6 +386,16 @@ export function ShiftTimelineView({
               }
             }
           }
+          // Enriquecer con metadatos del bucket (lote, calibre dominante) si existen.
+          // barPt/linePt.dataIndex=0 es el slot sintético → ignorar.
+          const metaIdx = ((barPt?.dataIndex ?? linePt?.dataIndex ?? 0) - 1)
+          const metaBucket = metaIdx >= 0 ? buckets[metaIdx] : undefined
+          if (metaBucket?.lot) {
+            lines.push(`<span style="color:#8b5cf6">📦</span> Lote: <b>${metaBucket.lot}</b>`)
+          }
+          if (metaBucket?.dominantCalibre) {
+            lines.push(`<span style="color:#6366f1">📏</span> Calibre: ${metaBucket.dominantCalibre}`)
+          }
           for (const sp of scatterPts) {
             const v = Array.isArray(sp.value) ? sp.value[1] : sp.value
             lines.push(`<span style="color:${sp.color}">●</span> ${sp.seriesName}: ${v}g`)
@@ -370,10 +437,15 @@ export function ShiftTimelineView({
               ...uploadLines,
               ...actionLines,
               ...configChangeLines,
+              ...lotChangeLines,
               ...shiftMarkLines,
               ...thresholdLines,
             ],
           },
+          markArea: deadTimeAreas.length > 0 ? {
+            silent: true,
+            data: deadTimeAreas,
+          } : undefined,
         },
         // Una serie scatter por cada causa seleccionada (multi-select)
         ...causesArr.map(cause => {

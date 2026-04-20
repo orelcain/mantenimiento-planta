@@ -687,6 +687,16 @@ Si se necesita re-procesar o corregir algo, usar `scripts/iter18-full-season-reb
 
 ## Pendientes priorizados
 
+### P0 — ✅ COMPLETADO sesión 2026-04-19 (v2.132.0 — enrichment full columns)
+- ✅ **Script reclassify amplio**: parser extrae Lote + Conservación + Producto + Turno A/B (además de Calidad + Calibre ya existentes)
+- ✅ **`computeEnrichment()`** agrega por minuto (`bucketExtrasByMinute`) y por turno (`lotsInShift`, `calidadBreakdown`, `productoBreakdown`, `conservacionBreakdown`)
+- ✅ **Reprocesamiento 383 turnos** — 0 errores en 11.3 min (updates individuales secuenciales — batch hacía DEADLINE_EXCEEDED con bucketExtrasByMinute grande)
+- ✅ **Timeline**: tiempos muertos 2 tiers (Pausa naranja 8-30min + Colación azul >30min, ejercicios 3-8min ocultos por ser ruido)
+- ✅ **Timeline**: markLine 📦 morado en cambios de lote dominante entre minutos consecutivos
+- ✅ **Tooltip timeline** enriquecido con 📦 Lote + 📏 Calibre del bucket
+- ✅ **`ShiftBreakdownsCard.tsx`** (nuevo): card con 4 columnas Lotes/Calidad/Producto/Conservación, backward compat (null si data vacía)
+- ✅ **Badge Turno A/B** en header del turno (rotación día/noche inferida por mayoría en columna Turno del Excel)
+
 ### P0 — ✅ COMPLETADO iter 19 (Grader PeriodView)
 - ✅ **Drill-down hourly**: `hourlyFiltered` + `hourlyChartData` cuando zoom ≤ 2 días (GraderPeriodView L149-296). Implementado en iter 18.1.
 - ✅ **KPIs dinámicos según zoom**: `visibleStats` recalculado via `computeStatsFromSummaries(visibleSummaries)` (L130-142). KPI cards usan `visibleStats`.

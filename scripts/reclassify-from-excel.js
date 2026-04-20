@@ -201,6 +201,10 @@ function parseXlsx(filePath) {
   const iQuality= col(colMap, 'calidad', 'quality')
   const iCalibre= col(colMap, 'calibre', 'size', 'tamano')
   const iError  = col(colMap, 'error', 'motivo', 'causa', 'reason')
+  const iTurno  = col(colMap, 'turno', 'shift', 'turno de produccion')
+  const iLot    = col(colMap, 'lote', 'folio', 'lot', 'batch')
+  const iConserv= col(colMap, 'conservacion', 'conservación', 'conservation')
+  const iProd   = col(colMap, 'producto', 'product', 'tipo producto')
 
   const records = []
   for (let r = info.rowIndex + 1; r < rows.length; r++) {
@@ -215,6 +219,13 @@ function parseXlsx(filePath) {
       : 0
     const weightG = iWeightG != null ? parseNum(row[iWeightG]) : undefined
     const weightKg = iWeight != null ? parseNum(row[iWeight]) : undefined
+    // Normalizar Turno A/B: "Turno A", "turno a", "A" → 'A'
+    let shift
+    if (iTurno != null && row[iTurno] != null) {
+      const raw = String(row[iTurno]).trim().toUpperCase()
+      if (raw.includes('A')) shift = 'A'
+      else if (raw.includes('B')) shift = 'B'
+    }
     records.push({
       ts, gate, pieces,
       weightKg:            weightKg,
@@ -222,6 +233,10 @@ function parseXlsx(filePath) {
       quality: iQuality != null && row[iQuality] != null ? String(row[iQuality]).trim() || undefined : undefined,
       calibre: normalizeCalibre(iCalibre != null ? row[iCalibre] : null),
       error:   iError   != null && row[iError]   != null ? String(row[iError]).trim()   || undefined : undefined,
+      shift,
+      lot:     iLot     != null && row[iLot]     != null ? String(row[iLot]).trim()     || undefined : undefined,
+      conservacion: iConserv != null && row[iConserv] != null ? String(row[iConserv]).trim().toUpperCase() || undefined : undefined,
+      producto:     iProd    != null && row[iProd]    != null ? String(row[iProd]).trim().toUpperCase()    || undefined : undefined,
     })
   }
   return { kind, records }
@@ -315,6 +330,136 @@ function classifyRecord(record, activeGates) {
   if (!gateForWeight) return 'fuera_de_limites'
   if (record.quality && gateForWeight.assignedQuality !== record.quality) return 'fuera_de_calidad'
   return 'fuera_de_limites'
+}
+
+// ─── computeEnrichment: agrega TODAS las dimensiones por minuto y por turno ──
+// Se alimenta de los records PP (pieza-pieza) y P0 (puerta 0) del turno.
+// Devuelve:
+//   bucketExtrasByMinute: { [tsMin]: { lot, dominantCalibre, weightMinGrams,
+//     weightMaxGrams, weightP50Grams, gateCounts, qualityCounts, productCounts,
+//     conservacionCounts } }
+//   lotsInShift: [{ lot, pieces, pct }]
+//   calidadBreakdown, productoBreakdown, conservacionBreakdown: { [key]: pieces }
+function truncateToMinute(ts) {
+  // "2026-02-24T09:16:45.000Z" → "2026-02-24T09:16:00.000Z"
+  return ts.slice(0, 16) + ':00.000Z'
+}
+
+function dominantKey(map) {
+  let max = 0, key
+  for (const [k, v] of map) {
+    if (v > max) { max = v; key = k }
+  }
+  return key
+}
+
+function computeEnrichment(ppRecords, p0Records) {
+  const all = [...(ppRecords || []), ...(p0Records || [])]
+  const perMinute = new Map()
+
+  const getBucket = (tsMin) => {
+    if (!perMinute.has(tsMin)) {
+      perMinute.set(tsMin, {
+        lots: new Map(),
+        calibres: new Map(),
+        qualities: new Map(),
+        products: new Map(),
+        conservaciones: new Map(),
+        gateCounts: new Map(),
+        weightsG: [],
+      })
+    }
+    return perMinute.get(tsMin)
+  }
+
+  const addToMap = (m, k, n) => {
+    if (!k) return
+    m.set(k, (m.get(k) || 0) + n)
+  }
+
+  for (const r of all) {
+    if (!r.ts) continue
+    const tsMin = truncateToMinute(r.ts)
+    const b = getBucket(tsMin)
+    const n = r.pieces || 1
+    addToMap(b.lots, r.lot, n)
+    addToMap(b.calibres, r.calibre, n)
+    addToMap(b.qualities, r.quality, n)
+    addToMap(b.products, r.producto, n)
+    addToMap(b.conservaciones, r.conservacion, n)
+    if (r.gate != null && r.gate >= 1 && r.gate <= 12) {
+      addToMap(b.gateCounts, String(r.gate), n)
+    }
+    const wG = r.weightPerPieceGrams != null
+      ? r.weightPerPieceGrams
+      : r.weightKg != null ? r.weightKg * 1000 : null
+    if (wG != null && wG > 200 && wG < 8000) b.weightsG.push(wG)
+  }
+
+  // Reduce cada minuto a forma compacta
+  const bucketExtrasByMinute = {}
+  for (const [tsMin, b] of perMinute) {
+    const extras = {}
+    const lot = dominantKey(b.lots)
+    if (lot) extras.lot = lot
+    const cal = dominantKey(b.calibres)
+    if (cal) extras.dominantCalibre = cal
+    if (b.gateCounts.size > 0) {
+      extras.gateCounts = {}
+      for (const [k, v] of b.gateCounts) extras.gateCounts[k] = v
+    }
+    if (b.qualities.size > 0) {
+      extras.qualityCounts = {}
+      for (const [k, v] of b.qualities) extras.qualityCounts[k] = v
+    }
+    if (b.products.size > 0) {
+      extras.productCounts = {}
+      for (const [k, v] of b.products) extras.productCounts[k] = v
+    }
+    if (b.conservaciones.size > 0) {
+      extras.conservacionCounts = {}
+      for (const [k, v] of b.conservaciones) extras.conservacionCounts[k] = v
+    }
+    if (b.weightsG.length > 0) {
+      const sorted = [...b.weightsG].sort((x, y) => x - y)
+      extras.weightMinGrams = Math.round(sorted[0])
+      extras.weightMaxGrams = Math.round(sorted[sorted.length - 1])
+      extras.weightP50Grams = Math.round(sorted[Math.floor(sorted.length / 2)])
+    }
+    bucketExtrasByMinute[tsMin] = extras
+  }
+
+  // Agregaciones a nivel turno
+  const lotTotals = new Map()
+  const calidadBreakdown = {}
+  const productoBreakdown = {}
+  const conservacionBreakdown = {}
+  let totalShiftPieces = 0
+
+  for (const r of all) {
+    const n = r.pieces || 1
+    totalShiftPieces += n
+    if (r.lot) lotTotals.set(r.lot, (lotTotals.get(r.lot) || 0) + n)
+    if (r.quality) calidadBreakdown[r.quality] = (calidadBreakdown[r.quality] || 0) + n
+    if (r.producto) productoBreakdown[r.producto] = (productoBreakdown[r.producto] || 0) + n
+    if (r.conservacion) conservacionBreakdown[r.conservacion] = (conservacionBreakdown[r.conservacion] || 0) + n
+  }
+
+  const lotsInShift = [...lotTotals.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([lot, pieces]) => ({
+      lot,
+      pieces,
+      pct: totalShiftPieces > 0 ? +((pieces / totalShiftPieces) * 100).toFixed(2) : 0,
+    }))
+
+  return {
+    bucketExtrasByMinute,
+    lotsInShift,
+    calidadBreakdown,
+    productoBreakdown,
+    conservacionBreakdown,
+  }
 }
 
 // ─── Cache en disco para byShift (evita reparsear Excel cada corrida) ────────
@@ -441,11 +586,7 @@ async function main() {
   // 3) Reclasificar cada turno
   let ok = 0, sinP0 = 0, sinDatos = 0, errors = 0
   const start = Date.now()
-  const WRITE_BATCH_SIZE = 400  // límite Firestore batch
-
-  // Acumular writes para batch commit
-  let batch = db.batch()
-  let batchCount = 0
+  let firstError = null
 
   for (let i = 0; i < summaries.length; i++) {
     const { id } = summaries[i]
@@ -480,36 +621,50 @@ async function main() {
         .sort((a, b) => b[1] - a[1])
         .map(([error, pieces]) => ({ error, pieces, pct: totalG0 > 0 ? +((pieces/totalG0)*100).toFixed(2) : 0 }))
 
+      // Inferir turnoLabel (A/B) desde columna "Turno" del Excel PP.
+      // Mayoría de los registros del turno determinan el label.
+      let turnoLabel
+      const turnoCountA = productive.filter(r => r.shift === 'A').length
+      const turnoCountB = productive.filter(r => r.shift === 'B').length
+      if (turnoCountA > 0 || turnoCountB > 0) {
+        turnoLabel = turnoCountA >= turnoCountB ? 'A' : 'B'
+      }
+
+      // Enrichment: extras por minuto + breakdowns por turno (todas las columnas)
+      const enrichment = computeEnrichment(data.pp, data.p0)
+
       if (!DRY_RUN) {
         const ref = db.collection('graderDailySummaries').doc(id)
         // Actualizar pointZeroPieces y pointZeroPct (fields reales del summary)
         // para que matcheen con la suma de topP0Causes
         const totalPieces = (data.pp || []).reduce((s, r) => s + r.pieces, 0)
         const pointZeroPct = totalPieces > 0 ? +((totalG0 / totalPieces) * 100).toFixed(2) : 0
-        batch.update(ref, {
+        const updateData = {
           topP0Causes,
           pointZeroPieces: totalG0,
           pointZeroPct,
           reclassifiedAt: new Date().toISOString(),
-        })
-        batchCount++
-        // Commit cada 400 docs (límite Firestore)
-        if (batchCount >= WRITE_BATCH_SIZE) {
-          await batch.commit()
-          batch = db.batch()
-          batchCount = 0
+          bucketExtrasByMinute: enrichment.bucketExtrasByMinute,
+          lotsInShift: enrichment.lotsInShift,
+          calidadBreakdown: enrichment.calidadBreakdown,
+          productoBreakdown: enrichment.productoBreakdown,
+          conservacionBreakdown: enrichment.conservacionBreakdown,
         }
+        if (turnoLabel) updateData.turnoLabel = turnoLabel
+        // Update individual secuencial — más lento que batch pero sin riesgo
+        // de payload explosivo. El bucketExtrasByMinute puede ser grande (~10-40KB
+        // por turno × 500 entradas/minuto) y agrupar 25 en un batch llega al
+        // límite de gRPC (60s) o al cap de request size.
+        await ref.update(updateData)
       }
       ok++
     } catch (e) {
       errors++
+      if (!firstError) { firstError = e; console.log('\nPrimer error:', e?.message || String(e)) }
     }
 
     process.stdout.write(`\r  ${i+1}/${summaries.length} — ✅${ok} ⏭️${sinP0} ❌${errors} — ${((Date.now()-start)/1000).toFixed(1)}s  `)
   }
-
-  // Commit final
-  if (!DRY_RUN && batchCount > 0) await batch.commit()
 
   console.log('\n')
   console.log(`✅ ${ok} reclasificados`)

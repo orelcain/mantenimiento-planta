@@ -526,6 +526,10 @@ export interface GraderModuleConfig {
   shiftSchedule?: GraderShiftSchedule[];
   /** Configuración física de la máquina grader */
   physicalConfig?: GraderPhysicalConfig;
+  /** Umbral de alerta P0% (línea amarilla en timeline). Default 2. */
+  alertThreshold?: number;
+  /** Umbral crítico P0% (línea roja en timeline). Default 3.5. */
+  criticalThreshold?: number;
   updatedBy: string;
   updatedAt: string;
 }
@@ -575,6 +579,35 @@ export interface GraderDailySummary {
   sourceFileNames?: string[];
   /** ID del lote de carga masiva que generó este resumen */
   batchUploadId?: string;
+  /**
+   * Turno de producción leído directo de la columna "Turno" del Excel PP.
+   * 'A' = Turno A, 'B' = Turno B. Rotan día/noche según temporada.
+   */
+  turnoLabel?: 'A' | 'B';
+  /**
+   * Extras por minuto poblados por el script de reclassify-from-excel.
+   * Merge sobre timelineBuckets en el cliente para enriquecer la UI sin
+   * reescribir el array existente. Clave: tsMin ISO ("YYYY-MM-DDTHH:MM:00.000Z").
+   */
+  bucketExtrasByMinute?: Record<string, {
+    lot?: string;
+    dominantCalibre?: string;
+    weightMinGrams?: number;
+    weightMaxGrams?: number;
+    weightP50Grams?: number;
+    gateCounts?: Record<string, number>;
+    qualityCounts?: Record<string, number>;
+    productCounts?: Record<string, number>;
+    conservacionCounts?: Record<string, number>;
+  }>;
+  /** Lotes del turno ordenados por volumen. Soporta timeline + análisis. */
+  lotsInShift?: Array<{ lot: string; pieces: number; pct: number }>;
+  /** Mix de calidad ({Premium: X, Industrial: Y, 'CALIDAD D': Z}). */
+  calidadBreakdown?: Record<string, number>;
+  /** Mix de producto ({HG: X, 'DESTINO FILETE': Y}). */
+  productoBreakdown?: Record<string, number>;
+  /** Mix de conservación ({CONGELADO: X, FRESCO: Y}). */
+  conservacionBreakdown?: Record<string, number>;
   /** Si el segmento contiene registros PIEZA_PIEZA (para indicador de completitud) */
   hasPieceData?: boolean;
   /** Si el segmento contiene registros PUERTA_0 (para indicador de completitud) */

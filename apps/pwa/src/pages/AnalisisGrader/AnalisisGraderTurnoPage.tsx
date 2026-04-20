@@ -12,6 +12,7 @@ import { Button, Card, CardContent, Spinner, Badge } from '@/components/ui'
 import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { usePermissionsStore } from '@/store'
 import { getDailySummary, loadTimelineAggregates, listDailySummariesByRange, listGate0PieceRecords, type FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
+import { getModuleRanges } from '@/services/grader/graderModuleConfig.service'
 import { listSnapshots, type GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
 import { getShiftDoc } from '@/services/grader/graderShifts.service'
 import { computeShiftTimeWindow } from '@/services/grader/graderShiftStatus'
@@ -21,6 +22,7 @@ import { parseMatrixErrorString } from '@/services/grader/graderMatrixP0Causes'
 import { HeroScorecard } from '@/components/grader/HeroScorecard'
 import { P0CausesPanel } from '@/components/grader/P0CausesPanel'
 import { ShiftTimelineView } from '@/components/grader/ShiftTimelineView'
+import { ShiftBreakdownsCard } from '@/components/grader/ShiftBreakdownsCard'
 import { ConfigChangeHistory } from '@/components/grader/ConfigChangeHistory'
 import { ActionPlanPanel, deriveSuggestions } from '@/components/grader/ActionPlanPanel'
 import { findTriggeredRunbooks } from '@/services/grader/graderRunbooks'
@@ -147,6 +149,8 @@ export function AnalisisGraderTurnoPage() {
   const [selectedCauses, setSelectedCauses] = useState<Set<MatrixP0Cause>>(new Set())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [alertThreshold, setAlertThreshold] = useState(2)
+  const [criticalThreshold, setCriticalThreshold] = useState(3.5)
 
   // ── IA (FASE 16) ─────────────────────────────────────────────────────────
   const [aiOutput, setAiOutput] = useState<AIGraderOutput | null>(null)
@@ -157,6 +161,35 @@ export function AnalisisGraderTurnoPage() {
   useEffect(() => {
     loadSeasonBenchmark('2025-2026').then(setBenchmark).catch(() => setBenchmark(null))
   }, [])
+
+  useEffect(() => {
+    getModuleRanges().then(cfg => {
+      if (cfg?.alertThreshold) setAlertThreshold(cfg.alertThreshold)
+      if (cfg?.criticalThreshold) setCriticalThreshold(cfg.criticalThreshold)
+    }).catch(() => {})
+  }, [])
+
+  // Merge timelineBuckets con bucketExtrasByMinute (script reclassify) —
+  // campos que el segmenter viejo no guardó (lot, dominantCalibre, etc.)
+  // se llenan desde el extras object. Campos presentes en el bucket original
+  // tienen precedencia.
+  const enrichedTimelineBuckets = useMemo(() => {
+    const extras = summary?.bucketExtrasByMinute
+    if (!extras || timelineBuckets.length === 0) return timelineBuckets
+    return timelineBuckets.map(b => {
+      const ex = extras[b.tsMin]
+      if (!ex) return b
+      return {
+        ...b,
+        lot: b.lot ?? ex.lot,
+        dominantCalibre: b.dominantCalibre ?? ex.dominantCalibre,
+        weightMinGrams: b.weightMinGrams ?? ex.weightMinGrams,
+        weightMaxGrams: b.weightMaxGrams ?? ex.weightMaxGrams,
+        weightP50Grams: b.weightP50Grams ?? ex.weightP50Grams,
+        gateCounts: b.gateCounts ?? ex.gateCounts,
+      }
+    })
+  }, [timelineBuckets, summary?.bucketExtrasByMinute])
 
   // ── Navegación contextual prev/next ─────────────────────────────────────
   // Carga shifts del rango ±20 días para construir cadena de navegación
@@ -391,6 +424,15 @@ export function AnalisisGraderTurnoPage() {
               <span className="text-sm text-muted-foreground truncate">
                 {dateLabel}
               </span>
+              {summary?.turnoLabel && (
+                <Badge
+                  variant="outline"
+                  className="text-[10px] px-1.5 py-0 shrink-0 border-violet-500/40 text-violet-400"
+                  title="Turno de producción (columna Turno del Excel)"
+                >
+                  Turno {summary.turnoLabel}
+                </Badge>
+              )}
               {shiftWindow && (
                 <Badge
                   variant="outline"
@@ -508,7 +550,7 @@ export function AnalisisGraderTurnoPage() {
 
           {/* Timeline — full width */}
           <ShiftTimelineView
-            timelineBuckets={timelineBuckets}
+            timelineBuckets={enrichedTimelineBuckets}
             shiftDoc={shiftDoc}
             shiftWindow={shiftWindow}
             configSnapshots={configSnapshots}
@@ -516,13 +558,23 @@ export function AnalisisGraderTurnoPage() {
             selectedCauses={selectedCauses}
             onClearSelectedCauses={() => setSelectedCauses(new Set())}
             summaryP0Pct={summary.pointZeroPct}
+            alertThreshold={alertThreshold}
+            criticalThreshold={criticalThreshold}
+          />
+
+          {/* Composición del turno (lotes + calidad + producto + conservación) */}
+          <ShiftBreakdownsCard
+            lotsInShift={summary.lotsInShift}
+            calidadBreakdown={summary.calidadBreakdown}
+            productoBreakdown={summary.productoBreakdown}
+            conservacionBreakdown={summary.conservacionBreakdown}
           />
 
           {/* Historial de cambios de configuración del turno */}
           <ConfigChangeHistory
             shiftDocId={`${dateKey}__${shiftLabel}`}
             snapshots={configSnapshots}
-            timelineBuckets={timelineBuckets}
+            timelineBuckets={enrichedTimelineBuckets}
             onChange={reloadConfigSnapshots}
           />
 
