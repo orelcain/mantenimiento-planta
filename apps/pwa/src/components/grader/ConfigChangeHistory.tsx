@@ -16,7 +16,7 @@
  */
 
 import { useMemo } from 'react'
-import { Wrench, Sparkles, User, Clock } from 'lucide-react'
+import { Wrench, Sparkles, User, Clock, AlertTriangle } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, Badge } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { QuickGateChangeButton } from './QuickGateChangeButton'
@@ -82,6 +82,17 @@ function ConfigChangeRow({ snap, isFirst }: RowProps) {
       ? 'Config inicial del turno'
       : `${grouped.size} ${grouped.size === 1 ? 'gate cambiada' : 'gates cambiadas'}`
 
+  // Para snapshots synthetic: si el reason indica N ventanas detectadas (N>=2),
+  // significa que el sistema infirió múltiples cambios intra-turno que el operador
+  // no registró en su momento. Mostramos badge sutil que invita a revisar.
+  const undetectedChanges = useMemo(() => {
+    if (!isSynthetic || !snap.reason) return 0
+    const m = snap.reason.match(/\((\d+)\s*ventanas?\s+detectadas/i)
+    if (!m || !m[1]) return 0
+    const n = parseInt(m[1], 10)
+    return n >= 2 ? n - 1 : 0  // N ventanas → N-1 transiciones (cambios)
+  }, [isSynthetic, snap.reason])
+
   return (
     <li className="flex items-start gap-3 py-2.5 border-b border-border/40 last:border-b-0">
       {/* Indicador timeline lateral */}
@@ -112,6 +123,15 @@ function ConfigChangeRow({ snap, isFirst }: RowProps) {
             <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
               <User className="w-2.5 h-2.5" />
               {snap.changedBy.name}
+            </span>
+          )}
+          {undetectedChanges > 0 && (
+            <span
+              className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 font-medium"
+              title={`El sistema detectó ~${undetectedChanges} transiciones de configuración durante el turno que no fueron registradas en tiempo real. Si recordás los cambios reales (qué gate, qué hora), registralos manualmente con el botón "Cambiar gate" para que el análisis segmentado los reconozca.`}
+            >
+              <AlertTriangle className="w-2.5 h-2.5" />
+              ~{undetectedChanges} {undetectedChanges === 1 ? 'cambio' : 'cambios'} no registrados
             </span>
           )}
         </div>
