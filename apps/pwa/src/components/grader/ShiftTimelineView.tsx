@@ -114,7 +114,17 @@ export function ShiftTimelineView({
   const chartOption = useMemo(() => {
     const buckets = timelineBuckets.filter(b => b.pieces > 0)
     const times = buckets.map(b => fmtTime(b.tsMin))
+    // P0% por minuto (instantáneo) — para barras de fondo (dónde hubo picos)
     const p0Pcts = buckets.map(b => b.pieces > 0 ? +((b.p0Pieces / b.pieces) * 100).toFixed(1) : 0)
+    // P0% acumulado del turno hasta ese minuto inclusive — para línea principal.
+    // Termina exactamente en summary.pointZeroPct (promedio ponderado del turno).
+    const cumulativeP0Pcts: number[] = []
+    let cumPieces = 0, cumP0 = 0
+    for (const b of buckets) {
+      cumPieces += b.pieces
+      cumP0     += b.p0Pieces
+      cumulativeP0Pcts.push(cumPieces > 0 ? +((cumP0 / cumPieces) * 100).toFixed(2) : 0)
+    }
 
     // Checkpoints como markLine
     const uploadLines = (shiftDoc?.uploads ?? []).map(u => ({
@@ -175,20 +185,25 @@ export function ShiftTimelineView({
         type: 'category' as const,
         data: times,
         axisLine: { lineStyle: { color: '#374151' } },
-        axisLabel: { color: '#6b7280', fontSize: 10, interval: Math.floor(times.length / 8) },
+        // 'auto' deja que ECharts calcule el interval según el espacio visible
+        // tras zoom — antes se calculaba con times.length total y al hacer zoom
+        // quedaba 1 sola etiqueta visible.
+        axisLabel: { color: '#6b7280', fontSize: 10, hideOverlap: true },
       },
       yAxis: [
         (() => {
-          // Escala dinámica: techo = max(10, p98 + 20%) para que la línea se lea
-          // bien cuando el P0% es bajo, sin que outliers iniciales (turnos
-          // arrancando con 100% si sólo hubo 1 pieza) aplasten todo el chart.
-          const sorted = [...p0Pcts].filter(v => v > 0).sort((a, b) => a - b)
-          const p98 = sorted.length > 0
-            ? (sorted[Math.floor(sorted.length * 0.98)] ?? sorted[sorted.length - 1] ?? 10)
+          // Escala dinámica basada en el max del acumulado + headroom para
+          // los picos del minuto. Como el acumulado converge (~6% típico) y los
+          // picos pueden ser >30%, mostramos el max necesario sin que ninguno
+          // se salga, pero dando peso visual al acumulado (lo importante).
+          const maxCum    = Math.max(...cumulativeP0Pcts, 0)
+          const sortedIns = [...p0Pcts].filter(v => v > 0).sort((a, b) => a - b)
+          const p90Ins    = sortedIns.length > 0
+            ? (sortedIns[Math.floor(sortedIns.length * 0.90)] ?? sortedIns[sortedIns.length - 1] ?? 10)
             : 10
-          const max = Math.max(10, Math.ceil(p98 * 1.2 / 5) * 5)
-          // Interval uniforme (cada 2/5/10 según el max), evita ticks erráticos
-          // tipo "0, 10, 15, 20" que ECharts a veces produce con auto-tick.
+          // Techo: el mayor entre 2× acumulado y p90 instantáneo + 20%
+          const ceilCandidate = Math.max(maxCum * 2, p90Ins * 1.2, 10)
+          const max = Math.ceil(ceilCandidate / 5) * 5
           const interval = max <= 10 ? 2 : max <= 30 ? 5 : 10
           return {
             type: 'value' as const,
@@ -219,11 +234,13 @@ export function ShiftTimelineView({
         formatter: (params: unknown[]) => {
           if (!Array.isArray(params) || params.length === 0) return ''
           const arr = params as Array<{ name: string; value: number | [string, number]; seriesName: string; seriesType: string; dataIndex: number; color?: string }>
-          const linePt = arr.find(p => p.seriesType === 'line')
+          const linePt    = arr.find(p => p.seriesType === 'line')
+          const barPt     = arr.find(p => p.seriesType === 'bar')
           const scatterPts = arr.filter(p => p.seriesType === 'scatter')
-          const time = linePt?.name ?? (Array.isArray(scatterPts[0]?.value) ? scatterPts[0].value[0] : '')
+          const time = linePt?.name ?? barPt?.name ?? (Array.isArray(scatterPts[0]?.value) ? scatterPts[0].value[0] : '')
           const lines: string[] = [time]
-          if (linePt) lines.push(`P0: <b>${linePt.value}%</b>`)
+          if (linePt) lines.push(`<span style="color:#ef4444">━</span> Acumulado: <b>${linePt.value}%</b>`)
+          if (barPt)  lines.push(`<span style="color:#94a3b8">▮</span> Este minuto: <b>${barPt.value}%</b>`)
           for (const sp of scatterPts) {
             const v = Array.isArray(sp.value) ? sp.value[1] : sp.value
             lines.push(`<span style="color:${sp.color}">●</span> ${sp.seriesName}: ${v}g`)
@@ -232,16 +249,31 @@ export function ShiftTimelineView({
         },
       },
       series: [
+        // Barras tenues — P0% por minuto (instantáneo). Muestra cuándo hubo
+        // picos malos sin saturar la lectura.
         {
-          name: 'P0%',
-          type: 'line' as const,
+          name: 'P0% por minuto',
+          type: 'bar' as const,
           yAxisIndex: 0,
           data: p0Pcts,
+          itemStyle: { color: 'rgba(148, 163, 184, 0.35)' },  // slate-400 con opacidad
+          emphasis: { itemStyle: { color: 'rgba(148, 163, 184, 0.6)' } },
+          barMaxWidth: 4,
+          z: 1,
+        },
+        // Línea principal — P0% acumulado del turno. Termina en summary.pointZeroPct.
+        // Es la "salud" del turno: pendiente hacia arriba = empeorando, abajo = mejorando.
+        {
+          name: 'P0% acumulado',
+          type: 'line' as const,
+          yAxisIndex: 0,
+          data: cumulativeP0Pcts,
           smooth: true,
-          lineStyle: { color: '#ef4444', width: 2 },
+          lineStyle: { color: '#ef4444', width: 2.5 },
           areaStyle: { color: { type: 'linear' as const, x: 0, y: 0, x2: 0, y2: 1,
-            colorStops: [{ offset: 0, color: 'rgba(239,68,68,0.25)' }, { offset: 1, color: 'rgba(239,68,68,0)' }] } },
+            colorStops: [{ offset: 0, color: 'rgba(239,68,68,0.20)' }, { offset: 1, color: 'rgba(239,68,68,0)' }] } },
           symbol: 'none',
+          z: 3,
           markLine: {
             silent: false,
             animation: false,
