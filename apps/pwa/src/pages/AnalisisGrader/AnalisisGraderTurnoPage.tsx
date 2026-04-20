@@ -515,6 +515,7 @@ export function AnalisisGraderTurnoPage() {
             gate0Pieces={gate0Pieces}
             selectedCauses={selectedCauses}
             onClearSelectedCauses={() => setSelectedCauses(new Set())}
+            summaryP0Pct={summary.pointZeroPct}
           />
 
           {/* Historial de cambios de configuración del turno */}

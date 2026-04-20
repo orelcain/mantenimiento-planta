@@ -19,7 +19,7 @@ import type { GraderShiftDoc } from '@/services/grader/graderShifts.service'
 import type { ShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import type { GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
 import type { FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
-import { MATRIX_P0_CAUSES } from '@/services/grader/graderMatrixP0Causes'
+import { MATRIX_P0_CAUSES, parseMatrixErrorString } from '@/services/grader/graderMatrixP0Causes'
 import { classifyRecordToMatrix, CALIBRE_WEIGHT_RANGES } from '@/services/grader/graderAnalytics'
 
 interface ShiftTimelineViewProps {
@@ -34,6 +34,11 @@ interface ShiftTimelineViewProps {
   selectedCauses?: Set<MatrixP0Cause>
   /** Callback para limpiar todas las selecciones desde el badge */
   onClearSelectedCauses?: () => void
+  /** P0% final del turno (summary.pointZeroPct) — color de línea según verdict */
+  summaryP0Pct?: number
+  /** Umbrales para semáforo y líneas horizontales (defaults 2% / 3.5%) */
+  alertThreshold?: number
+  criticalThreshold?: number
 }
 
 function fmtTime(iso: string): string {
@@ -87,6 +92,9 @@ function classifyPiece(piece: FirestorePieceRecord, configSnapshots?: GateConfig
 export function ShiftTimelineView({
   timelineBuckets, shiftDoc, shiftWindow, configSnapshots,
   gate0Pieces, selectedCauses, onClearSelectedCauses,
+  summaryP0Pct,
+  alertThreshold = 2,
+  criticalThreshold = 3.5,
 }: ShiftTimelineViewProps) {
   const causesArr = useMemo(() => [...(selectedCauses ?? new Set<MatrixP0Cause>())], [selectedCauses])
   const hasSelection = causesArr.length > 0
@@ -114,8 +122,8 @@ export function ShiftTimelineView({
   const chartOption = useMemo(() => {
     const buckets = timelineBuckets.filter(b => b.pieces > 0)
     const times = buckets.map(b => fmtTime(b.tsMin))
-    // P0% por minuto (instantáneo) — para barras de fondo (dónde hubo picos)
-    const p0Pcts = buckets.map(b => b.pieces > 0 ? +((b.p0Pieces / b.pieces) * 100).toFixed(1) : 0)
+    // CANTIDAD de piezas P0 por minuto — para barras (más intuitivo que %)
+    const p0PiecesByBucket = buckets.map(b => b.p0Pieces ?? 0)
     // P0% acumulado del turno hasta ese minuto inclusive — para línea principal.
     // Termina exactamente en summary.pointZeroPct (promedio ponderado del turno).
     const cumulativeP0Pcts: number[] = []
@@ -125,6 +133,63 @@ export function ShiftTimelineView({
       cumP0     += b.p0Pieces
       cumulativeP0Pcts.push(cumPieces > 0 ? +((cumP0 / cumPieces) * 100).toFixed(2) : 0)
     }
+
+    // Punto inicial sintético en (shiftStart, 0%) para que la línea arranque
+    // desde 0 — antes empezaba en el % del primer bucket (a veces 15-30%).
+    const lineTimes  = [fmtTime(shiftWindow.startAt), ...times]
+    const lineValues = [0, ...cumulativeP0Pcts]
+
+    // Desglose por minuto: cuántas pzs P0 de cada causa hubo en ese minuto.
+    // Map<minuteKey, Map<MatrixP0Cause, count>>
+    const breakdownByMinute = new Map<string, Map<MatrixP0Cause, number>>()
+    if (gate0Pieces && gate0Pieces.length > 0) {
+      for (const p of gate0Pieces) {
+        const minuteKey = fmtTime(p.ts)
+        const cause = parseMatrixErrorString(p.error ?? '')
+        if (!breakdownByMinute.has(minuteKey)) breakdownByMinute.set(minuteKey, new Map())
+        const m = breakdownByMinute.get(minuteKey)!
+        m.set(cause, (m.get(cause) ?? 0) + (p.pieces ?? 1))
+      }
+    }
+
+    // Color de línea según verdict del turno (mismo semáforo que calendario)
+    const lineColor = summaryP0Pct == null
+      ? '#ef4444'
+      : summaryP0Pct < alertThreshold
+        ? '#10b981'  // emerald — bajo el umbral de alerta
+        : summaryP0Pct <= criticalThreshold
+          ? '#f59e0b'  // amber — entre alerta y crítico
+          : '#ef4444'  // red — sobre crítico
+
+    // Markers verticales del turno configurado (inicio + fin)
+    const shiftMarkLines = [
+      {
+        name: `Inicio turno\n${fmtTime(shiftWindow.startAt)}`,
+        xAxis: fmtTime(shiftWindow.startAt),
+        lineStyle: { color: '#10b981', type: 'solid' as const, width: 1 },
+        label: { show: true, formatter: '▶ Inicio', color: '#10b981', fontSize: 9, position: 'insideStartTop' as const },
+      },
+      {
+        name: `Fin turno\n${fmtTime(shiftWindow.endAt)}`,
+        xAxis: fmtTime(shiftWindow.endAt),
+        lineStyle: { color: '#6b7280', type: 'solid' as const, width: 1 },
+        label: { show: true, formatter: '◀ Fin', color: '#6b7280', fontSize: 9, position: 'insideEndTop' as const },
+      },
+    ]
+
+    // Líneas horizontales en umbrales (visualmente "salud OK / atención / crítico")
+    const thresholdLines = [
+      {
+        yAxis: alertThreshold,
+        lineStyle: { color: '#f59e0b', type: 'dashed' as const, width: 1, opacity: 0.5 },
+        label: { show: true, formatter: `${alertThreshold}% alerta`, color: '#f59e0b', fontSize: 9, position: 'insideEndTop' as const },
+      },
+      {
+        yAxis: criticalThreshold,
+        lineStyle: { color: '#ef4444', type: 'dashed' as const, width: 1, opacity: 0.5 },
+        label: { show: true, formatter: `${criticalThreshold}% crítico`, color: '#ef4444', fontSize: 9, position: 'insideEndTop' as const },
+      },
+    ]
 
     // Checkpoints como markLine
     const uploadLines = (shiftDoc?.uploads ?? []).map(u => ({
@@ -183,26 +248,23 @@ export function ShiftTimelineView({
       ],
       xAxis: {
         type: 'category' as const,
-        data: times,
+        // lineTimes incluye el punto sintético del inicio del turno
+        data: lineTimes,
         axisLine: { lineStyle: { color: '#374151' } },
-        // 'auto' deja que ECharts calcule el interval según el espacio visible
-        // tras zoom — antes se calculaba con times.length total y al hacer zoom
-        // quedaba 1 sola etiqueta visible.
+        // hideOverlap deja que ECharts calcule el interval según el espacio
+        // visible tras zoom — antes calculaba con times.length y al hacer
+        // zoom quedaba 1 sola etiqueta visible.
         axisLabel: { color: '#6b7280', fontSize: 10, hideOverlap: true },
       },
       yAxis: [
         (() => {
-          // Escala dinámica basada en el max del acumulado + headroom para
-          // los picos del minuto. Como el acumulado converge (~6% típico) y los
-          // picos pueden ser >30%, mostramos el max necesario sin que ninguno
-          // se salga, pero dando peso visual al acumulado (lo importante).
-          const maxCum    = Math.max(...cumulativeP0Pcts, 0)
-          const sortedIns = [...p0Pcts].filter(v => v > 0).sort((a, b) => a - b)
-          const p90Ins    = sortedIns.length > 0
-            ? (sortedIns[Math.floor(sortedIns.length * 0.90)] ?? sortedIns[sortedIns.length - 1] ?? 10)
-            : 10
-          // Techo: el mayor entre 2× acumulado y p90 instantáneo + 20%
-          const ceilCandidate = Math.max(maxCum * 2, p90Ins * 1.2, 10)
+          // Escala dinámica para el P0% acumulado.
+          // Mejora: ignoramos buckets con <10 piezas (suelen ser inicio del
+          // turno con 1-2 pzs → ratio errático que aplasta el chart).
+          const stableCum = cumulativeP0Pcts.filter((_, i) => (buckets[i]?.pieces ?? 0) >= 10)
+          const maxCum = stableCum.length > 0 ? Math.max(...stableCum) : 0
+          // Techo: max(acumulado*2, criticalThreshold*2, 10)
+          const ceilCandidate = Math.max(maxCum * 2, criticalThreshold * 2.5, 10)
           const max = Math.ceil(ceilCandidate / 5) * 5
           const interval = max <= 10 ? 2 : max <= 30 ? 5 : 10
           return {
@@ -217,9 +279,22 @@ export function ShiftTimelineView({
           }
         })(),
         {
+          // Eje secundario para barras de cantidad de P0 por minuto
+          type: 'value' as const,
+          name: 'Pzs P0/min',
+          nameTextStyle: { color: '#6b7280', fontSize: 10 },
+          position: 'right' as const,
+          axisLabel: { color: '#6b7280', fontSize: 10 },
+          splitLine: { show: false },
+          min: 0,
+        },
+        {
+          // Eje terciario para scatter del drill-down (peso en gramos)
           type: 'value' as const,
           name: 'Peso (g)',
           nameTextStyle: { color: '#6b7280', fontSize: 10 },
+          position: 'right' as const,
+          offset: 50,
           axisLabel: { color: '#6b7280', fontSize: 10, formatter: '{value} g' },
           splitLine: { show: false },
           min: 0,
@@ -238,9 +313,22 @@ export function ShiftTimelineView({
           const barPt     = arr.find(p => p.seriesType === 'bar')
           const scatterPts = arr.filter(p => p.seriesType === 'scatter')
           const time = linePt?.name ?? barPt?.name ?? (Array.isArray(scatterPts[0]?.value) ? scatterPts[0].value[0] : '')
-          const lines: string[] = [time]
-          if (linePt) lines.push(`<span style="color:#ef4444">━</span> Acumulado: <b>${linePt.value}%</b>`)
-          if (barPt)  lines.push(`<span style="color:#94a3b8">▮</span> Este minuto: <b>${barPt.value}%</b>`)
+          const lines: string[] = [`<b>${time}</b>`]
+          if (linePt) lines.push(`<span style="color:${lineColor}">━</span> Acumulado del turno: <b>${linePt.value}%</b>`)
+          if (barPt) {
+            const piezas = barPt.value as number
+            lines.push(`<span style="color:#94a3b8">▮</span> Este minuto: <b>${piezas} ${piezas === 1 ? 'pza' : 'pzas'} P0</b>`)
+            // Desglose por causa para este minuto
+            const breakdown = breakdownByMinute.get(time)
+            if (breakdown && breakdown.size > 0) {
+              const sortedCauses = [...breakdown.entries()].sort((a, b) => b[1] - a[1])
+              for (const [cause, count] of sortedCauses) {
+                const label = MATRIX_P0_CAUSES[cause]?.label ?? cause
+                const color = CAUSE_HEX[cause] ?? '#94a3b8'
+                lines.push(`&nbsp;&nbsp;<span style="color:${color}">●</span> ${label}: ${count}`)
+              }
+            }
+          }
           for (const sp of scatterPts) {
             const v = Array.isArray(sp.value) ? sp.value[1] : sp.value
             lines.push(`<span style="color:${sp.color}">●</span> ${sp.seriesName}: ${v}g`)
@@ -249,35 +337,42 @@ export function ShiftTimelineView({
         },
       },
       series: [
-        // Barras tenues — P0% por minuto (instantáneo). Muestra cuándo hubo
-        // picos malos sin saturar la lectura.
+        // Barras tenues — CANTIDAD de pzs P0 por minuto (más intuitivo que %).
+        // Eje derecho ("Pzs P0/min"). Tooltip muestra desglose por causa.
+        // Las barras incluyen un slot vacío al inicio (sintético) → null.
         {
-          name: 'P0% por minuto',
+          name: 'Pzs P0/min',
           type: 'bar' as const,
-          yAxisIndex: 0,
-          data: p0Pcts,
-          itemStyle: { color: 'rgba(148, 163, 184, 0.35)' },  // slate-400 con opacidad
-          emphasis: { itemStyle: { color: 'rgba(148, 163, 184, 0.6)' } },
+          yAxisIndex: 1,
+          data: [null, ...p0PiecesByBucket],
+          itemStyle: { color: 'rgba(148, 163, 184, 0.40)' },
+          emphasis: { itemStyle: { color: 'rgba(148, 163, 184, 0.7)' } },
           barMaxWidth: 4,
           z: 1,
         },
-        // Línea principal — P0% acumulado del turno. Termina en summary.pointZeroPct.
-        // Es la "salud" del turno: pendiente hacia arriba = empeorando, abajo = mejorando.
+        // Línea principal — P0% acumulado del turno. Color según verdict
+        // (verde/amber/rojo) consistente con calendario y panel.
         {
           name: 'P0% acumulado',
           type: 'line' as const,
           yAxisIndex: 0,
-          data: cumulativeP0Pcts,
+          data: lineValues,
           smooth: true,
-          lineStyle: { color: '#ef4444', width: 2.5 },
+          lineStyle: { color: lineColor, width: 2.5 },
           areaStyle: { color: { type: 'linear' as const, x: 0, y: 0, x2: 0, y2: 1,
-            colorStops: [{ offset: 0, color: 'rgba(239,68,68,0.20)' }, { offset: 1, color: 'rgba(239,68,68,0)' }] } },
+            colorStops: [{ offset: 0, color: lineColor + '33' }, { offset: 1, color: lineColor + '00' }] } },
           symbol: 'none',
           z: 3,
           markLine: {
             silent: false,
             animation: false,
-            data: [...uploadLines, ...actionLines, ...configChangeLines],
+            data: [
+              ...uploadLines,
+              ...actionLines,
+              ...configChangeLines,
+              ...shiftMarkLines,
+              ...thresholdLines,
+            ],
           },
         },
         // Una serie scatter por cada causa seleccionada (multi-select)
@@ -287,7 +382,7 @@ export function ShiftTimelineView({
           return {
             name: MATRIX_P0_CAUSES[cause].label,
             type: 'scatter' as const,
-            yAxisIndex: 1,
+            yAxisIndex: 2,  // eje terciario "Peso (g)"
             data: pts.map(p => [p.time, p.grams]),
             symbolSize: 6,
             itemStyle: {
@@ -302,7 +397,7 @@ export function ShiftTimelineView({
         }),
       ],
     }
-  }, [timelineBuckets, shiftDoc, configSnapshots, causesArr, piecesByCause, scatterAxisShow])
+  }, [timelineBuckets, shiftDoc, shiftWindow, configSnapshots, causesArr, piecesByCause, scatterAxisShow, gate0Pieces, summaryP0Pct, alertThreshold, criticalThreshold])
 
   // Lista cronológica de checkpoints
   const checkpoints = useMemo(() => {
