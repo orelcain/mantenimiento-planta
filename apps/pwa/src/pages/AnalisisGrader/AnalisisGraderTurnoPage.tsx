@@ -30,6 +30,7 @@ import { ShiftBreakdownsCard } from '@/components/grader/ShiftBreakdownsCard'
 import { GateBreakdownCard } from '@/components/grader/GateBreakdownCard'
 import { ConfigChangeHistory } from '@/components/grader/ConfigChangeHistory'
 import { CurrentGateConfigPanel } from '@/components/grader/CurrentGateConfigPanel'
+import { ShiftGatesConfigAccordion } from '@/components/grader/ShiftGatesConfigAccordion'
 import { ActionPlanPanel, deriveSuggestions } from '@/components/grader/ActionPlanPanel'
 import { findTriggeredRunbooks } from '@/services/grader/graderRunbooks'
 import { analyzeGraderFromSummary } from '@/services/grader/graderSummaryAI'
@@ -664,6 +665,14 @@ export function AnalisisGraderTurnoPage() {
           {configSnapshots.length > 0 && (
             <CurrentGateConfigPanel configSnapshots={configSnapshots} />
           )}
+
+          {/* Acordeón editable de los 12 gates — colapsado por defecto */}
+          <ShiftGatesConfigAccordion
+            shiftDocId={shiftDocId}
+            configSnapshots={configSnapshots}
+            onSaved={reloadConfigSnapshots}
+            allowEdit={shiftWindow?.status === 'live'}
+          />
 
           {/* Historial de cambios de configuración del turno */}
           <ConfigChangeHistory
