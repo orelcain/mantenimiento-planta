@@ -25,9 +25,9 @@ import {
 } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { Loader2 } from 'lucide-react'
-import { GRADER_PAUSE_TAGS } from '@/services/grader/graderPauseTags'
 import type { Pause } from '@/services/grader/types'
 import { updatePauseAnnotation } from '@/services/grader/graderDailySummary.service'
+import { usePauseTags } from '@/hooks/usePauseTags'
 
 interface PauseAnnotationDialogProps {
   open: boolean
@@ -53,6 +53,7 @@ export function PauseAnnotationDialog({
   adminUid,
   onSaved,
 }: PauseAnnotationDialogProps) {
+  const { tags } = usePauseTags()
   const [selectedTagId, setSelectedTagId] = useState<string | null>(null)
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
@@ -134,7 +135,7 @@ export function PauseAnnotationDialog({
           <div className="space-y-2">
             <Label>Motivo</Label>
             <div className="grid grid-cols-1 gap-1.5">
-              {GRADER_PAUSE_TAGS.map((tag) => {
+              {tags.map((tag) => {
                 const isSelected = selectedTagId === tag.id
                 return (
                   <button
