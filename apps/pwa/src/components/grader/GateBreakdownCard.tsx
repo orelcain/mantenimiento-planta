@@ -6,15 +6,8 @@
  *   2. ¿La configuración de gates era apropiada para la composición del turno?
  *   3. ¿Hay gates sobredimensionados que conviene reasignar?
  *
- * El "desequilibrio" entre gates puede ser natural (el turno tuvo 60% de 6-8 lb
- * y eso no es un problema) o estructural (se asignaron 2 gates a un calibre que
- * representó solo 3% del turno, mientras el calibre dominante tenía 4 gates al tope).
- *
- * La métrica clave es el RATIO DE EFICIENCIA por calibre:
- *   ratio = (% producción del calibre) / (% de gates asignados al calibre)
- *   ratio > 1.5  → calibre saturado  (necesita más gates)
- *   0.5–1.5      → calibre óptimo
- *   ratio < 0.5  → calibre sobredimensionado (tiene más gates de los que necesita)
+ * Barra coloreada por STATUS de eficiencia (rojo=saturado, ámbar=sobredim., verde=óptimo).
+ * La calidad sigue visible en el texto. Sugerencias ordenadas por impacto descendente.
  */
 
 import { useMemo, useState } from 'react'
@@ -40,7 +33,6 @@ interface GateBreakdownCardProps {
 // ── Tipos internos ────────────────────────────────────────────────────────────
 
 interface CalibreGroup {
-  /** Label compuesto: "6-8 lb · Premium" */
   label: string
   calibre: string
   quality: string
@@ -54,24 +46,32 @@ interface CalibreGroup {
 
 interface Suggestion {
   fromGate: number
-  fromLabel: string   // "2-4 lb · Premium"
-  toLabel: string     // "6-8 lb · Premium"
+  fromLabel: string
+  toLabel: string
   fromPieces: number
   fromPct: number
   satRatio: number
-  cautela: string     // razón de cautela específica
+  cautela: string
+  impact: number  // fromPieces × satRatio — usado para ordenar
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+// Color de barra por STATUS — no por calidad (calidad queda en el texto)
+const STATUS_BAR_COLOR: Record<CalibreGroup['status'], string> = {
+  saturado:         '#f87171', // red-400
+  optimo:           '#34d399', // emerald-400
+  sobredimensionado:'#fbbf24', // amber-400
+}
+
 const QUALITY_COLOR: Record<string, string> = {
-  premium:    '#6366f1', // indigo
-  superior:   '#10b981', // emerald
-  primera:    '#3b82f6', // blue
-  segunda:    '#f59e0b', // amber
-  tercera:    '#f97316', // orange
-  industrial: '#94a3b8', // slate
-  descarte:   '#ef4444', // red
+  premium:    '#6366f1',
+  superior:   '#10b981',
+  primera:    '#3b82f6',
+  segunda:    '#f59e0b',
+  tercera:    '#f97316',
+  industrial: '#94a3b8',
+  descarte:   '#ef4444',
 }
 
 function qualityColor(q?: string): string {
@@ -106,8 +106,6 @@ function computeAssignmentAnalysis(
     }
   }
 
-  // Agrupar por COMBINACIÓN calibre + calidad — son dimensiones independientes
-  // G3 "6-8 lb · Industrial" y G10 "6-8 lb · Premium" NO son intercambiables
   const byGroup = new Map<string, { calibre: string; quality: string; gates: number[]; pieces: number }>()
 
   for (const row of activeGates) {
@@ -143,7 +141,6 @@ function computeAssignmentAnalysis(
   const saturados = calibreGroups.filter(g => g.status === 'saturado')
   const sobredimensionados = calibreGroups.filter(g => g.status === 'sobredimensionado')
 
-  // Diagnóstico global
   let diagnosis: { label: string; color: string; detail: string }
   if (saturados.length > 0 && sobredimensionados.length > 0) {
     const topSat = saturados[0]!
@@ -167,10 +164,6 @@ function computeAssignmentAnalysis(
     }
   }
 
-  // Sugerencias — solo cuando la calidad del grupo sobredimensionado es compatible
-  // con el grupo saturado (misma calidad o calidad "superior" asignable al destino).
-  // Se emite nota de cautela cuando las calidades difieren: un gate Industrial no
-  // puede recibir producto Premium sin reconfigurar los criterios de aceptación.
   const suggestions: Suggestion[] = []
   const seenPairs = new Set<string>()
 
@@ -183,7 +176,6 @@ function computeAssignmentAnalysis(
       const sameQuality = sobre.quality.toLowerCase() === sat.quality.toLowerCase()
       const sameCalibre = sobre.calibre.toLowerCase() === sat.calibre.toLowerCase()
 
-      // Cautela: si calibre o calidad difieren, el cambio implica reconfiguración
       let cautela = ''
       if (!sameQuality && !sameCalibre) {
         cautela = `Requiere cambiar calibre (${sobre.calibre}→${sat.calibre}) Y calidad (${sobre.quality}→${sat.quality}) — verificar criterios de aceptación`
@@ -195,7 +187,6 @@ function computeAssignmentAnalysis(
         cautela = 'Misma calidad y calibre — cambio directo sin riesgo de reconfiguración'
       }
 
-      // Gate a mover: el menos productivo del grupo sobredimensionado
       const gateToMove = sobre.gates
         .map(g => ({ gate: g, pieces: productiveRows.find(r => r.gate === g)?.pieces ?? 0 }))
         .sort((a, b) => a.pieces - b.pieces)[0]
@@ -213,9 +204,13 @@ function computeAssignmentAnalysis(
         fromPct,
         satRatio: sat.ratio,
         cautela,
+        impact: gateToMove.pieces * sat.ratio,
       })
     }
   }
+
+  // Ordenar por impacto descendente — la sugerencia más valiosa primero
+  suggestions.sort((a, b) => b.impact - a.impact)
 
   return { calibreGroups, diagnosis, suggestions }
 }
@@ -255,14 +250,21 @@ export function GateBreakdownCard({
     [productiveRows, gateConfigMap, totalProductivePieces],
   )
 
-  // Mapa: gateNumber → status del calibre al que pertenece
+  // Mapa gate → status para colorear las barras
   const gateStatusMap = useMemo(() => {
-    const m = new Map<number, 'saturado' | 'optimo' | 'sobredimensionado'>()
+    const m = new Map<number, CalibreGroup['status']>()
     for (const g of calibreGroups) {
       for (const gate of g.gates) m.set(gate, g.status)
     }
     return m
   }, [calibreGroups])
+
+  // Conteo de grupos por status — para el KPI strip
+  const kpi = useMemo(() => ({
+    saturado:         calibreGroups.filter(g => g.status === 'saturado').length,
+    optimo:           calibreGroups.filter(g => g.status === 'optimo').length,
+    sobredimensionado:calibreGroups.filter(g => g.status === 'sobredimensionado').length,
+  }), [calibreGroups])
 
   const activeGates = productiveRows.filter(r => r.pieces > 0).length
 
@@ -291,13 +293,40 @@ export function GateBreakdownCard({
       </CardHeader>
 
       <CardContent className="space-y-1.5">
-        {/* ── Barras por gate ──────────────────────────────────────────── */}
+
+        {/* ── KPI strip — foto instantánea antes de leer las barras ────── */}
+        {calibreGroups.length > 0 && (
+          <div className="flex items-center gap-2 pb-1 flex-wrap">
+            {kpi.saturado > 0 && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/10 border border-red-500/30 text-[11px] font-medium text-red-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                {kpi.saturado} saturado{kpi.saturado > 1 ? 's' : ''}
+              </span>
+            )}
+            {kpi.optimo > 0 && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-[11px] font-medium text-emerald-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                {kpi.optimo} óptimo{kpi.optimo > 1 ? 's' : ''}
+              </span>
+            )}
+            {kpi.sobredimensionado > 0 && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-[11px] font-medium text-amber-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                {kpi.sobredimensionado} sobredim.
+              </span>
+            )}
+            <span className="text-[10px] text-muted-foreground/50 ml-auto">grupos calibre·calidad</span>
+          </div>
+        )}
+
+        {/* ── Barras por gate — coloreadas por status de eficiencia ────── */}
         {productiveRows.map(row => {
           const cfg = gateConfigMap.get(row.gate)
           const barPct = maxPieces > 0 ? (row.pieces / maxPieces) * 100 : 0
-          const color = cfg ? qualityColor(cfg.quality) : '#6366f1'
-          const isTop = row === productiveRows[0]
           const status = gateStatusMap.get(row.gate)
+          // Barra: color por STATUS (rojo/verde/ámbar). Calidad queda en el texto.
+          const barColor = status ? STATUS_BAR_COLOR[status] : '#94a3b8'
+          const isTop = row === productiveRows[0]
 
           return (
             <div key={row.gate} className="flex items-center gap-2">
@@ -305,33 +334,35 @@ export function GateBreakdownCard({
               <div className="w-8 shrink-0 text-right">
                 <span className={cn(
                   'text-xs font-semibold tabular-nums',
-                  isTop ? 'text-foreground' : 'text-muted-foreground',
+                  status === 'saturado'          && 'text-red-400',
+                  status === 'sobredimensionado' && 'text-amber-400',
+                  status === 'optimo'            && 'text-emerald-400',
+                  !status                        && (isTop ? 'text-foreground' : 'text-muted-foreground'),
                 )}>
                   G{row.gate}
                 </span>
               </div>
 
-              {/* Config */}
-              <div className="w-32 shrink-0 truncate text-[11px] text-muted-foreground">
+              {/* Config: calibre · calidad con punto de color por calidad */}
+              <div className="w-32 shrink-0 truncate text-[11px] text-muted-foreground flex items-center gap-1">
+                {cfg && (
+                  <span
+                    className="inline-block w-1.5 h-1.5 rounded-full shrink-0"
+                    style={{ backgroundColor: qualityColor(cfg.quality) }}
+                  />
+                )}
                 {cfg ? `${cfg.calibre} · ${cfg.quality}` : '—'}
               </div>
 
-              {/* Barra */}
-              <div className="flex-1 h-4 rounded-sm bg-muted/20 overflow-hidden relative">
+              {/* Barra coloreada por status */}
+              <div className="flex-1 h-4 rounded-sm bg-muted/20 overflow-hidden">
                 <div
                   className="h-full rounded-sm transition-all duration-300"
                   style={{
                     width: `${barPct}%`,
-                    backgroundColor: color + (isTop ? 'cc' : '80'),
+                    backgroundColor: barColor + (isTop ? 'dd' : '70'),
                   }}
                 />
-                {/* Indicador de status del calibre */}
-                {status === 'sobredimensionado' && row.pieces > 0 && (
-                  <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] text-amber-400/80 font-medium">↓</span>
-                )}
-                {status === 'saturado' && (
-                  <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] text-red-400/80 font-medium">↑</span>
-                )}
               </div>
 
               {/* Piezas + % */}
@@ -368,7 +399,7 @@ export function GateBreakdownCard({
           </>
         )}
 
-        {/* ── Sección análisis de asignación (expandible) ──────────────── */}
+        {/* ── Análisis expandible ───────────────────────────────────────── */}
         {calibreGroups.length > 0 && (
           <>
             <div className="border-t border-border/30 mt-2" />
@@ -382,7 +413,7 @@ export function GateBreakdownCard({
 
             {showAnalysis && (
               <div className="space-y-3 pt-1">
-                {/* Tabla por calibre */}
+                {/* Tabla de grupos */}
                 <div className="rounded-md border border-border/40 overflow-hidden text-xs">
                   <table className="w-full">
                     <thead className="bg-muted/20 text-muted-foreground">
@@ -398,7 +429,10 @@ export function GateBreakdownCard({
                       {calibreGroups.map(g => (
                         <tr key={g.label} className="border-t border-border/30 hover:bg-muted/10">
                           <td className="px-2 py-1.5 font-medium">
-                            <span style={{ color: qualityColor(g.quality) }} className="inline-block w-1.5 h-1.5 rounded-full mr-1.5 align-middle" />
+                            <span
+                              className="inline-block w-1.5 h-1.5 rounded-full mr-1.5 align-middle"
+                              style={{ backgroundColor: qualityColor(g.quality) }}
+                            />
                             {g.label}
                           </td>
                           <td className="px-2 py-1.5 text-center text-muted-foreground">
@@ -409,19 +443,19 @@ export function GateBreakdownCard({
                           </td>
                           <td className={cn(
                             'px-2 py-1.5 text-right tabular-nums font-semibold',
-                            g.status === 'saturado'         && 'text-red-400',
-                            g.status === 'sobredimensionado'&& 'text-amber-400',
-                            g.status === 'optimo'           && 'text-emerald-400',
+                            g.status === 'saturado'          && 'text-red-400',
+                            g.status === 'sobredimensionado' && 'text-amber-400',
+                            g.status === 'optimo'            && 'text-emerald-400',
                           )}>
                             {g.ratio.toFixed(1)}×
                           </td>
                           <td className={cn(
                             'px-2 py-1.5',
-                            g.status === 'saturado'         && 'text-red-400',
-                            g.status === 'sobredimensionado'&& 'text-amber-400',
-                            g.status === 'optimo'           && 'text-emerald-400',
+                            g.status === 'saturado'          && 'text-red-400',
+                            g.status === 'sobredimensionado' && 'text-amber-400',
+                            g.status === 'optimo'            && 'text-emerald-400',
                           )}>
-                            {g.status === 'saturado'          ? '↑ saturado'
+                            {g.status === 'saturado'           ? '↑ saturado'
                               : g.status === 'sobredimensionado' ? '↓ sobredim.'
                               : '✓ óptimo'}
                           </td>
@@ -434,35 +468,64 @@ export function GateBreakdownCard({
                   </div>
                 </div>
 
-                {/* Sugerencias */}
+                {/* Sugerencias ordenadas por impacto */}
                 {suggestions.length > 0 && (
                   <div className="space-y-1.5">
                     <p className="text-[11px] font-medium text-muted-foreground">
                       Sugerencias para el próximo turno
+                      <span className="ml-1 text-muted-foreground/50 font-normal">— ordenadas por impacto</span>
                     </p>
-                    {suggestions.map((s, i) => (
-                      <div
-                        key={i}
-                        className="flex items-start gap-2 px-3 py-2 rounded-md border border-amber-500/20 bg-amber-500/5 text-xs"
-                      >
-                        <ArrowRight className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
-                        <div className="flex-1 min-w-0">
-                          <span className="font-medium text-foreground">
-                            Reasignar G{s.fromGate}
+                    {suggestions.map((s, i) => {
+                      const isTop = i === 0
+                      return (
+                        <div
+                          key={i}
+                          className={cn(
+                            'flex items-start gap-2.5 px-3 py-2.5 rounded-md border text-xs transition-colors',
+                            isTop
+                              ? 'border-red-500/30 bg-red-500/5'
+                              : 'border-amber-500/20 bg-amber-500/5',
+                          )}
+                        >
+                          {/* Número de prioridad */}
+                          <span className={cn(
+                            'shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold mt-0.5',
+                            isTop
+                              ? 'bg-red-500/20 text-red-400'
+                              : 'bg-amber-500/15 text-amber-400',
+                          )}>
+                            {i + 1}
                           </span>
-                          <span className="text-muted-foreground ml-1">
-                            de <span className="text-foreground/80">{s.fromLabel}</span>
-                            {' → '}<span className="text-foreground/80">{s.toLabel}</span>
-                          </span>
-                          <div className="text-muted-foreground/70 mt-0.5">
-                            G{s.fromGate} clasificó {s.fromPieces.toLocaleString('es-CL')} pzas ({s.fromPct.toFixed(1)}%) · destino saturado a {s.satRatio.toFixed(1)}×
-                          </div>
-                          <div className="text-amber-400/80 mt-0.5 text-[10px] italic">
-                            ⚠ {s.cautela}
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-medium text-foreground">
+                                Reasignar G{s.fromGate}
+                              </span>
+                              <ArrowRight className={cn(
+                                'w-3 h-3 shrink-0',
+                                isTop ? 'text-red-400' : 'text-amber-400',
+                              )} />
+                              <span className="text-muted-foreground">
+                                <span className="text-foreground/70">{s.fromLabel}</span>
+                                {' → '}
+                                <span className="text-foreground/70">{s.toLabel}</span>
+                              </span>
+                            </div>
+                            <div className="text-muted-foreground/70 mt-0.5">
+                              G{s.fromGate} clasificó {s.fromPieces.toLocaleString('es-CL')} pzas ({s.fromPct.toFixed(1)}%)
+                              {' · '}destino saturado a {s.satRatio.toFixed(1)}×
+                            </div>
+                            <div className={cn(
+                              'mt-1 text-[10px] italic',
+                              isTop ? 'text-red-400/70' : 'text-amber-400/70',
+                            )}>
+                              ⚠ {s.cautela}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 )}
               </div>
