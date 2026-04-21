@@ -79,6 +79,7 @@ const HmiKnuroPublicPage = lazyWithReload(() => import('@/pages/HmiKnuroPublicPa
 const Visor3DInteractiveToboganPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DInteractiveToboganPage').then((mod) => ({ default: mod.Visor3DInteractiveToboganPage })))
 const Visor3DInteractiveBaader142Page = lazyWithReload(() => import('@/pages/Visor3D/Visor3DInteractiveBaader142Page').then((mod) => ({ default: mod.Visor3DInteractiveBaader142Page })))
 const AnalisisGraderTurnoPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderTurnoPage').then((mod) => ({ default: mod.AnalisisGraderTurnoPage })))
+const GraderQuickChangePage = lazyWithReload(() => import('@/pages/AnalisisGrader/GraderQuickChangePage').then((mod) => ({ default: mod.GraderQuickChangePage })))
 const AnalisisGraderWizardPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderWizardPage').then((mod) => ({ default: mod.AnalisisGraderWizardPage })))
 const AnalisisGraderAyudaPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderAyudaPage').then((mod) => ({ default: mod.AnalisisGraderAyudaPage })))
 const AnalisisGraderPeriodoPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderPeriodoPage').then((mod) => ({ default: mod.AnalisisGraderPeriodoPage })))
@@ -522,6 +523,11 @@ export function App() {
             <Route path="analisis-grader/turno/:shiftId" element={
               <Suspense fallback={<LoadingScreen />}>
                 <AnalisisGraderTurnoPage />
+              </Suspense>
+            } />
+            <Route path="analisis-grader/quick-change" element={
+              <Suspense fallback={<LoadingScreen />}>
+                <GraderQuickChangePage />
               </Suspense>
             } />
             <Route path="analisis-grader/detalle" element={<AnalisisGraderDetalleRedirect />} />

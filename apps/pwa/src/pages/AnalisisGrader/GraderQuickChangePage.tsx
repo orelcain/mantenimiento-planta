@@ -1,0 +1,195 @@
+/**
+ * GraderQuickChangePage — vista mobile para registrar cambio de gate rápido.
+ *
+ * URL fija: /analisis-grader/quick-change
+ * Uso: el QR pegado en la máquina apunta aquí. El supervisor escanea,
+ * registra el cambio que control de producción acaba de indicar, listo.
+ *
+ * Detecta automáticamente el turno vivo. Si no hay turno activo,
+ * muestra un estado vacío con link al landing.
+ */
+
+import { useMemo, useState, useCallback } from 'react'
+import { useNavigate, Navigate } from 'react-router-dom'
+import { Card, CardContent, Button, Badge } from '@/components/ui'
+import { Activity, ArrowLeft, CheckCircle2, Clock, SlidersHorizontal } from 'lucide-react'
+import { usePermissionsStore } from '@/store'
+import { QuickGateChangeButton } from '@/components/grader/QuickGateChangeButton'
+import { computeShiftTimeWindow } from '@/services/grader/graderShiftStatus'
+import { DEFAULT_SHIFT_SCHEDULE } from '@/services/grader/graderShiftSchedule'
+import { listSnapshots } from '@/services/grader/graderConfigSnapshot.service'
+import { useEffect } from 'react'
+import type { GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
+
+function todayKey() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+export function GraderQuickChangePage() {
+  const { canSee } = usePermissionsStore()
+  const navigate = useNavigate()
+  const [snapshots, setSnapshots] = useState<GateConfigSnapshot[]>([])
+  const [savedCount, setSavedCount] = useState(0)
+
+  const liveShift = useMemo(() => {
+    const today = todayKey()
+    const now = new Date()
+    for (const sched of DEFAULT_SHIFT_SCHEDULE) {
+      const win = computeShiftTimeWindow(today, sched.shiftId, DEFAULT_SHIFT_SCHEDULE, now)
+      if (win.status === 'live') {
+        return { shiftId: sched.shiftId, dateKey: today, window: win }
+      }
+    }
+    return null
+  }, [])
+
+  const shiftDocId = liveShift ? `${liveShift.dateKey}__${liveShift.shiftId}` : null
+
+  // Cargar el último snapshot para mostrar config actual
+  const reloadSnapshots = useCallback(() => {
+    if (!shiftDocId) return
+    listSnapshots(shiftDocId)
+      .then(setSnapshots)
+      .catch(() => {})
+  }, [shiftDocId])
+
+  useEffect(() => { reloadSnapshots() }, [reloadSnapshots])
+
+  const handleSaved = useCallback(() => {
+    setSavedCount(c => c + 1)
+    reloadSnapshots()
+  }, [reloadSnapshots])
+
+  if (!canSee('analisisGrader')) return <Navigate to="/" replace />
+
+  const latest = snapshots.length > 0 ? snapshots[snapshots.length - 1] : null
+  const activeGates = latest?.gates.filter(g => g.active) ?? []
+
+  const shortShift = liveShift?.shiftId.includes('día') ? 'día' : 'noche'
+  const shiftStart = liveShift?.window.startAt
+    ? new Date(liveShift.window.startAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })
+    : null
+
+  return (
+    <div className="container mx-auto p-4 max-w-md space-y-4">
+
+      {/* Header compacto */}
+      <div className="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => navigate('/analisis-grader')}
+          className="gap-1 text-muted-foreground -ml-1"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span className="text-xs">Grader</span>
+        </Button>
+        <span className="text-sm font-semibold ml-auto">Cambio rápido</span>
+      </div>
+
+      {/* Estado del turno */}
+      {liveShift ? (
+        <>
+          <Card className="border-red-500/30 bg-red-500/5">
+            <CardContent className="p-4 flex items-center gap-3">
+              <Activity className="w-5 h-5 text-red-400 animate-pulse shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-semibold capitalize">Turno {shortShift}</span>
+                  <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-[10px]">EN VIVO</Badge>
+                </div>
+                {shiftStart && (
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
+                    <Clock className="w-3 h-3" />
+                    Desde {shiftStart}
+                  </div>
+                )}
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-xs shrink-0"
+                onClick={() => navigate(`/analisis-grader/turno/${shiftDocId}`)}
+              >
+                Ver turno
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Feedback de cambios guardados */}
+          {savedCount > 0 && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-sm text-emerald-400">
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              {savedCount === 1
+                ? 'Cambio registrado exitosamente'
+                : `${savedCount} cambios registrados en este turno`}
+            </div>
+          )}
+
+          {/* Botón principal — CTA grande para mobile */}
+          <div className="pt-2">
+            <QuickGateChangeButton
+              shiftDocId={shiftDocId!}
+              variant="default"
+              onSaved={handleSaved}
+              allowEdit
+              triggerLabel="Registrar cambio de gate"
+              className="w-full h-14 text-base gap-2"
+            />
+            <p className="text-center text-xs text-muted-foreground mt-2">
+              El cambio queda marcado en el timeline con hora exacta
+            </p>
+          </div>
+
+          {/* Config actual compacta — los gates activos del último snapshot */}
+          {activeGates.length > 0 && (
+            <Card>
+              <CardContent className="p-3 space-y-2">
+                <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                  <SlidersHorizontal className="w-3.5 h-3.5" />
+                  Config actual ({activeGates.length} gates activas)
+                </div>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
+                  {activeGates
+                    .sort((a, b) => a.gateNumber - b.gateNumber)
+                    .map(g => (
+                      <div key={g.gateNumber} className="flex items-center gap-2 py-0.5 text-xs border-b border-border/20 last:border-0">
+                        <span className="font-semibold w-7 shrink-0 text-muted-foreground">G{g.gateNumber}</span>
+                        <span className="truncate text-foreground/80">{g.assignedCalibre}</span>
+                        <span className="shrink-0 text-muted-foreground">{g.assignedQuality}</span>
+                      </div>
+                    ))}
+                </div>
+                {latest?.changedBy?.name && (
+                  <p className="text-[10px] text-muted-foreground/50 pt-1">
+                    Última config por {latest.changedBy.name}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </>
+      ) : (
+        /* Sin turno activo */
+        <Card className="border-dashed">
+          <CardContent className="p-8 flex flex-col items-center gap-3 text-center">
+            <Clock className="w-8 h-8 text-muted-foreground/40" />
+            <p className="font-medium">No hay turno activo ahora</p>
+            <p className="text-sm text-muted-foreground">
+              Esta página es para registrar cambios durante un turno en vivo.
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate('/analisis-grader')}
+              className="mt-1 gap-1.5"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              Ir al landing
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
+}
