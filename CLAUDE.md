@@ -693,8 +693,8 @@ Si se necesita re-procesar o corregir algo, usar `scripts/iter18-full-season-reb
 
 - ✅ **PNG con cabecera de metadata** (v2.144.0) — canvas compuesto: header con `GRADER Z2 · turno · fecha · rango visible · P0%` coloreado (verde/amber/rojo). `ShiftTimelineView.tsx`.
 - ✅ **CSV separador `;` + resumen por hora** (v2.144.0) — agrupado por hora (UTC), columnas: Hora;Piezas;OK;P0;P0%;Peso prom;Calibre;Tiempo muerto. BOM UTF-8. `ShiftTimelineView.tsx`.
-- 🔲 **Link público con token temporal** — Firestore `graderPublicTokens` (UUID, expiración 7 días). Ruta read-only `/view/:token` sin login. Reglas Firestore: lectura permitida solo con token válido y no expirado. Botón "Compartir turno" en `AnalisisGraderTurnoPage`. (~1 día)
-- 🔲 **QR del link** — generar QR con librería `qrcode.react` (ya en deps) y embeber en el PNG de cabecera. Supervisor escanea y abre turno en el celular sin login.
+- ✅ **Link público con token temporal** (v2.145.0) — `graderPublicToken.service.ts` + `GraderPublicTokenPage` read-only sin login. Snapshot denorm (summary+buckets+pauses). Ruta `/view/:token`. Botón "Compartir turno" en TurnoPage (solo admin). Válido 7 días.
+- 🔲 **QR del link** — generar QR con `qrcode.react` (ya en deps) y embeber en el PNG de cabecera o mostrar inline al generar link.
 - 🔲 **Refactor config Grader — Fase A** — mover las 12 Gates + configuración Física al acordeón del detalle de turno (`AnalisisGraderTurnoPage`), en lugar de vivir solo en la página de config global. Botón "Cambié gate" mid-turno + segmentación automática antes/después del cambio. Plan de 3 fases acordado sesión 2026-04-19. Es el pendiente estructural más importante.
 
 **P2 — Media prioridad**
