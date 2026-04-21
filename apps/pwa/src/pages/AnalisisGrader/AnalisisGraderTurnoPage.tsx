@@ -25,6 +25,7 @@ import { HeroScorecard } from '@/components/grader/HeroScorecard'
 import { P0CausesPanel } from '@/components/grader/P0CausesPanel'
 import { ShiftTimelineView } from '@/components/grader/ShiftTimelineView'
 import { ShiftBreakdownsCard } from '@/components/grader/ShiftBreakdownsCard'
+import { GateBreakdownCard } from '@/components/grader/GateBreakdownCard'
 import { ConfigChangeHistory } from '@/components/grader/ConfigChangeHistory'
 import { ActionPlanPanel, deriveSuggestions } from '@/components/grader/ActionPlanPanel'
 import { findTriggeredRunbooks } from '@/services/grader/graderRunbooks'
@@ -599,6 +600,17 @@ export function AnalisisGraderTurnoPage() {
             alertThreshold={alertThreshold}
             criticalThreshold={criticalThreshold}
           />
+
+          {/* Distribución por gate — balance del turno */}
+          {summary.gateDistribution && summary.gateDistribution.length > 0 && (
+            <GateBreakdownCard
+              gateDistribution={summary.gateDistribution}
+              configSnapshots={configSnapshots}
+              totalPieces={summary.totalPieces}
+              pointZeroPieces={summary.pointZeroPieces}
+              pointZeroPct={summary.pointZeroPct}
+            />
+          )}
 
           {/* Composición del turno (lotes + calidad + producto + conservación) */}
           <ShiftBreakdownsCard

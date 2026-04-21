@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.134.0' as const
+export const APP_VERSION = '2.135.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-04-20' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'feat(grader): export PNG+CSV + selector de rango zoom en Timeline v2' as const
+export const VERSION_NAME = 'feat(grader): GateBreakdownCard — distribución y balance por gate del turno' as const
 
 /**
  * Nota:
