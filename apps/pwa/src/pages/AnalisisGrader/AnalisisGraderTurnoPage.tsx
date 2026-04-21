@@ -9,10 +9,11 @@
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useParams, useNavigate, Navigate } from 'react-router-dom'
 import { Button, Card, CardContent, Spinner, Badge } from '@/components/ui'
-import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check } from 'lucide-react'
 import { usePermissionsStore } from '@/store'
 import { useAuthStore, useIsAdmin } from '@/store/authStore'
 import { getDailySummary, loadTimelineAggregates, loadPausesAggregates, listDailySummariesByRange, listGate0PieceRecords, type FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
+import { createPublicToken } from '@/services/grader/graderPublicToken.service'
 import type { Pause, MicroDetentionsSummary } from '@/services/grader/types'
 import { getModuleRanges } from '@/services/grader/graderModuleConfig.service'
 import { listSnapshots, type GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
@@ -159,6 +160,11 @@ export function AnalisisGraderTurnoPage() {
   const [error, setError] = useState<string | null>(null)
   const [alertThreshold, setAlertThreshold] = useState(2)
   const [criticalThreshold, setCriticalThreshold] = useState(3.5)
+
+  // ── Share (token público) — estado; handlers después de enrichedTimelineBuckets ──
+  const [sharing, setSharing] = useState(false)
+  const [shareUrl, setShareUrl] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
 
   // ── IA (FASE 16) ─────────────────────────────────────────────────────────
   const [aiOutput, setAiOutput] = useState<AIGraderOutput | null>(null)
@@ -429,6 +435,36 @@ export function AnalisisGraderTurnoPage() {
     return `${dayName} ${dayNum} ${monthName}`
   }, [dateKey])
 
+  // handlers de share — después de enrichedTimelineBuckets para evitar TDZ
+  const handleShare = useCallback(async () => {
+    if (!summary || !dateKey || !shiftLabel) return
+    setSharing(true)
+    try {
+      const token = await createPublicToken(shiftDocId, {
+        dateKey,
+        shiftId: shiftLabel,
+        createdBy: user?.nombre
+          ? `${user.nombre}${user.apellido ? ' ' + user.apellido : ''}`
+          : (user?.email ?? 'admin'),
+        summary,
+        timelineBuckets: enrichedTimelineBuckets,
+        pauses,
+      })
+      const base = `${window.location.origin}${import.meta.env.BASE_URL}`
+      setShareUrl(`${base}view/${token}`)
+    } finally {
+      setSharing(false)
+    }
+  }, [summary, dateKey, shiftLabel, shiftDocId, user, enrichedTimelineBuckets, pauses])
+
+  const handleCopy = useCallback(() => {
+    if (!shareUrl) return
+    void navigator.clipboard.writeText(shareUrl).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }, [shareUrl])
+
   if (!canSee('analisisGrader')) return <Navigate to="/" replace />
 
   return (
@@ -666,6 +702,52 @@ export function AnalisisGraderTurnoPage() {
           {/* Nota: el contador de cambios de config (FASE 27) ya vive en
               el badge del panel ConfigChangeHistory de arriba — eliminado
               para evitar duplicación con conteos divergentes. */}
+
+          {/* Compartir turno — solo supervisores/admins cuando hay summary */}
+          {summary && isAdmin && (
+            <div className="rounded-lg border border-border/40 bg-muted/10 p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <Share2 className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Compartir turno</span>
+                {!shareUrl && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="ml-auto h-7 text-xs"
+                    onClick={() => void handleShare()}
+                    disabled={sharing}
+                  >
+                    {sharing ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Generar link'}
+                  </Button>
+                )}
+              </div>
+              {shareUrl && (
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 truncate rounded bg-muted px-2 py-1 text-[11px] text-muted-foreground">
+                    {shareUrl}
+                  </code>
+                  <button
+                    onClick={handleCopy}
+                    className="shrink-0 flex items-center gap-1 rounded bg-amber-500/80 hover:bg-amber-500 text-white text-[11px] px-2 py-1 transition-colors"
+                    title="Copiar link"
+                  >
+                    {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                    {copied ? 'Copiado' : 'Copiar'}
+                  </button>
+                  <button
+                    onClick={() => { setShareUrl(null); setCopied(false) }}
+                    className="shrink-0 text-[11px] text-muted-foreground/60 hover:text-muted-foreground px-1"
+                    title="Generar nuevo link"
+                  >
+                    nuevo
+                  </button>
+                </div>
+              )}
+              <p className="text-[10px] text-muted-foreground/40">
+                Link válido 7 días · sin login · solo lectura
+              </p>
+            </div>
+          )}
 
           {/* Link a configuración avanzada */}
           <button

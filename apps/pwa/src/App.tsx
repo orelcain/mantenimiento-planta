@@ -64,6 +64,7 @@ const SettingsPage = lazyWithReload(() => import('@/pages/SettingsPage').then((m
 const HierarchyPage = lazyWithReload(() => import('@/pages/HierarchyPage').then((mod) => ({ default: mod.HierarchyPage })))
 const PhotoEvidencePage = lazyWithReload(() => import('@/pages/PhotoEvidencePage').then((mod) => ({ default: mod.PhotoEvidencePage })))
 const PublicEquipmentView = lazyWithReload(() => import('@/pages/PublicEquipmentView').then((mod) => ({ default: mod.PublicEquipmentView })))
+const GraderPublicTokenPage = lazyWithReload(() => import('@/pages/GraderPublicTokenPage').then((mod) => ({ default: mod.GraderPublicTokenPage })))
 const SensorsPage = lazyWithReload(() => import('@/pages/SensorsPage').then((mod) => ({ default: mod.SensorsPage })))
 const SensorsMonitorPage = lazyWithReload(() => import('@/pages/SensorsMonitorPage').then((mod) => ({ default: mod.SensorsMonitorPage })))
 const MapsAdminPage = lazyWithReload(() => import('@/pages/admin/MapsAdminPage').then((mod) => ({ default: mod.MapsAdminPage })))
@@ -349,6 +350,16 @@ export function App() {
           <Route path="/baader-200/learn" element={
             <Suspense fallback={<LoadingScreen />}><Baader200LearningPublicPage /></Suspense>
           } />
+
+          {/* Public grader shift view — token-based, no auth required */}
+          <Route
+            path="/view/:token"
+            element={
+              <Suspense fallback={<LoadingScreen />}>
+                <GraderPublicTokenPage />
+              </Suspense>
+            }
+          />
 
           {/* Public equipment view (no auth required) */}
           <Route

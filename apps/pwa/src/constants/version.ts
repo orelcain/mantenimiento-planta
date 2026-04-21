@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.144.0' as const
+export const APP_VERSION = '2.145.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-04-21' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'feat(grader): PNG cabecera metadata + CSV por hora con sep ; en ShiftTimelineView' as const
+export const VERSION_NAME = 'feat(grader): link público con token 7d + vista read-only sin login + botón Compartir turno' as const
 
 /**
  * Nota:
