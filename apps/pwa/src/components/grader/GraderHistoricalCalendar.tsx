@@ -19,8 +19,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from '@/components/ui'
-import { ChevronLeft, ChevronRight, Loader2, Clock, Database, Eye, Trash2, AlertTriangle, Sun, Moon } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, Clock, Database, Eye, Trash2, AlertTriangle, Sun, Moon, Wrench } from 'lucide-react'
 import { QuickGateChangeButton } from './QuickGateChangeButton'
+import { listSnapshots } from '@/services/grader/graderConfigSnapshot.service'
 import { cn } from '@/lib/utils'
 import { listGraderUploads } from '@/services/grader/graderUpload.service'
 import { getModuleRanges } from '@/services/grader/graderModuleConfig.service'
@@ -174,6 +175,8 @@ export function GraderHistoricalCalendar({
   const [shiftSchedule, setShiftSchedule] = useState(DEFAULT_SHIFT_SCHEDULE)
   const [historicalByDate, setHistoricalByDate] = useState<Map<string, GraderDailySummary[]>>(new Map())
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  // Counts de cambios manuales de gate por shiftDocId (lazy-loaded al seleccionar un día)
+  const [configChangeCounts, setConfigChangeCounts] = useState<Map<string, number>>(new Map())
   const autoSelectedRef = useRef(!!effectiveInitialKey)
 
   useEffect(() => {
@@ -290,6 +293,27 @@ export function GraderHistoricalCalendar({
     const sorted = [...turnosDelDia].sort((a, b) => (order[a.shiftId] ?? 9) - (order[b.shiftId] ?? 9))
     setSelectedHistorical(sorted[0] ?? null)
   }, [selectedKey, historicalByDate, selectedHistorical, setSelectedHistorical])
+
+  // Lazy-load de cambios manuales de gate para los turnos del día seleccionado.
+  // Se dispara al cambiar el día — solo carga si el shiftDocId no está ya en caché.
+  useEffect(() => {
+    if (!selectedKey) return
+    const turnosDelDia = historicalByDate.get(selectedKey) ?? []
+    if (turnosDelDia.length === 0) return
+    let cancelled = false
+    for (const hist of turnosDelDia) {
+      if (configChangeCounts.has(hist.id)) continue
+      listSnapshots(hist.id)
+        .then(snaps => {
+          if (cancelled) return
+          const count = snaps.filter(s => !s.synthetic && (s.changes?.length ?? 0) > 0).length
+          setConfigChangeCounts(prev => new Map(prev).set(hist.id, count))
+        })
+        .catch(() => {})
+    }
+    return () => { cancelled = true }
+  }, [selectedKey, historicalByDate]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const selectedUploads = useMemo(() => {
     if (!selectedKey) return []
     return uploadsByDate.get(selectedKey) || []
@@ -706,7 +730,18 @@ export function GraderHistoricalCalendar({
                   >
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium">{hist.shiftId}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-sm font-medium">{hist.shiftId}</p>
+                          {(configChangeCounts.get(hist.id) ?? 0) > 0 && (
+                            <span
+                              className="inline-flex items-center gap-0.5 text-[9px] px-1 py-0.5 rounded bg-amber-500/15 text-amber-600 border border-amber-500/30 font-medium shrink-0"
+                              title={`${configChangeCounts.get(hist.id)} cambio${configChangeCounts.get(hist.id) === 1 ? '' : 's'} de gate registrado${configChangeCounts.get(hist.id) === 1 ? '' : 's'}`}
+                            >
+                              <Wrench className="w-2.5 h-2.5" />
+                              {configChangeCounts.get(hist.id)}
+                            </span>
+                          )}
+                        </div>
                         {hist.hasPieceData !== undefined && (!hist.hasPieceData || !hist.hasGate0Data) && (
                           <div className="flex flex-wrap gap-1 mt-0.5">
                             {!hist.hasPieceData && (

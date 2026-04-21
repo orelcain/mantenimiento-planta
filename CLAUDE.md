@@ -687,18 +687,21 @@ Si se necesita re-procesar o corregir algo, usar `scripts/iter18-full-season-reb
 
 ## Pendientes priorizados
 
-### PENDIENTE — Grader iter 9 (sesión 2026-04-21, continuación)
+### PENDIENTE — Grader iter 10 (sesión 2026-04-21)
+
+**Quick wins completados en iter 10:**
+- ✅ **#5 QuickGateChangeButton deshabilitado en turno cerrado** (v2.147.0) — `allowEdit` prop cascada TurnoPage→ConfigChangeHistory→QuickGateChangeButton. Tooltip explica motivo.
+- ✅ **#4 Badge 🔧 en calendario histórico** (v2.148.0) — lazy-load count de snapshots manuales al seleccionar un día. Badge amber con icono Wrench + tooltip en la tarjeta de turno.
 
 **P1 — Alta prioridad**
 
-- ✅ **PNG con cabecera de metadata** (v2.144.0) — canvas compuesto: header con `GRADER Z2 · turno · fecha · rango visible · P0%` coloreado (verde/amber/rojo). `ShiftTimelineView.tsx`.
-- ✅ **CSV separador `;` + resumen por hora** (v2.144.0) — agrupado por hora (UTC), columnas: Hora;Piezas;OK;P0;P0%;Peso prom;Calibre;Tiempo muerto. BOM UTF-8. `ShiftTimelineView.tsx`.
-- ✅ **Link público con token temporal** (v2.145.0) — `graderPublicToken.service.ts` + `GraderPublicTokenPage` read-only sin login. Snapshot denorm (summary+buckets+pauses). Ruta `/view/:token`. Botón "Compartir turno" en TurnoPage (solo admin). Válido 7 días.
-- ✅ **QR del link** (v2.146.0) — `QRCodeSVG` 100×100 inline bajo el link al generarlo. Supervisor escanea con el celular para abrir vista sin login.
 - 🔲 **Refactor config Grader — Fase A** — mover las 12 Gates + configuración Física al acordeón del detalle de turno (`AnalisisGraderTurnoPage`), en lugar de vivir solo en la página de config global. Botón "Cambié gate" mid-turno + segmentación automática antes/después del cambio. Plan de 3 fases acordado sesión 2026-04-19. Es el pendiente estructural más importante.
+- 🔲 **#1 GlobalSettingsModal en home** — separar Análisis+Rangos en modal del header del home. Sub-item Fase A que se puede hacer independiente. (~1h)
 
 **P2 — Media prioridad**
 
+- 🔲 **#6 Tests `computeSegmentVerdicts`** — corazón de Fase C sin unit tests. (~45min)
+- 🔲 **#2 Ruta mobile `/grader/quick-change?turno=X`** — vista reducida para supervisor con celular. (~1h)
 - 🔲 **Fase 3b — Edición manual de rangos de pausas** — drag handles en bandas del Timeline para redimensionar/crear/descartar pausas. Estado local complejo + persistir a Firestore + no pisar el detector automático. `ShiftTimelineView.tsx`. (~2-3 días)
 - 🔲 **Fase 4 — CRUD admin de tags** — página admin para gestionar `graderPauseTags` en Firestore (crear/renombrar/cambiar color+emoji/archivar). Hoy los 9 tags están hardcoded en `graderPauseTags.ts`. Reglas Firestore nuevas. (~2-3 días)
 - 🔲 **Re-upload pieceRecords productivas** — 383 turnos × ~5M pieceRecords a Firestore (script batch idempotente, mismo patrón que el script P0 de la temporada). Sin esto, el timeline segundo a segundo solo funciona desde la fecha de la primera carga manual.
