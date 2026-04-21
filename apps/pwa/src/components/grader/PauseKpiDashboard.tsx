@@ -3,17 +3,23 @@
  *
  * Agrega totalDeadTimeSec / pausesCount de GraderDailySummary[]
  * (campos precalculados en el doc principal, sin sub-collection queries).
- * Muestra 4 KPI cards + barras horizontales por día/semana.
+ *
+ * Desglose por tag: lazy-load de meta/pauses solo al expandir la sección,
+ * en batches de 15 para no saturar Firestore. Se resetea al cambiar el período.
  */
 
-import { useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
-import { Activity, Clock, PauseCircle, TrendingDown } from 'lucide-react'
+import { Activity, ChevronDown, ChevronUp, Clock, PauseCircle, Tag, TrendingDown } from 'lucide-react'
+import { loadPausesAggregates } from '@/services/grader/graderDailySummary.service'
+import { GRADER_PAUSE_TAGS, resolveEffectiveTag } from '@/services/grader/graderPauseTags'
 import type { GraderDailySummary } from '@/services/grader/types'
 
 interface PauseKpiDashboardProps {
   summaries: GraderDailySummary[]
 }
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmtSec(totalSec: number): string {
   const h = Math.floor(totalSec / 3600)
@@ -21,6 +27,8 @@ function fmtSec(totalSec: number): string {
   if (h === 0) return `${m}m`
   return `${h}h ${m}m`
 }
+
+// ── Sub-componentes ───────────────────────────────────────────────────────────
 
 function KpiCard({
   label,
@@ -41,6 +49,59 @@ function KpiCard({
       </div>
       <div className="text-lg font-semibold tabular-nums leading-none">{value}</div>
       <div className="text-[10px] text-muted-foreground/60 mt-1">{sub}</div>
+    </div>
+  )
+}
+
+const SIN_TAG_ID = '__sin_tag'
+
+function TagBreakdownChart({ tagBreakdown }: { tagBreakdown: Record<string, number> }) {
+  const entries = useMemo(() => {
+    const tagMap = new Map(GRADER_PAUSE_TAGS.map(t => [t.id, t]))
+    const all = Object.entries(tagBreakdown).map(([id, sec]) => {
+      const tag = tagMap.get(id)
+      return {
+        id,
+        sec,
+        label: tag?.label ?? 'Sin clasificar',
+        emoji: tag?.emoji ?? '○',
+        color: tag?.color ?? '#6b7280',
+      }
+    })
+    return all.sort((a, b) => b.sec - a.sec)
+  }, [tagBreakdown])
+
+  const maxSec = Math.max(...entries.map(e => e.sec), 1)
+  const totalSec = entries.reduce((sum, e) => sum + e.sec, 0)
+
+  if (entries.length === 0) {
+    return (
+      <p className="mt-2 text-[11px] text-muted-foreground/60">
+        Todas las pausas están sin clasificar o los datos aún no se han cargado.
+      </p>
+    )
+  }
+
+  return (
+    <div className="space-y-1 mt-2">
+      {entries.map(e => (
+        <div key={e.id} className="flex items-center gap-2">
+          <span className="w-4 shrink-0 text-center text-xs">{e.emoji}</span>
+          <span className="w-24 shrink-0 text-[11px] text-muted-foreground truncate">{e.label}</span>
+          <div className="flex-1 h-2.5 bg-muted/30 rounded-sm overflow-hidden">
+            <div
+              className="h-full rounded-sm transition-all duration-300"
+              style={{ width: `${(e.sec / maxSec) * 100}%`, backgroundColor: e.color + 'aa' }}
+            />
+          </div>
+          <span className="w-10 shrink-0 text-[11px] text-muted-foreground tabular-nums">
+            {fmtSec(e.sec)}
+          </span>
+          <span className="w-7 shrink-0 text-[11px] text-muted-foreground/60 tabular-nums text-right">
+            {totalSec > 0 ? `${((e.sec / totalSec) * 100).toFixed(0)}%` : '—'}
+          </span>
+        </div>
+      ))}
     </div>
   )
 }
@@ -75,7 +136,7 @@ function buildChartEntries(withData: GraderDailySummary[]): { entries: ChartEntr
   for (const dateKey of days) {
     const d = new Date(`${dateKey}T12:00:00`)
     const mon = new Date(d)
-    mon.setDate(d.getDate() - ((d.getDay() + 6) % 7)) // lunes
+    mon.setDate(d.getDate() - ((d.getDay() + 6) % 7))
     const wk = mon.toISOString().slice(0, 10)
     weekMap[wk] = (weekMap[wk] ?? 0) + dayMap[dateKey]!
     if (!weekLabel[wk]) {
@@ -97,6 +158,8 @@ function buildChartEntries(withData: GraderDailySummary[]): { entries: ChartEntr
   }
 }
 
+// ── Componente principal ──────────────────────────────────────────────────────
+
 export function PauseKpiDashboard({ summaries }: PauseKpiDashboardProps) {
   const withData = useMemo(
     () => summaries.filter(s => s.totalDeadTimeSec !== undefined),
@@ -111,7 +174,7 @@ export function PauseKpiDashboard({ summaries }: PauseKpiDashboardProps) {
     const withDuration = withData.filter(s => (s.durationMinutes ?? 0) > 0)
     const avgDeadPct   = withDuration.length > 0
       ? withDuration.reduce(
-          (sum, s) => sum + (s.totalDeadTimeSec ?? 0) / ((s.durationMinutes!) * 60) * 100,
+          (sum, s) => sum + (s.totalDeadTimeSec ?? 0) / (s.durationMinutes! * 60) * 100,
           0,
         ) / withDuration.length
       : null
@@ -119,6 +182,64 @@ export function PauseKpiDashboard({ summaries }: PauseKpiDashboardProps) {
   }, [withData])
 
   const chart = useMemo(() => buildChartEntries(withData), [withData])
+
+  // Turnos que tienen pausas ≥5min (sub-collection cargable)
+  const pausesWithData = useMemo(
+    () => withData.filter(s => (s.pausesCount ?? 0) > 0),
+    [withData],
+  )
+
+  // Estado del desglose por tag
+  const [tagOpen, setTagOpen]           = useState(false)
+  const [tagBreakdown, setTagBreakdown] = useState<Record<string, number> | null>(null)
+  const [loadingTags, setLoadingTags]   = useState(false)
+  const [loadProgress, setLoadProgress] = useState<{ current: number; total: number } | null>(null)
+
+  // Resetear desglose cuando cambia el período
+  useEffect(() => {
+    setTagBreakdown(null)
+    setTagOpen(false)
+    setLoadingTags(false)
+    setLoadProgress(null)
+  }, [summaries])
+
+  const doLoadTags = useCallback(async () => {
+    if (pausesWithData.length === 0) return
+    setLoadingTags(true)
+    setLoadProgress({ current: 0, total: pausesWithData.length })
+
+    const totals: Record<string, number> = {}
+    const BATCH = 15
+    let done = 0
+
+    for (let i = 0; i < pausesWithData.length; i += BATCH) {
+      const slice = pausesWithData.slice(i, i + BATCH)
+      const results = await Promise.all(slice.map(s => loadPausesAggregates(s.id)))
+      for (const result of results) {
+        if (!result) continue
+        for (const pause of result.pauses) {
+          const tagId = resolveEffectiveTag(pause)?.id ?? SIN_TAG_ID
+          totals[tagId] = (totals[tagId] ?? 0) + pause.durationSec
+        }
+      }
+      done += slice.length
+      setLoadProgress({ current: done, total: pausesWithData.length })
+    }
+
+    setTagBreakdown(totals)
+    setLoadingTags(false)
+    setLoadProgress(null)
+  }, [pausesWithData])
+
+  const handleToggleTags = useCallback(() => {
+    const next = !tagOpen
+    setTagOpen(next)
+    if (next && tagBreakdown === null && !loadingTags) {
+      void doLoadTags()
+    }
+  }, [tagOpen, tagBreakdown, loadingTags, doLoadTags])
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   if (withData.length === 0) {
     return (
@@ -177,7 +298,7 @@ export function PauseKpiDashboard({ summaries }: PauseKpiDashboardProps) {
           />
         </div>
 
-        {/* Bar chart */}
+        {/* Bar chart por día/semana */}
         {chart.entries.length > 0 && (
           <div className="pt-1">
             {chart.grouped && (
@@ -204,6 +325,51 @@ export function PauseKpiDashboard({ summaries }: PauseKpiDashboardProps) {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Desglose por tag — lazy load */}
+        {kpis!.totalPauses > 0 && (
+          <div className="pt-2 border-t border-border/20">
+            <button
+              onClick={handleToggleTags}
+              className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {tagOpen
+                ? <ChevronUp className="w-3 h-3" />
+                : <ChevronDown className="w-3 h-3" />
+              }
+              <Tag className="w-3 h-3" />
+              Desglose por tag
+              <span className="text-muted-foreground/60 ml-0.5">
+                · {kpis!.totalPauses} pausas · {pausesWithData.length} turnos
+              </span>
+              {tagBreakdown !== null && (
+                <span className="text-muted-foreground/40 ml-0.5">
+                  · {Object.keys(tagBreakdown).length} categorías
+                </span>
+              )}
+            </button>
+
+            {/* Progreso de carga */}
+            {tagOpen && loadingTags && loadProgress && (
+              <div className="mt-2 space-y-1">
+                <p className="text-[11px] text-muted-foreground">
+                  Cargando pausas — {loadProgress.current}/{loadProgress.total} turnos…
+                </p>
+                <div className="h-1 bg-muted/30 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-amber-500/50 transition-all duration-150"
+                    style={{ width: `${(loadProgress.current / loadProgress.total) * 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Resultado */}
+            {tagOpen && tagBreakdown !== null && !loadingTags && (
+              <TagBreakdownChart tagBreakdown={tagBreakdown} />
+            )}
           </div>
         )}
       </CardContent>
