@@ -240,15 +240,86 @@ export function ShiftTimelineView({
   }, [totalMinutes])
 
   const downloadPNG = useCallback(() => {
-    const url = echartsRef.current?.getEchartsInstance()?.getDataURL({
-      type: 'png', pixelRatio: 2, backgroundColor: '#111827',
-    }) as string | undefined
-    if (!url) return
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `timeline-${shiftDoc?.id ?? 'turno'}.png`
-    a.click()
-  }, [shiftDoc?.id])
+    const instance = echartsRef.current?.getEchartsInstance()
+    if (!instance) return
+    const chartUrl = instance.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#111827' }) as string
+
+    // ── Metadata para la cabecera ──────────────────────────────────────────
+    const dateLabel = shiftDoc?.dateKey
+      ? new Date(`${shiftDoc.dateKey}T12:00:00`).toLocaleDateString('es-CL', {
+          weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+        })
+      : 'Fecha desconocida'
+    const shiftLabel = shiftDoc?.shiftId ?? 'Turno'
+
+    // Rango visible: convertir porcentaje de zoom a timestamps reales
+    const activeBuckets = timelineBuckets.filter(b => b.pieces > 0)
+    let rangeLabel = 'Rango completo'
+    if (activeBuckets.length >= 2) {
+      const n = activeBuckets.length - 1
+      const s = activeBuckets[Math.round((zoomState.start / 100) * n)]
+      const e = activeBuckets[Math.min(n, Math.round((zoomState.end / 100) * n))]
+      if (s && e) rangeLabel = `${fmtTime(s.tsMin)} → ${fmtTime(e.tsMin)}`
+    }
+
+    const isZoomed = zoomState.start > 1 || zoomState.end < 99
+    const p0Pct = summaryP0Pct
+    const p0Label = p0Pct != null
+      ? `P0% ${p0Pct.toFixed(2)}%${isZoomed ? ' (turno completo)' : ''}`
+      : null
+    const p0Color = p0Pct == null ? '#94a3b8'
+      : p0Pct <= alertThreshold ? '#22c55e'
+      : p0Pct <= criticalThreshold ? '#f59e0b'
+      : '#ef4444'
+
+    // ── Componer canvas: cabecera + chart ──────────────────────────────────
+    const img = new Image()
+    img.onload = () => {
+      const W = img.width
+      const HEADER_H = Math.round(W * 0.055)   // ~5.5% del ancho → ~88px a 1600px
+      const canvas = document.createElement('canvas')
+      canvas.width = W
+      canvas.height = img.height + HEADER_H
+      const ctx = canvas.getContext('2d')!
+
+      // Fondo cabecera
+      ctx.fillStyle = '#0f172a'
+      ctx.fillRect(0, 0, W, HEADER_H)
+      // Línea separadora amber
+      ctx.fillStyle = '#f59e0b'
+      ctx.fillRect(0, HEADER_H - 3, W, 3)
+
+      const base = Math.round(W * 0.016)
+
+      // Título principal
+      ctx.fillStyle = '#f8fafc'
+      ctx.font = `bold ${Math.round(base * 1.15)}px system-ui,sans-serif`
+      ctx.fillText(`GRADER Z2 · ${shiftLabel} · ${dateLabel}`, Math.round(W * 0.013), Math.round(HEADER_H * 0.42))
+
+      // Rango visible
+      ctx.fillStyle = '#94a3b8'
+      ctx.font = `${base}px system-ui,sans-serif`
+      ctx.fillText(`Rango: ${rangeLabel}`, Math.round(W * 0.013), Math.round(HEADER_H * 0.76))
+
+      // P0% (alineado a la derecha)
+      if (p0Label) {
+        ctx.fillStyle = p0Color
+        ctx.font = `bold ${Math.round(base * 1.15)}px system-ui,sans-serif`
+        ctx.textAlign = 'right'
+        ctx.fillText(p0Label, W - Math.round(W * 0.013), Math.round(HEADER_H * 0.58))
+        ctx.textAlign = 'left'
+      }
+
+      // Chart
+      ctx.drawImage(img, 0, HEADER_H)
+
+      const a = document.createElement('a')
+      a.href = canvas.toDataURL('image/png')
+      a.download = `timeline-${shiftDoc?.id ?? 'turno'}.png`
+      a.click()
+    }
+    img.src = chartUrl
+  }, [shiftDoc, timelineBuckets, zoomState, summaryP0Pct, alertThreshold, criticalThreshold])
 
   // Indexar piezas con peso por su causa clasificada (cliente-side)
   const piecesByCause = useMemo(() => {
@@ -368,33 +439,61 @@ export function ShiftTimelineView({
       const ts = Date.parse(tsMin)
       return ts >= productionWindow.startMs && ts <= productionWindow.endMs
     }
+    // Agrupar por hora (UTC — consistente con fmtTime que usa getUTCHours)
     const buckets = timelineBuckets.filter(b => b.pieces > 0 && inWin(b.tsMin))
-    const header = ['Hora', 'Piezas totales', 'Piezas OK', 'Piezas P0', 'P0%', 'Peso prom (g)', 'Calibre', 'Lote'].join(',')
-    const rows = buckets.map(b => {
-      const p0Pct = b.pieces > 0 ? ((b.p0Pieces / b.pieces) * 100).toFixed(2) : '0.00'
-      const avgG = b.weightCount && b.weightCount > 0 && b.weightKg
-        ? Math.round((b.weightKg / b.weightCount) * 1000)
-        : ''
-      return [
-        fmtTime(b.tsMin),
-        b.pieces,
-        b.pieces - b.p0Pieces,
-        b.p0Pieces,
-        p0Pct,
-        avgG,
-        b.dominantCalibre ?? '',
-        b.lot ?? '',
-      ].join(',')
+    type HourRow = {
+      hourLabel: string
+      pieces: number; ok: number; p0: number
+      weightKgSum: number; weightCount: number
+      calibres: Record<string, number>
+      pausesSec: number
+    }
+    const hourMap = new Map<string, HourRow>()
+    for (const b of buckets) {
+      const d = new Date(b.tsMin)
+      const hh = String(d.getUTCHours()).padStart(2, '0')
+      const key = `${hh}:00`
+      const row = hourMap.get(key) ?? {
+        hourLabel: key, pieces: 0, ok: 0, p0: 0,
+        weightKgSum: 0, weightCount: 0, calibres: {}, pausesSec: 0,
+      }
+      row.pieces += b.pieces
+      row.ok += b.pieces - b.p0Pieces
+      row.p0 += b.p0Pieces
+      if (b.weightKg) row.weightKgSum += b.weightKg
+      if (b.weightCount) row.weightCount += b.weightCount
+      if (b.dominantCalibre) row.calibres[b.dominantCalibre] = (row.calibres[b.dominantCalibre] ?? 0) + b.pieces
+      hourMap.set(key, row)
+    }
+
+    // Sumar pausas por hora
+    for (const pause of (pauses ?? [])) {
+      const d = new Date(pause.startAt)
+      const hh = String(d.getUTCHours()).padStart(2, '0')
+      const key = `${hh}:00`
+      const row = hourMap.get(key)
+      if (row) row.pausesSec += pause.durationSec
+    }
+
+    const SEP = ';'
+    const header = ['Hora', 'Piezas totales', 'Piezas OK', 'Piezas P0', 'P0%', 'Peso prom (g)', 'Calibre dominante', 'Tiempo muerto (min)'].join(SEP)
+    const rows = [...hourMap.values()].sort((a, b) => a.hourLabel.localeCompare(b.hourLabel)).map(row => {
+      const p0Pct = row.pieces > 0 ? ((row.p0 / row.pieces) * 100).toFixed(2) : '0,00'
+      const avgG = row.weightCount > 0 ? Math.round((row.weightKgSum / row.weightCount) * 1000) : ''
+      const calibre = Object.entries(row.calibres).sort((a, b) => b[1] - a[1])[0]?.[0] ?? ''
+      const pauseMin = row.pausesSec > 0 ? Math.round(row.pausesSec / 60) : ''
+      return [row.hourLabel, row.pieces, row.ok, row.p0, p0Pct, avgG, calibre, pauseMin].join(SEP)
     })
-    const csv = [header, ...rows].join('\n')
+
+    const csv = [header, ...rows].join('\r\n')
     const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `timeline-${shiftDoc?.id ?? 'turno'}.csv`
+    a.download = `resumen-${shiftDoc?.id ?? 'turno'}.csv`
     a.click()
     URL.revokeObjectURL(url)
-  }, [timelineBuckets, productionWindow, shiftDoc?.id])
+  }, [timelineBuckets, productionWindow, pauses, shiftDoc?.id])
 
   const chartOption = useMemo(() => {
     // Filtrar buckets: solo los del rango productivo real. Los pre/post-turno
