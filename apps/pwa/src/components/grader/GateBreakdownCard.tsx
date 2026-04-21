@@ -40,21 +40,26 @@ interface GateBreakdownCardProps {
 // ── Tipos internos ────────────────────────────────────────────────────────────
 
 interface CalibreGroup {
+  /** Label compuesto: "6-8 lb · Premium" */
+  label: string
   calibre: string
-  gates: number[]            // gate numbers asignados a este calibre
-  pieces: number             // piezas totales del calibre en el turno
-  productionPct: number      // % del total productivo
-  gatesPct: number           // % de gates activos asignados a este calibre
-  ratio: number              // productionPct / gatesPct
+  quality: string
+  gates: number[]
+  pieces: number
+  productionPct: number
+  gatesPct: number
+  ratio: number
   status: 'saturado' | 'optimo' | 'sobredimensionado'
 }
 
 interface Suggestion {
   fromGate: number
-  fromCalibre: string
-  toCalibre: string
+  fromLabel: string   // "2-4 lb · Premium"
+  toLabel: string     // "6-8 lb · Premium"
   fromPieces: number
-  reason: string
+  fromPct: number
+  satRatio: number
+  cautela: string     // razón de cautela específica
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -77,9 +82,8 @@ function qualityColor(q?: string): string {
   return '#6366f1'
 }
 
-/** Normaliza el calibre para agrupar (elimina espacios y mayúsculas). */
-function normCalibre(c: string): string {
-  return c.toLowerCase().replace(/\s+/g, '')
+function normKey(calibre: string, quality: string): string {
+  return `${calibre.toLowerCase().replace(/\s+/g, '')}__${quality.toLowerCase().replace(/\s+/g, '')}`
 }
 
 // ── Análisis de asignación ────────────────────────────────────────────────────
@@ -102,32 +106,31 @@ function computeAssignmentAnalysis(
     }
   }
 
-  // Agrupar gates por calibre normalizado
-  const byCalibNorm = new Map<string, {
-    calibre: string
-    gates: number[]
-    pieces: number
-  }>()
+  // Agrupar por COMBINACIÓN calibre + calidad — son dimensiones independientes
+  // G3 "6-8 lb · Industrial" y G10 "6-8 lb · Premium" NO son intercambiables
+  const byGroup = new Map<string, { calibre: string; quality: string; gates: number[]; pieces: number }>()
 
   for (const row of activeGates) {
     const cfg = gateConfigMap.get(row.gate)
     if (!cfg) continue
-    const key = normCalibre(cfg.calibre)
-    const entry = byCalibNorm.get(key) ?? { calibre: cfg.calibre, gates: [], pieces: 0 }
+    const key = normKey(cfg.calibre, cfg.quality)
+    const entry = byGroup.get(key) ?? { calibre: cfg.calibre, quality: cfg.quality, gates: [], pieces: 0 }
     entry.gates.push(row.gate)
     entry.pieces += row.pieces
-    byCalibNorm.set(key, entry)
+    byGroup.set(key, entry)
   }
 
   const numActiveGates = activeGates.length
 
-  // Calcular ratio de eficiencia por calibre
-  const calibreGroups: CalibreGroup[] = [...byCalibNorm.values()].map(g => {
+  const calibreGroups: CalibreGroup[] = [...byGroup.values()].map(g => {
+    const label = `${g.calibre} · ${g.quality}`
     const productionPct = totalProductivePieces > 0 ? (g.pieces / totalProductivePieces) * 100 : 0
     const gatesPct = (g.gates.length / numActiveGates) * 100
     const ratio = gatesPct > 0 ? productionPct / gatesPct : 0
     return {
+      label,
       calibre: g.calibre,
+      quality: g.quality,
       gates: g.gates,
       pieces: g.pieces,
       productionPct,
@@ -148,37 +151,68 @@ function computeAssignmentAnalysis(
     diagnosis = {
       label: 'Asignación subóptima',
       color: 'amber',
-      detail: `${topSat.calibre} saturado (ratio ${topSat.ratio.toFixed(1)}×) mientras ${topSobre.calibre} sobredimensionado (ratio ${topSobre.ratio.toFixed(1)}×)`,
+      detail: `${topSat.label} saturado (${topSat.ratio.toFixed(1)}×) · ${topSobre.label} sobredimensionado (${topSobre.ratio.toFixed(1)}×)`,
     }
   } else if (saturados.length > 0) {
     diagnosis = {
       label: 'Distribución natural',
       color: 'blue',
-      detail: `${saturados[0]!.calibre} dominó el turno — sin gates disponibles para reasignar`,
+      detail: `${saturados[0]!.label} dominó el turno — no hay combinaciones disponibles para reasignar`,
     }
   } else {
     diagnosis = {
       label: 'Asignación óptima',
       color: 'emerald',
-      detail: 'Todos los calibres dentro del rango de eficiencia (ratio 0.5–1.5×)',
+      detail: 'Todos los grupos calibre+calidad dentro del rango de eficiencia (0.5–1.5×)',
     }
   }
 
-  // Sugerencias concretas: por cada calibre saturado + sobredimensionado
+  // Sugerencias — solo cuando la calidad del grupo sobredimensionado es compatible
+  // con el grupo saturado (misma calidad o calidad "superior" asignable al destino).
+  // Se emite nota de cautela cuando las calidades difieren: un gate Industrial no
+  // puede recibir producto Premium sin reconfigurar los criterios de aceptación.
   const suggestions: Suggestion[] = []
+  const seenPairs = new Set<string>()
+
   for (const sat of saturados) {
     for (const sobre of sobredimensionados) {
-      // El gate a mover: el menos productivo dentro del calibre sobredimensionado
+      const pairKey = `${sat.label}__${sobre.label}`
+      if (seenPairs.has(pairKey)) continue
+      seenPairs.add(pairKey)
+
+      const sameQuality = sobre.quality.toLowerCase() === sat.quality.toLowerCase()
+      const sameCalibre = sobre.calibre.toLowerCase() === sat.calibre.toLowerCase()
+
+      // Cautela: si calibre o calidad difieren, el cambio implica reconfiguración
+      let cautela = ''
+      if (!sameQuality && !sameCalibre) {
+        cautela = `Requiere cambiar calibre (${sobre.calibre}→${sat.calibre}) Y calidad (${sobre.quality}→${sat.quality}) — verificar criterios de aceptación`
+      } else if (!sameQuality) {
+        cautela = `Mismo calibre pero calidad diferente (${sobre.quality}→${sat.quality}) — revisar si el grader acepta el cambio sin ajuste de parámetros`
+      } else if (!sameCalibre) {
+        cautela = `Misma calidad pero calibre diferente (${sobre.calibre}→${sat.calibre}) — ajustar rango de peso del gate`
+      } else {
+        cautela = 'Misma calidad y calibre — cambio directo sin riesgo de reconfiguración'
+      }
+
+      // Gate a mover: el menos productivo del grupo sobredimensionado
       const gateToMove = sobre.gates
         .map(g => ({ gate: g, pieces: productiveRows.find(r => r.gate === g)?.pieces ?? 0 }))
         .sort((a, b) => a.pieces - b.pieces)[0]
       if (!gateToMove) continue
+
+      const fromPct = totalProductivePieces > 0
+        ? (gateToMove.pieces / totalProductivePieces) * 100
+        : 0
+
       suggestions.push({
         fromGate: gateToMove.gate,
-        fromCalibre: sobre.calibre,
-        toCalibre: sat.calibre,
+        fromLabel: sobre.label,
+        toLabel: sat.label,
         fromPieces: gateToMove.pieces,
-        reason: `Libera carga de ${sat.calibre} (ratio ${sat.ratio.toFixed(1)}×)`,
+        fromPct,
+        satRatio: sat.ratio,
+        cautela,
       })
     }
   }
@@ -342,7 +376,7 @@ export function GateBreakdownCard({
               onClick={() => setShowAnalysis(v => !v)}
               className="w-full flex items-center justify-between py-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
             >
-              <span className="font-medium">Análisis de asignación por calibre</span>
+              <span className="font-medium">Análisis de asignación por calibre · calidad</span>
               {showAnalysis ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
             </button>
 
@@ -353,7 +387,7 @@ export function GateBreakdownCard({
                   <table className="w-full">
                     <thead className="bg-muted/20 text-muted-foreground">
                       <tr>
-                        <th className="px-2 py-1.5 text-left font-medium">Calibre</th>
+                        <th className="px-2 py-1.5 text-left font-medium">Calibre · Calidad</th>
                         <th className="px-2 py-1.5 text-center font-medium">Gates</th>
                         <th className="px-2 py-1.5 text-right font-medium">Producción</th>
                         <th className="px-2 py-1.5 text-right font-medium">Ratio</th>
@@ -362,8 +396,11 @@ export function GateBreakdownCard({
                     </thead>
                     <tbody>
                       {calibreGroups.map(g => (
-                        <tr key={g.calibre} className="border-t border-border/30 hover:bg-muted/10">
-                          <td className="px-2 py-1.5 font-medium">{g.calibre}</td>
+                        <tr key={g.label} className="border-t border-border/30 hover:bg-muted/10">
+                          <td className="px-2 py-1.5 font-medium">
+                            <span style={{ color: qualityColor(g.quality) }} className="inline-block w-1.5 h-1.5 rounded-full mr-1.5 align-middle" />
+                            {g.label}
+                          </td>
                           <td className="px-2 py-1.5 text-center text-muted-foreground">
                             {g.gates.map(n => `G${n}`).join(' ')}
                           </td>
@@ -414,10 +451,14 @@ export function GateBreakdownCard({
                             Reasignar G{s.fromGate}
                           </span>
                           <span className="text-muted-foreground ml-1">
-                            de {s.fromCalibre} → {s.toCalibre}
+                            de <span className="text-foreground/80">{s.fromLabel}</span>
+                            {' → '}<span className="text-foreground/80">{s.toLabel}</span>
                           </span>
                           <div className="text-muted-foreground/70 mt-0.5">
-                            G{s.fromGate} clasificó solo {s.fromPieces.toLocaleString('es-CL')} pzas este turno · {s.reason}
+                            G{s.fromGate} clasificó {s.fromPieces.toLocaleString('es-CL')} pzas ({s.fromPct.toFixed(1)}%) · destino saturado a {s.satRatio.toFixed(1)}×
+                          </div>
+                          <div className="text-amber-400/80 mt-0.5 text-[10px] italic">
+                            ⚠ {s.cautela}
                           </div>
                         </div>
                       </div>
