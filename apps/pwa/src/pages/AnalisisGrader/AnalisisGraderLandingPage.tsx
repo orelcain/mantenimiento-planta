@@ -16,6 +16,7 @@ import { useNavigate, Navigate } from 'react-router-dom'
 import { Card, CardContent, Badge, Button } from '@/components/ui'
 import { Upload, Activity, BarChart3, Settings2, TrendingUp, BookOpen, Eye } from 'lucide-react'
 import { usePermissionsStore } from '@/store'
+import { GlobalSettingsModal } from '@/components/grader/GlobalSettingsModal'
 import { listDailySummariesByRange } from '@/services/grader/graderDailySummary.service'
 import { computeShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import { DEFAULT_SHIFT_SCHEDULE } from '@/services/grader/graderShiftSchedule'
@@ -114,6 +115,8 @@ export function AnalisisGraderLandingPage() {
     return `${dayName} ${dayNum} ${monthName} · ${shortShift}`
   }, [lastClosedShift])
 
+  const [settingsOpen, setSettingsOpen] = useState(false)
+
   if (!canSee('analisisGrader')) return <Navigate to="/" replace />
 
   const goToTurno = (dateKey: string, shiftId: string) => {
@@ -130,11 +133,22 @@ export function AnalisisGraderLandingPage() {
       <Card className="border-primary/20 overflow-hidden">
         <CardContent className="p-4 sm:p-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="min-w-0">
-              <h1 className="text-xl sm:text-2xl font-bold">Análisis Grader</h1>
-              <p className="text-muted-foreground text-xs sm:text-sm mt-0.5">
-                Cargá el Excel exportado de Matrix para ver el estado del proceso
-              </p>
+            <div className="min-w-0 flex items-start justify-between gap-2">
+              <div>
+                <h1 className="text-xl sm:text-2xl font-bold">Análisis Grader</h1>
+                <p className="text-muted-foreground text-xs sm:text-sm mt-0.5">
+                  Cargá el Excel exportado de Matrix para ver el estado del proceso
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setSettingsOpen(true)}
+                title="Configuración global (umbrales + rangos)"
+                className="shrink-0 text-muted-foreground hover:text-foreground"
+              >
+                <Settings2 className="w-4 h-4" />
+              </Button>
             </div>
 
             {/* CTAs: mobile stack, desktop inline */}
@@ -206,8 +220,8 @@ export function AnalisisGraderLandingPage() {
         <QuickAccess
           icon={Settings2}
           title="Configuración"
-          subtitle="Gates, cintas, distancias"
-          onClick={() => navigate('/analisis-grader/wizard?tab=gates')}
+          subtitle="Umbrales · rangos · física"
+          onClick={() => setSettingsOpen(true)}
         />
         <QuickAccess
           icon={BookOpen}
@@ -230,6 +244,8 @@ export function AnalisisGraderLandingPage() {
         </div>
         <GraderHistoricalCalendar onLoadTurno={goToTurno} />
       </section>
+
+      <GlobalSettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
     </div>
   )
 }

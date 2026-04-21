@@ -97,3 +97,22 @@ export async function getModuleRanges(): Promise<GraderModuleConfig | null> {
   if (!snap.exists()) return null
   return snap.data() as GraderModuleConfig
 }
+
+/** Persiste umbrales P0% + rangos de calibre en el doc global (merge). */
+export async function saveModuleAnalysisConfig(params: {
+  alertThreshold: number
+  criticalThreshold: number
+  customWeightRanges: CalibreWeightRange[]
+  updatedBy: string
+}): Promise<void> {
+  const data = deepCleanUndefined({
+    id: 'global',
+    alertThreshold: params.alertThreshold,
+    criticalThreshold: params.criticalThreshold,
+    customWeightRanges: params.customWeightRanges,
+    updatedBy: params.updatedBy,
+    updatedAt: new Date().toISOString(),
+    _updatedAt: serverTimestamp(),
+  })
+  await setDoc(doc(db, COLLECTION, GLOBAL_ID), data, { merge: true })
+}
