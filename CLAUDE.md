@@ -685,6 +685,92 @@ Si se necesita re-procesar o corregir algo, usar `scripts/iter18-full-season-reb
 ### Antes de esta sesion (2026-04-09 manana) — v2.72.1
 - Calendario `<thead>` sticky top-0, modulos aprendizaje Seguridad y Marel activados, Editor Sidebar (`/admin/sidebar`) con @dnd-kit, modo alto contraste, preload lightbox, input validation 7 colecciones
 
+## Módulo Visor Planta 3D — Estilo y Tecnología
+
+### Ruta
+`/mantenimiento-planta/map/planta` → `MapaPlantaPage.tsx` → `PlantaScene3D.tsx`
+
+### Estilo visual objetivo (OBLIGATORIO respetarlo)
+El módulo debe replicar fielmente el estilo de las **infografías isométricas medievales virales de Instagram** (ej. ciudades árabes/europeas medievales en tonos cálidos con anotaciones en pergamino, cielo golden hour, sombras largas, vista 3/4 aérea). Características clave:
+
+- **Vista aérea isométrica** — cámara alta, ángulo ~35–45° respecto al suelo, sin perspectiva extrema
+- **Iluminación golden hour** — sol bajo en el horizonte (~15–20° sobre él), color naranja-ámbar intenso, sombras largas y cálidas, relleno azul-violeta del lado opuesto
+- **Paleta tierra cálida** — suelos en ocres/marrones, paredes en arena/arcilla, techos en tonos óxido/terracota/pizarra
+- **Anotaciones tipo pergamino** — etiquetas con fondo sepia, borde dorado, texto serif, línea de conexión al edificio
+- **Tarjetas de estadísticas estilo medieval** — esquinas redondeadas, fondo oscuro con borde dorado, texto serif en dorado/crema
+- **Edificios con carácter** — variación de alturas pronunciada, elementos decorativos (ventanas, rayas de categoría), techo a dos aguas si es posible
+
+### Stack técnico disponible (ya instalado en apps/pwa/package.json)
+- `@react-three/fiber` 8.17.10 + `@react-three/drei` 9.117.3 — Canvas, OrbitControls, Sky, Environment, Html, Line, ContactShadows
+- `three` r182 — geometrías, materiales, texturas canvas procedurales
+- `zustand` 5.0.2 — store `usePlanta3DStore`
+
+### Paquetes adicionales a considerar para fases futuras (instalar cuando se necesiten)
+- `@react-three/postprocessing` — Bloom, SSAO, Vignette, ChromaticAberration (iluminación cinematográfica)
+- `three-stdlib` — helpers adicionales de three.js
+- `maath` (ya incluida con drei) — funciones matemáticas para animaciones
+- `leva` — panel de control de parámetros en dev (debug de luces/cámara sin editar código)
+
+### Archivos del módulo
+```
+apps/pwa/src/
+  pages/MapaPlantaPage.tsx          — página principal (header + canvas + overlays)
+  components/map/3d/
+    PlantaScene3D.tsx               — Canvas R3F, cámara, luces, Sky, OrbitControls
+    Building3D.tsx                  — edificios clicables con label, status ring, overlay
+    Silo3D.tsx                      — silos/estanques cilíndricos con label
+    Ground3D.tsx                    — suelo procedural, muros perimetrales, torres
+    InfoPanel3D.tsx                 — panel deslizante derecho con detalles de zona
+    StatsCards.tsx                  — tarjetas absolutas top-left y top-right
+  data/zonas3d.ts                   — ZONAS[], SILOS[], MOCK_OT, constantes de color
+  store/usePlanta3DStore.ts         — estado global (selectedZona, toggles)
+```
+
+### Configuración de cámara de referencia
+```tsx
+camera={{ position: [65, 58, 65], fov: 45 }}  // vista aérea isométrica golden hour
+<OrbitControls maxPolarAngle={Math.PI / 2.25} minDistance={12} maxDistance={130} target={[0,2,0]} />
+```
+
+### Planos reales disponibles (PRÓXIMA PRIORIDAD)
+Ruta: `C:\Users\pc hp\OneDrive\ANTARFOOD\Mapas\`
+
+Archivos disponibles:
+- `planta principal.dwg` — AutoCAD de la nave de proceso (cotas en metros)
+- `planta principal.png` — imagen del plano arquitectónico (ya copiada a `public/maps/planta-principal.png`)
+- `recinto completo.dwg` — AutoCAD del predio completo
+- `recinto completo.png` — imagen del predio (ya copiada a `public/maps/recinto-completo.png`)
+- `mapa planta principal.pdf` — PDF de la planta
+- `vistas aereas varios años/` — carpeta con fotos aéreas históricas
+- `coordenadas gps 4 puntos del recinto completo/` — 4 capturas Google Earth con GPS de esquinas
+
+**GPS de las 4 esquinas del recinto:**
+| Punto | Latitud | Longitud | Elevación | Descripción |
+|-------|---------|----------|-----------|-------------|
+| A | 42°33'54.98"S | 73°40'47.68"W | ~49 m | Tierra — planta principal |
+| B | 42°37'41.07"S | 73°42'22.53"W | 0 m | Mar — jaulas acuicultura |
+| C | 42°37'41.61"S | 73°40'23.16"W | 0 m | Mar — jaulas acuicultura |
+| D | 42°38'00.20"S | 73°40'43.46"W | ~55 m | Tierra — recinto |
+
+Con Haversine A→D = dimensión real del recinto en metros. El DWG ya tiene cotas internas en metros.
+
+**Flujo DXF para 3D preciso:**
+1. En AutoCAD: `Archivo → Guardar como → DXF` (guarda `planta principal.dxf`)
+2. `pnpm add dxf-parser` → parsea coordenadas reales de cada muro/sala
+3. Script: DXF coords → normalizar a world units → reconstruir `zonas3d.ts` con posiciones/tamaños reales
+4. 1 unidad world = 1 metro real
+
+**Estado actual:** `planta-principal.png` ya está como textura translúcida en el suelo 3D (Ground3D.tsx, opacidad 0.35) como guía visual mientras se espera el DXF.
+
+### Fases de desarrollo
+- **Fase 1 (MVP)** ✅ — 12 edificios procedurales, 3 silos, suelo, muros, StatsCards, InfoPanel, labels pergamino, cámara ortográfica, toon shading, bloom, vignette
+- **Fase 1.5** ✅ — Techos piramidales, paleta medieval cálida, adoquines, chimeneas, niebla atmosférica
+- **Fase 2 (PLANOS)** — Incorporar planos DWG reales: textura de suelo con imagen del plano + reposicionar edificios con coordenadas reales
+- **Fase 3** — Toolbar vertical flotante, flechas de flujo animadas, tween de cámara al seleccionar edificio, marcadores IoT
+- **Fase 4** — three-dxf parser completo, modelos .glb con Draco, optimización mobile
+
+---
+
 ## Pendientes priorizados
 
 ### PENDIENTE — Grader iter 10 (sesión 2026-04-21)

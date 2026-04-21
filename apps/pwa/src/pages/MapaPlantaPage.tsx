@@ -1,80 +1,101 @@
-/**
- * MapaPlantaPage — Visor georeferenciado de planta Antarfood
- *
- * Reemplaza el visor isométrico 3D por un mapa 2D con:
- *  - Imagen aérea 2023 georeferenciada (4 puntos GPS reales)
- *  - Sensores IoT con estado en tiempo real
- *  - Incidencias con globos informativos y severidad
- *  - Heatmap gradual de zonas con mayor incidencia
- *  - Toggle de capas
- */
-
 import { Suspense, lazy } from 'react'
-import { Spinner } from '@/components/ui'
-import { useMapaPlanta } from '@/hooks/useMapaPlanta'
+import { Layers, Tag, ArrowRight } from 'lucide-react'
+import { StatsCards } from '@/components/map/3d/StatsCards'
+import { InfoPanel3D } from '@/components/map/3d/InfoPanel3D'
+import { usePlanta3DStore } from '@/store/usePlanta3DStore'
 
-// Lazy load para no cargar Leaflet en el bundle inicial
-const MapaPlanta = lazy(() =>
-  import('@/components/map/leaflet/MapaPlanta').then(m => ({ default: m.MapaPlanta }))
+const PlantaScene3D = lazy(() =>
+  import('@/components/map/3d/PlantaScene3D').then((m) => ({ default: m.PlantaScene3D })),
 )
 
-export function MapaPlantaPage() {
-  const {
-    capasActivas,
-    toggleCapa,
-    sensores,
-    incidencias,
-    setSensorSeleccionado,
-    setIncidenciaSeleccionada,
-  } = useMapaPlanta()
+function LoadingScene() {
+  return (
+    <div className="flex flex-col items-center justify-center h-full bg-gray-950 gap-3">
+      <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+      <span className="text-xs text-amber-500/70 font-serif italic">Cargando escena 3D…</span>
+    </div>
+  )
+}
 
-  const activas = incidencias.filter(i => i.estado === 'activa').length
-  const criticos = sensores.filter(s => s.estado === 'critico').length
+export function MapaPlantaPage() {
+  const { selectedZonaId, showEstados, showLabels, toggleEstados, toggleLabels } =
+    usePlanta3DStore()
 
   return (
-    <div className="flex flex-col h-screen bg-gray-950">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 bg-gray-900 border-b border-gray-800 shrink-0">
+    <div className="flex flex-col h-screen bg-gray-950 overflow-hidden">
+      {/* ── Header ── */}
+      <header className="flex items-center justify-between px-4 py-2 bg-gray-900/90 border-b border-gray-800/60 shrink-0 backdrop-blur-sm z-10">
         <div className="flex items-center gap-3">
-          <h1 className="text-sm font-semibold text-white">Visor de Planta</h1>
-          <span className="text-xs text-gray-500">Antarfood — Recinto Principal</span>
-        </div>
-        <div className="flex items-center gap-3">
-          {criticos > 0 && (
-            <span className="flex items-center gap-1 text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded-full">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
-              {criticos} sensor{criticos > 1 ? 'es' : ''} crítico{criticos > 1 ? 's' : ''}
-            </span>
-          )}
-          {activas > 0 && (
-            <span className="flex items-center gap-1 text-xs bg-orange-500/20 text-orange-400 px-2 py-1 rounded-full">
-              <span className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse" />
-              {activas} incidencia{activas > 1 ? 's' : ''} activa{activas > 1 ? 's' : ''}
-            </span>
-          )}
-          <span className="text-[10px] text-gray-600">
-            {sensores.length} sensores · {incidencias.length} incidencias
-          </span>
-        </div>
-      </div>
-
-      {/* Mapa — ocupa todo el espacio restante */}
-      <div className="flex-1 relative">
-        <Suspense fallback={
-          <div className="flex items-center justify-center h-full bg-gray-950">
-            <Spinner className="w-8 h-8 text-blue-500" />
+          <span className="text-amber-400 text-base select-none" aria-hidden>⚜</span>
+          <div>
+            <h1 className="text-sm font-bold text-white font-serif leading-none tracking-wide">
+              VISOR PLANTA ANTARFOOD
+            </h1>
+            <p className="text-[10px] text-gray-500 mt-0.5">
+              Punta Arenas · Vista 3D interactiva
+            </p>
           </div>
-        }>
-          <MapaPlanta
-            sensores={sensores}
-            incidencias={incidencias}
-            capasActivas={capasActivas}
-            onToggleCapa={toggleCapa}
-            onSensorClick={setSensorSeleccionado}
-            onIncidenciaClick={setIncidenciaSeleccionada}
-          />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={toggleEstados}
+            title="Mostrar/ocultar estados de equipos"
+            className={`flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded border transition-all ${
+              showEstados
+                ? 'border-green-500/70 text-green-400 bg-green-500/10'
+                : 'border-gray-600 text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            <Layers size={11} />
+            Estados
+          </button>
+          <button
+            onClick={toggleLabels}
+            title="Mostrar/ocultar etiquetas de edificios"
+            className={`flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded border transition-all ${
+              showLabels
+                ? 'border-amber-500/70 text-amber-400 bg-amber-500/10'
+                : 'border-gray-600 text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            <Tag size={11} />
+            Etiquetas
+          </button>
+
+          <div className="w-px h-4 bg-gray-700 mx-1" />
+
+          <span className="text-[10px] text-gray-600">
+            Toca un edificio para ver detalles
+          </span>
+          <ArrowRight size={10} className="text-gray-600" />
+        </div>
+      </header>
+
+      {/* ── Canvas + Overlays ── */}
+      <main className="flex-1 relative overflow-hidden">
+        <Suspense fallback={<LoadingScene />}>
+          <PlantaScene3D />
         </Suspense>
-      </div>
+
+        {/* Stats cards (top-left y top-right) */}
+        <StatsCards />
+
+        {/* Hint de navegación */}
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 pointer-events-none">
+          <div className="bg-black/50 backdrop-blur-sm text-[10px] text-gray-400 px-3 py-1.5 rounded-full border border-gray-700/50">
+            Arrastra para rotar · Scroll para zoom · Click en edificio para detalles
+          </div>
+        </div>
+
+        {/* Info panel — desliza desde la derecha */}
+        <div
+          className="absolute top-0 right-0 h-full transition-transform duration-300 ease-out z-20"
+          style={{ transform: selectedZonaId ? 'translateX(0)' : 'translateX(100%)' }}
+        >
+          <InfoPanel3D />
+        </div>
+      </main>
     </div>
   )
 }
