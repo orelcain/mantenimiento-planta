@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.140.0' as const
+export const APP_VERSION = '2.141.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-04-21' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'feat(grader): CurrentGateConfigPanel — grilla colapsable config actual de los 12 gates en turno' as const
+export const VERSION_NAME = 'feat(grader): PauseKpiDashboard — 4 KPIs tiempo muerto + barras por día en página Período' as const
 
 /**
  * Nota:

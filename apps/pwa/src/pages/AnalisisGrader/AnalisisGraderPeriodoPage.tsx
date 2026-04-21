@@ -46,6 +46,7 @@ import { aggregateAttribution, type AggregatedAttribution } from '@/services/gra
 import { reclassifyShift, type ReclassifyResult } from '@/services/grader/graderReclassifier'
 import { useIsAdmin } from '@/store'
 import type { GraderDailySummary } from '@/services/grader/types'
+import { PauseKpiDashboard } from '@/components/grader/PauseKpiDashboard'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -491,6 +492,9 @@ export function AnalisisGraderPeriodoPage() {
               <TopActionsCard attribution={attribution} />
             )}
           </div>
+
+          {/* ── Tiempo muerto del período ──────────────────────────────── */}
+          <PauseKpiDashboard summaries={allSummaries} />
         </>
       )}
     </div>
