@@ -671,6 +671,7 @@ export function AnalisisGraderTurnoPage() {
             snapshots={configSnapshots}
             timelineBuckets={enrichedTimelineBuckets}
             onChange={reloadConfigSnapshots}
+            allowEdit={shiftWindow?.status === 'live'}
           />
 
           {/* ── Sección IA ─────────────────────────────────────────────── */}

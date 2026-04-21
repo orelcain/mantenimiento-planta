@@ -31,6 +31,8 @@ interface Props {
   timelineBuckets?: TimelineBucket[]
   /** Callback tras guardar un nuevo cambio — el caller refresca snapshots */
   onChange?: () => void
+  /** Si false, deshabilita el botón de registro (turno ya cerrado) */
+  allowEdit?: boolean
 }
 
 const FIELD_LABELS: Record<ConfigDiff['field'], string> = {
@@ -216,7 +218,7 @@ function ConfigChangeRow({ snap, isFirst, verdict }: RowProps) {
   )
 }
 
-export function ConfigChangeHistory({ shiftDocId, snapshots, timelineBuckets, onChange }: Props) {
+export function ConfigChangeHistory({ shiftDocId, snapshots, timelineBuckets, onChange, allowEdit = true }: Props) {
   // Filtrar snapshots "ruido": manuales sin cambios reales (changes=0 && !synthetic)
   // suelen quedar al abrir el wizard de config sin tocar nada — no aportan info.
   // Synthetic con changes=0 SÍ se muestran (representan la config inicial inferida).
@@ -251,6 +253,7 @@ export function ConfigChangeHistory({ shiftDocId, snapshots, timelineBuckets, on
           shiftDocId={shiftDocId}
           variant="compact"
           onSaved={onChange}
+          allowEdit={allowEdit}
         />
       </CardHeader>
 

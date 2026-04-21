@@ -48,6 +48,8 @@ interface QuickGateChangeButtonProps {
   initialReason?: string
   /** Etiqueta personalizada del botón disparador */
   triggerLabel?: string
+  /** Si false, el botón queda deshabilitado (ej. turno ya cerrado) */
+  allowEdit?: boolean
 }
 
 export function QuickGateChangeButton({
@@ -60,6 +62,7 @@ export function QuickGateChangeButton({
   initialQuality,
   initialReason,
   triggerLabel,
+  allowEdit = true,
 }: QuickGateChangeButtonProps) {
   const isAdmin = useIsAdmin()
   const user = useAuthStore(s => s.user)
@@ -180,7 +183,9 @@ export function QuickGateChangeButton({
         size={variant === 'compact' ? 'sm' : 'default'}
         variant="outline"
         onClick={() => setOpen(true)}
+        disabled={!allowEdit}
         className={className}
+        title={!allowEdit ? 'Solo se pueden registrar cambios en un turno en vivo' : undefined}
       >
         <Settings2 className={variant === 'compact' ? 'w-3 h-3 mr-1' : 'w-4 h-4 mr-1.5'} />
         {triggerLabel ?? (variant === 'compact' ? 'Cambiar gate' : 'Registrar cambio de gate')}
