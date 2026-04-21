@@ -6,17 +6,40 @@
  *
  * Desglose por tag: lazy-load de meta/pauses solo al expandir la sección,
  * en batches de 15 para no saturar Firestore. Se resetea al cambiar el período.
+ *
+ * Panel de anotación batch: solo admins. Lista pausas sin clasificar del período
+ * con selector inline de tag. Optimistic update de tagBreakdown al guardar.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
-import { Activity, ChevronDown, ChevronUp, Clock, PauseCircle, Tag, TrendingDown } from 'lucide-react'
-import { loadPausesAggregates } from '@/services/grader/graderDailySummary.service'
+import {
+  Activity,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  Edit3,
+  PauseCircle,
+  Tag,
+  TrendingDown,
+} from 'lucide-react'
+import {
+  loadPausesAggregates,
+  updatePauseAnnotation,
+} from '@/services/grader/graderDailySummary.service'
 import { GRADER_PAUSE_TAGS, resolveEffectiveTag } from '@/services/grader/graderPauseTags'
-import type { GraderDailySummary } from '@/services/grader/types'
+import type { GraderDailySummary, Pause } from '@/services/grader/types'
+import { useIsAdmin, useAuthStore } from '@/store/authStore'
 
 interface PauseKpiDashboardProps {
   summaries: GraderDailySummary[]
+}
+
+interface UntaggedPause {
+  summaryId: string
+  dateKey: string
+  shiftId: string
+  pause: Pause
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -106,6 +129,85 @@ function TagBreakdownChart({ tagBreakdown }: { tagBreakdown: Record<string, numb
   )
 }
 
+// ── Panel de anotación batch ──────────────────────────────────────────────────
+
+function PauseAnnotationPanel({
+  untagged,
+  annotatedBy,
+  onSaved,
+}: {
+  untagged: UntaggedPause[]
+  annotatedBy: string
+  onSaved: (summaryId: string, pauseId: string, tagId: string, durationSec: number) => void
+}) {
+  const [selections, setSelections] = useState<Record<string, string>>({})
+  const [saving, setSaving] = useState<Record<string, boolean>>({})
+  const [saved, setSaved] = useState<Set<string>>(new Set())
+
+  const pending = untagged.filter(u => !saved.has(`${u.summaryId}::${u.pause.id}`))
+
+  if (pending.length === 0) {
+    return (
+      <p className="mt-2 text-[11px] text-green-600 dark:text-green-400">
+        ✓ Todas las pausas del período están clasificadas.
+      </p>
+    )
+  }
+
+  async function handleSave(item: UntaggedPause) {
+    const key = `${item.summaryId}::${item.pause.id}`
+    const tagId = selections[key]
+    if (!tagId) return
+    setSaving(s => ({ ...s, [key]: true }))
+    try {
+      await updatePauseAnnotation(item.summaryId, item.pause.id, { tagId, annotatedBy })
+      setSaved(s => new Set([...s, key]))
+      onSaved(item.summaryId, item.pause.id, tagId, item.pause.durationSec)
+    } finally {
+      setSaving(s => ({ ...s, [key]: false }))
+    }
+  }
+
+  return (
+    <div className="mt-2 space-y-1 max-h-72 overflow-y-auto pr-1">
+      {pending.map(item => {
+        const key = `${item.summaryId}::${item.pause.id}`
+        const isSaving = saving[key] ?? false
+        const dateLabel = new Date(`${item.dateKey}T12:00:00`)
+          .toLocaleDateString('es-CL', { day: 'numeric', month: 'short' })
+          .replace('.', '')
+        const durLabel = fmtSec(item.pause.durationSec)
+
+        return (
+          <div key={key} className="flex items-center gap-2 text-[11px]">
+            <span className="w-14 shrink-0 text-muted-foreground tabular-nums">{dateLabel}</span>
+            <span className="w-10 shrink-0 text-muted-foreground/60 truncate">{item.shiftId.replace('Turno ', '')}</span>
+            <span className="w-8 shrink-0 text-muted-foreground tabular-nums">{durLabel}</span>
+            <select
+              className="flex-1 h-6 rounded border border-border/50 bg-background text-[11px] px-1"
+              value={selections[key] ?? ''}
+              onChange={e => setSelections(s => ({ ...s, [key]: e.target.value }))}
+              disabled={isSaving}
+            >
+              <option value="">— elegir —</option>
+              {GRADER_PAUSE_TAGS.map(t => (
+                <option key={t.id} value={t.id}>{t.emoji} {t.label}</option>
+              ))}
+            </select>
+            <button
+              onClick={() => void handleSave(item)}
+              disabled={!selections[key] || isSaving}
+              className="shrink-0 px-2 h-6 rounded text-[11px] bg-amber-500/80 text-white disabled:opacity-30 hover:bg-amber-500 transition-colors"
+            >
+              {isSaving ? '…' : 'OK'}
+            </button>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 type ChartEntry = { key: string; sec: number; pct: number; label: string }
 
 function buildChartEntries(withData: GraderDailySummary[]): { entries: ChartEntry[]; grouped: boolean } {
@@ -161,6 +263,12 @@ function buildChartEntries(withData: GraderDailySummary[]): { entries: ChartEntr
 // ── Componente principal ──────────────────────────────────────────────────────
 
 export function PauseKpiDashboard({ summaries }: PauseKpiDashboardProps) {
+  const isAdmin = useIsAdmin()
+  const user = useAuthStore(s => s.user)
+  const annotatedBy = user?.nombre
+    ? `${user.nombre}${user.apellido ? ' ' + user.apellido : ''}`
+    : (user?.email ?? 'admin')
+
   const withData = useMemo(
     () => summaries.filter(s => s.totalDeadTimeSec !== undefined),
     [summaries],
@@ -190,17 +298,23 @@ export function PauseKpiDashboard({ summaries }: PauseKpiDashboardProps) {
   )
 
   // Estado del desglose por tag
-  const [tagOpen, setTagOpen]           = useState(false)
-  const [tagBreakdown, setTagBreakdown] = useState<Record<string, number> | null>(null)
-  const [loadingTags, setLoadingTags]   = useState(false)
-  const [loadProgress, setLoadProgress] = useState<{ current: number; total: number } | null>(null)
+  const [tagOpen, setTagOpen]               = useState(false)
+  const [tagBreakdown, setTagBreakdown]     = useState<Record<string, number> | null>(null)
+  const [loadingTags, setLoadingTags]       = useState(false)
+  const [loadProgress, setLoadProgress]    = useState<{ current: number; total: number } | null>(null)
 
-  // Resetear desglose cuando cambia el período
+  // Estado del panel de anotación
+  const [untaggedPauses, setUntaggedPauses] = useState<UntaggedPause[] | null>(null)
+  const [annotationOpen, setAnnotationOpen] = useState(false)
+
+  // Resetear todo cuando cambia el período
   useEffect(() => {
     setTagBreakdown(null)
     setTagOpen(false)
     setLoadingTags(false)
     setLoadProgress(null)
+    setUntaggedPauses(null)
+    setAnnotationOpen(false)
   }, [summaries])
 
   const doLoadTags = useCallback(async () => {
@@ -209,17 +323,29 @@ export function PauseKpiDashboard({ summaries }: PauseKpiDashboardProps) {
     setLoadProgress({ current: 0, total: pausesWithData.length })
 
     const totals: Record<string, number> = {}
+    const collected: UntaggedPause[] = []
     const BATCH = 15
     let done = 0
 
     for (let i = 0; i < pausesWithData.length; i += BATCH) {
       const slice = pausesWithData.slice(i, i + BATCH)
       const results = await Promise.all(slice.map(s => loadPausesAggregates(s.id)))
-      for (const result of results) {
+      for (let j = 0; j < results.length; j++) {
+        const result = results[j]
         if (!result) continue
+        const summary = slice[j]!
         for (const pause of result.pauses) {
-          const tagId = resolveEffectiveTag(pause)?.id ?? SIN_TAG_ID
+          const resolved = resolveEffectiveTag(pause)
+          const tagId = resolved?.id ?? SIN_TAG_ID
           totals[tagId] = (totals[tagId] ?? 0) + pause.durationSec
+          if (!resolved) {
+            collected.push({
+              summaryId: summary.id,
+              dateKey: summary.dateKey,
+              shiftId: summary.shiftId,
+              pause,
+            })
+          }
         }
       }
       done += slice.length
@@ -227,6 +353,7 @@ export function PauseKpiDashboard({ summaries }: PauseKpiDashboardProps) {
     }
 
     setTagBreakdown(totals)
+    setUntaggedPauses(collected)
     setLoadingTags(false)
     setLoadProgress(null)
   }, [pausesWithData])
@@ -238,6 +365,28 @@ export function PauseKpiDashboard({ summaries }: PauseKpiDashboardProps) {
       void doLoadTags()
     }
   }, [tagOpen, tagBreakdown, loadingTags, doLoadTags])
+
+  // Optimistic update cuando se guarda una anotación desde el panel
+  const handlePauseSaved = useCallback(
+    (summaryId: string, pauseId: string, tagId: string, durationSec: number) => {
+      setTagBreakdown(prev => {
+        if (!prev) return prev
+        const next = { ...prev }
+        // Quitar del bucket sin_tag
+        if (next[SIN_TAG_ID] !== undefined) {
+          next[SIN_TAG_ID] = Math.max(0, (next[SIN_TAG_ID] ?? 0) - durationSec)
+          if (next[SIN_TAG_ID] === 0) delete next[SIN_TAG_ID]
+        }
+        // Sumar al bucket del tag elegido
+        next[tagId] = (next[tagId] ?? 0) + durationSec
+        return next
+      })
+      setUntaggedPauses(prev =>
+        prev ? prev.filter(u => !(u.summaryId === summaryId && u.pause.id === pauseId)) : prev,
+      )
+    },
+    [],
+  )
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -256,6 +405,10 @@ export function PauseKpiDashboard({ summaries }: PauseKpiDashboardProps) {
       </Card>
     )
   }
+
+  const sinTagCount = tagBreakdown?.[SIN_TAG_ID] !== undefined
+    ? (untaggedPauses?.length ?? 0)
+    : 0
 
   return (
     <Card>
@@ -369,6 +522,34 @@ export function PauseKpiDashboard({ summaries }: PauseKpiDashboardProps) {
             {/* Resultado */}
             {tagOpen && tagBreakdown !== null && !loadingTags && (
               <TagBreakdownChart tagBreakdown={tagBreakdown} />
+            )}
+
+            {/* Panel de anotación batch — solo admins, solo si hay sin clasificar */}
+            {tagOpen && tagBreakdown !== null && !loadingTags && isAdmin && sinTagCount > 0 && (
+              <div className="mt-3 pt-2 border-t border-border/20">
+                <button
+                  onClick={() => setAnnotationOpen(o => !o)}
+                  className="flex items-center gap-1.5 text-[11px] text-amber-600 dark:text-amber-400 hover:text-amber-500 transition-colors"
+                >
+                  {annotationOpen
+                    ? <ChevronUp className="w-3 h-3" />
+                    : <ChevronDown className="w-3 h-3" />
+                  }
+                  <Edit3 className="w-3 h-3" />
+                  Clasificar sin clasificar
+                  <span className="text-muted-foreground/60 ml-0.5">
+                    · {sinTagCount} pausas pendientes
+                  </span>
+                </button>
+
+                {annotationOpen && untaggedPauses !== null && (
+                  <PauseAnnotationPanel
+                    untagged={untaggedPauses}
+                    annotatedBy={annotatedBy}
+                    onSaved={handlePauseSaved}
+                  />
+                )}
+              </div>
             )}
           </div>
         )}
