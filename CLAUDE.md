@@ -687,6 +687,32 @@ Si se necesita re-procesar o corregir algo, usar `scripts/iter18-full-season-reb
 
 ## Pendientes priorizados
 
+### PENDIENTE — Grader iter 9 (sesión 2026-04-21, continuación)
+
+**P1 — Alta prioridad**
+
+- 🔲 **PNG con cabecera de metadata** — el botón PNG básico existe en v2.134.0 (ECharts `getDataURL`), pero el usuario quiere un PNG compuesto con header (fecha, turno, rango visible, P0%). Decidido como parte del plan "3 componentes" (PNG + QR + link). `ShiftTimelineView.tsx`.
+- 🔲 **CSV separador `;` + resumen por hora** — el CSV actual usa `,` (no abre bien en Excel Chile) y genera fila-por-minuto (útil para analistas, no para gerentes). Pendiente: separador `;` + versión con 1 fila por hora (Hora, Pzas, P0%, Calibre dominante, Pausas). `ShiftTimelineView.tsx`.
+- 🔲 **Link público con token temporal** — Firestore `graderPublicTokens` (UUID, expiración 7 días). Ruta read-only `/view/:token` sin login. Reglas Firestore: lectura permitida solo con token válido y no expirado. Botón "Compartir turno" en `AnalisisGraderTurnoPage`. (~1 día)
+- 🔲 **QR del link** — generar QR con librería `qrcode.react` (ya en deps) y embeber en el PNG de cabecera. Supervisor escanea y abre turno en el celular sin login.
+- 🔲 **Refactor config Grader — Fase A** — mover las 12 Gates + configuración Física al acordeón del detalle de turno (`AnalisisGraderTurnoPage`), en lugar de vivir solo en la página de config global. Botón "Cambié gate" mid-turno + segmentación automática antes/después del cambio. Plan de 3 fases acordado sesión 2026-04-19. Es el pendiente estructural más importante.
+
+**P2 — Media prioridad**
+
+- 🔲 **Fase 3b — Edición manual de rangos de pausas** — drag handles en bandas del Timeline para redimensionar/crear/descartar pausas. Estado local complejo + persistir a Firestore + no pisar el detector automático. `ShiftTimelineView.tsx`. (~2-3 días)
+- 🔲 **Fase 4 — CRUD admin de tags** — página admin para gestionar `graderPauseTags` en Firestore (crear/renombrar/cambiar color+emoji/archivar). Hoy los 9 tags están hardcoded en `graderPauseTags.ts`. Reglas Firestore nuevas. (~2-3 días)
+- 🔲 **Re-upload pieceRecords productivas** — 383 turnos × ~5M pieceRecords a Firestore (script batch idempotente, mismo patrón que el script P0 de la temporada). Sin esto, el timeline segundo a segundo solo funciona desde la fecha de la primera carga manual.
+
+---
+
+### P1.12 — ✅ COMPLETADO sesión 2026-04-21 (Análisis Grader iter 9, v2.134.0→v2.143.0)
+
+- ✅ **v2.134.0** — Export PNG + Export CSV + Selector rango (`Todo / 1h / 10min`) en `ShiftTimelineView`. PNG: `getDataURL(pixelRatio:2)` con renderer canvas. CSV: fila por minuto con BOM UTF-8 para Excel, excluyendo minutos pre/post-turno. Rango: `dataZoom.start/end` proporcional al `totalMinutes` real.
+- ✅ **v2.135.0** — `GateBreakdownCard`: card analítico nuevo entre Timeline y configuraciones en `AnalisisGraderTurnoPage`. Muestra distribución de piezas y tiempo muerto por gate con barras horizontales, P0% per-gate, std-dev. Agrega `useGraderShiftAnalytics` existente.
+- ✅ **v2.141.0** — `PauseKpiDashboard`: 4 KPI cards (total muerto, pausas ≥5min, promedio turno, % muerto) + barchart CSS por día (agrupado por semana si >60 días). Integrado en `AnalisisGraderPeriodoPage` usando `allSummaries` ya cargados (0 queries extra).
+- ✅ **v2.142.0** — Desglose por tag en `PauseKpiDashboard`: lazy-load de `meta/pauses` en batches de 15, barra de progreso, `TagBreakdownChart` con barras de colores por categoría + porcentaje. Auto-reset al cambiar período.
+- ✅ **v2.143.0** — Panel anotación batch en `PauseKpiDashboard`: visible solo para admins cuando hay pausas sin clasificar. Selector inline + botón OK por pausa. Optimistic update de `tagBreakdown` al guardar (resta de `__sin_tag`, suma al bucket elegido).
+
 ### P0 — ✅ COMPLETADO sesión 2026-04-19 (v2.132.0 — enrichment full columns)
 - ✅ **Script reclassify amplio**: parser extrae Lote + Conservación + Producto + Turno A/B (además de Calidad + Calibre ya existentes)
 - ✅ **`computeEnrichment()`** agrega por minuto (`bucketExtrasByMinute`) y por turno (`lotsInShift`, `calidadBreakdown`, `productoBreakdown`, `conservacionBreakdown`)
