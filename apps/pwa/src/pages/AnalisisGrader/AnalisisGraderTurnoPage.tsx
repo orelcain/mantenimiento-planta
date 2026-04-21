@@ -9,7 +9,8 @@
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useParams, useNavigate, Navigate } from 'react-router-dom'
 import { Button, Card, CardContent, Spinner, Badge } from '@/components/ui'
-import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check } from 'lucide-react'
+import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode } from 'lucide-react'
+import { QRCodeSVG } from 'qrcode.react'
 import { usePermissionsStore } from '@/store'
 import { useAuthStore, useIsAdmin } from '@/store/authStore'
 import { getDailySummary, loadTimelineAggregates, loadPausesAggregates, listDailySummariesByRange, listGate0PieceRecords, type FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
@@ -722,25 +723,42 @@ export function AnalisisGraderTurnoPage() {
                 )}
               </div>
               {shareUrl && (
-                <div className="flex items-center gap-2">
-                  <code className="flex-1 truncate rounded bg-muted px-2 py-1 text-[11px] text-muted-foreground">
-                    {shareUrl}
-                  </code>
-                  <button
-                    onClick={handleCopy}
-                    className="shrink-0 flex items-center gap-1 rounded bg-amber-500/80 hover:bg-amber-500 text-white text-[11px] px-2 py-1 transition-colors"
-                    title="Copiar link"
-                  >
-                    {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                    {copied ? 'Copiado' : 'Copiar'}
-                  </button>
-                  <button
-                    onClick={() => { setShareUrl(null); setCopied(false) }}
-                    className="shrink-0 text-[11px] text-muted-foreground/60 hover:text-muted-foreground px-1"
-                    title="Generar nuevo link"
-                  >
-                    nuevo
-                  </button>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 truncate rounded bg-muted px-2 py-1 text-[11px] text-muted-foreground">
+                      {shareUrl}
+                    </code>
+                    <button
+                      onClick={handleCopy}
+                      className="shrink-0 flex items-center gap-1 rounded bg-amber-500/80 hover:bg-amber-500 text-white text-[11px] px-2 py-1 transition-colors"
+                      title="Copiar link"
+                    >
+                      {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                      {copied ? 'Copiado' : 'Copiar'}
+                    </button>
+                    <button
+                      onClick={() => { setShareUrl(null); setCopied(false) }}
+                      className="shrink-0 text-[11px] text-muted-foreground/60 hover:text-muted-foreground px-1"
+                      title="Generar nuevo link"
+                    >
+                      nuevo
+                    </button>
+                  </div>
+                  {/* QR code para escanear desde celular */}
+                  <div className="flex items-start gap-3 pt-1">
+                    <div className="rounded-lg border border-border/40 bg-white p-1.5">
+                      <QRCodeSVG value={shareUrl} size={100} level="M" includeMargin={false} />
+                    </div>
+                    <div className="flex flex-col justify-center gap-1 pt-1">
+                      <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                        <QrCode className="w-3 h-3" />
+                        Escanear con el celular
+                      </div>
+                      <p className="text-[10px] text-muted-foreground/50">
+                        Abre la vista de turno sin necesidad de login
+                      </p>
+                    </div>
+                  </div>
                 </div>
               )}
               <p className="text-[10px] text-muted-foreground/40">
