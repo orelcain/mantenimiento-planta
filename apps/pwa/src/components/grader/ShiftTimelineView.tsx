@@ -10,10 +10,10 @@
  * Usa ECharts (consistente con GraderTimelineChart).
  */
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import ReactECharts from 'echarts-for-react'
 import { Card, CardContent, CardHeader, CardTitle, Button } from '@/components/ui'
-import { Upload, Wrench, Clock, X } from 'lucide-react'
+import { Upload, Wrench, Clock, X, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { TimelineBucket, MatrixP0Cause, Pause, MicroDetentionsSummary } from '@/services/grader/types'
 import type { GraderShiftDoc } from '@/services/grader/graderShifts.service'
@@ -217,6 +217,39 @@ export function ShiftTimelineView({
   const causesArr = useMemo(() => [...(selectedCauses ?? new Set<MatrixP0Cause>())], [selectedCauses])
   const hasSelection = causesArr.length > 0
 
+  // ── Export PNG / CSV + selector de rango ─────────────────────────────────
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const echartsRef = useRef<any>(null)
+  const [activeZoom, setActiveZoom] = useState<'10min' | '1h' | 'turno'>('turno')
+  const [zoomState, setZoomState] = useState({ start: 0, end: 100 })
+
+  const totalMinutes = useMemo(() => {
+    const buckets = timelineBuckets.filter(b => b.pieces > 0)
+    if (buckets.length === 0) return 480
+    const effectiveStartMs = Date.parse(buckets[0]!.tsMin) - 10 * 60_000
+    const effectiveEndMs = Date.parse(buckets[buckets.length - 1]!.tsMin) + 10 * 60_000
+    return Math.min(24 * 60, Math.max(1, Math.round((effectiveEndMs - effectiveStartMs) / 60_000)))
+  }, [timelineBuckets])
+
+  const handleZoomPreset = useCallback((preset: '10min' | '1h' | 'turno') => {
+    setActiveZoom(preset)
+    let start = 0
+    if (preset === '10min') start = Math.max(0, 100 - Math.round((10 / totalMinutes) * 100))
+    else if (preset === '1h') start = Math.max(0, 100 - Math.round((60 / totalMinutes) * 100))
+    setZoomState({ start, end: 100 })
+  }, [totalMinutes])
+
+  const downloadPNG = useCallback(() => {
+    const url = echartsRef.current?.getEchartsInstance()?.getDataURL({
+      type: 'png', pixelRatio: 2, backgroundColor: '#111827',
+    }) as string | undefined
+    if (!url) return
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `timeline-${shiftDoc?.id ?? 'turno'}.png`
+    a.click()
+  }, [shiftDoc?.id])
+
   // Indexar piezas con peso por su causa clasificada (cliente-side)
   const piecesByCause = useMemo(() => {
     type Point = { time: string; grams: number; ts: string; calibre?: string; quality?: string; error?: string }
@@ -328,6 +361,40 @@ export function ShiftTimelineView({
       .reduce((s, b) => s + b.pieces, 0)
     return { startTs, endTs, startMs, endMs, dummyLots, excludedPieces }
   }, [timelineBuckets])
+
+  const downloadCSV = useCallback(() => {
+    const inWin = (tsMin: string) => {
+      if (!productionWindow) return true
+      const ts = Date.parse(tsMin)
+      return ts >= productionWindow.startMs && ts <= productionWindow.endMs
+    }
+    const buckets = timelineBuckets.filter(b => b.pieces > 0 && inWin(b.tsMin))
+    const header = ['Hora', 'Piezas totales', 'Piezas OK', 'Piezas P0', 'P0%', 'Peso prom (g)', 'Calibre', 'Lote'].join(',')
+    const rows = buckets.map(b => {
+      const p0Pct = b.pieces > 0 ? ((b.p0Pieces / b.pieces) * 100).toFixed(2) : '0.00'
+      const avgG = b.weightCount && b.weightCount > 0 && b.weightKg
+        ? Math.round((b.weightKg / b.weightCount) * 1000)
+        : ''
+      return [
+        fmtTime(b.tsMin),
+        b.pieces,
+        b.pieces - b.p0Pieces,
+        b.p0Pieces,
+        p0Pct,
+        avgG,
+        b.dominantCalibre ?? '',
+        b.lot ?? '',
+      ].join(',')
+    })
+    const csv = [header, ...rows].join('\n')
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `timeline-${shiftDoc?.id ?? 'turno'}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [timelineBuckets, productionWindow, shiftDoc?.id])
 
   const chartOption = useMemo(() => {
     // Filtrar buckets: solo los del rango productivo real. Los pre/post-turno
@@ -587,17 +654,18 @@ export function ShiftTimelineView({
         feature: {
           dataZoom: { yAxisIndex: false, title: { zoom: 'Zoom', back: 'Reset zoom' } },
           restore: { title: 'Resetear' },
+          saveAsImage: { type: 'png' as const, pixelRatio: 2, title: 'Guardar PNG', name: 'timeline-grader', backgroundColor: '#111827' },
         },
         iconStyle: { borderColor: '#6b7280' },
         emphasis: { iconStyle: { borderColor: '#f9fafb' } },
       },
       // Zoom: rueda para pan, slider visible, pinch-zoom en móvil
       dataZoom: [
-        { type: 'inside', start: 0, end: 100, zoomOnMouseWheel: true, moveOnMouseMove: true, moveOnMouseWheel: false },
+        { type: 'inside', start: zoomState.start, end: zoomState.end, zoomOnMouseWheel: true, moveOnMouseMove: true, moveOnMouseWheel: false },
         {
           type: 'slider',
-          start: 0,
-          end: 100,
+          start: zoomState.start,
+          end: zoomState.end,
           height: 14,           // antes 18 — más discreto
           bottom: 8,
           backgroundColor: '#111827',
@@ -846,7 +914,7 @@ export function ShiftTimelineView({
         }),
       ],
     }
-  }, [timelineBuckets, shiftDoc, shiftWindow, configSnapshots, causesArr, piecesByCause, scatterAxisShow, gate0Pieces, pauses, productionWindow, bucketByLabel, summaryP0Pct, alertThreshold, criticalThreshold])
+  }, [timelineBuckets, shiftDoc, shiftWindow, configSnapshots, causesArr, piecesByCause, scatterAxisShow, gate0Pieces, pauses, productionWindow, bucketByLabel, summaryP0Pct, alertThreshold, criticalThreshold, zoomState])
 
   // ── Cobertura del turno ────────────────────────────────────────────────
   // Mide cuánto del turno está "entendido" (operación + colación + micros
@@ -949,6 +1017,35 @@ export function ShiftTimelineView({
             </span>
           )}
         </CardTitle>
+      {hasData && (
+        <div className="flex items-center gap-2 px-6 pb-2">
+          {/* Presets de zoom */}
+          <div className="flex border border-border/40 rounded-md overflow-hidden text-[11px]">
+            {(['10min', '1h', 'turno'] as const).map(preset => (
+              <button
+                key={preset}
+                onClick={() => handleZoomPreset(preset)}
+                className={cn(
+                  'px-2 py-0.5 font-medium transition-colors',
+                  activeZoom === preset
+                    ? 'bg-primary/20 text-primary'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/30',
+                )}
+              >
+                {preset === 'turno' ? 'Todo' : preset}
+              </button>
+            ))}
+          </div>
+          <div className="ml-auto flex items-center gap-1">
+            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1" onClick={downloadPNG} title="Exportar imagen PNG">
+              <Download className="w-3 h-3" /> PNG
+            </Button>
+            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1" onClick={downloadCSV} title="Exportar datos CSV (minuto a minuto)">
+              <Download className="w-3 h-3" /> CSV
+            </Button>
+          </div>
+        </div>
+      )}
       </CardHeader>
 
       <CardContent className="space-y-4">
@@ -993,12 +1090,11 @@ export function ShiftTimelineView({
           </p>
         ) : (
           <ReactECharts
+            ref={echartsRef}
             option={chartOption}
-            // Altura ampliada (Fase 3): ratio ~4:1 para lectura analítica real
-            // de un turno de 8-12h. Antes 180 px comprimía barras y línea.
             style={{ height: scatterAxisShow ? 360 : 320 }}
             theme="dark"
-            opts={{ renderer: 'svg' }}
+            opts={{ renderer: 'canvas' }}
             notMerge={true}
             lazyUpdate={false}
             onEvents={{ click: handleChartClick }}
