@@ -609,6 +609,8 @@ export function AnalisisGraderTurnoPage() {
               totalPieces={summary.totalPieces}
               pointZeroPieces={summary.pointZeroPieces}
               pointZeroPct={summary.pointZeroPct}
+              shiftDocId={`${dateKey}__${shiftLabel}`}
+              onSaved={reloadConfigSnapshots}
             />
           )}
 

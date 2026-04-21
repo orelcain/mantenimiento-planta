@@ -18,7 +18,7 @@
  * Solo visible para usuarios con rol admin.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Settings2, Save, Loader2, AlertCircle } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Button, Input, Label } from '@/components/ui'
@@ -41,9 +41,26 @@ interface QuickGateChangeButtonProps {
   className?: string
   /** Callback tras guardar exitosamente (para refrescar lista de cambios) */
   onSaved?: () => void
+  /** Valores iniciales para pre-rellenar desde una sugerencia externa */
+  initialGate?: number
+  initialCalibre?: string
+  initialQuality?: string
+  initialReason?: string
+  /** Etiqueta personalizada del botón disparador */
+  triggerLabel?: string
 }
 
-export function QuickGateChangeButton({ shiftDocId, variant = 'default', className, onSaved }: QuickGateChangeButtonProps) {
+export function QuickGateChangeButton({
+  shiftDocId,
+  variant = 'default',
+  className,
+  onSaved,
+  initialGate,
+  initialCalibre,
+  initialQuality,
+  initialReason,
+  triggerLabel,
+}: QuickGateChangeButtonProps) {
   const isAdmin = useIsAdmin()
   const user = useAuthStore(s => s.user)
   const { toast } = useToast()
@@ -53,29 +70,46 @@ export function QuickGateChangeButton({ shiftDocId, variant = 'default', classNa
   const [latestGates, setLatestGates] = useState<GateAssignment[] | null>(null)
   const [noChangeWarning, setNoChangeWarning] = useState(false)
 
-  const [gateNumber, setGateNumber] = useState(1)
-  const [calibre, setCalibre] = useState<string>(CALIBRE_WEIGHT_RANGES[0]?.calibre ?? '4-6 lb')
-  const [quality, setQuality] = useState<GraderQuality>('Premium')
+  const [gateNumber, setGateNumber] = useState(initialGate ?? 1)
+  const [calibre, setCalibre] = useState<string>(initialCalibre ?? CALIBRE_WEIGHT_RANGES[0]?.calibre ?? '4-6 lb')
+  const [quality, setQuality] = useState<GraderQuality>((initialQuality as GraderQuality) ?? 'Premium')
   const [conservation, setConservation] = useState<GraderConservation | ''>('')
   const [product, setProduct] = useState<GraderProduct | ''>('')
   const [active, setActive] = useState(true)
-  const [reason, setReason] = useState('')
+  const [reason, setReason] = useState(initialReason ?? '')
 
-  // Cargar último snapshot al abrir
+  // Indica que el próximo disparo del auto-fill (cuando llegan latestGates)
+  // no debe sobreescribir los valores que vinieron de una sugerencia externa.
+  const skipNextAutoFill = useRef(false)
+
+  // Al abrir: aplicar valores iniciales si vienen de una sugerencia
   useEffect(() => {
     if (!open) return
-    setNoChangeWarning(false) // reset al abrir
+    setNoChangeWarning(false)
     getLatestSnapshot(shiftDocId)
       .then(snap => setLatestGates(snap?.gates ?? null))
       .catch(() => setLatestGates(null))
-  }, [open, shiftDocId])
+
+    if (initialGate !== undefined) {
+      setGateNumber(initialGate)
+      skipNextAutoFill.current = true  // no sobreescribir con config actual del gate
+    }
+    if (initialCalibre) setCalibre(initialCalibre)
+    if (initialQuality) setQuality(initialQuality as GraderQuality)
+    if (initialReason !== undefined) setReason(initialReason)
+  }, [open, shiftDocId, initialGate, initialCalibre, initialQuality, initialReason])
 
   // Limpiar warning si el user toca cualquier campo
   useEffect(() => { setNoChangeWarning(false) }, [gateNumber, calibre, quality, conservation, product, active])
 
-  // Prellenar form con valores actuales del gate seleccionado
+  // Auto-fill con valores actuales del gate cuando cambia la selección.
+  // Se omite la primera vez si venimos de una sugerencia (skipNextAutoFill).
   useEffect(() => {
     if (!latestGates) return
+    if (skipNextAutoFill.current) {
+      skipNextAutoFill.current = false
+      return
+    }
     const current = latestGates.find(g => g.gateNumber === gateNumber)
     if (!current) return
     setCalibre(current.assignedCalibre)
@@ -149,7 +183,7 @@ export function QuickGateChangeButton({ shiftDocId, variant = 'default', classNa
         className={className}
       >
         <Settings2 className={variant === 'compact' ? 'w-3 h-3 mr-1' : 'w-4 h-4 mr-1.5'} />
-        {variant === 'compact' ? 'Cambiar gate' : 'Registrar cambio de gate'}
+        {triggerLabel ?? (variant === 'compact' ? 'Cambiar gate' : 'Registrar cambio de gate')}
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>

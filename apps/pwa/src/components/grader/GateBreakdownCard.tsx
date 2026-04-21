@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { LayoutGrid, ChevronDown, ChevronUp, ArrowRight } from 'lucide-react'
 import type { GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
+import { QuickGateChangeButton } from './QuickGateChangeButton'
 
 interface GateRow {
   gate: number
@@ -28,6 +29,10 @@ interface GateBreakdownCardProps {
   totalPieces: number
   pointZeroPieces: number
   pointZeroPct: number
+  /** Si se provee, aparece botón "Aplicar →" en cada sugerencia (solo admin) */
+  shiftDocId?: string
+  /** Se llama tras guardar un cambio de gate desde una sugerencia */
+  onSaved?: () => void
 }
 
 // ── Tipos internos ────────────────────────────────────────────────────────────
@@ -48,6 +53,8 @@ interface Suggestion {
   fromGate: number
   fromLabel: string
   toLabel: string
+  toCalibre: string   // calibre raw del grupo destino (para pre-rellenar el form)
+  toQuality: string   // calidad raw del grupo destino
   fromPieces: number
   fromPct: number
   satRatio: number
@@ -200,6 +207,8 @@ function computeAssignmentAnalysis(
         fromGate: gateToMove.gate,
         fromLabel: sobre.label,
         toLabel: sat.label,
+        toCalibre: sat.calibre,
+        toQuality: sat.quality,
         fromPieces: gateToMove.pieces,
         fromPct,
         satRatio: sat.ratio,
@@ -223,6 +232,8 @@ export function GateBreakdownCard({
   totalPieces,
   pointZeroPieces,
   pointZeroPct,
+  shiftDocId,
+  onSaved,
 }: GateBreakdownCardProps) {
   const [showAnalysis, setShowAnalysis] = useState(false)
 
@@ -523,6 +534,22 @@ export function GateBreakdownCard({
                               ⚠ {s.cautela}
                             </div>
                           </div>
+
+                          {/* Botón aplicar — solo si hay shiftDocId (solo admin lo ve) */}
+                          {shiftDocId && (
+                            <div className="shrink-0 self-start">
+                              <QuickGateChangeButton
+                                shiftDocId={shiftDocId}
+                                variant="compact"
+                                initialGate={s.fromGate}
+                                initialCalibre={s.toCalibre}
+                                initialQuality={s.toQuality}
+                                initialReason={`Sugerencia: G${s.fromGate} ${s.fromLabel} → ${s.toLabel}`}
+                                triggerLabel="Aplicar →"
+                                onSaved={onSaved}
+                              />
+                            </div>
+                          )}
                         </div>
                       )
                     })}
