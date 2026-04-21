@@ -624,6 +624,19 @@ export interface GraderDailySummary {
     totalPieces: number;
     p0Pieces: number;
   }>;
+  // ── Pausas / tiempo muerto — agregados ligeros ─────────────────────────────
+  // El detalle de cada pausa (≥5min) vive en `meta/pauses`. Acá en el doc
+  // summary solo guardamos totales para listar KPIs rápido (mes, temporada)
+  // sin tener que cargar la sub-colección. Poblado por `graderPauseDetector`.
+  /** Tiempo muerto total del turno (micro + pausas), en segundos. */
+  totalDeadTimeSec?: number;
+  /** Cantidad de micro-detenciones (60s ≤ dur < 300s). */
+  microDetentionsCount?: number;
+  /** Segundos acumulados en micro-detenciones. */
+  microDetentionsTotalSec?: number;
+  /** Cantidad de pausas (≥5min) persistidas en sub-coll `meta/pauses`. */
+  pausesCount?: number;
+
   // NOTA: Los agregados por minuto para el timeline chart NO viven en este
   // doc. Están en la sub-collection `graderDailySummaries/{id}/meta/timeline`
   // (ver saveTimelineAggregates / loadTimelineAggregates). Motivo: las queries
@@ -631,6 +644,8 @@ export interface GraderDailySummary {
   // estuvieran acá, haciendo que el calendario y la vista de período bajen
   // 10× más data de la necesaria. El cliente web Firestore no soporta
   // field projection, por eso van en sub-coll separada.
+  //
+  // Misma razón aplica para el detalle de pausas (sub-coll `meta/pauses`).
 }
 
 /**
@@ -678,6 +693,70 @@ export interface TimelineBucket {
    * Cambios entre minutos consecutivos marcan un cambio de lote en el chart.
    */
   lot?: string;
+}
+
+// ============================================================================
+// PAUSAS / TIEMPO MUERTO
+// ============================================================================
+//
+// Detectadas por `graderPauseDetector.detectPauses()` a partir de gaps entre
+// piezas consecutivas. El detector clasifica los gaps en 4 tiers por duración:
+//
+//   - Micro  (60s  ≤ dur <  300s): NO se emite doc individual — se agrega en
+//                                    `MicroDetentionsSummary` (count + total + byHour).
+//   - Pausa  (300s ≤ dur < 1800s): doc individual, tier 'pausa'.
+//   - Larga  (1800 ≤ dur < 3600s): doc individual, tier 'larga'.
+//   - Parada (≥ 3600s):            doc individual, tier 'parada'.
+//
+// El detalle (array de pausas anotables + microDetentions.byHour) vive en la
+// sub-colección `graderDailySummaries/{id}/meta/pauses`. El summary guarda
+// solo totales para KPIs rápidos (ver campos en `GraderDailySummary`).
+
+export type PauseTier = 'pausa' | 'larga' | 'parada';
+
+/** Tag asignado automáticamente por heurísticas del detector. */
+export type PauseAutoTag = 'colacion';
+
+export interface Pause {
+  /** ID único dentro del turno. Formato: `p-{HHMM}-{durMin}m` (hora local planta). */
+  id: string;
+  /** ISO timestamp inicio del gap (hora local planta con sufijo Z). */
+  startAt: string;
+  /** ISO timestamp fin del gap. */
+  endAt: string;
+  /** Duración en segundos (redondeada). */
+  durationSec: number;
+  /** Clasificación por duración. */
+  tier: PauseTier;
+  /**
+   * Tag auto-detectado por heurística del detector.
+   * Actualmente solo 'colacion' cuando duración 45-90min + centro en
+   * ventana esperada (12:30-14:30 día / 00:30-02:30 noche).
+   */
+  autoTag?: PauseAutoTag;
+  /**
+   * Tag asignado manualmente (referencia al ID de `graderPauseTags` cuando
+   * exista el CRUD — por ahora string libre).
+   */
+  tag?: string;
+  /** Nota libre opcional del admin anotando. */
+  note?: string;
+  /** UID del usuario que anotó tag/nota. */
+  annotatedBy?: string;
+  /** ISO timestamp de la anotación. */
+  annotatedAt?: string;
+}
+
+export interface MicroDetentionsSummary {
+  /** Cantidad de micro-pausas (60s ≤ dur < 300s). */
+  count: number;
+  /** Tiempo total acumulado en segundos. */
+  totalSec: number;
+  /**
+   * Distribución por hora del día (HH como clave 00-23 → segundos).
+   * Hora local planta. Solo horas con ≥1 micro.
+   */
+  byHour: Record<string, number>;
 }
 
 // ============================================================================

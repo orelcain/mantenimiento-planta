@@ -30,7 +30,7 @@ import {
   getCountFromServer,
 } from 'firebase/firestore'
 import { db } from '../firebase'
-import type { GraderDailySummary, TimelineBucket } from './types'
+import type { GraderDailySummary, TimelineBucket, Pause, MicroDetentionsSummary } from './types'
 
 const COLLECTION = 'graderDailySummaries'
 /** Firestore permite máx. 500 ops por batch; usamos 400 para margen */
@@ -589,6 +589,39 @@ export async function countPieceRecords(summaryId: string): Promise<number> {
   return snap.data().count
 }
 
+/**
+ * Lee los pieceRecords de UN minuto específico de un turno, ordenados por ts.
+ *
+ * Usado por el modal de "detalle del minuto" (Fase 4a) — al clickear una barra
+ * del Timeline, se cargan solo las piezas de ese minuto (típico 50-80 docs,
+ * max histórico 80). Firestore hace la query por rango de ts server-side.
+ *
+ * Cache-first: el mismo rango se beneficia de IndexedDB si se consultó antes.
+ */
+export async function listPieceRecordsByMinute(
+  summaryId: string,
+  tsMin: string,  // ISO "YYYY-MM-DDTHH:MM:00.000Z"
+): Promise<FirestorePieceRecord[]> {
+  const startTs = tsMin
+  // Fin del minuto: ts estricto < startMs + 60s
+  const startMs = Date.parse(tsMin)
+  const endTs = new Date(startMs + 60_000).toISOString()
+  const q = query(
+    pieceRecordsCol(summaryId),
+    where('ts', '>=', startTs),
+    where('ts', '<', endTs),
+    orderBy('ts'),
+  )
+  try {
+    const cached = await getDocsFromCache(q)
+    if (!cached.empty) return cached.docs.map((d) => d.data() as FirestorePieceRecord)
+  } catch {
+    // Cache miss — fallthrough a red
+  }
+  const snap = await getDocs(q)
+  return snap.docs.map((d) => d.data() as FirestorePieceRecord)
+}
+
 // ============================================================================
 // Timeline aggregates — buckets pre-computados por minuto
 // ============================================================================
@@ -646,4 +679,157 @@ export async function loadTimelineAggregates(
   const data = snap.data() as Partial<TimelineAggregatesDoc>
   if (!Array.isArray(data.buckets)) return null
   return data.buckets as TimelineBucket[]
+}
+
+// ============================================================================
+// Pauses aggregates — detalle de pausas ≥5min + byHour de microDetentions
+// ============================================================================
+//
+// El detector (`graderPauseDetector`) produce:
+//   - `pauses`: Pause[] anotables (tier 'pausa' | 'larga' | 'parada')
+//   - `microDetentions`: agregado de gaps 1-5min (count + total + byHour)
+//
+// Los totales ligeros van en el doc summary (ver campos en GraderDailySummary).
+// Este doc de sub-collection guarda el detalle para la UI del Timeline y la
+// anotación manual (Fase 3). Path: `graderDailySummaries/{id}/meta/pauses`.
+
+const PAUSES_META_DOC = 'pauses'
+
+interface PausesAggregatesDoc {
+  pauses: Pause[]
+  microDetentions: MicroDetentionsSummary
+  updatedAt: string
+  /** Versión del schema para futuras migraciones sin romper readers */
+  schemaVersion: number
+}
+
+const PAUSES_SCHEMA_VERSION = 1
+
+/**
+ * Guarda las pausas detectadas + microDetentions en la sub-collection.
+ * Sobrescribe cualquier versión previa (overwrite intencional: la detección
+ * es función pura del set de pieceRecords).
+ *
+ * IMPORTANTE: este método guarda la detección automática. Cuando Fase 3
+ * agregue anotación manual, los campos `tag` / `note` / `annotatedBy` de
+ * pausas existentes deben preservarse — este método SOBRESCRIBE, así que
+ * el caller que haga re-detección debe hacer merge primero con la versión
+ * previa (se maneja en `mergeAnnotationsIntoPauses`).
+ */
+export async function savePausesAggregates(
+  summaryId: string,
+  pauses: Pause[],
+  microDetentions: MicroDetentionsSummary,
+): Promise<void> {
+  const ref = doc(db, COLLECTION, summaryId, TIMELINE_META_SUB, PAUSES_META_DOC)
+  const payload: PausesAggregatesDoc = {
+    pauses: deepCleanUndefined(pauses),
+    microDetentions: deepCleanUndefined(microDetentions),
+    updatedAt: new Date().toISOString(),
+    schemaVersion: PAUSES_SCHEMA_VERSION,
+  }
+  await setDoc(ref, payload)
+}
+
+/**
+ * Lee las pausas desde la sub-collection. Retorna `null` si el turno todavía
+ * no tiene backfill (summary legacy antes de Fase 1 de pausas).
+ */
+export async function loadPausesAggregates(
+  summaryId: string,
+): Promise<{ pauses: Pause[]; microDetentions: MicroDetentionsSummary } | null> {
+  const ref = doc(db, COLLECTION, summaryId, TIMELINE_META_SUB, PAUSES_META_DOC)
+  const snap = await getDoc(ref)
+  if (!snap.exists()) return null
+  const data = snap.data() as Partial<PausesAggregatesDoc>
+  if (!Array.isArray(data.pauses)) return null
+  return {
+    pauses: data.pauses,
+    microDetentions: data.microDetentions ?? { count: 0, totalSec: 0, byHour: {} },
+  }
+}
+
+/**
+ * Actualiza la anotación (tag + nota) de UNA pausa existente dentro de un turno.
+ * Lee el doc `meta/pauses` completo, modifica la pausa por id, y re-escribe.
+ *
+ * Atómico en el sentido de Firestore setDoc (una sola escritura), pero no hay
+ * transacción ni optimistic-concurrency: si dos admins editan la misma pausa
+ * simultáneamente, gana el último write. Aceptable mientras la operación sea
+ * humana y esporádica.
+ *
+ * Si el `tagId` es null, la anotación se remueve (vuelve a "sin clasificar",
+ * aunque puede conservar el `autoTag` que puso el detector).
+ */
+export async function updatePauseAnnotation(
+  summaryId: string,
+  pauseId: string,
+  annotation: {
+    tagId: string | null
+    note?: string
+    annotatedBy: string
+  },
+): Promise<void> {
+  const ref = doc(db, COLLECTION, summaryId, TIMELINE_META_SUB, PAUSES_META_DOC)
+  const snap = await getDoc(ref)
+  if (!snap.exists()) throw new Error(`No existe meta/pauses para ${summaryId}`)
+  const data = snap.data() as Partial<PausesAggregatesDoc>
+  if (!Array.isArray(data.pauses)) throw new Error(`meta/pauses con forma inesperada para ${summaryId}`)
+
+  const now = new Date().toISOString()
+  const updatedPauses = data.pauses.map((p) => {
+    if (p.id !== pauseId) return p
+    const next: Pause = { ...p }
+    if (annotation.tagId === null) {
+      delete next.tag
+      delete next.note
+      delete next.annotatedBy
+      delete next.annotatedAt
+    } else {
+      next.tag = annotation.tagId
+      next.annotatedBy = annotation.annotatedBy
+      next.annotatedAt = now
+      if (annotation.note && annotation.note.trim()) {
+        next.note = annotation.note.trim()
+      } else {
+        delete next.note
+      }
+    }
+    return next
+  })
+
+  const payload: PausesAggregatesDoc = {
+    pauses: deepCleanUndefined(updatedPauses),
+    microDetentions: data.microDetentions ?? { count: 0, totalSec: 0, byHour: {} },
+    updatedAt: now,
+    schemaVersion: PAUSES_SCHEMA_VERSION,
+  }
+  await setDoc(ref, payload)
+}
+
+/**
+ * Merge de anotaciones existentes sobre una detección fresca.
+ *
+ * Cuando se reprocesa un turno (ej. re-upload del Excel), el detector produce
+ * pausas nuevas. Si previamente el admin anotó algunas, queremos preservar
+ * esas anotaciones. Esta función empareja por `id` (que codifica hora+duración
+ * del gap — estable mientras los timestamps del Excel no cambien).
+ *
+ * Si un gap anotado ya no aparece en la detección fresca, se descarta su
+ * anotación (es probable que el parser haya cambiado los datos subyacentes).
+ */
+export function mergeAnnotationsIntoPauses(fresh: Pause[], previous: Pause[]): Pause[] {
+  if (previous.length === 0) return fresh
+  const prevById = new Map(previous.map((p) => [p.id, p]))
+  return fresh.map((p) => {
+    const prev = prevById.get(p.id)
+    if (!prev) return p
+    return {
+      ...p,
+      tag: prev.tag ?? p.tag,
+      note: prev.note ?? p.note,
+      annotatedBy: prev.annotatedBy ?? p.annotatedBy,
+      annotatedAt: prev.annotatedAt ?? p.annotatedAt,
+    }
+  })
 }

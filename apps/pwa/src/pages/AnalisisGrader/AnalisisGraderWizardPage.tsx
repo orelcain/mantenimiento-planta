@@ -29,7 +29,18 @@ import {
   dedupePieceRecords,
   dedupeGate0Records,
 } from '@/services/grader/graderSegmenter'
-import { saveDailySummaryBatch, fetchExistingSummaryIds, savePieceRecordsBatch, buildDedupeKey, saveTimelineAggregates, type FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
+import {
+  saveDailySummaryBatch,
+  fetchExistingSummaryIds,
+  savePieceRecordsBatch,
+  buildDedupeKey,
+  saveTimelineAggregates,
+  savePausesAggregates,
+  loadPausesAggregates,
+  mergeAnnotationsIntoPauses,
+  type FirestorePieceRecord,
+} from '@/services/grader/graderDailySummary.service'
+import { detectPauses, collectSortedTimestamps, type PauseDetectionResult } from '@/services/grader/graderPauseDetector'
 import type { ParsedMatrixData, GateAssignment, GraderAnalysisConfig } from '@/services/grader/types'
 
 const GRADER_WIZARD_DRAFT_KEY = 'grader_wizard_draft_v1'
@@ -373,14 +384,31 @@ export function AnalisisGraderWizardPage() {
     try {
       const batchId = crypto.randomUUID()
       const sourceNames = parsedData?.files.map((f) => f.name) ?? []
-      const summaries = multiDayInfo.entries.map(([, segment]) =>
-        computeShiftSummary(segment, batchId, sourceNames, user.id, gates),
-      )
+
+      // Calcular summaries + detectar pausas en el mismo pase.
+      // Los agregados de pausas (totales) se embeben en el summary para
+      // KPIs rápidos; el detalle se guarda en meta/pauses dentro del loop.
+      const detectionByKey = new Map<string, PauseDetectionResult>()
+      const summaries = multiDayInfo.entries.map(([key, segment]) => {
+        const raw = computeShiftSummary(segment, batchId, sourceNames, user.id, gates)
+        const tsSorted = collectSortedTimestamps(segment.pieceRecords, segment.gate0Records)
+        const det = detectPauses(tsSorted, raw.shiftId)
+        detectionByKey.set(key, det)
+        return {
+          ...raw,
+          totalDeadTimeSec: det.totalDeadTimeSec,
+          microDetentionsCount: det.microDetentions.count,
+          microDetentionsTotalSec: det.microDetentions.totalSec,
+          pausesCount: det.pauses.length,
+        }
+      })
       await saveDailySummaryBatch(summaries)
 
       // Guardar pieceRecords en subcollection (dedup automática) + timeline
       // aggregates en sub-collection `meta/timeline` para que el timeline chart
       // se pinte al instante al abrir el turno sin bajar los records crudos.
+      // Además guarda el detalle de pausas en `meta/pauses` preservando
+      // anotaciones manuales previas (merge por id estable).
       for (const [key, segment] of multiDayInfo.entries) {
         const [dateKey, shiftId] = key.split('|')
         if (!dateKey || !shiftId) continue
@@ -406,6 +434,18 @@ export function AnalisisGraderWizardPage() {
         const aggregates = computeTimelineAggregates(segment.pieceRecords, segment.gate0Records)
         if (aggregates.length > 0) {
           await saveTimelineAggregates(summaryId, aggregates)
+        }
+
+        // Detalle de pausas (≥5min) + microDetentions.byHour.
+        // Merge preserva tag/note/annotatedBy/annotatedAt de anotaciones
+        // manuales previas antes de sobrescribir.
+        const det = detectionByKey.get(key)
+        if (det && (det.pauses.length > 0 || det.microDetentions.count > 0)) {
+          const prev = await loadPausesAggregates(summaryId)
+          const mergedPauses = prev
+            ? mergeAnnotationsIntoPauses(det.pauses, prev.pauses)
+            : det.pauses
+          await savePausesAggregates(summaryId, mergedPauses, det.microDetentions)
         }
       }
 

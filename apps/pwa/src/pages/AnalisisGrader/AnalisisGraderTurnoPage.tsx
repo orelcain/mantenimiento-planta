@@ -11,7 +11,9 @@ import { useParams, useNavigate, Navigate } from 'react-router-dom'
 import { Button, Card, CardContent, Spinner, Badge } from '@/components/ui'
 import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { usePermissionsStore } from '@/store'
-import { getDailySummary, loadTimelineAggregates, listDailySummariesByRange, listGate0PieceRecords, type FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
+import { useAuthStore, useIsAdmin } from '@/store/authStore'
+import { getDailySummary, loadTimelineAggregates, loadPausesAggregates, listDailySummariesByRange, listGate0PieceRecords, type FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
+import type { Pause, MicroDetentionsSummary } from '@/services/grader/types'
 import { getModuleRanges } from '@/services/grader/graderModuleConfig.service'
 import { listSnapshots, type GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
 import { getShiftDoc } from '@/services/grader/graderShifts.service'
@@ -106,6 +108,8 @@ function dominantCause(
 
 export function AnalisisGraderTurnoPage() {
   const { canSee } = usePermissionsStore()
+  const user = useAuthStore((s) => s.user)
+  const isAdmin = useIsAdmin()
   const navigate = useNavigate()
   const { shiftId: rawShiftId } = useParams<{ shiftId: string }>()
 
@@ -146,6 +150,8 @@ export function AnalisisGraderTurnoPage() {
   const [timelineBuckets, setTimelineBuckets] = useState<TimelineBucket[]>([])
   const [configSnapshots, setConfigSnapshots] = useState<GateConfigSnapshot[]>([])
   const [gate0Pieces, setGate0Pieces] = useState<FirestorePieceRecord[]>([])
+  const [pauses, setPauses] = useState<Pause[]>([])
+  const [microDetentions, setMicroDetentions] = useState<MicroDetentionsSummary | null>(null)
   const [selectedCauses, setSelectedCauses] = useState<Set<MatrixP0Cause>>(new Set())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -342,6 +348,33 @@ export function AnalisisGraderTurnoPage() {
       .then(buckets => setTimelineBuckets(buckets ?? []))
       .catch(() => {})
   }, [dateKey, shiftLabel])
+
+  // Carga pausas detectadas sub-collection (graderDailySummaries/{id}/meta/pauses)
+  // Fase 1 backfill pobló esto para los 383 turnos históricos. Turnos legacy
+  // sin backfill devuelven null → UI cae a arrays vacíos sin crashear.
+  //
+  // Extraído a callback para poder re-invocarse tras una anotación manual
+  // (Fase 3) sin recargar toda la página.
+  const reloadPauses = useCallback(() => {
+    if (!dateKey || !shiftLabel) return
+    loadPausesAggregates(`${dateKey}__${shiftLabel}`)
+      .then(data => {
+        if (!data) {
+          setPauses([])
+          setMicroDetentions(null)
+          return
+        }
+        setPauses(data.pauses)
+        setMicroDetentions(data.microDetentions)
+      })
+      .catch(() => {})
+  }, [dateKey, shiftLabel])
+
+  useEffect(() => {
+    setPauses([])
+    setMicroDetentions(null)
+    reloadPauses()
+  }, [reloadPauses])
 
   // Carga pieceRecords gate=0 para drill-down en timeline
   useEffect(() => {
@@ -555,6 +588,11 @@ export function AnalisisGraderTurnoPage() {
             shiftWindow={shiftWindow}
             configSnapshots={configSnapshots}
             gate0Pieces={gate0Pieces}
+            pauses={pauses}
+            microDetentions={microDetentions}
+            summaryId={shiftDocId}
+            adminUid={isAdmin ? user?.id : undefined}
+            onPauseUpdated={reloadPauses}
             selectedCauses={selectedCauses}
             onClearSelectedCauses={() => setSelectedCauses(new Set())}
             summaryP0Pct={summary.pointZeroPct}
