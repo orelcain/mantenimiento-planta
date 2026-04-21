@@ -27,6 +27,7 @@ import { ShiftTimelineView } from '@/components/grader/ShiftTimelineView'
 import { ShiftBreakdownsCard } from '@/components/grader/ShiftBreakdownsCard'
 import { GateBreakdownCard } from '@/components/grader/GateBreakdownCard'
 import { ConfigChangeHistory } from '@/components/grader/ConfigChangeHistory'
+import { CurrentGateConfigPanel } from '@/components/grader/CurrentGateConfigPanel'
 import { ActionPlanPanel, deriveSuggestions } from '@/components/grader/ActionPlanPanel'
 import { findTriggeredRunbooks } from '@/services/grader/graderRunbooks'
 import { analyzeGraderFromSummary } from '@/services/grader/graderSummaryAI'
@@ -621,6 +622,11 @@ export function AnalisisGraderTurnoPage() {
             productoBreakdown={summary.productoBreakdown}
             conservacionBreakdown={summary.conservacionBreakdown}
           />
+
+          {/* Config actual del turno — grilla compacta de los 12 gates */}
+          {configSnapshots.length > 0 && (
+            <CurrentGateConfigPanel configSnapshots={configSnapshots} />
+          )}
 
           {/* Historial de cambios de configuración del turno */}
           <ConfigChangeHistory
