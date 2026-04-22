@@ -1,0 +1,12 @@
+{
+"type": "FeatureCollection",
+"name": "SELECT",
+"features": [
+{ "type": "Feature", "properties": { "Layer": "A_PV", "PaperSpace": null, "SubClasses": null, "Linetype": null, "EntityHandle": "1D1F0AE5", "Text": null }, "geometry": { "type": "LineString", "coordinates": [ [ 768.564026407075744, -632.966755394510074, 0.0 ], [ 768.564839272998483, -632.967614507767962, 0.0 ] ] } },
+{ "type": "Feature", "properties": { "Layer": "A_PV", "PaperSpace": null, "SubClasses": null, "Linetype": null, "EntityHandle": "1D1F0B19", "Text": null }, "geometry": { "type": "LineString", "coordinates": [ [ 769.600430458726919, -634.062124798293439, 0.0 ], [ 769.601243324649886, -634.062983911551328, 0.0 ] ] } },
+{ "type": "Feature", "properties": { "Layer": "A_PV", "PaperSpace": null, "SubClasses": null, "Linetype": null, "EntityHandle": "1D1F0BB0", "Text": null }, "geometry": { "type": "LineString", "coordinates": [ [ 747.131680305801751, -628.818662268094499, 0.0 ], [ 747.131147287154022, -628.817606466162488, 0.0 ] ] } },
+{ "type": "Feature", "properties": { "Layer": "A_PV", "PaperSpace": null, "SubClasses": null, "Linetype": null, "EntityHandle": "1D1F0BC9", "Text": null }, "geometry": { "type": "LineString", "coordinates": [ [ 746.367728047940204, -628.477636570975733, 0.0 ], [ 746.368261066587593, -628.478692372907744, 0.0 ] ] } },
+{ "type": "Feature", "properties": { "Layer": "A_PV", "PaperSpace": null, "SubClasses": null, "Linetype": null, "EntityHandle": "1D1F0BF5", "Text": null }, "geometry": { "type": "LineString", "coordinates": [ [ 746.410080658865013, -628.589958951299423, 0.0 ], [ 746.411840328752078, -628.589070586886805, 0.0 ] ] } },
+{ "type": "Feature", "properties": { "Layer": "A_PV", "PaperSpace": null, "SubClasses": null, "Linetype": null, "EntityHandle": "1D1F160F", "Text": null }, "geometry": { "type": "LineString", "coordinates": [ [ 774.916333459689554, -616.489378706100752, 0.0 ], [ 774.91460345077553, -616.490323533384526, 0.0 ] ] } }
+]
+}

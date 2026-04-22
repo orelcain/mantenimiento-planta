@@ -1,0 +1,13 @@
+{
+"type": "FeatureCollection",
+"name": "SELECT",
+"features": [
+{ "type": "Feature", "properties": { "Layer": "DIBUJO", "PaperSpace": null, "SubClasses": null, "Linetype": null, "EntityHandle": "1D1F1946", "Text": null }, "geometry": { "type": "LineString", "coordinates": [ [ 751.779513658920337, -636.363258542805283, 0.0 ], [ 752.176456841146091, -636.163952246793201, 0.0 ] ] } },
+{ "type": "Feature", "properties": { "Layer": "DIBUJO", "PaperSpace": null, "SubClasses": null, "Linetype": null, "EntityHandle": "1D1F1947", "Text": null }, "geometry": { "type": "LineString", "coordinates": [ [ 752.176456841146091, -636.163952246793201, 0.0 ], [ 752.172034292689432, -636.155144193594879, 0.0 ] ] } },
+{ "type": "Feature", "properties": { "Layer": "DIBUJO", "PaperSpace": null, "SubClasses": null, "Linetype": null, "EntityHandle": "1D1F1948", "Text": null }, "geometry": { "type": "LineString", "coordinates": [ [ 752.172034292689432, -636.155144193594879, 0.0 ], [ 751.775091110463563, -636.354450489607075, 0.0 ] ] } },
+{ "type": "Feature", "properties": { "Layer": "DIBUJO", "PaperSpace": null, "SubClasses": null, "Linetype": null, "EntityHandle": "1D1F1949", "Text": null }, "geometry": { "type": "LineString", "coordinates": [ [ 751.775091110463563, -636.354450489607075, 0.0 ], [ 751.779513658920337, -636.363258542805283, 0.0 ] ] } },
+{ "type": "Feature", "properties": { "Layer": "DIBUJO", "PaperSpace": null, "SubClasses": null, "Linetype": null, "EntityHandle": "1D1F1975", "Text": null }, "geometry": { "type": "LineString", "coordinates": [ [ 752.103975928632849, -636.168737442607039, 0.0 ], [ 751.899205864116993, -636.271553071947324, 0.0 ] ] } },
+{ "type": "Feature", "properties": { "Layer": "DIBUJO", "PaperSpace": null, "SubClasses": null, "Linetype": null, "EntityHandle": "1D1F1976", "Text": null }, "geometry": { "type": "LineString", "coordinates": [ [ 752.103975928632849, -636.168737442607039, 0.0 ], [ 752.083149750464941, -636.192485497116536, 0.0 ] ] } },
+{ "type": "Feature", "properties": { "Layer": "DIBUJO", "PaperSpace": null, "SubClasses": null, "Linetype": null, "EntityHandle": "1D1F1977", "Text": null }, "geometry": { "type": "LineString", "coordinates": [ [ 752.103975928632849, -636.168737442607039, 0.0 ], [ 752.071749127181647, -636.169096271775061, 0.0 ] ] } }
+]
+}
