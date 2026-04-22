@@ -69,9 +69,9 @@ function FloorPlan() {
   planTex.wrapS = planTex.wrapT = THREE.ClampToEdgeWrapping
 
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
-      {/* El plano arquitectónico cubre aprox 55×30 unidades world (la nave principal) */}
-      <planeGeometry args={[58, 30]} />
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, -1]}>
+      {/* Plano arquitectónico real: 88 m ancho × 44 m profundo, centrado */}
+      <planeGeometry args={[88, 44]} />
       <meshBasicMaterial
         map={planTex}
         transparent
@@ -89,7 +89,7 @@ export function Ground3D() {
     <>
       {/* Suelo base — adoquines medievales */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.05, 0]} receiveShadow>
-        <planeGeometry args={[140, 140]} />
+        <planeGeometry args={[180, 180]} />
         <meshStandardMaterial map={cobblesTex} roughness={0.95} metalness={0.0} />
       </mesh>
 
@@ -98,41 +98,47 @@ export function Ground3D() {
         <FloorPlan />
       </Suspense>
 
-      {/* Muros perimetrales del recinto */}
-      <WallSegment pos={[0, 1.5, -22]}    size={[76, 3, 0.6]} />
-      <WallSegment pos={[0, 1.5,  22]}    size={[76, 3, 0.6]} />
-      <WallSegment pos={[38, 1.5, 0]}     size={[0.6, 3, 44]} />
-      <WallSegment pos={[-38, 1.5, 0]}    size={[0.6, 3, 44]} />
+      {/* Muros perimetrales — recinto Antarfood ~110m × 65m (incluye patio y estanques) */}
+      <WallSegment pos={[0,  1.5, -35]}   size={[114, 3, 0.6]} />
+      <WallSegment pos={[0,  1.5,  32]}   size={[114, 3, 0.6]} />
+      <WallSegment pos={[-57, 1.5, -1.5]} size={[0.6, 3, 68]} />
+      <WallSegment pos={[ 57, 1.5, -1.5]} size={[0.6, 3, 68]} />
 
-      {/* Torres esquina — estilo medieval */}
-      {([[-38, -22], [38, -22], [38, 22], [-38, 22]] as [number, number][]).map(([x, z], i) => (
+      {/* Torres esquina medievales */}
+      {([[-57, -35], [57, -35], [57, 32], [-57, 32]] as [number, number][]).map(([x, z], i) => (
         <group key={i}>
           <mesh position={[x, 2.5, z]} castShadow>
-            <boxGeometry args={[2.5, 5, 2.5]} />
+            <boxGeometry args={[3, 5, 3]} />
             <meshToonMaterial color="#8a6a4a" />
           </mesh>
-          {/* Techo cónico de torre */}
           <mesh position={[x, 5.5, z]} castShadow>
-            <coneGeometry args={[2.0, 2.5, 4]} />
+            <coneGeometry args={[2.4, 3, 4]} />
             <meshToonMaterial color="#7a2818" />
           </mesh>
         </group>
       ))}
 
-      {/* Portón principal sur */}
-      <WallSegment pos={[-10, 1.5, 22]}   size={[14, 3, 0.6]} />
-      <WallSegment pos={[14, 1.5, 22]}    size={[12, 3, 0.6]} />
+      {/* Portón principal sur (acceso camiones — frente a maq_sur) */}
+      <WallSegment pos={[-20, 1.5, -35]} size={[22, 3, 0.6]} />
+      <WallSegment pos={[ 22, 1.5, -35]} size={[36, 3, 0.6]} />
 
-      {/* Camino de acceso — asfalto */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 8]} receiveShadow>
-        <planeGeometry args={[10, 30]} />
+      {/* Portón norte (salida producto / estanques) */}
+      <WallSegment pos={[-10, 1.5, 32]}  size={[80, 3, 0.6]} />
+
+      {/* Camino de acceso principal — asfalto */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, -43]} receiveShadow>
+        <planeGeometry args={[16, 18]} />
         <meshStandardMaterial color="#2a2820" roughness={0.98} />
       </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, -43]}>
+        <planeGeometry args={[0.3, 18]} />
+        <meshBasicMaterial color="#ddcc00" />
+      </mesh>
 
-      {/* Líneas de la calzada */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 8]}>
-        <planeGeometry args={[0.25, 28]} />
-        <meshBasicMaterial color="#cccc00" />
+      {/* Patio maniobras despacho — sur este */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[20, 0, -43]} receiveShadow>
+        <planeGeometry args={[30, 18]} />
+        <meshStandardMaterial color="#2e2c28" roughness={0.98} />
       </mesh>
     </>
   )

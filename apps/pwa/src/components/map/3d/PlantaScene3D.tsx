@@ -100,8 +100,8 @@ function SceneContent() {
         dampingFactor={0.07}
         maxPolarAngle={Math.PI / 2.3}
         minPolarAngle={0.2}
-        minZoom={10}
-        maxZoom={60}
+        minZoom={5}
+        maxZoom={45}
         target={[0, 2, 0]}
         makeDefault
       />
@@ -138,7 +138,7 @@ export function PlantaScene3D() {
     <div className="w-full h-full">
       <Canvas
         orthographic
-        camera={{ zoom: 22, position: [80, 80, 80], near: -500, far: 1000 }}
+        camera={{ zoom: 13, position: [100, 100, 100], near: -800, far: 1200 }}
         shadows
         gl={{
           antialias: true,
