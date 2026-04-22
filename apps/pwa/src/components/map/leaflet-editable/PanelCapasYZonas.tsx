@@ -39,12 +39,14 @@ const ESTADOS: { value: ZonaEstado; label: string; color: string }[] = [
 // ─── Indicador de tipo (zona/punto/forma) ────────────────────────────────────
 function TipoBadge({ tipo }: { tipo: ElementoMapa['tipo'] }) {
   const cfg = {
-    zona:   { label: 'ZONA',   bg: 'bg-amber-900/40', text: 'text-amber-300' },
-    forma:  { label: 'CIRC',   bg: 'bg-cyan-900/40',  text: 'text-cyan-300' },
-    punto:  { label: 'PUNTO',  bg: 'bg-purple-900/40',text: 'text-purple-300' },
-    equipo: { label: 'EQUIP',  bg: 'bg-blue-900/40',  text: 'text-blue-300' },
-    sensor: { label: 'SENSOR', bg: 'bg-green-900/40', text: 'text-green-300' },
+    zona:   { label: 'ZONA',  bg: 'bg-amber-900/40',  text: 'text-amber-300' },
+    forma:  { label: 'CIRC',  bg: 'bg-cyan-900/40',   text: 'text-cyan-300' },
+    punto:  { label: 'PUNTO', bg: 'bg-purple-900/40', text: 'text-purple-300' },
+    equipo: { label: 'EQUIP', bg: 'bg-blue-900/40',   text: 'text-blue-300' },
+    sensor: { label: 'SENSR', bg: 'bg-green-900/40',  text: 'text-green-300' },
+    cota:   { label: 'COTA',  bg: 'bg-slate-800/60',  text: 'text-slate-300' },
   }[tipo]
+  if (!cfg) return null
   return (
     <span className={`text-[8px] px-1.5 py-0.5 rounded ${cfg.bg} ${cfg.text} font-mono font-bold`}>
       {cfg.label}

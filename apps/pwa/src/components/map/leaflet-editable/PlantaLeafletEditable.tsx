@@ -50,6 +50,49 @@ function polygonCenter(coords: PolygonCoords): L.LatLng {
   return L.latLng(lat, lng)
 }
 
+// ─── Snap helpers (herramienta medir) ───────────────────────────────────────
+/** Recorre un FeatureCollection GeoJSON y empuja todos los vértices a `out`.
+ *  DXF guarda [X, Y] → Leaflet necesita lat=Y, lng=X. */
+function collectSnapPoints(fc: GeoJSON.FeatureCollection, out: L.LatLng[]) {
+  const walk = (c: unknown): void => {
+    if (!Array.isArray(c) || c.length === 0) return
+    if (typeof c[0] === 'number') {
+      out.push(L.latLng(c[1] as number, c[0] as number))
+    } else {
+      for (const child of c) walk(child)
+    }
+  }
+  for (const f of fc.features) {
+    if (f.geometry) walk((f.geometry as { coordinates: unknown }).coordinates)
+  }
+}
+
+/** Busca el vértice snap más cercano al cursor en espacio de píxeles. */
+function findSnap(map: LMap, pts: L.LatLng[], cursor: L.LatLng, threshPx: number): L.LatLng | null {
+  const cp = map.latLngToContainerPoint(cursor)
+  let best: L.LatLng | null = null
+  let bestD = threshPx
+  for (const pt of pts) {
+    const pp = map.latLngToContainerPoint(pt)
+    const d = Math.hypot(pp.x - cp.x, pp.y - cp.y)
+    if (d < bestD) { bestD = d; best = pt }
+  }
+  return best
+}
+
+/** Ángulo en grados del segmento a→b (respecto a horizontal). */
+function segAngle(a: L.LatLng, b: L.LatLng): number {
+  return Math.atan2(b.lat - a.lat, b.lng - a.lng) * 180 / Math.PI
+}
+
+/** Etiqueta de ángulo: "H" si ~horizontal, "V" si ~vertical, o "XX.X°". */
+function angleTag(deg: number): string {
+  const a = ((deg % 180) + 180) % 180
+  if (a <= 3 || a >= 177) return 'H'
+  if (Math.abs(a - 90) <= 3) return 'V'
+  return `${deg.toFixed(1)}°`
+}
+
 // ─── Carga perezosa de cada GeoJSON DXF ──────────────────────────────────────
 function CapaDXF({ cfg, folder }: { cfg: DxfLayerConfig; folder: string }) {
   const [data, setData] = useState<GeoJSON.FeatureCollection | null>(null)
@@ -395,10 +438,10 @@ function CenterOnSelected() {
 
 // ─── Herramienta de medición ─────────────────────────────────────────────────
 /**
- * MeasureTool — clic a clic en el mapa para medir distancias reales.
- * Dibuja líneas + etiquetas de distancia por segmento.
- * Esc limpia todas las medidas de la sesión actual.
- * unitScale convierte unidades nativas → metros (recinto=1, interior=0.001).
+ * MeasureTool — clic a clic para medir distancias reales en el DXF.
+ * • Snap automático a vértices de las capas visibles (anillo ámbar)
+ * • Indicador H / V / ángulo en el overlay
+ * • Esc limpia la sesión actual
  */
 function MeasureTool({ view }: { view: MapView }) {
   const map = useMap()
@@ -407,25 +450,30 @@ function MeasureTool({ view }: { view: MapView }) {
     measureClearSignal,
     addMeasureSegment,
     setMeasurePointCount,
+    setMeasureCurrentPoints,
+    setMeasureLastAngle,
   } = useMapaLeafletStore()
 
-  const pointsRef  = useRef<L.LatLng[]>([])
-  const layersRef  = useRef<L.Layer[]>([])
-  const rubberRef  = useRef<L.Polyline | null>(null)
+  const pointsRef     = useRef<L.LatLng[]>([])
+  const layersRef     = useRef<L.Layer[]>([])
+  const rubberRef     = useRef<L.Polyline | null>(null)
+  const snapPtsRef    = useRef<L.LatLng[]>([])
+  const snapRingRef   = useRef<L.CircleMarker | null>(null)
+  const snapActiveRef = useRef<L.LatLng | null>(null)
 
   const removeLayers = useCallback(() => {
-    layersRef.current.forEach((l) => { try { map.removeLayer(l) } catch { /* ignore */ } })
+    layersRef.current.forEach((l) => { try { map.removeLayer(l) } catch { /* ok */ } })
     layersRef.current = []
-    if (rubberRef.current) {
-      try { map.removeLayer(rubberRef.current) } catch { /* ignore */ }
-      rubberRef.current = null
-    }
+    if (rubberRef.current)  { try { map.removeLayer(rubberRef.current) }  catch { /* ok */ }; rubberRef.current  = null }
+    if (snapRingRef.current){ try { map.removeLayer(snapRingRef.current) } catch { /* ok */ }; snapRingRef.current = null }
   }, [map])
 
   const resetPoints = useCallback(() => {
     pointsRef.current = []
     setMeasurePointCount(0)
-  }, [setMeasurePointCount])
+    setMeasureCurrentPoints([])
+    setMeasureLastAngle(null)
+  }, [setMeasurePointCount, setMeasureCurrentPoints, setMeasureLastAngle])
 
   // Reacciona al signal de limpieza (desde overlay o toggleMeasureMode)
   const prevSignalRef = useRef(0)
@@ -435,6 +483,22 @@ function MeasureTool({ view }: { view: MapView }) {
     removeLayers()
     resetPoints()
   }, [measureClearSignal, removeLayers, resetPoints])
+
+  // Carga puntos de snap cuando se activa el modo medir
+  useEffect(() => {
+    if (!measureMode) { snapPtsRef.current = []; return }
+    const { capasVisibles } = useMapaLeafletStore.getState()
+    const visible = view.layers.filter((c) => capasVisibles[c.name] ?? c.defaultVisible)
+    const all: L.LatLng[] = []
+    Promise.all(
+      visible.map((c) =>
+        fetch(`${import.meta.env.BASE_URL}maps/${view.folder}/${c.name}.geojson`)
+          .then((r) => (r.ok ? r.json() : null))
+          .then((fc: GeoJSON.FeatureCollection | null) => { if (fc) collectSnapPoints(fc, all) })
+          .catch(() => {})
+      )
+    ).then(() => { snapPtsRef.current = all })
+  }, [measureMode, view])
 
   useEffect(() => {
     if (!measureMode) {
@@ -448,13 +512,16 @@ function MeasureTool({ view }: { view: MapView }) {
 
     const onClick = (e: L.LeafletMouseEvent) => {
       L.DomEvent.stopPropagation(e)
+      const snap  = snapActiveRef.current
+      const newPt = snap ?? e.latlng
       const pts   = pointsRef.current
-      const newPt = e.latlng
 
-      // Punto visual
       const dot = L.circleMarker(newPt, {
-        radius: 5, color: '#f59e0b', fillColor: '#0a0e14',
-        fillOpacity: 1, weight: 2.5, interactive: false,
+        radius: snap ? 6 : 5,
+        color: '#f59e0b',
+        fillColor: snap ? '#f59e0b' : '#0a0e14',
+        fillOpacity: snap ? 0.8 : 1,
+        weight: 2.5, interactive: false,
       }).addTo(map)
       layersRef.current.push(dot)
 
@@ -464,24 +531,22 @@ function MeasureTool({ view }: { view: MapView }) {
           const dx   = newPt.lng - prev.lng
           const dy   = newPt.lat - prev.lat
           const dist = Math.sqrt(dx * dx + dy * dy) * view.unitScale
+          const tag  = angleTag(segAngle(prev, newPt))
 
-          // Línea de segmento
           const line = L.polyline([prev, newPt], {
             color: '#f59e0b', weight: 2, dashArray: '8 5',
             interactive: false, opacity: 0.9,
           }).addTo(map)
 
-          // Etiqueta en el punto medio
           const mid = L.latLng((prev.lat + newPt.lat) / 2, (prev.lng + newPt.lng) / 2)
           const lbl = L.marker(mid, {
             icon: L.divIcon({
               className: 'measure-label-container',
-              html: `<span class="measure-label">${dist.toFixed(2)} m</span>`,
-              iconSize:   [80, 22],
-              iconAnchor: [40, 11],
+              html: `<span class="measure-label">${dist.toFixed(2)} m${tag === 'H' || tag === 'V' ? ` · ${tag}` : ''}</span>`,
+              iconSize:   [110, 22],
+              iconAnchor: [55, 11],
             }),
-            interactive: false,
-            zIndexOffset: 1000,
+            interactive: false, zIndexOffset: 1000,
           }).addTo(map)
 
           layersRef.current.push(line, lbl)
@@ -489,21 +554,43 @@ function MeasureTool({ view }: { view: MapView }) {
         }
       }
 
-      pointsRef.current = [...pts, newPt]
-      setMeasurePointCount(pointsRef.current.length)
+      const newPts = [...pts, newPt]
+      pointsRef.current = newPts
+      setMeasurePointCount(newPts.length)
+      setMeasureCurrentPoints(newPts.map((p) => [p.lat, p.lng]))
     }
 
     const onMouseMove = (e: L.LeafletMouseEvent) => {
+      const snap   = findSnap(map, snapPtsRef.current, e.latlng, 18)
+      snapActiveRef.current = snap
+      const cursor = snap ?? e.latlng
+
+      // Anillo snap
+      if (snap) {
+        if (snapRingRef.current) {
+          snapRingRef.current.setLatLng(snap)
+        } else {
+          snapRingRef.current = L.circleMarker(snap, {
+            radius: 9, color: '#fbbf24', fillOpacity: 0, weight: 2, interactive: false,
+          }).addTo(map)
+        }
+      } else if (snapRingRef.current) {
+        try { map.removeLayer(snapRingRef.current) } catch { /* ok */ }
+        snapRingRef.current = null
+      }
+
+      // Línea de goma
       const last = pointsRef.current[pointsRef.current.length - 1]
       if (!last) return
       if (rubberRef.current) {
-        rubberRef.current.setLatLngs([last, e.latlng])
+        rubberRef.current.setLatLngs([last, cursor])
       } else {
-        rubberRef.current = L.polyline([last, e.latlng], {
-          color: '#fbbf24', weight: 1, dashArray: '4 4',
-          interactive: false, opacity: 0.5,
+        rubberRef.current = L.polyline([last, cursor], {
+          color: '#fbbf24', weight: 1, dashArray: '4 4', interactive: false, opacity: 0.5,
         }).addTo(map)
       }
+
+      setMeasureLastAngle(segAngle(last, cursor))
     }
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -523,12 +610,82 @@ function MeasureTool({ view }: { view: MapView }) {
       map.off('mousemove', onMouseMove)
       window.removeEventListener('keydown', onKeyDown)
       container.style.cursor = ''
-      if (rubberRef.current) {
-        try { map.removeLayer(rubberRef.current) } catch { /* ignore */ }
-        rubberRef.current = null
+      if (rubberRef.current)  { try { map.removeLayer(rubberRef.current) }  catch { /* ok */ }; rubberRef.current  = null }
+      if (snapRingRef.current){ try { map.removeLayer(snapRingRef.current) } catch { /* ok */ }; snapRingRef.current = null }
+    }
+  }, [map, measureMode, view, addMeasureSegment, setMeasurePointCount, setMeasureCurrentPoints, setMeasureLastAngle, removeLayers, resetPoints])
+
+  return null
+}
+
+// ─── Cotas permanentes guardadas ─────────────────────────────────────────────
+function CapaCotas({ view }: { view: MapView }) {
+  const map        = useMap()
+  const allElementos = useMapaLeafletStore((s) => s.elementos)
+  const cotas = useMemo(
+    () => allElementos.filter((e) => e.tipo === 'cota' && e.mapView === view.name),
+    [allElementos, view.name],
+  )
+  const layersRef = useRef<Map<string, L.Layer[]>>(new Map())
+
+  useEffect(() => {
+    if (!map) return
+    const current = layersRef.current
+
+    // Elimina cotas que ya no están en el store
+    for (const [id, layers] of current.entries()) {
+      if (!cotas.find((c) => c.id === id)) {
+        layers.forEach((l) => { try { map.removeLayer(l) } catch { /* ok */ } })
+        current.delete(id)
       }
     }
-  }, [map, measureMode, view, addMeasureSegment, setMeasurePointCount, removeLayers, resetPoints])
+
+    for (const cota of cotas) {
+      if (current.has(cota.id)) continue
+      const meta = cota.meta as { points?: [number, number][]; totalM?: number } | undefined
+      if (!meta?.points || meta.points.length < 2) continue
+
+      const latlngs = meta.points.map((p) => L.latLng(p[0], p[1]))
+      const layers: L.Layer[] = []
+
+      // Línea cota
+      const line = L.polyline(latlngs, {
+        color: '#94a3b8', weight: 1.5, dashArray: '6 4', interactive: true, opacity: 0.85,
+      })
+      line.bindPopup(`<div style="font-size:11px;color:#fbbf24;font-weight:600">${cota.nombre}</div>`)
+      line.addTo(map)
+      layers.push(line)
+
+      // Etiqueta en punto medio
+      const midIdx = Math.floor(latlngs.length / 2)
+      const midPt  = latlngs[midIdx] ?? latlngs[0]
+      if (midPt) {
+        const lbl = L.marker(midPt, {
+          icon: L.divIcon({
+            className: 'cota-label-container',
+            html: `<span class="cota-label">${cota.nombre}</span>`,
+            iconSize:   [90, 20],
+            iconAnchor: [45, 20],
+          }),
+          interactive: false, zIndexOffset: 500,
+        }).addTo(map)
+        layers.push(lbl)
+      }
+
+      // Extremos
+      const first = latlngs[0]
+      const last  = latlngs[latlngs.length - 1]
+      for (const pt of [first, last]) {
+        if (!pt) continue
+        const cap = L.circleMarker(pt, {
+          radius: 4, color: '#94a3b8', fillColor: '#94a3b8', fillOpacity: 0.9, weight: 1, interactive: false,
+        }).addTo(map)
+        layers.push(cap)
+      }
+
+      current.set(cota.id, layers)
+    }
+  }, [map, cotas])
 
   return null
 }
@@ -601,6 +758,7 @@ function MapContents({ view }: { view: MapView }) {
       ))}
 
       <CapaElementos view={view} />
+      <CapaCotas view={view} />
       <EditorGeoman view={view} />
       <MeasureTool view={view} />
       <DrawAreaTooltip />
@@ -614,21 +772,58 @@ function MapContents({ view }: { view: MapView }) {
 
 // ─── Overlay de medición (fuera del MapContainer) ────────────────────────────
 function MeasureOverlay() {
-  const measureSegments  = useMapaLeafletStore((s) => s.measureSegments)
-  const measurePointCount = useMapaLeafletStore((s) => s.measurePointCount)
-  const clearMeasurements = useMapaLeafletStore((s) => s.clearMeasurements)
+  const measureSegments      = useMapaLeafletStore((s) => s.measureSegments)
+  const measurePointCount    = useMapaLeafletStore((s) => s.measurePointCount)
+  const measureCurrentPoints = useMapaLeafletStore((s) => s.measureCurrentPoints)
+  const measureLastAngle     = useMapaLeafletStore((s) => s.measureLastAngle)
+  const currentView          = useMapaLeafletStore((s) => s.currentView)
+  const clearMeasurements    = useMapaLeafletStore((s) => s.clearMeasurements)
+  const addElemento          = useMapaLeafletStore((s) => s.addElemento)
 
   const total = measureSegments.reduce((a, d) => a + d, 0)
+  const tag   = measureLastAngle !== null ? angleTag(measureLastAngle) : null
+
+  const handleGuardarCota = () => {
+    if (measureCurrentPoints.length < 2 || measureSegments.length === 0) return
+    addElemento({
+      tipo: 'cota',
+      nombre: `${total.toFixed(2)} m`,
+      categoria: 'otros',
+      estado: 'operativo',
+      mapView: currentView,
+      meta: {
+        points:   measureCurrentPoints,
+        segments: measureSegments,
+        totalM:   total,
+        angle:    measureLastAngle,
+      },
+    })
+    clearMeasurements()
+  }
 
   return (
     <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1000] pointer-events-none select-none">
-      <div className="bg-gray-900/95 border border-amber-700/60 rounded-xl shadow-2xl px-4 py-3 min-w-56 backdrop-blur-sm">
+      <div className="bg-gray-900/95 border border-amber-700/60 rounded-xl shadow-2xl px-4 py-3 min-w-60 backdrop-blur-sm">
 
         {/* Header */}
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">
-            Herramienta Medir
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">
+              Herramienta Medir
+            </span>
+            {tag && (
+              <span className={[
+                'text-[9px] font-bold px-1.5 py-0.5 rounded',
+                tag === 'H'
+                  ? 'bg-sky-900/60 text-sky-300 border border-sky-700/50'
+                  : tag === 'V'
+                    ? 'bg-emerald-900/60 text-emerald-300 border border-emerald-700/50'
+                    : 'bg-gray-800/60 text-gray-300 border border-gray-700/50',
+              ].join(' ')}>
+                {tag}
+              </span>
+            )}
+          </div>
           <button
             className="pointer-events-auto text-[10px] text-gray-500 hover:text-red-400 transition-colors"
             onClick={clearMeasurements}
@@ -662,7 +857,15 @@ function MeasureOverlay() {
                 <span className="font-mono font-bold text-white">{total.toFixed(2)} m</span>
               </div>
             )}
-            <p className="text-[10px] text-gray-600 mt-1 pt-1 border-t border-gray-800">
+            <div className="flex gap-2 mt-2 pt-1.5 border-t border-gray-800">
+              <button
+                className="pointer-events-auto flex-1 text-[10px] py-1 rounded-md bg-amber-600/20 border border-amber-600/50 text-amber-400 hover:bg-amber-600/35 transition-colors"
+                onClick={handleGuardarCota}
+              >
+                Guardar cota
+              </button>
+            </div>
+            <p className="text-[10px] text-gray-600 pt-1">
               Seguí haciendo clic para sumar segmentos
             </p>
           </div>

@@ -10,7 +10,7 @@ import type { ViewName } from '@/data/dxfLayers'
 
 export type ZonaCategoria = 'produccion' | 'frio' | 'utilidades' | 'logistica' | 'admin' | 'estructura' | 'otros'
 export type ZonaEstado    = 'operativo' | 'alerta' | 'detenido'
-export type ElementoTipo  = 'zona' | 'equipo' | 'sensor' | 'punto' | 'forma'
+export type ElementoTipo  = 'zona' | 'equipo' | 'sensor' | 'punto' | 'forma' | 'cota'
 
 /** Polígono: array de puntos [lat, lng] = [Y, X] en unidades del DXF de la vista */
 export type PolygonCoords = [number, number][]
@@ -47,10 +47,13 @@ interface MapaLeafletState {
 
   // ── Medición ────────────────────────────────────────────────────────────────
   measureMode: boolean
-  measureSegments: number[]   // distancias acumuladas en metros
-  measurePointCount: number   // para mostrar instrucciones en overlay
+  measureSegments: number[]       // distancias acumuladas en metros
+  measurePointCount: number       // para mostrar instrucciones en overlay
+  measureCurrentPoints: [number, number][]  // [lat, lng] del path actual
   /** Incrementar para señalar a MeasureTool que limpie sus capas Leaflet */
   measureClearSignal: number
+  /** Ángulo del último segmento medido (grados, null si < 2 puntos) */
+  measureLastAngle: number | null
 
   // Acciones
   setView: (v: ViewName) => void
@@ -67,6 +70,8 @@ interface MapaLeafletState {
   toggleMeasureMode: () => void
   addMeasureSegment: (dist: number) => void
   setMeasurePointCount: (n: number) => void
+  setMeasureCurrentPoints: (pts: [number, number][]) => void
+  setMeasureLastAngle: (a: number | null) => void
   clearMeasurements: () => void
 }
 
@@ -85,7 +90,9 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
       measureMode: false,
       measureSegments: [],
       measurePointCount: 0,
+      measureCurrentPoints: [],
       measureClearSignal: 0,
+      measureLastAngle: null,
 
       setView: (v) => set({ currentView: v, selectedId: null }),
       setSelectedId: (id) => set({ selectedId: id }),
@@ -134,15 +141,21 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
         editMode: false,
         measureSegments: [],
         measurePointCount: 0,
+        measureCurrentPoints: [],
+        measureLastAngle: null,
         measureClearSignal: s.measureClearSignal + 1,
       })),
       addMeasureSegment: (dist) => set((s) => ({
         measureSegments: [...s.measureSegments, dist],
       })),
       setMeasurePointCount: (n) => set({ measurePointCount: n }),
+      setMeasureCurrentPoints: (pts) => set({ measureCurrentPoints: pts }),
+      setMeasureLastAngle: (a) => set({ measureLastAngle: a }),
       clearMeasurements: () => set((s) => ({
         measureSegments: [],
         measurePointCount: 0,
+        measureCurrentPoints: [],
+        measureLastAngle: null,
         measureClearSignal: s.measureClearSignal + 1,
       })),
     }),
