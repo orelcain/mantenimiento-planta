@@ -841,6 +841,24 @@ export async function updatePauseRange(
   const found = data.pauses.some((p) => p.id === pauseId)
   if (!found) throw new Error(`Pausa ${pauseId} no encontrada en ${summaryId}`)
 
+  // M6 — Validación: el nuevo rango no puede solaparse con otras pausas del turno.
+  // Dos intervalos [s1,e1] y [s2,e2] se solapan si s1 < e2 AND s2 < e1 (strict).
+  const newStart = Date.parse(params.startAt)
+  const newEnd = Date.parse(params.endAt)
+  if (newStart >= newEnd) throw new Error('El inicio debe ser anterior al fin')
+  for (const other of data.pauses) {
+    if (other.id === pauseId) continue
+    const oStart = Date.parse(other.startAt)
+    const oEnd = Date.parse(other.endAt)
+    if (newStart < oEnd && oStart < newEnd) {
+      const fmtUTC = (ms: number) => {
+        const d = new Date(ms)
+        return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
+      }
+      throw new Error(`El rango se solapa con otra pausa (${fmtUTC(oStart)}–${fmtUTC(oEnd)})`)
+    }
+  }
+
   const updatedPauses = data.pauses.map((p) => {
     if (p.id !== pauseId) return p
     return {

@@ -119,6 +119,33 @@ export function PauseAnnotationDialog({
     setRangeError(null)
   }, [])
 
+  // M5 — Atajos de teclado (antes del guard para cumplir rules-of-hooks)
+  // · 1-9 : selecciona tag por posición en la lista
+  // · ← / →  : ajusta inicio −1/+1 min   (Shift = ±5 min)
+  // · ↑ / ↓  : ajusta fin   −1/+1 min   (Shift = ±5 min)
+  useEffect(() => {
+    if (!open || !pause) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      // 1-9: elegir tag (sin Ctrl/Meta para no pisar atajos del OS)
+      if (!e.ctrlKey && !e.metaKey && e.key >= '1' && e.key <= '9') {
+        e.preventDefault()
+        const tag = tags[parseInt(e.key) - 1]
+        if (tag) setSelectedTagId(tag.id)
+        return
+      }
+      if (saving || savingRange) return
+      // Flechas: ← → = inicio, ↑ ↓ = fin; Shift multiplica por 5
+      const delta = e.shiftKey ? 5 : 1
+      if      (e.key === 'ArrowLeft')  { e.preventDefault(); adjustStart(-delta) }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); adjustStart(delta) }
+      else if (e.key === 'ArrowUp')    { e.preventDefault(); adjustEnd(-delta) }
+      else if (e.key === 'ArrowDown')  { e.preventDefault(); adjustEnd(delta) }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [open, pause, saving, savingRange, tags, adjustStart, adjustEnd])
+
   if (!pause) return null
 
   const isAutoTag = !pause.tag && !!pause.autoTag
@@ -196,6 +223,12 @@ export function PauseAnnotationDialog({
               {isAutoTag && (
                 <span className="block text-xs text-amber-400 mt-1">
                   Tag sugerido por el sistema — confírmalo o cámbialo
+                </span>
+              )}
+              {/* M4: chip trazabilidad rango ajustado */}
+              {pause.adjustedBy && (
+                <span className="inline-flex items-center gap-1 text-xs text-sky-400 mt-1">
+                  ✏ Rango ajustado por <span className="font-medium">{pause.adjustedBy}</span>
                 </span>
               )}
             </div>

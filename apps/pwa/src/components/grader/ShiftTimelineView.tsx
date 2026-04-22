@@ -710,22 +710,22 @@ export function ShiftTimelineView({
       let areaColor: string
       let labelColor: string
       let labelText: string
+      // M4: indicador visual cuando el rango fue ajustado manualmente
+      const rangeAdjusted = !!p.adjustedBy
       if (effectiveTag) {
         areaColor = effectiveTag.bandFill
         labelColor = effectiveTag.color
-        labelText = `${effectiveTag.emoji} ${effectiveTag.label.split(' ')[0]} ${durMin}min`
+        labelText = `${effectiveTag.emoji} ${effectiveTag.label.split(' ')[0]} ${durMin}min${rangeAdjusted ? ' ✏' : ''}`
       } else {
         const opacityByTier = p.tier === 'parada' ? 0.12 : p.tier === 'larga' ? 0.09 : 0.06
         areaColor = `rgba(148,163,184,${opacityByTier})`
         labelColor = '#94a3b8'
-        labelText = `⏸ ${durMin}min`
+        labelText = `⏸ ${durMin}min${rangeAdjusted ? ' ✏' : ''}`
       }
       // Ocultar label en pausas CORTAS SIN CLASIFICAR (<10min). Si el admin
-      // clasificó (tag manual) o el detector marcó colación (autoTag), el
-      // label se muestra siempre — el esfuerzo de anotar merece ser visible.
-      // La banda translúcida sigue ahí para las <10min sin tag, y el click
-      // sigue abriendo el diálogo.
-      const showLabel = durMin >= 10 || !!effectiveTag
+      // clasificó (tag manual) o el detector marcó colación (autoTag) o
+      // ajustó el rango (adjustedBy), el label se muestra siempre.
+      const showLabel = durMin >= 10 || !!effectiveTag || rangeAdjusted
       return [
         {
           name: p.id, // identifica la pausa al clickear (Fase 3)
