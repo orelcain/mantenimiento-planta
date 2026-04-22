@@ -808,6 +808,61 @@ export async function updatePauseAnnotation(
 }
 
 /**
+ * Corrige el rango horario de una pausa (startAt / endAt).
+ *
+ * Útil cuando el detector automático marcó bordes imprecisos (±minutos).
+ * Recalcula `durationSec` y registra quién ajustó.
+ * El `id` de la pausa NO cambia — sigue siendo el identificador estable
+ * aunque ya no coincida exactamente con la hora (es cosmético, no funcional).
+ *
+ * Validaciones mínimas:
+ *   - endAt > startAt
+ *   - durationSec ≥ 60 s (pausa de al menos 1 min)
+ */
+export async function updatePauseRange(
+  summaryId: string,
+  pauseId: string,
+  params: {
+    startAt: string  // ISO string (misma convención Z-suffix = hora local planta)
+    endAt: string
+    adjustedBy: string
+  },
+): Promise<void> {
+  const durationSec = Math.round((Date.parse(params.endAt) - Date.parse(params.startAt)) / 1000)
+  if (durationSec < 60) throw new Error('La pausa debe durar al menos 1 minuto')
+
+  const ref = doc(db, COLLECTION, summaryId, TIMELINE_META_SUB, PAUSES_META_DOC)
+  const snap = await getDoc(ref)
+  if (!snap.exists()) throw new Error(`No existe meta/pauses para ${summaryId}`)
+  const data = snap.data() as Partial<PausesAggregatesDoc>
+  if (!Array.isArray(data.pauses)) throw new Error(`meta/pauses con forma inesperada`)
+
+  const now = new Date().toISOString()
+  const found = data.pauses.some((p) => p.id === pauseId)
+  if (!found) throw new Error(`Pausa ${pauseId} no encontrada en ${summaryId}`)
+
+  const updatedPauses = data.pauses.map((p) => {
+    if (p.id !== pauseId) return p
+    return {
+      ...p,
+      startAt: params.startAt,
+      endAt: params.endAt,
+      durationSec,
+      adjustedBy: params.adjustedBy,
+      adjustedAt: now,
+    }
+  })
+
+  const payload: PausesAggregatesDoc = {
+    pauses: deepCleanUndefined(updatedPauses),
+    microDetentions: data.microDetentions ?? { count: 0, totalSec: 0, byHour: {} },
+    updatedAt: now,
+    schemaVersion: PAUSES_SCHEMA_VERSION,
+  }
+  await setDoc(ref, payload)
+}
+
+/**
  * Merge de anotaciones existentes sobre una detección fresca.
  *
  * Cuando se reprocesa un turno (ej. re-upload del Excel), el detector produce

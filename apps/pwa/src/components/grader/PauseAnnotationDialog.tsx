@@ -1,17 +1,19 @@
 /**
- * Diálogo para anotar manualmente una pausa del Timeline (Fase 3).
+ * Diálogo para anotar y ajustar manualmente una pausa del Timeline.
  *
  * Flujo:
  *   1. Admin clickea una banda de pausa en `ShiftTimelineView`.
- *   2. Se abre este diálogo con: info de la pausa (read-only) + grid de
- *      tags + textarea para nota.
- *   3. Admin selecciona tag → "Guardar" dispara `updatePauseAnnotation`.
+ *   2. Se abre este diálogo con: info de la pausa + grid de tags + ajuste de rango.
+ *   3a. Admin selecciona tag → "Guardar" dispara `updatePauseAnnotation`.
+ *   3b. Admin ajusta inicio/fin con botones ±1/±5 min → "Guardar rango" dispara
+ *       `updatePauseRange`. Ambas acciones son independientes.
  *   4. Callback `onSaved` refresca las pausas en el parent.
  *
- * Un tag previo ya aplicado viene pre-seleccionado. Botón "Quitar tag" lo
- * limpia (sin borrar la pausa — vuelve a estado "sin clasificar").
+ * **Convención de timestamps**: los ISO strings de las pausas llevan sufijo `Z`
+ * pero representan hora local de la planta (no UTC real). Para mostrar y editar
+ * siempre usamos getUTCHours/Minutes — igual que `fmtTime` en ShiftTimelineView.
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -24,9 +26,9 @@ import {
   Label,
 } from '@/components/ui'
 import { cn } from '@/lib/utils'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Clock } from 'lucide-react'
 import type { Pause } from '@/services/grader/types'
-import { updatePauseAnnotation } from '@/services/grader/graderDailySummary.service'
+import { updatePauseAnnotation, updatePauseRange } from '@/services/grader/graderDailySummary.service'
 import { usePauseTags } from '@/hooks/usePauseTags'
 
 interface PauseAnnotationDialogProps {
@@ -40,9 +42,26 @@ interface PauseAnnotationDialogProps {
   onSaved?: () => void
 }
 
-function formatHHMM(iso: string): string {
+/** Muestra HH:MM de un ISO usando UTC (= hora local planta). */
+function fmtHHMM(iso: string): string {
   const d = new Date(iso)
   return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
+}
+
+/** Ajusta un ISO string ±deltaMin manteniendo la convención Z-planta. */
+function shiftMinutes(iso: string, deltaMin: number): string {
+  const d = new Date(iso)
+  d.setUTCMinutes(d.getUTCMinutes() + deltaMin)
+  return d.toISOString()
+}
+
+/** Duración legible: "X h Y min" o "X min". */
+function fmtDuration(sec: number): string {
+  const totalMin = Math.round(sec / 60)
+  if (totalMin < 60) return `${totalMin} min`
+  const h = Math.floor(totalMin / 60)
+  const m = totalMin % 60
+  return m > 0 ? `${h} h ${m} min` : `${h} h`
 }
 
 export function PauseAnnotationDialog({
@@ -54,10 +73,27 @@ export function PauseAnnotationDialog({
   onSaved,
 }: PauseAnnotationDialogProps) {
   const { tags } = usePauseTags()
+
+  // — Tag / nota —
   const [selectedTagId, setSelectedTagId] = useState<string | null>(null)
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // — Ajuste de rango —
+  const [editedStart, setEditedStart] = useState('')
+  const [editedEnd, setEditedEnd] = useState('')
+  const [savingRange, setSavingRange] = useState(false)
+  const [rangeError, setRangeError] = useState<string | null>(null)
+  const [rangeSaved, setRangeSaved] = useState(false)
+
+  // Duración calculada desde los valores editados
+  const editedDurationSec = editedStart && editedEnd
+    ? Math.round((Date.parse(editedEnd) - Date.parse(editedStart)) / 1000)
+    : 0
+  const rangeChanged = pause
+    ? editedStart !== pause.startAt || editedEnd !== pause.endAt
+    : false
 
   // Inicializar estado cuando cambia la pausa abierta.
   useEffect(() => {
@@ -65,14 +101,31 @@ export function PauseAnnotationDialog({
     setSelectedTagId(pause.tag ?? pause.autoTag ?? null)
     setNote(pause.note ?? '')
     setError(null)
+    setEditedStart(pause.startAt)
+    setEditedEnd(pause.endAt)
+    setRangeError(null)
+    setRangeSaved(false)
   }, [pause])
+
+  const adjustStart = useCallback((deltaMin: number) => {
+    setEditedStart(prev => shiftMinutes(prev, deltaMin))
+    setRangeSaved(false)
+    setRangeError(null)
+  }, [])
+
+  const adjustEnd = useCallback((deltaMin: number) => {
+    setEditedEnd(prev => shiftMinutes(prev, deltaMin))
+    setRangeSaved(false)
+    setRangeError(null)
+  }, [])
 
   if (!pause) return null
 
-  const durationMin = Math.round(pause.durationSec / 60)
   const isAutoTag = !pause.tag && !!pause.autoTag
+  const tierLabel = { pausa: 'Pausa', larga: 'Pausa larga', parada: 'Parada' }[pause.tier]
 
-  const handleSave = async () => {
+  // — Handlers —
+  const handleSaveTag = async () => {
     if (!selectedTagId) return
     setSaving(true)
     setError(null)
@@ -108,30 +161,50 @@ export function PauseAnnotationDialog({
     }
   }
 
-  const tierLabel = {
-    pausa: 'Pausa',
-    larga: 'Pausa larga',
-    parada: 'Parada',
-  }[pause.tier]
+  const handleSaveRange = async () => {
+    setRangeError(null)
+    if (editedDurationSec < 60) {
+      setRangeError('La pausa debe durar al menos 1 minuto')
+      return
+    }
+    setSavingRange(true)
+    try {
+      await updatePauseRange(summaryId, pause.id, {
+        startAt: editedStart,
+        endAt: editedEnd,
+        adjustedBy: adminUid,
+      })
+      setRangeSaved(true)
+      onSaved?.()
+    } catch (err) {
+      setRangeError(err instanceof Error ? err.message : 'Error al guardar rango')
+    } finally {
+      setSavingRange(false)
+    }
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Clasificar pausa</DialogTitle>
-          <DialogDescription>
-            <span className="font-medium text-foreground">{tierLabel}</span>
-            <span className="text-muted-foreground"> · {formatHHMM(pause.startAt)} – {formatHHMM(pause.endAt)} · </span>
-            <span className="font-medium text-foreground">{durationMin} min</span>
-            {isAutoTag && (
-              <span className="block text-xs text-amber-400 mt-1">
-                Tag sugerido por el sistema — confírmalo o cámbialo
-              </span>
-            )}
+          <DialogDescription asChild>
+            <div>
+              <span className="font-medium text-foreground">{tierLabel}</span>
+              <span className="text-muted-foreground"> · {fmtHHMM(pause.startAt)} – {fmtHHMM(pause.endAt)} · </span>
+              <span className="font-medium text-foreground">{fmtDuration(pause.durationSec)}</span>
+              {isAutoTag && (
+                <span className="block text-xs text-amber-400 mt-1">
+                  Tag sugerido por el sistema — confírmalo o cámbialo
+                </span>
+              )}
+            </div>
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="flex-1 overflow-y-auto space-y-5 py-1 min-h-0">
+
+          {/* ── Sección: Tag ── */}
           <div className="space-y-2">
             <Label>Motivo</Label>
             <div className="grid grid-cols-1 gap-1.5">
@@ -149,11 +222,7 @@ export function PauseAnnotationDialog({
                       isSelected ? 'border-2' : 'border',
                       isSelected ? '' : 'border-border/60',
                     )}
-                    style={
-                      isSelected
-                        ? { borderColor: tag.color, backgroundColor: tag.bandFill }
-                        : undefined
-                    }
+                    style={isSelected ? { borderColor: tag.color, backgroundColor: tag.bandFill } : undefined}
                   >
                     <span className="text-lg leading-none">{tag.emoji}</span>
                     <span className={cn('flex-1', isSelected && 'font-medium')} style={isSelected ? { color: tag.color } : undefined}>
@@ -168,6 +237,7 @@ export function PauseAnnotationDialog({
             </div>
           </div>
 
+          {/* ── Nota ── */}
           <div className="space-y-2">
             <Label htmlFor="pause-note">Nota (opcional)</Label>
             <Textarea
@@ -175,17 +245,95 @@ export function PauseAnnotationDialog({
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="Detalle del evento, causa, responsable…"
-              rows={3}
+              rows={2}
               disabled={saving}
             />
           </div>
 
-          {error && (
-            <p className="text-xs text-red-400">{error}</p>
-          )}
+          {error && <p className="text-xs text-red-400">{error}</p>}
+
+          {/* ── Sección: Ajustar rango ── */}
+          <div className="border border-border/40 rounded-md p-3 space-y-3">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <Clock className="w-3.5 h-3.5" />
+              Ajustar rango detectado
+            </div>
+
+            {/* Inicio */}
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Inicio</p>
+              <div className="flex items-center gap-1.5">
+                <span className="font-mono text-sm font-semibold w-12 text-center tabular-nums">
+                  {fmtHHMM(editedStart)}
+                </span>
+                {([[-5, '−5'], [-1, '−1'], [1, '+1'], [5, '+5']] as const).map(([delta, label]) => (
+                  <Button
+                    key={delta}
+                    size="sm"
+                    variant="outline"
+                    className="h-7 w-9 text-xs p-0 font-mono"
+                    onClick={() => adjustStart(delta)}
+                    disabled={saving || savingRange}
+                  >
+                    {label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {/* Fin */}
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Fin</p>
+              <div className="flex items-center gap-1.5">
+                <span className="font-mono text-sm font-semibold w-12 text-center tabular-nums">
+                  {fmtHHMM(editedEnd)}
+                </span>
+                {([[-5, '−5'], [-1, '−1'], [1, '+1'], [5, '+5']] as const).map(([delta, label]) => (
+                  <Button
+                    key={delta}
+                    size="sm"
+                    variant="outline"
+                    className="h-7 w-9 text-xs p-0 font-mono"
+                    onClick={() => adjustEnd(delta)}
+                    disabled={saving || savingRange}
+                  >
+                    {label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {/* Duración live */}
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">
+                Duración: <span className={cn('font-medium', editedDurationSec < 60 ? 'text-red-400' : 'text-foreground')}>
+                  {editedDurationSec > 0 ? fmtDuration(editedDurationSec) : '—'}
+                </span>
+              </span>
+              {rangeChanged && !rangeSaved && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="h-7 text-xs gap-1"
+                  onClick={handleSaveRange}
+                  disabled={savingRange || editedDurationSec < 60}
+                >
+                  {savingRange
+                    ? <Loader2 className="w-3 h-3 animate-spin" />
+                    : null}
+                  Guardar rango
+                </Button>
+              )}
+              {rangeSaved && (
+                <span className="text-xs text-emerald-400">✓ Rango guardado</span>
+              )}
+            </div>
+
+            {rangeError && <p className="text-xs text-red-400">{rangeError}</p>}
+          </div>
         </div>
 
-        <DialogFooter className="gap-2 sm:justify-between">
+        <DialogFooter className="gap-2 pt-2 border-t border-border/40 sm:justify-between">
           <div>
             {pause.tag && (
               <Button
@@ -211,7 +359,7 @@ export function PauseAnnotationDialog({
             </Button>
             <Button
               type="button"
-              onClick={handleSave}
+              onClick={handleSaveTag}
               disabled={saving || !selectedTagId}
             >
               {saving && <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />}
@@ -223,4 +371,3 @@ export function PauseAnnotationDialog({
     </Dialog>
   )
 }
-
