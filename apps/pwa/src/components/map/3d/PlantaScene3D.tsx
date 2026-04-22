@@ -1,8 +1,6 @@
 import { Suspense, useCallback } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, Environment, ContactShadows, Sky } from '@react-three/drei'
-import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing'
-import { BlendFunction } from 'postprocessing'
 import * as THREE from 'three'
 import { Building3D } from './Building3D'
 import { Silo3D } from './Silo3D'
@@ -106,20 +104,8 @@ function SceneContent() {
         makeDefault
       />
 
-      {/* Post-processing: bloom cálido + viñeta cinematográfica */}
-      <EffectComposer>
-        <Bloom
-          intensity={0.9}
-          luminanceThreshold={0.55}
-          luminanceSmoothing={0.82}
-          blendFunction={BlendFunction.ADD}
-        />
-        <Vignette
-          offset={0.35}
-          darkness={0.65}
-          blendFunction={BlendFunction.NORMAL}
-        />
-      </EffectComposer>
+      {/* Post-processing deshabilitado: @react-three/postprocessing v3 requiere fiber v9 + React 19.
+          Re-habilitar cuando se actualice el stack. */}
     </>
   )
 }
