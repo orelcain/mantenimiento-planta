@@ -11,21 +11,22 @@
  *  • Persistencia: Zustand + localStorage
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { MapContainer, GeoJSON, useMap, ZoomControl } from 'react-leaflet'
 import L, { LatLngBounds, Map as LMap, FeatureGroup } from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import '@geoman-io/leaflet-geoman-free'
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css'
 import './geoman-dark.css'
-import { DXF_LAYERS, DXF_BOUNDS, DXF_CENTER, type DxfLayerConfig } from '@/data/dxfLayers'
+import { MAP_VIEWS, type DxfLayerConfig, type MapView } from '@/data/dxfLayers'
 import { useMapaLeafletStore, type ElementoMapa, type PolygonCoords } from '@/store/useMapaLeafletStore'
 
 // ─── Helpers de geometría ────────────────────────────────────────────────────
-const SNAP_GRID = 0.5  // metros — snap mientras se dibuja
-
-function snap(v: number): number {
-  return Math.round(v / SNAP_GRID) * SNAP_GRID
+/** Snap a grilla — usa unidad nativa de la vista. Para recinto = 0.5m, para
+ *  interior (mm) = 500mm = 0.5m. */
+function snapFor(view: MapView): (v: number) => number {
+  const grid = 0.5 / view.unitScale  // siempre 0.5m físicos
+  return (v: number) => Math.round(v / grid) * grid
 }
 
 /** Área en m² de un polígono (Shoelace formula). Coords [Y, X] */
@@ -47,18 +48,18 @@ function polygonCenter(coords: PolygonCoords): L.LatLng {
 }
 
 // ─── Carga perezosa de cada GeoJSON DXF ──────────────────────────────────────
-function CapaDXF({ cfg }: { cfg: DxfLayerConfig }) {
+function CapaDXF({ cfg, folder }: { cfg: DxfLayerConfig; folder: string }) {
   const [data, setData] = useState<GeoJSON.FeatureCollection | null>(null)
   const visible = useMapaLeafletStore((s) => s.capasVisibles[cfg.name] ?? cfg.defaultVisible)
 
   useEffect(() => {
     let cancel = false
-    fetch(`${import.meta.env.BASE_URL}maps/dxf/${cfg.name}.geojson`)
+    fetch(`${import.meta.env.BASE_URL}maps/${folder}/${cfg.name}.geojson`)
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => { if (!cancel) setData(j) })
       .catch(() => {})
     return () => { cancel = true }
-  }, [cfg.name])
+  }, [cfg.name, folder])
 
   if (!data || !visible) return null
 
@@ -129,10 +130,12 @@ function DrawAreaTooltip() {
 }
 
 // ─── Editor Geoman ────────────────────────────────────────────────────────────
-function EditorGeoman() {
+function EditorGeoman({ view }: { view: MapView }) {
   const map = useMap()
   const editMode = useMapaLeafletStore((s) => s.editMode)
   const featureGroupRef = useRef<FeatureGroup | null>(null)
+  const snap = snapFor(view)
+  const u2 = view.unitScale * view.unitScale  // factor unidad² → m²
 
   useEffect(() => {
     if (!map) return
@@ -155,33 +158,15 @@ function EditorGeoman() {
 
     pmMap.pm.addControls({
       position: 'topleft',
-      drawMarker: true,
-      drawCircleMarker: false,
-      drawPolyline: false,
-      drawRectangle: true,
-      drawPolygon: true,
-      drawCircle: true,
-      drawText: false,
-      editMode: true,
-      dragMode: true,
-      cutPolygon: false,
-      removalMode: true,
-      rotateMode: true,
+      drawMarker: true, drawCircleMarker: false, drawPolyline: false,
+      drawRectangle: true, drawPolygon: true, drawCircle: true,
+      drawText: false, editMode: true, dragMode: true,
+      cutPolygon: false, removalMode: true, rotateMode: true,
     })
 
-    pmMap.pm.setPathOptions({
-      color: '#22c55e',
-      fillColor: '#22c55e',
-      fillOpacity: 0.18,
-      weight: 2,
-    })
-
-    // Snap a grilla mientras dibuja
+    pmMap.pm.setPathOptions({ color: '#22c55e', fillColor: '#22c55e', fillOpacity: 0.18, weight: 2 })
     pmMap.pm.setGlobalOptions({
-      snappable: true,
-      snapDistance: 12,
-      tooltips: true,
-      allowSelfIntersection: false,
+      snappable: true, snapDistance: 12, tooltips: true, allowSelfIntersection: false,
     })
 
     const onCreate = (e: any) => {
@@ -193,17 +178,13 @@ function EditorGeoman() {
 
       if (shape === 'Polygon' || shape === 'Rectangle') {
         const latlngs: L.LatLng[] = (layer.getLatLngs()[0] as L.LatLng[]) ?? []
-        // Snap vértices a grilla
         const snapped: PolygonCoords = latlngs.map((p) => [snap(p.lat), snap(p.lng)])
         layer.setLatLngs([snapped.map((p) => L.latLng(p[0], p[1]))])
-        const area = polygonArea(latlngs)
+        const area_m2 = polygonArea(latlngs) * u2
         elemento = {
-          tipo: 'zona',
-          nombre: '', // vacío → fuerza al usuario a nombrar
-          categoria: 'otros',
-          estado: 'operativo',
-          poligono: snapped,
-          meta: { area_m2: Number(area.toFixed(2)) },
+          tipo: 'zona', nombre: '', categoria: 'otros', estado: 'operativo',
+          mapView: view.name, poligono: snapped,
+          meta: { area_m2: Number(area_m2.toFixed(2)) },
         }
       } else if (shape === 'Circle') {
         const c = layer.getLatLng() as L.LatLng
@@ -211,23 +192,18 @@ function EditorGeoman() {
         const cs: [number, number] = [snap(c.lat), snap(c.lng)]
         layer.setLatLng(L.latLng(cs[0], cs[1]))
         elemento = {
-          tipo: 'forma',
-          nombre: '',
-          categoria: 'otros',
-          estado: 'operativo',
-          punto: cs,
+          tipo: 'forma', nombre: '', categoria: 'otros', estado: 'operativo',
+          mapView: view.name, punto: cs,
           radio: Math.round(r * 10) / 10,
+          meta: { radio_m: Number((r * view.unitScale).toFixed(2)) },
         }
       } else if (shape === 'Marker') {
         const c = layer.getLatLng() as L.LatLng
         const cs: [number, number] = [snap(c.lat), snap(c.lng)]
         layer.setLatLng(L.latLng(cs[0], cs[1]))
         elemento = {
-          tipo: 'punto',
-          nombre: '',
-          categoria: 'otros',
-          estado: 'operativo',
-          punto: cs,
+          tipo: 'punto', nombre: '', categoria: 'otros', estado: 'operativo',
+          mapView: view.name, punto: cs,
         }
       }
 
@@ -235,11 +211,9 @@ function EditorGeoman() {
         const id = addElemento(elemento)
         ;(layer.options as any).elementoId = id
         setSelectedId(id)
-        // Foco al campo nombre del panel después de un tick
         setTimeout(() => {
           const input = document.querySelector<HTMLInputElement>('input[data-name-input="true"]')
-          input?.focus()
-          input?.select()
+          input?.focus(); input?.select()
         }, 80)
       }
       if (featureGroupRef.current) featureGroupRef.current.addLayer(layer)
@@ -255,12 +229,16 @@ function EditorGeoman() {
         const poligono: PolygonCoords = latlngs.map((p) => [snap(p.lat), snap(p.lng)])
         updateElemento(id, {
           poligono,
-          meta: { area_m2: Number(polygonArea(latlngs).toFixed(2)) },
+          meta: { area_m2: Number((polygonArea(latlngs) * u2).toFixed(2)) },
         })
       } else if (layer.getLatLng) {
         const c = layer.getLatLng() as L.LatLng
         const patch: Partial<ElementoMapa> = { punto: [snap(c.lat), snap(c.lng)] }
-        if (layer.getRadius) patch.radio = Math.round(layer.getRadius() * 10) / 10
+        if (layer.getRadius) {
+          const r = layer.getRadius()
+          patch.radio = Math.round(r * 10) / 10
+          patch.meta = { radio_m: Number((r * view.unitScale).toFixed(2)) }
+        }
         updateElemento(id, patch)
       }
     }
@@ -279,15 +257,19 @@ function EditorGeoman() {
       map.off('pm:edit', onEdit)
       map.off('pm:remove', onRemove)
     }
-  }, [map, editMode])
+  }, [map, editMode, view, snap, u2])
 
   return null
 }
 
 // ─── Renderiza elementos del store + selección/hover ─────────────────────────
-function CapaElementos() {
+function CapaElementos({ view }: { view: MapView }) {
   const map = useMap()
-  const elementos = useMapaLeafletStore((s) => s.elementos)
+  const allElementos = useMapaLeafletStore((s) => s.elementos)
+  const elementos = useMemo(
+    () => allElementos.filter((e) => e.mapView === view.name),
+    [allElementos, view.name],
+  )
   const selectedId = useMapaLeafletStore((s) => s.selectedId)
   const setSelectedId = useMapaLeafletStore((s) => s.setSelectedId)
   const layersRef = useRef<Map<string, L.Layer>>(new Map())
@@ -405,13 +387,13 @@ function KeyboardShortcuts() {
         e.preventDefault()
         const el = elementos.find((x) => x.id === selectedId)
         if (el) {
-          // Duplicar con offset 2m al este
           const offset = (coords: [number, number]): [number, number] => [coords[0], coords[1] + 2]
           const newId = addElemento({
             tipo: el.tipo,
             nombre: el.nombre + ' (copia)',
             categoria: el.categoria,
             estado: el.estado,
+            mapView: el.mapView,
             poligono: el.poligono?.map(offset),
             punto: el.punto ? offset(el.punto) : undefined,
             radio: el.radio,
@@ -430,42 +412,57 @@ function KeyboardShortcuts() {
   return null
 }
 
-// ─── Fit bounds inicial ──────────────────────────────────────────────────────
-function FitDxfBounds() {
+// ─── Fit bounds — refit cuando cambia la vista ───────────────────────────────
+function FitDxfBounds({ view }: { view: MapView }) {
   const map = useMap()
   useEffect(() => {
-    map.fitBounds(new LatLngBounds(DXF_BOUNDS), { padding: [20, 20] })
-  }, [map])
+    map.fitBounds(new LatLngBounds(view.bounds), { padding: [20, 20] })
+  }, [map, view])
   return null
 }
 
-// ─── Componente principal ────────────────────────────────────────────────────
+// ─── Componente principal — internal (con view fija) ─────────────────────────
+function MapContents({ view }: { view: MapView }) {
+  return (
+    <>
+      <FitDxfBounds view={view} />
+
+      {view.layers.map((cfg) => (
+        <CapaDXF key={cfg.name} cfg={cfg} folder={view.folder} />
+      ))}
+
+      <CapaElementos view={view} />
+      <EditorGeoman view={view} />
+      <DrawAreaTooltip />
+      <CenterOnSelected />
+      <KeyboardShortcuts />
+
+      <ZoomControl position="bottomright" />
+    </>
+  )
+}
+
+// ─── Componente principal — wrapper que reacciona al cambio de vista ─────────
 export function PlantaLeafletEditable() {
+  const currentView = useMapaLeafletStore((s) => s.currentView)
+  const view = MAP_VIEWS[currentView]
+
   return (
     <div className="relative w-full h-full">
+      {/* key={currentView} fuerza re-mount al cambiar vista (CRS, bounds, etc) */}
       <MapContainer
-        center={DXF_CENTER as L.LatLngTuple}
-        zoom={3}
-        minZoom={1}
-        maxZoom={8}
+        key={currentView}
+        center={view.center as L.LatLngTuple}
+        zoom={0}
+        minZoom={-20}
+        maxZoom={20}
+        zoomSnap={0.25}
         zoomControl={false}
         crs={L.CRS.Simple}
         className="w-full h-full"
         style={{ background: '#0a0e14' }}
       >
-        <FitDxfBounds />
-
-        {DXF_LAYERS.map((cfg) => (
-          <CapaDXF key={cfg.name} cfg={cfg} />
-        ))}
-
-        <CapaElementos />
-        <EditorGeoman />
-        <DrawAreaTooltip />
-        <CenterOnSelected />
-        <KeyboardShortcuts />
-
-        <ZoomControl position="bottomright" />
+        <MapContents view={view} />
       </MapContainer>
     </div>
   )

@@ -1,0 +1,7 @@
+{
+"type": "FeatureCollection",
+"name": "SELECT",
+"features": [
+{ "type": "Feature", "properties": { "Layer": "VANO-ANTEPECHOS", "PaperSpace": null, "SubClasses": null, "Linetype": null, "EntityHandle": "1C1E1C57", "Text": null }, "geometry": { "type": "LineString", "coordinates": [ [ 32336.901340359869209, 17472.712318905349093, 0.0 ], [ 32285.75977930110821, 17472.712318905349093, 0.0 ] ] } }
+]
+}

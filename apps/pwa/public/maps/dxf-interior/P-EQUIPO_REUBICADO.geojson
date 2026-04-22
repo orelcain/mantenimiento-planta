@@ -1,0 +1,7 @@
+{
+"type": "FeatureCollection",
+"name": "SELECT",
+"features": [
+{ "type": "Feature", "properties": { "Layer": "P-EQUIPO_REUBICADO", "PaperSpace": null, "SubClasses": null, "Linetype": null, "EntityHandle": "1C217986", "Text": null }, "geometry": { "type": "LineString", "coordinates": [ [ 10841.794303819300694, 22778.108995680409862, 0.0 ], [ 10840.81845754672031, 22777.545546442579507, 0.0 ] ] } }
+]
+}

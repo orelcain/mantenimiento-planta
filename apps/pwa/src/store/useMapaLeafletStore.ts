@@ -6,12 +6,13 @@
 
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import type { ViewName } from '@/data/dxfLayers'
 
 export type ZonaCategoria = 'produccion' | 'frio' | 'utilidades' | 'logistica' | 'admin' | 'estructura' | 'otros'
 export type ZonaEstado    = 'operativo' | 'alerta' | 'detenido'
 export type ElementoTipo  = 'zona' | 'equipo' | 'sensor' | 'punto' | 'forma'
 
-/** Polígono: array de puntos [lat, lng] = [Y, X] en metros DXF */
+/** Polígono: array de puntos [lat, lng] = [Y, X] en unidades del DXF de la vista */
 export type PolygonCoords = [number, number][]
 
 export interface ElementoMapa {
@@ -20,11 +21,14 @@ export interface ElementoMapa {
   nombre: string
   categoria: ZonaCategoria
   estado: ZonaEstado
-  /** Polígono en CRS.Simple ([Y, X], en metros) */
+  /** Vista a la que pertenece (recinto / interior). Sus coords están en
+      el sistema de esa vista. */
+  mapView: ViewName
+  /** Polígono en CRS.Simple ([Y, X]) */
   poligono?: PolygonCoords
   /** Para puntos (equipos, sensores): coordenada única [lat, lng] */
   punto?: [number, number]
-  /** Para círculos: radio en metros */
+  /** Para círculos: radio en unidades del DXF */
   radio?: number
   /** Metadata libre */
   meta?: Record<string, unknown>
@@ -34,12 +38,15 @@ export interface ElementoMapa {
 }
 
 interface MapaLeafletState {
+  /** Vista actualmente activa */
+  currentView: ViewName
   elementos: ElementoMapa[]
   selectedId: string | null
   editMode: boolean
   capasVisibles: Record<string, boolean>   // capas DXF visibles por nombre
 
   // Acciones
+  setView: (v: ViewName) => void
   setSelectedId: (id: string | null) => void
   toggleEditMode: () => void
   setCapaVisible: (name: string, visible: boolean) => void
@@ -58,11 +65,13 @@ function makeId(): string {
 export const useMapaLeafletStore = create<MapaLeafletState>()(
   persist(
     (set) => ({
+      currentView: 'recinto' as ViewName,
       elementos: [],
       selectedId: null,
       editMode: false,
       capasVisibles: {},
 
+      setView: (v) => set({ currentView: v, selectedId: null }),
       setSelectedId: (id) => set({ selectedId: id }),
       toggleEditMode: () => set((s) => ({ editMode: !s.editMode, selectedId: null })),
 
@@ -102,7 +111,11 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
     }),
     {
       name: 'mapa-leaflet-v1',
-      partialize: (s) => ({ elementos: s.elementos, capasVisibles: s.capasVisibles }),
+      partialize: (s) => ({
+        elementos: s.elementos,
+        capasVisibles: s.capasVisibles,
+        currentView: s.currentView,
+      }),
     },
   ),
 )

@@ -1,0 +1,8 @@
+{
+"type": "FeatureCollection",
+"name": "SELECT",
+"features": [
+{ "type": "Feature", "properties": { "Layer": "VANO-PUERTAS", "PaperSpace": null, "SubClasses": null, "Linetype": null, "EntityHandle": "1C1E1C2C", "Text": null }, "geometry": { "type": "LineString", "coordinates": [ [ 18825.300908531451569, 16935.725927784540545, 0.0 ], [ 18866.21415737874122, 16935.725927784540545, 0.0 ] ] } },
+{ "type": "Feature", "properties": { "Layer": "VANO-PUERTAS", "PaperSpace": null, "SubClasses": null, "Linetype": null, "EntityHandle": "1C1E1C31", "Text": null }, "geometry": { "type": "LineString", "coordinates": [ [ 20380.00436473029913, 16935.725927784540545, 0.0 ], [ 20339.091115882889426, 16935.725927784540545, 0.0 ] ] } }
+]
+}

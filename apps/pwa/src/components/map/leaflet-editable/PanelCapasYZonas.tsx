@@ -8,7 +8,7 @@
  */
 
 import { Eye, EyeOff, Edit3, Save, Trash2, Check, Search, X, Crosshair, Copy } from 'lucide-react'
-import { DXF_LAYERS, type DxfLayerConfig } from '@/data/dxfLayers'
+import { MAP_VIEWS, type DxfLayerConfig } from '@/data/dxfLayers'
 import { useMapaLeafletStore, type ZonaCategoria, type ZonaEstado, type ElementoMapa } from '@/store/useMapaLeafletStore'
 import { useState, useMemo, useEffect, useRef } from 'react'
 
@@ -54,10 +54,20 @@ function TipoBadge({ tipo }: { tipo: ElementoMapa['tipo'] }) {
 
 export function PanelCapasYZonas() {
   const {
-    elementos, selectedId, editMode, capasVisibles,
+    currentView, elementos: allElementos,
+    selectedId, editMode, capasVisibles,
     setSelectedId, toggleEditMode, setCapaVisible, setAllCapas,
     updateElemento, deleteElemento, addElemento,
   } = useMapaLeafletStore()
+
+  // Filtra elementos a los de la vista activa
+  const elementos = useMemo(
+    () => allElementos.filter((e) => e.mapView === currentView),
+    [allElementos, currentView],
+  )
+
+  // Capas de la vista actual
+  const viewLayers = MAP_VIEWS[currentView].layers
 
   const [tab, setTab]               = useState<'capas' | 'zonas'>('zonas')
   const [filtro, setFiltro]         = useState('')
@@ -98,7 +108,7 @@ export function PanelCapasYZonas() {
   // Agrupar capas DXF
   const grupos = useMemo(() => {
     const g = new Map<string, DxfLayerConfig[]>()
-    for (const c of DXF_LAYERS) {
+    for (const c of viewLayers) {
       if (!g.has(c.group)) g.set(c.group, [])
       g.get(c.group)!.push(c)
     }
@@ -362,6 +372,7 @@ export function PanelCapasYZonas() {
                         nombre: selectedEl.nombre + ' (copia)',
                         categoria: selectedEl.categoria,
                         estado: selectedEl.estado,
+                        mapView: selectedEl.mapView,
                         poligono: selectedEl.poligono?.map(offset),
                         punto: selectedEl.punto ? offset(selectedEl.punto) : undefined,
                         radio: selectedEl.radio,
@@ -406,7 +417,7 @@ export function PanelCapasYZonas() {
 
       {/* Footer con info */}
       <div className="px-3 py-1.5 border-t border-gray-700/40 text-[9px] text-gray-500 flex justify-between shrink-0">
-        <span>{elementos.length} elementos · {DXF_LAYERS.length} capas</span>
+        <span>{elementos.length} elementos · {viewLayers.length} capas</span>
         {editMode && <span className="text-blue-400 font-semibold">EDIT</span>}
       </div>
     </div>

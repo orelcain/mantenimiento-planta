@@ -64,3 +64,70 @@ export const DXF_CENTER: [number, number] = [
   (-654 + -595) / 2,  // Y promedio
   (731 + 793) / 2,    // X promedio
 ]
+
+// ═══════════════════════════════════════════════════════════════════════════
+// VISTA INTERIOR (planta-principal.dxf)
+// Coordenadas en milímetros del arquitecto. Bounds ~87.6 × 55.6 m físicos.
+// ═══════════════════════════════════════════════════════════════════════════
+
+export const DXF_INTERIOR_LAYERS: DxfLayerConfig[] = [
+  { name: '023_MUROS_2',                 label: 'Muros',                 group: 'estructura',   color: '#f59e0b', weight: 0.8, opacity: 1.0,  defaultVisible: true,  zIndex: 90 },
+  { name: 'CIMENTACION',                 label: 'Cimentación',           group: 'estructura',   color: '#ef4444', weight: 1.2, opacity: 0.7,  defaultVisible: true,  zIndex: 70 },
+  { name: 'P-ESTRUCTURA_NUEVA',          label: 'Estructura nueva',      group: 'estructura',   color: '#a78bfa', weight: 1.5, opacity: 0.95, defaultVisible: true,  zIndex: 85 },
+  { name: 'ESCALERAS',                   label: 'Escaleras',             group: 'detalle',      color: '#34d399', weight: 1.0, opacity: 0.85, defaultVisible: true,  zIndex: 65 },
+  { name: 'VENTANAS',                    label: 'Ventanas',              group: 'detalle',      color: '#60a5fa', weight: 1.0, opacity: 0.85, defaultVisible: true,  zIndex: 60 },
+  { name: 'VANO-PUERTAS',                label: 'Puertas',               group: 'detalle',      color: '#22d3ee', weight: 1.5, opacity: 0.95, defaultVisible: true,  zIndex: 65 },
+  { name: 'VANO-ANTEPECHOS',             label: 'Antepechos',            group: 'detalle',      color: '#7dd3fc', weight: 1.0, opacity: 0.7,  defaultVisible: true,  zIndex: 55 },
+  { name: 'EQP-EQUIPOS_-_SITUACION_P0',  label: 'Equipos actuales',      group: 'instalaciones',color: '#22c55e', weight: 1.2, opacity: 1.0,  defaultVisible: true,  zIndex: 80 },
+  { name: 'EQP-EQUIPOS_-_SITUACION_PR',  label: 'Equipos proyecto',      group: 'instalaciones',color: '#facc15', weight: 1.0, opacity: 0.7,  defaultVisible: false, zIndex: 75 },
+  { name: 'P-EQUIPO_REUBICADO',          label: 'Equipo reubicado',      group: 'instalaciones',color: '#fb923c', weight: 1.0, opacity: 0.7,  defaultVisible: false, zIndex: 75 },
+  { name: 'MUEBLES',                     label: 'Muebles',               group: 'otros',        color: '#94a3b8', weight: 0.6, opacity: 0.5,  defaultVisible: false, zIndex: 40 },
+]
+
+/** Bounds del interior (de los datos) */
+export const DXF_INTERIOR_BOUNDS: [[number, number], [number, number]] = [
+  [3572, 5948],     // SW
+  [59154, 93554],   // NE
+]
+
+export const DXF_INTERIOR_CENTER: [number, number] = [
+  (3572 + 59154) / 2,
+  (5948 + 93554) / 2,
+]
+
+// ═══════════════════════════════════════════════════════════════════════════
+
+export type ViewName = 'recinto' | 'interior'
+
+export interface MapView {
+  name: ViewName
+  label: string
+  layers: DxfLayerConfig[]
+  bounds: [[number, number], [number, number]]
+  center: [number, number]
+  /** Subdirectorio dentro de /maps/ */
+  folder: string
+  /** Factor de unidad (m por unidad nativa). Recinto=1, Interior=0.001 (mm→m) */
+  unitScale: number
+}
+
+export const MAP_VIEWS: Record<ViewName, MapView> = {
+  recinto: {
+    name: 'recinto',
+    label: 'Recinto',
+    layers: DXF_LAYERS,
+    bounds: DXF_BOUNDS,
+    center: DXF_CENTER,
+    folder: 'dxf',
+    unitScale: 1,
+  },
+  interior: {
+    name: 'interior',
+    label: 'Interior',
+    layers: DXF_INTERIOR_LAYERS,
+    bounds: DXF_INTERIOR_BOUNDS,
+    center: DXF_INTERIOR_CENTER,
+    folder: 'dxf-interior',
+    unitScale: 0.001,
+  },
+}
