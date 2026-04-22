@@ -290,9 +290,9 @@ export function PanelCapasYZonas() {
               <div className="border-t border-gray-700/50 pt-3 mt-1 flex flex-col gap-2.5">
                 <div className="flex items-center gap-2">
                   <TipoBadge tipo={selectedEl.tipo} />
-                  {selectedEl.meta?.area_m2 && (
+                  {typeof selectedEl.meta?.area_m2 === 'number' && (
                     <span className="text-[9px] text-gray-400 font-mono">
-                      {String(selectedEl.meta.area_m2)} m²
+                      {selectedEl.meta.area_m2} m²
                     </span>
                   )}
                   {selectedEl.radio && (

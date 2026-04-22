@@ -34,8 +34,11 @@ function polygonArea(latlngs: L.LatLng[]): number {
   let area = 0
   for (let i = 0; i < latlngs.length; i++) {
     const j = (i + 1) % latlngs.length
-    area += latlngs[i].lng * latlngs[j].lat
-    area -= latlngs[j].lng * latlngs[i].lat
+    const a = latlngs[i]
+    const b = latlngs[j]
+    if (!a || !b) continue
+    area += a.lng * b.lat
+    area -= b.lng * a.lat
   }
   return Math.abs(area / 2)
 }
@@ -51,6 +54,8 @@ function polygonCenter(coords: PolygonCoords): L.LatLng {
 function CapaDXF({ cfg, folder }: { cfg: DxfLayerConfig; folder: string }) {
   const [data, setData] = useState<GeoJSON.FeatureCollection | null>(null)
   const visible = useMapaLeafletStore((s) => s.capasVisibles[cfg.name] ?? cfg.defaultVisible)
+  const map = useMap()
+  const [zoomFactor, setZoomFactor] = useState(1)
 
   useEffect(() => {
     let cancel = false
@@ -61,6 +66,20 @@ function CapaDXF({ cfg, folder }: { cfg: DxfLayerConfig; folder: string }) {
     return () => { cancel = true }
   }, [cfg.name, folder])
 
+  // Ajustar peso según zoom: más zoom = trazo más grueso, menos zoom = más fino
+  useEffect(() => {
+    if (!map) return
+    const update = () => {
+      const z = map.getZoom()
+      // En CRS.Simple zoom 0 ≈ 1px/unidad; queremos peso 1.0 cerca de fit y crece al zoom-in
+      const factor = Math.max(0.5, Math.min(3, Math.pow(1.4, Math.max(0, z + 4))))
+      setZoomFactor(factor)
+    }
+    update()
+    map.on('zoomend', update)
+    return () => { map.off('zoomend', update) }
+  }, [map])
+
   if (!data || !visible) return null
 
   return (
@@ -69,13 +88,18 @@ function CapaDXF({ cfg, folder }: { cfg: DxfLayerConfig; folder: string }) {
       coordsToLatLng={(c) => L.latLng(c[1], c[0])}
       style={{
         color: cfg.color,
-        weight: cfg.weight,
+        weight: Math.max(0.4, cfg.weight * zoomFactor * 0.8),
         opacity: cfg.opacity,
         fillColor: cfg.color,
         fillOpacity: 0.06,
+        lineCap: 'round',
+        lineJoin: 'round',
       }}
       pointToLayer={(_f, latlng) =>
-        L.circleMarker(latlng, { radius: 2.5, color: cfg.color, fillOpacity: 0.7, weight: 1 })
+        L.circleMarker(latlng, {
+          radius: Math.max(1.5, 2.5 * zoomFactor * 0.6),
+          color: cfg.color, fillOpacity: 0.7, weight: 1,
+        })
       }
       interactive={false}
     />
@@ -376,7 +400,7 @@ function KeyboardShortcuts() {
       const tag = (e.target as HTMLElement)?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA') return  // no interferir con inputs
 
-      const { selectedId, deleteElemento, setSelectedId, editMode, toggleEditMode, elementos, addElemento } =
+      const { selectedId, deleteElemento, setSelectedId, toggleEditMode, elementos, addElemento } =
         useMapaLeafletStore.getState()
 
       if (e.key === 'Escape') {
@@ -416,7 +440,12 @@ function KeyboardShortcuts() {
 function FitDxfBounds({ view }: { view: MapView }) {
   const map = useMap()
   useEffect(() => {
-    map.fitBounds(new LatLngBounds(view.bounds), { padding: [20, 20] })
+    // Pequeño delay para asegurar que el container ya tiene su tamaño final
+    const t = setTimeout(() => {
+      map.invalidateSize()
+      map.fitBounds(new LatLngBounds(view.bounds), { padding: [40, 40], animate: false })
+    }, 50)
+    return () => clearTimeout(t)
   }, [map, view])
   return null
 }
