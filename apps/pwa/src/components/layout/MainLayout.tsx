@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   AlertTriangle,
   Map,
+  Building2,
   Wrench,
   Settings,
   Package,
@@ -90,7 +91,7 @@ const navGroups: NavGroup[] = [
   {
     id: 'herramientas', label: 'Herramientas',
     items: [
-      { name: 'Visor de Mapas', href: '/map', icon: Map, module: 'mapa' },
+      { name: 'Visor Planta 3D', href: '/map', icon: Building2, module: 'mapa' },
       { name: 'Visor 3D', href: '/visor-3d', icon: Box },
       { name: 'Análisis Grader', href: '/analisis-grader', icon: BarChart3, module: 'analisisGrader' },
     ],
@@ -107,6 +108,7 @@ const navGroups: NavGroup[] = [
       { name: 'Configuración', href: '/settings', icon: Settings, module: 'configuracion' },
       { name: 'Jerarquías', href: '/hierarchy', icon: FolderTree },
       { name: 'Mapas', href: '/admin/maps', icon: MapPin },
+      { name: 'Editor Terreno', href: '/admin/mapa-terreno', icon: Map },
       { name: 'ETT', href: '/admin/ett', icon: FileText },
       { name: 'Clima Puerto', href: '/clima-puerto', icon: CloudSun, module: 'climaPuerto' as AppModule },
       { name: 'HMI Knuro', href: '/hmi-knuro', icon: Cpu },

@@ -391,19 +391,17 @@ export function App() {
           >
             <Route index element={<DashboardPage />} />
             <Route path="incidents" element={<IncidentsPage />} />
+            {/* Visor Planta 3D — reemplaza al editor de terreno como vista principal */}
             <Route path="map" element={
               <Suspense fallback={<LoadingScreen />}>
-                <MapPage />
+                <MapaPlantaPage />
               </Suspense>
             } />
+            {/* Redirigir la ruta antigua /map/planta al nuevo /map */}
+            <Route path="map/planta" element={<Navigate to="/map" replace />} />
             <Route path="map/view" element={
               <Suspense fallback={<LoadingScreen />}>
                 <MapViewPage />
-              </Suspense>
-            } />
-            <Route path="map/planta" element={
-              <Suspense fallback={<LoadingScreen />}>
-                <MapaPlantaPage />
               </Suspense>
             } />
             <Route path="inspections" element={
@@ -450,6 +448,14 @@ export function App() {
               <AdminRoute>
                 <Suspense fallback={<LoadingScreen />}>
                   <MapsAdminPage />
+                </Suspense>
+              </AdminRoute>
+            } />
+            {/* Editor de terreno DEM — solo admins */}
+            <Route path="admin/mapa-terreno" element={
+              <AdminRoute>
+                <Suspense fallback={<LoadingScreen />}>
+                  <MapPage />
                 </Suspense>
               </AdminRoute>
             } />
