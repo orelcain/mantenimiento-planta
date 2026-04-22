@@ -1,0 +1,169 @@
+/**
+ * Tema oscuro para Leaflet-Geoman + Leaflet
+ * Paleta: ámbar / azul / fondos gray-900
+ */
+
+/* ─── Toolbar Geoman ──────────────────────────────────────────────── */
+.leaflet-pm-toolbar .leaflet-pm-actions-container,
+.leaflet-pm-toolbar .leaflet-pm-icon-circle,
+.leaflet-pm-toolbar .leaflet-pm-icon-circle-marker,
+.leaflet-pm-toolbar .leaflet-pm-icon-cut,
+.leaflet-pm-toolbar .leaflet-pm-icon-delete,
+.leaflet-pm-toolbar .leaflet-pm-icon-drag,
+.leaflet-pm-toolbar .leaflet-pm-icon-edit,
+.leaflet-pm-toolbar .leaflet-pm-icon-marker,
+.leaflet-pm-toolbar .leaflet-pm-icon-polygon,
+.leaflet-pm-toolbar .leaflet-pm-icon-polyline,
+.leaflet-pm-toolbar .leaflet-pm-icon-rectangle,
+.leaflet-pm-toolbar .leaflet-pm-icon-rotate,
+.leaflet-pm-toolbar a {
+  background-color: #111827 !important;       /* gray-900 */
+  border-color: #374151 !important;           /* gray-700 */
+}
+
+.leaflet-pm-toolbar a {
+  color: #d1d5db !important;                  /* gray-300 */
+  filter: invert(0.92) hue-rotate(180deg);    /* invierte iconos negros a claros */
+}
+
+.leaflet-pm-toolbar a:hover {
+  background-color: #1f2937 !important;       /* gray-800 */
+  border-color: #f59e0b !important;           /* amber-500 */
+}
+
+.leaflet-pm-toolbar a.active,
+.leaflet-pm-toolbar a.leaflet-pm-button-active {
+  background-color: #f59e0b !important;       /* amber-500 */
+  border-color: #fbbf24 !important;           /* amber-400 */
+  filter: none;
+}
+
+/* Tooltip Geoman */
+.leaflet-pm-tooltip {
+  background: #0f172a !important;             /* slate-900 */
+  color: #e2e8f0 !important;
+  border: 1px solid #334155 !important;
+  font-family: system-ui, sans-serif;
+  font-size: 11px !important;
+  padding: 4px 8px !important;
+  border-radius: 4px !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+}
+
+.leaflet-pm-tooltip::before {
+  border-color: transparent transparent #0f172a transparent !important;
+}
+
+/* ─── Acciones contextuales (cancel/finish) ───────────────────────── */
+.leaflet-pm-actions-container {
+  background: #0f172a !important;
+  border: 1px solid #334155 !important;
+  border-radius: 4px !important;
+}
+
+.leaflet-pm-actions-container .leaflet-pm-action {
+  background: #1e293b !important;
+  color: #e2e8f0 !important;
+  font-size: 11px !important;
+  padding: 4px 10px !important;
+  border-right: 1px solid #334155 !important;
+}
+
+.leaflet-pm-actions-container .leaflet-pm-action:hover {
+  background: #f59e0b !important;
+  color: #0a0e14 !important;
+}
+
+/* ─── Vértices editables ──────────────────────────────────────────── */
+.marker-icon.leaflet-pm-draggable {
+  border: 2px solid #f59e0b !important;
+  background: #1e293b !important;
+  box-shadow: 0 0 6px rgba(245,158,11,0.4) !important;
+}
+
+.marker-icon-middle {
+  border: 2px solid #fbbf24 !important;
+  background: #f59e0b !important;
+  opacity: 0.6 !important;
+}
+
+/* ─── Controles zoom Leaflet ──────────────────────────────────────── */
+.leaflet-control-zoom a {
+  background-color: #111827 !important;
+  color: #d1d5db !important;
+  border-color: #374151 !important;
+}
+
+.leaflet-control-zoom a:hover {
+  background-color: #1f2937 !important;
+  color: #f59e0b !important;
+  border-color: #f59e0b !important;
+}
+
+/* ─── Popups ──────────────────────────────────────────────────────── */
+.leaflet-popup-content-wrapper {
+  background: #0f172a !important;
+  color: #e2e8f0 !important;
+  border-radius: 6px !important;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.6) !important;
+  border: 1px solid #334155 !important;
+}
+
+.leaflet-popup-content {
+  margin: 10px 14px !important;
+  font-family: system-ui, sans-serif;
+  font-size: 12px !important;
+}
+
+.leaflet-popup-tip {
+  background: #0f172a !important;
+  border: 1px solid #334155 !important;
+}
+
+.leaflet-popup-close-button {
+  color: #64748b !important;
+}
+
+.leaflet-popup-close-button:hover {
+  color: #f59e0b !important;
+}
+
+/* ─── Atribución (esquina inferior) ───────────────────────────────── */
+.leaflet-control-attribution {
+  background: rgba(15, 23, 42, 0.85) !important;
+  color: #64748b !important;
+  font-size: 9px !important;
+  border-top: 1px solid #334155 !important;
+  border-left: 1px solid #334155 !important;
+}
+
+.leaflet-control-attribution a {
+  color: #94a3b8 !important;
+}
+
+/* ─── Hover sobre elementos editables ─────────────────────────────── */
+.editable-element:hover {
+  filter: brightness(1.4) drop-shadow(0 0 4px currentColor);
+  cursor: pointer;
+}
+
+.editable-element-selected {
+  filter: brightness(1.6) drop-shadow(0 0 8px #f59e0b);
+}
+
+/* ─── Tooltip mientras se dibuja (área/longitud) ─────────────────── */
+.draw-area-tooltip {
+  position: absolute;
+  background: rgba(15, 23, 42, 0.95);
+  color: #fbbf24;
+  border: 1px solid #f59e0b;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 12px;
+  font-weight: bold;
+  pointer-events: none;
+  z-index: 9999;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+}
