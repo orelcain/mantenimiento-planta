@@ -1,7 +1,7 @@
 {
 "type": "FeatureCollection",
-"name": "SELECT",
+"name": "entities",
 "features": [
-{ "type": "Feature", "properties": { "Layer": "VANO-ANTEPECHOS", "PaperSpace": null, "SubClasses": null, "Linetype": null, "EntityHandle": "1C1E1C57", "Text": null }, "geometry": { "type": "LineString", "coordinates": [ [ 32336.901340359869209, 17472.712318905349093, 0.0 ], [ 32285.75977930110821, 17472.712318905349093, 0.0 ] ] } }
+{ "type": "Feature", "properties": { "Layer": "VANO-ANTEPECHOS", "SubClasses": "AcDbEntity:AcDbLine", "EntityHandle": "1C1E1C57" }, "geometry": { "type": "LineString", "coordinates": [ [ 29.144197776974352, 61.691195605982273, 0.0 ], [ 29.094197776974742, 61.691195605982273, 0.0 ] ] } }
 ]
 }

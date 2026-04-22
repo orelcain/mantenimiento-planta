@@ -1,8 +1,8 @@
 {
 "type": "FeatureCollection",
-"name": "SELECT",
+"name": "entities",
 "features": [
-{ "type": "Feature", "properties": { "Layer": "VANO-PUERTAS", "PaperSpace": null, "SubClasses": null, "Linetype": null, "EntityHandle": "1C1E1C2C", "Text": null }, "geometry": { "type": "LineString", "coordinates": [ [ 18825.300908531451569, 16935.725927784540545, 0.0 ], [ 18866.21415737874122, 16935.725927784540545, 0.0 ] ] } },
-{ "type": "Feature", "properties": { "Layer": "VANO-PUERTAS", "PaperSpace": null, "SubClasses": null, "Linetype": null, "EntityHandle": "1C1E1C31", "Text": null }, "geometry": { "type": "LineString", "coordinates": [ [ 20380.00436473029913, 16935.725927784540545, 0.0 ], [ 20339.091115882889426, 16935.725927784540545, 0.0 ] ] } }
+{ "type": "Feature", "properties": { "Layer": "VANO-PUERTAS", "SubClasses": "AcDbEntity:AcDbLine", "EntityHandle": "1C1E1C2C" }, "geometry": { "type": "LineString", "coordinates": [ [ 15.934197776974431, 61.16619560598258, 0.0 ], [ 15.974197776974391, 61.16619560598258, 0.0 ] ] } },
+{ "type": "Feature", "properties": { "Layer": "VANO-PUERTAS", "SubClasses": "AcDbEntity:AcDbLine", "EntityHandle": "1C1E1C31" }, "geometry": { "type": "LineString", "coordinates": [ [ 17.454197776974979, 61.16619560598258, 0.0 ], [ 17.414197776974898, 61.16619560598258, 0.0 ] ] } }
 ]
 }

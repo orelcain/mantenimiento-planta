@@ -20,7 +20,7 @@ const VIEW_ICONS: Record<ViewName, typeof Globe2> = {
 
 const VIEW_DESC: Record<ViewName, string> = {
   recinto:  'Predio completo · cerco, edificios, accesos',
-  interior: 'Planta principal · muros internos, equipos',
+  interior: 'Planta principal · muros, salas, etiquetas DXF v2',
 }
 
 export function MapaPlantaPage() {

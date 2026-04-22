@@ -1,7 +1,0 @@
-{
-"type": "FeatureCollection",
-"name": "SELECT",
-"features": [
-{ "type": "Feature", "properties": { "Layer": "MUEBLES", "PaperSpace": null, "SubClasses": null, "Linetype": null, "EntityHandle": "1C1E2319", "Text": null }, "geometry": { "type": "LineString", "coordinates": [ [ 14202.618757201429617, 6538.646564458103967, 0.0 ], [ 14568.529520969830628, 6538.646564458103967, 0.0 ] ] } }
-]
-}
