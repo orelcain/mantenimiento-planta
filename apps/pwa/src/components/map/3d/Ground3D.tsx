@@ -1,6 +1,13 @@
-import { useMemo, Suspense } from 'react'
+import { useMemo, Suspense, Component, type ReactNode } from 'react'
 import { useTexture } from '@react-three/drei'
 import * as THREE from 'three'
+
+// ErrorBoundary para el overlay del plano — si no carga el PNG la escena sigue funcionando
+class FloorPlanErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false }
+  static getDerivedStateFromError() { return { failed: true } }
+  render() { return this.state.failed ? null : this.props.children }
+}
 
 function makeCobblesTexture(): THREE.CanvasTexture {
   const size = 512
@@ -62,8 +69,10 @@ function WallSegment({ pos, size }: { pos: [number, number, number]; size: [numb
 }
 
 // Plano con el plano arquitectónico real superpuesto sobre el suelo
+// BASE_URL prefix necesario porque Vite sirve /public con el base path (/mantenimiento-planta/)
 function FloorPlan() {
-  const planTex = useTexture('/maps/planta-principal.png')
+  const base = import.meta.env.BASE_URL ?? '/'
+  const planTex = useTexture(`${base}maps/planta-principal.png`)
 
   planTex.colorSpace = THREE.SRGBColorSpace
   planTex.wrapS = planTex.wrapT = THREE.ClampToEdgeWrapping
@@ -94,9 +103,11 @@ export function Ground3D() {
       </mesh>
 
       {/* Plano arquitectónico real translúcido (guía visual de layout) */}
-      <Suspense fallback={null}>
-        <FloorPlan />
-      </Suspense>
+      <FloorPlanErrorBoundary>
+        <Suspense fallback={null}>
+          <FloorPlan />
+        </Suspense>
+      </FloorPlanErrorBoundary>
 
       {/* Muros perimetrales — recinto Antarfood ~110m × 65m (incluye patio y estanques) */}
       <WallSegment pos={[0,  1.5, -35]}   size={[114, 3, 0.6]} />
