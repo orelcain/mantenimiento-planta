@@ -124,7 +124,7 @@ export const MAP_VIEWS: Record<ViewName, MapView> = {
     bounds: DXF_BOUNDS,
     center: DXF_CENTER,
     folder: 'dxf',
-    unitScale: 1,
+    unitScale: 5.054,  // calibrado 2026-04-22: sala paletizado 3.74m real / 0.74 DXF units
   },
   interior: {
     name: 'interior',
