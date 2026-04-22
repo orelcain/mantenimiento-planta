@@ -735,8 +735,8 @@ export interface Pause {
    */
   autoTag?: PauseAutoTag;
   /**
-   * Tag asignado manualmente (referencia al ID de `graderPauseTags` cuando
-   * exista el CRUD — por ahora string libre).
+   * Tag asignado manualmente — referencia al `id` de la colección `graderPauseTags`.
+   * Si está en Firestore (CRUD Fase 4 activo), el valor coincide con un doc de esa colección.
    */
   tag?: string;
   /** Nota libre opcional del admin anotando. */
@@ -745,6 +745,10 @@ export interface Pause {
   annotatedBy?: string;
   /** ISO timestamp de la anotación. */
   annotatedAt?: string;
+  /** UID del admin que corrigió el rango horario (Fase 3b). */
+  adjustedBy?: string;
+  /** ISO timestamp de la corrección de rango. */
+  adjustedAt?: string;
 }
 
 export interface MicroDetentionsSummary {
