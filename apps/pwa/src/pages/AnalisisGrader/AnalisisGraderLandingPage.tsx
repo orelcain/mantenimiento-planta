@@ -14,10 +14,12 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useNavigate, Navigate } from 'react-router-dom'
 import { Card, CardContent, Badge, Button } from '@/components/ui'
-import { Upload, Activity, BarChart3, Settings2, TrendingUp, BookOpen, Eye } from 'lucide-react'
+import { Upload, Activity, BarChart3, Settings2, TrendingUp, BookOpen, Eye, ClipboardList } from 'lucide-react'
 import { usePermissionsStore } from '@/store'
+import { useIsAdmin } from '@/store/authStore'
 import { GlobalSettingsModal } from '@/components/grader/GlobalSettingsModal'
-import { listDailySummariesByRange } from '@/services/grader/graderDailySummary.service'
+import { listDailySummariesByRange, loadPausesAggregates } from '@/services/grader/graderDailySummary.service'
+import { resolveEffectiveTag } from '@/services/grader/graderPauseTags'
 import { computeShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import { DEFAULT_SHIFT_SCHEDULE } from '@/services/grader/graderShiftSchedule'
 import { verdictFromP0Pct } from '@/services/grader/graderThresholds'
@@ -69,10 +71,15 @@ function QuickAccess({ icon: Icon, title, subtitle, onClick, accent }: QuickAcce
 
 export function AnalisisGraderLandingPage() {
   const { canSee } = usePermissionsStore()
+  const isAdmin = useIsAdmin()
   const navigate = useNavigate()
 
   const [lastClosedShift, setLastClosedShift] = useState<GraderDailySummary | null>(null)
+  const [allSummaries, setAllSummaries] = useState<GraderDailySummary[]>([])
   const [loading, setLoading] = useState(true)
+
+  // M1 — badge pausas sin clasificar
+  const [untaggedCount, setUntaggedCount] = useState<number | null>(null)
 
   useEffect(() => {
     // Traemos 60 días para capturar el último turno cerrado aunque la
@@ -87,10 +94,33 @@ export function AnalisisGraderLandingPage() {
           return b.shiftId.localeCompare(a.shiftId)
         })
         setLastClosedShift(sorted[0] ?? null)
+        setAllSummaries(list)
       })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
+
+  // M1 — carga lazy de meta/pauses solo para admins, últimos 7 días
+  useEffect(() => {
+    if (!isAdmin || allSummaries.length === 0) return
+    const cutoff = offsetDate(todayKey(), -7)
+    const recent = allSummaries.filter(
+      s => s.dateKey >= cutoff && (s.pausesCount ?? 0) > 0
+    )
+    if (recent.length === 0) { setUntaggedCount(0); return }
+    let count = 0
+    Promise.all(recent.map(s => loadPausesAggregates(s.id)))
+      .then(results => {
+        for (const result of results) {
+          if (!result) continue
+          for (const pause of result.pauses) {
+            if (!resolveEffectiveTag(pause)) count++
+          }
+        }
+        setUntaggedCount(count)
+      })
+      .catch(() => setUntaggedCount(null))
+  }, [allSummaries, isAdmin])
 
   const liveShift = useMemo(() => {
     const today = todayKey()
@@ -207,6 +237,25 @@ export function AnalisisGraderLandingPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* ── M1 · Badge pausas sin clasificar (solo admins) ───────────── */}
+      {isAdmin && untaggedCount !== null && untaggedCount > 0 && (
+        <button
+          onClick={() => navigate('/analisis-grader/periodo')}
+          className="flex items-center justify-between gap-3 w-full px-4 py-2.5 rounded-lg border border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10 transition-colors text-left"
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <ClipboardList className="w-4 h-4 text-amber-400 shrink-0" />
+            <span className="text-sm">
+              <span className="font-semibold text-amber-400">{untaggedCount}</span>
+              <span className="text-muted-foreground">
+                {' '}pausa{untaggedCount !== 1 ? 's' : ''} sin clasificar en los últimos 7 días
+              </span>
+            </span>
+          </div>
+          <span className="text-xs text-amber-400 shrink-0">Clasificar →</span>
+        </button>
+      )}
 
       {/* ── Accesos rápidos: tira compacta (3 en mobile, 3 en desktop) ── */}
       <div className="grid grid-cols-3 gap-2 sm:gap-3">

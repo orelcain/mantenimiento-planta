@@ -9,7 +9,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useParams, useNavigate, Navigate } from 'react-router-dom'
 import { Button, Card, CardContent, Spinner, Badge } from '@/components/ui'
-import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode } from 'lucide-react'
+import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { usePermissionsStore } from '@/store'
 import { useAuthStore, useIsAdmin } from '@/store/authStore'
@@ -31,6 +31,8 @@ import { GateBreakdownCard } from '@/components/grader/GateBreakdownCard'
 import { ConfigChangeHistory } from '@/components/grader/ConfigChangeHistory'
 import { CurrentGateConfigPanel } from '@/components/grader/CurrentGateConfigPanel'
 import { ShiftGatesConfigAccordion } from '@/components/grader/ShiftGatesConfigAccordion'
+import { PauseAnnotationDialog } from '@/components/grader/PauseAnnotationDialog'
+import { resolveEffectiveTag } from '@/services/grader/graderPauseTags'
 import { ActionPlanPanel, deriveSuggestions } from '@/components/grader/ActionPlanPanel'
 import { findTriggeredRunbooks } from '@/services/grader/graderRunbooks'
 import { analyzeGraderFromSummary } from '@/services/grader/graderSummaryAI'
@@ -109,6 +111,89 @@ function dominantCause(
     if (v.pieces > max) { max = v.pieces; top = mc }
   }
   return top
+}
+
+// ── M2: Helpers de export CSV ─────────────────────────────────────────────────
+
+/** HH:MM de un ISO con convención Z-planta (igual que PauseAnnotationDialog) */
+function fmtTimeHHMM(iso: string): string {
+  const d = new Date(iso)
+  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
+}
+
+function exportTurnoCsv(
+  dateKey: string,
+  shiftLabel: string,
+  summary: GraderDailySummary,
+  pauses: Pause[],
+): void {
+  const SEP = ';'
+  const esc = (v: string | number) => String(v).replace(/;/g, ',').replace(/\n/g, ' ')
+  const lines: string[] = []
+
+  // Resumen
+  lines.push('=== RESUMEN DEL TURNO ===')
+  lines.push(['Turno', 'Fecha', 'P0%', 'Piezas totales', 'Piezas P0', 'Duración min', 'Lotes'].join(SEP))
+  lines.push([
+    esc(shiftLabel),
+    dateKey,
+    summary.pointZeroPct.toFixed(2),
+    summary.totalPieces,
+    summary.pointZeroPieces,
+    summary.durationMinutes ?? '',
+    esc(summary.lotsInShift?.join(' / ') ?? ''),
+  ].join(SEP))
+
+  // Pausas
+  lines.push('')
+  lines.push('=== PAUSAS DETECTADAS ===')
+  if (pauses.length === 0) {
+    lines.push('Sin pausas registradas')
+  } else {
+    lines.push(['Inicio', 'Fin', 'Duración min', 'Tipo', 'Tag', 'Nota', 'Anotado por', 'Ajustado por'].join(SEP))
+    for (const p of pauses) {
+      const tag = resolveEffectiveTag(p)
+      lines.push([
+        fmtTimeHHMM(p.startAt),
+        fmtTimeHHMM(p.endAt),
+        Math.round(p.durationSec / 60),
+        p.tier,
+        tag ? esc(`${tag.emoji} ${tag.label}`) : '—',
+        esc(p.note ?? ''),
+        esc(p.annotatedBy ?? ''),
+        esc(p.adjustedBy ?? ''),
+      ].join(SEP))
+    }
+  }
+
+  // Distribución por gate
+  if (summary.gateDistribution && summary.gateDistribution.length > 0) {
+    lines.push('')
+    lines.push('=== DISTRIBUCIÓN POR GATE ===')
+    lines.push(['Gate', 'Piezas', '%'].join(SEP))
+    for (const g of summary.gateDistribution) {
+      lines.push([g.gate, g.pieces, g.pct.toFixed(1)].join(SEP))
+    }
+  }
+
+  // Top causas P0
+  if (summary.topP0Causes && summary.topP0Causes.length > 0) {
+    lines.push('')
+    lines.push('=== TOP CAUSAS P0 ===')
+    lines.push(['Causa', 'Piezas', '%'].join(SEP))
+    for (const c of summary.topP0Causes) {
+      lines.push([esc(c.error), c.pieces, c.pct.toFixed(1)].join(SEP))
+    }
+  }
+
+  const csv = lines.join('\r\n')
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `grader_${dateKey}_${shiftLabel.replace(/\s+/g, '_').toLowerCase()}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 export function AnalisisGraderTurnoPage() {
@@ -406,6 +491,20 @@ export function AnalisisGraderTurnoPage() {
 
   useEffect(() => { reloadConfigSnapshots() }, [reloadConfigSnapshots])
 
+  // M3 — Siguiente pausa sin clasificar
+  const [nextPauseOpen, setNextPauseOpen] = useState(false)
+
+  const untaggedPauses = useMemo(
+    () => pauses.filter(p => !resolveEffectiveTag(p)),
+    [pauses],
+  )
+
+  const handleNextPauseSaved = useCallback(() => {
+    reloadPauses()
+    // El diálogo se cierra solo vía onSaved→onOpenChange(false) en PauseAnnotationDialog.
+    // Tras reload, untaggedPauses se recomputa y el botón muestra el nuevo conteo.
+  }, [reloadPauses])
+
   // Todos los useMemo ANTES del early return condicional (regla de hooks)
   const byMatrixCause = useMemo(() => {
     if (!summary?.topP0Causes?.length) return null
@@ -522,8 +621,32 @@ export function AnalisisGraderTurnoPage() {
           )}
         </div>
 
-        {/* Derecha: prev/next navigation */}
+        {/* Derecha: acciones + prev/next navigation */}
         <div className="flex items-center gap-1 shrink-0">
+          {/* M3: Siguiente pausa sin clasificar */}
+          {isAdmin && summary && untaggedPauses.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setNextPauseOpen(true)}
+              className="gap-1.5 text-amber-400 border-amber-500/30 hover:bg-amber-500/10"
+              title={`${untaggedPauses.length} pausas sin clasificar en este turno`}
+            >
+              <Tag className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline text-xs tabular-nums">{untaggedPauses.length}</span>
+            </Button>
+          )}
+          {/* M2: Exportar turno a CSV */}
+          {summary && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportTurnoCsv(dateKey, shiftLabel, summary, pauses)}
+              title="Exportar turno a CSV (pauses + gates + causas P0)"
+            >
+              <Download className="w-3.5 h-3.5" />
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -791,6 +914,16 @@ export function AnalisisGraderTurnoPage() {
           </button>
         </>
       )}
+
+      {/* M3: Diálogo "siguiente pausa sin clasificar" */}
+      <PauseAnnotationDialog
+        open={nextPauseOpen}
+        onOpenChange={setNextPauseOpen}
+        pause={untaggedPauses[0] ?? null}
+        summaryId={shiftDocId}
+        adminUid={user?.id ?? ''}
+        onSaved={handleNextPauseSaved}
+      />
     </div>
   )
 }
