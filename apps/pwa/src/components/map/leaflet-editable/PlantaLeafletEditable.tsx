@@ -11,7 +11,7 @@
  *  • Persistencia: Zustand + localStorage
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MapContainer, GeoJSON, useMap, ZoomControl } from 'react-leaflet'
 import L, { LatLngBounds, Map as LMap, FeatureGroup } from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -393,6 +393,146 @@ function CenterOnSelected() {
   return null
 }
 
+// ─── Herramienta de medición ─────────────────────────────────────────────────
+/**
+ * MeasureTool — clic a clic en el mapa para medir distancias reales.
+ * Dibuja líneas + etiquetas de distancia por segmento.
+ * Esc limpia todas las medidas de la sesión actual.
+ * unitScale convierte unidades nativas → metros (recinto=1, interior=0.001).
+ */
+function MeasureTool({ view }: { view: MapView }) {
+  const map = useMap()
+  const {
+    measureMode,
+    measureClearSignal,
+    addMeasureSegment,
+    setMeasurePointCount,
+  } = useMapaLeafletStore()
+
+  const pointsRef  = useRef<L.LatLng[]>([])
+  const layersRef  = useRef<L.Layer[]>([])
+  const rubberRef  = useRef<L.Polyline | null>(null)
+
+  const removeLayers = useCallback(() => {
+    layersRef.current.forEach((l) => { try { map.removeLayer(l) } catch { /* ignore */ } })
+    layersRef.current = []
+    if (rubberRef.current) {
+      try { map.removeLayer(rubberRef.current) } catch { /* ignore */ }
+      rubberRef.current = null
+    }
+  }, [map])
+
+  const resetPoints = useCallback(() => {
+    pointsRef.current = []
+    setMeasurePointCount(0)
+  }, [setMeasurePointCount])
+
+  // Reacciona al signal de limpieza (desde overlay o toggleMeasureMode)
+  const prevSignalRef = useRef(0)
+  useEffect(() => {
+    if (measureClearSignal === prevSignalRef.current) return
+    prevSignalRef.current = measureClearSignal
+    removeLayers()
+    resetPoints()
+  }, [measureClearSignal, removeLayers, resetPoints])
+
+  useEffect(() => {
+    if (!measureMode) {
+      removeLayers()
+      resetPoints()
+      return
+    }
+
+    const container = map.getContainer()
+    container.style.cursor = 'crosshair'
+
+    const onClick = (e: L.LeafletMouseEvent) => {
+      L.DomEvent.stopPropagation(e)
+      const pts   = pointsRef.current
+      const newPt = e.latlng
+
+      // Punto visual
+      const dot = L.circleMarker(newPt, {
+        radius: 5, color: '#f59e0b', fillColor: '#0a0e14',
+        fillOpacity: 1, weight: 2.5, interactive: false,
+      }).addTo(map)
+      layersRef.current.push(dot)
+
+      if (pts.length > 0) {
+        const prev = pts[pts.length - 1]
+        if (prev) {
+          const dx   = newPt.lng - prev.lng
+          const dy   = newPt.lat - prev.lat
+          const dist = Math.sqrt(dx * dx + dy * dy) * view.unitScale
+
+          // Línea de segmento
+          const line = L.polyline([prev, newPt], {
+            color: '#f59e0b', weight: 2, dashArray: '8 5',
+            interactive: false, opacity: 0.9,
+          }).addTo(map)
+
+          // Etiqueta en el punto medio
+          const mid = L.latLng((prev.lat + newPt.lat) / 2, (prev.lng + newPt.lng) / 2)
+          const lbl = L.marker(mid, {
+            icon: L.divIcon({
+              className: 'measure-label-container',
+              html: `<span class="measure-label">${dist.toFixed(2)} m</span>`,
+              iconSize:   [80, 22],
+              iconAnchor: [40, 11],
+            }),
+            interactive: false,
+            zIndexOffset: 1000,
+          }).addTo(map)
+
+          layersRef.current.push(line, lbl)
+          addMeasureSegment(dist)
+        }
+      }
+
+      pointsRef.current = [...pts, newPt]
+      setMeasurePointCount(pointsRef.current.length)
+    }
+
+    const onMouseMove = (e: L.LeafletMouseEvent) => {
+      const last = pointsRef.current[pointsRef.current.length - 1]
+      if (!last) return
+      if (rubberRef.current) {
+        rubberRef.current.setLatLngs([last, e.latlng])
+      } else {
+        rubberRef.current = L.polyline([last, e.latlng], {
+          color: '#fbbf24', weight: 1, dashArray: '4 4',
+          interactive: false, opacity: 0.5,
+        }).addTo(map)
+      }
+    }
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        removeLayers()
+        resetPoints()
+        useMapaLeafletStore.getState().clearMeasurements()
+      }
+    }
+
+    map.on('click', onClick)
+    map.on('mousemove', onMouseMove)
+    window.addEventListener('keydown', onKeyDown)
+
+    return () => {
+      map.off('click', onClick)
+      map.off('mousemove', onMouseMove)
+      window.removeEventListener('keydown', onKeyDown)
+      container.style.cursor = ''
+      if (rubberRef.current) {
+        try { map.removeLayer(rubberRef.current) } catch { /* ignore */ }
+        rubberRef.current = null
+      }
+    }
+  }, [map, measureMode, view, addMeasureSegment, setMeasurePointCount, removeLayers, resetPoints])
+
+  return null
+}
+
 // ─── Atajos de teclado ───────────────────────────────────────────────────────
 function KeyboardShortcuts() {
   useEffect(() => {
@@ -462,6 +602,7 @@ function MapContents({ view }: { view: MapView }) {
 
       <CapaElementos view={view} />
       <EditorGeoman view={view} />
+      <MeasureTool view={view} />
       <DrawAreaTooltip />
       <CenterOnSelected />
       <KeyboardShortcuts />
@@ -471,9 +612,70 @@ function MapContents({ view }: { view: MapView }) {
   )
 }
 
+// ─── Overlay de medición (fuera del MapContainer) ────────────────────────────
+function MeasureOverlay() {
+  const measureSegments  = useMapaLeafletStore((s) => s.measureSegments)
+  const measurePointCount = useMapaLeafletStore((s) => s.measurePointCount)
+  const clearMeasurements = useMapaLeafletStore((s) => s.clearMeasurements)
+
+  const total = measureSegments.reduce((a, d) => a + d, 0)
+
+  return (
+    <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1000] pointer-events-none select-none">
+      <div className="bg-gray-900/95 border border-amber-700/60 rounded-xl shadow-2xl px-4 py-3 min-w-56 backdrop-blur-sm">
+
+        {/* Header */}
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">
+            Herramienta Medir
+          </span>
+          <button
+            className="pointer-events-auto text-[10px] text-gray-500 hover:text-red-400 transition-colors"
+            onClick={clearMeasurements}
+          >
+            Limpiar · Esc
+          </button>
+        </div>
+
+        {/* Instrucción o resultados */}
+        {measurePointCount === 0 && (
+          <p className="text-gray-400 text-xs">Clic en el mapa → primer punto</p>
+        )}
+        {measurePointCount === 1 && (
+          <p className="text-amber-300 text-xs">
+            <span className="inline-block w-2 h-2 rounded-full bg-amber-500 mr-1.5 align-middle" />
+            Punto fijado — clic para medir
+          </p>
+        )}
+
+        {measureSegments.length > 0 && (
+          <div className="space-y-1 mt-1">
+            {measureSegments.map((d, i) => (
+              <div key={i} className="flex justify-between items-center text-xs gap-6">
+                <span className="text-gray-500">Seg {i + 1}</span>
+                <span className="font-mono font-bold text-amber-400">{d.toFixed(2)} m</span>
+              </div>
+            ))}
+            {measureSegments.length > 1 && (
+              <div className="flex justify-between items-center text-xs gap-6 border-t border-gray-700/60 pt-1.5 mt-1">
+                <span className="text-gray-300 font-semibold">Total</span>
+                <span className="font-mono font-bold text-white">{total.toFixed(2)} m</span>
+              </div>
+            )}
+            <p className="text-[10px] text-gray-600 mt-1 pt-1 border-t border-gray-800">
+              Seguí haciendo clic para sumar segmentos
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── Componente principal — wrapper que reacciona al cambio de vista ─────────
 export function PlantaLeafletEditable() {
-  const currentView = useMapaLeafletStore((s) => s.currentView)
+  const currentView  = useMapaLeafletStore((s) => s.currentView)
+  const measureMode  = useMapaLeafletStore((s) => s.measureMode)
   const view = MAP_VIEWS[currentView]
 
   return (
@@ -493,6 +695,8 @@ export function PlantaLeafletEditable() {
       >
         <MapContents view={view} />
       </MapContainer>
+
+      {measureMode && <MeasureOverlay />}
     </div>
   )
 }

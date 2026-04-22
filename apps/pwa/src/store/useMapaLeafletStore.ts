@@ -45,6 +45,13 @@ interface MapaLeafletState {
   editMode: boolean
   capasVisibles: Record<string, boolean>   // capas DXF visibles por nombre
 
+  // ── Medición ────────────────────────────────────────────────────────────────
+  measureMode: boolean
+  measureSegments: number[]   // distancias acumuladas en metros
+  measurePointCount: number   // para mostrar instrucciones en overlay
+  /** Incrementar para señalar a MeasureTool que limpie sus capas Leaflet */
+  measureClearSignal: number
+
   // Acciones
   setView: (v: ViewName) => void
   setSelectedId: (id: string | null) => void
@@ -56,6 +63,11 @@ interface MapaLeafletState {
   updateElemento: (id: string, patch: Partial<ElementoMapa>) => void
   deleteElemento: (id: string) => void
   clearAllElementos: () => void
+
+  toggleMeasureMode: () => void
+  addMeasureSegment: (dist: number) => void
+  setMeasurePointCount: (n: number) => void
+  clearMeasurements: () => void
 }
 
 function makeId(): string {
@@ -70,10 +82,18 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
       selectedId: null,
       editMode: false,
       capasVisibles: {},
+      measureMode: false,
+      measureSegments: [],
+      measurePointCount: 0,
+      measureClearSignal: 0,
 
       setView: (v) => set({ currentView: v, selectedId: null }),
       setSelectedId: (id) => set({ selectedId: id }),
-      toggleEditMode: () => set((s) => ({ editMode: !s.editMode, selectedId: null })),
+      toggleEditMode: () => set((s) => ({
+        editMode: !s.editMode,
+        selectedId: null,
+        measureMode: false,  // edit y measure son mutuamente excluyentes
+      })),
 
       setCapaVisible: (name, visible) =>
         set((s) => ({ capasVisibles: { ...s.capasVisibles, [name]: visible } })),
@@ -108,6 +128,23 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
         })),
 
       clearAllElementos: () => set({ elementos: [], selectedId: null }),
+
+      toggleMeasureMode: () => set((s) => ({
+        measureMode: !s.measureMode,
+        editMode: false,
+        measureSegments: [],
+        measurePointCount: 0,
+        measureClearSignal: s.measureClearSignal + 1,
+      })),
+      addMeasureSegment: (dist) => set((s) => ({
+        measureSegments: [...s.measureSegments, dist],
+      })),
+      setMeasurePointCount: (n) => set({ measurePointCount: n }),
+      clearMeasurements: () => set((s) => ({
+        measureSegments: [],
+        measurePointCount: 0,
+        measureClearSignal: s.measureClearSignal + 1,
+      })),
     }),
     {
       name: 'mapa-leaflet-v1',
