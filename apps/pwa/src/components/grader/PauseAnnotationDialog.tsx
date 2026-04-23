@@ -26,9 +26,9 @@ import {
   Label,
 } from '@/components/ui'
 import { cn } from '@/lib/utils'
-import { Loader2, Clock } from 'lucide-react'
-import type { Pause } from '@/services/grader/types'
-import { updatePauseAnnotation, updatePauseRange } from '@/services/grader/graderDailySummary.service'
+import { Loader2, Clock, History, ChevronDown } from 'lucide-react'
+import type { Pause, PauseHistoryEntry } from '@/services/grader/types'
+import { updatePauseAnnotation, updatePauseRange, loadPauseHistory } from '@/services/grader/graderDailySummary.service'
 import { usePauseTags } from '@/hooks/usePauseTags'
 
 interface PauseAnnotationDialogProps {
@@ -64,6 +64,58 @@ function fmtDuration(sec: number): string {
   return m > 0 ? `${h} h ${m} min` : `${h} h`
 }
 
+/** Formatea un ISO a "dd/MM HH:MM" en UTC-planta. */
+function fmtDateTime(iso: string): string {
+  const d = new Date(iso)
+  const dd = String(d.getUTCDate()).padStart(2, '0')
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0')
+  const hh = String(d.getUTCHours()).padStart(2, '0')
+  const mn = String(d.getUTCMinutes()).padStart(2, '0')
+  return `${dd}/${mm} ${hh}:${mn}`
+}
+
+const ACTION_LABEL: Record<PauseHistoryEntry['action'], string> = {
+  tag: 'Tag asignado',
+  clear_tag: 'Tag eliminado',
+  range: 'Rango ajustado',
+}
+
+/** Fila del historial de cambios de una pausa. */
+function HistoryRow({ entry }: { entry: PauseHistoryEntry }) {
+  const label = ACTION_LABEL[entry.action]
+  const detail = (() => {
+    if (entry.action === 'tag') {
+      const parts: string[] = []
+      if (entry.diff.tag) {
+        const old = entry.diff.tag.old ? `«${entry.diff.tag.old}»` : '–'
+        parts.push(`${old} → «${entry.diff.tag.new ?? '–'}»`)
+      }
+      if (entry.diff.note?.new) parts.push(`nota: "${entry.diff.note.new}"`)
+      return parts.join(', ')
+    }
+    if (entry.action === 'clear_tag') {
+      return entry.diff.tag?.old ? `«${entry.diff.tag.old}» eliminado` : 'tag eliminado'
+    }
+    if (entry.action === 'range') {
+      const s = entry.diff.startAt ? `${fmtHHMM(entry.diff.startAt.old)} → ${fmtHHMM(entry.diff.startAt.new)}` : ''
+      const e = entry.diff.endAt ? `${fmtHHMM(entry.diff.endAt.old)} → ${fmtHHMM(entry.diff.endAt.new)}` : ''
+      return [s, e].filter(Boolean).join(' | fin: ')
+    }
+    return ''
+  })()
+
+  return (
+    <div className="flex items-start gap-2 text-xs">
+      <span className="text-muted-foreground shrink-0 tabular-nums">{fmtDateTime(entry.changedAt)}</span>
+      <div className="min-w-0">
+        <span className="font-medium text-foreground">{label}</span>
+        {detail && <span className="text-muted-foreground"> · {detail}</span>}
+        <span className="text-muted-foreground/60 ml-1">({entry.changedBy.split('@')[0] ?? entry.changedBy})</span>
+      </div>
+    </div>
+  )
+}
+
 export function PauseAnnotationDialog({
   open,
   onOpenChange,
@@ -87,6 +139,11 @@ export function PauseAnnotationDialog({
   const [rangeError, setRangeError] = useState<string | null>(null)
   const [rangeSaved, setRangeSaved] = useState(false)
 
+  // — M13: Historial de cambios —
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [historyEntries, setHistoryEntries] = useState<PauseHistoryEntry[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+
   // Duración calculada desde los valores editados
   const editedDurationSec = editedStart && editedEnd
     ? Math.round((Date.parse(editedEnd) - Date.parse(editedStart)) / 1000)
@@ -105,7 +162,19 @@ export function PauseAnnotationDialog({
     setEditedEnd(pause.endAt)
     setRangeError(null)
     setRangeSaved(false)
+    setHistoryOpen(false)
+    setHistoryEntries([])
   }, [pause])
+
+  // M13 — Carga lazy del historial al abrir el acordeón.
+  useEffect(() => {
+    if (!historyOpen || !pause || !summaryId) return
+    setHistoryLoading(true)
+    loadPauseHistory(summaryId, pause.id)
+      .then(setHistoryEntries)
+      .catch(() => setHistoryEntries([]))
+      .finally(() => setHistoryLoading(false))
+  }, [historyOpen, pause, summaryId])
 
   const adjustStart = useCallback((deltaMin: number) => {
     setEditedStart(prev => shiftMinutes(prev, deltaMin))
@@ -363,6 +432,35 @@ export function PauseAnnotationDialog({
             </div>
 
             {rangeError && <p className="text-xs text-red-400">{rangeError}</p>}
+          </div>
+
+          {/* ── M13: Historial de cambios ── */}
+          <div className="border border-border/40 rounded-md overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setHistoryOpen((v) => !v)}
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-muted/30 transition-colors"
+            >
+              <History className="w-3.5 h-3.5" />
+              <span className="flex-1 text-left">Historial de cambios</span>
+              <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', historyOpen && 'rotate-180')} />
+            </button>
+            {historyOpen && (
+              <div className="border-t border-border/40 px-3 py-2 space-y-2 max-h-48 overflow-y-auto">
+                {historyLoading ? (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    Cargando…
+                  </div>
+                ) : historyEntries.length === 0 ? (
+                  <p className="text-xs text-muted-foreground py-1">Sin cambios registrados aún.</p>
+                ) : (
+                  historyEntries.map((entry, idx) => (
+                    <HistoryRow key={idx} entry={entry} />
+                  ))
+                )}
+              </div>
+            )}
           </div>
         </div>
 

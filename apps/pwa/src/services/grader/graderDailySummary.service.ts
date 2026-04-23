@@ -29,9 +29,10 @@ import {
   documentId,
   getCountFromServer,
   onSnapshot,
+  addDoc,
 } from 'firebase/firestore'
 import { db } from '../firebase'
-import type { GraderDailySummary, TimelineBucket, Pause, MicroDetentionsSummary } from './types'
+import type { GraderDailySummary, TimelineBucket, Pause, MicroDetentionsSummary, PauseHistoryEntry } from './types'
 
 const COLLECTION = 'graderDailySummaries'
 /** Firestore permite máx. 500 ops por batch; usamos 400 para margen */
@@ -695,6 +696,8 @@ export async function loadTimelineAggregates(
 // anotación manual (Fase 3). Path: `graderDailySummaries/{id}/meta/pauses`.
 
 const PAUSES_META_DOC = 'pauses'
+/** Subcollección de audit log para pausas (M13). */
+const PAUSE_HISTORY_SUB = 'pauseHistory'
 
 interface PausesAggregatesDoc {
   pauses: Pause[]
@@ -705,6 +708,46 @@ interface PausesAggregatesDoc {
 }
 
 const PAUSES_SCHEMA_VERSION = 1
+
+// ── M13: Audit log de pausas ─────────────────────────────────────────────────
+
+/**
+ * Escribe una entrada en el historial de cambios de una pausa.
+ * Colección: `graderDailySummaries/{summaryId}/pauseHistory` (auto-id).
+ * Silencia errores para no bloquear la operación principal.
+ */
+async function appendPauseHistory(
+  summaryId: string,
+  entry: PauseHistoryEntry,
+): Promise<void> {
+  try {
+    const colRef = collection(db, COLLECTION, summaryId, PAUSE_HISTORY_SUB)
+    await addDoc(colRef, entry)
+  } catch (e) {
+    console.warn('[graderDailySummary] appendPauseHistory falló (no bloqueante):', e)
+  }
+}
+
+/**
+ * Carga el historial de cambios de una pausa específica dentro de un turno.
+ * Filtra por `pauseId` en cliente para evitar índice compuesto en Firestore.
+ * Ordena por `changedAt` ascendente (más antiguo primero).
+ */
+export async function loadPauseHistory(
+  summaryId: string,
+  pauseId: string,
+): Promise<PauseHistoryEntry[]> {
+  const q = query(
+    collection(db, COLLECTION, summaryId, PAUSE_HISTORY_SUB),
+    orderBy('changedAt', 'asc'),
+  )
+  const snap = await getDocs(q)
+  return snap.docs
+    .map((d) => d.data() as PauseHistoryEntry)
+    .filter((e) => e.pauseId === pauseId)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Guarda las pausas detectadas + microDetentions en la sub-collection.
@@ -805,6 +848,7 @@ export async function updatePauseAnnotation(
   if (!Array.isArray(data.pauses)) throw new Error(`meta/pauses con forma inesperada para ${summaryId}`)
 
   const now = new Date().toISOString()
+  const oldPause = data.pauses.find((p) => p.id === pauseId)
   const updatedPauses = data.pauses.map((p) => {
     if (p.id !== pauseId) return p
     const next: Pause = { ...p }
@@ -833,6 +877,33 @@ export async function updatePauseAnnotation(
     schemaVersion: PAUSES_SCHEMA_VERSION,
   }
   await setDoc(ref, payload)
+
+  // M13 — Audit log
+  if (annotation.tagId === null) {
+    await appendPauseHistory(summaryId, {
+      pauseId,
+      action: 'clear_tag',
+      changedBy: annotation.annotatedBy,
+      changedAt: now,
+      diff: {
+        tag: { old: oldPause?.tag, new: undefined },
+        note: oldPause?.note ? { old: oldPause.note, new: undefined } : undefined,
+      },
+    })
+  } else {
+    await appendPauseHistory(summaryId, {
+      pauseId,
+      action: 'tag',
+      changedBy: annotation.annotatedBy,
+      changedAt: now,
+      diff: {
+        tag: { old: oldPause?.tag, new: annotation.tagId },
+        ...(oldPause?.note !== (annotation.note?.trim() || undefined)
+          ? { note: { old: oldPause?.note, new: annotation.note?.trim() || undefined } }
+          : {}),
+      },
+    })
+  }
 }
 
 /**
@@ -887,6 +958,7 @@ export async function updatePauseRange(
     }
   }
 
+  const oldPauseRange = data.pauses.find((p) => p.id === pauseId)
   const updatedPauses = data.pauses.map((p) => {
     if (p.id !== pauseId) return p
     return {
@@ -906,6 +978,18 @@ export async function updatePauseRange(
     schemaVersion: PAUSES_SCHEMA_VERSION,
   }
   await setDoc(ref, payload)
+
+  // M13 — Audit log
+  await appendPauseHistory(summaryId, {
+    pauseId,
+    action: 'range',
+    changedBy: params.adjustedBy,
+    changedAt: now,
+    diff: {
+      startAt: { old: oldPauseRange?.startAt ?? params.startAt, new: params.startAt },
+      endAt: { old: oldPauseRange?.endAt ?? params.endAt, new: params.endAt },
+    },
+  })
 }
 
 /**

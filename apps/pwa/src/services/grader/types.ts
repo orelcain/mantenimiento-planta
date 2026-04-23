@@ -763,6 +763,28 @@ export interface MicroDetentionsSummary {
   byHour: Record<string, number>;
 }
 
+/**
+ * Entrada del audit log de una pausa (M13).
+ * Guardada en la subcollection `graderDailySummaries/{summaryId}/pauseHistory`.
+ */
+export interface PauseHistoryEntry {
+  /** ID de la pausa que fue modificada (formato `p-HHMM-Xm`). */
+  pauseId: string;
+  /** Tipo de cambio realizado. */
+  action: 'tag' | 'clear_tag' | 'range';
+  /** UID del usuario que realizó el cambio. */
+  changedBy: string;
+  /** ISO timestamp del cambio. */
+  changedAt: string;
+  /** Valores anteriores y nuevos del campo modificado. */
+  diff: {
+    tag?: { old?: string; new?: string };
+    note?: { old?: string; new?: string };
+    startAt?: { old: string; new: string };
+    endAt?: { old: string; new: string };
+  };
+}
+
 // ============================================================================
 // CONFIGURACIÓN DE GATES
 // ============================================================================
