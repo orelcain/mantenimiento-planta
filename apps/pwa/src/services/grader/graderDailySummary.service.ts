@@ -739,12 +739,11 @@ export async function loadPauseHistory(
 ): Promise<PauseHistoryEntry[]> {
   const q = query(
     collection(db, COLLECTION, summaryId, PAUSE_HISTORY_SUB),
+    where('pauseId', '==', pauseId),
     orderBy('changedAt', 'asc'),
   )
   const snap = await getDocs(q)
-  return snap.docs
-    .map((d) => d.data() as PauseHistoryEntry)
-    .filter((e) => e.pauseId === pauseId)
+  return snap.docs.map((d) => d.data() as PauseHistoryEntry)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

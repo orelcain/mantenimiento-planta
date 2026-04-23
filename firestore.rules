@@ -1010,6 +1010,19 @@ service cloud.firestore {
         allow read: if isAuthenticated();
         allow write: if isSupervisor();
       }
+
+      // Historial de anotaciones de pausas (M13) — audit trail inmutable
+      // Solo admins pueden crear entradas; nadie puede actualizar ni borrar.
+      match /pauseHistory/{entryId} {
+        allow read: if isAuthenticated();
+        allow create: if isAdmin()
+          && request.resource.data.pauseId is string
+          && request.resource.data.action in ['tag', 'clear_tag', 'range']
+          && request.resource.data.changedBy is string
+          && request.resource.data.changedAt is string
+          && request.resource.data.diff is map;
+        allow update, delete: if false;
+      }
     }
 
     // ANÁLISIS GRADER - Turnos (uploads + acciones live)

@@ -14,10 +14,11 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useNavigate, Navigate } from 'react-router-dom'
 import { Card, CardContent, Badge, Button } from '@/components/ui'
-import { Upload, Activity, BarChart3, Settings2, TrendingUp, BookOpen, Eye, ClipboardList } from 'lucide-react'
+import { Upload, Activity, BarChart3, Settings2, TrendingUp, BookOpen, Eye, ClipboardList, GitCompare } from 'lucide-react'
 import { usePermissionsStore } from '@/store'
 import { useIsAdmin } from '@/store/authStore'
 import { GlobalSettingsModal } from '@/components/grader/GlobalSettingsModal'
+import { DayComparisonModal } from '@/components/grader/DayComparisonModal'
 import { listDailySummariesByRange, loadPausesAggregates } from '@/services/grader/graderDailySummary.service'
 import { resolveEffectiveTag } from '@/services/grader/graderPauseTags'
 import { computeShiftTimeWindow } from '@/services/grader/graderShiftStatus'
@@ -146,6 +147,17 @@ export function AnalisisGraderLandingPage() {
   }, [lastClosedShift])
 
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [showComparison, setShowComparison] = useState(false)
+
+  // Par de turnos día+noche para el último día con ambos turnos disponibles
+  const comparisonPair = useMemo<[GraderDailySummary, GraderDailySummary] | null>(() => {
+    if (!lastClosedShift || allSummaries.length === 0) return null
+    const dateKey = lastClosedShift.dateKey
+    const dayShift   = allSummaries.find((s) => s.dateKey === dateKey && s.shiftId === 'Turno día')
+    const nightShift = allSummaries.find((s) => s.dateKey === dateKey && s.shiftId === 'Turno noche')
+    if (!dayShift || !nightShift) return null
+    return [dayShift, nightShift]
+  }, [allSummaries, lastClosedShift])
 
   if (!canSee('analisisGrader')) return <Navigate to="/" replace />
 
@@ -231,6 +243,19 @@ export function AnalisisGraderLandingPage() {
                       </span>
                     </Button>
                   )}
+                  {/* D↔N rápido: solo cuando el último día tiene ambos turnos */}
+                  {!loading && comparisonPair && (
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      onClick={() => setShowComparison(true)}
+                      className="gap-2 text-indigo-500 border-indigo-500/30 hover:bg-indigo-500/10 w-full sm:w-auto"
+                      title="Comparar turno día vs noche"
+                    >
+                      <GitCompare className="w-4 h-4" />
+                      D↔N
+                    </Button>
+                  )}
                 </>
               )}
             </div>
@@ -295,6 +320,15 @@ export function AnalisisGraderLandingPage() {
       </section>
 
       <GlobalSettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
+
+      {showComparison && comparisonPair && (
+        <DayComparisonModal
+          open={showComparison}
+          onClose={() => setShowComparison(false)}
+          summaries={comparisonPair}
+          dateKey={comparisonPair[0].dateKey}
+        />
+      )}
     </div>
   )
 }
