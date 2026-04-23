@@ -10,7 +10,7 @@ import type { ViewName } from '@/data/dxfLayers'
 
 export type ZonaCategoria = 'produccion' | 'frio' | 'utilidades' | 'logistica' | 'admin' | 'estructura' | 'otros'
 export type ZonaEstado    = 'operativo' | 'alerta' | 'detenido'
-export type ElementoTipo  = 'zona' | 'equipo' | 'sensor' | 'punto' | 'forma' | 'cota'
+export type ElementoTipo  = 'zona' | 'equipo' | 'sensor' | 'punto' | 'forma' | 'cota' | 'linea'
 
 /** Polígono: array de puntos [lat, lng] = [Y, X] en unidades del DXF de la vista */
 export type PolygonCoords = [number, number][]

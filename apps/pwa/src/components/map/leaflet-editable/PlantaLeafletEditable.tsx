@@ -486,7 +486,7 @@ function EditorGeoman({ view }: { view: MapView }) {
 
     pmMap.pm.addControls({
       position: 'topleft',
-      drawMarker: true, drawCircleMarker: false, drawPolyline: false,
+      drawMarker: true, drawCircleMarker: false, drawPolyline: true,
       drawRectangle: true, drawPolygon: true, drawCircle: true,
       drawText: false, editMode: true, dragMode: true,
       cutPolygon: false, removalMode: true, rotateMode: true,
@@ -532,6 +532,22 @@ function EditorGeoman({ view }: { view: MapView }) {
         elemento = {
           tipo: 'punto', nombre: '', categoria: 'otros', estado: 'operativo',
           mapView: view.name, punto: cs,
+        }
+      } else if (shape === 'Line') {
+        const latlngs: L.LatLng[] = (layer.getLatLngs() as L.LatLng[]) ?? []
+        const snapped: PolygonCoords = latlngs.map((p) => [snap(p.lat), snap(p.lng)])
+        layer.setLatLngs(snapped.map((p) => L.latLng(p[0], p[1])))
+        // Longitud total en metros
+        let totalM = 0
+        for (let i = 1; i < snapped.length; i++) {
+          const a = snapped[i - 1]; const b = snapped[i]
+          if (!a || !b) continue
+          totalM += Math.hypot(b[0] - a[0], b[1] - a[1]) * view.unitScale
+        }
+        elemento = {
+          tipo: 'linea', nombre: '', categoria: 'estructura', estado: 'operativo',
+          mapView: view.name, poligono: snapped,
+          meta: { longitud_m: Number(totalM.toFixed(2)) },
         }
       }
 
@@ -629,7 +645,11 @@ function CapaElementos({ view }: { view: MapView }) {
       let layer = current.get(el.id) as any
       if (!layer) {
         // Crear nueva capa
-        if (el.poligono && el.poligono.length >= 3) {
+        if (el.tipo === 'linea' && el.poligono && el.poligono.length >= 2) {
+          layer = L.polyline(el.poligono as L.LatLngTuple[], {
+            ...baseStyle, fillOpacity: 0, weight: isSelected ? 4 : 3,
+          })
+        } else if (el.poligono && el.poligono.length >= 3) {
           layer = L.polygon(el.poligono as L.LatLngTuple[], baseStyle)
         } else if (el.punto && el.radio) {
           layer = L.circle(el.punto as L.LatLngTuple, { ...baseStyle, radius: el.radio })

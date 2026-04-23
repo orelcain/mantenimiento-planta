@@ -45,6 +45,7 @@ function TipoBadge({ tipo }: { tipo: ElementoMapa['tipo'] }) {
     equipo: { label: 'EQUIP', bg: 'bg-blue-900/40',   text: 'text-blue-300' },
     sensor: { label: 'SENSR', bg: 'bg-green-900/40',  text: 'text-green-300' },
     cota:   { label: 'COTA',  bg: 'bg-slate-800/60',  text: 'text-slate-300' },
+    linea:  { label: 'LINEA', bg: 'bg-orange-900/40', text: 'text-orange-300' },
   }[tipo]
   if (!cfg) return null
   return (
