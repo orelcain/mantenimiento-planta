@@ -137,19 +137,36 @@ function GrillaLayer({ view }: { view: MapView }) {
       if (oneMpx < 1.5) return   // demasiado alejado — invisible, no dibuja
 
       // Fase calculada desde DXF puro (estable a cualquier zoom/pan)
-      // originLL = coord DXF del píxel (0,0) del canvas en este momento
       const originLL = map.containerPointToLatLng(L.point(0, 0))
       const aRad = grillaAngle * Math.PI / 180
       const phase1 = gridPhase(originLL, aRad,                view.unitScale, oneMpx)
       const phase2 = gridPhase(originLL, aRad + Math.PI / 2, view.unitScale, oneMpx)
 
-      // Una sola grilla tenue uniforme — 1 m, sin doble nivel
-      ctx.strokeStyle = 'rgba(148,163,184,0.14)'
-      ctx.lineWidth = 0.5
-      drawParallelLines(ctx, sz.x, sz.y, aRad,                oneMpx, phase1)
-      drawParallelLines(ctx, sz.x, sz.y, aRad + Math.PI / 2, oneMpx, phase2)
+      // Clip al recinto + 100 m de margen (no dibuja fuera del área del mapa)
+      const marginDxf = 100 / view.unitScale
+      const [swB, neB] = view.bounds
+      const swPx = map.latLngToContainerPoint(L.latLng(swB[0] - marginDxf, swB[1] - marginDxf))
+      const nePx = map.latLngToContainerPoint(L.latLng(neB[0] + marginDxf, neB[1] + marginDxf))
+      const clipL = Math.max(0, Math.min(swPx.x, nePx.x))
+      const clipT = Math.max(0, Math.min(swPx.y, nePx.y))
+      const clipR = Math.min(sz.x, Math.max(swPx.x, nePx.x))
+      const clipB = Math.min(sz.y, Math.max(swPx.y, nePx.y))
 
-      // Etiqueta fija "1m × 1m"
+      if (clipR > clipL && clipB > clipT) {
+        ctx.save()
+        ctx.beginPath()
+        ctx.rect(clipL, clipT, clipR - clipL, clipB - clipT)
+        ctx.clip()
+
+        ctx.strokeStyle = 'rgba(148,163,184,0.14)'
+        ctx.lineWidth = 0.5
+        drawParallelLines(ctx, sz.x, sz.y, aRad,                oneMpx, phase1)
+        drawParallelLines(ctx, sz.x, sz.y, aRad + Math.PI / 2, oneMpx, phase2)
+
+        ctx.restore()
+      }
+
+      // Etiqueta fuera del clip (siempre visible)
       ctx.fillStyle = 'rgba(148,163,184,0.4)'
       ctx.font = '9px ui-monospace, monospace'
       ctx.fillText(`1m × 1m${grillaAngle !== 0 ? ' · ' + grillaAngle + '°' : ''}`, 6, sz.y - 6)
@@ -200,7 +217,7 @@ function GrillaOverlay({ view }: { view: MapView }) {
   // ── Panel colapsado ───────────────────────────────────────────────────────
   if (!editing) {
     return (
-      <div className="absolute top-3 left-3 z-[1000] pointer-events-none select-none">
+      <div className="absolute bottom-10 left-3 z-[1000] pointer-events-none select-none">
         <div className="bg-gray-900/90 border border-slate-700/40 rounded-lg shadow-lg px-3 py-1.5 flex items-center gap-2 backdrop-blur-sm">
           <span className="text-[9px] text-slate-500 font-mono">1m × 1m</span>
           {grillaAngle !== 0 && (
@@ -219,7 +236,11 @@ function GrillaOverlay({ view }: { view: MapView }) {
 
   // ── Panel expandido ───────────────────────────────────────────────────────
   return (
-    <div className="absolute top-3 left-3 z-[1000] pointer-events-none select-none">
+    // onWheel stopPropagation evita que el scroll sobre el panel haga zoom en el mapa
+    <div
+      className="absolute bottom-10 left-3 z-[1000] pointer-events-none select-none"
+      onWheel={(e) => e.stopPropagation()}
+    >
       <div className="bg-gray-900/95 border border-slate-700/60 rounded-xl shadow-xl px-4 py-3 w-56 backdrop-blur-sm">
         <div className="flex items-center justify-between mb-2.5">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
