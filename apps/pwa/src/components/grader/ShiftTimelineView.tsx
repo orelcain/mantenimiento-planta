@@ -22,10 +22,17 @@ import type { GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.
 import type { FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
 import { MATRIX_P0_CAUSES, parseMatrixErrorString } from '@/services/grader/graderMatrixP0Causes'
 import { classifyRecordToMatrix, CALIBRE_WEIGHT_RANGES } from '@/services/grader/graderAnalytics'
-import { resolveEffectiveTag } from '@/services/grader/graderPauseTags'
 import { PauseAnnotationDialog } from './PauseAnnotationDialog'
 import { MinuteDetailDialog } from './MinuteDetailDialog'
 import type { GateAssignment } from '@/services/grader/types'
+import {
+  fmtTime,
+  CAUSE_HEX,
+  computeProductionWindow,
+  resolveAxisWindow,
+  buildMarkLines,
+  buildMarkAreas,
+} from './shiftTimelineHelpers'
 
 interface ShiftTimelineViewProps {
   timelineBuckets: TimelineBucket[]
@@ -70,40 +77,6 @@ interface ShiftTimelineViewProps {
 }
 
 /**
- * Formatea ISO string a HH:MM en HORA LOCAL DE PLANTA.
- *
- * Los timestamps del parser Excel Marelec llevan sufijo `Z` pero representan
- * hora local de la planta (sin conversión). Si usáramos toLocaleTimeString,
- * el navegador los interpretaría como UTC y aplicaría su propio offset
- * (ej. Chile UTC-3 → 07:00 planta se mostraría como "04:00"). Acá leemos
- * getUTCHours/getUTCMinutes para mostrar la hora "tal cual" del string.
- *
- * Los timestamps construidos localmente (shiftWindow.startAt, uploads,
- * actions) sí se convierten a UTC real al hacer toISOString, y al pasarlos
- * por esta función quedarían 3-4 h desplazados. En la práctica no afecta
- * porque las markLines de inicio/fin del turno caen fuera del rango
- * visible del chart (el eje X se recorta al primer/último piece real),
- * y los uploads/actions que se renderizan como markLine también.
- */
-function fmtTime(iso: string): string {
-  const d = new Date(iso)
-  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
-}
-
-/** Mapeo Tailwind → hex aproximado para ECharts (tailwind se resuelve server-side). */
-const CAUSE_HEX: Record<MatrixP0Cause, string> = {
-  fuera_de_limites:     '#ef4444', // red-500
-  no_leido_fotocelula:  '#f97316', // orange-500
-  too_close_too_long:   '#a855f7', // purple-500
-  puerta_no_preparada:  '#06b6d4', // cyan-500
-  fuera_de_calibre:     '#6366f1', // indigo-500
-  fuera_de_calidad:     '#10b981', // emerald-500
-  fuera_de_conservacion:'#f59e0b', // amber-500
-  fuera_de_producto:    '#92400e', // amber-800
-  otro:                 '#71717a', // zinc-500
-}
-
-/**
  * Clasifica una pieza gate=0 a su MatrixP0Cause final, usando la config de
  * gates más reciente del turno (la última snapshot disponible, o la única si
  * sólo hay una). Para piezas sin error explícito o con "Fuera de límites" hace
@@ -113,14 +86,12 @@ const CAUSE_HEX: Record<MatrixP0Cause, string> = {
  * "Fuera de límites" agrupa todo.
  */
 function classifyPiece(piece: FirestorePieceRecord, configSnapshots?: GateConfigSnapshot[]): MatrixP0Cause {
-  // Encontrar el snapshot más reciente con at <= piece.ts (o el último si todos son posteriores)
   let activeGates: GateConfigSnapshot['gates'] = []
   if (configSnapshots && configSnapshots.length > 0) {
     const eligible = configSnapshots.filter(s => s.at <= piece.ts)
     const snap = eligible[eligible.length - 1] ?? configSnapshots[configSnapshots.length - 1]
     activeGates = snap?.gates ?? []
   }
-  // El record para classifyRecordToMatrix debe verse como Gate0Record
   const gate0Record = {
     ts: piece.ts,
     pieces: piece.pieces,
@@ -360,78 +331,11 @@ export function ShiftTimelineView({
   //
   // Los dos criterios se aplican en cadena: primero filtramos dummies,
   // después buscamos densidad sobre los buckets limpios.
-  const productionWindow = useMemo(() => {
-    if (timelineBuckets.length === 0) return null
-
-    // Paso 1 — detectar lotes dummy
-    const byLot = new Map<string, { pieces: number; p0: number }>()
-    let total = 0
-    for (const b of timelineBuckets) {
-      if (!b.lot) continue
-      const entry = byLot.get(b.lot) ?? { pieces: 0, p0: 0 }
-      entry.pieces += b.pieces
-      entry.p0 += b.p0Pieces ?? 0
-      byLot.set(b.lot, entry)
-      total += b.pieces
-    }
-    if (total === 0) return null
-    const dummyLots = new Set<string>()
-    for (const [lot, entry] of byLot) {
-      const pct = (entry.pieces / total) * 100
-      const p0Ratio = entry.pieces > 0 ? entry.p0 / entry.pieces : 0
-      if (pct < 1 && p0Ratio >= 0.95) dummyLots.add(lot)
-    }
-    // Buckets que pasan el filtro de lote (conservador: mantenemos buckets
-    // sin lote porque no tenemos señal para descartar).
-    const cleanBuckets = timelineBuckets.filter((b) => {
-      if (!b.lot) return b.pieces > 0
-      return !dummyLots.has(b.lot) && b.pieces > 0
-    })
-    if (cleanBuckets.length === 0) return null
-
-    // Paso 2 — búsqueda de densidad (ventana móvil 5 min)
-    const WINDOW_MIN = 5
-    const MIN_ACTIVE = 3
-    const MIN_PIECES = 20
-    const bucketByMs = new Map<number, { pieces: number }>()
-    for (const b of cleanBuckets) bucketByMs.set(Date.parse(b.tsMin), { pieces: b.pieces })
-
-    const windowMeetsCriteria = (anchorMs: number, direction: 1 | -1): boolean => {
-      let active = 0
-      let pieces = 0
-      for (let i = 0; i < WINDOW_MIN; i++) {
-        const b = bucketByMs.get(anchorMs + direction * i * 60_000)
-        if (b && b.pieces > 0) { active++; pieces += b.pieces }
-      }
-      return active >= MIN_ACTIVE && pieces >= MIN_PIECES
-    }
-
-    // Inicio real: primera ventana forward que cumple
-    let startBucket = cleanBuckets[0]!
-    for (const b of cleanBuckets) {
-      if (windowMeetsCriteria(Date.parse(b.tsMin), 1)) { startBucket = b; break }
-    }
-    // Fin real: última ventana backward que cumple (desde atrás hacia adelante)
-    let endBucket = cleanBuckets[cleanBuckets.length - 1]!
-    for (let i = cleanBuckets.length - 1; i >= 0; i--) {
-      const b = cleanBuckets[i]!
-      if (windowMeetsCriteria(Date.parse(b.tsMin), -1)) { endBucket = b; break }
-    }
-
-    const startTs = startBucket.tsMin
-    const endTs = endBucket.tsMin
-    const startMs = Date.parse(startTs)
-    const endMs = Date.parse(endTs)
-    // Piezas excluidas: todo lo que queda fuera del rango productivo
-    // (dummies + piezas pre/post de lote real sin densidad).
-    const excludedPieces = timelineBuckets
-      .filter((b) => {
-        const ts = Date.parse(b.tsMin)
-        return ts < startMs || ts > endMs
-      })
-      .reduce((s, b) => s + b.pieces, 0)
-    return { startTs, endTs, startMs, endMs, dummyLots, excludedPieces }
-  }, [timelineBuckets])
+  // ── Ventana de producción real (helper puro extraído en M11) ─────────────
+  const productionWindow = useMemo(
+    () => computeProductionWindow(timelineBuckets),
+    [timelineBuckets],
+  )
 
   const downloadCSV = useCallback(() => {
     const inWin = (tsMin: string) => {
@@ -525,38 +429,8 @@ export function ShiftTimelineView({
     // significativo, sin el spike artificial del arranque/calibración).
     const P0_LINE_MIN_PIECES = 50
 
-    // Eje X dinámico + proporcional al tiempo real (Fase 2).
-    //
-    // Dos cambios vs la versión anterior:
-    //   1. Arranque: 10 min antes del primer bucket con datos (NO en
-    //      shiftWindow.startAt=19:00/07:00 ventana ancha) — evita 2-3 h
-    //      vacías al inicio que aplastan la escala visual.
-    //   2. Expansión minuto a minuto: el category axis antes solo tenía
-    //      slots para minutos con piezas. Entre bucket con data y el
-    //      siguiente, un gap de 90 min se renderizaba como 1 slot → las
-    //      bandas de pausa se veían como líneas de 4 px. Ahora generamos
-    //      un label por CADA minuto del rango, con null en slots sin data.
-    //      Los markArea ahora cubren proporcionalmente el tiempo real.
-    const firstBucket = buckets[0]
-    const lastBucket = buckets[buckets.length - 1]
-    const effectiveStartMs = firstBucket
-      ? Date.parse(firstBucket.tsMin) - 10 * 60_000
-      : Date.parse(shiftWindow.startAt)
-    const effectiveEndMs = lastBucket
-      ? Date.parse(lastBucket.tsMin) + 10 * 60_000
-      : Date.parse(shiftWindow.endAt)
-
-    // Axis expandido minuto a minuto. Cap a 24 h para evitar arrays
-    // absurdos si el rango llega corrupto.
-    const maxSlots = 24 * 60
-    const totalMinutes = Math.min(maxSlots, Math.max(1, Math.round((effectiveEndMs - effectiveStartMs) / 60_000)))
-    const lineTimes: string[] = new Array(totalMinutes + 1)
-    const axisIndexByLabel = new Map<string, number>()
-    for (let i = 0; i <= totalMinutes; i++) {
-      const label = fmtTime(new Date(effectiveStartMs + i * 60_000).toISOString())
-      lineTimes[i] = label
-      axisIndexByLabel.set(label, i)
-    }
+    // Eje X dinámico: helper puro extraído en M11 (resolveAxisWindow).
+    const { lineTimes, axisIndexByLabel } = resolveAxisWindow(buckets, shiftWindow)
 
     // Alinear data al axis expandido. Los slots sin bucket quedan null —
     // connectNulls en la serie line hace que la línea siga conectada.
@@ -606,142 +480,10 @@ export function ShiftTimelineView({
           ? '#f59e0b'  // amber — entre alerta y crítico
           : '#ef4444'  // red — sobre crítico
 
-    // Markers verticales del turno configurado (inicio + fin)
-    const shiftMarkLines = [
-      {
-        name: `Inicio turno\n${fmtTime(shiftWindow.startAt)}`,
-        xAxis: fmtTime(shiftWindow.startAt),
-        lineStyle: { color: '#10b981', type: 'solid' as const, width: 1 },
-        label: { show: true, formatter: '▶ Inicio', color: '#10b981', fontSize: 9, position: 'insideStartTop' as const },
-      },
-      {
-        name: `Fin turno\n${fmtTime(shiftWindow.endAt)}`,
-        xAxis: fmtTime(shiftWindow.endAt),
-        lineStyle: { color: '#6b7280', type: 'solid' as const, width: 1 },
-        label: { show: true, formatter: '◀ Fin', color: '#6b7280', fontSize: 9, position: 'insideEndTop' as const },
-      },
-    ]
-
-    // Líneas horizontales en umbrales (visualmente "salud OK / atención / crítico")
-    const thresholdLines = [
-      {
-        yAxis: alertThreshold,
-        lineStyle: { color: '#f59e0b', type: 'dashed' as const, width: 1, opacity: 0.5 },
-        // Labels al lado IZQUIERDO (insideStartTop) para no chocar con el
-        // título "Pzs/min" y los íconos del toolbox en la esquina derecha.
-        // Texto corto sin "alerta/crítico" (el color ya lo dice).
-        label: { show: true, formatter: `${alertThreshold}%`, color: '#f59e0b', fontSize: 10, position: 'insideStartTop' as const },
-      },
-      {
-        yAxis: criticalThreshold,
-        lineStyle: { color: '#ef4444', type: 'dashed' as const, width: 1, opacity: 0.5 },
-        label: { show: true, formatter: `${criticalThreshold}%`, color: '#ef4444', fontSize: 10, position: 'insideStartTop' as const },
-      },
-    ]
-
-    // Checkpoints como markLine
-    const uploadLines = (shiftDoc?.uploads ?? []).map(u => ({
-      name: `Upload\n${fmtTime(u.at)}`,
-      xAxis: fmtTime(u.at),
-      lineStyle: { color: '#3b82f6', type: 'dashed' as const, width: 1.5 },
-      label: { show: true, formatter: '↑', color: '#3b82f6', fontSize: 10 },
-    }))
-
-    const actionLines = (shiftDoc?.actions ?? []).map(a => ({
-      name: `Acción\n${fmtTime(a.at)}`,
-      xAxis: fmtTime(a.at),
-      lineStyle: { color: '#f59e0b', type: 'dashed' as const, width: 1.5 },
-      label: { show: true, formatter: '⚙', color: '#f59e0b', fontSize: 10 },
-    }))
-
-    // Markers de cambio de config de gates (FASE 27) — skip primer snapshot (config inicial)
-    const configChangeLines = (configSnapshots ?? []).slice(1).map(s => ({
-      name: `Config gates\n${fmtTime(s.at)}`,
-      xAxis: fmtTime(s.at),
-      lineStyle: { color: '#06b6d4', type: 'dashed' as const, width: 1.5 },
-      label: { show: true, formatter: '🔧', color: '#06b6d4', fontSize: 10 },
-    }))
-
-    // Cambios de lote: cuando el lot dominante cambia entre buckets consecutivos
-    // con actividad (pieces > 0). Un cambio de lote puede indicar nueva bandeja.
-    const lotChangeLines: object[] = []
-    const activeBuckets = buckets  // ya filtrados: pieces > 0
-    for (let i = 1; i < activeBuckets.length; i++) {
-      const prev = activeBuckets[i - 1]
-      const curr = activeBuckets[i]
-      if (prev?.lot && curr?.lot && prev.lot !== curr.lot) {
-        const t = fmtTime(curr.tsMin)
-        lotChangeLines.push({
-          name: `Lote ${curr.lot}`,
-          xAxis: t,
-          lineStyle: { color: '#8b5cf6', type: 'dotted' as const, width: 1.5 },
-          label: { show: true, formatter: '📦', color: '#8b5cf6', fontSize: 9, position: 'insideEndBottom' as const },
-        })
-      }
-    }
-
-    // Bandas de tiempo muerto — renderizadas desde `pauses` cargadas de
-    // `meta/pauses` (pobladas por Fase 1 backfill). Cada banda lleva
-    // `name: p.id` para que el click identifique qué pausa se editó.
-    //
-    // Filtramos las pausas que caen FUERA del productionWindow: las pausas
-    // entre piezas de calibración pre-turno no son pausas operativas reales,
-    // son "no hay turno todavía". Mismo para post-turno.
-    //
-    // Colores:
-    //   - Tag efectivo (manual > auto) → color del tag con emoji
-    //   - Sin tag → gris tenue con opacidad por tier ("⏸ Xmin", invita a clickear)
-    //
-    // La opacidad crece con el tier (pausa < larga < parada) para que
-    // paradas grandes sin clasificar salten a la vista.
-    const pausesInWindow = (pauses ?? []).filter((p) => {
-      if (!productionWindow) return true
-      const pStart = Date.parse(p.startAt)
-      const pEnd = Date.parse(p.endAt)
-      // Permisivo: pausa cuyo rango SOLAPA con el productionWindow.
-      return pEnd >= productionWindow.startMs && pStart <= productionWindow.endMs
-    })
-    const deadTimeAreas: Array<[object, object]> = pausesInWindow.map((p) => {
-      const tA = fmtTime(p.startAt)
-      const tB = fmtTime(p.endAt)
-      const durMin = Math.round(p.durationSec / 60)
-      const effectiveTag = resolveEffectiveTag(p)
-
-      let areaColor: string
-      let labelColor: string
-      let labelText: string
-      // M4: indicador visual cuando el rango fue ajustado manualmente
-      const rangeAdjusted = !!p.adjustedBy
-      if (effectiveTag) {
-        areaColor = effectiveTag.bandFill
-        labelColor = effectiveTag.color
-        labelText = `${effectiveTag.emoji} ${effectiveTag.label.split(' ')[0]} ${durMin}min${rangeAdjusted ? ' ✏' : ''}`
-      } else {
-        const opacityByTier = p.tier === 'parada' ? 0.12 : p.tier === 'larga' ? 0.09 : 0.06
-        areaColor = `rgba(148,163,184,${opacityByTier})`
-        labelColor = '#94a3b8'
-        labelText = `⏸ ${durMin}min${rangeAdjusted ? ' ✏' : ''}`
-      }
-      // Ocultar label en pausas CORTAS SIN CLASIFICAR (<10min). Si el admin
-      // clasificó (tag manual) o el detector marcó colación (autoTag) o
-      // ajustó el rango (adjustedBy), el label se muestra siempre.
-      const showLabel = durMin >= 10 || !!effectiveTag || rangeAdjusted
-      return [
-        {
-          name: p.id, // identifica la pausa al clickear (Fase 3)
-          xAxis: tA,
-          itemStyle: { color: areaColor },
-          label: {
-            show: showLabel,
-            formatter: labelText,
-            color: labelColor,
-            fontSize: 10,
-            position: 'insideTopRight' as const,
-          },
-        },
-        { xAxis: tB },
-      ]
-    })
+    // Mark lines y mark areas: helpers puros extraídos en M11.
+    const { shiftMarkLines, thresholdLines, uploadLines, actionLines, configChangeLines, lotChangeLines } =
+      buildMarkLines(shiftDoc, shiftWindow, configSnapshots, buckets, alertThreshold, criticalThreshold)
+    const deadTimeAreas = buildMarkAreas(pauses ?? [], productionWindow)
 
     return {
       backgroundColor: 'transparent',

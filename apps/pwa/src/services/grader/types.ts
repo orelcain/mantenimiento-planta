@@ -714,8 +714,8 @@ export interface TimelineBucket {
 
 export type PauseTier = 'pausa' | 'larga' | 'parada';
 
-/** Tag asignado automáticamente por heurísticas del detector. */
-export type PauseAutoTag = 'colacion';
+/** Tag asignado automáticamente por heurísticas del detector (M10). */
+export type PauseAutoTag = 'colacion' | 'ejercicios' | 'cambio_lote';
 
 export interface Pause {
   /** ID único dentro del turno. Formato: `p-{HHMM}-{durMin}m` (hora local planta). */
