@@ -52,23 +52,43 @@ function polygonCenter(coords: PolygonCoords): L.LatLng {
 
 // ─── Grilla canvas ───────────────────────────────────────────────────────────
 
-/** Dibuja líneas paralelas a `angleRad` separadas `spacingPx` px,
- *  ancladas al punto (ax, ay) del canvas. */
+/**
+ * Fase estable de la grilla anclada a coordenadas DXF.
+ * Calcula a qué distancia (en px) del origen del canvas (0,0) cae la primera
+ * línea de la grilla en el eje perpendicular, usando las coordenadas DXF del
+ * punto que hay en ese origen. Estable a cualquier zoom/pan.
+ *
+ * Derivación: en CRS.Simple Leaflet flipea Y (screen_y = -dxf_lat * scale + k).
+ * La dirección perpendicular a `lineAngleRad` en screen es (-sin θ, cos θ).
+ * Ese vector en DXF es (lat=-cos θ, lng=-sin θ). La proyección del punto DXF
+ * (lat0, lng0) sobre ese eje: -(lat0·cos θ + lng0·sin θ) · unitScale [metros].
+ */
+function gridPhase(
+  originLL: L.LatLng,
+  lineAngleRad: number,
+  unitScale: number,
+  oneMpx: number,
+): number {
+  const projM = -unitScale * (originLL.lat * Math.cos(lineAngleRad) + originLL.lng * Math.sin(lineAngleRad))
+  return (((projM % 1) + 1) % 1) * oneMpx
+}
+
+/** Dibuja líneas paralelas a `lineAngleRad` separadas `spacingPx` px,
+ *  usando `phasePx` (0..spacingPx) precalculado en coordenadas DXF. */
 function drawParallelLines(
   ctx: CanvasRenderingContext2D,
   W: number, H: number,
-  angleRad: number, spacingPx: number,
-  ax: number, ay: number,
+  lineAngleRad: number, spacingPx: number,
+  phasePx: number,
 ) {
   if (spacingPx < 2) return
-  const cos = Math.cos(angleRad), sin = Math.sin(angleRad)
+  const cos = Math.cos(lineAngleRad), sin = Math.sin(lineAngleRad)
   const perpX = -sin, perpY = cos
   const ext = Math.hypot(W, H) + spacingPx * 2
-  const phase = ((ax * perpX + ay * perpY) % spacingPx + spacingPx) % spacingPx
   const n = Math.ceil(ext / spacingPx) + 2
   ctx.beginPath()
   for (let i = -n; i <= n; i++) {
-    const d = phase + i * spacingPx
+    const d = phasePx + i * spacingPx
     const px = d * perpX, py = d * perpY
     ctx.moveTo(px - ext * cos, py - ext * sin)
     ctx.lineTo(px + ext * cos, py + ext * sin)
@@ -116,17 +136,18 @@ function GrillaLayer({ view }: { view: MapView }) {
       const oneMpx = Math.abs(p1.x - p0.x)
       if (oneMpx < 1.5) return   // demasiado alejado — invisible, no dibuja
 
-      // Ancla en esquina SW de la vista (siempre dentro del área visible → sin deriva float)
-      const swCorner = L.latLng(view.bounds[0][0], view.bounds[0][1])
-      const anchor = map.latLngToContainerPoint(swCorner)
+      // Fase calculada desde DXF puro (estable a cualquier zoom/pan)
+      // originLL = coord DXF del píxel (0,0) del canvas en este momento
+      const originLL = map.containerPointToLatLng(L.point(0, 0))
       const aRad = grillaAngle * Math.PI / 180
+      const phase1 = gridPhase(originLL, aRad,                view.unitScale, oneMpx)
+      const phase2 = gridPhase(originLL, aRad + Math.PI / 2, view.unitScale, oneMpx)
 
       // Una sola grilla tenue uniforme — 1 m, sin doble nivel
       ctx.strokeStyle = 'rgba(148,163,184,0.14)'
       ctx.lineWidth = 0.5
-      for (const d of [0, 1]) {
-        drawParallelLines(ctx, sz.x, sz.y, aRad + d * Math.PI / 2, oneMpx, anchor.x, anchor.y)
-      }
+      drawParallelLines(ctx, sz.x, sz.y, aRad,                oneMpx, phase1)
+      drawParallelLines(ctx, sz.x, sz.y, aRad + Math.PI / 2, oneMpx, phase2)
 
       // Etiqueta fija "1m × 1m"
       ctx.fillStyle = 'rgba(148,163,184,0.4)'
@@ -179,7 +200,7 @@ function GrillaOverlay({ view }: { view: MapView }) {
   // ── Panel colapsado ───────────────────────────────────────────────────────
   if (!editing) {
     return (
-      <div className="absolute bottom-16 left-3 z-[1000] pointer-events-none select-none">
+      <div className="absolute top-3 left-3 z-[1000] pointer-events-none select-none">
         <div className="bg-gray-900/90 border border-slate-700/40 rounded-lg shadow-lg px-3 py-1.5 flex items-center gap-2 backdrop-blur-sm">
           <span className="text-[9px] text-slate-500 font-mono">1m × 1m</span>
           {grillaAngle !== 0 && (
@@ -198,7 +219,7 @@ function GrillaOverlay({ view }: { view: MapView }) {
 
   // ── Panel expandido ───────────────────────────────────────────────────────
   return (
-    <div className="absolute bottom-16 left-3 z-[1000] pointer-events-none select-none">
+    <div className="absolute top-3 left-3 z-[1000] pointer-events-none select-none">
       <div className="bg-gray-900/95 border border-slate-700/60 rounded-xl shadow-xl px-4 py-3 w-56 backdrop-blur-sm">
         <div className="flex items-center justify-between mb-2.5">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
