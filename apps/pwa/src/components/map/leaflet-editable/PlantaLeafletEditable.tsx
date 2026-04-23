@@ -401,11 +401,15 @@ function CapaDXF({ cfg, folder }: { cfg: DxfLayerConfig; folder: string }) {
       }}
       pointToLayer={(_f, latlng) =>
         L.circleMarker(latlng, {
-          radius: Math.max(1.5, 2.5 * zoomFactor * 0.6),
-          color: cfg.color, fillOpacity: 0.7, weight: 1,
+          radius: Math.max(2, 3.5 * zoomFactor * 0.5),
+          color: cfg.color, fillColor: cfg.color, fillOpacity: 0.75, weight: 1.5,
         })
       }
-      interactive={false}
+      onEachFeature={cfg.interactive ? (feature, layer) => {
+        const block = feature.properties?.block as string | undefined
+        if (block) layer.bindTooltip(block, { sticky: true, className: 'eqp-tooltip' })
+      } : undefined}
+      interactive={cfg.interactive ?? false}
     />
   )
 }

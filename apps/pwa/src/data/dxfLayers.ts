@@ -25,6 +25,8 @@ export interface DxfLayerConfig {
   defaultVisible: boolean
   /** Z-index relativo (mayor = encima) */
   zIndex: number
+  /** Si true, los features muestran tooltip con propiedad 'block' al hover */
+  interactive?: boolean
 }
 
 export const DXF_LAYERS: DxfLayerConfig[] = [
@@ -83,6 +85,18 @@ export const DXF_INTERIOR_LAYERS: DxfLayerConfig[] = [
   { name: 'VENTANAS',          label: 'Ventanas',         group: 'detalle',       color: '#60a5fa', weight: 1.0, opacity: 0.85, defaultVisible: true,  zIndex: 65 },
   { name: 'VANO-PUERTAS',      label: 'Puertas',          group: 'detalle',       color: '#22d3ee', weight: 1.5, opacity: 0.95, defaultVisible: true,  zIndex: 68 },
   { name: 'VANO-ANTEPECHOS',   label: 'Antepechos',       group: 'detalle',       color: '#7dd3fc', weight: 0.8, opacity: 0.6,  defaultVisible: false, zIndex: 55 },
+
+  // ─── Indicadores ─────────────────────────────────────────────────────
+  { name: 'A_INDICADORES',     label: 'Indicadores',      group: 'detalle',       color: '#34d399', weight: 1.2, opacity: 0.9,  defaultVisible: true,  zIndex: 72 },
+  { name: 'ESCALERAS',         label: 'Escaleras',        group: 'detalle',       color: '#6ee7b7', weight: 1.5, opacity: 0.9,  defaultVisible: true,  zIndex: 66 },
+
+  // ─── Equipos ─────────────────────────────────────────────────────────
+  { name: 'EQP-INSERTS',                   label: 'Equipos (posición)',   group: 'instalaciones', color: '#f97316', weight: 1.5, opacity: 0.9,  defaultVisible: true,  zIndex: 95, interactive: true },
+  { name: 'P-EQUIPO_EXISTENTE',            label: 'Equipos existentes',   group: 'instalaciones', color: '#fb923c', weight: 1.2, opacity: 0.85, defaultVisible: true,  zIndex: 85 },
+  { name: 'P-CINTA_MODIFICADA',            label: 'Cintas modificadas',   group: 'instalaciones', color: '#fbbf24', weight: 1.5, opacity: 0.9,  defaultVisible: true,  zIndex: 87 },
+  { name: 'P-EQUIPO_REUBICADO',            label: 'Equipos reubicados',   group: 'instalaciones', color: '#c084fc', weight: 1.2, opacity: 0.85, defaultVisible: true,  zIndex: 86 },
+  { name: 'EQP-EQUIPOS_-_SITUACION_P0',    label: 'Situación P0',         group: 'instalaciones', color: '#fde68a', weight: 1.0, opacity: 0.75, defaultVisible: false, zIndex: 82 },
+  { name: 'EQP-EQUIPOS_-_SITUACION_P3',    label: 'Situación P3',         group: 'instalaciones', color: '#fcd34d', weight: 1.0, opacity: 0.75, defaultVisible: false, zIndex: 81 },
 
   // ─── Nomenclatura ────────────────────────────────────────────────────
   { name: 'A_TEXTOLOCAL',      label: 'Etiquetas salas',  group: 'otros',         color: '#94a3b8', weight: 0.5, opacity: 0.7,  defaultVisible: true,  zIndex: 50 },

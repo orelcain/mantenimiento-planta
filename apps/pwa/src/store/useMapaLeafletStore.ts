@@ -135,6 +135,10 @@ interface MapaLeafletState {
   deleteNivel: (id: string) => void
   setCurrentNivel: (id: string | null) => void
 
+  /** Vista 3D wireframe activa (true = 3D, false = 2D Leaflet) */
+  view3DMode: boolean
+  toggleView3DMode: () => void
+
   toggleMeasureMode: () => void
   addMeasureSegment: (dist: number) => void
   setMeasurePointCount: (n: number) => void
@@ -164,6 +168,9 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
       grillaAngles: { recinto: 0, interior: 0 } as Record<string, number>,
       toggleGrilla:   () => set((s) => ({ grillaVisible: !s.grillaVisible })),
       setGrillaAngle: (view, a) => set((s) => ({ grillaAngles: { ...s.grillaAngles, [view]: a } })),
+
+      view3DMode: false,
+      toggleView3DMode: () => set((s) => ({ view3DMode: !s.view3DMode })),
 
       measureMode: false,
       measureSegments: [],

@@ -8,9 +8,10 @@
  * Editor: zonas, equipos y formas custom (Geoman). Persistencia local.
  */
 
-import { Map as MapIcon, Building2, Globe2, Ruler, LayoutGrid, BoxSelect, Layers, Plus, Trash2, ChevronDown } from 'lucide-react'
+import { Map as MapIcon, Building2, Globe2, Ruler, LayoutGrid, BoxSelect, Layers, Plus, Trash2, ChevronDown, Box } from 'lucide-react'
 import { useRef, useState, useEffect, useMemo } from 'react'
 import { PlantaLeafletEditable, PanelCapasYZonas } from '@/components/map/leaflet-editable'
+import { Wireframe3DView } from '@/components/map/wireframe3d'
 import { useMapaLeafletStore, type Nivel } from '@/store/useMapaLeafletStore'
 import { MAP_VIEWS, type ViewName } from '@/data/dxfLayers'
 
@@ -197,15 +198,17 @@ function NivelSelector({ view }: { view: ViewName }) {
 }
 
 export function MapaPlantaPage() {
-  const currentView       = useMapaLeafletStore((s) => s.currentView)
-  const setView           = useMapaLeafletStore((s) => s.setView)
-  const measureMode       = useMapaLeafletStore((s) => s.measureMode)
-  const toggleMeasureMode = useMapaLeafletStore((s) => s.toggleMeasureMode)
-  const grillaVisible     = useMapaLeafletStore((s) => s.grillaVisible)
-  const toggleGrilla      = useMapaLeafletStore((s) => s.toggleGrilla)
-  const editMode          = useMapaLeafletStore((s) => s.editMode)
-  const boxSelectMode     = useMapaLeafletStore((s) => s.boxSelectMode)
-  const toggleBoxSelect   = useMapaLeafletStore((s) => s.toggleBoxSelectMode)
+  const currentView        = useMapaLeafletStore((s) => s.currentView)
+  const setView            = useMapaLeafletStore((s) => s.setView)
+  const measureMode        = useMapaLeafletStore((s) => s.measureMode)
+  const toggleMeasureMode  = useMapaLeafletStore((s) => s.toggleMeasureMode)
+  const grillaVisible      = useMapaLeafletStore((s) => s.grillaVisible)
+  const toggleGrilla       = useMapaLeafletStore((s) => s.toggleGrilla)
+  const editMode           = useMapaLeafletStore((s) => s.editMode)
+  const boxSelectMode      = useMapaLeafletStore((s) => s.boxSelectMode)
+  const toggleBoxSelect    = useMapaLeafletStore((s) => s.toggleBoxSelectMode)
+  const view3DMode         = useMapaLeafletStore((s) => s.view3DMode)
+  const toggleView3DMode   = useMapaLeafletStore((s) => s.toggleView3DMode)
 
   return (
     <div className="flex flex-col h-screen bg-gray-950 overflow-hidden">
@@ -272,8 +275,23 @@ export function MapaPlantaPage() {
           )}
         </div>
 
+        {/* Toggle 2D / 3D */}
+        <button
+          onClick={toggleView3DMode}
+          title={view3DMode ? 'Volver a vista 2D' : 'Ver blueprint 3D isométrico'}
+          className={[
+            'flex items-center gap-1 text-[11px] px-2 sm:px-3 py-1.5 rounded-lg transition-all border',
+            view3DMode
+              ? 'bg-indigo-600/25 border-indigo-500/70 text-indigo-300 shadow-[0_0_8px_rgba(99,102,241,0.35)]'
+              : 'border-gray-700/60 text-gray-400 hover:text-indigo-300 hover:border-indigo-700/50',
+          ].join(' ')}
+        >
+          <Box size={12} />
+          <span className="hidden sm:inline">{view3DMode ? '3D' : '3D'}</span>
+        </button>
+
         {/* Selector de nivel/piso */}
-        <NivelSelector view={currentView} />
+        {!view3DMode && <NivelSelector view={currentView} />}
 
         {/* Vista — icono + label corto en móvil */}
         <div className="flex items-center bg-gray-800 rounded-lg p-0.5 gap-0.5 shrink-0">
@@ -300,8 +318,15 @@ export function MapaPlantaPage() {
 
       {/* ── Mapa + panel ─────────────────────────────────────────────────── */}
       <main className="flex-1 relative overflow-hidden">
-        <PlantaLeafletEditable />
-        <PanelCapasYZonas />
+        {/* 2D — siempre montado (Leaflet no tolera re-init) */}
+        <div className={`absolute inset-0 ${view3DMode ? 'invisible pointer-events-none' : ''}`}>
+          <PlantaLeafletEditable />
+          <PanelCapasYZonas />
+        </div>
+        {/* 3D — siempre montado (contexto WebGL persiste, se muestra/oculta con opacity) */}
+        <div className={`absolute inset-0 transition-opacity duration-200 ${view3DMode ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+          <Wireframe3DView />
+        </div>
       </main>
     </div>
   )
