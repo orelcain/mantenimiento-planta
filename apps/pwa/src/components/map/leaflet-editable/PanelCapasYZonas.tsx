@@ -62,9 +62,15 @@ export function PanelCapasYZonas() {
     updateElemento, deleteElemento, addElemento,
   } = useMapaLeafletStore()
 
-  // Filtra elementos a los de la vista activa
+  // Elementos de la vista activa (sin cotas — van en su propia sección)
   const elementos = useMemo(
-    () => allElementos.filter((e) => e.mapView === currentView),
+    () => allElementos.filter((e) => e.mapView === currentView && e.tipo !== 'cota'),
+    [allElementos, currentView],
+  )
+
+  // Cotas de la vista activa, agrupadas por categoría
+  const cotasElementos = useMemo(
+    () => allElementos.filter((e) => e.mapView === currentView && e.tipo === 'cota'),
     [allElementos, currentView],
   )
 
@@ -75,6 +81,7 @@ export function PanelCapasYZonas() {
   const [filtro, setFiltro]         = useState('')
   const [filtroCat, setFiltroCat]   = useState<'all' | ZonaCategoria>('all')
   const [confirmDel, setConfirmDel] = useState(false)
+  const [cotasExpanded, setCotasExpanded] = useState(true)
   const nameInputRef = useRef<HTMLInputElement>(null)
 
   const selectedEl = useMemo(
@@ -127,9 +134,9 @@ export function PanelCapasYZonas() {
             tab === 'zonas' ? 'bg-gray-800 text-amber-400' : 'text-gray-500 hover:text-gray-300'
           }`}
         >
-          Zonas / Equipos {elementos.length > 0 && (
+          Zonas / Equipos {(elementos.length + cotasElementos.length) > 0 && (
             <span className="ml-1 text-[9px] px-1 py-0.5 bg-amber-900/40 text-amber-300 rounded">
-              {elementos.length}
+              {elementos.length + cotasElementos.length}
             </span>
           )}
         </button>
@@ -287,11 +294,84 @@ export function PanelCapasYZonas() {
               </div>
             )}
 
+            {/* ── Sección Cotas ─────────────────────────────────────── */}
+            {cotasElementos.length > 0 && (
+              <div className="border-t border-gray-700/30 pt-2 mt-1">
+                <button
+                  onClick={() => setCotasExpanded((v) => !v)}
+                  className="w-full flex items-center justify-between px-1 mb-1 group"
+                >
+                  <span className="text-[9px] uppercase tracking-wider font-semibold text-slate-400 group-hover:text-slate-300">
+                    Cotas
+                  </span>
+                  <span className="text-[9px] text-slate-500">
+                    {cotasElementos.length} {cotasExpanded ? '▲' : '▼'}
+                  </span>
+                </button>
+
+                {cotasExpanded && (
+                  <div className="flex flex-col gap-0.5">
+                    {/* Agrupa por categoría */}
+                    {CATEGORIAS.filter((cat) => cotasElementos.some((c) => c.categoria === cat.value)).map((cat) => (
+                      <div key={cat.value} className="mb-1.5">
+                        <div className="flex items-center gap-1 px-1 mb-0.5">
+                          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />
+                          <span className="text-[9px] text-gray-500 font-semibold">{cat.label}</span>
+                        </div>
+                        {cotasElementos.filter((c) => c.categoria === cat.value).map((cota) => (
+                          <button
+                            key={cota.id}
+                            onClick={() => setSelectedId(cota.id === selectedId ? null : cota.id)}
+                            className={`w-full flex items-center gap-2 px-2 py-1 rounded text-left transition-all border ${
+                              selectedId === cota.id
+                                ? 'bg-slate-800/60 border-slate-600/60'
+                                : 'border-transparent hover:bg-gray-800/60'
+                            }`}
+                          >
+                            <span className="text-[10px] text-slate-300 flex-1 truncate">
+                              {cota.nombre || <span className="italic text-slate-600">(sin etiqueta)</span>}
+                            </span>
+                            <span className="text-[10px] font-mono text-slate-400 shrink-0">
+                              {((cota.meta?.totalM as number | undefined) ?? 0).toFixed(2)} m
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    ))}
+                    {/* Cotas sin categoría clasificada */}
+                    {cotasElementos.filter((c) => !CATEGORIAS.some((cat) => cat.value === c.categoria)).map((cota) => (
+                      <button
+                        key={cota.id}
+                        onClick={() => setSelectedId(cota.id === selectedId ? null : cota.id)}
+                        className={`w-full flex items-center gap-2 px-2 py-1 rounded text-left transition-all border ${
+                          selectedId === cota.id
+                            ? 'bg-slate-800/60 border-slate-600/60'
+                            : 'border-transparent hover:bg-gray-800/60'
+                        }`}
+                      >
+                        <span className="text-[10px] text-slate-300 flex-1 truncate">
+                          {cota.nombre || <span className="italic text-slate-600">(sin etiqueta)</span>}
+                        </span>
+                        <span className="text-[10px] font-mono text-slate-400 shrink-0">
+                          {((cota.meta?.totalM as number | undefined) ?? 0).toFixed(2)} m
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Detalle del seleccionado */}
             {selectedEl && (
               <div className="border-t border-gray-700/50 pt-3 mt-1 flex flex-col gap-2.5">
                 <div className="flex items-center gap-2">
                   <TipoBadge tipo={selectedEl.tipo} />
+                  {selectedEl.tipo === 'cota' && typeof selectedEl.meta?.totalM === 'number' && (
+                    <span className="text-[9px] text-slate-300 font-mono font-bold">
+                      {(selectedEl.meta.totalM as number).toFixed(2)} m
+                    </span>
+                  )}
                   {typeof selectedEl.meta?.area_m2 === 'number' && (
                     <span className="text-[9px] text-gray-400 font-mono">
                       {selectedEl.meta.area_m2} m²
@@ -305,11 +385,13 @@ export function PanelCapasYZonas() {
                 </div>
 
                 <div>
-                  <label className="text-[9px] uppercase text-gray-500 font-semibold">Nombre</label>
+                  <label className="text-[9px] uppercase text-gray-500 font-semibold">
+                    {selectedEl.tipo === 'cota' ? 'Etiqueta' : 'Nombre'}
+                  </label>
                   <input
                     ref={nameInputRef}
                     data-name-input="true"
-                    placeholder="Ej: Sala calderas"
+                    placeholder={selectedEl.tipo === 'cota' ? 'Ej: Ancho paletizado' : 'Ej: Sala calderas'}
                     className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-[11px] text-white mt-0.5 focus:border-amber-500/60 focus:outline-none"
                     value={selectedEl.nombre}
                     onChange={(e) => updateElemento(selectedEl.id, { nombre: e.target.value })}
@@ -317,7 +399,9 @@ export function PanelCapasYZonas() {
                 </div>
 
                 <div>
-                  <label className="text-[9px] uppercase text-gray-500 font-semibold">Categoría</label>
+                  <label className="text-[9px] uppercase text-gray-500 font-semibold">
+                    {selectedEl.tipo === 'cota' ? 'Área' : 'Categoría'}
+                  </label>
                   <select
                     className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-[11px] text-white mt-0.5 focus:border-amber-500/60 focus:outline-none"
                     value={selectedEl.categoria}
@@ -327,29 +411,31 @@ export function PanelCapasYZonas() {
                   </select>
                 </div>
 
-                <div>
-                  <label className="text-[9px] uppercase text-gray-500 font-semibold">Estado</label>
-                  <div className="flex gap-1 mt-0.5">
-                    {ESTADOS.map((s) => {
-                      const active = selectedEl.estado === s.value
-                      return (
-                        <button
-                          key={s.value}
-                          onClick={() => updateElemento(selectedEl.id, { estado: s.value })}
-                          className={`flex-1 text-[10px] py-1 rounded border transition-all ${
-                            active ? 'font-semibold' : 'border-gray-700 text-gray-500 hover:text-gray-300'
-                          }`}
-                          style={active
-                            ? { color: s.color, borderColor: s.color, backgroundColor: s.color + '22' }
-                            : {}}
-                        >
-                          {active && <Check size={10} className="inline -mt-0.5 mr-0.5" />}
-                          {s.label}
-                        </button>
-                      )
-                    })}
+                {selectedEl.tipo !== 'cota' && (
+                  <div>
+                    <label className="text-[9px] uppercase text-gray-500 font-semibold">Estado</label>
+                    <div className="flex gap-1 mt-0.5">
+                      {ESTADOS.map((s) => {
+                        const active = selectedEl.estado === s.value
+                        return (
+                          <button
+                            key={s.value}
+                            onClick={() => updateElemento(selectedEl.id, { estado: s.value })}
+                            className={`flex-1 text-[10px] py-1 rounded border transition-all ${
+                              active ? 'font-semibold' : 'border-gray-700 text-gray-500 hover:text-gray-300'
+                            }`}
+                            style={active
+                              ? { color: s.color, borderColor: s.color, backgroundColor: s.color + '22' }
+                              : {}}
+                          >
+                            {active && <Check size={10} className="inline -mt-0.5 mr-0.5" />}
+                            {s.label}
+                          </button>
+                        )
+                      })}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Acciones del elemento */}
                 <div className="flex gap-1 mt-1">

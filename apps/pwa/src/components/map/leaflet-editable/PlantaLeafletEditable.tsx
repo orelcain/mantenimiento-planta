@@ -620,39 +620,58 @@ function MeasureTool({ view }: { view: MapView }) {
 
 // ─── Cotas permanentes guardadas ─────────────────────────────────────────────
 function CapaCotas({ view }: { view: MapView }) {
-  const map        = useMap()
+  const map          = useMap()
   const allElementos = useMapaLeafletStore((s) => s.elementos)
   const cotas = useMemo(
     () => allElementos.filter((e) => e.tipo === 'cota' && e.mapView === view.name),
     [allElementos, view.name],
   )
-  const layersRef = useRef<Map<string, L.Layer[]>>(new Map())
+  const layersRef    = useRef<Map<string, L.Layer[]>>(new Map())
+  const updatedAtRef = useRef<Map<string, number>>(new Map())
 
   useEffect(() => {
     if (!map) return
-    const current = layersRef.current
+    const current   = layersRef.current
+    const updatedAt = updatedAtRef.current
 
     // Elimina cotas que ya no están en el store
     for (const [id, layers] of current.entries()) {
       if (!cotas.find((c) => c.id === id)) {
         layers.forEach((l) => { try { map.removeLayer(l) } catch { /* ok */ } })
         current.delete(id)
+        updatedAt.delete(id)
       }
     }
 
     for (const cota of cotas) {
-      if (current.has(cota.id)) continue
+      // Re-renderiza si el nombre (u otro campo) cambió
+      const lastAt = updatedAt.get(cota.id)
+      if (lastAt !== undefined && lastAt >= cota.updatedAt) continue
+
+      // Limpia capas previas antes de re-renderizar
+      const oldLayers = current.get(cota.id)
+      if (oldLayers) {
+        oldLayers.forEach((l) => { try { map.removeLayer(l) } catch { /* ok */ } })
+        current.delete(cota.id)
+      }
+
       const meta = cota.meta as { points?: [number, number][]; totalM?: number } | undefined
       if (!meta?.points || meta.points.length < 2) continue
 
-      const latlngs = meta.points.map((p) => L.latLng(p[0], p[1]))
+      const latlngs   = meta.points.map((p) => L.latLng(p[0], p[1]))
       const layers: L.Layer[] = []
+      const totalM    = (meta.totalM as number | undefined) ?? 0
+      const measLabel = `${totalM.toFixed(2)} m`
+      // Muestra "Etiqueta · 3.74 m" o solo "3.74 m" si no hay etiqueta
+      const displayLabel = cota.nombre && cota.nombre !== measLabel
+        ? `${cota.nombre} · ${measLabel}`
+        : measLabel
 
       // Línea cota
       const line = L.polyline(latlngs, {
         color: '#94a3b8', weight: 1.5, dashArray: '6 4', interactive: true, opacity: 0.85,
       })
-      line.bindPopup(`<div style="font-size:11px;color:#fbbf24;font-weight:600">${cota.nombre}</div>`)
+      line.bindPopup(`<div style="font-size:11px;color:#fbbf24;font-weight:600">${displayLabel}</div>`)
       line.addTo(map)
       layers.push(line)
 
@@ -663,9 +682,9 @@ function CapaCotas({ view }: { view: MapView }) {
         const lbl = L.marker(midPt, {
           icon: L.divIcon({
             className: 'cota-label-container',
-            html: `<span class="cota-label">${cota.nombre}</span>`,
-            iconSize:   [90, 20],
-            iconAnchor: [45, 20],
+            html: `<span class="cota-label">${displayLabel}</span>`,
+            iconSize:   [130, 20],
+            iconAnchor: [65, 20],
           }),
           interactive: false, zIndexOffset: 500,
         }).addTo(map)
@@ -684,6 +703,7 @@ function CapaCotas({ view }: { view: MapView }) {
       }
 
       current.set(cota.id, layers)
+      updatedAt.set(cota.id, cota.updatedAt)
     }
   }, [map, cotas])
 
@@ -780,6 +800,8 @@ function MeasureOverlay() {
   const clearMeasurements    = useMapaLeafletStore((s) => s.clearMeasurements)
   const addElemento          = useMapaLeafletStore((s) => s.addElemento)
 
+  const [cotaNombre, setCotaNombre] = useState('')
+
   const total = measureSegments.reduce((a, d) => a + d, 0)
   const tag   = measureLastAngle !== null ? angleTag(measureLastAngle) : null
 
@@ -787,7 +809,7 @@ function MeasureOverlay() {
     if (measureCurrentPoints.length < 2 || measureSegments.length === 0) return
     addElemento({
       tipo: 'cota',
-      nombre: `${total.toFixed(2)} m`,
+      nombre: cotaNombre.trim(),   // vacío = solo muestra la medida
       categoria: 'otros',
       estado: 'operativo',
       mapView: currentView,
@@ -798,6 +820,7 @@ function MeasureOverlay() {
         angle:    measureLastAngle,
       },
     })
+    setCotaNombre('')
     clearMeasurements()
   }
 
@@ -857,9 +880,17 @@ function MeasureOverlay() {
                 <span className="font-mono font-bold text-white">{total.toFixed(2)} m</span>
               </div>
             )}
-            <div className="flex gap-2 mt-2 pt-1.5 border-t border-gray-800">
+            <div className="flex flex-col gap-1 mt-2 pt-1.5 border-t border-gray-800">
+              <input
+                type="text"
+                value={cotaNombre}
+                onChange={(e) => setCotaNombre(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleGuardarCota()}
+                placeholder="Etiqueta (ej: Ancho paletizado)"
+                className="pointer-events-auto w-full text-[10px] bg-gray-800/80 border border-gray-700/60 rounded px-2 py-1 text-gray-200 placeholder-gray-600 focus:outline-none focus:border-amber-600/60"
+              />
               <button
-                className="pointer-events-auto flex-1 text-[10px] py-1 rounded-md bg-amber-600/20 border border-amber-600/50 text-amber-400 hover:bg-amber-600/35 transition-colors"
+                className="pointer-events-auto w-full text-[10px] py-1 rounded-md bg-amber-600/20 border border-amber-600/50 text-amber-400 hover:bg-amber-600/35 transition-colors"
                 onClick={handleGuardarCota}
               >
                 Guardar cota
