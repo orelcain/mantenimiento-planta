@@ -217,5 +217,13 @@
   pointer-events: none !important;
 }
 .leaflet-overlay-pane svg.dxf-svg-overlay {
-  mix-blend-mode: screen;  /* permite que se lea sobre fondo oscuro */
+  mix-blend-mode: screen;  /* aditivo sobre fondo oscuro → tono blueprint */
+}
+/* Stroke no-escalable: el DXF SVG tiene viewBox 1M × 714K; sin esto las
+   líneas quedan a fracción de pixel y se ven invisibles. */
+.leaflet-overlay-pane svg.dxf-svg-overlay path {
+  vector-effect: non-scaling-stroke;
+  stroke-width: 1 !important;
+  stroke: #c8d8f0 !important;
+  fill: none !important;
 }

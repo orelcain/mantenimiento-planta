@@ -361,6 +361,16 @@ function angleTag(deg: number): string {
   return `${deg.toFixed(1)}°`
 }
 
+// ─── Tema blueprint: mismo estilo que Wireframe3DView ────────────────────────
+const BLUEPRINT_COLOR = '#c8d8f0'
+const BLUEPRINT_BG    = '#060e1a'
+const BLUEPRINT_ACCENT = '#fbbf24'  // Ámbar para elementos interactivos (markers equipos)
+
+/** Opacidad por grupo — jerarquía visual del blueprint */
+const BLUEPRINT_OPACITY_BY_GROUP: Record<string, number> = {
+  cerco: 1.0, estructura: 0.95, instalaciones: 0.7, detalle: 0.55, otros: 0.35,
+}
+
 // ─── Carga perezosa de cada GeoJSON DXF ──────────────────────────────────────
 function CapaDXF({ cfg, folder }: { cfg: DxfLayerConfig; folder: string }) {
   const [data, setData] = useState<GeoJSON.FeatureCollection | null>(null)
@@ -393,30 +403,38 @@ function CapaDXF({ cfg, folder }: { cfg: DxfLayerConfig; folder: string }) {
 
   if (!data || !visible) return null
 
+  // Estilo blueprint: color uniforme salvo capas interactivas (markers equipos)
+  const isInteractive = cfg.interactive ?? false
+  const color = isInteractive ? BLUEPRINT_ACCENT : BLUEPRINT_COLOR
+  const groupOpacity = BLUEPRINT_OPACITY_BY_GROUP[cfg.group] ?? 0.5
+  const finalOpacity = isInteractive ? 1 : groupOpacity
+
   return (
     <GeoJSON
       data={data as GeoJSON.GeoJsonObject}
       coordsToLatLng={(c) => L.latLng(c[1], c[0])}
       style={{
-        color: cfg.color,
+        color,
         weight: Math.max(0.4, cfg.weight * zoomFactor * 0.8),
-        opacity: cfg.opacity,
-        fillColor: cfg.color,
-        fillOpacity: 0.06,
+        opacity: finalOpacity,
+        fillColor: color,
+        fillOpacity: isInteractive ? 0.15 : 0.04,
         lineCap: 'round',
         lineJoin: 'round',
       }}
       pointToLayer={(_f, latlng) =>
         L.circleMarker(latlng, {
           radius: Math.max(2, 3.5 * zoomFactor * 0.5),
-          color: cfg.color, fillColor: cfg.color, fillOpacity: 0.75, weight: 1.5,
+          color, fillColor: color,
+          fillOpacity: isInteractive ? 0.85 : 0.5,
+          weight: 1.5,
         })
       }
-      onEachFeature={cfg.interactive ? (feature, layer) => {
+      onEachFeature={isInteractive ? (feature, layer) => {
         const block = feature.properties?.block as string | undefined
         if (block) layer.bindTooltip(block, { sticky: true, className: 'eqp-tooltip' })
       } : undefined}
-      interactive={cfg.interactive ?? false}
+      interactive={isInteractive}
     />
   )
 }
@@ -1574,7 +1592,7 @@ export function PlantaLeafletEditable() {
         zoomControl={false}
         crs={L.CRS.Simple}
         className="w-full h-full"
-        style={{ background: '#0a0e14' }}
+        style={{ background: BLUEPRINT_BG }}
       >
         <MapContents view={view} />
       </MapContainer>
