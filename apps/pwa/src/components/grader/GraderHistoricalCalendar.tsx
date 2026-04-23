@@ -19,7 +19,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from '@/components/ui'
-import { ChevronLeft, ChevronRight, Loader2, Clock, Database, Eye, Trash2, AlertTriangle, Sun, Moon, Wrench, Tag } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, Clock, Database, Eye, Trash2, AlertTriangle, Sun, Moon, Wrench, Tag, GitCompare } from 'lucide-react'
 import { QuickGateChangeButton } from './QuickGateChangeButton'
 import { listSnapshots } from '@/services/grader/graderConfigSnapshot.service'
 import { cn } from '@/lib/utils'
@@ -41,6 +41,7 @@ import {
   normalizeShiftSchedule,
 } from '@/services/grader/graderShiftSchedule'
 import type { GraderUpload, GraderDailySummary } from '@/services/grader/types'
+import { DayComparisonModal } from './DayComparisonModal'
 import { useAuthStore } from '@/store'
 import { useGraderSelectionStore } from '@/store/graderSelectionStore'
 
@@ -181,6 +182,8 @@ export function GraderHistoricalCalendar({
   const [configChangeCounts, setConfigChangeCounts] = useState<Map<string, number>>(new Map())
   // M9 — Filtro "solo turnos con pausas sin anotar"
   const [filterUntagged, setFilterUntagged] = useState(false)
+  // M12 — Modal comparación día vs noche
+  const [showComparison, setShowComparison] = useState(false)
   // summaryId → cantidad de pausas sin tag (calculado lazy cuando el filtro está activo)
   const [untaggedCounts, setUntaggedCounts] = useState<Map<string, number>>(new Map())
   const [loadingUntagged, setLoadingUntagged] = useState(false)
@@ -765,10 +768,30 @@ export function GraderHistoricalCalendar({
           {/* ── Datos históricos (carga masiva) ── */}
           {selectedKey && (historicalByDate.get(selectedKey) ?? []).length > 0 && (
             <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 uppercase tracking-wide">
-                <Database className="h-3.5 w-3.5" />
-                Historial guardado
-              </p>
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 uppercase tracking-wide">
+                  <Database className="h-3.5 w-3.5" />
+                  Historial guardado
+                </p>
+                {/* M12 — Botón comparación D↔N (solo cuando hay ambos turnos) */}
+                {(() => {
+                  const hists = historicalByDate.get(selectedKey) ?? []
+                  const hasDia   = hists.some((h) => h.shiftId === 'Turno día')
+                  const hasNoche = hists.some((h) => h.shiftId === 'Turno noche')
+                  if (!hasDia || !hasNoche) return null
+                  return (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-6 text-[10px] gap-1 px-2 border-indigo-500/30 text-indigo-500 hover:bg-indigo-500/10"
+                      onClick={() => setShowComparison(true)}
+                    >
+                      <GitCompare className="h-3 w-3" />
+                      D↔N
+                    </Button>
+                  )
+                })()}
+              </div>
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
               {(historicalByDate.get(selectedKey) ?? [])
                 .sort((a, b) => {
@@ -1028,6 +1051,22 @@ export function GraderHistoricalCalendar({
           })()}
         </CardContent>
       </Card>
+
+      {/* M12 — Modal comparación día vs noche */}
+      {showComparison && selectedKey && (() => {
+        const hists = historicalByDate.get(selectedKey) ?? []
+        const dia   = hists.find((h) => h.shiftId === 'Turno día')
+        const noche = hists.find((h) => h.shiftId === 'Turno noche')
+        if (!dia || !noche) return null
+        return (
+          <DayComparisonModal
+            open={showComparison}
+            onClose={() => setShowComparison(false)}
+            summaries={[dia, noche]}
+            dateKey={selectedKey}
+          />
+        )
+      })()}
     </div>
   )
 }
