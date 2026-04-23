@@ -385,6 +385,10 @@ export function AnalisisGraderWizardPage() {
       const batchId = crypto.randomUUID()
       const sourceNames = parsedData?.files.map((f) => f.name) ?? []
 
+      // Cargar PauseDetectorConfig guardada por el admin (M16) para re-detección consistente.
+      const moduleCfg = await getModuleRanges().catch(() => null)
+      const pauseDetectorCfg = moduleCfg?.pauseDetectorConfig
+
       // Calcular summaries + detectar pausas en el mismo pase.
       // Los agregados de pausas (totales) se embeben en el summary para
       // KPIs rápidos; el detalle se guarda en meta/pauses dentro del loop.
@@ -401,7 +405,7 @@ export function AnalisisGraderWizardPage() {
           }
           if (r.lot) prevLot = r.lot
         }
-        const det = detectPauses(tsSorted, raw.shiftId, loteChangeTsMs)
+        const det = detectPauses(tsSorted, raw.shiftId, loteChangeTsMs, pauseDetectorCfg)
         detectionByKey.set(key, det)
         return {
           ...raw,

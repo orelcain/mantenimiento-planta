@@ -6,7 +6,7 @@
  * (React Router decodifica automáticamente → `YYYY-MM-DD__Turno día`)
  */
 
-import { useEffect, useState, useMemo, useCallback } from 'react'
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useParams, useNavigate, Navigate } from 'react-router-dom'
 import { Button, Card, CardContent, Spinner, Badge } from '@/components/ui'
 import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag, FileText, WifiOff } from 'lucide-react'
@@ -35,6 +35,8 @@ import { PauseAnnotationDialog } from '@/components/grader/PauseAnnotationDialog
 import { resolveEffectiveTag } from '@/services/grader/graderPauseTags'
 import { exportTurnToPDF } from '@/services/grader/graderTurnToPDF'
 import { useOnlineStatus } from '@/hooks/useOnlineStatus'
+import { usePauseTags } from '@/hooks/usePauseTags'
+import { useToast } from '@/hooks/useToast'
 import { ActionPlanPanel, deriveSuggestions } from '@/components/grader/ActionPlanPanel'
 import { findTriggeredRunbooks } from '@/services/grader/graderRunbooks'
 import { analyzeGraderFromSummary } from '@/services/grader/graderSummaryAI'
@@ -203,6 +205,13 @@ export function AnalisisGraderTurnoPage() {
   const user = useAuthStore((s) => s.user)
   const isAdmin = useIsAdmin()
   const isOnline = useOnlineStatus()        // M18 — detección de conectividad
+  const { toast } = useToast()
+  const prevIsOnline = useRef(isOnline)
+  const { tags: pauseTags } = usePauseTags()
+  const tagLabels = useMemo(
+    () => new Map(pauseTags.map((t) => [t.id, `${t.emoji} ${t.label}`])),
+    [pauseTags],
+  )
   const navigate = useNavigate()
   const { shiftId: rawShiftId } = useParams<{ shiftId: string }>()
 
@@ -222,6 +231,14 @@ export function AnalisisGraderTurnoPage() {
         : null,
     )
   }, [dateKey, shiftLabel])
+
+  // P1-2 — Toast al reconectar (false → true)
+  useEffect(() => {
+    if (!prevIsOnline.current && isOnline) {
+      toast({ title: '✅ Conexión restablecida', description: 'Cambios sincronizados.' })
+    }
+    prevIsOnline.current = isOnline
+  }, [isOnline, toast])
 
   // Auto-refresh cada minuto si el turno está en vivo.
   // Depende solo de `shiftWindow?.status` para evitar resetear el interval
@@ -494,7 +511,7 @@ export function AnalisisGraderTurnoPage() {
     if (!summary || pdfExporting) return
     setPdfExporting(true)
     try {
-      await exportTurnToPDF({ summary, pauses })
+      await exportTurnToPDF({ summary, pauses, tagLabels })
     } catch (err) {
       console.error('[M17] PDF export error:', err)
     } finally {

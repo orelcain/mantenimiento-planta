@@ -13,7 +13,7 @@
  * pero representan hora local de la planta (no UTC real). Para mostrar y editar
  * siempre usamos getUTCHours/Minutes — igual que `fmtTime` en ShiftTimelineView.
  */
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -83,20 +83,21 @@ const ACTION_LABEL: Record<PauseHistoryEntry['action'], string> = {
 }
 
 /** Fila del historial de cambios de una pausa. */
-function HistoryRow({ entry }: { entry: PauseHistoryEntry }) {
+function HistoryRow({ entry, tagLabels }: { entry: PauseHistoryEntry; tagLabels: Map<string, string> }) {
+  const resolveTag = (id: string | undefined) => (id ? (tagLabels.get(id) ?? id) : '–')
   const label = ACTION_LABEL[entry.action]
   const detail = (() => {
     if (entry.action === 'tag') {
       const parts: string[] = []
       if (entry.diff.tag) {
-        const old = entry.diff.tag.old ? `«${entry.diff.tag.old}»` : '–'
-        parts.push(`${old} → «${entry.diff.tag.new ?? '–'}»`)
+        const old = entry.diff.tag.old ? `«${resolveTag(entry.diff.tag.old)}»` : '–'
+        parts.push(`${old} → «${resolveTag(entry.diff.tag.new)}»`)
       }
       if (entry.diff.note?.new) parts.push(`nota: "${entry.diff.note.new}"`)
       return parts.join(', ')
     }
     if (entry.action === 'clear_tag') {
-      return entry.diff.tag?.old ? `«${entry.diff.tag.old}» eliminado` : 'tag eliminado'
+      return entry.diff.tag?.old ? `«${resolveTag(entry.diff.tag.old)}» eliminado` : 'tag eliminado'
     }
     if (entry.action === 'range') {
       const s = entry.diff.startAt ? `${fmtHHMM(entry.diff.startAt.old)} → ${fmtHHMM(entry.diff.startAt.new)}` : ''
@@ -128,6 +129,10 @@ export function PauseAnnotationDialog({
   isOnline = true,
 }: PauseAnnotationDialogProps) {
   const { tags } = usePauseTags()
+  const tagLabels = useMemo(
+    () => new Map(tags.map((t) => [t.id, `${t.emoji} ${t.label}`])),
+    [tags],
+  )
 
   // — Tag / nota —
   const [selectedTagId, setSelectedTagId] = useState<string | null>(null)
@@ -466,7 +471,7 @@ export function PauseAnnotationDialog({
                   <p className="text-xs text-muted-foreground py-1">Sin cambios registrados aún.</p>
                 ) : (
                   historyEntries.map((entry, idx) => (
-                    <HistoryRow key={idx} entry={entry} />
+                    <HistoryRow key={idx} entry={entry} tagLabels={tagLabels} />
                   ))
                 )}
               </div>
