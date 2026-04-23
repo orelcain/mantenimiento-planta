@@ -8,7 +8,7 @@
  * Editor: zonas, equipos y formas custom (Geoman). Persistencia local.
  */
 
-import { Map as MapIcon, Building2, Globe2, Ruler } from 'lucide-react'
+import { Map as MapIcon, Building2, Globe2, Ruler, LayoutGrid } from 'lucide-react'
 import { PlantaLeafletEditable, PanelCapasYZonas } from '@/components/map/leaflet-editable'
 import { useMapaLeafletStore } from '@/store/useMapaLeafletStore'
 import { MAP_VIEWS, type ViewName } from '@/data/dxfLayers'
@@ -24,10 +24,12 @@ const VIEW_DESC: Record<ViewName, string> = {
 }
 
 export function MapaPlantaPage() {
-  const currentView      = useMapaLeafletStore((s) => s.currentView)
-  const setView          = useMapaLeafletStore((s) => s.setView)
-  const measureMode      = useMapaLeafletStore((s) => s.measureMode)
+  const currentView       = useMapaLeafletStore((s) => s.currentView)
+  const setView           = useMapaLeafletStore((s) => s.setView)
+  const measureMode       = useMapaLeafletStore((s) => s.measureMode)
   const toggleMeasureMode = useMapaLeafletStore((s) => s.toggleMeasureMode)
+  const grillaVisible     = useMapaLeafletStore((s) => s.grillaVisible)
+  const toggleGrilla      = useMapaLeafletStore((s) => s.toggleGrilla)
 
   return (
     <div className="flex flex-col h-screen bg-gray-950 overflow-hidden">
@@ -46,20 +48,35 @@ export function MapaPlantaPage() {
           </div>
         </div>
 
-        {/* Herramienta Medir */}
-        <button
-          onClick={toggleMeasureMode}
-          title="Medir distancias (clic a clic)"
-          className={[
-            'flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg transition-all border',
-            measureMode
-              ? 'bg-amber-600/20 border-amber-600/60 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.25)]'
-              : 'border-gray-700/60 text-gray-400 hover:text-amber-400 hover:border-amber-700/50',
-          ].join(' ')}
-        >
-          <Ruler size={12} />
-          Medir
-        </button>
+        {/* Botones de herramientas */}
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={toggleMeasureMode}
+            title="Medir distancias (clic a clic)"
+            className={[
+              'flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg transition-all border',
+              measureMode
+                ? 'bg-amber-600/20 border-amber-600/60 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.25)]'
+                : 'border-gray-700/60 text-gray-400 hover:text-amber-400 hover:border-amber-700/50',
+            ].join(' ')}
+          >
+            <Ruler size={12} />
+            Medir
+          </button>
+          <button
+            onClick={toggleGrilla}
+            title="Grilla de referencia métrica con rotación"
+            className={[
+              'flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg transition-all border',
+              grillaVisible
+                ? 'bg-slate-600/25 border-slate-500/60 text-slate-300 shadow-[0_0_8px_rgba(148,163,184,0.2)]'
+                : 'border-gray-700/60 text-gray-400 hover:text-slate-300 hover:border-slate-600/50',
+            ].join(' ')}
+          >
+            <LayoutGrid size={12} />
+            Grilla
+          </button>
+        </div>
 
         {/* View switcher */}
         <div className="flex items-center bg-gray-800 rounded-lg p-0.5 gap-0.5">

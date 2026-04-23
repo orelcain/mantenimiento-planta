@@ -50,6 +50,178 @@ function polygonCenter(coords: PolygonCoords): L.LatLng {
   return L.latLng(lat, lng)
 }
 
+// ─── Grilla canvas ───────────────────────────────────────────────────────────
+/** Menor espaciado en metros tal que spacing * pixPerMeter ≥ 28px. */
+function adaptiveSpacingM(pixPerMeter: number): number {
+  for (const m of [0.1, 0.25, 0.5, 1, 2, 5, 10, 25, 50, 100, 250, 500]) {
+    if (m * pixPerMeter >= 28) return m
+  }
+  return 500
+}
+
+/** Dibuja líneas paralelas a `angleRad` separadas `spacingPx` px,
+ *  ancladas al punto (ax, ay) del canvas. */
+function drawParallelLines(
+  ctx: CanvasRenderingContext2D,
+  W: number, H: number,
+  angleRad: number, spacingPx: number,
+  ax: number, ay: number,
+) {
+  if (spacingPx < 2) return
+  const cos = Math.cos(angleRad), sin = Math.sin(angleRad)
+  const perpX = -sin, perpY = cos
+  const ext = Math.hypot(W, H) + spacingPx * 2
+  const phase = ((ax * perpX + ay * perpY) % spacingPx + spacingPx) % spacingPx
+  const n = Math.ceil(ext / spacingPx) + 2
+  ctx.beginPath()
+  for (let i = -n; i <= n; i++) {
+    const d = phase + i * spacingPx
+    const px = d * perpX, py = d * perpY
+    ctx.moveTo(px - ext * cos, py - ext * sin)
+    ctx.lineTo(px + ext * cos, py + ext * sin)
+  }
+  ctx.stroke()
+}
+
+/** Capa canvas con grilla de referencia métrica y ángulo ajustable. */
+function GrillaLayer({ view }: { view: MapView }) {
+  const map          = useMap()
+  const grillaVisible = useMapaLeafletStore((s) => s.grillaVisible)
+  const grillaAngle   = useMapaLeafletStore((s) => s.grillaAngle)
+  const canvasRef     = useRef<HTMLCanvasElement | null>(null)
+
+  useEffect(() => {
+    const container = map.getContainer()
+
+    const cleanup = () => {
+      if (canvasRef.current) { canvasRef.current.remove(); canvasRef.current = null }
+    }
+
+    if (!grillaVisible) { cleanup(); return }
+
+    if (!canvasRef.current) {
+      const cv = document.createElement('canvas')
+      cv.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;z-index:200;'
+      container.appendChild(cv)
+      canvasRef.current = cv
+    }
+
+    const draw = () => {
+      const cv = canvasRef.current
+      if (!cv) return
+      const sz = map.getSize()
+      cv.width = sz.x; cv.height = sz.y
+      const ctx = cv.getContext('2d')
+      if (!ctx) return
+      ctx.clearRect(0, 0, sz.x, sz.y)
+
+      // Pixels por metro real
+      const p0 = map.latLngToContainerPoint(L.latLng(0, 0))
+      const p1 = map.latLngToContainerPoint(L.latLng(0, 1 / view.unitScale))
+      const pixPerMeter = Math.abs(p1.x - p0.x)
+      if (pixPerMeter < 0.3) return
+
+      const minorM  = adaptiveSpacingM(pixPerMeter)
+      const minorPx = minorM * pixPerMeter
+      const majorPx = minorPx * 5
+
+      // Ancla en DXF (0, 0) → pixel del canvas
+      const anchor = map.latLngToContainerPoint(L.latLng(0, 0))
+      const aRad = grillaAngle * Math.PI / 180
+
+      // Grilla menor
+      ctx.strokeStyle = 'rgba(148,163,184,0.13)'
+      ctx.lineWidth = 0.5
+      for (const d of [0, 1]) {
+        drawParallelLines(ctx, sz.x, sz.y, aRad + d * Math.PI / 2, minorPx, anchor.x, anchor.y)
+      }
+      // Grilla mayor (×5)
+      if (majorPx > 15) {
+        ctx.strokeStyle = 'rgba(148,163,184,0.26)'
+        ctx.lineWidth = 0.9
+        for (const d of [0, 1]) {
+          drawParallelLines(ctx, sz.x, sz.y, aRad + d * Math.PI / 2, majorPx, anchor.x, anchor.y)
+        }
+      }
+
+      // Etiqueta de espaciado (esquina inferior izquierda del canvas)
+      ctx.fillStyle = 'rgba(148,163,184,0.5)'
+      ctx.font = '9px ui-monospace, monospace'
+      ctx.fillText(`${minorM < 1 ? minorM * 100 + 'cm' : minorM + 'm'} · ${grillaAngle !== 0 ? grillaAngle + '°' : 'sin rot.'}`, 6, sz.y - 6)
+    }
+
+    draw()
+    map.on('move zoom moveend zoomend', draw)
+    return () => {
+      map.off('move zoom moveend zoomend', draw)
+      cleanup()
+    }
+  }, [map, grillaVisible, grillaAngle, view])
+
+  return null
+}
+
+// ─── Overlay de grilla (controles ángulo, fuera del MapContainer) ─────────────
+function GrillaOverlay() {
+  const grillaAngle    = useMapaLeafletStore((s) => s.grillaAngle)
+  const setGrillaAngle = useMapaLeafletStore((s) => s.setGrillaAngle)
+  const [inputVal, setInputVal] = useState(String(grillaAngle))
+
+  // Sync slider → input
+  const handleSlider = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = Number(e.target.value)
+    setGrillaAngle(v)
+    setInputVal(String(v))
+  }
+  // Sync text input → slider
+  const handleText = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputVal(e.target.value)
+    const n = parseFloat(e.target.value)
+    if (!isNaN(n) && n >= -90 && n <= 90) setGrillaAngle(n)
+  }
+
+  return (
+    <div className="absolute bottom-16 left-3 z-[1000] pointer-events-none select-none">
+      <div className="bg-gray-900/95 border border-slate-700/60 rounded-xl shadow-xl px-4 py-3 w-52 backdrop-blur-sm">
+        <div className="flex items-center justify-between mb-2.5">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Grilla</span>
+          <button
+            className="pointer-events-auto text-[10px] text-gray-600 hover:text-amber-400 transition-colors"
+            onClick={() => { setGrillaAngle(0); setInputVal('0') }}
+          >
+            Reset
+          </button>
+        </div>
+
+        <label className="text-[9px] text-gray-500 block mb-1">
+          Rotación del edificio
+        </label>
+        <input
+          type="range"
+          min="-90" max="90" step="0.5"
+          value={grillaAngle}
+          onChange={handleSlider}
+          className="pointer-events-auto w-full accent-amber-500 mb-1.5"
+        />
+        <div className="flex items-center gap-2">
+          <span className="text-[9px] text-gray-600">-90°</span>
+          <input
+            type="number"
+            min="-90" max="90" step="0.5"
+            value={inputVal}
+            onChange={handleText}
+            className="pointer-events-auto flex-1 text-center text-[11px] font-mono bg-gray-800 border border-gray-700 rounded px-1 py-0.5 text-amber-400 focus:outline-none focus:border-amber-600"
+          />
+          <span className="text-[9px] text-gray-600">+90°</span>
+        </div>
+        <p className="text-[9px] text-gray-600 mt-2">
+          Ajustá hasta que la grilla se alinee con los muros
+        </p>
+      </div>
+    </div>
+  )
+}
+
 // ─── Snap helpers (herramienta medir) ───────────────────────────────────────
 /** Recorre un FeatureCollection GeoJSON y empuja todos los vértices a `out`.
  *  DXF guarda [X, Y] → Leaflet necesita lat=Y, lng=X. */
@@ -777,6 +949,7 @@ function MapContents({ view }: { view: MapView }) {
         <CapaDXF key={cfg.name} cfg={cfg} folder={view.folder} />
       ))}
 
+      <GrillaLayer view={view} />
       <CapaElementos view={view} />
       <CapaCotas view={view} />
       <EditorGeoman view={view} />
@@ -908,8 +1081,9 @@ function MeasureOverlay() {
 
 // ─── Componente principal — wrapper que reacciona al cambio de vista ─────────
 export function PlantaLeafletEditable() {
-  const currentView  = useMapaLeafletStore((s) => s.currentView)
-  const measureMode  = useMapaLeafletStore((s) => s.measureMode)
+  const currentView   = useMapaLeafletStore((s) => s.currentView)
+  const measureMode   = useMapaLeafletStore((s) => s.measureMode)
+  const grillaVisible = useMapaLeafletStore((s) => s.grillaVisible)
   const view = MAP_VIEWS[currentView]
 
   return (
@@ -930,7 +1104,8 @@ export function PlantaLeafletEditable() {
         <MapContents view={view} />
       </MapContainer>
 
-      {measureMode && <MeasureOverlay />}
+      {measureMode   && <MeasureOverlay />}
+      {grillaVisible && <GrillaOverlay />}
     </div>
   )
 }

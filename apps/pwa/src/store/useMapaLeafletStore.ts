@@ -45,6 +45,13 @@ interface MapaLeafletState {
   editMode: boolean
   capasVisibles: Record<string, boolean>   // capas DXF visibles por nombre
 
+  // ── Grilla ──────────────────────────────────────────────────────────────────
+  grillaVisible: boolean
+  /** Ángulo de rotación de la grilla en grados (0 = ejes DXF, ±45°) */
+  grillaAngle: number
+  toggleGrilla: () => void
+  setGrillaAngle: (a: number) => void
+
   // ── Medición ────────────────────────────────────────────────────────────────
   measureMode: boolean
   measureSegments: number[]       // distancias acumuladas en metros
@@ -87,6 +94,11 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
       selectedId: null,
       editMode: false,
       capasVisibles: {},
+      grillaVisible: false,
+      grillaAngle: 0,
+      toggleGrilla:   () => set((s) => ({ grillaVisible: !s.grillaVisible })),
+      setGrillaAngle: (a) => set({ grillaAngle: a }),
+
       measureMode: false,
       measureSegments: [],
       measurePointCount: 0,
@@ -165,6 +177,8 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
         elementos: s.elementos,
         capasVisibles: s.capasVisibles,
         currentView: s.currentView,
+        grillaVisible: s.grillaVisible,
+        grillaAngle: s.grillaAngle,
       }),
     },
   ),
