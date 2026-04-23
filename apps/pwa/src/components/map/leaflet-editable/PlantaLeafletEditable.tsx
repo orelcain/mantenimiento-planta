@@ -116,8 +116,9 @@ function GrillaLayer({ view }: { view: MapView }) {
       const oneMpx = Math.abs(p1.x - p0.x)
       if (oneMpx < 1.5) return   // demasiado alejado — invisible, no dibuja
 
-      // Ancla en DXF (0, 0) → pixel del canvas
-      const anchor = map.latLngToContainerPoint(L.latLng(0, 0))
+      // Ancla en esquina SW de la vista (siempre dentro del área visible → sin deriva float)
+      const swCorner = L.latLng(view.bounds[0][0], view.bounds[0][1])
+      const anchor = map.latLngToContainerPoint(swCorner)
       const aRad = grillaAngle * Math.PI / 180
 
       // Una sola grilla tenue uniforme — 1 m, sin doble nivel
@@ -219,8 +220,26 @@ function GrillaOverlay({ view }: { view: MapView }) {
           </div>
         </div>
 
+        {/* Presets rápidos */}
+        <div className="flex gap-1 mb-2">
+          {[0, 15, 30, 45].map((deg) => (
+            <button
+              key={deg}
+              className={[
+                'pointer-events-auto flex-1 text-[9px] py-0.5 rounded border transition-colors',
+                Math.abs(grillaAngle) === deg || Math.abs(grillaAngle) === 90 - deg
+                  ? 'border-amber-600/60 text-amber-400 bg-amber-600/10'
+                  : 'border-gray-700/50 text-gray-500 hover:text-white hover:border-gray-500',
+              ].join(' ')}
+              onClick={() => { setGrillaAngle(view.name, deg); setInputVal(String(deg)) }}
+            >
+              {deg === 0 ? 'H/V' : `${deg}°`}
+            </button>
+          ))}
+        </div>
+
         <label className="text-[9px] text-gray-500 block mb-1">
-          Alineación con muros ({grillaAngle}°)
+          Fino ({grillaAngle}°)
         </label>
         <input
           type="range"
