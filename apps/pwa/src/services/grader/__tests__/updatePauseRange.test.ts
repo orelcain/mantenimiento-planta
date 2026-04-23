@@ -68,7 +68,7 @@ const OTHER_PAUSE = {
   tier: 'larga' as const,
 }
 
-function mockDocExists(pauses: typeof BASE_PAUSE[]) {
+function mockDocExists(pauses: Array<typeof BASE_PAUSE | typeof OTHER_PAUSE>) {
   mockGetDoc.mockResolvedValueOnce({
     exists: () => true,
     data: () => ({

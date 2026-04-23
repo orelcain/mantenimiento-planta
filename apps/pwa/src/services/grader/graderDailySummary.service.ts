@@ -28,6 +28,7 @@ import {
   writeBatch,
   documentId,
   getCountFromServer,
+  onSnapshot,
 } from 'firebase/firestore'
 import { db } from '../firebase'
 import type { GraderDailySummary, TimelineBucket, Pause, MicroDetentionsSummary } from './types'
@@ -747,6 +748,33 @@ export async function loadPausesAggregates(
     pauses: data.pauses,
     microDetentions: data.microDetentions ?? { count: 0, totalSec: 0, byHour: {} },
   }
+}
+
+/**
+ * Suscripción en tiempo real al doc `meta/pauses` de un turno.
+ *
+ * Cuando otro admin anota o ajusta desde otro dispositivo, el callback se
+ * dispara automáticamente — sin necesidad de recargar la página.
+ *
+ * @returns función de limpieza (unsubscribe) que debe llamarse al desmontar.
+ */
+export function subscribePausesAggregates(
+  summaryId: string,
+  callback: (data: { pauses: Pause[]; microDetentions: MicroDetentionsSummary } | null) => void,
+): () => void {
+  const ref = firestoreDoc(db, COLLECTION, summaryId, TIMELINE_META_SUB, PAUSES_META_DOC)
+  return onSnapshot(
+    ref,
+    (snap) => {
+      if (!snap.exists()) { callback(null); return }
+      const data = snap.data() as Partial<PausesAggregatesDoc>
+      callback({
+        pauses: Array.isArray(data.pauses) ? data.pauses : [],
+        microDetentions: data.microDetentions ?? { count: 0, totalSec: 0, byHour: {} },
+      })
+    },
+    () => { callback(null) },
+  )
 }
 
 /**

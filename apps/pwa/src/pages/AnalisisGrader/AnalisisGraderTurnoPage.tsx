@@ -13,7 +13,7 @@ import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2,
 import { QRCodeSVG } from 'qrcode.react'
 import { usePermissionsStore } from '@/store'
 import { useAuthStore, useIsAdmin } from '@/store/authStore'
-import { getDailySummary, loadTimelineAggregates, loadPausesAggregates, listDailySummariesByRange, listGate0PieceRecords, type FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
+import { getDailySummary, loadTimelineAggregates, subscribePausesAggregates, listDailySummariesByRange, listGate0PieceRecords, type FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
 import { createPublicToken } from '@/services/grader/graderPublicToken.service'
 import type { Pause, MicroDetentionsSummary } from '@/services/grader/types'
 import { getModuleRanges } from '@/services/grader/graderModuleConfig.service'
@@ -444,32 +444,23 @@ export function AnalisisGraderTurnoPage() {
       .catch(() => {})
   }, [dateKey, shiftLabel])
 
-  // Carga pausas detectadas sub-collection (graderDailySummaries/{id}/meta/pauses)
-  // Fase 1 backfill pobló esto para los 383 turnos históricos. Turnos legacy
-  // sin backfill devuelven null → UI cae a arrays vacíos sin crashear.
-  //
-  // Extraído a callback para poder re-invocarse tras una anotación manual
-  // (Fase 3) sin recargar toda la página.
-  const reloadPauses = useCallback(() => {
-    if (!dateKey || !shiftLabel) return
-    loadPausesAggregates(`${dateKey}__${shiftLabel}`)
-      .then(data => {
-        if (!data) {
-          setPauses([])
-          setMicroDetentions(null)
-          return
-        }
-        setPauses(data.pauses)
-        setMicroDetentions(data.microDetentions)
-      })
-      .catch(() => {})
-  }, [dateKey, shiftLabel])
+  // Suscripción en tiempo real a `meta/pauses` — M8.
+  // onSnapshot propaga cambios de otros admins al instante (sin reload manual).
+  // reloadPauses se mantiene como no-op para compatibilidad con la prop
+  // onPauseUpdated de ShiftTimelineView.
+  const reloadPauses = useCallback(() => {}, [])
 
   useEffect(() => {
+    if (!dateKey || !shiftLabel) return
     setPauses([])
     setMicroDetentions(null)
-    reloadPauses()
-  }, [reloadPauses])
+    const unsub = subscribePausesAggregates(`${dateKey}__${shiftLabel}`, (data) => {
+      if (!data) { setPauses([]); setMicroDetentions(null); return }
+      setPauses(data.pauses)
+      setMicroDetentions(data.microDetentions)
+    })
+    return unsub
+  }, [dateKey, shiftLabel])
 
   // Carga pieceRecords gate=0 para drill-down en timeline
   useEffect(() => {
