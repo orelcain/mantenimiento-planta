@@ -13,14 +13,15 @@ import type { PauseHistoryEntry } from '../types'
 
 // ── Mocks hoistados ───────────────────────────────────────────────────────────
 
-const { mockGetDocs, mockCollection, mockQuery, mockOrderBy, mockWhere, mockAddDoc } = vi.hoisted(() => {
+const { mockGetDocs, mockCollection, mockQuery, mockOrderBy, mockWhere, mockAddDoc, mockLimitToLast } = vi.hoisted(() => {
   return {
-    mockGetDocs:    vi.fn(),
-    mockCollection: vi.fn(),
-    mockQuery:      vi.fn(),
-    mockOrderBy:    vi.fn(),
-    mockWhere:      vi.fn(),
-    mockAddDoc:     vi.fn(),
+    mockGetDocs:      vi.fn(),
+    mockCollection:   vi.fn(),
+    mockQuery:        vi.fn(),
+    mockOrderBy:      vi.fn(),
+    mockWhere:        vi.fn(),
+    mockAddDoc:       vi.fn(),
+    mockLimitToLast:  vi.fn(),
   }
 })
 
@@ -46,6 +47,7 @@ vi.mock('firebase/firestore', () => ({
   updateDoc:               vi.fn(),
   serverTimestamp:         vi.fn(),
   where:                   (...args: unknown[]) => mockWhere(...args),
+  limitToLast:             (...args: unknown[]) => mockLimitToLast(...args),
   writeBatch:              vi.fn(() => ({ set: vi.fn(), update: vi.fn(), commit: vi.fn() })),
   documentId:              vi.fn(),
   getDocsFromCache:        vi.fn(),
@@ -96,6 +98,7 @@ beforeEach(() => {
   mockQuery.mockReturnValue('query-ref')
   mockOrderBy.mockReturnValue('orderby-ref')
   mockWhere.mockReturnValue('where-ref')
+  mockLimitToLast.mockReturnValue('limittolast-ref')
 })
 
 describe('loadPauseHistory — filtrado server-side por pauseId (M13 + P1-4)', () => {
@@ -173,5 +176,13 @@ describe('loadPauseHistory — filtrado server-side por pauseId (M13 + P1-4)', (
       '2024-01-15__Turno día',
       'pauseHistory',
     )
+  })
+
+  it('llama a limitToLast(50) para limitar el audit log a los últimos 50 cambios (P2-3)', async () => {
+    mockFirestoreResult([])
+
+    await loadPauseHistory('2024-01-15__Turno día', 'p-1234-7m')
+
+    expect(mockLimitToLast).toHaveBeenCalledWith(50)
   })
 })

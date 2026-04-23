@@ -51,8 +51,10 @@ export async function exportTurnToPDF(params: {
   pauses: Pause[]
   /** Map<tagId, tagLabel> para mostrar nombre legible en lugar de id. */
   tagLabels?: Map<string, string>
+  /** Data URL PNG del gráfico ECharts (timeline P0% minuto a minuto). Si se provee, se inserta en el PDF antes de los KPIs. */
+  chartImageDataUrl?: string | null
 }): Promise<void> {
-  const { summary, pauses, tagLabels } = params
+  const { summary, pauses, tagLabels, chartImageDataUrl } = params
 
   // Carga dinámica — no penaliza el bundle principal
   const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
@@ -86,7 +88,24 @@ export async function exportTurnToPDF(params: {
   doc.line(MARGIN, y, pageW - MARGIN, y)
   y += 6
 
-  // ── 2. KPIs ────────────────────────────────────────────────────────────────
+  // ── 2. Timeline chart (si se provee imagen del gráfico ECharts) ───────────
+  if (chartImageDataUrl) {
+    const imgW = pageW - 2 * MARGIN
+    const imgH = 52
+    if (y + imgH + 12 > pageH - 20) { doc.addPage(); y = 14 }
+    doc.setFontSize(11)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Timeline del turno (P0% por minuto)', MARGIN, y)
+    y += 4
+    try {
+      doc.addImage(chartImageDataUrl, 'PNG', MARGIN, y, imgW, imgH)
+      y += imgH + 8
+    } catch {
+      // Si la imagen falla (ECharts aún no renderizado), continuar sin ella
+    }
+  }
+
+  // ── 3. KPIs ────────────────────────────────────────────────────────────────
   doc.setFontSize(11)
   doc.setFont('helvetica', 'bold')
   doc.text('KPIs del turno', MARGIN, y)
@@ -121,7 +140,7 @@ export async function exportTurnToPDF(params: {
   })
   y = doc.lastAutoTable.finalY + 8
 
-  // ── 3. Pausas ──────────────────────────────────────────────────────────────
+  // ── 4. Pausas ──────────────────────────────────────────────────────────────
   if (pauses.length > 0) {
     if (y > pageH - 40) { doc.addPage(); y = 14 }
     doc.setFontSize(11)
@@ -165,7 +184,7 @@ export async function exportTurnToPDF(params: {
     y = doc.lastAutoTable.finalY + 8
   }
 
-  // ── 4. Gates ───────────────────────────────────────────────────────────────
+  // ── 5. Gates ───────────────────────────────────────────────────────────────
   if (summary.gateDistribution && summary.gateDistribution.length > 0) {
     if (y > pageH - 50) { doc.addPage(); y = 14 }
     doc.setFontSize(11)
@@ -190,7 +209,7 @@ export async function exportTurnToPDF(params: {
     y = doc.lastAutoTable.finalY + 8
   }
 
-  // ── 5. Top causas P0 ───────────────────────────────────────────────────────
+  // ── 6. Top causas P0 ───────────────────────────────────────────────────────
   if (summary.topP0Causes && summary.topP0Causes.length > 0) {
     if (y > pageH - 50) { doc.addPage(); y = 14 }
     doc.setFontSize(11)

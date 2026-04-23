@@ -80,3 +80,30 @@ describe('detectShiftStatusFromData', () => {
     expect(detectShiftStatusFromData('invalid', 'Turno día')).toBe('closed')
   })
 })
+
+describe('computeShiftTimeWindow — edge cases', () => {
+  it('schedule vacío retorna closed', () => {
+    const now = new Date('2026-04-17T12:00:00')
+    const result = computeShiftTimeWindow('2026-04-17', 'Turno día', [], now)
+    expect(result.status).toBe('closed')
+  })
+
+  it('progressPct es monótonamente creciente durante el turno', () => {
+    const h7 = new Date('2026-04-17T07:00:00')
+    const h12 = new Date('2026-04-17T12:00:00')
+    const h18 = new Date('2026-04-17T18:00:00')
+    const r7  = computeShiftTimeWindow('2026-04-17', 'Turno día', SCHEDULE, h7)
+    const r12 = computeShiftTimeWindow('2026-04-17', 'Turno día', SCHEDULE, h12)
+    const r18 = computeShiftTimeWindow('2026-04-17', 'Turno día', SCHEDULE, h18)
+    expect(r7.progressPct).toBeLessThan(r12.progressPct!)
+    expect(r12.progressPct!).toBeLessThan(r18.progressPct!)
+  })
+
+  it('remainingMin disminuye a medida que avanza la hora', () => {
+    const h10 = new Date('2026-04-17T10:00:00')
+    const h14 = new Date('2026-04-17T14:00:00')
+    const r10 = computeShiftTimeWindow('2026-04-17', 'Turno día', SCHEDULE, h10)
+    const r14 = computeShiftTimeWindow('2026-04-17', 'Turno día', SCHEDULE, h14)
+    expect(r10.remainingMin!).toBeGreaterThan(r14.remainingMin!)
+  })
+})

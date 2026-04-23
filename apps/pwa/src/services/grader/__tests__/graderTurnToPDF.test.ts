@@ -17,6 +17,7 @@ const {
   MockJsPDF,
   mockAutoTable,
   mockSave,
+  mockAddImage,
   mockDoc,
 } = vi.hoisted(() => {
   const mockSave         = vi.fn()
@@ -28,6 +29,7 @@ const {
   const mockSetTextColor = vi.fn()
   const mockAddPage      = vi.fn()
   const mockSetPage      = vi.fn()
+  const mockAddImage     = vi.fn()
 
   const mockDoc = {
     save: mockSave,
@@ -39,6 +41,7 @@ const {
     setTextColor: mockSetTextColor,
     addPage: mockAddPage,
     setPage: mockSetPage,
+    addImage: mockAddImage,
     internal: { pageSize: { getWidth: () => 210, getHeight: () => 297 } },
     getNumberOfPages: () => 1,
     lastAutoTable: { finalY: 60 },
@@ -49,7 +52,7 @@ const {
   const MockJsPDF = vi.fn(function (): any { return mockDoc })
   const mockAutoTable = vi.fn()
 
-  return { MockJsPDF, mockAutoTable, mockSave, mockDoc }
+  return { MockJsPDF, mockAutoTable, mockSave, mockAddImage, mockDoc }
 })
 
 vi.mock('jspdf', () => ({ default: MockJsPDF }))
@@ -113,6 +116,7 @@ const PAUSES: Pause[] = [
 beforeEach(() => {
   vi.clearAllMocks()
   mockDoc.lastAutoTable = { finalY: 60 }
+  mockDoc.addImage = mockAddImage
   // Re-aplicar implementación del constructor tras clearAllMocks
   MockJsPDF.mockImplementation(function () { return mockDoc })
 })
@@ -192,6 +196,17 @@ describe('exportTurnToPDF — smoke (M17)', () => {
     const body = (pauseTableCall![1] as { body: string[][] }).body
     // autoTag sin tag manual → se muestra entre paréntesis
     expect(body[0]?.join(' ')).toContain('colacion')
+  })
+
+  it('inserta imagen en el PDF cuando se provee chartImageDataUrl (P2-1)', async () => {
+    const dataUrl = 'data:image/png;base64,iVBORw0KGgo='
+    await exportTurnToPDF({ summary: SUMMARY, pauses: [], chartImageDataUrl: dataUrl })
+    expect(mockAddImage).toHaveBeenCalledWith(dataUrl, 'PNG', expect.any(Number), expect.any(Number), expect.any(Number), expect.any(Number))
+  })
+
+  it('no llama a addImage cuando chartImageDataUrl no se provee', async () => {
+    await exportTurnToPDF({ summary: SUMMARY, pauses: [] })
+    expect(mockAddImage).not.toHaveBeenCalled()
   })
 
   it('genera menos llamadas a autoTable sin pausas que con pausas', async () => {

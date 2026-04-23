@@ -507,17 +507,19 @@ export function AnalisisGraderTurnoPage() {
 
   // M17 — Export PDF
   const [pdfExporting, setPdfExporting] = useState(false)
+  const chartImageRef = useRef<(() => string | null) | null>(null)
   const handleExportPdf = useCallback(async () => {
     if (!summary || pdfExporting) return
     setPdfExporting(true)
     try {
-      await exportTurnToPDF({ summary, pauses, tagLabels })
+      const chartImageDataUrl = chartImageRef.current?.() ?? null
+      await exportTurnToPDF({ summary, pauses, tagLabels, chartImageDataUrl })
     } catch (err) {
       console.error('[M17] PDF export error:', err)
     } finally {
       setPdfExporting(false)
     }
-  }, [summary, pauses, pdfExporting])
+  }, [summary, pauses, pdfExporting, tagLabels])
 
   const untaggedPauses = useMemo(
     () => pauses.filter(p => !resolveEffectiveTag(p)),
@@ -810,6 +812,7 @@ export function AnalisisGraderTurnoPage() {
             alertThreshold={alertThreshold}
             criticalThreshold={criticalThreshold}
             isOnline={isOnline}
+            chartImageRef={chartImageRef}
           />
 
           {/* Distribución por gate — balance del turno */}
