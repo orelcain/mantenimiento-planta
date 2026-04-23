@@ -1280,10 +1280,13 @@ function BoxSelect({ view }: { view: MapView }) {
   useEffect(() => {
     if (!map || !editMode) return
 
-    // Deshabilitar boxZoom de Leaflet (shift+drag zoom nativo)
     if (map.boxZoom) map.boxZoom.disable()
 
     const container = map.getContainer()
+
+    // Cursor crosshair en el mapa cuando el modo está activo
+    if (boxSelectMode) container.style.cursor = 'crosshair'
+
     let startLL: L.LatLng | null = null
     let startPt: { x: number; y: number } | null = null
     let rect: L.Rectangle | null = null
@@ -1296,14 +1299,15 @@ function BoxSelect({ view }: { view: MapView }) {
       return map.containerPointToLatLng(pt)
     }
 
-    const isClickableTarget = (t: EventTarget | null): boolean => {
+    const isControlTarget = (t: EventTarget | null): boolean => {
       const el = t as Element | null
-      if (!el || !el.closest) return false
-      // En modo botón (boxSelectMode): solo bloquear controles de UI, no capas interactivas del mapa
-      // En modo shift: bloquear también elementos interactivos para no interferir con click normal
-      if (boxSelectMode) {
-        return !!el.closest('.leaflet-popup, .leaflet-control')
-      }
+      if (!el?.closest) return false
+      return !!el.closest('.leaflet-popup, .leaflet-control')
+    }
+
+    const isInteractiveTarget = (t: EventTarget | null): boolean => {
+      const el = t as Element | null
+      if (!el?.closest) return false
       return !!el.closest('.leaflet-marker-icon, .leaflet-popup, .leaflet-interactive, .leaflet-control')
     }
 
@@ -1370,14 +1374,19 @@ function BoxSelect({ view }: { view: MapView }) {
     }
 
     // ── Mouse (desktop) ─────────────────────────────────────────────────
+    // Escuchar en document nivel captura: dispara ANTES del drag handler de Leaflet
+    // (que está en container bubble). Así map.dragging.disable() se llama primero.
     const onMouseDown = (ev: MouseEvent) => {
+      if (!container.contains(ev.target as Node)) return  // solo dentro del mapa
       const canBox = ev.shiftKey || boxSelectMode
       if (!canBox) return
-      if (isClickableTarget(ev.target)) return
+      // En modo botón solo bloqueamos controles; en modo shift también interactivos
+      if (boxSelectMode ? isControlTarget(ev.target) : isInteractiveTarget(ev.target)) return
+      // Deshabilitar drag de Leaflet antes de que su handler lo active
+      map.dragging.disable()
       ev.preventDefault()
-      ev.stopPropagation()
       beginDrag(ev.clientX, ev.clientY)
-      window.addEventListener('mousemove', onMouseMove, true)
+      window.addEventListener('mousemove', onMouseMove, { capture: true, passive: true })
       window.addEventListener('mouseup', onMouseUp, true)
     }
     const onMouseMove = (ev: MouseEvent) => updateDrag(ev.clientX, ev.clientY)
@@ -1387,15 +1396,17 @@ function BoxSelect({ view }: { view: MapView }) {
       endDrag(ev.clientX, ev.clientY)
     }
 
-    // ── Touch (mobile) — solo si boxSelectMode esta activo ──────────────
+    // ── Touch (mobile) ─────────────────────────────────────────────────
     const onTouchStart = (ev: TouchEvent) => {
       if (!boxSelectMode) return
       if (ev.touches.length !== 1) return
       const t = ev.touches[0]
       if (!t) return
-      if (isClickableTarget(t.target)) return
+      if (!container.contains(t.target as Node)) return
+      if (isControlTarget(t.target)) return
       ev.preventDefault()
       touchId = t.identifier
+      map.dragging.disable()
       beginDrag(t.clientX, t.clientY)
       window.addEventListener('touchmove', onTouchMove, { capture: true, passive: false })
       window.addEventListener('touchend', onTouchEnd, true)
@@ -1418,17 +1429,18 @@ function BoxSelect({ view }: { view: MapView }) {
       endDrag(t.clientX, t.clientY)
     }
 
-    container.addEventListener('mousedown', onMouseDown, true)
-    container.addEventListener('touchstart', onTouchStart, { capture: true, passive: false })
+    document.addEventListener('mousedown', onMouseDown, true)
+    document.addEventListener('touchstart', onTouchStart, { capture: true, passive: false })
     return () => {
-      container.removeEventListener('mousedown', onMouseDown, true)
-      container.removeEventListener('touchstart', onTouchStart, true)
+      document.removeEventListener('mousedown', onMouseDown, true)
+      document.removeEventListener('touchstart', onTouchStart, true)
       window.removeEventListener('mousemove', onMouseMove, true)
       window.removeEventListener('mouseup', onMouseUp, true)
       window.removeEventListener('touchmove', onTouchMove, true)
       window.removeEventListener('touchend', onTouchEnd, true)
       window.removeEventListener('touchcancel', onTouchEnd, true)
       if (rect) { map.removeLayer(rect); rect = null }
+      container.style.cursor = ''
       map.dragging.enable()
       if (map.boxZoom) map.boxZoom.enable()
     }
