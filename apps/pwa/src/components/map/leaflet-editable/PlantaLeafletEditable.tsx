@@ -143,7 +143,7 @@ function GrillaLayer({ view }: { view: MapView }) {
       const phase2 = gridPhase(originLL, aRad + Math.PI / 2, view.unitScale, oneMpx)
 
       // Clip al recinto + 100 m de margen (no dibuja fuera del área del mapa)
-      const marginDxf = 100 / view.unitScale
+      const marginDxf = 10 / view.unitScale
       const [swB, neB] = view.bounds
       const swPx = map.latLngToContainerPoint(L.latLng(swB[0] - marginDxf, swB[1] - marginDxf))
       const nePx = map.latLngToContainerPoint(L.latLng(neB[0] + marginDxf, neB[1] + marginDxf))
@@ -217,7 +217,7 @@ function GrillaOverlay({ view }: { view: MapView }) {
   // ── Panel colapsado ───────────────────────────────────────────────────────
   if (!editing) {
     return (
-      <div className="absolute bottom-10 left-3 z-[1000] pointer-events-none select-none">
+      <div className="hidden sm:block absolute bottom-10 left-3 z-[1000] pointer-events-none select-none">
         <div className="bg-gray-900/90 border border-slate-700/40 rounded-lg shadow-lg px-3 py-1.5 flex items-center gap-2 backdrop-blur-sm">
           <span className="text-[9px] text-slate-500 font-mono">1m × 1m</span>
           {grillaAngle !== 0 && (
@@ -236,9 +236,8 @@ function GrillaOverlay({ view }: { view: MapView }) {
 
   // ── Panel expandido ───────────────────────────────────────────────────────
   return (
-    // onWheel stopPropagation evita que el scroll sobre el panel haga zoom en el mapa
     <div
-      className="absolute bottom-10 left-3 z-[1000] pointer-events-none select-none"
+      className="hidden sm:block absolute bottom-10 left-3 z-[1000] pointer-events-none select-none"
       onWheel={(e) => e.stopPropagation()}
     >
       <div className="bg-gray-900/95 border border-slate-700/60 rounded-xl shadow-xl px-4 py-3 w-56 backdrop-blur-sm">

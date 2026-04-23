@@ -16,14 +16,12 @@ import type {
   GateBalanceInsight,
   CalibreRange,
   GraderQuality,
-  CalibreWeightRange,
   Gate0Record,
   LotAnalysis,
   WeightTrendBucket,
   MatrixQCEnhanced,
   GateAdvancedStats,
   GateSwapSuggestion,
-  MatrixP0Cause,
 } from './types'
 
 import {
