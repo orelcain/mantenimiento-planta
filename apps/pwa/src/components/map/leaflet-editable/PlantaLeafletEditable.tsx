@@ -1284,8 +1284,12 @@ function BoxSelect({ view }: { view: MapView }) {
 
     const container = map.getContainer()
 
-    // Cursor crosshair en el mapa cuando el modo está activo
-    if (boxSelectMode) container.style.cursor = 'crosshair'
+    // Cuando boxSelectMode está activo, deshabilitar map.dragging upfront para
+    // que Leaflet NO compita por los eventos. El cursor crosshair confirma el modo.
+    if (boxSelectMode) {
+      map.dragging.disable()
+      container.style.cursor = 'crosshair'
+    }
 
     let startLL: L.LatLng | null = null
     let startPt: { x: number; y: number } | null = null
@@ -1312,7 +1316,6 @@ function BoxSelect({ view }: { view: MapView }) {
     }
 
     const beginDrag = (clientX: number, clientY: number) => {
-      map.dragging.disable()
       startPt = { x: clientX, y: clientY }
       startLL = getLL(clientX, clientY)
       dragActive = true
@@ -1336,7 +1339,6 @@ function BoxSelect({ view }: { view: MapView }) {
     }
 
     const endDrag = (clientX: number, clientY: number) => {
-      map.dragging.enable()
       const wasActive = dragActive && !!rect
       const start = startLL
       dragActive = false
@@ -1374,25 +1376,23 @@ function BoxSelect({ view }: { view: MapView }) {
     }
 
     // ── Mouse (desktop) ─────────────────────────────────────────────────
-    // Escuchar en document nivel captura: dispara ANTES del drag handler de Leaflet
-    // (que está en container bubble). Así map.dragging.disable() se llama primero.
     const onMouseDown = (ev: MouseEvent) => {
-      if (!container.contains(ev.target as Node)) return  // solo dentro del mapa
       const canBox = ev.shiftKey || boxSelectMode
       if (!canBox) return
-      // En modo botón solo bloqueamos controles; en modo shift también interactivos
       if (boxSelectMode ? isControlTarget(ev.target) : isInteractiveTarget(ev.target)) return
-      // Deshabilitar drag de Leaflet antes de que su handler lo active
-      map.dragging.disable()
+      // En modo shift: deshabilitar drag ahora (upfront solo aplica a boxSelectMode)
+      if (!boxSelectMode) map.dragging.disable()
       ev.preventDefault()
       beginDrag(ev.clientX, ev.clientY)
-      window.addEventListener('mousemove', onMouseMove, { capture: true, passive: true })
+      window.addEventListener('mousemove', onMouseMove, true)
       window.addEventListener('mouseup', onMouseUp, true)
     }
     const onMouseMove = (ev: MouseEvent) => updateDrag(ev.clientX, ev.clientY)
     const onMouseUp = (ev: MouseEvent) => {
       window.removeEventListener('mousemove', onMouseMove, true)
       window.removeEventListener('mouseup', onMouseUp, true)
+      // Reactivar dragging si venía de shift (no boxSelectMode); en boxSelectMode sigue off
+      if (!boxSelectMode) map.dragging.enable()
       endDrag(ev.clientX, ev.clientY)
     }
 
@@ -1402,11 +1402,9 @@ function BoxSelect({ view }: { view: MapView }) {
       if (ev.touches.length !== 1) return
       const t = ev.touches[0]
       if (!t) return
-      if (!container.contains(t.target as Node)) return
       if (isControlTarget(t.target)) return
       ev.preventDefault()
       touchId = t.identifier
-      map.dragging.disable()
       beginDrag(t.clientX, t.clientY)
       window.addEventListener('touchmove', onTouchMove, { capture: true, passive: false })
       window.addEventListener('touchend', onTouchEnd, true)
@@ -1429,11 +1427,11 @@ function BoxSelect({ view }: { view: MapView }) {
       endDrag(t.clientX, t.clientY)
     }
 
-    document.addEventListener('mousedown', onMouseDown, true)
-    document.addEventListener('touchstart', onTouchStart, { capture: true, passive: false })
+    container.addEventListener('mousedown', onMouseDown)
+    container.addEventListener('touchstart', onTouchStart, { passive: false })
     return () => {
-      document.removeEventListener('mousedown', onMouseDown, true)
-      document.removeEventListener('touchstart', onTouchStart, true)
+      container.removeEventListener('mousedown', onMouseDown)
+      container.removeEventListener('touchstart', onTouchStart)
       window.removeEventListener('mousemove', onMouseMove, true)
       window.removeEventListener('mouseup', onMouseUp, true)
       window.removeEventListener('touchmove', onTouchMove, true)
