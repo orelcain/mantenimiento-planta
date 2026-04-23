@@ -773,6 +773,31 @@ Con Haversine A→D = dimensión real del recinto en metros. El DWG ya tiene cot
 
 ## Pendientes priorizados
 
+### PENDIENTE — Visor Mapas 3 (sesión 2026-04-22)
+
+**Módulo:** `/mantenimiento-planta/map` — Leaflet CRS.Simple + DXF + Geoman + Zustand
+
+**Estado al cierre sesión 2026-04-22:**
+- ✅ Grilla 1m×1m anclada a DXF (fase invariante a zoom/pan via `gridPhase()`)
+- ✅ Ángulo de grilla por vista (recinto/interior independientes, `grillaAngles: Record<string,number>`)
+- ✅ Panel colapsado por defecto: badge "1m × 1m [X°]" + botón "Editar ángulo" + presets 0/15/30/45°
+- ✅ RAF throttle + clip a bounds + 10m margen
+- ✅ Dibujar polilíneas/paredes (Geoman `drawPolyline`, tipo `'linea'`, longitud auto calculada)
+- ✅ Header móvil responsive (icono-only en xs, título compacto)
+
+**P0 próxima sesión:**
+- 🔲 **Import DXF layers as editable elements** — Botón "Absorber" por capa DXF en PanelCapasYZonas (tab Capas DXF). Fetch GeoJSON → convertir Features → `addElemento()` con `meta.dxfSource = name`. LineString→`'linea'`, Polygon→`'zona'`. `setCapaVisible(name, false)` tras absorber. Prevenir duplicados.
+
+**P1 Visor Mapas:**
+- 🔲 Equipos del módulo Repuestos sobre el mapa (posicionar motores/bombas, drag&drop, click → datos SAP)
+- 🔲 Firestore sync (esquema `/maps/{view}/elementos/{id}`, reglas admin-only-write)
+- 🔲 Texto libre / anotaciones (`drawText: true` en Geoman)
+- 🔲 Tooltip hover sobre elemento (sin abrir panel lateral)
+- 🔲 Colores por categoría + undo/redo + panel móvil bottom-sheet
+- 🔲 Alinear grilla a muro (click 2 puntos → detectar ángulo y aplicar)
+
+---
+
 ### PENDIENTE — Grader iter 10 (sesión 2026-04-21)
 
 **Quick wins completados en iter 10:**
