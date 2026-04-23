@@ -9,7 +9,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useParams, useNavigate, Navigate } from 'react-router-dom'
 import { Button, Card, CardContent, Spinner, Badge } from '@/components/ui'
-import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag } from 'lucide-react'
+import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag, FileText } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { usePermissionsStore } from '@/store'
 import { useAuthStore, useIsAdmin } from '@/store/authStore'
@@ -33,6 +33,7 @@ import { CurrentGateConfigPanel } from '@/components/grader/CurrentGateConfigPan
 import { ShiftGatesConfigAccordion } from '@/components/grader/ShiftGatesConfigAccordion'
 import { PauseAnnotationDialog } from '@/components/grader/PauseAnnotationDialog'
 import { resolveEffectiveTag } from '@/services/grader/graderPauseTags'
+import { exportTurnToPDF } from '@/services/grader/graderTurnToPDF'
 import { ActionPlanPanel, deriveSuggestions } from '@/components/grader/ActionPlanPanel'
 import { findTriggeredRunbooks } from '@/services/grader/graderRunbooks'
 import { analyzeGraderFromSummary } from '@/services/grader/graderSummaryAI'
@@ -485,6 +486,20 @@ export function AnalisisGraderTurnoPage() {
   // M3 — Siguiente pausa sin clasificar
   const [nextPauseOpen, setNextPauseOpen] = useState(false)
 
+  // M17 — Export PDF
+  const [pdfExporting, setPdfExporting] = useState(false)
+  const handleExportPdf = useCallback(async () => {
+    if (!summary || pdfExporting) return
+    setPdfExporting(true)
+    try {
+      await exportTurnToPDF({ summary, pauses })
+    } catch (err) {
+      console.error('[M17] PDF export error:', err)
+    } finally {
+      setPdfExporting(false)
+    }
+  }, [summary, pauses, pdfExporting])
+
   const untaggedPauses = useMemo(
     () => pauses.filter(p => !resolveEffectiveTag(p)),
     [pauses],
@@ -636,6 +651,20 @@ export function AnalisisGraderTurnoPage() {
               title="Exportar turno a CSV (pauses + gates + causas P0)"
             >
               <Download className="w-3.5 h-3.5" />
+            </Button>
+          )}
+          {/* M17: Exportar turno a PDF */}
+          {summary && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportPdf}
+              disabled={pdfExporting}
+              title="Exportar resumen de turno a PDF"
+            >
+              {pdfExporting
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <FileText className="w-3.5 h-3.5" />}
             </Button>
           )}
           <Button

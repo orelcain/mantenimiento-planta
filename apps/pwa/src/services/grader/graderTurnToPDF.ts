@@ -1,0 +1,232 @@
+/**
+ * Export PDF de resumen de turno (M17).
+ *
+ * Secciones:
+ *   1. Encabezado  — identificación del turno
+ *   2. KPIs        — métricas clave (P0%, piezas, peso, throughput, duración)
+ *   3. Pausas      — tabla con hora, duración, tier, tag y nota
+ *   4. Gates       — distribución de piezas por compuerta (si disponible)
+ *   5. Top P0      — causas de Punto Cero por frecuencia
+ *
+ * Carga jsPDF y jspdf-autotable dinámicamente (no aumenta el bundle inicial).
+ */
+
+import type { GraderDailySummary, Pause } from './types'
+
+// Mínimo de autoTable para typing (acceso a lastAutoTable.finalY)
+interface AutoTableDoc {
+  lastAutoTable: { finalY: number }
+}
+
+// ── Helpers de formato ────────────────────────────────────────────────────────
+
+function fmtHHMM(iso: string): string {
+  const d = new Date(iso)
+  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
+}
+
+function fmtDur(sec: number): string {
+  const m = Math.round(sec / 60)
+  if (m < 60) return `${m} min`
+  const h = Math.floor(m / 60)
+  const rm = m % 60
+  return rm > 0 ? `${h} h ${rm} min` : `${h} h`
+}
+
+function n(v: number | undefined, decimals = 0): string {
+  if (v === undefined || isNaN(v)) return '—'
+  return v.toLocaleString('es-CL', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
+}
+
+const TIER_LABEL: Record<string, string> = {
+  pausa: 'Pausa',
+  larga: 'Pausa larga',
+  parada: 'Parada',
+}
+
+// ── Función principal ─────────────────────────────────────────────────────────
+
+export async function exportTurnToPDF(params: {
+  summary: GraderDailySummary
+  pauses: Pause[]
+  /** Map<tagId, tagLabel> para mostrar nombre legible en lugar de id. */
+  tagLabels?: Map<string, string>
+}): Promise<void> {
+  const { summary, pauses, tagLabels } = params
+
+  // Carga dinámica — no penaliza el bundle principal
+  const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+    import('jspdf'),
+    import('jspdf-autotable'),
+  ])
+
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' }) as InstanceType<typeof jsPDF> & AutoTableDoc
+  const pageW = doc.internal.pageSize.getWidth()
+  const pageH = doc.internal.pageSize.getHeight()
+  const MARGIN = 14
+  let y = 14
+
+  const shiftLabel = summary.shiftId
+  const dateKey    = summary.dateKey
+  const generated  = new Date().toLocaleString('es-CL')
+
+  // ── 1. Encabezado ──────────────────────────────────────────────────────────
+  doc.setFontSize(16)
+  doc.setFont('helvetica', 'bold')
+  doc.text('Resumen de Turno — Grader', pageW / 2, y, { align: 'center' })
+  y += 7
+
+  doc.setFontSize(10)
+  doc.setFont('helvetica', 'normal')
+  doc.text(`${shiftLabel}  |  ${dateKey}  |  Generado: ${generated}`, pageW / 2, y, { align: 'center' })
+  y += 3
+
+  // Línea separadora
+  doc.setDrawColor(180)
+  doc.line(MARGIN, y, pageW - MARGIN, y)
+  y += 6
+
+  // ── 2. KPIs ────────────────────────────────────────────────────────────────
+  doc.setFontSize(11)
+  doc.setFont('helvetica', 'bold')
+  doc.text('KPIs del turno', MARGIN, y)
+  y += 2
+
+  const p0Color: [number, number, number] =
+    summary.pointZeroPct >= 3.5 ? [220, 38, 38]  // rojo
+    : summary.pointZeroPct >= 2  ? [217, 119, 6]  // ámbar
+    : [22, 163, 74]                                 // verde
+
+  autoTable(doc, {
+    startY: y,
+    head: [['Métrica', 'Valor']],
+    body: [
+      ['P0% (Punto Cero)', `${n(summary.pointZeroPct, 2)}%`],
+      ['Piezas clasificadas (total)', n(summary.totalPieces)],
+      ['Piezas P0', n(summary.pointZeroPieces)],
+      ['Peso clasificado', `${n(summary.totalWeightKg, 1)} kg`],
+      ['Peso promedio', `${n(summary.avgWeightGrams)} g`],
+      ['Throughput', `${n(summary.productionRatePerHour)} pzas/h`],
+      ['Duración turno', summary.durationMinutes !== undefined ? fmtDur(summary.durationMinutes * 60) : '—'],
+      ['Tiempo muerto total', summary.totalDeadTimeSec !== undefined ? fmtDur(summary.totalDeadTimeSec) : '—'],
+      ['Cantidad de pausas', `${summary.pausesCount ?? pauses.length}`],
+    ],
+    theme: 'grid',
+    styles: { fontSize: 9, cellPadding: 2 },
+    headStyles: { fillColor: [51, 65, 85], textColor: 255, fontStyle: 'bold' },
+    columnStyles: { 1: { fontStyle: 'bold', textColor: p0Color } },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+    margin: { left: MARGIN },
+    tableWidth: 90,
+  })
+  y = doc.lastAutoTable.finalY + 8
+
+  // ── 3. Pausas ──────────────────────────────────────────────────────────────
+  if (pauses.length > 0) {
+    if (y > pageH - 40) { doc.addPage(); y = 14 }
+    doc.setFontSize(11)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Pausas del turno', MARGIN, y)
+    y += 2
+
+    const pauseRows = pauses.map((p) => {
+      const tagLabel = p.tag
+        ? (tagLabels?.get(p.tag) ?? p.tag)
+        : p.autoTag
+          ? `(${p.autoTag})`
+          : '—'
+      return [
+        fmtHHMM(p.startAt),
+        fmtHHMM(p.endAt),
+        fmtDur(p.durationSec),
+        TIER_LABEL[p.tier] ?? p.tier,
+        tagLabel,
+        p.note ?? '',
+      ]
+    })
+
+    autoTable(doc, {
+      startY: y,
+      head: [['Inicio', 'Fin', 'Duración', 'Tipo', 'Tag', 'Nota']],
+      body: pauseRows,
+      theme: 'striped',
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [51, 65, 85], textColor: 255, fontStyle: 'bold' },
+      columnStyles: {
+        0: { cellWidth: 16 },
+        1: { cellWidth: 16 },
+        2: { cellWidth: 22 },
+        3: { cellWidth: 28 },
+        4: { cellWidth: 28 },
+        5: { cellWidth: 'auto' },
+      },
+      margin: { left: MARGIN, right: MARGIN },
+    })
+    y = doc.lastAutoTable.finalY + 8
+  }
+
+  // ── 4. Gates ───────────────────────────────────────────────────────────────
+  if (summary.gateDistribution && summary.gateDistribution.length > 0) {
+    if (y > pageH - 50) { doc.addPage(); y = 14 }
+    doc.setFontSize(11)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Distribución por gate', MARGIN, y)
+    y += 2
+
+    autoTable(doc, {
+      startY: y,
+      head: [['Gate', 'Piezas', '%']],
+      body: summary.gateDistribution.map(g => [
+        `Gate ${g.gate}`,
+        n(g.pieces),
+        `${n(g.pct, 1)}%`,
+      ]),
+      theme: 'striped',
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [51, 65, 85], textColor: 255, fontStyle: 'bold' },
+      margin: { left: MARGIN },
+      tableWidth: 70,
+    })
+    y = doc.lastAutoTable.finalY + 8
+  }
+
+  // ── 5. Top causas P0 ───────────────────────────────────────────────────────
+  if (summary.topP0Causes && summary.topP0Causes.length > 0) {
+    if (y > pageH - 50) { doc.addPage(); y = 14 }
+    doc.setFontSize(11)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Top causas Punto Cero', MARGIN, y)
+    y += 2
+
+    autoTable(doc, {
+      startY: y,
+      head: [['Causa', 'Piezas', '% P0']],
+      body: summary.topP0Causes.map(c => [c.error, n(c.pieces), `${n(c.pct, 1)}%`]),
+      theme: 'striped',
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [51, 65, 85], textColor: 255, fontStyle: 'bold' },
+      margin: { left: MARGIN },
+      tableWidth: 100,
+    })
+  }
+
+  // ── Pie de página ──────────────────────────────────────────────────────────
+  const pageCount = doc.getNumberOfPages()
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i)
+    doc.setFontSize(7)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(160)
+    doc.text(
+      `${shiftLabel}  |  ${dateKey}  —  Pág. ${i}/${pageCount}  |  ${generated}`,
+      pageW / 2,
+      pageH - 6,
+      { align: 'center' },
+    )
+    doc.setTextColor(0)
+  }
+
+  // Guardar
+  const filename = `grader-turno_${dateKey}_${shiftLabel.replace(/\s+/g, '-')}.pdf`
+  doc.save(filename)
+}
