@@ -7,10 +7,25 @@
  *  • Confirmación antes de eliminar
  */
 
-import { Eye, EyeOff, Edit3, Save, Trash2, Check, Search, X, Crosshair, Copy } from 'lucide-react'
+import { Eye, EyeOff, Edit3, Save, Trash2, Check, Search, X, Crosshair, Copy, Download, CheckCircle2, Loader, Layers, Undo2 } from 'lucide-react'
 import { MAP_VIEWS, type DxfLayerConfig } from '@/data/dxfLayers'
-import { useMapaLeafletStore, type ZonaCategoria, type ZonaEstado, type ElementoMapa } from '@/store/useMapaLeafletStore'
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useMapaLeafletStore, type ZonaCategoria, type ZonaEstado, type ElementoMapa, type PolygonCoords } from '@/store/useMapaLeafletStore'
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
+
+// ─── Tipos mínimos GeoJSON para absorción DXF ────────────────────────────────
+type GJCoord = readonly number[]
+type GJGeometry =
+  | { type: 'LineString';      coordinates: GJCoord[] }
+  | { type: 'MultiLineString'; coordinates: GJCoord[][] }
+  | { type: 'Polygon';         coordinates: GJCoord[][] }
+  | { type: 'Point';           coordinates: GJCoord }
+  | { type: string }
+
+interface GJFeature { geometry: GJGeometry | null }
+
+function toLatLng(c: GJCoord): [number, number] {
+  return [c[1] ?? 0, c[0] ?? 0]
+}
 
 const GROUP_LABEL: Record<DxfLayerConfig['group'], string> = {
   cerco:         'Cerco perimetral',
@@ -58,14 +73,93 @@ function TipoBadge({ tipo }: { tipo: ElementoMapa['tipo'] }) {
 export function PanelCapasYZonas() {
   const {
     currentView, elementos: allElementos,
-    selectedId, editMode, capasVisibles,
-    setSelectedId, toggleEditMode, setCapaVisible, setAllCapas,
-    updateElemento, deleteElemento, addElemento,
+    selectedId, multiSelection, editMode, capasVisibles,
+    setSelectedId, clearMultiSelection, toggleEditMode, setCapaVisible, setAllCapas,
+    updateElemento, updateElementosBulk, deleteElemento, addElemento, addElementosBulk, removeElementosBulk,
   } = useMapaLeafletStore()
 
-  // Elementos de la vista activa (sin cotas — van en su propia sección)
+  // ids seleccionados (primary + multi)
+  const selectedIds = useMemo(() => {
+    const out: string[] = []
+    if (selectedId) out.push(selectedId)
+    for (const x of multiSelection) if (!out.includes(x)) out.push(x)
+    return out
+  }, [selectedId, multiSelection])
+  const isMultiSelect = selectedIds.length > 1
+
+  // Capas ya absorbidas (tienen meta.dxfSource en la vista actual)
+  const absorbedLayers = useMemo(() => {
+    const s = new Set<string>()
+    for (const e of allElementos) {
+      if (e.mapView === currentView && typeof e.meta?.dxfSource === 'string') {
+        s.add(e.meta.dxfSource)
+      }
+    }
+    return s
+  }, [allElementos, currentView])
+
+  const [absorbing, setAbsorbing] = useState<Record<string, boolean>>({})
+
+  const absorbDxfLayer = useCallback(async (layerName: string) => {
+    if (absorbedLayers.has(layerName)) return
+
+    setAbsorbing((prev) => ({ ...prev, [layerName]: true }))
+    try {
+      const folder = MAP_VIEWS[currentView].folder
+      const res = await fetch(`${import.meta.env.BASE_URL}maps/${folder}/${layerName}.geojson`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const geojson = await res.json() as { features: GJFeature[] }
+
+      const items: Parameters<typeof addElementosBulk>[0] = []
+
+      for (const feature of geojson.features) {
+        const geom = feature.geometry
+        if (!geom) continue
+
+        const base = {
+          nombre: '',
+          categoria: 'otros' as const,
+          estado: 'operativo' as const,
+          mapView: currentView,
+          meta: { dxfSource: layerName },
+        }
+
+        if (geom.type === 'LineString') {
+          const poligono: PolygonCoords = (geom as Extract<GJGeometry, { type: 'LineString' }>).coordinates.map(toLatLng)
+          items.push({ ...base, tipo: 'linea', poligono })
+        } else if (geom.type === 'MultiLineString') {
+          const poligono: PolygonCoords = (geom as Extract<GJGeometry, { type: 'MultiLineString' }>).coordinates.flat().map(toLatLng)
+          items.push({ ...base, tipo: 'linea', poligono })
+        } else if (geom.type === 'Polygon') {
+          const ring = (geom as Extract<GJGeometry, { type: 'Polygon' }>).coordinates[0]
+          if (ring) {
+            const poligono: PolygonCoords = ring.map(toLatLng)
+            items.push({ ...base, tipo: 'zona', poligono })
+          }
+        } else if (geom.type === 'Point') {
+          const c = (geom as Extract<GJGeometry, { type: 'Point' }>).coordinates
+          items.push({ ...base, tipo: 'punto', punto: toLatLng(c) })
+        }
+      }
+
+      if (items.length > 0) {
+        addElementosBulk(items)
+        setCapaVisible(layerName, false)
+      }
+    } catch (err) {
+      console.error('[Absorber] Error:', err)
+    } finally {
+      setAbsorbing((prev) => ({ ...prev, [layerName]: false }))
+    }
+  }, [currentView, absorbedLayers, addElementosBulk, setCapaVisible])
+
+  // Elementos semánticos (zonas/equipos nombrados) — excluye cotas y estructurales absorbidos
   const elementos = useMemo(
-    () => allElementos.filter((e) => e.mapView === currentView && e.tipo !== 'cota'),
+    () => allElementos.filter((e) =>
+      e.mapView === currentView &&
+      e.tipo !== 'cota' &&
+      typeof e.meta?.dxfSource !== 'string',
+    ),
     [allElementos, currentView],
   )
 
@@ -75,6 +169,19 @@ export function PanelCapasYZonas() {
     [allElementos, currentView],
   )
 
+  // Estructurales absorbidos del DXF, agrupados por capa fuente
+  const estructurales = useMemo(() => {
+    const g = new Map<string, ElementoMapa[]>()
+    for (const e of allElementos) {
+      const src = e.meta?.dxfSource
+      if (e.mapView === currentView && typeof src === 'string') {
+        if (!g.has(src)) g.set(src, [])
+        g.get(src)!.push(e)
+      }
+    }
+    return g
+  }, [allElementos, currentView])
+
   // Capas de la vista actual
   const viewLayers = MAP_VIEWS[currentView].layers
 
@@ -83,11 +190,23 @@ export function PanelCapasYZonas() {
   const [filtroCat, setFiltroCat]   = useState<'all' | ZonaCategoria>('all')
   const [confirmDel, setConfirmDel] = useState(false)
   const [cotasExpanded, setCotasExpanded] = useState(true)
+  const [estExpanded, setEstExpanded] = useState(false)
+  const [confirmUndo, setConfirmUndo] = useState<string | null>(null)
   const nameInputRef = useRef<HTMLInputElement>(null)
 
+  const devolverAlDxf = useCallback((src: string) => {
+    const items = allElementos.filter((e) =>
+      e.mapView === currentView && e.meta?.dxfSource === src,
+    )
+    if (items.length === 0) return
+    removeElementosBulk(items.map((e) => e.id))
+    setCapaVisible(src, true)
+    setConfirmUndo(null)
+  }, [allElementos, currentView, removeElementosBulk, setCapaVisible])
+
   const selectedEl = useMemo(
-    () => elementos.find((e) => e.id === selectedId) ?? null,
-    [elementos, selectedId],
+    () => allElementos.find((e) => e.id === selectedId && e.mapView === currentView) ?? null,
+    [allElementos, selectedId, currentView],
   )
 
   // Auto-foco en nombre cuando un elemento se selecciona y aún no tiene nombre
@@ -115,7 +234,7 @@ export function PanelCapasYZonas() {
     return c
   }, [elementos])
 
-  // Agrupar capas DXF
+  // Agrupar capas DXF (reactivo al cambio de vista)
   const grupos = useMemo(() => {
     const g = new Map<string, DxfLayerConfig[]>()
     for (const c of viewLayers) {
@@ -123,7 +242,7 @@ export function PanelCapasYZonas() {
       g.get(c.group)!.push(c)
     }
     return g
-  }, [])
+  }, [viewLayers])
 
   return (
     <div className="absolute top-3 right-3 w-72 max-h-[calc(100%-24px)] bg-gray-900/97 backdrop-blur border border-gray-700/60 rounded-lg shadow-2xl text-gray-200 flex flex-col overflow-hidden z-[1000]">
@@ -191,24 +310,49 @@ export function PanelCapasYZonas() {
                   {GROUP_LABEL[gKey as DxfLayerConfig['group']]}
                 </div>
                 {capas.map((c) => {
-                  const visible = capasVisibles[c.name] ?? c.defaultVisible
+                  const visible = capasVisibles[currentView]?.[c.name] ?? c.defaultVisible
+                  const isAbsorbing = absorbing[c.name] ?? false
+                  const isAbsorbed = absorbedLayers.has(c.name)
                   return (
-                    <button
-                      key={c.name}
-                      onClick={() => setCapaVisible(c.name, !visible)}
-                      className="w-full flex items-center gap-2 px-2 py-1 hover:bg-gray-800 rounded text-left transition-colors group"
-                    >
-                      {visible
-                        ? <Eye size={11} className="text-gray-400 shrink-0 group-hover:text-amber-400" />
-                        : <EyeOff size={11} className="text-gray-600 shrink-0 group-hover:text-gray-400" />}
-                      <div
-                        className="w-3 h-3 rounded-sm border border-gray-700 shrink-0"
-                        style={{ backgroundColor: visible ? c.color : 'transparent' }}
-                      />
-                      <span className={`text-[11px] truncate transition-colors ${visible ? 'text-gray-200' : 'text-gray-600'}`}>
-                        {c.label}
-                      </span>
-                    </button>
+                    <div key={c.name} className="flex items-center gap-1">
+                      <button
+                        onClick={() => { if (!isAbsorbed) setCapaVisible(c.name, !visible) }}
+                        disabled={isAbsorbed}
+                        title={isAbsorbed ? 'Absorbida — ver en "Estructura absorbida"' : (visible ? 'Ocultar capa' : 'Mostrar capa')}
+                        className={`flex-1 flex items-center gap-2 px-2 py-1 rounded text-left transition-colors group min-w-0 ${
+                          isAbsorbed ? 'opacity-40 cursor-not-allowed' : 'hover:bg-gray-800'
+                        }`}
+                      >
+                        {visible && !isAbsorbed
+                          ? <Eye size={11} className="text-gray-400 shrink-0 group-hover:text-amber-400" />
+                          : <EyeOff size={11} className="text-gray-600 shrink-0 group-hover:text-gray-400" />}
+                        <div
+                          className="w-3 h-3 rounded-sm border border-gray-700 shrink-0"
+                          style={{ backgroundColor: (visible && !isAbsorbed) ? c.color : 'transparent' }}
+                        />
+                        <span className={`text-[11px] truncate transition-colors ${(visible && !isAbsorbed) ? 'text-gray-200' : 'text-gray-600'}`}>
+                          {c.label}
+                        </span>
+                      </button>
+                      <button
+                        onClick={() => { void absorbDxfLayer(c.name) }}
+                        disabled={isAbsorbing || isAbsorbed}
+                        title={isAbsorbed ? 'Ya absorbida' : 'Absorber como elementos editables'}
+                        className={`shrink-0 flex items-center justify-center w-6 h-6 rounded transition-colors ${
+                          isAbsorbed
+                            ? 'text-emerald-500 cursor-default'
+                            : isAbsorbing
+                              ? 'text-gray-500 cursor-wait'
+                              : 'text-gray-600 hover:text-amber-400 hover:bg-gray-800'
+                        }`}
+                      >
+                        {isAbsorbing
+                          ? <Loader size={10} className="animate-spin" />
+                          : isAbsorbed
+                            ? <CheckCircle2 size={10} />
+                            : <Download size={10} />}
+                      </button>
+                    </div>
                   )
                 })}
               </div>
@@ -312,7 +456,7 @@ export function PanelCapasYZonas() {
 
                 {cotasExpanded && (
                   <div className="flex flex-col gap-0.5">
-                    {/* Agrupa por categoría */}
+                    {/* Agrupa por categoria */}
                     {CATEGORIAS.filter((cat) => cotasElementos.some((c) => c.categoria === cat.value)).map((cat) => (
                       <div key={cat.value} className="mb-1.5">
                         <div className="flex items-center gap-1 px-1 mb-0.5">
@@ -363,8 +507,155 @@ export function PanelCapasYZonas() {
               </div>
             )}
 
-            {/* Detalle del seleccionado */}
-            {selectedEl && (
+            {/* ── Seccion Estructura absorbida del DXF ────────────────── */}
+            {estructurales.size > 0 && (
+              <div className="border-t border-gray-700/30 pt-2 mt-1">
+                <button
+                  onClick={() => setEstExpanded((v) => !v)}
+                  className="w-full flex items-center justify-between px-1 mb-1 group"
+                >
+                  <span className="text-[9px] uppercase tracking-wider font-semibold text-orange-400/80 group-hover:text-orange-300 flex items-center gap-1">
+                    <Layers size={9} /> Estructura absorbida
+                  </span>
+                  <span className="text-[9px] text-orange-500/70">
+                    {Array.from(estructurales.values()).reduce((n, a) => n + a.length, 0)} {estExpanded ? '▲' : '▼'}
+                  </span>
+                </button>
+
+                {estExpanded && (
+                  <div className="flex flex-col gap-1">
+                    {Array.from(estructurales.entries()).map(([src, items]) => {
+                      const cfg = viewLayers.find((l) => l.name === src)
+                      const color = cfg?.color ?? '#94a3b8'
+                      const label = cfg?.label ?? src
+                      const isConfirming = confirmUndo === src
+                      return (
+                        <div key={src} className="flex items-center gap-1 px-1 py-0.5 rounded hover:bg-gray-800/50">
+                          <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: color }} />
+                          <span className="text-[10px] text-gray-200 flex-1 truncate">{label}</span>
+                          <span className="text-[9px] text-gray-500 font-mono">{items.length}</span>
+                          {isConfirming ? (
+                            <>
+                              <button
+                                onClick={() => setConfirmUndo(null)}
+                                className="text-[9px] px-1 py-0.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded"
+                                title="Cancelar"
+                              >
+                                ✕
+                              </button>
+                              <button
+                                onClick={() => devolverAlDxf(src)}
+                                className="text-[9px] px-1 py-0.5 bg-red-700 hover:bg-red-600 text-white rounded font-medium"
+                                title={`Eliminar ${items.length} elementos y mostrar capa DXF original`}
+                              >
+                                Devolver
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              onClick={() => setConfirmUndo(src)}
+                              className="shrink-0 flex items-center justify-center w-5 h-5 rounded text-gray-500 hover:text-orange-400 hover:bg-gray-800 transition-colors"
+                              title="Devolver al DXF original (elimina los editables)"
+                            >
+                              <Undo2 size={10} />
+                            </button>
+                          )}
+                        </div>
+                      )
+                    })}
+                    <p className="text-[9px] text-gray-500 italic px-1 mt-1">
+                      Cliquea un muro/linea en el mapa para editarlo. En modo edicion aparecen los vertices.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Panel multi-seleccion (2+ elementos) ─────────────── */}
+            {isMultiSelect && (
+              <div className="border-t border-amber-700/60 pt-3 mt-1 flex flex-col gap-2 bg-amber-900/10 -mx-2 px-2 pb-2 rounded-b">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase tracking-wider font-bold text-amber-300">
+                    {selectedIds.length} elementos seleccionados
+                  </span>
+                  <button
+                    onClick={() => { setSelectedId(null); clearMultiSelection() }}
+                    className="text-[9px] text-gray-400 hover:text-amber-300"
+                    title="Limpiar seleccion"
+                  >
+                    limpiar
+                  </button>
+                </div>
+
+                <div>
+                  <label className="text-[9px] uppercase text-gray-500 font-semibold">Cambiar categoria a todos</label>
+                  <select
+                    className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-[11px] text-white mt-0.5 focus:border-amber-500/60 focus:outline-none"
+                    defaultValue=""
+                    onChange={(e) => {
+                      const v = e.target.value as ZonaCategoria
+                      if (v) updateElementosBulk(selectedIds, { categoria: v })
+                      e.target.value = ''
+                    }}
+                  >
+                    <option value="">— elegir —</option>
+                    {CATEGORIAS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[9px] uppercase text-gray-500 font-semibold">Cambiar estado a todos</label>
+                  <div className="flex gap-1 mt-0.5">
+                    {ESTADOS.map((s) => (
+                      <button
+                        key={s.value}
+                        onClick={() => updateElementosBulk(selectedIds, { estado: s.value })}
+                        className="flex-1 text-[10px] py-1 rounded border border-gray-700 text-gray-300 hover:text-white transition-all"
+                        style={{ borderColor: s.color, color: s.color }}
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {!confirmDel ? (
+                  <button
+                    onClick={() => setConfirmDel(true)}
+                    className="flex items-center justify-center gap-1.5 text-[11px] py-1.5 bg-red-900/30 hover:bg-red-900/50 border border-red-800/60 text-red-400 rounded transition-colors"
+                  >
+                    <Trash2 size={11} /> Eliminar {selectedIds.length} elementos
+                  </button>
+                ) : (
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => setConfirmDel(false)}
+                      className="flex-1 text-[11px] py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={() => {
+                        removeElementosBulk(selectedIds)
+                        setSelectedId(null)
+                        clearMultiSelection()
+                        setConfirmDel(false)
+                      }}
+                      className="flex-1 text-[11px] py-1.5 bg-red-700 hover:bg-red-600 text-white rounded font-medium"
+                    >
+                      Sí, eliminar {selectedIds.length}
+                    </button>
+                  </div>
+                )}
+
+                <p className="text-[9px] text-gray-500 italic">
+                  Tip: Shift+click agrega/quita. Shift+arrastre = seleccion por recuadro.
+                </p>
+              </div>
+            )}
+
+            {/* Detalle del seleccionado (solo single-select) */}
+            {!isMultiSelect && selectedEl && (
               <div className="border-t border-gray-700/50 pt-3 mt-1 flex flex-col gap-2.5">
                 <div className="flex items-center gap-2">
                   <TipoBadge tipo={selectedEl.tipo} />

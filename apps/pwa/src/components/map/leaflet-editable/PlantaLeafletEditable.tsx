@@ -357,7 +357,7 @@ function angleTag(deg: number): string {
 // ─── Carga perezosa de cada GeoJSON DXF ──────────────────────────────────────
 function CapaDXF({ cfg, folder }: { cfg: DxfLayerConfig; folder: string }) {
   const [data, setData] = useState<GeoJSON.FeatureCollection | null>(null)
-  const visible = useMapaLeafletStore((s) => s.capasVisibles[cfg.name] ?? cfg.defaultVisible)
+  const visible = useMapaLeafletStore((s) => s.capasVisibles[s.currentView]?.[cfg.name] ?? cfg.defaultVisible)
   const map = useMap()
   const [zoomFactor, setZoomFactor] = useState(1)
 
@@ -567,21 +567,38 @@ function EditorGeoman({ view }: { view: MapView }) {
       const layer = e.layer
       const id = layer.options?.elementoId
       if (!id) return
-      const { updateElemento } = useMapaLeafletStore.getState()
+      const { updateElemento, elementos } = useMapaLeafletStore.getState()
+      const el = elementos.find((x) => x.id === id)
       if (layer.getLatLngs) {
-        const latlngs: L.LatLng[] = (layer.getLatLngs()[0] as L.LatLng[]) ?? []
+        const raw = layer.getLatLngs() as L.LatLng[] | L.LatLng[][]
+        // Polygon: LatLng[][] (rings). Polyline (linea): LatLng[].
+        const isLinea = el?.tipo === 'linea' || !Array.isArray(raw[0])
+        const latlngs: L.LatLng[] = (isLinea ? raw : raw[0] ?? []) as L.LatLng[]
         const poligono: PolygonCoords = latlngs.map((p) => [snap(p.lat), snap(p.lng)])
-        updateElemento(id, {
-          poligono,
-          meta: { area_m2: Number((polygonArea(latlngs) * u2).toFixed(2)) },
-        })
+        if (isLinea) {
+          let totalM = 0
+          for (let i = 1; i < poligono.length; i++) {
+            const a = poligono[i - 1]!
+            const b = poligono[i]!
+            totalM += Math.hypot(b[0] - a[0], b[1] - a[1]) * view.unitScale
+          }
+          updateElemento(id, {
+            poligono,
+            meta: { ...(el?.meta ?? {}), longitud_m: Number(totalM.toFixed(2)) },
+          })
+        } else {
+          updateElemento(id, {
+            poligono,
+            meta: { ...(el?.meta ?? {}), area_m2: Number((polygonArea(latlngs) * u2).toFixed(2)) },
+          })
+        }
       } else if (layer.getLatLng) {
         const c = layer.getLatLng() as L.LatLng
         const patch: Partial<ElementoMapa> = { punto: [snap(c.lat), snap(c.lng)] }
         if (layer.getRadius) {
           const r = layer.getRadius()
           patch.radio = Math.round(r * 10) / 10
-          patch.meta = { radio_m: Number((r * view.unitScale).toFixed(2)) }
+          patch.meta = { ...(el?.meta ?? {}), radio_m: Number((r * view.unitScale).toFixed(2)) }
         }
         updateElemento(id, patch)
       }
@@ -616,7 +633,16 @@ function CapaElementos({ view }: { view: MapView }) {
   )
   const selectedId = useMapaLeafletStore((s) => s.selectedId)
   const setSelectedId = useMapaLeafletStore((s) => s.setSelectedId)
+  const multiSelection = useMapaLeafletStore((s) => s.multiSelection)
+  const toggleMultiSelect = useMapaLeafletStore((s) => s.toggleMultiSelect)
+  const editMode = useMapaLeafletStore((s) => s.editMode)
   const layersRef = useRef<Map<string, L.Layer>>(new Map())
+
+  const selectedSet = useMemo(() => {
+    const s = new Set<string>(multiSelection)
+    if (selectedId) s.add(selectedId)
+    return s
+  }, [selectedId, multiSelection])
 
   useEffect(() => {
     if (!map) return
@@ -633,11 +659,12 @@ function CapaElementos({ view }: { view: MapView }) {
     const ESTADO_COLOR = { operativo: '#22c55e', alerta: '#f59e0b', detenido: '#ef4444' }
 
     for (const el of elementos) {
-      const isSelected = el.id === selectedId
+      const isSelected = selectedSet.has(el.id)
+      const isPrimary = el.id === selectedId
       const color = ESTADO_COLOR[el.estado] ?? '#888'
 
       const baseStyle = {
-        color, weight: isSelected ? 3 : 2,
+        color, weight: isSelected ? (isPrimary ? 3 : 2.5) : 2,
         fillColor: color, fillOpacity: isSelected ? 0.35 : 0.18,
         className: isSelected ? 'editable-element editable-element-selected' : 'editable-element',
       }
@@ -660,7 +687,12 @@ function CapaElementos({ view }: { view: MapView }) {
           ;(layer.options as any).elementoId = el.id
           layer.on('click', (ev: L.LeafletMouseEvent) => {
             L.DomEvent.stopPropagation(ev)
-            setSelectedId(el.id)
+            const oe = ev.originalEvent
+            if (oe && (oe.shiftKey || oe.metaKey || oe.ctrlKey)) {
+              toggleMultiSelect(el.id)
+            } else {
+              setSelectedId(el.id)
+            }
           })
           layer.addTo(map)
           current.set(el.id, layer)
@@ -689,7 +721,22 @@ function CapaElementos({ view }: { view: MapView }) {
         layer.bindPopup(popupHtml)
       }
     }
-  }, [map, elementos, selectedId, setSelectedId])
+  }, [map, elementos, selectedId, setSelectedId, selectedSet, toggleMultiSelect])
+
+  // ── Geoman edit handles: sólo sobre la capa seleccionada cuando editMode está activo ──
+  useEffect(() => {
+    const current = layersRef.current
+    for (const [id, layer] of current.entries()) {
+      const pm = (layer as unknown as { pm?: { enabled: () => boolean; enable: (o?: unknown) => void; disable: () => void } }).pm
+      if (!pm) continue
+      const shouldEdit = editMode && id === selectedId
+      if (shouldEdit && !pm.enabled()) {
+        pm.enable({ allowSelfIntersection: true, preventMarkerRemoval: false, snappable: true })
+      } else if (!shouldEdit && pm.enabled()) {
+        pm.disable()
+      }
+    }
+  }, [selectedId, editMode, elementos])
 
   return null
 }
@@ -768,8 +815,8 @@ function MeasureTool({ view }: { view: MapView }) {
   // Carga puntos de snap cuando se activa el modo medir
   useEffect(() => {
     if (!measureMode) { snapPtsRef.current = []; return }
-    const { capasVisibles } = useMapaLeafletStore.getState()
-    const visible = view.layers.filter((c) => capasVisibles[c.name] ?? c.defaultVisible)
+    const { capasVisibles, currentView } = useMapaLeafletStore.getState()
+    const visible = view.layers.filter((c) => capasVisibles[currentView]?.[c.name] ?? c.defaultVisible)
     const all: L.LatLng[] = []
     Promise.all(
       visible.map((c) =>
@@ -1048,6 +1095,91 @@ function FitDxfBounds({ view }: { view: MapView }) {
   return null
 }
 
+// ─── Box-select: shift+drag para seleccionar varios elementos ────────────────
+function BoxSelect({ view }: { view: MapView }) {
+  const map = useMap()
+  const editMode = useMapaLeafletStore((s) => s.editMode)
+
+  useEffect(() => {
+    if (!map || !editMode) return
+
+    let startLL: L.LatLng | null = null
+    let rect: L.Rectangle | null = null
+
+    const onMouseDown = (ev: L.LeafletMouseEvent) => {
+      const oe = ev.originalEvent
+      if (!oe?.shiftKey) return
+      oe.preventDefault()
+      map.dragging.disable()
+      if (map.boxZoom) map.boxZoom.disable()
+      startLL = ev.latlng
+    }
+
+    const onMouseMove = (ev: L.LeafletMouseEvent) => {
+      if (!startLL) return
+      const bounds = L.latLngBounds(startLL, ev.latlng)
+      if (!rect) {
+        rect = L.rectangle(bounds, {
+          color: '#fbbf24', weight: 1.5, dashArray: '4 3', fillColor: '#fbbf24', fillOpacity: 0.08,
+          interactive: false,
+        }).addTo(map)
+      } else {
+        rect.setBounds(bounds)
+      }
+    }
+
+    const onMouseUp = (ev: L.LeafletMouseEvent) => {
+      map.dragging.enable()
+      if (map.boxZoom) map.boxZoom.enable()
+      if (!startLL) return
+      const bounds = L.latLngBounds(startLL, ev.latlng)
+      if (rect) { map.removeLayer(rect); rect = null }
+      startLL = null
+
+      const { elementos, selectedId, multiSelection, setSelectedId } = useMapaLeafletStore.getState()
+      const toggle = useMapaLeafletStore.getState().toggleMultiSelect
+      const hit: string[] = []
+      for (const el of elementos) {
+        if (el.mapView !== view.name) continue
+        const coords = el.poligono ?? (el.punto ? [el.punto] : [])
+        let inside = false
+        for (const c of coords) {
+          if (bounds.contains(L.latLng(c[0], c[1]))) { inside = true; break }
+        }
+        if (inside) hit.push(el.id)
+      }
+      if (hit.length === 0) return
+      const existing = new Set<string>([...(selectedId ? [selectedId] : []), ...multiSelection])
+      // Si no hay nada seleccionado, primero del hit se vuelve primary
+      if (existing.size === 0) {
+        setSelectedId(hit[0] ?? null)
+        for (let i = 1; i < hit.length; i++) {
+          const id = hit[i]
+          if (id) toggle(id)
+        }
+      } else {
+        for (const id of hit) {
+          if (!existing.has(id)) toggle(id)
+        }
+      }
+    }
+
+    map.on('mousedown', onMouseDown)
+    map.on('mousemove', onMouseMove)
+    map.on('mouseup', onMouseUp)
+    return () => {
+      map.off('mousedown', onMouseDown)
+      map.off('mousemove', onMouseMove)
+      map.off('mouseup', onMouseUp)
+      if (rect) { map.removeLayer(rect); rect = null }
+      map.dragging.enable()
+      if (map.boxZoom) map.boxZoom.enable()
+    }
+  }, [map, editMode, view.name])
+
+  return null
+}
+
 // ─── Componente principal — internal (con view fija) ─────────────────────────
 function MapContents({ view }: { view: MapView }) {
   return (
@@ -1062,6 +1194,7 @@ function MapContents({ view }: { view: MapView }) {
       <CapaElementos view={view} />
       <CapaCotas view={view} />
       <EditorGeoman view={view} />
+      <BoxSelect view={view} />
       <MeasureTool view={view} />
       <DrawAreaTooltip />
       <CenterOnSelected />

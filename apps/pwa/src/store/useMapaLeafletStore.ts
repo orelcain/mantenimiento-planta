@@ -42,8 +42,11 @@ interface MapaLeafletState {
   currentView: ViewName
   elementos: ElementoMapa[]
   selectedId: string | null
+  /** Ids adicionales seleccionados (multi-seleccion, ademas de selectedId) */
+  multiSelection: string[]
   editMode: boolean
-  capasVisibles: Record<string, boolean>   // capas DXF visibles por nombre
+  /** Visibilidad de capas DXF, independiente por vista */
+  capasVisibles: Record<ViewName, Record<string, boolean>>
 
   // ── Grilla ──────────────────────────────────────────────────────────────────
   grillaVisible: boolean
@@ -65,13 +68,19 @@ interface MapaLeafletState {
   // Acciones
   setView: (v: ViewName) => void
   setSelectedId: (id: string | null) => void
+  toggleMultiSelect: (id: string) => void
+  clearMultiSelection: () => void
+  getAllSelectedIds: () => string[]
   toggleEditMode: () => void
   setCapaVisible: (name: string, visible: boolean) => void
   setAllCapas: (visible: boolean) => void
 
   addElemento: (e: Omit<ElementoMapa, 'id' | 'createdAt' | 'updatedAt'>) => string
+  addElementosBulk: (items: Omit<ElementoMapa, 'id' | 'createdAt' | 'updatedAt'>[]) => void
   updateElemento: (id: string, patch: Partial<ElementoMapa>) => void
+  updateElementosBulk: (ids: string[], patch: Partial<ElementoMapa>) => void
   deleteElemento: (id: string) => void
+  removeElementosBulk: (ids: string[]) => void
   clearAllElementos: () => void
 
   toggleMeasureMode: () => void
@@ -92,8 +101,9 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
       currentView: 'recinto' as ViewName,
       elementos: [],
       selectedId: null,
+      multiSelection: [],
       editMode: false,
-      capasVisibles: {},
+      capasVisibles: { recinto: {}, interior: {} } as Record<ViewName, Record<string, boolean>>,
       grillaVisible: false,
       grillaAngles: { recinto: 0, interior: 0 } as Record<string, number>,
       toggleGrilla:   () => set((s) => ({ grillaVisible: !s.grillaVisible })),
@@ -106,22 +116,58 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
       measureClearSignal: 0,
       measureLastAngle: null,
 
-      setView: (v) => set({ currentView: v, selectedId: null }),
-      setSelectedId: (id) => set({ selectedId: id }),
+      setView: (v) => set({ currentView: v, selectedId: null, multiSelection: [] }),
+      setSelectedId: (id) => set({ selectedId: id, multiSelection: [] }),
+      toggleMultiSelect: (id) => set((s) => {
+        // Si es el primary, promover un multi al primary (o limpiar)
+        if (s.selectedId === id) {
+          const first = s.multiSelection[0]
+          return { selectedId: first ?? null, multiSelection: s.multiSelection.slice(1) }
+        }
+        // Si ya esta en multiSelection → remover
+        if (s.multiSelection.includes(id)) {
+          return { multiSelection: s.multiSelection.filter((x) => x !== id) }
+        }
+        // Si no hay primary → este se vuelve primary
+        if (!s.selectedId) {
+          return { selectedId: id }
+        }
+        // Sino → agregar a multiSelection
+        return { multiSelection: [...s.multiSelection, id] }
+      }),
+      clearMultiSelection: () => set({ multiSelection: [] }),
+      getAllSelectedIds: () => {
+        const s = useMapaLeafletStore.getState()
+        const out: string[] = []
+        if (s.selectedId) out.push(s.selectedId)
+        for (const x of s.multiSelection) if (!out.includes(x)) out.push(x)
+        return out
+      },
       toggleEditMode: () => set((s) => ({
         editMode: !s.editMode,
         selectedId: null,
+        multiSelection: [],
         measureMode: false,  // edit y measure son mutuamente excluyentes
       })),
 
       setCapaVisible: (name, visible) =>
-        set((s) => ({ capasVisibles: { ...s.capasVisibles, [name]: visible } })),
+        set((s) => {
+          const v = s.currentView
+          return {
+            capasVisibles: {
+              ...s.capasVisibles,
+              [v]: { ...(s.capasVisibles[v] ?? {}), [name]: visible },
+            },
+          }
+        }),
 
       setAllCapas: (visible) =>
         set((s) => {
+          const v = s.currentView
           const next: Record<string, boolean> = {}
-          for (const k of Object.keys(s.capasVisibles)) next[k] = visible
-          return { capasVisibles: next }
+          const current = s.capasVisibles[v] ?? {}
+          for (const k of Object.keys(current)) next[k] = visible
+          return { capasVisibles: { ...s.capasVisibles, [v]: next } }
         }),
 
       addElemento: (data) => {
@@ -133,6 +179,17 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
         return id
       },
 
+      addElementosBulk: (items) => {
+        const now = Date.now()
+        const nuevos: ElementoMapa[] = items.map((data) => ({
+          ...data,
+          id: makeId(),
+          createdAt: now,
+          updatedAt: now,
+        }))
+        set((s) => ({ elementos: [...s.elementos, ...nuevos] }))
+      },
+
       updateElemento: (id, patch) =>
         set((s) => ({
           elementos: s.elementos.map((e) =>
@@ -140,11 +197,29 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
           ),
         })),
 
+      updateElementosBulk: (ids, patch) => {
+        const idSet = new Set(ids)
+        const now = Date.now()
+        set((s) => ({
+          elementos: s.elementos.map((e) =>
+            idSet.has(e.id) ? { ...e, ...patch, updatedAt: now } : e,
+          ),
+        }))
+      },
+
       deleteElemento: (id) =>
         set((s) => ({
           elementos: s.elementos.filter((e) => e.id !== id),
           selectedId: s.selectedId === id ? null : s.selectedId,
         })),
+
+      removeElementosBulk: (ids) => {
+        const idSet = new Set(ids)
+        set((s) => ({
+          elementos: s.elementos.filter((e) => !idSet.has(e.id)),
+          selectedId: s.selectedId && idSet.has(s.selectedId) ? null : s.selectedId,
+        }))
+      },
 
       clearAllElementos: () => set({ elementos: [], selectedId: null }),
 
@@ -173,6 +248,23 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
     }),
     {
       name: 'mapa-leaflet-v1',
+      version: 2,
+      migrate: (persisted, version) => {
+        const s = persisted as Partial<MapaLeafletState> & { capasVisibles?: unknown }
+        if (version < 2 && s.capasVisibles && typeof s.capasVisibles === 'object') {
+          const old = s.capasVisibles as Record<string, unknown>
+          // Detectar si es flat antiguo (valores boolean) vs nested nuevo (valores objeto)
+          const isFlat = Object.values(old).every((v) => typeof v === 'boolean')
+          if (isFlat) {
+            const currView = (s.currentView ?? 'recinto') as ViewName
+            s.capasVisibles = {
+              recinto: currView === 'recinto' ? (old as Record<string, boolean>) : {},
+              interior: currView === 'interior' ? (old as Record<string, boolean>) : {},
+            } as Record<ViewName, Record<string, boolean>>
+          }
+        }
+        return s as MapaLeafletState
+      },
       partialize: (s) => ({
         elementos: s.elementos,
         capasVisibles: s.capasVisibles,
