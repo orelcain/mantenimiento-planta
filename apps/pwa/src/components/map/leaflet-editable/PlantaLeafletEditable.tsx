@@ -858,9 +858,20 @@ function MeasureTool({ view }: { view: MapView }) {
   // Carga puntos de snap cuando se activa el modo medir
   useEffect(() => {
     if (!measureMode) { snapPtsRef.current = []; return }
-    const { capasVisibles, currentView } = useMapaLeafletStore.getState()
+    const { capasVisibles, currentView, elementos } = useMapaLeafletStore.getState()
     const visible = view.layers.filter((c) => capasVisibles[currentView]?.[c.name] ?? c.defaultVisible)
     const all: L.LatLng[] = []
+
+    // Vértices de elementos absorbidos/dibujados en el store
+    for (const el of elementos) {
+      if (el.mapView !== currentView) continue
+      if (el.poligono) {
+        for (const [lat, lng] of el.poligono) all.push(L.latLng(lat, lng))
+      } else if (el.punto) {
+        all.push(L.latLng(el.punto[0], el.punto[1]))
+      }
+    }
+
     Promise.all(
       visible.map((c) =>
         fetch(`${import.meta.env.BASE_URL}maps/${view.folder}/${c.name}.geojson`)
@@ -888,11 +899,11 @@ function MeasureTool({ view }: { view: MapView }) {
       const pts   = pointsRef.current
 
       const dot = L.circleMarker(newPt, {
-        radius: snap ? 6 : 5,
+        radius: snap ? 4 : 3,
         color: '#f59e0b',
         fillColor: snap ? '#f59e0b' : '#0a0e14',
-        fillOpacity: snap ? 0.8 : 1,
-        weight: 2.5, interactive: false,
+        fillOpacity: snap ? 1 : 1,
+        weight: 2, interactive: false,
       }).addTo(map)
       layersRef.current.push(dot)
 
@@ -932,7 +943,12 @@ function MeasureTool({ view }: { view: MapView }) {
     }
 
     const onMouseMove = (e: L.LeafletMouseEvent) => {
-      const snap   = findSnap(map, snapPtsRef.current, e.latlng, 18)
+      const zoom = map.getZoom()
+      // Umbral adaptativo: reduce al hacer zoom in para más precisión
+      const threshPx = Math.max(8, Math.round(20 - Math.max(0, zoom + 4) * 1.5))
+      // Radio del anillo: pequeño y fijo para no tapar el elemento
+      const ringRadius = 5
+      const snap = findSnap(map, snapPtsRef.current, e.latlng, threshPx)
       snapActiveRef.current = snap
       const cursor = snap ?? e.latlng
 
@@ -940,9 +956,10 @@ function MeasureTool({ view }: { view: MapView }) {
       if (snap) {
         if (snapRingRef.current) {
           snapRingRef.current.setLatLng(snap)
+          snapRingRef.current.setRadius(ringRadius)
         } else {
           snapRingRef.current = L.circleMarker(snap, {
-            radius: 9, color: '#fbbf24', fillOpacity: 0, weight: 2, interactive: false,
+            radius: ringRadius, color: '#fbbf24', fillOpacity: 0.15, fillColor: '#fbbf24', weight: 2, interactive: false,
           }).addTo(map)
         }
       } else if (snapRingRef.current) {
