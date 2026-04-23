@@ -72,7 +72,11 @@ function TipoBadge({ tipo }: { tipo: ElementoMapa['tipo'] }) {
 
 /** Picker de nivel para un elemento individual en el panel de propiedades */
 function NivelPickerEl({ elId, nivelId, view }: { elId: string; nivelId?: string; view: string }) {
-  const niveles      = useMapaLeafletStore((s) => (s.niveles as Nivel[]).filter((n) => n.mapView === view).sort((a, b) => a.orden - b.orden))
+  const allNiveles     = useMapaLeafletStore((s) => s.niveles)
+  const niveles        = useMemo(
+    () => (allNiveles as Nivel[]).filter((n) => n.mapView === view).sort((a, b) => a.orden - b.orden),
+    [allNiveles, view],
+  )
   const updateElemento = useMapaLeafletStore((s) => s.updateElemento)
   if (niveles.length === 0) return null
   return (

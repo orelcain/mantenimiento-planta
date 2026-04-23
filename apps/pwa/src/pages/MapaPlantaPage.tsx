@@ -9,7 +9,7 @@
  */
 
 import { Map as MapIcon, Building2, Globe2, Ruler, LayoutGrid, BoxSelect, Layers, Plus, Trash2, ChevronDown } from 'lucide-react'
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useState, useEffect, useMemo } from 'react'
 import { PlantaLeafletEditable, PanelCapasYZonas } from '@/components/map/leaflet-editable'
 import { useMapaLeafletStore, type Nivel } from '@/store/useMapaLeafletStore'
 import { MAP_VIEWS, type ViewName } from '@/data/dxfLayers'
@@ -29,7 +29,11 @@ const NIVEL_COLORS = ['#38bdf8', '#4ade80', '#a78bfa', '#fb923c', '#f472b6', '#f
 
 /** Selector compacto de nivel/piso con popover inline */
 function NivelSelector({ view }: { view: ViewName }) {
-  const niveles        = useMapaLeafletStore((s) => s.niveles.filter((n) => n.mapView === view).sort((a, b) => a.orden - b.orden))
+  const allNiveles     = useMapaLeafletStore((s) => s.niveles)
+  const niveles        = useMemo(
+    () => allNiveles.filter((n) => n.mapView === view).sort((a, b) => a.orden - b.orden),
+    [allNiveles, view],
+  )
   const currentNivelId = useMapaLeafletStore((s) => s.currentNivelId)
   const setCurrentNivel = useMapaLeafletStore((s) => s.setCurrentNivel)
   const addNivel       = useMapaLeafletStore((s) => s.addNivel)
