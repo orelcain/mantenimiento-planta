@@ -1299,6 +1299,11 @@ function BoxSelect({ view }: { view: MapView }) {
     const isClickableTarget = (t: EventTarget | null): boolean => {
       const el = t as Element | null
       if (!el || !el.closest) return false
+      // En modo botón (boxSelectMode): solo bloquear controles de UI, no capas interactivas del mapa
+      // En modo shift: bloquear también elementos interactivos para no interferir con click normal
+      if (boxSelectMode) {
+        return !!el.closest('.leaflet-popup, .leaflet-control')
+      }
       return !!el.closest('.leaflet-marker-icon, .leaflet-popup, .leaflet-interactive, .leaflet-control')
     }
 
