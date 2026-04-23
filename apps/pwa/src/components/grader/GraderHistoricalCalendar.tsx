@@ -19,7 +19,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from '@/components/ui'
-import { ChevronLeft, ChevronRight, Loader2, Clock, Database, Eye, Trash2, AlertTriangle, Sun, Moon, Wrench } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, Clock, Database, Eye, Trash2, AlertTriangle, Sun, Moon, Wrench, Tag } from 'lucide-react'
 import { QuickGateChangeButton } from './QuickGateChangeButton'
 import { listSnapshots } from '@/services/grader/graderConfigSnapshot.service'
 import { cn } from '@/lib/utils'
@@ -30,7 +30,9 @@ import {
   saveDailySummary,
   deleteDailySummary,
   listDailySummariesByRange,
+  loadPausesAggregates,
 } from '@/services/grader/graderDailySummary.service'
+import { resolveEffectiveTag } from '@/services/grader/graderPauseTags'
 import { parseFile, mergeParsedData } from '@/services/grader/graderExcelParser'
 import { parseMatrixErrorString, MATRIX_P0_CAUSES } from '@/services/grader/graderMatrixP0Causes'
 import {
@@ -177,6 +179,11 @@ export function GraderHistoricalCalendar({
   const [deletingId, setDeletingId] = useState<string | null>(null)
   // Counts de cambios manuales de gate por shiftDocId (lazy-loaded al seleccionar un día)
   const [configChangeCounts, setConfigChangeCounts] = useState<Map<string, number>>(new Map())
+  // M9 — Filtro "solo turnos con pausas sin anotar"
+  const [filterUntagged, setFilterUntagged] = useState(false)
+  // summaryId → cantidad de pausas sin tag (calculado lazy cuando el filtro está activo)
+  const [untaggedCounts, setUntaggedCounts] = useState<Map<string, number>>(new Map())
+  const [loadingUntagged, setLoadingUntagged] = useState(false)
   const autoSelectedRef = useRef(!!effectiveInitialKey)
 
   useEffect(() => {
@@ -498,6 +505,39 @@ export function GraderHistoricalCalendar({
     }
   }
 
+  // M9 — Carga conteos de pausas sin anotar para el mes visible cuando el filtro está activo.
+  // Solo procesa summaries con pausesCount > 0 para minimizar lecturas Firestore.
+  useEffect(() => {
+    if (!filterUntagged) return
+    const summaryList = Array.from(historicalByDate.values()).flat()
+    const pending = summaryList.filter(
+      (s) => (s.pausesCount ?? 0) > 0 && !untaggedCounts.has(s.id),
+    )
+    if (pending.length === 0) return
+    let cancelled = false
+    setLoadingUntagged(true)
+    Promise.all(
+      pending.map(async (s) => {
+        const data = await loadPausesAggregates(s.id)
+        const count = data
+          ? data.pauses.filter((p) => !resolveEffectiveTag(p)).length
+          : 0
+        return { id: s.id, count }
+      }),
+    )
+      .then((results) => {
+        if (cancelled) return
+        setUntaggedCounts((prev) => {
+          const next = new Map(prev)
+          for (const { id, count } of results) next.set(id, count)
+          return next
+        })
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoadingUntagged(false) })
+    return () => { cancelled = true }
+  }, [filterUntagged, historicalByDate]) // eslint-disable-line react-hooks/exhaustive-deps
+
   /** Duración defensiva: si durationMinutes > 1440 (>24h, claramente anómalo),
    *  deriva de endAt–startAt y limita a 720 min (12h = turno completo máximo). */
   function safeDisplayMinutes(hist: GraderDailySummary): number | undefined {
@@ -552,6 +592,21 @@ export function GraderHistoricalCalendar({
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
+          {/* M9 — Filtro pausas sin anotar */}
+          <Button
+            variant={filterUntagged ? 'default' : 'outline'}
+            size="sm"
+            className={cn(
+              'gap-1.5 text-xs',
+              filterUntagged && 'bg-amber-500 hover:bg-amber-600 border-amber-500 text-white',
+            )}
+            onClick={() => setFilterUntagged((v) => !v)}
+          >
+            {loadingUntagged
+              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              : <Tag className="h-3.5 w-3.5" />}
+            Sin anotar
+          </Button>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-7 gap-1 mb-2">
@@ -586,6 +641,12 @@ export function GraderHistoricalCalendar({
                   })
                 : []
 
+              // M9 — cuando el filtro está activo, calcula si el día tiene algún turno con pausas sin anotar
+              const dayHasUntagged = filterUntagged && hasData
+                ? dayHistorical.some((s) => (untaggedCounts.get(s.id) ?? 0) > 0)
+                : false
+              const dimByFilter = filterUntagged && hasData && !dayHasUntagged
+
               return (
                 <button
                   key={dayKey}
@@ -597,6 +658,8 @@ export function GraderHistoricalCalendar({
                     hasData && worstP0 !== null && worstP0 >= 3.5 && 'border-red-400/50 bg-red-500/3',
                     hasData && worstP0 !== null && worstP0 >= 2 && worstP0 < 3.5 && 'border-amber-400/50',
                     hasData && worstP0 !== null && worstP0 < 2 && 'border-emerald-400/40',
+                    dimByFilter && 'opacity-20 pointer-events-none',
+                    dayHasUntagged && !isSelected && 'border-amber-400/70 bg-amber-500/5',
                   )}
                   onClick={() => setSelectedDate(day)}
                 >
@@ -619,6 +682,7 @@ export function GraderHistoricalCalendar({
                   {sortedHistory.map((s) => {
                     const shiftLabel = s.shiftId === 'Turno día' ? 'D' : 'N'
                     const p0 = s.pointZeroPct
+                    const untagged = filterUntagged ? (untaggedCounts.get(s.id) ?? null) : null
                     return (
                       <div
                         key={s.id}
@@ -631,6 +695,11 @@ export function GraderHistoricalCalendar({
                       >
                         <span className="text-[8px] font-medium opacity-70">{shiftLabel}</span>
                         <span className="text-[9px] font-bold tabular-nums">{p0.toFixed(1)}%</span>
+                        {untagged !== null && untagged > 0 && (
+                          <span className="ml-0.5 text-[7px] leading-none px-0.5 rounded bg-amber-500/25 text-amber-600 font-semibold">
+                            🏷{untagged}
+                          </span>
+                        )}
                       </div>
                     )
                   })}
