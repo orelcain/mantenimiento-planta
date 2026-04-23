@@ -428,12 +428,18 @@ function CapaDXF({ cfg, folder }: { cfg: DxfLayerConfig; folder: string }) {
           color, fillColor: color,
           fillOpacity: isInteractive ? 0.85 : 0.5,
           weight: 1.5,
-        })
+          // Evita que Geoman agregue handles de edición a capas DXF de referencia
+          pmIgnore: true,
+        } as any)
       }
-      onEachFeature={isInteractive ? (feature, layer) => {
-        const block = feature.properties?.block as string | undefined
-        if (block) layer.bindTooltip(block, { sticky: true, className: 'eqp-tooltip' })
-      } : undefined}
+      onEachFeature={(feature, layer) => {
+        // Excluir todas las capas DXF del control de Geoman
+        ;(layer as any).pm?.disable?.()
+        if (isInteractive) {
+          const block = feature.properties?.block as string | undefined
+          if (block) layer.bindTooltip(block, { sticky: true, className: 'eqp-tooltip' })
+        }
+      }}
       interactive={isInteractive}
     />
   )
