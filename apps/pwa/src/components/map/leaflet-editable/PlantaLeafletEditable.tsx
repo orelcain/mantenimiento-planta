@@ -627,9 +627,41 @@ function EditorGeoman({ view }: { view: MapView }) {
 function CapaElementos({ view }: { view: MapView }) {
   const map = useMap()
   const allElementos = useMapaLeafletStore((s) => s.elementos)
+  const capasUsuario = useMapaLeafletStore((s) => s.capasUsuario)
+
+  const capasById = useMemo(() => {
+    const m = new Map<string, { color: string; visible: boolean; orden: number }>()
+    for (const c of capasUsuario) {
+      if (c.mapView === view.name) m.set(c.id, { color: c.color, visible: c.visible, orden: c.orden })
+    }
+    return m
+  }, [capasUsuario, view.name])
+
+  // Gestion de panes Leaflet por capa (z-index)
+  useEffect(() => {
+    if (!map) return
+    for (const c of capasUsuario) {
+      if (c.mapView !== view.name) continue
+      const paneName = `capa-${c.id}`
+      let pane = map.getPane(paneName)
+      if (!pane) pane = map.createPane(paneName)
+      // overlayPane default = 400. Distribuir capas en [410, 410+orden]
+      pane.style.zIndex = String(410 + c.orden)
+      pane.style.pointerEvents = 'auto'
+    }
+  }, [map, capasUsuario, view.name])
+
   const elementos = useMemo(
-    () => allElementos.filter((e) => e.mapView === view.name),
-    [allElementos, view.name],
+    () => allElementos.filter((e) => {
+      if (e.mapView !== view.name) return false
+      const capaId = e.meta?.capaId
+      if (typeof capaId === 'string') {
+        const capa = capasById.get(capaId)
+        if (capa && !capa.visible) return false
+      }
+      return true
+    }),
+    [allElementos, view.name, capasById],
   )
   const selectedId = useMapaLeafletStore((s) => s.selectedId)
   const setSelectedId = useMapaLeafletStore((s) => s.setSelectedId)
@@ -661,7 +693,9 @@ function CapaElementos({ view }: { view: MapView }) {
     for (const el of elementos) {
       const isSelected = selectedSet.has(el.id)
       const isPrimary = el.id === selectedId
-      const color = ESTADO_COLOR[el.estado] ?? '#888'
+      const capaId = typeof el.meta?.capaId === 'string' ? el.meta.capaId : null
+      const capaColor = capaId ? capasById.get(capaId)?.color : null
+      const color = capaColor ?? ESTADO_COLOR[el.estado] ?? '#888'
 
       const baseStyle = {
         color, weight: isSelected ? (isPrimary ? 3 : 2.5) : 2,
@@ -669,19 +703,28 @@ function CapaElementos({ view }: { view: MapView }) {
         className: isSelected ? 'editable-element editable-element-selected' : 'editable-element',
       }
 
+      const paneName = capaId && map.getPane(`capa-${capaId}`) ? `capa-${capaId}` : undefined
+
       let layer = current.get(el.id) as any
+      // Si cambio el pane (reasignacion de capa), destruir y recrear
+      if (layer && layer.options?.pane !== paneName) {
+        map.removeLayer(layer)
+        current.delete(el.id)
+        layer = null
+      }
       if (!layer) {
+        const opts = { ...baseStyle, ...(paneName ? { pane: paneName } : {}) }
         // Crear nueva capa
         if (el.tipo === 'linea' && el.poligono && el.poligono.length >= 2) {
           layer = L.polyline(el.poligono as L.LatLngTuple[], {
-            ...baseStyle, fillOpacity: 0, weight: isSelected ? 4 : 3,
+            ...opts, fillOpacity: 0, weight: isSelected ? 4 : 3,
           })
         } else if (el.poligono && el.poligono.length >= 3) {
-          layer = L.polygon(el.poligono as L.LatLngTuple[], baseStyle)
+          layer = L.polygon(el.poligono as L.LatLngTuple[], opts)
         } else if (el.punto && el.radio) {
-          layer = L.circle(el.punto as L.LatLngTuple, { ...baseStyle, radius: el.radio })
+          layer = L.circle(el.punto as L.LatLngTuple, { ...opts, radius: el.radio })
         } else if (el.punto) {
-          layer = L.circleMarker(el.punto as L.LatLngTuple, { ...baseStyle, radius: 7 })
+          layer = L.circleMarker(el.punto as L.LatLngTuple, { ...opts, radius: 7 })
         }
         if (layer) {
           ;(layer.options as any).elementoId = el.id
@@ -721,7 +764,7 @@ function CapaElementos({ view }: { view: MapView }) {
         layer.bindPopup(popupHtml)
       }
     }
-  }, [map, elementos, selectedId, setSelectedId, selectedSet, toggleMultiSelect])
+  }, [map, elementos, selectedId, setSelectedId, selectedSet, toggleMultiSelect, capasById])
 
   // ── Geoman edit handles: sólo sobre la capa seleccionada cuando editMode está activo ──
   useEffect(() => {

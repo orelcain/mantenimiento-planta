@@ -7,7 +7,7 @@
  *  • Confirmación antes de eliminar
  */
 
-import { Eye, EyeOff, Edit3, Save, Trash2, Check, Search, X, Crosshair, Copy, Download, CheckCircle2, Loader, Layers, Undo2 } from 'lucide-react'
+import { Eye, EyeOff, Edit3, Save, Trash2, Check, Search, X, Crosshair, Copy, Download, CheckCircle2, Loader, Plus, GripVertical } from 'lucide-react'
 import { MAP_VIEWS, type DxfLayerConfig } from '@/data/dxfLayers'
 import { useMapaLeafletStore, type ZonaCategoria, type ZonaEstado, type ElementoMapa, type PolygonCoords } from '@/store/useMapaLeafletStore'
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
@@ -74,8 +74,11 @@ export function PanelCapasYZonas() {
   const {
     currentView, elementos: allElementos,
     selectedId, multiSelection, editMode, capasVisibles,
+    capasUsuario,
     setSelectedId, clearMultiSelection, toggleEditMode, setCapaVisible, setAllCapas,
-    updateElemento, updateElementosBulk, deleteElemento, addElemento, addElementosBulk, removeElementosBulk,
+    updateElemento, updateElementosBulk, updateElementosBulkMeta,
+    deleteElemento, addElemento, addElementosBulk, removeElementosBulk,
+    addCapaUsuario, updateCapaUsuario, deleteCapaUsuario, toggleCapaUsuarioVisible, reorderCapas,
   } = useMapaLeafletStore()
 
   // ids seleccionados (primary + multi)
@@ -110,6 +113,16 @@ export function PanelCapasYZonas() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const geojson = await res.json() as { features: GJFeature[] }
 
+      // Crear o reutilizar CapaUsuario asociada
+      const cfg = MAP_VIEWS[currentView].layers.find((l) => l.name === layerName)
+      const nombre = cfg?.label ?? layerName
+      let capaId = capasUsuario.find((c) => c.mapView === currentView && c.nombre === nombre)?.id
+      if (!capaId) {
+        capaId = addCapaUsuario({
+          nombre, color: cfg?.color ?? '#94a3b8', visible: true, mapView: currentView,
+        })
+      }
+
       const items: Parameters<typeof addElementosBulk>[0] = []
 
       for (const feature of geojson.features) {
@@ -121,7 +134,7 @@ export function PanelCapasYZonas() {
           categoria: 'otros' as const,
           estado: 'operativo' as const,
           mapView: currentView,
-          meta: { dxfSource: layerName },
+          meta: { dxfSource: layerName, capaId },
         }
 
         if (geom.type === 'LineString') {
@@ -151,7 +164,7 @@ export function PanelCapasYZonas() {
     } finally {
       setAbsorbing((prev) => ({ ...prev, [layerName]: false }))
     }
-  }, [currentView, absorbedLayers, addElementosBulk, setCapaVisible])
+  }, [currentView, absorbedLayers, addElementosBulk, setCapaVisible, capasUsuario, addCapaUsuario])
 
   // Elementos semánticos (zonas/equipos nombrados) — excluye cotas y estructurales absorbidos
   const elementos = useMemo(
@@ -169,18 +182,6 @@ export function PanelCapasYZonas() {
     [allElementos, currentView],
   )
 
-  // Estructurales absorbidos del DXF, agrupados por capa fuente
-  const estructurales = useMemo(() => {
-    const g = new Map<string, ElementoMapa[]>()
-    for (const e of allElementos) {
-      const src = e.meta?.dxfSource
-      if (e.mapView === currentView && typeof src === 'string') {
-        if (!g.has(src)) g.set(src, [])
-        g.get(src)!.push(e)
-      }
-    }
-    return g
-  }, [allElementos, currentView])
 
   // Capas de la vista actual
   const viewLayers = MAP_VIEWS[currentView].layers
@@ -190,19 +191,32 @@ export function PanelCapasYZonas() {
   const [filtroCat, setFiltroCat]   = useState<'all' | ZonaCategoria>('all')
   const [confirmDel, setConfirmDel] = useState(false)
   const [cotasExpanded, setCotasExpanded] = useState(true)
-  const [estExpanded, setEstExpanded] = useState(false)
-  const [confirmUndo, setConfirmUndo] = useState<string | null>(null)
+  const [editingCapaId, setEditingCapaId] = useState<string | null>(null)
+  const [confirmDelCapa, setConfirmDelCapa] = useState<string | null>(null)
+  const [draggingCapaId, setDraggingCapaId] = useState<string | null>(null)
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
+  const [dxfImportExpanded, setDxfImportExpanded] = useState(false)
   const nameInputRef = useRef<HTMLInputElement>(null)
 
-  const devolverAlDxf = useCallback((src: string) => {
-    const items = allElementos.filter((e) =>
-      e.mapView === currentView && e.meta?.dxfSource === src,
-    )
-    if (items.length === 0) return
-    removeElementosBulk(items.map((e) => e.id))
-    setCapaVisible(src, true)
-    setConfirmUndo(null)
-  }, [allElementos, currentView, removeElementosBulk, setCapaVisible])
+  // Capas del usuario para la vista actual, ordenadas de mayor a menor orden
+  // (arriba = z-index mas alto)
+  const capasDeVista = useMemo(() => {
+    return capasUsuario
+      .filter((c) => c.mapView === currentView)
+      .sort((a, b) => b.orden - a.orden)
+  }, [capasUsuario, currentView])
+
+  // Contador de elementos por capa de la vista actual
+  const contadorPorCapa = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const e of allElementos) {
+      if (e.mapView !== currentView) continue
+      const id = typeof e.meta?.capaId === 'string' ? e.meta.capaId : null
+      if (id) m.set(id, (m.get(id) ?? 0) + 1)
+    }
+    return m
+  }, [allElementos, currentView])
+
 
   const selectedEl = useMemo(
     () => allElementos.find((e) => e.id === selectedId && e.mapView === currentView) ?? null,
@@ -266,7 +280,7 @@ export function PanelCapasYZonas() {
             tab === 'capas' ? 'bg-gray-800 text-amber-400' : 'text-gray-500 hover:text-gray-300'
           }`}
         >
-          Capas DXF
+          Capas
         </button>
       </div>
 
@@ -291,72 +305,226 @@ export function PanelCapasYZonas() {
       <div className="flex-1 overflow-y-auto">
         {tab === 'capas' && (
           <div className="p-2">
-            <div className="flex gap-1 mb-2">
+            {/* Header: titulo + nueva */}
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] uppercase tracking-wider font-semibold text-gray-400">
+                Capas {currentView === 'recinto' ? 'Recinto' : 'Planta'}
+              </span>
               <button
-                onClick={() => setAllCapas(true)}
-                className="flex-1 text-[10px] py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded transition-colors">
-                Todas
-              </button>
-              <button
-                onClick={() => setAllCapas(false)}
-                className="flex-1 text-[10px] py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded transition-colors">
-                Ninguna
+                onClick={() => {
+                  const id = addCapaUsuario({
+                    nombre: 'Nueva capa', color: '#fbbf24', visible: true, mapView: currentView,
+                  })
+                  setEditingCapaId(id)
+                }}
+                className="text-[9px] px-2 py-0.5 bg-amber-600/80 hover:bg-amber-500 text-gray-900 rounded font-semibold flex items-center gap-0.5"
+                title="Crear nueva capa"
+              >
+                <Plus size={10} /> Nueva
               </button>
             </div>
 
-            {Array.from(grupos.entries()).map(([gKey, capas]) => (
-              <div key={gKey} className="mb-3">
-                <div className="text-[9px] uppercase tracking-wider text-gray-500 px-1 mb-1 font-semibold">
-                  {GROUP_LABEL[gKey as DxfLayerConfig['group']]}
-                </div>
-                {capas.map((c) => {
-                  const visible = capasVisibles[currentView]?.[c.name] ?? c.defaultVisible
-                  const isAbsorbing = absorbing[c.name] ?? false
-                  const isAbsorbed = absorbedLayers.has(c.name)
+            {/* Lista CapasUsuario */}
+            {capasDeVista.length === 0 ? (
+              <div className="text-[11px] text-gray-500 italic text-center py-3">
+                Sin capas. Crea una o importa desde DXF abajo.
+              </div>
+            ) : (
+              <div className="flex flex-col gap-0.5 mb-3">
+                {capasDeVista.map((c, idx) => {
+                  const count = contadorPorCapa.get(c.id) ?? 0
+                  const isEditing = editingCapaId === c.id
+                  const isConfirmingDel = confirmDelCapa === c.id
                   return (
-                    <div key={c.name} className="flex items-center gap-1">
+                    <div
+                      key={c.id}
+                      draggable
+                      onDragStart={(e) => { e.dataTransfer.setData('text/plain', c.id); setDraggingCapaId(c.id) }}
+                      onDragOver={(e) => { e.preventDefault(); setDragOverIdx(idx) }}
+                      onDragEnd={() => { setDraggingCapaId(null); setDragOverIdx(null) }}
+                      onDrop={(e) => {
+                        e.preventDefault()
+                        const dragId = e.dataTransfer.getData('text/plain')
+                        if (!dragId || dragId === c.id) return
+                        const orderedIds = capasDeVista.map((x) => x.id)
+                        const from = orderedIds.indexOf(dragId)
+                        const to = orderedIds.indexOf(c.id)
+                        if (from < 0 || to < 0) return
+                        orderedIds.splice(from, 1)
+                        orderedIds.splice(to, 0, dragId)
+                        // Store uses orden ascendente (mayor = encima)
+                        reorderCapas(currentView, [...orderedIds].reverse())
+                        setDraggingCapaId(null); setDragOverIdx(null)
+                      }}
+                      className={`flex items-center gap-1 px-1 py-0.5 rounded text-left transition-all border ${
+                        draggingCapaId === c.id ? 'opacity-40' : ''
+                      } ${dragOverIdx === idx ? 'border-amber-500/60 bg-amber-900/20' : 'border-transparent hover:bg-gray-800/60'}`}
+                    >
+                      <GripVertical size={10} className="text-gray-600 shrink-0 cursor-grab active:cursor-grabbing" />
                       <button
-                        onClick={() => { if (!isAbsorbed) setCapaVisible(c.name, !visible) }}
-                        disabled={isAbsorbed}
-                        title={isAbsorbed ? 'Absorbida — ver en "Estructura absorbida"' : (visible ? 'Ocultar capa' : 'Mostrar capa')}
-                        className={`flex-1 flex items-center gap-2 px-2 py-1 rounded text-left transition-colors group min-w-0 ${
-                          isAbsorbed ? 'opacity-40 cursor-not-allowed' : 'hover:bg-gray-800'
-                        }`}
+                        onClick={() => toggleCapaUsuarioVisible(c.id)}
+                        title={c.visible ? 'Ocultar capa' : 'Mostrar capa'}
+                        className="shrink-0"
                       >
-                        {visible && !isAbsorbed
-                          ? <Eye size={11} className="text-gray-400 shrink-0 group-hover:text-amber-400" />
-                          : <EyeOff size={11} className="text-gray-600 shrink-0 group-hover:text-gray-400" />}
-                        <div
-                          className="w-3 h-3 rounded-sm border border-gray-700 shrink-0"
-                          style={{ backgroundColor: (visible && !isAbsorbed) ? c.color : 'transparent' }}
+                        {c.visible
+                          ? <Eye size={11} className="text-gray-300" />
+                          : <EyeOff size={11} className="text-gray-600" />}
+                      </button>
+                      <label className="shrink-0 cursor-pointer" title="Cambiar color">
+                        <div className="w-3 h-3 rounded-sm border border-gray-700" style={{ backgroundColor: c.color }} />
+                        <input
+                          type="color"
+                          value={c.color}
+                          onChange={(e) => updateCapaUsuario(c.id, { color: e.target.value })}
+                          className="sr-only"
                         />
-                        <span className={`text-[11px] truncate transition-colors ${(visible && !isAbsorbed) ? 'text-gray-200' : 'text-gray-600'}`}>
-                          {c.label}
-                        </span>
-                      </button>
-                      <button
-                        onClick={() => { void absorbDxfLayer(c.name) }}
-                        disabled={isAbsorbing || isAbsorbed}
-                        title={isAbsorbed ? 'Ya absorbida' : 'Absorber como elementos editables'}
-                        className={`shrink-0 flex items-center justify-center w-6 h-6 rounded transition-colors ${
-                          isAbsorbed
-                            ? 'text-emerald-500 cursor-default'
-                            : isAbsorbing
-                              ? 'text-gray-500 cursor-wait'
-                              : 'text-gray-600 hover:text-amber-400 hover:bg-gray-800'
-                        }`}
-                      >
-                        {isAbsorbing
-                          ? <Loader size={10} className="animate-spin" />
-                          : isAbsorbed
-                            ? <CheckCircle2 size={10} />
-                            : <Download size={10} />}
-                      </button>
+                      </label>
+                      {isEditing ? (
+                        <input
+                          autoFocus
+                          defaultValue={c.nombre}
+                          onBlur={(e) => {
+                            const v = e.target.value.trim()
+                            if (v) updateCapaUsuario(c.id, { nombre: v })
+                            setEditingCapaId(null)
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+                            if (e.key === 'Escape') setEditingCapaId(null)
+                          }}
+                          className="flex-1 min-w-0 bg-gray-800 border border-amber-600/60 rounded px-1 py-0 text-[11px] text-white outline-none"
+                        />
+                      ) : (
+                        <button
+                          onDoubleClick={() => setEditingCapaId(c.id)}
+                          title="Doble-click para renombrar"
+                          className={`flex-1 min-w-0 text-[11px] text-left truncate transition-colors ${c.visible ? 'text-gray-200' : 'text-gray-500'}`}
+                        >
+                          {c.nombre}
+                        </button>
+                      )}
+                      <span className="text-[9px] text-gray-500 font-mono shrink-0">{count}</span>
+                      {isConfirmingDel ? (
+                        <>
+                          <button
+                            onClick={() => setConfirmDelCapa(null)}
+                            className="text-[9px] px-1 py-0.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded"
+                            title="Cancelar"
+                          >
+                            ✕
+                          </button>
+                          <button
+                            onClick={() => { deleteCapaUsuario(c.id, { keepElementos: true }); setConfirmDelCapa(null) }}
+                            className="text-[9px] px-1 py-0.5 bg-amber-700/80 hover:bg-amber-600 text-white rounded"
+                            title="Eliminar capa, conservar elementos (quedan sin capa)"
+                          >
+                            Capa
+                          </button>
+                          <button
+                            onClick={() => { deleteCapaUsuario(c.id); setConfirmDelCapa(null) }}
+                            className="text-[9px] px-1 py-0.5 bg-red-700 hover:bg-red-600 text-white rounded font-medium"
+                            title="Eliminar capa Y todos sus elementos"
+                          >
+                            Todo
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmDelCapa(c.id)}
+                          title="Eliminar capa"
+                          className="shrink-0 flex items-center justify-center w-5 h-5 rounded text-gray-600 hover:text-red-400 hover:bg-gray-800"
+                        >
+                          <Trash2 size={10} />
+                        </button>
+                      )}
                     </div>
                   )
                 })}
               </div>
-            ))}
+            )}
+
+            {/* Importar desde DXF */}
+            <div className="border-t border-gray-700/50 pt-2 mt-1">
+              <button
+                onClick={() => setDxfImportExpanded((v) => !v)}
+                className="w-full flex items-center justify-between px-1 mb-1 group"
+              >
+                <span className="text-[9px] uppercase tracking-wider font-semibold text-gray-500 group-hover:text-gray-300 flex items-center gap-1">
+                  <Download size={10} /> Importar desde DXF
+                </span>
+                <span className="text-[9px] text-gray-500">
+                  {viewLayers.length} {dxfImportExpanded ? '▲' : '▼'}
+                </span>
+              </button>
+
+              {dxfImportExpanded && (
+                <div>
+                  <div className="flex gap-1 mb-2">
+                    <button
+                      onClick={() => setAllCapas(true)}
+                      className="flex-1 text-[10px] py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded">
+                      Ver todas
+                    </button>
+                    <button
+                      onClick={() => setAllCapas(false)}
+                      className="flex-1 text-[10px] py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded">
+                      Ocultar todas
+                    </button>
+                  </div>
+                  {Array.from(grupos.entries()).map(([gKey, capas]) => (
+                    <div key={gKey} className="mb-2">
+                      <div className="text-[9px] uppercase tracking-wider text-gray-500 px-1 mb-0.5 font-semibold">
+                        {GROUP_LABEL[gKey as DxfLayerConfig['group']]}
+                      </div>
+                      {capas.map((c) => {
+                        const visible = capasVisibles[currentView]?.[c.name] ?? c.defaultVisible
+                        const isAbsorbing = absorbing[c.name] ?? false
+                        const isAbsorbed = absorbedLayers.has(c.name)
+                        return (
+                          <div key={c.name} className="flex items-center gap-1">
+                            <button
+                              onClick={() => { if (!isAbsorbed) setCapaVisible(c.name, !visible) }}
+                              disabled={isAbsorbed}
+                              title={isAbsorbed ? 'Absorbida — ver en Capas' : (visible ? 'Ocultar' : 'Mostrar')}
+                              className={`flex-1 flex items-center gap-2 px-2 py-0.5 rounded text-left transition-colors group min-w-0 ${
+                                isAbsorbed ? 'opacity-40 cursor-not-allowed' : 'hover:bg-gray-800'
+                              }`}
+                            >
+                              {visible && !isAbsorbed
+                                ? <Eye size={10} className="text-gray-400 shrink-0" />
+                                : <EyeOff size={10} className="text-gray-600 shrink-0" />}
+                              <div className="w-2 h-2 rounded-sm border border-gray-700 shrink-0"
+                                   style={{ backgroundColor: (visible && !isAbsorbed) ? c.color : 'transparent' }} />
+                              <span className={`text-[10px] truncate ${(visible && !isAbsorbed) ? 'text-gray-200' : 'text-gray-600'}`}>
+                                {c.label}
+                              </span>
+                            </button>
+                            <button
+                              onClick={() => { void absorbDxfLayer(c.name) }}
+                              disabled={isAbsorbing || isAbsorbed}
+                              title={isAbsorbed ? 'Ya absorbida' : 'Absorber como capa editable'}
+                              className={`shrink-0 flex items-center justify-center w-5 h-5 rounded transition-colors ${
+                                isAbsorbed
+                                  ? 'text-emerald-500 cursor-default'
+                                  : isAbsorbing
+                                    ? 'text-gray-500 cursor-wait'
+                                    : 'text-gray-600 hover:text-amber-400 hover:bg-gray-800'
+                              }`}
+                            >
+                              {isAbsorbing
+                                ? <Loader size={9} className="animate-spin" />
+                                : isAbsorbed
+                                  ? <CheckCircle2 size={9} />
+                                  : <Download size={9} />}
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -507,70 +675,6 @@ export function PanelCapasYZonas() {
               </div>
             )}
 
-            {/* ── Seccion Estructura absorbida del DXF ────────────────── */}
-            {estructurales.size > 0 && (
-              <div className="border-t border-gray-700/30 pt-2 mt-1">
-                <button
-                  onClick={() => setEstExpanded((v) => !v)}
-                  className="w-full flex items-center justify-between px-1 mb-1 group"
-                >
-                  <span className="text-[9px] uppercase tracking-wider font-semibold text-orange-400/80 group-hover:text-orange-300 flex items-center gap-1">
-                    <Layers size={9} /> Estructura absorbida
-                  </span>
-                  <span className="text-[9px] text-orange-500/70">
-                    {Array.from(estructurales.values()).reduce((n, a) => n + a.length, 0)} {estExpanded ? '▲' : '▼'}
-                  </span>
-                </button>
-
-                {estExpanded && (
-                  <div className="flex flex-col gap-1">
-                    {Array.from(estructurales.entries()).map(([src, items]) => {
-                      const cfg = viewLayers.find((l) => l.name === src)
-                      const color = cfg?.color ?? '#94a3b8'
-                      const label = cfg?.label ?? src
-                      const isConfirming = confirmUndo === src
-                      return (
-                        <div key={src} className="flex items-center gap-1 px-1 py-0.5 rounded hover:bg-gray-800/50">
-                          <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: color }} />
-                          <span className="text-[10px] text-gray-200 flex-1 truncate">{label}</span>
-                          <span className="text-[9px] text-gray-500 font-mono">{items.length}</span>
-                          {isConfirming ? (
-                            <>
-                              <button
-                                onClick={() => setConfirmUndo(null)}
-                                className="text-[9px] px-1 py-0.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded"
-                                title="Cancelar"
-                              >
-                                ✕
-                              </button>
-                              <button
-                                onClick={() => devolverAlDxf(src)}
-                                className="text-[9px] px-1 py-0.5 bg-red-700 hover:bg-red-600 text-white rounded font-medium"
-                                title={`Eliminar ${items.length} elementos y mostrar capa DXF original`}
-                              >
-                                Devolver
-                              </button>
-                            </>
-                          ) : (
-                            <button
-                              onClick={() => setConfirmUndo(src)}
-                              className="shrink-0 flex items-center justify-center w-5 h-5 rounded text-gray-500 hover:text-orange-400 hover:bg-gray-800 transition-colors"
-                              title="Devolver al DXF original (elimina los editables)"
-                            >
-                              <Undo2 size={10} />
-                            </button>
-                          )}
-                        </div>
-                      )
-                    })}
-                    <p className="text-[9px] text-gray-500 italic px-1 mt-1">
-                      Cliquea un muro/linea en el mapa para editarlo. En modo edicion aparecen los vertices.
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-
             {/* ── Panel multi-seleccion (2+ elementos) ─────────────── */}
             {isMultiSelect && (
               <div className="border-t border-amber-700/60 pt-3 mt-1 flex flex-col gap-2 bg-amber-900/10 -mx-2 px-2 pb-2 rounded-b">
@@ -585,6 +689,29 @@ export function PanelCapasYZonas() {
                   >
                     limpiar
                   </button>
+                </div>
+
+                <div>
+                  <label className="text-[9px] uppercase text-gray-500 font-semibold">Asignar a capa</label>
+                  <select
+                    className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-[11px] text-white mt-0.5 focus:border-amber-500/60 focus:outline-none"
+                    defaultValue=""
+                    onChange={(e) => {
+                      const v = e.target.value
+                      if (v === '__none__') {
+                        updateElementosBulkMeta(selectedIds, { capaId: undefined })
+                      } else if (v) {
+                        updateElementosBulkMeta(selectedIds, { capaId: v })
+                      }
+                      e.target.value = ''
+                    }}
+                  >
+                    <option value="">— elegir capa —</option>
+                    <option value="__none__">(sin capa)</option>
+                    {capasDeVista.map((c) => (
+                      <option key={c.id} value={c.id}>{c.nombre}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
