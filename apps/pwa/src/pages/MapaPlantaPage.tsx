@@ -8,9 +8,10 @@
  * Editor: zonas, equipos y formas custom (Geoman). Persistencia local.
  */
 
-import { Map as MapIcon, Building2, Globe2, Ruler, LayoutGrid, BoxSelect } from 'lucide-react'
+import { Map as MapIcon, Building2, Globe2, Ruler, LayoutGrid, BoxSelect, Layers, Plus, Trash2, ChevronDown } from 'lucide-react'
+import { useRef, useState, useEffect } from 'react'
 import { PlantaLeafletEditable, PanelCapasYZonas } from '@/components/map/leaflet-editable'
-import { useMapaLeafletStore } from '@/store/useMapaLeafletStore'
+import { useMapaLeafletStore, type Nivel } from '@/store/useMapaLeafletStore'
 import { MAP_VIEWS, type ViewName } from '@/data/dxfLayers'
 
 const VIEW_ICONS: Record<ViewName, typeof Globe2> = {
@@ -21,6 +22,174 @@ const VIEW_ICONS: Record<ViewName, typeof Globe2> = {
 const VIEW_DESC: Record<ViewName, string> = {
   recinto:  'Predio completo · cerco, edificios, accesos',
   interior: 'Planta principal · muros, salas, etiquetas DXF v2',
+}
+
+/** Colores sugeridos por defecto al crear un nuevo nivel */
+const NIVEL_COLORS = ['#38bdf8', '#4ade80', '#a78bfa', '#fb923c', '#f472b6', '#facc15']
+
+/** Selector compacto de nivel/piso con popover inline */
+function NivelSelector({ view }: { view: ViewName }) {
+  const niveles        = useMapaLeafletStore((s) => s.niveles.filter((n) => n.mapView === view).sort((a, b) => a.orden - b.orden))
+  const currentNivelId = useMapaLeafletStore((s) => s.currentNivelId)
+  const setCurrentNivel = useMapaLeafletStore((s) => s.setCurrentNivel)
+  const addNivel       = useMapaLeafletStore((s) => s.addNivel)
+  const updateNivel    = useMapaLeafletStore((s) => s.updateNivel)
+  const deleteNivel    = useMapaLeafletStore((s) => s.deleteNivel)
+
+  const [open, setOpen]           = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [draft, setDraft]         = useState('')
+  const popRef = useRef<HTMLDivElement>(null)
+
+  // Cierra popover al clic fuera
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (popRef.current && !popRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  const activeNivel = niveles.find((n) => n.id === currentNivelId)
+
+  function handleAddNivel() {
+    const idx   = niveles.length
+    const color = NIVEL_COLORS[idx % NIVEL_COLORS.length] ?? '#94a3b8'
+    const zBase = niveles.reduce((acc, n) => Math.max(acc, n.zBase + n.altura), 0)
+    addNivel({
+      nombre: idx === 0 ? 'Planta Baja' : `Piso ${idx}`,
+      abrev:  idx === 0 ? 'PB' : `P${idx}`,
+      zBase,
+      altura: 3.5,
+      color,
+      mapView: view,
+    })
+  }
+
+  function commitRename(n: Nivel) {
+    if (draft.trim()) updateNivel(n.id, { nombre: draft.trim() })
+    setEditingId(null)
+    setDraft('')
+  }
+
+  return (
+    <div className="relative" ref={popRef}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        title="Filtrar por nivel/piso"
+        className={[
+          'flex items-center gap-1 text-[11px] px-2 sm:px-3 py-1.5 rounded-lg transition-all border',
+          currentNivelId
+            ? 'border-sky-500/70 text-sky-300 bg-sky-600/20 shadow-[0_0_8px_rgba(56,189,248,0.2)]'
+            : 'border-gray-700/60 text-gray-400 hover:text-sky-300 hover:border-sky-700/50',
+        ].join(' ')}
+      >
+        <Layers size={12} />
+        <span className="hidden sm:inline font-medium">
+          {activeNivel ? activeNivel.abrev : 'Niveles'}
+        </span>
+        {activeNivel && (
+          <span
+            className="w-2 h-2 rounded-full shrink-0"
+            style={{ backgroundColor: activeNivel.color }}
+          />
+        )}
+        <ChevronDown size={10} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute top-full mt-1 right-0 z-[9999] w-56 bg-gray-900 border border-gray-700/80 rounded-xl shadow-2xl py-1 overflow-hidden">
+          {/* "Todos los niveles" */}
+          <button
+            onClick={() => { setCurrentNivel(null); setOpen(false) }}
+            className={`w-full flex items-center gap-2 px-3 py-1.5 text-[11px] transition-colors ${
+              !currentNivelId ? 'bg-gray-700/60 text-white' : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+            }`}
+          >
+            <span className="w-3 h-3 rounded-full border border-gray-600 shrink-0" />
+            <span>Todos los niveles</span>
+          </button>
+
+          {niveles.length > 0 && <div className="h-px bg-gray-800 my-1 mx-2" />}
+
+          {/* Lista de niveles */}
+          {niveles.map((n) => (
+            <div
+              key={n.id}
+              className={`flex items-center gap-1.5 px-2 py-1 text-[11px] rounded-lg mx-1 transition-colors group ${
+                currentNivelId === n.id ? 'bg-gray-700/50' : 'hover:bg-gray-800/60'
+              }`}
+            >
+              {/* Dot color (clic → cambia color) */}
+              <label className="cursor-pointer shrink-0">
+                <span
+                  className="block w-3 h-3 rounded-full border border-white/20"
+                  style={{ backgroundColor: n.color }}
+                />
+                <input
+                  type="color"
+                  className="sr-only"
+                  value={n.color}
+                  onChange={(e) => updateNivel(n.id, { color: e.target.value })}
+                />
+              </label>
+
+              {/* Abrev badge */}
+              <span
+                className="px-1 rounded text-[9px] font-bold shrink-0"
+                style={{ backgroundColor: n.color + '33', color: n.color }}
+              >
+                {n.abrev}
+              </span>
+
+              {/* Nombre (dblclick → editar) */}
+              {editingId === n.id ? (
+                <input
+                  autoFocus
+                  className="flex-1 bg-gray-800 text-white text-[11px] px-1 rounded outline-none border border-sky-500/60"
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onBlur={() => commitRename(n)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') commitRename(n); if (e.key === 'Escape') { setEditingId(null) } }}
+                />
+              ) : (
+                <button
+                  className="flex-1 text-left text-gray-300 truncate"
+                  onClick={() => { setCurrentNivel(n.id); setOpen(false) }}
+                  onDoubleClick={() => { setEditingId(n.id); setDraft(n.nombre) }}
+                  title={`${n.nombre} · Z+${n.zBase}m · ${n.altura}m altura. Doble clic para renombrar`}
+                >
+                  {n.nombre}
+                </button>
+              )}
+
+              {/* zBase badge */}
+              <span className="text-[9px] text-gray-600 shrink-0">+{n.zBase}m</span>
+
+              {/* Eliminar */}
+              <button
+                onClick={() => { if (window.confirm(`¿Eliminar nivel "${n.nombre}"? Los elementos quedarán sin nivel.`)) deleteNivel(n.id) }}
+                className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 transition-all shrink-0"
+              >
+                <Trash2 size={10} />
+              </button>
+            </div>
+          ))}
+
+          {/* Agregar nivel */}
+          <div className="h-px bg-gray-800 my-1 mx-2" />
+          <button
+            onClick={handleAddNivel}
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-gray-500 hover:text-sky-400 hover:bg-gray-800/60 transition-colors"
+          >
+            <Plus size={11} />
+            <span>Añadir nivel</span>
+          </button>
+        </div>
+      )}
+    </div>
+  )
 }
 
 export function MapaPlantaPage() {
@@ -98,6 +267,9 @@ export function MapaPlantaPage() {
             </button>
           )}
         </div>
+
+        {/* Selector de nivel/piso */}
+        <NivelSelector view={currentView} />
 
         {/* Vista — icono + label corto en móvil */}
         <div className="flex items-center bg-gray-800 rounded-lg p-0.5 gap-0.5 shrink-0">

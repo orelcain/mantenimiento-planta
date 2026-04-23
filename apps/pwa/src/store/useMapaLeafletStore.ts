@@ -19,6 +19,18 @@ export interface CapaUsuario {
   mapView: ViewName
 }
 
+/** Nivel / piso de la estructura. Define el eje Z de los elementos. */
+export interface Nivel {
+  id: string
+  nombre: string   // "Planta Baja", "Segundo Piso"
+  abrev: string    // "PB", "P1" — label compacto en header
+  zBase: number    // altura desde 0 en metros (0, 3.5, 7.0)
+  altura: number   // piso a techo en metros (3.5, 3.2, 0=abierto)
+  color: string    // identificador visual del nivel
+  mapView: ViewName
+  orden: number    // 0 = más bajo
+}
+
 export type ZonaCategoria = 'produccion' | 'frio' | 'utilidades' | 'logistica' | 'admin' | 'estructura' | 'otros'
 export type ZonaEstado    = 'operativo' | 'alerta' | 'detenido'
 export type ElementoTipo  = 'zona' | 'equipo' | 'sensor' | 'punto' | 'forma' | 'cota' | 'linea'
@@ -41,6 +53,8 @@ export interface ElementoMapa {
   punto?: [number, number]
   /** Para círculos: radio en unidades del DXF */
   radio?: number
+  /** Nivel/piso al que pertenece (undefined = sin asignar, visible en todos los niveles) */
+  nivelId?: string
   /** Metadata libre */
   meta?: Record<string, unknown>
   /** Marca de creación / última edición */
@@ -62,6 +76,10 @@ interface MapaLeafletState {
   capasVisibles: Record<ViewName, Record<string, boolean>>
   /** Capas de usuario (agrupaciones con visibilidad/orden propios) */
   capasUsuario: CapaUsuario[]
+  /** Niveles/pisos definidos por el usuario */
+  niveles: Nivel[]
+  /** Nivel activo para filtrar (null = mostrar todos) */
+  currentNivelId: string | null
 
   // ── Grilla ──────────────────────────────────────────────────────────────────
   grillaVisible: boolean
@@ -111,6 +129,12 @@ interface MapaLeafletState {
   /** Reordena capas de una vista (orderedIds de abajo hacia arriba) */
   reorderCapas: (mapView: ViewName, orderedIds: string[]) => void
 
+  // ── Niveles / pisos ───────────────────────────────────────────────────────
+  addNivel: (data: Omit<Nivel, 'id' | 'orden'>) => string
+  updateNivel: (id: string, patch: Partial<Nivel>) => void
+  deleteNivel: (id: string) => void
+  setCurrentNivel: (id: string | null) => void
+
   toggleMeasureMode: () => void
   addMeasureSegment: (dist: number) => void
   setMeasurePointCount: (n: number) => void
@@ -134,6 +158,8 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
       boxSelectMode: false,
       capasVisibles: { recinto: {}, interior: {} } as Record<ViewName, Record<string, boolean>>,
       capasUsuario: [],
+      niveles: [],
+      currentNivelId: null,
       grillaVisible: false,
       grillaAngles: { recinto: 0, interior: 0 } as Record<string, number>,
       toggleGrilla:   () => set((s) => ({ grillaVisible: !s.grillaVisible })),
@@ -326,6 +352,31 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
 
       clearAllElementos: () => set({ elementos: [], selectedId: null }),
 
+      addNivel: (data) => {
+        const id = 'niv_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7)
+        set((s) => {
+          const siblings = s.niveles.filter((n) => n.mapView === data.mapView)
+          const maxOrden = siblings.reduce((m, n) => Math.max(m, n.orden), -1)
+          return { niveles: [...s.niveles, { ...data, id, orden: maxOrden + 1 }] }
+        })
+        return id
+      },
+
+      updateNivel: (id, patch) =>
+        set((s) => ({ niveles: s.niveles.map((n) => (n.id === id ? { ...n, ...patch } : n)) })),
+
+      deleteNivel: (id) =>
+        set((s) => ({
+          niveles: s.niveles.filter((n) => n.id !== id),
+          // Elementos del nivel eliminado quedan sin nivel (visible en todos)
+          elementos: s.elementos.map((e) =>
+            e.nivelId === id ? { ...e, nivelId: undefined } : e,
+          ),
+          currentNivelId: s.currentNivelId === id ? null : s.currentNivelId,
+        })),
+
+      setCurrentNivel: (id) => set({ currentNivelId: id }),
+
       toggleMeasureMode: () => set((s) => ({
         measureMode: !s.measureMode,
         editMode: false,
@@ -351,11 +402,12 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
     }),
     {
       name: 'mapa-leaflet-v1',
-      version: 3,
+      version: 4,
       migrate: (persisted, version) => {
         const s = persisted as Partial<MapaLeafletState> & {
           capasVisibles?: unknown
           capasUsuario?: unknown
+          niveles?: unknown
         }
         // v1 → v2: capasVisibles flat → nested per-view
         if (version < 2 && s.capasVisibles && typeof s.capasVisibles === 'object') {
@@ -412,12 +464,19 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
             return { ...e, meta: { ...(e.meta ?? {}), capaId } }
           })
         }
+        // v3 → v4: inicializar niveles y currentNivelId
+        if (version < 4) {
+          if (!Array.isArray(s.niveles)) s.niveles = []
+          if (s.currentNivelId === undefined) s.currentNivelId = null
+        }
         return s as MapaLeafletState
       },
       partialize: (s) => ({
         elementos: s.elementos,
         capasVisibles: s.capasVisibles,
         capasUsuario: s.capasUsuario,
+        niveles: s.niveles,
+        currentNivelId: s.currentNivelId,
         currentView: s.currentView,
         grillaVisible: s.grillaVisible,
         grillaAngles: s.grillaAngles,

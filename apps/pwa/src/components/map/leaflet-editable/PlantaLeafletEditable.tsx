@@ -623,11 +623,20 @@ function EditorGeoman({ view }: { view: MapView }) {
   return null
 }
 
+// ─── Helper: opacidad según nivel activo ─────────────────────────────────────
+function getNivelOpacity(nivelId: string | undefined, currentNivelId: string | null): number {
+  if (currentNivelId === null) return 1      // sin filtro → todos visibles
+  if (!nivelId) return 1                     // sin nivel asignado → referencia estructural, siempre visible
+  if (nivelId === currentNivelId) return 1   // nivel activo → visible
+  return 0.12                                // otro nivel → fantasma
+}
+
 // ─── Renderiza elementos del store + selección/hover ─────────────────────────
 function CapaElementos({ view }: { view: MapView }) {
   const map = useMap()
   const allElementos = useMapaLeafletStore((s) => s.elementos)
   const capasUsuario = useMapaLeafletStore((s) => s.capasUsuario)
+  const currentNivelId = useMapaLeafletStore((s) => s.currentNivelId)
 
   const capasById = useMemo(() => {
     const m = new Map<string, { color: string; visible: boolean; orden: number }>()
@@ -696,10 +705,13 @@ function CapaElementos({ view }: { view: MapView }) {
       const capaId = typeof el.meta?.capaId === 'string' ? el.meta.capaId : null
       const capaColor = capaId ? capasById.get(capaId)?.color : null
       const color = capaColor ?? ESTADO_COLOR[el.estado] ?? '#888'
+      const nivelOp = getNivelOpacity(el.nivelId, currentNivelId)
+      const isGhost = nivelOp < 1
 
       const baseStyle = {
         color, weight: isSelected ? (isPrimary ? 3 : 2.5) : 2,
-        fillColor: color, fillOpacity: isSelected ? 0.35 : 0.18,
+        fillColor: color, fillOpacity: isGhost ? 0.04 : (isSelected ? 0.35 : 0.18),
+        opacity: isGhost ? nivelOp : 1,
         className: isSelected ? 'editable-element editable-element-selected' : 'editable-element',
       }
 
@@ -730,6 +742,8 @@ function CapaElementos({ view }: { view: MapView }) {
           ;(layer.options as any).elementoId = el.id
           layer.on('click', (ev: L.LeafletMouseEvent) => {
             L.DomEvent.stopPropagation(ev)
+            // Ignorar clics en elementos fantasma (otro nivel)
+            if (getNivelOpacity(el.nivelId, useMapaLeafletStore.getState().currentNivelId) < 1) return
             const oe = ev.originalEvent
             if (oe && (oe.shiftKey || oe.metaKey || oe.ctrlKey)) {
               toggleMultiSelect(el.id)
@@ -764,7 +778,7 @@ function CapaElementos({ view }: { view: MapView }) {
         layer.bindPopup(popupHtml)
       }
     }
-  }, [map, elementos, selectedId, setSelectedId, selectedSet, toggleMultiSelect, capasById])
+  }, [map, elementos, selectedId, setSelectedId, selectedSet, toggleMultiSelect, capasById, currentNivelId])
 
   // ── Geoman edit handles: sólo sobre la capa seleccionada cuando editMode está activo ──
   useEffect(() => {

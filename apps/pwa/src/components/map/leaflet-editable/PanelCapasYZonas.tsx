@@ -9,7 +9,7 @@
 
 import { Eye, EyeOff, Edit3, Save, Trash2, Check, Search, X, Crosshair, Copy, Download, CheckCircle2, Loader, Plus, GripVertical } from 'lucide-react'
 import { MAP_VIEWS, type DxfLayerConfig } from '@/data/dxfLayers'
-import { useMapaLeafletStore, type ZonaCategoria, type ZonaEstado, type ElementoMapa, type PolygonCoords } from '@/store/useMapaLeafletStore'
+import { useMapaLeafletStore, type ZonaCategoria, type ZonaEstado, type ElementoMapa, type PolygonCoords, type Nivel } from '@/store/useMapaLeafletStore'
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 
 // ─── Tipos mínimos GeoJSON para absorción DXF ────────────────────────────────
@@ -70,11 +70,35 @@ function TipoBadge({ tipo }: { tipo: ElementoMapa['tipo'] }) {
   )
 }
 
+/** Picker de nivel para un elemento individual en el panel de propiedades */
+function NivelPickerEl({ elId, nivelId, view }: { elId: string; nivelId?: string; view: string }) {
+  const niveles      = useMapaLeafletStore((s) => (s.niveles as Nivel[]).filter((n) => n.mapView === view).sort((a, b) => a.orden - b.orden))
+  const updateElemento = useMapaLeafletStore((s) => s.updateElemento)
+  if (niveles.length === 0) return null
+  return (
+    <div>
+      <label className="text-[9px] uppercase text-gray-500 font-semibold">Nivel / Piso</label>
+      <select
+        className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-[11px] text-white mt-0.5 focus:border-sky-500/60 focus:outline-none"
+        value={nivelId ?? ''}
+        onChange={(e) => updateElemento(elId, { nivelId: e.target.value || undefined })}
+      >
+        <option value="">Sin nivel (visible en todos)</option>
+        {niveles.map((n) => (
+          <option key={n.id} value={n.id}>
+            {n.abrev} — {n.nombre} (+{n.zBase}m)
+          </option>
+        ))}
+      </select>
+    </div>
+  )
+}
+
 export function PanelCapasYZonas() {
   const {
     currentView, elementos: allElementos,
     selectedId, multiSelection, editMode, capasVisibles,
-    capasUsuario,
+    capasUsuario, niveles,
     setSelectedId, clearMultiSelection, toggleEditMode, setCapaVisible, setAllCapas,
     updateElemento, updateElementosBulk, updateElementosBulkMeta,
     deleteElemento, addElemento, addElementosBulk, removeElementosBulk,
@@ -205,6 +229,10 @@ export function PanelCapasYZonas() {
       .filter((c) => c.mapView === currentView)
       .sort((a, b) => b.orden - a.orden)
   }, [capasUsuario, currentView])
+
+  const nivelesBulk = useMemo(() => {
+    return (niveles as Nivel[]).filter((n) => n.mapView === currentView).sort((a, b) => a.orden - b.orden)
+  }, [niveles, currentView])
 
   // Contador de elementos por capa de la vista actual
   const contadorPorCapa = useMemo(() => {
@@ -714,6 +742,29 @@ export function PanelCapasYZonas() {
                   </select>
                 </div>
 
+                {/* Asignar nivel bulk */}
+                {nivelesBulk.length > 0 && (
+                  <div>
+                    <label className="text-[9px] uppercase text-gray-500 font-semibold">Asignar nivel a todos</label>
+                    <select
+                      className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-[11px] text-white mt-0.5 focus:border-sky-500/60 focus:outline-none"
+                      defaultValue=""
+                      onChange={(e) => {
+                        const v = e.target.value
+                        if (v === '__none__') updateElementosBulk(selectedIds, { nivelId: undefined })
+                        else if (v) updateElementosBulk(selectedIds, { nivelId: v })
+                        e.target.value = ''
+                      }}
+                    >
+                      <option value="">— elegir nivel —</option>
+                      <option value="__none__">(sin nivel)</option>
+                      {nivelesBulk.map((n) => (
+                        <option key={n.id} value={n.id}>{n.abrev} — {n.nombre}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 <div>
                   <label className="text-[9px] uppercase text-gray-500 font-semibold">Cambiar categoria a todos</label>
                   <select
@@ -855,6 +906,9 @@ export function PanelCapasYZonas() {
                     </div>
                   </div>
                 )}
+
+                {/* Nivel/piso */}
+                <NivelPickerEl elId={selectedEl.id} nivelId={selectedEl.nivelId} view={selectedEl.mapView} />
 
                 {/* Acciones del elemento */}
                 <div className="flex gap-1 mt-1">
