@@ -9,7 +9,7 @@ import {
   serverTimestamp,
 } from '@/services/firestoreTracked'
 import { db } from '../firebase'
-import type { CalibreWeightRange, GraderModuleConfig, GraderPhysicalConfig, GraderShiftSchedule } from './types'
+import type { CalibreWeightRange, GraderModuleConfig, GraderPhysicalConfig, GraderShiftSchedule, PauseDetectorConfig } from './types'
 
 const COLLECTION = 'graderModuleConfigs'
 const GLOBAL_ID = 'global'
@@ -96,6 +96,21 @@ export async function getModuleRanges(): Promise<GraderModuleConfig | null> {
   const snap = await getDoc(doc(db, COLLECTION, GLOBAL_ID))
   if (!snap.exists()) return null
   return snap.data() as GraderModuleConfig
+}
+
+/** Persiste configuración del detector de pausas en el doc global (merge). */
+export async function savePauseDetectorConfig(params: {
+  config: PauseDetectorConfig
+  updatedBy: string
+}): Promise<void> {
+  const data = deepCleanUndefined({
+    id: 'global',
+    pauseDetectorConfig: params.config,
+    updatedBy: params.updatedBy,
+    updatedAt: new Date().toISOString(),
+    _updatedAt: serverTimestamp(),
+  })
+  await setDoc(doc(db, COLLECTION, GLOBAL_ID), data, { merge: true })
 }
 
 /** Persiste umbrales P0% + rangos de calibre en el doc global (merge). */

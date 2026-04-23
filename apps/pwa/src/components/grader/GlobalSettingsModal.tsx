@@ -22,20 +22,21 @@ import {
 import { Button, Input, Label, Badge } from '@/components/ui'
 import { useAuthStore, useIsAdmin } from '@/store'
 import { useToast } from '@/hooks/useToast'
-import { getModuleRanges, saveModuleAnalysisConfig } from '@/services/grader/graderModuleConfig.service'
+import { getModuleRanges, saveModuleAnalysisConfig, savePauseDetectorConfig } from '@/services/grader/graderModuleConfig.service'
 import { CALIBRE_WEIGHT_RANGES } from '@/services/grader/graderAnalytics'
 import { savePauseTag, archivePauseTag, seedDefaultTagsIfEmpty } from '@/services/grader/graderPauseTags.service'
 import { usePauseTags } from '@/hooks/usePauseTags'
-import type { CalibreWeightRange } from '@/services/grader/types'
+import type { CalibreWeightRange, PauseDetectorConfig } from '@/services/grader/types'
 import type { GraderPauseTag } from '@/services/grader/graderPauseTags'
 import { cn } from '@/lib/utils'
 
-type SettingsTab = 'umbrales' | 'rangos' | 'tags'
+type SettingsTab = 'umbrales' | 'rangos' | 'tags' | 'detector'
 
 const TABS: { id: SettingsTab; label: string }[] = [
   { id: 'umbrales', label: 'Umbrales P0%' },
   { id: 'rangos',   label: 'Rangos calibre' },
   { id: 'tags',     label: 'Tags pausa' },
+  { id: 'detector', label: 'Detector pausas' },
 ]
 
 const EMPTY_TAG: Omit<GraderPauseTag, 'id'> & { id: string } = {
@@ -63,6 +64,22 @@ export function GlobalSettingsModal({ open, onOpenChange }: Props) {
   // Rangos calibre
   const [ranges, setRanges] = useState<CalibreWeightRange[]>(CALIBRE_WEIGHT_RANGES)
 
+  // Detector de pausas (M16) — defaults hardcoded del detector
+  const [detector, setDetector] = useState<Required<PauseDetectorConfig>>({
+    microMinSec: 60,
+    microMaxSec: 300,
+    pausaMaxSec: 1800,
+    largaMaxSec: 3600,
+    colacionMinMin: 45,
+    colacionMaxMin: 90,
+    colacionWindowDia:   { start: 750, end: 870 },
+    colacionWindowNoche: { start:  30, end: 210 },
+    ejerciciosMinMin: 10,
+    ejerciciosMaxMin: 20,
+    ejerciciosAfterStartMin:  120,
+    ejerciciosBeforeStartMin: 180,
+  })
+
   // Tags pausa
   const { tags: pauseTags, loading: tagsLoading, reload: reloadTags } = usePauseTags()
   const [newTag, setNewTag] = useState<GraderPauseTag>(EMPTY_TAG)
@@ -88,6 +105,9 @@ export function GlobalSettingsModal({ open, onOpenChange }: Props) {
           setRanges(cfg.customWeightRanges)
         } else {
           setRanges(CALIBRE_WEIGHT_RANGES)
+        }
+        if (cfg?.pauseDetectorConfig) {
+          setDetector(prev => ({ ...prev, ...cfg.pauseDetectorConfig }))
         }
       })
       .catch(() => {})
@@ -168,6 +188,20 @@ export function GlobalSettingsModal({ open, onOpenChange }: Props) {
         description: err instanceof Error ? err.message : 'Reintentar',
         variant: 'destructive',
       })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleSaveDetector() {
+    if (!user) return
+    setSaving(true)
+    try {
+      await savePauseDetectorConfig({ config: detector, updatedBy: user.id })
+      toast({ title: 'Detector guardado', description: 'Los parámetros se aplicarán en la próxima detección.' })
+      onOpenChange(false)
+    } catch (err) {
+      toast({ title: 'Error al guardar', description: err instanceof Error ? err.message : 'Reintentar', variant: 'destructive' })
     } finally {
       setSaving(false)
     }
@@ -255,6 +289,108 @@ export function GlobalSettingsModal({ open, onOpenChange }: Props) {
                   <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-red-500/15 text-red-600 font-medium">
                     ✕ Crítico — sobre {criticalThreshold}%
                   </span>
+                </div>
+              </div>
+            </div>
+          ) : tab === 'detector' ? (
+            <div className="space-y-4">
+              <p className="text-xs text-muted-foreground">
+                Umbrales del detector automático de pausas. Se aplican en la próxima re-detección o recarga del turno.
+              </p>
+
+              {/* Umbrales de duración */}
+              <div className="border border-border/40 rounded-md p-3 space-y-3">
+                <p className="text-xs font-semibold text-foreground">Umbrales de duración</p>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  {([ ['microMinSec', 'Mín. tiempo muerto (s)', 'ej: 60'],
+                       ['microMaxSec', 'Máx. micro-detención (s)', 'ej: 300'],
+                       ['pausaMaxSec', 'Máx. "Pausa" (s)', 'ej: 1800'],
+                       ['largaMaxSec', 'Máx. "Pausa larga" (s)', 'ej: 3600'],
+                  ] as const).map(([key, label, placeholder]) => (
+                    <div key={key}>
+                      <Label className="text-[10px] text-muted-foreground">{label}</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={detector[key]}
+                        onChange={e => setDetector(prev => ({ ...prev, [key]: Number(e.target.value) }))}
+                        className="h-7 text-xs mt-0.5 font-mono"
+                        placeholder={placeholder}
+                        disabled={!isAdmin}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Colación */}
+              <div className="border border-border/40 rounded-md p-3 space-y-3">
+                <p className="text-xs font-semibold text-foreground">Auto-tag Colación</p>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground">Duración mín. (min)</Label>
+                    <Input type="number" min={0} value={detector.colacionMinMin}
+                      onChange={e => setDetector(p => ({ ...p, colacionMinMin: Number(e.target.value) }))}
+                      className="h-7 text-xs mt-0.5 font-mono" disabled={!isAdmin} />
+                  </div>
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground">Duración máx. (min)</Label>
+                    <Input type="number" min={0} value={detector.colacionMaxMin}
+                      onChange={e => setDetector(p => ({ ...p, colacionMaxMin: Number(e.target.value) }))}
+                      className="h-7 text-xs mt-0.5 font-mono" disabled={!isAdmin} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground">Ventana Turno día (min del día)</Label>
+                    <div className="flex gap-1 mt-0.5">
+                      <Input type="number" min={0} max={1440} value={detector.colacionWindowDia.start}
+                        onChange={e => setDetector(p => ({ ...p, colacionWindowDia: { ...p.colacionWindowDia, start: Number(e.target.value) } }))}
+                        className="h-7 text-xs font-mono" placeholder="inicio" disabled={!isAdmin} />
+                      <Input type="number" min={0} max={1440} value={detector.colacionWindowDia.end}
+                        onChange={e => setDetector(p => ({ ...p, colacionWindowDia: { ...p.colacionWindowDia, end: Number(e.target.value) } }))}
+                        className="h-7 text-xs font-mono" placeholder="fin" disabled={!isAdmin} />
+                    </div>
+                    <p className="text-[9px] text-muted-foreground/60 mt-0.5">
+                      {Math.floor(detector.colacionWindowDia.start/60).toString().padStart(2,'0')}:{((detector.colacionWindowDia.start%60)).toString().padStart(2,'0')} –{' '}
+                      {Math.floor(detector.colacionWindowDia.end/60).toString().padStart(2,'0')}:{((detector.colacionWindowDia.end%60)).toString().padStart(2,'0')}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground">Ventana Turno noche (min del día)</Label>
+                    <div className="flex gap-1 mt-0.5">
+                      <Input type="number" min={0} max={1440} value={detector.colacionWindowNoche.start}
+                        onChange={e => setDetector(p => ({ ...p, colacionWindowNoche: { ...p.colacionWindowNoche, start: Number(e.target.value) } }))}
+                        className="h-7 text-xs font-mono" placeholder="inicio" disabled={!isAdmin} />
+                      <Input type="number" min={0} max={1440} value={detector.colacionWindowNoche.end}
+                        onChange={e => setDetector(p => ({ ...p, colacionWindowNoche: { ...p.colacionWindowNoche, end: Number(e.target.value) } }))}
+                        className="h-7 text-xs font-mono" placeholder="fin" disabled={!isAdmin} />
+                    </div>
+                    <p className="text-[9px] text-muted-foreground/60 mt-0.5">
+                      {Math.floor(detector.colacionWindowNoche.start/60).toString().padStart(2,'0')}:{((detector.colacionWindowNoche.start%60)).toString().padStart(2,'0')} –{' '}
+                      {Math.floor(detector.colacionWindowNoche.end/60).toString().padStart(2,'0')}:{((detector.colacionWindowNoche.end%60)).toString().padStart(2,'0')}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Ejercicios */}
+              <div className="border border-border/40 rounded-md p-3 space-y-3">
+                <p className="text-xs font-semibold text-foreground">Auto-tag Ejercicios</p>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  {([
+                    ['ejerciciosMinMin', 'Duración mín. (min)', '10'],
+                    ['ejerciciosMaxMin', 'Duración máx. (min)', '20'],
+                    ['ejerciciosAfterStartMin',  'Mín. min. desde inicio turno', '120'],
+                    ['ejerciciosBeforeStartMin', 'Máx. min. desde inicio turno', '180'],
+                  ] as const).map(([key, label, placeholder]) => (
+                    <div key={key}>
+                      <Label className="text-[10px] text-muted-foreground">{label}</Label>
+                      <Input type="number" min={0} value={detector[key]}
+                        onChange={e => setDetector(p => ({ ...p, [key]: Number(e.target.value) }))}
+                        className="h-7 text-xs mt-0.5 font-mono" placeholder={placeholder} disabled={!isAdmin} />
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -472,7 +608,10 @@ export function GlobalSettingsModal({ open, onOpenChange }: Props) {
             Cancelar
           </Button>
           {isAdmin && tab !== 'tags' && (
-            <Button onClick={handleSave} disabled={saving || loading}>
+            <Button
+              onClick={tab === 'detector' ? handleSaveDetector : handleSave}
+              disabled={saving || loading}
+            >
               {saving
                 ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" />Guardando…</>
                 : <><Save className="w-4 h-4 mr-1.5" />Guardar</>}

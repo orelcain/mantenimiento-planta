@@ -520,6 +520,38 @@ export interface GraderDeviceConfig {
 // CONFIGURACION GLOBAL DEL MODULO
 // ============================================================================
 
+/**
+ * Parámetros del detector de pausas configurables por el admin (M16).
+ * Los defaults hardcoded en graderPauseDetector.ts se usan cuando este
+ * objeto no existe o cuando un campo es undefined.
+ */
+export interface PauseDetectorConfig {
+  /** Segundos mínimos para registrar tiempo muerto. Default: 60 */
+  microMinSec?: number;
+  /** Segundos máximos de micro-detención (< = no se emite pausa). Default: 300 */
+  microMaxSec?: number;
+  /** Segundos máximos de una "Pausa" (< Larga). Default: 1800 */
+  pausaMaxSec?: number;
+  /** Segundos máximos de una "Pausa larga" (< Parada). Default: 3600 */
+  largaMaxSec?: number;
+  /** Duración mínima de colación en minutos. Default: 45 */
+  colacionMinMin?: number;
+  /** Duración máxima de colación en minutos. Default: 90 */
+  colacionMaxMin?: number;
+  /** Ventana colación Turno día (minutos del día). Default: {start:750, end:870} */
+  colacionWindowDia?: { start: number; end: number };
+  /** Ventana colación Turno noche (minutos del día). Default: {start:30, end:210} */
+  colacionWindowNoche?: { start: number; end: number };
+  /** Duración mínima de ejercicios en minutos. Default: 10 */
+  ejerciciosMinMin?: number;
+  /** Duración máxima de ejercicios en minutos. Default: 20 */
+  ejerciciosMaxMin?: number;
+  /** Minutos mín. desde inicio turno para ventana ejercicios. Default: 120 */
+  ejerciciosAfterStartMin?: number;
+  /** Minutos máx. desde inicio turno para ventana ejercicios. Default: 180 */
+  ejerciciosBeforeStartMin?: number;
+}
+
 export interface GraderModuleConfig {
   id: 'global';
   customWeightRanges: CalibreWeightRange[];
@@ -530,6 +562,8 @@ export interface GraderModuleConfig {
   alertThreshold?: number;
   /** Umbral crítico P0% (línea roja en timeline). Default 3.5. */
   criticalThreshold?: number;
+  /** Parámetros del detector de pausas (M16). */
+  pauseDetectorConfig?: PauseDetectorConfig;
   updatedBy: string;
   updatedAt: string;
 }

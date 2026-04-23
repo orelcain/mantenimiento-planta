@@ -24,29 +24,23 @@
  * usa `getUTCHours/getUTCMinutes` para leer la hora "tal cual" del string.
  */
 
-import type { Pause, PauseTier, MicroDetentionsSummary } from './types'
+import type { Pause, PauseTier, MicroDetentionsSummary, PauseDetectorConfig } from './types'
 
-const MICRO_MIN_SEC = 60    // umbral mínimo para considerar tiempo muerto
-const MICRO_MAX_SEC = 300   // < 5 min → micro
-const PAUSA_MAX_SEC = 1800  // < 30 min → pausa
-const LARGA_MAX_SEC = 3600  // < 60 min → larga
+// ── Defaults hardcoded (se usan cuando PauseDetectorConfig no tiene el campo) ─
+const DEF_MICRO_MIN_SEC          = 60
+const DEF_MICRO_MAX_SEC          = 300
+const DEF_PAUSA_MAX_SEC          = 1800
+const DEF_LARGA_MAX_SEC          = 3600
+const DEF_COLACION_MIN_MIN       = 45
+const DEF_COLACION_MAX_MIN       = 90
+const DEF_EJERCICIOS_MIN_MIN     = 10
+const DEF_EJERCICIOS_MAX_MIN     = 20
+const DEF_EJERCICIOS_AFTER_MIN   = 120
+const DEF_EJERCICIOS_BEFORE_MIN  = 180
+const DEF_CAMBIO_LOTE_WINDOW_MS  = 15 * 60 * 1000
 
-const COLACION_MIN_MIN = 45
-const COLACION_MAX_MIN = 90
-
-// Ejercicios compensatorios: 10-20 min en la ventana 2-3h tras el inicio del turno.
-const EJERCICIOS_MIN_MIN = 10
-const EJERCICIOS_MAX_MIN = 20
-const EJERCICIOS_AFTER_START_MIN = 120  // min 2h después del inicio
-const EJERCICIOS_BEFORE_START_MIN = 180 // máx 3h después del inicio
-
-// Cambio de lote: pausa dentro de ±15 min de un cambio detectado en pieceRecords.
-const CAMBIO_LOTE_WINDOW_MS = 15 * 60 * 1000
-
-// Ventanas de colación por turno (minutos del día, en hora local planta).
-// Noche ampliada a 03:30 para capturar colaciones tardías (empiezan ≥02:00),
-// validado con muestra de 40+ turnos históricos.
-const COLACION_WINDOWS: Record<string, { start: number; end: number }> = {
+/** Ventanas de colación por defecto (minutos del día, hora local planta). */
+export const DEFAULT_COLACION_WINDOWS: Record<string, { start: number; end: number }> = {
   'Turno día':   { start: 12 * 60 + 30, end: 14 * 60 + 30 },
   'Turno noche': { start:  0 * 60 + 30, end:  3 * 60 + 30 },
 }
@@ -58,9 +52,9 @@ export interface PauseDetectionResult {
   totalDeadTimeSec: number
 }
 
-function tierFor(durSec: number): PauseTier {
-  if (durSec < PAUSA_MAX_SEC) return 'pausa'
-  if (durSec < LARGA_MAX_SEC) return 'larga'
+function tierFor(durSec: number, pausaMax: number, largaMax: number): PauseTier {
+  if (durSec < pausaMax) return 'pausa'
+  if (durSec < largaMax) return 'larga'
   return 'parada'
 }
 
@@ -69,10 +63,13 @@ function isColacionCandidate(
   endMs: number,
   durSec: number,
   shiftId: string,
+  colMinMin: number,
+  colMaxMin: number,
+  windows: Record<string, { start: number; end: number }>,
 ): boolean {
   const durMin = durSec / 60
-  if (durMin < COLACION_MIN_MIN || durMin > COLACION_MAX_MIN) return false
-  const window = COLACION_WINDOWS[shiftId]
+  if (durMin < colMinMin || durMin > colMaxMin) return false
+  const window = windows[shiftId]
   if (!window) return false
 
   // Criterio "solape": el gap [gapStart, gapEnd] se cruza con la ventana
@@ -93,11 +90,15 @@ function isEjerciciosCandidate(
   gapStartMs: number,
   durSec: number,
   shiftStartMs: number,
+  ejMinMin: number,
+  ejMaxMin: number,
+  ejAfterMin: number,
+  ejBeforeMin: number,
 ): boolean {
   const durMin = durSec / 60
-  if (durMin < EJERCICIOS_MIN_MIN || durMin > EJERCICIOS_MAX_MIN) return false
+  if (durMin < ejMinMin || durMin > ejMaxMin) return false
   const elapsedMin = (gapStartMs - shiftStartMs) / 60_000
-  return elapsedMin >= EJERCICIOS_AFTER_START_MIN && elapsedMin <= EJERCICIOS_BEFORE_START_MIN
+  return elapsedMin >= ejAfterMin && elapsedMin <= ejBeforeMin
 }
 
 /** Pausa cuyo inicio está dentro de ±15 min de algún cambio de lote detectado. */
@@ -105,7 +106,7 @@ function isCambioLoteCandidate(
   gapStartMs: number,
   loteChangeTsMs: number[],
 ): boolean {
-  return loteChangeTsMs.some((ts) => Math.abs(ts - gapStartMs) <= CAMBIO_LOTE_WINDOW_MS)
+  return loteChangeTsMs.some((ts) => Math.abs(ts - gapStartMs) <= DEF_CAMBIO_LOTE_WINDOW_MS)
 }
 
 function makePauseId(startMs: number, durSec: number): string {
@@ -126,12 +127,31 @@ function makePauseId(startMs: number, durSec: number): string {
  * @param shiftId         'Turno día' | 'Turno noche' (para auto-tag colación)
  * @param loteChangeTsMs  (opcional) timestamps en ms de cambios de lote detectados en pieceRecords.
  *                        Cuando se proporciona, pausas dentro de ±15 min reciben autoTag 'cambio_lote'.
+ * @param cfg             (opcional) sobreescribe umbrales/ventanas del detector (M16).
  */
 export function detectPauses(
   tsSorted: string[],
   shiftId: string,
   loteChangeTsMs: number[] = [],
+  cfg?: PauseDetectorConfig,
 ): PauseDetectionResult {
+  // Resolver parámetros: cfg primero, luego default hardcoded
+  const microMinSec   = cfg?.microMinSec         ?? DEF_MICRO_MIN_SEC
+  const microMaxSec   = cfg?.microMaxSec         ?? DEF_MICRO_MAX_SEC
+  const pausaMaxSec   = cfg?.pausaMaxSec         ?? DEF_PAUSA_MAX_SEC
+  const largaMaxSec   = cfg?.largaMaxSec         ?? DEF_LARGA_MAX_SEC
+  const colMinMin     = cfg?.colacionMinMin       ?? DEF_COLACION_MIN_MIN
+  const colMaxMin     = cfg?.colacionMaxMin       ?? DEF_COLACION_MAX_MIN
+  const ejMinMin      = cfg?.ejerciciosMinMin     ?? DEF_EJERCICIOS_MIN_MIN
+  const ejMaxMin      = cfg?.ejerciciosMaxMin     ?? DEF_EJERCICIOS_MAX_MIN
+  const ejAfterMin    = cfg?.ejerciciosAfterStartMin  ?? DEF_EJERCICIOS_AFTER_MIN
+  const ejBeforeMin   = cfg?.ejerciciosBeforeStartMin ?? DEF_EJERCICIOS_BEFORE_MIN
+  const colWindows: Record<string, { start: number; end: number }> = {
+    ...DEFAULT_COLACION_WINDOWS,
+    ...(cfg?.colacionWindowDia   ? { 'Turno día':   cfg.colacionWindowDia }   : {}),
+    ...(cfg?.colacionWindowNoche ? { 'Turno noche': cfg.colacionWindowNoche } : {}),
+  }
+
   const pauses: Pause[] = []
   const microByHour: Record<string, number> = {}
   let microCount = 0
@@ -152,11 +172,11 @@ export function detectPauses(
     const currMs = Date.parse(curr)
     if (isNaN(prevMs) || isNaN(currMs)) continue
     const gapSec = (currMs - prevMs) / 1000
-    if (gapSec < MICRO_MIN_SEC) continue
+    if (gapSec < microMinSec) continue
 
     totalDeadTimeSec += gapSec
 
-    if (gapSec < MICRO_MAX_SEC) {
+    if (gapSec < microMaxSec) {
       microCount++
       microTotalSec += gapSec
       const hh = String(new Date(prevMs).getUTCHours()).padStart(2, '0')
@@ -164,7 +184,7 @@ export function detectPauses(
       continue
     }
 
-    const tier = tierFor(gapSec)
+    const tier = tierFor(gapSec, pausaMaxSec, largaMaxSec)
     const pause: Pause = {
       id: makePauseId(prevMs, gapSec),
       startAt: prev,
@@ -173,9 +193,9 @@ export function detectPauses(
       tier,
     }
     // Auto-tag: colación > ejercicios > cambio_lote (en orden de confianza descendente)
-    if (isColacionCandidate(prevMs, currMs, gapSec, shiftId)) {
+    if (isColacionCandidate(prevMs, currMs, gapSec, shiftId, colMinMin, colMaxMin, colWindows)) {
       pause.autoTag = 'colacion'
-    } else if (!isNaN(shiftStartMs) && isEjerciciosCandidate(prevMs, gapSec, shiftStartMs)) {
+    } else if (!isNaN(shiftStartMs) && isEjerciciosCandidate(prevMs, gapSec, shiftStartMs, ejMinMin, ejMaxMin, ejAfterMin, ejBeforeMin)) {
       pause.autoTag = 'ejercicios'
     } else if (loteChangeTsMs.length > 0 && isCambioLoteCandidate(prevMs, loteChangeTsMs)) {
       pause.autoTag = 'cambio_lote'
