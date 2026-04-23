@@ -7,8 +7,8 @@
  *  • Confirmación antes de eliminar
  */
 
-import { Eye, EyeOff, Edit3, Save, Trash2, Check, Search, X, Crosshair, Copy, Download, CheckCircle2, Loader, Plus, GripVertical } from 'lucide-react'
-import { MAP_VIEWS, type DxfLayerConfig } from '@/data/dxfLayers'
+import { Eye, EyeOff, Edit3, Save, Trash2, Check, Search, X, Crosshair, Copy, Download, CheckCircle2, Loader, Plus, GripVertical, Layers } from 'lucide-react'
+import { MAP_VIEWS, type DxfLayerConfig, DXF_INTERIOR_SVG_LAYERS } from '@/data/dxfLayers'
 import { useMapaLeafletStore, type ZonaCategoria, type ZonaEstado, type ElementoMapa, type PolygonCoords, type Nivel } from '@/store/useMapaLeafletStore'
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 
@@ -102,8 +102,10 @@ export function PanelCapasYZonas() {
   const {
     currentView, elementos: allElementos,
     selectedId, multiSelection, editMode, capasVisibles,
+    capasSvgVisibles, capasSvgOpacity,
     capasUsuario, niveles,
     setSelectedId, clearMultiSelection, toggleEditMode, setCapaVisible, setAllCapas,
+    setCapaSvgVisible, setCapasSvgOpacity,
     updateElemento, updateElementosBulk, updateElementosBulkMeta,
     deleteElemento, addElemento, addElementosBulk, removeElementosBulk,
     addCapaUsuario, updateCapaUsuario, deleteCapaUsuario, toggleCapaUsuarioVisible, reorderCapas,
@@ -488,6 +490,54 @@ export function PanelCapasYZonas() {
                   {viewLayers.length} {dxfImportExpanded ? '▲' : '▼'}
                 </span>
               </button>
+
+              {/* Capas SVG fieles al DXF — solo vista interior */}
+              {currentView === 'interior' && (
+                <div className="mb-3 pb-2 border-b border-gray-800">
+                  <div className="flex items-center gap-1.5 px-1 mb-1.5">
+                    <Layers size={10} className="text-orange-400" />
+                    <span className="text-[10px] font-bold text-orange-300 uppercase tracking-wider">
+                      Capas SVG fieles al DXF
+                    </span>
+                  </div>
+                  <p className="text-[9px] text-gray-500 px-1 mb-1.5 leading-tight">
+                    Overlay visual (no editable). 2D + 3D.
+                  </p>
+                  {/* Slider opacidad global */}
+                  <div className="flex items-center gap-2 px-1 mb-2">
+                    <span className="text-[9px] text-gray-500">Opacidad</span>
+                    <input
+                      type="range" min={0} max={1} step={0.05}
+                      value={capasSvgOpacity}
+                      onChange={(e) => setCapasSvgOpacity(parseFloat(e.target.value))}
+                      className="flex-1 accent-orange-500"
+                    />
+                    <span className="text-[9px] text-orange-400 font-mono w-6 text-right">
+                      {Math.round(capasSvgOpacity * 100)}%
+                    </span>
+                  </div>
+                  {DXF_INTERIOR_SVG_LAYERS.map((c) => {
+                    const vis = capasSvgVisibles[c.name] ?? c.defaultVisible
+                    return (
+                      <button
+                        key={c.name}
+                        onClick={() => setCapaSvgVisible(c.name, !vis)}
+                        className="w-full flex items-center gap-2 px-2 py-0.5 rounded text-left hover:bg-gray-800 transition-colors"
+                      >
+                        {vis
+                          ? <Eye size={10} className="text-gray-400 shrink-0" />
+                          : <EyeOff size={10} className="text-gray-600 shrink-0" />}
+                        <span className={`text-[10px] truncate flex-1 ${vis ? 'text-gray-200' : 'text-gray-600'}`}>
+                          {c.label}
+                        </span>
+                        <span className={`text-[8px] font-mono ${c.sizeKb > 300 ? 'text-amber-500' : 'text-gray-600'}`}>
+                          {c.sizeKb < 10 ? `${c.sizeKb}KB` : `${c.sizeKb}K`}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
 
               {dxfImportExpanded && (
                 <div>

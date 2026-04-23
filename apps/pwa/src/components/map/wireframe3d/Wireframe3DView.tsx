@@ -11,8 +11,16 @@ import { Canvas, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
+import { SVGLoader } from 'three/examples/jsm/loaders/SVGLoader.js'
 import { useMapaLeafletStore } from '@/store/useMapaLeafletStore'
-import { MAP_VIEWS, type DxfLayerConfig, type ViewName } from '@/data/dxfLayers'
+import {
+  MAP_VIEWS,
+  type DxfLayerConfig,
+  type ViewName,
+  DXF_INTERIOR_SVG_LAYERS,
+  DXF_SVG_BOUNDS,
+  type DxfSvgLayerConfig,
+} from '@/data/dxfLayers'
 import { RotateCw, Home } from 'lucide-react'
 
 // ── Constantes ───────────────────────────────────────────────────────────────
@@ -127,6 +135,97 @@ function LayerLines({ layer, folder, cx, cy }: {
   )
 }
 
+// ── SVGLayer3D — carga un SVG DXF y lo renderiza como líneas 3D al y=0 ──────
+/**
+ * Las capas SVG del DXF usan viewBox 0..1000000 (X) × 0..714286 (Y) que
+ * corresponde a DXF_SVG_BOUNDS = X[-5,100], Y[40,115]. En SVG, Y crece hacia
+ * abajo → DXF Y=115 (top) cae en SVG Y=0; invertimos al convertir a 3D.
+ */
+const SVG_BOUNDS = DXF_SVG_BOUNDS  // [[Ymin,Xmin],[Ymax,Xmax]]
+const SVG_VIEWBOX_W = 1_000_000
+const SVG_VIEWBOX_H = 714_286
+
+const svgCache = new Map<string, string>()
+
+function SVGLayer3D({ cfg, cx, cy, opacity }: {
+  cfg: DxfSvgLayerConfig; cx: number; cy: number; opacity: number
+}) {
+  const [geo, setGeo] = useState<THREE.BufferGeometry | null>(null)
+  const { invalidate } = useThree()
+  const alive = useRef(true)
+
+  useEffect(() => {
+    alive.current = true
+    const url = `${import.meta.env.BASE_URL}maps/dxf-interior/svg/${cfg.name}.svg`
+
+    async function load() {
+      try {
+        let text = svgCache.get(url)
+        if (!text) {
+          const res = await fetch(url)
+          if (!res.ok) return
+          text = await res.text()
+          svgCache.set(url, text)
+        }
+        if (!alive.current) return
+
+        const loader = new SVGLoader()
+        const data = loader.parse(text)
+
+        // Escalas viewBox → metros DXF
+        const dxfXMin = SVG_BOUNDS[0][1]  // -5
+        const dxfXMax = SVG_BOUNDS[1][1]  // 100
+        const dxfYMin = SVG_BOUNDS[0][0]  // 40
+        const dxfYMax = SVG_BOUNDS[1][0]  // 115
+        const wM = dxfXMax - dxfXMin      // 105
+        const hM = dxfYMax - dxfYMin      // 75
+        const sx = wM / SVG_VIEWBOX_W     // m por unidad SVG X
+        const sy = hM / SVG_VIEWBOX_H     // m por unidad SVG Y
+
+        const buf: number[] = []
+        const SAMPLE_MIN_DIST = 0.05  // m — densidad mínima entre puntos consecutivos
+
+        for (const path of data.paths) {
+          for (const sub of path.subPaths) {
+            const pts = sub.getPoints(Math.max(8, Math.floor(sub.getLength() / 100)))
+            for (let i = 0; i < pts.length - 1; i++) {
+              const a = pts[i]!
+              const b = pts[i + 1]!
+              // SVG → DXF (Y invertido: SVG 0 = DXF Y top)
+              const axm = dxfXMin + a.x * sx
+              const aym = dxfYMax - a.y * sy
+              const bxm = dxfXMin + b.x * sx
+              const bym = dxfYMax - b.y * sy
+              // Saltar segmentos demasiado cortos (ruido)
+              const d = Math.hypot(bxm - axm, bym - aym)
+              if (d < SAMPLE_MIN_DIST) continue
+              // 3D: worldX = dxfX - cx, worldZ = -(dxfY - cy)
+              buf.push(axm - cx, 0, -(aym - cy))
+              buf.push(bxm - cx, 0, -(bym - cy))
+            }
+          }
+        }
+
+        if (!buf.length || !alive.current) return
+
+        const geometry = new THREE.BufferGeometry()
+        geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(buf), 3))
+        setGeo(geometry)
+        invalidate()
+      } catch { /* skip */ }
+    }
+    load()
+    return () => { alive.current = false }
+  }, [cfg.name, cx, cy, invalidate])
+
+  if (!geo) return null
+  return (
+    <lineSegments geometry={geo}>
+      <lineBasicMaterial color={LINE_COLOR} opacity={opacity} transparent depthWrite={false} />
+    </lineSegments>
+  )
+}
+
 // ── GridFloor — grilla de referencia métrica ─────────────────────────────────
 
 function GridFloor({ size }: { size: number }) {
@@ -158,6 +257,8 @@ function Scene({ view, cx, cy }: { view: ViewName; cx: number; cy: number }) {
   const mapView = MAP_VIEWS[view]
   // Blueprint 3D muestra siempre las capas con defaultVisible=true, independiente de los toggles 2D
   const layers = mapView.layers.filter((l) => l.defaultVisible)
+  const capasSvgVisibles = useMapaLeafletStore((s) => s.capasSvgVisibles)
+  const capasSvgOpacity  = useMapaLeafletStore((s) => s.capasSvgOpacity)
 
   const sizeX = mapView.bounds[1][1] - mapView.bounds[0][1]
   const sizeZ = mapView.bounds[1][0] - mapView.bounds[0][0]
@@ -168,6 +269,16 @@ function Scene({ view, cx, cy }: { view: ViewName; cx: number; cy: number }) {
       {layers.map((layer) => (
         <LayerLines key={layer.name} layer={layer} folder={mapView.folder} cx={cx} cy={cy} />
       ))}
+      {/* Capas SVG fieles al DXF (solo vista interior) */}
+      {view === 'interior' && DXF_INTERIOR_SVG_LAYERS
+        .filter((cfg) => capasSvgVisibles[cfg.name] ?? cfg.defaultVisible)
+        .map((cfg) => (
+          <SVGLayer3D
+            key={`svg3d-${cfg.name}`}
+            cfg={cfg} cx={cx} cy={cy}
+            opacity={Math.min(1, cfg.opacity * capasSvgOpacity * 1.15)}
+          />
+        ))}
     </>
   )
 }

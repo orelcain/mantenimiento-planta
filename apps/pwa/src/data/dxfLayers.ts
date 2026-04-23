@@ -115,6 +115,47 @@ export const DXF_INTERIOR_CENTER: [number, number] = [
 ]
 
 // ═══════════════════════════════════════════════════════════════════════════
+// CAPAS SVG FIELES AL DXF (renderizadas server-side con ezdxf drawing addon)
+// Overlay visual, NO editables (pointer-events: none).
+// Archivos en public/maps/dxf-interior/svg/{name}.svg
+// Bounds SVG renderizados: X:[-5,100], Y:[40,115] = 105m × 75m
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface DxfSvgLayerConfig {
+  /** Nombre del archivo SVG (sin extensión) en public/maps/dxf-interior/svg/ */
+  name: string
+  /** Etiqueta visible */
+  label: string
+  /** Agrupable */
+  group: 'equipos' | 'estructura' | 'indicadores'
+  /** Opacidad 0-1 */
+  opacity: number
+  /** Visible por defecto */
+  defaultVisible: boolean
+  /** Z-index CSS relativo (sobre Leaflet overlayPane) */
+  zIndex: number
+  /** Tamaño aproximado en KB (para UI de "peso") */
+  sizeKb: number
+}
+
+/** Bounds DXF usados al generar los SVGs (debe coincidir con dxf_layers_to_svg.py) */
+export const DXF_SVG_BOUNDS: [[number, number], [number, number]] = [
+  [40, -5],     // SW (Ymin, Xmin)
+  [115, 100],   // NE (Ymax, Xmax)
+]
+
+export const DXF_INTERIOR_SVG_LAYERS: DxfSvgLayerConfig[] = [
+  { name: 'ACHUTECH',                    label: 'Equipos ACHUTECH',     group: 'equipos',      opacity: 0.9, defaultVisible: true,  zIndex: 92, sizeKb: 225 },
+  { name: 'P-EQUIPO_EXISTENTE',          label: 'Equipos existentes',   group: 'equipos',      opacity: 0.9, defaultVisible: true,  zIndex: 88, sizeKb: 7 },
+  { name: 'P-CINTA_MODIFICADA',          label: 'Cintas modificadas',   group: 'equipos',      opacity: 0.9, defaultVisible: true,  zIndex: 89, sizeKb: 2 },
+  { name: 'P-EQUIPO_REUBICADO',          label: 'Equipos reubicados',   group: 'equipos',      opacity: 0.9, defaultVisible: true,  zIndex: 87, sizeKb: 1 },
+  { name: 'RIO2',                        label: 'Equipos P0 (RIO2)',    group: 'equipos',      opacity: 0.85, defaultVisible: false, zIndex: 84, sizeKb: 782 },
+  { name: 'EQP-EQUIPOS_-_SITUACION_P1',  label: 'Situación P1',         group: 'equipos',      opacity: 0.85, defaultVisible: false, zIndex: 83, sizeKb: 483 },
+  { name: 'EQP-EQUIPOS_-_SITUACION_P3',  label: 'Situación P3',         group: 'equipos',      opacity: 0.85, defaultVisible: false, zIndex: 82, sizeKb: 1 },
+  { name: 'A_INDICADORES',               label: 'Indicadores (DXF)',    group: 'indicadores',  opacity: 0.75, defaultVisible: false, zIndex: 73, sizeKb: 9 },
+]
+
+// ═══════════════════════════════════════════════════════════════════════════
 
 export type ViewName = 'recinto' | 'interior'
 

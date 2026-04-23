@@ -18,7 +18,14 @@ import 'leaflet/dist/leaflet.css'
 import '@geoman-io/leaflet-geoman-free'
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css'
 import './geoman-dark.css'
-import { MAP_VIEWS, type DxfLayerConfig, type MapView } from '@/data/dxfLayers'
+import {
+  MAP_VIEWS,
+  type DxfLayerConfig,
+  type MapView,
+  DXF_INTERIOR_SVG_LAYERS,
+  DXF_SVG_BOUNDS,
+  type DxfSvgLayerConfig,
+} from '@/data/dxfLayers'
 import { useMapaLeafletStore, type ElementoMapa, type PolygonCoords } from '@/store/useMapaLeafletStore'
 
 // ─── Helpers de geometría ────────────────────────────────────────────────────
@@ -412,6 +419,73 @@ function CapaDXF({ cfg, folder }: { cfg: DxfLayerConfig; folder: string }) {
       interactive={cfg.interactive ?? false}
     />
   )
+}
+
+// ─── Capa SVG fiel al DXF (overlay visual, NO editable) ─────────────────────
+/**
+ * CapaDXFSVG — renderiza un SVG generado desde el DXF con ezdxf drawing addon.
+ * • Se agrega como L.svgOverlay con pointer-events: none
+ * • Bounds fijos DXF_SVG_BOUNDS (coincide con el script de generación)
+ * • No interfiere con Geoman / selección / medir
+ */
+function CapaDXFSVG({ cfg }: { cfg: DxfSvgLayerConfig }) {
+  const map = useMap()
+  const visible = useMapaLeafletStore((s) => s.capasSvgVisibles[cfg.name] ?? cfg.defaultVisible)
+  const globalOpacity = useMapaLeafletStore((s) => s.capasSvgOpacity)
+  const currentView = useMapaLeafletStore((s) => s.currentView)
+  const overlayRef = useRef<L.SVGOverlay | null>(null)
+
+  useEffect(() => {
+    if (currentView !== 'interior' || !visible) {
+      if (overlayRef.current) { map.removeLayer(overlayRef.current); overlayRef.current = null }
+      return
+    }
+
+    let cancelled = false
+    fetch(`${import.meta.env.BASE_URL}maps/dxf-interior/svg/${cfg.name}.svg`)
+      .then((r) => (r.ok ? r.text() : null))
+      .then((text) => {
+        if (cancelled || !text) return
+        const parser = new DOMParser()
+        const doc = parser.parseFromString(text, 'image/svg+xml')
+        const svg = doc.querySelector('svg') as SVGElement | null
+        if (!svg) return
+
+        const finalOpacity = cfg.opacity * globalOpacity
+        svg.style.opacity = String(finalOpacity)
+        svg.style.pointerEvents = 'none'
+        svg.setAttribute('class', `dxf-svg-overlay dxf-svg-${cfg.name}`)
+
+        const overlay = L.svgOverlay(svg, DXF_SVG_BOUNDS, {
+          interactive: false,
+          opacity: 1,
+          className: 'dxf-svg-overlay-wrap',
+        })
+        overlay.addTo(map)
+        const elem = (overlay as unknown as { getElement: () => SVGElement }).getElement?.()
+        if (elem) {
+          elem.style.pointerEvents = 'none'
+          elem.style.zIndex = String(cfg.zIndex)
+        }
+        overlayRef.current = overlay
+      })
+      .catch(() => {})
+
+    return () => {
+      cancelled = true
+      if (overlayRef.current) { map.removeLayer(overlayRef.current); overlayRef.current = null }
+    }
+  }, [map, cfg.name, cfg.opacity, cfg.zIndex, visible, globalOpacity, currentView])
+
+  // Actualización de opacidad sin recrear el overlay
+  useEffect(() => {
+    const ov = overlayRef.current as (L.SVGOverlay & { getElement?: () => SVGElement | null }) | null
+    if (!ov?.getElement) return
+    const elem = ov.getElement()
+    if (elem) elem.style.opacity = String(cfg.opacity * globalOpacity)
+  }, [cfg.opacity, globalOpacity])
+
+  return null
 }
 
 // ─── Tooltip flotante con área mientras se dibuja ────────────────────────────
@@ -1342,6 +1416,11 @@ function MapContents({ view }: { view: MapView }) {
 
       {view.layers.map((cfg) => (
         <CapaDXF key={cfg.name} cfg={cfg} folder={view.folder} />
+      ))}
+
+      {/* Capas SVG fieles al DXF (solo vista interior, overlay visual) */}
+      {view.name === 'interior' && DXF_INTERIOR_SVG_LAYERS.map((cfg) => (
+        <CapaDXFSVG key={`svg-${cfg.name}`} cfg={cfg} />
       ))}
 
       <GrillaLayer view={view} />

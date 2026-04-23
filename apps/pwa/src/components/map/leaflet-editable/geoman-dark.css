@@ -207,3 +207,15 @@
   pointer-events: none;
   box-shadow: 0 1px 3px rgba(0,0,0,0.5);
 }
+
+/* ─── Overlay SVG fiel al DXF (capas visuales no interactivas) ──────────────
+   Las capas DXF renderizadas como SVG deben quedar "detrás" de la UI
+   interactiva y no capturar clicks para no interferir con Geoman ni selección.
+   ─────────────────────────────────────────────────────────────────────────── */
+.leaflet-overlay-pane svg.dxf-svg-overlay,
+.leaflet-overlay-pane svg.dxf-svg-overlay * {
+  pointer-events: none !important;
+}
+.leaflet-overlay-pane svg.dxf-svg-overlay {
+  mix-blend-mode: screen;  /* permite que se lea sobre fondo oscuro */
+}

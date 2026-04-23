@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.147.0' as const
+export const APP_VERSION = '2.148.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-04-23' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'feat(mapa): capas DXF equipos planta — EQP-INSERTS, cintas, equipos existentes/reubicados' as const
+export const VERSION_NAME = 'feat(mapa): capas SVG fieles al DXF (2D+3D) como overlay visual no editable' as const
 
 /**
  * Nota:
