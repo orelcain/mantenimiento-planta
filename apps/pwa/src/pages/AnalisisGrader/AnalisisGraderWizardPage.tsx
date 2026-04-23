@@ -392,7 +392,16 @@ export function AnalisisGraderWizardPage() {
       const summaries = multiDayInfo.entries.map(([key, segment]) => {
         const raw = computeShiftSummary(segment, batchId, sourceNames, user.id, gates)
         const tsSorted = collectSortedTimestamps(segment.pieceRecords, segment.gate0Records)
-        const det = detectPauses(tsSorted, raw.shiftId)
+        // Extraer timestamps de cambios de lote para auto-tag 'cambio_lote' (M10)
+        const loteChangeTsMs: number[] = []
+        let prevLot: string | undefined
+        for (const r of segment.pieceRecords) {
+          if (r.lot && r.lot !== prevLot && prevLot !== undefined) {
+            loteChangeTsMs.push(Date.parse(r.ts))
+          }
+          if (r.lot) prevLot = r.lot
+        }
+        const det = detectPauses(tsSorted, raw.shiftId, loteChangeTsMs)
         detectionByKey.set(key, det)
         return {
           ...raw,
