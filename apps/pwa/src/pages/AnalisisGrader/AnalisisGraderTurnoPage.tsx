@@ -9,7 +9,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useParams, useNavigate, Navigate } from 'react-router-dom'
 import { Button, Card, CardContent, Spinner, Badge } from '@/components/ui'
-import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag, FileText } from 'lucide-react'
+import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag, FileText, WifiOff } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { usePermissionsStore } from '@/store'
 import { useAuthStore, useIsAdmin } from '@/store/authStore'
@@ -34,6 +34,7 @@ import { ShiftGatesConfigAccordion } from '@/components/grader/ShiftGatesConfigA
 import { PauseAnnotationDialog } from '@/components/grader/PauseAnnotationDialog'
 import { resolveEffectiveTag } from '@/services/grader/graderPauseTags'
 import { exportTurnToPDF } from '@/services/grader/graderTurnToPDF'
+import { useOnlineStatus } from '@/hooks/useOnlineStatus'
 import { ActionPlanPanel, deriveSuggestions } from '@/components/grader/ActionPlanPanel'
 import { findTriggeredRunbooks } from '@/services/grader/graderRunbooks'
 import { analyzeGraderFromSummary } from '@/services/grader/graderSummaryAI'
@@ -201,6 +202,7 @@ export function AnalisisGraderTurnoPage() {
   const { canSee } = usePermissionsStore()
   const user = useAuthStore((s) => s.user)
   const isAdmin = useIsAdmin()
+  const isOnline = useOnlineStatus()        // M18 — detección de conectividad
   const navigate = useNavigate()
   const { shiftId: rawShiftId } = useParams<{ shiftId: string }>()
 
@@ -576,6 +578,15 @@ export function AnalisisGraderTurnoPage() {
 
   return (
     <div className="container mx-auto p-3 sm:p-4 space-y-4 max-w-screen-xl">
+      {/* M18 — Banner offline */}
+      {!isOnline && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-400 text-sm">
+          <WifiOff className="w-4 h-4 shrink-0" />
+          <span>
+            Sin conexión — las anotaciones se guardarán localmente y se sincronizarán al reconectarse.
+          </span>
+        </div>
+      )}
       {/* ── Header sticky con navegación contextual ───────────────────── */}
       <div className="sticky top-0 z-20 -mx-3 sm:-mx-4 px-3 sm:px-4 py-2 bg-background/85 backdrop-blur-md border-b border-border/40 flex items-center justify-between gap-2 flex-wrap">
         {/* Sub-helper visual: tip de swipe en mobile */}
@@ -781,6 +792,7 @@ export function AnalisisGraderTurnoPage() {
             summaryP0Pct={summary.pointZeroPct}
             alertThreshold={alertThreshold}
             criticalThreshold={criticalThreshold}
+            isOnline={isOnline}
           />
 
           {/* Distribución por gate — balance del turno */}
@@ -943,6 +955,7 @@ export function AnalisisGraderTurnoPage() {
         summaryId={shiftDocId}
         adminUid={user?.id ?? ''}
         onSaved={handleNextPauseSaved}
+        isOnline={isOnline}
       />
     </div>
   )

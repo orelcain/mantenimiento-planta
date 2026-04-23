@@ -40,6 +40,8 @@ interface PauseAnnotationDialogProps {
   adminUid: string
   /** Callback después de guardar exitosamente — el parent debería refrescar pauses. */
   onSaved?: () => void
+  /** M18 — indica si el dispositivo tiene conectividad. Default: true. */
+  isOnline?: boolean
 }
 
 /** Muestra HH:MM de un ISO usando UTC (= hora local planta). */
@@ -123,6 +125,7 @@ export function PauseAnnotationDialog({
   summaryId,
   adminUid,
   onSaved,
+  isOnline = true,
 }: PauseAnnotationDialogProps) {
   const { tags } = usePauseTags()
 
@@ -353,6 +356,13 @@ export function PauseAnnotationDialog({
           </div>
 
           {error && <p className="text-xs text-red-400">{error}</p>}
+
+          {/* M18 — aviso offline */}
+          {!isOnline && (
+            <p className="text-xs text-amber-400 flex items-center gap-1.5">
+              ⚡ Sin conexión — el cambio se guardará localmente y se sincronizará al reconectarse.
+            </p>
+          )}
 
           {/* ── Sección: Ajustar rango ── */}
           <div className="border border-border/40 rounded-md p-3 space-y-3">

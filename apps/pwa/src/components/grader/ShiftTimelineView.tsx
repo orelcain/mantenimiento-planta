@@ -65,6 +65,8 @@ interface ShiftTimelineViewProps {
   adminUid?: string
   /** Callback invocado tras guardar una anotación — el parent debe recargar pauses. */
   onPauseUpdated?: () => void
+  /** M18 — estado de conectividad del dispositivo, se pasa al diálogo de anotación. */
+  isOnline?: boolean
   /** Causas seleccionadas (multi-select) en el P0CausesPanel — filtran el scatter */
   selectedCauses?: Set<MatrixP0Cause>
   /** Callback para limpiar todas las selecciones desde el badge */
@@ -113,6 +115,7 @@ export function ShiftTimelineView({
   summaryP0Pct,
   alertThreshold = 2,
   criticalThreshold = 3.5,
+  isOnline = true,
 }: ShiftTimelineViewProps) {
   // ── Estado del diálogo de anotación (Fase 3) ──────────────────────────
   const canAnnotate = !!summaryId && !!adminUid
@@ -950,6 +953,7 @@ export function ShiftTimelineView({
             summaryId={summaryId!}
             adminUid={adminUid!}
             onSaved={onPauseUpdated}
+            isOnline={isOnline}
           />
         )}
 
