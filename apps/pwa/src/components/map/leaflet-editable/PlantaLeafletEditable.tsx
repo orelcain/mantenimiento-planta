@@ -51,13 +51,6 @@ function polygonCenter(coords: PolygonCoords): L.LatLng {
 }
 
 // ─── Grilla canvas ───────────────────────────────────────────────────────────
-/** Menor espaciado en metros tal que spacing * pixPerMeter ≥ 28px. */
-function adaptiveSpacingM(pixPerMeter: number): number {
-  for (const m of [0.1, 0.25, 0.5, 1, 2, 5, 10, 25, 50, 100, 250, 500]) {
-    if (m * pixPerMeter >= 28) return m
-  }
-  return 500
-}
 
 /** Dibuja líneas paralelas a `angleRad` separadas `spacingPx` px,
  *  ancladas al punto (ax, ay) del canvas. */
@@ -83,11 +76,12 @@ function drawParallelLines(
   ctx.stroke()
 }
 
-/** Capa canvas con grilla de referencia métrica y ángulo ajustable. */
+/** Capa canvas con grilla 1m×1m fija y ángulo ajustable por vista. */
 function GrillaLayer({ view }: { view: MapView }) {
-  const map          = useMap()
+  const map           = useMap()
   const grillaVisible = useMapaLeafletStore((s) => s.grillaVisible)
-  const grillaAngle   = useMapaLeafletStore((s) => s.grillaAngle)
+  const grillaAngles  = useMapaLeafletStore((s) => s.grillaAngles)
+  const grillaAngle   = grillaAngles[view.name] ?? 0
   const canvasRef     = useRef<HTMLCanvasElement | null>(null)
 
   useEffect(() => {
@@ -115,28 +109,25 @@ function GrillaLayer({ view }: { view: MapView }) {
       if (!ctx) return
       ctx.clearRect(0, 0, sz.x, sz.y)
 
-      // Pixels por metro real
+      // Pixels por 1 metro real
       const p0 = map.latLngToContainerPoint(L.latLng(0, 0))
       const p1 = map.latLngToContainerPoint(L.latLng(0, 1 / view.unitScale))
-      const pixPerMeter = Math.abs(p1.x - p0.x)
-      if (pixPerMeter < 0.3) return
-
-      const minorM  = adaptiveSpacingM(pixPerMeter)
-      const minorPx = minorM * pixPerMeter
-      const majorPx = minorPx * 5
+      const minorPx = Math.abs(p1.x - p0.x)   // px por 1 m
+      if (minorPx < 1.5) return                 // demasiado alejado — no dibuja
+      const majorPx = minorPx * 5               // línea gruesa cada 5 m
 
       // Ancla en DXF (0, 0) → pixel del canvas
       const anchor = map.latLngToContainerPoint(L.latLng(0, 0))
       const aRad = grillaAngle * Math.PI / 180
 
-      // Grilla menor
+      // Grilla 1 m (líneas finas)
       ctx.strokeStyle = 'rgba(148,163,184,0.13)'
       ctx.lineWidth = 0.5
       for (const d of [0, 1]) {
         drawParallelLines(ctx, sz.x, sz.y, aRad + d * Math.PI / 2, minorPx, anchor.x, anchor.y)
       }
-      // Grilla mayor (×5)
-      if (majorPx > 15) {
+      // Grilla 5 m (líneas más marcadas)
+      if (majorPx > 8) {
         ctx.strokeStyle = 'rgba(148,163,184,0.26)'
         ctx.lineWidth = 0.9
         for (const d of [0, 1]) {
@@ -144,10 +135,10 @@ function GrillaLayer({ view }: { view: MapView }) {
         }
       }
 
-      // Etiqueta de espaciado (esquina inferior izquierda del canvas)
-      ctx.fillStyle = 'rgba(148,163,184,0.5)'
+      // Etiqueta fija "1m × 1m" en esquina inferior izquierda
+      ctx.fillStyle = 'rgba(148,163,184,0.45)'
       ctx.font = '9px ui-monospace, monospace'
-      ctx.fillText(`${minorM < 1 ? minorM * 100 + 'cm' : minorM + 'm'} · ${grillaAngle !== 0 ? grillaAngle + '°' : 'sin rot.'}`, 6, sz.y - 6)
+      ctx.fillText(`1m × 1m${grillaAngle !== 0 ? ' · ' + grillaAngle + '°' : ''}`, 6, sz.y - 6)
     }
 
     draw()
@@ -162,39 +153,74 @@ function GrillaLayer({ view }: { view: MapView }) {
 }
 
 // ─── Overlay de grilla (controles ángulo, fuera del MapContainer) ─────────────
-function GrillaOverlay() {
-  const grillaAngle    = useMapaLeafletStore((s) => s.grillaAngle)
+function GrillaOverlay({ view }: { view: MapView }) {
+  const grillaAngles   = useMapaLeafletStore((s) => s.grillaAngles)
   const setGrillaAngle = useMapaLeafletStore((s) => s.setGrillaAngle)
+  const grillaAngle    = grillaAngles[view.name] ?? 0
+  const [editing, setEditing] = useState(false)
   const [inputVal, setInputVal] = useState(String(grillaAngle))
 
-  // Sync slider → input
+  // Sync inputVal cuando cambia la vista o el ángulo externo
+  useEffect(() => { setInputVal(String(grillaAngle)) }, [view.name, grillaAngle])
+
   const handleSlider = (e: React.ChangeEvent<HTMLInputElement>) => {
     const v = Number(e.target.value)
-    setGrillaAngle(v)
+    setGrillaAngle(view.name, v)
     setInputVal(String(v))
   }
-  // Sync text input → slider
   const handleText = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInputVal(e.target.value)
     const n = parseFloat(e.target.value)
-    if (!isNaN(n) && n >= -90 && n <= 90) setGrillaAngle(n)
+    if (!isNaN(n) && n >= -90 && n <= 90) setGrillaAngle(view.name, n)
+  }
+  const handleReset = () => { setGrillaAngle(view.name, 0); setInputVal('0') }
+
+  // ── Panel colapsado ───────────────────────────────────────────────────────
+  if (!editing) {
+    return (
+      <div className="absolute bottom-16 left-3 z-[1000] pointer-events-none select-none">
+        <div className="bg-gray-900/90 border border-slate-700/40 rounded-lg shadow-lg px-3 py-1.5 flex items-center gap-2 backdrop-blur-sm">
+          <span className="text-[9px] text-slate-500 font-mono">1m × 1m</span>
+          {grillaAngle !== 0 && (
+            <span className="text-[9px] font-mono text-amber-400/80">{grillaAngle}°</span>
+          )}
+          <button
+            className="pointer-events-auto text-[9px] text-gray-500 hover:text-amber-400 transition-colors border border-gray-700/50 rounded px-1.5 py-0.5"
+            onClick={() => setEditing(true)}
+          >
+            Editar ángulo
+          </button>
+        </div>
+      </div>
+    )
   }
 
+  // ── Panel expandido ───────────────────────────────────────────────────────
   return (
     <div className="absolute bottom-16 left-3 z-[1000] pointer-events-none select-none">
-      <div className="bg-gray-900/95 border border-slate-700/60 rounded-xl shadow-xl px-4 py-3 w-52 backdrop-blur-sm">
+      <div className="bg-gray-900/95 border border-slate-700/60 rounded-xl shadow-xl px-4 py-3 w-56 backdrop-blur-sm">
         <div className="flex items-center justify-between mb-2.5">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Grilla</span>
-          <button
-            className="pointer-events-auto text-[10px] text-gray-600 hover:text-amber-400 transition-colors"
-            onClick={() => { setGrillaAngle(0); setInputVal('0') }}
-          >
-            Reset
-          </button>
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+            Grilla · {view.label}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              className="pointer-events-auto text-[10px] text-gray-600 hover:text-amber-400 transition-colors"
+              onClick={handleReset}
+            >
+              Reset
+            </button>
+            <button
+              className="pointer-events-auto text-[11px] text-gray-600 hover:text-white transition-colors leading-none"
+              onClick={() => setEditing(false)}
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         <label className="text-[9px] text-gray-500 block mb-1">
-          Rotación del edificio
+          Alineación con muros ({grillaAngle}°)
         </label>
         <input
           type="range"
@@ -214,9 +240,12 @@ function GrillaOverlay() {
           />
           <span className="text-[9px] text-gray-600">+90°</span>
         </div>
-        <p className="text-[9px] text-gray-600 mt-2">
-          Ajustá hasta que la grilla se alinee con los muros
-        </p>
+        <button
+          className="pointer-events-auto w-full text-[10px] py-1 mt-2.5 rounded-md bg-slate-700/40 border border-slate-600/40 text-slate-300 hover:bg-slate-600/50 transition-colors"
+          onClick={() => setEditing(false)}
+        >
+          Listo
+        </button>
       </div>
     </div>
   )
@@ -1105,7 +1134,7 @@ export function PlantaLeafletEditable() {
       </MapContainer>
 
       {measureMode   && <MeasureOverlay />}
-      {grillaVisible && <GrillaOverlay />}
+      {grillaVisible && <GrillaOverlay view={view} />}
     </div>
   )
 }

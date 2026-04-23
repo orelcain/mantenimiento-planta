@@ -47,10 +47,10 @@ interface MapaLeafletState {
 
   // ── Grilla ──────────────────────────────────────────────────────────────────
   grillaVisible: boolean
-  /** Ángulo de rotación de la grilla en grados (0 = ejes DXF, ±45°) */
-  grillaAngle: number
+  /** Ángulo de rotación de la grilla por vista (recinto / interior) */
+  grillaAngles: Record<string, number>
   toggleGrilla: () => void
-  setGrillaAngle: (a: number) => void
+  setGrillaAngle: (view: string, a: number) => void
 
   // ── Medición ────────────────────────────────────────────────────────────────
   measureMode: boolean
@@ -95,9 +95,9 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
       editMode: false,
       capasVisibles: {},
       grillaVisible: false,
-      grillaAngle: 0,
+      grillaAngles: { recinto: 0, interior: 0 } as Record<string, number>,
       toggleGrilla:   () => set((s) => ({ grillaVisible: !s.grillaVisible })),
-      setGrillaAngle: (a) => set({ grillaAngle: a }),
+      setGrillaAngle: (view, a) => set((s) => ({ grillaAngles: { ...s.grillaAngles, [view]: a } })),
 
       measureMode: false,
       measureSegments: [],
@@ -178,7 +178,7 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
         capasVisibles: s.capasVisibles,
         currentView: s.currentView,
         grillaVisible: s.grillaVisible,
-        grillaAngle: s.grillaAngle,
+        grillaAngles: s.grillaAngles,
       }),
     },
   ),
