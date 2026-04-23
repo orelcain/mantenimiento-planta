@@ -1138,46 +1138,73 @@ function FitDxfBounds({ view }: { view: MapView }) {
   return null
 }
 
-// ─── Box-select: shift+drag para seleccionar varios elementos ────────────────
+// ─── Box-select: shift+drag (desktop) o toggle + drag/touch (mobile) ─────────
 function BoxSelect({ view }: { view: MapView }) {
   const map = useMap()
   const editMode = useMapaLeafletStore((s) => s.editMode)
+  const boxSelectMode = useMapaLeafletStore((s) => s.boxSelectMode)
 
   useEffect(() => {
     if (!map || !editMode) return
 
-    let startLL: L.LatLng | null = null
-    let rect: L.Rectangle | null = null
+    // Deshabilitar boxZoom de Leaflet (shift+drag zoom nativo)
+    if (map.boxZoom) map.boxZoom.disable()
 
-    const onMouseDown = (ev: L.LeafletMouseEvent) => {
-      const oe = ev.originalEvent
-      if (!oe?.shiftKey) return
-      oe.preventDefault()
-      map.dragging.disable()
-      if (map.boxZoom) map.boxZoom.disable()
-      startLL = ev.latlng
+    const container = map.getContainer()
+    let startLL: L.LatLng | null = null
+    let startPt: { x: number; y: number } | null = null
+    let rect: L.Rectangle | null = null
+    let dragActive = false
+    let touchId: number | null = null
+
+    const getLL = (clientX: number, clientY: number): L.LatLng => {
+      const r = container.getBoundingClientRect()
+      const pt = L.point(clientX - r.left, clientY - r.top)
+      return map.containerPointToLatLng(pt)
     }
 
-    const onMouseMove = (ev: L.LeafletMouseEvent) => {
-      if (!startLL) return
-      const bounds = L.latLngBounds(startLL, ev.latlng)
+    const isClickableTarget = (t: EventTarget | null): boolean => {
+      const el = t as Element | null
+      if (!el || !el.closest) return false
+      return !!el.closest('.leaflet-marker-icon, .leaflet-popup, .leaflet-interactive, .leaflet-control')
+    }
+
+    const beginDrag = (clientX: number, clientY: number) => {
+      map.dragging.disable()
+      startPt = { x: clientX, y: clientY }
+      startLL = getLL(clientX, clientY)
+      dragActive = true
+    }
+
+    const updateDrag = (clientX: number, clientY: number) => {
+      if (!dragActive || !startLL || !startPt) return
+      const dx = Math.abs(clientX - startPt.x)
+      const dy = Math.abs(clientY - startPt.y)
+      if (dx < 3 && dy < 3) return
+      const currLL = getLL(clientX, clientY)
+      const bounds = L.latLngBounds(startLL, currLL)
       if (!rect) {
         rect = L.rectangle(bounds, {
-          color: '#fbbf24', weight: 1.5, dashArray: '4 3', fillColor: '#fbbf24', fillOpacity: 0.08,
-          interactive: false,
+          color: '#fbbf24', weight: 1.5, dashArray: '4 3',
+          fillColor: '#fbbf24', fillOpacity: 0.08, interactive: false,
         }).addTo(map)
       } else {
         rect.setBounds(bounds)
       }
     }
 
-    const onMouseUp = (ev: L.LeafletMouseEvent) => {
+    const endDrag = (clientX: number, clientY: number) => {
       map.dragging.enable()
-      if (map.boxZoom) map.boxZoom.enable()
-      if (!startLL) return
-      const bounds = L.latLngBounds(startLL, ev.latlng)
-      if (rect) { map.removeLayer(rect); rect = null }
+      const wasActive = dragActive && !!rect
+      const start = startLL
+      dragActive = false
       startLL = null
+      startPt = null
+      if (rect) { map.removeLayer(rect); rect = null }
+      if (!wasActive || !start) return
+
+      const endLL = getLL(clientX, clientY)
+      const bounds = L.latLngBounds(start, endLL)
 
       const { elementos, selectedId, multiSelection, setSelectedId } = useMapaLeafletStore.getState()
       const toggle = useMapaLeafletStore.getState().toggleMultiSelect
@@ -1185,15 +1212,12 @@ function BoxSelect({ view }: { view: MapView }) {
       for (const el of elementos) {
         if (el.mapView !== view.name) continue
         const coords = el.poligono ?? (el.punto ? [el.punto] : [])
-        let inside = false
         for (const c of coords) {
-          if (bounds.contains(L.latLng(c[0], c[1]))) { inside = true; break }
+          if (bounds.contains(L.latLng(c[0], c[1]))) { hit.push(el.id); break }
         }
-        if (inside) hit.push(el.id)
       }
       if (hit.length === 0) return
       const existing = new Set<string>([...(selectedId ? [selectedId] : []), ...multiSelection])
-      // Si no hay nada seleccionado, primero del hit se vuelve primary
       if (existing.size === 0) {
         setSelectedId(hit[0] ?? null)
         for (let i = 1; i < hit.length; i++) {
@@ -1207,18 +1231,70 @@ function BoxSelect({ view }: { view: MapView }) {
       }
     }
 
-    map.on('mousedown', onMouseDown)
-    map.on('mousemove', onMouseMove)
-    map.on('mouseup', onMouseUp)
+    // ── Mouse (desktop) ─────────────────────────────────────────────────
+    const onMouseDown = (ev: MouseEvent) => {
+      const canBox = ev.shiftKey || boxSelectMode
+      if (!canBox) return
+      if (isClickableTarget(ev.target)) return
+      ev.preventDefault()
+      ev.stopPropagation()
+      beginDrag(ev.clientX, ev.clientY)
+      window.addEventListener('mousemove', onMouseMove, true)
+      window.addEventListener('mouseup', onMouseUp, true)
+    }
+    const onMouseMove = (ev: MouseEvent) => updateDrag(ev.clientX, ev.clientY)
+    const onMouseUp = (ev: MouseEvent) => {
+      window.removeEventListener('mousemove', onMouseMove, true)
+      window.removeEventListener('mouseup', onMouseUp, true)
+      endDrag(ev.clientX, ev.clientY)
+    }
+
+    // ── Touch (mobile) — solo si boxSelectMode esta activo ──────────────
+    const onTouchStart = (ev: TouchEvent) => {
+      if (!boxSelectMode) return
+      if (ev.touches.length !== 1) return
+      const t = ev.touches[0]
+      if (!t) return
+      if (isClickableTarget(t.target)) return
+      ev.preventDefault()
+      touchId = t.identifier
+      beginDrag(t.clientX, t.clientY)
+      window.addEventListener('touchmove', onTouchMove, { capture: true, passive: false })
+      window.addEventListener('touchend', onTouchEnd, true)
+      window.addEventListener('touchcancel', onTouchEnd, true)
+    }
+    const onTouchMove = (ev: TouchEvent) => {
+      if (touchId == null) return
+      const t = Array.from(ev.changedTouches).find((x) => x.identifier === touchId)
+      if (!t) return
+      ev.preventDefault()
+      updateDrag(t.clientX, t.clientY)
+    }
+    const onTouchEnd = (ev: TouchEvent) => {
+      window.removeEventListener('touchmove', onTouchMove, true)
+      window.removeEventListener('touchend', onTouchEnd, true)
+      window.removeEventListener('touchcancel', onTouchEnd, true)
+      const t = Array.from(ev.changedTouches).find((x) => x.identifier === touchId)
+      touchId = null
+      if (!t) return
+      endDrag(t.clientX, t.clientY)
+    }
+
+    container.addEventListener('mousedown', onMouseDown, true)
+    container.addEventListener('touchstart', onTouchStart, { capture: true, passive: false })
     return () => {
-      map.off('mousedown', onMouseDown)
-      map.off('mousemove', onMouseMove)
-      map.off('mouseup', onMouseUp)
+      container.removeEventListener('mousedown', onMouseDown, true)
+      container.removeEventListener('touchstart', onTouchStart, true)
+      window.removeEventListener('mousemove', onMouseMove, true)
+      window.removeEventListener('mouseup', onMouseUp, true)
+      window.removeEventListener('touchmove', onTouchMove, true)
+      window.removeEventListener('touchend', onTouchEnd, true)
+      window.removeEventListener('touchcancel', onTouchEnd, true)
       if (rect) { map.removeLayer(rect); rect = null }
       map.dragging.enable()
       if (map.boxZoom) map.boxZoom.enable()
     }
-  }, [map, editMode, view.name])
+  }, [map, editMode, boxSelectMode, view.name])
 
   return null
 }

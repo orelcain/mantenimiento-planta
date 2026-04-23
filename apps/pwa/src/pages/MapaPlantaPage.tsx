@@ -8,7 +8,7 @@
  * Editor: zonas, equipos y formas custom (Geoman). Persistencia local.
  */
 
-import { Map as MapIcon, Building2, Globe2, Ruler, LayoutGrid } from 'lucide-react'
+import { Map as MapIcon, Building2, Globe2, Ruler, LayoutGrid, BoxSelect } from 'lucide-react'
 import { PlantaLeafletEditable, PanelCapasYZonas } from '@/components/map/leaflet-editable'
 import { useMapaLeafletStore } from '@/store/useMapaLeafletStore'
 import { MAP_VIEWS, type ViewName } from '@/data/dxfLayers'
@@ -30,6 +30,9 @@ export function MapaPlantaPage() {
   const toggleMeasureMode = useMapaLeafletStore((s) => s.toggleMeasureMode)
   const grillaVisible     = useMapaLeafletStore((s) => s.grillaVisible)
   const toggleGrilla      = useMapaLeafletStore((s) => s.toggleGrilla)
+  const editMode          = useMapaLeafletStore((s) => s.editMode)
+  const boxSelectMode     = useMapaLeafletStore((s) => s.boxSelectMode)
+  const toggleBoxSelect   = useMapaLeafletStore((s) => s.toggleBoxSelectMode)
 
   return (
     <div className="flex flex-col h-screen bg-gray-950 overflow-hidden">
@@ -79,6 +82,21 @@ export function MapaPlantaPage() {
             <LayoutGrid size={12} />
             <span className="hidden sm:inline">Grilla</span>
           </button>
+          {editMode && (
+            <button
+              onClick={toggleBoxSelect}
+              title="Selección por recuadro (arrastra para seleccionar varios). Atajo desktop: Shift+arrastre"
+              className={[
+                'flex items-center gap-1 text-[11px] px-2 sm:px-3 py-1.5 rounded-lg transition-all border',
+                boxSelectMode
+                  ? 'bg-amber-600/25 border-amber-500/70 text-amber-300 shadow-[0_0_8px_rgba(245,158,11,0.3)]'
+                  : 'border-gray-700/60 text-gray-400 hover:text-amber-300 hover:border-amber-700/50',
+              ].join(' ')}
+            >
+              <BoxSelect size={12} />
+              <span className="hidden sm:inline">Selección</span>
+            </button>
+          )}
         </div>
 
         {/* Vista — icono + label corto en móvil */}

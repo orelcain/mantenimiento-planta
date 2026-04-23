@@ -56,6 +56,8 @@ interface MapaLeafletState {
   /** Ids adicionales seleccionados (multi-seleccion, ademas de selectedId) */
   multiSelection: string[]
   editMode: boolean
+  /** Modo seleccion por recuadro activo (para touch/mobile sin shift) */
+  boxSelectMode: boolean
   /** Visibilidad de capas DXF, independiente por vista */
   capasVisibles: Record<ViewName, Record<string, boolean>>
   /** Capas de usuario (agrupaciones con visibilidad/orden propios) */
@@ -85,6 +87,7 @@ interface MapaLeafletState {
   clearMultiSelection: () => void
   getAllSelectedIds: () => string[]
   toggleEditMode: () => void
+  toggleBoxSelectMode: () => void
   setCapaVisible: (name: string, visible: boolean) => void
   setAllCapas: (visible: boolean) => void
 
@@ -128,6 +131,7 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
       selectedId: null,
       multiSelection: [],
       editMode: false,
+      boxSelectMode: false,
       capasVisibles: { recinto: {}, interior: {} } as Record<ViewName, Record<string, boolean>>,
       capasUsuario: [],
       grillaVisible: false,
@@ -173,7 +177,14 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
         editMode: !s.editMode,
         selectedId: null,
         multiSelection: [],
+        boxSelectMode: false,
         measureMode: false,  // edit y measure son mutuamente excluyentes
+      })),
+      toggleBoxSelectMode: () => set((s) => ({
+        boxSelectMode: !s.boxSelectMode,
+        // Al activar, limpia seleccion previa para que el box empiece de cero
+        selectedId: !s.boxSelectMode ? null : s.selectedId,
+        multiSelection: !s.boxSelectMode ? [] : s.multiSelection,
       })),
 
       setCapaVisible: (name, visible) =>
