@@ -104,7 +104,8 @@ function GrillaLayer({ view }: { view: MapView }) {
       const cv = canvasRef.current
       if (!cv) return
       const sz = map.getSize()
-      cv.width = sz.x; cv.height = sz.y
+      // Redimensionar solo si cambió el tamaño (evita borrar el canvas innecesariamente)
+      if (cv.width !== sz.x || cv.height !== sz.y) { cv.width = sz.x; cv.height = sz.y }
       const ctx = cv.getContext('2d')
       if (!ctx) return
       ctx.clearRect(0, 0, sz.x, sz.y)
@@ -112,39 +113,38 @@ function GrillaLayer({ view }: { view: MapView }) {
       // Pixels por 1 metro real
       const p0 = map.latLngToContainerPoint(L.latLng(0, 0))
       const p1 = map.latLngToContainerPoint(L.latLng(0, 1 / view.unitScale))
-      const minorPx = Math.abs(p1.x - p0.x)   // px por 1 m
-      if (minorPx < 1.5) return                 // demasiado alejado — no dibuja
-      const majorPx = minorPx * 5               // línea gruesa cada 5 m
+      const oneMpx = Math.abs(p1.x - p0.x)
+      if (oneMpx < 1.5) return   // demasiado alejado — invisible, no dibuja
 
       // Ancla en DXF (0, 0) → pixel del canvas
       const anchor = map.latLngToContainerPoint(L.latLng(0, 0))
       const aRad = grillaAngle * Math.PI / 180
 
-      // Grilla 1 m (líneas finas)
-      ctx.strokeStyle = 'rgba(148,163,184,0.13)'
+      // Una sola grilla tenue uniforme — 1 m, sin doble nivel
+      ctx.strokeStyle = 'rgba(148,163,184,0.14)'
       ctx.lineWidth = 0.5
       for (const d of [0, 1]) {
-        drawParallelLines(ctx, sz.x, sz.y, aRad + d * Math.PI / 2, minorPx, anchor.x, anchor.y)
-      }
-      // Grilla 5 m (líneas más marcadas)
-      if (majorPx > 8) {
-        ctx.strokeStyle = 'rgba(148,163,184,0.26)'
-        ctx.lineWidth = 0.9
-        for (const d of [0, 1]) {
-          drawParallelLines(ctx, sz.x, sz.y, aRad + d * Math.PI / 2, majorPx, anchor.x, anchor.y)
-        }
+        drawParallelLines(ctx, sz.x, sz.y, aRad + d * Math.PI / 2, oneMpx, anchor.x, anchor.y)
       }
 
-      // Etiqueta fija "1m × 1m" en esquina inferior izquierda
-      ctx.fillStyle = 'rgba(148,163,184,0.45)'
+      // Etiqueta fija "1m × 1m"
+      ctx.fillStyle = 'rgba(148,163,184,0.4)'
       ctx.font = '9px ui-monospace, monospace'
       ctx.fillText(`1m × 1m${grillaAngle !== 0 ? ' · ' + grillaAngle + '°' : ''}`, 6, sz.y - 6)
     }
 
+    // RAF throttle: máximo 1 redibujado por frame aunque Leaflet dispare muchos eventos
+    let rafId: number | null = null
+    const scheduleDraw = () => {
+      if (rafId !== null) return
+      rafId = requestAnimationFrame(() => { rafId = null; draw() })
+    }
+
     draw()
-    map.on('move zoom moveend zoomend', draw)
+    map.on('move zoom moveend zoomend resize', scheduleDraw)
     return () => {
-      map.off('move zoom moveend zoomend', draw)
+      if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null }
+      map.off('move zoom moveend zoomend resize', scheduleDraw)
       cleanup()
     }
   }, [map, grillaVisible, grillaAngle, view])
