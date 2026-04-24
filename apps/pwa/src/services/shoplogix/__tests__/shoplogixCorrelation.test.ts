@@ -175,6 +175,34 @@ describe('correlatePausesWithUpstream', () => {
     const [corr] = correlatePausesWithUpstream([pause], snap)
     expect(corr!.contributors[0]!.leadSec).toBe(-300)  // Baader paró 5 min antes
   })
+
+  it('filtra Baader states que empezaron MUCHO después del Grader (no pueden ser causa)', () => {
+    // Grader paró a las 10:00, Baader "paró" recién a las 11:30 — no puede ser causa raíz
+    const lateStop = mkState('2026-02-26T11:30:00Z', '2026-02-26T11:45:00Z', 'break', 'Detencion', 'COLACION')
+    const snap = mkSnapshot([
+      mkShift('A', 'E1', [lateStop]),
+      mkShift('B', 'E2', [lateStop]),
+      mkShift('C', 'E3', [lateStop]),
+    ])
+    const pause = mkPause('p1', '2026-02-26T10:00:00Z', '2026-02-26T10:10:00Z')
+    const [corr] = correlatePausesWithUpstream([pause], snap)
+    // Baader paró 90 min DESPUÉS del Grader → no puede ser causa
+    expect(corr!.kind).toBe('no_correlation')
+  })
+
+  it('acepta Baader states que empezaron hasta 2 min después (tolerancia de sensor)', () => {
+    // Baader paró 1 min después del Grader (puede ser lag de sensor)
+    const slightlyLate = mkState('2026-02-26T10:01:00Z', '2026-02-26T10:15:00Z', 'break', 'Detencion')
+    const snap = mkSnapshot([
+      mkShift('A', 'E1', [slightlyLate]),
+      mkShift('B', 'E2', [slightlyLate]),
+      mkShift('C', 'E3', [slightlyLate]),
+    ])
+    const pause = mkPause('p1', '2026-02-26T10:00:00Z', '2026-02-26T10:10:00Z')
+    const [corr] = correlatePausesWithUpstream([pause], snap)
+    expect(corr!.kind).toBe('upstream_global')
+    expect(corr!.contributors[0]!.leadSec).toBe(60)
+  })
 })
 
 describe('summarizeCorrelations', () => {

@@ -100,8 +100,12 @@ export function correlatePausesWithUpstream(
     for (const machine of snapshot.machines) {
       for (const state of machine.states) {
         if (!isStopState(state)) continue
-        // Ventana efectiva del paro upstream que podría afectar al Grader:
-        // desde leadWindowSec antes del paro Grader, hasta el fin del paro Grader.
+        // Filtro causal: el Baader state debe haber EMPEZADO antes o poco
+        // después del inicio del paro Grader. Si empezó >2 min después,
+        // no puede ser causa (la causa precede al efecto).
+        const leadSec = Math.floor((state.startAt.getTime() - pauseStart.getTime()) / 1000)
+        if (leadSec > 120) continue
+
         const overlap = overlapSec(state.startAt, state.endAt, lookbackStart, pauseEnd)
         if (overlap < minOverlapSec) continue
 
@@ -113,7 +117,7 @@ export function correlatePausesWithUpstream(
           stateStart: state.startAt,
           stateEnd: state.endAt,
           overlapSec: overlap,
-          leadSec: Math.floor((state.startAt.getTime() - pauseStart.getTime()) / 1000),
+          leadSec,
         })
       }
     }

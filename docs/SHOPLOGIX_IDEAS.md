@@ -172,6 +172,18 @@ E1 vs E2 vs E3 a lo largo del tiempo. ¿Alguna consistentemente peor?
 - Badge "⚠️ Atención" para microparadas anómalas (iter 1)
 - UpstreamCorrelationCard — hipótesis automática de causa raíz por paro Grader (iter 2)
 
+## ✅ P0 corregidos
+
+### 21. leadSec positivo — FIX aplicado
+**Era:** contributors mostraban `lead +86 min` (Baader paró DESPUÉS del
+Grader → no puede ser causa).
+
+**Fix:** `correlatePausesWithUpstream` ahora filtra contributors con
+`leadSec > 120` (tolerancia de 2 min para lag de sensor).
+Tests agregados: 2 casos nuevos.
+
+---
+
 ## 🧪 Observaciones del campo (para revisar)
 
 ### Feb 26 — actualRuntime 11.2% es muy bajo
