@@ -5,7 +5,7 @@
  * Panel lateral con lista de capas, visibilidad y eliminación.
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { MapContainer, GeoJSON, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'

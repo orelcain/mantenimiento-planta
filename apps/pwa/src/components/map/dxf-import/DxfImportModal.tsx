@@ -5,7 +5,7 @@
  */
 
 import { useCallback, useRef, useState } from 'react'
-import { X, Upload, FileText, Eye, EyeOff, Trash2, Check, AlertTriangle, Loader } from 'lucide-react'
+import { X, Upload, FileText, Eye, EyeOff, Check, AlertTriangle, Loader } from 'lucide-react'
 import { parseDxfText, type CapaDxfParseada } from './parseDxf'
 import { useMapaLeafletStore, type MapaImportado, type CapaImportada } from '@/store/useMapaLeafletStore'
 
