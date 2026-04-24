@@ -145,9 +145,29 @@ export interface UpstreamMachineShift {
   totalPieces: number;
   expectedTotalPieces: number;
   overallRatio: number;        // productividad total (0..1+)
-  actualRuntime: number;       // fracción del turno productivo (0..1)
+  /**
+   * Campo crudo de Shoplogix — fracción de tiempo Uptime sobre un denominador
+   * INCONSISTENTE (no es la duración del turno; observado 11.2% cuando el
+   * Uptime real era 46% del turno). Usar `shiftRuntime` para el % real.
+   */
+  actualRuntime: number;
   expectedRuntime: number;
   runtimeVariance: number;
+  /**
+   * % del turno en estado Uptime, calculado por nosotros desde los states:
+   *   Σ duración(state.type === 'uptime') / (shiftEnd − shiftStart)
+   * Es el número que tiene sentido para operadores ("la máquina produjo X%
+   * del turno"). Distinto al `actualRuntime` crudo de Shoplogix.
+   */
+  shiftRuntime: number;
+  /** Suma de duraciones (en segundos) por categoría de state, calculada nosotros. */
+  shiftRuntimeBreakdown: {
+    uptimeSec: number;
+    breakSec: number;       // Break (Colación, Reunión, Planned Downtime, etc.)
+    downtimeSec: number;    // Downtime (Micro Detención, Limpieza, etc.)
+    setupSec: number;
+    totalTrackedSec: number;
+  };
 
   // Detalle
   intervals: UpstreamProductionInterval[];

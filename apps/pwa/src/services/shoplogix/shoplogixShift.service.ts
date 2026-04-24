@@ -71,14 +71,47 @@ function deserializeState(raw: FirestoreData): UpstreamMachineState {
 }
 
 function deserializeShift(raw: FirestoreData): UpstreamMachineShift {
+  const shiftStart = toDateSafe(raw.shiftStart)
+  const shiftEnd   = toDateSafe(raw.shiftEnd)
+  const states: UpstreamMachineState[] = Array.isArray(raw.states)
+    ? raw.states.map(x => deserializeState(x as FirestoreData))
+    : []
+
+  // Si los docs Firestore aún no traen shiftRuntime/breakdown (data legacy),
+  // los recomputamos desde states. Mismo cálculo que el normalizer.
+  const breakdown = (raw.shiftRuntimeBreakdown && typeof raw.shiftRuntimeBreakdown === 'object'
+    ? {
+        uptimeSec:       Number((raw.shiftRuntimeBreakdown as FirestoreData).uptimeSec ?? 0),
+        breakSec:        Number((raw.shiftRuntimeBreakdown as FirestoreData).breakSec ?? 0),
+        downtimeSec:     Number((raw.shiftRuntimeBreakdown as FirestoreData).downtimeSec ?? 0),
+        setupSec:        Number((raw.shiftRuntimeBreakdown as FirestoreData).setupSec ?? 0),
+        totalTrackedSec: Number((raw.shiftRuntimeBreakdown as FirestoreData).totalTrackedSec ?? 0),
+      }
+    : (() => {
+        const b = {
+          uptimeSec:   states.filter(s => s.type === 'uptime').reduce((a, s) => a + s.durationSec, 0),
+          breakSec:    states.filter(s => s.type === 'break').reduce((a, s) => a + s.durationSec, 0),
+          downtimeSec: states.filter(s => s.type === 'downtime').reduce((a, s) => a + s.durationSec, 0),
+          setupSec:    states.filter(s => s.type === 'setup').reduce((a, s) => a + s.durationSec, 0),
+          totalTrackedSec: 0,
+        }
+        b.totalTrackedSec = b.uptimeSec + b.breakSec + b.downtimeSec + b.setupSec
+        return b
+      })()
+  )
+  const shiftDurationSec = Math.max(1, (shiftEnd.getTime() - shiftStart.getTime()) / 1000)
+  const shiftRuntime = raw.shiftRuntime != null
+    ? Number(raw.shiftRuntime)
+    : breakdown.uptimeSec / shiftDurationSec
+
   return {
     machineid:           String(raw.machineid ?? ''),
     machineName:         String(raw.machineName ?? ''),
     machineType:         (raw.machineType as UpstreamMachineShift['machineType']) ?? 'other',
     dateKey:             String(raw.dateKey ?? ''),
     shiftId:             String(raw.shiftId ?? ''),
-    shiftStart:          toDateSafe(raw.shiftStart),
-    shiftEnd:            toDateSafe(raw.shiftEnd),
+    shiftStart,
+    shiftEnd,
     totalCycles:         Number(raw.totalCycles ?? 0),
     expectedTotalCycles: Number(raw.expectedTotalCycles ?? 0),
     totalPieces:         Number(raw.totalPieces ?? 0),
@@ -87,8 +120,10 @@ function deserializeShift(raw: FirestoreData): UpstreamMachineShift {
     actualRuntime:       Number(raw.actualRuntime ?? 0),
     expectedRuntime:     Number(raw.expectedRuntime ?? 0),
     runtimeVariance:     Number(raw.runtimeVariance ?? 0),
+    shiftRuntime,
+    shiftRuntimeBreakdown: breakdown,
     intervals:           Array.isArray(raw.intervals) ? raw.intervals.map(x => deserializeInterval(x as FirestoreData)) : [],
-    states:              Array.isArray(raw.states)    ? raw.states.map(x => deserializeState(x as FirestoreData))       : [],
+    states,
     threshold:           Number(raw.threshold ?? 15),
     productionUnit:      String(raw.productionUnit ?? ''),
     comments:            Array.isArray(raw.comments) ? raw.comments.map(coerceComment).filter(Boolean) : [],

@@ -83,6 +83,18 @@ function makeShift(
   const expectedTotalCycles = intervals.reduce((a, x) => a + x.expectedCycles, 0);
   const last = intervals[intervals.length - 1]!;
 
+  // Mismo cálculo que el normalizer real para mantener parity en demo data.
+  const breakdown = {
+    uptimeSec:   states.filter(s => s.type === 'uptime').reduce((a, s) => a + s.durationSec, 0),
+    breakSec:    states.filter(s => s.type === 'break').reduce((a, s) => a + s.durationSec, 0),
+    downtimeSec: states.filter(s => s.type === 'downtime').reduce((a, s) => a + s.durationSec, 0),
+    setupSec:    states.filter(s => s.type === 'setup').reduce((a, s) => a + s.durationSec, 0),
+    totalTrackedSec: 0,
+  };
+  breakdown.totalTrackedSec = breakdown.uptimeSec + breakdown.breakSec + breakdown.downtimeSec + breakdown.setupSec;
+  const shiftDurationSec = Math.max(1, (shiftEnd.getTime() - shiftStart.getTime()) / 1000);
+  const shiftRuntime = breakdown.uptimeSec / shiftDurationSec;
+
   return {
     machineid,
     machineName,
@@ -97,6 +109,8 @@ function makeShift(
     actualRuntime,
     expectedRuntime: 0.92,
     runtimeVariance: actualRuntime - 0.92,
+    shiftRuntime,
+    shiftRuntimeBreakdown: breakdown,
     intervals, states,
     threshold: 15,
     productionUnit: 'Eviscerado',
@@ -126,7 +140,7 @@ export function buildDemoLineSnapshot(): UpstreamLineSnapshot {
     machines,
     lineThroughputActual:   durationH > 0 ? totalCycles / durationH : 0,
     lineThroughputExpected: durationH > 0 ? expected    / durationH : 0,
-    lineAvailability:       machines.reduce((a, m) => a + m.actualRuntime, 0) / machines.length,
+    lineAvailability:       machines.reduce((a, m) => a + m.shiftRuntime, 0) / machines.length,
     machinesProducing:      0,
   };
 }

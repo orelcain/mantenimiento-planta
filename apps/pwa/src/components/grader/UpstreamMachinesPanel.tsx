@@ -446,8 +446,11 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
 
       {/* Mini stats footer */}
       <div className="flex items-center gap-4 text-[11px] text-slate-500">
-        <span className="flex items-center gap-1" title="Runtime del turno">
-          <Timer className="w-3 h-3" /> {fmtPct(shift.actualRuntime)} runtime
+        <span
+          className="flex items-center gap-1"
+          title={`% del turno en Uptime real (calculado desde states).\nUptime: ${fmtDuration(shift.shiftRuntimeBreakdown.uptimeSec)}\nBreak: ${fmtDuration(shift.shiftRuntimeBreakdown.breakSec)}\nDowntime: ${fmtDuration(shift.shiftRuntimeBreakdown.downtimeSec)}`}
+        >
+          <Timer className="w-3 h-3" /> {fmtPct(shift.shiftRuntime)} runtime
         </span>
         <span className="flex items-center gap-1" title="Paros (Break)">
           <Pause className="w-3 h-3" /> {breaks} paros

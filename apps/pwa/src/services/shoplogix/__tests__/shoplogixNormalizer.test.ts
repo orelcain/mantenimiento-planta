@@ -332,7 +332,10 @@ describe('buildLineSnapshot', () => {
     // totalCycles = 3000; throughput = 3000 / 9.25
     expect(snap.lineThroughputActual).toBeCloseTo(3000 / 9.25, 1);
     expect(snap.lineThroughputExpected).toBeCloseTo(3600 / 9.25, 1);
-    expect(snap.lineAvailability).toBeCloseTo(0.9, 2);
+    // lineAvailability ahora promedia `shiftRuntime` (calculado desde states),
+    // no el `actualRuntime` opaco de Shoplogix. Las máquinas del test no tienen
+    // states, por lo que el shiftRuntime resultante es 0.
+    expect(snap.lineAvailability).toBe(0);
     expect(snap.machinesProducing).toBe(0);   // ningún state marcado como current
   });
 
