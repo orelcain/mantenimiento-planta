@@ -217,6 +217,7 @@ export function GlobalSettingsModal({ open, onOpenChange }: Props) {
           </DialogTitle>
           <DialogDescription>
             Parámetros de política de planta — se aplican a todos los turnos.
+            Los 12 gates y la configuración física son específicos de cada turno.
           </DialogDescription>
         </DialogHeader>
 

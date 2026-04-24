@@ -482,10 +482,10 @@ export function AnalisisGraderWizardPage() {
           <div>
             <h1 className="text-xl lg:text-2xl font-bold flex items-center gap-2">
               <BarChart3 className="h-5 w-5 lg:h-6 lg:w-6 text-primary" />
-              Análisis Grader
+              Análisis de Turno
             </h1>
             <p className="text-xs lg:text-sm text-muted-foreground mt-0.5">
-              Clasificadora de salmones — análisis en tiempo real
+              Línea completa Grader + Baaders — carga de Excel del Grader
             </p>
           </div>
           {/* [2] Carga de archivos — compacto en el header */}

@@ -45,6 +45,20 @@ interface Props {
 }
 
 // ============================================================================
+// Alineación pixel-perfect con el chart ECharts del Grader (ShiftTimelineView)
+// ============================================================================
+// El plot area del ECharts del Grader queda en:
+//   - x_inicio = CardContent.paddingLeft (24px de p-6) + grid.left (40px) = 64px
+//   - x_fin    = ancho_card - CardContent.paddingRight (24px) - grid.right (16px) = ancho_card - 40px
+// Este panel usa CardContent con `px-4` (16px), así que para que el Gantt
+// arranque/termine en los mismos píxeles X que el plot del Grader necesitamos:
+//   - paddingLeft  extra del wrapper del Gantt = 64 - 16 = 48px
+//   - paddingRight extra del wrapper del Gantt = 40 - 16 = 24px
+// Si cambia `grid` en ShiftTimelineView o `px-*` aquí, recalcular.
+const PLOT_LEFT_PAD_PX  = 48
+const PLOT_RIGHT_PAD_PX = 24
+
+// ============================================================================
 // Helpers de formato
 // ============================================================================
 
@@ -388,11 +402,14 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
       {/* KPI row siempre visible (verde/amarillo/rojo) */}
       <ProductionKpiRow kpis={kpis} />
 
-      {/* Gantt con leyenda */}
-      <StateTimeline shift={shift} windowStart={windowStart} windowEnd={windowEnd} />
+      {/* Wrapper con padding para alinear pixel-perfect con plot area del ECharts del Grader */}
+      <div style={{ paddingLeft: PLOT_LEFT_PAD_PX, paddingRight: PLOT_RIGHT_PAD_PX }} className="space-y-2">
+        {/* Gantt con leyenda */}
+        <StateTimeline shift={shift} windowStart={windowStart} windowEnd={windowEnd} />
 
-      {/* Production bars + objetivo */}
-      <ProductionBars intervals={shift.intervals} threshold={shift.threshold} />
+        {/* Production bars + objetivo */}
+        <ProductionBars intervals={shift.intervals} threshold={shift.threshold} />
+      </div>
 
       {/* Mini stats footer */}
       <div className="flex items-center gap-4 text-[11px] text-slate-500">
