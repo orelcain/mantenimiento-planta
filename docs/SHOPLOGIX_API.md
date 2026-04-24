@@ -138,35 +138,84 @@ interface WhiteboardProductionResponse {
 
 **Endpoint:** `GET /web/query.axd?type=whiteboardsummary&format=json&machines={uuid}&start=...&end=...`
 
-**Retorna:** KPIs agregados del período:
-- Piezas reales / potencial (ej: `5,424 / 8,170 (66%)`)
-- Piezas en verde (ej: `4,228 (78%)`)
-- Piezas en amarillo (ej: `1,087 (20%)`)
-- Piezas en rojo (ej: `109 (2%)`)
-- Ciclo real vs objetivo (ej: `3.9s / 2.9s`)
+**Validado con datos reales** (Feb 26 2026, Evisceradora 1, 29 kB).
 
-> **Pendiente:** capturar una respuesta concreta para documentar el schema exacto (aún no tengo una muestra con datos no-null).
+**Schema:**
+
+```ts
+interface WhiteboardSummaryResponse {
+  version: 1
+  machines: Array<{
+    machineId: string
+    machineName: string
+    time: string                      // timestamp respuesta
+    threshold: number                 // 15 = % tolerancia coloreo
+
+    // Unidades
+    finishedGoodUnits: string
+    inventoryUnits: string
+    lineUnits: string
+    productionUnits: string           // "Eviscerado"
+    productionMachine: boolean
+
+    // Turno
+    currentShiftStart: string         // "20260228T080000.000"
+    currentShiftEnd: string           // "20260228T151500.000"
+
+    // OEE métricas
+    runtimeVariance: number           // -0.0083 (negativo = bajo expected)
+    expectedRuntime: number           // 0.1035 (fracción del día)
+    actualRuntime: number             // 0.1118
+
+    // 🔥 Estados/paros del turno — los 81 segmentos del Gantt
+    machineStates: Array<MachineState>
+
+    comments: string[]                // anotaciones del operador
+    cameras: unknown[]                // configuración de cámaras
+    autoEnforceStatusReasons: boolean
+  }>
+}
+
+interface MachineState {
+  name: 'Produciendo' | 'Detencion' | 'Micro Detencion' | string
+  reason: string                      // "REUNION INICIO TURNO" | "" | "COLACION"
+  reasonRootCause: boolean
+  reasonRootCauseName: string
+  statusColor: string                 // "ff0000" (rojo) | "008000" (verde) | "73d8ff" (celeste)
+  reasonColor: string
+  acceptsReason: boolean              // si puede recibir justificación del operador
+  reasonExceeded: boolean             // si se pasó del tiempo permitido para la razón
+  setupExceeded: boolean
+  type: 'Uptime' | 'Downtime' | 'Break' | string
+  current: boolean                    // si es el estado en curso
+  start: string                       // "20260226T090000.000"
+  end: string
+  startMilli: number                  // 1772096400000 (Unix ms)
+  endMilli: number
+  durationMilli: number
+}
+```
+
+**Categorías de paros observadas (Feb 26, Evisceradora 1):**
+- `Produciendo` (type: Uptime) — verde
+- `Detencion` con `reason: "REUNION INICIO TURNO"` (type: Break)
+- `Detencion` con `reason: "COLACION"` (type: Break)
+- `Detencion` con `reason: "Paro Programado"` (type: Break)
+- `Detencion` con `reason: "Limpieza de Ducto"`
+- `Micro Detencion` (type: Downtime) — celeste, <5 min
+- `Detencion` con `reason: ""` (sin categorizar — el operador aún no justificó)
+
+**Insight clave:** este es el dato más valioso de toda la API. Reemplaza nuestro detector de pausas casero del módulo Grader cuando se aplica a las Evisceradoras (upstream).
 
 ---
 
 ## 5. Cronología de paros — `Machine - Chrono`
 
-**Endpoint:** configurable vía UI "MÁQUINA CHRONO"; nombre técnico por confirmar.
+**Conclusión tras inspección:** el Machine-Chrono en sí solo trae configuración de la vista (`splat`, `viewName`, `machineId`). **Los datos reales de paros están en `whiteboardsummary.machines[0].machineStates`** (sección 4). No se necesita un endpoint aparte — el summary ya los incluye.
 
-**Lo que muestra la UI:**
-- Inicio, fin, duración del período
-- Leyenda de paros con categorías:
-  - Produciendo
-  - COLACION
-  - Paro Programado
-  - Limpieza de Ducto
-  - REUNION INICIO TURNO
-  - Micro Detencion
-  - EJERCICIO COMPENSATORIO
-  - DETENCION PROGRAMADA
-- Cada barra stacked representa el % de cada categoría en el intervalo
-
-**La primera respuesta capturada** solo trae config base (`splat`, `viewName`, `machineId`). El endpoint real con los datos probablemente se dispara después y tiene otro nombre. **Pendiente:** inspeccionar con filtro `name*=chrono` o `downtime`.
+**Diferencia:**
+- **whiteboardproduction:** intervalos regulares de N min (para barras de producción)
+- **whiteboardsummary.machineStates:** segmentos de duración variable por estado (para Gantt)
 
 ---
 
@@ -229,7 +278,14 @@ function toShoplogixTime(d: Date): string {
 
 ## 10. Próximos pasos
 
-1. Capturar respuesta de `whiteboardsummary` con datos reales.
-2. Identificar el endpoint real de Machine-Chrono con datos.
-3. Decidir estrategia de auth: replicar login o pedir API oficial a Shoplogix.
+1. ~~Capturar respuesta de `whiteboardsummary` con datos reales.~~ ✅ Fixture `scripts/fixtures/feb26-summary-Evisceradora_1.json` (29 kB, 81 machineStates)
+2. ~~Identificar el endpoint real de Machine-Chrono con datos.~~ ✅ No existe endpoint separado — los datos están en `summary.machineStates`
+3. **Pendiente:** decidir estrategia de auth — replicar login o pedir API oficial a Shoplogix.
 4. Ver plan de integración: [SHOPLOGIX_INTEGRATION_PLAN.md](./SHOPLOGIX_INTEGRATION_PLAN.md)
+
+## 11. Observaciones operacionales (2026-04-24)
+
+- Al correr el POC en Abr 24, la API devolvió **0 intervalos para hoy y ayer**. Los últimos datos productivos están en **Feb 28** (`currentShift` en todos los responses apunta a esa fecha).
+- La planta parece estar en **temporada baja** (sin turnos productivos actuales).
+- Para pruebas y desarrollo usar rango histórico Feb 25-28. Para producción futura, validar que la API siga respondiendo cuando reinicien operaciones.
+- La cuenta de sesión observada: `javier.toro@aquachile.com`, `customer: AquaChile SA Plantas`, account: `AquaChile SA Planta Chonchi`, accesos: `analytics_designer`, `analytics_viewer`.
