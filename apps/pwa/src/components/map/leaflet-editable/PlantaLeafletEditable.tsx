@@ -1261,6 +1261,8 @@ function KeyboardShortcuts() {
 function FitDxfBounds({ view }: { view: MapView }) {
   const map = useMap()
   useEffect(() => {
+    // Exponer map globalmente para debug (DEV only)
+    if (import.meta.env.DEV) (window as any).__leafletMap__ = map
     // Pequeño delay para asegurar que el container ya tiene su tamaño final
     const t = setTimeout(() => {
       map.invalidateSize()
@@ -1269,6 +1271,24 @@ function FitDxfBounds({ view }: { view: MapView }) {
     return () => clearTimeout(t)
   }, [map, view])
   return null
+}
+
+// Feedback visual de box-select: flasea el rectángulo + badge con el count
+function showBoxSelectFeedback(map: LMap, bounds: L.LatLngBounds, hits: number): void {
+  const color = hits > 0 ? '#22c55e' : '#ef4444'
+  const flash = L.rectangle(bounds, {
+    color, weight: 2, dashArray: '0',
+    fillColor: color, fillOpacity: 0.18, interactive: false,
+  }).addTo(map)
+  const center = bounds.getCenter()
+  const badge = L.tooltip({
+    permanent: true, direction: 'center', className: 'box-select-badge', interactive: false,
+  }).setLatLng(center).setContent(hits > 0 ? `✓ ${hits} seleccionado${hits !== 1 ? 's' : ''}` : '— sin elementos en el área')
+  badge.addTo(map)
+  setTimeout(() => {
+    try { map.removeLayer(flash) } catch { /* ok */ }
+    try { map.closeTooltip(badge as any) } catch { /* ok */ }
+  }, 900)
 }
 
 // ─── Box-select: shift+drag (desktop) o toggle + drag/touch (mobile) ─────────
@@ -1360,6 +1380,8 @@ function BoxSelect({ view }: { view: MapView }) {
           if (bounds.contains(L.latLng(c[0], c[1]))) { hit.push(el.id); break }
         }
       }
+      // Feedback visual: mostrar resultado del drag (aunque sea 0)
+      showBoxSelectFeedback(map, bounds, hit.length)
       if (hit.length === 0) return
       const existing = new Set<string>([...(selectedId ? [selectedId] : []), ...multiSelection])
       if (existing.size === 0) {
@@ -1610,6 +1632,12 @@ export function PlantaLeafletEditable() {
         minZoom={-20}
         maxZoom={20}
         zoomSnap={0.25}
+        zoomDelta={0.5}
+        wheelPxPerZoomLevel={120}
+        wheelDebounceTime={20}
+        scrollWheelZoom={true}
+        zoomAnimation={true}
+        zoomAnimationThreshold={6}
         zoomControl={false}
         crs={L.CRS.Simple}
         className="w-full h-full"
