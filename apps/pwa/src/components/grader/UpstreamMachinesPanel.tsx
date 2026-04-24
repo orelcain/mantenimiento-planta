@@ -18,7 +18,7 @@ import { useState, useMemo } from 'react'
 import { Card, CardContent, Badge } from '@/components/ui'
 import {
   ChevronDown, ChevronRight, Factory, Activity, AlertCircle, Zap,
-  TrendingUp, TrendingDown, Timer, Pause,
+  TrendingUp, TrendingDown, Timer, Pause, AlertTriangle,
 } from 'lucide-react'
 import type {
   UpstreamLineSnapshot,
@@ -33,6 +33,15 @@ interface Props {
   error?: string | null
   defaultCollapsed?: boolean
   syncedAt?: Date | null
+  /**
+   * Ventana temporal del turno del Grader para alinear el eje X del Gantt.
+   * Si se provee, el Gantt se renderiza sobre este rango (con gaps donde
+   * Baader no tenga datos) — permite comparar visualmente paros Grader vs Baader.
+   */
+  shiftWindow?: {
+    startAt: string  // ISO
+    endAt: string
+  } | null
 }
 
 // ============================================================================
@@ -126,35 +135,109 @@ function aggregateStatesByReason(states: UpstreamMachineState[]): ReasonAggregat
 // Subcomponentes visuales
 // ============================================================================
 
-/** Gantt con leyenda inferior de duraciones por categoría. */
-function StateTimeline({ shift }: { shift: UpstreamMachineShift }) {
-  const totalMs = shift.shiftEnd.getTime() - shift.shiftStart.getTime()
+/**
+ * Genera ticks horarios entre start y end. Devuelve Date en cada hora exacta
+ * del rango que tenga al menos 30 min hasta el borde.
+ */
+function generateHourTicks(start: Date, end: Date): Date[] {
+  const ticks: Date[] = []
+  // Primer tick: siguiente hora exacta a start
+  const firstTick = new Date(Date.UTC(
+    start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate(),
+    start.getUTCHours() + (start.getUTCMinutes() > 0 ? 1 : 0), 0, 0, 0,
+  ))
+  for (let t = firstTick.getTime(); t < end.getTime() - 30 * 60 * 1000; t += 3600 * 1000) {
+    ticks.push(new Date(t))
+  }
+  return ticks
+}
+
+/**
+ * Gantt con leyenda + ticks horarios. Si se provee `windowStart/End`, el Gantt
+ * se renderiza en ese rango (permite alineación con timeline del Grader).
+ */
+function StateTimeline({
+  shift,
+  windowStart,
+  windowEnd,
+}: {
+  shift: UpstreamMachineShift
+  windowStart?: Date
+  windowEnd?: Date
+}) {
+  const rangeStart = windowStart ?? shift.shiftStart
+  const rangeEnd   = windowEnd   ?? shift.shiftEnd
+  const totalMs = rangeEnd.getTime() - rangeStart.getTime()
   const reasons = useMemo(() => aggregateStatesByReason(shift.states), [shift.states])
+  const ticks = useMemo(() => generateHourTicks(rangeStart, rangeEnd), [rangeStart, rangeEnd])
 
   if (totalMs <= 0 || shift.states.length === 0) {
     return <div className="h-4 rounded bg-slate-800/60" />
   }
 
   return (
-    <div className="space-y-1.5">
-      <div className="flex h-4 rounded overflow-hidden bg-slate-800/60 border border-slate-800">
-        {shift.states.map((st, i) => {
-          const startOffset = Math.max(0, st.startAt.getTime() - shift.shiftStart.getTime())
-          const segMs = Math.max(0, st.endAt.getTime() - st.startAt.getTime())
-          const widthPct = (segMs / totalMs) * 100
-          if (widthPct <= 0) return null
-          const label = st.reason ? `${st.name}: ${st.reason}` : st.name
-          const mins = Math.round(st.durationSec / 60)
+    <div className="space-y-1">
+      {/* Gantt + overlay de ticks */}
+      <div className="relative">
+        <div className="flex h-4 rounded overflow-hidden bg-slate-800/60 border border-slate-800">
+          {shift.states.map((st, i) => {
+            // Recorta el estado al windowStart/End si lo excede
+            const segStart = Math.max(st.startAt.getTime(), rangeStart.getTime())
+            const segEnd   = Math.min(st.endAt.getTime(),   rangeEnd.getTime())
+            if (segEnd <= segStart) return null
+            const startOffsetPct = ((segStart - rangeStart.getTime()) / totalMs) * 100
+            const widthPct       = ((segEnd - segStart) / totalMs) * 100
+            const label = st.reason ? `${st.name}: ${st.reason}` : st.name
+            const mins = Math.round(st.durationSec / 60)
+            return (
+              <div
+                key={i}
+                style={{
+                  position: 'absolute',
+                  left: `${startOffsetPct}%`,
+                  width: `${widthPct}%`,
+                  height: '100%',
+                  backgroundColor: st.color,
+                }}
+                className="border-r border-slate-900/40"
+                title={`${label} — ${mins} min (${fmtHHmm(st.startAt)}–${fmtHHmm(st.endAt)})`}
+              />
+            )
+          })}
+        </div>
+
+        {/* Ticks verticales de hora — sutiles, sobre el gantt */}
+        {ticks.map((t, i) => {
+          const leftPct = ((t.getTime() - rangeStart.getTime()) / totalMs) * 100
           return (
             <div
-              key={i}
-              style={{ width: `${widthPct}%`, backgroundColor: st.color, marginLeft: i === 0 ? `${(startOffset / totalMs) * 100}%` : 0 }}
-              className="border-r border-slate-900/40 last:border-r-0"
-              title={`${label} — ${mins} min (${fmtHHmm(st.startAt)}–${fmtHHmm(st.endAt)})`}
+              key={`tick-${i}`}
+              className="absolute top-0 bottom-0 border-l border-white/25 pointer-events-none"
+              style={{ left: `${leftPct}%` }}
             />
           )
         })}
       </div>
+
+      {/* Eje horario debajo del gantt */}
+      {ticks.length > 0 && (
+        <div className="relative h-3 text-[9px] text-slate-500 tabular-nums">
+          <span className="absolute left-0">{fmtHHmm(rangeStart)}</span>
+          {ticks.map((t, i) => {
+            const leftPct = ((t.getTime() - rangeStart.getTime()) / totalMs) * 100
+            return (
+              <span
+                key={`label-${i}`}
+                className="absolute"
+                style={{ left: `${leftPct}%`, transform: 'translateX(-50%)' }}
+              >
+                {fmtHHmm(t)}
+              </span>
+            )
+          })}
+          <span className="absolute right-0">{fmtHHmm(rangeEnd)}</span>
+        </div>
+      )}
 
       {/* Leyenda condensada — top 6 razones por duración */}
       {reasons.length > 0 && (
@@ -248,10 +331,14 @@ function ProductionKpiRow({ kpis }: { kpis: MachineKpis }) {
 // MachineRow — 1 máquina
 // ============================================================================
 
-function MachineRow({ shift, expanded, onToggle }: {
+function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAlert }: {
   shift: UpstreamMachineShift
   expanded: boolean
   onToggle: () => void
+  windowStart?: Date
+  windowEnd?: Date
+  /** Si es true, esta máquina tiene >50% más microparadas que el promedio de la línea. */
+  microAlert?: boolean
 }) {
   const kpis   = useMemo(() => computeKpis(shift.intervals), [shift.intervals])
   const breaks = shift.states.filter(s => s.type === 'break').length
@@ -281,6 +368,11 @@ function MachineRow({ shift, expanded, onToggle }: {
           <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-slate-700 text-slate-400">
             Baader 142
           </Badge>
+          {microAlert && (
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-amber-900/70 bg-amber-950/50 text-amber-300 flex items-center gap-1" title="Microparadas anómalas (>50% sobre promedio línea). Revisar mantención.">
+              <AlertTriangle className="w-3 h-3" /> Atención
+            </Badge>
+          )}
         </div>
         <div className="flex items-center gap-3 text-xs flex-shrink-0">
           <span className={`font-semibold tabular-nums flex items-center gap-0.5 ${ratioColor}`} title="Ritmo vs objetivo">
@@ -297,7 +389,7 @@ function MachineRow({ shift, expanded, onToggle }: {
       <ProductionKpiRow kpis={kpis} />
 
       {/* Gantt con leyenda */}
-      <StateTimeline shift={shift} />
+      <StateTimeline shift={shift} windowStart={windowStart} windowEnd={windowEnd} />
 
       {/* Production bars + objetivo */}
       <ProductionBars intervals={shift.intervals} threshold={shift.threshold} />
@@ -367,6 +459,7 @@ export function UpstreamMachinesPanel({
   error = null,
   defaultCollapsed = false,
   syncedAt = null,
+  shiftWindow = null,
 }: Props) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed)
   const [expandedMachines, setExpandedMachines] = useState<Set<string>>(new Set())
@@ -377,11 +470,38 @@ export function UpstreamMachinesPanel({
     return ageMin > 15
   }, [syncedAt])
 
+  // Ventana temporal a usar para alinear el Gantt. Si el Grader provee
+  // shiftWindow, lo respetamos. Sino, cada máquina usa su propio shiftStart/End.
+  const [windowStart, windowEnd] = useMemo<[Date | undefined, Date | undefined]>(() => {
+    if (!shiftWindow?.startAt || !shiftWindow?.endAt) return [undefined, undefined]
+    const s = new Date(shiftWindow.startAt)
+    const e = new Date(shiftWindow.endAt)
+    if (isNaN(s.getTime()) || isNaN(e.getTime())) return [undefined, undefined]
+    return [s, e]
+  }, [shiftWindow?.startAt, shiftWindow?.endAt])
+
   // Agregado de toda la línea (para header)
   const lineKpis = useMemo(() => {
     if (!snapshot || snapshot.machines.length === 0) return null
     const all = snapshot.machines.flatMap(m => m.intervals)
     return computeKpis(all)
+  }, [snapshot])
+
+  // Detector de microparadas anómalas por máquina: marca la máquina si tiene
+  // >50% más microparadas que el promedio de la línea (útil para mantención
+  // predictiva — ej: E3 con 61 vs prom 44 = +39% → atención).
+  const microAlertSet = useMemo<Set<string>>(() => {
+    const set = new Set<string>()
+    if (!snapshot || snapshot.machines.length < 2) return set
+    const counts = snapshot.machines.map(m =>
+      m.states.filter(s => s.name === 'Micro Detencion').length,
+    )
+    const avg = counts.reduce((a, x) => a + x, 0) / counts.length
+    if (avg <= 0) return set
+    snapshot.machines.forEach((m, i) => {
+      if ((counts[i] ?? 0) > avg * 1.5) set.add(m.machineid)
+    })
+    return set
   }, [snapshot])
 
   const empty = !loading && !error && (!snapshot || snapshot.machines.length === 0)
@@ -469,6 +589,9 @@ export function UpstreamMachinesPanel({
                       shift={m}
                       expanded={expandedMachines.has(m.machineid)}
                       onToggle={() => toggleMachine(m.machineid)}
+                      windowStart={windowStart}
+                      windowEnd={windowEnd}
+                      microAlert={microAlertSet.has(m.machineid)}
                     />
                   ))}
                 </div>

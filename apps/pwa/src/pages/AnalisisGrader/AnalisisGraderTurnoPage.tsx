@@ -826,6 +826,7 @@ export function AnalisisGraderTurnoPage() {
             loading={upstreamLine.loading}
             error={upstreamLine.error}
             syncedAt={upstreamLine.syncedAt}
+            shiftWindow={shiftWindow}
           />
 
           {/* Distribución por gate — balance del turno */}
