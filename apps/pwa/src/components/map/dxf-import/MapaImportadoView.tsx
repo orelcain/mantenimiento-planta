@@ -9,22 +9,19 @@ import { useEffect, useRef, useState } from 'react'
 import { MapContainer, GeoJSON, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { Eye, EyeOff, Trash2, X, Upload, ChevronDown } from 'lucide-react'
+import { Eye, EyeOff, Trash2, Upload, ChevronDown } from 'lucide-react'
 import { useMapaLeafletStore, type MapaImportado } from '@/store/useMapaLeafletStore'
 
 // ── FitBounds helper ─────────────────────────────────────────────────────────
 
 function FitBounds({ bounds }: { bounds: [[number, number], [number, number]] }) {
   const map = useMap()
-  const fitted = useRef(false)
   useEffect(() => {
-    if (fitted.current) return
-    fitted.current = true
     const lb = L.latLngBounds(
       L.latLng(bounds[0][0], bounds[0][1]),
       L.latLng(bounds[1][0], bounds[1][1]),
     )
-    map.fitBounds(lb, { padding: [20, 20], animate: false })
+    map.fitBounds(lb, { padding: [40, 40], animate: false, maxZoom: 4 })
   }, [map, bounds])
   return null
 }
@@ -125,7 +122,9 @@ export function MapaImportadoView({ mapa }: Props) {
         crs={L.CRS.Simple}
         zoom={0}
         center={[0, 0]}
-        zoomControl={false}
+        minZoom={-8}
+        maxZoom={6}
+        zoomControl={true}
         scrollWheelZoom={true}
         className="w-full h-full"
         style={{ background: BLUEPRINT_BG }}

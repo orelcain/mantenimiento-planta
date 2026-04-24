@@ -271,7 +271,7 @@ export function MapaPlantaPage() {
   const mapasImportados         = useMapaLeafletStore((s) => s.mapasImportados)
   const mapaImportadoActivoId   = useMapaLeafletStore((s) => s.mapaImportadoActivoId)
   const setMapaImportadoActivo  = useMapaLeafletStore((s) => s.setMapaImportadoActivo)
-  const deleteMapaImportado     = useMapaLeafletStore((s) => s.deleteMapaImportado)
+  // deleteMapaImportado se usa desde MapaImportadoView directamente
   const [showDxfImport, setShowDxfImport] = useState(false)
 
   const mapaActivo = mapasImportados.find((m) => m.id === mapaImportadoActivoId) ?? null
