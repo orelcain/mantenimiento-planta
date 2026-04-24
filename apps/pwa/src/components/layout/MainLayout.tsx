@@ -150,6 +150,7 @@ export function MainLayout() {
   const isHmiKnuroRoute = location.pathname.startsWith('/hmi-knuro')
   const isBaader200Route = location.pathname.startsWith('/baader-200')
   const isAprendizajeRoute = location.pathname.startsWith('/aprendizaje')
+  const isMapRoute = location.pathname.startsWith('/map')
   const shouldHideDesktopSidebar =
     sidebarCollapsed || (isGanttRoute && ganttFocusMode && !sidebarPeekOpen)
 
@@ -1039,7 +1040,7 @@ export function MainLayout() {
         <main
           id="main-content"
           className={`${
-            isClimaRoute || isHmiKnuroRoute || isBaader200Route
+            isClimaRoute || isHmiKnuroRoute || isBaader200Route || isMapRoute
               ? 'h-[calc(100vh-3.5rem-4rem)] lg:h-[calc(100vh-3.5rem)] p-0 overflow-hidden'
               : isAprendizajeRoute
               ? 'p-0 w-full max-w-[100vw] overflow-x-hidden pb-16 lg:pb-0'

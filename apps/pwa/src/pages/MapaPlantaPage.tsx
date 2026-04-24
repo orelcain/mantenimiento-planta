@@ -268,7 +268,7 @@ export function MapaPlantaPage() {
   const toggleView3DMode   = useMapaLeafletStore((s) => s.toggleView3DMode)
 
   return (
-    <div className="flex flex-col h-screen bg-gray-950 overflow-hidden">
+    <div className="flex flex-col h-full bg-gray-950 overflow-hidden">
 
       {/* ── Header ───────────────────────────────────────────────────────── */}
       <header className="flex items-center justify-between gap-2 px-2 sm:px-4 py-1.5 sm:py-2 bg-gray-900/90 border-b border-gray-800/60 shrink-0 z-10 min-h-0">
