@@ -601,8 +601,9 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
         capasSvgVisibles: s.capasSvgVisibles,
         capasSvgEliminadas: s.capasSvgEliminadas,
         capasGeoJsonEliminadas: s.capasGeoJsonEliminadas,
-        mapasImportados: s.mapasImportados,
-        mapaImportadoActivoId: s.mapaImportadoActivoId,
+        // NOTA: mapasImportados NO se persisten (cada DXF puede tener 100k+
+        // polilíneas, excede el quota de localStorage). Viven en memoria
+        // hasta recargar página. TODO: mover a IndexedDB para persistencia.
         capasSvgOpacity: s.capasSvgOpacity,
         capasUsuario: s.capasUsuario,
         niveles: s.niveles,

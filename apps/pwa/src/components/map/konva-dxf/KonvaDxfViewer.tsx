@@ -27,6 +27,53 @@ function clamp(v: number, mn: number, mx: number) {
   return Math.max(mn, Math.min(mx, v))
 }
 
+/**
+ * Bbox robusto que descarta polilíneas outlier (p.ej. paper space /
+ * cajetines a decenas de miles de unidades del model space real).
+ * Usa mediana de centros + MAD para filtrar outliers (umbral 15 · MAD).
+ */
+function computeRobustBbox(mapa: MapaImportado): [number, number, number, number] {
+  const centros: Array<{ cx: number; cy: number; poly: [number, number][] }> = []
+  for (const capa of mapa.capas) {
+    if (capa.eliminada) continue
+    for (const poly of capa.polylines) {
+      if (!poly.length) continue
+      let sx = 0, sy = 0
+      for (const [x, y] of poly) { sx += x; sy += y }
+      centros.push({ cx: sx / poly.length, cy: sy / poly.length, poly })
+    }
+  }
+  if (!centros.length) return mapa.bbox
+
+  const xs = centros.map((c) => c.cx).sort((a, b) => a - b)
+  const ys = centros.map((c) => c.cy).sort((a, b) => a - b)
+  const medX = xs[Math.floor(xs.length / 2)]!
+  const medY = ys[Math.floor(ys.length / 2)]!
+  const devX = centros.map((c) => Math.abs(c.cx - medX)).sort((a, b) => a - b)
+  const devY = centros.map((c) => Math.abs(c.cy - medY)).sort((a, b) => a - b)
+  const madX = Math.max(devX[Math.floor(devX.length / 2)]!, 1)
+  const madY = Math.max(devY[Math.floor(devY.length / 2)]!, 1)
+  const UMBRAL = 15
+  const insiders = centros.filter(
+    (c) => Math.abs(c.cx - medX) <= UMBRAL * madX && Math.abs(c.cy - medY) <= UMBRAL * madY,
+  )
+  const pool = insiders.length ? insiders : centros
+
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const { poly } of pool) {
+    for (const [x, y] of poly) {
+      if (x < minX) minX = x
+      if (x > maxX) maxX = x
+      if (y < minY) minY = y
+      if (y > maxY) maxY = y
+    }
+  }
+  if (!isFinite(minX)) return mapa.bbox
+  const padX = (maxX - minX) * 0.02
+  const padY = (maxY - minY) * 0.02
+  return [minX - padX, minY - padY, maxX + padX, maxY + padY]
+}
+
 // ── Panel de capas (reusable con el anterior pero adaptado a MapaImportado) ──
 
 function PanelCapasKonva({ mapa }: { mapa: MapaImportado }) {
@@ -133,18 +180,20 @@ export function KonvaDxfViewer({ mapa }: Props) {
     [mapa.capas]
   )
 
+  // Bbox robusto (ignora outliers tipo paper space)
+  const robustBbox = useMemo(() => computeRobustBbox(mapa), [mapa])
+
   // Fit bbox al montar / al cambiar mapa
   useEffect(() => {
     if (!size.w || !size.h) return
-    const [minX, minY, maxX, maxY] = mapa.bbox
+    const [minX, minY, maxX, maxY] = robustBbox
     const w = maxX - minX || 1
     const h = maxY - minY || 1
     const pad = 0.92
     const s = Math.min((size.w * pad) / w, (size.h * pad) / h)
+    // eslint-disable-next-line no-console
+    console.log('[KonvaDxfViewer] robustBbox=', robustBbox, 'originalBbox=', mapa.bbox, 'scale=', s)
 
-    // DXF Y va hacia arriba. Konva Y va hacia abajo. Para que el dibujo
-    // no salga invertido, escalamos en Y con signo negativo.
-    // Centramos el bbox en el viewport.
     const cx = (minX + maxX) / 2
     const cy = (minY + maxY) / 2
     setScale(s)
@@ -152,7 +201,7 @@ export function KonvaDxfViewer({ mapa }: Props) {
       x: size.w / 2 - cx * s,
       y: size.h / 2 + cy * s,   // +cy*s porque Y está invertida (scaleY = -s)
     })
-  }, [mapa.id, mapa.bbox, size.w, size.h])
+  }, [mapa.id, robustBbox, size.w, size.h, mapa.bbox])
 
   // Zoom con rueda centrado en cursor
   const onWheel = (e: Konva.KonvaEventObject<WheelEvent>) => {
@@ -184,7 +233,7 @@ export function KonvaDxfViewer({ mapa }: Props) {
 
   function fitToBbox() {
     if (!size.w || !size.h) return
-    const [minX, minY, maxX, maxY] = mapa.bbox
+    const [minX, minY, maxX, maxY] = robustBbox
     const w = maxX - minX || 1
     const h = maxY - minY || 1
     const pad = 0.92

@@ -83,28 +83,72 @@ export function parseDxfKonva(text: string): ResultadoParseKonva {
   // Ordenar capas alfabéticamente
   const capas = Array.from(capasMap.values()).sort((a, b) => a.name.localeCompare(b.name))
 
-  const bbox: [number, number, number, number] = [
-    result.bbox.min.x,
-    result.bbox.min.y,
-    result.bbox.max.x,
-    result.bbox.max.y,
-  ]
-
-  // Si el bbox es inválido, calcular de vertices
-  if (!isFinite(bbox[0]) || !isFinite(bbox[2])) {
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-    for (const capa of capas) {
-      for (const poly of capa.polylines) {
-        for (const [x, y] of poly) {
-          if (x < minX) minX = x
-          if (x > maxX) maxX = x
-          if (y < minY) minY = y
-          if (y > maxY) maxY = y
-        }
-      }
-    }
-    bbox[0] = minX; bbox[1] = minY; bbox[2] = maxX; bbox[3] = maxY
-  }
+  const bbox = computeRobustBbox(capas, warnings)
 
   return { capas, bbox, warnings }
+}
+
+// ── Bbox robusto (ignorando outliers tipo "paper space") ─────────────────────
+
+/**
+ * Muchos DXF de AutoCAD contienen polilíneas de "paper space" (viewports,
+ * cajetines, bordes de hoja) cuyas coordenadas están a decenas de miles de
+ * unidades del "model space" real. Si incluimos esas en el bbox, el fit-to-bbox
+ * deja el contenido real microscópico.
+ *
+ * Estrategia:
+ *   1. Por cada polilínea, calcular su centro (cx, cy).
+ *   2. Usar mediana + MAD (median absolute deviation) para detectar outliers.
+ *   3. Excluir polilíneas cuyo centro esté a > 15 · MAD de la mediana.
+ *   4. Calcular bbox con las polilíneas restantes.
+ */
+function computeRobustBbox(capas: CapaKonva[], warnings: string[]): [number, number, number, number] {
+  const centros: Array<{ cx: number; cy: number; poly: [number, number][] }> = []
+  for (const capa of capas) {
+    for (const poly of capa.polylines) {
+      let sx = 0, sy = 0
+      for (const [x, y] of poly) { sx += x; sy += y }
+      centros.push({ cx: sx / poly.length, cy: sy / poly.length, poly })
+    }
+  }
+  if (!centros.length) return [0, 0, 100, 100]
+
+  // Mediana de X e Y por separado
+  const xs = centros.map((c) => c.cx).sort((a, b) => a - b)
+  const ys = centros.map((c) => c.cy).sort((a, b) => a - b)
+  const medX = xs[Math.floor(xs.length / 2)]!
+  const medY = ys[Math.floor(ys.length / 2)]!
+
+  // MAD (desviación mediana absoluta)
+  const devX = centros.map((c) => Math.abs(c.cx - medX)).sort((a, b) => a - b)
+  const devY = centros.map((c) => Math.abs(c.cy - medY)).sort((a, b) => a - b)
+  const madX = Math.max(devX[Math.floor(devX.length / 2)]!, 1)
+  const madY = Math.max(devY[Math.floor(devY.length / 2)]!, 1)
+
+  const UMBRAL = 15
+  const insiders = centros.filter(
+    (c) => Math.abs(c.cx - medX) <= UMBRAL * madX && Math.abs(c.cy - medY) <= UMBRAL * madY,
+  )
+
+  const descartados = centros.length - insiders.length
+  if (descartados > 0) {
+    warnings.push(`${descartados} polilíneas outlier descartadas del bbox (probable paper space)`)
+  }
+
+  const pool = insiders.length ? insiders : centros
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const { poly } of pool) {
+    for (const [x, y] of poly) {
+      if (x < minX) minX = x
+      if (x > maxX) maxX = x
+      if (y < minY) minY = y
+      if (y > maxY) maxY = y
+    }
+  }
+
+  if (!isFinite(minX)) return [0, 0, 100, 100]
+  // Margen pequeño
+  const padX = (maxX - minX) * 0.02
+  const padY = (maxY - minY) * 0.02
+  return [minX - padX, minY - padY, maxX + padX, maxY + padY]
 }
