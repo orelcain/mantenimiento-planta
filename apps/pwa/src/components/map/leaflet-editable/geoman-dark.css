@@ -100,6 +100,11 @@
   border-color: #f59e0b !important;
 }
 
+/* Subir zoom para que no se solape con la atribución "Leaflet" */
+.leaflet-bottom.leaflet-right .leaflet-control-zoom {
+  margin-bottom: 28px !important;
+}
+
 /* ─── Popups ──────────────────────────────────────────────────────── */
 .leaflet-popup-content-wrapper {
   background: #0f172a !important;
