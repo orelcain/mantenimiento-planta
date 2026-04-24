@@ -262,7 +262,6 @@ export function MapaPlantaPage() {
   const toggleMeasureMode  = useMapaLeafletStore((s) => s.toggleMeasureMode)
   const grillaVisible      = useMapaLeafletStore((s) => s.grillaVisible)
   const toggleGrilla       = useMapaLeafletStore((s) => s.toggleGrilla)
-  const editMode           = useMapaLeafletStore((s) => s.editMode)
   const boxSelectMode      = useMapaLeafletStore((s) => s.boxSelectMode)
   const toggleBoxSelect    = useMapaLeafletStore((s) => s.toggleBoxSelectMode)
   const view3DMode         = useMapaLeafletStore((s) => s.view3DMode)
