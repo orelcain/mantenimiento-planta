@@ -8,10 +8,12 @@
  * Editor: zonas, equipos y formas custom (Geoman). Persistencia local.
  */
 
-import { Map as MapIcon, Building2, Globe2, Ruler, LayoutGrid, BoxSelect, Layers, Plus, Trash2, ChevronDown, Box, X } from 'lucide-react'
+import { Map as MapIcon, Building2, Globe2, Ruler, LayoutGrid, BoxSelect, Layers, Plus, Trash2, ChevronDown, Box, X, Upload } from 'lucide-react'
 import { useRef, useState, useEffect, useMemo } from 'react'
 import { PlantaLeafletEditable, PanelCapasYZonas } from '@/components/map/leaflet-editable'
 import { Wireframe3DView } from '@/components/map/wireframe3d'
+import { MapaImportadoView } from '@/components/map/dxf-import/MapaImportadoView'
+import { DxfImportModal } from '@/components/map/dxf-import/DxfImportModal'
 import { useMapaLeafletStore, type Nivel } from '@/store/useMapaLeafletStore'
 import { MAP_VIEWS, type ViewName } from '@/data/dxfLayers'
 
@@ -264,8 +266,15 @@ export function MapaPlantaPage() {
   const toggleGrilla       = useMapaLeafletStore((s) => s.toggleGrilla)
   const boxSelectMode      = useMapaLeafletStore((s) => s.boxSelectMode)
   const toggleBoxSelect    = useMapaLeafletStore((s) => s.toggleBoxSelectMode)
-  const view3DMode         = useMapaLeafletStore((s) => s.view3DMode)
-  const toggleView3DMode   = useMapaLeafletStore((s) => s.toggleView3DMode)
+  const view3DMode              = useMapaLeafletStore((s) => s.view3DMode)
+  const toggleView3DMode        = useMapaLeafletStore((s) => s.toggleView3DMode)
+  const mapasImportados         = useMapaLeafletStore((s) => s.mapasImportados)
+  const mapaImportadoActivoId   = useMapaLeafletStore((s) => s.mapaImportadoActivoId)
+  const setMapaImportadoActivo  = useMapaLeafletStore((s) => s.setMapaImportadoActivo)
+  const deleteMapaImportado     = useMapaLeafletStore((s) => s.deleteMapaImportado)
+  const [showDxfImport, setShowDxfImport] = useState(false)
+
+  const mapaActivo = mapasImportados.find((m) => m.id === mapaImportadoActivoId) ?? null
 
   return (
     <div className="flex flex-col h-full bg-gray-950 overflow-hidden">
@@ -350,13 +359,14 @@ export function MapaPlantaPage() {
 
         {/* Vista — icono + label corto en móvil */}
         <div className="flex items-center bg-gray-800 rounded-lg p-0.5 gap-0.5 shrink-0">
+          {/* Vistas estáticas */}
           {(Object.keys(MAP_VIEWS) as ViewName[]).map((v) => {
             const Icon = VIEW_ICONS[v]
-            const active = currentView === v
+            const active = !mapaImportadoActivoId && currentView === v
             return (
               <button
                 key={v}
-                onClick={() => setView(v)}
+                onClick={() => { setMapaImportadoActivo(null); setView(v) }}
                 className={`flex items-center gap-1 text-[10px] sm:text-[11px] px-2 sm:px-3 py-1 rounded-md transition-all ${
                   active
                     ? 'bg-amber-600/80 text-white shadow-[inset_0_0_6px_rgba(245,158,11,0.3)]'
@@ -368,26 +378,57 @@ export function MapaPlantaPage() {
               </button>
             )
           })}
+          {/* Mapas importados */}
+          {mapasImportados.map((m) => (
+            <button
+              key={m.id}
+              onClick={() => setMapaImportadoActivo(m.id)}
+              title={m.nombre}
+              className={`flex items-center gap-1 text-[10px] sm:text-[11px] px-2 sm:px-3 py-1 rounded-md transition-all max-w-[120px] ${
+                mapaImportadoActivoId === m.id
+                  ? 'bg-emerald-700/80 text-white'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-700/60'
+              }`}
+            >
+              <Upload size={10} />
+              <span className="truncate">{m.nombre}</span>
+            </button>
+          ))}
+          {/* Botón importar DXF */}
+          <button
+            onClick={() => setShowDxfImport(true)}
+            title="Importar nuevo DXF"
+            className="flex items-center gap-1 text-[10px] sm:text-[11px] px-2 py-1 rounded-md text-gray-500 hover:text-emerald-300 hover:bg-gray-700/60 transition-all"
+          >
+            <Plus size={10} />
+            <span className="hidden sm:inline">DXF</span>
+          </button>
         </div>
       </header>
 
       {/* ── Mapa + panel ─────────────────────────────────────────────────── */}
       <main className="flex-1 relative overflow-hidden">
-        {/* 2D — siempre montado (Leaflet no tolera re-init) */}
-        <div className={`absolute inset-0 ${view3DMode ? 'invisible pointer-events-none' : ''}`}>
-          <PlantaLeafletEditable />
-          <PanelCapasYZonas />
-          <SelectionActionBar />
-        </div>
-        {/* 3D — siempre montado (contexto WebGL persiste, se muestra/oculta con opacity).
-            NOTA CRÍTICA: three.js fuerza pointer-events:auto en su canvas, por lo que
-            el pointer-events:none del padre NO bloquea al canvas hijo. Sin este
-            selector arbitrario, el canvas 3D invisible intercepta TODOS los eventos
-            del mapa 2D (zoom wheel, clicks, drag, Geoman, box-select, medir). */}
-        <div className={`absolute inset-0 transition-opacity duration-200 ${view3DMode ? 'opacity-100' : 'opacity-0 pointer-events-none [&_*]:!pointer-events-none'}`}>
-          <Wireframe3DView />
-        </div>
+        {/* Mapa importado activo */}
+        {mapaActivo ? (
+          <MapaImportadoView mapa={mapaActivo} />
+        ) : (
+          <>
+            {/* 2D — siempre montado (Leaflet no tolera re-init) */}
+            <div className={`absolute inset-0 ${view3DMode ? 'invisible pointer-events-none' : ''}`}>
+              <PlantaLeafletEditable />
+              <PanelCapasYZonas />
+              <SelectionActionBar />
+            </div>
+            {/* 3D — siempre montado */}
+            <div className={`absolute inset-0 transition-opacity duration-200 ${view3DMode ? 'opacity-100' : 'opacity-0 pointer-events-none [&_*]:!pointer-events-none'}`}>
+              <Wireframe3DView />
+            </div>
+          </>
+        )}
       </main>
+
+      {/* Modal importar DXF */}
+      {showDxfImport && <DxfImportModal onClose={() => setShowDxfImport(false)} />}
     </div>
   )
 }

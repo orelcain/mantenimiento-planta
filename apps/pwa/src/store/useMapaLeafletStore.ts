@@ -31,6 +31,25 @@ export interface Nivel {
   orden: number    // 0 = más bajo
 }
 
+// ── Mapas importados desde DXF ───────────────────────────────────────────────
+
+export interface CapaImportada {
+  name: string
+  color: string
+  visible: boolean
+  eliminada: boolean
+  entityCount: number
+  geojson: GeoJSON.FeatureCollection
+}
+
+export interface MapaImportado {
+  id: string
+  nombre: string
+  bounds: [[number, number], [number, number]]  // [[Ymin,Xmin],[Ymax,Xmax]]
+  capas: CapaImportada[]
+  createdAt: number
+}
+
 export type ZonaCategoria = 'produccion' | 'frio' | 'utilidades' | 'logistica' | 'admin' | 'estructura' | 'otros'
 export type ZonaEstado    = 'operativo' | 'alerta' | 'detenido'
 export type ElementoTipo  = 'zona' | 'equipo' | 'sensor' | 'punto' | 'forma' | 'cota' | 'linea'
@@ -80,6 +99,10 @@ interface MapaLeafletState {
   capasSvgEliminadas: string[]
   /** Capas GeoJSON (base DXF) eliminadas permanentemente por vista */
   capasGeoJsonEliminadas: Record<ViewName, string[]>
+  /** Mapas DXF importados por el usuario */
+  mapasImportados: MapaImportado[]
+  /** ID del mapa importado activo (null = usa vistas estáticas) */
+  mapaImportadoActivoId: string | null
   /** Opacidad global de las capas SVG DXF (0-1) */
   capasSvgOpacity: number
   /** Capas de usuario (agrupaciones con visibilidad/orden propios) */
@@ -121,6 +144,12 @@ interface MapaLeafletState {
   eliminarCapaSvg: (name: string) => void
   restaurarCapasSvg: () => void
   eliminarCapaGeoJson: (view: ViewName, name: string) => void
+  // Mapas importados
+  addMapaImportado: (m: MapaImportado) => void
+  deleteMapaImportado: (id: string) => void
+  setMapaImportadoActivo: (id: string | null) => void
+  toggleCapaImportadaVisible: (mapId: string, capaName: string) => void
+  eliminarCapaImportada: (mapId: string, capaName: string) => void
 
   addElemento: (e: Omit<ElementoMapa, 'id' | 'createdAt' | 'updatedAt'>) => string
   addElementosBulk: (items: Omit<ElementoMapa, 'id' | 'createdAt' | 'updatedAt'>[]) => void
@@ -177,6 +206,8 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
       capasSvgVisibles: {} as Record<string, boolean>,
       capasSvgEliminadas: [] as string[],
       capasGeoJsonEliminadas: { recinto: [], interior: [] } as Record<ViewName, string[]>,
+      mapasImportados: [] as MapaImportado[],
+      mapaImportadoActivoId: null,
       capasSvgOpacity: 0.9,
       capasUsuario: [],
       niveles: [],
@@ -279,6 +310,38 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
           if (prev.includes(name)) return {}
           return { capasGeoJsonEliminadas: { ...s.capasGeoJsonEliminadas, [view]: [...prev, name] } }
         }),
+
+      addMapaImportado: (m) =>
+        set((s) => ({ mapasImportados: [...s.mapasImportados, m] })),
+
+      deleteMapaImportado: (id) =>
+        set((s) => ({
+          mapasImportados: s.mapasImportados.filter((m) => m.id !== id),
+          mapaImportadoActivoId: s.mapaImportadoActivoId === id ? null : s.mapaImportadoActivoId,
+        })),
+
+      setMapaImportadoActivo: (id) =>
+        set(() => ({ mapaImportadoActivoId: id })),
+
+      toggleCapaImportadaVisible: (mapId, capaName) =>
+        set((s) => ({
+          mapasImportados: s.mapasImportados.map((m) =>
+            m.id !== mapId ? m : {
+              ...m,
+              capas: m.capas.map((c) => c.name === capaName ? { ...c, visible: !c.visible } : c),
+            }
+          ),
+        })),
+
+      eliminarCapaImportada: (mapId, capaName) =>
+        set((s) => ({
+          mapasImportados: s.mapasImportados.map((m) =>
+            m.id !== mapId ? m : {
+              ...m,
+              capas: m.capas.map((c) => c.name === capaName ? { ...c, eliminada: true } : c),
+            }
+          ),
+        })),
 
       addElemento: (data) => {
         const id = makeId()
@@ -530,6 +593,8 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
         capasSvgVisibles: s.capasSvgVisibles,
         capasSvgEliminadas: s.capasSvgEliminadas,
         capasGeoJsonEliminadas: s.capasGeoJsonEliminadas,
+        mapasImportados: s.mapasImportados,
+        mapaImportadoActivoId: s.mapaImportadoActivoId,
         capasSvgOpacity: s.capasSvgOpacity,
         capasUsuario: s.capasUsuario,
         niveles: s.niveles,
