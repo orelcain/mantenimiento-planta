@@ -504,7 +504,7 @@ function CapaDXFSVG({ cfg }: { cfg: DxfSvgLayerConfig }) {
       cancelled = true
       if (overlayRef.current) { map.removeLayer(overlayRef.current); overlayRef.current = null }
     }
-  }, [map, cfg.name, cfg.opacity, cfg.zIndex, visible, globalOpacity, currentView])
+  }, [map, cfg.name, cfg.opacity, cfg.zIndex, visible, eliminada, globalOpacity, currentView])
 
   // Actualización de opacidad sin recrear el overlay
   useEffect(() => {
