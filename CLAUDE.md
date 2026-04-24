@@ -773,28 +773,50 @@ Con Haversine A→D = dimensión real del recinto en metros. El DWG ya tiene cot
 
 ## Pendientes priorizados
 
-### PENDIENTE — Visor Mapas 3 (sesión 2026-04-22)
+### PENDIENTE — Visor Mapas 4 (sesión 2026-04-24) — Konva DXF editor
 
-**Módulo:** `/mantenimiento-planta/map` — Leaflet CRS.Simple + DXF + Geoman + Zustand
+**Módulo:** `/mantenimiento-planta/map` — **importación DXF migró de Leaflet a Konva.js**
 
-**Estado al cierre sesión 2026-04-22:**
+**Estado al cierre:**
+- ✅ Stack Konva: `konva@10`, `react-konva@18`, `dxf@5` (gdsestimating) instalados
+- ✅ `parseDxfKonva.ts` usa `Helper.toPolylines()` — expande INSERT/bloques, interpola SPLINE/ARC/ELLIPSE
+- ✅ `KonvaDxfViewer.tsx` renderiza con Stage/Layer/Line por capa
+- ✅ Pan (default), Zoom con rueda centrado cursor, Fit-to-bbox
+- ✅ **Bbox robusto** — descarta outliers (paper space) vía mediana + MAD
+- ✅ **Fase 2 edición**: select (click), multi-select (shift+click), delete, move (flechas), undo (Ctrl+Z), escape
+- ✅ Panel capas con toggle visibilidad + eliminar individual + eliminar mapa
+- ✅ Store v6: `CapaImportada.polylines` + `MapaImportado.bbox` (reemplaza geojson/bounds viejos)
+- ⚠️ **`mapasImportados` NO persisten** — viven en memoria, se pierden al reload (localStorage quota)
+
+**P0 próxima sesión — Performance:**
+- 🔲 **Optimización render 100k+ polilíneas**: reemplazar Konva.Line por capa pesada (>5000 polys) con **`Konva.Shape` + `sceneFunc` custom** que dibuja todas en una pasada de canvas. Speedup esperado 50-100×.
+- 🔲 Custom hit-detection en sceneFunc para mantener selección por entidad individual (bucle sobre polys para encontrar la más cercana al click).
+
+**P1 Visor Mapas 4 — Persistencia:**
+- 🔲 Mover `mapasImportados` a IndexedDB (localStorage quota ~5MB insuficiente para 100k+ polys)
+- 🔲 Fase 3: drawing tools — Línea, Polígono, Círculo, Rectángulo → se agregan a capa "Usuario"
+- 🔲 Conectar toolbar existente (Medir, Grilla, 3D, Niveles, Selección) al KonvaDxfViewer
+- 🔲 Zonas/Equipos/Sensores sobre DXF (absorber elementos tipo vista Recinto/Planta)
+- 🔲 3D view del DXF importado
+
+---
+
+### PENDIENTE — Visor Mapas 3 (sesión 2026-04-22) [legacy, Leaflet views]
+
+**Módulo:** `/mantenimiento-planta/map` — Leaflet CRS.Simple + SVG DXF + Geoman + Zustand (vistas Recinto/Planta)
+
+**Estado:**
 - ✅ Grilla 1m×1m anclada a DXF (fase invariante a zoom/pan via `gridPhase()`)
-- ✅ Ángulo de grilla por vista (recinto/interior independientes, `grillaAngles: Record<string,number>`)
-- ✅ Panel colapsado por defecto: badge "1m × 1m [X°]" + botón "Editar ángulo" + presets 0/15/30/45°
-- ✅ RAF throttle + clip a bounds + 10m margen
-- ✅ Dibujar polilíneas/paredes (Geoman `drawPolyline`, tipo `'linea'`, longitud auto calculada)
-- ✅ Header móvil responsive (icono-only en xs, título compacto)
+- ✅ Ángulo de grilla por vista (recinto/interior independientes)
+- ✅ Dibujar polilíneas/paredes (Geoman `drawPolyline`)
+- ✅ Header móvil responsive
+- ✅ Absorber capas DXF como CapaUsuario (sesión 2026-04-23)
 
-**P0 próxima sesión:**
-- 🔲 **Import DXF layers as editable elements** — Botón "Absorber" por capa DXF en PanelCapasYZonas (tab Capas DXF). Fetch GeoJSON → convertir Features → `addElemento()` con `meta.dxfSource = name`. LineString→`'linea'`, Polygon→`'zona'`. `setCapaVisible(name, false)` tras absorber. Prevenir duplicados.
-
-**P1 Visor Mapas:**
+**P1 Visor Mapas (no migradas a Konva aún):**
 - 🔲 Equipos del módulo Repuestos sobre el mapa (posicionar motores/bombas, drag&drop, click → datos SAP)
 - 🔲 Firestore sync (esquema `/maps/{view}/elementos/{id}`, reglas admin-only-write)
 - 🔲 Texto libre / anotaciones (`drawText: true` en Geoman)
-- 🔲 Tooltip hover sobre elemento (sin abrir panel lateral)
-- 🔲 Colores por categoría + undo/redo + panel móvil bottom-sheet
-- 🔲 Alinear grilla a muro (click 2 puntos → detectar ángulo y aplicar)
+- 🔲 Alinear grilla a muro (click 2 puntos → detectar ángulo)
 
 ---
 
