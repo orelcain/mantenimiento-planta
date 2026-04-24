@@ -56,6 +56,13 @@ GANTT Mantencion temporada baja.xlsm
 # Cache local de scripts (Excel parseados, muy pesado)
 scripts/.cache/
 
+# Fixtures capturados de APIs externas (pueden contener data de producción)
+scripts/fixtures/
+
+# Cookies/credenciales de sesión para POCs locales — NUNCA commitear
+.shoplogix-cookie.txt
+.*-cookie.txt
+
 # Scripts one-shot de diagnóstico (no comitear)
 scripts/diag-fast.js
 scripts/diag-p0-errors.js

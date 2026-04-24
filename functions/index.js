@@ -3059,3 +3059,102 @@ exports.setupTelegramTopics = onRequest({ region: 'us-central1' }, async (req, r
   })
 })
 
+// ═══════════════════════════════════════════════════════════════════════════
+// SHOPLOGIX INTEGRATION (Fase 2b) — sync con Evisceradoras Baader 142 upstream
+// Docs: docs/SHOPLOGIX_API.md + docs/SHOPLOGIX_INTEGRATION_PLAN.md
+// ═══════════════════════════════════════════════════════════════════════════
+
+const shoplogixSyncMod = require('./shoplogix/sync')
+const shoplogixPolling = require('./shoplogix/polling')
+
+/**
+ * Sync HTTP — trigger manual para testing/backfill.
+ * Uso: curl -X POST https://.../shoplogixSyncHttp?dateKey=2026-02-26&shiftId=Turno%20día
+ *
+ * Requiere secret SHOPLOGIX_COOKIE seteado:
+ *   firebase functions:secrets:set SHOPLOGIX_COOKIE
+ *   (pega el header Cookie completo cuando lo pida)
+ */
+exports.shoplogixSyncHttp = onRequest(
+  {
+    secrets: ['SHOPLOGIX_COOKIE'],
+    region: 'us-central1',
+    timeoutSeconds: 180,
+    memory: '256MiB',
+    cors: ALLOWED_ORIGINS,
+  },
+  async (req, res) => {
+    const cookie = process.env.SHOPLOGIX_COOKIE
+    if (!cookie) {
+      res.status(500).json({ error: 'SHOPLOGIX_COOKIE secret no configurado' })
+      return
+    }
+
+    const { dateKey, shiftId } = req.query || {}
+    try {
+      const result = await shoplogixSyncMod.syncShift({
+        db,
+        cookie,
+        dateKey: dateKey || undefined,
+        shiftId: shiftId || undefined,
+        logger,
+      })
+      res.json(result)
+    } catch (err) {
+      if (err.code === 'AUTH_EXPIRED') {
+        logger.error('[shoplogixSyncHttp] AUTH_EXPIRED — refrescar SHOPLOGIX_COOKIE')
+        res.status(401).json({ error: 'AUTH_EXPIRED', message: err.message })
+        return
+      }
+      logger.error('[shoplogixSyncHttp] error', { err: err.message, stack: err.stack })
+      res.status(500).json({ error: err.message })
+    }
+  },
+)
+
+/**
+ * Wakeup scheduler — dispara cada hora durante ventana operativa.
+ * El sync decide internamente si corresponde (vs. fase del turno, last sync, etc).
+ *
+ * Cloud Scheduler no soporta intervalos variables, así que el "human-like"
+ * se logra haciendo que esta wakeup corra seguido pero el handler decide
+ * cuándo saltarse un ciclo basado en nextPollDelaySec.
+ */
+exports.shoplogixSyncWakeup = onSchedule(
+  {
+    schedule: 'every 60 minutes',     // Chequea cada 1h; el handler decide si corre o skip
+    timeZone: 'America/Santiago',
+    timeoutSeconds: 180,
+    memory: '256MiB',
+    retryCount: 1,
+    secrets: ['SHOPLOGIX_COOKIE'],
+  },
+  async () => {
+    const cookie = process.env.SHOPLOGIX_COOKIE
+    if (!cookie) {
+      logger.error('[shoplogixSyncWakeup] SHOPLOGIX_COOKIE no seteado — skip')
+      return
+    }
+
+    // Solo corre durante turnos (fuera de turno: skip)
+    const ctx = shoplogixPolling.currentShift()
+    if (!ctx) {
+      logger.info('[shoplogixSyncWakeup] Fuera de turno — skip')
+      return
+    }
+
+    try {
+      const result = await shoplogixSyncMod.syncShift({ db, cookie, logger })
+      logger.info('[shoplogixSyncWakeup] OK', { result })
+    } catch (err) {
+      if (err.code === 'AUTH_EXPIRED') {
+        logger.error('[shoplogixSyncWakeup] AUTH_EXPIRED — necesita refresh de cookie')
+        // TODO (Fase 2b.1): cuando tengamos login automatizado, acá refrescamos.
+        // Por ahora, la alerta queda en logs → Cloud Logging alert policy.
+        return
+      }
+      logger.error('[shoplogixSyncWakeup] error', { err: err.message })
+    }
+  },
+)
+
