@@ -105,7 +105,8 @@ export function PanelCapasYZonas() {
     capasSvgVisibles, capasSvgOpacity, capasSvgEliminadas,
     capasUsuario, niveles,
     setSelectedId, clearMultiSelection, toggleEditMode, setCapaVisible, setAllCapas,
-    setCapaSvgVisible, setCapasSvgOpacity, eliminarCapaSvg,
+    setCapaSvgVisible, setCapasSvgOpacity, eliminarCapaSvg, eliminarCapaGeoJson,
+    capasGeoJsonEliminadas,
     updateElemento, updateElementosBulk, updateElementosBulkMeta,
     deleteElemento, addElemento, addElementosBulk, removeElementosBulk,
     addCapaUsuario, updateCapaUsuario, deleteCapaUsuario, toggleCapaUsuarioVisible, reorderCapas,
@@ -588,12 +589,16 @@ export function PanelCapasYZonas() {
                       Ocultar todas
                     </button>
                   </div>
-                  {Array.from(grupos.entries()).map(([gKey, capas]) => (
+                  {Array.from(grupos.entries()).map(([gKey, capas]) => {
+                    const eliminadasVista = capasGeoJsonEliminadas[currentView] ?? []
+                    const capasVisibles2 = capas.filter((c) => !eliminadasVista.includes(c.name))
+                    if (!capasVisibles2.length) return null
+                    return (
                     <div key={gKey} className="mb-2">
                       <div className="text-[9px] uppercase tracking-wider text-gray-500 px-1 mb-0.5 font-semibold">
                         {GROUP_LABEL[gKey as DxfLayerConfig['group']]}
                       </div>
-                      {capas.map((c) => {
+                      {capasVisibles2.map((c) => {
                         const visible = capasVisibles[currentView]?.[c.name] ?? c.defaultVisible
                         const isAbsorbing = absorbing[c.name] ?? false
                         const isAbsorbed = absorbedLayers.has(c.name)
@@ -634,11 +639,22 @@ export function PanelCapasYZonas() {
                                   ? <CheckCircle2 size={9} />
                                   : <Download size={9} />}
                             </button>
+                            <button
+                              onClick={() => {
+                                if (!window.confirm(`¿Eliminar capa "${c.label}" del mapa y del visor 3D?\n\nEsta acción es permanente.`)) return
+                                eliminarCapaGeoJson(currentView, c.name)
+                              }}
+                              title="Eliminar capa del mapa"
+                              className="shrink-0 p-0.5 hover:bg-red-900/60 rounded transition-colors text-red-500 hover:text-red-300"
+                            >
+                              <Trash2 size={10} />
+                            </button>
                           </div>
                         )
                       })}
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </div>

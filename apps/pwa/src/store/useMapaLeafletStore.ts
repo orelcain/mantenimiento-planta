@@ -78,6 +78,8 @@ interface MapaLeafletState {
   capasSvgVisibles: Record<string, boolean>
   /** Capas SVG eliminadas permanentemente del mapa y del panel */
   capasSvgEliminadas: string[]
+  /** Capas GeoJSON (base DXF) eliminadas permanentemente por vista */
+  capasGeoJsonEliminadas: Record<ViewName, string[]>
   /** Opacidad global de las capas SVG DXF (0-1) */
   capasSvgOpacity: number
   /** Capas de usuario (agrupaciones con visibilidad/orden propios) */
@@ -118,6 +120,7 @@ interface MapaLeafletState {
   setCapasSvgOpacity: (o: number) => void
   eliminarCapaSvg: (name: string) => void
   restaurarCapasSvg: () => void
+  eliminarCapaGeoJson: (view: ViewName, name: string) => void
 
   addElemento: (e: Omit<ElementoMapa, 'id' | 'createdAt' | 'updatedAt'>) => string
   addElementosBulk: (items: Omit<ElementoMapa, 'id' | 'createdAt' | 'updatedAt'>[]) => void
@@ -173,6 +176,7 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
       capasVisibles: { recinto: {}, interior: {} } as Record<ViewName, Record<string, boolean>>,
       capasSvgVisibles: {} as Record<string, boolean>,
       capasSvgEliminadas: [] as string[],
+      capasGeoJsonEliminadas: { recinto: [], interior: [] } as Record<ViewName, string[]>,
       capasSvgOpacity: 0.9,
       capasUsuario: [],
       niveles: [],
@@ -268,6 +272,13 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
 
       restaurarCapasSvg: () =>
         set(() => ({ capasSvgEliminadas: [] })),
+
+      eliminarCapaGeoJson: (view, name) =>
+        set((s) => {
+          const prev = s.capasGeoJsonEliminadas[view] ?? []
+          if (prev.includes(name)) return {}
+          return { capasGeoJsonEliminadas: { ...s.capasGeoJsonEliminadas, [view]: [...prev, name] } }
+        }),
 
       addElemento: (data) => {
         const id = makeId()
@@ -512,6 +523,7 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
         capasVisibles: s.capasVisibles,
         capasSvgVisibles: s.capasSvgVisibles,
         capasSvgEliminadas: s.capasSvgEliminadas,
+        capasGeoJsonEliminadas: s.capasGeoJsonEliminadas,
         capasSvgOpacity: s.capasSvgOpacity,
         capasUsuario: s.capasUsuario,
         niveles: s.niveles,
