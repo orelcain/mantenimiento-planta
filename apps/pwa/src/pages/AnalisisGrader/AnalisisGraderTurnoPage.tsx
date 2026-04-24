@@ -627,7 +627,7 @@ export function AnalisisGraderTurnoPage() {
             className="gap-1.5 shrink-0"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span className="hidden sm:inline">Análisis Grader</span>
+            <span className="hidden sm:inline">Análisis de Turno</span>
           </Button>
           {dateKey && shiftLabel && (
             <div className="flex items-center gap-2 min-w-0">

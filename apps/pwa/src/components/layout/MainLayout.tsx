@@ -93,7 +93,7 @@ const navGroups: NavGroup[] = [
     items: [
       { name: 'Visor Planta 3D', href: '/map', icon: Building2, module: 'mapa' },
       { name: 'Visor 3D', href: '/visor-3d', icon: Box },
-      { name: 'Análisis Grader', href: '/analisis-grader', icon: BarChart3, module: 'analisisGrader' },
+      { name: 'Análisis de Turno', href: '/analisis-grader', icon: BarChart3, module: 'analisisGrader' },
     ],
   },
   {

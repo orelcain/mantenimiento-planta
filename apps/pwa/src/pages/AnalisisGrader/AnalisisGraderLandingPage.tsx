@@ -177,16 +177,16 @@ export function AnalisisGraderLandingPage() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="min-w-0 flex items-start justify-between gap-2">
               <div>
-                <h1 className="text-xl sm:text-2xl font-bold">Análisis Grader</h1>
+                <h1 className="text-xl sm:text-2xl font-bold">Análisis de Turno</h1>
                 <p className="text-muted-foreground text-xs sm:text-sm mt-0.5">
-                  Cargá el Excel exportado de Matrix para ver el estado del proceso
+                  Línea completa: Grader + Baaders. Cargá el Excel del Grader para ver el estado del turno.
                 </p>
               </div>
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setSettingsOpen(true)}
-                title="Configuración global (umbrales + rangos)"
+                title="Configuración global (umbrales + tags + detector). Los 12 gates se editan en cada turno."
                 className="shrink-0 text-muted-foreground hover:text-foreground"
               >
                 <Settings2 className="w-4 h-4" />
@@ -293,8 +293,8 @@ export function AnalisisGraderLandingPage() {
         />
         <QuickAccess
           icon={Settings2}
-          title="Configuración"
-          subtitle="Umbrales · rangos · física"
+          title="Configuración global"
+          subtitle="Umbrales · tags · detector pausas"
           onClick={() => setSettingsOpen(true)}
         />
         <QuickAccess

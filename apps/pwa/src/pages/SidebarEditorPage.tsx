@@ -69,7 +69,7 @@ const DEFAULT_GROUPS: Group[] = [
     items: [
       { id: 'mapa', name: 'Visor de Mapas', href: '/map', groupId: 'herramientas' },
       { id: 'visor3d', name: 'Visor 3D', href: '/visor-3d', groupId: 'herramientas' },
-      { id: 'grader', name: 'Análisis Grader', href: '/analisis-grader', groupId: 'herramientas' },
+      { id: 'grader', name: 'Análisis de Turno', href: '/analisis-grader', groupId: 'herramientas' },
     ],
   },
   {

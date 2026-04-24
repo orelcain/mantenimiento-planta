@@ -773,32 +773,36 @@ Con Haversine A→D = dimensión real del recinto en metros. El DWG ya tiene cot
 
 ## Pendientes priorizados
 
-### PENDIENTE — Shoplogix Integration (sesión 2026-04-24) — Fase 3 iter 3+4 y pixel-align
+### PENDIENTE — Shoplogix Integration (sesiones 2026-04-24) — Fase 3 iter 3+4
 
-**Módulo:** integración Shoplogix con módulo Análisis Grader — data real de 3 Baader 142 upstream (Evisceradoras 1/2/3, Planta Chonchi)
+**Módulo:** integración Shoplogix con módulo Análisis de Turno (ex-"Análisis Grader") — data real de 3 Baader 142 upstream (Evisceradoras 1/2/3, Planta Chonchi)
 
-**Estado al cierre:**
-- ✅ Fase 1 POC + Fase 2a UI completa + Fase 2b Cloud Functions desplegadas
+**Estado al cierre (sesión tarde 2026-04-24):**
+- ✅ Fase 1 POC + Fase 2a UI completa + Fase 2b Cloud Functions desplegadas (mañana)
 - ✅ Data real en Firestore: 4 turnos sincronizados (Feb 25 día/noche, Feb 26 día, Feb 27 día)
 - ✅ Fase 3 iter 1: ticks horarios + shiftWindow align + alerta microparadas anómalas
 - ✅ Fase 3 iter 2: correlación automática Grader↔Baader con hipótesis humana + 13 tests
 - ✅ Docs: SHOPLOGIX_API.md, SHOPLOGIX_INTEGRATION_PLAN.md, SHOPLOGIX_DEPLOY.md, SHOPLOGIX_IDEAS.md (20+ mejoras)
-- Rama: `feat/shoplogix-integration-docs` (merge a main pendiente tras validación)
+- ✅ **Rename módulo a "Análisis de Turno"** (sidebar/breadcrumbs/headers, URLs intactas) — refleja que cubre Grader + Baaders + futuro Marel HG/Knuro
+- ✅ **Alineación pixel-perfect Grader↔Baaders** (Opción A quick-win) — `PLOT_LEFT_PAD_PX=48` / `PLOT_RIGHT_PAD_PX=24` en `UpstreamMachinesPanel.tsx` compensan grid ECharts (40/16) + diff padding Card. Verificado en data real Feb 26: plot ECharts 98–1101 vs Gantt 99–1100, **±1px**
+- ✅ Home: clarificar split global/per-turno (QuickAccess "Configuración global" + DialogDescription)
+- Rama: `feat/analisis-turno-rename-and-align` ([PR #44](https://github.com/orelcain/mantenimiento-planta/pull/44))
 
-**P0 próxima sesión — Pixel-align chart Grader↔Baaders:**
-- 🔲 **Alineación pixel-perfect**: extraer grid.left/grid.right del ECharts del Grader y aplicar mismo padding al UpstreamMachinesPanel. Una línea vertical debe cruzar ambos charts en el mismo pixel.
-- 🔲 **Marcadores Baader sobre timeline Grader** — franja en sub-fila del chart Grader
-- 🔲 **Mejoras visuales Baader Gantt** (altura, separación, colores brand-consistent)
+**P0 próxima sesión:**
+- 🔲 **Marcadores Baader sobre timeline Grader** — franja coloreada en sub-fila del chart Grader cuando una Baader está parada (correlación cross-equipo en una sola pasada visual)
+- 🔲 **Mejoras visuales Baader Gantt** (altura uniforme, separación, colores brand-consistent, hover con más info)
 
 **P1 Shoplogix:**
 - 🔲 Fase 3 iter 3: scatter P0% Grader vs ritmo Baader
 - 🔲 Fase 3 iter 4: export PDF con sección upstream
-- 🔲 Fase 2b.1: login automatizado (hoy cookie manual dura ~8h)
+- 🔲 Fase 2b.1: login automatizado Shoplogix (hoy cookie manual dura ~8h)
 - 🔲 Fase 4: integrar Marel HG, Knuro, plantas hermanas
+- 🔲 **Refactor estructural home** — RANGOS calibre + 12 GATES por turno (hoy son globales). Implica refactor storage Firestore + UI per-turno. Diferido por scope.
 
 **Deuda técnica conocida:**
 - TZ display: ticks muestran UTC ("10:00") pero operador chileno espera local ("07:00")
 - `actualRuntime 11.2%` Feb 26 — investigar qué registra Shoplogix como "Planned Downtime"
+- Warnings preexistentes setState-in-render en `AnalisisGraderGatesConfigPage` (Wizard) — no críticos, no relacionados a este trabajo
 
 ---
 
@@ -858,7 +862,7 @@ Con Haversine A→D = dimensión real del recinto en metros. El DWG ya tiene cot
 **P1 — Alta prioridad**
 
 - 🔲 **Refactor config Grader — Fase A** — mover las 12 Gates + configuración Física al acordeón del detalle de turno (`AnalisisGraderTurnoPage`), en lugar de vivir solo en la página de config global. Botón "Cambié gate" mid-turno + segmentación automática antes/después del cambio. Plan de 3 fases acordado sesión 2026-04-19. Es el pendiente estructural más importante.
-- 🔲 **#1 GlobalSettingsModal en home** — separar Análisis+Rangos en modal del header del home. Sub-item Fase A que se puede hacer independiente. (~1h)
+- 🔲 **#1 GlobalSettingsModal en home** — separar Análisis+Rangos en modal del header del home. Sub-item Fase A que se puede hacer independiente. (~1h) *Parcialmente abordado sesión 2026-04-24 tarde: labels y descripción aclaran scope global vs per-turno; el move estructural de rangos sigue pendiente.*
 
 **P2 — Media prioridad**
 

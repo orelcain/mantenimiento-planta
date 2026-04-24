@@ -252,8 +252,8 @@ export const MODULES_CONFIG: ModuleConfig[] = [
   },
   {
     id: 'analisisGrader',
-    nombre: 'Análisis Grader',
-    descripcion: 'Análisis de datos de clasificadora de salmones',
+    nombre: 'Análisis de Turno',
+    descripcion: 'Análisis de turno: Grader + Baaders + correlación cross-equipo',
     icono: 'BarChart3',
     accionesDisponibles: ['ver', 'crear', 'editar', 'exportar', 'configurar'],
   },
