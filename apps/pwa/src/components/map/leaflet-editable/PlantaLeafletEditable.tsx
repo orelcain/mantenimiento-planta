@@ -459,12 +459,13 @@ function CapaDXF({ cfg, folder }: { cfg: DxfLayerConfig; folder: string }) {
 function CapaDXFSVG({ cfg }: { cfg: DxfSvgLayerConfig }) {
   const map = useMap()
   const visible = useMapaLeafletStore((s) => s.capasSvgVisibles[cfg.name] ?? cfg.defaultVisible)
+  const eliminada = useMapaLeafletStore((s) => s.capasSvgEliminadas.includes(cfg.name))
   const globalOpacity = useMapaLeafletStore((s) => s.capasSvgOpacity)
   const currentView = useMapaLeafletStore((s) => s.currentView)
   const overlayRef = useRef<L.SVGOverlay | null>(null)
 
   useEffect(() => {
-    if (currentView !== 'interior' || !visible) {
+    if (currentView !== 'interior' || !visible || eliminada) {
       if (overlayRef.current) { map.removeLayer(overlayRef.current); overlayRef.current = null }
       return
     }

@@ -76,6 +76,8 @@ interface MapaLeafletState {
   capasVisibles: Record<ViewName, Record<string, boolean>>
   /** Visibilidad de capas SVG fieles al DXF (solo vista interior) */
   capasSvgVisibles: Record<string, boolean>
+  /** Capas SVG eliminadas permanentemente del mapa y del panel */
+  capasSvgEliminadas: string[]
   /** Opacidad global de las capas SVG DXF (0-1) */
   capasSvgOpacity: number
   /** Capas de usuario (agrupaciones con visibilidad/orden propios) */
@@ -114,6 +116,8 @@ interface MapaLeafletState {
   setAllCapas: (visible: boolean) => void
   setCapaSvgVisible: (name: string, visible: boolean) => void
   setCapasSvgOpacity: (o: number) => void
+  eliminarCapaSvg: (name: string) => void
+  restaurarCapasSvg: () => void
 
   addElemento: (e: Omit<ElementoMapa, 'id' | 'createdAt' | 'updatedAt'>) => string
   addElementosBulk: (items: Omit<ElementoMapa, 'id' | 'createdAt' | 'updatedAt'>[]) => void
@@ -168,6 +172,7 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
       boxSelectMode: false,
       capasVisibles: { recinto: {}, interior: {} } as Record<ViewName, Record<string, boolean>>,
       capasSvgVisibles: {} as Record<string, boolean>,
+      capasSvgEliminadas: [] as string[],
       capasSvgOpacity: 0.9,
       capasUsuario: [],
       niveles: [],
@@ -253,6 +258,16 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
 
       setCapasSvgOpacity: (o) =>
         set(() => ({ capasSvgOpacity: Math.max(0, Math.min(1, o)) })),
+
+      eliminarCapaSvg: (name) =>
+        set((s) => ({
+          capasSvgEliminadas: s.capasSvgEliminadas.includes(name)
+            ? s.capasSvgEliminadas
+            : [...s.capasSvgEliminadas, name],
+        })),
+
+      restaurarCapasSvg: () =>
+        set(() => ({ capasSvgEliminadas: [] })),
 
       addElemento: (data) => {
         const id = makeId()
@@ -496,6 +511,7 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
         elementos: s.elementos,
         capasVisibles: s.capasVisibles,
         capasSvgVisibles: s.capasSvgVisibles,
+        capasSvgEliminadas: s.capasSvgEliminadas,
         capasSvgOpacity: s.capasSvgOpacity,
         capasUsuario: s.capasUsuario,
         niveles: s.niveles,
