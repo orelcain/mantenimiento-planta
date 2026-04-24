@@ -379,8 +379,12 @@ export function MapaPlantaPage() {
           <PanelCapasYZonas />
           <SelectionActionBar />
         </div>
-        {/* 3D — siempre montado (contexto WebGL persiste, se muestra/oculta con opacity) */}
-        <div className={`absolute inset-0 transition-opacity duration-200 ${view3DMode ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+        {/* 3D — siempre montado (contexto WebGL persiste, se muestra/oculta con opacity).
+            NOTA CRÍTICA: three.js fuerza pointer-events:auto en su canvas, por lo que
+            el pointer-events:none del padre NO bloquea al canvas hijo. Sin este
+            selector arbitrario, el canvas 3D invisible intercepta TODOS los eventos
+            del mapa 2D (zoom wheel, clicks, drag, Geoman, box-select, medir). */}
+        <div className={`absolute inset-0 transition-opacity duration-200 ${view3DMode ? 'opacity-100' : 'opacity-0 pointer-events-none [&_canvas]:!pointer-events-none'}`}>
           <Wireframe3DView />
         </div>
       </main>
