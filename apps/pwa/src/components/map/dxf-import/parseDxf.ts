@@ -6,7 +6,7 @@
  * En CRS.Simple Leaflet los trata como píxeles/metros directos.
  */
 
-// dxf-parser es CJS; el import default funciona con Vite
+// dxf-parser es CJS sin tipos TS; el import default funciona con Vite
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import DxfParser from 'dxf-parser'
@@ -46,7 +46,7 @@ function arcPoints(
   segments = 32,
 ): [number, number][] {
   const pts: [number, number][] = []
-  let end = endDeg < startDeg ? endDeg + 360 : endDeg
+  const end = endDeg < startDeg ? endDeg + 360 : endDeg
   const step = (end - startDeg) / segments
   for (let i = 0; i <= segments; i++) {
     const a = ((startDeg + i * step) * Math.PI) / 180
@@ -62,27 +62,27 @@ function circlePoints(cx: number, cy: number, r: number, n = 32): [number, numbe
 // ── Entidad → Feature(s) GeoJSON ────────────────────────────────────────────
 
 type GeoFeature = GeoJSON.Feature<GeoJSON.Geometry>
+// dxf-parser no tiene definiciones TS — los parámetros son unknown en runtime
+type DxfEntity = Record<string, unknown>
+type DxfVertex = { x: number; y: number }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function entityToFeatures(e: any): GeoFeature[] {
+function entityToFeatures(e: DxfEntity): GeoFeature[] {
   try {
     switch (e.type) {
       case 'LINE': {
-        const coords: [number, number][] = [
-          [e.start.x, e.start.y],
-          [e.end.x,   e.end.y],
-        ]
+        const s = e.start as DxfVertex
+        const n = e.end   as DxfVertex
+        const coords: [number, number][] = [[s.x, s.y], [n.x, n.y]]
         return [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coords } }]
       }
 
       case 'LWPOLYLINE':
       case 'POLYLINE': {
-        const verts: [number, number][] = (e.vertices ?? []).map(
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (v: any) => [v.x, v.y] as [number, number]
+        const verts: [number, number][] = ((e.vertices ?? []) as DxfVertex[]).map(
+          (v) => [v.x, v.y] as [number, number]
         )
         if (verts.length < 2) return []
-        const closed = e.shape ?? e.closed ?? false
+        const closed = (e.shape ?? e.closed ?? false) as boolean
         if (closed) {
           verts.push(verts[0]!)
           return [{ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [verts] } }]
@@ -91,24 +91,26 @@ function entityToFeatures(e: any): GeoFeature[] {
       }
 
       case 'CIRCLE': {
-        const pts = circlePoints(e.center.x, e.center.y, e.radius)
+        const c = e.center as DxfVertex
+        const pts = circlePoints(c.x, c.y, e.radius as number)
         pts.push(pts[0]!)
         return [{ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [pts] } }]
       }
 
       case 'ARC': {
-        const pts = arcPoints(e.center.x, e.center.y, e.radius, e.startAngle ?? 0, e.endAngle ?? 360)
+        const c = e.center as DxfVertex
+        const pts = arcPoints(c.x, c.y, e.radius as number, (e.startAngle ?? 0) as number, (e.endAngle ?? 360) as number)
         return [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: pts } }]
       }
 
-      case 'POINT':
-        return [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [e.position.x, e.position.y] } }]
+      case 'POINT': {
+        const p = e.position as DxfVertex
+        return [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [p.x, p.y] } }]
+      }
 
       case 'SPLINE': {
-        const pts = (e.controlPoints ?? e.fitPoints ?? []).map(
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (p: any) => [p.x, p.y] as [number, number]
-        )
+        const raw = (e.controlPoints ?? e.fitPoints ?? []) as DxfVertex[]
+        const pts = raw.map((p) => [p.x, p.y] as [number, number])
         if (pts.length < 2) return []
         return [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: pts } }]
       }
@@ -147,25 +149,21 @@ function featuresCoords(f: GeoFeature): [number, number][] {
 
 export function parseDxfText(text: string): ResultadoParseDxf {
   const parser = new DxfParser()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const dxf = parser.parseSync(text) as any
+  const dxf = parser.parseSync(text) as unknown as Record<string, unknown>
 
   const warnings: string[] = []
   const layerMap = new Map<string, GeoFeature[]>()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const layerColorMap = new Map<string, string>()
 
   // Colores de las capas definidos en TABLES
-  const layerTable = dxf?.tables?.layer?.layers ?? {}
-  for (const [name, info] of Object.entries(layerTable)) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    layerColorMap.set(name, aciToHex((info as any).color))
+  const layerTable = ((dxf?.tables as Record<string, unknown>)?.layer as Record<string, unknown>)?.layers ?? {}
+  for (const [name, info] of Object.entries(layerTable as Record<string, unknown>)) {
+    layerColorMap.set(name, aciToHex((info as Record<string, unknown>).color as number))
   }
 
   // Procesar entidades
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  for (const entity of (dxf?.entities ?? []) as any[]) {
-    const layer = entity.layer ?? '0'
+  for (const entity of ((dxf?.entities ?? []) as DxfEntity[])) {
+    const layer = (entity.layer as string) ?? '0'
     if (!layerMap.has(layer)) layerMap.set(layer, [])
     const features = entityToFeatures(entity)
     layerMap.get(layer)!.push(...features)
@@ -175,11 +173,13 @@ export function parseDxfText(text: string): ResultadoParseDxf {
   const b = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity }
 
   // Intentar bounds del header primero
-  if (dxf?.header?.$EXTMIN && dxf?.header?.$EXTMAX) {
-    const mn = dxf.header.$EXTMIN
-    const mx = dxf.header.$EXTMAX
-    if (isFinite(mn.x) && isFinite(mx.x)) {
-      b.minX = mn.x; b.minY = mn.y; b.maxX = mx.x; b.maxY = mx.y
+  type XYZ = { x?: number; y?: number }
+  const header = dxf?.header as Record<string, XYZ> | undefined
+  if (header?.$EXTMIN && header?.$EXTMAX) {
+    const mn = header.$EXTMIN
+    const mx = header.$EXTMAX
+    if (mn.x != null && mx.x != null && isFinite(mn.x) && isFinite(mx.x)) {
+      b.minX = mn.x; b.minY = mn.y ?? 0; b.maxX = mx.x; b.maxY = mx.y ?? 0
     }
   }
 
