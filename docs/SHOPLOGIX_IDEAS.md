@@ -11,6 +11,42 @@ Mantener ordenado por prioridad + estado. Cada idea incluye contexto y valor.
 
 ---
 
+## 🎯 Próxima sesión — decidido por usuario 2026-04-24
+
+### A. Emparejar gráfico Grader ↔ Baaders (alineación pixel-perfect)
+**Contexto actual:** tenemos shiftWindow alignment (mismo rango lógico de tiempo)
+pero el Grader usa ECharts (con padding interno) y los Baaders usan divs flex.
+Una línea vertical a las 14:37 NO cae en el mismo X pixel en ambos charts.
+
+**Mejora propuesta:**
+- Extraer el xAxis layout del ECharts del Grader (grid.left / grid.right)
+- Aplicar mismo padding al panel upstream
+- O (más ambicioso): renderizar los 3 Baader Gantts COMO series ECharts
+  dentro del mismo gráfico del Grader → alineación nativa perfecta
+- Render vertical lines visibles en ambos charts al hacer hover
+
+**Esfuerzo:** 1-2 días (cauteloso).
+**Valor:** CORRELACIÓN VISUAL INMEDIATA — ver el paro Grader y ver arriba qué
+estaban haciendo las Baaders en ese mismo pixel.
+
+### B. Marcadores de paros Baader SOBRE timeline del Grader
+Complemento de A: cuando una Baader está parada, mostrar una pequeña franja
+coloreada en una "sub-fila" del chart del Grader (ej: abajo del eje X)
+indicando qué Baader estaba parada y por qué.
+
+### C. Mejoras visuales a los gráficos de los Baaders
+Ideas específicas:
+- Altura mayor del Gantt (actual h-4, probar h-6 o h-8)
+- Separación visual más clara entre máquinas (borde o fondo alternado)
+- Colores más brand-consistent con el resto del Grader
+- Hover estados con más info (piezas totales en ese intervalo, etc.)
+- Zoom/pan sincronizado con el timeline del Grader
+
+**Todo esto depende de A primero** — si conseguimos alineación pixel-perfect,
+muchas de estas mejoras emergen naturales.
+
+---
+
 ## 🔥 P0 — hacer pronto
 
 ### 1. Hora local Chile en timestamps (fmtHHmm)
