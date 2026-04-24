@@ -1653,8 +1653,13 @@ export function PlantaLeafletEditable() {
         wheelPxPerZoomLevel={120}
         wheelDebounceTime={20}
         scrollWheelZoom={true}
-        zoomAnimation={true}
-        zoomAnimationThreshold={6}
+        /* zoomAnimation=false: con 5000+ elementos + 20+ panes personalizados, la
+           transición CSS del proxy no completa transitionend y el zoom queda
+           bloqueado (wheel/zoomIn/setZoom sin animate=false todos fallan).
+           Instantáneo es más confiable a esta escala. */
+        zoomAnimation={false}
+        fadeAnimation={false}
+        zoomAnimationThreshold={0}
         zoomControl={false}
         crs={L.CRS.Simple}
         className="w-full h-full"
