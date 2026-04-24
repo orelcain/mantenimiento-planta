@@ -2,13 +2,18 @@
 /**
  * POC Shoplogix — valida acceso a la API sin replicar login.
  *
- * Uso:
+ * IMPORTANTE: Shoplogix usa 3 cookies juntas (_SLX_*, _SLX_*, SLXPNE).
+ * La forma más robusta de copiarlas todas es desde el Request Header real:
+ *
  *   1. Logéate en Edge a saas139.shoplogix.com
- *   2. F12 → Application (o Storage) → Cookies → saas139.shoplogix.com
- *      Copia el valor completo de la cookie _SLX_... (toda la línea)
- *   3. Exporta como variable de entorno (sin comillas, reemplaza ... por el valor):
- *        $env:SHOPLOGIX_COOKIE = "_SLX_cDOG345DYUYMav6Mj52gcA=..."
- *   4. Corre este script:
+ *   2. F12 → Red (Network) → filtra por "query.axd"
+ *   3. Click en una fila → pestaña "Headers" → sección "Request Headers"
+ *   4. Busca la línea "Cookie:" — copia todo el valor (después del ":")
+ *      Ejemplo esperado (¡no copies este, copia el tuyo!):
+ *        _SLX_2HoO...=uD6D...; _SLX_cDOG...=Z1ys...; SLXPNE=k=eyJhbG...
+ *   5. Exporta como variable de entorno en PowerShell:
+ *        $env:SHOPLOGIX_COOKIE = "_SLX_2...=uD6D...; _SLX_c...=Z1ys...; SLXPNE=k=eyJ..."
+ *   6. Corre este script:
  *        node scripts/shoplogix-poc.js
  *
  * Qué hace:
@@ -20,7 +25,8 @@
  * Nada de esto se commitea a Firestore ni se pushea a remoto. 100% local.
  *
  * Si este script funciona → procede con Fase 2 (Cloud Function).
- * Si falla con 401/403 → la cookie expiró; re-login y re-copia.
+ * Si falla con 401/403 → la cookie SLXPNE expiró (expira ~1h después de login);
+ * re-logéate y re-copia.
  */
 
 const fs   = require('fs')
@@ -103,13 +109,23 @@ async function main() {
   const cookie = process.env.SHOPLOGIX_COOKIE
   if (!cookie) {
     console.error('\n❌ Falta SHOPLOGIX_COOKIE en el entorno.\n')
-    console.error('   Obtenla desde DevTools (Application → Cookies → saas139.shoplogix.com → _SLX_...)')
-    console.error('   Luego: $env:SHOPLOGIX_COOKIE = "_SLX_xxx=valor"\n')
+    console.error('   Shoplogix usa 3 cookies (2x _SLX_* + SLXPNE). La forma más robusta:')
+    console.error('   DevTools → Network → click en una fila "query.axd" → Headers →')
+    console.error('   copia el valor completo de "Cookie:" (incluye las 3 juntas separadas por ";")\n')
+    console.error('   Luego en PowerShell:')
+    console.error('     $env:SHOPLOGIX_COOKIE = "_SLX_xxx=...; _SLX_yyy=...; SLXPNE=k=eyJ..."\n')
     process.exit(1)
   }
 
-  if (!cookie.startsWith('_SLX_')) {
-    console.warn('⚠️  La cookie no empieza con "_SLX_" — puede no ser la correcta.')
+  // Validación: al menos debe contener SLXPNE (la cookie JWT principal)
+  const hasSLXPNE = cookie.includes('SLXPNE=')
+  const hasSLX    = cookie.includes('_SLX_')
+  if (!hasSLXPNE) {
+    console.warn('⚠️  La cookie NO contiene "SLXPNE=" — es la cookie JWT principal de auth.')
+    console.warn('   El script puede fallar con 401. Asegúrate de copiar el header Cookie completo.\n')
+  }
+  if (!hasSLX) {
+    console.warn('⚠️  La cookie NO contiene ninguna "_SLX_*=" — faltan las cookies de sesión.\n')
   }
 
   const { start, end } = currentShiftWindow()
