@@ -3,42 +3,43 @@
  * (upstream del Grader) durante el mismo turno, para correlacionar paros y
  * ritmos con los P0 del Grader.
  *
- * Data viene de Shoplogix (integración vía Cloud Function — ver
- * docs/SHOPLOGIX_INTEGRATION_PLAN.md). Mientras no esté la Cloud Function,
- * en DEV muestra data sintética realista basada en Feb 26 2026.
+ * Diseño inspirado en la UI de Shoplogix (saas139.shoplogix.com):
+ *   - Header con nombre + ritmo vs objetivo
+ *   - Gantt horizontal con paros coloreados + leyenda de durations abajo
+ *   - Bar chart de producción por intervalo de 5 min + línea objetivo
+ *   - KPI row: piezas en verde/amarillo/rojo (%) como en Shoplogix
+ *   - Expandable: click para ver detalle completo por máquina
  *
- * UX: panel colapsable. Inicia expandido si hay al menos 1 Baader con datos.
+ * Data viene de Shoplogix (Cloud Function — Fase 2b). Mientras tanto,
+ * en DEV usa datos sintéticos realistas (shoplogixDemoData).
  */
 
 import { useState, useMemo } from 'react'
 import { Card, CardContent, Badge } from '@/components/ui'
-import { ChevronDown, ChevronRight, Factory, Activity, AlertCircle, Zap } from 'lucide-react'
+import {
+  ChevronDown, ChevronRight, Factory, Activity, AlertCircle, Zap,
+  TrendingUp, TrendingDown, Timer, Pause,
+} from 'lucide-react'
 import type {
   UpstreamLineSnapshot,
   UpstreamMachineShift,
   UpstreamProductionInterval,
+  UpstreamMachineState,
 } from '@/services/shoplogix/types'
 
 interface Props {
-  /** Data de la línea upstream para este turno. null si aún no carga; undefined si no hay. */
   snapshot: UpstreamLineSnapshot | null | undefined
-  /** Se está cargando data real. */
   loading?: boolean
-  /** Hubo error cargando. */
   error?: string | null
-  /** Inicia colapsado. Default: false. */
   defaultCollapsed?: boolean
-  /**
-   * Timestamp del último sync exitoso. Si > 15 min → warning "desactualizado".
-   */
   syncedAt?: Date | null
 }
 
-/**
- * Formatea un Date a HH:mm. Shoplogix almacena timestamps como wall-clock
- * local (aunque los devuelve con sufijo UTC). Por eso mostramos getUTCHours()
- * tal cual — así coincide con el horario que muestra la UI de Shoplogix.
- */
+// ============================================================================
+// Helpers de formato
+// ============================================================================
+
+/** Shoplogix guarda wall-clock time como UTC. Mostramos UTC tal cual. */
 function fmtHHmm(d: Date): string {
   return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
 }
@@ -53,78 +54,204 @@ function fmtInt(n: number): string {
   return Math.round(n).toLocaleString('es-CL')
 }
 
-/** Mini Gantt horizontal — renderiza una fila de segmentos por máquina. */
-function MiniGantt({ shift }: { shift: UpstreamMachineShift }) {
+/** "3600s" → "1 h" | "900s" → "15 min" */
+function fmtDuration(sec: number): string {
+  const min = Math.round(sec / 60)
+  if (min < 60) return `${min} min`
+  const h = Math.floor(min / 60)
+  const rm = min % 60
+  return rm > 0 ? `${h} h ${rm} min` : `${h} h`
+}
+
+// ============================================================================
+// Agregados por máquina (como Shoplogix summary)
+// ============================================================================
+
+interface MachineKpis {
+  greenCycles: number    // intervalos en verde
+  yellowCycles: number
+  redCycles: number
+  greenPct: number       // del total
+  yellowPct: number
+  redPct: number
+  totalProduced: number
+  totalExpected: number
+  reachedPct: number     // % de lo esperado (producido/expected)
+}
+
+function computeKpis(intervals: UpstreamProductionInterval[]): MachineKpis {
+  let green = 0, yellow = 0, red = 0, total = 0, expected = 0
+  for (const it of intervals) {
+    if (it.expectedCycles <= 0) continue  // ignora intervalos sin objetivo
+    total    += it.cycles
+    expected += it.expectedCycles
+    if      (it.color === 'green')  green  += it.cycles
+    else if (it.color === 'yellow') yellow += it.cycles
+    else if (it.color === 'red')    red    += it.cycles
+  }
+  const base = Math.max(1, total)
+  return {
+    greenCycles: green, yellowCycles: yellow, redCycles: red,
+    greenPct: green / base, yellowPct: yellow / base, redPct: red / base,
+    totalProduced: total, totalExpected: expected,
+    reachedPct: expected > 0 ? total / expected : 0,
+  }
+}
+
+/** Agrega estados por reason para la leyenda. */
+interface ReasonAggregate {
+  reason: string
+  color: string
+  durationSec: number
+  count: number
+}
+
+function aggregateStatesByReason(states: UpstreamMachineState[]): ReasonAggregate[] {
+  const map = new Map<string, ReasonAggregate>()
+  for (const s of states) {
+    if (s.type === 'uptime') continue  // solo paros
+    const key = s.reason || s.name     // si no tiene reason, usa name ("Micro Detencion")
+    const existing = map.get(key)
+    if (existing) {
+      existing.durationSec += s.durationSec
+      existing.count += 1
+    } else {
+      map.set(key, { reason: key, color: s.color, durationSec: s.durationSec, count: 1 })
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => b.durationSec - a.durationSec)
+}
+
+// ============================================================================
+// Subcomponentes visuales
+// ============================================================================
+
+/** Gantt con leyenda inferior de duraciones por categoría. */
+function StateTimeline({ shift }: { shift: UpstreamMachineShift }) {
   const totalMs = shift.shiftEnd.getTime() - shift.shiftStart.getTime()
+  const reasons = useMemo(() => aggregateStatesByReason(shift.states), [shift.states])
+
   if (totalMs <= 0 || shift.states.length === 0) {
-    return <div className="h-3 rounded bg-slate-800/60" />
+    return <div className="h-4 rounded bg-slate-800/60" />
   }
+
   return (
-    <div className="flex h-3 rounded overflow-hidden bg-slate-800/60" title={`${shift.machineName} — timeline`}>
-      {shift.states.map((st, i) => {
-        const startOffset = Math.max(0, st.startAt.getTime() - shift.shiftStart.getTime())
-        const segMs = Math.max(0, st.endAt.getTime() - st.startAt.getTime())
-        const widthPct = (segMs / totalMs) * 100
-        if (widthPct <= 0) return null
-        const label = st.reason ? `${st.name}: ${st.reason}` : st.name
-        const mins = Math.round(st.durationSec / 60)
-        return (
-          <div
-            key={i}
-            style={{ width: `${widthPct}%`, backgroundColor: st.color, marginLeft: i === 0 ? `${(startOffset / totalMs) * 100}%` : 0 }}
-            className="border-r border-slate-900/40 last:border-r-0"
-            title={`${label} — ${mins} min (${fmtHHmm(st.startAt)}–${fmtHHmm(st.endAt)})`}
-          />
-        )
-      })}
+    <div className="space-y-1.5">
+      <div className="flex h-4 rounded overflow-hidden bg-slate-800/60 border border-slate-800">
+        {shift.states.map((st, i) => {
+          const startOffset = Math.max(0, st.startAt.getTime() - shift.shiftStart.getTime())
+          const segMs = Math.max(0, st.endAt.getTime() - st.startAt.getTime())
+          const widthPct = (segMs / totalMs) * 100
+          if (widthPct <= 0) return null
+          const label = st.reason ? `${st.name}: ${st.reason}` : st.name
+          const mins = Math.round(st.durationSec / 60)
+          return (
+            <div
+              key={i}
+              style={{ width: `${widthPct}%`, backgroundColor: st.color, marginLeft: i === 0 ? `${(startOffset / totalMs) * 100}%` : 0 }}
+              className="border-r border-slate-900/40 last:border-r-0"
+              title={`${label} — ${mins} min (${fmtHHmm(st.startAt)}–${fmtHHmm(st.endAt)})`}
+            />
+          )
+        })}
+      </div>
+
+      {/* Leyenda condensada — top 6 razones por duración */}
+      {reasons.length > 0 && (
+        <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-400">
+          {reasons.slice(0, 6).map(r => (
+            <div key={r.reason} className="flex items-center gap-1" title={`${r.count} eventos`}>
+              <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: r.color }} />
+              <span className="text-slate-300">{r.reason}</span>
+              <span className="text-slate-500 tabular-nums">{fmtDuration(r.durationSec)}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
 
-/** Mini barras de producción — 1 barra por intervalo de 5 min. */
-function MiniBars({ intervals }: { intervals: UpstreamProductionInterval[] }) {
+/** Bar chart de producción por intervalo con línea objetivo visible. */
+function ProductionBars({ intervals, threshold }: { intervals: UpstreamProductionInterval[]; threshold: number }) {
   if (intervals.length === 0) {
-    return <div className="h-10 rounded bg-slate-800/40" />
+    return <div className="h-16 rounded bg-slate-800/40" />
   }
-  const maxCycles = Math.max(1, ...intervals.map(x => Math.max(x.cycles, x.expectedCycles)))
+  const maxValue = Math.max(1, ...intervals.map(x => Math.max(x.cycles, x.expectedCycles)))
+  const expected = intervals.find(x => x.expectedCycles > 0)?.expectedCycles ?? 0
+  const expectedPct = (expected / maxValue) * 100
+
   const colorMap: Record<UpstreamProductionInterval['color'], string> = {
-    green:  'bg-emerald-500',
-    yellow: 'bg-amber-500',
-    red:    'bg-rose-500',
-    gray:   'bg-slate-700',
+    green:  'bg-emerald-500/90',
+    yellow: 'bg-amber-500/90',
+    red:    'bg-rose-500/90',
+    gray:   'bg-slate-700/60',
   }
+
   return (
-    <div className="flex items-end gap-[1px] h-10 bg-slate-900/40 rounded px-1 py-1">
-      {intervals.map((it, i) => {
-        const heightPct = (it.cycles / maxCycles) * 100
-        const expectedPct = (it.expectedCycles / maxCycles) * 100
-        return (
-          <div
-            key={i}
-            className="flex-1 min-w-[2px] flex flex-col justify-end relative"
-            title={`${fmtHHmm(it.startAt)}: ${it.cycles}/${Math.round(it.expectedCycles)} (${fmtPct(it.ratio)})`}
-          >
-            {/* Línea del objetivo (tenue) */}
+    <div className="relative">
+      <div className="flex items-end gap-[2px] h-16 bg-slate-950/60 rounded px-1.5 py-1 border border-slate-800">
+        {/* Línea objetivo — renderizada como pseudo-elemento para estar sobre las barras */}
+        <div
+          className="absolute left-1.5 right-1.5 border-t border-dashed border-violet-400/70 z-10 pointer-events-none"
+          style={{ bottom: `${4 + (expectedPct * 56) / 100}px` }}
+        />
+        {intervals.map((it, i) => {
+          const heightPct = (it.cycles / maxValue) * 100
+          return (
             <div
-              className="absolute left-0 right-0 border-t border-dashed border-slate-500/50"
-              style={{ bottom: `${expectedPct}%` }}
-            />
-            {/* Barra real */}
-            <div
-              className={`${colorMap[it.color]} rounded-sm`}
-              style={{ height: `${Math.max(2, heightPct)}%` }}
-            />
-          </div>
-        )
-      })}
+              key={i}
+              className="flex-1 min-w-[2px] flex flex-col justify-end relative group"
+              title={`${fmtHHmm(it.startAt)}: ${it.cycles}/${Math.round(it.expectedCycles)} pz (${fmtPct(it.ratio)})`}
+            >
+              <div
+                className={`${colorMap[it.color]} rounded-sm transition-all`}
+                style={{ height: `${Math.max(2, heightPct)}%` }}
+              />
+            </div>
+          )
+        })}
+      </div>
+      {/* Etiqueta "Objetivo" */}
+      <div className="absolute right-2 top-1 text-[9px] text-violet-400/80 bg-slate-900/90 px-1.5 rounded">
+        Objetivo {Math.round(expected)} ± {threshold}%
+      </div>
     </div>
   )
 }
 
-/** Fila por máquina con KPIs + mini-timeline + mini-bars. */
-function MachineRow({ shift }: { shift: UpstreamMachineShift }) {
-  const stops = shift.states.filter(s => s.type !== 'uptime')
-  const breaks = stops.filter(s => s.type === 'break').length
+/** KPI row tipo Shoplogix: total / verde / amarillo / rojo. */
+function ProductionKpiRow({ kpis }: { kpis: MachineKpis }) {
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap">
+      <Badge variant="outline" className="bg-slate-900/60 border-slate-700 text-slate-300 tabular-nums text-[11px] px-2 py-0.5 h-5">
+        {fmtInt(kpis.totalProduced)} / {fmtInt(kpis.totalExpected)}
+        <span className="text-slate-500 ml-1.5">({fmtPct(kpis.reachedPct, 0)})</span>
+      </Badge>
+      <Badge variant="outline" className="bg-emerald-950/60 border-emerald-900 text-emerald-300 tabular-nums text-[11px] px-2 py-0.5 h-5">
+        {fmtInt(kpis.greenCycles)} ({fmtPct(kpis.greenPct, 0)})
+      </Badge>
+      <Badge variant="outline" className="bg-amber-950/60 border-amber-900 text-amber-300 tabular-nums text-[11px] px-2 py-0.5 h-5">
+        {fmtInt(kpis.yellowCycles)} ({fmtPct(kpis.yellowPct, 0)})
+      </Badge>
+      <Badge variant="outline" className="bg-rose-950/60 border-rose-900 text-rose-300 tabular-nums text-[11px] px-2 py-0.5 h-5">
+        {fmtInt(kpis.redCycles)} ({fmtPct(kpis.redPct, 0)})
+      </Badge>
+    </div>
+  )
+}
+
+// ============================================================================
+// MachineRow — 1 máquina
+// ============================================================================
+
+function MachineRow({ shift, expanded, onToggle }: {
+  shift: UpstreamMachineShift
+  expanded: boolean
+  onToggle: () => void
+}) {
+  const kpis   = useMemo(() => computeKpis(shift.intervals), [shift.intervals])
+  const breaks = shift.states.filter(s => s.type === 'break').length
   const micro  = shift.states.filter(s => s.name === 'Micro Detencion').length
 
   const ratioColor =
@@ -132,36 +259,97 @@ function MachineRow({ shift }: { shift: UpstreamMachineShift }) {
     : shift.overallRatio >= 0.5 ? 'text-amber-400'
     : 'text-rose-400'
 
+  const RatioIcon = shift.runtimeVariance >= 0 ? TrendingUp : TrendingDown
+
   return (
-    <div className="space-y-1.5 py-2">
-      <div className="flex items-center justify-between gap-2">
+    <div className="py-3 space-y-2">
+      {/* Row header — clickeable para expandir */}
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center justify-between gap-2 text-left group"
+        aria-expanded={expanded}
+      >
         <div className="flex items-center gap-2 min-w-0">
+          {expanded
+            ? <ChevronDown  className="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-300" />
+            : <ChevronRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-300" />}
           <Factory className="w-4 h-4 text-slate-400 flex-shrink-0" />
           <span className="font-medium text-sm truncate">{shift.machineName}</span>
           <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-slate-700 text-slate-400">
             Baader 142
           </Badge>
         </div>
-        <div className="flex items-center gap-3 text-xs">
-          <span className={`font-semibold tabular-nums ${ratioColor}`} title="Ritmo vs objetivo">
+        <div className="flex items-center gap-3 text-xs flex-shrink-0">
+          <span className={`font-semibold tabular-nums flex items-center gap-0.5 ${ratioColor}`} title="Ritmo vs objetivo">
+            <RatioIcon className="w-3 h-3" />
             {fmtPct(shift.overallRatio)}
           </span>
           <span className="text-slate-400 tabular-nums" title="Piezas totales">
-            {fmtInt(shift.totalCycles)}
+            {fmtInt(shift.totalCycles)} pz
           </span>
         </div>
-      </div>
+      </button>
 
-      <MiniGantt shift={shift} />
-      <MiniBars intervals={shift.intervals} />
+      {/* KPI row siempre visible (verde/amarillo/rojo) */}
+      <ProductionKpiRow kpis={kpis} />
 
+      {/* Gantt con leyenda */}
+      <StateTimeline shift={shift} />
+
+      {/* Production bars + objetivo */}
+      <ProductionBars intervals={shift.intervals} threshold={shift.threshold} />
+
+      {/* Mini stats footer */}
       <div className="flex items-center gap-4 text-[11px] text-slate-500">
-        <span title="Runtime del turno">⏱ {fmtPct(shift.actualRuntime)}</span>
-        <span title="Paros programados (Break)">⏸ {breaks}</span>
+        <span className="flex items-center gap-1" title="Runtime del turno">
+          <Timer className="w-3 h-3" /> {fmtPct(shift.actualRuntime)} runtime
+        </span>
+        <span className="flex items-center gap-1" title="Paros (Break)">
+          <Pause className="w-3 h-3" /> {breaks} paros
+        </span>
         {micro > 0 && (
-          <span className="text-cyan-400" title="Micro Detenciones">⚡ {micro}</span>
+          <span className="text-cyan-400 flex items-center gap-1" title="Micro Detenciones (<5 min)">
+            <Zap className="w-3 h-3" /> {micro} micro
+          </span>
         )}
+        <span className="ml-auto text-[10px] text-slate-600">
+          {fmtHHmm(shift.shiftStart)} – {fmtHHmm(shift.shiftEnd)}
+        </span>
       </div>
+
+      {/* Detalle expandido (futuro: aquí iría el drill-down tipo Shoplogix completo) */}
+      {expanded && (
+        <div className="mt-2 pt-2 border-t border-slate-800/60 text-[11px] text-slate-500 space-y-1">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <div>
+              <div className="text-slate-600">Intervalos</div>
+              <div className="text-slate-300 tabular-nums">{shift.intervals.length} × 5 min</div>
+            </div>
+            <div>
+              <div className="text-slate-600">Eventos timeline</div>
+              <div className="text-slate-300 tabular-nums">{shift.states.length}</div>
+            </div>
+            <div>
+              <div className="text-slate-600">Unidad</div>
+              <div className="text-slate-300">{shift.productionUnit || '—'}</div>
+            </div>
+            <div>
+              <div className="text-slate-600">Variance runtime</div>
+              <div className={shift.runtimeVariance >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                {shift.runtimeVariance >= 0 ? '+' : ''}{fmtPct(shift.runtimeVariance, 2)}
+              </div>
+            </div>
+          </div>
+          {shift.comments.length > 0 && (
+            <div className="mt-2">
+              <div className="text-slate-600 mb-0.5">Comentarios del turno</div>
+              <ul className="list-disc list-inside text-slate-300 space-y-0.5">
+                {shift.comments.slice(0, 5).map((c, i) => <li key={i}>{c}</li>)}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -178,6 +366,7 @@ export function UpstreamMachinesPanel({
   syncedAt = null,
 }: Props) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed)
+  const [expandedMachines, setExpandedMachines] = useState<Set<string>>(new Set())
 
   const isStale = useMemo(() => {
     if (!syncedAt) return false
@@ -185,13 +374,27 @@ export function UpstreamMachinesPanel({
     return ageMin > 15
   }, [syncedAt])
 
-  // Estado vacío: sin integración aún
+  // Agregado de toda la línea (para header)
+  const lineKpis = useMemo(() => {
+    if (!snapshot || snapshot.machines.length === 0) return null
+    const all = snapshot.machines.flatMap(m => m.intervals)
+    return computeKpis(all)
+  }, [snapshot])
+
   const empty = !loading && !error && (!snapshot || snapshot.machines.length === 0)
+
+  const toggleMachine = (id: string) => {
+    setExpandedMachines(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
 
   return (
     <Card className="border-slate-800 bg-slate-950/50">
       <CardContent className="py-3 px-4">
-        {/* Header */}
+        {/* Header del panel */}
         <button
           onClick={() => setCollapsed(c => !c)}
           className="w-full flex items-center justify-between gap-2 group"
@@ -240,23 +443,33 @@ export function UpstreamMachinesPanel({
 
             {empty && (
               <div className="text-xs text-slate-500 py-3 space-y-1">
-                <p>
-                  📡 <strong className="text-slate-300">Integración con Shoplogix en desarrollo.</strong>
-                </p>
+                <p>📡 <strong className="text-slate-300">Integración con Shoplogix en desarrollo.</strong></p>
                 <p className="text-slate-600">
-                  Próximamente: estado en vivo de las 3 Baaders 142 (Evisceradora 1, 2, 3), paros, Micro Detenciones
-                  y correlación con los P0 del Grader. Ver{' '}
-                  <code className="text-slate-400">docs/SHOPLOGIX_INTEGRATION_PLAN.md</code>.
+                  Próximamente: estado en vivo de las 3 Baaders 142, paros, Micro Detenciones
+                  y correlación con los P0 del Grader. Ver <code className="text-slate-400">docs/SHOPLOGIX_INTEGRATION_PLAN.md</code>.
                 </p>
               </div>
             )}
 
-            {snapshot && snapshot.machines.length > 0 && (
-              <div className="divide-y divide-slate-800/60">
-                {snapshot.machines.map(m => (
-                  <MachineRow key={m.machineid} shift={m} />
-                ))}
-              </div>
+            {snapshot && snapshot.machines.length > 0 && lineKpis && (
+              <>
+                {/* Línea-wide KPI row (suma de las 3) */}
+                <div className="mb-3 pb-3 border-b border-slate-800/60">
+                  <div className="text-[11px] text-slate-500 mb-1.5">Totales línea completa</div>
+                  <ProductionKpiRow kpis={lineKpis} />
+                </div>
+
+                <div className="divide-y divide-slate-800/60">
+                  {snapshot.machines.map(m => (
+                    <MachineRow
+                      key={m.machineid}
+                      shift={m}
+                      expanded={expandedMachines.has(m.machineid)}
+                      onToggle={() => toggleMachine(m.machineid)}
+                    />
+                  ))}
+                </div>
+              </>
             )}
 
             {snapshot && syncedAt && (
