@@ -487,19 +487,23 @@ export function UpstreamMachinesPanel({
     return computeKpis(all)
   }, [snapshot])
 
-  // Detector de microparadas anómalas por máquina: marca la máquina si tiene
-  // >50% más microparadas que el promedio de la línea (útil para mantención
-  // predictiva — ej: E3 con 61 vs prom 44 = +39% → atención).
+  // Detector de microparadas anómalas. Marca una máquina si:
+  //   (a) tiene el conteo más alto de la línea, Y
+  //   (b) está ≥25% sobre el promedio Y al menos 15 eventos absolutos
+  // (evita falsos positivos en turnos con muy pocas microparadas totales).
   const microAlertSet = useMemo<Set<string>>(() => {
     const set = new Set<string>()
     if (!snapshot || snapshot.machines.length < 2) return set
     const counts = snapshot.machines.map(m =>
       m.states.filter(s => s.name === 'Micro Detencion').length,
     )
+    const max = Math.max(...counts)
+    if (max < 15) return set  // umbral absoluto
     const avg = counts.reduce((a, x) => a + x, 0) / counts.length
     if (avg <= 0) return set
     snapshot.machines.forEach((m, i) => {
-      if ((counts[i] ?? 0) > avg * 1.5) set.add(m.machineid)
+      const n = counts[i] ?? 0
+      if (n === max && n > avg * 1.25) set.add(m.machineid)
     })
     return set
   }, [snapshot])

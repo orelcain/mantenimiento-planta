@@ -39,6 +39,7 @@ import { usePauseTags } from '@/hooks/usePauseTags'
 import { useToast } from '@/hooks/useToast'
 import { ActionPlanPanel, deriveSuggestions } from '@/components/grader/ActionPlanPanel'
 import { UpstreamMachinesPanel } from '@/components/grader/UpstreamMachinesPanel'
+import { UpstreamCorrelationCard } from '@/components/grader/UpstreamCorrelationCard'
 import { useUpstreamLineSnapshot } from '@/hooks/useUpstreamLineSnapshot'
 import { findTriggeredRunbooks } from '@/services/grader/graderRunbooks'
 import { analyzeGraderFromSummary } from '@/services/grader/graderSummaryAI'
@@ -818,6 +819,12 @@ export function AnalisisGraderTurnoPage() {
             criticalThreshold={criticalThreshold}
             isOnline={isOnline}
             chartImageRef={chartImageRef}
+          />
+
+          {/* Correlación automática Grader↔Baader (Fase 3 iter 2) */}
+          <UpstreamCorrelationCard
+            pauses={pauses}
+            snapshot={upstreamLine.snapshot}
           />
 
           {/* Línea upstream — Evisceradoras Baader 142 (integración Shoplogix) */}

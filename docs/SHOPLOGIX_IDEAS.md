@@ -168,3 +168,26 @@ E1 vs E2 vs E3 a lo largo del tiempo. ¿Alguna consistentemente peor?
 - Cloud Function con sync automático
 - Firestore rules shoplogix/
 - Doc de deploy SHOPLOGIX_DEPLOY.md
+- Ticks horarios + shiftWindow alignment (iter 1)
+- Badge "⚠️ Atención" para microparadas anómalas (iter 1)
+- UpstreamCorrelationCard — hipótesis automática de causa raíz por paro Grader (iter 2)
+
+## 🧪 Observaciones del campo (para revisar)
+
+### Feb 26 — actualRuntime 11.2% es muy bajo
+E1 tuvo solo 11.2% de runtime en 9h de turno. La categoría "Planned Downtime"
+domina con 4h 15min por máquina. Posibles causas:
+- Día de mantención programada
+- Cambio de producto a mitad turno
+- Paro anticipado
+
+Valdría la pena revisar: ¿estos "Planned Downtime" son realmente planificados
+o Shoplogix los registra así por default cuando no hay señal OPC?
+
+### Ticks 10:00-22:00 UTC vs hora Chile
+Los ticks se ven "10:00, 11:00, ..." pero en hora Chile eso sería 07:00-19:00.
+Los datos de Shoplogix aparecen en el rango correcto visualmente (overlap de
+hora-wall-clock), pero el LABEL de los ticks es UTC. Podría confundir al
+operador que espera ver "hora de la planta".
+
+**Fix propuesto** (P0 idea 1 en arriba): display con Chile TZ ajustada.
