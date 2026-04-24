@@ -560,13 +560,13 @@ export function PanelCapasYZonas() {
                         </button>
                         <button
                           onClick={() => {
-                            if (!window.confirm(`Eliminar capa SVG "${c.label}" del mapa?\n\nSe puede restaurar desde el botón "Restaurar".`)) return
+                            if (!window.confirm(`¿Eliminar capa "${c.label}" del mapa y del visor 3D?\n\nEsta acción es permanente.`)) return
                             eliminarCapaSvg(c.name)
                           }}
-                          title="Eliminar esta capa SVG del mapa"
-                          className="shrink-0 opacity-0 group-hover:opacity-100 p-0.5 hover:bg-red-900/60 rounded transition-all"
+                          title="Eliminar esta capa del mapa"
+                          className="shrink-0 p-0.5 hover:bg-red-900/60 rounded transition-colors text-red-500 hover:text-red-300"
                         >
-                          <Trash2 size={9} className="text-red-400" />
+                          <Trash2 size={10} />
                         </button>
                       </div>
                     )
