@@ -189,31 +189,34 @@ function ProductionBars({ intervals, threshold }: { intervals: UpstreamProductio
   }
 
   return (
-    <div className="relative">
-      <div className="flex items-end gap-[2px] h-16 bg-slate-950/60 rounded px-1.5 py-1 border border-slate-800">
-        {/* Línea objetivo — renderizada como pseudo-elemento para estar sobre las barras */}
-        <div
-          className="absolute left-1.5 right-1.5 border-t border-dashed border-violet-400/70 z-10 pointer-events-none"
-          style={{ bottom: `${4 + (expectedPct * 56) / 100}px` }}
-        />
+    <div className="relative h-16 bg-slate-950/60 rounded px-1.5 py-1 border border-slate-800">
+      {/* Línea objetivo — absolute dentro del contenedor relativo */}
+      <div
+        className="absolute left-1.5 right-1.5 border-t border-dashed border-violet-400/70 z-10 pointer-events-none"
+        style={{ bottom: `${4 + (expectedPct * (64 - 8)) / 100}px` }}
+      />
+
+      {/* Barras: flex row con altura completa */}
+      <div className="flex gap-[2px] h-full">
         {intervals.map((it, i) => {
           const heightPct = (it.cycles / maxValue) * 100
           return (
             <div
               key={i}
-              className="flex-1 min-w-[2px] flex flex-col justify-end relative group"
+              className="flex-1 min-w-[2px] h-full flex flex-col justify-end relative group"
               title={`${fmtHHmm(it.startAt)}: ${it.cycles}/${Math.round(it.expectedCycles)} pz (${fmtPct(it.ratio)})`}
             >
               <div
-                className={`${colorMap[it.color]} rounded-sm transition-all`}
-                style={{ height: `${Math.max(2, heightPct)}%` }}
+                className={`${colorMap[it.color]} rounded-sm transition-all w-full`}
+                style={{ height: `${Math.max(4, heightPct)}%` }}
               />
             </div>
           )
         })}
       </div>
+
       {/* Etiqueta "Objetivo" */}
-      <div className="absolute right-2 top-1 text-[9px] text-violet-400/80 bg-slate-900/90 px-1.5 rounded">
+      <div className="absolute right-2 top-1 text-[9px] text-violet-400/80 bg-slate-900/90 px-1.5 rounded z-20">
         Objetivo {Math.round(expected)} ± {threshold}%
       </div>
     </div>
