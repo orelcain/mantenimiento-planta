@@ -6,7 +6,7 @@
 
 import { useCallback, useRef, useState } from 'react'
 import { X, Upload, FileText, Eye, EyeOff, Check, AlertTriangle, Loader } from 'lucide-react'
-import { parseDxfText, type CapaDxfParseada } from './parseDxf'
+import { parseDxfKonva, type CapaKonva } from '../konva-dxf/parseDxfKonva'
 import { useMapaLeafletStore, type MapaImportado, type CapaImportada } from '@/store/useMapaLeafletStore'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -31,9 +31,9 @@ export function DxfImportModal({ onClose }: Props) {
   const [step, setStep]             = useState<Step>('upload')
   const [error, setError]           = useState<string | null>(null)
   const [warnings, setWarnings]     = useState<string[]>([])
-  const [capas, setCapas]           = useState<CapaDxfParseada[]>([])
+  const [capas, setCapas]           = useState<CapaKonva[]>([])
   const [selected, setSelected]     = useState<Set<string>>(new Set())
-  const [bounds, setBounds]         = useState<[[number,number],[number,number]] | null>(null)
+  const [bbox, setBbox]             = useState<[number, number, number, number] | null>(null)
   const [nombre, setNombre]         = useState('Planta importada')
   const [fileName, setFileName]     = useState('')
   const inputRef                    = useRef<HTMLInputElement>(null)
@@ -54,7 +54,7 @@ export function DxfImportModal({ onClose }: Props) {
 
     try {
       const text = await file.text()
-      const result = parseDxfText(text)
+      const result = parseDxfKonva(text)
 
       if (!result.capas.length) {
         setError('El archivo DXF no contiene entidades reconocibles')
@@ -63,7 +63,7 @@ export function DxfImportModal({ onClose }: Props) {
       }
 
       setCapas(result.capas)
-      setBounds(result.bounds)
+      setBbox(result.bbox)
       setWarnings(result.warnings)
       // Seleccionar todas por defecto
       setSelected(new Set(result.capas.map((c) => c.name)))
@@ -106,7 +106,7 @@ export function DxfImportModal({ onClose }: Props) {
   // ── Confirmar importación ───────────────────────────────────────────────
 
   function handleImport() {
-    if (!bounds || !selected.size) return
+    if (!bbox || !selected.size) return
 
     const capasImportadas: CapaImportada[] = capas
       .filter((c) => selected.has(c.name))
@@ -116,13 +116,13 @@ export function DxfImportModal({ onClose }: Props) {
         visible: true,
         eliminada: false,
         entityCount: c.entityCount,
-        geojson: c.geojson,
+        polylines: c.polylines,
       }))
 
     const mapa: MapaImportado = {
       id: makeId(),
       nombre: nombre.trim() || 'Mapa DXF',
-      bounds,
+      bbox,
       capas: capasImportadas,
       createdAt: Date.now(),
     }

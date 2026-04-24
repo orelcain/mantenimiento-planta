@@ -39,13 +39,15 @@ export interface CapaImportada {
   visible: boolean
   eliminada: boolean
   entityCount: number
-  geojson: GeoJSON.FeatureCollection
+  /** Polilíneas interpoladas listas para Konva: array de [[x, y], ...] */
+  polylines: [number, number][][]
 }
 
 export interface MapaImportado {
   id: string
   nombre: string
-  bounds: [[number, number], [number, number]]  // [[Ymin,Xmin],[Ymax,Xmax]]
+  /** [minX, minY, maxX, maxY] — caja contenedora de toda la geometría */
+  bbox: [number, number, number, number]
   capas: CapaImportada[]
   createdAt: number
 }
@@ -512,7 +514,7 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
     }),
     {
       name: 'mapa-leaflet-v1',
-      version: 5,
+      version: 6,
       migrate: (persisted, version) => {
         const s = persisted as Partial<MapaLeafletState> & {
           capasVisibles?: unknown
@@ -584,6 +586,12 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
           if (!s.capasGeoJsonEliminadas) {
             s.capasGeoJsonEliminadas = { recinto: [], interior: [] }
           }
+        }
+        // v5 → v6: cambio a formato Konva (polylines). Mapas importados viejos
+        // tenían `geojson` y `bounds`; se descartan por incompatibilidad.
+        if (version < 6) {
+          s.mapasImportados = []
+          s.mapaImportadoActivoId = null
         }
         return s as MapaLeafletState
       },

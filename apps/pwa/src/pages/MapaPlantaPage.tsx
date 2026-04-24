@@ -12,7 +12,7 @@ import { Map as MapIcon, Building2, Globe2, Ruler, LayoutGrid, BoxSelect, Layers
 import { useRef, useState, useEffect, useMemo } from 'react'
 import { PlantaLeafletEditable, PanelCapasYZonas } from '@/components/map/leaflet-editable'
 import { Wireframe3DView } from '@/components/map/wireframe3d'
-import { MapaImportadoView } from '@/components/map/dxf-import/MapaImportadoView'
+import { KonvaDxfViewer } from '@/components/map/konva-dxf/KonvaDxfViewer'
 import { DxfImportModal } from '@/components/map/dxf-import/DxfImportModal'
 import { useMapaLeafletStore, type Nivel } from '@/store/useMapaLeafletStore'
 import { MAP_VIEWS, type ViewName } from '@/data/dxfLayers'
@@ -410,7 +410,7 @@ export function MapaPlantaPage() {
       <main className="flex-1 relative overflow-hidden">
         {/* Mapa importado activo */}
         {mapaActivo ? (
-          <MapaImportadoView mapa={mapaActivo} />
+          <KonvaDxfViewer mapa={mapaActivo} />
         ) : (
           <>
             {/* 2D — siempre montado (Leaflet no tolera re-init) */}
