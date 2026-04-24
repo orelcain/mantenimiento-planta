@@ -1640,11 +1640,21 @@ export function PlantaLeafletEditable() {
   const grillaVisible = useMapaLeafletStore((s) => s.grillaVisible)
   const view = MAP_VIEWS[currentView]
 
+  // Listener nativo (no React sintético) con passive:false para detener la
+  // propagación del wheel event ANTES de que llegue al <main id="main-content">
+  // del layout (overflow-y:auto) que lo captura y consume sin dejar que Leaflet
+  // haga zoom. React onWheel es sintético y no detiene eventos nativos del DOM.
+  const wrapperRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = wrapperRef.current
+    if (!el) return
+    const stopWheel = (e: WheelEvent) => { e.stopPropagation() }
+    el.addEventListener('wheel', stopWheel, { passive: false })
+    return () => el.removeEventListener('wheel', stopWheel)
+  }, [])
+
   return (
-    // onWheel stopPropagation: el <main id="main-content"> del layout tiene
-    // overflow-y:auto y captura los eventos wheel antes que Leaflet. Al cortar
-    // la propagación aquí, el scroll wheel llega solo al mapa.
-    <div className="relative w-full h-full" onWheel={(e) => e.stopPropagation()}>
+    <div ref={wrapperRef} className="relative w-full h-full">
       {/* key={currentView} fuerza re-mount al cambiar vista (CRS, bounds, etc) */}
       <MapContainer
         key={currentView}
