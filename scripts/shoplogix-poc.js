@@ -106,14 +106,25 @@ function saveFixture(filename, data) {
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
-  const cookie = process.env.SHOPLOGIX_COOKIE
+  // Prioridad: env var > archivo local .shoplogix-cookie.txt (gitignored)
+  let cookie = process.env.SHOPLOGIX_COOKIE
+  const cookieFile = path.join(__dirname, '..', '.shoplogix-cookie.txt')
+
+  if (!cookie && fs.existsSync(cookieFile)) {
+    cookie = fs.readFileSync(cookieFile, 'utf8').trim()
+    console.log(`📄 Cookie leída desde ${path.basename(cookieFile)} (${cookie.length} chars)`)
+  }
+
   if (!cookie) {
-    console.error('\n❌ Falta SHOPLOGIX_COOKIE en el entorno.\n')
-    console.error('   Shoplogix usa 3 cookies (2x _SLX_* + SLXPNE). La forma más robusta:')
-    console.error('   DevTools → Network → click en una fila "query.axd" → Headers →')
-    console.error('   copia el valor completo de "Cookie:" (incluye las 3 juntas separadas por ";")\n')
-    console.error('   Luego en PowerShell:')
+    console.error('\n❌ Falta cookie de sesión.\n')
+    console.error('   Shoplogix usa 3 cookies (2x _SLX_* + SLXPNE). Dos opciones:\n')
+    console.error('   OPCIÓN A (recomendada):')
+    console.error('     1. Guarda el header Cookie completo en el archivo:')
+    console.error(`        ${cookieFile}`)
+    console.error('     2. node scripts/shoplogix-poc.js\n')
+    console.error('   OPCIÓN B (variable de entorno en PowerShell):')
     console.error('     $env:SHOPLOGIX_COOKIE = "_SLX_xxx=...; _SLX_yyy=...; SLXPNE=k=eyJ..."\n')
+    console.error('   El archivo .shoplogix-cookie.txt está en .gitignore — seguro.\n')
     process.exit(1)
   }
 
