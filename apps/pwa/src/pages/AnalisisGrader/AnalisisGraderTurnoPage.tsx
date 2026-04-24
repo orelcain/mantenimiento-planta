@@ -38,6 +38,8 @@ import { useOnlineStatus } from '@/hooks/useOnlineStatus'
 import { usePauseTags } from '@/hooks/usePauseTags'
 import { useToast } from '@/hooks/useToast'
 import { ActionPlanPanel, deriveSuggestions } from '@/components/grader/ActionPlanPanel'
+import { UpstreamMachinesPanel } from '@/components/grader/UpstreamMachinesPanel'
+import { useUpstreamLineSnapshot } from '@/hooks/useUpstreamLineSnapshot'
 import { findTriggeredRunbooks } from '@/services/grader/graderRunbooks'
 import { analyzeGraderFromSummary } from '@/services/grader/graderSummaryAI'
 import { loadSeasonBenchmark, type SeasonBenchmark } from '@/services/grader/graderBenchmarks'
@@ -216,6 +218,9 @@ export function AnalisisGraderTurnoPage() {
   const { shiftId: rawShiftId } = useParams<{ shiftId: string }>()
 
   const [dateKey, shiftLabel] = useMemo(() => parseShiftId(rawShiftId), [rawShiftId])
+
+  // Línea upstream (Shoplogix) — en DEV muestra demo; en prod lee de Firestore (Fase 2)
+  const upstreamLine = useUpstreamLineSnapshot(dateKey || null, shiftLabel || null)
 
   const [shiftWindow, setShiftWindow] = useState<ShiftTimeWindow | null>(
     () => dateKey && shiftLabel
@@ -813,6 +818,14 @@ export function AnalisisGraderTurnoPage() {
             criticalThreshold={criticalThreshold}
             isOnline={isOnline}
             chartImageRef={chartImageRef}
+          />
+
+          {/* Línea upstream — Evisceradoras Baader 142 (integración Shoplogix) */}
+          <UpstreamMachinesPanel
+            snapshot={upstreamLine.snapshot}
+            loading={upstreamLine.loading}
+            error={upstreamLine.error}
+            syncedAt={upstreamLine.syncedAt}
           />
 
           {/* Distribución por gate — balance del turno */}
