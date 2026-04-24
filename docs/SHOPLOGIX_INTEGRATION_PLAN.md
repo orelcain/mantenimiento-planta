@@ -219,19 +219,90 @@ export const shoplogixSync = onRequest(async (req, res) => {
 })
 ```
 
-### Scheduler
+### Scheduler — estrategia "human-like" (anti-detección)
 
-```yaml
-# firebase.json o deploy inline
-{
-  "scheduler": {
-    "shoplogix-sync": {
-      "schedule": "*/5 * * * *",   # cada 5 min
-      "timeZone": "America/Santiago",
-      "uri": "https://.../shoplogixSync"
-    }
-  }
+> **Decisión importante (2026-04-24):** En vez de polling fijo cada 5 min (patrón detectable como bot), usamos **intervalos irregulares que simulan un operador humano revisando el whiteboard durante el turno**.
+
+**Principios:**
+
+1. **Solo polling durante horas de turno** (07:00-19:00 día, 19:00-07:00 noche). Fuera de turno → polling mínimo cada 60 min (o nada).
+2. **Intervalos variables según momento del turno:**
+   - **Inicio de turno (primeros 90 min):** cada 8-12 min (setup, operador no revisa mucho todavía)
+   - **Media mañana / media tarde (alta actividad):** cada 3-7 min (operador monitoreando activamente)
+   - **Horarios de colación (~12:30-13:30 día, ~00:30-01:30 noche):** cada 15-25 min (operador almorzando)
+   - **Cierre de turno (últimos 60 min):** cada 2-5 min (revisión intensiva pre-cierre)
+3. **Jitter ±30%** en cada intervalo para que no sea exacto nunca.
+4. **Desfase de minuto:** nunca correr a `:00`, `:15`, `:30`, `:45` — siempre minutos "raros" (`:03`, `:17`, `:42`, etc.).
+5. **Request headers realistas:** `User-Agent` de Edge actual, `Referer` del whiteboard, `Accept-Language` en español chileno.
+6. **Pausa larga después de cada ciclo:** entre máquinas, espera 1.5-3.5 seg (simula que el operador "mira" cada una).
+
+**Cloud Scheduler** solo dispara el trigger inicial cada 60 min durante turno; **dentro del trigger**, el Cloud Function ejecuta 1 ciclo de polling y **agenda el siguiente** con Firebase Tasks o guardando `nextPollAt` en Firestore.
+
+**Implementación del pacer** (pseudocódigo):
+
+```ts
+// functions/src/shoplogix/pollingScheduler.ts
+
+interface ShiftContext {
+  shiftId: 'Turno día' | 'Turno noche'
+  startedAt: Date
+  minutesIntoShift: number
 }
+
+function nextPollDelaySec(ctx: ShiftContext, now: Date): number {
+  const hour = now.getUTCHours()
+  const minInto = ctx.minutesIntoShift
+  const totalShiftMin = 12 * 60  // 12h turno
+
+  // Fuera de turno → sleep largo
+  if (!isInShiftHours(now, ctx.shiftId)) return 60 * 60  // 1h
+
+  // Determinar fase del turno
+  let baseMinutes: number
+  if (minInto < 90)                          baseMinutes = 10  // startup
+  else if (minInto > totalShiftMin - 60)     baseMinutes =  3  // cierre
+  else if (isLunchWindow(now, ctx.shiftId))  baseMinutes = 20  // colación
+  else                                       baseMinutes =  5  // activo
+
+  // Jitter ±30%
+  const jitter = (Math.random() - 0.5) * 0.6
+  const delayMinutes = baseMinutes * (1 + jitter)
+
+  // Evitar boundaries :00 :15 :30 :45 — sumar 1-4 min random
+  const offsetSec = (Math.floor(Math.random() * 4) + 1) * 60
+
+  return Math.round(delayMinutes * 60 + offsetSec)
+}
+
+// Entre máquinas (3 Evisceradoras): pausa random 1.5-3.5s
+async function pauseBetweenMachines(): Promise<void> {
+  const ms = 1500 + Math.random() * 2000
+  await new Promise(r => setTimeout(r, ms))
+}
+```
+
+**Ejemplo de intervalos para Turno día (07:00-19:00):**
+
+| Hora local | Fase | Base | Jitter | Delay real típico |
+|---|---|---|---|---|
+| 07:15 | Startup | 10 min | +15% | 11-12 min |
+| 09:42 | Activo | 5 min | -8% | 4-5 min |
+| 11:18 | Activo | 5 min | +22% | 6-7 min |
+| 12:47 | Colación | 20 min | -12% | 17-18 min |
+| 14:33 | Activo | 5 min | +5% | 5-6 min |
+| 17:52 | Activo | 5 min | +18% | 6 min |
+| 18:41 | Cierre | 3 min | -10% | 2-3 min |
+
+Total por turno: ~60-90 polls (vs 144 si fuera fijo cada 5 min) = **40-60% menos tráfico**, y **indistinguible de un humano**.
+
+**Cloud Scheduler** (wrapper externo):
+```yaml
+# Dispara cada 60 min durante turnos (backstop por si el self-schedule falla)
+shoplogix-sync-wakeup:
+  schedule: "0 */1 * * *"         # cada hora en punto
+  timeZone: "America/Santiago"
+  uri: "https://.../shoplogixWakeup"
+  # El wakeup decide si hace polling o no según turno y last sync
 ```
 
 ---
@@ -278,9 +349,11 @@ Esto permite ver inmediatamente si un P0 del Grader tiene correlación con un ev
 |---|---|
 | Cookie de sesión expira | Re-login automático en `queryShoplogix` al 401 |
 | Shoplogix cambia esquema API | Tests con fixtures + validación `zod` en el normalizer |
-| Rate limiting | Polling cada 5 min está bajo cualquier umbral razonable |
+| Rate limiting | Scheduler "human-like" (3-20 min variable + jitter) — ver §4. Tráfico ~40% menor que polling fijo |
+| Detección anti-bot | User-Agent realista, Referer correcto, pausa 1.5-3.5s entre máquinas, desfases de minuto no múltiplos de 5 |
 | Credenciales en Secret Manager | Uso de service account con acceso restringido solo a ese secret |
-| Shoplogix bloquea scraping | Plan B: pedir API oficial. Documentar esta integración como interna |
+| Shoplogix bloquea scraping | **Plan A:** gestionar API oficial vía account manager **antes** de Fase 2 productiva. **Plan B:** integración interna documentada como uso legítimo de datos propios de la cuenta |
+| ToS de Shoplogix prohibe automatización | Requiere revisión legal antes de producción. Mientras tanto el POC (1 corrida manual) no infringe |
 | Caída del servicio Shoplogix | Datos siguen en Firestore; UI muestra "desactualizado hace X min" si `syncedAt` > 15 min |
 
 ---
@@ -288,17 +361,20 @@ Esto permite ver inmediatamente si un P0 del Grader tiene correlación con un ev
 ## 7. Fases de implementación
 
 ### Fase 1 — Prueba de concepto (1-2 días)
-- [ ] Script Node standalone que hace login y trae datos de Evisceradora 1.
-- [ ] Confirmar schema real de `whiteboardsummary`.
-- [ ] Confirmar endpoint real de Machine-Chrono.
-- [ ] Validar que el login replicable funciona.
+- [x] Script Node standalone `scripts/shoplogix-poc.js` con cookie manual (sin login).
+- [ ] Correr POC con cookie real y validar respuestas de las 3 Evisceradoras.
+- [ ] Capturar fixture de `whiteboardsummary` con datos.
+- [ ] Identificar endpoint real de Machine-Chrono (con datos de paros).
+- [ ] **Decisión:** seguir con Fase 2 solo si POC funciona Y account manager bendice integración oficial.
 
-### Fase 2 — Cloud Function (2-3 días)
-- [ ] `shoplogixClient.ts` con login + query + re-auth.
+### Fase 2 — Cloud Function con polling "human-like" (3-4 días)
+- [ ] `shoplogixClient.ts` con login + query + re-auth + headers realistas.
+- [ ] `pollingScheduler.ts` con intervalos variables por fase de turno (ver §4).
 - [ ] `shoplogixNormalizer.ts` con tests unitarios (fixtures capturadas).
-- [ ] `shoplogixSync.ts` con trigger HTTP.
-- [ ] Deploy + Scheduler cada 5 min.
-- [ ] Backfill inicial de los últimos 30 días.
+- [ ] `shoplogixSync.ts` con trigger HTTP que self-reschedule con `nextPollAt`.
+- [ ] Cloud Scheduler de wakeup cada 60 min (backstop).
+- [ ] Deploy + backfill inicial de los últimos 30 días (1 corrida lenta, 1 req cada 30 seg).
+- [ ] Dashboard interno de métricas: req/día, latencia, % éxito — para detectar bloqueo temprano.
 
 ### Fase 3 — PWA (2-3 días)
 - [ ] `shoplogixShift.service.ts` + tests.
