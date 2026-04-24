@@ -1641,7 +1641,10 @@ export function PlantaLeafletEditable() {
   const view = MAP_VIEWS[currentView]
 
   return (
-    <div className="relative w-full h-full">
+    // onWheel stopPropagation: el <main id="main-content"> del layout tiene
+    // overflow-y:auto y captura los eventos wheel antes que Leaflet. Al cortar
+    // la propagación aquí, el scroll wheel llega solo al mapa.
+    <div className="relative w-full h-full" onWheel={(e) => e.stopPropagation()}>
       {/* key={currentView} fuerza re-mount al cambiar vista (CRS, bounds, etc) */}
       <MapContainer
         key={currentView}
