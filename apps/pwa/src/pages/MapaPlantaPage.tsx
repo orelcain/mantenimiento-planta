@@ -384,7 +384,7 @@ export function MapaPlantaPage() {
             el pointer-events:none del padre NO bloquea al canvas hijo. Sin este
             selector arbitrario, el canvas 3D invisible intercepta TODOS los eventos
             del mapa 2D (zoom wheel, clicks, drag, Geoman, box-select, medir). */}
-        <div className={`absolute inset-0 transition-opacity duration-200 ${view3DMode ? 'opacity-100' : 'opacity-0 pointer-events-none [&_canvas]:!pointer-events-none'}`}>
+        <div className={`absolute inset-0 transition-opacity duration-200 ${view3DMode ? 'opacity-100' : 'opacity-0 pointer-events-none [&_*]:!pointer-events-none'}`}>
           <Wireframe3DView />
         </div>
       </main>
