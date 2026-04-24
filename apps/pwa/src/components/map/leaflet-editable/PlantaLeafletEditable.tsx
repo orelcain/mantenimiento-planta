@@ -18,8 +18,19 @@ import 'leaflet/dist/leaflet.css'
 import '@geoman-io/leaflet-geoman-free'
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css'
 import './geoman-dark.css'
-import { MAP_VIEWS, type DxfLayerConfig, type MapView } from '@/data/dxfLayers'
+import {
+  MAP_VIEWS,
+  type DxfLayerConfig,
+  type MapView,
+  DXF_INTERIOR_SVG_LAYERS,
+  DXF_SVG_BOUNDS,
+  type DxfSvgLayerConfig,
+} from '@/data/dxfLayers'
 import { useMapaLeafletStore, type ElementoMapa, type PolygonCoords } from '@/store/useMapaLeafletStore'
+
+// Timestamp del último box-select completado — usado para suprimir el click nativo
+// que Leaflet dispara inmediatamente después del mouseup final del drag.
+let _boxSelectEndedAt = 0
 
 // ─── Helpers de geometría ────────────────────────────────────────────────────
 /** Snap a grilla — usa unidad nativa de la vista. Para recinto = 0.5m, para
@@ -354,6 +365,16 @@ function angleTag(deg: number): string {
   return `${deg.toFixed(1)}°`
 }
 
+// ─── Tema blueprint: mismo estilo que Wireframe3DView ────────────────────────
+const BLUEPRINT_COLOR = '#c8d8f0'
+const BLUEPRINT_BG    = '#060e1a'
+const BLUEPRINT_ACCENT = '#fbbf24'  // Ámbar para elementos interactivos (markers equipos)
+
+/** Opacidad por grupo — jerarquía visual del blueprint */
+const BLUEPRINT_OPACITY_BY_GROUP: Record<string, number> = {
+  cerco: 1.0, estructura: 0.95, instalaciones: 0.7, detalle: 0.55, otros: 0.35,
+}
+
 // ─── Carga perezosa de cada GeoJSON DXF ──────────────────────────────────────
 function CapaDXF({ cfg, folder }: { cfg: DxfLayerConfig; folder: string }) {
   const [data, setData] = useState<GeoJSON.FeatureCollection | null>(null)
@@ -386,28 +407,113 @@ function CapaDXF({ cfg, folder }: { cfg: DxfLayerConfig; folder: string }) {
 
   if (!data || !visible) return null
 
+  // Estilo blueprint: color uniforme salvo capas interactivas (markers equipos)
+  const isInteractive = cfg.interactive ?? false
+  const color = isInteractive ? BLUEPRINT_ACCENT : BLUEPRINT_COLOR
+  const groupOpacity = BLUEPRINT_OPACITY_BY_GROUP[cfg.group] ?? 0.5
+  const finalOpacity = isInteractive ? 1 : groupOpacity
+
   return (
     <GeoJSON
       data={data as GeoJSON.GeoJsonObject}
       coordsToLatLng={(c) => L.latLng(c[1], c[0])}
       style={{
-        color: cfg.color,
+        color,
         weight: Math.max(0.4, cfg.weight * zoomFactor * 0.8),
-        opacity: cfg.opacity,
-        fillColor: cfg.color,
-        fillOpacity: 0.06,
+        opacity: finalOpacity,
+        fillColor: color,
+        fillOpacity: isInteractive ? 0.15 : 0.04,
         lineCap: 'round',
         lineJoin: 'round',
       }}
       pointToLayer={(_f, latlng) =>
         L.circleMarker(latlng, {
-          radius: Math.max(1.5, 2.5 * zoomFactor * 0.6),
-          color: cfg.color, fillOpacity: 0.7, weight: 1,
-        })
+          radius: Math.max(2, 3.5 * zoomFactor * 0.5),
+          color, fillColor: color,
+          fillOpacity: isInteractive ? 0.85 : 0.5,
+          weight: 1.5,
+          // Evita que Geoman agregue handles de edición a capas DXF de referencia
+          pmIgnore: true,
+        } as any)
       }
-      interactive={false}
+      onEachFeature={(feature, layer) => {
+        // Excluir todas las capas DXF del control de Geoman
+        ;(layer as any).pm?.disable?.()
+        if (isInteractive) {
+          const block = feature.properties?.block as string | undefined
+          if (block) layer.bindTooltip(block, { sticky: true, className: 'eqp-tooltip' })
+        }
+      }}
+      interactive={isInteractive}
     />
   )
+}
+
+// ─── Capa SVG fiel al DXF (overlay visual, NO editable) ─────────────────────
+/**
+ * CapaDXFSVG — renderiza un SVG generado desde el DXF con ezdxf drawing addon.
+ * • Se agrega como L.svgOverlay con pointer-events: none
+ * • Bounds fijos DXF_SVG_BOUNDS (coincide con el script de generación)
+ * • No interfiere con Geoman / selección / medir
+ */
+function CapaDXFSVG({ cfg }: { cfg: DxfSvgLayerConfig }) {
+  const map = useMap()
+  const visible = useMapaLeafletStore((s) => s.capasSvgVisibles[cfg.name] ?? cfg.defaultVisible)
+  const globalOpacity = useMapaLeafletStore((s) => s.capasSvgOpacity)
+  const currentView = useMapaLeafletStore((s) => s.currentView)
+  const overlayRef = useRef<L.SVGOverlay | null>(null)
+
+  useEffect(() => {
+    if (currentView !== 'interior' || !visible) {
+      if (overlayRef.current) { map.removeLayer(overlayRef.current); overlayRef.current = null }
+      return
+    }
+
+    let cancelled = false
+    fetch(`${import.meta.env.BASE_URL}maps/dxf-interior/svg/${cfg.name}.svg`)
+      .then((r) => (r.ok ? r.text() : null))
+      .then((text) => {
+        if (cancelled || !text) return
+        const parser = new DOMParser()
+        const doc = parser.parseFromString(text, 'image/svg+xml')
+        const svg = doc.querySelector('svg') as SVGElement | null
+        if (!svg) return
+
+        const finalOpacity = cfg.opacity * globalOpacity
+        svg.style.opacity = String(finalOpacity)
+        svg.style.pointerEvents = 'none'
+        svg.setAttribute('class', `dxf-svg-overlay dxf-svg-${cfg.name}`)
+
+        const overlay = L.svgOverlay(svg, DXF_SVG_BOUNDS, {
+          interactive: false,
+          opacity: 1,
+          className: 'dxf-svg-overlay-wrap',
+        })
+        overlay.addTo(map)
+        const elem = (overlay as unknown as { getElement: () => SVGElement }).getElement?.()
+        if (elem) {
+          elem.style.pointerEvents = 'none'
+          elem.style.zIndex = String(cfg.zIndex)
+        }
+        overlayRef.current = overlay
+      })
+      .catch(() => {})
+
+    return () => {
+      cancelled = true
+      if (overlayRef.current) { map.removeLayer(overlayRef.current); overlayRef.current = null }
+    }
+  }, [map, cfg.name, cfg.opacity, cfg.zIndex, visible, globalOpacity, currentView])
+
+  // Actualización de opacidad sin recrear el overlay
+  useEffect(() => {
+    const ov = overlayRef.current as (L.SVGOverlay & { getElement?: () => SVGElement | null }) | null
+    if (!ov?.getElement) return
+    const elem = ov.getElement()
+    if (elem) elem.style.opacity = String(cfg.opacity * globalOpacity)
+  }, [cfg.opacity, globalOpacity])
+
+  return null
 }
 
 // ─── Tooltip flotante con área mientras se dibuja ────────────────────────────
@@ -742,6 +848,8 @@ function CapaElementos({ view }: { view: MapView }) {
           ;(layer.options as any).elementoId = el.id
           layer.on('click', (ev: L.LeafletMouseEvent) => {
             L.DomEvent.stopPropagation(ev)
+            // Suprimir click nativo que Leaflet dispara tras el mouseup del box-select
+            if (Date.now() - _boxSelectEndedAt < 200) return
             // Ignorar clics en elementos fantasma (otro nivel)
             if (getNivelOpacity(el.nivelId, useMapaLeafletStore.getState().currentNivelId) < 1) return
             const oe = ev.originalEvent
@@ -1159,6 +1267,8 @@ function KeyboardShortcuts() {
 function FitDxfBounds({ view }: { view: MapView }) {
   const map = useMap()
   useEffect(() => {
+    // Exponer map globalmente para debug (DEV only)
+    if (import.meta.env.DEV) (window as any).__leafletMap__ = map
     // Pequeño delay para asegurar que el container ya tiene su tamaño final
     const t = setTimeout(() => {
       map.invalidateSize()
@@ -1169,6 +1279,24 @@ function FitDxfBounds({ view }: { view: MapView }) {
   return null
 }
 
+// Feedback visual de box-select: flasea el rectángulo + badge con el count
+function showBoxSelectFeedback(map: LMap, bounds: L.LatLngBounds, hits: number): void {
+  const color = hits > 0 ? '#22c55e' : '#ef4444'
+  const flash = L.rectangle(bounds, {
+    color, weight: 2, dashArray: '0',
+    fillColor: color, fillOpacity: 0.18, interactive: false,
+  }).addTo(map)
+  const center = bounds.getCenter()
+  const badge = L.tooltip({
+    permanent: true, direction: 'center', className: 'box-select-badge', interactive: false,
+  }).setLatLng(center).setContent(hits > 0 ? `✓ ${hits} seleccionado${hits !== 1 ? 's' : ''}` : '— sin elementos en el área')
+  badge.addTo(map)
+  setTimeout(() => {
+    try { map.removeLayer(flash) } catch { /* ok */ }
+    try { map.closeTooltip(badge as any) } catch { /* ok */ }
+  }, 900)
+}
+
 // ─── Box-select: shift+drag (desktop) o toggle + drag/touch (mobile) ─────────
 function BoxSelect({ view }: { view: MapView }) {
   const map = useMap()
@@ -1176,12 +1304,20 @@ function BoxSelect({ view }: { view: MapView }) {
   const boxSelectMode = useMapaLeafletStore((s) => s.boxSelectMode)
 
   useEffect(() => {
-    if (!map || !editMode) return
+    // Permite operar en boxSelectMode aunque editMode esté apagado
+    if (!map || (!editMode && !boxSelectMode)) return
 
-    // Deshabilitar boxZoom de Leaflet (shift+drag zoom nativo)
     if (map.boxZoom) map.boxZoom.disable()
 
     const container = map.getContainer()
+
+    // Cuando boxSelectMode está activo, deshabilitar map.dragging upfront para
+    // que Leaflet NO compita por los eventos. El cursor crosshair confirma el modo.
+    if (boxSelectMode) {
+      map.dragging.disable()
+      container.style.cursor = 'crosshair'
+    }
+
     let startLL: L.LatLng | null = null
     let startPt: { x: number; y: number } | null = null
     let rect: L.Rectangle | null = null
@@ -1194,14 +1330,19 @@ function BoxSelect({ view }: { view: MapView }) {
       return map.containerPointToLatLng(pt)
     }
 
-    const isClickableTarget = (t: EventTarget | null): boolean => {
+    const isControlTarget = (t: EventTarget | null): boolean => {
       const el = t as Element | null
-      if (!el || !el.closest) return false
+      if (!el?.closest) return false
+      return !!el.closest('.leaflet-popup, .leaflet-control')
+    }
+
+    const isInteractiveTarget = (t: EventTarget | null): boolean => {
+      const el = t as Element | null
+      if (!el?.closest) return false
       return !!el.closest('.leaflet-marker-icon, .leaflet-popup, .leaflet-interactive, .leaflet-control')
     }
 
     const beginDrag = (clientX: number, clientY: number) => {
-      map.dragging.disable()
       startPt = { x: clientX, y: clientY }
       startLL = getLL(clientX, clientY)
       dragActive = true
@@ -1225,7 +1366,6 @@ function BoxSelect({ view }: { view: MapView }) {
     }
 
     const endDrag = (clientX: number, clientY: number) => {
-      map.dragging.enable()
       const wasActive = dragActive && !!rect
       const start = startLL
       dragActive = false
@@ -1237,16 +1377,28 @@ function BoxSelect({ view }: { view: MapView }) {
       const endLL = getLL(clientX, clientY)
       const bounds = L.latLngBounds(start, endLL)
 
-      const { elementos, selectedId, multiSelection, setSelectedId } = useMapaLeafletStore.getState()
+      const { elementos, capasUsuario, selectedId, multiSelection, setSelectedId } = useMapaLeafletStore.getState()
       const toggle = useMapaLeafletStore.getState().toggleMultiSelect
+      // Índice de capas de usuario para filtrar invisibles en O(1)
+      const capasById = new Map(capasUsuario.map((c) => [c.id, c]))
       const hit: string[] = []
       for (const el of elementos) {
         if (el.mapView !== view.name) continue
+        // Solo seleccionar elementos en capas VISIBLES
+        const capaId = el.meta?.capaId
+        if (typeof capaId === 'string') {
+          const capa = capasById.get(capaId)
+          if (capa && !capa.visible) continue
+        }
         const coords = el.poligono ?? (el.punto ? [el.punto] : [])
         for (const c of coords) {
           if (bounds.contains(L.latLng(c[0], c[1]))) { hit.push(el.id); break }
         }
       }
+      // Feedback visual: mostrar resultado del drag (aunque sea 0)
+      showBoxSelectFeedback(map, bounds, hit.length)
+      // Marcar timestamp para suprimir el click nativo post-drag de Leaflet
+      if (hit.length > 0) _boxSelectEndedAt = Date.now()
       if (hit.length === 0) return
       const existing = new Set<string>([...(selectedId ? [selectedId] : []), ...multiSelection])
       if (existing.size === 0) {
@@ -1266,9 +1418,10 @@ function BoxSelect({ view }: { view: MapView }) {
     const onMouseDown = (ev: MouseEvent) => {
       const canBox = ev.shiftKey || boxSelectMode
       if (!canBox) return
-      if (isClickableTarget(ev.target)) return
+      if (boxSelectMode ? isControlTarget(ev.target) : isInteractiveTarget(ev.target)) return
+      // En modo shift: deshabilitar drag ahora (upfront solo aplica a boxSelectMode)
+      if (!boxSelectMode) map.dragging.disable()
       ev.preventDefault()
-      ev.stopPropagation()
       beginDrag(ev.clientX, ev.clientY)
       window.addEventListener('mousemove', onMouseMove, true)
       window.addEventListener('mouseup', onMouseUp, true)
@@ -1277,16 +1430,18 @@ function BoxSelect({ view }: { view: MapView }) {
     const onMouseUp = (ev: MouseEvent) => {
       window.removeEventListener('mousemove', onMouseMove, true)
       window.removeEventListener('mouseup', onMouseUp, true)
+      // Reactivar dragging si venía de shift (no boxSelectMode); en boxSelectMode sigue off
+      if (!boxSelectMode) map.dragging.enable()
       endDrag(ev.clientX, ev.clientY)
     }
 
-    // ── Touch (mobile) — solo si boxSelectMode esta activo ──────────────
+    // ── Touch (mobile) ─────────────────────────────────────────────────
     const onTouchStart = (ev: TouchEvent) => {
       if (!boxSelectMode) return
       if (ev.touches.length !== 1) return
       const t = ev.touches[0]
       if (!t) return
-      if (isClickableTarget(t.target)) return
+      if (isControlTarget(t.target)) return
       ev.preventDefault()
       touchId = t.identifier
       beginDrag(t.clientX, t.clientY)
@@ -1311,17 +1466,18 @@ function BoxSelect({ view }: { view: MapView }) {
       endDrag(t.clientX, t.clientY)
     }
 
-    container.addEventListener('mousedown', onMouseDown, true)
-    container.addEventListener('touchstart', onTouchStart, { capture: true, passive: false })
+    container.addEventListener('mousedown', onMouseDown)
+    container.addEventListener('touchstart', onTouchStart, { passive: false })
     return () => {
-      container.removeEventListener('mousedown', onMouseDown, true)
-      container.removeEventListener('touchstart', onTouchStart, true)
+      container.removeEventListener('mousedown', onMouseDown)
+      container.removeEventListener('touchstart', onTouchStart)
       window.removeEventListener('mousemove', onMouseMove, true)
       window.removeEventListener('mouseup', onMouseUp, true)
       window.removeEventListener('touchmove', onTouchMove, true)
       window.removeEventListener('touchend', onTouchEnd, true)
       window.removeEventListener('touchcancel', onTouchEnd, true)
       if (rect) { map.removeLayer(rect); rect = null }
+      container.style.cursor = ''
       map.dragging.enable()
       if (map.boxZoom) map.boxZoom.enable()
     }
@@ -1338,6 +1494,11 @@ function MapContents({ view }: { view: MapView }) {
 
       {view.layers.map((cfg) => (
         <CapaDXF key={cfg.name} cfg={cfg} folder={view.folder} />
+      ))}
+
+      {/* Capas SVG fieles al DXF (solo vista interior, overlay visual) */}
+      {view.name === 'interior' && DXF_INTERIOR_SVG_LAYERS.map((cfg) => (
+        <CapaDXFSVG key={`svg-${cfg.name}`} cfg={cfg} />
       ))}
 
       <GrillaLayer view={view} />
@@ -1488,10 +1649,16 @@ export function PlantaLeafletEditable() {
         minZoom={-20}
         maxZoom={20}
         zoomSnap={0.25}
+        zoomDelta={0.5}
+        wheelPxPerZoomLevel={120}
+        wheelDebounceTime={20}
+        scrollWheelZoom={true}
+        zoomAnimation={true}
+        zoomAnimationThreshold={6}
         zoomControl={false}
         crs={L.CRS.Simple}
         className="w-full h-full"
-        style={{ background: '#0a0e14' }}
+        style={{ background: BLUEPRINT_BG }}
       >
         <MapContents view={view} />
       </MapContainer>

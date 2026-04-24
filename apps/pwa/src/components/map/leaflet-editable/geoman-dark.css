@@ -151,6 +151,26 @@
   filter: brightness(1.6) drop-shadow(0 0 8px #f59e0b);
 }
 
+/* ─── Badge feedback tras box-select ───────────────────────────────── */
+.box-select-badge {
+  background: rgba(10, 14, 20, 0.95) !important;
+  color: #e2e8f0 !important;
+  border: 1px solid rgba(245, 158, 11, 0.6) !important;
+  padding: 6px 14px !important;
+  border-radius: 6px !important;
+  font-family: system-ui, sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6) !important;
+  pointer-events: none !important;
+  animation: box-select-badge-in 0.2s ease-out !important;
+}
+.box-select-badge::before { display: none !important; }
+@keyframes box-select-badge-in {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
 /* ─── Tooltip mientras se dibuja (área/longitud) ─────────────────── */
 .draw-area-tooltip {
   position: absolute;
@@ -206,4 +226,24 @@
   white-space: nowrap;
   pointer-events: none;
   box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+}
+
+/* ─── Overlay SVG fiel al DXF (capas visuales no interactivas) ──────────────
+   Las capas DXF renderizadas como SVG deben quedar "detrás" de la UI
+   interactiva y no capturar clicks para no interferir con Geoman ni selección.
+   ─────────────────────────────────────────────────────────────────────────── */
+.leaflet-overlay-pane svg.dxf-svg-overlay,
+.leaflet-overlay-pane svg.dxf-svg-overlay * {
+  pointer-events: none !important;
+}
+.leaflet-overlay-pane svg.dxf-svg-overlay {
+  mix-blend-mode: screen;  /* aditivo sobre fondo oscuro → tono blueprint */
+}
+/* Stroke no-escalable: el DXF SVG tiene viewBox 1M × 714K; sin esto las
+   líneas quedan a fracción de pixel y se ven invisibles. */
+.leaflet-overlay-pane svg.dxf-svg-overlay path {
+  vector-effect: non-scaling-stroke;
+  stroke-width: 1 !important;
+  stroke: #c8d8f0 !important;
+  fill: none !important;
 }

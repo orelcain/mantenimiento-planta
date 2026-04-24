@@ -10,7 +10,7 @@
  * Usa ECharts (consistente con GraderTimelineChart).
  */
 
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ReactECharts from 'echarts-for-react'
 import { Card, CardContent, CardHeader, CardTitle, Button } from '@/components/ui'
 import { Upload, Wrench, Clock, X, Download } from 'lucide-react'
@@ -76,6 +76,12 @@ interface ShiftTimelineViewProps {
   /** Umbrales para semáforo y líneas horizontales (defaults 2% / 3.5%) */
   alertThreshold?: number
   criticalThreshold?: number
+  /**
+   * Ref que el parent puede pasar para obtener una función que devuelve
+   * el data URL (PNG) del chart ECharts en el momento de llamarla.
+   * Útil para embeber el gráfico en el PDF de exportación (P2-1).
+   */
+  chartImageRef?: React.MutableRefObject<(() => string | null) | null>
 }
 
 /**
@@ -116,6 +122,7 @@ export function ShiftTimelineView({
   alertThreshold = 2,
   criticalThreshold = 3.5,
   isOnline = true,
+  chartImageRef,
 }: ShiftTimelineViewProps) {
   // ── Estado del diálogo de anotación (Fase 3) ──────────────────────────
   const canAnnotate = !!summaryId && !!adminUid
@@ -194,6 +201,18 @@ export function ShiftTimelineView({
   // ── Export PNG / CSV + selector de rango ─────────────────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const echartsRef = useRef<any>(null)
+
+  // Exponer función getDataURL al parent para incluir imagen en PDF (P2-1)
+  useEffect(() => {
+    if (!chartImageRef) return
+    chartImageRef.current = () => {
+      const instance = echartsRef.current?.getEchartsInstance()
+      if (!instance) return null
+      return instance.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#111827' }) as string
+    }
+    return () => { chartImageRef.current = null }
+  }, [chartImageRef])
+
   const [activeZoom, setActiveZoom] = useState<'10min' | '1h' | 'turno'>('turno')
   const [zoomState, setZoomState] = useState({ start: 0, end: 100 })
 

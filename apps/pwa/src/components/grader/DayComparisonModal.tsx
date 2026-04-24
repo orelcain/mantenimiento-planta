@@ -286,6 +286,87 @@ export function DayComparisonModal({ open, onClose, summaries, dateKey }: DayCom
               }
             />
           )}
+
+          {/* Calibre dominante */}
+          {(dia.calibreDistribution?.length || noche.calibreDistribution?.length) ? (
+            <KpiRow
+              label="Calibre dom."
+              dayValue={
+                <span className="text-xs font-medium">
+                  {dia.calibreDistribution?.[0]
+                    ? `${dia.calibreDistribution[0].calibre} (${dia.calibreDistribution[0].pct.toFixed(0)}%)`
+                    : '—'}
+                </span>
+              }
+              nightValue={
+                <span className="text-xs font-medium">
+                  {noche.calibreDistribution?.[0]
+                    ? `${noche.calibreDistribution[0].calibre} (${noche.calibreDistribution[0].pct.toFixed(0)}%)`
+                    : '—'}
+                </span>
+              }
+            />
+          ) : null}
+
+          {/* Calidad dominante */}
+          {(dia.qualityDistribution?.length || noche.qualityDistribution?.length) ? (
+            <KpiRow
+              label="Calidad dom."
+              dayValue={
+                <span className="text-xs font-medium">
+                  {dia.qualityDistribution?.[0]
+                    ? `${dia.qualityDistribution[0].quality} (${dia.qualityDistribution[0].pct.toFixed(0)}%)`
+                    : '—'}
+                </span>
+              }
+              nightValue={
+                <span className="text-xs font-medium">
+                  {noche.qualityDistribution?.[0]
+                    ? `${noche.qualityDistribution[0].quality} (${noche.qualityDistribution[0].pct.toFixed(0)}%)`
+                    : '—'}
+                </span>
+              }
+            />
+          ) : null}
+
+          {/* Lotes procesados */}
+          {(dia.lotsInShift != null || noche.lotsInShift != null) && (() => {
+            const diaLots   = dia.lotsInShift?.length ?? 0
+            const nocheLots = noche.lotsInShift?.length ?? 0
+            const lotsTrend = trend(diaLots, nocheLots, false)
+            return (
+              <KpiRow
+                label="Lotes"
+                dayTrend={lotsTrend.day}
+                nightTrend={lotsTrend.night}
+                dayValue={<span className="text-xs font-semibold tabular-nums">{diaLots || '—'}</span>}
+                nightValue={<span className="text-xs font-semibold tabular-nums">{nocheLots || '—'}</span>}
+              />
+            )
+          })()}
+
+          {/* Top causa P0 */}
+          {(dia.topP0Causes?.length || noche.topP0Causes?.length) ? (() => {
+            const diaTop   = dia.topP0Causes?.[0]
+            const nocheTop = noche.topP0Causes?.[0]
+            const fmtCause = (e: { error: string; pct: number } | undefined) => {
+              if (!e) return <span className="text-muted-foreground/50">—</span>
+              const label = MATRIX_P0_CAUSES[parseMatrixErrorString(e.error)]?.label ?? e.error
+              return (
+                <span className="text-[10px] font-medium leading-tight" title={label}>
+                  {label.length > 16 ? label.slice(0, 15) + '…' : label}
+                  <span className="text-muted-foreground ml-0.5">({e.pct.toFixed(0)}%)</span>
+                </span>
+              )
+            }
+            return (
+              <KpiRow
+                label="Top causa P0"
+                dayValue={fmtCause(diaTop)}
+                nightValue={fmtCause(nocheTop)}
+              />
+            )
+          })() : null}
         </div>
 
         {/* ── Top causas P0 ── */}

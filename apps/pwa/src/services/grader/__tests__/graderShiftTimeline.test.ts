@@ -136,4 +136,59 @@ describe('buildShiftTimeline', () => {
       }
     }
   })
+
+  it('incluye checkpoint de tipo "action" cuando se proveen actions', () => {
+    const result = buildShiftTimeline({
+      dateKey: '2026-04-17',
+      shiftId: 'Turno día',
+      uploads: [],
+      actions: [{ at: '2026-04-17T09:00:00.000Z', by: 'supervisor', action: { field: 'gate', before: 1, after: 2 } }],
+      pieceRecords: pieces,
+      gate0Records: g0,
+      shiftWindow: WINDOW,
+    })
+    const action = result.checkpoints.find(c => c.kind === 'action')
+    expect(action).toBeDefined()
+    expect(action?.by).toBe('supervisor')
+  })
+
+  it('globalAnalysis.p0Pct es correcto cuando todos los registros son P0', () => {
+    const onlyP0: PieceRecord[] = [mkPiece('2026-04-17T08:00:00.000Z', 0, 100)]
+    const g0All: Gate0Record[] = [mkG0('2026-04-17T08:00:00.000Z', 'Fuera de límites', 100)]
+    const result = buildShiftTimeline({
+      dateKey: '2026-04-17',
+      shiftId: 'Turno día',
+      uploads: [],
+      actions: [],
+      pieceRecords: onlyP0,
+      gate0Records: g0All,
+      shiftWindow: WINDOW,
+    })
+    expect(result.globalAnalysis.p0Pct).toBe(100)
+  })
+
+  it('globalAnalysis queda vacío cuando no hay registros de piezas', () => {
+    const result = buildShiftTimeline({
+      dateKey: '2026-04-17',
+      shiftId: 'Turno día',
+      uploads: [],
+      actions: [],
+      pieceRecords: [],
+      gate0Records: [],
+      shiftWindow: WINDOW,
+    })
+    expect(result.globalAnalysis.totalPieces).toBe(0)
+    expect(result.globalAnalysis.p0Pct).toBe(0)
+  })
+
+  it('p0Pct del segmento es 0 cuando no hay gate0Records', () => {
+    const result = analyzeSegment(
+      [mkPiece('2026-04-17T08:00:00.000Z', 1, 500)],
+      [],
+      '2026-04-17T07:00:00.000Z',
+      '2026-04-17T19:00:00.000Z',
+    )
+    expect(result.p0Pct).toBe(0)
+    expect(result.topCauses).toHaveLength(0)
+  })
 })

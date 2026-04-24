@@ -13,7 +13,7 @@
  * pero representan hora local de la planta (no UTC real). Para mostrar y editar
  * siempre usamos getUTCHours/Minutes — igual que `fmtTime` en ShiftTimelineView.
  */
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -26,7 +26,7 @@ import {
   Label,
 } from '@/components/ui'
 import { cn } from '@/lib/utils'
-import { Loader2, Clock, History, ChevronDown } from 'lucide-react'
+import { Loader2, Clock, History, ChevronDown, Download } from 'lucide-react'
 import type { Pause, PauseHistoryEntry } from '@/services/grader/types'
 import { updatePauseAnnotation, updatePauseRange, loadPauseHistory } from '@/services/grader/graderDailySummary.service'
 import { usePauseTags } from '@/hooks/usePauseTags'
@@ -83,20 +83,21 @@ const ACTION_LABEL: Record<PauseHistoryEntry['action'], string> = {
 }
 
 /** Fila del historial de cambios de una pausa. */
-function HistoryRow({ entry }: { entry: PauseHistoryEntry }) {
+function HistoryRow({ entry, tagLabels }: { entry: PauseHistoryEntry; tagLabels: Map<string, string> }) {
+  const resolveTag = (id: string | undefined) => (id ? (tagLabels.get(id) ?? id) : '–')
   const label = ACTION_LABEL[entry.action]
   const detail = (() => {
     if (entry.action === 'tag') {
       const parts: string[] = []
       if (entry.diff.tag) {
-        const old = entry.diff.tag.old ? `«${entry.diff.tag.old}»` : '–'
-        parts.push(`${old} → «${entry.diff.tag.new ?? '–'}»`)
+        const old = entry.diff.tag.old ? `«${resolveTag(entry.diff.tag.old)}»` : '–'
+        parts.push(`${old} → «${resolveTag(entry.diff.tag.new)}»`)
       }
       if (entry.diff.note?.new) parts.push(`nota: "${entry.diff.note.new}"`)
       return parts.join(', ')
     }
     if (entry.action === 'clear_tag') {
-      return entry.diff.tag?.old ? `«${entry.diff.tag.old}» eliminado` : 'tag eliminado'
+      return entry.diff.tag?.old ? `«${resolveTag(entry.diff.tag.old)}» eliminado` : 'tag eliminado'
     }
     if (entry.action === 'range') {
       const s = entry.diff.startAt ? `${fmtHHMM(entry.diff.startAt.old)} → ${fmtHHMM(entry.diff.startAt.new)}` : ''
@@ -118,6 +119,49 @@ function HistoryRow({ entry }: { entry: PauseHistoryEntry }) {
   )
 }
 
+function buildDetailText(entry: PauseHistoryEntry, tagLabels: Map<string, string>): string {
+  const resolveTag = (id: string | undefined) => (id ? (tagLabels.get(id) ?? id) : '–')
+  if (entry.action === 'tag') {
+    const parts: string[] = []
+    if (entry.diff.tag) {
+      const old = entry.diff.tag.old ? `«${resolveTag(entry.diff.tag.old)}»` : '–'
+      parts.push(`${old} → «${resolveTag(entry.diff.tag.new)}»`)
+    }
+    if (entry.diff.note?.new) parts.push(`nota: "${entry.diff.note.new}"`)
+    return parts.join(', ')
+  }
+  if (entry.action === 'clear_tag') {
+    return entry.diff.tag?.old ? `«${resolveTag(entry.diff.tag.old)}» eliminado` : 'tag eliminado'
+  }
+  if (entry.action === 'range') {
+    const s = entry.diff.startAt ? `${fmtHHMM(entry.diff.startAt.old)} → ${fmtHHMM(entry.diff.startAt.new)}` : ''
+    const e = entry.diff.endAt ? `${fmtHHMM(entry.diff.endAt.old)} → ${fmtHHMM(entry.diff.endAt.new)}` : ''
+    return [s, e].filter(Boolean).join(' | fin: ')
+  }
+  return ''
+}
+
+function exportHistoryAsCSV(entries: PauseHistoryEntry[], pauseId: string, tagLabels: Map<string, string>): void {
+  const escape = (v: string) => `"${v.replace(/"/g, '""')}"`
+  const header = ['Fecha', 'Acción', 'Detalle', 'Admin'].map(escape).join(',')
+  const rows = entries.map((e) =>
+    [
+      e.changedAt,
+      ACTION_LABEL[e.action] ?? e.action,
+      buildDetailText(e, tagLabels),
+      e.changedBy,
+    ].map(escape).join(','),
+  )
+  const csv = [header, ...rows].join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `historial-pausa_${pauseId}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export function PauseAnnotationDialog({
   open,
   onOpenChange,
@@ -128,6 +172,10 @@ export function PauseAnnotationDialog({
   isOnline = true,
 }: PauseAnnotationDialogProps) {
   const { tags } = usePauseTags()
+  const tagLabels = useMemo(
+    () => new Map(tags.map((t) => [t.id, `${t.emoji} ${t.label}`])),
+    [tags],
+  )
 
   // — Tag / nota —
   const [selectedTagId, setSelectedTagId] = useState<string | null>(null)
@@ -446,15 +494,27 @@ export function PauseAnnotationDialog({
 
           {/* ── M13: Historial de cambios ── */}
           <div className="border border-border/40 rounded-md overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setHistoryOpen((v) => !v)}
-              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-muted/30 transition-colors"
-            >
-              <History className="w-3.5 h-3.5" />
-              <span className="flex-1 text-left">Historial de cambios</span>
-              <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', historyOpen && 'rotate-180')} />
-            </button>
+            <div className="flex items-center">
+              <button
+                type="button"
+                onClick={() => setHistoryOpen((v) => !v)}
+                className="flex-1 flex items-center gap-2 px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-muted/30 transition-colors"
+              >
+                <History className="w-3.5 h-3.5" />
+                <span className="flex-1 text-left">Historial de cambios</span>
+                <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', historyOpen && 'rotate-180')} />
+              </button>
+              {historyEntries.length > 0 && (
+                <button
+                  type="button"
+                  title="Exportar historial como CSV"
+                  onClick={() => exportHistoryAsCSV(historyEntries, pause?.id ?? 'pausa', tagLabels)}
+                  className="px-2 py-2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
             {historyOpen && (
               <div className="border-t border-border/40 px-3 py-2 space-y-2 max-h-48 overflow-y-auto">
                 {historyLoading ? (
@@ -466,7 +526,7 @@ export function PauseAnnotationDialog({
                   <p className="text-xs text-muted-foreground py-1">Sin cambios registrados aún.</p>
                 ) : (
                   historyEntries.map((entry, idx) => (
-                    <HistoryRow key={idx} entry={entry} />
+                    <HistoryRow key={idx} entry={entry} tagLabels={tagLabels} />
                   ))
                 )}
               </div>

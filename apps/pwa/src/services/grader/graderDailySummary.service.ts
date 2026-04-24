@@ -30,6 +30,7 @@ import {
   getCountFromServer,
   onSnapshot,
   addDoc,
+  limitToLast,
 } from 'firebase/firestore'
 import { db } from '../firebase'
 import type { GraderDailySummary, TimelineBucket, Pause, MicroDetentionsSummary, PauseHistoryEntry } from './types'
@@ -730,8 +731,8 @@ async function appendPauseHistory(
 
 /**
  * Carga el historial de cambios de una pausa específica dentro de un turno.
- * Filtra por `pauseId` en cliente para evitar índice compuesto en Firestore.
- * Ordena por `changedAt` ascendente (más antiguo primero).
+ * Filtra server-side por pauseId (índice compuesto pauseId ASC + changedAt ASC).
+ * Limita a los últimos 50 cambios para evitar lecturas excesivas en pausas muy editadas.
  */
 export async function loadPauseHistory(
   summaryId: string,
@@ -739,12 +740,12 @@ export async function loadPauseHistory(
 ): Promise<PauseHistoryEntry[]> {
   const q = query(
     collection(db, COLLECTION, summaryId, PAUSE_HISTORY_SUB),
+    where('pauseId', '==', pauseId),
     orderBy('changedAt', 'asc'),
+    limitToLast(50),
   )
   const snap = await getDocs(q)
-  return snap.docs
-    .map((d) => d.data() as PauseHistoryEntry)
-    .filter((e) => e.pauseId === pauseId)
+  return snap.docs.map((d) => d.data() as PauseHistoryEntry)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

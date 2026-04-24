@@ -72,8 +72,12 @@ interface MapaLeafletState {
   editMode: boolean
   /** Modo seleccion por recuadro activo (para touch/mobile sin shift) */
   boxSelectMode: boolean
-  /** Visibilidad de capas DXF, independiente por vista */
+  /** Visibilidad de capas DXF (GeoJSON), independiente por vista */
   capasVisibles: Record<ViewName, Record<string, boolean>>
+  /** Visibilidad de capas SVG fieles al DXF (solo vista interior) */
+  capasSvgVisibles: Record<string, boolean>
+  /** Opacidad global de las capas SVG DXF (0-1) */
+  capasSvgOpacity: number
   /** Capas de usuario (agrupaciones con visibilidad/orden propios) */
   capasUsuario: CapaUsuario[]
   /** Niveles/pisos definidos por el usuario */
@@ -108,6 +112,8 @@ interface MapaLeafletState {
   toggleBoxSelectMode: () => void
   setCapaVisible: (name: string, visible: boolean) => void
   setAllCapas: (visible: boolean) => void
+  setCapaSvgVisible: (name: string, visible: boolean) => void
+  setCapasSvgOpacity: (o: number) => void
 
   addElemento: (e: Omit<ElementoMapa, 'id' | 'createdAt' | 'updatedAt'>) => string
   addElementosBulk: (items: Omit<ElementoMapa, 'id' | 'createdAt' | 'updatedAt'>[]) => void
@@ -135,6 +141,10 @@ interface MapaLeafletState {
   deleteNivel: (id: string) => void
   setCurrentNivel: (id: string | null) => void
 
+  /** Vista 3D wireframe activa (true = 3D, false = 2D Leaflet) */
+  view3DMode: boolean
+  toggleView3DMode: () => void
+
   toggleMeasureMode: () => void
   addMeasureSegment: (dist: number) => void
   setMeasurePointCount: (n: number) => void
@@ -157,6 +167,8 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
       editMode: false,
       boxSelectMode: false,
       capasVisibles: { recinto: {}, interior: {} } as Record<ViewName, Record<string, boolean>>,
+      capasSvgVisibles: {} as Record<string, boolean>,
+      capasSvgOpacity: 0.9,
       capasUsuario: [],
       niveles: [],
       currentNivelId: null,
@@ -164,6 +176,9 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
       grillaAngles: { recinto: 0, interior: 0 } as Record<string, number>,
       toggleGrilla:   () => set((s) => ({ grillaVisible: !s.grillaVisible })),
       setGrillaAngle: (view, a) => set((s) => ({ grillaAngles: { ...s.grillaAngles, [view]: a } })),
+
+      view3DMode: false,
+      toggleView3DMode: () => set((s) => ({ view3DMode: !s.view3DMode })),
 
       measureMode: false,
       measureSegments: [],
@@ -232,6 +247,12 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
           for (const k of Object.keys(current)) next[k] = visible
           return { capasVisibles: { ...s.capasVisibles, [v]: next } }
         }),
+
+      setCapaSvgVisible: (name, visible) =>
+        set((s) => ({ capasSvgVisibles: { ...s.capasSvgVisibles, [name]: visible } })),
+
+      setCapasSvgOpacity: (o) =>
+        set(() => ({ capasSvgOpacity: Math.max(0, Math.min(1, o)) })),
 
       addElemento: (data) => {
         const id = makeId()
@@ -474,6 +495,8 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
       partialize: (s) => ({
         elementos: s.elementos,
         capasVisibles: s.capasVisibles,
+        capasSvgVisibles: s.capasSvgVisibles,
+        capasSvgOpacity: s.capasSvgOpacity,
         capasUsuario: s.capasUsuario,
         niveles: s.niveles,
         currentNivelId: s.currentNivelId,

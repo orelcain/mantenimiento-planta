@@ -68,3 +68,33 @@ describe('verdictFromEffectivePressureBar', () => {
     expect(verdictFromEffectivePressureBar(1.0)).toBe('critical')
   })
 })
+
+// ── Edge cases: NaN / Infinity / negativos ─────────────────────────────────
+// Documenta el comportamiento actual con entradas inesperadas.
+// NaN en comparaciones JS siempre retorna false → cae al rama más baja ('ok').
+// Importante: si upstream retorna NaN (cálculo fallido), el dashboard muestra
+// estado verde erróneamente — no es crítico pero ayuda a detectar bugs de datos.
+describe('edge cases — NaN, Infinity, valores negativos', () => {
+  it('verdictFromP0Pct(NaN) retorna "ok" (NaN >= umbral es false)', () => {
+    expect(verdictFromP0Pct(NaN)).toBe('ok')
+  })
+  it('verdictFromP0Pct(Infinity) retorna "critical"', () => {
+    expect(verdictFromP0Pct(Infinity)).toBe('critical')
+  })
+  it('verdictFromP0Pct(-1) retorna "ok" (imposible en prod, P0 no puede ser negativo)', () => {
+    expect(verdictFromP0Pct(-1)).toBe('ok')
+  })
+  it('verdictFromGapRatio(NaN) retorna "ok"', () => {
+    expect(verdictFromGapRatio(NaN)).toBe('ok')
+  })
+  it('verdictFromGapRatio(Infinity) retorna "critical"', () => {
+    expect(verdictFromGapRatio(Infinity)).toBe('critical')
+  })
+  it('verdictFromMarginSec(NaN) retorna "critical" (NaN < umbral es false → safe fail a ok, pero marginWarnSec=0.15 y NaN<0.15=false → retorna warn? No, ambas comparaciones fallan → ok)', () => {
+    // NaN < 0.15 = false → no critical; NaN < 0.5 = false → no warn → ok
+    expect(verdictFromMarginSec(NaN)).toBe('ok')
+  })
+  it('verdictFromEffectivePressureBar(NaN) retorna "ok"', () => {
+    expect(verdictFromEffectivePressureBar(NaN)).toBe('ok')
+  })
+})

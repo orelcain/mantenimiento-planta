@@ -313,3 +313,77 @@ describe('collectSortedTimestamps', () => {
     expect(collectSortedTimestamps([], [])).toHaveLength(0)
   })
 })
+
+// ── M16 — PauseDetectorConfig override ───────────────────────────────────────
+
+describe('detectPauses — cfg override (M16)', () => {
+  it('cfg.microMaxSec eleva el umbral micro → gaps antes en tier pausa', () => {
+    // Sin cfg: gap 200s → micro (microMax default = 300s). Con cfg microMaxSec=100 → pausa
+    const [s, e] = mkGap(mkTs(DAY, 9, 0), 200)
+    const r = detectPauses([s, e], 'Turno día', [], { microMaxSec: 100 })
+    expect(r.pauses).toHaveLength(1)
+    expect(r.pauses[0]!.tier).toBe('pausa')
+    expect(r.microDetentions.count).toBe(0)
+  })
+
+  it('cfg.microMaxSec más alto convierte pausas normales en micro', () => {
+    // Gap 350s — default: pausa. Con cfg microMaxSec=400 → micro
+    const [s, e] = mkGap(mkTs(DAY, 9, 0), 350)
+    const r = detectPauses([s, e], 'Turno día', [], { microMaxSec: 400 })
+    expect(r.pauses).toHaveLength(0)
+    expect(r.microDetentions.count).toBe(1)
+  })
+
+  it('cfg.pausaMaxSec desplaza el límite pausa/larga', () => {
+    // Gap 600s — default: pausa (<1800s). Con cfg pausaMaxSec=300 → larga
+    const [s, e] = mkGap(mkTs(DAY, 9, 0), 600)
+    const r = detectPauses([s, e], 'Turno día', [], { pausaMaxSec: 300 })
+    expect(r.pauses[0]!.tier).toBe('larga')
+  })
+
+  it('cfg.largaMaxSec desplaza el límite larga/parada', () => {
+    // Gap 2000s — default: larga (1800-3600). Con cfg largaMaxSec=1500 → parada
+    const [s, e] = mkGap(mkTs(DAY, 9, 0), 2000)
+    const r = detectPauses([s, e], 'Turno día', [], { largaMaxSec: 1500 })
+    expect(r.pauses[0]!.tier).toBe('parada')
+  })
+
+  it('cfg.colacionMinMin/colacionMaxMin estrecha la ventana de duración', () => {
+    // Gap 50 min en ventana 12:30-14:30 — default: colación (45-90 min). Con cfg min=60 → sin autoTag
+    const s = mkTs(DAY, 13, 0)
+    const [, e] = mkGap(s, 50 * 60)
+    const r = detectPauses([s, e], 'Turno día', [], { colacionMinMin: 60, colacionMaxMin: 90 })
+    expect(r.pauses[0]!.autoTag).toBeUndefined()
+  })
+
+  it('cfg.colacionWindowDia sobreescribe la ventana de colación para turno día', () => {
+    // Ventana custom 10:00-12:00; gap 60 min en 10:30 → autoTag colacion
+    const s = mkTs(DAY, 10, 30)
+    const [, e] = mkGap(s, 60 * 60)
+    const r = detectPauses([s, e], 'Turno día', [], {
+      colacionWindowDia: { start: 10 * 60, end: 12 * 60 },
+    })
+    expect(r.pauses[0]!.autoTag).toBe('colacion')
+  })
+
+  it('cfg.colacionWindowDia custom NO activa colación en la ventana default 12:30-14:30', () => {
+    // Sin el override la ventana default habría detectado colación a las 13:00
+    const s = mkTs(DAY, 13, 0)
+    const [, e] = mkGap(s, 60 * 60)
+    const r = detectPauses([s, e], 'Turno día', [], {
+      colacionWindowDia: { start: 10 * 60, end: 12 * 60 },
+    })
+    // 13:00 queda fuera de la ventana custom (10:00-12:00) → sin autoTag
+    expect(r.pauses[0]!.autoTag).toBeUndefined()
+  })
+
+  it('cfg.colacionWindowNoche sobreescribe la ventana de colación para turno noche', () => {
+    // Ventana custom noche 22:00-00:00 (1320-0); gap 60 min en 22:30
+    const s = mkTs(DAY, 22, 30)
+    const [, e] = mkGap(s, 60 * 60)
+    const r = detectPauses([s, e], 'Turno noche', [], {
+      colacionWindowNoche: { start: 22 * 60, end: 24 * 60 },
+    })
+    expect(r.pauses[0]!.autoTag).toBe('colacion')
+  })
+})
