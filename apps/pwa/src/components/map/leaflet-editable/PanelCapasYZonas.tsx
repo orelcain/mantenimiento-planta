@@ -214,8 +214,11 @@ export function PanelCapasYZonas() {
   )
 
 
-  // Capas de la vista actual
-  const viewLayers = MAP_VIEWS[currentView].layers
+  // Capas de la vista actual (excluye las eliminadas permanentemente)
+  const _eliminadasGeoJson = capasGeoJsonEliminadas?.[currentView] ?? []
+  const viewLayers = MAP_VIEWS[currentView].layers.filter(
+    (l) => !_eliminadasGeoJson.includes(l.name)
+  )
 
   const [tab, setTab]               = useState<'capas' | 'zonas'>('zonas')
   const [filtro, setFiltro]         = useState('')
@@ -543,15 +546,13 @@ export function PanelCapasYZonas() {
                     </button>
                   </div>
                   {Array.from(grupos.entries()).map(([gKey, capas]) => {
-                    const eliminadasVista = capasGeoJsonEliminadas[currentView] ?? []
-                    const capasVisibles2 = capas.filter((c) => !eliminadasVista.includes(c.name))
-                    if (!capasVisibles2.length) return null
+                    if (!capas.length) return null
                     return (
                     <div key={gKey} className="mb-2">
                       <div className="text-[9px] uppercase tracking-wider text-gray-500 px-1 mb-0.5 font-semibold">
                         {GROUP_LABEL[gKey as DxfLayerConfig['group']]}
                       </div>
-                      {capasVisibles2.map((c) => {
+                      {capas.map((c) => {
                         const visible = capasVisibles[currentView]?.[c.name] ?? c.defaultVisible
                         const isAbsorbing = absorbing[c.name] ?? false
                         const isAbsorbed = absorbedLayers.has(c.name)

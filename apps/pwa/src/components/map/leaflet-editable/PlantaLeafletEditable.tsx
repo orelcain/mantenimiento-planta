@@ -378,7 +378,8 @@ const BLUEPRINT_OPACITY_BY_GROUP: Record<string, number> = {
 // ─── Carga perezosa de cada GeoJSON DXF ──────────────────────────────────────
 function CapaDXF({ cfg, folder }: { cfg: DxfLayerConfig; folder: string }) {
   const [data, setData] = useState<GeoJSON.FeatureCollection | null>(null)
-  const visible = useMapaLeafletStore((s) => s.capasVisibles[s.currentView]?.[cfg.name] ?? cfg.defaultVisible)
+  const visible    = useMapaLeafletStore((s) => s.capasVisibles[s.currentView]?.[cfg.name] ?? cfg.defaultVisible)
+  const eliminada  = useMapaLeafletStore((s) => (s.capasGeoJsonEliminadas?.[s.currentView] ?? []).includes(cfg.name))
   const map = useMap()
   const [zoomFactor, setZoomFactor] = useState(1)
 
@@ -405,7 +406,7 @@ function CapaDXF({ cfg, folder }: { cfg: DxfLayerConfig; folder: string }) {
     return () => { map.off('zoomend', update) }
   }, [map])
 
-  if (!data || !visible) return null
+  if (!data || !visible || eliminada) return null
 
   // Estilo blueprint: color uniforme salvo capas interactivas (markers equipos)
   const isInteractive = cfg.interactive ?? false
