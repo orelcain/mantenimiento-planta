@@ -773,6 +773,35 @@ Con Haversine A→D = dimensión real del recinto en metros. El DWG ya tiene cot
 
 ## Pendientes priorizados
 
+### PENDIENTE — Shoplogix Integration (sesión 2026-04-24) — Fase 3 iter 3+4 y pixel-align
+
+**Módulo:** integración Shoplogix con módulo Análisis Grader — data real de 3 Baader 142 upstream (Evisceradoras 1/2/3, Planta Chonchi)
+
+**Estado al cierre:**
+- ✅ Fase 1 POC + Fase 2a UI completa + Fase 2b Cloud Functions desplegadas
+- ✅ Data real en Firestore: 4 turnos sincronizados (Feb 25 día/noche, Feb 26 día, Feb 27 día)
+- ✅ Fase 3 iter 1: ticks horarios + shiftWindow align + alerta microparadas anómalas
+- ✅ Fase 3 iter 2: correlación automática Grader↔Baader con hipótesis humana + 13 tests
+- ✅ Docs: SHOPLOGIX_API.md, SHOPLOGIX_INTEGRATION_PLAN.md, SHOPLOGIX_DEPLOY.md, SHOPLOGIX_IDEAS.md (20+ mejoras)
+- Rama: `feat/shoplogix-integration-docs` (merge a main pendiente tras validación)
+
+**P0 próxima sesión — Pixel-align chart Grader↔Baaders:**
+- 🔲 **Alineación pixel-perfect**: extraer grid.left/grid.right del ECharts del Grader y aplicar mismo padding al UpstreamMachinesPanel. Una línea vertical debe cruzar ambos charts en el mismo pixel.
+- 🔲 **Marcadores Baader sobre timeline Grader** — franja en sub-fila del chart Grader
+- 🔲 **Mejoras visuales Baader Gantt** (altura, separación, colores brand-consistent)
+
+**P1 Shoplogix:**
+- 🔲 Fase 3 iter 3: scatter P0% Grader vs ritmo Baader
+- 🔲 Fase 3 iter 4: export PDF con sección upstream
+- 🔲 Fase 2b.1: login automatizado (hoy cookie manual dura ~8h)
+- 🔲 Fase 4: integrar Marel HG, Knuro, plantas hermanas
+
+**Deuda técnica conocida:**
+- TZ display: ticks muestran UTC ("10:00") pero operador chileno espera local ("07:00")
+- `actualRuntime 11.2%` Feb 26 — investigar qué registra Shoplogix como "Planned Downtime"
+
+---
+
 ### PENDIENTE — Visor Mapas 4 (sesión 2026-04-24) — Konva DXF editor
 
 **Módulo:** `/mantenimiento-planta/map` — **importación DXF migró de Leaflet a Konva.js**
