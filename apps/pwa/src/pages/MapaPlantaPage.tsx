@@ -8,7 +8,7 @@
  * Editor: zonas, equipos y formas custom (Geoman). Persistencia local.
  */
 
-import { Map as MapIcon, Building2, Globe2, Ruler, LayoutGrid, BoxSelect, Layers, Plus, Trash2, ChevronDown, Box } from 'lucide-react'
+import { Map as MapIcon, Building2, Globe2, Ruler, LayoutGrid, BoxSelect, Layers, Plus, Trash2, ChevronDown, Box, X } from 'lucide-react'
 import { useRef, useState, useEffect, useMemo } from 'react'
 import { PlantaLeafletEditable, PanelCapasYZonas } from '@/components/map/leaflet-editable'
 import { Wireframe3DView } from '@/components/map/wireframe3d'
@@ -197,6 +197,64 @@ function NivelSelector({ view }: { view: ViewName }) {
   )
 }
 
+/** Barra flotante que aparece cuando hay 1+ elementos seleccionados */
+function SelectionActionBar() {
+  const selectedId          = useMapaLeafletStore((s) => s.selectedId)
+  const multiSelection      = useMapaLeafletStore((s) => s.multiSelection)
+  const setSelectedId       = useMapaLeafletStore((s) => s.setSelectedId)
+  const clearMultiSelection = useMapaLeafletStore((s) => s.clearMultiSelection)
+  const removeElementosBulk = useMapaLeafletStore((s) => s.removeElementosBulk)
+  const toggleBoxSelectMode = useMapaLeafletStore((s) => s.toggleBoxSelectMode)
+  const boxSelectMode       = useMapaLeafletStore((s) => s.boxSelectMode)
+
+  const allIds = useMemo(() => {
+    const ids: string[] = []
+    if (selectedId) ids.push(selectedId)
+    for (const id of multiSelection) if (!ids.includes(id)) ids.push(id)
+    return ids
+  }, [selectedId, multiSelection])
+
+  if (allIds.length === 0) return null
+
+  function deselect() {
+    setSelectedId(null)
+    clearMultiSelection()
+    if (boxSelectMode) toggleBoxSelectMode()
+  }
+
+  function deleteAll() {
+    if (!window.confirm(`¿Eliminar ${allIds.length} elemento${allIds.length !== 1 ? 's' : ''} seleccionado${allIds.length !== 1 ? 's' : ''}?`)) return
+    removeElementosBulk(allIds)
+    setSelectedId(null)
+    clearMultiSelection()
+    if (boxSelectMode) toggleBoxSelectMode()
+  }
+
+  return (
+    <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-[9999] flex items-center gap-2 bg-gray-900/95 border border-amber-500/40 rounded-xl shadow-2xl px-4 py-2 backdrop-blur-sm pointer-events-auto">
+      <BoxSelect size={13} className="text-amber-400 shrink-0" />
+      <span className="text-[12px] font-semibold text-amber-300 whitespace-nowrap">
+        {allIds.length} elemento{allIds.length !== 1 ? 's' : ''} seleccionado{allIds.length !== 1 ? 's' : ''}
+      </span>
+      <div className="w-px h-4 bg-gray-700 shrink-0" />
+      <button
+        onClick={deleteAll}
+        className="flex items-center gap-1 text-[11px] text-red-400 hover:text-red-300 px-2 py-1 rounded hover:bg-red-900/20 transition-colors"
+      >
+        <Trash2 size={11} />
+        Eliminar
+      </button>
+      <button
+        onClick={deselect}
+        className="flex items-center gap-1 text-[11px] text-gray-400 hover:text-gray-200 px-2 py-1 rounded hover:bg-gray-700/50 transition-colors"
+      >
+        <X size={11} />
+        Deseleccionar
+      </button>
+    </div>
+  )
+}
+
 export function MapaPlantaPage() {
   const currentView        = useMapaLeafletStore((s) => s.currentView)
   const setView            = useMapaLeafletStore((s) => s.setView)
@@ -258,21 +316,19 @@ export function MapaPlantaPage() {
             <LayoutGrid size={12} />
             <span className="hidden sm:inline">Grilla</span>
           </button>
-          {editMode && (
-            <button
-              onClick={toggleBoxSelect}
-              title="Selección por recuadro (arrastra para seleccionar varios). Atajo desktop: Shift+arrastre"
-              className={[
-                'flex items-center gap-1 text-[11px] px-2 sm:px-3 py-1.5 rounded-lg transition-all border',
-                boxSelectMode
-                  ? 'bg-amber-600/25 border-amber-500/70 text-amber-300 shadow-[0_0_8px_rgba(245,158,11,0.3)]'
-                  : 'border-gray-700/60 text-gray-400 hover:text-amber-300 hover:border-amber-700/50',
-              ].join(' ')}
-            >
-              <BoxSelect size={12} />
-              <span className="hidden sm:inline">Selección</span>
-            </button>
-          )}
+          <button
+            onClick={toggleBoxSelect}
+            title="Selección por recuadro — arrastrá para seleccionar varios. Shift+arrastre en desktop."
+            className={[
+              'flex items-center gap-1 text-[11px] px-2 sm:px-3 py-1.5 rounded-lg transition-all border',
+              boxSelectMode
+                ? 'bg-amber-600/25 border-amber-500/70 text-amber-300 shadow-[0_0_8px_rgba(245,158,11,0.3)]'
+                : 'border-gray-700/60 text-gray-400 hover:text-amber-300 hover:border-amber-700/50',
+            ].join(' ')}
+          >
+            <BoxSelect size={12} />
+            <span className="hidden sm:inline">Selección</span>
+          </button>
         </div>
 
         {/* Toggle 2D / 3D */}
@@ -322,6 +378,7 @@ export function MapaPlantaPage() {
         <div className={`absolute inset-0 ${view3DMode ? 'invisible pointer-events-none' : ''}`}>
           <PlantaLeafletEditable />
           <PanelCapasYZonas />
+          <SelectionActionBar />
         </div>
         {/* 3D — siempre montado (contexto WebGL persiste, se muestra/oculta con opacity) */}
         <div className={`absolute inset-0 transition-opacity duration-200 ${view3DMode ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>

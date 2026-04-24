@@ -28,6 +28,10 @@ import {
 } from '@/data/dxfLayers'
 import { useMapaLeafletStore, type ElementoMapa, type PolygonCoords } from '@/store/useMapaLeafletStore'
 
+// Timestamp del último box-select completado — usado para suprimir el click nativo
+// que Leaflet dispara inmediatamente después del mouseup final del drag.
+let _boxSelectEndedAt = 0
+
 // ─── Helpers de geometría ────────────────────────────────────────────────────
 /** Snap a grilla — usa unidad nativa de la vista. Para recinto = 0.5m, para
  *  interior (mm) = 500mm = 0.5m. */
@@ -844,6 +848,8 @@ function CapaElementos({ view }: { view: MapView }) {
           ;(layer.options as any).elementoId = el.id
           layer.on('click', (ev: L.LeafletMouseEvent) => {
             L.DomEvent.stopPropagation(ev)
+            // Suprimir click nativo que Leaflet dispara tras el mouseup del box-select
+            if (Date.now() - _boxSelectEndedAt < 200) return
             // Ignorar clics en elementos fantasma (otro nivel)
             if (getNivelOpacity(el.nivelId, useMapaLeafletStore.getState().currentNivelId) < 1) return
             const oe = ev.originalEvent
@@ -1298,7 +1304,8 @@ function BoxSelect({ view }: { view: MapView }) {
   const boxSelectMode = useMapaLeafletStore((s) => s.boxSelectMode)
 
   useEffect(() => {
-    if (!map || !editMode) return
+    // Permite operar en boxSelectMode aunque editMode esté apagado
+    if (!map || (!editMode && !boxSelectMode)) return
 
     if (map.boxZoom) map.boxZoom.disable()
 
@@ -1370,11 +1377,19 @@ function BoxSelect({ view }: { view: MapView }) {
       const endLL = getLL(clientX, clientY)
       const bounds = L.latLngBounds(start, endLL)
 
-      const { elementos, selectedId, multiSelection, setSelectedId } = useMapaLeafletStore.getState()
+      const { elementos, capasUsuario, selectedId, multiSelection, setSelectedId } = useMapaLeafletStore.getState()
       const toggle = useMapaLeafletStore.getState().toggleMultiSelect
+      // Índice de capas de usuario para filtrar invisibles en O(1)
+      const capasById = new Map(capasUsuario.map((c) => [c.id, c]))
       const hit: string[] = []
       for (const el of elementos) {
         if (el.mapView !== view.name) continue
+        // Solo seleccionar elementos en capas VISIBLES
+        const capaId = el.meta?.capaId
+        if (typeof capaId === 'string') {
+          const capa = capasById.get(capaId)
+          if (capa && !capa.visible) continue
+        }
         const coords = el.poligono ?? (el.punto ? [el.punto] : [])
         for (const c of coords) {
           if (bounds.contains(L.latLng(c[0], c[1]))) { hit.push(el.id); break }
@@ -1382,6 +1397,8 @@ function BoxSelect({ view }: { view: MapView }) {
       }
       // Feedback visual: mostrar resultado del drag (aunque sea 0)
       showBoxSelectFeedback(map, bounds, hit.length)
+      // Marcar timestamp para suprimir el click nativo post-drag de Leaflet
+      if (hit.length > 0) _boxSelectEndedAt = Date.now()
       if (hit.length === 0) return
       const existing = new Set<string>([...(selectedId ? [selectedId] : []), ...multiSelection])
       if (existing.size === 0) {
