@@ -449,7 +449,7 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
     }),
     {
       name: 'mapa-leaflet-v1',
-      version: 4,
+      version: 5,
       migrate: (persisted, version) => {
         const s = persisted as Partial<MapaLeafletState> & {
           capasVisibles?: unknown
@@ -515,6 +515,12 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
         if (version < 4) {
           if (!Array.isArray(s.niveles)) s.niveles = []
           if (s.currentNivelId === undefined) s.currentNivelId = null
+        }
+        // v4 → v5: inicializar capasGeoJsonEliminadas
+        if (version < 5) {
+          if (!s.capasGeoJsonEliminadas) {
+            s.capasGeoJsonEliminadas = { recinto: [], interior: [] }
+          }
         }
         return s as MapaLeafletState
       },

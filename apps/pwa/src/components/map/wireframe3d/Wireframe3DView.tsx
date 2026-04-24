@@ -331,13 +331,13 @@ function ElementosLayer({ view, cx, cy }: { view: string; cx: number; cy: number
 
 function Scene({ view, cx, cy }: { view: ViewName; cx: number; cy: number }) {
   const mapView = MAP_VIEWS[view]
-  // Blueprint 3D: capas con defaultVisible=true, excluyendo eliminadas permanentemente
-  const layers = mapView.layers.filter((l) => l.defaultVisible && !geoJsonElim.includes(l.name))
   const capasSvgVisibles        = useMapaLeafletStore((s) => s.capasSvgVisibles)
   const capasSvgOpacity         = useMapaLeafletStore((s) => s.capasSvgOpacity)
   const capasSvgEliminadas      = useMapaLeafletStore((s) => s.capasSvgEliminadas)
   const capasGeoJsonEliminadas  = useMapaLeafletStore((s) => s.capasGeoJsonEliminadas)
-  const geoJsonElim             = capasGeoJsonEliminadas[view] ?? []
+  const geoJsonElim             = (capasGeoJsonEliminadas?.[view]) ?? []
+  // Blueprint 3D: capas con defaultVisible=true, excluyendo eliminadas permanentemente
+  const layers = mapView.layers.filter((l) => l.defaultVisible && !geoJsonElim.includes(l.name))
 
   const sizeX = mapView.bounds[1][1] - mapView.bounds[0][1]
   const sizeZ = mapView.bounds[1][0] - mapView.bounds[0][0]
