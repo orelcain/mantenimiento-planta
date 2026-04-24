@@ -31,6 +31,19 @@ function toDateSafe(v: unknown): Date {
   return new Date(0)  // fallback — doc corrupto
 }
 
+/** Convierte item de comments a string legible (Shoplogix a veces trae objetos). */
+function coerceComment(c: unknown): string {
+  if (typeof c === 'string') return c
+  if (c && typeof c === 'object') {
+    // Típicos campos que usa Shoplogix
+    const obj = c as Record<string, unknown>
+    const text = obj.text ?? obj.comment ?? obj.message ?? obj.body
+    if (typeof text === 'string') return text
+    return ''  // objeto sin texto útil → omitir
+  }
+  return ''
+}
+
 function deserializeInterval(raw: FirestoreData): UpstreamProductionInterval {
   return {
     startAt: toDateSafe(raw.startAt),
@@ -78,7 +91,7 @@ function deserializeShift(raw: FirestoreData): UpstreamMachineShift {
     states:              Array.isArray(raw.states)    ? raw.states.map(x => deserializeState(x as FirestoreData))       : [],
     threshold:           Number(raw.threshold ?? 15),
     productionUnit:      String(raw.productionUnit ?? ''),
-    comments:            Array.isArray(raw.comments) ? raw.comments.map(String) : [],
+    comments:            Array.isArray(raw.comments) ? raw.comments.map(coerceComment).filter(Boolean) : [],
     source:              'shoplogix',
     sourceVersion:       Number(raw.sourceVersion ?? 1),
     syncedAt:            toDateSafe(raw.syncedAt),
