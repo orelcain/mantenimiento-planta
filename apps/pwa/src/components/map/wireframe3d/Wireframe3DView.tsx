@@ -9,10 +9,10 @@
 
 import { Canvas, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { SVGLoader } from 'three/examples/jsm/loaders/SVGLoader.js'
-import { useMapaLeafletStore } from '@/store/useMapaLeafletStore'
+import { useMapaLeafletStore, type ElementoMapa } from '@/store/useMapaLeafletStore'
 import {
   MAP_VIEWS,
   type DxfLayerConfig,
@@ -251,14 +251,91 @@ function CameraRotator({ angleIdx, distance }: { angleIdx: 0|1|2|3; distance: nu
   return null
 }
 
+// ── ElementosLayer — elementos del usuario (polígonos, círculos, líneas) ─────
+/**
+ * Convierte los ElementoMapa de la vista activa a LineSegments Three.js.
+ * Coords del store: [lat, lng] = [Y, X] en unidades DXF.
+ * Mismo sistema que addChain: x3d = X - cx,  z3d = -(Y - cy).
+ */
+const ELEM_CIRCLE_SEGMENTS = 32
+
+function buildElemGeometry(
+  elementos: ElementoMapa[],
+  view: string,
+  cx: number,
+  cy: number,
+): THREE.BufferGeometry | null {
+  const buf: number[] = []
+
+  for (const el of elementos) {
+    if (el.mapView !== view) continue
+
+    if (el.poligono && el.poligono.length >= 2) {
+      // Polígono / línea
+      const close = el.tipo !== 'linea'
+      const pts = close ? [...el.poligono, el.poligono[0]!] : el.poligono
+      for (let i = 0; i < pts.length - 1; i++) {
+        const a = pts[i]!; const b = pts[i + 1]!
+        buf.push(a[1] - cx, 0, -(a[0] - cy))
+        buf.push(b[1] - cx, 0, -(b[0] - cy))
+      }
+    } else if (el.punto) {
+      const [lat, lng] = el.punto
+      if (el.radio && el.radio > 0) {
+        // Círculo: N segmentos
+        const r = el.radio
+        const N = ELEM_CIRCLE_SEGMENTS
+        for (let i = 0; i < N; i++) {
+          const a = (i / N) * Math.PI * 2
+          const b = ((i + 1) / N) * Math.PI * 2
+          buf.push(
+            (lng + r * Math.cos(a)) - cx, 0, -((lat + r * Math.sin(a)) - cy),
+            (lng + r * Math.cos(b)) - cx, 0, -((lat + r * Math.sin(b)) - cy),
+          )
+        }
+      } else {
+        // Punto: pequeña cruz
+        const s = 0.5
+        buf.push(lng - s - cx, 0, -(lat - cy),  lng + s - cx, 0, -(lat - cy))
+        buf.push(lng - cx, 0, -(lat - s - cy),  lng - cx, 0, -(lat + s - cy))
+      }
+    }
+  }
+
+  if (!buf.length) return null
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(buf), 3))
+  return geometry
+}
+
+function ElementosLayer({ view, cx, cy }: { view: string; cx: number; cy: number }) {
+  const elementos = useMapaLeafletStore((s) => s.elementos)
+  const { invalidate } = useThree()
+
+  const geo = useMemo(
+    () => buildElemGeometry(elementos, view, cx, cy),
+    [elementos, view, cx, cy],
+  )
+
+  useEffect(() => { if (geo) invalidate() }, [geo, invalidate])
+
+  if (!geo) return null
+  return (
+    <lineSegments geometry={geo}>
+      <lineBasicMaterial color="#f59e0b" opacity={0.9} transparent depthWrite={false} />
+    </lineSegments>
+  )
+}
+
 // ── Scene — contenido 3D ─────────────────────────────────────────────────────
 
 function Scene({ view, cx, cy }: { view: ViewName; cx: number; cy: number }) {
   const mapView = MAP_VIEWS[view]
   // Blueprint 3D muestra siempre las capas con defaultVisible=true, independiente de los toggles 2D
   const layers = mapView.layers.filter((l) => l.defaultVisible)
-  const capasSvgVisibles = useMapaLeafletStore((s) => s.capasSvgVisibles)
-  const capasSvgOpacity  = useMapaLeafletStore((s) => s.capasSvgOpacity)
+  const capasSvgVisibles   = useMapaLeafletStore((s) => s.capasSvgVisibles)
+  const capasSvgOpacity    = useMapaLeafletStore((s) => s.capasSvgOpacity)
+  const capasSvgEliminadas = useMapaLeafletStore((s) => s.capasSvgEliminadas)
 
   const sizeX = mapView.bounds[1][1] - mapView.bounds[0][1]
   const sizeZ = mapView.bounds[1][0] - mapView.bounds[0][0]
@@ -269,8 +346,9 @@ function Scene({ view, cx, cy }: { view: ViewName; cx: number; cy: number }) {
       {layers.map((layer) => (
         <LayerLines key={layer.name} layer={layer} folder={mapView.folder} cx={cx} cy={cy} />
       ))}
-      {/* Capas SVG fieles al DXF (solo vista interior) */}
+      {/* Capas SVG fieles al DXF (solo vista interior) — respeta eliminadas y visibilidad */}
       {view === 'interior' && DXF_INTERIOR_SVG_LAYERS
+        .filter((cfg) => !capasSvgEliminadas.includes(cfg.name))
         .filter((cfg) => capasSvgVisibles[cfg.name] ?? cfg.defaultVisible)
         .map((cfg) => (
           <SVGLayer3D
@@ -279,6 +357,8 @@ function Scene({ view, cx, cy }: { view: ViewName; cx: number; cy: number }) {
             opacity={Math.min(1, cfg.opacity * capasSvgOpacity * 1.15)}
           />
         ))}
+      {/* Elementos del usuario: polígonos, círculos, líneas */}
+      <ElementosLayer view={view} cx={cx} cy={cy} />
     </>
   )
 }
