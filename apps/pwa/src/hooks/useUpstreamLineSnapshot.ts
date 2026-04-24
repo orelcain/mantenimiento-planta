@@ -62,6 +62,22 @@ export function useUpstreamLineSnapshot(
       setLoading(true)
       setError(null)
 
+      // Helper: fallback a demo en DEV, o null
+      const fallback = () => {
+        if (isDemoEnabled()) {
+          const demo = buildDemoLineSnapshot()
+          if (!cancelled) {
+            setSnapshot(demo)
+            setSource('demo')
+            setSyncedAt(new Date())
+          }
+        } else if (!cancelled) {
+          setSnapshot(null)
+          setSource('none')
+          setSyncedAt(null)
+        }
+      }
+
       try {
         // 1. Intenta Firestore primero
         const { snapshot: fsSnap, syncedAt: fsSynced } = await loadShoplogixShift(dateKey, shiftId)
@@ -73,29 +89,16 @@ export function useUpstreamLineSnapshot(
           }
           return
         }
-
-        // 2. Fallback DEV: demo data sintético (solo si no hay data real)
-        if (isDemoEnabled()) {
-          const demo = buildDemoLineSnapshot()
-          if (!cancelled) {
-            setSnapshot(demo)
-            setSource('demo')
-            setSyncedAt(new Date())
-          }
-          return
-        }
-
-        // 3. Nada → null (panel muestra "próximamente")
-        if (!cancelled) {
-          setSnapshot(null)
-          setSource('none')
-          setSyncedAt(null)
-        }
+        // Firestore vacío → fallback
+        fallback()
       } catch (e) {
+        // Permission error (rules) o red caída → tratamos como "sin data" y fallback
+        // No mostramos error al usuario: el panel siempre degrada gracefully.
         if (!cancelled) {
-          setError(e instanceof Error ? e.message : 'Error desconocido')
-          setSnapshot(null)
+          // eslint-disable-next-line no-console
+          console.warn('[useUpstreamLineSnapshot] Firestore error, usando fallback:', e instanceof Error ? e.message : e)
         }
+        fallback()
       } finally {
         if (!cancelled) setLoading(false)
       }

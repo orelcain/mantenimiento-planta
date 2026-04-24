@@ -1219,5 +1219,27 @@ service cloud.firestore {
       allow read: if true;
       allow create, update, delete: if isAdmin();
     }
+
+    // ============================================
+    // SHOPLOGIX INTEGRATION — Data upstream de Evisceradoras Baader 142
+    // Escrito solo por Cloud Function `shoplogixSync*` (Admin SDK bypassea rules).
+    // Lectura abierta a cualquier usuario autenticado (read-only para clientes).
+    // Estructura: shoplogix/{plantSlug}/shifts/{shiftId}/machines/{machineid}
+    // Ver: docs/SHOPLOGIX_API.md + docs/SHOPLOGIX_INTEGRATION_PLAN.md
+    // ============================================
+    match /shoplogix/{plantSlug} {
+      allow read: if isAuthenticated();
+      allow write: if false;  // solo via Admin SDK (Cloud Function)
+
+      match /shifts/{shiftId} {
+        allow read: if isAuthenticated();
+        allow write: if false;
+
+        match /machines/{machineid} {
+          allow read: if isAuthenticated();
+          allow write: if false;
+        }
+      }
+    }
   }
 }
