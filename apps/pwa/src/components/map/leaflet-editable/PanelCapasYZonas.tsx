@@ -109,7 +109,7 @@ export function PanelCapasYZonas() {
     capasGeoJsonEliminadas,
     updateElemento, updateElementosBulk, updateElementosBulkMeta,
     deleteElemento, addElemento, addElementosBulk, removeElementosBulk,
-    addCapaUsuario, updateCapaUsuario, deleteCapaUsuario, toggleCapaUsuarioVisible, reorderCapas,
+    addCapaUsuario, updateCapaUsuario, toggleCapaUsuarioVisible, reorderCapas,
   } = useMapaLeafletStore()
 
   // ids seleccionados (primary + multi)
@@ -223,7 +223,7 @@ export function PanelCapasYZonas() {
   const [confirmDel, setConfirmDel] = useState(false)
   const [cotasExpanded, setCotasExpanded] = useState(true)
   const [editingCapaId, setEditingCapaId] = useState<string | null>(null)
-  const [confirmDelCapa, setConfirmDelCapa] = useState<string | null>(null)
+
   const [draggingCapaId, setDraggingCapaId] = useState<string | null>(null)
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
   const [dxfImportExpanded, setDxfImportExpanded] = useState(false)
@@ -369,7 +369,6 @@ export function PanelCapasYZonas() {
                 {capasDeVista.map((c, idx) => {
                   const count = contadorPorCapa.get(c.id) ?? 0
                   const isEditing = editingCapaId === c.id
-                  const isConfirmingDel = confirmDelCapa === c.id
                   return (
                     <div
                       key={c.id}
@@ -439,52 +438,6 @@ export function PanelCapasYZonas() {
                         </button>
                       )}
                       <span className="text-[9px] text-gray-500 font-mono shrink-0">{count}</span>
-                      {isConfirmingDel ? (
-                        <>
-                          <button
-                            onClick={() => setConfirmDelCapa(null)}
-                            className="text-[9px] px-1 py-0.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded"
-                            title="Cancelar"
-                          >
-                            ✕
-                          </button>
-                          <button
-                            onClick={() => { deleteCapaUsuario(c.id, { keepElementos: true }); setConfirmDelCapa(null) }}
-                            className="text-[9px] px-1 py-0.5 bg-amber-700/80 hover:bg-amber-600 text-white rounded"
-                            title="Eliminar capa, conservar elementos (quedan sin capa)"
-                          >
-                            Capa
-                          </button>
-                          <button
-                            onClick={() => { deleteCapaUsuario(c.id); setConfirmDelCapa(null) }}
-                            className="text-[9px] px-1 py-0.5 bg-red-700 hover:bg-red-600 text-white rounded font-medium"
-                            title="Eliminar capa Y todos sus elementos"
-                          >
-                            Todo
-                          </button>
-                          <button
-                            onClick={() => {
-                              const otras = capasUsuario.filter((x) => x.mapView === currentView && x.id !== c.id)
-                              const totalOtros = otras.reduce((acc, x) => acc + (contadorPorCapa.get(x.id) ?? 0), 0)
-                              if (!window.confirm(`Conservar SOLO "${c.nombre}".\n\nSe eliminarán ${otras.length} capa${otras.length !== 1 ? 's' : ''} y ${totalOtros} elemento${totalOtros !== 1 ? 's' : ''}.\n\n¿Continuar?`)) return
-                              for (const otra of otras) deleteCapaUsuario(otra.id)
-                              setConfirmDelCapa(null)
-                            }}
-                            className="text-[9px] px-1 py-0.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded font-medium"
-                            title="Mantener SOLO esta capa — eliminar todas las demás capas + sus elementos"
-                          >
-                            Solo
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          onClick={() => setConfirmDelCapa(c.id)}
-                          title="Eliminar capa"
-                          className="shrink-0 flex items-center justify-center w-5 h-5 rounded text-gray-600 hover:text-red-400 hover:bg-gray-800"
-                        >
-                          <Trash2 size={10} />
-                        </button>
-                      )}
                     </div>
                   )
                 })}
