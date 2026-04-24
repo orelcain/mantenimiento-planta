@@ -105,7 +105,7 @@ export function PanelCapasYZonas() {
     capasSvgVisibles, capasSvgOpacity, capasSvgEliminadas,
     capasUsuario, niveles,
     setSelectedId, clearMultiSelection, toggleEditMode, setCapaVisible, setAllCapas,
-    setCapaSvgVisible, setCapasSvgOpacity, eliminarCapaSvg, restaurarCapasSvg,
+    setCapaSvgVisible, setCapasSvgOpacity, eliminarCapaSvg,
     updateElemento, updateElementosBulk, updateElementosBulkMeta,
     deleteElemento, addElemento, addElementosBulk, removeElementosBulk,
     addCapaUsuario, updateCapaUsuario, deleteCapaUsuario, toggleCapaUsuarioVisible, reorderCapas,
@@ -571,15 +571,6 @@ export function PanelCapasYZonas() {
                       </div>
                     )
                   })}
-                  {/* Botón restaurar — solo si hay capas eliminadas */}
-                  {capasSvgEliminadas.length > 0 && (
-                    <button
-                      onClick={() => restaurarCapasSvg()}
-                      className="w-full text-[9px] py-0.5 mt-1 bg-gray-800/60 hover:bg-gray-700/60 text-gray-500 hover:text-gray-300 rounded transition-colors"
-                    >
-                      Restaurar {capasSvgEliminadas.length} eliminada{capasSvgEliminadas.length !== 1 ? 's' : ''}
-                    </button>
-                  )}
                 </div>
               )}
 
