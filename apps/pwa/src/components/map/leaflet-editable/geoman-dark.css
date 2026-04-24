@@ -102,7 +102,7 @@
 
 /* Subir zoom para que no se solape con la atribución "Leaflet" */
 .leaflet-bottom.leaflet-right .leaflet-control-zoom {
-  margin-bottom: 28px !important;
+  margin-bottom: 56px !important;
 }
 
 /* ─── Popups ──────────────────────────────────────────────────────── */
