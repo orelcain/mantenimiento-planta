@@ -169,30 +169,17 @@ export function parseDxfText(text: string): ResultadoParseDxf {
     layerMap.get(layer)!.push(...features)
   }
 
-  // Bounds globales
+  // Bounds globales — SIEMPRE desde geometría (los $EXTMIN/MAX del header
+  // suelen ser irrealmente grandes o estar desactualizados)
   const b = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity }
 
-  // Intentar bounds del header primero
-  type XYZ = { x?: number; y?: number }
-  const header = dxf?.header as Record<string, XYZ> | undefined
-  if (header?.$EXTMIN && header?.$EXTMAX) {
-    const mn = header.$EXTMIN
-    const mx = header.$EXTMAX
-    if (mn.x != null && mx.x != null && isFinite(mn.x) && isFinite(mx.x)) {
-      b.minX = mn.x; b.minY = mn.y ?? 0; b.maxX = mx.x; b.maxY = mx.y ?? 0
-    }
-  }
-
-  // Construir capas
+  // Construir capas + calcular bounds de todas las features
   const capas: CapaDxfParseada[] = []
 
   for (const [name, features] of layerMap.entries()) {
     if (!features.length) continue
 
-    // Actualizar bounds desde geometría si header no los dio
-    if (!isFinite(b.minX)) {
-      for (const f of features) updateBounds(featuresCoords(f), b)
-    }
+    for (const f of features) updateBounds(featuresCoords(f), b)
 
     const fc: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features }
     capas.push({
