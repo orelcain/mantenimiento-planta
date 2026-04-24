@@ -516,6 +516,17 @@ export function PanelCapasYZonas() {
                   <p className="text-[9px] text-gray-500 px-1 mb-1.5 leading-tight">
                     Overlay visual (no editable). 2D + 3D.
                   </p>
+                  {/* Botones ver/ocultar todas SVG */}
+                  <div className="flex gap-1 px-1 mb-2">
+                    <button
+                      onClick={() => DXF_INTERIOR_SVG_LAYERS.forEach((c) => setCapaSvgVisible(c.name, true))}
+                      className="flex-1 text-[9px] py-0.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded"
+                    >Ver todas</button>
+                    <button
+                      onClick={() => DXF_INTERIOR_SVG_LAYERS.forEach((c) => setCapaSvgVisible(c.name, false))}
+                      className="flex-1 text-[9px] py-0.5 bg-red-900/60 hover:bg-red-800/60 text-red-300 rounded"
+                    >Ocultar todas</button>
+                  </div>
                   {/* Slider opacidad global */}
                   <div className="flex items-center gap-2 px-1 mb-2">
                     <span className="text-[9px] text-gray-500">Opacidad</span>
