@@ -152,6 +152,8 @@ interface MapaLeafletState {
   setMapaImportadoActivo: (id: string | null) => void
   toggleCapaImportadaVisible: (mapId: string, capaName: string) => void
   eliminarCapaImportada: (mapId: string, capaName: string) => void
+  /** Reemplaza las capas completas de un mapa importado (para edición). */
+  setCapasMapaImportado: (mapId: string, capas: CapaImportada[]) => void
 
   addElemento: (e: Omit<ElementoMapa, 'id' | 'createdAt' | 'updatedAt'>) => string
   addElementosBulk: (items: Omit<ElementoMapa, 'id' | 'createdAt' | 'updatedAt'>[]) => void
@@ -342,6 +344,13 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
               ...m,
               capas: m.capas.map((c) => c.name === capaName ? { ...c, eliminada: true } : c),
             }
+          ),
+        })),
+
+      setCapasMapaImportado: (mapId, capas) =>
+        set((s) => ({
+          mapasImportados: s.mapasImportados.map((m) =>
+            m.id !== mapId ? m : { ...m, capas }
           ),
         })),
 
