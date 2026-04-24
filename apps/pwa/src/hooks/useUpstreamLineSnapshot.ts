@@ -2,11 +2,11 @@
  * Hook: carga el snapshot de la línea upstream (3 Evisceradoras Baader 142)
  * para un turno específico.
  *
- * Estado actual (Fase 2 en progreso):
- *   - En DEV con flag `VITE_SHOPLOGIX_DEMO=1` → retorna data sintética.
- *   - En cualquier entorno con Firestore integrado → leería de
- *     `shoplogix/chonchi/shifts/{dateKey}_{shiftId}/machines/*`.
- *   - Por defecto → retorna null (panel muestra estado vacío "próximamente").
+ * Fuentes en orden de prioridad:
+ *   1. Firestore (`shoplogix/chonchi/shifts/{dateKey}_{shiftId}/machines/*`)
+ *      — escrito por Cloud Function `shoplogixSync`
+ *   2. Demo data sintética (solo DEV, apagable con VITE_SHOPLOGIX_DEMO=0)
+ *   3. null (panel muestra estado vacío "próximamente")
  *
  * Ver: docs/SHOPLOGIX_INTEGRATION_PLAN.md
  */
@@ -14,6 +14,7 @@
 import { useState, useEffect } from 'react'
 import type { UpstreamLineSnapshot } from '@/services/shoplogix/types'
 import { buildDemoLineSnapshot } from '@/services/shoplogix/shoplogixDemoData'
+import { loadShoplogixShift } from '@/services/shoplogix/shoplogixShift.service'
 
 export interface UseUpstreamLineSnapshotResult {
   snapshot: UpstreamLineSnapshot | null
@@ -62,12 +63,18 @@ export function useUpstreamLineSnapshot(
       setError(null)
 
       try {
-        // TODO (Fase 2): intentar primero leer de Firestore
-        //   const col = collection(db, `shoplogix/chonchi/shifts/${dateKey}_${shiftId}/machines`)
-        //   const snap = await getDocs(col)
-        //   if (!snap.empty) { ... setSource('firestore'); return }
+        // 1. Intenta Firestore primero
+        const { snapshot: fsSnap, syncedAt: fsSynced } = await loadShoplogixShift(dateKey, shiftId)
+        if (fsSnap) {
+          if (!cancelled) {
+            setSnapshot(fsSnap)
+            setSource('firestore')
+            setSyncedAt(fsSynced)
+          }
+          return
+        }
 
-        // Fallback DEV: demo data sintético
+        // 2. Fallback DEV: demo data sintético (solo si no hay data real)
         if (isDemoEnabled()) {
           const demo = buildDemoLineSnapshot()
           if (!cancelled) {
@@ -78,10 +85,11 @@ export function useUpstreamLineSnapshot(
           return
         }
 
-        // Sin integración ni demo → null (panel muestra "próximamente")
+        // 3. Nada → null (panel muestra "próximamente")
         if (!cancelled) {
           setSnapshot(null)
           setSource('none')
+          setSyncedAt(null)
         }
       } catch (e) {
         if (!cancelled) {
