@@ -461,6 +461,19 @@ export function PanelCapasYZonas() {
                           >
                             Todo
                           </button>
+                          <button
+                            onClick={() => {
+                              const otras = capasUsuario.filter((x) => x.mapView === currentView && x.id !== c.id)
+                              const totalOtros = otras.reduce((acc, x) => acc + (contadorPorCapa.get(x.id) ?? 0), 0)
+                              if (!window.confirm(`Conservar SOLO "${c.nombre}".\n\nSe eliminarán ${otras.length} capa${otras.length !== 1 ? 's' : ''} y ${totalOtros} elemento${totalOtros !== 1 ? 's' : ''}.\n\n¿Continuar?`)) return
+                              for (const otra of otras) deleteCapaUsuario(otra.id)
+                              setConfirmDelCapa(null)
+                            }}
+                            className="text-[9px] px-1 py-0.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded font-medium"
+                            title="Mantener SOLO esta capa — eliminar todas las demás capas + sus elementos"
+                          >
+                            Solo
+                          </button>
                         </>
                       ) : (
                         <button
