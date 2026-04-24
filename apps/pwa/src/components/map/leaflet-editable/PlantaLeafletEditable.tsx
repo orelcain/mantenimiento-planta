@@ -1513,8 +1513,69 @@ function MapContents({ view }: { view: MapView }) {
       <KeyboardShortcuts />
 
       <ZoomControl position="bottomright" />
+      <WheelZoomController />
     </>
   )
+}
+
+// ─── Zoom con rueda del mouse (implementación propia) ────────────────────────
+/**
+ * WheelZoomController — bypassa el handler nativo de Leaflet.
+ *
+ * Problema raíz: el <main id="main-content" overflow-y:auto> del layout de la
+ * app es un ancestro del mapa en el DOM. Los wheel events burbujean hasta él y
+ * el browser lo toma como "scroll de página", ignorando el zoom del mapa.
+ *
+ * Solución:
+ *  1. scrollWheelZoom={false} en MapContainer → el handler de Leaflet no se registra.
+ *  2. Este componente registra su propio listener en map.getContainer() con
+ *     { passive: false } → puede llamar preventDefault() para bloquear el scroll
+ *     de la página, y llama setZoomAround() para hacer zoom centrado en el cursor.
+ *
+ * PanMap: Leaflet's map.dragging handler usa mousedown/mousemove/mouseup — esos
+ * eventos NO son interceptados por overflow-y:auto, así que el pan funciona solo.
+ * Re-habilitamos dragging explícitamente por si algún efecto anterior lo dejó off.
+ */
+function WheelZoomController() {
+  const map = useMap()
+
+  useEffect(() => {
+    // Asegurar que el drag (pan) esté habilitado al montar
+    if (!map.dragging.enabled()) map.dragging.enable()
+
+    const container = map.getContainer()
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault()      // bloquea scroll de página
+      e.stopPropagation()     // evita que llegue al <main>
+
+      // Normalizar delta: una rueda mecánica = ~120 px = 0.5 niveles de zoom
+      const delta = e.deltaMode === 1
+        ? -e.deltaY * 0.5           // modo líneas
+        : e.deltaMode === 2
+          ? -e.deltaY * 2            // modo páginas
+          : -e.deltaY / 120 * 0.5   // modo píxeles (trackpad / rueda estándar)
+
+      const current = map.getZoom()
+      const next = Math.max(
+        map.getMinZoom(),
+        Math.min(map.getMaxZoom(), current + delta),
+      )
+      if (Math.abs(next - current) < 0.01) return
+
+      // Zoom centrado en el cursor (no en el centro del mapa)
+      const rect  = container.getBoundingClientRect()
+      const point = L.point(e.clientX - rect.left, e.clientY - rect.top)
+      const ll    = map.containerPointToLatLng(point)
+      map.setZoomAround(ll, next, { animate: false })
+    }
+
+    // passive:false OBLIGATORIO para poder llamar preventDefault()
+    container.addEventListener('wheel', onWheel, { passive: false })
+    return () => container.removeEventListener('wheel', onWheel)
+  }, [map])
+
+  return null
 }
 
 // ─── Overlay de medición (fuera del MapContainer) ────────────────────────────
@@ -1666,7 +1727,11 @@ export function PlantaLeafletEditable() {
         zoomDelta={0.5}
         wheelPxPerZoomLevel={120}
         wheelDebounceTime={20}
-        scrollWheelZoom={true}
+        scrollWheelZoom={false}
+        /* scrollWheelZoom=false: deshabilitamos el handler nativo de Leaflet porque
+           el ancestor <main overflow-y:auto> captura el wheel event antes. En su lugar
+           usamos WheelZoomController (abajo) que registra el listener directamente en
+           map.getContainer() con { passive:false } y llama preventDefault(). */
         /* zoomAnimation=false: con 5000+ elementos + 20+ panes personalizados, la
            transición CSS del proxy no completa transitionend y el zoom queda
            bloqueado (wheel/zoomIn/setZoom sin animate=false todos fallan).
