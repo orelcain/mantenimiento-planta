@@ -219,14 +219,14 @@ function StateTimeline({
   const ticks = useMemo(() => generateHourTicks(rangeStart, rangeEnd), [rangeStart, rangeEnd])
 
   if (totalMs <= 0 || shift.states.length === 0) {
-    return <div className="h-4 rounded bg-slate-800/60" />
+    return <div className="h-5 rounded-md bg-slate-800/60" />
   }
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-1.5">
       {/* Gantt + overlay de ticks */}
       <div className="relative">
-        <div className="flex h-4 rounded overflow-hidden bg-slate-800/60 border border-slate-800">
+        <div className="relative flex h-5 rounded-md overflow-hidden bg-slate-800/60 border border-slate-700/70 shadow-inner">
           {shift.states.map((st, i) => {
             // Recorta el estado al windowStart/End si lo excede
             const segStart = Math.max(st.startAt.getTime(), rangeStart.getTime())
@@ -235,7 +235,6 @@ function StateTimeline({
             const startOffsetPct = ((segStart - rangeStart.getTime()) / totalMs) * 100
             const widthPct       = ((segEnd - segStart) / totalMs) * 100
             const label = st.reason ? `${st.name}: ${st.reason}` : st.name
-            const mins = Math.round(st.durationSec / 60)
             return (
               <div
                 key={i}
@@ -246,29 +245,29 @@ function StateTimeline({
                   height: '100%',
                   backgroundColor: st.color,
                 }}
-                className="border-r border-slate-900/40"
-                title={`${label} — ${mins} min (${fmtHHmm(st.startAt)}–${fmtHHmm(st.endAt)})`}
+                className="border-r border-slate-900/40 transition-[filter] duration-150 hover:brightness-125 hover:z-10 cursor-help"
+                title={`${label}\n⏱ ${fmtDuration(st.durationSec)}\n🕐 ${fmtHHmm(st.startAt)}–${fmtHHmm(st.endAt)} (Chile)`}
+              />
+            )
+          })}
+
+          {/* Ticks verticales de hora — sobre los segmentos para legibilidad */}
+          {ticks.map((t, i) => {
+            const leftPct = ((t.getTime() - rangeStart.getTime()) / totalMs) * 100
+            return (
+              <div
+                key={`tick-${i}`}
+                className="absolute top-0 bottom-0 w-px bg-white/20 pointer-events-none"
+                style={{ left: `${leftPct}%` }}
               />
             )
           })}
         </div>
-
-        {/* Ticks verticales de hora — sutiles, sobre el gantt */}
-        {ticks.map((t, i) => {
-          const leftPct = ((t.getTime() - rangeStart.getTime()) / totalMs) * 100
-          return (
-            <div
-              key={`tick-${i}`}
-              className="absolute top-0 bottom-0 border-l border-white/25 pointer-events-none"
-              style={{ left: `${leftPct}%` }}
-            />
-          )
-        })}
       </div>
 
       {/* Eje horario debajo del gantt */}
       {ticks.length > 0 && (
-        <div className="relative h-3 text-[9px] text-slate-500 tabular-nums">
+        <div className="relative h-3 text-[10px] text-slate-400 tabular-nums">
           <span className="absolute left-0">{fmtHHmm(rangeStart)}</span>
           {ticks.map((t, i) => {
             const leftPct = ((t.getTime() - rangeStart.getTime()) / totalMs) * 100
@@ -288,10 +287,10 @@ function StateTimeline({
 
       {/* Leyenda condensada — top 6 razones por duración */}
       {reasons.length > 0 && (
-        <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-400">
+        <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-400 pt-0.5">
           {reasons.slice(0, 6).map(r => (
-            <div key={r.reason} className="flex items-center gap-1" title={`${r.count} eventos`}>
-              <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: r.color }} />
+            <div key={r.reason} className="flex items-center gap-1.5" title={`${r.count} evento${r.count !== 1 ? 's' : ''}`}>
+              <span className="w-2.5 h-2.5 rounded-sm shrink-0 ring-1 ring-slate-900/50" style={{ backgroundColor: r.color }} />
               <span className="text-slate-300">{r.reason}</span>
               <span className="text-slate-500 tabular-nums">{fmtDuration(r.durationSec)}</span>
             </div>
