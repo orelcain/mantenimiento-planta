@@ -77,6 +77,35 @@ function deserializeShift(raw: FirestoreData): UpstreamMachineShift {
     ? raw.states.map(x => deserializeState(x as FirestoreData))
     : []
 
+  // FIX-ON-READ para data legacy: los turnos sincronizados antes del fix
+  // de bounds (PR #50) tienen `intervals[i].startAt` calculado desde
+  // `summary.currentShiftStart` que apuntaba al turno EN CURSO al momento
+  // del sync (no al consultado), por lo que los intervals quedan dateados
+  // en un día distinto al del data real. Si detectamos esto, recomputamos
+  // sus timestamps anclados al primer state (que sí tiene timestamps
+  // reales del día consultado).
+  const rawIntervals: UpstreamProductionInterval[] = Array.isArray(raw.intervals)
+    ? raw.intervals.map(x => deserializeInterval(x as FirestoreData))
+    : []
+  let intervals = rawIntervals
+  if (rawIntervals.length > 0 && states.length > 0) {
+    const firstStateDay = Math.floor(states[0]!.startAt.getTime() / 86_400_000)
+    const firstIvlDay   = Math.floor(rawIntervals[0]!.startAt.getTime() / 86_400_000)
+    if (firstStateDay !== firstIvlDay) {
+      // Re-ancla intervals al inicio del primer state (heurística: el primer
+      // state usualmente arranca cuando empieza el tracking de producción).
+      const intervalMs = rawIntervals.length > 1
+        ? Math.max(60_000, rawIntervals[1]!.startAt.getTime() - rawIntervals[0]!.startAt.getTime())
+        : 5 * 60_000
+      const anchor = states[0]!.startAt.getTime()
+      intervals = rawIntervals.map((it, i) => ({
+        ...it,
+        startAt: new Date(anchor + i * intervalMs),
+        endAt:   new Date(anchor + (i + 1) * intervalMs),
+      }))
+    }
+  }
+
   // Si los docs Firestore aún no traen shiftRuntime/breakdown (data legacy),
   // los recomputamos desde states. Mismo cálculo que el normalizer.
   const breakdown = (raw.shiftRuntimeBreakdown && typeof raw.shiftRuntimeBreakdown === 'object'
@@ -125,7 +154,7 @@ function deserializeShift(raw: FirestoreData): UpstreamMachineShift {
     runtimeVariance:     Number(raw.runtimeVariance ?? 0),
     shiftRuntime,
     shiftRuntimeBreakdown: breakdown,
-    intervals:           Array.isArray(raw.intervals) ? raw.intervals.map(x => deserializeInterval(x as FirestoreData)) : [],
+    intervals,
     states,
     threshold:           Number(raw.threshold ?? 15),
     productionUnit:      String(raw.productionUnit ?? ''),
