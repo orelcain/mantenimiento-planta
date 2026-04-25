@@ -4,6 +4,8 @@ import {
   upstreamCausedPauses,
   summarizeCorrelations,
   confidenceLabel,
+  isPlannedBaaderReason,
+  isOrganizationalGraderPause,
 } from '../shoplogixCorrelation'
 import type { Pause } from '@/services/grader/types'
 import type { UpstreamLineSnapshot, UpstreamMachineShift, UpstreamMachineState } from '../types'
@@ -88,8 +90,9 @@ describe('correlatePausesWithUpstream', () => {
     expect(correlatePausesWithUpstream(pauses, undefined)).toEqual([])
   })
 
-  it('clasifica como upstream_global cuando las 3 Baaders están paradas', () => {
-    const state1 = mkState('2026-02-26T09:55:00Z', '2026-02-26T10:15:00Z', 'break', 'Detencion', 'COLACION')
+  it('clasifica como upstream_global cuando las 3 Baaders están paradas (operacional)', () => {
+    // Razón operacional (no planned) — falta de materia prima / avería
+    const state1 = mkState('2026-02-26T09:55:00Z', '2026-02-26T10:15:00Z', 'downtime', 'Detencion', 'Falta MP')
     const snap = mkSnapshot([
       mkShift('A', 'Evisceradora 1', [state1]),
       mkShift('B', 'Evisceradora 2', [state1]),
@@ -100,7 +103,7 @@ describe('correlatePausesWithUpstream', () => {
     expect(corr!.kind).toBe('upstream_global')
     expect(corr!.confidence).toBeGreaterThan(0.5)
     expect(corr!.contributors).toHaveLength(3)
-    expect(corr!.hypothesis).toContain('COLACION')
+    expect(corr!.hypothesis).toContain('Falta MP')
   })
 
   it('clasifica como upstream_majority con 2/3 Baaders paradas', () => {
@@ -190,6 +193,82 @@ describe('correlatePausesWithUpstream', () => {
     const pause = mkPause('p1', '2026-02-26T10:00:00Z', '2026-02-26T10:10:00Z')
     const [corr] = correlatePausesWithUpstream([pause], snap)
     // Baader paró 90 min DESPUÉS del Grader → no puede ser causa
+    expect(corr!.kind).toBe('no_correlation')
+  })
+
+  // ── NUEVO (v2.99.1): no contar coincidencias organizacionales como upstream ──
+
+  it('clasifica como coincidental_planned cuando las 3 Baaders están en COLACION', () => {
+    // Caso real: 13:00-14:00 todos paran por colación organizacional, NO causal
+    const colacion = mkState('2026-02-26T12:55:00Z', '2026-02-26T14:00:00Z', 'break', 'Detencion', 'COLACION')
+    const snap = mkSnapshot([
+      mkShift('A', 'Evisceradora 1', [colacion]),
+      mkShift('B', 'Evisceradora 2', [colacion]),
+      mkShift('C', 'Evisceradora 3', [colacion]),
+    ])
+    const pause = mkPause('p1', '2026-02-26T13:00:00Z', '2026-02-26T14:00:00Z')
+    const [corr] = correlatePausesWithUpstream([pause], snap)
+    expect(corr!.kind).toBe('coincidental_planned')
+    expect(corr!.confidence).toBeLessThan(0.5)
+    expect(corr!.hypothesis).toContain('organizacional')
+    expect(corr!.hypothesis).toContain('COLACION')
+  })
+
+  it('coincidental_planned con REUNION INICIO TURNO en las 3 Baaders', () => {
+    const reunion = mkState('2026-02-26T07:00:00Z', '2026-02-26T07:15:00Z', 'break', 'Detencion', 'REUNION INICIO TURNO')
+    const snap = mkSnapshot([
+      mkShift('A', 'E1', [reunion]),
+      mkShift('B', 'E2', [reunion]),
+      mkShift('C', 'E3', [reunion]),
+    ])
+    const pause = mkPause('p1', '2026-02-26T07:00:00Z', '2026-02-26T07:10:00Z')
+    const [corr] = correlatePausesWithUpstream([pause], snap)
+    expect(corr!.kind).toBe('coincidental_planned')
+  })
+
+  it('si AL MENOS 1 Baader es operacional (sin reason planned), evalúa upstream_single solo con ella', () => {
+    // 2 Baaders en COLACION (planned) + 1 en avería real → upstream_single
+    const colacion = mkState('2026-02-26T09:55:00Z', '2026-02-26T10:15:00Z', 'break', 'Detencion', 'COLACION')
+    const averia   = mkState('2026-02-26T09:55:00Z', '2026-02-26T10:15:00Z', 'downtime', 'Detencion', 'Falla mecánica')
+    const snap = mkSnapshot([
+      mkShift('A', 'E1', [averia]),
+      mkShift('B', 'E2', [colacion]),
+      mkShift('C', 'E3', [colacion]),
+    ])
+    const pause = mkPause('p1', '2026-02-26T10:00:00Z', '2026-02-26T10:10:00Z')
+    const [corr] = correlatePausesWithUpstream([pause], snap)
+    expect(corr!.kind).toBe('upstream_single')
+    // Contributors operacionales solamente — sin las dos en colación
+    expect(corr!.contributors).toHaveLength(1)
+    expect(corr!.contributors[0]!.machineName).toBe('E1')
+    expect(corr!.hypothesis).toContain('Falla mecánica')
+  })
+
+  it('si el paro Grader tiene tag organizacional (colacion), retorna no_correlation sin evaluar', () => {
+    const colacion = mkState('2026-02-26T09:55:00Z', '2026-02-26T10:15:00Z', 'break', 'Detencion', 'COLACION')
+    const snap = mkSnapshot([
+      mkShift('A', 'E1', [colacion]),
+      mkShift('B', 'E2', [colacion]),
+      mkShift('C', 'E3', [colacion]),
+    ])
+    // Pausa con tag manual = colacion
+    const pause = { ...mkPause('p1', '2026-02-26T10:00:00Z', '2026-02-26T10:10:00Z'), tag: 'colacion' }
+    const [corr] = correlatePausesWithUpstream([pause], snap)
+    expect(corr!.kind).toBe('no_correlation')
+    expect(corr!.hypothesis).toContain('organizacional')
+    expect(corr!.contributors).toHaveLength(0)
+  })
+
+  it('autoTag organizacional (sin tag manual) también dispara la regla', () => {
+    const averia = mkState('2026-02-26T09:55:00Z', '2026-02-26T10:15:00Z', 'downtime', 'Detencion', 'Falla')
+    const snap = mkSnapshot([
+      mkShift('A', 'E1', [averia]),
+      mkShift('B', 'E2', [averia]),
+      mkShift('C', 'E3', [averia]),
+    ])
+    // El detector asignó autoTag=cambio_lote — paro organizacional
+    const pause = { ...mkPause('p1', '2026-02-26T10:00:00Z', '2026-02-26T10:10:00Z'), autoTag: 'cambio_lote' }
+    const [corr] = correlatePausesWithUpstream([pause], snap)
     expect(corr!.kind).toBe('no_correlation')
   })
 
@@ -342,5 +421,67 @@ describe('confidenceLabel', () => {
   it('baja en < 0.4', () => {
     expect(confidenceLabel(0.39).text).toBe('baja')
     expect(confidenceLabel(0).text).toBe('baja')
+  })
+})
+
+// ── Filtros anti-falso-positivo: planned + organizational ────────────────────
+
+describe('isPlannedBaaderReason', () => {
+  it('detecta COLACION (case insensitive + trim)', () => {
+    expect(isPlannedBaaderReason('COLACION')).toBe(true)
+    expect(isPlannedBaaderReason('colacion')).toBe(true)
+    expect(isPlannedBaaderReason('  colacion  ')).toBe(true)
+  })
+  it('detecta REUNION INICIO/FIN TURNO por prefijo', () => {
+    expect(isPlannedBaaderReason('REUNION INICIO TURNO')).toBe(true)
+    expect(isPlannedBaaderReason('REUNION FIN TURNO')).toBe(true)
+    expect(isPlannedBaaderReason('Reunion equipo')).toBe(true)
+  })
+  it('detecta Planned Downtime', () => {
+    expect(isPlannedBaaderReason('Planned Downtime')).toBe(true)
+    expect(isPlannedBaaderReason('PLANNED DOWNTIME')).toBe(true)
+  })
+  it('detecta LIMPIEZA exacta (programada) pero NO "Limpieza de Ducto" (operacional)', () => {
+    expect(isPlannedBaaderReason('LIMPIEZA')).toBe(true)
+    expect(isPlannedBaaderReason('Limpieza de Ducto')).toBe(false)
+  })
+  it('NO detecta razones operacionales', () => {
+    expect(isPlannedBaaderReason('Falla mecánica')).toBe(false)
+    expect(isPlannedBaaderReason('Falta MP')).toBe(false)
+    expect(isPlannedBaaderReason('Micro Detencion')).toBe(false)
+  })
+  it('reason vacío / null / undefined retornan false', () => {
+    expect(isPlannedBaaderReason('')).toBe(false)
+    expect(isPlannedBaaderReason(null)).toBe(false)
+    expect(isPlannedBaaderReason(undefined)).toBe(false)
+  })
+})
+
+describe('isOrganizationalGraderPause', () => {
+  type Pause = Parameters<typeof isOrganizationalGraderPause>[0]
+  const base: Pause = {
+    id: 'p1', startAt: '2026-02-26T10:00:00Z', endAt: '2026-02-26T10:10:00Z',
+    durationSec: 600, tier: 'parada' as const,
+  }
+  it('detecta tag manual organizacional', () => {
+    expect(isOrganizationalGraderPause({ ...base, tag: 'colacion' })).toBe(true)
+    expect(isOrganizationalGraderPause({ ...base, tag: 'ejercicios' })).toBe(true)
+    expect(isOrganizationalGraderPause({ ...base, tag: 'cambio_lote' })).toBe(true)
+    expect(isOrganizationalGraderPause({ ...base, tag: 'limpieza' })).toBe(true)
+  })
+  it('detecta autoTag organizacional cuando no hay tag manual', () => {
+    expect(isOrganizationalGraderPause({ ...base, autoTag: 'colacion' })).toBe(true)
+  })
+  it('tag manual gana sobre autoTag', () => {
+    // tag manual = falla_equipo (operacional) → NO organizacional aunque autoTag sea colacion
+    expect(isOrganizationalGraderPause({ ...base, tag: 'falla_equipo', autoTag: 'colacion' })).toBe(false)
+  })
+  it('tags operacionales NO disparan la regla', () => {
+    expect(isOrganizationalGraderPause({ ...base, tag: 'falla_equipo' })).toBe(false)
+    expect(isOrganizationalGraderPause({ ...base, tag: 'mantencion' })).toBe(false)
+    expect(isOrganizationalGraderPause({ ...base, tag: 'espera_mp' })).toBe(false)
+  })
+  it('sin tag ni autoTag retorna false', () => {
+    expect(isOrganizationalGraderPause(base)).toBe(false)
   })
 })

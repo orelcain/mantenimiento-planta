@@ -46,10 +46,13 @@ function fmtLead(sec: number): string {
 }
 
 const KIND_STYLE: Record<CorrelationKind, { bg: string; border: string; text: string; icon: typeof AlertTriangle; label: string }> = {
-  upstream_global:   { bg: 'bg-rose-950/40',   border: 'border-rose-900/60',   text: 'text-rose-300',    icon: AlertTriangle, label: 'Causa upstream' },
-  upstream_majority: { bg: 'bg-amber-950/40',  border: 'border-amber-900/60',  text: 'text-amber-300',   icon: AlertTriangle, label: 'Upstream parcial' },
-  upstream_single:   { bg: 'bg-slate-900/60',  border: 'border-slate-800',     text: 'text-slate-400',   icon: Info,          label: 'Verificar' },
-  no_correlation:    { bg: 'bg-emerald-950/30',border: 'border-emerald-900/40',text: 'text-emerald-400', icon: CheckCircle2,  label: 'Interna' },
+  upstream_global:      { bg: 'bg-rose-950/40',    border: 'border-rose-900/60',    text: 'text-rose-300',    icon: AlertTriangle, label: 'Causa upstream' },
+  upstream_majority:    { bg: 'bg-amber-950/40',   border: 'border-amber-900/60',   text: 'text-amber-300',   icon: AlertTriangle, label: 'Upstream parcial' },
+  upstream_single:      { bg: 'bg-slate-900/60',   border: 'border-slate-800',      text: 'text-slate-400',   icon: Info,          label: 'Verificar' },
+  // Coincidencia organizacional (colación, reunión) — NO es causal upstream.
+  // Tono cyan/info para diferenciarlo claramente de los upstream "reales".
+  coincidental_planned: { bg: 'bg-cyan-950/30',    border: 'border-cyan-900/40',    text: 'text-cyan-300',    icon: Info,          label: 'Coincidencia programada' },
+  no_correlation:       { bg: 'bg-emerald-950/30', border: 'border-emerald-900/40', text: 'text-emerald-400', icon: CheckCircle2,  label: 'Interna' },
 }
 
 function CorrelationRow({ corr, expanded, onToggle }: {
@@ -120,12 +123,25 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
   // Si no hay snapshot o no hay paros → no renderizar
   if (!snapshot || pauses.length === 0) return null
 
-  // Ordenar: primero causas upstream (alta confianza), después el resto
+  // Ordenar por importancia operacional:
+  //   1. upstream real (causal genuino, prioridad)
+  //   2. coincidental_planned (informativo, distinto a internal)
+  //   3. no_correlation (sin info)
+  const sortRank: Record<typeof correlations[number]['kind'], number> = {
+    upstream_global:      0,
+    upstream_majority:    1,
+    upstream_single:      2,
+    coincidental_planned: 3,
+    no_correlation:       4,
+  }
   const sorted = [...correlations].sort((a, b) => {
-    if (a.kind === 'no_correlation' && b.kind !== 'no_correlation') return 1
-    if (b.kind === 'no_correlation' && a.kind !== 'no_correlation') return -1
+    const ra = sortRank[a.kind]; const rb = sortRank[b.kind]
+    if (ra !== rb) return ra - rb
     return b.confidence - a.confidence
   })
+
+  // Contar coincidentales para mostrar en sub-info del header
+  const coincidentalCount = correlations.filter(c => c.kind === 'coincidental_planned').length
 
   const toggle = (id: string) => {
     setExpandedIds(prev => {
@@ -167,7 +183,16 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
           )}
         </div>
 
-        {summary.upstreamCaused === 0 ? (
+        {/* Sub-info: cuántos paros fueron coincidentales (colación, etc.) — claridad
+            sobre por qué el conteo upstream excluye esas filas cyan abajo */}
+        {coincidentalCount > 0 && (
+          <div className="text-[11px] text-cyan-400/80 mb-2 flex items-center gap-1.5">
+            <Info className="w-3 h-3" />
+            {coincidentalCount} paro{coincidentalCount !== 1 ? 's' : ''} coincide{coincidentalCount === 1 ? '' : 'n'} con paros programados de Baader (colación, reunión) — excluido{coincidentalCount === 1 ? '' : 's'} del conteo upstream causal.
+          </div>
+        )}
+
+        {summary.upstreamCaused === 0 && coincidentalCount === 0 ? (
           <div className="text-xs text-slate-500 py-2 flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-500" />
             Ninguno de los {pauses.length} paros correlacionó con eventos upstream. Las Baaders estaban corriendo normal → las causas son internas del Grader.

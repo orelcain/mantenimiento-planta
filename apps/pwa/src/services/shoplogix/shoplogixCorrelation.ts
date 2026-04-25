@@ -20,9 +20,11 @@ import type { UpstreamLineSnapshot, UpstreamMachineState } from './types'
 // ============================================================================
 
 export type CorrelationKind =
-  | 'upstream_global'        // las 3 Baaders paradas antes/durante el paro Grader
-  | 'upstream_majority'      // 2 de 3 Baaders paradas
+  | 'upstream_global'        // las 3 Baaders paradas antes/durante el paro Grader (causal real)
+  | 'upstream_majority'      // 2 de 3 Baaders paradas (causal probable)
   | 'upstream_single'        // 1 Baader parada (podría ser coincidencia)
+  | 'coincidental_planned'   // todos los matches Baader son por reasons "planned" (colación,
+                              // reunión, etc.) — coincidencia organizacional, NO causal upstream
   | 'no_correlation'         // Baaders corriendo normal — causa interna del Grader
 
 export interface MachineContribution {
@@ -69,6 +71,60 @@ function isStopState(state: UpstreamMachineState): boolean {
   return state.type !== 'uptime'
 }
 
+// ── Listas de exclusión: paros NO causales upstream ─────────────────────────
+//
+// Razones "planned" del lado Baader: descansos programados que coinciden por
+// turno organizacional con paros del Grader (mismo personal). NO son causa
+// upstream real — el Grader hubiera parado igual.
+//
+// Lista completa derivada de:
+//   apps/pwa/src/services/shoplogix/types.ts líneas 49 y 127
+//   apps/pwa/src/services/shoplogix/shoplogixDemoData.ts (ejemplos)
+//   y observación del CLAUDE.md docs/SHOPLOGIX_API.md
+//
+const PLANNED_BAADER_REASONS_NORMALIZED = new Set([
+  'COLACION',
+  'PLANNED DOWNTIME',
+  'CAMBIO DE TURNO',
+])
+
+/**
+ * Determina si un `state.reason` (Baader) corresponde a un paro programado
+ * organizacional (colación, reunión, planned downtime).
+ *
+ * Esos paros NO son causa upstream real — son coincidencia con el horario
+ * del personal. Excluirlos previene falsos positivos del tipo "el Grader
+ * paró por colación de las 3 Baaders" cuando en realidad el operador del
+ * Grader también estaba en colación.
+ */
+export function isPlannedBaaderReason(reason: string | null | undefined): boolean {
+  if (!reason) return false
+  const r = reason.trim().toUpperCase()
+  if (PLANNED_BAADER_REASONS_NORMALIZED.has(r)) return true
+  // Patrones por prefijo: "REUNION INICIO TURNO", "REUNION FIN TURNO", etc.
+  if (r.startsWith('REUNION')) return true
+  // LIMPIEZA programada (distinguir de "Limpieza de Ducto" que es operacional puntual).
+  // Solo "LIMPIEZA" exacto (sin sufijo) cuenta como programado de fin de turno.
+  if (r === 'LIMPIEZA') return true
+  return false
+}
+
+// Tags del Grader que indican paros organizacionales (no upstream):
+// el operador del Grader también estaba en break, así que aunque las
+// Baaders estuvieran paradas, no son la "causa" del paro Grader.
+const ORGANIZATIONAL_GRADER_TAGS = new Set([
+  'colacion',
+  'ejercicios',
+  'cambio_lote',
+  'limpieza',
+])
+
+/** Determina si la pausa del Grader es organizacional (no operacional). */
+export function isOrganizationalGraderPause(pause: Pause): boolean {
+  const tag = pause.tag ?? pause.autoTag ?? null
+  return tag != null && ORGANIZATIONAL_GRADER_TAGS.has(tag)
+}
+
 // ============================================================================
 // Correlación principal
 // ============================================================================
@@ -94,6 +150,23 @@ export function correlatePausesWithUpstream(
     const pauseStart = new Date(pause.startAt)
     const pauseEnd   = new Date(pause.endAt)
     const lookbackStart = new Date(pauseStart.getTime() - leadWindowSec * 1000)
+
+    // Pre-filtro: paros organizacionales del Grader (colación, ejercicios,
+    // cambio_lote, limpieza) NO se evalúan como upstream — el operador del
+    // Grader también está en break, así que coincidir con paros Baader es
+    // organizacional, no causal.
+    if (isOrganizationalGraderPause(pause)) {
+      const tag = pause.tag ?? pause.autoTag ?? 'organizacional'
+      return {
+        pauseId: pause.id,
+        pauseStart, pauseEnd,
+        pauseDurSec: pause.durationSec,
+        kind: 'no_correlation' as CorrelationKind,
+        confidence: 0,
+        hypothesis: `Paro organizacional del Grader (${tag}) — no aplica análisis upstream.`,
+        contributors: [],
+      }
+    }
 
     const contributors: MachineContribution[] = []
 
@@ -130,37 +203,55 @@ export function correlatePausesWithUpstream(
         byMachine.set(c.machineid, c)
       }
     }
-    const topContributors = Array.from(byMachine.values())
+    const allTopContributors = Array.from(byMachine.values())
       .sort((a, b) => b.overlapSec - a.overlapSec)
 
-    const machinesInvolved = byMachine.size
-    const fraction = totalMachines > 0 ? machinesInvolved / totalMachines : 0
+    // Separar contributors operacionales vs planned (colación, reunión, etc.)
+    const operationalContribs = allTopContributors.filter(c => !isPlannedBaaderReason(c.reason))
+    const plannedContribs     = allTopContributors.filter(c =>  isPlannedBaaderReason(c.reason))
 
     let kind: CorrelationKind
     let confidence: number
     let hypothesis: string
+    let topContributors: MachineContribution[]
 
-    if (machinesInvolved === 0) {
+    if (allTopContributors.length === 0) {
       kind = 'no_correlation'
       confidence = 0
       hypothesis = 'Upstream corriendo normal — la causa es interna del Grader.'
-    } else if (fraction >= 1) {
-      kind = 'upstream_global'
-      confidence = 0.9
-      const topReasons = [...new Set(topContributors.map(c => c.reason).filter(Boolean))]
-      const reasonsText = topReasons.length > 0 ? ` (${topReasons.join(', ')})` : ''
-      hypothesis = `Las ${totalMachines} Baaders estaban paradas${reasonsText} — el Grader se quedó sin material.`
-    } else if (fraction >= 2 / 3) {
-      kind = 'upstream_majority'
-      confidence = 0.6
-      const names = topContributors.map(c => c.machineName).join(', ')
-      hypothesis = `${machinesInvolved}/${totalMachines} Baaders paradas (${names}) — flujo upstream reducido.`
+      topContributors = []
+    } else if (operationalContribs.length === 0) {
+      // TODOS los matches son planned (colación, reunión) — coincidencia organizacional
+      kind = 'coincidental_planned'
+      confidence = 0.1
+      const reasons = [...new Set(plannedContribs.map(c => c.reason).filter(Boolean))]
+      const reasonsText = reasons.length > 0 ? ` (${reasons.join(', ')})` : ''
+      hypothesis = `Coincide con paro programado de Baaders${reasonsText} — probable causa organizacional, no upstream.`
+      topContributors = plannedContribs
     } else {
-      kind = 'upstream_single'
-      confidence = 0.3
-      const c = topContributors[0]!
-      const reasonText = c.reason ? ` (${c.reason})` : ''
-      hypothesis = `Solo ${c.machineName} parada${reasonText} — probable coincidencia, verificar.`
+      // Hay al menos un contributor operacional — evaluar SOLO esos
+      const machinesInvolved = operationalContribs.length
+      const fraction = totalMachines > 0 ? machinesInvolved / totalMachines : 0
+
+      if (fraction >= 1) {
+        kind = 'upstream_global'
+        confidence = 0.9
+        const topReasons = [...new Set(operationalContribs.map(c => c.reason).filter(Boolean))]
+        const reasonsText = topReasons.length > 0 ? ` (${topReasons.join(', ')})` : ''
+        hypothesis = `Las ${totalMachines} Baaders estaban paradas${reasonsText} — el Grader se quedó sin material.`
+      } else if (fraction >= 2 / 3) {
+        kind = 'upstream_majority'
+        confidence = 0.6
+        const names = operationalContribs.map(c => c.machineName).join(', ')
+        hypothesis = `${machinesInvolved}/${totalMachines} Baaders paradas (${names}) — flujo upstream reducido.`
+      } else {
+        kind = 'upstream_single'
+        confidence = 0.3
+        const c = operationalContribs[0]!
+        const reasonText = c.reason ? ` (${c.reason})` : ''
+        hypothesis = `Solo ${c.machineName} parada${reasonText} — probable coincidencia, verificar.`
+      }
+      topContributors = operationalContribs
     }
 
     return {
@@ -173,9 +264,14 @@ export function correlatePausesWithUpstream(
   })
 }
 
-/** Helper UI: filtra solo correlaciones con causa upstream (ignora las "no correlation"). */
+/** Kinds que se consideran upstream "real" (causal operacional, no organizacional). */
+const REAL_UPSTREAM_KINDS = new Set<CorrelationKind>([
+  'upstream_global', 'upstream_majority', 'upstream_single',
+])
+
+/** Helper UI: filtra solo correlaciones con causa upstream REAL (excluye no_correlation y coincidental_planned). */
 export function upstreamCausedPauses(correlations: PauseCorrelation[]): PauseCorrelation[] {
-  return correlations.filter(c => c.kind !== 'no_correlation')
+  return correlations.filter(c => REAL_UPSTREAM_KINDS.has(c.kind))
 }
 
 /** Resumen agregado por máquina: para identificar qué Evisceradora atender. */
