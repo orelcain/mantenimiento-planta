@@ -19,11 +19,13 @@ function wrap(groupId?: string) {
 }
 
 describe('TimelineSyncContext', () => {
-  it('provee range=null y groupId default', () => {
+  it('provee range=null, hover=null y groupId default', () => {
     const { result } = renderHook(() => useTimelineSync(), { wrapper: wrap() })
     expect(result.current.range).toBeNull()
+    expect(result.current.hover).toBeNull()
     expect(result.current.connectGroupId).toBe('timeline-sync')
     expect(typeof result.current.setRange).toBe('function')
+    expect(typeof result.current.setHover).toBe('function')
   })
 
   it('respeta el groupId pasado al Provider', () => {
@@ -87,5 +89,22 @@ describe('TimelineSyncContext', () => {
     const { result } = renderHook(() => useTimelineSyncOptional(), { wrapper: wrap() })
     expect(result.current).not.toBeNull()
     expect(result.current?.range).toBeNull()
+    expect(result.current?.hover).toBeNull()
+  })
+
+  it('setHover actualiza el estado de hover', () => {
+    const { result } = renderHook(() => useTimelineSync(), { wrapper: wrap() })
+    act(() => result.current.setHover({ ms: 1700000000000, originId: 'chart-A' }))
+    expect(result.current.hover).toEqual({ ms: 1700000000000, originId: 'chart-A' })
+    act(() => result.current.setHover(null))
+    expect(result.current.hover).toBeNull()
+  })
+
+  it('setHover es idempotente con valores estructuralmente iguales', () => {
+    const { result } = renderHook(() => useTimelineSync(), { wrapper: wrap() })
+    act(() => result.current.setHover({ ms: 100, originId: 'X' }))
+    const firstHover = result.current.hover
+    act(() => result.current.setHover({ ms: 100, originId: 'X' }))
+    expect(result.current.hover).toBe(firstHover)
   })
 })

@@ -24,27 +24,26 @@ type EChartsForReactRef = React.MutableRefObject<any>
  * Inscribe una instancia ECharts a un grupo. Idempotente: re-asignar el
  * mismo group no duplica nada en el registro global de echarts.
  *
- * IMPORTANTE: `echarts.connect()` propaga dataZoom entre charts del mismo
- * grupo. Si los charts tienen xAxis types diferentes (ej. el Grader es
- * `category` con 462 slots minute-by-minute, mientras los Baader Gantts son
- * `time` continuos en ms), la propagación NO es semánticamente correcta —
- * el % del Grader se aplica literalmente al rango time del Gantt, dando
- * rangos visibles que NO coinciden temporalmente.
+ * `echarts.connect()` propaga eventos entre charts del mismo grupo:
+ *   - axisPointer (crosshair vertical cross-chart al hover)
+ *   - showTip / hideTip (tooltip sincronizado)
  *
- * Por eso el sync del rango se hace MANUALMENTE vía TimelineSyncContext
- * (callback `setRange` con timestamps reales). El group se setea pero NO
- * llamamos `echarts.connect()` para evitar la propagación rota.
+ * Notas sobre dataZoom: ECharts intenta propagar dataZoom también, pero los
+ * charts del panel (Gantts, ProductionBars) NO tienen dataZoom configurado
+ * — son charts read-only desde el zoom point of view. Cuando connect
+ * intenta propagar dataZoom hacia ellos, el cambio no se aplica (no hay
+ * dataZoom donde aterrizar). El sync de zoom se hace 100% vía
+ * TimelineSyncContext callback (timestamps reales en ms).
  *
- * Lo que SÍ aporta tener el group set (sin connect): permite operaciones
- * manuales como `dispatchAction` cross-chart en el futuro (Fase 4 crosshair).
+ * Resultado: tenemos lo mejor de ambos mundos:
+ *   - Zoom sync exacto vía context (timestamps en ms, no porcentajes
+ *     mal-traducidos entre xAxis types diferentes)
+ *   - axisPointer + tooltips cross-chart automáticos vía echarts.connect
  */
 export function connectChartToGroup(inst: any, groupId: string): void {
   if (!inst) return
   inst.group = groupId
-  // NO llamamos echarts.connect(groupId) intencionalmente — ver comment arriba.
-  // El sync del rango se hace vía context callback en setRange + xAxis.min/max
-  // explícito en cada chart al re-render.
-  void echarts // referencia para evitar tree-shaking del import (futuro F4)
+  echarts.connect(groupId)
 }
 
 /**
