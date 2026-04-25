@@ -28,6 +28,18 @@ import type {
 } from '@/services/shoplogix/types'
 import type { Pause as GraderPause } from '@/services/grader/types'
 import { correlatePausesWithUpstream, summarizeCorrelations } from '@/services/shoplogix/shoplogixCorrelation'
+import {
+  reachedStatusFromPct,
+  reachedStatusColor,
+  reachedStatusLabel,
+  detectMicroAnomalies,
+  isStaleSync,
+  varianceDirection,
+  varianceLabel,
+  varianceColor,
+  REACHED_PCT_THRESHOLDS,
+  SYNC_STALE_MINUTES,
+} from '@/services/grader/graderUpstreamHealth'
 import { useTimelineSyncOptional } from './useTimelineSync'
 import { StateTimelineEC } from './StateTimelineEC'
 import { ProductionBarsEC } from './ProductionBarsEC'
@@ -234,21 +246,49 @@ function StateTimeline({
 // ProductionBarsEC (Fase 3 del Synchronized Timeline). Ver
 // `./ProductionBarsEC.tsx`.
 
-/** KPI row tipo Shoplogix: total / verde / amarillo / rojo. */
+/**
+ * KPI row tipo Shoplogix: total / verde / amarillo / rojo.
+ *
+ * Colores y tooltips siguen el principio "info útil": el operador debe entender
+ * QUÉ significa cada color sin tener que adivinar.
+ */
 function ProductionKpiRow({ kpis }: { kpis: MachineKpis }) {
+  const reachedStatus = reachedStatusFromPct(kpis.reachedPct)
+  const reachedColor = reachedStatusColor(reachedStatus)
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
-      <Badge variant="outline" className="bg-slate-900/60 border-slate-700 text-slate-300 tabular-nums text-[11px] px-2 py-0.5 h-5">
+      <Badge
+        variant="outline"
+        className="bg-slate-900/60 border-slate-700 text-slate-300 tabular-nums text-[11px] px-2 py-0.5 h-5"
+        title={
+          `Tasa alcanzada: ${fmtPct(kpis.reachedPct, 0)} del esperado · ${reachedStatusLabel(reachedStatus)}.\n` +
+          `Saludable ≥${REACHED_PCT_THRESHOLDS.healthyAbove * 100}% · Crítico <${REACHED_PCT_THRESHOLDS.criticalBelow * 100}%`
+        }
+      >
         {fmtInt(kpis.totalProduced)} / {fmtInt(kpis.totalExpected)}
-        <span className="text-slate-500 ml-1.5">({fmtPct(kpis.reachedPct, 0)})</span>
+        <span className={`ml-1.5 font-semibold ${reachedColor}`}>
+          ({fmtPct(kpis.reachedPct, 0)})
+        </span>
       </Badge>
-      <Badge variant="outline" className="bg-emerald-950/60 border-emerald-900 text-emerald-300 tabular-nums text-[11px] px-2 py-0.5 h-5">
+      <Badge
+        variant="outline"
+        className="bg-emerald-950/60 border-emerald-900 text-emerald-300 tabular-nums text-[11px] px-2 py-0.5 h-5"
+        title="Verde: piezas en intervalos donde el ritmo cumplió el objetivo (dentro de tolerancia)"
+      >
         {fmtInt(kpis.greenCycles)} ({fmtPct(kpis.greenPct, 0)})
       </Badge>
-      <Badge variant="outline" className="bg-amber-950/60 border-amber-900 text-amber-300 tabular-nums text-[11px] px-2 py-0.5 h-5">
+      <Badge
+        variant="outline"
+        className="bg-amber-950/60 border-amber-900 text-amber-300 tabular-nums text-[11px] px-2 py-0.5 h-5"
+        title="Amarillo: piezas en intervalos con ritmo bajo el objetivo (dentro de tolerancia)"
+      >
         {fmtInt(kpis.yellowCycles)} ({fmtPct(kpis.yellowPct, 0)})
       </Badge>
-      <Badge variant="outline" className="bg-rose-950/60 border-rose-900 text-rose-300 tabular-nums text-[11px] px-2 py-0.5 h-5">
+      <Badge
+        variant="outline"
+        className="bg-rose-950/60 border-rose-900 text-rose-300 tabular-nums text-[11px] px-2 py-0.5 h-5"
+        title="Rojo: piezas en intervalos con ritmo MUY bajo el objetivo (fuera de tolerancia — atención)"
+      >
         {fmtInt(kpis.redCycles)} ({fmtPct(kpis.redPct, 0)})
       </Badge>
     </div>
@@ -428,9 +468,18 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
             </div>
             <div>
               <div className="text-slate-600">Variance runtime</div>
-              <div className={shift.runtimeVariance >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
-                {shift.runtimeVariance >= 0 ? '+' : ''}{fmtPct(shift.runtimeVariance, 2)}
-              </div>
+              {(() => {
+                const dir = varianceDirection(shift.runtimeVariance)
+                return (
+                  <div
+                    className={varianceColor(dir)}
+                    title={`Diferencia entre runtime real y esperado de Shoplogix. ${varianceLabel(dir)}.`}
+                  >
+                    {shift.runtimeVariance >= 0 ? '+' : ''}{fmtPct(shift.runtimeVariance, 2)}
+                    <span className="text-[10px] opacity-70 ml-1">({varianceLabel(dir)})</span>
+                  </div>
+                )
+              })()}
             </div>
           </div>
           {shift.comments.length > 0 && (
@@ -463,11 +512,7 @@ export function UpstreamMachinesPanel({
   const [collapsed, setCollapsed] = useState(defaultCollapsed)
   const [expandedMachines, setExpandedMachines] = useState<Set<string>>(new Set())
 
-  const isStale = useMemo(() => {
-    if (!syncedAt) return false
-    const ageMin = (Date.now() - syncedAt.getTime()) / 60000
-    return ageMin > 15
-  }, [syncedAt])
+  const isStale = useMemo(() => isStaleSync(syncedAt), [syncedAt])
 
   // Ventana temporal a usar para alinear el Gantt.
   // Prioridad de fuentes (Synchronized Timeline):
@@ -523,25 +568,16 @@ export function UpstreamMachinesPanel({
     return computeKpis(filtered)
   }, [snapshot, windowStart, windowEnd, isLineZoomActive])
 
-  // Detector de microparadas anómalas. Marca una máquina si:
-  //   (a) tiene el conteo más alto de la línea, Y
-  //   (b) está ≥25% sobre el promedio Y al menos 15 eventos absolutos
-  // (evita falsos positivos en turnos con muy pocas microparadas totales).
+  // Detector de microparadas anómalas — usa helper testable + umbrales
+  // exportados (ver MICRO_ANOMALY_THRESHOLDS en graderUpstreamHealth.ts).
   const microAlertSet = useMemo<Set<string>>(() => {
-    const set = new Set<string>()
-    if (!snapshot || snapshot.machines.length < 2) return set
-    const counts = snapshot.machines.map(m =>
-      m.states.filter(s => s.name === 'Micro Detencion').length,
+    if (!snapshot) return new Set()
+    return detectMicroAnomalies(
+      snapshot.machines.map(m => ({
+        machineid: m.machineid,
+        microCount: m.states.filter(s => s.name === 'Micro Detencion').length,
+      })),
     )
-    const max = Math.max(...counts)
-    if (max < 15) return set  // umbral absoluto
-    const avg = counts.reduce((a, x) => a + x, 0) / counts.length
-    if (avg <= 0) return set
-    snapshot.machines.forEach((m, i) => {
-      const n = counts[i] ?? 0
-      if (n === max && n > avg * 1.25) set.add(m.machineid)
-    })
-    return set
   }, [snapshot])
 
   const empty = !loading && !error && (!snapshot || snapshot.machines.length === 0)
@@ -605,7 +641,18 @@ export function UpstreamMachinesPanel({
             )}
             {loading && <span>Cargando…</span>}
             {error && <span className="text-rose-400 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Error</span>}
-            {isStale && <span className="text-amber-400">Desactualizado</span>}
+            {isStale && syncedAt && (
+              <span
+                className="text-amber-400 cursor-help"
+                title={
+                  `Datos sincronizados hace ${Math.round((Date.now() - syncedAt.getTime()) / 60000)} min. ` +
+                  `Umbral: ${SYNC_STALE_MINUTES} min. ` +
+                  `Si el problema persiste, revisar conexión Cloud Function ↔ Shoplogix.`
+                }
+              >
+                Desactualizado
+              </span>
+            )}
             {snapshot && !loading && (
               <span className="tabular-nums">
                 <Activity className="w-3 h-3 inline mr-1" />
