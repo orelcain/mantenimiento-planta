@@ -19,7 +19,7 @@
  */
 
 const { CHONCHI_EVISCERADORAS } = require('./machines')
-const { queryShoplogix } = require('./client')
+const { queryShoplogix, queryShoplogixBearer } = require('./client')
 const { normalizeShift } = require('./normalizer')
 const { toShoplogixTime, parseShoplogixTime } = require('./time')
 const { pauseBetweenMachines, currentShift } = require('./polling')
@@ -68,15 +68,25 @@ function currentShiftKey(now = new Date()) {
 /**
  * Sync completo de un turno — trae data de las 3 Evisceradoras y escribe a Firestore.
  *
+ * Autenticación — dos modos (mutuamente excluyentes, Bearer tiene prioridad):
+ *   - accessToken: Bearer OAuth 2.0 (Fase 2b.1 — auto-login)
+ *   - cookie:      Session cookie manual (Fase 2b.0 — legado)
+ *
  * @param {object} deps
  * @param {import('firebase-admin/firestore').Firestore} deps.db
- * @param {string} deps.cookie
- * @param {string} [deps.dateKey]  — override; default: turno actual
- * @param {string} [deps.shiftId]  — override
- * @param {function} [deps.logger] — logger (default: console)
+ * @param {string} [deps.accessToken] — Bearer token OAuth (Fase 2b.1)
+ * @param {string} [deps.cookie]      — Session cookie (Fase 2b.0 legado)
+ * @param {string} [deps.dateKey]     — override; default: turno actual
+ * @param {string} [deps.shiftId]     — override
+ * @param {function} [deps.logger]    — logger (default: console)
  */
-async function syncShift({ db, cookie, dateKey, shiftId, logger = console }) {
-  if (!cookie) throw new Error('[sync] cookie vacía')
+async function syncShift({ db, accessToken, cookie, dateKey, shiftId, logger = console }) {
+  if (!accessToken && !cookie) throw new Error('[sync] se requiere accessToken (Bearer) o cookie (legacy)')
+
+  /** Wrapper unificado: usa Bearer si hay accessToken, cookie si no */
+  const query = accessToken
+    ? (opts) => queryShoplogixBearer({ accessToken, ...opts })
+    : (opts) => queryShoplogix({ cookie, ...opts })
   let key = { dateKey, shiftId }
   if (!key.dateKey || !key.shiftId) {
     const current = currentShiftKey()
@@ -95,8 +105,7 @@ async function syncShift({ db, cookie, dateKey, shiftId, logger = console }) {
 
   for (const machine of CHONCHI_EVISCERADORAS) {
     try {
-      const production = await queryShoplogix({
-        cookie,
+      const production = await query({
         type: 'whiteboardproduction',
         params: {
           machines: machine.machineid,
@@ -108,8 +117,7 @@ async function syncShift({ db, cookie, dateKey, shiftId, logger = console }) {
 
       await pauseBetweenMachines()
 
-      const summary = await queryShoplogix({
-        cookie,
+      const summary = await query({
         type: 'whiteboardsummary',
         params: {
           machines: machine.machineid,

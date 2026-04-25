@@ -3064,46 +3064,94 @@ exports.setupTelegramTopics = onRequest({ region: 'us-central1' }, async (req, r
 // Docs: docs/SHOPLOGIX_API.md + docs/SHOPLOGIX_INTEGRATION_PLAN.md
 // ═══════════════════════════════════════════════════════════════════════════
 
-const shoplogixSyncMod = require('./shoplogix/sync')
-const shoplogixPolling = require('./shoplogix/polling')
+const shoplogixSyncMod  = require('./shoplogix/sync')
+const shoplogixPolling  = require('./shoplogix/polling')
+const shoplogixTokenStore = require('./shoplogix/tokenStore')
+
+// ── Helpers de auth Shoplogix ──────────────────────────────────────────────
+
+/**
+ * Resuelve credenciales para el sync: Bearer > Cookie.
+ *
+ * Fase 2b.1 (Bearer):
+ *   Si SHOPLOGIX_USER + SHOPLOGIX_PASS están configurados, obtiene/renueva
+ *   el access_token automáticamente vía ROPC.
+ *
+ * Fase 2b.0 fallback (Cookie):
+ *   Si no hay user/pass, usa SHOPLOGIX_COOKIE (manual).
+ *
+ * @returns {{ accessToken?: string, cookie?: string, mode: 'bearer' | 'cookie' | 'none' }}
+ */
+async function resolveShoplogixAuth(log) {
+  const user   = process.env.SHOPLOGIX_USER
+  const pass   = process.env.SHOPLOGIX_PASS
+  const cookie = process.env.SHOPLOGIX_COOKIE
+
+  // Fase 2b.1: auto-login si hay credenciales
+  if (user && pass) {
+    try {
+      const accessToken = await shoplogixTokenStore.getValidAccessToken(
+        db, { user, password: pass }, log
+      )
+      return { accessToken, mode: 'bearer' }
+    } catch (e) {
+      log.error('[shoplogix-auth] Auto-login falló, intentando fallback cookie:', e.message)
+      // Caer al modo cookie si el auto-login falla y hay cookie disponible
+    }
+  }
+
+  // Fase 2b.0: cookie manual
+  if (cookie) return { cookie, mode: 'cookie' }
+
+  return { mode: 'none' }
+}
+
+// ── Cloud Functions ────────────────────────────────────────────────────────
 
 /**
  * Sync HTTP — trigger manual para testing/backfill.
  * Uso: curl -X POST https://.../shoplogixSyncHttp?dateKey=2026-02-26&shiftId=Turno%20día
  *
- * Requiere secret SHOPLOGIX_COOKIE seteado:
- *   firebase functions:secrets:set SHOPLOGIX_COOKIE
- *   (pega el header Cookie completo cuando lo pida)
+ * Secretos requeridos (al menos uno):
+ *   Fase 2b.1 (auto): SHOPLOGIX_USER + SHOPLOGIX_PASS
+ *   Fase 2b.0 (legado): SHOPLOGIX_COOKIE
  */
 exports.shoplogixSyncHttp = onRequest(
   {
-    secrets: ['SHOPLOGIX_COOKIE'],
+    secrets: ['SHOPLOGIX_COOKIE', 'SHOPLOGIX_USER', 'SHOPLOGIX_PASS'],
     region: 'us-central1',
     timeoutSeconds: 180,
     memory: '256MiB',
     cors: ALLOWED_ORIGINS,
   },
   async (req, res) => {
-    const cookie = process.env.SHOPLOGIX_COOKIE
-    if (!cookie) {
-      res.status(500).json({ error: 'SHOPLOGIX_COOKIE secret no configurado' })
+    const auth = await resolveShoplogixAuth(logger)
+    if (auth.mode === 'none') {
+      res.status(500).json({
+        error: 'NO_AUTH',
+        message: 'Configurar SHOPLOGIX_USER+SHOPLOGIX_PASS (Bearer) o SHOPLOGIX_COOKIE (legado)',
+      })
       return
     }
+    logger.info(`[shoplogixSyncHttp] modo auth: ${auth.mode}`)
 
     const { dateKey, shiftId } = req.query || {}
     try {
       const result = await shoplogixSyncMod.syncShift({
         db,
-        cookie,
+        accessToken: auth.accessToken,
+        cookie:      auth.cookie,
         dateKey: dateKey || undefined,
         shiftId: shiftId || undefined,
         logger,
       })
-      res.json(result)
+      res.json({ ...result, authMode: auth.mode })
     } catch (err) {
       if (err.code === 'AUTH_EXPIRED') {
-        logger.error('[shoplogixSyncHttp] AUTH_EXPIRED — refrescar SHOPLOGIX_COOKIE')
-        res.status(401).json({ error: 'AUTH_EXPIRED', message: err.message })
+        // Bearer mode: limpiar token guardado para forzar re-login en el próximo intento
+        if (auth.mode === 'bearer') await shoplogixTokenStore.clearStoredToken(db)
+        logger.error('[shoplogixSyncHttp] AUTH_EXPIRED', { mode: auth.mode })
+        res.status(401).json({ error: 'AUTH_EXPIRED', message: err.message, authMode: auth.mode })
         return
       }
       logger.error('[shoplogixSyncHttp] error', { err: err.message, stack: err.stack })
@@ -3114,28 +3162,19 @@ exports.shoplogixSyncHttp = onRequest(
 
 /**
  * Wakeup scheduler — dispara cada hora durante ventana operativa.
- * El sync decide internamente si corresponde (vs. fase del turno, last sync, etc).
- *
- * Cloud Scheduler no soporta intervalos variables, así que el "human-like"
- * se logra haciendo que esta wakeup corra seguido pero el handler decide
- * cuándo saltarse un ciclo basado en nextPollDelaySec.
+ * Fase 2b.1: auto-login integrado. Si AUTH_EXPIRED y hay credenciales,
+ * limpia el token guardado y el próximo ciclo (en 60min) hará re-login.
  */
 exports.shoplogixSyncWakeup = onSchedule(
   {
-    schedule: 'every 60 minutes',     // Chequea cada 1h; el handler decide si corre o skip
+    schedule: 'every 60 minutes',
     timeZone: 'America/Santiago',
     timeoutSeconds: 180,
     memory: '256MiB',
     retryCount: 1,
-    secrets: ['SHOPLOGIX_COOKIE'],
+    secrets: ['SHOPLOGIX_COOKIE', 'SHOPLOGIX_USER', 'SHOPLOGIX_PASS'],
   },
   async () => {
-    const cookie = process.env.SHOPLOGIX_COOKIE
-    if (!cookie) {
-      logger.error('[shoplogixSyncWakeup] SHOPLOGIX_COOKIE no seteado — skip')
-      return
-    }
-
     // Solo corre durante turnos (fuera de turno: skip)
     const ctx = shoplogixPolling.currentShift()
     if (!ctx) {
@@ -3143,17 +3182,73 @@ exports.shoplogixSyncWakeup = onSchedule(
       return
     }
 
+    const auth = await resolveShoplogixAuth(logger)
+    if (auth.mode === 'none') {
+      logger.error('[shoplogixSyncWakeup] Sin auth configurada (SHOPLOGIX_USER/PASS o COOKIE) — skip')
+      return
+    }
+    logger.info(`[shoplogixSyncWakeup] modo auth: ${auth.mode}`)
+
     try {
-      const result = await shoplogixSyncMod.syncShift({ db, cookie, logger })
-      logger.info('[shoplogixSyncWakeup] OK', { result })
+      const result = await shoplogixSyncMod.syncShift({
+        db,
+        accessToken: auth.accessToken,
+        cookie:      auth.cookie,
+        logger,
+      })
+      logger.info('[shoplogixSyncWakeup] OK', { result, authMode: auth.mode })
     } catch (err) {
       if (err.code === 'AUTH_EXPIRED') {
-        logger.error('[shoplogixSyncWakeup] AUTH_EXPIRED — necesita refresh de cookie')
-        // TODO (Fase 2b.1): cuando tengamos login automatizado, acá refrescamos.
-        // Por ahora, la alerta queda en logs → Cloud Logging alert policy.
+        if (auth.mode === 'bearer') {
+          // Limpiar token inválido; el siguiente ciclo hará re-login completo
+          await shoplogixTokenStore.clearStoredToken(db)
+          logger.error('[shoplogixSyncWakeup] AUTH_EXPIRED (Bearer) — token limpiado, re-login en próximo ciclo')
+        } else {
+          logger.error('[shoplogixSyncWakeup] AUTH_EXPIRED (Cookie) — refrescar SHOPLOGIX_COOKIE manualmente')
+        }
         return
       }
       logger.error('[shoplogixSyncWakeup] error', { err: err.message })
+    }
+  },
+)
+
+/**
+ * Refresh proactivo del token Shoplogix — corre cada 50 min.
+ * Se asegura de que el access_token siempre esté vigente antes de que
+ * el sync wakeup lo necesite. Requiere SHOPLOGIX_USER + SHOPLOGIX_PASS.
+ *
+ * Si el refresh falla, el wakeup intentará re-login completo.
+ * Si no hay credenciales, esta function es un no-op (sin error).
+ */
+exports.shoplogixTokenRefresh = onSchedule(
+  {
+    schedule: 'every 50 minutes',
+    timeZone: 'UTC',
+    timeoutSeconds: 60,
+    memory: '128MiB',
+    retryCount: 2,
+    secrets: ['SHOPLOGIX_USER', 'SHOPLOGIX_PASS'],
+  },
+  async () => {
+    const user = process.env.SHOPLOGIX_USER
+    const pass = process.env.SHOPLOGIX_PASS
+    if (!user || !pass) {
+      // Sin credenciales → modo cookie legado activo → no-op
+      logger.info('[shoplogixTokenRefresh] SHOPLOGIX_USER/PASS no configurados — skip (modo cookie)')
+      return
+    }
+
+    try {
+      const accessToken = await shoplogixTokenStore.getValidAccessToken(
+        db, { user, password: pass }, logger
+      )
+      logger.info('[shoplogixTokenRefresh] token vigente/renovado OK', {
+        first8: accessToken.slice(0, 8) + '…'
+      })
+    } catch (e) {
+      logger.error('[shoplogixTokenRefresh] falló renovación:', e.message)
+      // No re-throw: el scheduler reintentará (retryCount: 2)
     }
   },
 )

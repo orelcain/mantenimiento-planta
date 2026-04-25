@@ -172,17 +172,66 @@ firebase functions:delete shoplogixSyncHttp shoplogixSyncWakeup
 
 ---
 
-## 8. Roadmap
+## 8. Fase 2b.1 — Login automatizado (IMPLEMENTADO)
 
-**Fase 2b.0 — Cookie manual (ACTUAL):**
-- Human refresca cookie cada ~8h
-- Riesgo: si nadie refresca, el sync se detiene hasta que alguien lo haga
+Usa ROPC (Resource Owner Password Credentials) de OAuth 2.0, soportado por
+`identity.shoplogix.com/connect/token` (confirmado vía OIDC Discovery).
 
-**Fase 2b.1 — Login automatizado (próximo):**
-- Capturar el flujo de login OAuth/OIDC de Shoplogix identity.shoplogix.com
-- Secrets: `SHOPLOGIX_USER` + `SHOPLOGIX_PASS`
-- Auto-refresh de cookie sin intervención humana
-- ETA: 1-2 días cuando capturemos el flujo de login con DevTools
+### Activar auto-login
+
+```bash
+# Configurar credenciales (solo una vez):
+firebase functions:secrets:set SHOPLOGIX_USER
+# (ingresá el email de login)
+firebase functions:secrets:set SHOPLOGIX_PASS
+# (ingresá la contraseña)
+
+# Desplegar las 3 functions de Shoplogix:
+firebase deploy --only functions:shoplogixSyncHttp,functions:shoplogixSyncWakeup,functions:shoplogixTokenRefresh
+```
+
+Con `SHOPLOGIX_USER` + `SHOPLOGIX_PASS` configurados:
+- El sistema hace auto-login ROPC en el primer sync
+- El access_token se renueva cada ~50 min (función `shoplogixTokenRefresh`)
+- Si el refresh falla → re-login completo automático con user/pass
+- SHOPLOGIX_COOKIE sigue como fallback si no hay user/pass
+
+### Modo Bearer vs Cookie
+
+| Situación | Modo activo |
+|---|---|
+| `SHOPLOGIX_USER` + `SHOPLOGIX_PASS` configurados | **Bearer (auto)** — Fase 2b.1 |
+| Solo `SHOPLOGIX_COOKIE` configurado | **Cookie (legado)** — Fase 2b.0 |
+| Ninguno | Error `NO_AUTH` |
+
+El modo activo se loguea en cada sync: `modo auth: bearer` o `modo auth: cookie`.
+
+### Tokens almacenados en Firestore
+
+Los tokens OAuth se guardan en `system/shoplogixToken`:
+- `access_token` — vigente ~1h
+- `refresh_token` — vigente varios días
+- `expires_at` — cuándo vence el access_token
+
+No hay que hacer nada con ellos — el sistema los renueva automáticamente.
+
+### Si Bearer no funciona en query.axd
+
+Si Shoplogix no acepta `Authorization: Bearer` en `query.axd` (responde 401),
+los logs mostrarán `AUTH_EXPIRED (Bearer)`. En ese caso:
+
+1. Conservar `SHOPLOGIX_COOKIE` como mecanismo
+2. Implementar Fase 2b.1b: usar el access_token para obtener session cookie
+   vía el endpoint `/identity` (OAuth callback)
+
+## 9. Roadmap
+
+**Fase 2b.0 — Cookie manual (LEGADO):**
+- Sigue funcionando como fallback si no hay SHOPLOGIX_USER/PASS
+
+**Fase 2b.1 — Login automatizado (IMPLEMENTADO):**
+- ROPC con `identity.shoplogix.com/connect/token`
+- Bearer token en `query.axd` (o fallback a cookie via callback)
 
 **Fase 2b.2 — API oficial (ideal):**
 - Gestionar con el account manager de AquaChile acceso API oficial
