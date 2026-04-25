@@ -18,7 +18,7 @@ import { useState, useMemo } from 'react'
 import { Card, CardContent, Badge } from '@/components/ui'
 import {
   ChevronDown, ChevronRight, Factory, Activity, AlertCircle, Zap,
-  TrendingUp, TrendingDown, Timer, Pause, AlertTriangle,
+  TrendingUp, TrendingDown, Timer, Pause, AlertTriangle, Download,
 } from 'lucide-react'
 import type {
   UpstreamLineSnapshot,
@@ -31,6 +31,7 @@ import { correlatePausesWithUpstream, summarizeCorrelations } from '@/services/s
 import { useTimelineSyncOptional } from './useTimelineSync'
 import { StateTimelineEC } from './StateTimelineEC'
 import { ProductionBarsEC } from './ProductionBarsEC'
+import { exportCombinedTimelinePng } from './exportCombinedTimelinePng'
 
 interface Props {
   snapshot: UpstreamLineSnapshot | null | undefined
@@ -636,6 +637,30 @@ export function UpstreamMachinesPanel({
                 <Activity className="w-3 h-3 inline mr-1" />
                 {fmtInt(snapshot.lineThroughputActual)} / {fmtInt(snapshot.lineThroughputExpected)} pz/h
               </span>
+            )}
+            {/* F5c — Botón export PNG combinado: captura Grader + 3 Gantts +
+                3 ProductionBars en un solo PNG vertical, listo para
+                compartir (Slack, ticket, email). Sólo visible cuando hay
+                snapshot cargado y echarts.connect activo. */}
+            {snapshot && !loading && timelineSync && (
+              <button
+                onClick={() => {
+                  if (!snapshot) return
+                  const subtitle = correlationSummary && correlationSummary.upstreamCaused > 0
+                    ? `${correlationSummary.upstreamCaused} de ${correlationSummary.total} paros del Grader coinciden con paros upstream`
+                    : `${snapshot.machines.length} máquinas — sincronizado al Grader`
+                  void exportCombinedTimelinePng(timelineSync.connectGroupId, {
+                    title: `Análisis de Turno · ${snapshot.dateKey} · ${snapshot.shiftId}`,
+                    subtitle,
+                    filenameSuffix: `${snapshot.dateKey}_${snapshot.shiftId.replace(/\s+/g, '_').toLowerCase()}`,
+                  }).catch((err) => console.error('Export combinado falló:', err))
+                }}
+                className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-slate-200 transition-colors px-1.5 py-1 rounded border border-slate-700 hover:border-slate-500"
+                title="Exportar timeline completo (Grader + 3 Baaders) como PNG único"
+              >
+                <Download className="w-3 h-3" />
+                <span>PNG</span>
+              </button>
             )}
           </div>
         </div>
