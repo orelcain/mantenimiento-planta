@@ -2,14 +2,15 @@
  * Smoke tests para exportTurnToPDF (M17).
  *
  * Verifica que la función completa el ciclo sin errores, genera el PDF
- * con las secciones esperadas (encabezado, KPIs, pausas, gates, top-P0)
- * y llama a doc.save con el nombre de archivo correcto.
+ * con las secciones esperadas (encabezado, KPIs, pausas, gates, top-P0,
+ * upstream Baader 142) y llama a doc.save con el nombre correcto.
  *
  * jsPDF y jspdf-autotable se mockean — no se genera PDF real.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { GraderDailySummary, Pause } from '../types'
+import type { UpstreamLineSnapshot } from '../../shoplogix/types'
 
 // ── Mocks hoistados (antes de vi.mock para que el factory los vea) ─────────────
 
@@ -227,5 +228,115 @@ describe('exportTurnToPDF — smoke (M17)', () => {
     })()
 
     expect(countWithout).toBeLessThan(countWith)
+  })
+
+  // ── Sección 7: upstream Baader 142 ─────────────────────────────────────────
+
+  const UPSTREAM_SNAPSHOT: UpstreamLineSnapshot = {
+    dateKey: '2024-01-15',
+    shiftId: 'Turno día',
+    lineThroughputActual: 400,
+    lineThroughputExpected: 500,
+    lineAvailability: 0.72,
+    machinesProducing: 2,
+    machines: [
+      {
+        machineid: 'uuid-1',
+        machineName: 'Evisceradora 1',
+        machineType: 'baader_142',
+        dateKey: '2024-01-15',
+        shiftId: 'Turno día',
+        shiftStart: new Date('2024-01-15T12:00:00Z'),
+        shiftEnd:   new Date('2024-01-16T00:00:00Z'),
+        totalCycles: 5553,
+        expectedTotalCycles: 6000,
+        totalPieces: 5553,
+        expectedTotalPieces: 6000,
+        overallRatio: 0.93,
+        actualRuntime: 0.11,
+        expectedRuntime: 0.50,
+        runtimeVariance: -0.39,
+        shiftRuntime: 0.723,
+        shiftRuntimeBreakdown: {
+          uptimeSec: 31140, breakSec: 2700, plannedDowntimeSec: 0,
+          downtimeSec: 1800, setupSec: 0, totalTrackedSec: 35640,
+        },
+        intervals: [],
+        states: [],
+        threshold: 15,
+        productionUnit: 'Eviscerado',
+        comments: [],
+        source: 'shoplogix',
+        sourceVersion: 1,
+        syncedAt: new Date('2024-01-15T21:00:00Z'),
+      },
+    ],
+  }
+
+  it('genera tabla upstream cuando upstreamSnapshot está presente (§7)', async () => {
+    const baseCount = await (async () => {
+      vi.clearAllMocks()
+      MockJsPDF.mockImplementation(function () { return mockDoc })
+      mockDoc.lastAutoTable = { finalY: 60 }
+      await exportTurnToPDF({ summary: SUMMARY, pauses: [] })
+      return mockAutoTable.mock.calls.length
+    })()
+
+    vi.clearAllMocks()
+    MockJsPDF.mockImplementation(function () { return mockDoc })
+    mockDoc.lastAutoTable = { finalY: 60 }
+    await exportTurnToPDF({ summary: SUMMARY, pauses: [], upstreamSnapshot: UPSTREAM_SNAPSHOT })
+    // La sección upstream agrega 1 autoTable adicional
+    expect(mockAutoTable.mock.calls.length).toBeGreaterThan(baseCount)
+  })
+
+  it('la tabla upstream contiene encabezados Uptime% y Ciclos', async () => {
+    await exportTurnToPDF({ summary: SUMMARY, pauses: [], upstreamSnapshot: UPSTREAM_SNAPSHOT })
+
+    const upstreamCall = mockAutoTable.mock.calls.find(
+      (args) => {
+        const head = (args[1] as { head?: unknown[] })?.head?.[0]
+        return Array.isArray(head) && (head as string[]).includes('Uptime %')
+      },
+    )
+    expect(upstreamCall).toBeDefined()
+    const head = (upstreamCall![1] as { head: string[][] }).head[0]
+    expect(head).toContain('Ciclos')
+    expect(head).toContain('Produciendo')
+  })
+
+  it('la tabla upstream contiene datos de la máquina (nombre, uptime%)', async () => {
+    await exportTurnToPDF({ summary: SUMMARY, pauses: [], upstreamSnapshot: UPSTREAM_SNAPSHOT })
+
+    const upstreamCall = mockAutoTable.mock.calls.find(
+      (args) => {
+        const head = (args[1] as { head?: unknown[] })?.head?.[0]
+        return Array.isArray(head) && (head as string[]).includes('Uptime %')
+      },
+    )
+    const body = (upstreamCall![1] as { body: string[][] }).body
+    expect(body[0]).toContain('Evisceradora 1')
+    expect(body[0]).toContain('72.3%')
+  })
+
+  it('no genera sección upstream cuando upstreamSnapshot es null', async () => {
+    const countWithNull = await (async () => {
+      vi.clearAllMocks()
+      MockJsPDF.mockImplementation(function () { return mockDoc })
+      mockDoc.lastAutoTable = { finalY: 60 }
+      await exportTurnToPDF({ summary: SUMMARY, pauses: [], upstreamSnapshot: null })
+      return mockAutoTable.mock.calls.length
+    })()
+
+    const countWithout = await (async () => {
+      vi.clearAllMocks()
+      MockJsPDF.mockImplementation(function () { return mockDoc })
+      mockDoc.lastAutoTable = { finalY: 60 }
+      await exportTurnToPDF({ summary: SUMMARY, pauses: [] })
+      return mockAutoTable.mock.calls.length
+    })()
+
+    // Con null debe ser idéntico a sin el parámetro
+    expect(countWithNull).toBe(countWithout)
   })
 })

@@ -3,15 +3,18 @@
  *
  * Secciones:
  *   1. Encabezado  — identificación del turno
- *   2. KPIs        — métricas clave (P0%, piezas, peso, throughput, duración)
- *   3. Pausas      — tabla con hora, duración, tier, tag y nota
- *   4. Gates       — distribución de piezas por compuerta (si disponible)
- *   5. Top P0      — causas de Punto Cero por frecuencia
+ *   2. Timeline    — imagen PNG del gráfico ECharts (opcional)
+ *   3. KPIs        — métricas clave (P0%, piezas, peso, throughput, duración)
+ *   4. Pausas      — tabla con hora, duración, tier, tag y nota
+ *   5. Gates       — distribución de piezas por compuerta (si disponible)
+ *   6. Top P0      — causas de Punto Cero por frecuencia
+ *   7. Upstream    — disponibilidad + ciclos de las Evisceradoras Baader 142 (si disponible)
  *
  * Carga jsPDF y jspdf-autotable dinámicamente (no aumenta el bundle inicial).
  */
 
 import type { GraderDailySummary, Pause } from './types'
+import type { UpstreamLineSnapshot } from '../shoplogix/types'
 
 // Mínimo de autoTable para typing (acceso a lastAutoTable.finalY)
 interface AutoTableDoc {
@@ -53,8 +56,10 @@ export async function exportTurnToPDF(params: {
   tagLabels?: Map<string, string>
   /** Data URL PNG del gráfico ECharts (timeline P0% minuto a minuto). Si se provee, se inserta en el PDF antes de los KPIs. */
   chartImageDataUrl?: string | null
+  /** Snapshot de la línea upstream (Evisceradoras Baader 142). Si se provee, se agrega sección 7. */
+  upstreamSnapshot?: UpstreamLineSnapshot | null
 }): Promise<void> {
-  const { summary, pauses, tagLabels, chartImageDataUrl } = params
+  const { summary, pauses, tagLabels, chartImageDataUrl, upstreamSnapshot } = params
 
   // Carga dinámica — no penaliza el bundle principal
   const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
@@ -227,6 +232,62 @@ export async function exportTurnToPDF(params: {
       margin: { left: MARGIN },
       tableWidth: 100,
     })
+  }
+
+  // ── 7. Línea upstream (Baader 142) ────────────────────────────────────────
+  if (upstreamSnapshot && upstreamSnapshot.machines.length > 0) {
+    if (y > pageH - 50) { doc.addPage(); y = 14 }
+    doc.setFontSize(11)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Línea upstream — Evisceradoras Baader 142', MARGIN, y)
+    y += 2
+
+    const upstreamRows = upstreamSnapshot.machines.map((m) => {
+      const bd = m.shiftRuntimeBreakdown
+      const uptimePct = `${(m.shiftRuntime * 100).toFixed(1)}%`
+      return [
+        m.machineName,
+        uptimePct,
+        fmtDur(bd.uptimeSec),
+        fmtDur(bd.breakSec),
+        fmtDur(bd.downtimeSec),
+        n(m.totalCycles),
+      ]
+    })
+
+    autoTable(doc, {
+      startY: y,
+      head: [['Máquina', 'Uptime %', 'Produciendo', 'Descansos', 'Paros', 'Ciclos']],
+      body: upstreamRows,
+      theme: 'grid',
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [51, 65, 85], textColor: 255, fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      columnStyles: {
+        0: { cellWidth: 40 },
+        1: { cellWidth: 20, halign: 'center', fontStyle: 'bold' },
+        2: { cellWidth: 28, halign: 'right' },
+        3: { cellWidth: 24, halign: 'right' },
+        4: { cellWidth: 20, halign: 'right' },
+        5: { cellWidth: 24, halign: 'right' },
+      },
+      margin: { left: MARGIN, right: MARGIN },
+    })
+    y = doc.lastAutoTable.finalY + 3
+
+    // Nota de fuente de datos
+    const syncedAt = upstreamSnapshot.machines[0]?.syncedAt
+    const syncedLabel = syncedAt
+      ? `Fuente: Shoplogix — sincronizado ${syncedAt instanceof Date
+          ? syncedAt.toLocaleString('es-CL', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
+          : String(syncedAt)}`
+      : 'Fuente: Shoplogix'
+    doc.setFontSize(7)
+    doc.setFont('helvetica', 'italic')
+    doc.setTextColor(140)
+    doc.text(syncedLabel, MARGIN, y)
+    doc.setTextColor(0)
+    y += 8
   }
 
   // ── Pie de página ──────────────────────────────────────────────────────────

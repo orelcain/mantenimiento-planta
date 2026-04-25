@@ -558,7 +558,7 @@ export function AnalisisGraderTurnoPage() {
     setPdfExporting(true)
     try {
       const chartImageDataUrl = chartImageRef.current?.() ?? null
-      await exportTurnToPDF({ summary, pauses, tagLabels, chartImageDataUrl })
+      await exportTurnToPDF({ summary, pauses, tagLabels, chartImageDataUrl, upstreamSnapshot: upstreamLine.snapshot })
     } catch (err) {
       console.error('[M17] PDF export error:', err)
     } finally {
