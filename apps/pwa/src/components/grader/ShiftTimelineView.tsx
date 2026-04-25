@@ -243,13 +243,32 @@ export function ShiftTimelineView({
     return Math.min(24 * 60, Math.max(1, Math.round((effectiveEndMs - effectiveStartMs) / 60_000)))
   }, [timelineBuckets])
 
+  // ── Emite rango temporal del zoom al parent ──────────────────────────────
+  // Calcula el rango temporal real (ms) a partir de un % de zoom y emite al
+  // callback. Síncrono: lo invocan tanto el handler `datazoom` de ECharts
+  // como `handleZoomPreset` apenas cambia el zoom — sin esperar re-render.
+  const emitZoomRange = useCallback((startPct: number, endPct: number) => {
+    if (!onZoomRangeChange) return
+    const buckets = timelineBuckets.filter((b) => b.pieces > 0)
+    if (buckets.length === 0) { onZoomRangeChange(null); return }
+    // Full zoom (100%): emite null para que el caller use su rango completo
+    if (startPct <= 0.5 && endPct >= 99.5) { onZoomRangeChange(null); return }
+    const axis = resolveAxisWindow(buckets, shiftWindow)
+    const spanMs = axis.effectiveEndMs - axis.effectiveStartMs
+    onZoomRangeChange({
+      startMs: axis.effectiveStartMs + Math.round((startPct / 100) * spanMs),
+      endMs:   axis.effectiveStartMs + Math.round((endPct / 100) * spanMs),
+    })
+  }, [onZoomRangeChange, timelineBuckets, shiftWindow])
+
   const handleZoomPreset = useCallback((preset: '10min' | '1h' | 'turno') => {
     setActiveZoom(preset)
     let start = 0
     if (preset === '10min') start = Math.max(0, 100 - Math.round((10 / totalMinutes) * 100))
     else if (preset === '1h') start = Math.max(0, 100 - Math.round((60 / totalMinutes) * 100))
     setZoomState({ start, end: 100 })
-  }, [totalMinutes])
+    emitZoomRange(start, 100)
+  }, [totalMinutes, emitZoomRange])
 
   const downloadPNG = useCallback(() => {
     const instance = echartsRef.current?.getEchartsInstance()
@@ -378,23 +397,14 @@ export function ShiftTimelineView({
     [timelineBuckets],
   )
 
-  // ── Emite rango temporal del zoom al parent (para sincronizar paneles) ──
-  // Basado en el axis effective del chart + el % de zoom actual. null si 100%.
+  // Emit inicial cuando los buckets cargan: se asegura que el callback reciba
+  // el rango actual (null si zoom completo). Re-emite si emitZoomRange cambia
+  // (timelineBuckets/shiftWindow), pero sin depender de zoomState (eso lo
+  // maneja el handler `datazoom` directo y los presets).
   useEffect(() => {
-    if (!onZoomRangeChange) return
-    const buckets = timelineBuckets.filter((b) => b.pieces > 0)
-    if (buckets.length === 0) { onZoomRangeChange(null); return }
-    const axis = resolveAxisWindow(buckets, shiftWindow)
-    const spanMs = axis.effectiveEndMs - axis.effectiveStartMs
-    // Full zoom (100%): emite null (caller usa su rango original completo)
-    if (zoomState.start <= 0.5 && zoomState.end >= 99.5) {
-      onZoomRangeChange(null)
-      return
-    }
-    const startMs = axis.effectiveStartMs + Math.round((zoomState.start / 100) * spanMs)
-    const endMs = axis.effectiveStartMs + Math.round((zoomState.end / 100) * spanMs)
-    onZoomRangeChange({ startMs, endMs })
-  }, [zoomState, timelineBuckets, shiftWindow, onZoomRangeChange])
+    emitZoomRange(zoomState.start, zoomState.end)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [emitZoomRange])
 
   const downloadCSV = useCallback(() => {
     const inWin = (tsMin: string) => {
@@ -544,77 +554,35 @@ export function ShiftTimelineView({
       buildMarkLines(shiftDoc, shiftWindow, configSnapshots, buckets, alertThreshold, criticalThreshold, productionWindow)
     const deadTimeAreas = buildMarkAreas(pauses ?? [], productionWindow)
 
-    // Marcadores Baader (sub-grid debajo del axis principal). Solo si hay
-    // snapshot upstream con máquinas. Cada lane = una Evisceradora; bandas
-    // = paros (downtime/break/setup) alineados temporalmente al chart.
+    // Marcadores Baader — usados SOLO para enriquecer el tooltip del chart
+    // con la sección "⚠ Upstream parado". El sub-grid visual fue retirado
+    // tras feedback del usuario (no aportaba en el formato compacto). La
+    // visualización detallada vive en UpstreamMachinesPanel sincronizado
+    // por zoom.
     const baaderMarkers = buildBaaderTimelineMarkers(upstreamSnapshot ?? null, lineTimes, productionWindow)
-    const hasBaader = baaderMarkers.lanes.length > 0
-    // Index: minuto label → bandas activas en ese minuto (para tooltip).
-    // Keys son los `lineTimes[i]` del axis; para cada banda, agregamos su
-    // rango [tA..tB] a todos los labels intermedios.
     const bandsByMinuteLabel = new Map<string, Array<{ machine: string; reason: string; durationMin: number; color: string }>>()
-    if (hasBaader) {
-      for (const band of baaderMarkers.bands) {
-        const iA = axisIndexByLabel.get(band.tA)
-        const iB = axisIndexByLabel.get(band.tB)
-        if (iA === undefined || iB === undefined) continue
-        const [from, to] = iA <= iB ? [iA, iB] : [iB, iA]
-        for (let i = from; i <= to; i++) {
-          const label = lineTimes[i]
-          if (!label) continue
-          if (!bandsByMinuteLabel.has(label)) bandsByMinuteLabel.set(label, [])
-          bandsByMinuteLabel.get(label)!.push({
-            machine: band.machineName,
-            reason: band.reason,
-            durationMin: band.durationMin,
-            color: band.stroke,
-          })
-        }
+    for (const band of baaderMarkers.bands) {
+      const iA = axisIndexByLabel.get(band.tA)
+      const iB = axisIndexByLabel.get(band.tB)
+      if (iA === undefined || iB === undefined) continue
+      const [from, to] = iA <= iB ? [iA, iB] : [iB, iA]
+      for (let i = from; i <= to; i++) {
+        const label = lineTimes[i]
+        if (!label) continue
+        if (!bandsByMinuteLabel.has(label)) bandsByMinuteLabel.set(label, [])
+        bandsByMinuteLabel.get(label)!.push({
+          machine: band.machineName,
+          reason: band.reason,
+          durationMin: band.durationMin,
+          color: band.stroke,
+        })
       }
     }
-    const LANE_HEIGHT = 24
-    const subGridHeight = hasBaader ? baaderMarkers.lanes.length * LANE_HEIGHT + 10 : 0
-    // Reserva vertical para slider zoom (8 + 14) + sub-grid + gap mayor
-    const mainGridBottom = hasBaader ? 30 + subGridHeight + 22 : 60
-    // Bottom del sub-grid: justo arriba del slider zoom (que vive en bottom: 8)
-    const subGridBottom = 30
-    const subYAxisData = baaderMarkers.lanes.map((l) => l.machineName).slice().reverse()
-    // markArea data — rectángulos por banda. Coords mixtas xAxis(category)/yAxis(category).
-    const baaderMarkAreas: Array<[object, object]> = baaderMarkers.bands.map((band) => [
-      {
-        name: band.name,
-        xAxis: band.tA,
-        yAxis: band.machineName,
-        itemStyle: {
-          color: band.fill,
-          borderColor: band.stroke,
-          borderWidth: 1,
-        },
-        // Etiqueta solo cuando la banda es suficientemente larga (>= 8 min)
-        // para evitar texto encimado en micro-paros.
-        label: band.durationMin >= 8
-          ? {
-              show: true,
-              formatter: `${band.reason} ${band.durationMin}m`,
-              color: '#f9fafb',
-              fontSize: 9,
-              position: 'inside' as const,
-              overflow: 'truncate' as const,
-            }
-          : { show: false },
-      },
-      { xAxis: band.tB, yAxis: band.machineName },
-    ])
 
     return {
       backgroundColor: 'transparent',
-      // Más margen bajo para el slider de zoom + sub-grid Baader si aplica
-      grid: hasBaader
-        ? [
-            { left: 40, right: 16, top: 20, bottom: mainGridBottom },
-            { left: 40, right: 16, height: subGridHeight, bottom: subGridBottom },
-          ]
-        : { left: 40, right: 16, top: 20, bottom: 60 },
+      // Más margen bajo para el slider de zoom
+      grid: { left: 40, right: 16, top: 20, bottom: 60 },
       toolbox: {
         right: 10,
         top: 0,
@@ -626,14 +594,11 @@ export function ShiftTimelineView({
         iconStyle: { borderColor: '#6b7280' },
         emphasis: { iconStyle: { borderColor: '#f9fafb' } },
       },
-      // Zoom: rueda para pan, slider visible, pinch-zoom en móvil. Cuando hay
-      // sub-grid Baader, el zoom se aplica a ambos xAxes para mantener
-      // alineación pixel-perfect entre chart Grader y sub-fila Baader.
+      // Zoom: rueda para pan, slider visible, pinch-zoom en móvil
       dataZoom: [
-        { type: 'inside', xAxisIndex: hasBaader ? [0, 1] : 0, start: zoomState.start, end: zoomState.end, zoomOnMouseWheel: true, moveOnMouseMove: true, moveOnMouseWheel: false },
+        { type: 'inside', start: zoomState.start, end: zoomState.end, zoomOnMouseWheel: true, moveOnMouseMove: true, moveOnMouseWheel: false },
         {
           type: 'slider',
-          xAxisIndex: hasBaader ? [0, 1] : 0,
           start: zoomState.start,
           end: zoomState.end,
           height: 14,           // antes 18 — más discreto
@@ -647,53 +612,19 @@ export function ShiftTimelineView({
           textStyle: { color: '#6b7280', fontSize: 10 },
         },
       ],
-      xAxis: hasBaader
-        ? [
-            {
-              type: 'category' as const,
-              data: lineTimes,
-              axisLine: { lineStyle: { color: '#374151' } },
-              axisLabel: {
-                color: '#6b7280',
-                fontSize: 11,
-                hideOverlap: true,
-                interval: 'auto' as const,
-              },
-            },
-            {
-              // Sub-grid Baader: mismo lineTimes (alineación pixel-perfect),
-              // sin labels (las horas ya las muestra el principal arriba).
-              type: 'category' as const,
-              data: lineTimes,
-              gridIndex: 1,
-              axisLine: { show: false },
-              axisTick: { show: false },
-              axisLabel: { show: false },
-              splitLine: { show: false },
-            },
-          ]
-        : {
-            type: 'category' as const,
-            // lineTimes: 1 label por minuto (axis expandido minuto a minuto).
-            data: lineTimes,
-            axisLine: { lineStyle: { color: '#374151' } },
-            // Adaptativo al zoom: dejamos que ECharts decida cuántos labels
-            // mostrar según el ancho visible post-zoom — `hideOverlap: true` hace
-            // que labels que se solapan se escondan. Al hacer zoom la densidad
-            // crece naturalmente (más espacio por label → más minutos visibles,
-            // llegando hasta minuto a minuto en zoom muy cercano).
-            //
-            // `interval: 'auto'` pide a ECharts que compute el stride óptimo
-            // según el pixel width disponible. Cualquier interval fijo rompe
-            // este comportamiento y deja rangos con 0-2 labels al zoom.
-            axisLabel: {
-              color: '#6b7280',
-              fontSize: 11,
-              hideOverlap: true,
-              interval: 'auto' as const,
-            },
-          },
-      yAxis: ([
+      xAxis: {
+        type: 'category' as const,
+        // lineTimes: 1 label por minuto (axis expandido minuto a minuto).
+        data: lineTimes,
+        axisLine: { lineStyle: { color: '#374151' } },
+        axisLabel: {
+          color: '#6b7280',
+          fontSize: 11,
+          hideOverlap: true,
+          interval: 'auto' as const,
+        },
+      },
+      yAxis: [
         (() => {
           // Escala adaptativa tier-based para el P0% acumulado.
           //
@@ -749,40 +680,7 @@ export function ShiftTimelineView({
           min: 0,
           show: scatterAxisShow,
         },
-      ] as object[]).concat(
-        hasBaader
-          ? [
-              {
-                // yAxis #4: lanes Baader (sub-grid). Category con un slot por
-                // máquina; markArea coords usan el machineName como yAxis.
-                // subYAxisData está reverso para que el orden visual coincida
-                // con snapshot.machines (primer item arriba en el sub-grid).
-                type: 'category' as const,
-                data: subYAxisData,
-                gridIndex: 1,
-                axisLine: { show: false },
-                axisTick: { show: false },
-                axisLabel: {
-                  color: '#e2e8f0',
-                  fontSize: 11,
-                  fontWeight: 700 as const,
-                  margin: 8,
-                  interval: 0 as const,
-                  formatter: (v: string) => {
-                    // Abreviar "Evisceradora N" → "EN" para no comer ancho
-                    const m = /Evisceradora\s+(\d+)/i.exec(v)
-                    return m ? `E${m[1]}` : v
-                  },
-                },
-                splitLine: { show: true, lineStyle: { color: 'rgba(148,163,184,0.18)', type: 'solid' as const } },
-                splitArea: {
-                  show: true,
-                  areaStyle: { color: ['rgba(15,23,42,0.4)', 'rgba(30,41,59,0.5)'] },
-                },
-              },
-            ]
-          : [],
-      ),
+      ],
       tooltip: {
         trigger: 'axis' as const,
         backgroundColor: '#1f2937',
@@ -952,29 +850,6 @@ export function ShiftTimelineView({
             z: 5,
           }
         }),
-        // Sub-fila Baader — serie bar invisible en grid[1] que aloja el
-        // markArea con las bandas de paros. La serie en sí no dibuja nada
-        // (data vacía) pero ECharts requiere la serie para ubicar el markArea
-        // en el sub-grid via xAxisIndex/yAxisIndex.
-        ...(hasBaader
-          ? [
-              {
-                name: 'Paros Baader',
-                type: 'bar' as const,
-                xAxisIndex: 1,
-                yAxisIndex: 3,
-                data: [],
-                silent: false,
-                tooltip: { show: false },
-                markArea: {
-                  silent: false,
-                  data: baaderMarkAreas,
-                  emphasis: { itemStyle: { opacity: 0.85 } },
-                },
-                z: 1,
-              },
-            ]
-          : []),
       ],
     }
   }, [timelineBuckets, shiftDoc, shiftWindow, configSnapshots, causesArr, piecesByCause, scatterAxisShow, gate0Pieces, pauses, productionWindow, bucketByLabel, summaryP0Pct, alertThreshold, criticalThreshold, zoomState, upstreamSnapshot])
@@ -1155,18 +1030,16 @@ export function ShiftTimelineView({
           <ReactECharts
             ref={echartsRef}
             option={chartOption}
-            style={{ height: (scatterAxisShow ? 360 : 320) + (upstreamSnapshot && upstreamSnapshot.machines.length > 0 ? upstreamSnapshot.machines.length * 24 + 22 : 0) }}
+            style={{ height: scatterAxisShow ? 360 : 320 }}
             theme="dark"
             opts={{ renderer: 'canvas' }}
             notMerge={true}
             lazyUpdate={false}
             onEvents={{
               click: handleChartClick,
-              // Sincroniza el state local cuando el usuario arrastra el slider
-              // o hace pan/wheel dentro del chart. ECharts emite start/end en %.
-              // Robusto: lee siempre desde getOption().dataZoom para evitar
-              // payloads parciales (batch[0] puede no traer start/end al
-              // arrancar wheel-zoom o cuando vienen múltiples instancias).
+              // Sincroniza el state local + emite rango al parent cuando el
+              // usuario arrastra el slider o hace pan/wheel. Lee del state
+              // canónico de ECharts (getOption) para evitar payloads parciales.
               datazoom: () => {
                 const inst = echartsRef.current?.getEchartsInstance?.()
                 if (!inst) return
@@ -1175,6 +1048,7 @@ export function ShiftTimelineView({
                 const s = typeof dz?.start === 'number' ? dz.start : 0
                 const e = typeof dz?.end === 'number' ? dz.end : 100
                 setZoomState((prev) => (prev.start === s && prev.end === e ? prev : { start: s, end: e }))
+                emitZoomRange(s, e)
               },
             }}
           />

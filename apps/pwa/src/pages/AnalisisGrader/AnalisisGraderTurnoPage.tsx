@@ -545,12 +545,21 @@ export function AnalisisGraderTurnoPage() {
   // Rango temporal del zoom del chart Grader — se usa para sincronizar el
   // eje X del panel upstream (Baader Gantts + barras producción). null = full.
   const [zoomRange, setZoomRange] = useState<{ startMs: number; endMs: number } | null>(null)
-  const zoomedAxisWindow = useMemo(() => {
-    if (!zoomRange) return chartAxisWindow ?? shiftWindow
-    return {
-      startAt: new Date(zoomRange.startMs).toISOString(),
-      endAt: new Date(zoomRange.endMs).toISOString(),
+  // Rango efectivo para alinear el panel upstream con el chart Grader.
+  // Prioridad estricta: zoomRange > chartAxisWindow > shiftWindow del schedule.
+  // CRÍTICO: garantiza que NUNCA es null cuando hay buckets cargados — sin
+  // esto, el panel cae a `shift.shiftStart` por máquina (07:23 etc.) y queda
+  // visualmente desincronizado del Grader.
+  const zoomedAxisWindow = useMemo<{ startAt: string; endAt: string } | null>(() => {
+    if (zoomRange) {
+      return {
+        startAt: new Date(zoomRange.startMs).toISOString(),
+        endAt: new Date(zoomRange.endMs).toISOString(),
+      }
     }
+    if (chartAxisWindow) return chartAxisWindow
+    if (shiftWindow) return { startAt: shiftWindow.startAt, endAt: shiftWindow.endAt }
+    return null
   }, [zoomRange, chartAxisWindow, shiftWindow])
   const handleExportPdf = useCallback(async () => {
     if (!summary || pdfExporting) return
