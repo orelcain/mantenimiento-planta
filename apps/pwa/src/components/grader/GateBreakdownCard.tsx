@@ -15,6 +15,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { LayoutGrid, ChevronDown, ChevronUp, ArrowRight } from 'lucide-react'
 import type { GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
+import {
+  GATE_RATIO_THRESHOLDS,
+  gateStatusFromRatio,
+  cautelaSeverity,
+  severityBadgeClass,
+  severityLabel,
+  estimateRebalanceImpact,
+  quantifyReassignable,
+  type ReassignmentSeverity,
+} from '@/services/grader/graderGateAssignment'
 import { QuickGateChangeButton } from './QuickGateChangeButton'
 
 interface GateRow {
@@ -52,6 +62,8 @@ interface CalibreGroup {
 interface Suggestion {
   fromGate: number
   fromLabel: string
+  fromCalibre: string  // calibre raw del grupo origen (para severidad)
+  fromQuality: string  // calidad raw del grupo origen
   toLabel: string
   toCalibre: string   // calibre raw del grupo destino (para pre-rellenar el form)
   toQuality: string   // calidad raw del grupo destino
@@ -59,6 +71,10 @@ interface Suggestion {
   fromPct: number
   satRatio: number
   cautela: string
+  /** Severidad operacional del cambio (directo / ajuste / reconfigurar). */
+  severity: ReassignmentSeverity
+  /** Estimación post-reasignación: ratio destino antes/después + status final. */
+  estimate: ReturnType<typeof estimateRebalanceImpact>
   impact: number  // fromPieces × satRatio — usado para ordenar
 }
 
@@ -141,7 +157,7 @@ function computeAssignmentAnalysis(
       productionPct,
       gatesPct,
       ratio,
-      status: (ratio > 1.5 ? 'saturado' : ratio < 0.5 ? 'sobredimensionado' : 'optimo') as CalibreGroup['status'],
+      status: gateStatusFromRatio(ratio),
     }
   }).sort((a, b) => b.productionPct - a.productionPct)
 
@@ -180,16 +196,18 @@ function computeAssignmentAnalysis(
       if (seenPairs.has(pairKey)) continue
       seenPairs.add(pairKey)
 
-      const sameQuality = sobre.quality.toLowerCase() === sat.quality.toLowerCase()
-      const sameCalibre = sobre.calibre.toLowerCase() === sat.calibre.toLowerCase()
+      const severity = cautelaSeverity(sobre.calibre, sobre.quality, sat.calibre, sat.quality)
 
       let cautela = ''
-      if (!sameQuality && !sameCalibre) {
+      if (severity === 'reconfigure') {
         cautela = `Requiere cambiar calibre (${sobre.calibre}→${sat.calibre}) Y calidad (${sobre.quality}→${sat.quality}) — verificar criterios de aceptación`
-      } else if (!sameQuality) {
-        cautela = `Mismo calibre pero calidad diferente (${sobre.quality}→${sat.quality}) — revisar si el grader acepta el cambio sin ajuste de parámetros`
-      } else if (!sameCalibre) {
-        cautela = `Misma calidad pero calibre diferente (${sobre.calibre}→${sat.calibre}) — ajustar rango de peso del gate`
+      } else if (severity === 'adjustment') {
+        const sameQuality = sobre.quality.toLowerCase() === sat.quality.toLowerCase()
+        if (sameQuality) {
+          cautela = `Misma calidad pero calibre diferente (${sobre.calibre}→${sat.calibre}) — ajustar rango de peso del gate`
+        } else {
+          cautela = `Mismo calibre pero calidad diferente (${sobre.quality}→${sat.quality}) — revisar si el grader acepta el cambio sin ajuste de parámetros`
+        }
       } else {
         cautela = 'Misma calidad y calibre — cambio directo sin riesgo de reconfiguración'
       }
@@ -203,9 +221,18 @@ function computeAssignmentAnalysis(
         ? (gateToMove.pieces / totalProductivePieces) * 100
         : 0
 
+      const estimate = estimateRebalanceImpact({
+        destProductionPct:     sat.productionPct,
+        destGatesCount:        sat.gates.length,
+        numActiveGates,
+        fromGateProductionPct: fromPct,
+      })
+
       suggestions.push({
         fromGate: gateToMove.gate,
         fromLabel: sobre.label,
+        fromCalibre: sobre.calibre,
+        fromQuality: sobre.quality,
         toLabel: sat.label,
         toCalibre: sat.calibre,
         toQuality: sat.quality,
@@ -213,6 +240,8 @@ function computeAssignmentAnalysis(
         fromPct,
         satRatio: sat.ratio,
         cautela,
+        severity,
+        estimate,
         impact: gateToMove.pieces * sat.ratio,
       })
     }
@@ -261,6 +290,9 @@ export function GateBreakdownCard({
     [productiveRows, gateConfigMap, totalProductivePieces],
   )
 
+  // Cuantificar el potencial total reasignable — info útil para el badge.
+  const reassignable = useMemo(() => quantifyReassignable(suggestions), [suggestions])
+
   // Mapa gate → status para colorear las barras
   const gateStatusMap = useMemo(() => {
     const m = new Map<number, CalibreGroup['status']>()
@@ -299,6 +331,12 @@ export function GateBreakdownCard({
           >
             <span className="w-1.5 h-1.5 rounded-full bg-current" />
             {diagnosis.label}
+            {/* Cuantificar potencial reasignable cuando la asignación es subóptima */}
+            {reassignable.totalPieces > 0 && diagnosis.color === 'amber' && (
+              <span className="opacity-80 tabular-nums">
+                · ~{reassignable.totalPieces.toLocaleString('es-CL')} pzas reasignables
+              </span>
+            )}
           </span>
         </CardTitle>
       </CardHeader>
@@ -522,10 +560,35 @@ export function GateBreakdownCard({
                                 {' → '}
                                 <span className="text-foreground/70">{s.toLabel}</span>
                               </span>
+                              {/* Badge severidad — visible primero, comunica complejidad del cambio */}
+                              <span
+                                className={cn(
+                                  'inline-flex items-center px-1.5 py-0 rounded-full border text-[9px] font-medium uppercase tracking-wide',
+                                  severityBadgeClass(s.severity),
+                                )}
+                                title={s.cautela}
+                              >
+                                {severityLabel(s.severity)}
+                              </span>
                             </div>
                             <div className="text-muted-foreground/70 mt-0.5">
                               G{s.fromGate} clasificó {s.fromPieces.toLocaleString('es-CL')} pzas ({s.fromPct.toFixed(1)}%)
                               {' · '}destino saturado a {s.satRatio.toFixed(1)}×
+                            </div>
+                            {/* Estimación post-reasignación — info útil concreta */}
+                            <div className="text-[10px] mt-0.5 tabular-nums">
+                              <span className="text-muted-foreground/60">Esperado:</span>{' '}
+                              <span className={cn(
+                                s.estimate.improvesDestination ? 'text-emerald-400' : 'text-amber-400/80',
+                              )}>
+                                {s.toLabel} {s.estimate.destBeforeRatio.toFixed(1)}× → {s.estimate.destAfterRatio.toFixed(1)}×
+                              </span>
+                              {s.estimate.improvesDestination && (
+                                <span className="text-emerald-400 ml-1">(óptimo ✓)</span>
+                              )}
+                              {!s.estimate.improvesDestination && s.estimate.destAfterStatus === 'saturado' && (
+                                <span className="text-amber-400/80 ml-1">(sigue saturado — considerar mover 2 gates)</span>
+                              )}
                             </div>
                             <div className={cn(
                               'mt-1 text-[10px] italic',
