@@ -1,0 +1,91 @@
+/**
+ * Tests del TimelineSyncContext — verifica:
+ *   - Provider expone range/setRange/connectGroupId
+ *   - setRange es idempotente (no causa re-render cuando el valor es igual)
+ *   - useTimelineSync lanza error fuera del provider
+ *   - useTimelineSyncOptional devuelve null fuera del provider
+ *   - El groupId default es 'timeline-sync', se puede sobreescribir
+ */
+
+import { describe, it, expect } from 'vitest'
+import { renderHook, act } from '@testing-library/react'
+import { TimelineSyncProvider } from '../TimelineSyncContext'
+import { useTimelineSync, useTimelineSyncOptional } from '../useTimelineSync'
+import type { ReactNode } from 'react'
+
+function wrap(groupId?: string) {
+  return ({ children }: { children: ReactNode }) =>
+    <TimelineSyncProvider groupId={groupId}>{children}</TimelineSyncProvider>
+}
+
+describe('TimelineSyncContext', () => {
+  it('provee range=null y groupId default', () => {
+    const { result } = renderHook(() => useTimelineSync(), { wrapper: wrap() })
+    expect(result.current.range).toBeNull()
+    expect(result.current.connectGroupId).toBe('timeline-sync')
+    expect(typeof result.current.setRange).toBe('function')
+  })
+
+  it('respeta el groupId pasado al Provider', () => {
+    const { result } = renderHook(() => useTimelineSync(), { wrapper: wrap('group-feb-26') })
+    expect(result.current.connectGroupId).toBe('group-feb-26')
+  })
+
+  it('setRange actualiza el rango', () => {
+    const { result } = renderHook(() => useTimelineSync(), { wrapper: wrap() })
+    act(() => result.current.setRange({ startMs: 1000, endMs: 2000 }))
+    expect(result.current.range).toEqual({ startMs: 1000, endMs: 2000 })
+    act(() => result.current.setRange(null))
+    expect(result.current.range).toBeNull()
+  })
+
+  it('setRange es idempotente con el mismo objeto', () => {
+    const { result } = renderHook(() => useTimelineSync(), { wrapper: wrap() })
+    const obj = { startMs: 100, endMs: 200 }
+    act(() => result.current.setRange(obj))
+    const firstRange = result.current.range
+    act(() => result.current.setRange(obj))
+    // Mismo identity: no hay nueva referencia
+    expect(result.current.range).toBe(firstRange)
+  })
+
+  it('setRange es idempotente con valores estructuralmente iguales', () => {
+    const { result } = renderHook(() => useTimelineSync(), { wrapper: wrap() })
+    act(() => result.current.setRange({ startMs: 100, endMs: 200 }))
+    const firstRange = result.current.range
+    // Nueva referencia pero mismos valores → no actualiza
+    act(() => result.current.setRange({ startMs: 100, endMs: 200 }))
+    expect(result.current.range).toBe(firstRange)
+  })
+
+  it('setRange null → null es idempotente', () => {
+    const { result } = renderHook(() => useTimelineSync(), { wrapper: wrap() })
+    expect(result.current.range).toBeNull()
+    act(() => result.current.setRange(null))
+    expect(result.current.range).toBeNull()
+  })
+
+  it('useTimelineSync lanza error fuera del provider', () => {
+    // Silenciar error de React 18 para este test
+    const consoleError = console.error
+    console.error = () => {}
+    try {
+      expect(() => renderHook(() => useTimelineSync())).toThrow(
+        /must be used inside <TimelineSyncProvider>/,
+      )
+    } finally {
+      console.error = consoleError
+    }
+  })
+
+  it('useTimelineSyncOptional devuelve null fuera del provider', () => {
+    const { result } = renderHook(() => useTimelineSyncOptional())
+    expect(result.current).toBeNull()
+  })
+
+  it('useTimelineSyncOptional devuelve el value dentro del provider', () => {
+    const { result } = renderHook(() => useTimelineSyncOptional(), { wrapper: wrap() })
+    expect(result.current).not.toBeNull()
+    expect(result.current?.range).toBeNull()
+  })
+})
