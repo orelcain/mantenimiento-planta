@@ -18,7 +18,7 @@ import { useState, useMemo } from 'react'
 import { Card, CardContent, Badge } from '@/components/ui'
 import {
   ChevronDown, ChevronRight, Factory, Activity, AlertCircle, Zap,
-  TrendingUp, TrendingDown, Timer, Pause, AlertTriangle,
+  TrendingUp, TrendingDown, Timer, Pause, AlertTriangle, Download,
 } from 'lucide-react'
 import type {
   UpstreamLineSnapshot,
@@ -26,6 +26,12 @@ import type {
   UpstreamProductionInterval,
   UpstreamMachineState,
 } from '@/services/shoplogix/types'
+import type { Pause as GraderPause } from '@/services/grader/types'
+import { correlatePausesWithUpstream, summarizeCorrelations } from '@/services/shoplogix/shoplogixCorrelation'
+import { useTimelineSyncOptional } from './useTimelineSync'
+import { StateTimelineEC } from './StateTimelineEC'
+import { ProductionBarsEC } from './ProductionBarsEC'
+import { exportCombinedTimelinePng } from './exportCombinedTimelinePng'
 
 interface Props {
   snapshot: UpstreamLineSnapshot | null | undefined
@@ -42,6 +48,11 @@ interface Props {
     startAt: string  // ISO
     endAt: string
   } | null
+  /**
+   * Paros del Grader (≥5min) — usados para detectar paros coincidentes con
+   * paros upstream y mostrar badge "⚠ N coincidencias" en el header (F5b).
+   */
+  pauses?: GraderPause[]
 }
 
 // ============================================================================
@@ -159,50 +170,6 @@ function aggregateStatesByReason(states: UpstreamMachineState[]): ReasonAggregat
 // ============================================================================
 
 /**
- * Genera ticks de eje horario entre start y end. Granularidad adaptativa al
- * rango total — necesario para que el panel muestre referencias visibles
- * cuando el chart Grader está zoomeado (rangos < 1h pierden todos los ticks
- * si solo se usan horas exactas).
- *
- * Reglas:
- *   - rango ≤ 30 min: cada 5 min
- *   - rango ≤ 2 h:    cada 15 min
- *   - rango ≤ 6 h:    cada 1 h (legacy)
- *   - rango > 6 h:    cada 2 h
- *
- * Funciona en UTC porque los timestamps Shoplogix son wall-clock-as-UTC.
- */
-function generateHourTicks(start: Date, end: Date): Date[] {
-  const totalMin = (end.getTime() - start.getTime()) / 60_000
-  if (totalMin <= 0) return []
-
-  // Step en minutos (también define cómo se "rounded-up" el primer tick).
-  let stepMin: number
-  if (totalMin <= 30)      stepMin = 5
-  else if (totalMin <= 120) stepMin = 15
-  else if (totalMin <= 360) stepMin = 60
-  else                       stepMin = 120
-
-  const stepMs = stepMin * 60_000
-
-  // Round-up del primer tick: lo alineamos al siguiente múltiplo de stepMin
-  // dentro de la hora actual (en wall-clock UTC).
-  const minutesUTC = start.getUTCMinutes()
-  const remainder = minutesUTC % stepMin
-  const minutesPad = remainder === 0 ? 0 : stepMin - remainder
-  const firstTickMs = start.getTime() + minutesPad * 60_000
-  // Margen al borde para evitar overlap con label "end". Para rangos cortos
-  // usamos margen proporcional al step (medio step).
-  const edgeMs = Math.max(2 * 60_000, stepMs / 2)
-
-  const ticks: Date[] = []
-  for (let t = firstTickMs; t < end.getTime() - edgeMs; t += stepMs) {
-    ticks.push(new Date(t))
-  }
-  return ticks
-}
-
-/**
  * Gantt con leyenda + ticks horarios. Si se provee `windowStart/End`, el Gantt
  * se renderiza en ese rango (permite alineación con timeline del Grader).
  */
@@ -219,7 +186,6 @@ function StateTimeline({
   const rangeEnd   = windowEnd   ?? shift.shiftEnd
   const totalMs = rangeEnd.getTime() - rangeStart.getTime()
   const reasons = useMemo(() => aggregateStatesByReason(shift.states), [shift.states])
-  const ticks = useMemo(() => generateHourTicks(rangeStart, rangeEnd), [rangeStart, rangeEnd])
 
   if (totalMs <= 0 || shift.states.length === 0) {
     return <div className="h-5 rounded-md bg-slate-800/60" />
@@ -227,66 +193,17 @@ function StateTimeline({
 
   return (
     <div className="space-y-1.5">
-      {/* Gantt + overlay de ticks */}
-      <div className="relative">
-        <div className="relative flex h-5 rounded-md overflow-hidden bg-slate-800/60 border border-slate-700/70 shadow-inner">
-          {shift.states.map((st, i) => {
-            // Recorta el estado al windowStart/End si lo excede
-            const segStart = Math.max(st.startAt.getTime(), rangeStart.getTime())
-            const segEnd   = Math.min(st.endAt.getTime(),   rangeEnd.getTime())
-            if (segEnd <= segStart) return null
-            const startOffsetPct = ((segStart - rangeStart.getTime()) / totalMs) * 100
-            const widthPct       = ((segEnd - segStart) / totalMs) * 100
-            const label = st.reason ? `${st.name}: ${st.reason}` : st.name
-            return (
-              <div
-                key={i}
-                style={{
-                  position: 'absolute',
-                  left: `${startOffsetPct}%`,
-                  width: `${widthPct}%`,
-                  height: '100%',
-                  backgroundColor: st.color,
-                }}
-                className="border-r border-slate-900/40 transition-[filter] duration-150 hover:brightness-125 hover:z-10 cursor-help"
-                title={`${label}\n⏱ ${fmtDuration(st.durationSec)}\n🕐 ${fmtHHmm(st.startAt)}–${fmtHHmm(st.endAt)} (Chile)`}
-              />
-            )
-          })}
-
-          {/* Ticks verticales de hora — sobre los segmentos para legibilidad */}
-          {ticks.map((t, i) => {
-            const leftPct = ((t.getTime() - rangeStart.getTime()) / totalMs) * 100
-            return (
-              <div
-                key={`tick-${i}`}
-                className="absolute top-0 bottom-0 w-px bg-white/20 pointer-events-none"
-                style={{ left: `${leftPct}%` }}
-              />
-            )
-          })}
-        </div>
+      {/* Gantt en ECharts — sincroniza zoom y crosshair via echarts.connect()
+          con el chart Grader y los demás Gantts del mismo turno (Fase 2 del
+          Synchronized Timeline). Mantiene el rendering visual del HTML viejo
+          pero con interactividad nativa de ECharts. */}
+      <div className="rounded-md overflow-hidden bg-slate-800/60 border border-slate-700/70 shadow-inner">
+        <StateTimelineEC shift={shift} windowStart={windowStart} windowEnd={windowEnd} height={20} />
       </div>
 
-      {/* Eje horario debajo del gantt */}
-      {ticks.length > 0 && (
-        <div className="relative h-3 text-[10px] text-slate-400 tabular-nums">
-          <span className="absolute left-0">{fmtHHmm(rangeStart)}</span>
-          {ticks.map((t, i) => {
-            const leftPct = ((t.getTime() - rangeStart.getTime()) / totalMs) * 100
-            return (
-              <span
-                key={`label-${i}`}
-                className="absolute"
-                style={{ left: `${leftPct}%`, transform: 'translateX(-50%)' }}
-              >
-                {fmtHHmm(t)}
-              </span>
-            )
-          })}
-          <span className="absolute right-0">{fmtHHmm(rangeEnd)}</span>
-        </div>
-      )}
+      {/* El eje horario se muestra dentro de ProductionBarsEC (ECharts axisLabel)
+          que está inmediatamente debajo — adapta su granularidad al zoom
+          automáticamente (1 min cuando < 10 min, 5 min a 30 min, etc.). */}
 
       {/* Leyenda condensada — top 6 razones por duración */}
       {reasons.length > 0 && (
@@ -304,91 +221,9 @@ function StateTimeline({
   )
 }
 
-/**
- * Bar chart de producción por intervalo con línea objetivo visible.
- * Cada barra se posiciona ABSOLUTAMENTE según su `startAt` dentro del rango
- * `windowStart..windowEnd` — así queda alineado pixel-perfect con el Gantt
- * de arriba (que usa el mismo rango). Sin esto, las barras se distribuyen
- * con `flex` y NO coinciden temporalmente con el Gantt cuando los intervals
- * no cubren todo el rango.
- */
-function ProductionBars({
-  intervals,
-  threshold,
-  windowStart,
-  windowEnd,
-}: {
-  intervals: UpstreamProductionInterval[]
-  threshold: number
-  windowStart?: Date
-  windowEnd?: Date
-}) {
-  if (intervals.length === 0) {
-    return <div className="h-16 rounded bg-slate-800/40" />
-  }
-  const maxValue = Math.max(1, ...intervals.map(x => Math.max(x.cycles, x.expectedCycles)))
-  const expected = intervals.find(x => x.expectedCycles > 0)?.expectedCycles ?? 0
-  const expectedPct = (expected / maxValue) * 100
-
-  const colorMap: Record<UpstreamProductionInterval['color'], string> = {
-    green:  'bg-emerald-500/90',
-    yellow: 'bg-amber-500/90',
-    red:    'bg-rose-500/90',
-    gray:   'bg-slate-700/60',
-  }
-
-  // Rango temporal — fallback al span de los intervals si no se pasa window
-  const firstIvl = intervals[0]!
-  const lastIvl  = intervals[intervals.length - 1]!
-  const rangeStart = windowStart ?? firstIvl.startAt
-  const rangeEnd   = windowEnd   ?? lastIvl.endAt
-  const totalMs = Math.max(1, rangeEnd.getTime() - rangeStart.getTime())
-
-  return (
-    <div className="relative h-16 bg-slate-950/60 rounded px-1.5 py-1 border border-slate-800">
-      {/* Línea objetivo — absolute dentro del contenedor relativo */}
-      <div
-        className="absolute left-1.5 right-1.5 border-t border-dashed border-violet-400/70 z-10 pointer-events-none"
-        style={{ bottom: `${4 + (expectedPct * (64 - 8)) / 100}px` }}
-      />
-
-      {/* Barras: posicionadas absolutamente por timestamp para alinear con Gantt */}
-      <div className="relative h-full">
-        {intervals.map((it, i) => {
-          // Recorta interval al window si lo excede
-          const segStart = Math.max(it.startAt.getTime(), rangeStart.getTime())
-          const segEnd   = Math.min(it.endAt.getTime(),   rangeEnd.getTime())
-          if (segEnd <= segStart) return null
-          const leftPct = ((segStart - rangeStart.getTime()) / totalMs) * 100
-          const widthPct = ((segEnd - segStart) / totalMs) * 100
-          const heightPct = (it.cycles / maxValue) * 100
-          return (
-            <div
-              key={i}
-              className="absolute bottom-0 group"
-              style={{
-                left: `${leftPct}%`,
-                width: `calc(${widthPct}% - 1px)`,
-                height: '100%',
-              }}
-              title={`${fmtHHmm(it.startAt)}: ${it.cycles}/${Math.round(it.expectedCycles)} pz (${fmtPct(it.ratio)})`}
-            >
-              <div
-                className={`${colorMap[it.color]} rounded-sm transition-all absolute bottom-0 left-0 right-0`}
-                style={{ height: `${Math.max(4, heightPct)}%` }}
-              />
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Etiqueta "Objetivo" */}
-      <div className="absolute right-2 top-1 text-[9px] text-violet-400/80 bg-slate-900/90 px-1.5 rounded z-20">
-        Objetivo {Math.round(expected)} ± {threshold}%
-      </div>
-    </div>
-  )
-}
+// Nota: ProductionBars (HTML divs absolute) fue reemplazado por
+// ProductionBarsEC (Fase 3 del Synchronized Timeline). Ver
+// `./ProductionBarsEC.tsx`.
 
 /** KPI row tipo Shoplogix: total / verde / amarillo / rojo. */
 function ProductionKpiRow({ kpis }: { kpis: MachineKpis }) {
@@ -424,7 +259,25 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
   /** Si es true, esta máquina tiene >50% más microparadas que el promedio de la línea. */
   microAlert?: boolean
 }) {
-  const kpis   = useMemo(() => computeKpis(shift.intervals), [shift.intervals])
+  // F5a — Mini-KPIs zoom-aware. Source of truth: context.range (idéntico al
+  // panel-global). Sin esto, el badge aparecería siempre que el rango de
+  // alineación con el Grader difiera del shift Baader (false positive).
+  const timelineSyncRow = useTimelineSyncOptional()
+  const isZoomActive = timelineSyncRow?.range != null
+
+  const kpis = useMemo(() => {
+    if (!isZoomActive || !windowStart || !windowEnd) {
+      return computeKpis(shift.intervals)
+    }
+    const wStart = windowStart.getTime()
+    const wEnd = windowEnd.getTime()
+    const filtered = shift.intervals.filter((it) => {
+      const ts = it.startAt.getTime()
+      return ts >= wStart && ts <= wEnd
+    })
+    return computeKpis(filtered)
+  }, [shift.intervals, windowStart, windowEnd, isZoomActive])
+
   const breaks = shift.states.filter(s => s.type === 'break').length
   const micro  = shift.states.filter(s => s.name === 'Micro Detencion').length
 
@@ -469,16 +322,31 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
         </div>
       </button>
 
-      {/* KPI row siempre visible (verde/amarillo/rojo) */}
-      <ProductionKpiRow kpis={kpis} />
+      {/* KPI row siempre visible (verde/amarillo/rojo). Badge "del rango"
+          aparece cuando hay zoom activo — los KPIs se recalculan sólo del
+          rango temporal visible (F5a). */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <ProductionKpiRow kpis={kpis} />
+        {isZoomActive && (
+          <Badge
+            variant="outline"
+            className="bg-violet-950/60 border-violet-800 text-violet-300 text-[10px] px-1.5 py-0.5 h-5 gap-1"
+            title="KPIs recalculados sólo del rango temporal visible (no del turno completo)"
+          >
+            <span>✂</span> del rango
+          </Badge>
+        )}
+      </div>
 
       {/* Wrapper con padding para alinear pixel-perfect con plot area del ECharts del Grader */}
       <div style={{ paddingLeft: PLOT_LEFT_PAD_PX, paddingRight: PLOT_RIGHT_PAD_PX }} className="space-y-2">
         {/* Gantt con leyenda */}
         <StateTimeline shift={shift} windowStart={windowStart} windowEnd={windowEnd} />
 
-        {/* Production bars + objetivo — alineadas al MISMO rango que el Gantt */}
-        <ProductionBars
+        {/* Production bars + objetivo — versión ECharts (Fase 3 del
+            Synchronized Timeline). Sincroniza zoom + axisPointer cross-chart
+            con Grader y Gantts via echarts.connect. */}
+        <ProductionBarsEC
           intervals={shift.intervals}
           threshold={shift.threshold}
           windowStart={windowStart ?? shift.shiftStart}
@@ -555,6 +423,7 @@ export function UpstreamMachinesPanel({
   defaultCollapsed = false,
   syncedAt = null,
   shiftWindow = null,
+  pauses = [],
 }: Props) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed)
   const [expandedMachines, setExpandedMachines] = useState<Set<string>>(new Set())
@@ -565,22 +434,59 @@ export function UpstreamMachinesPanel({
     return ageMin > 15
   }, [syncedAt])
 
-  // Ventana temporal a usar para alinear el Gantt. Si el Grader provee
-  // shiftWindow, lo respetamos. Sino, cada máquina usa su propio shiftStart/End.
+  // Ventana temporal a usar para alinear el Gantt.
+  // Prioridad de fuentes (Synchronized Timeline):
+  //   1. Context `useTimelineSync().range` — si la página está dentro de un
+  //      <TimelineSyncProvider>, el zoom del Grader se propaga al panel via
+  //      este state global. NUNCA cae a shift.shiftStart por máquina.
+  //   2. Prop `shiftWindow` legacy — uso anterior (compatibilidad).
+  //   3. Sin source: cada máquina usa su propio shift.shiftStart/End.
+  const timelineSync = useTimelineSyncOptional()
   const [windowStart, windowEnd] = useMemo<[Date | undefined, Date | undefined]>(() => {
-    if (!shiftWindow?.startAt || !shiftWindow?.endAt) return [undefined, undefined]
-    const s = new Date(shiftWindow.startAt)
-    const e = new Date(shiftWindow.endAt)
-    if (isNaN(s.getTime()) || isNaN(e.getTime())) return [undefined, undefined]
-    return [s, e]
-  }, [shiftWindow?.startAt, shiftWindow?.endAt])
+    // 1. Context (prioridad máxima cuando está disponible y no es null)
+    if (timelineSync?.range) {
+      return [new Date(timelineSync.range.startMs), new Date(timelineSync.range.endMs)]
+    }
+    // 2. Prop legacy
+    if (shiftWindow?.startAt && shiftWindow?.endAt) {
+      const s = new Date(shiftWindow.startAt)
+      const e = new Date(shiftWindow.endAt)
+      if (!isNaN(s.getTime()) && !isNaN(e.getTime())) return [s, e]
+    }
+    // 3. Fallback: cada máquina usa su propio shiftStart/End downstream
+    return [undefined, undefined]
+  }, [timelineSync?.range, shiftWindow?.startAt, shiftWindow?.endAt])
 
-  // Agregado de toda la línea (para header)
+  // ¿Hay zoom activo? Source of truth: context.range. null = no zoom (vista
+  // completa del turno alineada al Grader). Cualquier valor = zoom activo.
+  const isLineZoomActive = timelineSync?.range != null
+
+  // F5b — Correlación paros Grader ↔ Baaders. Si un paro del Grader tiene
+  // 2+ Baaders paradas dentro de la ventana de tolerancia, lo marcamos como
+  // "coincidente". Banner en header alerta al supervisor del posible upstream
+  // root cause sin tener que ir al UpstreamCorrelationCard de abajo.
+  const correlationSummary = useMemo(() => {
+    if (!snapshot || pauses.length === 0) return null
+    const correlations = correlatePausesWithUpstream(pauses, snapshot)
+    return summarizeCorrelations(correlations)
+  }, [snapshot, pauses])
+
+  // Agregado de toda la línea (para header). Zoom-aware F5a: filtra
+  // intervals al rango visible cuando hay zoom activo.
   const lineKpis = useMemo(() => {
     if (!snapshot || snapshot.machines.length === 0) return null
     const all = snapshot.machines.flatMap(m => m.intervals)
-    return computeKpis(all)
-  }, [snapshot])
+    if (!isLineZoomActive || !windowStart || !windowEnd) {
+      return computeKpis(all)
+    }
+    const wStart = windowStart.getTime()
+    const wEnd = windowEnd.getTime()
+    const filtered = all.filter((it) => {
+      const ts = it.startAt.getTime()
+      return ts >= wStart && ts <= wEnd
+    })
+    return computeKpis(filtered)
+  }, [snapshot, windowStart, windowEnd, isLineZoomActive])
 
   // Detector de microparadas anómalas. Marca una máquina si:
   //   (a) tiene el conteo más alto de la línea, Y
@@ -637,6 +543,31 @@ export function UpstreamMachinesPanel({
           <div className="flex items-center gap-3 text-xs text-slate-500 ml-auto flex-wrap justify-end">
             {/* KPIs totales línea completa — siempre visibles, también en collapsed */}
             {lineKpis && <ProductionKpiRow kpis={lineKpis} />}
+            {isLineZoomActive && (
+              <Badge
+                variant="outline"
+                className="bg-violet-950/60 border-violet-800 text-violet-300 text-[10px] px-1.5 py-0.5 h-5 gap-1"
+                title="KPIs recalculados sólo del rango temporal visible"
+              >
+                <span>✂</span> del rango
+              </Badge>
+            )}
+            {/* F5b — Badge paros coincidentes: aparece cuando ≥1 paro del
+                Grader tiene causa upstream (≥2 Baaders paradas en ±2 min).
+                Llama atención al supervisor: posible root cause upstream. */}
+            {correlationSummary && correlationSummary.upstreamCaused > 0 && (
+              <Badge
+                variant="outline"
+                className="bg-orange-950/60 border-orange-800 text-orange-300 text-[10px] px-2 py-0.5 h-5 gap-1 cursor-help"
+                title={
+                  `${correlationSummary.upstreamCaused} de ${correlationSummary.total} paros del Grader coinciden con paros upstream (±2 min). ` +
+                  `Probable root cause en línea Baader. Ver detalle en card de correlación abajo.`
+                }
+              >
+                <AlertTriangle className="w-3 h-3" />
+                {correlationSummary.upstreamCaused} {correlationSummary.upstreamCaused === 1 ? 'paro' : 'paros'} coincidente{correlationSummary.upstreamCaused !== 1 ? 's' : ''}
+              </Badge>
+            )}
             {loading && <span>Cargando…</span>}
             {error && <span className="text-rose-400 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Error</span>}
             {isStale && <span className="text-amber-400">Desactualizado</span>}
@@ -645,6 +576,30 @@ export function UpstreamMachinesPanel({
                 <Activity className="w-3 h-3 inline mr-1" />
                 {fmtInt(snapshot.lineThroughputActual)} / {fmtInt(snapshot.lineThroughputExpected)} pz/h
               </span>
+            )}
+            {/* F5c — Botón export PNG combinado: captura Grader + 3 Gantts +
+                3 ProductionBars en un solo PNG vertical, listo para
+                compartir (Slack, ticket, email). Sólo visible cuando hay
+                snapshot cargado y echarts.connect activo. */}
+            {snapshot && !loading && timelineSync && (
+              <button
+                onClick={() => {
+                  if (!snapshot) return
+                  const subtitle = correlationSummary && correlationSummary.upstreamCaused > 0
+                    ? `${correlationSummary.upstreamCaused} de ${correlationSummary.total} paros del Grader coinciden con paros upstream`
+                    : `${snapshot.machines.length} máquinas — sincronizado al Grader`
+                  void exportCombinedTimelinePng(timelineSync.connectGroupId, {
+                    title: `Análisis de Turno · ${snapshot.dateKey} · ${snapshot.shiftId}`,
+                    subtitle,
+                    filenameSuffix: `${snapshot.dateKey}_${snapshot.shiftId.replace(/\s+/g, '_').toLowerCase()}`,
+                  }).catch((err) => console.error('Export combinado falló:', err))
+                }}
+                className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-slate-200 transition-colors px-1.5 py-1 rounded border border-slate-700 hover:border-slate-500"
+                title="Exportar timeline completo (Grader + 3 Baaders) como PNG único"
+              >
+                <Download className="w-3 h-3" />
+                <span>PNG</span>
+              </button>
             )}
           </div>
         </div>

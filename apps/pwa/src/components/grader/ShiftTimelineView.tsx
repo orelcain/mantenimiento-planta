@@ -10,7 +10,7 @@
  * Usa ECharts (consistente con GraderTimelineChart).
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import ReactECharts from 'echarts-for-react'
 import { Card, CardContent, CardHeader, CardTitle, Button } from '@/components/ui'
 import { Upload, Wrench, Clock, X, Download } from 'lucide-react'
@@ -35,6 +35,8 @@ import {
   buildMarkAreas,
   buildBaaderTimelineMarkers,
 } from './shiftTimelineHelpers'
+import { useTimelineSyncOptional } from './useTimelineSync'
+import { useChartReadyConnect } from './useEChartsConnect'
 
 interface ShiftTimelineViewProps {
   timelineBuckets: TimelineBucket[]
@@ -221,6 +223,11 @@ export function ShiftTimelineView({
   // ── Export PNG / CSV + selector de rango ─────────────────────────────────
   const echartsRef = useRef<any>(null)
 
+  // ── Sincronización cross-chart (Fase 1 del Synchronized Timeline) ────────
+  const timelineSync = useTimelineSyncOptional()
+  const myHoverId = useId()
+  const onChartReady = useChartReadyConnect(timelineSync?.connectGroupId ?? '__no-sync__')
+
   // Exponer función getDataURL al parent para incluir imagen en PDF (P2-1)
   useEffect(() => {
     if (!chartImageRef) return
@@ -243,23 +250,57 @@ export function ShiftTimelineView({
     return Math.min(24 * 60, Math.max(1, Math.round((effectiveEndMs - effectiveStartMs) / 60_000)))
   }, [timelineBuckets])
 
+  // ── Ventana de producción real (movida antes de emitZoomRange para evitar
+  // TDZ — emitZoomRange filtra por productionWindow para que su rango emitido
+  // matchee EXACTAMENTE el axis visible del chartOption). ──────────────────
+  const productionWindow = useMemo(
+    () => computeProductionWindow(timelineBuckets),
+    [timelineBuckets],
+  )
+
   // ── Emite rango temporal del zoom al parent ──────────────────────────────
-  // Calcula el rango temporal real (ms) a partir de un % de zoom y emite al
-  // callback. Síncrono: lo invocan tanto el handler `datazoom` de ECharts
-  // como `handleZoomPreset` apenas cambia el zoom — sin esperar re-render.
+  // Calcula el rango temporal real (ms) a partir de un % de zoom y propaga a
+  // (a) callback prop legacy `onZoomRangeChange` si está, (b) context global
+  // `useTimelineSync` si la página está envuelta en TimelineSyncProvider.
+  // Síncrono: lo invocan el handler `datazoom` y `handleZoomPreset`.
+  //
+  // CRÍTICO: el filtrado de buckets DEBE coincidir EXACTAMENTE con el del
+  // chartOption (pieces>0 AND dentro de productionWindow). Si difiere,
+  // resolveAxisWindow devuelve un effectiveStart/End distinto al axis
+  // visible, y el rango emitido al panel queda desplazado (~50min de diff
+  // observada con lotes dummy pre-turno). Sin esta consistencia, el slider
+  // del Grader desincroniza con los Gantts y barras del panel.
   const emitZoomRange = useCallback((startPct: number, endPct: number) => {
-    if (!onZoomRangeChange) return
-    const buckets = timelineBuckets.filter((b) => b.pieces > 0)
-    if (buckets.length === 0) { onZoomRangeChange(null); return }
+    if (!onZoomRangeChange && !timelineSync) return
+    const inProductionWindow = (tsMin: string): boolean => {
+      if (!productionWindow) return true
+      const ts = Date.parse(tsMin)
+      return ts >= productionWindow.startMs && ts <= productionWindow.endMs
+    }
+    const buckets = timelineBuckets.filter((b) => b.pieces > 0 && inProductionWindow(b.tsMin))
+    const emit = (range: { startMs: number; endMs: number } | null) => {
+      onZoomRangeChange?.(range)
+      timelineSync?.setRange(range)
+    }
+    if (buckets.length === 0) { emit(null); return }
     // Full zoom (100%): emite null para que el caller use su rango completo
-    if (startPct <= 0.5 && endPct >= 99.5) { onZoomRangeChange(null); return }
+    if (startPct <= 0.5 && endPct >= 99.5) { emit(null); return }
     const axis = resolveAxisWindow(buckets, shiftWindow)
     const spanMs = axis.effectiveEndMs - axis.effectiveStartMs
-    onZoomRangeChange({
-      startMs: axis.effectiveStartMs + Math.round((startPct / 100) * spanMs),
-      endMs:   axis.effectiveStartMs + Math.round((endPct / 100) * spanMs),
+    // Snap al MINUTO EXACTO: el axis category del Grader usa
+    // Math.round(idx_fraccional) sobre slots de 1min cada uno. Si emitimos
+    // ms con resolución de segundos, los charts time del panel quedan
+    // desfasados por hasta 30s (visible como 1 min en HH:MM). Snap aplica
+    // round al índice de minuto antes de convertir a ms — alineación
+    // pixel-perfect entre Grader y panel.
+    const totalMin = Math.round(spanMs / 60_000)
+    const startMinIdx = Math.round((startPct / 100) * totalMin)
+    const endMinIdx = Math.round((endPct / 100) * totalMin)
+    emit({
+      startMs: axis.effectiveStartMs + startMinIdx * 60_000,
+      endMs:   axis.effectiveStartMs + endMinIdx * 60_000,
     })
-  }, [onZoomRangeChange, timelineBuckets, shiftWindow])
+  }, [onZoomRangeChange, timelineSync, timelineBuckets, shiftWindow, productionWindow])
 
   const handleZoomPreset = useCallback((preset: '10min' | '1h' | 'turno') => {
     setActiveZoom(preset)
@@ -269,6 +310,93 @@ export function ShiftTimelineView({
     setZoomState({ start, end: 100 })
     emitZoomRange(start, 100)
   }, [totalMinutes, emitZoomRange])
+
+  // ── Anchor del axis para conversión index↔ms (hover cross-chart) ────────
+  // Refleja el effectiveStartMs que produce resolveAxisWindow para el rango
+  // visible. Cada slot del axis category representa 1 minuto desde anchor.
+  const axisAnchorMs = useMemo(() => {
+    const inProductionWindow = (tsMin: string): boolean => {
+      if (!productionWindow) return true
+      const ts = Date.parse(tsMin)
+      return ts >= productionWindow.startMs && ts <= productionWindow.endMs
+    }
+    const buckets = timelineBuckets.filter((b) => b.pieces > 0 && inProductionWindow(b.tsMin))
+    if (buckets.length === 0) return null
+    const axis = resolveAxisWindow(buckets, shiftWindow)
+    return axis.effectiveStartMs
+  }, [timelineBuckets, productionWindow, shiftWindow])
+
+  // ── Publica los lot changes al context (Fase 4c) ─────────────────────────
+  // Detecta cambios de lote en los buckets activos y los publica como
+  // markLines verticales que el panel upstream proyecta sobre sus charts.
+  // Permite ver al instante cómo afectó cada cambio de lote a las Baaders.
+  useEffect(() => {
+    if (!timelineSync) return
+    const inProductionWindow = (tsMin: string): boolean => {
+      if (!productionWindow) return true
+      const ts = Date.parse(tsMin)
+      return ts >= productionWindow.startMs && ts <= productionWindow.endMs
+    }
+    const buckets = timelineBuckets.filter((b) => b.pieces > 0 && inProductionWindow(b.tsMin))
+    const changes: { ms: number; lot: string }[] = []
+    for (let i = 1; i < buckets.length; i++) {
+      const prev = buckets[i - 1]
+      const curr = buckets[i]
+      if (prev?.lot && curr?.lot && prev.lot !== curr.lot) {
+        changes.push({ ms: Date.parse(curr.tsMin), lot: curr.lot })
+      }
+    }
+    timelineSync.setLotChanges(changes)
+  }, [timelineSync, timelineBuckets, productionWindow])
+
+  // ── Hover cross-chart (Fase 4b): mousemove broadcast + listener ─────────
+  // Snap al minuto: setHover idempotente skip cuando ms === prev.ms — sin
+  // esto, mover el mouse 1px re-renderiza los 7 charts del grupo.
+  const onChartMouseMove = useCallback((params: any) => {
+    if (!timelineSync || axisAnchorMs == null) return
+    const inst = echartsRef.current?.getEchartsInstance?.()
+    if (!inst) return
+    const offsetX = params?.event?.offsetX ?? params?.offsetX
+    if (typeof offsetX !== 'number') return
+    // Para xAxis category, convertFromPixel devuelve el índice fraccional.
+    // Cada índice representa 1 minuto desde axisAnchorMs. Round-down al
+    // índice entero más cercano (snap al minuto).
+    const idx = inst.convertFromPixel({ xAxisIndex: 0 }, offsetX)
+    if (typeof idx !== 'number' || !Number.isFinite(idx)) return
+    const minuteIdx = Math.floor(idx)
+    const ms = axisAnchorMs + minuteIdx * 60_000
+    timelineSync.setHover({ ms, originId: myHoverId })
+  }, [timelineSync, myHoverId, axisAnchorMs])
+
+  const onChartMouseOut = useCallback(() => {
+    if (timelineSync?.hover?.originId === myHoverId) {
+      timelineSync.setHover(null)
+    }
+  }, [timelineSync, myHoverId])
+
+  // Listener: cuando otro chart del grupo origina hover, dispatchear
+  // axisPointer manual sobre este chart para mostrar línea vertical alineada.
+  const externalHoverMs = timelineSync?.hover && timelineSync.hover.originId !== myHoverId
+    ? timelineSync.hover.ms
+    : null
+  useEffect(() => {
+    const inst = echartsRef.current?.getEchartsInstance?.()
+    if (!inst) return
+    if (externalHoverMs == null || axisAnchorMs == null) {
+      inst.dispatchAction({ type: 'updateAxisPointer', currTrigger: 'leave' })
+      inst.dispatchAction({ type: 'hideTip' })
+      return
+    }
+    const idx = (externalHoverMs - axisAnchorMs) / 60_000
+    const pixelX = inst.convertToPixel({ xAxisIndex: 0 }, idx)
+    if (typeof pixelX !== 'number' || !Number.isFinite(pixelX)) return
+    inst.dispatchAction({
+      type: 'updateAxisPointer',
+      currTrigger: 'mousemove',
+      x: pixelX,
+      y: 100,
+    })
+  }, [externalHoverMs, axisAnchorMs])
 
   const downloadPNG = useCallback(() => {
     const instance = echartsRef.current?.getEchartsInstance()
@@ -391,11 +519,7 @@ export function ShiftTimelineView({
   //
   // Los dos criterios se aplican en cadena: primero filtramos dummies,
   // después buscamos densidad sobre los buckets limpios.
-  // ── Ventana de producción real (helper puro extraído en M11) ─────────────
-  const productionWindow = useMemo(
-    () => computeProductionWindow(timelineBuckets),
-    [timelineBuckets],
-  )
+  // (productionWindow se calcula arriba, antes de emitZoomRange, para evitar TDZ.)
 
   // Emit inicial cuando los buckets cargan: se asegura que el callback reciba
   // el rango actual (null si zoom completo). Re-emite si emitZoomRange cambia
@@ -1035,8 +1159,11 @@ export function ShiftTimelineView({
             opts={{ renderer: 'canvas' }}
             notMerge={true}
             lazyUpdate={false}
+            onChartReady={onChartReady}
             onEvents={{
               click: handleChartClick,
+              mousemove: onChartMouseMove,
+              mouseout: onChartMouseOut,
               // Sincroniza el state local + emite rango al parent cuando el
               // usuario arrastra el slider o hace pan/wheel. Lee del state
               // canónico de ECharts (getOption) para evitar payloads parciales.
