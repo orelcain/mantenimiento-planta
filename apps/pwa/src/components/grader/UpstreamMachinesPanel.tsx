@@ -277,8 +277,25 @@ function StateTimeline({
   )
 }
 
-/** Bar chart de producción por intervalo con línea objetivo visible. */
-function ProductionBars({ intervals, threshold }: { intervals: UpstreamProductionInterval[]; threshold: number }) {
+/**
+ * Bar chart de producción por intervalo con línea objetivo visible.
+ * Cada barra se posiciona ABSOLUTAMENTE según su `startAt` dentro del rango
+ * `windowStart..windowEnd` — así queda alineado pixel-perfect con el Gantt
+ * de arriba (que usa el mismo rango). Sin esto, las barras se distribuyen
+ * con `flex` y NO coinciden temporalmente con el Gantt cuando los intervals
+ * no cubren todo el rango.
+ */
+function ProductionBars({
+  intervals,
+  threshold,
+  windowStart,
+  windowEnd,
+}: {
+  intervals: UpstreamProductionInterval[]
+  threshold: number
+  windowStart?: Date
+  windowEnd?: Date
+}) {
   if (intervals.length === 0) {
     return <div className="h-16 rounded bg-slate-800/40" />
   }
@@ -293,6 +310,13 @@ function ProductionBars({ intervals, threshold }: { intervals: UpstreamProductio
     gray:   'bg-slate-700/60',
   }
 
+  // Rango temporal — fallback al span de los intervals si no se pasa window
+  const firstIvl = intervals[0]!
+  const lastIvl  = intervals[intervals.length - 1]!
+  const rangeStart = windowStart ?? firstIvl.startAt
+  const rangeEnd   = windowEnd   ?? lastIvl.endAt
+  const totalMs = Math.max(1, rangeEnd.getTime() - rangeStart.getTime())
+
   return (
     <div className="relative h-16 bg-slate-950/60 rounded px-1.5 py-1 border border-slate-800">
       {/* Línea objetivo — absolute dentro del contenedor relativo */}
@@ -301,18 +325,29 @@ function ProductionBars({ intervals, threshold }: { intervals: UpstreamProductio
         style={{ bottom: `${4 + (expectedPct * (64 - 8)) / 100}px` }}
       />
 
-      {/* Barras: flex row con altura completa */}
-      <div className="flex gap-[2px] h-full">
+      {/* Barras: posicionadas absolutamente por timestamp para alinear con Gantt */}
+      <div className="relative h-full">
         {intervals.map((it, i) => {
+          // Recorta interval al window si lo excede
+          const segStart = Math.max(it.startAt.getTime(), rangeStart.getTime())
+          const segEnd   = Math.min(it.endAt.getTime(),   rangeEnd.getTime())
+          if (segEnd <= segStart) return null
+          const leftPct = ((segStart - rangeStart.getTime()) / totalMs) * 100
+          const widthPct = ((segEnd - segStart) / totalMs) * 100
           const heightPct = (it.cycles / maxValue) * 100
           return (
             <div
               key={i}
-              className="flex-1 min-w-[2px] h-full flex flex-col justify-end relative group"
+              className="absolute bottom-0 group"
+              style={{
+                left: `${leftPct}%`,
+                width: `calc(${widthPct}% - 1px)`,
+                height: '100%',
+              }}
               title={`${fmtHHmm(it.startAt)}: ${it.cycles}/${Math.round(it.expectedCycles)} pz (${fmtPct(it.ratio)})`}
             >
               <div
-                className={`${colorMap[it.color]} rounded-sm transition-all w-full`}
+                className={`${colorMap[it.color]} rounded-sm transition-all absolute bottom-0 left-0 right-0`}
                 style={{ height: `${Math.max(4, heightPct)}%` }}
               />
             </div>
@@ -415,8 +450,13 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
         {/* Gantt con leyenda */}
         <StateTimeline shift={shift} windowStart={windowStart} windowEnd={windowEnd} />
 
-        {/* Production bars + objetivo */}
-        <ProductionBars intervals={shift.intervals} threshold={shift.threshold} />
+        {/* Production bars + objetivo — alineadas al MISMO rango que el Gantt */}
+        <ProductionBars
+          intervals={shift.intervals}
+          threshold={shift.threshold}
+          windowStart={windowStart ?? shift.shiftStart}
+          windowEnd={windowEnd ?? shift.shiftEnd}
+        />
       </div>
 
       {/* Mini stats footer */}
