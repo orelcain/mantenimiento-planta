@@ -62,9 +62,38 @@ const PLOT_RIGHT_PAD_PX = 24
 // Helpers de formato
 // ============================================================================
 
-/** Shoplogix guarda wall-clock time como UTC. Mostramos UTC tal cual. */
+/**
+ * Shoplogix guarda timestamps en UTC real. Para los operadores de planta en
+ * Chonchi mostramos hora local (America/Santiago — incluye DST automático).
+ */
+const CHILE_TZ = 'America/Santiago'
+
+const _santiagoFmt = new Intl.DateTimeFormat('es-CL', {
+  timeZone: CHILE_TZ,
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+})
+
 function fmtHHmm(d: Date): string {
-  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
+  // Intl puede devolver "24:00" en lugar de "00:00" en algunos engines —
+  // normalizamos para evitar ese caso de borde.
+  return _santiagoFmt.format(d).replace(/^24:/, '00:')
+}
+
+/** Devuelve los componentes hora/min/seg en zona Chile para un Date. */
+const _santiagoPartsFmt = new Intl.DateTimeFormat('en-CA', {
+  timeZone: CHILE_TZ,
+  hour: '2-digit', minute: '2-digit', second: '2-digit',
+  hour12: false,
+})
+
+function chileHMS(d: Date): { h: number; m: number; s: number } {
+  const parts = _santiagoPartsFmt.formatToParts(d)
+  const get = (type: string) => parseInt(parts.find(p => p.type === type)?.value ?? '0', 10)
+  let h = get('hour')
+  if (h === 24) h = 0  // normalizar
+  return { h, m: get('minute'), s: get('second') }
 }
 
 function fmtPct(x: number, decimals = 1): string {
@@ -150,17 +179,21 @@ function aggregateStatesByReason(states: UpstreamMachineState[]): ReasonAggregat
 // ============================================================================
 
 /**
- * Genera ticks horarios entre start y end. Devuelve Date en cada hora exacta
- * del rango que tenga al menos 30 min hasta el borde.
+ * Genera ticks horarios (en hora LOCAL Chile) entre start y end. Devuelve
+ * Date en cada hora exacta del rango que tenga al menos 30 min hasta el borde.
+ *
+ * Asume que no hay transición DST dentro del rango — true para shifts ≤12h
+ * en cualquier época excepto durante el cambio horario (~1× al año). Si ocurre,
+ * los ticks post-transición quedarán desfasados 1 min hasta el siguiente.
  */
 function generateHourTicks(start: Date, end: Date): Date[] {
   const ticks: Date[] = []
-  // Primer tick: siguiente hora exacta a start
-  const firstTick = new Date(Date.UTC(
-    start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate(),
-    start.getUTCHours() + (start.getUTCMinutes() > 0 ? 1 : 0), 0, 0, 0,
-  ))
-  for (let t = firstTick.getTime(); t < end.getTime() - 30 * 60 * 1000; t += 3600 * 1000) {
+  const { m: startMin, s: startSec } = chileHMS(start)
+  // ms hasta próxima hora local exacta (0 si ya está en :00:00)
+  const advanceMs = (startMin === 0 && startSec === 0)
+    ? 0
+    : (60 - startMin) * 60_000 - startSec * 1_000
+  for (let t = start.getTime() + advanceMs; t < end.getTime() - 30 * 60_000; t += 3_600_000) {
     ticks.push(new Date(t))
   }
   return ticks
