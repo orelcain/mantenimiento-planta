@@ -172,13 +172,14 @@ function aggregateStatesByReason(states: UpstreamMachineState[]): ReasonAggregat
 /**
  * Genera ticks de eje horario entre start y end. Granularidad adaptativa al
  * rango total — necesario para que el panel muestre referencias visibles
- * cuando el chart Grader está zoomeado (rangos < 1h pierden todos los ticks
- * si solo se usan horas exactas).
+ * cuando el chart Grader está zoomeado.
  *
- * Reglas:
- *   - rango ≤ 30 min: cada 5 min
- *   - rango ≤ 2 h:    cada 15 min
- *   - rango ≤ 6 h:    cada 1 h (legacy)
+ * Reglas (actualizadas para granularidad minuto-a-minuto en zoom corto):
+ *   - rango ≤ 10 min: cada 1 min  → permite ver sincronía exacta con Grader
+ *   - rango ≤ 20 min: cada 2 min
+ *   - rango ≤ 40 min: cada 5 min
+ *   - rango ≤ 2 h:    cada 10 min
+ *   - rango ≤ 6 h:    cada 1 h
  *   - rango > 6 h:    cada 2 h
  *
  * Funciona en UTC porque los timestamps Shoplogix son wall-clock-as-UTC.
@@ -189,8 +190,10 @@ function generateHourTicks(start: Date, end: Date): Date[] {
 
   // Step en minutos (también define cómo se "rounded-up" el primer tick).
   let stepMin: number
-  if (totalMin <= 30)      stepMin = 5
-  else if (totalMin <= 120) stepMin = 15
+  if      (totalMin <= 10)  stepMin = 1
+  else if (totalMin <= 20)  stepMin = 2
+  else if (totalMin <= 40)  stepMin = 5
+  else if (totalMin <= 120) stepMin = 10
   else if (totalMin <= 360) stepMin = 60
   else                       stepMin = 120
 
