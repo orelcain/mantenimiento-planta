@@ -35,6 +35,8 @@ import {
   buildMarkAreas,
   buildBaaderTimelineMarkers,
 } from './shiftTimelineHelpers'
+import { useTimelineSyncOptional } from './useTimelineSync'
+import { useEChartsConnect } from './useEChartsConnect'
 
 interface ShiftTimelineViewProps {
   timelineBuckets: TimelineBucket[]
@@ -221,6 +223,17 @@ export function ShiftTimelineView({
   // ── Export PNG / CSV + selector de rango ─────────────────────────────────
   const echartsRef = useRef<any>(null)
 
+  // ── Sincronización cross-chart (Fase 1 del Synchronized Timeline) ────────
+  // Si la página está envuelta en <TimelineSyncProvider>, este chart:
+  //   1. Se inscribe al grupo via echarts.connect — comparte axisPointer
+  //      (crosshair) y dataZoom con otros charts del mismo grupo
+  //   2. Escribe el rango actual al context cuando el usuario hace zoom local
+  //
+  // Si no hay provider, el comportamiento legacy (callback prop onZoomRangeChange)
+  // sigue funcionando — migración progresiva sin breaking changes.
+  const timelineSync = useTimelineSyncOptional()
+  useEChartsConnect(echartsRef, timelineSync?.connectGroupId ?? '__no-sync__')
+
   // Exponer función getDataURL al parent para incluir imagen en PDF (P2-1)
   useEffect(() => {
     if (!chartImageRef) return
@@ -244,22 +257,27 @@ export function ShiftTimelineView({
   }, [timelineBuckets])
 
   // ── Emite rango temporal del zoom al parent ──────────────────────────────
-  // Calcula el rango temporal real (ms) a partir de un % de zoom y emite al
-  // callback. Síncrono: lo invocan tanto el handler `datazoom` de ECharts
-  // como `handleZoomPreset` apenas cambia el zoom — sin esperar re-render.
+  // Calcula el rango temporal real (ms) a partir de un % de zoom y propaga a
+  // (a) callback prop legacy `onZoomRangeChange` si está, (b) context global
+  // `useTimelineSync` si la página está envuelta en TimelineSyncProvider.
+  // Síncrono: lo invocan el handler `datazoom` y `handleZoomPreset`.
   const emitZoomRange = useCallback((startPct: number, endPct: number) => {
-    if (!onZoomRangeChange) return
+    if (!onZoomRangeChange && !timelineSync) return
     const buckets = timelineBuckets.filter((b) => b.pieces > 0)
-    if (buckets.length === 0) { onZoomRangeChange(null); return }
+    const emit = (range: { startMs: number; endMs: number } | null) => {
+      onZoomRangeChange?.(range)
+      timelineSync?.setRange(range)
+    }
+    if (buckets.length === 0) { emit(null); return }
     // Full zoom (100%): emite null para que el caller use su rango completo
-    if (startPct <= 0.5 && endPct >= 99.5) { onZoomRangeChange(null); return }
+    if (startPct <= 0.5 && endPct >= 99.5) { emit(null); return }
     const axis = resolveAxisWindow(buckets, shiftWindow)
     const spanMs = axis.effectiveEndMs - axis.effectiveStartMs
-    onZoomRangeChange({
+    emit({
       startMs: axis.effectiveStartMs + Math.round((startPct / 100) * spanMs),
       endMs:   axis.effectiveStartMs + Math.round((endPct / 100) * spanMs),
     })
-  }, [onZoomRangeChange, timelineBuckets, shiftWindow])
+  }, [onZoomRangeChange, timelineSync, timelineBuckets, shiftWindow])
 
   const handleZoomPreset = useCallback((preset: '10min' | '1h' | 'turno') => {
     setActiveZoom(preset)

@@ -26,6 +26,7 @@ import type {
   UpstreamProductionInterval,
   UpstreamMachineState,
 } from '@/services/shoplogix/types'
+import { useTimelineSyncOptional } from './useTimelineSync'
 
 interface Props {
   snapshot: UpstreamLineSnapshot | null | undefined
@@ -565,15 +566,28 @@ export function UpstreamMachinesPanel({
     return ageMin > 15
   }, [syncedAt])
 
-  // Ventana temporal a usar para alinear el Gantt. Si el Grader provee
-  // shiftWindow, lo respetamos. Sino, cada máquina usa su propio shiftStart/End.
+  // Ventana temporal a usar para alinear el Gantt.
+  // Prioridad de fuentes (Synchronized Timeline):
+  //   1. Context `useTimelineSync().range` — si la página está dentro de un
+  //      <TimelineSyncProvider>, el zoom del Grader se propaga al panel via
+  //      este state global. NUNCA cae a shift.shiftStart por máquina.
+  //   2. Prop `shiftWindow` legacy — uso anterior (compatibilidad).
+  //   3. Sin source: cada máquina usa su propio shift.shiftStart/End.
+  const timelineSync = useTimelineSyncOptional()
   const [windowStart, windowEnd] = useMemo<[Date | undefined, Date | undefined]>(() => {
-    if (!shiftWindow?.startAt || !shiftWindow?.endAt) return [undefined, undefined]
-    const s = new Date(shiftWindow.startAt)
-    const e = new Date(shiftWindow.endAt)
-    if (isNaN(s.getTime()) || isNaN(e.getTime())) return [undefined, undefined]
-    return [s, e]
-  }, [shiftWindow?.startAt, shiftWindow?.endAt])
+    // 1. Context (prioridad máxima cuando está disponible y no es null)
+    if (timelineSync?.range) {
+      return [new Date(timelineSync.range.startMs), new Date(timelineSync.range.endMs)]
+    }
+    // 2. Prop legacy
+    if (shiftWindow?.startAt && shiftWindow?.endAt) {
+      const s = new Date(shiftWindow.startAt)
+      const e = new Date(shiftWindow.endAt)
+      if (!isNaN(s.getTime()) && !isNaN(e.getTime())) return [s, e]
+    }
+    // 3. Fallback: cada máquina usa su propio shiftStart/End downstream
+    return [undefined, undefined]
+  }, [timelineSync?.range, shiftWindow?.startAt, shiftWindow?.endAt])
 
   // Agregado de toda la línea (para header)
   const lineKpis = useMemo(() => {
