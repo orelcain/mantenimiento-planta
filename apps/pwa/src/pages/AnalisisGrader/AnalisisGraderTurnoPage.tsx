@@ -26,6 +26,7 @@ import { parseMatrixErrorString } from '@/services/grader/graderMatrixP0Causes'
 import { HeroScorecard } from '@/components/grader/HeroScorecard'
 import { P0CausesPanel } from '@/components/grader/P0CausesPanel'
 import { ShiftTimelineView } from '@/components/grader/ShiftTimelineView'
+import { resolveAxisWindow, computeProductionWindow } from '@/components/grader/shiftTimelineHelpers'
 import { ShiftBreakdownsCard } from '@/components/grader/ShiftBreakdownsCard'
 import { GateBreakdownCard } from '@/components/grader/GateBreakdownCard'
 import { ConfigChangeHistory } from '@/components/grader/ConfigChangeHistory'
@@ -317,6 +318,32 @@ export function AnalisisGraderTurnoPage() {
       }
     })
   }, [timelineBuckets, summary?.bucketExtrasByMinute])
+
+  /**
+   * Ventana temporal REAL del eje X del chart Grader (data-driven, no el
+   * shiftWindow del schedule). Replica el filtrado interno de
+   * `ShiftTimelineView`: `pieces > 0` + dentro de `productionWindow`
+   * (excluye pre/post-turno con lotes dummy 1111). Pasamos esta a Baader
+   * panel para que su Gantt tenga EXACTAMENTE el mismo rango temporal que
+   * el chart Grader — sin esto, la "alineación pixel-perfect" alinea pixels
+   * pero no horas.
+   */
+  const chartAxisWindow = useMemo(() => {
+    if (!shiftWindow) return null
+    const productionWindow = computeProductionWindow(enrichedTimelineBuckets)
+    const inWindow = (tsMin: string): boolean => {
+      if (!productionWindow) return true
+      const ts = Date.parse(tsMin)
+      return ts >= productionWindow.startMs && ts <= productionWindow.endMs
+    }
+    const filtered = enrichedTimelineBuckets.filter(b => b.pieces > 0 && inWindow(b.tsMin))
+    if (filtered.length === 0) return null
+    const axis = resolveAxisWindow(filtered, shiftWindow)
+    return {
+      startAt: new Date(axis.effectiveStartMs).toISOString(),
+      endAt:   new Date(axis.effectiveEndMs).toISOString(),
+    }
+  }, [enrichedTimelineBuckets, shiftWindow])
 
   // ── Navegación contextual prev/next ─────────────────────────────────────
   // Carga shifts del rango ±20 días para construir cadena de navegación
@@ -833,7 +860,7 @@ export function AnalisisGraderTurnoPage() {
             loading={upstreamLine.loading}
             error={upstreamLine.error}
             syncedAt={upstreamLine.syncedAt}
-            shiftWindow={shiftWindow}
+            shiftWindow={chartAxisWindow ?? shiftWindow}
           />
 
           {/* Distribución por gate — balance del turno */}
