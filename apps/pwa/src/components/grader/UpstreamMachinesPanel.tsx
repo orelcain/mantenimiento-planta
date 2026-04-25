@@ -27,6 +27,7 @@ import type {
   UpstreamMachineState,
 } from '@/services/shoplogix/types'
 import { useTimelineSyncOptional } from './useTimelineSync'
+import { StateTimelineEC } from './StateTimelineEC'
 
 interface Props {
   snapshot: UpstreamLineSnapshot | null | undefined
@@ -228,45 +229,12 @@ function StateTimeline({
 
   return (
     <div className="space-y-1.5">
-      {/* Gantt + overlay de ticks */}
-      <div className="relative">
-        <div className="relative flex h-5 rounded-md overflow-hidden bg-slate-800/60 border border-slate-700/70 shadow-inner">
-          {shift.states.map((st, i) => {
-            // Recorta el estado al windowStart/End si lo excede
-            const segStart = Math.max(st.startAt.getTime(), rangeStart.getTime())
-            const segEnd   = Math.min(st.endAt.getTime(),   rangeEnd.getTime())
-            if (segEnd <= segStart) return null
-            const startOffsetPct = ((segStart - rangeStart.getTime()) / totalMs) * 100
-            const widthPct       = ((segEnd - segStart) / totalMs) * 100
-            const label = st.reason ? `${st.name}: ${st.reason}` : st.name
-            return (
-              <div
-                key={i}
-                style={{
-                  position: 'absolute',
-                  left: `${startOffsetPct}%`,
-                  width: `${widthPct}%`,
-                  height: '100%',
-                  backgroundColor: st.color,
-                }}
-                className="border-r border-slate-900/40 transition-[filter] duration-150 hover:brightness-125 hover:z-10 cursor-help"
-                title={`${label}\n⏱ ${fmtDuration(st.durationSec)}\n🕐 ${fmtHHmm(st.startAt)}–${fmtHHmm(st.endAt)} (Chile)`}
-              />
-            )
-          })}
-
-          {/* Ticks verticales de hora — sobre los segmentos para legibilidad */}
-          {ticks.map((t, i) => {
-            const leftPct = ((t.getTime() - rangeStart.getTime()) / totalMs) * 100
-            return (
-              <div
-                key={`tick-${i}`}
-                className="absolute top-0 bottom-0 w-px bg-white/20 pointer-events-none"
-                style={{ left: `${leftPct}%` }}
-              />
-            )
-          })}
-        </div>
+      {/* Gantt en ECharts — sincroniza zoom y crosshair via echarts.connect()
+          con el chart Grader y los demás Gantts del mismo turno (Fase 2 del
+          Synchronized Timeline). Mantiene el rendering visual del HTML viejo
+          pero con interactividad nativa de ECharts. */}
+      <div className="rounded-md overflow-hidden bg-slate-800/60 border border-slate-700/70 shadow-inner">
+        <StateTimelineEC shift={shift} windowStart={windowStart} windowEnd={windowEnd} height={20} />
       </div>
 
       {/* Eje horario debajo del gantt */}
