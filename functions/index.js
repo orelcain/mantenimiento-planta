@@ -3074,25 +3074,25 @@ const shoplogixTokenStore = require('./shoplogix/tokenStore')
  * Resuelve credenciales para el sync: Bearer > Cookie.
  *
  * Fase 2b.1 (Bearer):
- *   Si SHOPLOGIX_USER + SHOPLOGIX_PASS están configurados, obtiene/renueva
- *   el access_token automáticamente vía ROPC.
+ *   Lee user/password desde Firestore system/shoplogixCredentials (Fase 2b.1).
+ *   Si existen, obtiene/renueva el access_token automáticamente vía ROPC.
+ *   NOTA: Se usa Firestore (no Secret Manager) porque Firebase Functions v2
+ *   falla el deploy si el secret no existe aún. Firestore es más flexible
+ *   para credenciales que se configuran post-deploy.
  *
  * Fase 2b.0 fallback (Cookie):
- *   Si no hay user/pass, usa SHOPLOGIX_COOKIE (manual).
+ *   Si no hay credenciales en Firestore, usa SHOPLOGIX_COOKIE (manual).
  *
  * @returns {{ accessToken?: string, cookie?: string, mode: 'bearer' | 'cookie' | 'none' }}
  */
 async function resolveShoplogixAuth(log) {
-  const user   = process.env.SHOPLOGIX_USER
-  const pass   = process.env.SHOPLOGIX_PASS
   const cookie = process.env.SHOPLOGIX_COOKIE
 
-  // Fase 2b.1: auto-login si hay credenciales
-  if (user && pass) {
+  // Fase 2b.1: auto-login si hay credenciales en Firestore
+  const creds = await shoplogixTokenStore.getStoredCredentials(db)
+  if (creds?.user && creds?.password) {
     try {
-      const accessToken = await shoplogixTokenStore.getValidAccessToken(
-        db, { user, password: pass }, log
-      )
+      const accessToken = await shoplogixTokenStore.getValidAccessToken(db, creds, log)
       return { accessToken, mode: 'bearer' }
     } catch (e) {
       log.error('[shoplogix-auth] Auto-login falló, intentando fallback cookie:', e.message)
@@ -3118,7 +3118,7 @@ async function resolveShoplogixAuth(log) {
  */
 exports.shoplogixSyncHttp = onRequest(
   {
-    secrets: ['SHOPLOGIX_COOKIE', 'SHOPLOGIX_USER', 'SHOPLOGIX_PASS'],
+    secrets: ['SHOPLOGIX_COOKIE'],
     region: 'us-central1',
     timeoutSeconds: 180,
     memory: '256MiB',
@@ -3172,7 +3172,7 @@ exports.shoplogixSyncWakeup = onSchedule(
     timeoutSeconds: 180,
     memory: '256MiB',
     retryCount: 1,
-    secrets: ['SHOPLOGIX_COOKIE', 'SHOPLOGIX_USER', 'SHOPLOGIX_PASS'],
+    secrets: ['SHOPLOGIX_COOKIE'],
   },
   async () => {
     // Solo corre durante turnos (fuera de turno: skip)
@@ -3228,21 +3228,18 @@ exports.shoplogixTokenRefresh = onSchedule(
     timeoutSeconds: 60,
     memory: '128MiB',
     retryCount: 2,
-    secrets: ['SHOPLOGIX_USER', 'SHOPLOGIX_PASS'],
+    // No secrets: credenciales en Firestore system/shoplogixCredentials
   },
   async () => {
-    const user = process.env.SHOPLOGIX_USER
-    const pass = process.env.SHOPLOGIX_PASS
-    if (!user || !pass) {
-      // Sin credenciales → modo cookie legado activo → no-op
-      logger.info('[shoplogixTokenRefresh] SHOPLOGIX_USER/PASS no configurados — skip (modo cookie)')
+    // Lee credenciales desde Firestore (configuradas manualmente una vez)
+    const creds = await shoplogixTokenStore.getStoredCredentials(db)
+    if (!creds?.user || !creds?.password) {
+      logger.info('[shoplogixTokenRefresh] Sin credenciales en Firestore — skip (modo cookie legado)')
       return
     }
 
     try {
-      const accessToken = await shoplogixTokenStore.getValidAccessToken(
-        db, { user, password: pass }, logger
-      )
+      const accessToken = await shoplogixTokenStore.getValidAccessToken(db, creds, logger)
       logger.info('[shoplogixTokenRefresh] token vigente/renovado OK', {
         first8: accessToken.slice(0, 8) + '…'
       })

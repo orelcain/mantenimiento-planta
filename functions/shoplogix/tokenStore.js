@@ -1,15 +1,28 @@
 /**
  * Shoplogix Token Store — Firestore-backed token management.
  *
- * Almacena access_token + refresh_token en Firestore:
- *   system/shoplogixToken (doc)
+ * Almacena DOS tipos de datos en Firestore:
+ *
+ *   system/shoplogixToken (doc) — tokens OAuth (access + refresh)
  *     access_token:  string
  *     refresh_token: string
- *     expires_at:    Timestamp   — cuando vence el access_token (UTC)
- *     obtained_at:   Timestamp   — cuándo se obtuvo
+ *     expires_at:    Timestamp
+ *     obtained_at:   Timestamp
  *     method:        'ropc' | 'refresh'
  *
- * `getValidAccessToken(db, creds, logger)` es la función principal:
+ *   system/shoplogixCredentials (doc) — credenciales de login (opcional)
+ *     user:     string  — email de login
+ *     password: string  — contraseña
+ *     set_at:   Timestamp — cuándo se guardaron
+ *
+ * Por qué Firestore y no Secret Manager:
+ *   Firebase Functions v2 valida que los secrets existan en Secret Manager
+ *   en DEPLOY time. Si el secret no existe, el deploy falla con 404. Para
+ *   evitar que el CI explote antes de que el operador configure credenciales,
+ *   las guardamos en Firestore (cifradas en reposo por GCP, acceso controlado
+ *   por Firestore security rules).
+ *
+ * `getValidAccessToken(db, creds?, logger)` es la función principal:
  *   1. Lee el token almacenado
  *   2. Si sigue vigente (> BUFFER_MS antes de expirar) → lo devuelve
  *   3. Si está próximo a vencer → refresh con refresh_token
@@ -18,14 +31,18 @@
  *
  * Integración con el sync:
  *   const { getValidAccessToken } = require('./tokenStore')
- *   const accessToken = await getValidAccessToken(db, { user, password }, logger)
+ *   const creds = await getStoredCredentials(db)
+ *   const accessToken = await getValidAccessToken(db, creds, logger)
  *   await syncShift({ db, accessToken, ... })
  */
 
 const { loginWithPassword, refreshAccessToken } = require('./auth')
 
-/** Path del doc en Firestore */
+/** Path de tokens OAuth en Firestore */
 const TOKEN_DOC = 'system/shoplogixToken'
+
+/** Path de credenciales de login en Firestore */
+const CREDS_DOC = 'system/shoplogixCredentials'
 
 /**
  * Margen antes del vencimiento para renovar el token (5 minutos).
@@ -137,10 +154,45 @@ async function clearStoredToken(db) {
   } catch (_) { /* ignore */ }
 }
 
+/**
+ * Lee las credenciales de login desde Firestore `system/shoplogixCredentials`.
+ * Retorna null si no están configuradas (modo cookie legacy activo).
+ *
+ * Para configurar las credenciales, usar el helper CLI:
+ *   node scripts/set-shoplogix-creds.js <user> <password>
+ * O directamente desde Firebase Console → Firestore → system/shoplogixCredentials
+ */
+async function getStoredCredentials(db) {
+  try {
+    const snap = await db.doc(CREDS_DOC).get()
+    if (!snap.exists) return null
+    const data = snap.data()
+    if (!data?.user || !data?.password) return null
+    return { user: data.user, password: data.password }
+  } catch (e) {
+    return null
+  }
+}
+
+/**
+ * Persiste credenciales de login en Firestore.
+ * Solo debe llamarse desde un admin autenticado o desde un script de setup.
+ */
+async function saveCredentials(db, { user, password }) {
+  await db.doc(CREDS_DOC).set({
+    user,
+    password,
+    set_at: new Date(),
+  })
+}
+
 module.exports = {
   TOKEN_DOC,
+  CREDS_DOC,
   getStoredToken,
   saveToken,
   getValidAccessToken,
   clearStoredToken,
+  getStoredCredentials,
+  saveCredentials,
 }
