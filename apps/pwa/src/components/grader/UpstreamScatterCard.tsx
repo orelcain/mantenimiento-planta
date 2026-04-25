@@ -50,9 +50,8 @@ export function UpstreamScatterCard({ snapshot, timelineBuckets }: Props) {
     return buildScatterData(snapshot, timelineBuckets)
   }, [snapshot, timelineBuckets])
 
-  // No renderizar si no hay datos suficientes
+  // No renderizar si no hay datos suficientes — early return DESPUÉS de todos los hooks
   const totalPoints = seriesData.reduce((a, s) => a + s.points.length, 0)
-  if (!snapshot || totalPoints < 10) return null
 
   const option = useMemo(() => {
     const series: object[] = []
@@ -176,6 +175,9 @@ export function UpstreamScatterCard({ snapshot, timelineBuckets }: Props) {
       }
     }).filter(s => s.pts >= 3)
   }, [seriesData])
+
+  // Early return post-hooks: no renderizar si no hay datos suficientes
+  if (!snapshot || totalPoints < 10) return null
 
   return (
     <Card className="border-slate-800 bg-slate-950/50">
