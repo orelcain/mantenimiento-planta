@@ -558,6 +558,94 @@ export function buildScatterData(
   return result
 }
 
+// ── Scatter analytics: zona crítica + mediana + magnitud de pendiente ─────────
+
+/**
+ * Filtra puntos "usables" de una serie de scatter — puntos con datos
+ * significativos en ambos sistemas. Usado por la regresión y los KPIs.
+ */
+export function usableScatterPoints(points: ScatterPoint[]): ScatterPoint[] {
+  return points.filter(p => p.baaderCycles > 0 && p.graderPieces >= 5)
+}
+
+/** Mediana clásica de un array numérico. Vacío → 0. */
+export function median(arr: number[]): number {
+  if (arr.length === 0) return 0
+  const sorted = [...arr].sort((a, b) => a - b)
+  const mid = Math.floor(sorted.length / 2)
+  return sorted.length % 2 === 0
+    ? (sorted[mid - 1]! + sorted[mid]!) / 2
+    : sorted[mid]!
+}
+
+/**
+ * Calcula la mediana del ritmo Baader (ciclos/5min) sobre todos los puntos
+ * usables de TODAS las máquinas — ritmo "típico" de la línea, no de una máquina aislada.
+ */
+export function scatterBaaderMedian(seriesData: ScatterSeriesData[]): number {
+  const allCycles = seriesData.flatMap(s => usableScatterPoints(s.points).map(p => p.baaderCycles))
+  return median(allCycles)
+}
+
+/**
+ * Cuenta puntos en zona crítica del scatter:
+ *   P0% > criticalP0Pct  Y  baaderCycles < baaderMedian
+ *
+ * Cuadrante inferior-derecho semánticamente: alto P0 + baja producción upstream.
+ *
+ * @returns { critical, total, pct } — total y % sobre puntos usables
+ */
+export function scatterCriticalZone(
+  seriesData: ScatterSeriesData[],
+  criticalP0Pct: number,
+  baaderMedian: number,
+): { critical: number; total: number; pct: number } {
+  let critical = 0
+  let total = 0
+  seriesData.forEach((s) => {
+    usableScatterPoints(s.points).forEach((p) => {
+      total++
+      if (p.graderP0Pct * 100 > criticalP0Pct && p.baaderCycles < baaderMedian) {
+        critical++
+      }
+    })
+  })
+  return { critical, total, pct: total > 0 ? (critical / total) * 100 : 0 }
+}
+
+/**
+ * Pendiente promedio (ponderada por nº puntos) de las regresiones de las series.
+ * Convierte la magnitud a "puntos P0% por -10 ciclos/5min" — operacional para
+ * el operador en lugar de un slope académico.
+ */
+export function scatterSlopeMagnitude(
+  seriesData: ScatterSeriesData[],
+): {
+  avgSlope: number
+  /** Cambio de P0% (en puntos %) cuando el ritmo Baader cae 10 ciclos/5min. Signo positivo = sube P0%. */
+  deltaP0_per_minus10cycles: number
+  direction: 'neg' | 'pos' | 'flat'
+} | null {
+  const withSlope = seriesData
+    .map(s => ({
+      slope: s.regression?.slope ?? null,
+      pts: usableScatterPoints(s.points).length,
+    }))
+    .filter(x => x.slope != null && x.pts >= 3) as { slope: number; pts: number }[]
+
+  if (withSlope.length === 0) return null
+  const totalPts = withSlope.reduce((a, x) => a + x.pts, 0)
+  if (totalPts === 0) return null
+  const wSum = withSlope.reduce((a, x) => a + x.slope * x.pts, 0)
+  const avgSlope = wSum / totalPts
+  const deltaP0_per_minus10cycles = -avgSlope * 10
+  return {
+    avgSlope,
+    deltaP0_per_minus10cycles,
+    direction: avgSlope < -0.005 ? 'neg' : avgSlope > 0.005 ? 'pos' : 'flat',
+  }
+}
+
 /** Convierte "#rrggbb" o "rgba(...)" a rgba con alpha custom (best-effort). */
 function colorWithAlpha(color: string, alpha: number): string {
   const c = color.trim()

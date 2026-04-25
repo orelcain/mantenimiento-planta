@@ -1,25 +1,43 @@
 /**
  * UpstreamScatterCard — Scatter plot: ritmo Baader vs P0% Grader.
  *
- * Muestra la correlación entre la producción de cada Evisceradora (ciclos cada
- * 5 min) y el P0% del Grader en el mismo período. Un punto = un intervalo de
- * 5 min con datos de ambos sistemas.
+ * Cada punto = intervalo de 5 min con datos de ambos sistemas.
+ * Lo que el operador debe ver de un vistazo:
  *
- * - 3 series (E1, E2, E3) con colores distintos
- * - Línea de tendencia (regresión lineal) + R² en leyenda
- * - Tooltip con hora, ciclos Baader, P0% Grader, piezas
- * - Solo se muestra cuando hay ≥ 10 puntos con datos en al menos 1 serie
+ *   1. **¿Cuánto del turno fue malo?** → KPI "Zona crítica: N de M min (X%)"
+ *      Define malo = P0% > 3.5% (umbral crítico) Y ritmo Baader < mediana del turno.
  *
- * Fase 3 iter 3 — Shoplogix Integration.
+ *   2. **¿Hay relación causal?** → narrativa "↘ negativa — más Baader, menos P0%"
+ *      + magnitud legible: "cada -10 ciclos/5min → +N puntos P0%".
+ *
+ *   3. **Líneas de referencia visibles**:
+ *      - Horizontal en P0%=3.5% (rojo)  — frontera crítica del Grader
+ *      - Vertical en mediana de ciclos Baader (slate) — ritmo típico del turno
+ *      Cuadrante inferior-derecho (P0 alto + Baader lento) tinte rojo tenue.
+ *
+ *   4. **Tamaño del punto = piezas Grader** (confianza del minuto). Documentado.
+ *
+ * Solo se muestra cuando hay ≥ 10 puntos con datos en al menos 1 serie.
+ *
+ * Fase 3 iter 3 — Shoplogix Integration. Iter 3.1 — accionabilidad (2026-04-25).
  */
 
 import { useMemo } from 'react'
 import ReactECharts from 'echarts-for-react'
 import { Card, CardContent } from '@/components/ui'
-import { ScatterChart } from 'lucide-react'
+import { ScatterChart, AlertTriangle, TrendingDown, TrendingUp, Minus } from 'lucide-react'
 import type { TimelineBucket } from '@/services/grader/types'
 import type { UpstreamLineSnapshot } from '@/services/shoplogix/types'
-import { buildScatterData } from './shiftTimelineHelpers'
+import {
+  buildScatterData,
+  scatterBaaderMedian,
+  scatterCriticalZone,
+  scatterSlopeMagnitude,
+  usableScatterPoints,
+} from './shiftTimelineHelpers'
+
+/** Umbral crítico de P0% (alineado con el header del summary y el coloreo del turno). */
+const P0_CRITICAL_PCT = 3.5
 
 interface Props {
   snapshot: UpstreamLineSnapshot | null | undefined
@@ -53,8 +71,69 @@ export function UpstreamScatterCard({ snapshot, timelineBuckets }: Props) {
   // No renderizar si no hay datos suficientes — early return DESPUÉS de todos los hooks
   const totalPoints = seriesData.reduce((a, s) => a + s.points.length, 0)
 
+  // ── Analytics extraídos a funciones puras (testables) ──────────────────────
+  const baaderMedian = useMemo(() => scatterBaaderMedian(seriesData), [seriesData])
+  const criticalKpi  = useMemo(() => scatterCriticalZone(seriesData, P0_CRITICAL_PCT, baaderMedian), [seriesData, baaderMedian])
+
   const option = useMemo(() => {
     const series: object[] = []
+
+    // ── Capa de fondo: zona crítica (cuadrante inferior-derecho invertido) ───
+    // En ECharts y va de 0 hacia arriba — "P0% alto" significa Y > 3.5
+    // y "Baader lento" significa X < median. Por eso markArea va:
+    //   - X: [0, baaderMedian]
+    //   - Y: [P0_CRITICAL_PCT, ∞]
+    // markArea + markLine se asocian a una serie "fantasma" sin datos visibles.
+    if (baaderMedian > 0) {
+      series.push({
+        name: '__zona_critica__',
+        type: 'scatter',
+        data: [],
+        silent: true,
+        markArea: {
+          silent: true,
+          itemStyle: { color: 'rgba(220, 38, 38, 0.06)' },  // red-600 muy tenue
+          data: [[
+            { coord: [0, P0_CRITICAL_PCT], name: 'Zona crítica' },
+            { coord: [baaderMedian, 'max'] },
+          ]],
+        },
+        markLine: {
+          silent: true,
+          symbol: 'none',
+          label: { show: false },
+          data: [
+            // Horizontal: P0%=3.5 (umbral crítico) — rojo dashed
+            {
+              yAxis: P0_CRITICAL_PCT,
+              lineStyle: { color: 'rgba(220, 38, 38, 0.45)', type: 'dashed', width: 1 },
+              label: {
+                show: true,
+                position: 'insideEndTop',
+                formatter: `Crítico ${P0_CRITICAL_PCT}%`,
+                color: 'rgba(220, 38, 38, 0.7)',
+                fontSize: 9,
+              },
+            },
+            // Vertical: mediana del ritmo Baader — slate dotted
+            {
+              xAxis: baaderMedian,
+              lineStyle: { color: 'rgba(148, 163, 184, 0.45)', type: 'dotted', width: 1 },
+              label: {
+                show: true,
+                position: 'insideEndBottom',
+                formatter: `Mediana ${Math.round(baaderMedian)}`,
+                color: 'rgba(148, 163, 184, 0.7)',
+                fontSize: 9,
+              },
+            },
+          ],
+        },
+        legendHoverLink: false,
+        // No aparece en leyenda
+        z: 0,
+      })
+    }
 
     seriesData.forEach((s, idx) => {
       const color = MACHINE_COLORS[idx % MACHINE_COLORS.length]!
@@ -132,6 +211,10 @@ export function UpstreamScatterCard({ snapshot, timelineBuckets }: Props) {
         bottom: 0,
         textStyle: { color: '#64748b', fontSize: 9 },
         itemWidth: 12, itemHeight: 8,
+        // Ocultar la serie fantasma "__zona_critica__" del legend
+        data: series
+          .map((s: any) => s.name)
+          .filter((n: string) => n !== '__zona_critica__'),
       },
       xAxis: {
         type: 'value',
@@ -161,12 +244,12 @@ export function UpstreamScatterCard({ snapshot, timelineBuckets }: Props) {
       },
       series,
     }
-  }, [seriesData])
+  }, [seriesData, baaderMedian])
 
-  // Resumen estadístico rápido
+  // Resumen estadístico rápido (R² + slope) — secundario al KPI accionable.
   const stats = useMemo(() => {
     return seriesData.map(s => {
-      const usable = s.points.filter(p => p.baaderCycles > 0 && p.graderPieces >= 5)
+      const usable = usableScatterPoints(s.points)
       return {
         name: s.machineName.replace('Evisceradora', 'E'),
         pts: usable.length,
@@ -176,48 +259,101 @@ export function UpstreamScatterCard({ snapshot, timelineBuckets }: Props) {
     }).filter(s => s.pts >= 3)
   }, [seriesData])
 
+  // Pendiente con magnitud operacional ("cada -10 ciclos → ±N pts P0%")
+  const slopeMagnitude = useMemo(() => scatterSlopeMagnitude(seriesData), [seriesData])
+
   // Early return post-hooks: no renderizar si no hay datos suficientes
   if (!snapshot || totalPoints < 10) return null
+
+  // Color del KPI zona crítica según severidad
+  const criticalColor =
+    criticalKpi.pct >= 20 ? 'text-rose-400'
+    : criticalKpi.pct >= 10 ? 'text-amber-400'
+    : 'text-emerald-400'
+
+  // Narrativa direccional con magnitud operacional
+  const trendNarrative = slopeMagnitude == null
+    ? null
+    : slopeMagnitude.direction === 'neg'
+      ? {
+          icon: <TrendingDown className="w-3 h-3" />,
+          text: `Cada -10 ciclos/5min Baader → +${slopeMagnitude.deltaP0_per_minus10cycles.toFixed(2)} pts P0%`,
+          color: 'text-rose-400',
+          tone: 'Más Baader → menos P0%. Confirma que ritmo upstream impacta calidad.',
+        }
+      : slopeMagnitude.direction === 'pos'
+      ? {
+          icon: <TrendingUp className="w-3 h-3" />,
+          text: `Cada -10 ciclos/5min Baader → ${slopeMagnitude.deltaP0_per_minus10cycles.toFixed(2)} pts P0%`,
+          color: 'text-amber-400',
+          tone: 'P0% sube cuando Baader sube. Anti-intuitivo — investigar.',
+        }
+      : {
+          icon: <Minus className="w-3 h-3" />,
+          text: 'Sin tendencia significativa',
+          color: 'text-slate-400',
+          tone: 'P0% del Grader no se explica por el ritmo Baader en este turno.',
+        }
 
   return (
     <Card className="border-slate-800 bg-slate-950/50">
       <CardContent className="py-3 px-4">
-        <div className="flex items-center justify-between gap-2 mb-2">
+        {/* Header: ícono + título + KPI accionable de zona crítica */}
+        <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
           <div className="flex items-center gap-2">
             <ScatterChart className="w-4 h-4 text-violet-400" />
             <span className="font-medium text-sm">Correlación Baader → P0%</span>
           </div>
-          {/* Stats por máquina: R² y signo de pendiente */}
-          <div className="flex items-center gap-3">
+
+          {/* KPI accionable: zona crítica (lo que el operador debe ver primero) */}
+          {criticalKpi.total > 0 && (
+            <div
+              className={`flex items-center gap-1.5 text-xs tabular-nums ${criticalColor}`}
+              title={`Zona crítica = P0% > ${P0_CRITICAL_PCT}% (umbral) Y ritmo Baader < mediana del turno (${Math.round(baaderMedian)} ciclos/5min). Cuadrante inferior-derecho del scatter.`}
+            >
+              <AlertTriangle className="w-3.5 h-3.5" />
+              <span className="font-semibold">
+                Zona crítica: {criticalKpi.critical} de {criticalKpi.total} min
+                <span className="ml-1 opacity-80">({criticalKpi.pct.toFixed(1)}%)</span>
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Sub-header: tendencia con magnitud operacional + tono narrativo */}
+        {trendNarrative && (
+          <div className={`flex items-center gap-1.5 text-[11px] mb-1 ${trendNarrative.color}`}>
+            {trendNarrative.icon}
+            <span className="font-medium tabular-nums">{trendNarrative.text}</span>
+            <span className="text-slate-500">— {trendNarrative.tone}</span>
+          </div>
+        )}
+
+        {/* Nota explicativa pequeña */}
+        <div className="text-[10px] text-slate-500 mb-2">
+          Punto = 5 min · X = ciclos Baader · Y = P0% Grader · tamaño = piezas Grader (confianza).
+          {' '}Líneas: <span className="text-rose-400/80">P0% crítico {P0_CRITICAL_PCT}%</span>
+          {' · '}<span className="text-slate-400">mediana ritmo {Math.round(baaderMedian)} ciclos</span>.
+        </div>
+
+        {/* Stats por máquina (R² ahora secundario, en línea sutil) */}
+        {stats.length > 0 && (
+          <div className="flex items-center gap-3 mb-2">
             {stats.map((s, idx) => {
               const trendColor = TREND_COLORS[idx % TREND_COLORS.length]!
-              const slopeSign = s.slope == null ? '—'
-                : s.slope > 0.01  ? '↗ positiva'
-                : s.slope < -0.01 ? '↘ negativa'
-                : '→ nula'
               return (
                 <span
                   key={s.name}
-                  className="text-[10px] tabular-nums flex items-center gap-1"
+                  className="text-[10px] tabular-nums opacity-70"
                   style={{ color: trendColor }}
-                  title={`${s.name}: ${s.pts} puntos, R²=${s.r2?.toFixed(2) ?? '—'}, tendencia ${slopeSign}`}
+                  title={`${s.name}: ${s.pts} puntos, R²=${s.r2?.toFixed(2) ?? '—'}, slope=${s.slope?.toFixed(4) ?? '—'}`}
                 >
-                  {s.name}
-                  {s.r2 != null && ` R²${s.r2.toFixed(2)}`}
+                  {s.name} {s.r2 != null ? `R²${s.r2.toFixed(2)}` : '—'}
                 </span>
               )
             })}
           </div>
-        </div>
-
-        <div className="text-[10px] text-slate-500 mb-2">
-          Cada punto = intervalo de 5 min. X = ciclos Baader, Y = P0% Grader en el mismo período.
-          Tendencia {stats.find(s => s.slope != null && s.slope < -0.01)
-            ? '↘ negativa — más producción Baader correlaciona con menor P0% Grader'
-            : stats.find(s => s.slope != null && s.slope > 0.01)
-            ? '↗ positiva — más producción Baader correlaciona con mayor P0% Grader'
-            : '→ sin tendencia clara'}
-        </div>
+        )}
 
         <ReactECharts
           option={option}

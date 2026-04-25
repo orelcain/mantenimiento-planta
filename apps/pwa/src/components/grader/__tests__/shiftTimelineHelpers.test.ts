@@ -3,7 +3,13 @@ import {
   buildBaaderTimelineMarkers,
   buildScatterData,
   computeProductionWindow,
+  median,
+  scatterBaaderMedian,
+  scatterCriticalZone,
+  scatterSlopeMagnitude,
+  usableScatterPoints,
   type ProductionWindow,
+  type ScatterSeriesData,
 } from '../shiftTimelineHelpers'
 import type {
   UpstreamLineSnapshot,
@@ -353,5 +359,206 @@ describe('buildScatterData', () => {
     const [series] = buildScatterData(snap, buckets)
     // Solo 2 puntos → sin regresión
     expect(series!.regression).toBeNull()
+  })
+})
+
+// ── Scatter analytics: zona crítica + magnitud pendiente ─────────────────────
+
+describe('median', () => {
+  it('retorna 0 para array vacío', () => {
+    expect(median([])).toBe(0)
+  })
+  it('retorna el elemento medio en arrays impares', () => {
+    expect(median([3, 1, 2])).toBe(2)
+    expect(median([5, 1, 3, 2, 4])).toBe(3)
+  })
+  it('retorna el promedio de los 2 medios en arrays pares', () => {
+    expect(median([1, 2, 3, 4])).toBe(2.5)
+    expect(median([10, 20])).toBe(15)
+  })
+})
+
+describe('usableScatterPoints', () => {
+  it('filtra puntos sin ciclos Baader', () => {
+    const pts = [
+      { tsMs: 0, baaderCycles: 0,  baaderRatio: 0, graderP0Pct: 0.05, graderPieces: 100, baaderColor: 'green' },
+      { tsMs: 1, baaderCycles: 50, baaderRatio: 1, graderP0Pct: 0.05, graderPieces: 100, baaderColor: 'green' },
+    ]
+    expect(usableScatterPoints(pts)).toHaveLength(1)
+  })
+  it('filtra puntos con < 5 piezas Grader (poca confianza)', () => {
+    const pts = [
+      { tsMs: 0, baaderCycles: 50, baaderRatio: 1, graderP0Pct: 0.05, graderPieces: 4,   baaderColor: 'green' },
+      { tsMs: 1, baaderCycles: 50, baaderRatio: 1, graderP0Pct: 0.05, graderPieces: 100, baaderColor: 'green' },
+    ]
+    expect(usableScatterPoints(pts)).toHaveLength(1)
+  })
+})
+
+describe('scatterBaaderMedian', () => {
+  it('retorna la mediana del ritmo Baader sobre TODAS las máquinas', () => {
+    const series: ScatterSeriesData[] = [
+      {
+        machineid: 'm1', machineName: 'E1',
+        points: [
+          { tsMs: 0, baaderCycles: 10, baaderRatio: 1, graderP0Pct: 0.05, graderPieces: 100, baaderColor: 'green' },
+          { tsMs: 1, baaderCycles: 30, baaderRatio: 1, graderP0Pct: 0.05, graderPieces: 100, baaderColor: 'green' },
+        ],
+        regression: null,
+      },
+      {
+        machineid: 'm2', machineName: 'E2',
+        points: [
+          { tsMs: 2, baaderCycles: 50, baaderRatio: 1, graderP0Pct: 0.05, graderPieces: 100, baaderColor: 'green' },
+          { tsMs: 3, baaderCycles: 70, baaderRatio: 1, graderP0Pct: 0.05, graderPieces: 100, baaderColor: 'green' },
+        ],
+        regression: null,
+      },
+    ]
+    // Cycles agregados: [10, 30, 50, 70] → median = (30+50)/2 = 40
+    expect(scatterBaaderMedian(series)).toBe(40)
+  })
+
+  it('retorna 0 cuando no hay puntos usables', () => {
+    expect(scatterBaaderMedian([])).toBe(0)
+  })
+
+  it('ignora puntos no usables (sin ciclos / piezas insuficientes) en el cálculo', () => {
+    const series: ScatterSeriesData[] = [
+      {
+        machineid: 'm1', machineName: 'E1',
+        points: [
+          { tsMs: 0, baaderCycles: 0,   baaderRatio: 0, graderP0Pct: 0.05, graderPieces: 100, baaderColor: 'green' },
+          { tsMs: 1, baaderCycles: 100, baaderRatio: 1, graderP0Pct: 0.05, graderPieces: 100, baaderColor: 'green' },
+          { tsMs: 2, baaderCycles: 200, baaderRatio: 1, graderP0Pct: 0.05, graderPieces: 4,   baaderColor: 'green' },
+        ],
+        regression: null,
+      },
+    ]
+    // Solo el punto con baader=100 es usable → mediana = 100
+    expect(scatterBaaderMedian(series)).toBe(100)
+  })
+})
+
+describe('scatterCriticalZone', () => {
+  it('cuenta puntos con P0% > umbral Y baaderCycles < mediana', () => {
+    const series: ScatterSeriesData[] = [
+      {
+        machineid: 'm1', machineName: 'E1',
+        points: [
+          // Crítico: P0=5% > 3.5, ciclos=20 < 50
+          { tsMs: 0, baaderCycles: 20, baaderRatio: 0.5, graderP0Pct: 0.05, graderPieces: 100, baaderColor: 'red' },
+          // No crítico: P0=2% < 3.5
+          { tsMs: 1, baaderCycles: 20, baaderRatio: 0.5, graderP0Pct: 0.02, graderPieces: 100, baaderColor: 'red' },
+          // No crítico: ciclos=80 >= mediana
+          { tsMs: 2, baaderCycles: 80, baaderRatio: 1.5, graderP0Pct: 0.05, graderPieces: 100, baaderColor: 'green' },
+          // Crítico: P0=4% > 3.5, ciclos=10 < 50
+          { tsMs: 3, baaderCycles: 10, baaderRatio: 0.2, graderP0Pct: 0.04, graderPieces: 100, baaderColor: 'red' },
+        ],
+        regression: null,
+      },
+    ]
+    const result = scatterCriticalZone(series, 3.5, 50)
+    expect(result.critical).toBe(2)
+    expect(result.total).toBe(4)
+    expect(result.pct).toBeCloseTo(50, 5)
+  })
+
+  it('retorna pct=0 cuando no hay puntos usables', () => {
+    expect(scatterCriticalZone([], 3.5, 50)).toEqual({ critical: 0, total: 0, pct: 0 })
+  })
+
+  it('puntos justo bajo el umbral (P0=3.4%) NO cuentan como crítico', () => {
+    const series: ScatterSeriesData[] = [
+      {
+        machineid: 'm1', machineName: 'E1',
+        points: [
+          // P0=3.4% (0.034 sin float-math sucio) NO es crítico
+          { tsMs: 0, baaderCycles: 20, baaderRatio: 0.5, graderP0Pct: 0.034, graderPieces: 100, baaderColor: 'amber' },
+        ],
+        regression: null,
+      },
+    ]
+    const result = scatterCriticalZone(series, 3.5, 50)
+    expect(result.critical).toBe(0)
+    expect(result.total).toBe(1)
+  })
+})
+
+describe('scatterSlopeMagnitude', () => {
+  it('retorna null si ninguna serie tiene regresión', () => {
+    const series: ScatterSeriesData[] = [
+      { machineid: 'm1', machineName: 'E1', points: [], regression: null },
+    ]
+    expect(scatterSlopeMagnitude(series)).toBeNull()
+  })
+
+  it('promedio ponderado por nº puntos usables', () => {
+    const series: ScatterSeriesData[] = [
+      {
+        machineid: 'm1', machineName: 'E1',
+        points: Array.from({ length: 10 }, (_, i) => ({
+          tsMs: i, baaderCycles: 20, baaderRatio: 1, graderP0Pct: 0.05, graderPieces: 100, baaderColor: 'green',
+        })),
+        regression: { slope: -0.05, intercept: 5, r2: 0.8 },
+      },
+      {
+        machineid: 'm2', machineName: 'E2',
+        points: Array.from({ length: 10 }, (_, i) => ({
+          tsMs: i, baaderCycles: 20, baaderRatio: 1, graderP0Pct: 0.05, graderPieces: 100, baaderColor: 'green',
+        })),
+        regression: { slope: -0.03, intercept: 5, r2: 0.7 },
+      },
+    ]
+    const result = scatterSlopeMagnitude(series)!
+    // Promedio ponderado: (-0.05*10 + -0.03*10) / 20 = -0.04
+    expect(result.avgSlope).toBeCloseTo(-0.04, 5)
+    // Por -10 ciclos → +0.4 puntos P0%
+    expect(result.deltaP0_per_minus10cycles).toBeCloseTo(0.4, 5)
+    expect(result.direction).toBe('neg')
+  })
+
+  it('clasifica direction "flat" cuando |slope| < 0.005', () => {
+    const series: ScatterSeriesData[] = [
+      {
+        machineid: 'm1', machineName: 'E1',
+        points: Array.from({ length: 10 }, (_, i) => ({
+          tsMs: i, baaderCycles: 20, baaderRatio: 1, graderP0Pct: 0.05, graderPieces: 100, baaderColor: 'green',
+        })),
+        regression: { slope: 0.001, intercept: 5, r2: 0.05 },
+      },
+    ]
+    const result = scatterSlopeMagnitude(series)!
+    expect(result.direction).toBe('flat')
+  })
+
+  it('clasifica direction "pos" con slope > 0.005', () => {
+    const series: ScatterSeriesData[] = [
+      {
+        machineid: 'm1', machineName: 'E1',
+        points: Array.from({ length: 10 }, (_, i) => ({
+          tsMs: i, baaderCycles: 20, baaderRatio: 1, graderP0Pct: 0.05, graderPieces: 100, baaderColor: 'green',
+        })),
+        regression: { slope: 0.02, intercept: 5, r2: 0.5 },
+      },
+    ]
+    const result = scatterSlopeMagnitude(series)!
+    expect(result.direction).toBe('pos')
+    // Slope positivo → -0.02*10 = -0.2 (P0% BAJA cuando ritmo baja, anti-intuitivo)
+    expect(result.deltaP0_per_minus10cycles).toBeCloseTo(-0.2, 5)
+  })
+
+  it('ignora series con < 3 puntos usables', () => {
+    const series: ScatterSeriesData[] = [
+      {
+        machineid: 'm1', machineName: 'E1',
+        points: [
+          { tsMs: 0, baaderCycles: 20, baaderRatio: 1, graderP0Pct: 0.05, graderPieces: 100, baaderColor: 'green' },
+          { tsMs: 1, baaderCycles: 20, baaderRatio: 1, graderP0Pct: 0.05, graderPieces: 100, baaderColor: 'green' },
+        ],
+        regression: { slope: -0.1, intercept: 5, r2: 0.9 },
+      },
+    ]
+    expect(scatterSlopeMagnitude(series)).toBeNull()
   })
 })
