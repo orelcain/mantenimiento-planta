@@ -110,8 +110,15 @@ export function normalizeShift(params: {
   shiftId: string;
   /** Tamaño del intervalo en ms. Default 5 min. */
   intervalMs?: number;
-  /** Override de start del turno (si no se infiere de currentShift). */
+  /**
+   * Override del bound de inicio del turno. RECOMENDADO siempre — el
+   * `currentShiftStart` que devuelve Shoplogix corresponde al turno en
+   * curso AHORA, no al turno consultado (bug observado al sincronizar
+   * Feb 26 cuando today=Feb 28).
+   */
   shiftStartAt?: Date;
+  /** Override del bound de fin del turno. Mismo motivo. */
+  shiftEndAt?: Date;
   syncedAt?: Date;
 }): UpstreamMachineShift {
   const { production, summary, dateKey, shiftId } = params;
@@ -125,10 +132,13 @@ export function normalizeShift(params: {
   const intervalMs = params.intervalMs ?? 5 * 60 * 1000;
   const threshold = summary.threshold ?? production.threshold ?? 15;
 
-  // Shift bounds — preferimos currentShiftStart/End del summary, luego production
+  // Shift bounds — preferimos overrides explícitos del caller (cloud function
+  // pasa el shiftWindow del schedule). Fallback a currentShiftStart/End de
+  // Shoplogix solo si no hay override (legacy / sin schedule).
   const shiftStart = params.shiftStartAt
     ?? parseShoplogixTime(summary.currentShiftStart || production.currentShiftStart);
-  const shiftEnd   = parseShoplogixTime(summary.currentShiftEnd || production.currentShiftEnd);
+  const shiftEnd   = params.shiftEndAt
+    ?? parseShoplogixTime(summary.currentShiftEnd || production.currentShiftEnd);
 
   // Intervalos (5 min cada uno, empezando desde shiftStart)
   const intervals: UpstreamProductionInterval[] = production.machineProduction.map((raw, i) => {
@@ -147,11 +157,12 @@ export function normalizeShift(params: {
   // Estados / paros
   const states: UpstreamMachineState[] = summary.machineStates.map(normalizeState);
 
-  // shiftRuntime: % del turno realmente en Uptime, calculado desde states.
+  // shiftRuntime: % del tiempo tracked realmente en Uptime, calculado desde
+  // los states. Usamos `totalTrackedSec` (suma de durations) y NO
+  // `shiftEnd-shiftStart` porque los bounds de Shoplogix son poco confiables
+  // (`currentShiftStart/End` apunta al turno actual, no al consultado).
   // El `actualRuntime` crudo de Shoplogix usa un denominador opaco (ej. 11.2%
-  // cuando el Uptime real era 46% del turno Feb 26 E1). Nosotros computamos
-  // el ratio respecto a la duración del turno para que coincida con la
-  // intuición del operador.
+  // cuando el Uptime real era 46% del turno Feb 26 E1).
   const shiftRuntimeBreakdown = {
     uptimeSec:   states.filter(s => s.type === 'uptime').reduce((a, s) => a + s.durationSec, 0),
     breakSec:    states.filter(s => s.type === 'break').reduce((a, s) => a + s.durationSec, 0),
@@ -162,8 +173,9 @@ export function normalizeShift(params: {
   shiftRuntimeBreakdown.totalTrackedSec =
     shiftRuntimeBreakdown.uptimeSec + shiftRuntimeBreakdown.breakSec +
     shiftRuntimeBreakdown.downtimeSec + shiftRuntimeBreakdown.setupSec;
-  const shiftDurationSec = Math.max(1, (shiftEnd.getTime() - shiftStart.getTime()) / 1000);
-  const shiftRuntime = shiftRuntimeBreakdown.uptimeSec / shiftDurationSec;
+  const shiftRuntime = shiftRuntimeBreakdown.totalTrackedSec > 0
+    ? shiftRuntimeBreakdown.uptimeSec / shiftRuntimeBreakdown.totalTrackedSec
+    : 0;
 
   // Info de la máquina (type) — si no está en registry, default 'other'
   const info: UpstreamMachineInfo | undefined = findMachineInfo(production.machineId);

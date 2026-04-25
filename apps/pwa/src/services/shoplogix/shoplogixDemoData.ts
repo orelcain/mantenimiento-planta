@@ -92,8 +92,9 @@ function makeShift(
     totalTrackedSec: 0,
   };
   breakdown.totalTrackedSec = breakdown.uptimeSec + breakdown.breakSec + breakdown.downtimeSec + breakdown.setupSec;
-  const shiftDurationSec = Math.max(1, (shiftEnd.getTime() - shiftStart.getTime()) / 1000);
-  const shiftRuntime = breakdown.uptimeSec / shiftDurationSec;
+  const shiftRuntime = breakdown.totalTrackedSec > 0
+    ? breakdown.uptimeSec / breakdown.totalTrackedSec
+    : 0;
 
   return {
     machineid,

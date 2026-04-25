@@ -21,7 +21,7 @@
 const { CHONCHI_EVISCERADORAS } = require('./machines')
 const { queryShoplogix } = require('./client')
 const { normalizeShift } = require('./normalizer')
-const { toShoplogixTime } = require('./time')
+const { toShoplogixTime, parseShoplogixTime } = require('./time')
 const { pauseBetweenMachines, currentShift } = require('./polling')
 
 const PLANT_SLUG = 'chonchi'
@@ -127,11 +127,19 @@ async function syncShift({ db, cookie, dateKey, shiftId, logger = console }) {
         continue
       }
 
+      // Pasamos shiftStart/End explícitos para evitar el bug de
+      // `currentShiftStart/End` en summary que apunta al turno EN CURSO
+      // ahora, no al turno consultado.
+      const queryStart = parseShoplogixTime(window.start)
+      const queryEnd   = parseShoplogixTime(window.end)
+
       const doc = normalizeShift({
         production: prodMachine,
         summary: sumMachine,
         dateKey: key.dateKey,
         shiftId: key.shiftId,
+        shiftStartAt: queryStart,
+        shiftEndAt:   queryEnd,
         syncedAt,
       })
 
