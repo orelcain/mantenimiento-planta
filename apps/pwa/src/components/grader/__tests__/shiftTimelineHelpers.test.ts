@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   buildBaaderTimelineMarkers,
+  buildScatterData,
   computeProductionWindow,
   type ProductionWindow,
 } from '../shiftTimelineHelpers'
@@ -228,5 +229,129 @@ describe('computeProductionWindow (sanity)', () => {
   it('retorna null para array vacío', () => {
     const buckets: TimelineBucket[] = []
     expect(computeProductionWindow(buckets)).toBeNull()
+  })
+})
+
+// ── buildScatterData ──────────────────────────────────────────────────────────
+
+function mkInterval(
+  startISO: string,
+  cycles: number,
+  expectedCycles = 40,
+): import('../shiftTimelineHelpers').ScatterPoint['baaderCycles'] extends number
+  ? import('@/services/shoplogix/types').UpstreamProductionInterval
+  : never {
+  const startAt = new Date(startISO)
+  const endAt   = new Date(startAt.getTime() + 5 * 60_000)
+  const ratio   = expectedCycles > 0 ? cycles / expectedCycles : 0
+  return {
+    startAt, endAt, cycles, expectedCycles,
+    total: cycles, expectedTotal: expectedCycles, ratio,
+    color: ratio >= 0.85 ? 'green' : ratio > 0 ? 'yellow' : 'red',
+  }
+}
+
+function mkBucket(tsMin: string, pieces: number, p0Pieces: number): TimelineBucket {
+  return { tsMin, pieces, p0Pieces }
+}
+
+// Snapshot de 1 máquina con 3 intervalos de 5 min (09:00, 09:05, 09:10)
+function mkScatterSnap(cycles: number[]): UpstreamLineSnapshot {
+  const intervals = cycles.map((c, i) =>
+    mkInterval(`2026-02-26T${String(9).padStart(2,'0')}:${String(i * 5).padStart(2,'0')}:00Z`, c),
+  )
+  return mkSnap([{ ...mkShift('Evisceradora 1', []), intervals }])
+}
+
+// Buckets: 5 minutos por intervalo → 3 × 5 = 15 buckets (09:00-09:14)
+function mkScatterBuckets(
+  p0Pcts: number[],  // uno por intervalo (5 min)
+  piecesPerMin = 10,
+): TimelineBucket[] {
+  const buckets: TimelineBucket[] = []
+  for (let ivl = 0; ivl < p0Pcts.length; ivl++) {
+    for (let m = 0; m < 5; m++) {
+      const h = 9
+      const min = ivl * 5 + m
+      const tsMin = `2026-02-26T${String(h).padStart(2,'0')}:${String(min).padStart(2,'0')}:00Z`
+      const pieces = piecesPerMin
+      const p0Pieces = Math.round(pieces * p0Pcts[ivl]!)
+      buckets.push(mkBucket(tsMin, pieces, p0Pieces))
+    }
+  }
+  return buckets
+}
+
+describe('buildScatterData', () => {
+  it('retorna array vacío si no hay buckets', () => {
+    const snap = mkScatterSnap([20, 30, 25])
+    expect(buildScatterData(snap, [])).toEqual([])
+  })
+
+  it('retorna array vacío si no hay máquinas', () => {
+    const snap: UpstreamLineSnapshot = { ...mkSnap([]), machines: [] }
+    const buckets = mkScatterBuckets([0.02, 0.03, 0.01])
+    expect(buildScatterData(snap, buckets)).toEqual([])
+  })
+
+  it('alinea correctamente intervalos Baader con buckets Grader', () => {
+    // 3 intervalos de 5 min, 3 P0% distintos.
+    // piecesPerMin=100 para evitar rounding: 100*0.02=2, 100*0.04=4, 100*0.08=8 (exactos)
+    const cycles = [30, 40, 10]
+    const p0Pcts = [0.02, 0.04, 0.08]
+    const snap    = mkScatterSnap(cycles)
+    const buckets = mkScatterBuckets(p0Pcts, 100)
+
+    const [series] = buildScatterData(snap, buckets)
+    expect(series).toBeDefined()
+    expect(series!.points).toHaveLength(3)
+
+    // Punto 0: Baader=30, Grader P0%=2%
+    expect(series!.points[0]!.baaderCycles).toBe(30)
+    expect(series!.points[0]!.graderP0Pct).toBeCloseTo(0.02, 3)
+    expect(series!.points[0]!.graderPieces).toBe(500)  // 5 min × 100 piezas/min
+
+    // Punto 2: Baader=10 (baja producción), P0%=8% (alto)
+    expect(series!.points[2]!.baaderCycles).toBe(10)
+    expect(series!.points[2]!.graderP0Pct).toBeCloseTo(0.08, 3)
+  })
+
+  it('omite puntos sin datos Grader (0 piezas en el intervalo)', () => {
+    const snap    = mkScatterSnap([30, 40])
+    // Primer intervalo sin piezas Grader, segundo con piezas
+    const buckets = [
+      ...Array.from({ length: 5 }, (_, i) =>
+        mkBucket(`2026-02-26T09:${String(i).padStart(2,'0')}:00Z`, 0, 0)),
+      ...Array.from({ length: 5 }, (_, i) =>
+        mkBucket(`2026-02-26T09:${String(5 + i).padStart(2,'0')}:00Z`, 10, 1)),
+    ]
+    const [series] = buildScatterData(snap, buckets)
+    // Solo el segundo intervalo tiene piezas Grader → 1 punto
+    expect(series!.points).toHaveLength(1)
+    expect(series!.points[0]!.baaderCycles).toBe(40)
+  })
+
+  it('calcula regresión cuando hay ≥ 3 puntos con datos', () => {
+    // Correlación negativa: más ciclos Baader → menor P0%
+    // piecesPerMin=100 para evitar rounding en p0Pieces: 100*0.10=10, 100*0.03=3 exactos
+    const cycles = [10, 20, 30, 40, 50]
+    const p0Pcts = [0.10, 0.08, 0.05, 0.03, 0.02]  // inversamente proporcional
+    const snap    = mkScatterSnap(cycles)
+    const buckets = mkScatterBuckets(p0Pcts, 100)
+
+    const [series] = buildScatterData(snap, buckets)
+    expect(series!.regression).not.toBeNull()
+    // Pendiente negativa (más ciclos → menos P0%)
+    expect(series!.regression!.slope).toBeLessThan(0)
+    // R² debe ser alto (correlación casi perfecta)
+    expect(series!.regression!.r2).toBeGreaterThan(0.8)
+  })
+
+  it('regression es null si hay < 3 puntos con datos', () => {
+    const snap    = mkScatterSnap([20, 25])
+    const buckets = mkScatterBuckets([0.02, 0.03])
+    const [series] = buildScatterData(snap, buckets)
+    // Solo 2 puntos → sin regresión
+    expect(series!.regression).toBeNull()
   })
 })

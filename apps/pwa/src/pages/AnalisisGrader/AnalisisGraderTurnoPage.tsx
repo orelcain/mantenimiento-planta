@@ -42,6 +42,7 @@ import { useToast } from '@/hooks/useToast'
 import { ActionPlanPanel, deriveSuggestions } from '@/components/grader/ActionPlanPanel'
 import { UpstreamMachinesPanel } from '@/components/grader/UpstreamMachinesPanel'
 import { UpstreamCorrelationCard } from '@/components/grader/UpstreamCorrelationCard'
+import { UpstreamScatterCard } from '@/components/grader/UpstreamScatterCard'
 import { useUpstreamLineSnapshot } from '@/hooks/useUpstreamLineSnapshot'
 import { findTriggeredRunbooks } from '@/services/grader/graderRunbooks'
 import { analyzeGraderFromSummary } from '@/services/grader/graderSummaryAI'
@@ -881,6 +882,12 @@ export function AnalisisGraderTurnoPage() {
           <UpstreamCorrelationCard
             pauses={pauses}
             snapshot={upstreamLine.snapshot}
+          />
+
+          {/* Scatter ritmo Baader vs P0% Grader (Fase 3 iter 3) */}
+          <UpstreamScatterCard
+            snapshot={upstreamLine.snapshot}
+            timelineBuckets={enrichedTimelineBuckets}
           />
 
           {/* Distribución por gate — balance del turno */}

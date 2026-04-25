@@ -435,6 +435,129 @@ export function buildBaaderTimelineMarkers(
   return { lanes, bands }
 }
 
+// ── Scatter: correlación Baader ritmo vs Grader P0% ──────────────────────────
+
+/**
+ * Punto del scatter de correlación upstream.
+ * Un punto = un intervalo de 5 min donde hay datos de AMBOS sistemas.
+ */
+export interface ScatterPoint {
+  /** Timestamp inicio del intervalo (ms UTC — wall-clock Chile) */
+  tsMs: number;
+  /** Ciclos Baader en el intervalo (0..∞) */
+  baaderCycles: number;
+  /** Ratio Baader (cycles / expectedCycles, 0..1+) — usado como tamaño del punto */
+  baaderRatio: number;
+  /** P0% del Grader en el mismo intervalo (0..1) */
+  graderP0Pct: number;
+  /** Piezas totales del Grader en el intervalo (para ponderar confianza del punto) */
+  graderPieces: number;
+  /** Color del intervalo Baader ("green"|"yellow"|"red"|"gray") */
+  baaderColor: string;
+}
+
+export interface ScatterSeriesData {
+  machineid: string;
+  machineName: string;
+  points: ScatterPoint[];
+  /** Regresión lineal simple: y = slope * x + intercept (si hay ≥ 3 puntos con datos) */
+  regression: { slope: number; intercept: number; r2: number } | null;
+}
+
+/**
+ * Construye los datos del scatter de correlación entre el ritmo de cada Baader
+ * y el P0% del Grader, alineados temporalmente en ventanas de 5 minutos.
+ *
+ * Convención de timestamps: ambos sistemas usan UTC-as-wall-clock (hora Chile
+ * almacenada sin conversión de TZ). La comparación numérica de getTime() es
+ * válida porque ambos usan la misma convención.
+ *
+ * @param snapshot   UpstreamLineSnapshot (las 3 Evisceradoras)
+ * @param buckets    TimelineBucket[] por minuto del turno Grader
+ */
+export function buildScatterData(
+  snapshot: UpstreamLineSnapshot,
+  buckets: TimelineBucket[],
+): ScatterSeriesData[] {
+  if (buckets.length === 0 || snapshot.machines.length === 0) return []
+
+  // Pre-index: bucket por timestamp de inicio de minuto (ms) para O(1) lookup
+  const bucketByTs = new Map<number, TimelineBucket>()
+  for (const b of buckets) {
+    const ms = new Date(b.tsMin).getTime()
+    bucketByTs.set(ms, b)
+  }
+
+  const result: ScatterSeriesData[] = []
+
+  for (const machine of snapshot.machines) {
+    const points: ScatterPoint[] = []
+
+    for (const interval of machine.intervals) {
+      const startMs = interval.startAt.getTime()
+      const endMs   = interval.endAt.getTime()
+      const spanMs  = endMs - startMs  // normalmente 300_000 (5 min)
+
+      // Agregar los buckets del Grader que caen dentro del intervalo Baader
+      let totalPieces = 0
+      let totalP0     = 0
+
+      // Recorre minutos dentro del span del intervalo
+      for (let tMs = startMs; tMs < endMs; tMs += 60_000) {
+        const b = bucketByTs.get(tMs)
+        if (!b) continue
+        totalPieces += b.pieces
+        totalP0     += b.p0Pieces
+      }
+
+      // Solo incluir puntos con ambos sistemas activos
+      if (totalPieces < 1) continue
+
+      const graderP0Pct = totalP0 / totalPieces
+
+      points.push({
+        tsMs:         startMs,
+        baaderCycles: interval.cycles,
+        baaderRatio:  interval.ratio,
+        graderP0Pct,
+        graderPieces: totalPieces,
+        baaderColor:  interval.color,
+        // Nota: también guardamos spanMs implícitamente via endAt-startAt
+        // para normalizar ciclos/min si fuera necesario en el futuro.
+      })
+
+      void spanMs  // suprimir warning TS de variable no usada
+    }
+
+    // Regresión lineal simple (Ordinary Least Squares)
+    // y = graderP0Pct * 100, x = baaderCycles
+    const usable = points.filter(p => p.baaderCycles > 0 && p.graderPieces >= 5)
+    const regression = usable.length >= 3
+      ? (() => {
+          const n  = usable.length
+          const sx = usable.reduce((a, p) => a + p.baaderCycles, 0)
+          const sy = usable.reduce((a, p) => a + p.graderP0Pct * 100, 0)
+          const sx2 = usable.reduce((a, p) => a + p.baaderCycles ** 2, 0)
+          const sxy = usable.reduce((a, p) => a + p.baaderCycles * p.graderP0Pct * 100, 0)
+          const denom = n * sx2 - sx ** 2
+          if (denom === 0) return null
+          const slope     = (n * sxy - sx * sy) / denom
+          const intercept = (sy - slope * sx) / n
+          // R² — proporción de varianza explicada
+          const yMean = sy / n
+          const ssTot  = usable.reduce((a, p) => a + (p.graderP0Pct * 100 - yMean) ** 2, 0)
+          const ssRes  = usable.reduce((a, p) => a + (p.graderP0Pct * 100 - (slope * p.baaderCycles + intercept)) ** 2, 0)
+          const r2 = ssTot > 0 ? 1 - ssRes / ssTot : 0
+          return { slope, intercept, r2 }
+        })()
+      : null
+
+    result.push({ machineid: machine.machineid, machineName: machine.machineName, points, regression })
+  }
+
+  return result
+}
+
 /** Convierte "#rrggbb" o "rgba(...)" a rgba con alpha custom (best-effort). */
 function colorWithAlpha(color: string, alpha: number): string {
   const c = color.trim()
