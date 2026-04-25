@@ -14,6 +14,7 @@
 
 import type { Pause } from '@/services/grader/types'
 import type { UpstreamLineSnapshot, UpstreamMachineState } from './types'
+import { isOrganizationalTag } from '@/services/grader/graderPauseTags'
 
 // ============================================================================
 // Tipos
@@ -109,20 +110,15 @@ export function isPlannedBaaderReason(reason: string | null | undefined): boolea
   return false
 }
 
-// Tags del Grader que indican paros organizacionales (no upstream):
-// el operador del Grader también estaba en break, así que aunque las
-// Baaders estuvieran paradas, no son la "causa" del paro Grader.
-const ORGANIZATIONAL_GRADER_TAGS = new Set([
-  'colacion',
-  'ejercicios',
-  'cambio_lote',
-  'limpieza',
-])
-
-/** Determina si la pausa del Grader es organizacional (no operacional). */
+/**
+ * Determina si la pausa del Grader es organizacional (no operacional).
+ *
+ * Reusa la fuente única `isOrganizationalTag` de `graderPauseTags.ts` —
+ * mantener la lista en un solo lugar evita inconsistencias entre módulos
+ * (ver principios UI/UX en CLAUDE.md).
+ */
 export function isOrganizationalGraderPause(pause: Pause): boolean {
-  const tag = pause.tag ?? pause.autoTag ?? null
-  return tag != null && ORGANIZATIONAL_GRADER_TAGS.has(tag)
+  return isOrganizationalTag(pause.tag ?? pause.autoTag ?? null)
 }
 
 // ============================================================================

@@ -27,7 +27,12 @@ import {
   loadPausesAggregates,
   updatePauseAnnotation,
 } from '@/services/grader/graderDailySummary.service'
-import { GRADER_PAUSE_TAGS, resolveEffectiveTag } from '@/services/grader/graderPauseTags'
+import {
+  GRADER_PAUSE_TAGS,
+  resolveEffectiveTag,
+  isOperationalTag,
+  isOrganizationalTag,
+} from '@/services/grader/graderPauseTags'
 import type { GraderDailySummary, Pause } from '@/services/grader/types'
 import { useIsAdmin, useAuthStore } from '@/store/authStore'
 
@@ -58,11 +63,14 @@ function KpiCard({
   value,
   sub,
   icon,
+  /** Color tailwind para el value (alerta operacional según severidad). */
+  valueColor,
 }: {
   label: string
   value: string
   sub: string
   icon: React.ReactNode
+  valueColor?: string
 }) {
   return (
     <div className="rounded-lg border border-border/50 bg-muted/20 px-3 py-2.5">
@@ -70,28 +78,88 @@ function KpiCard({
         {icon}
         {label}
       </div>
-      <div className="text-lg font-semibold tabular-nums leading-none">{value}</div>
+      <div className={`text-lg font-semibold tabular-nums leading-none ${valueColor ?? ''}`}>{value}</div>
       <div className="text-[10px] text-muted-foreground/60 mt-1">{sub}</div>
     </div>
   )
 }
 
+// ── Umbrales operacionales del % muerto del turno ─────────────────────────────
+//
+// Aplica el principio "consistencia entre elementos" — mismos umbrales en cuanto
+// a coloreo del KPI promedio del período. No hay un umbral previo en el módulo
+// para "% muerto del turno" (distinto al P0% crítico del scatter), así que
+// los establecemos aquí como referencia operacional típica de líneas de
+// procesamiento.
+const DEAD_TIME_PCT_THRESHOLDS = {
+  /** ≤ 10% — operación saludable. */
+  okBelow: 10,
+  /** 10-20% — atención. */
+  warnBelow: 20,
+  /** > 20% — crítico. */
+} as const
+
+function deadTimePctColor(pct: number): string {
+  if (pct <= DEAD_TIME_PCT_THRESHOLDS.okBelow) return 'text-emerald-400'
+  if (pct <= DEAD_TIME_PCT_THRESHOLDS.warnBelow) return 'text-amber-400'
+  return 'text-rose-400'
+}
+
 const SIN_TAG_ID = '__sin_tag'
+
+/**
+ * Suma agregada por categoría (operacional/organizacional/sin clasificar)
+ * sobre un tagBreakdown — usada para distinguir tiempo evitable vs ineludible.
+ */
+export function summarizeByCategory(tagBreakdown: Record<string, number>): {
+  operationalSec: number
+  organizationalSec: number
+  unclassifiedSec: number
+  totalSec: number
+} {
+  let operationalSec = 0
+  let organizationalSec = 0
+  let unclassifiedSec = 0
+  for (const [id, sec] of Object.entries(tagBreakdown)) {
+    if (id === SIN_TAG_ID) unclassifiedSec += sec
+    else if (isOperationalTag(id)) operationalSec += sec
+    else if (isOrganizationalTag(id)) organizationalSec += sec
+    else unclassifiedSec += sec  // tag desconocido — al bucket "sin clasificar"
+  }
+  return {
+    operationalSec,
+    organizationalSec,
+    unclassifiedSec,
+    totalSec: operationalSec + organizationalSec + unclassifiedSec,
+  }
+}
 
 function TagBreakdownChart({ tagBreakdown }: { tagBreakdown: Record<string, number> }) {
   const entries = useMemo(() => {
     const tagMap = new Map(GRADER_PAUSE_TAGS.map(t => [t.id, t]))
     const all = Object.entries(tagBreakdown).map(([id, sec]) => {
       const tag = tagMap.get(id)
+      const category: 'operacional' | 'organizacional' | 'sin_clasificar' =
+        id === SIN_TAG_ID ? 'sin_clasificar'
+        : isOperationalTag(id) ? 'operacional'
+        : isOrganizationalTag(id) ? 'organizacional'
+        : 'sin_clasificar'
       return {
         id,
         sec,
         label: tag?.label ?? 'Sin clasificar',
         emoji: tag?.emoji ?? '○',
         color: tag?.color ?? '#6b7280',
+        category,
       }
     })
-    return all.sort((a, b) => b.sec - a.sec)
+    // Ordenar: operacionales primero (atacables), luego organizacionales,
+    // luego sin clasificar. Dentro de cada grupo, por duración desc.
+    const catRank = { operacional: 0, organizacional: 1, sin_clasificar: 2 } as const
+    return all.sort((a, b) => {
+      if (catRank[a.category] !== catRank[b.category]) return catRank[a.category] - catRank[b.category]
+      return b.sec - a.sec
+    })
   }, [tagBreakdown])
 
   const maxSec = Math.max(...entries.map(e => e.sec), 1)
@@ -105,28 +173,48 @@ function TagBreakdownChart({ tagBreakdown }: { tagBreakdown: Record<string, numb
     )
   }
 
-  return (
-    <div className="space-y-1 mt-2">
-      {entries.map(e => (
-        <div key={e.id} className="flex items-center gap-2">
-          <span className="w-4 shrink-0 text-center text-xs">{e.emoji}</span>
-          <span className="w-24 shrink-0 text-[11px] text-muted-foreground truncate">{e.label}</span>
-          <div className="flex-1 h-2.5 bg-muted/30 rounded-sm overflow-hidden">
-            <div
-              className="h-full rounded-sm transition-all duration-300"
-              style={{ width: `${(e.sec / maxSec) * 100}%`, backgroundColor: e.color + 'aa' }}
-            />
-          </div>
-          <span className="w-10 shrink-0 text-[11px] text-muted-foreground tabular-nums">
-            {fmtSec(e.sec)}
-          </span>
-          <span className="w-7 shrink-0 text-[11px] text-muted-foreground/60 tabular-nums text-right">
-            {totalSec > 0 ? `${((e.sec / totalSec) * 100).toFixed(0)}%` : '—'}
-          </span>
+  // Insertar separadores entre categorías para que el operador vea de un vistazo
+  // qué está atacable (operacional) vs ineludible (organizacional).
+  const renderItems: React.ReactNode[] = []
+  let lastCategory: string | null = null
+  const CATEGORY_LABEL = {
+    operacional:    { label: 'Atacables (operacionales)',     color: 'text-rose-400/80'   },
+    organizacional: { label: 'Ineludibles (organizacionales)', color: 'text-cyan-400/80'  },
+    sin_clasificar: { label: 'Sin clasificar',                color: 'text-slate-500'    },
+  } as const
+  for (const e of entries) {
+    if (e.category !== lastCategory) {
+      renderItems.push(
+        <div
+          key={`hdr-${e.category}`}
+          className={`text-[10px] uppercase tracking-wider mt-2 first:mt-0 ${CATEGORY_LABEL[e.category].color}`}
+        >
+          {CATEGORY_LABEL[e.category].label}
+        </div>,
+      )
+      lastCategory = e.category
+    }
+    renderItems.push(
+      <div key={e.id} className="flex items-center gap-2">
+        <span className="w-4 shrink-0 text-center text-xs">{e.emoji}</span>
+        <span className="w-24 shrink-0 text-[11px] text-muted-foreground truncate">{e.label}</span>
+        <div className="flex-1 h-2.5 bg-muted/30 rounded-sm overflow-hidden">
+          <div
+            className="h-full rounded-sm transition-all duration-300"
+            style={{ width: `${(e.sec / maxSec) * 100}%`, backgroundColor: e.color + 'aa' }}
+          />
         </div>
-      ))}
-    </div>
-  )
+        <span className="w-10 shrink-0 text-[11px] text-muted-foreground tabular-nums">
+          {fmtSec(e.sec)}
+        </span>
+        <span className="w-7 shrink-0 text-[11px] text-muted-foreground/60 tabular-nums text-right">
+          {totalSec > 0 ? `${((e.sec / totalSec) * 100).toFixed(0)}%` : '—'}
+        </span>
+      </div>,
+    )
+  }
+
+  return <div className="space-y-1 mt-2">{renderItems}</div>
 }
 
 // ── Panel de anotación batch ──────────────────────────────────────────────────
@@ -446,10 +534,55 @@ export function PauseKpiDashboard({ summaries }: PauseKpiDashboardProps) {
           <KpiCard
             label="% muerto del turno"
             value={kpis!.avgDeadPct != null ? `${kpis!.avgDeadPct.toFixed(1)}%` : '—'}
-            sub="promedio del período"
+            sub={
+              kpis!.avgDeadPct != null
+                ? kpis!.avgDeadPct <= DEAD_TIME_PCT_THRESHOLDS.okBelow
+                  ? 'saludable (≤10%)'
+                  : kpis!.avgDeadPct <= DEAD_TIME_PCT_THRESHOLDS.warnBelow
+                  ? 'atención (10-20%)'
+                  : 'crítico (>20%)'
+                : 'promedio del período'
+            }
             icon={<Activity className="w-3.5 h-3.5" />}
+            valueColor={kpis!.avgDeadPct != null ? deadTimePctColor(kpis!.avgDeadPct) : undefined}
           />
         </div>
+
+        {/* KPI accionable: tiempo muerto evitable vs ineludible (solo si tagBreakdown cargado).
+            Aplica el principio "info útil" — el operador puede decir
+            "del 12h muerto, X horas son atacables y el resto son colación/limpieza programadas". */}
+        {tagBreakdown && (() => {
+          const cat = summarizeByCategory(tagBreakdown)
+          if (cat.totalSec === 0) return null
+          const evitablePct = (cat.operationalSec / cat.totalSec) * 100
+          return (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2 border-t border-border/20">
+              <KpiCard
+                label="Evitable (operacional)"
+                value={fmtSec(cat.operationalSec)}
+                sub={`${evitablePct.toFixed(0)}% del muerto · falla, mantención, espera MP`}
+                icon={<TrendingDown className="w-3.5 h-3.5" />}
+                valueColor="text-rose-400"
+              />
+              <KpiCard
+                label="Ineludible (organizacional)"
+                value={fmtSec(cat.organizationalSec)}
+                sub={`${((cat.organizationalSec / cat.totalSec) * 100).toFixed(0)}% del muerto · colación, limpieza`}
+                icon={<Clock className="w-3.5 h-3.5" />}
+                valueColor="text-cyan-400"
+              />
+              {cat.unclassifiedSec > 0 && (
+                <KpiCard
+                  label="Sin clasificar"
+                  value={fmtSec(cat.unclassifiedSec)}
+                  sub={`${((cat.unclassifiedSec / cat.totalSec) * 100).toFixed(0)}% — clasificar para análisis preciso`}
+                  icon={<Tag className="w-3.5 h-3.5" />}
+                  valueColor="text-slate-400"
+                />
+              )}
+            </div>
+          )
+        })()}
 
         {/* Bar chart por día/semana */}
         {chart.entries.length > 0 && (

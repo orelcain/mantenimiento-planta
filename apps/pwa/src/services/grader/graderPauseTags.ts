@@ -41,6 +41,51 @@ export function getPauseTagById(id: string | undefined | null): GraderPauseTag |
   return GRADER_PAUSE_TAGS.find((t) => t.id === id)
 }
 
+// ── Clasificación operacional vs organizacional (fuente única de verdad) ──────
+//
+// Esta clasificación se usa en MÚLTIPLES módulos:
+//   - shoplogixCorrelation.isOrganizationalGraderPause() → excluir paros
+//     organizacionales del análisis upstream causal
+//   - PauseKpiDashboard → separar tiempo muerto evitable vs ineludible
+//   - ActionPlanPanel → priorizar sugerencias accionables
+//
+// Mantener una sola fuente evita inconsistencias entre componentes.
+//
+// REGLAS:
+// - **Organizacional** (ineludible) = el operador del Grader está en break por
+//   horario/proceso. Coincidir con paros Baader es coincidencia, no causal.
+// - **Operacional** (evitable) = paros donde el Grader podría estar produciendo
+//   pero no lo está por mantención, falla, espera, ajuste. Reducirlos es ROI directo.
+
+/** Tags de pausas que son inevitables/programadas — el operador no las puede reducir. */
+export const ORGANIZATIONAL_PAUSE_TAG_IDS = new Set([
+  'colacion',     // descanso de turno
+  'ejercicios',   // ejercicios compensatorios obligatorios
+  'cambio_lote',  // proceso necesario al cambiar producto/calibre
+  'limpieza',     // sanitización programada
+] as const)
+
+/** Tags de pausas que son evitables/atacables — reducción posible con mantención/optimización. */
+export const OPERATIONAL_PAUSE_TAG_IDS = new Set([
+  'mantencion',
+  'ajuste_gates',
+  'espera_mp',
+  'falla_equipo',
+  'otro',
+] as const)
+
+/** True si el tagId es organizacional (paro programado/inevitable). */
+export function isOrganizationalTag(tagId: string | null | undefined): boolean {
+  if (!tagId) return false
+  return (ORGANIZATIONAL_PAUSE_TAG_IDS as Set<string>).has(tagId)
+}
+
+/** True si el tagId es operacional (paro evitable/atacable). */
+export function isOperationalTag(tagId: string | null | undefined): boolean {
+  if (!tagId) return false
+  return (OPERATIONAL_PAUSE_TAG_IDS as Set<string>).has(tagId)
+}
+
 /**
  * Resuelve el tag efectivo de una pausa:
  *   1. `tag` manual anotado por admin (gana siempre)

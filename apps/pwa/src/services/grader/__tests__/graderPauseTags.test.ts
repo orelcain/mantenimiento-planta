@@ -10,6 +10,10 @@ import {
   GRADER_PAUSE_TAGS,
   getPauseTagById,
   resolveEffectiveTag,
+  isOperationalTag,
+  isOrganizationalTag,
+  ORGANIZATIONAL_PAUSE_TAG_IDS,
+  OPERATIONAL_PAUSE_TAG_IDS,
 } from '../graderPauseTags'
 
 // ── getPauseTagById ───────────────────────────────────────────────────────────
@@ -95,5 +99,70 @@ describe('GRADER_PAUSE_TAGS', () => {
 
   it('contiene el tag "colacion" que usa el detector de pausas', () => {
     expect(GRADER_PAUSE_TAGS.some(t => t.id === 'colacion')).toBe(true)
+  })
+})
+
+// ── Clasificación operacional vs organizacional (fuente única) ────────────────
+
+describe('Clasificación operacional vs organizacional', () => {
+  it('los sets son disjuntos (un tag NO puede ser ambas categorías)', () => {
+    for (const id of ORGANIZATIONAL_PAUSE_TAG_IDS) {
+      expect((OPERATIONAL_PAUSE_TAG_IDS as Set<string>).has(id)).toBe(false)
+    }
+    for (const id of OPERATIONAL_PAUSE_TAG_IDS) {
+      expect((ORGANIZATIONAL_PAUSE_TAG_IDS as Set<string>).has(id)).toBe(false)
+    }
+  })
+
+  it('todos los GRADER_PAUSE_TAGS están clasificados (cobertura completa)', () => {
+    for (const tag of GRADER_PAUSE_TAGS) {
+      const isInOrg = (ORGANIZATIONAL_PAUSE_TAG_IDS as Set<string>).has(tag.id)
+      const isInOp  = (OPERATIONAL_PAUSE_TAG_IDS as Set<string>).has(tag.id)
+      expect(isInOrg || isInOp, `tag ${tag.id} sin clasificar`).toBe(true)
+    }
+  })
+})
+
+describe('isOrganizationalTag', () => {
+  it('detecta los 4 organizacionales (colacion, ejercicios, cambio_lote, limpieza)', () => {
+    expect(isOrganizationalTag('colacion')).toBe(true)
+    expect(isOrganizationalTag('ejercicios')).toBe(true)
+    expect(isOrganizationalTag('cambio_lote')).toBe(true)
+    expect(isOrganizationalTag('limpieza')).toBe(true)
+  })
+  it('NO detecta operacionales', () => {
+    expect(isOrganizationalTag('mantencion')).toBe(false)
+    expect(isOrganizationalTag('falla_equipo')).toBe(false)
+    expect(isOrganizationalTag('espera_mp')).toBe(false)
+    expect(isOrganizationalTag('ajuste_gates')).toBe(false)
+    expect(isOrganizationalTag('otro')).toBe(false)
+  })
+  it('null / undefined / "" / desconocido retornan false', () => {
+    expect(isOrganizationalTag(null)).toBe(false)
+    expect(isOrganizationalTag(undefined)).toBe(false)
+    expect(isOrganizationalTag('')).toBe(false)
+    expect(isOrganizationalTag('id_inventado')).toBe(false)
+  })
+})
+
+describe('isOperationalTag', () => {
+  it('detecta los 5 operacionales', () => {
+    expect(isOperationalTag('mantencion')).toBe(true)
+    expect(isOperationalTag('ajuste_gates')).toBe(true)
+    expect(isOperationalTag('espera_mp')).toBe(true)
+    expect(isOperationalTag('falla_equipo')).toBe(true)
+    expect(isOperationalTag('otro')).toBe(true)
+  })
+  it('NO detecta organizacionales', () => {
+    expect(isOperationalTag('colacion')).toBe(false)
+    expect(isOperationalTag('ejercicios')).toBe(false)
+    expect(isOperationalTag('cambio_lote')).toBe(false)
+    expect(isOperationalTag('limpieza')).toBe(false)
+  })
+  it('null / undefined / "" / desconocido retornan false', () => {
+    expect(isOperationalTag(null)).toBe(false)
+    expect(isOperationalTag(undefined)).toBe(false)
+    expect(isOperationalTag('')).toBe(false)
+    expect(isOperationalTag('id_inventado')).toBe(false)
   })
 })
