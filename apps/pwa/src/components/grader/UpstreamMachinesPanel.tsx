@@ -159,17 +159,44 @@ function aggregateStatesByReason(states: UpstreamMachineState[]): ReasonAggregat
 // ============================================================================
 
 /**
- * Genera ticks horarios entre start y end. Devuelve Date en cada hora exacta
- * (wall-clock) del rango con al menos 30 min hasta el borde. Funciona en UTC
- * porque los timestamps Shoplogix son wall-clock-as-UTC (ver `fmtHHmm`).
+ * Genera ticks de eje horario entre start y end. Granularidad adaptativa al
+ * rango total — necesario para que el panel muestre referencias visibles
+ * cuando el chart Grader está zoomeado (rangos < 1h pierden todos los ticks
+ * si solo se usan horas exactas).
+ *
+ * Reglas:
+ *   - rango ≤ 30 min: cada 5 min
+ *   - rango ≤ 2 h:    cada 15 min
+ *   - rango ≤ 6 h:    cada 1 h (legacy)
+ *   - rango > 6 h:    cada 2 h
+ *
+ * Funciona en UTC porque los timestamps Shoplogix son wall-clock-as-UTC.
  */
 function generateHourTicks(start: Date, end: Date): Date[] {
+  const totalMin = (end.getTime() - start.getTime()) / 60_000
+  if (totalMin <= 0) return []
+
+  // Step en minutos (también define cómo se "rounded-up" el primer tick).
+  let stepMin: number
+  if (totalMin <= 30)      stepMin = 5
+  else if (totalMin <= 120) stepMin = 15
+  else if (totalMin <= 360) stepMin = 60
+  else                       stepMin = 120
+
+  const stepMs = stepMin * 60_000
+
+  // Round-up del primer tick: lo alineamos al siguiente múltiplo de stepMin
+  // dentro de la hora actual (en wall-clock UTC).
+  const minutesUTC = start.getUTCMinutes()
+  const remainder = minutesUTC % stepMin
+  const minutesPad = remainder === 0 ? 0 : stepMin - remainder
+  const firstTickMs = start.getTime() + minutesPad * 60_000
+  // Margen al borde para evitar overlap con label "end". Para rangos cortos
+  // usamos margen proporcional al step (medio step).
+  const edgeMs = Math.max(2 * 60_000, stepMs / 2)
+
   const ticks: Date[] = []
-  const firstTick = new Date(Date.UTC(
-    start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate(),
-    start.getUTCHours() + (start.getUTCMinutes() > 0 ? 1 : 0), 0, 0, 0,
-  ))
-  for (let t = firstTick.getTime(); t < end.getTime() - 30 * 60_000; t += 3_600_000) {
+  for (let t = firstTickMs; t < end.getTime() - edgeMs; t += stepMs) {
     ticks.push(new Date(t))
   }
   return ticks

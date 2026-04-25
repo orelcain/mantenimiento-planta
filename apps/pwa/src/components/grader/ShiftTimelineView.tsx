@@ -219,7 +219,6 @@ export function ShiftTimelineView({
   const hasSelection = causesArr.length > 0
 
   // ── Export PNG / CSV + selector de rango ─────────────────────────────────
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const echartsRef = useRef<any>(null)
 
   // Exponer función getDataURL al parent para incluir imagen en PDF (P2-1)
@@ -573,10 +572,10 @@ export function ShiftTimelineView({
         }
       }
     }
-    const LANE_HEIGHT = 20
-    const subGridHeight = hasBaader ? baaderMarkers.lanes.length * LANE_HEIGHT + 8 : 0
-    // Reserva vertical para slider zoom (8 + 14) + sub-grid + gap
-    const mainGridBottom = hasBaader ? 30 + subGridHeight + 14 : 60
+    const LANE_HEIGHT = 24
+    const subGridHeight = hasBaader ? baaderMarkers.lanes.length * LANE_HEIGHT + 10 : 0
+    // Reserva vertical para slider zoom (8 + 14) + sub-grid + gap mayor
+    const mainGridBottom = hasBaader ? 30 + subGridHeight + 22 : 60
     // Bottom del sub-grid: justo arriba del slider zoom (que vive en bottom: 8)
     const subGridBottom = 30
     const subYAxisData = baaderMarkers.lanes.map((l) => l.machineName).slice().reverse()
@@ -764,21 +763,21 @@ export function ShiftTimelineView({
                 axisLine: { show: false },
                 axisTick: { show: false },
                 axisLabel: {
-                  color: '#cbd5e1',
-                  fontSize: 10,
-                  fontWeight: 600 as const,
-                  margin: 6,
+                  color: '#e2e8f0',
+                  fontSize: 11,
+                  fontWeight: 700 as const,
+                  margin: 8,
                   interval: 0 as const,
                   formatter: (v: string) => {
-                    // Abreviar "Evisceradora N" → "E-N" para no comer ancho
+                    // Abreviar "Evisceradora N" → "EN" para no comer ancho
                     const m = /Evisceradora\s+(\d+)/i.exec(v)
                     return m ? `E${m[1]}` : v
                   },
                 },
-                splitLine: { show: false },
+                splitLine: { show: true, lineStyle: { color: 'rgba(148,163,184,0.18)', type: 'solid' as const } },
                 splitArea: {
                   show: true,
-                  areaStyle: { color: ['rgba(255,255,255,0.02)', 'rgba(255,255,255,0.04)'] },
+                  areaStyle: { color: ['rgba(15,23,42,0.4)', 'rgba(30,41,59,0.5)'] },
                 },
               },
             ]
@@ -1156,7 +1155,7 @@ export function ShiftTimelineView({
           <ReactECharts
             ref={echartsRef}
             option={chartOption}
-            style={{ height: (scatterAxisShow ? 360 : 320) + (upstreamSnapshot && upstreamSnapshot.machines.length > 0 ? upstreamSnapshot.machines.length * 20 + 8 : 0) }}
+            style={{ height: (scatterAxisShow ? 360 : 320) + (upstreamSnapshot && upstreamSnapshot.machines.length > 0 ? upstreamSnapshot.machines.length * 24 + 22 : 0) }}
             theme="dark"
             opts={{ renderer: 'canvas' }}
             notMerge={true}
@@ -1165,12 +1164,17 @@ export function ShiftTimelineView({
               click: handleChartClick,
               // Sincroniza el state local cuando el usuario arrastra el slider
               // o hace pan/wheel dentro del chart. ECharts emite start/end en %.
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              datazoom: (e: any) => {
-                const payload = Array.isArray(e.batch) && e.batch.length > 0 ? e.batch[0] : e
-                const start = typeof payload?.start === 'number' ? payload.start : zoomState.start
-                const end = typeof payload?.end === 'number' ? payload.end : zoomState.end
-                setZoomState((prev) => (prev.start === start && prev.end === end ? prev : { start, end }))
+              // Robusto: lee siempre desde getOption().dataZoom para evitar
+              // payloads parciales (batch[0] puede no traer start/end al
+              // arrancar wheel-zoom o cuando vienen múltiples instancias).
+              datazoom: () => {
+                const inst = echartsRef.current?.getEchartsInstance?.()
+                if (!inst) return
+                const opt = inst.getOption?.()
+                const dz = Array.isArray(opt?.dataZoom) ? opt.dataZoom[0] : null
+                const s = typeof dz?.start === 'number' ? dz.start : 0
+                const e = typeof dz?.end === 'number' ? dz.end : 100
+                setZoomState((prev) => (prev.start === s && prev.end === e ? prev : { start: s, end: e }))
               },
             }}
           />
