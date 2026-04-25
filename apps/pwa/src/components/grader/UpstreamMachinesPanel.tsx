@@ -312,7 +312,30 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
   /** Si es true, esta máquina tiene >50% más microparadas que el promedio de la línea. */
   microAlert?: boolean
 }) {
-  const kpis   = useMemo(() => computeKpis(shift.intervals), [shift.intervals])
+  // F5a — Mini-KPIs zoom-aware: cuando hay un rango activo (windowStart/End
+  // distinto del shift completo), filtramos intervalos a ese rango y
+  // recalculamos KPIs. Permite ver "qué pasó EN ESTE TRAMO" en vez del turno
+  // completo siempre.
+  const isZoomActive = useMemo(() => {
+    if (!windowStart || !windowEnd) return false
+    const sameStart = windowStart.getTime() === shift.shiftStart.getTime()
+    const sameEnd = windowEnd.getTime() === shift.shiftEnd.getTime()
+    return !(sameStart && sameEnd)
+  }, [windowStart, windowEnd, shift.shiftStart, shift.shiftEnd])
+
+  const kpis = useMemo(() => {
+    if (!isZoomActive || !windowStart || !windowEnd) {
+      return computeKpis(shift.intervals)
+    }
+    const wStart = windowStart.getTime()
+    const wEnd = windowEnd.getTime()
+    const filtered = shift.intervals.filter((it) => {
+      const ts = it.startAt.getTime()
+      return ts >= wStart && ts <= wEnd
+    })
+    return computeKpis(filtered)
+  }, [shift.intervals, windowStart, windowEnd, isZoomActive])
+
   const breaks = shift.states.filter(s => s.type === 'break').length
   const micro  = shift.states.filter(s => s.name === 'Micro Detencion').length
 
@@ -357,8 +380,21 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
         </div>
       </button>
 
-      {/* KPI row siempre visible (verde/amarillo/rojo) */}
-      <ProductionKpiRow kpis={kpis} />
+      {/* KPI row siempre visible (verde/amarillo/rojo). Badge "del rango"
+          aparece cuando hay zoom activo — los KPIs se recalculan sólo del
+          rango temporal visible (F5a). */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <ProductionKpiRow kpis={kpis} />
+        {isZoomActive && (
+          <Badge
+            variant="outline"
+            className="bg-violet-950/60 border-violet-800 text-violet-300 text-[10px] px-1.5 py-0.5 h-5 gap-1"
+            title="KPIs recalculados sólo del rango temporal visible (no del turno completo)"
+          >
+            <span>✂</span> del rango
+          </Badge>
+        )}
+      </div>
 
       {/* Wrapper con padding para alinear pixel-perfect con plot area del ECharts del Grader */}
       <div style={{ paddingLeft: PLOT_LEFT_PAD_PX, paddingRight: PLOT_RIGHT_PAD_PX }} className="space-y-2">
@@ -478,12 +514,31 @@ export function UpstreamMachinesPanel({
     return [undefined, undefined]
   }, [timelineSync?.range, shiftWindow?.startAt, shiftWindow?.endAt])
 
-  // Agregado de toda la línea (para header)
+  // ¿Hay zoom activo? Si windowStart/End difieren de los bounds del primer
+  // shift, asumimos zoom (todos los shifts del mismo turno comparten bounds).
+  const isLineZoomActive = useMemo(() => {
+    if (!windowStart || !windowEnd || !snapshot || snapshot.machines.length === 0) return false
+    const ref = snapshot.machines[0]!
+    return windowStart.getTime() !== ref.shiftStart.getTime() ||
+           windowEnd.getTime() !== ref.shiftEnd.getTime()
+  }, [windowStart, windowEnd, snapshot])
+
+  // Agregado de toda la línea (para header). Zoom-aware F5a: filtra
+  // intervals al rango visible cuando hay zoom activo.
   const lineKpis = useMemo(() => {
     if (!snapshot || snapshot.machines.length === 0) return null
     const all = snapshot.machines.flatMap(m => m.intervals)
-    return computeKpis(all)
-  }, [snapshot])
+    if (!isLineZoomActive || !windowStart || !windowEnd) {
+      return computeKpis(all)
+    }
+    const wStart = windowStart.getTime()
+    const wEnd = windowEnd.getTime()
+    const filtered = all.filter((it) => {
+      const ts = it.startAt.getTime()
+      return ts >= wStart && ts <= wEnd
+    })
+    return computeKpis(filtered)
+  }, [snapshot, windowStart, windowEnd, isLineZoomActive])
 
   // Detector de microparadas anómalas. Marca una máquina si:
   //   (a) tiene el conteo más alto de la línea, Y
@@ -540,6 +595,15 @@ export function UpstreamMachinesPanel({
           <div className="flex items-center gap-3 text-xs text-slate-500 ml-auto flex-wrap justify-end">
             {/* KPIs totales línea completa — siempre visibles, también en collapsed */}
             {lineKpis && <ProductionKpiRow kpis={lineKpis} />}
+            {isLineZoomActive && (
+              <Badge
+                variant="outline"
+                className="bg-violet-950/60 border-violet-800 text-violet-300 text-[10px] px-1.5 py-0.5 h-5 gap-1"
+                title="KPIs recalculados sólo del rango temporal visible"
+              >
+                <span>✂</span> del rango
+              </Badge>
+            )}
             {loading && <span>Cargando…</span>}
             {error && <span className="text-rose-400 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Error</span>}
             {isStale && <span className="text-amber-400">Desactualizado</span>}
