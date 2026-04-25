@@ -287,9 +287,18 @@ export function ShiftTimelineView({
     if (startPct <= 0.5 && endPct >= 99.5) { emit(null); return }
     const axis = resolveAxisWindow(buckets, shiftWindow)
     const spanMs = axis.effectiveEndMs - axis.effectiveStartMs
+    // Snap al MINUTO EXACTO: el axis category del Grader usa
+    // Math.round(idx_fraccional) sobre slots de 1min cada uno. Si emitimos
+    // ms con resolución de segundos, los charts time del panel quedan
+    // desfasados por hasta 30s (visible como 1 min en HH:MM). Snap aplica
+    // round al índice de minuto antes de convertir a ms — alineación
+    // pixel-perfect entre Grader y panel.
+    const totalMin = Math.round(spanMs / 60_000)
+    const startMinIdx = Math.round((startPct / 100) * totalMin)
+    const endMinIdx = Math.round((endPct / 100) * totalMin)
     emit({
-      startMs: axis.effectiveStartMs + Math.round((startPct / 100) * spanMs),
-      endMs:   axis.effectiveStartMs + Math.round((endPct / 100) * spanMs),
+      startMs: axis.effectiveStartMs + startMinIdx * 60_000,
+      endMs:   axis.effectiveStartMs + endMinIdx * 60_000,
     })
   }, [onZoomRangeChange, timelineSync, timelineBuckets, shiftWindow, productionWindow])
 
