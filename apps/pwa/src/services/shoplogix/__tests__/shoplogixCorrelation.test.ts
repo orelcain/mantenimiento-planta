@@ -3,6 +3,7 @@ import {
   correlatePausesWithUpstream,
   upstreamCausedPauses,
   summarizeCorrelations,
+  confidenceLabel,
 } from '../shoplogixCorrelation'
 import type { Pause } from '@/services/grader/types'
 import type { UpstreamLineSnapshot, UpstreamMachineShift, UpstreamMachineState } from '../types'
@@ -232,5 +233,114 @@ describe('upstreamCausedPauses', () => {
       { kind: 'no_correlation' } as Parameters<typeof upstreamCausedPauses>[0][number],
     ]
     expect(upstreamCausedPauses(arr)).toHaveLength(1)
+  })
+})
+
+// ── Nuevas métricas accionables: tiempo + breakdown por máquina ───────────────
+
+describe('summarizeCorrelations — accionables (v2.99)', () => {
+  type Corr = Parameters<typeof summarizeCorrelations>[0][number]
+  type Contrib = Corr['contributors'][number]
+
+  function mkContrib(machineid: string, machineName: string, overlapSec: number): Contrib {
+    return {
+      machineid,
+      machineName,
+      stateName: 'Detencion',
+      reason: '',
+      stateStart: new Date('2026-02-26T13:00:00Z'),
+      stateEnd:   new Date('2026-02-26T13:05:00Z'),
+      overlapSec,
+      leadSec: 0,
+    }
+  }
+
+  function mkCorr(opts: {
+    pauseId: string
+    kind: Corr['kind']
+    pauseDurSec: number
+    contributors?: Contrib[]
+  }): Corr {
+    return {
+      pauseId: opts.pauseId,
+      pauseStart: new Date('2026-02-26T13:00:00Z'),
+      pauseEnd:   new Date('2026-02-26T13:05:00Z'),
+      pauseDurSec: opts.pauseDurSec,
+      kind: opts.kind,
+      confidence: 0.8,
+      hypothesis: 'test',
+      contributors: opts.contributors ?? [],
+    }
+  }
+
+  it('upstreamCausedDurSec = suma de pauseDurSec de paros con correlación upstream', () => {
+    const arr = [
+      mkCorr({ pauseId: 'a', kind: 'upstream_global',   pauseDurSec: 600 }),
+      mkCorr({ pauseId: 'b', kind: 'upstream_majority', pauseDurSec: 300 }),
+      mkCorr({ pauseId: 'c', kind: 'no_correlation',    pauseDurSec: 1000 }),  // NO suma
+    ]
+    expect(summarizeCorrelations(arr).upstreamCausedDurSec).toBe(900)
+  })
+
+  it('byMachine agrupa contributors por machineid sumando overlap y paros', () => {
+    const arr = [
+      mkCorr({
+        pauseId: 'a', kind: 'upstream_global', pauseDurSec: 600,
+        contributors: [
+          mkContrib('e1-uuid', 'Evisceradora 1', 200),
+          mkContrib('e2-uuid', 'Evisceradora 2', 500),
+        ],
+      }),
+      mkCorr({
+        pauseId: 'b', kind: 'upstream_majority', pauseDurSec: 300,
+        contributors: [
+          mkContrib('e2-uuid', 'Evisceradora 2', 250),
+        ],
+      }),
+    ]
+    const s = summarizeCorrelations(arr)
+    expect(s.byMachine).toHaveLength(2)
+    // E2 lidera: 500 + 250 = 750 overlap, 2 paros
+    expect(s.byMachine[0]!.machineid).toBe('e2-uuid')
+    expect(s.byMachine[0]!.totalOverlapSec).toBe(750)
+    expect(s.byMachine[0]!.pauseCount).toBe(2)
+    // E1: 200 overlap, 1 paro
+    expect(s.byMachine[1]!.machineid).toBe('e1-uuid')
+    expect(s.byMachine[1]!.totalOverlapSec).toBe(200)
+    expect(s.byMachine[1]!.pauseCount).toBe(1)
+  })
+
+  it('byMachine ignora contributors de paros no_correlation', () => {
+    const arr = [
+      mkCorr({
+        pauseId: 'a', kind: 'no_correlation', pauseDurSec: 600,
+        contributors: [mkContrib('e1-uuid', 'Evisceradora 1', 999)],
+      }),
+    ]
+    expect(summarizeCorrelations(arr).byMachine).toHaveLength(0)
+  })
+
+  it('byMachine vacío y upstreamCausedDurSec=0 si no hay correlaciones upstream', () => {
+    const arr = [
+      mkCorr({ pauseId: 'a', kind: 'no_correlation', pauseDurSec: 1000 }),
+    ]
+    const s = summarizeCorrelations(arr)
+    expect(s.byMachine).toEqual([])
+    expect(s.upstreamCausedDurSec).toBe(0)
+  })
+})
+
+describe('confidenceLabel', () => {
+  it('alta cuando >= 0.7', () => {
+    expect(confidenceLabel(0.7).text).toBe('alta')
+    expect(confidenceLabel(1).text).toBe('alta')
+  })
+  it('media en [0.4, 0.7)', () => {
+    expect(confidenceLabel(0.4).text).toBe('media')
+    expect(confidenceLabel(0.69).text).toBe('media')
+  })
+  it('baja en < 0.4', () => {
+    expect(confidenceLabel(0.39).text).toBe('baja')
+    expect(confidenceLabel(0).text).toBe('baja')
   })
 })

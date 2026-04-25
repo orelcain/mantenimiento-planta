@@ -178,17 +178,63 @@ export function upstreamCausedPauses(correlations: PauseCorrelation[]): PauseCor
   return correlations.filter(c => c.kind !== 'no_correlation')
 }
 
-/** Helper UI: resumen para header — cuántos paros tuvieron causa upstream. */
+/** Resumen agregado por máquina: para identificar qué Evisceradora atender. */
+export interface MachineImpact {
+  machineid: string
+  machineName: string
+  /** Cantidad de paros del Grader donde esta máquina aparece como contributor. */
+  pauseCount: number
+  /** Suma de overlapSec de esta máquina con los paros del Grader. */
+  totalOverlapSec: number
+}
+
+/** Helper UI: resumen para header — cuántos paros tuvieron causa upstream + breakdown. */
 export function summarizeCorrelations(correlations: PauseCorrelation[]): {
   total: number
   upstreamCaused: number
   upstreamPct: number
+  /** Suma de duración (en segundos) de los paros con causa upstream. */
+  upstreamCausedDurSec: number
+  /** Breakdown por máquina: cuántos paros + segundos de overlap. Ordenado desc por totalOverlapSec. */
+  byMachine: MachineImpact[]
 } {
   const total = correlations.length
-  const upstreamCaused = upstreamCausedPauses(correlations).length
+  const upstream = upstreamCausedPauses(correlations)
+  const upstreamCaused = upstream.length
+  const upstreamCausedDurSec = upstream.reduce((acc, c) => acc + c.pauseDurSec, 0)
+
+  // Agregación por máquina — solo de paros con correlación upstream
+  const byMachineMap = new Map<string, MachineImpact>()
+  for (const corr of upstream) {
+    for (const contrib of (corr.contributors ?? [])) {
+      const existing = byMachineMap.get(contrib.machineid)
+      if (existing) {
+        existing.pauseCount += 1
+        existing.totalOverlapSec += contrib.overlapSec
+      } else {
+        byMachineMap.set(contrib.machineid, {
+          machineid: contrib.machineid,
+          machineName: contrib.machineName,
+          pauseCount: 1,
+          totalOverlapSec: contrib.overlapSec,
+        })
+      }
+    }
+  }
+  const byMachine = [...byMachineMap.values()].sort((a, b) => b.totalOverlapSec - a.totalOverlapSec)
+
   return {
     total,
     upstreamCaused,
     upstreamPct: total > 0 ? upstreamCaused / total : 0,
+    upstreamCausedDurSec,
+    byMachine,
   }
+}
+
+/** Convierte confidence numérico (0..1) a label textual operacional. */
+export function confidenceLabel(confidence: number): { text: 'alta' | 'media' | 'baja'; color: string } {
+  if (confidence >= 0.7) return { text: 'alta',  color: 'text-rose-300' }
+  if (confidence >= 0.4) return { text: 'media', color: 'text-amber-300' }
+  return { text: 'baja', color: 'text-slate-400' }
 }

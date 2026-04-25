@@ -11,12 +11,13 @@
 
 import { useMemo, useState } from 'react'
 import { Card, CardContent, Badge } from '@/components/ui'
-import { Link2, ChevronDown, ChevronRight, AlertTriangle, Info, CheckCircle2 } from 'lucide-react'
+import { Link2, ChevronDown, ChevronRight, AlertTriangle, Info, CheckCircle2, Factory, Clock } from 'lucide-react'
 import type { Pause } from '@/services/grader/types'
 import type { UpstreamLineSnapshot } from '@/services/shoplogix/types'
 import {
   correlatePausesWithUpstream,
   summarizeCorrelations,
+  confidenceLabel,
   type PauseCorrelation,
   type CorrelationKind,
 } from '@/services/shoplogix/shoplogixCorrelation'
@@ -58,6 +59,7 @@ function CorrelationRow({ corr, expanded, onToggle }: {
 }) {
   const s = KIND_STYLE[corr.kind]
   const Icon = s.icon
+  const conf = confidenceLabel(corr.confidence)
   return (
     <div className="py-2">
       <button
@@ -76,8 +78,12 @@ function CorrelationRow({ corr, expanded, onToggle }: {
           {fmtDur(corr.pauseDurSec)}
         </Badge>
         <span className={`text-xs ${s.text} truncate`}>{corr.hypothesis}</span>
-        <Badge variant="outline" className="ml-auto text-[10px] px-1.5 py-0 h-4 border-slate-700 text-slate-500 flex-shrink-0">
-          {Math.round(corr.confidence * 100)}%
+        <Badge
+          variant="outline"
+          className={`ml-auto text-[10px] px-1.5 py-0 h-4 border-slate-700 ${conf.color} flex-shrink-0`}
+          title={`Confianza ${Math.round(corr.confidence * 100)}% (alta ≥70%, media 40-70%, baja <40%)`}
+        >
+          confianza {conf.text}
         </Badge>
       </button>
 
@@ -129,22 +135,36 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
     })
   }
 
+  // Total tiempo muerto del turno (todos los paros, para % comparativo)
+  const totalPauseDurSec = pauses.reduce((acc, p) => acc + p.durationSec, 0)
+  const upstreamShareOfPauseTime = totalPauseDurSec > 0
+    ? summary.upstreamCausedDurSec / totalPauseDurSec
+    : 0
+
   return (
     <Card className="border-slate-800 bg-slate-950/50">
       <CardContent className="py-3 px-4">
-        <div className="flex items-center justify-between gap-2 mb-2">
+        {/* Header — KPI accionable: tiempo muerto causado por upstream */}
+        <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
           <div className="flex items-center gap-2">
             <Link2 className="w-4 h-4 text-violet-400" />
             <span className="font-medium text-sm">Correlación con upstream</span>
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-violet-900/60 text-violet-400">
-              {summary.upstreamCaused}/{summary.total} paros
-            </Badge>
           </div>
-          <div className="text-[11px] text-slate-500">
-            {summary.upstreamCaused > 0
-              ? `${Math.round(summary.upstreamPct * 100)}% correlacionados`
-              : 'Todos paros internos'}
-          </div>
+
+          {summary.upstreamCaused > 0 && (
+            <div
+              className="flex items-center gap-1.5 text-xs text-rose-300 tabular-nums"
+              title={`${summary.upstreamCaused} de ${summary.total} paros del Grader correlacionaron con eventos upstream. Tiempo muerto del Grader que coincidió con paros Baader: ${fmtDur(summary.upstreamCausedDurSec)} (${Math.round(upstreamShareOfPauseTime * 100)}% del tiempo muerto del turno).`}
+            >
+              <Clock className="w-3.5 h-3.5" />
+              <span className="font-semibold">
+                {fmtDur(summary.upstreamCausedDurSec)} de paro upstream
+              </span>
+              <span className="opacity-70">
+                ({summary.upstreamCaused} de {summary.total} paros · {Math.round(upstreamShareOfPauseTime * 100)}% del tiempo muerto)
+              </span>
+            </div>
+          )}
         </div>
 
         {summary.upstreamCaused === 0 ? (
@@ -153,21 +173,63 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
             Ninguno de los {pauses.length} paros correlacionó con eventos upstream. Las Baaders estaban corriendo normal → las causas son internas del Grader.
           </div>
         ) : (
-          <div className="divide-y divide-slate-800/60">
-            {sorted.slice(0, 10).map(corr => (
-              <CorrelationRow
-                key={corr.pauseId}
-                corr={corr}
-                expanded={expandedIds.has(corr.pauseId)}
-                onToggle={() => toggle(corr.pauseId)}
-              />
-            ))}
-            {sorted.length > 10 && (
-              <div className="text-[11px] text-slate-600 py-2 text-center">
-                … y {sorted.length - 10} paros más
+          <>
+            {/* Breakdown por máquina — qué Evisceradora atender primero */}
+            {summary.byMachine.length > 0 && (
+              <div className="mb-3 p-2 rounded border border-slate-800/80 bg-slate-900/40">
+                <div className="text-[10px] text-slate-500 mb-1.5 flex items-center gap-1">
+                  <Factory className="w-3 h-3" />
+                  Impacto por máquina (paros del Grader donde la máquina contribuyó)
+                </div>
+                <div className="space-y-0.5">
+                  {summary.byMachine.map((m, idx) => {
+                    const totalUpstreamSec = summary.upstreamCausedDurSec
+                    const sharePct = totalUpstreamSec > 0 ? (m.totalOverlapSec / totalUpstreamSec) * 100 : 0
+                    // Top máquina destacada en rojo, resto slate
+                    const isTop = idx === 0
+                    return (
+                      <div
+                        key={m.machineid}
+                        className={`flex items-center gap-2 text-[11px] tabular-nums ${isTop ? 'text-rose-300' : 'text-slate-400'}`}
+                      >
+                        <span className="min-w-[8rem]">{m.machineName}</span>
+                        <span className="opacity-80">{m.pauseCount} paro{m.pauseCount !== 1 ? 's' : ''}</span>
+                        <span>·</span>
+                        <span className="font-semibold">{fmtDur(m.totalOverlapSec)} overlap</span>
+                        {/* Barra visual proporcional al share */}
+                        <div className="flex-1 h-1.5 rounded-full bg-slate-800/80 overflow-hidden ml-1 max-w-[120px]">
+                          <div
+                            className={`h-full rounded-full ${isTop ? 'bg-rose-400' : 'bg-slate-500'}`}
+                            style={{ width: `${Math.max(2, Math.min(100, sharePct))}%` }}
+                          />
+                        </div>
+                        <span className="w-10 text-right opacity-70">{sharePct.toFixed(0)}%</span>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="text-[9px] text-slate-600 mt-1.5">
+                  Recomendación: priorizar mantención en la máquina con mayor overlap.
+                </div>
               </div>
             )}
-          </div>
+
+            <div className="divide-y divide-slate-800/60">
+              {sorted.slice(0, 10).map(corr => (
+                <CorrelationRow
+                  key={corr.pauseId}
+                  corr={corr}
+                  expanded={expandedIds.has(corr.pauseId)}
+                  onToggle={() => toggle(corr.pauseId)}
+                />
+              ))}
+              {sorted.length > 10 && (
+                <div className="text-[11px] text-slate-600 py-2 text-center">
+                  … y {sorted.length - 10} paros más
+                </div>
+              )}
+            </div>
+          </>
         )}
       </CardContent>
     </Card>
