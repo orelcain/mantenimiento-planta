@@ -15,7 +15,7 @@
  * escribe via setRange cuando el usuario hace zoom local.
  */
 
-import { useCallback, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef } from 'react'
 import ReactECharts from 'echarts-for-react'
 import type { UpstreamProductionInterval } from '@/services/shoplogix/types'
 import { useTimelineSyncOptional } from './useTimelineSync'
@@ -46,8 +46,50 @@ function fmtPct(x: number, decimals = 1): string {
 
 export function ProductionBarsEC({ intervals, threshold, windowStart, windowEnd }: Props) {
   const echartsRef = useRef<any>(null)
+  const myHoverId = useId()
   const timelineSync = useTimelineSyncOptional()
   const onChartReady = useChartReadyConnect(timelineSync?.connectGroupId ?? '__no-sync__')
+
+  // ── Hover cross-chart (Fase 4b) — snap al minuto para evitar re-render
+  // por pixel (idempotencia del setHover skip cuando ms === prev.ms).
+  const onMouseMove = useCallback((params: any) => {
+    if (!timelineSync) return
+    const inst = echartsRef.current?.getEchartsInstance?.()
+    if (!inst) return
+    const offsetX = params?.event?.offsetX ?? params?.offsetX
+    if (typeof offsetX !== 'number') return
+    const rawMs = inst.convertFromPixel({ xAxisIndex: 0 }, offsetX)
+    if (typeof rawMs !== 'number' || !Number.isFinite(rawMs)) return
+    const ms = Math.floor(rawMs / 60_000) * 60_000
+    timelineSync.setHover({ ms, originId: myHoverId })
+  }, [timelineSync, myHoverId])
+
+  const onMouseOut = useCallback(() => {
+    if (timelineSync?.hover?.originId === myHoverId) {
+      timelineSync.setHover(null)
+    }
+  }, [timelineSync, myHoverId])
+
+  const externalHoverMs = timelineSync?.hover && timelineSync.hover.originId !== myHoverId
+    ? timelineSync.hover.ms
+    : null
+  useEffect(() => {
+    const inst = echartsRef.current?.getEchartsInstance?.()
+    if (!inst) return
+    if (externalHoverMs == null) {
+      inst.dispatchAction({ type: 'updateAxisPointer', currTrigger: 'leave' })
+      inst.dispatchAction({ type: 'hideTip' })
+      return
+    }
+    const pixelX = inst.convertToPixel({ xAxisIndex: 0 }, externalHoverMs)
+    if (typeof pixelX !== 'number' || !Number.isFinite(pixelX)) return
+    inst.dispatchAction({
+      type: 'updateAxisPointer',
+      currTrigger: 'mousemove',
+      x: pixelX,
+      y: 30,
+    })
+  }, [externalHoverMs])
 
   // Rango temporal efectivo. Mismo contrato que StateTimelineEC.
   const [rangeStart, rangeEnd] = useMemo<[Date, Date]>(() => {
@@ -220,7 +262,11 @@ export function ProductionBarsEC({ intervals, threshold, windowStart, windowEnd 
         notMerge={true}
         lazyUpdate={false}
         onChartReady={onChartReady}
-        onEvents={{ datazoom: onDataZoom }}
+        onEvents={{
+          datazoom: onDataZoom,
+          mousemove: onMouseMove,
+          mouseout: onMouseOut,
+        }}
       />
     </div>
   )

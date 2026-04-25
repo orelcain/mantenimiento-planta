@@ -15,7 +15,7 @@
  *   - Escribe al context cuando el usuario hace zoom local en este chart
  */
 
-import { useCallback, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef } from 'react'
 import ReactECharts from 'echarts-for-react'
 import type { UpstreamMachineShift } from '@/services/shoplogix/types'
 import { useTimelineSyncOptional } from './useTimelineSync'
@@ -48,6 +48,7 @@ function fmtDuration(sec: number): string {
 
 export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20 }: Props) {
   const echartsRef = useRef<any>(null)
+  const myHoverId = useId()
   const timelineSync = useTimelineSyncOptional()
   // Callback que inscribe la instancia al grupo cuando ECharts inicializa.
   // Más confiable que useEffect porque corre exactamente cuando la instancia
@@ -82,6 +83,54 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20 }: 
       },
     }))
   }, [shift.states])
+
+  // ── Hover cross-chart (Fase 4b del Synchronized Timeline) ───────────────
+  // Cuando el mouse se mueve sobre este chart, capturamos el ms del axis
+  // bajo el cursor y lo broadcastemos al context. Otros charts del grupo
+  // muestran un axisPointer en su pixel correspondiente al mismo ms.
+  // OPTIMIZACIÓN: snap al minuto (floor / 60_000) para que setHover sea
+  // idempotente entre pixels del mismo minuto — sin esto, mover el mouse
+  // un pixel re-renderiza los 7 charts del grupo.
+  const onMouseMove = useCallback((params: any) => {
+    if (!timelineSync) return
+    const inst = echartsRef.current?.getEchartsInstance?.()
+    if (!inst) return
+    const offsetX = params?.event?.offsetX ?? params?.offsetX
+    if (typeof offsetX !== 'number') return
+    const rawMs = inst.convertFromPixel({ xAxisIndex: 0 }, offsetX)
+    if (typeof rawMs !== 'number' || !Number.isFinite(rawMs)) return
+    const ms = Math.floor(rawMs / 60_000) * 60_000
+    timelineSync.setHover({ ms, originId: myHoverId })
+  }, [timelineSync, myHoverId])
+
+  const onMouseOut = useCallback(() => {
+    if (timelineSync?.hover?.originId === myHoverId) {
+      timelineSync.setHover(null)
+    }
+  }, [timelineSync, myHoverId])
+
+  // Listener: cuando OTRO chart originó hover, dispatchear axisPointer manual
+  // sobre este chart para mostrar la línea vertical en el ms correspondiente.
+  const externalHoverMs = timelineSync?.hover && timelineSync.hover.originId !== myHoverId
+    ? timelineSync.hover.ms
+    : null
+  useEffect(() => {
+    const inst = echartsRef.current?.getEchartsInstance?.()
+    if (!inst) return
+    if (externalHoverMs == null) {
+      inst.dispatchAction({ type: 'updateAxisPointer', currTrigger: 'leave' })
+      inst.dispatchAction({ type: 'hideTip' })
+      return
+    }
+    const pixelX = inst.convertToPixel({ xAxisIndex: 0 }, externalHoverMs)
+    if (typeof pixelX !== 'number' || !Number.isFinite(pixelX)) return
+    inst.dispatchAction({
+      type: 'updateAxisPointer',
+      currTrigger: 'mousemove',
+      x: pixelX,
+      y: height / 2,
+    })
+  }, [externalHoverMs, height])
 
   // Handler: cuando el usuario zoom-ea localmente, propaga al context.
   // ECharts emite el rango en ms (no en %) cuando xAxis es type 'time'.
@@ -191,7 +240,11 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20 }: 
         notMerge={true}
         lazyUpdate={false}
         onChartReady={onChartReady}
-        onEvents={{ datazoom: onDataZoom }}
+        onEvents={{
+          datazoom: onDataZoom,
+          mousemove: onMouseMove,
+          mouseout: onMouseOut,
+        }}
       />
     </div>
   )

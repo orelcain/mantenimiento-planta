@@ -32,11 +32,22 @@ export interface TimelineRange {
   endMs: number
 }
 
+export interface HoverState {
+  /** Timestamp en ms del minuto bajo el cursor */
+  ms: number
+  /** ID del chart que originó el hover (evita feedback loops) */
+  originId: string
+}
+
 export interface TimelineSyncValue {
   /** Rango actualmente seleccionado (null = full range / sin zoom) */
   range: TimelineRange | null
   /** Actualiza el rango. Pasar null para resetear a full. */
   setRange: (next: TimelineRange | null) => void
+  /** Estado de hover compartido (crosshair cross-chart). null = sin hover. */
+  hover: HoverState | null
+  /** Actualiza el hover. Pasar null para limpiar. */
+  setHover: (next: HoverState | null) => void
   /** ID de grupo para `echarts.connect()` — todos los charts del grupo
    *  sincronizan zoom y axisPointer nativamente. */
   connectGroupId: string
@@ -54,6 +65,7 @@ interface ProviderProps {
 
 export function TimelineSyncProvider({ children, groupId = 'timeline-sync' }: ProviderProps) {
   const [range, setRangeState] = useState<TimelineRange | null>(null)
+  const [hover, setHoverState] = useState<HoverState | null>(null)
 
   // setRange es estable (useCallback) para evitar re-renders cascada en
   // consumidores que sólo dependen del setter.
@@ -69,9 +81,21 @@ export function TimelineSyncProvider({ children, groupId = 'timeline-sync' }: Pr
     })
   }, [])
 
+  // setHover idempotente: la combinación (ms, originId) define el hover.
+  const setHover = useCallback((next: HoverState | null) => {
+    setHoverState((prev) => {
+      if (prev === next) return prev
+      if (prev == null && next == null) return prev
+      if (prev != null && next != null && prev.ms === next.ms && prev.originId === next.originId) {
+        return prev
+      }
+      return next
+    })
+  }, [])
+
   const value = useMemo<TimelineSyncValue>(
-    () => ({ range, setRange, connectGroupId: groupId }),
-    [range, setRange, groupId],
+    () => ({ range, setRange, hover, setHover, connectGroupId: groupId }),
+    [range, setRange, hover, setHover, groupId],
   )
 
   return <TimelineSyncContext.Provider value={value}>{children}</TimelineSyncContext.Provider>
