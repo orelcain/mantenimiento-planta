@@ -19,7 +19,7 @@ import { useCallback, useMemo, useRef } from 'react'
 import ReactECharts from 'echarts-for-react'
 import type { UpstreamProductionInterval } from '@/services/shoplogix/types'
 import { useTimelineSyncOptional } from './useTimelineSync'
-import { useEChartsConnect } from './useEChartsConnect'
+import { useChartReadyConnect } from './useEChartsConnect'
 
 interface Props {
   intervals: UpstreamProductionInterval[]
@@ -47,7 +47,7 @@ function fmtPct(x: number, decimals = 1): string {
 export function ProductionBarsEC({ intervals, threshold, windowStart, windowEnd }: Props) {
   const echartsRef = useRef<any>(null)
   const timelineSync = useTimelineSyncOptional()
-  useEChartsConnect(echartsRef, timelineSync?.connectGroupId ?? '__no-sync__')
+  const onChartReady = useChartReadyConnect(timelineSync?.connectGroupId ?? '__no-sync__')
 
   // Rango temporal efectivo. Mismo contrato que StateTimelineEC.
   const [rangeStart, rangeEnd] = useMemo<[Date, Date]>(() => {
@@ -219,6 +219,7 @@ export function ProductionBarsEC({ intervals, threshold, windowStart, windowEnd 
         opts={{ renderer: 'canvas' }}
         notMerge={true}
         lazyUpdate={false}
+        onChartReady={onChartReady}
         onEvents={{ datazoom: onDataZoom }}
       />
     </div>
