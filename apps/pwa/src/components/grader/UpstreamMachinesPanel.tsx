@@ -358,7 +358,7 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
       <div className="flex items-center gap-4 text-[11px] text-slate-500">
         <span
           className="flex items-center gap-1"
-          title={`% del turno en Uptime real (calculado desde states).\nUptime: ${fmtDuration(shift.shiftRuntimeBreakdown.uptimeSec)}\nBreak: ${fmtDuration(shift.shiftRuntimeBreakdown.breakSec)}\nDowntime: ${fmtDuration(shift.shiftRuntimeBreakdown.downtimeSec)}`}
+          title={`% del tiempo productivo en Uptime (excluye post-turno).\nUptime: ${fmtDuration(shift.shiftRuntimeBreakdown.uptimeSec)}\nBreak (dentro turno): ${fmtDuration(shift.shiftRuntimeBreakdown.breakSec)}\nPost-turno (excl.): ${fmtDuration(shift.shiftRuntimeBreakdown.plannedDowntimeSec)}\nDowntime: ${fmtDuration(shift.shiftRuntimeBreakdown.downtimeSec)}`}
         >
           <Timer className="w-3 h-3" /> {fmtPct(shift.shiftRuntime)} runtime
         </span>

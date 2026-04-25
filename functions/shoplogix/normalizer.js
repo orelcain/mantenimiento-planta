@@ -91,6 +91,27 @@ function normalizeShift({ production, summary, dateKey, shiftId, intervalMs, syn
 
   const states = (summary.machineStates || []).map(normalizeState)
 
+  // "Planned Downtime" (type='break', reason contains 'planned downtime') =
+  // período POST-TURNO capturado por la ventana de consulta. Debe excluirse
+  // del denominador de shiftRuntime.
+  const isPlannedDT = (s) =>
+    s.type === 'break' && (s.reason || '').toLowerCase().includes('planned downtime')
+
+  const shiftRuntimeBreakdown = {
+    uptimeSec:          states.filter(s => s.type === 'uptime').reduce((a, s) => a + s.durationSec, 0),
+    breakSec:           states.filter(s => s.type === 'break' && !isPlannedDT(s)).reduce((a, s) => a + s.durationSec, 0),
+    plannedDowntimeSec: states.filter(isPlannedDT).reduce((a, s) => a + s.durationSec, 0),
+    downtimeSec:        states.filter(s => s.type === 'downtime').reduce((a, s) => a + s.durationSec, 0),
+    setupSec:           states.filter(s => s.type === 'setup').reduce((a, s) => a + s.durationSec, 0),
+    totalTrackedSec:    0,
+  }
+  shiftRuntimeBreakdown.totalTrackedSec =
+    shiftRuntimeBreakdown.uptimeSec + shiftRuntimeBreakdown.breakSec +
+    shiftRuntimeBreakdown.plannedDowntimeSec + shiftRuntimeBreakdown.downtimeSec +
+    shiftRuntimeBreakdown.setupSec
+  const productiveSec = shiftRuntimeBreakdown.totalTrackedSec - shiftRuntimeBreakdown.plannedDowntimeSec
+  const shiftRuntime  = productiveSec > 0 ? shiftRuntimeBreakdown.uptimeSec / productiveSec : 0
+
   const info = findMachineInfo(production.machineId)
   const machineType = info?.type ?? 'other'
 
@@ -109,6 +130,8 @@ function normalizeShift({ production, summary, dateKey, shiftId, intervalMs, syn
     actualRuntime:   summary.actualRuntime ?? 0,
     expectedRuntime: summary.expectedRuntime ?? 0,
     runtimeVariance: summary.runtimeVariance ?? 0,
+    shiftRuntime,
+    shiftRuntimeBreakdown,
     intervals,
     states,
     threshold,

@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.93.0' as const
+export const APP_VERSION = '2.94.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-04-25' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'style(mapa): tema blueprint unificado 2D = 3D (#c8d8f0 sobre #060e1a)' as const
+export const VERSION_NAME = 'fix(shoplogix): excluir Planned Downtime post-turno del denominador shiftRuntime' as const
 
 /**
  * Nota:

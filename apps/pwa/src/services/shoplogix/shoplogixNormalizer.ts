@@ -157,24 +157,37 @@ export function normalizeShift(params: {
   // Estados / paros
   const states: UpstreamMachineState[] = summary.machineStates.map(normalizeState);
 
-  // shiftRuntime: % del tiempo tracked realmente en Uptime, calculado desde
-  // los states. Usamos `totalTrackedSec` (suma de durations) y NO
-  // `shiftEnd-shiftStart` porque los bounds de Shoplogix son poco confiables
-  // (`currentShiftStart/End` apunta al turno actual, no al consultado).
+  // shiftRuntime: % del tiempo programado para producir en estado Uptime.
+  //
+  // "Planned Downtime" (reason='Planned Downtime', type='Break') = período
+  // POST-TURNO capturado por la ventana de consulta (09:00-22:00). Se
+  // separa de breakSec y se EXCLUYE del denominador porque no es tiempo
+  // productivo programado — es tiempo fuera del turno.
+  //
+  // Observado en Feb 26: start=17:15, end=21:30, 255 min, idéntico en las 3
+  // máquinas. Con esta corrección: 46.3% → ~69% (valor real de disponibilidad).
+  //
   // El `actualRuntime` crudo de Shoplogix usa un denominador opaco (ej. 11.2%
-  // cuando el Uptime real era 46% del turno Feb 26 E1).
+  // cuando el Uptime real era 46% del turno Feb 26 E1) — no usar.
+  const isPlannedDT = (s: UpstreamMachineState) =>
+    s.type === 'break' && s.reason.toLowerCase().includes('planned downtime');
+
   const shiftRuntimeBreakdown = {
-    uptimeSec:   states.filter(s => s.type === 'uptime').reduce((a, s) => a + s.durationSec, 0),
-    breakSec:    states.filter(s => s.type === 'break').reduce((a, s) => a + s.durationSec, 0),
-    downtimeSec: states.filter(s => s.type === 'downtime').reduce((a, s) => a + s.durationSec, 0),
-    setupSec:    states.filter(s => s.type === 'setup').reduce((a, s) => a + s.durationSec, 0),
-    totalTrackedSec: 0,
+    uptimeSec:          states.filter(s => s.type === 'uptime').reduce((a, s) => a + s.durationSec, 0),
+    breakSec:           states.filter(s => s.type === 'break' && !isPlannedDT(s)).reduce((a, s) => a + s.durationSec, 0),
+    plannedDowntimeSec: states.filter(isPlannedDT).reduce((a, s) => a + s.durationSec, 0),
+    downtimeSec:        states.filter(s => s.type === 'downtime').reduce((a, s) => a + s.durationSec, 0),
+    setupSec:           states.filter(s => s.type === 'setup').reduce((a, s) => a + s.durationSec, 0),
+    totalTrackedSec:    0,
   };
   shiftRuntimeBreakdown.totalTrackedSec =
     shiftRuntimeBreakdown.uptimeSec + shiftRuntimeBreakdown.breakSec +
+    shiftRuntimeBreakdown.plannedDowntimeSec +
     shiftRuntimeBreakdown.downtimeSec + shiftRuntimeBreakdown.setupSec;
-  const shiftRuntime = shiftRuntimeBreakdown.totalTrackedSec > 0
-    ? shiftRuntimeBreakdown.uptimeSec / shiftRuntimeBreakdown.totalTrackedSec
+  // Denominador excluye plannedDowntimeSec (post-turno no es tiempo productivo)
+  const productiveSec = shiftRuntimeBreakdown.totalTrackedSec - shiftRuntimeBreakdown.plannedDowntimeSec;
+  const shiftRuntime = productiveSec > 0
+    ? shiftRuntimeBreakdown.uptimeSec / productiveSec
     : 0;
 
   // Info de la máquina (type) — si no está en registry, default 'other'

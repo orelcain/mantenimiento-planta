@@ -106,34 +106,56 @@ function deserializeShift(raw: FirestoreData): UpstreamMachineShift {
     }
   }
 
+  // Función de detección "Planned Downtime" — igual que en shoplogixNormalizer.ts.
+  // type='break' + reason contains 'planned downtime' (case-insensitive).
+  const isPlannedDT = (s: UpstreamMachineState) =>
+    s.type === 'break' && s.reason.toLowerCase().includes('planned downtime')
+
   // Si los docs Firestore aún no traen shiftRuntime/breakdown (data legacy),
-  // los recomputamos desde states. Mismo cálculo que el normalizer.
-  const breakdown = (raw.shiftRuntimeBreakdown && typeof raw.shiftRuntimeBreakdown === 'object'
-    ? {
-        uptimeSec:       Number((raw.shiftRuntimeBreakdown as FirestoreData).uptimeSec ?? 0),
-        breakSec:        Number((raw.shiftRuntimeBreakdown as FirestoreData).breakSec ?? 0),
-        downtimeSec:     Number((raw.shiftRuntimeBreakdown as FirestoreData).downtimeSec ?? 0),
-        setupSec:        Number((raw.shiftRuntimeBreakdown as FirestoreData).setupSec ?? 0),
-        totalTrackedSec: Number((raw.shiftRuntimeBreakdown as FirestoreData).totalTrackedSec ?? 0),
-      }
-    : (() => {
-        const b = {
-          uptimeSec:   states.filter(s => s.type === 'uptime').reduce((a, s) => a + s.durationSec, 0),
-          breakSec:    states.filter(s => s.type === 'break').reduce((a, s) => a + s.durationSec, 0),
-          downtimeSec: states.filter(s => s.type === 'downtime').reduce((a, s) => a + s.durationSec, 0),
-          setupSec:    states.filter(s => s.type === 'setup').reduce((a, s) => a + s.durationSec, 0),
-          totalTrackedSec: 0,
+  // los recomputamos desde states. Si sí traen breakdown, lo completamos con
+  // plannedDowntimeSec (campo nuevo que docs legacy no tienen → calcularlo).
+  const computeBreakdownFromStates = () => {
+    const b = {
+      uptimeSec:          states.filter(s => s.type === 'uptime').reduce((a, s) => a + s.durationSec, 0),
+      breakSec:           states.filter(s => s.type === 'break' && !isPlannedDT(s)).reduce((a, s) => a + s.durationSec, 0),
+      plannedDowntimeSec: states.filter(isPlannedDT).reduce((a, s) => a + s.durationSec, 0),
+      downtimeSec:        states.filter(s => s.type === 'downtime').reduce((a, s) => a + s.durationSec, 0),
+      setupSec:           states.filter(s => s.type === 'setup').reduce((a, s) => a + s.durationSec, 0),
+      totalTrackedSec:    0,
+    }
+    b.totalTrackedSec = b.uptimeSec + b.breakSec + b.plannedDowntimeSec + b.downtimeSec + b.setupSec
+    return b
+  }
+
+  const breakdown = raw.shiftRuntimeBreakdown && typeof raw.shiftRuntimeBreakdown === 'object'
+    ? (() => {
+        const rd = raw.shiftRuntimeBreakdown as FirestoreData
+        // plannedDowntimeSec puede faltar en docs legacy → recompútar desde states
+        const hasPlannedDT = typeof rd.plannedDowntimeSec === 'number'
+        const plannedDowntimeSec = hasPlannedDT
+          ? Number(rd.plannedDowntimeSec)
+          : states.filter(isPlannedDT).reduce((a, s) => a + s.durationSec, 0)
+        const breakSec = hasPlannedDT
+          ? Number(rd.breakSec ?? 0)
+          : states.filter(s => s.type === 'break' && !isPlannedDT(s)).reduce((a, s) => a + s.durationSec, 0)
+        return {
+          uptimeSec:          Number(rd.uptimeSec ?? 0),
+          breakSec,
+          plannedDowntimeSec,
+          downtimeSec:        Number(rd.downtimeSec ?? 0),
+          setupSec:           Number(rd.setupSec ?? 0),
+          totalTrackedSec:    Number(rd.totalTrackedSec ?? 0),
         }
-        b.totalTrackedSec = b.uptimeSec + b.breakSec + b.downtimeSec + b.setupSec
-        return b
       })()
-  )
-  // shiftRuntime SIEMPRE se recomputa desde breakdown — los docs almacenados
-  // pueden tener un valor de la fórmula vieja (`uptime / shiftDuration`) que
-  // dependía de bounds incorrectos. Con la fórmula nueva (`uptime / totalTracked`)
-  // es robusta a los bounds y no requiere re-sync.
-  const shiftRuntime = breakdown.totalTrackedSec > 0
-    ? breakdown.uptimeSec / breakdown.totalTrackedSec
+    : computeBreakdownFromStates()
+
+  // shiftRuntime SIEMPRE se recomputa:
+  //   - Los docs legacy usaban `uptime / shiftDuration` (bounds incorrectos).
+  //   - Docs intermedios: `uptime / totalTracked` (incluyendo post-shift Planned DT).
+  //   - Fórmula correcta: excluir plannedDowntimeSec del denominador.
+  const productiveSec = breakdown.totalTrackedSec - breakdown.plannedDowntimeSec
+  const shiftRuntime = productiveSec > 0
+    ? breakdown.uptimeSec / productiveSec
     : 0
 
   return {

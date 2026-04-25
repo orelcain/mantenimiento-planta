@@ -298,6 +298,83 @@ describe('normalizeShift', () => {
     );
     expect(deltas).toEqual([5 * 60 * 1000, 5 * 60 * 1000]);
   });
+
+  // ── Planned Downtime (post-shift) ─────────────────────────────────────────
+  // Fixture representativo de Feb 26 Turno día: ventana consulta 09:00-22:00 (13h).
+  // "Planned Downtime" = estado post-turno (17:15-21:30 = 255 min).
+  // Debe separarse de breakSec y excluirse del denominador de shiftRuntime.
+  it('Planned Downtime se separa de breakSec y se excluye del denominador', () => {
+    const UPTIME_MS       = 6 * 3600 * 1000        // 6h produciendo (360 min)
+    const BREAK_MS        = 72 * 60 * 1000          // 72 min Colación
+    const PLANNED_DT_MS   = 255 * 60 * 1000         // 255 min post-turno (Planned Downtime)
+    const DOWNTIME_MS     = 39 * 60 * 1000          // 39 min Limpieza de Ducto
+    const TOTAL_MS        = UPTIME_MS + BREAK_MS + PLANNED_DT_MS + DOWNTIME_MS
+    const PRODUCTIVE_MS   = TOTAL_MS - PLANNED_DT_MS
+
+    const summary = buildRawSummary({
+      machineStates: [
+        // Colación — break normal, dentro del turno
+        {
+          name: 'Detencion', reason: 'COLACION',
+          reasonRootCause: false, reasonRootCauseName: '',
+          statusColor: 'ff0000', reasonColor: '',
+          acceptsReason: true, reasonExceeded: false, setupExceeded: false,
+          type: 'Break', current: false,
+          start: '20260226T120000.000', end: '20260226T131200.000',
+          startMilli: 0, endMilli: 0, durationMilli: BREAK_MS,
+        },
+        // Produciendo
+        {
+          name: 'Produciendo', reason: '',
+          reasonRootCause: false, reasonRootCauseName: '',
+          statusColor: '008000', reasonColor: '',
+          acceptsReason: false, reasonExceeded: false, setupExceeded: false,
+          type: 'Uptime', current: false,
+          start: '20260226T091700.000', end: '20260226T171500.000',
+          startMilli: 0, endMilli: 0, durationMilli: UPTIME_MS,
+        },
+        // Limpieza de Ducto — downtime
+        {
+          name: 'Detencion', reason: 'Limpieza de Ducto',
+          reasonRootCause: false, reasonRootCauseName: '',
+          statusColor: '0000ff', reasonColor: '',
+          acceptsReason: true, reasonExceeded: false, setupExceeded: false,
+          type: 'Downtime', current: false,
+          start: '20260226T145000.000', end: '20260226T152900.000',
+          startMilli: 0, endMilli: 0, durationMilli: DOWNTIME_MS,
+        },
+        // Planned Downtime — post-turno. Tipo Break en Shoplogix.
+        {
+          name: 'Detencion', reason: 'Planned Downtime',
+          reasonRootCause: false, reasonRootCauseName: '',
+          statusColor: 'aaaaaa', reasonColor: '',
+          acceptsReason: false, reasonExceeded: false, setupExceeded: false,
+          type: 'Break', current: false,
+          start: '20260226T171500.000', end: '20260226T213000.000',
+          startMilli: 0, endMilli: 0, durationMilli: PLANNED_DT_MS,
+        },
+      ],
+    });
+
+    const shift = normalizeShift({
+      production: buildRawProduction(),
+      summary,
+      dateKey: '2026-02-26', shiftId: 'Turno día',
+    });
+
+    const bd = shift.shiftRuntimeBreakdown;
+    // plannedDowntimeSec separado y correcto
+    expect(bd.plannedDowntimeSec).toBe(PLANNED_DT_MS / 1000);
+    // breakSec solo incluye breaks DENTRO del turno (Colación)
+    expect(bd.breakSec).toBe(BREAK_MS / 1000);
+    // totalTrackedSec incluye TODO (inclusive post-turno)
+    expect(bd.totalTrackedSec).toBe(TOTAL_MS / 1000);
+    // shiftRuntime excluye planned DT del denominador → uptimeSec / productiveSec
+    expect(shift.shiftRuntime).toBeCloseTo(UPTIME_MS / PRODUCTIVE_MS, 4);
+    // Verifica que el resultado es distinto de uptime/total (sin la corrección sería ~0.623)
+    const wrongFormula = UPTIME_MS / TOTAL_MS;
+    expect(shift.shiftRuntime).not.toBeCloseTo(wrongFormula, 3);
+  });
 });
 
 // ── buildLineSnapshot ─────────────────────────────────────────────────────

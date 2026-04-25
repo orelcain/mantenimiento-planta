@@ -163,10 +163,22 @@ export interface UpstreamMachineShift {
   /** Suma de duraciones (en segundos) por categoría de state, calculada nosotros. */
   shiftRuntimeBreakdown: {
     uptimeSec: number;
-    breakSec: number;       // Break (Colación, Reunión, Planned Downtime, etc.)
-    downtimeSec: number;    // Downtime (Micro Detención, Limpieza, etc.)
+    breakSec: number;            // Break dentro del turno: Colación, Reunión, etc.
+    /**
+     * Tiempo POST-TURNO capturado por la ventana de consulta (09:00-22:00).
+     * Shoplogix lo registra como state name='Detencion', type='Break',
+     * reason='Planned Downtime'. Es idéntico en las 3 máquinas (confirma que
+     * es schedule-level, no machine-specific).
+     *
+     * Se EXCLUYE del denominador de shiftRuntime porque no es tiempo
+     * productivo programado — es tiempo fuera del turno.
+     *
+     * Observado en Feb 26 Turno día: 17:15-21:30 = 255 min (4h 15min).
+     */
+    plannedDowntimeSec: number;
+    downtimeSec: number;         // Downtime (Micro Detención, Limpieza, etc.)
     setupSec: number;
-    totalTrackedSec: number;
+    totalTrackedSec: number;     // Incluye plannedDowntimeSec (suma de todas las categorías)
   };
 
   // Detalle
