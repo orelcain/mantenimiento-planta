@@ -19,7 +19,7 @@ import { useCallback, useMemo, useRef } from 'react'
 import ReactECharts from 'echarts-for-react'
 import type { UpstreamMachineShift } from '@/services/shoplogix/types'
 import { useTimelineSyncOptional } from './useTimelineSync'
-import { useEChartsConnect } from './useEChartsConnect'
+import { useChartReadyConnect } from './useEChartsConnect'
 
 interface Props {
   shift: UpstreamMachineShift
@@ -49,9 +49,10 @@ function fmtDuration(sec: number): string {
 export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20 }: Props) {
   const echartsRef = useRef<any>(null)
   const timelineSync = useTimelineSyncOptional()
-  // Inscribe al grupo del context — comparte zoom + axisPointer con Grader
-  // y otros Gantts del mismo turno.
-  useEChartsConnect(echartsRef, timelineSync?.connectGroupId ?? '__no-sync__')
+  // Callback que inscribe la instancia al grupo cuando ECharts inicializa.
+  // Más confiable que useEffect porque corre exactamente cuando la instancia
+  // está lista (vía onChartReady de ReactECharts).
+  const onChartReady = useChartReadyConnect(timelineSync?.connectGroupId ?? '__no-sync__')
 
   // Rango temporal efectivo. Prioridad: context.range > prop window > shift bounds
   const [rangeStart, rangeEnd] = useMemo<[Date, Date]>(() => {
@@ -189,6 +190,7 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20 }: 
         opts={{ renderer: 'canvas' }}
         notMerge={true}
         lazyUpdate={false}
+        onChartReady={onChartReady}
         onEvents={{ datazoom: onDataZoom }}
       />
     </div>

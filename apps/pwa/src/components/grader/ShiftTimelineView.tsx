@@ -36,7 +36,7 @@ import {
   buildBaaderTimelineMarkers,
 } from './shiftTimelineHelpers'
 import { useTimelineSyncOptional } from './useTimelineSync'
-import { useEChartsConnect } from './useEChartsConnect'
+import { useChartReadyConnect } from './useEChartsConnect'
 
 interface ShiftTimelineViewProps {
   timelineBuckets: TimelineBucket[]
@@ -232,7 +232,7 @@ export function ShiftTimelineView({
   // Si no hay provider, el comportamiento legacy (callback prop onZoomRangeChange)
   // sigue funcionando — migración progresiva sin breaking changes.
   const timelineSync = useTimelineSyncOptional()
-  useEChartsConnect(echartsRef, timelineSync?.connectGroupId ?? '__no-sync__')
+  const onChartReady = useChartReadyConnect(timelineSync?.connectGroupId ?? '__no-sync__')
 
   // Exponer función getDataURL al parent para incluir imagen en PDF (P2-1)
   useEffect(() => {
@@ -256,14 +256,34 @@ export function ShiftTimelineView({
     return Math.min(24 * 60, Math.max(1, Math.round((effectiveEndMs - effectiveStartMs) / 60_000)))
   }, [timelineBuckets])
 
+  // ── Ventana de producción real (movida antes de emitZoomRange para evitar
+  // TDZ — emitZoomRange filtra por productionWindow para que su rango emitido
+  // matchee EXACTAMENTE el axis visible del chartOption). ──────────────────
+  const productionWindow = useMemo(
+    () => computeProductionWindow(timelineBuckets),
+    [timelineBuckets],
+  )
+
   // ── Emite rango temporal del zoom al parent ──────────────────────────────
   // Calcula el rango temporal real (ms) a partir de un % de zoom y propaga a
   // (a) callback prop legacy `onZoomRangeChange` si está, (b) context global
   // `useTimelineSync` si la página está envuelta en TimelineSyncProvider.
   // Síncrono: lo invocan el handler `datazoom` y `handleZoomPreset`.
+  //
+  // CRÍTICO: el filtrado de buckets DEBE coincidir EXACTAMENTE con el del
+  // chartOption (pieces>0 AND dentro de productionWindow). Si difiere,
+  // resolveAxisWindow devuelve un effectiveStart/End distinto al axis
+  // visible, y el rango emitido al panel queda desplazado (~50min de diff
+  // observada con lotes dummy pre-turno). Sin esta consistencia, el slider
+  // del Grader desincroniza con los Gantts y barras del panel.
   const emitZoomRange = useCallback((startPct: number, endPct: number) => {
     if (!onZoomRangeChange && !timelineSync) return
-    const buckets = timelineBuckets.filter((b) => b.pieces > 0)
+    const inProductionWindow = (tsMin: string): boolean => {
+      if (!productionWindow) return true
+      const ts = Date.parse(tsMin)
+      return ts >= productionWindow.startMs && ts <= productionWindow.endMs
+    }
+    const buckets = timelineBuckets.filter((b) => b.pieces > 0 && inProductionWindow(b.tsMin))
     const emit = (range: { startMs: number; endMs: number } | null) => {
       onZoomRangeChange?.(range)
       timelineSync?.setRange(range)
@@ -277,7 +297,7 @@ export function ShiftTimelineView({
       startMs: axis.effectiveStartMs + Math.round((startPct / 100) * spanMs),
       endMs:   axis.effectiveStartMs + Math.round((endPct / 100) * spanMs),
     })
-  }, [onZoomRangeChange, timelineSync, timelineBuckets, shiftWindow])
+  }, [onZoomRangeChange, timelineSync, timelineBuckets, shiftWindow, productionWindow])
 
   const handleZoomPreset = useCallback((preset: '10min' | '1h' | 'turno') => {
     setActiveZoom(preset)
@@ -409,11 +429,7 @@ export function ShiftTimelineView({
   //
   // Los dos criterios se aplican en cadena: primero filtramos dummies,
   // después buscamos densidad sobre los buckets limpios.
-  // ── Ventana de producción real (helper puro extraído en M11) ─────────────
-  const productionWindow = useMemo(
-    () => computeProductionWindow(timelineBuckets),
-    [timelineBuckets],
-  )
+  // (productionWindow se calcula arriba, antes de emitZoomRange, para evitar TDZ.)
 
   // Emit inicial cuando los buckets cargan: se asegura que el callback reciba
   // el rango actual (null si zoom completo). Re-emite si emitZoomRange cambia
@@ -1053,6 +1069,7 @@ export function ShiftTimelineView({
             opts={{ renderer: 'canvas' }}
             notMerge={true}
             lazyUpdate={false}
+            onChartReady={onChartReady}
             onEvents={{
               click: handleChartClick,
               // Sincroniza el state local + emite rango al parent cuando el
