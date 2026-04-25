@@ -163,14 +163,30 @@ export function ProductionBarsEC({ intervals, threshold, windowStart, windowEnd 
 
   const option = useMemo(() => ({
     backgroundColor: 'transparent',
-    grid: { left: 0, right: 0, top: 4, bottom: 0, containLabel: false },
+    // containLabel: true → ECharts reserva espacio para labels del eje X sin
+    // necesidad de calcular bottom manualmente. El plot area se reduce
+    // automáticamente (~14 px) para que los labels "HH:mm" quepan.
+    grid: { left: 0, right: 0, top: 4, bottom: 0, containLabel: true },
     xAxis: {
       type: 'time' as const,
       min: rangeStart.getTime(),
       max: rangeEnd.getTime(),
       axisLine: { show: false },
-      axisTick: { show: false },
-      axisLabel: { show: false },
+      // Tick marks pequeños + labels HH:mm wall-clock Chile (Shoplogix guarda
+      // UTC-as-local, por eso usamos getUTCHours/Minutes).
+      // ECharts elige automáticamente la densidad de ticks según el rango
+      // visible (min..max). Al hacer zoom a 10 min: ~cada 1-2 min. A 8 h:
+      // ~cada 1 h. Siempre sin overlap gracias al motor de layout nativo.
+      axisTick: { show: true, lineStyle: { color: '#334155' }, length: 3 },
+      axisLabel: {
+        show: true,
+        color: '#64748b',
+        fontSize: 9,
+        formatter: (value: number) => {
+          const d = new Date(value)
+          return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
+        },
+      },
       splitLine: { show: false },
     },
     yAxis: {
