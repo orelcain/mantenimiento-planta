@@ -703,6 +703,23 @@ export function ShiftTimelineView({
       }
     }
 
+    // Baader stop bands → markArea translúcidas detrás del chart Grader.
+    // Una entrada por evento de pausa de cada máquina. El overlap natural entre
+    // múltiples máquinas crea un efecto de densidad visual:
+    //   1 Baader parada  → ~9% opacidad (violet-500)
+    //   2 Baaders paradas → ~18% (overlap natural de dos capas)
+    //   3 Baaders paradas → ~27% — zona claramente visible
+    // Solo incluimos bandas cuyos extremos existen en el axis actual.
+    const baaderBandMarkAreas = baaderMarkers.bands
+      .filter(b => b.tA !== b.tB && axisIndexByLabel.has(b.tA) && axisIndexByLabel.has(b.tB))
+      .map(b => [
+        {
+          xAxis: b.tA as string,
+          itemStyle: { color: 'rgba(139,92,246,0.09)', borderWidth: 0 },
+        },
+        { xAxis: b.tB as string },
+      ])
+
     return {
       backgroundColor: 'transparent',
       // Más margen bajo para el slider de zoom
@@ -813,7 +830,7 @@ export function ShiftTimelineView({
         formatter: (params: unknown[]) => {
           if (!Array.isArray(params) || params.length === 0) return ''
           const arr = params as Array<{ name: string; value: number | [string, number]; seriesName: string; seriesType: string; dataIndex: number; color?: string }>
-          const linePt    = arr.find(p => p.seriesType === 'line')
+          const linePt    = arr.find(p => p.seriesType === 'line' && p.seriesName !== '__baader_bands__')
           const barPts    = arr.filter(p => p.seriesType === 'bar')
           const productivePt = barPts.find(p => p.seriesName === 'Pzs productivas/min')
           const p0Pt         = barPts.find(p => p.seriesName === 'Pzs P0/min')
@@ -878,6 +895,27 @@ export function ShiftTimelineView({
         },
       },
       series: [
+        // ── Baader upstream stop bands ────────────────────────────────────────
+        // Serie fantasma (z:0, invisible) cuya única misión es hospedar el
+        // markArea con las zonas de paros Baader. Se renderiza PRIMERO para
+        // quedar detrás de barras y línea P0%. El tooltip la ignora por nombre.
+        // Sin esto, las bandas tapan la interactividad de las barras (silent:true).
+        ...(baaderBandMarkAreas.length > 0 ? [{
+          name: '__baader_bands__',
+          type: 'line' as const,
+          yAxisIndex: 0,
+          data: new Array(lineTimes.length).fill(null) as null[],
+          lineStyle: { opacity: 0, width: 0 },
+          symbol: 'none',
+          silent: true,
+          z: 0,
+          tooltip: { show: false },
+          markArea: {
+            silent: true,
+            emphasis: { disabled: true },
+            data: baaderBandMarkAreas,
+          },
+        }] : []),
         // Barras tenues — CANTIDAD de pzs P0 por minuto (más intuitivo que %).
         // Eje derecho ("Pzs P0/min"). Tooltip muestra desglose por causa.
         // Las barras incluyen un slot vacío al inicio (sintético) → null.
