@@ -189,17 +189,26 @@ export function buildMarkLines(
   activeBuckets: TimelineBucket[],
   alertThreshold: number,
   criticalThreshold: number,
+  productionWindow?: ProductionWindow | null,
 ): MarkLinesResult {
+  // Inicio: usa productionWindow.startTs (primer minuto con producción real)
+  // en lugar de shiftWindow.startAt (horario oficial del schedule). Los
+  // timestamps Marelec son wall-clock-as-UTC mientras que shiftWindow
+  // convierte hora local Chile a ISO UTC — un gap de 3-4h. Marcar la flecha
+  // sobre el primer bucket productivo evita ese desfase y refleja cuándo
+  // REALMENTE arrancó la línea.
+  const startLabelTs = productionWindow?.startTs ?? shiftWindow.startAt
+  const endLabelTs = productionWindow?.endTs ?? shiftWindow.endAt
   const shiftMarkLines = [
     {
-      name: `Inicio turno\n${fmtTime(shiftWindow.startAt)}`,
-      xAxis: fmtTime(shiftWindow.startAt),
+      name: `Inicio turno\n${fmtTime(startLabelTs)}`,
+      xAxis: fmtTime(startLabelTs),
       lineStyle: { color: '#10b981', type: 'solid' as const, width: 1 },
       label: { show: true, formatter: '▶ Inicio', color: '#10b981', fontSize: 9, position: 'insideStartTop' as const },
     },
     {
-      name: `Fin turno\n${fmtTime(shiftWindow.endAt)}`,
-      xAxis: fmtTime(shiftWindow.endAt),
+      name: `Fin turno\n${fmtTime(endLabelTs)}`,
+      xAxis: fmtTime(endLabelTs),
       lineStyle: { color: '#6b7280', type: 'solid' as const, width: 1 },
       label: { show: true, formatter: '◀ Fin', color: '#6b7280', fontSize: 9, position: 'insideEndTop' as const },
     },
@@ -245,10 +254,25 @@ export function buildMarkLines(
     const curr = activeBuckets[i]
     if (prev?.lot && curr?.lot && prev.lot !== curr.lot) {
       lotChangeLines.push({
-        name: `Lote ${curr.lot}`,
+        name: `Cambio a Lote ${curr.lot}`,
         xAxis: fmtTime(curr.tsMin),
         lineStyle: { color: '#8b5cf6', type: 'dotted' as const, width: 1.5 },
-        label: { show: true, formatter: '📦', color: '#8b5cf6', fontSize: 9, position: 'insideEndBottom' as const },
+        label: {
+          show: true,
+          // El salto de línea mantiene el emoji arriba y el texto apilado,
+          // para no comer ancho horizontal dentro del chart.
+          formatter: `📦\nLote ${curr.lot}`,
+          color: '#a78bfa',
+          fontSize: 9,
+          fontWeight: 600 as const,
+          position: 'insideEndBottom' as const,
+          backgroundColor: 'rgba(139,92,246,0.15)',
+          borderColor: 'rgba(139,92,246,0.4)',
+          borderWidth: 1,
+          borderRadius: 3,
+          padding: [2, 4, 2, 4] as [number, number, number, number],
+          distance: 4,
+        },
       })
     }
   }

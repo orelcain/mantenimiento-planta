@@ -541,6 +541,17 @@ export function AnalisisGraderTurnoPage() {
   // M17 — Export PDF
   const [pdfExporting, setPdfExporting] = useState(false)
   const chartImageRef = useRef<(() => string | null) | null>(null)
+
+  // Rango temporal del zoom del chart Grader — se usa para sincronizar el
+  // eje X del panel upstream (Baader Gantts + barras producción). null = full.
+  const [zoomRange, setZoomRange] = useState<{ startMs: number; endMs: number } | null>(null)
+  const zoomedAxisWindow = useMemo(() => {
+    if (!zoomRange) return chartAxisWindow ?? shiftWindow
+    return {
+      startAt: new Date(zoomRange.startMs).toISOString(),
+      endAt: new Date(zoomRange.endMs).toISOString(),
+    }
+  }, [zoomRange, chartAxisWindow, shiftWindow])
   const handleExportPdf = useCallback(async () => {
     if (!summary || pdfExporting) return
     setPdfExporting(true)
@@ -847,6 +858,7 @@ export function AnalisisGraderTurnoPage() {
             isOnline={isOnline}
             chartImageRef={chartImageRef}
             upstreamSnapshot={upstreamLine.snapshot}
+            onZoomRangeChange={setZoomRange}
           />
 
           {/* Línea upstream — Evisceradoras Baader 142 (integración Shoplogix) */}
@@ -856,7 +868,7 @@ export function AnalisisGraderTurnoPage() {
             loading={upstreamLine.loading}
             error={upstreamLine.error}
             syncedAt={upstreamLine.syncedAt}
-            shiftWindow={chartAxisWindow ?? shiftWindow}
+            shiftWindow={zoomedAxisWindow}
           />
 
           {/* Correlación automática Grader↔Baader (Fase 3 iter 2) — debajo de los 3 gantts */}

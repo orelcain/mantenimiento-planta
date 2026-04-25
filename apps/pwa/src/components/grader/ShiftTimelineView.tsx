@@ -92,6 +92,14 @@ interface ShiftTimelineViewProps {
    * entre P0% Grader y paros upstream.
    */
   upstreamSnapshot?: UpstreamLineSnapshot | null
+  /**
+   * Callback opcional: emite el rango temporal actual del zoom del chart.
+   * Cuando el usuario hace zoom (slider o preset), se emite `{ startMs, endMs }`
+   * con el rango efectivamente visible. Cuando el zoom vuelve a 100%, emite
+   * `null`. Permite sincronizar otros paneles (ej. UpstreamMachinesPanel) al
+   * mismo rango visible.
+   */
+  onZoomRangeChange?: (range: { startMs: number; endMs: number } | null) => void
 }
 
 /**
@@ -134,6 +142,7 @@ export function ShiftTimelineView({
   isOnline = true,
   chartImageRef,
   upstreamSnapshot,
+  onZoomRangeChange,
 }: ShiftTimelineViewProps) {
   // ── Estado del diálogo de anotación (Fase 3) ──────────────────────────
   const canAnnotate = !!summaryId && !!adminUid
@@ -370,6 +379,24 @@ export function ShiftTimelineView({
     [timelineBuckets],
   )
 
+  // ── Emite rango temporal del zoom al parent (para sincronizar paneles) ──
+  // Basado en el axis effective del chart + el % de zoom actual. null si 100%.
+  useEffect(() => {
+    if (!onZoomRangeChange) return
+    const buckets = timelineBuckets.filter((b) => b.pieces > 0)
+    if (buckets.length === 0) { onZoomRangeChange(null); return }
+    const axis = resolveAxisWindow(buckets, shiftWindow)
+    const spanMs = axis.effectiveEndMs - axis.effectiveStartMs
+    // Full zoom (100%): emite null (caller usa su rango original completo)
+    if (zoomState.start <= 0.5 && zoomState.end >= 99.5) {
+      onZoomRangeChange(null)
+      return
+    }
+    const startMs = axis.effectiveStartMs + Math.round((zoomState.start / 100) * spanMs)
+    const endMs = axis.effectiveStartMs + Math.round((zoomState.end / 100) * spanMs)
+    onZoomRangeChange({ startMs, endMs })
+  }, [zoomState, timelineBuckets, shiftWindow, onZoomRangeChange])
+
   const downloadCSV = useCallback(() => {
     const inWin = (tsMin: string) => {
       if (!productionWindow) return true
@@ -515,7 +542,7 @@ export function ShiftTimelineView({
 
     // Mark lines y mark areas: helpers puros extraídos en M11.
     const { shiftMarkLines, thresholdLines, uploadLines, actionLines, configChangeLines, lotChangeLines } =
-      buildMarkLines(shiftDoc, shiftWindow, configSnapshots, buckets, alertThreshold, criticalThreshold)
+      buildMarkLines(shiftDoc, shiftWindow, configSnapshots, buckets, alertThreshold, criticalThreshold, productionWindow)
     const deadTimeAreas = buildMarkAreas(pauses ?? [], productionWindow)
 
     // Marcadores Baader (sub-grid debajo del axis principal). Solo si hay
@@ -523,6 +550,29 @@ export function ShiftTimelineView({
     // = paros (downtime/break/setup) alineados temporalmente al chart.
     const baaderMarkers = buildBaaderTimelineMarkers(upstreamSnapshot ?? null, lineTimes, productionWindow)
     const hasBaader = baaderMarkers.lanes.length > 0
+    // Index: minuto label → bandas activas en ese minuto (para tooltip).
+    // Keys son los `lineTimes[i]` del axis; para cada banda, agregamos su
+    // rango [tA..tB] a todos los labels intermedios.
+    const bandsByMinuteLabel = new Map<string, Array<{ machine: string; reason: string; durationMin: number; color: string }>>()
+    if (hasBaader) {
+      for (const band of baaderMarkers.bands) {
+        const iA = axisIndexByLabel.get(band.tA)
+        const iB = axisIndexByLabel.get(band.tB)
+        if (iA === undefined || iB === undefined) continue
+        const [from, to] = iA <= iB ? [iA, iB] : [iB, iA]
+        for (let i = from; i <= to; i++) {
+          const label = lineTimes[i]
+          if (!label) continue
+          if (!bandsByMinuteLabel.has(label)) bandsByMinuteLabel.set(label, [])
+          bandsByMinuteLabel.get(label)!.push({
+            machine: band.machineName,
+            reason: band.reason,
+            durationMin: band.durationMin,
+            color: band.stroke,
+          })
+        }
+      }
+    }
     const LANE_HEIGHT = 20
     const subGridHeight = hasBaader ? baaderMarkers.lanes.length * LANE_HEIGHT + 8 : 0
     // Reserva vertical para slider zoom (8 + 14) + sub-grid + gap
@@ -790,6 +840,18 @@ export function ShiftTimelineView({
           for (const sp of scatterPts) {
             const v = Array.isArray(sp.value) ? sp.value[1] : sp.value
             lines.push(`<span style="color:${sp.color}">●</span> ${sp.seriesName}: ${v}g`)
+          }
+          // Upstream: si el minuto cae dentro de bandas Baader, listar las
+          // máquinas paradas y la razón. Hace visible la correlación Grader↔
+          // Baader desde el tooltip, sin hover separado por banda.
+          if (typeof time === 'string' && bandsByMinuteLabel.size > 0) {
+            const activeBands = bandsByMinuteLabel.get(time)
+            if (activeBands && activeBands.length > 0) {
+              lines.push('<span style="color:#94a3b8">⚠ Upstream parado:</span>')
+              for (const b of activeBands) {
+                lines.push(`&nbsp;&nbsp;<span style="color:${b.color}">▮</span> ${b.machine}: <b>${b.reason}</b> (${b.durationMin}m)`)
+              }
+            }
           }
           return lines.join('<br/>')
         },
@@ -1099,7 +1161,18 @@ export function ShiftTimelineView({
             opts={{ renderer: 'canvas' }}
             notMerge={true}
             lazyUpdate={false}
-            onEvents={{ click: handleChartClick }}
+            onEvents={{
+              click: handleChartClick,
+              // Sincroniza el state local cuando el usuario arrastra el slider
+              // o hace pan/wheel dentro del chart. ECharts emite start/end en %.
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              datazoom: (e: any) => {
+                const payload = Array.isArray(e.batch) && e.batch.length > 0 ? e.batch[0] : e
+                const start = typeof payload?.start === 'number' ? payload.start : zoomState.start
+                const end = typeof payload?.end === 'number' ? payload.end : zoomState.end
+                setZoomState((prev) => (prev.start === start && prev.end === end ? prev : { start, end }))
+              },
+            }}
           />
         )}
 
