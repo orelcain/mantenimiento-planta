@@ -147,6 +147,24 @@ export function normalizeShift(params: {
   // Estados / paros
   const states: UpstreamMachineState[] = summary.machineStates.map(normalizeState);
 
+  // shiftRuntime: % del turno realmente en Uptime, calculado desde states.
+  // El `actualRuntime` crudo de Shoplogix usa un denominador opaco (ej. 11.2%
+  // cuando el Uptime real era 46% del turno Feb 26 E1). Nosotros computamos
+  // el ratio respecto a la duración del turno para que coincida con la
+  // intuición del operador.
+  const shiftRuntimeBreakdown = {
+    uptimeSec:   states.filter(s => s.type === 'uptime').reduce((a, s) => a + s.durationSec, 0),
+    breakSec:    states.filter(s => s.type === 'break').reduce((a, s) => a + s.durationSec, 0),
+    downtimeSec: states.filter(s => s.type === 'downtime').reduce((a, s) => a + s.durationSec, 0),
+    setupSec:    states.filter(s => s.type === 'setup').reduce((a, s) => a + s.durationSec, 0),
+    totalTrackedSec: 0,
+  };
+  shiftRuntimeBreakdown.totalTrackedSec =
+    shiftRuntimeBreakdown.uptimeSec + shiftRuntimeBreakdown.breakSec +
+    shiftRuntimeBreakdown.downtimeSec + shiftRuntimeBreakdown.setupSec;
+  const shiftDurationSec = Math.max(1, (shiftEnd.getTime() - shiftStart.getTime()) / 1000);
+  const shiftRuntime = shiftRuntimeBreakdown.uptimeSec / shiftDurationSec;
+
   // Info de la máquina (type) — si no está en registry, default 'other'
   const info: UpstreamMachineInfo | undefined = findMachineInfo(production.machineId);
   const machineType = info?.type ?? 'other';
@@ -167,6 +185,8 @@ export function normalizeShift(params: {
     actualRuntime: summary.actualRuntime,
     expectedRuntime: summary.expectedRuntime,
     runtimeVariance: summary.runtimeVariance,
+    shiftRuntime,
+    shiftRuntimeBreakdown,
     intervals,
     states,
     threshold,
@@ -204,8 +224,9 @@ export function buildLineSnapshot(params: {
   const lineThroughputActual   = shiftDurationHours > 0 ? totalCycles / shiftDurationHours : 0;
   const lineThroughputExpected = shiftDurationHours > 0 ? expectedCycles / shiftDurationHours : 0;
 
+  // Promedio del shiftRuntime real (no el `actualRuntime` opaco de Shoplogix).
   const lineAvailability = machines.length > 0
-    ? machines.reduce((a, m) => a + m.actualRuntime, 0) / machines.length
+    ? machines.reduce((a, m) => a + m.shiftRuntime, 0) / machines.length
     : 0;
 
   const machinesProducing = machines.filter(m => {
