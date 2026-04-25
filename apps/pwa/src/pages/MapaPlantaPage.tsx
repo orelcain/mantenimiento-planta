@@ -8,7 +8,7 @@
  * Editor: zonas, equipos y formas custom (Geoman). Persistencia local.
  */
 
-import { Map as MapIcon, Building2, Globe2, Ruler, LayoutGrid, BoxSelect, Layers, Plus, Trash2, ChevronDown, Box, X, Upload } from 'lucide-react'
+import { Map as MapIcon, Building2, Globe2, Ruler, LayoutGrid, BoxSelect, Layers, Plus, Trash2, ChevronDown, Box, X, Upload, Type } from 'lucide-react'
 import { useRef, useState, useEffect, useMemo } from 'react'
 import { PlantaLeafletEditable, PanelCapasYZonas } from '@/components/map/leaflet-editable'
 import { Wireframe3DView } from '@/components/map/wireframe3d'
@@ -264,8 +264,10 @@ export function MapaPlantaPage() {
   const toggleMeasureMode  = useMapaLeafletStore((s) => s.toggleMeasureMode)
   const grillaVisible      = useMapaLeafletStore((s) => s.grillaVisible)
   const toggleGrilla       = useMapaLeafletStore((s) => s.toggleGrilla)
-  const boxSelectMode      = useMapaLeafletStore((s) => s.boxSelectMode)
-  const toggleBoxSelect    = useMapaLeafletStore((s) => s.toggleBoxSelectMode)
+  const boxSelectMode       = useMapaLeafletStore((s) => s.boxSelectMode)
+  const toggleBoxSelect     = useMapaLeafletStore((s) => s.toggleBoxSelectMode)
+  const textPlacementMode   = useMapaLeafletStore((s) => s.textPlacementMode)
+  const setTextPlacementMode = useMapaLeafletStore((s) => s.setTextPlacementMode)
   const view3DMode              = useMapaLeafletStore((s) => s.view3DMode)
   const toggleView3DMode        = useMapaLeafletStore((s) => s.toggleView3DMode)
   const mapasImportados         = useMapaLeafletStore((s) => s.mapasImportados)
@@ -336,6 +338,19 @@ export function MapaPlantaPage() {
           >
             <BoxSelect size={12} />
             <span className="hidden sm:inline">Selección</span>
+          </button>
+          <button
+            onClick={() => setTextPlacementMode(!textPlacementMode)}
+            title="Agregar anotación de texto en el mapa"
+            className={[
+              'flex items-center gap-1 text-[11px] px-2 sm:px-3 py-1.5 rounded-lg transition-all border',
+              textPlacementMode
+                ? 'bg-pink-600/25 border-pink-500/60 text-pink-300 shadow-[0_0_8px_rgba(236,72,153,0.25)]'
+                : 'border-gray-700/60 text-gray-400 hover:text-pink-300 hover:border-pink-700/50',
+            ].join(' ')}
+          >
+            <Type size={12} />
+            <span className="hidden sm:inline">Texto</span>
           </button>
         </div>
 

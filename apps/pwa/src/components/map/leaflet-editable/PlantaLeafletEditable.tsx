@@ -204,14 +204,38 @@ function GrillaLayer({ view }: { view: MapView }) {
 
 // ─── Overlay de grilla (controles ángulo, fuera del MapContainer) ─────────────
 function GrillaOverlay({ view }: { view: MapView }) {
-  const grillaAngles   = useMapaLeafletStore((s) => s.grillaAngles)
-  const setGrillaAngle = useMapaLeafletStore((s) => s.setGrillaAngle)
-  const grillaAngle    = grillaAngles[view.name] ?? 0
+  const grillaAngles       = useMapaLeafletStore((s) => s.grillaAngles)
+  const setGrillaAngle     = useMapaLeafletStore((s) => s.setGrillaAngle)
+  const grillaAngle        = grillaAngles[view.name] ?? 0
+  const alignGrillaMode    = useMapaLeafletStore((s) => s.alignGrillaMode)
+  const setAlignGrillaMode = useMapaLeafletStore((s) => s.setAlignGrillaMode)
   const [editing, setEditing] = useState(false)
   const [inputVal, setInputVal] = useState(String(grillaAngle))
 
   // Sync inputVal cuando cambia la vista o el ángulo externo
   useEffect(() => { setInputVal(String(grillaAngle)) }, [view.name, grillaAngle])
+
+  // ── Modo alinear a muro ────────────────────────────────────────────────────
+  if (alignGrillaMode) {
+    return (
+      <div className="absolute inset-0 pointer-events-none z-[1100]">
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 pointer-events-auto bg-slate-900/97 border border-slate-500/60 rounded-xl shadow-2xl px-5 py-3 backdrop-blur-sm text-center">
+          <div className="flex items-center gap-3 justify-center mb-1.5">
+            <span className="text-[11px] font-bold text-slate-300 uppercase tracking-widest">Alinear Grilla al Muro</span>
+            <button
+              className="text-[10px] text-gray-500 hover:text-red-400 border border-gray-700/50 rounded px-2 py-0.5 transition-colors"
+              onClick={() => setAlignGrillaMode(false)}
+            >
+              Esc · Cancelar
+            </button>
+          </div>
+          <p className="text-[11px] text-amber-300/80">
+            Clic en <strong>2 puntos</strong> sobre el muro o línea de referencia
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   const handleSlider = (e: React.ChangeEvent<HTMLInputElement>) => {
     const v = Number(e.target.value)
@@ -239,6 +263,13 @@ function GrillaOverlay({ view }: { view: MapView }) {
             onClick={() => setEditing(true)}
           >
             Editar ángulo
+          </button>
+          <button
+            className="pointer-events-auto text-[9px] text-slate-400 hover:text-sky-300 transition-colors border border-slate-700/50 hover:border-sky-600/50 rounded px-1.5 py-0.5"
+            onClick={() => setAlignGrillaMode(true)}
+            title="Clic en 2 puntos del muro para alinear la grilla automáticamente"
+          >
+            ⟂ Alinear
           </button>
         </div>
       </div>
@@ -312,7 +343,14 @@ function GrillaOverlay({ view }: { view: MapView }) {
           <span className="text-[9px] text-gray-600">+90°</span>
         </div>
         <button
-          className="pointer-events-auto w-full text-[10px] py-1 mt-2.5 rounded-md bg-slate-700/40 border border-slate-600/40 text-slate-300 hover:bg-slate-600/50 transition-colors"
+          className="pointer-events-auto w-full text-[10px] py-1 mt-2.5 rounded-md bg-sky-900/30 border border-sky-700/40 text-sky-300 hover:bg-sky-800/40 transition-colors"
+          onClick={() => { setAlignGrillaMode(true); setEditing(false) }}
+          title="Clic en 2 puntos del muro para computar el ángulo automáticamente"
+        >
+          ⟂ Alinear grilla al muro
+        </button>
+        <button
+          className="pointer-events-auto w-full text-[10px] py-1 mt-1.5 rounded-md bg-slate-700/40 border border-slate-600/40 text-slate-300 hover:bg-slate-600/50 transition-colors"
           onClick={() => setEditing(false)}
         >
           Listo
@@ -832,6 +870,12 @@ function CapaElementos({ view }: { view: MapView }) {
         current.delete(el.id)
         layer = null
       }
+      // Etiquetas de texto: recrear cuando cambia la selección (L.Marker no tiene setStyle)
+      if (layer && el.tipo === 'texto' && (layer as any)._textoIsSelected !== isSelected) {
+        map.removeLayer(layer)
+        current.delete(el.id)
+        layer = null
+      }
       if (!layer) {
         const opts = { ...baseStyle, ...(paneName ? { pane: paneName } : {}) }
         // Crear nueva capa
@@ -843,6 +887,22 @@ function CapaElementos({ view }: { view: MapView }) {
           layer = L.polygon(el.poligono as L.LatLngTuple[], opts)
         } else if (el.punto && el.radio) {
           layer = L.circle(el.punto as L.LatLngTuple, { ...opts, radius: el.radio })
+        } else if (el.tipo === 'texto' && el.punto) {
+          // Etiqueta flotante en el mapa
+          const texto = (el.meta?.texto as string) || el.nombre || '?'
+          const escapedTexto = String(texto).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          const selStyle = isSelected
+            ? `;outline:1.5px dashed ${color};outline-offset:3px`
+            : ''
+          layer = L.marker(el.punto as L.LatLngTuple, {
+            icon: L.divIcon({
+              className: '',
+              html: `<div style="white-space:nowrap;background:rgba(0,0,0,0.72);color:${color};padding:2px 8px;border-radius:4px;font-size:13px;font-weight:600;pointer-events:auto;cursor:pointer${selStyle}">${escapedTexto}</div>`,
+              iconAnchor: [0, 14],
+            }),
+            ...(paneName ? { pane: paneName } : {}),
+          })
+          ;(layer as any)._textoIsSelected = isSelected
         } else if (el.punto) {
           layer = L.circleMarker(el.punto as L.LatLngTuple, { ...opts, radius: 7 })
         }
@@ -927,6 +987,216 @@ function CenterOnSelected() {
       map.flyTo(el.punto as L.LatLngTuple, Math.max(map.getZoom(), 5), { duration: 0.6 })
     }
   }, [map, selectedId, elementos])
+
+  return null
+}
+
+// ─── Alinear grilla a muro: captura 2 clics y computa el ángulo ──────────────
+function AlignGrillaController({ view }: { view: MapView }) {
+  const map              = useMap()
+  const alignGrillaMode  = useMapaLeafletStore((s) => s.alignGrillaMode)
+  const setAlignGrillaMode = useMapaLeafletStore((s) => s.setAlignGrillaMode)
+  const setGrillaAngle   = useMapaLeafletStore((s) => s.setGrillaAngle)
+  const pointsRef        = useRef<L.LatLng[]>([])
+
+  useEffect(() => {
+    if (!map || !alignGrillaMode) {
+      pointsRef.current = []
+      return
+    }
+    const container = map.getContainer()
+    container.style.cursor = 'crosshair'
+
+    const onClick = (e: L.LeafletMouseEvent) => {
+      L.DomEvent.stopPropagation(e)
+      pointsRef.current.push(e.latlng)
+      if (pointsRef.current.length >= 2) {
+        const [a, b] = pointsRef.current
+        // CRS.Simple: lat = Y, lng = X
+        const dx = b!.lng - a!.lng
+        const dy = b!.lat - a!.lat
+        // Ángulo en grados respecto al eje X, normalizado a [-90, 90]
+        let deg = (Math.atan2(dy, dx) * 180) / Math.PI
+        while (deg > 90)  deg -= 180
+        while (deg < -90) deg += 180
+        setGrillaAngle(view.name, Math.round(deg * 10) / 10)
+        setAlignGrillaMode(false)
+        container.style.cursor = ''
+      }
+    }
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setAlignGrillaMode(false)
+        container.style.cursor = ''
+      }
+    }
+
+    map.on('click', onClick as any)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      map.off('click', onClick as any)
+      document.removeEventListener('keydown', onKeyDown)
+      container.style.cursor = ''
+      pointsRef.current = []
+    }
+  }, [map, alignGrillaMode, view.name, setAlignGrillaMode, setGrillaAngle])
+
+  return null
+}
+
+// ─── Colocación de Equipos SAP en el mapa ─────────────────────────────────────
+/**
+ * EquipoPlacementTool — cuando equipoToPlaceId está seteado, el próximo clic
+ * en el mapa crea un elemento tipo='equipo' con meta.plantAssetId.
+ * Esc cancela sin colocar nada.
+ */
+function EquipoPlacementTool({ view }: { view: MapView }) {
+  const map               = useMap()
+  const equipoToPlaceId   = useMapaLeafletStore((s) => s.equipoToPlaceId)
+  const setEquipoToPlaceId = useMapaLeafletStore((s) => s.setEquipoToPlaceId)
+  const snap              = snapFor(view)
+
+  useEffect(() => {
+    if (!map || !equipoToPlaceId) return
+    const container = map.getContainer()
+    container.style.cursor = 'crosshair'
+
+    const onClick = (e: L.LeafletMouseEvent) => {
+      L.DomEvent.stopPropagation(e)
+      const cs: [number, number] = [snap(e.latlng.lat), snap(e.latlng.lng)]
+      const { addElemento, setSelectedId } = useMapaLeafletStore.getState()
+      const id = addElemento({
+        tipo: 'equipo', nombre: '', categoria: 'otros', estado: 'operativo',
+        mapView: view.name, punto: cs,
+        meta: { plantAssetId: equipoToPlaceId },
+      })
+      setSelectedId(id)
+      setEquipoToPlaceId(null)
+      container.style.cursor = ''
+    }
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setEquipoToPlaceId(null)
+        container.style.cursor = ''
+      }
+    }
+
+    map.on('click', onClick as any)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      map.off('click', onClick as any)
+      document.removeEventListener('keydown', onKeyDown)
+      container.style.cursor = ''
+    }
+  }, [map, equipoToPlaceId, snap, view.name, setEquipoToPlaceId])
+
+  return null
+}
+
+// ─── Texto libre: clic en mapa → popup con input → crea elemento tipo=texto ──
+function TextPlacementTool({ view }: { view: MapView }) {
+  const map                 = useMap()
+  const textPlacementMode   = useMapaLeafletStore((s) => s.textPlacementMode)
+  const setTextPlacementMode = useMapaLeafletStore((s) => s.setTextPlacementMode)
+  const snap                = snapFor(view)
+  const popupRef            = useRef<L.Popup | null>(null)
+
+  useEffect(() => {
+    if (!map || !textPlacementMode) {
+      popupRef.current?.remove()
+      popupRef.current = null
+      return
+    }
+    const container = map.getContainer()
+    container.style.cursor = 'text'
+
+    const onClick = (e: L.LeafletMouseEvent) => {
+      L.DomEvent.stopPropagation(e)
+      popupRef.current?.remove()
+
+      const latlng = e.latlng
+      const cs: [number, number] = [snap(latlng.lat), snap(latlng.lng)]
+
+      // Popup imperativo con formulario de texto
+      const div = document.createElement('div')
+      div.style.cssText = 'padding:4px;min-width:200px'
+      div.innerHTML = `
+        <div style="font-size:11px;font-weight:700;color:#fbbf24;margin-bottom:6px;letter-spacing:.04em">TEXTO LIBRE</div>
+        <input id="tpt-input" type="text" autofocus placeholder="Escribe el texto..."
+          style="width:100%;padding:5px 8px;background:#1e293b;border:1px solid #475569;border-radius:5px;color:white;font-size:13px;outline:none;box-sizing:border-box" />
+        <div style="display:flex;gap:6px;margin-top:7px">
+          <button id="tpt-ok"
+            style="flex:1;padding:4px;background:#d97706;color:white;border:none;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer">
+            Colocar ↵
+          </button>
+          <button id="tpt-cancel"
+            style="padding:4px 8px;background:#374151;color:#9ca3af;border:none;border-radius:4px;font-size:11px;cursor:pointer">
+            Esc
+          </button>
+        </div>
+      `
+
+      const popup = L.popup({ closeButton: false, closeOnClick: false, className: 'text-placement-popup' })
+        .setLatLng(latlng)
+        .setContent(div)
+        .openOn(map)
+      popupRef.current = popup
+
+      const finishOk = () => {
+        const input = div.querySelector<HTMLInputElement>('#tpt-input')
+        const text  = input?.value.trim() ?? ''
+        if (text) {
+          const { addElemento, setSelectedId } = useMapaLeafletStore.getState()
+          const id = addElemento({
+            tipo: 'texto', nombre: text, categoria: 'otros', estado: 'operativo',
+            mapView: view.name, punto: cs, meta: { texto: text },
+          })
+          setSelectedId(id)
+        }
+        popup.remove()
+        popupRef.current = null
+        setTextPlacementMode(false)
+        container.style.cursor = ''
+      }
+
+      const finishCancel = () => {
+        popup.remove()
+        popupRef.current = null
+        // mantiene textPlacementMode activo para seguir colocando
+        container.style.cursor = 'text'
+      }
+
+      setTimeout(() => {
+        const input = div.querySelector<HTMLInputElement>('#tpt-input')
+        input?.focus()
+        div.querySelector('#tpt-ok')?.addEventListener('click', finishOk)
+        div.querySelector('#tpt-cancel')?.addEventListener('click', finishCancel)
+        input?.addEventListener('keydown', (ev) => {
+          if (ev.key === 'Enter') { ev.preventDefault(); finishOk() }
+          if (ev.key === 'Escape') { ev.preventDefault(); finishCancel() }
+        })
+      }, 30)
+    }
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !popupRef.current) {
+        setTextPlacementMode(false)
+        container.style.cursor = ''
+      }
+    }
+
+    map.on('click', onClick as any)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      map.off('click', onClick as any)
+      document.removeEventListener('keydown', onKeyDown)
+      container.style.cursor = ''
+      popupRef.current?.remove()
+      popupRef.current = null
+    }
+  }, [map, textPlacementMode, snap, view.name, setTextPlacementMode])
 
   return null
 }
@@ -1509,6 +1779,9 @@ function MapContents({ view }: { view: MapView }) {
       <EditorGeoman view={view} />
       <BoxSelect view={view} />
       <MeasureTool view={view} />
+      <AlignGrillaController view={view} />
+      <EquipoPlacementTool view={view} />
+      <TextPlacementTool view={view} />
       <DrawAreaTooltip />
       <CenterOnSelected />
       <KeyboardShortcuts />
@@ -1697,9 +1970,13 @@ function MeasureOverlay() {
 
 // ─── Componente principal — wrapper que reacciona al cambio de vista ─────────
 export function PlantaLeafletEditable() {
-  const currentView   = useMapaLeafletStore((s) => s.currentView)
-  const measureMode   = useMapaLeafletStore((s) => s.measureMode)
-  const grillaVisible = useMapaLeafletStore((s) => s.grillaVisible)
+  const currentView        = useMapaLeafletStore((s) => s.currentView)
+  const measureMode        = useMapaLeafletStore((s) => s.measureMode)
+  const grillaVisible      = useMapaLeafletStore((s) => s.grillaVisible)
+  const textPlacementMode  = useMapaLeafletStore((s) => s.textPlacementMode)
+  const setTextPlacementMode = useMapaLeafletStore((s) => s.setTextPlacementMode)
+  const equipoToPlaceId    = useMapaLeafletStore((s) => s.equipoToPlaceId)
+  const setEquipoToPlaceId = useMapaLeafletStore((s) => s.setEquipoToPlaceId)
   const view = MAP_VIEWS[currentView]
 
   // Listener nativo (no React sintético) con passive:false para detener la
@@ -1750,6 +2027,34 @@ export function PlantaLeafletEditable() {
 
       {measureMode   && <MeasureOverlay />}
       {grillaVisible && <GrillaOverlay view={view} />}
+
+      {/* Overlay: modo colocación de texto */}
+      {textPlacementMode && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1200] pointer-events-none">
+          <div className="pointer-events-auto bg-gray-900/97 border border-amber-500/60 rounded-xl shadow-2xl px-4 py-2.5 flex items-center gap-3 backdrop-blur-sm">
+            <span className="text-[11px] font-bold text-amber-300 uppercase tracking-widest">Modo Texto</span>
+            <span className="text-[10px] text-gray-400">Clic en el mapa para colocar · Esc cancela</span>
+            <button
+              className="text-[9px] text-gray-500 hover:text-red-400 border border-gray-700/50 rounded px-2 py-0.5 transition-colors"
+              onClick={() => setTextPlacementMode(false)}
+            >✕</button>
+          </div>
+        </div>
+      )}
+
+      {/* Overlay: modo colocación de equipo SAP */}
+      {equipoToPlaceId && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1200] pointer-events-none">
+          <div className="pointer-events-auto bg-gray-900/97 border border-blue-500/60 rounded-xl shadow-2xl px-4 py-2.5 flex items-center gap-3 backdrop-blur-sm">
+            <span className="text-[11px] font-bold text-blue-300 uppercase tracking-widest">Colocar Equipo</span>
+            <span className="text-[10px] text-gray-400">Clic en el mapa para posicionar · Esc cancela</span>
+            <button
+              className="text-[9px] text-gray-500 hover:text-red-400 border border-gray-700/50 rounded px-2 py-0.5 transition-colors"
+              onClick={() => setEquipoToPlaceId(null)}
+            >✕</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

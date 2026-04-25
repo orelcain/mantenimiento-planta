@@ -54,7 +54,7 @@ export interface MapaImportado {
 
 export type ZonaCategoria = 'produccion' | 'frio' | 'utilidades' | 'logistica' | 'admin' | 'estructura' | 'otros'
 export type ZonaEstado    = 'operativo' | 'alerta' | 'detenido'
-export type ElementoTipo  = 'zona' | 'equipo' | 'sensor' | 'punto' | 'forma' | 'cota' | 'linea'
+export type ElementoTipo  = 'zona' | 'equipo' | 'sensor' | 'punto' | 'forma' | 'cota' | 'linea' | 'texto'
 
 /** Polígono: array de puntos [lat, lng] = [Y, X] en unidades del DXF de la vista */
 export type PolygonCoords = [number, number][]
@@ -191,6 +191,21 @@ interface MapaLeafletState {
   setMeasureCurrentPoints: (pts: [number, number][]) => void
   setMeasureLastAngle: (a: number | null) => void
   clearMeasurements: () => void
+
+  // ── Align grilla a muro (efímero — no persiste) ────────────────────────────
+  /** Activo: el usuario hace clic en 2 puntos del muro para computar ángulo */
+  alignGrillaMode: boolean
+  setAlignGrillaMode: (v: boolean) => void
+
+  // ── Equipos SAP placement (efímero — no persiste) ─────────────────────────
+  /** ID del PlantAsset que el usuario quiere colocar en el mapa */
+  equipoToPlaceId: string | null
+  setEquipoToPlaceId: (id: string | null) => void
+
+  // ── Texto libre placement (efímero — no persiste) ─────────────────────────
+  /** Activo: próximo clic en el mapa abre popup para ingresar texto */
+  textPlacementMode: boolean
+  setTextPlacementMode: (v: boolean) => void
 }
 
 function makeId(): string {
@@ -230,6 +245,14 @@ export const useMapaLeafletStore = create<MapaLeafletState>()(
       measureCurrentPoints: [],
       measureClearSignal: 0,
       measureLastAngle: null,
+
+      // Efímeros — no persisten
+      alignGrillaMode: false,
+      setAlignGrillaMode: (v) => set({ alignGrillaMode: v }),
+      equipoToPlaceId: null,
+      setEquipoToPlaceId: (id) => set({ equipoToPlaceId: id }),
+      textPlacementMode: false,
+      setTextPlacementMode: (v) => set({ textPlacementMode: v }),
 
       setView: (v) => set({ currentView: v, selectedId: null, multiSelection: [] }),
       setSelectedId: (id) => set({ selectedId: id, multiSelection: [] }),

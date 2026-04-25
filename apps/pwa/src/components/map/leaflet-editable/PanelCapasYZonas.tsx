@@ -7,10 +7,11 @@
  *  • Confirmación antes de eliminar
  */
 
-import { Eye, EyeOff, Edit3, Save, Trash2, Check, Search, X, Crosshair, Copy, Download, CheckCircle2, Loader, Plus, GripVertical, Layers } from 'lucide-react'
+import { Eye, EyeOff, Edit3, Save, Trash2, Check, Search, X, Crosshair, Copy, Download, CheckCircle2, Loader, Plus, GripVertical, Layers, MapPin, ChevronRight } from 'lucide-react'
 import { MAP_VIEWS, type DxfLayerConfig, DXF_INTERIOR_SVG_LAYERS } from '@/data/dxfLayers'
 import { useMapaLeafletStore, type ZonaCategoria, type ZonaEstado, type ElementoMapa, type PolygonCoords, type Nivel } from '@/store/useMapaLeafletStore'
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import { usePlantAssets } from '@/hooks/repuestos/usePlantAssets'
 
 // ─── Tipos mínimos GeoJSON para absorción DXF ────────────────────────────────
 type GJCoord = readonly number[]
@@ -61,6 +62,7 @@ function TipoBadge({ tipo }: { tipo: ElementoMapa['tipo'] }) {
     sensor: { label: 'SENSR', bg: 'bg-green-900/40',  text: 'text-green-300' },
     cota:   { label: 'COTA',  bg: 'bg-slate-800/60',  text: 'text-slate-300' },
     linea:  { label: 'LINEA', bg: 'bg-orange-900/40', text: 'text-orange-300' },
+    texto:  { label: 'TEXTO', bg: 'bg-pink-900/40',   text: 'text-pink-300' },
   }[tipo]
   if (!cfg) return null
   return (
@@ -231,6 +233,25 @@ export function PanelCapasYZonas() {
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
   const [dxfImportExpanded, setDxfImportExpanded] = useState(false)
   const nameInputRef = useRef<HTMLInputElement>(null)
+
+  // ── Equipos SAP ─────────────────────────────────────────────────────────────
+  const { assets: plantAssets, loading: assetsLoading } = usePlantAssets()
+  const [sapExpanded, setSapExpanded] = useState(false)
+  const [sapFiltro, setSapFiltro]     = useState('')
+  const equipoToPlaceId    = useMapaLeafletStore((s) => s.equipoToPlaceId)
+  const setEquipoToPlaceId = useMapaLeafletStore((s) => s.setEquipoToPlaceId)
+  const textPlacementMode  = useMapaLeafletStore((s) => s.textPlacementMode)
+  const setTextPlacementMode = useMapaLeafletStore((s) => s.setTextPlacementMode)
+
+  const sapFiltrado = useMemo(() => {
+    if (!sapFiltro.trim()) return plantAssets
+    const f = sapFiltro.toLowerCase()
+    return plantAssets.filter(
+      (a) => a.equipo?.toLowerCase().includes(f)
+        || a.codigoSAP?.toLowerCase().includes(f)
+        || a.descripcionSAP?.toLowerCase().includes(f),
+    )
+  }, [plantAssets, sapFiltro])
 
   // Capas del usuario para la vista actual, ordenadas de mayor a menor orden
   // (arriba = z-index mas alto)
@@ -1031,6 +1052,112 @@ export function PanelCapasYZonas() {
                 )}
               </div>
             )}
+
+            {/* ── Herramientas de anotación ─────────────────────────────── */}
+            <div className="border-t border-gray-700/40 pt-2 mt-1">
+              <div className="text-[9px] uppercase tracking-widest text-gray-500 font-semibold mb-1.5 px-1">
+                Anotar
+              </div>
+              <button
+                onClick={() => setTextPlacementMode(!textPlacementMode)}
+                className={[
+                  'w-full flex items-center gap-2 text-[11px] px-3 py-1.5 rounded-md border transition-all',
+                  textPlacementMode
+                    ? 'bg-pink-600/25 border-pink-500/60 text-pink-300'
+                    : 'bg-gray-800/60 border-gray-700/50 text-gray-400 hover:text-pink-300 hover:border-pink-700/50',
+                ].join(' ')}
+              >
+                <span className="text-base leading-none">𝐓</span>
+                {textPlacementMode ? 'Clic en el mapa para colocar texto…' : 'Agregar texto libre'}
+              </button>
+            </div>
+
+            {/* ── Equipos SAP ───────────────────────────────────────────── */}
+            <div className="border-t border-gray-700/40 pt-2 mt-1">
+              <button
+                onClick={() => setSapExpanded((v) => !v)}
+                className="w-full flex items-center justify-between text-[10px] px-1 py-0.5 text-gray-400 hover:text-blue-300 transition-colors"
+              >
+                <span className="uppercase tracking-widest font-semibold flex items-center gap-1">
+                  <MapPin size={10} /> Equipos SAP
+                  {plantAssets.length > 0 && (
+                    <span className="ml-1 text-[9px] px-1.5 py-0.5 bg-blue-900/40 text-blue-300 rounded font-mono">
+                      {plantAssets.length}
+                    </span>
+                  )}
+                </span>
+                <ChevronRight size={12} className={`transition-transform ${sapExpanded ? 'rotate-90' : ''}`} />
+              </button>
+
+              {sapExpanded && (
+                <div className="mt-2 flex flex-col gap-1.5">
+                  {/* Buscador SAP */}
+                  <div className="relative">
+                    <Search size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500" />
+                    <input
+                      placeholder="Buscar equipo SAP…"
+                      value={sapFiltro}
+                      onChange={(e) => setSapFiltro(e.target.value)}
+                      className="w-full pl-6 pr-2 py-1 bg-gray-800 border border-gray-700 rounded text-[10px] text-white placeholder-gray-500 focus:border-blue-500/60 focus:outline-none"
+                    />
+                    {sapFiltro && (
+                      <button onClick={() => setSapFiltro('')} className="absolute right-1 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300">
+                        <X size={10} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Lista de assets */}
+                  {assetsLoading ? (
+                    <div className="text-[10px] text-gray-500 text-center py-2">
+                      <Loader size={12} className="animate-spin inline mr-1" />Cargando…
+                    </div>
+                  ) : sapFiltrado.length === 0 ? (
+                    <div className="text-[10px] text-gray-500 italic text-center py-2">
+                      {plantAssets.length === 0 ? 'No hay equipos en SAP' : 'Sin coincidencias'}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-0.5 max-h-48 overflow-y-auto">
+                      {sapFiltrado.map((asset) => {
+                        const isPlacing = equipoToPlaceId === asset.id
+                        return (
+                          <div
+                            key={asset.id}
+                            className={[
+                              'flex items-center gap-2 px-2 py-1 rounded border transition-all',
+                              isPlacing
+                                ? 'bg-blue-900/40 border-blue-500/60'
+                                : 'bg-gray-800/50 border-gray-700/40 hover:border-blue-700/40',
+                            ].join(' ')}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="text-[11px] font-semibold text-gray-200 truncate">
+                                {asset.equipo || asset.descripcionSAP || asset.id}
+                              </div>
+                              {asset.codigoSAP && (
+                                <div className="text-[9px] text-blue-400/70 font-mono">{asset.codigoSAP}</div>
+                              )}
+                            </div>
+                            <button
+                              onClick={() => setEquipoToPlaceId(isPlacing ? null : asset.id)}
+                              title={isPlacing ? 'Cancelar — clic en el mapa para colocar' : 'Colocar en el mapa'}
+                              className={[
+                                'shrink-0 text-[9px] px-2 py-0.5 rounded border font-semibold transition-all',
+                                isPlacing
+                                  ? 'bg-blue-500/30 border-blue-400/60 text-blue-200'
+                                  : 'bg-gray-700/60 border-gray-600/50 text-gray-400 hover:bg-blue-600/30 hover:text-blue-300 hover:border-blue-500/50',
+                              ].join(' ')}
+                            >
+                              {isPlacing ? '✓ activo' : '+ colocar'}
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
