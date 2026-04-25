@@ -916,7 +916,7 @@ Con Haversine A→D = dimensión real del recinto en metros. El DWG ya tiene cot
 
 **P2 — Media prioridad**
 
-- 🔲 **#6 Tests `computeSegmentVerdicts`** — corazón de Fase C sin unit tests. (~45min)
+- ✅ **#6 Tests `computeSegmentVerdicts`** — DONE 2026-04-25 v3.0.3. Cubierto con 29 tests (entradas vacías, synthetic, insufficient-data, improved/worsened/neutral, afterMinutes, múltiples snapshots con boundeo, boundaries finos +0.5/=0.5, snapshot al final). Constantes `MIN_PIECES_AFTER_THRESHOLD` y `DELTA_THRESHOLD_PTS` exportadas para consistencia.
 - 🔲 **#2 Ruta mobile `/grader/quick-change?turno=X`** — vista reducida para supervisor con celular. (~1h)
 - 🔲 **Fase 3b — Edición manual de rangos de pausas** — drag handles en bandas del Timeline para redimensionar/crear/descartar pausas. Estado local complejo + persistir a Firestore + no pisar el detector automático. `ShiftTimelineView.tsx`. (~2-3 días)
 - 🔲 **Fase 4 — CRUD admin de tags** — página admin para gestionar `graderPauseTags` en Firestore (crear/renombrar/cambiar color+emoji/archivar). Hoy los 9 tags están hardcoded en `graderPauseTags.ts`. Reglas Firestore nuevas. (~2-3 días)

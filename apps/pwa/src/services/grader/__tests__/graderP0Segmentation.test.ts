@@ -7,7 +7,11 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { computeSegmentVerdicts } from '../graderP0Segmentation'
+import {
+  computeSegmentVerdicts,
+  MIN_PIECES_AFTER_THRESHOLD,
+  DELTA_THRESHOLD_PTS,
+} from '../graderP0Segmentation'
 import type { GateConfigSnapshot } from '../graderConfigSnapshot.service'
 import type { TimelineBucket } from '../types'
 
@@ -286,5 +290,73 @@ describe('computeSegmentVerdicts — afterPieces', () => {
     ]
     const v = computeSegmentVerdicts([snap], [...before, ...after]).get('s1')!
     expect(v.afterPieces).toBe(105)
+  })
+})
+
+// ── Constantes exportadas (CONSISTENCIA — fuente única de verdad) ────────────
+
+describe('Constantes exportadas', () => {
+  it('MIN_PIECES_AFTER_THRESHOLD = 30 piezas', () => {
+    expect(MIN_PIECES_AFTER_THRESHOLD).toBe(30)
+  })
+  it('DELTA_THRESHOLD_PTS = 0.5 pts porcentuales', () => {
+    expect(DELTA_THRESHOLD_PTS).toBe(0.5)
+  })
+})
+
+// ── Boundaries específicos no cubiertos antes ────────────────────────────────
+
+describe('computeSegmentVerdicts — boundaries finos', () => {
+  it('bucket con tsMin === snap.at se incluye en AFTER (no en before)', () => {
+    // Diseño semántico: el momento exacto del cambio cuenta como "después"
+    const snap = makeSnap({ id: 's1', at: '2024-01-15T08:10:00.000Z' })
+    const before = [makeBucket('2024-01-15T08:00:00.000Z', 100, 5)]
+    // bucket tsMin idéntico al snap.at — debe ir a after
+    const exactBucket = makeBucket('2024-01-15T08:10:00.000Z', 50, 2)
+    const v = computeSegmentVerdicts([snap], [...before, exactBucket]).get('s1')!
+    // Si exactBucket fuera before: beforeTotal=150 / 7 P0 = 4.67%, afterTotal=0 → insufficient
+    // Si exactBucket fuera after: afterTotal=50 (insufficient<30=false → wait, 50>=30 so OK), beforePct=5%, afterPct=4%
+    expect(v.afterPieces).toBe(50)
+    expect(v.beforePct).toBeCloseTo(5, 1)
+    expect(v.afterPct).toBeCloseTo(4, 1)
+  })
+
+  it('delta exactamente +0.5 → neutral (umbral estricto >)', () => {
+    const snap = makeSnap({ id: 's1', at: '2024-01-15T08:10:00.000Z' })
+    // 200 piezas antes 100 P0 = 50%; 200 después 101 P0 = 50.5% → delta = +0.5
+    const before = [makeBucket('2024-01-15T08:00:00.000Z', 200, 100)]
+    const after  = [makeBucket('2024-01-15T08:10:00.000Z', 200, 101)]
+    const v = computeSegmentVerdicts([snap], [...before, ...after]).get('s1')!
+    expect(v.delta).toBeCloseTo(0.5, 1)
+    expect(v.status).toBe('neutral')  // 0.5 NO supera > 0.5 estricto
+  })
+
+  it('worsened cuando delta = +0.51 (cruza umbral)', () => {
+    const snap = makeSnap({ id: 's1', at: '2024-01-15T08:10:00.000Z' })
+    // 1000 piezas antes 100 P0 = 10%; 1000 después 106 P0 = 10.6% → delta ≈ +0.6
+    const before = [makeBucket('2024-01-15T08:00:00.000Z', 1000, 100)]
+    const after  = [makeBucket('2024-01-15T08:10:00.000Z', 1000, 106)]
+    const v = computeSegmentVerdicts([snap], [...before, ...after]).get('s1')!
+    expect(v.status).toBe('worsened')
+  })
+
+  it('snapshot al final del timeline (sin afterBuckets) → afterPieces=0 → insufficient', () => {
+    const snap = makeSnap({ id: 's1', at: '2024-01-15T09:00:00.000Z' })
+    // Solo buckets antes del snap, ninguno después
+    const before = bucketSeries('2024-01-15T08:00:00.000Z', 30, 100, 5)
+    const v = computeSegmentVerdicts([snap], before).get('s1')!
+    expect(v.afterPieces).toBe(0)
+    expect(v.status).toBe('insufficient-data')
+    expect(v.afterMinutes).toBe(0)
+  })
+
+  it('un solo snapshot manual + buckets cubre todo el rango (sin nextAt boundary)', () => {
+    const snap = makeSnap({ id: 's1', at: '2024-01-15T08:10:00.000Z' })
+    // 60 buckets en total, 10 antes + 50 después
+    const before = bucketSeries('2024-01-15T08:00:00.000Z', 10, 100, 5)
+    const after  = bucketSeries('2024-01-15T08:10:00.000Z', 50, 100, 3)
+    const v = computeSegmentVerdicts([snap], [...before, ...after]).get('s1')!
+    expect(v.afterPieces).toBe(50 * 100)
+    expect(v.afterMinutes).toBe(49)  // 49 min desde T08:10 al último T08:59
   })
 })

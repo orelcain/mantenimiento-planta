@@ -35,8 +35,30 @@ export interface SegmentVerdict {
   status: 'improved' | 'worsened' | 'neutral' | 'insufficient-data'
 }
 
-const MIN_PIECES_AFTER = 30
-const DELTA_THRESHOLD  = 0.5  // puntos porcentuales
+/**
+ * Mínimo de piezas en el segmento "después" para emitir un veredicto.
+ *
+ * Si el cambio se acaba de hacer y aún no llegan suficientes piezas, no se
+ * puede declarar mejora/empeoramiento — devuelve `'insufficient-data'`.
+ *
+ * Exportado para que la UI muestre el umbral en tooltips y mantenga
+ * consistencia entre componentes (principio "fuente única de verdad").
+ */
+export const MIN_PIECES_AFTER_THRESHOLD = 30
+
+/**
+ * Magnitud mínima de delta P0% (puntos porcentuales) para clasificar como
+ * mejora/empeoramiento. Por debajo (en magnitud) se clasifica `'neutral'`.
+ *
+ * Diseño: la condición es ESTRICTA (`< -0.5` y `> +0.5`), por lo que un delta
+ * de ±0.5 exacto cae en `neutral`. Esto evita oscilaciones por ruido cuando
+ * el cambio fue marginal.
+ */
+export const DELTA_THRESHOLD_PTS = 0.5
+
+// Aliases internos legacy — no usar en código nuevo
+const MIN_PIECES_AFTER = MIN_PIECES_AFTER_THRESHOLD
+const DELTA_THRESHOLD  = DELTA_THRESHOLD_PTS
 
 export function computeSegmentVerdicts(
   snapshots: GateConfigSnapshot[],
