@@ -151,6 +151,20 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20 }: 
     timelineSync.setRange({ startMs, endMs })
   }, [timelineSync, rangeStart, rangeEnd])
 
+  // ── Lot projection (Fase 4c) ────────────────────────────────────────────
+  // markLines verticales para cada cambio de lote del Grader. Solo se
+  // muestran si el lot change cae dentro del rango visible.
+  const lotMarkLines = useMemo(() => {
+    if (!timelineSync || timelineSync.lotChanges.length === 0) return []
+    return timelineSync.lotChanges
+      .filter((lc) => lc.ms >= rangeStart.getTime() && lc.ms <= rangeEnd.getTime())
+      .map((lc) => ({
+        xAxis: lc.ms,
+        lineStyle: { color: 'rgba(139,92,246,0.55)', type: 'dotted' as const, width: 1 },
+        label: { show: false },
+      }))
+  }, [timelineSync, rangeStart, rangeEnd])
+
   const option = useMemo(() => ({
     backgroundColor: 'transparent',
     // Padding mínimo: el Gantt es solo una franja horizontal
@@ -226,9 +240,16 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20 }: 
         data: seriesData,
         // Allow tooltip al hover de cada rect
         tooltip: { show: true },
+        // Lot projection: verticales tenues violetas en cambios de lote
+        markLine: lotMarkLines.length > 0 ? {
+          silent: true,
+          symbol: 'none',
+          data: lotMarkLines,
+          z: 5,
+        } : undefined,
       },
     ],
-  }), [rangeStart, rangeEnd, seriesData, height])
+  }), [rangeStart, rangeEnd, seriesData, height, lotMarkLines])
 
   return (
     <div className="relative w-full" style={{ height: height + 4 }}>

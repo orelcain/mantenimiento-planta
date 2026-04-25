@@ -149,6 +149,18 @@ export function ProductionBarsEC({ intervals, threshold, windowStart, windowEnd 
     timelineSync.setRange({ startMs, endMs })
   }, [timelineSync, rangeStart, rangeEnd])
 
+  // ── Lot projection (Fase 4c) — verticales en cambios de lote del Grader
+  const lotMarkLines = useMemo(() => {
+    if (!timelineSync || timelineSync.lotChanges.length === 0) return []
+    return timelineSync.lotChanges
+      .filter((lc) => lc.ms >= rangeStart.getTime() && lc.ms <= rangeEnd.getTime())
+      .map((lc) => ({
+        xAxis: lc.ms,
+        lineStyle: { color: 'rgba(139,92,246,0.55)', type: 'dotted' as const, width: 1 },
+        label: { show: false },
+      }))
+  }, [timelineSync, rangeStart, rangeEnd])
+
   const option = useMemo(() => ({
     backgroundColor: 'transparent',
     grid: { left: 0, right: 0, top: 4, bottom: 0, containLabel: false },
@@ -223,8 +235,8 @@ export function ProductionBarsEC({ intervals, threshold, windowStart, windowEnd 
         },
         encode: { x: [0, 1], y: 2 },
         data: seriesData,
-        // Línea objetivo horizontal
-        markLine: expected > 0 ? {
+        // markLines: línea objetivo horizontal + verticales lot projection
+        markLine: (expected > 0 || lotMarkLines.length > 0) ? {
           silent: true,
           symbol: 'none',
           lineStyle: {
@@ -232,21 +244,27 @@ export function ProductionBarsEC({ intervals, threshold, windowStart, windowEnd 
             type: 'dashed' as const,
             width: 1,
           },
-          label: {
-            show: true,
-            position: 'insideEndTop' as const,
-            formatter: `Objetivo ${Math.round(expected)} ± ${threshold}%`,
-            color: '#a78bfa',
-            fontSize: 9,
-            backgroundColor: 'rgba(15,23,42,0.9)',
-            padding: [2, 4, 2, 4] as [number, number, number, number],
-            borderRadius: 2,
-          },
-          data: [{ yAxis: expected }],
+          label: { show: false },
+          data: [
+            ...(expected > 0 ? [{
+              yAxis: expected,
+              label: {
+                show: true,
+                position: 'insideEndTop' as const,
+                formatter: `Objetivo ${Math.round(expected)} ± ${threshold}%`,
+                color: '#a78bfa',
+                fontSize: 9,
+                backgroundColor: 'rgba(15,23,42,0.9)',
+                padding: [2, 4, 2, 4] as [number, number, number, number],
+                borderRadius: 2,
+              },
+            }] : []),
+            ...lotMarkLines,
+          ],
         } : undefined,
       },
     ],
-  }), [rangeStart, rangeEnd, seriesData, maxValue, expected, threshold])
+  }), [rangeStart, rangeEnd, seriesData, maxValue, expected, threshold, lotMarkLines])
 
   if (intervals.length === 0) {
     return <div className="h-16 rounded bg-slate-800/40" />

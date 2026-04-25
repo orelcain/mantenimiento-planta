@@ -19,13 +19,15 @@ function wrap(groupId?: string) {
 }
 
 describe('TimelineSyncContext', () => {
-  it('provee range=null, hover=null y groupId default', () => {
+  it('provee range=null, hover=null, lotChanges=[] y groupId default', () => {
     const { result } = renderHook(() => useTimelineSync(), { wrapper: wrap() })
     expect(result.current.range).toBeNull()
     expect(result.current.hover).toBeNull()
+    expect(result.current.lotChanges).toEqual([])
     expect(result.current.connectGroupId).toBe('timeline-sync')
     expect(typeof result.current.setRange).toBe('function')
     expect(typeof result.current.setHover).toBe('function')
+    expect(typeof result.current.setLotChanges).toBe('function')
   })
 
   it('respeta el groupId pasado al Provider', () => {
@@ -106,5 +108,31 @@ describe('TimelineSyncContext', () => {
     const firstHover = result.current.hover
     act(() => result.current.setHover({ ms: 100, originId: 'X' }))
     expect(result.current.hover).toBe(firstHover)
+  })
+
+  it('setLotChanges actualiza la lista de cambios de lote', () => {
+    const { result } = renderHook(() => useTimelineSync(), { wrapper: wrap() })
+    const lots = [{ ms: 1000, lot: '142' }, { ms: 2000, lot: '143' }]
+    act(() => result.current.setLotChanges(lots))
+    expect(result.current.lotChanges).toEqual(lots)
+  })
+
+  it('setLotChanges es idempotente con arrays estructuralmente iguales', () => {
+    const { result } = renderHook(() => useTimelineSync(), { wrapper: wrap() })
+    const lotsA = [{ ms: 1000, lot: '142' }]
+    const lotsB = [{ ms: 1000, lot: '142' }]  // mismo contenido, distinta ref
+    act(() => result.current.setLotChanges(lotsA))
+    const first = result.current.lotChanges
+    act(() => result.current.setLotChanges(lotsB))
+    expect(result.current.lotChanges).toBe(first)  // misma referencia
+  })
+
+  it('setLotChanges detecta cambios cuando longitud o contenido cambian', () => {
+    const { result } = renderHook(() => useTimelineSync(), { wrapper: wrap() })
+    act(() => result.current.setLotChanges([{ ms: 1000, lot: '142' }]))
+    act(() => result.current.setLotChanges([{ ms: 1000, lot: '142' }, { ms: 2000, lot: '143' }]))
+    expect(result.current.lotChanges).toHaveLength(2)
+    act(() => result.current.setLotChanges([{ ms: 1000, lot: 'OTHER' }, { ms: 2000, lot: '143' }]))
+    expect(result.current.lotChanges[0]!.lot).toBe('OTHER')
   })
 })

@@ -39,6 +39,13 @@ export interface HoverState {
   originId: string
 }
 
+export interface LotChange {
+  /** Timestamp en ms del minuto donde empieza el lote */
+  ms: number
+  /** Número de lote (string para preservar formato Marelec) */
+  lot: string
+}
+
 export interface TimelineSyncValue {
   /** Rango actualmente seleccionado (null = full range / sin zoom) */
   range: TimelineRange | null
@@ -48,6 +55,13 @@ export interface TimelineSyncValue {
   hover: HoverState | null
   /** Actualiza el hover. Pasar null para limpiar. */
   setHover: (next: HoverState | null) => void
+  /** Cambios de lote detectados en el timeline del Grader. Los charts del
+   *  panel los proyectan como markLines verticales para correlación visual
+   *  (Fase 4c — lot projection). */
+  lotChanges: LotChange[]
+  /** Publica los cambios de lote (lo invoca el Grader cuando sus buckets
+   *  cambian). Idempotente: skip si el array es estructuralmente igual. */
+  setLotChanges: (next: LotChange[]) => void
   /** ID de grupo para `echarts.connect()` — todos los charts del grupo
    *  sincronizan zoom y axisPointer nativamente. */
   connectGroupId: string
@@ -66,6 +80,7 @@ interface ProviderProps {
 export function TimelineSyncProvider({ children, groupId = 'timeline-sync' }: ProviderProps) {
   const [range, setRangeState] = useState<TimelineRange | null>(null)
   const [hover, setHoverState] = useState<HoverState | null>(null)
+  const [lotChanges, setLotChangesState] = useState<LotChange[]>([])
 
   // setRange es estable (useCallback) para evitar re-renders cascada en
   // consumidores que sólo dependen del setter.
@@ -93,9 +108,22 @@ export function TimelineSyncProvider({ children, groupId = 'timeline-sync' }: Pr
     })
   }, [])
 
+  // setLotChanges idempotente: compare estructural (longitud + ms+lot por idx)
+  // para evitar re-renders cascada cuando el Grader recalcula con la misma data.
+  const setLotChanges = useCallback((next: LotChange[]) => {
+    setLotChangesState((prev) => {
+      if (prev === next) return prev
+      if (prev.length !== next.length) return next
+      for (let i = 0; i < prev.length; i++) {
+        if (prev[i]!.ms !== next[i]!.ms || prev[i]!.lot !== next[i]!.lot) return next
+      }
+      return prev
+    })
+  }, [])
+
   const value = useMemo<TimelineSyncValue>(
-    () => ({ range, setRange, hover, setHover, connectGroupId: groupId }),
-    [range, setRange, hover, setHover, groupId],
+    () => ({ range, setRange, hover, setHover, lotChanges, setLotChanges, connectGroupId: groupId }),
+    [range, setRange, hover, setHover, lotChanges, setLotChanges, groupId],
   )
 
   return <TimelineSyncContext.Provider value={value}>{children}</TimelineSyncContext.Provider>
