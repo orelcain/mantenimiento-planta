@@ -99,10 +99,13 @@ function deserializeShift(raw: FirestoreData): UpstreamMachineShift {
         return b
       })()
   )
-  const shiftDurationSec = Math.max(1, (shiftEnd.getTime() - shiftStart.getTime()) / 1000)
-  const shiftRuntime = raw.shiftRuntime != null
-    ? Number(raw.shiftRuntime)
-    : breakdown.uptimeSec / shiftDurationSec
+  // shiftRuntime SIEMPRE se recomputa desde breakdown — los docs almacenados
+  // pueden tener un valor de la fórmula vieja (`uptime / shiftDuration`) que
+  // dependía de bounds incorrectos. Con la fórmula nueva (`uptime / totalTracked`)
+  // es robusta a los bounds y no requiere re-sync.
+  const shiftRuntime = breakdown.totalTrackedSec > 0
+    ? breakdown.uptimeSec / breakdown.totalTrackedSec
+    : 0
 
   return {
     machineid:           String(raw.machineid ?? ''),

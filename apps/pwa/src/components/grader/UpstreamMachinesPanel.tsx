@@ -63,37 +63,17 @@ const PLOT_RIGHT_PAD_PX = 24
 // ============================================================================
 
 /**
- * Shoplogix guarda timestamps en UTC real. Para los operadores de planta en
- * Chonchi mostramos hora local (America/Santiago — incluye DST automático).
+ * Shoplogix guarda los timestamps como wall-clock LOCAL Chile pero formateados
+ * AS-IF UTC (ej. `20260226T132711` representa las 13:27 hora Chile, NO UTC).
+ * Cuando `parseShoplogixTime` los convierte a Date con sufijo `Z`, los métodos
+ * `getUTCHours/Minutes` devuelven exactamente el valor wall-clock que el
+ * operador ve en la planta. NO conviertas a TZ — solo extrae UTC components.
+ *
+ * (Verificado con datos reales Feb 26: COLACION segments en Shoplogix marcan
+ * 13:27–14:39 que corresponde a la hora real de almuerzo en Chile, no 10:27.)
  */
-const CHILE_TZ = 'America/Santiago'
-
-const _santiagoFmt = new Intl.DateTimeFormat('es-CL', {
-  timeZone: CHILE_TZ,
-  hour: '2-digit',
-  minute: '2-digit',
-  hour12: false,
-})
-
 function fmtHHmm(d: Date): string {
-  // Intl puede devolver "24:00" en lugar de "00:00" en algunos engines —
-  // normalizamos para evitar ese caso de borde.
-  return _santiagoFmt.format(d).replace(/^24:/, '00:')
-}
-
-/** Devuelve los componentes hora/min/seg en zona Chile para un Date. */
-const _santiagoPartsFmt = new Intl.DateTimeFormat('en-CA', {
-  timeZone: CHILE_TZ,
-  hour: '2-digit', minute: '2-digit', second: '2-digit',
-  hour12: false,
-})
-
-function chileHMS(d: Date): { h: number; m: number; s: number } {
-  const parts = _santiagoPartsFmt.formatToParts(d)
-  const get = (type: string) => parseInt(parts.find(p => p.type === type)?.value ?? '0', 10)
-  let h = get('hour')
-  if (h === 24) h = 0  // normalizar
-  return { h, m: get('minute'), s: get('second') }
+  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
 }
 
 function fmtPct(x: number, decimals = 1): string {
@@ -179,21 +159,17 @@ function aggregateStatesByReason(states: UpstreamMachineState[]): ReasonAggregat
 // ============================================================================
 
 /**
- * Genera ticks horarios (en hora LOCAL Chile) entre start y end. Devuelve
- * Date en cada hora exacta del rango que tenga al menos 30 min hasta el borde.
- *
- * Asume que no hay transición DST dentro del rango — true para shifts ≤12h
- * en cualquier época excepto durante el cambio horario (~1× al año). Si ocurre,
- * los ticks post-transición quedarán desfasados 1 min hasta el siguiente.
+ * Genera ticks horarios entre start y end. Devuelve Date en cada hora exacta
+ * (wall-clock) del rango con al menos 30 min hasta el borde. Funciona en UTC
+ * porque los timestamps Shoplogix son wall-clock-as-UTC (ver `fmtHHmm`).
  */
 function generateHourTicks(start: Date, end: Date): Date[] {
   const ticks: Date[] = []
-  const { m: startMin, s: startSec } = chileHMS(start)
-  // ms hasta próxima hora local exacta (0 si ya está en :00:00)
-  const advanceMs = (startMin === 0 && startSec === 0)
-    ? 0
-    : (60 - startMin) * 60_000 - startSec * 1_000
-  for (let t = start.getTime() + advanceMs; t < end.getTime() - 30 * 60_000; t += 3_600_000) {
+  const firstTick = new Date(Date.UTC(
+    start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate(),
+    start.getUTCHours() + (start.getUTCMinutes() > 0 ? 1 : 0), 0, 0, 0,
+  ))
+  for (let t = firstTick.getTime(); t < end.getTime() - 30 * 60_000; t += 3_600_000) {
     ticks.push(new Date(t))
   }
   return ticks
