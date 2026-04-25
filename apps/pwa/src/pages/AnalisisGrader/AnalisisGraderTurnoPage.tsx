@@ -848,19 +848,20 @@ export function AnalisisGraderTurnoPage() {
             chartImageRef={chartImageRef}
           />
 
-          {/* Correlación automática Grader↔Baader (Fase 3 iter 2) */}
-          <UpstreamCorrelationCard
-            pauses={pauses}
-            snapshot={upstreamLine.snapshot}
-          />
-
           {/* Línea upstream — Evisceradoras Baader 142 (integración Shoplogix) */}
+          {/* Va INMEDIATAMENTE después del timeline Grader para máxima cercanía visual */}
           <UpstreamMachinesPanel
             snapshot={upstreamLine.snapshot}
             loading={upstreamLine.loading}
             error={upstreamLine.error}
             syncedAt={upstreamLine.syncedAt}
             shiftWindow={chartAxisWindow ?? shiftWindow}
+          />
+
+          {/* Correlación automática Grader↔Baader (Fase 3 iter 2) — debajo de los 3 gantts */}
+          <UpstreamCorrelationCard
+            pauses={pauses}
+            snapshot={upstreamLine.snapshot}
           />
 
           {/* Distribución por gate — balance del turno */}
