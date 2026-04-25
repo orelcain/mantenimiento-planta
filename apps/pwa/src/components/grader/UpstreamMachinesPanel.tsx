@@ -170,53 +170,6 @@ function aggregateStatesByReason(states: UpstreamMachineState[]): ReasonAggregat
 // ============================================================================
 
 /**
- * Genera ticks de eje horario entre start y end. Granularidad adaptativa al
- * rango total — necesario para que el panel muestre referencias visibles
- * cuando el chart Grader está zoomeado.
- *
- * Reglas (actualizadas para granularidad minuto-a-minuto en zoom corto):
- *   - rango ≤ 10 min: cada 1 min  → permite ver sincronía exacta con Grader
- *   - rango ≤ 20 min: cada 2 min
- *   - rango ≤ 40 min: cada 5 min
- *   - rango ≤ 2 h:    cada 10 min
- *   - rango ≤ 6 h:    cada 1 h
- *   - rango > 6 h:    cada 2 h
- *
- * Funciona en UTC porque los timestamps Shoplogix son wall-clock-as-UTC.
- */
-function generateHourTicks(start: Date, end: Date): Date[] {
-  const totalMin = (end.getTime() - start.getTime()) / 60_000
-  if (totalMin <= 0) return []
-
-  // Step en minutos (también define cómo se "rounded-up" el primer tick).
-  let stepMin: number
-  if      (totalMin <= 10)  stepMin = 1
-  else if (totalMin <= 20)  stepMin = 2
-  else if (totalMin <= 40)  stepMin = 5
-  else if (totalMin <= 120) stepMin = 10
-  else if (totalMin <= 360) stepMin = 60
-  else                       stepMin = 120
-
-  const stepMs = stepMin * 60_000
-
-  // Round-up del primer tick: lo alineamos al siguiente múltiplo de stepMin
-  // dentro de la hora actual (en wall-clock UTC).
-  const minutesUTC = start.getUTCMinutes()
-  const remainder = minutesUTC % stepMin
-  const minutesPad = remainder === 0 ? 0 : stepMin - remainder
-  const firstTickMs = start.getTime() + minutesPad * 60_000
-  // Margen al borde para evitar overlap con label "end". Para rangos cortos
-  // usamos margen proporcional al step (medio step).
-  const edgeMs = Math.max(2 * 60_000, stepMs / 2)
-
-  const ticks: Date[] = []
-  for (let t = firstTickMs; t < end.getTime() - edgeMs; t += stepMs) {
-    ticks.push(new Date(t))
-  }
-  return ticks
-}
-
-/**
  * Gantt con leyenda + ticks horarios. Si se provee `windowStart/End`, el Gantt
  * se renderiza en ese rango (permite alineación con timeline del Grader).
  */
@@ -233,7 +186,6 @@ function StateTimeline({
   const rangeEnd   = windowEnd   ?? shift.shiftEnd
   const totalMs = rangeEnd.getTime() - rangeStart.getTime()
   const reasons = useMemo(() => aggregateStatesByReason(shift.states), [shift.states])
-  const ticks = useMemo(() => generateHourTicks(rangeStart, rangeEnd), [rangeStart, rangeEnd])
 
   if (totalMs <= 0 || shift.states.length === 0) {
     return <div className="h-5 rounded-md bg-slate-800/60" />
@@ -249,25 +201,9 @@ function StateTimeline({
         <StateTimelineEC shift={shift} windowStart={windowStart} windowEnd={windowEnd} height={20} />
       </div>
 
-      {/* Eje horario debajo del gantt */}
-      {ticks.length > 0 && (
-        <div className="relative h-3 text-[10px] text-slate-400 tabular-nums">
-          <span className="absolute left-0">{fmtHHmm(rangeStart)}</span>
-          {ticks.map((t, i) => {
-            const leftPct = ((t.getTime() - rangeStart.getTime()) / totalMs) * 100
-            return (
-              <span
-                key={`label-${i}`}
-                className="absolute"
-                style={{ left: `${leftPct}%`, transform: 'translateX(-50%)' }}
-              >
-                {fmtHHmm(t)}
-              </span>
-            )
-          })}
-          <span className="absolute right-0">{fmtHHmm(rangeEnd)}</span>
-        </div>
-      )}
+      {/* El eje horario se muestra dentro de ProductionBarsEC (ECharts axisLabel)
+          que está inmediatamente debajo — adapta su granularidad al zoom
+          automáticamente (1 min cuando < 10 min, 5 min a 30 min, etc.). */}
 
       {/* Leyenda condensada — top 6 razones por duración */}
       {reasons.length > 0 && (
