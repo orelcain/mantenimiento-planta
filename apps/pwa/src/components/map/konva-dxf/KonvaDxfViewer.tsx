@@ -1,26 +1,28 @@
 /**
- * KonvaDxfViewer
- * Visor + editor de un MapaImportado (DXF parseado).
+ * KonvaDxfViewer v2 — renderer optimizado con sceneFunc
  *
- * Fase 1: visualización con pan/zoom ✅
- * Fase 2: edición — selección, borrar, mover, deshacer ← ACTUAL
+ * Fase 1: visualización (pan/zoom) ✅
+ * Fase 2: edición (select/delete/move/undo) ✅
+ * Fase 2.1: render sceneFunc — 1 Shape por capa en lugar de N Lines ✅
+ *   Antes: 80k+ Konva.Line → 80k nodos React, reconciliación por cada setState
+ *   Ahora: 1 Konva.Shape por capa con sceneFunc (pasada única de canvas)
+ *   Speedup esperado: 50-100×
  *
- * Modos (herramientas):
- *   - Pan     : arrastrar el mapa (default)
- *   - Select  : click sobre entidades para seleccionar, drag para mover
+ * Hit detection: Stage-level click/mousemove → distancia punto-segmento custom
+ *   (umbral HIT_PX en píxeles de pantalla, convertido a unidades DXF)
  *
  * Atajos:
- *   - S        → modo Select
- *   - H / V    → modo Pan
- *   - Delete   → borrar seleccionadas
- *   - Escape   → deseleccionar
- *   - Ctrl/⌘+Z → deshacer último cambio
- *   - Flechas  → mover selección (Shift = ×10, Ctrl = ÷10)
- *   - Shift+click → multi-selección
+ *   S / H / V        → cambiar herramienta
+ *   Click            → seleccionar polilínea más cercana
+ *   Shift+Click      → agregar/quitar de selección
+ *   Delete           → borrar seleccionadas
+ *   Ctrl/⌘+Z         → deshacer
+ *   Flechas          → mover (Shift ×10, Ctrl ÷10)
+ *   Escape           → deseleccionar + volver a Pan
  */
 
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
-import { Stage, Layer, Line } from 'react-konva'
+import { useEffect, useMemo, useRef, useState, useCallback, memo } from 'react'
+import { Stage, Layer, Shape } from 'react-konva'
 import type Konva from 'konva'
 import {
   Eye, EyeOff, Trash2, Upload, ChevronDown, Maximize2, Plus, Minus,
@@ -32,6 +34,8 @@ const BG = '#0a0e14'
 const SELECTED_STROKE = '#f59e0b'
 const HOVER_STROKE = '#fbbf24'
 const MAX_HISTORY = 20
+/** Umbral de selección en píxeles de pantalla. */
+const HIT_PX = 8
 
 type Tool = 'pan' | 'select'
 
@@ -50,7 +54,48 @@ function parseId(id: string): { capaName: string; idx: number } {
   return { capaName: id.slice(0, i), idx: parseInt(id.slice(i + 1), 10) }
 }
 
-/** Bbox robusto que descarta polilíneas outlier. Ver Fase 1 para detalle. */
+/** Distancia mínima de punto (px,py) al segmento (ax,ay)→(bx,by). */
+function distPointToSegment(
+  px: number, py: number,
+  ax: number, ay: number,
+  bx: number, by: number,
+): number {
+  const dx = bx - ax, dy = by - ay
+  const lenSq = dx * dx + dy * dy
+  if (lenSq === 0) return Math.hypot(px - ax, py - ay)
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq))
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy))
+}
+
+/**
+ * Busca la polilínea más cercana a (wx, wy) en unidades DXF.
+ * Recorre todas las capas visibles. Retorna el id "capa:idx" o null.
+ */
+function findNearestPolyId(
+  capas: CapaImportada[],
+  wx: number,
+  wy: number,
+  threshDxf: number,
+): string | null {
+  let bestId: string | null = null
+  let bestDist = threshDxf
+  for (const capa of capas) {
+    const polys = capa.polylines
+    for (let i = 0; i < polys.length; i++) {
+      const poly = polys[i]
+      if (!poly) continue
+      for (let j = 0; j + 1 < poly.length; j++) {
+        const a = poly[j], b = poly[j + 1]
+        if (!a || !b) continue
+        const d = distPointToSegment(wx, wy, a[0], a[1], b[0], b[1])
+        if (d < bestDist) { bestDist = d; bestId = polyId(capa.name, i) }
+      }
+    }
+  }
+  return bestId
+}
+
+/** Bbox robusto: descarta polilíneas outlier (paper space) via mediana + MAD. */
 function computeRobustBbox(mapa: MapaImportado): [number, number, number, number] {
   const centros: Array<{ cx: number; cy: number; poly: [number, number][] }> = []
   for (const capa of mapa.capas) {
@@ -92,6 +137,93 @@ function computeRobustBbox(mapa: MapaImportado): [number, number, number, number
   const padY = (maxY - minY) * 0.02
   return [minX - padX, minY - padY, maxX + padX, maxY + padY]
 }
+
+// ── CapaShapeLayer — 1 Shape por capa ────────────────────────────────────────
+//
+//  Renderiza TODAS las polilíneas de una capa en una sola pasada de canvas via
+//  sceneFunc. Esto elimina los 80k+ nodos Konva/React del renderer anterior.
+//
+//  Tres pases dentro de sceneFunc:
+//   1. Polilíneas normales (batch → 1 stroke() call por capa)
+//   2. Polilínea hover (amarillo claro, 2px)
+//   3. Polilíneas seleccionadas (ámbar, 2px)
+//
+//  lineWidth se calcula desde la transformación actual del canvas (getTransform)
+//  para ser siempre 1px en pantalla sin depender del prop scale — esto evita
+//  recrear sceneFunc en cada paso de zoom.
+
+interface CapaShapeProps {
+  capa: CapaImportada
+  selectedIds: Set<string>
+  hoveredId: string | null
+}
+
+const CapaShapeLayer = memo(function CapaShapeLayer({ capa, selectedIds, hoveredId }: CapaShapeProps) {
+  const sceneFunc = useCallback((ctx: Konva.Context, _shape: Konva.Shape) => {
+    // Acceso al contexto nativo (Konva.Context es un wrapper)
+    const c = (ctx as unknown as { _context: CanvasRenderingContext2D })._context
+
+    // Calcular 1px en unidades DXF desde la transformación actual del canvas.
+    // La transformación del Stage (scaleX/scaleY) ya está aplicada al contexto
+    // cuando se llama sceneFunc. getTransform().a = scaleX = scale actual.
+    const t = c.getTransform()
+    const screenScale = Math.abs(t.a)
+    const lw = screenScale > 0 ? 1 / screenScale : 1
+
+    c.lineCap = 'round'
+    c.lineJoin = 'round'
+
+    // ── Pase 1: todas las polilíneas normales en una sola llamada stroke() ──
+    c.beginPath()
+    c.strokeStyle = capa.color
+    c.lineWidth = lw
+    for (let i = 0; i < capa.polylines.length; i++) {
+      const id = polyId(capa.name, i)
+      if (selectedIds.has(id) || hoveredId === id) continue
+      const poly = capa.polylines[i]
+      if (!poly || poly.length < 2) continue
+      c.moveTo(poly[0]![0], poly[0]![1])
+      for (let j = 1; j < poly.length; j++) c.lineTo(poly[j]![0], poly[j]![1])
+    }
+    c.stroke()
+
+    // ── Pase 2: hover (una sola polilínea, amarillo) ──────────────────────
+    if (hoveredId !== null) {
+      const { capaName, idx } = parseId(hoveredId)
+      if (capaName === capa.name) {
+        const poly = capa.polylines[idx]
+        if (poly && poly.length >= 2) {
+          c.beginPath()
+          c.strokeStyle = HOVER_STROKE
+          c.lineWidth = 2 * lw
+          c.moveTo(poly[0]![0], poly[0]![1])
+          for (let j = 1; j < poly.length; j++) c.lineTo(poly[j]![0], poly[j]![1])
+          c.stroke()
+        }
+      }
+    }
+
+    // ── Pase 3: seleccionadas (ámbar) ─────────────────────────────────────
+    for (const id of selectedIds) {
+      const { capaName, idx } = parseId(id)
+      if (capaName !== capa.name) continue
+      const poly = capa.polylines[idx]
+      if (!poly || poly.length < 2) continue
+      c.beginPath()
+      c.strokeStyle = SELECTED_STROKE
+      c.lineWidth = 2 * lw
+      c.moveTo(poly[0]![0], poly[0]![1])
+      for (let j = 1; j < poly.length; j++) c.lineTo(poly[j]![0], poly[j]![1])
+      c.stroke()
+    }
+  }, [capa, selectedIds, hoveredId])
+
+  return (
+    <Layer listening={false}>
+      <Shape sceneFunc={sceneFunc} listening={false} perfectDrawEnabled={false} />
+    </Layer>
+  )
+})
 
 // ── Panel de capas ───────────────────────────────────────────────────────────
 
@@ -168,7 +300,7 @@ function PanelCapasKonva({ mapa }: { mapa: MapaImportado }) {
   )
 }
 
-// ── Vista principal ──────────────────────────────────────────────────────────
+// ── KonvaDxfViewer — componente principal ────────────────────────────────────
 
 interface Props {
   mapa: MapaImportado
@@ -181,11 +313,12 @@ export function KonvaDxfViewer({ mapa }: Props) {
   const [scale, setScale] = useState(1)
   const [pos, setPos]     = useState({ x: 0, y: 0 })
 
-  // Editor state
-  const [tool, setTool] = useState<Tool>('pan')
+  const [tool, setTool]           = useState<Tool>('pan')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const historyRef = useRef<CapaImportada[][]>([])
+  /** RAF handle para throttling del mousemove. */
+  const rafRef = useRef<number | null>(null)
 
   const setCapasMapa = useMapaLeafletStore((s) => s.setCapasMapaImportado)
 
@@ -202,7 +335,7 @@ export function KonvaDxfViewer({ mapa }: Props) {
 
   const capasVisibles = useMemo(
     () => mapa.capas.filter((c) => !c.eliminada && c.visible),
-    [mapa.capas]
+    [mapa.capas],
   )
 
   const robustBbox = useMemo(() => computeRobustBbox(mapa), [mapa])
@@ -213,20 +346,31 @@ export function KonvaDxfViewer({ mapa }: Props) {
     const [minX, minY, maxX, maxY] = robustBbox
     const w = maxX - minX || 1
     const h = maxY - minY || 1
-    const pad = 0.92
-    const s = Math.min((size.w * pad) / w, (size.h * pad) / h)
+    const s = Math.min((size.w * 0.92) / w, (size.h * 0.92) / h)
     const cx = (minX + maxX) / 2
     const cy = (minY + maxY) / 2
     setScale(s)
-    setPos({
-      x: size.w / 2 - cx * s,
-      y: size.h / 2 + cy * s,
-    })
+    setPos({ x: size.w / 2 - cx * s, y: size.h / 2 + cy * s })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapa.id, size.w, size.h])
 
-  // ── Historial (undo) ───────────────────────────────────────────────────────
+  // ── Limpiar hover al salir de select ──────────────────────────────────────
+  useEffect(() => {
+    if (tool !== 'select') {
+      setHoveredId(null)
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current)
+        rafRef.current = null
+      }
+    }
+  }, [tool])
 
+  // Cancelar RAF al desmontar
+  useEffect(() => () => {
+    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
+  }, [])
+
+  // ── Historial (undo) ───────────────────────────────────────────────────────
   const pushHistory = useCallback(() => {
     historyRef.current.push(mapa.capas)
     if (historyRef.current.length > MAX_HISTORY) historyRef.current.shift()
@@ -241,12 +385,9 @@ export function KonvaDxfViewer({ mapa }: Props) {
   }, [mapa.id, setCapasMapa])
 
   // ── Mutaciones ─────────────────────────────────────────────────────────────
-
-  /** Borra las polilíneas seleccionadas. Si una capa queda sin polilíneas, se conserva. */
   const deleteSelected = useCallback(() => {
     if (!selectedIds.size) return
     pushHistory()
-    // Agrupar IDs por capa
     const porCapa = new Map<string, Set<number>>()
     for (const id of selectedIds) {
       const { capaName, idx } = parseId(id)
@@ -263,7 +404,6 @@ export function KonvaDxfViewer({ mapa }: Props) {
     setSelectedIds(new Set())
   }, [selectedIds, mapa.capas, mapa.id, setCapasMapa, pushHistory])
 
-  /** Mueve las polilíneas seleccionadas por (dx, dy) en unidades del DXF. */
   const moveSelected = useCallback((dx: number, dy: number) => {
     if (!selectedIds.size) return
     pushHistory()
@@ -286,32 +426,15 @@ export function KonvaDxfViewer({ mapa }: Props) {
   }, [selectedIds, mapa.capas, mapa.id, setCapasMapa, pushHistory])
 
   // ── Atajos de teclado ──────────────────────────────────────────────────────
-
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      // No interferir con inputs
       const t = e.target as HTMLElement | null
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
-
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        e.preventDefault()
-        deleteSelected()
-        return
-      }
-      if (e.key === 'Escape') {
-        setSelectedIds(new Set())
-        setTool('pan')
-        return
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
-        e.preventDefault()
-        undo()
-        return
-      }
+      if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSelected(); return }
+      if (e.key === 'Escape') { setSelectedIds(new Set()); setTool('pan'); return }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); return }
       if (e.key === 's' || e.key === 'S') { setTool('select'); return }
       if (e.key === 'h' || e.key === 'H' || e.key === 'v' || e.key === 'V') { setTool('pan'); return }
-
-      // Flechas: mover selección
       if (selectedIds.size) {
         const base = e.shiftKey ? 10 : (e.ctrlKey || e.metaKey ? 0.1 : 1)
         let dx = 0, dy = 0
@@ -319,18 +442,69 @@ export function KonvaDxfViewer({ mapa }: Props) {
         else if (e.key === 'ArrowLeft') dx = -base
         else if (e.key === 'ArrowUp') dy = base
         else if (e.key === 'ArrowDown') dy = -base
-        if (dx || dy) {
-          e.preventDefault()
-          moveSelected(dx, dy)
-        }
+        if (dx || dy) { e.preventDefault(); moveSelected(dx, dy) }
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [deleteSelected, undo, moveSelected, selectedIds.size])
 
-  // ── Interacción con el Stage ───────────────────────────────────────────────
+  // ── Hit detection — Stage-level (todas las capas) ─────────────────────────
+  //
+  //  Dado que todas las Shapes tienen listening={false}, los clics "caen" al
+  //  Stage. Aquí convertimos la posición del puntero a coords DXF y buscamos
+  //  la polilínea más cercana con distancia punto-segmento.
 
+  const onStageClick = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
+    if (tool !== 'select') return
+    const stage = stageRef.current
+    if (!stage) return
+    const pointer = stage.getPointerPosition()
+    if (!pointer) return
+
+    // Convertir pantalla → DXF (compensar pos, scale y flipped Y)
+    const sx = stage.x(), sy = stage.y(), sc = stage.scaleX()
+    const wx = (pointer.x - sx) / sc
+    const wy = -(pointer.y - sy) / sc
+    const threshDxf = HIT_PX / sc
+
+    const found = findNearestPolyId(capasVisibles, wx, wy, threshDxf)
+    if (found !== null) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev)
+        if (e.evt.shiftKey) {
+          if (next.has(found)) next.delete(found)
+          else next.add(found)
+        } else {
+          if (next.size === 1 && next.has(found)) next.clear()
+          else { next.clear(); next.add(found) }
+        }
+        return next
+      })
+    } else {
+      setSelectedIds(new Set())
+    }
+  }, [tool, capasVisibles])
+
+  const onStageMouseMove = useCallback((_e: Konva.KonvaEventObject<MouseEvent>) => {
+    if (tool !== 'select') return
+    // Throttle a 1 búsqueda por frame (60fps)
+    if (rafRef.current !== null) return
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null
+      const stage = stageRef.current
+      if (!stage) return
+      const pointer = stage.getPointerPosition()
+      if (!pointer) return
+      const sx = stage.x(), sy = stage.y(), sc = stage.scaleX()
+      const wx = (pointer.x - sx) / sc
+      const wy = -(pointer.y - sy) / sc
+      const threshDxf = HIT_PX / sc
+      setHoveredId(findNearestPolyId(capasVisibles, wx, wy, threshDxf))
+    })
+  }, [tool, capasVisibles])
+
+  // ── Interacción zoom / pan ────────────────────────────────────────────────
   const onWheel = (e: Konva.KonvaEventObject<WheelEvent>) => {
     e.evt.preventDefault()
     const stage = stageRef.current
@@ -352,42 +526,13 @@ export function KonvaDxfViewer({ mapa }: Props) {
     }
   }
 
-  /** Click sobre el Stage vacío → limpia selección (si estamos en select). */
-  const onStageClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
-    if (tool !== 'select') return
-    if (e.target === stageRef.current) {
-      setSelectedIds(new Set())
-    }
-  }
-
-  /** Click sobre una polilínea → toggle en la selección. */
-  const onLineClick = (id: string, shift: boolean) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev)
-      if (shift) {
-        if (next.has(id)) next.delete(id)
-        else next.add(id)
-      } else {
-        if (next.size === 1 && next.has(id)) {
-          next.clear()
-        } else {
-          next.clear()
-          next.add(id)
-        }
-      }
-      return next
-    })
-  }
-
   // ── Controles de zoom ──────────────────────────────────────────────────────
-
   function fitToBbox() {
     if (!size.w || !size.h) return
     const [minX, minY, maxX, maxY] = robustBbox
     const w = maxX - minX || 1
     const h = maxY - minY || 1
-    const pad = 0.92
-    const s = Math.min((size.w * pad) / w, (size.h * pad) / h)
+    const s = Math.min((size.w * 0.92) / w, (size.h * 0.92) / h)
     const cx = (minX + maxX) / 2
     const cy = (minY + maxY) / 2
     setScale(s)
@@ -396,8 +541,7 @@ export function KonvaDxfViewer({ mapa }: Props) {
 
   function zoomBy(factor: number) {
     const newScale = clamp(scale * factor, 0.01, 5000)
-    const cx = size.w / 2
-    const cy = size.h / 2
+    const cx = size.w / 2, cy = size.h / 2
     const mx = (cx - pos.x) / scale
     const my = (cy - pos.y) / (-scale)
     setScale(newScale)
@@ -405,7 +549,6 @@ export function KonvaDxfViewer({ mapa }: Props) {
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
-
   const selectMode = tool === 'select'
   const cursor = selectMode ? 'default' : 'grab'
 
@@ -423,39 +566,16 @@ export function KonvaDxfViewer({ mapa }: Props) {
         onWheel={onWheel}
         onDragEnd={onStageDragEnd}
         onClick={onStageClick}
+        onMouseMove={onStageMouseMove}
+        onMouseLeave={() => setHoveredId(null)}
       >
         {capasVisibles.map((capa) => (
-          <Layer key={capa.name} listening={selectMode}>
-            {capa.polylines.map((poly, i) => {
-              const id = polyId(capa.name, i)
-              const isSel = selectedIds.has(id)
-              const isHover = hoveredId === id
-              const flat: number[] = []
-              for (const [x, y] of poly) { flat.push(x, y) }
-              const stroke = isSel ? SELECTED_STROKE : isHover ? HOVER_STROKE : capa.color
-              const strokeW = isSel ? 2 : 1
-              return (
-                <Line
-                  key={i}
-                  points={flat}
-                  stroke={stroke}
-                  strokeWidth={strokeW}
-                  strokeScaleEnabled={false}
-                  perfectDrawEnabled={false}
-                  listening={selectMode}
-                  hitStrokeWidth={6}  /* área de click un poco más ancha para precisión */
-                  lineCap="round"
-                  lineJoin="round"
-                  onClick={selectMode ? (e) => {
-                    e.cancelBubble = true
-                    onLineClick(id, e.evt.shiftKey)
-                  } : undefined}
-                  onMouseEnter={selectMode ? () => setHoveredId(id) : undefined}
-                  onMouseLeave={selectMode ? () => setHoveredId(null) : undefined}
-                />
-              )
-            })}
-          </Layer>
+          <CapaShapeLayer
+            key={capa.name}
+            capa={capa}
+            selectedIds={selectedIds}
+            hoveredId={hoveredId}
+          />
         ))}
       </Stage>
 
@@ -509,7 +629,7 @@ export function KonvaDxfViewer({ mapa }: Props) {
         </button>
       </div>
 
-      {/* Barra inferior con acciones sobre selección */}
+      {/* Barra inferior — acciones sobre selección */}
       {selectMode && (
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-gray-900/95 border border-gray-700 rounded-lg px-3 py-1.5 z-[500] shadow-xl">
           <span className="text-[10px] text-gray-400 font-mono">
