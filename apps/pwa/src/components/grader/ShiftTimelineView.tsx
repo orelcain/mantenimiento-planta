@@ -20,6 +20,7 @@ import type { GraderShiftDoc } from '@/services/grader/graderShifts.service'
 import type { ShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import type { GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
 import type { FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
+import type { UpstreamLineSnapshot } from '@/services/shoplogix/types'
 import { MATRIX_P0_CAUSES, parseMatrixErrorString } from '@/services/grader/graderMatrixP0Causes'
 import { classifyRecordToMatrix, CALIBRE_WEIGHT_RANGES } from '@/services/grader/graderAnalytics'
 import { PauseAnnotationDialog } from './PauseAnnotationDialog'
@@ -32,6 +33,7 @@ import {
   resolveAxisWindow,
   buildMarkLines,
   buildMarkAreas,
+  buildBaaderTimelineMarkers,
 } from './shiftTimelineHelpers'
 
 interface ShiftTimelineViewProps {
@@ -82,6 +84,14 @@ interface ShiftTimelineViewProps {
    * Útil para embeber el gráfico en el PDF de exportación (P2-1).
    */
   chartImageRef?: React.MutableRefObject<(() => string | null) | null>
+  /**
+   * Snapshot de la línea upstream (3 Evisceradoras Baader). Si está presente
+   * y tiene máquinas, el chart agrega un sub-grid debajo del eje X principal
+   * con una lane por máquina y bandas de paros (downtime/break/setup) alineadas
+   * temporalmente al chart Grader. Permite correlación visual instantánea
+   * entre P0% Grader y paros upstream.
+   */
+  upstreamSnapshot?: UpstreamLineSnapshot | null
 }
 
 /**
@@ -123,6 +133,7 @@ export function ShiftTimelineView({
   criticalThreshold = 3.5,
   isOnline = true,
   chartImageRef,
+  upstreamSnapshot,
 }: ShiftTimelineViewProps) {
   // ── Estado del diálogo de anotación (Fase 3) ──────────────────────────
   const canAnnotate = !!summaryId && !!adminUid
@@ -507,10 +518,54 @@ export function ShiftTimelineView({
       buildMarkLines(shiftDoc, shiftWindow, configSnapshots, buckets, alertThreshold, criticalThreshold)
     const deadTimeAreas = buildMarkAreas(pauses ?? [], productionWindow)
 
+    // Marcadores Baader (sub-grid debajo del axis principal). Solo si hay
+    // snapshot upstream con máquinas. Cada lane = una Evisceradora; bandas
+    // = paros (downtime/break/setup) alineados temporalmente al chart.
+    const baaderMarkers = buildBaaderTimelineMarkers(upstreamSnapshot ?? null, lineTimes, productionWindow)
+    const hasBaader = baaderMarkers.lanes.length > 0
+    const LANE_HEIGHT = 20
+    const subGridHeight = hasBaader ? baaderMarkers.lanes.length * LANE_HEIGHT + 8 : 0
+    // Reserva vertical para slider zoom (8 + 14) + sub-grid + gap
+    const mainGridBottom = hasBaader ? 30 + subGridHeight + 14 : 60
+    // Bottom del sub-grid: justo arriba del slider zoom (que vive en bottom: 8)
+    const subGridBottom = 30
+    const subYAxisData = baaderMarkers.lanes.map((l) => l.machineName).slice().reverse()
+    // markArea data — rectángulos por banda. Coords mixtas xAxis(category)/yAxis(category).
+    const baaderMarkAreas: Array<[object, object]> = baaderMarkers.bands.map((band) => [
+      {
+        name: band.name,
+        xAxis: band.tA,
+        yAxis: band.machineName,
+        itemStyle: {
+          color: band.fill,
+          borderColor: band.stroke,
+          borderWidth: 1,
+        },
+        // Etiqueta solo cuando la banda es suficientemente larga (>= 8 min)
+        // para evitar texto encimado en micro-paros.
+        label: band.durationMin >= 8
+          ? {
+              show: true,
+              formatter: `${band.reason} ${band.durationMin}m`,
+              color: '#f9fafb',
+              fontSize: 9,
+              position: 'inside' as const,
+              overflow: 'truncate' as const,
+            }
+          : { show: false },
+      },
+      { xAxis: band.tB, yAxis: band.machineName },
+    ])
+
     return {
       backgroundColor: 'transparent',
-      // Más margen bajo para el slider de zoom
-      grid: { left: 40, right: 16, top: 20, bottom: 60 },
+      // Más margen bajo para el slider de zoom + sub-grid Baader si aplica
+      grid: hasBaader
+        ? [
+            { left: 40, right: 16, top: 20, bottom: mainGridBottom },
+            { left: 40, right: 16, height: subGridHeight, bottom: subGridBottom },
+          ]
+        : { left: 40, right: 16, top: 20, bottom: 60 },
       toolbox: {
         right: 10,
         top: 0,
@@ -522,11 +577,14 @@ export function ShiftTimelineView({
         iconStyle: { borderColor: '#6b7280' },
         emphasis: { iconStyle: { borderColor: '#f9fafb' } },
       },
-      // Zoom: rueda para pan, slider visible, pinch-zoom en móvil
+      // Zoom: rueda para pan, slider visible, pinch-zoom en móvil. Cuando hay
+      // sub-grid Baader, el zoom se aplica a ambos xAxes para mantener
+      // alineación pixel-perfect entre chart Grader y sub-fila Baader.
       dataZoom: [
-        { type: 'inside', start: zoomState.start, end: zoomState.end, zoomOnMouseWheel: true, moveOnMouseMove: true, moveOnMouseWheel: false },
+        { type: 'inside', xAxisIndex: hasBaader ? [0, 1] : 0, start: zoomState.start, end: zoomState.end, zoomOnMouseWheel: true, moveOnMouseMove: true, moveOnMouseWheel: false },
         {
           type: 'slider',
+          xAxisIndex: hasBaader ? [0, 1] : 0,
           start: zoomState.start,
           end: zoomState.end,
           height: 14,           // antes 18 — más discreto
@@ -540,28 +598,53 @@ export function ShiftTimelineView({
           textStyle: { color: '#6b7280', fontSize: 10 },
         },
       ],
-      xAxis: {
-        type: 'category' as const,
-        // lineTimes: 1 label por minuto (axis expandido minuto a minuto).
-        data: lineTimes,
-        axisLine: { lineStyle: { color: '#374151' } },
-        // Adaptativo al zoom: dejamos que ECharts decida cuántos labels
-        // mostrar según el ancho visible post-zoom — `hideOverlap: true` hace
-        // que labels que se solapan se escondan. Al hacer zoom la densidad
-        // crece naturalmente (más espacio por label → más minutos visibles,
-        // llegando hasta minuto a minuto en zoom muy cercano).
-        //
-        // `interval: 'auto'` pide a ECharts que compute el stride óptimo
-        // según el pixel width disponible. Cualquier interval fijo rompe
-        // este comportamiento y deja rangos con 0-2 labels al zoom.
-        axisLabel: {
-          color: '#6b7280',
-          fontSize: 11,
-          hideOverlap: true,
-          interval: 'auto' as const,
-        },
-      },
-      yAxis: [
+      xAxis: hasBaader
+        ? [
+            {
+              type: 'category' as const,
+              data: lineTimes,
+              axisLine: { lineStyle: { color: '#374151' } },
+              axisLabel: {
+                color: '#6b7280',
+                fontSize: 11,
+                hideOverlap: true,
+                interval: 'auto' as const,
+              },
+            },
+            {
+              // Sub-grid Baader: mismo lineTimes (alineación pixel-perfect),
+              // sin labels (las horas ya las muestra el principal arriba).
+              type: 'category' as const,
+              data: lineTimes,
+              gridIndex: 1,
+              axisLine: { show: false },
+              axisTick: { show: false },
+              axisLabel: { show: false },
+              splitLine: { show: false },
+            },
+          ]
+        : {
+            type: 'category' as const,
+            // lineTimes: 1 label por minuto (axis expandido minuto a minuto).
+            data: lineTimes,
+            axisLine: { lineStyle: { color: '#374151' } },
+            // Adaptativo al zoom: dejamos que ECharts decida cuántos labels
+            // mostrar según el ancho visible post-zoom — `hideOverlap: true` hace
+            // que labels que se solapan se escondan. Al hacer zoom la densidad
+            // crece naturalmente (más espacio por label → más minutos visibles,
+            // llegando hasta minuto a minuto en zoom muy cercano).
+            //
+            // `interval: 'auto'` pide a ECharts que compute el stride óptimo
+            // según el pixel width disponible. Cualquier interval fijo rompe
+            // este comportamiento y deja rangos con 0-2 labels al zoom.
+            axisLabel: {
+              color: '#6b7280',
+              fontSize: 11,
+              hideOverlap: true,
+              interval: 'auto' as const,
+            },
+          },
+      yAxis: ([
         (() => {
           // Escala adaptativa tier-based para el P0% acumulado.
           //
@@ -617,7 +700,40 @@ export function ShiftTimelineView({
           min: 0,
           show: scatterAxisShow,
         },
-      ],
+      ] as object[]).concat(
+        hasBaader
+          ? [
+              {
+                // yAxis #4: lanes Baader (sub-grid). Category con un slot por
+                // máquina; markArea coords usan el machineName como yAxis.
+                // subYAxisData está reverso para que el orden visual coincida
+                // con snapshot.machines (primer item arriba en el sub-grid).
+                type: 'category' as const,
+                data: subYAxisData,
+                gridIndex: 1,
+                axisLine: { show: false },
+                axisTick: { show: false },
+                axisLabel: {
+                  color: '#cbd5e1',
+                  fontSize: 10,
+                  fontWeight: 600 as const,
+                  margin: 6,
+                  interval: 0 as const,
+                  formatter: (v: string) => {
+                    // Abreviar "Evisceradora N" → "E-N" para no comer ancho
+                    const m = /Evisceradora\s+(\d+)/i.exec(v)
+                    return m ? `E${m[1]}` : v
+                  },
+                },
+                splitLine: { show: false },
+                splitArea: {
+                  show: true,
+                  areaStyle: { color: ['rgba(255,255,255,0.02)', 'rgba(255,255,255,0.04)'] },
+                },
+              },
+            ]
+          : [],
+      ),
       tooltip: {
         trigger: 'axis' as const,
         backgroundColor: '#1f2937',
@@ -775,9 +891,32 @@ export function ShiftTimelineView({
             z: 5,
           }
         }),
+        // Sub-fila Baader — serie bar invisible en grid[1] que aloja el
+        // markArea con las bandas de paros. La serie en sí no dibuja nada
+        // (data vacía) pero ECharts requiere la serie para ubicar el markArea
+        // en el sub-grid via xAxisIndex/yAxisIndex.
+        ...(hasBaader
+          ? [
+              {
+                name: 'Paros Baader',
+                type: 'bar' as const,
+                xAxisIndex: 1,
+                yAxisIndex: 3,
+                data: [],
+                silent: false,
+                tooltip: { show: false },
+                markArea: {
+                  silent: false,
+                  data: baaderMarkAreas,
+                  emphasis: { itemStyle: { opacity: 0.85 } },
+                },
+                z: 1,
+              },
+            ]
+          : []),
       ],
     }
-  }, [timelineBuckets, shiftDoc, shiftWindow, configSnapshots, causesArr, piecesByCause, scatterAxisShow, gate0Pieces, pauses, productionWindow, bucketByLabel, summaryP0Pct, alertThreshold, criticalThreshold, zoomState])
+  }, [timelineBuckets, shiftDoc, shiftWindow, configSnapshots, causesArr, piecesByCause, scatterAxisShow, gate0Pieces, pauses, productionWindow, bucketByLabel, summaryP0Pct, alertThreshold, criticalThreshold, zoomState, upstreamSnapshot])
 
   // ── Cobertura del turno ────────────────────────────────────────────────
   // Mide cuánto del turno está "entendido" (operación + colación + micros
@@ -955,7 +1094,7 @@ export function ShiftTimelineView({
           <ReactECharts
             ref={echartsRef}
             option={chartOption}
-            style={{ height: scatterAxisShow ? 360 : 320 }}
+            style={{ height: (scatterAxisShow ? 360 : 320) + (upstreamSnapshot && upstreamSnapshot.machines.length > 0 ? upstreamSnapshot.machines.length * 20 + 8 : 0) }}
             theme="dark"
             opts={{ renderer: 'canvas' }}
             notMerge={true}

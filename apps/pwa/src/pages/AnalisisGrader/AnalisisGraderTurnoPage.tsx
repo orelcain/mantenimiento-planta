@@ -846,6 +846,7 @@ export function AnalisisGraderTurnoPage() {
             criticalThreshold={criticalThreshold}
             isOnline={isOnline}
             chartImageRef={chartImageRef}
+            upstreamSnapshot={upstreamLine.snapshot}
           />
 
           {/* Línea upstream — Evisceradoras Baader 142 (integración Shoplogix) */}

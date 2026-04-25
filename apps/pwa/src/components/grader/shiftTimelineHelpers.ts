@@ -11,6 +11,7 @@ import type { TimelineBucket, MatrixP0Cause, Pause } from '@/services/grader/typ
 import type { GraderShiftDoc } from '@/services/grader/graderShifts.service'
 import type { ShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import type { GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
+import type { UpstreamLineSnapshot, UpstreamMachineState } from '@/services/shoplogix/types'
 import { resolveEffectiveTag } from '@/services/grader/graderPauseTags'
 
 // ── Formato de hora ───────────────────────────────────────────────────────────
@@ -302,4 +303,130 @@ export function buildMarkAreas(
       { xAxis: tB },
     ]
   })
+}
+
+// ── Bandas Baader sobre el sub-grid del timeline Grader ────────────────────────
+
+export interface BaaderLane {
+  /** Nombre canónico de la máquina (key del yAxis category, ej: "Evisceradora 1") */
+  machineName: string
+}
+
+export interface BaaderMarkerBand {
+  /** name único para tooltip/click (ej: "E1__1700000000000") */
+  name: string
+  machineName: string
+  /** Etiqueta tA en HH:MM, alineada al lineTimes del axis principal */
+  tA: string
+  /** Etiqueta tB en HH:MM */
+  tB: string
+  /** Color de relleno de la banda (con transparencia) */
+  fill: string
+  /** Color del borde (más sólido) */
+  stroke: string
+  /** Tipo de estado: downtime/break/setup (uptime se omite — es el fondo) */
+  stateType: Exclude<UpstreamMachineState['type'], 'uptime'>
+  /** Texto de la razón Shoplogix ("COLACION", "Limpieza ducto", etc.) */
+  reason: string
+  /** Duración en minutos enteros para tooltip */
+  durationMin: number
+}
+
+export interface BaaderTimelineMarkers {
+  /** Lista ordenada de lanes (orden = orden visual de yAxis: machine[0] arriba) */
+  lanes: BaaderLane[]
+  /** Bandas a pintar como markArea — la lane se resuelve por machineName */
+  bands: BaaderMarkerBand[]
+}
+
+/**
+ * Construye los marcadores de paros Baader para pintar sobre el timeline del
+ * Grader (sub-grid debajo del chart principal).
+ *
+ * Filtra:
+ *   - Estados type === 'uptime' (es el "fondo" — solo importan los paros)
+ *   - Bandas fuera de productionWindow (se descartan completas si no solapan)
+ *
+ * Recorta tA/tB al rango del axis (lineTimes[0] / lineTimes[N-1]) para que
+ * markArea no intente pintar fuera del eje category.
+ */
+export function buildBaaderTimelineMarkers(
+  snapshot: UpstreamLineSnapshot | null | undefined,
+  lineTimes: string[],
+  productionWindow: ProductionWindow | null,
+): BaaderTimelineMarkers {
+  if (!snapshot || lineTimes.length === 0) {
+    return { lanes: [], bands: [] }
+  }
+  const axisStartLabel = lineTimes[0]!
+  const axisEndLabel = lineTimes[lineTimes.length - 1]!
+  // Construye Set para O(1) lookup de labels válidos en el axis
+  const validLabels = new Set(lineTimes)
+
+  const lanes: BaaderLane[] = snapshot.machines.map((m) => ({
+    machineName: m.machineName,
+  }))
+
+  const bands: BaaderMarkerBand[] = []
+  for (const machine of snapshot.machines) {
+    for (const state of machine.states) {
+      if (state.type === 'uptime') continue
+      const startMs = state.startAt.getTime()
+      const endMs = state.endAt.getTime()
+      // Filtrar fuera de la production window
+      if (productionWindow) {
+        if (endMs < productionWindow.startMs) continue
+        if (startMs > productionWindow.endMs) continue
+      }
+      // Recortar a la ventana del axis si la banda excede sus extremos
+      const tStartIso = state.startAt.toISOString()
+      const tEndIso = state.endAt.toISOString()
+      let tA = fmtTime(tStartIso)
+      let tB = fmtTime(tEndIso)
+      if (!validLabels.has(tA)) tA = axisStartLabel
+      if (!validLabels.has(tB)) tB = axisEndLabel
+      // Si tA === tB tras recorte (banda colapsada), skip
+      if (tA === tB) continue
+
+      // Color: usa el de Shoplogix como base, agrega transparencia para fill
+      const baseColor = state.color || '#94a3b8'
+      const fill = colorWithAlpha(baseColor, 0.55)
+      const stroke = colorWithAlpha(baseColor, 0.9)
+      const durationMin = Math.max(1, Math.round(state.durationSec / 60))
+
+      bands.push({
+        name: `${machine.machineid}__${startMs}`,
+        machineName: machine.machineName,
+        tA,
+        tB,
+        fill,
+        stroke,
+        stateType: state.type,
+        reason: state.reason || state.name || '—',
+        durationMin,
+      })
+    }
+  }
+
+  return { lanes, bands }
+}
+
+/** Convierte "#rrggbb" o "rgba(...)" a rgba con alpha custom (best-effort). */
+function colorWithAlpha(color: string, alpha: number): string {
+  const c = color.trim()
+  if (c.startsWith('#') && (c.length === 7 || c.length === 4)) {
+    let r = 0, g = 0, b = 0
+    if (c.length === 7) {
+      r = parseInt(c.slice(1, 3), 16)
+      g = parseInt(c.slice(3, 5), 16)
+      b = parseInt(c.slice(5, 7), 16)
+    } else {
+      r = parseInt(c[1]! + c[1]!, 16)
+      g = parseInt(c[2]! + c[2]!, 16)
+      b = parseInt(c[3]! + c[3]!, 16)
+    }
+    return `rgba(${r},${g},${b},${alpha})`
+  }
+  // rgba(...) o rgb(...) — devuelve tal cual; el caller absorbe el alpha del original
+  return c
 }
