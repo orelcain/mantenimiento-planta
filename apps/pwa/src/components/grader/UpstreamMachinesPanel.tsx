@@ -589,13 +589,13 @@ export function UpstreamMachinesPanel({
   return (
     <Card className="border-slate-800 bg-slate-950/50">
       <CardContent className="py-3 px-4">
-        {/* Header del panel */}
-        <button
-          onClick={() => setCollapsed(c => !c)}
-          className="w-full flex items-center justify-between gap-2 group"
-          aria-expanded={!collapsed}
-        >
-          <div className="flex items-center gap-2">
+        {/* Header del panel — colapsable + KPIs línea-completa siempre visibles */}
+        <div className="w-full flex items-center justify-between gap-3 flex-wrap">
+          <button
+            onClick={() => setCollapsed(c => !c)}
+            className="flex items-center gap-2 group shrink-0"
+            aria-expanded={!collapsed}
+          >
             {collapsed
               ? <ChevronRight className="w-4 h-4 text-slate-400" />
               : <ChevronDown  className="w-4 h-4 text-slate-400" />}
@@ -606,8 +606,10 @@ export function UpstreamMachinesPanel({
                 {snapshot.machines.length} máquinas
               </Badge>
             )}
-          </div>
-          <div className="flex items-center gap-2 text-xs text-slate-500">
+          </button>
+          <div className="flex items-center gap-3 text-xs text-slate-500 ml-auto flex-wrap justify-end">
+            {/* KPIs totales línea completa — siempre visibles, también en collapsed */}
+            {lineKpis && <ProductionKpiRow kpis={lineKpis} />}
             {loading && <span>Cargando…</span>}
             {error && <span className="text-rose-400 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Error</span>}
             {isStale && <span className="text-amber-400">Desactualizado</span>}
@@ -618,7 +620,7 @@ export function UpstreamMachinesPanel({
               </span>
             )}
           </div>
-        </button>
+        </div>
 
         {/* Body */}
         {!collapsed && (
@@ -646,28 +648,20 @@ export function UpstreamMachinesPanel({
               </div>
             )}
 
-            {snapshot && snapshot.machines.length > 0 && lineKpis && (
-              <>
-                {/* Línea-wide KPI row (suma de las 3) */}
-                <div className="mb-3 pb-3 border-b border-slate-800/60">
-                  <div className="text-[11px] text-slate-500 mb-1.5">Totales línea completa</div>
-                  <ProductionKpiRow kpis={lineKpis} />
-                </div>
-
-                <div className="divide-y divide-slate-800/60">
-                  {snapshot.machines.map(m => (
-                    <MachineRow
-                      key={m.machineid}
-                      shift={m}
-                      expanded={expandedMachines.has(m.machineid)}
-                      onToggle={() => toggleMachine(m.machineid)}
-                      windowStart={windowStart}
-                      windowEnd={windowEnd}
-                      microAlert={microAlertSet.has(m.machineid)}
-                    />
-                  ))}
-                </div>
-              </>
+            {snapshot && snapshot.machines.length > 0 && (
+              <div className="divide-y divide-slate-800/60">
+                {snapshot.machines.map(m => (
+                  <MachineRow
+                    key={m.machineid}
+                    shift={m}
+                    expanded={expandedMachines.has(m.machineid)}
+                    onToggle={() => toggleMachine(m.machineid)}
+                    windowStart={windowStart}
+                    windowEnd={windowEnd}
+                    microAlert={microAlertSet.has(m.machineid)}
+                  />
+                ))}
+              </div>
             )}
 
             {snapshot && syncedAt && (
