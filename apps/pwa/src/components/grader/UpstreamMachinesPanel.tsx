@@ -28,6 +28,7 @@ import type {
 } from '@/services/shoplogix/types'
 import { useTimelineSyncOptional } from './useTimelineSync'
 import { StateTimelineEC } from './StateTimelineEC'
+import { ProductionBarsEC } from './ProductionBarsEC'
 
 interface Props {
   snapshot: UpstreamLineSnapshot | null | undefined
@@ -273,91 +274,9 @@ function StateTimeline({
   )
 }
 
-/**
- * Bar chart de producción por intervalo con línea objetivo visible.
- * Cada barra se posiciona ABSOLUTAMENTE según su `startAt` dentro del rango
- * `windowStart..windowEnd` — así queda alineado pixel-perfect con el Gantt
- * de arriba (que usa el mismo rango). Sin esto, las barras se distribuyen
- * con `flex` y NO coinciden temporalmente con el Gantt cuando los intervals
- * no cubren todo el rango.
- */
-function ProductionBars({
-  intervals,
-  threshold,
-  windowStart,
-  windowEnd,
-}: {
-  intervals: UpstreamProductionInterval[]
-  threshold: number
-  windowStart?: Date
-  windowEnd?: Date
-}) {
-  if (intervals.length === 0) {
-    return <div className="h-16 rounded bg-slate-800/40" />
-  }
-  const maxValue = Math.max(1, ...intervals.map(x => Math.max(x.cycles, x.expectedCycles)))
-  const expected = intervals.find(x => x.expectedCycles > 0)?.expectedCycles ?? 0
-  const expectedPct = (expected / maxValue) * 100
-
-  const colorMap: Record<UpstreamProductionInterval['color'], string> = {
-    green:  'bg-emerald-500/90',
-    yellow: 'bg-amber-500/90',
-    red:    'bg-rose-500/90',
-    gray:   'bg-slate-700/60',
-  }
-
-  // Rango temporal — fallback al span de los intervals si no se pasa window
-  const firstIvl = intervals[0]!
-  const lastIvl  = intervals[intervals.length - 1]!
-  const rangeStart = windowStart ?? firstIvl.startAt
-  const rangeEnd   = windowEnd   ?? lastIvl.endAt
-  const totalMs = Math.max(1, rangeEnd.getTime() - rangeStart.getTime())
-
-  return (
-    <div className="relative h-16 bg-slate-950/60 rounded px-1.5 py-1 border border-slate-800">
-      {/* Línea objetivo — absolute dentro del contenedor relativo */}
-      <div
-        className="absolute left-1.5 right-1.5 border-t border-dashed border-violet-400/70 z-10 pointer-events-none"
-        style={{ bottom: `${4 + (expectedPct * (64 - 8)) / 100}px` }}
-      />
-
-      {/* Barras: posicionadas absolutamente por timestamp para alinear con Gantt */}
-      <div className="relative h-full">
-        {intervals.map((it, i) => {
-          // Recorta interval al window si lo excede
-          const segStart = Math.max(it.startAt.getTime(), rangeStart.getTime())
-          const segEnd   = Math.min(it.endAt.getTime(),   rangeEnd.getTime())
-          if (segEnd <= segStart) return null
-          const leftPct = ((segStart - rangeStart.getTime()) / totalMs) * 100
-          const widthPct = ((segEnd - segStart) / totalMs) * 100
-          const heightPct = (it.cycles / maxValue) * 100
-          return (
-            <div
-              key={i}
-              className="absolute bottom-0 group"
-              style={{
-                left: `${leftPct}%`,
-                width: `calc(${widthPct}% - 1px)`,
-                height: '100%',
-              }}
-              title={`${fmtHHmm(it.startAt)}: ${it.cycles}/${Math.round(it.expectedCycles)} pz (${fmtPct(it.ratio)})`}
-            >
-              <div
-                className={`${colorMap[it.color]} rounded-sm transition-all absolute bottom-0 left-0 right-0`}
-                style={{ height: `${Math.max(4, heightPct)}%` }}
-              />
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Etiqueta "Objetivo" */}
-      <div className="absolute right-2 top-1 text-[9px] text-violet-400/80 bg-slate-900/90 px-1.5 rounded z-20">
-        Objetivo {Math.round(expected)} ± {threshold}%
-      </div>
-    </div>
-  )
-}
+// Nota: ProductionBars (HTML divs absolute) fue reemplazado por
+// ProductionBarsEC (Fase 3 del Synchronized Timeline). Ver
+// `./ProductionBarsEC.tsx`.
 
 /** KPI row tipo Shoplogix: total / verde / amarillo / rojo. */
 function ProductionKpiRow({ kpis }: { kpis: MachineKpis }) {
@@ -446,8 +365,10 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
         {/* Gantt con leyenda */}
         <StateTimeline shift={shift} windowStart={windowStart} windowEnd={windowEnd} />
 
-        {/* Production bars + objetivo — alineadas al MISMO rango que el Gantt */}
-        <ProductionBars
+        {/* Production bars + objetivo — versión ECharts (Fase 3 del
+            Synchronized Timeline). Sincroniza zoom + axisPointer cross-chart
+            con Grader y Gantts via echarts.connect. */}
+        <ProductionBarsEC
           intervals={shift.intervals}
           threshold={shift.threshold}
           windowStart={windowStart ?? shift.shiftStart}
