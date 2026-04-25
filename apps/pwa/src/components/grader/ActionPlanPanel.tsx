@@ -14,6 +14,7 @@ import type { MatrixP0Cause } from '@/services/grader/types'
 import type { ShiftStatus } from '@/services/grader/graderShiftStatus'
 import type { Runbook } from '@/services/grader/graderRunbooks'
 import { RunbookCard } from '@/components/grader/RunbookCard'
+import type { MachineImpact } from '@/services/shoplogix/shoplogixCorrelation'
 
 // ============================================================================
 // TIPOS
@@ -36,12 +37,42 @@ interface ActionPlanPanelProps {
 }
 
 // ============================================================================
-// SUGERENCIAS BASADAS EN CAUSA DOMINANTE
+// SUGERENCIAS BASADAS EN CAUSA DOMINANTE + CONTEXTO UPSTREAM
 // ============================================================================
+
+/**
+ * Contexto extra para enriquecer las sugerencias con señales que YA detectó
+ * el sistema (correlación upstream, pendiente del scatter Baader↔P0%).
+ */
+export interface SuggestionContext {
+  /** Top máquina(s) con mayor overlap en paros del Grader (de byMachine summary). */
+  upstreamByMachine?: MachineImpact[]
+  /** Tiempo total (seg) de paro del Grader correlacionado upstream causal. */
+  upstreamCausedDurSec?: number
+  /**
+   * Pendiente del scatter ritmo Baader vs P0% Grader, ya convertido a magnitud
+   * operacional ("+N pts P0% por -10 ciclos/5min"). Solo cuando hay datos
+   * suficientes y la dirección es 'neg' (más Baader → menos P0%).
+   */
+  scatterSlope?: {
+    deltaP0_per_minus10cycles: number
+    direction: 'neg' | 'pos' | 'flat'
+  } | null
+}
+
+/** Helper local para formatear duraciones de manera amigable. */
+function fmtDur(sec: number): string {
+  const m = Math.round(sec / 60)
+  if (m < 60) return `${m} min`
+  const h = Math.floor(m / 60)
+  const rm = m % 60
+  return rm > 0 ? `${h} h ${rm} min` : `${h} h`
+}
 
 export function deriveSuggestions(
   p0Pct: number,
   dominantCause: MatrixP0Cause | null,
+  context: SuggestionContext = {},
 ): SuggestedAction[] {
   const actions: SuggestedAction[] = []
 
@@ -137,6 +168,38 @@ export function deriveSuggestions(
       title: 'Monitorear evolución en próximos 30 min',
       description: `P0 en ${p0Pct.toFixed(1)}% (zona warning). Verificar si la tendencia es ascendente antes de intervenir.`,
       severity: 'recommended',
+    })
+  }
+
+  // ── Contexto upstream: derivar acciones de las señales Shoplogix ──────────
+  //
+  // El sistema YA sabe qué Evisceradoras causaron paros del Grader (vía
+  // `summarizeCorrelations.byMachine`) y la magnitud de la correlación
+  // ritmo Baader→P0% (vía `scatterSlopeMagnitude`). Convertimos eso en
+  // acciones concretas — la información existía, solo no estaba conectada.
+
+  // 1) Máquina top con overlap significativo (>= 5 min causados) → atender
+  const topMachine = context.upstreamByMachine?.[0]
+  if (topMachine && topMachine.totalOverlapSec >= 300) {
+    const totalUpstream = context.upstreamCausedDurSec ?? 0
+    const sharePct = totalUpstream > 0 ? (topMachine.totalOverlapSec / totalUpstream) * 100 : 0
+    actions.push({
+      id: `upstream-attend-${topMachine.machineid}`,
+      category: 'terreno',
+      title: `Atender ${topMachine.machineName} (mantención prioritaria)`,
+      description: `Esta máquina causó ${fmtDur(topMachine.totalOverlapSec)} de paro del Grader en ${topMachine.pauseCount} evento${topMachine.pauseCount !== 1 ? 's' : ''} (${sharePct.toFixed(0)}% del tiempo muerto upstream del turno). Priorizar mantención reduce tiempo muerto sin tener que cambiar configuración del Grader.`,
+      severity: topMachine.totalOverlapSec >= 1800 ? 'critical' : 'warning',
+    })
+  }
+
+  // 2) Pendiente negativa significativa del scatter → investigar ritmo upstream
+  if (context.scatterSlope?.direction === 'neg' && context.scatterSlope.deltaP0_per_minus10cycles >= 0.3) {
+    actions.push({
+      id: 'scatter-baader-rate',
+      category: 'oficina',
+      title: 'Investigar caídas de ritmo en Evisceradoras',
+      description: `Detectada correlación operacional: cada -10 ciclos/5min de las Baaders → +${context.scatterSlope.deltaP0_per_minus10cycles.toFixed(2)} puntos P0% del Grader. Indica que la calidad del corte en evisceración impacta la clasificación. Verificar materia prima, dotación de operadores y mantenciones programadas en esa línea.`,
+      severity: 'warning',
     })
   }
 

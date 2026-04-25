@@ -40,6 +40,8 @@ import { useOnlineStatus } from '@/hooks/useOnlineStatus'
 import { usePauseTags } from '@/hooks/usePauseTags'
 import { useToast } from '@/hooks/useToast'
 import { ActionPlanPanel, deriveSuggestions } from '@/components/grader/ActionPlanPanel'
+import { correlatePausesWithUpstream, summarizeCorrelations } from '@/services/shoplogix/shoplogixCorrelation'
+import { buildScatterData, scatterSlopeMagnitude } from '@/components/grader/shiftTimelineHelpers'
 import { UpstreamMachinesPanel } from '@/components/grader/UpstreamMachinesPanel'
 import { UpstreamCorrelationCard } from '@/components/grader/UpstreamCorrelationCard'
 import { UpstreamScatterCard } from '@/components/grader/UpstreamScatterCard'
@@ -585,9 +587,28 @@ export function AnalisisGraderTurnoPage() {
 
   const dominant = useMemo(() => dominantCause(byMatrixCause), [byMatrixCause])
 
+  // Contexto upstream para enriquecer las sugerencias del plan de acción.
+  // Calculamos `byMachine` + `upstreamCausedDurSec` desde el correlation summary,
+  // y la magnitud de la pendiente desde el scatter Baader↔P0%.
+  // Si no hay snapshot de Shoplogix, este memo retorna {} (no rompe nada).
+  const suggestionContext = useMemo(() => {
+    const ctx: Parameters<typeof deriveSuggestions>[2] = {}
+    if (upstreamLine.snapshot) {
+      const correlations = correlatePausesWithUpstream(pauses, upstreamLine.snapshot)
+      const corrSummary  = summarizeCorrelations(correlations)
+      ctx.upstreamByMachine    = corrSummary.byMachine
+      ctx.upstreamCausedDurSec = corrSummary.upstreamCausedDurSec
+
+      const scatterSeries = buildScatterData(upstreamLine.snapshot, enrichedTimelineBuckets)
+      const slope = scatterSlopeMagnitude(scatterSeries)
+      if (slope) ctx.scatterSlope = slope
+    }
+    return ctx
+  }, [upstreamLine.snapshot, pauses, enrichedTimelineBuckets])
+
   const suggestions = useMemo(
-    () => deriveSuggestions(summary?.pointZeroPct ?? 0, dominant),
-    [summary, dominant],
+    () => deriveSuggestions(summary?.pointZeroPct ?? 0, dominant, suggestionContext),
+    [summary, dominant, suggestionContext],
   )
 
   const triggeredRunbooks = useMemo(
