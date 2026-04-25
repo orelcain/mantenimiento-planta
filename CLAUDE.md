@@ -773,36 +773,53 @@ Con Haversine A→D = dimensión real del recinto en metros. El DWG ya tiene cot
 
 ## Pendientes priorizados
 
-### PENDIENTE — Shoplogix Integration (sesiones 2026-04-24) — Fase 3 iter 3+4
+### PENDIENTE — Shoplogix Integration (sesión 2026-04-24 tarde) — Fase 3 iter 3+4
 
-**Módulo:** integración Shoplogix con módulo Análisis de Turno (ex-"Análisis Grader") — data real de 3 Baader 142 upstream (Evisceradoras 1/2/3, Planta Chonchi)
+**Módulo:** integración Shoplogix con módulo **Análisis de Turno** (ex-"Análisis Grader") — data real de 3 Baader 142 upstream (Evisceradoras 1/2/3, Planta Chonchi)
 
-**Estado al cierre (sesión tarde 2026-04-24):**
-- ✅ Fase 1 POC + Fase 2a UI completa + Fase 2b Cloud Functions desplegadas (mañana)
-- ✅ Data real en Firestore: 4 turnos sincronizados (Feb 25 día/noche, Feb 26 día, Feb 27 día)
-- ✅ Fase 3 iter 1: ticks horarios + shiftWindow align + alerta microparadas anómalas
-- ✅ Fase 3 iter 2: correlación automática Grader↔Baader con hipótesis humana + 13 tests
-- ✅ Docs: SHOPLOGIX_API.md, SHOPLOGIX_INTEGRATION_PLAN.md, SHOPLOGIX_DEPLOY.md, SHOPLOGIX_IDEAS.md (20+ mejoras)
-- ✅ **Rename módulo a "Análisis de Turno"** (sidebar/breadcrumbs/headers, URLs intactas) — refleja que cubre Grader + Baaders + futuro Marel HG/Knuro
-- ✅ **Alineación pixel-perfect Grader↔Baaders** (Opción A quick-win) — `PLOT_LEFT_PAD_PX=48` / `PLOT_RIGHT_PAD_PX=24` en `UpstreamMachinesPanel.tsx` compensan grid ECharts (40/16) + diff padding Card. Verificado en data real Feb 26: plot ECharts 98–1101 vs Gantt 99–1100, **±1px**
-- ✅ Home: clarificar split global/per-turno (QuickAccess "Configuración global" + DialogDescription)
-- Rama: `feat/analisis-turno-rename-and-align` ([PR #44](https://github.com/orelcain/mantenimiento-planta/pull/44))
+**Estado al cierre (10 PRs mergeados a producción, v2.93.0):**
 
-**P0 próxima sesión:**
-- 🔲 **Marcadores Baader sobre timeline Grader** — franja coloreada en sub-fila del chart Grader cuando una Baader está parada (correlación cross-equipo en una sola pasada visual)
-- 🔲 **Mejoras visuales Baader Gantt** (altura uniforme, separación, colores brand-consistent, hover con más info)
+*Backend (mañana):*
+- ✅ Fase 1 POC + Fase 2a UI + Fase 2b Cloud Functions desplegadas
+- ✅ Data real Firestore: 4 turnos sincronizados (Feb 25 día/noche, Feb 26 día, Feb 27 día)
+- ✅ Fase 3 iter 1: ticks horarios + shiftWindow align + alerta microparadas
+- ✅ Fase 3 iter 2: correlación automática Grader↔Baader + 13 tests
+- ✅ Docs: SHOPLOGIX_API/INTEGRATION_PLAN/DEPLOY/IDEAS.md
+
+*Sesión tarde — UI/data refinement (PRs #44–#53):*
+- ✅ **Rename "Análisis de Turno"** (sidebar/breadcrumbs/headers, URLs intactas)
+- ✅ **Alineación pixel-perfect** (anchos): `PLOT_LEFT_PAD_PX=48` / `PLOT_RIGHT_PAD_PX=24`
+- ✅ **Alineación TEMPORAL real** (PR #51): `chartAxisWindow` en TurnoPage replica `resolveAxisWindow(buckets_filtrados, ...)` y se pasa a UpstreamMachinesPanel — ambos ejes con MISMO rango horario
+- ✅ **Production bars por timestamp** (PR #52): posicionamiento absoluto `left = (startAt-windowStart)/totalMs × 100%`, no más `flex` con barras uniformes
+- ✅ **shiftRuntime real** robusto (uptime/totalTrackedSec, no del shiftEnd-shiftStart opaco) — antes 11.2% Shoplogix, ahora **46.3%** real
+- ✅ **TZ display correcto**: Shoplogix guarda wall-clock local Chile as-if-UTC. Mantener `getUTCHours()`. PR #46 había sido erroneo y se revirtió en PR #50
+- ✅ **Shift bounds explícitos**: Cloud Function pasa `shiftStartAt/EndAt` desde `shiftWindow` (no del `currentShiftStart` opaco que apuntaba al turno EN CURSO al momento del sync)
+- ✅ **Fix-on-read intervals legacy**: deserializer detecta intervals dateados en día distinto a states[0] y re-ancla preservando `intervalMs`. Sin re-sync necesario.
+- ✅ **Layout compacto** (PR #53): Grader → Baader (adyacentes), Correlación movida abajo. Totales línea completa al header del panel.
+
+**Hallazgos técnicos importantes:**
+- **Shoplogix guarda timestamps wall-clock LOCAL Chile pero formateados as-if UTC** (`20260226T132711` = 13:27 hora Chile, no UTC). El parser los marca con `Z` → `getUTCHours()` extrae el wall-clock real. NO convertir a TZ.
+- **`summary.currentShiftStart/End` es OPACO**: devuelve los bordes del turno EN CURSO al momento del sync, no del turno consultado. Pasar `shiftStartAt/EndAt` explícitos siempre.
+- **`actualRuntime` de Shoplogix es OPACO**: usa denominador desconocido (devolvía 11.2% cuando real era 46%). Computar `shiftRuntime = uptime / totalTrackedSec` por nuestra cuenta.
+
+**P0 próxima sesión — Marcadores Baader sobre timeline Grader:**
+- 🔲 Pintar `markArea` en sub-fila DENTRO del chart ECharts del Grader cuando una Baader está parada — correlación cross-equipo en una sola pasada visual sin tener que mirar abajo. Ahora que Gantt/bars/Grader comparten el MISMO eje X temporal, este es el siguiente nivel: ~3-4h
+- 🔲 Hover con detail panel rico (vs tooltip nativo) en Gantt segments — drill-down click
+
+**Quick wins (próxima sesión corta):**
+- 🔲 Re-sync turnos Feb 25-27 vía Cloud Function ahora que el fix de bounds está deployado (cookie required — verificar antes)
+- 🔲 Investigar `Planned Downtime 4h 15min` semantic — qué registra Shoplogix exactamente bajo ese tag (~30min con fixture)
 
 **P1 Shoplogix:**
-- 🔲 Fase 3 iter 3: scatter P0% Grader vs ritmo Baader
-- 🔲 Fase 3 iter 4: export PDF con sección upstream
-- 🔲 Fase 2b.1: login automatizado Shoplogix (hoy cookie manual dura ~8h)
-- 🔲 Fase 4: integrar Marel HG, Knuro, plantas hermanas
-- 🔲 **Refactor estructural home** — RANGOS calibre + 12 GATES por turno (hoy son globales). Implica refactor storage Firestore + UI per-turno. Diferido por scope.
+- 🔲 Fase 3 iter 3: scatter P0% Grader vs ritmo Baader (~3h)
+- 🔲 Fase 3 iter 4: export PDF con sección upstream (~4h)
+- 🔲 Fase 2b.1: login automatizado Shoplogix (cookie manual ~8h) (~1d)
+- 🔲 Fase 4: integrar Marel HG, Knuro, plantas hermanas (bloqueado API externa)
+- 🔲 Refactor estructural home — RANGOS calibre + 12 GATES por turno (1-2 días, requiere refactor storage Firestore)
 
-**Deuda técnica conocida:**
-- TZ display: ticks muestran UTC ("10:00") pero operador chileno espera local ("07:00")
-- `actualRuntime 11.2%` Feb 26 — investigar qué registra Shoplogix como "Planned Downtime"
+**Deuda técnica residual:**
 - Warnings preexistentes setState-in-render en `AnalisisGraderGatesConfigPage` (Wizard) — no críticos, no relacionados a este trabajo
+- Re-sync explícito de turnos Feb 25-27 (fix-on-read los corrige al leer pero limpiar persistencia es bueno)
 
 ---
 
