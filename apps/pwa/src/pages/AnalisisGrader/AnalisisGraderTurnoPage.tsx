@@ -874,6 +874,7 @@ export function AnalisisGraderTurnoPage() {
             error={upstreamLine.error}
             syncedAt={upstreamLine.syncedAt}
             shiftWindow={baseAxisWindow}
+            pauses={pauses}
           />
 
           {/* Correlación automática Grader↔Baader (Fase 3 iter 2) — debajo de los 3 gantts */}

@@ -26,6 +26,8 @@ import type {
   UpstreamProductionInterval,
   UpstreamMachineState,
 } from '@/services/shoplogix/types'
+import type { Pause as GraderPause } from '@/services/grader/types'
+import { correlatePausesWithUpstream, summarizeCorrelations } from '@/services/shoplogix/shoplogixCorrelation'
 import { useTimelineSyncOptional } from './useTimelineSync'
 import { StateTimelineEC } from './StateTimelineEC'
 import { ProductionBarsEC } from './ProductionBarsEC'
@@ -45,6 +47,11 @@ interface Props {
     startAt: string  // ISO
     endAt: string
   } | null
+  /**
+   * Paros del Grader (≥5min) — usados para detectar paros coincidentes con
+   * paros upstream y mostrar badge "⚠ N coincidencias" en el header (F5b).
+   */
+  pauses?: GraderPause[]
 }
 
 // ============================================================================
@@ -312,16 +319,11 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
   /** Si es true, esta máquina tiene >50% más microparadas que el promedio de la línea. */
   microAlert?: boolean
 }) {
-  // F5a — Mini-KPIs zoom-aware: cuando hay un rango activo (windowStart/End
-  // distinto del shift completo), filtramos intervalos a ese rango y
-  // recalculamos KPIs. Permite ver "qué pasó EN ESTE TRAMO" en vez del turno
-  // completo siempre.
-  const isZoomActive = useMemo(() => {
-    if (!windowStart || !windowEnd) return false
-    const sameStart = windowStart.getTime() === shift.shiftStart.getTime()
-    const sameEnd = windowEnd.getTime() === shift.shiftEnd.getTime()
-    return !(sameStart && sameEnd)
-  }, [windowStart, windowEnd, shift.shiftStart, shift.shiftEnd])
+  // F5a — Mini-KPIs zoom-aware. Source of truth: context.range (idéntico al
+  // panel-global). Sin esto, el badge aparecería siempre que el rango de
+  // alineación con el Grader difiera del shift Baader (false positive).
+  const timelineSyncRow = useTimelineSyncOptional()
+  const isZoomActive = timelineSyncRow?.range != null
 
   const kpis = useMemo(() => {
     if (!isZoomActive || !windowStart || !windowEnd) {
@@ -481,6 +483,7 @@ export function UpstreamMachinesPanel({
   defaultCollapsed = false,
   syncedAt = null,
   shiftWindow = null,
+  pauses = [],
 }: Props) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed)
   const [expandedMachines, setExpandedMachines] = useState<Set<string>>(new Set())
@@ -514,14 +517,19 @@ export function UpstreamMachinesPanel({
     return [undefined, undefined]
   }, [timelineSync?.range, shiftWindow?.startAt, shiftWindow?.endAt])
 
-  // ¿Hay zoom activo? Si windowStart/End difieren de los bounds del primer
-  // shift, asumimos zoom (todos los shifts del mismo turno comparten bounds).
-  const isLineZoomActive = useMemo(() => {
-    if (!windowStart || !windowEnd || !snapshot || snapshot.machines.length === 0) return false
-    const ref = snapshot.machines[0]!
-    return windowStart.getTime() !== ref.shiftStart.getTime() ||
-           windowEnd.getTime() !== ref.shiftEnd.getTime()
-  }, [windowStart, windowEnd, snapshot])
+  // ¿Hay zoom activo? Source of truth: context.range. null = no zoom (vista
+  // completa del turno alineada al Grader). Cualquier valor = zoom activo.
+  const isLineZoomActive = timelineSync?.range != null
+
+  // F5b — Correlación paros Grader ↔ Baaders. Si un paro del Grader tiene
+  // 2+ Baaders paradas dentro de la ventana de tolerancia, lo marcamos como
+  // "coincidente". Banner en header alerta al supervisor del posible upstream
+  // root cause sin tener que ir al UpstreamCorrelationCard de abajo.
+  const correlationSummary = useMemo(() => {
+    if (!snapshot || pauses.length === 0) return null
+    const correlations = correlatePausesWithUpstream(pauses, snapshot)
+    return summarizeCorrelations(correlations)
+  }, [snapshot, pauses])
 
   // Agregado de toda la línea (para header). Zoom-aware F5a: filtra
   // intervals al rango visible cuando hay zoom activo.
@@ -602,6 +610,22 @@ export function UpstreamMachinesPanel({
                 title="KPIs recalculados sólo del rango temporal visible"
               >
                 <span>✂</span> del rango
+              </Badge>
+            )}
+            {/* F5b — Badge paros coincidentes: aparece cuando ≥1 paro del
+                Grader tiene causa upstream (≥2 Baaders paradas en ±2 min).
+                Llama atención al supervisor: posible root cause upstream. */}
+            {correlationSummary && correlationSummary.upstreamCaused > 0 && (
+              <Badge
+                variant="outline"
+                className="bg-orange-950/60 border-orange-800 text-orange-300 text-[10px] px-2 py-0.5 h-5 gap-1 cursor-help"
+                title={
+                  `${correlationSummary.upstreamCaused} de ${correlationSummary.total} paros del Grader coinciden con paros upstream (±2 min). ` +
+                  `Probable root cause en línea Baader. Ver detalle en card de correlación abajo.`
+                }
+              >
+                <AlertTriangle className="w-3 h-3" />
+                {correlationSummary.upstreamCaused} {correlationSummary.upstreamCaused === 1 ? 'paro' : 'paros'} coincidente{correlationSummary.upstreamCaused !== 1 ? 's' : ''}
               </Badge>
             )}
             {loading && <span>Cargando…</span>}
