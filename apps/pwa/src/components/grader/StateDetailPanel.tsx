@@ -1,0 +1,190 @@
+/**
+ * StateDetailPanel — panel de detalle rico al clickear un estado del Gantt Baader.
+ *
+ * Reemplaza el tooltip nativo (efímero, solo texto) con un panel persistente
+ * que muestra:
+ *   - Estado (nombre + razón categorizada)
+ *   - Hora inicio / fin (HH:MM:SS Chile)
+ *   - Duración formateada
+ *   - % del turno que ocupa este estado
+ *   - Posición en la secuencia ("estado #5 de 87")
+ *   - Conteo de estados similares + tiempo total acumulado de la misma razón
+ *
+ * Drill-down típico:
+ *   1. Operador ve un paro largo en el Gantt
+ *   2. Click → panel se expande con el contexto completo
+ *   3. Decide: ¿fue colación? ¿micro detención repetitiva?
+ *
+ * Diseño compacto (≤ 4 filas de altura) para no romper layout del MachineRow.
+ */
+
+import { Badge } from '@/components/ui'
+import { X, Clock, Activity, AlertCircle, Pause, Wrench } from 'lucide-react'
+import type { UpstreamMachineShift, UpstreamMachineState } from '@/services/shoplogix/types'
+
+// ── Helpers de formato ────────────────────────────────────────────────────────
+
+function fmtHHmmss(d: Date): string {
+  return [d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds()]
+    .map((n) => String(n).padStart(2, '0'))
+    .join(':')
+}
+
+function fmtDuration(sec: number): string {
+  if (sec < 60) return `${sec.toFixed(0)} s`
+  const m = Math.round(sec / 60)
+  if (m < 60) return `${m} min`
+  const h = Math.floor(m / 60)
+  const rm = m % 60
+  return rm > 0 ? `${h} h ${rm} min` : `${h} h`
+}
+
+function fmtPct(frac: number, decimals = 1): string {
+  return `${(frac * 100).toFixed(decimals)}%`
+}
+
+/** Icono según el tipo de estado. */
+function StateIcon({ type }: { type: UpstreamMachineState['type'] }) {
+  if (type === 'uptime') return <Activity className="w-4 h-4 text-emerald-400" />
+  if (type === 'downtime') return <AlertCircle className="w-4 h-4 text-rose-400" />
+  if (type === 'break') return <Pause className="w-4 h-4 text-cyan-400" />
+  return <Wrench className="w-4 h-4 text-amber-400" />
+}
+
+const TYPE_LABEL: Record<UpstreamMachineState['type'], string> = {
+  uptime:   'Producción',
+  downtime: 'Detención',
+  break:    'Pausa programada',
+  setup:    'Setup',
+}
+
+// ── Componente ────────────────────────────────────────────────────────────────
+
+interface Props {
+  /** El estado seleccionado en el Gantt. */
+  state: UpstreamMachineState
+  /** Shift completo — necesario para % del turno y comparación con estados similares. */
+  shift: UpstreamMachineShift
+  /** Cierra el panel. */
+  onClose: () => void
+}
+
+export function StateDetailPanel({ state, shift, onClose }: Props) {
+  const shiftDurationMs = shift.shiftEnd.getTime() - shift.shiftStart.getTime()
+  const shiftDurationSec = shiftDurationMs / 1000
+
+  // Posición del estado en la secuencia
+  const stateIndex = shift.states.findIndex((s) => s.startAt.getTime() === state.startAt.getTime() && s.name === state.name)
+
+  // Conteo + duración acumulada de estados similares (misma razón)
+  const similarStates = shift.states.filter((s) =>
+    s.name === state.name && (s.reason || '') === (state.reason || ''),
+  )
+  const similarTotalSec = similarStates.reduce((acc, s) => acc + s.durationSec, 0)
+
+  // % del turno
+  const pctOfShift = shiftDurationSec > 0 ? state.durationSec / shiftDurationSec : 0
+  const pctSimilarOfShift = shiftDurationSec > 0 ? similarTotalSec / shiftDurationSec : 0
+
+  const reasonLabel = state.reason && state.reason.trim().length > 0
+    ? state.reason
+    : <span className="text-slate-500 italic">sin categorizar</span>
+
+  return (
+    <div
+      className="rounded-md border border-slate-700/80 bg-slate-900/80 backdrop-blur-sm p-3 space-y-2"
+      role="region"
+      aria-label="Detalle de estado seleccionado"
+    >
+      {/* Header */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span
+            className="w-3 h-3 rounded-sm shrink-0 ring-1 ring-slate-900/50"
+            style={{ backgroundColor: state.color }}
+          />
+          <StateIcon type={state.type} />
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-semibold text-sm text-slate-100">{state.name}</span>
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-slate-700 text-slate-400">
+                {TYPE_LABEL[state.type] ?? state.type}
+              </Badge>
+              {state.isCurrent && (
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-emerald-900 bg-emerald-950/50 text-emerald-300">
+                  En curso
+                </Badge>
+              )}
+            </div>
+            <div className="text-xs text-slate-300 mt-0.5 truncate">{reasonLabel}</div>
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          className="text-slate-500 hover:text-slate-200 transition-colors shrink-0"
+          aria-label="Cerrar detalle"
+          data-testid="state-detail-close"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Datos en grid 2-col */}
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+        <DataRow
+          icon={<Clock className="w-3 h-3" />}
+          label="Inicio"
+          value={fmtHHmmss(state.startAt)}
+        />
+        <DataRow
+          icon={<Clock className="w-3 h-3" />}
+          label="Fin"
+          value={fmtHHmmss(state.endAt)}
+        />
+        <DataRow
+          label="Duración"
+          value={<span className="font-semibold text-slate-100 tabular-nums">{fmtDuration(state.durationSec)}</span>}
+        />
+        <DataRow
+          label="% del turno"
+          value={<span className="tabular-nums">{fmtPct(pctOfShift)}</span>}
+        />
+        {stateIndex >= 0 && (
+          <DataRow
+            label="Posición"
+            value={<span className="tabular-nums">#{stateIndex + 1} de {shift.states.length}</span>}
+          />
+        )}
+        {similarStates.length > 1 && (
+          <DataRow
+            label="Similares"
+            value={
+              <span className="tabular-nums" title={`Estados con misma categoría "${state.name}${state.reason ? ' / ' + state.reason : ''}" en el turno`}>
+                {similarStates.length} × {fmtDuration(similarTotalSec)}{' '}
+                <span className="text-slate-500">({fmtPct(pctSimilarOfShift)})</span>
+              </span>
+            }
+          />
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Sub-helpers ───────────────────────────────────────────────────────────────
+
+function DataRow({
+  icon, label, value,
+}: {
+  icon?: React.ReactNode
+  label: string
+  value: React.ReactNode
+}) {
+  return (
+    <div className="flex items-center gap-1.5">
+      {icon && <span className="text-slate-500">{icon}</span>}
+      <span className="text-slate-500 shrink-0">{label}:</span>
+      <span className="text-slate-200 truncate">{value}</span>
+    </div>
+  )
+}

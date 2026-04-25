@@ -28,6 +28,11 @@ interface Props {
   windowEnd?: Date
   /** Altura del Gantt en pixels (default 20 = h-5 del HTML viejo) */
   height?: number
+  /**
+   * Callback al clickear un segmento de estado. Se le pasa el state seleccionado.
+   * Si no se provee, click se ignora (sólo tooltip al hover).
+   */
+  onStateClick?: (state: UpstreamMachineShift['states'][number]) => void
 }
 
 /**
@@ -46,7 +51,7 @@ function fmtDuration(sec: number): string {
   return rm > 0 ? `${h} h ${rm} min` : `${h} h`
 }
 
-export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20 }: Props) {
+export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, onStateClick }: Props) {
   const echartsRef = useRef<any>(null)
   const myHoverId = useId()
   const timelineSync = useTimelineSyncOptional()
@@ -109,6 +114,16 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20 }: 
     }
   }, [timelineSync, myHoverId])
 
+  // Click sobre un segmento → invoca onStateClick con el state subyacente.
+  // ECharts emite `click` en eventos de la series con dataIndex, lo usamos
+  // para mapear de vuelta al UpstreamMachineState original.
+  const onClick = useCallback((params: any) => {
+    if (!onStateClick) return
+    const idx = typeof params?.dataIndex === 'number' ? params.dataIndex : -1
+    if (idx < 0 || idx >= shift.states.length) return
+    onStateClick(shift.states[idx])
+  }, [onStateClick, shift.states])
+
   // Listener: cuando OTRO chart originó hover, dispatchear axisPointer manual
   // sobre este chart para mostrar la línea vertical en el ms correspondiente.
   const externalHoverMs = timelineSync?.hover && timelineSync.hover.originId !== myHoverId
@@ -164,6 +179,8 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20 }: 
         label: { show: false },
       }))
   }, [timelineSync, rangeStart, rangeEnd])
+
+  const interactive = !!onStateClick
 
   const option = useMemo(() => ({
     backgroundColor: 'transparent',
@@ -234,6 +251,8 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20 }: 
             emphasis: {
               style: { opacity: 0.85 },
             },
+            // Cursor pointer cuando hay handler de click — pista visual de drill-down
+            cursor: interactive ? 'pointer' : 'default',
           }
         },
         encode: { x: [0, 1], y: -1 },
@@ -249,7 +268,7 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20 }: 
         } : undefined,
       },
     ],
-  }), [rangeStart, rangeEnd, seriesData, height, lotMarkLines])
+  }), [rangeStart, rangeEnd, seriesData, height, lotMarkLines, interactive])
 
   return (
     <div className="relative w-full" style={{ height: height + 4 }}>
@@ -265,6 +284,7 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20 }: 
           datazoom: onDataZoom,
           mousemove: onMouseMove,
           mouseout: onMouseOut,
+          click: onClick,
         }}
       />
     </div>

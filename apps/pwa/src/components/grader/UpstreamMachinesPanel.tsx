@@ -31,6 +31,7 @@ import { correlatePausesWithUpstream, summarizeCorrelations } from '@/services/s
 import { useTimelineSyncOptional } from './useTimelineSync'
 import { StateTimelineEC } from './StateTimelineEC'
 import { ProductionBarsEC } from './ProductionBarsEC'
+import { StateDetailPanel } from './StateDetailPanel'
 import { exportCombinedTimelinePng } from './exportCombinedTimelinePng'
 
 interface Props {
@@ -177,10 +178,12 @@ function StateTimeline({
   shift,
   windowStart,
   windowEnd,
+  onStateClick,
 }: {
   shift: UpstreamMachineShift
   windowStart?: Date
   windowEnd?: Date
+  onStateClick?: (state: UpstreamMachineState) => void
 }) {
   const rangeStart = windowStart ?? shift.shiftStart
   const rangeEnd   = windowEnd   ?? shift.shiftEnd
@@ -198,7 +201,13 @@ function StateTimeline({
           Synchronized Timeline). Mantiene el rendering visual del HTML viejo
           pero con interactividad nativa de ECharts. */}
       <div className="rounded-md overflow-hidden bg-slate-800/60 border border-slate-700/70 shadow-inner">
-        <StateTimelineEC shift={shift} windowStart={windowStart} windowEnd={windowEnd} height={20} />
+        <StateTimelineEC
+          shift={shift}
+          windowStart={windowStart}
+          windowEnd={windowEnd}
+          height={20}
+          onStateClick={onStateClick}
+        />
       </div>
 
       {/* El eje horario se muestra dentro de ProductionBarsEC (ECharts axisLabel)
@@ -259,6 +268,16 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
   /** Si es true, esta máquina tiene >50% más microparadas que el promedio de la línea. */
   microAlert?: boolean
 }) {
+  // Estado seleccionado al clickear un segmento del Gantt (drill-down rico).
+  // Click sobre el mismo state lo cierra (toggle).
+  const [selectedState, setSelectedState] = useState<UpstreamMachineState | null>(null)
+  const handleStateClick = (s: UpstreamMachineState) => {
+    setSelectedState((prev) =>
+      prev && prev.startAt.getTime() === s.startAt.getTime() && prev.name === s.name
+        ? null
+        : s,
+    )
+  }
   // F5a — Mini-KPIs zoom-aware. Source of truth: context.range (idéntico al
   // panel-global). Sin esto, el badge aparecería siempre que el rango de
   // alineación con el Grader difiera del shift Baader (false positive).
@@ -340,8 +359,24 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
 
       {/* Wrapper con padding para alinear pixel-perfect con plot area del ECharts del Grader */}
       <div style={{ paddingLeft: PLOT_LEFT_PAD_PX, paddingRight: PLOT_RIGHT_PAD_PX }} className="space-y-2">
-        {/* Gantt con leyenda */}
-        <StateTimeline shift={shift} windowStart={windowStart} windowEnd={windowEnd} />
+        {/* Gantt con leyenda — segmentos clickeables abren panel de detalle */}
+        <StateTimeline
+          shift={shift}
+          windowStart={windowStart}
+          windowEnd={windowEnd}
+          onStateClick={handleStateClick}
+        />
+
+        {/* Panel de detalle del estado seleccionado (drill-down click).
+            Aparece debajo del Gantt y persiste hasta que se cierre o se
+            re-clickee el mismo segmento. */}
+        {selectedState && (
+          <StateDetailPanel
+            state={selectedState}
+            shift={shift}
+            onClose={() => setSelectedState(null)}
+          />
+        )}
 
         {/* Production bars + objetivo — versión ECharts (Fase 3 del
             Synchronized Timeline). Sincroniza zoom + axisPointer cross-chart
