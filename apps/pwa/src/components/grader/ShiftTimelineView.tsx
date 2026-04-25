@@ -20,6 +20,7 @@ import type { GraderShiftDoc } from '@/services/grader/graderShifts.service'
 import type { ShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import type { GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
 import type { FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
+import type { UpstreamLineSnapshot } from '@/services/shoplogix/types'
 import { MATRIX_P0_CAUSES, parseMatrixErrorString } from '@/services/grader/graderMatrixP0Causes'
 import { classifyRecordToMatrix, CALIBRE_WEIGHT_RANGES } from '@/services/grader/graderAnalytics'
 import { PauseAnnotationDialog } from './PauseAnnotationDialog'
@@ -32,6 +33,7 @@ import {
   resolveAxisWindow,
   buildMarkLines,
   buildMarkAreas,
+  buildBaaderTimelineMarkers,
 } from './shiftTimelineHelpers'
 
 interface ShiftTimelineViewProps {
@@ -82,6 +84,22 @@ interface ShiftTimelineViewProps {
    * Útil para embeber el gráfico en el PDF de exportación (P2-1).
    */
   chartImageRef?: React.MutableRefObject<(() => string | null) | null>
+  /**
+   * Snapshot de la línea upstream (3 Evisceradoras Baader). Si está presente
+   * y tiene máquinas, el chart agrega un sub-grid debajo del eje X principal
+   * con una lane por máquina y bandas de paros (downtime/break/setup) alineadas
+   * temporalmente al chart Grader. Permite correlación visual instantánea
+   * entre P0% Grader y paros upstream.
+   */
+  upstreamSnapshot?: UpstreamLineSnapshot | null
+  /**
+   * Callback opcional: emite el rango temporal actual del zoom del chart.
+   * Cuando el usuario hace zoom (slider o preset), se emite `{ startMs, endMs }`
+   * con el rango efectivamente visible. Cuando el zoom vuelve a 100%, emite
+   * `null`. Permite sincronizar otros paneles (ej. UpstreamMachinesPanel) al
+   * mismo rango visible.
+   */
+  onZoomRangeChange?: (range: { startMs: number; endMs: number } | null) => void
 }
 
 /**
@@ -123,6 +141,8 @@ export function ShiftTimelineView({
   criticalThreshold = 3.5,
   isOnline = true,
   chartImageRef,
+  upstreamSnapshot,
+  onZoomRangeChange,
 }: ShiftTimelineViewProps) {
   // ── Estado del diálogo de anotación (Fase 3) ──────────────────────────
   const canAnnotate = !!summaryId && !!adminUid
@@ -199,7 +219,6 @@ export function ShiftTimelineView({
   const hasSelection = causesArr.length > 0
 
   // ── Export PNG / CSV + selector de rango ─────────────────────────────────
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const echartsRef = useRef<any>(null)
 
   // Exponer función getDataURL al parent para incluir imagen en PDF (P2-1)
@@ -224,13 +243,32 @@ export function ShiftTimelineView({
     return Math.min(24 * 60, Math.max(1, Math.round((effectiveEndMs - effectiveStartMs) / 60_000)))
   }, [timelineBuckets])
 
+  // ── Emite rango temporal del zoom al parent ──────────────────────────────
+  // Calcula el rango temporal real (ms) a partir de un % de zoom y emite al
+  // callback. Síncrono: lo invocan tanto el handler `datazoom` de ECharts
+  // como `handleZoomPreset` apenas cambia el zoom — sin esperar re-render.
+  const emitZoomRange = useCallback((startPct: number, endPct: number) => {
+    if (!onZoomRangeChange) return
+    const buckets = timelineBuckets.filter((b) => b.pieces > 0)
+    if (buckets.length === 0) { onZoomRangeChange(null); return }
+    // Full zoom (100%): emite null para que el caller use su rango completo
+    if (startPct <= 0.5 && endPct >= 99.5) { onZoomRangeChange(null); return }
+    const axis = resolveAxisWindow(buckets, shiftWindow)
+    const spanMs = axis.effectiveEndMs - axis.effectiveStartMs
+    onZoomRangeChange({
+      startMs: axis.effectiveStartMs + Math.round((startPct / 100) * spanMs),
+      endMs:   axis.effectiveStartMs + Math.round((endPct / 100) * spanMs),
+    })
+  }, [onZoomRangeChange, timelineBuckets, shiftWindow])
+
   const handleZoomPreset = useCallback((preset: '10min' | '1h' | 'turno') => {
     setActiveZoom(preset)
     let start = 0
     if (preset === '10min') start = Math.max(0, 100 - Math.round((10 / totalMinutes) * 100))
     else if (preset === '1h') start = Math.max(0, 100 - Math.round((60 / totalMinutes) * 100))
     setZoomState({ start, end: 100 })
-  }, [totalMinutes])
+    emitZoomRange(start, 100)
+  }, [totalMinutes, emitZoomRange])
 
   const downloadPNG = useCallback(() => {
     const instance = echartsRef.current?.getEchartsInstance()
@@ -358,6 +396,15 @@ export function ShiftTimelineView({
     () => computeProductionWindow(timelineBuckets),
     [timelineBuckets],
   )
+
+  // Emit inicial cuando los buckets cargan: se asegura que el callback reciba
+  // el rango actual (null si zoom completo). Re-emite si emitZoomRange cambia
+  // (timelineBuckets/shiftWindow), pero sin depender de zoomState (eso lo
+  // maneja el handler `datazoom` directo y los presets).
+  useEffect(() => {
+    emitZoomRange(zoomState.start, zoomState.end)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [emitZoomRange])
 
   const downloadCSV = useCallback(() => {
     const inWin = (tsMin: string) => {
@@ -504,8 +551,33 @@ export function ShiftTimelineView({
 
     // Mark lines y mark areas: helpers puros extraídos en M11.
     const { shiftMarkLines, thresholdLines, uploadLines, actionLines, configChangeLines, lotChangeLines } =
-      buildMarkLines(shiftDoc, shiftWindow, configSnapshots, buckets, alertThreshold, criticalThreshold)
+      buildMarkLines(shiftDoc, shiftWindow, configSnapshots, buckets, alertThreshold, criticalThreshold, productionWindow)
     const deadTimeAreas = buildMarkAreas(pauses ?? [], productionWindow)
+
+    // Marcadores Baader — usados SOLO para enriquecer el tooltip del chart
+    // con la sección "⚠ Upstream parado". El sub-grid visual fue retirado
+    // tras feedback del usuario (no aportaba en el formato compacto). La
+    // visualización detallada vive en UpstreamMachinesPanel sincronizado
+    // por zoom.
+    const baaderMarkers = buildBaaderTimelineMarkers(upstreamSnapshot ?? null, lineTimes, productionWindow)
+    const bandsByMinuteLabel = new Map<string, Array<{ machine: string; reason: string; durationMin: number; color: string }>>()
+    for (const band of baaderMarkers.bands) {
+      const iA = axisIndexByLabel.get(band.tA)
+      const iB = axisIndexByLabel.get(band.tB)
+      if (iA === undefined || iB === undefined) continue
+      const [from, to] = iA <= iB ? [iA, iB] : [iB, iA]
+      for (let i = from; i <= to; i++) {
+        const label = lineTimes[i]
+        if (!label) continue
+        if (!bandsByMinuteLabel.has(label)) bandsByMinuteLabel.set(label, [])
+        bandsByMinuteLabel.get(label)!.push({
+          machine: band.machineName,
+          reason: band.reason,
+          durationMin: band.durationMin,
+          color: band.stroke,
+        })
+      }
+    }
 
     return {
       backgroundColor: 'transparent',
@@ -545,15 +617,6 @@ export function ShiftTimelineView({
         // lineTimes: 1 label por minuto (axis expandido minuto a minuto).
         data: lineTimes,
         axisLine: { lineStyle: { color: '#374151' } },
-        // Adaptativo al zoom: dejamos que ECharts decida cuántos labels
-        // mostrar según el ancho visible post-zoom — `hideOverlap: true` hace
-        // que labels que se solapan se escondan. Al hacer zoom la densidad
-        // crece naturalmente (más espacio por label → más minutos visibles,
-        // llegando hasta minuto a minuto en zoom muy cercano).
-        //
-        // `interval: 'auto'` pide a ECharts que compute el stride óptimo
-        // según el pixel width disponible. Cualquier interval fijo rompe
-        // este comportamiento y deja rangos con 0-2 labels al zoom.
         axisLabel: {
           color: '#6b7280',
           fontSize: 11,
@@ -675,6 +738,18 @@ export function ShiftTimelineView({
             const v = Array.isArray(sp.value) ? sp.value[1] : sp.value
             lines.push(`<span style="color:${sp.color}">●</span> ${sp.seriesName}: ${v}g`)
           }
+          // Upstream: si el minuto cae dentro de bandas Baader, listar las
+          // máquinas paradas y la razón. Hace visible la correlación Grader↔
+          // Baader desde el tooltip, sin hover separado por banda.
+          if (typeof time === 'string' && bandsByMinuteLabel.size > 0) {
+            const activeBands = bandsByMinuteLabel.get(time)
+            if (activeBands && activeBands.length > 0) {
+              lines.push('<span style="color:#94a3b8">⚠ Upstream parado:</span>')
+              for (const b of activeBands) {
+                lines.push(`&nbsp;&nbsp;<span style="color:${b.color}">▮</span> ${b.machine}: <b>${b.reason}</b> (${b.durationMin}m)`)
+              }
+            }
+          }
           return lines.join('<br/>')
         },
       },
@@ -777,7 +852,7 @@ export function ShiftTimelineView({
         }),
       ],
     }
-  }, [timelineBuckets, shiftDoc, shiftWindow, configSnapshots, causesArr, piecesByCause, scatterAxisShow, gate0Pieces, pauses, productionWindow, bucketByLabel, summaryP0Pct, alertThreshold, criticalThreshold, zoomState])
+  }, [timelineBuckets, shiftDoc, shiftWindow, configSnapshots, causesArr, piecesByCause, scatterAxisShow, gate0Pieces, pauses, productionWindow, bucketByLabel, summaryP0Pct, alertThreshold, criticalThreshold, zoomState, upstreamSnapshot])
 
   // ── Cobertura del turno ────────────────────────────────────────────────
   // Mide cuánto del turno está "entendido" (operación + colación + micros
@@ -960,7 +1035,22 @@ export function ShiftTimelineView({
             opts={{ renderer: 'canvas' }}
             notMerge={true}
             lazyUpdate={false}
-            onEvents={{ click: handleChartClick }}
+            onEvents={{
+              click: handleChartClick,
+              // Sincroniza el state local + emite rango al parent cuando el
+              // usuario arrastra el slider o hace pan/wheel. Lee del state
+              // canónico de ECharts (getOption) para evitar payloads parciales.
+              datazoom: () => {
+                const inst = echartsRef.current?.getEchartsInstance?.()
+                if (!inst) return
+                const opt = inst.getOption?.()
+                const dz = Array.isArray(opt?.dataZoom) ? opt.dataZoom[0] : null
+                const s = typeof dz?.start === 'number' ? dz.start : 0
+                const e = typeof dz?.end === 'number' ? dz.end : 100
+                setZoomState((prev) => (prev.start === s && prev.end === e ? prev : { start: s, end: e }))
+                emitZoomRange(s, e)
+              },
+            }}
           />
         )}
 
