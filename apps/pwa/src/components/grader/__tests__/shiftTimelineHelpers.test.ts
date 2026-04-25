@@ -53,7 +53,7 @@ function mkShift(name: string, states: UpstreamMachineState[]): UpstreamMachineS
     runtimeVariance: 0,
     shiftRuntime: 0,
     shiftRuntimeBreakdown: {
-      uptimeSec: 0, breakSec: 0, downtimeSec: 0, setupSec: 0, totalTrackedSec: 0,
+      uptimeSec: 0, breakSec: 0, plannedDowntimeSec: 0, downtimeSec: 0, setupSec: 0, totalTrackedSec: 0,
     },
     intervals: [],
     states,

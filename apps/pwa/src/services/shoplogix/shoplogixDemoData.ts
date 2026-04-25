@@ -84,16 +84,21 @@ function makeShift(
   const last = intervals[intervals.length - 1]!;
 
   // Mismo cálculo que el normalizer real para mantener parity en demo data.
+  // Demo data no tiene "Planned Downtime" (post-shift) → plannedDowntimeSec = 0.
+  const isPlannedDT = (s: UpstreamMachineState) =>
+    s.type === 'break' && s.reason.toLowerCase().includes('planned downtime');
   const breakdown = {
-    uptimeSec:   states.filter(s => s.type === 'uptime').reduce((a, s) => a + s.durationSec, 0),
-    breakSec:    states.filter(s => s.type === 'break').reduce((a, s) => a + s.durationSec, 0),
-    downtimeSec: states.filter(s => s.type === 'downtime').reduce((a, s) => a + s.durationSec, 0),
-    setupSec:    states.filter(s => s.type === 'setup').reduce((a, s) => a + s.durationSec, 0),
-    totalTrackedSec: 0,
+    uptimeSec:          states.filter(s => s.type === 'uptime').reduce((a, s) => a + s.durationSec, 0),
+    breakSec:           states.filter(s => s.type === 'break' && !isPlannedDT(s)).reduce((a, s) => a + s.durationSec, 0),
+    plannedDowntimeSec: 0,  // demo data no tiene post-shift time
+    downtimeSec:        states.filter(s => s.type === 'downtime').reduce((a, s) => a + s.durationSec, 0),
+    setupSec:           states.filter(s => s.type === 'setup').reduce((a, s) => a + s.durationSec, 0),
+    totalTrackedSec:    0,
   };
   breakdown.totalTrackedSec = breakdown.uptimeSec + breakdown.breakSec + breakdown.downtimeSec + breakdown.setupSec;
-  const shiftRuntime = breakdown.totalTrackedSec > 0
-    ? breakdown.uptimeSec / breakdown.totalTrackedSec
+  const productiveSec = breakdown.totalTrackedSec - breakdown.plannedDowntimeSec;
+  const shiftRuntime = productiveSec > 0
+    ? breakdown.uptimeSec / productiveSec
     : 0;
 
   return {
