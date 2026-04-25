@@ -317,6 +317,29 @@ export function ShiftTimelineView({
     return axis.effectiveStartMs
   }, [timelineBuckets, productionWindow, shiftWindow])
 
+  // ── Publica los lot changes al context (Fase 4c) ─────────────────────────
+  // Detecta cambios de lote en los buckets activos y los publica como
+  // markLines verticales que el panel upstream proyecta sobre sus charts.
+  // Permite ver al instante cómo afectó cada cambio de lote a las Baaders.
+  useEffect(() => {
+    if (!timelineSync) return
+    const inProductionWindow = (tsMin: string): boolean => {
+      if (!productionWindow) return true
+      const ts = Date.parse(tsMin)
+      return ts >= productionWindow.startMs && ts <= productionWindow.endMs
+    }
+    const buckets = timelineBuckets.filter((b) => b.pieces > 0 && inProductionWindow(b.tsMin))
+    const changes: { ms: number; lot: string }[] = []
+    for (let i = 1; i < buckets.length; i++) {
+      const prev = buckets[i - 1]
+      const curr = buckets[i]
+      if (prev?.lot && curr?.lot && prev.lot !== curr.lot) {
+        changes.push({ ms: Date.parse(curr.tsMin), lot: curr.lot })
+      }
+    }
+    timelineSync.setLotChanges(changes)
+  }, [timelineSync, timelineBuckets, productionWindow])
+
   // ── Hover cross-chart (Fase 4b): mousemove broadcast + listener ─────────
   // Snap al minuto: setHover idempotente skip cuando ms === prev.ms — sin
   // esto, mover el mouse 1px re-renderiza los 7 charts del grupo.
