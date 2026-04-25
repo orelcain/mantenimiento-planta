@@ -109,6 +109,39 @@ Batch 3 (Haiku 4.5, ~5 min)   Verificar CI + confirmar deploy
 - **Base URL**: `/mantenimiento-planta/` (GitHub Pages)
 - **Deploy**: GitHub Pages via `gh-pages` branch + Firebase Hosting
 
+### Principios de UI/UX — establecidos sesión 2026-04-25
+
+> *"que los gráficos revelen información útil y fácil de entender, no solo mostrar datos por que sí"*
+
+1. **Información útil, no datos por que sí.** Antes de agregar un gráfico/KPI/badge,
+   responder: *¿qué decisión opera el usuario al verlo?* Si la respuesta es "ninguna",
+   sacarlo. Métricas académicas (R², slope numérico) deben acompañarse de magnitud
+   operacional ("cada -10 ciclos → +N pts P0%") o reemplazarse por un KPI accionable
+   ("Zona crítica: N de M min").
+
+2. **Consistencia entre elementos.** Un mismo concepto debe llamarse igual, calcularse
+   igual y verse igual en todos los componentes:
+   - **Umbrales operacionales** (ej. P0 crítico = 3.5%) → constante exportada de un
+     único módulo. Si aparece hardcoded en 2 archivos, refactor a constante compartida.
+   - **Etiquetas semánticas** (alta/media/baja, crítico/warning/recommended,
+     verde/amarillo/rojo) → reutilizar helpers existentes (`confidenceLabel()`,
+     `criticalColor()`). No inventar nuevos labels para el mismo eje.
+   - **Categorías cross-sistema** (tags Grader vs reasons Baader): mantener listas
+     parejas en helpers compartidos (`isPlannedBaaderReason()`,
+     `isOrganizationalGraderPause()`).
+   - **Convenciones temporales** — Shoplogix guarda wall-clock-as-UTC; usar
+     `getUTCHours/Minutes/Seconds` siempre. Documentar al tope del componente.
+   - **Antes de inventar un umbral nuevo**: `grep` por el concepto en el módulo. Si
+     existe, reutilizar; si difiere, decidir cuál es correcto y unificar.
+
+3. **Cautela y atención al detalle.** Cambios contenidos, helpers extraídos a archivos
+   testables, tests para cada función pura nueva (incluir edge cases observados:
+   float-math, valores vacíos, contributors faltantes en backward compat).
+
+4. **Auditar antes de agregar.** Antes de construir un componente nuevo, auditar los
+   existentes con el método: *qué decisión opera, qué datos ya tenemos, dónde caen los
+   falsos positivos*. Suele resultar en mejoras de los existentes en lugar de uno nuevo.
+
 ### Arquitectura de almacenamiento
 
 ```
