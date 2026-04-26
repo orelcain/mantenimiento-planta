@@ -4,10 +4,8 @@ import { Suspense } from 'react'
 import {
   LayoutDashboard,
   AlertTriangle,
-  Map,
   Building2,
   Wrench,
-  Settings,
   Package,
   Menu,
   X,
@@ -16,14 +14,11 @@ import {
   ChevronLeft,
   ChevronRight,
   CalendarClock,
-  FolderTree,
   RefreshCw,
   Camera,
   Sun,
   Activity,
   Cpu,
-  MapPin,
-  FileText,
   Route,
   Mail,
   Box,
@@ -32,9 +27,9 @@ import {
   CloudSun,
   BookOpen,
   GraduationCap,
-  GripVertical,
   Upload,
   History,
+  Shield,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, Button } from '@/components/ui'
 import { useAuthStore, useIsAdmin, useAppStore, usePermissionsStore } from '@/store'
@@ -94,6 +89,9 @@ const navGroups: NavGroup[] = [
       { name: 'Visor Planta 3D', href: '/map', icon: Building2, module: 'mapa' },
       { name: 'Visor 3D', href: '/visor-3d', icon: Box },
       { name: 'Análisis de Turno', href: '/analisis-grader', icon: BarChart3, module: 'analisisGrader' },
+      { name: 'Clima Puerto', href: '/clima-puerto', icon: CloudSun, module: 'climaPuerto' as AppModule },
+      { name: 'HMI Knuro', href: '/hmi-knuro', icon: Cpu },
+      { name: 'Baader 200', href: '/baader-200', icon: BookOpen },
     ],
   },
   {
@@ -105,16 +103,12 @@ const navGroups: NavGroup[] = [
   {
     id: 'admin', label: 'Administración', adminOnly: true,
     items: [
-      { name: 'Configuración', href: '/settings', icon: Settings, module: 'configuracion' },
-      { name: 'Jerarquías', href: '/hierarchy', icon: FolderTree },
-      { name: 'Mapas', href: '/admin/maps', icon: MapPin },
-      { name: 'Editor Terreno', href: '/admin/mapa-terreno', icon: Map },
-      { name: 'ETT', href: '/admin/ett', icon: FileText },
-      { name: 'Clima Puerto', href: '/clima-puerto', icon: CloudSun, module: 'climaPuerto' as AppModule },
-      { name: 'HMI Knuro', href: '/hmi-knuro', icon: Cpu },
-      { name: 'Baader 200', href: '/baader-200', icon: BookOpen },
-      { name: 'Editor Sidebar', href: '/admin/sidebar', icon: GripVertical },
-      { name: 'Editor Aprendizaje', href: '/aprendizaje/admin', icon: GraduationCap },
+      // Sidebar minimalista: el grupo 'Administración' es un único punto de
+      // entrada al hub `/admin`. Allí están agrupados Configuración,
+      // Jerarquías, Mapas, ETT, Visores (Clima/HMI/Baader), Permisos,
+      // Credenciales Shoplogix, etc., con re-confirmación de identidad
+      // sobre las opciones sensibles.
+      { name: 'Panel Admin', href: '/admin', icon: Shield },
     ],
   },
 ]

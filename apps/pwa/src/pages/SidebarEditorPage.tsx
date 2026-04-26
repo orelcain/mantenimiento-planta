@@ -70,6 +70,9 @@ const DEFAULT_GROUPS: Group[] = [
       { id: 'mapa', name: 'Visor de Mapas', href: '/map', groupId: 'herramientas' },
       { id: 'visor3d', name: 'Visor 3D', href: '/visor-3d', groupId: 'herramientas' },
       { id: 'grader', name: 'Análisis de Turno', href: '/analisis-grader', groupId: 'herramientas' },
+      { id: 'clima', name: 'Clima Puerto', href: '/clima-puerto', groupId: 'herramientas' },
+      { id: 'hmi', name: 'HMI Knuro', href: '/hmi-knuro', groupId: 'herramientas' },
+      { id: 'baader', name: 'Baader 200', href: '/baader-200', groupId: 'herramientas' },
     ],
   },
   {
@@ -81,14 +84,10 @@ const DEFAULT_GROUPS: Group[] = [
   {
     id: 'admin', label: 'Administración',
     items: [
-      { id: 'settings', name: 'Configuración', href: '/settings', groupId: 'admin' },
-      { id: 'hierarchy', name: 'Jerarquías', href: '/hierarchy', groupId: 'admin' },
-      { id: 'maps', name: 'Mapas', href: '/admin/maps', groupId: 'admin' },
-      { id: 'ett', name: 'ETT', href: '/admin/ett', groupId: 'admin' },
-      { id: 'clima', name: 'Clima Puerto', href: '/clima-puerto', groupId: 'admin' },
-      { id: 'hmi', name: 'HMI Knuro', href: '/hmi-knuro', groupId: 'admin' },
-      { id: 'baader', name: 'Baader 200', href: '/baader-200', groupId: 'admin' },
-      { id: 'sidebar-editor', name: 'Editor Sidebar', href: '/admin/sidebar', groupId: 'admin' },
+      // Sidebar minimalista — todo lo admin vive en el hub `/admin` con
+      // re-confirmación. Los items individuales (Configuración, Mapas, ETT,
+      // etc.) NO aparecen en el sidebar; se accede a ellos desde el Panel.
+      { id: 'panel-admin', name: 'Panel Admin', href: '/admin', groupId: 'admin' },
     ],
   },
 ]

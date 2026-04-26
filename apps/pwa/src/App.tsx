@@ -5,6 +5,7 @@ import { useAuthStore, usePermissionsStore } from '@/store'
 import { logger } from '@/lib/logger'
 import { LoadingScreen } from '@/components/ui'
 import { MainLayout } from '@/components/layout'
+import { RequireReAuth } from '@/components/auth/RequireReAuth'
 import { HelpProvider } from '@/components/help'
 import { MachineProvider } from '@/contexts/MachineContext'
 import { initializeHierarchySystem, isHierarchyInitialized } from '@/services/hierarchyInit'
@@ -73,6 +74,7 @@ const InspectionsPage = lazyWithReload(() => import('@/pages/InspectionsPage').t
 const ETTPage = lazyWithReload(() => import('@/pages/admin/ETTPage').then((mod) => ({ default: mod.ETTPage })))
 const PermissionsPage = lazyWithReload(() => import('@/pages/admin/PermissionsPage').then((mod) => ({ default: mod.PermissionsPage })))
 const ShoplogixCredentialsPage = lazyWithReload(() => import('@/pages/admin/ShoplogixCredentialsPage').then((mod) => ({ default: mod.ShoplogixCredentialsPage })))
+const AdminPanelPage = lazyWithReload(() => import('@/pages/admin/AdminPanelPage').then((mod) => ({ default: mod.AdminPanelPage })))
 const Visor3DListPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DListPage').then((mod) => ({ default: mod.Visor3DListPage })))
 const Visor3DViewerPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DViewerPage').then((mod) => ({ default: mod.Visor3DViewerPage })))
 const Visor3DPublicPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DPublicPage').then((mod) => ({ default: mod.Visor3DPublicPage })))
@@ -445,47 +447,71 @@ export function App() {
                 <PhotoEvidencePage />
               </Suspense>
             } />
+            {/* Hub admin — el único punto de entrada visible. Todas las sub-rutas
+                están envueltas en RequireReAuth para pedir credenciales aún con
+                sesión activa, evitando cambios accidentales. */}
+            <Route path="admin" element={
+              <AdminRoute>
+                <RequireReAuth reason="para acceder al panel de administración">
+                  <Suspense fallback={<LoadingScreen />}>
+                    <AdminPanelPage />
+                  </Suspense>
+                </RequireReAuth>
+              </AdminRoute>
+            } />
             <Route path="admin/maps" element={
               <AdminRoute>
-                <Suspense fallback={<LoadingScreen />}>
-                  <MapsAdminPage />
-                </Suspense>
+                <RequireReAuth reason="antes de modificar mapas y planos">
+                  <Suspense fallback={<LoadingScreen />}>
+                    <MapsAdminPage />
+                  </Suspense>
+                </RequireReAuth>
               </AdminRoute>
             } />
             {/* Editor de terreno DEM — solo admins */}
             <Route path="admin/mapa-terreno" element={
               <AdminRoute>
-                <Suspense fallback={<LoadingScreen />}>
-                  <MapPage />
-                </Suspense>
+                <RequireReAuth reason="antes de modificar el modelo de terreno">
+                  <Suspense fallback={<LoadingScreen />}>
+                    <MapPage />
+                  </Suspense>
+                </RequireReAuth>
               </AdminRoute>
             } />
             <Route path="admin/permissions" element={
               <AdminRoute>
-                <Suspense fallback={<LoadingScreen />}>
-                  <PermissionsPage />
-                </Suspense>
+                <RequireReAuth reason="antes de modificar permisos de usuarios">
+                  <Suspense fallback={<LoadingScreen />}>
+                    <PermissionsPage />
+                  </Suspense>
+                </RequireReAuth>
               </AdminRoute>
             } />
             <Route path="admin/shoplogix-credentials" element={
               <AdminRoute>
-                <Suspense fallback={<LoadingScreen />}>
-                  <ShoplogixCredentialsPage />
-                </Suspense>
+                <RequireReAuth reason="antes de gestionar credenciales Shoplogix">
+                  <Suspense fallback={<LoadingScreen />}>
+                    <ShoplogixCredentialsPage />
+                  </Suspense>
+                </RequireReAuth>
               </AdminRoute>
             } />
             <Route path="admin/ett" element={
               <AdminRoute>
-                <Suspense fallback={<LoadingScreen />}>
-                  <ETTPage />
-                </Suspense>
+                <RequireReAuth reason="antes de modificar configuración ETT">
+                  <Suspense fallback={<LoadingScreen />}>
+                    <ETTPage />
+                  </Suspense>
+                </RequireReAuth>
               </AdminRoute>
             } />
             <Route path="admin/sidebar" element={
               <AdminRoute>
-                <Suspense fallback={<LoadingScreen />}>
-                  <SidebarEditorPage />
-                </Suspense>
+                <RequireReAuth reason="antes de modificar el sidebar">
+                  <Suspense fallback={<LoadingScreen />}>
+                    <SidebarEditorPage />
+                  </Suspense>
+                </RequireReAuth>
               </AdminRoute>
             } />
             <Route path="aprendizaje/admin" element={
