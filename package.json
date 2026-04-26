@@ -38,7 +38,11 @@
       "protobufjs": ">=7.5.5",
       "protocol-buffers-schema": ">=3.6.1",
       "serialize-javascript": ">=7.0.5",
-      "@tootallnate/once": ">=3.0.1"
+      "@tootallnate/once": ">=3.0.1",
+      "@xmldom/xmldom": ">=0.9.10",
+      "fast-xml-parser": ">=5.7.0",
+      "postcss": ">=8.5.10",
+      "uuid": ">=14.0.0"
     }
   }
 }
