@@ -35,6 +35,12 @@ import {
   buildMarkAreas,
   buildBaaderTimelineMarkers,
 } from './shiftTimelineHelpers'
+import {
+  DEFAULT_P0_ALERT_PCT,
+  DEFAULT_P0_CRITICAL_PCT,
+  p0StatusFromPct,
+  p0StatusHex,
+} from '@/services/grader/graderP0Thresholds'
 import { useTimelineSyncOptional } from './useTimelineSync'
 import { useChartReadyConnect } from './useEChartsConnect'
 
@@ -139,8 +145,8 @@ export function ShiftTimelineView({
   summaryId, adminUid, onPauseUpdated,
   selectedCauses, onClearSelectedCauses,
   summaryP0Pct,
-  alertThreshold = 2,
-  criticalThreshold = 3.5,
+  alertThreshold = DEFAULT_P0_ALERT_PCT,
+  criticalThreshold = DEFAULT_P0_CRITICAL_PCT,
   isOnline = true,
   chartImageRef,
   upstreamSnapshot,
@@ -426,10 +432,11 @@ export function ShiftTimelineView({
     const p0Label = p0Pct != null
       ? `P0% ${p0Pct.toFixed(2)}%${isZoomed ? ' (turno completo)' : ''}`
       : null
-    const p0Color = p0Pct == null ? '#94a3b8'
-      : p0Pct <= alertThreshold ? '#22c55e'
-      : p0Pct <= criticalThreshold ? '#f59e0b'
-      : '#ef4444'
+    // Color del P0% en el header del PNG: usa el helper compartido
+    // (consistencia con el resto del módulo). Slate gris si no hay P0% aún.
+    const p0Color = p0Pct == null
+      ? '#94a3b8'
+      : p0StatusHex(p0StatusFromPct(p0Pct, { alert: alertThreshold, critical: criticalThreshold }))
 
     // ── Componer canvas: cabecera + chart ──────────────────────────────────
     const img = new Image()

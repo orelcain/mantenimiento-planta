@@ -24,6 +24,7 @@ import { useAuthStore, useIsAdmin } from '@/store'
 import { useToast } from '@/hooks/useToast'
 import { getModuleRanges, saveModuleAnalysisConfig, savePauseDetectorConfig } from '@/services/grader/graderModuleConfig.service'
 import { CALIBRE_WEIGHT_RANGES } from '@/services/grader/graderAnalytics'
+import { DEFAULT_P0_ALERT_PCT, DEFAULT_P0_CRITICAL_PCT } from '@/services/grader/graderP0Thresholds'
 import { savePauseTag, archivePauseTag, seedDefaultTagsIfEmpty } from '@/services/grader/graderPauseTags.service'
 import { usePauseTags } from '@/hooks/usePauseTags'
 import type { CalibreWeightRange, PauseDetectorConfig } from '@/services/grader/types'
@@ -57,9 +58,9 @@ export function GlobalSettingsModal({ open, onOpenChange }: Props) {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  // Umbrales
-  const [alertThreshold, setAlertThreshold] = useState(2)
-  const [criticalThreshold, setCriticalThreshold] = useState(3.5)
+  // Umbrales — defaults centralizados en graderP0Thresholds.ts (consistencia)
+  const [alertThreshold, setAlertThreshold] = useState(DEFAULT_P0_ALERT_PCT)
+  const [criticalThreshold, setCriticalThreshold] = useState(DEFAULT_P0_CRITICAL_PCT)
 
   // Rangos calibre
   const [ranges, setRanges] = useState<CalibreWeightRange[]>(CALIBRE_WEIGHT_RANGES)

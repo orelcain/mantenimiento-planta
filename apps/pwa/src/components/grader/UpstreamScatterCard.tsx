@@ -35,13 +35,18 @@ import {
   scatterSlopeMagnitude,
   usableScatterPoints,
 } from './shiftTimelineHelpers'
-
-/** Umbral crítico de P0% (alineado con el header del summary y el coloreo del turno). */
-const P0_CRITICAL_PCT = 3.5
+import { DEFAULT_P0_CRITICAL_PCT } from '@/services/grader/graderP0Thresholds'
 
 interface Props {
   snapshot: UpstreamLineSnapshot | null | undefined
   timelineBuckets: TimelineBucket[]
+  /**
+   * Umbral crítico de P0% (en puntos %, ej. 3.5).
+   * Si no se provee, usa el default `DEFAULT_P0_CRITICAL_PCT`. La página padre
+   * debe pasar el valor configurado por el usuario en `system/graderConfig`
+   * para que el scatter respete la misma frontera que el resto del módulo.
+   */
+  criticalThreshold?: number
 }
 
 // Colores por máquina (consistentes con UpstreamMachinesPanel)
@@ -62,7 +67,11 @@ function fmtHHmm(ms: number): string {
 }
 
 
-export function UpstreamScatterCard({ snapshot, timelineBuckets }: Props) {
+export function UpstreamScatterCard({
+  snapshot,
+  timelineBuckets,
+  criticalThreshold = DEFAULT_P0_CRITICAL_PCT,
+}: Props) {
   const seriesData = useMemo(() => {
     if (!snapshot) return []
     return buildScatterData(snapshot, timelineBuckets)
@@ -73,7 +82,7 @@ export function UpstreamScatterCard({ snapshot, timelineBuckets }: Props) {
 
   // ── Analytics extraídos a funciones puras (testables) ──────────────────────
   const baaderMedian = useMemo(() => scatterBaaderMedian(seriesData), [seriesData])
-  const criticalKpi  = useMemo(() => scatterCriticalZone(seriesData, P0_CRITICAL_PCT, baaderMedian), [seriesData, baaderMedian])
+  const criticalKpi  = useMemo(() => scatterCriticalZone(seriesData, criticalThreshold, baaderMedian), [seriesData, criticalThreshold, baaderMedian])
 
   const option = useMemo(() => {
     const series: object[] = []
@@ -82,7 +91,7 @@ export function UpstreamScatterCard({ snapshot, timelineBuckets }: Props) {
     // En ECharts y va de 0 hacia arriba — "P0% alto" significa Y > 3.5
     // y "Baader lento" significa X < median. Por eso markArea va:
     //   - X: [0, baaderMedian]
-    //   - Y: [P0_CRITICAL_PCT, ∞]
+    //   - Y: [criticalThreshold, ∞]
     // markArea + markLine se asocian a una serie "fantasma" sin datos visibles.
     if (baaderMedian > 0) {
       series.push({
@@ -94,7 +103,7 @@ export function UpstreamScatterCard({ snapshot, timelineBuckets }: Props) {
           silent: true,
           itemStyle: { color: 'rgba(220, 38, 38, 0.06)' },  // red-600 muy tenue
           data: [[
-            { coord: [0, P0_CRITICAL_PCT], name: 'Zona crítica' },
+            { coord: [0, criticalThreshold], name: 'Zona crítica' },
             { coord: [baaderMedian, 'max'] },
           ]],
         },
@@ -105,12 +114,12 @@ export function UpstreamScatterCard({ snapshot, timelineBuckets }: Props) {
           data: [
             // Horizontal: P0%=3.5 (umbral crítico) — rojo dashed
             {
-              yAxis: P0_CRITICAL_PCT,
+              yAxis: criticalThreshold,
               lineStyle: { color: 'rgba(220, 38, 38, 0.45)', type: 'dashed', width: 1 },
               label: {
                 show: true,
                 position: 'insideEndTop',
-                formatter: `Crítico ${P0_CRITICAL_PCT}%`,
+                formatter: `Crítico ${criticalThreshold}%`,
                 color: 'rgba(220, 38, 38, 0.7)',
                 fontSize: 9,
               },
@@ -244,7 +253,7 @@ export function UpstreamScatterCard({ snapshot, timelineBuckets }: Props) {
       },
       series,
     }
-  }, [seriesData, baaderMedian])
+  }, [seriesData, baaderMedian, criticalThreshold])
 
   // Resumen estadístico rápido (R² + slope) — secundario al KPI accionable.
   const stats = useMemo(() => {
@@ -309,7 +318,7 @@ export function UpstreamScatterCard({ snapshot, timelineBuckets }: Props) {
           {criticalKpi.total > 0 && (
             <div
               className={`flex items-center gap-1.5 text-xs tabular-nums ${criticalColor}`}
-              title={`Zona crítica = P0% > ${P0_CRITICAL_PCT}% (umbral) Y ritmo Baader < mediana del turno (${Math.round(baaderMedian)} ciclos/5min). Cuadrante inferior-derecho del scatter.`}
+              title={`Zona crítica = P0% > ${criticalThreshold}% (umbral) Y ritmo Baader < mediana del turno (${Math.round(baaderMedian)} ciclos/5min). Cuadrante inferior-derecho del scatter.`}
             >
               <AlertTriangle className="w-3.5 h-3.5" />
               <span className="font-semibold">
@@ -332,7 +341,7 @@ export function UpstreamScatterCard({ snapshot, timelineBuckets }: Props) {
         {/* Nota explicativa pequeña */}
         <div className="text-[10px] text-slate-500 mb-2">
           Punto = 5 min · X = ciclos Baader · Y = P0% Grader · tamaño = piezas Grader (confianza).
-          {' '}Líneas: <span className="text-rose-400/80">P0% crítico {P0_CRITICAL_PCT}%</span>
+          {' '}Líneas: <span className="text-rose-400/80">P0% crítico {criticalThreshold}%</span>
           {' · '}<span className="text-slate-400">mediana ritmo {Math.round(baaderMedian)} ciclos</span>.
         </div>
 

@@ -42,6 +42,7 @@ import { useToast } from '@/hooks/useToast'
 import { ActionPlanPanel, deriveSuggestions } from '@/components/grader/ActionPlanPanel'
 import { correlatePausesWithUpstream, summarizeCorrelations } from '@/services/shoplogix/shoplogixCorrelation'
 import { buildScatterData, scatterSlopeMagnitude } from '@/components/grader/shiftTimelineHelpers'
+import { DEFAULT_P0_ALERT_PCT, DEFAULT_P0_CRITICAL_PCT } from '@/services/grader/graderP0Thresholds'
 import { UpstreamMachinesPanel } from '@/components/grader/UpstreamMachinesPanel'
 import { UpstreamCorrelationCard } from '@/components/grader/UpstreamCorrelationCard'
 import { UpstreamScatterCard } from '@/components/grader/UpstreamScatterCard'
@@ -276,8 +277,8 @@ export function AnalisisGraderTurnoPage() {
   const [selectedCauses, setSelectedCauses] = useState<Set<MatrixP0Cause>>(new Set())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [alertThreshold, setAlertThreshold] = useState(2)
-  const [criticalThreshold, setCriticalThreshold] = useState(3.5)
+  const [alertThreshold, setAlertThreshold] = useState(DEFAULT_P0_ALERT_PCT)
+  const [criticalThreshold, setCriticalThreshold] = useState(DEFAULT_P0_CRITICAL_PCT)
 
   // ── Share (token público) — estado; handlers después de enrichedTimelineBuckets ──
   const [sharing, setSharing] = useState(false)
@@ -905,10 +906,12 @@ export function AnalisisGraderTurnoPage() {
             snapshot={upstreamLine.snapshot}
           />
 
-          {/* Scatter ritmo Baader vs P0% Grader (Fase 3 iter 3) */}
+          {/* Scatter ritmo Baader vs P0% Grader (Fase 3 iter 3) — usa el
+              umbral crítico configurado por el usuario, no un hardcoded */}
           <UpstreamScatterCard
             snapshot={upstreamLine.snapshot}
             timelineBuckets={enrichedTimelineBuckets}
+            criticalThreshold={criticalThreshold}
           />
 
           {/* Distribución por gate — balance del turno */}
