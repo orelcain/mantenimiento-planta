@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /**
  * Servicio centralizado de logging y manejo de errores
  */

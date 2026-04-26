@@ -58,6 +58,9 @@ export default tseslint.config(
       'no-unused-vars': 'off',
       'prefer-const': 'off',
       'no-empty': 'off',
+      // console.* directo en app = deuda técnica; usar logger de @/lib/logger.
+      // 'warn' para no bloquear CI mientras se migra el código existente.
+      'no-console': ['warn', { allow: [] }],
     },
   },
   {

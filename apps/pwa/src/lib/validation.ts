@@ -14,9 +14,17 @@ export const emailSchema = z.string()
   .min(5, 'Email muy corto')
   .max(100, 'Email muy largo')
 
+// Solo para login — validación mínima para no romper contraseñas existentes
 export const passwordSchema = z.string()
   .min(6, 'La contraseña debe tener al menos 6 caracteres')
   .max(50, 'La contraseña no puede tener más de 50 caracteres')
+
+// Para crear/cambiar contraseña — política segura
+export const createPasswordSchema = z.string()
+  .min(12, 'La contraseña debe tener al menos 12 caracteres')
+  .max(50, 'La contraseña no puede tener más de 50 caracteres')
+  .regex(/[A-Z]/, 'Debe contener al menos una letra mayúscula')
+  .regex(/[0-9]/, 'Debe contener al menos un número')
 
 export const nameSchema = z.string()
   .min(2, 'Nombre muy corto')
@@ -90,7 +98,7 @@ export const userRoleSchema = z.enum(['admin', 'supervisor', 'tecnico', 'usuario
 
 export const createUserSchema = z.object({
   email: emailSchema,
-  password: passwordSchema,
+  password: createPasswordSchema,
   nombre: nameSchema,
   apellido: nameSchema,
   rol: userRoleSchema,
@@ -110,7 +118,7 @@ export const loginSchema = z.object({
 
 export const signUpSchema = z.object({
   email: emailSchema,
-  password: passwordSchema,
+  password: createPasswordSchema,
   nombre: nameSchema,
   apellido: nameSchema,
   inviteCode: z.string()
