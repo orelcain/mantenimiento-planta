@@ -8,7 +8,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useSuggestionEngine } from '@/services/grader/suggestions/useSuggestionEngine'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch, Label } from '@/components/ui'
-import { Save, FolderOpen, ChevronRight, Trash2, ChevronDown, Plus } from 'lucide-react'
+import { Save, FolderOpen, ChevronRight, Trash2, ChevronDown, Settings2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore, useIsAdmin } from '@/store'
 import {
@@ -17,7 +17,7 @@ import {
   deleteGatesTemplate,
   type GatesTemplate,
 } from '@/services/grader/graderSession.service'
-import { getModuleRanges, saveModuleRanges, saveModulePhysicalConfig, saveModuleShiftSchedule } from '@/services/grader/graderModuleConfig.service'
+import { getModuleRanges, saveModulePhysicalConfig, saveModuleShiftSchedule } from '@/services/grader/graderModuleConfig.service'
 import { saveConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
 import { listDailySummariesByRange } from '@/services/grader/graderDailySummary.service'
 import { useGraderSelectionStore } from '@/store/graderSelectionStore'
@@ -37,6 +37,7 @@ import type {
 import { CALIBRE_WEIGHT_RANGES, DEFAULT_PHYSICAL_CONFIG } from '@/services/grader/graderAnalytics'
 import { getGradingBelt, GRADING_BELT_DEFAULT_MPS } from '@/services/grader/graderBeltHelpers'
 import type { GraderBeltId } from '@/services/grader/graderBeltHelpers'
+import { GlobalSettingsModal } from '@/components/grader/GlobalSettingsModal'
 import { TachMeasurementModal } from '@/components/grader/modals/TachMeasurementModal'
 import { SlowMoMeasurementModal } from '@/components/grader/modals/SlowMoMeasurementModal'
 import { Z2CaptureModal } from '@/components/grader/modals/Z2CaptureModal'
@@ -333,34 +334,20 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
     historicalSummaries: fallbackSummaries,
   })
 
-  const updateWeightRange = (idx: number, patch: Partial<CalibreWeightRange>) => {
-    const ranges: CalibreWeightRange[] = activeRanges.map((r, i) => {
-      if (i !== idx) return r
-      const next = { ...r, ...patch }
-      return {
-        ...next,
-        label: buildRangeLabel(next.calibre, next.minGrams, next.maxGrams),
-      }
-    })
-    setConfig((c) => ({ ...c, customWeightRanges: sortRanges(ranges) }))
-  }
+  const [globalSettingsOpen, setGlobalSettingsOpen] = useState(false)
 
-  const addWeightRange = () => {
-    const newRange: CalibreWeightRange = {
-      calibre: 'Nuevo calibre',
-      label: buildRangeLabel('Nuevo calibre', 0, 0),
-      minGrams: 0,
-      maxGrams: 0,
+  function handleGlobalSettingsClose(open: boolean) {
+    setGlobalSettingsOpen(open)
+    if (!open) {
+      getModuleRanges().then((cfg) => {
+        if (cfg?.customWeightRanges && cfg.customWeightRanges.length > 0) {
+          setConfig((c) => ({ ...c, customWeightRanges: cfg.customWeightRanges }))
+        } else {
+          setConfig((c) => ({ ...c, customWeightRanges: [] }))
+        }
+      }).catch(() => {})
     }
-    const ranges = sortRanges([...activeRanges, newRange])
-    setConfig((c) => ({ ...c, customWeightRanges: ranges }))
   }
-
-  const removeWeightRange = (idx: number) => {
-    const ranges = activeRanges.filter((_, i) => i !== idx)
-    setConfig((c) => ({ ...c, customWeightRanges: ranges }))
-  }
-
 
   const updateShiftSchedule = (idx: number, patch: Partial<typeof shiftSchedule[number]>) => {
     setShiftSchedule((prev) => {
@@ -418,19 +405,6 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
         moduleConfigLoadedRef.current = true
       })
   }, [setPhysicalConfig])
-
-  // Autosave rangos globales (debounce)
-  useEffect(() => {
-    if (!user || !moduleConfigLoadedRef.current) return
-    if (!config.customWeightRanges || config.customWeightRanges.length === 0) return
-    setSaveStatus('saving')
-    const timer = setTimeout(() => {
-      saveModuleRanges({ ranges: config.customWeightRanges || [], updatedBy: user.id })
-        .then(() => setSaveStatus('saved'))
-        .catch(() => setSaveStatus('idle'))
-    }, 800)
-    return () => clearTimeout(timer)
-  }, [config.customWeightRanges, user])
 
   // Autosave physicalConfig (debounce)
   useEffect(() => {
@@ -986,75 +960,36 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
         {(tabbed || showWeightRanges) && (
           <CardContent>
             <p className="text-xs text-muted-foreground mb-3">
-              Define los rangos de peso (en gramos) para cada calibre.
-              El análisis usará estos valores para clasificar piezas.
+              Rangos de política de planta — se aplican a todos los turnos. Para editar, usá la configuración global.
             </p>
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto mb-3">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b text-left">
-                    <th className="py-2 px-2">Calibre</th>
-                    <th className="py-2 px-2">Mín (g)</th>
-                    <th className="py-2 px-2">Máx (g)</th>
-                    <th className="py-2 px-2">Vista</th>
-                    <th className="py-2 px-2"></th>
+                  <tr className="border-b text-left text-muted-foreground">
+                    <th className="py-1.5 px-2">Calibre</th>
+                    <th className="py-1.5 px-2">Mín (g)</th>
+                    <th className="py-1.5 px-2">Máx (g)</th>
+                    <th className="py-1.5 px-2">Rango</th>
                   </tr>
                 </thead>
                 <tbody>
                   {activeRanges.map((r, idx) => (
-                    <tr key={idx} className="border-b hover:bg-muted/30">
-                      <td className="py-2 px-2">
-                        <Input
-                          value={r.calibre}
-                          onChange={(e) => updateWeightRange(idx, { calibre: e.target.value })}
-                          className="h-8 text-xs w-28"
-                          placeholder="0-2 lb"
-                        />
-                      </td>
-                      <td className="py-2 px-2">
-                        <Input
-                          type="number"
-                          value={r.minGrams}
-                          onChange={(e) => updateWeightRange(idx, { minGrams: Number(e.target.value) })}
-                          className="h-8 text-xs w-24 font-mono"
-                          step="1"
-                        />
-                      </td>
-                      <td className="py-2 px-2">
-                        <Input
-                          type="number"
-                          value={r.maxGrams}
-                          onChange={(e) => updateWeightRange(idx, { maxGrams: Number(e.target.value) })}
-                          className="h-8 text-xs w-24 font-mono"
-                          step="1"
-                        />
-                      </td>
-                      <td className="py-2 px-2 text-xs text-muted-foreground">
+                    <tr key={idx} className="border-b border-border/30 hover:bg-muted/20">
+                      <td className="py-1.5 px-2 font-mono text-xs">{r.calibre}</td>
+                      <td className="py-1.5 px-2 text-xs tabular-nums">{r.minGrams.toLocaleString('es-CL')}</td>
+                      <td className="py-1.5 px-2 text-xs tabular-nums">{r.maxGrams.toLocaleString('es-CL')}</td>
+                      <td className="py-1.5 px-2 text-xs text-muted-foreground">
                         {r.label || buildRangeLabel(r.calibre, r.minGrams, r.maxGrams)}
-                      </td>
-                      <td className="py-2 px-2 text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeWeightRange(idx)}
-                          title="Eliminar calibre"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <div className="mt-3 flex items-center justify-between gap-2 flex-wrap">
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={addWeightRange}>
-                  <Plus className="h-3 w-3 mr-1" />
-                  Agregar calibre
-                </Button>
-              </div>
-            </div>
+            <Button variant="outline" size="sm" onClick={() => setGlobalSettingsOpen(true)}>
+              <Settings2 className="h-3 w-3 mr-1.5" />
+              Editar rangos en configuración global
+            </Button>
           </CardContent>
         )}
       </Card>
@@ -1282,6 +1217,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
           flipperDelayCloseMs:  values.delayFlipperCloseMs,
         }))}
       />
+      <GlobalSettingsModal open={globalSettingsOpen} onOpenChange={handleGlobalSettingsClose} />
     </div>
   )
 }
