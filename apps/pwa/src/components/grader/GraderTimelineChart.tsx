@@ -493,11 +493,11 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
     }
   }, [weightSeries, zoomRange])
 
-  const handleDataZoom = useCallback((params: any) => {
+  const handleDataZoom = useCallback((params: { batch?: Array<{ start?: number; end?: number }>; start?: number; end?: number }) => {
     if (params.batch?.[0]) {
       setZoomRange({ start: params.batch[0].start ?? 0, end: params.batch[0].end ?? 100 })
     } else if (params.start != null) {
-      setZoomRange({ start: params.start, end: params.end })
+      setZoomRange({ start: params.start, end: params.end ?? 100 })
     }
   }, [])
 
