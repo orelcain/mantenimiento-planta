@@ -1,5 +1,5 @@
 rules_version = '2';
-// Version: v1.2.0 - Updated: 2026-04-26
+// Version: v1.2.1 - Updated: 2026-04-26
 // Sistema de jerarquías anidadas de 8 niveles con validación mejorada
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -893,33 +893,34 @@ service cloud.firestore {
       allow delete: if isAdmin();
 
       // Subcolección de cotas/dimensiones
-      // Lectura pública (QR), escritura requiere rol técnico mínimo
+      // Lectura pública (QR); escritura requiere usuario activo (incluye rol 'usuario')
+      // Wiki-like: cualquier empleado activo puede anotar/medir; QR público es read-only.
       match /dimensions/{dimensionId} {
         allow read: if true;
-        allow create, update: if isTechnician();
-        allow delete: if isTechnician();
+        allow create, update: if isActiveUser();
+        allow delete: if isActiveUser();
       }
 
       // Subcolección de overrides de material (colores de pintura)
-      // Lectura pública (QR), escritura requiere rol técnico mínimo
+      // Lectura pública (QR); escritura requiere usuario activo
       match /materialOverrides/{overrideId} {
         allow read: if true;
-        allow create, update: if isTechnician();
-        allow delete: if isTechnician();
+        allow create, update: if isActiveUser();
+        allow delete: if isActiveUser();
       }
 
       // Subcolección de anotaciones (Pines de interés)
       match /annotations/{annotationId} {
         allow read: if true;
-        allow create, update: if isTechnician();
-        allow delete: if isTechnician();
+        allow create, update: if isActiveUser();
+        allow delete: if isActiveUser();
       }
 
       // Subcolección de enlaces interactivos (binding asset → grupo GLB)
       match /interactiveBindings/{bindingId} {
         allow read: if true;
-        allow create, update: if isTechnician();
-        allow delete: if isTechnician();
+        allow create, update: if isActiveUser();
+        allow delete: if isActiveUser();
       }
     }
 
