@@ -1,4 +1,5 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import { doc, getDoc, serverTimestamp } from 'firebase/firestore'
 import { db } from '../services/firebase'
@@ -354,7 +355,20 @@ export function CalendarioMantencionPage() {
   const [exportScope, setExportScope] = useState<ExportScope>('month')
   const [exportSpanCount, setExportSpanCount] = useState(2)
   const [showAllCols, setShowAllCols] = useState(false)
-  const [activeTab, setActiveTab] = useState<TabId>('edicion')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [activeTab, setActiveTab] = useState<TabId>(() => {
+    const fromUrl = searchParams.get('tab')
+    const valid: TabId[] = ['edicion', 'plantillas', 'horas', 'tecnicos', 'control']
+    return (valid as string[]).includes(fromUrl ?? '') ? (fromUrl as TabId) : 'edicion'
+  })
+
+  // Sincronizar tab a URL param
+  useEffect(() => {
+    setSearchParams(p => {
+      if (activeTab && activeTab !== 'edicion') p.set('tab', activeTab); else p.delete('tab')
+      return p
+    }, { replace: true })
+  }, [activeTab, setSearchParams])
   const [newTechName, setNewTechName] = useState('')
   const [newTechRut, setNewTechRut] = useState('')
   const [newTechGroup, setNewTechGroup] = useState('A')
