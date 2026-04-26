@@ -120,23 +120,50 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot }: HeroSc
               value={summary.totalWeightKg != null ? summary.totalWeightKg.toFixed(0) : '—'}
             />
           </div>
-          {baaderTotal > 0 && (
-            <div className="grid grid-cols-3 gap-3 pt-2 border-t border-border/40">
-              <MetricTile
-                label="Upstream Baader"
-                value={baaderTotal.toLocaleString('es-CL')}
-                sub="ciclos totales"
-              />
-              <MetricTile
-                label="Rechazo estimado"
-                value={estimatedRejected != null ? estimatedRejected.toLocaleString('es-CL') : '—'}
-                sub={rejectedPct != null ? `${rejectedPct}%` : undefined}
-              />
-              <MetricTile
-                label="Máquinas"
-                value={String(upstreamSnapshot!.machines.length)}
-                sub="Baader activas"
-              />
+          {baaderTotal > 0 && upstreamSnapshot && (
+            <div className="pt-2 border-t border-border/40 space-y-1.5">
+              <div className="flex items-baseline justify-between flex-wrap gap-2 text-xs">
+                <div className="flex items-baseline gap-2">
+                  <span className="font-semibold text-muted-foreground uppercase tracking-wider">
+                    Upstream Baader
+                  </span>
+                  <span className="tabular-nums font-semibold text-foreground">
+                    {baaderTotal.toLocaleString('es-CL')}
+                  </span>
+                  <span className="text-muted-foreground">ciclos</span>
+                </div>
+                {estimatedRejected != null && estimatedRejected > 0 && (
+                  <span
+                    className="text-amber-400 cursor-help"
+                    title="Diferencia entre ciclos Baader y piezas Grader. Incluye caídas, partidas, descartes manuales y diferencia de timing — no es rechazo de las Baader (las Baader evisceran, no rechazan; el rechazo de calidad ya está en P0)."
+                  >
+                    merma{' '}
+                    <span className="tabular-nums font-semibold">
+                      {estimatedRejected.toLocaleString('es-CL')}
+                    </span>
+                    <span className="text-muted-foreground"> ({rejectedPct}%)</span>
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {upstreamSnapshot.machines.map((m) => {
+                  const sharePct = (m.totalCycles / baaderTotal) * 100
+                  const uptimePct = (m.shiftRuntime * 100).toFixed(0)
+                  return (
+                    <div key={m.machineid} className="text-center">
+                      <div className="text-base font-semibold tabular-nums">
+                        {m.totalCycles.toLocaleString('es-CL')}
+                      </div>
+                      <div className="text-xs text-muted-foreground truncate" title={m.machineName}>
+                        {m.machineName}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground/70 tabular-nums">
+                        {sharePct.toFixed(0)}% línea · {uptimePct}% uptime
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           )}
         </div>
