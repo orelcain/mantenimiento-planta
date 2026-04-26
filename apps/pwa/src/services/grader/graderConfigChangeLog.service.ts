@@ -138,7 +138,7 @@ const TRACKED_FIELDS: readonly string[] = [
   'avgFishSpacingOnZetaBeltM',
 ]
 
-export function diffPhysicalConfig<T extends Record<string, any>>(
+export function diffPhysicalConfig<T extends Record<string, unknown>>(
   prev: T,
   next: T,
 ): Array<{ field: string; prevValue: unknown; nextValue: unknown }> {

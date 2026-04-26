@@ -24,7 +24,7 @@ export async function exportRepuestosToExcel(
 
   // Hoja 1: Datos principales
   const mainData = repuestos.map((rep) => {
-    const row: Record<string, any> = {
+    const row: Record<string, unknown> = {
       'Código SAP': rep.codigoSAP || '',
       'Texto Breve': rep.textoBreve || '',
       'Descripción': rep.descripcion || '',

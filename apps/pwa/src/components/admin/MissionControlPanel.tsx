@@ -80,8 +80,8 @@ function CorrectionRow({ correction: c, onDelete, onToggle }: {
   return (
     <div className={`flex items-start gap-2 p-2 rounded border text-xs ${c.active ? 'border-amber-500/20 bg-amber-500/5' : 'border-border bg-muted/30 opacity-60'}`}>
       <div className="flex-1 min-w-0">
-        <div className="text-muted-foreground truncate">❓ "{c.userQuery}"</div>
-        <div className="text-red-400 truncate text-[10px]">❌ {c.wrongResponse.slice(0, 80)}...</div>
+        <div className="text-muted-foreground truncate" title={c.userQuery}>❓ "{c.userQuery}"</div>
+        <div className="text-red-400 truncate text-[10px]" title={c.wrongResponse}>❌ {c.wrongResponse.slice(0, 80)}...</div>
         <div className="text-green-400 text-[10px]">✅ {c.correctResponse.slice(0, 120)}</div>
         {c.equipmentName && <div className="text-[9px] text-muted-foreground">🔧 {c.equipmentName}</div>}
         <div className="text-[9px] text-muted-foreground mt-0.5">Usada {c.usageCount}x</div>
@@ -447,7 +447,7 @@ export function MissionControlPanel() {
                   <span className="font-medium shrink-0">{log.agentName}</span>
 
                   {/* Preview */}
-                  <span className="text-muted-foreground truncate flex-1 min-w-0">
+                  <span className="text-muted-foreground truncate flex-1 min-w-0" title={log.taskPreview}>
                     {log.taskPreview}
                   </span>
 

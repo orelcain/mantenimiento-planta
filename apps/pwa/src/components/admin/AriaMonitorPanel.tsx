@@ -242,7 +242,7 @@ export function AriaMonitorPanel() {
                 return (
                   <div key={u.userId} className="flex items-center gap-3 text-sm py-1.5 border-b border-border/50 last:border-0">
                     <div className="flex-1 min-w-0">
-                      <span className="font-medium truncate block">{u.userName || u.userId.slice(0, 8)}</span>
+                      <span className="font-medium truncate block" title={u.userName || u.userId}>{u.userName || u.userId.slice(0, 8)}</span>
                     </div>
                     <div className="flex items-center gap-2 text-xs">
                       <span className="font-mono">{u.count}</span>
@@ -323,7 +323,7 @@ export function AriaMonitorPanel() {
               return (
                 <div key={u.id} className="flex items-center gap-3 py-1.5">
                   <div className="flex-1 min-w-0">
-                    <span className="text-sm font-medium truncate block">
+                    <span className="text-sm font-medium truncate block" title={`${u.nombre} ${u.apellido}`}>
                       {u.nombre} {u.apellido}
                     </span>
                     <span className="text-xs text-muted-foreground capitalize">{u.rol}</span>

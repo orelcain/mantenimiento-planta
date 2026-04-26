@@ -52,7 +52,7 @@ export interface HierarchyNode {
   orden: number // Para ordenar hermanos
   activo: boolean
   descripcion?: string
-  metadata?: Record<string, any> // Datos adicionales específicos del nivel
+  metadata?: Record<string, unknown> // Datos adicionales específicos del nivel
   creadoPor: string
   creadoEn: Timestamp
   actualizadoEn: Timestamp
@@ -88,7 +88,7 @@ export interface CreateHierarchyNodeInput {
   nivel: HierarchyLevel
   parentId: string | null
   descripcion?: string
-  metadata?: Record<string, any>
+  metadata?: Record<string, unknown>
 }
 
 // Datos para actualizar un nodo
@@ -97,7 +97,7 @@ export interface UpdateHierarchyNodeInput {
   codigo?: string
   descripcion?: string
   activo?: boolean
-  metadata?: Record<string, any>
+  metadata?: Record<string, unknown>
 }
 
 // Filtros para búsqueda de nodos

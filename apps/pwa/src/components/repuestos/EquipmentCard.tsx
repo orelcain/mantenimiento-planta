@@ -177,7 +177,7 @@ export function EquipmentCard({
     const newAlias = trimmed && trimmed.toUpperCase() !== equipment.nombre ? trimmed.toUpperCase() : undefined
     setSaving(true)
     try {
-      const updateData: Record<string, any> = { actualizadoEn: Timestamp.now() }
+      const updateData: Record<string, unknown> = { actualizadoEn: Timestamp.now() }
       if (newAlias) {
         updateData.alias = newAlias
       } else {
