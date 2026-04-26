@@ -4,19 +4,19 @@
  * Marel HG es la primera estación del pipeline planta Chonchi:
  * Marel HG → 3 Baader 142 → línea manual → Grader.
  *
- * Marel HG cuenta:
- *   - Total de piezas que ingresan (con cabeza)
- *   - "Controladas": las que pesa correctamente
- *   - "No controladas": 1-7% típico — escapan al pesaje y van a línea manual
+ * IMPORTANTE — Reset en colación:
+ *   En el descanso de colación la pantalla Marel HG entra en modo
+ *   "contrastación" y el contador se resetea. El conteo pre-colación
+ *   queda guardado en Control de Producción pero no visible en pantalla.
+ *   Por eso se soportan 2 segmentos por turno:
+ *     · Segmento 1 — captura pre-colación (operador captura justo antes de salir)
+ *     · Segmento 2 — captura post-colación (al cierre del turno, ya con conteo fresco)
+ *   Los campos `totalInput` y `uncontrolled` en la raíz son siempre la SUMA de ambos.
+ *   Si solo hay un segmento (no hubo reset o solo se pudo capturar una vez), los
+ *   campos raíz contienen ese único valor.
  *
- * Esa data NO está automatizada (no hay API ni OPC UA accesibles), por eso
- * el operador la captura manualmente UNA vez por turno desde la pantalla
- * Marel HG. Con esto + Shoplogix Baader procesadas + Grader piezas, podemos
- * deducir el rechazo Baader puro:
- *
+ * Con totalInput + uncontrolled del turno + Shoplogix Baader procesadas + Grader piezas:
  *   ΣBaader_rechazadas ≈ Grader_total − ΣBaader_procesadas − Marel_no_controladas
- *
- * Sin esta captura el número estimado mezcla rechazos + no-controladas.
  *
  * Persistencia: sub-doc `graderDailySummaries/{summaryId}/meta/marelHg`
  * (consistente con `meta/pauses` y `meta/timeline`).
@@ -28,18 +28,31 @@ import { db } from '../firebase'
 const COLLECTION = 'graderDailySummaries'
 const META_SUB = 'meta'
 const MAREL_HG_DOC = 'marelHg'
-const SCHEMA_VERSION = 1
+const SCHEMA_VERSION = 2
+
+/** Un segmento de conteo Marel HG (pre-colación o post-colación). */
+export interface MarelHgSegment {
+  /** "pre-colación" | "post-colación" */
+  label: string
+  totalInput: number
+  uncontrolled: number
+  /** ISO timestamp del momento en que se registró este segmento. */
+  capturedAt: string
+}
 
 export interface MarelHgCapture {
-  /** Total de piezas que ingresaron a Marel HG (con cabeza). */
+  /**
+   * Total de piezas del turno completo (suma de todos los segmentos).
+   * Si hubo reset en colación = Σ segmentos; si no = valor único capturado.
+   */
   totalInput: number
-  /** Cantidad de piezas no controladas (no pesadas correctamente). */
+  /** No controladas del turno completo (suma de segmentos). */
   uncontrolled: number
   /** Peso promedio de las piezas con cabeza, en gramos. */
   avgWeightHeadGrams: number
   /** Notas opcionales del operador (ej. paros Marel, condiciones especiales). */
   notes?: string
-  /** ISO timestamp del momento de captura. */
+  /** ISO timestamp de la última grabación. */
   capturedAt: string
   /** UID del operador que capturó. */
   capturedBy: string
@@ -47,11 +60,38 @@ export interface MarelHgCapture {
   capturedByName: string
   /** Versión del schema para migraciones futuras. */
   schemaVersion: number
+  /**
+   * Desglose por segmento si hubo reset en colación.
+   * Presente solo cuando se capturaron 2 períodos; ausente en captura única.
+   */
+  segments?: MarelHgSegment[]
 }
 
 /** Persistencia: lo que se guarda en Firestore. */
 interface MarelHgCaptureDoc extends MarelHgCapture {
   updatedAt: string
+}
+
+function parseCapture(data: Partial<MarelHgCaptureDoc>): MarelHgCapture {
+  const base: MarelHgCapture = {
+    totalInput: data.totalInput ?? 0,
+    uncontrolled: data.uncontrolled ?? 0,
+    avgWeightHeadGrams: data.avgWeightHeadGrams ?? 0,
+    notes: data.notes,
+    capturedAt: data.capturedAt ?? '',
+    capturedBy: data.capturedBy ?? '',
+    capturedByName: data.capturedByName ?? '',
+    schemaVersion: data.schemaVersion ?? SCHEMA_VERSION,
+  }
+  if (Array.isArray(data.segments) && data.segments.length > 0) {
+    base.segments = data.segments.map((s) => ({
+      label: s.label ?? '',
+      totalInput: s.totalInput ?? 0,
+      uncontrolled: s.uncontrolled ?? 0,
+      capturedAt: s.capturedAt ?? '',
+    }))
+  }
+  return base
 }
 
 /**
@@ -64,16 +104,7 @@ export async function getMarelHgCapture(summaryId: string): Promise<MarelHgCaptu
   if (!snap.exists()) return null
   const data = snap.data() as Partial<MarelHgCaptureDoc>
   if (typeof data.totalInput !== 'number') return null
-  return {
-    totalInput: data.totalInput,
-    uncontrolled: data.uncontrolled ?? 0,
-    avgWeightHeadGrams: data.avgWeightHeadGrams ?? 0,
-    notes: data.notes,
-    capturedAt: data.capturedAt ?? '',
-    capturedBy: data.capturedBy ?? '',
-    capturedByName: data.capturedByName ?? '',
-    schemaVersion: data.schemaVersion ?? SCHEMA_VERSION,
-  }
+  return parseCapture(data)
 }
 
 /**
@@ -91,16 +122,7 @@ export function subscribeMarelHgCapture(
       if (!snap.exists()) { callback(null); return }
       const data = snap.data() as Partial<MarelHgCaptureDoc>
       if (typeof data.totalInput !== 'number') { callback(null); return }
-      callback({
-        totalInput: data.totalInput,
-        uncontrolled: data.uncontrolled ?? 0,
-        avgWeightHeadGrams: data.avgWeightHeadGrams ?? 0,
-        notes: data.notes,
-        capturedAt: data.capturedAt ?? '',
-        capturedBy: data.capturedBy ?? '',
-        capturedByName: data.capturedByName ?? '',
-        schemaVersion: data.schemaVersion ?? SCHEMA_VERSION,
-      })
+      callback(parseCapture(data))
     },
     () => { callback(null) },
   )
@@ -108,8 +130,9 @@ export function subscribeMarelHgCapture(
 
 /**
  * Guarda (crea o sobrescribe) la captura para un turno.
- * El caller debe pasar el uid + nombre del operador. Se reescribe completo
- * cada vez (no parche): la captura es atómica por turno.
+ *
+ * Si `segments` está presente (2 períodos), `totalInput` y `uncontrolled`
+ * deben ser la suma de ambos segmentos — el caller es responsable de sumarlos.
  */
 export async function saveMarelHgCapture(
   summaryId: string,
@@ -120,6 +143,7 @@ export async function saveMarelHgCapture(
     notes?: string
     capturedBy: string
     capturedByName: string
+    segments?: MarelHgSegment[]
   },
 ): Promise<void> {
   if (!summaryId) throw new Error('saveMarelHgCapture: summaryId vacío')
@@ -143,6 +167,7 @@ export async function saveMarelHgCapture(
     schemaVersion: SCHEMA_VERSION,
     updatedAt: now,
     ...(payload.notes && payload.notes.trim() ? { notes: payload.notes.trim() } : {}),
+    ...(payload.segments && payload.segments.length > 0 ? { segments: payload.segments } : {}),
   }
 
   const ref = doc(db, COLLECTION, summaryId, META_SUB, MAREL_HG_DOC)
@@ -158,8 +183,7 @@ export async function saveMarelHgCapture(
  *
  * Asume que las rechazadas Baader vuelven todas vía línea manual al Grader,
  * y que las no-controladas Marel también llegan al Grader vía línea manual.
- * La merma real de cinta (caídas, partidas) se considera despreciable —
- * podría refinar el modelo cuando tengamos métrica de merma física.
+ * La merma real de cinta (caídas, partidas) se considera despreciable.
  */
 export function deriveBaaderRejection(args: {
   graderTotalPieces: number
