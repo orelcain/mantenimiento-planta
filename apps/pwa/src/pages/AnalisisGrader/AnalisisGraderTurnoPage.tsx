@@ -44,6 +44,7 @@ import { deriveSuggestions } from '@/services/grader/actionPlanSuggestions'
 import { correlatePausesWithUpstream, summarizeCorrelations } from '@/services/shoplogix/shoplogixCorrelation'
 import { buildScatterData, scatterSlopeMagnitude } from '@/components/grader/shiftTimelineHelpers'
 import { DEFAULT_P0_ALERT_PCT, DEFAULT_P0_CRITICAL_PCT } from '@/services/grader/graderP0Thresholds'
+import { fmtTime } from '@/services/grader/graderTimeFormat'
 import { UpstreamMachinesPanel } from '@/components/grader/UpstreamMachinesPanel'
 import { UpstreamCorrelationCard } from '@/components/grader/UpstreamCorrelationCard'
 import { UpstreamScatterCard } from '@/components/grader/UpstreamScatterCard'
@@ -129,12 +130,6 @@ function dominantCause(
 
 // ── M2: Helpers de export CSV ─────────────────────────────────────────────────
 
-/** HH:MM de un ISO con convención Z-planta (igual que PauseAnnotationDialog) */
-function fmtTimeHHMM(iso: string): string {
-  const d = new Date(iso)
-  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
-}
-
 function exportTurnoCsv(
   dateKey: string,
   shiftLabel: string,
@@ -168,8 +163,8 @@ function exportTurnoCsv(
     for (const p of pauses) {
       const tag = resolveEffectiveTag(p)
       lines.push([
-        fmtTimeHHMM(p.startAt),
-        fmtTimeHHMM(p.endAt),
+        fmtTime(p.startAt),
+        fmtTime(p.endAt),
         Math.round(p.durationSec / 60),
         p.tier,
         tag ? esc(`${tag.emoji} ${tag.label}`) : '—',

@@ -14,6 +14,7 @@ import { Card, CardContent, Badge } from '@/components/ui'
 import { Link2, ChevronDown, ChevronRight, AlertTriangle, Info, CheckCircle2, Factory, Clock } from 'lucide-react'
 import type { Pause } from '@/services/grader/types'
 import type { UpstreamLineSnapshot } from '@/services/shoplogix/types'
+import { fmtTime, fmtDurationSec } from '@/services/grader/graderTimeFormat'
 import {
   correlatePausesWithUpstream,
   summarizeCorrelations,
@@ -27,17 +28,6 @@ interface Props {
   snapshot: UpstreamLineSnapshot | null | undefined
 }
 
-function fmtHHmm(d: Date): string {
-  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
-}
-
-function fmtDur(sec: number): string {
-  const m = Math.round(sec / 60)
-  if (m < 60) return `${m} min`
-  const h = Math.floor(m / 60)
-  const rm = m % 60
-  return rm > 0 ? `${h} h ${rm} min` : `${h} h`
-}
 
 function fmtLead(sec: number): string {
   if (sec === 0) return 'simultáneo'
@@ -75,10 +65,10 @@ function CorrelationRow({ corr, expanded, onToggle }: {
           : <ChevronRight className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />}
         <Icon className={`w-4 h-4 flex-shrink-0 ${s.text}`} />
         <span className="text-xs text-slate-400 tabular-nums flex-shrink-0">
-          {fmtHHmm(corr.pauseStart)}
+          {fmtTime(corr.pauseStart)}
         </span>
         <Badge variant="outline" className={`text-[10px] px-1.5 py-0 h-4 ${s.text} ${s.border} flex-shrink-0`}>
-          {fmtDur(corr.pauseDurSec)}
+          {fmtDurationSec(corr.pauseDurSec)}
         </Badge>
         <span className={`text-xs ${s.text} truncate`}>{corr.hypothesis}</span>
         <Badge
@@ -98,7 +88,7 @@ function CorrelationRow({ corr, expanded, onToggle }: {
               <span>{c.stateName}</span>
               {c.reason && <span className="text-slate-500">· {c.reason}</span>}
               <span className="ml-auto tabular-nums text-slate-500">
-                {fmtHHmm(c.stateStart)}–{fmtHHmm(c.stateEnd)}
+                {fmtTime(c.stateStart)}–{fmtTime(c.stateEnd)}
               </span>
               <span className="tabular-nums text-slate-600 w-16 text-right">
                 lead {fmtLead(c.leadSec)}
@@ -170,11 +160,11 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
           {summary.upstreamCaused > 0 && (
             <div
               className="flex items-center gap-1.5 text-xs text-rose-300 tabular-nums"
-              title={`${summary.upstreamCaused} de ${summary.total} paros del Grader correlacionaron con eventos upstream. Tiempo muerto del Grader que coincidió con paros Baader: ${fmtDur(summary.upstreamCausedDurSec)} (${Math.round(upstreamShareOfPauseTime * 100)}% del tiempo muerto del turno).`}
+              title={`${summary.upstreamCaused} de ${summary.total} paros del Grader correlacionaron con eventos upstream. Tiempo muerto del Grader que coincidió con paros Baader: ${fmtDurationSec(summary.upstreamCausedDurSec)} (${Math.round(upstreamShareOfPauseTime * 100)}% del tiempo muerto del turno).`}
             >
               <Clock className="w-3.5 h-3.5" />
               <span className="font-semibold">
-                {fmtDur(summary.upstreamCausedDurSec)} de paro upstream
+                {fmtDurationSec(summary.upstreamCausedDurSec)} de paro upstream
               </span>
               <span className="opacity-70">
                 ({summary.upstreamCaused} de {summary.total} paros · {Math.round(upstreamShareOfPauseTime * 100)}% del tiempo muerto)
@@ -220,7 +210,7 @@ export function UpstreamCorrelationCard({ pauses, snapshot }: Props) {
                         <span className="min-w-[8rem]">{m.machineName}</span>
                         <span className="opacity-80">{m.pauseCount} paro{m.pauseCount !== 1 ? 's' : ''}</span>
                         <span>·</span>
-                        <span className="font-semibold">{fmtDur(m.totalOverlapSec)} overlap</span>
+                        <span className="font-semibold">{fmtDurationSec(m.totalOverlapSec)} overlap</span>
                         {/* Barra visual proporcional al share */}
                         <div className="flex-1 h-1.5 rounded-full bg-slate-800/80 overflow-hidden ml-1 max-w-[120px]">
                           <div

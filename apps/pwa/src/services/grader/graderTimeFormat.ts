@@ -28,13 +28,14 @@
 export { fmtTime } from '@/components/grader/shiftTimelineHelpers'
 
 /**
- * Formatea ISO string a `HH:MM:SS` en hora local de planta.
+ * Formatea un timestamp a `HH:MM:SS` en hora local de planta.
  *
+ * Acepta string ISO / Date / number (epoch ms) — misma firma que `fmtTime`.
  * Útil cuando el contexto requiere precisión a segundos (ej: detalle pieza
- * por pieza en `MinuteDetailDialog`).
+ * por pieza en `MinuteDetailDialog`, o el panel de detalle de estado Baader).
  */
-export function fmtTimeWithSec(iso: string): string {
-  const d = new Date(iso)
+export function fmtTimeWithSec(input: string | Date | number): string {
+  const d = input instanceof Date ? input : new Date(input)
   return [
     String(d.getUTCHours()).padStart(2, '0'),
     String(d.getUTCMinutes()).padStart(2, '0'),

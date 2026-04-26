@@ -20,6 +20,7 @@ import ReactECharts from 'echarts-for-react'
 import type { UpstreamProductionInterval } from '@/services/shoplogix/types'
 import { useTimelineSyncOptional } from './useTimelineSync'
 import { useChartReadyConnect } from './useEChartsConnect'
+import { fmtTime } from '@/services/grader/graderTimeFormat'
 
 interface Props {
   intervals: UpstreamProductionInterval[]
@@ -35,9 +36,6 @@ const COLOR_MAP: Record<UpstreamProductionInterval['color'], string> = {
   gray:   'rgba(51, 65, 85, 0.6)',    // slate-700
 }
 
-function fmtHHmm(d: Date): string {
-  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
-}
 
 function fmtPct(x: number, decimals = 1): string {
   if (!isFinite(x)) return '—'
@@ -182,10 +180,7 @@ export function ProductionBarsEC({ intervals, threshold, windowStart, windowEnd 
         show: true,
         color: '#64748b',
         fontSize: 9,
-        formatter: (value: number) => {
-          const d = new Date(value)
-          return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
-        },
+        formatter: (value: number) => fmtTime(value),
       },
       splitLine: { show: false },
     },
@@ -207,7 +202,7 @@ export function ProductionBarsEC({ intervals, threshold, windowStart, windowEnd 
         const m = params?.data?.meta
         if (!m) return ''
         return [
-          `<b>${fmtHHmm(m.startAt)}</b>`,
+          `<b>${fmtTime(m.startAt)}</b>`,
           `<span style="color:#10b981">▮</span> Producido: <b>${m.cycles}</b> pz`,
           `<span style="color:#a78bfa">┄</span> Objetivo: ${Math.round(m.expectedCycles)} pz`,
           `<span style="color:#94a3b8">→</span> Cumplimiento: <b>${fmtPct(m.ratio, 0)}</b>`,

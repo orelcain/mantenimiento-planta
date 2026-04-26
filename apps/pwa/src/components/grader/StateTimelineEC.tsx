@@ -20,6 +20,7 @@ import ReactECharts from 'echarts-for-react'
 import type { UpstreamMachineShift } from '@/services/shoplogix/types'
 import { useTimelineSyncOptional } from './useTimelineSync'
 import { useChartReadyConnect } from './useEChartsConnect'
+import { fmtTime, fmtDurationSec } from '@/services/grader/graderTimeFormat'
 
 interface Props {
   shift: UpstreamMachineShift
@@ -39,17 +40,6 @@ interface Props {
  * Mapea state.type a un nombre humano para el tooltip.
  * Coincide con la convención del StateTimeline HTML.
  */
-function fmtHHmm(d: Date): string {
-  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
-}
-
-function fmtDuration(sec: number): string {
-  const min = Math.round(sec / 60)
-  if (min < 60) return `${min} min`
-  const h = Math.floor(min / 60)
-  const rm = min % 60
-  return rm > 0 ? `${h} h ${rm} min` : `${h} h`
-}
 
 export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, onStateClick }: Props) {
   const echartsRef = useRef<any>(null)
@@ -216,8 +206,8 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
         const label = meta.reason ? `${meta.name}: ${meta.reason}` : meta.name
         return [
           `<b>${label}</b>`,
-          `⏱ ${fmtDuration(meta.durationSec)}`,
-          `🕐 ${fmtHHmm(meta.startAt)}–${fmtHHmm(meta.endAt)} (Chile)`,
+          `⏱ ${fmtDurationSec(meta.durationSec)}`,
+          `🕐 ${fmtTime(meta.startAt)}–${fmtTime(meta.endAt)} (Chile)`,
         ].join('<br/>')
       },
     },

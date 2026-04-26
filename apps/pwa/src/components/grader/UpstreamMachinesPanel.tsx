@@ -45,6 +45,7 @@ import { StateTimelineEC } from './StateTimelineEC'
 import { ProductionBarsEC } from './ProductionBarsEC'
 import { StateDetailPanel } from './StateDetailPanel'
 import { exportCombinedTimelinePng } from './exportCombinedTimelinePng'
+import { fmtTime, fmtDurationSec } from '@/services/grader/graderTimeFormat'
 
 interface Props {
   snapshot: UpstreamLineSnapshot | null | undefined
@@ -96,9 +97,6 @@ const PLOT_RIGHT_PAD_PX = 24
  * (Verificado con datos reales Feb 26: COLACION segments en Shoplogix marcan
  * 13:27–14:39 que corresponde a la hora real de almuerzo en Chile, no 10:27.)
  */
-function fmtHHmm(d: Date): string {
-  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
-}
 
 function fmtPct(x: number, decimals = 1): string {
   if (!isFinite(x)) return '—'
@@ -108,15 +106,6 @@ function fmtPct(x: number, decimals = 1): string {
 function fmtInt(n: number): string {
   if (!isFinite(n)) return '—'
   return Math.round(n).toLocaleString('es-CL')
-}
-
-/** "3600s" → "1 h" | "900s" → "15 min" */
-function fmtDuration(sec: number): string {
-  const min = Math.round(sec / 60)
-  if (min < 60) return `${min} min`
-  const h = Math.floor(min / 60)
-  const rm = min % 60
-  return rm > 0 ? `${h} h ${rm} min` : `${h} h`
 }
 
 // ============================================================================
@@ -233,7 +222,7 @@ function StateTimeline({
             <div key={r.reason} className="flex items-center gap-1.5" title={`${r.count} evento${r.count !== 1 ? 's' : ''}`}>
               <span className="w-2.5 h-2.5 rounded-sm shrink-0 ring-1 ring-slate-900/50" style={{ backgroundColor: r.color }} />
               <span className="text-slate-300">{r.reason}</span>
-              <span className="text-slate-500 tabular-nums">{fmtDuration(r.durationSec)}</span>
+              <span className="text-slate-500 tabular-nums">{fmtDurationSec(r.durationSec)}</span>
             </div>
           ))}
         </div>
@@ -433,7 +422,7 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
       <div className="flex items-center gap-4 text-[11px] text-slate-500">
         <span
           className="flex items-center gap-1"
-          title={`% del tiempo productivo en Uptime (excluye post-turno).\nUptime: ${fmtDuration(shift.shiftRuntimeBreakdown.uptimeSec)}\nBreak (dentro turno): ${fmtDuration(shift.shiftRuntimeBreakdown.breakSec)}\nPost-turno (excl.): ${fmtDuration(shift.shiftRuntimeBreakdown.plannedDowntimeSec)}\nDowntime: ${fmtDuration(shift.shiftRuntimeBreakdown.downtimeSec)}`}
+          title={`% del tiempo productivo en Uptime (excluye post-turno).\nUptime: ${fmtDurationSec(shift.shiftRuntimeBreakdown.uptimeSec)}\nBreak (dentro turno): ${fmtDurationSec(shift.shiftRuntimeBreakdown.breakSec)}\nPost-turno (excl.): ${fmtDurationSec(shift.shiftRuntimeBreakdown.plannedDowntimeSec)}\nDowntime: ${fmtDurationSec(shift.shiftRuntimeBreakdown.downtimeSec)}`}
         >
           <Timer className="w-3 h-3" /> {fmtPct(shift.shiftRuntime)} runtime
         </span>
@@ -446,7 +435,7 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
           </span>
         )}
         <span className="ml-auto text-[10px] text-slate-600">
-          {fmtHHmm(shift.shiftStart)} – {fmtHHmm(shift.shiftEnd)}
+          {fmtTime(shift.shiftStart)} – {fmtTime(shift.shiftEnd)}
         </span>
       </div>
 

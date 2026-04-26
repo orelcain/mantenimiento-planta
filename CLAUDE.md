@@ -845,10 +845,17 @@ principios "info útil + consistencia + cautela". Lista priorizada de lo que que
 - 🔲 **`MinuteDetailDialog`** — diálogo del click en barra. No auditado. Probable: verificar que muestra info accionable (qué causa P0 dominó ese minuto, sugerencia inmediata). (~30min)
 - 🔲 **`PauseAnnotationDialog`** — diálogo de anotación. No auditado. Verificar UX: ¿tag pre-seleccionado por autoTag? ¿muestra contexto (P0% antes/durante)? (~30min)
 
-**P0 — Cierre Shoplogix (bloqueado por user):**
-- 🔲 **Activar auto-login en producción** — correr `node scripts/set-shoplogix-creds.mjs <user> <pass>` y validar Bearer en `query.axd`. (5 min, REQUIERE CREDS)
-- 🔲 Re-sync turnos Feb 25-27 con bounds explícitos — invocar `shoplogixSyncHttp` (~15 min, requiere auto-login activo)
-- 🔲 Investigar `Planned Downtime 4h 15min` semantic — qué registra Shoplogix exactamente (~30 min)
+**P0 — Cierre Shoplogix (RESUELTO sesión 2026-04-26 madrugada):**
+- ✅ **Creds activadas en Firestore** (`system/shoplogixCredentials`) para `javier.toro@aquachile.com`. Script: `node scripts/set-shoplogix-creds.mjs --check`
+- ✅ **Re-sync Feb 25-27 completo** vía `shoplogixSyncHttp` GET — 5 turnos OK con data fresca:
+  - Feb 25 día/noche, Feb 26 día/noche, Feb 27 día → 3 Evisceradoras OK
+  - Feb 27 noche → 0 ciclos (viernes noche, sin producción — no es bug)
+- ✅ **Planned Downtime 4h 15min ACLARADO**: NO es bug. Es semántica esperada. Cuando la línea cierra antes del fin de la ventana de consulta del turno (ej: 17:45 con ventana 09-22), Shoplogix marca el período post-turno como `break` con reason "planned downtime". El normalizer (`functions/shoplogix/normalizer.js:97-113`) ya lo excluye correctamente del denominador de `shiftRuntime`. Helper `isPlannedDT(s)` documenta la convención.
+- 🟡 **DEUDA TÉCNICA — auto-login Bearer/ROPC fallando con `invalid_client`**: el `client_id=SAAS139` (hardcoded en `functions/shoplogix/auth.js:32`) NO acepta `grant_type=password` sin `client_secret`. Login devuelve `HTTP 400 {"error":"invalid_client"}`. **Sistema sigue operacional** porque `resolveShoplogixAuth` cae al fallback de cookie (`SHOPLOGIX_COOKIE` secret en GCP). Cuando esa cookie expire, opciones:
+  1. Rotar cookie manualmente en GCP secret (workaround simple)
+  2. Capturar OAuth flow real desde browser DevTools (ver si necesita `client_secret` o cambió `client_id`)
+  3. Pedir a AquaChile/Shoplogix credenciales OAuth oficiales con ROPC habilitado
+  Las creds en Firestore quedan persistidas pero ignoradas hasta que se arregle el ROPC. Un módulo admin UI permite rotarlas sin terminal: `/admin/shoplogix-credentials`.
 
 **P1 — Estructural (DEUDA ARQUITECTURAL — requiere planeación Opus):**
 - 🔲 **Refactor config Grader Fase A** — mover 12 Gates + Física al turno (`AnalisisGraderTurnoPage`), botón "Cambié gate" mid-turno + segmentación automática. **Requiere refactor storage Firestore.** Plan acordado 2026-04-19. (1-2 días, NECESITA OPUS PARA PLANEAR)
@@ -866,15 +873,7 @@ principios "info útil + consistencia + cautela". Lista priorizada de lo que que
 - 🔲 **Re-upload pieceRecords productivas** — 383 turnos × ~5M pieceRecords (script batch idempotente)
 
 **P2 — Deuda técnica leve:**
-- 🔲 9 warnings preexistentes ESLint (no introducidos por esta sesión, pero acercándose al cap=10):
-  - `parseDxfKonva.ts:49` — eslint-disable directive sin error
-  - `useUpstreamLineSnapshot.ts:98` — eslint-disable sin uso
-  - `AnalisisGraderGatesConfigPage.tsx:420,489` — useEffect missing dep `setPhysicalConfig`
-  - `AnalisisGraderTurnoPage.tsx:570` — useCallback missing dep `upstreamLine.snapshot`
-  - `AnalisisGraderUploadPage.tsx:379` — eslint-disable sin uso
-  - `AnalisisGraderWizardPage.tsx:471` — useCallback missing dep `gates`
-  - `graderTurnToPDF.test.ts:52` — eslint-disable sin uso
-  - `useConfigChangeLogger.ts:58` — useCallback missing dep `options.enabledRef`
+- ✅ **9 warnings ESLint cerrados** (sesión 2026-04-26 v3.1.2). Cap CI bajado de 10 a 5 (margen para 5 nuevos sin romper deploy). Patrón aplicado para 4 unused eslint-disable + 5 deps faltantes en hooks.
 
 **Recomendación de orden próxima sesión:**
 1. **Activar auto-login Shoplogix** (5 min con creds del user)

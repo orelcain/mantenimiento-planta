@@ -21,23 +21,9 @@
 import { Badge } from '@/components/ui'
 import { X, Clock, Activity, AlertCircle, Pause, Wrench } from 'lucide-react'
 import type { UpstreamMachineShift, UpstreamMachineState } from '@/services/shoplogix/types'
+import { fmtTimeWithSec, fmtDurationSec } from '@/services/grader/graderTimeFormat'
 
 // ── Helpers de formato ────────────────────────────────────────────────────────
-
-function fmtHHmmss(d: Date): string {
-  return [d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds()]
-    .map((n) => String(n).padStart(2, '0'))
-    .join(':')
-}
-
-function fmtDuration(sec: number): string {
-  if (sec < 60) return `${sec.toFixed(0)} s`
-  const m = Math.round(sec / 60)
-  if (m < 60) return `${m} min`
-  const h = Math.floor(m / 60)
-  const rm = m % 60
-  return rm > 0 ? `${h} h ${rm} min` : `${h} h`
-}
 
 function fmtPct(frac: number, decimals = 1): string {
   return `${(frac * 100).toFixed(decimals)}%`
@@ -134,16 +120,16 @@ export function StateDetailPanel({ state, shift, onClose }: Props) {
         <DataRow
           icon={<Clock className="w-3 h-3" />}
           label="Inicio"
-          value={fmtHHmmss(state.startAt)}
+          value={fmtTimeWithSec(state.startAt)}
         />
         <DataRow
           icon={<Clock className="w-3 h-3" />}
           label="Fin"
-          value={fmtHHmmss(state.endAt)}
+          value={fmtTimeWithSec(state.endAt)}
         />
         <DataRow
           label="Duración"
-          value={<span className="font-semibold text-slate-100 tabular-nums">{fmtDuration(state.durationSec)}</span>}
+          value={<span className="font-semibold text-slate-100 tabular-nums">{fmtDurationSec(state.durationSec)}</span>}
         />
         <DataRow
           label="% del turno"
@@ -160,7 +146,7 @@ export function StateDetailPanel({ state, shift, onClose }: Props) {
             label="Similares"
             value={
               <span className="tabular-nums" title={`Estados con misma categoría "${state.name}${state.reason ? ' / ' + state.reason : ''}" en el turno`}>
-                {similarStates.length} × {fmtDuration(similarTotalSec)}{' '}
+                {similarStates.length} × {fmtDurationSec(similarTotalSec)}{' '}
                 <span className="text-slate-500">({fmtPct(pctSimilarOfShift)})</span>
               </span>
             }

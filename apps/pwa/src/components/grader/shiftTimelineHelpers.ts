@@ -17,13 +17,19 @@ import { resolveEffectiveTag } from '@/services/grader/graderPauseTags'
 // ── Formato de hora ───────────────────────────────────────────────────────────
 
 /**
- * Formatea ISO string a HH:MM en HORA LOCAL DE PLANTA.
+ * Formatea un timestamp a HH:MM en HORA LOCAL DE PLANTA.
  *
- * Los timestamps Marelec llevan sufijo 'Z' pero son hora local (sin conversión).
- * Usamos getUTCHours/getUTCMinutes para leer la hora "tal cual" del string.
+ * Acepta tres formas de entrada porque el módulo recibe timestamps de
+ * orígenes diversos:
+ *   - `string` ISO con sufijo 'Z' (Marelec/Shoplogix; no aplicar TZ)
+ *   - `Date` ya parseado (resultado de `new Date(iso)` en otro punto)
+ *   - `number` epoch ms (clicks de ECharts, agregaciones, etc.)
+ *
+ * En todos los casos usa `getUTCHours/Minutes` para leer la hora "tal cual"
+ * sin convertir TZ — la convención del módulo es Z-as-wall-clock-local.
  */
-export function fmtTime(iso: string): string {
-  const d = new Date(iso)
+export function fmtTime(input: string | Date | number): string {
+  const d = input instanceof Date ? input : new Date(input)
   return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
 }
 

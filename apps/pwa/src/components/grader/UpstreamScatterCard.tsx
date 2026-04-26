@@ -36,6 +36,7 @@ import {
   usableScatterPoints,
 } from './shiftTimelineHelpers'
 import { DEFAULT_P0_CRITICAL_PCT } from '@/services/grader/graderP0Thresholds'
+import { fmtTime } from '@/services/grader/graderTimeFormat'
 
 interface Props {
   snapshot: UpstreamLineSnapshot | null | undefined
@@ -61,10 +62,6 @@ const TREND_COLORS = [
   '#fbbf24',   // amber
 ]
 
-function fmtHHmm(ms: number): string {
-  const d = new Date(ms)
-  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
-}
 
 
 export function UpstreamScatterCard({
@@ -207,7 +204,7 @@ export function UpstreamScatterCard({
           if (params.seriesType !== 'scatter') return ''
           const [cycles, p0pct, tsMs, pieces] = params.value as [number, number, number, number]
           return [
-            `<b>${fmtHHmm(tsMs)}</b>`,
+            `<b>${fmtTime(tsMs)}</b>`,
             `${params.seriesName}`,
             `Ciclos Baader: <b>${cycles}</b>`,
             `P0% Grader: <b>${p0pct.toFixed(1)}%</b>`,

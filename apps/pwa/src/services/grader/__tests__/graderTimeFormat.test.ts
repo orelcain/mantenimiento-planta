@@ -29,6 +29,25 @@ describe('fmtTime — re-export desde shiftTimelineHelpers', () => {
     expect(fmtTime('2026-04-25T14:59:00.000Z')).toBe('14:59')
     expect(fmtTime('2026-04-25T15:00:00.000Z')).toBe('15:00')
   })
+
+  it('acepta Date como entrada (firma extendida Iter 7)', () => {
+    expect(fmtTime(new Date('2026-04-25T13:27:00.000Z'))).toBe('13:27')
+    expect(fmtTime(new Date('2026-04-25T08:05:00.000Z'))).toBe('08:05')
+  })
+
+  it('acepta number (epoch ms) como entrada (firma extendida Iter 7)', () => {
+    const ms = Date.parse('2026-04-25T13:27:00.000Z')
+    expect(fmtTime(ms)).toBe('13:27')
+    expect(fmtTime(0)).toBe('00:00') // epoch start
+  })
+
+  it('las 3 firmas devuelven el mismo resultado para el mismo instante', () => {
+    const iso = '2026-04-25T15:42:00.000Z'
+    const d = new Date(iso)
+    const ms = d.getTime()
+    expect(fmtTime(iso)).toBe(fmtTime(d))
+    expect(fmtTime(d)).toBe(fmtTime(ms))
+  })
 })
 
 describe('fmtTimeWithSec', () => {

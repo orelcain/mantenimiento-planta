@@ -34,6 +34,7 @@ import {
 } from 'firebase/firestore'
 import { db } from '../firebase'
 import type { GraderDailySummary, TimelineBucket, Pause, MicroDetentionsSummary, PauseHistoryEntry } from './types'
+import { fmtTime } from './graderTimeFormat'
 
 const COLLECTION = 'graderDailySummaries'
 /** Firestore permite máx. 500 ops por batch; usamos 400 para margen */
@@ -951,11 +952,7 @@ export async function updatePauseRange(
     const oStart = Date.parse(other.startAt)
     const oEnd = Date.parse(other.endAt)
     if (newStart < oEnd && oStart < newEnd) {
-      const fmtUTC = (ms: number) => {
-        const d = new Date(ms)
-        return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
-      }
-      throw new Error(`El rango se solapa con otra pausa (${fmtUTC(oStart)}–${fmtUTC(oEnd)})`)
+      throw new Error(`El rango se solapa con otra pausa (${fmtTime(oStart)}–${fmtTime(oEnd)})`)
     }
   }
 

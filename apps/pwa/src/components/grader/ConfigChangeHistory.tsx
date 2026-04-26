@@ -28,6 +28,7 @@ import {
 } from '@/services/grader/graderP0Segmentation'
 import type { GateConfigSnapshot, ConfigDiff } from '@/services/grader/graderConfigSnapshot.service'
 import type { TimelineBucket } from '@/services/grader/types'
+import { fmtTime } from '@/services/grader/graderTimeFormat'
 
 interface Props {
   shiftDocId: string
@@ -48,11 +49,6 @@ const FIELD_LABELS: Record<ConfigDiff['field'], string> = {
   active:               'activa',
 }
 
-function fmtTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('es-CL', {
-    hour: '2-digit', minute: '2-digit', timeZone: 'UTC',
-  })
-}
 
 function fmtValue(field: ConfigDiff['field'], value: unknown): string {
   if (field === 'active') return value ? 'sí' : 'no'
