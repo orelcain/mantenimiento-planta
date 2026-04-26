@@ -468,7 +468,7 @@ export function AnalisisGraderWizardPage() {
     } catch {
       setSavingToCalendar(false)
     }
-  }, [multiDayInfo, parsedData, user?.id])
+  }, [multiDayInfo, parsedData, user?.id, gates])
 
   if (!canSee('analisisGrader')) return <Navigate to="/" replace />
 

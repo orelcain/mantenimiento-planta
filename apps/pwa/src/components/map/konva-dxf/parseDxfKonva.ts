@@ -46,7 +46,6 @@ function rgbToHex(rgb: [number, number, number] | string | undefined): string {
 
 export function parseDxfKonva(text: string): ResultadoParseKonva {
   const helper = new Helper(text)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const result = helper.toPolylines() as {
     bbox: { min: { x: number; y: number }; max: { x: number; y: number } }
     polylines: Array<{

@@ -376,7 +376,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
     if (!hasPP) return
     const merged = mergeParsedData(files)
     onCompleteRef.current(merged)
-  }, [files]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [files])
 
   if (compact) return (
       <div className="flex items-center gap-2 flex-wrap">

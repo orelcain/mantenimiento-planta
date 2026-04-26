@@ -417,7 +417,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
       .finally(() => {
         moduleConfigLoadedRef.current = true
       })
-  }, [])
+  }, [setPhysicalConfig])
 
   // Autosave rangos globales (debounce)
   useEffect(() => {
@@ -486,7 +486,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
       }
       return changed ? next : p
     })
-  }, [suggestedDimensions, physicalConfig.autoSuggestions?.avgSalmonLengthCm, physicalConfig.autoSuggestions?.avgSalmonWidthCm])
+  }, [suggestedDimensions, physicalConfig.autoSuggestions?.avgSalmonLengthCm, physicalConfig.autoSuggestions?.avgSalmonWidthCm, setPhysicalConfig])
 
   // Propagar cambios al parent (debounce) — reemplaza al antiguo botón "Aplicar configuración".
   // El parent (Wizard) necesita gates + config + physicalConfig actualizados para que el

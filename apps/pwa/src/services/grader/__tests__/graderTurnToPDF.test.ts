@@ -49,8 +49,7 @@ const {
   }
 
   // Regular function (not arrow) para poder usarla como constructor con `new`
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const MockJsPDF = vi.fn(function (): any { return mockDoc })
+  const MockJsPDF = vi.fn(function (): unknown { return mockDoc })
   const mockAutoTable = vi.fn()
 
   return { MockJsPDF, mockAutoTable, mockSave, mockAddImage, mockDoc }

@@ -568,7 +568,7 @@ export function AnalisisGraderTurnoPage() {
     } finally {
       setPdfExporting(false)
     }
-  }, [summary, pauses, pdfExporting, tagLabels])
+  }, [summary, pauses, pdfExporting, tagLabels, upstreamLine.snapshot])
 
   const untaggedPauses = useMemo(
     () => pauses.filter(p => !resolveEffectiveTag(p)),

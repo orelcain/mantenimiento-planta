@@ -95,7 +95,6 @@ export function useUpstreamLineSnapshot(
         // Permission error (rules) o red caída → tratamos como "sin data" y fallback
         // No mostramos error al usuario: el panel siempre degrada gracefully.
         if (!cancelled) {
-          // eslint-disable-next-line no-console
           console.warn('[useUpstreamLineSnapshot] Firestore error, usando fallback:', e instanceof Error ? e.message : e)
         }
         fallback()

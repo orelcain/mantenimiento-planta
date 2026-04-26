@@ -55,6 +55,6 @@ export function useConfigChangeLogger(
         return next
       })
     },
-    [rawSetter, user, options?.reason],
+    [rawSetter, user, options?.reason, options?.enabledRef],
   )
 }
