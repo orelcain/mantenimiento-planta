@@ -1239,6 +1239,11 @@ export function ShiftTimelineView({
             adminUid={adminUid!}
             onSaved={onPauseUpdated}
             isOnline={isOnline}
+            timelineBuckets={timelineBuckets}
+            thresholds={{
+              alert: alertThreshold ?? DEFAULT_P0_ALERT_PCT,
+              critical: criticalThreshold ?? DEFAULT_P0_CRITICAL_PCT,
+            }}
           />
         )}
 
@@ -1250,6 +1255,10 @@ export function ShiftTimelineView({
             tsMin={minuteDetailState.tsMin}
             activeGates={minuteDetailState.activeGates}
             bucket={minuteDetailState.bucket}
+            thresholds={{
+              alert: alertThreshold ?? DEFAULT_P0_ALERT_PCT,
+              critical: criticalThreshold ?? DEFAULT_P0_CRITICAL_PCT,
+            }}
           />
         )}
 

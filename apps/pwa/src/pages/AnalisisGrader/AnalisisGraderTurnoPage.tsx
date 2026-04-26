@@ -1076,6 +1076,8 @@ export function AnalisisGraderTurnoPage() {
         adminUid={user?.id ?? ''}
         onSaved={handleNextPauseSaved}
         isOnline={isOnline}
+        timelineBuckets={enrichedTimelineBuckets}
+        thresholds={{ alert: alertThreshold, critical: criticalThreshold }}
       />
     </div>
     </TimelineSyncProvider>

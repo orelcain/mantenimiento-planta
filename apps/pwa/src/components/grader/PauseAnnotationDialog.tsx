@@ -26,12 +26,18 @@ import {
   Label,
 } from '@/components/ui'
 import { cn } from '@/lib/utils'
-import { Loader2, Clock, History, ChevronDown, Download } from 'lucide-react'
-import type { Pause, PauseHistoryEntry } from '@/services/grader/types'
+import { Loader2, Clock, History, ChevronDown, Download, TrendingDown } from 'lucide-react'
+import type { Pause, PauseHistoryEntry, TimelineBucket } from '@/services/grader/types'
 import { updatePauseAnnotation, updatePauseRange, loadPauseHistory } from '@/services/grader/graderDailySummary.service'
 import { usePauseTags } from '@/hooks/usePauseTags'
 import { fmtTime, fmtDateTime, fmtDurationSec } from '@/services/grader/graderTimeFormat'
 import { pauseTierLabel } from '@/services/grader/graderPauseTiers'
+import {
+  DEFAULT_P0_THRESHOLDS,
+  p0StatusFromPct,
+  p0StatusColor,
+} from '@/services/grader/graderP0Thresholds'
+import { computePauseP0Context } from './pauseAnnotationHelpers'
 
 interface PauseAnnotationDialogProps {
   open: boolean
@@ -44,7 +50,23 @@ interface PauseAnnotationDialogProps {
   onSaved?: () => void
   /** M18 — indica si el dispositivo tiene conectividad. Default: true. */
   isOnline?: boolean
+  /**
+   * Buckets minuto-a-minuto del turno completo. Cuando se proveen, el diálogo
+   * muestra un chip "Contexto P0%: antes → durante" para que el admin tenga
+   * pista de si la pausa pudo haber sido provocada por un spike P0%.
+   */
+  timelineBuckets?: TimelineBucket[]
+  /** Umbrales de P0% para colorear el chip de contexto. Default: globales. */
+  thresholds?: { alert: number; critical: number }
+  /**
+   * Minutos hacia atrás desde `pause.startAt` para calcular el "P0% antes".
+   * Default: 10 min — ventana suficiente para detectar un spike sin ahogarlo
+   * con minutos lejanos sin relación. Hacer prop facilita testing y permite
+   * tunear si en producción se descubre que otra ventana funciona mejor.
+   */
+  contextWindowMin?: number
 }
+
 
 /** Ajusta un ISO string ±deltaMin manteniendo la convención Z-planta. */
 function shiftMinutes(iso: string, deltaMin: number): string {
@@ -147,6 +169,9 @@ export function PauseAnnotationDialog({
   adminUid,
   onSaved,
   isOnline = true,
+  timelineBuckets,
+  thresholds = DEFAULT_P0_THRESHOLDS,
+  contextWindowMin = 10,
 }: PauseAnnotationDialogProps) {
   const { tags } = usePauseTags()
   const tagLabels = useMemo(
@@ -171,6 +196,13 @@ export function PauseAnnotationDialog({
   const [historyOpen, setHistoryOpen] = useState(false)
   const [historyEntries, setHistoryEntries] = useState<PauseHistoryEntry[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
+
+  // Contexto P0% antes / durante de la pausa — pista para clasificar el motivo.
+  // Solo se computa cuando el parent provee timelineBuckets.
+  const p0Context = useMemo(() => {
+    if (!pause || !timelineBuckets) return null
+    return computePauseP0Context(timelineBuckets, pause.startAt, pause.endAt, contextWindowMin)
+  }, [pause, timelineBuckets, contextWindowMin])
 
   // Duración calculada desde los valores editados
   const editedDurationSec = editedStart && editedEnd
@@ -326,6 +358,31 @@ export function PauseAnnotationDialog({
               {pause.adjustedBy && (
                 <span className="inline-flex items-center gap-1 text-xs text-sky-400 mt-1">
                   ✏ Rango ajustado por <span className="font-medium">{pause.adjustedBy}</span>
+                </span>
+              )}
+              {/* Iter 2: contexto P0% antes/durante para clasificar el motivo */}
+              {p0Context && (p0Context.beforePct !== null || p0Context.duringPct !== null) && (
+                <span
+                  className="inline-flex items-center gap-1.5 text-xs mt-2 px-2 py-1 rounded-md border border-border/40 bg-muted/20"
+                  title={`Ventana antes: ${contextWindowMin} min previos a la pausa (${p0Context.beforePieces} pzas). Durante: ${p0Context.duringPieces} pzas dentro del rango.`}
+                >
+                  <TrendingDown className="w-3 h-3 text-muted-foreground" />
+                  <span className="text-muted-foreground">P0% antes</span>
+                  {p0Context.beforePct !== null ? (
+                    <span className={cn('font-medium tabular-nums', p0StatusColor(p0StatusFromPct(p0Context.beforePct, thresholds)))}>
+                      {p0Context.beforePct.toFixed(1)}%
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground/60 italic">sin datos</span>
+                  )}
+                  <span className="text-muted-foreground">→ durante</span>
+                  {p0Context.duringPct !== null ? (
+                    <span className={cn('font-medium tabular-nums', p0StatusColor(p0StatusFromPct(p0Context.duringPct, thresholds)))}>
+                      {p0Context.duringPct.toFixed(1)}%
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground/60 italic">sin piezas</span>
+                  )}
                 </span>
               )}
             </div>

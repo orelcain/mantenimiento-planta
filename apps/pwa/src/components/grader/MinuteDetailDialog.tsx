@@ -34,6 +34,14 @@ import type { GateAssignment, TimelineBucket } from '@/services/grader/types'
 import { CALIBRE_WEIGHT_RANGES, classifyRecordToMatrix } from '@/services/grader/graderAnalytics'
 import { MATRIX_P0_CAUSES } from '@/services/grader/graderMatrixP0Causes'
 import { fmtTime, fmtTimeWithSec } from '@/services/grader/graderTimeFormat'
+import {
+  DEFAULT_P0_THRESHOLDS,
+  p0StatusFromPct,
+  p0StatusColor,
+  p0StatusLabel,
+  type P0Status,
+} from '@/services/grader/graderP0Thresholds'
+import type { MatrixP0Cause } from '@/services/grader/types'
 
 interface MinuteDetailDialogProps {
   open: boolean
@@ -57,6 +65,31 @@ interface MinuteDetailDialogProps {
    * distribución aunque el detalle individual de las productivas no exista.
    */
   bucket?: TimelineBucket
+  /**
+   * Umbrales operacionales de P0% para clasificar el minuto como ok / alert
+   * / critical. Default: DEFAULT_P0_THRESHOLDS (alert=2%, critical=3.5%).
+   * Pasar la config del usuario (Firestore `system/graderConfig`) cuando
+   * esté disponible para que el banner respete las preferencias del cliente.
+   */
+  thresholds?: { alert: number; critical: number }
+}
+
+/**
+ * Sugerencia operacional accionable según la causa Matrix dominante de un
+ * minuto. Mapea cada causa a una hipótesis de "qué revisar" — el analista
+ * decide si tomar acción, pero el sistema le baja el costo de pensar el
+ * primer paso.
+ */
+const SUGGESTION_BY_CAUSE: Record<MatrixP0Cause, string> = {
+  fuera_de_limites:      'Pieza fuera del rango operativo del Marelec — verificar setup de fotocélulas y rango de pesos.',
+  no_leido_fotocelula:   'Lectura de fotocélula falló — revisar limpieza de lentes, suciedad o roces en banda.',
+  too_close_too_long:    'Piezas demasiado cerca o sostenidas demasiado tiempo — ajustar separación o velocidad de carga.',
+  puerta_no_preparada:   'Puerta del gate no preparó a tiempo — revisar mecánica del gate y aire comprimido.',
+  fuera_de_calibre:      'Peso real de la pieza no calza con ningún gate activo — revisar gates configurados (¿faltan calibres?).',
+  fuera_de_calidad:      'Calidad asignada por el grader no calza con ningún gate activo — revisar config (¿faltan calidades?).',
+  fuera_de_conservacion: 'Conservación detectada no calza con ningún gate — revisar criterios fresco/frozen del turno.',
+  fuera_de_producto:     'Producto detectado no calza con ningún gate — verificar que el lote sea el correcto.',
+  otro:                  'Causa no clasificada — revisar la columna "Error" en la tabla detalle.',
 }
 
 const INITIAL_ROWS = 20
@@ -109,6 +142,7 @@ export function MinuteDetailDialog({
   tsMin,
   activeGates,
   bucket,
+  thresholds = DEFAULT_P0_THRESHOLDS,
 }: MinuteDetailDialogProps) {
   const [records, setRecords] = useState<FirestorePieceRecord[]>([])
   const [loading, setLoading] = useState(false)
@@ -254,8 +288,48 @@ export function MinuteDetailDialog({
     // Detectar si faltan detalles productivos (para banner informativo)
     const missingProductiveDetail = rows.some((r) => r.gate !== 0 && !r.hasDetail && r.pieces > 0)
 
-    return { gateRows: rows, total, p0, p0Pct, missingProductiveDetail }
-  }, [records, bucket, activeGates])
+    // Causa Matrix dominante del minuto — re-clasificamos cada record P0 con
+    // la config de gates activa, agrupamos por cause id y devolvemos el top.
+    // Útil para el banner accionable: "Causa dominante: X (Y piezas, Z%)".
+    let topP0Cause: { id: MatrixP0Cause; label: string; pieces: number; pctOfP0: number } | null = null
+    if (p0 > 0 && records.length > 0) {
+      const causeCounter = new Map<MatrixP0Cause, number>()
+      for (const r of records) {
+        if (r.gate !== 0) continue
+        const matrixCause = classifyRecordToMatrix(
+          {
+            ts: r.ts,
+            pieces: r.pieces,
+            weightKg: r.weightKg,
+            weightPerPieceGrams: r.weightPerPieceGrams,
+            quality: r.quality,
+            calibre: r.calibre,
+            error: r.error ?? '',
+          } as Parameters<typeof classifyRecordToMatrix>[0],
+          activeGates ?? [],
+          CALIBRE_WEIGHT_RANGES,
+        )
+        causeCounter.set(matrixCause, (causeCounter.get(matrixCause) ?? 0) + r.pieces)
+      }
+      let topId: MatrixP0Cause | null = null
+      let topPieces = 0
+      for (const [id, n] of causeCounter) {
+        if (n > topPieces) { topId = id; topPieces = n }
+      }
+      if (topId) {
+        topP0Cause = {
+          id: topId,
+          label: MATRIX_P0_CAUSES[topId].label,
+          pieces: topPieces,
+          pctOfP0: (topPieces / p0) * 100,
+        }
+      }
+    }
+
+    const p0Status: P0Status = p0StatusFromPct(p0Pct, thresholds)
+
+    return { gateRows: rows, total, p0, p0Pct, missingProductiveDetail, topP0Cause, p0Status }
+  }, [records, bucket, activeGates, thresholds])
 
   if (!tsMin) return null
 
@@ -299,6 +373,37 @@ export function MinuteDetailDialog({
 
         {!loading && !error && breakdown.total > 0 && (
           <div className="overflow-y-auto flex-1 pr-1 space-y-4">
+            {/* Banner accionable según P0% del minuto y causa dominante.
+                Solo aparece cuando hay P0 — si el minuto está perfecto, no ruido visual. */}
+            {breakdown.p0 > 0 && breakdown.topP0Cause && (
+              <div
+                className={cn(
+                  'flex items-start gap-2 px-3 py-2 rounded-md border text-xs',
+                  breakdown.p0Status === 'critical' && 'border-rose-500/40 bg-rose-500/5',
+                  breakdown.p0Status === 'alert'    && 'border-amber-500/40 bg-amber-500/5',
+                  breakdown.p0Status === 'ok'       && 'border-emerald-500/30 bg-emerald-500/5',
+                )}
+                title={MATRIX_P0_CAUSES[breakdown.topP0Cause.id].description}
+              >
+                <span className="text-base leading-none">
+                  {breakdown.p0Status === 'critical' ? '🚨' : breakdown.p0Status === 'alert' ? '⚠️' : '✓'}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className={cn('font-medium flex items-center gap-1.5 flex-wrap', p0StatusColor(breakdown.p0Status))}>
+                    <span>P0% {breakdown.p0Pct.toFixed(1)}%</span>
+                    <span className="text-[10px] uppercase tracking-wide opacity-70">{p0StatusLabel(breakdown.p0Status)}</span>
+                    <span className="text-muted-foreground/60 font-normal">·</span>
+                    <span className="font-normal text-foreground">
+                      Causa dominante: <span className="font-medium">{breakdown.topP0Cause.label}</span>
+                      <span className="text-muted-foreground"> ({breakdown.topP0Cause.pieces} {breakdown.topP0Cause.pieces === 1 ? 'pza' : 'pzas'}, {breakdown.topP0Cause.pctOfP0.toFixed(0)}% de las P0)</span>
+                    </span>
+                  </div>
+                  <div className="text-muted-foreground/90 mt-0.5">
+                    {SUGGESTION_BY_CAUSE[breakdown.topP0Cause.id]}
+                  </div>
+                </div>
+              </div>
+            )}
             {/* Banner de cobertura de data */}
             {breakdown.missingProductiveDetail && (
               <div className="flex items-start gap-2 px-3 py-2 rounded-md border border-amber-500/30 bg-amber-500/5 text-xs text-amber-200">
