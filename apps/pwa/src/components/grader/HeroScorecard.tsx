@@ -57,9 +57,13 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot }: HeroSc
     : '—'
 
   const baaderTotal = upstreamSnapshot?.machines.reduce((s, m) => s + (m.totalCycles ?? 0), 0) ?? 0
-  const estimatedRejected = baaderTotal > 0 ? Math.max(0, baaderTotal - summary.totalPieces) : null
-  const rejectedPct = baaderTotal > 0 && estimatedRejected != null
-    ? ((estimatedRejected / baaderTotal) * 100).toFixed(1)
+  // Diferencia Grader − ΣBaader_procesadas. Positiva = piezas rechazadas por las
+  // Baader (vuelven vía línea manual) + no-controladas Marel HG (1-7% típico).
+  // No es rechazo Baader puro hasta tener captura manual de Marel.
+  const upstreamDelta = baaderTotal > 0 ? summary.totalPieces - baaderTotal : null
+  const rejectedEstimate = upstreamDelta != null && upstreamDelta > 0 ? upstreamDelta : null
+  const rejectedPct = rejectedEstimate != null && baaderTotal > 0
+    ? ((rejectedEstimate / baaderTotal) * 100).toFixed(1)
     : null
 
   const durationLabel = shiftWindow.status === 'live' && shiftWindow.remainingMin != null
@@ -132,14 +136,14 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot }: HeroSc
                   </span>
                   <span className="text-muted-foreground">ciclos</span>
                 </div>
-                {estimatedRejected != null && estimatedRejected > 0 && (
+                {rejectedEstimate != null && (
                   <span
                     className="text-amber-400 cursor-help"
-                    title="Diferencia entre ciclos Baader y piezas Grader. Incluye caídas, partidas, descartes manuales y diferencia de timing — no es rechazo de las Baader (las Baader evisceran, no rechazan; el rechazo de calidad ya está en P0)."
+                    title="Estimación bruta: Grader_total − ΣBaader_procesadas. Incluye rechazos Baader (vuelven vía línea manual al Grader) + no-controladas Marel HG (1-7% típico). Para extraer rechazo Baader puro falta captura manual de Marel HG por turno."
                   >
-                    merma{' '}
+                    rechazo est.{' '}
                     <span className="tabular-nums font-semibold">
-                      {estimatedRejected.toLocaleString('es-CL')}
+                      {rejectedEstimate.toLocaleString('es-CL')}
                     </span>
                     <span className="text-muted-foreground"> ({rejectedPct}%)</span>
                   </span>
