@@ -38,6 +38,7 @@ import {
 import {
   DEFAULT_P0_ALERT_PCT,
   DEFAULT_P0_CRITICAL_PCT,
+  P0_LINE_MIN_PIECES,
   p0StatusFromPct,
   p0StatusHex,
 } from '@/services/grader/graderP0Thresholds'
@@ -623,11 +624,10 @@ export function ShiftTimelineView({
       cumulativeP0Pcts.push(cumPieces > 0 ? +((cumP0 / cumPieces) * 100).toFixed(2) : 0)
       cumPiecesByBucket.push(cumPieces)
     }
-    // Umbral de masa estadística: la línea P0% solo se dibuja cuando hay
-    // ≥ este número de piezas acumuladas. Antes de eso, quedará null
-    // (connectNulls hace que la línea arranque limpia en el primer punto
-    // significativo, sin el spike artificial del arranque/calibración).
-    const P0_LINE_MIN_PIECES = 50
+    // Umbral de masa estadística: importado de graderP0Thresholds (fuente única).
+    // La línea P0% solo se dibuja con ≥ P0_LINE_MIN_PIECES piezas acumuladas
+    // — connectNulls hace que arranque limpia en el primer punto significativo
+    // sin el spike artificial del arranque/calibración.
 
     // Eje X dinámico: helper puro extraído en M11 (resolveAxisWindow).
     const { lineTimes, axisIndexByLabel } = resolveAxisWindow(buckets, shiftWindow)
@@ -671,14 +671,13 @@ export function ShiftTimelineView({
       }
     }
 
-    // Color de línea según verdict del turno (mismo semáforo que calendario)
+    // Color de línea según verdict del turno — usa el helper compartido
+    // p0StatusHex(p0StatusFromPct(...)) para mantener consistencia con el
+    // resto del módulo (downloadPNG, scatter, etc.). Cuando todavía no hay
+    // P0% del turno, se muestra rojo conservador.
     const lineColor = summaryP0Pct == null
       ? '#ef4444'
-      : summaryP0Pct < alertThreshold
-        ? '#10b981'  // emerald — bajo el umbral de alerta
-        : summaryP0Pct <= criticalThreshold
-          ? '#f59e0b'  // amber — entre alerta y crítico
-          : '#ef4444'  // red — sobre crítico
+      : p0StatusHex(p0StatusFromPct(summaryP0Pct, { alert: alertThreshold, critical: criticalThreshold }))
 
     // Mark lines y mark areas: helpers puros extraídos en M11.
     const { shiftMarkLines, thresholdLines, uploadLines, actionLines, configChangeLines, lotChangeLines } =

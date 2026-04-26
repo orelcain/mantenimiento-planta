@@ -30,6 +30,17 @@ export const DEFAULT_P0_THRESHOLDS = {
   critical: DEFAULT_P0_CRITICAL_PCT,
 } as const
 
+/**
+ * Masa estadística mínima de piezas acumuladas para mostrar P0% en la línea
+ * del timeline. Por debajo de esto, los porcentajes son ruido (1-2 piezas
+ * iniciales pueden dar 100% P0% por chance).
+ *
+ * Usado en `ShiftTimelineView.chartOption` para esconder la línea P0%
+ * acumulada hasta tener suficientes piezas. `connectNulls` hace que la
+ * línea arranque limpia en el primer punto significativo.
+ */
+export const P0_LINE_MIN_PIECES = 50
+
 // ── Status + helpers ──────────────────────────────────────────────────────────
 
 export type P0Status = 'ok' | 'alert' | 'critical'

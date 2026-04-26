@@ -10,6 +10,7 @@ import {
   DEFAULT_P0_ALERT_PCT,
   DEFAULT_P0_CRITICAL_PCT,
   DEFAULT_P0_THRESHOLDS,
+  P0_LINE_MIN_PIECES,
   p0StatusFromPct,
   p0StatusColor,
   p0StatusHex,
@@ -23,6 +24,9 @@ describe('Defaults', () => {
   })
   it('DEFAULT_P0_THRESHOLDS contiene ambos campos', () => {
     expect(DEFAULT_P0_THRESHOLDS).toEqual({ alert: 2, critical: 3.5 })
+  })
+  it('P0_LINE_MIN_PIECES=50 — masa estadística para mostrar línea', () => {
+    expect(P0_LINE_MIN_PIECES).toBe(50)
   })
 })
 
