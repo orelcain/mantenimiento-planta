@@ -17,6 +17,7 @@ import type { GraderDailySummary, Pause } from './types'
 import type { UpstreamLineSnapshot } from '../shoplogix/types'
 import { fmtTime as fmtHHMM, fmtDurationSec as fmtDur } from './graderTimeFormat'
 import { pauseTierLabel } from './graderPauseTiers'
+import { DEFAULT_P0_ALERT_PCT, DEFAULT_P0_CRITICAL_PCT } from './graderP0Thresholds'
 
 // Mínimo de autoTable para typing (acceso a lastAutoTable.finalY)
 interface AutoTableDoc {
@@ -100,9 +101,9 @@ export async function exportTurnToPDF(params: {
   y += 2
 
   const p0Color: [number, number, number] =
-    summary.pointZeroPct >= 3.5 ? [220, 38, 38]  // rojo
-    : summary.pointZeroPct >= 2  ? [217, 119, 6]  // ámbar
-    : [22, 163, 74]                                 // verde
+    summary.pointZeroPct >= DEFAULT_P0_CRITICAL_PCT ? [220, 38, 38]  // rojo
+    : summary.pointZeroPct >= DEFAULT_P0_ALERT_PCT  ? [217, 119, 6]  // ámbar
+    : [22, 163, 74]                                                    // verde
 
   autoTable(doc, {
     startY: y,
