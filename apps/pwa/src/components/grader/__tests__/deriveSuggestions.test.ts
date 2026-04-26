@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { deriveSuggestions } from '../ActionPlanPanel'
+import { deriveSuggestions } from '@/services/grader/actionPlanSuggestions'
 import type { MachineImpact } from '@/services/shoplogix/shoplogixCorrelation'
 
 describe('deriveSuggestions — base (sin context)', () => {

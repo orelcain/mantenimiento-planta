@@ -33,6 +33,7 @@ import {
   isOperationalTag,
   isOrganizationalTag,
 } from '@/services/grader/graderPauseTags'
+import { summarizeByCategory, SIN_TAG_ID } from '@/services/grader/pauseKpiAnalytics'
 import type { GraderDailySummary, Pause } from '@/services/grader/types'
 import { useIsAdmin, useAuthStore } from '@/store/authStore'
 
@@ -105,34 +106,8 @@ function deadTimePctColor(pct: number): string {
   return 'text-rose-400'
 }
 
-const SIN_TAG_ID = '__sin_tag'
-
-/**
- * Suma agregada por categoría (operacional/organizacional/sin clasificar)
- * sobre un tagBreakdown — usada para distinguir tiempo evitable vs ineludible.
- */
-export function summarizeByCategory(tagBreakdown: Record<string, number>): {
-  operationalSec: number
-  organizationalSec: number
-  unclassifiedSec: number
-  totalSec: number
-} {
-  let operationalSec = 0
-  let organizationalSec = 0
-  let unclassifiedSec = 0
-  for (const [id, sec] of Object.entries(tagBreakdown)) {
-    if (id === SIN_TAG_ID) unclassifiedSec += sec
-    else if (isOperationalTag(id)) operationalSec += sec
-    else if (isOrganizationalTag(id)) organizationalSec += sec
-    else unclassifiedSec += sec  // tag desconocido — al bucket "sin clasificar"
-  }
-  return {
-    operationalSec,
-    organizationalSec,
-    unclassifiedSec,
-    totalSec: operationalSec + organizationalSec + unclassifiedSec,
-  }
-}
+// SIN_TAG_ID y summarizeByCategory viven en services/grader/pauseKpiAnalytics
+// (helpers puros) para satisfacer react-refresh/only-export-components.
 
 function TagBreakdownChart({ tagBreakdown }: { tagBreakdown: Record<string, number> }) {
   const entries = useMemo(() => {

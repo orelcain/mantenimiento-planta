@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { summarizeByCategory } from '../PauseKpiDashboard'
+import { summarizeByCategory } from '@/services/grader/pauseKpiAnalytics'
 
 describe('summarizeByCategory — agrega tiempo muerto por categoría', () => {
   it('agrupa por operacional vs organizacional vs sin_clasificar', () => {
