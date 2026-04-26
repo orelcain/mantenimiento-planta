@@ -56,7 +56,7 @@ export function suggestFishBaseLength({
     reasoning: `La relación Largo-Peso oficial de FishBase para ${label} indica que un pez de ${(medianWeightG / 1000).toFixed(2)} kg debería medir aprox. ${suggestedCm} cm. El valor configurado (${currentCm} cm) difiere en ${diff} cm, lo que afecta el cálculo del gap libre y el timing del flipper.`,
     formula: `L = (W / a)^(1/b) = (${medianWeightG} / ${a})^(1/${b}) ≈ ${suggestedCm} cm`,
     dataPoints: [
-      { label: 'Peso mediano lote', value: `${medianWeightG.toLocaleString()} g`, detail: `${(medianWeightG / 1000).toFixed(2)} kg` },
+      { label: 'Peso mediano lote', value: `${medianWeightG.toLocaleString('es-CL')} g`, detail: `${(medianWeightG / 1000).toFixed(2)} kg` },
       { label: 'Especie', value: label },
       { label: 'Coef. a (FishBase)', value: String(a), detail: `FishBase ID ${fishBaseId}` },
       { label: 'Coef. b (FishBase)', value: String(b) },

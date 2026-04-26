@@ -39,7 +39,7 @@ const DEFAULT_GATES: GateAssignment[] = Array.from({ length: 12 }, (_, i) => ({
 function weightRangeLabel(calibre: string, ranges: CalibreWeightRange[]): string {
   const r = ranges.find(w => w.calibre === calibre)
   if (!r) return '—'
-  return `${r.minGrams.toLocaleString()}–${r.maxGrams.toLocaleString()} g`
+  return `${r.minGrams.toLocaleString('es-CL')}–${r.maxGrams.toLocaleString('es-CL')} g`
 }
 
 interface Props {

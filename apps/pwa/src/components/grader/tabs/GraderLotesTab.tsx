@@ -126,7 +126,7 @@ export function GraderLotesTab({
                         return [
                           `Calibre prom.: ${getCalibreByWeightGrams(lot.avgWeightGrams)}`,
                           `Calibre med.: ${getCalibreByWeightGrams(lot.medianWeightGrams)}`,
-                          `P0: ${lot.pointZeroPieces.toLocaleString()} / ${lot.pieces.toLocaleString()} (${lot.pointZeroPctChecked}%)`,
+                          `P0: ${lot.pointZeroPieces.toLocaleString('es-CL')} / ${lot.pieces.toLocaleString('es-CL')} (${lot.pointZeroPctChecked}%)`,
                         ]
                       },
                     },
@@ -202,9 +202,9 @@ export function GraderLotesTab({
                   return (
                     <tr key={i} className="border-b hover:bg-muted/30">
                       <td className="py-2 px-2 font-medium">{lot.lot}</td>
-                      <td className="py-2 px-2 text-right">{lot.pieces.toLocaleString()}</td>
-                      <td className="py-2 px-2 text-right">{lot.avgWeightGrams.toLocaleString()}</td>
-                      <td className="py-2 px-2 text-right">{lot.medianWeightGrams.toLocaleString()}</td>
+                      <td className="py-2 px-2 text-right">{lot.pieces.toLocaleString('es-CL')}</td>
+                      <td className="py-2 px-2 text-right">{lot.avgWeightGrams.toLocaleString('es-CL')}</td>
+                      <td className="py-2 px-2 text-right">{lot.medianWeightGrams.toLocaleString('es-CL')}</td>
                       <td className="py-2 px-2 text-right">
                         {(() => {
                           const cv = lot.avgWeightGrams > 0 ? (lot.stdDevWeightGrams / lot.avgWeightGrams) * 100 : 0
@@ -245,7 +245,7 @@ export function GraderLotesTab({
                           )
                         })()}
                       </td>
-                      <td className="py-2 px-2 text-right">{lot.weightKg.toLocaleString()}</td>
+                      <td className="py-2 px-2 text-right">{lot.weightKg.toLocaleString('es-CL')}</td>
                       <td className="py-2 px-2 text-right">{getCalibreByWeightGrams(lot.avgWeightGrams)}</td>
                       <td className="py-2 px-2 text-right">{getCalibreByWeightGrams(lot.medianWeightGrams)}</td>
                       <td className="py-2 px-2 text-right">
@@ -397,7 +397,7 @@ export function GraderLotesTab({
                       label: (ctx) => {
                         const lot = lotAnalysisView[ctx.dataIndex]
                         if (!lot) return ''
-                        return `P0: ${lot.pointZeroPctChecked}% (${lot.pointZeroPieces.toLocaleString()} / ${lot.pieces.toLocaleString()} pz)`
+                        return `P0: ${lot.pointZeroPctChecked}% (${lot.pointZeroPieces.toLocaleString('es-CL')} / ${lot.pieces.toLocaleString('es-CL')} pz)`
                       },
                     },
                   },

@@ -172,7 +172,7 @@ export function MainLayout() {
     .filter(([, count]) => count > 0)
     .map(([key, count]) => `${key}: ${count}`)
     .join(', ')
-  const lastSyncLabel = lastSyncAt ? new Date(lastSyncAt).toLocaleString() : null
+  const lastSyncLabel = lastSyncAt ? new Date(lastSyncAt).toLocaleString('es-CL') : null
   const syncModules = Array.from(new Set(pendingEntries.map((entry) => entry.context.split(':')[0]))).sort()
   const filteredEntries = syncFilter === 'all'
     ? pendingEntries

@@ -245,7 +245,7 @@ export function BatchStatsCard({ stats }: { stats: BatchStats | null }) {
     <div className="mb-4 p-3 rounded-lg bg-muted/50 border grid grid-cols-3 sm:grid-cols-4 gap-2 text-xs">
       <div className="text-center">
         <p className="text-muted-foreground">Piezas</p>
-        <p className="font-mono font-medium">{stats.n.toLocaleString()}</p>
+        <p className="font-mono font-medium">{stats.n.toLocaleString('es-CL')}</p>
       </div>
       <div className="text-center">
         <p className="text-muted-foreground">p10 / med / p90 kg</p>

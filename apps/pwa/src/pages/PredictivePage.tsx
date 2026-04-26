@@ -1213,7 +1213,7 @@ export function PredictivePage() {
                     </div>
 
                     <div className="text-xs text-muted-foreground">
-                      {lastReadingTs ? `Última lectura: ${new Date(lastReadingTs).toLocaleString()}` : 'Última lectura: —'}
+                      {lastReadingTs ? `Última lectura: ${new Date(lastReadingTs).toLocaleString('es-CL')}` : 'Última lectura: —'}
                     </div>
 
                     <div className="space-y-2 max-h-[300px] overflow-auto">

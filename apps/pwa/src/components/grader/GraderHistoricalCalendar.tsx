@@ -20,6 +20,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from '@/components/ui'
 import { ChevronLeft, ChevronRight, Loader2, Clock, Database, Eye, Trash2, AlertTriangle, Sun, Moon, Wrench, Tag, GitCompare } from 'lucide-react'
+import { fmt } from '@/lib/format'
 import { QuickGateChangeButton } from './QuickGateChangeButton'
 import { listSnapshots } from '@/services/grader/graderConfigSnapshot.service'
 import { cn } from '@/lib/utils'
@@ -1034,7 +1035,7 @@ export function GraderHistoricalCalendar({
                       <div className="grid grid-cols-2 gap-2 text-xs">
                         <div className="p-2 rounded bg-muted/40">
                           <div className="text-muted-foreground">Piezas</div>
-                          <div className="font-semibold">{summary.data.totalPieces.toLocaleString()}</div>
+                          <div className="font-semibold">{fmt(summary.data.totalPieces)}</div>
                         </div>
                         <div className="p-2 rounded bg-muted/40">
                           <div className="text-muted-foreground">P0 %</div>
@@ -1042,7 +1043,7 @@ export function GraderHistoricalCalendar({
                         </div>
                         <div className="p-2 rounded bg-muted/40 col-span-2">
                           <div className="text-muted-foreground">P0 piezas</div>
-                          <div className="font-semibold">{summary.data.pointZeroPieces.toLocaleString()}</div>
+                          <div className="font-semibold">{fmt(summary.data.pointZeroPieces)}</div>
                         </div>
                       </div>
                     )}

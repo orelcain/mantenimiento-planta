@@ -90,10 +90,10 @@ export function GraderMatrizTab({ analytics, matrixQualities, matrixCalibres }: 
                           )}>
                             {cell ? (
                               <div>
-                                <span className="font-medium">{cell.pieces.toLocaleString()}</span>
+                                <span className="font-medium">{cell.pieces.toLocaleString('es-CL')}</span>
                                 <span className="text-muted-foreground text-xs ml-1">({cell.pct}%)</span>
                                 {avgW != null && (
-                                  <p className="text-[10px] text-muted-foreground">{avgW.toLocaleString()}g</p>
+                                  <p className="text-[10px] text-muted-foreground">{avgW.toLocaleString('es-CL')}g</p>
                                 )}
                               </div>
                             ) : (

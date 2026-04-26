@@ -1403,7 +1403,7 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
 
       const machineTotal = reps.reduce((sum, r) => sum + (r.valorUnitario || 0) * (r.cantidadPorMaquina || 1), 0)
       valorTotal += machineTotal
-      repuestosByMachine.push(`- ${machine.nombre}: ${reps.length} repuestos ($${Math.round(machineTotal).toLocaleString()})`)
+      repuestosByMachine.push(`- ${machine.nombre}: ${reps.length} repuestos ($${Math.round(machineTotal).toLocaleString('es-CL')})`)
 
       // Si hay filtro de máquina y esta no es la indicada, saltar búsqueda de coincidencias
       if (matchedMachineIds.size > 0 && !matchedMachineIds.has(machine.id)) continue
@@ -1504,7 +1504,7 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
     logger.info(`Chatbot repuestos: ${matchedRepuestos.length} matches found for component=[${componentTerms}] in machines=[${[...matchedMachineIds]}]`)
 
     const lines = [
-      `REPUESTOS (total: ${totalRepuestos}, valor inventario: $${Math.round(valorTotal).toLocaleString()}):`,
+      `REPUESTOS (total: ${totalRepuestos}, valor inventario: $${Math.round(valorTotal).toLocaleString('es-CL')}):`,
       `Máquinas con repuestos: ${machines.length}`,
       ...repuestosByMachine,
     ]

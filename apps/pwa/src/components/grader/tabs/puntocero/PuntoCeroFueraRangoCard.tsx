@@ -56,7 +56,7 @@ export function PuntoCeroFueraRangoCard({ analytics }: Props) {
                     callbacks: {
                       label: (ctx) => {
                         const d = outOfRange[ctx.dataIndex]
-                        return d ? `${d.pieces.toLocaleString()} piezas (${d.pct}%)` : ''
+                        return d ? `${d.pieces.toLocaleString('es-CL')} piezas (${d.pct}%)` : ''
                       },
                     },
                   },
@@ -85,8 +85,8 @@ export function PuntoCeroFueraRangoCard({ analytics }: Props) {
                   {analytics.pointZeroClassification.calibreWeightRanges.map((r, i) => (
                     <tr key={i} className="border-b">
                       <td className="py-1 px-2">{r.calibre}</td>
-                      <td className="py-1 px-2 text-right font-mono">{r.minGrams.toLocaleString()}</td>
-                      <td className="py-1 px-2 text-right font-mono">{r.maxGrams.toLocaleString()}</td>
+                      <td className="py-1 px-2 text-right font-mono">{r.minGrams.toLocaleString('es-CL')}</td>
+                      <td className="py-1 px-2 text-right font-mono">{r.maxGrams.toLocaleString('es-CL')}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -107,7 +107,7 @@ export function PuntoCeroFueraRangoCard({ analytics }: Props) {
                   {outOfRange.map((d, i) => (
                     <tr key={i} className="border-b hover:bg-muted/30">
                       <td className="py-1 px-2">{d.rangeLabel}</td>
-                      <td className="py-1 px-2 text-right font-medium">{d.pieces.toLocaleString()}</td>
+                      <td className="py-1 px-2 text-right font-medium">{d.pieces.toLocaleString('es-CL')}</td>
                       <td className="py-1 px-2 text-right">{d.pct}%</td>
                     </tr>
                   ))}

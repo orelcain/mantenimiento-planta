@@ -59,7 +59,7 @@ export function GanttMobilePage() {
             </CardHeader>
             <CardContent className="space-y-2">
               <p className="text-xs text-muted-foreground">{task.equipmentNombre ?? 'Sin equipo'} · {task.progress}%</p>
-              <p className="text-xs text-muted-foreground">Fin: {task.endDate.toLocaleString()}</p>
+              <p className="text-xs text-muted-foreground">Fin: {task.endDate.toLocaleString('es-CL')}</p>
               <div className="grid grid-cols-2 gap-2">
                 <Button size="sm" variant="secondary" onClick={() => markInProgress(task)} disabled={!canEdit || task.status === 'completada'}>Iniciar</Button>
                 <Button size="sm" onClick={() => markDone(task)} disabled={!canEdit || task.status === 'completada'}>Cerrar</Button>

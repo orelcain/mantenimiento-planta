@@ -37,7 +37,7 @@ export function computeDeterministicInsights(
     // Add classification breakdown to evidence
     const classEvidence = result.pointZeroClassification.causes
       .filter((c) => c.pctOfPointZero >= 1)
-      .map((c) => `  → ${c.label}: ${c.pieces.toLocaleString()} pz (${c.pctOfPointZero}% del P.Cero)`)
+      .map((c) => `  → ${c.label}: ${c.pieces.toLocaleString('es-CL')} pz (${c.pctOfPointZero}% del P.Cero)`)
 
     insights.push({
       id: nextId(),
@@ -65,7 +65,7 @@ export function computeDeterministicInsights(
       severity: photocellCause.pctOfTotal >= thresholds.photocellPctWarn * 2 ? 'critical' : 'warn',
       title: 'Error de fotocélula alto',
       evidence: [
-        `${photocellCause.label}: ${photocellCause.pieces.toLocaleString()} piezas (${photocellCause.pctOfPointZero}% del P.Cero, ${photocellCause.pctOfTotal}% del total)`,
+        `${photocellCause.label}: ${photocellCause.pieces.toLocaleString('es-CL')} piezas (${photocellCause.pctOfPointZero}% del P.Cero, ${photocellCause.pctOfTotal}% del total)`,
         `Umbral: ${thresholds.photocellPctWarn}%`,
       ],
       recommendations: [
@@ -84,10 +84,10 @@ export function computeDeterministicInsights(
   if (combinedOOBPct >= thresholds.outOfLimitsPctWarn) {
     const evidence: string[] = []
     if (fueraRangoCause) {
-      evidence.push(`Fuera de rango: ${fueraRangoCause.pieces.toLocaleString()} pz (${fueraRangoCause.pctOfPointZero}% del P.Cero)`)
+      evidence.push(`Fuera de rango: ${fueraRangoCause.pieces.toLocaleString('es-CL')} pz (${fueraRangoCause.pctOfPointZero}% del P.Cero)`)
     }
     if (fueraLimitesCause) {
-      evidence.push(`Fuera de límites: ${fueraLimitesCause.pieces.toLocaleString()} pz (${fueraLimitesCause.pctOfPointZero}% del P.Cero)`)
+      evidence.push(`Fuera de límites: ${fueraLimitesCause.pieces.toLocaleString('es-CL')} pz (${fueraLimitesCause.pctOfPointZero}% del P.Cero)`)
     }
     evidence.push(`Umbral combinado: ${thresholds.outOfLimitsPctWarn}%`)
 
@@ -163,7 +163,7 @@ export function computeDeterministicInsights(
       severity: tooCloseCause.pctOfTotal >= 2 ? 'warn' : 'info',
       title: 'Piezas "too close/too long"',
       evidence: [
-        `${tooCloseCause.label}: ${tooCloseCause.pieces.toLocaleString()} piezas (${tooCloseCause.pctOfPointZero}% del P.Cero, ${tooCloseCause.pctOfTotal}% del total)`,
+        `${tooCloseCause.label}: ${tooCloseCause.pieces.toLocaleString('es-CL')} piezas (${tooCloseCause.pctOfPointZero}% del P.Cero, ${tooCloseCause.pctOfTotal}% del total)`,
       ],
       recommendations: [
         'Verificar velocidad del alimentador y separación entre piezas.',
@@ -180,7 +180,7 @@ export function computeDeterministicInsights(
       severity: doorCause.pctOfTotal >= 2 ? 'warn' : 'info',
       title: 'Puerta no preparada frecuente',
       evidence: [
-        `${doorCause.label}: ${doorCause.pieces.toLocaleString()} piezas (${doorCause.pctOfPointZero}% del P.Cero, ${doorCause.pctOfTotal}% del total)`,
+        `${doorCause.label}: ${doorCause.pieces.toLocaleString('es-CL')} piezas (${doorCause.pctOfPointZero}% del P.Cero, ${doorCause.pctOfTotal}% del total)`,
       ],
       recommendations: [
         'Verificar el mecanismo de actuación de las compuertas.',
@@ -341,7 +341,7 @@ export function computeDeterministicInsights(
           `Espacio libre entre peces: ${gapCm.toFixed(1)} cm (${((gapCm / salmonLengthCm) * 100).toFixed(0)}% del largo)`,
         ]
         if (tooCloseCause && tooCloseCause.pieces > 0) {
-          evidence.push(`Errores "too close/too long" detectados: ${tooCloseCause.pieces.toLocaleString()} pz (${tooCloseCause.pctOfTotal}% del total)`)
+          evidence.push(`Errores "too close/too long" detectados: ${tooCloseCause.pieces.toLocaleString('es-CL')} pz (${tooCloseCause.pctOfTotal}% del total)`)
         }
         insights.push({
           id: nextId(),
@@ -466,7 +466,7 @@ export function computeDeterministicInsights(
           severity: g.utilizationPct >= overloadCritical ? 'critical' : 'warn',
           title: `Gate ${g.gateNumber} concentra el ${g.utilizationPct.toFixed(1)}% del tráfico`,
           evidence: [
-            `Gate ${g.gateNumber}: ${g.pieces.toLocaleString()} pz = ${g.utilizationPct.toFixed(1)}% del total clasificado`,
+            `Gate ${g.gateNumber}: ${g.pieces.toLocaleString('es-CL')} pz = ${g.utilizationPct.toFixed(1)}% del total clasificado`,
             `Umbral warn: ${overloadWarn}% · Umbral critical: ${overloadCritical}%`,
             `Promedio esperado por gate activa: ${avgUtilization.toFixed(1)}%`,
             `Calibre: ${g.assignedCalibre} / ${g.assignedQuality}`,

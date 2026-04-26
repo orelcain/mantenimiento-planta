@@ -18,6 +18,7 @@ import {
   Info,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { fmt } from '@/lib/format'
 import { useAuthStore } from '@/store'
 import { parseFile, mergeParsedData } from '@/services/grader/graderExcelParser'
 import { getModuleRanges } from '@/services/grader/graderModuleConfig.service'
@@ -403,7 +404,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
         </button>
         {turnoRange && (
           <span className="text-xs text-muted-foreground">
-            {turnoRange.date} · {turnoRange.start}–{turnoRange.end} · {turnoRange.totalPieces.toLocaleString()} pzs
+            {turnoRange.date} · {turnoRange.start}–{turnoRange.end} · {fmt(turnoRange.totalPieces)} pzs
           </span>
         )}
         <input
@@ -484,9 +485,9 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
                   <span className="truncate flex-1">{f.fileMeta.name}</span>
                   <span className="text-muted-foreground shrink-0 tabular-nums">
                     {f.fileMeta.kind === 'PIEZA_PIEZA'
-                      ? `${(f.partialData.pieceRecords?.length ?? 0).toLocaleString()} reg`
+                      ? `${fmt(f.partialData.pieceRecords?.length ?? 0)} reg`
                       : f.fileMeta.kind === 'PUERTA_0'
-                        ? `${(f.partialData.gate0Records?.length ?? 0).toLocaleString()} reg P0`
+                        ? `${fmt(f.partialData.gate0Records?.length ?? 0)} reg P0`
                         : ''}
                   </span>
                   <button
@@ -507,7 +508,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
             <div className="flex items-center gap-3 flex-wrap text-xs bg-emerald-500/10 border border-emerald-500/20 rounded-md px-3 py-2">
               <CheckCircle className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
               <span className="font-medium">{turnoRange.date} · {turnoRange.start}–{turnoRange.end}</span>
-              <span className="text-muted-foreground">{turnoRange.durationMin} min · {turnoRange.totalPieces.toLocaleString()} piezas</span>
+              <span className="text-muted-foreground">{turnoRange.durationMin} min · {turnoRange.totalPieces.toLocaleString('es-CL')} piezas</span>
             </div>
           )}
 

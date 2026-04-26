@@ -796,7 +796,7 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
           </div>
           <div className="rounded-md border p-2 bg-card/40">
             <div className="text-[10px] text-muted-foreground">Lecturas visibles</div>
-            <div className="text-sm font-semibold">{visibleSummary.points.toLocaleString()}</div>
+            <div className="text-sm font-semibold">{visibleSummary.points.toLocaleString('es-CL')}</div>
           </div>
           <div className="col-span-2 lg:col-span-5 text-[10px] text-muted-foreground">
             Última lectura: {visibleSummary.latestAt.toLocaleString('es-CL')}

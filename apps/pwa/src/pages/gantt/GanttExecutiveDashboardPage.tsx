@@ -162,7 +162,7 @@ export function GanttExecutiveDashboardPage() {
           {delayedCritical.map((task) => (
             <div key={task.id} className="rounded border border-destructive/40 p-3">
               <p className="font-medium text-destructive">{task.titulo}</p>
-              <p className="text-xs text-muted-foreground">Fin planificado: {task.endDate.toLocaleString()} · Responsable: {task.responsibleName ?? 'Sin asignar'}</p>
+              <p className="text-xs text-muted-foreground">Fin planificado: {task.endDate.toLocaleString('es-CL')} · Responsable: {task.responsibleName ?? 'Sin asignar'}</p>
             </div>
           ))}
         </CardContent>

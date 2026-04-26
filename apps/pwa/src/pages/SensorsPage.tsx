@@ -2471,7 +2471,7 @@ export function SensorsPage() {
                         <div className="text-xs text-muted-foreground space-y-1">
                           <p>⏱️ Mínimo: 5s | Máximo: 300s (5 min)</p>
                           <p className={sendInterval <= 10 ? 'text-amber-600 dark:text-amber-400' : ''}>
-                            {sendInterval <= 10 && '⚠️ '}{sendInterval}s = ~{Math.round(86400 / sendInterval).toLocaleString()} lecturas/día
+                            {sendInterval <= 10 && '⚠️ '}{sendInterval}s = ~{Math.round(86400 / sendInterval).toLocaleString('es-CL')} lecturas/día
                             {sendInterval <= 10 && ' (alto consumo)'}
                           </p>
                         </div>

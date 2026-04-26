@@ -683,7 +683,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
     pdfDoc.text('Análisis Grader — Reporte', pageW / 2, y, { align: 'center' })
     y += 8
     pdfDoc.setFontSize(9)
-    pdfDoc.text(`Generado: ${new Date().toLocaleString()} | Dispositivo: ${config.deviceId || 'N/D'} | Período: ${analytics.config.startAt || '?'} — ${analytics.config.endAt || '?'}`, pageW / 2, y, { align: 'center' })
+    pdfDoc.text(`Generado: ${new Date().toLocaleString('es-CL')} | Dispositivo: ${config.deviceId || 'N/D'} | Período: ${analytics.config.startAt || '?'} — ${analytics.config.endAt || '?'}`, pageW / 2, y, { align: 'center' })
     y += 10
 
     // KPI table
@@ -694,16 +694,16 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
       startY: y,
       head: [['Métrica', 'Valor']],
       body: [
-        ['Total Piezas', kpis.totalPieces.toLocaleString()],
-        ['Peso Total (kg)', kpis.totalWeightKg?.toLocaleString() ?? 'N/D'],
-        ['Punto Cero Piezas', kpis.pointZeroPieces.toLocaleString()],
+        ['Total Piezas', kpis.totalPieces.toLocaleString('es-CL')],
+        ['Peso Total (kg)', kpis.totalWeightKg?.toLocaleString('es-CL') ?? 'N/D'],
+        ['Punto Cero Piezas', kpis.pointZeroPieces.toLocaleString('es-CL')],
         ['Punto Cero %', `${kpis.pointZeroPct}%`],
         ['Calibre Dominante', kpis.dominantCalibre ? `${kpis.dominantCalibre.calibre} (${kpis.dominantCalibre.pct}%)` : 'N/D'],
         ['Calidad Dominante', kpis.dominantQuality ? `${kpis.dominantQuality.quality} (${kpis.dominantQuality.pct}%)` : 'N/D'],
-        ['Peso Promedio (g)', kpis.avgWeightGrams?.toLocaleString() ?? 'N/D'],
-        ['Peso Mediana (g)', kpis.medianWeightGrams?.toLocaleString() ?? 'N/D'],
+        ['Peso Promedio (g)', kpis.avgWeightGrams?.toLocaleString('es-CL') ?? 'N/D'],
+        ['Peso Mediana (g)', kpis.medianWeightGrams?.toLocaleString('es-CL') ?? 'N/D'],
         ['Lotes Procesados', kpis.uniqueLots?.toString() ?? 'N/D'],
-        ['Piezas/Hora', kpis.productionRatePerHour?.toLocaleString() ?? 'N/D'],
+        ['Piezas/Hora', kpis.productionRatePerHour?.toLocaleString('es-CL') ?? 'N/D'],
       ],
       theme: 'grid',
       styles: { fontSize: 8 },
@@ -720,7 +720,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
       autoTable(pdfDoc, {
         startY: y,
         head: [['Calibre', 'Piezas', '%']],
-        body: analytics.distributionByCalibre.map(d => [d.key, d.pieces.toLocaleString(), `${d.pct}%`]),
+        body: analytics.distributionByCalibre.map(d => [d.key, d.pieces.toLocaleString('es-CL'), `${d.pct}%`]),
         theme: 'striped',
         styles: { fontSize: 8 },
         margin: { left: 14 },
@@ -737,7 +737,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
       autoTable(pdfDoc, {
         startY: y,
         head: [['Error', 'Piezas', '%']],
-        body: analytics.pointZeroByError.map(e => [e.error, e.pieces.toLocaleString(), `${e.pct}%`]),
+        body: analytics.pointZeroByError.map(e => [e.error, e.pieces.toLocaleString('es-CL'), `${e.pct}%`]),
         theme: 'striped',
         styles: { fontSize: 8 },
         margin: { left: 14 },
@@ -755,8 +755,8 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
         startY: y,
         head: [['Causa', 'Piezas', '% P.Cero', '% Total']],
         body: [
-          ...analytics.pointZeroClassification.causes.map(c => [c.label, c.pieces.toLocaleString(), `${c.pctOfPointZero}%`, `${c.pctOfTotal}%`]),
-          ['TOTAL', analytics.pointZeroClassification.totalPointZeroPieces.toLocaleString(), '100%', `${kpis.pointZeroPct}%`],
+          ...analytics.pointZeroClassification.causes.map(c => [c.label, c.pieces.toLocaleString('es-CL'), `${c.pctOfPointZero}%`, `${c.pctOfTotal}%`]),
+          ['TOTAL', analytics.pointZeroClassification.totalPointZeroPieces.toLocaleString('es-CL'), '100%', `${kpis.pointZeroPct}%`],
         ],
         theme: 'grid',
         styles: { fontSize: 8 },
@@ -778,7 +778,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
           new Date(r.ts).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'UTC' }),
           r.causeLabel,
           r.error,
-          r.pieces.toLocaleString(),
+          r.pieces.toLocaleString('es-CL'),
           r.weightPerPieceGrams != null ? r.weightPerPieceGrams.toFixed(0) : '—',
           r.quality || '—',
           r.calibre,
@@ -800,7 +800,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
       autoTable(pdfDoc, {
         startY: y,
         head: [['Rango Peso', 'Piezas', '%']],
-        body: analytics.pointZeroClassification.outOfRangeByWeight.map(d => [d.rangeLabel, d.pieces.toLocaleString(), `${d.pct}%`]),
+        body: analytics.pointZeroClassification.outOfRangeByWeight.map(d => [d.rangeLabel, d.pieces.toLocaleString('es-CL'), `${d.pct}%`]),
         theme: 'striped',
         styles: { fontSize: 8 },
         margin: { left: 14 },
@@ -824,7 +824,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
         eGroups.set(r.error, g)
       }
       for (const [eLabel, eg] of Array.from(eGroups.entries())) {
-        pivotBody.push([eLabel, eg.total.toLocaleString(), `${pctCalc(eg.total, analytics.pointZeroClassification.totalPointZeroPieces)}%`, `${pctCalc(eg.total, kpis.totalPieces)}%`])
+        pivotBody.push([eLabel, eg.total.toLocaleString('es-CL'), `${pctCalc(eg.total, analytics.pointZeroClassification.totalPointZeroPieces)}%`, `${pctCalc(eg.total, kpis.totalPieces)}%`])
         const qGroups = new Map<string, { rows: typeof hRows; total: number }>()
         for (const r of eg.rows) {
           const qg = qGroups.get(r.quality) || { rows: [], total: 0 }
@@ -833,13 +833,13 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
           qGroups.set(r.quality, qg)
         }
         for (const [qLabel, qg] of Array.from(qGroups.entries())) {
-          pivotBody.push([`  ${qLabel}`, qg.total.toLocaleString(), `${pctCalc(qg.total, analytics.pointZeroClassification.totalPointZeroPieces)}%`, `${pctCalc(qg.total, kpis.totalPieces)}%`])
+          pivotBody.push([`  ${qLabel}`, qg.total.toLocaleString('es-CL'), `${pctCalc(qg.total, analytics.pointZeroClassification.totalPointZeroPieces)}%`, `${pctCalc(qg.total, kpis.totalPieces)}%`])
           for (const r of qg.rows.sort((a, b) => b.pieces - a.pieces)) {
-            pivotBody.push([`    ${r.calibre}`, r.pieces.toLocaleString(), `${r.pctOfPointZero}%`, `${r.pctOfTotal}%`])
+            pivotBody.push([`    ${r.calibre}`, r.pieces.toLocaleString('es-CL'), `${r.pctOfPointZero}%`, `${r.pctOfTotal}%`])
           }
         }
       }
-      pivotBody.push(['Total general', analytics.pointZeroClassification.totalPointZeroPieces.toLocaleString(), '100%', `${kpis.pointZeroPct}%`])
+      pivotBody.push(['Total general', analytics.pointZeroClassification.totalPointZeroPieces.toLocaleString('es-CL'), '100%', `${kpis.pointZeroPct}%`])
       autoTable(pdfDoc, {
         startY: y,
         head: [['Etiquetas de fila', 'Piezas', '% P.Cero', '% Total']],
@@ -1221,10 +1221,10 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
 
       {/* ——— KPIs ——— */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <KPICard label="Total Piezas" value={kpis.totalPieces.toLocaleString()} icon={BarChart3} tooltip={getTooltip('kpi.totalPieces')} />
+        <KPICard label="Total Piezas" value={kpis.totalPieces.toLocaleString('es-CL')} icon={BarChart3} tooltip={getTooltip('kpi.totalPieces')} />
         <KPICard
           label="Punto Cero"
-          value={`${kpis.pointZeroPieces.toLocaleString()} (${kpis.pointZeroPct}%)`}
+          value={`${kpis.pointZeroPieces.toLocaleString('es-CL')} (${kpis.pointZeroPct}%)`}
           icon={Target}
           severity={getPointZeroSeverity(kpis.pointZeroPct)}
           tooltip={getTooltip('kpi.pointZero')}
@@ -1249,7 +1249,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
           {kpis.avgWeightGrams != null && (
             <KPICard
               label="Peso Promedio"
-              value={`${kpis.avgWeightGrams.toLocaleString()} g`}
+              value={`${kpis.avgWeightGrams.toLocaleString('es-CL')} g`}
               secondaryText={`Calibre eq.: ${avgWeightCalibre}`}
               statusBadge={
                 getPointZeroSeverity(kpis.pointZeroPct) === 'critical'
@@ -1265,7 +1265,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
           {kpis.medianWeightGrams != null && (
             <KPICard
               label="Peso Mediana"
-              value={`${kpis.medianWeightGrams.toLocaleString()} g`}
+              value={`${kpis.medianWeightGrams.toLocaleString('es-CL')} g`}
               secondaryText={`Calibre eq.: ${medianWeightCalibre}`}
               statusBadge={
                 getPointZeroSeverity(kpis.pointZeroPct) === 'critical'
@@ -1282,7 +1282,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
             <KPICard label="Lotes Procesados" value={kpis.uniqueLots.toString()} icon={Layers} tooltip={getTooltip('kpi.uniqueLots')} />
           )}
           {kpis.productionRatePerHour != null && kpis.productionRatePerHour > 0 && (
-            <KPICard label="Piezas/Hora" value={kpis.productionRatePerHour.toLocaleString()} icon={Activity} tooltip={getTooltip('kpi.productionRate')} />
+            <KPICard label="Piezas/Hora" value={kpis.productionRatePerHour.toLocaleString('es-CL')} icon={Activity} tooltip={getTooltip('kpi.productionRate')} />
           )}
         </div>
       )}

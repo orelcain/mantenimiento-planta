@@ -208,7 +208,7 @@ export function PuntoCeroPatronesCard({
           </div>
         </div>
         <div className="flex items-center gap-2 mt-2">
-          <Badge variant="outline" className="text-[11px]">Piezas filtradas: {patternTotalPieces.toLocaleString()}</Badge>
+          <Badge variant="outline" className="text-[11px]">Piezas filtradas: {patternTotalPieces.toLocaleString('es-CL')}</Badge>
           {topPatternCalibre && <Badge variant="secondary" className="text-[11px]">Top calibre: {topPatternCalibre.key} ({topPatternCalibre.pct}%)</Badge>}
           {topPatternQuality && <Badge variant="secondary" className="text-[11px]">Top calidad: {topPatternQuality.key} ({topPatternQuality.pct}%)</Badge>}
           {peakPatternHour && <Badge variant="secondary" className="text-[11px]">Ventana pico: {peakPatternHour.rangeLabel} ({peakPatternHour.pct}%)</Badge>}
@@ -246,7 +246,7 @@ export function PuntoCeroPatronesCard({
                       maintainAspectRatio: false,
                       plugins: {
                         legend: { display: false },
-                        tooltip: { callbacks: { label: (ctx) => { const d = patternByCalibre[ctx.dataIndex]; return d ? `${d.pieces.toLocaleString()} pz (${d.pct}%)` : '' } } },
+                        tooltip: { callbacks: { label: (ctx) => { const d = patternByCalibre[ctx.dataIndex]; return d ? `${d.pieces.toLocaleString('es-CL')} pz (${d.pct}%)` : '' } } },
                       },
                       scales: { x: { beginAtZero: true, max: 100 }, y: { grid: { display: false } } },
                     }}
@@ -265,7 +265,7 @@ export function PuntoCeroPatronesCard({
                       maintainAspectRatio: false,
                       plugins: {
                         legend: { display: false },
-                        tooltip: { callbacks: { label: (ctx) => { const d = patternByQuality[ctx.dataIndex]; return d ? `${d.pieces.toLocaleString()} pz (${d.pct}%)` : '' } } },
+                        tooltip: { callbacks: { label: (ctx) => { const d = patternByQuality[ctx.dataIndex]; return d ? `${d.pieces.toLocaleString('es-CL')} pz (${d.pct}%)` : '' } } },
                       },
                       scales: { x: { beginAtZero: true, max: 100 }, y: { grid: { display: false } } },
                     }}
@@ -299,7 +299,7 @@ export function PuntoCeroPatronesCard({
                       tooltip: {
                         callbacks: {
                           title: (items) => { const first = items?.[0]; if (!first) return ''; const bucket = patternByHour[first.dataIndex]; return bucket ? `Ventana: ${bucket.rangeLabel}` : '' },
-                          label: (ctx) => { const bucket = patternByHour[ctx.dataIndex]; return bucket ? `Piezas: ${bucket.pieces.toLocaleString()} (${bucket.pct}%)` : '' },
+                          label: (ctx) => { const bucket = patternByHour[ctx.dataIndex]; return bucket ? `Piezas: ${bucket.pieces.toLocaleString('es-CL')} (${bucket.pct}%)` : '' },
                           afterBody: (items) => {
                             const first = items?.[0]
                             if (!first) return []
@@ -308,9 +308,9 @@ export function PuntoCeroPatronesCard({
                             const detail = patternIntervalDetailsByLabel.get(bucket.key)
                             if (!detail) return []
                             const lines: string[] = ['', 'Calibre:']
-                            for (const c of detail.calibres) lines.push(`- ${c.key}: ${c.pieces.toLocaleString()} pz`)
+                            for (const c of detail.calibres) lines.push(`- ${c.key}: ${c.pieces.toLocaleString('es-CL')} pz`)
                             lines.push('', 'Calidad:')
-                            for (const q of detail.qualities) lines.push(`- ${q.key}: ${q.pieces.toLocaleString()} pz`)
+                            for (const q of detail.qualities) lines.push(`- ${q.key}: ${q.pieces.toLocaleString('es-CL')} pz`)
                             return lines
                           },
                         },
@@ -338,7 +338,7 @@ export function PuntoCeroPatronesCard({
                       <div>
                         <p className="font-semibold">{pin.label}</p>
                         <p className="text-muted-foreground">{pin.rangeLabel}</p>
-                        <p className="text-muted-foreground">{pin.pieces.toLocaleString()} pz ({pin.pct}%)</p>
+                        <p className="text-muted-foreground">{pin.pieces.toLocaleString('es-CL')} pz ({pin.pct}%)</p>
                       </div>
                       <button type="button" className="text-muted-foreground hover:text-foreground leading-none" onMouseDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); removePinnedPatternPoint(pin.id) }} aria-label={`Quitar comparación ${pin.label}`}>
                         ✕
@@ -346,11 +346,11 @@ export function PuntoCeroPatronesCard({
                     </div>
                     <div className="mt-1">
                       <p className="font-medium">Calibre</p>
-                      {pin.calibres.map((row) => <p key={`${pin.id}-c-${row.key}`} className="text-muted-foreground">- {row.key}: {row.pieces.toLocaleString()} pz</p>)}
+                      {pin.calibres.map((row) => <p key={`${pin.id}-c-${row.key}`} className="text-muted-foreground">- {row.key}: {row.pieces.toLocaleString('es-CL')} pz</p>)}
                     </div>
                     <div className="mt-1">
                       <p className="font-medium">Calidad</p>
-                      {pin.qualities.map((row) => <p key={`${pin.id}-q-${row.key}`} className="text-muted-foreground">- {row.key}: {row.pieces.toLocaleString()} pz</p>)}
+                      {pin.qualities.map((row) => <p key={`${pin.id}-q-${row.key}`} className="text-muted-foreground">- {row.key}: {row.pieces.toLocaleString('es-CL')} pz</p>)}
                     </div>
                   </div>
                 ))}
@@ -388,7 +388,7 @@ export function PuntoCeroPatronesCard({
                             const cumulativeTotal = patternCauseTrend.cumulativeTotals[idx] ?? 0
                             const pct = cause.pctCumulative[idx] ?? 0
                             if (idx === 0) return `${cause.label}: 0% (inicio)`
-                            return `${cause.label}: ${pct}% acum. (${cumulativePieces.toLocaleString()} / ${cumulativeTotal.toLocaleString()} pz) · int: ${intervalPieces.toLocaleString()} / ${intervalTotal.toLocaleString()}`
+                            return `${cause.label}: ${pct}% acum. (${cumulativePieces.toLocaleString('es-CL')} / ${cumulativeTotal.toLocaleString('es-CL')} pz) · int: ${intervalPieces.toLocaleString('es-CL')} / ${intervalTotal.toLocaleString('es-CL')}`
                           },
                         },
                       },
@@ -406,13 +406,13 @@ export function PuntoCeroPatronesCard({
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead><tr className="border-b"><th className="py-1.5 px-2 text-left">Calibre</th><th className="py-1.5 px-2 text-right">Piezas</th><th className="py-1.5 px-2 text-right">%</th></tr></thead>
-                  <tbody>{patternByCalibre.map((row) => <tr key={row.key} className="border-b"><td className="py-1 px-2">{row.key}</td><td className="py-1 px-2 text-right">{row.pieces.toLocaleString()}</td><td className="py-1 px-2 text-right">{row.pct}%</td></tr>)}</tbody>
+                  <tbody>{patternByCalibre.map((row) => <tr key={row.key} className="border-b"><td className="py-1 px-2">{row.key}</td><td className="py-1 px-2 text-right">{row.pieces.toLocaleString('es-CL')}</td><td className="py-1 px-2 text-right">{row.pct}%</td></tr>)}</tbody>
                 </table>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead><tr className="border-b"><th className="py-1.5 px-2 text-left">Calidad</th><th className="py-1.5 px-2 text-right">Piezas</th><th className="py-1.5 px-2 text-right">%</th></tr></thead>
-                  <tbody>{patternByQuality.map((row) => <tr key={row.key} className="border-b"><td className="py-1 px-2">{row.key}</td><td className="py-1 px-2 text-right">{row.pieces.toLocaleString()}</td><td className="py-1 px-2 text-right">{row.pct}%</td></tr>)}</tbody>
+                  <tbody>{patternByQuality.map((row) => <tr key={row.key} className="border-b"><td className="py-1 px-2">{row.key}</td><td className="py-1 px-2 text-right">{row.pieces.toLocaleString('es-CL')}</td><td className="py-1 px-2 text-right">{row.pct}%</td></tr>)}</tbody>
                 </table>
               </div>
             </div>

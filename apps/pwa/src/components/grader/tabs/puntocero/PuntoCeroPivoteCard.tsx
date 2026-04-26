@@ -65,7 +65,7 @@ export function PuntoCeroPivoteCard({ analytics }: Props) {
             className="cursor-pointer text-xs"
             onClick={() => setP0ErrorFilter(null)}
           >
-            Todos ({analytics.pointZeroClassification.totalPointZeroPieces.toLocaleString()})
+            Todos ({analytics.pointZeroClassification.totalPointZeroPieces.toLocaleString('es-CL')})
           </Badge>
           {uniqueErrors.map((errorLabel) => {
             const errorTotal = allRows.filter((r) => r.error === errorLabel).reduce((s, r) => s + r.pieces, 0)
@@ -76,7 +76,7 @@ export function PuntoCeroPivoteCard({ analytics }: Props) {
                 className="cursor-pointer text-xs"
                 onClick={() => setP0ErrorFilter(p0ErrorFilter === errorLabel ? null : errorLabel)}
               >
-                {errorLabel} ({errorTotal.toLocaleString()})
+                {errorLabel} ({errorTotal.toLocaleString('es-CL')})
               </Badge>
             )
           })}
@@ -102,7 +102,7 @@ export function PuntoCeroPivoteCard({ analytics }: Props) {
                         const v = ctx.parsed.y
                         if (!v) return ''
                         const pct = filteredTotal > 0 ? ((v / filteredTotal) * 100).toFixed(1) : '0'
-                        return `${ctx.dataset.label}: ${v.toLocaleString()} pz (${pct}%)`
+                        return `${ctx.dataset.label}: ${v.toLocaleString('es-CL')} pz (${pct}%)`
                       },
                     },
                   },
@@ -147,7 +147,7 @@ export function PuntoCeroPivoteCard({ analytics }: Props) {
                   elements.push(
                     <tr key={`e-${errorLabel}`} className="bg-muted/60 font-bold border-b">
                       <td className="py-2 px-2">{errorLabel}</td>
-                      <td className="py-2 px-2 text-right">{eg.total.toLocaleString()}</td>
+                      <td className="py-2 px-2 text-right">{eg.total.toLocaleString('es-CL')}</td>
                       <td className="py-2 px-2 text-right">{pctCalc(eg.total, analytics.pointZeroClassification.totalPointZeroPieces)}%</td>
                       <td className="py-2 px-2 text-right text-muted-foreground">{pctCalc(eg.total, analytics.kpis.totalPieces)}%</td>
                     </tr>
@@ -163,7 +163,7 @@ export function PuntoCeroPivoteCard({ analytics }: Props) {
                     elements.push(
                       <tr key={`q-${errorLabel}-${qualLabel}`} className="font-semibold border-b hover:bg-muted/20">
                         <td className="py-1.5 px-2 pl-6">{qualLabel}</td>
-                        <td className="py-1.5 px-2 text-right">{qg.total.toLocaleString()}</td>
+                        <td className="py-1.5 px-2 text-right">{qg.total.toLocaleString('es-CL')}</td>
                         <td className="py-1.5 px-2 text-right">{pctCalc(qg.total, analytics.pointZeroClassification.totalPointZeroPieces)}%</td>
                         <td className="py-1.5 px-2 text-right text-muted-foreground">{pctCalc(qg.total, analytics.kpis.totalPieces)}%</td>
                       </tr>
@@ -172,7 +172,7 @@ export function PuntoCeroPivoteCard({ analytics }: Props) {
                       elements.push(
                         <tr key={`c-${errorLabel}-${qualLabel}-${r.calibre}`} className="border-b hover:bg-muted/10 text-muted-foreground">
                           <td className="py-1 px-2 pl-12">{r.calibre}</td>
-                          <td className="py-1 px-2 text-right">{r.pieces.toLocaleString()}</td>
+                          <td className="py-1 px-2 text-right">{r.pieces.toLocaleString('es-CL')}</td>
                           <td className="py-1 px-2 text-right">{r.pctOfPointZero}%</td>
                           <td className="py-1 px-2 text-right">{r.pctOfTotal}%</td>
                         </tr>
@@ -184,7 +184,7 @@ export function PuntoCeroPivoteCard({ analytics }: Props) {
               })()}
               <tr className="border-t-2 font-bold bg-muted/50">
                 <td className="py-2 px-2">{p0ErrorFilter ? `Total ${p0ErrorFilter}` : 'Total general'}</td>
-                <td className="py-2 px-2 text-right">{filteredTotal.toLocaleString()}</td>
+                <td className="py-2 px-2 text-right">{filteredTotal.toLocaleString('es-CL')}</td>
                 <td className="py-2 px-2 text-right">{pctCalc(filteredTotal, analytics.pointZeroClassification.totalPointZeroPieces)}%</td>
                 <td className="py-2 px-2 text-right">{pctCalc(filteredTotal, analytics.kpis.totalPieces)}%</td>
               </tr>

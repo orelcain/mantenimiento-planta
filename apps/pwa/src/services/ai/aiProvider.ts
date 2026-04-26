@@ -89,9 +89,9 @@ function buildPrompt(p: AIGraderInput): string {
 
   lines.push('=== DATOS DEL TURNO ===')
   lines.push('Periodo: ' + (p.metadata.startAt || '?') + ' a ' + (p.metadata.endAt || '?'))
-  lines.push('Piezas totales: ' + p.kpis.totalPieces.toLocaleString())
-  lines.push('Punto Cero: ' + p.kpis.pointZeroPieces.toLocaleString() + ' (' + p.kpis.pointZeroPct + '%)')
-  lines.push('Piezas productivas: ' + (p.kpis.totalPieces - p.kpis.pointZeroPieces).toLocaleString())
+  lines.push('Piezas totales: ' + p.kpis.totalPieces.toLocaleString('es-CL'))
+  lines.push('Punto Cero: ' + p.kpis.pointZeroPieces.toLocaleString('es-CL') + ' (' + p.kpis.pointZeroPct + '%)')
+  lines.push('Piezas productivas: ' + (p.kpis.totalPieces - p.kpis.pointZeroPieces).toLocaleString('es-CL'))
   if (p.kpis.avgWeightGrams) lines.push('Peso promedio: ' + p.kpis.avgWeightGrams + 'g')
   if (p.kpis.medianWeightGrams) lines.push('Peso mediana: ' + p.kpis.medianWeightGrams + 'g')
   if (p.kpis.dominantCalibre) lines.push('Calibre dominante: ' + p.kpis.dominantCalibre.calibre + ' (' + p.kpis.dominantCalibre.pct + '%)')
@@ -199,7 +199,7 @@ function buildPrompt(p: AIGraderInput): string {
     if (p.patternFocus.intervalMinutes) {
       lines.push('  Intervalo temporal: ' + p.patternFocus.intervalMinutes + ' min')
     }
-    lines.push('  Piezas en foco: ' + p.patternFocus.filteredTotalPieces.toLocaleString())
+    lines.push('  Piezas en foco: ' + p.patternFocus.filteredTotalPieces.toLocaleString('es-CL'))
 
     if (p.patternFocus.distributionByCalibre.length > 0) {
       lines.push('  Distribución por calibre (foco):')
@@ -270,9 +270,9 @@ function buildPrompt(p: AIGraderInput): string {
     lines.push('=== PROYECCIÓN DE CIERRE DE TURNO (datos parciales) ===')
     lines.push('  Turno planificado: ' + p.trendForecast.shiftStart + ' a ' + p.trendForecast.shiftEnd)
     lines.push('  Avance observado: ' + p.trendForecast.completionPct + '% (' + p.trendForecast.observedBuckets + '/' + p.trendForecast.totalBuckets + ' intervalos)')
-    lines.push('  Piezas observadas: ' + p.trendForecast.observedPieces.toLocaleString())
-    lines.push('  Piezas proyectadas al cierre: ' + p.trendForecast.projectedTotalPieces.toLocaleString())
-    lines.push('  Punto Cero proyectado al cierre: ' + p.trendForecast.projectedPointZeroPieces.toLocaleString() + ' pz (' + p.trendForecast.projectedPointZeroPct + '%)')
+    lines.push('  Piezas observadas: ' + p.trendForecast.observedPieces.toLocaleString('es-CL'))
+    lines.push('  Piezas proyectadas al cierre: ' + p.trendForecast.projectedTotalPieces.toLocaleString('es-CL'))
+    lines.push('  Punto Cero proyectado al cierre: ' + p.trendForecast.projectedPointZeroPieces.toLocaleString('es-CL') + ' pz (' + p.trendForecast.projectedPointZeroPct + '%)')
     lines.push('  Usa esta proyección para priorizar acciones tempranas de gates.')
   }
 
@@ -328,8 +328,8 @@ class MockAIProvider implements AIProvider {
     const { kpis, distributions, gateBalance } = payload
 
     const summaryBullets: string[] = [
-      'Se procesaron ' + kpis.totalPieces.toLocaleString() + ' piezas.',
-      'Punto Cero: ' + kpis.pointZeroPieces.toLocaleString() + ' (' + kpis.pointZeroPct + '%).',
+      'Se procesaron ' + kpis.totalPieces.toLocaleString('es-CL') + ' piezas.',
+      'Punto Cero: ' + kpis.pointZeroPieces.toLocaleString('es-CL') + ' (' + kpis.pointZeroPct + '%).',
     ]
     if (kpis.dominantCalibre) summaryBullets.push('Calibre dominante: ' + kpis.dominantCalibre.calibre + ' (' + kpis.dominantCalibre.pct + '%).')
     if (kpis.dominantQuality) summaryBullets.push('Calidad dominante: ' + kpis.dominantQuality.quality + ' (' + kpis.dominantQuality.pct + '%).')

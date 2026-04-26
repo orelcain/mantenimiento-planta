@@ -32,7 +32,7 @@ function buildPrompt(input: EstimateInput): string {
 
   input.comments.slice(0, 12).forEach((comment, index) => {
     lines.push(
-      `${index + 1}. [${comment.createdAt.toLocaleString()}] ${comment.createdByName || 'técnico'} · ${comment.reportedProgress ?? 'sin % explícito'}% · ${comment.content}`
+      `${index + 1}. [${comment.createdAt.toLocaleString('es-CL')}] ${comment.createdByName || 'técnico'} · ${comment.reportedProgress ?? 'sin % explícito'}% · ${comment.content}`
     )
   })
 

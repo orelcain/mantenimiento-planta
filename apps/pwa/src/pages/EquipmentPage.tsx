@@ -705,7 +705,7 @@ ${new Date().toLocaleDateString()} • ${new Date().toLocaleTimeString()}
 
   const generateSharePdfContent = (data: any): string => {
     let content = `REPORTE DE EQUIPOS\n`
-    content += `Fecha: ${new Date(data.fecha_exportacion).toLocaleString()}\n`
+    content += `Fecha: ${new Date(data.fecha_exportacion).toLocaleString('es-CL')}\n`
     content += `Total equipos: ${data.total_equipos}\n`
     content += `\n${'='.repeat(60)}\n\n`
 
@@ -726,7 +726,7 @@ ${new Date().toLocaleDateString()} • ${new Date().toLocaleTimeString()}
         content += `\nHistorial de Incidencias (${eq.historial.length}):\n`
         eq.historial.forEach((inc: any, i: number) => {
           content += `  ${i + 1}. ${inc.titulo} - ${inc.prioridad} - ${inc.estado}\n`
-          content += `     Fecha: ${new Date(inc.fecha).toLocaleString()}\n`
+          content += `     Fecha: ${new Date(inc.fecha).toLocaleString('es-CL')}\n`
         })
       }
 
@@ -734,7 +734,7 @@ ${new Date().toLocaleDateString()} • ${new Date().toLocaleTimeString()}
         content += `\nNotas (${eq.notas.length}):\n`
         eq.notas.forEach((nota: any, i: number) => {
           content += `  ${i + 1}. ${nota.texto}\n`
-          content += `     Fecha: ${new Date(nota.fecha).toLocaleString()}\n`
+          content += `     Fecha: ${new Date(nota.fecha).toLocaleString('es-CL')}\n`
         })
       }
 

@@ -279,7 +279,7 @@ export function ImportRepuestosModal({
               {previewCount !== null && (
                 <p className={`text-xs font-medium ${previewCount > 0 ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}>
                   {previewCount > 0
-                    ? `${previewCount.toLocaleString()} repuestos listos para importar`
+                    ? `${previewCount.toLocaleString('es-CL')} repuestos listos para importar`
                     : 'No se detectaron repuestos válidos en esta hoja'}
                 </p>
               )}
@@ -292,7 +292,7 @@ export function ImportRepuestosModal({
             Cancelar
           </Button>
           <Button onClick={handleImport} disabled={!isReady || isLoading || previewCount === 0}>
-            {isLoading ? 'Importando…' : `Importar${previewCount ? ` (${previewCount.toLocaleString()})` : ''}`}
+            {isLoading ? 'Importando…' : `Importar${previewCount ? ` (${previewCount.toLocaleString('es-CL')})` : ''}`}
           </Button>
         </DialogFooter>
       </DialogContent>

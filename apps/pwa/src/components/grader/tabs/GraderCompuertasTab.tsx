@@ -227,9 +227,9 @@ export function GraderCompuertasTab({ analytics, physicalConfig, gates, errorThr
                       gs.mismatchPct > 30 && 'bg-red-50/50 dark:bg-red-900/5',
                     )}>
                       <td className="py-2 px-2 font-medium">Gate {gs.gateNumber}</td>
-                      <td className="py-2 px-2 text-right">{gs.pieces.toLocaleString()}</td>
-                      <td className="py-2 px-2 text-right">{gs.avgWeightGrams.toLocaleString()}</td>
-                      <td className="py-2 px-2 text-right">{gs.stdDevWeightGrams.toLocaleString()}</td>
+                      <td className="py-2 px-2 text-right">{gs.pieces.toLocaleString('es-CL')}</td>
+                      <td className="py-2 px-2 text-right">{gs.avgWeightGrams.toLocaleString('es-CL')}</td>
+                      <td className="py-2 px-2 text-right">{gs.stdDevWeightGrams.toLocaleString('es-CL')}</td>
                       <td className="py-2 px-2 text-right">
                         <span className={cn(
                           'font-medium',

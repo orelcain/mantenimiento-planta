@@ -171,7 +171,7 @@ export function TendenciaWeightCard({
                       const bucketTs = bucketKey ? new Date(bucketKey).getTime() : NaN
                       const bucket = Number.isFinite(bucketTs) ? weightTrendByTs.get(bucketTs) : undefined
                       if (!bucket) return ''
-                      const lines = [`Mediana: ${bucket.medianWeightGrams.toLocaleString()} g`, `σ: ${bucket.stdDevWeightGrams.toLocaleString()} g`, `Piezas: ${bucket.pieces.toLocaleString()}`]
+                      const lines = [`Mediana: ${bucket.medianWeightGrams.toLocaleString('es-CL')} g`, `σ: ${bucket.stdDevWeightGrams.toLocaleString('es-CL')} g`, `Piezas: ${bucket.pieces.toLocaleString('es-CL')}`]
                       if (bucket.dominantLot) lines.push(`Lote: ${bucket.dominantLot}`)
                       return lines
                     },
@@ -327,9 +327,9 @@ export function TendenciaWeightCard({
                 {analytics.weightTrendSeries.map((b, i) => (
                   <tr key={i} className="border-b hover:bg-muted/30">
                     <td className="py-1.5 px-2 text-xs">{new Date(b.bucketStart).toLocaleTimeString()}</td>
-                    <td className="py-1.5 px-2 text-right">{b.pieces.toLocaleString()}</td>
-                    <td className="py-1.5 px-2 text-right font-medium">{b.avgWeightGrams.toLocaleString()}</td>
-                    <td className="py-1.5 px-2 text-right">{b.medianWeightGrams.toLocaleString()}</td>
+                    <td className="py-1.5 px-2 text-right">{b.pieces.toLocaleString('es-CL')}</td>
+                    <td className="py-1.5 px-2 text-right font-medium">{b.avgWeightGrams.toLocaleString('es-CL')}</td>
+                    <td className="py-1.5 px-2 text-right">{b.medianWeightGrams.toLocaleString('es-CL')}</td>
                     <td className="py-1.5 px-2 text-right">
                       {(() => {
                         const cv = b.avgWeightGrams > 0 ? (b.stdDevWeightGrams / b.avgWeightGrams) * 100 : 0
@@ -366,7 +366,7 @@ export function TendenciaWeightCard({
                       })()}
                     </td>
                     <td className="py-1.5 px-2 text-right text-purple-600">
-                      {b.movingAvg5 != null ? b.movingAvg5.toLocaleString() : '—'}
+                      {b.movingAvg5 != null ? b.movingAvg5.toLocaleString('es-CL') : '—'}
                     </td>
                     <td className="py-1.5 px-2 text-xs">{b.dominantLot || '—'}</td>
                   </tr>

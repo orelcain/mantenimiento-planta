@@ -504,7 +504,7 @@ export function BuscadorGlobal({ initialQuery, onQueryConsumed, onViewInCatalog 
             </div>
           ) : loaded ? (
             <span className="text-[10px] text-muted-foreground">
-              {totalRepuestos.toLocaleString()} repuestos · {totalMaquinas} equipos indexados
+              {totalRepuestos.toLocaleString('es-CL')} repuestos · {totalMaquinas} equipos indexados
             </span>
           ) : (
             <button onClick={loadAll} className="text-[10px] text-primary hover:underline">Cargar índice</button>
@@ -542,10 +542,10 @@ export function BuscadorGlobal({ initialQuery, onQueryConsumed, onViewInCatalog 
       {!query.trim() && (
         <div className="space-y-3">
           <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 sm:grid sm:grid-cols-4 sm:gap-3 sm:pb-0">
-            <StatCard icon={Package} label="Total repuestos" value={totalRepuestos.toLocaleString()} color="bg-blue-500/10 text-blue-400" />
+            <StatCard icon={Package} label="Total repuestos" value={totalRepuestos.toLocaleString('es-CL')} color="bg-blue-500/10 text-blue-400" />
             <StatCard icon={Layers} label="Equipos" value={totalMaquinas} color="bg-emerald-500/10 text-emerald-400" />
             <StatCard icon={Tag} label="Tipos" value={totalTipos} color="bg-purple-500/10 text-purple-400" />
-            <StatCard icon={BarChart3} label="Con código SAP" value={totalConSAP.toLocaleString()} color="bg-amber-500/10 text-amber-400" />
+            <StatCard icon={BarChart3} label="Con código SAP" value={totalConSAP.toLocaleString('es-CL')} color="bg-amber-500/10 text-amber-400" />
           </div>
 
           {loading && <Skeleton />}

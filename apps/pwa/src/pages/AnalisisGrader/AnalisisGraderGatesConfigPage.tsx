@@ -7,6 +7,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useSuggestionEngine } from '@/services/grader/suggestions/useSuggestionEngine'
+import { fmt } from '@/lib/format'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch, Label } from '@/components/ui'
 import { Save, FolderOpen, ChevronRight, Trash2, ChevronDown, Settings2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -68,7 +69,7 @@ const DEFAULT_CALIBRES: CalibreRange[] = ['0-2 lb', '2-4 lb', '4-6 lb', '6-8 lb'
 
 
 function buildRangeLabel(calibre: string, minGrams: number, maxGrams: number): string {
-  return `${calibre} (${minGrams.toLocaleString()}-${maxGrams.toLocaleString()} g)`
+  return `${calibre} (${fmt(minGrams)}-${fmt(maxGrams)} g)`
 }
 
 /** Lookup rango peso por calibre — usa custom ranges si existen */
@@ -734,8 +735,8 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
           {/* Period inferred */}
           {parsedData.inferred.startAt && (
             <div className="mt-3 text-xs text-muted-foreground">
-              Periodo detectado: {new Date(parsedData.inferred.startAt).toLocaleString()} →{' '}
-              {parsedData.inferred.endAt ? new Date(parsedData.inferred.endAt).toLocaleString() : '?'}
+              Periodo detectado: {new Date(parsedData.inferred.startAt).toLocaleString('es-CL')} →{' '}
+              {parsedData.inferred.endAt ? new Date(parsedData.inferred.endAt).toLocaleString('es-CL') : '?'}
             </div>
           )}
         </CardContent>

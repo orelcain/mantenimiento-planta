@@ -59,7 +59,7 @@ export function PuntoCeroClasificacionCard({
           <InfoTooltip {...getTooltipProps('pz.clasificacion')} />
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          {analytics.pointZeroClassification.totalPointZeroPieces.toLocaleString()} piezas totales en Punto Cero
+          {analytics.pointZeroClassification.totalPointZeroPieces.toLocaleString('es-CL')} piezas totales en Punto Cero
         </p>
       </CardHeader>
       <CardContent>
@@ -80,7 +80,7 @@ export function PuntoCeroClasificacionCard({
                         label: (ctx) => {
                           const cause = causes[ctx.dataIndex]
                           return cause
-                            ? `${cause.label}: ${cause.pieces.toLocaleString()} pz (${cause.pctOfPointZero}% P.Cero | ${cause.pctOfTotal}% Total)`
+                            ? `${cause.label}: ${cause.pieces.toLocaleString('es-CL')} pz (${cause.pctOfPointZero}% P.Cero | ${cause.pctOfTotal}% Total)`
                             : ''
                         },
                       },
@@ -101,7 +101,7 @@ export function PuntoCeroClasificacionCard({
                     <span className="text-muted-foreground">{c.pctOfPointZero}%</span>
                   </div>
                   <div className="text-[10px] text-muted-foreground mt-0.5">
-                    {c.pieces.toLocaleString()} pz · {c.pctOfTotal}% total
+                    {c.pieces.toLocaleString('es-CL')} pz · {c.pctOfTotal}% total
                   </div>
                 </div>
               ))}
@@ -154,7 +154,7 @@ export function PuntoCeroClasificacionCard({
                             <p className="text-[11px] text-muted-foreground leading-snug max-w-[38ch]">{c.description}</p>
                           </div>
                         </td>
-                        <td className="py-2 px-2 text-right font-medium tabular-nums">{c.pieces.toLocaleString()}</td>
+                        <td className="py-2 px-2 text-right font-medium tabular-nums">{c.pieces.toLocaleString('es-CL')}</td>
                         <td className="py-2 px-2 text-right tabular-nums">
                           <span className={cn(
                             'font-semibold',
@@ -165,7 +165,7 @@ export function PuntoCeroClasificacionCard({
                           </span>
                         </td>
                         <td className="py-2 px-2 text-right text-muted-foreground tabular-nums">{c.pctOfTotal}%</td>
-                        <td className="py-2 px-2 text-right tabular-nums">{c.weightKg ? c.weightKg.toLocaleString() : '—'}</td>
+                        <td className="py-2 px-2 text-right tabular-nums">{c.weightKg ? c.weightKg.toLocaleString('es-CL') : '—'}</td>
                       </tr>
                       {isExpanded && c.records && (
                         <tr>
@@ -215,7 +215,7 @@ export function PuntoCeroClasificacionCard({
                 <tr className="border-t-2 border-muted/60 font-bold bg-muted/40">
                   <td className="py-2 px-1"></td>
                   <td className="py-2 px-2">TOTAL</td>
-                  <td className="py-2 px-2 text-right tabular-nums">{analytics.pointZeroClassification.totalPointZeroPieces.toLocaleString()}</td>
+                  <td className="py-2 px-2 text-right tabular-nums">{analytics.pointZeroClassification.totalPointZeroPieces.toLocaleString('es-CL')}</td>
                   <td className="py-2 px-2 text-right tabular-nums">100%</td>
                   <td className="py-2 px-2 text-right tabular-nums">{kpis.pointZeroPct}%</td>
                   <td className="py-2 px-2 text-right">—</td>

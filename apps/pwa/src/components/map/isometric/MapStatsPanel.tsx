@@ -63,7 +63,7 @@ export function MapStatsPanel({ config, nodes, areas, connectors, terrain }: Map
         <div className="text-foreground font-medium">{relief}m</div>
 
         <div>Cobertura terreno</div>
-        <div className="text-foreground font-medium">{terrain.length.toLocaleString()} celdas ({coverage}%)</div>
+        <div className="text-foreground font-medium">{terrain.length.toLocaleString('es-CL')} celdas ({coverage}%)</div>
 
         <div className="flex items-center gap-1">
           <Layers className="h-3 w-3" />
