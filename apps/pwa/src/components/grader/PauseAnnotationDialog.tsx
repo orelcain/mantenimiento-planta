@@ -30,6 +30,8 @@ import { Loader2, Clock, History, ChevronDown, Download } from 'lucide-react'
 import type { Pause, PauseHistoryEntry } from '@/services/grader/types'
 import { updatePauseAnnotation, updatePauseRange, loadPauseHistory } from '@/services/grader/graderDailySummary.service'
 import { usePauseTags } from '@/hooks/usePauseTags'
+import { fmtTime, fmtDateTime, fmtDurationSec } from '@/services/grader/graderTimeFormat'
+import { pauseTierLabel } from '@/services/grader/graderPauseTiers'
 
 interface PauseAnnotationDialogProps {
   open: boolean
@@ -44,36 +46,11 @@ interface PauseAnnotationDialogProps {
   isOnline?: boolean
 }
 
-/** Muestra HH:MM de un ISO usando UTC (= hora local planta). */
-function fmtHHMM(iso: string): string {
-  const d = new Date(iso)
-  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
-}
-
 /** Ajusta un ISO string ±deltaMin manteniendo la convención Z-planta. */
 function shiftMinutes(iso: string, deltaMin: number): string {
   const d = new Date(iso)
   d.setUTCMinutes(d.getUTCMinutes() + deltaMin)
   return d.toISOString()
-}
-
-/** Duración legible: "X h Y min" o "X min". */
-function fmtDuration(sec: number): string {
-  const totalMin = Math.round(sec / 60)
-  if (totalMin < 60) return `${totalMin} min`
-  const h = Math.floor(totalMin / 60)
-  const m = totalMin % 60
-  return m > 0 ? `${h} h ${m} min` : `${h} h`
-}
-
-/** Formatea un ISO a "dd/MM HH:MM" en UTC-planta. */
-function fmtDateTime(iso: string): string {
-  const d = new Date(iso)
-  const dd = String(d.getUTCDate()).padStart(2, '0')
-  const mm = String(d.getUTCMonth() + 1).padStart(2, '0')
-  const hh = String(d.getUTCHours()).padStart(2, '0')
-  const mn = String(d.getUTCMinutes()).padStart(2, '0')
-  return `${dd}/${mm} ${hh}:${mn}`
 }
 
 const ACTION_LABEL: Record<PauseHistoryEntry['action'], string> = {
@@ -100,8 +77,8 @@ function HistoryRow({ entry, tagLabels }: { entry: PauseHistoryEntry; tagLabels:
       return entry.diff.tag?.old ? `«${resolveTag(entry.diff.tag.old)}» eliminado` : 'tag eliminado'
     }
     if (entry.action === 'range') {
-      const s = entry.diff.startAt ? `${fmtHHMM(entry.diff.startAt.old)} → ${fmtHHMM(entry.diff.startAt.new)}` : ''
-      const e = entry.diff.endAt ? `${fmtHHMM(entry.diff.endAt.old)} → ${fmtHHMM(entry.diff.endAt.new)}` : ''
+      const s = entry.diff.startAt ? `${fmtTime(entry.diff.startAt.old)} → ${fmtTime(entry.diff.startAt.new)}` : ''
+      const e = entry.diff.endAt ? `${fmtTime(entry.diff.endAt.old)} → ${fmtTime(entry.diff.endAt.new)}` : ''
       return [s, e].filter(Boolean).join(' | fin: ')
     }
     return ''
@@ -134,8 +111,8 @@ function buildDetailText(entry: PauseHistoryEntry, tagLabels: Map<string, string
     return entry.diff.tag?.old ? `«${resolveTag(entry.diff.tag.old)}» eliminado` : 'tag eliminado'
   }
   if (entry.action === 'range') {
-    const s = entry.diff.startAt ? `${fmtHHMM(entry.diff.startAt.old)} → ${fmtHHMM(entry.diff.startAt.new)}` : ''
-    const e = entry.diff.endAt ? `${fmtHHMM(entry.diff.endAt.old)} → ${fmtHHMM(entry.diff.endAt.new)}` : ''
+    const s = entry.diff.startAt ? `${fmtTime(entry.diff.startAt.old)} → ${fmtTime(entry.diff.startAt.new)}` : ''
+    const e = entry.diff.endAt ? `${fmtTime(entry.diff.endAt.old)} → ${fmtTime(entry.diff.endAt.new)}` : ''
     return [s, e].filter(Boolean).join(' | fin: ')
   }
   return ''
@@ -269,7 +246,7 @@ export function PauseAnnotationDialog({
   if (!pause) return null
 
   const isAutoTag = !pause.tag && !!pause.autoTag
-  const tierLabel = { pausa: 'Pausa', larga: 'Pausa larga', parada: 'Parada' }[pause.tier]
+  const tierLabel = pauseTierLabel(pause.tier)
 
   // — Handlers —
   const handleSaveTag = async () => {
@@ -338,8 +315,8 @@ export function PauseAnnotationDialog({
           <DialogDescription asChild>
             <div>
               <span className="font-medium text-foreground">{tierLabel}</span>
-              <span className="text-muted-foreground"> · {fmtHHMM(pause.startAt)} – {fmtHHMM(pause.endAt)} · </span>
-              <span className="font-medium text-foreground">{fmtDuration(pause.durationSec)}</span>
+              <span className="text-muted-foreground"> · {fmtTime(pause.startAt)} – {fmtTime(pause.endAt)} · </span>
+              <span className="font-medium text-foreground">{fmtDurationSec(pause.durationSec)}</span>
               {isAutoTag && (
                 <span className="block text-xs text-amber-400 mt-1">
                   Tag sugerido por el sistema — confírmalo o cámbialo
@@ -424,7 +401,7 @@ export function PauseAnnotationDialog({
               <p className="text-xs text-muted-foreground">Inicio</p>
               <div className="flex items-center gap-1.5">
                 <span className="font-mono text-sm font-semibold w-12 text-center tabular-nums">
-                  {fmtHHMM(editedStart)}
+                  {fmtTime(editedStart)}
                 </span>
                 {([[-5, '−5'], [-1, '−1'], [1, '+1'], [5, '+5']] as const).map(([delta, label]) => (
                   <Button
@@ -446,7 +423,7 @@ export function PauseAnnotationDialog({
               <p className="text-xs text-muted-foreground">Fin</p>
               <div className="flex items-center gap-1.5">
                 <span className="font-mono text-sm font-semibold w-12 text-center tabular-nums">
-                  {fmtHHMM(editedEnd)}
+                  {fmtTime(editedEnd)}
                 </span>
                 {([[-5, '−5'], [-1, '−1'], [1, '+1'], [5, '+5']] as const).map(([delta, label]) => (
                   <Button
@@ -467,7 +444,7 @@ export function PauseAnnotationDialog({
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground">
                 Duración: <span className={cn('font-medium', editedDurationSec < 60 ? 'text-red-400' : 'text-foreground')}>
-                  {editedDurationSec > 0 ? fmtDuration(editedDurationSec) : '—'}
+                  {editedDurationSec > 0 ? fmtDurationSec(editedDurationSec) : '—'}
                 </span>
               </span>
               {rangeChanged && !rangeSaved && (

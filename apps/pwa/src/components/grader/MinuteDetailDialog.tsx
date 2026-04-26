@@ -33,6 +33,7 @@ import {
 import type { GateAssignment, TimelineBucket } from '@/services/grader/types'
 import { CALIBRE_WEIGHT_RANGES, classifyRecordToMatrix } from '@/services/grader/graderAnalytics'
 import { MATRIX_P0_CAUSES } from '@/services/grader/graderMatrixP0Causes'
+import { fmtTime, fmtTimeWithSec } from '@/services/grader/graderTimeFormat'
 
 interface MinuteDetailDialogProps {
   open: boolean
@@ -59,16 +60,6 @@ interface MinuteDetailDialogProps {
 }
 
 const INITIAL_ROWS = 20
-
-function formatHHMM(iso: string): string {
-  const d = new Date(iso)
-  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
-}
-
-function formatHHMMSS(iso: string): string {
-  const d = new Date(iso)
-  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}:${String(d.getUTCSeconds()).padStart(2, '0')}`
-}
 
 /**
  * Infiere el calibre REAL de una pieza desde su peso.
@@ -275,7 +266,7 @@ export function MinuteDetailDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle>Detalle del minuto {formatHHMM(tsMin)}</DialogTitle>
+          <DialogTitle>Detalle del minuto {fmtTime(tsMin)}</DialogTitle>
           <DialogDescription>
             {loading ? (
               <span className="text-muted-foreground">Cargando piezas…</span>
@@ -459,7 +450,7 @@ export function MinuteDetailDialog({
                             r.gate === 0 && 'bg-orange-500/5',
                           )}
                         >
-                          <td className="px-2 py-1 tabular-nums text-muted-foreground">{formatHHMMSS(r.ts)}</td>
+                          <td className="px-2 py-1 tabular-nums text-muted-foreground">{fmtTimeWithSec(r.ts)}</td>
                           <td className="px-2 py-1 font-medium tabular-nums">
                             {r.gate === 0 ? <span className="text-orange-400">P0</span> : r.gate}
                           </td>

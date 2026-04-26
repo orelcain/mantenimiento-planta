@@ -13,29 +13,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { SlidersHorizontal, ChevronDown, ChevronUp } from 'lucide-react'
 import type { GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
+import { qualityColorTextClass } from '@/services/grader/graderQualityColors'
+import { fmtTime, fmtRelativeTime } from '@/services/grader/graderTimeFormat'
 
 interface CurrentGateConfigPanelProps {
   configSnapshots: GateConfigSnapshot[]
-}
-
-const QUALITY_COLOR: Record<string, string> = {
-  premium:    'text-indigo-400',
-  superior:   'text-emerald-400',
-  primera:    'text-blue-400',
-  segunda:    'text-amber-400',
-  tercera:    'text-orange-400',
-  industrial: 'text-slate-400',
-  descarte:   'text-red-400',
-  grado:      'text-cyan-400',
-  d:          'text-zinc-400',
-}
-
-function qualityClass(q: string): string {
-  const k = q.toLowerCase().replace(/[^a-z]/g, '')
-  for (const [key, cls] of Object.entries(QUALITY_COLOR)) {
-    if (k.includes(key)) return cls
-  }
-  return 'text-muted-foreground'
 }
 
 export function CurrentGateConfigPanel({ configSnapshots }: CurrentGateConfigPanelProps) {
@@ -50,7 +32,8 @@ export function CurrentGateConfigPanel({ configSnapshots }: CurrentGateConfigPan
 
   const gates = [...latest.gates].sort((a, b) => a.gateNumber - b.gateNumber)
   const activeCount = gates.filter(g => g.active).length
-  const snapshotAt = new Date(latest.at).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })
+  const snapshotAt = fmtTime(latest.at)
+  const snapshotRelative = fmtRelativeTime(Date.parse(latest.at))
   const isSynthetic = latest.synthetic
 
   return (
@@ -63,15 +46,20 @@ export function CurrentGateConfigPanel({ configSnapshots }: CurrentGateConfigPan
             {activeCount} de 12 activas
           </span>
           {isSynthetic && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted/40 text-muted-foreground border border-border/40">
+            <span
+              className="text-[10px] px-1.5 py-0.5 rounded bg-muted/40 text-muted-foreground border border-border/40 cursor-help"
+              title="Inferida desde la última asignación efectiva — no se subió un snapshot manual al inicio del turno."
+            >
               inferida
             </span>
           )}
           <button
             onClick={() => setOpen(v => !v)}
             className="ml-auto flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+            title={`Última actualización: ${snapshotRelative}`}
           >
             <span>desde {snapshotAt}</span>
+            <span className="text-muted-foreground/50">· {snapshotRelative}</span>
             {open ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           </button>
         </CardTitle>
@@ -103,7 +91,7 @@ export function CurrentGateConfigPanel({ configSnapshots }: CurrentGateConfigPan
 
                 {/* Calidad */}
                 {g.active && (
-                  <span className={cn('shrink-0 font-medium', qualityClass(g.assignedQuality))}>
+                  <span className={cn('shrink-0 font-medium', qualityColorTextClass(g.assignedQuality))}>
                     {g.assignedQuality}
                   </span>
                 )}

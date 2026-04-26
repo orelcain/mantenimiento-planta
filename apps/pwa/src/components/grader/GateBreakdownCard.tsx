@@ -24,6 +24,7 @@ import {
   quantifyReassignable,
   type ReassignmentSeverity,
 } from '@/services/grader/graderGateAssignment'
+import { qualityColorHex } from '@/services/grader/graderQualityColors'
 import { QuickGateChangeButton } from './QuickGateChangeButton'
 
 interface GateRow {
@@ -84,24 +85,6 @@ const STATUS_BAR_COLOR: Record<CalibreGroup['status'], string> = {
   saturado:         '#f87171', // red-400
   optimo:           '#34d399', // emerald-400
   sobredimensionado:'#fbbf24', // amber-400
-}
-
-const QUALITY_COLOR: Record<string, string> = {
-  premium:    '#6366f1',
-  superior:   '#10b981',
-  primera:    '#3b82f6',
-  segunda:    '#f59e0b',
-  tercera:    '#f97316',
-  industrial: '#94a3b8',
-  descarte:   '#ef4444',
-}
-
-function qualityColor(q?: string): string {
-  const k = (q ?? '').toLowerCase().replace(/[^a-z]/g, '')
-  for (const [key, hex] of Object.entries(QUALITY_COLOR)) {
-    if (k.includes(key)) return hex
-  }
-  return '#6366f1'
 }
 
 function normKey(calibre: string, quality: string): string {
@@ -396,7 +379,7 @@ export function GateBreakdownCard({
                 {cfg && (
                   <span
                     className="inline-block w-1.5 h-1.5 rounded-full shrink-0"
-                    style={{ backgroundColor: qualityColor(cfg.quality) }}
+                    style={{ backgroundColor: qualityColorHex(cfg.quality) }}
                   />
                 )}
                 {cfg ? `${cfg.calibre} · ${cfg.quality}` : '—'}
@@ -479,7 +462,7 @@ export function GateBreakdownCard({
                           <td className="px-2 py-1.5 font-medium">
                             <span
                               className="inline-block w-1.5 h-1.5 rounded-full mr-1.5 align-middle"
-                              style={{ backgroundColor: qualityColor(g.quality) }}
+                              style={{ backgroundColor: qualityColorHex(g.quality) }}
                             />
                             {g.label}
                           </td>

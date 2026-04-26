@@ -15,6 +15,8 @@
 
 import type { GraderDailySummary, Pause } from './types'
 import type { UpstreamLineSnapshot } from '../shoplogix/types'
+import { fmtTime as fmtHHMM, fmtDurationSec as fmtDur } from './graderTimeFormat'
+import { pauseTierLabel } from './graderPauseTiers'
 
 // Mínimo de autoTable para typing (acceso a lastAutoTable.finalY)
 interface AutoTableDoc {
@@ -23,28 +25,9 @@ interface AutoTableDoc {
 
 // ── Helpers de formato ────────────────────────────────────────────────────────
 
-function fmtHHMM(iso: string): string {
-  const d = new Date(iso)
-  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
-}
-
-function fmtDur(sec: number): string {
-  const m = Math.round(sec / 60)
-  if (m < 60) return `${m} min`
-  const h = Math.floor(m / 60)
-  const rm = m % 60
-  return rm > 0 ? `${h} h ${rm} min` : `${h} h`
-}
-
 function n(v: number | undefined, decimals = 0): string {
   if (v === undefined || isNaN(v)) return '—'
   return v.toLocaleString('es-CL', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
-}
-
-const TIER_LABEL: Record<string, string> = {
-  pausa: 'Pausa',
-  larga: 'Pausa larga',
-  parada: 'Parada',
 }
 
 // ── Función principal ─────────────────────────────────────────────────────────
@@ -163,7 +146,7 @@ export async function exportTurnToPDF(params: {
         fmtHHMM(p.startAt),
         fmtHHMM(p.endAt),
         fmtDur(p.durationSec),
-        TIER_LABEL[p.tier] ?? p.tier,
+        pauseTierLabel(p.tier),
         tagLabel,
         p.note ?? '',
       ]
