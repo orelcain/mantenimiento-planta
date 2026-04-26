@@ -14,7 +14,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { usePermissionsStore } from '@/store'
 import { useAuthStore, useIsAdmin, useIsSupervisor } from '@/store/authStore'
 import { getDailySummary, loadTimelineAggregates, subscribePausesAggregates, listDailySummariesByRange, listGate0PieceRecords, type FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
-import { createPublicToken } from '@/services/grader/graderPublicToken.service'
+import { createPublicToken, revokePublicToken } from '@/services/grader/graderPublicToken.service'
 import type { Pause, MicroDetentionsSummary } from '@/services/grader/types'
 import { getModuleRanges } from '@/services/grader/graderModuleConfig.service'
 import { listSnapshots, type GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
@@ -283,7 +283,9 @@ export function AnalisisGraderTurnoPage() {
   // ── Share (token público) — estado; handlers después de enrichedTimelineBuckets ──
   const [sharing, setSharing] = useState(false)
   const [shareUrl, setShareUrl] = useState<string | null>(null)
+  const [shareToken, setShareToken] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [revoking, setRevoking] = useState(false)
 
   // ── IA (FASE 16) ─────────────────────────────────────────────────────────
   const [aiOutput, setAiOutput] = useState<AIGraderOutput | null>(null)
@@ -654,6 +656,7 @@ export function AnalisisGraderTurnoPage() {
         pauses,
       })
       const base = `${window.location.origin}${import.meta.env.BASE_URL}`
+      setShareToken(token)
       setShareUrl(`${base}view/${token}`)
     } finally {
       setSharing(false)
@@ -1041,11 +1044,20 @@ export function AnalisisGraderTurnoPage() {
                       {copied ? 'Copiado' : 'Copiar'}
                     </button>
                     <button
-                      onClick={() => { setShareUrl(null); setCopied(false) }}
-                      className="shrink-0 text-[11px] text-muted-foreground/60 hover:text-muted-foreground px-1"
-                      title="Generar nuevo link"
+                      onClick={async () => {
+                        if (!shareToken) return
+                        setRevoking(true)
+                        try { await revokePublicToken(shareToken) } catch { /* ignorar error de red */ }
+                        setShareUrl(null)
+                        setShareToken(null)
+                        setCopied(false)
+                        setRevoking(false)
+                      }}
+                      disabled={revoking}
+                      className="shrink-0 text-[11px] text-destructive/60 hover:text-destructive px-1 disabled:opacity-40"
+                      title="Revocar link (lo invalida para quien lo tenga)"
                     >
-                      nuevo
+                      {revoking ? '…' : 'Revocar'}
                     </button>
                   </div>
                   {/* QR code para escanear desde celular */}

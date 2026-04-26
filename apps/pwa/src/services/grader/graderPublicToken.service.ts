@@ -9,7 +9,7 @@
  * ID doc: UUID v4 generado con crypto.randomUUID()
  */
 
-import { doc, getDoc, setDoc } from '@/services/firestoreTracked'
+import { doc, getDoc, setDoc, deleteDoc } from '@/services/firestoreTracked'
 import { db } from '../firebase'
 import type { GraderDailySummary, TimelineBucket, Pause } from './types'
 
@@ -69,4 +69,8 @@ export async function loadPublicToken(token: string): Promise<GraderPublicTokenD
   const snap = await getDoc(doc(db, COLLECTION, token))
   if (!snap.exists()) return null
   return snap.data() as GraderPublicTokenDoc
+}
+
+export async function revokePublicToken(token: string): Promise<void> {
+  await deleteDoc(doc(db, COLLECTION, token))
 }

@@ -24,6 +24,7 @@ import {
   increment,
 } from '@/services/firestoreTracked'
 import { auth, db } from './firebase'
+import { logger } from '@/lib/logger'
 import type { User, UserRole, InviteCode } from '@/types'
 
 // Establecer persistencia de sesión
@@ -32,7 +33,7 @@ export async function setAuthPersistence(remember: boolean): Promise<void> {
     const type = remember ? browserLocalPersistence : browserSessionPersistence
     await setPersistence(auth, type)
   } catch (error) {
-    console.error('Error setting persistence:', error)
+    logger.error('Error setting persistence', error instanceof Error ? error : new Error(String(error)))
   }
 }
 
@@ -50,14 +51,14 @@ export async function signIn(email: string, password: string): Promise<User> {
   return user
 }
 
-// Google Client ID (de Firebase Console) - IMPORTANTE: Agregar https://orelcain.github.io a Origins en Google Cloud Console
-const GOOGLE_CLIENT_ID = '1019421112530-ouvc28l3ufackhhg4fh3kib71slcbhpg.apps.googleusercontent.com'
+// Google Client ID — IMPORTANTE: Agregar https://orelcain.github.io a Origins en Google Cloud Console
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string
 
 // Iniciar Google Identity Services y obtener token
 export function initGoogleSignIn(onSuccess: (user: User) => void, onError: (error: Error) => void): void {
   // @ts-expect-error - google es global desde el script GSI
   if (typeof google === 'undefined') {
-    console.error('Google Identity Services not loaded')
+    logger.error('Google Identity Services not loaded', new Error('GSI not available'))
     onError(new Error('Google Identity Services no cargado. Recarga la página.'))
     return
   }
@@ -66,12 +67,11 @@ export function initGoogleSignIn(onSuccess: (user: User) => void, onError: (erro
   google.accounts.id.initialize({
     client_id: GOOGLE_CLIENT_ID,
     callback: async (response: { credential: string }) => {
-      console.log('Google Sign In Callback Received')
       try {
         const user = await signInWithGoogleToken(response.credential)
         onSuccess(user)
       } catch (error) {
-        console.error('Error signing in with Google Token:', error)
+        logger.error('Error signing in with Google Token', error instanceof Error ? error : new Error(String(error)))
         onError(error instanceof Error ? error : new Error('Error en autenticación'))
       }
     },
@@ -113,28 +113,19 @@ export function renderGoogleButton(elementId: string): void {
 
 // Autenticar con el token JWT de Google
 async function signInWithGoogleToken(idToken: string): Promise<User> {
-  console.log('[Auth] 1. Creating credential object...')
   const credential = GoogleAuthProvider.credential(idToken)
-  
-  console.log('[Auth] 2. Signing in with credential to Firebase...')
   const result = await signInWithCredential(auth, credential)
   const firebaseUser = result.user
-  console.log('[Auth] 3. Firebase Auth success. UID:', firebaseUser.uid)
-  
-  // Verificar si ya existe en Firestore
-  console.log('[Auth] 4. Fetching user profile from Firestore...')
+
   let user = await getUserById(firebaseUser.uid)
-  
+
   if (user) {
-    console.log('[Auth] 5. User profile found. Checking status...')
     if (!user.activo) {
       await firebaseSignOut(auth)
       throw new Error('Usuario desactivado. Contacte al administrador.')
     }
     return user
   }
-  
-  console.log('[Auth] 5. New user. Creating profile...')
   // Usuario nuevo - crear perfil
   const nombres = firebaseUser.displayName?.split(' ') || ['', '']
   const nombre = nombres[0] || ''
@@ -158,8 +149,7 @@ async function signInWithGoogleToken(idToken: string): Promise<User> {
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   })
-  
-  console.log('[Auth] 6. Profile created successfully')
+
   return newUser
 }
 

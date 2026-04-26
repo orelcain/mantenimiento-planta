@@ -16,6 +16,8 @@ import {
   Wrench,
   Moon,
   Sun,
+  Eye,
+  EyeOff,
 } from 'lucide-react'
 import {
   Card,
@@ -923,6 +925,7 @@ function SystemSettings() {
 // Componente para clave de edición de tooltips HMI Knuro
 function HmiTooltipPwdCard() {
   const [currentPwd, setCurrentPwd] = useState('')
+  const [showCurrentPwd, setShowCurrentPwd] = useState(false)
   const [newPwd, setNewPwd] = useState('')
   const [confirmPwd, setConfirmPwd] = useState('')
   const [loading, setLoading] = useState(true)
@@ -973,8 +976,16 @@ function HmiTooltipPwdCard() {
           </div>
         ) : (
           <>
-            <div className="p-3 rounded-lg bg-muted/50 text-sm">
-              Clave actual: <span className="font-mono font-semibold">{currentPwd}</span>
+            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 text-sm">
+              <span>Clave actual: <span className="font-mono font-semibold">{showCurrentPwd ? currentPwd : '•'.repeat(Math.max(currentPwd.length, 6))}</span></span>
+              <button
+                onClick={() => setShowCurrentPwd(v => !v)}
+                className="ml-2 text-muted-foreground hover:text-foreground"
+                title={showCurrentPwd ? 'Ocultar clave' : 'Mostrar clave'}
+                type="button"
+              >
+                {showCurrentPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
             </div>
             <div className="space-y-3">
               <div className="space-y-1">
