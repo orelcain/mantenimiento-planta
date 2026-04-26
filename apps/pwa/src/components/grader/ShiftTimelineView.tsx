@@ -42,6 +42,11 @@ import {
   p0StatusFromPct,
   p0StatusHex,
 } from '@/services/grader/graderP0Thresholds'
+import {
+  verdictColor,
+  verdictLabel,
+  verdictArrow,
+} from '@/services/grader/graderP0Segmentation'
 import { useTimelineSyncOptional } from './useTimelineSync'
 import { useChartReadyConnect } from './useEChartsConnect'
 
@@ -1269,15 +1274,10 @@ export function ShiftTimelineView({
                   <span className="text-muted-foreground ml-1.5">{cp.sub}</span>
                   {cp.verdict && cp.verdict !== 'insufficient-data' && (
                     <span
-                      className={cn('ml-2 font-medium', {
-                        'text-emerald-400': cp.verdict === 'improved',
-                        'text-red-400': cp.verdict === 'worsened',
-                        'text-zinc-400': cp.verdict === 'neutral',
-                      })}
+                      className={cn('ml-2 font-medium', verdictColor(cp.verdict as 'improved' | 'worsened' | 'neutral'))}
+                      title={verdictLabel(cp.verdict as 'improved' | 'worsened' | 'neutral')}
                     >
-                      {cp.verdict === 'improved' ? '↓ mejoró'
-                        : cp.verdict === 'worsened' ? '↑ empeoró'
-                        : '→ sin cambio'}
+                      {verdictArrow(cp.verdict as 'improved' | 'worsened' | 'neutral')} {verdictLabel(cp.verdict as 'improved' | 'worsened' | 'neutral')}
                     </span>
                   )}
                 </div>

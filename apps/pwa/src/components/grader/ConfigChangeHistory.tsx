@@ -20,7 +20,12 @@ import { Wrench, Sparkles, User, Clock, AlertTriangle, TrendingDown, TrendingUp,
 import { Card, CardContent, CardHeader, CardTitle, Badge } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { QuickGateChangeButton } from './QuickGateChangeButton'
-import { computeSegmentVerdicts, type SegmentVerdict } from '@/services/grader/graderP0Segmentation'
+import {
+  computeSegmentVerdicts,
+  verdictColor,
+  verdictLabel,
+  type SegmentVerdict,
+} from '@/services/grader/graderP0Segmentation'
 import type { GateConfigSnapshot, ConfigDiff } from '@/services/grader/graderConfigSnapshot.service'
 import type { TimelineBucket } from '@/services/grader/types'
 
@@ -87,21 +92,26 @@ function VerdictBadge({ v }: { v: SegmentVerdict }) {
     )
   }
 
-  const cfg = {
-    improved: { Icon: TrendingDown, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', label: 'Mejoró' },
-    worsened: { Icon: TrendingUp,   color: 'text-red-400',     bg: 'bg-red-500/10',     border: 'border-red-500/30',     label: 'Empeoró' },
-    neutral:  { Icon: Minus,        color: 'text-zinc-400',    bg: 'bg-zinc-500/10',    border: 'border-zinc-500/30',    label: 'Sin cambio significativo' },
+  // Iconos y bg/border son específicos de este componente (otros lugares usan
+  // arrows unicode), pero el COLOR de texto y el LABEL vienen de helpers
+  // compartidos en graderP0Segmentation.ts (consistencia entre componentes).
+  const visualByStatus = {
+    improved: { Icon: TrendingDown, bg: 'bg-emerald-500/10', border: 'border-emerald-500/30' },
+    worsened: { Icon: TrendingUp,   bg: 'bg-rose-500/10',    border: 'border-rose-500/30'    },
+    neutral:  { Icon: Minus,        bg: 'bg-zinc-500/10',    border: 'border-zinc-500/30'    },
   }[v.status]
 
+  const color = verdictColor(v.status)
+  const label = verdictLabel(v.status)
   const sign = v.delta > 0 ? '+' : ''
   return (
     <div
-      className={cn('inline-flex items-center gap-1.5 text-[11px] rounded px-2 py-1 mt-1 border', cfg.bg, cfg.border)}
+      className={cn('inline-flex items-center gap-1.5 text-[11px] rounded px-2 py-1 mt-1 border', visualByStatus.bg, visualByStatus.border)}
       title={`Antes ${v.beforePct.toFixed(2)}% → Después ${v.afterPct.toFixed(2)}% (${v.afterPieces.toLocaleString('es-CL')} piezas en ${v.afterMinutes} min)`}
     >
-      <cfg.Icon className={cn('w-3 h-3', cfg.color)} />
-      <span className={cn('font-medium', cfg.color)}>{cfg.label}</span>
-      <span className={cfg.color}>
+      <visualByStatus.Icon className={cn('w-3 h-3', color)} />
+      <span className={cn('font-medium', color)}>{label}</span>
+      <span className={color}>
         {sign}{v.delta.toFixed(2)}pts
       </span>
       <span className="text-muted-foreground/80">

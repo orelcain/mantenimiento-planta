@@ -11,6 +11,9 @@ import {
   computeSegmentVerdicts,
   MIN_PIECES_AFTER_THRESHOLD,
   DELTA_THRESHOLD_PTS,
+  verdictColor,
+  verdictLabel,
+  verdictArrow,
 } from '../graderP0Segmentation'
 import type { GateConfigSnapshot } from '../graderConfigSnapshot.service'
 import type { TimelineBucket } from '../types'
@@ -358,5 +361,34 @@ describe('computeSegmentVerdicts — boundaries finos', () => {
     const v = computeSegmentVerdicts([snap], [...before, ...after]).get('s1')!
     expect(v.afterPieces).toBe(50 * 100)
     expect(v.afterMinutes).toBe(49)  // 49 min desde T08:10 al último T08:59
+  })
+})
+
+// ── Visual helpers (color/label/arrow) — fuente única de verdad ──────────────
+
+describe('verdictColor', () => {
+  it('cubre los 4 status con paleta consistente', () => {
+    expect(verdictColor('improved')).toContain('emerald')
+    expect(verdictColor('worsened')).toContain('rose')
+    expect(verdictColor('neutral')).toContain('zinc')
+    expect(verdictColor('insufficient-data')).toContain('zinc')
+  })
+})
+
+describe('verdictLabel', () => {
+  it('cubre los 4 status con texto operacional', () => {
+    expect(verdictLabel('improved')).toBe('Mejoró')
+    expect(verdictLabel('worsened')).toBe('Empeoró')
+    expect(verdictLabel('neutral')).toBe('Sin cambio significativo')
+    expect(verdictLabel('insufficient-data')).toBe('Esperando datos')
+  })
+})
+
+describe('verdictArrow', () => {
+  it('cubre los 4 status con arrows unicode', () => {
+    expect(verdictArrow('improved')).toBe('↓')
+    expect(verdictArrow('worsened')).toBe('↑')
+    expect(verdictArrow('neutral')).toBe('→')
+    expect(verdictArrow('insufficient-data')).toBe('⏳')
   })
 })

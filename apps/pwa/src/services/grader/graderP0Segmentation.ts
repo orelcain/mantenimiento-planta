@@ -60,6 +60,45 @@ export const DELTA_THRESHOLD_PTS = 0.5
 const MIN_PIECES_AFTER = MIN_PIECES_AFTER_THRESHOLD
 const DELTA_THRESHOLD  = DELTA_THRESHOLD_PTS
 
+// ── Helpers visuales para mostrar el verdict en UI (consistencia) ────────────
+//
+// Antes vivían INLINE en ShiftTimelineView (líneas 1270-1282) y
+// ConfigChangeHistory (líneas 90-94) con labels distintos:
+//   "↓ mejoró" vs "Mejoró"
+// Centralizar mantiene la UI coherente y simplifica futuros ajustes.
+
+export type VerdictStatus = SegmentVerdict['status']
+
+/** Color tailwind para texto del verdict — paleta consistente con módulo P0%. */
+export function verdictColor(status: VerdictStatus): string {
+  switch (status) {
+    case 'improved':          return 'text-emerald-400'
+    case 'worsened':          return 'text-rose-400'
+    case 'neutral':           return 'text-zinc-400'
+    case 'insufficient-data': return 'text-zinc-500'
+  }
+}
+
+/** Label corto para mostrar como badge/texto del verdict. */
+export function verdictLabel(status: VerdictStatus): string {
+  switch (status) {
+    case 'improved':          return 'Mejoró'
+    case 'worsened':          return 'Empeoró'
+    case 'neutral':           return 'Sin cambio significativo'
+    case 'insufficient-data': return 'Esperando datos'
+  }
+}
+
+/** Flecha unicode para uso compacto (cuando no hay Icon library disponible). */
+export function verdictArrow(status: VerdictStatus): string {
+  switch (status) {
+    case 'improved':          return '↓'
+    case 'worsened':          return '↑'
+    case 'neutral':           return '→'
+    case 'insufficient-data': return '⏳'
+  }
+}
+
 export function computeSegmentVerdicts(
   snapshots: GateConfigSnapshot[],
   timelineBuckets: TimelineBucket[],
