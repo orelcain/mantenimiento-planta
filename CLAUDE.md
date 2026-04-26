@@ -834,130 +834,68 @@ Con Haversine A→D = dimensión real del recinto en metros. El DWG ya tiene cot
 
 ## Pendientes priorizados
 
-### PENDIENTE — Análisis de Turno — siguientes auditorías (sesión 2026-04-25 cierre)
+### PENDIENTE — Análisis de Turno (actualizado sesión 2026-04-26)
 
-Sesión 2026-04-25 auditó 8 componentes principales (v2.95→v3.0.8) aplicando los
-principios "info útil + consistencia + cautela". Lista priorizada de lo que queda:
+**Auditoría módulo completa (sesiones 2026-04-25/26):**
+- ✅ `ShiftTimelineView` 2ª pasada — coverage badge accionable, checkpoint zoom ±5min, P0 delta entre uploads
+- ✅ `CurrentGateConfigPanel` — distribución calidades + badge cambios mid-turno
+- ✅ `MinuteDetailDialog` — calibre dominante + banner sin-rechazos
+- ✅ `PauseAnnotationDialog` — hint teclado numérico + label Cerrar/Cancelar
+- ✅ `graderP0Thresholds.ts` — fuente única real: todos los `3.5`/`2` hardcoded eliminados en 10+ archivos
+- ✅ `?turno=X` en `GraderQuickChangePage` — banner RETROACTIVO para registro retroactivo
+- ✅ `summarizeByCategory` audit — sin violaciones encontradas
+- ✅ 9 warnings ESLint + cap bajado a 5
 
-**P0 — Componentes no auditados aún (riesgo de inconsistencias acumuladas):**
-- 🔲 **`ShiftTimelineView` segunda pasada** (auditado parcial v3.0.5+v3.0.6, quedan ~1200 LOC). Buscar más oportunidades de info útil: tooltip rico en checkpoints (uploads/actions/lots), badge "Cobertura X%" accionable (¿qué hacer cuando es <85%?), pre/post-turno badge ("¿reasignar X piezas?"), zoom presets configurables. (~1.5h)
-- 🔲 **`CurrentGateConfigPanel`** — config activa del turno. No auditado. Verificar consistencia con `GateBreakdownCard`, sugerencias accionables al cambiar config mid-turno. (~45min)
-- 🔲 **`MinuteDetailDialog`** — diálogo del click en barra. No auditado. Probable: verificar que muestra info accionable (qué causa P0 dominó ese minuto, sugerencia inmediata). (~30min)
-- 🔲 **`PauseAnnotationDialog`** — diálogo de anotación. No auditado. Verificar UX: ¿tag pre-seleccionado por autoTag? ¿muestra contexto (P0% antes/durante)? (~30min)
-
-**P0 — Cierre Shoplogix (RESUELTO sesión 2026-04-26 madrugada):**
-- ✅ **Creds activadas en Firestore** (`system/shoplogixCredentials`) para `javier.toro@aquachile.com`. Script: `node scripts/set-shoplogix-creds.mjs --check`
-- ✅ **Re-sync Feb 25-27 completo** vía `shoplogixSyncHttp` GET — 5 turnos OK con data fresca:
-  - Feb 25 día/noche, Feb 26 día/noche, Feb 27 día → 3 Evisceradoras OK
-  - Feb 27 noche → 0 ciclos (viernes noche, sin producción — no es bug)
-- ✅ **Planned Downtime 4h 15min ACLARADO**: NO es bug. Es semántica esperada. Cuando la línea cierra antes del fin de la ventana de consulta del turno (ej: 17:45 con ventana 09-22), Shoplogix marca el período post-turno como `break` con reason "planned downtime". El normalizer (`functions/shoplogix/normalizer.js:97-113`) ya lo excluye correctamente del denominador de `shiftRuntime`. Helper `isPlannedDT(s)` documenta la convención.
-- 🟡 **DEUDA TÉCNICA — auto-login Bearer/ROPC fallando con `invalid_client`**: el `client_id=SAAS139` (hardcoded en `functions/shoplogix/auth.js:32`) NO acepta `grant_type=password` sin `client_secret`. Login devuelve `HTTP 400 {"error":"invalid_client"}`. **Sistema sigue operacional** porque `resolveShoplogixAuth` cae al fallback de cookie (`SHOPLOGIX_COOKIE` secret en GCP). Cuando esa cookie expire, opciones:
-  1. Rotar cookie manualmente en GCP secret (workaround simple)
-  2. Capturar OAuth flow real desde browser DevTools (ver si necesita `client_secret` o cambió `client_id`)
-  3. Pedir a AquaChile/Shoplogix credenciales OAuth oficiales con ROPC habilitado
-  Las creds en Firestore quedan persistidas pero ignoradas hasta que se arregle el ROPC. Un módulo admin UI permite rotarlas sin terminal: `/admin/shoplogix-credentials`.
-
-**P1 — Estructural (DEUDA ARQUITECTURAL — requiere planeación Opus):**
-- 🔲 **Refactor config Grader Fase A** — mover 12 Gates + Física al turno (`AnalisisGraderTurnoPage`), botón "Cambié gate" mid-turno + segmentación automática. **Requiere refactor storage Firestore.** Plan acordado 2026-04-19. (1-2 días, NECESITA OPUS PARA PLANEAR)
+**P1 — Estructural (requiere planeación Opus):**
+- 🔲 **Refactor config Grader Fase A** — mover 12 Gates + Física al turno (`AnalisisGraderTurnoPage`), botón "Cambié gate" mid-turno + segmentación automática. **Requiere refactor storage Firestore.** (1-2 días, NECESITA OPUS)
 - 🔲 **GlobalSettingsModal en home** — separar Análisis+Rangos en modal del header (~1h, sub-item de Fase A)
 
-**P1 — Aprovechamiento de helpers nuevos en otros componentes:**
-- 🔲 Buscar más usos de `p0StatusFromPct` / `p0StatusHex` en el módulo (calendario, KPIs período, badges) — donde se clasifique manualmente con `if-else` reemplazar
-- 🔲 Buscar más componentes que muestren tiempo muerto sin separar evitable/ineludible (calendario? heatmap?) — usar `summarizeByCategory`
-- 🔲 Verificar visualmente en producción que las mejoras de v2.96-v3.0.8 funcionan como se espera (testing manual de un turno real)
-
 **P2 — Mejoras chicas:**
-- 🔲 **Ruta mobile `/grader/quick-change?turno=X`** (~1h)
 - 🔲 **Fase 3b — Edición manual de rangos de pausas** — drag handles en bandas Timeline (~2-3 días)
 - 🔲 **Fase 4 — CRUD admin de tags** — gestión Firestore de `graderPauseTags` (~2-3 días)
-- 🔲 **Re-upload pieceRecords productivas** — 383 turnos × ~5M pieceRecords (script batch idempotente)
-
-**P2 — Deuda técnica leve:**
-- ✅ **9 warnings ESLint cerrados** (sesión 2026-04-26 v3.1.2). Cap CI bajado de 10 a 5 (margen para 5 nuevos sin romper deploy). Patrón aplicado para 4 unused eslint-disable + 5 deps faltantes en hooks.
-
-**Recomendación de orden próxima sesión:**
-1. **Activar auto-login Shoplogix** (5 min con creds del user)
-2. **Auditar CurrentGateConfigPanel + MinuteDetailDialog + PauseAnnotationDialog** (3 chicos, ~2h total — completa el módulo)
-3. **Limpiar 9 warnings preexistentes** (~30 min, baja max-warnings a 5)
-4. **DECIDIR con Opus**: Refactor config Grader Fase A vs continuar mejoras incrementales
+- 🔲 **Re-upload pieceRecords productivas** — 383 turnos × ~5M pieceRecords. Script: `node scripts/bulk-upload-piece-records.js` (idempotente). Luego `enrich-pieceRecords-from-p0.js`.
 
 ---
 
-### PENDIENTE — Shoplogix Integration (sesión 2026-04-24 tarde) — Fase 3 iter 3+4
+### PENDIENTE — Shoplogix Integration (actualizado sesión 2026-04-26)
 
-**Módulo:** integración Shoplogix con módulo **Análisis de Turno** (ex-"Análisis Grader") — data real de 3 Baader 142 upstream (Evisceradoras 1/2/3, Planta Chonchi)
+**Estado completo — Fases 1–3 + extras terminados:**
+- ✅ Fase 1 POC + Fase 2a UI + Fase 2b Cloud Functions + Fase 2b.1 ROPC UI
+- ✅ Data real Feb 25-27: 5 turnos OK, 3 Evisceradoras
+- ✅ Fases 3 iter 1-4: ticks, correlación, scatter P0%↔Baader, PDF upstream
+- ✅ Marcadores Baader en chart ECharts del Grader (markArea translúcidas)
+- ✅ Drill-down rich al clickear segmentos Gantt
+- ✅ Synchronized Timeline F1-F5 (mini-KPIs zoom, badge coincidentes, PNG export, lot projection)
+- ✅ Alineación temporal real + fix-on-read + planned downtime excluido
+- ✅ Admin hub `/admin` con gestión creds Shoplogix
 
-**Estado al cierre (10 PRs mergeados a producción, v2.93.0):**
+**Hallazgos técnicos críticos (NO cambiar sin leer):**
+- Shoplogix guarda wall-clock LOCAL Chile as-if-UTC → `getUTCHours()`, NO convertir TZ
+- `summary.currentShiftStart/End` opaco → pasar `shiftStartAt/EndAt` explícitos siempre
+- `actualRuntime` Shoplogix opaco → usar `uptime/totalTrackedSec` propio
+- Post-shift marcado como `break/planned downtime` → `isPlannedDT()` lo excluye del runtime
 
-*Backend (mañana):*
-- ✅ Fase 1 POC + Fase 2a UI + Fase 2b Cloud Functions desplegadas
-- ✅ Data real Firestore: 4 turnos sincronizados (Feb 25 día/noche, Feb 26 día, Feb 27 día)
-- ✅ Fase 3 iter 1: ticks horarios + shiftWindow align + alerta microparadas
-- ✅ Fase 3 iter 2: correlación automática Grader↔Baader + 13 tests
-- ✅ Docs: SHOPLOGIX_API/INTEGRATION_PLAN/DEPLOY/IDEAS.md
-
-*Sesión tarde — UI/data refinement (PRs #44–#53):*
-- ✅ **Rename "Análisis de Turno"** (sidebar/breadcrumbs/headers, URLs intactas)
-- ✅ **Alineación pixel-perfect** (anchos): `PLOT_LEFT_PAD_PX=48` / `PLOT_RIGHT_PAD_PX=24`
-- ✅ **Alineación TEMPORAL real** (PR #51): `chartAxisWindow` en TurnoPage replica `resolveAxisWindow(buckets_filtrados, ...)` y se pasa a UpstreamMachinesPanel — ambos ejes con MISMO rango horario
-- ✅ **Production bars por timestamp** (PR #52): posicionamiento absoluto `left = (startAt-windowStart)/totalMs × 100%`, no más `flex` con barras uniformes
-- ✅ **shiftRuntime real** robusto (uptime/totalTrackedSec, no del shiftEnd-shiftStart opaco) — antes 11.2% Shoplogix, ahora **46.3%** real
-- ✅ **TZ display correcto**: Shoplogix guarda wall-clock local Chile as-if-UTC. Mantener `getUTCHours()`. PR #46 había sido erroneo y se revirtió en PR #50
-- ✅ **Shift bounds explícitos**: Cloud Function pasa `shiftStartAt/EndAt` desde `shiftWindow` (no del `currentShiftStart` opaco que apuntaba al turno EN CURSO al momento del sync)
-- ✅ **Fix-on-read intervals legacy**: deserializer detecta intervals dateados en día distinto a states[0] y re-ancla preservando `intervalMs`. Sin re-sync necesario.
-- ✅ **Layout compacto** (PR #53): Grader → Baader (adyacentes), Correlación movida abajo. Totales línea completa al header del panel.
-
-**Hallazgos técnicos importantes:**
-- **Shoplogix guarda timestamps wall-clock LOCAL Chile pero formateados as-if UTC** (`20260226T132711` = 13:27 hora Chile, no UTC). El parser los marca con `Z` → `getUTCHours()` extrae el wall-clock real. NO convertir a TZ.
-- **`summary.currentShiftStart/End` es OPACO**: devuelve los bordes del turno EN CURSO al momento del sync, no del turno consultado. Pasar `shiftStartAt/EndAt` explícitos siempre.
-- **`actualRuntime` de Shoplogix es OPACO**: usa denominador desconocido (devolvía 11.2% cuando real era 46%). Computar `shiftRuntime = uptime / totalTrackedSec` por nuestra cuenta.
-
-**P0 próxima sesión — Marcadores Baader sobre timeline Grader:**
-- 🔲 Pintar `markArea` en sub-fila DENTRO del chart ECharts del Grader cuando una Baader está parada — correlación cross-equipo en una sola pasada visual sin tener que mirar abajo. Ahora que Gantt/bars/Grader comparten el MISMO eje X temporal, este es el siguiente nivel: ~3-4h
-- 🔲 Hover con detail panel rico (vs tooltip nativo) en Gantt segments — drill-down click
-
-**Quick wins (próxima sesión corta):**
-- 🔲 Re-sync turnos Feb 25-27 vía Cloud Function ahora que el fix de bounds está deployado (cookie required — verificar antes)
-- 🔲 Investigar `Planned Downtime 4h 15min` semantic — qué registra Shoplogix exactamente bajo ese tag (~30min con fixture)
-
-**P1 Shoplogix:**
-- 🔲 Fase 3 iter 3: scatter P0% Grader vs ritmo Baader (~3h)
-- 🔲 Fase 3 iter 4: export PDF con sección upstream (~4h)
-- 🔲 Fase 2b.1: login automatizado Shoplogix (cookie manual ~8h) (~1d)
+**Deuda activa:**
+- 🟡 **ROPC `invalid_client`**: `client_id=SAAS139` no acepta `grant_type=password`. Sistema opera con cookie fallback (`SHOPLOGIX_COOKIE` en GCP). Cuando expire: rotar en GCP secret o capturar OAuth real. UI: `/admin/shoplogix-credentials`.
 - 🔲 Fase 4: integrar Marel HG, Knuro, plantas hermanas (bloqueado API externa)
-- 🔲 Refactor estructural home — RANGOS calibre + 12 GATES por turno (1-2 días, requiere refactor storage Firestore)
-
-**Deuda técnica residual:**
-- Warnings preexistentes setState-in-render en `AnalisisGraderGatesConfigPage` (Wizard) — no críticos, no relacionados a este trabajo
-- Re-sync explícito de turnos Feb 25-27 (fix-on-read los corrige al leer pero limpiar persistencia es bueno)
 
 ---
 
-### PENDIENTE — Visor Mapas 4 (sesión 2026-04-24) — Konva DXF editor
+### PENDIENTE — Visor Mapas Konva (actualizado sesión 2026-04-26)
 
-**Módulo:** `/mantenimiento-planta/map` — **importación DXF migró de Leaflet a Konva.js**
+**Estado:**
+- ✅ Stack Konva + DXF parser + bbox robusto + Fase 2 edición (select/move/delete/undo)
+- ✅ Panel capas + toggle + eliminar
+- ✅ **sceneFunc optimizer** — 1 Shape por capa (50-100× speedup en capas pesadas)
+- ✅ Texto libre + Alinear grilla + Equipos SAP (vistas Leaflet)
+- ⚠️ `mapasImportados` NO persisten — localStorage quota insuficiente
 
-**Estado al cierre:**
-- ✅ Stack Konva: `konva@10`, `react-konva@18`, `dxf@5` (gdsestimating) instalados
-- ✅ `parseDxfKonva.ts` usa `Helper.toPolylines()` — expande INSERT/bloques, interpola SPLINE/ARC/ELLIPSE
-- ✅ `KonvaDxfViewer.tsx` renderiza con Stage/Layer/Line por capa
-- ✅ Pan (default), Zoom con rueda centrado cursor, Fit-to-bbox
-- ✅ **Bbox robusto** — descarta outliers (paper space) vía mediana + MAD
-- ✅ **Fase 2 edición**: select (click), multi-select (shift+click), delete, move (flechas), undo (Ctrl+Z), escape
-- ✅ Panel capas con toggle visibilidad + eliminar individual + eliminar mapa
-- ✅ Store v6: `CapaImportada.polylines` + `MapaImportado.bbox` (reemplaza geojson/bounds viejos)
-- ⚠️ **`mapasImportados` NO persisten** — viven en memoria, se pierden al reload (localStorage quota)
-
-**P0 próxima sesión — Performance:**
-- 🔲 **Optimización render 100k+ polilíneas**: reemplazar Konva.Line por capa pesada (>5000 polys) con **`Konva.Shape` + `sceneFunc` custom** que dibuja todas en una pasada de canvas. Speedup esperado 50-100×.
-- 🔲 Custom hit-detection en sceneFunc para mantener selección por entidad individual (bucle sobre polys para encontrar la más cercana al click).
-
-**P1 Visor Mapas 4 — Persistencia:**
-- 🔲 Mover `mapasImportados` a IndexedDB (localStorage quota ~5MB insuficiente para 100k+ polys)
-- 🔲 Fase 3: drawing tools — Línea, Polígono, Círculo, Rectángulo → se agregan a capa "Usuario"
-- 🔲 Conectar toolbar existente (Medir, Grilla, 3D, Niveles, Selección) al KonvaDxfViewer
-- 🔲 Zonas/Equipos/Sensores sobre DXF (absorber elementos tipo vista Recinto/Planta)
-- 🔲 3D view del DXF importado
+**Pendiente:**
+- 🔲 **Custom hit-detection** en sceneFunc para selección por entidad individual
+- 🔲 **IndexedDB** para persistir mapasImportados (localStorage ~5MB insuficiente)
+- 🔲 Fase 3: drawing tools (Línea, Polígono, Círculo, Rectángulo)
+- 🔲 Conectar toolbar existente (Medir, Grilla, 3D, Niveles) al KonvaDxfViewer
+- 🔲 Equipos SAP/Repuestos sobre DXF Konva (posicionar, drag&drop, click → datos SAP)
 
 ---
 
