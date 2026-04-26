@@ -516,7 +516,12 @@ function TaskDialog({
   const [endDate, setEndDate] = useState(toInput(task.endDate))
   const [saving, setSaving] = useState(false)
 
+  const dateError = startDate && endDate && startDate > endDate
+    ? 'La fecha de inicio no puede ser posterior a la fecha de fin'
+    : null
+
   async function handleSave() {
+    if (dateError) return
     setSaving(true)
     try {
       await onSave({
@@ -573,13 +578,14 @@ function TaskDialog({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Inicio</Label>
-              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} disabled={!canEdit} />
+              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} disabled={!canEdit} className={dateError ? 'border-red-500' : ''} />
             </div>
             <div>
               <Label>Fin</Label>
-              <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} disabled={!canEdit} />
+              <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} disabled={!canEdit} className={dateError ? 'border-red-500' : ''} />
             </div>
           </div>
+          {dateError && <p className="text-xs text-red-500">{dateError}</p>}
           {/* Info */}
           <div className="text-xs text-muted-foreground space-y-0.5">
             {task.responsibleName && <p>Responsable: {task.responsibleName}</p>}
@@ -600,7 +606,7 @@ function TaskDialog({
           <div className="flex gap-2">
             <Button variant="ghost" onClick={onClose}>Cancelar</Button>
             {canEdit && (
-              <Button onClick={handleSave} disabled={saving || !titulo.trim()}>
+              <Button onClick={handleSave} disabled={saving || !titulo.trim() || !!dateError}>
                 {saving ? 'Guardando...' : 'Guardar'}
               </Button>
             )}

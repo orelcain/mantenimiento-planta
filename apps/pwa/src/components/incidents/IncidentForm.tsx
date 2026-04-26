@@ -151,7 +151,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
                  })
             }
         } catch (e) {
-            console.error(e)
+            logger.error('Error generating symptoms', e instanceof Error ? e : new Error(String(e)))
         } finally {
             setIsGeneratingSymptoms(false)
         }
@@ -177,7 +177,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
       const refined = await refineText(formData.titulo, false)
       setFormData(prev => ({ ...prev, titulo: refined.replace(/\.$/, '') })) 
     } catch(e) {
-      console.error(e)
+      logger.error('Error refining title', e instanceof Error ? e : new Error(String(e)))
     } finally {
       setIsRefiningTitle(false)
     }
@@ -193,7 +193,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
         title: "Error de configuración",
         description: "No se detectó la API Key de IA. Revisa la consola o el archivo .env.local",
       })
-      console.error('Magic Button: GROQ_API_KEY no encontrada.')
+      logger.error('Magic Button: GROQ_API_KEY no encontrada', new Error('GROQ_API_KEY missing'))
       return
     }
     
@@ -208,7 +208,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
       const refined = await refineText(formData.descripcion)
       
       if (refined === formData.descripcion) {
-         console.warn('Magic Button: El texto no cambió (posible error API o texto muy corto)')
+         logger.warn('Magic Button: El texto no cambió (posible error API o texto muy corto)')
       }
 
       setFormData(prev => ({ ...prev, descripcion: refined }))
@@ -310,27 +310,11 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
   // Enviar formulario
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log('🔍 handleSubmit llamado')
-    console.log('📝 formData:', formData)
-    console.log('👤 user:', user)
-    console.log('✅ disabled condition:', {
-      isLoading,
-      noLocation: !formData.hierarchyNodeId && !formData.zoneId,
-      noTitle: !formData.titulo,
-      shouldBeDisabled: isLoading || (!formData.hierarchyNodeId && !formData.zoneId) || !formData.titulo
-    })
-    
-    if (!user) {
-      console.log('❌ No user, aborting')
-      return
-    }
-
-    console.log('⏳ Setting loading state...')
+    if (!user) return
     setIsLoading(true)
     setValidationErrors({})
 
     try {
-      console.log('📋 Preparando datos para validación...')
       // Validar datos con Zod antes de enviar
       const dataToValidate = {
         tipo: 'correctivo' as const,
@@ -355,12 +339,10 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
         return
       }
 
-      console.log('🔒 Validando con Zod...', dataToValidate)
       // Validar con el schema de Zod
       const validation = createIncidentSchema.safeParse(dataToValidate)
       
       if (!validation.success) {
-        console.log('❌ Validación Zod falló:', validation.error.issues)
         const errors: Record<string, string> = {}
         validation.error.issues.forEach((err) => {
           const path = err.path.join('.')
@@ -371,7 +353,6 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
         return
       }
 
-      console.log('✅ Validación Zod exitosa')
       logger.info('Creating incident', { titulo: formData.titulo, prioridad: formData.prioridad })
       
       // Construir objeto de incidencia sin campos undefined
@@ -401,25 +382,19 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
         incidentData.sintomas = selectedSymptoms
       }
 
-      console.log('💾 Creando incidencia en Firestore...', incidentData)
       const createdIncident = await createIncident(incidentData)
-      console.log('✅ Incidencia creada:', createdIncident.id)
       logger.info('Incident created successfully', { incidentId: createdIncident.id })
 
       // Subir fotos
       if (photos.length > 0) {
-        console.log('📸 Subiendo fotos:', photos.length)
         logger.info('Uploading photos', { count: photos.length })
         await Promise.all(
           photos.map((photo) => uploadIncidentPhoto(createdIncident.id, photo))
         )
-        console.log('✅ Fotos subidas')
       }
 
-      console.log('🎉 Todo completo, llamando onSuccess()')
       onSuccess()
     } catch (error: unknown) {
-      console.log('❌ ERROR CAPTURADO:', error)
       const errorMessage = error instanceof Error ? error : new Error('Error al crear la incidencia')
       logger.error('Error creating incident', errorMessage)
       setValidationErrors({ general: 'Error al crear la incidencia. Por favor intenta de nuevo.' })

@@ -337,7 +337,7 @@ export function BuscadorGlobal({ initialQuery, onQueryConsumed, onViewInCatalog 
   }, [hierarchyNames])
 
   const globalSearch = useGlobalSearch(machines)
-  const { allRepuestos, search, loadAll, loaded, loading, progress } = globalSearch
+  const { allRepuestos, search, loadAll, loaded, loading, progress, updateRepuestoAlias } = globalSearch
 
   const [query, setQuery] = useState(initialQuery ?? '')
   const [filterTipo, setFilterTipo] = useState<string | null>(null)
@@ -702,7 +702,7 @@ export function BuscadorGlobal({ initialQuery, onQueryConsumed, onViewInCatalog 
           ) : (
             displayed.map((result, i) => (
               <ResultRow
-                key={`${result.machineId}-${result.repuesto.id}-${i}`}
+                key={`${result.machineId}-${result.repuesto.id}`}
                 result={result}
                 index={i}
                 onView={setDetailTarget}
@@ -723,9 +723,7 @@ export function BuscadorGlobal({ initialQuery, onQueryConsumed, onViewInCatalog 
           machineName={shortBreadcrumb(machineInfoMap.get(detailTarget.machineId)?.breadcrumb) || detailTarget.machineName}
           machineId={detailTarget.machineId}
           onAliasUpdated={(repId, alias) => {
-            // Actualizar el alias en el resultado local para que se refleje en la lista
-            const target = allRepuestos.find(r => r.repuesto.id === repId && r.machineId === detailTarget.machineId)
-            if (target) (target.repuesto as any).alias = alias || undefined
+            updateRepuestoAlias(repId, detailTarget.machineId, alias || undefined)
           }}
         />
       )}

@@ -558,6 +558,8 @@ export function KonvaDxfViewer({ mapa }: Props) {
         ref={stageRef}
         width={size.w}
         height={size.h}
+        role="img"
+        aria-label="Mapa de planta interactivo"
         draggable={tool === 'pan'}
         x={pos.x}
         y={pos.y}

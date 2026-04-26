@@ -41,7 +41,8 @@ export function FlowDiagramViewer({ flows, color }: Props) {
             {/* Header colapsable */}
             <button
               type="button"
-              className="w-full text-left p-4 sm:p-5 flex items-center justify-between gap-3 hover:bg-white/[0.02] transition-colors"
+              aria-expanded={isOpen}
+              className="w-full text-left p-4 sm:p-5 flex items-center justify-between gap-3 hover:bg-white/[0.02] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-inset"
               onClick={() => setExpandedFlow(isOpen ? null : flow.id)}
             >
               <div className="flex items-center gap-3 min-w-0">
@@ -172,6 +173,7 @@ function FlowNode({
       onClick={onClick}
       className={cn(
         'w-full text-left rounded-lg border transition-all duration-200',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30',
         isActive ? 'ring-1 ring-offset-0' : 'hover:brightness-110',
       )}
       style={{

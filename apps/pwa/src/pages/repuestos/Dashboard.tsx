@@ -14,6 +14,7 @@ import { RepuestoDetailModal } from '@/components/repuestos/RepuestoDetailModal'
 
 import { ManualSearchModal } from '@/components/repuestos/ManualSearchModal'
 import { MachineManualPanel } from '@/components/repuestos/MachineManualPanel'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { useRepuestos } from '@/hooks/repuestos/useRepuestos'
 import { useEquipmentRepuestos } from '@/hooks/repuestos/useEquipmentRepuestos'
 import { useRepuestosCounts } from '@/hooks/repuestos/useRepuestosCounts'
@@ -640,6 +641,7 @@ export function RepuestosDashboard({
 
   // Filtros, ordenamiento y paginación
   const [searchQuery, setSearchQuery] = useState('')
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 300)
   const [filterTipo, setFilterTipo] = useState<string | null>(null)
   const [kpiFilter, setKpiFilter] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
@@ -765,8 +767,8 @@ export function RepuestosDashboard({
   const filteredRepuestos = useMemo(() => {
     let filtered = [...repuestos]
 
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase()
+    if (debouncedSearchQuery.trim()) {
+      const query = debouncedSearchQuery.toLowerCase()
       filtered = filtered.filter((r) => {
         return (
           r.codigoSAP?.toLowerCase().includes(query) ||
@@ -804,7 +806,7 @@ export function RepuestosDashboard({
     }
 
     return filtered
-  }, [repuestos, searchQuery, filterTipo, kpiFilter, activeFavListName, repFavLists])
+  }, [repuestos, debouncedSearchQuery, filterTipo, kpiFilter, activeFavListName, repFavLists])
 
   // Tipos únicos ordenados por frecuencia (sobre todos los repuestos, no el filtrado)
   const tiposDisponibles = useMemo(() => {

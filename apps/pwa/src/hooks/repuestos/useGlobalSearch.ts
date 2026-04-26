@@ -321,6 +321,16 @@ export function useGlobalSearch(machines: Machine[]) {
     [allRepuestos]
   )
 
+  const updateRepuestoAlias = useCallback((repId: string, machineId: string, alias: string | undefined) => {
+    setAllRepuestos(prev =>
+      prev.map(r =>
+        r.repuesto.id === repId && r.machineId === machineId
+          ? { ...r, repuesto: { ...r.repuesto, alias } }
+          : r
+      )
+    )
+  }, [])
+
   return {
     allRepuestos,
     loading,
@@ -329,5 +339,6 @@ export function useGlobalSearch(machines: Machine[]) {
     progress,
     loadAll,
     search,
+    updateRepuestoAlias,
   }
 }

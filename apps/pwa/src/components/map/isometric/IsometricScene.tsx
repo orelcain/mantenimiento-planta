@@ -387,6 +387,7 @@ export function IsometricScene(props: IsometricSceneProps) {
           outputColorSpace: THREE.SRGBColorSpace,
         }}
         style={{ background: '#1a2530' }}
+        aria-label="Vista isométrica 3D de la planta"
         onPointerMissed={() => props.callbacks?.onBackgroundClick?.()}
       >
         <Suspense fallback={<InCanvasLoader />}>

@@ -14,8 +14,9 @@
  *   scatter con opacidad, dual grid, moving avg, bandas calibre, gap markers,
  *   crosshair, dark theme polish.
  */
-import { useMemo, useState, useCallback } from 'react'
+import { useMemo, useState, useCallback, useRef, useEffect } from 'react'
 import ReactECharts from 'echarts-for-react'
+import type ReactEChartsCore from 'echarts-for-react'
 import type { EChartsOption } from 'echarts'
 import { Card, CardContent, CardHeader, CardTitle, Badge } from '@/components/ui'
 import { Activity, Coffee } from 'lucide-react'
@@ -456,6 +457,8 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
   })
   const [showLegend, setShowLegend] = useState(false)
   const [zoomRange, setZoomRange] = useState<{ start: number; end: number }>({ start: 0, end: 100 })
+  const chartRef = useRef<ReactEChartsCore>(null)
+  useEffect(() => () => { try { chartRef.current?.getEchartsInstance()?.dispose() } catch { /* already disposed */ } }, [])
 
   const toggleLayer = (key: LayerKey) =>
     setLayers((prev) => ({ ...prev, [key]: !prev[key] }))
@@ -963,6 +966,7 @@ export function GraderTimelineChart({ records, aggregates, shiftId, dateKey }: P
       <CardContent>
         <div className={cn('w-full', useDualGrid ? 'h-[420px] lg:h-[520px]' : 'h-[340px] lg:h-[440px]')}>
           <ReactECharts
+            ref={chartRef}
             option={option}
             style={{ height: '100%', width: '100%' }}
             opts={{ renderer: 'canvas' }}

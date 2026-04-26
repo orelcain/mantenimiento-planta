@@ -1082,6 +1082,7 @@ export function Viewer3D(props: Viewer3DProps) {
           onCreated={({ gl: renderer }) => {
             renderer.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault() })
           }}
+          aria-label="Visor 3D de máquina"
           style={{ background: 'transparent' }}
         >
           <SceneContent {...props} />
