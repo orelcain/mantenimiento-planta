@@ -125,6 +125,8 @@ interface ShiftTimelineViewProps {
  * Si no hay configSnapshots, las sub-causas no se distinguen — el paraguas
  * "Fuera de límites" agrupa todo.
  */
+const CHECKPOINT_PREVIEW = 3
+
 function classifyPiece(piece: FirestorePieceRecord, configSnapshots?: GateConfigSnapshot[]): MatrixP0Cause {
   let activeGates: GateConfigSnapshot['gates'] = []
   if (configSnapshots && configSnapshots.length > 0) {
@@ -162,6 +164,7 @@ export function ShiftTimelineView({
   const canAnnotate = !!summaryId && !!adminUid
   const [annotationPause, setAnnotationPause] = useState<Pause | null>(null)
   const [annotationOpen, setAnnotationOpen] = useState(false)
+  const [checkpointsExpanded, setCheckpointsExpanded] = useState(false)
 
   // ── Estado del diálogo de detalle de minuto (Fase 4a) ─────────────────
   const [minuteDetailState, setMinuteDetailState] = useState<{
@@ -604,6 +607,43 @@ export function ShiftTimelineView({
     a.click()
     URL.revokeObjectURL(url)
   }, [timelineBuckets, productionWindow, pauses, shiftDoc?.id])
+
+  // Abre el dialog de anotación para el PRIMER paro sin clasificar del turno.
+  // Permite al admin ir directo a la acción desde el badge de cobertura.
+  const handleCoverageBadgeClick = useCallback(() => {
+    if (!canAnnotate || !pauses || pauses.length === 0) return
+    const first = [...pauses]
+      .filter((p) => !p.autoTag && !p.tag)
+      .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime())[0]
+    if (!first) return
+    setAnnotationPause(first)
+    setAnnotationOpen(true)
+  }, [canAnnotate, pauses])
+
+  // Centra el zoom del chart en un timestamp dado (±5 min).
+  // Permite al admin ir directo al momento de un upload/acción en el gráfico.
+  const handleCheckpointClick = useCallback((atIso: string) => {
+    if (timelineBuckets.length === 0) return
+    const atMs = Date.parse(atIso)
+    const inPW = (tsMin: string): boolean => {
+      if (!productionWindow) return true
+      const ts = Date.parse(tsMin)
+      return ts >= productionWindow.startMs && ts <= productionWindow.endMs
+    }
+    const buckets = timelineBuckets.filter((b) => b.pieces > 0 && inPW(b.tsMin))
+    if (buckets.length < 2) return
+    const axis = resolveAxisWindow(buckets, shiftWindow)
+    const totalMs = axis.effectiveEndMs - axis.effectiveStartMs
+    if (totalMs <= 0) return
+    const windowMs = 10 * 60_000
+    const startMs = Math.max(axis.effectiveStartMs, atMs - windowMs / 2)
+    const endMs = Math.min(axis.effectiveEndMs, atMs + windowMs / 2)
+    const startPct = ((startMs - axis.effectiveStartMs) / totalMs) * 100
+    const endPct = ((endMs - axis.effectiveStartMs) / totalMs) * 100
+    setZoomState({ start: startPct, end: endPct })
+    setActiveZoom('10min')
+    emitZoomRange(startPct, endPct)
+  }, [timelineBuckets, productionWindow, shiftWindow, emitZoomRange])
 
   const chartOption = useMemo(() => {
     // Filtrar buckets: solo los del rango productivo real. Los pre/post-turno
@@ -1058,6 +1098,8 @@ export function ShiftTimelineView({
       label: string
       sub: string
       verdict?: string
+      p0Pct?: number
+      p0Delta?: number
     }> = []
 
     for (const u of shiftDoc?.uploads ?? []) {
@@ -1067,6 +1109,7 @@ export function ShiftTimelineView({
         at: u.at,
         label: `Carga: ${files}`,
         sub: `${u.byName} · ${u.snapshot.totalPieces.toLocaleString('es-CL')} pzas · P0 ${u.snapshot.p0Pct.toFixed(1)}%`,
+        p0Pct: u.snapshot.p0Pct,
       })
     }
 
@@ -1080,7 +1123,18 @@ export function ShiftTimelineView({
       })
     }
 
-    return list.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
+    const sorted = list.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
+    // Calcular delta P0% entre cargas consecutivas para indicador ▲/▼
+    let lastUploadP0: number | null = null
+    for (const item of sorted) {
+      if (item.kind === 'upload' && item.p0Pct != null) {
+        if (lastUploadP0 != null) {
+          item.p0Delta = +(item.p0Pct - lastUploadP0).toFixed(2)
+        }
+        lastUploadP0 = item.p0Pct
+      }
+    }
+    return sorted
   }, [shiftDoc])
 
   const hasData = timelineBuckets.some(b => b.pieces > 0)
@@ -1101,12 +1155,17 @@ export function ShiftTimelineView({
                 coverage.pct >= 95 && 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400',
                 coverage.pct < 95 && coverage.pct >= 85 && 'border-amber-500/40 bg-amber-500/10 text-amber-400',
                 coverage.pct < 85 && 'border-orange-500/40 bg-orange-500/10 text-orange-400',
+                canAnnotate && coverage.unclassifiedMin > 0 && 'cursor-pointer hover:opacity-80 active:opacity-60 transition-opacity',
               )}
+              role={canAnnotate && coverage.unclassifiedMin > 0 ? 'button' : undefined}
               title={
                 coverage.unclassifiedMin > 0
-                  ? `${coverage.unclassifiedMin} min sin clasificar de ${coverage.totalMin} min totales`
+                  ? canAnnotate
+                    ? `${coverage.unclassifiedMin} min sin clasificar — click para ir al primer paro sin tag`
+                    : `${coverage.unclassifiedMin} min sin clasificar de ${coverage.totalMin} min totales`
                   : `${coverage.totalMin} min totales — todo el tiempo clasificado`
               }
+              onClick={canAnnotate && coverage.unclassifiedMin > 0 ? handleCoverageBadgeClick : undefined}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-current" />
               Cobertura {coverage.pct}%
@@ -1118,7 +1177,7 @@ export function ShiftTimelineView({
           {productionWindow && productionWindow.excludedPieces > 0 && (
             <span
               className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-zinc-500/40 bg-zinc-500/10 text-zinc-300 text-[11px] font-medium"
-              title={`Calibración/aseo detectado por lotes no-correlativos (ej. 1111). ${productionWindow.excludedPieces} pzs quedaron fuera del eje para mantener el análisis centrado en producción real.`}
+              title={`Calibración/aseo detectado por lotes no-correlativos${productionWindow.dummyLots.size > 0 ? ` (${[...productionWindow.dummyLots].join(', ')})` : ' (ej. 1111)'}. ${productionWindow.excludedPieces} pzs quedaron fuera del eje para mantener el análisis centrado en producción real.`}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-zinc-400" />
               Pre/post-turno: {productionWindow.excludedPieces} pzs
@@ -1151,7 +1210,7 @@ export function ShiftTimelineView({
             <Button variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1" onClick={downloadPNG} title="Exportar imagen PNG">
               <Download className="w-3 h-3" /> PNG
             </Button>
-            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1" onClick={downloadCSV} title="Exportar datos CSV (minuto a minuto)">
+            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1" onClick={downloadCSV} title="Exportar resumen CSV (datos por hora)">
               <Download className="w-3 h-3" /> CSV
             </Button>
           </div>
@@ -1265,11 +1324,26 @@ export function ShiftTimelineView({
         {/* Checkpoints list */}
         {checkpoints.length > 0 && (
           <div className="space-y-1.5">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Eventos del turno
-            </p>
-            {checkpoints.map((cp, i) => (
-              <div key={i} className="flex items-start gap-2.5 text-xs">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Eventos del turno
+              </p>
+              {checkpoints.length > CHECKPOINT_PREVIEW && (
+                <button
+                  onClick={() => setCheckpointsExpanded((v) => !v)}
+                  className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {checkpointsExpanded ? 'Ocultar' : `Ver todos (${checkpoints.length})`}
+                </button>
+              )}
+            </div>
+            {(checkpointsExpanded ? checkpoints : checkpoints.slice(0, CHECKPOINT_PREVIEW)).map((cp, i) => (
+              <div
+                key={i}
+                className="flex items-start gap-2.5 text-xs cursor-pointer hover:bg-muted/20 rounded px-1 -mx-1 py-0.5 transition-colors"
+                onClick={() => handleCheckpointClick(cp.at)}
+                title="Click para centrar el gráfico en este evento"
+              >
                 <span className="shrink-0 mt-0.5">
                   {cp.kind === 'upload'
                     ? <Upload className="w-3.5 h-3.5 text-blue-400" />
@@ -1281,6 +1355,18 @@ export function ShiftTimelineView({
                 <div className="flex-1 min-w-0">
                   <span className="font-medium text-foreground">{cp.label}</span>
                   <span className="text-muted-foreground ml-1.5">{cp.sub}</span>
+                  {cp.p0Delta != null && (
+                    <span
+                      className={cn(
+                        'ml-2 tabular-nums text-[11px] font-medium',
+                        cp.p0Delta > 0 ? 'text-rose-400' : cp.p0Delta < 0 ? 'text-emerald-400' : 'text-slate-400',
+                      )}
+                      title="Δ P0% respecto a la carga anterior"
+                    >
+                      {cp.p0Delta > 0 ? '▲' : cp.p0Delta < 0 ? '▼' : '='}{' '}
+                      {cp.p0Delta > 0 ? '+' : ''}{cp.p0Delta.toFixed(2)}%
+                    </span>
+                  )}
                   {cp.verdict && cp.verdict !== 'insufficient-data' && (
                     <span
                       className={cn('ml-2 font-medium', verdictColor(cp.verdict as 'improved' | 'worsened' | 'neutral'))}
@@ -1292,6 +1378,11 @@ export function ShiftTimelineView({
                 </div>
               </div>
             ))}
+            {!checkpointsExpanded && checkpoints.length > CHECKPOINT_PREVIEW && (
+              <p className="text-[11px] text-muted-foreground pl-1">
+                +{checkpoints.length - CHECKPOINT_PREVIEW} eventos más
+              </p>
+            )}
           </div>
         )}
 
