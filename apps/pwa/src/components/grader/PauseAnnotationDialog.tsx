@@ -393,7 +393,10 @@ export function PauseAnnotationDialog({
 
           {/* ── Sección: Tag ── */}
           <div className="space-y-2">
-            <Label>Motivo</Label>
+            <Label>
+              Motivo{' '}
+              <span className="text-[10px] font-normal text-muted-foreground/60">(tecla 1–9 para seleccionar)</span>
+            </Label>
             <div className="grid grid-cols-1 gap-1.5">
               {tags.map((tag) => {
                 const isSelected = selectedTagId === tag.id
@@ -590,7 +593,7 @@ export function PauseAnnotationDialog({
               onClick={() => onOpenChange(false)}
               disabled={saving}
             >
-              Cancelar
+              {rangeSaved ? 'Cerrar' : 'Cancelar'}
             </Button>
             <Button
               type="button"

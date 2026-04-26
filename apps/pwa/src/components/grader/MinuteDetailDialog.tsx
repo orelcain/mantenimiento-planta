@@ -358,6 +358,12 @@ export function MinuteDetailDialog({
                       {breakdown.p0} P0
                     </span>
                     <span className="text-muted-foreground"> ({breakdown.p0Pct.toFixed(1)}%)</span>
+                    {bucket?.dominantCalibre && (
+                      <>
+                        <span className="text-muted-foreground"> · </span>
+                        <span className="text-muted-foreground/80">Calibre: {bucket.dominantCalibre}</span>
+                      </>
+                    )}
                   </>
                 )}
               </span>
@@ -373,6 +379,13 @@ export function MinuteDetailDialog({
 
         {!loading && !error && breakdown.total > 0 && (
           <div className="overflow-y-auto flex-1 pr-1 space-y-4">
+            {/* Minuto sin rechazos — mensaje positivo cuando todo llegó a destino. */}
+            {breakdown.total > 0 && breakdown.p0 === 0 && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 text-xs text-emerald-300">
+                <span className="text-base leading-none">✓</span>
+                <span>Sin rechazos este minuto — las {breakdown.total} piezas llegaron a destino.</span>
+              </div>
+            )}
             {/* Banner accionable según P0% del minuto y causa dominante.
                 Solo aparece cuando hay P0 — si el minuto está perfecto, no ruido visual. */}
             {breakdown.p0 > 0 && breakdown.topP0Cause && (

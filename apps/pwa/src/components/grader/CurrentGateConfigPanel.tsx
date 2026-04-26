@@ -35,6 +35,17 @@ export function CurrentGateConfigPanel({ configSnapshots }: CurrentGateConfigPan
   const snapshotAt = fmtTime(latest.at)
   const snapshotRelative = fmtRelativeTime(Date.parse(latest.at))
   const isSynthetic = latest.synthetic
+  const configChangesCount = configSnapshots.length - 1
+
+  // Distribución de calidades — visible incluso con el panel colapsado.
+  // Permite al supervisor ver de un vistazo la combinación A/B/Super sin abrir.
+  const qualityCount = gates
+    .filter((g) => g.active)
+    .reduce<Record<string, number>>((acc, g) => {
+      const q = g.assignedQuality ?? '?'
+      acc[q] = (acc[q] ?? 0) + 1
+      return acc
+    }, {})
 
   return (
     <Card>
@@ -45,6 +56,22 @@ export function CurrentGateConfigPanel({ configSnapshots }: CurrentGateConfigPan
           <span className="text-[11px] font-normal text-muted-foreground ml-1">
             {activeCount} de 12 activas
           </span>
+          {Object.keys(qualityCount).length > 0 && (
+            <span className="flex items-center gap-0.5 text-[10px] font-normal text-muted-foreground/70">
+              {Object.entries(qualityCount).sort().flatMap(([q, n], i) => [
+                ...(i > 0 ? [<span key={`sep-${i}`} className="text-muted-foreground/30 mx-0.5">·</span>] : []),
+                <span key={q} className={qualityColorTextClass(q)}>{n}×{q}</span>,
+              ])}
+            </span>
+          )}
+          {configChangesCount > 0 && (
+            <span
+              className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20"
+              title={`La configuración de gates cambió ${configChangesCount} vez${configChangesCount > 1 ? 'es' : ''} durante el turno`}
+            >
+              {configChangesCount} cambio{configChangesCount > 1 ? 's' : ''} mid-turno
+            </span>
+          )}
           {isSynthetic && (
             <span
               className="text-[10px] px-1.5 py-0.5 rounded bg-muted/40 text-muted-foreground border border-border/40 cursor-help"
