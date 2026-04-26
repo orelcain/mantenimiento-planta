@@ -766,10 +766,18 @@ export function ShiftTimelineView({
       .map(b => [
         {
           xAxis: b.tA as string,
-          itemStyle: { color: 'rgba(139,92,246,0.09)', borderWidth: 0 },
+          itemStyle: { color: 'rgba(139,92,246,0.15)', borderWidth: 0 },
         },
         { xAxis: b.tB as string },
       ])
+
+    // Máximo del eje Pzs/min sobredimensionado ~43% para que las barras
+    // ocupen solo ~70% de la altura del chart (visualmente menos aplastadas).
+    const maxStackedPerMin = Math.max(
+      1,
+      ...lineTimes.map((_, i) => (productivePiecesAligned[i] ?? 0) + (p0PiecesAligned[i] ?? 0)),
+    )
+    const piecesAxisMax = Math.ceil(maxStackedPerMin * 1.43)
 
     return {
       backgroundColor: 'transparent',
@@ -859,6 +867,7 @@ export function ShiftTimelineView({
           axisLabel: { color: '#6b7280', fontSize: 11 },
           splitLine: { show: false },
           min: 0,
+          max: piecesAxisMax,
         },
         {
           // Eje terciario para scatter del drill-down (peso en gramos)

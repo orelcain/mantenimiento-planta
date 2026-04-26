@@ -265,19 +265,17 @@ export function buildMarkLines(
         lineStyle: { color: '#8b5cf6', type: 'dotted' as const, width: 1.5 },
         label: {
           show: true,
-          // El salto de línea mantiene el emoji arriba y el texto apilado,
-          // para no comer ancho horizontal dentro del chart.
-          formatter: `📦\nLote ${curr.lot}`,
+          formatter: `📦 ${curr.lot}`,
           color: '#a78bfa',
           fontSize: 9,
           fontWeight: 600 as const,
-          position: 'insideEndBottom' as const,
+          position: 'insideEndTop' as const,
           backgroundColor: 'rgba(139,92,246,0.15)',
           borderColor: 'rgba(139,92,246,0.4)',
           borderWidth: 1,
           borderRadius: 3,
           padding: [2, 4, 2, 4] as [number, number, number, number],
-          distance: 4,
+          distance: 2,
         },
       })
     }
