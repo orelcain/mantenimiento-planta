@@ -34,7 +34,7 @@ export function useAppVersion() {
         
         // Verificación de URL válida antes del fetch
         if (!versionUrl || versionUrl.includes('undefined')) {
-          console.warn('⚠️ Invalid version URL:', versionUrl)
+          logger.warn('Invalid version URL')
           return
         }
 
@@ -56,12 +56,6 @@ export function useAppVersion() {
 
           const data = await response.json()
           const serverVersion = data.version
-          
-          console.log('🔍 Version check:', {
-            current: APP_VERSION,
-            server: serverVersion,
-            hasUpdate: serverVersion !== APP_VERSION
-          })
           
           if (serverVersion && isNewerVersion(serverVersion, APP_VERSION)) {
             logger.info('New app version detected', {

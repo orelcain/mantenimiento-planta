@@ -14,6 +14,7 @@ import {
   getDocs,
 } from 'firebase/firestore'
 import { db } from '@/services/firebase'
+import { logger } from '@/lib/logger'
 import { HierarchyNode, HierarchyLevel, isEquipmentNode } from '@/types/hierarchy'
 
 export interface EquipmentDisplayNode {
@@ -157,7 +158,7 @@ export function useEquipmentForArea(areaNodeId: string | null, refreshKey = 0) {
           setEquipment(equipWithChildren)
         }
       } catch (err) {
-        console.error('Error loading equipment for area', areaNodeId, err)
+        logger.error('Error loading equipment for area', err instanceof Error ? err : new Error(String(err)))
         if (!cancelled) setEquipment([])
       } finally {
         if (!cancelled) setLoading(false)

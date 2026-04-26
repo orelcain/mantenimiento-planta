@@ -4,6 +4,7 @@
  */
 
 import { useState, useCallback, useRef } from 'react'
+import { logger } from '@/lib/logger'
 
 const SpeechRecognition = window.SpeechRecognition || (window as any).webkitSpeechRecognition
 
@@ -15,7 +16,7 @@ export function useSpeechRecognition() {
 
   const startListening = useCallback(() => {
     if (!isSupported) {
-      console.error('Speech Recognition no es soportado en este navegador')
+      logger.error('Speech Recognition no es soportado en este navegador', new Error('SpeechRecognition not supported'))
       return
     }
 
@@ -48,7 +49,7 @@ export function useSpeechRecognition() {
       }
 
       recognitionRef.current.onerror = (event: any) => {
-        console.error('Speech Recognition error:', event.error)
+        logger.error('Speech Recognition error', event.error instanceof Error ? event.error : new Error(String(event.error)))
       }
 
       recognitionRef.current.onend = () => {

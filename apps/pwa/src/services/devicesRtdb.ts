@@ -6,6 +6,7 @@ import {
   type DataSnapshot,
 } from 'firebase/database'
 import { rtdb } from './firebase'
+import { logger } from '@/lib/logger'
 
 export type SensorThresholds = {
   tempWarnLow?: number
@@ -138,23 +139,19 @@ export function subscribeDevices(
 ) {
   const r = ref(rtdb, 'devices')
   
-  console.log('[devicesRtdb] Iniciando suscripción a devices/')
-
   const unsubscribe = onValue(
     r,
     (snap) => {
       const devices = snapshotToDevices(snap)
-      console.log('[devicesRtdb] Datos recibidos:', devices.length, 'dispositivos')
       onData(devices)
     },
     (err) => {
-      console.error('[devicesRtdb] Error suscripción:', err)
+      logger.error('devicesRtdb: Error suscripción', err instanceof Error ? err : new Error(String(err)))
       onError?.(err)
     }
   )
 
   return () => {
-    console.log('[devicesRtdb] Desuscribiendo de devices/')
     unsubscribe()
   }
 }
@@ -182,7 +179,6 @@ export async function deleteDevice(deviceId: string): Promise<void> {
   const path = `devices/${deviceId}`
   const r = ref(rtdb, path)
   await remove(r)
-  console.log(`[devicesRtdb] Dispositivo eliminado: ${deviceId}`)
 }
 
 /**
@@ -194,5 +190,4 @@ export async function updateDeviceThresholds(
 ): Promise<void> {
   const r = ref(rtdb, `devices/${deviceId}`)
   await update(r, { thresholds })
-  console.log(`[devicesRtdb] Umbrales actualizados: ${deviceId}`, thresholds)
 }

@@ -7,6 +7,7 @@ import { FileText, FileSpreadsheet, ClipboardList, ChevronRight, ChevronDown, Ch
 import type { Repuesto } from '@/types/repuestos'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import * as repuestoExports from '@/utils/repuestos'
+import { logger } from '@/lib/logger'
 
 export type ReportType = 'technical_sheet' | 'catalog' | 'excel'
 
@@ -215,7 +216,7 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
         }
         onClose()
     } catch (error) {
-        console.error("Export failed", error)
+        logger.error('Export failed', error instanceof Error ? error : new Error(String(error)))
     } finally {
         setIsExporting(false)
     }

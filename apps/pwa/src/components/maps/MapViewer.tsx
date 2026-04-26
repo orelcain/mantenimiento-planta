@@ -268,7 +268,6 @@ export const MapViewer = forwardRef<MapViewerHandle, MapViewerProps>(({
     if (!hasMoved && editable && onPositionSelect) {
       const position = getClickPosition(e.clientX, e.clientY)
       if (position) {
-        console.log('📍 Marcador colocado:', position) // DEBUG
         onPositionSelect(position)
       }
     }
@@ -333,7 +332,6 @@ export const MapViewer = forwardRef<MapViewerHandle, MapViewerProps>(({
         const touch = e.changedTouches[0]!
         const position = getClickPosition(touch.clientX, touch.clientY)
         if (position) {
-          console.log('📍 Marcador colocado (touch):', position) // DEBUG
           onPositionSelect(position)
         }
       }
@@ -371,9 +369,6 @@ export const MapViewer = forwardRef<MapViewerHandle, MapViewerProps>(({
       top: offsetY + position.y * scaledHeight,
     }
   }, [zoom, pan, imageLoaded])
-
-  // DEBUG: Log para verificar si los botones deberían mostrarse
-  console.log('🗺️ MapViewer render - pendingPosition:', pendingPosition, 'onPositionConfirm:', !!onPositionConfirm, 'onPositionCancel:', !!onPositionCancel)
 
   return (
     <div className={cn('relative flex flex-col', className)}>

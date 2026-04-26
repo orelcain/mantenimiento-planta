@@ -1411,8 +1411,6 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
       // Guardar en cache para safety-net
       repsByMachineCache.set(machine.id, reps)
 
-      // DEBUG: log por máquina filtrada
-      console.warn(`[ARIA-RAG] Procesando máquina "${machine.nombre}" (${machine.id}): ${reps.length} repuestos, listAll=${listAllForMachine}, expandedTerms=${expandedTerms.length}`)
 
       // Listar todos los repuestos de la máquina filtrada (sin búsqueda de componente)
       if (listAllForMachine) {
@@ -1490,17 +1488,11 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
             matchedRepuestos.push(
               `  ✓ [${machine.nombre}] ${r.textoBreve}${desc} | SAP: ${r.codigoSAP || 'pendiente'} | Fab: ${r.codigoFabricante || 'pendiente'} | Cant: ${cant}${stockNote} | $${r.valorUnitario ?? 0}${ubic}`
             )
-            console.warn(`[ARIA-RAG] SAFETY-NET rescued: "${r.textoBreve}" (SAP: ${r.codigoSAP}) - missed by fuzzy matching!`)
           }
         }
       }
     }
 
-    // DEBUG: log detallado del matching para diagnosticar problemas
-    console.warn(`[ARIA-RAG] fetchRepuestosSummary: query="${userQuery}" → searchTerms=[${searchTerms}] → componentTerms=[${componentTerms}] → expandedTerms=[${expandedTerms.slice(0, 8)}] → matchedMachines=[${[...matchedMachineIds]}] (${matchedMachineIds.size}) → listAll=${listAllForMachine} → matches=${matchedRepuestos.length}`)
-    if (matchedRepuestos.length > 0) {
-      matchedRepuestos.forEach((m, i) => console.warn(`[ARIA-RAG] match[${i}]: ${m.slice(0, 120)}`))
-    }
     logger.info(`Chatbot repuestos: ${matchedRepuestos.length} matches found for component=[${componentTerms}] in machines=[${[...matchedMachineIds]}]`)
 
     const lines = [

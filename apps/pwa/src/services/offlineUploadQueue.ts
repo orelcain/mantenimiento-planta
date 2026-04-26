@@ -2,6 +2,7 @@ import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage'
 import { storage } from '@/services/firebase'
 import { useUploadQueueStore, type UploadItem } from '@/store/uploadQueueStore'
 import { getPhotoEvidenceById, updatePhotoEvidence } from '@/services/photoEvidence'
+import { logger } from '@/lib/logger'
 
 const DB_NAME = 'offline-upload-queue'
 const STORE_NAME = 'evidenceUploads'
@@ -120,7 +121,7 @@ export async function loadUploadQueue(): Promise<void> {
     const entries = await getAllUploads()
     useUploadQueueStore.getState().setItems(entries.map(toUploadItem))
   } catch (error) {
-    console.warn('Failed to load upload queue', error)
+    logger.warn('Failed to load upload queue')
   }
 }
 

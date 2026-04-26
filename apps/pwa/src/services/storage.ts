@@ -176,7 +176,7 @@ export async function deleteFile(url: string): Promise<void> {
     const storageRef = ref(storage, url)
     await deleteObject(storageRef)
   } catch (error) {
-    console.error('Error eliminando archivo:', error)
+    logger.error('Error eliminando archivo', error instanceof Error ? error : new Error(String(error)))
   }
 }
 
@@ -219,9 +219,6 @@ export async function compressImage(
           type: mimeType,
           lastModified: Date.now(),
         })
-        console.log(
-          `📸 Imagen comprimida: ${file.size} → ${blob.size} bytes (${Math.round((1 - blob.size / file.size) * 100)}% reducción)`
-        )
         resolve(compressedFile)
       }
 
@@ -246,7 +243,7 @@ export async function compressImage(
             // Some browsers (iOS < 14, some Android) return PNG if WebP is not supported for encoding.
             // PNG is lossless and much larger, so we must avoid it.
             if (!webpBlob || webpBlob.type !== 'image/webp') {
-              console.warn('WebP compression not supported or returned PNG. Falling back to JPEG.')
+              logger.warn('WebP compression not supported or returned PNG. Falling back to JPEG.')
               tryJpeg()
               return
             }
@@ -325,7 +322,7 @@ export async function deleteMapImage(url: string): Promise<void> {
     const storageRef = ref(storage, url)
     await deleteObject(storageRef)
   } catch (error) {
-    console.error('Error eliminando mapa:', error)
+    logger.error('Error eliminando mapa', error instanceof Error ? error : new Error(String(error)))
   }
 }
 
@@ -381,6 +378,6 @@ export async function deleteBodegaPhoto(url: string): Promise<void> {
     const storageRef = ref(storage, url)
     await deleteObject(storageRef)
   } catch (error) {
-    console.error('Error eliminando foto bodega:', error)
+    logger.error('Error eliminando foto bodega', error instanceof Error ? error : new Error(String(error)))
   }
 }

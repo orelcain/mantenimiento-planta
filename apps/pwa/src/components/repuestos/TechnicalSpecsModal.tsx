@@ -24,6 +24,7 @@ import {
 import type { Repuesto, TechnicalSpecs, MachineImage, TechnicalDataType } from '@/types/repuestos'
 import { exportTechnicalSheetToPDF } from '@/utils/repuestos/exportTechnicalSheet'
 import { useToast } from '@/hooks/useToast'
+import { logger } from '@/lib/logger'
 
 // ─── Templates ──────────────────────────────────────────────
 
@@ -282,7 +283,7 @@ export function TechnicalSpecsModal({
       await onSave(repuesto.id, { ...specs, updatedAt: Date.now() }, repuesto.gallery || [])
       onOpenChange(false)
     } catch (err) {
-      console.error('Error saving specs:', err)
+      logger.error('Error saving specs', err instanceof Error ? err : new Error(String(err)))
     } finally {
       setSaving(false)
     }
@@ -295,7 +296,7 @@ export function TechnicalSpecsModal({
       await exportTechnicalSheetToPDF({ ...repuesto, technicalSpecs: specs }, machineId)
       toast({ title: 'PDF Exportado', description: 'La ficha técnica se ha descargado.' })
     } catch (err) {
-      console.error(err)
+      logger.error('Error al exportar PDF de ficha técnica', err instanceof Error ? err : new Error(String(err)))
       toast({ title: 'Error', description: 'No se pudo generar el PDF', variant: 'destructive' })
     } finally {
       setExporting(false)

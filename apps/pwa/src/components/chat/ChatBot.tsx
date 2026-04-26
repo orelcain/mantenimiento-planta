@@ -10,6 +10,7 @@ import DOMPurify from 'dompurify'
 import { useChatBot } from '@/hooks/useChatBot'
 import type { ChatMessage, ChatAction, MiniChartData } from '@/services/chatbot'
 import { saveFeedback } from '@/services/ariaLearning'
+import { logger } from '@/lib/logger'
 
 // ─── Formateador de markdown básico + #9 tablas ────────────────────
 function formatMessage(text: string): string {
@@ -1176,9 +1177,8 @@ export function ChatBot() {
       intents: autoIntents,
       equipmentMentioned: equipMatch?.[0],
     }).then(() => {
-      console.log(`✅ ARIA Learning: feedback ${rating} guardado${correction ? ' con corrección' : ''}`)
     }).catch((err) => {
-      console.error('❌ ARIA Learning: error guardando feedback', err)
+      logger.error('Error guardando feedback en ARIA Learning', err instanceof Error ? err : new Error(String(err)))
     })
   }, [messages, userId])
 

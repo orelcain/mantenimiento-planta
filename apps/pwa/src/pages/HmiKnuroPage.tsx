@@ -2,6 +2,7 @@ import { useEffect, useRef, useMemo, useState, useCallback } from 'react'
 import { History, Cpu, RefreshCw, X, ChevronDown, ChevronUp, Sliders, RotateCcw, Copy, Pencil, Check, ArrowUp, ArrowDown, BookmarkCheck, QrCode } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useAuthStore } from '@/store'
+import { logger } from '@/lib/logger'
 import { cn } from '@/lib/utils'
 import {
   getHmiPresets,
@@ -86,9 +87,9 @@ export function HmiKnuroPage() {
           try {
             await seedDefaultPresets(uid)
             ;[presetsData, current] = await Promise.all([getHmiPresets(), getCurrentPreset()])
-            console.info('[HMI] Presets sembrados:', Object.keys(presetsData).join(', '))
+            logger.info('HMI: Presets sembrados')
           } catch (seedErr) {
-            console.error('[HMI] Error sembrando presets (reglas Firestore?):', seedErr)
+            logger.error('HMI: Error sembrando presets (reglas Firestore?)', seedErr instanceof Error ? seedErr : new Error(String(seedErr)))
           }
         }
       }
@@ -97,7 +98,7 @@ export function HmiKnuroPage() {
       setPresetOrder(order)
       iframe.contentWindow?.postMessage({ type: 'hmi:init', presets: presetsData, current, refs, order, pwd, tooltips }, '*')
     } catch (err) {
-      console.error('[HMI] Error cargando Firestore:', err)
+      logger.error('HMI: Error cargando Firestore', err instanceof Error ? err : new Error(String(err)))
     }
   }, [user])
 
@@ -132,8 +133,8 @@ export function HmiKnuroPage() {
       if (type === 'hmi:ready') {
         iframeReadyRef.current = true
         if (event.data.tooltips && Object.keys(event.data.tooltips).length > 0) {
-          saveHmiTooltips(event.data.tooltips).catch(err =>
-            console.warn('[HMI] Auto-sync tooltips:', err)
+          saveHmiTooltips(event.data.tooltips).catch(_err =>
+            logger.warn('HMI: Auto-sync tooltips falló')
           )
         }
         if (user && iframeRef.current) await sendInitData(iframeRef.current)
@@ -145,7 +146,7 @@ export function HmiKnuroPage() {
       if (type === 'hmi:save-tooltip') {
         if (event.data.tooltips) {
           await saveHmiTooltips(event.data.tooltips).catch(err =>
-            console.error('[HMI] Error guardando tooltips en Firestore:', err)
+            logger.error('HMI: Error guardando tooltips en Firestore', err instanceof Error ? err : new Error(String(err)))
           )
         }
         return
@@ -154,7 +155,7 @@ export function HmiKnuroPage() {
       if (type === 'hmi:save-pwd') {
         if (typeof event.data.pwd === 'string' && event.data.pwd) {
           await saveHmiTooltipPwd(event.data.pwd).catch(err =>
-            console.error('[HMI] Error guardando clave en Firestore:', err)
+            logger.error('HMI: Error guardando clave en Firestore', err instanceof Error ? err : new Error(String(err)))
           )
         }
         return

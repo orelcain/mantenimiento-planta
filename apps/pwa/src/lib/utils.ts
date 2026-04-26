@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
+import { logger } from '@/lib/logger'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -11,7 +12,7 @@ export function formatDate(date: Date | string | number | undefined): string {
   const dateObj = new Date(date)
   // Validar que la fecha sea válida
   if (isNaN(dateObj.getTime())) {
-    console.warn('⚠️ formatDate: Fecha inválida recibida:', date)
+    logger.warn('formatDate: Fecha inválida recibida')
     return 'Fecha inválida'
   }
   
@@ -30,7 +31,7 @@ export function formatRelativeTime(date: Date | string | number | undefined): st
   const target = new Date(date)
   // Validar que la fecha sea válida
   if (isNaN(target.getTime())) {
-    console.warn('⚠️ formatRelativeTime: Fecha inválida recibida:', date)
+    logger.warn('formatRelativeTime: Fecha inválida recibida')
     return 'Fecha inválida'
   }
   

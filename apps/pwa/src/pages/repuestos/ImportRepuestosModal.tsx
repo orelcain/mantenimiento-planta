@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import * as XLSX from 'xlsx'
 import { Button } from '@/components/ui/button'
+import { logger } from '@/lib/logger'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -173,7 +174,7 @@ export function ImportRepuestosModal({
       setSelectedSheet(auto || '')
     }
 
-    readSheets().catch(console.error)
+    readSheets().catch((err) => logger.error('Error leyendo hojas Excel', err instanceof Error ? err : new Error(String(err))))
   }, [file, machineName])
 
   // Al cambiar de hoja: calcular preview de filas a importar
@@ -234,7 +235,7 @@ export function ImportRepuestosModal({
     } catch (err) {
       const message = err instanceof Error ? err.message : 'No se pudo importar el Excel'
       onError(message)
-      console.error('Import Excel error:', err)
+      logger.error('Import Excel error', err instanceof Error ? err : new Error(String(err)))
     } finally {
       setIsLoading(false)
     }

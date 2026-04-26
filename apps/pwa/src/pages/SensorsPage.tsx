@@ -15,6 +15,7 @@ import { getEquipments } from '@/services/equipment'
 import { TelemetryChart, type ChartType } from '@/components/telemetry/TelemetryChart'
 import { TelemetryExportDialog } from '@/components/telemetry/TelemetryExportDialog'
 import { useTelemetryHistory, type TimeRange } from '@/hooks/useTelemetryHistory'
+import { logger } from '@/lib/logger'
 
 function normalizeTs(ts: number | undefined): number | null {
   if (typeof ts !== 'number' || !Number.isFinite(ts)) return null
@@ -74,7 +75,7 @@ function formatDateTime(timestamp: number | Date | undefined): string {
       hour12: false
     })
   } catch (err) {
-    console.error('Error formateando fecha:', err, timestamp)
+    logger.error('Error formateando fecha', err instanceof Error ? err : new Error(String(err)))
     return '—'
   }
 }
@@ -108,18 +109,15 @@ export function SensorsPage() {
     if (equipmentStore.length > 0) {
       setEquipment(equipmentStore)
       loadedRef.current = true
-      console.log('[SensorsPage] Equipment cargado desde store:', equipmentStore.length, 'items')
     } else {
-      console.log('[SensorsPage] Store vacío, cargando equipment desde Firestore...')
       setLoadingEquipment(true)
       loadedRef.current = true
       getEquipments()
         .then((data) => {
           setEquipment(data)
-          console.log('[SensorsPage] Equipment cargado desde Firestore:', data.length, 'items')
         })
         .catch((err) => {
-          console.error('[SensorsPage] Error cargando equipment:', err)
+          logger.error('SensorsPage: Error cargando equipment', err instanceof Error ? err : new Error(String(err)))
         })
         .finally(() => {
           setLoadingEquipment(false)
@@ -198,10 +196,8 @@ export function SensorsPage() {
   const { connectedDevices: usbDevices, isSupported: usbSupported, error: usbError, requestDevice } = useUsbDetection()
 
   useEffect(() => {
-    console.log('[SensorsPage] Montando componente, iniciando suscripción devices')
     const unsub = subscribeDevices(
       (rows) => {
-        console.log('[SensorsPage] Dispositivos recibidos:', rows.length)
         setDevices(rows)
         setLoadError(null) // Limpiar error si la suscripción funciona
         // Auto seleccionar el primer dispositivo si no hay selección.
@@ -210,14 +206,13 @@ export function SensorsPage() {
         }
       },
       (err) => {
-        console.error('[SensorsPage] Error suscripción devices:', err)
+        logger.error('SensorsPage: Error suscripción devices', err instanceof Error ? err : new Error(String(err)))
         const errorMsg = err instanceof Error ? err.message : 'Error leyendo dispositivos de Firebase RTDB'
         setLoadError(`${errorMsg}. Verifica que estés autenticado y que las reglas RTDB permitan lectura.`)
       }
     )
 
     return () => {
-      console.log('[SensorsPage] Desmontando componente')
       unsub()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -386,7 +381,7 @@ export function SensorsPage() {
       setCopiedField(field)
       setTimeout(() => setCopiedField(null), 2000)
     } catch (err) {
-      console.error('Error copiando:', err)
+      logger.error('Error copiando al portapapeles', err instanceof Error ? err : new Error(String(err)))
     }
   }
 
@@ -398,7 +393,6 @@ export function SensorsPage() {
       
       if (matchingDevice) {
         setSelectedDeviceId(matchingDevice.deviceId)
-        console.log('✓ Dispositivo USB auto-seleccionado:', matchingDevice.deviceId)
       }
     }
   }, [usbDevices, devices])
@@ -432,7 +426,7 @@ export function SensorsPage() {
         setSensorData(data)
       },
       (err) => {
-        console.error('[SensorsPage] Error telemetría equipo:', err)
+        logger.error('SensorsPage: Error telemetría equipo', err instanceof Error ? err : new Error(String(err)))
       }
     )
 
@@ -867,7 +861,7 @@ export function SensorsPage() {
         setSelectedDeviceId('')
       }
     } catch (err) {
-      console.error('[SensorsPage] Error eliminando dispositivo:', err)
+      logger.error('SensorsPage: Error eliminando dispositivo', err instanceof Error ? err : new Error(String(err)))
       alert(err instanceof Error ? err.message : 'Error eliminando dispositivo')
     } finally {
       setDeletingDevice(null)

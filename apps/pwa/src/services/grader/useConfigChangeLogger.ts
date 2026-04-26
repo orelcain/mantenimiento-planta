@@ -17,6 +17,7 @@ import { useCallback, useRef } from 'react'
 import type { Dispatch, SetStateAction, MutableRefObject } from 'react'
 import { useAuthStore } from '@/store'
 import { diffPhysicalConfig, logConfigChanges } from './graderConfigChangeLog.service'
+import { logger } from '@/lib/logger'
 import type { GraderPhysicalConfig } from './types'
 
 type Setter = Dispatch<SetStateAction<GraderPhysicalConfig>>
@@ -46,8 +47,8 @@ export function useConfigChangeLogger(
               reason: options?.reason,
               changedBy: user.id,
             }))
-            logConfigChanges(entries).catch((err) => {
-              console.warn('[useConfigChangeLogger] Error logueando cambios:', err)
+            logConfigChanges(entries).catch((_err) => {
+              logger.warn('useConfigChangeLogger: Error logueando cambios')
             })
           }
         }

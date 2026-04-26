@@ -7,6 +7,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { ChevronRight, ChevronDown, X, Loader2, Pencil, Check, Plus, ArrowUp, ArrowDown, EyeOff, Eye, Pin, PinOff, Star } from 'lucide-react'
 import { doc, updateDoc, addDoc, collection, Timestamp } from 'firebase/firestore'
+import { logger } from '@/lib/logger'
 import { db } from '@/services/firebase'
 import type { EquipmentDisplayNode } from '@/hooks/useEquipmentForArea'
 
@@ -302,7 +303,7 @@ export function EquipmentCard({
       ])
       onAliasUpdated?.()
     } catch (err) {
-      console.error('Error reordering sub-equipment', err)
+      logger.error('Error reordering sub-equipment', err instanceof Error ? err : new Error(String(err)))
     }
   }
 

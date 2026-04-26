@@ -33,6 +33,7 @@ import {
   limitToLast,
 } from 'firebase/firestore'
 import { db } from '../firebase'
+import { logger } from '@/lib/logger'
 import type { GraderDailySummary, TimelineBucket, Pause, MicroDetentionsSummary, PauseHistoryEntry } from './types'
 import { fmtTime } from './graderTimeFormat'
 
@@ -726,7 +727,7 @@ async function appendPauseHistory(
     const colRef = collection(db, COLLECTION, summaryId, PAUSE_HISTORY_SUB)
     await addDoc(colRef, entry)
   } catch (e) {
-    console.warn('[graderDailySummary] appendPauseHistory falló (no bloqueante):', e)
+    logger.warn('graderDailySummary: appendPauseHistory falló (no bloqueante)')
   }
 }
 

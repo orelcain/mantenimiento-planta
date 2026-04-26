@@ -42,6 +42,7 @@ import {
   Input,
   Label,
 } from '@/components/ui';
+import { logger } from '@/lib/logger';
 
 interface CategorySelectorProps {
   selectedCategoryId: string | null; // null = "Todas"
@@ -157,7 +158,7 @@ export function CategorySelector({
       try {
         await reorderCategories(newOrder);
       } catch (error) {
-        console.error('Error reordering categories:', error);
+        logger.error('Error reordering categories', error instanceof Error ? error : new Error(String(error)));
       }
     }
   };
@@ -176,7 +177,7 @@ export function CategorySelector({
       setShowCreateDialog(false);
       setFormData({ nombre: '', descripcion: '', icono: 'Folder' });
     } catch (error) {
-      console.error('Error creating category:', error);
+      logger.error('Error creating category', error instanceof Error ? error : new Error(String(error)));
       alert('Error al crear la categoría');
     }
   };
@@ -195,7 +196,7 @@ export function CategorySelector({
       setEditingCategoryId(null);
       setFormData({ nombre: '', descripcion: '', icono: 'Folder' });
     } catch (error) {
-      console.error('Error updating category:', error);
+      logger.error('Error updating category', error instanceof Error ? error : new Error(String(error)));
       alert('Error al actualizar la categoría');
     }
   };

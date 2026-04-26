@@ -21,6 +21,7 @@ import { Camera, Check, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store'
 import { saveFlipperTimingMeasurement } from '@/services/grader/graderMeasurements.service'
+import { logger } from '@/lib/logger'
 
 interface Props {
   open: boolean
@@ -85,7 +86,7 @@ export function SlowMoMeasurementModal({
         setNotes('')
       }, 900)
     } catch (err) {
-      console.error('Error guardando slow-mo:', err)
+      logger.error('Error guardando slow-mo', err instanceof Error ? err : new Error(String(err)))
     } finally {
       setSaving(false)
     }

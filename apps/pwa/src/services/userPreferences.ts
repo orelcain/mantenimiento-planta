@@ -10,6 +10,7 @@
 
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
 import { db } from './firebase'
+import { logger } from '@/lib/logger'
 
 const COL = 'user_preferences'
 
@@ -46,7 +47,7 @@ export async function getUserPreferences(userId: string): Promise<UserPreference
       }
     }
   } catch (err) {
-    console.error('Error loading user preferences:', err)
+    logger.error('Error loading user preferences', err instanceof Error ? err : new Error(String(err)))
   }
   return { favoriteLists: [], bodegaWatchlist: [] }
 }
@@ -60,7 +61,7 @@ export async function saveFavoriteLists(userId: string, lists: FavList[]): Promi
       updatedAt: serverTimestamp(),
     }, { merge: true })
   } catch (err) {
-    console.error('Error saving favorite lists:', err)
+    logger.error('Error saving favorite lists', err instanceof Error ? err : new Error(String(err)))
   }
 }
 
@@ -74,7 +75,7 @@ export async function getRepuestoFavLists(userId: string, equipmentId: string): 
       return all[equipmentId] || []
     }
   } catch (err) {
-    console.error('Error loading repuesto fav lists:', err)
+    logger.error('Error loading repuesto fav lists', err instanceof Error ? err : new Error(String(err)))
   }
   return []
 }
@@ -90,7 +91,7 @@ export async function saveRepuestoFavLists(userId: string, equipmentId: string, 
       updatedAt: serverTimestamp(),
     }, { merge: true })
   } catch (err) {
-    console.error('Error saving repuesto fav lists:', err)
+    logger.error('Error saving repuesto fav lists', err instanceof Error ? err : new Error(String(err)))
   }
 }
 
@@ -103,6 +104,6 @@ export async function saveBodegaWatchlist(userId: string, watchlist: string[]): 
       updatedAt: serverTimestamp(),
     }, { merge: true })
   } catch (err) {
-    console.error('Error saving bodega watchlist:', err)
+    logger.error('Error saving bodega watchlist', err instanceof Error ? err : new Error(String(err)))
   }
 }

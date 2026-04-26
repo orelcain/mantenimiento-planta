@@ -45,6 +45,7 @@ import {
   DialogTitle,
   LoadingScreen,
 } from '@/components/ui'
+import { logger } from '@/lib/logger'
 
 interface RepuestosDashboardProps {
   /** ID de máquina a auto-seleccionar al montar (viene desde BuscadorGlobal → "Ver en equipo") */
@@ -75,7 +76,7 @@ function EquipmentHeaderPhoto({ equipmentId }: { equipmentId: string }) {
       const url = await uploadEquipmentPhoto(equipmentId, file)
       setPhotos(prev => [...prev, url])
     } catch (err) {
-      console.error('Error uploading equipment photo:', err)
+      logger.error('Error uploading equipment photo', err instanceof Error ? err : new Error(String(err)))
     }
     setUploading(false)
   }
@@ -689,7 +690,7 @@ export function RepuestosDashboard({
         description: 'Los cambios se han guardado correctamente.',
       });
     } catch (err) {
-      console.error('Error saving specs:', err);
+      logger.error('Error saving specs', err instanceof Error ? err : new Error(String(err)));
       toast({
         variant: 'destructive',
         title: 'Error al guardar',
@@ -707,7 +708,7 @@ export function RepuestosDashboard({
         description: 'Las imágenes se han guardado correctamente.',
       });
     } catch (err) {
-      console.error('Error saving gallery:', err);
+      logger.error('Error saving gallery', err instanceof Error ? err : new Error(String(err)));
       toast({
         variant: 'destructive',
         title: 'Error al guardar',
@@ -745,7 +746,7 @@ export function RepuestosDashboard({
       if (prefs.filterTipo !== undefined) setFilterTipo(prefs.filterTipo ?? null)
       if (typeof prefs.pageSize === 'number' && Number.isFinite(prefs.pageSize)) setPageSize(prefs.pageSize)
     } catch (err) {
-      console.warn('No se pudieron restaurar preferencias del dashboard:', err)
+      logger.warn('No se pudieron restaurar preferencias del dashboard')
     } finally {
       hasHydratedPrefsRef.current = true
     }

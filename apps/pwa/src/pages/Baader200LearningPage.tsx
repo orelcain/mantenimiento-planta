@@ -2,6 +2,7 @@ import { useEffect, useRef, useMemo, useState, useCallback } from 'react'
 import { History, BookOpen, RefreshCw, X, ChevronDown, ChevronUp, QrCode, Copy, Check } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useAuthStore } from '@/store'
+import { logger } from '@/lib/logger'
 import { cn } from '@/lib/utils'
 import { storage } from '@/services/firebase'
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage'
@@ -60,7 +61,7 @@ export function Baader200LearningPage() {
         readonly: false,
       }, '*')
     } catch (err) {
-      console.error('[B200] Error cargando datos:', err)
+      logger.error('B200: Error cargando datos', err instanceof Error ? err : new Error(String(err)))
     }
   }, [user])
 

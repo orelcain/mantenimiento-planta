@@ -21,6 +21,7 @@ import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage
 import { db, storage } from '@/services/firebase'
 import { generateId } from '@/lib/utils'
 import { compressImage } from '@/services/storage'
+import { logger } from '@/lib/logger'
 import type {
   MapLocation,
   MapVersion,
@@ -246,7 +247,7 @@ export async function deleteMapVersion(id: string): Promise<void> {
     const storageRef = ref(storage, version.imagePath)
     await deleteObject(storageRef)
   } catch (e) {
-    console.warn('Error deleting map image from storage:', e)
+    logger.warn('Error deleting map image from storage')
   }
 
   // Eliminar de Firestore

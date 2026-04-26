@@ -47,6 +47,7 @@ import {
   Filler,
 } from 'chart.js'
 import 'chartjs-adapter-date-fns'
+import { logger } from '@/lib/logger'
 
 import { useAuthStore } from '@/store'
 import { cn } from '@/lib/utils'
@@ -222,7 +223,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
         setSiblingSessions(siblings)
         setRecentSessions(recent)
       } catch (err) {
-        console.warn('[grader] no se pudieron cargar sesiones hermanas:', err)
+        logger.warn('grader: no se pudieron cargar sesiones hermanas')
       }
     }
     load()
@@ -458,7 +459,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
       setSaved(true)
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
-      console.error('[Guardar Sesión] Error:', msg)
+      logger.error('Guardar Sesión error', new Error(msg))
       setSaveError(msg)
     } finally {
       setSaving(false)

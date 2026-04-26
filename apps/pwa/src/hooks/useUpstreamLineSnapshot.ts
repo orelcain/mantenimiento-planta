@@ -15,6 +15,7 @@ import { useState, useEffect } from 'react'
 import type { UpstreamLineSnapshot } from '@/services/shoplogix/types'
 import { buildDemoLineSnapshot } from '@/services/shoplogix/shoplogixDemoData'
 import { loadShoplogixShift } from '@/services/shoplogix/shoplogixShift.service'
+import { logger } from '@/lib/logger'
 
 export interface UseUpstreamLineSnapshotResult {
   snapshot: UpstreamLineSnapshot | null
@@ -95,7 +96,7 @@ export function useUpstreamLineSnapshot(
         // Permission error (rules) o red caída → tratamos como "sin data" y fallback
         // No mostramos error al usuario: el panel siempre degrada gracefully.
         if (!cancelled) {
-          console.warn('[useUpstreamLineSnapshot] Firestore error, usando fallback:', e instanceof Error ? e.message : e)
+          logger.warn('useUpstreamLineSnapshot: Firestore error, usando fallback')
         }
         fallback()
       } finally {

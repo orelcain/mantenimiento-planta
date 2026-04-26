@@ -17,6 +17,7 @@ import { usePermissions } from '@/hooks/usePermissions'
 import { getMapLocations } from '@/services/maps'
 import type { Incident, IncidentStatus, IncidentPriority } from '@/types'
 import type { MapLocation } from '@/types/maps'
+import { logger } from '@/lib/logger'
 import { formatRelativeTime } from '@/lib/utils'
 import { IncidentForm } from '@/components/incidents/IncidentForm'
 import { IncidentDetail } from '@/components/incidents/IncidentDetail'
@@ -71,7 +72,7 @@ export function IncidentsPage() {
 
   // Cargar ubicaciones de mapa
   useEffect(() => {
-    getMapLocations().then(setMapLocations).catch(console.error)
+    getMapLocations().then(setMapLocations).catch((err) => logger.error('Error loading map locations', err instanceof Error ? err : new Error(String(err))))
   }, [])
 
   // Debounce search con 300ms

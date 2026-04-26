@@ -20,6 +20,7 @@ import { collection, getDocs, query, orderBy, limit, where } from '@/services/fi
 import { db } from '@/services/firebase'
 import { useAuthStore } from '@/store/authStore'
 import type { AriaActionLog } from '@/services/chatActions'
+import { logger } from '@/lib/logger'
 
 // ─── Tipos ───────────────────────────────────────────────────────────
 
@@ -141,7 +142,7 @@ export function AriaActionsPage() {
       })
       setActions(data)
     } catch (err) {
-      console.error('Error loading ARIA actions:', err)
+      logger.error('Error loading ARIA actions', err instanceof Error ? err : new Error(String(err)))
     } finally {
       setLoading(false)
     }

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useMemo, useState, useCallback } from 'react'
 import { Scale, RefreshCw, RotateCcw, Save } from 'lucide-react'
 import { useAuthStore } from '@/store'
+import { logger } from '@/lib/logger'
 import {
   getGraderState,
   saveGraderState,
@@ -45,7 +46,7 @@ export function HmiGraderPage() {
         '*',
       )
     } catch (err) {
-      console.error('[HMI Grader] Error cargando Firestore:', err)
+      logger.error('HMI Grader: Error cargando Firestore', err instanceof Error ? err : new Error(String(err)))
     }
   }, [])
 
@@ -75,7 +76,7 @@ export function HmiGraderPage() {
           await saveGraderState(event.data.state, user?.id)
           setGraderState(event.data.state)
         } catch (err) {
-          console.error('[HMI Grader] Error guardando estado:', err)
+          logger.error('HMI Grader: Error guardando estado', err instanceof Error ? err : new Error(String(err)))
         }
         return
       }
@@ -90,7 +91,7 @@ export function HmiGraderPage() {
             userName: ((user.nombre ?? '') + ' ' + (user.apellido ?? '')).trim() || user.email,
           })
         } catch (err) {
-          console.warn('[HMI Grader] Error guardando historial:', err)
+          logger.warn('HMI Grader: Error guardando historial')
         }
         return
       }
@@ -113,7 +114,7 @@ export function HmiGraderPage() {
       await resetGraderState(user?.id)
       refreshIframe()
     } catch (err) {
-      console.error('[HMI Grader] Error reseteando estado:', err)
+      logger.error('HMI Grader: Error reseteando estado', err instanceof Error ? err : new Error(String(err)))
       alert('Error al restaurar estado')
     }
   }, [user, refreshIframe])
@@ -128,7 +129,7 @@ export function HmiGraderPage() {
       await saveGraderState(graderState, user?.id)
       alert('✓ Estado guardado')
     } catch (err) {
-      console.error('[HMI Grader] Error guardando:', err)
+      logger.error('HMI Grader: Error guardando', err instanceof Error ? err : new Error(String(err)))
       alert('Error al guardar estado')
     } finally {
       setSavingState(false)

@@ -283,8 +283,7 @@ const JERARQUIA_CHONCHI: HierarchyItem[] = [
 
 export async function initializeHierarchySystem(userId: string): Promise<void> {
   try {
-    console.log('[hierarchyInit] 🚀 Iniciando sistema jerárquico PLANTA CHONCHI para usuario:', userId)
-    console.log('[hierarchyInit] 📊 Total de nodos a crear:', JERARQUIA_CHONCHI.length)
+    logger.info('hierarchyInit: Iniciando sistema jerárquico PLANTA CHONCHI')
 
     // Crear mapa de IDs para referencias
     const idMap = new Map<string, string>()
@@ -324,7 +323,6 @@ export async function initializeHierarchySystem(userId: string): Promise<void> {
         const existingDoc = await getDoc(nodeRef)
         
         if (existingDoc.exists()) {
-          console.log(`[hierarchyInit] ⚠️ Nodo ${item.codigo} ya existe, se omite (preservando ediciones)`)
           continue // NO sobrescribir nodos existentes
         }
 
@@ -348,14 +346,10 @@ export async function initializeHierarchySystem(userId: string): Promise<void> {
       }
       
       await batch.commit()
-      console.log(`[hierarchyInit] ✅ Batch completado: ${processedCount}/${JERARQUIA_CHONCHI.length} nodos`)
     }
 
-    console.log('[hierarchyInit] 🎉 Sistema jerárquico inicializado exitosamente')
-    console.log('[hierarchyInit] 📊 Total nodos creados:', processedCount)
     logger.info(`Hierarchy system initialized with ${processedCount} nodes`)
   } catch (error) {
-    console.error('[hierarchyInit] ❌ Error durante inicialización:', error)
     logger.error('Failed to initialize hierarchy system', error instanceof Error ? error : new Error(String(error)))
     throw error
   }

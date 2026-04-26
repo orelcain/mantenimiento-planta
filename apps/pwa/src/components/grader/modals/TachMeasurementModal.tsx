@@ -23,6 +23,7 @@ import { saveBeltSpeedMeasurement } from '@/services/grader/graderMeasurements.s
 import type { GraderBeltId } from '@/services/grader/graderBeltHelpers'
 import { getBeltLabel } from '@/services/grader/graderBeltHelpers'
 import type { GraderPhysicalConfig } from '@/services/grader/types'
+import { logger } from '@/lib/logger'
 
 interface Props {
   open: boolean
@@ -100,7 +101,7 @@ export function TachMeasurementModal({
         setNotes('')
       }, 900)
     } catch (err) {
-      console.error('Error guardando medición tach:', err)
+      logger.error('Error guardando medición tach', err instanceof Error ? err : new Error(String(err)))
     } finally {
       setSaving(false)
     }

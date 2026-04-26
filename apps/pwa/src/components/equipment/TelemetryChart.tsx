@@ -18,6 +18,7 @@ import { es } from 'date-fns/locale'
 import { Card, CardContent, CardHeader, CardTitle, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui'
 import { fetchSensorHistory, type SensorReading } from '@/services/sensorsRtdb'
 import { Loader2 } from 'lucide-react'
+import { logger } from '@/lib/logger'
 
 ChartJS.register(
   CategoryScale,
@@ -61,7 +62,7 @@ export function TelemetryChart({ equipmentId }: TelemetryChartProps) {
           setData(history)
         }
       } catch (error) {
-        console.error('Error loading telemetry:', error)
+        logger.error('Error loading telemetry', error instanceof Error ? error : new Error(String(error)))
       } finally {
         if (isActive) setLoading(false)
       }

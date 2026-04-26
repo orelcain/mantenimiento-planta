@@ -12,6 +12,7 @@ import { MAP_VIEWS, type DxfLayerConfig, DXF_INTERIOR_SVG_LAYERS } from '@/data/
 import { useMapaLeafletStore, type ZonaCategoria, type ZonaEstado, type ElementoMapa, type PolygonCoords, type Nivel } from '@/store/useMapaLeafletStore'
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { usePlantAssets } from '@/hooks/repuestos/usePlantAssets'
+import { logger } from '@/lib/logger'
 
 // ─── Tipos mínimos GeoJSON para absorción DXF ────────────────────────────────
 type GJCoord = readonly number[]
@@ -193,7 +194,7 @@ export function PanelCapasYZonas() {
         setCapaVisible(layerName, false)
       }
     } catch (err) {
-      console.error('[Absorber] Error:', err)
+      logger.error('[Absorber] Error', err instanceof Error ? err : new Error(String(err)))
     } finally {
       setAbsorbing((prev) => ({ ...prev, [layerName]: false }))
     }

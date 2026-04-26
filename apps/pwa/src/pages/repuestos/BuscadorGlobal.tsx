@@ -24,6 +24,7 @@ import { useGlobalSearch, type GlobalSearchResult } from '@/hooks/repuestos/useG
 import { getGlobalEquipmentCache, useGlobalEquipmentSearch } from '@/hooks/useGlobalEquipmentSearch'
 import { RepuestoDetailModal } from '@/components/repuestos/RepuestoDetailModal'
 import type { Repuesto, Machine } from '@/types/repuestos'
+import { logger } from '@/lib/logger'
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -282,7 +283,7 @@ export function BuscadorGlobal({ initialQuery, onQueryConsumed, onViewInCatalog 
         })
         setHierarchyNames(names)
       } catch (err) {
-        console.error('Error loading hierarchy names:', err)
+        logger.error('Error loading hierarchy names', err instanceof Error ? err : new Error(String(err)))
       }
     }
     load()

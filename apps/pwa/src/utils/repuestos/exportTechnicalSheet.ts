@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import type { Repuesto, TechnicalDataField } from '@/types/repuestos'
+import { logger } from '@/lib/logger'
 
 /**
  * Convierte una URL de imagen a Base64
@@ -16,7 +17,7 @@ async function imageUrlToBase64(url: string): Promise<string | null> {
       reader.readAsDataURL(blob);
     });
   } catch (error) {
-    console.warn('Error fetching image for PDF:', error);
+    logger.warn('Error fetching image for PDF')
     return null;
   }
 }
@@ -273,7 +274,7 @@ async function addTechnicalSheetToDoc(
              }
 
         } catch (e) {
-            console.warn('No se pudo agregar imagen al PDF', e);
+            logger.warn('No se pudo agregar imagen al PDF')
             doc.rect(xPos, yPos, imgWidth, imgHeight);
         }
 

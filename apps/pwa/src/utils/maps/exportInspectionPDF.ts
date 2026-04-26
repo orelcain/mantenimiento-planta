@@ -8,6 +8,8 @@
  * - Fotos asociadas (opcional)
  */
 
+import { logger } from '@/lib/logger'
+
 // Funcion para limpiar caracteres especiales (jsPDF no soporta UTF-8 completo)
 function sanitizeText(text: string): string {
   if (!text) return ''
@@ -338,7 +340,7 @@ export async function exportInspectionToPDF(
     yPosition += mapHeight + 10
     
   } catch (error) {
-    console.error('Error generando mapa:', error)
+    logger.error('Error generando mapa', error instanceof Error ? error : new Error(String(error)))
     doc.setFont('helvetica', 'italic')
     doc.text('No se pudo cargar el mapa', margin, yPosition)
     yPosition += 10
@@ -466,7 +468,7 @@ export async function exportInspectionToPDF(
               yPosition += totalPhotoHeight + 5
             }
           } catch (error) {
-            console.error('Error cargando foto:', error)
+            logger.error('Error cargando foto', error instanceof Error ? error : new Error(String(error)))
           }
         }
 
@@ -586,7 +588,7 @@ export async function exportMapViewToPDF(
     doc.addImage(mapWithMarkers, 'JPEG', mapX, yPosition, mapWidth, mapHeight)
     
   } catch (error) {
-    console.error('Error generando mapa:', error)
+    logger.error('Error generando mapa', error instanceof Error ? error : new Error(String(error)))
   }
 
   // Nueva página para tabla
@@ -765,7 +767,7 @@ async function exportInspectionLandscapePDF(
     doc.addImage(mapWithMarkers, 'JPEG', mapX, yPosition, mapWidth, mapHeight)
     
   } catch (error) {
-    console.error('Error generando mapa landscape:', error)
+    logger.error('Error generando mapa landscape', error instanceof Error ? error : new Error(String(error)))
     doc.setFontSize(12)
     doc.text('Error al cargar el mapa', pageWidth / 2, pageHeight / 2, { align: 'center' })
   }
@@ -944,7 +946,7 @@ async function exportInspectionLandscapePDF(
               photoYPosition += totalPhotoHeight + 8
             }
           } catch (err) {
-            console.error(`Error cargando foto ${i + 1} del punto ${item.order}:`, err)
+            logger.error('Error cargando foto', err instanceof Error ? err : new Error(String(err)))
           }
         }
         // Si terminó en columna impar, mover a siguiente fila

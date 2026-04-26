@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { MapPin, Plus, X, Check } from 'lucide-react'
 import { Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Input, Label, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui'
 import type { PlantMap, PlantMarker, PlantAsset } from '@/types/repuestos'
+import { logger } from '@/lib/logger'
 
 interface MapasViewerProps {
   maps: PlantMap[]
@@ -67,7 +68,7 @@ export function MapasViewer({ maps, assets, loading, onMarkerClick, onCreateMark
       setNewMarkerLabel('')
       setShowAddMarker(false)
     } catch (err) {
-      console.error('Error creando marcador:', err)
+      logger.error('Error creando marcador', err instanceof Error ? err : new Error(String(err)))
       alert(err instanceof Error ? err.message : 'Error al crear marcador')
     } finally {
       setIsCreating(false)
@@ -81,7 +82,7 @@ export function MapasViewer({ maps, assets, loading, onMarkerClick, onCreateMark
     try {
       await onDeleteMarker(asset.id, markerId)
     } catch (err) {
-      console.error('Error eliminando marcador:', err)
+      logger.error('Error eliminando marcador', err instanceof Error ? err : new Error(String(err)))
       alert(err instanceof Error ? err.message : 'Error al eliminar marcador')
     } finally {
       setIsDeletingId(null)

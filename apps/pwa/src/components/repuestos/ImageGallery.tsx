@@ -15,6 +15,7 @@ import React, { useState, useRef } from 'react';
 import { useStorage } from '@/hooks/repuestos/useStorage';
 import { useCurrentMachine } from '@/contexts/MachineContext';
 import type { ImagenRepuesto } from '@/types/repuestos';
+import { logger } from '@/lib/logger';
 
 interface ImageGalleryProps {
   repuestoId: string;
@@ -96,7 +97,7 @@ export function ImageGallery({
       
       onImageAdded?.();
     } catch (error) {
-      console.error('Error uploading image:', error);
+      logger.error('Error uploading image', error instanceof Error ? error : new Error(String(error)));
       alert('Error al subir la imagen');
     }
   };

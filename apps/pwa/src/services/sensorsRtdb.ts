@@ -11,6 +11,7 @@ import {
   type DataSnapshot,
 } from 'firebase/database'
 import { rtdb } from './firebase'
+import { logger } from '@/lib/logger'
 
 export type SensorValueNode = {
   value?: number
@@ -92,7 +93,7 @@ export async function fetchSensorHistory(
 
     return results.sort((a, b) => a.timestamp - b.timestamp)
   } catch (error) {
-    console.warn('Error fetching sensor history:', error)
+    logger.warn('Error fetching sensor history')
     return []
   }
 }

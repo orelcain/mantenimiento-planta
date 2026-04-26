@@ -14,6 +14,7 @@ import {
   getDocs,
 } from 'firebase/firestore'
 import { db } from '@/services/firebase'
+import { logger } from '@/lib/logger'
 import {
   HierarchyNode,
   HierarchyNodeWithChildren,
@@ -213,7 +214,7 @@ export function useHierarchyAreaTree() {
         return newNodes.length > 0 ? [...prev, ...newNodes] : prev
       })
     } catch (err) {
-      console.error('Error expanding node', nodeId, err)
+      logger.error('Error expanding node', err instanceof Error ? err : new Error(String(err)))
     } finally {
       setLoadingNodeIds(prev => {
         const next = new Set(prev)

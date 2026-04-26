@@ -9,6 +9,7 @@ import { subscribeSensorReadings, fetchLastSensorReadings, subscribeBackfillStat
 import type { Equipment } from '@/types'
 import ReactECharts from 'echarts-for-react'
 import type { EChartsOption } from 'echarts'
+import { logger } from '@/lib/logger'
 
 function formatDateTime(timestamp?: number): string {
   if (!timestamp || !Number.isFinite(timestamp)) return '—'
@@ -132,7 +133,7 @@ function ThresholdEditor({ deviceId, current, onClose }: {
       await updateDeviceThresholds(deviceId, form)
       onClose()
     } catch (err) {
-      console.error('Error guardando umbrales', err)
+      logger.error('Error guardando umbrales', err instanceof Error ? err : new Error(String(err)))
     } finally {
       setSaving(false)
     }

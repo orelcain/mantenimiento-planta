@@ -3,6 +3,7 @@ import { Mic, StopCircle } from 'lucide-react'
 import { Input, InputProps } from './input'
 import { Button } from './button'
 import { cn } from '@/lib/utils'
+import { logger } from '@/lib/logger'
 
 // Definición básica de tipos para Web Speech API
 interface SpeechRecognition extends EventTarget {
@@ -79,7 +80,7 @@ const SpeechInput = React.forwardRef<HTMLInputElement, SpeechInputProps>(
       }
 
       recognition.onerror = (event: any) => {
-        console.error('Error de reconocimiento de voz:', event.error)
+        logger.error('Error de reconocimiento de voz', new Error(String(event.error)))
         setIsListening(false)
         if (event.error === 'not-allowed') {
             // Toast or alert handled by parent ideally, but alert is consistent with SpeechTextarea
@@ -110,7 +111,7 @@ const SpeechInput = React.forwardRef<HTMLInputElement, SpeechInputProps>(
           recognitionRef.current.start()
           setIsListening(true)
         } catch (err) {
-          console.error('No se pudo iniciar el dictado:', err)
+          logger.error('No se pudo iniciar el dictado', err instanceof Error ? err : new Error(String(err)))
           setIsListening(false)
         }
       }

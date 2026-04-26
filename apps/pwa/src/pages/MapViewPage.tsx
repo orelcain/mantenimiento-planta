@@ -45,6 +45,7 @@ import {
 import { MapViewer } from '@/components/maps'
 import { exportMapViewToPDF } from '@/utils/maps'
 import { formatDate } from '@/lib/utils'
+import { logger } from '@/lib/logger'
 import type { 
   MapLocation, 
   MapVersion,
@@ -99,7 +100,7 @@ export function MapViewPage() {
         setSelectedLocationId(data[0].id)
       }
     } catch (error) {
-      console.error('Error loading locations:', error)
+      logger.error('Error loading locations', error instanceof Error ? error : new Error(String(error)))
       toast({
         title: 'Error',
         description: 'No se pudieron cargar las ubicaciones',
@@ -134,7 +135,7 @@ export function MapViewPage() {
       setInspectionItemsMap(itemsMap)
       
     } catch (error) {
-      console.error('Error loading location data:', error)
+      logger.error('Error loading location data', error instanceof Error ? error : new Error(String(error)))
       toast({
         title: 'Error',
         description: 'No se pudieron cargar los datos del mapa',
@@ -277,7 +278,7 @@ export function MapViewPage() {
         description: 'El archivo se ha descargado'
       })
     } catch (error) {
-      console.error('Error exporting PDF:', error)
+      logger.error('Error exporting PDF', error instanceof Error ? error : new Error(String(error)))
       toast({
         variant: 'destructive',
         title: 'Error',

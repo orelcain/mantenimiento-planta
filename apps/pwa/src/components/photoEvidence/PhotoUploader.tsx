@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { Camera, X, Image as ImageIcon, Plus } from 'lucide-react'
 import { Button, Spinner } from '@/components/ui'
 import { compressImage } from '@/services/storage'
+import { logger } from '@/lib/logger'
 
 interface PhotoUploaderProps {
   photos: { id: string; url: string; preview?: string }[]
@@ -59,7 +60,7 @@ export function PhotoUploader({
           file: compressed,
         })
       } catch (error) {
-        console.error('Error processing photo:', error)
+        logger.error('Error processing photo', error instanceof Error ? error : new Error(String(error)))
       }
     }
 

@@ -45,6 +45,7 @@ import { EquipmentCard } from '@/components/repuestos/EquipmentCard'
 // import { LinkMachineModal } from '@/components/repuestos/LinkMachineModal' // deshabilitado
 import { useGlobalEquipmentSearch, getGlobalEquipmentCache, type GlobalEquipmentResult } from '@/hooks/useGlobalEquipmentSearch'
 import { Loader2, MapPin } from 'lucide-react'
+import { logger } from '@/lib/logger'
 
 /* ═══════════════════════════════════════════════════════════════ */
 export interface SelectedEquipmentInfo {
@@ -919,7 +920,7 @@ export function EquipmentNavigator({
       invalidateEquipmentCache(selectedTreeNodeId)
       setRefreshKey(k => k + 1)
     } catch (err) {
-      console.error('Error al agregar equipo:', err)
+      logger.error('Error al agregar equipo', err instanceof Error ? err : new Error(String(err)))
     } finally {
       setSavingNewEq(false)
       setAddingEquipment(false)
@@ -940,7 +941,7 @@ export function EquipmentNavigator({
       invalidateEquipmentCache(selectedTreeNodeId ?? undefined)
       setRefreshKey(k => k + 1)
     } catch (err) {
-      console.error('Error toggling hidden', err)
+      logger.error('Error toggling hidden', err instanceof Error ? err : new Error(String(err)))
     }
   }, [selectedTreeNodeId])
 
@@ -989,7 +990,7 @@ export function EquipmentNavigator({
       setRefreshKey(k => k + 1)
       setDeleteTarget(null)
     } catch (err) {
-      console.error('Error deleting equipment', err)
+      logger.error('Error deleting equipment', err instanceof Error ? err : new Error(String(err)))
       setDeleteError('Error al eliminar')
     }
     setDeleting(false)
@@ -1015,7 +1016,7 @@ export function EquipmentNavigator({
       invalidateEquipmentCache(selectedTreeNodeId ?? undefined)
       setRefreshKey(k => k + 1)
     } catch (err) {
-      console.error('Error reordering equipment', err)
+      logger.error('Error reordering equipment', err instanceof Error ? err : new Error(String(err)))
     }
   }, [areaEquipment, selectedTreeNodeId])
 

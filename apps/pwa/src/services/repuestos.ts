@@ -1,5 +1,6 @@
 import { collection, getDocs, query, orderBy } from '@/services/firestoreTracked'
 import { db } from '@/services/firebase'
+import { logger } from '@/lib/logger'
 
 export interface HistorialCambio {
   id: string
@@ -26,7 +27,7 @@ export async function getHistorial(repuestoId: string, machineId: string): Promi
       fecha: doc.data().fecha?.toDate() || new Date(),
     })) as HistorialCambio[]
   } catch (err) {
-    console.error('Error getting historial:', err)
+    logger.error('Error getting historial', err instanceof Error ? err : new Error(String(err)))
     return []
   }
 }

@@ -17,6 +17,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useMachines } from '@/hooks/repuestos/useMachines';
 import type { Machine, MachineContextType } from '@/types/repuestos';
+import { logger } from '@/lib/logger';
 
 const MachineContext = createContext<MachineContextType | null>(null);
 
@@ -71,27 +72,25 @@ export function MachineProvider({ children }: MachineProviderProps) {
     if (!machine) {
       // Si no existe en la lista, puede ser una máquina recién creada
       // El listener de Firestore actualizará la lista automáticamente
-      console.warn(`Machine not found in current list: ${machineId} - waiting for refresh...`);
+      logger.warn(`Machine not found in current list: ${machineId} - waiting for refresh...`);
       localStorage.setItem(STORAGE_KEY, machineId); // Guardar para auto-selección cuando se actualice
       return;
     }
 
     if (!machine.activa) {
-      console.warn(`Machine is not active: ${machineId}`);
+      logger.warn(`Machine is not active: ${machineId}`);
       // Permitir selección de máquinas archivadas si es necesario
     }
 
     setCurrentMachineState(machine);
     localStorage.setItem(STORAGE_KEY, machineId);
     
-    console.log(`✅ Switched to machine: ${machine.nombre} (${machineId})`);
   };
 
   // Establecer máquina directamente (útil después de crear una nueva)
   const setCurrentMachineDirect = (machine: Machine) => {
     setCurrentMachineState(machine);
     localStorage.setItem(STORAGE_KEY, machine.id);
-    console.log(`✅ Set machine directly: ${machine.nombre} (${machine.id})`);
   };
 
   // Limpiar máquina seleccionada (al cambiar categoría se deja sin máquina)

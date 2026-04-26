@@ -6,6 +6,7 @@
  */
 
 import type { AIGraderInput, AIGraderOutput } from '../grader/types'
+import { logger } from '@/lib/logger'
 
 // ============================================================================
 // INTERFAZ
@@ -399,7 +400,7 @@ export async function analyzeGrader(payload: AIGraderInput): Promise<AIGraderOut
     return await currentProvider.analyzeGrader(payload)
   } catch (err) {
     // If Groq fails (no key, no cloud function), fall back to mock
-    console.warn('Groq AI failed, falling back to mock:', err instanceof Error ? err.message : err)
+    logger.warn('Groq AI failed, falling back to mock')
     const mock = new MockAIProvider()
     return mock.analyzeGrader(payload)
   }

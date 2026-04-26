@@ -15,6 +15,7 @@ import {
   Timestamp,
 } from '@/services/firestoreTracked'
 import { db } from './firebase'
+import { logger } from '@/lib/logger'
 import type { MaterialOverride, CreateMaterialOverrideData } from '@/types/models3d'
 
 const PARENT_COLLECTION = 'models3d'
@@ -110,7 +111,7 @@ export function subscribeToMaterialOverrides(
       callback(overrides)
     },
     (error) => {
-      console.warn('Error en suscripción materialOverrides:', error.message)
+      logger.warn('Error en suscripción materialOverrides')
       onError?.(error)
     }
   )

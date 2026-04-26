@@ -20,6 +20,7 @@ import { useIsAdmin } from '@/store/authStore'
 import { Button } from '@/components/ui'
 import { preloadMachinePdfsWithProgress, preloadPdf, clearPdfCache, isCached } from '@/services/pdfCache'
 import type { Machine } from '@/types/repuestos'
+import { logger } from '@/lib/logger'
 
 interface MachineManualPanelProps {
   machine?: Machine
@@ -172,7 +173,7 @@ export function MachineManualPanel({ machine, storageId, displayName, className 
       }
       await loadManuals()
     } catch (err) {
-      console.error('Error uploading manual:', err)
+      logger.error('Error uploading manual', err instanceof Error ? err : new Error(String(err)))
     }
     // Reset input
     e.target.value = ''
@@ -200,7 +201,7 @@ export function MachineManualPanel({ machine, storageId, displayName, className 
       }
       await loadManuals()
     } catch (err) {
-      console.error('Error deleting manual:', err)
+      logger.error('Error deleting manual', err instanceof Error ? err : new Error(String(err)))
     } finally {
       setDeleting(null)
     }

@@ -26,6 +26,7 @@ import {
 } from 'firebase/storage'
 import { db, storage } from './firebase'
 import { generateId } from '@/lib/utils'
+import { logger } from '@/lib/logger'
 import type {
   Model3D,
   CreateModel3DData,
@@ -176,7 +177,7 @@ export function subscribeToModels3D(
       callback(models)
     },
     (error) => {
-      console.warn('Error en suscripción models3d:', error.message)
+      logger.warn('Error en suscripción models3d')
       onError?.(error)
     }
   )
@@ -196,7 +197,7 @@ export async function deleteModel3D(modelId: string): Promise<void> {
     await deleteObject(storageRef)
   } catch (error) {
     // Si no existe en Storage, continuar (puede ya haberse borrado)
-    console.warn('Error eliminando archivo de Storage:', error)
+    logger.warn('Error eliminando archivo de Storage')
   }
 
   // 3. Eliminar subcolección dimensions

@@ -1,6 +1,7 @@
 import { Component, ErrorInfo, ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, RefreshCcw, Trash2 } from "lucide-react";
+import { logger } from "@/lib/logger";
 
 interface Props {
   children?: ReactNode;
@@ -21,8 +22,8 @@ export class ErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
-  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("Uncaught error:", error, errorInfo);
+  public componentDidCatch(error: Error, _errorInfo: ErrorInfo) {
+    logger.error('Uncaught error', error instanceof Error ? error : new Error(String(error)));
 
     // Auto-reload on chunk load failures (stale deploy / cache mismatch)
     // These happen when the app references old hashed filenames after a new deploy

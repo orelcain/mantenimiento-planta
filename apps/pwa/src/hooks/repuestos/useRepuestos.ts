@@ -336,7 +336,18 @@ export function useRepuestos(machineId: string | null) {
       }
     });
 
-    const ops = rows.map((row) => {
+    // Deduplicar filas del mismo archivo: si el mismo SAP (o Baader) aparece varias
+    // veces en el Excel, conservar solo la última aparición (la más completa).
+    const deduped = new Map<string, ImportCatalogoRow>();
+    for (const row of rows) {
+      const sap = normalizeKey((row.codigoSAP || '').trim() || placeholder);
+      const baader = normalizeKey((row.codigoFabricante || '').trim() || placeholder);
+      const key = sap !== normalizeKey(placeholder) ? `sap:${sap}` : baader !== normalizeKey(placeholder) ? `baader:${baader}` : `text:${normalizeText(row.descripcion || row.textoBreve || '')}:${Math.random()}`;
+      deduped.set(key, row);
+    }
+    const dedupedRows = Array.from(deduped.values());
+
+    const ops = dedupedRows.map((row) => {
       const codigoSAP = (row.codigoSAP || '').trim() || placeholder;
       const codigoFabricante = (row.codigoFabricante || '').trim() || placeholder;
       const keySAP = codigoSAP !== placeholder ? normalizeKey(codigoSAP) : '';

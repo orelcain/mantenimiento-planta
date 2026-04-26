@@ -9,6 +9,7 @@ import {
   Timestamp,
 } from '@/services/firestoreTracked'
 import { db } from './firebase'
+import { logger } from '@/lib/logger'
 
 const PARENT_COLLECTION = 'models3d'
 const SUB_COLLECTION = 'interactiveBindings'
@@ -88,7 +89,7 @@ export function subscribeToInteractiveBindings(
       callback(snapshot.docs.map((docSnap) => parseBindingDoc(docSnap as unknown as { id: string; data: () => Record<string, unknown> })))
     },
     (error) => {
-      console.warn('Error en suscripción interactiveBindings:', error.message)
+      logger.warn('Error en suscripción interactiveBindings')
       onError?.(error)
     },
   )

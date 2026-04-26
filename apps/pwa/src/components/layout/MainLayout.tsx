@@ -50,6 +50,7 @@ import { useHighContrast } from '@/hooks/useHighContrast'
 
 import type { AppModule } from '@/types/permissions'
 import { ChatBot } from '@/components/chat/ChatBot'
+import { logger } from '@/lib/logger'
 
 interface NavItem { name: string; href: string; icon: React.ElementType; module?: AppModule }
 interface NavGroup { id: string; label: string; items: NavItem[]; defaultOpen?: boolean; adminOnly?: boolean }
@@ -250,7 +251,7 @@ export function MainLayout() {
   useEffect(() => {
     if (!lastSyncError) return
     // Solo loguear en consola, sin toast emergente para no molestar al usuario
-    console.warn('[sync]', lastSyncError)
+    logger.warn('[sync] ' + String(lastSyncError))
     setSyncError(null)
   }, [lastSyncError, setSyncError])
 
@@ -420,7 +421,7 @@ export function MainLayout() {
         setEquipment(equipmentData)
       } catch (error) {
         // Silenciar errores de carga inicial para no bloquear UI
-        console.warn('Init load error:', error)
+        logger.warn('Init load error')
       }
       unsubscribe = subscribeToIncidents((list) => setIncidents(list))
     }

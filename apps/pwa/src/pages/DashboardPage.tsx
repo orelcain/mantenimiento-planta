@@ -23,6 +23,7 @@ import {
 } from '@/components/ui'
 import { useAppStore, useAuthStore, useCanValidateIncidents } from '@/store'
 import { formatRelativeTime } from '@/lib/utils'
+import { logger } from '@/lib/logger'
 import { fetchLastSensorReadings, fetchSensorSummaryOnce } from '@/services/sensorsRtdb'
 import { DEFAULT_PREDICTIVE_THRESHOLDS } from '@/lib/predictive/predictor'
 import { useEffect, useMemo, useState } from 'react'
@@ -145,7 +146,7 @@ export function DashboardPage() {
           }))
         } catch (e) {
           // Ignorar errores silenciosamente para no bloquear el dashboard
-          console.warn('IoT details load error for', eqId, e)
+          logger.warn('IoT details load error')
         }
       }
     }

@@ -35,6 +35,7 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui';
+import { logger } from '@/lib/logger';
 
 interface MachineHierarchySelectorProps {
   open: boolean;
@@ -96,7 +97,7 @@ export function MachineHierarchySelector({
 
         setCategories(cats);
       } catch (err) {
-        console.error('Error al cargar categorías:', err);
+        logger.error('Error al cargar categorías', err instanceof Error ? err : new Error(String(err)));
       } finally {
         setLoadingCategories(false);
       }
@@ -235,7 +236,7 @@ export function MachineHierarchySelector({
       onOpenChange(false);
       resetForm();
     } catch (err) {
-      console.error('Error al crear equipo:', err);
+      logger.error('Error al crear equipo', err instanceof Error ? err : new Error(String(err)));
     }
   };
 
@@ -292,7 +293,7 @@ export function MachineHierarchySelector({
       setSelectedPath([...selectedPath, catId]);
 
     } catch (err) {
-      console.error('Error al crear subcategoría:', err);
+      logger.error('Error al crear subcategoría', err instanceof Error ? err : new Error(String(err)));
     }
   };
 

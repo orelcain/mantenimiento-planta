@@ -10,6 +10,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { collection, query, where, getDocs } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import { isEquipmentNode } from '@/types/hierarchy'
+import { logger } from '@/lib/logger'
 
 export interface GlobalEquipmentResult {
   id: string
@@ -82,7 +83,7 @@ export function useGlobalEquipmentSearch(searchQuery: string, minChars = 2) {
         cacheTimestamp = Date.now()
         setAllEquipment(results)
       } catch (err) {
-        console.error('Error loading global equipment search', err)
+        logger.error('Error loading global equipment search', err instanceof Error ? err : new Error(String(err)))
       } finally {
         setLoading(false)
       }

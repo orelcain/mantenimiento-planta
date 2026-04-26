@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Pencil, Check, Loader2 } from 'lucide-react'
+import { logger } from '@/lib/logger'
 
 interface InlineEditNameProps {
   value: string
@@ -68,7 +69,7 @@ export function InlineEditName({
     try {
       await onSave(trimmed)
     } catch (err) {
-      console.error('InlineEditName save error:', err)
+      logger.error('InlineEditName save error', err instanceof Error ? err : new Error(String(err)))
     } finally {
       setSaving(false)
       setEditing(false)

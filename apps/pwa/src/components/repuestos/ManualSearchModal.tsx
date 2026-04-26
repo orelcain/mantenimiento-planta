@@ -40,6 +40,7 @@ import {
   Input,
 } from '@/components/ui'
 import type { Machine, Repuesto } from '@/types/repuestos'
+import { logger } from '@/lib/logger'
 import type { VinculoManual } from '@/types/vinculos'
 import { MARKER_COLORS } from '@/types/vinculos'
 
@@ -321,7 +322,7 @@ export function ManualSearchModal({
         setCurrentPage(initialVinculo.pagina)
       }
     } catch (err) {
-      console.error('Error loading PDF:', err)
+      logger.error('Error loading PDF', err instanceof Error ? err : new Error(String(err)))
     } finally {
       setLoadingPdf(false)
     }
@@ -354,7 +355,7 @@ export function ManualSearchModal({
       setResults(found)
       setMatchPages(pages)
     } catch (err) {
-      console.error('Error searching PDF:', err)
+      logger.error('Error searching PDF', err instanceof Error ? err : new Error(String(err)))
     } finally {
       setSearching(false)
     }
@@ -392,7 +393,7 @@ export function ManualSearchModal({
       setMatchPages(pages)
       if (found.length > 0 && found[0]) setCurrentPage(found[0].page)
     } catch (err) {
-      console.error('Error searching PDF:', err)
+      logger.error('Error searching PDF', err instanceof Error ? err : new Error(String(err)))
     } finally {
       setSearching(false)
       setLoadingPdf(false)
@@ -431,7 +432,7 @@ export function ManualSearchModal({
       setMatchPages(pages)
       if (found.length > 0 && found[0]) setCurrentPage(found[0].page)
     } catch (err) {
-      console.error('Error re-searching PDF:', err)
+      logger.error('Error re-searching PDF', err instanceof Error ? err : new Error(String(err)))
     } finally {
       setSearching(false)
     }
@@ -572,7 +573,7 @@ export function ManualSearchModal({
         svgRef.current.setAttribute('height', String(viewport.height))
       }
     } catch (err) {
-      console.error('Error rendering page:', err)
+      logger.error('Error rendering page', err instanceof Error ? err : new Error(String(err)))
     } finally {
       setRendering(false)
     }
@@ -1055,7 +1056,7 @@ export function ManualSearchModal({
       setHoveredPointIdx(null)
       renderPage(currentPage)
     } catch (err) {
-      console.error('Error saving annotation:', err)
+      logger.error('Error saving annotation', err instanceof Error ? err : new Error(String(err)))
     } finally {
       setSavingAnnotation(false)
     }
@@ -1078,7 +1079,7 @@ export function ManualSearchModal({
       setOriginalVinculo(null)
       renderPage(currentPage)
     } catch (err) {
-      console.error('Error deleting annotation:', err)
+      logger.error('Error deleting annotation', err instanceof Error ? err : new Error(String(err)))
     } finally {
       setDeletingAnnotation(false)
     }
@@ -1160,7 +1161,7 @@ export function ManualSearchModal({
       setEditingStyle(false)
       renderPage(currentPage)
     } catch (err) {
-      console.error('Error saving style:', err)
+      logger.error('Error saving style', err instanceof Error ? err : new Error(String(err)))
     } finally {
       setSavingStyle(false)
     }

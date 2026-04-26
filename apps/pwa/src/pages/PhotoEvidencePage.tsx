@@ -23,6 +23,7 @@ import { getUserDisplayNameMap } from '@/services/userDisplay'
 import { exportPhotoEvidenceTechnicalReportToPDF } from '@/lib/pdfExport'
 import type { PhotoEvidence, PhotoEvidenceStatus } from '@/types'
 import { cn } from '@/lib/utils'
+import { logger } from '@/lib/logger'
 
 type FilterStatus = 'todos' | PhotoEvidenceStatus
 
@@ -101,7 +102,7 @@ export function PhotoEvidencePage() {
         setUserDisplayNameById((prev) => ({ ...prev, ...map }))
       })
       .catch((error) => {
-        console.error('Error resolving user display names:', error)
+        logger.error('Error resolving user display names', error instanceof Error ? error : new Error(String(error)))
       })
 
     return () => {
@@ -114,7 +115,7 @@ export function PhotoEvidencePage() {
       const data = await getPhotoEvidenceStats()
       setStats(data)
     } catch (error) {
-      console.error('Error loading stats:', error)
+      logger.error('Error loading stats', error instanceof Error ? error : new Error(String(error)))
     }
   }
 
@@ -159,7 +160,7 @@ export function PhotoEvidencePage() {
       // Limpiar selección
       setSelectedForExport(new Set())
     } catch (error) {
-      console.error('Error exporting PDF:', error)
+      logger.error('Error exporting PDF', error instanceof Error ? error : new Error(String(error)))
       alert('Error al exportar PDF. Por favor intenta de nuevo.')
     } finally {
       setIsExporting(false)
@@ -182,7 +183,7 @@ export function PhotoEvidencePage() {
         userDisplayNameById: nameMap,
       })
     } catch (error) {
-      console.error('Error exporting PDF:', error)
+      logger.error('Error exporting PDF', error instanceof Error ? error : new Error(String(error)))
       alert('Error al exportar PDF. Por favor intenta de nuevo.')
     } finally {
       setIsExporting(false)

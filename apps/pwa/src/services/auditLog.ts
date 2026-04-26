@@ -27,6 +27,7 @@ import {
   type DocumentData,
 } from 'firebase/firestore'
 import { db } from './firebase'
+import { logger } from '@/lib/logger'
 import type {
   AuditAction,
   AuditLogEntry,
@@ -119,7 +120,7 @@ export async function writeAuditLog(params: {
     if (params.metadata) entry.metadata = params.metadata
     await addDoc(collection(db, AUDIT_COL), entry)
   } catch (err) {
-    console.error('[auditLog] Error writing audit log:', err)
+    logger.error('auditLog: Error writing audit log', err instanceof Error ? err : new Error(String(err)))
   }
 }
 
@@ -174,7 +175,7 @@ export async function moveToTrash(params: {
 
     return ref.id
   } catch (err) {
-    console.error('[auditLog] Error moving to trash:', err)
+    logger.error('auditLog: Error moving to trash', err instanceof Error ? err : new Error(String(err)))
     return null
   }
 }
@@ -231,7 +232,7 @@ export async function restoreFromTrash(
 
     return { success: true, restoredId: item.originalId }
   } catch (err) {
-    console.error('[auditLog] Error restoring from trash:', err)
+    logger.error('auditLog: Error restoring from trash', err instanceof Error ? err : new Error(String(err)))
     return { success: false, error: err instanceof Error ? err.message : 'Error desconocido' }
   }
 }
@@ -243,7 +244,7 @@ export async function permanentDeleteFromTrash(trashId: string): Promise<boolean
     await deleteDoc(doc(db, TRASH_COL, trashId))
     return true
   } catch (err) {
-    console.error('[auditLog] Error permanent delete:', err)
+    logger.error('auditLog: Error permanent delete', err instanceof Error ? err : new Error(String(err)))
     return false
   }
 }
@@ -274,7 +275,7 @@ export async function getAuditLog(
 
     return { entries, lastDoc }
   } catch (err) {
-    console.error('[auditLog] Error getting audit log:', err)
+    logger.error('auditLog: Error getting audit log', err instanceof Error ? err : new Error(String(err)))
     return { entries: [], lastDoc: null }
   }
 }
@@ -298,7 +299,7 @@ export async function getTrashItems(
 
     return snap.docs.map(d => docToTrashItem(d.id, d.data()))
   } catch (err) {
-    console.error('[auditLog] Error getting trash items:', err)
+    logger.error('auditLog: Error getting trash items', err instanceof Error ? err : new Error(String(err)))
     return []
   }
 }

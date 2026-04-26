@@ -37,6 +37,7 @@ import {
   type Flow,
   type DiagnosisEntry,
 } from '@/services/learningContent'
+import { logger } from '@/lib/logger'
 
 type AdminTab = 'procedures' | 'manual' | 'flows' | 'diagnosis'
 
@@ -397,7 +398,7 @@ function StepImageUploader({
       }
       onChange(url)
     } catch (e) {
-      console.error(e)
+      logger.error('Error al subir imagen', e instanceof Error ? e : new Error(String(e)))
       setError('Error al subir imagen')
     } finally {
       setUploading(false)

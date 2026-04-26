@@ -2,6 +2,7 @@
  * Desactivar completamente el registro de Service Workers
  * Esto previene que Firebase Auth u otros módulos registren SWs automáticamente
  */
+import { logger } from '@/lib/logger'
 
 // Guardar la función original
 const originalRegister = navigator.serviceWorker?.register
@@ -18,25 +19,23 @@ if ('serviceWorker' in navigator && originalRegister) {
     const isAllowed = allowedSWs.some(allowed => urlString.includes(allowed))
     
     if (!isAllowed) {
-      console.warn('🚫 Blocked SW registration attempt:', urlString)
+      logger.warn('Blocked SW registration attempt')
       // Devolver una promesa rechazada
       return Promise.reject(new Error(`Service Worker registration blocked: ${urlString}`))
     }
     
-    console.log('✅ Allowed SW registration:', urlString)
     const result = originalRegister.call(navigator.serviceWorker, scriptURL, options)
-    
+
     // Agregar logging al resultado
     result.then(() => {
-      console.log('✅ SW registered successfully')
-    }).catch((error) => {
-      console.error('❌ SW registration failed:', error)
+      logger.info('SW registered successfully')
+    }).catch((error: unknown) => {
+      logger.error('SW registration failed', error instanceof Error ? error : new Error(String(error)))
     })
     
     return result
   }
   
-  console.log('🛡️ Service Worker registration interceptor installed')
 }
 
 /**
@@ -56,13 +55,10 @@ export async function cleanupServiceWorkers(): Promise<void> {
       const isAllowed = allowedSWs.some(allowed => scriptUrl.includes(allowed))
       
       if (!isAllowed && scriptUrl) {
-        const success = await registration.unregister()
-        if (success) {
-          console.log('🧹 Unregistered unwanted SW:', scriptUrl)
-        }
+        await registration.unregister()
       }
     }
   } catch (error) {
-    console.warn('Error cleaning up SWs:', error)
+    logger.warn('Error cleaning up SWs')
   }
 }

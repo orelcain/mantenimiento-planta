@@ -21,6 +21,7 @@ import { MapViewer } from './MapViewer'
 import { getMapLocations, getLatestMapVersion } from '@/services/maps'
 import type { MapLocation, MapVersion } from '@/types/maps'
 import { cn } from '@/lib/utils'
+import { logger } from '@/lib/logger'
 
 interface MapLocationSelectorProps {
   open: boolean
@@ -74,7 +75,7 @@ export function MapLocationSelector({
       setLocations(locs)
     } catch (e) {
       setError('Error al cargar ubicaciones')
-      console.error(e)
+      logger.error('Error al cargar ubicaciones', e instanceof Error ? e : new Error(String(e)))
     } finally {
       setLoading(false)
     }
@@ -96,7 +97,7 @@ export function MapLocationSelector({
       setStep('place-marker')
     } catch (e) {
       setError('Error al cargar el mapa')
-      console.error(e)
+      logger.error('Error al cargar el mapa', e instanceof Error ? e : new Error(String(e)))
     } finally {
       setLoadingMap(false)
     }

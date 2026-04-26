@@ -18,6 +18,7 @@ import {
 } from 'chart.js'
 import { Bar, Pie } from 'react-chartjs-2'
 import { Loader2, BrainCircuit, AlertTriangle, ChevronRight, CheckCircle2, Calendar } from 'lucide-react'
+import { logger } from '@/lib/logger'
 
 // Registrar componentes de ChartJS
 ChartJS.register(
@@ -45,7 +46,7 @@ export function FailureAnalysis() {
             const data = await getIncidents({ limit: 50 })
             setIncidents(data)
         } catch (error) {
-            console.error(error)
+            logger.error('Error al cargar incidencias para análisis', error instanceof Error ? error : new Error(String(error)))
         } finally {
             setLoading(false)
         }

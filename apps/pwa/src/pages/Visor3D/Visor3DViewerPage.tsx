@@ -52,6 +52,7 @@ import {
   SelectValue,
 } from '@/components/ui'
 import { useIsAdmin, useAuthStore } from '@/store'
+import { logger } from '@/lib/logger'
 import { getModel3DById } from '@/services/models3d'
 import { subscribeToDimensions, createDimension, deleteDimension, calculateDistance, convertUnit, calculatePolygonArea, calculateCircleFrom3Points, calculateOrientedBoxVolume, convertAreaUnit, convertVolumeUnit, getRequiredPoints, formatMeasurement } from '@/services/dimensions'
 import { subscribeToMaterialOverrides, setMaterialOverride, deleteMaterialOverride, deleteAllMaterialOverrides } from '@/services/materials3d'
@@ -264,7 +265,7 @@ export function Visor3DViewerPage() {
       setAnnPhotos([])
       setAnnExistingPhotos([])
     } catch (err) {
-      console.error(err)
+      logger.error('Error guardando anotación', err instanceof Error ? err : new Error(String(err)))
     } finally {
       setUploadingPhotos(false)
     }

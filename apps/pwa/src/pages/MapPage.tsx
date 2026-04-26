@@ -68,6 +68,7 @@ import {
   ELEMENT_NODE_TYPES,
 } from '@/types/isometricMap'
 import { useAuthStore } from '@/store'
+import { logger } from '@/lib/logger'
 import {
   DEFAULT_CHONCHI_RECTANGLE,
   estimateTerrainImportPreview,
@@ -530,7 +531,7 @@ export function MapPage() {
           : 'No hay ubicaciones de mapa activas para usar como plano base.'
       )
     } catch (error) {
-      console.error('Error loading base map sources:', error)
+      logger.error('Error loading base map sources', error instanceof Error ? error : new Error(String(error)))
       setMapLocations([])
       setBaseMapStatusText('No se pudieron cargar las fuentes de plano base.')
     } finally {
@@ -560,7 +561,7 @@ export function MapPage() {
         setMapStatusText('Sin mapas guardados. Se abrió un lienzo grande en blanco (600 m × 500 m).')
       }
     } catch (error) {
-      console.error('Error loading map library:', error)
+      logger.error('Error loading map library', error instanceof Error ? error : new Error(String(error)))
       applyMapDocument(null)
       setMapStatusText('No se pudo cargar la biblioteca de mapas. Se abrió un lienzo en blanco.')
     } finally {
@@ -994,7 +995,7 @@ export function MapPage() {
         await el.requestFullscreen()
       }
     } catch (error) {
-      console.warn('No se pudo cambiar a pantalla completa', error)
+      logger.warn('No se pudo cambiar a pantalla completa')
     }
   }, [])
 
@@ -2038,7 +2039,7 @@ export function MapPage() {
       setHasUnsavedChanges(true)
       setBaseMapStatusText(`Plano base cargado: ${latestVersion.width}×${latestVersion.height}px · versión ${latestVersion.version}.`)
     } catch (error) {
-      console.error('Error loading latest base map version:', error)
+      logger.error('Error loading latest base map version', error instanceof Error ? error : new Error(String(error)))
       setBaseMapStatusText('No se pudo cargar la última versión del plano base.')
     }
   }, [backgroundMap?.opacity, mapConfig, setBackgroundMap, setBaseMapStatusText, setCalibrationMode, setSelectedBaseLocationId, setShowBaseMap])
@@ -2089,7 +2090,7 @@ export function MapPage() {
       setMapStatusText(`Mapa guardado: ${normalizedName} (v${currentVersion}).`)
       await refreshSavedMaps(mapId)
     } catch (error) {
-      console.error('Error saving map:', error)
+      logger.error('Error saving map', error instanceof Error ? error : new Error(String(error)))
       setMapStatusText('Error al guardar el mapa. Revisa consola/permisos de Firestore.')
     } finally {
       setIsSaving(false)
@@ -2128,7 +2129,7 @@ export function MapPage() {
       setMapStatusText(`Mapa guardado como nuevo: ${normalizedName}.`)
       await refreshSavedMaps(mapId)
     } catch (error) {
-      console.error('Error saving map as new:', error)
+      logger.error('Error saving map as new', error instanceof Error ? error : new Error(String(error)))
       setMapStatusText('No se pudo guardar como nuevo mapa.')
     } finally {
       setIsSaving(false)

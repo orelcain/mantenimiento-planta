@@ -625,7 +625,6 @@ export async function parseFile(file: File): Promise<{
   const rows: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null })
 
   const kind = detectFileKind(rows, file.name)
-  console.info(`[grader parse] "${file.name}" → detectado como ${kind}`)
   if (kind === 'UNKNOWN') {
     warnings.push('No se pudo detectar el tipo de archivo. Verifique las columnas.')
   }
@@ -821,13 +820,11 @@ export function mergeParsedData(
         }
       }
       // NO agregar pieceRecords del P0 (ya están en el PP como gate=0)
-      console.info(`[grader merge] "${fileMeta.name}" → P0 (${realGate0Records.length} registros para clasificación)`)
     } else {
       // PP: agregar TODOS los pieceRecords (incluyendo gate=0)
       if (partialData.pieceRecords) {
         pushAll(merged.pieceRecords, partialData.pieceRecords)
       }
-      console.info(`[grader merge] "${fileMeta.name}" → PP (${partialData.pieceRecords?.length ?? 0} pieceRecords)`)
     }
 
     if (partialData.folioRecords) pushAll(merged.folioRecords, partialData.folioRecords)
@@ -841,21 +838,12 @@ export function mergeParsedData(
   if (hasP0File && realGate0Records.length > 0) {
     // P0 tiene datos reales con columna Error de la máquina
     merged.gate0Records = realGate0Records
-    console.info(`[grader merge] Clasificación P0: ${realGate0Records.length} registros REALES`)
   } else {
     // Inferir errores desde gate=0 del PP
     merged.gate0Records = inferGate0FromPieceRecords(ppGate0)
-    console.info(`[grader merge] Clasificación P0: ${ppGate0.length} registros INFERIDOS del PP`)
   }
 
   // pieceRecords NO se modifica — conserva gate=0. ES la fuente de verdad.
-  const totalFromPP = merged.pieceRecords.reduce((s, r) => s + r.pieces, 0)
-  const gate0FromPP = ppGate0.reduce((s, r) => s + r.pieces, 0)
-  console.info(
-    `[grader merge] TOTAL PP: ${totalFromPP} piezas (${gate0FromPP} gate=0). ` +
-    `gate0Records: ${merged.gate0Records.length} (solo para clasificación de errores).`,
-  )
-
   // Infer overall period
   const allTs: string[] = [
     ...merged.pieceRecords.map((r) => r.ts),

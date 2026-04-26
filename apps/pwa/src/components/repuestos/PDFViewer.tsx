@@ -18,6 +18,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { VinculoManual } from '@/types/vinculos';
+import { logger } from '@/lib/logger';
 import { getCachedPdf } from '@/services/pdfCache';
 import {
   normalizeCoordinates,
@@ -98,7 +99,7 @@ export function PDFViewer({
         setNumPages(pdf.numPages);
         setLoading(false);
       } catch (err: any) {
-        console.error('Error loading PDF:', err);
+        logger.error('Error loading PDF', err instanceof Error ? err : new Error(String(err)));
         if (isMounted) {
           setError('Error al cargar el PDF');
           setLoading(false);
@@ -161,7 +162,7 @@ export function PDFViewer({
 
         await page.render(renderContext).promise;
       } catch (err) {
-        console.error('Error rendering page:', err);
+        logger.error('Error rendering page', err instanceof Error ? err : new Error(String(err)));
       }
     },
     [pdfDoc, zoomMode, customZoom]

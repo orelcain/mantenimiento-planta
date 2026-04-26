@@ -19,6 +19,7 @@ import {
 } from '@/services/firestoreTracked'
 import { db } from './firebase'
 import { generateId } from '@/lib/utils'
+import { logger } from '@/lib/logger'
 import type { Dimension3D, CreateDimensionData, DimensionUnit, Point3D, MeasurementType } from '@/types/models3d'
 
 const PARENT_COLLECTION = 'models3d'
@@ -342,8 +343,8 @@ export function subscribeToDimensions(
       )
       callback(dims)
     },
-    (error) => {
-      console.warn('Error en suscripción dimensions:', error.message)
+    (_error) => {
+      logger.warn('Error en suscripción dimensions')
     }
   )
 }

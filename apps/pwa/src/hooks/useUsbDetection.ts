@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { logger } from '@/lib/logger'
 
 interface SerialDevice {
   port: SerialPort
@@ -77,7 +78,7 @@ export function useUsbDetection() {
 
       return deviceId
     } catch (err) {
-      console.error('Error leyendo puerto serial:', err)
+      logger.error('Error leyendo puerto serial', err instanceof Error ? err : new Error(String(err)))
       try {
         await port.close()
       } catch {}
@@ -110,7 +111,7 @@ export function useUsbDetection() {
 
       setConnectedDevices(devices)
     } catch (err) {
-      console.error('Error detectando dispositivos:', err)
+      logger.error('Error detectando dispositivos', err instanceof Error ? err : new Error(String(err)))
       setError(err instanceof Error ? err.message : 'Error desconocido')
     }
   }, [getDeviceIdFromPort])
@@ -159,7 +160,7 @@ export function useUsbDetection() {
         // Usuario canceló - no es error
         return null
       }
-      console.error('Error solicitando dispositivo:', err)
+      logger.error('Error solicitando dispositivo', err instanceof Error ? err : new Error(String(err)))
       setError(err instanceof Error ? err.message : 'Error al conectar dispositivo')
     }
 

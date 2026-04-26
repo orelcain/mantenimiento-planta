@@ -46,6 +46,7 @@ import { ProductionBarsEC } from './ProductionBarsEC'
 import { StateDetailPanel } from './StateDetailPanel'
 import { exportCombinedTimelinePng } from './exportCombinedTimelinePng'
 import { fmtTime, fmtDurationSec } from '@/services/grader/graderTimeFormat'
+import { logger } from '@/lib/logger'
 
 interface Props {
   snapshot: UpstreamLineSnapshot | null | undefined
@@ -663,7 +664,7 @@ export function UpstreamMachinesPanel({
                     title: `Análisis de Turno · ${snapshot.dateKey} · ${snapshot.shiftId}`,
                     subtitle,
                     filenameSuffix: `${snapshot.dateKey}_${snapshot.shiftId.replace(/\s+/g, '_').toLowerCase()}`,
-                  }).catch((err) => console.error('Export combinado falló:', err))
+                  }).catch((err) => logger.error('Export combinado falló', err instanceof Error ? err : new Error(String(err))))
                 }}
                 className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-slate-200 transition-colors px-1.5 py-1 rounded border border-slate-700 hover:border-slate-500"
                 title="Exportar timeline completo (Grader + 3 Baaders) como PNG único"

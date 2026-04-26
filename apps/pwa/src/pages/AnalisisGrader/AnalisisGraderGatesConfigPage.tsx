@@ -8,6 +8,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useSuggestionEngine } from '@/services/grader/suggestions/useSuggestionEngine'
 import { fmt } from '@/lib/format'
+import { logger } from '@/lib/logger'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch, Label } from '@/components/ui'
 import { Save, FolderOpen, ChevronRight, Trash2, ChevronDown, Settings2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -162,7 +163,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
     setChangeLogLoading(true)
     listRecentConfigChanges(10)
       .then((entries) => { if (!cancelled) setChangeLog(entries) })
-      .catch((err) => console.warn('[changeLog] error cargando:', err))
+      .catch(() => logger.warn('changeLog: error cargando'))
       .finally(() => { if (!cancelled) setChangeLogLoading(false) })
     return () => { cancelled = true }
   }, [fisicaSubTab, productoSubTab])
@@ -476,7 +477,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
           selectedFromCalendar.id,
           gates,
           { uid: user.id, name: `${user.nombre} ${user.apellido}`.trim() },
-        ).catch(err => console.warn('[FASE 27] snapshot gates falló, continuando', err))
+        ).catch(_err => logger.warn('FASE 27: snapshot gates falló, continuando'))
       }
     }, 500)
     return () => clearTimeout(timer)

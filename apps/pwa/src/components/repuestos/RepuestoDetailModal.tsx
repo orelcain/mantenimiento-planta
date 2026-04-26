@@ -23,6 +23,7 @@ import { doc, updateDoc } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import { Dialog, DialogContent, Badge } from '@/components/ui'
 import type { Repuesto, ImagenRepuesto, MachineImage } from '@/types/repuestos'
+import { logger } from '@/lib/logger'
 
 // ─── Helpers ────────────────────────────────────────────────
 
@@ -169,7 +170,7 @@ export function RepuestoDetailModal({
       onAliasUpdated?.(rep.id, trimmed)
       setEditingAlias(false)
     } catch (err) {
-      console.error('Error saving alias:', err)
+      logger.error('Error saving alias', err instanceof Error ? err : new Error(String(err)))
     } finally {
       setSavingAlias(false)
     }
@@ -188,7 +189,7 @@ export function RepuestoDetailModal({
       ;(rep as any).tipo = trimmed || undefined
       setEditingTipo(false)
     } catch (err) {
-      console.error('Error saving tipo:', err)
+      logger.error('Error saving tipo', err instanceof Error ? err : new Error(String(err)))
     } finally {
       setSavingTipo(false)
     }

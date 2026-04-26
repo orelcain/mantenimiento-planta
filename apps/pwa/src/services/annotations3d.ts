@@ -17,6 +17,7 @@ import { db } from './firebase'
 import { storage } from './firebase'
 import { generateId } from '@/lib/utils'
 import { compressImage } from './storage'
+import { logger } from '@/lib/logger'
 import type { Annotation3D, AnnotationStatus, AnnotationPriority, Point3D } from '@/types/models3d'
 
 const PARENT_COLLECTION = 'models3d'
@@ -56,8 +57,8 @@ export function subscribeToAnnotations(
       )
       callback(annotations)
     },
-    (error) => {
-      console.warn('Error en suscripción annotations:', error.message)
+    (_error) => {
+      logger.warn('Error en suscripción annotations')
     }
   )
 }
@@ -123,7 +124,6 @@ export async function uploadAnnotationPhotos(
     const url = await getDownloadURL(storageRef)
     urls.push(url)
     
-    console.log(`📸 Annotation photo: ${file.size} → ${compressed.size} bytes (${Math.round((1 - compressed.size / file.size) * 100)}% reducción)`)
   }
   
   return urls

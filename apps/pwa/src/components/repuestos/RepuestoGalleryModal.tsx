@@ -15,6 +15,7 @@ import {
 import type { Repuesto, MachineImage } from '@/types/repuestos'
 import { useStorage } from '@/hooks/repuestos/useStorage'
 import { useToast } from '@/hooks/useToast'
+import { logger } from '@/lib/logger'
 
 // ─── Props ──────────────────────────────────────────────────
 
@@ -86,7 +87,7 @@ export function RepuestoGalleryModal({
       setGallery((prev) => [newItem, ...prev])
       toast({ title: 'Imagen subida', description: 'La imagen se agregó a la galería' })
     } catch (err) {
-      console.error(err)
+      logger.error('Error subiendo imagen a galería', err instanceof Error ? err : new Error(String(err)))
       toast({ title: 'Error subiendo imagen', description: 'Intente nuevamente', variant: 'destructive' })
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = ''
@@ -104,7 +105,7 @@ export function RepuestoGalleryModal({
       await onSave(repuesto.id, gallery)
       onOpenChange(false)
     } catch (err) {
-      console.error('Error saving gallery:', err)
+      logger.error('Error saving gallery', err instanceof Error ? err : new Error(String(err)))
     } finally {
       setSaving(false)
     }

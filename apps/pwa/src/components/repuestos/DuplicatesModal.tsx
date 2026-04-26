@@ -31,6 +31,7 @@ import {
   Input,
   Badge,
 } from '@/components/ui'
+import { logger } from '@/lib/logger'
 
 interface DuplicatesModalProps {
   open: boolean
@@ -306,7 +307,7 @@ export function DuplicatesModal({
       // Remove from groups
       setGroups(prev => prev.filter(g => g.codigoSAP !== group.codigoSAP))
     } catch (err) {
-      console.error('Error merging group:', err)
+      logger.error('Error merging group', err instanceof Error ? err : new Error(String(err)))
     } finally {
       setMergingGroup(null)
     }
@@ -365,7 +366,7 @@ export function DuplicatesModal({
         setMergedGroups(prev => new Set([...prev, group.codigoSAP]))
         setGroups(prev => prev.filter(g => g.codigoSAP !== group.codigoSAP))
       } catch (err) {
-        console.error(`Error merging ${group.codigoSAP}:`, err)
+        logger.error('Error merging ' + group.codigoSAP, err instanceof Error ? err : new Error(String(err)))
       }
       done++
       setMergeAllProgress(Math.round((done / pending.length) * 100))

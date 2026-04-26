@@ -8,6 +8,7 @@
 
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useParams, useNavigate, Navigate } from 'react-router-dom'
+import { logger } from '@/lib/logger'
 import { Button, Card, CardContent, Spinner, Badge } from '@/components/ui'
 import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag, FileText, WifiOff } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
@@ -573,7 +574,7 @@ export function AnalisisGraderTurnoPage() {
       const chartImageDataUrl = chartImageRef.current?.() ?? null
       await exportTurnToPDF({ summary, pauses, tagLabels, chartImageDataUrl, upstreamSnapshot: upstreamLine.snapshot })
     } catch (err) {
-      console.error('[M17] PDF export error:', err)
+      logger.error('M17: PDF export error', err instanceof Error ? err : new Error(String(err)))
     } finally {
       setPdfExporting(false)
     }

@@ -35,6 +35,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuthStore } from '@/store'
 import { useToast } from '@/hooks/useToast'
+import { logger } from '@/lib/logger'
 import {
   getMapLocations,
   createMapLocation,
@@ -128,7 +129,7 @@ export function MapsAdminPage() {
       setLocationDesc('')
       toast({ title: 'Ubicación creada', description: `"${newLoc.nombre}" ha sido creada`, variant: 'success' })
     } catch (e) {
-      console.error('Error al crear ubicación:', e)
+      logger.error('Error al crear ubicación', e instanceof Error ? e : new Error(String(e)))
       toast({ title: 'Error', description: `No se pudo crear la ubicación: ${e instanceof Error ? e.message : 'Error desconocido'}`, variant: 'destructive' })
     } finally {
       setSaving(false)
@@ -221,7 +222,7 @@ export function MapsAdminPage() {
         variant: 'success',
       })
     } catch (e) {
-      console.error('Error al subir mapa:', e)
+      logger.error('Error al subir mapa', e instanceof Error ? e : new Error(String(e)))
       toast({ title: 'Error', description: `No se pudo subir el mapa: ${e instanceof Error ? e.message : 'Error desconocido'}`, variant: 'destructive' })
     } finally {
       setSaving(false)

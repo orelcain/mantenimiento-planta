@@ -32,7 +32,7 @@ const lazyWithReload = (fn: () => Promise<any>) =>
         const reloaded = sessionStorage.getItem(storageKey)
         
         if (!reloaded) {
-          console.log('Recargando página por actualización de versión (Chunk Load Error)...')
+          logger.info('Recargando página por actualización de versión (Chunk Load Error)')
           sessionStorage.setItem(storageKey, 'true')
           window.location.reload()
           return new Promise(() => {}) // Promesa perpetua mientras recarga

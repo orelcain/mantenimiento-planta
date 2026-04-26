@@ -15,6 +15,7 @@
 
 import { Suspense, useRef, useEffect, useCallback, useState, Component, type ReactNode, type ErrorInfo } from 'react'
 import { Canvas, useThree, useFrame } from '@react-three/fiber'
+import { logger } from '@/lib/logger'
 import {
   OrbitControls,
   Environment,
@@ -363,7 +364,7 @@ function OBJModel({ url, overrides, onLoaded }: { url: string; overrides: Materi
       applyMaterialOverrides(object, overrides)
       setObj(object)
       onLoaded(object, { ...info, meshIds })
-    }, undefined, (err) => console.error('Error loading OBJ:', err))
+    }, undefined, (err) => logger.error('Error loading OBJ', err instanceof Error ? err : new Error(String(err))))
   }, [url]) // eslint-disable-line react-hooks/exhaustive-deps
   if (!obj) return null
   return <primitive object={obj} />
@@ -1041,8 +1042,8 @@ class CanvasErrorBoundary extends Component<
   static getDerivedStateFromError() {
     return { hasError: true }
   }
-  componentDidCatch(error: Error, _info: ErrorInfo) {
-    console.warn('[Viewer3D] Canvas creation failed:', error.message)
+  componentDidCatch(_error: Error, _info: ErrorInfo) {
+    logger.warn('Viewer3D: Canvas creation failed')
   }
   render() {
     if (this.state.hasError) return this.props.fallback

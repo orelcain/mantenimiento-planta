@@ -16,6 +16,7 @@ import { MonitorSmartphone, Check, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store'
 import { saveFlipperZ2Capture } from '@/services/grader/graderMeasurements.service'
+import { logger } from '@/lib/logger'
 
 interface CurrentValues {
   delayFlipperOpenMs: number
@@ -93,7 +94,7 @@ export function Z2CaptureModal({ open, onOpenChange, currentValues, onApply }: P
         setNotes('')
       }, 900)
     } catch (err) {
-      console.error('[Z2CaptureModal] error guardando:', err)
+      logger.error('[Z2CaptureModal] error guardando', err instanceof Error ? err : new Error(String(err)))
     } finally {
       setSaving(false)
     }

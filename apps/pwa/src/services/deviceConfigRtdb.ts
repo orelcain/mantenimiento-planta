@@ -14,7 +14,6 @@ export async function saveSendInterval(deviceId: string, intervalSeconds: number
   
   const intervalRef = ref(rtdb, `devices/${deviceId}/sendInterval`)
   await set(intervalRef, clampedInterval)
-  console.log(`[deviceConfigRtdb] Intervalo guardado: ${clampedInterval}s para ${deviceId}`)
 }
 
 /**
@@ -50,7 +49,6 @@ export async function saveWifiConfig(deviceId: string, config: WifiConfig): Prom
     password: config.password ?? '',
     reconnect: config.reconnect ?? true,
   })
-  console.log(`[deviceConfigRtdb] WiFi config guardada para ${deviceId}`)
 }
 
 /**
@@ -59,5 +57,4 @@ export async function saveWifiConfig(deviceId: string, config: WifiConfig): Prom
 export async function requestWifiScan(deviceId: string): Promise<void> {
   const scanRef = ref(rtdb, `devices/${deviceId}/wifiScanRequest`)
   await set(scanRef, Date.now())
-  console.log(`[deviceConfigRtdb] Solicitud de escaneo WiFi enviada a ${deviceId}`)
 }
