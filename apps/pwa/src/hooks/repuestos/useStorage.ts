@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { ref, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject, listAll } from 'firebase/storage';
 import { storage } from '@/services/firebase';
+import { logger } from '@/lib/logger';
 import type { ImagenRepuesto } from '@/types/repuestos';
 import { optimizeImage } from '@/utils/repuestos';
 
@@ -53,7 +54,7 @@ export function useStorage(machineId: string | null, manualStoragePath?: string)
           width = result.width;
           height = result.height;
         } catch (err) {
-          console.warn('[useStorage] No se pudo optimizar imagen; subiendo original', err);
+          logger.warn('[useStorage] No se pudo optimizar imagen; subiendo original');
           fileToUpload = file;
         }
       }
@@ -102,7 +103,7 @@ export function useStorage(machineId: string | null, manualStoragePath?: string)
 
       return imagen;
     } catch (err) {
-      console.error('Error al subir imagen:', err);
+      logger.error('Error al subir imagen', err instanceof Error ? err : new Error(String(err)));
       throw err;
     } finally {
       setUploading(false);
@@ -116,7 +117,7 @@ export function useStorage(machineId: string | null, manualStoragePath?: string)
       const storageRef = ref(storage, url);
       await deleteObject(storageRef);
     } catch (err) {
-      console.error('Error al eliminar imagen:', err);
+      logger.error('Error al eliminar imagen', err instanceof Error ? err : new Error(String(err)));
       // Si el archivo no existe, no es un error crítico
     }
   }, []);
@@ -141,7 +142,6 @@ export function useStorage(machineId: string | null, manualStoragePath?: string)
       const basePath = manualStoragePath || `machines/${machineId}/manuales`;
       const path = `${basePath}/${uniqueName}`;
 
-      console.log('📁 [useStorage] Upload path:', path);
       const storageRef = ref(storage, path);
 
       // Upload con progreso real
@@ -173,7 +173,7 @@ export function useStorage(machineId: string | null, manualStoragePath?: string)
 
       return url;
     } catch (err) {
-      console.error('Error al subir PDF:', err);
+      logger.error('Error al subir PDF', err instanceof Error ? err : new Error(String(err)));
       throw err;
     } finally {
       setUploading(false);
@@ -196,7 +196,6 @@ export function useStorage(machineId: string | null, manualStoragePath?: string)
       for (const item of listResult.items) {
         if (item.name.toLowerCase().endsWith('.pdf')) {
           const url = await getDownloadURL(item);
-          console.log(`✅ Manual encontrado: ${folder}/${item.name}`);
           return url;
         }
       }
@@ -226,7 +225,6 @@ export function useStorage(machineId: string | null, manualStoragePath?: string)
 
       const path = `machines/${machineId}/infografias/${uniqueName}`;
       
-      console.log('📊 [useStorage] Upload infografia path for machine', machineId, ':', path);
       const storageRef = ref(storage, path);
 
       await uploadBytes(storageRef, file);
@@ -235,7 +233,7 @@ export function useStorage(machineId: string | null, manualStoragePath?: string)
       const url = await getDownloadURL(storageRef);
       return url;
     } catch (err) {
-      console.error('Error al subir infografía:', err);
+      logger.error('Error al subir infografía', err instanceof Error ? err : new Error(String(err)));
       throw err;
     } finally {
       setUploading(false);

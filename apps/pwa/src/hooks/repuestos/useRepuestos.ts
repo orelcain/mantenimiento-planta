@@ -14,6 +14,7 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { db } from '@/services/firebase';
+import { logger } from '@/lib/logger'
 import { useAuthStore } from '@/store/authStore';
 import { writeAuditLog, moveToTrash } from '@/services/auditLog';
 import type {
@@ -77,7 +78,7 @@ export function useRepuestos(machineId: string | null) {
         setLoading(false);
       },
       (err) => {
-        console.error('Error getting repuestos:', err);
+        logger.error('Error getting repuestos', err instanceof Error ? err : new Error(String(err)));
         setError(err.message);
         setLoading(false);
       }
@@ -107,7 +108,7 @@ export function useRepuestos(machineId: string | null) {
         fecha: Timestamp.now()
       });
     } catch (err) {
-      console.error('Error adding historial:', err);
+      logger.error('Error adding historial', err instanceof Error ? err : new Error(String(err)));
     }
   }, [machineId]);
 
@@ -151,7 +152,7 @@ export function useRepuestos(machineId: string | null) {
 
       return docRef.id;
     } catch (err) {
-      console.error('Error creating repuesto:', err);
+      logger.error('Error creating repuesto', err instanceof Error ? err : new Error(String(err)));
       throw err;
     }
   }, [machineId, addHistorial, authUser]);
@@ -200,7 +201,7 @@ export function useRepuestos(machineId: string | null) {
         });
       }
     } catch (err) {
-      console.error('Error updating repuesto:', err);
+      logger.error('Error updating repuesto', err instanceof Error ? err : new Error(String(err)));
       throw err;
     }
   }, [machineId, addHistorial, authUser]);
@@ -248,7 +249,7 @@ export function useRepuestos(machineId: string | null) {
       // 5. Hard delete repuesto
       await deleteDoc(docRef);
     } catch (err) {
-      console.error('Error deleting repuesto:', err);
+      logger.error('Error deleting repuesto', err instanceof Error ? err : new Error(String(err)));
       throw err;
     }
   }, [machineId, authUser]);
@@ -272,7 +273,7 @@ export function useRepuestos(machineId: string | null) {
         fecha: doc.data().fecha?.toDate() || new Date()
       })) as HistorialCambio[];
     } catch (err) {
-      console.error('Error getting historial:', err);
+      logger.error('Error getting historial', err instanceof Error ? err : new Error(String(err)));
       return [];
     }
   }, [machineId]);
@@ -305,7 +306,7 @@ export function useRepuestos(machineId: string | null) {
 
       await batch.commit();
     } catch (err) {
-      console.error('Error importing repuestos:', err);
+      logger.error('Error importing repuestos', err instanceof Error ? err : new Error(String(err)));
       throw err;
     }
   }, [machineId]);

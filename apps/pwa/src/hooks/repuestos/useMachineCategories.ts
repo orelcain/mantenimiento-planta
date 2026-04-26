@@ -24,6 +24,7 @@ import {
   onSnapshot,
 } from 'firebase/firestore';
 import { db } from '@/services/firebase';
+import { logger } from '@/lib/logger'
 import type { MachineCategory } from '@/types/repuestos';
 
 const COLLECTION_NAME = 'machineCategories';
@@ -61,7 +62,7 @@ export function useMachineCategories() {
 
       setCategories(categoriesData);
     } catch (err) {
-      console.error('Error fetching machine categories:', err);
+      logger.error('Error fetching machine categories', err instanceof Error ? err : new Error(String(err)));
       setError('Error al cargar las categorías');
     } finally {
       setLoading(false);
@@ -93,7 +94,7 @@ export function useMachineCategories() {
         updatedAt: data.updatedAt?.toDate(),
       } as MachineCategory;
     } catch (err) {
-      console.error(`Error fetching category ${categoryId}:`, err);
+      logger.error(`Error fetching category ${categoryId}`, err instanceof Error ? err : new Error(String(err)));
       throw new Error('Error al obtener la categoría');
     }
   };
@@ -133,7 +134,7 @@ export function useMachineCategories() {
 
       return id;
     } catch (err) {
-      console.error('Error creating category:', err);
+      logger.error('Error creating category', err instanceof Error ? err : new Error(String(err)));
       throw new Error('Error al crear la categoría');
     }
   };
@@ -150,7 +151,7 @@ export function useMachineCategories() {
         updatedAt: Timestamp.now(),
       });
     } catch (err) {
-      console.error(`Error updating category ${categoryId}:`, err);
+      logger.error(`Error updating category ${categoryId}`, err instanceof Error ? err : new Error(String(err)));
       throw new Error('Error al actualizar la categoría');
     }
   };
@@ -161,7 +162,7 @@ export function useMachineCategories() {
       const docRef = doc(db, COLLECTION_NAME, categoryId);
       await deleteDoc(docRef);
     } catch (err) {
-      console.error(`Error deleting category ${categoryId}:`, err);
+      logger.error(`Error deleting category ${categoryId}`, err instanceof Error ? err : new Error(String(err)));
       throw new Error('Error al eliminar la categoría');
     }
   };
@@ -191,7 +192,7 @@ export function useMachineCategories() {
 
       await batch.commit();
     } catch (err) {
-      console.error('Error reordering categories:', err);
+      logger.error('Error reordering categories', err instanceof Error ? err : new Error(String(err)));
       throw new Error('Error al reordenar las categorías');
     }
   };
@@ -236,7 +237,7 @@ export function useMachineCategories() {
         setLoading(false);
       },
       (err) => {
-        console.error('Error en listener de categorías:', err);
+        logger.error('Error en listener de categorías', err instanceof Error ? err : new Error(String(err)));
         setError('Error al cargar las categorías');
         setLoading(false);
       }

@@ -26,6 +26,7 @@ import {
   Timestamp,
 } from 'firebase/firestore'
 import { db } from '@/services/firebase'
+import { logger } from '@/lib/logger'
 import { uploadBodegaPhoto, deleteBodegaPhoto } from '@/services/storage'
 import type { GlobalSearchResult } from '@/hooks/repuestos/useGlobalSearch'
 
@@ -248,7 +249,7 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
       setBodegaOverlays(map)
     } catch (err: any) {
       if (err?.code !== 'permission-denied') {
-        console.error('Error cargando bodega:', err)
+        logger.error('Error cargando bodega', err instanceof Error ? err : new Error(String(err)))
       }
     } finally {
       setBodegaLoading(false)

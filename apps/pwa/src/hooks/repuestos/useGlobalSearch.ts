@@ -11,6 +11,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { collection, getDocs, query, where } from 'firebase/firestore'
 import { db } from '@/services/firebase'
+import { logger } from '@/lib/logger'
 import type { Repuesto, Machine } from '@/types/repuestos'
 
 export interface GlobalSearchResult {
@@ -281,7 +282,7 @@ export function useGlobalSearch(machines: Machine[]) {
           }
         }
       } catch (err) {
-        console.warn('Error cargando repuestos de jerarquía:', err)
+        logger.warn('Error cargando repuestos de jerarquía')
       }
 
       // Guardar en caché módulo
@@ -292,7 +293,7 @@ export function useGlobalSearch(machines: Machine[]) {
       setLoaded(true)
       setProgress({ loaded: total, total, phase: 'done' })
     } catch (err) {
-      console.error('Error en búsqueda global:', err)
+      logger.error('Error en búsqueda global', err instanceof Error ? err : new Error(String(err)))
       setError('Error al buscar en todas las máquinas')
     } finally {
       loadingRef.current = false

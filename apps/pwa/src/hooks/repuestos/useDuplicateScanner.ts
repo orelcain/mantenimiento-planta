@@ -10,6 +10,7 @@
 import { useState, useCallback } from 'react'
 import { collection, getDocs, query, orderBy } from 'firebase/firestore'
 import { db } from '@/services/firebase'
+import { logger } from '@/lib/logger'
 import type { Repuesto, Machine } from '@/types/repuestos'
 
 export interface DuplicateEntry {
@@ -125,7 +126,7 @@ export function useDuplicateScanner() {
 
       setGroups(duplicateGroups)
     } catch (err) {
-      console.error('Error scanning duplicates:', err)
+      logger.error('Error scanning duplicates', err instanceof Error ? err : new Error(String(err)))
       setError(err instanceof Error ? err.message : 'Error al escanear')
     } finally {
       setScanning(false)

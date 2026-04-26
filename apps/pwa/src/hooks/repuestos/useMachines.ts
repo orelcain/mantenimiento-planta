@@ -15,6 +15,7 @@ import {
   onSnapshot
 } from 'firebase/firestore';
 import { db } from '@/services/firebase';
+import { logger } from '@/lib/logger'
 import { useAuthStore } from '@/store';
 import type { Machine } from '@/types/repuestos';
 
@@ -58,7 +59,7 @@ export function useMachines() {
       
       // Si no hay máquinas, crear automáticamente "Baader 200"
       if (machinesData.length === 0) {
-        console.log('🔧 No hay máquinas, creando Baader 200 por defecto...');
+        logger.info('No hay máquinas, creando Baader 200 por defecto');
         const baaderMachine = {
           nombre: 'Baader 200',
           marca: 'Baader',
@@ -75,7 +76,7 @@ export function useMachines() {
         const docRef = doc(db, COLLECTION_NAME, 'baader-200');
         await setDoc(docRef, baaderMachine);
         
-        console.log('✅ Máquina Baader 200 creada con ID: baader-200');
+        logger.info('Máquina Baader 200 creada con ID: baader-200');
         
         // Recargar después de crear
         const newSnapshot = await getDocs(q);
@@ -103,7 +104,7 @@ export function useMachines() {
         setMachines(machinesData);
       }
     } catch (err) {
-      console.error('Error fetching machines:', err);
+      logger.error('Error fetching machines', err instanceof Error ? err : new Error(String(err)));
       setError('Error al cargar las máquinas');
     } finally {
       setLoading(false);
@@ -138,7 +139,7 @@ export function useMachines() {
         updatedAt: data.updatedAt?.toDate(),
       } as Machine;
     } catch (err) {
-      console.error('Error getting machine:', err);
+      logger.error('Error getting machine', err instanceof Error ? err : new Error(String(err)));
       return null;
     }
   };
@@ -191,7 +192,7 @@ export function useMachines() {
         if (existingDoc.exists()) {
            // Si ya existe, usamos un ID generado automáticamente
            // O podríamos lanzar error, pero mejor ser robusto
-           console.warn(`Máquina con ID ${slug} ya existe, generando ID automático.`);
+           logger.warn(`Máquina con ID ${slug} ya existe, generando ID automático`);
            docRef = doc(collection(db, COLLECTION_NAME));
         }
       } else {
@@ -203,7 +204,7 @@ export function useMachines() {
       
       return docRef.id;
     } catch (err) {
-      console.error('Error creating machine:', err);
+      logger.error('Error creating machine', err instanceof Error ? err : new Error(String(err)));
       throw err instanceof Error ? err : new Error('Error al crear la máquina');
     }
   };
@@ -224,7 +225,7 @@ export function useMachines() {
       // Actualizar estado local
       await fetchMachines();
     } catch (err) {
-      console.error('Error updating machine:', err);
+      logger.error('Error updating machine', err instanceof Error ? err : new Error(String(err)));
       throw new Error('Error al actualizar la máquina');
     }
   };
@@ -238,7 +239,7 @@ export function useMachines() {
       // Actualizar estado local
       await fetchMachines();
     } catch (err) {
-      console.error('Error deleting machine:', err);
+      logger.error('Error deleting machine', err instanceof Error ? err : new Error(String(err)));
       throw new Error('Error al eliminar la máquina');
     }
   };
@@ -271,7 +272,7 @@ export function useMachines() {
       // Actualizar estado local
       await fetchMachines();
     } catch (err) {
-      console.error('Error reordering machines:', err);
+      logger.error('Error reordering machines', err instanceof Error ? err : new Error(String(err)));
       throw new Error('Error al reordenar las máquinas');
     }
   };
@@ -343,7 +344,7 @@ export function useMachines() {
         }
       },
       (err) => {
-        console.error('Error en listener de máquinas:', err);
+        logger.error('Error en listener de máquinas', err instanceof Error ? err : new Error(String(err)));
         setError('Error al cargar las máquinas');
         setLoading(false);
       }
