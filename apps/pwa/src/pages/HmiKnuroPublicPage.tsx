@@ -83,10 +83,12 @@ export function HmiKnuroPublicPage() {
 
   // Cargar datos desde Firestore (sin auth)
   useEffect(() => {
+    let cancelled = false
     setLoading(true)
     setError(null)
     Promise.all([getHmiPresets(), getHmiTooltips(), getPresetOrder()])
       .then(([p, t, order]) => {
+        if (cancelled) return
         setPresets(p)
         setTooltips(t)
         setPresetOrder(order)
@@ -96,8 +98,9 @@ export function HmiKnuroPublicPage() {
           setSelected(keys[0] ?? '')
         }
       })
-      .catch(err => setError(`Error cargando datos: ${(err as Error).message}`))
-      .finally(() => setLoading(false))
+      .catch(err => { if (!cancelled) setError(`Error cargando datos: ${(err as Error).message}`) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Presets en orden

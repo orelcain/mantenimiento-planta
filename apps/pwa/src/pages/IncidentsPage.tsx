@@ -74,7 +74,11 @@ export function IncidentsPage() {
 
   // Cargar ubicaciones de mapa
   useEffect(() => {
-    getMapLocations().then(setMapLocations).catch((err) => logger.error('Error loading map locations', err instanceof Error ? err : new Error(String(err))))
+    let cancelled = false
+    getMapLocations()
+      .then(locs => { if (!cancelled) setMapLocations(locs) })
+      .catch((err) => logger.error('Error loading map locations', err instanceof Error ? err : new Error(String(err))))
+    return () => { cancelled = true }
   }, [])
 
   // Debounce search con 300ms

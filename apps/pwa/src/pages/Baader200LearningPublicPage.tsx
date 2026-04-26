@@ -68,10 +68,12 @@ export function Baader200LearningPublicPage() {
   }, [selected])
 
   useEffect(() => {
+    let cancelled = false
     setLoading(true)
     setError(null)
     Promise.all([getB200Sections(), getB200SectionOrder()])
       .then(([s, order]) => {
+        if (cancelled) return
         setSections(s)
         setSectionOrder(order)
         const keys = order.filter(id => s.find(x => x.id === id)).concat(s.filter(x => !order.includes(x.id)).map(x => x.id))
@@ -79,8 +81,9 @@ export function Baader200LearningPublicPage() {
           setSelected(keys[0] ?? '')
         }
       })
-      .catch(err => setError(`Error cargando datos: ${(err as Error).message}`))
-      .finally(() => setLoading(false))
+      .catch(err => { if (!cancelled) setError(`Error cargando datos: ${(err as Error).message}`) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const orderedSections = useMemo(() => {

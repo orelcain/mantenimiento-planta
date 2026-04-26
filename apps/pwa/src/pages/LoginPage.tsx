@@ -203,6 +203,7 @@ export function LoginPage() {
                       onChange={(e) => setNombre(e.target.value)}
                       required
                       disabled={isLoading}
+                      autoComplete="given-name"
                     />
                     {validationErrors.nombre && (
                       <p className="text-sm text-destructive">{validationErrors.nombre}</p>
@@ -217,6 +218,7 @@ export function LoginPage() {
                       onChange={(e) => setApellido(e.target.value)}
                       required
                       disabled={isLoading}
+                      autoComplete="family-name"
                     />
                     {validationErrors.apellido && (
                       <p className="text-sm text-destructive">{validationErrors.apellido}</p>

@@ -404,15 +404,15 @@ function UsersSettings() {
             </div>
             <div>
               <Label>Email *</Label>
-              <Input value={createEmail} onChange={(e: ChangeEvent<HTMLInputElement>) => setCreateEmail(e.target.value)} placeholder="correo@dominio.com" className="mt-1" />
+              <Input type="email" autoComplete="email" value={createEmail} onChange={(e: ChangeEvent<HTMLInputElement>) => setCreateEmail(e.target.value)} placeholder="correo@dominio.com" className="mt-1" />
             </div>
             <div>
               <Label>Nombre *</Label>
-              <Input value={createNombre} onChange={(e: ChangeEvent<HTMLInputElement>) => setCreateNombre(e.target.value)} placeholder="Nombre" className="mt-1" />
+              <Input autoComplete="given-name" value={createNombre} onChange={(e: ChangeEvent<HTMLInputElement>) => setCreateNombre(e.target.value)} placeholder="Nombre" className="mt-1" />
             </div>
             <div>
               <Label>Apellido *</Label>
-              <Input value={createApellido} onChange={(e: ChangeEvent<HTMLInputElement>) => setCreateApellido(e.target.value)} placeholder="Apellido" className="mt-1" />
+              <Input autoComplete="family-name" value={createApellido} onChange={(e: ChangeEvent<HTMLInputElement>) => setCreateApellido(e.target.value)} placeholder="Apellido" className="mt-1" />
             </div>
             <div>
               <Label>Rol</Label>
