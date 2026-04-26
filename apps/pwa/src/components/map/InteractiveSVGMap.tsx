@@ -86,8 +86,9 @@ export function InteractiveSVGMap({
   useEffect(() => {
     if (!svgDoc || svgElements.size === 0) return
 
+    const cleanups: (() => void)[] = []
+
     zones.forEach((zone) => {
-      // Buscar elemento SVG por varios patrones de ID
       const possibleIds = [
         zone.codigo,
         zone.codigo?.toLowerCase(),
@@ -100,7 +101,6 @@ export function InteractiveSVGMap({
       for (const id of possibleIds) {
         const element = svgElements.get(id!)
         if (element) {
-          // Aplicar estilo según incidencias
           const zoneIncidents = incidents.filter(i => i.zoneId === zone.id)
           const hasCritical = zoneIncidents.some(i => i.prioridad === 'critica')
           const hasHigh = zoneIncidents.some(i => i.prioridad === 'alta')
@@ -108,13 +108,8 @@ export function InteractiveSVGMap({
           let fillColor = zone.color || '#2196f3'
           let opacity = '0.2'
 
-          if (hasCritical) {
-            fillColor = '#ef4444' // red-500
-            opacity = '0.3'
-          } else if (hasHigh) {
-            fillColor = '#f59e0b' // amber-500
-            opacity = '0.25'
-          }
+          if (hasCritical) { fillColor = '#ef4444'; opacity = '0.3' }
+          else if (hasHigh) { fillColor = '#f59e0b'; opacity = '0.25' }
 
           element.style.fill = fillColor
           element.style.fillOpacity = opacity
@@ -123,35 +118,34 @@ export function InteractiveSVGMap({
           element.style.cursor = 'pointer'
           element.style.transition = 'all 0.2s'
 
-          // Event listeners
-          element.addEventListener('mouseenter', () => {
-            element.style.fillOpacity = '0.4'
-            element.style.strokeWidth = '3'
-          })
-
-          element.addEventListener('mouseleave', () => {
-            element.style.fillOpacity = opacity
-            element.style.strokeWidth = '2'
-          })
-
-          element.addEventListener('click', (e) => {
+          const onEnter = () => { element.style.fillOpacity = '0.4'; element.style.strokeWidth = '3' }
+          const onLeave = () => { element.style.fillOpacity = opacity; element.style.strokeWidth = '2' }
+          const onClick = (e: Event) => {
             e.stopPropagation()
             onZoneClick?.(zone.id)
             logger.info('Zone clicked', { zoneId: zone.id, zoneName: zone.nombre })
-          })
+          }
 
-          // Agregar tooltip
+          element.addEventListener('mouseenter', onEnter)
+          element.addEventListener('mouseleave', onLeave)
+          element.addEventListener('click', onClick)
+          cleanups.push(
+            () => element.removeEventListener('mouseenter', onEnter),
+            () => element.removeEventListener('mouseleave', onLeave),
+            () => element.removeEventListener('click', onClick),
+          )
+
           const title = element.querySelector('title') || document.createElementNS('http://www.w3.org/2000/svg', 'title')
           title.textContent = `${zone.nombre} (${zoneIncidents.length} incidencias)`
-          if (!element.querySelector('title')) {
-            element.appendChild(title)
-          }
+          if (!element.querySelector('title')) element.appendChild(title)
 
           logger.debug('Zone linked to SVG element', { zoneId: zone.id, svgId: id })
           break
         }
       }
     })
+
+    return () => cleanups.forEach(fn => fn())
   }, [svgDoc, svgElements, zones, incidents, onZoneClick])
 
   // Inyectar marcadores de incidencias
