@@ -834,6 +834,56 @@ Con Haversine A→D = dimensión real del recinto en metros. El DWG ya tiene cot
 
 ## Pendientes priorizados
 
+### PENDIENTE — Análisis de Turno — siguientes auditorías (sesión 2026-04-25 cierre)
+
+Sesión 2026-04-25 auditó 8 componentes principales (v2.95→v3.0.8) aplicando los
+principios "info útil + consistencia + cautela". Lista priorizada de lo que queda:
+
+**P0 — Componentes no auditados aún (riesgo de inconsistencias acumuladas):**
+- 🔲 **`ShiftTimelineView` segunda pasada** (auditado parcial v3.0.5+v3.0.6, quedan ~1200 LOC). Buscar más oportunidades de info útil: tooltip rico en checkpoints (uploads/actions/lots), badge "Cobertura X%" accionable (¿qué hacer cuando es <85%?), pre/post-turno badge ("¿reasignar X piezas?"), zoom presets configurables. (~1.5h)
+- 🔲 **`CurrentGateConfigPanel`** — config activa del turno. No auditado. Verificar consistencia con `GateBreakdownCard`, sugerencias accionables al cambiar config mid-turno. (~45min)
+- 🔲 **`MinuteDetailDialog`** — diálogo del click en barra. No auditado. Probable: verificar que muestra info accionable (qué causa P0 dominó ese minuto, sugerencia inmediata). (~30min)
+- 🔲 **`PauseAnnotationDialog`** — diálogo de anotación. No auditado. Verificar UX: ¿tag pre-seleccionado por autoTag? ¿muestra contexto (P0% antes/durante)? (~30min)
+
+**P0 — Cierre Shoplogix (bloqueado por user):**
+- 🔲 **Activar auto-login en producción** — correr `node scripts/set-shoplogix-creds.mjs <user> <pass>` y validar Bearer en `query.axd`. (5 min, REQUIERE CREDS)
+- 🔲 Re-sync turnos Feb 25-27 con bounds explícitos — invocar `shoplogixSyncHttp` (~15 min, requiere auto-login activo)
+- 🔲 Investigar `Planned Downtime 4h 15min` semantic — qué registra Shoplogix exactamente (~30 min)
+
+**P1 — Estructural (DEUDA ARQUITECTURAL — requiere planeación Opus):**
+- 🔲 **Refactor config Grader Fase A** — mover 12 Gates + Física al turno (`AnalisisGraderTurnoPage`), botón "Cambié gate" mid-turno + segmentación automática. **Requiere refactor storage Firestore.** Plan acordado 2026-04-19. (1-2 días, NECESITA OPUS PARA PLANEAR)
+- 🔲 **GlobalSettingsModal en home** — separar Análisis+Rangos en modal del header (~1h, sub-item de Fase A)
+
+**P1 — Aprovechamiento de helpers nuevos en otros componentes:**
+- 🔲 Buscar más usos de `p0StatusFromPct` / `p0StatusHex` en el módulo (calendario, KPIs período, badges) — donde se clasifique manualmente con `if-else` reemplazar
+- 🔲 Buscar más componentes que muestren tiempo muerto sin separar evitable/ineludible (calendario? heatmap?) — usar `summarizeByCategory`
+- 🔲 Verificar visualmente en producción que las mejoras de v2.96-v3.0.8 funcionan como se espera (testing manual de un turno real)
+
+**P2 — Mejoras chicas:**
+- 🔲 **Ruta mobile `/grader/quick-change?turno=X`** (~1h)
+- 🔲 **Fase 3b — Edición manual de rangos de pausas** — drag handles en bandas Timeline (~2-3 días)
+- 🔲 **Fase 4 — CRUD admin de tags** — gestión Firestore de `graderPauseTags` (~2-3 días)
+- 🔲 **Re-upload pieceRecords productivas** — 383 turnos × ~5M pieceRecords (script batch idempotente)
+
+**P2 — Deuda técnica leve:**
+- 🔲 9 warnings preexistentes ESLint (no introducidos por esta sesión, pero acercándose al cap=10):
+  - `parseDxfKonva.ts:49` — eslint-disable directive sin error
+  - `useUpstreamLineSnapshot.ts:98` — eslint-disable sin uso
+  - `AnalisisGraderGatesConfigPage.tsx:420,489` — useEffect missing dep `setPhysicalConfig`
+  - `AnalisisGraderTurnoPage.tsx:570` — useCallback missing dep `upstreamLine.snapshot`
+  - `AnalisisGraderUploadPage.tsx:379` — eslint-disable sin uso
+  - `AnalisisGraderWizardPage.tsx:471` — useCallback missing dep `gates`
+  - `graderTurnToPDF.test.ts:52` — eslint-disable sin uso
+  - `useConfigChangeLogger.ts:58` — useCallback missing dep `options.enabledRef`
+
+**Recomendación de orden próxima sesión:**
+1. **Activar auto-login Shoplogix** (5 min con creds del user)
+2. **Auditar CurrentGateConfigPanel + MinuteDetailDialog + PauseAnnotationDialog** (3 chicos, ~2h total — completa el módulo)
+3. **Limpiar 9 warnings preexistentes** (~30 min, baja max-warnings a 5)
+4. **DECIDIR con Opus**: Refactor config Grader Fase A vs continuar mejoras incrementales
+
+---
+
 ### PENDIENTE — Shoplogix Integration (sesión 2026-04-24 tarde) — Fase 3 iter 3+4
 
 **Módulo:** integración Shoplogix con módulo **Análisis de Turno** (ex-"Análisis Grader") — data real de 3 Baader 142 upstream (Evisceradoras 1/2/3, Planta Chonchi)
