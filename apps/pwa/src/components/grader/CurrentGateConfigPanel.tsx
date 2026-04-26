@@ -112,7 +112,7 @@ export function CurrentGateConfigPanel({ configSnapshots }: CurrentGateConfigPan
                 </span>
 
                 {/* Calibre */}
-                <span className="text-muted-foreground truncate flex-1">
+                <span className="text-muted-foreground truncate flex-1" title={g.active ? g.assignedCalibre : undefined}>
                   {g.active ? g.assignedCalibre : '—'}
                 </span>
 

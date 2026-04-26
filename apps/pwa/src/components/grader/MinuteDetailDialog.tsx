@@ -458,7 +458,14 @@ export function MinuteDetailDialog({
                       >
                         {isP0 ? 'P0' : `G${gate}`}
                       </span>
-                      <span className="flex-1 min-w-0 truncate text-muted-foreground text-xs">
+                      <span
+                        className="flex-1 min-w-0 truncate text-muted-foreground text-xs"
+                        title={isP0
+                          ? 'Rechazo (fuera de rango)'
+                          : cfg
+                            ? `${cfg.assignedCalibre} · ${cfg.assignedQuality}`
+                            : 'Sin config'}
+                      >
                         {isP0
                           ? 'Rechazo (fuera de rango)'
                           : cfg

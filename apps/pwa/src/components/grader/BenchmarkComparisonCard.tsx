@@ -113,7 +113,7 @@ export function BenchmarkComparisonCard({ period, benchmark, comparison }: Props
             return (
               <div key={cause} className="flex items-center gap-2 text-xs">
                 <div className={cn('w-2 h-2 rounded-full shrink-0', DOT_COLOR[def.color])} />
-                <span className="w-36 truncate text-muted-foreground">{def.label}</span>
+                <span className="w-36 truncate text-muted-foreground" title={def.label}>{def.label}</span>
                 <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
                   <div
                     className="h-full bg-primary/60 rounded-full transition-all"

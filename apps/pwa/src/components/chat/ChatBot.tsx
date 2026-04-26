@@ -804,7 +804,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
                       <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
                         c.score >= 0.7 ? 'bg-green-500' : c.score >= 0.4 ? 'bg-amber-500' : 'bg-gray-400'
                       }`} />
-                      <span className="truncate flex-1">{c.nombre}</span>
+                      <span className="truncate flex-1" title={c.nombre}>{c.nombre}</span>
                       <span className="text-[9px] text-muted-foreground flex-shrink-0">{c.codigo}</span>
                     </button>
                   ))
@@ -890,7 +890,7 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
                               }`}
                             >
                               <span className="flex-shrink-0">{rolLabel}</span>
-                              <span className="truncate flex-1">{fullName}</span>
+                              <span className="truncate flex-1" title={fullName}>{fullName}</span>
                               <span className="text-[9px] text-muted-foreground flex-shrink-0 capitalize">{t.rol}</span>
                             </button>
                           )
