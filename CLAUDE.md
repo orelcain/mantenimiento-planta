@@ -848,7 +848,7 @@ Con Haversine A→D = dimensión real del recinto en metros. El DWG ya tiene cot
 
 **P1 — Estructural (requiere planeación Opus):**
 - 🔲 **Refactor config Grader Fase A** — mover 12 Gates + Física al turno (`AnalisisGraderTurnoPage`), botón "Cambié gate" mid-turno + segmentación automática. **Requiere refactor storage Firestore.** (1-2 días, NECESITA OPUS)
-- 🔲 **GlobalSettingsModal en home** — separar Análisis+Rangos en modal del header (~1h, sub-item de Fase A)
+- ✅ **GlobalSettingsModal en home** — move estructural completado 2026-04-26: rangos de GatesConfigPage ahora read-only, botón abre GlobalSettingsModal con reload al cerrar
 
 **P2 — Mejoras chicas:**
 - 🔲 **Fase 3b — Edición manual de rangos de pausas** — drag handles en bandas Timeline (~2-3 días)
@@ -927,7 +927,7 @@ Con Haversine A→D = dimensión real del recinto en metros. El DWG ya tiene cot
 **P1 — Alta prioridad**
 
 - 🔲 **Refactor config Grader — Fase A** — mover las 12 Gates + configuración Física al acordeón del detalle de turno (`AnalisisGraderTurnoPage`), en lugar de vivir solo en la página de config global. Botón "Cambié gate" mid-turno + segmentación automática antes/después del cambio. Plan de 3 fases acordado sesión 2026-04-19. Es el pendiente estructural más importante.
-- 🔲 **#1 GlobalSettingsModal en home** — separar Análisis+Rangos en modal del header del home. Sub-item Fase A que se puede hacer independiente. (~1h) *Parcialmente abordado sesión 2026-04-24 tarde: labels y descripción aclaran scope global vs per-turno; el move estructural de rangos sigue pendiente.*
+- ✅ **#1 GlobalSettingsModal en home** — COMPLETADO 2026-04-26: move estructural rangos GatesConfigPage → GlobalSettingsModal. Tab rangos ahora read-only + botón "Editar rangos en configuración global" que abre modal con reload de Firestore al cerrar.
 
 **P2 — Media prioridad**
 
