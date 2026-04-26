@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Plus, Search, AlertTriangle, Clock, CheckCircle, XCircle, User, MapPin } from 'lucide-react'
 import {
   Card,
@@ -58,13 +59,14 @@ export function IncidentsPage() {
   const permissions = usePermissions()
   const { incidents, selectedIncident, setSelectedIncident } = useAppStore()
   
+  const [searchParams, setSearchParams] = useSearchParams()
   const [showForm, setShowForm] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [activeFilter, setActiveFilter] = useState<string | null>(null) // null = todos
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') ?? '')
+  const [debouncedSearch, setDebouncedSearch] = useState(() => searchParams.get('q') ?? '')
+  const [activeFilter, setActiveFilter] = useState<string | null>(() => searchParams.get('filter'))
   const [mapLocations, setMapLocations] = useState<MapLocation[]>([])
-  const [selectedMapLocation, setSelectedMapLocation] = useState<string>('all')
-  const [selectedReporter, setSelectedReporter] = useState<string>('all')
+  const [selectedMapLocation, setSelectedMapLocation] = useState<string>(() => searchParams.get('location') ?? 'all')
+  const [selectedReporter, setSelectedReporter] = useState<string>(() => searchParams.get('reporter') ?? 'all')
   const [reporterNames, setReporterNames] = useState<Record<string, string>>({})
   const [userInfoLabels, setUserInfoLabels] = useState<Record<string, string>>({})
 
@@ -84,6 +86,17 @@ export function IncidentsPage() {
   useEffect(() => {
     debouncedSetSearch(searchQuery)
   }, [searchQuery, debouncedSetSearch])
+
+  // Sincronizar filtros activos a URL params
+  useEffect(() => {
+    setSearchParams(p => {
+      if (searchQuery) p.set('q', searchQuery); else p.delete('q')
+      if (activeFilter) p.set('filter', activeFilter); else p.delete('filter')
+      if (selectedMapLocation !== 'all') p.set('location', selectedMapLocation); else p.delete('location')
+      if (selectedReporter !== 'all') p.set('reporter', selectedReporter); else p.delete('reporter')
+      return p
+    }, { replace: true })
+  }, [searchQuery, activeFilter, selectedMapLocation, selectedReporter, setSearchParams])
 
   // Suscripción global en MainLayout
 

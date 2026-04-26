@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   AlertTriangle, Calendar, GripVertical, Plus, Search, Trash2, ZoomIn, ZoomOut,
 } from 'lucide-react'
@@ -55,7 +56,8 @@ export function GanttPlannerPage() {
   const [projects, setProjects] = useState<GanttProject[]>([])
   const [loading, setLoading] = useState(true)
   const [zoom, setZoom] = useState<ZoomLevel>('week')
-  const [search, setSearch] = useState('')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [search, setSearch] = useState(() => searchParams.get('q') ?? '')
   const [editTask, setEditTask] = useState<GanttTask | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
@@ -215,7 +217,11 @@ export function GanttPlannerPage() {
             className="pl-8"
             placeholder="Buscar tarea, equipo, responsable..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+                const v = e.target.value
+                setSearch(v)
+                setSearchParams(p => { if (v) p.set('q', v); else p.delete('q'); return p }, { replace: true })
+              }}
           />
         </div>
         <div className="flex items-center gap-1 border rounded-md px-1">
