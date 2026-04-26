@@ -1241,5 +1241,21 @@ service cloud.firestore {
         }
       }
     }
+
+    // ============================================
+    // SYSTEM CONFIG — Documentos sensibles de configuración
+    // ============================================
+
+    // shoplogixCredentials: contiene user/password en texto plano para auto-login
+    // ROPC desde Cloud Functions. Solo admins pueden leer/escribir desde el cliente.
+    // Las Cloud Functions usan Admin SDK (bypass de reglas).
+    // shoplogixToken: tokens OAuth gestionados por las Cloud Functions —
+    // no debe leerse desde el cliente bajo ninguna circunstancia.
+    match /system/shoplogixCredentials {
+      allow read, write: if isAdmin();
+    }
+    match /system/shoplogixToken {
+      allow read, write: if false; // solo Admin SDK (Cloud Functions)
+    }
   }
 }

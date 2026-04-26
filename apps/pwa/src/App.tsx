@@ -72,6 +72,7 @@ const SidebarEditorPage = lazyWithReload(() => import('@/pages/SidebarEditorPage
 const InspectionsPage = lazyWithReload(() => import('@/pages/InspectionsPage').then((mod) => ({ default: mod.InspectionsPage })))
 const ETTPage = lazyWithReload(() => import('@/pages/admin/ETTPage').then((mod) => ({ default: mod.ETTPage })))
 const PermissionsPage = lazyWithReload(() => import('@/pages/admin/PermissionsPage').then((mod) => ({ default: mod.PermissionsPage })))
+const ShoplogixCredentialsPage = lazyWithReload(() => import('@/pages/admin/ShoplogixCredentialsPage').then((mod) => ({ default: mod.ShoplogixCredentialsPage })))
 const Visor3DListPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DListPage').then((mod) => ({ default: mod.Visor3DListPage })))
 const Visor3DViewerPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DViewerPage').then((mod) => ({ default: mod.Visor3DViewerPage })))
 const Visor3DPublicPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DPublicPage').then((mod) => ({ default: mod.Visor3DPublicPage })))
@@ -463,6 +464,13 @@ export function App() {
               <AdminRoute>
                 <Suspense fallback={<LoadingScreen />}>
                   <PermissionsPage />
+                </Suspense>
+              </AdminRoute>
+            } />
+            <Route path="admin/shoplogix-credentials" element={
+              <AdminRoute>
+                <Suspense fallback={<LoadingScreen />}>
+                  <ShoplogixCredentialsPage />
                 </Suspense>
               </AdminRoute>
             } />
