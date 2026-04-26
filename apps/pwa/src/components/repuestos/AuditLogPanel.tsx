@@ -84,11 +84,11 @@ function ChangeSummary({ before, after }: { before?: Record<string, unknown>; af
       {changedKeys.slice(0, 3).map(key => (
         <div key={key} className="text-[10px] text-muted-foreground flex items-center gap-1">
           <span className="font-medium text-foreground/70">{key}:</span>
-          <span className="line-through text-red-400 truncate max-w-[80px]">
+          <span className="line-through text-red-400 truncate max-w-[80px]" title={String(before[key] ?? '')}>
             {String(before[key] ?? '').slice(0, 30)}
           </span>
           <span className="text-foreground/60">&rarr;</span>
-          <span className="text-emerald-500 truncate max-w-[80px]">
+          <span className="text-emerald-500 truncate max-w-[80px]" title={String(after[key] ?? '')}>
             {String(after[key] ?? '').slice(0, 30)}
           </span>
         </div>
@@ -224,7 +224,7 @@ export function AuditLogPanel({ open, onOpenChange }: Props) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline gap-1.5">
-                      <span className="text-xs font-medium truncate">{entry.documentLabel}</span>
+                      <span className="text-xs font-medium truncate" title={entry.documentLabel}>{entry.documentLabel}</span>
                       <span className="text-[10px] px-1 py-0.5 rounded bg-muted text-muted-foreground shrink-0">
                         {collectionLabel(entry.collection)}
                       </span>

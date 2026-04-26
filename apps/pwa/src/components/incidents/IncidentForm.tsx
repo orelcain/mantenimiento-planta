@@ -536,7 +536,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
                           className="w-3 h-3 rounded-full flex-shrink-0"
                           style={{ backgroundColor: zone.color || '#2196f3' }}
                         />
-                        <span className="truncate">{zone.nombre}</span>
+                        <span className="truncate" title={zone.nombre}>{zone.nombre}</span>
                       </div>
                     </button>
                   ))}

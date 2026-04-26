@@ -510,7 +510,7 @@ function IncidentCard({
                 {priorityConfig.label}
               </Badge>
             </div>
-            <h3 className="font-medium truncate">{incident.titulo}</h3>
+            <h3 className="font-medium truncate" title={incident.titulo}>{incident.titulo}</h3>
             <p className="text-sm text-muted-foreground line-clamp-2">
               {incident.descripcion}
             </p>

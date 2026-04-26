@@ -184,8 +184,8 @@ export function BulkRelocateModal({
               {selectedRepuestos.map(r => (
                 <div key={r.id} className="px-3 py-1.5 text-xs flex items-center gap-2">
                   <Package className="h-3 w-3 text-muted-foreground shrink-0" />
-                  <span className="font-mono text-muted-foreground w-20 truncate">{r.codigoSAP || '—'}</span>
-                  <span className="truncate text-foreground">{r.textoBreve || r.descripcion || 'Sin nombre'}</span>
+                  <span className="font-mono text-muted-foreground w-20 truncate" title={r.codigoSAP || undefined}>{r.codigoSAP || '—'}</span>
+                  <span className="truncate text-foreground" title={r.textoBreve || r.descripcion || 'Sin nombre'}>{r.textoBreve || r.descripcion || 'Sin nombre'}</span>
                 </div>
               ))}
             </div>
@@ -231,7 +231,7 @@ export function BulkRelocateModal({
                     }`}
                   >
                     <span className="inline-block w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: m.color }} />
-                    <span className="truncate">{m.nombre}</span>
+                    <span className="truncate" title={m.nombre}>{m.nombre}</span>
                     {targetMachineId === m.id && (
                       <Check className="ml-auto h-3.5 w-3.5 text-primary shrink-0" />
                     )}
@@ -279,7 +279,7 @@ export function BulkRelocateModal({
                     onCheckedChange={() => toggleSelect(r.id)}
                   />
                   <div className="min-w-0 flex-1">
-                    <div className="text-xs font-medium text-foreground truncate">{r.textoBreve || r.descripcion || 'Sin nombre'}</div>
+                    <div className="text-xs font-medium text-foreground truncate" title={r.textoBreve || r.descripcion || 'Sin nombre'}>{r.textoBreve || r.descripcion || 'Sin nombre'}</div>
                     <div className="text-[10px] text-muted-foreground font-mono">
                       {r.codigoSAP || '—'}
                       {r.codigoFabricante && <span className="ml-2">Fab: {r.codigoFabricante}</span>}

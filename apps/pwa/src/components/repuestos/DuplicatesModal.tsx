@@ -67,7 +67,7 @@ function EntryCard({
             className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
             style={{ backgroundColor: entry.machineColor }}
           />
-          <span className="font-medium text-foreground truncate">
+          <span className="font-medium text-foreground truncate" title={entry.machineName}>
             {entry.machineName}
           </span>
           {isWinner && (
@@ -77,7 +77,7 @@ function EntryCard({
           )}
         </div>
         <div className="mt-1 pl-4.5 space-y-0.5">
-          <div className="text-foreground/80 truncate">{entry.repuesto.textoBreve || entry.repuesto.descripcion || 'Sin nombre'}</div>
+          <div className="text-foreground/80 truncate" title={entry.repuesto.textoBreve || entry.repuesto.descripcion || 'Sin nombre'}>{entry.repuesto.textoBreve || entry.repuesto.descripcion || 'Sin nombre'}</div>
           <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
             <span>Cant: <span className="font-bold text-foreground">{entry.repuesto.cantidadPorMaquina || 0}</span></span>
             <span>Valor: ${(entry.repuesto.valorUnitario || 0).toLocaleString('es-CL')}</span>
@@ -139,7 +139,7 @@ function GroupCard({
         <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
         <div className="min-w-0">
           <div className="text-xs font-medium text-green-400">Fusionado: {group.codigoSAP}</div>
-          <div className="text-[10px] text-muted-foreground truncate">{bestName}</div>
+          <div className="text-[10px] text-muted-foreground truncate" title={bestName}>{bestName}</div>
         </div>
       </div>
     )
@@ -169,7 +169,7 @@ function GroupCard({
               </Badge>
             )}
           </div>
-          <div className="text-[11px] text-muted-foreground truncate mt-0.5">{bestName}</div>
+          <div className="text-[11px] text-muted-foreground truncate mt-0.5" title={bestName}>{bestName}</div>
         </div>
         <div className="flex items-center gap-3 text-[10px] text-muted-foreground shrink-0">
           <span>Σ {totalCantidad}</span>

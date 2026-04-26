@@ -1729,7 +1729,7 @@ export function RepuestosDashboard({
             {editFavClaveError && <p className="text-xs text-destructive">{editFavClaveError}</p>}
             <DialogFooter>
               <Button type="button" variant="ghost" size="sm" onClick={() => setEditFavClaveOpen(false)}>Cancelar</Button>
-              <Button type="submit" size="sm" disabled={!editFavClave.trim()}>Confirmar</Button>
+              <Button type="submit" size="sm" disabled={!editFavClave.trim()}>Guardar</Button>
             </DialogFooter>
           </form>
         </DialogContent>

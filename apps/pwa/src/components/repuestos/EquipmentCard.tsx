@@ -398,11 +398,14 @@ export function EquipmentCard({
               </div>
             ) : (
               <>
-                <span className={[
-                  'truncate leading-snug font-medium transition-colors',
-                  depth === 0 ? 'text-[11.5px]' : 'text-[10.5px]',
-                  isActive ? 'text-primary' : 'text-foreground group-hover:text-primary',
-                ].join(' ')}>
+                <span
+                  className={[
+                    'truncate leading-snug font-medium transition-colors',
+                    depth === 0 ? 'text-[11.5px]' : 'text-[10.5px]',
+                    isActive ? 'text-primary' : 'text-foreground group-hover:text-primary',
+                  ].join(' ')}
+                  title={displayName}
+                >
                   {displayName}
                 </span>
                 {isAdmin && (
