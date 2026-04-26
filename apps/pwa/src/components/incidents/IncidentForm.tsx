@@ -876,6 +876,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
                       src={preview}
                       alt={`Foto ${index + 1}`}
                       className="w-full h-full object-cover rounded-lg border"
+                      loading="lazy"
                     />
                     {/* Botón eliminar */}
                     <button

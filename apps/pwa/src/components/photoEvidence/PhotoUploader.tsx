@@ -108,6 +108,7 @@ export function PhotoUploader({
               className="w-full h-full object-cover"
               onClick={() => onSelectPhotoId?.(photo.id)}
               style={{ cursor: onSelectPhotoId ? 'pointer' : 'default' }}
+              loading="lazy"
             />
             {!disabled && (
               <button

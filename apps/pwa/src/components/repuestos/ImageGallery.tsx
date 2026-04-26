@@ -112,6 +112,7 @@ export function ImageGallery({
         src={image.url}
         alt={image.descripcion}
         className="w-full h-40 object-cover"
+        loading="lazy"
       />
       
       {/* Overlay con info */}
