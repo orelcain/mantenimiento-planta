@@ -1,5 +1,5 @@
 rules_version = '2';
-// Version: v1.2.1 - Updated: 2026-04-26
+// Version: v1.3.0 - Updated: 2026-04-26
 // Sistema de jerarquías anidadas de 8 niveles con validación mejorada
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -743,19 +743,25 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
-    // ARIA – Knowledge base (reinforceKnowledge/weakenKnowledge necesita update para todos)
+    // ARIA – Knowledge base
+    // Update restringido a campos de feedback (reinforce/weaken) — bloquea envenenamiento del contenido
     match /ariaKnowledge/{docId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() && isValidAriaKnowledge();
-      allow update: if isAuthenticated();
+      allow update: if isAdmin()
+        || (isAuthenticated()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['confidence', 'usageCount', 'updatedAt']));
       allow delete: if isAdmin();
     }
 
-    // ARIA – Equipment problem patterns (trackEquipmentProblem necesita update para todos)
+    // ARIA – Equipment problem patterns
+    // Update restringido a campos de tracking — bloquea modificación arbitraria de patrones
     match /ariaEquipmentPatterns/{docId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() && isValidAriaEquipmentPattern();
-      allow update: if isAuthenticated();
+      allow update: if isAdmin()
+        || (isAuthenticated()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['occurrences', 'lastOccurrence', 'updatedAt', 'commonSolution', 'avgResolutionHours', 'relatedSpares']));
       allow delete: if isAdmin();
     }
 
