@@ -142,6 +142,34 @@ Batch 3 (Haiku 4.5, ~5 min)   Verificar CI + confirmar deploy
    existentes con el método: *qué decisión opera, qué datos ya tenemos, dónde caen los
    falsos positivos*. Suele resultar en mejoras de los existentes en lugar de uno nuevo.
 
+### Verificación pre-push (OBLIGATORIO)
+
+**TSC y ESLint deben correrse desde `apps/pwa/`** — NO desde la raíz del monorepo.
+La raíz no tiene `tsconfig.json` propio, así que `pnpm exec tsc --noEmit` desde root
+solo imprime el help y devuelve exit 0 (engañoso). El CI corre con
+`working-directory: apps/pwa`, por eso fallan deploys que parecían "verde local".
+
+Comandos canónicos antes de push:
+
+```bash
+cd apps/pwa
+pnpm exec tsc --noEmit                    # TSC strict mode (CI usa esto)
+pnpm exec eslint . --max-warnings 10      # Lint (CI usa esto)
+cd ../..
+pnpm --filter pwa exec vitest run         # Tests
+```
+
+Errores típicos que SOLO aparecen en CI con la config strict:
+- TS6133: imports no usados → eliminar
+- TS2345/TS2322 con `noUncheckedIndexedAccess`: `array[idx]` puede ser `undefined`
+  → guard con `if (!x) return` o usar non-null assertion `array[idx]!` cuando se
+  acaba de validar `idx < array.length`
+- Spread con literales: `{ ...base, autoTag: 'cambio_lote' }` → TS pierde el literal
+  type. Usar `as const` o cast al tipo unión.
+
+Si olvidás esto, los deploys fallan en cadena (sucedió 12 veces consecutivas en
+sesión 2026-04-25 antes de detectarlo).
+
 ### Arquitectura de almacenamiento
 
 ```

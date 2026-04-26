@@ -121,7 +121,9 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
     if (!onStateClick) return
     const idx = typeof params?.dataIndex === 'number' ? params.dataIndex : -1
     if (idx < 0 || idx >= shift.states.length) return
-    onStateClick(shift.states[idx])
+    const st = shift.states[idx]
+    if (!st) return  // noUncheckedIndexedAccess: guard explícito
+    onStateClick(st)
   }, [onStateClick, shift.states])
 
   // Listener: cuando OTRO chart originó hover, dispatchear axisPointer manual

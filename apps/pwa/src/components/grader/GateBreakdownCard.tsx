@@ -16,7 +16,6 @@ import { cn } from '@/lib/utils'
 import { LayoutGrid, ChevronDown, ChevronUp, ArrowRight } from 'lucide-react'
 import type { GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
 import {
-  GATE_RATIO_THRESHOLDS,
   gateStatusFromRatio,
   cautelaSeverity,
   severityBadgeClass,

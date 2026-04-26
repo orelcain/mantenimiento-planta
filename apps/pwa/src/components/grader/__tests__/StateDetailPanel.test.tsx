@@ -135,7 +135,7 @@ describe('StateDetailPanel', () => {
     ]
     const shift = mkShift(states)
 
-    render(<StateDetailPanel state={states[1]} shift={shift} onClose={vi.fn()} />)
+    render(<StateDetailPanel state={states[1]!} shift={shift} onClose={vi.fn()} />)
     expect(screen.getByText('#2 de 3')).toBeTruthy()
   })
 

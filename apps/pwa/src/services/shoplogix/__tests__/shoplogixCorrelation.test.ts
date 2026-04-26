@@ -267,7 +267,8 @@ describe('correlatePausesWithUpstream', () => {
       mkShift('C', 'E3', [averia]),
     ])
     // El detector asignó autoTag=cambio_lote — paro organizacional
-    const pause = { ...mkPause('p1', '2026-02-26T10:00:00Z', '2026-02-26T10:10:00Z'), autoTag: 'cambio_lote' }
+    // `as const` para que el literal se preserve y satisfaga PauseAutoTag
+    const pause = { ...mkPause('p1', '2026-02-26T10:00:00Z', '2026-02-26T10:10:00Z'), autoTag: 'cambio_lote' as const }
     const [corr] = correlatePausesWithUpstream([pause], snap)
     expect(corr!.kind).toBe('no_correlation')
   })
