@@ -5,25 +5,6 @@ import { Button } from './button'
 import { cn } from '@/lib/utils'
 import { logger } from '@/lib/logger'
 
-// Definición básica de tipos para Web Speech API
-interface SpeechRecognition extends EventTarget {
-  continuous: boolean
-  interimResults: boolean
-  lang: string
-  start: () => void
-  stop: () => void
-  abort: () => void
-  onresult: (event: any) => void
-  onerror: (event: any) => void
-  onend: () => void
-}
-
-declare global {
-  interface Window {
-    SpeechRecognition: any
-    webkitSpeechRecognition: any
-  }
-}
 
 export interface SpeechTextareaProps extends TextareaProps {}
 
@@ -76,13 +57,13 @@ const SpeechTextarea = React.forwardRef<HTMLTextAreaElement, SpeechTextareaProps
       recognition.interimResults = true // Necesario para que Android no cierre prematuramente
       recognition.lang = 'es-ES'
 
-      recognition.onresult = (event: any) => {
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
         let newText = ''
         // Iterar solo sobre los nuevos resultados
         for (let i = event.resultIndex; i < event.results.length; i++) {
-          const result = event.results[i]
+          const result = event.results[i]!
           if (result.isFinal) {
-            newText += result[0].transcript + ' '
+            newText += result[0]!.transcript + ' '
           }
         }
         
@@ -91,8 +72,8 @@ const SpeechTextarea = React.forwardRef<HTMLTextAreaElement, SpeechTextareaProps
         }
       }
 
-      recognition.onerror = (event: any) => {
-        logger.error('Error de reconocimiento de voz', event.error instanceof Error ? event.error : new Error(String(event.error)))
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+        logger.error('Error de reconocimiento de voz', new Error(event.error))
         setIsListening(false)
         if (event.error === 'not-allowed') {
           alert('Permiso de micrófono denegado. Por favor actívalo en la configuración.')

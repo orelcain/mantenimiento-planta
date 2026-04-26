@@ -6,22 +6,23 @@
 import { useState, useCallback, useRef } from 'react'
 import { logger } from '@/lib/logger'
 
-const SpeechRecognition = window.SpeechRecognition || (window as any).webkitSpeechRecognition
+const SpeechRecognitionCtor =
+  window.SpeechRecognition || window.webkitSpeechRecognition
 
 export function useSpeechRecognition() {
   const [transcript, setTranscript] = useState('')
   const [isListening, setIsListening] = useState(false)
-  const isSupported = !!SpeechRecognition
-  const recognitionRef = useRef<any>(null)
+  const isSupported = !!SpeechRecognitionCtor
+  const recognitionRef = useRef<SpeechRecognition | null>(null)
 
   const startListening = useCallback(() => {
-    if (!isSupported) {
+    if (!isSupported || !SpeechRecognitionCtor) {
       logger.error('Speech Recognition no es soportado en este navegador', new Error('SpeechRecognition not supported'))
       return
     }
 
     if (!recognitionRef.current) {
-      recognitionRef.current = new SpeechRecognition()
+      recognitionRef.current = new SpeechRecognitionCtor()
       recognitionRef.current.continuous = true
       recognitionRef.current.interimResults = true
       recognitionRef.current.lang = 'es-ES'
@@ -31,14 +32,14 @@ export function useSpeechRecognition() {
         setTranscript('')
       }
 
-      recognitionRef.current.onresult = (event: any) => {
+      recognitionRef.current.onresult = (event: SpeechRecognitionEvent) => {
         let interim = ''
         let final = ''
 
         for (let i = event.resultIndex; i < event.results.length; i++) {
-          const transcript = event.results[i][0].transcript
+          const transcript = event.results[i]![0]!.transcript
 
-          if (event.results[i].isFinal) {
+          if (event.results[i]!.isFinal) {
             final += transcript + ' '
           } else {
             interim += transcript
@@ -48,8 +49,8 @@ export function useSpeechRecognition() {
         setTranscript(final || interim)
       }
 
-      recognitionRef.current.onerror = (event: any) => {
-        logger.error('Speech Recognition error', event.error instanceof Error ? event.error : new Error(String(event.error)))
+      recognitionRef.current.onerror = (event: SpeechRecognitionErrorEvent) => {
+        logger.error('Speech Recognition error', new Error(event.error))
       }
 
       recognitionRef.current.onend = () => {
