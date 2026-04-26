@@ -4,6 +4,7 @@ import { Activity, Clock } from 'lucide-react'
 import { verdictFromP0Pct } from '@/services/grader/graderThresholds'
 import type { ShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import type { GraderDailySummary } from '@/services/grader/types'
+import type { UpstreamLineSnapshot } from '@/services/shoplogix/types'
 
 const VERDICT_STYLE = {
   ok: {
@@ -45,14 +46,21 @@ function MetricTile({ label, value, sub }: MetricTileProps) {
 interface HeroScorecardProps {
   summary: GraderDailySummary
   shiftWindow: ShiftTimeWindow
+  upstreamSnapshot?: UpstreamLineSnapshot | null
 }
 
-export function HeroScorecard({ summary, shiftWindow }: HeroScorecardProps) {
+export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot }: HeroScorecardProps) {
   const verdict = verdictFromP0Pct(summary.pointZeroPct)
   const style = VERDICT_STYLE[verdict]
   const throughputPerMin = summary.productionRatePerHour
     ? (summary.productionRatePerHour / 60).toFixed(0)
     : '—'
+
+  const baaderTotal = upstreamSnapshot?.machines.reduce((s, m) => s + (m.totalCycles ?? 0), 0) ?? 0
+  const estimatedRejected = baaderTotal > 0 ? Math.max(0, baaderTotal - summary.totalPieces) : null
+  const rejectedPct = baaderTotal > 0 && estimatedRejected != null
+    ? ((estimatedRejected / baaderTotal) * 100).toFixed(1)
+    : null
 
   const durationLabel = shiftWindow.status === 'live' && shiftWindow.remainingMin != null
     ? `${Math.round(shiftWindow.elapsedMin)} min · faltan ${Math.round(shiftWindow.remainingMin)} min`
@@ -97,19 +105,40 @@ export function HeroScorecard({ summary, shiftWindow }: HeroScorecardProps) {
         </div>
 
         {/* KPIs secundarios */}
-        <div className="flex-1 grid grid-cols-3 gap-3 border-l pl-6">
-          <MetricTile
-            label="Piezas"
-            value={summary.totalPieces.toLocaleString('es-CL')}
-          />
-          <MetricTile
-            label="pz/min"
-            value={throughputPerMin}
-          />
-          <MetricTile
-            label="Peso kg"
-            value={summary.totalWeightKg != null ? summary.totalWeightKg.toFixed(0) : '—'}
-          />
+        <div className="flex-1 border-l pl-6 space-y-2">
+          <div className="grid grid-cols-3 gap-3">
+            <MetricTile
+              label="Piezas"
+              value={summary.totalPieces.toLocaleString('es-CL')}
+            />
+            <MetricTile
+              label="pz/min"
+              value={throughputPerMin}
+            />
+            <MetricTile
+              label="Peso kg"
+              value={summary.totalWeightKg != null ? summary.totalWeightKg.toFixed(0) : '—'}
+            />
+          </div>
+          {baaderTotal > 0 && (
+            <div className="grid grid-cols-3 gap-3 pt-2 border-t border-border/40">
+              <MetricTile
+                label="Upstream Baader"
+                value={baaderTotal.toLocaleString('es-CL')}
+                sub="ciclos totales"
+              />
+              <MetricTile
+                label="Rechazo estimado"
+                value={estimatedRejected != null ? estimatedRejected.toLocaleString('es-CL') : '—'}
+                sub={rejectedPct != null ? `${rejectedPct}%` : undefined}
+              />
+              <MetricTile
+                label="Máquinas"
+                value={String(upstreamSnapshot!.machines.length)}
+                sub="Baader activas"
+              />
+            </div>
+          )}
         </div>
 
         {/* Barra de progreso si live */}

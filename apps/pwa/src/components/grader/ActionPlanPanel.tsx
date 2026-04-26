@@ -6,7 +6,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui'
-import { Wrench, Monitor, Eye, CheckSquare, Square, ChevronDown, AlertTriangle, Info } from 'lucide-react'
+import { Wrench, Monitor, Eye, CheckSquare, Square, AlertTriangle, Info } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store'
 import { appendShiftAction } from '@/services/grader/graderShifts.service'
@@ -62,7 +62,6 @@ function ActionItem({
   checked: boolean
   onToggle: () => void
 }) {
-  const [expanded, setExpanded] = useState(false)
   const SeverityIcon = SEVERITY_ICON[action.severity]
 
   return (
@@ -95,21 +94,9 @@ function ActionItem({
               ≈ {action.estimatedImpact.deltaPct > 0 ? '+' : ''}{action.estimatedImpact.deltaPct}% {action.estimatedImpact.metric}
             </span>
           )}
+          <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{action.description}</p>
         </div>
-
-        <button
-          onClick={() => setExpanded(e => !e)}
-          className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', expanded && 'rotate-180')} />
-        </button>
       </div>
-
-      {expanded && (
-        <div className="px-3 pb-2.5 pt-0 border-t bg-muted/10">
-          <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">{action.description}</p>
-        </div>
-      )}
     </div>
   )
 }

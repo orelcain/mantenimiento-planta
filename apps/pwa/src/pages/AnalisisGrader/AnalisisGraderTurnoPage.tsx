@@ -833,7 +833,7 @@ export function AnalisisGraderTurnoPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* Scorecard — mobile row 1 */}
             <div className="lg:col-span-2 lg:row-start-1">
-              <HeroScorecard summary={summary} shiftWindow={shiftWindow} />
+              <HeroScorecard summary={summary} shiftWindow={shiftWindow} upstreamSnapshot={upstreamLine.snapshot} />
             </div>
 
             {/* Acciones — mobile row 2 (protagonismo), desktop derecha full-height */}

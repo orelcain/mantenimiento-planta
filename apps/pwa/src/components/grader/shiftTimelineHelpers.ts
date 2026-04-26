@@ -251,7 +251,7 @@ export function buildMarkLines(
     name: `Config gates\n${fmtTime(s.at)}`,
     xAxis: fmtTime(s.at),
     lineStyle: { color: '#06b6d4', type: 'dashed' as const, width: 1.5 },
-    label: { show: true, formatter: '🔧', color: '#06b6d4', fontSize: 10 },
+    label: { show: true, formatter: 'Cfg', color: '#06b6d4', fontSize: 9 },
   }))
 
   const lotChangeLines: object[] = []
@@ -265,7 +265,7 @@ export function buildMarkLines(
         lineStyle: { color: '#8b5cf6', type: 'dotted' as const, width: 1.5 },
         label: {
           show: true,
-          formatter: `📦 ${curr.lot}`,
+          formatter: curr.lot,
           color: '#a78bfa',
           fontSize: 9,
           fontWeight: 600 as const,
@@ -313,12 +313,12 @@ export function buildMarkAreas(
     if (effectiveTag) {
       areaColor = effectiveTag.bandFill
       labelColor = effectiveTag.color
-      labelText = `${effectiveTag.emoji} ${effectiveTag.label.split(' ')[0]} ${durMin}min${rangeAdjusted ? ' ✏' : ''}`
+      labelText = `${effectiveTag.label.split(' ')[0]} ${durMin}min${rangeAdjusted ? ' *' : ''}`
     } else {
       const opacityByTier = p.tier === 'parada' ? 0.12 : p.tier === 'larga' ? 0.09 : 0.06
       areaColor = `rgba(148,163,184,${opacityByTier})`
       labelColor = '#94a3b8'
-      labelText = `⏸ ${durMin}min${rangeAdjusted ? ' ✏' : ''}`
+      labelText = `${durMin}min${rangeAdjusted ? ' *' : ''}`
     }
     const showLabel = durMin >= 10 || !!effectiveTag || rangeAdjusted
     return [

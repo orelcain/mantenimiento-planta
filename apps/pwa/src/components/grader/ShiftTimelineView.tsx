@@ -254,16 +254,8 @@ export function ShiftTimelineView({
     return () => { chartImageRef.current = null }
   }, [chartImageRef])
 
-  const [activeZoom, setActiveZoom] = useState<'10min' | '1h' | 'turno'>('turno')
+  const [activeZoom, setActiveZoom] = useState<string>('turno')
   const [zoomState, setZoomState] = useState({ start: 0, end: 100 })
-
-  const totalMinutes = useMemo(() => {
-    const buckets = timelineBuckets.filter(b => b.pieces > 0)
-    if (buckets.length === 0) return 480
-    const effectiveStartMs = Date.parse(buckets[0]!.tsMin) - 10 * 60_000
-    const effectiveEndMs = Date.parse(buckets[buckets.length - 1]!.tsMin) + 10 * 60_000
-    return Math.min(24 * 60, Math.max(1, Math.round((effectiveEndMs - effectiveStartMs) / 60_000)))
-  }, [timelineBuckets])
 
   // ── Ventana de producción real (movida antes de emitZoomRange para evitar
   // TDZ — emitZoomRange filtra por productionWindow para que su rango emitido
@@ -317,14 +309,44 @@ export function ShiftTimelineView({
     })
   }, [onZoomRangeChange, timelineSync, timelineBuckets, shiftWindow, productionWindow])
 
-  const handleZoomPreset = useCallback((preset: '10min' | '1h' | 'turno') => {
-    setActiveZoom(preset)
-    let start = 0
-    if (preset === '10min') start = Math.max(0, 100 - Math.round((10 / totalMinutes) * 100))
-    else if (preset === '1h') start = Math.max(0, 100 - Math.round((60 / totalMinutes) * 100))
-    setZoomState({ start, end: 100 })
-    emitZoomRange(start, 100)
-  }, [totalMinutes, emitZoomRange])
+  // Segmentos horarios: un botón por hora del turno, coloreados por densidad P0.
+  // startPct/endPct son los porcentajes del axis que corresponden a esa hora,
+  // listos para pasar directamente a zoomState.
+  const hourlySegments = useMemo(() => {
+    const inWin = (tsMin: string): boolean => {
+      if (!productionWindow) return true
+      const ts = Date.parse(tsMin)
+      return ts >= productionWindow.startMs && ts <= productionWindow.endMs
+    }
+    const buckets = timelineBuckets.filter(b => b.pieces > 0 && inWin(b.tsMin))
+    if (buckets.length < 2) return []
+    const axis = resolveAxisWindow(buckets, shiftWindow)
+    const spanMs = axis.effectiveEndMs - axis.effectiveStartMs
+    if (spanMs <= 0) return []
+
+    const byHour = new Map<number, { pieces: number; p0: number; firstMs: number; lastMs: number }>()
+    for (const b of buckets) {
+      const ts = Date.parse(b.tsMin)
+      const h = new Date(b.tsMin).getUTCHours()
+      const cur = byHour.get(h) ?? { pieces: 0, p0: 0, firstMs: ts, lastMs: ts }
+      cur.pieces += b.pieces
+      cur.p0 += b.p0Pieces ?? 0
+      cur.firstMs = Math.min(cur.firstMs, ts)
+      cur.lastMs = Math.max(cur.lastMs, ts)
+      byHour.set(h, cur)
+    }
+
+    return [...byHour.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([h, { pieces, p0, firstMs, lastMs }]) => {
+        const p0Pct = pieces > 0 ? (p0 / pieces) * 100 : 0
+        const startPct = Math.max(0, ((firstMs - axis.effectiveStartMs) / spanMs) * 100)
+        const endPct = Math.min(100, ((lastMs + 60_000 - axis.effectiveStartMs) / spanMs) * 100)
+        return { hour: h, label: `${String(h).padStart(2, '0')}h`, startPct, endPct, p0Pct, pieces }
+      })
+      .filter(s => s.endPct > s.startPct)
+      .slice(0, 8)
+  }, [timelineBuckets, productionWindow, shiftWindow])
 
   // ── Anchor del axis para conversión index↔ms (hover cross-chart) ────────
   // Refleja el effectiveStartMs que produce resolveAxisWindow para el rango
@@ -641,7 +663,7 @@ export function ShiftTimelineView({
     const startPct = ((startMs - axis.effectiveStartMs) / totalMs) * 100
     const endPct = ((endMs - axis.effectiveStartMs) / totalMs) * 100
     setZoomState({ start: startPct, end: endPct })
-    setActiveZoom('10min')
+    setActiveZoom('zoom')
     emitZoomRange(startPct, endPct)
   }, [timelineBuckets, productionWindow, shiftWindow, emitZoomRange])
 
@@ -783,17 +805,6 @@ export function ShiftTimelineView({
       backgroundColor: 'transparent',
       // Más margen bajo para el slider de zoom
       grid: { left: 40, right: 16, top: 20, bottom: 60 },
-      toolbox: {
-        right: 10,
-        top: 0,
-        feature: {
-          dataZoom: { yAxisIndex: false, title: { zoom: 'Zoom', back: 'Reset zoom' } },
-          restore: { title: 'Resetear' },
-          saveAsImage: { type: 'png' as const, pixelRatio: 2, title: 'Guardar PNG', name: 'timeline-grader', backgroundColor: '#111827' },
-        },
-        iconStyle: { borderColor: '#6b7280' },
-        emphasis: { iconStyle: { borderColor: '#f9fafb' } },
-      },
       // Zoom: rueda para pan, slider visible, pinch-zoom en móvil
       dataZoom: [
         { type: 'inside', start: zoomState.start, end: zoomState.end, zoomOnMouseWheel: true, moveOnMouseMove: true, moveOnMouseWheel: false },
@@ -887,6 +898,8 @@ export function ShiftTimelineView({
         backgroundColor: '#1f2937',
         borderColor: '#374151',
         textStyle: { color: '#f9fafb', fontSize: 11 },
+        confine: true,
+        hideDelay: 400,
         formatter: (params: unknown[]) => {
           if (!Array.isArray(params) || params.length === 0) return ''
           const arr = params as Array<{ name: string; value: number | [string, number]; seriesName: string; seriesType: string; dataIndex: number; color?: string }>
@@ -1198,22 +1211,50 @@ export function ShiftTimelineView({
         </CardTitle>
       {hasData && (
         <div className="flex items-center gap-2 px-6 pb-2">
-          {/* Presets de zoom */}
-          <div className="flex border border-border/40 rounded-md overflow-hidden text-[11px]">
-            {(['10min', '1h', 'turno'] as const).map(preset => (
-              <button
-                key={preset}
-                onClick={() => handleZoomPreset(preset)}
-                className={cn(
-                  'px-2 py-0.5 font-medium transition-colors',
-                  activeZoom === preset
-                    ? 'bg-primary/20 text-primary'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/30',
-                )}
-              >
-                {preset === 'turno' ? 'Todo' : preset}
-              </button>
-            ))}
+          {/* Zoom horario dinámico */}
+          <div className="flex flex-wrap border border-border/40 rounded-md overflow-hidden text-[11px]">
+            <button
+              onClick={() => {
+                setActiveZoom('turno')
+                setZoomState({ start: 0, end: 100 })
+                emitZoomRange(0, 100)
+              }}
+              className={cn(
+                'px-2 py-0.5 font-medium transition-colors',
+                activeZoom === 'turno'
+                  ? 'bg-primary/20 text-primary'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/30',
+              )}
+            >
+              Todo
+            </button>
+            {hourlySegments.map(seg => {
+              const segId = `h${seg.hour}`
+              const colorClass =
+                seg.p0Pct >= criticalThreshold ? 'text-red-400' :
+                seg.p0Pct >= alertThreshold    ? 'text-amber-400' :
+                seg.pieces > 0                 ? 'text-emerald-400' :
+                'text-muted-foreground'
+              return (
+                <button
+                  key={seg.hour}
+                  onClick={() => {
+                    setActiveZoom(segId)
+                    setZoomState({ start: seg.startPct, end: seg.endPct })
+                    emitZoomRange(seg.startPct, seg.endPct)
+                  }}
+                  title={`${seg.label}: P0% ${seg.p0Pct.toFixed(1)}%, ${seg.pieces.toLocaleString('es-CL')} pzas`}
+                  className={cn(
+                    'px-2 py-0.5 font-medium transition-colors border-l border-border/30',
+                    activeZoom === segId
+                      ? 'bg-primary/20 text-primary'
+                      : `${colorClass} hover:bg-muted/30`,
+                  )}
+                >
+                  {seg.label}
+                </button>
+              )
+            })}
           </div>
           <div className="ml-auto flex items-center gap-1">
             <Button variant="ghost" size="sm" className="h-6 px-2 text-xs gap-1" onClick={downloadPNG} title="Exportar imagen PNG">
