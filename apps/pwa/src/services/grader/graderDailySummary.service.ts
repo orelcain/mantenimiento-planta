@@ -726,7 +726,7 @@ async function appendPauseHistory(
   try {
     const colRef = collection(db, COLLECTION, summaryId, PAUSE_HISTORY_SUB)
     await addDoc(colRef, entry)
-  } catch (e) {
+  } catch {
     logger.warn('graderDailySummary: appendPauseHistory falló (no bloqueante)')
   }
 }

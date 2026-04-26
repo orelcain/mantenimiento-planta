@@ -1,3 +1,4 @@
+/* eslint-disable no-console -- herramienta de debug intencional: salida cruda a consola del navegador */
 /**
  * Herramientas de debugging para Firebase
  */

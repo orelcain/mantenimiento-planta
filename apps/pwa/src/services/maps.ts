@@ -246,7 +246,7 @@ export async function deleteMapVersion(id: string): Promise<void> {
   try {
     const storageRef = ref(storage, version.imagePath)
     await deleteObject(storageRef)
-  } catch (e) {
+  } catch {
     logger.warn('Error deleting map image from storage')
   }
 

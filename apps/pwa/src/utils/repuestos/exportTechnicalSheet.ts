@@ -16,7 +16,7 @@ async function imageUrlToBase64(url: string): Promise<string | null> {
       reader.onerror = reject;
       reader.readAsDataURL(blob);
     });
-  } catch (error) {
+  } catch {
     logger.warn('Error fetching image for PDF')
     return null;
   }
@@ -273,7 +273,7 @@ async function addTechnicalSheetToDoc(
                 doc.setTextColor(0);
              }
 
-        } catch (e) {
+        } catch {
             logger.warn('No se pudo agregar imagen al PDF')
             doc.rect(xPos, yPos, imgWidth, imgHeight);
         }

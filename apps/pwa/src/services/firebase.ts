@@ -1,3 +1,4 @@
+/* eslint-disable no-console -- bootstrap del SDK Firebase: el logger central no está disponible aún */
 import { initializeApp } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore'

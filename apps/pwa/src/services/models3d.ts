@@ -195,7 +195,7 @@ export async function deleteModel3D(modelId: string): Promise<void> {
   try {
     const storageRef = ref(storage, model.storagePath)
     await deleteObject(storageRef)
-  } catch (error) {
+  } catch {
     // Si no existe en Storage, continuar (puede ya haberse borrado)
     logger.warn('Error eliminando archivo de Storage')
   }

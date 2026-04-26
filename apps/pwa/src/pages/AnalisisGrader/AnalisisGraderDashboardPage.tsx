@@ -222,7 +222,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
         const recent = all.filter((s) => s.id !== currentId).slice(0, 10)
         setSiblingSessions(siblings)
         setRecentSessions(recent)
-      } catch (err) {
+      } catch {
         logger.warn('grader: no se pudieron cargar sesiones hermanas')
       }
     }

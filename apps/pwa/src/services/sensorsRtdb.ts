@@ -92,7 +92,7 @@ export async function fetchSensorHistory(
     })
 
     return results.sort((a, b) => a.timestamp - b.timestamp)
-  } catch (error) {
+  } catch {
     logger.warn('Error fetching sensor history')
     return []
   }

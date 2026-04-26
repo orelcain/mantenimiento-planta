@@ -92,7 +92,7 @@ export function useUpstreamLineSnapshot(
         }
         // Firestore vacío → fallback
         fallback()
-      } catch (e) {
+      } catch {
         // Permission error (rules) o red caída → tratamos como "sin data" y fallback
         // No mostramos error al usuario: el panel siempre degrada gracefully.
         if (!cancelled) {

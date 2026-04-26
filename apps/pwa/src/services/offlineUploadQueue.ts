@@ -120,7 +120,7 @@ export async function loadUploadQueue(): Promise<void> {
   try {
     const entries = await getAllUploads()
     useUploadQueueStore.getState().setItems(entries.map(toUploadItem))
-  } catch (error) {
+  } catch {
     logger.warn('Failed to load upload queue')
   }
 }

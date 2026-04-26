@@ -398,7 +398,7 @@ export function getAIProvider(): AIProvider {
 export async function analyzeGrader(payload: AIGraderInput): Promise<AIGraderOutput> {
   try {
     return await currentProvider.analyzeGrader(payload)
-  } catch (err) {
+  } catch {
     // If Groq fails (no key, no cloud function), fall back to mock
     logger.warn('Groq AI failed, falling back to mock')
     const mock = new MockAIProvider()

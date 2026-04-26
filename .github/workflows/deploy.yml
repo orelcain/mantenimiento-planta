@@ -47,7 +47,7 @@ jobs:
 
       - name: Lint
         working-directory: apps/pwa
-        run: pnpm exec eslint . --max-warnings 300
+        run: pnpm exec eslint . --max-warnings 30
 
       - name: Build PWA
         working-directory: apps/pwa

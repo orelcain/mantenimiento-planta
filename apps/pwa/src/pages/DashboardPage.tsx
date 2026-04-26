@@ -144,7 +144,7 @@ export function DashboardPage() {
               source,
             }
           }))
-        } catch (e) {
+        } catch {
           // Ignorar errores silenciosamente para no bloquear el dashboard
           logger.warn('IoT details load error')
         }

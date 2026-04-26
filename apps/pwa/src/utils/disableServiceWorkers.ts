@@ -58,7 +58,7 @@ export async function cleanupServiceWorkers(): Promise<void> {
         await registration.unregister()
       }
     }
-  } catch (error) {
+  } catch {
     logger.warn('Error cleaning up SWs')
   }
 }

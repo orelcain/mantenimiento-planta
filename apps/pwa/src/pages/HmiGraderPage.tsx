@@ -90,7 +90,7 @@ export function HmiGraderPage() {
             userId: user.id,
             userName: ((user.nombre ?? '') + ' ' + (user.apellido ?? '')).trim() || user.email,
           })
-        } catch (err) {
+        } catch {
           logger.warn('HMI Grader: Error guardando historial')
         }
         return

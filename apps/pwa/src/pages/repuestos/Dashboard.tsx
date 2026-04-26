@@ -745,7 +745,7 @@ export function RepuestosDashboard({
       if (typeof prefs.searchQuery === 'string') setSearchQuery(prefs.searchQuery)
       if (prefs.filterTipo !== undefined) setFilterTipo(prefs.filterTipo ?? null)
       if (typeof prefs.pageSize === 'number' && Number.isFinite(prefs.pageSize)) setPageSize(prefs.pageSize)
-    } catch (err) {
+    } catch {
       logger.warn('No se pudieron restaurar preferencias del dashboard')
     } finally {
       hasHydratedPrefsRef.current = true

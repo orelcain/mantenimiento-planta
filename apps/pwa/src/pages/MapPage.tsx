@@ -994,7 +994,7 @@ export function MapPage() {
       } else {
         await el.requestFullscreen()
       }
-    } catch (error) {
+    } catch {
       logger.warn('No se pudo cambiar a pantalla completa')
     }
   }, [])
