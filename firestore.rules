@@ -1,5 +1,5 @@
 rules_version = '2';
-// Version: v1.1.0 - Updated: 2025-12-26
+// Version: v1.2.0 - Updated: 2026-04-26
 // Sistema de jerarquías anidadas de 8 niveles con validación mejorada
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -662,7 +662,7 @@ service cloud.firestore {
     // ============================================
     match /audit_log/{logId} {
       allow read: if isSupervisor();
-      allow create: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidDocSize();
       allow update, delete: if isAdmin();
     }
 
@@ -671,7 +671,7 @@ service cloud.firestore {
     // ============================================
     match /trash/{trashId} {
       allow read: if isSupervisor();
-      allow create: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidDocSize();
       allow update, delete: if isAdmin();
     }
 
@@ -706,7 +706,7 @@ service cloud.firestore {
     // ============================================
     match /ariaMissionLogs/{date}/entries/{entryId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidDocSize();
       allow update, delete: if isAdmin();
     }
 
@@ -893,33 +893,33 @@ service cloud.firestore {
       allow delete: if isAdmin();
 
       // Subcolección de cotas/dimensiones
-      // Lectura pública (QR), escritura solo autenticados
+      // Lectura pública (QR), escritura requiere rol técnico mínimo
       match /dimensions/{dimensionId} {
         allow read: if true;
-        allow create, update: if request.auth != null;
-        allow delete: if request.auth != null;
+        allow create, update: if isTechnician();
+        allow delete: if isTechnician();
       }
 
       // Subcolección de overrides de material (colores de pintura)
-      // Lectura pública (QR), escritura solo autenticados
+      // Lectura pública (QR), escritura requiere rol técnico mínimo
       match /materialOverrides/{overrideId} {
         allow read: if true;
-        allow create, update: if request.auth != null;
-        allow delete: if request.auth != null;
+        allow create, update: if isTechnician();
+        allow delete: if isTechnician();
       }
 
       // Subcolección de anotaciones (Pines de interés)
       match /annotations/{annotationId} {
         allow read: if true;
-        allow create, update: if request.auth != null;
-        allow delete: if request.auth != null;
+        allow create, update: if isTechnician();
+        allow delete: if isTechnician();
       }
 
       // Subcolección de enlaces interactivos (binding asset → grupo GLB)
       match /interactiveBindings/{bindingId} {
         allow read: if true;
-        allow create, update: if request.auth != null;
-        allow delete: if request.auth != null;
+        allow create, update: if isTechnician();
+        allow delete: if isTechnician();
       }
     }
 
@@ -1034,7 +1034,7 @@ service cloud.firestore {
       // Log cronológico de cambios de configuración de gates (FASE 27)
       match /configHistory/{snapshotId} {
         allow read: if isAuthenticated();
-        allow create: if isAuthenticated();
+        allow create: if isSupervisor(); // solo supervisores gestionan config de gates
         allow update, delete: if isAdmin(); // snapshots son inmutables una vez creados
       }
     }
@@ -1129,7 +1129,11 @@ service cloud.firestore {
     match /inviteCodes/{codeId} {
       allow read: if isAuthenticated();
       allow create: if isAdmin() && isValidInviteCode();
-      allow update: if isAuthenticated(); // mark as used on registration
+      // Solo admin edita libremente; registro solo puede incrementar usosActuales (+1) y/o desactivar el código
+      allow update: if isAdmin()
+        || (isAuthenticated()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usosActuales', 'activo'])
+          && request.resource.data.usosActuales == resource.data.usosActuales + 1);
       allow delete: if isAdmin();
     }
 
