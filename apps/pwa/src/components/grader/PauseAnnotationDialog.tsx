@@ -229,11 +229,13 @@ export function PauseAnnotationDialog({
   // M13 — Carga lazy del historial al abrir el acordeón.
   useEffect(() => {
     if (!historyOpen || !pause || !summaryId) return
+    let mounted = true
     setHistoryLoading(true)
     loadPauseHistory(summaryId, pause.id)
-      .then(setHistoryEntries)
-      .catch(() => setHistoryEntries([]))
-      .finally(() => setHistoryLoading(false))
+      .then(entries => { if (mounted) setHistoryEntries(entries) })
+      .catch(() => { if (mounted) setHistoryEntries([]) })
+      .finally(() => { if (mounted) setHistoryLoading(false) })
+    return () => { mounted = false }
   }, [historyOpen, pause, summaryId])
 
   const adjustStart = useCallback((deltaMin: number) => {

@@ -6,6 +6,7 @@
  */
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { logger } from '@/lib/logger'
 import { ArrowLeft, Edit3, GraduationCap, Loader2 } from 'lucide-react'
 import {
   LEARNING_MACHINES,
@@ -31,7 +32,8 @@ export function LearningAdminPage() {
             try {
               const c = await getMachineContentCounts(m.slug)
               return [m.slug, c] as const
-            } catch {
+            } catch (err) {
+              logger.error('Error cargando counts para máquina', err instanceof Error ? err : new Error(String(err)), { slug: m.slug })
               return [m.slug, { manual: 0, procedures: 0, flows: 0, diagnosis: 0 }] as const
             }
           })

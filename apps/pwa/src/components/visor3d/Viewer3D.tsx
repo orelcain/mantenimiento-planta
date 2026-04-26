@@ -1080,15 +1080,7 @@ export function Viewer3D(props: Viewer3DProps) {
             powerPreference: 'high-performance',
           }}
           onCreated={({ gl: renderer }) => {
-            console.log('[Viewer3D] Canvas created — lightweight:', !!props.lightweight, 'renderer:', renderer.info.render)
-            const canvas = renderer.domElement
-            canvas.addEventListener('webglcontextlost', (e) => {
-              e.preventDefault()
-              console.warn('[Viewer3D] WebGL context lost — pausing render')
-            })
-            canvas.addEventListener('webglcontextrestored', () => {
-              console.info('[Viewer3D] WebGL context restored')
-            })
+            renderer.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault() })
           }}
           style={{ background: 'transparent' }}
         >

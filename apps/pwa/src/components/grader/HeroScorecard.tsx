@@ -167,7 +167,7 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, marelHgC
                     <span className="tabular-nums font-semibold">
                       {rejectedRaw.toLocaleString('es-CL')}
                     </span>
-                    <span className="text-muted-foreground"> ({rejectedRawPct}%)</span>
+                    <span className="text-muted-foreground"> ({rejectedRawPct ?? '—'}%)</span>
                   </span>
                 ) : null}
               </div>

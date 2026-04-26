@@ -19,7 +19,6 @@ import {
   Sun,
   Activity,
   Cpu,
-  Route,
   Mail,
   Box,
   BarChart3,
@@ -67,7 +66,6 @@ const navGroups: NavGroup[] = [
   {
     id: 'planificacion', label: 'Planificación',
     items: [
-      { name: 'Inspecciones', href: '/inspections', icon: Route, module: 'inspecciones' },
       { name: 'Preventivo', href: '/preventive', icon: CalendarClock, module: 'preventivo' },
       { name: 'Predictivo', href: '/predictive', icon: Activity },
       { name: 'Planificador Gantt', href: '/gantt', icon: CalendarClock, module: 'gantt' },

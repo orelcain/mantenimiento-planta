@@ -59,7 +59,14 @@ export function GanttPlannerPage() {
   const [editTask, setEditTask] = useState<GanttTask | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
-  const [splitterX, setSplitterX] = useState(420)
+  const [splitterX, setSplitterX] = useState(() => {
+    const saved = localStorage.getItem('gantt-splitter-x')
+    return saved ? Math.max(200, Math.min(700, Number(saved))) : 420
+  })
+
+  useEffect(() => {
+    try { localStorage.setItem('gantt-splitter-x', String(splitterX)) } catch { /* storage full */ }
+  }, [splitterX])
 
   // CPM
   const cpm = useMemo<GanttCPMResult>(() => calculateCPM(tasks), [tasks])

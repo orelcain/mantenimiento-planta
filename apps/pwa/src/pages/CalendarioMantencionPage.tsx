@@ -5,6 +5,7 @@ import { db } from '../services/firebase'
 import { setDoc as trackedSetDoc } from '../services/firestoreTracked'
 import { getCurrentUser } from '../services/auth'
 import { getHmiTooltipPwd } from '../services/hmiKnuro'
+import { logger } from '@/lib/logger'
 
 type DayCol = {
   c: number
@@ -392,6 +393,7 @@ export function CalendarioMantencionPage() {
   const isHydratingRemoteRef = useRef(false)
   const hasLoadedCalendarRef = useRef(false)
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const syncSeqRef = useRef(0)
   const shiftStyleSamplesRef = useRef<ShiftStyleSamples>({})
   const undoStackRef = useRef<CalendarSnapshot[]>([])
   const redoStackRef = useRef<CalendarSnapshot[]>([])
@@ -811,7 +813,7 @@ export function CalendarioMantencionPage() {
       } else {
         setStatus(`Plantilla cargada localmente (sin sync Firebase): ${filename}`)
       }
-      console.warn('No se pudo hidratar calendario desde Firebase', error)
+      logger.error('No se pudo hidratar calendario desde Firebase', error instanceof Error ? error : new Error(String(error)))
     } finally {
       isHydratingRemoteRef.current = false
       hasLoadedCalendarRef.current = true
@@ -819,6 +821,7 @@ export function CalendarioMantencionPage() {
   }
 
   const syncCalendarToFirebase = useCallback(async (reason: string): Promise<void> => {
+    const mySeq = ++syncSeqRef.current
     try {
       setSyncState('saving')
       setSyncErrorText('')
@@ -855,10 +858,11 @@ export function CalendarioMantencionPage() {
         updatedBy: currentUser?.uid ?? 'anon',
       }
       await trackedSetDoc(doc(db, CALENDAR_FIRESTORE_PATH[0], CALENDAR_FIRESTORE_PATH[1]), payload, { merge: true })
+      if (syncSeqRef.current !== mySeq) return
       setLastSyncAt(new Date())
       setSyncState('synced')
     } catch (error) {
-      console.warn('No se pudo sincronizar calendario en Firebase', error)
+      if (syncSeqRef.current !== mySeq) return
       setSyncState('error')
       setSyncErrorText(error instanceof Error ? error.message : 'Error desconocido')
       setStatus('Cambios guardados en este navegador, pero sin permisos para sincronizar en Firebase.')

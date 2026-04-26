@@ -9,6 +9,7 @@ import { useViewer3DModelContext } from '@/components/visor3d/Viewer3DModelConte
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/useToast'
 import { deleteInteractiveBinding, setInteractiveBinding, subscribeToInteractiveBindings, type InteractiveBinding } from '@/services/interactiveBindings'
+import { logger } from '@/lib/logger'
 import type { Model3DFormat } from '@/types/models3d'
 
 type OperatingMode = 'produccion' | 'lavado' | 'mantencion'
@@ -498,11 +499,6 @@ function resolveInteractiveNodes(object: THREE.Object3D | null, info: { size: TH
       })
     })
 
-    if (allNamedObjects.length > 0) {
-      console.groupCollapsed(`[Sopladoras GLB] ${allNamedObjects.length} objetos nombrados detectados`)
-      allNamedObjects.forEach((item, index) => console.log(`  ${index}: ${item}`))
-      console.groupEnd()
-    }
   }
 
   const usedCandidateIndexes = new Set<number>()
@@ -661,12 +657,10 @@ function MeshClickHandler({
 
     const handleAssignClick = (event: MouseEvent) => {
       const intersects = getSelectionFromEvent(event)
-      console.log('[Editor] click — intersects:', intersects.length, intersects.slice(0, 3).map((i) => ({ type: i.object.type, name: i.object.name, sid: i.object.userData.stableMeshId })))
       const hit = intersects.find((i) => isModelMesh(i.object))
-      if (!hit) { console.log('[Editor] click — no model mesh hit'); return }
+      if (!hit) return
       if (editMode && assignmentTargetId && modelRoot && onAssignBinding) {
         const selection = getNamedSelectionFromHit(hit.object, modelRoot)
-        console.log('[Editor] click — selection:', selection)
         if (selection) {
           onAssignBinding(assignmentTargetId, selection)
         }
@@ -738,7 +732,6 @@ function RealMeshEffects({
 
   // Blower emissive — only runs when blower state changes
   useEffect(() => {
-    console.log('[RealMeshEffects] Applying blower emissive colors')
     for (const node of resolvedNodes) {
       if (node.kind !== 'blower' || !node.objectRef) continue
       const blower = blowers.find((item) => item.id === node.id)
@@ -763,7 +756,6 @@ function RealMeshEffects({
 
   // Valve emissive — only runs when valve state changes (NOT every frame)
   useEffect(() => {
-    console.log('[RealMeshEffects] Applying valve emissive colors')
     for (const node of resolvedNodes) {
       if (node.kind !== 'valve' || !node.objectRef) continue
       const valve = valves.find((item) => item.id === node.id)
@@ -897,9 +889,6 @@ function SopladorasBaader142InteractiveCanvasOverlay({
 
   const resolvedNodes = useMemo(() => {
     const nodes = resolveInteractiveNodes(object, info, bindingMap)
-    const objCount = nodes.filter((n) => n.source === 'object').length
-    const fbCount = nodes.filter((n) => n.source === 'fallback').length
-    console.log(`[Sopladoras Canvas] resolvedNodes: ${objCount} from GLB, ${fbCount} fallback — object:`, !!object, 'info:', !!info)
     return nodes
   }, [bindingMap, object, info])
 
@@ -1180,9 +1169,7 @@ function ModelBoundExperience({ modelId, modelName: _modelName, className, model
   // Without this, R3F's async Canvas init causes two WebGL contexts to coexist briefly → GPU crash.
   const [canvasReady, setCanvasReady] = useState(false)
   useEffect(() => {
-    console.log('[Sopladoras] ModelBoundExperience MOUNTED — delaying Canvas to avoid dual WebGL context')
     const timer = setTimeout(() => {
-      console.log('[Sopladoras] Previous Canvas disposed — creating lightweight Canvas now')
       setCanvasReady(true)
     }, 500)
     return () => clearTimeout(timer)
@@ -1209,11 +1196,10 @@ function ModelBoundExperience({ modelId, modelName: _modelName, className, model
     const unsubscribe = subscribeToInteractiveBindings(
       modelId,
       (nextBindings) => {
-        console.log('[Sopladoras] Firestore bindings received:', nextBindings.length)
         setBindings(nextBindings)
       },
       (error) => {
-        console.warn('[InteractiveBindings] Firestore subscription error (may be permissions):', error.message)
+        logger.error('[InteractiveBindings] Firestore subscription error', new Error(error.message))
       },
     )
     return () => unsubscribe()

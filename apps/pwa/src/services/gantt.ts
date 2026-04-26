@@ -40,7 +40,14 @@ function asDate(value: unknown): Date {
     return Number.isNaN(converted.getTime()) ? now : converted
   }
 
-  const parsed = new Date(value as string)
+  // Date-only strings (YYYY-MM-DD) parse as UTC midnight — use local constructor to avoid TZ shift
+  const s = value as string
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const [y, m, d] = s.split('-').map(Number)
+    const local = new Date(y!, m! - 1, d!)
+    return Number.isNaN(local.getTime()) ? now : local
+  }
+  const parsed = new Date(s)
   return Number.isNaN(parsed.getTime()) ? now : parsed
 }
 

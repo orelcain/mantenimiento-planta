@@ -140,13 +140,12 @@ export function HierarchyPage() {
 
   // Persistir estado de expansión de equipos
   useEffect(() => {
-    localStorage.setItem('hierarchy_expanded_equipment_nodes', JSON.stringify([...expandedEquipmentNodes]))
+    try { localStorage.setItem('hierarchy_expanded_equipment_nodes', JSON.stringify([...expandedEquipmentNodes])) } catch { /* storage full */ }
   }, [expandedEquipmentNodes])
 
   useEffect(() => {
     expandedNodesRef.current = expandedNodes
-    // Persistir estado de expansión
-    localStorage.setItem('hierarchy_expanded_nodes', JSON.stringify([...expandedNodes]))
+    try { localStorage.setItem('hierarchy_expanded_nodes', JSON.stringify([...expandedNodes])) } catch { /* storage full */ }
   }, [expandedNodes])
 
   // Cargar equipos cuando se monta el componente

@@ -679,7 +679,7 @@ export function AnalisisGraderTurnoPage() {
   const timelineGroupId = `timeline-${shiftDocId || 'default'}`
 
   return (
-    <TimelineSyncProvider groupId={timelineGroupId}>
+    <TimelineSyncProvider key={shiftDocId ?? 'default'} groupId={timelineGroupId}>
     <div className="container mx-auto p-3 sm:p-4 space-y-4 max-w-screen-xl">
       {/* M18 — Banner offline */}
       {!isOnline && (
