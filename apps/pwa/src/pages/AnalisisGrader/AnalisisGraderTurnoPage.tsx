@@ -12,7 +12,7 @@ import { Button, Card, CardContent, Spinner, Badge } from '@/components/ui'
 import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag, FileText, WifiOff } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { usePermissionsStore } from '@/store'
-import { useAuthStore, useIsAdmin } from '@/store/authStore'
+import { useAuthStore, useIsAdmin, useIsSupervisor } from '@/store/authStore'
 import { getDailySummary, loadTimelineAggregates, subscribePausesAggregates, listDailySummariesByRange, listGate0PieceRecords, type FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
 import { createPublicToken } from '@/services/grader/graderPublicToken.service'
 import type { Pause, MicroDetentionsSummary } from '@/services/grader/types'
@@ -40,6 +40,8 @@ import { useOnlineStatus } from '@/hooks/useOnlineStatus'
 import { usePauseTags } from '@/hooks/usePauseTags'
 import { useToast } from '@/hooks/useToast'
 import { ActionPlanPanel } from '@/components/grader/ActionPlanPanel'
+import { MarelHgCaptureCard } from '@/components/grader/MarelHgCaptureCard'
+import { subscribeMarelHgCapture, type MarelHgCapture } from '@/services/grader/graderMarelHg.service'
 import { deriveSuggestions } from '@/services/grader/actionPlanSuggestions'
 import { correlatePausesWithUpstream, summarizeCorrelations } from '@/services/shoplogix/shoplogixCorrelation'
 import { buildScatterData, scatterSlopeMagnitude } from '@/components/grader/shiftTimelineHelpers'
@@ -209,6 +211,7 @@ export function AnalisisGraderTurnoPage() {
   const { canSee } = usePermissionsStore()
   const user = useAuthStore((s) => s.user)
   const isAdmin = useIsAdmin()
+  const isSupervisor = useIsSupervisor()
   const isOnline = useOnlineStatus()        // M18 — detección de conectividad
   const { toast } = useToast()
   const prevIsOnline = useRef(isOnline)
@@ -270,6 +273,7 @@ export function AnalisisGraderTurnoPage() {
   const [gate0Pieces, setGate0Pieces] = useState<FirestorePieceRecord[]>([])
   const [pauses, setPauses] = useState<Pause[]>([])
   const [microDetentions, setMicroDetentions] = useState<MicroDetentionsSummary | null>(null)
+  const [marelHgCapture, setMarelHgCapture] = useState<MarelHgCapture | null>(null)
   const [selectedCauses, setSelectedCauses] = useState<Set<MatrixP0Cause>>(new Set())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -513,6 +517,14 @@ export function AnalisisGraderTurnoPage() {
       setPauses(data.pauses)
       setMicroDetentions(data.microDetentions)
     })
+    return unsub
+  }, [dateKey, shiftLabel])
+
+  // Captura Marel HG (corta-cabeza) — usada para deducir rechazo Baader puro
+  useEffect(() => {
+    if (!dateKey || !shiftLabel) return
+    setMarelHgCapture(null)
+    const unsub = subscribeMarelHgCapture(`${dateKey}__${shiftLabel}`, setMarelHgCapture)
     return unsub
   }, [dateKey, shiftLabel])
 
@@ -831,9 +843,21 @@ export function AnalisisGraderTurnoPage() {
       {summary && shiftWindow && (
         <>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {/* Scorecard — mobile row 1 */}
-            <div className="lg:col-span-2 lg:row-start-1">
-              <HeroScorecard summary={summary} shiftWindow={shiftWindow} upstreamSnapshot={upstreamLine.snapshot} />
+            {/* Scorecard + Marel HG capture — mobile row 1 */}
+            <div className="lg:col-span-2 lg:row-start-1 space-y-4">
+              <HeroScorecard
+                summary={summary}
+                shiftWindow={shiftWindow}
+                upstreamSnapshot={upstreamLine.snapshot}
+                marelHgCapture={marelHgCapture}
+              />
+              {(upstreamLine.snapshot || marelHgCapture) && (
+                <MarelHgCaptureCard
+                  summaryId={`${dateKey}__${shiftLabel}`}
+                  capture={marelHgCapture}
+                  canEdit={isSupervisor}
+                />
+              )}
             </div>
 
             {/* Acciones — mobile row 2 (protagonismo), desktop derecha full-height */}

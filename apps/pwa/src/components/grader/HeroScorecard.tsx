@@ -5,6 +5,7 @@ import { verdictFromP0Pct } from '@/services/grader/graderThresholds'
 import type { ShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import type { GraderDailySummary } from '@/services/grader/types'
 import type { UpstreamLineSnapshot } from '@/services/shoplogix/types'
+import { deriveBaaderRejection, type MarelHgCapture } from '@/services/grader/graderMarelHg.service'
 
 const VERDICT_STYLE = {
   ok: {
@@ -47,9 +48,14 @@ interface HeroScorecardProps {
   summary: GraderDailySummary
   shiftWindow: ShiftTimeWindow
   upstreamSnapshot?: UpstreamLineSnapshot | null
+  /**
+   * Captura manual Marel HG. Si está, se calcula rechazo Baader puro.
+   * Si no, se cae a estimación bruta (rechazos + no-controladas Marel mezclados).
+   */
+  marelHgCapture?: MarelHgCapture | null
 }
 
-export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot }: HeroScorecardProps) {
+export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, marelHgCapture }: HeroScorecardProps) {
   const verdict = verdictFromP0Pct(summary.pointZeroPct)
   const style = VERDICT_STYLE[verdict]
   const throughputPerMin = summary.productionRatePerHour
@@ -57,13 +63,18 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot }: HeroSc
     : '—'
 
   const baaderTotal = upstreamSnapshot?.machines.reduce((s, m) => s + (m.totalCycles ?? 0), 0) ?? 0
-  // Diferencia Grader − ΣBaader_procesadas. Positiva = piezas rechazadas por las
-  // Baader (vuelven vía línea manual) + no-controladas Marel HG (1-7% típico).
-  // No es rechazo Baader puro hasta tener captura manual de Marel.
+
+  // Si hay captura Marel HG → rechazo Baader puro (Grader − Baader − Marel_no_controladas).
+  // Si no hay captura → estimación bruta (Grader − Baader, mezcla rechazos + no-controladas).
+  const baaderRejectionPure = deriveBaaderRejection({
+    graderTotalPieces: summary.totalPieces,
+    baaderTotalCycles: baaderTotal,
+    marelHgCapture: marelHgCapture ?? null,
+  })
   const upstreamDelta = baaderTotal > 0 ? summary.totalPieces - baaderTotal : null
-  const rejectedEstimate = upstreamDelta != null && upstreamDelta > 0 ? upstreamDelta : null
-  const rejectedPct = rejectedEstimate != null && baaderTotal > 0
-    ? ((rejectedEstimate / baaderTotal) * 100).toFixed(1)
+  const rejectedRaw = upstreamDelta != null && upstreamDelta > 0 ? upstreamDelta : null
+  const rejectedRawPct = rejectedRaw != null && baaderTotal > 0
+    ? ((rejectedRaw / baaderTotal) * 100).toFixed(1)
     : null
 
   const durationLabel = shiftWindow.status === 'live' && shiftWindow.remainingMin != null
@@ -136,18 +147,29 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot }: HeroSc
                   </span>
                   <span className="text-muted-foreground">ciclos</span>
                 </div>
-                {rejectedEstimate != null && (
+                {baaderRejectionPure != null ? (
                   <span
                     className="text-amber-400 cursor-help"
-                    title="Estimación bruta: Grader_total − ΣBaader_procesadas. Incluye rechazos Baader (vuelven vía línea manual al Grader) + no-controladas Marel HG (1-7% típico). Para extraer rechazo Baader puro falta captura manual de Marel HG por turno."
+                    title={`Rechazo Baader puro = Grader_total − ΣBaader_procesadas − Marel_no_controladas (${marelHgCapture!.uncontrolled.toLocaleString('es-CL')}). Asume que rechazos Baader + no-controladas Marel vuelven al Grader vía línea manual. Para per-Baader real falta captura del bandejón.`}
                   >
-                    rechazo est.{' '}
+                    rechazo Baader{' '}
                     <span className="tabular-nums font-semibold">
-                      {rejectedEstimate.toLocaleString('es-CL')}
+                      {baaderRejectionPure.rejected.toLocaleString('es-CL')}
                     </span>
-                    <span className="text-muted-foreground"> ({rejectedPct}%)</span>
+                    <span className="text-muted-foreground"> ({baaderRejectionPure.rejectedPctOfBaader.toFixed(1)}%)</span>
                   </span>
-                )}
+                ) : rejectedRaw != null ? (
+                  <span
+                    className="text-amber-400 cursor-help"
+                    title="Estimación bruta: Grader_total − ΣBaader_procesadas. Incluye rechazos Baader + no-controladas Marel HG (1-7% típico). Capturá los datos Marel HG abajo para extraer rechazo Baader puro."
+                  >
+                    rechazo est. (bruto){' '}
+                    <span className="tabular-nums font-semibold">
+                      {rejectedRaw.toLocaleString('es-CL')}
+                    </span>
+                    <span className="text-muted-foreground"> ({rejectedRawPct}%)</span>
+                  </span>
+                ) : null}
               </div>
               <div className="grid grid-cols-3 gap-2">
                 {upstreamSnapshot.machines.map((m) => {
