@@ -61,7 +61,7 @@ export async function getShoplogixCredentialsInfo(): Promise<ShoplogixCredential
       setAt: setAtIso,
     }
   } catch (err) {
-    logger.error('[shoplogixCredentials] Error leyendo credenciales:', err)
+    logger.error('[shoplogixCredentials] Error leyendo credenciales:', err instanceof Error ? err : new Error(String(err)))
     throw err
   }
 }

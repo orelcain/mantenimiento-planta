@@ -69,7 +69,7 @@ export function ShoplogixCredentialsPage() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Error desconocido'
       setError(msg)
-      logger.error('[ShoplogixCredentialsPage] Error cargando info:', err)
+      logger.error('[ShoplogixCredentialsPage] Error cargando info:', err instanceof Error ? err : new Error(String(err)))
     } finally {
       setLoading(false)
     }
@@ -115,7 +115,7 @@ export function ShoplogixCredentialsPage() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Error al guardar'
       setFormError(msg)
-      logger.error('[ShoplogixCredentialsPage] Error guardando:', err)
+      logger.error('[ShoplogixCredentialsPage] Error guardando:', err instanceof Error ? err : new Error(String(err)))
     } finally {
       setSaving(false)
     }
@@ -134,7 +134,7 @@ export function ShoplogixCredentialsPage() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Error al eliminar'
       toast({ title: 'Error', description: msg, variant: 'destructive' })
-      logger.error('[ShoplogixCredentialsPage] Error eliminando:', err)
+      logger.error('[ShoplogixCredentialsPage] Error eliminando:', err instanceof Error ? err : new Error(String(err)))
     } finally {
       setDeleting(false)
     }
