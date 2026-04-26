@@ -40,7 +40,7 @@ import { analyzeGraderFromSummary } from '@/services/grader/graderSummaryAI'
 import { AIOutputPanel } from '@/components/grader/GraderInlinePanels'
 import { listPieceRecords, loadTimelineAggregates, type FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
 import { GraderTimelineChart } from '@/components/grader/GraderTimelineChart'
-import { p0StatusFromPct, p0StatusColor, p0StatusBgBorderClass } from '@/services/grader/graderP0Thresholds'
+import { p0StatusFromPct, p0StatusColor, p0StatusBgBorderClass, p0StatusHex } from '@/services/grader/graderP0Thresholds'
 
 // Registrar los elementos de Chart.js necesarios (idempotente si ya están)
 ChartJS.register(
@@ -549,7 +549,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
                         tension: 0.3,
                         pointRadius: 5,
                         pointHoverRadius: 7,
-                        pointBackgroundColor: p0PctData.map(v => v >= 3.5 ? 'rgba(239,68,68,1)' : v >= 2 ? 'rgba(245,158,11,1)' : 'rgba(16,185,129,1)'),
+                        pointBackgroundColor: p0PctData.map(v => p0StatusHex(p0StatusFromPct(v))),
                         pointBorderColor: 'rgba(255,255,255,0.8)',
                         pointBorderWidth: 2,
                         yAxisID: 'yP0',

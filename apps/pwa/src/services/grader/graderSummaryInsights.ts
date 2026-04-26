@@ -14,6 +14,7 @@
  */
 
 import type { GraderDailySummary } from './types'
+import { DEFAULT_P0_ALERT_PCT, DEFAULT_P0_CRITICAL_PCT } from './graderP0Thresholds'
 
 export interface SummaryInsight {
   id: string
@@ -23,8 +24,8 @@ export interface SummaryInsight {
   recommendations: string[]
 }
 
-const P0_WARN     = 2    // %
-const P0_CRITICAL = 3.5  // %
+const P0_WARN     = DEFAULT_P0_ALERT_PCT
+const P0_CRITICAL = DEFAULT_P0_CRITICAL_PCT
 const MIN_PIECES  = 500  // muestra mínima confiable
 const CAUSE_CONCENTRATION = 60 // % de una sola causa sobre el total P0
 

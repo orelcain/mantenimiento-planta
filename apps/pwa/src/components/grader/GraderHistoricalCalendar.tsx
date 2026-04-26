@@ -44,7 +44,7 @@ import type { GraderUpload, GraderDailySummary } from '@/services/grader/types'
 import { DayComparisonModal } from './DayComparisonModal'
 import { useAuthStore } from '@/store'
 import { useGraderSelectionStore } from '@/store/graderSelectionStore'
-import { p0StatusFromPct, p0StatusColor, type P0Status } from '@/services/grader/graderP0Thresholds'
+import { p0StatusFromPct, p0StatusColor, DEFAULT_P0_ALERT_PCT, DEFAULT_P0_CRITICAL_PCT, type P0Status } from '@/services/grader/graderP0Thresholds'
 
 interface TurnoSummary {
   totalPieces: number
@@ -665,9 +665,9 @@ export function GraderHistoricalCalendar({
                     isToday(day) && !isSelected && 'border-primary/60 bg-primary/5',
                     isSelected && 'ring-2 ring-primary border-primary bg-primary/8',
                     !hasData && dayUploads.length === 0 && 'opacity-40',
-                    hasData && worstP0 !== null && worstP0 >= 3.5 && 'border-red-400/50 bg-red-500/3',
-                    hasData && worstP0 !== null && worstP0 >= 2 && worstP0 < 3.5 && 'border-amber-400/50',
-                    hasData && worstP0 !== null && worstP0 < 2 && 'border-emerald-400/40',
+                    hasData && worstP0 !== null && worstP0 >= DEFAULT_P0_CRITICAL_PCT && 'border-red-400/50 bg-red-500/3',
+                    hasData && worstP0 !== null && worstP0 >= DEFAULT_P0_ALERT_PCT && worstP0 < DEFAULT_P0_CRITICAL_PCT && 'border-amber-400/50',
+                    hasData && worstP0 !== null && worstP0 < DEFAULT_P0_ALERT_PCT && 'border-emerald-400/40',
                     dimByFilter && 'opacity-20 pointer-events-none',
                     dayHasUntagged && !isSelected && 'border-amber-400/70 bg-amber-500/5',
                   )}
@@ -698,9 +698,9 @@ export function GraderHistoricalCalendar({
                         key={s.id}
                         className={cn(
                           'flex items-center justify-between rounded px-1 py-0.5 leading-none',
-                          p0 >= 3.5 ? 'bg-red-500/18 text-red-600' :
-                          p0 >= 2   ? 'bg-amber-500/18 text-amber-600' :
-                                      'bg-emerald-500/18 text-emerald-600',
+                          p0 >= DEFAULT_P0_CRITICAL_PCT ? 'bg-red-500/18 text-red-600' :
+                          p0 >= DEFAULT_P0_ALERT_PCT    ? 'bg-amber-500/18 text-amber-600' :
+                                                          'bg-emerald-500/18 text-emerald-600',
                         )}
                       >
                         <span className="text-[8px] font-medium opacity-70">{shiftLabel}</span>

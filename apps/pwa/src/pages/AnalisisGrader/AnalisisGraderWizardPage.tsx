@@ -41,6 +41,7 @@ import {
   type FirestorePieceRecord,
 } from '@/services/grader/graderDailySummary.service'
 import { detectPauses, collectSortedTimestamps, type PauseDetectionResult } from '@/services/grader/graderPauseDetector'
+import { DEFAULT_P0_ALERT_PCT, DEFAULT_P0_CRITICAL_PCT } from '@/services/grader/graderP0Thresholds'
 import type { ParsedMatrixData, GateAssignment, GraderAnalysisConfig } from '@/services/grader/types'
 
 const GRADER_WIZARD_DRAFT_KEY = 'grader_wizard_draft_v1'
@@ -66,8 +67,8 @@ export function AnalisisGraderWizardPage() {
     errorThresholds: {
       photocellPctWarn: 1,
       outOfLimitsPctWarn: 3,
-      pointZeroPctWarn: 2,
-      pointZeroPctCritical: 3.5,
+      pointZeroPctWarn: DEFAULT_P0_ALERT_PCT,
+      pointZeroPctCritical: DEFAULT_P0_CRITICAL_PCT,
     },
   })
   const [autosaveState, setAutosaveState] = useState<'idle' | 'queued' | 'saving' | 'saved' | 'error'>('idle')
@@ -200,8 +201,8 @@ export function AnalisisGraderWizardPage() {
           errorThresholds: {
             photocellPctWarn: c.errorThresholds?.photocellPctWarn ?? prev.errorThresholds?.photocellPctWarn ?? 1,
             outOfLimitsPctWarn: c.errorThresholds?.outOfLimitsPctWarn ?? prev.errorThresholds?.outOfLimitsPctWarn ?? 3,
-            pointZeroPctWarn: c.errorThresholds?.pointZeroPctWarn ?? prev.errorThresholds?.pointZeroPctWarn ?? 2,
-            pointZeroPctCritical: c.errorThresholds?.pointZeroPctCritical ?? prev.errorThresholds?.pointZeroPctCritical ?? 3.5,
+            pointZeroPctWarn: c.errorThresholds?.pointZeroPctWarn ?? prev.errorThresholds?.pointZeroPctWarn ?? DEFAULT_P0_ALERT_PCT,
+            pointZeroPctCritical: c.errorThresholds?.pointZeroPctCritical ?? prev.errorThresholds?.pointZeroPctCritical ?? DEFAULT_P0_CRITICAL_PCT,
           },
         }))
       }

@@ -32,7 +32,7 @@ import { cn } from '@/lib/utils'
 import type { PeriodAggregate, PeriodStats } from '@/services/grader/graderPeriodAggregate'
 import { computeStatsFromSummaries } from '@/services/grader/graderPeriodAggregate'
 import type { GraderDailySummary } from '@/services/grader/types'
-import { p0StatusFromPct, p0StatusColor, p0StatusBorderClass } from '@/services/grader/graderP0Thresholds'
+import { p0StatusFromPct, p0StatusColor, p0StatusBorderClass, DEFAULT_P0_CRITICAL_PCT } from '@/services/grader/graderP0Thresholds'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend, Filler, zoomPlugin)
 
@@ -490,7 +490,7 @@ export function GraderPeriodView({ data }: Props) {
     let maxStreak = 0
     let streak = 0
     for (const d of dailyP0Series) {
-      if (d.p0Pct >= 3.5) {
+      if (d.p0Pct >= DEFAULT_P0_CRITICAL_PCT) {
         criticalCount++
         streak++
         if (streak > maxStreak) maxStreak = streak

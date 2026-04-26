@@ -13,6 +13,7 @@ import { AlertTriangle, CheckCircle, ChevronDown, ChevronUp, Gauge } from 'lucid
 import { Badge, Input } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { DEFAULT_PHYSICAL_CONFIG } from '@/services/grader/graderAnalytics'
+import { DEFAULT_P0_ALERT_PCT, DEFAULT_P0_CRITICAL_PCT } from '@/services/grader/graderP0Thresholds'
 import type { GraderAnalyticsResult, DeterministicInsight } from '@/services/grader/types'
 
 const BELT_SHORT_NAMES: Record<string, string> = {
@@ -50,8 +51,8 @@ export function GraderResumenRapido({
   const { kpis, config } = analytics
   const belts = analytics.config.physicalConfig?.belts ?? DEFAULT_PHYSICAL_CONFIG.belts
   const p0Pct = kpis.pointZeroPct
-  const warnTh = config.errorThresholds?.pointZeroPctWarn ?? 2
-  const critTh = config.errorThresholds?.pointZeroPctCritical ?? 3.5
+  const warnTh = config.errorThresholds?.pointZeroPctWarn ?? DEFAULT_P0_ALERT_PCT
+  const critTh = config.errorThresholds?.pointZeroPctCritical ?? DEFAULT_P0_CRITICAL_PCT
 
   const p0Status: 'ok' | 'warn' | 'critical' =
     p0Pct >= critTh ? 'critical' : p0Pct >= warnTh ? 'warn' : 'ok'
