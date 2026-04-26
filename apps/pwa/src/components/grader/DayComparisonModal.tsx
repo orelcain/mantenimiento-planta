@@ -17,14 +17,9 @@ import { Sun, Moon, TrendingDown, TrendingUp, Minus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { parseMatrixErrorString, MATRIX_P0_CAUSES } from '@/services/grader/graderMatrixP0Causes'
 import type { GraderDailySummary } from '@/services/grader/types'
+import { p0StatusFromPct, p0StatusColor } from '@/services/grader/graderP0Thresholds'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function p0Color(pct: number): string {
-  if (pct >= 3.5) return 'text-red-500'
-  if (pct >= 2)   return 'text-amber-500'
-  return 'text-emerald-600'
-}
 
 function fmtMin(sec: number): string {
   const m = Math.round(sec / 60)
@@ -175,12 +170,12 @@ export function DayComparisonModal({ open, onClose, summaries, dateKey }: DayCom
             dayTrend={p0Trend.day}
             nightTrend={p0Trend.night}
             dayValue={
-              <span className={cn('text-xl font-bold tabular-nums', p0Color(dia.pointZeroPct))}>
+              <span className={cn('text-xl font-bold tabular-nums', p0StatusColor(p0StatusFromPct(dia.pointZeroPct)))}>
                 {dia.pointZeroPct}%
               </span>
             }
             nightValue={
-              <span className={cn('text-xl font-bold tabular-nums', p0Color(noche.pointZeroPct))}>
+              <span className={cn('text-xl font-bold tabular-nums', p0StatusColor(p0StatusFromPct(noche.pointZeroPct)))}>
                 {noche.pointZeroPct}%
               </span>
             }

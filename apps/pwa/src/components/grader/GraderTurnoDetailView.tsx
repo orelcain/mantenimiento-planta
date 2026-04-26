@@ -40,6 +40,7 @@ import { analyzeGraderFromSummary } from '@/services/grader/graderSummaryAI'
 import { AIOutputPanel } from '@/components/grader/GraderInlinePanels'
 import { listPieceRecords, loadTimelineAggregates, type FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
 import { GraderTimelineChart } from '@/components/grader/GraderTimelineChart'
+import { p0StatusFromPct, p0StatusColor, p0StatusBgBorderClass } from '@/services/grader/graderP0Thresholds'
 
 // Registrar los elementos de Chart.js necesarios (idempotente si ya están)
 ChartJS.register(
@@ -48,18 +49,6 @@ ChartJS.register(
 )
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-function p0Color(pct: number): string {
-  if (pct >= 3.5) return 'text-red-500'
-  if (pct >= 2)   return 'text-amber-500'
-  return 'text-emerald-600'
-}
-
-function p0BorderClass(pct: number): string {
-  if (pct >= 3.5) return 'border-red-500/30 bg-red-500/5'
-  if (pct >= 2)   return 'border-amber-500/30 bg-amber-500/5'
-  return 'border-emerald-500/30 bg-emerald-500/5'
-}
 
 /** Duración defensiva: si durationMinutes > 1440 (anomalía por merge),
  *  deriva de endAt–startAt con máximo de 720 min (12h = turno completo). */
@@ -353,7 +342,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
       )}
 
       {/* ── Header con fecha + turno + icono dia/noche ────────────────────── */}
-      <Card className={cn('border-2', p0BorderClass(summary.pointZeroPct))}>
+      <Card className={cn('border-2', p0StatusBgBorderClass(p0StatusFromPct(summary.pointZeroPct)))}>
         <CardContent className="pt-4 pb-4">
           <div className="flex items-start justify-between flex-wrap gap-3">
             <div>
@@ -394,7 +383,7 @@ export function GraderTurnoDetailView({ summary, recentTurns, hideDashboardButto
             </div>
             <div className="text-right">
               <p className="text-xs text-muted-foreground uppercase tracking-wide">P0%</p>
-              <p className={cn('text-5xl font-bold tabular-nums', p0Color(summary.pointZeroPct))}>
+              <p className={cn('text-5xl font-bold tabular-nums', p0StatusColor(p0StatusFromPct(summary.pointZeroPct)))}>
                 {summary.pointZeroPct}%
               </p>
             </div>

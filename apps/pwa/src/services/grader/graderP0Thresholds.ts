@@ -88,3 +88,21 @@ export function p0StatusLabel(status: P0Status): string {
     case 'critical': return 'crítico'
   }
 }
+
+/** Clase Tailwind de borde+fondo sutil — para cards y rows coloreados por status P0. */
+export function p0StatusBgBorderClass(status: P0Status): string {
+  switch (status) {
+    case 'ok':       return 'border-emerald-500/30 bg-emerald-500/5'
+    case 'alert':    return 'border-amber-500/30 bg-amber-500/5'
+    case 'critical': return 'border-rose-500/30 bg-rose-500/5'
+  }
+}
+
+/** Clase Tailwind solo de borde (sin fondo) — para badges y chips coloreados por status P0. */
+export function p0StatusBorderClass(status: P0Status): string {
+  switch (status) {
+    case 'ok':       return 'border-emerald-500/30'
+    case 'alert':    return 'border-amber-500/30'
+    case 'critical': return 'border-rose-500/30'
+  }
+}

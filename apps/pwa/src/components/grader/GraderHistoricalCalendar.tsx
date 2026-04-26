@@ -44,6 +44,7 @@ import type { GraderUpload, GraderDailySummary } from '@/services/grader/types'
 import { DayComparisonModal } from './DayComparisonModal'
 import { useAuthStore } from '@/store'
 import { useGraderSelectionStore } from '@/store/graderSelectionStore'
+import { p0StatusFromPct, p0StatusColor, type P0Status } from '@/services/grader/graderP0Thresholds'
 
 interface TurnoSummary {
   totalPieces: number
@@ -82,6 +83,12 @@ const monthNames = [
 ]
 
 const dayNames = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab']
+
+const P0_CARD_CLASS: Record<P0Status, string> = {
+  ok:       'border-emerald-500/20 bg-emerald-500/5 hover:border-emerald-500/40',
+  alert:    'border-amber-500/30 bg-amber-500/5 hover:border-amber-500/50',
+  critical: 'border-rose-500/30 bg-rose-500/5 hover:border-rose-500/50',
+}
 
 function toDateKey(iso?: string): string {
   if (!iso) return new Date().toISOString().slice(0, 10)
@@ -814,9 +821,7 @@ export function GraderHistoricalCalendar({
                     }}
                     className={cn(
                       'rounded-lg border px-3 py-2.5 space-y-2 cursor-pointer transition-all',
-                      hist.pointZeroPct >= 3.5 ? 'border-red-500/30 bg-red-500/5 hover:border-red-500/50' :
-                      hist.pointZeroPct >= 2   ? 'border-amber-500/30 bg-amber-500/5 hover:border-amber-500/50' :
-                                                 'border-emerald-500/20 bg-emerald-500/5 hover:border-emerald-500/40',
+                      P0_CARD_CLASS[p0StatusFromPct(hist.pointZeroPct)],
                       isActiveForConfig && 'ring-2 ring-emerald-500 ring-offset-1 ring-offset-background',
                     )}
                   >
@@ -851,9 +856,7 @@ export function GraderHistoricalCalendar({
                       </div>
                       <span className={cn(
                         'text-lg font-bold tabular-nums',
-                        hist.pointZeroPct >= 3.5 ? 'text-red-500' :
-                        hist.pointZeroPct >= 2   ? 'text-amber-500' :
-                                                   'text-emerald-600',
+                        p0StatusColor(p0StatusFromPct(hist.pointZeroPct)),
                       )}>
                         {hist.pointZeroPct}%
                       </span>

@@ -32,22 +32,11 @@ import { cn } from '@/lib/utils'
 import type { PeriodAggregate, PeriodStats } from '@/services/grader/graderPeriodAggregate'
 import { computeStatsFromSummaries } from '@/services/grader/graderPeriodAggregate'
 import type { GraderDailySummary } from '@/services/grader/types'
+import { p0StatusFromPct, p0StatusColor, p0StatusBorderClass } from '@/services/grader/graderP0Thresholds'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend, Filler, zoomPlugin)
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-function p0Color(pct: number): string {
-  if (pct >= 3.5) return 'text-red-500'
-  if (pct >= 2)   return 'text-amber-500'
-  return 'text-emerald-600'
-}
-
-function p0BorderClass(pct: number): string {
-  if (pct >= 3.5) return 'border-red-500/30'
-  if (pct >= 2)   return 'border-amber-500/30'
-  return 'border-emerald-500/30'
-}
 
 function formatWeight(kg: number): string {
   if (kg >= 1000) return `${(kg / 1000).toFixed(1)} t`
@@ -562,7 +551,7 @@ export function GraderPeriodView({ data }: Props) {
   return (
     <div className="space-y-4">
       {/* ── Header del rango ──────────────────────────────────────────────── */}
-      <Card className={cn('border-l-4', p0BorderClass(visibleStats.p0PctWeighted))}>
+      <Card className={cn('border-l-4', p0StatusBorderClass(p0StatusFromPct(visibleStats.p0PctWeighted)))}>
         <CardContent className="pt-4 pb-4">
           <div className="flex items-start justify-between flex-wrap gap-3">
             <div className="min-w-0">
@@ -593,7 +582,7 @@ export function GraderPeriodView({ data }: Props) {
             </div>
             <div className="text-right shrink-0">
               <p className="text-[10px] text-muted-foreground uppercase tracking-wide">P0% ponderado</p>
-              <p className={cn('text-4xl font-bold tabular-nums', p0Color(visibleStats.p0PctWeighted))}>
+              <p className={cn('text-4xl font-bold tabular-nums', p0StatusColor(p0StatusFromPct(visibleStats.p0PctWeighted)))}>
                 {visibleStats.p0PctWeighted}%
               </p>
             </div>
@@ -617,7 +606,7 @@ export function GraderPeriodView({ data }: Props) {
         <Card>
           <CardContent className="pt-4 pb-3 text-center">
             <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">P0 piezas</p>
-            <p className={cn('text-xl font-bold tabular-nums mt-0.5', p0Color(visibleStats.p0PctWeighted))}>
+            <p className={cn('text-xl font-bold tabular-nums mt-0.5', p0StatusColor(p0StatusFromPct(visibleStats.p0PctWeighted)))}>
               {(visibleStats.totalP0Pieces / 1e3).toFixed(1)}k
             </p>
             <p className="text-[9px] text-muted-foreground mt-0.5">{formatNumber(visibleStats.totalP0Pieces)}</p>
@@ -944,7 +933,7 @@ export function GraderPeriodView({ data }: Props) {
                 key={g.shiftId}
                 className={cn(
                   'rounded-lg border px-4 py-3',
-                  p0BorderClass(g.p0PctWeighted),
+                  p0StatusBorderClass(p0StatusFromPct(g.p0PctWeighted)),
                 )}
               >
                 <div className="flex items-start justify-between">
@@ -954,7 +943,7 @@ export function GraderPeriodView({ data }: Props) {
                       {g.count} turno{g.count !== 1 ? 's' : ''}
                     </p>
                   </div>
-                  <p className={cn('text-2xl font-bold tabular-nums', p0Color(g.p0PctWeighted))}>
+                  <p className={cn('text-2xl font-bold tabular-nums', p0StatusColor(p0StatusFromPct(g.p0PctWeighted)))}>
                     {g.p0PctWeighted}%
                   </p>
                 </div>
@@ -1044,7 +1033,7 @@ export function GraderPeriodView({ data }: Props) {
                       </Badge>
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums">{formatNumber(s.totalPieces)}</td>
-                    <td className={cn('px-3 py-2 text-right tabular-nums font-semibold', p0Color(s.pointZeroPct))}>
+                    <td className={cn('px-3 py-2 text-right tabular-nums font-semibold', p0StatusColor(p0StatusFromPct(s.pointZeroPct)))}>
                       {s.pointZeroPct}%
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
