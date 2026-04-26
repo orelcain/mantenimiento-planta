@@ -9,16 +9,15 @@
  * muestra un estado vacío con link al landing.
  */
 
-import { useMemo, useState, useCallback } from 'react'
-import { useNavigate, Navigate } from 'react-router-dom'
+import { useMemo, useState, useCallback, useEffect } from 'react'
+import { useNavigate, Navigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, Button, Badge } from '@/components/ui'
-import { Activity, ArrowLeft, CheckCircle2, Clock, SlidersHorizontal } from 'lucide-react'
+import { Activity, ArrowLeft, CheckCircle2, Clock, SlidersHorizontal, History } from 'lucide-react'
 import { usePermissionsStore } from '@/store'
 import { QuickGateChangeButton } from '@/components/grader/QuickGateChangeButton'
 import { computeShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import { DEFAULT_SHIFT_SCHEDULE } from '@/services/grader/graderShiftSchedule'
 import { listSnapshots } from '@/services/grader/graderConfigSnapshot.service'
-import { useEffect } from 'react'
 import type { GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
 
 function todayKey() {
@@ -28,10 +27,16 @@ function todayKey() {
 export function GraderQuickChangePage() {
   const { canSee } = usePermissionsStore()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [snapshots, setSnapshots] = useState<GateConfigSnapshot[]>([])
   const [savedCount, setSavedCount] = useState(0)
 
+  // ?turno=YYYY-MM-DD__Turno+día → registro retroactivo de un turno específico
+  const paramTurno = searchParams.get('turno')
+
+  // Detectar turno vivo solo si no hay override por query param
   const liveShift = useMemo(() => {
+    if (paramTurno) return null
     const today = todayKey()
     const now = new Date()
     for (const sched of DEFAULT_SHIFT_SCHEDULE) {
@@ -41,9 +46,19 @@ export function GraderQuickChangePage() {
       }
     }
     return null
-  }, [])
+  }, [paramTurno])
 
-  const shiftDocId = liveShift ? `${liveShift.dateKey}__${liveShift.shiftId}` : null
+  // Derivar display info desde el param override (formato: YYYY-MM-DD__Turno día)
+  const overrideDisplay = useMemo(() => {
+    if (!paramTurno) return null
+    const sep = paramTurno.indexOf('__')
+    if (sep === -1) return null
+    const dateKey = paramTurno.slice(0, sep)
+    const shiftId = paramTurno.slice(sep + 2)
+    return { dateKey, shiftId }
+  }, [paramTurno])
+
+  const shiftDocId = paramTurno ?? (liveShift ? `${liveShift.dateKey}__${liveShift.shiftId}` : null)
 
   // Cargar el último snapshot para mostrar config actual
   const reloadSnapshots = useCallback(() => {
@@ -65,7 +80,8 @@ export function GraderQuickChangePage() {
   const latest = snapshots.length > 0 ? snapshots[snapshots.length - 1] : null
   const activeGates = latest?.gates.filter(g => g.active) ?? []
 
-  const shortShift = liveShift?.shiftId.includes('día') ? 'día' : 'noche'
+  const activeDisplay = overrideDisplay ?? (liveShift ? { dateKey: liveShift.dateKey, shiftId: liveShift.shiftId } : null)
+  const shortShift = activeDisplay?.shiftId.includes('día') ? 'día' : 'noche'
   const shiftStart = liveShift?.window.startAt
     ? new Date(liveShift.window.startAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })
     : null
@@ -88,33 +104,59 @@ export function GraderQuickChangePage() {
       </div>
 
       {/* Estado del turno */}
-      {liveShift ? (
+      {activeDisplay ? (
         <>
-          <Card className="border-red-500/30 bg-red-500/5">
-            <CardContent className="p-4 flex items-center gap-3">
-              <Activity className="w-5 h-5 text-red-400 animate-pulse shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-semibold capitalize">Turno {shortShift}</span>
-                  <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-[10px]">EN VIVO</Badge>
-                </div>
-                {shiftStart && (
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
-                    <Clock className="w-3 h-3" />
-                    Desde {shiftStart}
+          {/* Banner: EN VIVO (turno activo) o RETROACTIVO (override por param) */}
+          {overrideDisplay ? (
+            <Card className="border-amber-500/30 bg-amber-500/5">
+              <CardContent className="p-4 flex items-center gap-3">
+                <History className="w-5 h-5 text-amber-400 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold capitalize">Turno {shortShift}</span>
+                    <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 text-[10px]">RETROACTIVO</Badge>
                   </div>
-                )}
-              </div>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="text-xs shrink-0"
-                onClick={() => navigate(`/analisis-grader/turno/${shiftDocId}`)}
-              >
-                Ver turno
-              </Button>
-            </CardContent>
-          </Card>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    {overrideDisplay.dateKey}
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-xs shrink-0"
+                  onClick={() => navigate(`/analisis-grader/turno/${shiftDocId}`)}
+                >
+                  Ver turno
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="border-red-500/30 bg-red-500/5">
+              <CardContent className="p-4 flex items-center gap-3">
+                <Activity className="w-5 h-5 text-red-400 animate-pulse shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold capitalize">Turno {shortShift}</span>
+                    <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-[10px]">EN VIVO</Badge>
+                  </div>
+                  {shiftStart && (
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
+                      <Clock className="w-3 h-3" />
+                      Desde {shiftStart}
+                    </div>
+                  )}
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-xs shrink-0"
+                  onClick={() => navigate(`/analisis-grader/turno/${shiftDocId}`)}
+                >
+                  Ver turno
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Feedback de cambios guardados */}
           {savedCount > 0 && (
@@ -137,7 +179,9 @@ export function GraderQuickChangePage() {
               className="w-full h-14 text-base gap-2"
             />
             <p className="text-center text-xs text-muted-foreground mt-2">
-              El cambio queda marcado en el timeline con hora exacta
+              {overrideDisplay
+                ? 'El cambio se registra con la hora actual como timestamp retroactivo'
+                : 'El cambio queda marcado en el timeline con hora exacta'}
             </p>
           </div>
 
