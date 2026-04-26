@@ -853,7 +853,7 @@ Con Haversine A→D = dimensión real del recinto en metros. El DWG ya tiene cot
 **P2 — Mejoras chicas:**
 - 🔲 **Fase 3b — Edición manual de rangos de pausas** — drag handles en bandas Timeline (~2-3 días)
 - 🔲 **Fase 4 — CRUD admin de tags** — gestión Firestore de `graderPauseTags` (~2-3 días)
-- 🔲 **Re-upload pieceRecords productivas** — 383 turnos × ~5M pieceRecords. Script: `node scripts/bulk-upload-piece-records.js` (idempotente). Luego `enrich-pieceRecords-from-p0.js`.
+- ✅ **pieceRecords productivas** — 383 turnos × 5.37M records ya en Firestore (verificado dry-run 2026-04-26: 0 nuevos en todos los segmentos)
 
 ---
 
@@ -935,7 +935,7 @@ Con Haversine A→D = dimensión real del recinto en metros. El DWG ya tiene cot
 - 🔲 **#2 Ruta mobile `/grader/quick-change?turno=X`** — vista reducida para supervisor con celular. (~1h)
 - 🔲 **Fase 3b — Edición manual de rangos de pausas** — drag handles en bandas del Timeline para redimensionar/crear/descartar pausas. Estado local complejo + persistir a Firestore + no pisar el detector automático. `ShiftTimelineView.tsx`. (~2-3 días)
 - 🔲 **Fase 4 — CRUD admin de tags** — página admin para gestionar `graderPauseTags` en Firestore (crear/renombrar/cambiar color+emoji/archivar). Hoy los 9 tags están hardcoded en `graderPauseTags.ts`. Reglas Firestore nuevas. (~2-3 días)
-- 🔲 **Re-upload pieceRecords productivas** — 383 turnos × ~5M pieceRecords a Firestore (script batch idempotente, mismo patrón que el script P0 de la temporada). Sin esto, el timeline segundo a segundo solo funciona desde la fecha de la primera carga manual.
+- ✅ **pieceRecords productivas** — 383/383 turnos ya en Firestore (5.37M records, verificado 2026-04-26)
 
 ---
 
