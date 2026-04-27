@@ -130,34 +130,38 @@ function renderShiftChip(chip: ShiftChipDescriptor, untaggedCount: number | null
       : 'bg-emerald-500/18 text-emerald-600'
 
   if (chip.role === 'orphan-source') {
-    // Chip atenuado tachado en el día schedule sin actividad real
+    // Chip atenuado en el día schedule sin actividad real.
+    // Color indigo (consistente con el banner del TurnoPage y badge del panel
+    // resumen del día) para diferenciarlo de "celda vacía" gris neutro.
     return (
       <div
         key={key}
         title={`Turno ${chip.shiftId.toLowerCase()} programado pero sin actividad este día. Detalle en ${chip.primaryDateKey ?? 'otro día'}.`}
-        className="flex items-center justify-between rounded px-1 py-0.5 leading-none bg-neutral-500/10 text-neutral-500"
+        className="flex items-center justify-between rounded px-1 py-0.5 leading-none bg-indigo-500/15 text-indigo-300 border border-indigo-500/25"
       >
-        <span className="text-[8px] font-medium line-through">{baseLetter}⌧</span>
-        <span className="text-[7px] tabular-nums opacity-80">→ {chip.primaryDateKey?.slice(8) ?? '--'}</span>
+        <span className="text-[8px] font-medium line-through opacity-80">{baseLetter}⌧</span>
+        <span className="text-[8px] tabular-nums opacity-90">→ {chip.primaryDateKey?.slice(8) ?? '--'}</span>
       </div>
     )
   }
 
   if (chip.role === 'secondary') {
-    // Chip chico atenuado: % del fragmento (no P0%) para indicar continuidad
+    // Chip chico atenuado: % del fragmento (no P0%) para indicar continuidad.
+    // OCULTO en mobile (<640px) para reducir densidad — sigue accesible en
+    // el panel "Resumen del día" abajo.
     const pct = chip.pctOfShift != null ? Math.round(chip.pctOfShift) : 0
     return (
       <div
         key={key}
         title={`${chip.shiftId} ${chip.shiftDateKey} → este día aportó ${pct}% de la carga (P0% del turno completo: ${p0.toFixed(1)}%)`}
         className={cn(
-          'flex items-center justify-between rounded px-1 leading-none opacity-60 hover:opacity-100 transition-opacity',
+          'hidden sm:flex items-center justify-between rounded px-1 leading-none opacity-60 hover:opacity-100 transition-opacity',
           colorByP0,
         )}
-        style={{ paddingTop: 0, paddingBottom: 0, height: '11px' }}
+        style={{ paddingTop: 0, paddingBottom: 0, height: '13px' }}
       >
-        <span className="text-[7px] font-medium opacity-80">{label}</span>
-        <span className="text-[7px] font-semibold tabular-nums">{pct}%</span>
+        <span className="text-[8px] font-medium opacity-80">{label}</span>
+        <span className="text-[8px] font-semibold tabular-nums">{pct}%</span>
       </div>
     )
   }
