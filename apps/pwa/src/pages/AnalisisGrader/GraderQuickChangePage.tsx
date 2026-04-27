@@ -12,9 +12,9 @@
 import { useMemo, useState, useCallback, useEffect } from 'react'
 import { useNavigate, Navigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, Button, Badge } from '@/components/ui'
-import { Activity, ArrowLeft, CheckCircle2, Clock, SlidersHorizontal, History } from 'lucide-react'
+import { Activity, ArrowLeft, CheckCircle2, Clock, GitBranch, SlidersHorizontal, History } from 'lucide-react'
 import { usePermissionsStore } from '@/store'
-import { QuickGateChangeButton } from '@/components/grader/QuickGateChangeButton'
+import { GateChangeModal } from '@/components/grader/modals/GateChangeModal'
 import { computeShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import { DEFAULT_SHIFT_SCHEDULE } from '@/services/grader/graderShiftSchedule'
 import { listSnapshots } from '@/services/grader/graderConfigSnapshot.service'
@@ -30,6 +30,7 @@ export function GraderQuickChangePage() {
   const [searchParams] = useSearchParams()
   const [snapshots, setSnapshots] = useState<GateConfigSnapshot[]>([])
   const [savedCount, setSavedCount] = useState(0)
+  const [modalOpen, setModalOpen] = useState(false)
 
   // ?turno=YYYY-MM-DD__Turno+día → registro retroactivo de un turno específico
   const paramTurno = searchParams.get('turno')
@@ -170,20 +171,27 @@ export function GraderQuickChangePage() {
 
           {/* Botón principal — CTA grande para mobile */}
           <div className="pt-2">
-            <QuickGateChangeButton
-              shiftDocId={shiftDocId!}
-              variant="default"
-              onSaved={handleSaved}
-              allowEdit
-              triggerLabel="Registrar cambio de gate"
+            <Button
               className="w-full h-14 text-base gap-2"
-            />
+              onClick={() => setModalOpen(true)}
+            >
+              <GitBranch className="w-5 h-5" />
+              Registrar cambio de gate
+            </Button>
             <p className="text-center text-xs text-muted-foreground mt-2">
               {overrideDisplay
                 ? 'El cambio se registra con la hora actual como timestamp retroactivo'
                 : 'El cambio queda marcado en el timeline con hora exacta'}
             </p>
           </div>
+
+          <GateChangeModal
+            open={modalOpen}
+            onOpenChange={setModalOpen}
+            shiftDocId={shiftDocId!}
+            configSnapshots={snapshots}
+            onSaved={() => { setModalOpen(false); handleSaved() }}
+          />
 
           {/* Config actual compacta — los gates activos del último snapshot */}
           {activeGates.length > 0 && (
