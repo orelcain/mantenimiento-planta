@@ -31,6 +31,7 @@ import { resolveAxisWindow, computeProductionWindow } from '@/components/grader/
 import { TimelineSyncProvider } from '@/components/grader/TimelineSyncContext'
 import { ShiftBreakdownsCard } from '@/components/grader/ShiftBreakdownsCard'
 import { GateBreakdownCard } from '@/components/grader/GateBreakdownCard'
+import { GateEvolutionChart } from '@/components/grader/GateEvolutionChart'
 import { ConfigChangeHistory } from '@/components/grader/ConfigChangeHistory'
 import { ShiftConfigPanel } from '@/components/grader/ShiftConfigPanel'
 import { PauseAnnotationDialog } from '@/components/grader/PauseAnnotationDialog'
@@ -959,6 +960,14 @@ export function AnalisisGraderTurnoPage() {
               pointZeroPct={summary.pointZeroPct}
               shiftDocId={`${dateKey}__${shiftLabel}`}
               onSaved={reloadConfigSnapshots}
+            />
+          )}
+
+          {/* Evolución de gates a lo largo del turno (piezas/min por gate) */}
+          {enrichedTimelineBuckets.length > 0 && configSnapshots.length > 0 && (
+            <GateEvolutionChart
+              timelineBuckets={enrichedTimelineBuckets}
+              configSnapshots={configSnapshots}
             />
           )}
 

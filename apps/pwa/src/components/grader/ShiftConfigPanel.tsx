@@ -264,6 +264,35 @@ export function ShiftConfigPanel({
               {latest.reason && ` · "${latest.reason}"`}
             </p>
           )}
+
+          {/* Velocidades registradas — read-only para turnos cerrados */}
+          {shiftDoc?.beltSpeedHistory && shiftDoc.beltSpeedHistory.length > 0 && (() => {
+            const history = shiftDoc.beltSpeedHistory!
+            const last = history[history.length - 1]!
+            return (
+              <div className="mt-2.5 pt-2 border-t border-border/20">
+                <p className="text-[10px] text-muted-foreground/50 mb-1">
+                  Velocidades registradas · {fmtTime(last.at)}
+                  {last.note && ` · "${last.note}"`}
+                </p>
+                <div className="flex flex-wrap gap-x-4 gap-y-0.5">
+                  {last.belts.map(b => (
+                    <span key={b.beltId} className="text-[10px] text-muted-foreground tabular-nums">
+                      <span className="font-medium text-foreground/70">
+                        {b.beltId === 'zeta' ? 'Z-Belt' : b.beltId === 'accel1' ? 'Accel 1' : 'Accel 2'}
+                      </span>
+                      {' '}{b.rpm} RPM → {b.calculatedMps.toFixed(3)} m/s
+                    </span>
+                  ))}
+                </div>
+                {history.length > 1 && (
+                  <p className="text-[10px] text-muted-foreground/40 mt-0.5">
+                    {history.length} ajuste{history.length > 1 ? 's' : ''} registrado{history.length > 1 ? 's' : ''} en el turno
+                  </p>
+                )}
+              </div>
+            )
+          })()}
         </CardContent>
       )}
 
