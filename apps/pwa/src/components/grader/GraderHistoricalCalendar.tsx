@@ -809,7 +809,7 @@ export function GraderHistoricalCalendar({
                   )
                 })()}
               </div>
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {(historicalByDate.get(selectedKey) ?? [])
                 .sort((a, b) => {
                   const order: Record<string, number> = { 'Turno día': 0, 'Turno noche': 1 }
