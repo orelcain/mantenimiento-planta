@@ -5,7 +5,7 @@
  */
 import { useMemo } from 'react'
 import { Card, CardContent } from '@/components/ui'
-import { TrendingDown, TrendingUp, AlertTriangle, BarChart3 } from 'lucide-react'
+import { TrendingDown, TrendingUp, AlertTriangle, BarChart3, Sun, Moon } from 'lucide-react'
 import type { GraderDailySummary } from '@/services/grader/types'
 import { getCauseLabel } from '@/services/grader/graderMatrixP0Causes'
 import { p0StatusFromPct, p0StatusColor } from '@/services/grader/graderP0Thresholds'
@@ -92,7 +92,12 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries }: Props) {
               {stats.totalWeightKg > 0 && (
                 <p className="text-xs text-muted-foreground">{fmtDec(stats.totalWeightKg / 1000, 1)} t</p>
               )}
-              <p className="text-xs text-muted-foreground">{stats.uniqueDays} días · {stats.turnos} turnos</p>
+              <p
+                className="text-xs text-muted-foreground"
+                title="Días con al menos un turno iniciado en ese día calendario · Turnos totales con datos"
+              >
+                {stats.uniqueDays} días · {stats.turnos} turnos
+              </p>
             </div>
           </div>
         </CardContent>
@@ -133,15 +138,24 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries }: Props) {
       {/* Distribución Día / Noche */}
       <Card>
         <CardContent className="py-2 px-4">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wide text-center mb-1.5">
+            Turnos
+          </p>
           <div className="flex justify-around text-center">
             <div>
-              <p className="text-2xl font-bold">{stats.dayShifts}</p>
-              <p className="text-xs text-muted-foreground">Turnos día</p>
+              <p className="text-2xl font-bold leading-none">{stats.dayShifts}</p>
+              <p className="text-xs text-muted-foreground mt-1 flex items-center justify-center gap-1">
+                <Sun className="w-3 h-3 text-amber-500" />
+                Día
+              </p>
             </div>
             <div className="w-px bg-border" />
             <div>
-              <p className="text-2xl font-bold">{stats.nightShifts}</p>
-              <p className="text-xs text-muted-foreground">Turnos noche</p>
+              <p className="text-2xl font-bold leading-none">{stats.nightShifts}</p>
+              <p className="text-xs text-muted-foreground mt-1 flex items-center justify-center gap-1">
+                <Moon className="w-3 h-3 text-indigo-400" />
+                Noche
+              </p>
             </div>
           </div>
         </CardContent>
