@@ -51,10 +51,13 @@ export interface CalendarDayContribution {
   /** Minutos con actividad de este summary en este día calendario */
   activeMinutes: number
   /**
-   * Si los datos provienen de los timelineBuckets (precision por minuto)
-   * o de un fallback legacy (todo el summary atribuido al día de inicio).
+   * Origen de los datos:
+   * - `timeline`: precision por minuto desde TimelineBucket sub-collection
+   * - `hourly`: precision por hora desde hourlyBuckets del summary (turno
+   *   noche que cruza medianoche se reparte heurísticamente por hour del bucket)
+   * - `legacy`: sin granularidad — todo el summary atribuido al día de inicio
    */
-  source: 'timeline' | 'legacy'
+  source: 'timeline' | 'hourly' | 'legacy'
 }
 
 /** Agregado de un día calendario completo (puede recibir aportes de varios turnos). */
@@ -98,9 +101,15 @@ export interface CalendarAggregationInput {
  * Path A (preferido): si el summary tiene buckets en `timelinesBySummaryId`,
  * cada bucket aporta sus piezas al `tsMin.slice(0,10)`. Precision por minuto.
  *
- * Path B (fallback): si no hay buckets, el summary completo se atribuye a
- * `summary.dateKey` (mismo comportamiento que hoy). La contribución se marca
- * `source: 'legacy'` para que la UI pueda señalarlo si quisiera.
+ * Path C (hourly): si no hay timelineBuckets pero el summary trae
+ * `hourlyBuckets` + `startAt` + `endAt`, las horas se reparten entre día de
+ * inicio y día siguiente usando la heurística "hours >= startHour van al día
+ * de inicio, hours < startHour van al día siguiente" (sólo si el turno cruza
+ * medianoche). Precision por hora. Es el path que usa el panel mensual sin
+ * pagar el costo de cargar 40+ docs `meta/timeline`.
+ *
+ * Path B (legacy fallback): si no hay buckets ni hourly+bounds, el summary
+ * completo se atribuye a `summary.dateKey` (mismo comportamiento que hoy).
  *
  * NOTA convencional: los timestamps del Grader son wall-clock-as-UTC (ver
  * `graderSegmenter.computeShiftSummary` línea 486 — usa `getUTCHours()` para
@@ -133,6 +142,8 @@ export function aggregateByCalendarDay(
     const buckets = timelinesBySummaryId?.get(summary.id)
     if (buckets && buckets.length > 0) {
       contributeFromTimeline(summary, buckets, getOrCreate)
+    } else if (canUseHourlyPath(summary)) {
+      contributeFromHourly(summary, getOrCreate)
     } else {
       contributeFromLegacy(summary, getOrCreate)
     }
@@ -202,7 +213,110 @@ function contributeFromTimeline(
   }
 }
 
-// ── Path B: fallback legacy (sin timeline) ────────────────────────────────────
+// ── Path C: precision por hora (hourlyBuckets + startAt/endAt) ────────────────
+
+function canUseHourlyPath(summary: GraderDailySummary): boolean {
+  return !!(
+    summary.hourlyBuckets &&
+    summary.hourlyBuckets.length > 0 &&
+    summary.startAt &&
+    summary.endAt
+  )
+}
+
+/**
+ * Reconstruye el día calendario al que pertenece cada hour bucket.
+ *
+ * Convención wall-clock-as-UTC: `startAt = "2026-04-12T21:30:00.000Z"`
+ * representa 21:30 hora Chile, no UTC. La string slice del hour funciona
+ * directamente sin conversión TZ.
+ *
+ * - Turno que NO cruza medianoche (start.dateKey === end.dateKey):
+ *   todas las horas → start.dateKey
+ * - Turno que SÍ cruza:
+ *   hours >= startHour → start.dateKey (parte vespertina)
+ *   hours <  startHour → end.dateKey   (parte madrugada del día siguiente)
+ *
+ * Esta heurística asume turnos de máximo 24h y schedules razonables. Para
+ * turnos exóticos (ej. 30h continuos) se requeriría usar timelineBuckets.
+ */
+function dateKeyForHour(
+  hour: number,
+  startDateKey: string,
+  endDateKey: string,
+  startHour: number,
+): string {
+  if (startDateKey === endDateKey) return startDateKey
+  return hour >= startHour ? startDateKey : endDateKey
+}
+
+function contributeFromHourly(
+  summary: GraderDailySummary,
+  getOrCreate: (k: string) => CalendarDayAggregate,
+): void {
+  const startDateKey = summary.startAt!.slice(0, 10)
+  const endDateKey = summary.endAt!.slice(0, 10)
+  const startHour = Number(summary.startAt!.slice(11, 13))
+
+  // Agrupar piezas por día calendario
+  interface PerDayAcc {
+    pieces: number
+    p0: number
+    hours: Set<number>
+  }
+  const byDay = new Map<string, PerDayAcc>()
+
+  for (const hb of summary.hourlyBuckets!) {
+    const dateKey = dateKeyForHour(hb.hour, startDateKey, endDateKey, startHour)
+    let acc = byDay.get(dateKey)
+    if (!acc) {
+      acc = { pieces: 0, p0: 0, hours: new Set() }
+      byDay.set(dateKey, acc)
+    }
+    acc.pieces += hb.totalPieces
+    acc.p0 += hb.p0Pieces
+    acc.hours.add(hb.hour)
+  }
+
+  // Calcular ratio de cada día respecto al total de piezas para repartir
+  // proporcionalmente weightKg y durationMinutes (que vienen como totales del turno).
+  const totalPiecesInBuckets = Array.from(byDay.values()).reduce(
+    (s, v) => s + v.pieces,
+    0,
+  )
+
+  for (const [dateKey, contrib] of byDay) {
+    const ratio = totalPiecesInBuckets > 0 ? contrib.pieces / totalPiecesInBuckets : 0
+    const agg = getOrCreate(dateKey)
+
+    agg.totalPieces += contrib.pieces
+    agg.pointZeroPieces += contrib.p0
+
+    let weightKg: number | undefined
+    if (summary.totalWeightKg != null && summary.totalWeightKg > 0 && ratio > 0) {
+      weightKg = r(summary.totalWeightKg * ratio, 2)
+      agg.totalWeightKg = r((agg.totalWeightKg ?? 0) + weightKg, 2)
+    }
+
+    const activeMinutes = summary.durationMinutes
+      ? Math.round(summary.durationMinutes * ratio)
+      : 0
+    agg.activeMinutes += activeMinutes
+
+    agg.contributingShifts.push({
+      summaryId: summary.id,
+      shiftDateKey: summary.dateKey,
+      shiftId: summary.shiftId,
+      pieces: contrib.pieces,
+      pointZeroPieces: contrib.p0,
+      weightKg,
+      activeMinutes,
+      source: 'hourly',
+    })
+  }
+}
+
+// ── Path B: fallback legacy (sin timeline ni hourly) ──────────────────────────
 
 function contributeFromLegacy(
   summary: GraderDailySummary,

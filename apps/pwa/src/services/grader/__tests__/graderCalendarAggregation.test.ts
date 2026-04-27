@@ -335,6 +335,184 @@ describe('aggregateByCalendarDay', () => {
   })
 })
 
+describe('aggregateByCalendarDay — path hourly (sin timelineBuckets)', () => {
+  it('turno noche que cruza medianoche se reparte entre día de inicio y siguiente', () => {
+    // Dom 21:30 → Lun 06:00. hourlyBuckets típicos: [21,22,23,0,1,2,3,4,5]
+    const summary = mkSummary({
+      id: '2026-04-12__Turno noche',
+      dateKey: '2026-04-12',
+      shiftId: 'Turno noche',
+      totalPieces: 900, // 300 dom + 600 lun
+      pointZeroPieces: 27, // 9 dom + 18 lun
+      totalWeightKg: 3000,
+      durationMinutes: 480,
+      startAt: '2026-04-12T21:30:00.000Z',
+      endAt: '2026-04-13T06:00:00.000Z',
+      hourlyBuckets: [
+        { hour: 21, totalPieces: 100, p0Pieces: 3 },
+        { hour: 22, totalPieces: 100, p0Pieces: 3 },
+        { hour: 23, totalPieces: 100, p0Pieces: 3 },
+        { hour: 0, totalPieces: 100, p0Pieces: 3 },
+        { hour: 1, totalPieces: 100, p0Pieces: 3 },
+        { hour: 2, totalPieces: 100, p0Pieces: 3 },
+        { hour: 3, totalPieces: 100, p0Pieces: 3 },
+        { hour: 4, totalPieces: 100, p0Pieces: 3 },
+        { hour: 5, totalPieces: 100, p0Pieces: 3 },
+      ],
+    })
+    const result = aggregateByCalendarDay({ summaries: [summary] })
+
+    expect(result.size).toBe(2)
+
+    const dom = result.get('2026-04-12')!
+    expect(dom.totalPieces).toBe(300) // hours 21,22,23
+    expect(dom.pointZeroPieces).toBe(9)
+    expect(dom.totalWeightKg).toBe(1000) // 3000 × 300/900
+    expect(dom.activeMinutes).toBe(160) // 480 × 300/900
+    expect(dom.contributingShifts[0]!.source).toBe('hourly')
+
+    const lun = result.get('2026-04-13')!
+    expect(lun.totalPieces).toBe(600) // hours 0..5
+    expect(lun.pointZeroPieces).toBe(18)
+    expect(lun.totalWeightKg).toBe(2000) // 3000 × 600/900
+    expect(lun.activeMinutes).toBe(320) // 480 × 600/900
+    expect(lun.contributingShifts[0]!.source).toBe('hourly')
+    expect(lun.contributingShifts[0]!.shiftDateKey).toBe('2026-04-12')
+  })
+
+  it('turno día (sin cruce) deja todas las horas en el mismo dateKey', () => {
+    const summary = mkSummary({
+      id: '2026-04-12__Turno día',
+      dateKey: '2026-04-12',
+      shiftId: 'Turno día',
+      totalPieces: 1000,
+      pointZeroPieces: 30,
+      totalWeightKg: 3500,
+      durationMinutes: 480,
+      startAt: '2026-04-12T08:00:00.000Z',
+      endAt: '2026-04-12T16:00:00.000Z',
+      hourlyBuckets: [
+        { hour: 8, totalPieces: 200, p0Pieces: 6 },
+        { hour: 10, totalPieces: 300, p0Pieces: 9 },
+        { hour: 14, totalPieces: 500, p0Pieces: 15 },
+      ],
+    })
+    const result = aggregateByCalendarDay({ summaries: [summary] })
+
+    expect(result.size).toBe(1)
+    const dom = result.get('2026-04-12')!
+    expect(dom.totalPieces).toBe(1000)
+    expect(dom.pointZeroPieces).toBe(30)
+    expect(dom.totalWeightKg).toBe(3500)
+    expect(dom.contributingShifts[0]!.source).toBe('hourly')
+  })
+
+  it('hourly conserva totales: suma de aportes = totales originales', () => {
+    const summary = mkSummary({
+      totalPieces: 900,
+      pointZeroPieces: 27,
+      totalWeightKg: 3000,
+      durationMinutes: 480,
+      startAt: '2026-04-12T22:00:00.000Z',
+      endAt: '2026-04-13T06:00:00.000Z',
+      hourlyBuckets: [
+        { hour: 22, totalPieces: 200, p0Pieces: 6 },
+        { hour: 23, totalPieces: 100, p0Pieces: 3 },
+        { hour: 0, totalPieces: 200, p0Pieces: 6 },
+        { hour: 1, totalPieces: 200, p0Pieces: 6 },
+        { hour: 2, totalPieces: 200, p0Pieces: 6 },
+      ],
+    })
+    const result = aggregateByCalendarDay({ summaries: [summary] })
+
+    const totalPieces = Array.from(result.values()).reduce((s, d) => s + d.totalPieces, 0)
+    const totalP0 = Array.from(result.values()).reduce((s, d) => s + d.pointZeroPieces, 0)
+    expect(totalPieces).toBe(900)
+    expect(totalP0).toBe(27)
+    // Peso puede tener pequeño error de redondeo por el ratio, pero suma cercana
+    const totalWeight = Array.from(result.values()).reduce(
+      (s, d) => s + (d.totalWeightKg ?? 0),
+      0,
+    )
+    expect(totalWeight).toBeCloseTo(3000, 0)
+  })
+
+  it('hourly cae a legacy si falta startAt', () => {
+    const summary = mkSummary({
+      startAt: undefined,
+      endAt: '2026-04-13T06:00:00.000Z',
+      hourlyBuckets: [{ hour: 22, totalPieces: 100, p0Pieces: 3 }],
+    })
+    const result = aggregateByCalendarDay({ summaries: [summary] })
+    expect(result.get('2026-04-12')!.contributingShifts[0]!.source).toBe('legacy')
+  })
+
+  it('hourly cae a legacy si falta endAt', () => {
+    const summary = mkSummary({
+      startAt: '2026-04-12T22:00:00.000Z',
+      endAt: undefined,
+      hourlyBuckets: [{ hour: 22, totalPieces: 100, p0Pieces: 3 }],
+    })
+    const result = aggregateByCalendarDay({ summaries: [summary] })
+    expect(result.get('2026-04-12')!.contributingShifts[0]!.source).toBe('legacy')
+  })
+
+  it('timelineBuckets gana sobre hourlyBuckets (path A es preferido)', () => {
+    const summary = mkSummary({
+      id: '2026-04-12__Turno noche',
+      dateKey: '2026-04-12',
+      totalPieces: 900,
+      pointZeroPieces: 27,
+      hourlyBuckets: [
+        { hour: 21, totalPieces: 100, p0Pieces: 3 },
+        { hour: 22, totalPieces: 100, p0Pieces: 3 },
+      ],
+    })
+    const buckets: TimelineBucket[] = [mkBucket('2026-04-12T22:00:00.000Z', 50, 1)]
+    const result = aggregateByCalendarDay({
+      summaries: [summary],
+      timelinesBySummaryId: new Map([[summary.id, buckets]]),
+    })
+    // Si hubiera tomado hourly, totalPieces sería 200; con timeline es 50
+    expect(result.get('2026-04-12')!.totalPieces).toBe(50)
+    expect(result.get('2026-04-12')!.contributingShifts[0]!.source).toBe('timeline')
+  })
+
+  it('caso real Feb 2026: turno noche con startHour=22 y hours [22,23,0..5]', () => {
+    // Reproduce el patrón típico del histórico: el lunes recibe la mayoría
+    // del turno noche que arrancó el domingo
+    const noche = mkSummary({
+      id: '2026-02-15__Turno noche',
+      dateKey: '2026-02-15',
+      shiftId: 'Turno noche',
+      totalPieces: 14000, // similar a los datos reales (~15k típico)
+      pointZeroPieces: 420,
+      totalWeightKg: 49000,
+      durationMinutes: 480,
+      startAt: '2026-02-15T22:00:00.000Z',
+      endAt: '2026-02-16T06:00:00.000Z',
+      hourlyBuckets: [
+        { hour: 22, totalPieces: 1500, p0Pieces: 45 },
+        { hour: 23, totalPieces: 1500, p0Pieces: 45 },
+        { hour: 0, totalPieces: 2000, p0Pieces: 60 },
+        { hour: 1, totalPieces: 2000, p0Pieces: 60 },
+        { hour: 2, totalPieces: 2000, p0Pieces: 60 },
+        { hour: 3, totalPieces: 2000, p0Pieces: 60 },
+        { hour: 4, totalPieces: 2000, p0Pieces: 60 },
+        { hour: 5, totalPieces: 1000, p0Pieces: 30 },
+      ],
+    })
+    const result = aggregateByCalendarDay({ summaries: [noche] })
+
+    const dom = result.get('2026-02-15')!
+    const lun = result.get('2026-02-16')!
+    expect(dom.totalPieces).toBe(3000) // 1500+1500
+    expect(lun.totalPieces).toBe(11000) // 2000×5 + 1000
+    // El lunes recibe la mayoría del peso, no el domingo
+    expect(lun.totalWeightKg).toBeGreaterThan(dom.totalWeightKg!)
+  })
+})
+
 describe('sortedCalendarDays', () => {
   it('ordena los días ascendente por dateKey', () => {
     const map = aggregateByCalendarDay({
