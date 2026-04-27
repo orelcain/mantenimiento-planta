@@ -10,7 +10,7 @@ import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useParams, useNavigate, Navigate } from 'react-router-dom'
 import { logger } from '@/lib/logger'
 import { Button, Card, CardContent, Spinner, Badge } from '@/components/ui'
-import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag, FileText, WifiOff } from 'lucide-react'
+import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag, FileText, WifiOff, ChevronDown } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { usePermissionsStore } from '@/store'
 import { useAuthStore, useIsAdmin, useIsSupervisor } from '@/store/authStore'
@@ -18,7 +18,7 @@ import { getDailySummary, loadTimelineAggregates, subscribePausesAggregates, lis
 import { createPublicToken, revokePublicToken } from '@/services/grader/graderPublicToken.service'
 import type { Pause, MicroDetentionsSummary } from '@/services/grader/types'
 import { getModuleRanges } from '@/services/grader/graderModuleConfig.service'
-import { listSnapshots, type GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
+import { listSnapshots, saveConfigSnapshot, type GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
 import { getShiftDoc } from '@/services/grader/graderShifts.service'
 import { computeShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import type { ShiftTimeWindow } from '@/services/grader/graderShiftStatus'
@@ -61,9 +61,10 @@ import { findTriggeredRunbooks } from '@/services/grader/graderRunbooks'
 import { analyzeGraderFromSummary } from '@/services/grader/graderSummaryAI'
 import { loadSeasonBenchmark, type SeasonBenchmark } from '@/services/grader/graderBenchmarks'
 import { AIOutputPanel } from '@/components/grader/GraderInlinePanels'
-import type { GraderDailySummary, MatrixP0Cause, PointZeroClassification, TimelineBucket } from '@/services/grader/types'
+import type { GraderDailySummary, MatrixP0Cause, PointZeroClassification, TimelineBucket, GraderAnalysisConfig, GateAssignment, CalibreWeightRange } from '@/services/grader/types'
 import type { GraderShiftDoc } from '@/services/grader/graderShifts.service'
 import type { AIGraderOutput } from '@/services/grader/types'
+import { AnalisisGraderGatesConfigPage } from './AnalisisGraderGatesConfigPage'
 
 /** Parsea `YYYY-MM-DD__Turno día` → [dateKey, shiftLabel] */
 function parseShiftId(raw: string | undefined): [string, string] {
@@ -285,6 +286,10 @@ export function AnalisisGraderTurnoPage() {
   const [error, setError] = useState<string | null>(null)
   const [alertThreshold, setAlertThreshold] = useState(DEFAULT_P0_ALERT_PCT)
   const [criticalThreshold, setCriticalThreshold] = useState(DEFAULT_P0_CRITICAL_PCT)
+  // Config inline del turno — override por turno
+  const [showConfigPanel, setShowConfigPanel] = useState(false)
+  const [calibreOverride, setCalibrerOverride] = useState<CalibreWeightRange[] | null>(null)
+  const [turnoThresholdsOverride, setTurnoThresholdsOverride] = useState<{ photocellPctWarn: number; outOfLimitsPctWarn: number; pointZeroPctWarn: number; pointZeroPctCritical: number } | null>(null)
 
   // ── Share (token público) — estado; handlers después de enrichedTimelineBuckets ──
   const [sharing, setSharing] = useState(false)
@@ -497,6 +502,8 @@ export function AnalisisGraderTurnoPage() {
           setSummary(s)
         }
         setShiftDoc(sd)
+        setCalibrerOverride(sd?.calibreRangeOverride ?? null)
+        setTurnoThresholdsOverride(sd?.thresholdsOverride ?? null)
         // Override de umbrales por turno: prioridad sobre los globales de planta
         if (sd?.thresholdsOverride) {
           setAlertThreshold(sd.thresholdsOverride.pointZeroPctWarn)
@@ -560,6 +567,29 @@ export function AnalisisGraderTurnoPage() {
   }, [dateKey, shiftLabel])
 
   useEffect(() => { reloadConfigSnapshots() }, [reloadConfigSnapshots])
+
+  // Config inline del turno — gates + config derivados
+  const turnoGates = useMemo<GateAssignment[]>(() => configSnapshots[0]?.gates ?? [], [configSnapshots])
+  const turnoConfig = useMemo<GraderAnalysisConfig>(() => ({
+    errorThresholds: {
+      photocellPctWarn: turnoThresholdsOverride?.photocellPctWarn ?? 1,
+      outOfLimitsPctWarn: turnoThresholdsOverride?.outOfLimitsPctWarn ?? 3,
+      pointZeroPctWarn: alertThreshold,
+      pointZeroPctCritical: criticalThreshold,
+    },
+  }), [turnoThresholdsOverride, alertThreshold, criticalThreshold])
+  const EMPTY_PARSED_DATA = useMemo(() => ({
+    files: [], pieceRecords: [], gate0Records: [], folioRecords: [],
+    qualitySummary: [], productionSummary: [], inferred: {},
+  }), [])
+  const handleTurnoConfigApply = useCallback((updatedGates: GateAssignment[]) => {
+    if (!user?.id || !dateKey || !shiftLabel) return
+    const docId = `${dateKey}__${shiftLabel}`
+    const userName = `${(user as unknown as Record<string, string>).nombre ?? ''} ${(user as unknown as Record<string, string>).apellido ?? ''}`.trim() || user.email || 'Supervisor'
+    saveConfigSnapshot(docId, updatedGates, { uid: user.id, name: userName })
+      .then(() => reloadConfigSnapshots())
+      .catch(() => {})
+  }, [dateKey, shiftLabel, user, reloadConfigSnapshots])
 
   // M3 — Siguiente pausa sin clasificar
   const [nextPauseOpen, setNextPauseOpen] = useState(false)
@@ -1139,18 +1169,46 @@ export function AnalisisGraderTurnoPage() {
             </div>
           )}
 
-          {/* Link a configuración avanzada — pasa contexto del turno por URL */}
-          <button
-            onClick={() => navigate(`/analisis-grader/wizard?tab=gates&dateKey=${dateKey}&shiftId=${encodeURIComponent(shiftLabel)}`)}
-            className="w-full text-left"
-          >
-            <Card className="border-dashed hover:bg-muted/30 transition-colors">
-              <CardContent className="py-3 px-4 flex items-center gap-2 text-sm text-muted-foreground">
-                <Settings2 className="w-4 h-4" />
-                Abrir configuración avanzada (12 Gates, Análisis, Rangos…)
-              </CardContent>
-            </Card>
-          </button>
+          {/* Configuración de este turno — inline expandible */}
+          <Card className="overflow-hidden">
+            <button
+              onClick={() => setShowConfigPanel(v => !v)}
+              className="w-full px-4 py-3 flex items-center justify-between text-sm hover:bg-muted/30 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <Settings2 className="w-4 h-4 text-muted-foreground" />
+                <span className="font-medium">Configuración de este turno</span>
+                {turnoGates.filter(g => g.active).length > 0 && (
+                  <Badge variant="outline" className="text-xs font-normal">
+                    {turnoGates.filter(g => g.active).length} gates activas
+                  </Badge>
+                )}
+              </div>
+              <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${showConfigPanel ? 'rotate-180' : ''}`} />
+            </button>
+            {showConfigPanel && (
+              <div className="border-t">
+                <AnalisisGraderGatesConfigPage
+                  tabbed
+                  gates={turnoGates}
+                  config={turnoConfig}
+                  parsedData={EMPTY_PARSED_DATA as Parameters<typeof AnalisisGraderGatesConfigPage>[0]['parsedData']}
+                  onComplete={handleTurnoConfigApply}
+                  shiftDocId={shiftDocId}
+                  shiftCalibreOverride={calibreOverride}
+                  onShiftRangesSaved={setCalibrerOverride}
+                  shiftThresholdsOverride={turnoThresholdsOverride}
+                  onShiftThresholdsSaved={(t) => {
+                    setTurnoThresholdsOverride(t)
+                    if (t) {
+                      setAlertThreshold(t.pointZeroPctWarn)
+                      setCriticalThreshold(t.pointZeroPctCritical)
+                    }
+                  }}
+                />
+              </div>
+            )}
+          </Card>
         </>
       )}
 

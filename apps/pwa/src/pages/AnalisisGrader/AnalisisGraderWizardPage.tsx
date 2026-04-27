@@ -552,35 +552,37 @@ export function AnalisisGraderWizardPage() {
         </div>
       </div>
 
-      {/* ═══ Cuerpo: 2 columnas — Calendario (izq) + Configuraciones (der) ═══ */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Columna izquierda — [1.1] Calendario + [1.2] Resumen turno */}
+      {/* ═══ Cuerpo: calendario full-width (config vive dentro de cada turno) ═══ */}
+      <div className={shiftDocId ? 'grid grid-cols-1 lg:grid-cols-2 gap-6' : 'grid grid-cols-1 gap-6'}>
+        {/* Calendario — toma todo el ancho si no hay contexto de turno */}
         <GraderHistoricalCalendar stacked />
 
-        {/* Columna derecha — [3] Configuraciones con pestañas */}
-        <Card className="border-l-4 border-l-emerald-500/40 h-fit">
-          <div className="px-4 pt-3 pb-1 flex items-center gap-2">
-            <Settings2 className="h-4 w-4 text-emerald-500" />
-            <span className="text-sm font-semibold">Configuraciones</span>
-            <Badge variant="outline" className="text-xs font-normal ml-auto">
-              {gates.filter((g) => g.active).length} gates activas
-            </Badge>
-          </div>
-          <CardContent className="pt-2 pb-4">
-            <AnalisisGraderGatesConfigPage
-              tabbed
-              gates={gates}
-              config={config}
-              parsedData={fallbackParsedData}
-              onComplete={handleGatesApply}
-              shiftDocId={shiftDocId}
-              shiftCalibreOverride={shiftCalibreOverride}
-              onShiftRangesSaved={setShiftCalibreOverride}
-              shiftThresholdsOverride={shiftThresholdsOverride}
-              onShiftThresholdsSaved={setShiftThresholdsOverride}
-            />
-          </CardContent>
-        </Card>
+        {/* Configuraciones — solo visible cuando se llega desde un turno específico */}
+        {shiftDocId && (
+          <Card className="border-l-4 border-l-emerald-500/40 h-fit">
+            <div className="px-4 pt-3 pb-1 flex items-center gap-2">
+              <Settings2 className="h-4 w-4 text-emerald-500" />
+              <span className="text-sm font-semibold">Configuraciones</span>
+              <Badge variant="outline" className="text-xs font-normal ml-auto">
+                {gates.filter((g) => g.active).length} gates activas
+              </Badge>
+            </div>
+            <CardContent className="pt-2 pb-4">
+              <AnalisisGraderGatesConfigPage
+                tabbed
+                gates={gates}
+                config={config}
+                parsedData={fallbackParsedData}
+                onComplete={handleGatesApply}
+                shiftDocId={shiftDocId}
+                shiftCalibreOverride={shiftCalibreOverride}
+                onShiftRangesSaved={setShiftCalibreOverride}
+                shiftThresholdsOverride={shiftThresholdsOverride}
+                onShiftThresholdsSaved={setShiftThresholdsOverride}
+              />
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Banners multi-día */}
