@@ -354,6 +354,81 @@ function isToday(date: Date): boolean {
   )
 }
 
+// ── Paso 3: timeline 24h ──────────────────────────────────────────────────────
+
+interface TimelineBlock {
+  leftPct: number
+  widthPct: number
+  bgClass: string
+  label: string
+  title: string
+}
+
+/**
+ * Convierte los summaries del día calendario en bloques posicionados en una
+ * barra 24h (0 = medianoche, 1 = siguiente medianoche).
+ *
+ * Los timestamps del Grader son wall-clock-as-UTC, así que se usa getUTC*
+ * para recuperar la hora Chile local.
+ */
+function buildDayTimelineBlocks(
+  entries: Array<{ summary: GraderDailySummary; chip: ShiftChipDescriptor | null }>,
+): TimelineBlock[] {
+  const blocks: TimelineBlock[] = []
+  for (const { summary: hist, chip } of entries) {
+    if (chip?.role === 'orphan-source') continue
+    if (!hist.startAt || !hist.endAt) continue
+
+    const startD = new Date(hist.startAt)
+    const endD   = new Date(hist.endAt)
+    const direction = chip?.direction ?? 'same'
+
+    // Wall-clock-as-UTC → getUTC* para hora Chile local
+    const startMin = startD.getUTCHours() * 60 + startD.getUTCMinutes()
+    const endMin   = endD.getUTCHours()   * 60 + endD.getUTCMinutes()
+
+    let startFrac: number, endFrac: number
+    if (direction === 'enters') {
+      // Madrugada: turno entró de la noche anterior → ocupa 00:00 hasta endAt
+      startFrac = 0
+      endFrac   = endMin / 1440
+    } else if (direction === 'exits') {
+      // Vespertina: turno sale hacia el día siguiente → ocupa startAt hasta 24:00
+      startFrac = startMin / 1440
+      endFrac   = 1
+    } else {
+      // Turno completo dentro del día calendario
+      startFrac = startMin / 1440
+      endFrac   = endMin   / 1440
+      if (endFrac <= startFrac) endFrac = Math.min(1, startFrac + 0.02)
+    }
+
+    const status = p0StatusFromPct(hist.pointZeroPct)
+    const bgClass =
+      status === 'ok'    ? 'bg-emerald-500/65' :
+      status === 'alert' ? 'bg-amber-500/65'   :
+                           'bg-rose-500/65'
+
+    const base  = hist.shiftId === 'Turno día' ? 'D' : 'N'
+    const label =
+      direction === 'enters' ? `→${base}` :
+      direction === 'exits'  ? `${base}→` :
+      base
+
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const ts = `${pad(startD.getUTCHours())}:${pad(startD.getUTCMinutes())}–${pad(endD.getUTCHours())}:${pad(endD.getUTCMinutes())}`
+    const pct = chip?.pctOfShift != null ? ` · ${Math.round(chip.pctOfShift)}% en este día` : ''
+    blocks.push({
+      leftPct:  startFrac * 100,
+      widthPct: (endFrac - startFrac) * 100,
+      bgClass, label,
+      title: `${hist.shiftId} · P0 ${hist.pointZeroPct.toFixed(2)}% · ${ts}${pct}`,
+    })
+  }
+  return blocks
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 function getDaysInMonth(date: Date): (Date | null)[] {
   const year = date.getFullYear()
   const month = date.getMonth()
@@ -1154,6 +1229,53 @@ export function GraderHistoricalCalendar({
               </div>
             </div>
           )}
+          {/* ── Paso 3a: Barra de timeline 24h ── */}
+          {summariesForSelectedDay.length > 0 && (() => {
+            const blocks = buildDayTimelineBlocks(summariesForSelectedDay)
+            if (blocks.length === 0) return null
+            return (
+              <div
+                className="relative h-8 rounded-md overflow-hidden border border-border/25 bg-muted/15 select-none"
+                title="Timeline del día — 00:00 a la izquierda, 24:00 a la derecha"
+              >
+                {/* Líneas de hora cada 3h */}
+                {[3, 6, 9, 12, 15, 18, 21].map(h => (
+                  <div
+                    key={h}
+                    className="absolute top-0 bottom-0 w-px bg-border/25"
+                    style={{ left: `${(h / 24) * 100}%` }}
+                  />
+                ))}
+                {/* Bloques de turno */}
+                {blocks.map((b, i) => (
+                  <div
+                    key={i}
+                    className={cn('absolute top-1 bottom-1 rounded-sm flex items-center justify-center', b.bgClass)}
+                    style={{ left: `${b.leftPct}%`, width: `max(${b.widthPct}%, 0.8%)` }}
+                    title={b.title}
+                  >
+                    {b.widthPct > 9 && (
+                      <span className="text-[9px] font-bold text-white/90 leading-none pointer-events-none">{b.label}</span>
+                    )}
+                  </div>
+                ))}
+                {/* Etiquetas de hora */}
+                {[0, 6, 12, 18, 24].map(h => (
+                  <span
+                    key={h}
+                    className="absolute bottom-0.5 text-[7px] text-muted-foreground/50 tabular-nums pointer-events-none"
+                    style={{
+                      left: `${(h / 24) * 100}%`,
+                      transform: h === 0 ? 'none' : h === 24 ? 'translateX(-100%)' : 'translateX(-50%)',
+                    }}
+                  >
+                    {h === 0 ? '0h' : `${h}h`}
+                  </span>
+                ))}
+              </div>
+            )
+          })()}
+
           {/* ── Datos históricos (carga masiva) — incluye aportes calendáricos ── */}
           {selectedKey && summariesForSelectedDay.length > 0 && (
             <div className="space-y-2">
