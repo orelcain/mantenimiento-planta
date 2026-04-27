@@ -15,6 +15,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { useNavigate, Navigate } from 'react-router-dom'
 import { Card, CardContent, Badge, Button } from '@/components/ui'
 import { Upload, Activity, BarChart3, Settings2, TrendingUp, BookOpen, Eye, ClipboardList, GitCompare } from 'lucide-react'
+import { LineStatusWidget } from '@/components/grader/LineStatusWidget'
 import { usePermissionsStore } from '@/store'
 import { useIsAdmin } from '@/store/authStore'
 import { GlobalSettingsModal } from '@/components/grader/GlobalSettingsModal'
@@ -132,6 +133,13 @@ export function AnalisisGraderLandingPage() {
     }
     return null
   }, [])
+
+  // Summary del turno vivo (para el widget de estado de línea)
+  const liveTodaySummary = useMemo(() => {
+    if (!liveShift) return null
+    const today = todayKey()
+    return allSummaries.find(s => s.dateKey === today && s.shiftId === liveShift.shiftId) ?? null
+  }, [liveShift, allSummaries])
 
   // Formatear fecha corta del último turno ("lun 27 feb")
   // IMPORTANTE: todos los hooks deben ir ANTES del early return de canSee
@@ -262,6 +270,16 @@ export function AnalisisGraderLandingPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* ── Estado de la línea ahora (solo turno vivo) ───────────────── */}
+      {liveShift && (
+        <LineStatusWidget
+          shiftDocId={`${todayKey()}__${liveShift.shiftId}`}
+          shiftId={liveShift.shiftId}
+          shiftStart={liveShift.window.startAt ?? null}
+          todaySummary={liveTodaySummary}
+        />
+      )}
 
       {/* ── M1 · Badge pausas sin clasificar (solo admins) ───────────── */}
       {isAdmin && untaggedCount !== null && untaggedCount > 0 && (
