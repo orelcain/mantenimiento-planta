@@ -12,6 +12,7 @@ import { Save, Loader2 } from 'lucide-react'
 import { getModuleRanges, saveModulePhysicalConfig } from '@/services/grader/graderModuleConfig.service'
 import { DEFAULT_PHYSICAL_CONFIG } from '@/services/grader/graderAnalytics'
 import { useToast } from '@/hooks/useToast'
+import { useAuthStore } from '@/store/authStore'
 import type { GraderPhysicalConfig } from '@/services/grader/types'
 import type { GraderBeltId } from '@/services/grader/graderBeltHelpers'
 import { CintasTab } from './tabs/gatesConfig/CintasTab'
@@ -34,6 +35,7 @@ const SUB_TABS: { id: SubTab; label: string }[] = [
 
 export function PhysicalLineSection() {
   const { toast } = useToast()
+  const user = useAuthStore(s => s.user)
   const [physicalConfig, setPhysicalConfig] = useState<GraderPhysicalConfig>(DEFAULT_PHYSICAL_CONFIG)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -52,14 +54,17 @@ export function PhysicalLineSection() {
   const handleSave = useCallback(async () => {
     setSaving(true)
     try {
-      await saveModulePhysicalConfig(physicalConfig)
+      await saveModulePhysicalConfig({
+        physicalConfig,
+        updatedBy: user?.id ?? 'unknown',
+      })
       toast({ title: 'Config física guardada' })
     } catch {
       toast({ title: 'Error al guardar', variant: 'destructive' })
     } finally {
       setSaving(false)
     }
-  }, [physicalConfig, toast])
+  }, [physicalConfig, user, toast])
 
   const updateBeltLength = useCallback((beltId: string, lengthMeters: number) => {
     setPhysicalConfig(p => ({
