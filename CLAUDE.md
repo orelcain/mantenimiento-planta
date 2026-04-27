@@ -279,6 +279,12 @@ sidebarConfig  ← nuevo: orden personalizado del sidebar admin
 | `fix-ci` | Diagnosticar y reparar fallos de CI (tsc, eslint, build, GitHub Actions) |
 | `auditar-deploys` | **Health check standalone** de todos los workflows CI/CD. Detecta workflows bloqueados, degradados o inactivos. Existe porque en 2026-04-09 hubo 18 dias con `deploy-functions` bloqueado sin notarlo |
 
+### Seguimiento de deploys — protocolo obligatorio
+Después de cada `git push`, verificar con `gh run list --limit 5` que el workflow **Deploy PWA to GitHub Pages** quede verde.
+- Si falla: `gh run view <run_id>` para ver el log del paso que falló
+- Un deploy fallido no bloquea si el siguiente push lo supera (GitHub Pages usa el último deploy exitoso)
+- Histórico actual: fallo puntual en commit `f7f9176` (2026-04-27) — superado sin impacto en producción
+
 ### Auditorias
 | Skill | Uso |
 |-------|-----|
