@@ -42,6 +42,11 @@ import {
   normalizeShiftSchedule,
 } from '@/services/grader/graderShiftSchedule'
 import type { GraderUpload, GraderDailySummary } from '@/services/grader/types'
+import {
+  aggregateByCalendarDay,
+  buildShiftChipDescriptors,
+  type ShiftChipDescriptor,
+} from '@/services/grader/graderCalendarAggregation'
 import { DayComparisonModal } from './DayComparisonModal'
 import { useAuthStore } from '@/store'
 import { useGraderSelectionStore } from '@/store/graderSelectionStore'
@@ -98,6 +103,85 @@ const P0_CARD_CLASS: Record<P0Status, string> = {
 function toDateKey(iso?: string): string {
   if (!iso) return new Date().toISOString().slice(0, 10)
   return iso.slice(0, 10)
+}
+
+/**
+ * Renderiza un chip de turno en una celda del calendario según su rol.
+ *
+ * - `primary`: chip prominente con P0% y label direccional (`D`, `N`, `→N`, `N→`).
+ *   Es el "Ver detalle" natural del turno (donde físicamente cargó más).
+ * - `secondary`: chip chico/atenuado con `pctOfShift%` (% del turno en este día).
+ *   Indica continuidad — el turno también pasó por aquí pero su carga real está en otro día.
+ * - `orphan-source`: chip tachado/muy atenuado en el día programado donde el turno
+ *   no tuvo actividad real (ej. los 4 domingos de Feb 2026 en Chile).
+ */
+function renderShiftChip(chip: ShiftChipDescriptor, untaggedCount: number | null): JSX.Element {
+  const baseLetter = chip.shiftId === 'Turno día' ? 'D' : 'N'
+  const label =
+    chip.direction === 'enters' ? `→${baseLetter}` :
+    chip.direction === 'exits' ? `${baseLetter}→` :
+    baseLetter
+  const key = `${chip.summaryId}-${chip.role}-${chip.renderInDateKey}`
+  const p0 = chip.pointZeroPct
+  const colorByP0 = p0 >= DEFAULT_P0_CRITICAL_PCT
+    ? 'bg-red-500/18 text-red-600'
+    : p0 >= DEFAULT_P0_ALERT_PCT
+      ? 'bg-amber-500/18 text-amber-600'
+      : 'bg-emerald-500/18 text-emerald-600'
+
+  if (chip.role === 'orphan-source') {
+    // Chip atenuado tachado en el día schedule sin actividad real
+    return (
+      <div
+        key={key}
+        title={`Turno ${chip.shiftId.toLowerCase()} programado pero sin actividad este día. Detalle en ${chip.primaryDateKey ?? 'otro día'}.`}
+        className="flex items-center justify-between rounded px-1 py-0.5 leading-none bg-neutral-500/10 text-neutral-500"
+      >
+        <span className="text-[8px] font-medium line-through">{baseLetter}⌧</span>
+        <span className="text-[7px] tabular-nums opacity-80">→ {chip.primaryDateKey?.slice(8) ?? '--'}</span>
+      </div>
+    )
+  }
+
+  if (chip.role === 'secondary') {
+    // Chip chico atenuado: % del fragmento (no P0%) para indicar continuidad
+    const pct = chip.pctOfShift != null ? Math.round(chip.pctOfShift) : 0
+    return (
+      <div
+        key={key}
+        title={`${chip.shiftId} ${chip.shiftDateKey} → este día aportó ${pct}% de la carga (P0% del turno completo: ${p0.toFixed(1)}%)`}
+        className={cn(
+          'flex items-center justify-between rounded px-1 leading-none opacity-60 hover:opacity-100 transition-opacity',
+          colorByP0,
+        )}
+        style={{ paddingTop: 0, paddingBottom: 0, height: '11px' }}
+      >
+        <span className="text-[7px] font-medium opacity-80">{label}</span>
+        <span className="text-[7px] font-semibold tabular-nums">{pct}%</span>
+      </div>
+    )
+  }
+
+  // role === 'primary'
+  return (
+    <div
+      key={key}
+      title={chip.direction === 'enters'
+        ? `Turno ${chip.shiftId.toLowerCase()} arrancó ${chip.shiftDateKey}, aportó ${Math.round(chip.pctOfShift ?? 100)}% en este día (madrugada).`
+        : chip.direction === 'exits'
+          ? `Turno ${chip.shiftId.toLowerCase()} arranca este día, ${Math.round(chip.pctOfShift ?? 100)}% de su carga aquí.`
+          : `Turno ${chip.shiftId.toLowerCase()} de este día.`}
+      className={cn('flex items-center justify-between rounded px-1 py-0.5 leading-none', colorByP0)}
+    >
+      <span className="text-[8px] font-medium opacity-70">{label}</span>
+      <span className="text-[9px] font-bold tabular-nums">{p0.toFixed(1)}%</span>
+      {untaggedCount !== null && untaggedCount > 0 && (
+        <span className="ml-0.5 text-[7px] leading-none px-0.5 rounded bg-amber-500/25 text-amber-600 font-semibold">
+          🏷{untaggedCount}
+        </span>
+      )}
+    </div>
+  )
 }
 
 function getUploadTimestamp(upload: GraderUpload): number {
@@ -191,6 +275,7 @@ export function GraderHistoricalCalendar({
   const [summaries, setSummaries] = useState<Record<string, SummaryState>>({})
   const [shiftSchedule, setShiftSchedule] = useState(DEFAULT_SHIFT_SCHEDULE)
   const [historicalByDate, setHistoricalByDate] = useState<Map<string, GraderDailySummary[]>>(new Map())
+  const [allSummariesRaw, setAllSummariesRaw] = useState<GraderDailySummary[]>([])
   const [deletingId, setDeletingId] = useState<string | null>(null)
   // Counts de cambios manuales de gate por shiftDocId (lazy-loaded al seleccionar un día)
   const [configChangeCounts, setConfigChangeCounts] = useState<Map<string, number>>(new Map())
@@ -246,6 +331,7 @@ export function GraderHistoricalCalendar({
           map.set(s.dateKey, existing)
         }
         setHistoricalByDate(map)
+        setAllSummariesRaw(list)
         onSummariesLoaded?.(list)
 
         // Si el mes actual no tiene datos y no hay initialDateKey, buscar el último mes con datos
@@ -301,6 +387,26 @@ export function GraderHistoricalCalendar({
     }
     return map
   }, [uploads])
+
+  // Reagregación calendárico-real (Opción D, sub-paso 3.B):
+  // - calendarAgg: piezas/P0% por día calendario REAL (split del turno noche)
+  // - chipsByDate: descriptores listos para renderizar (primary/secondary/orphan-source)
+  // Permite mostrar el chip del turno donde realmente cargó (no donde inició).
+  const summariesById = useMemo(() => {
+    const m = new Map<string, GraderDailySummary>()
+    for (const s of allSummariesRaw) m.set(s.id, s)
+    return m
+  }, [allSummariesRaw])
+
+  const calendarAgg = useMemo(() => {
+    const valid = allSummariesRaw.filter((s) => s.totalPieces > 0)
+    return aggregateByCalendarDay({ summaries: valid })
+  }, [allSummariesRaw])
+
+  const chipsByDate = useMemo(
+    () => buildShiftChipDescriptors(calendarAgg, summariesById),
+    [calendarAgg, summariesById],
+  )
 
   const selectedKey = selectedDate ? selectedDate.toISOString().slice(0, 10) : null
 
@@ -643,29 +749,32 @@ export function GraderHistoricalCalendar({
               const dayKey = day.toISOString().slice(0, 10)
               const dayUploads = uploadsByDate.get(dayKey) || []
               const dayHistorical = historicalByDate.get(dayKey) || []
-              const hasData = dayHistorical.length > 0
+              const chipsForDay = chipsByDate.get(dayKey) ?? []
+              // Chips no-orphan = los que aportaron piezas reales este día (primary/secondary)
+              const chipsWithPieces = chipsForDay.filter((c) => c.role !== 'orphan-source')
+              const hasData = chipsWithPieces.length > 0
 
-              const worstP0 = hasData
-                ? Math.max(...dayHistorical.map((s) => s.pointZeroPct))
+              // worstP0: del agregado calendárico real (no del Math.max de summaries legacy).
+              // Para el coloreado del borde, usamos el peor P0% entre los turnos que realmente
+              // contribuyeron al día (incluye turno entrante de ayer + turnos propios).
+              const worstP0 = chipsWithPieces.length > 0
+                ? Math.max(...chipsWithPieces.map((c) => c.pointZeroPct))
                 : null
 
               const missingPiece = hasData && dayHistorical.some((s) => s.hasPieceData === false)
               const missingGate0 = hasData && dayHistorical.some((s) => s.hasGate0Data === false)
               const isSelected = selectedDate?.toDateString() === day.toDateString()
 
-              // Ordenar día antes que noche para mostrar en el cell
-              const sortedHistory = hasData
-                ? [...dayHistorical].sort((a, b) => {
-                    const order: Record<string, number> = { 'Turno día': 0, 'Turno noche': 1 }
-                    return (order[a.shiftId] ?? 9) - (order[b.shiftId] ?? 9)
-                  })
-                : []
-
-              // M9 — cuando el filtro está activo, calcula si el día tiene algún turno con pausas sin anotar
-              const dayHasUntagged = filterUntagged && hasData
-                ? dayHistorical.some((s) => (untaggedCounts.get(s.id) ?? 0) > 0)
+              // M9 — un día tiene untagged si algún chip primary/orphan-source del día
+              // (no contamos secondary para evitar doble-marcar el mismo summary)
+              const dayHasUntagged = filterUntagged && chipsForDay.length > 0
+                ? chipsForDay.some(
+                    (c) =>
+                      (c.role === 'primary' || c.role === 'orphan-source') &&
+                      (untaggedCounts.get(c.summaryId) ?? 0) > 0,
+                  )
                 : false
-              const dimByFilter = filterUntagged && hasData && !dayHasUntagged
+              const dimByFilter = filterUntagged && chipsForDay.length > 0 && !dayHasUntagged
 
               return (
                 <button
@@ -698,31 +807,8 @@ export function GraderHistoricalCalendar({
                     )}
                   </div>
 
-                  {/* Per-shift P0% badges */}
-                  {sortedHistory.map((s) => {
-                    const shiftLabel = s.shiftId === 'Turno día' ? 'D' : 'N'
-                    const p0 = s.pointZeroPct
-                    const untagged = filterUntagged ? (untaggedCounts.get(s.id) ?? null) : null
-                    return (
-                      <div
-                        key={s.id}
-                        className={cn(
-                          'flex items-center justify-between rounded px-1 py-0.5 leading-none',
-                          p0 >= DEFAULT_P0_CRITICAL_PCT ? 'bg-red-500/18 text-red-600' :
-                          p0 >= DEFAULT_P0_ALERT_PCT    ? 'bg-amber-500/18 text-amber-600' :
-                                                          'bg-emerald-500/18 text-emerald-600',
-                        )}
-                      >
-                        <span className="text-[8px] font-medium opacity-70">{shiftLabel}</span>
-                        <span className="text-[9px] font-bold tabular-nums">{p0.toFixed(1)}%</span>
-                        {untagged !== null && untagged > 0 && (
-                          <span className="ml-0.5 text-[7px] leading-none px-0.5 rounded bg-amber-500/25 text-amber-600 font-semibold">
-                            🏷{untagged}
-                          </span>
-                        )}
-                      </div>
-                    )
-                  })}
+                  {/* Per-shift chips (Camino 2-B refinado: primary/secondary/orphan-source) */}
+                  {chipsForDay.map((chip) => renderShiftChip(chip, filterUntagged ? (untaggedCounts.get(chip.summaryId) ?? null) : null))}
 
                   {/* Missing data badges */}
                   {(missingPiece || missingGate0) && (

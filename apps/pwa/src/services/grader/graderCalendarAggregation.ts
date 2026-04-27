@@ -408,6 +408,170 @@ function contributeFromLegacy(
   })
 }
 
+// ── Descriptores de chips para el calendario ──────────────────────────────────
+
+/**
+ * Rol visual del chip en una celda del calendario:
+ *  - `primary`: el día con MÁS carga del summary. Renderizado prominente — es
+ *    el "Ver detalle" natural de ese turno.
+ *  - `secondary`: día con menor carga (cuando el turno cruza medianoche).
+ *    Renderizado pequeño/atenuado — indica continuidad del turno.
+ *  - `orphan-source`: marcador en el día de inicio del schedule cuando el turno
+ *    no tuvo actividad real ese día (toda la actividad fue otro día). Indica
+ *    "este turno está programado pero ver detalle en {otro día}".
+ */
+export type ChipRole = 'primary' | 'secondary' | 'orphan-source'
+
+/**
+ * Dirección temporal del chip relativa al día donde se renderiza:
+ *  - `enters`: el turno arrancó OTRO día y aporta su madrugada a éste (`→N`)
+ *  - `exits`: el turno arranca este día y se va al siguiente (`N→`)
+ *  - `same`: no cruza medianoche (turno D normal, o N que cabe en un solo día)
+ */
+export type ChipDirection = 'enters' | 'exits' | 'same'
+
+export interface ShiftChipDescriptor {
+  /** ID del summary fuente */
+  summaryId: string
+  /** dateKey del summary (día de inicio según schedule) */
+  shiftDateKey: string
+  /** 'Turno día' | 'Turno noche' */
+  shiftId: string
+  /** Día calendario donde se renderiza este chip */
+  renderInDateKey: string
+  /** Rol visual del chip */
+  role: ChipRole
+  /** Dirección temporal */
+  direction: ChipDirection
+  /** Piezas atribuidas a `renderInDateKey`. null si role=orphan-source. */
+  pieces: number | null
+  /** P0% del SUMMARY COMPLETO (no del fragmento). Usado para colorear. */
+  pointZeroPct: number
+  /** % de piezas del summary que cayeron en renderInDateKey. null si orphan-source. */
+  pctOfShift: number | null
+  /** Para orphan-source: dateKey donde está el chip principal del summary. */
+  primaryDateKey?: string
+}
+
+/**
+ * Genera los descriptores de chips a renderizar por celda del calendario.
+ *
+ * Cada celda recibe:
+ *  - **Chips primary y secondary** desde las contribuciones del agregado
+ *    calendárico (los turnos que físicamente aportaron piezas a este día).
+ *  - **Chips orphan-source** para summaries cuyo `summary.dateKey` apunta a
+ *    este día pero NO tienen contribución (toda la actividad fue otro día —
+ *    típico de turnos noche que arrancaron muy tarde y solo procesan después
+ *    de medianoche, ej. los 4 domingos de Feb 2026).
+ *
+ * Función pura. Tests cubren los 3 escenarios + ordenamiento.
+ */
+export function buildShiftChipDescriptors(
+  calendarAgg: Map<string, CalendarDayAggregate>,
+  summariesById: Map<string, GraderDailySummary>,
+): Map<string, ShiftChipDescriptor[]> {
+  const result = new Map<string, ShiftChipDescriptor[]>()
+
+  const push = (dateKey: string, desc: ShiftChipDescriptor) => {
+    const arr = result.get(dateKey) ?? []
+    arr.push(desc)
+    result.set(dateKey, arr)
+  }
+
+  // Agrupar contribuciones por summary para detectar cruces (1 vs 2 días)
+  const contribsBySummary = new Map<string, CalendarDayContribution[]>()
+  for (const agg of calendarAgg.values()) {
+    for (const c of agg.contributingShifts) {
+      const arr = contribsBySummary.get(c.summaryId) ?? []
+      arr.push(c)
+      contribsBySummary.set(c.summaryId, arr)
+    }
+  }
+
+  // Pasada 1: chips primary/secondary desde contribuciones
+  for (const [summaryId, contribs] of contribsBySummary) {
+    const summary = summariesById.get(summaryId)
+    if (!summary) continue
+
+    const crosses = contribs.length > 1
+    const orphan = contribs.length === 1 && contribs[0]!.dateKey !== summary.dateKey
+
+    for (const c of contribs) {
+      let direction: ChipDirection = 'same'
+      if (crosses) {
+        // El turno aporta a 2 días → cada chip es 'enters' o 'exits' según
+        // si su dateKey calendario es posterior o el mismo que el shiftDateKey.
+        direction = c.dateKey > c.shiftDateKey ? 'enters' : 'exits'
+      } else if (orphan) {
+        // Único día y NO es el shiftDateKey → toda la actividad fue otro día
+        direction = 'enters' // visualmente igual a entrada de madrugada
+      }
+      push(c.dateKey, {
+        summaryId,
+        shiftDateKey: c.shiftDateKey,
+        shiftId: c.shiftId,
+        renderInDateKey: c.dateKey,
+        role: c.isPrimary ? 'primary' : 'secondary',
+        direction,
+        pieces: c.pieces,
+        pointZeroPct: summary.pointZeroPct,
+        pctOfShift: c.pctOfShift,
+      })
+    }
+  }
+
+  // Pasada 2: detectar huérfanos (summaries con totalPieces > 0 cuyo
+  // summary.dateKey NO tiene contribución de este summary en el agregado).
+  for (const summary of summariesById.values()) {
+    if (summary.totalPieces <= 0) continue
+    const aggForShiftDate = calendarAgg.get(summary.dateKey)
+    const hasContribInShiftDate =
+      aggForShiftDate?.contributingShifts.some((c) => c.summaryId === summary.id) ?? false
+    if (hasContribInShiftDate) continue
+
+    // Es huérfano. Buscar dónde está su contribución primary
+    const contribs = contribsBySummary.get(summary.id) ?? []
+    const primary = contribs.find((c) => c.isPrimary)
+    if (!primary) continue // sanity: si tiene piezas, debe tener al menos 1 contribución
+
+    push(summary.dateKey, {
+      summaryId: summary.id,
+      shiftDateKey: summary.dateKey,
+      shiftId: summary.shiftId,
+      renderInDateKey: summary.dateKey,
+      role: 'orphan-source',
+      direction: 'same',
+      pieces: null,
+      pointZeroPct: summary.pointZeroPct,
+      pctOfShift: null,
+      primaryDateKey: primary.dateKey,
+    })
+  }
+
+  // Ordenar chips dentro de cada celda:
+  //   primary primero (más prominente), luego secondary, luego orphan-source.
+  //   Dentro de cada rol: Turno día antes que Turno noche.
+  //   Dentro del mismo rol/shift: por dirección (enters → same → exits) para
+  //   que el chip "que viene del día anterior" aparezca primero.
+  const roleOrder: Record<ChipRole, number> = { primary: 0, secondary: 1, 'orphan-source': 2 }
+  const dirOrder: Record<ChipDirection, number> = { enters: 0, same: 1, exits: 2 }
+  const shiftOrder: Record<string, number> = { 'Turno día': 0, 'Turno noche': 1 }
+
+  for (const arr of result.values()) {
+    arr.sort((a, b) => {
+      const ra = roleOrder[a.role], rb = roleOrder[b.role]
+      if (ra !== rb) return ra - rb
+      const da = dirOrder[a.direction], db = dirOrder[b.direction]
+      if (da !== db) return da - db
+      const sa = shiftOrder[a.shiftId] ?? 9
+      const sb = shiftOrder[b.shiftId] ?? 9
+      return sa - sb
+    })
+  }
+
+  return result
+}
+
 // ── Helpers de presentación ───────────────────────────────────────────────────
 
 /** Devuelve los agregados ordenados por dateKey ascendente (útil para listas/tablas). */
