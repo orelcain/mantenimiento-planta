@@ -35,8 +35,8 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries }: Props) {
     const totalWeightKg = valid.reduce((s, d) => s + (d.totalWeightKg ?? 0), 0)
 
     const sorted = [...valid].sort((a, b) => a.pointZeroPct - b.pointZeroPct)
-    const best = sorted[0]!
-    const worst = sorted[sorted.length - 1]!
+    const bestSummary = sorted[0]!
+    const worstSummary = sorted[sorted.length - 1]!
 
     // Top causa del mes: suma de piezas por tipo de error
     const causaMap = new Map<string, number>()
@@ -57,6 +57,21 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries }: Props) {
     // Ver project_grader_night_shift_attribution.md (Opción D).
     const calendarAgg = aggregateByCalendarDay({ summaries: valid })
     const uniqueDays = calendarAgg.size
+
+    // Fecha calendárica primary de cada summary (donde más cargó realmente).
+    // Usado por mejor/peor turno para mostrar la fecha real, no la legacy.
+    const primaryDateKeyBySummary = new Map<string, string>()
+    for (const day of calendarAgg.values()) {
+      for (const c of day.contributingShifts) {
+        if (c.isPrimary) primaryDateKeyBySummary.set(c.summaryId, c.dateKey)
+      }
+    }
+    const enrichWithPrimary = (s: GraderDailySummary) => ({
+      ...s,
+      primaryDateKey: primaryDateKeyBySummary.get(s.id) ?? s.dateKey,
+    })
+    const best = enrichWithPrimary(bestSummary)
+    const worst = enrichWithPrimary(worstSummary)
 
     const dayShifts = valid.filter(s => s.shiftId === 'Turno día').length
     const nightShifts = valid.length - dayShifts
@@ -130,7 +145,9 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries }: Props) {
               {fmtDec(stats.best.pointZeroPct, 2)}%
             </p>
             <p className="text-[11px] text-muted-foreground mt-0.5">
-              {stats.best.dateKey.slice(5)} · {shiftLabel(stats.best)}
+              <span title={stats.best.primaryDateKey !== stats.best.dateKey ? `Schedule original: ${stats.best.dateKey}` : undefined}>
+                {stats.best.primaryDateKey.slice(5)} · {shiftLabel(stats.best)}
+              </span>
             </p>
           </CardContent>
         </Card>
@@ -144,7 +161,9 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries }: Props) {
               {fmtDec(stats.worst.pointZeroPct, 2)}%
             </p>
             <p className="text-[11px] text-muted-foreground mt-0.5">
-              {stats.worst.dateKey.slice(5)} · {shiftLabel(stats.worst)}
+              <span title={stats.worst.primaryDateKey !== stats.worst.dateKey ? `Schedule original: ${stats.worst.dateKey}` : undefined}>
+                {stats.worst.primaryDateKey.slice(5)} · {shiftLabel(stats.worst)}
+              </span>
             </p>
           </CardContent>
         </Card>
