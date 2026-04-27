@@ -1079,10 +1079,46 @@ export function GraderHistoricalCalendar({
         onPointerUp={handleDaySwipeUp}
         onPointerCancel={() => { daySwipeRef.current = null; setDaySwipeDelta(0) }}
       >
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
           <CardTitle className="text-base">
             {selectedKey ? `Resumen ${selectedKey}` : 'Resumen diario'}
           </CardTitle>
+          {/* Flechas de navegación día anterior / siguiente (Paso 2) */}
+          {sortedDayKeys.length > 1 && selectedKey && (() => {
+            const idx = sortedDayKeys.indexOf(selectedKey)
+            const hasPrev = idx > 0
+            const hasNext = idx < sortedDayKeys.length - 1
+            const goTo = (key: string) => {
+              const d = new Date(`${key}T00:00:00`)
+              setSelectedDate(d)
+              setCurrentMonth(new Date(d.getFullYear(), d.getMonth(), 1))
+            }
+            return (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => hasPrev && goTo(sortedDayKeys[idx - 1]!)}
+                  disabled={!hasPrev}
+                  className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
+                  title={hasPrev ? `Ir a ${sortedDayKeys[idx - 1]}` : 'Primer día'}
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </button>
+                {idx >= 0 && (
+                  <span className="text-[10px] text-muted-foreground tabular-nums">
+                    {idx + 1}/{sortedDayKeys.length}
+                  </span>
+                )}
+                <button
+                  onClick={() => hasNext && goTo(sortedDayKeys[idx + 1]!)}
+                  disabled={!hasNext}
+                  className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
+                  title={hasNext ? `Ir a ${sortedDayKeys[idx + 1]}` : 'Último día'}
+                >
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )
+          })()}
         </CardHeader>
         <CardContent className="space-y-3">
           {/* Sin uploads ni historial ni aportes calendáricos: placeholders por turno */}
