@@ -1099,7 +1099,7 @@ export function AnalisisGraderTurnoPage() {
             <Card className="border-dashed hover:bg-muted/30 transition-colors">
               <CardContent className="py-3 px-4 flex items-center gap-2 text-sm text-muted-foreground">
                 <Settings2 className="w-4 h-4" />
-                Abrir configuración física avanzada (12 Gates, Cintas, Distancias…)
+                Abrir configuración avanzada (12 Gates, Análisis, Rangos…)
               </CardContent>
             </Card>
           </button>

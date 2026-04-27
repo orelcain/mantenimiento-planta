@@ -99,7 +99,7 @@ function SaveIndicator({ status }: { status: 'idle' | 'saving' | 'saved' }) {
   )
 }
 
-const VALID_TABS = ['analisis', 'gates', 'rangos', 'fisica'] as const
+const VALID_TABS = ['analisis', 'gates', 'rangos'] as const
 type ConfigTab = (typeof VALID_TABS)[number]
 
 export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: initialConfig, parsedData, onComplete, tabbed = false }: Props) {
@@ -562,7 +562,6 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
     { id: 'analisis', label: 'Análisis' },
     { id: 'gates',   label: '12 Gates' },
     { id: 'rangos',  label: 'Rangos' },
-    { id: 'fisica',  label: 'Física' },
   ] as const
 
   return (
@@ -997,8 +996,8 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
       </Card>
       )} {/* /3.3 */}
 
-      {/* 3.4 Configuración Física de la Máquina */}
-      {(!tabbed || activeTab === 'fisica') && (
+      {/* 3.4 Configuración Física de la Máquina — solo en modo no-tabbed (wizard) */}
+      {!tabbed && (
       <Card className="relative">
         {!tabbed && (
         <CardHeader
