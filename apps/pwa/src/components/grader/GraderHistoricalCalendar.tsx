@@ -410,6 +410,47 @@ export function GraderHistoricalCalendar({
 
   const selectedKey = selectedDate ? selectedDate.toISOString().slice(0, 10) : null
 
+  // Summaries a mostrar en el panel "Resumen del día" para el día seleccionado.
+  // Combina:
+  //  - Contribuciones calendáricas reales (chips primary/secondary)
+  //  - Summaries con dateKey legacy === selectedKey que no aportan (huérfanos)
+  // Orden: primary > secondary > orphan-source; D antes que N dentro de cada rol.
+  const summariesForSelectedDay = useMemo(() => {
+    if (!selectedKey) return [] as Array<{ summary: GraderDailySummary; chip: ShiftChipDescriptor | null }>
+    const out: Array<{ summary: GraderDailySummary; chip: ShiftChipDescriptor | null }> = []
+    const seen = new Set<string>()
+    const dayChips = chipsByDate.get(selectedKey) ?? []
+
+    // 1. Aportes reales (primary + secondary)
+    for (const chip of dayChips) {
+      if (chip.role === 'orphan-source') continue
+      const s = summariesById.get(chip.summaryId)
+      if (s && !seen.has(s.id)) {
+        out.push({ summary: s, chip })
+        seen.add(s.id)
+      }
+    }
+    // 2. Huérfanos: summaries con dateKey legacy === selectedKey sin aporte
+    for (const s of historicalByDate.get(selectedKey) ?? []) {
+      if (seen.has(s.id)) continue
+      const orphanChip = dayChips.find((c) => c.summaryId === s.id && c.role === 'orphan-source') ?? null
+      out.push({ summary: s, chip: orphanChip })
+      seen.add(s.id)
+    }
+    // Ordenamiento determinista
+    const roleOrder: Record<string, number> = { primary: 0, secondary: 1, 'orphan-source': 2 }
+    const shiftOrder: Record<string, number> = { 'Turno día': 0, 'Turno noche': 1 }
+    out.sort((a, b) => {
+      const ra = roleOrder[a.chip?.role ?? 'primary'] ?? 0
+      const rb = roleOrder[b.chip?.role ?? 'primary'] ?? 0
+      if (ra !== rb) return ra - rb
+      const sa = shiftOrder[a.summary.shiftId] ?? 9
+      const sb = shiftOrder[b.summary.shiftId] ?? 9
+      return sa - sb
+    })
+    return out
+  }, [selectedKey, chipsByDate, historicalByDate, summariesById])
+
   // Auto-selección del turno para el store compartido:
   //   - Cuando cambia el día seleccionado, si la selección actual no pertenece a este día,
   //     elegir el primer turno (día > noche) del día si existe. Si no hay turnos, limpiar.
@@ -835,8 +876,8 @@ export function GraderHistoricalCalendar({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {/* Sin uploads ni historial: placeholders por turno con botón cambio de gate */}
-          {selectedKey && selectedUploads.length === 0 && (historicalByDate.get(selectedKey) ?? []).length === 0 && (
+          {/* Sin uploads ni historial ni aportes calendáricos: placeholders por turno */}
+          {selectedKey && selectedUploads.length === 0 && summariesForSelectedDay.length === 0 && (
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 uppercase tracking-wide">
                 <Clock className="h-3.5 w-3.5" />
@@ -868,8 +909,8 @@ export function GraderHistoricalCalendar({
               </div>
             </div>
           )}
-          {/* ── Datos históricos (carga masiva) ── */}
-          {selectedKey && (historicalByDate.get(selectedKey) ?? []).length > 0 && (
+          {/* ── Datos históricos (carga masiva) — incluye aportes calendáricos ── */}
+          {selectedKey && summariesForSelectedDay.length > 0 && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 uppercase tracking-wide">
@@ -896,13 +937,28 @@ export function GraderHistoricalCalendar({
                 })()}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {(historicalByDate.get(selectedKey) ?? [])
-                .sort((a, b) => {
-                  const order: Record<string, number> = { 'Turno día': 0, 'Turno noche': 1 }
-                  return (order[a.shiftId] ?? 9) - (order[b.shiftId] ?? 9)
-                })
-                .map((hist) => {
+              {summariesForSelectedDay.map(({ summary: hist, chip }) => {
                   const isActiveForConfig = selectedHistorical?.id === hist.id
+                  // Badge contextual sobre cómo este turno se relaciona con el día seleccionado
+                  const contextBadge =
+                    chip?.role === 'orphan-source' ? {
+                      cls: 'bg-neutral-500/15 text-neutral-400 border-neutral-500/30',
+                      text: `Sin actividad real este día — detalle en ${chip.primaryDateKey ?? '—'}`,
+                    } :
+                    chip?.role === 'secondary' ? {
+                      cls: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+                      text: chip.direction === 'exits'
+                        ? `Vespertina · ${Math.round(chip.pctOfShift ?? 0)}% del turno aquí`
+                        : `Madrugada · ${Math.round(chip.pctOfShift ?? 0)}% del turno aquí`,
+                    } :
+                    chip?.role === 'primary' && chip.direction === 'enters' ? {
+                      cls: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30',
+                      text: `Madrugada · ${Math.round(chip.pctOfShift ?? 100)}% del turno aquí`,
+                    } :
+                    chip?.role === 'primary' && chip.direction === 'exits' ? {
+                      cls: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30',
+                      text: `Vespertina · ${Math.round(chip.pctOfShift ?? 100)}% del turno aquí`,
+                    } : null
                   return (
                   <div
                     key={hist.id}
@@ -919,12 +975,18 @@ export function GraderHistoricalCalendar({
                       'rounded-lg border px-3 py-2.5 space-y-2 cursor-pointer transition-all',
                       P0_CARD_CLASS[p0StatusFromPct(hist.pointZeroPct)],
                       isActiveForConfig && 'ring-2 ring-emerald-500 ring-offset-1 ring-offset-background',
+                      chip?.role === 'orphan-source' && 'opacity-70',
                     )}
                   >
                     <div className="flex items-center justify-between">
                       <div>
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <p className="text-sm font-medium">{hist.shiftId}</p>
+                          {contextBadge && (
+                            <span className={cn('text-[9px] px-1.5 py-0.5 rounded border font-medium', contextBadge.cls)}>
+                              {contextBadge.text}
+                            </span>
+                          )}
                           {(configChangeCounts.get(hist.id) ?? 0) > 0 && (
                             <span
                               className="inline-flex items-center gap-0.5 text-[9px] px-1 py-0.5 rounded bg-amber-500/15 text-amber-600 border border-amber-500/30 font-medium shrink-0"
