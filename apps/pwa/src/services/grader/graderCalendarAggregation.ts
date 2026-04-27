@@ -36,6 +36,8 @@ function r(v: number, dec: number): number {
  * calendario distintos (cuando su turno cruza medianoche).
  */
 export interface CalendarDayContribution {
+  /** Día calendario al que aporta esta contribución (igual al key del agregado padre) */
+  dateKey: string
   /** ID del summary fuente: `${dateKey}__${shiftId}` */
   summaryId: string
   /** dateKey del summary (día de inicio del turno, atribución legacy) */
@@ -58,6 +60,21 @@ export interface CalendarDayContribution {
    * - `legacy`: sin granularidad — todo el summary atribuido al día de inicio
    */
   source: 'timeline' | 'hourly' | 'legacy'
+  /**
+   * % de las piezas TOTALES del summary que cayeron en este día calendario (0-100).
+   * Se computa después de procesar todos los aportes del summary.
+   * Para summaries que solo aparecen en 1 día (sin cruce real) → 100.
+   * Suma de pctOfShift across days del mismo summary === 100 (con redondeo).
+   */
+  pctOfShift: number
+  /**
+   * `true` si este es el día con MÁS carga del summary (suele ser donde se
+   * espera ver el "Ver detalle" prominente en el calendario).
+   * Para summaries que solo aparecen en 1 día (turno completo o huérfano) → true.
+   * Tiebreaker en empate (50/50): la contribución con menor `dateKey` (día anterior)
+   * gana — criterio determinista para que el render sea estable.
+   */
+  isPrimary: boolean
 }
 
 /** Agregado de un día calendario completo (puede recibir aportes de varios turnos). */
@@ -156,7 +173,45 @@ export function aggregateByCalendarDay(
       : 0
   }
 
+  // Post-process: marcar contribución principal por summary y computar pctOfShift.
+  // Un summary puede aparecer en hasta 2 días (cuando su turno cruza medianoche).
+  // El "principal" es donde tuvo más piezas — usado por el calendario para
+  // decidir qué chip pintar prominente vs secundario.
+  markPrimaryAndComputePct(result)
+
   return result
+}
+
+function markPrimaryAndComputePct(
+  result: Map<string, CalendarDayAggregate>,
+): void {
+  const contribsBySummary = new Map<string, CalendarDayContribution[]>()
+  for (const agg of result.values()) {
+    for (const c of agg.contributingShifts) {
+      const arr = contribsBySummary.get(c.summaryId) ?? []
+      arr.push(c)
+      contribsBySummary.set(c.summaryId, arr)
+    }
+  }
+
+  for (const contribs of contribsBySummary.values()) {
+    const totalPieces = contribs.reduce((s, c) => s + c.pieces, 0)
+    for (const c of contribs) {
+      c.pctOfShift = totalPieces > 0 ? r(c.pieces / totalPieces * 100, 1) : 0
+    }
+    // Determinar primary: max pieces; empate → menor dateKey (día anterior gana)
+    let primary: CalendarDayContribution = contribs[0]!
+    for (const c of contribs) {
+      if (c.pieces > primary.pieces) {
+        primary = c
+      } else if (c.pieces === primary.pieces && c.dateKey < primary.dateKey) {
+        primary = c
+      }
+    }
+    for (const c of contribs) {
+      c.isPrimary = c === primary
+    }
+  }
 }
 
 // ── Path A: precision por minuto ──────────────────────────────────────────────
@@ -201,6 +256,7 @@ function contributeFromTimeline(
     }
     agg.activeMinutes += contrib.minutes
     agg.contributingShifts.push({
+      dateKey,
       summaryId: summary.id,
       shiftDateKey: summary.dateKey,
       shiftId: summary.shiftId,
@@ -209,6 +265,9 @@ function contributeFromTimeline(
       weightKg: contrib.hasWeight ? r(contrib.weightKg, 2) : undefined,
       activeMinutes: contrib.minutes,
       source: 'timeline',
+      // pctOfShift y isPrimary se calculan en markPrimaryAndComputePct
+      pctOfShift: 0,
+      isPrimary: false,
     })
   }
 }
@@ -304,6 +363,7 @@ function contributeFromHourly(
     agg.activeMinutes += activeMinutes
 
     agg.contributingShifts.push({
+      dateKey,
       summaryId: summary.id,
       shiftDateKey: summary.dateKey,
       shiftId: summary.shiftId,
@@ -312,6 +372,8 @@ function contributeFromHourly(
       weightKg,
       activeMinutes,
       source: 'hourly',
+      pctOfShift: 0,
+      isPrimary: false,
     })
   }
 }
@@ -332,6 +394,7 @@ function contributeFromLegacy(
   }
   agg.activeMinutes += summary.durationMinutes ?? 0
   agg.contributingShifts.push({
+    dateKey: summary.dateKey,
     summaryId: summary.id,
     shiftDateKey: summary.dateKey,
     shiftId: summary.shiftId,
@@ -340,6 +403,8 @@ function contributeFromLegacy(
     weightKg: summary.totalWeightKg,
     activeMinutes: summary.durationMinutes ?? 0,
     source: 'legacy',
+    pctOfShift: 0,
+    isPrimary: false,
   })
 }
 

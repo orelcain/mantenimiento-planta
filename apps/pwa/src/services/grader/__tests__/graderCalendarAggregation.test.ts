@@ -513,6 +513,185 @@ describe('aggregateByCalendarDay — path hourly (sin timelineBuckets)', () => {
   })
 })
 
+describe('aggregateByCalendarDay — isPrimary y pctOfShift', () => {
+  it('summary que solo aparece en 1 día → contribución única isPrimary=true, pctOfShift=100', () => {
+    const summary = mkSummary({
+      id: '2026-04-12__Turno día',
+      dateKey: '2026-04-12',
+      shiftId: 'Turno día',
+      totalPieces: 1000,
+      pointZeroPieces: 30,
+      startAt: '2026-04-12T08:00:00.000Z',
+      endAt: '2026-04-12T16:00:00.000Z',
+    })
+    const result = aggregateByCalendarDay({ summaries: [summary] })
+    const c = result.get('2026-04-12')!.contributingShifts[0]!
+    expect(c.isPrimary).toBe(true)
+    expect(c.pctOfShift).toBe(100)
+    expect(c.dateKey).toBe('2026-04-12')
+  })
+
+  it('cruce 75/25: la madrugada (más carga) gana isPrimary, vespertina queda secundaria', () => {
+    const summary = mkSummary({
+      id: '2026-04-12__Turno noche',
+      dateKey: '2026-04-12',
+      shiftId: 'Turno noche',
+      totalPieces: 800,
+      pointZeroPieces: 24,
+      durationMinutes: 480,
+      startAt: '2026-04-12T22:00:00.000Z',
+      endAt: '2026-04-13T06:00:00.000Z',
+      hourlyBuckets: [
+        // dom: 200 piezas (25%)
+        { hour: 22, totalPieces: 100, p0Pieces: 3 },
+        { hour: 23, totalPieces: 100, p0Pieces: 3 },
+        // lun: 600 piezas (75%) — más carga, primary
+        { hour: 0, totalPieces: 200, p0Pieces: 6 },
+        { hour: 1, totalPieces: 200, p0Pieces: 6 },
+        { hour: 2, totalPieces: 200, p0Pieces: 6 },
+      ],
+    })
+    const result = aggregateByCalendarDay({ summaries: [summary] })
+
+    const dom = result.get('2026-04-12')!.contributingShifts[0]!
+    const lun = result.get('2026-04-13')!.contributingShifts[0]!
+
+    expect(dom.pieces).toBe(200)
+    expect(dom.pctOfShift).toBe(25)
+    expect(dom.isPrimary).toBe(false)
+
+    expect(lun.pieces).toBe(600)
+    expect(lun.pctOfShift).toBe(75)
+    expect(lun.isPrimary).toBe(true)
+  })
+
+  it('turno huérfano (100% en día siguiente) → la única contribución es primary', () => {
+    // Caso real Feb 2026: turno noche del dom 1 con primera pieza lun 2 00:31
+    const summary = mkSummary({
+      id: '2026-02-01__Turno noche',
+      dateKey: '2026-02-01',
+      shiftId: 'Turno noche',
+      totalPieces: 13534,
+      pointZeroPieces: 410,
+      durationMinutes: 324,
+      startAt: '2026-02-02T00:31:06.000Z',
+      endAt: '2026-02-02T06:59:59.000Z',
+      hourlyBuckets: [
+        { hour: 0, totalPieces: 1500, p0Pieces: 50 },
+        { hour: 1, totalPieces: 2000, p0Pieces: 60 },
+        { hour: 2, totalPieces: 2500, p0Pieces: 75 },
+        { hour: 3, totalPieces: 2500, p0Pieces: 75 },
+        { hour: 4, totalPieces: 2500, p0Pieces: 75 },
+        { hour: 5, totalPieces: 2000, p0Pieces: 50 },
+        { hour: 6, totalPieces: 534, p0Pieces: 25 },
+      ],
+    })
+    const result = aggregateByCalendarDay({ summaries: [summary] })
+
+    expect(result.size).toBe(1) // solo lun 2
+    expect(result.has('2026-02-01')).toBe(false)
+
+    const lun = result.get('2026-02-02')!.contributingShifts[0]!
+    expect(lun.shiftDateKey).toBe('2026-02-01') // mantiene el legacy del summary
+    expect(lun.dateKey).toBe('2026-02-02') // pero el calendar dateKey es lun
+    expect(lun.isPrimary).toBe(true)
+    expect(lun.pctOfShift).toBe(100)
+  })
+
+  it('empate 50/50: la contribución con dateKey menor (día anterior) gana primary', () => {
+    const summary = mkSummary({
+      id: '2026-04-12__Turno noche',
+      dateKey: '2026-04-12',
+      shiftId: 'Turno noche',
+      totalPieces: 200,
+      pointZeroPieces: 6,
+      startAt: '2026-04-12T22:00:00.000Z',
+      endAt: '2026-04-13T02:00:00.000Z',
+      hourlyBuckets: [
+        { hour: 22, totalPieces: 100, p0Pieces: 3 },
+        { hour: 1, totalPieces: 100, p0Pieces: 3 },
+      ],
+    })
+    const result = aggregateByCalendarDay({ summaries: [summary] })
+
+    const dom = result.get('2026-04-12')!.contributingShifts[0]!
+    const lun = result.get('2026-04-13')!.contributingShifts[0]!
+    expect(dom.pieces).toBe(100)
+    expect(lun.pieces).toBe(100)
+    expect(dom.isPrimary).toBe(true) // empate → menor dateKey gana
+    expect(lun.isPrimary).toBe(false)
+  })
+
+  it('pctOfShift suma a 100% por summary (con redondeo)', () => {
+    const summary = mkSummary({
+      totalPieces: 700,
+      pointZeroPieces: 21,
+      startAt: '2026-04-12T22:00:00.000Z',
+      endAt: '2026-04-13T05:00:00.000Z',
+      hourlyBuckets: [
+        { hour: 22, totalPieces: 100, p0Pieces: 3 },
+        { hour: 23, totalPieces: 100, p0Pieces: 3 },
+        { hour: 0, totalPieces: 100, p0Pieces: 3 },
+        { hour: 1, totalPieces: 100, p0Pieces: 3 },
+        { hour: 2, totalPieces: 100, p0Pieces: 3 },
+        { hour: 3, totalPieces: 100, p0Pieces: 3 },
+        { hour: 4, totalPieces: 100, p0Pieces: 3 },
+      ],
+    })
+    const result = aggregateByCalendarDay({ summaries: [summary] })
+
+    const all = Array.from(result.values()).flatMap((d) => d.contributingShifts)
+    const totalPct = all.reduce((s, c) => s + c.pctOfShift, 0)
+    expect(totalPct).toBeCloseTo(100, 0)
+  })
+
+  it('cada summary tiene exactamente 1 contribución isPrimary=true', () => {
+    const summaries = [
+      mkSummary({
+        id: '2026-04-12__Turno día',
+        dateKey: '2026-04-12',
+        shiftId: 'Turno día',
+        startAt: '2026-04-12T08:00:00.000Z',
+        endAt: '2026-04-12T16:00:00.000Z',
+      }),
+      mkSummary({
+        id: '2026-04-12__Turno noche',
+        dateKey: '2026-04-12',
+        shiftId: 'Turno noche',
+        startAt: '2026-04-12T22:00:00.000Z',
+        endAt: '2026-04-13T06:00:00.000Z',
+        hourlyBuckets: [
+          { hour: 22, totalPieces: 50, p0Pieces: 2 },
+          { hour: 0, totalPieces: 50, p0Pieces: 1 },
+        ],
+      }),
+    ]
+    const result = aggregateByCalendarDay({ summaries })
+    const bySummary = new Map<string, number>()
+    for (const day of result.values()) {
+      for (const c of day.contributingShifts) {
+        if (c.isPrimary) bySummary.set(c.summaryId, (bySummary.get(c.summaryId) ?? 0) + 1)
+      }
+    }
+    expect(bySummary.get('2026-04-12__Turno día')).toBe(1)
+    expect(bySummary.get('2026-04-12__Turno noche')).toBe(1)
+  })
+
+  it('contribución legacy (sin granularidad) → isPrimary=true, pctOfShift=100', () => {
+    const summary = mkSummary({
+      totalPieces: 800,
+      pointZeroPieces: 24,
+      startAt: undefined,
+      endAt: undefined,
+    })
+    const result = aggregateByCalendarDay({ summaries: [summary] })
+    const c = result.get('2026-04-12')!.contributingShifts[0]!
+    expect(c.source).toBe('legacy')
+    expect(c.isPrimary).toBe(true)
+    expect(c.pctOfShift).toBe(100)
+  })
+})
+
 describe('sortedCalendarDays', () => {
   it('ordena los días ascendente por dateKey', () => {
     const map = aggregateByCalendarDay({
