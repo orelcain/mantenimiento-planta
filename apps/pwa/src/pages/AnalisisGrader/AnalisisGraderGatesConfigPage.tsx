@@ -10,7 +10,7 @@ import { useSuggestionEngine } from '@/services/grader/suggestions/useSuggestion
 import { fmt } from '@/lib/format'
 import { logger } from '@/lib/logger'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch, Label } from '@/components/ui'
-import { Save, FolderOpen, ChevronRight, Trash2, ChevronDown, Settings2 } from 'lucide-react'
+import { Save, FolderOpen, ChevronRight, Trash2, ChevronDown, Settings2, RotateCcw, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore, useIsAdmin } from '@/store'
 import {
@@ -20,6 +20,7 @@ import {
   type GatesTemplate,
 } from '@/services/grader/graderSession.service'
 import { getModuleRanges, saveModulePhysicalConfig, saveModuleShiftSchedule } from '@/services/grader/graderModuleConfig.service'
+import { saveShiftCalibreRanges } from '@/services/grader/graderShifts.service'
 import { saveConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
 import { listDailySummariesByRange } from '@/services/grader/graderDailySummary.service'
 import { useGraderSelectionStore } from '@/store/graderSelectionStore'
@@ -63,6 +64,12 @@ interface Props {
   onComplete: (gates: GateAssignment[], config: GraderAnalysisConfig) => void
   /** Si true, muestra navegación por pestañas en lugar de cards apiladas */
   tabbed?: boolean
+  /** ID del turno activo — habilita override de rangos por turno */
+  shiftDocId?: string
+  /** Rangos override ya cargados desde el turno (para no re-fetchear) */
+  shiftCalibreOverride?: CalibreWeightRange[] | null
+  /** Callback al guardar override por turno */
+  onShiftRangesSaved?: (ranges: CalibreWeightRange[] | null) => void
 }
 
 const QUALITIES: GraderQuality[] = ['Premium', 'Grado', 'Industrial', 'D', 'Unknown']
@@ -102,7 +109,16 @@ function SaveIndicator({ status }: { status: 'idle' | 'saving' | 'saved' }) {
 const VALID_TABS = ['analisis', 'gates', 'rangos'] as const
 type ConfigTab = (typeof VALID_TABS)[number]
 
-export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: initialConfig, parsedData, onComplete, tabbed = false }: Props) {
+export function AnalisisGraderGatesConfigPage({
+  gates: initialGates,
+  config: initialConfig,
+  parsedData,
+  onComplete,
+  tabbed = false,
+  shiftDocId,
+  shiftCalibreOverride,
+  onShiftRangesSaved,
+}: Props) {
   const [searchParams, setSearchParams] = useSearchParams()
   const [gates, setGates] = useState<GateAssignment[]>(initialGates)
   const [config, setConfig] = useState<GraderAnalysisConfig>(initialConfig)
@@ -128,6 +144,11 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
       setSearchParams(next, { replace: true })
     }
   }, [activeTab, tabbed, searchParams, setSearchParams])
+  // ── Rangos por turno ────────────────────────────────────────────────────
+  const [editingShiftRanges, setEditingShiftRanges] = useState(false)
+  const [shiftRangesDraft, setShiftRangesDraft] = useState<CalibreWeightRange[]>([])
+  const [savingShiftRanges, setSavingShiftRanges] = useState(false)
+
   const [templates, setTemplates] = useState<GatesTemplate[]>([])
   const [templateName, setTemplateName] = useState('')
   const [activeTemplateName, setActiveTemplateName] = useState<string | null>(null)
@@ -171,13 +192,14 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
   const sortRanges = (ranges: CalibreWeightRange[]) =>
     [...ranges].sort((a, b) => a.minGrams - b.minGrams)
 
-  // Active weight ranges: custom or default
+  // Active weight ranges: turno override > global custom > hardcoded defaults
   const activeRanges = useMemo<CalibreWeightRange[]>(() => {
+    if (shiftCalibreOverride && shiftCalibreOverride.length > 0) return sortRanges(shiftCalibreOverride)
     const base = config.customWeightRanges && config.customWeightRanges.length > 0
       ? config.customWeightRanges
       : CALIBRE_WEIGHT_RANGES
     return sortRanges(base)
-  }, [config.customWeightRanges])
+  }, [shiftCalibreOverride, config.customWeightRanges])
 
   const availableCalibres = useMemo<CalibreRange[]>(() => {
     const fromRanges = activeRanges.map((r) => r.calibre).filter(Boolean)
@@ -185,7 +207,8 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
     return Array.from(new Set(merged))
   }, [activeRanges])
 
-  const isCustomRanges = !!(config.customWeightRanges && config.customWeightRanges.length > 0)
+  const hasShiftOverride = !!(shiftCalibreOverride && shiftCalibreOverride.length > 0)
+  const isCustomRanges = hasShiftOverride || !!(config.customWeightRanges && config.customWeightRanges.length > 0)
 
   // Peso mediano del lote actual (gramos) — desde pieceRecords del Excel cargado
   const medianWeightG = useMemo(() => {
@@ -948,49 +971,161 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
           className={tabbed ? '' : 'cursor-pointer select-none'}
           onClick={tabbed ? undefined : () => setShowWeightRanges(!showWeightRanges)}
         >
-          <CardTitle className="text-base flex items-center gap-2">
+          <CardTitle className="text-base flex items-center gap-2 flex-wrap">
             {!tabbed && <ChevronDown className={`h-4 w-4 transition-transform ${showWeightRanges ? '' : '-rotate-90'}`} />}
             Rangos de Peso por Calibre
-            {isCustomRanges && (
+            {hasShiftOverride && (
+              <Badge className="text-[10px] bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                Override de este turno
+              </Badge>
+            )}
+            {!hasShiftOverride && isCustomRanges && (
               <Badge className="text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
-                Personalizado
+                Global personalizado
+              </Badge>
+            )}
+            {!hasShiftOverride && !isCustomRanges && (
+              <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                Global planta
               </Badge>
             )}
           </CardTitle>
         </CardHeader>
         {(tabbed || showWeightRanges) && (
-          <CardContent>
-            <p className="text-xs text-muted-foreground mb-3">
-              Rangos de política de planta — se aplican a todos los turnos. Para editar, usá la configuración global.
+          <CardContent className="space-y-4">
+            {/* Fuente actual */}
+            <p className="text-xs text-muted-foreground">
+              {hasShiftOverride
+                ? 'Rangos específicos de este turno. Tienen prioridad sobre los rangos globales de planta.'
+                : 'Rangos globales de planta — se aplican a todos los turnos que no tengan un override propio.'}
             </p>
-            <div className="overflow-x-auto mb-3">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-muted-foreground">
-                    <th className="py-1.5 px-2">Calibre</th>
-                    <th className="py-1.5 px-2">Mín (g)</th>
-                    <th className="py-1.5 px-2">Máx (g)</th>
-                    <th className="py-1.5 px-2">Rango</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {activeRanges.map((r, idx) => (
-                    <tr key={idx} className="border-b border-border/30 hover:bg-muted/20">
-                      <td className="py-1.5 px-2 font-mono text-xs">{r.calibre}</td>
-                      <td className="py-1.5 px-2 text-xs tabular-nums">{r.minGrams.toLocaleString('es-CL')}</td>
-                      <td className="py-1.5 px-2 text-xs tabular-nums">{r.maxGrams.toLocaleString('es-CL')}</td>
-                      <td className="py-1.5 px-2 text-xs text-muted-foreground">
-                        {r.label || buildRangeLabel(r.calibre, r.minGrams, r.maxGrams)}
-                      </td>
+
+            {/* Tabla de rangos activos */}
+            {!editingShiftRanges && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-muted-foreground">
+                      <th className="py-1.5 px-2">Calibre</th>
+                      <th className="py-1.5 px-2">Mín (g)</th>
+                      <th className="py-1.5 px-2">Máx (g)</th>
+                      <th className="py-1.5 px-2">Rango</th>
                     </tr>
+                  </thead>
+                  <tbody>
+                    {activeRanges.map((r, idx) => (
+                      <tr key={idx} className="border-b border-border/30 hover:bg-muted/20">
+                        <td className="py-1.5 px-2 font-mono text-xs">{r.calibre}</td>
+                        <td className="py-1.5 px-2 text-xs tabular-nums">{r.minGrams.toLocaleString('es-CL')}</td>
+                        <td className="py-1.5 px-2 text-xs tabular-nums">{r.maxGrams.toLocaleString('es-CL')}</td>
+                        <td className="py-1.5 px-2 text-xs text-muted-foreground">
+                          {r.label || buildRangeLabel(r.calibre, r.minGrams, r.maxGrams)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Editor inline del override por turno */}
+            {editingShiftRanges && (
+              <div className="space-y-2">
+                <p className="text-[11px] text-blue-400 font-medium">Editando override de este turno — los cambios NO afectan otros turnos</p>
+                <div className="space-y-1.5">
+                  {shiftRangesDraft.map((r, idx) => (
+                    <div key={idx} className="grid grid-cols-[1fr_100px_100px_auto] gap-1.5 items-center">
+                      <span className="text-xs font-mono px-2 py-1.5 bg-muted/40 rounded border border-border/40 truncate">{r.calibre}</span>
+                      <Input
+                        type="number"
+                        value={r.minGrams}
+                        min={0}
+                        step={1}
+                        className="h-7 text-xs tabular-nums"
+                        onChange={e => setShiftRangesDraft(prev => prev.map((x, i) => i === idx ? { ...x, minGrams: Number(e.target.value) } : x))}
+                      />
+                      <Input
+                        type="number"
+                        value={r.maxGrams}
+                        min={0}
+                        step={1}
+                        className="h-7 text-xs tabular-nums"
+                        onChange={e => setShiftRangesDraft(prev => prev.map((x, i) => i === idx ? { ...x, maxGrams: Number(e.target.value) } : x))}
+                      />
+                      <span className="text-[10px] text-muted-foreground/50 tabular-nums whitespace-nowrap">
+                        {buildRangeLabel(r.calibre, r.minGrams, r.maxGrams)}
+                      </span>
+                    </div>
                   ))}
-                </tbody>
-              </table>
-            </div>
-            <Button variant="outline" size="sm" onClick={() => setGlobalSettingsOpen(true)}>
-              <Settings2 className="h-3 w-3 mr-1.5" />
-              Editar rangos en configuración global
-            </Button>
+                </div>
+                <div className="flex gap-2 pt-1 flex-wrap">
+                  <Button
+                    size="sm"
+                    disabled={savingShiftRanges || !shiftDocId}
+                    onClick={async () => {
+                      if (!shiftDocId) return
+                      setSavingShiftRanges(true)
+                      try {
+                        await saveShiftCalibreRanges(shiftDocId, shiftRangesDraft)
+                        onShiftRangesSaved?.(shiftRangesDraft)
+                        setEditingShiftRanges(false)
+                      } finally {
+                        setSavingShiftRanges(false)
+                      }
+                    }}
+                  >
+                    {savingShiftRanges && <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />}
+                    Guardar override de este turno
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setEditingShiftRanges(false)}>
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Botones de acción */}
+            {!editingShiftRanges && (
+              <div className="flex gap-2 flex-wrap">
+                {shiftDocId && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setShiftRangesDraft(sortRanges(activeRanges))
+                      setEditingShiftRanges(true)
+                    }}
+                  >
+                    <Save className="h-3 w-3 mr-1.5" />
+                    {hasShiftOverride ? 'Editar override de este turno' : 'Crear override para este turno'}
+                  </Button>
+                )}
+                {hasShiftOverride && shiftDocId && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground hover:text-destructive"
+                    disabled={savingShiftRanges}
+                    onClick={async () => {
+                      setSavingShiftRanges(true)
+                      try {
+                        await saveShiftCalibreRanges(shiftDocId, null)
+                        onShiftRangesSaved?.(null)
+                      } finally {
+                        setSavingShiftRanges(false)
+                      }
+                    }}
+                  >
+                    <RotateCcw className="h-3 w-3 mr-1.5" />
+                    Quitar override (volver a global)
+                  </Button>
+                )}
+                <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setGlobalSettingsOpen(true)}>
+                  <Settings2 className="h-3 w-3 mr-1.5" />
+                  Editar rangos globales (planta)
+                </Button>
+              </div>
+            )}
           </CardContent>
         )}
       </Card>

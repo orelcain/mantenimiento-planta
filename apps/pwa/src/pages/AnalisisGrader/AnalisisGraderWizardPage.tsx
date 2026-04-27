@@ -19,6 +19,8 @@ import { AnalisisGraderDashboardPage } from './AnalisisGraderDashboardPage'
 import { GraderResumenRapido } from './GraderResumenRapido'
 import { getLatestGraderAutosaveDraft, saveGraderAutosaveDraft } from '@/services/grader/graderSession.service'
 import { getModuleRanges } from '@/services/grader/graderModuleConfig.service'
+import { getShiftDoc, buildShiftDocId } from '@/services/grader/graderShifts.service'
+import type { CalibreWeightRange } from '@/services/grader/types'
 import { computeAnalytics, DEFAULT_PHYSICAL_CONFIG } from '@/services/grader/graderAnalytics'
 import { computeDeterministicInsights } from '@/services/grader/graderInsights'
 import {
@@ -83,6 +85,23 @@ export function AnalisisGraderWizardPage() {
   const [savedToCalendar, setSavedToCalendar] = useState(false)
   // IDs de turnos del banner multi-día que ya existen en Firestore
   const [multiDayExistingIds, setMultiDayExistingIds] = useState<Set<string>>(new Set())
+
+  // Contexto de turno — si viene ?dateKey=&shiftId= en la URL, carga el override de rangos del turno
+  const shiftDocId = useMemo(() => {
+    const dk = searchParams.get('dateKey')
+    const si = searchParams.get('shiftId')
+    return dk && si ? buildShiftDocId(dk, si) : undefined
+  }, [searchParams])
+  const [shiftCalibreOverride, setShiftCalibreOverride] = useState<CalibreWeightRange[] | null>(null)
+
+  useEffect(() => {
+    if (!shiftDocId) { setShiftCalibreOverride(null); return }
+    const [dk, si] = shiftDocId.split('__')
+    if (!dk || !si) return
+    getShiftDoc(dk, si)
+      .then(doc => setShiftCalibreOverride(doc?.calibreRangeOverride ?? null))
+      .catch(() => {})
+  }, [shiftDocId])
 
   const dashboardRef = useRef<HTMLDivElement>(null)
   const localDraftLoadedRef = useRef(false)
@@ -546,6 +565,9 @@ export function AnalisisGraderWizardPage() {
               config={config}
               parsedData={fallbackParsedData}
               onComplete={handleGatesApply}
+              shiftDocId={shiftDocId}
+              shiftCalibreOverride={shiftCalibreOverride}
+              onShiftRangesSaved={setShiftCalibreOverride}
             />
           </CardContent>
         </Card>

@@ -83,6 +83,9 @@ export interface GraderShiftDoc {
   species?: 'salar' | 'coho'
   /** Historial de velocidades de cintas registradas durante el turno. */
   beltSpeedHistory?: ShiftBeltSpeedEntry[]
+  /** Override de rangos de peso por calibre para este turno específico.
+   *  Si está presente, tiene prioridad sobre los rangos globales de planta. */
+  calibreRangeOverride?: import('./types').CalibreWeightRange[]
   createdAt: string
   updatedAt: string
 }
@@ -191,6 +194,21 @@ export async function updateShiftSpecies(
   const ref = doc(db, COLLECTION, shiftDocId)
   await updateDoc(ref, {
     ...(species ? { species } : { species: deleteField() }),
+    updatedAt: new Date().toISOString(),
+  })
+}
+
+/**
+ * Guarda un override de rangos de calibre para este turno específico.
+ * Pasar `null` elimina el override (vuelve a usar rangos globales de planta).
+ */
+export async function saveShiftCalibreRanges(
+  shiftDocId: string,
+  ranges: import('./types').CalibreWeightRange[] | null,
+): Promise<void> {
+  const ref = doc(db, COLLECTION, shiftDocId)
+  await updateDoc(ref, {
+    ...(ranges ? { calibreRangeOverride: ranges } : { calibreRangeOverride: deleteField() }),
     updatedAt: new Date().toISOString(),
   })
 }

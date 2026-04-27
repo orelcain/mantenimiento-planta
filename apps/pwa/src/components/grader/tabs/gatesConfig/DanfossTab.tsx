@@ -62,8 +62,8 @@ export function DanfossTab({ physicalConfig, setPhysicalConfig }: DanfossTabProp
           </div>
           <div className="flex items-center gap-3 flex-wrap">
             <label className="text-xs w-44 shrink-0">
-              Setpoint variador (RPM)
-              <span className="block text-muted-foreground">Leer del display Danfoss al inicio turno</span>
+              Setpoint de referencia (RPM)
+              <span className="block text-muted-foreground">Valor base de planta. El RPM operacional de cada turno se registra via <strong>Ajusté RPM</strong> en el turno en vivo.</span>
             </label>
             <Input
               type="number" step="10"

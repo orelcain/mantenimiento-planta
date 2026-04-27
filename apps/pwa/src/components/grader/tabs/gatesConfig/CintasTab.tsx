@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Input, Label } from '@/components/ui'
+import { InfoTooltip } from '@/components/ui/InfoTooltip'
 import { Gauge } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { BELT_FLOW_ORDER, getBeltLabel, GRADING_BELT_DEFAULT_MPS, Z_BELT_DEFAULT_MPS } from '@/services/grader/graderBeltHelpers'
@@ -68,7 +69,17 @@ export function CintasTab({ physicalConfig, updateBeltLength, updateBeltSpeed, s
                 {/* Largo + velocidad en grid 2-col */}
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <Label className="text-[10px] text-muted-foreground">Largo (m)</Label>
+                    <div className="flex items-center gap-1 mb-1">
+                      <Label className="text-[10px] text-muted-foreground">Largo (m)</Label>
+                      <InfoTooltip
+                        title="Largo útil de la cinta"
+                        text="Distancia lineal de la superficie superior, de polea a polea. NO el perímetro completo del lazo."
+                        formula="Tránsito (s) = Largo ÷ Velocidad"
+                        example="3 m ÷ 0.39 m/s = 7.7s de tránsito"
+                        iconSize={10}
+                        position="bottom"
+                      />
+                    </div>
                     <Input
                       type="number"
                       step="0.1"
@@ -79,7 +90,16 @@ export function CintasTab({ physicalConfig, updateBeltLength, updateBeltSpeed, s
                     />
                   </div>
                   <div>
-                    <Label className="text-[10px] text-muted-foreground">Velocidad (m/s)</Label>
+                    <div className="flex items-center gap-1 mb-1">
+                      <Label className="text-[10px] text-muted-foreground">Velocidad (m/s)</Label>
+                      <InfoTooltip
+                        title="Velocidad base calibrada"
+                        text="Velocidad de la superficie medida con tachómetro SKF. Es el parámetro de planta — no el setpoint operacional del turno."
+                        example="Para registrar cambios durante un turno usá 'Ajusté RPM' en el panel del turno en vivo"
+                        iconSize={10}
+                        position="bottom"
+                      />
+                    </div>
                     <Input
                       type="number"
                       step="0.01"

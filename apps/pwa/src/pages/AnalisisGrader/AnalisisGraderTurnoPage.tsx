@@ -1134,9 +1134,9 @@ export function AnalisisGraderTurnoPage() {
             </div>
           )}
 
-          {/* Link a configuración avanzada */}
+          {/* Link a configuración avanzada — pasa contexto del turno por URL */}
           <button
-            onClick={() => navigate('/analisis-grader/wizard?tab=gates')}
+            onClick={() => navigate(`/analisis-grader/wizard?tab=gates&dateKey=${dateKey}&shiftId=${encodeURIComponent(shiftLabel)}`)}
             className="w-full text-left"
           >
             <Card className="border-dashed hover:bg-muted/30 transition-colors">
