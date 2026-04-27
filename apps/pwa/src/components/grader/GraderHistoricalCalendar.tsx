@@ -1128,14 +1128,22 @@ export function GraderHistoricalCalendar({
                   return (order[a] ?? 9) - (order[b] ?? 9)
                 })
                 .map(([shiftId, entries]) => {
-                  const nonOrphan = entries.filter((e) => e.chip?.role !== 'orphan-source')
+                  // Paso 1 (carrusel): para Turno noche, ocultar fragmentos secundarios de salida
+                  // (secondary/exits = vespertina) — ese mismo turno aparece en el día siguiente
+                  // como madrugada (primary/enters). Se conservan primary/exits (caso infrecuente:
+                  // la mayoría de las piezas ocurren antes de medianoche).
+                  const displayEntries = shiftId === 'Turno noche'
+                    ? entries.filter((e) => !(e.chip?.direction === 'exits' && e.chip?.role !== 'primary'))
+                    : entries
+                  const safeEntries = displayEntries.length > 0 ? displayEntries : entries
+                  const nonOrphan = safeEntries.filter((e) => e.chip?.role !== 'orphan-source')
                   const isMultiple = nonOrphan.length > 1
                   if (isMultiple) {
                     // Card consolidada: agrega fragmentos del mismo turno-tipo
-                    return renderConsolidatedShiftCard(shiftId, entries, navigate)
+                    return renderConsolidatedShiftCard(shiftId, safeEntries, navigate)
                   }
                   // Card simple (1 fragmento o solo orphans): comportamiento original
-                  const { summary: hist, chip } = entries[0]!
+                  const { summary: hist, chip } = safeEntries[0]!
                   const isActiveForConfig = selectedHistorical?.id === hist.id
                   // Badge contextual sobre cómo este turno se relaciona con el día seleccionado
                   const contextBadge =
