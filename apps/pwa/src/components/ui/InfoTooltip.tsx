@@ -36,6 +36,9 @@ export function InfoTooltip({
   variant = 'info',
 }: InfoTooltipProps) {
   const [visible, setVisible] = useState(false)
+  // adjustedPos como ref evita que sea dependencia del effect de posición,
+  // rompiendo el loop: adjustedPos cambia → effect re-corre → adjustedPos cambia...
+  const adjustedPosRef = useRef(position)
   const [adjustedPos, setAdjustedPos] = useState(position)
   const [mounted, setMounted] = useState(false)
   const [tooltipCoords, setTooltipCoords] = useState<{ top: number; left: number }>({ top: 0, left: 0 })
@@ -50,7 +53,8 @@ export function InfoTooltip({
 
   const hide = useCallback(() => {
     clearTimeout(timeoutRef.current)
-    timeoutRef.current = setTimeout(() => setVisible(false), 80)
+    // 200ms: da tiempo suficiente al mouse para cruzar el gap trigger → portal tooltip
+    timeoutRef.current = setTimeout(() => setVisible(false), 200)
   }, [])
 
   const updateTooltipPosition = useCallback(() => {
@@ -68,7 +72,11 @@ export function InfoTooltip({
     if (newPos === 'bottom' && (triggerRect.bottom + tooltipRect.height + gap) > (vh - edge)) newPos = 'top'
     if (newPos === 'left' && (triggerRect.left - tooltipRect.width - gap) < edge) newPos = 'right'
     if (newPos === 'right' && (triggerRect.right + tooltipRect.width + gap) > (vw - edge)) newPos = 'left'
-    if (newPos !== adjustedPos) setAdjustedPos(newPos)
+    // Usar ref para detectar cambio sin re-crear el callback (evita loop de renders)
+    if (newPos !== adjustedPosRef.current) {
+      adjustedPosRef.current = newPos
+      setAdjustedPos(newPos)
+    }
 
     let left = 0
     let top = 0
@@ -89,10 +97,13 @@ export function InfoTooltip({
     const clampedLeft = Math.min(vw - tooltipRect.width - edge, Math.max(edge, left))
     const clampedTop = Math.min(vh - tooltipRect.height - edge, Math.max(edge, top))
     setTooltipCoords({ top: clampedTop, left: clampedLeft })
-  }, [visible, position, adjustedPos])
+  }, [visible, position])
 
   useEffect(() => {
-    if (!visible) setAdjustedPos(position)
+    if (!visible) {
+      adjustedPosRef.current = position
+      setAdjustedPos(position)
+    }
   }, [visible, position])
 
   useEffect(() => {
@@ -110,7 +121,8 @@ export function InfoTooltip({
       window.removeEventListener('resize', onViewportChange)
       window.removeEventListener('scroll', onViewportChange, true)
     }
-  }, [visible, updateTooltipPosition, adjustedPos])
+    // adjustedPos eliminado de deps → evita loop: position correction → re-effect → re-correction
+  }, [visible, updateTooltipPosition])
 
   useEffect(() => () => clearTimeout(timeoutRef.current), [])
 

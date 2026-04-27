@@ -10,6 +10,7 @@ import {
   getDoc,
   setDoc,
   updateDoc,
+  deleteField,
   collection,
   query,
   where,
@@ -64,6 +65,8 @@ export interface GraderShiftDoc {
   status: 'live' | 'closed'
   uploads: ShiftUploadEntry[]
   actions: ShiftActionEntry[]
+  /** Especie del turno — override manual del supervisor. */
+  species?: 'salar' | 'coho'
   createdAt: string
   updatedAt: string
 }
@@ -147,6 +150,17 @@ export async function updateActionOutcome(
     a.id === actionId ? { ...a, outcome } : a,
   )
   await updateDoc(ref, { actions, updatedAt: new Date().toISOString() })
+}
+
+export async function updateShiftSpecies(
+  shiftDocId: string,
+  species: 'salar' | 'coho' | null,
+): Promise<void> {
+  const ref = doc(db, COLLECTION, shiftDocId)
+  await updateDoc(ref, {
+    ...(species ? { species } : { species: deleteField() }),
+    updatedAt: new Date().toISOString(),
+  })
 }
 
 export async function markShiftClosed(dateKey: string, shiftId: string): Promise<void> {

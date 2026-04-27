@@ -30,14 +30,16 @@ import { usePauseTags } from '@/hooks/usePauseTags'
 import type { CalibreWeightRange, PauseDetectorConfig } from '@/services/grader/types'
 import type { GraderPauseTag } from '@/services/grader/graderPauseTags'
 import { cn } from '@/lib/utils'
+import { PhysicalLineSection } from './PhysicalLineSection'
 
-type SettingsTab = 'umbrales' | 'rangos' | 'tags' | 'detector'
+type SettingsTab = 'umbrales' | 'rangos' | 'tags' | 'detector' | 'fisica'
 
 const TABS: { id: SettingsTab; label: string }[] = [
   { id: 'umbrales', label: 'Umbrales P0%' },
   { id: 'rangos',   label: 'Rangos calibre' },
   { id: 'tags',     label: 'Tags pausa' },
   { id: 'detector', label: 'Detector pausas' },
+  { id: 'fisica',   label: 'Línea física' },
 ]
 
 const EMPTY_TAG: Omit<GraderPauseTag, 'id'> & { id: string } = {
@@ -210,15 +212,15 @@ export function GlobalSettingsModal({ open, onOpenChange }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl max-h-[85vh] flex flex-col">
+      <DialogContent className={cn('max-h-[85vh] flex flex-col', tab === 'fisica' ? 'max-w-3xl' : 'max-w-xl')}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Settings2 className="w-4 h-4 text-muted-foreground" />
-            Configuración global del Grader
+            Configuración global
           </DialogTitle>
           <DialogDescription>
-            Parámetros de política de planta — se aplican a todos los turnos.
-            Los 12 gates y la configuración física son específicos de cada turno.
+            Política de planta (todos los turnos) + configuración física base de la línea.
+            Los 12 gates y velocidades operacionales se configuran en cada turno.
           </DialogDescription>
         </DialogHeader>
 
@@ -508,6 +510,8 @@ export function GlobalSettingsModal({ open, onOpenChange }: Props) {
                 </div>
               )}
             </div>
+          ) : tab === 'fisica' ? (
+            <PhysicalLineSection />
           ) : (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -609,7 +613,7 @@ export function GlobalSettingsModal({ open, onOpenChange }: Props) {
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancelar
           </Button>
-          {isAdmin && tab !== 'tags' && (
+          {isAdmin && tab !== 'tags' && tab !== 'fisica' && (
             <Button
               onClick={tab === 'detector' ? handleSaveDetector : handleSave}
               disabled={saving || loading}

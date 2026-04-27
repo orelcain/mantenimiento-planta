@@ -32,8 +32,7 @@ import { TimelineSyncProvider } from '@/components/grader/TimelineSyncContext'
 import { ShiftBreakdownsCard } from '@/components/grader/ShiftBreakdownsCard'
 import { GateBreakdownCard } from '@/components/grader/GateBreakdownCard'
 import { ConfigChangeHistory } from '@/components/grader/ConfigChangeHistory'
-import { CurrentGateConfigPanel } from '@/components/grader/CurrentGateConfigPanel'
-import { ShiftGatesConfigAccordion } from '@/components/grader/ShiftGatesConfigAccordion'
+import { ShiftConfigPanel } from '@/components/grader/ShiftConfigPanel'
 import { PauseAnnotationDialog } from '@/components/grader/PauseAnnotationDialog'
 import { resolveEffectiveTag } from '@/services/grader/graderPauseTags'
 import { exportTurnToPDF } from '@/services/grader/graderTurnToPDF'
@@ -891,6 +890,18 @@ export function AnalisisGraderTurnoPage() {
             </div>
           </div>
 
+          {/* Config de gates del turno — posición B (antes del timeline, visible sin scroll) */}
+          {configSnapshots.length > 0 && (
+            <ShiftConfigPanel
+              shiftDocId={shiftDocId}
+              shiftDoc={shiftDoc}
+              configSnapshots={configSnapshots}
+              onSaved={reloadConfigSnapshots}
+              allowEdit={shiftWindow?.status === 'live'}
+              summary={summary}
+            />
+          )}
+
           {/* Timeline — full width */}
           <ShiftTimelineView
             timelineBuckets={enrichedTimelineBuckets}
@@ -957,19 +968,6 @@ export function AnalisisGraderTurnoPage() {
             calidadBreakdown={summary.calidadBreakdown}
             productoBreakdown={summary.productoBreakdown}
             conservacionBreakdown={summary.conservacionBreakdown}
-          />
-
-          {/* Config actual del turno — grilla compacta de los 12 gates */}
-          {configSnapshots.length > 0 && (
-            <CurrentGateConfigPanel configSnapshots={configSnapshots} />
-          )}
-
-          {/* Acordeón editable de los 12 gates — colapsado por defecto */}
-          <ShiftGatesConfigAccordion
-            shiftDocId={shiftDocId}
-            configSnapshots={configSnapshots}
-            onSaved={reloadConfigSnapshots}
-            allowEdit={shiftWindow?.status === 'live'}
           />
 
           {/* Historial de cambios de configuración del turno */}

@@ -1016,6 +1016,11 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
         )}
         {(tabbed || showPhysicalConfig) && (
           <CardContent className="space-y-6">
+            {/* Banner migración: config física ahora también en Configuración Global */}
+            <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-primary/5 border border-primary/20 text-xs text-muted-foreground">
+              <Settings2 className="w-3.5 h-3.5 text-primary shrink-0" />
+              <span>Esta configuración también está disponible en <strong className="text-foreground">Configuración Global → Línea física</strong>, donde se puede editar sin pasar por el wizard.</span>
+            </div>
             {/* Sub-tabs Física */}
             <div className="flex gap-0 border-b border-border/50">
               {([
