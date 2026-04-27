@@ -10,17 +10,15 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, Button, Badge } from '@/components/ui'
-import { Settings2, BarChart3, Loader2, CheckCircle2, Calendar, BookOpen } from 'lucide-react'
+import { BarChart3, Loader2, CheckCircle2, Calendar, BookOpen } from 'lucide-react'
 import { useAuthStore, usePermissionsStore } from '@/store'
 import { AnalisisGraderUploadPage, type FileParsed } from './AnalisisGraderUploadPage'
 import { GraderHistoricalCalendar } from '@/components/grader/GraderHistoricalCalendar'
-import { AnalisisGraderGatesConfigPage } from './AnalisisGraderGatesConfigPage'
+import { GraderMonthlyStatsPanel } from '@/components/grader/GraderMonthlyStatsPanel'
 import { AnalisisGraderDashboardPage } from './AnalisisGraderDashboardPage'
 import { GraderResumenRapido } from './GraderResumenRapido'
 import { getLatestGraderAutosaveDraft, saveGraderAutosaveDraft } from '@/services/grader/graderSession.service'
 import { getModuleRanges } from '@/services/grader/graderModuleConfig.service'
-import { getShiftDoc, buildShiftDocId } from '@/services/grader/graderShifts.service'
-import type { CalibreWeightRange } from '@/services/grader/types'
 import { computeAnalytics, DEFAULT_PHYSICAL_CONFIG } from '@/services/grader/graderAnalytics'
 import { computeDeterministicInsights } from '@/services/grader/graderInsights'
 import {
@@ -44,7 +42,7 @@ import {
 } from '@/services/grader/graderDailySummary.service'
 import { detectPauses, collectSortedTimestamps, type PauseDetectionResult } from '@/services/grader/graderPauseDetector'
 import { DEFAULT_P0_ALERT_PCT, DEFAULT_P0_CRITICAL_PCT } from '@/services/grader/graderP0Thresholds'
-import type { ParsedMatrixData, GateAssignment, GraderAnalysisConfig } from '@/services/grader/types'
+import type { ParsedMatrixData, GateAssignment, GraderAnalysisConfig, GraderDailySummary } from '@/services/grader/types'
 
 const GRADER_WIZARD_DRAFT_KEY = 'grader_wizard_draft_v1'
 
@@ -86,30 +84,9 @@ export function AnalisisGraderWizardPage() {
   // IDs de turnos del banner multi-día que ya existen en Firestore
   const [multiDayExistingIds, setMultiDayExistingIds] = useState<Set<string>>(new Set())
 
-  // Contexto de turno — si viene ?dateKey=&shiftId= en la URL, carga el override de rangos del turno
-  const shiftDocId = useMemo(() => {
-    const dk = searchParams.get('dateKey')
-    const si = searchParams.get('shiftId')
-    return dk && si ? buildShiftDocId(dk, si) : undefined
-  }, [searchParams])
-  const [shiftCalibreOverride, setShiftCalibreOverride] = useState<CalibreWeightRange[] | null>(null)
-  const [shiftThresholdsOverride, setShiftThresholdsOverride] = useState<{ photocellPctWarn: number; outOfLimitsPctWarn: number; pointZeroPctWarn: number; pointZeroPctCritical: number } | null>(null)
-
-  useEffect(() => {
-    if (!shiftDocId) {
-      setShiftCalibreOverride(null)
-      setShiftThresholdsOverride(null)
-      return
-    }
-    const [dk, si] = shiftDocId.split('__')
-    if (!dk || !si) return
-    getShiftDoc(dk, si)
-      .then(doc => {
-        setShiftCalibreOverride(doc?.calibreRangeOverride ?? null)
-        setShiftThresholdsOverride(doc?.thresholdsOverride ?? null)
-      })
-      .catch(() => {})
-  }, [shiftDocId])
+  // Estado del panel de resumen mensual — se sincroniza con el calendario embebido
+  const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date())
+  const [calendarSummaries, setCalendarSummaries] = useState<GraderDailySummary[]>([])
 
   const dashboardRef = useRef<HTMLDivElement>(null)
   const localDraftLoadedRef = useRef(false)
@@ -552,37 +529,17 @@ export function AnalisisGraderWizardPage() {
         </div>
       </div>
 
-      {/* ═══ Cuerpo: calendario full-width (config vive dentro de cada turno) ═══ */}
-      <div className={shiftDocId ? 'grid grid-cols-1 lg:grid-cols-2 gap-6' : 'grid grid-cols-1 gap-6'}>
-        {/* Calendario — toma todo el ancho si no hay contexto de turno */}
-        <GraderHistoricalCalendar stacked />
-
-        {/* Configuraciones — solo visible cuando se llega desde un turno específico */}
-        {shiftDocId && (
-          <Card className="border-l-4 border-l-emerald-500/40 h-fit">
-            <div className="px-4 pt-3 pb-1 flex items-center gap-2">
-              <Settings2 className="h-4 w-4 text-emerald-500" />
-              <span className="text-sm font-semibold">Configuraciones</span>
-              <Badge variant="outline" className="text-xs font-normal ml-auto">
-                {gates.filter((g) => g.active).length} gates activas
-              </Badge>
-            </div>
-            <CardContent className="pt-2 pb-4">
-              <AnalisisGraderGatesConfigPage
-                tabbed
-                gates={gates}
-                config={config}
-                parsedData={fallbackParsedData}
-                onComplete={handleGatesApply}
-                shiftDocId={shiftDocId}
-                shiftCalibreOverride={shiftCalibreOverride}
-                onShiftRangesSaved={setShiftCalibreOverride}
-                shiftThresholdsOverride={shiftThresholdsOverride}
-                onShiftThresholdsSaved={setShiftThresholdsOverride}
-              />
-            </CardContent>
-          </Card>
-        )}
+      {/* ═══ Cuerpo: 2 columnas en desktop — calendario + resumen mensual ═══ */}
+      <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-6 items-start">
+        <GraderHistoricalCalendar
+          stacked
+          onMonthChange={setCalendarMonth}
+          onSummariesLoaded={setCalendarSummaries}
+        />
+        <GraderMonthlyStatsPanel
+          currentMonth={calendarMonth}
+          summaries={calendarSummaries}
+        />
       </div>
 
       {/* Banners multi-día */}

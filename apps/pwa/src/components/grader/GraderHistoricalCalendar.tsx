@@ -76,6 +76,10 @@ interface GraderHistoricalCalendarProps {
   initialDateKey?: string | null
   /** Si true, apila 1.1 (calendario) arriba y 1.2 (resumen) abajo en lugar del grid lateral */
   stacked?: boolean
+  /** Notifica al padre cada vez que el mes visible cambia (ej. al navegar ◀▶). */
+  onMonthChange?: (date: Date) => void
+  /** Notifica al padre cuando se cargan los summaries del mes visible. */
+  onSummariesLoaded?: (list: GraderDailySummary[]) => void
 }
 
 const monthNames = [
@@ -154,6 +158,8 @@ export function GraderHistoricalCalendar({
   className,
   initialDateKey,
   stacked = false,
+  onMonthChange,
+  onSummariesLoaded,
 }: GraderHistoricalCalendarProps) {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -197,6 +203,8 @@ export function GraderHistoricalCalendar({
   const [loadingUntagged, setLoadingUntagged] = useState(false)
   const autoSelectedRef = useRef(!!effectiveInitialKey)
 
+  useEffect(() => { onMonthChange?.(currentMonth) }, [currentMonth, onMonthChange])
+
   useEffect(() => {
     setLoading(true)
     setError(null)
@@ -238,6 +246,7 @@ export function GraderHistoricalCalendar({
           map.set(s.dateKey, existing)
         }
         setHistoricalByDate(map)
+        onSummariesLoaded?.(list)
 
         // Si el mes actual no tiene datos y no hay initialDateKey, buscar el último mes con datos
         if (list.length === 0 && !effectiveInitialKey && !autoSelectedRef.current) {
