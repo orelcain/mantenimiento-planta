@@ -14,6 +14,15 @@ import type { MachineImpact } from '@/services/shoplogix/shoplogixCorrelation'
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
 
+/**
+ * Acción directa que se puede ejecutar desde el panel sin salir de la página.
+ * - 'belt-rpm': abre el modal de ajuste de velocidades Danfoss
+ * - 'gate-change': abre el modal de cambio de gate
+ * - 'global-config': navega a la configuración global (Línea física)
+ * - 'wizard-gates': navega al wizard de gates
+ */
+export type ActionTrigger = 'belt-rpm' | 'gate-change' | 'global-config' | 'wizard-gates'
+
 export interface SuggestedAction {
   id: string
   category: 'terreno' | 'oficina' | 'verificar'
@@ -21,6 +30,10 @@ export interface SuggestedAction {
   description: string
   severity: 'critical' | 'warning' | 'recommended'
   estimatedImpact?: { metric: 'P0%' | 'throughput'; deltaPct: number }
+  /** Si está presente, el card muestra un botón "Ejecutar" que dispara la acción en la PWA */
+  actionTrigger?: ActionTrigger
+  /** Etiqueta personalizada para el botón de acción (default: "Ejecutar") */
+  actionLabel?: string
 }
 
 /**
@@ -89,6 +102,8 @@ export function deriveSuggestions(
         title: 'Revisar límites de calibre configurados',
         description: 'Verificar que los límites inferiores/superiores de calibre en la configuración física coincidan con la especie procesada actualmente.',
         severity: 'warning',
+        actionTrigger: 'global-config',
+        actionLabel: 'Abrir config',
       },
       {
         id: 'fl-verify-species',
@@ -117,6 +132,8 @@ export function deriveSuggestions(
         description: 'Si el throughput permite, reducir la velocidad de alimentación para aumentar el gap entre peces y evitar lecturas perdidas.',
         severity: 'warning',
         estimatedImpact: { metric: 'P0%', deltaPct: -0.8 },
+        actionTrigger: 'belt-rpm',
+        actionLabel: 'Ajustar RPM',
       },
       {
         id: 'nf-sensor-verify',
@@ -144,6 +161,8 @@ export function deriveSuggestions(
         title: 'Ajustar timing de apertura de puertas',
         description: 'En la configuración física, revisar el parámetro de anticipación de apertura (ms) en las gates con mayor incidencia.',
         severity: 'warning',
+        actionTrigger: 'global-config',
+        actionLabel: 'Abrir config',
       },
     )
   }

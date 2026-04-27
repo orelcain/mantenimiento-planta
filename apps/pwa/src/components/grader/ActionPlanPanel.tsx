@@ -5,25 +5,24 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui'
-import { Wrench, Monitor, Eye, CheckSquare, Square, AlertTriangle, Info } from 'lucide-react'
+import { Wrench, Monitor, Eye, CheckSquare, Square, AlertTriangle, Info, ArrowRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store'
 import { appendShiftAction } from '@/services/grader/graderShifts.service'
 import type { ShiftStatus } from '@/services/grader/graderShiftStatus'
 import type { Runbook } from '@/services/grader/graderRunbooks'
 import { RunbookCard } from '@/components/grader/RunbookCard'
-// La función pura `deriveSuggestions` y los tipos viven en
-// `@/services/grader/actionPlanSuggestions` — para satisfacer la regla
-// react-refresh/only-export-components (solo componentes en archivos .tsx
-// que renderizan UI). Los consumers deben importar desde ahí directamente.
-import type { SuggestedAction } from '@/services/grader/actionPlanSuggestions'
+import type { SuggestedAction, ActionTrigger } from '@/services/grader/actionPlanSuggestions'
 
 interface ActionPlanPanelProps {
   shiftDocId: string
   suggestions: SuggestedAction[]
   status: ShiftStatus
   relatedRunbooks?: Runbook[]
+  /** Callback para triggers que abren modales en el padre (belt-rpm, gate-change) */
+  onActionTrigger?: (trigger: ActionTrigger) => void
 }
 
 // ============================================================================
@@ -53,16 +52,41 @@ const SEVERITY_COLOR: Record<SuggestedAction['severity'], string> = {
   recommended: 'text-zinc-400',
 }
 
+const TRIGGER_LABELS: Record<ActionTrigger, string> = {
+  'belt-rpm':     'Ajustar RPM',
+  'gate-change':  'Cambiar gate',
+  'global-config': 'Abrir config',
+  'wizard-gates': 'Abrir wizard',
+}
+
+const TRIGGER_NAVIGATE: Partial<Record<ActionTrigger, string>> = {
+  'global-config': '/configuracion-global?tab=linea',
+  'wizard-gates':  '/analisis-grader/wizard?tab=gates',
+}
+
 function ActionItem({
   action,
   checked,
   onToggle,
+  onTrigger,
 }: {
   action: SuggestedAction
   checked: boolean
   onToggle: () => void
+  onTrigger?: (trigger: ActionTrigger) => void
 }) {
+  const navigate = useNavigate()
   const SeverityIcon = SEVERITY_ICON[action.severity]
+
+  function handleTrigger() {
+    if (!action.actionTrigger) return
+    const navPath = TRIGGER_NAVIGATE[action.actionTrigger]
+    if (navPath) {
+      navigate(navPath)
+    } else {
+      onTrigger?.(action.actionTrigger)
+    }
+  }
 
   return (
     <div
@@ -95,13 +119,24 @@ function ActionItem({
             </span>
           )}
           <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{action.description}</p>
+
+          {/* Botón de acción directa */}
+          {action.actionTrigger && (
+            <button
+              onClick={handleTrigger}
+              className="mt-2 flex items-center gap-1 text-[11px] px-2 py-1 rounded border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors font-medium"
+            >
+              {action.actionLabel ?? TRIGGER_LABELS[action.actionTrigger]}
+              <ArrowRight className="w-3 h-3" />
+            </button>
+          )}
         </div>
       </div>
     </div>
   )
 }
 
-export function ActionPlanPanel({ shiftDocId, suggestions, status, relatedRunbooks = [] }: ActionPlanPanelProps) {
+export function ActionPlanPanel({ shiftDocId, suggestions, status, relatedRunbooks = [], onActionTrigger }: ActionPlanPanelProps) {
   const storageKey = `grader-actions-checked-${shiftDocId}`
   const user = useAuthStore(s => s.user)
 
@@ -217,6 +252,7 @@ export function ActionPlanPanel({ shiftDocId, suggestions, status, relatedRunboo
                     action={action}
                     checked={checked.has(action.id)}
                     onToggle={() => toggle(action.id)}
+                    onTrigger={onActionTrigger}
                   />
                 ))}
               </div>

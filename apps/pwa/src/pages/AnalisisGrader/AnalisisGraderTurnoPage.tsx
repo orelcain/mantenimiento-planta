@@ -33,6 +33,9 @@ import { ShiftBreakdownsCard } from '@/components/grader/ShiftBreakdownsCard'
 import { GateBreakdownCard } from '@/components/grader/GateBreakdownCard'
 import { GateEvolutionChart } from '@/components/grader/GateEvolutionChart'
 import { GateChangeImpactCard } from '@/components/grader/GateChangeImpactCard'
+import { GateChangeModal } from '@/components/grader/modals/GateChangeModal'
+import { BeltRpmModal } from '@/components/grader/modals/BeltRpmModal'
+import type { ActionTrigger } from '@/services/grader/actionPlanSuggestions'
 import { ConfigChangeHistory } from '@/components/grader/ConfigChangeHistory'
 import { ShiftConfigPanel } from '@/components/grader/ShiftConfigPanel'
 import { PauseAnnotationDialog } from '@/components/grader/PauseAnnotationDialog'
@@ -555,6 +558,15 @@ export function AnalisisGraderTurnoPage() {
   // M3 — Siguiente pausa sin clasificar
   const [nextPauseOpen, setNextPauseOpen] = useState(false)
 
+  // Modales lanzados desde ActionPlanPanel (botones "Ejecutar")
+  const [planGateModalOpen, setPlanGateModalOpen] = useState(false)
+  const [planRpmModalOpen, setPlanRpmModalOpen] = useState(false)
+
+  function handleActionTrigger(trigger: ActionTrigger) {
+    if (trigger === 'belt-rpm') setPlanRpmModalOpen(true)
+    if (trigger === 'gate-change') setPlanGateModalOpen(true)
+  }
+
   // M17 — Export PDF
   const [pdfExporting, setPdfExporting] = useState(false)
   const chartImageRef = useRef<(() => string | null) | null>(null)
@@ -872,6 +884,22 @@ export function AnalisisGraderTurnoPage() {
                 suggestions={suggestions}
                 status={shiftWindow.status}
                 relatedRunbooks={triggeredRunbooks}
+                onActionTrigger={handleActionTrigger}
+              />
+
+              {/* Modales lanzados desde ActionPlanPanel */}
+              <GateChangeModal
+                open={planGateModalOpen}
+                onOpenChange={setPlanGateModalOpen}
+                shiftDocId={shiftDocId}
+                configSnapshots={configSnapshots}
+                onSaved={() => { setPlanGateModalOpen(false); void reloadConfigSnapshots() }}
+              />
+              <BeltRpmModal
+                open={planRpmModalOpen}
+                onOpenChange={setPlanRpmModalOpen}
+                shiftDocId={shiftDocId}
+                shiftDoc={shiftDoc}
               />
             </div>
 
