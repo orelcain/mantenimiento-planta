@@ -212,49 +212,6 @@ describe('detectPauses — pause ID', () => {
   })
 })
 
-// ── Auto-tag ejercicios ───────────────────────────────────────────────────────
-
-describe('detectPauses — auto-tag ejercicios', () => {
-  it('15 min a las 2.5h del inicio → autoTag ejercicios', () => {
-    // Inicio turno 06:00, pausa 08:30–08:45 (2.5h después, 15 min)
-    const start = mkTs(DAY, 6, 0)
-    const s     = mkTs(DAY, 8, 30)
-    const [, e] = mkGap(s, 900) // 15 min
-    const r = detectPauses([start, s, e], 'Turno día')
-    const pausa = r.pauses.find(p => p.startAt === s)
-    expect(pausa?.autoTag).toBe('ejercicios')
-  })
-
-  it('15 min a las 1h del inicio → sin autoTag (muy temprano)', () => {
-    const start = mkTs(DAY, 6, 0)
-    const s     = mkTs(DAY, 7, 0)
-    const [, e] = mkGap(s, 900)
-    const r = detectPauses([start, s, e], 'Turno día')
-    const pausa = r.pauses.find(p => p.startAt === s)
-    expect(pausa?.autoTag).toBeUndefined()
-  })
-
-  it('40 min a las 2.5h → sin autoTag (duración fuera de rango)', () => {
-    const start = mkTs(DAY, 6, 0)
-    const s     = mkTs(DAY, 8, 30)
-    const [, e] = mkGap(s, 2400) // 40 min → colación?? no (no en ventana), no ejercicios (>20min)
-    const r = detectPauses([start, s, e], 'Turno día')
-    const pausa = r.pauses.find(p => p.startAt === s)
-    expect(pausa?.autoTag).toBeUndefined()
-  })
-
-  it('gap 60 min en ventana colación → colación (no ejercicios: dur fuera de rango 10-20m)', () => {
-    // Los rangos de duración son mutuamente excluyentes: colación 45-90m, ejercicios 10-20m.
-    // Un gap de 60 min a las 2.5h del turno está en ventana ejercicios (timing) pero
-    // como no cumple la duración, no activa ejercicios — y sí activa colación.
-    const s = mkTs(DAY, 13, 0)
-    const e = mkTs(DAY, 14, 0) // 60 min → colación ✓, ejercicios ✗ (>20 min)
-    // Solo 2 timestamps → shiftStartMs = 13:00, elapsed = 0 → ejercicios no aplica igual
-    const r = detectPauses([s, e], 'Turno día')
-    expect(r.pauses[0]!.autoTag).toBe('colacion')
-  })
-})
-
 // ── Auto-tag cambio_lote ──────────────────────────────────────────────────────
 
 describe('detectPauses — auto-tag cambio_lote', () => {

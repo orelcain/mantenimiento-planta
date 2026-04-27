@@ -52,6 +52,7 @@ import { correlatePausesWithUpstream, summarizeCorrelations } from '@/services/s
 import { buildScatterData, scatterSlopeMagnitude } from '@/components/grader/shiftTimelineHelpers'
 import { DEFAULT_P0_ALERT_PCT, DEFAULT_P0_CRITICAL_PCT } from '@/services/grader/graderP0Thresholds'
 import { fmtTime } from '@/services/grader/graderTimeFormat'
+import { PieceScatterChart } from '@/components/grader/PieceScatterChart'
 import { UpstreamMachinesPanel } from '@/components/grader/UpstreamMachinesPanel'
 import { UpstreamCorrelationCard } from '@/components/grader/UpstreamCorrelationCard'
 import { UpstreamScatterCard } from '@/components/grader/UpstreamScatterCard'
@@ -953,6 +954,11 @@ export function AnalisisGraderTurnoPage() {
             chartImageRef={chartImageRef}
             upstreamSnapshot={upstreamLine.snapshot}
           />
+
+          {/* Dispersión segundo a segundo de piezas P0 (drill-down del timeline) */}
+          {gate0Pieces.length >= 5 && (
+            <PieceScatterChart gate0Pieces={gate0Pieces} />
+          )}
 
           {/* Línea upstream — Evisceradoras Baader 142 (integración Shoplogix) */}
           {/* Va INMEDIATAMENTE después del timeline Grader para máxima cercanía visual */}

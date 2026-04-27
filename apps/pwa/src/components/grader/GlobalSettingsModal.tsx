@@ -77,10 +77,6 @@ export function GlobalSettingsModal({ open, onOpenChange }: Props) {
     colacionMaxMin: 90,
     colacionWindowDia:   { start: 750, end: 870 },
     colacionWindowNoche: { start:  30, end: 210 },
-    ejerciciosMinMin: 10,
-    ejerciciosMaxMin: 20,
-    ejerciciosAfterStartMin:  120,
-    ejerciciosBeforeStartMin: 180,
   })
 
   // Tags pausa
@@ -378,25 +374,6 @@ export function GlobalSettingsModal({ open, onOpenChange }: Props) {
                 </div>
               </div>
 
-              {/* Ejercicios */}
-              <div className="border border-border/40 rounded-md p-3 space-y-3">
-                <p className="text-xs font-semibold text-foreground">Auto-tag Ejercicios</p>
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  {([
-                    ['ejerciciosMinMin', 'Duración mín. (min)', '10'],
-                    ['ejerciciosMaxMin', 'Duración máx. (min)', '20'],
-                    ['ejerciciosAfterStartMin',  'Mín. min. desde inicio turno', '120'],
-                    ['ejerciciosBeforeStartMin', 'Máx. min. desde inicio turno', '180'],
-                  ] as const).map(([key, label, placeholder]) => (
-                    <div key={key}>
-                      <Label className="text-[10px] text-muted-foreground">{label}</Label>
-                      <Input type="number" min={0} value={detector[key]}
-                        onChange={e => setDetector(p => ({ ...p, [key]: Number(e.target.value) }))}
-                        className="h-7 text-xs mt-0.5 font-mono" placeholder={placeholder} disabled={!isAdmin} />
-                    </div>
-                  ))}
-                </div>
-              </div>
             </div>
           ) : tab === 'tags' ? (
             <div className="space-y-4">

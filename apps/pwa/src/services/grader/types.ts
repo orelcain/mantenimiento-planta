@@ -542,14 +542,6 @@ export interface PauseDetectorConfig {
   colacionWindowDia?: { start: number; end: number };
   /** Ventana colación Turno noche (minutos del día). Default: {start:30, end:210} */
   colacionWindowNoche?: { start: number; end: number };
-  /** Duración mínima de ejercicios en minutos. Default: 10 */
-  ejerciciosMinMin?: number;
-  /** Duración máxima de ejercicios en minutos. Default: 20 */
-  ejerciciosMaxMin?: number;
-  /** Minutos mín. desde inicio turno para ventana ejercicios. Default: 120 */
-  ejerciciosAfterStartMin?: number;
-  /** Minutos máx. desde inicio turno para ventana ejercicios. Default: 180 */
-  ejerciciosBeforeStartMin?: number;
 }
 
 export interface GraderModuleConfig {

@@ -33,10 +33,6 @@ const DEF_PAUSA_MAX_SEC          = 1800
 const DEF_LARGA_MAX_SEC          = 3600
 const DEF_COLACION_MIN_MIN       = 45
 const DEF_COLACION_MAX_MIN       = 90
-const DEF_EJERCICIOS_MIN_MIN     = 10
-const DEF_EJERCICIOS_MAX_MIN     = 20
-const DEF_EJERCICIOS_AFTER_MIN   = 120
-const DEF_EJERCICIOS_BEFORE_MIN  = 180
 const DEF_CAMBIO_LOTE_WINDOW_MS  = 15 * 60 * 1000
 
 /** Ventanas de colación por defecto (minutos del día, hora local planta). */
@@ -85,22 +81,6 @@ function isColacionCandidate(
   return gapStartMin <= window.end && gapEndAdj >= window.start
 }
 
-/** Pausa de 10-20 min que ocurre 2-3h después del primer timestamp del turno (shiftStartMs). */
-function isEjerciciosCandidate(
-  gapStartMs: number,
-  durSec: number,
-  shiftStartMs: number,
-  ejMinMin: number,
-  ejMaxMin: number,
-  ejAfterMin: number,
-  ejBeforeMin: number,
-): boolean {
-  const durMin = durSec / 60
-  if (durMin < ejMinMin || durMin > ejMaxMin) return false
-  const elapsedMin = (gapStartMs - shiftStartMs) / 60_000
-  return elapsedMin >= ejAfterMin && elapsedMin <= ejBeforeMin
-}
-
 /** Pausa cuyo inicio está dentro de ±15 min de algún cambio de lote detectado. */
 function isCambioLoteCandidate(
   gapStartMs: number,
@@ -142,10 +122,6 @@ export function detectPauses(
   const largaMaxSec   = cfg?.largaMaxSec         ?? DEF_LARGA_MAX_SEC
   const colMinMin     = cfg?.colacionMinMin       ?? DEF_COLACION_MIN_MIN
   const colMaxMin     = cfg?.colacionMaxMin       ?? DEF_COLACION_MAX_MIN
-  const ejMinMin      = cfg?.ejerciciosMinMin     ?? DEF_EJERCICIOS_MIN_MIN
-  const ejMaxMin      = cfg?.ejerciciosMaxMin     ?? DEF_EJERCICIOS_MAX_MIN
-  const ejAfterMin    = cfg?.ejerciciosAfterStartMin  ?? DEF_EJERCICIOS_AFTER_MIN
-  const ejBeforeMin   = cfg?.ejerciciosBeforeStartMin ?? DEF_EJERCICIOS_BEFORE_MIN
   const colWindows: Record<string, { start: number; end: number }> = {
     ...DEFAULT_COLACION_WINDOWS,
     ...(cfg?.colacionWindowDia   ? { 'Turno día':   cfg.colacionWindowDia }   : {}),
@@ -157,13 +133,6 @@ export function detectPauses(
   let microCount = 0
   let microTotalSec = 0
   let totalDeadTimeSec = 0
-
-  // Primer timestamp válido = inicio efectivo del turno (para ejercicios)
-  let shiftStartMs = NaN
-  for (const ts of tsSorted) {
-    const ms = Date.parse(ts)
-    if (!isNaN(ms)) { shiftStartMs = ms; break }
-  }
 
   for (let i = 1; i < tsSorted.length; i++) {
     const prev = tsSorted[i - 1]!
@@ -192,11 +161,9 @@ export function detectPauses(
       durationSec: Math.round(gapSec),
       tier,
     }
-    // Auto-tag: colación > ejercicios > cambio_lote (en orden de confianza descendente)
+    // Auto-tag: colación > cambio_lote (ejercicios viene de Shoplogix, no se detecta aquí)
     if (isColacionCandidate(prevMs, currMs, gapSec, shiftId, colMinMin, colMaxMin, colWindows)) {
       pause.autoTag = 'colacion'
-    } else if (!isNaN(shiftStartMs) && isEjerciciosCandidate(prevMs, gapSec, shiftStartMs, ejMinMin, ejMaxMin, ejAfterMin, ejBeforeMin)) {
-      pause.autoTag = 'ejercicios'
     } else if (loteChangeTsMs.length > 0 && isCambioLoteCandidate(prevMs, loteChangeTsMs)) {
       pause.autoTag = 'cambio_lote'
     }
