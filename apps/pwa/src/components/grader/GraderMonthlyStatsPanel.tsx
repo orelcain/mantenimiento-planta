@@ -9,6 +9,7 @@ import { TrendingDown, TrendingUp, AlertTriangle, BarChart3, Sun, Moon } from 'l
 import type { GraderDailySummary } from '@/services/grader/types'
 import { getCauseLabel } from '@/services/grader/graderMatrixP0Causes'
 import { p0StatusFromPct, p0StatusColor } from '@/services/grader/graderP0Thresholds'
+import { aggregateByCalendarDay } from '@/services/grader/graderCalendarAggregation'
 import { fmt, fmtDec } from '@/lib/format'
 
 const MONTH_NAMES = [
@@ -46,11 +47,21 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries }: Props) {
     }
     const topCausa = [...causaMap.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
 
-    const uniqueDays = new Set(valid.map(s => s.dateKey)).size
+    // Días con AL MENOS un turno iniciado en ese día calendario (legacy: cuenta
+    // domingo si arrancó turno noche dom 22h, aunque la mayoría del peso fue lunes).
+    const startedDays = new Set(valid.map(s => s.dateKey)).size
+
+    // Días con actividad calendárico-real: usa hourlyBuckets para repartir el
+    // turno noche entre día de inicio y siguiente. Resuelve la mentira simétrica
+    // (lunes que estaban invisibles porque su madrugada se atribuía al domingo).
+    // Ver project_grader_night_shift_attribution.md (Opción D).
+    const calendarAgg = aggregateByCalendarDay({ summaries: valid })
+    const uniqueDays = calendarAgg.size
+
     const dayShifts = valid.filter(s => s.shiftId === 'Turno día').length
     const nightShifts = valid.length - dayShifts
 
-    return { turnos: valid.length, uniqueDays, dayShifts, nightShifts, totalPieces, totalWeightKg, p0Avg, best, worst, topCausa }
+    return { turnos: valid.length, uniqueDays, startedDays, dayShifts, nightShifts, totalPieces, totalWeightKg, p0Avg, best, worst, topCausa }
   }, [summaries])
 
   const shiftLabel = (s: GraderDailySummary) => s.shiftId === 'Turno día' ? 'Día' : 'Noche'
@@ -94,7 +105,11 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries }: Props) {
               )}
               <p
                 className="text-xs text-muted-foreground"
-                title="Días con al menos un turno iniciado en ese día calendario · Turnos totales con datos"
+                title={`Días calendario con actividad real (incluye lunes que reciben madrugada del turno noche del domingo) · Turnos totales con datos${
+                  stats.startedDays !== stats.uniqueDays
+                    ? ` · ${stats.startedDays} días iniciaron turno`
+                    : ''
+                }`}
               >
                 {stats.uniqueDays} días · {stats.turnos} turnos
               </p>
