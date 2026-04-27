@@ -34,8 +34,8 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries }: Props) {
     const totalWeightKg = valid.reduce((s, d) => s + (d.totalWeightKg ?? 0), 0)
 
     const sorted = [...valid].sort((a, b) => a.pointZeroPct - b.pointZeroPct)
-    const best = sorted[0]
-    const worst = sorted[sorted.length - 1]
+    const best = sorted[0]!
+    const worst = sorted[sorted.length - 1]!
 
     // Top causa del mes: suma de piezas por tipo de error
     const causaMap = new Map<string, number>()

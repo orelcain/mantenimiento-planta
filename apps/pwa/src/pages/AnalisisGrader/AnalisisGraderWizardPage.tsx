@@ -336,21 +336,6 @@ export function AnalisisGraderWizardPage() {
     }))
   }, [])
 
-  const handleGatesApply = useCallback((updatedGates: GateAssignment[], updatedConfig: GraderAnalysisConfig) => {
-    setGates(updatedGates)
-    setConfig(updatedConfig)
-    // Sincronizar velocidades de todas las cintas si el usuario cambió la config física
-    if (updatedConfig.physicalConfig) {
-      setEffectiveSpeeds((prev) => {
-        const updated = { ...prev }
-        for (const b of updatedConfig.physicalConfig!.belts) {
-          if (b.speedMps > 0) updated[b.beltId] = b.speedMps
-        }
-        return updated
-      })
-    }
-  }, [])
-
   const handleApplyGateSuggestion = useCallback((payload: { gateNumber: number; calibre: string; quality: string }) => {
     setGates((prev) => prev.map((gate) => {
       if (gate.gateNumber !== payload.gateNumber) return gate
