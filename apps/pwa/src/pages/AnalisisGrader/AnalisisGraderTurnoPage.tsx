@@ -274,6 +274,49 @@ export function AnalisisGraderTurnoPage() {
   }, [shiftWindow?.status, dateKey, shiftLabel])
 
   const [summary, setSummary] = useState<GraderDailySummary | null>(null)
+
+  // Contexto del turno respecto al día calendario (Opción D, sub-paso 3.D):
+  //   - 'orphan': el turno fue programado para un día pero su primera pieza fue
+  //     en un día posterior (típico domingos en planta Chonchi).
+  //   - 'crosses': el turno cruza medianoche (arranca un día y termina otro).
+  //   - null: turno normal sin cruce.
+  const turnoContext = useMemo<{
+    type: 'orphan' | 'crosses'
+    startDateKey: string
+    endDateKey: string
+    startTime: string
+    endTime: string
+    scheduleDateKey: string
+  } | null>(() => {
+    if (!summary?.startAt || !summary?.endAt || !summary?.dateKey) return null
+    const startDateKey = summary.startAt.slice(0, 10)
+    const endDateKey = summary.endAt.slice(0, 10)
+    const startTime = summary.startAt.slice(11, 16)
+    const endTime = summary.endAt.slice(11, 16)
+    const isOrphan = startDateKey !== summary.dateKey
+    const crossesMidnight = !isOrphan && startDateKey !== endDateKey
+    if (isOrphan) {
+      return {
+        type: 'orphan',
+        startDateKey,
+        endDateKey,
+        startTime,
+        endTime,
+        scheduleDateKey: summary.dateKey,
+      }
+    }
+    if (crossesMidnight) {
+      return {
+        type: 'crosses',
+        startDateKey,
+        endDateKey,
+        startTime,
+        endTime,
+        scheduleDateKey: summary.dateKey,
+      }
+    }
+    return null
+  }, [summary])
   const [shiftDoc, setShiftDoc] = useState<GraderShiftDoc | null>(null)
   const [timelineBuckets, setTimelineBuckets] = useState<TimelineBucket[]>([])
   const [configSnapshots, setConfigSnapshots] = useState<GateConfigSnapshot[]>([])
@@ -855,6 +898,37 @@ export function AnalisisGraderTurnoPage() {
           </Button>
         </div>
       </div>
+
+      {/* Banner contextual: turno huérfano o cruza medianoche (Opción D, 3.D) */}
+      {turnoContext && (
+        <div
+          className={`mt-2 mx-1 px-3 py-1.5 rounded-md border text-xs flex items-start gap-2 ${
+            turnoContext.type === 'orphan'
+              ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-300'
+              : 'bg-amber-500/10 border-amber-500/30 text-amber-200'
+          }`}
+        >
+          <span className="text-base leading-none mt-0.5 select-none" aria-hidden>
+            {turnoContext.type === 'orphan' ? '↪' : '⏵'}
+          </span>
+          <span className="flex-1 min-w-0">
+            {turnoContext.type === 'orphan' ? (
+              <>
+                <strong className="font-semibold">Turno huérfano:</strong>{' '}
+                programado {turnoContext.scheduleDateKey} pero sin actividad ese día. Toda la
+                operación fue {turnoContext.startDateKey} ({turnoContext.startTime} →{' '}
+                {turnoContext.endTime}).
+              </>
+            ) : (
+              <>
+                <strong className="font-semibold">Cruza medianoche:</strong>{' '}
+                {turnoContext.startDateKey} {turnoContext.startTime} →{' '}
+                {turnoContext.endDateKey} {turnoContext.endTime}.
+              </>
+            )}
+          </span>
+        </div>
+      )}
 
       {/* Estados */}
       {loading && (
