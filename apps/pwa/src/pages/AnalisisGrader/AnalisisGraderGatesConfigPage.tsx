@@ -20,7 +20,7 @@ import {
   type GatesTemplate,
 } from '@/services/grader/graderSession.service'
 import { getModuleRanges, saveModulePhysicalConfig, saveModuleShiftSchedule } from '@/services/grader/graderModuleConfig.service'
-import { saveShiftCalibreRanges } from '@/services/grader/graderShifts.service'
+import { saveShiftCalibreRanges, saveShiftThresholds } from '@/services/grader/graderShifts.service'
 import { saveConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
 import { listDailySummariesByRange } from '@/services/grader/graderDailySummary.service'
 import { useGraderSelectionStore } from '@/store/graderSelectionStore'
@@ -64,12 +64,16 @@ interface Props {
   onComplete: (gates: GateAssignment[], config: GraderAnalysisConfig) => void
   /** Si true, muestra navegación por pestañas en lugar de cards apiladas */
   tabbed?: boolean
-  /** ID del turno activo — habilita override de rangos por turno */
+  /** ID del turno activo — habilita override de rangos + umbrales por turno */
   shiftDocId?: string
   /** Rangos override ya cargados desde el turno (para no re-fetchear) */
   shiftCalibreOverride?: CalibreWeightRange[] | null
-  /** Callback al guardar override por turno */
+  /** Callback al guardar override de rangos por turno */
   onShiftRangesSaved?: (ranges: CalibreWeightRange[] | null) => void
+  /** Umbrales override ya cargados desde el turno */
+  shiftThresholdsOverride?: { photocellPctWarn: number; outOfLimitsPctWarn: number; pointZeroPctWarn: number; pointZeroPctCritical: number } | null
+  /** Callback al guardar/quitar override de umbrales por turno */
+  onShiftThresholdsSaved?: (t: { photocellPctWarn: number; outOfLimitsPctWarn: number; pointZeroPctWarn: number; pointZeroPctCritical: number } | null) => void
 }
 
 const QUALITIES: GraderQuality[] = ['Premium', 'Grado', 'Industrial', 'D', 'Unknown']
@@ -118,6 +122,8 @@ export function AnalisisGraderGatesConfigPage({
   shiftDocId,
   shiftCalibreOverride,
   onShiftRangesSaved,
+  shiftThresholdsOverride,
+  onShiftThresholdsSaved,
 }: Props) {
   const [searchParams, setSearchParams] = useSearchParams()
   const [gates, setGates] = useState<GateAssignment[]>(initialGates)
@@ -148,6 +154,12 @@ export function AnalisisGraderGatesConfigPage({
   const [editingShiftRanges, setEditingShiftRanges] = useState(false)
   const [shiftRangesDraft, setShiftRangesDraft] = useState<CalibreWeightRange[]>([])
   const [savingShiftRanges, setSavingShiftRanges] = useState(false)
+
+  // ── Umbrales por turno ──────────────────────────────────────────────────
+  const [savingShiftThresholds, setSavingShiftThresholds] = useState(false)
+  const hasShiftThresholdsOverride = !!(shiftThresholdsOverride)
+  // Valores efectivos: override turno > global
+  const effectiveThresholds = shiftThresholdsOverride ?? config.errorThresholds
 
   const [templates, setTemplates] = useState<GatesTemplate[]>([])
   const [templateName, setTemplateName] = useState('')
@@ -622,7 +634,18 @@ export function AnalisisGraderGatesConfigPage({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Umbrales de alerta</h3>
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Umbrales de alerta</h3>
+            {shiftDocId && (
+              <div className="flex items-center gap-2">
+                {hasShiftThresholdsOverride ? (
+                  <Badge className="text-[10px] bg-blue-500/15 text-blue-400 border-blue-500/30">Override de este turno</Badge>
+                ) : (
+                  <Badge variant="outline" className="text-[10px] text-muted-foreground">Global de planta</Badge>
+                )}
+              </div>
+            )}
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <div className="flex items-center gap-1">
@@ -632,7 +655,7 @@ export function AnalisisGraderGatesConfigPage({
               <Input
                 type="number"
                 min={0} max={100} step={0.5}
-                value={config.errorThresholds?.photocellPctWarn ?? 1}
+                value={effectiveThresholds?.photocellPctWarn ?? 1}
                 onChange={(e) =>
                   setConfig((c) => ({
                     ...c,
@@ -651,7 +674,7 @@ export function AnalisisGraderGatesConfigPage({
               <Input
                 type="number"
                 min={0} max={100} step={0.5}
-                value={config.errorThresholds?.outOfLimitsPctWarn ?? 3}
+                value={effectiveThresholds?.outOfLimitsPctWarn ?? 3}
                 onChange={(e) =>
                   setConfig((c) => ({
                     ...c,
@@ -670,7 +693,7 @@ export function AnalisisGraderGatesConfigPage({
               <Input
                 type="number"
                 min={0} max={100} step={0.5}
-                value={config.errorThresholds?.pointZeroPctWarn ?? 2}
+                value={effectiveThresholds?.pointZeroPctWarn ?? 2}
                 onChange={(e) =>
                   setConfig((c) => ({
                     ...c,
@@ -689,7 +712,7 @@ export function AnalisisGraderGatesConfigPage({
               <Input
                 type="number"
                 min={0} max={100} step={0.5}
-                value={config.errorThresholds?.pointZeroPctCritical ?? Math.max((config.errorThresholds?.pointZeroPctWarn ?? 2) + 0.5, (config.errorThresholds?.pointZeroPctWarn ?? 2) * 1.5)}
+                value={effectiveThresholds?.pointZeroPctCritical ?? Math.max((effectiveThresholds?.pointZeroPctWarn ?? 2) + 0.5, (effectiveThresholds?.pointZeroPctWarn ?? 2) * 1.5)}
                 onChange={(e) =>
                   setConfig((c) => ({
                     ...c,
@@ -701,6 +724,58 @@ export function AnalisisGraderGatesConfigPage({
               <p className="text-[10px] text-muted-foreground mt-1">Debe ser &gt; alerta</p>
             </div>
           </div>
+
+          {/* Botones override por turno — solo cuando hay contexto de turno */}
+          {shiftDocId && (
+            <div className="flex gap-2 mt-3 flex-wrap">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={savingShiftThresholds}
+                onClick={async () => {
+                  if (!shiftDocId) return
+                  setSavingShiftThresholds(true)
+                  try {
+                    const t = {
+                      photocellPctWarn: config.errorThresholds?.photocellPctWarn ?? 1,
+                      outOfLimitsPctWarn: config.errorThresholds?.outOfLimitsPctWarn ?? 3,
+                      pointZeroPctWarn: config.errorThresholds?.pointZeroPctWarn ?? 2,
+                      pointZeroPctCritical: config.errorThresholds?.pointZeroPctCritical ?? 3.5,
+                    }
+                    await saveShiftThresholds(shiftDocId, t)
+                    onShiftThresholdsSaved?.(t)
+                  } finally {
+                    setSavingShiftThresholds(false)
+                  }
+                }}
+                className="text-xs h-7 border-blue-500/30 text-blue-400 hover:bg-blue-500/10"
+              >
+                {savingShiftThresholds && <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />}
+                {hasShiftThresholdsOverride ? 'Actualizar override de este turno' : 'Guardar solo para este turno'}
+              </Button>
+              {hasShiftThresholdsOverride && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={savingShiftThresholds}
+                  onClick={async () => {
+                    if (!shiftDocId) return
+                    setSavingShiftThresholds(true)
+                    try {
+                      await saveShiftThresholds(shiftDocId, null)
+                      onShiftThresholdsSaved?.(null)
+                    } finally {
+                      setSavingShiftThresholds(false)
+                    }
+                  }}
+                  className="text-xs h-7 text-muted-foreground hover:text-foreground"
+                >
+                  <RotateCcw className="w-3 h-3 mr-1" />
+                  Volver a global
+                </Button>
+              )}
+            </div>
+          )}
 
           <div className="border-t border-zinc-800 my-5" />
           <div>

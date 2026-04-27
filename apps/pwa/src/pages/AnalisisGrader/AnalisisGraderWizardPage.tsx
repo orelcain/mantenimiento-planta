@@ -93,13 +93,21 @@ export function AnalisisGraderWizardPage() {
     return dk && si ? buildShiftDocId(dk, si) : undefined
   }, [searchParams])
   const [shiftCalibreOverride, setShiftCalibreOverride] = useState<CalibreWeightRange[] | null>(null)
+  const [shiftThresholdsOverride, setShiftThresholdsOverride] = useState<{ photocellPctWarn: number; outOfLimitsPctWarn: number; pointZeroPctWarn: number; pointZeroPctCritical: number } | null>(null)
 
   useEffect(() => {
-    if (!shiftDocId) { setShiftCalibreOverride(null); return }
+    if (!shiftDocId) {
+      setShiftCalibreOverride(null)
+      setShiftThresholdsOverride(null)
+      return
+    }
     const [dk, si] = shiftDocId.split('__')
     if (!dk || !si) return
     getShiftDoc(dk, si)
-      .then(doc => setShiftCalibreOverride(doc?.calibreRangeOverride ?? null))
+      .then(doc => {
+        setShiftCalibreOverride(doc?.calibreRangeOverride ?? null)
+        setShiftThresholdsOverride(doc?.thresholdsOverride ?? null)
+      })
       .catch(() => {})
   }, [shiftDocId])
 
@@ -568,6 +576,8 @@ export function AnalisisGraderWizardPage() {
               shiftDocId={shiftDocId}
               shiftCalibreOverride={shiftCalibreOverride}
               onShiftRangesSaved={setShiftCalibreOverride}
+              shiftThresholdsOverride={shiftThresholdsOverride}
+              onShiftThresholdsSaved={setShiftThresholdsOverride}
             />
           </CardContent>
         </Card>

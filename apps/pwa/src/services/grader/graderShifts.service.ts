@@ -86,6 +86,14 @@ export interface GraderShiftDoc {
   /** Override de rangos de peso por calibre para este turno específico.
    *  Si está presente, tiene prioridad sobre los rangos globales de planta. */
   calibreRangeOverride?: import('./types').CalibreWeightRange[]
+  /** Override de umbrales P0% para este turno.
+   *  Si está presente, tiene prioridad sobre los umbrales globales de planta. */
+  thresholdsOverride?: {
+    photocellPctWarn: number
+    outOfLimitsPctWarn: number
+    pointZeroPctWarn: number
+    pointZeroPctCritical: number
+  }
   createdAt: string
   updatedAt: string
 }
@@ -194,6 +202,21 @@ export async function updateShiftSpecies(
   const ref = doc(db, COLLECTION, shiftDocId)
   await updateDoc(ref, {
     ...(species ? { species } : { species: deleteField() }),
+    updatedAt: new Date().toISOString(),
+  })
+}
+
+/**
+ * Guarda un override de umbrales P0% para este turno específico.
+ * Pasar `null` elimina el override (vuelve a usar umbrales globales de planta).
+ */
+export async function saveShiftThresholds(
+  shiftDocId: string,
+  thresholds: NonNullable<GraderShiftDoc['thresholdsOverride']> | null,
+): Promise<void> {
+  const ref = doc(db, COLLECTION, shiftDocId)
+  await updateDoc(ref, {
+    ...(thresholds ? { thresholdsOverride: thresholds } : { thresholdsOverride: deleteField() }),
     updatedAt: new Date().toISOString(),
   })
 }

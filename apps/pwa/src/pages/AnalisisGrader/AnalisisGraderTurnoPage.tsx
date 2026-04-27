@@ -497,6 +497,11 @@ export function AnalisisGraderTurnoPage() {
           setSummary(s)
         }
         setShiftDoc(sd)
+        // Override de umbrales por turno: prioridad sobre los globales de planta
+        if (sd?.thresholdsOverride) {
+          setAlertThreshold(sd.thresholdsOverride.pointZeroPctWarn)
+          setCriticalThreshold(sd.thresholdsOverride.pointZeroPctCritical)
+        }
       })
       .catch(err => setError(err instanceof Error ? err.message : 'Error al cargar el turno.'))
       .finally(() => setLoading(false))
