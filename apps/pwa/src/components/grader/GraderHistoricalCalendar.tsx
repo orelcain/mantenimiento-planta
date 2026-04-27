@@ -417,6 +417,9 @@ export function GraderHistoricalCalendar({
   // summaryId → cantidad de pausas sin tag (calculado lazy cuando el filtro está activo)
   const [untaggedCounts, setUntaggedCounts] = useState<Map<string, number>>(new Map())
   const [loadingUntagged, setLoadingUntagged] = useState(false)
+  // Paso 2 — swipe entre días en el panel del resumen
+  const [daySwipeDelta, setDaySwipeDelta] = useState(0)
+  const daySwipeRef = useRef<{ startX: number; vx: number; lastX: number; lastT: number } | null>(null)
   const autoSelectedRef = useRef(!!effectiveInitialKey)
 
   useEffect(() => { onMonthChange?.(currentMonth) }, [currentMonth, onMonthChange])
@@ -538,6 +541,9 @@ export function GraderHistoricalCalendar({
     () => buildShiftChipDescriptors(calendarAgg, summariesById),
     [calendarAgg, summariesById],
   )
+
+  // Días navegables por swipe (Paso 2): días con actividad real del mes, en orden
+  const sortedDayKeys = useMemo(() => [...calendarAgg.keys()].sort(), [calendarAgg])
 
   const selectedKey = selectedDate ? selectedDate.toISOString().slice(0, 10) : null
 
@@ -870,6 +876,55 @@ export function GraderHistoricalCalendar({
     return Math.round(hist.totalPieces / (mins / 60))
   }
 
+  // ── Paso 2: swipe entre días en el panel del resumen ──────────────────────────
+  function handleDaySwipeDown(e: React.PointerEvent<HTMLDivElement>) {
+    // Ignorar si el clic viene de un botón u otro elemento interactivo
+    if ((e.target as HTMLElement).closest('button,a,input,select,textarea')) return
+    daySwipeRef.current = { startX: e.clientX, vx: 0, lastX: e.clientX, lastT: performance.now() }
+    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+  }
+
+  function handleDaySwipeMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (!daySwipeRef.current) return
+    const now = performance.now()
+    const dt = now - daySwipeRef.current.lastT
+    if (dt > 0) daySwipeRef.current.vx = (e.clientX - daySwipeRef.current.lastX) / dt
+    daySwipeRef.current.lastX = e.clientX
+    daySwipeRef.current.lastT = now
+    const totalDelta = e.clientX - daySwipeRef.current.startX
+    // Rubber-band: resistencia progresiva después de 80px para no salirse demasiado
+    const capped = Math.sign(totalDelta) * Math.min(Math.abs(totalDelta), 80 + (Math.abs(totalDelta) - 80) * 0.2)
+    setDaySwipeDelta(Math.abs(totalDelta) > 5 ? capped : 0)
+  }
+
+  function handleDaySwipeUp(e: React.PointerEvent<HTMLDivElement>) {
+    if (!daySwipeRef.current) return
+    const { startX, vx } = daySwipeRef.current
+    const delta = e.clientX - startX
+    daySwipeRef.current = null
+    setDaySwipeDelta(0)
+
+    const vpW = (e.currentTarget as HTMLElement).offsetWidth
+    const idx = sortedDayKeys.indexOf(selectedKey ?? '')
+    if (idx < 0) return
+
+    const goNext = vx < -0.3 || delta < -vpW * 0.35
+    const goPrev = vx > 0.3 || delta > vpW * 0.35
+
+    if (goNext && idx < sortedDayKeys.length - 1) {
+      const key = sortedDayKeys[idx + 1]!
+      const d = new Date(`${key}T00:00:00`)
+      setSelectedDate(d)
+      setCurrentMonth(new Date(d.getFullYear(), d.getMonth(), 1))
+    } else if (goPrev && idx > 0) {
+      const key = sortedDayKeys[idx - 1]!
+      const d = new Date(`${key}T00:00:00`)
+      setSelectedDate(d)
+      setCurrentMonth(new Date(d.getFullYear(), d.getMonth(), 1))
+    }
+  }
+  // ─────────────────────────────────────────────────────────────────────────────
+
   if (loading) {
     return (
       <div className={cn('flex items-center justify-center py-12', className)}>
@@ -1013,7 +1068,17 @@ export function GraderHistoricalCalendar({
         </CardContent>
       </Card>
 
-      <Card className="relative">
+      <Card
+        className="relative touch-pan-y"
+        style={{
+          transform: daySwipeDelta !== 0 ? `translateX(${daySwipeDelta}px)` : undefined,
+          transition: daySwipeDelta !== 0 ? 'none' : 'transform 0.32s cubic-bezier(0.25,0.46,0.45,0.94)',
+        }}
+        onPointerDown={handleDaySwipeDown}
+        onPointerMove={handleDaySwipeMove}
+        onPointerUp={handleDaySwipeUp}
+        onPointerCancel={() => { daySwipeRef.current = null; setDaySwipeDelta(0) }}
+      >
         <CardHeader>
           <CardTitle className="text-base">
             {selectedKey ? `Resumen ${selectedKey}` : 'Resumen diario'}
