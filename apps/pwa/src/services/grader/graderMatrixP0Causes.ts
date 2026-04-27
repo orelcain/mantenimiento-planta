@@ -207,6 +207,18 @@ export function toMatrixCause(subCause: PointZeroCause): MatrixP0Cause {
  * DERIVADA fina (calibre/calidad/conservación/producto) se hace en
  * `graderAnalytics.ts` cuando hay datos suficientes por pieza.
  */
+/**
+ * Label de causa para display. Cuando la causa es 'otro' (no clasificable),
+ * devuelve el string crudo para que el usuario vea el nombre real del error
+ * en lugar del genérico "Otra causa".
+ * @param classifiedAs — Pasar si ya clasificaste con classifyRecordToMatrix / parseMatrixErrorString.
+ */
+export function getCauseLabel(rawError: string, classifiedAs?: MatrixP0Cause): string {
+  const cause = classifiedAs ?? parseMatrixErrorString(rawError)
+  if (cause === 'otro') return rawError || MATRIX_P0_CAUSES.otro.label
+  return MATRIX_P0_CAUSES[cause].label
+}
+
 export function parseMatrixErrorString(raw: string): MatrixP0Cause {
   const s = (raw ?? '').toLowerCase().trim()
   const isFuera = s.includes('fuera de') || s.includes('fuera del') || s.includes('out of')

@@ -32,7 +32,7 @@ import {
 } from '@/services/grader/graderDailySummary.service'
 import type { GateAssignment, TimelineBucket } from '@/services/grader/types'
 import { CALIBRE_WEIGHT_RANGES, classifyRecordToMatrix } from '@/services/grader/graderAnalytics'
-import { MATRIX_P0_CAUSES } from '@/services/grader/graderMatrixP0Causes'
+import { MATRIX_P0_CAUSES, getCauseLabel } from '@/services/grader/graderMatrixP0Causes'
 import { fmtTime, fmtTimeWithSec } from '@/services/grader/graderTimeFormat'
 import {
   DEFAULT_P0_THRESHOLDS,
@@ -211,7 +211,7 @@ export function MinuteDetailDialog({
           activeGates ?? [],
           CALIBRE_WEIGHT_RANGES,
         )
-        const label = MATRIX_P0_CAUSES[matrixCause]?.label ?? (r.error ?? 'Otro')
+        const label = getCauseLabel(r.error ?? '', matrixCause)
         entry.errors.set(label, (entry.errors.get(label) ?? 0) + r.pieces)
       } else if (r.error) {
         entry.errors.set(r.error, (entry.errors.get(r.error) ?? 0) + r.pieces)
@@ -565,7 +565,7 @@ export function MinuteDetailDialog({
                           activeGates ?? [],
                           CALIBRE_WEIGHT_RANGES,
                         )
-                        errorDisplay = MATRIX_P0_CAUSES[matrixCause]?.label ?? errorDisplay
+                        errorDisplay = getCauseLabel(errorDisplay, matrixCause)
                       }
                       return (
                         <tr

@@ -35,7 +35,7 @@ import {
 } from '@/services/grader/graderDailySummary.service'
 import { resolveEffectiveTag } from '@/services/grader/graderPauseTags'
 import { parseFile, mergeParsedData } from '@/services/grader/graderExcelParser'
-import { parseMatrixErrorString, MATRIX_P0_CAUSES } from '@/services/grader/graderMatrixP0Causes'
+import { getCauseLabel } from '@/services/grader/graderMatrixP0Causes'
 import {
   DEFAULT_SHIFT_SCHEDULE,
   inferShiftIdFromSchedule,
@@ -896,8 +896,7 @@ export function GraderHistoricalCalendar({
                         <p className="text-muted-foreground font-medium">Top causas P0:</p>
                         {hist.topP0Causes.slice(0, 3).map((c, i) => {
                           // Label bonito Matrix + % del total (intuitivo) en lugar de % del P0
-                          const matrixCause = parseMatrixErrorString(c.error)
-                          const label = MATRIX_P0_CAUSES[matrixCause]?.label ?? c.error
+                          const label = getCauseLabel(c.error)
                           const pctOfTotal = (c.pct * hist.pointZeroPct) / 100
                           return (
                             <div key={i} className="flex justify-between gap-2">

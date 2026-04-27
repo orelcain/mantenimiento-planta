@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui'
 import { Sun, Moon, TrendingDown, TrendingUp, Minus } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { parseMatrixErrorString, MATRIX_P0_CAUSES } from '@/services/grader/graderMatrixP0Causes'
+import { getCauseLabel } from '@/services/grader/graderMatrixP0Causes'
 import type { GraderDailySummary } from '@/services/grader/types'
 import { p0StatusFromPct, p0StatusColor } from '@/services/grader/graderP0Thresholds'
 
@@ -346,7 +346,7 @@ export function DayComparisonModal({ open, onClose, summaries, dateKey }: DayCom
             const nocheTop = noche.topP0Causes?.[0]
             const fmtCause = (e: { error: string; pct: number } | undefined) => {
               if (!e) return <span className="text-muted-foreground/50">—</span>
-              const label = MATRIX_P0_CAUSES[parseMatrixErrorString(e.error)]?.label ?? e.error
+              const label = getCauseLabel(e.error)
               return (
                 <span className="text-[10px] font-medium leading-tight" title={label}>
                   {label.length > 16 ? label.slice(0, 15) + '…' : label}
@@ -374,8 +374,7 @@ export function DayComparisonModal({ open, onClose, summaries, dateKey }: DayCom
               {Array.from(allCauses).map((errorStr) => {
                 const diaEntry   = dia.topP0Causes?.find((c) => c.error === errorStr)
                 const nocheEntry = noche.topP0Causes?.find((c) => c.error === errorStr)
-                const matrixCause = parseMatrixErrorString(errorStr)
-                const label = MATRIX_P0_CAUSES[matrixCause]?.label ?? errorStr
+                const label = getCauseLabel(errorStr)
                 const diaPctTotal   = diaEntry   ? (diaEntry.pct   * dia.pointZeroPct)   / 100 : null
                 const nochePctTotal = nocheEntry ? (nocheEntry.pct * noche.pointZeroPct) / 100 : null
                 const causeP0Trend  = trend(diaPctTotal ?? undefined, nochePctTotal ?? undefined, true)
