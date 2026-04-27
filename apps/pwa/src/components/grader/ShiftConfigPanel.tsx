@@ -1,17 +1,17 @@
 /**
- * ShiftConfigPanel — fusión de CurrentGateConfigPanel + ShiftGatesConfigAccordion.
+ * ShiftConfigPanel — vista compacta de config de gates en la página de turno.
  * Posición B: justo después del grid HeroScorecard/P0Causes, antes del Timeline.
  *
  * Muestra: especie del turno, distribución de calidades, grilla de 12 gates.
- * Permite: editar gates inline (accordion) + override manual de especie.
+ * Permite: modal rápido de cambio de gate + override manual de especie.
  */
 import { useState, useMemo, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
-import { SlidersHorizontal, ChevronDown, ChevronUp, Pencil, Fish, X } from 'lucide-react'
+import { SlidersHorizontal, ChevronDown, ChevronUp, Pencil, Fish, X, GitBranch } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { qualityColorTextClass } from '@/services/grader/graderQualityColors'
 import { fmtTime } from '@/services/grader/graderTimeFormat'
-import { ShiftGatesConfigAccordion } from './ShiftGatesConfigAccordion'
+import { GateChangeModal } from './modals/GateChangeModal'
 import { updateShiftSpecies } from '@/services/grader/graderShifts.service'
 import type { GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
 import type { GraderDailySummary } from '@/services/grader/types'
@@ -53,7 +53,7 @@ export function ShiftConfigPanel({
   summary,
 }: ShiftConfigPanelProps) {
   const [open, setOpen] = useState(false)
-  const [editing, setEditing] = useState(false)
+  const [gateModalOpen, setGateModalOpen] = useState(false)
   const [editingSpecies, setEditingSpecies] = useState(false)
   const [localSpecies, setLocalSpecies] = useState<Species | null>(shiftDoc?.species ?? null)
   const [savingSpecies, setSavingSpecies] = useState(false)
@@ -98,7 +98,7 @@ export function ShiftConfigPanel({
   }, [shiftDocId])
 
   const handleGatesSaved = useCallback(() => {
-    setEditing(false)
+    setGateModalOpen(false)
     onSaved()
   }, [onSaved])
 
@@ -163,9 +163,20 @@ export function ShiftConfigPanel({
             </span>
           )}
 
+          {/* Botón rápido cambio de gate (solo turno live) */}
+          {allowEdit && (
+            <button
+              onClick={() => setGateModalOpen(true)}
+              className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors"
+            >
+              <GitBranch className="w-2.5 h-2.5" />
+              Cambié gate
+            </button>
+          )}
+
           {/* Expand toggle */}
           <button
-            onClick={() => { setOpen(v => !v); if (open && editing) setEditing(false) }}
+            onClick={() => setOpen(v => !v)}
             className="ml-auto flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
           >
             {snapshotAt && <span>desde {snapshotAt}</span>}
@@ -206,8 +217,8 @@ export function ShiftConfigPanel({
         </div>
       )}
 
-      {/* Grilla de gates */}
-      {open && !editing && (
+      {/* Grilla de gates (expandible) */}
+      {open && (
         <CardContent className="pt-2 pb-3">
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-0.5">
             {gates.map(g => (
@@ -236,18 +247,6 @@ export function ShiftConfigPanel({
             ))}
           </div>
 
-          {allowEdit && (
-            <div className="mt-3 flex justify-end">
-              <button
-                onClick={() => setEditing(true)}
-                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors border border-primary/20"
-              >
-                <Pencil className="w-3 h-3" />
-                Cambié gate mid-turno
-              </button>
-            </div>
-          )}
-
           {latest.changedBy?.name && (
             <p className="mt-2 text-[10px] text-muted-foreground/50">
               Último cambio por {latest.changedBy.name} · {snapshotAt}
@@ -257,25 +256,14 @@ export function ShiftConfigPanel({
         </CardContent>
       )}
 
-      {/* Editor inline (ShiftGatesConfigAccordion) */}
-      {open && editing && (
-        <CardContent className="pt-2 pb-1">
-          <ShiftGatesConfigAccordion
-            shiftDocId={shiftDocId}
-            configSnapshots={configSnapshots}
-            onSaved={handleGatesSaved}
-            allowEdit={allowEdit}
-          />
-          <div className="mt-2 mb-1 flex justify-end">
-            <button
-              onClick={() => setEditing(false)}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded hover:bg-muted"
-            >
-              Cancelar
-            </button>
-          </div>
-        </CardContent>
-      )}
+      {/* Modal rápido de cambio de gate */}
+      <GateChangeModal
+        open={gateModalOpen}
+        onOpenChange={setGateModalOpen}
+        shiftDocId={shiftDocId}
+        configSnapshots={configSnapshots}
+        onSaved={handleGatesSaved}
+      />
     </Card>
   )
 }
