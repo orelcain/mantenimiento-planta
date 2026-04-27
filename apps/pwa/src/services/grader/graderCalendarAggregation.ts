@@ -445,6 +445,10 @@ export interface ShiftChipDescriptor {
   direction: ChipDirection
   /** Piezas atribuidas a `renderInDateKey`. null si role=orphan-source. */
   pieces: number | null
+  /** Piezas P0 atribuidas a `renderInDateKey`. null si role=orphan-source. */
+  pointZeroPieces: number | null
+  /** Peso (kg) atribuido a `renderInDateKey`. null si orphan-source o sin peso. */
+  weightKg: number | null
   /** P0% del SUMMARY COMPLETO (no del fragmento). Usado para colorear. */
   pointZeroPct: number
   /** % de piezas del summary que cayeron en renderInDateKey. null si orphan-source. */
@@ -514,6 +518,8 @@ export function buildShiftChipDescriptors(
         role: c.isPrimary ? 'primary' : 'secondary',
         direction,
         pieces: c.pieces,
+        pointZeroPieces: c.pointZeroPieces,
+        weightKg: c.weightKg ?? null,
         pointZeroPct: summary.pointZeroPct,
         pctOfShift: c.pctOfShift,
       })
@@ -542,6 +548,8 @@ export function buildShiftChipDescriptors(
       role: 'orphan-source',
       direction: 'same',
       pieces: null,
+      pointZeroPieces: null,
+      weightKg: null,
       pointZeroPct: summary.pointZeroPct,
       pctOfShift: null,
       primaryDateKey: primary.dateKey,

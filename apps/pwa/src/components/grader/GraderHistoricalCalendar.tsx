@@ -184,6 +184,133 @@ function renderShiftChip(chip: ShiftChipDescriptor, untaggedCount: number | null
   )
 }
 
+/**
+ * Card consolidada para un mismo turno-tipo (ej. Turno noche) que recibe
+ * múltiples fragmentos en el día calendárico (ej. madrugada del N de ayer +
+ * vespertina del N que arranca hoy). Mantiene la mental model "1 día = 1 D + 1 N"
+ * agregando los KPIs calendáricos arriba y listando los fragmentos contribuyentes
+ * adentro como mini-cards clickeables.
+ */
+function renderConsolidatedShiftCard(
+  shiftId: string,
+  entries: Array<{ summary: GraderDailySummary; chip: ShiftChipDescriptor | null }>,
+  navigate: (path: string) => void,
+): JSX.Element {
+  // Calcular agregados calendáricos (solo no-orphan)
+  let totalPieces = 0
+  let totalP0 = 0
+  let totalWeight = 0
+  let hasWeight = false
+  for (const e of entries) {
+    if (e.chip?.role === 'orphan-source') continue
+    const pieces = e.chip?.pieces ?? e.summary.totalPieces
+    const p0 = e.chip?.pointZeroPieces ?? e.summary.pointZeroPieces
+    const wkg = e.chip?.weightKg ?? e.summary.totalWeightKg
+    totalPieces += pieces
+    totalP0 += p0
+    if (wkg != null && wkg > 0) {
+      totalWeight += wkg
+      hasWeight = true
+    }
+  }
+  const p0Pct = totalPieces > 0 ? (totalP0 / totalPieces) * 100 : 0
+  const status = p0StatusFromPct(p0Pct)
+
+  return (
+    <div
+      key={`consolidated-${shiftId}`}
+      className={cn(
+        'rounded-lg border px-3 py-2.5 space-y-2',
+        P0_CARD_CLASS[status],
+      )}
+    >
+      {/* Header: shiftId + badge "consolidado" + P0% calendárico */}
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <p className="text-sm font-medium">{shiftId}</p>
+            <span className="text-[9px] px-1.5 py-0.5 rounded border font-medium bg-indigo-500/15 text-indigo-300 border-indigo-500/30">
+              {entries.filter((e) => e.chip?.role !== 'orphan-source').length} fragmentos en este día
+            </span>
+          </div>
+        </div>
+        <span className={cn('text-lg font-bold tabular-nums', p0StatusColor(status))}>
+          {p0Pct.toFixed(2)}%
+        </span>
+      </div>
+
+      {/* KPIs agregados calendáricos */}
+      <div className="grid grid-cols-2 gap-1.5 text-xs">
+        <div className="rounded bg-background/60 px-2 py-1">
+          <p className="text-muted-foreground">Piezas</p>
+          <p className="font-semibold">{totalPieces.toLocaleString('es-CL')}</p>
+        </div>
+        <div className="rounded bg-background/60 px-2 py-1">
+          <p className="text-muted-foreground">P0 piezas</p>
+          <p className="font-semibold">{totalP0.toLocaleString('es-CL')}</p>
+        </div>
+        {hasWeight && (
+          <div className="rounded bg-background/60 px-2 py-1 col-span-2">
+            <p className="text-muted-foreground">Peso</p>
+            <p className="font-semibold">
+              {totalWeight >= 1000
+                ? `${(totalWeight / 1000).toFixed(1)} t`
+                : `${totalWeight.toFixed(0)} kg`}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Listado de fragmentos contribuyentes */}
+      <div className="space-y-1 pt-1.5 border-t border-border/30">
+        {entries.map(({ summary: hist, chip }) => {
+          const isOrphan = chip?.role === 'orphan-source'
+          const dirLabel =
+            chip?.direction === 'enters' ? 'Madrugada' :
+            chip?.direction === 'exits' ? 'Vespertina' :
+            null
+          const fragLabel = isOrphan
+            ? `Programado ${chip!.shiftDateKey} sin actividad real → detalle en ${chip!.primaryDateKey ?? '—'}`
+            : dirLabel != null
+              ? `${dirLabel} del turno de ${chip!.shiftDateKey} · ${Math.round(chip!.pctOfShift ?? 100)}% aquí`
+              : `Turno completo (${chip?.pctOfShift ?? 100}%)`
+          const fragPieces = chip?.pieces ?? hist.totalPieces
+          return (
+            <button
+              key={`${hist.id}-frag`}
+              onClick={() => navigate(`/analisis-grader/turno/${hist.dateKey}__${encodeURIComponent(hist.shiftId)}`)}
+              className={cn(
+                'w-full rounded-md border px-2 py-1.5 text-left transition-colors hover:bg-background/80',
+                isOrphan
+                  ? 'bg-neutral-500/8 border-neutral-500/20 opacity-70'
+                  : 'bg-background/40 border-border/40',
+              )}
+            >
+              <div className="flex items-center justify-between gap-2 mb-0.5">
+                <span className="text-[11px] font-medium truncate">{fragLabel}</span>
+                <span className={cn('text-xs font-bold tabular-nums shrink-0', p0StatusColor(p0StatusFromPct(hist.pointZeroPct)))}>
+                  {hist.pointZeroPct.toFixed(2)}%
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-2 text-[10px] text-muted-foreground">
+                <span>
+                  {isOrphan
+                    ? 'Sin piezas atribuidas a este día'
+                    : `${fragPieces.toLocaleString('es-CL')} pz`}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Eye className="h-2.5 w-2.5" />
+                  Ver detalle
+                </span>
+              </div>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function getUploadTimestamp(upload: GraderUpload): number {
   const ts = upload.updatedAt || upload.createdAt || upload.fileMeta.parsedAt
   return ts ? new Date(ts).getTime() : 0
@@ -450,6 +577,19 @@ export function GraderHistoricalCalendar({
     })
     return out
   }, [selectedKey, chipsByDate, historicalByDate, summariesById])
+
+  // Agrupar por shiftId para consolidar cuando un mismo tipo (Turno noche)
+  // tiene múltiples fragmentos calendáricos en el día (ej. madrugada del N
+  // de ayer + vespertina del N que arranca hoy → 1 sola card consolidada).
+  const groupedByShift = useMemo(() => {
+    const map = new Map<string, Array<{ summary: GraderDailySummary; chip: ShiftChipDescriptor | null }>>()
+    for (const entry of summariesForSelectedDay) {
+      const arr = map.get(entry.summary.shiftId) ?? []
+      arr.push(entry)
+      map.set(entry.summary.shiftId, arr)
+    }
+    return map
+  }, [summariesForSelectedDay])
 
   // Auto-selección del turno para el store compartido:
   //   - Cuando cambia el día seleccionado, si la selección actual no pertenece a este día,
@@ -937,7 +1077,20 @@ export function GraderHistoricalCalendar({
                 })()}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {summariesForSelectedDay.map(({ summary: hist, chip }) => {
+              {[...groupedByShift.entries()]
+                .sort(([a], [b]) => {
+                  const order: Record<string, number> = { 'Turno día': 0, 'Turno noche': 1 }
+                  return (order[a] ?? 9) - (order[b] ?? 9)
+                })
+                .map(([shiftId, entries]) => {
+                  const nonOrphan = entries.filter((e) => e.chip?.role !== 'orphan-source')
+                  const isMultiple = nonOrphan.length > 1
+                  if (isMultiple) {
+                    // Card consolidada: agrega fragmentos del mismo turno-tipo
+                    return renderConsolidatedShiftCard(shiftId, entries, navigate)
+                  }
+                  // Card simple (1 fragmento o solo orphans): comportamiento original
+                  const { summary: hist, chip } = entries[0]!
                   const isActiveForConfig = selectedHistorical?.id === hist.id
                   // Badge contextual sobre cómo este turno se relaciona con el día seleccionado
                   const contextBadge =
