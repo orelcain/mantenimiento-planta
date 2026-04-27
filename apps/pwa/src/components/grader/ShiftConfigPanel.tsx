@@ -7,11 +7,12 @@
  */
 import { useState, useMemo, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
-import { SlidersHorizontal, ChevronDown, ChevronUp, Pencil, Fish, X, GitBranch } from 'lucide-react'
+import { SlidersHorizontal, ChevronDown, ChevronUp, Pencil, Fish, X, GitBranch, Gauge } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { qualityColorTextClass } from '@/services/grader/graderQualityColors'
 import { fmtTime } from '@/services/grader/graderTimeFormat'
 import { GateChangeModal } from './modals/GateChangeModal'
+import { BeltRpmModal } from './modals/BeltRpmModal'
 import { updateShiftSpecies } from '@/services/grader/graderShifts.service'
 import type { GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
 import type { GraderDailySummary } from '@/services/grader/types'
@@ -54,6 +55,7 @@ export function ShiftConfigPanel({
 }: ShiftConfigPanelProps) {
   const [open, setOpen] = useState(false)
   const [gateModalOpen, setGateModalOpen] = useState(false)
+  const [rpmModalOpen, setRpmModalOpen] = useState(false)
   const [editingSpecies, setEditingSpecies] = useState(false)
   const [localSpecies, setLocalSpecies] = useState<Species | null>(shiftDoc?.species ?? null)
   const [savingSpecies, setSavingSpecies] = useState(false)
@@ -163,15 +165,24 @@ export function ShiftConfigPanel({
             </span>
           )}
 
-          {/* Botón rápido cambio de gate (solo turno live) */}
+          {/* Botones rápidos (solo turno live) */}
           {allowEdit && (
-            <button
-              onClick={() => setGateModalOpen(true)}
-              className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors"
-            >
-              <GitBranch className="w-2.5 h-2.5" />
-              Cambié gate
-            </button>
+            <>
+              <button
+                onClick={() => setGateModalOpen(true)}
+                className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors"
+              >
+                <GitBranch className="w-2.5 h-2.5" />
+                Cambié gate
+              </button>
+              <button
+                onClick={() => setRpmModalOpen(true)}
+                className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded border border-muted-foreground/20 bg-muted/30 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              >
+                <Gauge className="w-2.5 h-2.5" />
+                Ajusté RPM
+              </button>
+            </>
           )}
 
           {/* Expand toggle */}
@@ -263,6 +274,14 @@ export function ShiftConfigPanel({
         shiftDocId={shiftDocId}
         configSnapshots={configSnapshots}
         onSaved={handleGatesSaved}
+      />
+
+      {/* Modal velocidades Danfoss */}
+      <BeltRpmModal
+        open={rpmModalOpen}
+        onOpenChange={setRpmModalOpen}
+        shiftDocId={shiftDocId}
+        shiftDoc={shiftDoc}
       />
     </Card>
   )

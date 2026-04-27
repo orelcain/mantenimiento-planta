@@ -58,6 +58,20 @@ export interface ShiftActionEntry {
   }
 }
 
+export interface ShiftBeltSpeedEntry {
+  id: string
+  at: string
+  by: string
+  byName: string
+  belts: Array<{
+    beltId: 'zeta' | 'accel1' | 'accel2'
+    rpm: number
+    calculatedMps: number
+    measuredMps?: number
+  }>
+  note?: string
+}
+
 export interface GraderShiftDoc {
   id: string
   dateKey: string
@@ -67,6 +81,8 @@ export interface GraderShiftDoc {
   actions: ShiftActionEntry[]
   /** Especie del turno — override manual del supervisor. */
   species?: 'salar' | 'coho'
+  /** Historial de velocidades de cintas registradas durante el turno. */
+  beltSpeedHistory?: ShiftBeltSpeedEntry[]
   createdAt: string
   updatedAt: string
 }
@@ -150,6 +166,22 @@ export async function updateActionOutcome(
     a.id === actionId ? { ...a, outcome } : a,
   )
   await updateDoc(ref, { actions, updatedAt: new Date().toISOString() })
+}
+
+export async function saveShiftBeltSpeeds(
+  shiftDocId: string,
+  entry: Omit<ShiftBeltSpeedEntry, 'id' | 'at'>,
+): Promise<void> {
+  const ref = doc(db, COLLECTION, shiftDocId)
+  const full: ShiftBeltSpeedEntry = {
+    ...entry,
+    id: crypto.randomUUID(),
+    at: new Date().toISOString(),
+  }
+  await updateDoc(ref, {
+    beltSpeedHistory: arrayUnion(full),
+    updatedAt: new Date().toISOString(),
+  })
 }
 
 export async function updateShiftSpecies(
