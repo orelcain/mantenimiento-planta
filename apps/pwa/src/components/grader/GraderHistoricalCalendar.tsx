@@ -374,20 +374,6 @@ interface TimelineBlock {
   endTimeStr: string
   /** P0% del turno — para mostrar dentro del bloque */
   p0Pct: number
-  /**
-   * Segmentos de estado Shoplogix normalizados al bloque (0–100% del bloque).
-   * Undefined cuando no hay datos Shoplogix para este turno.
-   * Cuando está presente, el bloque se pinta como mini-Gantt de colores en vez
-   * de usar bgClass como color sólido.
-   */
-  segments?: Array<{
-    startPct: number
-    widthPct: number
-    type: CoverageSegmentType
-    /** Color hex real de Shoplogix (ej. "#008000"). Listo para backgroundColor CSS. */
-    color: string
-    title: string
-  }>
 }
 
 /**
@@ -400,9 +386,6 @@ interface TimelineBlock {
 function buildDayTimelineBlocks(
   entries: Array<{ summary: GraderDailySummary; chip: ShiftChipDescriptor | null }>,
   slxData?: Map<string, SlxShiftCache>,
-  /** Fecha del slide del carousel (YYYY-MM-DD). Necesaria para normalizar los
-   *  segmentos Shoplogix al sistema de coordenadas del slide (0=00:00 del slideKey). */
-  slideKey?: string,
 ): TimelineBlock[] {
   const blocks: TimelineBlock[] = []
   for (const { summary: hist, chip } of entries) {
@@ -487,45 +470,6 @@ function buildDayTimelineBlocks(
       direction === 'enters' ? 'mad' :
       direction === 'exits'  ? 'sal' :
       hist.shiftId === 'Turno noche' ? 'noc' : 'dia'
-    // ── Segmentos Shoplogix normalizados al bloque ──
-    // El bloque ocupa [startFrac, endFrac] del día del slideKey.
-    // Convertimos cada estado Shoplogix a % relativo al bloque (0=inicio, 100=fin).
-    let segments: TimelineBlock['segments'] = undefined
-    const slxCache = slxData?.get(hist.id)
-    if (slxCache && slxCache.states.length > 0 && slideKey) {
-      const slideDayStartMs = new Date(`${slideKey}T00:00:00.000Z`).getTime()
-      const blockStartMs = startFrac * 86400000 + slideDayStartMs
-      const blockEndMs   = endFrac   * 86400000 + slideDayStartMs
-      const blockDurMs   = blockEndMs - blockStartMs
-      if (blockDurMs > 60000) {
-        const padH = (n: number) => String(n).padStart(2, '0')
-        const fmtMs = (ms: number) => {
-          const d = new Date(ms)
-          return `${padH(d.getUTCHours())}:${padH(d.getUTCMinutes())}`
-        }
-        const rawSegs: NonNullable<TimelineBlock['segments']> = []
-        for (const s of slxCache.states) {
-          // Excluir períodos post-turno (planned downtime)
-          if (s.type === 'break' && (s.reason ?? '').toLowerCase().includes('planned downtime')) continue
-          const segStart = Math.max(s.startAt.getTime(), blockStartMs)
-          const segEnd   = Math.min(s.endAt.getTime(),   blockEndMs)
-          if (segEnd - segStart < 180000) continue // < 3min — filtra ruido visual del mini-Gantt
-          const sPct = (segStart - blockStartMs) / blockDurMs * 100
-          const wPct = (segEnd   - segStart)     / blockDurMs * 100
-          const durMin = Math.round((segEnd - segStart) / 60000)
-          const reason = s.reason || (s.type === 'uptime' ? 'Producción' : s.type === 'break' ? 'Pausa' : s.type === 'setup' ? 'Setup' : 'Detenido')
-          rawSegs.push({
-            startPct: sPct,
-            widthPct: wPct,
-            type: s.type as CoverageSegmentType,
-            color: s.color,  // hex real de Shoplogix, ej. "#008000" (verde), "#ff0000" (rojo)
-            title: `${fmtMs(segStart)}–${fmtMs(segEnd)} · ${reason} (${durMin}m)`,
-          })
-        }
-        if (rawSegs.length > 0) segments = rawSegs
-      }
-    }
-
     blocks.push({
       leftPct:  startFrac * 100,
       widthPct: (endFrac - startFrac) * 100,
@@ -539,39 +483,14 @@ function buildDayTimelineBlocks(
       startTimeStr,
       endTimeStr,
       p0Pct: hist.pointZeroPct,
-      segments,
     })
   }
   return blocks
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
-// ── Coverage bar: justifica las 8h del turno ─────────────────────────────────
+// ─ (coverage bar eliminada — detalle Shoplogix disponible en TurnoPage) ──────
 
-type CoverageSegmentType = 'uptime' | 'break' | 'downtime' | 'setup' | 'untracked'
-
-interface CoverageSegment {
-  startPct: number
-  widthPct: number
-  durSec: number
-  type: CoverageSegmentType
-  reason: string
-  title: string
-}
-
-interface CoverageSummary {
-  shiftDurSec: number
-  /** Inicio efectivo del turno (primer state operativo, post-PlannedDowntime) */
-  effectiveStart: Date
-  /** Fin efectivo del turno (último state operativo, pre-PlannedDowntime) */
-  effectiveEnd: Date
-  uptimeSec: number
-  breakSec: number
-  downtimeSec: number
-  setupSec: number
-  untrackedSec: number
-  segments: CoverageSegment[]
-}
 
 /**
  * Retorna el window efectivo de producción (primer/último state operativo)
@@ -596,143 +515,6 @@ function computeEffectiveWindow(
   return { startMs: operative[0]!.start, endMs: operative[operative.length - 1]!.end }
 }
 
-/**
- * Construye los segmentos de la coverage bar para un turno: justifica el window
- * con bloques de uptime/break/downtime/setup + detecta tiempo sin tracking.
- *
- * `graderStart`/`graderEnd` son el primer y último timestamp REAL del Grader
- * (min/max de los pieceRecords). Se usan para clipar el window de Shoplogix:
- * nunca mostramos más allá de lo que el Grader realmente registró, aunque
- * Shoplogix reporte un window más amplio (e.g. por bug de shiftStartAt).
- */
-function buildCoverageSegments(
-  states: UpstreamMachineState[],
-  shiftStart: Date | null,
-  shiftEnd: Date | null,
-  graderStart?: Date | null,
-  graderEnd?: Date | null,
-): CoverageSummary | null {
-  if (!shiftStart || !shiftEnd) return null
-  // Usar la intersección entre el window Shoplogix y el window Grader real.
-  // Si Shoplogix reporta 09:00–22:00 pero el Grader paró a las 17:27,
-  // el queryEnd = 17:27 (no 22:00).
-  const queryStart = graderStart
-    ? Math.max(shiftStart.getTime(), graderStart.getTime())
-    : shiftStart.getTime()
-  const queryEnd = graderEnd
-    ? Math.min(shiftEnd.getTime(), graderEnd.getTime())
-    : shiftEnd.getTime()
-  if (queryEnd - queryStart < 60_000) return null
-
-  // 1. Window efectivo: primer/último state operativo (excluye planned downtime).
-  const effWin = computeEffectiveWindow(states, queryStart, queryEnd)
-  if (!effWin) return null
-  const startMs = effWin.startMs
-  const endMs   = effWin.endMs
-  const shiftDurMs = endMs - startMs
-  if (shiftDurMs <= 0) return null
-
-  // 2. Filtrar+clipar states al window efectivo para construir los segmentos.
-  const clipped: Array<{ start: number; end: number; type: CoverageSegmentType; reason: string }> = []
-  for (const s of states) {
-    const clipS = Math.max(s.startAt.getTime(), startMs)
-    const clipE = Math.min(s.endAt.getTime(),   endMs)
-    if (clipE - clipS < 1000) continue
-    const reasonLower = (s.reason || '').toLowerCase()
-    if (s.type === 'break' && reasonLower.includes('planned downtime')) continue
-    let segType: CoverageSegmentType
-    if (s.type === 'uptime') segType = 'uptime'
-    else if (s.type === 'break') segType = 'break'
-    else if (s.type === 'setup') segType = 'setup'
-    else segType = 'downtime'
-    clipped.push({
-      start: clipS,
-      end:   clipE,
-      type:  segType,
-      reason: s.reason || s.name || segType,
-    })
-  }
-  clipped.sort((a, b) => a.start - b.start)
-
-  // 2. Detectar gaps > 1 min como 'untracked'.
-  const segments: CoverageSegment[] = []
-  let cursor = startMs
-  for (const c of clipped) {
-    if (c.start - cursor > 60_000) {
-      segments.push({
-        startPct: ((cursor - startMs) / shiftDurMs) * 100,
-        widthPct: ((c.start - cursor) / shiftDurMs) * 100,
-        durSec: (c.start - cursor) / 1000,
-        type: 'untracked',
-        reason: 'Sin tracking Shoplogix',
-        title: `Sin tracking · ${Math.round((c.start - cursor) / 60000)}m`,
-      })
-    }
-    segments.push({
-      startPct: ((c.start - startMs) / shiftDurMs) * 100,
-      widthPct: ((c.end - c.start) / shiftDurMs) * 100,
-      durSec: (c.end - c.start) / 1000,
-      type: c.type,
-      reason: c.reason,
-      title: `${c.reason} · ${Math.round((c.end - c.start) / 60000)}m`,
-    })
-    cursor = Math.max(cursor, c.end)
-  }
-  if (endMs - cursor > 60_000) {
-    segments.push({
-      startPct: ((cursor - startMs) / shiftDurMs) * 100,
-      widthPct: ((endMs - cursor) / shiftDurMs) * 100,
-      durSec: (endMs - cursor) / 1000,
-      type: 'untracked',
-      reason: 'Sin tracking Shoplogix',
-      title: `Sin tracking · ${Math.round((endMs - cursor) / 60000)}m`,
-    })
-  }
-
-  // 3. Totales por tipo.
-  const sumBy = (t: CoverageSegmentType) =>
-    segments.filter((s) => s.type === t).reduce((a, s) => a + s.durSec, 0)
-
-  return {
-    shiftDurSec: shiftDurMs / 1000,
-    effectiveStart: new Date(startMs),
-    effectiveEnd: new Date(endMs),
-    uptimeSec: sumBy('uptime'),
-    breakSec: sumBy('break'),
-    downtimeSec: sumBy('downtime'),
-    setupSec: sumBy('setup'),
-    untrackedSec: sumBy('untracked'),
-    segments,
-  }
-}
-
-function fmtDuration(sec: number): string {
-  if (sec < 60) return `${Math.round(sec)}s`
-  const totalMin = Math.round(sec / 60)
-  if (totalMin < 60) return `${totalMin}m`
-  const h = Math.floor(totalMin / 60)
-  const m = totalMin % 60
-  return m > 0 ? `${h}h${String(m).padStart(2, '0')}m` : `${h}h`
-}
-
-/**
- * Colores Shoplogix reales por tipo de estado.
- * Coinciden con los hex que retorna la API (statusColor) para que la coverage
- * bar y el timeline mini-Gantt usen el mismo idioma visual que los operadores
- * ya conocen del panel Shoplogix.
- *   uptime   → #008000 (verde producción)
- *   break    → #ff0000 (rojo — colación, detenciones, MMPP, etc.)
- *   downtime → #73d8ff (celeste — Micro Detención)
- *   setup    → #3b82f6 (azul — preparación/setup)
- *   untracked→ #94a3b8 (slate neutro — sin tracking)
- */
-const COVERAGE_COLOR_HEX: Record<CoverageSegmentType, string> = {
-  uptime:    '#008000',
-  break:     '#ff0000',
-  downtime:  '#73d8ff',
-  setup:     '#3b82f6',
-  untracked: '#94a3b8',
-}
 // ─────────────────────────────────────────────────────────────────────────────
 
 function getDaysInMonth(date: Date): (Date | null)[] {
@@ -1563,16 +1345,6 @@ export function GraderHistoricalCalendar({
               ? () => setSelectedHistorical(isActiveForConfig ? null : hist)
               : navigateToTurno
 
-            // Compute coverage upfront — reutilizado en subtitle + coverage bar
-            const slxCacheCard = slxByShift.get(hist.id)
-            const graderStartCard = hist.startAt ? new Date(hist.startAt) : null
-            const graderEndCard   = hist.endAt   ? new Date(hist.endAt)   : null
-            const covCard = (slxCacheCard?.shiftStart && slxCacheCard?.shiftEnd)
-              ? buildCoverageSegments(
-                  slxCacheCard.states, slxCacheCard.shiftStart, slxCacheCard.shiftEnd,
-                  graderStartCard, graderEndCard,
-                )
-              : null
 
             // ── Salida (orphan-source): strip compacto que invita a deslizar
             if (kind === 'salida') {
@@ -1708,101 +1480,12 @@ export function GraderHistoricalCalendar({
                   {hist.shiftId}
                   <span className="opacity-60"> · </span>
                   <strong className="text-foreground/90">
-                    {covCard
-                      ? (() => {
-                          const p = (n: number) => String(n).padStart(2, '0')
-                          const f = (d: Date) => `${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`
-                          return `${f(covCard.effectiveStart)} → ${f(covCard.effectiveEnd)}`
-                        })()
-                      : formatShiftTimeRange(hist)
-                    }
+                    {formatShiftTimeRange(hist)}
                   </strong>
                   {chip?.pctOfShift != null && chip.pctOfShift < 100 && (
                     <span className="opacity-70"> · {Math.round(chip.pctOfShift)}% del turno aquí</span>
                   )}
                 </p>
-                {/* Coverage bar — justifica el window real del turno (clipado al Grader).
-                    Usa covCard pre-computado arriba para evitar duplicación. */}
-                {(() => {
-                  const cov = covCard
-                  if (!cov) return null
-                  const justifiedSec = cov.uptimeSec + cov.breakSec + cov.downtimeSec + cov.setupSec
-                  const justifiedPct = cov.shiftDurSec > 0 ? (justifiedSec / cov.shiftDurSec) * 100 : 0
-                  const pad = (n: number) => String(n).padStart(2, '0')
-                  const sStart = `${pad(cov.effectiveStart.getUTCHours())}:${pad(cov.effectiveStart.getUTCMinutes())}`
-                  const sEnd = `${pad(cov.effectiveEnd.getUTCHours())}:${pad(cov.effectiveEnd.getUTCMinutes())}`
-                  // Detectar si el window Shoplogix fue recortado >15 min por el Grader real
-                  const slxRawDurSec = (slxCacheCard!.shiftEnd!.getTime() - slxCacheCard!.shiftStart!.getTime()) / 1000
-                  const wasClipped = slxRawDurSec - cov.shiftDurSec > 900
-                  return (
-                    <div className="space-y-1 pt-0.5" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-between gap-2 text-[9px] text-muted-foreground/80 leading-none">
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-2.5 h-2.5" />
-                          Cobertura {sStart}–{sEnd} ({fmtDuration(cov.shiftDurSec)})
-                        </span>
-                        <span className={cn('tabular-nums font-medium', justifiedPct >= 95 ? 'text-emerald-600' : justifiedPct >= 70 ? 'text-amber-600' : 'text-rose-600')}>
-                          {justifiedPct.toFixed(0)}% justificado
-                        </span>
-                      </div>
-                      <div className="relative h-2 rounded-sm overflow-hidden bg-muted/30">
-                        {cov.segments.map((seg, i) => (
-                          <div
-                            key={i}
-                            className="absolute top-0 bottom-0"
-                            style={{
-                              left: `${seg.startPct}%`,
-                              width: `max(${seg.widthPct}%, 0.3%)`,
-                              backgroundColor: COVERAGE_COLOR_HEX[seg.type] + 'bb',
-                            }}
-                            title={seg.title}
-                          />
-                        ))}
-                      </div>
-                      <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[9px] text-muted-foreground leading-none">
-                        {cov.uptimeSec > 0 && (
-                          <span className="flex items-center gap-0.5">
-                            <span className="w-1.5 h-1.5 rounded-sm" style={{ backgroundColor: COVERAGE_COLOR_HEX.uptime + 'bb' }} />
-                            uptime {fmtDuration(cov.uptimeSec)}
-                          </span>
-                        )}
-                        {cov.breakSec > 0 && (
-                          <span className="flex items-center gap-0.5">
-                            <span className="w-1.5 h-1.5 rounded-sm" style={{ backgroundColor: COVERAGE_COLOR_HEX.break + 'bb' }} />
-                            paros {fmtDuration(cov.breakSec)}
-                          </span>
-                        )}
-                        {cov.downtimeSec > 0 && (
-                          <span className="flex items-center gap-0.5">
-                            <span className="w-1.5 h-1.5 rounded-sm" style={{ backgroundColor: COVERAGE_COLOR_HEX.downtime + 'bb' }} />
-                            detenciones {fmtDuration(cov.downtimeSec)}
-                          </span>
-                        )}
-                        {cov.setupSec > 0 && (
-                          <span className="flex items-center gap-0.5">
-                            <span className="w-1.5 h-1.5 rounded-sm" style={{ backgroundColor: COVERAGE_COLOR_HEX.setup + 'bb' }} />
-                            setup {fmtDuration(cov.setupSec)}
-                          </span>
-                        )}
-                        {cov.untrackedSec > 60 && (
-                          <span className="flex items-center gap-0.5 text-muted-foreground/70">
-                            <span className="w-1.5 h-1.5 rounded-sm" style={{ backgroundColor: COVERAGE_COLOR_HEX.untracked + '88' }} />
-                            sin tracking {fmtDuration(cov.untrackedSec)}
-                          </span>
-                        )}
-                        {wasClipped && (
-                          <span
-                            className="flex items-center gap-0.5 text-amber-600/80"
-                            title={`Shoplogix reportó ${fmtDuration(slxRawDurSec)} de turno. Recortado a ${fmtDuration(cov.shiftDurSec)} según datos reales del Grader.`}
-                          >
-                            <AlertTriangle className="w-2.5 h-2.5" />
-                            Slx {fmtDuration(slxRawDurSec)} → recortado
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })()}
                 {hist.hasPieceData !== undefined && (!hist.hasPieceData || !hist.hasGate0Data) && (
                   <div className="flex flex-wrap gap-1">
                     {!hist.hasPieceData && (
@@ -2293,7 +1976,7 @@ export function GraderHistoricalCalendar({
                 { slideKey: nextKey,      entries: nextEntries },
               ] as const).map(({ slideKey, entries }, si) => {
                 const isSelectedSlide = si === 1
-                const blocks = slideKey ? buildDayTimelineBlocks(entries as Array<{ summary: GraderDailySummary; chip: ShiftChipDescriptor | null }>, slxByShift, slideKey) : []
+                const blocks = buildDayTimelineBlocks(entries as Array<{ summary: GraderDailySummary; chip: ShiftChipDescriptor | null }>, slxByShift)
                 // Huecos entre turnos → planned downtime gris, misma altura que los bloques.
                 // Se calcula GEOMÉTRICAMENTE desde los bordes de los bloques Grader,
                 // sin depender del reason-text de Shoplogix (que varía entre turnos).
@@ -2389,9 +2072,6 @@ export function GraderHistoricalCalendar({
                         const navigateToBlockTurno = () => navigate(
                           `/analisis-grader/turno/${b.dateKey}__${encodeURIComponent(b.shiftId)}`,
                         )
-                        // Con segmentos Shoplogix → solo colores, sin texto ni fondo oscuro.
-                        // Sin segmentos → color sólido P0%-based (fallback si no hay Shoplogix).
-                        const hasSegments = b.segments && b.segments.length > 0
                         return (
                           <div
                             key={i}
@@ -2400,9 +2080,7 @@ export function GraderHistoricalCalendar({
                             tabIndex={0}
                             className={cn(
                               'absolute cursor-pointer transition-all overflow-hidden',
-                              // Con segmentos: fondo gris muy sutil (tiempo sin tracking).
-                              // Sin segmentos: color sólido P0%-based (fallback).
-                              hasSegments ? '' : b.bgClass,
+                              b.bgClass,
                               b.nightSide === null && 'rounded-sm',
                               isHovered && 'ring-2 ring-white/80 ring-offset-1 ring-offset-background z-20',
                             )}
@@ -2415,14 +2093,9 @@ export function GraderHistoricalCalendar({
                                 b.nightSide === 'start' ? '0 3px 3px 0' :
                                 b.nightSide === 'end'   ? '3px 0 0 3px' :
                                 undefined,
-                              // Base: gris muy suave = tiempo sin datos Shoplogix (untracked)
-                              // Solo cuando hay segmentos; si no, bgClass ya provee el color.
-                              ...(hasSegments && { backgroundColor: 'rgba(100,116,139,0.20)' }),
-                              // Gradiente nocturno: en el contenedor cuando no hay segmentos
-                              backgroundImage: !hasSegments
-                                ? b.nightSide === 'start' ? 'linear-gradient(90deg, rgba(99,102,241,0.55) 0%, transparent 18px)'
-                                  : b.nightSide === 'end' ? 'linear-gradient(270deg, rgba(99,102,241,0.55) 0%, transparent 18px)'
-                                  : undefined
+                              backgroundImage:
+                                b.nightSide === 'start' ? 'linear-gradient(90deg, rgba(99,102,241,0.55) 0%, transparent 18px)'
+                                : b.nightSide === 'end' ? 'linear-gradient(270deg, rgba(99,102,241,0.55) 0%, transparent 18px)'
                                 : undefined,
                             }}
                             title={`${b.title} · click para ver detalle`}
@@ -2435,35 +2108,7 @@ export function GraderHistoricalCalendar({
                             }}
                             onMouseEnter={() => setHoveredFragId(b.fragId)}
                             onMouseLeave={() => setHoveredFragId(null)}
-                          >
-                            {/* ── Segmentos Shoplogix — color hex real de la API ──
-                                seg.color viene de raw.statusColor de Shoplogix.
-                                Ej: "#008000" verde, "#ff0000" rojo, "#73d8ff" celeste.
-                                Se añade 'cc' (80% alpha) para suavizar sin distorsionar. */}
-                            {hasSegments && b.segments!.map((seg, si) => (
-                              <div
-                                key={si}
-                                className="absolute top-0 bottom-0 pointer-events-none"
-                                style={{
-                                  left:            `${seg.startPct}%`,
-                                  width:           `max(${seg.widthPct}%, 0.3%)`,
-                                  backgroundColor: seg.color + 'cc',
-                                }}
-                                title={seg.title}
-                              />
-                            ))}
-                            {/* Gradiente nocturno como overlay sobre los segmentos */}
-                            {hasSegments && b.nightSide === 'start' && (
-                              <div className="absolute inset-0 pointer-events-none z-[2]"
-                                style={{ backgroundImage: 'linear-gradient(90deg, rgba(99,102,241,0.5) 0%, transparent 18px)' }} />
-                            )}
-                            {hasSegments && b.nightSide === 'end' && (
-                              <div className="absolute inset-0 pointer-events-none z-[2]"
-                                style={{ backgroundImage: 'linear-gradient(270deg, rgba(99,102,241,0.5) 0%, transparent 18px)' }} />
-                            )}
-                            {/* Sin texto dentro del bloque — los colores Shoplogix hablan por sí solos.
-                                El título (tooltip) con timestamps + P0% sigue disponible en hover. */}
-                          </div>
+                          />
                         )
                       })}
                     </div>
