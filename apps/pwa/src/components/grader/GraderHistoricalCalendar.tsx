@@ -191,17 +191,23 @@ function renderShiftChip(chip: ShiftChipDescriptor, untaggedCount: number | null
 }
 
 /**
- * Tipo de card según el rol temporal del fragmento en el día calendárico.
+ * Tipo de card según el shift que representa, anclado al día de INICIO del shift
+ * (no al día calendar de las piezas). Cada calendar day muestra hasta 2 cards
+ * principales (Día + Noche) + opcional Salida (orphan).
  *
- * - `madrugada`: turno noche que arrancó AYER y deja sus piezas en este día (00:00 → endAt).
- *   Render como card completa con icono `🌙→` y badge de orden temporal `1/N`.
- * - `dia`: turno día completo en este día calendárico. Card completa con icono `☀`.
- * - `vespertina`: reservado, actualmente nunca se renderiza — todos los `direction=exits`
- *   se ocultan (aparecen como Madrugada en el día siguiente al deslizar).
+ * - `dia`: Turno día completo (07-19 del día seleccionado). direction='same' + shiftId='Turno día'.
+ * - `noche`: Turno noche que ARRANCA este día (19 del día → 07 del siguiente).
+ *   Incluye los `exits` (cruza medianoche, lo común) y `same`+shiftId='Turno noche'
+ *   (raro, terminó antes de medianoche). El "Madrugada" del día siguiente es la
+ *   continuación de este card — se ve en el timeline 24h calendar pero no se
+ *   duplica como card separada.
  * - `salida`: turno noche programado en este día sin actividad real (ej. Domingos en
- *   Feb 2026). Render como strip compacto que invita a deslizar al primaryDateKey.
+ *   Feb 2026). Strip compacto que invita a deslizar al primaryDateKey.
+ *
+ * Las entries con `direction='enters'` (= madrugada del día siguiente) se filtran
+ * acá: pertenecen al card Noche del día anterior, no a este día.
  */
-type CardKind = 'madrugada' | 'dia' | 'vespertina' | 'salida'
+type CardKind = 'dia' | 'noche' | 'salida'
 
 interface EnrichedCardEntry {
   summary: GraderDailySummary
@@ -222,15 +228,21 @@ function getStartMinutesUTC(iso: string | undefined): number | null {
 }
 
 /**
- * Convierte los entries del día calendárico en cards enriquecidas con `kind`
- * temporal y orden cronológico. Filtra TODOS los `direction=exits` no-orphan
- * (aparecen como Madrugada en el día siguiente — máximo 2 cards por día).
+ * Convierte los entries del día seleccionado en cards anclados al día de INICIO
+ * del shift. Filtra:
+ *  - `direction='enters'`: madrugada del día actual = continuación del Noche
+ *    del día anterior. Pertenece al card de ayer, no al de hoy.
+ *
+ * Resultado: máximo 2 cards principales por día (Día + Noche) + opcional Salida.
  */
 function enrichEntriesByKind(
   entries: Array<{ summary: GraderDailySummary; chip: ShiftChipDescriptor | null }>,
 ): EnrichedCardEntry[] {
+  // Filtrar 'enters' — esos son la madrugada (parte del Noche de ayer).
+  // Mantener: 'same' (turno completo en este día) | 'exits' (turno noche que arranca acá)
+  // | orphan-source (placeholder).
   const visible = entries.filter(
-    (e) => e.chip?.role === 'orphan-source' || e.chip?.direction !== 'exits',
+    (e) => e.chip?.role === 'orphan-source' || e.chip?.direction !== 'enters',
   )
 
   return visible
@@ -243,10 +255,14 @@ function enrichEntriesByKind(
         kind = 'salida'
         sortMin = 99999
         fragSuffix = 'sal'
-      } else if (chip?.direction === 'enters') {
-        kind = 'madrugada'
-        sortMin = 0
-        fragSuffix = 'mad'
+      } else if (
+        chip?.direction === 'exits' ||
+        (chip?.direction === 'same' && summary.shiftId === 'Turno noche') ||
+        (!chip && summary.shiftId === 'Turno noche')
+      ) {
+        kind = 'noche'
+        sortMin = getStartMinutesUTC(summary.startAt) ?? 21 * 60
+        fragSuffix = 'noc'
       } else {
         kind = 'dia'
         sortMin = getStartMinutesUTC(summary.startAt) ?? 9 * 60
@@ -286,10 +302,9 @@ function formatShiftTimeRange(summary: GraderDailySummary): string {
 }
 
 const KIND_META: Record<CardKind, { icon: string; title: string }> = {
-  madrugada:  { icon: '🌙→', title: 'Madrugada' },
-  dia:        { icon: '☀',   title: 'Día' },
-  vespertina: { icon: '←🌙', title: 'Vespertina' },
-  salida:     { icon: '🌙',  title: 'Turno noche' },
+  dia:    { icon: '☀',   title: 'Día' },
+  noche:  { icon: '🌙',  title: 'Noche' },
+  salida: { icon: '🌙',  title: 'Turno noche' },
 }
 
 function getUploadTimestamp(upload: GraderUpload): number {
@@ -402,12 +417,10 @@ function buildDayTimelineBlocks(
     const pad = (n: number) => String(n).padStart(2, '0')
     const ts = `${pad(startD.getUTCHours())}:${pad(startD.getUTCMinutes())}–${pad(endD.getUTCHours())}:${pad(endD.getUTCMinutes())}`
     const pct = chip?.pctOfShift != null ? ` · ${Math.round(chip.pctOfShift)}% en este día` : ''
-    // fragId mantiene paridad con `EnrichedCardEntry.fragId` para sync hover/click (#32)
-    // 'enters' → 'mad' (madrugada), 'exits' → 'ves' (vespertina, oculta en cards), 'same' → 'dia'
-    const fragSuffix =
-      direction === 'enters' ? 'mad' :
-      direction === 'exits'  ? 'ves' :
-                                'dia'
+    // fragId mantiene paridad con `EnrichedCardEntry.fragId` para sync hover/click.
+    // Cualquier block de Turno noche (enters/exits/same) usa 'noc' → matchea la
+    // card Noche del día de inicio del shift (igual `summary.id`).
+    const fragSuffix = hist.shiftId === 'Turno noche' ? 'noc' : 'dia'
     blocks.push({
       leftPct:  startFrac * 100,
       widthPct: (endFrac - startFrac) * 100,
@@ -488,6 +501,150 @@ function buildShoplogixOverlayBands(
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ── Coverage bar: justifica las 8h del turno ─────────────────────────────────
+
+type CoverageSegmentType = 'uptime' | 'break' | 'downtime' | 'setup' | 'untracked'
+
+interface CoverageSegment {
+  startPct: number
+  widthPct: number
+  durSec: number
+  type: CoverageSegmentType
+  reason: string
+  title: string
+}
+
+interface CoverageSummary {
+  shiftDurSec: number
+  /** Inicio efectivo del turno (primer state operativo, post-PlannedDowntime) */
+  effectiveStart: Date
+  /** Fin efectivo del turno (último state operativo, pre-PlannedDowntime) */
+  effectiveEnd: Date
+  uptimeSec: number
+  breakSec: number
+  downtimeSec: number
+  setupSec: number
+  untrackedSec: number
+  segments: CoverageSegment[]
+}
+
+/**
+ * Construye los segmentos de la coverage bar para un turno: justifica el window
+ * 8h con bloques de uptime/break/downtime/setup + detecta tiempo sin tracking
+ * (gaps en los states de Shoplogix). Excluye 'planned downtime' (post-turno).
+ */
+function buildCoverageSegments(
+  states: UpstreamMachineState[],
+  shiftStart: Date | null,
+  shiftEnd: Date | null,
+): CoverageSummary | null {
+  if (!shiftStart || !shiftEnd) return null
+  const queryStart = shiftStart.getTime()
+  const queryEnd = shiftEnd.getTime()
+
+  // 1. Filtrar+clipar states al window del query + excluir planned downtime.
+  const clipped: Array<{ start: number; end: number; type: CoverageSegmentType; reason: string }> = []
+  for (const s of states) {
+    const sStart = s.startAt.getTime()
+    const sEnd = s.endAt.getTime()
+    const clipS = Math.max(sStart, queryStart)
+    const clipE = Math.min(sEnd, queryEnd)
+    if (clipE - clipS < 1000) continue
+    const reasonLower = (s.reason || '').toLowerCase()
+    if (s.type === 'break' && reasonLower.includes('planned downtime')) continue
+    let segType: CoverageSegmentType
+    if (s.type === 'uptime') segType = 'uptime'
+    else if (s.type === 'break') segType = 'break'
+    else if (s.type === 'setup') segType = 'setup'
+    else segType = 'downtime'
+    clipped.push({
+      start: clipS,
+      end: clipE,
+      type: segType,
+      reason: s.reason || s.name || segType,
+    })
+  }
+  if (clipped.length === 0) return null
+  clipped.sort((a, b) => a.start - b.start)
+
+  // 2. Window EFECTIVO del turno = desde el primer state operativo hasta el
+  // último. Esto excluye el Planned Downtime de inicio/final (la ventana de
+  // consulta es más amplia que el shift real).
+  const startMs = clipped[0]!.start
+  const endMs = clipped[clipped.length - 1]!.end
+  const shiftDurMs = endMs - startMs
+  if (shiftDurMs <= 0) return null
+
+  // 2. Detectar gaps > 1 min como 'untracked'.
+  const segments: CoverageSegment[] = []
+  let cursor = startMs
+  for (const c of clipped) {
+    if (c.start - cursor > 60_000) {
+      segments.push({
+        startPct: ((cursor - startMs) / shiftDurMs) * 100,
+        widthPct: ((c.start - cursor) / shiftDurMs) * 100,
+        durSec: (c.start - cursor) / 1000,
+        type: 'untracked',
+        reason: 'Sin tracking Shoplogix',
+        title: `Sin tracking · ${Math.round((c.start - cursor) / 60000)}m`,
+      })
+    }
+    segments.push({
+      startPct: ((c.start - startMs) / shiftDurMs) * 100,
+      widthPct: ((c.end - c.start) / shiftDurMs) * 100,
+      durSec: (c.end - c.start) / 1000,
+      type: c.type,
+      reason: c.reason,
+      title: `${c.reason} · ${Math.round((c.end - c.start) / 60000)}m`,
+    })
+    cursor = Math.max(cursor, c.end)
+  }
+  if (endMs - cursor > 60_000) {
+    segments.push({
+      startPct: ((cursor - startMs) / shiftDurMs) * 100,
+      widthPct: ((endMs - cursor) / shiftDurMs) * 100,
+      durSec: (endMs - cursor) / 1000,
+      type: 'untracked',
+      reason: 'Sin tracking Shoplogix',
+      title: `Sin tracking · ${Math.round((endMs - cursor) / 60000)}m`,
+    })
+  }
+
+  // 3. Totales por tipo.
+  const sumBy = (t: CoverageSegmentType) =>
+    segments.filter((s) => s.type === t).reduce((a, s) => a + s.durSec, 0)
+
+  return {
+    shiftDurSec: shiftDurMs / 1000,
+    effectiveStart: new Date(startMs),
+    effectiveEnd: new Date(endMs),
+    uptimeSec: sumBy('uptime'),
+    breakSec: sumBy('break'),
+    downtimeSec: sumBy('downtime'),
+    setupSec: sumBy('setup'),
+    untrackedSec: sumBy('untracked'),
+    segments,
+  }
+}
+
+function fmtDuration(sec: number): string {
+  if (sec < 60) return `${Math.round(sec)}s`
+  const totalMin = Math.round(sec / 60)
+  if (totalMin < 60) return `${totalMin}m`
+  const h = Math.floor(totalMin / 60)
+  const m = totalMin % 60
+  return m > 0 ? `${h}h${String(m).padStart(2, '0')}m` : `${h}h`
+}
+
+const COVERAGE_COLOR: Record<CoverageSegmentType, string> = {
+  uptime:    'bg-emerald-500/65',
+  break:     'bg-amber-500/55',
+  downtime:  'bg-orange-500/55',
+  setup:     'bg-blue-500/55',
+  untracked: 'bg-rose-500/45',
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 function getDaysInMonth(date: Date): (Date | null)[] {
   const year = date.getFullYear()
   const month = date.getMonth()
@@ -520,9 +677,25 @@ export function GraderHistoricalCalendar({
   // (ver buildDayTimelineBlocks + EnrichedCardEntry.fragId). Cuando es null,
   // ningún elemento está resaltado.
   const [hoveredFragId, setHoveredFragId] = useState<string | null>(null)
-  // Cache states de Shoplogix por shift (`${dateKey}__${shiftId}`).
-  // Usado para renderizar overlay de pausas (COLACION, MMPP, etc.) sobre el timeline.
-  const [slxStatesByShift, setSlxStatesByShift] = useState<Map<string, UpstreamMachineState[]>>(new Map())
+  // Cache de Shoplogix por shift (`${dateKey}__${shiftId}`).
+  // Incluye:
+  //  - states[] para overlay de pausas (COLACION, MMPP, etc.) sobre el timeline
+  //  - shiftStart/End para la coverage bar (ventana real del turno: ~8h)
+  //  - breakdown (uptime/break/downtime/setup/plannedDowntime sec) para la justificación
+  interface SlxShiftCache {
+    states: UpstreamMachineState[]
+    shiftStart: Date | null
+    shiftEnd: Date | null
+    breakdown: {
+      uptimeSec: number
+      breakSec: number
+      downtimeSec: number
+      setupSec: number
+      plannedDowntimeSec: number
+      totalTrackedSec: number
+    } | null
+  }
+  const [slxByShift, setSlxByShift] = useState<Map<string, SlxShiftCache>>(new Map())
   // Cache totales Baader por shift — para indicador de "data Grader perdida"
   // (cuando Grader.totalPieces < Baader.totalCycles * 0.95 = >5% loss).
   const [slxTotalsByShift, setSlxTotalsByShift] = useState<Map<string, number>>(new Map())
@@ -853,32 +1026,45 @@ export function GraderHistoricalCalendar({
     let cancelled = false
     for (const c of candidates) {
       const key = `${c.dateKey}__${c.shiftId}`
-      if (slxStatesByShift.has(key)) continue
+      if (slxByShift.has(key)) continue
       loadShoplogixShift(c.dateKey, c.shiftId)
         .then((res) => {
           if (cancelled) return
-          // Tomar states de Evisceradora 1 (sort por nombre — primera). Las 3
-          // máquinas suelen reportar el mismo break, así que usar 1 evita
-          // duplicación.
-          const states = res.snapshot?.machines[0]?.states ?? []
-          setSlxStatesByShift((prev) => new Map(prev).set(key, states))
+          const m0 = res.snapshot?.machines[0]
+          const states = m0?.states ?? []
           // Total cycles SUMADOS de las 3 Baaders (vs por máquina) — eso es lo
           // que físicamente entró a la línea Grader.
           const totalCycles = (res.snapshot?.machines ?? []).reduce(
             (a, m) => a + (m.totalCycles || 0), 0,
           )
+          // Breakdown del turno (uptime/break/downtime/setup) para coverage bar.
+          // Usamos m0 porque las 3 Baaders suelen tener breakdowns equivalentes.
+          const cache: SlxShiftCache = {
+            states,
+            shiftStart: m0?.shiftStart ?? null,
+            shiftEnd: m0?.shiftEnd ?? null,
+            breakdown: m0?.shiftRuntimeBreakdown ? {
+              uptimeSec: m0.shiftRuntimeBreakdown.uptimeSec,
+              breakSec: m0.shiftRuntimeBreakdown.breakSec,
+              downtimeSec: m0.shiftRuntimeBreakdown.downtimeSec,
+              setupSec: m0.shiftRuntimeBreakdown.setupSec,
+              plannedDowntimeSec: m0.shiftRuntimeBreakdown.plannedDowntimeSec,
+              totalTrackedSec: m0.shiftRuntimeBreakdown.totalTrackedSec,
+            } : null,
+          }
+          setSlxByShift((prev) => new Map(prev).set(key, cache))
           setSlxTotalsByShift((prev) => new Map(prev).set(key, totalCycles))
         })
         .catch(() => {
-          // Sin Shoplogix data → guardar array vacío para no re-intentar
+          // Sin Shoplogix data → guardar entry vacía para no re-intentar
           if (!cancelled) {
-            setSlxStatesByShift((prev) => new Map(prev).set(key, []))
+            setSlxByShift((prev) => new Map(prev).set(key, { states: [], shiftStart: null, shiftEnd: null, breakdown: null }))
             setSlxTotalsByShift((prev) => new Map(prev).set(key, 0))
           }
         })
     }
     return () => { cancelled = true }
-  }, [selectedKey, slxStatesByShift])
+  }, [selectedKey, slxByShift])
 
   const selectedUploads = useMemo(() => {
     if (!selectedKey) return []
@@ -1223,10 +1409,7 @@ export function GraderHistoricalCalendar({
               kind === 'salida' || visibleCount <= 1
                 ? ''
                 : `${visibleIdx}/${visibleCount}`
-            const meta =
-              kind === 'dia' && hist.shiftId === 'Turno noche'
-                ? { icon: '🌙', title: 'Noche' }
-                : KIND_META[kind]
+            const meta = KIND_META[kind]
             const status = p0StatusFromPct(hist.pointZeroPct)
             const fragPieces = chip?.pieces ?? hist.totalPieces
             const fragP0Pieces = chip?.pointZeroPieces ?? hist.pointZeroPieces
@@ -1302,7 +1485,7 @@ export function GraderHistoricalCalendar({
               )
             }
 
-            // ── Card completa (madrugada / día / vespertina)
+            // ── Card completa (día / noche)
             const isHovered = hoveredFragId === fragId
             return (
               <div
@@ -1373,6 +1556,74 @@ export function GraderHistoricalCalendar({
                     <span className="opacity-70"> · {Math.round(chip.pctOfShift)}% del turno aquí</span>
                   )}
                 </p>
+                {/* Coverage bar — justifica el window 8h del turno con uptime/break/downtime/setup
+                    + detecta tiempo sin tracking. Solo cuando hay data Shoplogix cargada. */}
+                {(() => {
+                  const slxCache = slxByShift.get(hist.id)
+                  if (!slxCache?.shiftStart || !slxCache?.shiftEnd) return null
+                  const cov = buildCoverageSegments(slxCache.states, slxCache.shiftStart, slxCache.shiftEnd)
+                  if (!cov) return null
+                  const justifiedSec = cov.uptimeSec + cov.breakSec + cov.downtimeSec + cov.setupSec
+                  const justifiedPct = cov.shiftDurSec > 0 ? (justifiedSec / cov.shiftDurSec) * 100 : 0
+                  const pad = (n: number) => String(n).padStart(2, '0')
+                  const sStart = `${pad(cov.effectiveStart.getUTCHours())}:${pad(cov.effectiveStart.getUTCMinutes())}`
+                  const sEnd = `${pad(cov.effectiveEnd.getUTCHours())}:${pad(cov.effectiveEnd.getUTCMinutes())}`
+                  return (
+                    <div className="space-y-1 pt-0.5" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-between gap-2 text-[9px] text-muted-foreground/80 leading-none">
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-2.5 h-2.5" />
+                          Cobertura {sStart}–{sEnd} ({fmtDuration(cov.shiftDurSec)})
+                        </span>
+                        <span className={cn('tabular-nums font-medium', justifiedPct >= 95 ? 'text-emerald-600' : justifiedPct >= 70 ? 'text-amber-600' : 'text-rose-600')}>
+                          {justifiedPct.toFixed(0)}% justificado
+                        </span>
+                      </div>
+                      <div className="relative h-2 rounded-sm overflow-hidden bg-muted/30">
+                        {cov.segments.map((seg, i) => (
+                          <div
+                            key={i}
+                            className={cn('absolute top-0 bottom-0', COVERAGE_COLOR[seg.type])}
+                            style={{ left: `${seg.startPct}%`, width: `max(${seg.widthPct}%, 0.3%)` }}
+                            title={seg.title}
+                          />
+                        ))}
+                      </div>
+                      <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[9px] text-muted-foreground leading-none">
+                        {cov.uptimeSec > 0 && (
+                          <span className="flex items-center gap-0.5">
+                            <span className="w-1.5 h-1.5 rounded-sm bg-emerald-500/65" />
+                            uptime {fmtDuration(cov.uptimeSec)}
+                          </span>
+                        )}
+                        {cov.breakSec > 0 && (
+                          <span className="flex items-center gap-0.5">
+                            <span className="w-1.5 h-1.5 rounded-sm bg-amber-500/55" />
+                            breaks {fmtDuration(cov.breakSec)}
+                          </span>
+                        )}
+                        {cov.downtimeSec > 0 && (
+                          <span className="flex items-center gap-0.5">
+                            <span className="w-1.5 h-1.5 rounded-sm bg-orange-500/55" />
+                            detenciones {fmtDuration(cov.downtimeSec)}
+                          </span>
+                        )}
+                        {cov.setupSec > 0 && (
+                          <span className="flex items-center gap-0.5">
+                            <span className="w-1.5 h-1.5 rounded-sm bg-blue-500/55" />
+                            setup {fmtDuration(cov.setupSec)}
+                          </span>
+                        )}
+                        {cov.untrackedSec > 60 && (
+                          <span className="flex items-center gap-0.5 text-rose-600">
+                            <span className="w-1.5 h-1.5 rounded-sm bg-rose-500/45" />
+                            sin tracking {fmtDuration(cov.untrackedSec)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })()}
                 {hist.hasPieceData !== undefined && (!hist.hasPieceData || !hist.hasGate0Data) && (
                   <div className="flex flex-wrap gap-1">
                     {!hist.hasPieceData && (
@@ -1871,8 +2122,8 @@ export function GraderHistoricalCalendar({
                   const [y, m, d] = slideKey.split('-').map(Number) as [number, number, number]
                   const prev = new Date(Date.UTC(y, m - 1, d - 1)).toISOString().slice(0, 10)
                   for (const id of [`${prev}__Turno noche`, `${slideKey}__Turno día`, `${slideKey}__Turno noche`]) {
-                    const s = slxStatesByShift.get(id)
-                    if (s) slxStates.push(...s)
+                    const cache = slxByShift.get(id)
+                    if (cache) slxStates.push(...cache.states)
                   }
                 }
                 const slxBands = slideKey ? buildShoplogixOverlayBands(slxStates, slideKey) : []
