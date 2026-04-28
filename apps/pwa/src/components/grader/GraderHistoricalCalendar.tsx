@@ -497,6 +497,8 @@ export function GraderHistoricalCalendar({
   const [carouselAnim, setCarouselAnim] = useState(false)  // CSS transition on/off
   const carouselViewportRef = useRef<HTMLDivElement>(null)
   const carouselDragRef = useRef<{ startX: number; vx: number; lastX: number; lastT: number; navigating: boolean } | null>(null)
+  const carouselMomentumRef = useRef<number | null>(null) // rafId de la inercia activa
+  const carouselStateRef = useRef<{ sortedDayKeys: string[]; currentIdx: number }>({ sortedDayKeys: [], currentIdx: 0 })
   const autoSelectedRef = useRef(!!effectiveInitialKey)
 
   useEffect(() => { onMonthChange?.(currentMonth) }, [currentMonth, onMonthChange])
@@ -623,6 +625,12 @@ export function GraderHistoricalCalendar({
   const sortedDayKeys = useMemo(() => [...calendarAgg.keys()].sort(), [calendarAgg])
 
   const selectedKey = selectedDate ? selectedDate.toISOString().slice(0, 10) : null
+
+  // Sincroniza ref mutable para acceso imperativo dentro del RAF de inercia
+  useEffect(() => {
+    carouselStateRef.current.sortedDayKeys = sortedDayKeys
+    carouselStateRef.current.currentIdx = Math.max(0, sortedDayKeys.indexOf(selectedKey ?? ''))
+  }, [sortedDayKeys, selectedKey])
 
   // Summaries a mostrar en el panel "Resumen del día" para el día seleccionado.
   // Combina:
@@ -988,9 +996,18 @@ export function GraderHistoricalCalendar({
     return Math.round(hist.totalPieces / (mins / 60))
   }
 
-  // ── Paso 3b: carousel de timelines entre días ────────────────────────────────
+  // ── Paso 3b: carousel de timelines entre días (Opción C — inercia libre) ────
+
+  function stopCarouselMomentum() {
+    if (carouselMomentumRef.current !== null) {
+      cancelAnimationFrame(carouselMomentumRef.current)
+      carouselMomentumRef.current = null
+    }
+  }
+
   function carouselPointerDown(e: React.PointerEvent<HTMLDivElement>) {
     if ((e.target as HTMLElement).closest('button,a,input,select,textarea')) return
+    stopCarouselMomentum()
     if (carouselDragRef.current?.navigating) return
     carouselDragRef.current = { startX: e.clientX, vx: 0, lastX: e.clientX, lastT: performance.now(), navigating: false }
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
@@ -1005,40 +1022,101 @@ export function GraderHistoricalCalendar({
     carouselDragRef.current.lastX = e.clientX
     carouselDragRef.current.lastT = now
     const raw = e.clientX - carouselDragRef.current.startX
-    const idx = sortedDayKeys.indexOf(selectedKey ?? '')
+    const { currentIdx, sortedDayKeys: keys } = carouselStateRef.current
     let x = raw
-    if (idx <= 0                         && raw > 0) x = Math.sign(raw) * Math.min(Math.abs(raw) * 0.18, 50)
-    if (idx >= sortedDayKeys.length - 1  && raw < 0) x = Math.sign(raw) * Math.min(Math.abs(raw) * 0.18, 50)
+    if (currentIdx <= 0               && raw > 0) x = Math.sign(raw) * Math.min(Math.abs(raw) * 0.18, 50)
+    if (currentIdx >= keys.length - 1 && raw < 0) x = Math.sign(raw) * Math.min(Math.abs(raw) * 0.18, 50)
     setCarouselX(Math.abs(raw) > 6 ? x : 0)
   }
 
-  function carouselPointerUp(e: React.PointerEvent<HTMLDivElement>) {
+  function carouselPointerUp(_e: React.PointerEvent<HTMLDivElement>) {
     if (!carouselDragRef.current || carouselDragRef.current.navigating) return
-    const { startX, vx } = carouselDragRef.current
-    const raw  = e.clientX - startX
-    const vpW  = carouselViewportRef.current?.offsetWidth ?? 300
-    const goNext = (vx < -0.3 || raw < -vpW * 0.35) && nextKey !== null
-    const goPrev = (vx >  0.3 || raw >  vpW * 0.35) && prevKey !== null
+    const { vx } = carouselDragRef.current
+    carouselDragRef.current = null
+    applyCarouselMomentum(vx)
+  }
 
-    if (goNext || goPrev) {
-      const targetKey = (goNext ? nextKey : prevKey)!
-      const targetX   = goNext ? -vpW : vpW
-      carouselDragRef.current.navigating = true
+  // Inercia libre con deceleración exponencial (mockup: Math.pow(0.965, dt/16))
+  function applyCarouselMomentum(v0: number) {
+    stopCarouselMomentum()
+    const vpW   = carouselViewportRef.current?.offsetWidth ?? 300
+    const state = carouselStateRef.current // referencia al objeto mutable (no copia)
+
+    // Animación suave CSS → día adyacente, luego actualiza React state
+    function snapToDay(direction: 1 | -1) {
+      const newIdx = state.currentIdx + direction
+      const keys   = state.sortedDayKeys
+      if (newIdx < 0 || newIdx >= keys.length) { setCarouselAnim(true); setCarouselX(0); return }
+      const key = keys[newIdx]!
+      state.currentIdx = newIdx
       setCarouselAnim(true)
-      setCarouselX(targetX)
+      setCarouselX(direction < 0 ? vpW : -vpW)
       setTimeout(() => {
-        carouselDragRef.current = null
-        setCarouselAnim(false)
-        setCarouselX(0)
-        const d = new Date(`${targetKey}T00:00:00`)
+        setCarouselAnim(false); setCarouselX(0)
+        const d = new Date(`${key}T00:00:00`)
         setSelectedDate(d)
         setCurrentMonth(new Date(d.getFullYear(), d.getMonth(), 1))
       }, 330)
-    } else {
-      carouselDragRef.current = null
-      setCarouselAnim(true)
-      setCarouselX(0)
     }
+
+    // Velocidad baja → snap suave al día más cercano según posición actual
+    if (Math.abs(v0) < 0.15) {
+      if      (carouselX < -vpW * 0.25 && state.currentIdx < state.sortedDayKeys.length - 1) snapToDay(1)
+      else if (carouselX >  vpW * 0.25 && state.currentIdx > 0)                              snapToDay(-1)
+      else { setCarouselAnim(true); setCarouselX(0) }
+      return
+    }
+
+    // Velocidad alta → inercia libre (Opción C-a)
+    let v = v0
+    let lastFrameT = performance.now()
+    let x = carouselX // captura posición actual al soltar
+
+    function step(t: number) {
+      const dt = Math.min(t - lastFrameT, 32)
+      lastFrameT = t
+      v *= Math.pow(0.965, dt / 16) // fricción ~96.5% por fotograma de 16ms
+
+      if (Math.abs(v) < 0.08) {
+        // Inercia agotada → snap al día más cercano
+        carouselMomentumRef.current = null
+        if      (x < -vpW * 0.35 && state.currentIdx < state.sortedDayKeys.length - 1) snapToDay(1)
+        else if (x >  vpW * 0.35 && state.currentIdx > 0)                              snapToDay(-1)
+        else { setCarouselAnim(true); setCarouselX(0) }
+        return
+      }
+
+      x += v * dt
+
+      // Rubber-band en los extremos del mes
+      if (state.currentIdx <= 0                               && x > 0) { x = Math.min(x * 0.2, 60); v *= 0.5 }
+      if (state.currentIdx >= state.sortedDayKeys.length - 1 && x < 0) { x = Math.max(x * 0.2, -60); v *= 0.5 }
+
+      // Cruce de límite de día: navegar y continuar inercia desde nuevo centro
+      if (x <= -vpW && state.currentIdx < state.sortedDayKeys.length - 1) {
+        x += vpW
+        const newIdx = state.currentIdx + 1
+        state.currentIdx = newIdx
+        const d = new Date(`${state.sortedDayKeys[newIdx]}T00:00:00`)
+        setSelectedDate(d)
+        setCurrentMonth(new Date(d.getFullYear(), d.getMonth(), 1))
+      } else if (x >= vpW && state.currentIdx > 0) {
+        x -= vpW
+        const newIdx = state.currentIdx - 1
+        state.currentIdx = newIdx
+        const d = new Date(`${state.sortedDayKeys[newIdx]}T00:00:00`)
+        setSelectedDate(d)
+        setCurrentMonth(new Date(d.getFullYear(), d.getMonth(), 1))
+      }
+
+      // Verificar si fue cancelado durante este frame (por nuevo pointerDown)
+      if (carouselMomentumRef.current === null) return
+
+      setCarouselX(x)
+      carouselMomentumRef.current = requestAnimationFrame(step)
+    }
+
+    carouselMomentumRef.current = requestAnimationFrame(step)
   }
   // ─────────────────────────────────────────────────────────────────────────────
 
