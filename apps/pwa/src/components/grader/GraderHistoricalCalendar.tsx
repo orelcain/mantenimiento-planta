@@ -384,6 +384,8 @@ interface TimelineBlock {
     startPct: number
     widthPct: number
     type: CoverageSegmentType
+    /** Color hex real de Shoplogix (ej. "#008000"). Listo para backgroundColor CSS. */
+    color: string
     title: string
   }>
 }
@@ -516,6 +518,7 @@ function buildDayTimelineBlocks(
             startPct: sPct,
             widthPct: wPct,
             type: s.type as CoverageSegmentType,
+            color: s.color,  // hex real de Shoplogix, ej. "#008000" (verde), "#ff0000" (rojo)
             title: `${fmtMs(segStart)}–${fmtMs(segEnd)} · ${reason} (${durMin}m)`,
           })
         }
@@ -2382,7 +2385,8 @@ export function GraderHistoricalCalendar({
                             tabIndex={0}
                             className={cn(
                               'absolute cursor-pointer transition-all overflow-hidden',
-                              // Sin fondo cuando hay segmentos → los huecos <3min muestran el bg del timeline
+                              // Con segmentos: fondo gris muy sutil (tiempo sin tracking).
+                              // Sin segmentos: color sólido P0%-based (fallback).
                               hasSegments ? '' : b.bgClass,
                               b.nightSide === null && 'rounded-sm',
                               isHovered && 'ring-2 ring-white/80 ring-offset-1 ring-offset-background z-20',
@@ -2396,8 +2400,10 @@ export function GraderHistoricalCalendar({
                                 b.nightSide === 'start' ? '0 3px 3px 0' :
                                 b.nightSide === 'end'   ? '3px 0 0 3px' :
                                 undefined,
-                              // Gradiente nocturno sólo cuando no hay segmentos
-                              // (si hay segmentos, el gradiente se pinta como overlay)
+                              // Base: gris muy suave = tiempo sin datos Shoplogix (untracked)
+                              // Solo cuando hay segmentos; si no, bgClass ya provee el color.
+                              ...(hasSegments && { backgroundColor: 'rgba(100,116,139,0.20)' }),
+                              // Gradiente nocturno: en el contenedor cuando no hay segmentos
                               backgroundImage: !hasSegments
                                 ? b.nightSide === 'start' ? 'linear-gradient(90deg, rgba(99,102,241,0.55) 0%, transparent 18px)'
                                   : b.nightSide === 'end' ? 'linear-gradient(270deg, rgba(99,102,241,0.55) 0%, transparent 18px)'
@@ -2415,21 +2421,18 @@ export function GraderHistoricalCalendar({
                             onMouseEnter={() => setHoveredFragId(b.fragId)}
                             onMouseLeave={() => setHoveredFragId(null)}
                           >
-                            {/* ── Segmentos Shoplogix (mini-Gantt colores operativos) ── */}
+                            {/* ── Segmentos Shoplogix — color hex real de la API ──
+                                seg.color viene de raw.statusColor de Shoplogix.
+                                Ej: "#008000" verde, "#ff0000" rojo, "#73d8ff" celeste.
+                                Se añade 'cc' (80% alpha) para suavizar sin distorsionar. */}
                             {hasSegments && b.segments!.map((seg, si) => (
                               <div
                                 key={si}
-                                className={cn(
-                                  'absolute top-0 bottom-0 pointer-events-none',
-                                  seg.type === 'uptime'    && 'bg-emerald-500/75',
-                                  seg.type === 'break'     && 'bg-amber-400/75',
-                                  seg.type === 'downtime'  && 'bg-orange-500/75',
-                                  seg.type === 'setup'     && 'bg-blue-500/75',
-                                  seg.type === 'untracked' && 'bg-slate-400/35',
-                                )}
+                                className="absolute top-0 bottom-0 pointer-events-none"
                                 style={{
-                                  left:  `${seg.startPct}%`,
-                                  width: `max(${seg.widthPct}%, 0.3%)`,
+                                  left:            `${seg.startPct}%`,
+                                  width:           `max(${seg.widthPct}%, 0.3%)`,
+                                  backgroundColor: seg.color + 'cc',
                                 }}
                                 title={seg.title}
                               />
