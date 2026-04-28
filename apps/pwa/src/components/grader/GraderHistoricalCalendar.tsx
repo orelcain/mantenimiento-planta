@@ -378,6 +378,7 @@ interface TimelineBlock {
  */
 function buildDayTimelineBlocks(
   entries: Array<{ summary: GraderDailySummary; chip: ShiftChipDescriptor | null }>,
+  slxData?: Map<string, SlxShiftCache>,
 ): TimelineBlock[] {
   const blocks: TimelineBlock[] = []
   for (const { summary: hist, chip } of entries) {
@@ -394,18 +395,42 @@ function buildDayTimelineBlocks(
 
     let startFrac: number, endFrac: number
     if (direction === 'enters') {
-      // Madrugada: turno entró de la noche anterior → ocupa 00:00 hasta endAt
       startFrac = 0
       endFrac   = endMin / 1440
     } else if (direction === 'exits') {
-      // Vespertina: turno sale hacia el día siguiente → ocupa startAt hasta 24:00
       startFrac = startMin / 1440
       endFrac   = 1
     } else {
-      // Turno completo dentro del día calendario
       startFrac = startMin / 1440
       endFrac   = endMin   / 1440
       if (endFrac <= startFrac) endFrac = Math.min(1, startFrac + 0.02)
+    }
+
+    // Refinar posición con Shoplogix efectivo (cuando disponible).
+    // Esto muestra gaps reales: ej. si Shoplogix dice activo 09:00–17:27
+    // pero hist.startAt = 07:00, el bloque D arranca en 09:00 (gap visible).
+    const slxCacheForBlock = slxData?.get(hist.id)
+    if (slxCacheForBlock?.shiftStart && slxCacheForBlock?.shiftEnd && slxCacheForBlock.states.length > 0) {
+      const gS = hist.startAt ? new Date(hist.startAt).getTime() : null
+      const gE = hist.endAt   ? new Date(hist.endAt).getTime()   : null
+      const qS = gS != null ? Math.max(slxCacheForBlock.shiftStart.getTime(), gS) : slxCacheForBlock.shiftStart.getTime()
+      const qE = gE != null ? Math.min(slxCacheForBlock.shiftEnd.getTime(),   gE) : slxCacheForBlock.shiftEnd.getTime()
+      const eff = computeEffectiveWindow(slxCacheForBlock.states, qS, qE)
+      if (eff) {
+        const effStart = new Date(eff.startMs)
+        const effEnd   = new Date(eff.endMs)
+        const effStartMin = effStart.getUTCHours() * 60 + effStart.getUTCMinutes()
+        const effEndMin   = effEnd.getUTCHours()   * 60 + effEnd.getUTCMinutes()
+        if (direction === 'same') {
+          startFrac = effStartMin / 1440
+          endFrac   = effEndMin   / 1440
+        } else if (direction === 'enters') {
+          endFrac = Math.min(effEndMin / 1440, 1)
+        } else if (direction === 'exits') {
+          startFrac = Math.max(effStartMin / 1440, 0)
+        }
+        if (endFrac <= startFrac) endFrac = Math.min(1, startFrac + 0.02)
+      }
     }
 
     const status = p0StatusFromPct(hist.pointZeroPct)
@@ -539,6 +564,29 @@ interface CoverageSummary {
 }
 
 /**
+ * Retorna el window efectivo de producción (primer/último state operativo)
+ * dentro del rango [queryStart, queryEnd], excluyendo 'planned downtime'.
+ * Compartido por buildCoverageSegments y buildDayTimelineBlocks.
+ */
+function computeEffectiveWindow(
+  states: UpstreamMachineState[],
+  queryStart: number,
+  queryEnd: number,
+): { startMs: number; endMs: number } | null {
+  const operative = states
+    .filter((s) => !(s.type === 'break' && (s.reason ?? '').toLowerCase().includes('planned downtime')))
+    .map((s) => ({
+      start: Math.max(s.startAt.getTime(), queryStart),
+      end:   Math.min(s.endAt.getTime(),   queryEnd),
+    }))
+    .filter((s) => s.end - s.start >= 1000)
+    .sort((a, b) => a.start - b.start)
+  if (operative.length === 0) return null
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+  return { startMs: operative[0]!.start, endMs: operative[operative.length - 1]!.end }
+}
+
+/**
  * Construye los segmentos de la coverage bar para un turno: justifica el window
  * con bloques de uptime/break/downtime/setup + detecta tiempo sin tracking.
  *
@@ -566,13 +614,19 @@ function buildCoverageSegments(
     : shiftEnd.getTime()
   if (queryEnd - queryStart < 60_000) return null
 
-  // 1. Filtrar+clipar states al window del query + excluir planned downtime.
+  // 1. Window efectivo: primer/último state operativo (excluye planned downtime).
+  const effWin = computeEffectiveWindow(states, queryStart, queryEnd)
+  if (!effWin) return null
+  const startMs = effWin.startMs
+  const endMs   = effWin.endMs
+  const shiftDurMs = endMs - startMs
+  if (shiftDurMs <= 0) return null
+
+  // 2. Filtrar+clipar states al window efectivo para construir los segmentos.
   const clipped: Array<{ start: number; end: number; type: CoverageSegmentType; reason: string }> = []
   for (const s of states) {
-    const sStart = s.startAt.getTime()
-    const sEnd = s.endAt.getTime()
-    const clipS = Math.max(sStart, queryStart)
-    const clipE = Math.min(sEnd, queryEnd)
+    const clipS = Math.max(s.startAt.getTime(), startMs)
+    const clipE = Math.min(s.endAt.getTime(),   endMs)
     if (clipE - clipS < 1000) continue
     const reasonLower = (s.reason || '').toLowerCase()
     if (s.type === 'break' && reasonLower.includes('planned downtime')) continue
@@ -583,21 +637,12 @@ function buildCoverageSegments(
     else segType = 'downtime'
     clipped.push({
       start: clipS,
-      end: clipE,
-      type: segType,
+      end:   clipE,
+      type:  segType,
       reason: s.reason || s.name || segType,
     })
   }
-  if (clipped.length === 0) return null
   clipped.sort((a, b) => a.start - b.start)
-
-  // 2. Window EFECTIVO del turno = desde el primer state operativo hasta el
-  // último. Esto excluye el Planned Downtime de inicio/final (la ventana de
-  // consulta es más amplia que el shift real).
-  const startMs = clipped[0]!.start
-  const endMs = clipped[clipped.length - 1]!.end
-  const shiftDurMs = endMs - startMs
-  if (shiftDurMs <= 0) return null
 
   // 2. Detectar gaps > 1 min como 'untracked'.
   const segments: CoverageSegment[] = []
@@ -683,6 +728,25 @@ function getDaysInMonth(date: Date): (Date | null)[] {
   return days
 }
 
+// Cache de Shoplogix por shift (`${dateKey}__${shiftId}`).
+// Incluye:
+//  - states[] para overlay de pausas (COLACION, MMPP, etc.) sobre el timeline
+//  - shiftStart/End para la coverage bar (ventana real del turno: ~8h)
+//  - breakdown (uptime/break/downtime/setup/plannedDowntime sec) para la justificación
+interface SlxShiftCache {
+  states: UpstreamMachineState[]
+  shiftStart: Date | null
+  shiftEnd: Date | null
+  breakdown: {
+    uptimeSec: number
+    breakSec: number
+    downtimeSec: number
+    setupSec: number
+    plannedDowntimeSec: number
+    totalTrackedSec: number
+  } | null
+}
+
 export function GraderHistoricalCalendar({
   onLoadTurno,
   className,
@@ -701,24 +765,6 @@ export function GraderHistoricalCalendar({
   // (ver buildDayTimelineBlocks + EnrichedCardEntry.fragId). Cuando es null,
   // ningún elemento está resaltado.
   const [hoveredFragId, setHoveredFragId] = useState<string | null>(null)
-  // Cache de Shoplogix por shift (`${dateKey}__${shiftId}`).
-  // Incluye:
-  //  - states[] para overlay de pausas (COLACION, MMPP, etc.) sobre el timeline
-  //  - shiftStart/End para la coverage bar (ventana real del turno: ~8h)
-  //  - breakdown (uptime/break/downtime/setup/plannedDowntime sec) para la justificación
-  interface SlxShiftCache {
-    states: UpstreamMachineState[]
-    shiftStart: Date | null
-    shiftEnd: Date | null
-    breakdown: {
-      uptimeSec: number
-      breakSec: number
-      downtimeSec: number
-      setupSec: number
-      plannedDowntimeSec: number
-      totalTrackedSec: number
-    } | null
-  }
   const [slxByShift, setSlxByShift] = useState<Map<string, SlxShiftCache>>(new Map())
   // Cache totales Baader por shift — para indicador de "data Grader perdida"
   // (cuando Grader.totalPieces < Baader.totalCycles * 0.95 = >5% loss).
@@ -1454,6 +1500,17 @@ export function GraderHistoricalCalendar({
               ? () => setSelectedHistorical(isActiveForConfig ? null : hist)
               : navigateToTurno
 
+            // Compute coverage upfront — reutilizado en subtitle + coverage bar
+            const slxCacheCard = slxByShift.get(hist.id)
+            const graderStartCard = hist.startAt ? new Date(hist.startAt) : null
+            const graderEndCard   = hist.endAt   ? new Date(hist.endAt)   : null
+            const covCard = (slxCacheCard?.shiftStart && slxCacheCard?.shiftEnd)
+              ? buildCoverageSegments(
+                  slxCacheCard.states, slxCacheCard.shiftStart, slxCacheCard.shiftEnd,
+                  graderStartCard, graderEndCard,
+                )
+              : null
+
             // ── Salida (orphan-source): strip compacto que invita a deslizar
             if (kind === 'salida') {
               const isHovered = hoveredFragId === fragId
@@ -1585,22 +1642,24 @@ export function GraderHistoricalCalendar({
                 <p className="text-[11px] text-muted-foreground leading-tight">
                   {hist.shiftId}
                   <span className="opacity-60"> · </span>
-                  <strong className="text-foreground/90">{formatShiftTimeRange(hist)}</strong>
+                  <strong className="text-foreground/90">
+                    {covCard
+                      ? (() => {
+                          const p = (n: number) => String(n).padStart(2, '0')
+                          const f = (d: Date) => `${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`
+                          return `${f(covCard.effectiveStart)} → ${f(covCard.effectiveEnd)}`
+                        })()
+                      : formatShiftTimeRange(hist)
+                    }
+                  </strong>
                   {chip?.pctOfShift != null && chip.pctOfShift < 100 && (
                     <span className="opacity-70"> · {Math.round(chip.pctOfShift)}% del turno aquí</span>
                   )}
                 </p>
-                {/* Coverage bar — justifica el window 8h del turno con uptime/break/downtime/setup
-                    + detecta tiempo sin tracking. Solo cuando hay data Shoplogix cargada. */}
+                {/* Coverage bar — justifica el window real del turno (clipado al Grader).
+                    Usa covCard pre-computado arriba para evitar duplicación. */}
                 {(() => {
-                  const slxCache = slxByShift.get(hist.id)
-                  if (!slxCache?.shiftStart || !slxCache?.shiftEnd) return null
-                  const graderStart = hist.startAt ? new Date(hist.startAt) : null
-                  const graderEnd   = hist.endAt   ? new Date(hist.endAt)   : null
-                  const cov = buildCoverageSegments(
-                    slxCache.states, slxCache.shiftStart, slxCache.shiftEnd,
-                    graderStart, graderEnd,
-                  )
+                  const cov = covCard
                   if (!cov) return null
                   const justifiedSec = cov.uptimeSec + cov.breakSec + cov.downtimeSec + cov.setupSec
                   const justifiedPct = cov.shiftDurSec > 0 ? (justifiedSec / cov.shiftDurSec) * 100 : 0
@@ -1608,7 +1667,7 @@ export function GraderHistoricalCalendar({
                   const sStart = `${pad(cov.effectiveStart.getUTCHours())}:${pad(cov.effectiveStart.getUTCMinutes())}`
                   const sEnd = `${pad(cov.effectiveEnd.getUTCHours())}:${pad(cov.effectiveEnd.getUTCMinutes())}`
                   // Detectar si el window Shoplogix fue recortado >15 min por el Grader real
-                  const slxRawDurSec = (slxCache.shiftEnd.getTime() - slxCache.shiftStart.getTime()) / 1000
+                  const slxRawDurSec = (slxCacheCard!.shiftEnd!.getTime() - slxCacheCard!.shiftStart!.getTime()) / 1000
                   const wasClipped = slxRawDurSec - cov.shiftDurSec > 900
                   return (
                     <div className="space-y-1 pt-0.5" onClick={(e) => e.stopPropagation()}>
@@ -2165,7 +2224,7 @@ export function GraderHistoricalCalendar({
                 { slideKey: nextKey,      entries: nextEntries },
               ] as const).map(({ slideKey, entries }, si) => {
                 const isSelectedSlide = si === 1
-                const blocks = slideKey ? buildDayTimelineBlocks(entries as Array<{ summary: GraderDailySummary; chip: ShiftChipDescriptor | null }>) : []
+                const blocks = slideKey ? buildDayTimelineBlocks(entries as Array<{ summary: GraderDailySummary; chip: ShiftChipDescriptor | null }>, slxByShift) : []
                 // Combinar states Shoplogix de los 3 candidate shifts del día.
                 // (prev noche → madrugada del slideKey, día del slideKey, noche del slideKey)
                 const slxStates: UpstreamMachineState[] = []
