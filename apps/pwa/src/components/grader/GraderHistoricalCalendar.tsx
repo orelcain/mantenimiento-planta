@@ -715,12 +715,23 @@ function fmtDuration(sec: number): string {
   return m > 0 ? `${h}h${String(m).padStart(2, '0')}m` : `${h}h`
 }
 
-const COVERAGE_COLOR: Record<CoverageSegmentType, string> = {
-  uptime:    'bg-emerald-500/65',
-  break:     'bg-amber-500/55',
-  downtime:  'bg-orange-500/55',
-  setup:     'bg-blue-500/55',
-  untracked: 'bg-rose-500/45',
+/**
+ * Colores Shoplogix reales por tipo de estado.
+ * Coinciden con los hex que retorna la API (statusColor) para que la coverage
+ * bar y el timeline mini-Gantt usen el mismo idioma visual que los operadores
+ * ya conocen del panel Shoplogix.
+ *   uptime   → #008000 (verde producción)
+ *   break    → #ff0000 (rojo — colación, detenciones, MMPP, etc.)
+ *   downtime → #73d8ff (celeste — Micro Detención)
+ *   setup    → #3b82f6 (azul — preparación/setup)
+ *   untracked→ #94a3b8 (slate neutro — sin tracking)
+ */
+const COVERAGE_COLOR_HEX: Record<CoverageSegmentType, string> = {
+  uptime:    '#008000',
+  break:     '#ff0000',
+  downtime:  '#73d8ff',
+  setup:     '#3b82f6',
+  untracked: '#94a3b8',
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1738,8 +1749,12 @@ export function GraderHistoricalCalendar({
                         {cov.segments.map((seg, i) => (
                           <div
                             key={i}
-                            className={cn('absolute top-0 bottom-0', COVERAGE_COLOR[seg.type])}
-                            style={{ left: `${seg.startPct}%`, width: `max(${seg.widthPct}%, 0.3%)` }}
+                            className="absolute top-0 bottom-0"
+                            style={{
+                              left: `${seg.startPct}%`,
+                              width: `max(${seg.widthPct}%, 0.3%)`,
+                              backgroundColor: COVERAGE_COLOR_HEX[seg.type] + 'bb',
+                            }}
                             title={seg.title}
                           />
                         ))}
@@ -1747,31 +1762,31 @@ export function GraderHistoricalCalendar({
                       <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[9px] text-muted-foreground leading-none">
                         {cov.uptimeSec > 0 && (
                           <span className="flex items-center gap-0.5">
-                            <span className="w-1.5 h-1.5 rounded-sm bg-emerald-500/65" />
+                            <span className="w-1.5 h-1.5 rounded-sm" style={{ backgroundColor: COVERAGE_COLOR_HEX.uptime + 'bb' }} />
                             uptime {fmtDuration(cov.uptimeSec)}
                           </span>
                         )}
                         {cov.breakSec > 0 && (
                           <span className="flex items-center gap-0.5">
-                            <span className="w-1.5 h-1.5 rounded-sm bg-amber-500/55" />
-                            breaks {fmtDuration(cov.breakSec)}
+                            <span className="w-1.5 h-1.5 rounded-sm" style={{ backgroundColor: COVERAGE_COLOR_HEX.break + 'bb' }} />
+                            paros {fmtDuration(cov.breakSec)}
                           </span>
                         )}
                         {cov.downtimeSec > 0 && (
                           <span className="flex items-center gap-0.5">
-                            <span className="w-1.5 h-1.5 rounded-sm bg-orange-500/55" />
+                            <span className="w-1.5 h-1.5 rounded-sm" style={{ backgroundColor: COVERAGE_COLOR_HEX.downtime + 'bb' }} />
                             detenciones {fmtDuration(cov.downtimeSec)}
                           </span>
                         )}
                         {cov.setupSec > 0 && (
                           <span className="flex items-center gap-0.5">
-                            <span className="w-1.5 h-1.5 rounded-sm bg-blue-500/55" />
+                            <span className="w-1.5 h-1.5 rounded-sm" style={{ backgroundColor: COVERAGE_COLOR_HEX.setup + 'bb' }} />
                             setup {fmtDuration(cov.setupSec)}
                           </span>
                         )}
                         {cov.untrackedSec > 60 && (
-                          <span className="flex items-center gap-0.5 text-rose-600">
-                            <span className="w-1.5 h-1.5 rounded-sm bg-rose-500/45" />
+                          <span className="flex items-center gap-0.5 text-muted-foreground/70">
+                            <span className="w-1.5 h-1.5 rounded-sm" style={{ backgroundColor: COVERAGE_COLOR_HEX.untracked + '88' }} />
                             sin tracking {fmtDuration(cov.untrackedSec)}
                           </span>
                         )}
