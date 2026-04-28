@@ -1088,7 +1088,10 @@ export function GraderHistoricalCalendar({
               kind === 'salida' || visibleCount <= 1
                 ? ''
                 : `${visibleIdx}/${visibleCount}`
-            const meta = KIND_META[kind]
+            const meta =
+              kind === 'dia' && hist.shiftId === 'Turno noche'
+                ? { icon: '🌙', title: 'Noche' }
+                : KIND_META[kind]
             const status = p0StatusFromPct(hist.pointZeroPct)
             const fragPieces = chip?.pieces ?? hist.totalPieces
             const fragP0Pieces = chip?.pointZeroPieces ?? hist.pointZeroPieces
