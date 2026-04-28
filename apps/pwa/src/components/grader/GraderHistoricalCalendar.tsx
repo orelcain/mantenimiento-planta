@@ -541,68 +541,75 @@ function buildDayTimelineBlocks(
   }
   return blocks
 }
-// ── Overlay Shoplogix: bandas de break/downtime con razón sobre la timeline ──
 
-interface ShoplogixOverlayBand {
+// ── Barra Shoplogix unificada: visión completa 24h del día ───────────────────
+
+/**
+ * Tipo de franja en la barra unificada.
+ * Igual que CoverageSegmentType pero añade 'planned' para el período entre-turnos
+ * que Shoplogix marca como "planned downtime" (hueco programado sin turno activo).
+ */
+type UnifiedBandType = 'uptime' | 'break' | 'downtime' | 'setup' | 'untracked' | 'planned'
+
+interface UnifiedShoplogixBand {
   leftPct: number
   widthPct: number
-  /** 'break' (colación, reunión) | 'downtime' (micro detención, falla) | 'setup' */
-  type: 'break' | 'downtime' | 'setup'
-  /** "COLACION" | "MMPP" | "Limpieza" | etc. — etiqueta operativa */
-  reason: string
-  /** Tooltip completo (HH:mm–HH:mm · razón · duración) */
+  type: UnifiedBandType
   title: string
 }
 
 /**
- * Convierte los `states[]` de Shoplogix (de las 3 Baader 142) en bandas
- * posicionadas sobre la timeline 24h del día calendario. Filtra:
- *  - 'uptime' (productivo, no es gap)
- *  - 'break' con reason "planned downtime" (período POST-TURNO, no operativo)
- *
- * Las 3 máquinas suelen reportar el mismo state simultáneamente (ej. colación);
- * deduplicamos por (startMin, endMin, reason) para no pintar 3 bandas iguales.
+ * Construye una barra continua de 24h con TODOS los estados Shoplogix del día.
+ * A diferencia de buildShoplogixOverlayBands (solo eventos no-uptime),
+ * incluye uptime (verde) y planned-downtime (gris) para dar imagen completa.
+ * Deduplica por (tipo, inicio-min, fin-min) para absorber los 3 Baaders reportando
+ * el mismo evento simultáneamente.
  */
-function buildShoplogixOverlayBands(
+function buildShoplogixUnifiedBar(
   states: UpstreamMachineState[],
   dateKey: string,
-): ShoplogixOverlayBand[] {
-  const bands: ShoplogixOverlayBand[] = []
+): UnifiedShoplogixBand[] {
+  const dayStartMs = new Date(`${dateKey}T00:00:00.000Z`).getTime()
+  const dayEndMs   = dayStartMs + 86400000
+  const MIN_MS     = 30_000 // 30s mínimo — filtra ruido
+  const pad = (n: number) => String(n).padStart(2, '0')
   const seen = new Set<string>()
-  const MIN_DURATION_MS = 60_000 // ignorar eventos < 1 min (micro-blips ruidosos)
+  const bands: UnifiedShoplogixBand[] = []
+
   for (const s of states) {
-    if (s.type === 'uptime') continue
-    const reasonLower = (s.reason || '').toLowerCase()
-    if (s.type === 'break' && reasonLower.includes('planned downtime')) continue
-    if (s.durationSec < 60) continue // skip < 1 min
-    // Convertir a fracción del día calendario [0..1]. Si state cruza medianoche
-    // (ej. madrugada), recortar al día actual.
-    const startMs = s.startAt.getTime()
-    const endMs = s.endAt.getTime()
-    const dayStartMs = new Date(`${dateKey}T00:00:00.000Z`).getTime()
-    const dayEndMs = dayStartMs + 86400000
-    const clipStart = Math.max(startMs, dayStartMs)
-    const clipEnd = Math.min(endMs, dayEndMs)
-    if (clipEnd - clipStart < MIN_DURATION_MS) continue
-    const startFrac = (clipStart - dayStartMs) / 86400000
-    const endFrac = (clipEnd - dayStartMs) / 86400000
-    const dedup = `${startFrac.toFixed(4)}|${endFrac.toFixed(4)}|${reasonLower}|${s.type}`
+    const clipStart = Math.max(s.startAt.getTime(), dayStartMs)
+    const clipEnd   = Math.min(s.endAt.getTime(),   dayEndMs)
+    if (clipEnd - clipStart < MIN_MS) continue
+
+    const isPlanned = s.type === 'break' && (s.reason ?? '').toLowerCase().includes('planned downtime')
+    const type: UnifiedBandType = isPlanned ? 'planned' : (s.type as UnifiedBandType)
+
+    // Dedup con precisión de 1 minuto — absorbe desfases entre Baaders
+    const rStart = Math.round(clipStart / 60000)
+    const rEnd   = Math.round(clipEnd   / 60000)
+    const dedup  = `${type}|${rStart}|${rEnd}`
     if (seen.has(dedup)) continue
     seen.add(dedup)
-    const pad = (n: number) => String(n).padStart(2, '0')
-    const sStart = new Date(clipStart)
-    const sEnd = new Date(clipEnd)
-    const ts = `${pad(sStart.getUTCHours())}:${pad(sStart.getUTCMinutes())}–${pad(sEnd.getUTCHours())}:${pad(sEnd.getUTCMinutes())}`
+
+    const leftPct  = (clipStart - dayStartMs) / 86400000 * 100
+    const widthPct = (clipEnd   - clipStart)  / 86400000 * 100
+    const sD = new Date(clipStart)
+    const eD = new Date(clipEnd)
+    const ts = `${pad(sD.getUTCHours())}:${pad(sD.getUTCMinutes())}–${pad(eD.getUTCHours())}:${pad(eD.getUTCMinutes())}`
     const durMin = Math.round((clipEnd - clipStart) / 60000)
-    const reason = s.reason || (s.type === 'break' ? 'Pausa' : s.type === 'setup' ? 'Setup' : 'Detenido')
-    bands.push({
-      leftPct: startFrac * 100,
-      widthPct: (endFrac - startFrac) * 100,
-      type: s.type as 'break' | 'downtime' | 'setup',
-      reason,
-      title: `${ts} · ${reason} (${durMin}m) · Shoplogix Baader`,
-    })
+    const label = isPlanned
+      ? 'Sin turno (paro programado)'
+      : s.type === 'uptime'
+        ? 'Producción'
+        : s.type === 'break'
+          ? (s.reason || 'Pausa/Colación')
+          : s.type === 'setup'
+            ? (s.reason || 'Setup/MMPP')
+            : (s.reason || 'Detención')
+
+    bands.push({ leftPct, widthPct, type, title: `${ts} · ${label} (${durMin}m)` })
   }
+
   return bands
 }
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2333,7 +2340,7 @@ export function GraderHistoricalCalendar({
                     if (cache) slxStates.push(...cache.states)
                   }
                 }
-                const slxBands = slideKey ? buildShoplogixOverlayBands(slxStates, slideKey) : []
+                const unifiedBands = slideKey ? buildShoplogixUnifiedBar(slxStates, slideKey) : []
                 return (
                   <div
                     key={slideKey ?? `empty-${si}`}
@@ -2383,29 +2390,52 @@ export function GraderHistoricalCalendar({
                         </span>
                       ))}
 
-                      {/* ── Capa 2: bandas Shoplogix (franja inferior — debajo de los bloques) ──
-                          Sólo aparecen en la zona inferior (top: 60%, bottom: 12px),
-                          visible como "barra de estado Baader" separada visualmente. */}
-                      {slxBands.map((band, i) => (
-                        <div
-                          key={`slx-${i}`}
-                          className={cn(
-                            'absolute z-[5] pointer-events-auto rounded-[1px]',
-                            band.type === 'break'    && 'bg-sky-400/50 border-t border-sky-400/30',
-                            band.type === 'downtime' && 'bg-orange-500/60 border-t border-orange-500/40',
-                            band.type === 'setup'    && 'bg-blue-400/40 border-t border-blue-400/30',
-                          )}
-                          style={{
-                            left:   `${band.leftPct}%`,
-                            width:  `max(${band.widthPct}%, 0.4%)`,
-                            top:    '62%',
-                            bottom: '14px',
-                          }}
-                          title={band.title}
-                        />
-                      ))}
-                      {/* Etiqueta "Shoplogix Baader" si hay alguna banda */}
-                      {slxBands.length > 0 && (
+                      {/* ── Capa 2: barra unificada Shoplogix (estado continuo 24h) ──
+                          Muestra TODOS los estados: uptime=verde, break=amber,
+                          downtime=naranja, setup=azul, planned=gris.
+                          uptime/planned se pintan primero (fondo), eventos encima. */}
+                      {unifiedBands
+                        .filter(b => b.type === 'uptime' || b.type === 'planned')
+                        .map((band, i) => (
+                          <div
+                            key={`slx-bg-${i}`}
+                            className={cn(
+                              'absolute z-[4] pointer-events-auto',
+                              band.type === 'uptime'  && 'bg-emerald-500/40',
+                              band.type === 'planned' && 'bg-slate-500/35',
+                            )}
+                            style={{
+                              left:   `${band.leftPct}%`,
+                              width:  `max(${band.widthPct}%, 0.3%)`,
+                              top:    '62%',
+                              bottom: '14px',
+                            }}
+                            title={band.title}
+                          />
+                        ))}
+                      {unifiedBands
+                        .filter(b => b.type !== 'uptime' && b.type !== 'planned')
+                        .map((band, i) => (
+                          <div
+                            key={`slx-ev-${i}`}
+                            className={cn(
+                              'absolute z-[5] pointer-events-auto rounded-[1px]',
+                              band.type === 'break'     && 'bg-amber-400/75 border-t border-amber-400/40',
+                              band.type === 'downtime'  && 'bg-orange-500/75 border-t border-orange-500/40',
+                              band.type === 'setup'     && 'bg-blue-500/70 border-t border-blue-400/40',
+                              band.type === 'untracked' && 'bg-rose-500/50',
+                            )}
+                            style={{
+                              left:   `${band.leftPct}%`,
+                              width:  `max(${band.widthPct}%, 0.4%)`,
+                              top:    '62%',
+                              bottom: '14px',
+                            }}
+                            title={band.title}
+                          />
+                        ))}
+                      {/* Etiqueta "Baader" si hay datos Shoplogix */}
+                      {unifiedBands.length > 0 && (
                         <span className="absolute right-1 text-[7px] text-muted-foreground/40 pointer-events-none z-10 leading-none"
                           style={{ top: '64%' }}>
                           Baader
