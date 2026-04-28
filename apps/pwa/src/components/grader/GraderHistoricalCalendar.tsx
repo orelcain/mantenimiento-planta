@@ -507,7 +507,7 @@ function buildDayTimelineBlocks(
           if (s.type === 'break' && (s.reason ?? '').toLowerCase().includes('planned downtime')) continue
           const segStart = Math.max(s.startAt.getTime(), blockStartMs)
           const segEnd   = Math.min(s.endAt.getTime(),   blockEndMs)
-          if (segEnd - segStart < 30000) continue // < 30s, skip ruido
+          if (segEnd - segStart < 180000) continue // < 3min — filtra ruido visual del mini-Gantt
           const sPct = (segStart - blockStartMs) / blockDurMs * 100
           const wPct = (segEnd   - segStart)     / blockDurMs * 100
           const durMin = Math.round((segEnd - segStart) / 60000)
@@ -1162,6 +1162,24 @@ export function GraderHistoricalCalendar({
       ease: 'outQuad',
     })
   }, [selectedKey, summariesForSelectedDay.length])
+
+  // Sweep izquierda→derecha de la barra unificada Shoplogix al cambiar día.
+  // Las bandas tienen transformOrigin='left center' → scaleX de 0 a 1 las "dibuja"
+  // en orden cronológico (stagger 12ms entre bandas adyacentes).
+  useEffect(() => {
+    if (!selectedSlideRef.current) return
+    const prefersReducedMotion = typeof window !== 'undefined'
+      && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    if (prefersReducedMotion) return
+    const nodes = selectedSlideRef.current.querySelectorAll<HTMLElement>('[data-anim-unif]')
+    if (nodes.length === 0) return
+    animate(nodes, {
+      scaleX: [0, 1],
+      duration: 450,
+      delay: stagger(12),
+      ease: 'outExpo',
+    })
+  }, [selectedKey])
 
   // Lazy-load de cambios manuales de gate para los turnos del día seleccionado.
   // Se dispara al cambiar el día — solo carga si el shiftDocId no está ya en caché.
@@ -2357,7 +2375,7 @@ export function GraderHistoricalCalendar({
                     {/* ── Barra timeline 24h — 3 capas: bloques Grader / Shoplogix / eje hora ── */}
                     <div
                       className="relative overflow-hidden border-y border-border/25 bg-muted/15"
-                      style={{ height: '52px' }}
+                      style={{ height: '56px' }}
                       title={slideKey ? `Timeline ${slideKey}` : undefined}
                     >
                       {/* ── Capa 1: grid de horas ── */}
@@ -2393,22 +2411,26 @@ export function GraderHistoricalCalendar({
                       {/* ── Capa 2: barra unificada Shoplogix (estado continuo 24h) ──
                           Muestra TODOS los estados: uptime=verde, break=amber,
                           downtime=naranja, setup=azul, planned=gris.
-                          uptime/planned se pintan primero (fondo), eventos encima. */}
+                          uptime/planned se pintan primero (fondo), eventos encima.
+                          Todos llevan data-anim-unif + transformOrigin left para
+                          el sweep izquierda→derecha de anime.js al cambiar día. */}
                       {unifiedBands
                         .filter(b => b.type === 'uptime' || b.type === 'planned')
                         .map((band, i) => (
                           <div
                             key={`slx-bg-${i}`}
+                            data-anim-unif=""
                             className={cn(
                               'absolute z-[4] pointer-events-auto',
                               band.type === 'uptime'  && 'bg-emerald-500/40',
                               band.type === 'planned' && 'bg-slate-500/35',
                             )}
                             style={{
-                              left:   `${band.leftPct}%`,
-                              width:  `max(${band.widthPct}%, 0.3%)`,
-                              top:    '62%',
-                              bottom: '14px',
+                              left:            `${band.leftPct}%`,
+                              width:           `max(${band.widthPct}%, 0.3%)`,
+                              top:             '57%',
+                              bottom:          '10px',
+                              transformOrigin: 'left center',
                             }}
                             title={band.title}
                           />
@@ -2418,18 +2440,20 @@ export function GraderHistoricalCalendar({
                         .map((band, i) => (
                           <div
                             key={`slx-ev-${i}`}
+                            data-anim-unif=""
                             className={cn(
                               'absolute z-[5] pointer-events-auto rounded-[1px]',
-                              band.type === 'break'     && 'bg-amber-400/75 border-t border-amber-400/40',
-                              band.type === 'downtime'  && 'bg-orange-500/75 border-t border-orange-500/40',
-                              band.type === 'setup'     && 'bg-blue-500/70 border-t border-blue-400/40',
-                              band.type === 'untracked' && 'bg-rose-500/50',
+                              band.type === 'break'     && 'bg-amber-400/80 border-t border-amber-400/50',
+                              band.type === 'downtime'  && 'bg-orange-500/80 border-t border-orange-500/50',
+                              band.type === 'setup'     && 'bg-blue-500/75 border-t border-blue-400/50',
+                              band.type === 'untracked' && 'bg-rose-500/55',
                             )}
                             style={{
-                              left:   `${band.leftPct}%`,
-                              width:  `max(${band.widthPct}%, 0.4%)`,
-                              top:    '62%',
-                              bottom: '14px',
+                              left:            `${band.leftPct}%`,
+                              width:           `max(${band.widthPct}%, 0.4%)`,
+                              top:             '57%',
+                              bottom:          '10px',
+                              transformOrigin: 'left center',
                             }}
                             title={band.title}
                           />
@@ -2437,7 +2461,7 @@ export function GraderHistoricalCalendar({
                       {/* Etiqueta "Baader" si hay datos Shoplogix */}
                       {unifiedBands.length > 0 && (
                         <span className="absolute right-1 text-[7px] text-muted-foreground/40 pointer-events-none z-10 leading-none"
-                          style={{ top: '64%' }}>
+                          style={{ top: '59%' }}>
                           Baader
                         </span>
                       )}
