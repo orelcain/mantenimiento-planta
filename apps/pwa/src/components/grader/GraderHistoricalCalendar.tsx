@@ -204,10 +204,12 @@ function renderShiftChip(chip: ShiftChipDescriptor, untaggedCount: number | null
  * - `salida`: turno noche programado en este día sin actividad real (ej. Domingos en
  *   Feb 2026). Strip compacto que invita a deslizar al primaryDateKey.
  *
- * Las entries con `direction='enters'` (= madrugada del día siguiente) se filtran
- * acá: pertenecen al card Noche del día anterior, no a este día.
+ * - `madrugada`: cola de turno noche del día anterior (`direction='enters'`). Card completa,
+ *   ordenada primera (00:00–06:00). Los datos completos del turno noche se ven aquí.
+ * - `salida`: turno noche que ARRANCA en este día y continúa mañana (`direction='exits'`).
+ *   Strip compacto que invita a ver el día siguiente donde aparece como Madrugada.
  */
-type CardKind = 'dia' | 'noche' | 'salida'
+type CardKind = 'madrugada' | 'dia' | 'noche' | 'salida'
 
 interface EnrichedCardEntry {
   summary: GraderDailySummary
@@ -238,25 +240,28 @@ function getStartMinutesUTC(iso: string | undefined): number | null {
 function enrichEntriesByKind(
   entries: Array<{ summary: GraderDailySummary; chip: ShiftChipDescriptor | null }>,
 ): EnrichedCardEntry[] {
-  // Filtrar 'enters' — esos son la madrugada (parte del Noche de ayer).
-  // Mantener: 'same' (turno completo en este día) | 'exits' (turno noche que arranca acá)
-  // | orphan-source (placeholder).
-  const visible = entries.filter(
-    (e) => e.chip?.role === 'orphan-source' || e.chip?.direction !== 'enters',
-  )
-
-  return visible
+  return entries
     .map(({ summary, chip }): EnrichedCardEntry => {
       let kind: CardKind
       let sortMin: number
       let fragSuffix: string
 
       if (chip?.role === 'orphan-source') {
+        // Turno noche programado sin actividad real aquí (placeholder)
+        kind = 'salida'
+        sortMin = 99999
+        fragSuffix = 'sal'
+      } else if (chip?.direction === 'enters') {
+        // Cola del turno noche de ayer — se muestra como Madrugada (00:00–endAt)
+        kind = 'madrugada'
+        sortMin = 0
+        fragSuffix = 'mad'
+      } else if (chip?.direction === 'exits') {
+        // Turno noche que arranca aquí y continúa mañana — strip compacto
         kind = 'salida'
         sortMin = 99999
         fragSuffix = 'sal'
       } else if (
-        chip?.direction === 'exits' ||
         (chip?.direction === 'same' && summary.shiftId === 'Turno noche') ||
         (!chip && summary.shiftId === 'Turno noche')
       ) {
@@ -302,9 +307,10 @@ function formatShiftTimeRange(summary: GraderDailySummary): string {
 }
 
 const KIND_META: Record<CardKind, { icon: string; title: string }> = {
-  dia:    { icon: '☀',   title: 'Día' },
-  noche:  { icon: '🌙',  title: 'Noche' },
-  salida: { icon: '🌙',  title: 'Turno noche' },
+  madrugada: { icon: '🌙→', title: 'Madrugada' },
+  dia:       { icon: '☀',   title: 'Día' },
+  noche:     { icon: '🌙',  title: 'Noche' },
+  salida:    { icon: '🌙',  title: 'Turno noche' },
 }
 
 function getUploadTimestamp(upload: GraderUpload): number {
@@ -417,10 +423,14 @@ function buildDayTimelineBlocks(
     const pad = (n: number) => String(n).padStart(2, '0')
     const ts = `${pad(startD.getUTCHours())}:${pad(startD.getUTCMinutes())}–${pad(endD.getUTCHours())}:${pad(endD.getUTCMinutes())}`
     const pct = chip?.pctOfShift != null ? ` · ${Math.round(chip.pctOfShift)}% en este día` : ''
-    // fragId mantiene paridad con `EnrichedCardEntry.fragId` para sync hover/click.
-    // Cualquier block de Turno noche (enters/exits/same) usa 'noc' → matchea la
-    // card Noche del día de inicio del shift (igual `summary.id`).
-    const fragSuffix = hist.shiftId === 'Turno noche' ? 'noc' : 'dia'
+    // fragSuffix en paridad con EnrichedCardEntry.fragId para sync hover (#32):
+    //   enters → 'mad' (Madrugada card en este día)
+    //   exits  → 'sal' (strip compacto en este día)
+    //   same noche → 'noc', same día → 'dia'
+    const fragSuffix =
+      direction === 'enters' ? 'mad' :
+      direction === 'exits'  ? 'sal' :
+      hist.shiftId === 'Turno noche' ? 'noc' : 'dia'
     blocks.push({
       leftPct:  startFrac * 100,
       widthPct: (endFrac - startFrac) * 100,
@@ -1463,11 +1473,21 @@ export function GraderHistoricalCalendar({
                           <span className="text-muted-foreground"> · </span>
                           <strong>{formatShiftTimeRange(hist)}</strong>
                         </p>
-                        <p className="text-[10px] text-muted-foreground leading-tight">
-                          Sin actividad real en este día — desliza{' '}
-                          <span className="text-foreground">→</span>{' '}
-                          para ver datos en {chip?.primaryDateKey ?? 'el siguiente día'}
-                        </p>
+                        {chip?.direction === 'exits' ? (
+                          <p className="text-[10px] text-muted-foreground leading-tight">
+                            Arranca aquí, continúa mañana — ver datos en{' '}
+                            <span className="text-foreground">
+                              {chip?.primaryDateKey ?? 'el día siguiente'}
+                            </span>
+                            {' '}como Madrugada
+                          </p>
+                        ) : (
+                          <p className="text-[10px] text-muted-foreground leading-tight">
+                            Sin actividad real en este día — desliza{' '}
+                            <span className="text-foreground">→</span>{' '}
+                            para ver datos en {chip?.primaryDateKey ?? 'el siguiente día'}
+                          </p>
+                        )}
                       </div>
                     </div>
                     {hist.pointZeroPct > 0 && (
