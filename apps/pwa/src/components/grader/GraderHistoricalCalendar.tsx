@@ -189,130 +189,112 @@ function renderShiftChip(chip: ShiftChipDescriptor, untaggedCount: number | null
 }
 
 /**
- * Card consolidada para un mismo turno-tipo (ej. Turno noche) que recibe
- * múltiples fragmentos en el día calendárico (ej. madrugada del N de ayer +
- * vespertina del N que arranca hoy). Mantiene la mental model "1 día = 1 D + 1 N"
- * agregando los KPIs calendáricos arriba y listando los fragmentos contribuyentes
- * adentro como mini-cards clickeables.
+ * Tipo de card según el rol temporal del fragmento en el día calendárico.
+ *
+ * - `madrugada`: turno noche que arrancó AYER y deja sus piezas en este día (00:00 → endAt).
+ *   Render como card completa con icono `🌙→` y badge de orden temporal `1/N`.
+ * - `dia`: turno día completo en este día calendárico. Card completa con icono `☀`.
+ * - `vespertina`: turno noche que ARRANCA este día y la mayoría de sus piezas se quedan
+ *   acá (caso raro de role=primary+direction=exits). Card completa con icono `←🌙`.
+ *   Las vespertinas secundarias (role!=primary) NO se renderizan: aparecen como Madrugada
+ *   en el día siguiente — al deslizar la flecha del calendario el usuario ve el mismo
+ *   chip "fluyendo" sin duplicarse.
+ * - `salida`: turno noche programado en este día sin actividad real (ej. Domingos en
+ *   Feb 2026). Render como strip compacto que invita a deslizar al primaryDateKey.
  */
-function renderConsolidatedShiftCard(
-  shiftId: string,
+type CardKind = 'madrugada' | 'dia' | 'vespertina' | 'salida'
+
+interface EnrichedCardEntry {
+  summary: GraderDailySummary
+  chip: ShiftChipDescriptor | null
+  kind: CardKind
+  /** Minutos desde 00:00 del día calendárico — usado para ordenamiento cronológico */
+  sortMin: number
+  /** Identificador único del fragmento en este día (para sincronizar con timeline #32) */
+  fragId: string
+}
+
+/** Wall-clock-as-UTC: extrae minutos-del-día (0-1439) desde un ISO. */
+function getStartMinutesUTC(iso: string | undefined): number | null {
+  if (!iso) return null
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return null
+  return d.getUTCHours() * 60 + d.getUTCMinutes()
+}
+
+/**
+ * Convierte los entries del día calendárico en cards enriquecidas con `kind`
+ * temporal y orden cronológico. Filtra las vespertinas secundarias (aparecen
+ * como Madrugada en el día siguiente).
+ */
+function enrichEntriesByKind(
   entries: Array<{ summary: GraderDailySummary; chip: ShiftChipDescriptor | null }>,
-  navigate: (path: string) => void,
-): JSX.Element {
-  // Calcular agregados calendáricos (solo no-orphan)
-  let totalPieces = 0
-  let totalP0 = 0
-  let totalWeight = 0
-  let hasWeight = false
-  for (const e of entries) {
-    if (e.chip?.role === 'orphan-source') continue
-    const pieces = e.chip?.pieces ?? e.summary.totalPieces
-    const p0 = e.chip?.pointZeroPieces ?? e.summary.pointZeroPieces
-    const wkg = e.chip?.weightKg ?? e.summary.totalWeightKg
-    totalPieces += pieces
-    totalP0 += p0
-    if (wkg != null && wkg > 0) {
-      totalWeight += wkg
-      hasWeight = true
-    }
-  }
-  const p0Pct = totalPieces > 0 ? (totalP0 / totalPieces) * 100 : 0
-  const status = p0StatusFromPct(p0Pct)
-
-  return (
-    <div
-      key={`consolidated-${shiftId}`}
-      className={cn(
-        'rounded-lg border px-3 py-2.5 space-y-2',
-        P0_CARD_CLASS[status],
-      )}
-    >
-      {/* Header: shiftId + badge "consolidado" + P0% calendárico */}
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <p className="text-sm font-medium">{shiftId}</p>
-            <span className="text-[9px] px-1.5 py-0.5 rounded border font-medium bg-indigo-500/15 text-indigo-300 border-indigo-500/30">
-              {entries.filter((e) => e.chip?.role !== 'orphan-source').length} fragmentos en este día
-            </span>
-          </div>
-        </div>
-        <span className={cn('text-lg font-bold tabular-nums', p0StatusColor(status))}>
-          {p0Pct.toFixed(2)}%
-        </span>
-      </div>
-
-      {/* KPIs agregados calendáricos */}
-      <div className="grid grid-cols-2 gap-1.5 text-xs">
-        <div className="rounded bg-background/60 px-2 py-1">
-          <p className="text-muted-foreground">Piezas</p>
-          <p className="font-semibold">{totalPieces.toLocaleString('es-CL')}</p>
-        </div>
-        <div className="rounded bg-background/60 px-2 py-1">
-          <p className="text-muted-foreground">P0 piezas</p>
-          <p className="font-semibold">{totalP0.toLocaleString('es-CL')}</p>
-        </div>
-        {hasWeight && (
-          <div className="rounded bg-background/60 px-2 py-1 col-span-2">
-            <p className="text-muted-foreground">Peso</p>
-            <p className="font-semibold">
-              {totalWeight >= 1000
-                ? `${(totalWeight / 1000).toFixed(1)} t`
-                : `${totalWeight.toFixed(0)} kg`}
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* Listado de fragmentos contribuyentes */}
-      <div className="space-y-1 pt-1.5 border-t border-border/30">
-        {entries.map(({ summary: hist, chip }) => {
-          const isOrphan = chip?.role === 'orphan-source'
-          const dirLabel =
-            chip?.direction === 'enters' ? 'Madrugada' :
-            chip?.direction === 'exits' ? 'Vespertina' :
-            null
-          const fragLabel = isOrphan
-            ? `Programado ${chip!.shiftDateKey} sin actividad real → detalle en ${chip!.primaryDateKey ?? '—'}`
-            : dirLabel != null
-              ? `${dirLabel} del turno de ${chip!.shiftDateKey} · ${Math.round(chip!.pctOfShift ?? 100)}% aquí`
-              : `Turno completo (${chip?.pctOfShift ?? 100}%)`
-          const fragPieces = chip?.pieces ?? hist.totalPieces
-          return (
-            <button
-              key={`${hist.id}-frag`}
-              onClick={() => navigate(`/analisis-grader/turno/${hist.dateKey}__${encodeURIComponent(hist.shiftId)}`)}
-              className={cn(
-                'w-full rounded-md border px-2 py-1.5 text-left transition-colors hover:bg-background/80',
-                isOrphan
-                  ? 'bg-neutral-500/8 border-neutral-500/20 opacity-70'
-                  : 'bg-background/40 border-border/40',
-              )}
-            >
-              <div className="flex items-center justify-between gap-2 mb-0.5">
-                <span className="text-[11px] font-medium truncate">{fragLabel}</span>
-                <span className={cn('text-xs font-bold tabular-nums shrink-0', p0StatusColor(p0StatusFromPct(hist.pointZeroPct)))}>
-                  {hist.pointZeroPct.toFixed(2)}%
-                </span>
-              </div>
-              <div className="flex items-center justify-between gap-2 text-[10px] text-muted-foreground">
-                <span>
-                  {isOrphan
-                    ? 'Sin piezas atribuidas a este día'
-                    : `${fragPieces.toLocaleString('es-CL')} pz`}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Eye className="h-2.5 w-2.5" />
-                  Ver detalle
-                </span>
-              </div>
-            </button>
-          )
-        })}
-      </div>
-    </div>
+): EnrichedCardEntry[] {
+  const visible = entries.filter(
+    (e) => !(e.chip?.direction === 'exits' && e.chip?.role !== 'primary'),
   )
+
+  return visible
+    .map(({ summary, chip }): EnrichedCardEntry => {
+      let kind: CardKind
+      let sortMin: number
+      let fragSuffix: string
+
+      if (chip?.role === 'orphan-source') {
+        kind = 'salida'
+        sortMin = 99999
+        fragSuffix = 'sal'
+      } else if (chip?.direction === 'enters') {
+        kind = 'madrugada'
+        sortMin = 0
+        fragSuffix = 'mad'
+      } else if (chip?.direction === 'exits') {
+        kind = 'vespertina'
+        sortMin = getStartMinutesUTC(summary.startAt) ?? 21 * 60
+        fragSuffix = 'ves'
+      } else {
+        kind = 'dia'
+        sortMin = getStartMinutesUTC(summary.startAt) ?? 9 * 60
+        fragSuffix = 'dia'
+      }
+
+      return {
+        summary,
+        chip,
+        kind,
+        sortMin,
+        fragId: `${summary.id}-${fragSuffix}`,
+      }
+    })
+    .sort((a, b) => a.sortMin - b.sortMin)
+}
+
+/** Formatea el rango horario del fragmento. Usa wall-clock-as-UTC. */
+function formatShiftTimeRange(summary: GraderDailySummary): string {
+  const fmt = (iso: string | undefined) =>
+    iso
+      ? new Date(iso).toLocaleTimeString('es-CL', {
+          hour: '2-digit',
+          minute: '2-digit',
+          timeZone: 'UTC',
+        })
+      : '?'
+  const dayPart = (iso: string | undefined) => (iso ? iso.slice(0, 10).slice(5) : '??')
+
+  const start = fmt(summary.startAt)
+  const end = fmt(summary.endAt)
+  const startDay = dayPart(summary.startAt)
+  const endDay = dayPart(summary.endAt)
+
+  if (startDay === endDay) return `${start} → ${end}`
+  return `${startDay} ${start} → ${endDay} ${end}`
+}
+
+const KIND_META: Record<CardKind, { icon: string; title: string }> = {
+  madrugada:  { icon: '🌙→', title: 'Madrugada' },
+  dia:        { icon: '☀',   title: 'Día' },
+  vespertina: { icon: '←🌙', title: 'Vespertina' },
+  salida:     { icon: '🌙',  title: 'Turno noche' },
 }
 
 function getUploadTimestamp(upload: GraderUpload): number {
@@ -733,19 +715,6 @@ export function GraderHistoricalCalendar({
     }
   }, [sortedDayKeys, selectedKey, getSummariesForDay])
 
-  // Agrupar por shiftId para consolidar cuando un mismo tipo (Turno noche)
-  // tiene múltiples fragmentos calendáricos en el día (ej. madrugada del N
-  // de ayer + vespertina del N que arranca hoy → 1 sola card consolidada).
-  const groupedByShift = useMemo(() => {
-    const map = new Map<string, Array<{ summary: GraderDailySummary; chip: ShiftChipDescriptor | null }>>()
-    for (const entry of summariesForSelectedDay) {
-      const arr = map.get(entry.summary.shiftId) ?? []
-      arr.push(entry)
-      map.set(entry.summary.shiftId, arr)
-    }
-    return map
-  }, [summariesForSelectedDay])
-
   // Auto-selección del turno para el store compartido:
   //   - Cuando cambia el día seleccionado, si la selección actual no pertenece a este día,
   //     elegir el primer turno (día > noche) del día si existe. Si no hay turnos, limpiar.
@@ -1019,6 +988,359 @@ export function GraderHistoricalCalendar({
     const mins = safeDisplayMinutes(hist)
     if (!mins || mins <= 0) return undefined
     return Math.round(hist.totalPieces / (mins / 60))
+  }
+
+  /**
+   * Render de las cards de un slide del carousel: sub-header agg calendárico +
+   * header "📂 X turnos" + grid de cards en orden temporal.
+   *
+   * Cada slide del carousel renderiza sus PROPIAS cards calculadas con sus
+   * propios entries — al deslizar el track horizontal, las cards del slide
+   * adyacente entran en pantalla junto con su timeline.
+   *
+   * `isSelectedSlide` indica si este slide es el día actualmente seleccionado:
+   *   - `true`: el ring `selectedHistorical` y el botón D↔N están activos.
+   *   - `false`: cards en modo "preview" — sin ring activo, sin botón D↔N.
+   */
+  const renderSlideCards = (
+    slideKey: string | null,
+    entries: Array<{ summary: GraderDailySummary; chip: ShiftChipDescriptor | null }>,
+    isSelectedSlide: boolean,
+  ): JSX.Element | null => {
+    if (!slideKey || entries.length === 0) return null
+    const enriched = enrichEntriesByKind(entries)
+    if (enriched.length === 0) return null
+    const visibleCount = enriched.filter((e) => e.kind !== 'salida').length
+    const allSalida = enriched.length > 0 && enriched.every((e) => e.kind === 'salida')
+    const headerText = allSalida
+      ? '📂 Turno noche programado en este día'
+      : `📂 ${visibleCount} ${visibleCount === 1 ? 'turno' : 'turnos'} · ordenados por hora de inicio`
+
+    const agg = calendarAgg.get(slideKey)
+    let visibleIdx = 0
+
+    return (
+      <div className="space-y-2 px-6 pt-3">
+        {/* Sub-header con agregado calendárico real del día */}
+        {agg && agg.totalPieces > 0 && (() => {
+          const status = p0StatusFromPct(agg.pointZeroPct)
+          const hours = Math.floor(agg.activeMinutes / 60)
+          const mins = agg.activeMinutes % 60
+          const nFragments = agg.contributingShifts.length
+          return (
+            <div
+              className={cn(
+                'rounded-md border px-3 py-2 flex items-center justify-between gap-3 flex-wrap',
+                P0_CARD_CLASS[status],
+              )}
+              title="Agregado calendárico real del día — suma de fragmentos físicamente procesados aquí"
+            >
+              <div className="flex items-baseline gap-2 min-w-0">
+                <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Día calendárico</span>
+                <span className={cn('text-lg font-bold tabular-nums', p0StatusColor(status))}>
+                  {agg.pointZeroPct.toFixed(2)}%
+                </span>
+              </div>
+              <div className="flex items-center gap-3 text-xs text-muted-foreground tabular-nums">
+                <span><strong className="text-foreground">{agg.totalPieces.toLocaleString('es-CL')}</strong> pz</span>
+                {agg.totalWeightKg != null && agg.totalWeightKg > 0 && (
+                  <span>
+                    <strong className="text-foreground">
+                      {agg.totalWeightKg >= 1000
+                        ? `${(agg.totalWeightKg / 1000).toFixed(1)} t`
+                        : `${agg.totalWeightKg.toFixed(0)} kg`}
+                    </strong>
+                  </span>
+                )}
+                {agg.activeMinutes > 0 && (
+                  <span><strong className="text-foreground">{hours}h {mins}m</strong> activos</span>
+                )}
+                <span>{nFragments} {nFragments === 1 ? 'fragmento' : 'fragmentos'}</span>
+              </div>
+            </div>
+          )
+        })()}
+
+        {/* Header con count y D↔N button (solo en slide seleccionado) */}
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 uppercase tracking-wide">
+            <Database className="h-3.5 w-3.5" />
+            {headerText}
+          </p>
+          {isSelectedSlide && (() => {
+            const hists = historicalByDate.get(slideKey) ?? []
+            const hasDia   = hists.some((h) => h.shiftId === 'Turno día')
+            const hasNoche = hists.some((h) => h.shiftId === 'Turno noche')
+            if (!hasDia || !hasNoche) return null
+            return (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-6 text-[10px] gap-1 px-2 border-indigo-500/30 text-indigo-500 hover:bg-indigo-500/10"
+                onClick={() => setShowComparison(true)}
+              >
+                <GitCompare className="h-3 w-3" />
+                D↔N
+              </Button>
+            )
+          })()}
+        </div>
+
+        {/* Grid de cards en orden temporal */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+          {enriched.map((entry) => {
+            const { summary: hist, chip, kind, fragId } = entry
+            if (kind !== 'salida') visibleIdx += 1
+            const orderText =
+              kind === 'salida' || visibleCount <= 1
+                ? ''
+                : `${visibleIdx}/${visibleCount}`
+            const meta = KIND_META[kind]
+            const status = p0StatusFromPct(hist.pointZeroPct)
+            const fragPieces = chip?.pieces ?? hist.totalPieces
+            const fragP0Pieces = chip?.pointZeroPieces ?? hist.pointZeroPieces
+            const fragWeight = chip?.weightKg ?? hist.totalWeightKg
+            const isActiveForConfig = isSelectedSlide && selectedHistorical?.id === hist.id
+            const navigateToTurno = () =>
+              navigate(
+                `/analisis-grader/turno/${hist.dateKey}__${encodeURIComponent(hist.shiftId)}`,
+              )
+            // Click en cuerpo de card: en slide seleccionado alterna selectedHistorical
+            // (legacy del wizard); en slides adyacentes navega directo al TurnoPage.
+            const onCardClick = isSelectedSlide
+              ? () => setSelectedHistorical(isActiveForConfig ? null : hist)
+              : navigateToTurno
+
+            // ── Salida (orphan-source): strip compacto que invita a deslizar
+            if (kind === 'salida') {
+              return (
+                <div
+                  key={hist.id}
+                  data-frag-id={fragId}
+                  role="button"
+                  tabIndex={0}
+                  onClick={navigateToTurno}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      navigateToTurno()
+                    }
+                  }}
+                  className={cn(
+                    'rounded-lg border-l-4 px-3 py-2 cursor-pointer transition-opacity opacity-80 hover:opacity-100 lg:col-span-2',
+                    P0_CARD_CLASS[status],
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-base shrink-0">{meta.icon}</span>
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-semibold leading-tight">
+                          {hist.shiftId}
+                          <span className="text-muted-foreground"> · </span>
+                          <strong>{formatShiftTimeRange(hist)}</strong>
+                        </p>
+                        <p className="text-[10px] text-muted-foreground leading-tight">
+                          Sin actividad real en este día — desliza{' '}
+                          <span className="text-foreground">→</span>{' '}
+                          para ver datos en {chip?.primaryDateKey ?? 'el siguiente día'}
+                        </p>
+                      </div>
+                    </div>
+                    {hist.pointZeroPct > 0 && (
+                      <span
+                        className={cn(
+                          'text-sm font-bold tabular-nums shrink-0',
+                          p0StatusColor(status),
+                        )}
+                      >
+                        {hist.pointZeroPct.toFixed(2)}%
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )
+            }
+
+            // ── Card completa (madrugada / día / vespertina)
+            return (
+              <div
+                key={hist.id}
+                data-frag-id={fragId}
+                role="button"
+                tabIndex={0}
+                onClick={onCardClick}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    onCardClick()
+                  }
+                }}
+                className={cn(
+                  'rounded-lg border-2 border-l-4 px-3 py-2.5 space-y-2 cursor-pointer transition-all',
+                  P0_CARD_CLASS[status],
+                  isActiveForConfig &&
+                    'ring-2 ring-emerald-500 ring-offset-1 ring-offset-background',
+                )}
+              >
+                <div className="flex items-baseline justify-between gap-2">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-base leading-none">{meta.icon}</span>
+                    <p className="text-sm font-semibold">{meta.title}</p>
+                    {orderText && (
+                      <span className="text-[9px] font-bold tracking-wider px-1.5 py-0.5 rounded-full bg-muted/60 text-muted-foreground">
+                        {orderText}
+                      </span>
+                    )}
+                    {(configChangeCounts.get(hist.id) ?? 0) > 0 && (
+                      <span
+                        className="inline-flex items-center gap-0.5 text-[9px] px-1 py-0.5 rounded bg-amber-500/15 text-amber-600 border border-amber-500/30 font-medium shrink-0"
+                        title={`${configChangeCounts.get(hist.id)} cambio${configChangeCounts.get(hist.id) === 1 ? '' : 's'} de gate registrado${configChangeCounts.get(hist.id) === 1 ? '' : 's'}`}
+                      >
+                        <Wrench className="w-2.5 h-2.5" />
+                        {configChangeCounts.get(hist.id)}
+                      </span>
+                    )}
+                  </div>
+                  <span
+                    className={cn(
+                      'text-xl font-bold tabular-nums',
+                      p0StatusColor(status),
+                    )}
+                  >
+                    {hist.pointZeroPct}%
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-tight">
+                  {hist.shiftId}
+                  <span className="opacity-60"> · </span>
+                  <strong className="text-foreground/90">{formatShiftTimeRange(hist)}</strong>
+                  {chip?.pctOfShift != null && chip.pctOfShift < 100 && (
+                    <span className="opacity-70"> · {Math.round(chip.pctOfShift)}% del turno aquí</span>
+                  )}
+                </p>
+                {hist.hasPieceData !== undefined && (!hist.hasPieceData || !hist.hasGate0Data) && (
+                  <div className="flex flex-wrap gap-1">
+                    {!hist.hasPieceData && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/15 text-red-600 font-medium">
+                        Falta PIEZA_PIEZA
+                      </span>
+                    )}
+                    {!hist.hasGate0Data && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/15 text-red-600 font-medium">
+                        Falta PUERTA_0
+                      </span>
+                    )}
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-1.5 text-xs">
+                  <div className="rounded bg-background/60 px-2 py-1">
+                    <p className="text-muted-foreground">Piezas</p>
+                    <p className="font-semibold tabular-nums">{fragPieces.toLocaleString('es-CL')}</p>
+                  </div>
+                  <div className="rounded bg-background/60 px-2 py-1">
+                    <p className="text-muted-foreground">P0 piezas</p>
+                    <p className="font-semibold tabular-nums">{fragP0Pieces.toLocaleString('es-CL')}</p>
+                  </div>
+                  {fragWeight != null && (
+                    <div className="rounded bg-background/60 px-2 py-1">
+                      <p className="text-muted-foreground">Peso</p>
+                      <p className="font-semibold tabular-nums">
+                        {fragWeight >= 1000
+                          ? `${(fragWeight / 1000).toFixed(1)} t`
+                          : `${fragWeight.toFixed(0)} kg`}
+                      </p>
+                    </div>
+                  )}
+                  {(() => {
+                    const rate = safeRate(hist)
+                    return rate != null ? (
+                      <div className="rounded bg-background/60 px-2 py-1">
+                        <p className="text-muted-foreground">pz/hora</p>
+                        <p className="font-semibold tabular-nums">{rate.toLocaleString('es-CL')}</p>
+                      </div>
+                    ) : null
+                  })()}
+                </div>
+                {hist.topP0Causes && hist.topP0Causes.length > 0 && (
+                  <div className="text-xs space-y-0.5">
+                    <p className="text-muted-foreground font-medium">Top causas P0:</p>
+                    {hist.topP0Causes.slice(0, 3).map((c, i) => {
+                      const label = getCauseLabel(c.error)
+                      const pctOfTotal = (c.pct * hist.pointZeroPct) / 100
+                      return (
+                        <div key={i} className="flex justify-between gap-2">
+                          <span className="text-muted-foreground truncate flex-1">{label}</span>
+                          <span className="font-semibold tabular-nums shrink-0">
+                            {pctOfTotal.toFixed(2)}%
+                            <span className="text-muted-foreground/70 font-normal text-[10px]"> ({c.pct.toFixed(0)}% P0)</span>
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+                {(() => {
+                  const mins = safeDisplayMinutes(hist)
+                  const anomalous = hist.durationMinutes != null && hist.durationMinutes > 1440
+                  return mins != null && mins > 0 ? (
+                    <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {Math.floor(mins / 60)}h {mins % 60}m
+                      {anomalous && <span title="Duración almacenada anómala — se muestra estimación"><AlertTriangle className="h-3 w-3 text-amber-500 ml-1" /></span>}
+                    </p>
+                  ) : anomalous ? (
+                    <p className="text-[10px] text-amber-500 flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3" />
+                      Duración anómala — registro posiblemente fusionado
+                    </p>
+                  ) : null
+                })()}
+                <div className="pt-1 space-y-1.5" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex gap-1.5">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className={cn(
+                        'h-7 text-[11px] flex-1 gap-1 border',
+                        status === 'critical' && 'bg-red-500/10 text-red-600 hover:bg-red-500/20 border-red-500/30',
+                        status === 'alert' && 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 border-amber-500/30',
+                        status === 'ok' && 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border-emerald-500/30',
+                      )}
+                      onClick={navigateToTurno}
+                    >
+                      <Eye className="h-3 w-3" />
+                      Ver detalle →
+                    </Button>
+                    {isSelectedSlide && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-[11px] text-red-600 hover:text-red-600 border-red-500/30 hover:bg-red-500/10"
+                        disabled={deletingId === hist.id}
+                        onClick={() => handleDeleteSummary(hist.dateKey, hist.shiftId)}
+                      >
+                        {deletingId === hist.id
+                          ? <Loader2 className="h-3 w-3 animate-spin" />
+                          : <Trash2 className="h-3 w-3" />
+                        }
+                      </Button>
+                    )}
+                  </div>
+                  {isSelectedSlide && (
+                    <QuickGateChangeButton
+                      shiftDocId={`${hist.dateKey}__${hist.shiftId}`}
+                      variant="compact"
+                      className="w-full h-7 text-[11px]"
+                    />
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
   }
 
   // ── Paso 3b: carousel de timelines entre días (Opción C — inercia libre) ────
@@ -1386,6 +1708,7 @@ export function GraderHistoricalCalendar({
                 { slideKey: selectedKey,  entries: summariesForSelectedDay },
                 { slideKey: nextKey,      entries: nextEntries },
               ] as const).map(({ slideKey, entries }, si) => {
+                const isSelectedSlide = si === 1
                 const blocks = slideKey ? buildDayTimelineBlocks(entries as Array<{ summary: GraderDailySummary; chip: ShiftChipDescriptor | null }>) : []
                 return (
                   <div key={slideKey ?? `empty-${si}`} className="min-w-0" style={{ width: '33.333%' }}>
@@ -1442,283 +1765,17 @@ export function GraderHistoricalCalendar({
                         </span>
                       ))}
                     </div>
+                    {/* Cards del día (madrugada · día · vespertina) — viajan con el timeline */}
+                    {renderSlideCards(
+                      slideKey,
+                      entries as Array<{ summary: GraderDailySummary; chip: ShiftChipDescriptor | null }>,
+                      isSelectedSlide,
+                    )}
                   </div>
                 )
               })}
             </div>
           </div>
-
-          {/* ── Datos históricos (carga masiva) — incluye aportes calendáricos ── */}
-          {selectedKey && summariesForSelectedDay.length > 0 && (
-            <div className="space-y-2">
-              {/* Sub-header con agregado calendárico real del día (Opción D, ajuste #5) */}
-              {(() => {
-                const agg = calendarAgg.get(selectedKey)
-                if (!agg || agg.totalPieces === 0) return null
-                const status = p0StatusFromPct(agg.pointZeroPct)
-                const hours = Math.floor(agg.activeMinutes / 60)
-                const mins = agg.activeMinutes % 60
-                const nFragments = agg.contributingShifts.length
-                return (
-                  <div
-                    className={cn(
-                      'rounded-md border px-3 py-2 flex items-center justify-between gap-3 flex-wrap',
-                      P0_CARD_CLASS[status],
-                    )}
-                    title="Agregado calendárico real del día — suma de fragmentos físicamente procesados aquí"
-                  >
-                    <div className="flex items-baseline gap-2 min-w-0">
-                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Día calendárico</span>
-                      <span className={cn('text-lg font-bold tabular-nums', p0StatusColor(status))}>
-                        {agg.pointZeroPct.toFixed(2)}%
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground tabular-nums">
-                      <span><strong className="text-foreground">{agg.totalPieces.toLocaleString('es-CL')}</strong> pz</span>
-                      {agg.totalWeightKg != null && agg.totalWeightKg > 0 && (
-                        <span>
-                          <strong className="text-foreground">
-                            {agg.totalWeightKg >= 1000
-                              ? `${(agg.totalWeightKg / 1000).toFixed(1)} t`
-                              : `${agg.totalWeightKg.toFixed(0)} kg`}
-                          </strong>
-                        </span>
-                      )}
-                      {agg.activeMinutes > 0 && (
-                        <span><strong className="text-foreground">{hours}h {mins}m</strong> activos</span>
-                      )}
-                      <span>{nFragments} {nFragments === 1 ? 'fragmento' : 'fragmentos'}</span>
-                    </div>
-                  </div>
-                )
-              })()}
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 uppercase tracking-wide">
-                  <Database className="h-3.5 w-3.5" />
-                  Historial guardado
-                </p>
-                {/* M12 — Botón comparación D↔N (solo cuando hay ambos turnos) */}
-                {(() => {
-                  const hists = historicalByDate.get(selectedKey) ?? []
-                  const hasDia   = hists.some((h) => h.shiftId === 'Turno día')
-                  const hasNoche = hists.some((h) => h.shiftId === 'Turno noche')
-                  if (!hasDia || !hasNoche) return null
-                  return (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-6 text-[10px] gap-1 px-2 border-indigo-500/30 text-indigo-500 hover:bg-indigo-500/10"
-                      onClick={() => setShowComparison(true)}
-                    >
-                      <GitCompare className="h-3 w-3" />
-                      D↔N
-                    </Button>
-                  )
-                })()}
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {[...groupedByShift.entries()]
-                .sort(([a], [b]) => {
-                  const order: Record<string, number> = { 'Turno día': 0, 'Turno noche': 1 }
-                  return (order[a] ?? 9) - (order[b] ?? 9)
-                })
-                .map(([shiftId, entries]) => {
-                  // Paso 1 (carrusel): para Turno noche, ocultar fragmentos secundarios de salida
-                  // (secondary/exits = vespertina) — ese mismo turno aparece en el día siguiente
-                  // como madrugada (primary/enters). Se conservan primary/exits (caso infrecuente:
-                  // la mayoría de las piezas ocurren antes de medianoche).
-                  const displayEntries = shiftId === 'Turno noche'
-                    ? entries.filter((e) => !(e.chip?.direction === 'exits' && e.chip?.role !== 'primary'))
-                    : entries
-                  const safeEntries = displayEntries.length > 0 ? displayEntries : entries
-                  const nonOrphan = safeEntries.filter((e) => e.chip?.role !== 'orphan-source')
-                  const isMultiple = nonOrphan.length > 1
-                  if (isMultiple) {
-                    // Card consolidada: agrega fragmentos del mismo turno-tipo
-                    return renderConsolidatedShiftCard(shiftId, safeEntries, navigate)
-                  }
-                  // Card simple (1 fragmento o solo orphans): comportamiento original
-                  const { summary: hist, chip } = safeEntries[0]!
-                  const isActiveForConfig = selectedHistorical?.id === hist.id
-                  // Badge contextual sobre cómo este turno se relaciona con el día seleccionado
-                  const contextBadge =
-                    chip?.role === 'orphan-source' ? {
-                      cls: 'bg-neutral-500/15 text-neutral-400 border-neutral-500/30',
-                      text: `Sin actividad real este día — detalle en ${chip.primaryDateKey ?? '—'}`,
-                    } :
-                    chip?.role === 'secondary' ? {
-                      cls: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
-                      text: chip.direction === 'exits'
-                        ? `Vespertina · ${Math.round(chip.pctOfShift ?? 0)}% del turno aquí`
-                        : `Madrugada · ${Math.round(chip.pctOfShift ?? 0)}% del turno aquí`,
-                    } :
-                    chip?.role === 'primary' && chip.direction === 'enters' ? {
-                      cls: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30',
-                      text: `Madrugada · ${Math.round(chip.pctOfShift ?? 100)}% del turno aquí`,
-                    } :
-                    chip?.role === 'primary' && chip.direction === 'exits' ? {
-                      cls: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30',
-                      text: `Vespertina · ${Math.round(chip.pctOfShift ?? 100)}% del turno aquí`,
-                    } : null
-                  return (
-                  <div
-                    key={hist.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => setSelectedHistorical(isActiveForConfig ? null : hist)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault()
-                        setSelectedHistorical(isActiveForConfig ? null : hist)
-                      }
-                    }}
-                    className={cn(
-                      'rounded-lg border px-3 py-2.5 space-y-2 cursor-pointer transition-all',
-                      P0_CARD_CLASS[p0StatusFromPct(hist.pointZeroPct)],
-                      isActiveForConfig && 'ring-2 ring-emerald-500 ring-offset-1 ring-offset-background',
-                      chip?.role === 'orphan-source' && 'opacity-70',
-                    )}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <p className="text-sm font-medium">{hist.shiftId}</p>
-                          {contextBadge && (
-                            <span className={cn('text-[9px] px-1.5 py-0.5 rounded border font-medium', contextBadge.cls)}>
-                              {contextBadge.text}
-                            </span>
-                          )}
-                          {(configChangeCounts.get(hist.id) ?? 0) > 0 && (
-                            <span
-                              className="inline-flex items-center gap-0.5 text-[9px] px-1 py-0.5 rounded bg-amber-500/15 text-amber-600 border border-amber-500/30 font-medium shrink-0"
-                              title={`${configChangeCounts.get(hist.id)} cambio${configChangeCounts.get(hist.id) === 1 ? '' : 's'} de gate registrado${configChangeCounts.get(hist.id) === 1 ? '' : 's'}`}
-                            >
-                              <Wrench className="w-2.5 h-2.5" />
-                              {configChangeCounts.get(hist.id)}
-                            </span>
-                          )}
-                        </div>
-                        {hist.hasPieceData !== undefined && (!hist.hasPieceData || !hist.hasGate0Data) && (
-                          <div className="flex flex-wrap gap-1 mt-0.5">
-                            {!hist.hasPieceData && (
-                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/15 text-red-600 font-medium">
-                                Falta PIEZA_PIEZA
-                              </span>
-                            )}
-                            {!hist.hasGate0Data && (
-                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/15 text-red-600 font-medium">
-                                Falta PUERTA_0
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      <span className={cn(
-                        'text-lg font-bold tabular-nums',
-                        p0StatusColor(p0StatusFromPct(hist.pointZeroPct)),
-                      )}>
-                        {hist.pointZeroPct}%
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-1.5 text-xs">
-                      <div className="rounded bg-background/60 px-2 py-1">
-                        <p className="text-muted-foreground">Piezas</p>
-                        <p className="font-semibold">{hist.totalPieces.toLocaleString('es-CL')}</p>
-                      </div>
-                      <div className="rounded bg-background/60 px-2 py-1">
-                        <p className="text-muted-foreground">P0 piezas</p>
-                        <p className="font-semibold">{hist.pointZeroPieces.toLocaleString('es-CL')}</p>
-                      </div>
-                      {hist.totalWeightKg != null && (
-                        <div className="rounded bg-background/60 px-2 py-1">
-                          <p className="text-muted-foreground">Peso</p>
-                          <p className="font-semibold">
-                            {hist.totalWeightKg >= 1000
-                              ? `${(hist.totalWeightKg / 1000).toFixed(1)} t`
-                              : `${hist.totalWeightKg.toFixed(0)} kg`}
-                          </p>
-                        </div>
-                      )}
-                      {(() => {
-                        const rate = safeRate(hist)
-                        return rate != null ? (
-                          <div className="rounded bg-background/60 px-2 py-1">
-                            <p className="text-muted-foreground">pz/hora</p>
-                            <p className="font-semibold">{rate.toLocaleString('es-CL')}</p>
-                          </div>
-                        ) : null
-                      })()}
-                    </div>
-                    {hist.topP0Causes && hist.topP0Causes.length > 0 && (
-                      <div className="text-xs space-y-0.5">
-                        <p className="text-muted-foreground font-medium">Top causas P0:</p>
-                        {hist.topP0Causes.slice(0, 3).map((c, i) => {
-                          // Label bonito Matrix + % del total (intuitivo) en lugar de % del P0
-                          const label = getCauseLabel(c.error)
-                          const pctOfTotal = (c.pct * hist.pointZeroPct) / 100
-                          return (
-                            <div key={i} className="flex justify-between gap-2">
-                              <span className="text-muted-foreground truncate flex-1">{label}</span>
-                              <span className="font-semibold tabular-nums shrink-0">
-                                {pctOfTotal.toFixed(2)}%
-                                <span className="text-muted-foreground/70 font-normal text-[10px]"> ({c.pct.toFixed(0)}% P0)</span>
-                              </span>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )}
-                    {(() => {
-                      const mins = safeDisplayMinutes(hist)
-                      const anomalous = hist.durationMinutes != null && hist.durationMinutes > 1440
-                      return mins != null && mins > 0 ? (
-                        <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {Math.floor(mins / 60)}h {mins % 60}m
-                          {hist.startAt && ` · ${new Date(hist.startAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })}–${hist.endAt ? new Date(hist.endAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }) : '?'}`}
-                          {anomalous && <span title="Duración almacenada anómala — se muestra estimación"><AlertTriangle className="h-3 w-3 text-amber-500 ml-1" /></span>}
-                        </p>
-                      ) : anomalous ? (
-                        <p className="text-[10px] text-amber-500 flex items-center gap-1">
-                          <AlertTriangle className="h-3 w-3" />
-                          Duración anómala — registro posiblemente fusionado
-                        </p>
-                      ) : null
-                    })()}
-                    <div className="pt-1 space-y-1.5" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex gap-1.5">
-                        <Button
-                          size="sm"
-                          className="h-7 text-[11px] flex-1 bg-primary/90 hover:bg-primary text-primary-foreground"
-                          onClick={() => navigate(`/analisis-grader/turno/${hist.dateKey}__${encodeURIComponent(hist.shiftId)}`)}
-                        >
-                          <Eye className="h-3 w-3 mr-1" />
-                          Ver detalle
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 text-[11px] text-red-600 hover:text-red-600 border-red-500/30 hover:bg-red-500/10"
-                          disabled={deletingId === hist.id}
-                          onClick={() => handleDeleteSummary(hist.dateKey, hist.shiftId)}
-                        >
-                          {deletingId === hist.id
-                            ? <Loader2 className="h-3 w-3 animate-spin" />
-                            : <Trash2 className="h-3 w-3" />
-                          }
-                        </Button>
-                      </div>
-                      <QuickGateChangeButton
-                        shiftDocId={`${hist.dateKey}__${hist.shiftId}`}
-                        variant="compact"
-                        className="w-full h-7 text-[11px]"
-                      />
-                    </div>
-                  </div>
-                )})}
-              </div>
-            </div>
-          )}
 
           {selectedUploads.length > 0 && (() => {
             // Ocultar turnos que ya tienen resumen en historial guardado
