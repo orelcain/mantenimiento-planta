@@ -51,6 +51,8 @@ import { DayComparisonModal } from './DayComparisonModal'
 import { useAuthStore } from '@/store'
 import { useGraderSelectionStore } from '@/store/graderSelectionStore'
 import { p0StatusFromPct, p0StatusColor, DEFAULT_P0_ALERT_PCT, DEFAULT_P0_CRITICAL_PCT, type P0Status } from '@/services/grader/graderP0Thresholds'
+import { loadShoplogixShift } from '@/services/shoplogix/shoplogixShift.service'
+import type { UpstreamMachineState } from '@/services/shoplogix/types'
 
 interface TurnoSummary {
   totalPieces: number
@@ -338,6 +340,12 @@ interface TimelineBlock {
   label: string
   title: string
   nightSide: 'start' | 'end' | null  // madrugada = start (sin radius izq), vespertina = end (sin radius der)
+  /** Para click → navigate al TurnoPage (#31) */
+  summaryId: string
+  dateKey: string
+  shiftId: string
+  /** Para hover-sync con la card del día (#32). Mismo formato que `EnrichedCardEntry.fragId`. */
+  fragId: string
 }
 
 /**
@@ -394,15 +402,89 @@ function buildDayTimelineBlocks(
     const pad = (n: number) => String(n).padStart(2, '0')
     const ts = `${pad(startD.getUTCHours())}:${pad(startD.getUTCMinutes())}–${pad(endD.getUTCHours())}:${pad(endD.getUTCMinutes())}`
     const pct = chip?.pctOfShift != null ? ` · ${Math.round(chip.pctOfShift)}% en este día` : ''
+    // fragId mantiene paridad con `EnrichedCardEntry.fragId` para sync hover/click (#32)
+    // 'enters' → 'mad' (madrugada), 'exits' → 'ves' (vespertina, oculta en cards), 'same' → 'dia'
+    const fragSuffix =
+      direction === 'enters' ? 'mad' :
+      direction === 'exits'  ? 'ves' :
+                                'dia'
     blocks.push({
       leftPct:  startFrac * 100,
       widthPct: (endFrac - startFrac) * 100,
       bgClass, label,
       title: `${hist.shiftId} · P0 ${hist.pointZeroPct.toFixed(2)}% · ${ts}${pct}`,
       nightSide: direction === 'enters' ? 'start' : direction === 'exits' ? 'end' : null,
+      summaryId: hist.id,
+      dateKey: hist.dateKey,
+      shiftId: hist.shiftId,
+      fragId: `${hist.id}-${fragSuffix}`,
     })
   }
   return blocks
+}
+// ── Overlay Shoplogix: bandas de break/downtime con razón sobre la timeline ──
+
+interface ShoplogixOverlayBand {
+  leftPct: number
+  widthPct: number
+  /** 'break' (colación, reunión) | 'downtime' (micro detención, falla) | 'setup' */
+  type: 'break' | 'downtime' | 'setup'
+  /** "COLACION" | "MMPP" | "Limpieza" | etc. — etiqueta operativa */
+  reason: string
+  /** Tooltip completo (HH:mm–HH:mm · razón · duración) */
+  title: string
+}
+
+/**
+ * Convierte los `states[]` de Shoplogix (de las 3 Baader 142) en bandas
+ * posicionadas sobre la timeline 24h del día calendario. Filtra:
+ *  - 'uptime' (productivo, no es gap)
+ *  - 'break' con reason "planned downtime" (período POST-TURNO, no operativo)
+ *
+ * Las 3 máquinas suelen reportar el mismo state simultáneamente (ej. colación);
+ * deduplicamos por (startMin, endMin, reason) para no pintar 3 bandas iguales.
+ */
+function buildShoplogixOverlayBands(
+  states: UpstreamMachineState[],
+  dateKey: string,
+): ShoplogixOverlayBand[] {
+  const bands: ShoplogixOverlayBand[] = []
+  const seen = new Set<string>()
+  const MIN_DURATION_MS = 60_000 // ignorar eventos < 1 min (micro-blips ruidosos)
+  for (const s of states) {
+    if (s.type === 'uptime') continue
+    const reasonLower = (s.reason || '').toLowerCase()
+    if (s.type === 'break' && reasonLower.includes('planned downtime')) continue
+    if (s.durationSec < 60) continue // skip < 1 min
+    // Convertir a fracción del día calendario [0..1]. Si state cruza medianoche
+    // (ej. madrugada), recortar al día actual.
+    const startMs = s.startAt.getTime()
+    const endMs = s.endAt.getTime()
+    const dayStartMs = new Date(`${dateKey}T00:00:00.000Z`).getTime()
+    const dayEndMs = dayStartMs + 86400000
+    const clipStart = Math.max(startMs, dayStartMs)
+    const clipEnd = Math.min(endMs, dayEndMs)
+    if (clipEnd - clipStart < MIN_DURATION_MS) continue
+    const startFrac = (clipStart - dayStartMs) / 86400000
+    const endFrac = (clipEnd - dayStartMs) / 86400000
+    const dedup = `${startFrac.toFixed(4)}|${endFrac.toFixed(4)}|${reasonLower}|${s.type}`
+    if (seen.has(dedup)) continue
+    seen.add(dedup)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const sStart = new Date(clipStart)
+    const sEnd = new Date(clipEnd)
+    const ts = `${pad(sStart.getUTCHours())}:${pad(sStart.getUTCMinutes())}–${pad(sEnd.getUTCHours())}:${pad(sEnd.getUTCMinutes())}`
+    const durMin = Math.round((clipEnd - clipStart) / 60000)
+    const reason = s.reason || (s.type === 'break' ? 'Pausa' : s.type === 'setup' ? 'Setup' : 'Detenido')
+    bands.push({
+      leftPct: startFrac * 100,
+      widthPct: (endFrac - startFrac) * 100,
+      type: s.type as 'break' | 'downtime' | 'setup',
+      reason,
+      title: `${ts} · ${reason} (${durMin}m) · Shoplogix Baader`,
+    })
+  }
+  return bands
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -433,6 +515,17 @@ export function GraderHistoricalCalendar({
   const user = useAuthStore((s) => s.user)
   const selectedHistorical = useGraderSelectionStore((s) => s.selectedHistorical)
   const setSelectedHistorical = useGraderSelectionStore((s) => s.setSelectedHistorical)
+  // Sync hover bidireccional entre bloques timeline y cards del día (#32).
+  // El fragId del bloque timeline coincide con el data-frag-id de la card
+  // (ver buildDayTimelineBlocks + EnrichedCardEntry.fragId). Cuando es null,
+  // ningún elemento está resaltado.
+  const [hoveredFragId, setHoveredFragId] = useState<string | null>(null)
+  // Cache states de Shoplogix por shift (`${dateKey}__${shiftId}`).
+  // Usado para renderizar overlay de pausas (COLACION, MMPP, etc.) sobre el timeline.
+  const [slxStatesByShift, setSlxStatesByShift] = useState<Map<string, UpstreamMachineState[]>>(new Map())
+  // Cache totales Baader por shift — para indicador de "data Grader perdida"
+  // (cuando Grader.totalPieces < Baader.totalCycles * 0.95 = >5% loss).
+  const [slxTotalsByShift, setSlxTotalsByShift] = useState<Map<string, number>>(new Map())
 
   // Si el URL trae ?goto=YYYY-MM-DD úsalo como initialDateKey (prioridad sobre prop)
   const gotoParam = searchParams.get('goto')
@@ -744,6 +837,48 @@ export function GraderHistoricalCalendar({
     }
     return () => { cancelled = true }
   }, [selectedKey, historicalByDate]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Lazy-load de Shoplogix states para los 3 candidate shifts del día seleccionado
+  // (yesterday's noche → madrugada, today's día, today's noche). Se usa para
+  // pintar bandas de break/downtime sobre la timeline 24h.
+  useEffect(() => {
+    if (!selectedKey) return
+    const [y, m, d] = selectedKey.split('-').map(Number) as [number, number, number]
+    const yesterday = new Date(Date.UTC(y, m - 1, d - 1)).toISOString().slice(0, 10)
+    const candidates: Array<{ dateKey: string; shiftId: string }> = [
+      { dateKey: yesterday, shiftId: 'Turno noche' },
+      { dateKey: selectedKey, shiftId: 'Turno día' },
+      { dateKey: selectedKey, shiftId: 'Turno noche' },
+    ]
+    let cancelled = false
+    for (const c of candidates) {
+      const key = `${c.dateKey}__${c.shiftId}`
+      if (slxStatesByShift.has(key)) continue
+      loadShoplogixShift(c.dateKey, c.shiftId)
+        .then((res) => {
+          if (cancelled) return
+          // Tomar states de Evisceradora 1 (sort por nombre — primera). Las 3
+          // máquinas suelen reportar el mismo break, así que usar 1 evita
+          // duplicación.
+          const states = res.snapshot?.machines[0]?.states ?? []
+          setSlxStatesByShift((prev) => new Map(prev).set(key, states))
+          // Total cycles SUMADOS de las 3 Baaders (vs por máquina) — eso es lo
+          // que físicamente entró a la línea Grader.
+          const totalCycles = (res.snapshot?.machines ?? []).reduce(
+            (a, m) => a + (m.totalCycles || 0), 0,
+          )
+          setSlxTotalsByShift((prev) => new Map(prev).set(key, totalCycles))
+        })
+        .catch(() => {
+          // Sin Shoplogix data → guardar array vacío para no re-intentar
+          if (!cancelled) {
+            setSlxStatesByShift((prev) => new Map(prev).set(key, []))
+            setSlxTotalsByShift((prev) => new Map(prev).set(key, 0))
+          }
+        })
+    }
+    return () => { cancelled = true }
+  }, [selectedKey, slxStatesByShift])
 
   const selectedUploads = useMemo(() => {
     if (!selectedKey) return []
@@ -1097,6 +1232,11 @@ export function GraderHistoricalCalendar({
             const fragP0Pieces = chip?.pointZeroPieces ?? hist.pointZeroPieces
             const fragWeight = chip?.weightKg ?? hist.totalWeightKg
             const isActiveForConfig = isSelectedSlide && selectedHistorical?.id === hist.id
+            // Cross-ref Baader (Shoplogix): ¿cuántas piezas pasaron upstream?
+            // Si Grader < 95% Baader → posible loss. Si Baader=0 (no data) → skip.
+            const slxBaader = slxTotalsByShift.get(hist.id) ?? 0
+            const baaderLossPct = slxBaader > 0 ? Math.max(0, (slxBaader - hist.totalPieces) / slxBaader * 100) : 0
+            const showLossBadge = slxBaader > 100 && baaderLossPct > 5
             const navigateToTurno = () =>
               navigate(
                 `/analisis-grader/turno/${hist.dateKey}__${encodeURIComponent(hist.shiftId)}`,
@@ -1109,6 +1249,7 @@ export function GraderHistoricalCalendar({
 
             // ── Salida (orphan-source): strip compacto que invita a deslizar
             if (kind === 'salida') {
+              const isHovered = hoveredFragId === fragId
               return (
                 <div
                   key={hist.id}
@@ -1122,9 +1263,12 @@ export function GraderHistoricalCalendar({
                       navigateToTurno()
                     }
                   }}
+                  onMouseEnter={() => setHoveredFragId(fragId)}
+                  onMouseLeave={() => setHoveredFragId(null)}
                   className={cn(
-                    'rounded-lg border-l-4 px-3 py-2 cursor-pointer transition-opacity opacity-80 hover:opacity-100 lg:col-span-2',
+                    'rounded-lg border-l-4 px-3 py-2 cursor-pointer transition-all opacity-80 hover:opacity-100 lg:col-span-2',
                     P0_CARD_CLASS[status],
+                    isHovered && 'ring-2 ring-white/80 ring-offset-1 ring-offset-background',
                   )}
                 >
                   <div className="flex items-center justify-between gap-3">
@@ -1159,6 +1303,7 @@ export function GraderHistoricalCalendar({
             }
 
             // ── Card completa (madrugada / día / vespertina)
+            const isHovered = hoveredFragId === fragId
             return (
               <div
                 key={hist.id}
@@ -1172,11 +1317,15 @@ export function GraderHistoricalCalendar({
                     onCardClick()
                   }
                 }}
+                onMouseEnter={() => setHoveredFragId(fragId)}
+                onMouseLeave={() => setHoveredFragId(null)}
                 className={cn(
                   'rounded-lg border-2 border-l-4 px-3 py-2.5 space-y-2 cursor-pointer transition-all',
                   P0_CARD_CLASS[status],
                   isActiveForConfig &&
                     'ring-2 ring-emerald-500 ring-offset-1 ring-offset-background',
+                  isHovered && !isActiveForConfig &&
+                    'ring-2 ring-white/80 ring-offset-1 ring-offset-background',
                 )}
               >
                 <div className="flex items-baseline justify-between gap-2">
@@ -1195,6 +1344,15 @@ export function GraderHistoricalCalendar({
                       >
                         <Wrench className="w-2.5 h-2.5" />
                         {configChangeCounts.get(hist.id)}
+                      </span>
+                    )}
+                    {showLossBadge && (
+                      <span
+                        className="inline-flex items-center gap-0.5 text-[9px] px-1 py-0.5 rounded bg-rose-500/15 text-rose-600 border border-rose-500/30 font-medium shrink-0"
+                        title={`Grader registró ${hist.totalPieces.toLocaleString('es-CL')} piezas. Baader 142 procesó ${slxBaader.toLocaleString('es-CL')} upstream. Posible pérdida de data en este turno (~${baaderLossPct.toFixed(1)}%).`}
+                      >
+                        <AlertTriangle className="w-2.5 h-2.5" />
+                        −{baaderLossPct.toFixed(0)}% vs Baader
                       </span>
                     )}
                   </div>
@@ -1706,6 +1864,18 @@ export function GraderHistoricalCalendar({
               ] as const).map(({ slideKey, entries }, si) => {
                 const isSelectedSlide = si === 1
                 const blocks = slideKey ? buildDayTimelineBlocks(entries as Array<{ summary: GraderDailySummary; chip: ShiftChipDescriptor | null }>) : []
+                // Combinar states Shoplogix de los 3 candidate shifts del día.
+                // (prev noche → madrugada del slideKey, día del slideKey, noche del slideKey)
+                const slxStates: UpstreamMachineState[] = []
+                if (slideKey) {
+                  const [y, m, d] = slideKey.split('-').map(Number) as [number, number, number]
+                  const prev = new Date(Date.UTC(y, m - 1, d - 1)).toISOString().slice(0, 10)
+                  for (const id of [`${prev}__Turno noche`, `${slideKey}__Turno día`, `${slideKey}__Turno noche`]) {
+                    const s = slxStatesByShift.get(id)
+                    if (s) slxStates.push(...s)
+                  }
+                }
+                const slxBands = slideKey ? buildShoplogixOverlayBands(slxStates, slideKey) : []
                 return (
                   <div key={slideKey ?? `empty-${si}`} className="min-w-0" style={{ width: '33.333%' }}>
                     {/* Etiqueta de fecha — con padding lateral para alinear con el resto del card */}
@@ -1724,33 +1894,72 @@ export function GraderHistoricalCalendar({
                       {[3, 6, 9, 12, 15, 18, 21].map(h => (
                         <div key={h} className="absolute top-0 bottom-0 w-px bg-border/25" style={{ left: `${(h / 24) * 100}%` }} />
                       ))}
-                      {blocks.map((b, i) => (
+                      {/* Overlay Shoplogix: bandas de break/downtime con razón.
+                          z-0 para quedar detrás de los blocks. top-0 bottom-0
+                          para cubrir la franja completa (incluyendo top y bottom
+                          donde no hay block, así el tooltip es accesible). */}
+                      {slxBands.map((band, i) => (
                         <div
-                          key={i}
+                          key={`slx-${i}`}
                           className={cn(
-                            'absolute top-1 bottom-1 flex items-center justify-center',
-                            b.bgClass,
-                            b.nightSide === null && 'rounded-sm',
+                            'absolute top-0 bottom-0 z-0 pointer-events-auto',
+                            band.type === 'break' && 'bg-slate-400/25',
+                            band.type === 'downtime' && 'bg-orange-500/25',
+                            band.type === 'setup' && 'bg-blue-400/20',
                           )}
                           style={{
-                            left: `${b.leftPct}%`,
-                            width: `max(${b.widthPct}%, 0.8%)`,
-                            borderRadius:
-                              b.nightSide === 'start' ? '0 3px 3px 0' :
-                              b.nightSide === 'end'   ? '3px 0 0 3px' :
-                              undefined,
-                            backgroundImage:
-                              b.nightSide === 'start' ? 'linear-gradient(90deg, rgba(99,102,241,0.55) 0%, transparent 18px)' :
-                              b.nightSide === 'end'   ? 'linear-gradient(270deg, rgba(99,102,241,0.55) 0%, transparent 18px)' :
-                              undefined,
+                            left: `${band.leftPct}%`,
+                            width: `max(${band.widthPct}%, 0.3%)`,
                           }}
-                          title={b.title}
-                        >
-                          {b.widthPct > 9 && (
-                            <span className="text-[9px] font-bold text-white/90 leading-none pointer-events-none">{b.label}</span>
-                          )}
-                        </div>
+                          title={band.title}
+                        />
                       ))}
+                      {blocks.map((b, i) => {
+                        const isHovered = hoveredFragId === b.fragId
+                        const navigateToBlockTurno = () => navigate(
+                          `/analisis-grader/turno/${b.dateKey}__${encodeURIComponent(b.shiftId)}`,
+                        )
+                        return (
+                          <div
+                            key={i}
+                            data-frag-id={b.fragId}
+                            role="button"
+                            tabIndex={0}
+                            className={cn(
+                              'absolute top-1 bottom-1 flex items-center justify-center cursor-pointer transition-all',
+                              b.bgClass,
+                              b.nightSide === null && 'rounded-sm',
+                              isHovered && 'ring-2 ring-white/80 ring-offset-1 ring-offset-background z-20',
+                            )}
+                            style={{
+                              left: `${b.leftPct}%`,
+                              width: `max(${b.widthPct}%, 0.8%)`,
+                              borderRadius:
+                                b.nightSide === 'start' ? '0 3px 3px 0' :
+                                b.nightSide === 'end'   ? '3px 0 0 3px' :
+                                undefined,
+                              backgroundImage:
+                                b.nightSide === 'start' ? 'linear-gradient(90deg, rgba(99,102,241,0.55) 0%, transparent 18px)' :
+                                b.nightSide === 'end'   ? 'linear-gradient(270deg, rgba(99,102,241,0.55) 0%, transparent 18px)' :
+                                undefined,
+                            }}
+                            title={`${b.title} · click para ver detalle`}
+                            onClick={navigateToBlockTurno}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault()
+                                navigateToBlockTurno()
+                              }
+                            }}
+                            onMouseEnter={() => setHoveredFragId(b.fragId)}
+                            onMouseLeave={() => setHoveredFragId(null)}
+                          >
+                            {b.widthPct > 9 && (
+                              <span className="text-[9px] font-bold text-white/90 leading-none pointer-events-none">{b.label}</span>
+                            )}
+                          </div>
+                        )
+                      })}
                       {[0, 6, 12, 18, 24].map(h => (
                         <span
                           key={h}
