@@ -16,7 +16,7 @@
  *    ya estamos en el Wizard y queremos actualizar el state en lugar de navegar).
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from '@/components/ui'
 import { ChevronLeft, ChevronRight, Loader2, Clock, Database, Eye, Trash2, AlertTriangle, Sun, Moon, Wrench, Tag, GitCompare } from 'lucide-react'
@@ -492,9 +492,11 @@ export function GraderHistoricalCalendar({
   // summaryId → cantidad de pausas sin tag (calculado lazy cuando el filtro está activo)
   const [untaggedCounts, setUntaggedCounts] = useState<Map<string, number>>(new Map())
   const [loadingUntagged, setLoadingUntagged] = useState(false)
-  // Paso 2 — swipe entre días en el panel del resumen
-  const [daySwipeDelta, setDaySwipeDelta] = useState(0)
-  const daySwipeRef = useRef<{ startX: number; vx: number; lastX: number; lastT: number } | null>(null)
+  // Paso 3b — carousel de timelines entre días
+  const [carouselX, setCarouselX]     = useState(0)       // px offset durante el drag
+  const [carouselAnim, setCarouselAnim] = useState(false)  // CSS transition on/off
+  const carouselViewportRef = useRef<HTMLDivElement>(null)
+  const carouselDragRef = useRef<{ startX: number; vx: number; lastX: number; lastT: number; navigating: boolean } | null>(null)
   const autoSelectedRef = useRef(!!effectiveInitialKey)
 
   useEffect(() => { onMonthChange?.(currentMonth) }, [currentMonth, onMonthChange])
@@ -617,7 +619,7 @@ export function GraderHistoricalCalendar({
     [calendarAgg, summariesById],
   )
 
-  // Días navegables por swipe (Paso 2): días con actividad real del mes, en orden
+  // Días navegables (Paso 2/3): días con actividad real del mes, en orden
   const sortedDayKeys = useMemo(() => [...calendarAgg.keys()].sort(), [calendarAgg])
 
   const selectedKey = selectedDate ? selectedDate.toISOString().slice(0, 10) : null
@@ -662,6 +664,41 @@ export function GraderHistoricalCalendar({
     })
     return out
   }, [selectedKey, chipsByDate, historicalByDate, summariesById])
+
+  // Generalización de summariesForSelectedDay para cualquier clave (slides adyacentes)
+  const getSummariesForDay = useCallback(
+    (key: string | null): Array<{ summary: GraderDailySummary; chip: ShiftChipDescriptor | null }> => {
+      if (!key) return []
+      const out: Array<{ summary: GraderDailySummary; chip: ShiftChipDescriptor | null }> = []
+      const seen = new Set<string>()
+      const dayChips = chipsByDate.get(key) ?? []
+      for (const chip of dayChips) {
+        if (chip.role === 'orphan-source') continue
+        const s = summariesById.get(chip.summaryId)
+        if (s && !seen.has(s.id)) { out.push({ summary: s, chip }); seen.add(s.id) }
+      }
+      for (const s of historicalByDate.get(key) ?? []) {
+        if (seen.has(s.id)) continue
+        const orphanChip = dayChips.find((c) => c.summaryId === s.id && c.role === 'orphan-source') ?? null
+        out.push({ summary: s, chip: orphanChip }); seen.add(s.id)
+      }
+      return out
+    },
+    [chipsByDate, historicalByDate, summariesById],
+  )
+
+  // Slides adyacentes (Paso 3b): claves y entradas del día anterior y siguiente
+  const { prevKey, nextKey, prevEntries, nextEntries } = useMemo(() => {
+    const idx = sortedDayKeys.indexOf(selectedKey ?? '')
+    const prevKey = idx > 0 ? sortedDayKeys[idx - 1]! : null
+    const nextKey = idx < sortedDayKeys.length - 1 ? sortedDayKeys[idx + 1]! : null
+    return {
+      prevKey,
+      nextKey,
+      prevEntries:  getSummariesForDay(prevKey),
+      nextEntries:  getSummariesForDay(nextKey),
+    }
+  }, [sortedDayKeys, selectedKey, getSummariesForDay])
 
   // Agrupar por shiftId para consolidar cuando un mismo tipo (Turno noche)
   // tiene múltiples fragmentos calendáricos en el día (ej. madrugada del N
@@ -951,51 +988,56 @@ export function GraderHistoricalCalendar({
     return Math.round(hist.totalPieces / (mins / 60))
   }
 
-  // ── Paso 2: swipe entre días en el panel del resumen ──────────────────────────
-  function handleDaySwipeDown(e: React.PointerEvent<HTMLDivElement>) {
-    // Ignorar si el clic viene de un botón u otro elemento interactivo
+  // ── Paso 3b: carousel de timelines entre días ────────────────────────────────
+  function carouselPointerDown(e: React.PointerEvent<HTMLDivElement>) {
     if ((e.target as HTMLElement).closest('button,a,input,select,textarea')) return
-    daySwipeRef.current = { startX: e.clientX, vx: 0, lastX: e.clientX, lastT: performance.now() }
+    if (carouselDragRef.current?.navigating) return
+    carouselDragRef.current = { startX: e.clientX, vx: 0, lastX: e.clientX, lastT: performance.now(), navigating: false }
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+    setCarouselAnim(false)
   }
 
-  function handleDaySwipeMove(e: React.PointerEvent<HTMLDivElement>) {
-    if (!daySwipeRef.current) return
+  function carouselPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (!carouselDragRef.current || carouselDragRef.current.navigating) return
     const now = performance.now()
-    const dt = now - daySwipeRef.current.lastT
-    if (dt > 0) daySwipeRef.current.vx = (e.clientX - daySwipeRef.current.lastX) / dt
-    daySwipeRef.current.lastX = e.clientX
-    daySwipeRef.current.lastT = now
-    const totalDelta = e.clientX - daySwipeRef.current.startX
-    // Rubber-band: resistencia progresiva después de 80px para no salirse demasiado
-    const capped = Math.sign(totalDelta) * Math.min(Math.abs(totalDelta), 80 + (Math.abs(totalDelta) - 80) * 0.2)
-    setDaySwipeDelta(Math.abs(totalDelta) > 5 ? capped : 0)
+    const dt  = now - carouselDragRef.current.lastT
+    if (dt > 0) carouselDragRef.current.vx = (e.clientX - carouselDragRef.current.lastX) / dt
+    carouselDragRef.current.lastX = e.clientX
+    carouselDragRef.current.lastT = now
+    const raw = e.clientX - carouselDragRef.current.startX
+    const idx = sortedDayKeys.indexOf(selectedKey ?? '')
+    let x = raw
+    if (idx <= 0                         && raw > 0) x = Math.sign(raw) * Math.min(Math.abs(raw) * 0.18, 50)
+    if (idx >= sortedDayKeys.length - 1  && raw < 0) x = Math.sign(raw) * Math.min(Math.abs(raw) * 0.18, 50)
+    setCarouselX(Math.abs(raw) > 6 ? x : 0)
   }
 
-  function handleDaySwipeUp(e: React.PointerEvent<HTMLDivElement>) {
-    if (!daySwipeRef.current) return
-    const { startX, vx } = daySwipeRef.current
-    const delta = e.clientX - startX
-    daySwipeRef.current = null
-    setDaySwipeDelta(0)
+  function carouselPointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    if (!carouselDragRef.current || carouselDragRef.current.navigating) return
+    const { startX, vx } = carouselDragRef.current
+    const raw  = e.clientX - startX
+    const vpW  = carouselViewportRef.current?.offsetWidth ?? 300
+    const goNext = (vx < -0.3 || raw < -vpW * 0.35) && nextKey !== null
+    const goPrev = (vx >  0.3 || raw >  vpW * 0.35) && prevKey !== null
 
-    const vpW = (e.currentTarget as HTMLElement).offsetWidth
-    const idx = sortedDayKeys.indexOf(selectedKey ?? '')
-    if (idx < 0) return
-
-    const goNext = vx < -0.3 || delta < -vpW * 0.35
-    const goPrev = vx > 0.3 || delta > vpW * 0.35
-
-    if (goNext && idx < sortedDayKeys.length - 1) {
-      const key = sortedDayKeys[idx + 1]!
-      const d = new Date(`${key}T00:00:00`)
-      setSelectedDate(d)
-      setCurrentMonth(new Date(d.getFullYear(), d.getMonth(), 1))
-    } else if (goPrev && idx > 0) {
-      const key = sortedDayKeys[idx - 1]!
-      const d = new Date(`${key}T00:00:00`)
-      setSelectedDate(d)
-      setCurrentMonth(new Date(d.getFullYear(), d.getMonth(), 1))
+    if (goNext || goPrev) {
+      const targetKey = (goNext ? nextKey : prevKey)!
+      const targetX   = goNext ? -vpW : vpW
+      carouselDragRef.current.navigating = true
+      setCarouselAnim(true)
+      setCarouselX(targetX)
+      setTimeout(() => {
+        carouselDragRef.current = null
+        setCarouselAnim(false)
+        setCarouselX(0)
+        const d = new Date(`${targetKey}T00:00:00`)
+        setSelectedDate(d)
+        setCurrentMonth(new Date(d.getFullYear(), d.getMonth(), 1))
+      }, 330)
+    } else {
+      carouselDragRef.current = null
+      setCarouselAnim(true)
+      setCarouselX(0)
     }
   }
   // ─────────────────────────────────────────────────────────────────────────────
@@ -1144,15 +1186,11 @@ export function GraderHistoricalCalendar({
       </Card>
 
       <Card
-        className="relative touch-pan-y"
-        style={{
-          transform: daySwipeDelta !== 0 ? `translateX(${daySwipeDelta}px)` : undefined,
-          transition: daySwipeDelta !== 0 ? 'none' : 'transform 0.32s cubic-bezier(0.25,0.46,0.45,0.94)',
-        }}
-        onPointerDown={handleDaySwipeDown}
-        onPointerMove={handleDaySwipeMove}
-        onPointerUp={handleDaySwipeUp}
-        onPointerCancel={() => { daySwipeRef.current = null; setDaySwipeDelta(0) }}
+        className="relative touch-pan-y overflow-hidden"
+        onPointerDown={carouselPointerDown}
+        onPointerMove={carouselPointerMove}
+        onPointerUp={carouselPointerUp}
+        onPointerCancel={() => { carouselDragRef.current = null; setCarouselX(0); setCarouselAnim(false) }}
       >
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
           <CardTitle className="text-base">
@@ -1229,52 +1267,66 @@ export function GraderHistoricalCalendar({
               </div>
             </div>
           )}
-          {/* ── Paso 3a: Barra de timeline 24h ── */}
-          {summariesForSelectedDay.length > 0 && (() => {
-            const blocks = buildDayTimelineBlocks(summariesForSelectedDay)
-            if (blocks.length === 0) return null
-            return (
-              <div
-                className="relative h-8 rounded-md overflow-hidden border border-border/25 bg-muted/15 select-none"
-                title="Timeline del día — 00:00 a la izquierda, 24:00 a la derecha"
-              >
-                {/* Líneas de hora cada 3h */}
-                {[3, 6, 9, 12, 15, 18, 21].map(h => (
-                  <div
-                    key={h}
-                    className="absolute top-0 bottom-0 w-px bg-border/25"
-                    style={{ left: `${(h / 24) * 100}%` }}
-                  />
-                ))}
-                {/* Bloques de turno */}
-                {blocks.map((b, i) => (
-                  <div
-                    key={i}
-                    className={cn('absolute top-1 bottom-1 rounded-sm flex items-center justify-center', b.bgClass)}
-                    style={{ left: `${b.leftPct}%`, width: `max(${b.widthPct}%, 0.8%)` }}
-                    title={b.title}
-                  >
-                    {b.widthPct > 9 && (
-                      <span className="text-[9px] font-bold text-white/90 leading-none pointer-events-none">{b.label}</span>
-                    )}
+          {/* ── Paso 3b: Carousel de timelines 24h (3 slides: prev · current · next) ── */}
+          <div ref={carouselViewportRef} className="overflow-hidden select-none -mx-6 px-0">
+            <div
+              className="flex"
+              style={{
+                width: '300%',
+                transform: `translateX(calc(-33.333% + ${carouselX}px))`,
+                transition: carouselAnim ? 'transform 0.32s cubic-bezier(0.25,0.46,0.45,0.94)' : 'none',
+                willChange: 'transform',
+              }}
+            >
+              {([
+                { slideKey: prevKey,      entries: prevEntries },
+                { slideKey: selectedKey,  entries: summariesForSelectedDay },
+                { slideKey: nextKey,      entries: nextEntries },
+              ] as const).map(({ slideKey, entries }, si) => {
+                const blocks = slideKey ? buildDayTimelineBlocks(entries as Array<{ summary: GraderDailySummary; chip: ShiftChipDescriptor | null }>) : []
+                return (
+                  <div key={slideKey ?? `empty-${si}`} className="min-w-0 px-6" style={{ width: '33.333%' }}>
+                    {/* Etiqueta de fecha del slide */}
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="text-[10px] text-muted-foreground/60 tabular-nums">
+                        {slideKey ? slideKey.slice(5) : '—'}
+                      </span>
+                    </div>
+                    {/* Barra timeline 24h */}
+                    <div
+                      className="relative h-8 rounded-md overflow-hidden border border-border/25 bg-muted/15"
+                      title={slideKey ? `Timeline ${slideKey}` : undefined}
+                    >
+                      {[3, 6, 9, 12, 15, 18, 21].map(h => (
+                        <div key={h} className="absolute top-0 bottom-0 w-px bg-border/25" style={{ left: `${(h / 24) * 100}%` }} />
+                      ))}
+                      {blocks.map((b, i) => (
+                        <div
+                          key={i}
+                          className={cn('absolute top-1 bottom-1 rounded-sm flex items-center justify-center', b.bgClass)}
+                          style={{ left: `${b.leftPct}%`, width: `max(${b.widthPct}%, 0.8%)` }}
+                          title={b.title}
+                        >
+                          {b.widthPct > 9 && (
+                            <span className="text-[9px] font-bold text-white/90 leading-none pointer-events-none">{b.label}</span>
+                          )}
+                        </div>
+                      ))}
+                      {[0, 6, 12, 18, 24].map(h => (
+                        <span
+                          key={h}
+                          className="absolute bottom-0.5 text-[7px] text-muted-foreground/50 tabular-nums pointer-events-none"
+                          style={{ left: `${(h / 24) * 100}%`, transform: h === 0 ? 'none' : h === 24 ? 'translateX(-100%)' : 'translateX(-50%)' }}
+                        >
+                          {h === 0 ? '0h' : `${h}h`}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                ))}
-                {/* Etiquetas de hora */}
-                {[0, 6, 12, 18, 24].map(h => (
-                  <span
-                    key={h}
-                    className="absolute bottom-0.5 text-[7px] text-muted-foreground/50 tabular-nums pointer-events-none"
-                    style={{
-                      left: `${(h / 24) * 100}%`,
-                      transform: h === 0 ? 'none' : h === 24 ? 'translateX(-100%)' : 'translateX(-50%)',
-                    }}
-                  >
-                    {h === 0 ? '0h' : `${h}h`}
-                  </span>
-                ))}
-              </div>
-            )
-          })()}
+                )
+              })}
+            </div>
+          </div>
 
           {/* ── Datos históricos (carga masiva) — incluye aportes calendáricos ── */}
           {selectedKey && summariesForSelectedDay.length > 0 && (
