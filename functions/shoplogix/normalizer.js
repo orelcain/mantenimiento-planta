@@ -68,14 +68,21 @@ function normalizeState(raw) {
 /**
  * Combina production + summary → documento Firestore para 1 máquina/turno.
  */
-function normalizeShift({ production, summary, dateKey, shiftId, intervalMs, syncedAt }) {
+function normalizeShift({ production, summary, dateKey, shiftId, intervalMs, syncedAt, shiftStartAt, shiftEndAt }) {
   if (production.machineId !== summary.machineId) {
     throw new Error(`[normalizer] machineId mismatch ${production.machineId} vs ${summary.machineId}`)
   }
   const iMs = intervalMs || 5 * 60 * 1000
   const threshold = summary.threshold ?? production.threshold ?? 15
-  const shiftStart = parseShoplogixTime(summary.currentShiftStart || production.currentShiftStart)
-  const shiftEnd   = parseShoplogixTime(summary.currentShiftEnd   || production.currentShiftEnd)
+  // Preferir shiftStart/End explícitos (pasados por sync.js) — el field
+  // `currentShiftStart` del API apunta al turno EN CURSO al hacer la consulta,
+  // NO al turno consultado, por lo que en backfill histórico es incorrecto.
+  const shiftStart = shiftStartAt
+    ? new Date(shiftStartAt)
+    : parseShoplogixTime(summary.currentShiftStart || production.currentShiftStart)
+  const shiftEnd = shiftEndAt
+    ? new Date(shiftEndAt)
+    : parseShoplogixTime(summary.currentShiftEnd || production.currentShiftEnd)
 
   const intervals = (production.machineProduction || []).map((raw, i) => {
     const intervalStart = new Date(shiftStart.getTime() + i * iMs)

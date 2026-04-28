@@ -11,6 +11,9 @@
  *   --from=YYYY-MM-DD  Procesa solo turnos desde esta fecha (default: todos)
  *   --to=YYYY-MM-DD    Hasta esta fecha (default: todos)
  *   --delay=N          Segundos entre llamadas (default: 5)
+ *   --force            Re-sincroniza turnos que ya tienen datos (sobrescribe).
+ *                      Necesario cuando el normalizer cambia para reescribir
+ *                      docs históricos. Idempotente y seguro.
  *
  * Uso:
  *   node scripts/backfill-shoplogix-history.js
@@ -29,11 +32,13 @@ const db = admin.firestore()
 const CF_URL = 'https://us-central1-mantenimiento-planta-771a3.cloudfunctions.net/shoplogixSyncHttp'
 
 const DRY_RUN  = process.argv.includes('--dry-run')
+const FORCE    = process.argv.includes('--force')
 const FROM_KEY = (process.argv.find(a => a.startsWith('--from=')) || '').replace('--from=', '') || null
 const TO_KEY   = (process.argv.find(a => a.startsWith('--to='))   || '').replace('--to=',   '') || null
 const DELAY_MS = parseInt((process.argv.find(a => a.startsWith('--delay=')) || '').replace('--delay=', '') || '5', 10) * 1000
 
 if (DRY_RUN) console.log('🔍 DRY RUN — no se llamará la CF\n')
+if (FORCE)   console.log('⚡ FORCE — re-sincroniza turnos con datos existentes (sobrescribe)\n')
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)) }
 
@@ -79,20 +84,25 @@ async function main() {
   const snap = await query.get()
   console.log(`  ${snap.size} turnos en el rango`)
 
-  // 2. Shifts que ya tienen datos
-  console.log('Verificando qué turnos ya tienen datos Shoplogix...')
-  const existing = await getExistingShoplogixShifts()
-  console.log(`  ${existing.size} turnos con datos completos (≥1 máquina OK)`)
+  // 2. Shifts que ya tienen datos (sólo se usa para skipear si NO --force)
+  let existing = new Set()
+  if (!FORCE) {
+    console.log('Verificando qué turnos ya tienen datos Shoplogix...')
+    existing = await getExistingShoplogixShifts()
+    console.log(`  ${existing.size} turnos con datos completos (≥1 máquina OK)`)
+  } else {
+    console.log('FORCE activo — se reprocesan TODOS los turnos en el rango (incluyendo los que ya tienen datos)')
+  }
   console.log()
 
   // 3. Filtrar pendientes
   const pending = snap.docs
     .map(d => ({ dateKey: d.data().dateKey, shiftId: d.data().shiftId }))
-    .filter(({ dateKey, shiftId }) => !existing.has(`${dateKey}_${shiftId}`))
+    .filter(({ dateKey, shiftId }) => FORCE || !existing.has(`${dateKey}_${shiftId}`))
 
-  console.log(`Pendientes: ${pending.length} de ${snap.size} turnos`)
+  console.log(`A procesar: ${pending.length} de ${snap.size} turnos`)
   if (pending.length === 0) {
-    console.log('✅ No hay nada que backfillear — todos los turnos ya tienen datos.')
+    console.log('✅ No hay nada que procesar.')
     process.exit(0)
   }
 
