@@ -374,6 +374,18 @@ interface TimelineBlock {
   endTimeStr: string
   /** P0% del turno — para mostrar dentro del bloque */
   p0Pct: number
+  /**
+   * Segmentos de estado Shoplogix normalizados al bloque (0–100% del bloque).
+   * Undefined cuando no hay datos Shoplogix para este turno.
+   * Cuando está presente, el bloque se pinta como mini-Gantt de colores en vez
+   * de usar bgClass como color sólido.
+   */
+  segments?: Array<{
+    startPct: number
+    widthPct: number
+    type: CoverageSegmentType
+    title: string
+  }>
 }
 
 /**
@@ -386,6 +398,9 @@ interface TimelineBlock {
 function buildDayTimelineBlocks(
   entries: Array<{ summary: GraderDailySummary; chip: ShiftChipDescriptor | null }>,
   slxData?: Map<string, SlxShiftCache>,
+  /** Fecha del slide del carousel (YYYY-MM-DD). Necesaria para normalizar los
+   *  segmentos Shoplogix al sistema de coordenadas del slide (0=00:00 del slideKey). */
+  slideKey?: string,
 ): TimelineBlock[] {
   const blocks: TimelineBlock[] = []
   for (const { summary: hist, chip } of entries) {
@@ -470,6 +485,44 @@ function buildDayTimelineBlocks(
       direction === 'enters' ? 'mad' :
       direction === 'exits'  ? 'sal' :
       hist.shiftId === 'Turno noche' ? 'noc' : 'dia'
+    // ── Segmentos Shoplogix normalizados al bloque ──
+    // El bloque ocupa [startFrac, endFrac] del día del slideKey.
+    // Convertimos cada estado Shoplogix a % relativo al bloque (0=inicio, 100=fin).
+    let segments: TimelineBlock['segments'] = undefined
+    const slxCache = slxData?.get(hist.id)
+    if (slxCache && slxCache.states.length > 0 && slideKey) {
+      const slideDayStartMs = new Date(`${slideKey}T00:00:00.000Z`).getTime()
+      const blockStartMs = startFrac * 86400000 + slideDayStartMs
+      const blockEndMs   = endFrac   * 86400000 + slideDayStartMs
+      const blockDurMs   = blockEndMs - blockStartMs
+      if (blockDurMs > 60000) {
+        const padH = (n: number) => String(n).padStart(2, '0')
+        const fmtMs = (ms: number) => {
+          const d = new Date(ms)
+          return `${padH(d.getUTCHours())}:${padH(d.getUTCMinutes())}`
+        }
+        const rawSegs: NonNullable<TimelineBlock['segments']> = []
+        for (const s of slxCache.states) {
+          // Excluir períodos post-turno (planned downtime)
+          if (s.type === 'break' && (s.reason ?? '').toLowerCase().includes('planned downtime')) continue
+          const segStart = Math.max(s.startAt.getTime(), blockStartMs)
+          const segEnd   = Math.min(s.endAt.getTime(),   blockEndMs)
+          if (segEnd - segStart < 30000) continue // < 30s, skip ruido
+          const sPct = (segStart - blockStartMs) / blockDurMs * 100
+          const wPct = (segEnd   - segStart)     / blockDurMs * 100
+          const durMin = Math.round((segEnd - segStart) / 60000)
+          const reason = s.reason || (s.type === 'uptime' ? 'Producción' : s.type === 'break' ? 'Pausa' : s.type === 'setup' ? 'Setup' : 'Detenido')
+          rawSegs.push({
+            startPct: sPct,
+            widthPct: wPct,
+            type: s.type as CoverageSegmentType,
+            title: `${fmtMs(segStart)}–${fmtMs(segEnd)} · ${reason} (${durMin}m)`,
+          })
+        }
+        if (rawSegs.length > 0) segments = rawSegs
+      }
+    }
+
     blocks.push({
       leftPct:  startFrac * 100,
       widthPct: (endFrac - startFrac) * 100,
@@ -483,6 +536,7 @@ function buildDayTimelineBlocks(
       startTimeStr,
       endTimeStr,
       p0Pct: hist.pointZeroPct,
+      segments,
     })
   }
   return blocks
@@ -2267,7 +2321,7 @@ export function GraderHistoricalCalendar({
                 { slideKey: nextKey,      entries: nextEntries },
               ] as const).map(({ slideKey, entries }, si) => {
                 const isSelectedSlide = si === 1
-                const blocks = slideKey ? buildDayTimelineBlocks(entries as Array<{ summary: GraderDailySummary; chip: ShiftChipDescriptor | null }>, slxByShift) : []
+                const blocks = slideKey ? buildDayTimelineBlocks(entries as Array<{ summary: GraderDailySummary; chip: ShiftChipDescriptor | null }>, slxByShift, slideKey) : []
                 // Combinar states Shoplogix de los 3 candidate shifts del día.
                 // (prev noche → madrugada del slideKey, día del slideKey, noche del slideKey)
                 const slxStates: UpstreamMachineState[] = []
@@ -2366,6 +2420,9 @@ export function GraderHistoricalCalendar({
                         )
                         const showTimes  = b.widthPct > 14  // espacio suficiente para HH:mm
                         const showP0     = b.widthPct > 10  // espacio para P0%
+                        // Si hay segmentos Shoplogix → mini-Gantt de colores;
+                        // si no → color sólido P0%-based (comportamiento anterior).
+                        const hasSegments = b.segments && b.segments.length > 0
                         return (
                           <div
                             key={i}
@@ -2374,7 +2431,8 @@ export function GraderHistoricalCalendar({
                             tabIndex={0}
                             className={cn(
                               'absolute flex items-center justify-center cursor-pointer transition-all overflow-hidden',
-                              b.bgClass,
+                              // Cuando hay segmentos usamos fondo neutro oscuro; si no, el color P0%.
+                              hasSegments ? 'bg-slate-900/40' : b.bgClass,
                               b.nightSide === null && 'rounded-sm',
                               isHovered && 'ring-2 ring-white/80 ring-offset-1 ring-offset-background z-20',
                             )}
@@ -2387,10 +2445,13 @@ export function GraderHistoricalCalendar({
                                 b.nightSide === 'start' ? '0 3px 3px 0' :
                                 b.nightSide === 'end'   ? '3px 0 0 3px' :
                                 undefined,
-                              backgroundImage:
-                                b.nightSide === 'start' ? 'linear-gradient(90deg, rgba(99,102,241,0.55) 0%, transparent 18px)' :
-                                b.nightSide === 'end'   ? 'linear-gradient(270deg, rgba(99,102,241,0.55) 0%, transparent 18px)' :
-                                undefined,
+                              // Gradiente nocturno sólo cuando no hay segmentos
+                              // (si hay segmentos, el gradiente se pinta como overlay)
+                              backgroundImage: !hasSegments
+                                ? b.nightSide === 'start' ? 'linear-gradient(90deg, rgba(99,102,241,0.55) 0%, transparent 18px)'
+                                  : b.nightSide === 'end' ? 'linear-gradient(270deg, rgba(99,102,241,0.55) 0%, transparent 18px)'
+                                  : undefined
+                                : undefined,
                             }}
                             title={`${b.title} · click para ver detalle`}
                             onClick={navigateToBlockTurno}
@@ -2403,16 +2464,44 @@ export function GraderHistoricalCalendar({
                             onMouseEnter={() => setHoveredFragId(b.fragId)}
                             onMouseLeave={() => setHoveredFragId(null)}
                           >
+                            {/* ── Segmentos Shoplogix (mini-Gantt colores operativos) ── */}
+                            {hasSegments && b.segments!.map((seg, si) => (
+                              <div
+                                key={si}
+                                className={cn(
+                                  'absolute top-0 bottom-0 pointer-events-none',
+                                  seg.type === 'uptime'    && 'bg-emerald-500/75',
+                                  seg.type === 'break'     && 'bg-amber-400/75',
+                                  seg.type === 'downtime'  && 'bg-orange-500/75',
+                                  seg.type === 'setup'     && 'bg-blue-500/75',
+                                  seg.type === 'untracked' && 'bg-slate-400/35',
+                                )}
+                                style={{
+                                  left:  `${seg.startPct}%`,
+                                  width: `max(${seg.widthPct}%, 0.3%)`,
+                                }}
+                                title={seg.title}
+                              />
+                            ))}
+                            {/* Gradiente nocturno como overlay sobre los segmentos */}
+                            {hasSegments && b.nightSide === 'start' && (
+                              <div className="absolute inset-0 pointer-events-none z-[2]"
+                                style={{ backgroundImage: 'linear-gradient(90deg, rgba(99,102,241,0.5) 0%, transparent 18px)' }} />
+                            )}
+                            {hasSegments && b.nightSide === 'end' && (
+                              <div className="absolute inset-0 pointer-events-none z-[2]"
+                                style={{ backgroundImage: 'linear-gradient(270deg, rgba(99,102,241,0.5) 0%, transparent 18px)' }} />
+                            )}
                             {/* Timestamp inicio — esquina sup-izq.
                                 Ocultamos en 'enters' (arranca en 00:00, no aporta info)
                                 y cuando el bloque es demasiado estrecho. */}
                             {showTimes && b.nightSide !== 'start' && (
-                              <span className="absolute left-0.5 top-0.5 text-[8px] font-mono text-white/80 leading-none pointer-events-none tabular-nums">
+                              <span className="absolute left-0.5 top-0.5 text-[8px] font-mono text-white/90 leading-none pointer-events-none tabular-nums z-[3]">
                                 {b.startTimeStr}
                               </span>
                             )}
                             {/* Label central (D / N / →N) + P0% */}
-                            <span className="text-[9px] font-bold text-white/95 leading-none pointer-events-none flex items-center gap-0.5">
+                            <span className="text-[9px] font-bold text-white/95 leading-none pointer-events-none flex items-center gap-0.5 z-[3]">
                               {b.label}
                               {showP0 && (
                                 <span className="opacity-80 font-semibold"> {b.p0Pct.toFixed(1)}%</span>
@@ -2421,7 +2510,7 @@ export function GraderHistoricalCalendar({
                             {/* Timestamp fin — esquina inf-der.
                                 Ocultamos en 'exits' (termina en 24:00, no aporta info). */}
                             {showTimes && b.nightSide !== 'end' && (
-                              <span className="absolute right-0.5 bottom-0.5 text-[8px] font-mono text-white/80 leading-none pointer-events-none tabular-nums">
+                              <span className="absolute right-0.5 bottom-0.5 text-[8px] font-mono text-white/90 leading-none pointer-events-none tabular-nums z-[3]">
                                 {b.endTimeStr}
                               </span>
                             )}
