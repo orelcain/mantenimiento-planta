@@ -573,9 +573,15 @@ export function sortedSegmentEntries(
  * El 15 de enero aparece en ambos con exactamente los mismos eventos.
  * Si juntamos ambos sin dedupear → las piezas se duplican y el P0% queda mal.
  *
- * La llave de dedupe usa los campos que identifican únicamente un evento de
- * clasificación en Matrix: `ts + gate + pieces + quality + calibre`. Dos
- * filas con exactamente esos 5 campos son el mismo evento físico.
+ * La llave de dedupe usa todos los campos que identifican únicamente un evento
+ * de clasificación: `ts + gate + pieces + quality + calibre + weightKg + lot
+ * + error + weightPerPieceGrams`. Dos filas con exactamente todos esos campos
+ * son el mismo evento físico (re-export de archivos overlapping).
+ *
+ * Nota: la key fue ampliada para evitar perder piezas reales que colisionan
+ * por timestamp-segundo cuando 5-10 piezas/seg pasan en pico (~0.5-0.8% loss).
+ * Mantener en sync con graderDailySummary.service.ts:buildDedupeKey y
+ * scripts/bulk-upload-piece-records.js:buildDedupeKey.
  */
 export function dedupePieceRecords(records: PieceRecord[]): {
   unique: PieceRecord[]
@@ -585,7 +591,7 @@ export function dedupePieceRecords(records: PieceRecord[]): {
   const unique: PieceRecord[] = []
   for (let i = 0; i < records.length; i++) {
     const r = records[i]!
-    const key = `${r.ts}|${r.gate}|${r.pieces}|${r.quality ?? ''}|${r.calibre ?? ''}|${r.weightKg ?? ''}`
+    const key = `${r.ts}|${r.gate}|${r.pieces}|${r.quality ?? ''}|${r.calibre ?? ''}|${r.weightKg ?? ''}|${r.lot ?? ''}|${r.error ?? ''}|${r.weightPerPieceGrams ?? ''}`
     if (seen.has(key)) continue
     seen.add(key)
     unique.push(r)

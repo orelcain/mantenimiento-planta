@@ -6,12 +6,18 @@
  * `graderDailySummaries/{summaryId}/pieceRecords/`.
  *
  * Flags:
- *   --dry-run   — solo parsea y reporta, no escribe
- *   --force     — escribe aunque el summary no exista (crea doc stub)
+ *   --dry-run            — solo parsea y reporta, no escribe
+ *   --force              — escribe aunque el summary no exista (crea doc stub)
+ *   --clean              — borra pieceRecords existentes antes de subir
+ *                          (necesario tras cambios en buildDedupeKey, evita
+ *                          duplicación entre keys viejas y nuevas).
+ *   --from=YYYY-MM-DD    — filtra segmentos cuyo sessionDate >= from
+ *   --to=YYYY-MM-DD      — filtra segmentos cuyo sessionDate <= to
  *
  * Uso:
  *   node scripts/bulk-upload-piece-records.js
  *   node scripts/bulk-upload-piece-records.js --dry-run
+ *   node scripts/bulk-upload-piece-records.js --clean --from=2026-02-01 --to=2026-02-28
  */
 const admin = require('firebase-admin')
 const XLSX = require('xlsx')
@@ -31,7 +37,13 @@ db.settings({ ignoreUndefinedProperties: true })
 
 const DRY_RUN = process.argv.includes('--dry-run')
 const FORCE = process.argv.includes('--force')
+const CLEAN = process.argv.includes('--clean')
+const FROM_KEY = (process.argv.find(a => a.startsWith('--from=')) || '').replace('--from=', '') || null
+const TO_KEY   = (process.argv.find(a => a.startsWith('--to='))   || '').replace('--to=',   '') || null
 if (DRY_RUN) console.log('🔍 DRY RUN — no se escribirá nada\n')
+if (CLEAN)   console.log('🧹 CLEAN — borra pieceRecords existentes antes de re-subir\n')
+if (FROM_KEY) console.log(`📅 Desde: ${FROM_KEY}`)
+if (TO_KEY)   console.log(`📅 Hasta: ${TO_KEY}`)
 
 const BASE_DIR = 'C:/Users/pc hp/OneDrive/ANTARFOOD/⚙️ GRADER/temporada 2025-2026'
 const PP_DIR = path.join(BASE_DIR, 'pieza a pieza')
@@ -166,8 +178,14 @@ function parsePP(rows, headerIdx, colMap) {
 }
 
 // ── Dedupe ────────────────────────────────────────────────────────────────
+// Key amplia: incluye lot + error + weightPerPieceGrams para distinguir piezas
+// reales con mismo (ts, gate, pieces, quality, calibre, weightKg) — situación
+// común a 5-10 piezas/seg en pico (lot tracking + Marelec timestamp segundo).
+// Antes: 0.5-0.8% de pérdidas legítimas por colisión.
+// Mantener en sync con apps/pwa/src/services/grader/graderDailySummary.service.ts:buildDedupeKey
+// y apps/pwa/src/services/grader/graderSegmenter.ts:dedupePieceRecords.
 function buildDedupeKey(r) {
-  return `${r.ts}|${r.gate}|${r.pieces}|${r.quality ?? ''}|${r.calibre ?? ''}|${r.weightKg ?? ''}`
+  return `${r.ts}|${r.gate}|${r.pieces}|${r.quality ?? ''}|${r.calibre ?? ''}|${r.weightKg ?? ''}|${r.lot ?? ''}|${r.error ?? ''}|${r.weightPerPieceGrams ?? ''}`
 }
 
 function dedupeRecords(records) {
@@ -206,6 +224,35 @@ function walkXlsx(dir) {
   return files
 }
 
+/**
+ * Extrae rango de fechas del nombre del archivo.
+ * Pattern: "...STATICGRADER1 (20260131_000000 - 20260210_000000).xlsx"
+ * Devuelve { fromKey, toKey } en formato YYYY-MM-DD, o null si no matchea.
+ */
+function dateRangeFromFilename(filePath) {
+  const name = path.basename(filePath)
+  const m = name.match(/\((\d{4})(\d{2})(\d{2})_\d+\s*-\s*(\d{4})(\d{2})(\d{2})_\d+\)/)
+  if (!m) return null
+  return {
+    fromKey: `${m[1]}-${m[2]}-${m[3]}`,
+    toKey:   `${m[4]}-${m[5]}-${m[6]}`,
+  }
+}
+
+/**
+ * ¿El rango del archivo se solapa con [fromKey, toKey] del filtro CLI?
+ * - Si no hay filtro, siempre true.
+ * - Si el archivo no tiene rango parseable del nombre, siempre true (parseamos por las dudas).
+ */
+function fileOverlapsFilter(filePath, filterFromKey, filterToKey) {
+  if (!filterFromKey && !filterToKey) return true
+  const range = dateRangeFromFilename(filePath)
+  if (!range) return true
+  if (filterToKey && range.fromKey > filterToKey) return false
+  if (filterFromKey && range.toKey < filterFromKey) return false
+  return true
+}
+
 function parseFileFromDisk(filePath) {
   const buffer = fs.readFileSync(filePath)
   const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: false })
@@ -223,9 +270,13 @@ function parseFileFromDisk(filePath) {
 async function main() {
   console.log('=== BULK UPLOAD: pieceRecords → Firestore ===\n')
 
-  // 1. Listar y parsear solo PP files (P0 no tiene peso por pieza individual)
-  const ppFiles = walkXlsx(PP_DIR)
-  console.log(`Archivos PP encontrados: ${ppFiles.length}`)
+  // 1. Listar archivos PP y filtrar por rango de fechas (parsear solo lo necesario)
+  const ppFilesAll = walkXlsx(PP_DIR)
+  const ppFiles = ppFilesAll.filter((f) => fileOverlapsFilter(f, FROM_KEY, TO_KEY))
+  console.log(`Archivos PP encontrados: ${ppFilesAll.length}`)
+  if (FROM_KEY || TO_KEY) {
+    console.log(`Archivos en rango [${FROM_KEY ?? '...'}, ${TO_KEY ?? '...'}]: ${ppFiles.length}`)
+  }
 
   const allRecords = []
   for (const f of ppFiles) {
@@ -248,11 +299,13 @@ async function main() {
   const segments = new Map()
   for (const r of unique) {
     const { shiftId, sessionDate } = assignShiftAndDate(r.ts)
+    if (FROM_KEY && sessionDate < FROM_KEY) continue
+    if (TO_KEY && sessionDate > TO_KEY) continue
     const summaryId = `${sessionDate}__${shiftId}`
     if (!segments.has(summaryId)) segments.set(summaryId, [])
     segments.get(summaryId).push(r)
   }
-  console.log(`Segmentos (fecha+turno): ${segments.size}\n`)
+  console.log(`Segmentos (fecha+turno): ${segments.size}${FROM_KEY || TO_KEY ? ' (filtrados por rango)' : ''}\n`)
 
   // 4. Escribir a Firestore
   let totalWritten = 0
@@ -285,8 +338,32 @@ async function main() {
       }, { merge: true })
     }
 
-    // Leer dedupeKeys existentes
     const pieceRecordsCol = summaryRef.collection('pieceRecords')
+
+    // Si --clean: borrar TODOS los pieceRecords existentes antes de re-subir.
+    // Necesario tras cambios en buildDedupeKey: si solo agregamos sin borrar,
+    // los registros viejos (key vieja) y nuevos (key nueva) coexistirían y
+    // duplicarían las piezas. Con --clean partimos de vacío.
+    if (CLEAN) {
+      const existingDocs = await pieceRecordsCol.listDocuments()
+      if (existingDocs.length > 0) {
+        if (DRY_RUN) {
+          console.log(`  [${segIdx}/${segTotal}] ${summaryId}: --clean borraría ${existingDocs.length} pieceRecords [DRY RUN]`)
+        } else {
+          let deleted = 0
+          while (deleted < existingDocs.length) {
+            const batch = db.batch()
+            const chunk = existingDocs.slice(deleted, deleted + 500)
+            chunk.forEach((d) => batch.delete(d))
+            await batch.commit()
+            deleted += chunk.length
+          }
+          console.log(`  [${segIdx}/${segTotal}] ${summaryId}: 🧹 borrados ${deleted} pieceRecords antiguos`)
+        }
+      }
+    }
+
+    // Leer dedupeKeys existentes (vacío si acabamos de hacer --clean)
     const existingSnap = await pieceRecordsCol.select('dedupeKey').get()
     const existingKeys = new Set(existingSnap.docs.map(d => d.data().dedupeKey))
     totalExisting += existingKeys.size

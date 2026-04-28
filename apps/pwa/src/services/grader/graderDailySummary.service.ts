@@ -492,10 +492,17 @@ function pieceRecordsCol(summaryId: string) {
 
 /**
  * Genera un dedupeKey a partir de los campos de un registro.
- * Mismo criterio que graderSegmenter.ts dedupePieceRecords().
+ *
+ * Key amplia: incluye lot + error + weightPerPieceGrams para distinguir piezas
+ * reales con mismo (ts, gate, pieces, quality, calibre, weightKg) — Marelec
+ * exporta timestamps con precisión de segundo y a 5-10 piezas/seg colisionan.
+ * Antes: 0.5-0.8% de pérdidas legítimas por colisión.
+ *
+ * Mantener en sync con scripts/bulk-upload-piece-records.js:buildDedupeKey
+ * y graderSegmenter.ts:dedupePieceRecords().
  */
-export function buildDedupeKey(r: { ts: string; gate: number; pieces: number; quality?: string; calibre?: string; weightKg?: number }): string {
-  return `${r.ts}|${r.gate}|${r.pieces}|${r.quality ?? ''}|${r.calibre ?? ''}|${r.weightKg ?? ''}`
+export function buildDedupeKey(r: { ts: string; gate: number; pieces: number; quality?: string; calibre?: string; weightKg?: number; lot?: string; error?: string; weightPerPieceGrams?: number }): string {
+  return `${r.ts}|${r.gate}|${r.pieces}|${r.quality ?? ''}|${r.calibre ?? ''}|${r.weightKg ?? ''}|${r.lot ?? ''}|${r.error ?? ''}|${r.weightPerPieceGrams ?? ''}`
 }
 
 /**
