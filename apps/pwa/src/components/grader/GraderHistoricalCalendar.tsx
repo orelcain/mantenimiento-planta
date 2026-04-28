@@ -362,6 +362,7 @@ interface TimelineBlock {
   bgClass: string
   label: string
   title: string
+  nightSide: 'start' | 'end' | null  // madrugada = start (sin radius izq), vespertina = end (sin radius der)
 }
 
 /**
@@ -423,6 +424,7 @@ function buildDayTimelineBlocks(
       widthPct: (endFrac - startFrac) * 100,
       bgClass, label,
       title: `${hist.shiftId} · P0 ${hist.pointZeroPct.toFixed(2)}% · ${ts}${pct}`,
+      nightSide: direction === 'enters' ? 'start' : direction === 'exits' ? 'end' : null,
     })
   }
   return blocks
@@ -631,6 +633,29 @@ export function GraderHistoricalCalendar({
     carouselStateRef.current.sortedDayKeys = sortedDayKeys
     carouselStateRef.current.currentIdx = Math.max(0, sortedDayKeys.indexOf(selectedKey ?? ''))
   }, [sortedDayKeys, selectedKey])
+
+  // Teclado ←/→ para navegar entre días (ignora eventos desde inputs)
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.target as HTMLElement).closest('input,textarea,select,[contenteditable]')) return
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+      const state = carouselStateRef.current
+      const dir = e.key === 'ArrowRight' ? 1 : -1
+      const newIdx = state.currentIdx + dir
+      if (newIdx < 0 || newIdx >= state.sortedDayKeys.length) return
+      e.preventDefault()
+      if (carouselMomentumRef.current !== null) {
+        cancelAnimationFrame(carouselMomentumRef.current)
+        carouselMomentumRef.current = null
+      }
+      const key = state.sortedDayKeys[newIdx]!
+      const d = new Date(`${key}T00:00:00`)
+      setSelectedDate(d)
+      setCurrentMonth(new Date(d.getFullYear(), d.getMonth(), 1))
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, []) // refs y setters de useState son estables entre renders
 
   // Summaries a mostrar en el panel "Resumen del día" para el día seleccionado.
   // Combina:
@@ -1363,26 +1388,43 @@ export function GraderHistoricalCalendar({
               ] as const).map(({ slideKey, entries }, si) => {
                 const blocks = slideKey ? buildDayTimelineBlocks(entries as Array<{ summary: GraderDailySummary; chip: ShiftChipDescriptor | null }>) : []
                 return (
-                  <div key={slideKey ?? `empty-${si}`} className="min-w-0 px-6" style={{ width: '33.333%' }}>
-                    {/* Etiqueta de fecha del slide */}
-                    <div className="flex items-center justify-between mb-0.5">
+                  <div key={slideKey ?? `empty-${si}`} className="min-w-0" style={{ width: '33.333%' }}>
+                    {/* Etiqueta de fecha — con padding lateral para alinear con el resto del card */}
+                    <div className="flex items-center justify-between mb-0.5 px-6">
                       <span className="text-[10px] text-muted-foreground/60 tabular-nums">
                         {slideKey ? slideKey.slice(5) : '—'}
                       </span>
                     </div>
-                    {/* Barra timeline 24h */}
+                    {/* Barra timeline 24h — full-bleed: sin padding lateral ni border-radius */}
                     <div
-                      className="relative h-8 rounded-md overflow-hidden border border-border/25 bg-muted/15"
+                      className="relative h-8 overflow-hidden border-y border-border/25 bg-muted/15"
                       title={slideKey ? `Timeline ${slideKey}` : undefined}
                     >
+                      {/* Línea de medianoche (00:00) en el borde izquierdo de cada slide */}
+                      <div className="absolute inset-y-0 left-0 w-px bg-white/20 z-10 pointer-events-none" />
                       {[3, 6, 9, 12, 15, 18, 21].map(h => (
                         <div key={h} className="absolute top-0 bottom-0 w-px bg-border/25" style={{ left: `${(h / 24) * 100}%` }} />
                       ))}
                       {blocks.map((b, i) => (
                         <div
                           key={i}
-                          className={cn('absolute top-1 bottom-1 rounded-sm flex items-center justify-center', b.bgClass)}
-                          style={{ left: `${b.leftPct}%`, width: `max(${b.widthPct}%, 0.8%)` }}
+                          className={cn(
+                            'absolute top-1 bottom-1 flex items-center justify-center',
+                            b.bgClass,
+                            b.nightSide === null && 'rounded-sm',
+                          )}
+                          style={{
+                            left: `${b.leftPct}%`,
+                            width: `max(${b.widthPct}%, 0.8%)`,
+                            borderRadius:
+                              b.nightSide === 'start' ? '0 3px 3px 0' :
+                              b.nightSide === 'end'   ? '3px 0 0 3px' :
+                              undefined,
+                            backgroundImage:
+                              b.nightSide === 'start' ? 'linear-gradient(90deg, rgba(99,102,241,0.55) 0%, transparent 18px)' :
+                              b.nightSide === 'end'   ? 'linear-gradient(270deg, rgba(99,102,241,0.55) 0%, transparent 18px)' :
+                              undefined,
+                          }}
                           title={b.title}
                         >
                           {b.widthPct > 9 && (
