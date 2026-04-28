@@ -18,6 +18,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { animate, stagger } from 'animejs'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from '@/components/ui'
 import { ChevronLeft, ChevronRight, Loader2, Clock, Database, Eye, Trash2, AlertTriangle, Sun, Moon, Wrench, Tag, GitCompare } from 'lucide-react'
 import { fmt } from '@/lib/format'
@@ -765,6 +766,10 @@ export function GraderHistoricalCalendar({
   // (ver buildDayTimelineBlocks + EnrichedCardEntry.fragId). Cuando es null,
   // ningún elemento está resaltado.
   const [hoveredFragId, setHoveredFragId] = useState<string | null>(null)
+  // Ref al slide central del carousel — se usa para hacer stagger entrance
+  // de las cards (anime.js v4) cuando cambia `selectedKey`. Se asigna
+  // condicionalmente solo en el slide con `isSelectedSlide === true`.
+  const selectedSlideRef = useRef<HTMLDivElement | null>(null)
   const [slxByShift, setSlxByShift] = useState<Map<string, SlxShiftCache>>(new Map())
   // Cache totales Baader por shift — para indicador de "data Grader perdida"
   // (cuando Grader.totalPieces < Baader.totalCycles * 0.95 = >5% loss).
@@ -1060,6 +1065,26 @@ export function GraderHistoricalCalendar({
     const sorted = [...turnosDelDia].sort((a, b) => (order[a.shiftId] ?? 9) - (order[b.shiftId] ?? 9))
     setSelectedHistorical(sorted[0] ?? null)
   }, [selectedKey, historicalByDate, selectedHistorical, setSelectedHistorical])
+
+  // Stagger entrance de las cards del slide central al cambiar de día.
+  // anime.js v4: animate(targets, props) con `delay: stagger(ms)`.
+  // Solo afecta al slide central (selectedSlideRef apunta solo allí).
+  // Respeta `prefers-reduced-motion` — si el usuario lo pide, saltamos la animación.
+  useEffect(() => {
+    if (!selectedSlideRef.current) return
+    const prefersReducedMotion = typeof window !== 'undefined'
+      && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    if (prefersReducedMotion) return
+    const nodes = selectedSlideRef.current.querySelectorAll<HTMLElement>('[data-card-anim]')
+    if (nodes.length === 0) return
+    animate(nodes, {
+      opacity: [0, 1],
+      translateY: [8, 0],
+      duration: 340,
+      delay: stagger(60),
+      ease: 'outQuad',
+    })
+  }, [selectedKey, summariesForSelectedDay.length])
 
   // Lazy-load de cambios manuales de gate para los turnos del día seleccionado.
   // Se dispara al cambiar el día — solo carga si el shiftDocId no está ya en caché.
@@ -1518,6 +1543,7 @@ export function GraderHistoricalCalendar({
                 <div
                   key={hist.id}
                   data-frag-id={fragId}
+                  data-card-anim
                   role="button"
                   tabIndex={0}
                   onClick={navigateToTurno}
@@ -1582,6 +1608,7 @@ export function GraderHistoricalCalendar({
               <div
                 key={hist.id}
                 data-frag-id={fragId}
+                data-card-anim
                 role="button"
                 tabIndex={0}
                 onClick={onCardClick}
@@ -2238,7 +2265,12 @@ export function GraderHistoricalCalendar({
                 }
                 const slxBands = slideKey ? buildShoplogixOverlayBands(slxStates, slideKey) : []
                 return (
-                  <div key={slideKey ?? `empty-${si}`} className="min-w-0" style={{ width: '33.333%' }}>
+                  <div
+                    key={slideKey ?? `empty-${si}`}
+                    ref={isSelectedSlide ? selectedSlideRef : undefined}
+                    className="min-w-0"
+                    style={{ width: '33.333%' }}
+                  >
                     {/* Etiqueta de fecha — con padding lateral para alinear con el resto del card */}
                     <div className="flex items-center justify-between mb-0.5 px-6">
                       <span className="text-[10px] text-muted-foreground/60 tabular-nums">

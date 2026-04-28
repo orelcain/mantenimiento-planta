@@ -37,6 +37,7 @@
     "@types/leaflet": "^1.9.21",
     "@types/lodash": "^4.17.21",
     "@types/three": "^0.182.0",
+    "animejs": "^4.3.6",
     "chart.js": "^4.5.1",
     "chartjs-adapter-date-fns": "^3.0.0",
     "chartjs-chart-financial": "^0.2.1",
