@@ -2371,10 +2371,8 @@ export function GraderHistoricalCalendar({
                         const navigateToBlockTurno = () => navigate(
                           `/analisis-grader/turno/${b.dateKey}__${encodeURIComponent(b.shiftId)}`,
                         )
-                        const showTimes  = b.widthPct > 14  // espacio suficiente para HH:mm
-                        const showP0     = b.widthPct > 10  // espacio para P0%
-                        // Si hay segmentos Shoplogix → mini-Gantt de colores;
-                        // si no → color sólido P0%-based (comportamiento anterior).
+                        // Con segmentos Shoplogix → solo colores, sin texto ni fondo oscuro.
+                        // Sin segmentos → color sólido P0%-based (fallback si no hay Shoplogix).
                         const hasSegments = b.segments && b.segments.length > 0
                         return (
                           <div
@@ -2383,9 +2381,9 @@ export function GraderHistoricalCalendar({
                             role="button"
                             tabIndex={0}
                             className={cn(
-                              'absolute flex items-center justify-center cursor-pointer transition-all overflow-hidden',
-                              // Cuando hay segmentos usamos fondo neutro oscuro; si no, el color P0%.
-                              hasSegments ? 'bg-slate-900/40' : b.bgClass,
+                              'absolute cursor-pointer transition-all overflow-hidden',
+                              // Sin fondo cuando hay segmentos → los huecos <3min muestran el bg del timeline
+                              hasSegments ? '' : b.bgClass,
                               b.nightSide === null && 'rounded-sm',
                               isHovered && 'ring-2 ring-white/80 ring-offset-1 ring-offset-background z-20',
                             )}
@@ -2445,28 +2443,8 @@ export function GraderHistoricalCalendar({
                               <div className="absolute inset-0 pointer-events-none z-[2]"
                                 style={{ backgroundImage: 'linear-gradient(270deg, rgba(99,102,241,0.5) 0%, transparent 18px)' }} />
                             )}
-                            {/* Timestamp inicio — esquina sup-izq.
-                                Ocultamos en 'enters' (arranca en 00:00, no aporta info)
-                                y cuando el bloque es demasiado estrecho. */}
-                            {showTimes && b.nightSide !== 'start' && (
-                              <span className="absolute left-0.5 top-0.5 text-[8px] font-mono text-white/90 leading-none pointer-events-none tabular-nums z-[3]">
-                                {b.startTimeStr}
-                              </span>
-                            )}
-                            {/* Label central (D / N / →N) + P0% */}
-                            <span className="text-[9px] font-bold text-white/95 leading-none pointer-events-none flex items-center gap-0.5 z-[3]">
-                              {b.label}
-                              {showP0 && (
-                                <span className="opacity-80 font-semibold"> {b.p0Pct.toFixed(1)}%</span>
-                              )}
-                            </span>
-                            {/* Timestamp fin — esquina inf-der.
-                                Ocultamos en 'exits' (termina en 24:00, no aporta info). */}
-                            {showTimes && b.nightSide !== 'end' && (
-                              <span className="absolute right-0.5 bottom-0.5 text-[8px] font-mono text-white/90 leading-none pointer-events-none tabular-nums z-[3]">
-                                {b.endTimeStr}
-                              </span>
-                            )}
+                            {/* Sin texto dentro del bloque — los colores Shoplogix hablan por sí solos.
+                                El título (tooltip) con timestamps + P0% sigue disponible en hover. */}
                           </div>
                         )
                       })}
