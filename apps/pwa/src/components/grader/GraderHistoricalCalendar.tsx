@@ -540,17 +540,31 @@ interface CoverageSummary {
 
 /**
  * Construye los segmentos de la coverage bar para un turno: justifica el window
- * 8h con bloques de uptime/break/downtime/setup + detecta tiempo sin tracking
- * (gaps en los states de Shoplogix). Excluye 'planned downtime' (post-turno).
+ * con bloques de uptime/break/downtime/setup + detecta tiempo sin tracking.
+ *
+ * `graderStart`/`graderEnd` son el primer y último timestamp REAL del Grader
+ * (min/max de los pieceRecords). Se usan para clipar el window de Shoplogix:
+ * nunca mostramos más allá de lo que el Grader realmente registró, aunque
+ * Shoplogix reporte un window más amplio (e.g. por bug de shiftStartAt).
  */
 function buildCoverageSegments(
   states: UpstreamMachineState[],
   shiftStart: Date | null,
   shiftEnd: Date | null,
+  graderStart?: Date | null,
+  graderEnd?: Date | null,
 ): CoverageSummary | null {
   if (!shiftStart || !shiftEnd) return null
-  const queryStart = shiftStart.getTime()
-  const queryEnd = shiftEnd.getTime()
+  // Usar la intersección entre el window Shoplogix y el window Grader real.
+  // Si Shoplogix reporta 09:00–22:00 pero el Grader paró a las 17:27,
+  // el queryEnd = 17:27 (no 22:00).
+  const queryStart = graderStart
+    ? Math.max(shiftStart.getTime(), graderStart.getTime())
+    : shiftStart.getTime()
+  const queryEnd = graderEnd
+    ? Math.min(shiftEnd.getTime(), graderEnd.getTime())
+    : shiftEnd.getTime()
+  if (queryEnd - queryStart < 60_000) return null
 
   // 1. Filtrar+clipar states al window del query + excluir planned downtime.
   const clipped: Array<{ start: number; end: number; type: CoverageSegmentType; reason: string }> = []
@@ -1581,13 +1595,21 @@ export function GraderHistoricalCalendar({
                 {(() => {
                   const slxCache = slxByShift.get(hist.id)
                   if (!slxCache?.shiftStart || !slxCache?.shiftEnd) return null
-                  const cov = buildCoverageSegments(slxCache.states, slxCache.shiftStart, slxCache.shiftEnd)
+                  const graderStart = hist.startAt ? new Date(hist.startAt) : null
+                  const graderEnd   = hist.endAt   ? new Date(hist.endAt)   : null
+                  const cov = buildCoverageSegments(
+                    slxCache.states, slxCache.shiftStart, slxCache.shiftEnd,
+                    graderStart, graderEnd,
+                  )
                   if (!cov) return null
                   const justifiedSec = cov.uptimeSec + cov.breakSec + cov.downtimeSec + cov.setupSec
                   const justifiedPct = cov.shiftDurSec > 0 ? (justifiedSec / cov.shiftDurSec) * 100 : 0
                   const pad = (n: number) => String(n).padStart(2, '0')
                   const sStart = `${pad(cov.effectiveStart.getUTCHours())}:${pad(cov.effectiveStart.getUTCMinutes())}`
                   const sEnd = `${pad(cov.effectiveEnd.getUTCHours())}:${pad(cov.effectiveEnd.getUTCMinutes())}`
+                  // Detectar si el window Shoplogix fue recortado >15 min por el Grader real
+                  const slxRawDurSec = (slxCache.shiftEnd.getTime() - slxCache.shiftStart.getTime()) / 1000
+                  const wasClipped = slxRawDurSec - cov.shiftDurSec > 900
                   return (
                     <div className="space-y-1 pt-0.5" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-between gap-2 text-[9px] text-muted-foreground/80 leading-none">
@@ -1638,6 +1660,15 @@ export function GraderHistoricalCalendar({
                           <span className="flex items-center gap-0.5 text-rose-600">
                             <span className="w-1.5 h-1.5 rounded-sm bg-rose-500/45" />
                             sin tracking {fmtDuration(cov.untrackedSec)}
+                          </span>
+                        )}
+                        {wasClipped && (
+                          <span
+                            className="flex items-center gap-0.5 text-amber-600/80"
+                            title={`Shoplogix reportó ${fmtDuration(slxRawDurSec)} de turno. Recortado a ${fmtDuration(cov.shiftDurSec)} según datos reales del Grader.`}
+                          >
+                            <AlertTriangle className="w-2.5 h-2.5" />
+                            Slx {fmtDuration(slxRawDurSec)} → recortado
                           </span>
                         )}
                       </div>
