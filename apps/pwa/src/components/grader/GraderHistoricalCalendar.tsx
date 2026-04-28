@@ -541,77 +541,6 @@ function buildDayTimelineBlocks(
   }
   return blocks
 }
-
-// ── Barra Shoplogix unificada: visión completa 24h del día ───────────────────
-
-/**
- * Tipo de franja en la barra unificada.
- * Igual que CoverageSegmentType pero añade 'planned' para el período entre-turnos
- * que Shoplogix marca como "planned downtime" (hueco programado sin turno activo).
- */
-type UnifiedBandType = 'uptime' | 'break' | 'downtime' | 'setup' | 'untracked' | 'planned'
-
-interface UnifiedShoplogixBand {
-  leftPct: number
-  widthPct: number
-  type: UnifiedBandType
-  title: string
-}
-
-/**
- * Construye una barra continua de 24h con TODOS los estados Shoplogix del día.
- * A diferencia de buildShoplogixOverlayBands (solo eventos no-uptime),
- * incluye uptime (verde) y planned-downtime (gris) para dar imagen completa.
- * Deduplica por (tipo, inicio-min, fin-min) para absorber los 3 Baaders reportando
- * el mismo evento simultáneamente.
- */
-function buildShoplogixUnifiedBar(
-  states: UpstreamMachineState[],
-  dateKey: string,
-): UnifiedShoplogixBand[] {
-  const dayStartMs = new Date(`${dateKey}T00:00:00.000Z`).getTime()
-  const dayEndMs   = dayStartMs + 86400000
-  const MIN_MS     = 30_000 // 30s mínimo — filtra ruido
-  const pad = (n: number) => String(n).padStart(2, '0')
-  const seen = new Set<string>()
-  const bands: UnifiedShoplogixBand[] = []
-
-  for (const s of states) {
-    const clipStart = Math.max(s.startAt.getTime(), dayStartMs)
-    const clipEnd   = Math.min(s.endAt.getTime(),   dayEndMs)
-    if (clipEnd - clipStart < MIN_MS) continue
-
-    const isPlanned = s.type === 'break' && (s.reason ?? '').toLowerCase().includes('planned downtime')
-    const type: UnifiedBandType = isPlanned ? 'planned' : (s.type as UnifiedBandType)
-
-    // Dedup con precisión de 1 minuto — absorbe desfases entre Baaders
-    const rStart = Math.round(clipStart / 60000)
-    const rEnd   = Math.round(clipEnd   / 60000)
-    const dedup  = `${type}|${rStart}|${rEnd}`
-    if (seen.has(dedup)) continue
-    seen.add(dedup)
-
-    const leftPct  = (clipStart - dayStartMs) / 86400000 * 100
-    const widthPct = (clipEnd   - clipStart)  / 86400000 * 100
-    const sD = new Date(clipStart)
-    const eD = new Date(clipEnd)
-    const ts = `${pad(sD.getUTCHours())}:${pad(sD.getUTCMinutes())}–${pad(eD.getUTCHours())}:${pad(eD.getUTCMinutes())}`
-    const durMin = Math.round((clipEnd - clipStart) / 60000)
-    const label = isPlanned
-      ? 'Sin turno (paro programado)'
-      : s.type === 'uptime'
-        ? 'Producción'
-        : s.type === 'break'
-          ? (s.reason || 'Pausa/Colación')
-          : s.type === 'setup'
-            ? (s.reason || 'Setup/MMPP')
-            : (s.reason || 'Detención')
-
-    bands.push({ leftPct, widthPct, type, title: `${ts} · ${label} (${durMin}m)` })
-  }
-
-  return bands
-}
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Coverage bar: justifica las 8h del turno ─────────────────────────────────
@@ -2347,18 +2276,26 @@ export function GraderHistoricalCalendar({
               ] as const).map(({ slideKey, entries }, si) => {
                 const isSelectedSlide = si === 1
                 const blocks = slideKey ? buildDayTimelineBlocks(entries as Array<{ summary: GraderDailySummary; chip: ShiftChipDescriptor | null }>, slxByShift, slideKey) : []
-                // Combinar states Shoplogix de los 3 candidate shifts del día.
-                // (prev noche → madrugada del slideKey, día del slideKey, noche del slideKey)
-                const slxStates: UpstreamMachineState[] = []
-                if (slideKey) {
-                  const [y, m, d] = slideKey.split('-').map(Number) as [number, number, number]
-                  const prev = new Date(Date.UTC(y, m - 1, d - 1)).toISOString().slice(0, 10)
-                  for (const id of [`${prev}__Turno noche`, `${slideKey}__Turno día`, `${slideKey}__Turno noche`]) {
-                    const cache = slxByShift.get(id)
-                    if (cache) slxStates.push(...cache.states)
+                // Huecos entre turnos → planned downtime gris, misma altura que los bloques.
+                // Se calcula GEOMÉTRICAMENTE desde los bordes de los bloques Grader,
+                // sin depender del reason-text de Shoplogix (que varía entre turnos).
+                const sortedBlocks = [...blocks].sort((a, b) => a.leftPct - b.leftPct)
+                const gapFills: Array<{ leftPct: number; widthPct: number }> = []
+                if (sortedBlocks.length > 0) {
+                  const first = sortedBlocks[0]!
+                  if (first.leftPct > 0.5)
+                    gapFills.push({ leftPct: 0, widthPct: first.leftPct })
+                  for (let k = 0; k < sortedBlocks.length - 1; k++) {
+                    const cur  = sortedBlocks[k]!
+                    const nxt  = sortedBlocks[k + 1]!
+                    const end  = cur.leftPct + cur.widthPct
+                    const next = nxt.leftPct
+                    if (next - end > 0.5) gapFills.push({ leftPct: end, widthPct: next - end })
                   }
+                  const last    = sortedBlocks[sortedBlocks.length - 1]!
+                  const lastEnd = last.leftPct + last.widthPct
+                  if (lastEnd < 99.5) gapFills.push({ leftPct: lastEnd, widthPct: 100 - lastEnd })
                 }
-                const unifiedBands = slideKey ? buildShoplogixUnifiedBar(slxStates, slideKey) : []
                 return (
                   <div
                     key={slideKey ?? `empty-${si}`}
@@ -2408,63 +2345,25 @@ export function GraderHistoricalCalendar({
                         </span>
                       ))}
 
-                      {/* ── Capa 2: barra unificada Shoplogix (estado continuo 24h) ──
-                          Muestra TODOS los estados: uptime=verde, break=amber,
-                          downtime=naranja, setup=azul, planned=gris.
-                          uptime/planned se pintan primero (fondo), eventos encima.
-                          Todos llevan data-anim-unif + transformOrigin left para
-                          el sweep izquierda→derecha de anime.js al cambiar día. */}
-                      {unifiedBands
-                        .filter(b => b.type === 'uptime' || b.type === 'planned')
-                        .map((band, i) => (
-                          <div
-                            key={`slx-bg-${i}`}
-                            data-anim-unif=""
-                            className={cn(
-                              'absolute z-[4] pointer-events-auto',
-                              band.type === 'uptime'  && 'bg-emerald-500/40',
-                              band.type === 'planned' && 'bg-slate-500/35',
-                            )}
-                            style={{
-                              left:            `${band.leftPct}%`,
-                              width:           `max(${band.widthPct}%, 0.3%)`,
-                              top:             '57%',
-                              bottom:          '10px',
-                              transformOrigin: 'left center',
-                            }}
-                            title={band.title}
-                          />
-                        ))}
-                      {unifiedBands
-                        .filter(b => b.type !== 'uptime' && b.type !== 'planned')
-                        .map((band, i) => (
-                          <div
-                            key={`slx-ev-${i}`}
-                            data-anim-unif=""
-                            className={cn(
-                              'absolute z-[5] pointer-events-auto rounded-[1px]',
-                              band.type === 'break'     && 'bg-amber-400/80 border-t border-amber-400/50',
-                              band.type === 'downtime'  && 'bg-orange-500/80 border-t border-orange-500/50',
-                              band.type === 'setup'     && 'bg-blue-500/75 border-t border-blue-400/50',
-                              band.type === 'untracked' && 'bg-rose-500/55',
-                            )}
-                            style={{
-                              left:            `${band.leftPct}%`,
-                              width:           `max(${band.widthPct}%, 0.4%)`,
-                              top:             '57%',
-                              bottom:          '10px',
-                              transformOrigin: 'left center',
-                            }}
-                            title={band.title}
-                          />
-                        ))}
-                      {/* Etiqueta "Baader" si hay datos Shoplogix */}
-                      {unifiedBands.length > 0 && (
-                        <span className="absolute right-1 text-[7px] text-muted-foreground/40 pointer-events-none z-10 leading-none"
-                          style={{ top: '59%' }}>
-                          Baader
-                        </span>
-                      )}
+                      {/* ── Capa 2: huecos entre turnos = planned downtime gris ──
+                          Misma posición que Capa 3 (top:3px, bottom:18px) → barra continua.
+                          Calculado geométricamente: gaps entre bloques Grader, sin depender
+                          del reason-text de Shoplogix. anime.js sweep izquierda→derecha. */}
+                      {gapFills.map((gap, i) => (
+                        <div
+                          key={`gap-${i}`}
+                          data-anim-unif=""
+                          className="absolute bg-slate-700/50 z-[4] pointer-events-none"
+                          style={{
+                            left:            `${gap.leftPct}%`,
+                            width:           `${gap.widthPct}%`,
+                            top:             '3px',
+                            bottom:          '18px',
+                            transformOrigin: 'left center',
+                          }}
+                          title="Sin turno activo (paro programado)"
+                        />
+                      ))}
 
                       {/* ── Capa 3: bloques del Grader (zona superior principal) ── */}
                       {blocks.map((b, i) => {
