@@ -368,6 +368,12 @@ interface TimelineBlock {
   shiftId: string
   /** Para hover-sync con la card del día (#32). Mismo formato que `EnrichedCardEntry.fragId`. */
   fragId: string
+  /** Hora de inicio efectiva del turno (HH:mm) — basada en Shoplogix si disponible */
+  startTimeStr: string
+  /** Hora de fin efectiva del turno (HH:mm) — basada en Shoplogix si disponible */
+  endTimeStr: string
+  /** P0% del turno — para mostrar dentro del bloque */
+  p0Pct: number
 }
 
 /**
@@ -447,7 +453,14 @@ function buildDayTimelineBlocks(
       base
 
     const pad = (n: number) => String(n).padStart(2, '0')
-    const ts = `${pad(startD.getUTCHours())}:${pad(startD.getUTCMinutes())}–${pad(endD.getUTCHours())}:${pad(endD.getUTCMinutes())}`
+    // Timestamps efectivos — derivados de startFrac/endFrac (que ya incorporan Shoplogix)
+    const fracToHHMM = (frac: number) => {
+      const totalMin = Math.round(Math.max(0, Math.min(1, frac)) * 1440)
+      return `${pad(Math.floor(totalMin / 60) % 24)}:${pad(totalMin % 60)}`
+    }
+    const startTimeStr = fracToHHMM(startFrac)
+    const endTimeStr   = fracToHHMM(endFrac)
+    const ts = `${startTimeStr}–${endTimeStr}`
     const pct = chip?.pctOfShift != null ? ` · ${Math.round(chip.pctOfShift)}% en este día` : ''
     // fragSuffix en paridad con EnrichedCardEntry.fragId para sync hover (#32):
     //   enters → 'mad' (Madrugada card en este día)
@@ -467,6 +480,9 @@ function buildDayTimelineBlocks(
       dateKey: hist.dateKey,
       shiftId: hist.shiftId,
       fragId: `${hist.id}-${fragSuffix}`,
+      startTimeStr,
+      endTimeStr,
+      p0Pct: hist.pointZeroPct,
     })
   }
   return blocks
@@ -2277,41 +2293,79 @@ export function GraderHistoricalCalendar({
                         {slideKey ? slideKey.slice(5) : '—'}
                       </span>
                     </div>
-                    {/* Barra timeline 24h — full-bleed: sin padding lateral ni border-radius */}
+                    {/* ── Barra timeline 24h — 3 capas: bloques Grader / Shoplogix / eje hora ── */}
                     <div
-                      className="relative h-8 overflow-hidden border-y border-border/25 bg-muted/15"
+                      className="relative overflow-hidden border-y border-border/25 bg-muted/15"
+                      style={{ height: '52px' }}
                       title={slideKey ? `Timeline ${slideKey}` : undefined}
                     >
-                      {/* Línea de medianoche (00:00) en el borde izquierdo de cada slide */}
-                      <div className="absolute inset-y-0 left-0 w-px bg-white/20 z-10 pointer-events-none" />
+                      {/* ── Capa 1: grid de horas ── */}
+                      {/* Medianoche */}
+                      <div className="absolute inset-y-0 left-0 w-px bg-white/25 z-10 pointer-events-none" />
+                      {/* Ticks cada 3h — más claros en las horas principales (6/12/18) */}
                       {[3, 6, 9, 12, 15, 18, 21].map(h => (
-                        <div key={h} className="absolute top-0 bottom-0 w-px bg-border/25" style={{ left: `${(h / 24) * 100}%` }} />
+                        <div
+                          key={h}
+                          className={cn(
+                            'absolute top-0 pointer-events-none z-10',
+                            [6, 12, 18].includes(h)
+                              ? 'bottom-0 w-px bg-white/20'
+                              : 'bottom-5 w-px bg-border/30',
+                          )}
+                          style={{ left: `${(h / 24) * 100}%` }}
+                        />
                       ))}
-                      {/* Overlay Shoplogix: bandas de break/downtime con razón.
-                          z-0 para quedar detrás de los blocks. top-0 bottom-0
-                          para cubrir la franja completa (incluyendo top y bottom
-                          donde no hay block, así el tooltip es accesible). */}
+                      {/* Labels de hora — zona inferior, más legibles */}
+                      {[0, 6, 12, 18, 24].map(h => (
+                        <span
+                          key={h}
+                          className="absolute bottom-0.5 text-[8px] font-medium text-muted-foreground/65 tabular-nums pointer-events-none z-10"
+                          style={{
+                            left: `${(h / 24) * 100}%`,
+                            transform: h === 0 ? 'none' : h === 24 ? 'translateX(-100%)' : 'translateX(-50%)',
+                          }}
+                        >
+                          {h === 0 ? '0h' : `${h}h`}
+                        </span>
+                      ))}
+
+                      {/* ── Capa 2: bandas Shoplogix (franja inferior — debajo de los bloques) ──
+                          Sólo aparecen en la zona inferior (top: 60%, bottom: 12px),
+                          visible como "barra de estado Baader" separada visualmente. */}
                       {slxBands.map((band, i) => (
                         <div
                           key={`slx-${i}`}
                           className={cn(
-                            'absolute top-0 bottom-0 z-0 pointer-events-auto',
-                            band.type === 'break' && 'bg-slate-400/25',
-                            band.type === 'downtime' && 'bg-orange-500/25',
-                            band.type === 'setup' && 'bg-blue-400/20',
+                            'absolute z-[5] pointer-events-auto rounded-[1px]',
+                            band.type === 'break'    && 'bg-sky-400/50 border-t border-sky-400/30',
+                            band.type === 'downtime' && 'bg-orange-500/60 border-t border-orange-500/40',
+                            band.type === 'setup'    && 'bg-blue-400/40 border-t border-blue-400/30',
                           )}
                           style={{
-                            left: `${band.leftPct}%`,
-                            width: `max(${band.widthPct}%, 0.3%)`,
+                            left:   `${band.leftPct}%`,
+                            width:  `max(${band.widthPct}%, 0.4%)`,
+                            top:    '62%',
+                            bottom: '14px',
                           }}
                           title={band.title}
                         />
                       ))}
+                      {/* Etiqueta "Shoplogix Baader" si hay alguna banda */}
+                      {slxBands.length > 0 && (
+                        <span className="absolute right-1 text-[7px] text-muted-foreground/40 pointer-events-none z-10 leading-none"
+                          style={{ top: '64%' }}>
+                          Baader
+                        </span>
+                      )}
+
+                      {/* ── Capa 3: bloques del Grader (zona superior principal) ── */}
                       {blocks.map((b, i) => {
                         const isHovered = hoveredFragId === b.fragId
                         const navigateToBlockTurno = () => navigate(
                           `/analisis-grader/turno/${b.dateKey}__${encodeURIComponent(b.shiftId)}`,
                         )
+                        const showTimes  = b.widthPct > 14  // espacio suficiente para HH:mm
+                        const showP0     = b.widthPct > 10  // espacio para P0%
                         return (
                           <div
                             key={i}
@@ -2319,14 +2373,16 @@ export function GraderHistoricalCalendar({
                             role="button"
                             tabIndex={0}
                             className={cn(
-                              'absolute top-1 bottom-1 flex items-center justify-center cursor-pointer transition-all',
+                              'absolute flex items-center justify-center cursor-pointer transition-all overflow-hidden',
                               b.bgClass,
                               b.nightSide === null && 'rounded-sm',
                               isHovered && 'ring-2 ring-white/80 ring-offset-1 ring-offset-background z-20',
                             )}
                             style={{
-                              left: `${b.leftPct}%`,
-                              width: `max(${b.widthPct}%, 0.8%)`,
+                              left:   `${b.leftPct}%`,
+                              width:  `max(${b.widthPct}%, 0.8%)`,
+                              top:    '3px',
+                              bottom: '18px',
                               borderRadius:
                                 b.nightSide === 'start' ? '0 3px 3px 0' :
                                 b.nightSide === 'end'   ? '3px 0 0 3px' :
@@ -2347,21 +2403,31 @@ export function GraderHistoricalCalendar({
                             onMouseEnter={() => setHoveredFragId(b.fragId)}
                             onMouseLeave={() => setHoveredFragId(null)}
                           >
-                            {b.widthPct > 9 && (
-                              <span className="text-[9px] font-bold text-white/90 leading-none pointer-events-none">{b.label}</span>
+                            {/* Timestamp inicio — esquina sup-izq.
+                                Ocultamos en 'enters' (arranca en 00:00, no aporta info)
+                                y cuando el bloque es demasiado estrecho. */}
+                            {showTimes && b.nightSide !== 'start' && (
+                              <span className="absolute left-0.5 top-0.5 text-[8px] font-mono text-white/80 leading-none pointer-events-none tabular-nums">
+                                {b.startTimeStr}
+                              </span>
+                            )}
+                            {/* Label central (D / N / →N) + P0% */}
+                            <span className="text-[9px] font-bold text-white/95 leading-none pointer-events-none flex items-center gap-0.5">
+                              {b.label}
+                              {showP0 && (
+                                <span className="opacity-80 font-semibold"> {b.p0Pct.toFixed(1)}%</span>
+                              )}
+                            </span>
+                            {/* Timestamp fin — esquina inf-der.
+                                Ocultamos en 'exits' (termina en 24:00, no aporta info). */}
+                            {showTimes && b.nightSide !== 'end' && (
+                              <span className="absolute right-0.5 bottom-0.5 text-[8px] font-mono text-white/80 leading-none pointer-events-none tabular-nums">
+                                {b.endTimeStr}
+                              </span>
                             )}
                           </div>
                         )
                       })}
-                      {[0, 6, 12, 18, 24].map(h => (
-                        <span
-                          key={h}
-                          className="absolute bottom-0.5 text-[7px] text-muted-foreground/50 tabular-nums pointer-events-none"
-                          style={{ left: `${(h / 24) * 100}%`, transform: h === 0 ? 'none' : h === 24 ? 'translateX(-100%)' : 'translateX(-50%)' }}
-                        >
-                          {h === 0 ? '0h' : `${h}h`}
-                        </span>
-                      ))}
                     </div>
                     {/* Cards del día (madrugada · día · vespertina) — viajan con el timeline */}
                     {renderSlideCards(
