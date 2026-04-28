@@ -194,11 +194,8 @@ function renderShiftChip(chip: ShiftChipDescriptor, untaggedCount: number | null
  * - `madrugada`: turno noche que arrancó AYER y deja sus piezas en este día (00:00 → endAt).
  *   Render como card completa con icono `🌙→` y badge de orden temporal `1/N`.
  * - `dia`: turno día completo en este día calendárico. Card completa con icono `☀`.
- * - `vespertina`: turno noche que ARRANCA este día y la mayoría de sus piezas se quedan
- *   acá (caso raro de role=primary+direction=exits). Card completa con icono `←🌙`.
- *   Las vespertinas secundarias (role!=primary) NO se renderizan: aparecen como Madrugada
- *   en el día siguiente — al deslizar la flecha del calendario el usuario ve el mismo
- *   chip "fluyendo" sin duplicarse.
+ * - `vespertina`: reservado, actualmente nunca se renderiza — todos los `direction=exits`
+ *   se ocultan (aparecen como Madrugada en el día siguiente al deslizar).
  * - `salida`: turno noche programado en este día sin actividad real (ej. Domingos en
  *   Feb 2026). Render como strip compacto que invita a deslizar al primaryDateKey.
  */
@@ -224,14 +221,14 @@ function getStartMinutesUTC(iso: string | undefined): number | null {
 
 /**
  * Convierte los entries del día calendárico en cards enriquecidas con `kind`
- * temporal y orden cronológico. Filtra las vespertinas secundarias (aparecen
- * como Madrugada en el día siguiente).
+ * temporal y orden cronológico. Filtra TODOS los `direction=exits` no-orphan
+ * (aparecen como Madrugada en el día siguiente — máximo 2 cards por día).
  */
 function enrichEntriesByKind(
   entries: Array<{ summary: GraderDailySummary; chip: ShiftChipDescriptor | null }>,
 ): EnrichedCardEntry[] {
   const visible = entries.filter(
-    (e) => !(e.chip?.direction === 'exits' && e.chip?.role !== 'primary'),
+    (e) => e.chip?.role === 'orphan-source' || e.chip?.direction !== 'exits',
   )
 
   return visible
@@ -248,10 +245,6 @@ function enrichEntriesByKind(
         kind = 'madrugada'
         sortMin = 0
         fragSuffix = 'mad'
-      } else if (chip?.direction === 'exits') {
-        kind = 'vespertina'
-        sortMin = getStartMinutesUTC(summary.startAt) ?? 21 * 60
-        fragSuffix = 'ves'
       } else {
         kind = 'dia'
         sortMin = getStartMinutesUTC(summary.startAt) ?? 9 * 60
