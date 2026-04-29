@@ -439,6 +439,28 @@ export function AnalisisGraderTurnoPage() {
   }, [enrichedTimelineBuckets, shiftWindow])
 
   // ── Navegación contextual prev/next ─────────────────────────────────────
+
+  /**
+   * Fallback de navegación por aritmética de calendario.
+   * Se usa cuando no hay graderDailySummaries para la planta (ej. Yal sin Excel)
+   * o cuando el turno actual no existe en los summaries del rango.
+   *   Turno día  → prev: día anterior Turno noche | next: mismo día Turno noche
+   *   Turno noche → prev: mismo día Turno día     | next: día siguiente Turno día
+   */
+  function scheduleAdjacentShifts(dk: string, sid: string) {
+    const SHIFTS = ['Turno día', 'Turno noche']
+    const si = SHIFTS.indexOf(sid)
+    if (si === -1) return { prev: null, next: null }
+    const d = new Date(`${dk}T12:00:00`)
+    const prev1 = new Date(d); prev1.setDate(prev1.getDate() - 1)
+    const next1 = new Date(d); next1.setDate(next1.getDate() + 1)
+    const prevKey = prev1.toISOString().slice(0, 10)
+    const nextKey = next1.toISOString().slice(0, 10)
+    return si === 0
+      ? { prev: { dateKey: prevKey, shiftId: 'Turno noche' }, next: { dateKey: dk,      shiftId: 'Turno noche' } }
+      : { prev: { dateKey: dk,      shiftId: 'Turno día'   }, next: { dateKey: nextKey, shiftId: 'Turno día'   } }
+  }
+
   // Carga shifts del rango ±20 días para construir cadena de navegación
   const [adjacentShifts, setAdjacentShifts] = useState<{ prev: { dateKey: string; shiftId: string } | null; next: { dateKey: string; shiftId: string } | null }>({ prev: null, next: null })
 
@@ -452,8 +474,14 @@ export function AnalisisGraderTurnoPage() {
       const d = new Date(`${dateKey}T12:00:00`); d.setDate(d.getDate() + 20)
       return d.toISOString().slice(0, 10)
     })()
-    listDailySummariesByRange(fromDate, toDate)
+    // BUGFIX: pasar plantLineCfg.id para no mezclar plants (Yal vs Chonchi)
+    listDailySummariesByRange(fromDate, toDate, plantLineCfg.id)
       .then(list => {
+        // Sin summaries para esta planta → fallback calendario (ej. Yal sin Excel)
+        if (list.length === 0) {
+          setAdjacentShifts(scheduleAdjacentShifts(dateKey, shiftLabel))
+          return
+        }
         // Orden cronológico ascendente por dateKey, luego día antes que noche
         const sorted = [...list].sort((a, b) => {
           if (a.dateKey !== b.dateKey) return a.dateKey.localeCompare(b.dateKey)
@@ -464,7 +492,8 @@ export function AnalisisGraderTurnoPage() {
         })
         const idx = sorted.findIndex(s => s.dateKey === dateKey && s.shiftId === shiftLabel)
         if (idx === -1) {
-          setAdjacentShifts({ prev: null, next: null })
+          // Turno actual sin summary en esta planta → fallback calendario
+          setAdjacentShifts(scheduleAdjacentShifts(dateKey, shiftLabel))
           return
         }
         const prevEntry = idx > 0 ? sorted[idx - 1] : null
@@ -474,12 +503,15 @@ export function AnalisisGraderTurnoPage() {
           next: nextEntry ? { dateKey: nextEntry.dateKey, shiftId: nextEntry.shiftId } : null,
         })
       })
-      .catch(() => setAdjacentShifts({ prev: null, next: null }))
-  }, [dateKey, shiftLabel])
+      .catch(() => setAdjacentShifts(scheduleAdjacentShifts(dateKey, shiftLabel)))
+  }, [dateKey, shiftLabel, plantLineCfg.id])
 
   const goToShift = useCallback((target: { dateKey: string; shiftId: string }) => {
-    navigate(`/analisis-grader/turno/${target.dateKey}__${encodeURIComponent(target.shiftId)}`)
-  }, [navigate])
+    // BUGFIX: preservar ?linea= para mantener la planta activa al navegar
+    const linea = searchParams.get('linea')
+    const qs = linea ? `?linea=${encodeURIComponent(linea)}` : ''
+    navigate(`/analisis-grader/turno/${target.dateKey}__${encodeURIComponent(target.shiftId)}${qs}`)
+  }, [navigate, searchParams])
 
   // Atajos de teclado: ← / → para navegar entre turnos
   useEffect(() => {
