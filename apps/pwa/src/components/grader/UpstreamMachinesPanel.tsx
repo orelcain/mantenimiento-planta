@@ -43,6 +43,7 @@ import {
 import { useTimelineSyncOptional } from './useTimelineSync'
 import { StateTimelineEC } from './StateTimelineEC'
 import { ProductionBarsEC } from './ProductionBarsEC'
+import { ProductionRateLineEC } from './ProductionRateLineEC'
 import { StateDetailPanel } from './StateDetailPanel'
 import { exportCombinedTimelinePng } from './exportCombinedTimelinePng'
 import { fmtTime, fmtDurationSec } from '@/services/grader/graderTimeFormat'
@@ -699,6 +700,22 @@ export function UpstreamMachinesPanel({
                   Próximamente: estado en vivo de las 3 Baaders 142, paros, Micro Detenciones
                   y correlación con los P0 del Grader. Ver <code className="text-slate-400">docs/SHOPLOGIX_INTEGRATION_PLAN.md</code>.
                 </p>
+              </div>
+            )}
+
+            {/* ── Gráfico tasa pz/min por Baader + promedio ─────────────────────
+                Siempre visible cuando hay datos. Permite ver de un vistazo
+                qué máquina bajó primero y cuánto difiere del promedio. */}
+            {snapshot && snapshot.machines.length > 0 && (
+              <div className="mb-3 pb-3 border-b border-slate-800/60">
+                <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
+                  Tasa de producción por máquina · pz/min
+                </p>
+                <ProductionRateLineEC
+                  machines={snapshot.machines}
+                  windowStart={windowStart}
+                  windowEnd={windowEnd}
+                />
               </div>
             )}
 
