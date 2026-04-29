@@ -25,6 +25,7 @@ import type { ShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import { DEFAULT_SHIFT_SCHEDULE } from '@/services/grader/graderShiftSchedule'
 import { parseMatrixErrorString } from '@/services/grader/graderMatrixP0Causes'
 import { HeroScorecard } from '@/components/grader/HeroScorecard'
+import { ShoplogixOnlyScorecard } from '@/components/grader/ShoplogixOnlyScorecard'
 import { P0CausesPanel } from '@/components/grader/P0CausesPanel'
 import { ShiftTimelineView } from '@/components/grader/ShiftTimelineView'
 import { resolveAxisWindow, computeProductionWindow } from '@/components/grader/shiftTimelineHelpers'
@@ -972,13 +973,21 @@ export function AnalisisGraderTurnoPage() {
       {/* Vista Shoplogix-only: sin Excel Grader pero con datos de máquinas (Yal u otras líneas) */}
       {!summary && !loading && upstreamLine.snapshot && (
         <div className="space-y-4">
-          {/* Banner informativo — no es un error, es el modo Shoplogix */}
+          {/* Scorecard principal — mismo patrón visual que HeroScorecard */}
+          <ShoplogixOnlyScorecard
+            snapshot={upstreamLine.snapshot}
+            shiftWindow={shiftWindow}
+            shiftLabel={shiftLabel}
+            dateKey={dateKey}
+          />
+
+          {/* Banner informativo con acción de carga */}
           <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-sky-500/10 border border-sky-500/30 text-sky-400 text-sm">
             <Activity className="w-4 h-4 shrink-0" />
             <span className="flex-1">
               {shiftWindow?.status === 'live'
-                ? 'Turno en curso · Sin datos Grader aún'
-                : 'Vista Shoplogix · Sin Excel Grader para este turno'}
+                ? 'Turno en curso · Sin datos Grader aún — vista basada en Shoplogix'
+                : 'Sin Excel Grader para este turno · mostrando datos Shoplogix'}
             </span>
             {isAdmin && (
               <Button
@@ -992,6 +1001,8 @@ export function AnalisisGraderTurnoPage() {
               </Button>
             )}
           </div>
+
+          {/* Panel de máquinas con timeline y Gantts */}
           <UpstreamMachinesPanel
             snapshot={upstreamLine.snapshot}
             loading={upstreamLine.loading}
