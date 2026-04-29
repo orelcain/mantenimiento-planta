@@ -43,6 +43,7 @@ import { PauseAnnotationDialog } from '@/components/grader/PauseAnnotationDialog
 import { resolveEffectiveTag } from '@/services/grader/graderPauseTags'
 import { exportTurnToPDF } from '@/services/grader/graderTurnToPDF'
 import { useOnlineStatus } from '@/hooks/useOnlineStatus'
+import { useSyncAge } from '@/hooks/useSyncAge'
 import { usePauseTags } from '@/hooks/usePauseTags'
 import { useToast } from '@/hooks/useToast'
 import { ActionPlanPanel } from '@/components/grader/ActionPlanPanel'
@@ -356,9 +357,14 @@ export function AnalisisGraderTurnoPage() {
   const [calibreOverride, setCalibrerOverride] = useState<CalibreWeightRange[] | null>(null)
   const [turnoThresholdsOverride, setTurnoThresholdsOverride] = useState<{ photocellPctWarn: number; outOfLimitsPctWarn: number; pointZeroPctWarn: number; pointZeroPctCritical: number } | null>(null)
 
-  // ── Shoplogix manual refresh ──────────────────────────────────────────────
+  // ── Shoplogix staleness counter + manual refresh ──────────────────────────
   const [slxSyncing, setSlxSyncing] = useState(false)
   const [slxLastManualSync, setSlxLastManualSync] = useState<Date | null>(null)
+  // syncAge usa upstreamLine.syncedAt (Firestore) o el último manual sync si es más reciente
+  const slxBestSyncedAt = slxLastManualSync && upstreamLine.syncedAt
+    ? (slxLastManualSync > upstreamLine.syncedAt ? slxLastManualSync : upstreamLine.syncedAt)
+    : (slxLastManualSync ?? upstreamLine.syncedAt)
+  const syncAge = useSyncAge(slxBestSyncedAt)
 
   // ── Share (token público) — estado; handlers después de enrichedTimelineBuckets ──
   const [sharing, setSharing] = useState(false)
@@ -1009,30 +1015,35 @@ export function AnalisisGraderTurnoPage() {
           />
 
           {/* Banner informativo con acción de carga + refresh */}
-          <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-sky-500/10 border border-sky-500/30 text-sky-400 text-sm">
+          <div className="flex flex-wrap items-center gap-2 px-3 py-2 rounded-md bg-sky-500/10 border border-sky-500/30 text-sky-400 text-sm">
             <Activity className="w-4 h-4 shrink-0" />
             <span className="flex-1 min-w-0">
               {shiftWindow?.status === 'live'
                 ? 'Turno en curso · Sin datos Grader aún — vista basada en Shoplogix'
                 : 'Sin Excel Grader para este turno · mostrando datos Shoplogix'}
-              {slxLastManualSync && (
-                <span className="ml-2 text-[10px] text-sky-500/70">
-                  · actualizado {Math.round((Date.now() - slxLastManualSync.getTime()) / 1000)}s atrás
-                </span>
-              )}
             </span>
-            {/* Botón actualizar ahora — disponible para todos los usuarios */}
+
+            {/* Contador de tiempo desde último sync */}
+            {slxBestSyncedAt && (
+              <span className={`flex items-center gap-1 text-[11px] font-medium tabular-nums shrink-0 px-2 py-0.5 rounded-full border ${syncAge.colorClass} ${syncAge.bgClass} border-current/20`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${syncAge.isStale ? 'bg-red-400 animate-pulse' : 'bg-current'}`} />
+                {slxSyncing ? 'sincronizando…' : syncAge.label}
+              </span>
+            )}
+
+            {/* Botón actualizar ahora */}
             <Button
               size="sm"
               variant="outline"
               className="h-7 text-xs border-sky-500/40 text-sky-400 hover:bg-sky-500/10 shrink-0"
               onClick={handleSlxRefresh}
               disabled={slxSyncing}
-              title="Forzar sync Shoplogix ahora"
+              title={`Último sync: ${slxBestSyncedAt?.toLocaleTimeString('es-CL') ?? 'nunca'}`}
             >
               <RefreshCw className={`w-3 h-3 mr-1.5 ${slxSyncing ? 'animate-spin' : ''}`} />
               {slxSyncing ? 'Actualizando…' : 'Actualizar ahora'}
             </Button>
+
             {isAdmin && (
               <Button
                 size="sm"
@@ -1182,25 +1193,31 @@ export function AnalisisGraderTurnoPage() {
 
           {/* Línea upstream — Evisceradoras Baader 142 (integración Shoplogix) */}
           {/* Va INMEDIATAMENTE después del timeline Grader para máxima cercanía visual */}
-          {/* Botón refresh Shoplogix — disponible cuando hay snapshot o está cargando */}
+          {/* Barra Shoplogix: contador de staleness + botón refresh */}
           {(upstreamLine.snapshot || upstreamLine.loading) && (
-            <div className="flex items-center justify-end gap-2 -mb-1">
-              {slxLastManualSync && (
-                <span className="text-[10px] text-muted-foreground">
-                  actualizado {Math.round((Date.now() - slxLastManualSync.getTime()) / 1000)}s atrás
-                </span>
-              )}
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-6 text-[11px] text-muted-foreground hover:text-sky-400 px-2"
-                onClick={handleSlxRefresh}
-                disabled={slxSyncing}
-                title="Forzar sync Shoplogix ahora"
-              >
-                <RefreshCw className={`w-3 h-3 mr-1 ${slxSyncing ? 'animate-spin' : ''}`} />
-                {slxSyncing ? 'Actualizando…' : 'Actualizar Shoplogix'}
-              </Button>
+            <div className="flex items-center justify-between gap-2 -mb-1 px-1">
+              <span className="text-[11px] text-muted-foreground">
+                Línea upstream · Evisceradoras Baader 142
+              </span>
+              <div className="flex items-center gap-2">
+                {slxBestSyncedAt && (
+                  <span className={`flex items-center gap-1 text-[11px] font-medium tabular-nums px-2 py-0.5 rounded-full border ${syncAge.colorClass} ${syncAge.bgClass} border-current/20`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${syncAge.isStale ? 'bg-red-400 animate-pulse' : 'bg-current'}`} />
+                    {slxSyncing ? 'sincronizando…' : syncAge.label}
+                  </span>
+                )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 text-[11px] text-muted-foreground hover:text-sky-400 px-2"
+                  onClick={handleSlxRefresh}
+                  disabled={slxSyncing}
+                  title={`Último sync: ${slxBestSyncedAt?.toLocaleTimeString('es-CL') ?? 'nunca'}`}
+                >
+                  <RefreshCw className={`w-3 h-3 mr-1 ${slxSyncing ? 'animate-spin' : ''}`} />
+                  {slxSyncing ? 'Actualizando…' : 'Actualizar'}
+                </Button>
+              </div>
             </div>
           )}
           <UpstreamMachinesPanel
