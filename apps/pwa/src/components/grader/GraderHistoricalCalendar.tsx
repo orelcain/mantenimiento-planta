@@ -95,6 +95,11 @@ interface GraderHistoricalCalendarProps {
    * Default: 'chonchi-eviscerado' (comportamiento original).
    */
   plantLineId?: PlantLineId
+  /**
+   * Emitido cuando cambian las stats mensuales de Shoplogix (mes o datos).
+   * Null si no hay datos Shoplogix para el mes visible.
+   */
+  onSlxMonthStatsLoaded?: (stats: SlxMonthlyStats | null) => void
 }
 
 const monthNames = [
@@ -592,6 +597,10 @@ interface SlxShiftCache {
   states: UpstreamMachineState[]
   shiftStart: Date | null
   shiftEnd: Date | null
+  /** Fracción uptime real (0-1) calculada por el normalizer Shoplogix */
+  shiftRuntime: number
+  /** Total ciclos sumados de todas las Baaders del turno */
+  totalCycles: number
   breakdown: {
     uptimeSec: number
     breakSec: number
@@ -602,6 +611,18 @@ interface SlxShiftCache {
   } | null
 }
 
+/** Stats mensuales Shoplogix — emitidos por `onSlxMonthStatsLoaded` para el panel lateral */
+export interface SlxMonthlyStats {
+  totalCycles: number
+  avgUptimePct: number       // 0-100
+  turnosWithData: number
+  dayShiftsWithData: number
+  nightShiftsWithData: number
+  daysWithData: number
+  bestShift: { dateKey: string; shiftId: string; uptimePct: number; totalCycles: number } | null
+  worstShift: { dateKey: string; shiftId: string; uptimePct: number; totalCycles: number } | null
+}
+
 export function GraderHistoricalCalendar({
   onLoadTurno,
   className,
@@ -609,6 +630,7 @@ export function GraderHistoricalCalendar({
   stacked = false,
   onMonthChange,
   onSummariesLoaded,
+  onSlxMonthStatsLoaded,
   plantLineId = DEFAULT_PLANT_LINE_ID,
 }: GraderHistoricalCalendarProps) {
   const navigate = useNavigate()
@@ -633,6 +655,8 @@ export function GraderHistoricalCalendar({
   // Cache totales Baader por shift — para indicador de "data Grader perdida"
   // (cuando Grader.totalPieces < Baader.totalCycles * 0.95 = >5% loss).
   const [slxTotalsByShift, setSlxTotalsByShift] = useState<Map<string, number>>(new Map())
+  // Ref para evitar re-queuing en el pre-cargador mensual de Shoplogix
+  const slxMonthQueuedRef = useRef<Set<string>>(new Set())
 
   // Si el URL trae ?goto=YYYY-MM-DD úsalo como initialDateKey (prioridad sobre prop)
   const gotoParam = searchParams.get('goto')
@@ -717,9 +741,13 @@ export function GraderHistoricalCalendar({
 
   // Reset de caché Shoplogix al cambiar de planta — evita que datos de Chonchi
   // aparezcan en el timeline de Yal (mismas claves dateKey__shiftId, distinto plantSlug).
+  // También resetea el queued-set para que el pre-loader mensual re-cargue los
+  // datos de la planta nueva (si no se resetea, las claves quedan marcadas como
+  // "ya cargadas" de la planta anterior y el pre-loader las saltea todas).
   useEffect(() => {
     setSlxByShift(new Map())
     setSlxTotalsByShift(new Map())
+    slxMonthQueuedRef.current = new Set()
   }, [plantLineId])
 
   // Cargar summaries históricos para el mes visible
@@ -1032,6 +1060,8 @@ export function GraderHistoricalCalendar({
             states,
             shiftStart: m0?.shiftStart ?? null,
             shiftEnd: m0?.shiftEnd ?? null,
+            shiftRuntime: m0?.shiftRuntime ?? 0,
+            totalCycles,
             breakdown: m0?.shiftRuntimeBreakdown ? {
               uptimeSec: m0.shiftRuntimeBreakdown.uptimeSec,
               breakSec: m0.shiftRuntimeBreakdown.breakSec,
@@ -1047,13 +1077,110 @@ export function GraderHistoricalCalendar({
         .catch(() => {
           // Sin Shoplogix data → guardar entry vacía para no re-intentar
           if (!cancelled) {
-            setSlxByShift((prev) => new Map(prev).set(key, { states: [], shiftStart: null, shiftEnd: null, breakdown: null }))
+            setSlxByShift((prev) => new Map(prev).set(key, { states: [], shiftStart: null, shiftEnd: null, shiftRuntime: 0, totalCycles: 0, breakdown: null }))
             setSlxTotalsByShift((prev) => new Map(prev).set(key, 0))
           }
         })
     }
     return () => { cancelled = true }
   }, [selectedKey, slxByShift])
+
+  // Pre-carga mensual de Shoplogix — carga TODOS los turnos del mes visible
+  // para habilitar chips en celdas del calendario y panel de stats mensuales.
+  // Usa `slxMonthQueuedRef` para no re-queuing. No depende de `slxByShift`
+  // para evitar re-renders infinitos.
+  useEffect(() => {
+    const year  = currentMonth.getFullYear()
+    const month = currentMonth.getMonth()
+    const daysInMonth = new Date(year, month + 1, 0).getDate()
+    let cancelled = false
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dk = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+      for (const shiftId of ['Turno día', 'Turno noche'] as const) {
+        const key = `${dk}__${shiftId}`
+        if (slxMonthQueuedRef.current.has(key)) continue
+        slxMonthQueuedRef.current.add(key)
+        loadShoplogixShift(dk, shiftId, plantSlug)
+          .then((res) => {
+            if (cancelled) return
+            const m0 = res.snapshot?.machines[0]
+            const states = m0?.states ?? []
+            const cycles = (res.snapshot?.machines ?? []).reduce((a, mc) => a + (mc.totalCycles || 0), 0)
+            const cache: SlxShiftCache = {
+              states,
+              shiftStart: m0?.shiftStart ?? null,
+              shiftEnd:   m0?.shiftEnd   ?? null,
+              shiftRuntime: m0?.shiftRuntime ?? 0,
+              totalCycles: cycles,
+              breakdown: m0?.shiftRuntimeBreakdown ? {
+                uptimeSec:          m0.shiftRuntimeBreakdown.uptimeSec,
+                breakSec:           m0.shiftRuntimeBreakdown.breakSec,
+                downtimeSec:        m0.shiftRuntimeBreakdown.downtimeSec,
+                setupSec:           m0.shiftRuntimeBreakdown.setupSec,
+                plannedDowntimeSec: m0.shiftRuntimeBreakdown.plannedDowntimeSec,
+                totalTrackedSec:    m0.shiftRuntimeBreakdown.totalTrackedSec,
+              } : null,
+            }
+            setSlxByShift((prev)       => new Map(prev).set(key, cache))
+            setSlxTotalsByShift((prev) => new Map(prev).set(key, cycles))
+          })
+          .catch(() => {
+            // Sin datos → entrada vacía para que el UI no quede en loading infinito
+            if (!cancelled) {
+              slxMonthQueuedRef.current.delete(key) // permite reintento en siguiente visita
+              setSlxByShift((prev) => new Map(prev).set(key, {
+                states: [], shiftStart: null, shiftEnd: null, shiftRuntime: 0, totalCycles: 0, breakdown: null,
+              }))
+              setSlxTotalsByShift((prev) => new Map(prev).set(key, 0))
+            }
+          })
+      }
+    }
+    return () => { cancelled = true }
+  }, [currentMonth, plantSlug]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Stats mensuales Shoplogix — calcula solo para el mes visible.
+  // Se emite via onSlxMonthStatsLoaded para el panel lateral.
+  const slxMonthlyStats = useMemo<SlxMonthlyStats | null>(() => {
+    const year  = currentMonth.getFullYear()
+    const month = currentMonth.getMonth()
+    const daysInMonth = new Date(year, month + 1, 0).getDate()
+    const prefix = `${year}-${String(month + 1).padStart(2, '0')}-`
+    type ShiftEntry = { dateKey: string; shiftId: string; uptimePct: number; totalCycles: number }
+    const withData: ShiftEntry[] = []
+    let totalCycles = 0
+    let sumUptime = 0
+    const daySet = new Set<string>()
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dk = `${prefix}${String(d).padStart(2, '0')}`
+      for (const shiftId of ['Turno día', 'Turno noche'] as const) {
+        const cache = slxByShift.get(`${dk}__${shiftId}`)
+        if (!cache || cache.totalCycles === 0) continue
+        const uptimePct = cache.shiftRuntime * 100
+        withData.push({ dateKey: dk, shiftId, uptimePct, totalCycles: cache.totalCycles })
+        totalCycles += cache.totalCycles
+        sumUptime   += uptimePct
+        daySet.add(dk)
+      }
+    }
+    if (withData.length === 0) return null
+    const sorted = [...withData].sort((a, b) => b.uptimePct - a.uptimePct)
+    return {
+      totalCycles,
+      avgUptimePct: sumUptime / withData.length,
+      turnosWithData: withData.length,
+      dayShiftsWithData:   withData.filter(e => e.shiftId === 'Turno día').length,
+      nightShiftsWithData: withData.filter(e => e.shiftId === 'Turno noche').length,
+      daysWithData: daySet.size,
+      bestShift:  sorted[0] ?? null,
+      worstShift: sorted[sorted.length - 1] ?? null,
+    }
+  }, [currentMonth, slxByShift])
+
+  // Emite stats mensuales al padre para el panel lateral
+  useEffect(() => {
+    onSlxMonthStatsLoaded?.(slxMonthlyStats)
+  }, [slxMonthlyStats, onSlxMonthStatsLoaded])
 
   const selectedUploads = useMemo(() => {
     if (!selectedKey) return []
@@ -1888,6 +2015,13 @@ export function GraderHistoricalCalendar({
               const missingGate0 = hasData && dayHistorical.some((s) => s.hasGate0Data === false)
               const isSelected = selectedDate?.toDateString() === day.toDateString()
 
+              // Indicadores Shoplogix para días sin datos Grader
+              const slxDayCycles   = !hasData ? (slxTotalsByShift.get(`${dayKey}__Turno día`)   ?? 0) : 0
+              const slxNightCycles = !hasData ? (slxTotalsByShift.get(`${dayKey}__Turno noche`) ?? 0) : 0
+              const hasSlxDay   = slxDayCycles   > 0
+              const hasSlxNight = slxNightCycles > 0
+              const hasAnySlx   = hasSlxDay || hasSlxNight
+
               // M9 — un día tiene untagged si algún chip primary/orphan-source del día
               // (no contamos secondary para evitar doble-marcar el mismo summary)
               const dayHasUntagged = filterUntagged && chipsForDay.length > 0
@@ -1906,10 +2040,11 @@ export function GraderHistoricalCalendar({
                     'h-24 p-1.5 border rounded-lg text-left transition-all flex flex-col gap-0.5',
                     isToday(day) && !isSelected && 'border-primary/60 bg-primary/5',
                     isSelected && 'ring-2 ring-primary border-primary bg-primary/8',
-                    !hasData && dayUploads.length === 0 && 'opacity-40',
+                    !hasData && !hasAnySlx && dayUploads.length === 0 && 'opacity-40',
                     hasData && worstP0 !== null && worstP0 >= DEFAULT_P0_CRITICAL_PCT && 'border-red-400/50 bg-red-500/3',
                     hasData && worstP0 !== null && worstP0 >= DEFAULT_P0_ALERT_PCT && worstP0 < DEFAULT_P0_CRITICAL_PCT && 'border-amber-400/50',
                     hasData && worstP0 !== null && worstP0 < DEFAULT_P0_ALERT_PCT && 'border-emerald-400/40',
+                    !hasData && hasAnySlx && 'border-sky-500/30 bg-sky-500/3',
                     dimByFilter && 'opacity-20 pointer-events-none',
                     dayHasUntagged && !isSelected && 'border-amber-400/70 bg-amber-500/5',
                   )}
@@ -1932,6 +2067,32 @@ export function GraderHistoricalCalendar({
 
                   {/* Per-shift chips (Camino 2-B refinado: primary/secondary/orphan-source) */}
                   {chipsForDay.map((chip) => renderShiftChip(chip, filterUntagged ? (untaggedCounts.get(chip.summaryId) ?? null) : null))}
+
+                  {/* Chips Shoplogix para días sin datos Grader */}
+                  {!hasData && hasAnySlx && (
+                    <>
+                      {hasSlxDay && (
+                        <div className="flex items-center justify-between rounded px-1 py-0.5 leading-none bg-sky-500/15 text-sky-400">
+                          <span className="text-[8px] font-medium opacity-80">D</span>
+                          <span className="text-[9px] font-bold tabular-nums">
+                            {slxDayCycles >= 1000
+                              ? `${(slxDayCycles / 1000).toFixed(1)}k`
+                              : String(slxDayCycles)}
+                          </span>
+                        </div>
+                      )}
+                      {hasSlxNight && (
+                        <div className="flex items-center justify-between rounded px-1 py-0.5 leading-none bg-indigo-500/15 text-indigo-400">
+                          <span className="text-[8px] font-medium opacity-80">N</span>
+                          <span className="text-[9px] font-bold tabular-nums">
+                            {slxNightCycles >= 1000
+                              ? `${(slxNightCycles / 1000).toFixed(1)}k`
+                              : String(slxNightCycles)}
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  )}
 
                   {/* Missing data badges */}
                   {(missingPiece || missingGate0) && (
@@ -2017,18 +2178,60 @@ export function GraderHistoricalCalendar({
                   return (
                     <div
                       key={shiftId}
-                      className="rounded-lg border border-dashed border-muted-foreground/30 p-3 space-y-2 bg-background/30"
+                      className={cn(
+                        'rounded-lg border p-3 space-y-2',
+                        hasSlx
+                          ? 'border-sky-500/30 bg-sky-500/3'
+                          : 'border-dashed border-muted-foreground/30 bg-background/30',
+                      )}
                     >
-                      <div className="flex items-center gap-2">
-                        {shiftId === 'Turno día'
-                          ? <Sun className="h-4 w-4 text-amber-500" />
-                          : <Moon className="h-4 w-4 text-indigo-400" />}
-                        <p className="text-sm font-medium">{shiftId}</p>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          {shiftId === 'Turno día'
+                            ? <Sun className="h-4 w-4 text-amber-500" />
+                            : <Moon className="h-4 w-4 text-indigo-400" />}
+                          <p className="text-sm font-medium">{shiftId}</p>
+                        </div>
+                        {hasSlx && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-400 border border-sky-500/30 font-medium">
+                            Shoplogix
+                          </span>
+                        )}
                       </div>
-                      <p className="text-[11px] text-muted-foreground leading-snug">
-                        Sin registros. Podés ir guardando los cambios de gate que reporta control de producción —
-                        al subir el Excel se cruzarán con tu historial.
-                      </p>
+
+                      {/* KPIs Shoplogix cuando hay datos */}
+                      {hasSlx && (() => {
+                        const cache = slxByShift.get(slxKey)
+                        const cycles = slxTotalsByShift.get(slxKey) ?? 0
+                        const uptimePct = (cache?.shiftRuntime ?? 0) * 100
+                        return (
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <div className="rounded bg-muted/40 px-2 py-1 text-center">
+                              <div className="text-sm font-semibold tabular-nums">
+                                {cycles.toLocaleString('es-CL')}
+                              </div>
+                              <div className="text-[10px] text-muted-foreground">ciclos</div>
+                            </div>
+                            <div className="rounded bg-muted/40 px-2 py-1 text-center">
+                              <div className={cn(
+                                'text-sm font-semibold tabular-nums',
+                                uptimePct >= 70 ? 'text-emerald-400' : uptimePct >= 40 ? 'text-amber-400' : 'text-red-400',
+                              )}>
+                                {uptimePct.toFixed(0)}%
+                              </div>
+                              <div className="text-[10px] text-muted-foreground">uptime</div>
+                            </div>
+                          </div>
+                        )
+                      })()}
+
+                      {!hasSlx && (
+                        <p className="text-[11px] text-muted-foreground leading-snug">
+                          Sin registros. Podés ir guardando los cambios de gate que reporta control de producción —
+                          al subir el Excel se cruzarán con tu historial.
+                        </p>
+                      )}
+
                       <div className="flex items-center gap-2">
                         <QuickGateChangeButton
                           shiftDocId={`${selectedKey}__${shiftId}`}
@@ -2042,7 +2245,7 @@ export function GraderHistoricalCalendar({
                             title="Ver detalle Shoplogix de este turno"
                           >
                             <Activity className="h-3 w-3" />
-                            Ver Shoplogix
+                            Ver detalle
                           </button>
                         )}
                       </div>

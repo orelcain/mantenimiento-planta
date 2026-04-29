@@ -5,12 +5,13 @@
  */
 import { useMemo } from 'react'
 import { Card, CardContent } from '@/components/ui'
-import { TrendingDown, TrendingUp, AlertTriangle, BarChart3, Sun, Moon } from 'lucide-react'
+import { TrendingDown, TrendingUp, AlertTriangle, BarChart3, Sun, Moon, Activity } from 'lucide-react'
 import type { GraderDailySummary } from '@/services/grader/types'
 import { getCauseLabel } from '@/services/grader/graderMatrixP0Causes'
 import { p0StatusFromPct, p0StatusColor } from '@/services/grader/graderP0Thresholds'
 import { aggregateByCalendarDay } from '@/services/grader/graderCalendarAggregation'
 import { fmt, fmtDec } from '@/lib/format'
+import type { SlxMonthlyStats } from './GraderHistoricalCalendar'
 
 const MONTH_NAMES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -20,9 +21,11 @@ const MONTH_NAMES = [
 interface Props {
   currentMonth: Date
   summaries: GraderDailySummary[]
+  /** Stats Shoplogix del mes — mostradas cuando no hay summaries Grader */
+  slxStats?: SlxMonthlyStats | null
 }
 
-export function GraderMonthlyStatsPanel({ currentMonth, summaries }: Props) {
+export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats }: Props) {
   const monthLabel = `${MONTH_NAMES[currentMonth.getMonth()]} ${currentMonth.getFullYear()}`
 
   const stats = useMemo(() => {
@@ -82,6 +85,113 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries }: Props) {
   const shiftLabel = (s: GraderDailySummary) => s.shiftId === 'Turno día' ? 'Día' : 'Noche'
 
   if (!stats) {
+    // Vista Shoplogix-only: sin Grader summaries pero con datos Shoplogix
+    if (slxStats) {
+      const uptimeColor =
+        slxStats.avgUptimePct >= 70 ? 'text-emerald-400'
+        : slxStats.avgUptimePct >= 40 ? 'text-amber-400'
+        : 'text-red-400'
+      const shiftLabel2 = (s: { shiftId: string }) =>
+        s.shiftId === 'Turno día' ? 'Día' : 'Noche'
+      return (
+        <div className="space-y-3 lg:sticky lg:top-4">
+          <div>
+            <p className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wide">Resumen del mes</p>
+            <p className="text-base font-bold leading-tight">{monthLabel}</p>
+            <p className="text-[10px] text-sky-400 flex items-center gap-1 mt-0.5">
+              <Activity className="w-3 h-3" />
+              Solo Shoplogix · sin Excel Grader
+            </p>
+          </div>
+
+          {/* KPI principal — total ciclos */}
+          <Card>
+            <CardContent className="pt-3 pb-3 px-4">
+              <div className="flex items-end justify-between gap-2">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Ciclos totales línea</p>
+                  <p className="text-4xl font-bold leading-none text-sky-400">
+                    {slxStats.totalCycles.toLocaleString('es-CL')}
+                  </p>
+                </div>
+                <div className="text-right space-y-0.5">
+                  <p className={`text-xl font-bold ${uptimeColor}`}>
+                    {fmtDec(slxStats.avgUptimePct, 0)}%
+                    <span className="text-xs font-normal text-muted-foreground ml-1">uptime</span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {slxStats.daysWithData} días · {slxStats.turnosWithData} turnos
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Mejor / Peor turno por uptime */}
+          <div className="grid grid-cols-2 gap-2">
+            {slxStats.bestShift && (
+              <Card className="border-emerald-500/20 bg-emerald-500/5">
+                <CardContent className="pt-2 pb-2 px-3">
+                  <div className="flex items-center gap-1 mb-0.5">
+                    <TrendingDown className="w-3 h-3 text-emerald-500" />
+                    <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">Mejor uptime</p>
+                  </div>
+                  <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400 leading-none">
+                    {fmtDec(slxStats.bestShift.uptimePct, 0)}%
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    {slxStats.bestShift.dateKey.slice(5)} · {shiftLabel2(slxStats.bestShift)}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+            {slxStats.worstShift && (
+              <Card className="border-rose-500/20 bg-rose-500/5">
+                <CardContent className="pt-2 pb-2 px-3">
+                  <div className="flex items-center gap-1 mb-0.5">
+                    <TrendingUp className="w-3 h-3 text-rose-500" />
+                    <p className="text-[11px] text-rose-600 dark:text-rose-400 font-medium">Peor uptime</p>
+                  </div>
+                  <p className="text-xl font-bold text-rose-600 dark:text-rose-400 leading-none">
+                    {fmtDec(slxStats.worstShift.uptimePct, 0)}%
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    {slxStats.worstShift.dateKey.slice(5)} · {shiftLabel2(slxStats.worstShift)}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          {/* Distribución Día / Noche */}
+          <Card>
+            <CardContent className="py-2 px-4">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wide text-center mb-1.5">
+                Turnos con datos
+              </p>
+              <div className="flex justify-around text-center">
+                <div>
+                  <p className="text-2xl font-bold leading-none">{slxStats.dayShiftsWithData}</p>
+                  <p className="text-xs text-muted-foreground mt-1 flex items-center justify-center gap-1">
+                    <Sun className="w-3 h-3 text-amber-500" />
+                    Día
+                  </p>
+                </div>
+                <div className="w-px bg-border" />
+                <div>
+                  <p className="text-2xl font-bold leading-none">{slxStats.nightShiftsWithData}</p>
+                  <p className="text-xs text-muted-foreground mt-1 flex items-center justify-center gap-1">
+                    <Moon className="w-3 h-3 text-indigo-400" />
+                    Noche
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )
+    }
+
     return (
       <Card className="h-fit">
         <CardContent className="py-10 text-center">

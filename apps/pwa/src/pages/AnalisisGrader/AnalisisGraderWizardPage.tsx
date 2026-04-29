@@ -13,7 +13,7 @@ import { Card, CardContent, Button, Badge } from '@/components/ui'
 import { BarChart3, Loader2, CheckCircle2, Calendar, BookOpen, Activity } from 'lucide-react'
 import { useAuthStore, usePermissionsStore } from '@/store'
 import { AnalisisGraderUploadPage, type FileParsed } from './AnalisisGraderUploadPage'
-import { GraderHistoricalCalendar } from '@/components/grader/GraderHistoricalCalendar'
+import { GraderHistoricalCalendar, type SlxMonthlyStats } from '@/components/grader/GraderHistoricalCalendar'
 import { GraderMonthlyStatsPanel } from '@/components/grader/GraderMonthlyStatsPanel'
 import { PlantLineTabs } from '@/components/grader/PlantLineTabs'
 import { getPlantLineConfig, DEFAULT_PLANT_LINE_ID, type PlantLineId } from '@/config/plantLines'
@@ -97,6 +97,7 @@ export function AnalisisGraderWizardPage() {
   // Estado del panel de resumen mensual — se sincroniza con el calendario embebido
   const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date())
   const [calendarSummaries, setCalendarSummaries] = useState<GraderDailySummary[]>([])
+  const [calendarSlxStats, setCalendarSlxStats] = useState<SlxMonthlyStats | null>(null)
 
   const dashboardRef = useRef<HTMLDivElement>(null)
   const localDraftLoadedRef = useRef(false)
@@ -558,23 +559,14 @@ export function AnalisisGraderWizardPage() {
           stacked
           onMonthChange={setCalendarMonth}
           onSummariesLoaded={setCalendarSummaries}
+          onSlxMonthStatsLoaded={setCalendarSlxStats}
           plantLineId={lineId}
         />
-        {lineConfig.hasGraderData ? (
-          <GraderMonthlyStatsPanel
-            currentMonth={calendarMonth}
-            summaries={calendarSummaries}
-          />
-        ) : (
-          <div className="lg:sticky lg:top-4 rounded-lg border border-dashed border-border/50 p-6 text-center space-y-2">
-            <BarChart3 className="w-8 h-8 text-muted-foreground/30 mx-auto" />
-            <p className="text-sm font-medium text-muted-foreground">{lineConfig.label}</p>
-            <p className="text-xs text-muted-foreground">
-              Datos Shoplogix disponibles en el calendario.
-              El resumen mensual P0% requiere Excel del Grader.
-            </p>
-          </div>
-        )}
+        <GraderMonthlyStatsPanel
+          currentMonth={calendarMonth}
+          summaries={calendarSummaries}
+          slxStats={calendarSlxStats}
+        />
       </div>
 
       {/* Banners multi-día */}
