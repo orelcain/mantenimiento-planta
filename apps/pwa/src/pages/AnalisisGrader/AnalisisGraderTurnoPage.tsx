@@ -959,33 +959,52 @@ export function AnalisisGraderTurnoPage() {
         </div>
       )}
 
-      {error && (
-        <Card className={upstreamLine.snapshot ? 'border-amber-500/40' : 'border-destructive/40'}>
-          <CardContent className={`p-4 flex items-center gap-3 ${upstreamLine.snapshot ? 'text-amber-600 dark:text-amber-400' : 'text-destructive'}`}>
+      {/* Error real: turno no encontrado y sin datos Shoplogix disponibles */}
+      {error && !upstreamLine.loading && !upstreamLine.snapshot && (
+        <Card className="border-destructive/40">
+          <CardContent className="p-4 flex items-center gap-3 text-destructive">
             <AlertCircle className="w-5 h-5 shrink-0" />
-            <span className="text-sm">
-              {upstreamLine.snapshot
-                ? `Sin Excel Grader para este turno — mostrando datos Shoplogix disponibles.`
-                : error}
-            </span>
+            <span className="text-sm">{error}</span>
           </CardContent>
         </Card>
       )}
 
-      {/* Vista Shoplogix-only: sin summary Grader pero con datos de Baaders disponibles */}
-      {error && !upstreamLine.loading && upstreamLine.snapshot && (
-        <UpstreamMachinesPanel
-          snapshot={upstreamLine.snapshot}
-          loading={upstreamLine.loading}
-          error={upstreamLine.error}
-          syncedAt={upstreamLine.syncedAt}
-          shiftWindow={baseAxisWindow}
-          pauses={[]}
-        />
+      {/* Vista Shoplogix-only: sin Excel Grader pero con datos de máquinas (Yal u otras líneas) */}
+      {!summary && !loading && upstreamLine.snapshot && (
+        <div className="space-y-4">
+          {/* Banner informativo — no es un error, es el modo Shoplogix */}
+          <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-sky-500/10 border border-sky-500/30 text-sky-400 text-sm">
+            <Activity className="w-4 h-4 shrink-0" />
+            <span className="flex-1">
+              {shiftWindow?.status === 'live'
+                ? 'Turno en curso · Sin datos Grader aún'
+                : 'Vista Shoplogix · Sin Excel Grader para este turno'}
+            </span>
+            {isAdmin && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs border-sky-500/40 text-sky-400 hover:bg-sky-500/10"
+                onClick={() => navigate('/analisis-grader/wizard')}
+              >
+                <Upload className="w-3 h-3 mr-1.5" />
+                Cargar Excel
+              </Button>
+            )}
+          </div>
+          <UpstreamMachinesPanel
+            snapshot={upstreamLine.snapshot}
+            loading={upstreamLine.loading}
+            error={upstreamLine.error}
+            syncedAt={upstreamLine.syncedAt}
+            shiftWindow={baseAxisWindow}
+            pauses={[]}
+          />
+        </div>
       )}
 
-      {/* Turno en vivo sin datos aún */}
-      {!loading && !error && !summary && shiftWindow?.status === 'live' && (
+      {/* Turno en vivo sin datos Grader NI Shoplogix */}
+      {!loading && !summary && shiftWindow?.status === 'live' && !upstreamLine.snapshot && !upstreamLine.loading && (
         <Card className="border-dashed">
           <CardContent className="p-8 flex flex-col items-center gap-3 text-center">
             <Activity className="w-8 h-8 text-red-400 animate-pulse" />
