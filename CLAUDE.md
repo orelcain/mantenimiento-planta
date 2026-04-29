@@ -142,6 +142,28 @@ Batch 3 (Haiku 4.5, ~5 min)   Verificar CI + confirmar deploy
    existentes con el método: *qué decisión opera, qué datos ya tenemos, dónde caen los
    falsos positivos*. Suele resultar en mejoras de los existentes en lugar de uno nuevo.
 
+### Preview y pruebas visuales (OBLIGATORIO leer antes de usar browser)
+
+**Regla principal: verificar en preview SIEMPRE después de cada avance**, antes de hacer commit.
+No asumir que "compila = se ve bien". Cada feature, fix o cambio de layout se confirma visualmente.
+
+**Flujo canónico por avance:**
+1. Hacer los cambios de código
+2. `preview_start("pwa-dev")` → arranca/reutiliza el Vite dev server
+3. `preview_eval` con `window.location.href = 'URL'` para navegar al módulo
+4. `preview_screenshot` → ver resultado visual
+5. `preview_snapshot` → accessibility tree si se necesita verificar DOM
+6. `preview_click` / `preview_eval` para interactuar
+7. Solo si se ve bien → `pnpm exec tsc --noEmit` + commit + push
+
+**Detalles técnicos:**
+- Navegador instalado: **Microsoft Edge** — tier "read" (solo screenshots, sin clicks/typing)
+- Para interactuar con la app usar **`mcp__Claude_Preview__*`** (preview server interno de Claude)
+- **NUNCA usar `mcp__computer-use__*` para pruebas de la app** — Edge es read-only
+- Dev server: `localhost:5173` · base path: `/mantenimiento-planta/`
+  → URL: `http://localhost:5173/mantenimiento-planta/<ruta>?<params>`
+- `preview_start` con nombre `"pwa-dev"` para reutilizar el server entre avances
+
 ### Verificación pre-push (OBLIGATORIO)
 
 **TSC y ESLint deben correrse desde `apps/pwa/`** — NO desde la raíz del monorepo.
