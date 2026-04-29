@@ -15,6 +15,7 @@ import { useState, useEffect } from 'react'
 import type { UpstreamLineSnapshot } from '@/services/shoplogix/types'
 import { buildDemoLineSnapshot } from '@/services/shoplogix/shoplogixDemoData'
 import { loadShoplogixShift } from '@/services/shoplogix/shoplogixShift.service'
+import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
 import { logger } from '@/lib/logger'
 
 export interface UseUpstreamLineSnapshotResult {
@@ -44,6 +45,7 @@ function isDemoEnabled(): boolean {
 export function useUpstreamLineSnapshot(
   dateKey: string | null | undefined,
   shiftId: string | null | undefined,
+  plantSlug: PlantSlug = 'chonchi',
 ): UseUpstreamLineSnapshotResult {
   const [snapshot, setSnapshot] = useState<UpstreamLineSnapshot | null>(null)
   const [loading, setLoading] = useState(false)
@@ -81,7 +83,7 @@ export function useUpstreamLineSnapshot(
 
       try {
         // 1. Intenta Firestore primero
-        const { snapshot: fsSnap, syncedAt: fsSynced } = await loadShoplogixShift(dateKey, shiftId)
+        const { snapshot: fsSnap, syncedAt: fsSynced } = await loadShoplogixShift(dateKey, shiftId, plantSlug)
         if (fsSnap) {
           if (!cancelled) {
             setSnapshot(fsSnap)
@@ -106,7 +108,7 @@ export function useUpstreamLineSnapshot(
 
     load()
     return () => { cancelled = true }
-  }, [dateKey, shiftId])
+  }, [dateKey, shiftId, plantSlug])
 
   return { snapshot, loading, error, syncedAt, source }
 }

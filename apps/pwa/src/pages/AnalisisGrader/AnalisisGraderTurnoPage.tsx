@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
-import { useParams, useNavigate, Navigate } from 'react-router-dom'
+import { useParams, useNavigate, Navigate, useSearchParams } from 'react-router-dom'
 import { logger } from '@/lib/logger'
 import { Button, Card, CardContent, Spinner, Badge } from '@/components/ui'
 import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag, FileText, WifiOff, ChevronDown } from 'lucide-react'
@@ -57,6 +57,7 @@ import { UpstreamMachinesPanel } from '@/components/grader/UpstreamMachinesPanel
 import { UpstreamCorrelationCard } from '@/components/grader/UpstreamCorrelationCard'
 import { UpstreamScatterCard } from '@/components/grader/UpstreamScatterCard'
 import { useUpstreamLineSnapshot } from '@/hooks/useUpstreamLineSnapshot'
+import { getPlantLineConfig } from '@/config/plantLines'
 import { findTriggeredRunbooks } from '@/services/grader/graderRunbooks'
 import { analyzeGraderFromSummary } from '@/services/grader/graderSummaryAI'
 import { loadSeasonBenchmark, type SeasonBenchmark } from '@/services/grader/graderBenchmarks'
@@ -229,11 +230,18 @@ export function AnalisisGraderTurnoPage() {
   )
   const navigate = useNavigate()
   const { shiftId: rawShiftId } = useParams<{ shiftId: string }>()
+  const [searchParams] = useSearchParams()
 
   const [dateKey, shiftLabel] = useMemo(() => parseShiftId(rawShiftId), [rawShiftId])
 
-  // Línea upstream (Shoplogix) — en DEV muestra demo; en prod lee de Firestore (Fase 2)
-  const upstreamLine = useUpstreamLineSnapshot(dateKey || null, shiftLabel || null)
+  // Planta activa — viene del parámetro ?linea= (preservado desde el calendario)
+  const plantLineCfg = useMemo(
+    () => getPlantLineConfig(searchParams.get('linea') ?? ''),
+    [searchParams],
+  )
+
+  // Línea upstream (Shoplogix) — usa el plantSlug correcto según la pestaña activa
+  const upstreamLine = useUpstreamLineSnapshot(dateKey || null, shiftLabel || null, plantLineCfg.plantSlug)
 
   const [shiftWindow, setShiftWindow] = useState<ShiftTimeWindow | null>(
     () => dateKey && shiftLabel
@@ -939,12 +947,28 @@ export function AnalisisGraderTurnoPage() {
       )}
 
       {error && (
-        <Card className="border-destructive/40">
-          <CardContent className="p-4 flex items-center gap-3 text-destructive">
+        <Card className={upstreamLine.snapshot ? 'border-amber-500/40' : 'border-destructive/40'}>
+          <CardContent className={`p-4 flex items-center gap-3 ${upstreamLine.snapshot ? 'text-amber-600 dark:text-amber-400' : 'text-destructive'}`}>
             <AlertCircle className="w-5 h-5 shrink-0" />
-            <span className="text-sm">{error}</span>
+            <span className="text-sm">
+              {upstreamLine.snapshot
+                ? `Sin Excel Grader para este turno — mostrando datos Shoplogix disponibles.`
+                : error}
+            </span>
           </CardContent>
         </Card>
+      )}
+
+      {/* Vista Shoplogix-only: sin summary Grader pero con datos de Baaders disponibles */}
+      {error && !upstreamLine.loading && upstreamLine.snapshot && (
+        <UpstreamMachinesPanel
+          snapshot={upstreamLine.snapshot}
+          loading={upstreamLine.loading}
+          error={upstreamLine.error}
+          syncedAt={upstreamLine.syncedAt}
+          shiftWindow={baseAxisWindow}
+          pauses={[]}
+        />
       )}
 
       {/* Turno en vivo sin datos aún */}

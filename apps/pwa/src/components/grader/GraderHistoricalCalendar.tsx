@@ -2143,25 +2143,27 @@ export function GraderHistoricalCalendar({
                       {/* ── Capa 3: bloques del Grader o Shoplogix standalone ── */}
                       {blocks.map((b, i) => {
                         const isHovered = hoveredFragId === b.fragId
-                        const navigateToBlockTurno = b.isShoplogixOnly
-                          ? undefined
-                          : () => navigate(
-                              `/analisis-grader/turno/${b.dateKey}__${encodeURIComponent(b.shiftId)}`,
-                            )
+                        // Siempre navegamos al TurnoPage. Para bloques SLX-only pasamos
+                        // ?linea= para que el TurnoPage cargue el plantSlug correcto y
+                        // muestre el panel Shoplogix aunque no haya graderDailySummary.
+                        const lineaQuery = plantLineId !== DEFAULT_PLANT_LINE_ID
+                          ? `?linea=${encodeURIComponent(plantLineId)}`
+                          : ''
+                        const navigateToBlockTurno = () => navigate(
+                          `/analisis-grader/turno/${b.dateKey}__${encodeURIComponent(b.shiftId)}${lineaQuery}`,
+                        )
                         return (
                           <div
                             key={i}
                             data-frag-id={b.fragId}
-                            role={b.isShoplogixOnly ? undefined : 'button'}
-                            tabIndex={b.isShoplogixOnly ? undefined : 0}
+                            role="button"
+                            tabIndex={0}
                             className={cn(
-                              'absolute overflow-hidden',
-                              b.isShoplogixOnly
-                                ? 'cursor-default border border-dashed border-sky-400/50'
-                                : 'cursor-pointer transition-all',
+                              'absolute overflow-hidden cursor-pointer transition-all',
+                              b.isShoplogixOnly && 'border border-dashed border-sky-400/50',
                               b.bgClass,
                               b.nightSide === null && 'rounded-sm',
-                              isHovered && !b.isShoplogixOnly && 'ring-2 ring-white/80 ring-offset-1 ring-offset-background z-20',
+                              isHovered && 'ring-2 ring-white/80 ring-offset-1 ring-offset-background z-20',
                             )}
                             style={{
                               left:   `${b.leftPct}%`,
@@ -2177,12 +2179,12 @@ export function GraderHistoricalCalendar({
                                 : b.nightSide === 'end' ? 'linear-gradient(270deg, rgba(99,102,241,0.55) 0%, transparent 18px)'
                                 : undefined,
                             }}
-                            title={b.isShoplogixOnly ? b.title : `${b.title} · click para ver detalle`}
+                            title={`${b.title} · click para ver detalle`}
                             onClick={navigateToBlockTurno}
-                            onKeyDown={b.isShoplogixOnly ? undefined : (e) => {
+                            onKeyDown={(e) => {
                               if (e.key === 'Enter' || e.key === ' ') {
                                 e.preventDefault()
-                                navigateToBlockTurno?.()
+                                navigateToBlockTurno()
                               }
                             }}
                             onMouseEnter={() => setHoveredFragId(b.fragId)}
