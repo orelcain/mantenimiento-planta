@@ -248,6 +248,63 @@ function DowntimeParetoBar({ reasons }: { reasons: ReasonAggregate[] }) {
   )
 }
 
+/**
+ * Barra apilada de disponibilidad: verde (uptime) | ámbar (breaks programados)
+ * | rojo (downtime no planificado). Proporciones sobre tiempo productivo
+ * (excluye post-turno plannedDowntimeSec). Reemplaza el texto "73.7% runtime"
+ * con un visual compacto + número.
+ *
+ * Sin anime.js: la barra es estática, la animación de fill ya está en el Pareto.
+ * overflow-hidden en el wrapper garantiza que los segmentos no se superpongan.
+ */
+function ShiftAvailabilityBar({
+  breakdown,
+  shiftRuntime,
+}: {
+  breakdown: UpstreamMachineShift['shiftRuntimeBreakdown']
+  shiftRuntime: number
+}) {
+  const productive =
+    breakdown.uptimeSec + breakdown.breakSec + breakdown.downtimeSec + breakdown.setupSec
+
+  if (productive === 0) {
+    return (
+      <span className="flex items-center gap-1">
+        <Timer className="w-3 h-3" /> {fmtPct(shiftRuntime)} runtime
+      </span>
+    )
+  }
+
+  const upPct    = (breakdown.uptimeSec   / productive) * 100
+  const breakPct = (breakdown.breakSec    / productive) * 100
+  const downPct  = (breakdown.downtimeSec / productive) * 100
+  const setupPct = (breakdown.setupSec    / productive) * 100
+
+  const tooltip = [
+    `↑ Uptime:     ${fmtDurationSec(breakdown.uptimeSec)} (${upPct.toFixed(0)}%)`,
+    `⏸ Breaks:     ${fmtDurationSec(breakdown.breakSec)} (${breakPct.toFixed(0)}%)`,
+    `✕ Downtime:   ${fmtDurationSec(breakdown.downtimeSec)} (${downPct.toFixed(0)}%)`,
+    breakdown.setupSec > 0
+      ? `⚙ Setup:      ${fmtDurationSec(breakdown.setupSec)} (${setupPct.toFixed(0)})%`
+      : null,
+    `─ Post-turno: ${fmtDurationSec(breakdown.plannedDowntimeSec)} (excluido)`,
+  ].filter(Boolean).join('\n')
+
+  return (
+    <span className="flex items-center gap-1.5" title={tooltip}>
+      <Timer className="w-3 h-3 shrink-0" />
+      {/* Barra apilada — overflow-hidden recorta los divs al borde redondeado */}
+      <div className="flex h-2 w-14 rounded-full overflow-hidden bg-slate-800/60 shrink-0">
+        {upPct    > 0 && <div className="h-full bg-emerald-500/75" style={{ width: `${upPct}%`    }} />}
+        {breakPct > 0 && <div className="h-full bg-amber-500/70"   style={{ width: `${breakPct}%` }} />}
+        {downPct  > 0 && <div className="h-full bg-rose-500/70"    style={{ width: `${downPct}%`  }} />}
+        {setupPct > 0 && <div className="h-full bg-violet-500/60"  style={{ width: `${setupPct}%` }} />}
+      </div>
+      <span className="tabular-nums">{fmtPct(shiftRuntime)}</span>
+    </span>
+  )
+}
+
 // ============================================================================
 // Subcomponentes visuales
 // ============================================================================
@@ -491,12 +548,10 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
 
       {/* Mini stats footer */}
       <div className="flex items-center gap-4 text-[11px] text-slate-500">
-        <span
-          className="flex items-center gap-1"
-          title={`% del tiempo productivo en Uptime (excluye post-turno).\nUptime: ${fmtDurationSec(shift.shiftRuntimeBreakdown.uptimeSec)}\nBreak (dentro turno): ${fmtDurationSec(shift.shiftRuntimeBreakdown.breakSec)}\nPost-turno (excl.): ${fmtDurationSec(shift.shiftRuntimeBreakdown.plannedDowntimeSec)}\nDowntime: ${fmtDurationSec(shift.shiftRuntimeBreakdown.downtimeSec)}`}
-        >
-          <Timer className="w-3 h-3" /> {fmtPct(shift.shiftRuntime)} runtime
-        </span>
+        <ShiftAvailabilityBar
+          breakdown={shift.shiftRuntimeBreakdown}
+          shiftRuntime={shift.shiftRuntime}
+        />
         <span className="flex items-center gap-1" title="Paros (Break)">
           <Pause className="w-3 h-3" /> {breaks} paros
         </span>
