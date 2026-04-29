@@ -3183,6 +3183,13 @@ exports.shoplogixSyncWakeup = onSchedule(
       return
     }
 
+    // Jitter anti-bot: delay aleatorio 0-120s para que las queries nunca lleguen
+    // en el mismo segundo (Cloud Scheduler dispara exacto, pero Shoplogix verá
+    // timestamps variables → patrón más humano).
+    const jitterMs = Math.floor(Math.random() * 120_000)
+    logger.info(`[shoplogixSyncWakeup] jitter ${Math.round(jitterMs / 1000)}s`)
+    await new Promise(r => setTimeout(r, jitterMs))
+
     const auth = await resolveShoplogixAuth(logger)
     if (auth.mode === 'none') {
       logger.error('[shoplogixSyncWakeup] Sin auth configurada (SHOPLOGIX_USER/PASS o COOKIE) — skip')
