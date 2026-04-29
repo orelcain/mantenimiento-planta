@@ -240,6 +240,19 @@ export function AnalisisGraderTurnoPage() {
     [searchParams],
   )
 
+  /**
+   * ID del documento Firestore para este turno en `graderDailySummaries`.
+   * - Chonchi (default):   `${dateKey}__${shiftLabel}`
+   * - Yal y otras líneas:  `${plantLineId}__${dateKey}__${shiftLabel}`
+   * Usar este ID (no el literal) en todas las operaciones sobre graderDailySummaries
+   * y sus sub-colecciones (timeline, pauses, pieceRecords, marelHg).
+   * Las operaciones sobre graderShifts siguen usando shiftDocId (sin prefix).
+   */
+  const effectiveSummaryId = useMemo(
+    () => (dateKey && shiftLabel) ? buildDailySummaryId(dateKey, shiftLabel, plantLineCfg.id) : '',
+    [dateKey, shiftLabel, plantLineCfg.id],
+  )
+
   // Línea upstream (Shoplogix) — usa el plantSlug correcto según la pestaña activa
   const upstreamLine = useUpstreamLineSnapshot(dateKey || null, shiftLabel || null, plantLineCfg.plantSlug)
 
@@ -539,7 +552,7 @@ export function AnalisisGraderTurnoPage() {
     setError(null)
 
     Promise.all([
-      getDailySummary(dateKey, shiftLabel),
+      getDailySummary(dateKey, shiftLabel, plantLineCfg.id),
       getShiftDoc(dateKey, shiftLabel).catch(() => null),
     ])
       .then(([s, sd]) => {
@@ -565,13 +578,13 @@ export function AnalisisGraderTurnoPage() {
       .finally(() => setLoading(false))
   }, [dateKey, shiftLabel])
 
-  // Carga timeline sub-collection (graderDailySummaries/{id}/meta/timeline)
+  // Carga timeline sub-collection (graderDailySummaries/{effectiveSummaryId}/meta/timeline)
   useEffect(() => {
-    if (!dateKey || !shiftLabel) return
-    loadTimelineAggregates(`${dateKey}__${shiftLabel}`)
+    if (!effectiveSummaryId) return
+    loadTimelineAggregates(effectiveSummaryId)
       .then(buckets => setTimelineBuckets(buckets ?? []))
       .catch(() => {})
-  }, [dateKey, shiftLabel])
+  }, [effectiveSummaryId])
 
   // Suscripción en tiempo real a `meta/pauses` — M8.
   // onSnapshot propaga cambios de otros admins al instante (sin reload manual).
@@ -580,33 +593,33 @@ export function AnalisisGraderTurnoPage() {
   const reloadPauses = useCallback(() => {}, [])
 
   useEffect(() => {
-    if (!dateKey || !shiftLabel) return
+    if (!effectiveSummaryId) return
     setPauses([])
     setMicroDetentions(null)
-    const unsub = subscribePausesAggregates(`${dateKey}__${shiftLabel}`, (data) => {
+    const unsub = subscribePausesAggregates(effectiveSummaryId, (data) => {
       if (!data) { setPauses([]); setMicroDetentions(null); return }
       setPauses(data.pauses)
       setMicroDetentions(data.microDetentions)
     })
     return unsub
-  }, [dateKey, shiftLabel])
+  }, [effectiveSummaryId])
 
   // Captura Marel HG (corta-cabeza) — usada para deducir rechazo Baader puro
   useEffect(() => {
-    if (!dateKey || !shiftLabel) return
+    if (!effectiveSummaryId) return
     setMarelHgCapture(null)
-    const unsub = subscribeMarelHgCapture(`${dateKey}__${shiftLabel}`, setMarelHgCapture)
+    const unsub = subscribeMarelHgCapture(effectiveSummaryId, setMarelHgCapture)
     return unsub
-  }, [dateKey, shiftLabel])
+  }, [effectiveSummaryId])
 
   // Carga pieceRecords gate=0 para drill-down en timeline
   useEffect(() => {
-    if (!dateKey || !shiftLabel) return
+    if (!effectiveSummaryId) return
     setSelectedCauses(new Set())  // reset al cambiar de turno
-    listGate0PieceRecords(`${dateKey}__${shiftLabel}`)
+    listGate0PieceRecords(effectiveSummaryId)
       .then(setGate0Pieces)
       .catch(() => setGate0Pieces([]))
-  }, [dateKey, shiftLabel])
+  }, [effectiveSummaryId])
 
   // Carga historial de config de gates (FASE 27)
   // Extraído como callback para poder refrescarse tras un nuevo cambio
@@ -1004,7 +1017,7 @@ export function AnalisisGraderTurnoPage() {
               />
               {(upstreamLine.snapshot || marelHgCapture) && (
                 <MarelHgCaptureCard
-                  summaryId={`${dateKey}__${shiftLabel}`}
+                  summaryId={effectiveSummaryId}
                   capture={marelHgCapture}
                   canEdit={isSupervisor}
                 />
@@ -1075,7 +1088,7 @@ export function AnalisisGraderTurnoPage() {
             gate0Pieces={gate0Pieces}
             pauses={pauses}
             microDetentions={microDetentions}
-            summaryId={shiftDocId}
+            summaryId={effectiveSummaryId}
             adminUid={isAdmin ? user?.id : undefined}
             onPauseUpdated={reloadPauses}
             selectedCauses={selectedCauses}
@@ -1126,7 +1139,7 @@ export function AnalisisGraderTurnoPage() {
               totalPieces={summary.totalPieces}
               pointZeroPieces={summary.pointZeroPieces}
               pointZeroPct={summary.pointZeroPct}
-              shiftDocId={`${dateKey}__${shiftLabel}`}
+              shiftDocId={shiftDocId}
               onSaved={reloadConfigSnapshots}
             />
           )}
@@ -1157,7 +1170,7 @@ export function AnalisisGraderTurnoPage() {
 
           {/* Historial de cambios de configuración del turno */}
           <ConfigChangeHistory
-            shiftDocId={`${dateKey}__${shiftLabel}`}
+            shiftDocId={shiftDocId}
             snapshots={configSnapshots}
             timelineBuckets={enrichedTimelineBuckets}
             onChange={reloadConfigSnapshots}
@@ -1315,7 +1328,7 @@ export function AnalisisGraderTurnoPage() {
         open={nextPauseOpen}
         onOpenChange={setNextPauseOpen}
         pause={untaggedPauses[0] ?? null}
-        summaryId={shiftDocId}
+        summaryId={effectiveSummaryId}
         adminUid={user?.id ?? ''}
         onSaved={handleNextPauseSaved}
         isOnline={isOnline}

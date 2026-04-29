@@ -74,8 +74,8 @@ export function buildDailySummaryId(dateKey: string, shiftId: string, plantLineI
   return `${plantLineId}__${dateKey}__${shiftId}`
 }
 
-export async function getDailySummary(dateKey: string, shiftId: string): Promise<GraderDailySummary | null> {
-  const id = buildDailySummaryId(dateKey, shiftId)
+export async function getDailySummary(dateKey: string, shiftId: string, plantLineId?: string): Promise<GraderDailySummary | null> {
+  const id = buildDailySummaryId(dateKey, shiftId, plantLineId)
   const snap = await getDoc(doc(db, COLLECTION, id))
   if (!snap.exists()) return null
   return snap.data() as GraderDailySummary
