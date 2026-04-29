@@ -18,7 +18,7 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import { Card, CardContent, Badge } from '@/components/ui'
 import {
   ChevronDown, ChevronRight, Factory, Activity, AlertCircle, Zap,
-  TrendingUp, TrendingDown, Timer, Pause, AlertTriangle, Download,
+  TrendingUp, TrendingDown, Timer, Pause, AlertTriangle, Download, MessageSquare,
 } from 'lucide-react'
 import type {
   UpstreamLineSnapshot,
@@ -565,7 +565,31 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
         </span>
       </div>
 
-      {/* Detalle expandido (futuro: aquí iría el drill-down tipo Shoplogix completo) */}
+      {/* Comentarios de operador — siempre visibles si existen (max 2).
+          Si hay más, el botón "y N más" abre el detalle expandido.
+          Permite leer anotaciones del turno sin hacer clic extra. */}
+      {shift.comments.length > 0 && (
+        <div className="flex items-start gap-1.5 text-[10px]">
+          <MessageSquare className="w-3 h-3 text-slate-500 shrink-0 mt-px" />
+          <div className="min-w-0 space-y-0.5">
+            {shift.comments.slice(0, 2).map((c, i) => (
+              <p key={i} className="text-slate-400 italic truncate" title={c}>
+                {c}
+              </p>
+            ))}
+            {shift.comments.length > 2 && !expanded && (
+              <button
+                onClick={onToggle}
+                className="text-slate-600 hover:text-slate-300 transition-colors"
+              >
+                y {shift.comments.length - 2} más →
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Detalle expandido */}
       {expanded && (
         <div className="mt-2 pt-2 border-t border-slate-800/60 text-[11px] text-slate-500 space-y-1">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -597,12 +621,16 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
               })()}
             </div>
           </div>
-          {shift.comments.length > 0 && (
-            <div className="mt-2">
-              <div className="text-slate-600 mb-0.5">Comentarios del turno</div>
-              <ul className="list-disc list-inside text-slate-300 space-y-0.5">
-                {shift.comments.slice(0, 5).map((c, i) => <li key={i}>{c}</li>)}
-              </ul>
+          {/* Comentarios completos en expanded (cuando hay más de 2) */}
+          {shift.comments.length > 2 && (
+            <div className="mt-2 space-y-0.5">
+              <div className="text-slate-600 mb-0.5">Todos los comentarios</div>
+              {shift.comments.map((c, i) => (
+                <p key={i} className="text-slate-300 italic text-[10px]">
+                  <MessageSquare className="w-2.5 h-2.5 inline mr-1 text-slate-500" />
+                  {c}
+                </p>
+              ))}
             </div>
           )}
         </div>
