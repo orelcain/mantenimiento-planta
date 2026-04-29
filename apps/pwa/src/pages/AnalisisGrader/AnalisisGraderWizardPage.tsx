@@ -15,6 +15,8 @@ import { useAuthStore, usePermissionsStore } from '@/store'
 import { AnalisisGraderUploadPage, type FileParsed } from './AnalisisGraderUploadPage'
 import { GraderHistoricalCalendar } from '@/components/grader/GraderHistoricalCalendar'
 import { GraderMonthlyStatsPanel } from '@/components/grader/GraderMonthlyStatsPanel'
+import { PlantLineTabs } from '@/components/grader/PlantLineTabs'
+import { getPlantLineConfig, DEFAULT_PLANT_LINE_ID, type PlantLineId } from '@/config/plantLines'
 import { AnalisisGraderDashboardPage } from './AnalisisGraderDashboardPage'
 import { GraderResumenRapido } from './GraderResumenRapido'
 import { getLatestGraderAutosaveDraft, saveGraderAutosaveDraft } from '@/services/grader/graderSession.service'
@@ -57,7 +59,14 @@ export function AnalisisGraderWizardPage() {
   const { canSee } = usePermissionsStore()
   const user = useAuthStore((s) => s.user)
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  // ── Línea/planta activa — persiste en ?linea= ──
+  const lineId = (searchParams.get('linea') as PlantLineId | null) ?? DEFAULT_PLANT_LINE_ID
+  const lineConfig = getPlantLineConfig(lineId)
+  const handleLineSelect = (id: PlantLineId) => {
+    setSearchParams((prev) => { prev.set('linea', id); return prev }, { replace: true })
+  }
 
   const [parsedData, setParsedData] = useState<ParsedMatrixData | null>(null)
   const [uploadedFiles, setUploadedFiles] = useState<FileParsed[]>([])
@@ -475,19 +484,23 @@ export function AnalisisGraderWizardPage() {
               Análisis de Turno
             </h1>
             <p className="text-xs lg:text-sm text-muted-foreground mt-0.5">
-              Línea completa Grader + Baaders — carga de Excel del Grader
+              {lineConfig.hasGraderData
+                ? 'Línea completa Grader + Baaders — carga de Excel del Grader'
+                : `${lineConfig.description} · datos Shoplogix`}
             </p>
           </div>
-          {/* [2] Carga de archivos — compacto en el header */}
-          <AnalisisGraderUploadPage
-            compact
-            onComplete={handleUploadComplete}
-            initialFiles={uploadedFiles}
-            onFilesChange={setUploadedFiles}
-          />
+          {/* Carga de archivos — solo cuando hay datos Grader */}
+          {lineConfig.hasGraderData && (
+            <AnalisisGraderUploadPage
+              compact
+              onComplete={handleUploadComplete}
+              initialFiles={uploadedFiles}
+              onFilesChange={setUploadedFiles}
+            />
+          )}
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {autosaveState !== 'idle' && (
+          {lineConfig.hasGraderData && autosaveState !== 'idle' && (
             <Badge
               variant="outline"
               className={
@@ -514,17 +527,32 @@ export function AnalisisGraderWizardPage() {
         </div>
       </div>
 
+      {/* ── Selector de línea/planta ── */}
+      <PlantLineTabs selected={lineId} onSelect={handleLineSelect} className="w-full max-w-sm" />
+
       {/* ═══ Cuerpo: 2 columnas en desktop — calendario + resumen mensual ═══ */}
       <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-6 items-start">
         <GraderHistoricalCalendar
           stacked
           onMonthChange={setCalendarMonth}
           onSummariesLoaded={setCalendarSummaries}
+          plantLineId={lineId}
         />
-        <GraderMonthlyStatsPanel
-          currentMonth={calendarMonth}
-          summaries={calendarSummaries}
-        />
+        {lineConfig.hasGraderData ? (
+          <GraderMonthlyStatsPanel
+            currentMonth={calendarMonth}
+            summaries={calendarSummaries}
+          />
+        ) : (
+          <div className="lg:sticky lg:top-4 rounded-lg border border-dashed border-border/50 p-6 text-center space-y-2">
+            <BarChart3 className="w-8 h-8 text-muted-foreground/30 mx-auto" />
+            <p className="text-sm font-medium text-muted-foreground">{lineConfig.label}</p>
+            <p className="text-xs text-muted-foreground">
+              Datos Shoplogix disponibles en el calendario.
+              El resumen mensual P0% requiere Excel del Grader.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Banners multi-día */}

@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useState, useMemo } from 'react'
-import { useNavigate, Navigate } from 'react-router-dom'
+import { useNavigate, Navigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, Badge, Button } from '@/components/ui'
 import { Upload, Activity, BarChart3, Settings2, TrendingUp, BookOpen, Eye, ClipboardList, GitCompare } from 'lucide-react'
 import { LineStatusWidget } from '@/components/grader/LineStatusWidget'
@@ -27,6 +27,8 @@ import { DEFAULT_SHIFT_SCHEDULE } from '@/services/grader/graderShiftSchedule'
 import { verdictFromP0Pct } from '@/services/grader/graderThresholds'
 import { GraderHistoricalCalendar } from '@/components/grader/GraderHistoricalCalendar'
 import type { GraderDailySummary } from '@/services/grader/types'
+import { PLANT_LINES, getPlantLineConfig, DEFAULT_PLANT_LINE_ID, type PlantLineId } from '@/config/plantLines'
+import { cn } from '@/lib/utils'
 
 function todayKey() {
   return new Date().toISOString().slice(0, 10)
@@ -52,6 +54,42 @@ interface QuickAccessProps {
   accent?: boolean
 }
 
+// ── Selector de línea/planta ────────────────────────────────────────────────
+
+interface PlantLineTabsProps {
+  selected: PlantLineId
+  onSelect: (id: PlantLineId) => void
+}
+
+function PlantLineTabs({ selected, onSelect }: PlantLineTabsProps) {
+  return (
+    <div className="flex gap-1 p-1 bg-muted/30 rounded-lg border border-border/40 w-full">
+      {PLANT_LINES.map((line) => (
+        <button
+          key={line.id}
+          onClick={() => !line.comingSoon && onSelect(line.id)}
+          disabled={line.comingSoon}
+          className={cn(
+            'flex-1 flex flex-col items-center gap-0.5 px-2 py-2 rounded-md transition-all text-center',
+            selected === line.id
+              ? 'bg-background shadow-sm text-foreground'
+              : line.comingSoon
+              ? 'text-muted-foreground/35 cursor-not-allowed'
+              : 'text-muted-foreground hover:text-foreground hover:bg-muted/50 cursor-pointer',
+          )}
+        >
+          <span className={cn('text-xs font-semibold leading-none', selected === line.id && 'text-primary')}>
+            {line.label}
+          </span>
+          <span className="text-[10px] leading-none mt-0.5 text-muted-foreground">
+            {line.comingSoon ? 'próximamente' : line.description}
+          </span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
 function QuickAccess({ icon: Icon, title, subtitle, onClick, accent }: QuickAccessProps) {
   return (
     <button
@@ -75,6 +113,15 @@ export function AnalisisGraderLandingPage() {
   const { canSee } = usePermissionsStore()
   const isAdmin = useIsAdmin()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  // Línea/planta activa — persiste en URL param ?linea=
+  const lineId = (searchParams.get('linea') as PlantLineId | null) ?? DEFAULT_PLANT_LINE_ID
+  const lineConfig = getPlantLineConfig(lineId)
+
+  const handleLineSelect = (id: PlantLineId) => {
+    setSearchParams((prev) => { prev.set('linea', id); return prev }, { replace: true })
+  }
 
   const [lastClosedShift, setLastClosedShift] = useState<GraderDailySummary | null>(null)
   const [allSummaries, setAllSummaries] = useState<GraderDailySummary[]>([])
@@ -187,7 +234,9 @@ export function AnalisisGraderLandingPage() {
               <div>
                 <h1 className="text-xl sm:text-2xl font-bold">Análisis de Turno</h1>
                 <p className="text-muted-foreground text-xs sm:text-sm mt-0.5">
-                  Línea completa: Grader + Baaders. Cargá el Excel del Grader para ver el estado del turno.
+                  {lineConfig.hasGraderData
+                    ? 'Línea completa Grader + Baaders — carga de Excel del Grader'
+                    : `${lineConfig.description} · datos Shoplogix`}
                 </p>
               </div>
               <Button
@@ -203,76 +252,83 @@ export function AnalisisGraderLandingPage() {
 
             {/* CTAs: mobile stack, desktop inline */}
             <div className="flex flex-col sm:flex-row gap-2 shrink-0 w-full sm:w-auto">
-              {liveShift ? (
-                <>
-                  <Button
-                    size="lg"
-                    onClick={() => goToTurno(todayKey(), liveShift.shiftId)}
-                    className="gap-2 bg-red-500/90 hover:bg-red-500 text-white border-0 w-full sm:w-auto"
-                  >
-                    <Activity className="w-4 h-4 animate-pulse" />
-                    <span className="hidden sm:inline">Turno en vivo:</span>
-                    <span>{liveShift.shiftId}</span>
-                    <Badge className="bg-white/20 text-white text-[10px] ml-1 border-0">LIVE</Badge>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    onClick={goToUpload}
-                    className="gap-2 w-full sm:w-auto"
-                  >
-                    <Upload className="w-4 h-4" />
-                    Cargar Excel
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button
-                    size="lg"
-                    onClick={goToUpload}
-                    className="gap-2 w-full sm:w-auto"
-                  >
-                    <Upload className="w-4 h-4" />
-                    Cargar Excel
-                  </Button>
-                  {/* CTA secundario: último turno (si existe) */}
-                  {!loading && lastClosedShift && lastShiftLabel && (
+              {lineConfig.hasGraderData ? (
+                /* ── Línea con datos Grader (Eviscerado Principal) ── */
+                liveShift ? (
+                  <>
+                    <Button
+                      size="lg"
+                      onClick={() => goToTurno(todayKey(), liveShift.shiftId)}
+                      className="gap-2 bg-red-500/90 hover:bg-red-500 text-white border-0 w-full sm:w-auto"
+                    >
+                      <Activity className="w-4 h-4 animate-pulse" />
+                      <span className="hidden sm:inline">Turno en vivo:</span>
+                      <span>{liveShift.shiftId}</span>
+                      <Badge className="bg-white/20 text-white text-[10px] ml-1 border-0">LIVE</Badge>
+                    </Button>
                     <Button
                       variant="outline"
                       size="lg"
-                      onClick={() => goToTurno(lastClosedShift.dateKey, lastClosedShift.shiftId)}
+                      onClick={goToUpload}
                       className="gap-2 w-full sm:w-auto"
                     >
-                      <Eye className="w-4 h-4 text-muted-foreground" />
-                      <span className="hidden sm:inline">Último turno:</span>
-                      <span className="text-xs sm:text-sm font-normal text-muted-foreground">{lastShiftLabel}</span>
-                      <span className={`font-bold tabular-nums ${P0_COLOR[lastShiftVerdict]}`}>
-                        {lastClosedShift.pointZeroPct.toFixed(1)}%
-                      </span>
+                      <Upload className="w-4 h-4" />
+                      Cargar Excel
                     </Button>
-                  )}
-                  {/* D↔N rápido: solo cuando el último día tiene ambos turnos */}
-                  {!loading && comparisonPair && (
+                  </>
+                ) : (
+                  <>
                     <Button
-                      variant="outline"
                       size="lg"
-                      onClick={() => setShowComparison(true)}
-                      className="gap-2 text-indigo-500 border-indigo-500/30 hover:bg-indigo-500/10 w-full sm:w-auto"
-                      title="Comparar turno día vs noche"
+                      onClick={goToUpload}
+                      className="gap-2 w-full sm:w-auto"
                     >
-                      <GitCompare className="w-4 h-4" />
-                      D↔N
+                      <Upload className="w-4 h-4" />
+                      Cargar Excel
                     </Button>
-                  )}
-                </>
+                    {!loading && lastClosedShift && lastShiftLabel && (
+                      <Button
+                        variant="outline"
+                        size="lg"
+                        onClick={() => goToTurno(lastClosedShift.dateKey, lastClosedShift.shiftId)}
+                        className="gap-2 w-full sm:w-auto"
+                      >
+                        <Eye className="w-4 h-4 text-muted-foreground" />
+                        <span className="hidden sm:inline">Último turno:</span>
+                        <span className="text-xs sm:text-sm font-normal text-muted-foreground">{lastShiftLabel}</span>
+                        <span className={`font-bold tabular-nums ${P0_COLOR[lastShiftVerdict]}`}>
+                          {lastClosedShift.pointZeroPct.toFixed(1)}%
+                        </span>
+                      </Button>
+                    )}
+                    {!loading && comparisonPair && (
+                      <Button
+                        variant="outline"
+                        size="lg"
+                        onClick={() => setShowComparison(true)}
+                        className="gap-2 text-indigo-500 border-indigo-500/30 hover:bg-indigo-500/10 w-full sm:w-auto"
+                        title="Comparar turno día vs noche"
+                      >
+                        <GitCompare className="w-4 h-4" />
+                        D↔N
+                      </Button>
+                    )}
+                  </>
+                )
+              ) : (
+                /* ── Línea solo Shoplogix (Yal / Filete) ── */
+                <div className="flex items-center gap-2 text-sm text-muted-foreground px-1">
+                  <Activity className="w-4 h-4 shrink-0" />
+                  <span>Datos desde Shoplogix · sin Excel Grader</span>
+                </div>
               )}
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* ── Estado de la línea ahora (solo turno vivo) ───────────────── */}
-      {liveShift && (
+      {/* ── Estado de la línea ahora (solo turno vivo · línea principal) ── */}
+      {liveShift && lineConfig.hasGraderData && (
         <LineStatusWidget
           shiftDocId={`${todayKey()}__${liveShift.shiftId}`}
           shiftId={liveShift.shiftId}
@@ -323,18 +379,25 @@ export function AnalisisGraderLandingPage() {
         />
       </div>
 
-      {/* ── Calendario histórico: protagonismo total, full width ───────── */}
-      <section>
-        <div className="flex items-baseline justify-between mb-3">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+      {/* ── Selector de línea/planta + Calendario ──────────────────────── */}
+      <section className="space-y-3">
+        {/* Selector */}
+        <div className="flex items-center gap-3">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2 shrink-0">
             <BarChart3 className="w-4 h-4" />
-            Historial de turnos
+            <span className="hidden sm:inline">Historial</span>
           </h2>
-          <span className="text-xs text-muted-foreground hidden sm:inline">
-            Click en un día para ver detalle · colores según P0%
+          <PlantLineTabs selected={lineId} onSelect={handleLineSelect} />
+          <span className="text-xs text-muted-foreground hidden lg:inline shrink-0">
+            {lineConfig.hasGraderData ? 'colores = P0%' : 'sin datos Excel'}
           </span>
         </div>
-        <GraderHistoricalCalendar onLoadTurno={goToTurno} />
+
+        {/* Calendario */}
+        <GraderHistoricalCalendar
+          onLoadTurno={goToTurno}
+          plantLineId={lineId}
+        />
       </section>
 
       <GlobalSettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />

@@ -54,6 +54,7 @@ import { useGraderSelectionStore } from '@/store/graderSelectionStore'
 import { p0StatusFromPct, p0StatusColor, DEFAULT_P0_ALERT_PCT, DEFAULT_P0_CRITICAL_PCT, type P0Status } from '@/services/grader/graderP0Thresholds'
 import { loadShoplogixShift } from '@/services/shoplogix/shoplogixShift.service'
 import type { UpstreamMachineState } from '@/services/shoplogix/types'
+import { getPlantLineConfig, DEFAULT_PLANT_LINE_ID, type PlantLineId } from '@/config/plantLines'
 
 interface TurnoSummary {
   totalPieces: number
@@ -88,6 +89,12 @@ interface GraderHistoricalCalendarProps {
   onMonthChange?: (date: Date) => void
   /** Notifica al padre cuando se cargan los summaries del mes visible. */
   onSummariesLoaded?: (list: GraderDailySummary[]) => void
+  /**
+   * Línea/planta activa. Determina qué datos Shoplogix cargar y si hay
+   * datos Grader Excel disponibles.
+   * Default: 'chonchi-eviscerado' (comportamiento original).
+   */
+  plantLineId?: PlantLineId
 }
 
 const monthNames = [
@@ -557,8 +564,14 @@ export function GraderHistoricalCalendar({
   stacked = false,
   onMonthChange,
   onSummariesLoaded,
+  plantLineId = DEFAULT_PLANT_LINE_ID,
 }: GraderHistoricalCalendarProps) {
   const navigate = useNavigate()
+
+  // Config de la línea activa: determina plantSlug + si hay datos Grader Excel
+  const plantLine = getPlantLineConfig(plantLineId)
+  const plantSlug = plantLine.plantSlug
+  const hasGraderData = plantLine.hasGraderData
   const [searchParams] = useSearchParams()
   const user = useAuthStore((s) => s.user)
   const selectedHistorical = useGraderSelectionStore((s) => s.selectedHistorical)
@@ -649,7 +662,14 @@ export function GraderHistoricalCalendar({
   }, [shiftSchedule, uploads.length])
 
   // Cargar summaries históricos para el mes visible
+  // Si la línea no tiene datos Grader Excel, limpiar sin consultar Firestore.
   useEffect(() => {
+    if (!hasGraderData) {
+      setHistoricalByDate(new Map())
+      setAllSummariesRaw([])
+      onSummariesLoaded?.([])
+      return
+    }
     const year = currentMonth.getFullYear()
     const month = currentMonth.getMonth()
     const startDate = `${year}-${String(month + 1).padStart(2, '0')}-01`
@@ -691,7 +711,7 @@ export function GraderHistoricalCalendar({
       .catch(() => {
         /* silent: historial no crítico */
       })
-  }, [currentMonth, effectiveInitialKey])
+  }, [currentMonth, effectiveInitialKey, hasGraderData, onSummariesLoaded])
 
   useEffect(() => {
     if (autoSelectedRef.current) return
@@ -942,7 +962,7 @@ export function GraderHistoricalCalendar({
     for (const c of candidates) {
       const key = `${c.dateKey}__${c.shiftId}`
       if (slxByShift.has(key)) continue
-      loadShoplogixShift(c.dateKey, c.shiftId)
+      loadShoplogixShift(c.dateKey, c.shiftId, plantSlug)
         .then((res) => {
           if (cancelled) return
           const m0 = res.snapshot?.machines[0]
