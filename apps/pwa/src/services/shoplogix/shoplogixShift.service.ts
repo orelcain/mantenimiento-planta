@@ -193,6 +193,65 @@ export interface LoadShoplogixShiftResult {
 }
 
 /**
+ * Punto de tendencia para un turno histórico de una máquina.
+ * Solo los campos necesarios para el gráfico — no carga states/intervals.
+ */
+export interface MachineTrendPoint {
+  dateKey: string
+  shiftId: string
+  overallRatio: number   // 0..1+  (ritmo vs objetivo)
+  shiftRuntime: number   // 0..1   (% uptime del turno productivo)
+  totalCycles: number
+}
+
+/**
+ * Carga tendencia histórica para UNA máquina en los últimos `nDays` turnos
+ * del mismo tipo (`shiftId`). Usa reads paralelos — un getDoc por día.
+ *
+ * Diseñado para carga lazy al expandir una MachineRow:
+ *   - Sin onSnapshot (datos históricos son estáticos)
+ *   - Documentos faltantes se omiten silenciosamente
+ *   - Devuelve array ordenado ascendente por dateKey (más antiguo primero)
+ */
+export async function loadMachineTrend(
+  plantSlug: PlantSlug,
+  machineid: string,
+  dateKey: string,
+  shiftId: string,
+  nDays = 7,
+): Promise<MachineTrendPoint[]> {
+  const points: MachineTrendPoint[] = []
+  const promises: Promise<void>[] = []
+
+  for (let i = 0; i < nDays; i++) {
+    const d = new Date(`${dateKey}T12:00:00`)
+    d.setDate(d.getDate() - i)
+    const dk = d.toISOString().slice(0, 10)
+    const ref = doc(db, `shoplogix/${plantSlug}/shifts/${dk}_${shiftId}/machines/${machineid}`)
+    promises.push(
+      getDoc(ref).then(snap => {
+        if (!snap.exists()) return
+        const raw = snap.data() as FirestoreData
+        // Usamos los campos almacenados directamente (sin full-deserialization).
+        // shiftRuntime está calculado correctamente en los docs recientes.
+        // Para docs muy legacy (pre-fix) el valor puede ser ~0, pero en tendencia
+        // es aceptable — aparecerán como puntos bajos y el operador lo notará.
+        points.push({
+          dateKey: dk,
+          shiftId,
+          overallRatio: Number(raw.overallRatio ?? 0),
+          shiftRuntime: Number(raw.shiftRuntime ?? 0),
+          totalCycles:  Number(raw.totalCycles  ?? 0),
+        })
+      }).catch(() => { /* doc inaccesible — ignorar */ }),
+    )
+  }
+
+  await Promise.all(promises)
+  return points.sort((a, b) => a.dateKey.localeCompare(b.dateKey))
+}
+
+/**
  * Suscripción en tiempo real al snapshot de un turno.
  * Llama a `onUpdate` cada vez que Firestore actualiza las máquinas del turno.
  * Devuelve la función `unsubscribe` para limpiar el listener.

@@ -1097,6 +1097,7 @@ export function AnalisisGraderTurnoPage() {
             syncedAt={upstreamLine.syncedAt}
             shiftWindow={baseAxisWindow}
             pauses={[]}
+            plantSlug={plantLineCfg.plantSlug}
           />
         </div>
       )}
@@ -1259,6 +1260,7 @@ export function AnalisisGraderTurnoPage() {
             syncedAt={upstreamLine.syncedAt}
             shiftWindow={baseAxisWindow}
             pauses={pauses}
+            plantSlug={plantLineCfg.plantSlug}
           />
 
           {/* Correlación automática Grader↔Baader (Fase 3 iter 2) — debajo de los 3 gantts */}

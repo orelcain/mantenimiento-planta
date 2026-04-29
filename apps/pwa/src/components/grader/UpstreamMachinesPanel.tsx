@@ -40,7 +40,10 @@ import {
   REACHED_PCT_THRESHOLDS,
   SYNC_STALE_MINUTES,
 } from '@/services/grader/graderUpstreamHealth'
+import ReactECharts from 'echarts-for-react'
 import { animate, stagger } from 'animejs'
+import { loadMachineTrend, type MachineTrendPoint } from '@/services/shoplogix/shoplogixShift.service'
+import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
 import { useTimelineSyncOptional } from './useTimelineSync'
 import { StateTimelineEC } from './StateTimelineEC'
 import { ProductionBarsEC } from './ProductionBarsEC'
@@ -70,6 +73,11 @@ interface Props {
    * paros upstream y mostrar badge "⚠ N coincidencias" en el header (F5b).
    */
   pauses?: GraderPause[]
+  /**
+   * Slug de la planta — necesario para cargar la tendencia histórica de cada
+   * máquina al expandirla. Default 'chonchi' si no se provee.
+   */
+  plantSlug?: PlantSlug
 }
 
 // ============================================================================
@@ -305,6 +313,91 @@ function ShiftAvailabilityBar({
   )
 }
 
+/**
+ * Gráfico de tendencia histórica de una máquina — últimos N turnos del mismo tipo.
+ * Dual-line: ritmo% (sky) + uptime% (emerald dashed). Altura 80px, sin zoom.
+ * Cargado lazy al expandir la MachineRow.
+ */
+function MachineTrendMiniChart({ points }: { points: MachineTrendPoint[] }) {
+  if (points.length < 2) {
+    return (
+      <p className="text-[10px] text-slate-600 italic py-1">
+        Sin suficientes turnos históricos aún (mín. 2)
+      </p>
+    )
+  }
+
+  const labels = points.map(p => {
+    const d = new Date(`${p.dateKey}T12:00:00`)
+    return d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' })
+  })
+
+  const option = {
+    backgroundColor: 'transparent',
+    grid: { left: 28, right: 6, top: 6, bottom: 20, containLabel: false },
+    xAxis: {
+      type:      'category' as const,
+      data:      labels,
+      axisLabel: { color: '#475569', fontSize: 8 },
+      axisLine:  { lineStyle: { color: '#1e293b' } },
+      axisTick:  { show: false },
+    },
+    yAxis: {
+      type:  'value' as const,
+      min:   0,
+      max:   100,
+      axisLabel: { color: '#475569', fontSize: 8, formatter: (v: number) => `${v}` },
+      splitLine: { lineStyle: { color: '#1e293b', type: 'dashed' as const } },
+      axisLine:  { show: false },
+    },
+    tooltip: {
+      trigger: 'axis' as const,
+      backgroundColor: '#1f2937',
+      borderColor:     '#374151',
+      textStyle:       { color: '#f1f5f9', fontSize: 10 },
+      formatter: (params: { color: string; seriesName: string; value: number; dataIndex: number }[]) => {
+        if (!params.length) return ''
+        const dk = points[params[0]!.dataIndex]?.dateKey ?? ''
+        const rows = params
+          .map(p => `<span style="color:${p.color}">●</span> ${p.seriesName}: <b>${p.value.toFixed(0)}%</b>`)
+          .join('<br/>')
+        return `<div style="font-size:9px;color:#94a3b8">${dk}</div>${rows}`
+      },
+    },
+    series: [
+      {
+        name:        'Ritmo',
+        type:        'line' as const,
+        data:        points.map(p => +(p.overallRatio * 100).toFixed(1)),
+        smooth:      0.3,
+        symbol:      'circle',
+        symbolSize:  4,
+        lineStyle:   { color: 'rgba(56,189,248,0.9)',  width: 1.5 },
+        itemStyle:   { color: 'rgba(56,189,248,0.9)'  },
+        areaStyle:   { color: 'rgba(56,189,248,0.06)' },
+      },
+      {
+        name:        'Uptime',
+        type:        'line' as const,
+        data:        points.map(p => +(p.shiftRuntime * 100).toFixed(1)),
+        smooth:      0.3,
+        symbol:      'diamond',
+        symbolSize:  4,
+        lineStyle:   { color: 'rgba(52,211,153,0.9)', width: 1.5, type: 'dashed' as const },
+        itemStyle:   { color: 'rgba(52,211,153,0.9)' },
+      },
+    ],
+  }
+
+  return (
+    <ReactECharts
+      option={option}
+      style={{ height: 80, width: '100%' }}
+      opts={{ renderer: 'canvas' }}
+    />
+  )
+}
+
 // ============================================================================
 // Subcomponentes visuales
 // ============================================================================
@@ -416,7 +509,7 @@ function ProductionKpiRow({ kpis }: { kpis: MachineKpis }) {
 // MachineRow — 1 máquina
 // ============================================================================
 
-function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAlert }: {
+function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAlert, plantSlug }: {
   shift: UpstreamMachineShift
   expanded: boolean
   onToggle: () => void
@@ -424,10 +517,24 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
   windowEnd?: Date
   /** Si es true, esta máquina tiene >50% más microparadas que el promedio de la línea. */
   microAlert?: boolean
+  plantSlug: PlantSlug
 }) {
   // Estado seleccionado al clickear un segmento del Gantt (drill-down rico).
   // Click sobre el mismo state lo cierra (toggle).
   const [selectedState, setSelectedState] = useState<UpstreamMachineState | null>(null)
+
+  // Tendencia histórica — lazy: solo carga al expandir, una sola vez por montaje.
+  const [trend, setTrend] = useState<MachineTrendPoint[] | null>(null)
+  const [trendLoading, setTrendLoading] = useState(false)
+
+  useEffect(() => {
+    if (!expanded || trend !== null || trendLoading) return
+    setTrendLoading(true)
+    loadMachineTrend(plantSlug, shift.machineid, shift.dateKey, shift.shiftId)
+      .then(pts => setTrend(pts))
+      .catch(() => setTrend([]))
+      .finally(() => setTrendLoading(false))
+  }, [expanded, trend, trendLoading, plantSlug, shift.machineid, shift.dateKey, shift.shiftId])
   const handleStateClick = (s: UpstreamMachineState) => {
     setSelectedState((prev) =>
       prev && prev.startAt.getTime() === s.startAt.getTime() && prev.name === s.name
@@ -621,6 +728,25 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
               })()}
             </div>
           </div>
+          {/* Tendencia histórica — últimos 7 turnos del mismo tipo */}
+          <div className="mt-3 pt-2 border-t border-slate-800/40">
+            <p className="text-[10px] text-slate-600 uppercase tracking-wider mb-1">
+              Tendencia · últimos 7 turnos
+            </p>
+            {trendLoading && (
+              <p className="text-[10px] text-slate-600 italic py-1">Cargando…</p>
+            )}
+            {!trendLoading && trend !== null && (
+              <MachineTrendMiniChart points={trend} />
+            )}
+            {!trendLoading && trend !== null && trend.length >= 2 && (
+              <div className="flex gap-3 text-[9px] text-slate-500 mt-0.5">
+                <span><span style={{ color: 'rgba(56,189,248,0.9)' }}>●</span> Ritmo (overallRatio)</span>
+                <span><span style={{ color: 'rgba(52,211,153,0.9)' }}>◆</span> Uptime %</span>
+              </div>
+            )}
+          </div>
+
           {/* Comentarios completos en expanded (cuando hay más de 2) */}
           {shift.comments.length > 2 && (
             <div className="mt-2 space-y-0.5">
@@ -651,6 +777,7 @@ export function UpstreamMachinesPanel({
   syncedAt = null,
   shiftWindow = null,
   pauses = [],
+  plantSlug = 'chonchi',
 }: Props) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed)
   const [expandedMachines, setExpandedMachines] = useState<Set<string>>(new Set())
@@ -882,6 +1009,7 @@ export function UpstreamMachinesPanel({
                     windowStart={windowStart}
                     windowEnd={windowEnd}
                     microAlert={microAlertSet.has(m.machineid)}
+                    plantSlug={plantSlug}
                   />
                 ))}
               </div>
