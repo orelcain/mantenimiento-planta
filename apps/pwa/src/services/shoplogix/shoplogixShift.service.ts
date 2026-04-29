@@ -1,7 +1,8 @@
 /**
  * Service de Shoplogix — lee shifts desde Firestore.
  *
- * Ruta: `shoplogix/chonchi/shifts/{dateKey}_{shiftId}/machines/{machineid}`
+ * Ruta: `shoplogix/{plantSlug}/shifts/{dateKey}_{shiftId}/machines/{machineid}`
+ *   plantSlug: 'chonchi' | 'yal'
  *
  * El Cloud Function `shoplogixSyncHttp` / `shoplogixSyncWakeup` escribe acá
  * cada pocos minutos durante horas de turno.
@@ -16,8 +17,7 @@ import type {
   UpstreamMachineState,
 } from './types'
 import { buildLineSnapshot } from './shoplogixNormalizer'
-
-const PLANT_SLUG = 'chonchi'
+import type { PlantSlug } from './shoplogixMachines'
 
 // Firestore devuelve Timestamp — las funciones backend pueden escribir Date
 // (Admin SDK los convierte a Timestamp automáticamente). Al leer, siempre es
@@ -195,14 +195,17 @@ export interface LoadShoplogixShiftResult {
 /**
  * Carga el snapshot de un turno desde Firestore (las 3 Evisceradoras).
  * Retorna `snapshot: null` si no hay documentos en la colección.
+ *
+ * @param plantSlug — 'chonchi' (default) | 'yal'
  */
 export async function loadShoplogixShift(
   dateKey: string,
   shiftId: string,
+  plantSlug: PlantSlug = 'chonchi',
 ): Promise<LoadShoplogixShiftResult> {
   const shiftDocId = `${dateKey}_${shiftId}`
-  const parentRef = doc(db, `shoplogix/${PLANT_SLUG}/shifts/${shiftDocId}`)
-  const machinesRef = collection(db, `shoplogix/${PLANT_SLUG}/shifts/${shiftDocId}/machines`)
+  const parentRef = doc(db, `shoplogix/${plantSlug}/shifts/${shiftDocId}`)
+  const machinesRef = collection(db, `shoplogix/${plantSlug}/shifts/${shiftDocId}/machines`)
 
   const [parentSnap, machinesSnap] = await Promise.all([
     getDoc(parentRef),

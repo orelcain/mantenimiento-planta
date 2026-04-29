@@ -18,13 +18,14 @@
  *   - Otros → skip esa máquina y continuar
  */
 
-const { CHONCHI_EVISCERADORAS } = require('./machines')
+const { PLANT_MACHINES } = require('./machines')
 const { queryShoplogix, queryShoplogixBearer } = require('./client')
 const { normalizeShift } = require('./normalizer')
 const { toShoplogixTime, parseShoplogixTime } = require('./time')
 const { pauseBetweenMachines, currentShift } = require('./polling')
 
-const PLANT_SLUG = 'chonchi'
+/** Plantas activas — usada solo en wakeup scheduler (se itera todas). */
+const ACTIVE_PLANTS = Object.freeze(['chonchi', 'yal'])
 
 /** Calcula start/end del turno en formato Shoplogix para una fecha+turno dados. */
 function shiftWindow(dateKey, shiftId) {
@@ -76,12 +77,16 @@ function currentShiftKey(now = new Date()) {
  * @param {import('firebase-admin/firestore').Firestore} deps.db
  * @param {string} [deps.accessToken] — Bearer token OAuth (Fase 2b.1)
  * @param {string} [deps.cookie]      — Session cookie (Fase 2b.0 legado)
+ * @param {string} [deps.plantSlug]   — 'chonchi' (default) | 'yal'
  * @param {string} [deps.dateKey]     — override; default: turno actual
  * @param {string} [deps.shiftId]     — override
  * @param {function} [deps.logger]    — logger (default: console)
  */
-async function syncShift({ db, accessToken, cookie, dateKey, shiftId, logger = console }) {
+async function syncShift({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey, shiftId, logger = console }) {
   if (!accessToken && !cookie) throw new Error('[sync] se requiere accessToken (Bearer) o cookie (legacy)')
+
+  const machines = PLANT_MACHINES[plantSlug]
+  if (!machines) throw new Error(`[sync] plantSlug desconocido: "${plantSlug}". Válidos: ${Object.keys(PLANT_MACHINES).join(', ')}`)
 
   /** Wrapper unificado: usa Bearer si hay accessToken, cookie si no */
   const query = accessToken
@@ -98,12 +103,12 @@ async function syncShift({ db, accessToken, cookie, dateKey, shiftId, logger = c
   }
 
   const window = shiftWindow(key.dateKey, key.shiftId)
-  logger.info(`[shoplogix-sync] Inicio ${key.dateKey} ${key.shiftId} (${window.start}→${window.end})`)
+  logger.info(`[shoplogix-sync][${plantSlug}] Inicio ${key.dateKey} ${key.shiftId} (${window.start}→${window.end})`)
 
   const results = []
   const syncedAt = new Date()
 
-  for (const machine of CHONCHI_EVISCERADORAS) {
+  for (const machine of machines) {
     try {
       const production = await query({
         type: 'whiteboardproduction',
@@ -130,7 +135,7 @@ async function syncShift({ db, accessToken, cookie, dateKey, shiftId, logger = c
       const sumMachine  = summary?.machines?.[0]
 
       if (!prodMachine || !sumMachine) {
-        logger.warn(`[shoplogix-sync] ${machine.name}: respuesta vacía`)
+        logger.warn(`[shoplogix-sync][${plantSlug}] ${machine.name}: respuesta vacía`)
         results.push({ machineid: machine.machineid, status: 'empty' })
         continue
       }
@@ -152,7 +157,7 @@ async function syncShift({ db, accessToken, cookie, dateKey, shiftId, logger = c
       })
 
       const ref = db.doc(
-        `shoplogix/${PLANT_SLUG}/shifts/${key.dateKey}_${key.shiftId}/machines/${machine.machineid}`,
+        `shoplogix/${plantSlug}/shifts/${key.dateKey}_${key.shiftId}/machines/${machine.machineid}`,
       )
       await ref.set(doc, { merge: true })
 
@@ -166,10 +171,10 @@ async function syncShift({ db, accessToken, cookie, dateKey, shiftId, logger = c
       })
     } catch (err) {
       if (err.code === 'AUTH_EXPIRED') {
-        logger.error(`[shoplogix-sync] AUTH_EXPIRED — aborta sync`, { err: err.message })
+        logger.error(`[shoplogix-sync][${plantSlug}] AUTH_EXPIRED — aborta sync`, { err: err.message })
         throw err  // propaga — el wrapper decide si alertar
       }
-      logger.error(`[shoplogix-sync] ${machine.name} error`, { err: err.message })
+      logger.error(`[shoplogix-sync][${plantSlug}] ${machine.name} error`, { err: err.message })
       results.push({ machineid: machine.machineid, status: 'error', error: err.message })
     }
 
@@ -177,19 +182,19 @@ async function syncShift({ db, accessToken, cookie, dateKey, shiftId, logger = c
   }
 
   // Metadatos del sync al doc padre
-  await db.doc(`shoplogix/${PLANT_SLUG}/shifts/${key.dateKey}_${key.shiftId}`).set({
+  await db.doc(`shoplogix/${plantSlug}/shifts/${key.dateKey}_${key.shiftId}`).set({
     dateKey: key.dateKey,
     shiftId: key.shiftId,
     lastSyncAt: syncedAt,
     machines: results,
   }, { merge: true })
 
-  logger.info(`[shoplogix-sync] Fin ${key.dateKey} ${key.shiftId}`, { results })
-  return { dateKey: key.dateKey, shiftId: key.shiftId, syncedAt, results }
+  logger.info(`[shoplogix-sync][${plantSlug}] Fin ${key.dateKey} ${key.shiftId}`, { results })
+  return { plantSlug, dateKey: key.dateKey, shiftId: key.shiftId, syncedAt, results }
 }
 
 module.exports = {
-  PLANT_SLUG,
+  ACTIVE_PLANTS,
   shiftWindow,
   currentShiftKey,
   syncShift,

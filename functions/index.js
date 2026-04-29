@@ -3135,12 +3135,13 @@ exports.shoplogixSyncHttp = onRequest(
     }
     logger.info(`[shoplogixSyncHttp] modo auth: ${auth.mode}`)
 
-    const { dateKey, shiftId } = req.query || {}
+    const { dateKey, shiftId, plantSlug } = req.query || {}
     try {
       const result = await shoplogixSyncMod.syncShift({
         db,
         accessToken: auth.accessToken,
         cookie:      auth.cookie,
+        plantSlug:   plantSlug || 'chonchi',
         dateKey: dateKey || undefined,
         shiftId: shiftId || undefined,
         logger,
@@ -3189,26 +3190,40 @@ exports.shoplogixSyncWakeup = onSchedule(
     }
     logger.info(`[shoplogixSyncWakeup] modo auth: ${auth.mode}`)
 
-    try {
-      const result = await shoplogixSyncMod.syncShift({
-        db,
-        accessToken: auth.accessToken,
-        cookie:      auth.cookie,
-        logger,
-      })
-      logger.info('[shoplogixSyncWakeup] OK', { result, authMode: auth.mode })
-    } catch (err) {
-      if (err.code === 'AUTH_EXPIRED') {
-        if (auth.mode === 'bearer') {
-          // Limpiar token inválido; el siguiente ciclo hará re-login completo
-          await shoplogixTokenStore.clearStoredToken(db)
-          logger.error('[shoplogixSyncWakeup] AUTH_EXPIRED (Bearer) — token limpiado, re-login en próximo ciclo')
+    // Sincroniza todas las plantas activas en paralelo
+    const settled = await Promise.allSettled(
+      shoplogixSyncMod.ACTIVE_PLANTS.map((plantSlug) =>
+        shoplogixSyncMod.syncShift({
+          db,
+          accessToken: auth.accessToken,
+          cookie:      auth.cookie,
+          plantSlug,
+          logger,
+        })
+      )
+    )
+
+    let authExpired = false
+    for (const outcome of settled) {
+      if (outcome.status === 'fulfilled') {
+        logger.info('[shoplogixSyncWakeup] OK', { result: outcome.value, authMode: auth.mode })
+      } else {
+        const err = outcome.reason
+        if (err?.code === 'AUTH_EXPIRED') {
+          authExpired = true
         } else {
-          logger.error('[shoplogixSyncWakeup] AUTH_EXPIRED (Cookie) — refrescar SHOPLOGIX_COOKIE manualmente')
+          logger.error('[shoplogixSyncWakeup] error planta', { err: err?.message })
         }
-        return
       }
-      logger.error('[shoplogixSyncWakeup] error', { err: err.message })
+    }
+
+    if (authExpired) {
+      if (auth.mode === 'bearer') {
+        await shoplogixTokenStore.clearStoredToken(db)
+        logger.error('[shoplogixSyncWakeup] AUTH_EXPIRED (Bearer) — token limpiado, re-login en próximo ciclo')
+      } else {
+        logger.error('[shoplogixSyncWakeup] AUTH_EXPIRED (Cookie) — refrescar SHOPLOGIX_COOKIE manualmente')
+      }
     }
   },
 )
