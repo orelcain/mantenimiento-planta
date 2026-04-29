@@ -513,7 +513,7 @@ function buildDayTimelineBlocks(
     for (const shiftId of ['Turno día', 'Turno noche'] as const) {
       const slxKey = `${slideKey}__${shiftId}`
       const slx = slxData.get(slxKey)
-      if (!slx?.shiftStart || !slx?.shiftEnd || slx.states.length === 0) continue
+      if (!slx?.shiftStart || !slx?.shiftEnd || slx.states.length === 0 || (slx.totalCycles ?? 0) === 0) continue
       const startMin = slx.shiftStart.getUTCHours() * 60 + slx.shiftStart.getUTCMinutes()
       const endMin   = slx.shiftEnd.getUTCHours()   * 60 + slx.shiftEnd.getUTCMinutes()
       let startFrac  = startMin / 1440
@@ -2177,100 +2177,6 @@ export function GraderHistoricalCalendar({
           })()}
         </CardHeader>
         <CardContent className="space-y-3">
-          {/* Sin uploads ni historial ni aportes calendáricos: placeholders por turno */}
-          {selectedKey && selectedUploads.length === 0 && summariesForSelectedDay.length === 0 && (
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 uppercase tracking-wide">
-                <Clock className="h-3.5 w-3.5" />
-                Sin Excel cargado todavía
-              </p>
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
-                {(['Turno día', 'Turno noche'] as const).map(shiftId => {
-                  const slxKey = `${selectedKey}__${shiftId}`
-                  const hasSlx = (slxByShift.get(slxKey)?.states?.length ?? 0) > 0
-                  const lineaQuery = plantLineId !== DEFAULT_PLANT_LINE_ID
-                    ? `?linea=${encodeURIComponent(plantLineId)}`
-                    : ''
-                  return (
-                    <div
-                      key={shiftId}
-                      className={cn(
-                        'rounded-lg border p-3 space-y-2',
-                        hasSlx
-                          ? 'border-sky-500/30 bg-sky-500/3'
-                          : 'border-dashed border-muted-foreground/30 bg-background/30',
-                      )}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          {shiftId === 'Turno día'
-                            ? <Sun className="h-4 w-4 text-amber-500" />
-                            : <Moon className="h-4 w-4 text-indigo-400" />}
-                          <p className="text-sm font-medium">{shiftId}</p>
-                        </div>
-                        {hasSlx && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-400 border border-sky-500/30 font-medium">
-                            Shoplogix
-                          </span>
-                        )}
-                      </div>
-
-                      {/* KPIs Shoplogix cuando hay datos */}
-                      {hasSlx && (() => {
-                        const cache = slxByShift.get(slxKey)
-                        const cycles = slxTotalsByShift.get(slxKey) ?? 0
-                        const uptimePct = (cache?.shiftRuntime ?? 0) * 100
-                        return (
-                          <div className="grid grid-cols-2 gap-1.5">
-                            <div className="rounded bg-muted/40 px-2 py-1 text-center">
-                              <div className="text-sm font-semibold tabular-nums">
-                                {cycles.toLocaleString('es-CL')}
-                              </div>
-                              <div className="text-[10px] text-muted-foreground">ciclos</div>
-                            </div>
-                            <div className="rounded bg-muted/40 px-2 py-1 text-center">
-                              <div className={cn(
-                                'text-sm font-semibold tabular-nums',
-                                uptimePct >= 70 ? 'text-emerald-400' : uptimePct >= 40 ? 'text-amber-400' : 'text-red-400',
-                              )}>
-                                {uptimePct.toFixed(0)}%
-                              </div>
-                              <div className="text-[10px] text-muted-foreground">uptime</div>
-                            </div>
-                          </div>
-                        )
-                      })()}
-
-                      {!hasSlx && (
-                        <p className="text-[11px] text-muted-foreground leading-snug">
-                          Sin registros. Podés ir guardando los cambios de gate que reporta control de producción —
-                          al subir el Excel se cruzarán con tu historial.
-                        </p>
-                      )}
-
-                      <div className="flex items-center gap-2">
-                        <QuickGateChangeButton
-                          shiftDocId={`${selectedKey}__${shiftId}`}
-                          variant="compact"
-                          className="flex-1 h-7 text-[11px]"
-                        />
-                        {hasSlx && (
-                          <button
-                            onClick={() => navigate(`/analisis-grader/turno/${selectedKey}__${encodeURIComponent(shiftId)}${lineaQuery}`)}
-                            className="flex items-center gap-1 h-7 px-2 rounded text-[11px] text-sky-400 border border-sky-500/40 hover:bg-sky-500/10 transition-colors shrink-0"
-                            title="Ver detalle Shoplogix de este turno"
-                          >
-                            <Activity className="h-3 w-3" />
-                            Ver detalle
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
           {/* ── Paso 3b: Carousel de timelines 24h (3 slides: prev · current · next) ── */}
           <div ref={carouselViewportRef} className="overflow-hidden select-none -mx-6 px-0">
             <div
@@ -2442,6 +2348,101 @@ export function GraderHistoricalCalendar({
               })}
             </div>
           </div>
+
+          {/* Sin uploads ni historial ni aportes calendáricos: placeholders por turno */}
+          {selectedKey && selectedUploads.length === 0 && summariesForSelectedDay.length === 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 uppercase tracking-wide">
+                <Clock className="h-3.5 w-3.5" />
+                Sin Excel cargado todavía
+              </p>
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
+                {(['Turno día', 'Turno noche'] as const).map(shiftId => {
+                  const slxKey = `${selectedKey}__${shiftId}`
+                  const hasSlx = (slxByShift.get(slxKey)?.states?.length ?? 0) > 0
+                  const lineaQuery = plantLineId !== DEFAULT_PLANT_LINE_ID
+                    ? `?linea=${encodeURIComponent(plantLineId)}`
+                    : ''
+                  return (
+                    <div
+                      key={shiftId}
+                      className={cn(
+                        'rounded-lg border p-3 space-y-2',
+                        hasSlx
+                          ? 'border-sky-500/30 bg-sky-500/3'
+                          : 'border-dashed border-muted-foreground/30 bg-background/30',
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          {shiftId === 'Turno día'
+                            ? <Sun className="h-4 w-4 text-amber-500" />
+                            : <Moon className="h-4 w-4 text-indigo-400" />}
+                          <p className="text-sm font-medium">{shiftId}</p>
+                        </div>
+                        {hasSlx && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-400 border border-sky-500/30 font-medium">
+                            Shoplogix
+                          </span>
+                        )}
+                      </div>
+
+                      {/* KPIs Shoplogix cuando hay datos */}
+                      {hasSlx && (() => {
+                        const cache = slxByShift.get(slxKey)
+                        const cycles = slxTotalsByShift.get(slxKey) ?? 0
+                        const uptimePct = (cache?.shiftRuntime ?? 0) * 100
+                        return (
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <div className="rounded bg-muted/40 px-2 py-1 text-center">
+                              <div className="text-sm font-semibold tabular-nums">
+                                {cycles.toLocaleString('es-CL')}
+                              </div>
+                              <div className="text-[10px] text-muted-foreground">ciclos</div>
+                            </div>
+                            <div className="rounded bg-muted/40 px-2 py-1 text-center">
+                              <div className={cn(
+                                'text-sm font-semibold tabular-nums',
+                                uptimePct >= 70 ? 'text-emerald-400' : uptimePct >= 40 ? 'text-amber-400' : 'text-red-400',
+                              )}>
+                                {uptimePct.toFixed(0)}%
+                              </div>
+                              <div className="text-[10px] text-muted-foreground">uptime</div>
+                            </div>
+                          </div>
+                        )
+                      })()}
+
+                      {!hasSlx && (
+                        <p className="text-[11px] text-muted-foreground leading-snug">
+                          Sin registros. Podés ir guardando los cambios de gate que reporta control de producción —
+                          al subir el Excel se cruzarán con tu historial.
+                        </p>
+                      )}
+
+                      <div className="flex items-center gap-2">
+                        <QuickGateChangeButton
+                          shiftDocId={`${selectedKey}__${shiftId}`}
+                          variant="compact"
+                          className="flex-1 h-7 text-[11px]"
+                        />
+                        {hasSlx && (
+                          <button
+                            onClick={() => navigate(`/analisis-grader/turno/${selectedKey}__${encodeURIComponent(shiftId)}${lineaQuery}`)}
+                            className="flex items-center gap-1 h-7 px-2 rounded text-[11px] text-sky-400 border border-sky-500/40 hover:bg-sky-500/10 transition-colors shrink-0"
+                            title="Ver detalle Shoplogix de este turno"
+                          >
+                            <Activity className="h-3 w-3" />
+                            Ver detalle
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
           {selectedUploads.length > 0 && (() => {
             // Ocultar turnos que ya tienen resumen en historial guardado
