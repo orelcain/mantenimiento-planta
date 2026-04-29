@@ -523,18 +523,6 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
   // Click sobre el mismo state lo cierra (toggle).
   const [selectedState, setSelectedState] = useState<UpstreamMachineState | null>(null)
 
-  // Tendencia histórica — lazy: solo carga al expandir, una sola vez por montaje.
-  const [trend, setTrend] = useState<MachineTrendPoint[] | null>(null)
-  const [trendLoading, setTrendLoading] = useState(false)
-
-  useEffect(() => {
-    if (!expanded || trend !== null || trendLoading) return
-    setTrendLoading(true)
-    loadMachineTrend(plantSlug, shift.machineid, shift.dateKey, shift.shiftId)
-      .then(pts => setTrend(pts))
-      .catch(() => setTrend([]))
-      .finally(() => setTrendLoading(false))
-  }, [expanded, trend, trendLoading, plantSlug, shift.machineid, shift.dateKey, shift.shiftId])
   const handleStateClick = (s: UpstreamMachineState) => {
     setSelectedState((prev) =>
       prev && prev.startAt.getTime() === s.startAt.getTime() && prev.name === s.name
@@ -728,25 +716,6 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
               })()}
             </div>
           </div>
-          {/* Tendencia histórica — últimos 7 turnos del mismo tipo */}
-          <div className="mt-3 pt-2 border-t border-slate-800/40">
-            <p className="text-[10px] text-slate-600 uppercase tracking-wider mb-1">
-              Tendencia · últimos 7 turnos
-            </p>
-            {trendLoading && (
-              <p className="text-[10px] text-slate-600 italic py-1">Cargando…</p>
-            )}
-            {!trendLoading && trend !== null && (
-              <MachineTrendMiniChart points={trend} />
-            )}
-            {!trendLoading && trend !== null && trend.length >= 2 && (
-              <div className="flex gap-3 text-[9px] text-slate-500 mt-0.5">
-                <span><span style={{ color: 'rgba(56,189,248,0.9)' }}>●</span> Ritmo (overallRatio)</span>
-                <span><span style={{ color: 'rgba(52,211,153,0.9)' }}>◆</span> Uptime %</span>
-              </div>
-            )}
-          </div>
-
           {/* Comentarios completos en expanded (cuando hay más de 2) */}
           {shift.comments.length > 2 && (
             <div className="mt-2 space-y-0.5">
