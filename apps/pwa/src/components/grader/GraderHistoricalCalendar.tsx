@@ -379,8 +379,10 @@ interface TimelineBlock {
   startTimeStr: string
   /** Hora de fin efectiva del turno (HH:mm) — basada en Shoplogix si disponible */
   endTimeStr: string
-  /** P0% del turno — para mostrar dentro del bloque */
-  p0Pct: number
+  /** P0% del turno — null para bloques Shoplogix-only (sin Grader) */
+  p0Pct: number | null
+  /** true → bloque generado desde Shoplogix sin graderDailySummary (Yal sin Excel) */
+  isShoplogixOnly?: boolean
 }
 
 /**
@@ -393,6 +395,7 @@ interface TimelineBlock {
 function buildDayTimelineBlocks(
   entries: Array<{ summary: GraderDailySummary; chip: ShiftChipDescriptor | null }>,
   slxData?: Map<string, SlxShiftCache>,
+  slideKey?: string,  // dateKey del slide — necesario para bloques Shoplogix standalone
 ): TimelineBlock[] {
   const blocks: TimelineBlock[] = []
   for (const { summary: hist, chip } of entries) {
@@ -492,6 +495,48 @@ function buildDayTimelineBlocks(
       p0Pct: hist.pointZeroPct,
     })
   }
+  // ── Shoplogix standalone blocks ────────────────────────────────────────────
+  // Cuando no hay ningún graderDailySummary para este slide (p.ej. Yal sin Excel
+  // cargado) pero sí hay datos Shoplogix, mostramos el window del turno como
+  // bloque neutro (sky/azul, sin P0%, no navegable).
+  if (blocks.length === 0 && slideKey && slxData) {
+    const pad2 = (n: number) => String(n).padStart(2, '0')
+    const fracToHHMM = (frac: number) => {
+      const totalMin = Math.round(Math.max(0, Math.min(1, frac)) * 1440)
+      return `${pad2(Math.floor(totalMin / 60) % 24)}:${pad2(totalMin % 60)}`
+    }
+    for (const shiftId of ['Turno día', 'Turno noche'] as const) {
+      const slxKey = `${slideKey}__${shiftId}`
+      const slx = slxData.get(slxKey)
+      if (!slx?.shiftStart || !slx?.shiftEnd || slx.states.length === 0) continue
+      const startMin = slx.shiftStart.getUTCHours() * 60 + slx.shiftStart.getUTCMinutes()
+      const endMin   = slx.shiftEnd.getUTCHours()   * 60 + slx.shiftEnd.getUTCMinutes()
+      let startFrac  = startMin / 1440
+      let endFrac    = endMin   / 1440
+      // Turno noche cruza medianoche → mostrar solo la parte de este día
+      if (endFrac < startFrac) endFrac = 1
+      if (endFrac <= startFrac) endFrac = Math.min(1, startFrac + 0.02)
+      const label = shiftId === 'Turno día' ? 'D' : 'N'
+      const ts    = `${fracToHHMM(startFrac)}–${fracToHHMM(endFrac)}`
+      blocks.push({
+        leftPct:      startFrac * 100,
+        widthPct:     (endFrac - startFrac) * 100,
+        bgClass:      'bg-sky-500/40',
+        label,
+        title:        `${shiftId} · Shoplogix · ${ts} · sin Excel cargado`,
+        nightSide:    shiftId === 'Turno noche' ? 'end' : null,
+        summaryId:    '',
+        dateKey:      slideKey,
+        shiftId,
+        fragId:       `${slideKey}__${shiftId}-slx`,
+        startTimeStr: fracToHHMM(startFrac),
+        endTimeStr:   fracToHHMM(endFrac),
+        p0Pct:        null,
+        isShoplogixOnly: true,
+      })
+    }
+  }
+
   return blocks
 }
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2005,7 +2050,7 @@ export function GraderHistoricalCalendar({
                 { slideKey: nextKey,      entries: nextEntries },
               ] as const).map(({ slideKey, entries }, si) => {
                 const isSelectedSlide = si === 1
-                const blocks = buildDayTimelineBlocks(entries as Array<{ summary: GraderDailySummary; chip: ShiftChipDescriptor | null }>, slxByShift)
+                const blocks = buildDayTimelineBlocks(entries as Array<{ summary: GraderDailySummary; chip: ShiftChipDescriptor | null }>, slxByShift, slideKey ?? undefined)
                 // Huecos entre turnos → planned downtime gris, misma altura que los bloques.
                 // Se calcula GEOMÉTRICAMENTE desde los bordes de los bloques Grader,
                 // sin depender del reason-text de Shoplogix (que varía entre turnos).
@@ -2095,23 +2140,28 @@ export function GraderHistoricalCalendar({
                         />
                       ))}
 
-                      {/* ── Capa 3: bloques del Grader (zona superior principal) ── */}
+                      {/* ── Capa 3: bloques del Grader o Shoplogix standalone ── */}
                       {blocks.map((b, i) => {
                         const isHovered = hoveredFragId === b.fragId
-                        const navigateToBlockTurno = () => navigate(
-                          `/analisis-grader/turno/${b.dateKey}__${encodeURIComponent(b.shiftId)}`,
-                        )
+                        const navigateToBlockTurno = b.isShoplogixOnly
+                          ? undefined
+                          : () => navigate(
+                              `/analisis-grader/turno/${b.dateKey}__${encodeURIComponent(b.shiftId)}`,
+                            )
                         return (
                           <div
                             key={i}
                             data-frag-id={b.fragId}
-                            role="button"
-                            tabIndex={0}
+                            role={b.isShoplogixOnly ? undefined : 'button'}
+                            tabIndex={b.isShoplogixOnly ? undefined : 0}
                             className={cn(
-                              'absolute cursor-pointer transition-all overflow-hidden',
+                              'absolute overflow-hidden',
+                              b.isShoplogixOnly
+                                ? 'cursor-default border border-dashed border-sky-400/50'
+                                : 'cursor-pointer transition-all',
                               b.bgClass,
                               b.nightSide === null && 'rounded-sm',
-                              isHovered && 'ring-2 ring-white/80 ring-offset-1 ring-offset-background z-20',
+                              isHovered && !b.isShoplogixOnly && 'ring-2 ring-white/80 ring-offset-1 ring-offset-background z-20',
                             )}
                             style={{
                               left:   `${b.leftPct}%`,
@@ -2127,12 +2177,12 @@ export function GraderHistoricalCalendar({
                                 : b.nightSide === 'end' ? 'linear-gradient(270deg, rgba(99,102,241,0.55) 0%, transparent 18px)'
                                 : undefined,
                             }}
-                            title={`${b.title} · click para ver detalle`}
+                            title={b.isShoplogixOnly ? b.title : `${b.title} · click para ver detalle`}
                             onClick={navigateToBlockTurno}
-                            onKeyDown={(e) => {
+                            onKeyDown={b.isShoplogixOnly ? undefined : (e) => {
                               if (e.key === 'Enter' || e.key === ' ') {
                                 e.preventDefault()
-                                navigateToBlockTurno()
+                                navigateToBlockTurno?.()
                               }
                             }}
                             onMouseEnter={() => setHoveredFragId(b.fragId)}
