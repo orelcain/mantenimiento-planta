@@ -20,7 +20,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { animate, stagger } from 'animejs'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from '@/components/ui'
-import { ChevronLeft, ChevronRight, Loader2, Clock, Database, Eye, Trash2, AlertTriangle, Sun, Moon, Wrench, Tag, GitCompare } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, Clock, Database, Eye, Trash2, AlertTriangle, Sun, Moon, Wrench, Tag, GitCompare, Activity } from 'lucide-react'
 import { fmt } from '@/lib/format'
 import { QuickGateChangeButton } from './QuickGateChangeButton'
 import { listSnapshots } from '@/services/grader/graderConfigSnapshot.service'
@@ -2008,28 +2008,47 @@ export function GraderHistoricalCalendar({
                 Sin Excel cargado todavía
               </p>
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
-                {(['Turno día', 'Turno noche'] as const).map(shiftId => (
-                  <div
-                    key={shiftId}
-                    className="rounded-lg border border-dashed border-muted-foreground/30 p-3 space-y-2 bg-background/30"
-                  >
-                    <div className="flex items-center gap-2">
-                      {shiftId === 'Turno día'
-                        ? <Sun className="h-4 w-4 text-amber-500" />
-                        : <Moon className="h-4 w-4 text-indigo-400" />}
-                      <p className="text-sm font-medium">{shiftId}</p>
+                {(['Turno día', 'Turno noche'] as const).map(shiftId => {
+                  const slxKey = `${selectedKey}__${shiftId}`
+                  const hasSlx = (slxByShift.get(slxKey)?.states?.length ?? 0) > 0
+                  const lineaQuery = plantLineId !== DEFAULT_PLANT_LINE_ID
+                    ? `?linea=${encodeURIComponent(plantLineId)}`
+                    : ''
+                  return (
+                    <div
+                      key={shiftId}
+                      className="rounded-lg border border-dashed border-muted-foreground/30 p-3 space-y-2 bg-background/30"
+                    >
+                      <div className="flex items-center gap-2">
+                        {shiftId === 'Turno día'
+                          ? <Sun className="h-4 w-4 text-amber-500" />
+                          : <Moon className="h-4 w-4 text-indigo-400" />}
+                        <p className="text-sm font-medium">{shiftId}</p>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground leading-snug">
+                        Sin registros. Podés ir guardando los cambios de gate que reporta control de producción —
+                        al subir el Excel se cruzarán con tu historial.
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <QuickGateChangeButton
+                          shiftDocId={`${selectedKey}__${shiftId}`}
+                          variant="compact"
+                          className="flex-1 h-7 text-[11px]"
+                        />
+                        {hasSlx && (
+                          <button
+                            onClick={() => navigate(`/analisis-grader/turno/${selectedKey}__${encodeURIComponent(shiftId)}${lineaQuery}`)}
+                            className="flex items-center gap-1 h-7 px-2 rounded text-[11px] text-sky-400 border border-sky-500/40 hover:bg-sky-500/10 transition-colors shrink-0"
+                            title="Ver detalle Shoplogix de este turno"
+                          >
+                            <Activity className="h-3 w-3" />
+                            Ver Shoplogix
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <p className="text-[11px] text-muted-foreground leading-snug">
-                      Sin registros. Podés ir guardando los cambios de gate que reporta control de producción —
-                      al subir el Excel se cruzarán con tu historial.
-                    </p>
-                    <QuickGateChangeButton
-                      shiftDocId={`${selectedKey}__${shiftId}`}
-                      variant="compact"
-                      className="w-full h-7 text-[11px]"
-                    />
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           )}
@@ -2243,7 +2262,10 @@ export function GraderHistoricalCalendar({
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => navigate(`/analisis-grader/turno/${selectedKey}__${encodeURIComponent(shiftId)}`)}
+                          onClick={() => {
+                            const lq = plantLineId !== DEFAULT_PLANT_LINE_ID ? `?linea=${encodeURIComponent(plantLineId)}` : ''
+                            navigate(`/analisis-grader/turno/${selectedKey}__${encodeURIComponent(shiftId)}${lq}`)
+                          }}
                         >
                           <Eye className="h-3 w-3 mr-1" />
                           Ver detalle
