@@ -8,7 +8,7 @@
  * cada pocos minutos durante horas de turno.
  */
 
-import { collection, getDocs, doc, getDoc, Timestamp } from 'firebase/firestore'
+import { collection, getDocs, doc, getDoc, Timestamp, onSnapshot } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import type {
   UpstreamMachineShift,
@@ -190,6 +190,48 @@ function deserializeShift(raw: FirestoreData): UpstreamMachineShift {
 export interface LoadShoplogixShiftResult {
   snapshot: UpstreamLineSnapshot | null
   syncedAt: Date | null
+}
+
+/**
+ * Suscripción en tiempo real al snapshot de un turno.
+ * Llama a `onUpdate` cada vez que Firestore actualiza las máquinas del turno.
+ * Devuelve la función `unsubscribe` para limpiar el listener.
+ *
+ * Usar en hooks de UI para el turno activo/live; `loadShoplogixShift` sigue
+ * siendo adecuado para pre-carga mensual del calendario (datos históricos).
+ *
+ * @param plantSlug — 'chonchi' (default) | 'yal'
+ */
+export function subscribeShoplogixShift(
+  dateKey: string,
+  shiftId: string,
+  plantSlug: PlantSlug = 'chonchi',
+  onUpdate: (result: LoadShoplogixShiftResult) => void,
+): () => void {
+  const shiftDocId = `${dateKey}_${shiftId}`
+  const machinesRef = collection(db, `shoplogix/${plantSlug}/shifts/${shiftDocId}/machines`)
+
+  return onSnapshot(
+    machinesRef,
+    (snap) => {
+      if (snap.empty) {
+        onUpdate({ snapshot: null, syncedAt: null })
+        return
+      }
+      const machines: ReturnType<typeof deserializeShift>[] = snap.docs.map(
+        d => deserializeShift(d.data() as FirestoreData),
+      )
+      machines.sort((a, b) => a.machineName.localeCompare(b.machineName))
+      const lineSnapshot = buildLineSnapshot({ dateKey, shiftId, machines })
+      // syncedAt desde el primer doc (todas las máquinas se sincronizan juntas)
+      const syncedAt = machines[0]?.syncedAt ?? null
+      onUpdate({ snapshot: lineSnapshot, syncedAt })
+    },
+    (_error) => {
+      // Error de red o permisos → informar pero no romper la UI
+      onUpdate({ snapshot: null, syncedAt: null })
+    },
+  )
 }
 
 /**

@@ -14,7 +14,7 @@
 import { useState, useEffect } from 'react'
 import type { UpstreamLineSnapshot } from '@/services/shoplogix/types'
 import { buildDemoLineSnapshot } from '@/services/shoplogix/shoplogixDemoData'
-import { loadShoplogixShift } from '@/services/shoplogix/shoplogixShift.service'
+import { subscribeShoplogixShift } from '@/services/shoplogix/shoplogixShift.service'
 import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
 import { logger } from '@/lib/logger'
 
@@ -60,54 +60,41 @@ export function useUpstreamLineSnapshot(
       return
     }
 
-    let cancelled = false
-    const load = async () => {
-      setLoading(true)
-      setError(null)
+    setLoading(true)
+    setError(null)
 
-      // Helper: fallback a demo en DEV, o null
-      const fallback = () => {
-        if (isDemoEnabled()) {
-          const demo = buildDemoLineSnapshot()
-          if (!cancelled) {
-            setSnapshot(demo)
+    // Suscripción en tiempo real: el hook se actualiza automáticamente cada
+    // vez que el Cloud Function escribe a Firestore (cada ~5 min en turno activo).
+    // onSnapshot devuelve `unsubscribe`, que React llama en el cleanup.
+    const unsubscribe = subscribeShoplogixShift(
+      dateKey,
+      shiftId,
+      plantSlug,
+      ({ snapshot: fsSnap, syncedAt: fsSynced }) => {
+        if (fsSnap) {
+          setSnapshot(fsSnap)
+          setSource('firestore')
+          setSyncedAt(fsSynced)
+          setLoading(false)
+          setError(null)
+        } else {
+          // Sin datos en Firestore → fallback demo (DEV) o vacío (PROD)
+          if (isDemoEnabled()) {
+            setSnapshot(buildDemoLineSnapshot())
             setSource('demo')
             setSyncedAt(new Date())
+          } else {
+            setSnapshot(null)
+            setSource('none')
+            setSyncedAt(null)
+            logger.warn('useUpstreamLineSnapshot: sin datos Firestore')
           }
-        } else if (!cancelled) {
-          setSnapshot(null)
-          setSource('none')
-          setSyncedAt(null)
+          setLoading(false)
         }
-      }
+      },
+    )
 
-      try {
-        // 1. Intenta Firestore primero
-        const { snapshot: fsSnap, syncedAt: fsSynced } = await loadShoplogixShift(dateKey, shiftId, plantSlug)
-        if (fsSnap) {
-          if (!cancelled) {
-            setSnapshot(fsSnap)
-            setSource('firestore')
-            setSyncedAt(fsSynced)
-          }
-          return
-        }
-        // Firestore vacío → fallback
-        fallback()
-      } catch {
-        // Permission error (rules) o red caída → tratamos como "sin data" y fallback
-        // No mostramos error al usuario: el panel siempre degrada gracefully.
-        if (!cancelled) {
-          logger.warn('useUpstreamLineSnapshot: Firestore error, usando fallback')
-        }
-        fallback()
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-
-    load()
-    return () => { cancelled = true }
+    return unsubscribe
   }, [dateKey, shiftId, plantSlug])
 
   return { snapshot, loading, error, syncedAt, source }

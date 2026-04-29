@@ -10,7 +10,7 @@ import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useParams, useNavigate, Navigate, useSearchParams } from 'react-router-dom'
 import { logger } from '@/lib/logger'
 import { Button, Card, CardContent, Spinner, Badge } from '@/components/ui'
-import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag, FileText, WifiOff, ChevronDown } from 'lucide-react'
+import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag, FileText, WifiOff, ChevronDown, RefreshCw } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { usePermissionsStore } from '@/store'
 import { useAuthStore, useIsAdmin, useIsSupervisor } from '@/store/authStore'
@@ -355,6 +355,10 @@ export function AnalisisGraderTurnoPage() {
   const [showConfigPanel, setShowConfigPanel] = useState(false)
   const [calibreOverride, setCalibrerOverride] = useState<CalibreWeightRange[] | null>(null)
   const [turnoThresholdsOverride, setTurnoThresholdsOverride] = useState<{ photocellPctWarn: number; outOfLimitsPctWarn: number; pointZeroPctWarn: number; pointZeroPctCritical: number } | null>(null)
+
+  // ── Shoplogix manual refresh ──────────────────────────────────────────────
+  const [slxSyncing, setSlxSyncing] = useState(false)
+  const [slxLastManualSync, setSlxLastManualSync] = useState<Date | null>(null)
 
   // ── Share (token público) — estado; handlers después de enrichedTimelineBuckets ──
   const [sharing, setSharing] = useState(false)
@@ -755,6 +759,29 @@ export function AnalisisGraderTurnoPage() {
     return `${dayName} ${dayNum} ${monthName}`
   }, [dateKey])
 
+  // ── Shoplogix manual refresh ─────────────────────────────────────────────
+  const handleSlxRefresh = useCallback(async () => {
+    if (slxSyncing) return
+    setSlxSyncing(true)
+    try {
+      const { httpsCallable, getFunctions } = await import('firebase/functions')
+      const functions = getFunctions((await import('@/services/firebase')).default)
+      const syncNow = httpsCallable(functions, 'shoplogixSyncNow')
+      await syncNow({
+        dateKey:   dateKey   || undefined,
+        shiftId:   shiftLabel || undefined,
+        plantSlug: plantLineCfg.plantSlug,
+      })
+      setSlxLastManualSync(new Date())
+      // El onSnapshot de useUpstreamLineSnapshot actualiza el snapshot automáticamente
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      toast({ title: '⚠️ Sin datos Shoplogix', description: msg, variant: 'destructive' })
+    } finally {
+      setSlxSyncing(false)
+    }
+  }, [slxSyncing, dateKey, shiftLabel, plantLineCfg.plantSlug, toast])
+
   // handlers de share — después de enrichedTimelineBuckets para evitar TDZ
   const handleShare = useCallback(async () => {
     if (!summary || !dateKey || !shiftLabel) return
@@ -981,19 +1008,36 @@ export function AnalisisGraderTurnoPage() {
             dateKey={dateKey}
           />
 
-          {/* Banner informativo con acción de carga */}
+          {/* Banner informativo con acción de carga + refresh */}
           <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-sky-500/10 border border-sky-500/30 text-sky-400 text-sm">
             <Activity className="w-4 h-4 shrink-0" />
-            <span className="flex-1">
+            <span className="flex-1 min-w-0">
               {shiftWindow?.status === 'live'
                 ? 'Turno en curso · Sin datos Grader aún — vista basada en Shoplogix'
                 : 'Sin Excel Grader para este turno · mostrando datos Shoplogix'}
+              {slxLastManualSync && (
+                <span className="ml-2 text-[10px] text-sky-500/70">
+                  · actualizado {Math.round((Date.now() - slxLastManualSync.getTime()) / 1000)}s atrás
+                </span>
+              )}
             </span>
+            {/* Botón actualizar ahora — disponible para todos los usuarios */}
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs border-sky-500/40 text-sky-400 hover:bg-sky-500/10 shrink-0"
+              onClick={handleSlxRefresh}
+              disabled={slxSyncing}
+              title="Forzar sync Shoplogix ahora"
+            >
+              <RefreshCw className={`w-3 h-3 mr-1.5 ${slxSyncing ? 'animate-spin' : ''}`} />
+              {slxSyncing ? 'Actualizando…' : 'Actualizar ahora'}
+            </Button>
             {isAdmin && (
               <Button
                 size="sm"
                 variant="outline"
-                className="h-7 text-xs border-sky-500/40 text-sky-400 hover:bg-sky-500/10"
+                className="h-7 text-xs border-sky-500/40 text-sky-400 hover:bg-sky-500/10 shrink-0"
                 onClick={() => navigate('/analisis-grader/wizard')}
               >
                 <Upload className="w-3 h-3 mr-1.5" />
@@ -1138,6 +1182,27 @@ export function AnalisisGraderTurnoPage() {
 
           {/* Línea upstream — Evisceradoras Baader 142 (integración Shoplogix) */}
           {/* Va INMEDIATAMENTE después del timeline Grader para máxima cercanía visual */}
+          {/* Botón refresh Shoplogix — disponible cuando hay snapshot o está cargando */}
+          {(upstreamLine.snapshot || upstreamLine.loading) && (
+            <div className="flex items-center justify-end gap-2 -mb-1">
+              {slxLastManualSync && (
+                <span className="text-[10px] text-muted-foreground">
+                  actualizado {Math.round((Date.now() - slxLastManualSync.getTime()) / 1000)}s atrás
+                </span>
+              )}
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 text-[11px] text-muted-foreground hover:text-sky-400 px-2"
+                onClick={handleSlxRefresh}
+                disabled={slxSyncing}
+                title="Forzar sync Shoplogix ahora"
+              >
+                <RefreshCw className={`w-3 h-3 mr-1 ${slxSyncing ? 'animate-spin' : ''}`} />
+                {slxSyncing ? 'Actualizando…' : 'Actualizar Shoplogix'}
+              </Button>
+            </div>
+          )}
           <UpstreamMachinesPanel
             snapshot={upstreamLine.snapshot}
             loading={upstreamLine.loading}

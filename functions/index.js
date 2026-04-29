@@ -3168,7 +3168,7 @@ exports.shoplogixSyncHttp = onRequest(
  */
 exports.shoplogixSyncWakeup = onSchedule(
   {
-    schedule: 'every 60 minutes',
+    schedule: 'every 5 minutes',
     timeZone: 'America/Santiago',
     timeoutSeconds: 180,
     memory: '256MiB',
@@ -3261,6 +3261,59 @@ exports.shoplogixTokenRefresh = onSchedule(
     } catch (e) {
       logger.error('[shoplogixTokenRefresh] falló renovación:', e.message)
       // No re-throw: el scheduler reintentará (retryCount: 2)
+    }
+  },
+)
+
+/**
+ * Trigger manual de sync Shoplogix — llamado desde el botón "Actualizar ahora"
+ * en la PWA. Autentica el usuario, sincroniza el turno solicitado (o el actual)
+ * y escribe a Firestore. El onSnapshot del hook useUpstreamLineSnapshot
+ * detecta el cambio y actualiza la UI automáticamente.
+ *
+ * @param {object} data
+ * @param {string} [data.dateKey]   — "2026-04-29" (default: turno actual)
+ * @param {string} [data.shiftId]   — "Turno día" | "Turno noche" (default: actual)
+ * @param {string} [data.plantSlug] — "chonchi" | "yal" (default: "chonchi")
+ */
+exports.shoplogixSyncNow = onCall(
+  {
+    timeoutSeconds: 90,
+    memory: '256MiB',
+    secrets: ['SHOPLOGIX_COOKIE'],
+  },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'Login requerido')
+    }
+
+    const { dateKey, shiftId, plantSlug = 'chonchi' } = (request.data ?? {})
+
+    const auth = await resolveShoplogixAuth(logger)
+    if (auth.mode === 'none') {
+      throw new HttpsError('internal', 'Sin credenciales Shoplogix configuradas')
+    }
+
+    logger.info(`[shoplogixSyncNow] uid=${request.auth.uid} planta=${plantSlug} ${dateKey ?? 'turno-actual'} ${shiftId ?? ''}`)
+
+    try {
+      const result = await shoplogixSyncMod.syncShift({
+        db,
+        accessToken: auth.accessToken,
+        cookie:      auth.cookie,
+        plantSlug:   plantSlug || 'chonchi',
+        dateKey:     dateKey   || undefined,
+        shiftId:     shiftId   || undefined,
+        logger,
+      })
+      return { ok: true, result }
+    } catch (err) {
+      if (err.message?.includes('AUTH_EXPIRED')) {
+        if (auth.mode === 'bearer') await shoplogixTokenStore.clearStoredToken(db)
+        throw new HttpsError('unauthenticated', 'Sesión Shoplogix expirada — contactar admin')
+      }
+      logger.error('[shoplogixSyncNow] error', { err: err.message })
+      throw new HttpsError('internal', err.message ?? 'Error desconocido')
     }
   },
 )
