@@ -14,7 +14,7 @@
  * en DEV usa datos sintéticos realistas (shoplogixDemoData).
  */
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { Card, CardContent, Badge } from '@/components/ui'
 import {
   ChevronDown, ChevronRight, Factory, Activity, AlertCircle, Zap,
@@ -40,6 +40,7 @@ import {
   REACHED_PCT_THRESHOLDS,
   SYNC_STALE_MINUTES,
 } from '@/services/grader/graderUpstreamHealth'
+import { animate, stagger } from 'animejs'
 import { useTimelineSyncOptional } from './useTimelineSync'
 import { StateTimelineEC } from './StateTimelineEC'
 import { ProductionBarsEC } from './ProductionBarsEC'
@@ -169,6 +170,84 @@ function aggregateStatesByReason(states: UpstreamMachineState[]): ReasonAggregat
   return Array.from(map.values()).sort((a, b) => b.durationSec - a.durationSec)
 }
 
+/**
+ * Pareto horizontal de causas de paro — muestra top 4 razones ordenadas por
+ * duración con barras proporcionales al total de downtime.
+ *
+ * anime.js v4: anima scaleX 0→1 con stagger al montar o cuando cambian los datos
+ * (nueva sincronización con Shoplogix). Respeta prefers-reduced-motion.
+ * Patrón idéntico al sweep del calendario (GraderHistoricalCalendar).
+ */
+function DowntimeParetoBar({ reasons }: { reasons: ReasonAggregate[] }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const top = reasons.slice(0, 4)
+  // Denominador = suma de TODOS los paros (no solo top 4) → % correcto del total downtime
+  const totalSec = reasons.reduce((a, r) => a + r.durationSec, 0)
+
+  useEffect(() => {
+    if (!containerRef.current || top.length === 0) return
+    const prefersReduced =
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    if (prefersReduced) return
+    const bars = containerRef.current.querySelectorAll<HTMLElement>('[data-pareto-bar]')
+    if (bars.length === 0) return
+    animate(bars, {
+      scaleX: [0, 1],
+      duration: 380,
+      delay: stagger(55),
+      ease: 'outExpo',
+    })
+  }, [reasons])  // re-anima cuando llegan datos nuevos de Shoplogix
+
+  if (top.length === 0) return null
+
+  return (
+    <div ref={containerRef} className="space-y-[5px] pt-0.5">
+      {top.map(r => {
+        const pct = totalSec > 0 ? (r.durationSec / totalSec) * 100 : 0
+        return (
+          <div
+            key={r.reason}
+            className="flex items-center gap-1.5 text-[10px]"
+            title={`${r.count} evento${r.count !== 1 ? 's' : ''} · ${fmtDurationSec(r.durationSec)} total`}
+          >
+            {/* Color del state (viene de Shoplogix) */}
+            <span
+              className="w-2 h-2 rounded-sm shrink-0 ring-1 ring-slate-900/60"
+              style={{ backgroundColor: r.color }}
+            />
+            {/* Etiqueta — ancho fijo para alinear las barras */}
+            <span className="text-slate-300 truncate shrink-0 w-[7.5rem]">
+              {r.reason || 'Sin categoría'}
+            </span>
+            {/* Barra proporcional — transformOrigin left para el scaleX 0→1 */}
+            <div className="flex-1 h-1.5 bg-slate-800/80 rounded-full overflow-hidden min-w-0">
+              <div
+                data-pareto-bar=""
+                className="h-full rounded-full opacity-80"
+                style={{
+                  width: `${Math.max(pct, 1)}%`,
+                  backgroundColor: r.color,
+                  transformOrigin: 'left center',
+                }}
+              />
+            </div>
+            {/* Duración */}
+            <span className="text-slate-500 tabular-nums shrink-0 w-12 text-right">
+              {fmtDurationSec(r.durationSec)}
+            </span>
+            {/* % del total downtime */}
+            <span className="text-slate-600 tabular-nums shrink-0 w-7 text-right">
+              {pct.toFixed(0)}%
+            </span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ============================================================================
 // Subcomponentes visuales
 // ============================================================================
@@ -217,18 +296,8 @@ function StateTimeline({
           que está inmediatamente debajo — adapta su granularidad al zoom
           automáticamente (1 min cuando < 10 min, 5 min a 30 min, etc.). */}
 
-      {/* Leyenda condensada — top 6 razones por duración */}
-      {reasons.length > 0 && (
-        <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-400 pt-0.5">
-          {reasons.slice(0, 6).map(r => (
-            <div key={r.reason} className="flex items-center gap-1.5" title={`${r.count} evento${r.count !== 1 ? 's' : ''}`}>
-              <span className="w-2.5 h-2.5 rounded-sm shrink-0 ring-1 ring-slate-900/50" style={{ backgroundColor: r.color }} />
-              <span className="text-slate-300">{r.reason}</span>
-              <span className="text-slate-500 tabular-nums">{fmtDurationSec(r.durationSec)}</span>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* Pareto de causas de paro — barras proporcionales con animación fill */}
+      <DowntimeParetoBar reasons={reasons} />
     </div>
   )
 }
