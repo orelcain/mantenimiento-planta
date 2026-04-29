@@ -43,7 +43,7 @@ export const PLANT_LINES: readonly PlantLineConfig[] = [
     label: 'Planta Yal',
     description: 'Eviscerado · 3 Baaders',
     plantSlug: 'yal',
-    hasGraderData: false,
+    hasGraderData: true,   // El Excel de la Grader Yal tiene el mismo formato
     shoplogixEnabled: true,
   },
   {

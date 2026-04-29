@@ -568,10 +568,9 @@ export function GraderHistoricalCalendar({
 }: GraderHistoricalCalendarProps) {
   const navigate = useNavigate()
 
-  // Config de la línea activa: determina plantSlug + si hay datos Grader Excel
+  // Config de la línea activa: determina plantSlug
   const plantLine = getPlantLineConfig(plantLineId)
   const plantSlug = plantLine.plantSlug
-  const hasGraderData = plantLine.hasGraderData
   const [searchParams] = useSearchParams()
   const user = useAuthStore((s) => s.user)
   const selectedHistorical = useGraderSelectionStore((s) => s.selectedHistorical)
@@ -661,21 +660,21 @@ export function GraderHistoricalCalendar({
     setUploads((prev) => normalizeUploads(prev, shiftSchedule))
   }, [shiftSchedule, uploads.length])
 
-  // Cargar summaries históricos para el mes visible
-  // Si la línea no tiene datos Grader Excel, limpiar sin consultar Firestore.
+  // Reset de caché Shoplogix al cambiar de planta — evita que datos de Chonchi
+  // aparezcan en el timeline de Yal (mismas claves dateKey__shiftId, distinto plantSlug).
   useEffect(() => {
-    if (!hasGraderData) {
-      setHistoricalByDate(new Map())
-      setAllSummariesRaw([])
-      onSummariesLoaded?.([])
-      return
-    }
+    setSlxByShift(new Map())
+    setSlxTotalsByShift(new Map())
+  }, [plantLineId])
+
+  // Cargar summaries históricos para el mes visible
+  useEffect(() => {
     const year = currentMonth.getFullYear()
     const month = currentMonth.getMonth()
     const startDate = `${year}-${String(month + 1).padStart(2, '0')}-01`
     const lastDay = new Date(year, month + 1, 0).getDate()
     const endDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
-    listDailySummariesByRange(startDate, endDate)
+    listDailySummariesByRange(startDate, endDate, plantLineId)
       .then((list) => {
         const map = new Map<string, GraderDailySummary[]>()
         for (const s of list) {
@@ -692,7 +691,7 @@ export function GraderHistoricalCalendar({
           const today = new Date()
           const lookback = `${today.getFullYear() - 1}-${String(today.getMonth() + 1).padStart(2, '0')}-01`
           const lookbackEnd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()).padStart(2, '0')}`
-          listDailySummariesByRange(lookback, lookbackEnd)
+          listDailySummariesByRange(lookback, lookbackEnd, plantLineId)
             .then((allList) => {
               if (allList.length > 0) {
                 const latestKey = allList.map((s) => s.dateKey).sort().slice(-1)[0]
@@ -711,7 +710,7 @@ export function GraderHistoricalCalendar({
       .catch(() => {
         /* silent: historial no crítico */
       })
-  }, [currentMonth, effectiveInitialKey, hasGraderData, onSummariesLoaded])
+  }, [currentMonth, effectiveInitialKey, plantLineId, onSummariesLoaded])
 
   useEffect(() => {
     if (autoSelectedRef.current) return

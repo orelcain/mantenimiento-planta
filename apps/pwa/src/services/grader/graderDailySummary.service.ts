@@ -63,8 +63,15 @@ function deepCleanUndefined<T>(value: T): T {
   return value
 }
 
-export function buildDailySummaryId(dateKey: string, shiftId: string): string {
-  return `${dateKey}__${shiftId}`
+/**
+ * Genera el ID del documento Firestore para un resumen de turno.
+ *
+ * - `chonchi-eviscerado` o sin plantLineId: `${dateKey}__${shiftId}` (legacy, backward compat)
+ * - otras líneas (ej. 'yal-eviscerado'): `${plantLineId}__${dateKey}__${shiftId}`
+ */
+export function buildDailySummaryId(dateKey: string, shiftId: string, plantLineId?: string): string {
+  if (!plantLineId || plantLineId === 'chonchi-eviscerado') return `${dateKey}__${shiftId}`
+  return `${plantLineId}__${dateKey}__${shiftId}`
 }
 
 export async function getDailySummary(dateKey: string, shiftId: string): Promise<GraderDailySummary | null> {
@@ -83,12 +90,14 @@ export async function saveDailySummary(params: {
   startAt?: string
   endAt?: string
   updatedBy: string
+  plantLineId?: string
 }): Promise<GraderDailySummary> {
-  const id = buildDailySummaryId(params.dateKey, params.shiftId)
+  const id = buildDailySummaryId(params.dateKey, params.shiftId, params.plantLineId)
   const summary: GraderDailySummary = {
     id,
     dateKey: params.dateKey,
     shiftId: params.shiftId,
+    ...(params.plantLineId ? { plantLineId: params.plantLineId } : {}),
     totalPieces: params.totalPieces,
     pointZeroPieces: params.pointZeroPieces,
     pointZeroPct: params.pointZeroPct,
@@ -175,12 +184,20 @@ export async function saveDailySummaryBatch(
 }
 
 /**
- * Consulta resúmenes diarios en un rango de fechas (inclusive).
- * startDate / endDate: 'YYYY-MM-DD'
+ * Consulta resúmenes diarios en un rango de fechas (inclusive), opcionalmente
+ * filtrados por línea de producción.
+ *
+ * @param plantLineId — Si se omite o es 'chonchi-eviscerado', retorna docs legacy
+ *   (sin plantLineId) + docs explícitamente marcados como 'chonchi-eviscerado'.
+ *   Para otras líneas (ej. 'yal-eviscerado'), filtra por ese valor exacto.
+ *
+ * El filtro es client-side para evitar índices compuestos en Firestore y mantener
+ * compatibilidad con docs legacy que no tienen el campo plantLineId.
  */
 export async function listDailySummariesByRange(
   startDate: string,
   endDate: string,
+  plantLineId?: string,
 ): Promise<GraderDailySummary[]> {
   const q = query(
     collection(db, COLLECTION),
@@ -189,7 +206,14 @@ export async function listDailySummariesByRange(
     orderBy('dateKey'),
   )
   const snap = await getDocs(q)
-  return snap.docs.map((d) => d.data() as GraderDailySummary)
+  const all = snap.docs.map((d) => d.data() as GraderDailySummary)
+
+  // Filtro client-side por línea
+  if (!plantLineId || plantLineId === 'chonchi-eviscerado') {
+    // Default: docs legacy (sin campo) + docs explícitamente chonchi
+    return all.filter((d) => !d.plantLineId || d.plantLineId === 'chonchi-eviscerado')
+  }
+  return all.filter((d) => d.plantLineId === plantLineId)
 }
 
 /**

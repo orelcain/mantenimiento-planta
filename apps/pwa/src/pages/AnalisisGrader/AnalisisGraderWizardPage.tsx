@@ -10,7 +10,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, Button, Badge } from '@/components/ui'
-import { BarChart3, Loader2, CheckCircle2, Calendar, BookOpen } from 'lucide-react'
+import { BarChart3, Loader2, CheckCircle2, Calendar, BookOpen, Activity } from 'lucide-react'
 import { useAuthStore, usePermissionsStore } from '@/store'
 import { AnalisisGraderUploadPage, type FileParsed } from './AnalisisGraderUploadPage'
 import { GraderHistoricalCalendar } from '@/components/grader/GraderHistoricalCalendar'
@@ -36,6 +36,7 @@ import {
   fetchExistingSummaryIds,
   savePieceRecordsBatch,
   buildDedupeKey,
+  buildDailySummaryId,
   saveTimelineAggregates,
   savePausesAggregates,
   loadPausesAggregates,
@@ -157,23 +158,29 @@ export function AnalisisGraderWizardPage() {
     setMultiDayExistingIds(new Set())
     if (!multiDayInfo) return
     let cancelled = false
-    const ids = multiDayInfo.entries.map(([, seg]) => `${seg.sessionDate}__${seg.shiftId}`)
+    const effectivePlantLineId = lineId !== DEFAULT_PLANT_LINE_ID ? lineId : undefined
+    const ids = multiDayInfo.entries.map(([, seg]) =>
+      buildDailySummaryId(seg.sessionDate, seg.shiftId, effectivePlantLineId),
+    )
     fetchExistingSummaryIds(ids)
       .then((set) => { if (!cancelled) setMultiDayExistingIds(set) })
       .catch(() => { /* silencioso — no bloqueamos el banner */ })
     return () => { cancelled = true }
-  }, [multiDayInfo])
+  }, [multiDayInfo, lineId])
 
   const multiDayCounts = useMemo(() => {
     if (!multiDayInfo) return null
+    const effectivePlantLineId = lineId !== DEFAULT_PLANT_LINE_ID ? lineId : undefined
     const replaceCount = multiDayInfo.entries.filter(
-      ([, seg]) => multiDayExistingIds.has(`${seg.sessionDate}__${seg.shiftId}`),
+      ([, seg]) => multiDayExistingIds.has(
+        buildDailySummaryId(seg.sessionDate, seg.shiftId, effectivePlantLineId),
+      ),
     ).length
     return {
       replace: replaceCount,
       new: multiDayInfo.totalSegments - replaceCount,
     }
-  }, [multiDayInfo, multiDayExistingIds])
+  }, [multiDayInfo, multiDayExistingIds, lineId])
 
   // Cargar physicalConfig guardado desde Firestore al iniciar
   // → así el widget de velocidad arranca con el valor real guardado, no con el default
@@ -391,6 +398,9 @@ export function AnalisisGraderWizardPage() {
       // Calcular summaries + detectar pausas en el mismo pase.
       // Los agregados de pausas (totales) se embeben en el summary para
       // KPIs rápidos; el detalle se guarda en meta/pauses dentro del loop.
+      // Para líneas no-default (ej: Yal), los docs se guardan con prefix de plantLineId
+      const effectivePlantLineId = lineId !== DEFAULT_PLANT_LINE_ID ? lineId : undefined
+
       const detectionByKey = new Map<string, PauseDetectionResult>()
       const summaries = multiDayInfo.entries.map(([key, segment]) => {
         const raw = computeShiftSummary(segment, batchId, sourceNames, user.id, gates)
@@ -406,8 +416,12 @@ export function AnalisisGraderWizardPage() {
         }
         const det = detectPauses(tsSorted, raw.shiftId, loteChangeTsMs, pauseDetectorCfg)
         detectionByKey.set(key, det)
+        // Sobrescribir id para líneas no-Chonchi (buildDailySummaryId agrega prefix)
+        const overrideId = buildDailySummaryId(raw.dateKey, raw.shiftId, effectivePlantLineId)
         return {
           ...raw,
+          id: overrideId,
+          ...(effectivePlantLineId ? { plantLineId: effectivePlantLineId } : {}),
           totalDeadTimeSec: det.totalDeadTimeSec,
           microDetentionsCount: det.microDetentions.count,
           microDetentionsTotalSec: det.microDetentions.totalSec,
@@ -424,7 +438,7 @@ export function AnalisisGraderWizardPage() {
       for (const [key, segment] of multiDayInfo.entries) {
         const [dateKey, shiftId] = key.split('|')
         if (!dateKey || !shiftId) continue
-        const summaryId = `${dateKey}__${shiftId}`
+        const summaryId = buildDailySummaryId(dateKey, shiftId, effectivePlantLineId)
         const allRecs = [...segment.pieceRecords, ...segment.gate0Records]
         if (allRecs.length === 0) continue
         const firestoreRecs: FirestorePieceRecord[] = allRecs.map((r) => ({
@@ -467,7 +481,7 @@ export function AnalisisGraderWizardPage() {
     } catch {
       setSavingToCalendar(false)
     }
-  }, [multiDayInfo, parsedData, user?.id, gates])
+  }, [multiDayInfo, parsedData, user?.id, gates, lineId])
 
   if (!canSee('analisisGrader')) return <Navigate to="/" replace />
 
@@ -527,8 +541,16 @@ export function AnalisisGraderWizardPage() {
         </div>
       </div>
 
-      {/* ── Selector de línea/planta ── */}
-      <PlantLineTabs selected={lineId} onSelect={handleLineSelect} className="w-full max-w-sm" />
+      {/* ── Selector de línea/planta + indicador live ── */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <PlantLineTabs selected={lineId} onSelect={handleLineSelect} className="w-full max-w-sm" />
+        {lineId !== DEFAULT_PLANT_LINE_ID && lineConfig.shoplogixEnabled && (
+          <Badge className="text-xs bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 gap-1.5 px-2.5 py-1">
+            <Activity className="h-3 w-3 shrink-0 animate-pulse" />
+            En proceso
+          </Badge>
+        )}
+      </div>
 
       {/* ═══ Cuerpo: 2 columnas en desktop — calendario + resumen mensual ═══ */}
       <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-6 items-start">

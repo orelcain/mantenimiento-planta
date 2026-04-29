@@ -573,9 +573,16 @@ export interface GraderShiftSchedule {
 // ============================================================================
 
 export interface GraderDailySummary {
-  id: string; // `${dateKey}__${shiftId}`
+  /**
+   * ID de Firestore.
+   * - Principal Eviscerado (default): `${dateKey}__${shiftId}`
+   * - Otras líneas: `${plantLineId}__${dateKey}__${shiftId}`
+   */
+  id: string;
   dateKey: string; // YYYY-MM-DD
   shiftId: string;
+  /** Línea de producción que generó este resumen. Undefined = 'chonchi-eviscerado' (legacy). */
+  plantLineId?: string;
   totalPieces: number;
   pointZeroPieces: number;
   pointZeroPct: number;
