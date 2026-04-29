@@ -843,8 +843,24 @@ export function GraderHistoricalCalendar({
     [calendarAgg, summariesById],
   )
 
-  // Días navegables (Paso 2/3): días con actividad real del mes, en orden
-  const sortedDayKeys = useMemo(() => [...calendarAgg.keys()].sort(), [calendarAgg])
+  // Días navegables (Paso 2/3): días con actividad real del mes, en orden.
+  // Incluye también días con datos Shoplogix del mes visible cuando no hay
+  // summaries Grader — así el carrusel, las flechas ◀▶ y la paginación
+  // funcionan para plantas sin Excel cargado (ej. Yal en modo Shoplogix-only).
+  const sortedDayKeys = useMemo(() => {
+    const keys = new Set([...calendarAgg.keys()])
+    const year  = currentMonth.getFullYear()
+    const month = currentMonth.getMonth()
+    const prefix = `${year}-${String(month + 1).padStart(2, '0')}-`
+    for (const [cacheKey, cycles] of slxTotalsByShift) {
+      if (cycles > 0) {
+        const dateKey = cacheKey.split('__')[0] ?? ''
+        if (dateKey.startsWith(prefix)) keys.add(dateKey)
+      }
+    }
+    return [...keys].sort()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calendarAgg, slxTotalsByShift, currentMonth])
 
   const selectedKey = selectedDate ? selectedDate.toISOString().slice(0, 10) : null
 
