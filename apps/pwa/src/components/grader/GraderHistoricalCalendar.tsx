@@ -20,7 +20,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { animate, stagger } from 'animejs'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from '@/components/ui'
-import { ChevronLeft, ChevronRight, Loader2, Clock, Database, Eye, Trash2, AlertTriangle, Sun, Moon, Wrench, Tag, GitCompare, Activity } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, Clock, Database, Eye, Trash2, AlertTriangle, Sun, Moon, Wrench, Tag, GitCompare, Activity, TrendingUp, TrendingDown } from 'lucide-react'
 import { fmt } from '@/lib/format'
 import { QuickGateChangeButton } from './QuickGateChangeButton'
 import { listSnapshots } from '@/services/grader/graderConfigSnapshot.service'
@@ -356,6 +356,17 @@ function normalizeUploads(
   return Array.from(map.values())
 }
 
+/** Formatea segundos en forma compacta. Usado en el panel panorámico mensual. */
+function fmtSecPanoramic(sec: number): string {
+  if (sec <= 0) return '0s'
+  if (sec < 60) return `${Math.round(sec)}s`
+  const m = Math.floor(sec / 60)
+  if (m < 60) return `${m}m`
+  const h = Math.floor(m / 60)
+  const rm = m % 60
+  return rm > 0 ? `${h}h ${rm}m` : `${h}h`
+}
+
 function isToday(date: Date): boolean {
   const today = new Date()
   return (
@@ -651,6 +662,8 @@ export function GraderHistoricalCalendar({
   // de las cards (anime.js v4) cuando cambia `selectedKey`. Se asigna
   // condicionalmente solo en el slide con `isSelectedSlide === true`.
   const selectedSlideRef = useRef<HTMLDivElement | null>(null)
+  // Ref para el contenedor del pareto mensual (animación scaleX)
+  const monthParetoRef = useRef<HTMLDivElement>(null)
   const [slxByShift, setSlxByShift] = useState<Map<string, SlxShiftCache>>(new Map())
   // Cache totales Baader por shift — para indicador de "data Grader perdida"
   // (cuando Grader.totalPieces < Baader.totalCycles * 0.95 = >5% loss).
@@ -1193,10 +1206,68 @@ export function GraderHistoricalCalendar({
     }
   }, [currentMonth, slxByShift])
 
+  // ── Panel panorámico: pareto de causas de paro cross-turno del mes ─────────
+  // Agrega todos los estados de tipo 'downtime' de los turnos ya cargados
+  // en slxByShift para el mes visible. Usa la primera máquina (m0) por diseño
+  // del cache — proxy válido para la vista macro mensual.
+  const monthParetoData = useMemo(() => {
+    const year  = currentMonth.getFullYear()
+    const month = currentMonth.getMonth()
+    const prefix = `${year}-${String(month + 1).padStart(2, '0')}-`
+    const reasonMap = new Map<string, { durationSec: number; color: string; count: number }>()
+    for (const [key, cache] of slxByShift) {
+      if (!key.startsWith(prefix)) continue
+      for (const s of cache.states) {
+        if (s.type !== 'downtime') continue
+        const reason = s.name || s.reason || 'Sin causa'
+        const entry  = reasonMap.get(reason)
+        if (entry) {
+          entry.durationSec += s.durationSec
+          entry.count       += 1
+        } else {
+          reasonMap.set(reason, { durationSec: s.durationSec, color: s.color, count: 1 })
+        }
+      }
+    }
+    return [...reasonMap.entries()]
+      .map(([name, v]) => ({ name, ...v }))
+      .sort((a, b) => b.durationSec - a.durationSec)
+  }, [slxByShift, currentMonth])
+
+  // ── Panel panorámico: disponibilidad diaria D/N del mes ──────────────────
+  const availabilityTrend = useMemo((): Array<{ dk: string; day: SlxShiftCache | null; night: SlxShiftCache | null }> => {
+    const year  = currentMonth.getFullYear()
+    const month = currentMonth.getMonth()
+    const prefix     = `${year}-${String(month + 1).padStart(2, '0')}-`
+    const daysInMonth = new Date(year, month + 1, 0).getDate()
+    const result: Array<{ dk: string; day: SlxShiftCache | null; night: SlxShiftCache | null }> = []
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dk         = `${prefix}${String(d).padStart(2, '0')}`
+      const dayCache   = slxByShift.get(`${dk}__Turno día`)   ?? null
+      const nightCache = slxByShift.get(`${dk}__Turno noche`) ?? null
+      const dayHasData   = (dayCache?.totalCycles   ?? 0) > 0
+      const nightHasData = (nightCache?.totalCycles ?? 0) > 0
+      if (!dayHasData && !nightHasData) continue
+      result.push({ dk, day: dayHasData ? dayCache : null, night: nightHasData ? nightCache : null })
+    }
+    return result
+  }, [slxByShift, currentMonth])
+
   // Emite stats mensuales al padre para el panel lateral
   useEffect(() => {
     onSlxMonthStatsLoaded?.(slxMonthlyStats)
   }, [slxMonthlyStats, onSlxMonthStatsLoaded])
+
+  // Anima las barras del pareto mensual cuando los datos llegan o cambian
+  useEffect(() => {
+    if (!monthParetoRef.current || monthParetoData.length === 0) return
+    const prefersReduced = typeof window !== 'undefined'
+      && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    if (prefersReduced) return
+    const bars = monthParetoRef.current.querySelectorAll<HTMLElement>('[data-month-pareto-bar]')
+    if (bars.length === 0) return
+    animate(bars, { scaleX: [0, 1], duration: 420, delay: stagger(70), ease: 'outExpo' })
+  }, [monthParetoData])
 
   const selectedUploads = useMemo(() => {
     if (!selectedKey) return []
@@ -2539,6 +2610,239 @@ export function GraderHistoricalCalendar({
           })()}
         </CardContent>
       </Card>
+
+      {/* ── Panel panorámico mensual (solo en layout no-stacked = landing page) ── */}
+      {!stacked && slxMonthlyStats && (
+        <div className="lg:col-span-3">
+          <Card>
+            <CardHeader className="pb-2 pt-4 px-6">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
+                  <Activity className="h-4 w-4 text-sky-400" />
+                  Vista panorámica · {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+                </CardTitle>
+                <span className="text-[10px] text-muted-foreground">
+                  {slxMonthlyStats.turnosWithData} turnos · {slxMonthlyStats.daysWithData} días con data
+                </span>
+              </div>
+            </CardHeader>
+            <CardContent className="px-6 pb-5">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+                {/* ── Col 1: KPIs mensuales Shoplogix ── */}
+                <div className="space-y-3">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                    Métricas del mes
+                  </p>
+                  {/* Avg uptime destacado */}
+                  <div className="flex items-baseline gap-2">
+                    <span className={cn(
+                      'text-3xl font-bold tabular-nums',
+                      slxMonthlyStats.avgUptimePct >= 70 ? 'text-emerald-400' :
+                      slxMonthlyStats.avgUptimePct >= 40 ? 'text-amber-400' : 'text-rose-400',
+                    )}>
+                      {slxMonthlyStats.avgUptimePct.toFixed(0)}%
+                    </span>
+                    <span className="text-xs text-muted-foreground">uptime promedio</span>
+                  </div>
+                  {/* Mini KPIs */}
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <div className="rounded bg-muted/40 px-2 py-1.5">
+                      <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Ciclos Baader</p>
+                      <p className="text-sm font-semibold tabular-nums">
+                        {slxMonthlyStats.totalCycles >= 1000
+                          ? `${(slxMonthlyStats.totalCycles / 1000).toFixed(1)}k`
+                          : slxMonthlyStats.totalCycles.toLocaleString('es-CL')}
+                      </p>
+                    </div>
+                    <div className="rounded bg-muted/40 px-2 py-1.5">
+                      <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Turnos D/N</p>
+                      <p className="text-sm font-semibold tabular-nums">
+                        <span className="text-amber-400">{slxMonthlyStats.dayShiftsWithData}</span>
+                        <span className="text-muted-foreground mx-0.5">/</span>
+                        <span className="text-indigo-400">{slxMonthlyStats.nightShiftsWithData}</span>
+                      </p>
+                    </div>
+                  </div>
+                  {/* Mejor turno */}
+                  {slxMonthlyStats.bestShift && (
+                    <div className="rounded border border-emerald-500/20 bg-emerald-500/5 px-2.5 py-1.5 space-y-0.5">
+                      <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
+                        <TrendingUp className="h-3 w-3 text-emerald-400" />
+                        Mejor turno
+                      </div>
+                      <p className="text-xs font-semibold text-emerald-400">
+                        {slxMonthlyStats.bestShift.dateKey.slice(5)}
+                        {' · '}{slxMonthlyStats.bestShift.shiftId === 'Turno día' ? '☀' : '🌙'}
+                        {' · '}<span className="font-bold">{slxMonthlyStats.bestShift.uptimePct.toFixed(0)}%</span>
+                        <span className="text-muted-foreground font-normal">
+                          {' · '}{slxMonthlyStats.bestShift.totalCycles >= 1000
+                            ? `${(slxMonthlyStats.bestShift.totalCycles / 1000).toFixed(1)}k`
+                            : slxMonthlyStats.bestShift.totalCycles} cic
+                        </span>
+                      </p>
+                    </div>
+                  )}
+                  {/* Peor turno */}
+                  {slxMonthlyStats.worstShift && (
+                    <div className="rounded border border-rose-500/20 bg-rose-500/5 px-2.5 py-1.5 space-y-0.5">
+                      <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
+                        <TrendingDown className="h-3 w-3 text-rose-400" />
+                        Peor turno
+                      </div>
+                      <p className="text-xs font-semibold text-rose-400">
+                        {slxMonthlyStats.worstShift.dateKey.slice(5)}
+                        {' · '}{slxMonthlyStats.worstShift.shiftId === 'Turno día' ? '☀' : '🌙'}
+                        {' · '}<span className="font-bold">{slxMonthlyStats.worstShift.uptimePct.toFixed(0)}%</span>
+                        <span className="text-muted-foreground font-normal">
+                          {' · '}{slxMonthlyStats.worstShift.totalCycles >= 1000
+                            ? `${(slxMonthlyStats.worstShift.totalCycles / 1000).toFixed(1)}k`
+                            : slxMonthlyStats.worstShift.totalCycles} cic
+                        </span>
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* ── Col 2: Pareto de paros del mes (upstream Baader) ── */}
+                <div className="space-y-2">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                    Top paros upstream · {monthNames[currentMonth.getMonth()]}
+                  </p>
+                  {monthParetoData.length === 0 ? (
+                    <p className="text-[11px] text-muted-foreground italic">Sin datos de paros para este mes</p>
+                  ) : (
+                    <div ref={monthParetoRef} className="space-y-[5px] pt-0.5">
+                      {(() => {
+                        const totalSec = monthParetoData.reduce((a, r) => a + r.durationSec, 0)
+                        return monthParetoData.slice(0, 7).map((item) => {
+                          const pct = totalSec > 0 ? (item.durationSec / totalSec) * 100 : 0
+                          return (
+                            <div
+                              key={item.name}
+                              className="flex items-center gap-1.5 text-[10px]"
+                              title={`${item.count} evento${item.count !== 1 ? 's' : ''} · ${fmtSecPanoramic(item.durationSec)} total`}
+                            >
+                              <span
+                                className="w-2 h-2 rounded-sm shrink-0 ring-1 ring-black/30"
+                                style={{ backgroundColor: item.color || '#64748b' }}
+                              />
+                              <span className="text-foreground/70 truncate shrink-0 w-[7.5rem]">
+                                {item.name || 'Sin categoría'}
+                              </span>
+                              <div className="flex-1 h-1.5 bg-muted/60 rounded-full overflow-hidden min-w-0">
+                                <div
+                                  data-month-pareto-bar=""
+                                  className="h-full rounded-full opacity-80"
+                                  style={{
+                                    width:           `${Math.max(pct, 1)}%`,
+                                    backgroundColor: item.color || '#64748b',
+                                    transformOrigin: 'left center',
+                                  }}
+                                />
+                              </div>
+                              <span className="text-muted-foreground tabular-nums shrink-0 w-10 text-right">
+                                {fmtSecPanoramic(item.durationSec)}
+                              </span>
+                              <span className="text-muted-foreground/60 tabular-nums shrink-0 w-7 text-right">
+                                {pct.toFixed(0)}%
+                              </span>
+                            </div>
+                          )
+                        })
+                      })()}
+                    </div>
+                  )}
+                  {monthParetoData.length > 0 && (
+                    <p className="text-[9px] text-muted-foreground/40 pt-1">
+                      * Estados de paro de la primera Baader 142 por turno
+                    </p>
+                  )}
+                </div>
+
+                {/* ── Col 3: Disponibilidad diaria D/N (stacked bars por día) ── */}
+                <div className="space-y-2">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                    Disponibilidad diaria · {monthNames[currentMonth.getMonth()]}
+                  </p>
+                  {availabilityTrend.length === 0 ? (
+                    <p className="text-[11px] text-muted-foreground italic">Cargando datos del mes...</p>
+                  ) : (
+                    <div className="space-y-[3px]">
+                      {/* Leyenda compacta */}
+                      <div className="flex items-center gap-3 pb-1 text-[9px] text-muted-foreground/70">
+                        <div className="flex items-center gap-1">
+                          <div className="w-2 h-1.5 rounded-sm bg-emerald-500/70" />
+                          Uptime
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <div className="w-2 h-1.5 rounded-sm bg-amber-500/60" />
+                          Breaks
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <div className="w-2 h-1.5 rounded-sm bg-rose-500/65" />
+                          Paro
+                        </div>
+                      </div>
+                      {/* Filas por día */}
+                      {availabilityTrend.map(({ dk, day, night }) => {
+                        const buildAvailBar = (cache: SlxShiftCache | null) => {
+                          if (!cache || !cache.breakdown) {
+                            return <div className="flex-1 h-3 rounded-sm bg-muted/20 opacity-40" />
+                          }
+                          const bd   = cache.breakdown
+                          const prod = bd.uptimeSec + bd.breakSec + bd.downtimeSec + bd.setupSec
+                          if (prod === 0) return <div className="flex-1 h-3 rounded-sm bg-muted/20 opacity-40" />
+                          const up    = (bd.uptimeSec   / prod) * 100
+                          const brk   = (bd.breakSec    / prod) * 100
+                          const down  = (bd.downtimeSec / prod) * 100
+                          const setup = (bd.setupSec    / prod) * 100
+                          return (
+                            <div
+                              className="flex flex-1 h-3 rounded-sm overflow-hidden bg-muted/60"
+                              title={`${fmtSecPanoramic(bd.uptimeSec)} uptime (${up.toFixed(0)}%) · ${cache.totalCycles.toLocaleString('es-CL')} ciclos`}
+                            >
+                              {up    > 0 && <div className="h-full bg-emerald-500/70" style={{ width: `${up}%`    }} />}
+                              {brk   > 0 && <div className="h-full bg-amber-500/60"   style={{ width: `${brk}%`   }} />}
+                              {down  > 0 && <div className="h-full bg-rose-500/65"    style={{ width: `${down}%`  }} />}
+                              {setup > 0 && <div className="h-full bg-violet-500/55"  style={{ width: `${setup}%` }} />}
+                            </div>
+                          )
+                        }
+                        const dayUptimeStr   = day   ? `${(day.shiftRuntime   * 100).toFixed(0)}%` : '—'
+                        const nightUptimeStr = night ? `${(night.shiftRuntime * 100).toFixed(0)}%` : '—'
+                        return (
+                          <div key={dk} className="flex items-center gap-1.5 text-[10px]">
+                            {/* Fecha clicable → navega al día */}
+                            <span
+                              className="text-muted-foreground/70 tabular-nums shrink-0 w-8 text-right cursor-pointer hover:text-foreground transition-colors"
+                              onClick={() => {
+                                const d = new Date(`${dk}T00:00:00`)
+                                setSelectedDate(d)
+                                setCurrentMonth(new Date(d.getFullYear(), d.getMonth(), 1))
+                              }}
+                            >
+                              {dk.slice(5)}
+                            </span>
+                            <span className="text-[8px] text-amber-500/60 shrink-0">D</span>
+                            {buildAvailBar(day)}
+                            <span className="text-[8px] text-indigo-400/60 shrink-0">N</span>
+                            {buildAvailBar(night)}
+                            <span className="text-muted-foreground/50 tabular-nums shrink-0 w-14 text-right text-[9px]">
+                              {dayUptimeStr}/{nightUptimeStr}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* M12 — Modal comparación día vs noche */}
       {showComparison && selectedKey && (() => {
