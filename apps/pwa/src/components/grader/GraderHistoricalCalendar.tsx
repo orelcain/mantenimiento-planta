@@ -683,7 +683,7 @@ function computeEffectiveWindow(
 /**
  * Devuelve los shiftIds a mostrar en las cards "Sin Excel" para un día,
  * de-duplicando formato legado vs nuevo (Turno 1/2/3 tiene precedencia).
- * Orden producción (08:00→08:00): Turno 2/día → Turno 3/noche → Turno 1/madrugada.
+ * Orden producción (08:00→08:00): Turno 1/día → Turno 2/tarde → Turno 3/madrugada.
  * Si no hay data alguna devuelve [] (sin placeholders legacy que serían incorrectos para Yal).
  */
 function slxDisplayIds(dateKey: string, slxByShift: Map<string, { totalCycles?: number }>): string[] {
@@ -697,8 +697,11 @@ function slxDisplayIds(dateKey: string, slxByShift: Map<string, { totalCycles?: 
     .filter(id => !(id === 'Turno día'   && hasT2))
     .filter(id => !(id === 'Turno noche' && hasT1or3))
   if (deduped.length === 0) return []
-  // Orden cronológico producción (izq=08:00 → der=08:00 día siguiente)
-  const ord: Record<string, number> = { 'Turno 2': 1, 'Turno día': 1, 'Turno 3': 2, 'Turno noche': 2, 'Turno 1': 3 }
+  // Orden cronológico producción (izq=08:00 → der=08:00 día siguiente):
+  //   Turno 1 / día  (08:00-16:15) → primero / izquierda
+  //   Turno 2 / noche (16:15-00:00) → segundo / centro
+  //   Turno 3        (00:00-07:45) → tercero / derecha (madrugada)
+  const ord: Record<string, number> = { 'Turno 1': 1, 'Turno día': 1, 'Turno 2': 2, 'Turno noche': 2, 'Turno 3': 3 }
   return [...deduped].sort((a, b) => (ord[a] ?? 9) - (ord[b] ?? 9))
 }
 
