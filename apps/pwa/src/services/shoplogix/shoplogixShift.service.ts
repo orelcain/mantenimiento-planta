@@ -8,7 +8,7 @@
  * cada pocos minutos durante horas de turno.
  */
 
-import { collection, getDocs, getDocsFromServer, doc, getDoc, getDocFromServer, Timestamp, onSnapshot, query, limit } from 'firebase/firestore'
+import { collection, getDocsFromServer, doc, getDoc, getDocFromServer, Timestamp, onSnapshot, query, limit } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import type {
   UpstreamMachineShift,
