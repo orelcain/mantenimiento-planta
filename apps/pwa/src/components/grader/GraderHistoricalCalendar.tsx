@@ -683,8 +683,8 @@ function computeEffectiveWindow(
 /**
  * Devuelve los shiftIds a mostrar en las cards "Sin Excel" para un día,
  * de-duplicando formato legado vs nuevo (Turno 1/2/3 tiene precedencia).
- * Orden: Turno 1 (madrugada) → Turno 2/día → Turno 3/noche.
- * Si no hay data alguna, devuelve los placeholders legado ['Turno día','Turno noche'].
+ * Orden producción (08:00→08:00): Turno 2/día → Turno 3/noche → Turno 1/madrugada.
+ * Si no hay data alguna devuelve [] (sin placeholders legacy que serían incorrectos para Yal).
  */
 function slxDisplayIds(dateKey: string, slxByShift: Map<string, { totalCycles?: number }>): string[] {
   const prefix = `${dateKey}__`
@@ -696,9 +696,9 @@ function slxDisplayIds(dateKey: string, slxByShift: Map<string, { totalCycles?: 
   const deduped  = all
     .filter(id => !(id === 'Turno día'   && hasT2))
     .filter(id => !(id === 'Turno noche' && hasT1or3))
-  if (deduped.length === 0) return ['Turno día', 'Turno noche']
-  // Orden cronológico (igual que la timeline izquierda→derecha del día)
-  const ord: Record<string, number> = { 'Turno 3': 1, 'Turno día': 2, 'Turno 1': 2, 'Turno 2': 3, 'Turno noche': 3 }
+  if (deduped.length === 0) return []
+  // Orden cronológico producción (izq=08:00 → der=08:00 día siguiente)
+  const ord: Record<string, number> = { 'Turno 2': 1, 'Turno día': 1, 'Turno 3': 2, 'Turno noche': 2, 'Turno 1': 3 }
   return [...deduped].sort((a, b) => (ord[a] ?? 9) - (ord[b] ?? 9))
 }
 
@@ -1438,7 +1438,8 @@ export function GraderHistoricalCalendar({
     animate(bars, { scaleX: [0, 1], duration: 420, delay: stagger(70), ease: 'outExpo' })
   }, [monthParetoData])
 
-  // Trend points mensuales — derivados de slxByShift ya cargado, sin llamadas extra
+  // Trend points mensuales — derivados de slxByShift ya cargado, sin llamadas extra.
+  // Soporta ambos formatos: nuevo (Turno 1/2/3) con precedencia sobre legado (Turno día/noche).
   const monthTrendPoints = useMemo<{ day: MachineTrendPoint[]; night: MachineTrendPoint[] }>(() => {
     const year  = currentMonth.getFullYear()
     const month = currentMonth.getMonth()
@@ -1448,10 +1449,22 @@ export function GraderHistoricalCalendar({
     const night: MachineTrendPoint[] = []
     for (let d = 1; d <= daysInMonth; d++) {
       const dk = `${prefix}${String(d).padStart(2, '0')}`
-      for (const [shiftId, arr] of [['Turno día', day], ['Turno noche', night]] as [string, MachineTrendPoint[]][]) {
-        const cache = slxByShift.get(`${dk}__${shiftId}`)
-        if (!cache || cache.totalCycles === 0) continue
-        arr.push({ dateKey: dk, shiftId, overallRatio: cache.overallRatio, shiftRuntime: cache.shiftRuntime, totalCycles: cache.totalCycles })
+      // Day: Turno 2 (nuevo) > Turno día (legado)
+      const dayCache = slxByShift.get(`${dk}__Turno 2`) ?? slxByShift.get(`${dk}__Turno día`) ?? null
+      if (dayCache && dayCache.totalCycles > 0) {
+        const shiftId = slxByShift.has(`${dk}__Turno 2`) ? 'Turno 2' : 'Turno día'
+        day.push({ dateKey: dk, shiftId, overallRatio: dayCache.overallRatio, shiftRuntime: dayCache.shiftRuntime, totalCycles: dayCache.totalCycles })
+      }
+      // Night: el de mayor ciclos entre Turno 1/3 (nuevo) > Turno noche (legado)
+      const newNights = (['Turno 1', 'Turno 3'] as string[])
+        .map(id => ({ id, c: slxByShift.get(`${dk}__${id}`) ?? null }))
+        .filter((x): x is { id: string; c: SlxShiftCache } => x.c !== null && x.c.totalCycles > 0)
+        .sort((a, b) => b.c.totalCycles - a.c.totalCycles)
+      const nightEntry  = newNights[0] ?? null
+      const nightCache  = nightEntry?.c ?? slxByShift.get(`${dk}__Turno noche`) ?? null
+      const nightShiftId = nightEntry?.id ?? 'Turno noche'
+      if (nightCache && nightCache.totalCycles > 0) {
+        night.push({ dateKey: dk, shiftId: nightShiftId, overallRatio: nightCache.overallRatio, shiftRuntime: nightCache.shiftRuntime, totalCycles: nightCache.totalCycles })
       }
     }
     return { day, night }
