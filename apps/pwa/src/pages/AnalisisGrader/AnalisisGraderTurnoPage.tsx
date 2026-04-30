@@ -740,9 +740,23 @@ export function AnalisisGraderTurnoPage() {
   // no hay zoom activo — sirve de fallback cuando context.range es null.
   const baseAxisWindow = useMemo<{ startAt: string; endAt: string } | null>(() => {
     if (chartAxisWindow) return chartAxisWindow
+
+    // Para turnos Shoplogix (Turno 1/2/3) el shiftWindow cae al día de
+    // producción completo (08:00→08:00). Cuando ya tenemos los bounds reales
+    // de Shoplogix (scheduledStart/End de intervals.shift), usamos esos para
+    // que el timeline muestre solo la ventana del turno (ej. 16:15→00:00).
+    const slxMachine = upstreamLine.snapshot?.machines[0]
+    if (slxMachine?.scheduledStart && slxMachine?.scheduledEnd
+        && slxMachine.scheduleSource === 'intervals') {
+      return {
+        startAt: slxMachine.scheduledStart.toISOString(),
+        endAt:   slxMachine.scheduledEnd.toISOString(),
+      }
+    }
+
     if (shiftWindow) return { startAt: shiftWindow.startAt, endAt: shiftWindow.endAt }
     return null
-  }, [chartAxisWindow, shiftWindow])
+  }, [chartAxisWindow, shiftWindow, upstreamLine.snapshot])
   const handleExportPdf = useCallback(async () => {
     if (!summary || pdfExporting) return
     setPdfExporting(true)
