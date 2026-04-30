@@ -3331,13 +3331,13 @@ exports.shoplogixSyncNow = onCall(
 /**
  * Cleanup HTTP — borra docs legacy de Shoplogix (`{dateKey}_Turno día` /
  * `{dateKey}_Turno noche`) y sus subcollections `machines/*` para un rango
- * de fechas. Útil cuando syncDay re-sincroniza con la convención nueva
- * (Turno 1/2/3) y los docs legacy quedan huérfanos contaminando
- * sortedDayKeys / slxByShift en el frontend.
+ * de fechas. Solo borra un doc legacy si ya existe el equivalente nuevo
+ * (Turno 1/2/3) para ese día — garantía de no dejar días sin datos.
  *
- * Uso: GET https://.../shoplogixCleanupLegacy?plantSlug=yal&from=2026-04-26&to=2026-04-29
+ * Uso: GET https://.../shoplogixCleanupLegacy?plantSlug=yal&from=2026-04-01&to=2026-04-30
+ *      Agregar &dryRun=false para ejecutar realmente (por defecto es dry-run).
  *
- * Nota: NO toca docs nuevos (Turno 1/2/3). Solo `Turno día` y `Turno noche`.
+ * Respuesta incluye `wouldDelete` (dry-run) o `deleted` (real) + `skipped` (sin nuevo formato).
  */
 exports.shoplogixCleanupLegacy = onRequest(
   {
@@ -3348,6 +3348,8 @@ exports.shoplogixCleanupLegacy = onRequest(
   },
   async (req, res) => {
     const { plantSlug = 'chonchi', from, to } = req.query || {}
+    // dryRun=true por defecto: requiere pasar explícitamente dryRun=false para borrar
+    const dryRun = req.query.dryRun !== 'false'
     if (!from || !to) {
       res.status(400).json({ error: 'BAD_REQUEST', message: 'Requiere from=YYYY-MM-DD y to=YYYY-MM-DD' })
       return
@@ -3367,39 +3369,65 @@ exports.shoplogixCleanupLegacy = onRequest(
       dateKeys.push(`${y}-${m}-${day}`)
     }
 
-    const legacyShiftIds = ['Turno día', 'Turno noche']
-    const deleted = []
+    const legacyMap = {
+      'Turno día':   ['Turno 2'],                  // nuevo equivalente de día
+      'Turno noche': ['Turno 1', 'Turno 3'],       // nuevos equivalentes de noche
+    }
+    const toDelete  = []   // legacy con nuevo equivalente confirmado
+    const skipped   = []   // legacy sin nuevo equivalente (no se toca)
+    const deleted   = []
     let totalMachines = 0
 
     try {
+      // Fase 1: detectar qué borrar (siempre se ejecuta, sirve de dry-run)
       for (const dateKey of dateKeys) {
-        for (const shiftId of legacyShiftIds) {
-          const shiftDocPath = `shoplogix/${plantSlug}/shifts/${dateKey}_${shiftId}`
-          const shiftRef = db.doc(shiftDocPath)
-          const shiftSnap = await shiftRef.get()
+        for (const [legacyId, newIds] of Object.entries(legacyMap)) {
+          const legacyRef  = db.doc(`shoplogix/${plantSlug}/shifts/${dateKey}_${legacyId}`)
+          const legacySnap = await legacyRef.get()
+          const machinesSnap = await legacyRef.collection('machines').get()
+          if (!legacySnap.exists && machinesSnap.empty) continue  // nada que hacer
 
-          // Borrar machines/* (subcollection) si existe
-          const machinesSnap = await shiftRef.collection('machines').get()
-          const machinesCount = machinesSnap.size
-          if (machinesCount > 0) {
-            const batch = db.batch()
-            machinesSnap.docs.forEach((m) => batch.delete(m.ref))
-            await batch.commit()
-            totalMachines += machinesCount
+          // Verificar si ya existe al menos un equivalente nuevo con datos
+          let hasNew = false
+          for (const newId of newIds) {
+            const newSnap = await db.doc(`shoplogix/${plantSlug}/shifts/${dateKey}_${newId}`).get()
+            if (newSnap.exists) { hasNew = true; break }
           }
 
-          if (shiftSnap.exists) {
-            await shiftRef.delete()
-            deleted.push({ dateKey, shiftId, machines: machinesCount })
-          } else if (machinesCount > 0) {
-            // Caso raro: parent no existe pero tenía machines
-            deleted.push({ dateKey, shiftId, machines: machinesCount, parentMissing: true })
+          const entry = { dateKey, shiftId: legacyId, machines: machinesSnap.size }
+          if (hasNew) {
+            toDelete.push({ ...entry, legacyRef, machinesDocs: machinesSnap.docs })
+          } else {
+            skipped.push({ dateKey, shiftId: legacyId, reason: 'sin_nuevo_equivalente' })
           }
         }
       }
 
-      logger.info('[shoplogixCleanupLegacy] OK', { plantSlug, from, to, deletedDocs: deleted.length, totalMachines })
-      res.json({ ok: true, plantSlug, from, to, deletedDocs: deleted.length, totalMachineDocs: totalMachines, deleted })
+      // Fase 2: borrar (solo si dryRun=false)
+      if (!dryRun) {
+        for (const item of toDelete) {
+          if (item.machinesDocs.length > 0) {
+            const batch = db.batch()
+            item.machinesDocs.forEach((m) => batch.delete(m.ref))
+            await batch.commit()
+            totalMachines += item.machinesDocs.length
+          }
+          await item.legacyRef.delete()
+          deleted.push({ dateKey: item.dateKey, shiftId: item.shiftId, machines: item.machines })
+        }
+      }
+
+      const summary = dryRun
+        ? { dryRun: true, wouldDelete: toDelete.length, skipped: skipped.length }
+        : { dryRun: false, deleted: deleted.length, skipped: skipped.length, totalMachineDocs: totalMachines }
+
+      logger.info('[shoplogixCleanupLegacy]', { plantSlug, from, to, ...summary })
+      res.json({
+        ok: true, plantSlug, from, to, ...summary,
+        items: dryRun
+          ? { wouldDelete: toDelete.map(i => ({ dateKey: i.dateKey, shiftId: i.shiftId, machines: i.machines })), skipped }
+          : { deleted, skipped },
+      })
     } catch (err) {
       logger.error('[shoplogixCleanupLegacy] error', { err: err.message, stack: err.stack })
       res.status(500).json({ error: err.message })
@@ -3451,6 +3479,95 @@ exports.shoplogixDumpShift = onRequest(
       }
     }
     res.json({ plantSlug, dateKey, shifts: out })
+  },
+)
+
+/**
+ * Backfill HTTP — re-sincroniza un rango de fechas con syncDay para generar
+ * los docs Turno 1/2/3 correctos en Firestore (reemplaza los legacy Turno día/noche).
+ *
+ * Uso: GET https://.../shoplogixBackfillRange?plantSlug=yal&from=2026-04-01&to=2026-04-30
+ *
+ * Notas:
+ *  - Procesa un día a la vez con 800ms de pausa entre peticiones (evita rate-limit).
+ *  - Si syncDay falla en un día, registra el error y continúa con el siguiente.
+ *  - Timeout 540s: soporta hasta ~30 días (cada día ≈ 2-5s + 0.8s pausa).
+ *  - Después de ejecutar esto, correr shoplogixCleanupLegacy (con dryRun=false)
+ *    para borrar los docs legacy que ya tienen equivalente nuevo.
+ */
+exports.shoplogixBackfillRange = onRequest(
+  {
+    secrets: ['SHOPLOGIX_COOKIE'],
+    region: 'us-central1',
+    timeoutSeconds: 540,
+    memory: '512MiB',
+    cors: ALLOWED_ORIGINS,
+  },
+  async (req, res) => {
+    const { plantSlug = 'chonchi', from, to } = req.query || {}
+    if (!from || !to) {
+      res.status(400).json({ error: 'BAD_REQUEST', message: 'Requiere from=YYYY-MM-DD y to=YYYY-MM-DD' })
+      return
+    }
+    const fromDate = new Date(`${from}T00:00:00Z`)
+    const toDate   = new Date(`${to}T00:00:00Z`)
+    if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime()) || fromDate > toDate) {
+      res.status(400).json({ error: 'BAD_REQUEST', message: 'from/to inválido o invertido' })
+      return
+    }
+    // Límite de seguridad: máximo 60 días por llamada
+    const diffDays = Math.round((toDate - fromDate) / 86_400_000) + 1
+    if (diffDays > 60) {
+      res.status(400).json({ error: 'BAD_REQUEST', message: 'Máximo 60 días por llamada' })
+      return
+    }
+
+    const auth = await resolveShoplogixAuth(logger)
+    if (auth.mode === 'none') {
+      res.status(500).json({ error: 'Sin credenciales Shoplogix configuradas' })
+      return
+    }
+
+    const dateKeys = []
+    for (let d = new Date(fromDate); d <= toDate; d.setUTCDate(d.getUTCDate() + 1)) {
+      const y = d.getUTCFullYear()
+      const m = String(d.getUTCMonth() + 1).padStart(2, '0')
+      const day = String(d.getUTCDate()).padStart(2, '0')
+      dateKeys.push(`${y}-${m}-${day}`)
+    }
+
+    const results = []
+    logger.info('[shoplogixBackfillRange] inicio', { plantSlug, from, to, days: dateKeys.length })
+
+    for (const dateKey of dateKeys) {
+      try {
+        const result = await shoplogixSyncMod.syncDay({
+          db,
+          accessToken: auth.accessToken,
+          cookie:      auth.cookie,
+          plantSlug,
+          dateKey,
+          logger,
+        })
+        results.push({ dateKey, ok: true, shifts: result?.shiftsWritten ?? result?.shifts ?? null })
+        logger.info('[shoplogixBackfillRange] día OK', { dateKey, plantSlug })
+      } catch (err) {
+        const msg = err.message ?? 'error desconocido'
+        results.push({ dateKey, ok: false, error: msg.slice(0, 200) })
+        logger.warn('[shoplogixBackfillRange] día FAIL', { dateKey, plantSlug, err: msg })
+        if (msg.includes('AUTH_EXPIRED')) {
+          if (auth.mode === 'bearer') await shoplogixTokenStore.clearStoredToken(db)
+          break  // sin credenciales válidas no tiene sentido continuar
+        }
+      }
+      // Pausa entre fechas para no saturar Shoplogix
+      await new Promise(r => setTimeout(r, 800))
+    }
+
+    const ok    = results.filter(r => r.ok).length
+    const fail  = results.filter(r => !r.ok).length
+    logger.info('[shoplogixBackfillRange] fin', { plantSlug, from, to, ok, fail })
+    res.json({ ok: fail === 0, plantSlug, from, to, total: results.length, synced: ok, failed: fail, results })
   },
 )
 
