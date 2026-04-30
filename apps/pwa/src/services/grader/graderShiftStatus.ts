@@ -51,14 +51,26 @@ export function computeShiftTimeWindow(
   const entry = schedule.find(s => s.shiftId === shiftId)
 
   if (!entry) {
-    // Turno no reconocido → tratar como cerrado
+    // Turno no reconocido en el schedule (ej. Turno 1/2/3 de Shoplogix).
+    // Usamos la ventana del día de producción (08:00→08:00) como bounds.
+    // El frontend refina con scheduledStart/End de Shoplogix cuando llegan.
+    const prodStart = new Date(`${dateKey}T08:00:00.000Z`)
+    const nextDayKey = dateKeyPlusDays(dateKey, 1)
+    const prodEnd   = new Date(`${nextDayKey}T08:00:00.000Z`)
+    const durationMin = 24 * 60
+    const elapsedMs = now.getTime() - prodStart.getTime()
+    const elapsedMin = Math.max(0, elapsedMs / 60_000)
+    let status: ShiftStatus
+    if (now.getTime() < prodStart.getTime()) status = 'future'
+    else if (now.getTime() > prodEnd.getTime()) status = 'closed'
+    else status = 'live'
     return {
-      status: 'closed',
-      startAt: `${dateKey}T00:00:00.000Z`,
-      endAt: `${dateKey}T23:59:59.999Z`,
-      progressPct: null,
-      elapsedMin: 0,
-      remainingMin: null,
+      status,
+      startAt: prodStart.toISOString(),
+      endAt:   prodEnd.toISOString(),
+      progressPct: status === 'live' ? Math.min(100, Math.max(0, (elapsedMin / durationMin) * 100)) : null,
+      elapsedMin,
+      remainingMin: status === 'live' ? Math.max(0, durationMin - elapsedMin) : null,
     }
   }
 

@@ -8,7 +8,7 @@
  * cada pocos minutos durante horas de turno.
  */
 
-import { collection, getDocs, doc, getDoc, Timestamp, onSnapshot } from 'firebase/firestore'
+import { collection, getDocs, doc, getDoc, Timestamp, onSnapshot, query, limit } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import type {
   UpstreamMachineShift,
@@ -340,4 +340,25 @@ export async function loadShoplogixShift(
   const syncedAt = parentData?.lastSyncAt ? toDateSafe(parentData.lastSyncAt) : null
 
   return { snapshot, syncedAt }
+}
+
+/** Shift IDs que puede devolver Shoplogix — en orden cronológico dentro de un día. */
+const CANDIDATE_SHIFT_IDS: string[] = ['Turno 1', 'Turno 2', 'Turno 3', 'Turno día', 'Turno noche']
+
+/**
+ * Devuelve los shiftIds disponibles en Firestore para un día dado.
+ * Verifica existencia con una lectura de 1 doc por candidato (lecturas en paralelo).
+ * Útil para construir navegación prev/next cuando no hay Excel.
+ */
+export async function listShoplogixShiftIdsForDay(
+  dateKey: string,
+  plantSlug: PlantSlug = 'chonchi',
+): Promise<string[]> {
+  const checks = CANDIDATE_SHIFT_IDS.map(async (shiftId) => {
+    const ref = collection(db, `shoplogix/${plantSlug}/shifts/${dateKey}_${shiftId}/machines`)
+    const snap = await getDocs(query(ref, limit(1))).catch(() => null)
+    return snap && !snap.empty ? shiftId : null
+  })
+  const results = await Promise.all(checks)
+  return results.filter((id): id is string => id !== null)
 }

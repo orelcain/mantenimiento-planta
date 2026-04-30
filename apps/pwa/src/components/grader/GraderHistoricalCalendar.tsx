@@ -1372,6 +1372,12 @@ export function GraderHistoricalCalendar({
     const reasonMap = new Map<string, { durationSec: number; color: string; count: number }>()
     for (const [key, cache] of slxByShift) {
       if (!key.startsWith(prefix)) continue
+      const dk      = key.slice(0, 10)
+      const shiftId = key.slice(12)
+      // Saltar legado si ya existe nuevo formato (igual que slxMonthlyStats)
+      if (shiftId === 'Turno día'   && (slxByShift.get(`${dk}__Turno 2`)?.totalCycles    ?? 0) > 0) continue
+      if (shiftId === 'Turno noche' && ((slxByShift.get(`${dk}__Turno 1`)?.totalCycles   ?? 0) > 0
+                                      || (slxByShift.get(`${dk}__Turno 3`)?.totalCycles  ?? 0) > 0)) continue
       for (const s of cache.states) {
         if (s.type !== 'downtime') continue
         const reason = s.name || s.reason || 'Sin causa'
@@ -1398,15 +1404,16 @@ export function GraderHistoricalCalendar({
     const result: Array<{ dk: string; day: SlxShiftCache | null; night: SlxShiftCache | null }> = []
     for (let d = 1; d <= daysInMonth; d++) {
       const dk = `${prefix}${String(d).padStart(2, '0')}`
-      // Buscar cache "día": formato legado primero, luego Turno 2 (syncDay)
-      const dayCache = slxByShift.get(`${dk}__Turno día`)
-        ?? slxByShift.get(`${dk}__Turno 2`)
+      // Nuevo formato tiene precedencia. Fallback a legado solo si no hay dato nuevo.
+      const dayCache = slxByShift.get(`${dk}__Turno 2`)
+        ?? slxByShift.get(`${dk}__Turno día`)
         ?? null
-      // Buscar cache "noche": formato legado primero, luego Turno 1 o Turno 3 (syncDay)
-      const nightCache = slxByShift.get(`${dk}__Turno noche`)
-        ?? ([slxByShift.get(`${dk}__Turno 1`), slxByShift.get(`${dk}__Turno 3`)]
-            .filter(Boolean)
-            .sort((a, b) => (b?.totalCycles ?? 0) - (a?.totalCycles ?? 0))[0] ?? null)
+      const nightCache =
+        ([slxByShift.get(`${dk}__Turno 1`), slxByShift.get(`${dk}__Turno 3`)]
+            .filter((c): c is SlxShiftCache => c != null && (c.totalCycles ?? 0) > 0)
+            .sort((a, b) => (b.totalCycles ?? 0) - (a.totalCycles ?? 0))[0] ?? null)
+        ?? slxByShift.get(`${dk}__Turno noche`)
+        ?? null
       const dayHasData   = (dayCache?.totalCycles   ?? 0) > 0
       const nightHasData = (nightCache?.totalCycles ?? 0) > 0
       if (!dayHasData && !nightHasData) continue

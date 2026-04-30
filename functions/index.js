@@ -3136,18 +3136,15 @@ exports.shoplogixSyncHttp = onRequest(
     }
     logger.info(`[shoplogixSyncHttp] modo auth: ${auth.mode}`)
 
-    const { dateKey, shiftId, plantSlug } = req.query || {}
+    const { dateKey, plantSlug } = req.query || {}
     try {
-      // Si se pasa shiftId explícito → syncShift legado (para backfill puntual).
-      // Sin shiftId → syncDay (full-day, detecta turnos reales desde intervals.shift).
-      const syncFn = shiftId ? shoplogixSyncMod.syncShift : shoplogixSyncMod.syncDay
-      const result = await syncFn({
+      // Siempre syncDay (ventana 08:00→08:00, bounds reales desde intervals.shift).
+      const result = await shoplogixSyncMod.syncDay({
         db,
         accessToken: auth.accessToken,
         cookie:      auth.cookie,
         plantSlug:   plantSlug || 'chonchi',
-        dateKey: dateKey || undefined,
-        shiftId: shiftId || undefined,
+        dateKey:     dateKey   || undefined,
         logger,
       })
       res.json({ ...result, authMode: auth.mode })
