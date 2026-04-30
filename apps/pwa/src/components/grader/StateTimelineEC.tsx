@@ -129,14 +129,23 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
   const externalHoverMs = timelineSync?.hover && timelineSync.hover.originId !== myHoverId
     ? timelineSync.hover.ms
     : null
+  // Ref para saber si el useEffect anterior fue externo (necesitamos ocultarlo)
+  const hadExternalHoverRef = useRef(false)
   useEffect(() => {
     const inst = echartsRef.current?.getEchartsInstance?.()
     if (!inst) return
     if (externalHoverMs == null) {
-      inst.dispatchAction({ type: 'updateAxisPointer', currTrigger: 'leave' })
-      inst.dispatchAction({ type: 'hideTip' })
+      // Solo ocultar la línea si en el ciclo anterior había un hover externo.
+      // NUNCA llamar hideTip aquí: mataría el tooltip local del usuario
+      // (ocurre porque externalHoverMs=null cuando el cursor está sobre ESTE chart
+      // y se llama setHover con nuestro propio originId).
+      if (hadExternalHoverRef.current) {
+        inst.dispatchAction({ type: 'updateAxisPointer', currTrigger: 'leave' })
+      }
+      hadExternalHoverRef.current = false
       return
     }
+    hadExternalHoverRef.current = true
     const pixelX = inst.convertToPixel({ xAxisIndex: 0 }, externalHoverMs)
     if (typeof pixelX !== 'number' || !Number.isFinite(pixelX)) return
     inst.dispatchAction({
@@ -211,7 +220,7 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
       padding: [8, 10],
       // Mantener tooltip visible mientras el cursor está sobre el área — no desaparecer al instante
       enterable: false,
-      hideDelay: 600,
+      hideDelay: 1200,
       confine: true,
       formatter: (params: any) => {
         const meta = params?.data?.meta
