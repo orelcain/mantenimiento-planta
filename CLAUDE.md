@@ -164,6 +164,20 @@ No asumir que "compila = se ve bien". Cada feature, fix o cambio de layout se co
   → URL: `http://localhost:5173/mantenimiento-planta/<ruta>?<params>`
 - `preview_start` con nombre `"pwa-dev"` para reutilizar el server entre avances
 
+**⚠️ FALSO POSITIVO recurrente — `preview_list` muestra cwd OneDrive:**
+
+Cuando `preview_list` retorna `cwd: C:\Users\pc hp\OneDrive\ANTARFOOD`, NO significa que el preview esté ignorando los cambios de `D:\a\...`. El `cwd` reportado es solo el directorio donde se invocó `preview_start`; el dev server real corre desde D:\a\ porque el `runtimeArgs` en `.claude/launch.json` contiene `"D: && cd D:\\a\\... && pnpm run dev"`.
+
+**Antes de concluir "los cambios no aparecen", verificar EN ESTE ORDEN:**
+
+1. Leer `.claude/launch.json` (sea el de OneDrive o el de D:\a\) y revisar el comando real. Si arranca desde D:\a\ → todo bien.
+2. Revisar `preview_logs` buscando `hmr update` con timestamp reciente del archivo editado. Si hay HMR update → cambio aplicado.
+3. **Console errors antiguos engañan**: el buffer histórico del navegador retorna stack traces con un `t=...` query param. Si ese timestamp es viejo (anterior al último HMR), el error es STALE — no del código actual.
+4. Tras un fix, recargar con `preview_eval window.location.reload()` + esperar 2-3s + volver a leer `preview_console_logs level: error`. Solo errores con timestamp posterior al reload son válidos.
+5. Si la app SÍ renderiza nuevos contenidos en el screenshot → el preview está bien, el "no veo cambios" es un falso positivo. Investigar la lógica de datos/estado en el código, no el preview.
+
+Esto sucedió ≥3 veces. NO desperdiciar turnos reiniciando preview ni asumiendo que está "leyendo OneDrive".
+
 ### Verificación pre-push (OBLIGATORIO)
 
 **TSC y ESLint deben correrse desde `apps/pwa/`** — NO desde la raíz del monorepo.
