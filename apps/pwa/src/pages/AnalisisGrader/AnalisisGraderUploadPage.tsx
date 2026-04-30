@@ -262,7 +262,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
           setUploads((prev) => normalizeUploads([upload, ...prev], shiftSchedule))
           if (result.fileMeta.kind === 'PIEZA_PIEZA' || result.fileMeta.kind === 'PUERTA_0') {
             try {
-              await deleteDailySummary(sessionDate, shiftId)
+              await deleteDailySummary(sessionDate, shiftId, lineId)
             } catch {
               // Evitar bloquear carga si no hay permisos para invalidar el resumen.
             }

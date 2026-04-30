@@ -116,8 +116,8 @@ export async function saveDailySummary(params: {
   return summary
 }
 
-export async function deleteDailySummary(dateKey: string, shiftId: string): Promise<void> {
-  const id = buildDailySummaryId(dateKey, shiftId)
+export async function deleteDailySummary(dateKey: string, shiftId: string, plantLineId?: string): Promise<void> {
+  const id = buildDailySummaryId(dateKey, shiftId, plantLineId)
   await deleteDoc(doc(db, COLLECTION, id))
 }
 
@@ -437,8 +437,8 @@ export async function migrateTardeShiftsToNoche(): Promise<MigrationResult> {
 
   for (const legacy of tardeDocs) {
     try {
-      const nocheId = buildDailySummaryId(legacy.dateKey, 'Turno noche')
-      const existingNoche = await getDailySummary(legacy.dateKey, 'Turno noche')
+      const nocheId = buildDailySummaryId(legacy.dateKey, 'Turno noche', legacy.plantLineId)
+      const existingNoche = await getDailySummary(legacy.dateKey, 'Turno noche', legacy.plantLineId)
       if (existingNoche) {
         // Fusionar
         const merged = mergeTwoSummaries(existingNoche, legacy)

@@ -33,6 +33,7 @@ import {
   deleteDailySummary,
   listDailySummariesByRange,
   loadPausesAggregates,
+  buildDailySummaryId,
 } from '@/services/grader/graderDailySummary.service'
 import { resolveEffectiveTag } from '@/services/grader/graderPauseTags'
 import { parseFile, mergeParsedData } from '@/services/grader/graderExcelParser'
@@ -1294,7 +1295,7 @@ export function GraderHistoricalCalendar({
       shifts.map(async (shiftId) => {
         const key = `${selectedKey}::${shiftId}`
         if (summaries[key]?.data) return
-        const cached = await getDailySummary(selectedKey, shiftId)
+        const cached = await getDailySummary(selectedKey, shiftId, plantLineId)
         if (cached) {
           setSummaries((prev) => ({
             ...prev,
@@ -1314,7 +1315,7 @@ export function GraderHistoricalCalendar({
         }
       }),
     ).catch(() => {})
-  }, [selectedKey, turnos, summaries])
+  }, [selectedKey, turnos, summaries, plantLineId])
 
   const handlePrevMonth = () => {
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))
@@ -1336,7 +1337,7 @@ export function GraderHistoricalCalendar({
     const key = `${dateKey}::${shiftId}`
     if (summaries[key]?.loading) return
 
-    const cached = await getDailySummary(dateKey, shiftId)
+    const cached = await getDailySummary(dateKey, shiftId, plantLineId)
     if (cached) {
       setSummaries((prev) => ({
         ...prev,
@@ -1402,6 +1403,7 @@ export function GraderHistoricalCalendar({
           startAt: merged.inferred.startAt,
           endAt: merged.inferred.endAt,
           updatedBy: user.id,
+          plantLineId,
         })
       }
 
@@ -1429,11 +1431,11 @@ export function GraderHistoricalCalendar({
   }
 
   const handleDeleteSummary = async (dateKey: string, shiftId: string) => {
-    const id = `${dateKey}__${shiftId}`
+    const id = buildDailySummaryId(dateKey, shiftId, plantLineId)
     if (!window.confirm(`¿Eliminar el registro "${shiftId}" del ${dateKey}? Esta acción no se puede deshacer.`)) return
     setDeletingId(id)
     try {
-      await deleteDailySummary(dateKey, shiftId)
+      await deleteDailySummary(dateKey, shiftId, plantLineId)
       setHistoricalByDate((prev) => {
         const next = new Map(prev)
         const dayList = (next.get(dateKey) ?? []).filter((s) => s.id !== id)
