@@ -695,7 +695,8 @@ function slxDisplayIds(dateKey: string, slxByShift: Map<string, { totalCycles?: 
     .filter(id => !(id === 'Turno día'   && hasT2))
     .filter(id => !(id === 'Turno noche' && hasT1or3))
   if (deduped.length === 0) return ['Turno día', 'Turno noche']
-  const ord: Record<string, number> = { 'Turno 1': 1, 'Turno día': 2, 'Turno 2': 2, 'Turno 3': 3, 'Turno noche': 3 }
+  // Orden cronológico (igual que la timeline izquierda→derecha del día)
+  const ord: Record<string, number> = { 'Turno 3': 1, 'Turno día': 2, 'Turno 1': 2, 'Turno 2': 3, 'Turno noche': 3 }
   return [...deduped].sort((a, b) => (ord[a] ?? 9) - (ord[b] ?? 9))
 }
 
@@ -2627,7 +2628,7 @@ export function GraderHistoricalCalendar({
                 <Clock className="h-3.5 w-3.5" />
                 Sin Excel cargado todavía
               </p>
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {/* displayIds: shifts con data del día de-duplicados (nuevo formato Turno 1/2/3 gana sobre legado). */}
                 {(slxDisplayIds(selectedKey, slxByShift)).map(shiftId => {
                   const slxKey = `${selectedKey}__${shiftId}`
