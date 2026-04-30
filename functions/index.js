@@ -3305,21 +3305,18 @@ exports.shoplogixSyncNow = onCall(
       throw new HttpsError('internal', 'Sin credenciales Shoplogix configuradas')
     }
 
-    // Si llega shiftId explícito → syncShift legacy (backward compat para callers viejos).
-    // Sin shiftId → syncDay con ventana 08:00→08:00 + bounds reales desde intervals.shift.
-    // El "Actualizar ahora" UI llama sin shiftId, evitando hardcodear 09-22 / 19-07.
-    const useSyncDay = !shiftId
-    logger.info(`[shoplogixSyncNow] uid=${request.auth.uid} planta=${plantSlug} ${dateKey ?? 'turno-actual'} ${shiftId ?? '(syncDay)'}`)
+    // Siempre syncDay (ventana 08:00→08:00, bounds reales desde intervals.shift).
+    // syncShift es legacy con ventanas hardcodeadas 09-22 / 19-07 — no usar.
+    // El UI envía shiftId pero se ignora para el routing (syncDay escribe todos los turnos del día).
+    logger.info(`[shoplogixSyncNow] uid=${request.auth.uid} planta=${plantSlug} ${dateKey ?? 'turno-actual'} (syncDay)`)
 
     try {
-      const syncFn = useSyncDay ? shoplogixSyncMod.syncDay : shoplogixSyncMod.syncShift
-      const result = await syncFn({
+      const result = await shoplogixSyncMod.syncDay({
         db,
         accessToken: auth.accessToken,
         cookie:      auth.cookie,
         plantSlug:   plantSlug || 'chonchi',
         dateKey:     dateKey   || undefined,
-        shiftId:     shiftId   || undefined,
         logger,
       })
       return { ok: true, result }

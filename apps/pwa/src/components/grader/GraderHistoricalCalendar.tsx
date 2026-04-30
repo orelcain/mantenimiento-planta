@@ -527,12 +527,14 @@ function buildDayTimelineBlocks(
   // que pueden ser incorrectos — pero eso ya es dato viejo que se irá reemplazando.
   if (blocks.length === 0 && slideKey && slxData) {
     const pad2 = (n: number) => String(n).padStart(2, '0')
-    const fracToHHMM = (frac: number) => {
-      const totalMin = Math.round(Math.max(0, Math.min(1, frac)) * 1440)
-      return `${pad2(Math.floor(totalMin / 60) % 24)}:${pad2(totalMin % 60)}`
-    }
-    const dayStartMs = new Date(`${slideKey}T00:00:00Z`).getTime()
+    // Día de producción = 08:00→08:00 (igual que fullDayWindow del backend).
+    // Así Turno 3 (00:00→03:32 del día siguiente) queda dentro del rango visible.
+    const dayStartMs = new Date(`${slideKey}T08:00:00Z`).getTime()
     const dayEndMs   = dayStartMs + 86_400_000
+    const fracToHHMM = (frac: number) => {
+      const d = new Date(dayStartMs + Math.max(0, Math.min(1, frac)) * 86_400_000)
+      return `${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}`
+    }
     const MIN_VALID_TS = 86_400_000
 
     // De-duplicar: si existen docs nuevo formato (Turno 1/2/3) Y legado (Turno día/noche)
