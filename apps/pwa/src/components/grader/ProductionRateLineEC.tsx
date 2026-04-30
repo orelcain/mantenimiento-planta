@@ -151,14 +151,20 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd }: Props
     ? timelineSync?.hover?.ms ?? null
     : null
 
+  const hadExternalRef = useRef(false)
   useEffect(() => {
     const inst = echartsRef.current?.getEchartsInstance?.()
     if (!inst) return
     if (externalHoverMs == null) {
-      inst.dispatchAction({ type: 'updateAxisPointer', currTrigger: 'leave' })
-      inst.dispatchAction({ type: 'hideTip' })
+      // Solo limpiar si había hover externo previo — nunca hideTip
+      // (hideTip mataba el tooltip cuando el cursor volvía al chart propio)
+      if (hadExternalRef.current) {
+        inst.dispatchAction({ type: 'updateAxisPointer', currTrigger: 'leave' })
+      }
+      hadExternalRef.current = false
       return
     }
+    hadExternalRef.current = true
     const pixelX = inst.convertToPixel({ xAxisIndex: 0 }, externalHoverMs)
     if (typeof pixelX !== 'number' || !Number.isFinite(pixelX)) return
     inst.dispatchAction({ type: 'updateAxisPointer', currTrigger: 'mousemove', x: pixelX, y: 30 })
@@ -280,6 +286,7 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd }: Props
         backgroundColor: '#1f2937',
         borderColor:     '#374151',
         textStyle:       { color: '#f1f5f9', fontSize: 11 },
+        hideDelay: 800,
         axisPointer: {
           type:      'line' as const,
           lineStyle: { color: '#475569', type: 'dashed', width: 1 },

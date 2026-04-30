@@ -71,14 +71,18 @@ export function ProductionBarsEC({ intervals, threshold, windowStart, windowEnd 
   const externalHoverMs = timelineSync?.hover && timelineSync.hover.originId !== myHoverId
     ? timelineSync.hover.ms
     : null
+  const hadExternalRef = useRef(false)
   useEffect(() => {
     const inst = echartsRef.current?.getEchartsInstance?.()
     if (!inst) return
     if (externalHoverMs == null) {
-      inst.dispatchAction({ type: 'updateAxisPointer', currTrigger: 'leave' })
-      inst.dispatchAction({ type: 'hideTip' })
+      if (hadExternalRef.current) {
+        inst.dispatchAction({ type: 'updateAxisPointer', currTrigger: 'leave' })
+      }
+      hadExternalRef.current = false
       return
     }
+    hadExternalRef.current = true
     const pixelX = inst.convertToPixel({ xAxisIndex: 0 }, externalHoverMs)
     if (typeof pixelX !== 'number' || !Number.isFinite(pixelX)) return
     inst.dispatchAction({
@@ -198,6 +202,7 @@ export function ProductionBarsEC({ intervals, threshold, windowStart, windowEnd 
       backgroundColor: '#1f2937',
       borderColor: '#374151',
       textStyle: { color: '#f9fafb', fontSize: 11 },
+      hideDelay: 800,
       formatter: (params: any) => {
         const m = params?.data?.meta
         if (!m) return ''

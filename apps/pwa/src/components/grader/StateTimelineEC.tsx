@@ -71,19 +71,32 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
   // Usar onMouseMove React evita que el re-render causado por setHover() provoque
   // un re-enlace de onEvents de ECharts que dispara mouseout falso al tooltip.
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    const ts = timelineSyncRef.current
-    if (!ts) return
     const inst = echartsRef.current?.getEchartsInstance?.()
     if (!inst) return
-    const rect = e.currentTarget.getBoundingClientRect()
-    const rawMs = inst.convertFromPixel({ xAxisIndex: 0 }, e.clientX - rect.left)
+    const rect  = e.currentTarget.getBoundingClientRect()
+    const offsetX = e.clientX - rect.left
+    const rawMs = inst.convertFromPixel({ xAxisIndex: 0 }, offsetX)
     if (typeof rawMs !== 'number' || !Number.isFinite(rawMs)) return
-    ts.setHover({ ms: Math.floor(rawMs / 60_000) * 60_000, originId: myHoverId })
-  }, [myHoverId])
+
+    // Timeline sync (crosshair en otros charts)
+    const ts = timelineSyncRef.current
+    if (ts) ts.setHover({ ms: Math.floor(rawMs / 60_000) * 60_000, originId: myHoverId })
+
+    // Activar tooltip local vía axisPointer — sin este dispatch ECharts no sabe
+    // que el cursor está sobre este chart y trigger:'axis' nunca dispara
+    inst.dispatchAction({
+      type: 'updateAxisPointer',
+      currTrigger: 'mousemove',
+      x: offsetX,
+      y: height / 2,
+    })
+  }, [myHoverId, height])
 
   const handleMouseLeave = useCallback(() => {
     const ts = timelineSyncRef.current
     if (ts?.hover?.originId === myHoverId) ts.setHover(null)
+    const inst = echartsRef.current?.getEchartsInstance?.()
+    if (inst) inst.dispatchAction({ type: 'updateAxisPointer', currTrigger: 'leave' })
   }, [myHoverId])
 
   // ── Click (sigue siendo evento ECharts) ─────────────────────────────────────
@@ -174,6 +187,7 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
       textStyle: { color: '#f9fafb', fontSize: 11 },
       padding: [8, 10],
       confine: true,
+      hideDelay: 800,
       formatter: (params: any) => {
         // Para trigger:'axis' con time-axis, params[0].axisValue es el ms del cursor
         const p = Array.isArray(params) ? params[0] : params
