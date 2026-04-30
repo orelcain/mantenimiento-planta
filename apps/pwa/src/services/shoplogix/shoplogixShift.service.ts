@@ -8,7 +8,7 @@
  * cada pocos minutos durante horas de turno.
  */
 
-import { collection, getDocs, doc, getDoc, Timestamp, onSnapshot, query, limit } from 'firebase/firestore'
+import { collection, getDocs, getDocsFromServer, doc, getDoc, getDocFromServer, Timestamp, onSnapshot, query, limit } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import type {
   UpstreamMachineShift,
@@ -317,9 +317,11 @@ export async function loadShoplogixShift(
   const parentRef = doc(db, `shoplogix/${plantSlug}/shifts/${shiftDocId}`)
   const machinesRef = collection(db, `shoplogix/${plantSlug}/shifts/${shiftDocId}/machines`)
 
+  // Siempre leer desde el servidor — bypasea el IndexedDB local cache para
+  // garantizar que tras un nuke+backfill la data refleje Firestore real.
   const [parentSnap, machinesSnap] = await Promise.all([
-    getDoc(parentRef),
-    getDocs(machinesRef),
+    getDocFromServer(parentRef),
+    getDocsFromServer(machinesRef),
   ])
 
   if (machinesSnap.empty) {
@@ -356,7 +358,7 @@ export async function listShoplogixShiftIdsForDay(
 ): Promise<string[]> {
   const checks = CANDIDATE_SHIFT_IDS.map(async (shiftId) => {
     const ref = collection(db, `shoplogix/${plantSlug}/shifts/${dateKey}_${shiftId}/machines`)
-    const snap = await getDocs(query(ref, limit(1))).catch(() => null)
+    const snap = await getDocsFromServer(query(ref, limit(1))).catch(() => null)
     return snap && !snap.empty ? shiftId : null
   })
   const results = await Promise.all(checks)
