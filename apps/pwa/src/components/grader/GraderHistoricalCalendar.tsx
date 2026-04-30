@@ -535,6 +535,16 @@ function buildDayTimelineBlocks(
     const dayEndMs   = dayStartMs + 86_400_000
     const MIN_VALID_TS = 86_400_000
 
+    // De-duplicar: si existen docs nuevo formato (Turno 1/2/3) Y legado (Turno día/noche)
+    // para el mismo día, preferir el nuevo y saltar el legado.
+    const allShiftIdsForDay = new Set(
+      [...slxData.keys()]
+        .filter(k => k.startsWith(`${slideKey}__`) && (slxData.get(k)?.totalCycles ?? 0) > 0)
+        .map(k => k.slice(`${slideKey}__`.length)),
+    )
+    const hasNewDay   = allShiftIdsForDay.has('Turno 2')
+    const hasNewNight = allShiftIdsForDay.has('Turno 1') || allShiftIdsForDay.has('Turno 3')
+
     // Recolectar todos los shifts de este día con datos válidos
     const dayShifts: Array<{ shiftId: string; startMs: number; endMs: number }> = []
     for (const [mapKey, slx] of slxData.entries()) {
@@ -542,6 +552,9 @@ function buildDayTimelineBlocks(
       if ((slx.totalCycles ?? 0) === 0) continue
 
       const shiftId = mapKey.slice(`${slideKey}__`.length)
+      // Saltar legado si existe equivalente nuevo
+      if (shiftId === 'Turno día'   && hasNewDay)   continue
+      if (shiftId === 'Turno noche' && hasNewNight) continue
 
       // Preferir scheduledStart/End (real de Shoplogix) sobre states
       const ssOk = slx.scheduledStart !== null && (slx.scheduledStart?.getTime() ?? 0) > MIN_VALID_TS
@@ -634,6 +647,29 @@ function computeEffectiveWindow(
   if (operative.length === 0) return null
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
   return { startMs: operative[0]!.start, endMs: operative[operative.length - 1]!.end }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Devuelve los shiftIds a mostrar en las cards "Sin Excel" para un día,
+ * de-duplicando formato legado vs nuevo (Turno 1/2/3 tiene precedencia).
+ * Orden: Turno 1 (madrugada) → Turno 2/día → Turno 3/noche.
+ * Si no hay data alguna, devuelve los placeholders legado ['Turno día','Turno noche'].
+ */
+function slxDisplayIds(dateKey: string, slxByShift: Map<string, { totalCycles?: number }>): string[] {
+  const prefix = `${dateKey}__`
+  const all = Array.from(slxByShift.keys())
+    .filter(k => k.startsWith(prefix))
+    .map(k => k.slice(prefix.length))
+  const hasT2    = all.includes('Turno 2')
+  const hasT1or3 = all.includes('Turno 1') || all.includes('Turno 3')
+  const deduped  = all
+    .filter(id => !(id === 'Turno día'   && hasT2))
+    .filter(id => !(id === 'Turno noche' && hasT1or3))
+  if (deduped.length === 0) return ['Turno día', 'Turno noche']
+  const ord: Record<string, number> = { 'Turno 1': 1, 'Turno día': 2, 'Turno 2': 2, 'Turno 3': 3, 'Turno noche': 3 }
+  return [...deduped].sort((a, b) => (ord[a] ?? 9) - (ord[b] ?? 9))
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1061,7 +1097,10 @@ export function GraderHistoricalCalendar({
     }
     const currentBelongsToDay = selectedHistorical && turnosDelDia.some((t) => t.id === selectedHistorical.id)
     if (currentBelongsToDay) return
-    const order: Record<string, number> = { 'Turno día': 0, 'Turno noche': 1 }
+    const order: Record<string, number> = {
+      'Turno día': 0, 'Turno 2': 0,
+      'Turno noche': 1, 'Turno 1': 1, 'Turno 3': 1,
+    }
     const sorted = [...turnosDelDia].sort((a, b) => (order[a.shiftId] ?? 9) - (order[b.shiftId] ?? 9))
     setSelectedHistorical(sorted[0] ?? null)
   }, [selectedKey, historicalByDate, selectedHistorical, setSelectedHistorical])
@@ -1261,26 +1300,32 @@ export function GraderHistoricalCalendar({
     let totalCycles = 0
     let sumUptime = 0
     const daySet = new Set<string>()
-    for (let d = 1; d <= daysInMonth; d++) {
-      const dk = `${prefix}${String(d).padStart(2, '0')}`
-      for (const shiftId of ['Turno día', 'Turno noche'] as const) {
-        const cache = slxByShift.get(`${dk}__${shiftId}`)
-        if (!cache || cache.totalCycles === 0) continue
-        const uptimePct = cache.shiftRuntime * 100
-        withData.push({ dateKey: dk, shiftId, uptimePct, totalCycles: cache.totalCycles })
-        totalCycles += cache.totalCycles
-        sumUptime   += uptimePct
-        daySet.add(dk)
-      }
+    // Iterar todos los shifts del mapa (soporta Turno día/noche legado + Turno 1/2/3 nuevo)
+    // De-duplicar: si existe nuevo formato, ignorar legado equivalente del mismo día.
+    for (const [key, cache] of slxByShift) {
+      if (!key.startsWith(prefix)) continue
+      if (cache.totalCycles === 0) continue
+      const dk      = key.slice(0, 10)   // 'YYYY-MM-DD'
+      const shiftId = key.slice(12)      // 'Turno X' (saltar 'YYYY-MM-DD__')
+      // Skip legado si ya existe nuevo formato para ese día
+      if (shiftId === 'Turno día'   && (slxByShift.get(`${dk}__Turno 2`)?.totalCycles    ?? 0) > 0) continue
+      if (shiftId === 'Turno noche' && ((slxByShift.get(`${dk}__Turno 1`)?.totalCycles   ?? 0) > 0
+                                      || (slxByShift.get(`${dk}__Turno 3`)?.totalCycles  ?? 0) > 0)) continue
+      const uptimePct = cache.shiftRuntime * 100
+      withData.push({ dateKey: dk, shiftId, uptimePct, totalCycles: cache.totalCycles })
+      totalCycles += cache.totalCycles
+      sumUptime   += uptimePct
+      daySet.add(dk)
     }
     if (withData.length === 0) return null
     const sorted = [...withData].sort((a, b) => b.uptimePct - a.uptimePct)
+    const isDayShift = (id: string) => id === 'Turno día' || id === 'Turno 2'
     return {
       totalCycles,
       avgUptimePct: sumUptime / withData.length,
       turnosWithData: withData.length,
-      dayShiftsWithData:   withData.filter(e => e.shiftId === 'Turno día').length,
-      nightShiftsWithData: withData.filter(e => e.shiftId === 'Turno noche').length,
+      dayShiftsWithData:   withData.filter(e => isDayShift(e.shiftId)).length,
+      nightShiftsWithData: withData.filter(e => !isDayShift(e.shiftId)).length,
       daysWithData: daySet.size,
       bestShift:  sorted[0] ?? null,
       worstShift: sorted[sorted.length - 1] ?? null,
@@ -2211,8 +2256,16 @@ export function GraderHistoricalCalendar({
               const isSelected = selectedDate?.toDateString() === day.toDateString()
 
               // Indicadores Shoplogix para días sin datos Grader
-              const slxDayCycles   = !hasData ? (slxTotalsByShift.get(`${dayKey}__Turno día`)   ?? 0) : 0
-              const slxNightCycles = !hasData ? (slxTotalsByShift.get(`${dayKey}__Turno noche`) ?? 0) : 0
+              // Preferir nuevo formato (Turno 2 / Turno 1+3) sobre legado (Turno día / Turno noche)
+              const slxNewDay   = !hasData ? (slxTotalsByShift.get(`${dayKey}__Turno 2`) ?? 0) : 0
+              const slxLegDay   = !hasData ? (slxTotalsByShift.get(`${dayKey}__Turno día`) ?? 0) : 0
+              const slxDayCycles   = slxNewDay > 0 ? slxNewDay : slxLegDay
+              const slxNewNight = !hasData ? Math.max(
+                slxTotalsByShift.get(`${dayKey}__Turno 3`) ?? 0,
+                slxTotalsByShift.get(`${dayKey}__Turno 1`) ?? 0,
+              ) : 0
+              const slxLegNight = !hasData ? (slxTotalsByShift.get(`${dayKey}__Turno noche`) ?? 0) : 0
+              const slxNightCycles = slxNewNight > 0 ? slxNewNight : slxLegNight
               const hasSlxDay   = slxDayCycles   > 0
               const hasSlxNight = slxNightCycles > 0
               const hasAnySlx   = hasSlxDay || hasSlxNight
@@ -2536,7 +2589,8 @@ export function GraderHistoricalCalendar({
                 Sin Excel cargado todavía
               </p>
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
-                {(['Turno día', 'Turno noche'] as const).map(shiftId => {
+                {/* displayIds: shifts con data del día de-duplicados (nuevo formato Turno 1/2/3 gana sobre legado). */}
+                {(slxDisplayIds(selectedKey, slxByShift)).map(shiftId => {
                   const slxKey = `${selectedKey}__${shiftId}`
                   const hasSlx = (slxByShift.get(slxKey)?.states?.length ?? 0) > 0
                   const lineaQuery = plantLineId !== DEFAULT_PLANT_LINE_ID
@@ -2554,7 +2608,7 @@ export function GraderHistoricalCalendar({
                     >
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
-                          {shiftId === 'Turno día'
+                          {(shiftId === 'Turno día' || shiftId === 'Turno 2')
                             ? <Sun className="h-4 w-4 text-amber-500" />
                             : <Moon className="h-4 w-4 text-indigo-400" />}
                           <p className="text-sm font-medium">{shiftId}</p>
