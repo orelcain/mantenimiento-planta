@@ -54,7 +54,9 @@ import { useAuthStore } from '@/store'
 import { useGraderSelectionStore } from '@/store/graderSelectionStore'
 import { p0StatusFromPct, p0StatusColor, DEFAULT_P0_ALERT_PCT, DEFAULT_P0_CRITICAL_PCT, type P0Status } from '@/services/grader/graderP0Thresholds'
 import { loadShoplogixShift } from '@/services/shoplogix/shoplogixShift.service'
+import type { MachineTrendPoint } from '@/services/shoplogix/shoplogixShift.service'
 import type { UpstreamMachineState } from '@/services/shoplogix/types'
+import { MachineTrendMiniChart } from './UpstreamMachinesPanel'
 import { getPlantLineConfig, DEFAULT_PLANT_LINE_ID, type PlantLineId } from '@/config/plantLines'
 
 interface TurnoSummary {
@@ -611,6 +613,8 @@ interface SlxShiftCache {
   shiftEnd: Date | null
   /** Fracción uptime real (0-1) calculada por el normalizer Shoplogix */
   shiftRuntime: number
+  /** Productividad total: ciclos / expectedCycles (0..1+) */
+  overallRatio: number
   /** Total ciclos sumados de todas las Baaders del turno */
   totalCycles: number
   breakdown: {
@@ -1092,6 +1096,7 @@ export function GraderHistoricalCalendar({
             shiftStart: m0?.shiftStart ?? null,
             shiftEnd: m0?.shiftEnd ?? null,
             shiftRuntime: m0?.shiftRuntime ?? 0,
+            overallRatio: m0?.overallRatio ?? 0,
             totalCycles,
             breakdown: m0?.shiftRuntimeBreakdown ? {
               uptimeSec: m0.shiftRuntimeBreakdown.uptimeSec,
@@ -1108,7 +1113,7 @@ export function GraderHistoricalCalendar({
         .catch(() => {
           // Sin Shoplogix data → guardar entry vacía para no re-intentar
           if (!cancelled) {
-            setSlxByShift((prev) => new Map(prev).set(key, { states: [], shiftStart: null, shiftEnd: null, shiftRuntime: 0, totalCycles: 0, breakdown: null }))
+            setSlxByShift((prev) => new Map(prev).set(key, { states: [], shiftStart: null, shiftEnd: null, shiftRuntime: 0, overallRatio: 0, totalCycles: 0, breakdown: null }))
             setSlxTotalsByShift((prev) => new Map(prev).set(key, 0))
           }
         })
@@ -1142,6 +1147,7 @@ export function GraderHistoricalCalendar({
               shiftStart: m0?.shiftStart ?? null,
               shiftEnd:   m0?.shiftEnd   ?? null,
               shiftRuntime: m0?.shiftRuntime ?? 0,
+              overallRatio: m0?.overallRatio ?? 0,
               totalCycles: cycles,
               breakdown: m0?.shiftRuntimeBreakdown ? {
                 uptimeSec:          m0.shiftRuntimeBreakdown.uptimeSec,
@@ -1160,7 +1166,7 @@ export function GraderHistoricalCalendar({
             if (!cancelled) {
               slxMonthQueuedRef.current.delete(key) // permite reintento en siguiente visita
               setSlxByShift((prev) => new Map(prev).set(key, {
-                states: [], shiftStart: null, shiftEnd: null, shiftRuntime: 0, totalCycles: 0, breakdown: null,
+                states: [], shiftStart: null, shiftEnd: null, shiftRuntime: 0, overallRatio: 0, totalCycles: 0, breakdown: null,
               }))
               setSlxTotalsByShift((prev) => new Map(prev).set(key, 0))
             }
@@ -1270,6 +1276,25 @@ export function GraderHistoricalCalendar({
     if (bars.length === 0) return
     animate(bars, { scaleX: [0, 1], duration: 420, delay: stagger(70), ease: 'outExpo' })
   }, [monthParetoData])
+
+  // Trend points mensuales — derivados de slxByShift ya cargado, sin llamadas extra
+  const monthTrendPoints = useMemo<{ day: MachineTrendPoint[]; night: MachineTrendPoint[] }>(() => {
+    const year  = currentMonth.getFullYear()
+    const month = currentMonth.getMonth()
+    const daysInMonth = new Date(year, month + 1, 0).getDate()
+    const prefix = `${year}-${String(month + 1).padStart(2, '0')}-`
+    const day: MachineTrendPoint[]   = []
+    const night: MachineTrendPoint[] = []
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dk = `${prefix}${String(d).padStart(2, '0')}`
+      for (const [shiftId, arr] of [['Turno día', day], ['Turno noche', night]] as [string, MachineTrendPoint[]][]) {
+        const cache = slxByShift.get(`${dk}__${shiftId}`)
+        if (!cache || cache.totalCycles === 0) continue
+        arr.push({ dateKey: dk, shiftId, overallRatio: cache.overallRatio, shiftRuntime: cache.shiftRuntime, totalCycles: cache.totalCycles })
+      }
+    }
+    return { day, night }
+  }, [slxByShift, currentMonth])
 
   const selectedUploads = useMemo(() => {
     if (!selectedKey) return []
@@ -2842,6 +2867,29 @@ export function GraderHistoricalCalendar({
                 </div>
 
               </div>
+
+              {/* ── Fila tendencia Baader: Día / Noche (debajo de las 3 cols) ── */}
+              {(monthTrendPoints.day.length >= 2 || monthTrendPoints.night.length >= 2) && (
+                <div className="col-span-full grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-border/40">
+                  {monthTrendPoints.day.length >= 2 && (
+                    <div className="space-y-1">
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                        ☀ Tendencia Baader · Turno Día
+                      </p>
+                      <MachineTrendMiniChart points={monthTrendPoints.day} />
+                    </div>
+                  )}
+                  {monthTrendPoints.night.length >= 2 && (
+                    <div className="space-y-1">
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                        🌙 Tendencia Baader · Turno Noche
+                      </p>
+                      <MachineTrendMiniChart points={monthTrendPoints.night} />
+                    </div>
+                  )}
+                </div>
+              )}
+
             </CardContent>
           </Card>
         </div>
