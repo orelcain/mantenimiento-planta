@@ -42,7 +42,7 @@ import {
 } from '@/services/grader/graderUpstreamHealth'
 import ReactECharts from 'echarts-for-react'
 import { animate, stagger } from 'animejs'
-import { loadMachineTrend, type MachineTrendPoint } from '@/services/shoplogix/shoplogixShift.service'
+import type { MachineTrendPoint } from '@/services/shoplogix/shoplogixShift.service'
 import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
 import { useTimelineSyncOptional } from './useTimelineSync'
 import { StateTimelineEC } from './StateTimelineEC'
@@ -318,7 +318,8 @@ function ShiftAvailabilityBar({
  * Dual-line: ritmo% (sky) + uptime% (emerald dashed). Altura 80px, sin zoom.
  * Cargado lazy al expandir la MachineRow.
  */
-function MachineTrendMiniChart({ points }: { points: MachineTrendPoint[] }) {
+/** @public — importado en GraderHistoricalCalendar para la vista panorámica del home */
+export function MachineTrendMiniChart({ points }: { points: MachineTrendPoint[] }) {
   if (points.length < 2) {
     return (
       <p className="text-[10px] text-slate-600 italic py-1">
@@ -509,7 +510,7 @@ function ProductionKpiRow({ kpis }: { kpis: MachineKpis }) {
 // MachineRow — 1 máquina
 // ============================================================================
 
-function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAlert, plantSlug }: {
+function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAlert }: {
   shift: UpstreamMachineShift
   expanded: boolean
   onToggle: () => void
@@ -517,7 +518,8 @@ function MachineRow({ shift, expanded, onToggle, windowStart, windowEnd, microAl
   windowEnd?: Date
   /** Si es true, esta máquina tiene >50% más microparadas que el promedio de la línea. */
   microAlert?: boolean
-  plantSlug: PlantSlug
+  /** Reservado para carga lazy de tendencia histórica — no usado aún. */
+  plantSlug?: PlantSlug
 }) {
   // Estado seleccionado al clickear un segmento del Gantt (drill-down rico).
   // Click sobre el mismo state lo cierra (toggle).
