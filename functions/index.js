@@ -3137,7 +3137,10 @@ exports.shoplogixSyncHttp = onRequest(
 
     const { dateKey, shiftId, plantSlug } = req.query || {}
     try {
-      const result = await shoplogixSyncMod.syncShift({
+      // Si se pasa shiftId explícito → syncShift legado (para backfill puntual).
+      // Sin shiftId → syncDay (full-day, detecta turnos reales desde intervals.shift).
+      const syncFn = shiftId ? shoplogixSyncMod.syncShift : shoplogixSyncMod.syncDay
+      const result = await syncFn({
         db,
         accessToken: auth.accessToken,
         cookie:      auth.cookie,
@@ -3197,10 +3200,10 @@ exports.shoplogixSyncWakeup = onSchedule(
     }
     logger.info(`[shoplogixSyncWakeup] modo auth: ${auth.mode}`)
 
-    // Sincroniza todas las plantas activas en paralelo
+    // Sincroniza todas las plantas activas en paralelo (full-day — detecta turnos reales)
     const settled = await Promise.allSettled(
       shoplogixSyncMod.ACTIVE_PLANTS.map((plantSlug) =>
-        shoplogixSyncMod.syncShift({
+        shoplogixSyncMod.syncDay({
           db,
           accessToken: auth.accessToken,
           cookie:      auth.cookie,

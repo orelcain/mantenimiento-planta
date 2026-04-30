@@ -516,55 +516,88 @@ function buildDayTimelineBlocks(
   }
   // ── Shoplogix standalone blocks ────────────────────────────────────────────
   // Cuando no hay ningún graderDailySummary para este slide (p.ej. Yal sin Excel
-  // cargado) pero sí hay datos Shoplogix, mostramos el window del turno como
-  // bloque neutro (sky/azul, sin P0%, no navegable).
+  // cargado) pero sí hay datos Shoplogix, mostramos la ventana real del turno
+  // como bloque neutro (sky/azul, sin P0%, no navegable).
+  //
+  // Iteramos TODOS los shifts del Map que correspondan a este día, sin hardcodear
+  // nombres. Así funciona con Turno 1/2/3 (nuevo syncDay) y Turno día/noche (legado).
+  //
+  // Usamos scheduledStart/End (horario real derivado de intervals.shift en syncDay).
+  // Para docs legacy: scheduledStart/End coinciden con shiftStart/End (bounds de consulta),
+  // que pueden ser incorrectos — pero eso ya es dato viejo que se irá reemplazando.
   if (blocks.length === 0 && slideKey && slxData) {
     const pad2 = (n: number) => String(n).padStart(2, '0')
     const fracToHHMM = (frac: number) => {
       const totalMin = Math.round(Math.max(0, Math.min(1, frac)) * 1440)
       return `${pad2(Math.floor(totalMin / 60) % 24)}:${pad2(totalMin % 60)}`
     }
-    for (const shiftId of ['Turno día', 'Turno noche'] as const) {
-      const slxKey = `${slideKey}__${shiftId}`
-      const slx = slxData.get(slxKey)
-      if (!slx || (slx.totalCycles ?? 0) === 0) continue
-      // Usar shiftStart/shiftEnd que Shoplogix escribe en el doc Firestore.
-      // Validar que no sea epoch (new Date(0)) — docs legacy no tenían el campo.
-      const MIN_VALID_TS = 86_400_000 // > 1 día desde epoch = claramente no es sentinel
-      const ssOk = slx.shiftStart !== null && slx.shiftStart.getTime() > MIN_VALID_TS
-      const seOk = slx.shiftEnd   !== null && slx.shiftEnd.getTime()   > MIN_VALID_TS
-      let startFrac: number, endFrac: number
+    const dayStartMs = new Date(`${slideKey}T00:00:00Z`).getTime()
+    const dayEndMs   = dayStartMs + 86_400_000
+    const MIN_VALID_TS = 86_400_000
+
+    // Recolectar todos los shifts de este día con datos válidos
+    const dayShifts: Array<{ shiftId: string; startMs: number; endMs: number }> = []
+    for (const [mapKey, slx] of slxData.entries()) {
+      if (!mapKey.startsWith(`${slideKey}__`)) continue
+      if ((slx.totalCycles ?? 0) === 0) continue
+
+      const shiftId = mapKey.slice(`${slideKey}__`.length)
+
+      // Preferir scheduledStart/End (real de Shoplogix) sobre states
+      const ssOk = slx.scheduledStart !== null && (slx.scheduledStart?.getTime() ?? 0) > MIN_VALID_TS
+      const seOk = slx.scheduledEnd   !== null && (slx.scheduledEnd?.getTime()   ?? 0) > MIN_VALID_TS
+      let startMs: number, endMs: number
+
       if (ssOk && seOk) {
-        startFrac = (slx.shiftStart!.getUTCHours() * 60 + slx.shiftStart!.getUTCMinutes()) / 1440
-        endFrac   = (slx.shiftEnd!.getUTCHours()   * 60 + slx.shiftEnd!.getUTCMinutes())   / 1440
+        startMs = slx.scheduledStart!.getTime()
+        endMs   = slx.scheduledEnd!.getTime()
       } else {
-        // Fallback para docs legacy sin shiftStart/End: derivar desde states.
+        // Fallback: derivar desde states
         if (slx.states.length === 0) continue
-        const dayStartMs = new Date(`${slideKey}T00:00:00Z`).getTime()
-        const dayEndMs   = dayStartMs + 86_400_000
         const eff = computeEffectiveWindow(slx.states, dayStartMs, dayEndMs)
         if (!eff) continue
-        const effStart = new Date(eff.startMs)
-        const effEnd   = new Date(eff.endMs)
-        startFrac = (effStart.getUTCHours() * 60 + effStart.getUTCMinutes()) / 1440
-        endFrac   = (effEnd.getUTCHours()   * 60 + effEnd.getUTCMinutes())   / 1440
+        startMs = eff.startMs
+        endMs   = eff.endMs
       }
-      // turno noche termina en 00:00 del día siguiente → endFrac = 0 → mapear a 1
-      if (endFrac < startFrac) endFrac = 1
+
+      dayShifts.push({ shiftId, startMs, endMs })
+    }
+
+    // Ordenar por inicio — garantiza orden coherente en el timeline
+    dayShifts.sort((a, b) => a.startMs - b.startMs)
+
+    for (const shift of dayShifts) {
+      // Clamp al día visible (00:00-24:00)
+      const visStart = Math.max(shift.startMs, dayStartMs)
+      const visEnd   = Math.min(shift.endMs,   dayEndMs)
+      if (visEnd <= visStart) continue
+
+      const startFrac = (visStart - dayStartMs) / 86_400_000
+      let endFrac     = (visEnd   - dayStartMs) / 86_400_000
+      // Si el turno termina exactamente en medianoche → endFrac = 1
+      if (shift.endMs >= dayEndMs - 1) endFrac = 1
       if (endFrac <= startFrac) endFrac = Math.min(1, startFrac + 0.02)
-      const label = shiftId === 'Turno día' ? 'D' : 'N'
-      const ts    = `${fracToHHMM(startFrac)}–${fracToHHMM(endFrac)}`
+
+      // Etiqueta: "D" para día/Turno 2, "N" para noche/Turno 1/3, "Tx" para resto
+      const label = shift.shiftId === 'Turno día' || shift.shiftId === 'Turno 2' ? 'D'
+        : shift.shiftId === 'Turno noche' || shift.shiftId === 'Turno 1' || shift.shiftId === 'Turno 3' ? 'N'
+        : shift.shiftId.replace('Turno ', 'T')
+
+      const ts = `${fracToHHMM(startFrac)}–${fracToHHMM(endFrac)}`
+      const nightSide = (shift.shiftId === 'Turno noche' || shift.shiftId === 'Turno 3')
+        ? (startFrac === 0 ? 'start' : 'end') : null
+
       blocks.push({
         leftPct:      startFrac * 100,
         widthPct:     (endFrac - startFrac) * 100,
         bgClass:      'bg-sky-500/40',
         label,
-        title:        `${shiftId} · Shoplogix · ${ts} · sin Excel cargado`,
-        nightSide:    shiftId === 'Turno noche' ? 'end' : null,
+        title:        `${shift.shiftId} · Shoplogix · ${ts} · sin Excel cargado`,
+        nightSide,
         summaryId:    '',
         dateKey:      slideKey,
-        shiftId,
-        fragId:       `${slideKey}__${shiftId}-slx`,
+        shiftId:      shift.shiftId,
+        fragId:       `${slideKey}__${shift.shiftId}-slx`,
         startTimeStr: fracToHHMM(startFrac),
         endTimeStr:   fracToHHMM(endFrac),
         p0Pct:        null,
@@ -622,12 +655,17 @@ function getDaysInMonth(date: Date): (Date | null)[] {
 // Cache de Shoplogix por shift (`${dateKey}__${shiftId}`).
 // Incluye:
 //  - states[] para overlay de pausas (COLACION, MMPP, etc.) sobre el timeline
-//  - shiftStart/End para la coverage bar (ventana real del turno: ~8h)
+//  - scheduledStart/End: horario real derivado de intervals.shift en syncDay
+//    (para docs legacy = igual a shiftStart/End; para syncDay = real de Shoplogix)
+//  - shiftStart/End: mantenidos por backward compat; preferir scheduledStart/End
 //  - breakdown (uptime/break/downtime/setup/plannedDowntime sec) para la justificación
 interface SlxShiftCache {
   states: UpstreamMachineState[]
   shiftStart: Date | null
   shiftEnd: Date | null
+  /** Horario real del turno según Shoplogix (de intervals.shift en syncDay). */
+  scheduledStart: Date | null
+  scheduledEnd: Date | null
   /** Fracción uptime real (0-1) calculada por el normalizer Shoplogix */
   shiftRuntime: number
   /** Productividad total: ciclos / expectedCycles (0..1+) */
@@ -1086,17 +1124,23 @@ export function GraderHistoricalCalendar({
     return () => { cancelled = true }
   }, [selectedKey, historicalByDate]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Lazy-load de Shoplogix states para los 3 candidate shifts del día seleccionado
-  // (yesterday's noche → madrugada, today's día, today's noche). Se usa para
-  // pintar bandas de break/downtime sobre la timeline 24h.
+  // Lazy-load de Shoplogix states para los shifts del día seleccionado.
+  // Carga tanto el formato legado (Turno día/noche) como el nuevo (Turno 1/2/3).
+  // Para Yal con 3 turnos, el Turno 3 de "hoy" corre en 00:00-07:45 del mismo día.
   useEffect(() => {
     if (!selectedKey) return
     const [y, m, d] = selectedKey.split('-').map(Number) as [number, number, number]
     const yesterday = new Date(Date.UTC(y, m - 1, d - 1)).toISOString().slice(0, 10)
     const candidates: Array<{ dateKey: string; shiftId: string }> = [
+      // Formato legado (Chonchi histórico)
       { dateKey: yesterday, shiftId: 'Turno noche' },
       { dateKey: selectedKey, shiftId: 'Turno día' },
       { dateKey: selectedKey, shiftId: 'Turno noche' },
+      // Formato nuevo — syncDay (Turno 1/2/3 reales de Shoplogix)
+      { dateKey: yesterday, shiftId: 'Turno 3' },    // madrugada del día anterior (Yal)
+      { dateKey: selectedKey, shiftId: 'Turno 1' },
+      { dateKey: selectedKey, shiftId: 'Turno 2' },
+      { dateKey: selectedKey, shiftId: 'Turno 3' },  // madrugada de este día
     ]
     let cancelled = false
     for (const c of candidates) {
@@ -1107,36 +1151,37 @@ export function GraderHistoricalCalendar({
           if (cancelled) return
           const m0 = res.snapshot?.machines[0]
           const states = m0?.states ?? []
-          // Total cycles SUMADOS de las 3 Baaders (vs por máquina) — eso es lo
-          // que físicamente entró a la línea Grader.
           const totalCycles = (res.snapshot?.machines ?? []).reduce(
-            (a, m) => a + (m.totalCycles || 0), 0,
+            (a, mc) => a + (mc.totalCycles || 0), 0,
           )
-          // Breakdown del turno (uptime/break/downtime/setup) para coverage bar.
-          // Usamos m0 porque las 3 Baaders suelen tener breakdowns equivalentes.
           const cache: SlxShiftCache = {
             states,
-            shiftStart: m0?.shiftStart ?? null,
-            shiftEnd: m0?.shiftEnd ?? null,
-            shiftRuntime: m0?.shiftRuntime ?? 0,
-            overallRatio: m0?.overallRatio ?? 0,
+            shiftStart:     m0?.shiftStart     ?? null,
+            shiftEnd:       m0?.shiftEnd       ?? null,
+            scheduledStart: m0?.scheduledStart ?? m0?.shiftStart ?? null,
+            scheduledEnd:   m0?.scheduledEnd   ?? m0?.shiftEnd   ?? null,
+            shiftRuntime:   m0?.shiftRuntime   ?? 0,
+            overallRatio:   m0?.overallRatio   ?? 0,
             totalCycles,
             breakdown: m0?.shiftRuntimeBreakdown ? {
-              uptimeSec: m0.shiftRuntimeBreakdown.uptimeSec,
-              breakSec: m0.shiftRuntimeBreakdown.breakSec,
-              downtimeSec: m0.shiftRuntimeBreakdown.downtimeSec,
-              setupSec: m0.shiftRuntimeBreakdown.setupSec,
+              uptimeSec:          m0.shiftRuntimeBreakdown.uptimeSec,
+              breakSec:           m0.shiftRuntimeBreakdown.breakSec,
+              downtimeSec:        m0.shiftRuntimeBreakdown.downtimeSec,
+              setupSec:           m0.shiftRuntimeBreakdown.setupSec,
               plannedDowntimeSec: m0.shiftRuntimeBreakdown.plannedDowntimeSec,
-              totalTrackedSec: m0.shiftRuntimeBreakdown.totalTrackedSec,
+              totalTrackedSec:    m0.shiftRuntimeBreakdown.totalTrackedSec,
             } : null,
           }
           setSlxByShift((prev) => new Map(prev).set(key, cache))
           setSlxTotalsByShift((prev) => new Map(prev).set(key, totalCycles))
         })
         .catch(() => {
-          // Sin Shoplogix data → guardar entry vacía para no re-intentar
           if (!cancelled) {
-            setSlxByShift((prev) => new Map(prev).set(key, { states: [], shiftStart: null, shiftEnd: null, shiftRuntime: 0, overallRatio: 0, totalCycles: 0, breakdown: null }))
+            setSlxByShift((prev) => new Map(prev).set(key, {
+              states: [], shiftStart: null, shiftEnd: null,
+              scheduledStart: null, scheduledEnd: null,
+              shiftRuntime: 0, overallRatio: 0, totalCycles: 0, breakdown: null,
+            }))
             setSlxTotalsByShift((prev) => new Map(prev).set(key, 0))
           }
         })
@@ -1153,9 +1198,11 @@ export function GraderHistoricalCalendar({
     const month = currentMonth.getMonth()
     const daysInMonth = new Date(year, month + 1, 0).getDate()
     let cancelled = false
-    for (let d = 1; d <= daysInMonth; d++) {
-      const dk = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-      for (const shiftId of ['Turno día', 'Turno noche'] as const) {
+    // Carga tanto formato legado (Turno día/noche) como nuevo (Turno 1/2/3)
+    const monthShiftIds = ['Turno día', 'Turno noche', 'Turno 1', 'Turno 2', 'Turno 3']
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dk = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+      for (const shiftId of monthShiftIds) {
         const key = `${dk}__${shiftId}`
         if (slxMonthQueuedRef.current.has(key)) continue
         slxMonthQueuedRef.current.add(key)
@@ -1167,11 +1214,13 @@ export function GraderHistoricalCalendar({
             const cycles = (res.snapshot?.machines ?? []).reduce((a, mc) => a + (mc.totalCycles || 0), 0)
             const cache: SlxShiftCache = {
               states,
-              shiftStart: m0?.shiftStart ?? null,
-              shiftEnd:   m0?.shiftEnd   ?? null,
-              shiftRuntime: m0?.shiftRuntime ?? 0,
-              overallRatio: m0?.overallRatio ?? 0,
-              totalCycles: cycles,
+              shiftStart:     m0?.shiftStart     ?? null,
+              shiftEnd:       m0?.shiftEnd       ?? null,
+              scheduledStart: m0?.scheduledStart ?? m0?.shiftStart ?? null,
+              scheduledEnd:   m0?.scheduledEnd   ?? m0?.shiftEnd   ?? null,
+              shiftRuntime:   m0?.shiftRuntime   ?? 0,
+              overallRatio:   m0?.overallRatio   ?? 0,
+              totalCycles:    cycles,
               breakdown: m0?.shiftRuntimeBreakdown ? {
                 uptimeSec:          m0.shiftRuntimeBreakdown.uptimeSec,
                 breakSec:           m0.shiftRuntimeBreakdown.breakSec,
@@ -1185,11 +1234,12 @@ export function GraderHistoricalCalendar({
             setSlxTotalsByShift((prev) => new Map(prev).set(key, cycles))
           })
           .catch(() => {
-            // Sin datos → entrada vacía para que el UI no quede en loading infinito
             if (!cancelled) {
-              slxMonthQueuedRef.current.delete(key) // permite reintento en siguiente visita
+              slxMonthQueuedRef.current.delete(key) // permite reintento
               setSlxByShift((prev) => new Map(prev).set(key, {
-                states: [], shiftStart: null, shiftEnd: null, shiftRuntime: 0, overallRatio: 0, totalCycles: 0, breakdown: null,
+                states: [], shiftStart: null, shiftEnd: null,
+                scheduledStart: null, scheduledEnd: null,
+                shiftRuntime: 0, overallRatio: 0, totalCycles: 0, breakdown: null,
               }))
               setSlxTotalsByShift((prev) => new Map(prev).set(key, 0))
             }
@@ -1273,9 +1323,16 @@ export function GraderHistoricalCalendar({
     const daysInMonth = new Date(year, month + 1, 0).getDate()
     const result: Array<{ dk: string; day: SlxShiftCache | null; night: SlxShiftCache | null }> = []
     for (let d = 1; d <= daysInMonth; d++) {
-      const dk         = `${prefix}${String(d).padStart(2, '0')}`
-      const dayCache   = slxByShift.get(`${dk}__Turno día`)   ?? null
-      const nightCache = slxByShift.get(`${dk}__Turno noche`) ?? null
+      const dk = `${prefix}${String(d).padStart(2, '0')}`
+      // Buscar cache "día": formato legado primero, luego Turno 2 (syncDay)
+      const dayCache = slxByShift.get(`${dk}__Turno día`)
+        ?? slxByShift.get(`${dk}__Turno 2`)
+        ?? null
+      // Buscar cache "noche": formato legado primero, luego Turno 1 o Turno 3 (syncDay)
+      const nightCache = slxByShift.get(`${dk}__Turno noche`)
+        ?? ([slxByShift.get(`${dk}__Turno 1`), slxByShift.get(`${dk}__Turno 3`)]
+            .filter(Boolean)
+            .sort((a, b) => (b?.totalCycles ?? 0) - (a?.totalCycles ?? 0))[0] ?? null)
       const dayHasData   = (dayCache?.totalCycles   ?? 0) > 0
       const nightHasData = (nightCache?.totalCycles ?? 0) > 0
       if (!dayHasData && !nightHasData) continue

@@ -10,10 +10,12 @@
  */
 
 const { parseShoplogixTime } = require('./time')
-const { CHONCHI_EVISCERADORAS } = require('./machines')
+const { CHONCHI_EVISCERADORAS, YAL_EVISCERADORAS } = require('./machines')
+
+const ALL_MACHINES = [...CHONCHI_EVISCERADORAS, ...YAL_EVISCERADORAS]
 
 function findMachineInfo(machineid) {
-  return CHONCHI_EVISCERADORAS.find(m => m.machineid === machineid)
+  return ALL_MACHINES.find(m => m.machineid === machineid)
 }
 
 function colorFromRatio(ratio, hadExpected, threshold) {
@@ -67,16 +69,28 @@ function normalizeState(raw) {
 
 /**
  * Combina production + summary → documento Firestore para 1 máquina/turno.
+ *
+ * Cambios clave vs v1:
+ * - Los intervals usan el timestamp real del raw data (`raw.start`) en lugar
+ *   de `shiftStart + i * 5min`. Esto garantiza posición correcta aunque la
+ *   ventana de consulta no empiece exactamente en el inicio del turno.
+ * - Los states se filtran al rango [shiftStartAt, shiftEndAt] cuando ambos
+ *   son válidos. Necesario para queries full-day (un estado de 8h abarca
+ *   múltiples turnos; solo queremos el segmento de este turno).
+ * - Se escriben scheduledStart, scheduledEnd, scheduleSource para que el
+ *   frontend pueda posicionar bloques sin depender de computeEffectiveWindow.
  */
-function normalizeShift({ production, summary, dateKey, shiftId, intervalMs, syncedAt, shiftStartAt, shiftEndAt }) {
+function normalizeShift({ production, summary, dateKey, shiftId, intervalMs, syncedAt, shiftStartAt, shiftEndAt, scheduleSource }) {
   if (production.machineId !== summary.machineId) {
     throw new Error(`[normalizer] machineId mismatch ${production.machineId} vs ${summary.machineId}`)
   }
   const iMs = intervalMs || 5 * 60 * 1000
   const threshold = summary.threshold ?? production.threshold ?? 15
-  // Preferir shiftStart/End explícitos (pasados por sync.js) — el field
+
+  // Preferir shiftStart/End explícitos (derivados de intervals en syncDay,
+  // o de la ventana hardcodeada en syncShift legacy). El field
   // `currentShiftStart` del API apunta al turno EN CURSO al hacer la consulta,
-  // NO al turno consultado, por lo que en backfill histórico es incorrecto.
+  // NO al turno consultado.
   const shiftStart = shiftStartAt
     ? new Date(shiftStartAt)
     : parseShoplogixTime(summary.currentShiftStart || production.currentShiftStart)
@@ -84,8 +98,13 @@ function normalizeShift({ production, summary, dateKey, shiftId, intervalMs, syn
     ? new Date(shiftEndAt)
     : parseShoplogixTime(summary.currentShiftEnd || production.currentShiftEnd)
 
-  const intervals = (production.machineProduction || []).map((raw, i) => {
-    const intervalStart = new Date(shiftStart.getTime() + i * iMs)
+  // Usar timestamps reales del raw data en lugar de shiftStart + i*5min.
+  // raw.start es wall-clock-as-UTC (ej. "20260226T090000.000") — parseShoplogixTime
+  // lo convierte a Date con esos valores como UTC, coherente con el resto del sistema.
+  const intervals = (production.machineProduction || []).map((raw) => {
+    const intervalStart = raw.start
+      ? parseShoplogixTime(raw.start)
+      : new Date(shiftStart.getTime() + ((production.machineProduction || []).indexOf(raw)) * iMs)
     return normalizeInterval(raw, intervalStart, threshold)
   })
 
@@ -96,7 +115,17 @@ function normalizeShift({ production, summary, dateKey, shiftId, intervalMs, syn
   const expectedTotalPieces = last?.expectedTotal ?? 0
   const overallRatio = expectedTotalCycles > 0 ? totalCycles / expectedTotalCycles : 0
 
-  const states = (summary.machineStates || []).map(normalizeState)
+  // Mapear todos los states del summary y filtrar al rango del turno.
+  // Cuando la consulta es full-day, el summary contiene states de TODOS los turnos;
+  // solo queremos los que pertenecen a este turno (solapan con [shiftStart, shiftEnd]).
+  const MIN_VALID_TS = 86_400_000
+  const ssValid = shiftStart.getTime() > MIN_VALID_TS
+  const seValid = shiftEnd.getTime()   > MIN_VALID_TS
+
+  const allStates = (summary.machineStates || []).map(normalizeState)
+  const states = ssValid && seValid
+    ? allStates.filter(s => s.endAt.getTime() > shiftStart.getTime() && s.startAt.getTime() < shiftEnd.getTime())
+    : allStates
 
   // "Planned Downtime" (type='break', reason contains 'planned downtime') =
   // período POST-TURNO capturado por la ventana de consulta. Debe excluirse
@@ -128,7 +157,13 @@ function normalizeShift({ production, summary, dateKey, shiftId, intervalMs, syn
     machineType,
     dateKey,
     shiftId,
-    shiftStart, shiftEnd,
+    shiftStart,
+    shiftEnd,
+    // scheduledStart/End: horario real del turno según Shoplogix (derivado de
+    // intervals.shift field en syncDay, o igual a shiftStart/End en syncShift legacy).
+    scheduledStart: shiftStart,
+    scheduledEnd:   shiftEnd,
+    scheduleSource: scheduleSource || 'legacy',
     totalCycles,
     expectedTotalCycles,
     totalPieces,
@@ -145,7 +180,7 @@ function normalizeShift({ production, summary, dateKey, shiftId, intervalMs, syn
     productionUnit: summary.productionUnits || production.productionUnits || '',
     comments: [...(summary.comments || []), ...(production.comments || [])],
     source: 'shoplogix',
-    sourceVersion: 1,
+    sourceVersion: 2,
     syncedAt: syncedAt || new Date(),
   }
 }

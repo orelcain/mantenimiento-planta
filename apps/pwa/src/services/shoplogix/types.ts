@@ -135,9 +135,19 @@ export interface UpstreamMachineShift {
   machineName: string;
   machineType: UpstreamMachineInfo['type'];
   dateKey: string;             // "2026-02-26"
-  shiftId: string;             // "Turno día" | "Turno noche"
+  shiftId: string;             // "Turno día" | "Turno noche" | "Turno 1" | "Turno 2" | "Turno 3"
   shiftStart: Date;
   shiftEnd: Date;
+  /**
+   * Horario real del turno derivado del campo `shift` en los intervalos de producción.
+   * En docs syncDay (scheduleSource='intervals'): refleja el horario real de Shoplogix.
+   * En docs legacy (scheduleSource='legacy'): igual a shiftStart/End (bounds de consulta).
+   * Usar scheduledStart/End para posicionar bloques en el timeline.
+   * Opcionales por backward compat — ausentes en docs v1 (deserializeShift usa shiftStart/End como fallback).
+   */
+  scheduledStart?: Date;
+  scheduledEnd?: Date;
+  scheduleSource?: 'intervals' | 'legacy';
 
   // Agregados (calculados en normalizer)
   totalCycles: number;

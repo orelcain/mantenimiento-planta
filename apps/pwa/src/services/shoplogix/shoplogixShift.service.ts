@@ -158,6 +158,12 @@ function deserializeShift(raw: FirestoreData): UpstreamMachineShift {
     ? breakdown.uptimeSec / productiveSec
     : 0
 
+  // scheduledStart/End: horario real del turno derivado de intervals.shift en syncDay.
+  // En docs legacy (scheduleSource='legacy') coincide con shiftStart/End (bounds de consulta).
+  // En docs nuevos (scheduleSource='intervals') refleja el horario real de Shoplogix.
+  const scheduledStart = raw.scheduledStart != null ? toDateSafe(raw.scheduledStart) : shiftStart
+  const scheduledEnd   = raw.scheduledEnd   != null ? toDateSafe(raw.scheduledEnd)   : shiftEnd
+
   return {
     machineid:           String(raw.machineid ?? ''),
     machineName:         String(raw.machineName ?? ''),
@@ -166,6 +172,9 @@ function deserializeShift(raw: FirestoreData): UpstreamMachineShift {
     shiftId:             String(raw.shiftId ?? ''),
     shiftStart,
     shiftEnd,
+    scheduledStart,
+    scheduledEnd,
+    scheduleSource:      String(raw.scheduleSource ?? 'legacy') as 'intervals' | 'legacy',
     totalCycles:         Number(raw.totalCycles ?? 0),
     expectedTotalCycles: Number(raw.expectedTotalCycles ?? 0),
     totalPieces:         Number(raw.totalPieces ?? 0),
