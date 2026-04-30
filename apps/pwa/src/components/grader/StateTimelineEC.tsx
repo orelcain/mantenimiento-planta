@@ -1,14 +1,17 @@
 /**
  * StateTimelineEC — Gantt de estados Baader (ECharts).
  *
- * TOOLTIP: usa trigger:'axis' igual que ProductionRateLineEC (probado y estable).
- * El trigger:'item' y los overlays React fallan porque setHover() → re-render →
- * ReactECharts re-enlaza onEvents → ECharts dispara mouseout falso → tooltip muerto.
- * Con trigger:'axis' ECharts gestiona show/hide según posición del axisPointer,
- * completamente al margen de los re-renders del TimelineSyncContext.
+ * TOOLTIP: trigger:'item' directo sobre los rects de la custom series.
+ * El formatter usa params.dataIndex para resolver el estado (sin axisValue).
  *
- * SINCRONIZACIÓN: onMouseMove React en el wrapper div (no evento ECharts) para
- * llamar setHover() sin interferir con el tooltip nativo de ECharts.
+ * AISLAMIENTO echarts.connect(): el componente usa myHoverId como group ID,
+ * quedando aislado del grupo principal del contexto. Esto evita que hideTip /
+ * showTip de ProductionRateLineEC o ProductionBarsEC destruyan el tooltip local
+ * (echarts.connect() propaga hideTip a todo el grupo automáticamente).
+ * El cross-chart sync se hace 100% via TimelineSyncContext, no via connect().
+ *
+ * SINCRONIZACIÓN: onMouseMove React en el wrapper div para llamar setHover()
+ * sin añadir handlers ECharts que causarían re-bind de onEvents.
  */
 
 import { useCallback, useEffect, useId, useMemo, useRef } from 'react'
@@ -31,7 +34,9 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
   const echartsRef = useRef<any>(null)
   const myHoverId  = useId()
   const timelineSync = useTimelineSyncOptional()
-  const onChartReady = useChartReadyConnect(timelineSync?.connectGroupId ?? '__no-sync__')
+  // Aislado del grupo principal: cada instancia usa su propio group ID.
+  // Esto evita que hideTip propagado por echarts.connect() destruya el tooltip.
+  const onChartReady = useChartReadyConnect(myHoverId)
 
   // Refs estables para callbacks sin deps cambiantes
   const timelineSyncRef = useRef(timelineSync)
@@ -155,8 +160,7 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
   const interactive = !!onStateClick
 
   // ── Opción ECharts ──────────────────────────────────────────────────────────
-  // shift.states incluido en deps para que el formatter del tooltip tenga la
-  // versión más actualizada (cambia solo al cargar un nuevo turno, no en hover).
+  // shift.states en deps: formatter usa shift.states[dataIndex] (solo cambia al cargar nuevo turno).
   const option = useMemo(() => ({
     backgroundColor: 'transparent',
     grid: { left: 0, right: 0, top: 0, bottom: 0, containLabel: false },
@@ -177,12 +181,12 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
       axisLabel: { show: false },
       splitLine: { show: false },
     },
-    // trigger:'axis' — mismo patrón que ProductionRateLineEC (estable, no depende
-    // de hit-detection sobre rects delgados). El formatter resuelve el estado
-    // usando axisValue sin necesidad de React state.
+    // trigger:'item' — el formatter recibe dataIndex del rect hovered.
+    // Más confiable que trigger:'axis' para custom series con rects pequeños.
+    // El chart está aislado de echarts.connect() (ver constructor) para que
+    // hideTip/showTip de otros charts no interfieran.
     tooltip: {
-      trigger: 'axis' as const,
-      axisPointer: { type: 'none' as const },  // línea gestionada por externalHoverMs
+      trigger: 'item' as const,
       backgroundColor: '#1f2937',
       borderColor: '#374151',
       textStyle: { color: '#f9fafb', fontSize: 11 },
@@ -190,22 +194,10 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
       confine: true,
       hideDelay: 800,
       formatter: (params: any) => {
-        // Para trigger:'axis' con time-axis, params[0].axisValue es el ms del cursor
-        const p = Array.isArray(params) ? params[0] : params
-        if (!p) return ''
-        const axisMs: number | null =
-          typeof p.axisValue === 'number'     ? p.axisValue
-          : typeof p.axisValue === 'string'   ? new Date(p.axisValue).getTime()
-          : p.axisValue instanceof Date       ? p.axisValue.getTime()
-          : null
-        if (axisMs == null || !Number.isFinite(axisMs)) return ''
-
-        // Buscar el estado que contiene este instante
-        const st = shift.states.find(
-          (s) => axisMs >= s.startAt.getTime() && axisMs <= s.endAt.getTime(),
-        )
-        if (!st) return ''
-
+        // trigger:'item': params.dataIndex = índice del rect hovered
+        const idx = typeof params?.dataIndex === 'number' ? params.dataIndex : -1
+        if (idx < 0 || idx >= shift.states.length) return ''
+        const st = shift.states[idx]!
         const color     = slxStateColor(st.type, st.reason, st.color)
         const cause     = st.reason || st.name
         const typeLabel = st.type === 'uptime'    ? 'Produciendo'
@@ -249,7 +241,6 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
         },
         encode: { x: [0, 1], y: -1 },
         data: seriesData,
-        tooltip: { show: false },  // tooltip manejado por la serie auxiliar abajo
         markLine: lotMarkLines.length > 0 ? {
           silent: true,
           symbol: 'none',
@@ -257,11 +248,8 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
           z: 5,
         } : undefined,
       },
-      // Serie auxiliar invisible: activa trigger:'axis' en todo el ancho del turno.
-      // Sin esta, ECharts no dispara el tooltip con trigger:'axis' para custom series.
-      // CRÍTICO: NO poner tooltip.show:false aquí. Si todos los series tienen show:false,
-      // ECharts omite llamar al formatter aunque trigger:'axis' esté configurado.
-      // El formatter ignora el valor de esta serie (usa axisValue del eje X directamente).
+      // Serie auxiliar invisible solo para axisPointer cross-chart (crosshair).
+      // No se usa para tooltip (trigger:'item' lo maneja directamente).
       {
         type: 'line' as const,
         data: [
@@ -273,13 +261,14 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
         showSymbol:  false,
         silent:      true,
         z:           -1,
+        tooltip:     { show: false },
       },
     ],
   // shift.states en deps: el formatter lo necesita actualizado (solo cambia al cargar nuevo turno)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [rangeStart, rangeEnd, seriesData, height, lotMarkLines, interactive, shift.states])
 
-  // onEvents mínimo y estable (sin mouse* para no interferir con trigger:'axis')
+  // onEvents mínimo y estable: solo datazoom + click, sin mouse* que causarían re-bind
   const onEvents = useMemo(() => ({
     datazoom: onDataZoom,
     click:    onClick,
