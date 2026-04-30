@@ -545,7 +545,8 @@ export interface PauseDetectorConfig {
 }
 
 export interface GraderModuleConfig {
-  id: 'global';
+  /** Identificador del documento Firestore ('global' para Chonchi, 'yal-eviscerado' para Yal, etc.) */
+  id: string;
   customWeightRanges: CalibreWeightRange[];
   shiftSchedule?: GraderShiftSchedule[];
   /** Configuración física de la máquina grader */
