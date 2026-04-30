@@ -1269,53 +1269,95 @@ export function GraderHistoricalCalendar({
     let cancelled = false
     // Carga tanto formato legado (Turno día/noche) como nuevo (Turno 1/2/3)
     const monthShiftIds = ['Turno día', 'Turno noche', 'Turno 1', 'Turno 2', 'Turno 3']
+
+    // Helper: carga un shift y actualiza el estado
+    const loadOne = (dk: string, shiftId: string, forceServer: boolean) => {
+      const key = `${dk}__${shiftId}`
+      return loadShoplogixShift(dk, shiftId, plantSlug, forceServer)
+        .then((res) => {
+          if (cancelled) return
+          const m0 = res.snapshot?.machines[0]
+          const states = m0?.states ?? []
+          const cycles = (res.snapshot?.machines ?? []).reduce((a, mc) => a + (mc.totalCycles || 0), 0)
+          const cache: SlxShiftCache = {
+            states,
+            shiftStart:     m0?.shiftStart     ?? null,
+            shiftEnd:       m0?.shiftEnd       ?? null,
+            scheduledStart: m0?.scheduledStart ?? m0?.shiftStart ?? null,
+            scheduledEnd:   m0?.scheduledEnd   ?? m0?.shiftEnd   ?? null,
+            shiftRuntime:   m0?.shiftRuntime   ?? 0,
+            overallRatio:   m0?.overallRatio   ?? 0,
+            totalCycles:    cycles,
+            breakdown: m0?.shiftRuntimeBreakdown ? {
+              uptimeSec:          m0.shiftRuntimeBreakdown.uptimeSec,
+              breakSec:           m0.shiftRuntimeBreakdown.breakSec,
+              downtimeSec:        m0.shiftRuntimeBreakdown.downtimeSec,
+              setupSec:           m0.shiftRuntimeBreakdown.setupSec,
+              plannedDowntimeSec: m0.shiftRuntimeBreakdown.plannedDowntimeSec,
+              totalTrackedSec:    m0.shiftRuntimeBreakdown.totalTrackedSec,
+            } : null,
+          }
+          setSlxByShift((prev)       => new Map(prev).set(key, cache))
+          setSlxTotalsByShift((prev) => new Map(prev).set(key, cycles))
+          return cycles
+        })
+        .catch(() => {
+          if (!cancelled) {
+            slxMonthQueuedRef.current.delete(key) // permite reintento
+            setSlxByShift((prev) => new Map(prev).set(key, {
+              states: [], shiftStart: null, shiftEnd: null,
+              scheduledStart: null, scheduledEnd: null,
+              shiftRuntime: 0, overallRatio: 0, totalCycles: 0, breakdown: null,
+            }))
+            setSlxTotalsByShift((prev) => new Map(prev).set(key, 0))
+          }
+          return 0
+        })
+    }
+
+    // Pase 1 — carga desde cache (rápido): dispara todos en paralelo
+    const staleKeys: string[] = []  // claves con 0 ciclos en datos recientes
+    const today = new Date()
+    const cutoffDays = 45 // revisar contra servidor si el dato tiene < 45 días
+    const cutoffMs = today.getTime() - cutoffDays * 86_400_000
+
     for (let day = 1; day <= daysInMonth; day++) {
       const dk = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+      const dkMs = new Date(`${dk}T12:00:00`).getTime()
       for (const shiftId of monthShiftIds) {
         const key = `${dk}__${shiftId}`
         if (slxMonthQueuedRef.current.has(key)) continue
         slxMonthQueuedRef.current.add(key)
-        loadShoplogixShift(dk, shiftId, plantSlug)
-          .then((res) => {
-            if (cancelled) return
-            const m0 = res.snapshot?.machines[0]
-            const states = m0?.states ?? []
-            const cycles = (res.snapshot?.machines ?? []).reduce((a, mc) => a + (mc.totalCycles || 0), 0)
-            const cache: SlxShiftCache = {
-              states,
-              shiftStart:     m0?.shiftStart     ?? null,
-              shiftEnd:       m0?.shiftEnd       ?? null,
-              scheduledStart: m0?.scheduledStart ?? m0?.shiftStart ?? null,
-              scheduledEnd:   m0?.scheduledEnd   ?? m0?.shiftEnd   ?? null,
-              shiftRuntime:   m0?.shiftRuntime   ?? 0,
-              overallRatio:   m0?.overallRatio   ?? 0,
-              totalCycles:    cycles,
-              breakdown: m0?.shiftRuntimeBreakdown ? {
-                uptimeSec:          m0.shiftRuntimeBreakdown.uptimeSec,
-                breakSec:           m0.shiftRuntimeBreakdown.breakSec,
-                downtimeSec:        m0.shiftRuntimeBreakdown.downtimeSec,
-                setupSec:           m0.shiftRuntimeBreakdown.setupSec,
-                plannedDowntimeSec: m0.shiftRuntimeBreakdown.plannedDowntimeSec,
-                totalTrackedSec:    m0.shiftRuntimeBreakdown.totalTrackedSec,
-              } : null,
-            }
-            setSlxByShift((prev)       => new Map(prev).set(key, cache))
-            setSlxTotalsByShift((prev) => new Map(prev).set(key, cycles))
-          })
-          .catch(() => {
-            if (!cancelled) {
-              slxMonthQueuedRef.current.delete(key) // permite reintento
-              setSlxByShift((prev) => new Map(prev).set(key, {
-                states: [], shiftStart: null, shiftEnd: null,
-                scheduledStart: null, scheduledEnd: null,
-                shiftRuntime: 0, overallRatio: 0, totalCycles: 0, breakdown: null,
-              }))
-              setSlxTotalsByShift((prev) => new Map(prev).set(key, 0))
-            }
-          })
+        // Cache-first; cuando resuelve, si era reciente y quedó en 0 → marcar para reintento
+        loadOne(dk, shiftId, false).then((cycles) => {
+          if (!cancelled && cycles === 0 && dkMs >= cutoffMs) {
+            staleKeys.push(key)
+          }
+        })
       }
     }
-    return () => { cancelled = true }
+
+    // Pase 2 — reintento servidor para entradas recientes con 0 ciclos.
+    // Se ejecuta 3 s después (deja que el pase 1 termine) en lotes de 8
+    // para no saturar la conexión Firestore con 150 RPCs simultáneas.
+    const timer = setTimeout(async () => {
+      if (cancelled || staleKeys.length === 0) return
+      const BATCH = 8
+      for (let i = 0; i < staleKeys.length; i += BATCH) {
+        if (cancelled) break
+        const batch = staleKeys.slice(i, i + BATCH)
+        await Promise.all(batch.map((key) => {
+          const [dk, shiftId] = key.split('__') as [string, string]
+          // Forzar desde servidor — bypass IndexedDB cache
+          return loadOne(dk, shiftId, true)
+        }))
+      }
+    }, 3000)
+
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
   }, [currentMonth, plantSlug]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Stats mensuales Shoplogix — calcula solo para el mes visible.
