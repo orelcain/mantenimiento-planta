@@ -545,8 +545,17 @@ function buildDayTimelineBlocks(
     const hasNewDay   = allShiftIdsForDay.has('Turno 2')
     const hasNewNight = allShiftIdsForDay.has('Turno 1') || allShiftIdsForDay.has('Turno 3')
 
+    // Colores por turno para distinguir visualmente la posición en el día
+    const shiftBg: Record<string, string> = {
+      'Turno 1':    'bg-indigo-500/40',   // madrugada
+      'Turno 2':    'bg-amber-500/40',    // día
+      'Turno 3':    'bg-teal-500/40',     // tarde-noche
+      'Turno día':  'bg-amber-500/40',    // legado día
+      'Turno noche':'bg-indigo-500/40',   // legado noche
+    }
+
     // Recolectar todos los shifts de este día con datos válidos
-    const dayShifts: Array<{ shiftId: string; startMs: number; endMs: number }> = []
+    const dayShifts: Array<{ shiftId: string; startMs: number; endMs: number; isGhost?: boolean }> = []
     for (const [mapKey, slx] of slxData.entries()) {
       if (!mapKey.startsWith(`${slideKey}__`)) continue
       if ((slx.totalCycles ?? 0) === 0) continue
@@ -579,6 +588,20 @@ function buildDayTimelineBlocks(
     // Ordenar por inicio — garantiza orden coherente en el timeline
     dayShifts.sort((a, b) => a.startMs - b.startMs)
 
+    // Ghost block: si existen docs nuevo formato y Turno 1 está vacío,
+    // añadirlo como bloque fantasma entre el fin de Turno 3 y el inicio de Turno 2.
+    const hasTurno2 = dayShifts.some(s => s.shiftId === 'Turno 2')
+    const hasTurno1 = dayShifts.some(s => s.shiftId === 'Turno 1')
+    if (hasTurno2 && !hasTurno1) {
+      const turno2  = dayShifts.find(s => s.shiftId === 'Turno 2')!
+      const turno3  = dayShifts.find(s => s.shiftId === 'Turno 3')
+      const ghostStart = turno3 ? turno3.endMs : dayStartMs
+      if (turno2.startMs - ghostStart > 15 * 60_000) {
+        dayShifts.push({ shiftId: 'Turno 1', startMs: ghostStart, endMs: turno2.startMs, isGhost: true })
+        dayShifts.sort((a, b) => a.startMs - b.startMs)
+      }
+    }
+
     for (const shift of dayShifts) {
       // Clamp al día visible (00:00-24:00)
       const visStart = Math.max(shift.startMs, dayStartMs)
@@ -591,21 +614,25 @@ function buildDayTimelineBlocks(
       if (shift.endMs >= dayEndMs - 1) endFrac = 1
       if (endFrac <= startFrac) endFrac = Math.min(1, startFrac + 0.02)
 
-      // Etiqueta: "D" para día/Turno 2, "N" para noche/Turno 1/3, "Tx" para resto
-      const label = shift.shiftId === 'Turno día' || shift.shiftId === 'Turno 2' ? 'D'
-        : shift.shiftId === 'Turno noche' || shift.shiftId === 'Turno 1' || shift.shiftId === 'Turno 3' ? 'N'
-        : shift.shiftId.replace('Turno ', 'T')
+      const label = shift.shiftId   // nombre completo: "Turno 1", "Turno 2", etc.
 
       const ts = `${fracToHHMM(startFrac)}–${fracToHHMM(endFrac)}`
       const nightSide = (shift.shiftId === 'Turno noche' || shift.shiftId === 'Turno 3')
         ? (startFrac === 0 ? 'start' : 'end') : null
 
+      const baseBg = shiftBg[shift.shiftId] ?? 'bg-sky-500/40'
+      const bgClass = shift.isGhost
+        ? baseBg.replace('/40', '/15') + ' border border-dashed border-current opacity-60'
+        : baseBg
+
       blocks.push({
         leftPct:      startFrac * 100,
         widthPct:     (endFrac - startFrac) * 100,
-        bgClass:      'bg-sky-500/40',
+        bgClass,
         label,
-        title:        `${shift.shiftId} · Shoplogix · ${ts} · sin Excel cargado`,
+        title:        shift.isGhost
+          ? `${shift.shiftId} · sin datos Shoplogix · ${ts}`
+          : `${shift.shiftId} · Shoplogix · ${ts} · sin Excel cargado`,
         nightSide,
         summaryId:    '',
         dateKey:      slideKey,
@@ -614,7 +641,7 @@ function buildDayTimelineBlocks(
         startTimeStr: fracToHHMM(startFrac),
         endTimeStr:   fracToHHMM(endFrac),
         p0Pct:        null,
-        isShoplogixOnly: true,
+        isShoplogixOnly: !shift.isGhost,
       })
     }
   }
@@ -2565,7 +2592,13 @@ export function GraderHistoricalCalendar({
                             }}
                             onMouseEnter={() => setHoveredFragId(b.fragId)}
                             onMouseLeave={() => setHoveredFragId(null)}
-                          />
+                          >
+                            {b.label && (
+                              <span className="absolute inset-x-0.5 top-0.5 text-[7px] font-semibold leading-none truncate text-white/70 pointer-events-none select-none">
+                                {b.label}
+                              </span>
+                            )}
+                          </div>
                         )
                       })}
                     </div>
