@@ -3067,6 +3067,7 @@ exports.setupTelegramTopics = onRequest({ region: 'us-central1' }, async (req, r
 const shoplogixSyncMod  = require('./shoplogix/sync')
 const shoplogixPolling  = require('./shoplogix/polling')
 const shoplogixTokenStore = require('./shoplogix/tokenStore')
+const shoplogixClient   = require('./shoplogix/client')
 
 // ── Helpers de auth Shoplogix ──────────────────────────────────────────────
 
@@ -3325,6 +3326,157 @@ exports.shoplogixSyncNow = onCall(
       logger.error('[shoplogixSyncNow] error', { err: err.message })
       throw new HttpsError('internal', err.message ?? 'Error desconocido')
     }
+  },
+)
+
+/**
+ * Cleanup HTTP — borra docs legacy de Shoplogix (`{dateKey}_Turno día` /
+ * `{dateKey}_Turno noche`) y sus subcollections `machines/*` para un rango
+ * de fechas. Útil cuando syncDay re-sincroniza con la convención nueva
+ * (Turno 1/2/3) y los docs legacy quedan huérfanos contaminando
+ * sortedDayKeys / slxByShift en el frontend.
+ *
+ * Uso: GET https://.../shoplogixCleanupLegacy?plantSlug=yal&from=2026-04-26&to=2026-04-29
+ *
+ * Nota: NO toca docs nuevos (Turno 1/2/3). Solo `Turno día` y `Turno noche`.
+ */
+exports.shoplogixCleanupLegacy = onRequest(
+  {
+    region: 'us-central1',
+    timeoutSeconds: 120,
+    memory: '256MiB',
+    cors: ALLOWED_ORIGINS,
+  },
+  async (req, res) => {
+    const { plantSlug = 'chonchi', from, to } = req.query || {}
+    if (!from || !to) {
+      res.status(400).json({ error: 'BAD_REQUEST', message: 'Requiere from=YYYY-MM-DD y to=YYYY-MM-DD' })
+      return
+    }
+    const fromDate = new Date(`${from}T00:00:00Z`)
+    const toDate   = new Date(`${to}T00:00:00Z`)
+    if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime()) || fromDate > toDate) {
+      res.status(400).json({ error: 'BAD_REQUEST', message: 'from/to inválido o invertido' })
+      return
+    }
+
+    const dateKeys = []
+    for (let d = new Date(fromDate); d <= toDate; d.setUTCDate(d.getUTCDate() + 1)) {
+      const y = d.getUTCFullYear()
+      const m = String(d.getUTCMonth() + 1).padStart(2, '0')
+      const day = String(d.getUTCDate()).padStart(2, '0')
+      dateKeys.push(`${y}-${m}-${day}`)
+    }
+
+    const legacyShiftIds = ['Turno día', 'Turno noche']
+    const deleted = []
+    let totalMachines = 0
+
+    try {
+      for (const dateKey of dateKeys) {
+        for (const shiftId of legacyShiftIds) {
+          const shiftDocPath = `shoplogix/${plantSlug}/shifts/${dateKey}_${shiftId}`
+          const shiftRef = db.doc(shiftDocPath)
+          const shiftSnap = await shiftRef.get()
+
+          // Borrar machines/* (subcollection) si existe
+          const machinesSnap = await shiftRef.collection('machines').get()
+          const machinesCount = machinesSnap.size
+          if (machinesCount > 0) {
+            const batch = db.batch()
+            machinesSnap.docs.forEach((m) => batch.delete(m.ref))
+            await batch.commit()
+            totalMachines += machinesCount
+          }
+
+          if (shiftSnap.exists) {
+            await shiftRef.delete()
+            deleted.push({ dateKey, shiftId, machines: machinesCount })
+          } else if (machinesCount > 0) {
+            // Caso raro: parent no existe pero tenía machines
+            deleted.push({ dateKey, shiftId, machines: machinesCount, parentMissing: true })
+          }
+        }
+      }
+
+      logger.info('[shoplogixCleanupLegacy] OK', { plantSlug, from, to, deletedDocs: deleted.length, totalMachines })
+      res.json({ ok: true, plantSlug, from, to, deletedDocs: deleted.length, totalMachineDocs: totalMachines, deleted })
+    } catch (err) {
+      logger.error('[shoplogixCleanupLegacy] error', { err: err.message, stack: err.stack })
+      res.status(500).json({ error: err.message })
+    }
+  },
+)
+
+/**
+ * Probe HTTP — diagnostica qué endpoints query.axd tiene Shoplogix con
+ * data útil de schedule/horario de turno (no solo intervals con `iv.shift`).
+ *
+ * Prueba una lista de `type=` candidatos. Para cada uno reporta status y
+ * los primeros ~600 chars del response, para inspeccionar manualmente y
+ * decidir cuál usar en `syncDay` para `scheduledStart/End` reales.
+ *
+ * Uso: GET https://.../shoplogixProbe?plantSlug=yal&dateKey=2026-04-29
+ */
+exports.shoplogixProbe = onRequest(
+  {
+    secrets: ['SHOPLOGIX_COOKIE'],
+    region: 'us-central1',
+    timeoutSeconds: 120,
+    memory: '256MiB',
+    cors: ALLOWED_ORIGINS,
+  },
+  async (req, res) => {
+    const auth = await resolveShoplogixAuth(logger)
+    if (auth.mode === 'none') {
+      res.status(500).json({ error: 'NO_AUTH' })
+      return
+    }
+    const { plantSlug = 'yal', dateKey } = req.query || {}
+    const dk = dateKey || (() => {
+      const d = new Date()
+      const chile = new Date(d.getTime() - 3 * 3600 * 1000)
+      return `${chile.getUTCFullYear()}-${String(chile.getUTCMonth() + 1).padStart(2, '0')}-${String(chile.getUTCDate()).padStart(2, '0')}`
+    })()
+
+    // Una máquina de Yal para probar params específicos por máquina
+    const machineid = (require('./shoplogix/machines').PLANT_MACHINES[plantSlug] || [])[0]?.machineid
+    const start = `${dk.replace(/-/g, '')}T080000.000`
+    const end   = (() => {
+      const [y, m, d] = dk.split('-').map(Number)
+      const next = new Date(Date.UTC(y, m - 1, d + 1))
+      const nextKey = `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, '0')}-${String(next.getUTCDate()).padStart(2, '0')}`
+      return `${nextKey.replace(/-/g, '')}T080000.000`
+    })()
+
+    // Lista de candidatos a explorar
+    const candidates = [
+      { type: 'tree' },
+      { type: 'whiteboardshifts',   params: { machines: machineid, start, end } },
+      { type: 'whiteboardshift',    params: { machines: machineid, start, end } },
+      { type: 'shifts',             params: { start, end } },
+      { type: 'shift',              params: { start, end } },
+      { type: 'schedule',           params: { machines: machineid, start, end } },
+      { type: 'whiteboardschedule', params: { machines: machineid, start, end } },
+      { type: 'shiftschedule',      params: { machines: machineid, start, end } },
+      { type: 'whiteboardplan',     params: { machines: machineid, start, end } },
+      { type: 'plan',               params: { machines: machineid, start, end } },
+      { type: 'whiteboardproduction', params: { machines: machineid, start, end, minutes: 60 } },
+    ]
+
+    const results = []
+    for (const c of candidates) {
+      try {
+        const data = auth.accessToken
+          ? await shoplogixClient.queryShoplogixBearer({ accessToken: auth.accessToken, type: c.type, params: c.params || {} })
+          : await shoplogixClient.queryShoplogix({ cookie: auth.cookie, type: c.type, params: c.params || {} })
+        const json = JSON.stringify(data)
+        results.push({ type: c.type, status: 'ok', size: json.length, preview: json.slice(0, 800) })
+      } catch (err) {
+        results.push({ type: c.type, status: 'err', error: (err.message || '').slice(0, 200) })
+      }
+    }
+    res.json({ plantSlug, dateKey: dk, machineid, start, end, authMode: auth.mode, results })
   },
 )
 
