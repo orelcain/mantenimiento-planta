@@ -7,6 +7,7 @@
  */
 
 import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
+import type { GraderShiftSchedule } from '@/services/grader/types'
 
 export type PlantLineId =
   | 'chonchi-eviscerado'  // Planta Principal — 3 Baaders 142
@@ -27,6 +28,12 @@ export interface PlantLineConfig {
   shoplogixEnabled: boolean
   /** Si true, el tab se renderiza pero está deshabilitado (proximamente) */
   comingSoon?: boolean
+  /**
+   * Horarios de turno por defecto para esta planta.
+   * Si se omite, se usa DEFAULT_SHIFT_SCHEDULE (Chonchi: día 07-19, noche 19-07).
+   * Se usa como fallback cuando no hay config guardada en Firestore para la planta.
+   */
+  defaultShiftSchedule?: GraderShiftSchedule[]
 }
 
 export const PLANT_LINES: readonly PlantLineConfig[] = [
@@ -45,6 +52,14 @@ export const PLANT_LINES: readonly PlantLineConfig[] = [
     plantSlug: 'yal',
     hasGraderData: true,   // El Excel de la Grader Yal tiene el mismo formato
     shoplogixEnabled: true,
+    // Yal opera con horario distinto a Chonchi:
+    //   Turno día:   07:00 – 14:45
+    //   Turno noche: 14:45 – 00:00 (no cruza medianoche)
+    // Confirmado en Shoplogix: "Turno 2 — 14:45 a 00:00" (29 Apr 2026)
+    defaultShiftSchedule: [
+      { shiftId: 'Turno día',   startHour: 7,  startMinute: 0,  endHour: 14, endMinute: 45 },
+      { shiftId: 'Turno noche', startHour: 14, startMinute: 45, endHour: 0,  endMinute: 0  },
+    ],
   },
   {
     id: 'chonchi-filete',

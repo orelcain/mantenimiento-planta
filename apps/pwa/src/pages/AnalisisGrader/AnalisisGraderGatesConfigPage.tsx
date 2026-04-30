@@ -20,6 +20,7 @@ import {
   type GatesTemplate,
 } from '@/services/grader/graderSession.service'
 import { getModuleRanges, saveModulePhysicalConfig, saveModuleShiftSchedule } from '@/services/grader/graderModuleConfig.service'
+import { getPlantLineConfig, DEFAULT_PLANT_LINE_ID, type PlantLineId } from '@/config/plantLines'
 import { saveShiftCalibreRanges, saveShiftThresholds } from '@/services/grader/graderShifts.service'
 import { saveConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
 import { listDailySummariesByRange } from '@/services/grader/graderDailySummary.service'
@@ -126,6 +127,9 @@ export function AnalisisGraderGatesConfigPage({
   onShiftThresholdsSaved,
 }: Props) {
   const [searchParams, setSearchParams] = useSearchParams()
+  // Planta activa desde URL ?linea= (mismo param que LandingPage)
+  const plantLineId: PlantLineId = (searchParams.get('linea') as PlantLineId | null) ?? DEFAULT_PLANT_LINE_ID
+  const plantLineConfig = getPlantLineConfig(plantLineId)
   const [gates, setGates] = useState<GateAssignment[]>(initialGates)
   const [config, setConfig] = useState<GraderAnalysisConfig>(initialConfig)
   // Tab inicial: lee ?tab= de la URL si está presente y es válido, sino 'analisis'
@@ -166,7 +170,7 @@ export function AnalisisGraderGatesConfigPage({
   const [activeTemplateName, setActiveTemplateName] = useState<string | null>(null)
   const [showTemplates, setShowTemplates] = useState(false)
   const [showWeightRanges, setShowWeightRanges] = useState(true)
-  const [shiftSchedule, setShiftSchedule] = useState(DEFAULT_SHIFT_SCHEDULE)
+  const [shiftSchedule, setShiftSchedule] = useState(() => plantLineConfig.defaultShiftSchedule ?? DEFAULT_SHIFT_SCHEDULE)
   const [showPhysicalConfig, setShowPhysicalConfig] = useState(false)
   const [fisicaSubTab, setFisicaSubTab] = useState<'producto' | 'cintas' | 'distancias' | 'calibracion'>('producto')
   const [calibracionSubTab, setCalibracionSubTab] = useState<'danfoss' | 'neumatica' | 'verificacion'>('danfoss')
@@ -177,7 +181,7 @@ export function AnalisisGraderGatesConfigPage({
   const [physicalConfig, _setPhysicalConfigRaw] = useState<GraderPhysicalConfig>(DEFAULT_PHYSICAL_CONFIG)
   // FASE 6 — logger de cambios: cada setPhysicalConfig persiste diff en Firestore
   const setPhysicalConfig = useConfigChangeLogger(physicalConfig, _setPhysicalConfigRaw, { enabledRef: moduleConfigLoadedRef })
-  const [loadedSchedule, setLoadedSchedule] = useState(DEFAULT_SHIFT_SCHEDULE)
+  const [loadedSchedule, setLoadedSchedule] = useState(() => plantLineConfig.defaultShiftSchedule ?? DEFAULT_SHIFT_SCHEDULE)
   // FASE 5 — Modales de medición
   const [tachModalBelt, setTachModalBelt] = useState<GraderBeltId | null>(null)
   const [slowMoModalGate, setSlowMoModalGate] = useState<number | null>(null)
@@ -376,7 +380,7 @@ export function AnalisisGraderGatesConfigPage({
   function handleGlobalSettingsClose(open: boolean) {
     setGlobalSettingsOpen(open)
     if (!open) {
-      getModuleRanges().then((cfg) => {
+      getModuleRanges(plantLineId).then((cfg) => {
         if (cfg?.customWeightRanges && cfg.customWeightRanges.length > 0) {
           setConfig((c) => ({ ...c, customWeightRanges: cfg.customWeightRanges }))
         } else {
@@ -422,14 +426,14 @@ export function AnalisisGraderGatesConfigPage({
     }).catch(() => {})
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Cargar rangos globales del modulo
+  // Cargar rangos globales del modulo (por planta)
   useEffect(() => {
-    getModuleRanges()
+    getModuleRanges(plantLineId)
       .then((cfg) => {
         if (cfg?.customWeightRanges && cfg.customWeightRanges.length > 0) {
           setConfig((c) => ({ ...c, customWeightRanges: cfg.customWeightRanges }))
         }
-        const normalized = normalizeShiftSchedule(cfg?.shiftSchedule)
+        const normalized = normalizeShiftSchedule(cfg?.shiftSchedule, plantLineConfig.defaultShiftSchedule)
         setShiftSchedule(normalized)
         setLoadedSchedule(normalized)
         if (cfg?.physicalConfig) {
@@ -441,6 +445,8 @@ export function AnalisisGraderGatesConfigPage({
       .finally(() => {
         moduleConfigLoadedRef.current = true
       })
+  // plantLineId no puede cambiar en esta página sin recargar → solo al montar
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setPhysicalConfig])
 
   // Autosave physicalConfig (debounce)
@@ -448,19 +454,19 @@ export function AnalisisGraderGatesConfigPage({
     if (!user || !moduleConfigLoadedRef.current) return
     setSaveStatus('saving')
     const timer = setTimeout(() => {
-      saveModulePhysicalConfig({ physicalConfig, updatedBy: user.id })
+      saveModulePhysicalConfig({ physicalConfig, updatedBy: user.id, plantLineId })
         .then(() => setSaveStatus('saved'))
         .catch(() => setSaveStatus('idle'))
     }, 1000)
     return () => clearTimeout(timer)
-  }, [physicalConfig, user])
+  }, [physicalConfig, user, plantLineId])
 
   // Autosave shiftSchedule (debounce)
   useEffect(() => {
     if (!user || !moduleConfigLoadedRef.current) return
     setSaveStatus('saving')
     const timer = setTimeout(() => {
-      saveModuleShiftSchedule({ schedule: shiftSchedule, updatedBy: user.id })
+      saveModuleShiftSchedule({ schedule: shiftSchedule, updatedBy: user.id, plantLineId })
         .then(() => {
           setLoadedSchedule(shiftSchedule)
           setSaveStatus('saved')
@@ -468,7 +474,7 @@ export function AnalisisGraderGatesConfigPage({
         .catch(() => setSaveStatus('idle'))
     }, 1000)
     return () => clearTimeout(timer)
-  }, [shiftSchedule, user])
+  }, [shiftSchedule, user, plantLineId])
 
   // Auto-clear: 'saved' vuelve a 'idle' tras 2s para que el indicador se oculte
   useEffect(() => {

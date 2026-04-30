@@ -693,7 +693,7 @@ export function GraderHistoricalCalendar({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [summaries, setSummaries] = useState<Record<string, SummaryState>>({})
-  const [shiftSchedule, setShiftSchedule] = useState(DEFAULT_SHIFT_SCHEDULE)
+  const [shiftSchedule, setShiftSchedule] = useState(() => plantLine.defaultShiftSchedule ?? DEFAULT_SHIFT_SCHEDULE)
   const [historicalByDate, setHistoricalByDate] = useState<Map<string, GraderDailySummary[]>>(new Map())
   const [allSummariesRaw, setAllSummariesRaw] = useState<GraderDailySummary[]>([])
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -737,15 +737,16 @@ export function GraderHistoricalCalendar({
   }, [plantLineId])
 
   useEffect(() => {
-    getModuleRanges()
+    const plantDefault = plantLine.defaultShiftSchedule
+    getModuleRanges(plantLineId)
       .then((cfg) => {
-        const schedule = normalizeShiftSchedule(cfg?.shiftSchedule)
+        const schedule = normalizeShiftSchedule(cfg?.shiftSchedule, plantDefault)
         setShiftSchedule(schedule)
       })
       .catch(() => {
-        setShiftSchedule(DEFAULT_SHIFT_SCHEDULE)
+        setShiftSchedule(plantDefault ?? DEFAULT_SHIFT_SCHEDULE)
       })
-  }, [])
+  }, [plantLineId, plantLine.defaultShiftSchedule])
 
   useEffect(() => {
     if (uploads.length === 0) return

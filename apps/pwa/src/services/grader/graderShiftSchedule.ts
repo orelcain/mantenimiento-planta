@@ -51,9 +51,21 @@ export function parseShiftTime(value: string): { hour: number; minute: number } 
   return { hour: clampHour(h || 0), minute: clampMinute(m || 0) }
 }
 
-export function normalizeShiftSchedule(schedule?: Partial<GraderShiftSchedule>[]): GraderShiftSchedule[] {
+/**
+ * Normaliza un horario de turnos contra una base.
+ *
+ * @param schedule  Valores parciales guardados en Firestore (pueden faltar campos)
+ * @param baseSchedule  Horarios base de la planta. Si se omite usa DEFAULT_SHIFT_SCHEDULE
+ *                      (Chonchi). Pasar `plantLineConfig.defaultShiftSchedule` para
+ *                      obtener los defaults correctos de cada planta.
+ */
+export function normalizeShiftSchedule(
+  schedule?: Partial<GraderShiftSchedule>[],
+  baseSchedule?: GraderShiftSchedule[],
+): GraderShiftSchedule[] {
+  const base = baseSchedule ?? DEFAULT_SHIFT_SCHEDULE
   const map = new Map<string, GraderShiftSchedule>()
-  for (const item of DEFAULT_SHIFT_SCHEDULE) {
+  for (const item of base) {
     map.set(item.shiftId, { ...item })
   }
   for (const item of schedule || []) {
@@ -66,7 +78,7 @@ export function normalizeShiftSchedule(schedule?: Partial<GraderShiftSchedule>[]
       endMinute: clampMinute(item.endMinute ?? 0),
     })
   }
-  return DEFAULT_SHIFT_SCHEDULE.map((item) => map.get(item.shiftId)!).map((item) => ({ ...item }))
+  return base.map((item) => map.get(item.shiftId)!).map((item) => ({ ...item }))
 }
 
 export function inferShiftIdFromSchedule(startAt: string | undefined, schedule?: GraderShiftSchedule[]): GraderShiftSchedule['shiftId'] {

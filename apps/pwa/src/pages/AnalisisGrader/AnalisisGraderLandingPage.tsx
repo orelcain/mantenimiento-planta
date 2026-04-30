@@ -174,12 +174,14 @@ export function AnalisisGraderLandingPage() {
   const liveShift = useMemo(() => {
     const today = todayKey()
     const now = new Date()
-    for (const sched of DEFAULT_SHIFT_SCHEDULE) {
-      const win = computeShiftTimeWindow(today, sched.shiftId, DEFAULT_SHIFT_SCHEDULE, now)
+    // Usa el horario de la planta activa (Yal tiene turnos distintos a Chonchi)
+    const effectiveSchedule = lineConfig.defaultShiftSchedule ?? DEFAULT_SHIFT_SCHEDULE
+    for (const sched of effectiveSchedule) {
+      const win = computeShiftTimeWindow(today, sched.shiftId, effectiveSchedule, now)
       if (win.status === 'live') return { shiftId: sched.shiftId, window: win }
     }
     return null
-  }, [])
+  }, [lineConfig])
 
   // Summary del turno vivo (para el widget de estado de línea)
   const liveTodaySummary = useMemo(() => {
