@@ -3414,6 +3414,53 @@ exports.shoplogixCleanupLegacy = onRequest(
 )
 
 /**
+ * Dump HTTP — vuelca contenido de un shift doc Firestore para diagnóstico.
+ * Uso: GET https://.../shoplogixDumpShift?plantSlug=yal&dateKey=2026-04-29&shiftId=Turno%202
+ */
+exports.shoplogixDumpShift = onRequest(
+  {
+    region: 'us-central1',
+    timeoutSeconds: 30,
+    memory: '256MiB',
+    cors: ALLOWED_ORIGINS,
+  },
+  async (req, res) => {
+    const { plantSlug = 'yal', dateKey, shiftId } = req.query || {}
+    if (!dateKey) { res.status(400).json({ error: 'dateKey requerido' }); return }
+
+    const shiftIds = shiftId ? [shiftId] : ['Turno 1', 'Turno 2', 'Turno 3', 'Turno día', 'Turno noche']
+    const out = {}
+    for (const sid of shiftIds) {
+      const ref = db.doc(`shoplogix/${plantSlug}/shifts/${dateKey}_${sid}`)
+      const snap = await ref.get()
+      if (!snap.exists) { out[sid] = null; continue }
+      const d = snap.data()
+      out[sid] = {
+        scheduledStart: d.scheduledStart?.toDate?.()?.toISOString() ?? d.scheduledStart,
+        scheduledEnd:   d.scheduledEnd?.toDate?.()?.toISOString()   ?? d.scheduledEnd,
+        scheduleSource: d.scheduleSource,
+        machinesCount:  d.machines?.length ?? 0,
+        lastSyncAt:     d.lastSyncAt?.toDate?.()?.toISOString() ?? d.lastSyncAt,
+      }
+      // Tomar la primera machine de la subcollection y mostrar shiftStart/End/scheduledStart/End
+      const machinesSnap = await ref.collection('machines').limit(1).get()
+      if (!machinesSnap.empty) {
+        const m = machinesSnap.docs[0].data()
+        out[sid].machineDoc = {
+          shiftStart:     m.shiftStart?.toDate?.()?.toISOString()     ?? m.shiftStart,
+          shiftEnd:       m.shiftEnd?.toDate?.()?.toISOString()       ?? m.shiftEnd,
+          scheduledStart: m.scheduledStart?.toDate?.()?.toISOString() ?? m.scheduledStart,
+          scheduledEnd:   m.scheduledEnd?.toDate?.()?.toISOString()   ?? m.scheduledEnd,
+          scheduleSource: m.scheduleSource,
+          totalCycles:    m.totalCycles,
+        }
+      }
+    }
+    res.json({ plantSlug, dateKey, shifts: out })
+  },
+)
+
+/**
  * Probe HTTP — diagnostica qué endpoints query.axd tiene Shoplogix con
  * data útil de schedule/horario de turno (no solo intervals con `iv.shift`).
  *
