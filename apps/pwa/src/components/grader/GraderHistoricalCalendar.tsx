@@ -2593,11 +2593,17 @@ export function GraderHistoricalCalendar({
                             onMouseEnter={() => setHoveredFragId(b.fragId)}
                             onMouseLeave={() => setHoveredFragId(null)}
                           >
-                            {b.label && (
-                              <span className="absolute inset-x-0.5 top-0.5 text-[7px] font-semibold leading-none truncate text-white/70 pointer-events-none select-none">
-                                {b.label}
-                              </span>
-                            )}
+                            {b.label && (() => {
+                              const totalMin = Math.round((b.widthPct / 100) * 24 * 60)
+                              const h = Math.floor(totalMin / 60)
+                              const m = totalMin % 60
+                              const dur = m === 0 ? `${h}h` : `${h}h ${m}m`
+                              return (
+                                <span className="absolute inset-x-0.5 top-0.5 text-[7px] font-semibold leading-none truncate text-white/70 pointer-events-none select-none">
+                                  {b.label} · {dur}
+                                </span>
+                              )
+                            })()}
                           </div>
                         )
                       })}
@@ -2645,6 +2651,18 @@ export function GraderHistoricalCalendar({
                             ? <Sun className="h-4 w-4 text-amber-500" />
                             : <Moon className="h-4 w-4 text-indigo-400" />}
                           <p className="text-sm font-medium">{shiftId}</p>
+                          {(() => {
+                            const cache = slxByShift.get(slxKey)
+                            const ss = cache?.scheduledStart ?? cache?.shiftStart ?? null
+                            const se = cache?.scheduledEnd   ?? cache?.shiftEnd   ?? null
+                            if (!ss || !se) return null
+                            const totalMin = Math.round((se.getTime() - ss.getTime()) / 60_000)
+                            if (totalMin <= 0) return null
+                            const h = Math.floor(totalMin / 60)
+                            const m = totalMin % 60
+                            const dur = m === 0 ? `${h}h` : `${h}h ${m}m`
+                            return <span className="text-[10px] text-muted-foreground/70 tabular-nums">{dur}</span>
+                          })()}
                         </div>
                         {hasSlx && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-400 border border-sky-500/30 font-medium">
