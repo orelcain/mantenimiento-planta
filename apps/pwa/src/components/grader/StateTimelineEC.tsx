@@ -1,14 +1,17 @@
 /**
- * StateTimelineEC — versión ECharts del Gantt de estados Baader.
+ * StateTimelineEC — Gantt de estados Baader (ECharts).
  *
- * TOOLTIP: manejado por onMouseMove React en el div wrapper (NO eventos ECharts).
- * Los eventos mouseover/mouseout de ECharts se interrumpen cuando ReactECharts
- * re-enlaza onEvents durante re-renders del TimelineSyncContext → mouseout falso
- * → tooltip desaparece. El div React es inmune: sus eventos persisten a través
- * de re-renders sin interrupciones.
+ * TOOLTIP: usa trigger:'axis' igual que ProductionRateLineEC (probado y estable).
+ * El trigger:'item' y los overlays React fallan porque setHover() → re-render →
+ * ReactECharts re-enlaza onEvents → ECharts dispara mouseout falso → tooltip muerto.
+ * Con trigger:'axis' ECharts gestiona show/hide según posición del axisPointer,
+ * completamente al margen de los re-renders del TimelineSyncContext.
+ *
+ * SINCRONIZACIÓN: onMouseMove React en el wrapper div (no evento ECharts) para
+ * llamar setHover() sin interferir con el tooltip nativo de ECharts.
  */
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef } from 'react'
 import ReactECharts from 'echarts-for-react'
 import type { UpstreamMachineShift } from '@/services/shoplogix/types'
 import { useTimelineSyncOptional } from './useTimelineSync'
@@ -24,33 +27,17 @@ interface Props {
   onStateClick?: (state: UpstreamMachineShift['states'][number]) => void
 }
 
-interface TooltipMeta {
-  type: string
-  name: string
-  reason: string
-  durationSec: number
-  startAt: Date
-  endAt: Date
-  color: string
-}
-
-interface TooltipState {
-  visible: boolean
-  x: number
-  meta: TooltipMeta | null
-}
-
 export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, onStateClick }: Props) {
   const echartsRef = useRef<any>(null)
-  const myHoverId = useId()
+  const myHoverId  = useId()
   const timelineSync = useTimelineSyncOptional()
   const onChartReady = useChartReadyConnect(timelineSync?.connectGroupId ?? '__no-sync__')
 
-  // Refs estables para usar dentro de callbacks sin deps cambiantes
+  // Refs estables para callbacks sin deps cambiantes
   const timelineSyncRef = useRef(timelineSync)
   useEffect(() => { timelineSyncRef.current = timelineSync }, [timelineSync])
 
-  // ── Rango temporal ─────────────────────────────────────────────────────────
+  // ── Rango temporal ──────────────────────────────────────────────────────────
   const [rangeStart, rangeEnd] = useMemo<[Date, Date]>(() => {
     if (timelineSync?.range) {
       return [new Date(timelineSync.range.startMs), new Date(timelineSync.range.endMs)]
@@ -59,92 +46,47 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
     return [shift.shiftStart, shift.shiftEnd]
   }, [timelineSync?.range, windowStart, windowEnd, shift.shiftStart, shift.shiftEnd])
 
-  // ── Datos de la serie ──────────────────────────────────────────────────────
-  const seriesData = useMemo(() => {
-    return shift.states.map((st) => {
-      const color = slxStateColor(st.type, st.reason, st.color)
-      return {
-        value: [st.startAt.getTime(), st.endAt.getTime(), color],
-        itemStyle: { color },
-        meta: {
-          type: st.type,
-          name: st.name,
-          reason: st.reason,
-          durationSec: st.durationSec,
-          startAt: st.startAt,
-          endAt: st.endAt,
-          color,
-        } satisfies TooltipMeta,
-      }
-    })
-  }, [shift.states])
-
-  // Ref para lookups sin deps en useCallback
-  const seriesDataRef = useRef(seriesData)
-  useEffect(() => { seriesDataRef.current = seriesData }, [seriesData])
-
-  // ── Tooltip React (div wrapper) ────────────────────────────────────────────
-  // NO usamos mouseover/mouseout de ECharts — se interrumpen con cada re-render
-  // del contexto de sync. El div React persiste a través de re-renders.
-  const [tooltip, setTooltip] = useState<TooltipState>({ visible: false, x: 0, meta: null })
-  const tooltipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const clearTimer = useCallback(() => {
-    if (tooltipTimerRef.current != null) {
-      clearTimeout(tooltipTimerRef.current)
-      tooltipTimerRef.current = null
+  // ── Datos de la serie ───────────────────────────────────────────────────────
+  const seriesData = useMemo(() => shift.states.map((st) => {
+    const color = slxStateColor(st.type, st.reason, st.color)
+    return {
+      value: [st.startAt.getTime(), st.endAt.getTime(), color],
+      itemStyle: { color },
     }
-  }, [])
-  useEffect(() => () => clearTimer(), [clearTimer])
+  }), [shift.states])
 
-  // onMouseMove del div wrapper — calcula posición temporal y muestra tooltip
+  // ── Lot projection ──────────────────────────────────────────────────────────
+  const lotMarkLines = useMemo(() => {
+    if (!timelineSync || timelineSync.lotChanges.length === 0) return []
+    return timelineSync.lotChanges
+      .filter((lc) => lc.ms >= rangeStart.getTime() && lc.ms <= rangeEnd.getTime())
+      .map((lc) => ({
+        xAxis: lc.ms,
+        lineStyle: { color: 'rgba(139,92,246,0.55)', type: 'dotted' as const, width: 1 },
+        label: { show: false },
+      }))
+  }, [timelineSync, rangeStart, rangeEnd])
+
+  // ── Hover cross-chart: React div (no evento ECharts) ────────────────────────
+  // Usar onMouseMove React evita que el re-render causado por setHover() provoque
+  // un re-enlace de onEvents de ECharts que dispara mouseout falso al tooltip.
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const ts = timelineSyncRef.current
+    if (!ts) return
     const inst = echartsRef.current?.getEchartsInstance?.()
     if (!inst) return
-
-    const divRect = e.currentTarget.getBoundingClientRect()
-    const offsetX = e.clientX - divRect.left
-
-    // Convertir pixel X → ms usando el xAxis de ECharts
-    const rawMs = inst.convertFromPixel({ xAxisIndex: 0 }, offsetX)
+    const rect = e.currentTarget.getBoundingClientRect()
+    const rawMs = inst.convertFromPixel({ xAxisIndex: 0 }, e.clientX - rect.left)
     if (typeof rawMs !== 'number' || !Number.isFinite(rawMs)) return
+    ts.setHover({ ms: Math.floor(rawMs / 60_000) * 60_000, originId: myHoverId })
+  }, [myHoverId])
 
-    // ── Timeline sync (crosshair en otros charts) ──────────────────────────
-    const ts = timelineSyncRef.current
-    if (ts) {
-      const ms = Math.floor(rawMs / 60_000) * 60_000
-      ts.setHover({ ms, originId: myHoverId })
-    }
-
-    // ── Buscar estado bajo el cursor ───────────────────────────────────────
-    const hovered = seriesDataRef.current.find(
-      (item) => rawMs >= (item.value[0] as number) && rawMs <= (item.value[1] as number),
-    )
-
-    if (hovered?.meta) {
-      clearTimer()
-      setTooltip({ visible: true, x: offsetX, meta: hovered.meta })
-    } else {
-      // Entre segmentos — ocultar con delay corto
-      clearTimer()
-      tooltipTimerRef.current = setTimeout(() => {
-        setTooltip((s) => ({ ...s, visible: false }))
-      }, 200)
-    }
-  }, [myHoverId, clearTimer]) // timelineSyncRef y seriesDataRef son refs, sin deps
-
-  // onMouseLeave del div wrapper — ocultar tooltip y limpiar crosshair
   const handleMouseLeave = useCallback(() => {
     const ts = timelineSyncRef.current
-    if (ts?.hover?.originId === myHoverId) {
-      ts.setHover(null)
-    }
-    clearTimer()
-    tooltipTimerRef.current = setTimeout(() => {
-      setTooltip((s) => ({ ...s, visible: false }))
-    }, 500)
-  }, [myHoverId, clearTimer])
+    if (ts?.hover?.originId === myHoverId) ts.setHover(null)
+  }, [myHoverId])
 
-  // ── Click sobre segmento (sigue siendo evento ECharts) ────────────────────
+  // ── Click (sigue siendo evento ECharts) ─────────────────────────────────────
   const onClick = useCallback((params: any) => {
     if (!onStateClick) return
     const idx = typeof params?.dataIndex === 'number' ? params.dataIndex : -1
@@ -154,9 +96,9 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
     onStateClick(st)
   }, [onStateClick, shift.states])
 
-  // ── Hover externo → axisPointer en este chart ─────────────────────────────
-  const externalHoverMs = timelineSync?.hover && timelineSync.hover.originId !== myHoverId
-    ? timelineSync.hover.ms
+  // ── Hover externo → axisPointer en este chart ───────────────────────────────
+  const externalHoverMs = timelineSync?.hover?.originId !== myHoverId
+    ? (timelineSync?.hover?.ms ?? null)
     : null
   const hadExternalRef = useRef(false)
   useEffect(() => {
@@ -180,7 +122,7 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
     })
   }, [externalHoverMs, height])
 
-  // ── DataZoom ───────────────────────────────────────────────────────────────
+  // ── DataZoom ────────────────────────────────────────────────────────────────
   const onDataZoom = useCallback(() => {
     const inst = echartsRef.current?.getEchartsInstance?.()
     const ts = timelineSyncRef.current
@@ -189,44 +131,25 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
     const dz = Array.isArray(opt?.dataZoom) ? opt.dataZoom[0] : null
     if (!dz) return
     const startMs = typeof dz.startValue === 'number' ? dz.startValue : null
-    const endMs = typeof dz.endValue === 'number' ? dz.endValue : null
+    const endMs   = typeof dz.endValue   === 'number' ? dz.endValue   : null
     if (startMs == null || endMs == null) return
     const totalMs = rangeEnd.getTime() - rangeStart.getTime()
-    const visibleMs = endMs - startMs
-    if (visibleMs / totalMs >= 0.995) { ts.setRange(null); return }
+    if ((endMs - startMs) / totalMs >= 0.995) { ts.setRange(null); return }
     ts.setRange({ startMs, endMs })
   }, [rangeStart, rangeEnd])
 
-  // ── Lot projection ─────────────────────────────────────────────────────────
-  const lotMarkLines = useMemo(() => {
-    if (!timelineSync || timelineSync.lotChanges.length === 0) return []
-    return timelineSync.lotChanges
-      .filter((lc) => lc.ms >= rangeStart.getTime() && lc.ms <= rangeEnd.getTime())
-      .map((lc) => ({
-        xAxis: lc.ms,
-        lineStyle: { color: 'rgba(139,92,246,0.55)', type: 'dotted' as const, width: 1 },
-        label: { show: false },
-      }))
-  }, [timelineSync, rangeStart, rangeEnd])
-
   const interactive = !!onStateClick
 
-  // ── onEvents estable: solo datazoom y click (sin mouse*) ──────────────────
-  // Excluimos mousemove/mouseover/mouseout de ECharts para evitar que los
-  // re-renders del contexto de sync re-enlacen los eventos y disparen mouseout falsos.
-  const onEvents = useMemo(() => ({
-    datazoom: onDataZoom,
-    click: onClick,
-  }), [onDataZoom, onClick])
-
-  // ── ECharts option ─────────────────────────────────────────────────────────
+  // ── Opción ECharts ──────────────────────────────────────────────────────────
+  // shift.states incluido en deps para que el formatter del tooltip tenga la
+  // versión más actualizada (cambia solo al cargar un nuevo turno, no en hover).
   const option = useMemo(() => ({
     backgroundColor: 'transparent',
     grid: { left: 0, right: 0, top: 0, bottom: 0, containLabel: false },
     xAxis: {
       type: 'time' as const,
-      min: rangeStart.getTime(),
-      max: rangeEnd.getTime(),
+      min:  rangeStart.getTime(),
+      max:  rangeEnd.getTime(),
       axisLine: { show: false },
       axisTick: { show: false },
       axisLabel: { show: false },
@@ -240,18 +163,61 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
       axisLabel: { show: false },
       splitLine: { show: false },
     },
-    tooltip: { show: false },  // tooltip manejado por overlay React
+    // trigger:'axis' — mismo patrón que ProductionRateLineEC (estable, no depende
+    // de hit-detection sobre rects delgados). El formatter resuelve el estado
+    // usando axisValue sin necesidad de React state.
+    tooltip: {
+      trigger: 'axis' as const,
+      axisPointer: { type: 'none' as const },  // línea gestionada por externalHoverMs
+      backgroundColor: '#1f2937',
+      borderColor: '#374151',
+      textStyle: { color: '#f9fafb', fontSize: 11 },
+      padding: [8, 10],
+      confine: true,
+      formatter: (params: any) => {
+        // Para trigger:'axis' con time-axis, params[0].axisValue es el ms del cursor
+        const p = Array.isArray(params) ? params[0] : params
+        if (!p) return ''
+        const axisMs: number | null =
+          typeof p.axisValue === 'number'     ? p.axisValue
+          : typeof p.axisValue === 'string'   ? new Date(p.axisValue).getTime()
+          : p.axisValue instanceof Date       ? p.axisValue.getTime()
+          : null
+        if (axisMs == null || !Number.isFinite(axisMs)) return ''
+
+        // Buscar el estado que contiene este instante
+        const st = shift.states.find(
+          (s) => axisMs >= s.startAt.getTime() && axisMs <= s.endAt.getTime(),
+        )
+        if (!st) return ''
+
+        const color     = slxStateColor(st.type, st.reason, st.color)
+        const cause     = st.reason || st.name
+        const typeLabel = st.type === 'uptime'    ? 'Produciendo'
+          : st.type === 'break'   ? 'Paro programado'
+          : st.type === 'setup'   ? 'Setup'
+          : 'Detención'
+        const dot = `<span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${color};margin-right:5px;vertical-align:middle;"></span>`
+        return [
+          `${dot}<b>${cause}</b>`,
+          `<span style="color:#9ca3af">${typeLabel}</span>`,
+          `⏱ <b>${fmtDurationSec(st.durationSec)}</b>`,
+          `🕐 ${fmtTime(st.startAt)} – ${fmtTime(st.endAt)}`,
+        ].join('<br/>')
+      },
+    },
     axisPointer: {
       link: [{ xAxisIndex: 'all' }],
       type: 'line' as const,
       lineStyle: { color: 'rgba(148,163,184,0.6)', type: 'solid' as const, width: 1 },
     },
     series: [
+      // Serie visual: rectángulos coloreados de los estados
       {
         type: 'custom' as const,
         renderItem: (_params: any, api: any) => {
-          const start = api.coord([api.value(0), 0])
-          const end = api.coord([api.value(1), 0])
+          const start   = api.coord([api.value(0), 0])
+          const end     = api.coord([api.value(1), 0])
           const widthPx = Math.max(0, end[0] - start[0])
           const yCenter = api.size([0, 1])[1] / 2
           return {
@@ -268,7 +234,7 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
         },
         encode: { x: [0, 1], y: -1 },
         data: seriesData,
-        tooltip: { show: false },
+        tooltip: { show: false },  // tooltip manejado por la serie auxiliar abajo
         markLine: lotMarkLines.length > 0 ? {
           silent: true,
           symbol: 'none',
@@ -276,10 +242,32 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
           z: 5,
         } : undefined,
       },
+      // Serie auxiliar invisible: activa trigger:'axis' en todo el ancho del turno.
+      // Sin esta, ECharts no dispara el tooltip con trigger:'axis' para custom series.
+      {
+        type: 'line' as const,
+        data: [
+          [rangeStart.getTime(), 0],
+          [rangeEnd.getTime(),   0],
+        ],
+        lineStyle:   { opacity: 0 },
+        symbol:      'none',
+        showSymbol:  false,
+        silent:      true,
+        z:           -1,
+        tooltip:     { show: false },
+      },
     ],
-  }), [rangeStart, rangeEnd, seriesData, height, lotMarkLines, interactive])
+  // shift.states en deps: el formatter lo necesita actualizado (solo cambia al cargar nuevo turno)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [rangeStart, rangeEnd, seriesData, height, lotMarkLines, interactive, shift.states])
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // onEvents mínimo y estable (sin mouse* para no interferir con trigger:'axis')
+  const onEvents = useMemo(() => ({
+    datazoom: onDataZoom,
+    click:    onClick,
+  }), [onDataZoom, onClick])
+
   return (
     <div
       className="relative w-full"
@@ -297,51 +285,6 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
         onChartReady={onChartReady}
         onEvents={onEvents}
       />
-
-      {tooltip.visible && tooltip.meta && (
-        <TooltipOverlay
-          meta={tooltip.meta}
-          anchorX={tooltip.x}
-          barHeight={height}
-        />
-      )}
-    </div>
-  )
-}
-
-// ─── Tooltip overlay ─────────────────────────────────────────────────────────
-function TooltipOverlay({ meta, anchorX, barHeight }: {
-  meta: TooltipMeta
-  anchorX: number
-  barHeight: number
-}) {
-  const typeLabel =
-    meta.type === 'uptime' ? 'Produciendo'
-    : meta.type === 'break' ? 'Paro programado'
-    : meta.type === 'setup' ? 'Setup'
-    : 'Detención'
-
-  return (
-    <div
-      className="pointer-events-none absolute z-50 min-w-[160px] max-w-[240px] rounded-lg border border-slate-600/60 bg-slate-900/95 px-3 py-2 text-[11px] shadow-xl backdrop-blur-sm"
-      style={{ bottom: barHeight + 10, left: anchorX, transform: 'translateX(-50%)' }}
-    >
-      <div className="flex items-center gap-1.5 font-semibold text-white leading-tight">
-        <span
-          className="h-2.5 w-2.5 shrink-0 rounded-sm ring-1 ring-white/20"
-          style={{ backgroundColor: meta.color }}
-        />
-        <span className="truncate">{meta.reason || meta.name}</span>
-      </div>
-      <div className="mt-0.5 text-slate-400">{typeLabel}</div>
-      <div className="mt-1 flex items-center gap-1 text-slate-200">
-        <span className="text-slate-500">⏱</span>
-        <b>{fmtDurationSec(meta.durationSec)}</b>
-      </div>
-      <div className="flex items-center gap-1 text-slate-400">
-        <span>🕐</span>
-        <span>{fmtTime(meta.startAt)} – {fmtTime(meta.endAt)}</span>
-      </div>
     </div>
   )
 }
