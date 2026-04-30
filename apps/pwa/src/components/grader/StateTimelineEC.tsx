@@ -259,6 +259,9 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
       },
       // Serie auxiliar invisible: activa trigger:'axis' en todo el ancho del turno.
       // Sin esta, ECharts no dispara el tooltip con trigger:'axis' para custom series.
+      // CRÍTICO: NO poner tooltip.show:false aquí. Si todos los series tienen show:false,
+      // ECharts omite llamar al formatter aunque trigger:'axis' esté configurado.
+      // El formatter ignora el valor de esta serie (usa axisValue del eje X directamente).
       {
         type: 'line' as const,
         data: [
@@ -270,7 +273,6 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
         showSymbol:  false,
         silent:      true,
         z:           -1,
-        tooltip:     { show: false },
       },
     ],
   // shift.states en deps: el formatter lo necesita actualizado (solo cambia al cargar nuevo turno)
