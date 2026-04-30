@@ -3464,6 +3464,29 @@ exports.shoplogixProbe = onRequest(
       { type: 'whiteboardproduction', params: { machines: machineid, start, end, minutes: 60 } },
     ]
 
+    // Solicitar production con minutes=5 (granularidad real) y resumir por shift
+    let shiftSummary = null
+    let currentShift = null
+    try {
+      const prod = auth.accessToken
+        ? await shoplogixClient.queryShoplogixBearer({ accessToken: auth.accessToken, type: 'whiteboardproduction', params: { machines: machineid, start, end, minutes: 5 } })
+        : await shoplogixClient.queryShoplogix({ cookie: auth.cookie, type: 'whiteboardproduction', params: { machines: machineid, start, end, minutes: 5 } })
+      const m0 = prod?.machines?.[0]
+      currentShift = { start: m0?.currentShiftStart, end: m0?.currentShiftEnd }
+      const intervals = m0?.machineProduction || []
+      const byShift = {}
+      for (const iv of intervals) {
+        const s = iv.shift || 'Unscheduled'
+        if (!byShift[s]) byShift[s] = { count: 0, firstStart: iv.start, lastEnd: iv.end, totalCycles: 0 }
+        byShift[s].count++
+        byShift[s].lastEnd = iv.end
+        byShift[s].totalCycles += iv.cycles || 0
+      }
+      shiftSummary = byShift
+    } catch (err) {
+      shiftSummary = { error: (err.message || '').slice(0, 300) }
+    }
+
     const results = []
     for (const c of candidates) {
       try {
@@ -3476,7 +3499,7 @@ exports.shoplogixProbe = onRequest(
         results.push({ type: c.type, status: 'err', error: (err.message || '').slice(0, 200) })
       }
     }
-    res.json({ plantSlug, dateKey: dk, machineid, start, end, authMode: auth.mode, results })
+    res.json({ plantSlug, dateKey: dk, machineid, start, end, authMode: auth.mode, currentShift, shiftSummary, results })
   },
 )
 
