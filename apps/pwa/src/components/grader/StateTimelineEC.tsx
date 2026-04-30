@@ -65,7 +65,12 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
         lineStyle: { color: 'rgba(139,92,246,0.55)', type: 'dotted' as const, width: 1 },
         label: { show: false },
       }))
-  }, [timelineSync, rangeStart, rangeEnd])
+  // Dep: timelineSync?.lotChanges (NO timelineSync completo). El context crea
+  // un nuevo objeto en cada setHover(), pero lotChanges solo cambia cuando hay
+  // nuevos lotes (gestionado con igualdad estructural en TimelineSyncContext).
+  // Si usamos timelineSync como dep → recomputa en cada hover → option cambia
+  // → setOption(notMerge=true) → ECharts reconstruye → tooltip muerto.
+  }, [timelineSync?.lotChanges, rangeStart, rangeEnd])
 
   // ── Hover cross-chart: React div (no evento ECharts) ────────────────────────
   // Usar onMouseMove React evita que el re-render causado por setHover() provoque

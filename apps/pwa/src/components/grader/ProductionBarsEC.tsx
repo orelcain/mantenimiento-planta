@@ -161,7 +161,8 @@ export function ProductionBarsEC({ intervals, threshold, windowStart, windowEnd 
         lineStyle: { color: 'rgba(139,92,246,0.55)', type: 'dotted' as const, width: 1 },
         label: { show: false },
       }))
-  }, [timelineSync, rangeStart, rangeEnd])
+  // Misma razón que StateTimelineEC: dep = lotChanges, no timelineSync completo.
+  }, [timelineSync?.lotChanges, rangeStart, rangeEnd])
 
   const option = useMemo(() => ({
     backgroundColor: 'transparent',
