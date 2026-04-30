@@ -21,6 +21,7 @@ import type { UpstreamMachineShift } from '@/services/shoplogix/types'
 import { useTimelineSyncOptional } from './useTimelineSync'
 import { useChartReadyConnect } from './useEChartsConnect'
 import { fmtTime, fmtDurationSec } from '@/services/grader/graderTimeFormat'
+import { slxStateColor } from '@/services/shoplogix/shoplogixColors'
 
 interface Props {
   shift: UpstreamMachineShift
@@ -61,22 +62,29 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
 
   // Data para la custom series: una entrada por cada state, con tiempos y meta
   const seriesData = useMemo(() => {
-    return shift.states.map((st) => ({
-      value: [
-        st.startAt.getTime(),
-        st.endAt.getTime(),
-        st.color,
-      ],
-      itemStyle: { color: st.color },
-      // Meta para tooltip
-      meta: {
-        name: st.name,
-        reason: st.reason,
-        durationSec: st.durationSec,
-        startAt: st.startAt,
-        endAt: st.endAt,
-      },
-    }))
+    return shift.states.map((st) => {
+      // Color semántico: calculado en render-time (ignora el '#ff0000' genérico
+      // almacenado en Firestore cuando Shoplogix usó statusColor para todos los paros).
+      const color = slxStateColor(st.type, st.reason, st.color)
+      return {
+        value: [
+          st.startAt.getTime(),
+          st.endAt.getTime(),
+          color,
+        ],
+        itemStyle: { color },
+        // Meta para tooltip
+        meta: {
+          type: st.type,
+          name: st.name,
+          reason: st.reason,
+          durationSec: st.durationSec,
+          startAt: st.startAt,
+          endAt: st.endAt,
+          color,
+        },
+      }
+    })
   }, [shift.states])
 
   // ── Hover cross-chart (Fase 4b del Synchronized Timeline) ───────────────
@@ -200,15 +208,32 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
       backgroundColor: '#1f2937',
       borderColor: '#374151',
       textStyle: { color: '#f9fafb', fontSize: 11 },
+      padding: [8, 10],
+      // Mantener tooltip visible mientras el cursor está sobre el área — no desaparecer al instante
+      enterable: false,
+      hideDelay: 600,
+      confine: true,
       formatter: (params: any) => {
         const meta = params?.data?.meta
         if (!meta) return ''
-        const label = meta.reason ? `${meta.name}: ${meta.reason}` : meta.name
-        return [
-          `<b>${label}</b>`,
-          `⏱ ${fmtDurationSec(meta.durationSec)}`,
-          `🕐 ${fmtTime(meta.startAt)}–${fmtTime(meta.endAt)} (Chile)`,
-        ].join('<br/>')
+        // Etiqueta: razón (más informativa) o nombre del estado
+        const causeLabel = meta.reason
+          ? meta.reason
+          : meta.name
+        // Punto de color a la izquierda del título
+        const dot = `<span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${meta.color};margin-right:5px;vertical-align:middle;"></span>`
+        const title = `${dot}<b style="font-size:12px">${causeLabel}</b>`
+        const typeLabel = meta.type === 'uptime' ? 'Produciendo'
+          : meta.type === 'break' ? 'Paro programado'
+          : meta.type === 'setup' ? 'Setup'
+          : 'Detención'
+        const lines = [
+          title,
+          `<span style="color:#9ca3af">${typeLabel}</span>`,
+          `⏱ <b>${fmtDurationSec(meta.durationSec)}</b>`,
+          `🕐 ${fmtTime(meta.startAt)} – ${fmtTime(meta.endAt)}`,
+        ]
+        return lines.join('<br/>')
       },
     },
     // axisPointer link='all' permite que echarts.connect propague crosshair

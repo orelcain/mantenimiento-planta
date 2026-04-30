@@ -51,6 +51,7 @@ import { ProductionRateLineEC } from './ProductionRateLineEC'
 import { StateDetailPanel } from './StateDetailPanel'
 import { exportCombinedTimelinePng } from './exportCombinedTimelinePng'
 import { fmtTime, fmtDurationSec } from '@/services/grader/graderTimeFormat'
+import { slxStateColor } from '@/services/shoplogix/shoplogixColors'
 import { logger } from '@/lib/logger'
 
 interface Props {
@@ -167,12 +168,14 @@ function aggregateStatesByReason(states: UpstreamMachineState[]): ReasonAggregat
   for (const s of states) {
     if (s.type === 'uptime') continue  // solo paros
     const key = s.reason || s.name     // si no tiene reason, usa name ("Micro Detencion")
+    // Color semántico (mismo helper que StateTimelineEC → leyenda siempre consistente)
+    const color = slxStateColor(s.type, s.reason, s.color)
     const existing = map.get(key)
     if (existing) {
       existing.durationSec += s.durationSec
       existing.count += 1
     } else {
-      map.set(key, { reason: key, color: s.color, durationSec: s.durationSec, count: 1 })
+      map.set(key, { reason: key, color, durationSec: s.durationSec, count: 1 })
     }
   }
   return Array.from(map.values()).sort((a, b) => b.durationSec - a.durationSec)
