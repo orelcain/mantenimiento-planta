@@ -74,23 +74,19 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
     const inst = echartsRef.current?.getEchartsInstance?.()
     if (!inst) return
     const rect  = e.currentTarget.getBoundingClientRect()
-    const offsetX = e.clientX - rect.left
-    const rawMs = inst.convertFromPixel({ xAxisIndex: 0 }, offsetX)
+    const rawMs = inst.convertFromPixel({ xAxisIndex: 0 }, e.clientX - rect.left)
     if (typeof rawMs !== 'number' || !Number.isFinite(rawMs)) return
 
-    // Timeline sync (crosshair en otros charts)
+    // Solo timeline sync — NO dispatchamos updateAxisPointer aquí.
+    // Si lo hacemos, echarts.connect() lo propaga a todos los charts conectados:
+    // ProductionRateLineEC recibe evento virtual → su onMouseMove dispara
+    // setHover({productionRateId}) → context cambia → loop de re-renders que
+    // genera la línea punteada parpadeante y mata el tooltip.
+    // ECharts detecta el mouse sobre su canvas nativamente y activa
+    // trigger:'axis' sin necesitar dispatch explícito.
     const ts = timelineSyncRef.current
     if (ts) ts.setHover({ ms: Math.floor(rawMs / 60_000) * 60_000, originId: myHoverId })
-
-    // Activar tooltip local vía axisPointer — sin este dispatch ECharts no sabe
-    // que el cursor está sobre este chart y trigger:'axis' nunca dispara
-    inst.dispatchAction({
-      type: 'updateAxisPointer',
-      currTrigger: 'mousemove',
-      x: offsetX,
-      y: height / 2,
-    })
-  }, [myHoverId, height])
+  }, [myHoverId])
 
   const handleMouseLeave = useCallback(() => {
     const ts = timelineSyncRef.current
