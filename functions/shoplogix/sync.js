@@ -32,12 +32,24 @@ const ACTIVE_PLANTS = Object.freeze(['chonchi', 'yal'])
 
 /**
  * Ventana de consulta para el día completo (wall-clock-as-UTC).
- * 00:00:00 → 24:00:00 (= 00:00 del día siguiente en UTC).
+ * Ancla en 08:00 en lugar de 00:00: esto asegura que turnos nocturnos que
+ * cruzan medianoche (ej. Yal Turno 3: ~22:00→07:45) queden completamente
+ * dentro de la ventana del día al que pertenecen, y no aparezcan como
+ * remanente espurio en la ventana del día siguiente.
+ *
+ * Ejemplo para dateKey = "2026-04-28":
+ *   window = 08:00 Apr 28 → 08:00 Apr 29
+ *   Turno 2 (09:00-22:00 Apr 28) ← dentro ✓
+ *   Turno 3 (~22:00 Apr 28 → 07:45 Apr 29) ← dentro ✓
+ *
+ * Ejemplo para dateKey = "2026-04-29":
+ *   window = 08:00 Apr 29 → 08:00 Apr 30
+ *   Turno 2 (09:00-22:00 Apr 29) ← dentro ✓ (sin remanente de Apr 28)
  */
 function fullDayWindow(dateKey) {
   const [y, m, d] = dateKey.split('-').map(Number)
-  const start = new Date(Date.UTC(y, m - 1, d,     0, 0, 0))
-  const end   = new Date(Date.UTC(y, m - 1, d + 1, 0, 0, 0))
+  const start = new Date(Date.UTC(y, m - 1, d,     8, 0, 0))
+  const end   = new Date(Date.UTC(y, m - 1, d + 1, 8, 0, 0))
   return { start: toShoplogixTime(start), end: toShoplogixTime(end) }
 }
 
