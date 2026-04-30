@@ -191,8 +191,12 @@ export function StateTimelineEC({ shift, windowStart, windowEnd, height = 20, on
       borderColor: '#374151',
       textStyle: { color: '#f9fafb', fontSize: 11 },
       padding: [8, 10],
-      confine: true,
-      hideDelay: 800,
+      // enterable: el cursor puede entrar al tooltip sin cerrarlo.
+      // Sin esto, mover el cursor hacia arriba para leer el tooltip
+      // sale del rect (20px) → mouseout → tooltip desaparece.
+      enterable: true,
+      // SIN confine: el chart mide 24px, confinar dentro es imposible.
+      hideDelay: 1200,
       formatter: (params: any) => {
         // trigger:'item': params.dataIndex = índice del rect hovered
         const idx = typeof params?.dataIndex === 'number' ? params.dataIndex : -1
