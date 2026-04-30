@@ -31,6 +31,7 @@ interface GateChangeModalProps {
   shiftDocId: string
   configSnapshots: GateConfigSnapshot[]
   onSaved: () => void
+  plantLineId?: string
 }
 
 export function GateChangeModal({
@@ -39,6 +40,7 @@ export function GateChangeModal({
   shiftDocId,
   configSnapshots,
   onSaved,
+  plantLineId,
 }: GateChangeModalProps) {
   const user = useAuthStore(s => s.user)
   const { toast } = useToast()
@@ -54,7 +56,7 @@ export function GateChangeModal({
   // Cargar calibres configurados
   useEffect(() => {
     if (!open) return
-    getModuleRanges()
+    getModuleRanges(plantLineId)
       .then(cfg => {
         if (cfg?.customWeightRanges && cfg.customWeightRanges.length > 0) {
           const fromRanges = cfg.customWeightRanges.map((r: CalibreWeightRange) => r.calibre).filter(Boolean) as CalibreRange[]
@@ -62,7 +64,7 @@ export function GateChangeModal({
         }
       })
       .catch(() => {})
-  }, [open])
+  }, [open, plantLineId])
 
   // Gates del último snapshot, ordenados
   const currentGates = useMemo<GateAssignment[]>(() => {

@@ -68,6 +68,7 @@ interface BeltRpmModalProps {
   onOpenChange: (open: boolean) => void
   shiftDocId: string
   shiftDoc: GraderShiftDoc | null
+  plantLineId?: string
 }
 
 export function BeltRpmModal({
@@ -75,6 +76,7 @@ export function BeltRpmModal({
   onOpenChange,
   shiftDocId,
   shiftDoc,
+  plantLineId,
 }: BeltRpmModalProps) {
   const user = useAuthStore(s => s.user)
   const { toast } = useToast()
@@ -87,7 +89,7 @@ export function BeltRpmModal({
   // Pre-rellenar desde último registro del turno o desde physicalConfig
   useEffect(() => {
     if (!open) return
-    getModuleRanges()
+    getModuleRanges(plantLineId)
       .then(cfg => {
         if (!cfg?.physicalConfig) return
         setPhysicalConfig(cfg.physicalConfig)
@@ -112,7 +114,7 @@ export function BeltRpmModal({
         setRpms(initial)
       })
       .catch(() => {})
-  }, [open, shiftDoc])
+  }, [open, shiftDoc, plantLineId])
 
   function handleClose() {
     setNote('')

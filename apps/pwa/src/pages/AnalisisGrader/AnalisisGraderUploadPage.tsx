@@ -25,6 +25,7 @@ import { getModuleRanges } from '@/services/grader/graderModuleConfig.service'
 import { deleteDailySummary } from '@/services/grader/graderDailySummary.service'
 import { listGraderUploads, saveGraderUpload, updateGraderUpload, uploadGraderFile, deleteGraderUpload } from '@/services/grader/graderUpload.service'
 import { DEFAULT_SHIFT_SCHEDULE, inferShiftIdFromSchedule, normalizeShiftSchedule, shiftIdToKey } from '@/services/grader/graderShiftSchedule'
+import { getPlantLineConfig, DEFAULT_PLANT_LINE_ID, type PlantLineId } from '@/config/plantLines'
 import { GraderHistoricalCalendar } from '@/components/grader/GraderHistoricalCalendar'
 import type {
   ParsedMatrixData,
@@ -124,6 +125,8 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
   const [searchParams] = useSearchParams()
   const autoLoadRef = useRef(false)
   const user = useAuthStore((s) => s.user)
+  const lineId = (searchParams.get('linea') as PlantLineId | null) ?? DEFAULT_PLANT_LINE_ID
+  const lineConfig = getPlantLineConfig(lineId)
 
   // Sincronizar con el padre cuando cambian los archivos
   const updateFiles = useCallback((updater: (prev: FileParsed[]) => FileParsed[]) => {
@@ -141,15 +144,15 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
   }, [])
 
   useEffect(() => {
-    getModuleRanges()
+    getModuleRanges(lineId)
       .then((cfg) => {
-        const schedule = normalizeShiftSchedule(cfg?.shiftSchedule)
+        const schedule = normalizeShiftSchedule(cfg?.shiftSchedule, lineConfig.defaultShiftSchedule)
         setShiftSchedule(schedule)
       })
       .catch(() => {
-        setShiftSchedule(DEFAULT_SHIFT_SCHEDULE)
+        setShiftSchedule(lineConfig.defaultShiftSchedule ?? DEFAULT_SHIFT_SCHEDULE)
       })
-  }, [])
+  }, [lineId, lineConfig.defaultShiftSchedule])
 
   useEffect(() => {
     if (uploads.length === 0) return

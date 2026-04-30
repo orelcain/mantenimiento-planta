@@ -191,6 +191,7 @@ export function GraderQuickChangePage() {
             shiftDocId={shiftDocId!}
             configSnapshots={snapshots}
             onSaved={() => { setModalOpen(false); handleSaved() }}
+            plantLineId={searchParams.get('linea') ?? undefined}
           />
 
           {/* Config actual compacta — los gates activos del último snapshot */}

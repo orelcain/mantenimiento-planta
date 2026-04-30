@@ -43,6 +43,7 @@ interface ShiftConfigPanelProps {
   onSaved: () => void
   allowEdit?: boolean
   summary?: GraderDailySummary | null
+  plantLineId?: string
 }
 
 export function ShiftConfigPanel({
@@ -52,6 +53,7 @@ export function ShiftConfigPanel({
   onSaved,
   allowEdit = false,
   summary,
+  plantLineId,
 }: ShiftConfigPanelProps) {
   const [open, setOpen] = useState(false)
   const [gateModalOpen, setGateModalOpen] = useState(false)
@@ -303,6 +305,7 @@ export function ShiftConfigPanel({
         shiftDocId={shiftDocId}
         configSnapshots={configSnapshots}
         onSaved={handleGatesSaved}
+        plantLineId={plantLineId}
       />
 
       {/* Modal velocidades Danfoss */}
@@ -311,6 +314,7 @@ export function ShiftConfigPanel({
         onOpenChange={setRpmModalOpen}
         shiftDocId={shiftDocId}
         shiftDoc={shiftDoc}
+        plantLineId={plantLineId}
       />
     </Card>
   )

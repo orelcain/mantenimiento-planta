@@ -189,7 +189,7 @@ export function AnalisisGraderWizardPage() {
     let cancelled = false
     ;(async () => {
       try {
-        const cfg = await getModuleRanges()
+        const cfg = await getModuleRanges(lineId)
         if (cancelled || !cfg?.physicalConfig) return
         // Sincronizar velocidades de todas las cintas desde el config guardado
         setEffectiveSpeeds((prev) => {
@@ -204,7 +204,7 @@ export function AnalisisGraderWizardPage() {
       } catch { /* fallback silencioso: usa DEFAULT_PHYSICAL_CONFIG */ }
     })()
     return () => { cancelled = true }
-  }, [])
+  }, [lineId])
 
   // Restaurar draft local
   useEffect(() => {
@@ -393,7 +393,7 @@ export function AnalisisGraderWizardPage() {
       const sourceNames = parsedData?.files.map((f) => f.name) ?? []
 
       // Cargar PauseDetectorConfig guardada por el admin (M16) para re-detección consistente.
-      const moduleCfg = await getModuleRanges().catch(() => null)
+      const moduleCfg = await getModuleRanges(lineId).catch(() => null)
       const pauseDetectorCfg = moduleCfg?.pauseDetectorConfig
 
       // Calcular summaries + detectar pausas en el mismo pase.

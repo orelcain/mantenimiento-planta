@@ -402,7 +402,7 @@ export function AnalisisGraderLandingPage() {
         />
       </section>
 
-      <GlobalSettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <GlobalSettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} plantLineId={lineId} />
 
       {showComparison && comparisonPair && (
         <DayComparisonModal

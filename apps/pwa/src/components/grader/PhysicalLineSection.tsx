@@ -33,7 +33,11 @@ const SUB_TABS: { id: SubTab; label: string }[] = [
   { id: 'verificacion', label: 'Verificación' },
 ]
 
-export function PhysicalLineSection() {
+interface Props {
+  plantLineId?: string
+}
+
+export function PhysicalLineSection({ plantLineId }: Props = {}) {
   const { toast } = useToast()
   const user = useAuthStore(s => s.user)
   const [physicalConfig, setPhysicalConfig] = useState<GraderPhysicalConfig>(DEFAULT_PHYSICAL_CONFIG)
@@ -45,11 +49,11 @@ export function PhysicalLineSection() {
 
   useEffect(() => {
     setLoading(true)
-    getModuleRanges()
+    getModuleRanges(plantLineId)
       .then(cfg => { if (cfg?.physicalConfig) setPhysicalConfig(cfg.physicalConfig) })
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [])
+  }, [plantLineId])
 
   const handleSave = useCallback(async () => {
     setSaving(true)
@@ -57,6 +61,7 @@ export function PhysicalLineSection() {
       await saveModulePhysicalConfig({
         physicalConfig,
         updatedBy: user?.id ?? 'unknown',
+        plantLineId,
       })
       toast({ title: 'Config física guardada' })
     } catch {
@@ -64,7 +69,7 @@ export function PhysicalLineSection() {
     } finally {
       setSaving(false)
     }
-  }, [physicalConfig, user, toast])
+  }, [physicalConfig, user, toast, plantLineId])
 
   const updateBeltLength = useCallback((beltId: string, lengthMeters: number) => {
     setPhysicalConfig(p => ({

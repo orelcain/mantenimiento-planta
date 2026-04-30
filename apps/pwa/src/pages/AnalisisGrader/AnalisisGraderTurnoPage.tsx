@@ -384,11 +384,11 @@ export function AnalisisGraderTurnoPage() {
   }, [])
 
   useEffect(() => {
-    getModuleRanges().then(cfg => {
+    getModuleRanges(plantLineCfg.id).then(cfg => {
       if (cfg?.alertThreshold) setAlertThreshold(cfg.alertThreshold)
       if (cfg?.criticalThreshold) setCriticalThreshold(cfg.criticalThreshold)
     }).catch(() => {})
-  }, [])
+  }, [plantLineCfg.id])
 
   // Merge timelineBuckets con bucketExtrasByMinute (script reclassify) —
   // campos que el segmenter viejo no guardó (lot, dominantCalibre, etc.)
@@ -1159,12 +1159,14 @@ export function AnalisisGraderTurnoPage() {
                 shiftDocId={shiftDocId}
                 configSnapshots={configSnapshots}
                 onSaved={() => { setPlanGateModalOpen(false); void reloadConfigSnapshots() }}
+                plantLineId={plantLineCfg.id}
               />
               <BeltRpmModal
                 open={planRpmModalOpen}
                 onOpenChange={setPlanRpmModalOpen}
                 shiftDocId={shiftDocId}
                 shiftDoc={shiftDoc}
+                plantLineId={plantLineCfg.id}
               />
             </div>
 
@@ -1194,6 +1196,7 @@ export function AnalisisGraderTurnoPage() {
               onSaved={reloadConfigSnapshots}
               allowEdit={shiftWindow?.status === 'live'}
               summary={summary}
+              plantLineId={plantLineCfg.id}
             />
           )}
 

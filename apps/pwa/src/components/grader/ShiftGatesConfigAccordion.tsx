@@ -48,9 +48,10 @@ interface Props {
   onSaved: () => void
   /** Cuando false, los selects y el botón de guardar quedan deshabilitados */
   allowEdit?: boolean
+  plantLineId?: string
 }
 
-export function ShiftGatesConfigAccordion({ shiftDocId, configSnapshots, onSaved, allowEdit = true }: Props) {
+export function ShiftGatesConfigAccordion({ shiftDocId, configSnapshots, onSaved, allowEdit = true, plantLineId }: Props) {
   const user = useAuthStore(s => s.user)
   const { toast } = useToast()
 
@@ -74,14 +75,14 @@ export function ShiftGatesConfigAccordion({ shiftDocId, configSnapshots, onSaved
   }, [initialGates])
 
   useEffect(() => {
-    getModuleRanges()
+    getModuleRanges(plantLineId)
       .then(cfg => {
         if (cfg?.customWeightRanges && cfg.customWeightRanges.length > 0) {
           setWeightRanges(cfg.customWeightRanges)
         }
       })
       .catch(() => {})
-  }, [])
+  }, [plantLineId])
 
   const availableCalibres = useMemo<CalibreRange[]>(() => {
     const fromRanges = weightRanges.map(r => r.calibre).filter(Boolean) as CalibreRange[]

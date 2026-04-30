@@ -1439,7 +1439,7 @@ export function AnalisisGraderGatesConfigPage({
           flipperDelayCloseMs:  values.delayFlipperCloseMs,
         }))}
       />
-      <GlobalSettingsModal open={globalSettingsOpen} onOpenChange={handleGlobalSettingsClose} />
+      <GlobalSettingsModal open={globalSettingsOpen} onOpenChange={handleGlobalSettingsClose} plantLineId={plantLineId} />
     </div>
   )
 }

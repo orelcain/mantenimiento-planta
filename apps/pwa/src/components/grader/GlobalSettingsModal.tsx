@@ -49,9 +49,10 @@ const EMPTY_TAG: Omit<GraderPauseTag, 'id'> & { id: string } = {
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
+  plantLineId?: string
 }
 
-export function GlobalSettingsModal({ open, onOpenChange }: Props) {
+export function GlobalSettingsModal({ open, onOpenChange, plantLineId }: Props) {
   const user = useAuthStore(s => s.user)
   const isAdmin = useIsAdmin()
   const { toast } = useToast()
@@ -96,7 +97,7 @@ export function GlobalSettingsModal({ open, onOpenChange }: Props) {
   useEffect(() => {
     if (!open) return
     setLoading(true)
-    getModuleRanges()
+    getModuleRanges(plantLineId)
       .then(cfg => {
         if (cfg?.alertThreshold)    setAlertThreshold(cfg.alertThreshold)
         if (cfg?.criticalThreshold) setCriticalThreshold(cfg.criticalThreshold)
@@ -111,7 +112,7 @@ export function GlobalSettingsModal({ open, onOpenChange }: Props) {
       })
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [open])
+  }, [open, plantLineId])
 
   function updateRange(idx: number, patch: Partial<CalibreWeightRange>) {
     setRanges(prev => prev.map((r, i) => i === idx ? { ...r, ...patch } : r))
@@ -178,6 +179,7 @@ export function GlobalSettingsModal({ open, onOpenChange }: Props) {
         criticalThreshold,
         customWeightRanges: isCustomRanges ? ranges : [],
         updatedBy: user.id,
+        plantLineId,
       })
       toast({ title: 'Configuración guardada', description: 'Los cambios se aplicarán en todos los turnos.' })
       onOpenChange(false)
@@ -196,7 +198,7 @@ export function GlobalSettingsModal({ open, onOpenChange }: Props) {
     if (!user) return
     setSaving(true)
     try {
-      await savePauseDetectorConfig({ config: detector, updatedBy: user.id })
+      await savePauseDetectorConfig({ config: detector, updatedBy: user.id, plantLineId })
       toast({ title: 'Detector guardado', description: 'Los parámetros se aplicarán en la próxima detección.' })
       onOpenChange(false)
     } catch (err) {
@@ -488,7 +490,7 @@ export function GlobalSettingsModal({ open, onOpenChange }: Props) {
               )}
             </div>
           ) : tab === 'fisica' ? (
-            <PhysicalLineSection />
+            <PhysicalLineSection plantLineId={plantLineId} />
           ) : (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
