@@ -527,11 +527,19 @@ function buildDayTimelineBlocks(
     for (const shiftId of ['Turno día', 'Turno noche'] as const) {
       const slxKey = `${slideKey}__${shiftId}`
       const slx = slxData.get(slxKey)
-      if (!slx?.shiftStart || !slx?.shiftEnd || slx.states.length === 0 || (slx.totalCycles ?? 0) === 0) continue
-      const startMin = slx.shiftStart.getUTCHours() * 60 + slx.shiftStart.getUTCMinutes()
-      const endMin   = slx.shiftEnd.getUTCHours()   * 60 + slx.shiftEnd.getUTCMinutes()
-      let startFrac  = startMin / 1440
-      let endFrac    = endMin   / 1440
+      if (!slx || slx.states.length === 0 || (slx.totalCycles ?? 0) === 0) continue
+      // Fuente de verdad: timestamps reales de los states del Shoplogix.
+      // Evita depender de shiftStart/shiftEnd del doc Firestore, que pueden
+      // ser epoch (new Date(0)) si el CF no los escribió, o usar el schedule
+      // de otra planta.
+      const dayStartMs = new Date(`${slideKey}T00:00:00Z`).getTime()
+      const dayEndMs   = dayStartMs + 86_400_000
+      const eff = computeEffectiveWindow(slx.states, dayStartMs, dayEndMs)
+      if (!eff) continue
+      const effStart = new Date(eff.startMs)
+      const effEnd   = new Date(eff.endMs)
+      let startFrac  = (effStart.getUTCHours() * 60 + effStart.getUTCMinutes()) / 1440
+      let endFrac    = (effEnd.getUTCHours()   * 60 + effEnd.getUTCMinutes())   / 1440
       // Turno noche cruza medianoche → mostrar solo la parte de este día
       if (endFrac < startFrac) endFrac = 1
       if (endFrac <= startFrac) endFrac = Math.min(1, startFrac + 0.02)
@@ -821,14 +829,20 @@ export function GraderHistoricalCalendar({
     const latestUpload = uploads.length > 0
       ? uploads.map((u) => u.sessionDate || toDateKey(u.inferred?.startAt)).filter(Boolean).sort().slice(-1)[0]
       : undefined
-    const latest = latestHist ?? latestUpload
+    // Fallback: último día con datos Shoplogix (útil cuando no hay Excel, ej. Yal)
+    const slxDays = [...slxByShift.entries()]
+      .filter(([, v]) => v.totalCycles > 0)
+      .map(([k]) => k.split('__')[0]!)
+    slxDays.sort()
+    const latestSlx = slxDays[slxDays.length - 1]
+    const latest = latestHist ?? latestUpload ?? latestSlx
     if (latest) {
       const latestDate = new Date(`${latest}T00:00:00`)
       setSelectedDate(latestDate)
       setCurrentMonth(new Date(latestDate.getFullYear(), latestDate.getMonth(), 1))
       autoSelectedRef.current = true
     }
-  }, [historicalByDate, uploads])
+  }, [historicalByDate, uploads, slxByShift])
 
   const days = getDaysInMonth(currentMonth)
 
