@@ -56,6 +56,12 @@ import { p0StatusFromPct, p0StatusColor, DEFAULT_P0_ALERT_PCT, DEFAULT_P0_CRITIC
 import { loadShoplogixShift } from '@/services/shoplogix/shoplogixShift.service'
 import type { MachineTrendPoint } from '@/services/shoplogix/shoplogixShift.service'
 import type { UpstreamMachineState } from '@/services/shoplogix/types'
+import {
+  getShiftDisplayDateKey,
+  isMidnightShift,
+  cfKeysForVisualDay,
+  addDaysToDateKey,
+} from '@/services/grader/graderShiftDisplay'
 import { MachineTrendMiniChart } from './UpstreamMachinesPanel'
 import { getPlantLineConfig, DEFAULT_PLANT_LINE_ID, type PlantLineId } from '@/config/plantLines'
 
@@ -527,9 +533,10 @@ function buildDayTimelineBlocks(
   // que pueden ser incorrectos — pero eso ya es dato viejo que se irá reemplazando.
   if (blocks.length === 0 && slideKey && slxData) {
     const pad2 = (n: number) => String(n).padStart(2, '0')
-    // Día de producción = 08:00→08:00 (igual que fullDayWindow del backend).
-    // Así Turno 3 (00:00→03:32 del día siguiente) queda dentro del rango visible.
-    const dayStartMs = new Date(`${slideKey}T08:00:00Z`).getTime()
+    // Día calendárico: 00:00 → 24:00 del slideKey (alineado con Shoplogix UI).
+    // El Turno 3 cuya CF dateKey = slideKey-1 tiene horas reales 00:00-07:45 del
+    // slideKey y aparece al inicio del timeline (no al final).
+    const dayStartMs = new Date(`${slideKey}T00:00:00Z`).getTime()
     const dayEndMs   = dayStartMs + 86_400_000
     const fracToHHMM = (frac: number) => {
       const d = new Date(dayStartMs + Math.max(0, Math.min(1, frac)) * 86_400_000)
@@ -537,35 +544,46 @@ function buildDayTimelineBlocks(
     }
     const MIN_VALID_TS = 86_400_000
 
-    // De-duplicar: si existen docs nuevo formato (Turno 1/2/3) Y legado (Turno día/noche)
-    // para el mismo día, preferir el nuevo y saltar el legado.
-    const allShiftIdsForDay = new Set(
-      [...slxData.keys()]
-        .filter(k => k.startsWith(`${slideKey}__`) && (slxData.get(k)?.totalCycles ?? 0) > 0)
-        .map(k => k.slice(`${slideKey}__`.length)),
-    )
-    const hasNewDay   = allShiftIdsForDay.has('Turno 2')
-    const hasNewNight = allShiftIdsForDay.has('Turno 1') || allShiftIdsForDay.has('Turno 3')
+    // Recolectar shifts del DÍA VISUAL slideKey:
+    //   - T1, T2, Turno día/noche con dateKey CF = slideKey
+    //   - Turno 3 con dateKey CF = slideKey-1 (madrugada del slideKey)
+    interface VisualShiftRef { shiftId: string; cfDateKey: string; mapKey: string }
+    const visualShifts: VisualShiftRef[] = []
+    for (const [mapKey, slx] of slxData.entries()) {
+      if ((slx.totalCycles ?? 0) === 0) continue
+      const sepIdx = mapKey.indexOf('__')
+      if (sepIdx < 0) continue
+      const cfDateKey = mapKey.slice(0, sepIdx)
+      const shiftId   = mapKey.slice(sepIdx + 2)
+      const visualDay = isMidnightShift(shiftId) ? addDaysToDateKey(cfDateKey, 1) : cfDateKey
+      if (visualDay !== slideKey) continue
+      visualShifts.push({ shiftId, cfDateKey, mapKey })
+    }
 
-    // Colores por turno para distinguir visualmente la posición en el día
+    // De-duplicar: si existen docs nuevo formato (Turno 1/2/3) Y legado
+    // (Turno día/noche) para el mismo día visual, preferir el nuevo.
+    const visualShiftIds = new Set(visualShifts.map(v => v.shiftId))
+    const hasNewDay   = visualShiftIds.has('Turno 2')
+    const hasNewNight = visualShiftIds.has('Turno 1') || visualShiftIds.has('Turno 3')
+
+    // Colores por turno (orden cronológico calendárico):
     const shiftBg: Record<string, string> = {
-      'Turno 1':    'bg-indigo-500/40',   // madrugada
-      'Turno 2':    'bg-amber-500/40',    // día
-      'Turno 3':    'bg-teal-500/40',     // tarde-noche
+      'Turno 3':    'bg-teal-500/40',     // 00:00-07:45 madrugada
+      'Turno 1':    'bg-indigo-500/40',   // 07:45-14:45 día
+      'Turno 2':    'bg-amber-500/40',    // 14:45-00:00 tarde-noche
       'Turno día':  'bg-amber-500/40',    // legado día
       'Turno noche':'bg-indigo-500/40',   // legado noche
     }
 
-    // Recolectar todos los shifts de este día con datos válidos
-    const dayShifts: Array<{ shiftId: string; startMs: number; endMs: number; isGhost?: boolean }> = []
-    for (const [mapKey, slx] of slxData.entries()) {
-      if (!mapKey.startsWith(`${slideKey}__`)) continue
-      if ((slx.totalCycles ?? 0) === 0) continue
-
-      const shiftId = mapKey.slice(`${slideKey}__`.length)
+    // Recolectar bloques con datos válidos
+    const dayShifts: Array<{ shiftId: string; cfDateKey: string; startMs: number; endMs: number; isGhost?: boolean }> = []
+    for (const v of visualShifts) {
       // Saltar legado si existe equivalente nuevo
-      if (shiftId === 'Turno día'   && hasNewDay)   continue
-      if (shiftId === 'Turno noche' && hasNewNight) continue
+      if (v.shiftId === 'Turno día'   && hasNewDay)   continue
+      if (v.shiftId === 'Turno noche' && hasNewNight) continue
+
+      const slx = slxData.get(v.mapKey)
+      if (!slx) continue
 
       // Preferir scheduledStart/End (real de Shoplogix) sobre states
       const ssOk = slx.scheduledStart !== null && (slx.scheduledStart?.getTime() ?? 0) > MIN_VALID_TS
@@ -584,22 +602,28 @@ function buildDayTimelineBlocks(
         endMs   = eff.endMs
       }
 
-      dayShifts.push({ shiftId, startMs, endMs })
+      dayShifts.push({ shiftId: v.shiftId, cfDateKey: v.cfDateKey, startMs, endMs })
     }
 
-    // Ordenar por inicio — garantiza orden coherente en el timeline
+    // Ordenar por inicio
     dayShifts.sort((a, b) => a.startMs - b.startMs)
 
-    // Ghost block: si existen docs nuevo formato y Turno 1 está vacío,
-    // añadirlo como bloque fantasma entre el fin de Turno 3 y el inicio de Turno 2.
+    // Ghost block: si existen T2 y T3 pero T1 está vacío,
+    // añadir un fantasma entre el fin del T3 (madrugada) y el inicio del T2 (tarde).
     const hasTurno2 = dayShifts.some(s => s.shiftId === 'Turno 2')
     const hasTurno1 = dayShifts.some(s => s.shiftId === 'Turno 1')
     if (hasTurno2 && !hasTurno1) {
-      const turno2  = dayShifts.find(s => s.shiftId === 'Turno 2')!
-      const turno3  = dayShifts.find(s => s.shiftId === 'Turno 3')
+      const turno2 = dayShifts.find(s => s.shiftId === 'Turno 2')!
+      const turno3 = dayShifts.find(s => s.shiftId === 'Turno 3')
       const ghostStart = turno3 ? turno3.endMs : dayStartMs
       if (turno2.startMs - ghostStart > 15 * 60_000) {
-        dayShifts.push({ shiftId: 'Turno 1', startMs: ghostStart, endMs: turno2.startMs, isGhost: true })
+        dayShifts.push({
+          shiftId: 'Turno 1',
+          cfDateKey: slideKey,
+          startMs: ghostStart,
+          endMs: turno2.startMs,
+          isGhost: true,
+        })
         dayShifts.sort((a, b) => a.startMs - b.startMs)
       }
     }
@@ -616,11 +640,17 @@ function buildDayTimelineBlocks(
       if (shift.endMs >= dayEndMs - 1) endFrac = 1
       if (endFrac <= startFrac) endFrac = Math.min(1, startFrac + 0.02)
 
-      const label = shift.shiftId   // nombre completo: "Turno 1", "Turno 2", etc.
+      const label = shift.shiftId
 
       const ts = `${fracToHHMM(startFrac)}–${fracToHHMM(endFrac)}`
-      const nightSide = (shift.shiftId === 'Turno noche' || shift.shiftId === 'Turno 3')
-        ? (startFrac === 0 ? 'start' : 'end') : null
+      // Madrugada (T3, Turno noche que arranca a las 0): nightSide='start'
+      // Vespertina (T2 que termina en 24): nightSide='end'
+      const nightSide: 'start' | 'end' | null =
+        shift.shiftId === 'Turno 3' || (shift.shiftId === 'Turno noche' && startFrac === 0)
+          ? 'start'
+          : (shift.shiftId === 'Turno 2' || shift.shiftId === 'Turno noche') && endFrac >= 0.999
+            ? 'end'
+            : null
 
       const baseBg = shiftBg[shift.shiftId] ?? 'bg-sky-500/40'
       const bgClass = shift.isGhost
@@ -637,9 +667,9 @@ function buildDayTimelineBlocks(
           : `${shift.shiftId} · Shoplogix · ${ts} · sin Excel cargado`,
         nightSide,
         summaryId:    '',
-        dateKey:      slideKey,
+        dateKey:      shift.cfDateKey,  // CF dateKey para navegación correcta
         shiftId:      shift.shiftId,
-        fragId:       `${slideKey}__${shift.shiftId}-slx`,
+        fragId:       `${shift.cfDateKey}__${shift.shiftId}-slx`,
         startTimeStr: fracToHHMM(startFrac),
         endTimeStr:   fracToHHMM(endFrac),
         p0Pct:        null,
@@ -681,28 +711,64 @@ function computeEffectiveWindow(
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Devuelve los shiftIds a mostrar en las cards "Sin Excel" para un día,
+ * Devuelve los shifts a mostrar en las cards "Sin Excel" para un día VISUAL,
  * de-duplicando formato legado vs nuevo (Turno 1/2/3 tiene precedencia).
- * Orden producción (08:00→08:00): Turno 1/día → Turno 2/tarde → Turno 3/madrugada.
- * Si no hay data alguna devuelve [] (sin placeholders legacy que serían incorrectos para Yal).
+ *
+ * Convención calendárica (alineada con Shoplogix UI): el día visual Y muestra
+ *   - Turno 3 con dateKey CF = Y-1 (00:00-07:45 del Y, almacenado con dateKey
+ *     del día anterior por el Cloud Function — convención "día laboral")
+ *   - Turno 1 con dateKey CF = Y   (07:45-14:45 del Y)
+ *   - Turno 2 con dateKey CF = Y   (14:45-00:00 del Y)
+ *   - Turno día / Turno noche legacy con dateKey CF = Y
+ *
+ * Orden cronológico calendárico (00:00→24:00 del día visual):
+ *   Turno 3 (madrugada) → Turno 1/día → Turno 2/noche
+ *
+ * Devuelve cada shift junto con su `cfDateKey` (la clave para acceder a
+ * `slxByShift`) y el `slxKey` ya armado.
  */
-function slxDisplayIds(dateKey: string, slxByShift: Map<string, { totalCycles?: number }>): string[] {
-  const prefix = `${dateKey}__`
-  const all = Array.from(slxByShift.keys())
-    .filter(k => k.startsWith(prefix))
-    .map(k => k.slice(prefix.length))
-  const hasT2    = all.includes('Turno 2')
-  const hasT1or3 = all.includes('Turno 1') || all.includes('Turno 3')
-  const deduped  = all
-    .filter(id => !(id === 'Turno día'   && hasT2))
-    .filter(id => !(id === 'Turno noche' && hasT1or3))
-  if (deduped.length === 0) return []
-  // Orden cronológico producción (izq=08:00 → der=08:00 día siguiente):
-  //   Turno 1 / día  (08:00-16:15) → primero / izquierda
-  //   Turno 2 / noche (16:15-00:00) → segundo / centro
-  //   Turno 3        (00:00-07:45) → tercero / derecha (madrugada)
-  const ord: Record<string, number> = { 'Turno 1': 1, 'Turno día': 1, 'Turno 2': 2, 'Turno noche': 2, 'Turno 3': 3 }
-  return [...deduped].sort((a, b) => (ord[a] ?? 9) - (ord[b] ?? 9))
+interface SlxDisplayShift {
+  shiftId: string
+  cfDateKey: string
+  slxKey: string
+}
+function slxDisplayShifts(
+  visualDay: string,
+  slxByShift: Map<string, { totalCycles?: number }>,
+): SlxDisplayShift[] {
+  const { ownDay, prevDay } = cfKeysForVisualDay(visualDay)
+  const collected: SlxDisplayShift[] = []
+
+  // Shifts cuyo dateKey CF == ownDay (todos excepto Turno 3, que viene del día anterior).
+  for (const k of slxByShift.keys()) {
+    if (!k.startsWith(`${ownDay}__`)) continue
+    const shiftId = k.slice(`${ownDay}__`.length)
+    if (isMidnightShift(shiftId)) continue
+    collected.push({ shiftId, cfDateKey: ownDay, slxKey: k })
+  }
+
+  // Turno 3 visual del día Y → dateKey CF = Y-1
+  const t3Key = `${prevDay}__Turno 3`
+  if (slxByShift.has(t3Key)) {
+    collected.push({ shiftId: 'Turno 3', cfDateKey: prevDay, slxKey: t3Key })
+  }
+
+  if (collected.length === 0) return []
+
+  const ids = new Set(collected.map(c => c.shiftId))
+  const hasT2    = ids.has('Turno 2')
+  const hasT1or3 = ids.has('Turno 1') || ids.has('Turno 3')
+  const deduped = collected
+    .filter(c => !(c.shiftId === 'Turno día'   && hasT2))
+    .filter(c => !(c.shiftId === 'Turno noche' && hasT1or3))
+
+  // Orden calendárico (Turno 3 madrugada va primero, luego día, luego noche)
+  const ord: Record<string, number> = {
+    'Turno 3': 1,
+    'Turno 1': 2, 'Turno día':  2,
+    'Turno 2': 3, 'Turno noche': 3,
+  }
+  return deduped.sort((a, b) => (ord[a.shiftId] ?? 9) - (ord[b.shiftId] ?? 9))
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -902,11 +968,16 @@ export function GraderHistoricalCalendar({
     const endDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
     listDailySummariesByRange(startDate, endDate, plantLineId)
       .then((list) => {
+        // Agrupar por DÍA VISUAL (calendárico). Para Turno 3 (00:00-07:45) cuyo
+        // dateKey CF apunta al día anterior, el día visual es dateKey + 1.
+        // Para Chonchi (Turno día/noche) se preserva el comportamiento previo
+        // porque getShiftDisplayDateKey solo desplaza Turno 3.
         const map = new Map<string, GraderDailySummary[]>()
         for (const s of list) {
-          const existing = map.get(s.dateKey) ?? []
+          const visualKey = getShiftDisplayDateKey(s.dateKey, s.shiftId)
+          const existing = map.get(visualKey) ?? []
           existing.push(s)
-          map.set(s.dateKey, existing)
+          map.set(visualKey, existing)
         }
         setHistoricalByDate(map)
         setAllSummariesRaw(list)
@@ -1196,23 +1267,31 @@ export function GraderHistoricalCalendar({
     return () => { cancelled = true }
   }, [selectedKey, historicalByDate]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Lazy-load de Shoplogix states para los shifts del día seleccionado.
+  // Lazy-load de Shoplogix states para los shifts del día visual seleccionado.
   // Carga tanto el formato legado (Turno día/noche) como el nuevo (Turno 1/2/3).
-  // Para Yal con 3 turnos, el Turno 3 de "hoy" corre en 00:00-07:45 del mismo día.
+  //
+  // Convención calendárica (alineada con Shoplogix UI): el día visual
+  // selectedKey muestra
+  //   - T1, T2, Turno día/noche con dateKey CF = selectedKey
+  //   - Turno 3 con dateKey CF = yesterday (la madrugada del selectedKey está
+  //     guardada bajo el día anterior por el CF — convención "día laboral").
+  //
+  // También pre-cargamos `selectedKey__Turno 3` para que cuando el usuario
+  // navegue al día siguiente, el chip nocturno aparezca sin spinner.
   useEffect(() => {
     if (!selectedKey) return
     const [y, m, d] = selectedKey.split('-').map(Number) as [number, number, number]
     const yesterday = new Date(Date.UTC(y, m - 1, d - 1)).toISOString().slice(0, 10)
     const candidates: Array<{ dateKey: string; shiftId: string }> = [
       // Formato legado (Chonchi histórico)
-      { dateKey: yesterday, shiftId: 'Turno noche' },
+      { dateKey: yesterday,   shiftId: 'Turno noche' },
       { dateKey: selectedKey, shiftId: 'Turno día' },
       { dateKey: selectedKey, shiftId: 'Turno noche' },
       // Formato nuevo — syncDay (Turno 1/2/3 reales de Shoplogix)
-      { dateKey: yesterday, shiftId: 'Turno 3' },    // madrugada del día anterior (Yal)
+      { dateKey: yesterday,   shiftId: 'Turno 3' },  // madrugada del día visual (CF=ayer)
       { dateKey: selectedKey, shiftId: 'Turno 1' },
       { dateKey: selectedKey, shiftId: 'Turno 2' },
-      { dateKey: selectedKey, shiftId: 'Turno 3' },  // madrugada de este día
+      { dateKey: selectedKey, shiftId: 'Turno 3' },  // pre-fetch: madrugada del día siguiente
     ]
     let cancelled = false
     for (const c of candidates) {
@@ -2349,14 +2428,19 @@ export function GraderHistoricalCalendar({
               const missingGate0 = hasData && dayHistorical.some((s) => s.hasGate0Data === false)
               const isSelected = selectedDate?.toDateString() === day.toDateString()
 
-              // Indicadores Shoplogix para días sin datos Grader
-              // Preferir nuevo formato (Turno 2 / Turno 1+3) sobre legado (Turno día / Turno noche)
+              // Indicadores Shoplogix para días sin datos Grader.
+              // Convención calendárica: el día visual `dayKey` muestra
+              //   - Turno 2 / Turno día con dateKey CF == dayKey (tarde-noche del día)
+              //   - Turno 1 con dateKey CF == dayKey (mañana del día)
+              //   - Turno 3 con dateKey CF == dayKey-1 (madrugada del día — almacenado
+              //     bajo el día anterior por la convención "día laboral" del CF).
+              const prevDayKey = !hasData ? addDaysToDateKey(dayKey, -1) : ''
               const slxNewDay   = !hasData ? (slxTotalsByShift.get(`${dayKey}__Turno 2`) ?? 0) : 0
               const slxLegDay   = !hasData ? (slxTotalsByShift.get(`${dayKey}__Turno día`) ?? 0) : 0
               const slxDayCycles   = slxNewDay > 0 ? slxNewDay : slxLegDay
               const slxNewNight = !hasData ? Math.max(
-                slxTotalsByShift.get(`${dayKey}__Turno 3`) ?? 0,
-                slxTotalsByShift.get(`${dayKey}__Turno 1`) ?? 0,
+                slxTotalsByShift.get(`${prevDayKey}__Turno 3`) ?? 0,  // madrugada (T3 CF=día anterior)
+                slxTotalsByShift.get(`${dayKey}__Turno 1`)     ?? 0,  // mañana T1 (CF=día visual)
               ) : 0
               const slxLegNight = !hasData ? (slxTotalsByShift.get(`${dayKey}__Turno noche`) ?? 0) : 0
               const slxNightCycles = slxNewNight > 0 ? slxNewNight : slxLegNight
@@ -2695,9 +2779,8 @@ export function GraderHistoricalCalendar({
                 Sin Excel cargado todavía
               </p>
               <div className="grid grid-cols-3 gap-2">
-                {/* displayIds: shifts con data del día de-duplicados (nuevo formato Turno 1/2/3 gana sobre legado). */}
-                {(slxDisplayIds(selectedKey, slxByShift)).map(shiftId => {
-                  const slxKey = `${selectedKey}__${shiftId}`
+                {/* displayShifts: shifts del día visual (T3 viene del CF=día anterior). */}
+                {(slxDisplayShifts(selectedKey, slxByShift)).map(({ shiftId, cfDateKey, slxKey }) => {
                   const hasSlx = (slxByShift.get(slxKey)?.states?.length ?? 0) > 0
                   const lineaQuery = plantLineId !== DEFAULT_PLANT_LINE_ID
                     ? `?linea=${encodeURIComponent(plantLineId)}`
@@ -2773,13 +2856,13 @@ export function GraderHistoricalCalendar({
 
                       <div className="flex items-center gap-2">
                         <QuickGateChangeButton
-                          shiftDocId={`${selectedKey}__${shiftId}`}
+                          shiftDocId={`${cfDateKey}__${shiftId}`}
                           variant="compact"
                           className="flex-1 h-7 text-[11px]"
                         />
                         {hasSlx && (
                           <button
-                            onClick={() => navigate(`/analisis-grader/turno/${selectedKey}__${encodeURIComponent(shiftId)}${lineaQuery}`)}
+                            onClick={() => navigate(`/analisis-grader/turno/${cfDateKey}__${encodeURIComponent(shiftId)}${lineaQuery}`)}
                             className="flex items-center gap-1 h-7 px-2 rounded text-[11px] text-sky-400 border border-sky-500/40 hover:bg-sky-500/10 transition-colors shrink-0"
                             title="Ver detalle Shoplogix de este turno"
                           >
@@ -2944,7 +3027,7 @@ export function GraderHistoricalCalendar({
                       </p>
                     </div>
                   </div>
-                  {/* Mejor turno */}
+                  {/* Mejor turno — fecha mostrada en convención calendárica */}
                   {slxMonthlyStats.bestShift && (
                     <div className="rounded border border-emerald-500/20 bg-emerald-500/5 px-2.5 py-1.5 space-y-0.5">
                       <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
@@ -2952,7 +3035,7 @@ export function GraderHistoricalCalendar({
                         Mejor turno
                       </div>
                       <p className="text-xs font-semibold text-emerald-400">
-                        {slxMonthlyStats.bestShift.dateKey.slice(5)}
+                        {getShiftDisplayDateKey(slxMonthlyStats.bestShift.dateKey, slxMonthlyStats.bestShift.shiftId).slice(5)}
                         {' · '}{slxMonthlyStats.bestShift.shiftId === 'Turno día' ? '☀' : '🌙'}
                         {' · '}<span className="font-bold">{slxMonthlyStats.bestShift.uptimePct.toFixed(0)}%</span>
                         <span className="text-muted-foreground font-normal">
@@ -2963,7 +3046,7 @@ export function GraderHistoricalCalendar({
                       </p>
                     </div>
                   )}
-                  {/* Peor turno */}
+                  {/* Peor turno — fecha mostrada en convención calendárica */}
                   {slxMonthlyStats.worstShift && (
                     <div className="rounded border border-rose-500/20 bg-rose-500/5 px-2.5 py-1.5 space-y-0.5">
                       <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
@@ -2971,7 +3054,7 @@ export function GraderHistoricalCalendar({
                         Peor turno
                       </div>
                       <p className="text-xs font-semibold text-rose-400">
-                        {slxMonthlyStats.worstShift.dateKey.slice(5)}
+                        {getShiftDisplayDateKey(slxMonthlyStats.worstShift.dateKey, slxMonthlyStats.worstShift.shiftId).slice(5)}
                         {' · '}{slxMonthlyStats.worstShift.shiftId === 'Turno día' ? '☀' : '🌙'}
                         {' · '}<span className="font-bold">{slxMonthlyStats.worstShift.uptimePct.toFixed(0)}%</span>
                         <span className="text-muted-foreground font-normal">
