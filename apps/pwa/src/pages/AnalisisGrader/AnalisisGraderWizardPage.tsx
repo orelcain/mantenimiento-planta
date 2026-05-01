@@ -16,6 +16,7 @@ import { AnalisisGraderUploadPage, type FileParsed } from './AnalisisGraderUploa
 import { GraderHistoricalCalendar, type SlxMonthlyStats } from '@/components/grader/GraderHistoricalCalendar'
 import { GraderMonthlyStatsPanel } from '@/components/grader/GraderMonthlyStatsPanel'
 import { PlantLineTabs } from '@/components/grader/PlantLineTabs'
+import { PlantKPIBoard } from '@/components/grader/PlantKPIBoard'
 import { getPlantLineConfig, DEFAULT_PLANT_LINE_ID, type PlantLineId } from '@/config/plantLines'
 import { AnalisisGraderDashboardPage } from './AnalisisGraderDashboardPage'
 import { GraderResumenRapido } from './GraderResumenRapido'
@@ -552,6 +553,13 @@ export function AnalisisGraderWizardPage() {
           </Badge>
         )}
       </div>
+
+      {/* ── Panel de indicadores de rendimiento (KPIs Shoplogix) ── */}
+      <PlantKPIBoard
+        plantSlug={lineConfig.plantSlug}
+        graderSummaries={calendarSummaries}
+        enabled={lineConfig.shoplogixEnabled && !lineConfig.comingSoon}
+      />
 
       {/* ═══ Cuerpo: 2 columnas en desktop — calendario + resumen mensual ═══ */}
       <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-6 items-start">

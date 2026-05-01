@@ -559,13 +559,13 @@ export function App() {
                 <Visor3DViewerPage />
               </Suspense>
             } />
-            {/* Home del módulo = Landing unificado (Hero + KPIs + Calendario). */}
+            {/* Home del módulo = Wizard (upload + calendar + KPIs + config). */}
             <Route path="analisis-grader" element={
               <Suspense fallback={<LoadingScreen />}>
-                <AnalisisGraderLandingPage />
+                <AnalisisGraderWizardPage />
               </Suspense>
             } />
-            {/* Wizard de carga de Excel (upload + pasos) */}
+            {/* Alias legacy: /wizard también lleva al home */}
             <Route path="analisis-grader/wizard" element={
               <Suspense fallback={<LoadingScreen />}>
                 <AnalisisGraderWizardPage />

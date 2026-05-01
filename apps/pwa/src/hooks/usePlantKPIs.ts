@@ -167,32 +167,33 @@ export function usePlantKPIs(
       setState({ loading: true, error: null, kpis: null })
 
       try {
-        // Buscar el turno más reciente (hasta 3 días atrás)
+        // Buscar el turno más reciente CON producción real (hasta 4 días atrás).
+        // Se omiten turnos donde todas las máquinas muestran 0 runtime (sin producción).
         let dateKey: string | null = null
         let shiftId: string | null = null
+        let snapshot: Awaited<ReturnType<typeof loadShoplogixShift>>['snapshot'] = null
 
-        for (let i = 0; i <= 3; i++) {
+        outer: for (let i = 0; i <= 4; i++) {
           const dk = daysAgo(i)
           const ids = await listShoplogixShiftIdsForDay(dk, plantSlug)
-          if (ids.length > 0) {
-            dateKey = dk
-            // El turno más tarde del día (orden lexicográfico: "Turno 3" > "Turno 2" > "Turno 1")
-            shiftId = ids[ids.length - 1]!
-            break
-          }
           if (cancelled) return
+          // Iterar desde el turno más tardío al más temprano del día
+          for (const sid of [...ids].reverse()) {
+            const res = await loadShoplogixShift(dk, sid, plantSlug)
+            if (cancelled) return
+            if (!res.snapshot || res.snapshot.machines.length === 0) continue
+            const hasActivity = res.snapshot.machines.some((m) => m.shiftRuntime > 0)
+            if (hasActivity) {
+              dateKey = dk
+              shiftId = sid
+              snapshot = res.snapshot
+              break outer
+            }
+          }
         }
 
-        if (!dateKey || !shiftId) {
+        if (!dateKey || !shiftId || !snapshot) {
           if (!cancelled) setState({ loading: false, error: null, kpis: null })
-          return
-        }
-
-        const { snapshot } = await loadShoplogixShift(dateKey, shiftId, plantSlug)
-        if (cancelled) return
-
-        if (!snapshot || snapshot.machines.length === 0) {
-          setState({ loading: false, error: null, kpis: null })
           return
         }
 
