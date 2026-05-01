@@ -167,13 +167,16 @@ export function usePlantKPIs(
       setState({ loading: true, error: null, kpis: null })
 
       try {
-        // Buscar el turno más reciente CON producción real (hasta 4 días atrás).
-        // Se omiten turnos donde todas las máquinas muestran 0 runtime (sin producción).
+        // Buscar el turno más reciente CON producción real (hasta 7 días atrás).
+        // Si no hay ninguno con runtime > 0, usar el último con datos (planta detenida).
         let dateKey: string | null = null
         let shiftId: string | null = null
         let snapshot: Awaited<ReturnType<typeof loadShoplogixShift>>['snapshot'] = null
+        let fallbackDateKey: string | null = null
+        let fallbackShiftId: string | null = null
+        let fallbackSnapshot: Awaited<ReturnType<typeof loadShoplogixShift>>['snapshot'] = null
 
-        outer: for (let i = 0; i <= 4; i++) {
+        outer: for (let i = 0; i <= 7; i++) {
           const dk = daysAgo(i)
           const ids = await listShoplogixShiftIdsForDay(dk, plantSlug)
           if (cancelled) return
@@ -182,6 +185,10 @@ export function usePlantKPIs(
             const res = await loadShoplogixShift(dk, sid, plantSlug)
             if (cancelled) return
             if (!res.snapshot || res.snapshot.machines.length === 0) continue
+            // Guardar como fallback el primer turno con datos (aunque runtime=0)
+            if (!fallbackSnapshot) {
+              fallbackDateKey = dk; fallbackShiftId = sid; fallbackSnapshot = res.snapshot
+            }
             const hasActivity = res.snapshot.machines.some((m) => m.shiftRuntime > 0)
             if (hasActivity) {
               dateKey = dk
@@ -190,6 +197,11 @@ export function usePlantKPIs(
               break outer
             }
           }
+        }
+
+        // Si no hubo actividad, usar el último turno sincronizado (planta detenida)
+        if (!snapshot && fallbackSnapshot) {
+          dateKey = fallbackDateKey; shiftId = fallbackShiftId; snapshot = fallbackSnapshot
         }
 
         if (!dateKey || !shiftId || !snapshot) {

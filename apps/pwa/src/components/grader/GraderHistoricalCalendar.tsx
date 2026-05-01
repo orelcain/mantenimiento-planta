@@ -1397,12 +1397,14 @@ export function GraderHistoricalCalendar({
         })
     }
 
-    // Pase 1 — carga desde cache (rápido): dispara todos en paralelo
-    const staleKeys: string[] = []  // claves con 0 ciclos en datos recientes
+    // Pase 1 — carga desde cache en lotes de 15 para no saturar Firestore.
+    // Antes disparaba todos (~90) simultáneamente → picos de 360 RPCs.
+    const staleKeys: string[] = []
     const today = new Date()
-    const cutoffDays = 45 // revisar contra servidor si el dato tiene < 45 días
+    const cutoffDays = 45
     const cutoffMs = today.getTime() - cutoffDays * 86_400_000
 
+    const pendingLoad: Array<{ dk: string; dkMs: number; shiftId: string; key: string }> = []
     for (let day = 1; day <= daysInMonth; day++) {
       const dk = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
       const dkMs = new Date(`${dk}T12:00:00`).getTime()
@@ -1410,31 +1412,39 @@ export function GraderHistoricalCalendar({
         const key = `${dk}__${shiftId}`
         if (slxMonthQueuedRef.current.has(key)) continue
         slxMonthQueuedRef.current.add(key)
-        // Cache-first; cuando resuelve, si era reciente y quedó en 0 → marcar para reintento
-        loadOne(dk, shiftId, false).then((cycles) => {
-          if (!cancelled && cycles === 0 && dkMs >= cutoffMs) {
-            staleKeys.push(key)
-          }
-        })
+        pendingLoad.push({ dk, dkMs, shiftId, key })
       }
     }
 
-    // Pase 2 — reintento servidor para entradas recientes con 0 ciclos.
-    // Se ejecuta 3 s después (deja que el pase 1 termine) en lotes de 8
-    // para no saturar la conexión Firestore con 150 RPCs simultáneas.
+    // Lanzar en lotes de 15 — deja que IndexedDB sirva cache hits en ráfaga
+    // pero limita los cache-miss que van a red a 15 conexiones simultáneas.
+    const CONCURRENCY = 15
+    let idx = 0
+    function launchNext() {
+      if (cancelled || idx >= pendingLoad.length) return
+      const { dk, dkMs, shiftId } = pendingLoad[idx++]!
+      loadOne(dk, shiftId, false).then((cycles) => {
+        if (!cancelled && cycles === 0 && dkMs >= cutoffMs) {
+          staleKeys.push(`${dk}__${shiftId}`)
+        }
+        launchNext()
+      })
+    }
+    for (let s = 0; s < Math.min(CONCURRENCY, pendingLoad.length); s++) launchNext()
+
+    // Pase 2 — reintento servidor para entradas recientes con 0 ciclos (lotes de 10).
     const timer = setTimeout(async () => {
       if (cancelled || staleKeys.length === 0) return
-      const BATCH = 8
+      const BATCH = 10
       for (let i = 0; i < staleKeys.length; i += BATCH) {
         if (cancelled) break
         const batch = staleKeys.slice(i, i + BATCH)
         await Promise.all(batch.map((key) => {
           const [dk, shiftId] = key.split('__') as [string, string]
-          // Forzar desde servidor — bypass IndexedDB cache
           return loadOne(dk, shiftId, true)
         }))
       }
-    }, 3000)
+    }, 2000)
 
     return () => {
       cancelled = true
