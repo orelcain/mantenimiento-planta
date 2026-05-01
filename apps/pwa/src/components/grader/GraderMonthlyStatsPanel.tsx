@@ -46,7 +46,14 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats }: P
         causaMap.set(c.error, (causaMap.get(c.error) ?? 0) + c.pieces)
       }
     }
-    const topCausa = [...causaMap.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
+    const totalP0Local = totalPieces > 0 ? totalP0 : 0
+    const causas = [...causaMap.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([error, pieces]) => ({
+        error,
+        pieces,
+        pct: totalP0Local > 0 ? (pieces / totalP0Local) * 100 : 0,
+      }))
 
     const calendarAgg = aggregateByCalendarDay({ summaries: valid })
     const uniqueDays  = calendarAgg.size
@@ -66,7 +73,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats }: P
     return {
       turnos: valid.length, uniqueDays, startedDays,
       dayShifts, nightShifts,
-      totalPieces, totalWeightKg, p0Avg, topCausa,
+      totalPieces, totalWeightKg, p0Avg, causas,
       best:  enrich(bestSummary),
       worst: enrich(worstSummary),
     }
@@ -215,15 +222,37 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats }: P
         </CardContent>
       </Card>
 
-      {/* ── Fila 4: Causa P0 dominante (solo si hay Grader) ── */}
-      {stats?.topCausa && (
+      {/* ── Fila 4: Desglose causas P0 (solo si hay Grader) ── */}
+      {stats && stats.causas.length > 0 && (
         <Card>
-          <CardContent className="py-1.5 px-3 flex items-center gap-2">
-            <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-            <div className="min-w-0">
-              <p className="text-[10px] text-muted-foreground">Causa P0 dominante</p>
-              <p className="text-xs font-semibold truncate">{getCauseLabel(stats.topCausa)}</p>
+          <CardContent className="py-2 px-3 space-y-1.5">
+            <div className="flex items-center gap-1.5 mb-1">
+              <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0" />
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+                Causas P0 del mes
+              </p>
+              <p className="text-[10px] text-muted-foreground/60 ml-auto tabular-nums">
+                {stats.causas.reduce((s, c) => s + c.pieces, 0).toLocaleString('es-CL')} pz P0
+              </p>
             </div>
+            {stats.causas.map(({ error, pieces, pct }) => (
+              <div key={error} className="space-y-0.5">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-[11px] font-medium leading-tight truncate min-w-0">
+                    {getCauseLabel(error)}
+                  </span>
+                  <span className="text-[10px] tabular-nums text-muted-foreground shrink-0">
+                    {pieces.toLocaleString('es-CL')} · <span className="font-semibold text-foreground">{pct.toFixed(0)}%</span>
+                  </span>
+                </div>
+                <div className="h-1 bg-muted/50 rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-amber-500/70 transition-all"
+                    style={{ width: `${Math.min(100, pct).toFixed(1)}%` }}
+                  />
+                </div>
+              </div>
+            ))}
           </CardContent>
         </Card>
       )}
