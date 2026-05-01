@@ -168,6 +168,12 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
   const productionResponses = []
   const summaryResponses    = []
 
+  // TEMP DEBUG — investigar timestamp bug Yal M2/M3 T3 Apr-29 (data llega mal etiquetada)
+  const DBG_RAW_MIDS = new Set([
+    'f7d8838a-0aff-4d80-a676-a4e35b3a4c00', // YAL Evisceradora 2
+    '54eea655-3c62-4d3d-8e3b-11b3962e988b', // YAL Evisceradora 3
+  ])
+
   for (const machine of machines) {
     try {
       const prod = await query({
@@ -175,6 +181,27 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
         params: { machines: machine.machineid, start: window.start, end: window.end, minutes: 5 },
       })
       productionResponses.push(prod?.machines?.[0] ?? null)
+
+      // DBG: para Yal M2/M3 dumpear payload crudo de Shoplogix
+      if (DBG_RAW_MIDS.has(machine.machineid)) {
+        const ivs = prod?.machines?.[0]?.machineProduction || []
+        const counts = {}
+        for (const iv of ivs) {
+          const k = iv.shift || '∅'
+          counts[k] = (counts[k] || 0) + 1
+        }
+        logger.info(`[DBG-RAW][${plantSlug}/${machine.name}] dateKey=${dateKey} window=${window.start}→${window.end} totalIvs=${ivs.length} byShift=${JSON.stringify(counts)}`)
+        for (const sname of Object.keys(counts)) {
+          const sub = ivs.filter(iv => (iv.shift || '∅') === sname)
+          const f = sub[0], l = sub[sub.length - 1]
+          logger.info(`[DBG-RAW][${plantSlug}/${machine.name}] shift=${sname} firstStart=${f?.start} lastStart=${l?.start} lastEnd=${l?.end}`)
+        }
+        const t3nz = ivs.filter(iv => iv.shift === 'Turno 3' && (iv.cycles || 0) > 0)
+        logger.info(`[DBG-RAW-T3-NZ][${plantSlug}/${machine.name}] ${t3nz.length} non-zero T3 intervals (mostrando hasta 20):`)
+        for (const iv of t3nz.slice(0, 20)) {
+          logger.info(`[DBG-RAW-T3-NZ]   start=${iv.start} cycles=${iv.cycles} expected=${iv.expectedCycles}`)
+        }
+      }
     } catch (err) {
       if (err.code === 'AUTH_EXPIRED') throw err
       logger.warn(`[syncDay][${plantSlug}] ${machine.name} production err: ${err.message}`)
