@@ -252,11 +252,32 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
       }
 
       try {
-        // Filtrar intervals al turno actual (por etiqueta shift)
+        // Filtrar intervals al turno por VENTANA TEMPORAL (no por etiqueta shift).
+        //
+        // Histórico: antes filtrábamos por `iv.shift === group.shiftId`. Eso falla
+        // cuando Shoplogix etiqueta inconsistentemente las máquinas — caso real
+        // 2026-04-29 T3 Yal: M1 tenía sus intervals 01:25-07:35 etiquetados
+        // "Turno 3" correctamente, pero M2/M3 tenían sus 05:00-07:35 etiquetados
+        // con otro shift (o "Unscheduled") y al mismo tiempo unos intervals de la
+        // tarde Apr-28 (13:15-15:35) mal etiquetados como "Turno 3". Resultado:
+        // se descartaba lo bueno y guardábamos basura.
+        //
+        // M1 (la primera máquina con datos) es la fuente de verdad para los
+        // bounds del turno via deriveShiftGroups. Ahora filtramos por solapamiento
+        // temporal con [scheduledStart, scheduledEnd] usando una tolerancia de
+        // 5 min (un bucket) para incluir el primer/último que arranque justo
+        // antes/después del bound exacto.
+        const TOLERANCE_MS = 5 * 60 * 1000
+        const groupStartMs = group.scheduledStart.getTime() - TOLERANCE_MS
+        const groupEndMs   = group.scheduledEnd.getTime()   + TOLERANCE_MS
         const filteredProd = {
           ...rawProd,
           machineProduction: (rawProd.machineProduction || [])
-            .filter(iv => iv.shift === group.shiftId),
+            .filter(iv => {
+              if (!iv.start) return false
+              const ivStartMs = parseShoplogixTime(iv.start).getTime()
+              return ivStartMs >= groupStartMs && ivStartMs <= groupEndMs
+            }),
         }
 
         const doc = normalizeShift({
