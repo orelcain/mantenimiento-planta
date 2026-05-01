@@ -317,6 +317,59 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats }: P
           </CardContent>
         </Card>
       )}
+
+      {/* ── Sección Shoplogix (cuando hay datos de línea upstream) ── */}
+      {slxStats && (
+        <>
+          <div className="flex items-center gap-2 pt-1">
+            <div className="flex-1 h-px bg-border/60" />
+            <p className="text-[10px] text-muted-foreground/60 uppercase tracking-wider flex items-center gap-1">
+              <Activity className="w-3 h-3" /> Línea upstream
+            </p>
+            <div className="flex-1 h-px bg-border/60" />
+          </div>
+          <Card>
+            <CardContent className="pt-2 pb-2 px-4">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-[10px] text-muted-foreground">Ciclos Baader</p>
+                  <p className="text-lg font-bold leading-none text-sky-400">
+                    {slxStats.totalCycles >= 1000
+                      ? `${(slxStats.totalCycles / 1000).toFixed(1)}k`
+                      : slxStats.totalCycles.toLocaleString('es-CL')}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] text-muted-foreground">Uptime prom.</p>
+                  <p className={`text-lg font-bold leading-none ${
+                    slxStats.avgUptimePct >= 70 ? 'text-emerald-400'
+                    : slxStats.avgUptimePct >= 40 ? 'text-amber-400' : 'text-rose-400'
+                  }`}>
+                    {slxStats.avgUptimePct.toFixed(0)}%
+                  </p>
+                </div>
+              </div>
+              {(slxStats.bestShift || slxStats.worstShift) && (
+                <div className="flex items-center gap-2 mt-1.5 text-[10px] text-muted-foreground">
+                  {slxStats.bestShift && (
+                    <span className="text-emerald-400">
+                      ↑{slxStats.bestShift.uptimePct.toFixed(0)}%
+                      <span className="text-muted-foreground/60 ml-0.5">{slxStats.bestShift.dateKey.slice(5)}</span>
+                    </span>
+                  )}
+                  {slxStats.bestShift && slxStats.worstShift && <span className="text-border">·</span>}
+                  {slxStats.worstShift && (
+                    <span className="text-rose-400">
+                      ↓{slxStats.worstShift.uptimePct.toFixed(0)}%
+                      <span className="text-muted-foreground/60 ml-0.5">{slxStats.worstShift.dateKey.slice(5)}</span>
+                    </span>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
   )
 }
