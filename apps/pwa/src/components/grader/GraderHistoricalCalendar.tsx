@@ -1405,7 +1405,10 @@ export function GraderHistoricalCalendar({
     const cutoffMs = today.getTime() - cutoffDays * 86_400_000
 
     const pendingLoad: Array<{ dk: string; dkMs: number; shiftId: string; key: string }> = []
-    for (let day = 1; day <= daysInMonth; day++) {
+    // Loop reverso: días más recientes primero → en plantas sin Grader (Yal)
+    // los datos están al final del mes y aparecen en las celdas sin esperar
+    // a que carguen los ~120 días vacíos previos.
+    for (let day = daysInMonth; day >= 1; day--) {
       const dk = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
       const dkMs = new Date(`${dk}T12:00:00`).getTime()
       for (const shiftId of monthShiftIds) {
