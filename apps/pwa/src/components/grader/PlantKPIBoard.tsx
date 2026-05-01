@@ -138,27 +138,24 @@ interface KPICardProps {
   note?: string
 }
 
-function KPICard({ esLabel, enLabel, tooltip, value, valueColor, barValue, barMax = 1, barColor, note }: KPICardProps) {
+function KPICard({ esLabel, enLabel: _enLabel, tooltip, value, valueColor, barValue, barMax = 1, barColor, note }: KPICardProps) {
   const width = barWidth(barValue, barMax)
   return (
-    <div className="bg-muted/20 rounded-lg p-3 space-y-2 border border-border/30">
-      <div className="flex items-start justify-between gap-1">
-        <div className="min-w-0">
-          <div className="text-xs font-medium leading-tight">{esLabel}</div>
-          <div className="text-[10px] text-muted-foreground/70 leading-tight">{enLabel}</div>
-        </div>
-        <InfoTooltip text={tooltip} iconSize={13} position="top" />
+    <div className="bg-muted/20 rounded-md px-2 py-1.5 border border-border/30">
+      <div className="flex items-center justify-between gap-1">
+        <div className="text-[10px] font-medium leading-tight truncate">{esLabel}</div>
+        <InfoTooltip text={tooltip} iconSize={11} position="top" />
       </div>
-      <div className={cn('text-2xl font-bold tabular-nums', valueColor)}>{value}</div>
+      <div className={cn('text-base font-bold tabular-nums leading-tight', valueColor)}>{value}</div>
       {barValue !== null && (
-        <div className="h-1.5 bg-muted/40 rounded-full overflow-hidden">
+        <div className="h-1 bg-muted/40 rounded-full overflow-hidden mt-1">
           <div
             className={cn('h-full rounded-full transition-all', barColor ?? 'bg-primary')}
             style={{ width }}
           />
         </div>
       )}
-      {note && <p className="text-[10px] text-muted-foreground/60">{note}</p>}
+      {note && <p className="text-[9px] text-muted-foreground/60 mt-0.5 leading-tight truncate">{note}</p>}
     </div>
   )
 }
@@ -192,9 +189,9 @@ export function PlantKPIBoard({ plantSlug, graderSummaries, enabled = true }: Pr
           )}
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-2 pb-3">
         {loading && (
-          <div className="flex items-center gap-2 text-muted-foreground text-sm py-2">
+          <div className="flex items-center gap-2 text-muted-foreground text-xs py-1">
             <Spinner /> Cargando…
           </div>
         )}
@@ -206,33 +203,29 @@ export function PlantKPIBoard({ plantSlug, graderSummaries, enabled = true }: Pr
         )}
 
         {!loading && !error && !kpis && (
-          <p className="text-xs text-muted-foreground/60 py-2">
+          <p className="text-xs text-muted-foreground/60 py-1">
             Sin datos Shoplogix disponibles para los últimos 3 días.
           </p>
         )}
 
         {!loading && kpis && (
           <>
-            {/* ── OEE principal ── */}
-            <div>
+            {/* ── Fila principal: OEE + A + P + Q ── */}
+            <div className="grid grid-cols-4 gap-1.5">
               <KPICard
-                esLabel={DEFS.oee.es}
+                esLabel="OEE"
                 enLabel={DEFS.oee.en}
                 tooltip={DEFS.oee.desc}
-                value={kpis.oee !== null ? pct(kpis.oee, 1) : `${pct(kpis.availability)} × ${pct(kpis.performance)} × Q?`}
+                value={kpis.oee !== null ? pct(kpis.oee, 1) : '—'}
                 valueColor={oeeColor(kpis.oee)}
                 barValue={kpis.oee}
                 barColor={kpis.oee !== null
                   ? (kpis.oee >= 0.85 ? 'bg-emerald-500' : kpis.oee >= 0.65 ? 'bg-sky-500' : kpis.oee >= 0.5 ? 'bg-amber-500' : 'bg-rose-500')
                   : 'bg-muted'}
-                note={kpis.oee === null ? '⚠ Calidad (Q) no disponible — carga el Excel del Grader para completar el OEE' : undefined}
+                note={kpis.oee === null ? 'Sin Q' : undefined}
               />
-            </div>
-
-            {/* ── A, P, Q ── */}
-            <div className="grid grid-cols-3 gap-2">
               <KPICard
-                esLabel={DEFS.avail.es}
+                esLabel="Disponibilidad"
                 enLabel={DEFS.avail.en}
                 tooltip={DEFS.avail.desc}
                 value={pct(kpis.availability)}
@@ -241,7 +234,7 @@ export function PlantKPIBoard({ plantSlug, graderSummaries, enabled = true }: Pr
                 barColor={kpis.availability >= 0.85 ? 'bg-emerald-500' : kpis.availability >= 0.70 ? 'bg-amber-500' : 'bg-rose-500'}
               />
               <KPICard
-                esLabel={DEFS.perf.es}
+                esLabel="Rendimiento"
                 enLabel={DEFS.perf.en}
                 tooltip={DEFS.perf.desc}
                 value={pct(kpis.performance)}
@@ -250,7 +243,7 @@ export function PlantKPIBoard({ plantSlug, graderSummaries, enabled = true }: Pr
                 barColor={kpis.performance >= 0.90 ? 'bg-emerald-500' : kpis.performance >= 0.75 ? 'bg-amber-500' : 'bg-rose-500'}
               />
               <KPICard
-                esLabel={DEFS.quality.es}
+                esLabel="Calidad"
                 enLabel={DEFS.quality.en}
                 tooltip={DEFS.quality.desc}
                 value={kpis.quality !== null ? pct(kpis.quality) : 'N/A'}
@@ -265,72 +258,62 @@ export function PlantKPIBoard({ plantSlug, graderSummaries, enabled = true }: Pr
               />
             </div>
 
-            {/* ── MTTR, MTBF, N° paros ── */}
-            <div className="grid grid-cols-3 gap-2">
+            {/* ── Fila secundaria: MTTR · MTBF · Paros ── */}
+            <div className="grid grid-cols-3 gap-1.5">
               <KPICard
-                esLabel={DEFS.mttr.es}
+                esLabel="MTTR ↓"
                 enLabel={DEFS.mttr.en}
                 tooltip={DEFS.mttr.desc}
                 value={fmtMin(kpis.mttrMin)}
                 valueColor={mttrColor(kpis.mttrMin)}
                 barValue={kpis.mttrMin > 0 ? Math.min(1, kpis.mttrMin / 30) : null}
                 barColor={kpis.mttrMin <= 5 ? 'bg-emerald-500' : kpis.mttrMin <= 15 ? 'bg-amber-500' : 'bg-rose-500'}
-                note="↓ mejor"
               />
               <KPICard
-                esLabel={DEFS.mtbf.es}
+                esLabel="MTBF ↑"
                 enLabel={DEFS.mtbf.en}
                 tooltip={DEFS.mtbf.desc}
                 value={fmtHours(kpis.mtbfHours)}
                 valueColor={mtbfColor(kpis.mtbfHours)}
                 barValue={kpis.mtbfHours > 0 ? Math.min(1, kpis.mtbfHours / 4) : null}
                 barColor={kpis.mtbfHours >= 2 ? 'bg-emerald-500' : kpis.mtbfHours >= 1 ? 'bg-amber-500' : 'bg-rose-500'}
-                note="↑ mejor"
               />
-              <div className="bg-muted/20 rounded-lg p-3 space-y-2 border border-border/30">
-                <div className="flex items-start justify-between gap-1">
-                  <div>
-                    <div className="text-xs font-medium">N° Paros</div>
-                    <div className="text-[10px] text-muted-foreground/70">Failure Count</div>
-                  </div>
-                </div>
-                <div className="text-2xl font-bold tabular-nums text-foreground">
+              <div className="bg-muted/20 rounded-md px-2 py-1.5 border border-border/30">
+                <div className="text-[10px] font-medium leading-tight truncate">N° Paros</div>
+                <div className="text-base font-bold tabular-nums leading-tight text-foreground">
                   {kpis.failureCount}
                 </div>
-                <p className="text-[10px] text-muted-foreground/60">Eventos downtime · turno</p>
+                <p className="text-[9px] text-muted-foreground/60 mt-0.5 leading-tight truncate">eventos · turno</p>
               </div>
             </div>
 
-            {/* ── Detalle por máquina ── */}
-            <div className="space-y-1">
-              <p className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">Detalle por máquina</p>
-              <div className="grid gap-1.5">
-                {kpis.machines.map((m) => (
-                  <div
-                    key={m.machineid}
-                    className="flex items-center gap-2 text-xs bg-muted/10 rounded-md px-2.5 py-1.5 border border-border/20"
-                  >
-                    <span className="text-muted-foreground w-28 shrink-0 truncate">{m.machineName}</span>
-                    <span className={cn('w-14 tabular-nums', availColor(m.availability))}>
-                      A: {pct(m.availability, 0)}
+            {/* ── Detalle por máquina (compacto) ── */}
+            <div className="grid gap-1 pt-0.5">
+              {kpis.machines.map((m) => (
+                <div
+                  key={m.machineid}
+                  className="flex items-center gap-2 text-[11px] bg-muted/10 rounded px-2 py-1 border border-border/20"
+                >
+                  <span className="text-muted-foreground w-24 shrink-0 truncate">{m.machineName}</span>
+                  <span className={cn('w-12 tabular-nums', availColor(m.availability))}>
+                    A {pct(m.availability, 0)}
+                  </span>
+                  <span className={cn('w-12 tabular-nums', perfColor(m.performance))}>
+                    P {pct(m.performance, 0)}
+                  </span>
+                  <span className={cn('w-16 tabular-nums', mttrColor(m.mttrMin))}>
+                    {fmtMin(m.mttrMin)}
+                  </span>
+                  <span className="text-muted-foreground/60 tabular-nums">
+                    {m.failureCount} paro{m.failureCount !== 1 ? 's' : ''}
+                  </span>
+                  {m.shoplogixTargetCpm !== null && (
+                    <span className="ml-auto text-muted-foreground/50 tabular-nums">
+                      {m.shoplogixTargetCpm.toFixed(1)} pz/min
                     </span>
-                    <span className={cn('w-14 tabular-nums', perfColor(m.performance))}>
-                      P: {pct(m.performance, 0)}
-                    </span>
-                    <span className={cn('w-20 tabular-nums', mttrColor(m.mttrMin))}>
-                      MTTR: {fmtMin(m.mttrMin)}
-                    </span>
-                    <span className="text-muted-foreground/60 tabular-nums">
-                      {m.failureCount} paro{m.failureCount !== 1 ? 's' : ''}
-                    </span>
-                    {m.shoplogixTargetCpm !== null && (
-                      <span className="ml-auto text-muted-foreground/50 tabular-nums">
-                        obj: {m.shoplogixTargetCpm.toFixed(1)} pz/min
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
+                  )}
+                </div>
+              ))}
             </div>
           </>
         )}
