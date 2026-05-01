@@ -64,16 +64,32 @@ function buildRateSeries(machines: UpstreamMachineShift[]): {
   const BUCKET_MS = 5 * 60_000
   const snap = (ts: number) => Math.round(ts / BUCKET_MS) * BUCKET_MS
 
+  // Descartar intervalos que Shoplogix etiquetó en el turno equivocado.
+  // Caso real: Apr-29 T3 (00:00-07:45 CL) — M2/M3 reciben intervalos de la tarde
+  // anterior (13:15-15:35 UTC, T1/T2) etiquetados como "Turno 3" por Shoplogix.
+  // ±2h de tolerancia cubre arranques lentos sin capturar turnos vecinos (>6h off).
+  const SHIFT_BUFFER_MS = 2 * 60 * 60_000
+  const filteredMachines = machines.map(m => {
+    const winStart = (m.scheduledStart ?? m.shiftStart).getTime() - SHIFT_BUFFER_MS
+    const winEnd   = (m.scheduledEnd   ?? m.shiftEnd).getTime()   + SHIFT_BUFFER_MS
+    return {
+      ...m,
+      intervals: m.intervals.filter(iv => {
+        const ts = iv.startAt.getTime()
+        return ts >= winStart && ts <= winEnd
+      }),
+    }
+  })
 
   // Colección de todos los timestamps únicos (alineados a grilla 5 min)
   const tsSet = new Set<number>()
-  for (const m of machines) {
+  for (const m of filteredMachines) {
     for (const iv of m.intervals) tsSet.add(snap(iv.startAt.getTime()))
   }
   const timeAxis = [...tsSet].sort((a, b) => a - b)
 
   // Índice de cycles por máquina y timestamp (con snap)
-  const machineRates: Map<number, number>[] = machines.map((m) => {
+  const machineRates: Map<number, number>[] = filteredMachines.map((m) => {
     const map = new Map<number, number>()
     for (const iv of m.intervals) {
       const durationMin = Math.max(1, (iv.endAt.getTime() - iv.startAt.getTime()) / 60_000)
@@ -83,7 +99,7 @@ function buildRateSeries(machines: UpstreamMachineShift[]): {
     return map
   })
 
-  const series = machines.map((m, i) => ({
+  const series = filteredMachines.map((m, i) => ({
     name: shortMachineName(m.machineName),
     data: timeAxis.map((ts) => {
       const r = machineRates[i]!.get(ts)
@@ -102,7 +118,7 @@ function buildRateSeries(machines: UpstreamMachineShift[]): {
 
   // Expected rate: primer bucket con expectedCycles > 0
   let expectedRate = 0
-  for (const m of machines) {
+  for (const m of filteredMachines) {
     const iv = m.intervals.find((x) => x.expectedCycles > 0)
     if (iv) {
       const durationMin = Math.max(1, (iv.endAt.getTime() - iv.startAt.getTime()) / 60_000)
@@ -114,7 +130,7 @@ function buildRateSeries(machines: UpstreamMachineShift[]): {
   // Promedio solo tiene sentido cuando ≥2 máquinas tienen datos —
   // si solo 1 tiene intervals, Promedio = esa máquina exactamente y
   // su línea amber (z:5) tapaba la línea individual haciéndola invisible.
-  const machinesWithData = machines.filter(m => m.intervals.length > 0).length
+  const machinesWithData = filteredMachines.filter(m => m.intervals.length > 0).length
 
   return {
     timeAxis,
