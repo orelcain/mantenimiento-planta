@@ -196,16 +196,18 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd }: Props
     timelineSync.setRange({ startMs, endMs })
   }, [timelineSync, rangeStart, rangeEnd])
 
-  // Max Y para escalar bien
+  // Max Y: percentil 95 de los datos para ignorar picos de arranque
   const maxRate = useMemo(() => {
-    let actualMax = 0
+    const vals: number[] = []
     for (const s of series) {
-      for (const v of s.data) { if (v != null && v > actualMax) actualMax = v }
+      for (const v of s.data) { if (v != null && v > 0) vals.push(v) }
     }
-    for (const v of avgSeries.data) { if (v != null && v > actualMax) actualMax = v }
-    const ceiling = Math.max(actualMax * 1.15, expectedRate > 0 ? expectedRate * 1.05 : 0)
+    if (vals.length === 0) return Math.max(expectedRate > 0 ? Math.ceil(expectedRate * 1.3) : 1, 1)
+    vals.sort((a, b) => a - b)
+    const p95 = vals[Math.floor(vals.length * 0.95)] ?? vals[vals.length - 1]!
+    const ceiling = Math.max(p95 * 1.25, expectedRate > 0 ? expectedRate * 1.05 : 0)
     return Math.ceil(Math.max(ceiling, 1))
-  }, [series, avgSeries, expectedRate])
+  }, [series, expectedRate])
 
   const option = useMemo(() => {
     const machineSeries = series.map((s, i) => {
