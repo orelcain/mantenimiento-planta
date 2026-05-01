@@ -8,7 +8,7 @@
  * cada pocos minutos durante horas de turno.
  */
 
-import { collection, getDocs, getDocsFromServer, doc, getDoc, getDocFromServer, Timestamp, onSnapshot, query, limit, orderBy, startAt, endBefore, documentId } from 'firebase/firestore'
+import { collection, getDocs, getDocsFromServer, doc, getDoc, getDocFromServer, Timestamp, onSnapshot, query, limit, documentId, where } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import type {
   UpstreamMachineShift,
@@ -424,11 +424,12 @@ export async function listShoplogixShiftDocIdsForMonth(
       : `${year}-${String(month + 2).padStart(2, '0')}`
 
     const shiftsRef = collection(db, `shoplogix/${plantSlug}/shifts`)
+    // where(documentId(), ...) funciona con strings en subcolecciones;
+    // startAt/endBefore requieren DocumentReference en subcolecciones y fallan silenciosamente.
     const q = query(
       shiftsRef,
-      orderBy(documentId()),
-      startAt(monthStr),
-      endBefore(nextMonthStr),
+      where(documentId(), '>=', monthStr),
+      where(documentId(), '<',  nextMonthStr),
     )
     const snap = await getDocs(q)
     return snap.docs.map(d => d.id)
