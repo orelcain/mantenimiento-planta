@@ -54,13 +54,15 @@ function oeeColor(v: number | null): string {
   return 'text-rose-400'
 }
 
-function availColor(v: number): string {
+function availColor(v: number | null): string {
+  if (v === null) return 'text-muted-foreground'
   if (v >= 0.85) return 'text-emerald-400'
   if (v >= 0.70) return 'text-amber-400'
   return 'text-rose-400'
 }
 
-function perfColor(v: number): string {
+function perfColor(v: number | null): string {
+  if (v === null) return 'text-muted-foreground'
   if (v >= 0.90) return 'text-emerald-400'
   if (v >= 0.75) return 'text-amber-400'
   return 'text-rose-400'
@@ -216,6 +218,14 @@ export function PlantKPIBoard({
 
         {!loading && kpis && (
           <>
+            {/* Banner informativo cuando solo hay calidad Grader */}
+            {kpis.graderOnly && (
+              <p className="text-[10px] text-sky-400/80 flex items-center gap-1 pb-0.5">
+                <AlertTriangle className="w-3 h-3 shrink-0" />
+                Sin datos Shoplogix para este período — solo calidad Grader
+              </p>
+            )}
+
             {/* ── Fila 1: OEE + A + P + Q ── */}
             <div className="grid grid-cols-4 gap-1.5">
               <KPICard
@@ -227,23 +237,29 @@ export function PlantKPIBoard({
                 barColor={kpis.oee !== null
                   ? (kpis.oee >= 0.85 ? 'bg-emerald-500' : kpis.oee >= 0.65 ? 'bg-sky-500' : kpis.oee >= 0.5 ? 'bg-amber-500' : 'bg-rose-500')
                   : 'bg-muted'}
-                note={kpis.oee === null ? 'Sin Q' : undefined}
+                note={kpis.graderOnly ? 'Sin Shoplogix' : kpis.oee === null ? 'Sin Q' : undefined}
               />
               <KPICard
                 label="Disponibilidad"
                 tooltip={DEFS.avail.desc}
-                value={pct(kpis.availability)}
+                value={kpis.availability !== null ? pct(kpis.availability) : '—'}
                 valueColor={availColor(kpis.availability)}
                 barValue={kpis.availability}
-                barColor={kpis.availability >= 0.85 ? 'bg-emerald-500' : kpis.availability >= 0.70 ? 'bg-amber-500' : 'bg-rose-500'}
+                barColor={kpis.availability !== null
+                  ? (kpis.availability >= 0.85 ? 'bg-emerald-500' : kpis.availability >= 0.70 ? 'bg-amber-500' : 'bg-rose-500')
+                  : undefined}
+                note={kpis.graderOnly ? 'Sin Shoplogix' : undefined}
               />
               <KPICard
                 label="Rendimiento"
                 tooltip={DEFS.perf.desc}
-                value={pct(kpis.performance)}
+                value={kpis.performance !== null ? pct(kpis.performance) : '—'}
                 valueColor={perfColor(kpis.performance)}
                 barValue={kpis.performance}
-                barColor={kpis.performance >= 0.90 ? 'bg-emerald-500' : kpis.performance >= 0.75 ? 'bg-amber-500' : 'bg-rose-500'}
+                barColor={kpis.performance !== null
+                  ? (kpis.performance >= 0.90 ? 'bg-emerald-500' : kpis.performance >= 0.75 ? 'bg-amber-500' : 'bg-rose-500')
+                  : undefined}
+                note={kpis.graderOnly ? 'Sin Shoplogix' : undefined}
               />
               <KPICard
                 label="Calidad"
@@ -260,7 +276,8 @@ export function PlantKPIBoard({
               />
             </div>
 
-            {/* ── Fila 2: MTTR · MTBF · Paros ── */}
+            {/* ── Fila 2: MTTR · MTBF · Paros (ocultar si solo Grader) ── */}
+            {!kpis.graderOnly && (
             <div className="grid grid-cols-3 gap-1.5">
               <KPICard
                 label="MTTR ↓"
@@ -286,9 +303,10 @@ export function PlantKPIBoard({
                 </p>
               </div>
             </div>
+            )}
 
-            {/* ── Detalle por máquina ── */}
-            <div className="grid gap-1 pt-0.5">
+            {/* ── Detalle por máquina (solo con Shoplogix) ── */}
+            {!kpis.graderOnly && <div className="grid gap-1 pt-0.5">
               {kpis.machines.map((m) => (
                 <div
                   key={m.machineid}
@@ -314,7 +332,7 @@ export function PlantKPIBoard({
                   )}
                 </div>
               ))}
-            </div>
+            </div>}
           </>
         )}
       </CardContent>

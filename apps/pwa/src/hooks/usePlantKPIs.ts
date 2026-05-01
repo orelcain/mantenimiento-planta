@@ -43,14 +43,18 @@ export interface PlantKPIs {
   periodLabel: string
   /** Turnos agregados en este período */
   shiftsCount: number
-  availability: number
-  performance: number
+  /** null = sin datos Shoplogix (solo Grader) */
+  availability: number | null
+  /** null = sin datos Shoplogix (solo Grader) */
+  performance: number | null
   quality: number | null
   oee: number | null
   mttrMin: number
   mtbfHours: number
   failureCount: number
   machines: MachineKPI[]
+  /** true cuando solo hay calidad Grader, sin datos Shoplogix */
+  graderOnly?: boolean
 }
 
 export interface UsePlantKPIsResult {
@@ -353,6 +357,36 @@ export function usePlantKPIsForPeriod(
 
         const shifts = await loadShiftsForDates(dateKeys, plantSlug)
         if (cancelled) return
+
+        if (shifts.length === 0) {
+          // Sin Shoplogix — intentar calidad solo desde Grader
+          const graderForPeriod = graderSummaries.filter(g => dateKeys.includes(g.dateKey))
+          if (graderForPeriod.length === 0) {
+            setState({ loading: false, error: null, kpis: null })
+            return
+          }
+          const qualityVals = graderForPeriod
+            .filter(g => typeof g.pointZeroPct === 'number')
+            .map(g => Math.max(0, Math.min(1, 1 - g.pointZeroPct / 100)))
+          const quality = qualityVals.length > 0 ? avg(qualityVals) : null
+          const graderKpi: PlantKPIs = {
+            dateKey: anchor,
+            shiftId: '',
+            periodLabel: label,
+            shiftsCount: graderForPeriod.length,
+            availability: null,
+            performance: null,
+            quality,
+            oee: null,
+            mttrMin: 0,
+            mtbfHours: 0,
+            failureCount: 0,
+            machines: [],
+            graderOnly: true,
+          }
+          setState({ loading: false, error: null, kpis: graderKpi })
+          return
+        }
 
         const kpis = aggregateShifts(shifts, label, graderSummaries)
         setState({ loading: false, error: null, kpis })
