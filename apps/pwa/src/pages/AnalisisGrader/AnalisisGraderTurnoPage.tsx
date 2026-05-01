@@ -23,6 +23,7 @@ import { getShiftDoc } from '@/services/grader/graderShifts.service'
 import { computeShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import type { ShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import { DEFAULT_SHIFT_SCHEDULE } from '@/services/grader/graderShiftSchedule'
+import { getShiftDisplayDateKey } from '@/services/grader/graderShiftDisplay'
 import { parseMatrixErrorString } from '@/services/grader/graderMatrixP0Causes'
 import { HeroScorecard } from '@/components/grader/HeroScorecard'
 import { ShoplogixOnlyScorecard } from '@/components/grader/ShoplogixOnlyScorecard'
@@ -822,14 +823,17 @@ export function AnalisisGraderTurnoPage() {
 
   // Fecha legible para el header ("vie 27 feb")
   // IMPORTANTE: todos los hooks ANTES del early return (rules-of-hooks)
+  // Usa getShiftDisplayDateKey para alinear con la convención calendárica de
+  // Shoplogix (Turno 3 → display = dateKey CF + 1 día).
   const dateLabel = useMemo(() => {
     if (!dateKey) return ''
-    const d = new Date(`${dateKey}T12:00:00`)
+    const displayKey = getShiftDisplayDateKey(dateKey, shiftLabel)
+    const d = new Date(`${displayKey}T12:00:00`)
     const dayName = d.toLocaleDateString('es-CL', { weekday: 'short' }).replace('.', '')
     const dayNum = d.getDate()
     const monthName = d.toLocaleDateString('es-CL', { month: 'short' }).replace('.', '')
     return `${dayName} ${dayNum} ${monthName}`
-  }, [dateKey])
+  }, [dateKey, shiftLabel])
 
   // ── Shoplogix manual refresh ─────────────────────────────────────────────
   const handleSlxRefresh = useCallback(async () => {

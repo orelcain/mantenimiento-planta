@@ -50,9 +50,10 @@ function buildRateSeries(machines: UpstreamMachineShift[]): {
   series: { name: string; data: (number | null)[] }[]
   avgSeries: { name: string; data: (number | null)[] }
   expectedRate: number
+  showAvg: boolean
 } {
   if (machines.length === 0) {
-    return { timeAxis: [], series: [], avgSeries: { name: 'Promedio', data: [] }, expectedRate: 0 }
+    return { timeAxis: [], series: [], avgSeries: { name: 'Promedio', data: [] }, expectedRate: 0, showAvg: false }
   }
 
   // Colección de todos los timestamps únicos (alineados al inicio del bucket)
@@ -100,11 +101,17 @@ function buildRateSeries(machines: UpstreamMachineShift[]): {
     }
   }
 
+  // Promedio solo tiene sentido cuando ≥2 máquinas tienen datos —
+  // si solo 1 tiene intervals, Promedio = esa máquina exactamente y
+  // su línea amber (z:5) tapaba la línea individual haciéndola invisible.
+  const machinesWithData = machines.filter(m => m.intervals.length > 0).length
+
   return {
     timeAxis,
     series,
     avgSeries: { name: 'Promedio', data: avgData },
     expectedRate,
+    showAvg: machinesWithData >= 2,
   }
 }
 
@@ -114,7 +121,7 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd }: Props
   const timelineSync = useTimelineSyncOptional()
   const onChartReady = useChartReadyConnect(timelineSync?.connectGroupId ?? '__no-sync__')
 
-  const { timeAxis, series, avgSeries, expectedRate } = useMemo(
+  const { timeAxis, series, avgSeries, expectedRate, showAvg } = useMemo(
     () => buildRateSeries(machines),
     [machines],
   )
@@ -156,8 +163,8 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd }: Props
     const inst = echartsRef.current?.getEchartsInstance?.()
     if (!inst) return
     if (externalHoverMs == null) {
-      // Solo limpiar si había hover externo previo — nunca hideTip
-      // (hideTip mataba el tooltip cuando el cursor volvía al chart propio)
+      // Solo limpiar si había hover externo previo — nunca hideTip incondicional
+      // (mataría el tooltip cuando el cursor vuelve al chart propio)
       if (hadExternalRef.current) {
         inst.dispatchAction({ type: 'updateAxisPointer', currTrigger: 'leave' })
       }
@@ -168,6 +175,10 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd }: Props
     const pixelX = inst.convertToPixel({ xAxisIndex: 0 }, externalHoverMs)
     if (typeof pixelX !== 'number' || !Number.isFinite(pixelX)) return
     inst.dispatchAction({ type: 'updateAxisPointer', currTrigger: 'mousemove', x: pixelX, y: 30 })
+    // Hover viene de OTRO chart (típicamente StateTimelineEC del Gantt Baader,
+    // que tiene su propio tooltip React). Ocultar el tooltip nativo de este chart
+    // para que solo se vea el crosshair y no compita con el tooltip Baader.
+    inst.dispatchAction({ type: 'hideTip' })
   }, [externalHoverMs])
 
   // Zoom sync
@@ -187,12 +198,13 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd }: Props
 
   // Max Y para escalar bien
   const maxRate = useMemo(() => {
-    let m = expectedRate * 1.3 || 1
+    let actualMax = 0
     for (const s of series) {
-      for (const v of s.data) { if (v != null && v > m) m = v }
+      for (const v of s.data) { if (v != null && v > actualMax) actualMax = v }
     }
-    for (const v of avgSeries.data) { if (v != null && v > m) m = v }
-    return Math.ceil(m)
+    for (const v of avgSeries.data) { if (v != null && v > actualMax) actualMax = v }
+    const ceiling = Math.max(actualMax * 1.15, expectedRate > 0 ? expectedRate * 1.05 : 0)
+    return Math.ceil(Math.max(ceiling, 1))
   }, [series, avgSeries, expectedRate])
 
   const option = useMemo(() => {
@@ -213,7 +225,10 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd }: Props
       }
     })
 
-    const avgS = {
+    // Promedio: línea punteada sin área fill — queda visualmente detrás de las
+    // líneas individuales (que son sólidas con área). Así B1/B2/B3 nunca quedan
+    // tapadas aunque Promedio coincida con alguna de ellas.
+    const avgS = showAvg ? {
       name:        'Promedio',
       type:        'line' as const,
       data:        timeAxis.map((ts, ti) => [ts, avgSeries.data[ti]] as [number, number | null]),
@@ -221,11 +236,10 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd }: Props
       connectNulls: false,
       symbol:      'diamond',
       symbolSize:  5,
-      lineStyle:   { color: AVG_COLOR.line, width: 2.5 },
+      lineStyle:   { color: AVG_COLOR.line, width: 2, type: 'dashed' as const },
       itemStyle:   { color: AVG_COLOR.line },
-      areaStyle:   { color: AVG_COLOR.area },
-      z:           5,
-      emphasis:    { lineStyle: { width: 3.5 } },
+      z:           1,
+      emphasis:    { lineStyle: { width: 3 } },
       // markLine objetivo
       markLine: expectedRate > 0 ? {
         silent: true,
@@ -242,7 +256,7 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd }: Props
           },
         }],
       } : undefined,
-    }
+    } : null
 
     return {
       backgroundColor: 'transparent',
@@ -254,7 +268,7 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd }: Props
         textStyle: { color: '#64748b', fontSize: 9 },
         itemWidth: 12,
         itemHeight: 8,
-        data: [...series.map(s => s.name), 'Promedio'],
+        data: [...series.map(s => s.name), ...(showAvg ? ['Promedio'] : [])],
       },
       xAxis: {
         type: 'time' as const,
@@ -313,9 +327,9 @@ export function ProductionRateLineEC({ machines, windowStart, windowEnd }: Props
         zoomOnMouseWheel: 'ctrl',
         moveOnMouseWheel: false,
       }] : [],
-      series: [...machineSeries, avgS],
+      series: avgS ? [...machineSeries, avgS] : machineSeries,
     }
-  }, [series, avgSeries, timeAxis, rangeStart, rangeEnd, maxRate, expectedRate, timelineSync])
+  }, [series, avgSeries, timeAxis, rangeStart, rangeEnd, maxRate, expectedRate, timelineSync, showAvg])
 
   if (timeAxis.length < 2) return null
 
