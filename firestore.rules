@@ -1255,6 +1255,12 @@ service cloud.firestore {
           allow write: if false;
         }
       }
+
+      // Velocidad nameplate Baader 142 — editable por admins desde el cliente
+      match /machineCapacity/{machineid} {
+        allow read: if isAuthenticated();
+        allow write: if isAdmin();
+      }
     }
 
     // ============================================
