@@ -1928,52 +1928,9 @@ export function GraderHistoricalCalendar({
 
     return (
       <div className="space-y-2 px-6 pt-3">
-        {/* Sub-header con agregado calendárico real del día */}
-        {agg && agg.totalPieces > 0 && (() => {
-          const status = p0StatusFromPct(agg.pointZeroPct)
-          const hours = Math.floor(agg.activeMinutes / 60)
-          const mins = agg.activeMinutes % 60
-          const nFragments = agg.contributingShifts.length
-          return (
-            <div
-              className={cn(
-                'rounded-md border px-3 py-2 flex items-center justify-between gap-3 flex-wrap',
-                P0_CARD_CLASS[status],
-              )}
-              title="Agregado calendárico real del día — suma de fragmentos físicamente procesados aquí"
-            >
-              <div className="flex items-baseline gap-2 min-w-0">
-                <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Día calendárico</span>
-                <span className={cn('text-lg font-bold tabular-nums', p0StatusColor(status))}>
-                  {agg.pointZeroPct.toFixed(2)}%
-                </span>
-              </div>
-              <div className="flex items-center gap-3 text-xs text-muted-foreground tabular-nums">
-                <span><strong className="text-foreground">{agg.totalPieces.toLocaleString('es-CL')}</strong> pz</span>
-                {agg.totalWeightKg != null && agg.totalWeightKg > 0 && (
-                  <span>
-                    <strong className="text-foreground">
-                      {agg.totalWeightKg >= 1000
-                        ? `${(agg.totalWeightKg / 1000).toFixed(1)} t`
-                        : `${agg.totalWeightKg.toFixed(0)} kg`}
-                    </strong>
-                  </span>
-                )}
-                {agg.activeMinutes > 0 && (
-                  <span><strong className="text-foreground">{hours}h {mins}m</strong> activos</span>
-                )}
-                <span>{nFragments} {nFragments === 1 ? 'fragmento' : 'fragmentos'}</span>
-              </div>
-            </div>
-          )
-        })()}
-
         {/* Header con count y D↔N button (solo en slide seleccionado) */}
         <div className="flex items-center justify-between">
-          <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 uppercase tracking-wide">
-            <Database className="h-3.5 w-3.5" />
-            {headerText}
-          </p>
+          <div />
           {isSelectedSlide && (() => {
             const hists = historicalByDate.get(slideKey) ?? []
             const hasDia   = hists.some((h) => h.shiftId === 'Turno día')
