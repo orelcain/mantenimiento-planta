@@ -64,6 +64,7 @@ function buildRateSeries(machines: UpstreamMachineShift[]): {
   const BUCKET_MS = 5 * 60_000
   const snap = (ts: number) => Math.round(ts / BUCKET_MS) * BUCKET_MS
 
+
   // Colección de todos los timestamps únicos (alineados a grilla 5 min)
   const tsSet = new Set<number>()
   for (const m of machines) {
