@@ -269,6 +269,30 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
         )
         await ref.set(doc, { merge: true })
 
+        // ── Capa 1: validación de calidad post-sync (no bloquea) ──────────────
+        // Detecta si algún interval quedó fuera de la ventana del turno — síntoma
+        // de filtrado incorrecto o timezone bug. Escribe dataQualityIssues al doc
+        // para que el cliente y los dashboards puedan mostrar una advertencia.
+        // Se ejecuta siempre: si no hay problema escribe [] para limpiar issues previos.
+        try {
+          const VAL_TOL_MS = 5 * 60_000
+          const winLo = group.scheduledStart.getTime() - VAL_TOL_MS
+          const winHi = group.scheduledEnd.getTime()   + VAL_TOL_MS
+          const outOfWindow = (doc.intervals || []).filter(iv => {
+            const ts = iv.startAt instanceof Date ? iv.startAt.getTime() : new Date(iv.startAt).getTime()
+            return ts < winLo || ts > winHi
+          })
+          const qualityIssues = outOfWindow.length > 0
+            ? [`${outOfWindow.length}/${(doc.intervals || []).length} intervals fuera de ventana (${toShoplogixTime(group.scheduledStart)}→${toShoplogixTime(group.scheduledEnd)})`]
+            : []
+          await ref.set({ dataQualityIssues: qualityIssues }, { merge: true })
+          if (qualityIssues.length > 0) {
+            logger.warn(`[syncDay][${plantSlug}] QUALITY ${machines[i].name}: ${qualityIssues[0]}`)
+          }
+        } catch (qErr) {
+          logger.warn(`[syncDay][${plantSlug}] quality-check err (${machines[i].name}): ${qErr.message}`)
+        }
+
         shiftMachineResults.push({
           machineid:   machines[i].machineid,
           name:        machines[i].name,

@@ -101,6 +101,16 @@ function deserializeShift(raw: FirestoreData): UpstreamMachineShift {
     const firstStateDay = Math.floor(states[0]!.startAt.getTime() / 86_400_000)
     const firstIvlDay   = Math.floor(rawIntervals[0]!.startAt.getTime() / 86_400_000)
     if (firstStateDay !== firstIvlDay) {
+      // ── Capa 3: telemetría FIX-ON-READ ──────────────────────────────────────
+      // Cuenta cuántas veces se activa el re-anchor legacy. Si este log deja de
+      // aparecer por 30 días → todos los docs legacy ya migraron y el bloque
+      // entero puede eliminarse. Filtrar en Datadog/CloudWatch por "[SLX-FIX-ON-READ]".
+      console.info(
+        `[SLX-FIX-ON-READ] ${String(raw.machineName ?? raw.machineid)} ` +
+        `${String(raw.dateKey)} ${String(raw.shiftId)}: re-anclando ` +
+        `${rawIntervals.length} intervals (firstState=${states[0]!.startAt.toISOString()} ` +
+        `≠ firstIvl=${rawIntervals[0]!.startAt.toISOString()})`,
+      )
       // Re-ancla intervals al inicio del primer state (heurística: el primer
       // state usualmente arranca cuando empieza el tracking de producción).
       const intervalMs = rawIntervals.length > 1
@@ -173,6 +183,40 @@ function deserializeShift(raw: FirestoreData): UpstreamMachineShift {
   const scheduledStart = raw.scheduledStart != null ? toDateSafe(raw.scheduledStart) : shiftStart
   const scheduledEnd   = raw.scheduledEnd   != null ? toDateSafe(raw.scheduledEnd)   : shiftEnd
 
+  // ── Capa 2: validación post-deserialización ──────────────────────────────────
+  // Solo para docs nuevos (scheduleSource='intervals') cuyos timestamps ya son
+  // correctos desde la API. Si algún interval cae fuera del rango del turno es
+  // síntoma de un bug en el normalizer o de un timezone mismatch en Shoplogix.
+  // No lanza error — solo loggea para diagnosticar silenciosamente en consola.
+  if (scheduleSource === 'intervals' && intervals.length > 0) {
+    const CAPA2_TOL_MS = 5 * 60_000
+    const winLo = scheduledStart.getTime() - CAPA2_TOL_MS
+    const winHi = scheduledEnd.getTime()   + CAPA2_TOL_MS
+    const badCount = intervals.filter(iv => {
+      const ts = iv.startAt.getTime()
+      return ts < winLo || ts > winHi
+    }).length
+    if (badCount > 0) {
+      const firstBad = intervals.find(iv => {
+        const ts = iv.startAt.getTime()
+        return ts < winLo || ts > winHi
+      })
+      console.warn(
+        `[SLX-QUALITY] ${String(raw.machineName ?? raw.machineid)} ` +
+        `${String(raw.shiftId)}: ${badCount}/${intervals.length} intervals fuera de ventana ` +
+        `(${scheduledStart.toISOString()}→${scheduledEnd.toISOString()}). ` +
+        `Primer fuera: ${firstBad!.startAt.toISOString()}`,
+      )
+    }
+  }
+
+  // dataQualityIssues: escritos por Capa 1 (Cloud Function) cuando detecta
+  // intervals fuera de ventana. Propagamos al tipo para que la UI pueda
+  // mostrar un badge "⚠ datos parciales" sin hacer un fetch adicional.
+  const dataQualityIssues: string[] = Array.isArray(raw.dataQualityIssues)
+    ? (raw.dataQualityIssues as unknown[]).filter((x): x is string => typeof x === 'string')
+    : []
+
   return {
     machineid:           String(raw.machineid ?? ''),
     machineName:         String(raw.machineName ?? ''),
@@ -202,6 +246,7 @@ function deserializeShift(raw: FirestoreData): UpstreamMachineShift {
     source:              'shoplogix',
     sourceVersion:       Number(raw.sourceVersion ?? 1),
     syncedAt:            toDateSafe(raw.syncedAt),
+    dataQualityIssues,
   }
 }
 

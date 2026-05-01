@@ -204,6 +204,13 @@ export interface UpstreamMachineShift {
   source: 'shoplogix';
   sourceVersion: number;
   syncedAt: Date;
+
+  /**
+   * Problemas de calidad detectados por la Capa 1 (Cloud Function post-sync)
+   * o por la Capa 2 (deserialización cliente). Ausente o vacío = datos OK.
+   * La UI puede mostrar un badge "⚠ datos parciales" cuando tenga entradas.
+   */
+  dataQualityIssues?: string[];
 }
 
 /**
