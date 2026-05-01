@@ -75,6 +75,7 @@ const ETTPage = lazyWithReload(() => import('@/pages/admin/ETTPage').then((mod) 
 const PermissionsPage = lazyWithReload(() => import('@/pages/admin/PermissionsPage').then((mod) => ({ default: mod.PermissionsPage })))
 const ShoplogixCredentialsPage = lazyWithReload(() => import('@/pages/admin/ShoplogixCredentialsPage').then((mod) => ({ default: mod.ShoplogixCredentialsPage })))
 const AdminPanelPage = lazyWithReload(() => import('@/pages/admin/AdminPanelPage').then((mod) => ({ default: mod.AdminPanelPage })))
+const MachineCapacityPage = lazyWithReload(() => import('@/pages/admin/MachineCapacityPage').then((mod) => ({ default: mod.MachineCapacityPage })))
 const Visor3DListPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DListPage').then((mod) => ({ default: mod.Visor3DListPage })))
 const Visor3DViewerPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DViewerPage').then((mod) => ({ default: mod.Visor3DViewerPage })))
 const Visor3DPublicPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DPublicPage').then((mod) => ({ default: mod.Visor3DPublicPage })))
@@ -510,6 +511,15 @@ export function App() {
                 <RequireReAuth reason="antes de modificar el sidebar">
                   <Suspense fallback={<LoadingScreen />}>
                     <SidebarEditorPage />
+                  </Suspense>
+                </RequireReAuth>
+              </AdminRoute>
+            } />
+            <Route path="admin/machine-capacity" element={
+              <AdminRoute>
+                <RequireReAuth reason="antes de configurar la velocidad nameplate de las Baaders">
+                  <Suspense fallback={<LoadingScreen />}>
+                    <MachineCapacityPage />
                   </Suspense>
                 </RequireReAuth>
               </AdminRoute>

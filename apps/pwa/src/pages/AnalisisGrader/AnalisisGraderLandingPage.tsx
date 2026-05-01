@@ -26,6 +26,7 @@ import { computeShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import { DEFAULT_SHIFT_SCHEDULE } from '@/services/grader/graderShiftSchedule'
 import { verdictFromP0Pct } from '@/services/grader/graderThresholds'
 import { GraderHistoricalCalendar } from '@/components/grader/GraderHistoricalCalendar'
+import { PlantKPIBoard } from '@/components/grader/PlantKPIBoard'
 import type { GraderDailySummary } from '@/services/grader/types'
 import { PLANT_LINES, getPlantLineConfig, DEFAULT_PLANT_LINE_ID, type PlantLineId } from '@/config/plantLines'
 import { cn } from '@/lib/utils'
@@ -381,7 +382,7 @@ export function AnalisisGraderLandingPage() {
         />
       </div>
 
-      {/* ── Selector de línea/planta + Calendario ──────────────────────── */}
+      {/* ── Selector de línea/planta + KPIs + Calendario ───────────────── */}
       <section className="space-y-3">
         {/* Selector */}
         <div className="flex items-center gap-3">
@@ -394,6 +395,13 @@ export function AnalisisGraderLandingPage() {
             {lineConfig.hasGraderData ? 'colores = P0%' : 'sin datos Excel'}
           </span>
         </div>
+
+        {/* Panel de indicadores de rendimiento — cambia con la planta seleccionada */}
+        <PlantKPIBoard
+          plantSlug={lineConfig.plantSlug}
+          graderSummaries={allSummaries}
+          enabled={lineConfig.shoplogixEnabled && !lineConfig.comingSoon}
+        />
 
         {/* Calendario */}
         <GraderHistoricalCalendar

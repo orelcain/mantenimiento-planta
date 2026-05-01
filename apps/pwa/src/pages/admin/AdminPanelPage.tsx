@@ -28,6 +28,7 @@ import {
   Map,
   GraduationCap,
   FileText,
+  Gauge,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 
@@ -90,6 +91,14 @@ const ADMIN_ITEMS: AdminItem[] = [
     description: 'Personaliza el orden y visibilidad de los items del menú lateral.',
     icon: <Layers className="w-5 h-5" />,
     iconColor: 'text-purple-400',
+    section: 'sensible',
+  },
+  {
+    to: '/admin/machine-capacity',
+    title: 'Velocidad Nameplate Baader',
+    description: 'Capacidad física máxima (pz/min) de cada Evisceradora. Usada para OEE y para detectar objetivos mal calibrados en Shoplogix.',
+    icon: <Gauge className="w-5 h-5" />,
+    iconColor: 'text-cyan-400',
     section: 'sensible',
   },
 
