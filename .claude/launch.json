@@ -13,6 +13,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["serve", "-l", "5500", "."],
       "port": 5500
+    },
+    {
+      "name": "mockups",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "-l", "5501", "apps/pwa/public/dev-mockups"],
+      "port": 5501
     }
   ]
 }
