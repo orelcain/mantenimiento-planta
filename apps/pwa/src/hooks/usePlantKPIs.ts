@@ -12,7 +12,7 @@
  * usePlantKPIsForPeriod agrega múltiples turnos para Día/Semana/Mes.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   listShoplogixShiftIdsForDay,
   loadShoplogixShift,
@@ -312,13 +312,28 @@ export function usePlantKPIs(
 
 // ── Hook multi-período ────────────────────────────────────────────────────────
 
+/** Datos crudos de Shoplogix cargados para un período — separados de graderSummaries. */
+type SlxLoad =
+  | { status: 'loading' }
+  | { status: 'error'; message: string }
+  | {
+      status: 'ok'
+      shifts: { dateKey: string; shiftId: string; machines: UpstreamMachineShift[] }[]
+      anchor: string
+      label: string
+      dateKeys: string[]
+    }
+
 /**
  * Agrega KPIs para un período (Día / Semana / Mes).
  *
- * - 'day' sin anchorDateKey  → busca el turno más reciente con actividad (últimos 7 días)
- * - 'day' con anchorDateKey  → agrega todos los turnos de ese día específico
- * - 'week'                   → agrega 7 días terminando en anchorDateKey (o hoy)
- * - 'month'                  → agrega todos los días de currentMonth
+ * Diseño en dos capas:
+ *   1. Effect: carga Shoplogix (costoso). Se re-ejecuta solo cuando cambia
+ *      plantSlug / period / anchorDateKey / currentMonth.
+ *   2. useMemo: agrega calidad (Q = 1 − P0%) desde graderSummaries. Se
+ *      re-ejecuta cuando llegan nuevos summaries SIN re-fetchear Shoplogix.
+ *      Esto resuelve la race condition donde Q llegaba como null porque
+ *      graderSummaries aún estaba vacío cuando el effect corrió.
  */
 export function usePlantKPIsForPeriod(
   plantSlug: PlantSlug,
@@ -327,13 +342,14 @@ export function usePlantKPIsForPeriod(
   currentMonth: Date,
   graderSummaries: GraderDailySummary[],
 ): UsePlantKPIsResult {
-  const [state, setState] = useState<UsePlantKPIsResult>({ loading: true, error: null, kpis: null })
+  const [slx, setSlx] = useState<SlxLoad>({ status: 'loading' })
 
+  // ── Capa 1: carga Shoplogix ──────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false
+    setSlx({ status: 'loading' })
 
     async function load() {
-      setState({ loading: true, error: null, kpis: null })
       try {
         // Caso especial: día sin anchor → buscar el turno más reciente con actividad
         if (period === 'day' && !anchorDateKey) {
@@ -359,15 +375,16 @@ export function usePlantKPIsForPeriod(
           }
           if (!foundSnapshot && fbSnapshot) { foundDateKey = fbDateKey; foundShiftId = fbShiftId; foundSnapshot = fbSnapshot }
           if (!foundDateKey || !foundShiftId || !foundSnapshot) {
-            if (!cancelled) setState({ loading: false, error: null, kpis: null })
+            if (!cancelled) setSlx({ status: 'ok', shifts: [], anchor: daysAgo(0), label: '', dateKeys: [] })
             return
           }
-          const kpis = aggregateShifts(
-            [{ dateKey: foundDateKey, shiftId: foundShiftId, machines: foundSnapshot.machines }],
-            getPeriodLabel('day', foundDateKey, currentMonth),
-            graderSummaries,
-          )
-          if (!cancelled) setState({ loading: false, error: null, kpis })
+          if (!cancelled) setSlx({
+            status: 'ok',
+            shifts: [{ dateKey: foundDateKey, shiftId: foundShiftId, machines: foundSnapshot.machines }],
+            anchor: foundDateKey,
+            label: getPeriodLabel('day', foundDateKey, currentMonth),
+            dateKeys: [foundDateKey],
+          })
           return
         }
 
@@ -375,52 +392,43 @@ export function usePlantKPIsForPeriod(
         const anchor   = anchorDateKey ?? daysAgo(0)
         const dateKeys = getDateKeys(period, anchor, currentMonth)
         const label    = getPeriodLabel(period, anchor, currentMonth)
-
-        const shifts = await loadShiftsForDates(dateKeys, plantSlug)
-        if (cancelled) return
-
-        if (shifts.length === 0) {
-          // Sin Shoplogix — intentar calidad solo desde Grader
-          const graderForPeriod = graderSummaries.filter(g => dateKeys.includes(g.dateKey))
-          if (graderForPeriod.length === 0) {
-            setState({ loading: false, error: null, kpis: null })
-            return
-          }
-          const qualityVals = graderForPeriod
-            .filter(g => typeof g.pointZeroPct === 'number')
-            .map(g => Math.max(0, Math.min(1, 1 - g.pointZeroPct / 100)))
-          const quality = qualityVals.length > 0 ? avg(qualityVals) : null
-          const graderKpi: PlantKPIs = {
-            dateKey: anchor,
-            shiftId: '',
-            periodLabel: label,
-            shiftsCount: graderForPeriod.length,
-            availability: null,
-            performance: null,
-            quality,
-            oee: null,
-            mttrMin: 0,
-            mtbfHours: 0,
-            failureCount: 0,
-            machines: [],
-            graderOnly: true,
-          }
-          setState({ loading: false, error: null, kpis: graderKpi })
-          return
-        }
-
-        const kpis = aggregateShifts(shifts, label, graderSummaries)
-        setState({ loading: false, error: null, kpis })
+        const shifts   = await loadShiftsForDates(dateKeys, plantSlug)
+        if (!cancelled) setSlx({ status: 'ok', shifts, anchor, label, dateKeys })
       } catch {
-        if (!cancelled) setState({ loading: false, error: 'No se pudo cargar los indicadores', kpis: null })
+        if (!cancelled) setSlx({ status: 'error', message: 'No se pudo cargar los indicadores' })
       }
     }
 
     load()
     return () => { cancelled = true }
-  // graderSummaries intencionalmente excluido
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plantSlug, period, anchorDateKey, currentMonth])
 
-  return state
+  // ── Capa 2: agrega calidad desde graderSummaries (reactivo) ─────────────
+  return useMemo<UsePlantKPIsResult>(() => {
+    if (slx.status === 'loading') return { loading: true, error: null, kpis: null }
+    if (slx.status === 'error')   return { loading: false, error: slx.message, kpis: null }
+
+    const { shifts, anchor, label, dateKeys } = slx
+
+    if (shifts.length === 0) {
+      const graderForPeriod = graderSummaries.filter(g => dateKeys.includes(g.dateKey))
+      if (graderForPeriod.length === 0) return { loading: false, error: null, kpis: null }
+      const qualityVals = graderForPeriod
+        .filter(g => typeof g.pointZeroPct === 'number')
+        .map(g => Math.max(0, Math.min(1, 1 - g.pointZeroPct / 100)))
+      const quality = qualityVals.length > 0 ? avg(qualityVals) : null
+      return {
+        loading: false, error: null,
+        kpis: {
+          dateKey: anchor, shiftId: '', periodLabel: label,
+          shiftsCount: graderForPeriod.length,
+          availability: null, performance: null, quality, oee: null,
+          mttrMin: 0, mtbfHours: 0, failureCount: 0, machines: [],
+          graderOnly: true,
+        },
+      }
+    }
+
+    return { loading: false, error: null, kpis: aggregateShifts(shifts, label, graderSummaries) }
+  }, [slx, graderSummaries])
 }

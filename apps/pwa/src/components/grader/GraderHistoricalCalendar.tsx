@@ -20,7 +20,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { animate, stagger } from 'animejs'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, InfoTooltip } from '@/components/ui'
-import { ChevronLeft, ChevronRight, Loader2, Clock, Database, Eye, Trash2, AlertTriangle, Sun, Moon, Wrench, Tag, GitCompare, Activity, TrendingUp, TrendingDown } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, Clock, Eye, Trash2, AlertTriangle, Sun, Moon, Wrench, Tag, GitCompare, Activity, TrendingUp, TrendingDown } from 'lucide-react'
 import { fmt } from '@/lib/format'
 import { QuickGateChangeButton } from './QuickGateChangeButton'
 import { listSnapshots } from '@/services/grader/graderConfigSnapshot.service'
@@ -1918,12 +1918,6 @@ export function GraderHistoricalCalendar({
     const enriched = enrichEntriesByKind(entries)
     if (enriched.length === 0) return null
     const visibleCount = enriched.filter((e) => e.kind !== 'salida').length
-    const allSalida = enriched.length > 0 && enriched.every((e) => e.kind === 'salida')
-    const headerText = allSalida
-      ? '📂 Turno noche programado en este día'
-      : `📂 ${visibleCount} ${visibleCount === 1 ? 'turno' : 'turnos'} · ordenados por hora de inicio`
-
-    const agg = calendarAgg.get(slideKey)
     let visibleIdx = 0
 
     return (
