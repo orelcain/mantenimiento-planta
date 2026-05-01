@@ -2519,7 +2519,7 @@ export function GraderHistoricalCalendar({
                 <button
                   key={dayKey}
                   className={cn(
-                    'h-14 p-1 border rounded-md text-left transition-all flex flex-col gap-px overflow-hidden',
+                    'min-h-[56px] p-1 border rounded-md text-left transition-all flex flex-col gap-px',
                     isToday(day) && !isSelected && 'border-primary/60 bg-primary/5',
                     isSelected && 'ring-2 ring-primary border-primary bg-primary/8',
                     !hasData && !hasAnySlx && dayUploads.length === 0 && 'opacity-40',
