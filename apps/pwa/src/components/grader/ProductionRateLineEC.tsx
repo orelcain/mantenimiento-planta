@@ -56,6 +56,15 @@ function buildRateSeries(machines: UpstreamMachineShift[]): {
     return { timeAxis: [], series: [], avgSeries: { name: 'Promedio', data: [] }, expectedRate: 0, showAvg: false }
   }
 
+  // DEBUG T3: verificar si los datos son distintos por máquina
+  if (machines.length > 1) {
+    console.log('[ProductionRateLineEC] machines:', machines.map(m => ({
+      name: m.machineName,
+      intervals: m.intervals.length,
+      first3cycles: m.intervals.slice(0, 3).map(iv => ({ t: iv.startAt.toISOString(), c: iv.cycles })),
+    })))
+  }
+
   // Colección de todos los timestamps únicos (alineados al inicio del bucket)
   const tsSet = new Set<number>()
   for (const m of machines) {
