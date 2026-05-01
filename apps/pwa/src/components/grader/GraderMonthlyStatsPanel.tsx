@@ -108,13 +108,13 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats }: P
   const turnosCount = stats?.turnos      ?? slxStats?.turnosWithData      ?? 0
 
   return (
-    <div className="space-y-3 lg:sticky lg:top-4">
+    <div className="space-y-2 lg:sticky lg:top-4">
 
       {/* ── Header ── */}
       <div>
-        <p className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wide">Resumen del mes</p>
-        <p className="text-base font-bold leading-tight">{monthLabel}</p>
-        <p className="text-[10px] text-muted-foreground/60 mt-0.5">
+        <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wide">Resumen del mes</p>
+        <p className="text-sm font-bold leading-tight">{monthLabel}</p>
+        <p className="text-[10px] text-muted-foreground/60 mt-0">
           {daysCount} días · {turnosCount} turnos
         </p>
       </div>
@@ -123,13 +123,13 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats }: P
       <div className="grid grid-cols-2 gap-2">
         {/* Grader */}
         <Card className={stats ? '' : 'opacity-40'}>
-          <CardContent className="pt-3 pb-3 px-3">
-            <p className="text-[10px] text-muted-foreground mb-1">P0% promedio</p>
-            <p className={`text-2xl font-bold leading-none ${p0Color}`}>
+          <CardContent className="pt-2 pb-2 px-3">
+            <p className="text-[10px] text-muted-foreground mb-0.5">P0% promedio</p>
+            <p className={`text-xl font-bold leading-none ${p0Color}`}>
               {stats ? `${fmtDec(stats.p0Avg, 2)}%` : '—'}
             </p>
             {stats && (
-              <p className="text-[10px] text-muted-foreground mt-1 leading-snug">
+              <p className="text-[10px] text-muted-foreground mt-0.5 leading-snug">
                 {fmt(stats.totalPieces)} pz
                 {stats.totalWeightKg > 0 && <> · {fmtDec(stats.totalWeightKg / 1000, 1)} t</>}
               </p>
@@ -139,9 +139,9 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats }: P
 
         {/* Shoplogix */}
         <Card className={slxStats ? '' : 'opacity-40'}>
-          <CardContent className="pt-3 pb-3 px-3">
-            <p className="text-[10px] text-muted-foreground mb-1">Ciclos Baader</p>
-            <p className={`text-2xl font-bold leading-none ${slxStats ? 'text-sky-400' : 'text-muted-foreground'}`}>
+          <CardContent className="pt-2 pb-2 px-3">
+            <p className="text-[10px] text-muted-foreground mb-0.5">Ciclos Baader</p>
+            <p className={`text-xl font-bold leading-none ${slxStats ? 'text-sky-400' : 'text-muted-foreground'}`}>
               {slxStats
                 ? (slxStats.totalCycles >= 1000
                     ? `${(slxStats.totalCycles / 1000).toFixed(1)}k`
@@ -149,7 +149,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats }: P
                 : '—'}
             </p>
             {slxStats && (
-              <p className={`text-[10px] mt-1 ${
+              <p className={`text-[10px] mt-0.5 ${
                 slxStats.avgUptimePct >= 70 ? 'text-emerald-400'
                 : slxStats.avgUptimePct >= 40 ? 'text-amber-400' : 'text-rose-400'
               }`}>
@@ -163,14 +163,14 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats }: P
       {/* ── Fila 2: Mejor / Peor turno ── */}
       <div className="grid grid-cols-2 gap-2">
         <Card className={`border-emerald-500/20 bg-emerald-500/5 ${!best ? 'opacity-40' : ''}`}>
-          <CardContent className="pt-2 pb-2 px-3">
+          <CardContent className="pt-1.5 pb-1.5 px-3">
             <div className="flex items-center gap-1 mb-0.5">
               <TrendingDown className="w-3 h-3 text-emerald-500" />
               <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
                 Mejor · {best?.metric ?? '—'}
               </p>
             </div>
-            <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400 leading-none">
+            <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400 leading-none">
               {best?.value ?? '—'}
             </p>
             {best && <p className="text-[10px] text-muted-foreground mt-0.5">{best.date}</p>}
@@ -178,14 +178,14 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats }: P
         </Card>
 
         <Card className={`border-rose-500/20 bg-rose-500/5 ${!worst ? 'opacity-40' : ''}`}>
-          <CardContent className="pt-2 pb-2 px-3">
+          <CardContent className="pt-1.5 pb-1.5 px-3">
             <div className="flex items-center gap-1 mb-0.5">
               <TrendingUp className="w-3 h-3 text-rose-500" />
               <p className="text-[11px] text-rose-600 dark:text-rose-400 font-medium">
                 Peor · {worst?.metric ?? '—'}
               </p>
             </div>
-            <p className="text-xl font-bold text-rose-600 dark:text-rose-400 leading-none">
+            <p className="text-lg font-bold text-rose-600 dark:text-rose-400 leading-none">
               {worst?.value ?? '—'}
             </p>
             {worst && <p className="text-[10px] text-muted-foreground mt-0.5">{worst.date}</p>}
@@ -195,19 +195,19 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats }: P
 
       {/* ── Fila 3: Distribución Día / Noche ── */}
       <Card>
-        <CardContent className="py-2 px-4">
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wide text-center mb-1.5">Turnos</p>
+        <CardContent className="py-1.5 px-4">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wide text-center mb-1">Turnos</p>
           <div className="flex justify-around text-center">
             <div>
-              <p className="text-2xl font-bold leading-none">{dayShifts}</p>
-              <p className="text-xs text-muted-foreground mt-1 flex items-center justify-center gap-1">
+              <p className="text-xl font-bold leading-none">{dayShifts}</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
                 <Sun className="w-3 h-3 text-amber-500" /> Día
               </p>
             </div>
             <div className="w-px bg-border" />
             <div>
-              <p className="text-2xl font-bold leading-none">{nightShifts}</p>
-              <p className="text-xs text-muted-foreground mt-1 flex items-center justify-center gap-1">
+              <p className="text-xl font-bold leading-none">{nightShifts}</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
                 <Moon className="w-3 h-3 text-indigo-400" /> Noche
               </p>
             </div>
@@ -218,11 +218,11 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats }: P
       {/* ── Fila 4: Causa P0 dominante (solo si hay Grader) ── */}
       {stats?.topCausa && (
         <Card>
-          <CardContent className="py-2 px-4 flex items-center gap-3">
-            <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
+          <CardContent className="py-1.5 px-3 flex items-center gap-2">
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
             <div className="min-w-0">
-              <p className="text-[11px] text-muted-foreground">Causa P0 dominante</p>
-              <p className="text-sm font-semibold truncate">{getCauseLabel(stats.topCausa)}</p>
+              <p className="text-[10px] text-muted-foreground">Causa P0 dominante</p>
+              <p className="text-xs font-semibold truncate">{getCauseLabel(stats.topCausa)}</p>
             </div>
           </CardContent>
         </Card>

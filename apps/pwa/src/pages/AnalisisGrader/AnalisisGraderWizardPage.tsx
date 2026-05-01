@@ -545,42 +545,46 @@ export function AnalisisGraderWizardPage() {
         </div>
       </div>
 
-      {/* ── Selector de línea/planta + indicador live ── */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <PlantLineTabs selected={lineId} onSelect={handleLineSelect} className="w-full max-w-sm" />
-        {lineId !== DEFAULT_PLANT_LINE_ID && lineConfig.shoplogixEnabled && (
-          <Badge className="text-xs bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 gap-1.5 px-2.5 py-1">
-            <Activity className="h-3 w-3 shrink-0 animate-pulse" />
-            En proceso
-          </Badge>
-        )}
-      </div>
+      {/* ═══ Grid 2-col que arranca en las pestañas de planta ═══ */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
 
-      {/* ── Panel de indicadores de rendimiento (KPIs Shoplogix) ── */}
-      <PlantKPIBoard
-        plantSlug={lineConfig.plantSlug}
-        graderSummaries={calendarSummaries}
-        enabled={lineConfig.shoplogixEnabled && !lineConfig.comingSoon}
-        selectedDateKey={selectedDateKey}
-        currentMonth={calendarMonth}
-      />
+        {/* Col izquierda: pestañas + KPI */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 flex-wrap">
+            <PlantLineTabs selected={lineId} onSelect={handleLineSelect} className="w-full" />
+            {lineId !== DEFAULT_PLANT_LINE_ID && lineConfig.shoplogixEnabled && (
+              <Badge className="text-xs bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 gap-1.5 px-2.5 py-1">
+                <Activity className="h-3 w-3 shrink-0 animate-pulse" />
+                En proceso
+              </Badge>
+            )}
+          </div>
+          <PlantKPIBoard
+            plantSlug={lineConfig.plantSlug}
+            graderSummaries={calendarSummaries}
+            enabled={lineConfig.shoplogixEnabled && !lineConfig.comingSoon}
+            selectedDateKey={selectedDateKey}
+            currentMonth={calendarMonth}
+          />
+        </div>
 
-      {/* ═══ Cuerpo: 2 columnas en desktop — calendario + resumen mensual ═══ */}
-      <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-6 items-start">
-        <GraderHistoricalCalendar
-          stacked
-          onMonthChange={setCalendarMonth}
-          onSummariesLoaded={setCalendarSummaries}
-          onSlxMonthStatsLoaded={setCalendarSlxStats}
-          onDateSelect={setSelectedDateKey}
-          plantLineId={lineId}
-        />
+        {/* Col derecha: Resumen del mes — arranca a la altura de las pestañas */}
         <GraderMonthlyStatsPanel
           currentMonth={calendarMonth}
           summaries={calendarSummaries}
           slxStats={calendarSlxStats}
         />
       </div>
+
+      {/* Fila 2: Calendario (izq 50%) | Resumen diario (der 50%) */}
+      <GraderHistoricalCalendar
+        equalColumns
+        onMonthChange={setCalendarMonth}
+        onSummariesLoaded={setCalendarSummaries}
+        onSlxMonthStatsLoaded={setCalendarSlxStats}
+        onDateSelect={setSelectedDateKey}
+        plantLineId={lineId}
+      />
 
       {/* Banners multi-día */}
       {multiDayInfo && !savedToCalendar && (

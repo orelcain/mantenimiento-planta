@@ -19,7 +19,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { animate, stagger } from 'animejs'
-import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from '@/components/ui'
+import { Card, CardContent, CardHeader, CardTitle, Button, Badge, InfoTooltip } from '@/components/ui'
 import { ChevronLeft, ChevronRight, Loader2, Clock, Database, Eye, Trash2, AlertTriangle, Sun, Moon, Wrench, Tag, GitCompare, Activity, TrendingUp, TrendingDown } from 'lucide-react'
 import { fmt } from '@/lib/format'
 import { QuickGateChangeButton } from './QuickGateChangeButton'
@@ -111,6 +111,8 @@ interface GraderHistoricalCalendarProps {
   onSlxMonthStatsLoaded?: (stats: SlxMonthlyStats | null) => void
   /** Notifica al padre cuando el día seleccionado cambia ("YYYY-MM-DD" o null). */
   onDateSelect?: (dateKey: string | null) => void
+  /** Si true, divide calendario y resumen en columnas 50/50 en lugar de 2/3-1/3. */
+  equalColumns?: boolean
 }
 
 const monthNames = [
@@ -803,8 +805,10 @@ interface SlxShiftCache {
   /** Horario real del turno según Shoplogix (de intervals.shift en syncDay). */
   scheduledStart: Date | null
   scheduledEnd: Date | null
-  /** Fracción uptime real (0-1) calculada por el normalizer Shoplogix */
+  /** Fracción uptime real (0-1) calculada por el normalizer Shoplogix — solo máquina 0 */
   shiftRuntime: number
+  /** Promedio de shiftRuntime entre todas las máquinas del turno (0-1) */
+  avgShiftRuntime: number
   /** Productividad total: ciclos / expectedCycles (0..1+) */
   overallRatio: number
   /** Total ciclos sumados de todas las Baaders del turno */
@@ -841,6 +845,7 @@ export function GraderHistoricalCalendar({
   onSlxMonthStatsLoaded,
   onDateSelect,
   plantLineId = DEFAULT_PLANT_LINE_ID,
+  equalColumns = false,
 }: GraderHistoricalCalendarProps) {
   const navigate = useNavigate()
 
@@ -1310,11 +1315,13 @@ export function GraderHistoricalCalendar({
       loadShoplogixShift(c.dateKey, c.shiftId, plantSlug)
         .then((res) => {
           if (cancelled) return
-          const m0 = res.snapshot?.machines[0]
+          const machines = res.snapshot?.machines ?? []
+          const m0 = machines[0]
           const states = m0?.states ?? []
-          const totalCycles = (res.snapshot?.machines ?? []).reduce(
-            (a, mc) => a + (mc.totalCycles || 0), 0,
-          )
+          const totalCycles = machines.reduce((a, mc) => a + (mc.totalCycles || 0), 0)
+          const avgShiftRuntime = machines.length > 0
+            ? machines.reduce((s, m) => s + (m.shiftRuntime ?? 0), 0) / machines.length
+            : 0
           const cache: SlxShiftCache = {
             states,
             shiftStart:     m0?.shiftStart     ?? null,
@@ -1322,6 +1329,7 @@ export function GraderHistoricalCalendar({
             scheduledStart: m0?.scheduledStart ?? m0?.shiftStart ?? null,
             scheduledEnd:   m0?.scheduledEnd   ?? m0?.shiftEnd   ?? null,
             shiftRuntime:   m0?.shiftRuntime   ?? 0,
+            avgShiftRuntime,
             overallRatio:   m0?.overallRatio   ?? 0,
             totalCycles,
             breakdown: m0?.shiftRuntimeBreakdown ? {
@@ -1341,7 +1349,7 @@ export function GraderHistoricalCalendar({
             setSlxByShift((prev) => new Map(prev).set(key, {
               states: [], shiftStart: null, shiftEnd: null,
               scheduledStart: null, scheduledEnd: null,
-              shiftRuntime: 0, overallRatio: 0, totalCycles: 0, breakdown: null,
+              shiftRuntime: 0, avgShiftRuntime: 0, overallRatio: 0, totalCycles: 0, breakdown: null,
             }))
             setSlxTotalsByShift((prev) => new Map(prev).set(key, 0))
           }
@@ -1368,7 +1376,7 @@ export function GraderHistoricalCalendar({
     const EMPTY_CACHE: SlxShiftCache = {
       states: [], shiftStart: null, shiftEnd: null,
       scheduledStart: null, scheduledEnd: null,
-      shiftRuntime: 0, overallRatio: 0, totalCycles: 0, breakdown: null,
+      shiftRuntime: 0, avgShiftRuntime: 0, overallRatio: 0, totalCycles: 0, breakdown: null,
     }
 
     const loadOne = (dk: string, shiftId: string, forceServer: boolean) => {
@@ -1376,9 +1384,13 @@ export function GraderHistoricalCalendar({
       return loadShoplogixShift(dk, shiftId, plantSlug, forceServer)
         .then((res) => {
           if (cancelled) return 0
-          const m0     = res.snapshot?.machines[0]
+          const mAll   = res.snapshot?.machines ?? []
+          const m0     = mAll[0]
           const states = m0?.states ?? []
-          const cycles = (res.snapshot?.machines ?? []).reduce((a, mc) => a + (mc.totalCycles || 0), 0)
+          const cycles = mAll.reduce((a, mc) => a + (mc.totalCycles || 0), 0)
+          const avgShiftRuntime2 = mAll.length > 0
+            ? mAll.reduce((s, m) => s + (m.shiftRuntime ?? 0), 0) / mAll.length
+            : 0
           const cache: SlxShiftCache = {
             states,
             shiftStart:     m0?.shiftStart     ?? null,
@@ -1386,6 +1398,7 @@ export function GraderHistoricalCalendar({
             scheduledStart: m0?.scheduledStart ?? m0?.shiftStart ?? null,
             scheduledEnd:   m0?.scheduledEnd   ?? m0?.shiftEnd   ?? null,
             shiftRuntime:   m0?.shiftRuntime   ?? 0,
+            avgShiftRuntime: avgShiftRuntime2,
             overallRatio:   m0?.overallRatio   ?? 0,
             totalCycles:    cycles,
             breakdown: m0?.shiftRuntimeBreakdown ? {
@@ -1515,7 +1528,7 @@ export function GraderHistoricalCalendar({
       if (shiftId === 'Turno día'   && (slxByShift.get(`${dk}__Turno 2`)?.totalCycles    ?? 0) > 0) continue
       if (shiftId === 'Turno noche' && ((slxByShift.get(`${dk}__Turno 1`)?.totalCycles   ?? 0) > 0
                                       || (slxByShift.get(`${dk}__Turno 3`)?.totalCycles  ?? 0) > 0)) continue
-      const uptimePct = cache.shiftRuntime * 100
+      const uptimePct = cache.avgShiftRuntime * 100
       withData.push({ dateKey: dk, shiftId, uptimePct, totalCycles: cache.totalCycles })
       totalCycles += cache.totalCycles
       sumUptime   += uptimePct
@@ -1628,7 +1641,7 @@ export function GraderHistoricalCalendar({
       const dayCache = slxByShift.get(`${dk}__Turno 2`) ?? slxByShift.get(`${dk}__Turno día`) ?? null
       if (dayCache && dayCache.totalCycles > 0) {
         const shiftId = slxByShift.has(`${dk}__Turno 2`) ? 'Turno 2' : 'Turno día'
-        day.push({ dateKey: dk, shiftId, overallRatio: dayCache.overallRatio, shiftRuntime: dayCache.shiftRuntime, totalCycles: dayCache.totalCycles })
+        day.push({ dateKey: dk, shiftId, overallRatio: dayCache.overallRatio, shiftRuntime: dayCache.avgShiftRuntime, totalCycles: dayCache.totalCycles })
       }
       // Night: el de mayor ciclos entre Turno 1/3 (nuevo) > Turno noche (legado)
       const newNights = (['Turno 1', 'Turno 3'] as string[])
@@ -1639,7 +1652,7 @@ export function GraderHistoricalCalendar({
       const nightCache  = nightEntry?.c ?? slxByShift.get(`${dk}__Turno noche`) ?? null
       const nightShiftId = nightEntry?.id ?? 'Turno noche'
       if (nightCache && nightCache.totalCycles > 0) {
-        night.push({ dateKey: dk, shiftId: nightShiftId, overallRatio: nightCache.overallRatio, shiftRuntime: nightCache.shiftRuntime, totalCycles: nightCache.totalCycles })
+        night.push({ dateKey: dk, shiftId: nightShiftId, overallRatio: nightCache.overallRatio, shiftRuntime: nightCache.avgShiftRuntime, totalCycles: nightCache.totalCycles })
       }
     }
     return { day, night }
@@ -2418,8 +2431,15 @@ export function GraderHistoricalCalendar({
   }
 
   return (
-    <div className={cn(stacked ? 'flex flex-col gap-4' : 'grid grid-cols-1 lg:grid-cols-3 gap-4', className)}>
-      <Card className={cn('relative', !stacked && 'lg:col-span-2')}>
+    <div className={cn(
+      stacked
+        ? 'flex flex-col gap-4'
+        : equalColumns
+          ? 'grid grid-cols-1 lg:grid-cols-2 gap-4'
+          : 'grid grid-cols-1 lg:grid-cols-3 gap-4',
+      className,
+    )}>
+      <Card className={cn('relative', !stacked && !equalColumns && 'lg:col-span-2')}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
           <div className="flex items-center gap-4">
             <Button variant="outline" size="icon" onClick={handlePrevMonth}>
@@ -2841,7 +2861,7 @@ export function GraderHistoricalCalendar({
                 <Clock className="h-3.5 w-3.5" />
                 Sin Excel cargado todavía
               </p>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2">
                 {/* displayShifts: shifts del día visual (T3 viene del CF=día anterior). */}
                 {(slxDisplayShifts(selectedKey, slxByShift)).map(({ shiftId, cfDateKey, slxKey }) => {
                   const hasSlx = (slxByShift.get(slxKey)?.states?.length ?? 0) > 0
@@ -2852,18 +2872,18 @@ export function GraderHistoricalCalendar({
                     <div
                       key={shiftId}
                       className={cn(
-                        'rounded-lg border p-3 space-y-2',
+                        'rounded-lg border p-2 space-y-1.5',
                         hasSlx
                           ? 'border-sky-500/30 bg-sky-500/3'
                           : 'border-dashed border-muted-foreground/30 bg-background/30',
                       )}
                     >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-between gap-1 flex-wrap">
+                        <div className="flex items-center gap-1.5">
                           {(shiftId === 'Turno día' || shiftId === 'Turno 2')
-                            ? <Sun className="h-4 w-4 text-amber-500" />
-                            : <Moon className="h-4 w-4 text-indigo-400" />}
-                          <p className="text-sm font-medium">{shiftId}</p>
+                            ? <Sun className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                            : <Moon className="h-3.5 w-3.5 text-indigo-400 shrink-0" />}
+                          <p className="text-xs font-medium leading-none">{shiftId}</p>
                           {(() => {
                             const cache = slxByShift.get(slxKey)
                             const ss = cache?.scheduledStart ?? cache?.shiftStart ?? null
@@ -2878,7 +2898,7 @@ export function GraderHistoricalCalendar({
                           })()}
                         </div>
                         {hasSlx && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-400 border border-sky-500/30 font-medium">
+                          <span className="text-[9px] px-1 py-0.5 rounded bg-sky-500/15 text-sky-400 border border-sky-500/30 font-medium leading-none">
                             Shoplogix
                           </span>
                         )}
@@ -2888,45 +2908,63 @@ export function GraderHistoricalCalendar({
                       {hasSlx && (() => {
                         const cache = slxByShift.get(slxKey)
                         const cycles = slxTotalsByShift.get(slxKey) ?? 0
-                        const uptimePct = (cache?.shiftRuntime ?? 0) * 100
+                        const uptimePct = (cache?.avgShiftRuntime ?? 0) * 100
+                        const uptimeColor = uptimePct >= 70 ? 'text-emerald-400' : uptimePct >= 40 ? 'text-amber-400' : 'text-red-400'
+                        const uptimeBarColor = uptimePct >= 70 ? 'bg-emerald-500' : uptimePct >= 40 ? 'bg-amber-500' : 'bg-red-500'
                         return (
-                          <div className="grid grid-cols-2 gap-1.5">
-                            <div className="rounded bg-muted/40 px-2 py-1 text-center">
-                              <div className="text-sm font-semibold tabular-nums">
+                          <div className="grid grid-cols-2 gap-1">
+                            <div className="rounded bg-muted/40 px-1.5 py-1 text-center">
+                              <div className="flex items-center justify-center gap-0.5 mb-0.5">
+                                <div className="text-[9px] text-muted-foreground">ciclos</div>
+                                <InfoTooltip
+                                  text="Piezas totales procesadas por las Baaders durante el turno, según Shoplogix."
+                                  iconSize={9}
+                                  position="top"
+                                />
+                              </div>
+                              <div className="text-xs font-semibold tabular-nums">
                                 {cycles.toLocaleString('es-CL')}
                               </div>
-                              <div className="text-[10px] text-muted-foreground">ciclos</div>
                             </div>
-                            <div className="rounded bg-muted/40 px-2 py-1 text-center">
-                              <div className={cn(
-                                'text-sm font-semibold tabular-nums',
-                                uptimePct >= 70 ? 'text-emerald-400' : uptimePct >= 40 ? 'text-amber-400' : 'text-red-400',
-                              )}>
+                            <div className="rounded bg-muted/40 px-1.5 py-1 text-center">
+                              <div className="flex items-center justify-center gap-0.5 mb-0.5">
+                                <div className="text-[9px] text-muted-foreground">uptime</div>
+                                <InfoTooltip
+                                  text={`% del turno en que las máquinas estuvieron activas.\n\n< 40% crítico · 40–70% bajo · ≥ 70% normal\n\nUn uptime bajo indica paros frecuentes, esperas de materia prima o mantenimiento no planificado.`}
+                                  iconSize={9}
+                                  position="top"
+                                />
+                              </div>
+                              <div className={cn('text-xs font-semibold tabular-nums', uptimeColor)}>
                                 {uptimePct.toFixed(0)}%
                               </div>
-                              <div className="text-[10px] text-muted-foreground">uptime</div>
+                              <div className="h-1 bg-muted/60 rounded-full overflow-hidden mt-1">
+                                <div
+                                  className={cn('h-full rounded-full transition-all', uptimeBarColor)}
+                                  style={{ width: `${Math.min(100, uptimePct).toFixed(1)}%` }}
+                                />
+                              </div>
                             </div>
                           </div>
                         )
                       })()}
 
                       {!hasSlx && (
-                        <p className="text-[11px] text-muted-foreground leading-snug">
-                          Sin registros. Podés ir guardando los cambios de gate que reporta control de producción —
-                          al subir el Excel se cruzarán con tu historial.
+                        <p className="text-[10px] text-muted-foreground leading-snug">
+                          Sin registros. Al subir el Excel se cruzarán con tu historial.
                         </p>
                       )}
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-col gap-1">
                         <QuickGateChangeButton
                           shiftDocId={`${cfDateKey}__${shiftId}`}
                           variant="compact"
-                          className="flex-1 h-7 text-[11px]"
+                          className="w-full h-6 text-[10px]"
                         />
                         {hasSlx && (
                           <button
                             onClick={() => navigate(`/analisis-grader/turno/${cfDateKey}__${encodeURIComponent(shiftId)}${lineaQuery}`)}
-                            className="flex items-center gap-1 h-7 px-2 rounded text-[11px] text-sky-400 border border-sky-500/40 hover:bg-sky-500/10 transition-colors shrink-0"
+                            className="w-full flex items-center justify-center gap-1 h-6 px-2 rounded text-[10px] text-sky-400 border border-sky-500/40 hover:bg-sky-500/10 transition-colors"
                             title="Ver detalle Shoplogix de este turno"
                           >
                             <Activity className="h-3 w-3" />
