@@ -137,8 +137,29 @@ function aggregateShifts(
   const performance  = avg(machineKPIs.map(m => m.performance))
 
   // Calidad: promedio de (1 − P0%) de los turnos con Grader data
+  // Mapeo Shoplogix → Grader: "Turno 1" = noche, "Turno 2" = día
+  // Turno 1 puede estar guardado en Grader bajo el día ANTERIOR (cruza medianoche)
+  const SLX_TO_GRADER: Record<string, string> = {
+    'Turno 1': 'Turno noche',
+    'Turno 2': 'Turno día',
+    'Turno noche': 'Turno noche',
+    'Turno día':   'Turno día',
+  }
+  function prevDay(dk: string): string {
+    const d = new Date(`${dk}T12:00:00`)
+    d.setDate(d.getDate() - 1)
+    return d.toISOString().slice(0, 10)
+  }
+  function findGraderSummary(s: { dateKey: string; shiftId: string }): GraderDailySummary | undefined {
+    const graderShiftId = SLX_TO_GRADER[s.shiftId] ?? s.shiftId
+    // Busca en el mismo día; si es turno noche, también en el día anterior
+    return graderSummaries.find(g => g.dateKey === s.dateKey && g.shiftId === graderShiftId)
+      ?? (graderShiftId === 'Turno noche'
+        ? graderSummaries.find(g => g.dateKey === prevDay(s.dateKey) && g.shiftId === 'Turno noche')
+        : undefined)
+  }
   const qualityValues = shifts
-    .map(s => graderSummaries.find(g => g.dateKey === s.dateKey && g.shiftId === s.shiftId))
+    .map(s => findGraderSummary(s))
     .filter((g): g is GraderDailySummary => g !== undefined && typeof g.pointZeroPct === 'number')
     .map(g => Math.max(0, Math.min(1, 1 - g.pointZeroPct / 100)))
   const quality = qualityValues.length > 0 ? avg(qualityValues) : null
