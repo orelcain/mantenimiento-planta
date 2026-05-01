@@ -163,7 +163,7 @@ function renderShiftChip(chip: ShiftChipDescriptor, untaggedCount: number | null
       <div
         key={key}
         title={`Turno ${chip.shiftId.toLowerCase()} programado pero sin actividad este día. Detalle en ${chip.primaryDateKey ?? 'otro día'}.`}
-        className="flex items-center justify-between rounded px-1 py-0.5 leading-none bg-indigo-500/15 text-indigo-300 border border-indigo-500/25"
+        className="flex items-center justify-between rounded px-1 py-px leading-none bg-indigo-500/15 text-indigo-300 border border-indigo-500/25"
       >
         <span className="text-[8px] font-medium line-through opacity-80">{baseLetter}⌧</span>
         <span className="text-[8px] tabular-nums opacity-90">→ {chip.primaryDateKey?.slice(8) ?? '--'}</span>
@@ -201,7 +201,7 @@ function renderShiftChip(chip: ShiftChipDescriptor, untaggedCount: number | null
         : chip.direction === 'exits'
           ? `Turno ${chip.shiftId.toLowerCase()} arranca este día, ${Math.round(chip.pctOfShift ?? 100)}% de su carga aquí.`
           : `Turno ${chip.shiftId.toLowerCase()} de este día.`}
-      className={cn('flex items-center justify-between rounded px-1 py-0.5 leading-none', colorByP0)}
+      className={cn('flex items-center justify-between rounded px-1 py-px leading-none', colorByP0)}
     >
       <span className="text-[8px] font-medium opacity-70">{label}</span>
       <span className="text-[9px] font-bold tabular-nums">{p0.toFixed(1)}%</span>
@@ -2449,16 +2449,16 @@ export function GraderHistoricalCalendar({
           </Button>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-7 gap-1 mb-2">
+          <div className="grid grid-cols-7 gap-0.5 mb-1">
             {dayNames.map((day) => (
-              <div key={day} className="text-center text-xs font-medium text-muted-foreground py-2">
+              <div key={day} className="text-center text-[11px] font-medium text-muted-foreground py-1">
                 {day}
               </div>
             ))}
           </div>
-          <div className="grid grid-cols-7 gap-1">
+          <div className="grid grid-cols-7 gap-0.5">
             {days.map((day, index) => {
-              if (!day) return <div key={`empty-${index}`} className="h-20" />
+              if (!day) return <div key={`empty-${index}`} className="h-14" />
 
               const dayKey = day.toISOString().slice(0, 10)
               const dayUploads = uploadsByDate.get(dayKey) || []
@@ -2519,7 +2519,7 @@ export function GraderHistoricalCalendar({
                 <button
                   key={dayKey}
                   className={cn(
-                    'h-24 p-1.5 border rounded-lg text-left transition-all flex flex-col gap-0.5',
+                    'h-14 p-1 border rounded-md text-left transition-all flex flex-col gap-px overflow-hidden',
                     isToday(day) && !isSelected && 'border-primary/60 bg-primary/5',
                     isSelected && 'ring-2 ring-primary border-primary bg-primary/8',
                     !hasData && !hasAnySlx && dayUploads.length === 0 && 'opacity-40',
@@ -2534,14 +2534,14 @@ export function GraderHistoricalCalendar({
                 >
                   <div className="flex items-center justify-between">
                     <span className={cn(
-                      'text-sm font-semibold leading-none',
+                      'text-xs font-semibold leading-none',
                       isToday(day) && 'text-primary',
                       isSelected && 'text-primary',
                     )}>
                       {day.getDate()}
                     </span>
                     {!hasData && dayUploads.length > 0 && (
-                      <span className="text-[8px] text-muted-foreground leading-none border rounded px-0.5">
+                      <span className="text-[7px] text-muted-foreground leading-none border rounded px-0.5">
                         {dayUploads.length}f
                       </span>
                     )}
@@ -2554,7 +2554,7 @@ export function GraderHistoricalCalendar({
                   {!hasData && hasAnySlx && (
                     <>
                       {hasSlxDay && (
-                        <div className="flex items-center justify-between rounded px-1 py-0.5 leading-none bg-sky-500/15 text-sky-400">
+                        <div className="flex items-center justify-between rounded px-1 py-px leading-none bg-sky-500/15 text-sky-400">
                           <span className="text-[8px] font-medium opacity-80">D</span>
                           <span className="text-[9px] font-bold tabular-nums">
                             {slxDayCycles >= 1000
@@ -2564,7 +2564,7 @@ export function GraderHistoricalCalendar({
                         </div>
                       )}
                       {hasSlxNight && (
-                        <div className="flex items-center justify-between rounded px-1 py-0.5 leading-none bg-indigo-500/15 text-indigo-400">
+                        <div className="flex items-center justify-between rounded px-1 py-px leading-none bg-indigo-500/15 text-indigo-400">
                           <span className="text-[8px] font-medium opacity-80">N</span>
                           <span className="text-[9px] font-bold tabular-nums">
                             {slxNightCycles >= 1000
