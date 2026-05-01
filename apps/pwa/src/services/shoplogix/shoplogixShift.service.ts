@@ -82,13 +82,22 @@ function deserializeShift(raw: FirestoreData): UpstreamMachineShift {
   // `summary.currentShiftStart` que apuntaba al turno EN CURSO al momento
   // del sync (no al consultado), por lo que los intervals quedan dateados
   // en un día distinto al del data real. Si detectamos esto, recomputamos
-  // sus timestamps anclados al primer state (que sí tiene timestamps
-  // reales del día consultado).
+  // sus timestamps anclados al primer state.
+  //
+  // CRÍTICO — solo aplicar a docs `legacy`: para docs nuevos (syncDay,
+  // scheduleSource='intervals') los timestamps de `intervals[]` ya vienen
+  // correctos desde la API (`parseShoplogixTime(raw.start)` en el normalizer).
+  // Aplicar el re-anchor a estos docs DESTRUYE timestamps correctos cuando
+  // states[0] es un downtime largo que arranca antes del turno (caso real
+  // 2026-04-29 T3 Yal: state[0] arranca a las 08:00 Apr-28 = inicio del
+  // query window, intervals correctos a las 00:00-07:45 Apr-29 → re-anchor
+  // los movía secuencialmente desde 08:00 Apr-28, vaciando el histograma).
   const rawIntervals: UpstreamProductionInterval[] = Array.isArray(raw.intervals)
     ? raw.intervals.map(x => deserializeInterval(x as FirestoreData))
     : []
+  const scheduleSource = String(raw.scheduleSource ?? 'legacy') as 'intervals' | 'legacy'
   let intervals = rawIntervals
-  if (rawIntervals.length > 0 && states.length > 0) {
+  if (scheduleSource === 'legacy' && rawIntervals.length > 0 && states.length > 0) {
     const firstStateDay = Math.floor(states[0]!.startAt.getTime() / 86_400_000)
     const firstIvlDay   = Math.floor(rawIntervals[0]!.startAt.getTime() / 86_400_000)
     if (firstStateDay !== firstIvlDay) {
