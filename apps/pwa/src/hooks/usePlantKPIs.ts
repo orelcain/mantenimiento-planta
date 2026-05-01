@@ -1,18 +1,15 @@
 /**
- * usePlantKPIs — carga y computa OEE, MTTR y MTBF para una planta.
- *
- * Busca el turno más reciente disponible en Firestore para el plantSlug dado
- * (hoy → ayer → anteayer, hasta encontrar uno con datos).
- * Combina los states de las máquinas Shoplogix con el último Grader summary
- * disponible para calcular el componente de Calidad del OEE.
+ * usePlantKPIs / usePlantKPIsForPeriod
  *
  * OEE = Disponibilidad × Rendimiento × Calidad
- *   A (Disponibilidad) = shiftRuntime promedio de las 3 Baaders
- *   P (Rendimiento)    = overallRatio promedio (capped a 1.0)
- *   Q (Calidad)        = 1 − P0Pct/100  [solo si graderSummaries aporta el turno]
+ *   A = shiftRuntime promedio de las Baaders
+ *   P = overallRatio promedio (capped 1.0)
+ *   Q = 1 − P0Pct (solo si hay Grader data)
  *
- * MTTR = media de durationSec de cada evento downtime (en minutos)
- * MTBF = uptimeSec total / n° de eventos downtime (en horas)
+ * MTTR = Σ durationSec de eventos downtime / n_paros  (min)
+ * MTBF = uptimeSec total / n_paros                    (horas)
+ *
+ * usePlantKPIsForPeriod agrega múltiples turnos para Día/Semana/Mes.
  */
 
 import { useEffect, useState } from 'react'
@@ -24,42 +21,35 @@ import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
 import type { UpstreamMachineShift } from '@/services/shoplogix/types'
 import type { GraderDailySummary } from '@/services/grader/types'
 
+// ── Tipos públicos ────────────────────────────────────────────────────────────
+
+export type KpiPeriod = 'day' | 'week' | 'month'
+
 export interface MachineKPI {
   machineid: string
   machineName: string
-  /** Disponibilidad: uptime / tiempo productivo (0‒1) */
   availability: number
-  /** Rendimiento: ciclos reales / ciclos esperados, capped a 1.0 (0‒1) */
   performance: number
-  /** Promedio de duración por evento de paro (minutos) */
   mttrMin: number
-  /** Tiempo promedio entre paros (horas) */
   mtbfHours: number
-  /** Número de eventos downtime en el turno */
   failureCount: number
-  /** Velocidad objetivo de Shoplogix en piezas/min (expectedCycles del primer interval / 5) */
   shoplogixTargetCpm: number | null
 }
 
 export interface PlantKPIs {
-  /** dateKey del turno base ("YYYY-MM-DD") */
   dateKey: string
   shiftId: string
-  /** Disponibilidad media de la línea (0‒1) */
+  /** Etiqueta legible del período: "lun 29 abr", "22–28 abr", "Abril 2026" */
+  periodLabel: string
+  /** Turnos agregados en este período */
+  shiftsCount: number
   availability: number
-  /** Rendimiento medio de la línea (0‒1, capped) */
   performance: number
-  /** Calidad: 1 − P0Pct. null si no hay Grader data para ese turno. */
   quality: number | null
-  /** OEE = A × P × Q. null si Q es null. */
   oee: number | null
-  /** MTTR promedio de la línea (minutos) */
   mttrMin: number
-  /** MTBF promedio de la línea (horas) */
   mtbfHours: number
-  /** Total de eventos downtime en toda la línea */
   failureCount: number
-  /** Breakdown por máquina */
   machines: MachineKPI[]
 }
 
@@ -69,160 +59,313 @@ export interface UsePlantKPIsResult {
   kpis: PlantKPIs | null
 }
 
-/** dateKey de hace N días en UTC (sin ajuste TZ — solo para búsqueda de Firestore). */
-function daysAgo(n: number): string {
-  const d = new Date(Date.now() - n * 86_400_000)
-  return d.toISOString().slice(0, 10)
-}
+// ── Helpers internos ──────────────────────────────────────────────────────────
 
 function avg(arr: number[]): number {
   return arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0
 }
 
+function daysAgo(n: number): string {
+  return new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10)
+}
+
+const MONTH_NAMES = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+]
+
 function computeMachineKPI(m: UpstreamMachineShift): MachineKPI {
-  const downtimes = m.states.filter((s) => s.type === 'downtime')
-  const uptimeSec = m.shiftRuntimeBreakdown.uptimeSec
-
-  const totalDowntimeSec = downtimes.reduce((a, s) => a + s.durationSec, 0)
-  const mttrMin = downtimes.length > 0
-    ? totalDowntimeSec / downtimes.length / 60
-    : 0
-
-  const mtbfHours = downtimes.length > 0
-    ? uptimeSec / downtimes.length / 3600
-    : uptimeSec / 3600
-
-  // Velocidad objetivo de Shoplogix: expectedCycles del primer interval / 5 min
+  const downtimes    = m.states.filter((s) => s.type === 'downtime')
+  const uptimeSec    = m.shiftRuntimeBreakdown.uptimeSec
+  const totalDtSec   = downtimes.reduce((a, s) => a + s.durationSec, 0)
   const firstInterval = m.intervals.find((iv) => iv.expectedCycles > 0)
-  const shoplogixTargetCpm = firstInterval
-    ? firstInterval.expectedCycles / 5
-    : null
-
   return {
-    machineid: m.machineid,
-    machineName: m.machineName,
-    availability: m.shiftRuntime,
-    performance: Math.min(1, m.overallRatio),
-    mttrMin,
-    mtbfHours,
-    failureCount: downtimes.length,
-    shoplogixTargetCpm,
+    machineid:          m.machineid,
+    machineName:        m.machineName,
+    availability:       m.shiftRuntime,
+    performance:        Math.min(1, m.overallRatio),
+    mttrMin:            downtimes.length > 0 ? totalDtSec / downtimes.length / 60 : 0,
+    mtbfHours:          downtimes.length > 0 ? uptimeSec / downtimes.length / 3600 : uptimeSec / 3600,
+    failureCount:       downtimes.length,
+    shoplogixTargetCpm: firstInterval ? firstInterval.expectedCycles / 5 : null,
   }
 }
 
-function computeKPIs(
-  machines: UpstreamMachineShift[],
-  dateKey: string,
-  shiftId: string,
+/** Agrega un array de {dateKey, shiftId, machines} en un PlantKPIs único. */
+function aggregateShifts(
+  shifts: { dateKey: string; shiftId: string; machines: UpstreamMachineShift[] }[],
+  periodLabel: string,
   graderSummaries: GraderDailySummary[],
-): PlantKPIs {
-  const machineKPIs = machines.map(computeMachineKPI)
+): PlantKPIs | null {
+  if (shifts.length === 0) return null
 
-  const availability = avg(machineKPIs.map((m) => m.availability))
-  const performance  = avg(machineKPIs.map((m) => m.performance))
+  // Agrupar instancias de cada máquina a lo largo de los turnos
+  const byMachine = new Map<string, { machine: UpstreamMachineShift; dateKey: string; shiftId: string }[]>()
+  for (const s of shifts) {
+    for (const m of s.machines) {
+      const list = byMachine.get(m.machineName) ?? []
+      list.push({ machine: m, dateKey: s.dateKey, shiftId: s.shiftId })
+      byMachine.set(m.machineName, list)
+    }
+  }
 
-  // Calidad: buscar el Grader summary que coincida con este turno
-  const graderSummary = graderSummaries.find(
-    (s) => s.dateKey === dateKey && s.shiftId === shiftId,
-  )
-  const quality: number | null =
-    graderSummary && typeof graderSummary.pointZeroPct === 'number'
-      ? Math.max(0, Math.min(1, 1 - graderSummary.pointZeroPct / 100))
-      : null
+  const machineKPIs: MachineKPI[] = []
+  for (const [, entries] of byMachine) {
+    const ms = entries.map(e => e.machine)
+    const allDowntimes  = ms.flatMap(m => m.states.filter(s => s.type === 'downtime'))
+    const totalDtSec    = allDowntimes.reduce((a, s) => a + s.durationSec, 0)
+    const totalUptimeSec = ms.reduce((a, m) => a + m.shiftRuntimeBreakdown.uptimeSec, 0)
+    const nFailures     = allDowntimes.length
+    const firstInterval = ms[0]?.intervals.find(iv => iv.expectedCycles > 0)
+    machineKPIs.push({
+      machineid:          ms[0]!.machineid,
+      machineName:        ms[0]!.machineName,
+      availability:       avg(ms.map(m => m.shiftRuntime)),
+      performance:        Math.min(1, avg(ms.map(m => m.overallRatio))),
+      mttrMin:            nFailures > 0 ? totalDtSec / nFailures / 60 : 0,
+      mtbfHours:          nFailures > 0 ? totalUptimeSec / nFailures / 3600 : totalUptimeSec / 3600,
+      failureCount:       nFailures,
+      shoplogixTargetCpm: firstInterval ? firstInterval.expectedCycles / 5 : null,
+    })
+  }
 
-  const oee = quality !== null ? availability * performance * quality : null
+  const availability = avg(machineKPIs.map(m => m.availability))
+  const performance  = avg(machineKPIs.map(m => m.performance))
 
+  // Calidad: promedio de (1 − P0%) de los turnos con Grader data
+  const qualityValues = shifts
+    .map(s => graderSummaries.find(g => g.dateKey === s.dateKey && g.shiftId === s.shiftId))
+    .filter((g): g is GraderDailySummary => g !== undefined && typeof g.pointZeroPct === 'number')
+    .map(g => Math.max(0, Math.min(1, 1 - g.pointZeroPct / 100)))
+  const quality = qualityValues.length > 0 ? avg(qualityValues) : null
+  const oee     = quality !== null ? availability * performance * quality : null
+
+  const first = shifts[0]!
   return {
-    dateKey,
-    shiftId,
+    dateKey:      first.dateKey,
+    shiftId:      first.shiftId,
+    periodLabel,
+    shiftsCount:  shifts.length,
     availability,
     performance,
     quality,
     oee,
-    mttrMin:      avg(machineKPIs.map((m) => m.mttrMin)),
-    mtbfHours:    avg(machineKPIs.map((m) => m.mtbfHours)),
+    mttrMin:      avg(machineKPIs.map(m => m.mttrMin)),
+    mtbfHours:    avg(machineKPIs.map(m => m.mtbfHours)),
     failureCount: machineKPIs.reduce((a, m) => a + m.failureCount, 0),
-    machines: machineKPIs,
+    machines:     machineKPIs,
   }
 }
 
-/**
- * @param plantSlug         'chonchi' | 'yal'
- * @param graderSummaries   Array ya cargado en el componente padre (evita fetch doble)
- */
+/** Genera lista de dateKeys para el período dado. */
+function getDateKeys(period: KpiPeriod, anchor: string, currentMonth: Date): string[] {
+  if (period === 'month') {
+    const y = currentMonth.getFullYear()
+    const m = currentMonth.getMonth()
+    const days = new Date(y, m + 1, 0).getDate()
+    return Array.from({ length: days }, (_, i) =>
+      `${y}-${String(m + 1).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`,
+    )
+  }
+  const anchorMs = new Date(`${anchor}T12:00:00`).getTime()
+  const numDays  = period === 'week' ? 7 : 1
+  return Array.from({ length: numDays }, (_, i) =>
+    new Date(anchorMs - (numDays - 1 - i) * 86_400_000).toISOString().slice(0, 10),
+  )
+}
+
+/** Etiqueta de período en español. */
+function getPeriodLabel(period: KpiPeriod, anchor: string, currentMonth: Date): string {
+  if (period === 'month') {
+    return `${MONTH_NAMES[currentMonth.getMonth()]} ${currentMonth.getFullYear()}`
+  }
+  const anchorDate = new Date(`${anchor}T12:00:00`)
+  if (period === 'week') {
+    const startDate = new Date(anchorDate.getTime() - 6 * 86_400_000)
+    const fmt = (d: Date) => d.toLocaleDateString('es-CL', { day: 'numeric', month: 'short' }).replace('.', '')
+    return `${fmt(startDate)} – ${fmt(anchorDate)}`
+  }
+  return anchorDate.toLocaleDateString('es-CL', { weekday: 'short', day: 'numeric', month: 'short' }).replace(/\./g, '')
+}
+
+/** Carga todos los turnos de un array de dateKeys en paralelo. */
+async function loadShiftsForDates(
+  dateKeys: string[],
+  plantSlug: PlantSlug,
+): Promise<{ dateKey: string; shiftId: string; machines: UpstreamMachineShift[] }[]> {
+  const perDay = await Promise.all(
+    dateKeys.map(async (dk) => {
+      const ids = await listShoplogixShiftIdsForDay(dk, plantSlug).catch(() => [] as string[])
+      const loaded = await Promise.all(
+        ids.map(async (sid) => {
+          const res = await loadShoplogixShift(dk, sid, plantSlug).catch(() => null)
+          if (!res?.snapshot || res.snapshot.machines.length === 0) return null
+          return { dateKey: dk, shiftId: sid, machines: res.snapshot.machines }
+        }),
+      )
+      return loaded.filter((x): x is NonNullable<typeof x> => x !== null)
+    }),
+  )
+  return perDay.flat()
+}
+
+// ── Hook original (un turno auto-detectado) ───────────────────────────────────
+
 export function usePlantKPIs(
   plantSlug: PlantSlug,
   graderSummaries: GraderDailySummary[],
 ): UsePlantKPIsResult {
-  const [state, setState] = useState<UsePlantKPIsResult>({
-    loading: true,
-    error: null,
-    kpis: null,
-  })
+  const [state, setState] = useState<UsePlantKPIsResult>({ loading: true, error: null, kpis: null })
 
   useEffect(() => {
     let cancelled = false
 
     async function load() {
       setState({ loading: true, error: null, kpis: null })
-
       try {
-        // Buscar el turno más reciente CON producción real (hasta 7 días atrás).
-        // Si no hay ninguno con runtime > 0, usar el último con datos (planta detenida).
         let dateKey: string | null = null
         let shiftId: string | null = null
         let snapshot: Awaited<ReturnType<typeof loadShoplogixShift>>['snapshot'] = null
-        let fallbackDateKey: string | null = null
-        let fallbackShiftId: string | null = null
-        let fallbackSnapshot: Awaited<ReturnType<typeof loadShoplogixShift>>['snapshot'] = null
+        let fbDateKey: string | null = null
+        let fbShiftId: string | null = null
+        let fbSnapshot: Awaited<ReturnType<typeof loadShoplogixShift>>['snapshot'] = null
 
         outer: for (let i = 0; i <= 7; i++) {
-          const dk = daysAgo(i)
+          const dk  = daysAgo(i)
           const ids = await listShoplogixShiftIdsForDay(dk, plantSlug)
           if (cancelled) return
-          // Iterar desde el turno más tardío al más temprano del día
           for (const sid of [...ids].reverse()) {
             const res = await loadShoplogixShift(dk, sid, plantSlug)
             if (cancelled) return
             if (!res.snapshot || res.snapshot.machines.length === 0) continue
-            // Guardar como fallback el primer turno con datos (aunque runtime=0)
-            if (!fallbackSnapshot) {
-              fallbackDateKey = dk; fallbackShiftId = sid; fallbackSnapshot = res.snapshot
-            }
-            const hasActivity = res.snapshot.machines.some((m) => m.shiftRuntime > 0)
-            if (hasActivity) {
-              dateKey = dk
-              shiftId = sid
-              snapshot = res.snapshot
-              break outer
+            if (!fbSnapshot) { fbDateKey = dk; fbShiftId = sid; fbSnapshot = res.snapshot }
+            if (res.snapshot.machines.some(m => m.shiftRuntime > 0)) {
+              dateKey = dk; shiftId = sid; snapshot = res.snapshot; break outer
             }
           }
         }
 
-        // Si no hubo actividad, usar el último turno sincronizado (planta detenida)
-        if (!snapshot && fallbackSnapshot) {
-          dateKey = fallbackDateKey; shiftId = fallbackShiftId; snapshot = fallbackSnapshot
-        }
-
+        if (!snapshot && fbSnapshot) { dateKey = fbDateKey; shiftId = fbShiftId; snapshot = fbSnapshot }
         if (!dateKey || !shiftId || !snapshot) {
           if (!cancelled) setState({ loading: false, error: null, kpis: null })
           return
         }
 
-        const kpis = computeKPIs(snapshot.machines, dateKey, shiftId, graderSummaries)
+        const machineKPIs  = snapshot.machines.map(computeMachineKPI)
+        const availability = avg(machineKPIs.map(m => m.availability))
+        const performance  = avg(machineKPIs.map(m => m.performance))
+        const graderSummary = graderSummaries.find(s => s.dateKey === dateKey && s.shiftId === shiftId)
+        const quality: number | null = graderSummary && typeof graderSummary.pointZeroPct === 'number'
+          ? Math.max(0, Math.min(1, 1 - graderSummary.pointZeroPct / 100))
+          : null
+        const oee = quality !== null ? availability * performance * quality : null
+
+        const kpis: PlantKPIs = {
+          dateKey: dateKey!, shiftId: shiftId!,
+          periodLabel: getPeriodLabel('day', dateKey!, new Date()),
+          shiftsCount: 1,
+          availability, performance, quality, oee,
+          mttrMin:      avg(machineKPIs.map(m => m.mttrMin)),
+          mtbfHours:    avg(machineKPIs.map(m => m.mtbfHours)),
+          failureCount: machineKPIs.reduce((a, m) => a + m.failureCount, 0),
+          machines:     machineKPIs,
+        }
         if (!cancelled) setState({ loading: false, error: null, kpis })
       } catch {
-        if (!cancelled) {
-          setState({ loading: false, error: 'No se pudo cargar los indicadores de rendimiento', kpis: null })
-        }
+        if (!cancelled) setState({ loading: false, error: 'No se pudo cargar los indicadores de rendimiento', kpis: null })
       }
     }
 
     load()
     return () => { cancelled = true }
-  // graderSummaries intencionalmente excluido: llega como prop estable del padre
+  // graderSummaries intencionalmente excluido
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plantSlug])
+
+  return state
+}
+
+// ── Hook multi-período ────────────────────────────────────────────────────────
+
+/**
+ * Agrega KPIs para un período (Día / Semana / Mes).
+ *
+ * - 'day' sin anchorDateKey  → busca el turno más reciente con actividad (últimos 7 días)
+ * - 'day' con anchorDateKey  → agrega todos los turnos de ese día específico
+ * - 'week'                   → agrega 7 días terminando en anchorDateKey (o hoy)
+ * - 'month'                  → agrega todos los días de currentMonth
+ */
+export function usePlantKPIsForPeriod(
+  plantSlug: PlantSlug,
+  period: KpiPeriod,
+  anchorDateKey: string | null,
+  currentMonth: Date,
+  graderSummaries: GraderDailySummary[],
+): UsePlantKPIsResult {
+  const [state, setState] = useState<UsePlantKPIsResult>({ loading: true, error: null, kpis: null })
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function load() {
+      setState({ loading: true, error: null, kpis: null })
+      try {
+        // Caso especial: día sin anchor → buscar el turno más reciente con actividad
+        if (period === 'day' && !anchorDateKey) {
+          let foundDateKey: string | null = null
+          let foundShiftId: string | null = null
+          let foundSnapshot: Awaited<ReturnType<typeof loadShoplogixShift>>['snapshot'] = null
+          let fbDateKey: string | null = null; let fbShiftId: string | null = null
+          let fbSnapshot: Awaited<ReturnType<typeof loadShoplogixShift>>['snapshot'] = null
+
+          outer: for (let i = 0; i <= 7; i++) {
+            const dk  = daysAgo(i)
+            const ids = await listShoplogixShiftIdsForDay(dk, plantSlug)
+            if (cancelled) return
+            for (const sid of [...ids].reverse()) {
+              const res = await loadShoplogixShift(dk, sid, plantSlug)
+              if (cancelled) return
+              if (!res.snapshot || res.snapshot.machines.length === 0) continue
+              if (!fbSnapshot) { fbDateKey = dk; fbShiftId = sid; fbSnapshot = res.snapshot }
+              if (res.snapshot.machines.some(m => m.shiftRuntime > 0)) {
+                foundDateKey = dk; foundShiftId = sid; foundSnapshot = res.snapshot; break outer
+              }
+            }
+          }
+          if (!foundSnapshot && fbSnapshot) { foundDateKey = fbDateKey; foundShiftId = fbShiftId; foundSnapshot = fbSnapshot }
+          if (!foundDateKey || !foundShiftId || !foundSnapshot) {
+            if (!cancelled) setState({ loading: false, error: null, kpis: null })
+            return
+          }
+          const kpis = aggregateShifts(
+            [{ dateKey: foundDateKey, shiftId: foundShiftId, machines: foundSnapshot.machines }],
+            getPeriodLabel('day', foundDateKey, currentMonth),
+            graderSummaries,
+          )
+          if (!cancelled) setState({ loading: false, error: null, kpis })
+          return
+        }
+
+        // Casos con rango de fechas explícito
+        const anchor   = anchorDateKey ?? daysAgo(0)
+        const dateKeys = getDateKeys(period, anchor, currentMonth)
+        const label    = getPeriodLabel(period, anchor, currentMonth)
+
+        const shifts = await loadShiftsForDates(dateKeys, plantSlug)
+        if (cancelled) return
+
+        const kpis = aggregateShifts(shifts, label, graderSummaries)
+        setState({ loading: false, error: null, kpis })
+      } catch {
+        if (!cancelled) setState({ loading: false, error: 'No se pudo cargar los indicadores', kpis: null })
+      }
+    }
+
+    load()
+    return () => { cancelled = true }
+  // graderSummaries intencionalmente excluido
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plantSlug, period, anchorDateKey, currentMonth])
 
   return state
 }

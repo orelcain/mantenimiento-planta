@@ -1,32 +1,28 @@
 /**
- * PlantKPIBoard — panel de indicadores de rendimiento industrial por planta.
+ * PlantKPIBoard — OEE, A, P, Q, MTTR, MTBF con selector Día / Semana / Mes.
  *
- * Muestra OEE, Disponibilidad, Rendimiento, Calidad, MTTR y MTBF
- * calculados desde el último turno Shoplogix disponible.
- *
- * Cada métrica incluye:
- *   - Valor numérico con barra de color
- *   - Nombre en español + inglés
- *   - Tooltip explicativo (qué es, cómo se calcula, valores de referencia)
- *
- * OEE thresholds (industria pesquera/cárnica):
- *   ≥ 65% → bueno   ≥ 85% → clase mundial   < 50% → crítico
+ * - Día:    turno más reciente con actividad (auto) o día seleccionado en el calendario.
+ * - Semana: 7 días hasta el día seleccionado (o hoy).
+ * - Mes:    mes visible en el calendario.
  */
 
-import { useMemo } from 'react'
+import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, Spinner, InfoTooltip } from '@/components/ui'
 import { TrendingUp, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { usePlantKPIs } from '@/hooks/usePlantKPIs'
+import { usePlantKPIsForPeriod } from '@/hooks/usePlantKPIs'
+import type { KpiPeriod } from '@/hooks/usePlantKPIs'
 import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
 import type { GraderDailySummary } from '@/services/grader/types'
 
 interface Props {
   plantSlug: PlantSlug
-  /** Summaries ya cargados en el padre (evita fetch doble). */
   graderSummaries: GraderDailySummary[]
-  /** Si false, no mostrar el panel (planta comingSoon). */
   enabled?: boolean
+  /** Día seleccionado en el calendario ("YYYY-MM-DD"). null = auto-último con actividad. */
+  selectedDateKey?: string | null
+  /** Mes visible en el calendario (para modo Mes). */
+  currentMonth?: Date
 }
 
 // ── Helpers de formato ────────────────────────────────────────────────────────
@@ -48,7 +44,7 @@ function fmtHours(v: number): string {
   return `${v.toFixed(1)} h`
 }
 
-// ── Colores por umbral ────────────────────────────────────────────────────────
+// ── Colores ───────────────────────────────────────────────────────────────────
 
 function oeeColor(v: number | null): string {
   if (v === null) return 'text-muted-foreground'
@@ -70,17 +66,17 @@ function perfColor(v: number): string {
   return 'text-rose-400'
 }
 
-function mttrColor(minutos: number): string {
-  if (minutos === 0) return 'text-muted-foreground'
-  if (minutos <= 5) return 'text-emerald-400'
-  if (minutos <= 15) return 'text-amber-400'
+function mttrColor(min: number): string {
+  if (min === 0) return 'text-muted-foreground'
+  if (min <= 5)  return 'text-emerald-400'
+  if (min <= 15) return 'text-amber-400'
   return 'text-rose-400'
 }
 
-function mtbfColor(horas: number): string {
-  if (horas === 0) return 'text-muted-foreground'
-  if (horas >= 2) return 'text-emerald-400'
-  if (horas >= 1) return 'text-amber-400'
+function mtbfColor(h: number): string {
+  if (h === 0)  return 'text-muted-foreground'
+  if (h >= 2)   return 'text-emerald-400'
+  if (h >= 1)   return 'text-amber-400'
   return 'text-rose-400'
 }
 
@@ -89,46 +85,21 @@ function barWidth(v: number | null, max = 1): string {
   return `${Math.min(100, Math.max(0, (v / max) * 100)).toFixed(1)}%`
 }
 
-// ── Definiciones bilingües ────────────────────────────────────────────────────
+// ── Tooltips ──────────────────────────────────────────────────────────────────
 
 const DEFS = {
-  oee: {
-    es: 'OEE — Eficiencia Global del Equipo',
-    en: 'OEE — Overall Equipment Effectiveness',
-    desc: 'Mide el % del tiempo planificado en que la planta produce a velocidad y calidad óptimas.\n\nOEE = Disponibilidad × Rendimiento × Calidad\n\nReferencia industrial:\n  < 50% → crítico\n  50‒65% → aceptable\n  65‒85% → bueno\n  ≥ 85% → clase mundial',
-  },
-  avail: {
-    es: 'Disponibilidad (A)',
-    en: 'Availability (A)',
-    desc: 'Porcentaje del tiempo productivo programado en que la máquina estuvo operativa.\n\nA = Tiempo de Uptime / (Uptime + Downtime)\n\nCalculado desde los estados Shoplogix de las 3 Baaders.',
-  },
-  perf: {
-    es: 'Rendimiento (P)',
-    en: 'Performance (P)',
-    desc: 'Velocidad real de producción respecto a la velocidad objetivo configurada en Shoplogix.\n\nP = Ciclos reales / Ciclos esperados (máx. 100%)\n\nSi el objetivo Shoplogix está sobre-configurado, el rendimiento aparecerá artificialmente bajo.',
-  },
-  quality: {
-    es: 'Calidad (Q)',
-    en: 'Quality (Q)',
-    desc: 'Porcentaje de piezas buenas sobre el total producido.\n\nQ = 1 − P0% del Grader\n(P0% = % de piezas clasificadas en calibre cero / sin valor)\n\nSolo disponible cuando hay datos del Grader para ese turno.',
-  },
-  mttr: {
-    es: 'MTTR — Tiempo Medio de Reparación',
-    en: 'MTTR — Mean Time To Repair',
-    desc: 'Duración promedio de cada evento de paro (downtime) en la línea.\n\nMTTR = Σ duración de paros / N° de paros\n\nMTTR menor → reparaciones más rápidas → mayor disponibilidad.\n\nReferencia: < 5 min excelente, 5‒15 min aceptable, > 15 min crítico.',
-  },
-  mtbf: {
-    es: 'MTBF — Tiempo Medio Entre Fallos',
-    en: 'MTBF — Mean Time Between Failures',
-    desc: 'Tiempo promedio que la línea opera sin interrupciones entre un paro y el siguiente.\n\nMTBF = Tiempo de Uptime / N° de paros\n\nMTBF mayor → mayor confiabilidad del equipo.\n\nReferencia: > 2 h excelente, 1‒2 h aceptable, < 1 h bajo.',
-  },
+  oee:     { desc: 'Mide el % del tiempo planificado en que la planta produce a velocidad y calidad óptimas.\n\nOEE = Disponibilidad × Rendimiento × Calidad\n\n< 50% crítico · 50‒65% aceptable · 65‒85% bueno · ≥ 85% clase mundial' },
+  avail:   { desc: 'Porcentaje del tiempo productivo en que la máquina estuvo operativa.\n\nA = Uptime / (Uptime + Downtime)\n\nCalculado desde los estados Shoplogix de las Baaders.' },
+  perf:    { desc: 'Velocidad real respecto a la velocidad objetivo configurada en Shoplogix.\n\nP = Ciclos reales / Ciclos esperados (máx. 100%)' },
+  quality: { desc: 'Porcentaje de piezas buenas sobre el total.\n\nQ = 1 − P0% del Grader\n\nSolo disponible cuando hay datos del Grader para ese período.' },
+  mttr:    { desc: 'Duración promedio de cada paro.\n\nMTTR = Σ duración / N° paros\n\n< 5 min excelente · 5‒15 min aceptable · > 15 min crítico' },
+  mtbf:    { desc: 'Tiempo promedio entre paros.\n\nMTBF = Uptime / N° paros\n\n> 2 h excelente · 1‒2 h aceptable · < 1 h bajo' },
 }
 
-// ── Sub-componentes ───────────────────────────────────────────────────────────
+// ── KPICard ───────────────────────────────────────────────────────────────────
 
 interface KPICardProps {
-  esLabel: string
-  enLabel: string
+  label: string
   tooltip: string
   value: string
   valueColor: string
@@ -138,21 +109,18 @@ interface KPICardProps {
   note?: string
 }
 
-function KPICard({ esLabel, enLabel: _enLabel, tooltip, value, valueColor, barValue, barMax = 1, barColor, note }: KPICardProps) {
-  const width = barWidth(barValue, barMax)
+function KPICard({ label, tooltip, value, valueColor, barValue, barMax = 1, barColor, note }: KPICardProps) {
   return (
     <div className="bg-muted/20 rounded-md px-2 py-1.5 border border-border/30">
       <div className="flex items-center justify-between gap-1">
-        <div className="text-[10px] font-medium leading-tight truncate">{esLabel}</div>
+        <div className="text-[10px] font-medium leading-tight truncate">{label}</div>
         <InfoTooltip text={tooltip} iconSize={11} position="top" />
       </div>
       <div className={cn('text-base font-bold tabular-nums leading-tight', valueColor)}>{value}</div>
       {barValue !== null && (
         <div className="h-1 bg-muted/40 rounded-full overflow-hidden mt-1">
-          <div
-            className={cn('h-full rounded-full transition-all', barColor ?? 'bg-primary')}
-            style={{ width }}
-          />
+          <div className={cn('h-full rounded-full transition-all', barColor ?? 'bg-primary')}
+               style={{ width: barWidth(barValue, barMax) }} />
         </div>
       )}
       {note && <p className="text-[9px] text-muted-foreground/60 mt-0.5 leading-tight truncate">{note}</p>}
@@ -160,35 +128,73 @@ function KPICard({ esLabel, enLabel: _enLabel, tooltip, value, valueColor, barVa
   )
 }
 
+// ── Selector de período ───────────────────────────────────────────────────────
+
+const PERIODS: { id: KpiPeriod; label: string }[] = [
+  { id: 'day',   label: 'Día' },
+  { id: 'week',  label: 'Semana' },
+  { id: 'month', label: 'Mes' },
+]
+
 // ── Componente principal ──────────────────────────────────────────────────────
 
-export function PlantKPIBoard({ plantSlug, graderSummaries, enabled = true }: Props) {
-  const { loading, error, kpis } = usePlantKPIs(plantSlug, graderSummaries)
+export function PlantKPIBoard({
+  plantSlug,
+  graderSummaries,
+  enabled = true,
+  selectedDateKey = null,
+  currentMonth,
+}: Props) {
+  const [period, setPeriod] = useState<KpiPeriod>('day')
+  const effectiveMonth = currentMonth ?? new Date()
 
-  const shiftLabel = useMemo(() => {
-    if (!kpis) return null
-    const d = new Date(`${kpis.dateKey}T12:00:00`)
-    const dayName = d.toLocaleDateString('es-CL', { weekday: 'short' }).replace('.', '')
-    const dayNum  = d.getDate()
-    const month   = d.toLocaleDateString('es-CL', { month: 'short' }).replace('.', '')
-    return `${dayName} ${dayNum} ${month} · ${kpis.shiftId}`
-  }, [kpis])
+  const { loading, error, kpis } = usePlantKPIsForPeriod(
+    plantSlug,
+    period,
+    selectedDateKey,
+    effectiveMonth,
+    graderSummaries,
+  )
 
   if (!enabled) return null
 
   return (
     <Card className="border-border/40">
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm flex items-center gap-2">
-          <TrendingUp className="w-4 h-4 text-sky-400" />
-          Indicadores de Rendimiento
-          {shiftLabel && (
-            <span className="text-[10px] font-normal text-muted-foreground ml-1">
-              · turno base: {shiftLabel}
-            </span>
-          )}
-        </CardTitle>
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-sky-400" />
+            Indicadores de Rendimiento
+            {kpis && (
+              <span className="text-[10px] font-normal text-muted-foreground">
+                · {kpis.periodLabel}
+                {kpis.shiftsCount > 1 && (
+                  <span className="text-muted-foreground/60"> ({kpis.shiftsCount} turnos)</span>
+                )}
+              </span>
+            )}
+          </CardTitle>
+
+          {/* Selector Día / Semana / Mes */}
+          <div className="flex gap-0.5 bg-muted/40 rounded-md p-0.5">
+            {PERIODS.map(p => (
+              <button
+                key={p.id}
+                onClick={() => setPeriod(p.id)}
+                className={cn(
+                  'px-2 py-0.5 text-[11px] font-medium rounded transition-colors',
+                  period === p.id
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </CardHeader>
+
       <CardContent className="space-y-2 pb-3">
         {loading && (
           <div className="flex items-center gap-2 text-muted-foreground text-xs py-1">
@@ -204,19 +210,18 @@ export function PlantKPIBoard({ plantSlug, graderSummaries, enabled = true }: Pr
 
         {!loading && !error && !kpis && (
           <p className="text-xs text-muted-foreground/60 py-1">
-            Sin datos Shoplogix disponibles para los últimos 3 días.
+            Sin datos Shoplogix disponibles para este período.
           </p>
         )}
 
         {!loading && kpis && (
           <>
-            {/* ── Fila principal: OEE + A + P + Q ── */}
+            {/* ── Fila 1: OEE + A + P + Q ── */}
             <div className="grid grid-cols-4 gap-1.5">
               <KPICard
-                esLabel="OEE"
-                enLabel={DEFS.oee.en}
+                label="OEE"
                 tooltip={DEFS.oee.desc}
-                value={kpis.oee !== null ? pct(kpis.oee, 1) : '—'}
+                value={kpis.oee !== null ? pct(kpis.oee) : '—'}
                 valueColor={oeeColor(kpis.oee)}
                 barValue={kpis.oee}
                 barColor={kpis.oee !== null
@@ -225,8 +230,7 @@ export function PlantKPIBoard({ plantSlug, graderSummaries, enabled = true }: Pr
                 note={kpis.oee === null ? 'Sin Q' : undefined}
               />
               <KPICard
-                esLabel="Disponibilidad"
-                enLabel={DEFS.avail.en}
+                label="Disponibilidad"
                 tooltip={DEFS.avail.desc}
                 value={pct(kpis.availability)}
                 valueColor={availColor(kpis.availability)}
@@ -234,8 +238,7 @@ export function PlantKPIBoard({ plantSlug, graderSummaries, enabled = true }: Pr
                 barColor={kpis.availability >= 0.85 ? 'bg-emerald-500' : kpis.availability >= 0.70 ? 'bg-amber-500' : 'bg-rose-500'}
               />
               <KPICard
-                esLabel="Rendimiento"
-                enLabel={DEFS.perf.en}
+                label="Rendimiento"
                 tooltip={DEFS.perf.desc}
                 value={pct(kpis.performance)}
                 valueColor={perfColor(kpis.performance)}
@@ -243,8 +246,7 @@ export function PlantKPIBoard({ plantSlug, graderSummaries, enabled = true }: Pr
                 barColor={kpis.performance >= 0.90 ? 'bg-emerald-500' : kpis.performance >= 0.75 ? 'bg-amber-500' : 'bg-rose-500'}
               />
               <KPICard
-                esLabel="Calidad"
-                enLabel={DEFS.quality.en}
+                label="Calidad"
                 tooltip={DEFS.quality.desc}
                 value={kpis.quality !== null ? pct(kpis.quality) : 'N/A'}
                 valueColor={kpis.quality !== null
@@ -258,11 +260,10 @@ export function PlantKPIBoard({ plantSlug, graderSummaries, enabled = true }: Pr
               />
             </div>
 
-            {/* ── Fila secundaria: MTTR · MTBF · Paros ── */}
+            {/* ── Fila 2: MTTR · MTBF · Paros ── */}
             <div className="grid grid-cols-3 gap-1.5">
               <KPICard
-                esLabel="MTTR ↓"
-                enLabel={DEFS.mttr.en}
+                label="MTTR ↓"
                 tooltip={DEFS.mttr.desc}
                 value={fmtMin(kpis.mttrMin)}
                 valueColor={mttrColor(kpis.mttrMin)}
@@ -270,8 +271,7 @@ export function PlantKPIBoard({ plantSlug, graderSummaries, enabled = true }: Pr
                 barColor={kpis.mttrMin <= 5 ? 'bg-emerald-500' : kpis.mttrMin <= 15 ? 'bg-amber-500' : 'bg-rose-500'}
               />
               <KPICard
-                esLabel="MTBF ↑"
-                enLabel={DEFS.mtbf.en}
+                label="MTBF ↑"
                 tooltip={DEFS.mtbf.desc}
                 value={fmtHours(kpis.mtbfHours)}
                 valueColor={mtbfColor(kpis.mtbfHours)}
@@ -279,15 +279,15 @@ export function PlantKPIBoard({ plantSlug, graderSummaries, enabled = true }: Pr
                 barColor={kpis.mtbfHours >= 2 ? 'bg-emerald-500' : kpis.mtbfHours >= 1 ? 'bg-amber-500' : 'bg-rose-500'}
               />
               <div className="bg-muted/20 rounded-md px-2 py-1.5 border border-border/30">
-                <div className="text-[10px] font-medium leading-tight truncate">N° Paros</div>
-                <div className="text-base font-bold tabular-nums leading-tight text-foreground">
-                  {kpis.failureCount}
-                </div>
-                <p className="text-[9px] text-muted-foreground/60 mt-0.5 leading-tight truncate">eventos · turno</p>
+                <div className="text-[10px] font-medium leading-tight">N° Paros</div>
+                <div className="text-base font-bold tabular-nums leading-tight">{kpis.failureCount}</div>
+                <p className="text-[9px] text-muted-foreground/60 mt-0.5 leading-tight">
+                  eventos · {kpis.shiftsCount > 1 ? `${kpis.shiftsCount} turnos` : 'turno'}
+                </p>
               </div>
             </div>
 
-            {/* ── Detalle por máquina (compacto) ── */}
+            {/* ── Detalle por máquina ── */}
             <div className="grid gap-1 pt-0.5">
               {kpis.machines.map((m) => (
                 <div

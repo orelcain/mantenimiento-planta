@@ -99,6 +99,8 @@ export function AnalisisGraderWizardPage() {
   const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date())
   const [calendarSummaries, setCalendarSummaries] = useState<GraderDailySummary[]>([])
   const [calendarSlxStats, setCalendarSlxStats] = useState<SlxMonthlyStats | null>(null)
+  // Día seleccionado en el calendario (para el KPI board)
+  const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null)
 
   const dashboardRef = useRef<HTMLDivElement>(null)
   const localDraftLoadedRef = useRef(false)
@@ -559,6 +561,8 @@ export function AnalisisGraderWizardPage() {
         plantSlug={lineConfig.plantSlug}
         graderSummaries={calendarSummaries}
         enabled={lineConfig.shoplogixEnabled && !lineConfig.comingSoon}
+        selectedDateKey={selectedDateKey}
+        currentMonth={calendarMonth}
       />
 
       {/* ═══ Cuerpo: 2 columnas en desktop — calendario + resumen mensual ═══ */}
@@ -568,6 +572,7 @@ export function AnalisisGraderWizardPage() {
           onMonthChange={setCalendarMonth}
           onSummariesLoaded={setCalendarSummaries}
           onSlxMonthStatsLoaded={setCalendarSlxStats}
+          onDateSelect={setSelectedDateKey}
           plantLineId={lineId}
         />
         <GraderMonthlyStatsPanel

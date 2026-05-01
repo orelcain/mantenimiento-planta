@@ -109,6 +109,8 @@ interface GraderHistoricalCalendarProps {
    * Null si no hay datos Shoplogix para el mes visible.
    */
   onSlxMonthStatsLoaded?: (stats: SlxMonthlyStats | null) => void
+  /** Notifica al padre cuando el día seleccionado cambia ("YYYY-MM-DD" o null). */
+  onDateSelect?: (dateKey: string | null) => void
 }
 
 const monthNames = [
@@ -837,6 +839,7 @@ export function GraderHistoricalCalendar({
   onMonthChange,
   onSummariesLoaded,
   onSlxMonthStatsLoaded,
+  onDateSelect,
   plantLineId = DEFAULT_PLANT_LINE_ID,
 }: GraderHistoricalCalendarProps) {
   const navigate = useNavigate()
@@ -911,6 +914,13 @@ export function GraderHistoricalCalendar({
   const autoSelectedRef = useRef(!!effectiveInitialKey)
 
   useEffect(() => { onMonthChange?.(currentMonth) }, [currentMonth, onMonthChange])
+
+  // Propaga la fecha seleccionada al padre
+  useEffect(() => {
+    const dk = selectedDate ? selectedDate.toISOString().slice(0, 10) : null
+    onDateSelect?.(dk)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate])
 
   // Los uploads de Firestore (graderUploads) no tienen campo plantLineId todavía —
   // no se pueden filtrar server-side por planta. Para evitar que los uploads de Chonchi
