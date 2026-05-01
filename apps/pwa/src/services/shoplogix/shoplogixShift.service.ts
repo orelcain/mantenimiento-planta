@@ -8,7 +8,7 @@
  * cada pocos minutos durante horas de turno.
  */
 
-import { collection, getDocs, getDocsFromServer, doc, getDoc, getDocFromServer, Timestamp, onSnapshot, query, limit } from 'firebase/firestore'
+import { collection, getDocs, getDocsFromServer, doc, getDoc, getDocFromServer, Timestamp, onSnapshot, query, limit, orderBy, startAt, endBefore, documentId } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import type {
   UpstreamMachineShift,
@@ -401,6 +401,41 @@ export async function loadShoplogixShift(
 
 /** Shift IDs que puede devolver Shoplogix — en orden cronológico dentro de un día. */
 const CANDIDATE_SHIFT_IDS: string[] = ['Turno 1', 'Turno 2', 'Turno 3', 'Turno día', 'Turno noche']
+
+/**
+ * Devuelve los IDs de documentos shift que existen en Firestore para un mes completo.
+ * Usa UNA sola query de colección en lugar de 150 lecturas individuales.
+ *
+ * Los doc IDs tienen formato `YYYY-MM-DD_Turno X`, por lo que
+ * startAt/endBefore por prefijo de mes funciona con ordenación lexicográfica.
+ *
+ * Retorna array de doc IDs, ej: ['2026-04-29_Turno 2', '2026-04-30_Turno 2'].
+ * Si la query falla (permisos, red) retorna null para que el caller haga fallback.
+ */
+export async function listShoplogixShiftDocIdsForMonth(
+  year: number,
+  month: number,   // 0-indexed (0 = enero, 11 = diciembre)
+  plantSlug: PlantSlug,
+): Promise<string[] | null> {
+  try {
+    const monthStr     = `${year}-${String(month + 1).padStart(2, '0')}`
+    const nextMonthStr = month === 11
+      ? `${year + 1}-01`
+      : `${year}-${String(month + 2).padStart(2, '0')}`
+
+    const shiftsRef = collection(db, `shoplogix/${plantSlug}/shifts`)
+    const q = query(
+      shiftsRef,
+      orderBy(documentId()),
+      startAt(monthStr),
+      endBefore(nextMonthStr),
+    )
+    const snap = await getDocs(q)
+    return snap.docs.map(d => d.id)
+  } catch {
+    return null  // fallback: el caller cargará shifts individualmente
+  }
+}
 
 /**
  * Devuelve los shiftIds disponibles en Firestore para un día dado.

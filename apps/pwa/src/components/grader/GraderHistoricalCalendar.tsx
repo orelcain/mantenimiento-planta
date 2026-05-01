@@ -53,7 +53,7 @@ import { DayComparisonModal } from './DayComparisonModal'
 import { useAuthStore } from '@/store'
 import { useGraderSelectionStore } from '@/store/graderSelectionStore'
 import { p0StatusFromPct, p0StatusColor, DEFAULT_P0_ALERT_PCT, DEFAULT_P0_CRITICAL_PCT, type P0Status } from '@/services/grader/graderP0Thresholds'
-import { loadShoplogixShift } from '@/services/shoplogix/shoplogixShift.service'
+import { loadShoplogixShift, listShoplogixShiftDocIdsForMonth } from '@/services/shoplogix/shoplogixShift.service'
 import type { MachineTrendPoint } from '@/services/shoplogix/shoplogixShift.service'
 import type { UpstreamMachineState } from '@/services/shoplogix/types'
 import {
@@ -1340,25 +1340,33 @@ export function GraderHistoricalCalendar({
     return () => { cancelled = true }
   }, [selectedKey, slxByShift])
 
-  // Pre-carga mensual de Shoplogix — carga TODOS los turnos del mes visible
-  // para habilitar chips en celdas del calendario y panel de stats mensuales.
-  // Usa `slxMonthQueuedRef` para no re-queuing. No depende de `slxByShift`
-  // para evitar re-renders infinitos.
+  // Pre-carga mensual de Shoplogix.
+  // Estrategia en 3 fases:
+  //   Fase 1 — 1 query de colección para saber qué shifts EXISTEN en el mes.
+  //   Fase 2 — Marcar todos los shifts inexistentes como "vacío confirmado" en un
+  //            solo batch setState (sin lecturas adicionales).
+  //   Fase 3 — Cargar datos reales solo para los shifts que sí existen.
+  // Esto reduce de ~150 reads individuales a 1 + n_shifts_con_data (típicamente 3-10).
   useEffect(() => {
-    const year  = currentMonth.getFullYear()
-    const month = currentMonth.getMonth()
+    const year       = currentMonth.getFullYear()
+    const month      = currentMonth.getMonth()
     const daysInMonth = new Date(year, month + 1, 0).getDate()
-    let cancelled = false
-    // Carga tanto formato legado (Turno día/noche) como nuevo (Turno 1/2/3)
+    let cancelled    = false
+    let retryTimer: ReturnType<typeof setTimeout> | null = null
     const monthShiftIds = ['Turno día', 'Turno noche', 'Turno 1', 'Turno 2', 'Turno 3']
 
-    // Helper: carga un shift y actualiza el estado
+    const EMPTY_CACHE: SlxShiftCache = {
+      states: [], shiftStart: null, shiftEnd: null,
+      scheduledStart: null, scheduledEnd: null,
+      shiftRuntime: 0, overallRatio: 0, totalCycles: 0, breakdown: null,
+    }
+
     const loadOne = (dk: string, shiftId: string, forceServer: boolean) => {
       const key = `${dk}__${shiftId}`
       return loadShoplogixShift(dk, shiftId, plantSlug, forceServer)
         .then((res) => {
-          if (cancelled) return
-          const m0 = res.snapshot?.machines[0]
+          if (cancelled) return 0
+          const m0     = res.snapshot?.machines[0]
           const states = m0?.states ?? []
           const cycles = (res.snapshot?.machines ?? []).reduce((a, mc) => a + (mc.totalCycles || 0), 0)
           const cache: SlxShiftCache = {
@@ -1385,73 +1393,93 @@ export function GraderHistoricalCalendar({
         })
         .catch(() => {
           if (!cancelled) {
-            slxMonthQueuedRef.current.delete(key) // permite reintento
-            setSlxByShift((prev) => new Map(prev).set(key, {
-              states: [], shiftStart: null, shiftEnd: null,
-              scheduledStart: null, scheduledEnd: null,
-              shiftRuntime: 0, overallRatio: 0, totalCycles: 0, breakdown: null,
-            }))
+            slxMonthQueuedRef.current.delete(key)
+            setSlxByShift((prev)       => new Map(prev).set(key, EMPTY_CACHE))
             setSlxTotalsByShift((prev) => new Map(prev).set(key, 0))
           }
           return 0
         })
     }
 
-    // Pase 1 — carga desde cache en lotes de 15 para no saturar Firestore.
-    // Antes disparaba todos (~90) simultáneamente → picos de 360 RPCs.
-    const staleKeys: string[] = []
-    const today = new Date()
-    const cutoffDays = 45
-    const cutoffMs = today.getTime() - cutoffDays * 86_400_000
+    async function run() {
+      // ── Fase 1: descubrir qué shifts existen en el mes (1 query) ──────────────
+      const existingDocIds = await listShoplogixShiftDocIdsForMonth(year, month, plantSlug)
+      if (cancelled) return
+      // null = query falló → fallback a cargar todo individualmente
+      const existingSet = existingDocIds ? new Set(existingDocIds) : null
 
-    const pendingLoad: Array<{ dk: string; dkMs: number; shiftId: string; key: string }> = []
-    // Loop reverso: días más recientes primero → en plantas sin Grader (Yal)
-    // los datos están al final del mes y aparecen en las celdas sin esperar
-    // a que carguen los ~120 días vacíos previos.
-    for (let day = daysInMonth; day >= 1; day--) {
-      const dk = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-      const dkMs = new Date(`${dk}T12:00:00`).getTime()
-      for (const shiftId of monthShiftIds) {
-        const key = `${dk}__${shiftId}`
-        if (slxMonthQueuedRef.current.has(key)) continue
-        slxMonthQueuedRef.current.add(key)
-        pendingLoad.push({ dk, dkMs, shiftId, key })
-      }
-    }
+      // ── Fase 2: clasificar en "vacío confirmado" vs "a cargar" ────────────────
+      const emptyKeys: string[] = []
+      const toLoad: Array<{ dk: string; dkMs: number; shiftId: string }> = []
 
-    // Lanzar en lotes de 15 — deja que IndexedDB sirva cache hits en ráfaga
-    // pero limita los cache-miss que van a red a 15 conexiones simultáneas.
-    const CONCURRENCY = 15
-    let idx = 0
-    function launchNext() {
-      if (cancelled || idx >= pendingLoad.length) return
-      const { dk, dkMs, shiftId } = pendingLoad[idx++]!
-      loadOne(dk, shiftId, false).then((cycles) => {
-        if (!cancelled && cycles === 0 && dkMs >= cutoffMs) {
-          staleKeys.push(`${dk}__${shiftId}`)
+      for (let day = daysInMonth; day >= 1; day--) {   // reverso → días recientes primero
+        const dk   = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+        const dkMs = new Date(`${dk}T12:00:00`).getTime()
+        for (const shiftId of monthShiftIds) {
+          const key = `${dk}__${shiftId}`
+          if (slxMonthQueuedRef.current.has(key)) continue
+          slxMonthQueuedRef.current.add(key)
+
+          if (existingSet === null || existingSet.has(`${dk}_${shiftId}`)) {
+            toLoad.push({ dk, dkMs, shiftId })
+          } else {
+            emptyKeys.push(key)
+          }
         }
-        launchNext()
-      })
-    }
-    for (let s = 0; s < Math.min(CONCURRENCY, pendingLoad.length); s++) launchNext()
-
-    // Pase 2 — reintento servidor para entradas recientes con 0 ciclos (lotes de 10).
-    const timer = setTimeout(async () => {
-      if (cancelled || staleKeys.length === 0) return
-      const BATCH = 10
-      for (let i = 0; i < staleKeys.length; i += BATCH) {
-        if (cancelled) break
-        const batch = staleKeys.slice(i, i + BATCH)
-        await Promise.all(batch.map((key) => {
-          const [dk, shiftId] = key.split('__') as [string, string]
-          return loadOne(dk, shiftId, true)
-        }))
       }
-    }, 2000)
 
+      // Marcar vacíos en DOS setStates (un render, no 150)
+      if (emptyKeys.length > 0 && !cancelled) {
+        setSlxByShift(prev => {
+          const next = new Map(prev)
+          for (const k of emptyKeys) next.set(k, EMPTY_CACHE)
+          return next
+        })
+        setSlxTotalsByShift(prev => {
+          const next = new Map(prev)
+          for (const k of emptyKeys) next.set(k, 0)
+          return next
+        })
+      }
+
+      if (cancelled) return
+
+      // ── Fase 3: cargar solo los shifts que existen ────────────────────────────
+      const staleKeys: string[] = []
+      const cutoffMs  = Date.now() - 45 * 86_400_000
+      const CONCURRENCY = 15
+      let idx = 0
+
+      function launchNext() {
+        if (cancelled || idx >= toLoad.length) return
+        const { dk, dkMs, shiftId } = toLoad[idx++]!
+        loadOne(dk, shiftId, false).then((cycles) => {
+          if (!cancelled && (cycles ?? 0) === 0 && dkMs >= cutoffMs) {
+            staleKeys.push(`${dk}__${shiftId}`)
+          }
+          launchNext()
+        })
+      }
+      for (let s = 0; s < Math.min(CONCURRENCY, toLoad.length); s++) launchNext()
+
+      // Reintento servidor para turnos recientes con 0 ciclos (posible cache stale)
+      retryTimer = setTimeout(async () => {
+        if (cancelled || staleKeys.length === 0) return
+        const BATCH = 10
+        for (let i = 0; i < staleKeys.length; i += BATCH) {
+          if (cancelled) break
+          await Promise.all(staleKeys.slice(i, i + BATCH).map(key => {
+            const [dk, shiftId] = key.split('__') as [string, string]
+            return loadOne(dk, shiftId, true)
+          }))
+        }
+      }, 2000)
+    }
+
+    run()
     return () => {
       cancelled = true
-      clearTimeout(timer)
+      if (retryTimer !== null) clearTimeout(retryTimer)
     }
   }, [currentMonth, plantSlug]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -2460,6 +2488,11 @@ export function GraderHistoricalCalendar({
               const hasSlxDay   = slxDayCycles   > 0
               const hasSlxNight = slxNightCycles > 0
               const hasAnySlx   = hasSlxDay || hasSlxNight
+              // Día confirmado sin producción: Shoplogix ya fue escaneado y no hay ciclos
+              const dayScanned = !hasData && !hasAnySlx && (
+                slxByShift.has(`${dayKey}__Turno 2`) ||
+                slxByShift.has(`${dayKey}__Turno día`)
+              )
 
               // M9 — un día tiene untagged si algún chip primary/orphan-source del día
               // (no contamos secondary para evitar doble-marcar el mismo summary)
@@ -2531,6 +2564,13 @@ export function GraderHistoricalCalendar({
                         </div>
                       )}
                     </>
+                  )}
+
+                  {/* Sin proceso: día escaneado por Shoplogix sin producción */}
+                  {dayScanned && (
+                    <span className="text-[8px] text-muted-foreground/40 mt-auto block text-center leading-none">
+                      sin proceso
+                    </span>
                   )}
 
                   {/* Missing data badges */}
