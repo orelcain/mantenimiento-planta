@@ -46,14 +46,16 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats }: P
         causaMap.set(c.error, (causaMap.get(c.error) ?? 0) + c.pieces)
       }
     }
-    const totalP0Local = totalPieces > 0 ? totalP0 : 0
-    const causas = [...causaMap.entries()]
+    const causasRaw = [...causaMap.entries()]
       .sort((a, b) => b[1] - a[1])
       .map(([error, pieces]) => ({
         error,
         pieces,
-        pct: totalP0Local > 0 ? (pieces / totalP0Local) * 100 : 0,
+        // % sobre total piezas → contribución directa al P0% (ej: 1.09% de 2.87%)
+        pct: totalPieces > 0 ? (pieces / totalPieces) * 100 : 0,
       }))
+    const maxCausaPct = causasRaw[0]?.pct ?? 1
+    const causas = causasRaw.map(c => ({ ...c, barPct: maxCausaPct > 0 ? (c.pct / maxCausaPct) * 100 : 0 }))
 
     const calendarAgg = aggregateByCalendarDay({ summaries: valid })
     const uniqueDays  = calendarAgg.size
@@ -235,20 +237,20 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats }: P
                 {stats.causas.reduce((s, c) => s + c.pieces, 0).toLocaleString('es-CL')} pz P0
               </p>
             </div>
-            {stats.causas.map(({ error, pieces, pct }) => (
+            {stats.causas.map(({ error, pieces, pct, barPct }) => (
               <div key={error} className="space-y-0.5">
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="text-[11px] font-medium leading-tight truncate min-w-0">
                     {getCauseLabel(error)}
                   </span>
                   <span className="text-[10px] tabular-nums text-muted-foreground shrink-0">
-                    {pieces.toLocaleString('es-CL')} · <span className="font-semibold text-foreground">{pct.toFixed(0)}%</span>
+                    {pieces.toLocaleString('es-CL')} pz · <span className="font-semibold text-foreground">{pct.toFixed(2)}%</span>
                   </span>
                 </div>
                 <div className="h-1 bg-muted/50 rounded-full overflow-hidden">
                   <div
                     className="h-full rounded-full bg-amber-500/70 transition-all"
-                    style={{ width: `${Math.min(100, pct).toFixed(1)}%` }}
+                    style={{ width: `${barPct.toFixed(1)}%` }}
                   />
                 </div>
               </div>
