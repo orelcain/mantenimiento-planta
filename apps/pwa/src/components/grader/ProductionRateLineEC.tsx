@@ -56,28 +56,28 @@ function buildRateSeries(machines: UpstreamMachineShift[]): {
     return { timeAxis: [], series: [], avgSeries: { name: 'Promedio', data: [] }, expectedRate: 0, showAvg: false }
   }
 
-  // DEBUG T3: verificar si los datos son distintos por máquina
-  if (machines.length > 1) {
-    console.log('[ProductionRateLineEC] machines:', machines.map(m => ({
-      name: m.machineName,
-      intervals: m.intervals.length,
-      first3cycles: m.intervals.slice(0, 3).map(iv => ({ t: iv.startAt.toISOString(), c: iv.cycles })),
-    })))
-  }
+  // Snap a grilla de 5 min: diferentes máquinas pueden tener buckets en :56/:01/:06
+  // (Shoplogix registra cada una desde que arranca, no desde el mismo segundo).
+  // Sin snap, M1 tiene datos en :01, :06... y M3 en :00, :05... → timeAxis mezclado
+  // → en cada tick SOLO UNA máquina tiene valor → las líneas se "intercalan" y
+  // parecen idénticas a escala de turno completo.
+  const BUCKET_MS = 5 * 60_000
+  const snap = (ts: number) => Math.round(ts / BUCKET_MS) * BUCKET_MS
 
-  // Colección de todos los timestamps únicos (alineados al inicio del bucket)
+  // Colección de todos los timestamps únicos (alineados a grilla 5 min)
   const tsSet = new Set<number>()
   for (const m of machines) {
-    for (const iv of m.intervals) tsSet.add(iv.startAt.getTime())
+    for (const iv of m.intervals) tsSet.add(snap(iv.startAt.getTime()))
   }
   const timeAxis = [...tsSet].sort((a, b) => a - b)
 
-  // Índice de cycles por máquina y timestamp
+  // Índice de cycles por máquina y timestamp (con snap)
   const machineRates: Map<number, number>[] = machines.map((m) => {
     const map = new Map<number, number>()
     for (const iv of m.intervals) {
       const durationMin = Math.max(1, (iv.endAt.getTime() - iv.startAt.getTime()) / 60_000)
-      map.set(iv.startAt.getTime(), iv.cycles / durationMin)
+      const key = snap(iv.startAt.getTime())
+      if (!map.has(key)) map.set(key, iv.cycles / durationMin)
     }
     return map
   })
