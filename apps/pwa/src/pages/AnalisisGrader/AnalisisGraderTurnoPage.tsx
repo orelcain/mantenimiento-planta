@@ -10,7 +10,7 @@ import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useParams, useNavigate, Navigate, useSearchParams } from 'react-router-dom'
 import { logger } from '@/lib/logger'
 import { Button, Card, CardContent, Spinner, Badge } from '@/components/ui'
-import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag, FileText, WifiOff, ChevronDown, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag, FileText, WifiOff, ChevronDown, RefreshCw, Zap, Scale } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { usePermissionsStore } from '@/store'
 import { useAuthStore, useIsAdmin, useIsSupervisor } from '@/store/authStore'
@@ -1154,6 +1154,73 @@ export function AnalisisGraderTurnoPage() {
               <Upload className="w-4 h-4" />
               Cargar Excel
             </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Turno sin datos — estado "listo para recibir data"
+          Aparece cuando: no hay summary (sin Excel Grader), no hay datos SLX reales,
+          y el turno NO está live (ese caso ya tiene su propio card arriba).
+          Comunica claramente los 3 canales de ingreso de datos. */}
+      {!loading && !summary && !upstreamLine.loading
+        && shiftWindow?.status !== 'live'
+        && upstreamLine.source !== 'firestore' && (
+        <Card className="border-slate-700/50">
+          <CardContent className="p-5 space-y-3">
+            <p className="text-sm font-medium text-slate-300">
+              Sin datos registrados para este turno
+            </p>
+
+            {/* Shoplogix — automático */}
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-violet-950/30 border border-violet-900/40">
+              <Zap className="w-4 h-4 text-violet-400 mt-0.5 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-violet-300">Shoplogix — Evisceradoras Baader 142</p>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Se sincroniza automáticamente cada 5 min cuando las máquinas están en operación.
+                  No requiere acción manual.
+                </p>
+              </div>
+              <Badge variant="outline" className="text-[10px] border-violet-700/60 text-violet-400 shrink-0 mt-0.5">
+                automático
+              </Badge>
+            </div>
+
+            {/* Grader — manual */}
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-sky-950/30 border border-sky-900/40">
+              <Upload className="w-4 h-4 text-sky-400 mt-0.5 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-sky-300">Grader Matrix — Informe de turno</p>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Exportar Excel de Matrix al cierre del turno y cargarlo para ver P0%, causas y timeline.
+                </p>
+              </div>
+              {isAdmin && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs border-sky-700/60 text-sky-400 hover:bg-sky-950 shrink-0 mt-0.5"
+                  onClick={() => navigate('/analisis-grader/wizard')}
+                >
+                  <Upload className="w-3 h-3 mr-1" />
+                  Cargar Excel
+                </Button>
+              )}
+            </div>
+
+            {/* Marel HG — manual, requiere Grader */}
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-950/30 border border-amber-900/40">
+              <Scale className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-amber-300">Marel HG — Corta-cabeza</p>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Ingreso manual de captura de la pantalla Marel. Disponible al cargar el Excel Grader.
+                </p>
+              </div>
+              <Badge variant="outline" className="text-[10px] border-amber-700/60 text-amber-400 shrink-0 mt-0.5">
+                requiere Grader
+              </Badge>
+            </div>
           </CardContent>
         </Card>
       )}
