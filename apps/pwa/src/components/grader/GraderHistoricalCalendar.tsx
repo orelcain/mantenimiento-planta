@@ -2460,12 +2460,20 @@ export function GraderHistoricalCalendar({
               const slxNewDay   = !hasData ? (slxTotalsByShift.get(`${dayKey}__Turno 2`) ?? 0) : 0
               const slxLegDay   = !hasData ? (slxTotalsByShift.get(`${dayKey}__Turno día`) ?? 0) : 0
               const slxDayCycles   = slxNewDay > 0 ? slxNewDay : slxLegDay
-              const slxNewNight = !hasData ? Math.max(
-                slxTotalsByShift.get(`${prevDayKey}__Turno 3`) ?? 0,  // madrugada (T3 CF=día anterior)
-                slxTotalsByShift.get(`${dayKey}__Turno 1`)     ?? 0,  // mañana T1 (CF=día visual)
-              ) : 0
+              // shiftId real para navegar desde chip día
+              const slxDayNav = slxNewDay > 0
+                ? { cfDateKey: dayKey, shiftId: 'Turno 2' }
+                : slxLegDay > 0 ? { cfDateKey: dayKey, shiftId: 'Turno día' } : null
+              const slxT3Cycles = !hasData ? (slxTotalsByShift.get(`${prevDayKey}__Turno 3`) ?? 0) : 0
+              const slxT1Cycles = !hasData ? (slxTotalsByShift.get(`${dayKey}__Turno 1`)     ?? 0) : 0
               const slxLegNight = !hasData ? (slxTotalsByShift.get(`${dayKey}__Turno noche`) ?? 0) : 0
+              const slxNewNight = Math.max(slxT3Cycles, slxT1Cycles)
               const slxNightCycles = slxNewNight > 0 ? slxNewNight : slxLegNight
+              // shiftId real para navegar desde chip noche (prefiere T3 madrugada si es mayor)
+              const slxNightNav = slxT3Cycles >= slxT1Cycles && slxT3Cycles > 0
+                ? { cfDateKey: prevDayKey, shiftId: 'Turno 3' }
+                : slxT1Cycles > 0 ? { cfDateKey: dayKey, shiftId: 'Turno 1' }
+                : slxLegNight > 0 ? { cfDateKey: dayKey, shiftId: 'Turno noche' } : null
               const hasSlxDay   = slxDayCycles   > 0
               const hasSlxNight = slxNightCycles > 0
               const hasAnySlx   = hasSlxDay || hasSlxNight
@@ -2521,31 +2529,50 @@ export function GraderHistoricalCalendar({
                   {/* Per-shift chips (Camino 2-B refinado: primary/secondary/orphan-source) */}
                   {chipsForDay.map((chip) => renderShiftChip(chip, filterUntagged ? (untaggedCounts.get(chip.summaryId) ?? null) : null))}
 
-                  {/* Chips Shoplogix para días sin datos Grader */}
-                  {!hasData && hasAnySlx && (
-                    <>
-                      {hasSlxDay && (
-                        <div className="flex items-center justify-between rounded px-1 py-px leading-none bg-sky-500/15 text-sky-400">
-                          <span className="text-[8px] font-medium opacity-80">D</span>
-                          <span className="text-[9px] font-bold tabular-nums">
-                            {slxDayCycles >= 1000
-                              ? `${(slxDayCycles / 1000).toFixed(1)}k`
-                              : String(slxDayCycles)}
-                          </span>
-                        </div>
-                      )}
-                      {hasSlxNight && (
-                        <div className="flex items-center justify-between rounded px-1 py-px leading-none bg-indigo-500/15 text-indigo-400">
-                          <span className="text-[8px] font-medium opacity-80">N</span>
-                          <span className="text-[9px] font-bold tabular-nums">
-                            {slxNightCycles >= 1000
-                              ? `${(slxNightCycles / 1000).toFixed(1)}k`
-                              : String(slxNightCycles)}
-                          </span>
-                        </div>
-                      )}
-                    </>
-                  )}
+                  {/* Chips Shoplogix para días sin datos Grader — clicables → TurnoPage */}
+                  {!hasData && hasAnySlx && (() => {
+                    const lineaQ = plantLineId !== DEFAULT_PLANT_LINE_ID
+                      ? `?linea=${encodeURIComponent(plantLineId)}`
+                      : ''
+                    return (
+                      <>
+                        {hasSlxDay && slxDayNav && (
+                          <button
+                            className="flex items-center justify-between rounded px-1 py-px leading-none bg-sky-500/15 text-sky-400 hover:bg-sky-500/30 transition-colors w-full"
+                            title={`Ver Turno día · ${slxDayCycles.toLocaleString('es-CL')} ciclos Baader`}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              navigate(`/analisis-grader/turno/${slxDayNav.cfDateKey}__${encodeURIComponent(slxDayNav.shiftId)}${lineaQ}`)
+                            }}
+                          >
+                            <span className="text-[8px] font-medium opacity-80">D</span>
+                            <span className="text-[9px] font-bold tabular-nums">
+                              {slxDayCycles >= 1000
+                                ? `${(slxDayCycles / 1000).toFixed(1)}k`
+                                : String(slxDayCycles)}
+                            </span>
+                          </button>
+                        )}
+                        {hasSlxNight && slxNightNav && (
+                          <button
+                            className="flex items-center justify-between rounded px-1 py-px leading-none bg-indigo-500/15 text-indigo-400 hover:bg-indigo-500/30 transition-colors w-full"
+                            title={`Ver Turno noche · ${slxNightCycles.toLocaleString('es-CL')} ciclos Baader`}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              navigate(`/analisis-grader/turno/${slxNightNav.cfDateKey}__${encodeURIComponent(slxNightNav.shiftId)}${lineaQ}`)
+                            }}
+                          >
+                            <span className="text-[8px] font-medium opacity-80">N</span>
+                            <span className="text-[9px] font-bold tabular-nums">
+                              {slxNightCycles >= 1000
+                                ? `${(slxNightCycles / 1000).toFixed(1)}k`
+                                : String(slxNightCycles)}
+                            </span>
+                          </button>
+                        )}
+                      </>
+                    )
+                  })()}
 
                   {/* Sin proceso: día escaneado por Shoplogix sin producción */}
                   {dayScanned && (
