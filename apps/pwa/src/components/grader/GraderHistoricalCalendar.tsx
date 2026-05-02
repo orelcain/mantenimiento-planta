@@ -952,7 +952,8 @@ export function GraderHistoricalCalendar({
   const carouselDragRef = useRef<{ startX: number; vx: number; lastX: number; lastT: number; navigating: boolean } | null>(null)
   const carouselMomentumRef = useRef<number | null>(null) // rafId de la inercia activa
   const carouselStateRef = useRef<{ sortedDayKeys: string[]; currentIdx: number }>({ sortedDayKeys: [], currentIdx: 0 })
-  const autoSelectedRef = useRef(!!effectiveInitialKey)
+  // Siempre true: el calendario abre en hoy. El botón "Último" navega al último registro.
+  const autoSelectedRef = useRef(true)
 
   useEffect(() => { onMonthChange?.(currentMonth) }, [currentMonth, onMonthChange])
 
