@@ -1431,7 +1431,10 @@ export function GraderHistoricalCalendar({
             try {
               const fbRes = await loadShoplogixShift(dk, fb, plantSlug, forceServer)
               const fbC = (fbRes.snapshot?.machines ?? []).reduce((a, m) => a + (m.totalCycles || 0), 0)
-              if (fbC > 0) { resolvedRes = fbRes; break }
+              // Unscheduled con <50 ciclos es ruido entre turnos, no producción real.
+              // Turnos named (Turno 3*, etc.) aceptan cualquier valor > 0.
+              const isValid = fbC > 0 && (fb !== 'Unscheduled' || fbC >= 50)
+              if (isValid) { resolvedRes = fbRes; break }
             } catch { /* ignorar, probar siguiente */ }
           }
         }
