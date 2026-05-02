@@ -145,9 +145,10 @@ function toDateKey(iso?: string): string {
  */
 function renderShiftChip(chip: ShiftChipDescriptor, untaggedCount: number | null): JSX.Element {
   const baseLetter = chip.shiftId === 'Turno día' ? 'D' : 'N'
+  // Madrugada (noche que entra desde ayer) → etiqueta "M", sin flecha confusa.
+  // Noche que sale (exits) → simple "N", el tooltip explica que cruza a mañana.
   const label =
-    chip.direction === 'enters' ? `→${baseLetter}` :
-    chip.direction === 'exits' ? `${baseLetter}→` :
+    chip.direction === 'enters' && baseLetter === 'N' ? 'M' :
     baseLetter
   const key = `${chip.summaryId}-${chip.role}-${chip.renderInDateKey}`
   const p0 = chip.pointZeroPct
@@ -2456,7 +2457,8 @@ export function GraderHistoricalCalendar({
               //   - Turno 1 con dateKey CF == dayKey (mañana del día)
               //   - Turno 3 con dateKey CF == dayKey-1 (madrugada del día — almacenado
               //     bajo el día anterior por la convención "día laboral" del CF).
-              const prevDayKey = !hasData ? addDaysToDateKey(dayKey, -1) : ''
+              // prevDayKey siempre computado (necesario para badge SLX + chips noche)
+              const prevDayKey = addDaysToDateKey(dayKey, -1)
               const slxNewDay   = !hasData ? (slxTotalsByShift.get(`${dayKey}__Turno 2`) ?? 0) : 0
               const slxLegDay   = !hasData ? (slxTotalsByShift.get(`${dayKey}__Turno día`) ?? 0) : 0
               const slxDayCycles   = slxNewDay > 0 ? slxNewDay : slxLegDay
@@ -2477,6 +2479,22 @@ export function GraderHistoricalCalendar({
               const hasSlxDay   = slxDayCycles   > 0
               const hasSlxNight = slxNightCycles > 0
               const hasAnySlx   = hasSlxDay || hasSlxNight
+              // Badge de fuente: SLX existe si hay ciclos en cualquier turno del día
+              // (se verifica independiente de hasData para mostrar badge incluso en días Grader)
+              const hasSLXBadge = (slxTotalsByShift.get(`${dayKey}__Turno 2`) ?? 0) > 0
+                || (slxTotalsByShift.get(`${dayKey}__Turno día`) ?? 0) > 0
+                || (slxTotalsByShift.get(`${prevDayKey}__Turno 3`) ?? 0) > 0
+                || (slxTotalsByShift.get(`${dayKey}__Turno 1`) ?? 0) > 0
+                || (slxTotalsByShift.get(`${dayKey}__Turno noche`) ?? 0) > 0
+              // Uptime% desde slxByShift (ya cargado por loadOne en el preloader mensual)
+              const slxDayShiftKey = slxNewDay > 0 ? `${dayKey}__Turno 2` : `${dayKey}__Turno día`
+              const slxDayUptimePct = hasSlxDay
+                ? (slxByShift.get(slxDayShiftKey)?.avgShiftRuntime ?? 0) * 100 : 0
+              const slxNightShiftKey = slxT3Cycles >= slxT1Cycles && slxT3Cycles > 0
+                ? `${prevDayKey}__Turno 3`
+                : slxT1Cycles > 0 ? `${dayKey}__Turno 1` : `${dayKey}__Turno noche`
+              const slxNightUptimePct = hasSlxNight
+                ? (slxByShift.get(slxNightShiftKey)?.avgShiftRuntime ?? 0) * 100 : 0
               // Día confirmado sin producción: Shoplogix ya fue escaneado y no hay ciclos
               const dayScanned = !hasData && !hasAnySlx && (
                 slxByShift.has(`${dayKey}__Turno 2`) ||
@@ -2519,11 +2537,26 @@ export function GraderHistoricalCalendar({
                     )}>
                       {day.getDate()}
                     </span>
-                    {!hasData && dayUploads.length > 0 && (
-                      <span className="text-[7px] text-muted-foreground leading-none border rounded px-0.5">
-                        {dayUploads.length}f
-                      </span>
-                    )}
+                    <div className="flex items-center gap-0.5">
+                      {!hasData && dayUploads.length > 0 && (
+                        <span className="text-[7px] text-muted-foreground leading-none border rounded px-0.5">
+                          {dayUploads.length}f
+                        </span>
+                      )}
+                      {/* Dots de fuente de datos: azul=SLX, verde=Grader Excel */}
+                      {hasSLXBadge && (
+                        <span
+                          className="w-1.5 h-1.5 rounded-full bg-sky-400/70 inline-block shrink-0"
+                          title="Shoplogix sincronizado"
+                        />
+                      )}
+                      {hasData && (
+                        <span
+                          className="w-1.5 h-1.5 rounded-full bg-emerald-400/70 inline-block shrink-0"
+                          title="Excel Grader cargado"
+                        />
+                      )}
+                    </div>
                   </div>
 
                   {/* Per-shift chips (Camino 2-B refinado: primary/secondary/orphan-source) */}
@@ -2534,12 +2567,27 @@ export function GraderHistoricalCalendar({
                     const lineaQ = plantLineId !== DEFAULT_PLANT_LINE_ID
                       ? `?linea=${encodeURIComponent(plantLineId)}`
                       : ''
+                    // Color semáforo uptime (mismo esquema que Grader pero azul-slate cuando sin data)
+                    const dayUptimeClass = slxDayUptimePct >= 70
+                      ? 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25'
+                      : slxDayUptimePct >= 40
+                        ? 'bg-amber-500/15 text-amber-400 hover:bg-amber-500/25'
+                        : slxDayUptimePct > 0
+                          ? 'bg-red-500/15 text-red-400 hover:bg-red-500/25'
+                          : 'bg-sky-500/15 text-sky-400 hover:bg-sky-500/25'
+                    const nightUptimeClass = slxNightUptimePct >= 70
+                      ? 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25'
+                      : slxNightUptimePct >= 40
+                        ? 'bg-amber-500/15 text-amber-400 hover:bg-amber-500/25'
+                        : slxNightUptimePct > 0
+                          ? 'bg-red-500/15 text-red-400 hover:bg-red-500/25'
+                          : 'bg-indigo-500/15 text-indigo-400 hover:bg-indigo-500/25'
                     return (
                       <>
                         {hasSlxDay && slxDayNav && (
                           <button
-                            className="flex items-center justify-between rounded px-1 py-px leading-none bg-sky-500/15 text-sky-400 hover:bg-sky-500/30 transition-colors w-full"
-                            title={`Ver Turno día · ${slxDayCycles.toLocaleString('es-CL')} ciclos Baader`}
+                            className={cn('flex items-center justify-between rounded px-1 py-px leading-none transition-colors w-full', dayUptimeClass)}
+                            title={`Ver Turno día · ${slxDayCycles.toLocaleString('es-CL')} ciclos Baader${slxDayUptimePct > 0 ? ` · ${slxDayUptimePct.toFixed(0)}% uptime` : ''}`}
                             onClick={(e) => {
                               e.stopPropagation()
                               navigate(`/analisis-grader/turno/${slxDayNav.cfDateKey}__${encodeURIComponent(slxDayNav.shiftId)}${lineaQ}`)
@@ -2547,16 +2595,16 @@ export function GraderHistoricalCalendar({
                           >
                             <span className="text-[8px] font-medium opacity-80">D</span>
                             <span className="text-[9px] font-bold tabular-nums">
-                              {slxDayCycles >= 1000
-                                ? `${(slxDayCycles / 1000).toFixed(1)}k`
-                                : String(slxDayCycles)}
+                              {slxDayUptimePct > 0
+                                ? `${slxDayUptimePct.toFixed(0)}%`
+                                : slxDayCycles >= 1000 ? `${(slxDayCycles / 1000).toFixed(1)}k` : String(slxDayCycles)}
                             </span>
                           </button>
                         )}
                         {hasSlxNight && slxNightNav && (
                           <button
-                            className="flex items-center justify-between rounded px-1 py-px leading-none bg-indigo-500/15 text-indigo-400 hover:bg-indigo-500/30 transition-colors w-full"
-                            title={`Ver Turno noche · ${slxNightCycles.toLocaleString('es-CL')} ciclos Baader`}
+                            className={cn('flex items-center justify-between rounded px-1 py-px leading-none transition-colors w-full', nightUptimeClass)}
+                            title={`Ver Turno noche · ${slxNightCycles.toLocaleString('es-CL')} ciclos Baader${slxNightUptimePct > 0 ? ` · ${slxNightUptimePct.toFixed(0)}% uptime` : ''}`}
                             onClick={(e) => {
                               e.stopPropagation()
                               navigate(`/analisis-grader/turno/${slxNightNav.cfDateKey}__${encodeURIComponent(slxNightNav.shiftId)}${lineaQ}`)
@@ -2564,9 +2612,9 @@ export function GraderHistoricalCalendar({
                           >
                             <span className="text-[8px] font-medium opacity-80">N</span>
                             <span className="text-[9px] font-bold tabular-nums">
-                              {slxNightCycles >= 1000
-                                ? `${(slxNightCycles / 1000).toFixed(1)}k`
-                                : String(slxNightCycles)}
+                              {slxNightUptimePct > 0
+                                ? `${slxNightUptimePct.toFixed(0)}%`
+                                : slxNightCycles >= 1000 ? `${(slxNightCycles / 1000).toFixed(1)}k` : String(slxNightCycles)}
                             </span>
                           </button>
                         )}
