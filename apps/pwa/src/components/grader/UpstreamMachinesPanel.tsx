@@ -785,6 +785,23 @@ export function UpstreamMachinesPanel({
   // completa del turno alineada al Grader). Cualquier valor = zoom activo.
   const isLineZoomActive = timelineSync?.range != null
 
+  // Detección de desfase SLX: si la primera máquina tiene shiftStart >6h fuera
+  // de windowStart, el doc Firestore tiene datos de otro turno (bug CF).
+  // Threshold 6h: datos correctos tienen gap ~3h (wall-clock-as-UTC vs UTC real
+  // en Chile UTC-3). Datos erróneos tienen >10h de gap (turno equivocado).
+  const slxWindowMismatch = useMemo(() => {
+    if (!snapshot || snapshot.machines.length === 0 || !windowStart) return null
+    const m = snapshot.machines[0]!
+    const gapHours = Math.abs(m.shiftStart.getTime() - windowStart.getTime()) / 3_600_000
+    if (gapHours <= 6) return null
+    return { actualStart: m.shiftStart, actualEnd: m.shiftEnd }
+  }, [snapshot, windowStart])
+
+  // Cuando hay desfase, los charts usan su propio rango (auto-scale)
+  // para que el supervisor pueda ver los datos aunque no correspondan al turno.
+  const chartWindowStart = slxWindowMismatch ? undefined : windowStart
+  const chartWindowEnd   = slxWindowMismatch ? undefined : windowEnd
+
   // F5b — Correlación paros Grader ↔ Baaders. Si un paro del Grader tiene
   // 2+ Baaders paradas dentro de la ventana de tolerancia, lo marcamos como
   // "coincidente". Banner en header alerta al supervisor del posible upstream
@@ -897,6 +914,20 @@ export function UpstreamMachinesPanel({
                 Desactualizado
               </span>
             )}
+            {slxWindowMismatch && (
+              <Badge
+                variant="outline"
+                className="bg-rose-950/60 border-rose-800 text-rose-300 text-[10px] px-2 py-0.5 h-5 gap-1 cursor-help"
+                title={
+                  `Datos SLX fuera de ventana: rango real ${fmtTime(slxWindowMismatch.actualStart.getTime())}–${fmtTime(slxWindowMismatch.actualEnd.getTime())} ` +
+                  `no coincide con el turno actual. Probable causa: documento Firestore con datos de otro turno. ` +
+                  `Los charts muestran el rango real de los datos.`
+                }
+              >
+                <AlertTriangle className="w-3 h-3" />
+                SLX desfasado
+              </Badge>
+            )}
             {snapshot && !loading && (
               <span className="tabular-nums">
                 <Activity className="w-3 h-3 inline mr-1" />
@@ -964,10 +995,15 @@ export function UpstreamMachinesPanel({
                 <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
                   Tasa de producción por máquina · pz/min
                 </p>
+                {slxWindowMismatch && (
+                  <p className="text-[10px] text-rose-400/70 mb-1">
+                    ⚠ Datos del rango {fmtTime(slxWindowMismatch.actualStart.getTime())}–{fmtTime(slxWindowMismatch.actualEnd.getTime())} · no coincide con la ventana del turno
+                  </p>
+                )}
                 <ProductionRateLineEC
                   machines={snapshot.machines}
-                  windowStart={windowStart}
-                  windowEnd={windowEnd}
+                  windowStart={chartWindowStart}
+                  windowEnd={chartWindowEnd}
                 />
               </div>
             )}
@@ -980,8 +1016,8 @@ export function UpstreamMachinesPanel({
                     shift={m}
                     expanded={expandedMachines.has(m.machineid)}
                     onToggle={() => toggleMachine(m.machineid)}
-                    windowStart={windowStart}
-                    windowEnd={windowEnd}
+                    windowStart={chartWindowStart}
+                    windowEnd={chartWindowEnd}
                     microAlert={microAlertSet.has(m.machineid)}
                     plantSlug={plantSlug}
                   />
