@@ -133,6 +133,9 @@ function toDateKey(iso?: string): string {
   return iso.slice(0, 10)
 }
 
+/** Vista activa del calendario: qué métrica muestra el valor principal de cada chip */
+type CalendarView = 'piezas' | 'p0' | 'uptime'
+
 /**
  * Renderiza un chip de turno en una celda del calendario según su rol.
  *
@@ -143,7 +146,12 @@ function toDateKey(iso?: string): string {
  * - `orphan-source`: chip tachado/muy atenuado en el día programado donde el turno
  *   no tuvo actividad real (ej. los 4 domingos de Feb 2026 en Chile).
  */
-function renderShiftChip(chip: ShiftChipDescriptor, untaggedCount: number | null): JSX.Element {
+function renderShiftChip(
+  chip: ShiftChipDescriptor,
+  untaggedCount: number | null,
+  view: CalendarView,
+  slxByShift: Map<string, SlxShiftCache>,
+): JSX.Element {
   const baseLetter = chip.shiftId === 'Turno día' ? 'D' : 'N'
   // Madrugada (noche que entra desde ayer) → etiqueta "M", sin flecha confusa.
   // Noche que sale (exits) → simple "N", el tooltip explica que cruza a mañana.
@@ -158,10 +166,26 @@ function renderShiftChip(chip: ShiftChipDescriptor, untaggedCount: number | null
       ? 'bg-amber-500/18 text-amber-600'
       : 'bg-emerald-500/18 text-emerald-600'
 
+  // Uptime% desde SLX para la vista Uptime (busca new-format primero, luego legacy)
+  const slxUptimePct: number | null = (() => {
+    const keys = chip.shiftId === 'Turno día'
+      ? [`${chip.shiftDateKey}__Turno 2`, `${chip.shiftDateKey}__Turno día`]
+      : [`${chip.shiftDateKey}__Turno 3`, `${chip.shiftDateKey}__Turno 1`, `${chip.shiftDateKey}__Turno noche`]
+    for (const k of keys) {
+      const v = slxByShift.get(k)?.avgShiftRuntime
+      if (v != null) return v * 100
+    }
+    return null
+  })()
+  const colorByUptime = slxUptimePct == null
+    ? 'bg-slate-500/15 text-slate-400'
+    : slxUptimePct >= 70 ? 'bg-emerald-500/18 text-emerald-600'
+    : slxUptimePct >= 40 ? 'bg-amber-500/18 text-amber-600'
+    : 'bg-red-500/18 text-red-600'
+
+  const activeColor = view === 'uptime' ? colorByUptime : colorByP0
+
   if (chip.role === 'orphan-source') {
-    // Chip atenuado en el día schedule sin actividad real.
-    // Color indigo (consistente con el banner del TurnoPage y badge del panel
-    // resumen del día) para diferenciarlo de "celda vacía" gris neutro.
     return (
       <div
         key={key}
@@ -175,9 +199,8 @@ function renderShiftChip(chip: ShiftChipDescriptor, untaggedCount: number | null
   }
 
   if (chip.role === 'secondary') {
-    // Chip chico atenuado: % del fragmento (no P0%) para indicar continuidad.
-    // OCULTO en mobile (<640px) para reducir densidad — sigue accesible en
-    // el panel "Resumen del día" abajo.
+    // Chip chico atenuado: % del fragmento — siempre muestra fragment%, independiente de vista.
+    // OCULTO en mobile (<640px) para reducir densidad.
     const pct = chip.pctOfShift != null ? Math.round(chip.pctOfShift) : 0
     return (
       <div
@@ -185,7 +208,7 @@ function renderShiftChip(chip: ShiftChipDescriptor, untaggedCount: number | null
         title={`${chip.shiftId} ${chip.shiftDateKey} → este día aportó ${pct}% de la carga (P0% del turno completo: ${p0.toFixed(1)}%)`}
         className={cn(
           'hidden sm:flex items-center justify-between rounded px-1 leading-none opacity-60 hover:opacity-100 transition-opacity',
-          colorByP0,
+          activeColor,
         )}
         style={{ paddingTop: 0, paddingBottom: 0, height: '13px' }}
       >
@@ -195,7 +218,14 @@ function renderShiftChip(chip: ShiftChipDescriptor, untaggedCount: number | null
     )
   }
 
-  // role === 'primary'
+  // role === 'primary' — valor principal según vista
+  const chipValue =
+    view === 'piezas'
+      ? (chip.pieces != null ? chip.pieces.toLocaleString('es-CL') : '—')
+      : view === 'uptime'
+        ? (slxUptimePct != null ? `${slxUptimePct.toFixed(0)}%` : '—')
+        : `${p0.toFixed(1)}%`
+
   return (
     <div
       key={key}
@@ -204,10 +234,10 @@ function renderShiftChip(chip: ShiftChipDescriptor, untaggedCount: number | null
         : chip.direction === 'exits'
           ? `Turno ${chip.shiftId.toLowerCase()} arranca este día, ${Math.round(chip.pctOfShift ?? 100)}% de su carga aquí.`
           : `Turno ${chip.shiftId.toLowerCase()} de este día.`}
-      className={cn('flex items-center justify-between rounded px-1 py-px leading-none', colorByP0)}
+      className={cn('flex items-center justify-between rounded px-1 py-px leading-none', activeColor)}
     >
       <span className="text-[8px] font-medium opacity-70">{label}</span>
-      <span className="text-[9px] font-bold tabular-nums">{p0.toFixed(1)}%</span>
+      <span className="text-[9px] font-bold tabular-nums">{chipValue}</span>
       {untaggedCount !== null && untaggedCount > 0 && (
         <span className="ml-0.5 text-[7px] leading-none px-0.5 rounded bg-amber-500/25 text-amber-600 font-semibold">
           🏷{untaggedCount}
@@ -905,6 +935,8 @@ export function GraderHistoricalCalendar({
   const [configChangeCounts, setConfigChangeCounts] = useState<Map<string, number>>(new Map())
   // M9 — Filtro "solo turnos con pausas sin anotar"
   const [filterUntagged, setFilterUntagged] = useState(false)
+  // Vista del calendario: qué métrica muestra el chip principal
+  const [calendarView, setCalendarView] = useState<CalendarView>('p0')
   // M12 — Modal comparación día vs noche
   const [showComparison, setShowComparison] = useState(false)
   // summaryId → cantidad de pausas sin tag (calculado lazy cuando el filtro está activo)
@@ -2404,21 +2436,40 @@ export function GraderHistoricalCalendar({
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
-          {/* M9 — Filtro pausas sin anotar */}
-          <Button
-            variant={filterUntagged ? 'default' : 'outline'}
-            size="sm"
-            className={cn(
-              'gap-1.5 text-xs',
-              filterUntagged && 'bg-amber-500 hover:bg-amber-600 border-amber-500 text-white',
-            )}
-            onClick={() => setFilterUntagged((v) => !v)}
-          >
-            {loadingUntagged
-              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              : <Tag className="h-3.5 w-3.5" />}
-            Sin anotar
-          </Button>
+          <div className="flex items-center gap-2">
+            {/* Vista: qué métrica muestra el chip principal */}
+            <div className="flex items-center rounded-md border border-border overflow-hidden">
+              {(['p0', 'piezas', 'uptime'] as CalendarView[]).map((v) => (
+                <button
+                  key={v}
+                  onClick={() => setCalendarView(v)}
+                  className={cn(
+                    'text-[10px] font-semibold px-2 py-1 leading-none transition-colors',
+                    calendarView === v
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
+                  )}
+                >
+                  {v === 'p0' ? 'P0%' : v === 'piezas' ? 'Pzas' : 'UPT'}
+                </button>
+              ))}
+            </div>
+            {/* M9 — Filtro pausas sin anotar */}
+            <Button
+              variant={filterUntagged ? 'default' : 'outline'}
+              size="sm"
+              className={cn(
+                'gap-1.5 text-xs',
+                filterUntagged && 'bg-amber-500 hover:bg-amber-600 border-amber-500 text-white',
+              )}
+              onClick={() => setFilterUntagged((v) => !v)}
+            >
+              {loadingUntagged
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                : <Tag className="h-3.5 w-3.5" />}
+              Sin anotar
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-7 gap-0.5 mb-1">
@@ -2560,33 +2611,36 @@ export function GraderHistoricalCalendar({
                   </div>
 
                   {/* Per-shift chips (Camino 2-B refinado: primary/secondary/orphan-source) */}
-                  {chipsForDay.map((chip) => renderShiftChip(chip, filterUntagged ? (untaggedCounts.get(chip.summaryId) ?? null) : null))}
+                  {chipsForDay.map((chip) => renderShiftChip(chip, filterUntagged ? (untaggedCounts.get(chip.summaryId) ?? null) : null, calendarView, slxByShift))}
 
                   {/* Chips Shoplogix para días sin datos Grader — clicables → TurnoPage */}
                   {!hasData && hasAnySlx && (() => {
                     const lineaQ = plantLineId !== DEFAULT_PLANT_LINE_ID
                       ? `?linea=${encodeURIComponent(plantLineId)}`
                       : ''
-                    // Color semáforo uptime (mismo esquema que Grader pero azul-slate cuando sin data)
-                    const dayUptimeClass = slxDayUptimePct >= 70
-                      ? 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25'
-                      : slxDayUptimePct >= 40
-                        ? 'bg-amber-500/15 text-amber-400 hover:bg-amber-500/25'
-                        : slxDayUptimePct > 0
-                          ? 'bg-red-500/15 text-red-400 hover:bg-red-500/25'
-                          : 'bg-sky-500/15 text-sky-400 hover:bg-sky-500/25'
-                    const nightUptimeClass = slxNightUptimePct >= 70
-                      ? 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25'
-                      : slxNightUptimePct >= 40
-                        ? 'bg-amber-500/15 text-amber-400 hover:bg-amber-500/25'
-                        : slxNightUptimePct > 0
-                          ? 'bg-red-500/15 text-red-400 hover:bg-red-500/25'
-                          : 'bg-indigo-500/15 text-indigo-400 hover:bg-indigo-500/25'
+                    const slxUptimeClass = (upt: number) =>
+                      upt >= 70 ? 'bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25'
+                      : upt >= 40 ? 'bg-amber-500/15 text-amber-400 hover:bg-amber-500/25'
+                      : upt > 0  ? 'bg-red-500/15 text-red-400 hover:bg-red-500/25'
+                      : 'bg-sky-500/15 text-sky-400 hover:bg-sky-500/25'
+                    const dayColorClass   = slxUptimeClass(slxDayUptimePct)
+                    const nightColorClass = slxNightUptimePct > 0
+                      ? slxUptimeClass(slxNightUptimePct)
+                      : 'bg-indigo-500/15 text-indigo-400 hover:bg-indigo-500/25'
+                    // Valor mostrado según vista
+                    const slxDayValue = calendarView === 'uptime'
+                      ? (slxDayUptimePct > 0 ? `${slxDayUptimePct.toFixed(0)}%` : '—')
+                      : calendarView === 'p0' ? '—'
+                      : slxDayCycles.toLocaleString('es-CL')
+                    const slxNightValue = calendarView === 'uptime'
+                      ? (slxNightUptimePct > 0 ? `${slxNightUptimePct.toFixed(0)}%` : '—')
+                      : calendarView === 'p0' ? '—'
+                      : slxNightCycles.toLocaleString('es-CL')
                     return (
                       <>
                         {hasSlxDay && slxDayNav && (
                           <button
-                            className={cn('flex items-center justify-between rounded px-1 py-px leading-none transition-colors w-full', dayUptimeClass)}
+                            className={cn('flex items-center justify-between rounded px-1 py-px leading-none transition-colors w-full', dayColorClass)}
                             title={`Ver Turno día · ${slxDayCycles.toLocaleString('es-CL')} ciclos Baader${slxDayUptimePct > 0 ? ` · ${slxDayUptimePct.toFixed(0)}% uptime` : ''}`}
                             onClick={(e) => {
                               e.stopPropagation()
@@ -2594,14 +2648,12 @@ export function GraderHistoricalCalendar({
                             }}
                           >
                             <span className="text-[8px] font-medium opacity-80">D</span>
-                            <span className="text-[9px] font-bold tabular-nums">
-                              {slxDayCycles.toLocaleString('es-CL')}
-                            </span>
+                            <span className="text-[9px] font-bold tabular-nums">{slxDayValue}</span>
                           </button>
                         )}
                         {hasSlxNight && slxNightNav && (
                           <button
-                            className={cn('flex items-center justify-between rounded px-1 py-px leading-none transition-colors w-full', nightUptimeClass)}
+                            className={cn('flex items-center justify-between rounded px-1 py-px leading-none transition-colors w-full', nightColorClass)}
                             title={`Ver Turno noche · ${slxNightCycles.toLocaleString('es-CL')} ciclos Baader${slxNightUptimePct > 0 ? ` · ${slxNightUptimePct.toFixed(0)}% uptime` : ''}`}
                             onClick={(e) => {
                               e.stopPropagation()
@@ -2609,9 +2661,7 @@ export function GraderHistoricalCalendar({
                             }}
                           >
                             <span className="text-[8px] font-medium opacity-80">N</span>
-                            <span className="text-[9px] font-bold tabular-nums">
-                              {slxNightCycles.toLocaleString('es-CL')}
-                            </span>
+                            <span className="text-[9px] font-bold tabular-nums">{slxNightValue}</span>
                           </button>
                         )}
                       </>
