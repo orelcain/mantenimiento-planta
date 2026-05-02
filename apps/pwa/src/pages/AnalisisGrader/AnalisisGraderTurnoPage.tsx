@@ -260,9 +260,14 @@ export function AnalisisGraderTurnoPage() {
   // Línea upstream (Shoplogix) — usa el plantSlug correcto según la pestaña activa
   const upstreamLine = useUpstreamLineSnapshot(dateKey || null, shiftLabel || null, plantLineCfg.plantSlug)
 
+  // Schedule efectivo de la planta — Yal define T1/T2/T3, Chonchi día/noche.
+  // Sin esto el chart de Yal Turno 3 caería al fallback 08:00→08:00 (24h)
+  // en vez de las 9h reales del turno noche (23:00 → 07:45).
+  const plantSchedule = plantLineCfg.defaultShiftSchedule ?? DEFAULT_SHIFT_SCHEDULE
+
   const [shiftWindow, setShiftWindow] = useState<ShiftTimeWindow | null>(
     () => dateKey && shiftLabel
-      ? computeShiftTimeWindow(dateKey, shiftLabel, DEFAULT_SHIFT_SCHEDULE)
+      ? computeShiftTimeWindow(dateKey, shiftLabel, plantSchedule)
       : null,
   )
 
@@ -270,10 +275,10 @@ export function AnalisisGraderTurnoPage() {
   useEffect(() => {
     setShiftWindow(
       dateKey && shiftLabel
-        ? computeShiftTimeWindow(dateKey, shiftLabel, DEFAULT_SHIFT_SCHEDULE)
+        ? computeShiftTimeWindow(dateKey, shiftLabel, plantSchedule)
         : null,
     )
-  }, [dateKey, shiftLabel])
+  }, [dateKey, shiftLabel, plantSchedule])
 
   // P1-2 — Toast al reconectar (false → true)
   useEffect(() => {
@@ -291,12 +296,12 @@ export function AnalisisGraderTurnoPage() {
     const id = setInterval(() => {
       setShiftWindow(
         dateKey && shiftLabel
-          ? computeShiftTimeWindow(dateKey, shiftLabel, DEFAULT_SHIFT_SCHEDULE)
+          ? computeShiftTimeWindow(dateKey, shiftLabel, plantSchedule)
           : null,
       )
     }, 60_000)
     return () => clearInterval(id)
-  }, [shiftWindow?.status, dateKey, shiftLabel])
+  }, [shiftWindow?.status, dateKey, shiftLabel, plantSchedule])
 
   const [summary, setSummary] = useState<GraderDailySummary | null>(null)
 
@@ -621,7 +626,7 @@ export function AnalisisGraderTurnoPage() {
     ])
       .then(([s, sd]) => {
         if (!s) {
-          const win = computeShiftTimeWindow(dateKey, shiftLabel, DEFAULT_SHIFT_SCHEDULE)
+          const win = computeShiftTimeWindow(dateKey, shiftLabel, plantSchedule)
           if (win.status !== 'live') {
             setError(`Turno ${shiftLabel} del ${dateKey} no encontrado en el historial.`)
           }
@@ -742,10 +747,14 @@ export function AnalisisGraderTurnoPage() {
   const baseAxisWindow = useMemo<{ startAt: string; endAt: string } | null>(() => {
     if (chartAxisWindow) return chartAxisWindow
 
-    // Para turnos Shoplogix (Turno 1/2/3) el shiftWindow cae al día de
-    // producción completo (08:00→08:00). Cuando ya tenemos los bounds reales
-    // de Shoplogix (scheduledStart/End de intervals.shift), usamos esos para
-    // que el timeline muestre solo la ventana del turno (ej. 16:15→00:00).
+    // Si tenemos shiftWindow del schedule de la planta, es la fuente más confiable.
+    // Antes priorizábamos los bounds del doc Firestore (machine.scheduledStart/End)
+    // pero eso falla cuando la suscripción cae al fallback "Unscheduled" cuyos
+    // bounds cubren todo el día (08:00→08:00 = 18h+ de eje vacío para un turno
+    // noche real de 23:00-07:45). El schedule define la ventana real del turno.
+    if (shiftWindow) return { startAt: shiftWindow.startAt, endAt: shiftWindow.endAt }
+
+    // Sin shiftWindow (turno desconocido) — usar bounds del doc como fallback.
     const slxMachine = upstreamLine.snapshot?.machines[0]
     if (slxMachine?.scheduledStart && slxMachine?.scheduledEnd
         && slxMachine.scheduleSource === 'intervals') {
@@ -755,7 +764,6 @@ export function AnalisisGraderTurnoPage() {
       }
     }
 
-    if (shiftWindow) return { startAt: shiftWindow.startAt, endAt: shiftWindow.endAt }
     return null
   }, [chartAxisWindow, shiftWindow, upstreamLine.snapshot])
   const handleExportPdf = useCallback(async () => {

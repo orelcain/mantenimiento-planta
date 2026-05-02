@@ -52,13 +52,19 @@ export const PLANT_LINES: readonly PlantLineConfig[] = [
     plantSlug: 'yal',
     hasGraderData: true,   // El Excel de la Grader Yal tiene el mismo formato
     shoplogixEnabled: true,
-    // Yal opera con horario distinto a Chonchi:
-    //   Turno día:   07:00 – 14:45
-    //   Turno noche: 14:45 – 00:00 (no cruza medianoche)
-    // Confirmado en Shoplogix: "Turno 2 — 14:45 a 00:00" (29 Apr 2026)
+    // Yal opera con 3 turnos en Shoplogix (T1/T2/T3) además de los labels del Grader.
+    // Horarios confirmados en Shoplogix UI (1 May 2026):
+    //   Turno 1:   07:45 – 15:15  (mañana)
+    //   Turno 2:   15:15 – 00:00  (tarde, llega a medianoche)
+    //   Turno 3:   23:00 – 07:45  (noche, cruza medianoche)
+    //   Turno 3*:  variante 23:00 – 06:15 (mismo bound efectivo, segundo "Turno 3")
+    // Mantener entries de "Turno día/noche" para compatibilidad con Grader Excel.
     defaultShiftSchedule: [
       { shiftId: 'Turno día',   startHour: 7,  startMinute: 0,  endHour: 14, endMinute: 45 },
       { shiftId: 'Turno noche', startHour: 14, startMinute: 45, endHour: 0,  endMinute: 0  },
+      { shiftId: 'Turno 1',     startHour: 7,  startMinute: 45, endHour: 15, endMinute: 15 },
+      { shiftId: 'Turno 2',     startHour: 15, startMinute: 15, endHour: 0,  endMinute: 0  },
+      { shiftId: 'Turno 3',     startHour: 23, startMinute: 0,  endHour: 7,  endMinute: 45 },
     ],
   },
   {

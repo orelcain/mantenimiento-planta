@@ -562,8 +562,16 @@ export interface GraderModuleConfig {
   updatedAt: string;
 }
 
+/**
+ * Turnos soportados:
+ *   - "Turno día"/"Turno noche": nomenclatura del Grader (Chonchi).
+ *   - "Turno 1"/"Turno 2"/"Turno 3": nomenclatura de Shoplogix (Yal y otras
+ *     plantas con 3 turnos).
+ * Tipo string genérico al final → permite añadir variantes futuras sin
+ * tocar este archivo.
+ */
 export interface GraderShiftSchedule {
-  shiftId: 'Turno día' | 'Turno noche';
+  shiftId: 'Turno día' | 'Turno noche' | 'Turno 1' | 'Turno 2' | 'Turno 3' | string;
   startHour: number;   // 0-23
   startMinute: number; // 0-59
   endHour: number;     // 0-23 (puede ser menor si cruza medianoche)

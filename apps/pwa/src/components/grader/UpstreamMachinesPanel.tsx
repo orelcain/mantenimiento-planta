@@ -792,17 +792,21 @@ export function UpstreamMachinesPanel({
   // completa del turno alineada al Grader). Cualquier valor = zoom activo.
   const isLineZoomActive = timelineSync?.range != null
 
-  // Detección de desfase SLX: si la primera máquina tiene shiftStart >6h fuera
-  // de windowStart, el doc Firestore tiene datos de otro turno (bug CF).
-  // Threshold 6h: datos correctos tienen gap ~3h (wall-clock-as-UTC vs UTC real
-  // en Chile UTC-3). Datos erróneos tienen >10h de gap (turno equivocado).
+  // Detección de desfase SLX: si la primera máquina tiene shiftStart >24h fuera
+  // de windowStart, el doc Firestore tiene datos de OTRO DÍA (bug CF).
+  //
+  // Threshold 24h (antes 6h): el threshold previo de 6h trippeaba falsamente
+  // cuando la suscripción cae al fallback "Unscheduled" cuyos bounds cubren
+  // todo el día (08:00→08:00, gap ~15h con un turno noche 23:00-07:45).
+  // En ese caso la data SÍ es del día correcto; sólo el doc tiene scope wider.
+  // Bug real (turno equivocado) tiene gap ≥ 24h (al menos un día completo).
   // No aplica a datos demo — esos tienen timestamps fijos intencionalmente.
   const slxWindowMismatch = useMemo(() => {
     if (dataSource === 'demo') return null
     if (!snapshot || snapshot.machines.length === 0 || !windowStart) return null
     const m = snapshot.machines[0]!
     const gapHours = Math.abs(m.shiftStart.getTime() - windowStart.getTime()) / 3_600_000
-    if (gapHours <= 6) return null
+    if (gapHours <= 24) return null
     return { actualStart: m.shiftStart, actualEnd: m.shiftEnd }
   }, [dataSource, snapshot, windowStart])
 
