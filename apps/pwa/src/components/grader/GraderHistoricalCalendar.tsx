@@ -2595,9 +2595,7 @@ export function GraderHistoricalCalendar({
                           >
                             <span className="text-[8px] font-medium opacity-80">D</span>
                             <span className="text-[9px] font-bold tabular-nums">
-                              {slxDayUptimePct > 0
-                                ? `${slxDayUptimePct.toFixed(0)}%`
-                                : slxDayCycles >= 1000 ? `${(slxDayCycles / 1000).toFixed(1)}k` : String(slxDayCycles)}
+                              {slxDayCycles.toLocaleString('es-CL')}
                             </span>
                           </button>
                         )}
@@ -2612,9 +2610,7 @@ export function GraderHistoricalCalendar({
                           >
                             <span className="text-[8px] font-medium opacity-80">N</span>
                             <span className="text-[9px] font-bold tabular-nums">
-                              {slxNightUptimePct > 0
-                                ? `${slxNightUptimePct.toFixed(0)}%`
-                                : slxNightCycles >= 1000 ? `${(slxNightCycles / 1000).toFixed(1)}k` : String(slxNightCycles)}
+                              {slxNightCycles.toLocaleString('es-CL')}
                             </span>
                           </button>
                         )}
