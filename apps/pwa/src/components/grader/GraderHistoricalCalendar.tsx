@@ -2671,6 +2671,39 @@ export function GraderHistoricalCalendar({
                     )
                   })()}
 
+                  {/* Chips placeholder D/N para días sin datos Grader ni SLX productivo — navegan al ready-state */}
+                  {!hasData && !hasAnySlx && dayUploads.length === 0 && (() => {
+                    const lineaQ = plantLineId !== DEFAULT_PLANT_LINE_ID
+                      ? `?linea=${encodeURIComponent(plantLineId)}`
+                      : ''
+                    return (
+                      <>
+                        <button
+                          className="flex items-center justify-between rounded px-1 py-px leading-none transition-colors w-full bg-slate-800/40 text-slate-600 hover:bg-slate-700/40 hover:text-slate-400"
+                          title={`Ver Turno día ${dayKey} — sin datos registrados`}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            navigate(`/analisis-grader/turno/${dayKey}__${encodeURIComponent('Turno día')}${lineaQ}`)
+                          }}
+                        >
+                          <span className="text-[8px] font-medium">D</span>
+                          <span className="text-[9px] opacity-30">—</span>
+                        </button>
+                        <button
+                          className="flex items-center justify-between rounded px-1 py-px leading-none transition-colors w-full bg-slate-800/40 text-slate-600 hover:bg-slate-700/40 hover:text-slate-400"
+                          title={`Ver Turno noche ${dayKey} — sin datos registrados`}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            navigate(`/analisis-grader/turno/${dayKey}__${encodeURIComponent('Turno noche')}${lineaQ}`)
+                          }}
+                        >
+                          <span className="text-[8px] font-medium">N</span>
+                          <span className="text-[9px] opacity-30">—</span>
+                        </button>
+                      </>
+                    )
+                  })()}
+
                   {/* Sin proceso: día escaneado por Shoplogix sin producción */}
                   {dayScanned && (
                     <span className="text-[8px] text-muted-foreground/40 mt-auto block text-center leading-none">
