@@ -402,18 +402,26 @@ export async function loadShoplogixShift(
 /**
  * Mapeo de labels del Grader → IDs reales que escribe el CF de Shoplogix.
  *
- * El CF escribe con los IDs que devuelve la API de Shoplogix ("Turno 1/2/3").
- * El Grader usa "Turno día" y "Turno noche". Para que el panel de upstream
- * funcione cuando arranquen las máquinas en temporada alta, intentamos los
- * candidatos en orden hasta encontrar datos reales en Firestore.
+ * El CF escribe con los IDs que devuelve la API de Shoplogix ("Turno 1/2/3"
+ * y variantes con asterisco para múltiples instancias del mismo turno en
+ * un día). Yal puede tener Turno 3 + Turno 3* (cross-midnight) en el mismo día.
  *
- * Prioridad:
- *   Turno día   → Turno 2 primero (Shoplogix noon shift), luego el label nativo
- *   Turno noche → Turno 3 primero (Shoplogix night shift), luego Turno 1 (si solo hay un turno)
+ * El Grader usa "Turno día" y "Turno noche". Para que el panel de upstream
+ * funcione, intentamos candidatos en orden hasta encontrar datos reales.
+ *
+ * Fallback `Unscheduled`: cuando Shoplogix no logra atribuir intervals a un
+ * turno específico, la producción real cae en intervals "Unscheduled".
+ * Caso real Yal: 2,275 cycles diarios estaban en Unscheduled. Sin este
+ * fallback, la UI mostraba "Sin datos" aunque hubiera producción.
  */
 export const GRADER_TO_SLX_SHIFT_CANDIDATES: Record<string, string[]> = {
-  'Turno día':   ['Turno 2', 'Turno día'],
-  'Turno noche': ['Turno 3', 'Turno 1', 'Turno noche'],
+  // Chonchi (Grader labels)
+  'Turno día':   ['Turno 2', 'Turno día',   'Unscheduled'],
+  'Turno noche': ['Turno 3', 'Turno 1',     'Turno noche', 'Unscheduled'],
+  // Yal (3 turnos + variantes con asterisco)
+  'Turno 1':     ['Turno 1', 'Turno 1*',    'Unscheduled'],
+  'Turno 2':     ['Turno 2', 'Turno 2*',    'Unscheduled'],
+  'Turno 3':     ['Turno 3', 'Turno 3*',    'Unscheduled'],
 }
 
 /**
@@ -450,14 +458,23 @@ export function subscribeShoplogixShiftAuto(
     currentUnsub = subscribeShoplogixShift(dateKey, candidateId, plantSlug, (result) => {
       if (!active) return
 
-      if (result.snapshot !== null) {
-        // Encontramos datos reales — de ahora en adelante propagamos todo de este candidato
+      // Considerar "tiene datos reales" si el snapshot existe Y tiene cycles > 0.
+      // Caso real Yal hoy: docs Turno 3* y Turno 2 existen con 3 máquinas pero
+      // 0 cycles cada una (Shoplogix no logró atribuir intervals). La producción
+      // real (791 cycles) está en el doc Unscheduled. Sin este check, settled
+      // se quedaba en Turno 3* (vacío) y nunca probaba Unscheduled (con data).
+      const totalCycles = result.snapshot?.machines?.reduce(
+        (sum, m) => sum + (m.totalCycles || 0), 0,
+      ) ?? 0
+      const hasRealData = result.snapshot !== null && totalCycles > 0
+
+      if (hasRealData) {
         settled = true
         onUpdate(result)
         return
       }
 
-      // Snapshot vacío: si aún no hemos encontrado datos, probar siguiente candidato
+      // Snapshot vacío o con 0 cycles: si aún no hemos encontrado datos, probar siguiente
       if (!settled) {
         currentUnsub?.()
         currentUnsub = null
