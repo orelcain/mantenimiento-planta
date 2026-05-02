@@ -222,7 +222,11 @@ function renderShiftChip(
   // role === 'primary' — valor principal según vista
   const chipValue =
     view === 'piezas'
-      ? (chip.pieces != null ? chip.pieces.toLocaleString('es-CL') : '—')
+      ? (chip.pieces != null
+          ? (chip.pointZeroPieces != null
+              ? (chip.pieces - chip.pointZeroPieces).toLocaleString('es-CL')
+              : chip.pieces.toLocaleString('es-CL'))
+          : '—')
       : view === 'uptime'
         ? (slxUptimePct != null ? `${slxUptimePct.toFixed(0)}%` : '—')
         : `${p0.toFixed(1)}%`
@@ -939,7 +943,7 @@ export function GraderHistoricalCalendar({
   // M9 — Filtro "solo turnos con pausas sin anotar"
   const [filterUntagged, setFilterUntagged] = useState(false)
   // Vista del calendario: qué métrica muestra el chip principal
-  const [calendarView, setCalendarView] = useState<CalendarView>('p0')
+  const [calendarView, setCalendarView] = useState<CalendarView>('piezas')
   // M12 — Modal comparación día vs noche
   const [showComparison, setShowComparison] = useState(false)
   // summaryId → cantidad de pausas sin tag (calculado lazy cuando el filtro está activo)
@@ -2562,7 +2566,7 @@ export function GraderHistoricalCalendar({
                       : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
                   )}
                 >
-                  {v === 'p0' ? 'P0%' : v === 'piezas' ? 'Pzas' : 'UPT'}
+                  {v === 'p0' ? 'P0%' : v === 'piezas' ? 'No P0' : 'UPT'}
                 </button>
               ))}
             </div>
