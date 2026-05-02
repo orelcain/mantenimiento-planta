@@ -79,6 +79,12 @@ interface Props {
    * máquina al expandirla. Default 'chonchi' si no se provee.
    */
   plantSlug?: PlantSlug
+  /**
+   * Fuente de los datos: 'firestore' (real), 'demo' (sintético DEV), 'none'.
+   * Se muestra badge "DEMO" cuando es demo. La detección de desfase SLX
+   * se desactiva automáticamente para datos demo.
+   */
+  dataSource?: 'firestore' | 'demo' | 'none'
 }
 
 // ============================================================================
@@ -752,6 +758,7 @@ export function UpstreamMachinesPanel({
   shiftWindow = null,
   pauses = [],
   plantSlug = 'chonchi',
+  dataSource = 'none',
 }: Props) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed)
   const [expandedMachines, setExpandedMachines] = useState<Set<string>>(new Set())
@@ -789,13 +796,15 @@ export function UpstreamMachinesPanel({
   // de windowStart, el doc Firestore tiene datos de otro turno (bug CF).
   // Threshold 6h: datos correctos tienen gap ~3h (wall-clock-as-UTC vs UTC real
   // en Chile UTC-3). Datos erróneos tienen >10h de gap (turno equivocado).
+  // No aplica a datos demo — esos tienen timestamps fijos intencionalmente.
   const slxWindowMismatch = useMemo(() => {
+    if (dataSource === 'demo') return null
     if (!snapshot || snapshot.machines.length === 0 || !windowStart) return null
     const m = snapshot.machines[0]!
     const gapHours = Math.abs(m.shiftStart.getTime() - windowStart.getTime()) / 3_600_000
     if (gapHours <= 6) return null
     return { actualStart: m.shiftStart, actualEnd: m.shiftEnd }
-  }, [snapshot, windowStart])
+  }, [dataSource, snapshot, windowStart])
 
   // Cuando hay desfase, los charts usan su propio rango (auto-scale)
   // para que el supervisor pueda ver los datos aunque no correspondan al turno.
@@ -869,6 +878,15 @@ export function UpstreamMachinesPanel({
             {snapshot && (
               <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-violet-900/60 text-violet-400">
                 {snapshot.machines.length} máquinas
+              </Badge>
+            )}
+            {dataSource === 'demo' && (
+              <Badge
+                variant="outline"
+                className="text-[10px] px-1.5 py-0 h-4 border-amber-700/60 text-amber-400 bg-amber-950/30"
+                title="Datos sintéticos de demostración — no hay datos reales de Shoplogix para este turno en Firestore"
+              >
+                DEMO
               </Badge>
             )}
           </button>
