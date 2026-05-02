@@ -4,6 +4,7 @@ import {
   Settings,
   Users,
   Bell,
+  BellOff,
   Shield,
   Save,
   Plus,
@@ -62,6 +63,7 @@ import { cn } from '@/lib/utils'
 import { initializeHierarchySystem, isHierarchyInitialized } from '../services/hierarchyInit'
 import { getHmiTooltipPwd, saveHmiTooltipPwd } from '@/services/hmiKnuro'
 import { NotificationsSettings as NotificationsPushSettings } from '@/components/settings/NotificationsSettings'
+import { ProcessNotificationsPanel } from '@/components/settings/ProcessNotificationsPanel'
 import { CategoryManager } from '@/components/repuestos/CategoryManager'
 import { PermissionsPage } from '@/pages/admin/PermissionsPage'
 import { AriaMonitorPanel } from '@/components/admin/AriaMonitorPanel'
@@ -284,6 +286,7 @@ function GeneralSettings() {
 function UsersSettings() {
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
+  const [expandedNotifUserId, setExpandedNotifUserId] = useState<string | null>(null)
 
   const [createUid, setCreateUid] = useState('')
   const [createEmail, setCreateEmail] = useState('')
@@ -454,8 +457,8 @@ function UsersSettings() {
         <CardContent>
         <div className="divide-y divide-border">
           {users.map((u) => (
+            <div key={u.id}>
             <div
-              key={u.id}
               className="py-4 flex items-center justify-between gap-4"
             >
               <div className="flex-1 min-w-0">
@@ -491,11 +494,31 @@ function UsersSettings() {
                   </SelectContent>
                 </Select>
 
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  title="Preferencias de notificación"
+                  onClick={() => setExpandedNotifUserId(expandedNotifUserId === u.id ? null : u.id)}
+                >
+                  {expandedNotifUserId === u.id
+                    ? <BellOff className="h-4 w-4" />
+                    : <Bell className="h-4 w-4 text-muted-foreground" />
+                  }
+                </Button>
+
                 <Switch
                   checked={u.activo}
                   onCheckedChange={() => handleToggleActive(u.id, u.activo)}
                 />
               </div>
+            </div>
+
+            {/* Panel de preferencias de notificación expandible */}
+            {expandedNotifUserId === u.id && (
+              <div className="pb-3 pl-1">
+                <ProcessNotificationsPanel userId={u.id} />
+              </div>
+            )}
             </div>
           ))}
         </div>

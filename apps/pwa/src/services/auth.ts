@@ -48,6 +48,7 @@ export async function signIn(email: string, password: string): Promise<User> {
     await firebaseSignOut(auth)
     throw new Error('Usuario desactivado. Contacte al administrador.')
   }
+  ensureDefaultNotificationPrefs(user.id).catch(() => {})
   return user
 }
 
@@ -124,13 +125,14 @@ async function signInWithGoogleToken(idToken: string): Promise<User> {
       await firebaseSignOut(auth)
       throw new Error('Usuario desactivado. Contacte al administrador.')
     }
+    ensureDefaultNotificationPrefs(firebaseUser.uid).catch(() => {})
     return user
   }
   // Usuario nuevo - crear perfil
   const nombres = firebaseUser.displayName?.split(' ') || ['', '']
   const nombre = nombres[0] || ''
   const apellido = nombres.slice(1).join(' ') || ''
-  
+
   const newUser: User = {
     id: firebaseUser.uid,
     email: firebaseUser.email || '',
@@ -143,11 +145,12 @@ async function signInWithGoogleToken(idToken: string): Promise<User> {
     updatedAt: new Date(),
     authProvider: 'google',
   }
-  
+
   await setDoc(doc(db, 'users', firebaseUser.uid), {
     ...newUser,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
+    notificationPrefs: { processStarted: { chonchi: true, yal: true } },
   })
 
   return newUser
@@ -191,6 +194,7 @@ export async function signUpWithInviteCode(
     ...userData,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
+    notificationPrefs: { processStarted: { chonchi: true, yal: true } },
   })
 
   // Incrementar usos del código
@@ -372,6 +376,25 @@ function generateInviteCode(): string {
     code += chars.charAt(Math.floor(Math.random() * chars.length))
   }
   return code
+}
+
+/**
+ * Garantiza que el doc del usuario tenga notificationPrefs con valores por defecto.
+ * Llama fire-and-forget — nunca bloquea el login.
+ */
+export async function ensureDefaultNotificationPrefs(userId: string): Promise<void> {
+  try {
+    const snap = await getDoc(doc(db, 'users', userId))
+    if (!snap.exists()) return
+    if (snap.data().notificationPrefs) return          // ya tiene prefs, no tocar
+    await updateDoc(doc(db, 'users', userId), {
+      notificationPrefs: {
+        processStarted: { chonchi: true, yal: true },
+      },
+    })
+  } catch {
+    // No crítico — el usuario puede configurarlas desde Settings
+  }
 }
 
 // Escuchar cambios en el estado de autenticación

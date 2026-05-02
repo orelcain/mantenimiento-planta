@@ -10,6 +10,7 @@ import { useNotifications } from '@/hooks/useNotifications'
 import { useIsAdmin } from '@/store'
 import { sendTestNotification } from '@/services/test-notifications'
 import { logger } from '@/lib/logger'
+import { ProcessNotificationsPanel } from './ProcessNotificationsPanel'
 
 export function NotificationsSettings() {
   const {
@@ -62,6 +63,7 @@ export function NotificationsSettings() {
   }
 
   return (
+    <div className="space-y-4">
     <Card>
       <CardContent className="p-6 space-y-4">
         <div className="flex items-center justify-between">
@@ -199,5 +201,9 @@ export function NotificationsSettings() {
         </p>
       </CardContent>
     </Card>
+
+    {/* Preferencias por tipo de aviso */}
+    <ProcessNotificationsPanel />
+    </div>
   )
 }

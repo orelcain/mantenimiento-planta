@@ -298,6 +298,7 @@ export enum NotificationType {
   INCIDENT_REJECTED = 'incident_rejected',
   INCIDENT_CLOSED = 'incident_closed',
   MAINTENANCE_DUE = 'maintenance_due',
+  PROCESS_STARTED = 'process_started',
 }
 
 /**
@@ -334,6 +335,11 @@ export function getNotificationConfig(type: NotificationType, data: any): { titl
       return {
         title: '⏰ Mantenimiento pendiente',
         body: `${data.equipmentName} requiere mantenimiento preventivo`,
+      }
+    case NotificationType.PROCESS_STARTED:
+      return {
+        title: `🟢 Proceso iniciado · ${data.plantLabel || data.plant || 'Planta'}`,
+        body: data.shiftId ? `${data.shiftId} ha arrancado` : 'Proceso productivo iniciado',
       }
     default:
       return {

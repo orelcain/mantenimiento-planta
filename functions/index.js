@@ -3666,3 +3666,56 @@ exports.shoplogixProbe = onRequest(
   },
 )
 
+// ── Notificación automática de inicio de proceso ──────────────────────────────
+// Se dispara cuando syncDay detecta el primer turno del día y crea el doc
+// shoplogix/{plant}/shifts/{dateKey}_{shiftId}. La idempotencia viene gratis:
+// onDocumentCreated solo dispara una vez por creación de doc.
+
+exports.onShoplogixShiftStarted = onDocumentCreated(
+  { document: 'shoplogix/{plant}/shifts/{shiftDoc}', region: 'us-central1' },
+  async (event) => {
+    const plant    = event.params.plant    // 'chonchi' | 'yal'
+    const shiftDoc = event.params.shiftDoc // '2026-05-02_Turno 2'
+    const data     = event.data?.data() || {}
+
+    const shiftId    = data.shiftId || shiftDoc.split('_').slice(1).join('_')
+    const plantLabel = plant === 'chonchi' ? 'Chonchi' : plant === 'yal' ? 'Yal' : plant
+
+    logger.info(`[onShoplogixShiftStarted] ${plant} ${shiftId}`)
+
+    // Usuarios activos con preferencia habilitada (undefined = ON por defecto)
+    const usersSnap = await db.collection('users').where('activo', '==', true).get()
+    const eligibleIds = []
+    usersSnap.forEach((d) => {
+      const prefs = d.data().notificationPrefs?.processStarted
+      const wantsThis = prefs ? prefs[plant] !== false : true
+      if (wantsThis) eligibleIds.push(d.id)
+    })
+
+    if (eligibleIds.length === 0) {
+      logger.info(`[onShoplogixShiftStarted] Sin usuarios elegibles para ${plant}`)
+      return
+    }
+
+    const tokens = await getTokensForUsers(eligibleIds)
+    if (tokens.length === 0) {
+      logger.info(`[onShoplogixShiftStarted] Sin tokens FCM para ${plant}`)
+      return
+    }
+
+    const title = `🟢 Proceso iniciado · ${plantLabel}`
+    const body  = `${shiftId} ha arrancado`
+
+    await sendNotification(tokens, title, body, {
+      type:    'process_started',
+      plant,
+      shiftId,
+      url:     '/turno',
+    })
+
+    logger.info(`[onShoplogixShiftStarted] Notif enviada`, {
+      plant, shiftId, eligible: eligibleIds.length, tokens: tokens.length,
+    })
+  },
+)
+
