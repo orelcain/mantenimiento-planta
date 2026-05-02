@@ -53,7 +53,7 @@ import { DayComparisonModal } from './DayComparisonModal'
 import { useAuthStore } from '@/store'
 import { useGraderSelectionStore } from '@/store/graderSelectionStore'
 import { p0StatusFromPct, p0StatusColor, DEFAULT_P0_ALERT_PCT, DEFAULT_P0_CRITICAL_PCT, type P0Status } from '@/services/grader/graderP0Thresholds'
-import { loadShoplogixShift, listShoplogixShiftDocIdsForMonth } from '@/services/shoplogix/shoplogixShift.service'
+import { loadShoplogixShift, listShoplogixShiftDocIdsForMonth, subscribeShoplogixShift } from '@/services/shoplogix/shoplogixShift.service'
 import type { MachineTrendPoint } from '@/services/shoplogix/shoplogixShift.service'
 import type { UpstreamMachineState } from '@/services/shoplogix/types'
 import {
@@ -1536,6 +1536,67 @@ export function GraderHistoricalCalendar({
       cancelled = true
       if (retryTimer !== null) clearTimeout(retryTimer)
     }
+  }, [currentMonth, plantSlug]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Listener en tiempo real para el turno activo del mes actual.
+  // Detecta cuando Shoplogix empieza a registrar la primera pieza y actualiza el calendario.
+  // Solo activo cuando el mes visualizado ES el mes corriente.
+  useEffect(() => {
+    const now = new Date()
+    if (now.getFullYear() !== currentMonth.getFullYear() || now.getMonth() !== currentMonth.getMonth()) return
+
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const todayKey = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+    const yest = new Date(now.getTime() - 86_400_000)
+    const yesterdayKey = `${yest.getFullYear()}-${pad(yest.getMonth() + 1)}-${pad(yest.getDate())}`
+
+    // Hoy: Turno 1, 2, día, noche. Ayer: Turno 3 y variantes que cruzan medianoche.
+    const candidates: Array<{ dk: string; shiftId: string }> = [
+      { dk: todayKey,     shiftId: 'Turno 1' },
+      { dk: todayKey,     shiftId: 'Turno 2' },
+      { dk: todayKey,     shiftId: 'Turno día' },
+      { dk: todayKey,     shiftId: 'Turno noche' },
+      { dk: yesterdayKey, shiftId: 'Turno 3' },
+      { dk: yesterdayKey, shiftId: 'Turno 3*' },
+      { dk: yesterdayKey, shiftId: 'Turno noche' },
+    ]
+
+    const unsubs = candidates.map(({ dk, shiftId }) => {
+      const key = `${dk}__${shiftId}`
+      return subscribeShoplogixShift(dk, shiftId, plantSlug, (result) => {
+        const mAll   = result.snapshot?.machines ?? []
+        const cycles = mAll.reduce((a, m) => a + (m.totalCycles || 0), 0)
+        if (cycles === 0) return
+
+        const m0 = mAll[0]
+        const avgShiftRuntime = mAll.length > 0
+          ? mAll.reduce((s, m) => s + (m.shiftRuntime ?? 0), 0) / mAll.length
+          : 0
+        const cache: SlxShiftCache = {
+          states:         m0?.states         ?? [],
+          shiftStart:     m0?.shiftStart     ?? null,
+          shiftEnd:       m0?.shiftEnd       ?? null,
+          scheduledStart: m0?.scheduledStart ?? m0?.shiftStart ?? null,
+          scheduledEnd:   m0?.scheduledEnd   ?? m0?.shiftEnd   ?? null,
+          shiftRuntime:   m0?.shiftRuntime   ?? 0,
+          avgShiftRuntime,
+          overallRatio:   m0?.overallRatio   ?? 0,
+          totalCycles:    cycles,
+          breakdown: m0?.shiftRuntimeBreakdown ? {
+            uptimeSec:          m0.shiftRuntimeBreakdown.uptimeSec,
+            breakSec:           m0.shiftRuntimeBreakdown.breakSec,
+            downtimeSec:        m0.shiftRuntimeBreakdown.downtimeSec,
+            setupSec:           m0.shiftRuntimeBreakdown.setupSec,
+            plannedDowntimeSec: m0.shiftRuntimeBreakdown.plannedDowntimeSec,
+            totalTrackedSec:    m0.shiftRuntimeBreakdown.totalTrackedSec,
+          } : null,
+        }
+        setSlxByShift(prev       => new Map(prev).set(key, cache))
+        setSlxTotalsByShift(prev => new Map(prev).set(key, cycles))
+      })
+    })
+
+    return () => { unsubs.forEach(u => u()) }
   }, [currentMonth, plantSlug]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Stats mensuales Shoplogix — calcula solo para el mes visible.
