@@ -186,34 +186,38 @@ function renderShiftChip(
   const activeColor = view === 'uptime' ? colorByUptime : colorByP0
 
   if (chip.role === 'orphan-source') {
+    // Turno programado sin actividad real en este día — toda la carga fue al día siguiente.
+    // Se muestra como indicador mínimo sin caja, para no ocupar espacio ni confundir.
+    const targetDay = chip.primaryDateKey?.slice(8) ?? '--'
     return (
       <div
         key={key}
-        title={`Turno ${chip.shiftId.toLowerCase()} programado pero sin actividad este día. Detalle en ${chip.primaryDateKey ?? 'otro día'}.`}
-        className="flex items-center justify-between rounded px-1 py-px leading-none bg-indigo-500/15 text-indigo-300 border border-indigo-500/25"
+        title={`${chip.shiftId} sin actividad este día — el turno continuó en día ${targetDay}`}
+        className="flex items-center justify-end leading-none opacity-30"
+        style={{ height: '11px' }}
       >
-        <span className="text-[8px] font-medium line-through opacity-80">{baseLetter}⌧</span>
-        <span className="text-[8px] tabular-nums opacity-90">→ {chip.primaryDateKey?.slice(8) ?? '--'}</span>
+        <span className="text-[7px] text-muted-foreground tabular-nums">↷ {targetDay}</span>
       </div>
     )
   }
 
   if (chip.role === 'secondary') {
-    // Chip chico atenuado: % del fragmento — siempre muestra fragment%, independiente de vista.
-    // OCULTO en mobile (<640px) para reducir densidad.
+    // Turno que CRUZA a mañana: la madrugada del día siguiente tiene la carga real.
+    // Se muestra como indicador de "sale hacia mañana" (→) en lugar de valor numérico
+    // para no confundirse con P0% o piezas. Oculto en mobile.
     const pct = chip.pctOfShift != null ? Math.round(chip.pctOfShift) : 0
     return (
       <div
         key={key}
-        title={`${chip.shiftId} ${chip.shiftDateKey} → este día aportó ${pct}% de la carga (P0% del turno completo: ${p0.toFixed(1)}%)`}
+        title={`${chip.shiftId} ${chip.shiftDateKey} — solo ${pct}% de la carga fue hoy; el resto continúa mañana como Madrugada (P0% del turno completo: ${p0.toFixed(1)}%)`}
         className={cn(
-          'hidden sm:flex items-center justify-between rounded px-1 leading-none opacity-60 hover:opacity-100 transition-opacity',
+          'hidden sm:flex items-center justify-between rounded-sm px-1 leading-none opacity-40 hover:opacity-70 transition-opacity border border-dashed',
           activeColor,
         )}
-        style={{ paddingTop: 0, paddingBottom: 0, height: '13px' }}
+        style={{ paddingTop: 0, paddingBottom: 0, height: '13px', borderColor: 'currentColor' }}
       >
-        <span className="text-[8px] font-medium opacity-80">{label}</span>
-        <span className="text-[8px] font-semibold tabular-nums">{pct}%</span>
+        <span className="text-[8px] font-medium">{label}</span>
+        <span className="text-[8px]">→</span>
       </div>
     )
   }
@@ -230,10 +234,10 @@ function renderShiftChip(
     <div
       key={key}
       title={chip.direction === 'enters'
-        ? `Turno ${chip.shiftId.toLowerCase()} arrancó ${chip.shiftDateKey}, aportó ${Math.round(chip.pctOfShift ?? 100)}% en este día (madrugada).`
+        ? `${chip.shiftId} arrancó ${chip.shiftDateKey} — este día recibió ${Math.round(chip.pctOfShift ?? 100)}% de la carga (madrugada)`
         : chip.direction === 'exits'
-          ? `Turno ${chip.shiftId.toLowerCase()} arranca este día, ${Math.round(chip.pctOfShift ?? 100)}% de su carga aquí.`
-          : `Turno ${chip.shiftId.toLowerCase()} de este día.`}
+          ? `${chip.shiftId} arranca este día — ${Math.round(chip.pctOfShift ?? 100)}% de su carga fue aquí, el resto continúa mañana`
+          : `${chip.shiftId} de este día`}
       className={cn('flex items-center justify-between rounded px-1 py-px leading-none', activeColor)}
     >
       <span className="text-[8px] font-medium opacity-70">{label}</span>
