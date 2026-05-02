@@ -497,7 +497,7 @@ export function subscribeShoplogixShiftAuto(
 }
 
 /** Shift IDs que puede devolver Shoplogix — en orden cronológico dentro de un día. */
-const CANDIDATE_SHIFT_IDS: string[] = ['Turno 1', 'Turno 2', 'Turno 3', 'Turno día', 'Turno noche']
+const CANDIDATE_SHIFT_IDS: string[] = ['Turno 1', 'Turno 2', 'Turno 3', 'Turno día', 'Turno noche', 'Unscheduled']
 
 /**
  * Devuelve los IDs de documentos shift que existen en Firestore para un mes completo.

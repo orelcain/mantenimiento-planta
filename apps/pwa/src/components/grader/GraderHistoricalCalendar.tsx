@@ -53,7 +53,7 @@ import { DayComparisonModal } from './DayComparisonModal'
 import { useAuthStore } from '@/store'
 import { useGraderSelectionStore } from '@/store/graderSelectionStore'
 import { p0StatusFromPct, p0StatusColor, DEFAULT_P0_ALERT_PCT, DEFAULT_P0_CRITICAL_PCT, type P0Status } from '@/services/grader/graderP0Thresholds'
-import { loadShoplogixShift, listShoplogixShiftDocIdsForMonth, subscribeShoplogixShift } from '@/services/shoplogix/shoplogixShift.service'
+import { loadShoplogixShift, listShoplogixShiftDocIdsForMonth, subscribeShoplogixShiftAuto, GRADER_TO_SLX_SHIFT_CANDIDATES } from '@/services/shoplogix/shoplogixShift.service'
 import type { MachineTrendPoint } from '@/services/shoplogix/shoplogixShift.service'
 import type { UpstreamMachineState } from '@/services/shoplogix/types'
 import {
@@ -1411,49 +1411,65 @@ export function GraderHistoricalCalendar({
       shiftRuntime: 0, avgShiftRuntime: 0, overallRatio: 0, totalCycles: 0, breakdown: null,
     }
 
-    const loadOne = (dk: string, shiftId: string, forceServer: boolean) => {
+    const loadOne = async (dk: string, shiftId: string, forceServer: boolean): Promise<number> => {
       const key = `${dk}__${shiftId}`
-      return loadShoplogixShift(dk, shiftId, plantSlug, forceServer)
-        .then((res) => {
-          if (cancelled) return 0
-          const mAll   = res.snapshot?.machines ?? []
-          const m0     = mAll[0]
-          const states = m0?.states ?? []
-          const cycles = mAll.reduce((a, mc) => a + (mc.totalCycles || 0), 0)
-          const avgShiftRuntime2 = mAll.length > 0
-            ? mAll.reduce((s, m) => s + (m.shiftRuntime ?? 0), 0) / mAll.length
-            : 0
-          const cache: SlxShiftCache = {
-            states,
-            shiftStart:     m0?.shiftStart     ?? null,
-            shiftEnd:       m0?.shiftEnd       ?? null,
-            scheduledStart: m0?.scheduledStart ?? m0?.shiftStart ?? null,
-            scheduledEnd:   m0?.scheduledEnd   ?? m0?.shiftEnd   ?? null,
-            shiftRuntime:   m0?.shiftRuntime   ?? 0,
-            avgShiftRuntime: avgShiftRuntime2,
-            overallRatio:   m0?.overallRatio   ?? 0,
-            totalCycles:    cycles,
-            breakdown: m0?.shiftRuntimeBreakdown ? {
-              uptimeSec:          m0.shiftRuntimeBreakdown.uptimeSec,
-              breakSec:           m0.shiftRuntimeBreakdown.breakSec,
-              downtimeSec:        m0.shiftRuntimeBreakdown.downtimeSec,
-              setupSec:           m0.shiftRuntimeBreakdown.setupSec,
-              plannedDowntimeSec: m0.shiftRuntimeBreakdown.plannedDowntimeSec,
-              totalTrackedSec:    m0.shiftRuntimeBreakdown.totalTrackedSec,
-            } : null,
+      const allCandidates = [shiftId, ...(GRADER_TO_SLX_SHIFT_CANDIDATES[shiftId] ?? []).filter(c => c !== shiftId)]
+
+      // Turno nombrado primero; si devuelve 0 ciclos, probar candidatos fallback (e.g. Unscheduled)
+      let resolvedRes = await loadShoplogixShift(dk, shiftId, plantSlug, forceServer).catch(() => null)
+      if (cancelled) return 0
+
+      if (resolvedRes !== null) {
+        const c = (resolvedRes.snapshot?.machines ?? []).reduce((a, m) => a + (m.totalCycles || 0), 0)
+        if (c === 0) {
+          for (const fb of allCandidates.slice(1)) {
+            if (cancelled) return 0
+            try {
+              const fbRes = await loadShoplogixShift(dk, fb, plantSlug, forceServer)
+              const fbC = (fbRes.snapshot?.machines ?? []).reduce((a, m) => a + (m.totalCycles || 0), 0)
+              if (fbC > 0) { resolvedRes = fbRes; break }
+            } catch { /* ignorar, probar siguiente */ }
           }
-          setSlxByShift((prev)       => new Map(prev).set(key, cache))
-          setSlxTotalsByShift((prev) => new Map(prev).set(key, cycles))
-          return cycles
-        })
-        .catch(() => {
-          if (!cancelled) {
-            slxMonthQueuedRef.current.delete(key)
-            setSlxByShift((prev)       => new Map(prev).set(key, EMPTY_CACHE))
-            setSlxTotalsByShift((prev) => new Map(prev).set(key, 0))
-          }
-          return 0
-        })
+        }
+      }
+
+      if (cancelled) return 0
+      if (!resolvedRes) {
+        slxMonthQueuedRef.current.delete(key)
+        setSlxByShift((prev)       => new Map(prev).set(key, EMPTY_CACHE))
+        setSlxTotalsByShift((prev) => new Map(prev).set(key, 0))
+        return 0
+      }
+
+      const mAll   = resolvedRes.snapshot?.machines ?? []
+      const m0     = mAll[0]
+      const states = m0?.states ?? []
+      const cycles = mAll.reduce((a, mc) => a + (mc.totalCycles || 0), 0)
+      const avgShiftRuntime2 = mAll.length > 0
+        ? mAll.reduce((s, m) => s + (m.shiftRuntime ?? 0), 0) / mAll.length
+        : 0
+      const cache: SlxShiftCache = {
+        states,
+        shiftStart:     m0?.shiftStart     ?? null,
+        shiftEnd:       m0?.shiftEnd       ?? null,
+        scheduledStart: m0?.scheduledStart ?? m0?.shiftStart ?? null,
+        scheduledEnd:   m0?.scheduledEnd   ?? m0?.shiftEnd   ?? null,
+        shiftRuntime:   m0?.shiftRuntime   ?? 0,
+        avgShiftRuntime: avgShiftRuntime2,
+        overallRatio:   m0?.overallRatio   ?? 0,
+        totalCycles:    cycles,
+        breakdown: m0?.shiftRuntimeBreakdown ? {
+          uptimeSec:          m0.shiftRuntimeBreakdown.uptimeSec,
+          breakSec:           m0.shiftRuntimeBreakdown.breakSec,
+          downtimeSec:        m0.shiftRuntimeBreakdown.downtimeSec,
+          setupSec:           m0.shiftRuntimeBreakdown.setupSec,
+          plannedDowntimeSec: m0.shiftRuntimeBreakdown.plannedDowntimeSec,
+          totalTrackedSec:    m0.shiftRuntimeBreakdown.totalTrackedSec,
+        } : null,
+      }
+      setSlxByShift((prev)       => new Map(prev).set(key, cache))
+      setSlxTotalsByShift((prev) => new Map(prev).set(key, cycles))
+      return cycles
     }
 
     async function run() {
@@ -1478,7 +1494,14 @@ export function GraderHistoricalCalendar({
           if (existingSet === null || existingSet.has(`${dk}_${shiftId}`)) {
             toLoad.push({ dk, dkMs, shiftId })
           } else {
-            emptyKeys.push(key)
+            // Verificar si algún candidato fallback existe (e.g. Unscheduled)
+            const hasFallback = (GRADER_TO_SLX_SHIFT_CANDIDATES[shiftId] ?? [])
+              .some(c => c !== shiftId && existingSet.has(`${dk}_${c}`))
+            if (hasFallback) {
+              toLoad.push({ dk, dkMs, shiftId })  // loadOne encontrará el fallback
+            } else {
+              emptyKeys.push(key)
+            }
           }
         }
       }
@@ -1550,20 +1573,20 @@ export function GraderHistoricalCalendar({
     const yest = new Date(now.getTime() - 86_400_000)
     const yesterdayKey = `${yest.getFullYear()}-${pad(yest.getMonth() + 1)}-${pad(yest.getDate())}`
 
-    // Hoy: Turno 1, 2, día, noche. Ayer: Turno 3 y variantes que cruzan medianoche.
-    const candidates: Array<{ dk: string; shiftId: string }> = [
+    // Suscribir a los turnos nombrados del día actual y anterior.
+    // subscribeShoplogixShiftAuto maneja la cadena de candidatos (Turno 3 → Turno 3* → Unscheduled)
+    // automáticamente, así no se necesita suscribir a Unscheduled explícitamente.
+    const liveShifts: Array<{ dk: string; shiftId: string }> = [
       { dk: todayKey,     shiftId: 'Turno 1' },
       { dk: todayKey,     shiftId: 'Turno 2' },
       { dk: todayKey,     shiftId: 'Turno día' },
-      { dk: todayKey,     shiftId: 'Turno noche' },
       { dk: yesterdayKey, shiftId: 'Turno 3' },
-      { dk: yesterdayKey, shiftId: 'Turno 3*' },
       { dk: yesterdayKey, shiftId: 'Turno noche' },
     ]
 
-    const unsubs = candidates.map(({ dk, shiftId }) => {
+    const unsubs = liveShifts.map(({ dk, shiftId }) => {
       const key = `${dk}__${shiftId}`
-      return subscribeShoplogixShift(dk, shiftId, plantSlug, (result) => {
+      return subscribeShoplogixShiftAuto(dk, shiftId, plantSlug, (result) => {
         const mAll   = result.snapshot?.machines ?? []
         const cycles = mAll.reduce((a, m) => a + (m.totalCycles || 0), 0)
         if (cycles === 0) return
