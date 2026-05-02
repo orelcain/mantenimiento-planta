@@ -961,20 +961,10 @@ export function GraderHistoricalCalendar({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate])
 
-  // Los uploads de Firestore (graderUploads) no tienen campo plantLineId todavía —
-  // no se pueden filtrar server-side por planta. Para evitar que los uploads de Chonchi
-  // contaminen la vista de Yal (auto-nav, chips en celdas), solo los cargamos para
-  // la línea por defecto. Al cambiar a Yal se vacían; al volver a Chonchi se recargan.
   useEffect(() => {
-    if (plantLineId !== DEFAULT_PLANT_LINE_ID) {
-      setUploads([])
-      setLoading(false)
-      setError(null)
-      return
-    }
     setLoading(true)
     setError(null)
-    listGraderUploads()
+    listGraderUploads(plantLineId)
       .then((list) => setUploads(normalizeUploads(list, DEFAULT_SHIFT_SCHEDULE)))
       .catch((err) => setError(err instanceof Error ? err.message : 'Error al cargar uploads'))
       .finally(() => setLoading(false))

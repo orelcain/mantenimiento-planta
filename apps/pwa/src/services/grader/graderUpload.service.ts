@@ -49,6 +49,7 @@ export async function saveGraderUpload(params: {
   inferred?: { startAt?: string; endAt?: string }
   sessionDate: string
   shiftId?: string
+  plantLineId?: string
   deviceId?: string
   createdBy: string
 }): Promise<GraderUpload> {
@@ -59,6 +60,7 @@ export async function saveGraderUpload(params: {
     inferred: params.inferred,
     sessionDate: params.sessionDate,
     shiftId: params.shiftId,
+    plantLineId: params.plantLineId,
     deviceId: params.deviceId,
     createdBy: params.createdBy,
     createdAt: new Date().toISOString(),
@@ -95,14 +97,22 @@ export async function updateGraderUpload(id: string, patch: Partial<GraderUpload
   await setDoc(doc(db, COLLECTION, id), firestoreData, { merge: true })
 }
 
-export async function listGraderUploads(max = 1000): Promise<GraderUpload[]> {
+export async function listGraderUploads(
+  plantLineId?: string,
+  max = 1000,
+): Promise<GraderUpload[]> {
   const q = query(
     collection(db, COLLECTION),
     orderBy('_createdAt', 'desc'),
     limit(max),
   )
   const snap = await getDocs(q)
-  return snap.docs.map((d) => d.data() as GraderUpload)
+  const all = snap.docs.map((d) => d.data() as GraderUpload)
+  if (!plantLineId) return all
+  // fix-on-read: docs sin plantLineId son legacy → pertenecen a chonchi-eviscerado
+  return all.filter(
+    (u) => (u.plantLineId ?? 'chonchi-eviscerado') === plantLineId,
+  )
 }
 
 export async function deleteGraderUpload(upload: GraderUpload): Promise<void> {

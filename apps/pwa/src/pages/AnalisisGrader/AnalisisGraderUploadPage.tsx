@@ -242,6 +242,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
             inferred,
             sessionDate,
             shiftId,
+            plantLineId: lineId,
             createdBy: user.id,
           })
           // Subir archivo a Storage

@@ -165,6 +165,7 @@ export interface GraderUpload {
   };
   sessionDate: string; // YYYY-MM-DD
   shiftId?: string;
+  plantLineId?: string; // fix-on-read: undefined → 'chonchi-eviscerado'
   deviceId?: string;
   createdBy: string;
   createdAt: string;
