@@ -2996,8 +2996,15 @@ export function GraderHistoricalCalendar({
                 Sin Excel cargado todavía
               </p>
               <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2">
-                {/* displayShifts: shifts del día visual (T3 viene del CF=día anterior). */}
-                {(slxDisplayShifts(selectedKey, slxByShift)).map(({ shiftId, cfDateKey, slxKey }) => {
+                {/* Chonchi: 2 turnos fijos (día/noche) con slxKey → T2/T1.
+                    Otras plantas (Yal): derivados de datos SLX (T3/T1/T2). */}
+                {(plantLineId === DEFAULT_PLANT_LINE_ID
+                  ? [
+                      { shiftId: 'Turno día',   cfDateKey: selectedKey!, slxKey: `${selectedKey}__Turno 2` },
+                      { shiftId: 'Turno noche', cfDateKey: selectedKey!, slxKey: `${selectedKey}__Turno 1` },
+                    ]
+                  : slxDisplayShifts(selectedKey, slxByShift)
+                ).map(({ shiftId, cfDateKey, slxKey }) => {
                   const hasSlx = (slxByShift.get(slxKey)?.states?.length ?? 0) > 0
                   const lineaQuery = plantLineId !== DEFAULT_PLANT_LINE_ID
                     ? `?linea=${encodeURIComponent(plantLineId)}`
