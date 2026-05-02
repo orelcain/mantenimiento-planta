@@ -68,7 +68,12 @@ function shiftWindow(dateKey, shiftId) {
 
 /**
  * Deriva turnos reales desde el campo `shift` de los intervalos de producción.
- * Descarta "Unscheduled". Retorna array ordenado por scheduledStart.
+ * Retorna array ordenado por scheduledStart.
+ *
+ * Política: respetar lo que Shoplogix emite — incluye "Unscheduled" como un
+ * "turno" más. Caso real Yal 2026-05-01: 624 cycles de producción real estaban
+ * en intervals etiquetados "Unscheduled" mientras los turnos labeled tenían
+ * 0 cycles. Si filtrábamos Unscheduled, descartábamos toda la producción.
  *
  * @param {Array} machineProductionResponses — array de objetos raw de la API
  *   (uno por máquina), cada uno con `.machineProduction[]`.
@@ -81,7 +86,7 @@ function deriveShiftGroups(machineProductionResponses) {
 
   const perShift = {}
   for (const iv of firstWithIntervals.machineProduction) {
-    if (!iv.shift || iv.shift === 'Unscheduled') continue
+    if (!iv.shift) continue          // sin etiqueta = no hay turno, descartable
     if (!perShift[iv.shift]) {
       perShift[iv.shift] = { first: iv, last: iv }
     } else {
