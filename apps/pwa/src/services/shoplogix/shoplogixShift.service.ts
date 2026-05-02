@@ -415,13 +415,14 @@ export async function loadShoplogixShift(
  * fallback, la UI mostraba "Sin datos" aunque hubiera producción.
  */
 export const GRADER_TO_SLX_SHIFT_CANDIDATES: Record<string, string[]> = {
-  // Chonchi (Grader labels)
-  'Turno día':   ['Turno 2', 'Turno día',   'Unscheduled'],
-  'Turno noche': ['Turno 3', 'Turno 1',     'Turno noche', 'Unscheduled'],
-  // Yal (3 turnos + variantes con asterisco)
-  'Turno 1':     ['Turno 1', 'Turno 1*',    'Unscheduled'],
-  'Turno 2':     ['Turno 2', 'Turno 2*',    'Unscheduled'],
-  'Turno 3':     ['Turno 3', 'Turno 3*',    'Unscheduled'],
+  // Chonchi (Grader labels nativos): solo el doc exacto, sin cruzar a Yal.
+  // Evita doble-conteo: 'Turno noche' no debe pisar 'Turno 3'/'Unscheduled' de Yal.
+  'Turno día':   ['Turno día'],
+  'Turno noche': ['Turno noche'],
+  // Yal (3 turnos Shoplogix + variantes asterisco)
+  'Turno 1':     ['Turno 1', 'Turno 1*'],
+  'Turno 2':     ['Turno 2', 'Turno 2*'],
+  'Turno 3':     ['Turno 3', 'Turno 3*', 'Unscheduled'],
 }
 
 /**

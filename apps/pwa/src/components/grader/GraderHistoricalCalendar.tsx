@@ -1579,6 +1579,7 @@ export function GraderHistoricalCalendar({
     const liveShifts: Array<{ dk: string; shiftId: string }> = [
       { dk: todayKey,     shiftId: 'Turno 1' },
       { dk: todayKey,     shiftId: 'Turno 2' },
+      { dk: todayKey,     shiftId: 'Turno 3' },      // Yal: Turno 3* puede quedar bajo hoy si sync corrió de madrugada
       { dk: todayKey,     shiftId: 'Turno día' },
       { dk: yesterdayKey, shiftId: 'Turno 3' },
       { dk: yesterdayKey, shiftId: 'Turno noche' },
