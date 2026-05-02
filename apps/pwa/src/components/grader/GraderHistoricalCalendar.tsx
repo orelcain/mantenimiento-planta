@@ -2613,7 +2613,7 @@ export function GraderHistoricalCalendar({
 
                   {/* Per-shift chips (Camino 2-B refinado: primary/secondary/orphan-source) */}
                   {chipsForDay
-                    .filter((chip) => chip.role !== 'secondary')
+                    .filter((chip) => chip.role === 'primary')
                     .map((chip) => renderShiftChip(chip, filterUntagged ? (untaggedCounts.get(chip.summaryId) ?? null) : null, calendarView, slxByShift))}
 
                   {/* Chips Shoplogix para días sin datos Grader — clicables → TurnoPage */}
