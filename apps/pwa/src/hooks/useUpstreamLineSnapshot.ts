@@ -14,7 +14,7 @@
 import { useState, useEffect } from 'react'
 import type { UpstreamLineSnapshot } from '@/services/shoplogix/types'
 import { buildDemoLineSnapshot } from '@/services/shoplogix/shoplogixDemoData'
-import { subscribeShoplogixShift } from '@/services/shoplogix/shoplogixShift.service'
+import { subscribeShoplogixShiftAuto } from '@/services/shoplogix/shoplogixShift.service'
 import type { PlantSlug } from '@/services/shoplogix/shoplogixMachines'
 import { logger } from '@/lib/logger'
 
@@ -66,7 +66,7 @@ export function useUpstreamLineSnapshot(
     // Suscripción en tiempo real: el hook se actualiza automáticamente cada
     // vez que el Cloud Function escribe a Firestore (cada ~5 min en turno activo).
     // onSnapshot devuelve `unsubscribe`, que React llama en el cleanup.
-    const unsubscribe = subscribeShoplogixShift(
+    const unsubscribe = subscribeShoplogixShiftAuto(
       dateKey,
       shiftId,
       plantSlug,

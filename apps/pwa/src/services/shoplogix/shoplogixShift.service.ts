@@ -399,6 +399,86 @@ export async function loadShoplogixShift(
   return { snapshot, syncedAt }
 }
 
+/**
+ * Mapeo de labels del Grader → IDs reales que escribe el CF de Shoplogix.
+ *
+ * El CF escribe con los IDs que devuelve la API de Shoplogix ("Turno 1/2/3").
+ * El Grader usa "Turno día" y "Turno noche". Para que el panel de upstream
+ * funcione cuando arranquen las máquinas en temporada alta, intentamos los
+ * candidatos en orden hasta encontrar datos reales en Firestore.
+ *
+ * Prioridad:
+ *   Turno día   → Turno 2 primero (Shoplogix noon shift), luego el label nativo
+ *   Turno noche → Turno 3 primero (Shoplogix night shift), luego Turno 1 (si solo hay un turno)
+ */
+export const GRADER_TO_SLX_SHIFT_CANDIDATES: Record<string, string[]> = {
+  'Turno día':   ['Turno 2', 'Turno día'],
+  'Turno noche': ['Turno 3', 'Turno 1', 'Turno noche'],
+}
+
+/**
+ * Suscripción con fallback automático de shiftId.
+ *
+ * Intenta candidatos en orden hasta encontrar datos en Firestore.
+ * Cuando el primero que tiene datos recibe una actualización, la propaga
+ * al caller. Descarta el listener del candidato vacío al pasar al siguiente.
+ *
+ * Caso de uso principal: el Grader consulta "Turno noche" pero el CF escribe
+ * "Turno 3". Esta función prueba ambos y usa el que tenga datos.
+ *
+ * @returns función unsubscribe (limpia el listener activo en ese momento)
+ */
+export function subscribeShoplogixShiftAuto(
+  dateKey: string,
+  shiftId: string,
+  plantSlug: PlantSlug = 'chonchi',
+  onUpdate: (result: LoadShoplogixShiftResult) => void,
+): () => void {
+  const candidates = GRADER_TO_SLX_SHIFT_CANDIDATES[shiftId] ?? [shiftId]
+  let currentUnsub: (() => void) | null = null
+  let active = true
+  let settled = false    // true cuando ya encontramos datos reales
+
+  function tryCandidate(idx: number): void {
+    if (!active || idx >= candidates.length) {
+      // Todos los candidatos agotados sin datos → el hook hará fallback demo
+      if (active) onUpdate({ snapshot: null, syncedAt: null })
+      return
+    }
+
+    const candidateId = candidates[idx]!
+    currentUnsub = subscribeShoplogixShift(dateKey, candidateId, plantSlug, (result) => {
+      if (!active) return
+
+      if (result.snapshot !== null) {
+        // Encontramos datos reales — de ahora en adelante propagamos todo de este candidato
+        settled = true
+        onUpdate(result)
+        return
+      }
+
+      // Snapshot vacío: si aún no hemos encontrado datos, probar siguiente candidato
+      if (!settled) {
+        currentUnsub?.()
+        currentUnsub = null
+        tryCandidate(idx + 1)
+        return
+      }
+
+      // Ya estábamos en un candidato con datos y ahora llegó vacío (turno terminó /
+      // limpieza de Firestore) → propagar el vacío al caller
+      onUpdate(result)
+    })
+  }
+
+  tryCandidate(0)
+
+  return () => {
+    active = false
+    currentUnsub?.()
+  }
+}
+
 /** Shift IDs que puede devolver Shoplogix — en orden cronológico dentro de un día. */
 const CANDIDATE_SHIFT_IDS: string[] = ['Turno 1', 'Turno 2', 'Turno 3', 'Turno día', 'Turno noche']
 
