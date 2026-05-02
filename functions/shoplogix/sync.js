@@ -98,12 +98,26 @@ function deriveShiftGroups(machineProductionResponses) {
     .sort((a, b) => a.scheduledStart.getTime() - b.scheduledStart.getTime())
 }
 
-/** Determina el dateKey de "hoy" en Chile (UTC-3 fijo). */
+/**
+ * Determina el dateKey para el sync actual.
+ *
+ * Ancla en 08:00 Chile (igual que fullDayWindow): si son las 00:00-07:59
+ * Chile, el "día de sync" es ayer. Esto garantiza que turnos que cruzan
+ * medianoche (Yal Turno 3: 22:00→06:15) caigan en la ventana correcta.
+ * Sin este ajuste, a las 02:00 Chile se intentaría sincronizar "hoy" cuya
+ * ventana empieza en 08:00 → los intervalos del Turno 3 (23:00-06:15)
+ * quedarían fuera de la ventana y el turno aparecería vacío.
+ */
 function currentDateKey(now = new Date()) {
   const chileNow = new Date(now.getTime() - 3 * 3600 * 1000)
-  const y = chileNow.getUTCFullYear()
-  const m = String(chileNow.getUTCMonth() + 1).padStart(2, '0')
-  const d = String(chileNow.getUTCDate()).padStart(2, '0')
+  const minutesOfDay = chileNow.getUTCHours() * 60 + chileNow.getUTCMinutes()
+  // Antes de las 08:00 Chile → el "día de sync" es el día anterior
+  const dateRef = minutesOfDay < 8 * 60
+    ? new Date(chileNow.getTime() - 24 * 3600 * 1000)
+    : chileNow
+  const y = dateRef.getUTCFullYear()
+  const m = String(dateRef.getUTCMonth() + 1).padStart(2, '0')
+  const d = String(dateRef.getUTCDate()).padStart(2, '0')
   return `${y}-${m}-${d}`
 }
 
