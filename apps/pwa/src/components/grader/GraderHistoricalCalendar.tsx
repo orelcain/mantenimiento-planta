@@ -931,6 +931,8 @@ export function GraderHistoricalCalendar({
   const [shiftSchedule, setShiftSchedule] = useState(() => plantLine.defaultShiftSchedule ?? DEFAULT_SHIFT_SCHEDULE)
   const [historicalByDate, setHistoricalByDate] = useState<Map<string, GraderDailySummary[]>>(new Map())
   const [allSummariesRaw, setAllSummariesRaw] = useState<GraderDailySummary[]>([])
+  // Máximo día visual con registros conocidos — se actualiza al cargar cada mes.
+  const [latestRecordKey, setLatestRecordKey] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   // Counts de cambios manuales de gate por shiftDocId (lazy-loaded al seleccionar un día)
   const [configChangeCounts, setConfigChangeCounts] = useState<Map<string, number>>(new Map())
@@ -1021,6 +1023,11 @@ export function GraderHistoricalCalendar({
         setHistoricalByDate(map)
         setAllSummariesRaw(list)
         onSummariesLoaded?.(list)
+        // Mantener el máximo día visual conocido (para botón "Último")
+        if (map.size > 0) {
+          const monthMax = Array.from(map.keys()).sort().slice(-1)[0]!
+          setLatestRecordKey((prev) => (!prev || monthMax > prev) ? monthMax : prev)
+        }
 
         // Si el mes actual no tiene datos y no hay initialDateKey, buscar el último mes con datos
         if (list.length === 0 && !effectiveInitialKey && !autoSelectedRef.current) {
@@ -1736,6 +1743,19 @@ export function GraderHistoricalCalendar({
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))
   }
 
+  const handleGoToToday = () => {
+    const today = new Date()
+    setCurrentMonth(new Date(today.getFullYear(), today.getMonth(), 1))
+    setSelectedDate(today)
+  }
+
+  const handleGoToLastRecord = () => {
+    if (!latestRecordKey) return
+    const d = new Date(`${latestRecordKey}T00:00:00`)
+    setCurrentMonth(new Date(d.getFullYear(), d.getMonth(), 1))
+    setSelectedDate(d)
+  }
+
   const handleLoadTurno = (dateKey: string, shiftId: string) => {
     if (onLoadTurno) {
       onLoadTurno(dateKey, shiftId)
@@ -2426,6 +2446,21 @@ export function GraderHistoricalCalendar({
             <Button variant="outline" size="icon" onClick={handleNextMonth}>
               <ChevronRight className="h-4 w-4" />
             </Button>
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground" onClick={handleGoToToday}>
+                Hoy
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground disabled:opacity-30"
+                onClick={handleGoToLastRecord}
+                disabled={!latestRecordKey}
+                title={latestRecordKey ? `Último registro: ${latestRecordKey}` : 'Cargando...'}
+              >
+                Último
+              </Button>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             {/* Vista: qué métrica muestra el chip principal */}
