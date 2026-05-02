@@ -153,11 +153,8 @@ function renderShiftChip(
   slxByShift: Map<string, SlxShiftCache>,
 ): JSX.Element {
   const baseLetter = chip.shiftId === 'Turno día' ? 'D' : 'N'
-  // Madrugada (noche que entra desde ayer) → etiqueta "M", sin flecha confusa.
-  // Noche que sale (exits) → simple "N", el tooltip explica que cruza a mañana.
-  const label =
-    chip.direction === 'enters' && baseLetter === 'N' ? 'M' :
-    baseLetter
+  // Siempre D o N — el tooltip aclara si es madrugada o salida.
+  const label = baseLetter
   const key = `${chip.summaryId}-${chip.role}-${chip.renderInDateKey}`
   const p0 = chip.pointZeroPct
   const colorByP0 = p0 >= DEFAULT_P0_CRITICAL_PCT
