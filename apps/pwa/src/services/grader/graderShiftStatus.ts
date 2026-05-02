@@ -84,9 +84,9 @@ export function computeShiftTimeWindow(
 
   const endDateKey = crossesMidnight ? dateKeyPlusDays(dateKey, 1) : dateKey
 
-  // Construir fechas locales (sin sufijo Z para respetar hora local de planta)
-  const startDate = new Date(`${dateKey}T${startTimeStr}`)
-  const endDate = new Date(`${endDateKey}T${endTimeStr}`)
+  // Wall-clock-as-UTC: misma convención que Shoplogix (hora local tratada como si fuera UTC)
+  const startDate = new Date(`${dateKey}T${startTimeStr}.000Z`)
+  const endDate = new Date(`${endDateKey}T${endTimeStr}.000Z`)
 
   const startAt = startDate.toISOString()
   const endAt = endDate.toISOString()
