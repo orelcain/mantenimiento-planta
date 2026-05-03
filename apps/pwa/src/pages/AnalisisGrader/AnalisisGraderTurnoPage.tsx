@@ -512,10 +512,19 @@ export function AnalisisGraderTurnoPage() {
       }
       const sort = (ids: string[]) => [...ids].sort((a, b) => shiftRank(a) - shiftRank(b))
 
+      // "Unscheduled" en Shoplogix son intervalos sin turno asignado — generalmente
+      // ruido (0 ciclos) entre turnos. Excluido del carrusel de flechas para evitar
+      // saltos a una vista vacía. Si tiene producción real, sigue accesible vía
+      // calendario (que aplica su propio filtro <50 ciclos).
+      // Excepción: si el shift actual ES "Unscheduled" (caso raro, llegada vía link
+      // directo), lo dejamos para que el carrusel funcione desde ese punto.
+      const dropUnscheduled = (id: string) =>
+        id !== 'Unscheduled' || shiftLabel === 'Unscheduled'
+
       const flat: Array<{ dateKey: string; shiftId: string }> = [
-        ...sort(prevIds).map(s => ({ dateKey: prevKey, shiftId: s })),
-        ...sort(currIds).map(s => ({ dateKey,         shiftId: s })),
-        ...sort(nextIds).map(s => ({ dateKey: nextKey, shiftId: s })),
+        ...sort(prevIds).filter(dropUnscheduled).map(s => ({ dateKey: prevKey, shiftId: s })),
+        ...sort(currIds).filter(dropUnscheduled).map(s => ({ dateKey,         shiftId: s })),
+        ...sort(nextIds).filter(dropUnscheduled).map(s => ({ dateKey: nextKey, shiftId: s })),
       ]
       const idx = flat.findIndex(e => e.dateKey === dateKey && e.shiftId === shiftLabel)
       setAdjacentShifts(idx === -1
