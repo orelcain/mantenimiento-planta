@@ -48,7 +48,9 @@ export function useUpstreamLineSnapshot(
   plantSlug: PlantSlug = 'chonchi',
 ): UseUpstreamLineSnapshotResult {
   const [snapshot, setSnapshot] = useState<UpstreamLineSnapshot | null>(null)
-  const [loading, setLoading] = useState(false)
+  // Inicial = true cuando hay dateKey/shiftId. Evita el flash de "sin datos
+  // cargados aún" entre el primer render y el setLoading(true) del useEffect.
+  const [loading, setLoading] = useState(Boolean(dateKey && shiftId))
   const [error, setError] = useState<string | null>(null)
   const [syncedAt, setSyncedAt] = useState<Date | null>(null)
   const [source, setSource] = useState<'firestore' | 'demo' | 'none'>('none')
@@ -57,6 +59,7 @@ export function useUpstreamLineSnapshot(
     if (!dateKey || !shiftId) {
       setSnapshot(null)
       setSource('none')
+      setLoading(false)
       return
     }
 

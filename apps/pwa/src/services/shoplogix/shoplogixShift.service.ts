@@ -444,56 +444,60 @@ export function subscribeShoplogixShiftAuto(
   onUpdate: (result: LoadShoplogixShiftResult) => void,
 ): () => void {
   const candidates = GRADER_TO_SLX_SHIFT_CANDIDATES[shiftId] ?? [shiftId]
-  let currentUnsub: (() => void) | null = null
   let active = true
-  let settled = false    // true cuando ya encontramos datos reales
 
-  function tryCandidate(idx: number): void {
-    if (!active || idx >= candidates.length) {
-      // Todos los candidatos agotados sin datos → el hook hará fallback demo
-      if (active) onUpdate({ snapshot: null, syncedAt: null })
-      return
-    }
+  // Mantener subscripciones a TODOS los candidatos en paralelo. La primera que
+  // emita cycles > 0 gana y propaga; si luego cae a 0, también propaga (turno
+  // terminado / data borrada). Sólo emitimos `null` final cuando todos los
+  // candidatos hayan emitido algo y ninguno tenga data.
+  //
+  // Histórico: la versión anterior probaba candidatos secuencialmente y
+  // desuscribía al primero tras una emisión vacía. Con caché frío de Firestore
+  // (deep link recién abierto), `onSnapshot` puede emitir la caché stale primero
+  // (ej. 0 cycles) y los datos reales del servidor después — al desuscribir,
+  // perdíamos la emisión real y la UI quedaba con "sin datos cargados aún".
+  //
+  // Caso Yal Turno 3: el wrapper en paralelo permite que "Unscheduled" gane si
+  // "Turno 3"/"Turno 3*" están vacíos. Cuando alguno tenga data, ese gana.
+  const winner: { idx: number | null } = { idx: null }
+  const heard: boolean[] = candidates.map(() => false)
+  const unsubs: Array<() => void> = []
 
-    const candidateId = candidates[idx]!
-    currentUnsub = subscribeShoplogixShift(dateKey, candidateId, plantSlug, (result) => {
+  candidates.forEach((candidateId, idx) => {
+    const u = subscribeShoplogixShift(dateKey, candidateId, plantSlug, (result) => {
       if (!active) return
+      heard[idx] = true
 
-      // Considerar "tiene datos reales" si el snapshot existe Y tiene cycles > 0.
-      // Caso real Yal hoy: docs Turno 3* y Turno 2 existen con 3 máquinas pero
-      // 0 cycles cada una (Shoplogix no logró atribuir intervals). La producción
-      // real (791 cycles) está en el doc Unscheduled. Sin este check, settled
-      // se quedaba en Turno 3* (vacío) y nunca probaba Unscheduled (con data).
       const totalCycles = result.snapshot?.machines?.reduce(
         (sum, m) => sum + (m.totalCycles || 0), 0,
       ) ?? 0
       const hasRealData = result.snapshot !== null && totalCycles > 0
 
-      if (hasRealData) {
-        settled = true
+      // Si nadie ha ganado todavía y este candidato trae data → propagar y fijar ganador
+      if (winner.idx === null && hasRealData) {
+        winner.idx = idx
         onUpdate(result)
         return
       }
 
-      // Snapshot vacío o con 0 cycles: si aún no hemos encontrado datos, probar siguiente
-      if (!settled) {
-        currentUnsub?.()
-        currentUnsub = null
-        tryCandidate(idx + 1)
+      // Si este es el ganador actual, propagar updates (incluso bajadas a 0)
+      if (winner.idx === idx) {
+        onUpdate(result)
         return
       }
 
-      // Ya estábamos en un candidato con datos y ahora llegó vacío (turno terminó /
-      // limpieza de Firestore) → propagar el vacío al caller
-      onUpdate(result)
+      // Si todos los candidatos ya emitieron y nadie tiene data → emitir null
+      if (winner.idx === null && heard.every(Boolean)) {
+        onUpdate({ snapshot: null, syncedAt: null })
+      }
+      // Otros candidatos sin data: silencioso, esperar al ganador o que cambien
     })
-  }
-
-  tryCandidate(0)
+    unsubs.push(u)
+  })
 
   return () => {
     active = false
-    currentUnsub?.()
+    unsubs.forEach(u => u())
   }
 }
 
