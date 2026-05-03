@@ -76,24 +76,31 @@ messaging.onBackgroundMessage((payload) => {
   return self.registration.showNotification(notificationTitle, notificationOptions)
 })
 
-// Manejar clics en notificaciones
+// Manejar clics en notificaciones — navega a la URL profunda en lugar de
+// solo enfocar el home. El backend manda `data.url` ya construida (relativa
+// al scope), ej: `analisis-grader/turno/2026-05-03__Turno%202?linea=yal-eviscerado`.
 self.addEventListener('notificationclick', (event) => {
   console.log('[firebase-messaging-sw.js] Notification click:', event)
-  
+
   event.notification.close()
-  
-  // Navegar a la app
-  const urlToOpen = event.notification.data?.url || `${baseUrl}`
-  
+
+  const target = event.notification.data?.url || ''
+  const urlToOpen = target.startsWith('http')
+    ? target
+    : `${baseUrl}${String(target).replace(/^\/+/, '')}`
+
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // Si ya hay una ventana abierta, enfocala
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (clientList) => {
+      // Si ya hay una ventana abierta de la app, navegar y enfocar.
       for (const client of clientList) {
         if (client.url.includes(baseUrl.replace(/\/$/, '')) && 'focus' in client) {
+          if ('navigate' in client) {
+            try { await client.navigate(urlToOpen) } catch (_) { /* fallback a focus */ }
+          }
           return client.focus()
         }
       }
-      // Si no, abre una nueva ventana
+      // Sin ventana abierta — abrir una nueva en la URL específica.
       if (clients.openWindow) {
         return clients.openWindow(urlToOpen)
       }

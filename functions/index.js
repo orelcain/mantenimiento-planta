@@ -3793,12 +3793,24 @@ async function getShoplogixEligibleUsers(plant) {
 }
 
 async function dispatchShoplogixNotif(config, eligibleUserIds, title, body, data = {}, telegramMsg = null) {
+  // URL profunda al turno específico para que el click en la notificación
+  // abra la vista correcta y no solo el home de la app.
+  // shiftDoc viene como `${dateKey}_${shiftLabel}` (ej "2026-05-03_Turno 2").
+  // Ruta cliente: `analisis-grader/turno/{dateKey}__{shiftLabel}?linea={plantLineId}`
+  const shiftDoc   = String(data.shiftDoc || '')
+  const dateKey    = shiftDoc.slice(0, 10)
+  const shiftLabel = shiftDoc.slice(11)
+  const lineaId    = data.plant === 'yal' ? 'yal-eviscerado' : 'chonchi-eviscerado'
+  const url = dateKey && shiftLabel
+    ? `analisis-grader/turno/${dateKey}__${encodeURIComponent(shiftLabel)}?linea=${lineaId}`
+    : 'analisis-grader'
+
   const promises = []
   if (config.channels.push && eligibleUserIds.length > 0) {
     const tokens = await getTokensForUsers(eligibleUserIds)
     if (tokens.length > 0) {
       promises.push(
-        sendNotification(tokens, title, body, { type: 'shoplogix_event', url: '/turno', ...data })
+        sendNotification(tokens, title, body, { type: 'shoplogix_event', ...data, url })
       )
     }
   }
