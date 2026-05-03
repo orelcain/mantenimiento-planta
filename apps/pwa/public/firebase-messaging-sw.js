@@ -47,19 +47,29 @@ const baseUrl = getBaseUrl()
 const CACHE_NAME = 'assets-cache-v1'
 const HEAVY_ASSET_RE = /\.(glb|gltf|bin|jpg|jpeg|png|webp|svg)$/i
 
-// Manejar mensajes en background
+// Manejar mensajes en background.
+// El backend envía data-only (sin payload.notification) para evitar la
+// auto-display del SDK FCM que sumada a este handler producía duplicados.
+// Título y body vienen en payload.data.
 messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Received background message:', payload)
-  
-  const notificationTitle = payload.notification?.title || 'Nueva notificación'
-  
-  // Usar rutas relativas simples para evitar 404
+
+  const d = payload.data || {}
+  const notificationTitle = d.title || payload.notification?.title || 'Nueva notificación'
+
+  // Tag único por (machineId, milestone) o (incidentId) → iOS reemplaza la
+  // anterior con el mismo tag en lugar de apilarla, evitando que un mismo
+  // hito aparezca dos veces en la lock screen.
+  const tag = d.incidentId
+    || (d.machineId ? `${d.plant || ''}_${d.shiftDoc || ''}_${d.machineId}_${d.title || ''}` : null)
+    || 'general'
+
   const notificationOptions = {
-    body: payload.notification?.body || '',
+    body: d.body || payload.notification?.body || '',
     icon: './icons/icon-192.svg',
     badge: './icons/icon-192.svg',
-    tag: payload.data?.incidentId || 'general',
-    data: payload.data,
+    tag,
+    data: d,
     requireInteraction: true,
   }
 

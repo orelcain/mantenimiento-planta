@@ -243,11 +243,21 @@ async function sendNotification(tokens, title, body, data = {}) {
     return
   }
 
+  // Data-only message: evita doble notificación en Web/PWA.
+  // Si incluyéramos `notification: { title, body }`, el SDK FCM auto-muestra
+  // una notificación + nuestro SW ejecuta `onBackgroundMessage` con
+  // `showNotification` → el usuario ve la misma alerta dos veces (y tres si
+  // la app estaba en foreground y el listener llama showLocalNotification).
+  // Con data-only, la pantalla la pinta solo el SW (background) o el
+  // listener (foreground), nunca ambos.
   const payload = {
-    notification: { title, body },
     data: {
-      ...data,
+      title:     String(title || ''),
+      body:      String(body  || ''),
       timestamp: Date.now().toString(),
+      ...Object.fromEntries(
+        Object.entries(data || {}).map(([k, v]) => [k, v == null ? '' : String(v)]),
+      ),
     },
   }
 

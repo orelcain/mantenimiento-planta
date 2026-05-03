@@ -44,10 +44,13 @@ export function useNotifications() {
     let unsubscribe: (() => void) | undefined
 
     setupForegroundMessageListener((payload: MessagePayload) => {
-      // Mostrar notificación local cuando la app está en foreground
-      const { title, body } = payload.notification || {}
+      // Backend ahora envía data-only: title/body vienen en payload.data.
+      // Fallback a payload.notification por compat con mensajes antiguos.
+      const data = payload.data || {}
+      const title = (data.title as string | undefined) || payload.notification?.title
+      const body  = (data.body  as string | undefined) || payload.notification?.body
       if (title) {
-        showLocalNotification(title, { body, data: payload.data })
+        showLocalNotification(title, { body, data })
       }
     }).then((unsub) => {
       unsubscribe = unsub
