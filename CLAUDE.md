@@ -296,7 +296,10 @@ models3d (subcol: annotations)
 auditLog, trash
 ariaMissionLogs, ariaKnowledgeBase, ariaPatterns
 ett, inviteCodes, roles, mapLocations
-sidebarConfig  ← nuevo: orden personalizado del sidebar admin
+sidebarConfig
+notificationConfig  ← config notif Shoplogix por planta
+shoplogixNotifState ← dedup state por máquina-turno (solo backend)
+shoplogixShiftDelayChecks ← control alertas inicio turno (solo backend)
 ```
 
 ## Skills disponibles (.claude/skills/)
@@ -365,12 +368,59 @@ Después de cada `git push`, verificar con `gh run list --limit 5` que el workfl
 
 ## Version actual
 
-- **v2.115.0** (2026-04-17) — "feat(grader): FASE 10 — split GatesConfigPage 6 sub-componentes (2715→1200 líneas)"
+- **v3.4.7** (2026-05-03)
 - Proyecto Firebase: `mantenimiento-planta-771a3`
 - GitHub: `orelcain/mantenimiento-planta`
 - Produccion: `https://orelcain.github.io/mantenimiento-planta/`
 - CI status: 4/4 workflows 🟢
-- Seguridad: 23 colecciones Firestore validadas, 0 vulnerabilidades runtime prod
+- Seguridad: 26 colecciones Firestore validadas, 0 vulnerabilidades runtime prod
+
+## Cambios recientes (sesión 2026-05-03 — Shoplogix Notification System + dedup fix)
+
+### Sistema de notificaciones Shoplogix (Cloud Functions + Admin UI)
+
+**Commits**: `22ffca78` (feat) + `da8c98a2` (fix dedup)
+
+#### Cloud Functions (`functions/index.js`)
+
+Nuevo trigger `onShoplogixMachineUpdated` — dispara en cada actualización de `shoplogix/{plant}/shifts/{shiftDoc}/machines/{machineId}`:
+
+- **Tipos de notificación**:
+  - Primera pieza por Baader (`firstPiece.enabled`) — cuando `cyclesBefore=0 && cyclesAfter>0`
+  - Hito de piezas (`pieceInterval.enabled`, `every`) — cada N piezas multiplicadas
+  - Detención (`events.stoppage`) — cada `states[type=downtime]` nueva
+  - Micro-detención (`events.microStoppage`) — cada downtime con "micro" en nombre
+- **Canales**: FCM push (default ON) + Telegram (default OFF), configurables por planta
+- **Modificado `onShoplogixShiftStarted`**: ahora usa config y crea `shoplogixShiftDelayChecks`
+- **Nueva función `checkShiftStartDelays`** (scheduled cada 5 min): verifica turnos sin piezas después del grace period
+
+#### Fix deduplicación (race condition)
+
+**Causa raíz**: `syncDay` escribe DOS veces cada machine doc (main data + `dataQualityIssues`) → 6 invocaciones concurrentes. Eventarc puede duplicar aún más.
+
+**Fix**: `db.runTransaction()` en torno al read/write de `shoplogixNotifState` — solo 1 invocación gana el lock, las demás re-leen el estado ya actualizado y retornan `toSend=[]`.
+
+**Baseline isFirstRun**: cuando el state doc no existe, se inicializa con los contadores actuales (sin notificar) para evitar catch-up histórico al deployar mid-shift.
+
+**Resultado test 2026-05-03 21:43**: 9 invocaciones concurrentes → 1 notificación exacta (`⛔ Detención · YAL Evisceradora 3`) con `count:1`. Cero duplicados.
+
+#### Admin UI (`apps/pwa/src/`)
+
+- **`services/shoplogix/shoplogixNotifConfig.service.ts`** (NEW): tipo `ShoplogixNotifConfig` + load/save en `notificationConfig/{plantSlug}`
+- **`pages/admin/ShoplogixNotificationsConfigPage.tsx`** (NEW): tabs por planta, 5 cards de config (canales, inicio turno, primera pieza, hitos, eventos)
+- **`pages/admin/AdminPanelPage.tsx`**: item "Notificaciones Shoplogix" con icono Bell naranja
+- **`App.tsx`**: ruta `admin/notifications-shoplogix` con `AdminRoute + RequireReAuth`
+- **`firestore.rules`**: `notificationConfig` (read:auth, write:admin) + `shoplogixNotifState`, `shoplogixShiftDelayChecks` (read+write: false — solo backend)
+
+#### Nuevas colecciones Firestore
+
+| Colección | Propósito |
+|-----------|-----------|
+| `notificationConfig/{plantSlug}` | Config por planta (canales, umbrales, eventos) |
+| `shoplogixNotifState/{plant}_{shiftDoc}_{machineId}` | Estado de dedup por máquina-turno |
+| `shoplogixShiftDelayChecks/{plant}_{shiftDoc}` | Control de alertas de inicio demorado |
+
+---
 
 ## Cambios recientes (sesión 2026-04-17 tarde — Grader Producto 3 capas + motor IA sugerencias, v2.112.1 → v2.113.0)
 
