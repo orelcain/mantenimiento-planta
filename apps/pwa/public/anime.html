@@ -317,6 +317,69 @@ select.modal-input { background-image: linear-gradient(45deg, transparent 50%, v
 .card-rating { display: flex; gap: 0; align-items: center; margin-top: 4px; }
 .card-star { font-size: 13px; color: #fbbf24; opacity: .22; }
 .card-star.filled { opacity: 1; }
+
+/* ── Stats cards ──────────────────────────────────────────────────────────── */
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 0 14px 12px; }
+.stat-card { background: var(--bg2); border-radius: 10px; padding: 14px 10px; text-align: center; border: 1px solid rgba(255,255,255,.06); }
+.stat-big { font-size: 24px; font-weight: 700; color: var(--accent); line-height: 1; margin-bottom: 4px; }
+.stat-label { font-size: 11px; color: var(--hint); font-weight: 500; }
+.stats-section { padding: 12px 14px 16px; border-top: 1px solid rgba(255,255,255,.05); margin-top: 4px; }
+
+/* ── List sort + filter row ──────────────────────────────────────────────── */
+.list-tools-row { display: flex; gap: 7px; align-items: center; padding: 8px 12px; position: sticky; top: 0; background: var(--bg); z-index: 4; border-bottom: 1px solid rgba(255,255,255,.04); }
+.list-search-mini { flex: 1; padding: 7px 11px 7px 30px; background: var(--bg2); border: 1px solid rgba(255,255,255,.08); border-radius: 8px; color: var(--text); font-size: 13px; outline: none; transition: border-color .2s; min-width: 0; }
+.list-search-mini:focus { border-color: var(--accent); }
+.list-search-wrap { position: relative; flex: 1; min-width: 0; }
+.list-search-wrap .si { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); font-size: 13px; pointer-events: none; color: var(--hint); }
+.list-sort-select { background: var(--bg2); border: 1px solid rgba(255,255,255,.08); border-radius: 8px; color: var(--hint); font-size: 11.5px; padding: 7px 8px; outline: none; flex-shrink: 0; cursor: pointer; }
+
+/* ── Behind highlight ────────────────────────────────────────────────────── */
+.card.is-behind { border-left: 3px solid rgba(239,68,68,.55); padding-left: 11px; background: rgba(239,68,68,.025); }
+
+/* ── Synopsis + duration ─────────────────────────────────────────────────── */
+.synopsis-wrap { margin-top: 4px; }
+.synopsis-text { font-size: 12.5px; line-height: 1.6; color: var(--hint); }
+.synopsis-text.clamped { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.synopsis-toggle { background: none; border: none; color: var(--accent); font-size: 11px; cursor: pointer; padding: 3px 0; display: block; }
+.duration-line { font-size: 11px; color: var(--hint); margin-top: 6px; display: flex; gap: 10px; flex-wrap: wrap; }
+.duration-line span { display: inline-flex; align-items: center; gap: 3px; }
+
+/* ── Week grid (Estrenos) ────────────────────────────────────────────────── */
+.week-toggle { padding: 4px 10px; border-radius: 7px; border: 1px solid rgba(255,255,255,.1); background: none; color: var(--hint); font-size: 11px; font-weight: 600; cursor: pointer; transition: all .15s; flex-shrink: 0; white-space: nowrap; }
+.week-toggle.active { background: rgba(124,58,237,.15); color: var(--accent); border-color: rgba(124,58,237,.4); }
+.week-grid-strip { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; padding: 8px 12px 6px; border-bottom: 1px solid rgba(255,255,255,.04); }
+.wdc { background: var(--bg2); border-radius: 8px; padding: 7px 3px; text-align: center; cursor: pointer; transition: all .12s; border: 1.5px solid transparent; min-width: 0; }
+.wdc:active { opacity: .7; }
+.wdc.wdc-today { border-color: rgba(124,58,237,.4); }
+.wdc.wdc-current { background: rgba(124,58,237,.2); border-color: var(--accent); }
+.wdc-name { font-size: 9px; color: var(--hint); font-weight: 700; text-transform: uppercase; letter-spacing: .3px; }
+.wdc-date { font-size: 12px; font-weight: 700; margin: 2px 0 1px; }
+.wdc-eps { font-size: 9px; color: var(--accent); font-weight: 700; min-height: 12px; }
+.wdc-mine { font-size: 8px; color: #10b981; font-weight: 700; }
+
+/* ── Notes ───────────────────────────────────────────────────────────────── */
+.notes-display { font-size: 12.5px; line-height: 1.55; color: var(--text); background: var(--bg2); border-radius: 8px; padding: 10px 12px; margin-bottom: 6px; white-space: pre-wrap; word-break: break-word; border: 1px solid rgba(255,255,255,.05); }
+#notes-textarea { width: 100%; padding: 11px 13px; background: var(--bg); border: 1.5px solid rgba(255,255,255,.1); border-radius: 9px; color: var(--text); font-size: 13px; line-height: 1.5; outline: none; min-height: 100px; resize: vertical; transition: border-color .2s; }
+#notes-textarea:focus { border-color: var(--accent); }
+.notes-char-count { font-size: 10px; color: var(--hint); text-align: right; margin-top: 4px; }
+
+/* ── Auto-complete modal ─────────────────────────────────────────────────── */
+#complete-modal .modal-content { text-align: center; }
+.complete-emoji { font-size: 44px; line-height: 1; margin-bottom: 8px; }
+
+/* ── Swipe-to-+1 in list cards ───────────────────────────────────────────── */
+.card-wrap { position: relative; overflow: hidden; }
+.card-swipe-bg { position: absolute; left: 0; top: 0; bottom: 0; width: 72px; background: var(--accent); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: white; font-size: 10px; font-weight: 700; opacity: 0; transition: opacity .1s; pointer-events: none; }
+.card-swipe-bg .swipe-icon { font-size: 18px; line-height: 1; }
+.card { transition: transform .18s; will-change: transform; }
+.card.swiping { transition: none !important; }
+
+/* ── Season quick chip ───────────────────────────────────────────────────── */
+.season-quick-row { display: flex; gap: 6px; padding: 5px 12px 2px; overflow-x: auto; scrollbar-width: none; flex-wrap: nowrap; }
+.season-quick-row::-webkit-scrollbar { display: none; }
+.season-chip-now { display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; border-radius: 99px; background: rgba(124,58,237,.12); border: 1.5px solid rgba(124,58,237,.3); color: var(--accent); font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: all .15s; flex-shrink: 0; }
+.season-chip-now:active { background: rgba(124,58,237,.22); transform: scale(.97); }
+.season-chip-now.applied { background: var(--accent); color: var(--acctxt); border-color: var(--accent); }
 </style>
 </head>
 <body>
@@ -404,6 +467,32 @@ select.modal-input { background-image: linear-gradient(45deg, transparent 50%, v
       <button class="action-btn action-primary" onclick="saveCreateListFromModal()">Guardar</button>
     </div>
     <button class="modal-delete" id="list-modal-delete" onclick="deleteListFromModal()" style="display:none">🗑️ Eliminar lista</button>
+  </div>
+</div>
+
+<div id="complete-modal" class="modal-overlay" onclick="if(event.target===this)closeCompleteModal()">
+  <div class="modal-content">
+    <div class="complete-emoji">🎉</div>
+    <div class="modal-title">¡Lo terminaste!</div>
+    <div class="modal-sub" id="complete-modal-sub">—</div>
+    <div class="modal-actions" style="margin-top:16px">
+      <button class="action-btn action-ghost" onclick="closeCompleteModal()">Seguir en Viendo</button>
+      <button class="action-btn action-primary" onclick="confirmComplete()">✅ Mover a Completado</button>
+    </div>
+  </div>
+</div>
+
+<div id="notes-modal" class="modal-overlay" onclick="if(event.target===this)closeNotesModal()">
+  <div class="modal-content">
+    <div class="modal-title">📝 Notas personales</div>
+    <div class="modal-sub">Apuntes privados sobre este anime (máx 500 chars)</div>
+    <textarea id="notes-textarea" placeholder="Ej: Dejé de ver en ep 12 porque… / Mejor arco: eps 5-8 / Continuar en…" oninput="document.getElementById('notes-char').textContent=this.value.length+'/500'"></textarea>
+    <div class="notes-char-count" id="notes-char">0/500</div>
+    <div class="modal-actions" style="margin-top:10px">
+      <button class="action-btn action-ghost" onclick="closeNotesModal()">Cancelar</button>
+      <button class="action-btn action-primary" onclick="saveNotesFromModal()">Guardar</button>
+    </div>
+    <button class="modal-delete" id="notes-modal-delete" onclick="clearNote()" style="display:none">🗑️ Borrar nota</button>
   </div>
 </div>
 
@@ -614,8 +703,12 @@ async function trackAnime(r, list) {
     averageScore: r.score || r.averageScore || null,
     nextEp:       r.nextEp || null,
     nextAirAt:    r.nextAirAt || null,
+    duration:     r.duration || existing?.duration || null,
+    description:  r.description || existing?.description || null,
     userLinks:    Array.isArray(existing?.userLinks) ? existing.userLinks : (existing?.userLink ? [existing.userLink] : []),
     nickname:     existing?.nickname || null,
+    userNote:     existing?.userNote || null,
+    userRating:   existing?.userRating || null,
   };
   if (!allLists[list]) allLists[list] = [];
   allLists[list].push(entry);
@@ -655,7 +748,7 @@ async function removeFromLists(id) {
 const ANILIST_GQL = `query($s:String,$year:Int,$season:MediaSeason,$status:MediaStatus,$format:MediaFormat,$genres:[String],$tags:[String],$sort:[MediaSort]){
   Page(page:1,perPage:20){
     media(type:ANIME,search:$s,seasonYear:$year,season:$season,status:$status,format:$format,genre_in:$genres,tag_in:$tags,sort:$sort){
-      id title{romaji english}status format episodes nextAiringEpisode{episode airingAt}coverImage{large medium}averageScore genres season seasonYear startDate{year month day}siteUrl
+      id title{romaji english}status format episodes duration nextAiringEpisode{episode airingAt}coverImage{large medium}averageScore genres season seasonYear startDate{year month day}siteUrl description(asHtml:false)
     }
   }
 }`;
@@ -663,7 +756,7 @@ const ANILIST_GQL = `query($s:String,$year:Int,$season:MediaSeason,$status:Media
 const ANILIST_GQL_BROWSE = `query($year:Int,$season:MediaSeason,$status:MediaStatus,$format:MediaFormat,$genres:[String],$tags:[String],$sort:[MediaSort]){
   Page(page:1,perPage:20){
     media(type:ANIME,seasonYear:$year,season:$season,status:$status,format:$format,genre_in:$genres,tag_in:$tags,sort:$sort){
-      id title{romaji english}status format episodes nextAiringEpisode{episode airingAt}coverImage{large medium}averageScore genres season seasonYear startDate{year month day}siteUrl
+      id title{romaji english}status format episodes duration nextAiringEpisode{episode airingAt}coverImage{large medium}averageScore genres season seasonYear startDate{year month day}siteUrl description(asHtml:false)
     }
   }
 }`;
@@ -749,20 +842,22 @@ async function doSearch(q) {
         ? `${sd.year}-${String(sd.month||1).padStart(2,'0')}-${String(sd.day||1).padStart(2,'0')}`
         : null;
       return {
-        id:       m.id,
-        title:    m.title.english || m.title.romaji,
-        romaji:   m.title.romaji,
-        status:   m.status,
-        format:   m.format,
-        score:    m.averageScore || null,
-        episodes: m.episodes || null,
-        season:   m.season ? `${m.season} ${m.seasonYear}` : null,
-        genres:   (m.genres || []).slice(0, 4),
-        cover:    m.coverImage?.large || m.coverImage?.medium || null,
-        siteUrl:  m.siteUrl || null,
+        id:          m.id,
+        title:       m.title.english || m.title.romaji,
+        romaji:      m.title.romaji,
+        status:      m.status,
+        format:      m.format,
+        score:       m.averageScore || null,
+        episodes:    m.episodes || null,
+        duration:    m.duration || null,
+        season:      m.season ? `${m.season} ${m.seasonYear}` : null,
+        genres:      (m.genres || []).slice(0, 4),
+        cover:       m.coverImage?.large || m.coverImage?.medium || null,
+        siteUrl:     m.siteUrl || null,
+        description: m.description ? m.description.replace(/<[^>]*>/g,'').replace(/\n\n+/g,'\n').trim().slice(0,600) : null,
         startDate,
-        nextEp:   next ? { ep: next.episode, airingAt: new Date(next.airingAt*1000).toLocaleDateString('es-CL') } : null,
-        tracking: getAnimeList(m.id),
+        nextEp:      next ? { ep: next.episode, airingAt: new Date(next.airingAt*1000).toLocaleDateString('es-CL') } : null,
+        tracking:    getAnimeList(m.id),
       };
     });
     // Merge: local matches first, then remote (dedup by id)
@@ -942,12 +1037,14 @@ function renderEstrenos() {
           <button class="chip ${estrenosFilter==='movie'?'active':''}"   data-f="movie"   onclick="setEstrenosFilter('movie')">🎬 Películas</button>
           <button class="chip ${estrenosFilter==='ona'?'active':''}"     data-f="ona"     onclick="setEstrenosFilter('ona')">🖥️ ONA</button>
         </div>
+        <button class="week-toggle${weekStripVisible?' active':''}" id="week-toggle-btn" onclick="toggleWeekStrip()" title="Vista semanal">📅 Semana</button>
         <div class="day-view-toggle">
           <button class="day-view-btn ${dayView==='list'?'active':''}" onclick="setDayView('list')" title="Lista">☰</button>
           <button class="day-view-btn ${dayView==='grid'?'active':''}" onclick="setDayView('grid')" title="Tarjetas">⊞</button>
         </div>
         <button class="estrenos-refresh" id="refresh-btn" onclick="fetchDay(currentDay, true)" title="Forzar actualización">↻</button>
       </div>
+      ${renderWeekStrip()}
     </div>
     <div id="estreno-content"><div class="spinner"></div></div>`;
   fetchDay(currentDay, false);
@@ -1171,6 +1268,7 @@ function renderSearch() {
       <button class="filter-btn${fc?' has-filters':''}" onclick="openFilterModal()" title="Filtros">⚙️${fc?`<span class="filter-count">${fc}</span>`:''}</button>
     </div>
     <div id="active-filters-bar">${renderActiveFiltersBar()}</div>
+    ${_seasonQuickRow()}
     <div id="search-results">${hasActiveFilters() ? '<div class="spinner"></div>' : renderRecentHtml()}</div>`;
 
   const inp = document.getElementById('search-in');
@@ -1333,6 +1431,7 @@ async function changeEpFromSearch(id, delta) {
       ?.closest('.result-progress-wrap')?.querySelector('.result-progress-bar-fill');
     if (bar) bar.style.width = p + '%';
   }
+  _checkAutoComplete(a);
 }
 
 async function quickAdd(id, list, btn) {
@@ -1402,8 +1501,10 @@ function openResultDetail(r) {
         <div class="detail-badges">${badges}</div>
         ${r.score?`<div class="detail-score">⭐ ${r.score}<span style="font-size:12px;color:var(--hint);font-weight:400"> / 100</span></div>`:''}
         ${r.genres?.length?`<div style="font-size:11px;color:var(--hint);margin-top:8px">${r.genres.join(' · ')}</div>`:''}
+        ${_durationHtml({duration:r.duration||a?.duration, totalEps:r.episodes||a?.totalEps}, a?.watchedEps||0)}
       </div>
     </div>
+    ${r.description||a?.description ? `<div class="detail-section"><div class="detail-section-title">Sinopsis</div>${_synopsisHtml(r.description||a?.description, 'rd'+r.id)}</div>` : ''}
     ${r.nextEp?`<div class="detail-section"><div style="font-size:13px;color:var(--link)">📡 Próx ep ${r.nextEp.ep}: ${r.nextEp.airingAt}</div></div>`:''}
     ${epSection}
     ${ratingSection}
@@ -1431,6 +1532,7 @@ async function _rdEp(id, delta) {
   if (ec) ec.innerHTML = `${w}<br><span style="font-size:11px;font-weight:400;color:var(--hint)">/ ${t||'?'}</span>`;
   if (ef) ef.style.width = p + '%';
   if (et) et.textContent = p + '%';
+  _checkAutoComplete(a);
   if (currentTab === 'estrenos') renderDayList();
 }
 
@@ -1491,23 +1593,73 @@ function renderOverview() {
     }
   }
   html += `<div style="padding:14px"><button class="link-add-btn" onclick="openCreateListModal()">➕ Nueva lista personalizada</button></div>`;
+  html += renderStats();
   html += '</div>';
   document.getElementById('content').innerHTML = html;
 }
 
 // ── List tabs ─────────────────────────────────────────────────────────────────
 function renderList(listName) {
-  const animes = (allLists[listName]||[]).slice().sort((a,b)=>(b.addedAt||0)-(a.addedAt||0));
-  const c = document.getElementById('content');
+  const raw = allLists[listName] || [];
+  const c   = document.getElementById('content');
   const meta = getListMeta(listName);
-  if (!animes.length) {
+  if (!raw.length) {
     c.innerHTML = `<div class="empty"><div class="big">${meta.emoji}</div><p><b>${safe(meta.name)}</b> está vacía.<br>Busca anime para agregar.</p></div>`;
     return;
   }
-  c.innerHTML = '<div style="padding-top:4px">' + animes.map(a=>animeCard(a,listName)).join('') + '</div>';
-  // Background refresh of airing info (lazy, 6h TTL → silent if all fresh)
+  const sortMode    = _listSort[listName]   || 'addedAt';
+  const filterText  = (_listFilter[listName] || '').toLowerCase();
+  const showSwipe   = listName !== 'completado' && listName !== 'descartado';
+
+  let animes = _sortAnimes(raw, sortMode);
+  if (filterText) animes = animes.filter(a =>
+    (a.title||'').toLowerCase().includes(filterText) ||
+    (a.nickname||'').toLowerCase().includes(filterText)
+  );
+
+  const sortOpts = [
+    {v:'addedAt',  l:'Reciente'},
+    {v:'title',    l:'A–Z'},
+    {v:'score',    l:'Score'},
+    {v:'rating',   l:'Mi rating'},
+    {v:'progress', l:'Progreso'},
+  ];
+
+  const toolsRow = `<div class="list-tools-row">
+    <div class="list-search-wrap">
+      <span class="si">🔍</span>
+      <input class="list-search-mini" id="lsf-${listName}" type="search" placeholder="Filtrar…" autocomplete="off" value="${safe(filterText)}"
+        oninput="_listFilterChange('${listName}',this.value)">
+    </div>
+    <select class="list-sort-select" onchange="_listSortChange('${listName}',this.value)">
+      ${sortOpts.map(o=>`<option value="${o.v}"${sortMode===o.v?' selected':''}>${o.l}</option>`).join('')}
+    </select>
+  </div>`;
+
+  const cards = animes.length
+    ? animes.map(a => showSwipe
+        ? `<div class="card-wrap"><div class="card-swipe-bg"><span class="swipe-icon">+1</span><span>ep</span></div>${animeCard(a,listName)}</div>`
+        : animeCard(a, listName)
+      ).join('')
+    : `<div class="empty"><div class="big">🔍</div><p>Sin resultados para "${safe(filterText)}"</p></div>`;
+
+  c.innerHTML = toolsRow + '<div style="padding-top:4px">' + cards + '</div>';
+
+  if (showSwipe) _attachSwipe(listName);
   if (listName !== 'completado' && listName !== 'descartado') refreshTrackedAiring(listName);
 }
+
+function _listSortChange(listName, val) {
+  _listSort[listName] = val;
+  renderList(listName);
+}
+function _listFilterChange(listName, val) {
+  _listFilter[listName] = val;
+  // Defer slightly so typing feels instant
+  clearTimeout(_listFilterTimer);
+  _listFilterTimer = setTimeout(() => renderList(listName), 200);
+}
+let _listFilterTimer = null;
 
 function animeCard(a,listName){
   const w=a.watchedEps||0,t=a.totalEps||0,p=t?pct(w,t):0,isMovie=a.format==='MOVIE';
@@ -1538,7 +1690,9 @@ function animeCard(a,listName){
       <button class="ep-btn" onclick="changeEp(${a.id},1,'${listName}')">+</button>
     </div>`:'';
   const miniStars = a.userRating ? `<div class="card-rating">${[1,2,3,4,5].map(n=>`<span class="card-star${a.userRating>=n?' filled':''}">★</span>`).join('')}</div>` : '';
-  return `<div class="card" onclick="openAnimeDetail(${a.id})">
+  const airedN = getAiredEp(a);
+  const behind = airedN != null ? airedN - w : 0;
+  return `<div class="card${behind >= 3 ? ' is-behind' : ''}" data-swipe-id="${a.id}" onclick="openAnimeDetail(${a.id})">
     <div class="card-poster">${imgTag(a.coverImage,'🎌')}</div>
     <div class="card-body">
       <div class="card-title">${safe(a.title)}</div>
@@ -1560,6 +1714,7 @@ async function changeEp(id,delta,listName){
   a.watchedEps=w;
   await updateEpInList(id,w);
   renderList(listName);
+  _checkAutoComplete(a);
 }
 
 // ── Detail sheet (my anime) ───────────────────────────────────────────────────
@@ -1597,12 +1752,23 @@ function renderDetailBody(a,listName){
           ${t?`<span class="detail-badge">${t} eps</span>`:''}
         </div>
         ${a.averageScore?`<div class="detail-score">⭐ ${a.averageScore}<span style="font-size:11px;color:var(--hint);font-weight:400"> / 100</span></div>`:''}
+        ${_durationHtml(a, w)}
       </div>
     </div>
+    ${a.description?`<div class="detail-section"><div class="detail-section-title">Sinopsis</div>${_synopsisHtml(a.description, 'da'+a.id)}</div>`:''}
     <div class="detail-section"><div class="detail-section-title">Progreso</div>${epSection}</div>
     <div class="detail-section">
       <div class="detail-section-title">Mi calificación</div>
       ${_starsHtml(a.id, a.userRating||0, `stars-detail-${a.id}`)}
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">Notas</div>
+      ${a.userNote
+        ? `<div class="link-row">
+            <div class="notes-display" style="flex:1">${safe(a.userNote)}</div>
+            <button class="link-edit-btn" onclick="openNotesModal(${a.id})" title="Editar">✏️</button>
+           </div>`
+        : `<button class="link-add-btn" onclick="openNotesModal(${a.id})">📝 Agregar nota personal</button>`}
     </div>
     <div class="detail-section">
       <div class="detail-section-title">Mis links${_getLinks(a).length?` · ${_getLinks(a).length}/${MAX_LINKS_PER_ANIME}`:''}</div>
@@ -1656,6 +1822,7 @@ async function detailEp(delta){
   if(ef) ef.style.width=p+'%';
   if(et) et.textContent=p+'%';
   await updateEpInList(a.id,w);
+  _checkAutoComplete(a);
 }
 
 async function toggleMovie(id,listName){
@@ -1700,6 +1867,10 @@ function closeDetail(){
   if(tg?.BackButton) tg.BackButton.hide();
 }
 if(tg?.BackButton) tg.BackButton.onClick(()=>{
+  const cm = document.getElementById('complete-modal');
+  if (cm?.classList.contains('open')) { closeCompleteModal(); return; }
+  const ntm = document.getElementById('notes-modal');
+  if (ntm?.classList.contains('open')) { closeNotesModal(); return; }
   const fm = document.getElementById('filter-modal');
   if (fm?.classList.contains('open')) { closeFilterModal(); return; }
   const lstm = document.getElementById('list-modal');
@@ -2079,6 +2250,8 @@ async function saveEpFromModal() {
   // List tabs re-render
   if (currentTab !== 'buscar' && currentTab !== 'estrenos') renderList(currentTab);
 
+  const a2 = getAnime(_epModalAnimeId);
+  if (a2) _checkAutoComplete(a2);
   toast(`✓ Ep ${v}`);
   closeEpModal();
 }
@@ -2286,25 +2459,269 @@ function searchLocal(q) {
       if (title.includes(needle) || (nick && nick.includes(needle))) {
         seen.add(a.id);
         matches.push({
-          id:        a.id,
-          title:     a.title,
-          nickname:  a.nickname || null,
-          status:    a.status || null,
-          format:    a.format || 'TV',
-          score:     a.averageScore || null,
-          episodes:  a.totalEps || null,
-          genres:    [],
-          cover:     a.coverImage || null,
-          siteUrl:   a.siteUrl || null,
-          startDate: null,
-          nextEp:    null,
-          tracking:  getAnimeList(a.id),
-          _local:    true,
+          id:          a.id,
+          title:       a.title,
+          nickname:    a.nickname || null,
+          status:      a.status || null,
+          format:      a.format || 'TV',
+          score:       a.averageScore || null,
+          episodes:    a.totalEps || null,
+          duration:    a.duration || null,
+          description: a.description || null,
+          genres:      [],
+          cover:       a.coverImage || null,
+          siteUrl:     a.siteUrl || null,
+          startDate:   null,
+          nextEp:      null,
+          tracking:    getAnimeList(a.id),
+          _local:      true,
         });
       }
     }
   }
   return matches;
+}
+
+// ── Auto-complete (sugiere mover a Completado al llegar al último ep) ────────
+let _pendingCompleteId = null;
+function _checkAutoComplete(a) {
+  if (!a || !a.totalEps || a.watchedEps < a.totalEps) return;
+  const list = getAnimeList(a.id);
+  if (list === 'completado') return;
+  _pendingCompleteId = a.id;
+  document.getElementById('complete-modal-sub').textContent =
+    `"${(a.title||'').substring(0,38)}" · ${a.totalEps} ep${a.totalEps===1?'':'s'}`;
+  document.getElementById('complete-modal').classList.add('open');
+}
+function closeCompleteModal() {
+  document.getElementById('complete-modal').classList.remove('open');
+  _pendingCompleteId = null;
+}
+async function confirmComplete() {
+  if (_pendingCompleteId == null) return;
+  const id = _pendingCompleteId;
+  closeCompleteModal();
+  const a = getAnime(id);
+  if (!a) return;
+  await updateEpInList(id, a.watchedEps, 'completado');
+  toast('✅ Movido a Completado');
+  if (detailAnime?.id === id) { detailAnime.listName = 'completado'; renderDetailBody(a, 'completado'); }
+  if (currentTab !== 'buscar' && currentTab !== 'estrenos' && currentTab !== 'listas') renderList(currentTab);
+}
+
+// ── Notes (notas personales por anime) ───────────────────────────────────────
+let _notesModalId = null;
+function openNotesModal(id) {
+  haptic('light');
+  _notesModalId = Number(id);
+  const a = getAnime(_notesModalId) || detailAnime;
+  const ta = document.getElementById('notes-textarea');
+  ta.value = a?.userNote || '';
+  document.getElementById('notes-char').textContent = (ta.value.length) + '/500';
+  document.getElementById('notes-modal-delete').style.display = a?.userNote ? 'block' : 'none';
+  document.getElementById('notes-modal').classList.add('open');
+  setTimeout(() => { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }, 80);
+}
+function closeNotesModal() {
+  document.getElementById('notes-modal').classList.remove('open');
+  _notesModalId = null;
+}
+async function saveNotesFromModal() {
+  if (_notesModalId == null) return;
+  const note = document.getElementById('notes-textarea').value.trim().slice(0, 500);
+  const a = getAnime(_notesModalId);
+  if (a) {
+    a.userNote = note || null;
+    await saveLists();
+    if (detailAnime?.id === _notesModalId) { detailAnime.userNote = a.userNote; renderDetailBody(a, detailAnime.listName); }
+    toast(note ? '✓ Nota guardada' : '✓ Nota eliminada');
+  }
+  closeNotesModal();
+}
+async function clearNote() {
+  if (_notesModalId == null) return;
+  const a = getAnime(_notesModalId);
+  if (a) { a.userNote = null; await saveLists(); if (detailAnime?.id === _notesModalId) { detailAnime.userNote = null; renderDetailBody(a, detailAnime.listName); } }
+  closeNotesModal();
+  toast('🗑️ Nota eliminada');
+}
+
+// ── Synopsis toggle (colapsar/expandir) ──────────────────────────────────────
+function toggleSynopsis(id) {
+  const txt = document.getElementById('syn-' + id);
+  const btn = document.getElementById('syn-btn-' + id);
+  if (!txt || !btn) return;
+  const collapsed = txt.classList.toggle('clamped');
+  btn.textContent = collapsed ? 'Leer más ▾' : 'Menos ▴';
+}
+function _synopsisHtml(desc, id) {
+  if (!desc) return '';
+  const short = desc.length > 200;
+  return `<div class="synopsis-wrap">
+    <p class="synopsis-text${short?' clamped':''}" id="syn-${id}">${safe(desc)}</p>
+    ${short?`<button class="synopsis-toggle" id="syn-btn-${id}" onclick="toggleSynopsis(${id})">Leer más ▾</button>`:''}
+  </div>`;
+}
+function _durationHtml(a, watchedEps) {
+  if (!a.duration) return '';
+  const dur = a.duration;
+  const pending = a.totalEps ? Math.max(0, a.totalEps - (watchedEps||0)) : null;
+  const parts = [];
+  parts.push(`<span>⏱ ${dur} min/ep</span>`);
+  if (pending !== null && pending > 0) {
+    const mins = pending * dur;
+    const label = mins >= 60 ? `~${Math.round(mins/60)}h restantes` : `~${mins}min restantes`;
+    parts.push(`<span>${label}</span>`);
+  }
+  return `<div class="duration-line">${parts.join('')}</div>`;
+}
+
+// ── Stats personales ─────────────────────────────────────────────────────────
+function renderStats() {
+  const allKeys = getAllListKeys();
+  const totalAnime  = allKeys.reduce((s,k) => s + (allLists[k]||[]).length, 0);
+  const totalEps    = allKeys.reduce((s,k) => s + (allLists[k]||[]).reduce((ss,a) => ss + (a.watchedEps||0), 0), 0);
+  const totalMins   = allKeys.reduce((s,k) => s + (allLists[k]||[]).reduce((ss,a) => ss + (a.watchedEps||0) * (a.duration||24), 0), 0);
+  const totalHours  = Math.round(totalMins / 60);
+  const rated       = allKeys.flatMap(k => (allLists[k]||[]).filter(a => a.userRating));
+  const avgRating   = rated.length ? (rated.reduce((s,a) => s + a.userRating, 0) / rated.length).toFixed(1) : null;
+  const genreCount  = {};
+  for (const k of allKeys) for (const a of (allLists[k]||[])) for (const g of (a.genres||[])) genreCount[g] = (genreCount[g]||0) + 1;
+  const topGenres   = Object.entries(genreCount).sort((a,b) => b[1]-a[1]).slice(0,5);
+  return `<div class="stats-section">
+    <div class="section-title" style="padding:0 0 10px">📊 Estadísticas</div>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-big">${totalAnime}</div><div class="stat-label">Anime</div></div>
+      <div class="stat-card"><div class="stat-big">${totalEps.toLocaleString()}</div><div class="stat-label">Eps vistos</div></div>
+      <div class="stat-card"><div class="stat-big">${totalHours >= 1000 ? (totalHours/1000).toFixed(1)+'k' : totalHours}h</div><div class="stat-label">Tiempo visto</div></div>
+      <div class="stat-card"><div class="stat-big">${avgRating ? avgRating+'★' : '—'}</div><div class="stat-label">Rating medio</div></div>
+    </div>
+    ${topGenres.length ? `<div style="margin-top:10px">
+      <div class="section-title" style="padding:0 0 6px;font-size:10px">Géneros favoritos</div>
+      <div style="display:flex;flex-wrap:wrap;gap:5px">${topGenres.map(([g,n])=>`<span class="active-filter-chip" style="cursor:default">${safe(g)}<span style="opacity:.6;margin-left:3px">${n}</span></span>`).join('')}</div>
+    </div>` : ''}
+  </div>`;
+}
+
+// ── Week strip (mini calendario 7 días en Estrenos) ──────────────────────────
+let weekStripVisible = false;
+const DAY_ABBR_ES = ['D','L','M','X','J','V','S'];
+function toggleWeekStrip() {
+  weekStripVisible = !weekStripVisible;
+  const btn = document.getElementById('week-toggle-btn');
+  if (btn) btn.classList.toggle('active', weekStripVisible);
+  const strip = document.getElementById('week-strip');
+  if (strip) { strip.style.display = weekStripVisible ? '' : 'none'; }
+}
+function renderWeekStrip() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  let html = '<div class="week-grid-strip" id="week-strip" style="display:' + (weekStripVisible ? '' : 'none') + '">';
+  for (let i = -3; i <= 3; i++) {
+    const d = new Date(today); d.setDate(today.getDate() + i);
+    const dk = dayKey(d);
+    const isToday   = i === 0;
+    const isCurrent = dk === dayKey(currentDay);
+    const cached    = loadDayCache(d);
+    const total     = cached !== null ? cached.length : null;
+    const mine      = cached !== null ? cached.filter(e => getAnimeList(e.id)).length : null;
+    html += `<div class="wdc${isToday?' wdc-today':''}${isCurrent?' wdc-current':''}" onclick="navToDateKey('${dk}')">
+      <div class="wdc-name">${DAY_ABBR_ES[d.getDay()]}</div>
+      <div class="wdc-date">${d.getDate()}</div>
+      <div class="wdc-eps">${total !== null ? total : '·'}</div>
+      ${mine ? `<div class="wdc-mine">⭐${mine}</div>` : '<div class="wdc-mine"></div>'}
+    </div>`;
+  }
+  html += '</div>';
+  return html;
+}
+function navToDateKey(dk) {
+  haptic('light');
+  const [y,m,d] = dk.split('-').map(Number);
+  const date = new Date(y, m-1, d); date.setHours(0,0,0,0);
+  currentDay = date;
+  renderEstrenos();
+}
+
+// ── List sort + filter ────────────────────────────────────────────────────────
+const _listSort   = {}; // { listKey: 'addedAt'|'title'|'score'|'rating'|'progress' }
+const _listFilter = {}; // { listKey: string }
+function _sortAnimes(animes, mode) {
+  const s = [...animes];
+  if (mode === 'title')    return s.sort((a,b) => (a.title||'').localeCompare(b.title||''));
+  if (mode === 'score')    return s.sort((a,b) => (b.averageScore||0) - (a.averageScore||0));
+  if (mode === 'rating')   return s.sort((a,b) => (b.userRating||0) - (a.userRating||0));
+  if (mode === 'progress') return s.sort((a,b) => {
+    const pa = a.totalEps ? (a.watchedEps||0)/a.totalEps : 0;
+    const pb = b.totalEps ? (b.watchedEps||0)/b.totalEps : 0;
+    return pb - pa;
+  });
+  return s.sort((a,b) => (b.addedAt||0) - (a.addedAt||0)); // default: recientes primero
+}
+
+// ── Season quick chip ─────────────────────────────────────────────────────────
+function _currentSeason() {
+  const m = new Date().getMonth() + 1;
+  const y = new Date().getFullYear();
+  if (m <= 3)  return { season:'WINTER', year:y, label:`❄️ Invierno ${y}` };
+  if (m <= 6)  return { season:'SPRING', year:y, label:`🌸 Primavera ${y}` };
+  if (m <= 9)  return { season:'SUMMER', year:y, label:`☀️ Verano ${y}` };
+  return        { season:'FALL',   year:y, label:`🍁 Otoño ${y}` };
+}
+function _seasonQuickRow() {
+  const cs = _currentSeason();
+  const applied = searchFilters.season === cs.season && searchFilters.year === cs.year;
+  return `<div class="season-quick-row">
+    <button class="season-chip-now${applied?' applied':''}" onclick="_applySeasonNow()" title="Filtrar por temporada actual">${cs.label}${applied?' ✕':''}</button>
+  </div>`;
+}
+function _applySeasonNow() {
+  haptic('light');
+  const cs = _currentSeason();
+  const alreadyApplied = searchFilters.season === cs.season && searchFilters.year === cs.year;
+  if (alreadyApplied) {
+    searchFilters.season = null; searchFilters.year = null;
+  } else {
+    searchFilters.season = cs.season; searchFilters.year = cs.year;
+  }
+  renderSearch();
+}
+
+// ── Swipe-right (+1 ep) on list cards ────────────────────────────────────────
+function _attachSwipe(listName) {
+  document.querySelectorAll('.card[data-swipe-id]').forEach(card => {
+    let sx = 0, sy = 0, dx = 0, active = false;
+    const wrap = card.parentElement;
+    const bg   = wrap?.querySelector('.card-swipe-bg');
+
+    card.addEventListener('touchstart', e => {
+      sx = e.touches[0].clientX; sy = e.touches[0].clientY; dx = 0; active = false;
+    }, { passive: true });
+
+    card.addEventListener('touchmove', e => {
+      const cx = e.touches[0].clientX, cy = e.touches[0].clientY;
+      const adx = cx - sx, ady = Math.abs(cy - sy);
+      if (!active && Math.abs(adx) < 6 && ady < 6) return;
+      if (!active && ady > Math.abs(adx)) return; // vertical — ignore
+      active = true;
+      dx = Math.max(0, Math.min(72, adx));
+      card.classList.add('swiping');
+      card.style.transform = `translateX(${dx}px)`;
+      if (bg) bg.style.opacity = Math.min(1, dx / 55);
+      if (dx > 8) e.preventDefault();
+    }, { passive: false });
+
+    card.addEventListener('touchend', () => {
+      card.classList.remove('swiping');
+      card.style.transform = '';
+      if (bg) bg.style.opacity = 0;
+      if (active && dx >= 55) {
+        haptic('light');
+        const id = Number(card.dataset.swipeId);
+        changeEp(id, 1, listName);
+      }
+      dx = 0; active = false;
+    });
+  });
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
