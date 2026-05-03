@@ -380,6 +380,31 @@ select.modal-input { background-image: linear-gradient(45deg, transparent 50%, v
 .season-chip-now { display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; border-radius: 99px; background: rgba(124,58,237,.12); border: 1.5px solid rgba(124,58,237,.3); color: var(--accent); font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: all .15s; flex-shrink: 0; }
 .season-chip-now:active { background: rgba(124,58,237,.22); transform: scale(.97); }
 .season-chip-now.applied { background: var(--accent); color: var(--acctxt); border-color: var(--accent); }
+
+/* ── Saga / Relations panel ──────────────────────────────────────────────── */
+#saga-panel { position: fixed; inset: 0; z-index: 110; display: flex; flex-direction: column; background: var(--bg); transform: translateY(100%); transition: transform .3s cubic-bezier(.32,.72,0,1); }
+#saga-panel.open { transform: translateY(0); }
+#saga-panel.closing { transform: translateY(100%); }
+.saga-info-bar { padding: 8px 14px; font-size: 11.5px; color: var(--hint); background: rgba(124,58,237,.07); border-bottom: 1px solid rgba(255,255,255,.04); }
+.relation-card { display: flex; gap: 10px; padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,.04); cursor: pointer; transition: background .12s; align-items: flex-start; }
+.relation-card:active { background: rgba(255,255,255,.04); }
+.relation-num { width: 18px; min-width: 18px; font-size: 11px; font-weight: 700; color: var(--hint); text-align: center; padding-top: 3px; flex-shrink: 0; }
+.relation-poster { width: 54px; min-width: 54px; height: 76px; border-radius: 7px; overflow: hidden; background: var(--bg2); display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; position: relative; }
+.relation-poster img { width: 100%; height: 100%; object-fit: cover; }
+.relation-watched-badge { position: absolute; inset: 0; background: rgba(0,0,0,.52); display: flex; align-items: center; justify-content: center; font-size: 20px; }
+.relation-body { flex: 1; min-width: 0; }
+.relation-title { font-weight: 600; font-size: 13px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }
+.relation-meta { font-size: 11px; color: var(--hint); display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; align-items: center; }
+.relation-type-badge { font-size: 9.5px; padding: 2px 6px; border-radius: 5px; background: rgba(255,255,255,.07); color: var(--hint); font-weight: 600; text-transform: uppercase; letter-spacing: .3px; display: inline-block; margin-bottom: 4px; }
+/* ── Translate button ─────────────────────────────────────────────────────── */
+.translate-btn { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--link); background: none; border: 1px solid rgba(124,58,237,.25); border-radius: 6px; cursor: pointer; padding: 3px 8px; margin-top: 6px; transition: all .15s; }
+.translate-btn:active { opacity: .6; }
+.translate-btn.loading { opacity: .5; pointer-events: none; }
+.translate-btn.done { color: var(--hint); border-color: rgba(255,255,255,.1); pointer-events: none; }
+/* ── Saga entry button in detail ─────────────────────────────────────────── */
+.saga-entry-btn { width: 100%; padding: 10px 14px; background: var(--bg2); border: 1.5px solid rgba(255,255,255,.08); border-radius: 10px; color: var(--text); font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.saga-entry-btn:active { background: rgba(255,255,255,.06); transform: scale(.98); }
+.saga-entry-btn .saga-arrow { font-size: 16px; color: var(--hint); }
 </style>
 </head>
 <body>
@@ -494,6 +519,14 @@ select.modal-input { background-image: linear-gradient(45deg, transparent 50%, v
     </div>
     <button class="modal-delete" id="notes-modal-delete" onclick="clearNote()" style="display:none">🗑️ Borrar nota</button>
   </div>
+</div>
+
+<div id="saga-panel">
+  <div class="detail-header">
+    <button class="back-btn" onclick="closeSagaPanel()">←</button>
+    <span class="detail-title" id="saga-panel-title">Saga</span>
+  </div>
+  <div class="detail-body" id="saga-panel-body"></div>
 </div>
 
 <div id="filter-modal" class="modal-overlay" onclick="if(event.target===this)closeFilterModal()">
@@ -760,6 +793,29 @@ const ANILIST_GQL_BROWSE = `query($year:Int,$season:MediaSeason,$status:MediaSta
     }
   }
 }`;
+
+// Franquicia / saga — relaciones de AniList
+const ANILIST_RELATIONS_GQL = `query($id:Int){
+  Media(id:$id,type:ANIME){
+    title{romaji english}
+    relations{
+      edges{
+        relationType
+        node{
+          id type title{romaji english}format status
+          startDate{year month}episodes averageScore
+          coverImage{medium}siteUrl
+        }
+      }
+    }
+  }
+}`;
+const RELATION_LABEL = {
+  PREQUEL:'Precuela', SEQUEL:'Secuela', SIDE_STORY:'Historia paralela',
+  ALTERNATIVE:'Alternativa', ADAPTATION:'Adaptación', PARENT:'Obra original',
+  SUMMARY:'Resumen', SPIN_OFF:'Spin-off', OTHER:'Relacionado',
+};
+const RELATION_SKIP = new Set(['CHARACTER','VOICE_ACTOR','STAFF','PRODUCER']);
 
 // Filter state + constants
 let searchFilters = { year: null, season: null, status: null, format: null, genres: [], tags: [] };
@@ -1505,6 +1561,13 @@ function openResultDetail(r) {
       </div>
     </div>
     ${r.description||a?.description ? `<div class="detail-section"><div class="detail-section-title">Sinopsis</div>${_synopsisHtml(r.description||a?.description, 'rd'+r.id)}</div>` : ''}
+    <div class="detail-section">
+      <div class="detail-section-title">Saga / Franquicia</div>
+      <button class="saga-entry-btn" onclick="openSagaPanel(${r.id})">
+        <span>🔗 Ver obras relacionadas</span>
+        <span class="saga-arrow">›</span>
+      </button>
+    </div>
     ${r.nextEp?`<div class="detail-section"><div style="font-size:13px;color:var(--link)">📡 Próx ep ${r.nextEp.ep}: ${r.nextEp.airingAt}</div></div>`:''}
     ${epSection}
     ${ratingSection}
@@ -1756,6 +1819,13 @@ function renderDetailBody(a,listName){
       </div>
     </div>
     ${a.description?`<div class="detail-section"><div class="detail-section-title">Sinopsis</div>${_synopsisHtml(a.description, 'da'+a.id)}</div>`:''}
+    <div class="detail-section">
+      <div class="detail-section-title">Saga / Franquicia</div>
+      <button class="saga-entry-btn" onclick="openSagaPanel(${a.id})">
+        <span>🔗 Ver obras relacionadas</span>
+        <span class="saga-arrow">›</span>
+      </button>
+    </div>
     <div class="detail-section"><div class="detail-section-title">Progreso</div>${epSection}</div>
     <div class="detail-section">
       <div class="detail-section-title">Mi calificación</div>
@@ -2554,12 +2624,18 @@ function toggleSynopsis(id) {
   const collapsed = txt.classList.toggle('clamped');
   btn.textContent = collapsed ? 'Leer más ▾' : 'Menos ▴';
 }
+const _synMap = {};
 function _synopsisHtml(desc, id) {
   if (!desc) return '';
-  const short = desc.length > 200;
+  _synMap[String(id)] = desc;
+  const cKey    = 'at_trans_' + id;
+  const cached  = localStorage.getItem(cKey);
+  const display = cached || desc;
+  const short   = !cached && display.length > 200;
   return `<div class="synopsis-wrap">
-    <p class="synopsis-text${short?' clamped':''}" id="syn-${id}">${safe(desc)}</p>
-    ${short?`<button class="synopsis-toggle" id="syn-btn-${id}" onclick="toggleSynopsis(${id})">Leer más ▾</button>`:''}
+    <p class="synopsis-text${short?' clamped':''}" id="syn-${id}">${safe(display)}</p>
+    ${short?`<button class="synopsis-toggle" id="syn-btn-${id}" onclick="toggleSynopsis('${id}')">Leer más ▾</button>`:''}
+    ${!cached?`<button class="translate-btn" id="trans-btn-${id}" onclick="translateSynopsis('${id}',this)">🌐 Español</button>`:'<span style="font-size:10px;color:var(--hint);display:inline-block;margin-top:4px">✓ Traducido</span>'}
   </div>`;
 }
 function _durationHtml(a, watchedEps) {
@@ -2574,6 +2650,191 @@ function _durationHtml(a, watchedEps) {
     parts.push(`<span>${label}</span>`);
   }
   return `<div class="duration-line">${parts.join('')}</div>`;
+}
+
+// ── Traducción de sinopsis (MyMemory API, sin key, caché localStorage) ────────
+async function translateSynopsis(synId, btnEl) {
+  const text = _synMap[String(synId)];
+  if (!text) return;
+  const cKey   = 'at_trans_' + synId;
+  const cached = localStorage.getItem(cKey);
+  if (cached) { _applyTranslation(synId, cached); return; }
+  btnEl.classList.add('loading');
+  btnEl.textContent = '⏳ Traduciendo…';
+  try {
+    const chunk = text.substring(0, 490);
+    const resp  = await fetch(
+      `https://api.mymemory.translated.net/get?q=${encodeURIComponent(chunk)}&langpair=en|es`
+    );
+    const data  = await resp.json();
+    let translated = data?.responseData?.translatedText;
+    if (!translated || data?.responseStatus !== 200) throw new Error('fail');
+    if (text.length > 490) translated += '… (resumen)';
+    localStorage.setItem(cKey, translated);
+    _applyTranslation(synId, translated);
+  } catch(_) {
+    btnEl.classList.remove('loading');
+    btnEl.textContent = '🌐 Español';
+    toast('⚠️ Error al traducir. Intenta de nuevo.');
+  }
+}
+function _applyTranslation(synId, text) {
+  const el = document.getElementById('syn-' + synId);
+  if (el) { el.textContent = text; el.classList.remove('clamped'); }
+  const btn    = document.getElementById('trans-btn-' + synId);
+  if (btn)    { btn.textContent = '✓ Traducido'; btn.classList.add('done'); }
+  const togBtn = document.getElementById('syn-btn-' + synId);
+  if (togBtn)  togBtn.style.display = 'none';
+}
+
+// ── Saga / Franquicia ─────────────────────────────────────────────────────────
+let _sagaData     = null;
+let _sagaSourceId = null;
+
+async function fetchRelations(id) {
+  try {
+    const resp = await fetch('https://graphql.anilist.co', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ query: ANILIST_RELATIONS_GQL, variables: { id: Number(id) } }),
+    });
+    const json  = await resp.json();
+    const media = json?.data?.Media;
+    if (!media) return null;
+    const entries = (media.relations?.edges || [])
+      .filter(e => e.node?.type === 'ANIME' && !RELATION_SKIP.has(e.relationType))
+      .map(e => ({
+        id:           e.node.id,
+        title:        e.node.title?.english || e.node.title?.romaji || '',
+        format:       e.node.format  || 'TV',
+        status:       e.node.status  || '',
+        startYear:    e.node.startDate?.year  || 9999,
+        startMonth:   e.node.startDate?.month || 0,
+        episodes:     e.node.episodes     || null,
+        score:        e.node.averageScore  || null,
+        cover:        e.node.coverImage?.medium || null,
+        siteUrl:      e.node.siteUrl || null,
+        relationType: e.relationType,
+      }));
+    entries.sort((a, b) =>
+      a.startYear !== b.startYear ? a.startYear - b.startYear : a.startMonth - b.startMonth
+    );
+    return {
+      mainTitle: media.title?.english || media.title?.romaji || '',
+      entries,
+    };
+  } catch(_) { return null; }
+}
+
+async function openSagaPanel(animeId) {
+  haptic('light');
+  _sagaSourceId = animeId;
+  const panel = document.getElementById('saga-panel');
+  const body  = document.getElementById('saga-panel-body');
+  const title = document.getElementById('saga-panel-title');
+  body.innerHTML = '<div class="spinner"></div>';
+  title.textContent = 'Cargando…';
+  panel.classList.add('open');
+
+  const result = await fetchRelations(animeId);
+  if (!result || !result.entries.length) {
+    body.innerHTML = `<div class="empty"><div class="big">🔗</div><p>No se encontraron obras relacionadas en AniList.</p></div>`;
+    title.textContent = 'Sin relaciones';
+    return;
+  }
+  _sagaData = result;
+  title.textContent = result.mainTitle;
+
+  const allOpts = [...LIST_OPTS, ...Object.entries(listMeta).map(([k,m]) => ({ key:k, emoji:m.emoji||'📂', label:m.name }))];
+  const cards = result.entries.map((e, i) => {
+    const tracked = getAnimeList(e.id);
+    const a       = tracked ? getAnime(e.id) : null;
+    const watchedBadge = tracked
+      ? `<div class="relation-watched-badge">${tracked==='completado'?'✅':tracked==='viendo'?'▶️':getListMeta(tracked).emoji}</div>`
+      : '';
+    const progressTxt = a && a.totalEps
+      ? `<span style="color:var(--accent);font-weight:600">${a.watchedEps||0}/${a.totalEps}</span>` : '';
+    const rData = JSON.stringify(e).replace(/"/g, '&quot;');
+    const addBtns = allOpts.map(l =>
+      `<button class="qadd-btn${tracked===l.key?' active':''}" onclick="event.stopPropagation();_sagaQuickAdd(${e.id},'${l.key}',${rData},this)">${safe(l.emoji)} ${safe(l.label)}</button>`
+    ).join('');
+    return `<div class="relation-card" onclick="openSagaEntryDetail(${e.id},${rData})">
+      <div class="relation-num">${i+1}</div>
+      <div class="relation-poster">${imgTag(e.cover,'🎌')}${watchedBadge}</div>
+      <div class="relation-body">
+        <div class="relation-title">${safe(e.title)}</div>
+        <div class="relation-meta">
+          ${e.startYear!==9999?`<span>📅 ${e.startYear}</span>`:''}
+          <span>${e.format==='MOVIE'?'🎬 Película':e.format||'TV'}</span>
+          ${e.episodes?`<span>🎞 ${e.episodes} eps</span>`:''}
+          ${e.score?`<span>⭐${e.score}</span>`:''}
+          ${progressTxt}
+        </div>
+        <span class="relation-type-badge">${RELATION_LABEL[e.relationType]||e.relationType}</span>
+        <div class="qadd-row" style="margin-top:5px">${addBtns}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const alreadySaved = !!listMeta['saga_' + animeId];
+  body.innerHTML = `
+    <div class="saga-info-bar">🔗 ${result.entries.length} obra${result.entries.length>1?'s':''} en orden cronológico · Toca una para ver detalle</div>
+    ${cards}
+    <div style="padding:14px">
+      <button class="action-btn action-primary" onclick="saveSagaToList()">
+        ${alreadySaved ? '🔄 Actualizar saga en listas' : '💾 Guardar saga completa en mis listas'}
+      </button>
+    </div>`;
+}
+
+function closeSagaPanel() {
+  const p = document.getElementById('saga-panel');
+  p.classList.add('closing');
+  setTimeout(() => p.classList.remove('open', 'closing'), 300);
+}
+
+function openSagaEntryDetail(id, r) {
+  closeSagaPanel();
+  setTimeout(() => {
+    if (getAnimeList(Number(id))) openAnimeDetail(Number(id));
+    else openResultDetail({ ...r, id: Number(r.id || id), cover: r.cover, score: r.score });
+  }, 320);
+}
+
+async function _sagaQuickAdd(id, list, r, btnEl) {
+  haptic('light');
+  await trackAnime({ ...r, id: Number(id) }, list);
+  btnEl.closest('.qadd-row')?.querySelectorAll('.qadd-btn').forEach(b => b.classList.remove('active'));
+  btnEl.classList.add('active');
+  const badge = btnEl.closest('.relation-card')?.querySelector('.relation-watched-badge');
+  if (badge) { badge.textContent = getListMeta(list).emoji; badge.style.display = 'flex'; }
+  else {
+    const poster = btnEl.closest('.relation-card')?.querySelector('.relation-poster');
+    if (poster) poster.insertAdjacentHTML('beforeend', `<div class="relation-watched-badge">${getListMeta(list).emoji}</div>`);
+  }
+  toast(`✓ "${(r.title||'').substring(0,20)}" → ${list}`);
+}
+
+async function saveSagaToList() {
+  if (!_sagaData) return;
+  haptic('medium');
+  const listKey  = 'saga_' + _sagaSourceId;
+  const sagaName = _sagaData.mainTitle.substring(0, 28);
+  if (!listMeta[listKey]) listMeta[listKey] = { name: sagaName, emoji: '🎭' };
+  if (!allLists[listKey]) allLists[listKey] = [];
+  let added = 0;
+  for (const e of _sagaData.entries) {
+    if (allLists[listKey].find(a => a.id === e.id)) continue;
+    allLists[listKey].push({
+      id: e.id, title: e.title, format: e.format, status: e.status,
+      totalEps: e.episodes, coverImage: e.cover, averageScore: e.score,
+      siteUrl: e.siteUrl, watchedEps: 0, addedAt: Date.now(), startYear: e.startYear,
+    });
+    added++;
+  }
+  await saveLists();
+  toast(`✓ Saga "${sagaName}" — ${added} nueva${added!==1?'s':''} obra${added!==1?'s':''}`);
+  closeSagaPanel();
 }
 
 // ── Stats personales ─────────────────────────────────────────────────────────
