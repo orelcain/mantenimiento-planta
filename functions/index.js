@@ -3679,43 +3679,449 @@ exports.onShoplogixShiftStarted = onDocumentCreated(
     const data     = event.data?.data() || {}
 
     const shiftId    = data.shiftId || shiftDoc.split('_').slice(1).join('_')
-    const plantLabel = plant === 'chonchi' ? 'Chonchi' : plant === 'yal' ? 'Yal' : plant
+    const plantLabel = SHOPLOGIX_PLANT_LABEL[plant] || plant
 
     logger.info(`[onShoplogixShiftStarted] ${plant} ${shiftId}`)
 
-    // Usuarios activos con preferencia habilitada (undefined = ON por defecto)
-    const usersSnap = await db.collection('users').where('activo', '==', true).get()
+    const [config, usersSnap] = await Promise.all([
+      getShoplogixNotifConfig(plant),
+      db.collection('users').where('activo', '==', true).get(),
+    ])
+
     const eligibleIds = []
     usersSnap.forEach((d) => {
       const prefs = d.data().notificationPrefs?.processStarted
-      const wantsThis = prefs ? prefs[plant] !== false : true
-      if (wantsThis) eligibleIds.push(d.id)
+      if (prefs ? prefs[plant] !== false : true) eligibleIds.push(d.id)
     })
-
-    if (eligibleIds.length === 0) {
-      logger.info(`[onShoplogixShiftStarted] Sin usuarios elegibles para ${plant}`)
-      return
-    }
-
-    const tokens = await getTokensForUsers(eligibleIds)
-    if (tokens.length === 0) {
-      logger.info(`[onShoplogixShiftStarted] Sin tokens FCM para ${plant}`)
-      return
-    }
 
     const title = `🟢 Proceso iniciado · ${plantLabel}`
     const body  = `${shiftId} ha arrancado`
 
-    await sendNotification(tokens, title, body, {
-      type:    'process_started',
-      plant,
-      shiftId,
-      url:     '/turno',
-    })
+    if (eligibleIds.length > 0) {
+      // FCM push (canal existente — siempre activo por defecto)
+      if (config.channels.push) {
+        const tokens = await getTokensForUsers(eligibleIds)
+        if (tokens.length > 0) {
+          await sendNotification(tokens, title, body, {
+            type: 'process_started', plant, shiftId, url: '/turno',
+          })
+          logger.info(`[onShoplogixShiftStarted] FCM enviado`, { eligible: eligibleIds.length, tokens: tokens.length })
+        }
+      }
+      // Telegram (canal opcional)
+      if (config.channels.telegram) {
+        const topicId = getTopicId('general')
+        await sendTelegramMessage(
+          `🟢 <b>Proceso iniciado · ${plantLabel}</b>\n${shiftId} ha arrancado`,
+          null,
+          topicId ? { topicId } : {},
+        )
+      }
+    }
 
-    logger.info(`[onShoplogixShiftStarted] Notif enviada`, {
-      plant, shiftId, eligible: eligibleIds.length, tokens: tokens.length,
+    // Crear check de inicio demorado (para cron de verificación)
+    if (config.shiftStart.enabled) {
+      const scheduledStart = data.scheduledStart?.toDate?.() || new Date()
+      const gracePeriodMs  = (config.shiftStart.gracePeriodMinutes || 20) * 60 * 1000
+      const checkAt        = new Date(scheduledStart.getTime() + gracePeriodMs)
+      await db.collection('shoplogixShiftDelayChecks').doc(`${plant}_${shiftDoc}`).set({
+        plant, shiftDoc, shiftId, plantLabel,
+        checkAt,
+        done: false,
+        createdAt: new Date(),
+      })
+      logger.info(`[onShoplogixShiftStarted] Delay check creado para ${checkAt.toISOString()}`)
+    }
+  },
+)
+
+
+// ── Sistema de notificaciones Shoplogix ───────────────────────────────────────
+// Detecta primera pieza por Baader, hitos de piezas, detenciones y retrasos de
+// inicio de turno. Configurable por planta desde Panel Admin.
+// Colecciones:
+//   notificationConfig/{plantSlug}      — config por planta
+//   shoplogixNotifState/{plant_shiftDoc_machineId} — estado por máquina/turno
+//   shoplogixShiftDelayChecks/{plant_shiftDoc}      — checks de inicio demorado
+
+const SHOPLOGIX_PLANT_LABEL = { chonchi: 'Chonchi', yal: 'Yal', filete: 'Filete' }
+
+const SHOPLOGIX_NOTIF_DEFAULTS = {
+  channels:      { push: true, telegram: false },
+  shiftStart:    { enabled: true, gracePeriodMinutes: 20 },
+  firstPiece:    { enabled: true },
+  pieceInterval: { enabled: false, every: 1000 },
+  events:        { stoppage: true, microStoppage: false },
+}
+
+async function getShoplogixNotifConfig(plantSlug) {
+  try {
+    const snap = await db.collection('notificationConfig').doc(plantSlug).get()
+    if (!snap.exists) return SHOPLOGIX_NOTIF_DEFAULTS
+    const d = snap.data()
+    return {
+      channels:      { ...SHOPLOGIX_NOTIF_DEFAULTS.channels,      ...(d.channels      || {}) },
+      shiftStart:    { ...SHOPLOGIX_NOTIF_DEFAULTS.shiftStart,    ...(d.shiftStart    || {}) },
+      firstPiece:    { ...SHOPLOGIX_NOTIF_DEFAULTS.firstPiece,    ...(d.firstPiece    || {}) },
+      pieceInterval: { ...SHOPLOGIX_NOTIF_DEFAULTS.pieceInterval, ...(d.pieceInterval || {}) },
+      events:        { ...SHOPLOGIX_NOTIF_DEFAULTS.events,        ...(d.events        || {}) },
+    }
+  } catch (e) {
+    logger.error('[shoplogix-notif] getShoplogixNotifConfig error', e)
+    return SHOPLOGIX_NOTIF_DEFAULTS
+  }
+}
+
+async function getShoplogixEligibleUsers(plant) {
+  const snap = await db.collection('users').where('activo', '==', true).get()
+  const ids = []
+  snap.forEach((d) => {
+    const prefs = d.data().notificationPrefs?.processStarted
+    if (prefs ? prefs[plant] !== false : true) ids.push(d.id)
+  })
+  return ids
+}
+
+async function dispatchShoplogixNotif(config, eligibleUserIds, title, body, data = {}, telegramMsg = null) {
+  const promises = []
+  if (config.channels.push && eligibleUserIds.length > 0) {
+    const tokens = await getTokensForUsers(eligibleUserIds)
+    if (tokens.length > 0) {
+      promises.push(
+        sendNotification(tokens, title, body, { type: 'shoplogix_event', url: '/turno', ...data })
+      )
+    }
+  }
+  if (config.channels.telegram && telegramMsg) {
+    const topicId = getTopicId('general')
+    promises.push(sendTelegramMessage(telegramMsg, null, topicId ? { topicId } : {}))
+  }
+  if (promises.length > 0) await Promise.all(promises)
+}
+
+// ── onShoplogixMachineUpdated ─────────────────────────────────────────────────
+// Dispara en cada sync de datos de máquina. Detecta:
+//   • Primera pieza (totalCycles 0→>0)
+//   • Hitos de piezas (floor(cycles/N) aumentó)
+//   • Nuevas detenciones (conteo de downtime states aumentó)
+//   • Nuevas micro-detenciones (conteo de estados con nombre "micro" aumentó)
+exports.onShoplogixMachineUpdated = onDocumentUpdated(
+  { document: 'shoplogix/{plant}/shifts/{shiftDoc}/machines/{machineId}', region: 'us-central1' },
+  async (event) => {
+    const { plant, shiftDoc, machineId } = event.params
+    const before = event.data.before.data() || {}
+    const after  = event.data.after.data()  || {}
+
+    const cyclesBefore = before.totalCycles || 0
+    const cyclesAfter  = after.totalCycles  || 0
+    const statesBefore = before.states || []
+    const statesAfter  = after.states  || []
+
+    // Salida rápida si no cambió nada relevante
+    if (cyclesBefore === cyclesAfter && statesBefore.length === statesAfter.length) return
+
+    const machineName = after.machineName || machineId
+    const plantLabel  = SHOPLOGIX_PLANT_LABEL[plant] || plant
+    const shiftId     = after.shiftId || shiftDoc.split('_').slice(1).join('_')
+
+    const [config, eligibleIds] = await Promise.all([
+      getShoplogixNotifConfig(plant),
+      getShoplogixEligibleUsers(plant),
+    ])
+    if (eligibleIds.length === 0) return
+
+    // Estado persistente por máquina/turno (idempotencia)
+    const stateRef  = db.doc(`shoplogixNotifState/${plant}_${shiftDoc}_${machineId}`)
+    const stateSnap = await stateRef.get()
+    const st = stateSnap.exists ? stateSnap.data() : {
+      firstPieceSent:     false,
+      lastNotifiedCycles: 0,
+      downtimeCount:      0,
+      microStopCount:     0,
+    }
+
+    const notifications = []
+    const stateUpdates  = {}
+
+    // ── Primera pieza ──────────────────────────────────────────────────────────
+    if (config.firstPiece.enabled && !st.firstPieceSent && cyclesBefore === 0 && cyclesAfter > 0) {
+      notifications.push({
+        title: `🎯 Primera pieza · ${plantLabel}`,
+        body:  `${machineName} procesó su primera pieza · ${shiftId}`,
+        tg:    `🎯 <b>Primera pieza</b> — ${plantLabel}\n${machineName} · ${shiftId}`,
+      })
+      stateUpdates.firstPieceSent = true
+    }
+
+    // ── Hitos de piezas ────────────────────────────────────────────────────────
+    if (config.pieceInterval.enabled && (config.pieceInterval.every || 0) > 0 && cyclesAfter > 0) {
+      const n = config.pieceInterval.every
+      const milestoneNow  = Math.floor(cyclesAfter                              / n)
+      const milestonePrev = Math.floor(Math.max(cyclesBefore, st.lastNotifiedCycles) / n)
+      if (milestoneNow > milestonePrev) {
+        const reached = milestoneNow * n
+        notifications.push({
+          title: `📊 ${reached.toLocaleString()} piezas · ${plantLabel}`,
+          body:  `${machineName} alcanzó ${reached.toLocaleString()} piezas · ${shiftId}`,
+          tg:    `📊 <b>${reached.toLocaleString()} piezas</b> — ${plantLabel}\n${machineName} · ${shiftId}`,
+        })
+        stateUpdates.lastNotifiedCycles = reached
+      }
+    }
+
+    // ── Detenciones (downtime, excluyendo micro) ───────────────────────────────
+    const isMicro      = (s) => (s.name || '').toLowerCase().includes('micro')
+    const downtimes    = statesAfter.filter(s => s.type === 'downtime' && !isMicro(s))
+    const microStops   = statesAfter.filter(s => s.type === 'downtime' && isMicro(s))
+
+    if (config.events.stoppage && downtimes.length > (st.downtimeCount || 0)) {
+      const newOnes = downtimes.slice(st.downtimeCount || 0)
+      for (const stop of newOnes) {
+        const dMin = Math.round((stop.durationSec || 0) / 60)
+        const durTxt = dMin > 0 ? `${dMin} min` : 'en curso'
+        const reason = stop.reason || stop.name || 'Detención'
+        notifications.push({
+          title: `⛔ Detención · ${plantLabel}`,
+          body:  `${machineName} — ${reason} · ${durTxt}`,
+          tg:    `⛔ <b>Detención</b> — ${plantLabel}\n${machineName} · ${reason} · ${durTxt}`,
+        })
+      }
+      stateUpdates.downtimeCount = downtimes.length
+    }
+
+    // ── Micro-detenciones ──────────────────────────────────────────────────────
+    if (config.events.microStoppage && microStops.length > (st.microStopCount || 0)) {
+      const newOnes = microStops.slice(st.microStopCount || 0)
+      for (const stop of newOnes) {
+        const dSec = stop.durationSec || 0
+        const reason = stop.reason || stop.name || 'Micro-detención'
+        notifications.push({
+          title: `⚡ Micro-detención · ${plantLabel}`,
+          body:  `${machineName} — ${reason} · ${dSec}s`,
+          tg:    `⚡ <b>Micro-detención</b> — ${plantLabel}\n${machineName} · ${reason} · ${dSec}s`,
+        })
+      }
+      stateUpdates.microStopCount = microStops.length
+    }
+
+    if (notifications.length === 0) return
+
+    // Persistir estado antes de despachar (evita duplicados si re-ejecuta)
+    await stateRef.set({ ...st, ...stateUpdates, updatedAt: new Date() }, { merge: true })
+
+    for (const n of notifications) {
+      await dispatchShoplogixNotif(config, eligibleIds, n.title, n.body, { plant, shiftDoc, machineId }, n.tg)
+    }
+
+    logger.info('[onShoplogixMachineUpdated] dispatched', {
+      plant, shiftDoc, machineId, count: notifications.length,
     })
   },
 )
 
+// ── checkShiftStartDelays ─────────────────────────────────────────────────────
+// Cron cada 5 minutos. Revisa docs pendientes en shoplogixShiftDelayChecks.
+// Si checkAt ya pasó y el turno aún tiene 0 piezas totales → alerta de retraso.
+exports.checkShiftStartDelays = onSchedule(
+  { schedule: 'every 5 minutes', region: 'us-central1' },
+  async () => {
+    const now = new Date()
+    const pending = await db.collection('shoplogixShiftDelayChecks')
+      .where('done', '==', false)
+      .where('checkAt', '<=', now)
+      .get()
+
+    if (pending.empty) return
+
+    for (const doc of pending.docs) {
+      const { plant, shiftDoc, shiftId, plantLabel } = doc.data()
+      try {
+        const config = await getShoplogixNotifConfig(plant)
+        if (!config.shiftStart.enabled) {
+          await doc.ref.update({ done: true })
+          continue
+        }
+
+        // Leer el turno padre para ver si ya tiene ciclos
+        const machinesSnap = await db
+          .collection(`shoplogix/${plant}/shifts/${shiftDoc}/machines`)
+          .get()
+
+        const totalCycles = machinesSnap.docs.reduce(
+          (sum, m) => sum + (m.data().totalCycles || 0), 0
+        )
+
+        if (totalCycles === 0) {
+          // Turno inició pero sin piezas — emitir alerta
+          const label = plantLabel || SHOPLOGIX_PLANT_LABEL[plant] || plant
+          const graceMins = config.shiftStart.gracePeriodMinutes || 20
+          const eligibleIds = await getShoplogixEligibleUsers(plant)
+          await dispatchShoplogixNotif(
+            config,
+            eligibleIds,
+            `⚠️ Sin piezas · ${label}`,
+            `${shiftId} arrancó hace ${graceMins} min pero sin piezas registradas`,
+            { plant, shiftDoc },
+            `⚠️ <b>Sin piezas registradas</b> — ${label}\n${shiftId} arrancó hace ${graceMins} min · Shoplogix no registra actividad`,
+          )
+          logger.warn('[checkShiftStartDelays] alerta emitida', { plant, shiftDoc, totalCycles })
+        } else {
+          logger.info('[checkShiftStartDelays] turno con piezas OK', { plant, shiftDoc, totalCycles })
+        }
+      } catch (e) {
+        logger.error('[checkShiftStartDelays] error procesando', { plant, shiftDoc, err: e.message })
+      }
+      await doc.ref.update({ done: true })
+    }
+  },
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// animeEstrenosDiarios — Resumen diario 23:00 Chile → Telegram
+// ─────────────────────────────────────────────────────────────────────────────
+const ANIME_CHAT_ID = '52949422';
+const ANIME_APP_URL = 'https://mantenimiento-planta-771a3.web.app/anime.html#estrenos';
+const ANILIST_URL   = 'https://graphql.anilist.co';
+
+async function _queryAniList(query, variables) {
+  const { default: fetch } = await import('node-fetch');
+  const r = await fetch(ANILIST_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify({ query, variables }),
+  });
+  return r.json();
+}
+
+async function _sendTelegram(botToken, chatId, text, replyMarkup) {
+  const { default: fetch } = await import('node-fetch');
+  const body = { chat_id: chatId, text, parse_mode: 'HTML', disable_web_page_preview: true };
+  if (replyMarkup) body.reply_markup = replyMarkup;
+  const r = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  return r.json();
+}
+
+async function _runAnimeEstrenos(botToken) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dateKey = today.toISOString().substring(0, 10);
+
+  // Check if already sent today
+  const sentDoc = await db.collection('anime_notifications').doc(dateKey).get();
+  if (sentDoc.exists && sentDoc.data().sent) {
+    logger.info('[anime] Notificación del día ya enviada:', dateKey);
+    return;
+  }
+
+  // Query AniList: episodes aired today (midnight → now + buffer)
+  const from = Math.floor(today.getTime() / 1000);
+  const to   = Math.floor(Date.now() / 1000) + 3600;
+  const GQL = `query($f:Int,$t:Int){Page(page:1,perPage:50){airingSchedules(airingAt_greater:$f,airingAt_lesser:$t){episode airingAt media{id title{romaji english}averageScore format}}}}`;
+  const json = await _queryAniList(GQL, { f: from, t: to });
+  const schedules = json.data?.Page?.airingSchedules || [];
+
+  if (!schedules.length) {
+    logger.info('[anime] Sin estrenos hoy:', dateKey);
+    return;
+  }
+
+  // Read user's tracked anime from Firestore
+  const listsDoc = await db.collection('animelists').doc(ANIME_CHAT_ID).get();
+  const lists = listsDoc.exists ? listsDoc.data() : {};
+  const trackedIds = new Set();
+  const trackedMap = {};
+  for (const [listName, animes] of Object.entries(lists)) {
+    if (!Array.isArray(animes)) continue;
+    for (const a of animes) {
+      trackedIds.add(String(a.id));
+      trackedMap[String(a.id)] = listName;
+    }
+  }
+
+  // Separate tracked vs discovery
+  const FMT = { MOVIE:'🎬', ONA:'🖥️', OVA:'📀', SPECIAL:'🌟', TV:'📺', TV_SHORT:'📺' };
+  const LIST_EMOJI = { viendo:'▶️', interesante:'⭐', pendiente:'📌', completado:'✅', descartado:'❌' };
+
+  const tracked   = [];
+  const discovery = [];
+
+  for (const s of schedules) {
+    const m  = s.media;
+    const id = String(m.id);
+    const title = (m.title.english || m.title.romaji).substring(0, 36);
+    const score = m.averageScore ? ` ⭐${m.averageScore}` : '';
+    const fmt   = FMT[m.format] || '🎞';
+    const ep    = s.episode;
+    const time  = new Date(s.airingAt * 1000).toLocaleTimeString('es-CL', { hour:'2-digit', minute:'2-digit', timeZone:'America/Santiago' });
+    const line  = `${fmt} <b>${title}</b> ep${ep}${score} · ${time}`;
+    if (trackedIds.has(id)) {
+      const emoji = LIST_EMOJI[trackedMap[id]] || '▶️';
+      tracked.push(`${emoji} ${line}`);
+    } else {
+      discovery.push(line);
+    }
+  }
+
+  // Build message
+  const dateLabel = today.toLocaleDateString('es-CL', { weekday:'long', day:'numeric', month:'long', timeZone:'America/Santiago' });
+  const dateCapitalized = dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1);
+  let text = `📺 <b>Estrenos del día — ${dateCapitalized}</b>\n`;
+
+  if (tracked.length) {
+    text += `\n⭐ <b>Tus series (${tracked.length}):</b>\n`;
+    text += tracked.join('\n');
+  }
+  if (discovery.length) {
+    const show = discovery.slice(0, 8);
+    const rest = discovery.length - show.length;
+    text += `\n\n📡 <b>Descubrimiento (${discovery.length}):</b>\n`;
+    text += show.join('\n');
+    if (rest > 0) text += `\n<i>… y ${rest} más en la app</i>`;
+  }
+
+  const replyMarkup = {
+    inline_keyboard: [[
+      { text: '🎌 Ver todos en Mini App', web_app: { url: ANIME_APP_URL } }
+    ]]
+  };
+
+  const result = await _sendTelegram(botToken, ANIME_CHAT_ID, text, replyMarkup);
+  logger.info('[anime] Telegram result:', result.ok, result.description || '');
+
+  // Mark as sent in Firestore
+  await db.collection('anime_notifications').doc(dateKey).set({
+    sent: true, sentAt: FieldValue.serverTimestamp(),
+    tracked: tracked.length, discovery: discovery.length, total: schedules.length,
+  });
+}
+
+exports.animeEstrenosDiarios = onSchedule(
+  {
+    schedule: 'every day 23:00',
+    timeZone: 'America/Santiago',
+    timeoutSeconds: 60,
+    memory: '256MiB',
+    retryCount: 0,
+    secrets: ['ANIME_BOT_TOKEN'],
+  },
+  async () => {
+    const token = process.env.ANIME_BOT_TOKEN;
+    if (!token) { logger.error('[anime] ANIME_BOT_TOKEN no configurado'); return; }
+    await _runAnimeEstrenos(token);
+  }
+);
+
+exports.animeEstrenosManual = onRequest(
+  { region: 'us-central1', secrets: ['ANIME_BOT_TOKEN'] },
+  async (req, res) => {
+    if (req.method !== 'POST') { res.status(405).send('POST only'); return; }
+    const token = process.env.ANIME_BOT_TOKEN;
+    if (!token) { res.status(500).json({ error: 'ANIME_BOT_TOKEN no configurado' }); return; }
+    await _runAnimeEstrenos(token);
+    res.json({ ok: true });
+  }
+);

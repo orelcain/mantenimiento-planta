@@ -1278,5 +1278,25 @@ service cloud.firestore {
     match /system/shoplogixToken {
       allow read, write: if false; // solo Admin SDK (Cloud Functions)
     }
+
+    // ── AnimeTracker Mini App (bot personal, sin auth) ──────────────────────
+    match /animelists/{userId} {
+      allow read, write: if true;
+    }
+
+    // ── Shoplogix Notification Config ────────────────────────────────────────
+    // Config por planta: admins leen/escriben; usuarios autenticados solo leen.
+    match /notificationConfig/{plantSlug} {
+      allow read:  if isAuthenticated();
+      allow write: if isAdmin();
+    }
+    // Estado interno de notificaciones por máquina/turno — solo Admin SDK
+    match /shoplogixNotifState/{docId} {
+      allow read, write: if false;
+    }
+    // Checks de inicio demorado — solo Admin SDK
+    match /shoplogixShiftDelayChecks/{docId} {
+      allow read, write: if false;
+    }
   }
 }
