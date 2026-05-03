@@ -3814,15 +3814,18 @@ exports.onShoplogixMachineUpdated = onDocumentUpdated(
 
     const cyclesBefore = before.totalCycles || 0
     const cyclesAfter  = after.totalCycles  || 0
-    const statesBefore = before.states || []
     const statesAfter  = after.states  || []
 
-    // Salida rápida si no cambió nada relevante
-    if (cyclesBefore === cyclesAfter && statesBefore.length === statesAfter.length) return
+    // Salida rápida: solo dataQualityIssues cambió, nada relevante para notifs
+    if (cyclesBefore === cyclesAfter && (before.states || []).length === statesAfter.length) return
 
     const machineName = after.machineName || machineId
     const plantLabel  = SHOPLOGIX_PLANT_LABEL[plant] || plant
     const shiftId     = after.shiftId || shiftDoc.split('_').slice(1).join('_')
+
+    const isMicro   = (s) => (s.name || '').toLowerCase().includes('micro')
+    const downtimes = statesAfter.filter(s => s.type === 'downtime' && !isMicro(s))
+    const microStops = statesAfter.filter(s => s.type === 'downtime' && isMicro(s))
 
     const [config, eligibleIds] = await Promise.all([
       getShoplogixNotifConfig(plant),
@@ -3830,84 +3833,98 @@ exports.onShoplogixMachineUpdated = onDocumentUpdated(
     ])
     if (eligibleIds.length === 0) return
 
-    // Estado persistente por máquina/turno (idempotencia)
-    const stateRef  = db.doc(`shoplogixNotifState/${plant}_${shiftDoc}_${machineId}`)
-    const stateSnap = await stateRef.get()
-    const st = stateSnap.exists ? stateSnap.data() : {
-      firstPieceSent:     false,
-      lastNotifiedCycles: 0,
-      downtimeCount:      0,
-      microStopCount:     0,
-    }
+    // ── Idempotencia via transacción Firestore ────────────────────────────────
+    // syncDay escribe 2 veces por máquina (doc + dataQualityIssues) y Eventarc
+    // tiene entrega at-least-once → varias invocaciones concurrentes para el
+    // mismo evento. La transacción garantiza que solo UNA actualiza el estado
+    // y determina qué notificaciones enviar. Las demás ven estado ya actualizado
+    // y devuelven lista vacía.
+    const stateRef = db.doc(`shoplogixNotifState/${plant}_${shiftDoc}_${machineId}`)
 
-    const notifications = []
-    const stateUpdates  = {}
+    const notifications = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(stateRef)
 
-    // ── Primera pieza ──────────────────────────────────────────────────────────
-    if (config.firstPiece.enabled && !st.firstPieceSent && cyclesBefore === 0 && cyclesAfter > 0) {
-      notifications.push({
-        title: `🎯 Primera pieza · ${plantLabel}`,
-        body:  `${machineName} procesó su primera pieza · ${shiftId}`,
-        tg:    `🎯 <b>Primera pieza</b> — ${plantLabel}\n${machineName} · ${shiftId}`,
-      })
-      stateUpdates.firstPieceSent = true
-    }
-
-    // ── Hitos de piezas ────────────────────────────────────────────────────────
-    if (config.pieceInterval.enabled && (config.pieceInterval.every || 0) > 0 && cyclesAfter > 0) {
-      const n = config.pieceInterval.every
-      const milestoneNow  = Math.floor(cyclesAfter                              / n)
-      const milestonePrev = Math.floor(Math.max(cyclesBefore, st.lastNotifiedCycles) / n)
-      if (milestoneNow > milestonePrev) {
-        const reached = milestoneNow * n
-        notifications.push({
-          title: `📊 ${reached.toLocaleString()} piezas · ${plantLabel}`,
-          body:  `${machineName} alcanzó ${reached.toLocaleString()} piezas · ${shiftId}`,
-          tg:    `📊 <b>${reached.toLocaleString()} piezas</b> — ${plantLabel}\n${machineName} · ${shiftId}`,
+      // Primera vez que vemos esta máquina/turno: inicializar baseline sin notificar.
+      // Evita "catch-up" de historial al hacer un deploy mid-shift.
+      if (!snap.exists) {
+        tx.set(stateRef, {
+          firstPieceSent:     cyclesAfter > 0,   // si ya tiene ciclos, no notificar
+          lastNotifiedCycles: 0,
+          downtimeCount:      downtimes.length,   // baseline — no notificar histórico
+          microStopCount:     microStops.length,
+          updatedAt:          new Date(),
         })
-        stateUpdates.lastNotifiedCycles = reached
+        return []
       }
-    }
 
-    // ── Detenciones (downtime, excluyendo micro) ───────────────────────────────
-    const isMicro      = (s) => (s.name || '').toLowerCase().includes('micro')
-    const downtimes    = statesAfter.filter(s => s.type === 'downtime' && !isMicro(s))
-    const microStops   = statesAfter.filter(s => s.type === 'downtime' && isMicro(s))
+      const st      = snap.data()
+      const toSend  = []
+      const updates = {}
 
-    if (config.events.stoppage && downtimes.length > (st.downtimeCount || 0)) {
-      const newOnes = downtimes.slice(st.downtimeCount || 0)
-      for (const stop of newOnes) {
-        const dMin = Math.round((stop.durationSec || 0) / 60)
-        const durTxt = dMin > 0 ? `${dMin} min` : 'en curso'
-        const reason = stop.reason || stop.name || 'Detención'
-        notifications.push({
-          title: `⛔ Detención · ${plantLabel}`,
-          body:  `${machineName} — ${reason} · ${durTxt}`,
-          tg:    `⛔ <b>Detención</b> — ${plantLabel}\n${machineName} · ${reason} · ${durTxt}`,
+      // ── Primera pieza ────────────────────────────────────────────────────────
+      if (config.firstPiece.enabled && !st.firstPieceSent && cyclesBefore === 0 && cyclesAfter > 0) {
+        toSend.push({
+          title: `🎯 Primera pieza · ${machineName}`,
+          body:  `${shiftId} · ${plantLabel}`,
+          tg:    `🎯 <b>Primera pieza</b> — ${plantLabel}\n${machineName} · ${shiftId}`,
         })
+        updates.firstPieceSent = true
       }
-      stateUpdates.downtimeCount = downtimes.length
-    }
 
-    // ── Micro-detenciones ──────────────────────────────────────────────────────
-    if (config.events.microStoppage && microStops.length > (st.microStopCount || 0)) {
-      const newOnes = microStops.slice(st.microStopCount || 0)
-      for (const stop of newOnes) {
-        const dSec = stop.durationSec || 0
-        const reason = stop.reason || stop.name || 'Micro-detención'
-        notifications.push({
-          title: `⚡ Micro-detención · ${plantLabel}`,
-          body:  `${machineName} — ${reason} · ${dSec}s`,
-          tg:    `⚡ <b>Micro-detención</b> — ${plantLabel}\n${machineName} · ${reason} · ${dSec}s`,
-        })
+      // ── Hitos de piezas ──────────────────────────────────────────────────────
+      if (config.pieceInterval.enabled && (config.pieceInterval.every || 0) > 0 && cyclesAfter > 0) {
+        const n             = config.pieceInterval.every
+        const milestoneNow  = Math.floor(cyclesAfter / n)
+        const milestonePrev = Math.floor(Math.max(cyclesBefore, st.lastNotifiedCycles || 0) / n)
+        if (milestoneNow > milestonePrev) {
+          const reached = milestoneNow * n
+          toSend.push({
+            title: `📊 ${reached.toLocaleString()} piezas · ${machineName}`,
+            body:  `${shiftId} · ${plantLabel}`,
+            tg:    `📊 <b>${reached.toLocaleString()} piezas</b> — ${plantLabel}\n${machineName} · ${shiftId}`,
+          })
+          updates.lastNotifiedCycles = reached
+        }
       }
-      stateUpdates.microStopCount = microStops.length
-    }
+
+      // ── Detenciones ──────────────────────────────────────────────────────────
+      if (config.events.stoppage && downtimes.length > (st.downtimeCount || 0)) {
+        const newOnes = downtimes.slice(st.downtimeCount || 0)
+        for (const stop of newOnes) {
+          const dMin   = Math.round((stop.durationSec || 0) / 60)
+          const durTxt = dMin > 0 ? `${dMin} min` : 'en curso'
+          const reason = stop.reason || stop.name || 'Detención'
+          toSend.push({
+            title: `⛔ Detención · ${machineName}`,
+            body:  `${reason} · ${durTxt} · ${plantLabel}`,
+            tg:    `⛔ <b>Detención</b> — ${plantLabel}\n${machineName} · ${reason} · ${durTxt}`,
+          })
+        }
+        updates.downtimeCount = downtimes.length
+      }
+
+      // ── Micro-detenciones ─────────────────────────────────────────────────────
+      if (config.events.microStoppage && microStops.length > (st.microStopCount || 0)) {
+        const newOnes = microStops.slice(st.microStopCount || 0)
+        for (const stop of newOnes) {
+          const dSec   = stop.durationSec || 0
+          const reason = stop.reason || stop.name || 'Micro-detención'
+          toSend.push({
+            title: `⚡ Micro-detención · ${machineName}`,
+            body:  `${reason} · ${dSec}s · ${plantLabel}`,
+            tg:    `⚡ <b>Micro-detención</b> — ${plantLabel}\n${machineName} · ${reason} · ${dSec}s`,
+          })
+        }
+        updates.microStopCount = microStops.length
+      }
+
+      if (Object.keys(updates).length > 0) {
+        tx.set(stateRef, { ...st, ...updates, updatedAt: new Date() }, { merge: true })
+      }
+      return toSend
+    })
 
     if (notifications.length === 0) return
-
-    // Persistir estado antes de despachar (evita duplicados si re-ejecuta)
-    await stateRef.set({ ...st, ...stateUpdates, updatedAt: new Date() }, { merge: true })
 
     for (const n of notifications) {
       await dispatchShoplogixNotif(config, eligibleIds, n.title, n.body, { plant, shiftDoc, machineId }, n.tg)
