@@ -1,0 +1,2322 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>AnimeTracker</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+:root {
+  --bg:      var(--tg-theme-bg-color, #0f0f1a);
+  --bg2:     var(--tg-theme-secondary-bg-color, #1a1a2e);
+  --text:    var(--tg-theme-text-color, #e8e8f0);
+  --hint:    var(--tg-theme-hint-color, #6b7280);
+  --accent:  var(--tg-theme-button-color, #7c3aed);
+  --acctxt:  var(--tg-theme-button-text-color, #ffffff);
+  --link:    var(--tg-theme-link-color, #8b5cf6);
+  --nav-h:   60px;
+  --hdr-h:   52px;
+  --radius:  12px;
+}
+
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+#app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+header { height: var(--hdr-h); min-height: var(--hdr-h); display: flex; align-items: center; justify-content: space-between; padding: 0 16px; background: var(--bg2); border-bottom: 1px solid rgba(255,255,255,.06); font-weight: 700; font-size: 17px; }
+header .logo { display: flex; align-items: center; gap: 8px; }
+header .badge { font-size: 11px; font-weight: 600; padding: 2px 8px; background: var(--accent); color: var(--acctxt); border-radius: 99px; }
+.status-dot { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 99px; }
+.status-dot::before { content: ''; width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.status-online  { background: rgba(16,185,129,.15); color: #10b981; }
+.status-online::before  { background: #10b981; box-shadow: 0 0 5px #10b981; }
+.status-offline { background: rgba(239,68,68,.15); color: #ef4444; }
+.status-offline::before { background: #ef4444; }
+.status-loading { background: rgba(107,114,128,.15); color: var(--hint); }
+.status-loading::before { background: var(--hint); animation: pulse .9s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:.3} 50%{opacity:1} }
+
+#content { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; padding-bottom: 8px; }
+
+.bottom-nav { height: var(--nav-h); min-height: var(--nav-h); display: flex; background: var(--bg2); border-top: 1px solid rgba(255,255,255,.06); }
+.nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border: none; background: none; color: var(--hint); font-size: 10px; font-weight: 500; cursor: pointer; transition: color .15s; position: relative; }
+.nav-btn .icon { font-size: 20px; line-height: 1; }
+.nav-btn.active { color: var(--accent); }
+.nav-btn.active::after { content: ''; position: absolute; top: 0; left: 25%; right: 25%; height: 2px; background: var(--accent); border-radius: 99px; }
+.nav-btn .dot { position: absolute; top: 6px; right: calc(50% - 14px); width: 7px; height: 7px; border-radius: 50%; background: #ef4444; border: 2px solid var(--bg2); }
+
+.search-top { padding: 10px 12px; position: sticky; top: 0; background: var(--bg); z-index: 5; display: flex; gap: 8px; align-items: center; border-bottom: 1px solid rgba(255,255,255,.04); }
+.search-wrap { position: relative; flex: 1; }
+.search-input { width: 100%; padding: 9px 12px 9px 36px; background: var(--bg2); border: 1px solid rgba(255,255,255,.08); border-radius: 10px; color: var(--text); font-size: 15px; outline: none; transition: border-color .2s; }
+.search-input:focus { border-color: var(--accent); }
+.search-wrap .si { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); font-size: 15px; pointer-events: none; }
+.view-toggle { display: flex; background: var(--bg2); border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,.08); flex-shrink: 0; }
+.view-btn { width: 34px; height: 34px; border: none; background: none; color: var(--hint); font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .15s; }
+.view-btn.active { background: var(--accent); color: var(--acctxt); }
+
+.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 10px 12px; }
+.grid-card { cursor: pointer; }
+.grid-poster { aspect-ratio: 2/3; border-radius: 8px; overflow: hidden; background: var(--bg2); margin-bottom: 5px; display: flex; align-items: center; justify-content: center; font-size: 28px; position: relative; }
+.grid-poster img { width: 100%; height: 100%; object-fit: cover; }
+.grid-poster .tracked-badge { position: absolute; top: 4px; right: 4px; font-size: 12px; background: rgba(0,0,0,.65); border-radius: 4px; padding: 1px 4px; }
+.grid-title { font-size: 11px; font-weight: 500; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.grid-meta { font-size: 10px; color: var(--hint); margin-top: 2px; }
+
+.list-results { padding: 6px 0; }
+.result-card { display: flex; gap: 11px; padding: 10px 13px; border-bottom: 1px solid rgba(255,255,255,.04); cursor: pointer; transition: background .12s; }
+.result-card:active { background: rgba(255,255,255,.03); }
+.result-poster { width: 62px; min-width: 62px; height: 88px; border-radius: 7px; overflow: hidden; background: var(--bg2); display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0; }
+.result-poster img { width: 100%; height: 100%; object-fit: cover; }
+.result-body { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: space-between; }
+.result-title { font-weight: 600; font-size: 13.5px; line-height: 1.3; margin-bottom: 3px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.result-meta { font-size: 11px; color: var(--hint); display: flex; flex-wrap: wrap; gap: 4px 8px; margin-bottom: 5px; }
+.result-next { font-size: 11px; color: var(--link); margin-bottom: 5px; }
+.result-genres { font-size: 10px; color: var(--hint); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; margin-bottom: 6px; }
+
+.qadd-row { display: flex; gap: 5px; flex-wrap: wrap; }
+.qadd-btn { padding: 4px 9px; border-radius: 7px; border: 1.5px solid rgba(255,255,255,.12); background: none; color: var(--hint); font-size: 11px; font-weight: 500; cursor: pointer; transition: all .15s; white-space: nowrap; }
+.qadd-btn:active { transform: scale(.95); }
+.qadd-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(124,58,237,.12); }
+
+.tracked-chip { display: inline-flex; align-self: flex-start; align-items: center; gap: 3px; font-size: 10px; padding: 2px 6px; border-radius: 5px; background: rgba(124,58,237,.18); color: var(--accent); font-weight: 600; margin-bottom: 4px; }
+
+.section-title { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; color: var(--hint); padding: 12px 14px 5px; }
+
+.card { display: flex; gap: 12px; padding: 11px 14px; align-items: flex-start; cursor: pointer; transition: background .15s; border-bottom: 1px solid rgba(255,255,255,.04); }
+.card:active { background: rgba(255,255,255,.04); }
+.card-poster { width: 72px; min-width: 72px; height: 102px; border-radius: 8px; overflow: hidden; background: var(--bg2); display: flex; align-items: center; justify-content: center; font-size: 28px; }
+.card-poster img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; }
+.card-body { flex: 1; min-width: 0; }
+.card-title { font-weight: 600; font-size: 14px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }
+.card-meta { font-size: 12px; color: var(--hint); margin-bottom: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+.badge-s { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; padding: 2px 6px; border-radius: 6px; background: rgba(255,255,255,.08); }
+.progress-wrap { margin-bottom: 8px; }
+.progress-label { font-size: 11px; color: var(--hint); margin-bottom: 4px; display: flex; justify-content: space-between; }
+.progress-bar { height: 4px; background: rgba(255,255,255,.08); border-radius: 99px; overflow: hidden; }
+.progress-fill { height: 100%; background: var(--accent); border-radius: 99px; transition: width .3s; }
+.ep-counter { display: inline-flex; align-items: center; background: var(--bg2); border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,.08); }
+.ep-btn { width: 32px; height: 32px; border: none; background: none; color: var(--accent); font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .1s; }
+.ep-btn:active { background: rgba(124,58,237,.15); }
+.ep-count { font-size: 13px; font-weight: 600; padding: 0 10px; color: var(--text); min-width: 52px; text-align: center; }
+
+.overview-card { margin: 7px 13px; padding: 14px; background: var(--bg2); border-radius: var(--radius); cursor: pointer; transition: transform .15s; border: 1px solid rgba(255,255,255,.06); }
+.overview-card:active { transform: scale(.98); }
+.ov-row { display: flex; align-items: center; justify-content: space-between; }
+.ov-left { display: flex; align-items: center; gap: 10px; }
+.ov-icon { font-size: 22px; }
+.ov-label { font-weight: 600; font-size: 15px; }
+.ov-sub { font-size: 11px; color: var(--hint); margin-top: 2px; }
+.ov-count { font-size: 26px; font-weight: 700; color: var(--accent); }
+.ov-bar { height: 3px; background: rgba(255,255,255,.06); border-radius: 99px; margin-top: 10px; overflow: hidden; }
+.ov-bar-fill { height: 100%; background: var(--accent); border-radius: 99px; }
+
+#detail { position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column; background: var(--bg); transform: translateY(100%); transition: transform .3s cubic-bezier(.32,.72,0,1); }
+#detail.open { transform: translateY(0); }
+#detail.closing { transform: translateY(100%); }
+.detail-header { display: flex; align-items: center; gap: 12px; padding: 13px 14px; background: var(--bg2); border-bottom: 1px solid rgba(255,255,255,.06); }
+.back-btn { width: 34px; height: 34px; border-radius: 50%; border: none; background: rgba(255,255,255,.08); color: var(--text); font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.detail-title { font-weight: 700; font-size: 15px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.detail-body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.detail-hero { display: flex; gap: 14px; padding: 14px; align-items: flex-start; }
+.detail-hero-img { width: 100px; min-width: 100px; height: 142px; border-radius: 9px; overflow: hidden; background: var(--bg2); display: flex; align-items: center; justify-content: center; font-size: 36px; }
+.detail-hero-img img { width: 100%; height: 100%; object-fit: cover; }
+.detail-info { flex: 1; }
+.detail-name { font-weight: 700; font-size: 15px; line-height: 1.3; margin-bottom: 6px; }
+.detail-badges { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
+.detail-badge { font-size: 11px; padding: 3px 8px; border-radius: 6px; background: rgba(255,255,255,.08); color: var(--hint); }
+.detail-score { font-size: 18px; font-weight: 700; color: #fbbf24; }
+.detail-section { padding: 0 14px 14px; }
+.detail-section-title { font-size: 11px; font-weight: 600; color: var(--hint); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
+.ep-big { display: flex; align-items: center; justify-content: center; background: var(--bg2); border-radius: var(--radius); overflow: hidden; border: 1px solid rgba(255,255,255,.08); }
+.ep-big .ep-btn { width: 52px; height: 52px; font-size: 22px; }
+.ep-big .ep-count { font-size: 18px; font-weight: 700; min-width: 80px; }
+.list-selector { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.list-opt { padding: 9px 10px; border-radius: 9px; background: var(--bg2); border: 1.5px solid transparent; cursor: pointer; transition: all .15s; font-size: 12px; font-weight: 500; text-align: center; }
+.list-opt.active { border-color: var(--accent); color: var(--accent); background: rgba(124,58,237,.12); }
+.list-opt:active { transform: scale(.97); }
+.action-btn { width: 100%; padding: 12px; border-radius: var(--radius); border: none; font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity .15s; margin-bottom: 7px; }
+.action-btn:active { opacity: .7; }
+.action-primary { background: var(--accent); color: var(--acctxt); }
+.action-danger { background: rgba(239,68,68,.15); color: #f87171; }
+.action-ghost { background: var(--bg2); color: var(--text); }
+
+.recent-header { display: flex; align-items: center; justify-content: space-between; padding-right: 14px; }
+.recent-clear { font-size: 12px; color: var(--hint); background: none; border: none; cursor: pointer; padding: 4px 0; }
+.recent-clear:active { color: var(--text); }
+.recent-list { padding: 4px 0 8px; }
+.recent-item { display: flex; align-items: center; gap: 10px; padding: 8px 14px; cursor: pointer; transition: background .12s; }
+.recent-item:active { background: rgba(255,255,255,.04); }
+.recent-thumb { width: 36px; height: 36px; border-radius: 6px; overflow: hidden; background: var(--bg2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.recent-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.recent-label { flex: 1; font-size: 14px; font-weight: 500; }
+.recent-count { font-size: 11px; color: var(--hint); background: var(--bg2); padding: 2px 7px; border-radius: 99px; }
+
+.empty { text-align: center; padding: 44px 22px; color: var(--hint); }
+.empty .big { font-size: 46px; margin-bottom: 10px; }
+.empty p { font-size: 14px; line-height: 1.5; }
+.spinner { display: flex; align-items: center; justify-content: center; padding: 44px; }
+.spinner::after { content: ''; width: 26px; height: 26px; border: 3px solid rgba(255,255,255,.1); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+#toast { position: fixed; bottom: calc(var(--nav-h) + 12px); left: 50%; transform: translateX(-50%) translateY(20px); background: #1e1e30; color: var(--text); padding: 9px 16px; border-radius: 99px; font-size: 13px; font-weight: 500; border: 1px solid rgba(255,255,255,.1); opacity: 0; transition: all .2s; pointer-events: none; z-index: 200; white-space: nowrap; box-shadow: 0 4px 20px rgba(0,0,0,.4); }
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ── Estrenos tab ─────────────────────────────────────────────────────────── */
+.estrenos-header { padding: 12px 14px 8px; position: sticky; top: 0; background: var(--bg); z-index: 5; border-bottom: 1px solid rgba(255,255,255,.04); }
+.estrenos-date-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.estrenos-date { font-size: 15px; font-weight: 700; }
+.estrenos-refresh { width: 32px; height: 32px; border: none; background: var(--bg2); border-radius: 50%; color: var(--hint); font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .2s; }
+.estrenos-refresh:active { transform: rotate(180deg); color: var(--accent); }
+.estrenos-refresh.spinning { animation: spin .7s linear infinite; color: var(--accent); }
+.filter-chips { display: flex; gap: 7px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.filter-chips::-webkit-scrollbar { display: none; }
+.chip { padding: 5px 13px; border-radius: 99px; font-size: 12px; font-weight: 600; border: 1.5px solid rgba(255,255,255,.1); background: none; color: var(--hint); cursor: pointer; white-space: nowrap; transition: all .15s; flex-shrink: 0; }
+.chip.active { background: var(--accent); border-color: var(--accent); color: var(--acctxt); }
+
+.estreno-section { padding: 4px 0 2px; }
+.estreno-section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--hint); padding: 10px 14px 6px; display: flex; align-items: center; gap: 6px; }
+.estreno-section-title::after { content: ''; flex: 1; height: 1px; background: rgba(255,255,255,.06); }
+
+.estreno-card { display: flex; gap: 11px; padding: 10px 13px; border-bottom: 1px solid rgba(255,255,255,.04); cursor: pointer; transition: background .12s; }
+.estreno-card:active { background: rgba(255,255,255,.03); }
+.estreno-card.is-tracked { background: rgba(124,58,237,.04); border-left: 3px solid var(--accent); padding-left: 10px; }
+.estreno-poster { width: 58px; min-width: 58px; height: 84px; border-radius: 7px; overflow: hidden; background: var(--bg2); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; position: relative; }
+.estreno-poster img { width: 100%; height: 100%; object-fit: cover; }
+.estreno-time-badge { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,.72); font-size: 9px; font-weight: 700; text-align: center; padding: 2px 0; color: #fff; letter-spacing: .3px; }
+.estreno-body { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: space-between; }
+.estreno-title { font-weight: 600; font-size: 13px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 3px; }
+.estreno-meta { font-size: 11px; color: var(--hint); display: flex; flex-wrap: wrap; gap: 4px 7px; margin-bottom: 4px; }
+.estreno-genres { font-size: 10px; color: var(--hint); opacity: .7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 5px; }
+.estreno-ep-counter { display: inline-flex; align-items: center; background: rgba(124,58,237,.12); border-radius: 7px; overflow: hidden; border: 1px solid rgba(124,58,237,.25); align-self: flex-start; }
+.estreno-ep-counter .ep-btn { width: 28px; height: 26px; font-size: 15px; }
+.estreno-ep-counter .ep-count { font-size: 11px; font-weight: 600; padding: 0 7px; min-width: 40px; }
+
+/* ── Day navigation (← Hoy →) ──────────────────────────────────────────────── */
+.day-nav-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.day-arrow { width: 38px; height: 44px; border: none; background: var(--bg2); border-radius: 10px; color: var(--text); font-size: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .12s; flex-shrink: 0; line-height: 1; font-weight: 600; }
+.day-arrow:active { opacity: .6; transform: scale(.92); }
+.day-arrow:disabled { opacity: .3; cursor: default; }
+.day-center { flex: 1; text-align: center; cursor: pointer; padding: 4px 6px; border-radius: 10px; transition: background .12s; min-width: 0; }
+.day-center:active { background: rgba(255,255,255,.04); }
+.day-center.is-today { cursor: default; }
+.day-date { font-size: 13.5px; font-weight: 700; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.day-relative { font-size: 11px; color: var(--hint); margin-top: 2px; }
+.day-relative.is-today { color: var(--accent); font-weight: 600; }
+.day-actions-row { display: flex; gap: 8px; align-items: center; }
+.day-actions-row .filter-chips { flex: 1; min-width: 0; }
+.day-loading-bar { font-size: 10px; color: var(--hint); padding: 5px 14px; text-align: center; display: flex; align-items: center; justify-content: center; gap: 6px; background: rgba(124,58,237,.06); }
+.day-loading-bar::before { content: ''; width: 10px; height: 10px; border: 1.5px solid rgba(255,255,255,.15); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
+
+/* ── Estrenos grid view (big posters) ──────────────────────────────────────── */
+.day-view-toggle { display: flex; background: var(--bg2); border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,.08); flex-shrink: 0; }
+.day-view-btn { width: 32px; height: 32px; border: none; background: none; color: var(--hint); font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .15s; }
+.day-view-btn.active { background: var(--accent); color: var(--acctxt); }
+.estreno-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 10px 12px; }
+.estreno-grid-card { cursor: pointer; transition: transform .15s; position: relative; }
+.estreno-grid-card:active { transform: scale(.97); }
+.estreno-grid-card.is-tracked .egc-poster { box-shadow: 0 0 0 2.5px var(--accent); }
+.egc-poster { aspect-ratio: 2/3; border-radius: 10px; overflow: hidden; background: var(--bg2); position: relative; margin-bottom: 6px; }
+.egc-poster img { width: 100%; height: 100%; object-fit: cover; }
+.egc-overlay { position: absolute; inset: auto 0 0 0; background: linear-gradient(to top, rgba(0,0,0,.85) 30%, transparent); padding: 18px 8px 7px; display: flex; justify-content: space-between; align-items: flex-end; gap: 6px; }
+.egc-time { font-size: 11px; font-weight: 700; color: white; letter-spacing: .3px; }
+.egc-ep { font-size: 11px; font-weight: 600; color: rgba(255,255,255,.9); background: rgba(0,0,0,.45); padding: 2px 7px; border-radius: 4px; }
+.egc-track-badge { position: absolute; top: 6px; left: 6px; background: rgba(124,58,237,.92); color: white; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 5px; backdrop-filter: blur(4px); display: inline-flex; align-items: center; gap: 3px; }
+.egc-progress-pill { position: absolute; top: 6px; right: 6px; background: rgba(0,0,0,.65); color: white; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 5px; backdrop-filter: blur(4px); }
+.egc-format-icon { position: absolute; bottom: 38px; right: 6px; font-size: 14px; opacity: .9; filter: drop-shadow(0 1px 2px rgba(0,0,0,.7)); }
+.egc-title { font-size: 12px; font-weight: 600; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.egc-meta { font-size: 10.5px; color: var(--hint); margin-top: 2px; display: flex; gap: 5px; flex-wrap: wrap; }
+
+/* ── Image viewer (cover zoom + pan) ────────────────────────────────────────── */
+.detail-hero-img { cursor: zoom-in; }
+.detail-hero-img::after { content: '🔍'; position: absolute; bottom: 4px; right: 4px; background: rgba(0,0,0,.6); border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 11px; pointer-events: none; opacity: .85; }
+.detail-hero-img { position: relative; }
+#img-viewer { position: fixed; inset: 0; z-index: 300; display: none; background: rgba(0,0,0,.96); align-items: center; justify-content: center; touch-action: none; overflow: hidden; }
+#img-viewer.open { display: flex; }
+.iv-canvas { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
+#iv-img { max-width: 100%; max-height: 100%; user-select: none; -webkit-user-drag: none; pointer-events: none; transform-origin: center center; will-change: transform; transition: transform .2s ease-out; }
+#iv-img.dragging { transition: none; }
+.iv-close { position: absolute; top: 14px; right: 14px; width: 40px; height: 40px; border-radius: 50%; background: rgba(0,0,0,.55); color: white; border: 1.5px solid rgba(255,255,255,.18); font-size: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 10; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); line-height: 1; }
+.iv-close:active { background: rgba(0,0,0,.85); transform: scale(.92); }
+.iv-hint { position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%); color: rgba(255,255,255,.6); font-size: 11px; text-align: center; pointer-events: none; background: rgba(0,0,0,.5); padding: 6px 14px; border-radius: 99px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); white-space: nowrap; transition: opacity .4s; z-index: 10; }
+.iv-hint.fade { opacity: 0; }
+
+/* ── User link (per-anime streaming URL) ───────────────────────────────────── */
+.link-row { display: flex; gap: 7px; align-items: stretch; margin-bottom: 7px; }
+.link-open-btn { flex: 1; display: flex; align-items: center; gap: 9px; padding: 11px 14px; background: rgba(124,58,237,.14); color: var(--text); border: 1.5px solid rgba(124,58,237,.32); border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s; min-width: 0; }
+.link-open-btn:active { background: rgba(124,58,237,.24); transform: scale(.98); }
+.link-domain { flex: 1; text-align: left; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.link-arrow { color: var(--accent); font-size: 14px; flex-shrink: 0; }
+.link-edit-btn { width: 44px; background: var(--bg2); border: 1.5px solid rgba(255,255,255,.08); color: var(--hint); border-radius: 10px; cursor: pointer; font-size: 14px; flex-shrink: 0; transition: all .15s; }
+.link-edit-btn:active { background: rgba(255,255,255,.06); transform: scale(.95); }
+.link-add-btn { width: 100%; padding: 11px 14px; background: var(--bg2); border: 1.5px dashed rgba(255,255,255,.15); color: var(--hint); border-radius: 10px; cursor: pointer; font-size: 13px; font-weight: 500; transition: all .15s; }
+.link-add-btn:active { background: rgba(124,58,237,.08); border-color: var(--accent); color: var(--accent); transform: scale(.99); }
+
+/* ── Modal (link input) ─────────────────────────────────────────────────────── */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.72); z-index: 250; display: none; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+.modal-overlay.open { display: flex; }
+.modal-content { background: var(--bg2); border-radius: 14px; padding: 18px; width: 100%; max-width: 360px; border: 1px solid rgba(255,255,255,.06); }
+.modal-title { font-weight: 700; font-size: 15px; margin-bottom: 4px; }
+.modal-sub { font-size: 11px; color: var(--hint); margin-bottom: 12px; }
+.modal-input { width: 100%; padding: 11px 13px; background: var(--bg); border: 1.5px solid rgba(255,255,255,.1); border-radius: 9px; color: var(--text); font-size: 14px; outline: none; margin-bottom: 14px; transition: border-color .2s; }
+.modal-input:focus { border-color: var(--accent); }
+.modal-actions { display: flex; gap: 8px; }
+.modal-actions .action-btn { flex: 1; margin-bottom: 0; padding: 10px; }
+.modal-delete { display: block; margin: 12px auto 0; background: none; border: none; color: #f87171; font-size: 12px; cursor: pointer; padding: 4px 10px; border-radius: 6px; }
+.modal-delete:active { background: rgba(239,68,68,.1); }
+.link-list { display: flex; flex-direction: column; gap: 6px; }
+
+/* ── Search result enrichments (progress counter + links inline) ───────────── */
+.result-progress-wrap { margin-bottom: 6px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.result-progress-wrap .estreno-ep-counter .ep-btn { width: 26px; height: 24px; font-size: 14px; }
+.result-progress-wrap .estreno-ep-counter .ep-count { font-size: 10.5px; padding: 0 7px; min-width: 56px; }
+.result-progress-bar { flex: 1; min-width: 60px; height: 3px; background: rgba(255,255,255,.08); border-radius: 99px; overflow: hidden; }
+.result-progress-bar-fill { height: 100%; background: var(--accent); border-radius: 99px; transition: width .25s; }
+.result-links { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 6px; }
+.link-mini-btn { padding: 3px 9px; border-radius: 6px; border: 1px solid rgba(124,58,237,.3); background: rgba(124,58,237,.1); color: var(--accent); font-size: 10.5px; font-weight: 600; cursor: pointer; transition: all .12s; white-space: nowrap; display: inline-flex; align-items: center; gap: 3px; }
+.link-mini-btn:active { background: rgba(124,58,237,.22); transform: scale(.95); }
+.tracked-badge.with-eps { font-size: 10px; padding: 2px 6px; }
+.ep-count.editable { cursor: pointer; transition: background .12s, color .12s; border-radius: 4px; }
+.ep-count.editable:active { background: rgba(124,58,237,.2); color: var(--accent); }
+.ep-count.editable::after { content: '✎'; font-size: 9px; margin-left: 4px; opacity: .5; vertical-align: middle; }
+
+/* ── Search filters ────────────────────────────────────────────────────────── */
+.filter-btn { width: 34px; height: 34px; border: 1px solid rgba(255,255,255,.08); background: var(--bg2); border-radius: 8px; color: var(--hint); font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .15s; flex-shrink: 0; position: relative; }
+.filter-btn:active { transform: scale(.92); }
+.filter-btn.has-filters { background: var(--accent); color: var(--acctxt); border-color: var(--accent); }
+.filter-btn .filter-count { position: absolute; top: -3px; right: -3px; background: #ef4444; color: white; font-size: 9px; font-weight: 700; min-width: 14px; height: 14px; padding: 0 3px; border-radius: 7px; display: flex; align-items: center; justify-content: center; border: 2px solid var(--bg); }
+.active-filters { display: flex; flex-wrap: wrap; gap: 5px; padding: 4px 12px 8px; align-items: center; }
+.active-filter-chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 4px 3px 9px; background: rgba(124,58,237,.15); border: 1px solid rgba(124,58,237,.3); border-radius: 99px; font-size: 11px; font-weight: 600; color: var(--accent); }
+.active-filter-chip button { background: rgba(124,58,237,.2); border: none; color: var(--accent); width: 18px; height: 18px; border-radius: 50%; cursor: pointer; font-size: 11px; padding: 0; display: flex; align-items: center; justify-content: center; }
+.active-filter-chip button:active { background: rgba(124,58,237,.4); }
+.active-filters .clear-all-btn { font-size: 11px; color: var(--hint); background: none; border: none; cursor: pointer; padding: 3px 6px; }
+.active-filters .clear-all-btn:active { color: var(--text); }
+.filter-modal-content { max-width: 420px; max-height: 88vh; overflow-y: auto; }
+.filter-section { margin-bottom: 14px; }
+.filter-section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--hint); margin-bottom: 6px; }
+.filter-chips-row { display: flex; flex-wrap: wrap; gap: 5px; }
+.filter-chip { padding: 5px 10px; border-radius: 7px; border: 1.5px solid rgba(255,255,255,.1); background: var(--bg); color: var(--hint); font-size: 11.5px; font-weight: 600; cursor: pointer; transition: all .12s; white-space: nowrap; }
+.filter-chip:active { transform: scale(.96); }
+.filter-chip.active { background: var(--accent); color: var(--acctxt); border-color: var(--accent); }
+.filter-chip.multi.active { background: rgba(124,58,237,.18); color: var(--accent); border-color: rgba(124,58,237,.5); }
+select.modal-input { background-image: linear-gradient(45deg, transparent 50%, var(--hint) 50%), linear-gradient(135deg, var(--hint) 50%, transparent 50%); background-position: calc(100% - 18px) center, calc(100% - 13px) center; background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; appearance: none; padding-right: 32px; }
+.progress-aired { font-size: 10.5px; color: var(--hint); margin-top: 3px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.progress-aired .behind { color: #fbbf24; font-weight: 600; }
+.progress-aired .uptodate { color: #10b981; font-weight: 600; }
+.progress-aired .ahead { color: var(--accent); font-weight: 600; }
+
+/* ── Personal rating (stars) ────────────────────────────────────────────────── */
+.star-row { display: flex; gap: 1px; align-items: center; }
+.star-btn { background: none; border: none; font-size: 24px; cursor: pointer; padding: 0 3px; line-height: 1; transition: transform .1s; color: #fbbf24; opacity: .22; }
+.star-btn.filled { opacity: 1; }
+.star-btn:active { transform: scale(.78); }
+.rating-label { font-size: 11px; color: var(--hint); margin-left: 5px; }
+.rating-clear { font-size: 10px; color: var(--hint); background: none; border: none; cursor: pointer; padding: 2px 6px; border-radius: 5px; }
+.rating-clear:active { background: rgba(255,255,255,.06); color: var(--text); }
+.card-rating { display: flex; gap: 0; align-items: center; margin-top: 4px; }
+.card-star { font-size: 13px; color: #fbbf24; opacity: .22; }
+.card-star.filled { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="logo">🎌 <span>AnimeTracker</span></div>
+    <div style="display:flex;align-items:center;gap:7px">
+      <span class="status-dot status-loading" id="conn-status" title="Verificando conexión…">…</span>
+      <span class="badge" id="hdr-badge">Buscar</span>
+    </div>
+  </header>
+  <div id="content"></div>
+  <nav class="bottom-nav">
+    <button class="nav-btn" data-tab="estrenos" onclick="setTab('estrenos')"><span class="icon">📺</span><span>Estrenos</span></button>
+    <button class="nav-btn active" data-tab="buscar" onclick="setTab('buscar')"><span class="icon">🔍</span><span>Buscar</span></button>
+    <button class="nav-btn" data-tab="viendo" onclick="setTab('viendo')"><span class="icon">▶️</span><span>Viendo</span><span class="dot" id="dot-viendo" style="display:none"></span></button>
+    <button class="nav-btn" data-tab="pendiente" onclick="setTab('pendiente')"><span class="icon">📌</span><span>Pendiente</span></button>
+    <button class="nav-btn" data-tab="listas" onclick="setTab('listas')"><span class="icon">📂</span><span>Listas</span></button>
+  </nav>
+</div>
+
+<div id="detail">
+  <div class="detail-header">
+    <button class="back-btn" onclick="closeDetail()">←</button>
+    <span class="detail-title" id="detail-title">Cargando...</span>
+  </div>
+  <div class="detail-body" id="detail-body"></div>
+</div>
+
+<div id="toast"></div>
+
+<div id="img-viewer">
+  <div class="iv-canvas" id="iv-canvas">
+    <img id="iv-img" alt="">
+  </div>
+  <button class="iv-close" onclick="closeImgViewer()" aria-label="Cerrar">×</button>
+  <div class="iv-hint" id="iv-hint">Pellizca o doble-tap para zoom · tap fuera para cerrar</div>
+</div>
+
+<div id="link-modal" class="modal-overlay" onclick="if(event.target===this)closeLinkModal()">
+  <div class="modal-content">
+    <div class="modal-title" id="link-modal-title">🔗 Agregar link</div>
+    <div class="modal-sub">Crunchyroll, Netflix, AnimeFLV…</div>
+    <input type="url" id="link-input" placeholder="https://..." class="modal-input" autocomplete="off">
+    <div class="modal-actions">
+      <button class="action-btn action-ghost" onclick="closeLinkModal()">Cancelar</button>
+      <button class="action-btn action-primary" onclick="saveLinkFromModal()">Guardar</button>
+    </div>
+    <button class="modal-delete" id="link-modal-delete" onclick="removeLinkFromModal()" style="display:none">🗑️ Eliminar este link</button>
+  </div>
+</div>
+
+<div id="nick-modal" class="modal-overlay" onclick="if(event.target===this)closeNickModal()">
+  <div class="modal-content">
+    <div class="modal-title">🏷️ Apodo del anime</div>
+    <div class="modal-sub">Nombre corto para encontrarlo más rápido (deja vacío para quitar)</div>
+    <input type="text" id="nick-input" placeholder="Ej: SnK, KnY, MHA…" class="modal-input" autocomplete="off" maxlength="40">
+    <div class="modal-actions">
+      <button class="action-btn action-ghost" onclick="closeNickModal()">Cancelar</button>
+      <button class="action-btn action-primary" onclick="saveNickFromModal()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div id="ep-modal" class="modal-overlay" onclick="if(event.target===this)closeEpModal()">
+  <div class="modal-content">
+    <div class="modal-title">📺 Episodios vistos</div>
+    <div class="modal-sub" id="ep-modal-sub">—</div>
+    <input type="number" id="ep-input" class="modal-input" inputmode="numeric" min="0" placeholder="0">
+    <div class="modal-actions">
+      <button class="action-btn action-ghost" onclick="closeEpModal()">Cancelar</button>
+      <button class="action-btn action-primary" onclick="saveEpFromModal()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div id="list-modal" class="modal-overlay" onclick="if(event.target===this)closeCreateListModal()">
+  <div class="modal-content">
+    <div class="modal-title" id="list-modal-title">📂 Nueva lista</div>
+    <div class="modal-sub">Nombre + emoji para identificarla rápido</div>
+    <input type="text" id="list-name-input" placeholder="Joyitas viejas, Comfort, Top 2025…" class="modal-input" autocomplete="off" maxlength="30">
+    <input type="text" id="list-emoji-input" placeholder="Emoji (📂 💎 ☕ 🌟 🍿…)" class="modal-input" autocomplete="off" maxlength="3">
+    <div class="modal-actions">
+      <button class="action-btn action-ghost" onclick="closeCreateListModal()">Cancelar</button>
+      <button class="action-btn action-primary" onclick="saveCreateListFromModal()">Guardar</button>
+    </div>
+    <button class="modal-delete" id="list-modal-delete" onclick="deleteListFromModal()" style="display:none">🗑️ Eliminar lista</button>
+  </div>
+</div>
+
+<div id="filter-modal" class="modal-overlay" onclick="if(event.target===this)closeFilterModal()">
+  <div class="modal-content filter-modal-content">
+    <div class="modal-title">⚙️ Filtros de búsqueda</div>
+    <div class="modal-sub">Combina filtros para descubrir joyitas</div>
+
+    <div class="filter-section">
+      <div class="filter-section-title">📅 Año</div>
+      <select id="filter-year" class="modal-input"></select>
+    </div>
+
+    <div class="filter-section">
+      <div class="filter-section-title">🗓 Temporada</div>
+      <div class="filter-chips-row" id="filter-seasons"></div>
+    </div>
+
+    <div class="filter-section">
+      <div class="filter-section-title">📡 Estado</div>
+      <div class="filter-chips-row" id="filter-statuses"></div>
+    </div>
+
+    <div class="filter-section">
+      <div class="filter-section-title">🎬 Formato</div>
+      <div class="filter-chips-row" id="filter-formats"></div>
+    </div>
+
+    <div class="filter-section">
+      <div class="filter-section-title">🎭 Géneros (multi)</div>
+      <div class="filter-chips-row" id="filter-genres"></div>
+    </div>
+
+    <div class="filter-section">
+      <div class="filter-section-title">🏷️ Tags populares</div>
+      <div class="filter-chips-row" id="filter-tags"></div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="action-btn action-ghost" onclick="clearAllFilters()">Limpiar</button>
+      <button class="action-btn action-primary" onclick="applyFilters()">Aplicar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Firebase ──────────────────────────────────────────────────────────────────
+firebase.initializeApp({
+  apiKey: "AIzaSyBsJSh6x3ZGEyuXsM18dSWsJKyU7--KJss",
+  authDomain: "mantenimiento-planta-771a3.firebaseapp.com",
+  projectId: "mantenimiento-planta-771a3",
+});
+const db = firebase.firestore();
+
+// ── Telegram WebApp ───────────────────────────────────────────────────────────
+const tg = window.Telegram && window.Telegram.WebApp;
+if (tg) { tg.ready(); tg.expand(); }
+
+function getUserId() {
+  const uid = tg?.initDataUnsafe?.user?.id;
+  return uid ? String(uid) : 'default';
+}
+
+// ── State ─────────────────────────────────────────────────────────────────────
+const DEFAULT_LIST_KEYS = ['viendo','interesante','pendiente','completado','descartado'];
+const DEFAULT_LIST_META = {
+  viendo:      { name: 'Viendo',      emoji: '▶️' },
+  interesante: { name: 'Interés',     emoji: '⭐' },
+  pendiente:   { name: 'Pendiente',   emoji: '📌' },
+  completado:  { name: 'Completado',  emoji: '✅' },
+  descartado:  { name: 'Descartado',  emoji: '❌' },
+};
+const EMPTY_LISTS = () => ({ viendo:[], interesante:[], pendiente:[], completado:[], descartado:[] });
+let allLists = EMPTY_LISTS();
+let listMeta = {};                  // metadata for custom lists: { customKey: {name, emoji} }
+function isCustomList(key) { return !DEFAULT_LIST_KEYS.includes(key); }
+function getAllListKeys() { return [...DEFAULT_LIST_KEYS, ...Object.keys(listMeta)]; }
+function getListMeta(key) { return DEFAULT_LIST_META[key] || listMeta[key] || { name: key, emoji: '📂' }; }
+let currentTab = 'buscar';
+let searchTimer = null;
+let detailAnime = null;
+let viewMode = 'list';
+let lastSearchResults = [];
+let lastSearchQuery = '';
+
+// Day view state (single day, navigable with arrows)
+let currentDay = new Date(); currentDay.setHours(0,0,0,0);
+let dayData = [];        // current day's episodes (already sorted by airingAt)
+let dayLoading = false;  // true while fetching from AniList
+let dayFetchToken = 0;   // invalidates older fetches when navigating quickly
+let dayView = (function(){ try { return localStorage.getItem('at_day_view') || 'list'; } catch { return 'list'; } })(); // 'list' | 'grid'
+
+// ── Recent searches ───────────────────────────────────────────────────────────
+const LS_KEY = 'at_recent_searches';
+function getRecent() { try { return JSON.parse(localStorage.getItem(LS_KEY)||'[]'); } catch { return []; } }
+function saveRecent(q, results) {
+  if (!q || !results.length) return;
+  let list = getRecent().filter(r => r.q.toLowerCase() !== q.toLowerCase());
+  list.unshift({ q, cover: results[0].cover||null, count: results.length, ts: Date.now() });
+  try { localStorage.setItem(LS_KEY, JSON.stringify(list.slice(0,10))); } catch {}
+}
+function clearRecent() { localStorage.removeItem(LS_KEY); renderSearch(); }
+
+// ── Utils ─────────────────────────────────────────────────────────────────────
+function toast(msg, ms=2200) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), ms);
+}
+function haptic(t) { if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred(t||'light'); }
+function safe(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function pct(w,t) { return t ? Math.min(100,Math.round(w/t*100)) : 0; }
+function imgTag(src, fb='🎌') {
+  if (!src) return fb;
+  return `<img src="${safe(src)}" loading="lazy" onerror="this.parentElement.innerHTML='${fb}'">`;
+}
+function statusLabel(s) {
+  return {RELEASING:'📺 En emisión',FINISHED:'✅ Terminado',NOT_YET_RELEASED:'🔜 Próximo',CANCELLED:'🚫 Cancelado',HIATUS:'⏸ Pausa'}[s]||s||'';
+}
+const LIST_OPTS = [
+  {key:'viendo',emoji:'▶️',label:'Viendo'},
+  {key:'interesante',emoji:'⭐',label:'Interés'},
+  {key:'pendiente',emoji:'📌',label:'Pendiente'},
+  {key:'completado',emoji:'✅',label:'Hecho'},
+];
+
+// ── Firestore: data layer ─────────────────────────────────────────────────────
+async function loadLists() {
+  try {
+    const snap = await db.collection('animelists').doc(getUserId()).get();
+    if (snap.exists) {
+      const d = snap.data();
+      // Default lists
+      allLists = {};
+      for (const k of DEFAULT_LIST_KEYS) allLists[k] = d[k] || [];
+      // Custom list metadata + items
+      listMeta = d.listMeta || {};
+      for (const k of Object.keys(listMeta)) allLists[k] = d[k] || [];
+      // Migrate userLink (string) → userLinks (array) for older entries
+      for (const list of Object.values(allLists)) {
+        for (const a of list) {
+          if (!Array.isArray(a.userLinks)) {
+            a.userLinks = a.userLink ? [a.userLink] : [];
+          }
+          if ('userLink' in a) delete a.userLink;
+        }
+      }
+    }
+  } catch(e) { console.error('loadLists:', e); }
+  updateDots();
+  return allLists;
+}
+
+async function saveLists() {
+  try {
+    await db.collection('animelists').doc(getUserId()).set({
+      ...allLists,
+      listMeta,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch(e) { console.error('saveLists:', e); }
+}
+
+// Custom list CRUD
+async function createCustomList(name, emoji) {
+  const key = 'custom_' + Date.now().toString(36);
+  listMeta[key] = { name: (name||'').trim().slice(0, 30) || 'Sin nombre', emoji: emoji || '📂' };
+  allLists[key] = [];
+  await saveLists();
+  return key;
+}
+async function renameCustomList(key, name, emoji) {
+  if (!isCustomList(key) || !listMeta[key]) return;
+  listMeta[key] = { name: (name||'').trim().slice(0,30) || listMeta[key].name, emoji: emoji || listMeta[key].emoji };
+  await saveLists();
+}
+async function deleteCustomList(key) {
+  if (!isCustomList(key) || !listMeta[key]) return;
+  delete listMeta[key];
+  delete allLists[key];
+  try {
+    await db.collection('animelists').doc(getUserId()).update({
+      [key]: firebase.firestore.FieldValue.delete(),
+      listMeta: listMeta,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch(e) { console.error('deleteCustomList:', e); }
+}
+
+async function trackAnime(r, list) {
+  const id = Number(r.id);
+  // Remove from all lists (defaults + customs)
+  let existing = null;
+  for (const l of getAllListKeys()) {
+    const i = (allLists[l]||[]).findIndex(a => a.id === id);
+    if (i !== -1) { existing = allLists[l][i]; allLists[l].splice(i,1); }
+  }
+  const entry = {
+    id,
+    title:        String(r.title||''),
+    addedAt:      Date.now(),
+    watchedEps:   existing?.watchedEps || 0,
+    totalEps:     r.episodes || r.totalEps || null,
+    status:       r.status || null,
+    format:       r.format || 'TV',
+    coverImage:   r.cover || r.coverImage || null,
+    siteUrl:      r.siteUrl || null,
+    averageScore: r.score || r.averageScore || null,
+    nextEp:       r.nextEp || null,
+    nextAirAt:    r.nextAirAt || null,
+    userLinks:    Array.isArray(existing?.userLinks) ? existing.userLinks : (existing?.userLink ? [existing.userLink] : []),
+    nickname:     existing?.nickname || null,
+  };
+  if (!allLists[list]) allLists[list] = [];
+  allLists[list].push(entry);
+  await saveLists();
+}
+
+async function updateEpInList(id, watchedEps, newList) {
+  id = Number(id);
+  const allKeys = getAllListKeys();
+  let anime = null;
+  let currentList = null;
+  for (const l of allKeys) {
+    const a = (allLists[l]||[]).find(x => x.id === id);
+    if (a) { anime = a; currentList = l; }
+  }
+  if (!anime) return;
+  anime.watchedEps = Math.max(0, watchedEps);
+  if (newList && newList !== currentList && allKeys.includes(newList)) {
+    allLists[currentList] = allLists[currentList].filter(x => x.id !== id);
+    anime.addedAt = Date.now();
+    if (!allLists[newList]) allLists[newList] = [];
+    allLists[newList].push(anime);
+  }
+  await saveLists();
+}
+
+async function removeFromLists(id) {
+  id = Number(id);
+  for (const l of getAllListKeys()) {
+    allLists[l] = (allLists[l]||[]).filter(a => a.id !== id);
+  }
+  await saveLists();
+}
+
+// ── Search (directo a AniList) ───────────────────────────────────────────────
+// With search term (full-text)
+const ANILIST_GQL = `query($s:String,$year:Int,$season:MediaSeason,$status:MediaStatus,$format:MediaFormat,$genres:[String],$tags:[String],$sort:[MediaSort]){
+  Page(page:1,perPage:20){
+    media(type:ANIME,search:$s,seasonYear:$year,season:$season,status:$status,format:$format,genre_in:$genres,tag_in:$tags,sort:$sort){
+      id title{romaji english}status format episodes nextAiringEpisode{episode airingAt}coverImage{large medium}averageScore genres season seasonYear startDate{year month day}siteUrl
+    }
+  }
+}`;
+// Browse / filter only — no search param (AniList rejects search:null in browse mode)
+const ANILIST_GQL_BROWSE = `query($year:Int,$season:MediaSeason,$status:MediaStatus,$format:MediaFormat,$genres:[String],$tags:[String],$sort:[MediaSort]){
+  Page(page:1,perPage:20){
+    media(type:ANIME,seasonYear:$year,season:$season,status:$status,format:$format,genre_in:$genres,tag_in:$tags,sort:$sort){
+      id title{romaji english}status format episodes nextAiringEpisode{episode airingAt}coverImage{large medium}averageScore genres season seasonYear startDate{year month day}siteUrl
+    }
+  }
+}`;
+
+// Filter state + constants
+let searchFilters = { year: null, season: null, status: null, format: null, genres: [], tags: [] };
+const SEASON_OPTS = [
+  { v: 'WINTER', label: '❄️ Invierno' },
+  { v: 'SPRING', label: '🌸 Primavera' },
+  { v: 'SUMMER', label: '☀️ Verano' },
+  { v: 'FALL',   label: '🍁 Otoño' },
+];
+const STATUS_OPTS = [
+  { v: 'RELEASING',        label: '📺 En emisión' },
+  { v: 'FINISHED',         label: '✅ Terminado' },
+  { v: 'NOT_YET_RELEASED', label: '🔜 Próximo' },
+  { v: 'CANCELLED',        label: '🚫 Cancelado' },
+  { v: 'HIATUS',           label: '⏸ Pausa' },
+];
+const FORMAT_OPTS = [
+  { v: 'TV',       label: '📺 TV' },
+  { v: 'TV_SHORT', label: '📺 TV Short' },
+  { v: 'MOVIE',    label: '🎬 Película' },
+  { v: 'OVA',      label: '📀 OVA' },
+  { v: 'ONA',      label: '🖥️ ONA' },
+  { v: 'SPECIAL',  label: '🌟 Special' },
+  { v: 'MUSIC',    label: '🎵 Music' },
+];
+const GENRE_OPTS = ['Action','Adventure','Comedy','Drama','Ecchi','Fantasy','Horror','Mahou Shoujo','Mecha','Music','Mystery','Psychological','Romance','Sci-Fi','Slice of Life','Sports','Supernatural','Thriller'];
+const TAG_OPTS = ['Isekai','Shounen','Seinen','Shoujo','Josei','Harem','Reverse Harem','Villainess','Reincarnation','Time Travel','Monsters','Super Power','Magic'];
+
+function hasActiveFilters() {
+  const f = searchFilters;
+  return !!(f.year || f.season || f.status || f.format || f.genres?.length || f.tags?.length);
+}
+function countActiveFilters() {
+  const f = searchFilters;
+  return (f.year?1:0) + (f.season?1:0) + (f.status?1:0) + (f.format?1:0) + (f.genres?.length||0) + (f.tags?.length||0);
+}
+function getActiveFilterChips() {
+  const chips = [];
+  if (searchFilters.year)   chips.push({ key:'year',   label:`📅 ${searchFilters.year}` });
+  if (searchFilters.season) chips.push({ key:'season', label: SEASON_OPTS.find(o=>o.v===searchFilters.season)?.label || searchFilters.season });
+  if (searchFilters.status) chips.push({ key:'status', label: STATUS_OPTS.find(o=>o.v===searchFilters.status)?.label || searchFilters.status });
+  if (searchFilters.format) chips.push({ key:'format', label: FORMAT_OPTS.find(o=>o.v===searchFilters.format)?.label || searchFilters.format });
+  for (const g of (searchFilters.genres || [])) chips.push({ key:'genre:'+g, label:`🎭 ${g}` });
+  for (const t of (searchFilters.tags   || [])) chips.push({ key:'tag:'+t,   label:`🏷️ ${t}` });
+  return chips;
+}
+
+async function doSearch(q) {
+  // Local matches first (instant, by title or nickname) — only if there's text
+  const localMatches = q ? searchLocal(q) : [];
+  if (localMatches.length) {
+    lastSearchResults = localMatches;
+    lastSearchQuery = q;
+    renderResults(lastSearchResults);
+  }
+  try {
+    // Use browse query (no search field) when there's no text — AniList rejects search:null
+    const gql = q ? ANILIST_GQL : ANILIST_GQL_BROWSE;
+    const vars = {
+      ...(q ? { s: q } : {}),
+      year:   searchFilters.year   || undefined,
+      season: searchFilters.season || undefined,
+      status: searchFilters.status || undefined,
+      format: searchFilters.format || undefined,
+      genres: searchFilters.genres?.length ? searchFilters.genres : undefined,
+      tags:   searchFilters.tags?.length   ? searchFilters.tags   : undefined,
+      sort:   q ? ['SEARCH_MATCH'] : ['POPULARITY_DESC'],
+    };
+    const r = await fetch('https://graphql.anilist.co', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ query: gql, variables: vars }),
+    });
+    const json = await r.json();
+    const media = json.data?.Page?.media || [];
+    const remote = media.map(m => {
+      const next = m.nextAiringEpisode;
+      const sd   = m.startDate;
+      const startDate = sd?.year
+        ? `${sd.year}-${String(sd.month||1).padStart(2,'0')}-${String(sd.day||1).padStart(2,'0')}`
+        : null;
+      return {
+        id:       m.id,
+        title:    m.title.english || m.title.romaji,
+        romaji:   m.title.romaji,
+        status:   m.status,
+        format:   m.format,
+        score:    m.averageScore || null,
+        episodes: m.episodes || null,
+        season:   m.season ? `${m.season} ${m.seasonYear}` : null,
+        genres:   (m.genres || []).slice(0, 4),
+        cover:    m.coverImage?.large || m.coverImage?.medium || null,
+        siteUrl:  m.siteUrl || null,
+        startDate,
+        nextEp:   next ? { ep: next.episode, airingAt: new Date(next.airingAt*1000).toLocaleDateString('es-CL') } : null,
+        tracking: getAnimeList(m.id),
+      };
+    });
+    // Merge: local matches first, then remote (dedup by id)
+    const localIds = new Set(localMatches.map(x => x.id));
+    lastSearchResults = [...localMatches, ...remote.filter(r => !localIds.has(r.id))];
+    lastSearchQuery = q;
+    renderResults(lastSearchResults);
+  } catch(e) {
+    if (!localMatches.length) {
+      const el = document.getElementById('search-results');
+      if (el) el.innerHTML = '<div class="empty"><div class="big">⚠️</div><p>Sin conexión</p></div>';
+    }
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function getAnime(id) {
+  id = Number(id);
+  for (const arr of Object.values(allLists)) {
+    const a = arr.find(x => x.id === id);
+    if (a) return a;
+  }
+  return null;
+}
+function getAiredEp(a) {
+  if (a?.nextEp?.ep) return a.nextEp.ep - 1;
+  if (a?.status === 'FINISHED' && a?.totalEps) return a.totalEps;
+  return null;
+}
+
+// ── Background refresh of tracked anime airing info (1 batched query, 6h TTL) ─
+const REFRESH_GQL = `query($ids:[Int]){Page(page:1,perPage:50){media(id_in:$ids,type:ANIME){id episodes status nextAiringEpisode{episode airingAt}}}}`;
+const _refreshing = new Set();
+const REFRESH_TTL_MS = 6 * 60 * 60 * 1000;
+
+async function refreshTrackedAiring(listName) {
+  if (_refreshing.has(listName)) return;
+  const list = allLists[listName] || [];
+  if (!list.length) return;
+  const now = Date.now();
+  const stale = list.filter(a => !a.nextEpFetchedAt || (now - a.nextEpFetchedAt) > REFRESH_TTL_MS);
+  if (!stale.length) return;
+  _refreshing.add(listName);
+  try {
+    for (let i = 0; i < stale.length; i += 50) {
+      const chunk = stale.slice(i, i + 50);
+      const r = await fetch('https://graphql.anilist.co', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ query: REFRESH_GQL, variables: { ids: chunk.map(a => a.id) } }),
+      });
+      const json = await r.json();
+      const media = json.data?.Page?.media || [];
+      for (const m of media) {
+        const a = list.find(x => x.id === m.id);
+        if (!a) continue;
+        if (m.episodes) a.totalEps = m.episodes;
+        if (m.status)   a.status   = m.status;
+        if (m.nextAiringEpisode) {
+          a.nextEp = {
+            ep: m.nextAiringEpisode.episode,
+            airingAt: new Date(m.nextAiringEpisode.airingAt * 1000).toLocaleDateString('es-CL'),
+          };
+          a.nextAirAt = m.nextAiringEpisode.airingAt;
+        } else {
+          a.nextEp = null; a.nextAirAt = null; // anime finished
+        }
+        a.nextEpFetchedAt = now;
+      }
+    }
+    await saveLists();
+    if (currentTab === listName) renderList(listName);
+  } catch(e) { console.error('refreshTrackedAiring:', e); }
+  finally { _refreshing.delete(listName); }
+}
+function getAnimeList(id) {
+  id = Number(id);
+  for (const l of getAllListKeys()) {
+    if ((allLists[l]||[]).find(a => a.id === id)) return l;
+  }
+  return null;
+}
+function updateDots() {
+  const v = (allLists.viendo||[]).filter(a=>(a.watchedEps||0)<(a.totalEps||Infinity)).length;
+  const dot = document.getElementById('dot-viendo');
+  if (dot) dot.style.display = v>0?'block':'none';
+}
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+function setTab(tab) {
+  currentTab = tab;
+  // Map list-tab keys to a nav button if it exists, else mark "Listas" active for custom/secondary lists
+  const navTab = document.querySelector(`.nav-btn[data-tab="${tab}"]`) ? tab : (
+    DEFAULT_LIST_KEYS.includes(tab) || isCustomList(tab) ? 'listas' : tab
+  );
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.tab===navTab));
+  const fixed = { estrenos:'Estrenos', buscar:'Buscar', listas:'Listas' };
+  let label = fixed[tab];
+  if (!label) {
+    const m = getListMeta(tab);
+    label = m ? `${m.emoji} ${m.name}` : tab;
+  }
+  document.getElementById('hdr-badge').textContent = label;
+  renderTab(tab);
+}
+async function renderTab(tab) {
+  if (tab==='estrenos') { renderEstrenos(); return; }
+  if (tab==='listas')   { renderOverview();  return; }
+  if (tab!=='buscar') { document.getElementById('content').innerHTML='<div class="spinner"></div>'; await loadLists(); }
+  if (tab==='buscar') renderSearch();
+  else renderList(tab);  // works for default and custom list keys
+}
+
+// ── Estrenos tab (single-day view, navigable with arrows) ────────────────────
+const DAY_GQL = `query($from:Int,$to:Int,$page:Int){Page(page:$page,perPage:50){pageInfo{hasNextPage}airingSchedules(airingAt_greater:$from,airingAt_lesser:$to){episode airingAt media{id title{romaji english}coverImage{large medium}averageScore format status genres siteUrl}}}}`;
+let estrenosFilter = 'todos';
+
+// Per-day persistence (localStorage)
+const LS_DAY_PREFIX = 'at_day_v1_';
+function dayKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function dayTTL(d) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const target = new Date(d); target.setHours(0,0,0,0);
+  const diff = target.getTime() - today.getTime();
+  if (diff < 0)  return 30 * 24 * 60 * 60 * 1000; // past: 30 days (data stable)
+  if (diff === 0) return 60 * 60 * 1000;          // today: 1 hour
+  return 6 * 60 * 60 * 1000;                       // future: 6 hours
+}
+function loadDayCache(d) {
+  try {
+    const raw = localStorage.getItem(LS_DAY_PREFIX + dayKey(d));
+    if (!raw) return null;
+    const { ts, eps } = JSON.parse(raw);
+    if (Date.now() - ts > dayTTL(d)) { localStorage.removeItem(LS_DAY_PREFIX + dayKey(d)); return null; }
+    return eps || [];
+  } catch { return null; }
+}
+function saveDayCache(d, eps) {
+  try { localStorage.setItem(LS_DAY_PREFIX + dayKey(d), JSON.stringify({ ts: Date.now(), eps })); }
+  catch(e) { console.warn('day cache save:', e?.message); }
+}
+function relativeDayLabel(d) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const target = new Date(d); target.setHours(0,0,0,0);
+  const diff = Math.round((target.getTime() - today.getTime()) / 86400000);
+  if (diff === 0)  return 'Hoy';
+  if (diff === -1) return 'Ayer';
+  if (diff === 1)  return 'Mañana';
+  if (diff < 0 && diff >= -7) return `Hace ${-diff} días`;
+  if (diff > 0 && diff <= 7)  return `En ${diff} días`;
+  return null;
+}
+
+function renderEstrenos() {
+  const dateStr    = currentDay.toLocaleDateString('es-CL', { weekday:'long', day:'numeric', month:'long' });
+  const dateStrCap = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
+  const relLabel   = relativeDayLabel(currentDay);
+  const isToday    = relLabel === 'Hoy';
+  const c = document.getElementById('content');
+  c.innerHTML = `
+    <div class="estrenos-header">
+      <div class="day-nav-row">
+        <button class="day-arrow" onclick="navDay(-1)" aria-label="Día anterior">‹</button>
+        <div class="day-center${isToday?' is-today':''}" onclick="${isToday?'':'goToday()'}" title="${isToday?'':'Tap para volver a hoy'}">
+          <div class="day-date">📅 ${dateStrCap}</div>
+          ${relLabel?`<div class="day-relative${isToday?' is-today':''}">${relLabel}${isToday?'':' · tap para volver a hoy'}</div>`:''}
+        </div>
+        <button class="day-arrow" onclick="navDay(1)" aria-label="Día siguiente">›</button>
+      </div>
+      <div class="day-actions-row">
+        <div class="filter-chips">
+          <button class="chip ${estrenosFilter==='todos'?'active':''}"   data-f="todos"   onclick="setEstrenosFilter('todos')">Todos</button>
+          <button class="chip ${estrenosFilter==='tracked'?'active':''}" data-f="tracked" onclick="setEstrenosFilter('tracked')">⭐ Mis series</button>
+          <button class="chip ${estrenosFilter==='tv'?'active':''}"      data-f="tv"      onclick="setEstrenosFilter('tv')">📺 TV</button>
+          <button class="chip ${estrenosFilter==='movie'?'active':''}"   data-f="movie"   onclick="setEstrenosFilter('movie')">🎬 Películas</button>
+          <button class="chip ${estrenosFilter==='ona'?'active':''}"     data-f="ona"     onclick="setEstrenosFilter('ona')">🖥️ ONA</button>
+        </div>
+        <div class="day-view-toggle">
+          <button class="day-view-btn ${dayView==='list'?'active':''}" onclick="setDayView('list')" title="Lista">☰</button>
+          <button class="day-view-btn ${dayView==='grid'?'active':''}" onclick="setDayView('grid')" title="Tarjetas">⊞</button>
+        </div>
+        <button class="estrenos-refresh" id="refresh-btn" onclick="fetchDay(currentDay, true)" title="Forzar actualización">↻</button>
+      </div>
+    </div>
+    <div id="estreno-content"><div class="spinner"></div></div>`;
+  fetchDay(currentDay, false);
+}
+
+function setEstrenosFilter(f) {
+  estrenosFilter = f;
+  document.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c.dataset.f === f));
+  renderDayList();
+}
+
+function setDayView(v) {
+  dayView = v;
+  try { localStorage.setItem('at_day_view', v); } catch {}
+  document.querySelectorAll('.day-view-btn').forEach((b, i) => b.classList.toggle('active', (i===0?'list':'grid') === v));
+  renderDayList();
+}
+
+function navDay(delta) {
+  haptic('light');
+  const next = new Date(currentDay);
+  next.setDate(next.getDate() + delta);
+  currentDay = next;
+  renderEstrenos();
+}
+
+function goToday() {
+  haptic('light');
+  const t = new Date(); t.setHours(0,0,0,0);
+  currentDay = t;
+  renderEstrenos();
+}
+
+async function fetchDay(d, force) {
+  const myToken = ++dayFetchToken;
+  // Cache hit → render instantly, no network
+  if (!force) {
+    const cached = loadDayCache(d);
+    if (cached) {
+      dayData = cached;
+      dayLoading = false;
+      renderDayList();
+      return;
+    }
+  }
+  // No cache or forced → show spinner if no stale data, fetch
+  dayLoading = true;
+  if (!dayData.length || force) renderDayList();
+
+  const start = new Date(d); start.setHours(0,0,0,0);
+  const end   = new Date(d); end.setHours(23,59,59,999);
+  const from = Math.floor(start.getTime() / 1000);
+  const to   = Math.floor(end.getTime() / 1000);
+
+  let allEps = [];
+  let page = 1, hasNext = true;
+  try {
+    while (hasNext && page <= 3) {
+      const r = await fetch('https://graphql.anilist.co', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ query: DAY_GQL, variables: { from, to, page } }),
+      });
+      const json = await r.json();
+      const eps = (json.data?.Page?.airingSchedules || [])
+        .filter(s => s?.media?.id)
+        .map(s => {
+          const m = s.media;
+          return {
+            id: m.id,
+            title: m.title?.english || m.title?.romaji || '?',
+            cover: m.coverImage?.large || m.coverImage?.medium || null,
+            score: m.averageScore || null,
+            format: m.format || 'TV',
+            status: m.status || null,
+            genres: (m.genres || []).slice(0, 3),
+            siteUrl: m.siteUrl || null,
+            episode: s.episode,
+            airingAt: s.airingAt,
+          };
+        });
+      allEps = [...allEps, ...eps];
+      hasNext = json.data?.Page?.pageInfo?.hasNextPage || false;
+      page++;
+    }
+    allEps.sort((a, b) => a.airingAt - b.airingAt);
+    saveDayCache(d, allEps);
+  } catch (e) { console.error('fetchDay:', e); }
+
+  // Discard if a newer fetch superseded this one (user navigated away)
+  if (myToken !== dayFetchToken) return;
+
+  dayData = allEps;
+  dayLoading = false;
+  renderDayList();
+}
+
+function renderDayList() {
+  const el = document.getElementById('estreno-content');
+  if (!el) return;
+
+  if (dayLoading && !dayData.length) {
+    el.innerHTML = '<div class="spinner"></div>';
+    return;
+  }
+
+  let items = dayData.map(e => ({ ...e, tracking: getAnimeList(e.id) }));
+  if (estrenosFilter === 'tracked')      items = items.filter(e => e.tracking);
+  else if (estrenosFilter === 'tv')      items = items.filter(e => ['TV','TV_SHORT'].includes(e.format));
+  else if (estrenosFilter === 'movie')   items = items.filter(e => e.format === 'MOVIE');
+  else if (estrenosFilter === 'ona')     items = items.filter(e => ['ONA','OVA','SPECIAL'].includes(e.format));
+
+  let html = '';
+  if (dayLoading) html += '<div class="day-loading-bar">Actualizando…</div>';
+
+  if (!items.length) {
+    el.innerHTML = html + '<div class="empty"><div class="big">📭</div><p>Sin estrenos este día</p></div>';
+    return;
+  }
+
+  const tracked   = items.filter(e => e.tracking);
+  const discovery = items.filter(e => !e.tracking);
+  const renderItem = dayView === 'grid' ? estrenoGridCard : estrenoCard;
+  const wrapOpen   = dayView === 'grid' ? '<div class="estreno-grid">' : '';
+  const wrapClose  = dayView === 'grid' ? '</div>' : '';
+  if (tracked.length) {
+    html += `<div class="estreno-section"><div class="estreno-section-title">⭐ Tus series — ${tracked.length}</div>`;
+    html += wrapOpen + tracked.map(e => renderItem(e, true)).join('') + wrapClose;
+    html += '</div>';
+  }
+  if (discovery.length) {
+    html += `<div class="estreno-section"><div class="estreno-section-title">📡 Descubrimiento — ${discovery.length}</div>`;
+    html += wrapOpen + discovery.map(e => renderItem(e, false)).join('') + wrapClose;
+    html += '</div>';
+  }
+  el.innerHTML = html;
+}
+
+function estrenoGridCard(e, isTracked) {
+  const time = new Date(e.airingAt*1000).toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
+  const fmtIcon = {TV:'📺',TV_SHORT:'📺',MOVIE:'🎬',ONA:'🖥️',OVA:'📀',SPECIAL:'🌟'}[e.format]||'🎞';
+  const trackEmoji = {viendo:'▶️',interesante:'⭐',pendiente:'📌',completado:'✅'}[e.tracking]||'';
+  const a = isTracked ? getAnime(e.id) : null;
+  const w = a?.watchedEps || 0;
+  const t = a?.totalEps || null;
+  const trackedBadge = isTracked ? `<div class="egc-track-badge">${trackEmoji} ${e.tracking}</div>` : '';
+  const progressPill = (isTracked && e.format !== 'MOVIE' && e.tracking !== 'completado' && t)
+    ? `<div class="egc-progress-pill">${w}/${t}</div>` : '';
+  return `<div class="estreno-grid-card${isTracked?' is-tracked':''}" onclick="openResultDetail(${JSON.stringify({...e, episodes: t || null}).replace(/"/g,'&quot;')})">
+    <div class="egc-poster">
+      ${e.cover?`<img src="${safe(e.cover)}" loading="lazy" onerror="this.parentElement.innerHTML='<div style=\\'display:flex;align-items:center;justify-content:center;height:100%;font-size:36px\\'>🎌</div>'">`:'<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:36px">🎌</div>'}
+      ${trackedBadge}
+      ${progressPill}
+      <div class="egc-format-icon">${fmtIcon}</div>
+      <div class="egc-overlay">
+        <span class="egc-time">${time}</span>
+        <span class="egc-ep">Ep ${e.episode}</span>
+      </div>
+    </div>
+    <div class="egc-title">${safe(e.title)}</div>
+    <div class="egc-meta">${e.score?`⭐ ${e.score}`:''}${e.genres?.length?` · ${e.genres[0]}`:''}</div>
+  </div>`;
+}
+
+function estrenoCard(e, isTracked) {
+  const time = new Date(e.airingAt*1000).toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
+  const fmtIcon = {TV:'📺',TV_SHORT:'📺',MOVIE:'🎬',ONA:'🖥️',OVA:'📀',SPECIAL:'🌟'}[e.format]||'🎞';
+  const trackEmoji = {viendo:'▶️',interesante:'⭐',pendiente:'📌',completado:'✅'}[e.tracking]||'';
+  const trackedChip = isTracked ? `<div class="tracked-chip">${trackEmoji} ${e.tracking}</div>` : '';
+  const addBtns = isTracked
+    ? `<div class="estreno-ep-counter" onclick="event.stopPropagation()">
+        <button class="ep-btn" onclick="changeEp(${e.id},-1,'${e.tracking}')">−</button>
+        <span class="ep-count editable" onclick="openEpModal(${e.id})" title="Tap para editar">${(getAnime(e.id)?.watchedEps||0)} ep</span>
+        <button class="ep-btn" onclick="changeEp(${e.id},1,'${e.tracking}')">+</button>
+       </div>`
+    : `<div class="qadd-row">${LIST_OPTS.map(l=>`<button class="qadd-btn" onclick="event.stopPropagation();quickAddEstreno(${JSON.stringify(e).replace(/"/g,'&quot;')},'${l.key}',this)">${l.emoji} ${l.label}</button>`).join('')}</div>`;
+  return `<div class="estreno-card${isTracked?' is-tracked':''}" onclick="openResultDetail(${JSON.stringify({...e, score: e.score, episodes: null}).replace(/"/g,'&quot;')})">
+    <div class="estreno-poster">
+      ${e.cover?`<img src="${safe(e.cover)}" loading="lazy" onerror="this.parentElement.innerHTML='🎌'">`:'🎌'}
+      <div class="estreno-time-badge">${time}</div>
+    </div>
+    <div class="estreno-body">
+      ${trackedChip}
+      <div class="estreno-title">${safe(e.title)}</div>
+      <div class="estreno-meta">
+        <span>Ep. ${e.episode}</span>
+        ${e.score?`<span>⭐ ${e.score}</span>`:''}
+        <span>${fmtIcon} ${e.format==='TV'?'TV':e.format==='MOVIE'?'Película':e.format}</span>
+      </div>
+      ${e.genres.length?`<div class="estreno-genres">${e.genres.join(' · ')}</div>`:''}
+      ${addBtns}
+    </div>
+  </div>`;
+}
+
+async function quickAddEstreno(e, list, btn) {
+  haptic('medium');
+  saveRecent(e.title, [e]);
+  await trackAnime(e, list);
+  // Refresh tracking on local data → re-render
+  dayData = dayData.map(x => x.id === e.id ? { ...x } : x);
+  renderDayList();
+  toast(`✓ "${(e.title||'').substring(0,20)}" → ${list}`);
+}
+
+
+// ── Search tab ────────────────────────────────────────────────────────────────
+function renderSearch() {
+  const c = document.getElementById('content');
+  const fc = countActiveFilters();
+  c.innerHTML = `
+    <div class="search-top">
+      <div class="search-wrap">
+        <span class="si">🔍</span>
+        <input class="search-input" id="search-in" type="search" placeholder="Buscar anime en AniList..." autocomplete="off">
+      </div>
+      <div class="view-toggle">
+        <button class="view-btn ${viewMode==='list'?'active':''}" id="vbtn-list" onclick="setView('list')">☰</button>
+        <button class="view-btn ${viewMode==='grid'?'active':''}" id="vbtn-grid" onclick="setView('grid')">⊞</button>
+      </div>
+      <button class="filter-btn${fc?' has-filters':''}" onclick="openFilterModal()" title="Filtros">⚙️${fc?`<span class="filter-count">${fc}</span>`:''}</button>
+    </div>
+    <div id="active-filters-bar">${renderActiveFiltersBar()}</div>
+    <div id="search-results">${hasActiveFilters() ? '<div class="spinner"></div>' : renderRecentHtml()}</div>`;
+
+  const inp = document.getElementById('search-in');
+  inp.addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    const q = inp.value.trim();
+    if ((!q || q.length < 2) && !hasActiveFilters()) {
+      document.getElementById('search-results').innerHTML = renderRecentHtml(); return;
+    }
+    document.getElementById('search-results').innerHTML = '<div class="spinner"></div>';
+    searchTimer = setTimeout(() => doSearch(q), 400);
+  });
+
+  // Auto-fire search if filters were active when entering tab
+  if (hasActiveFilters()) doSearch('');
+}
+
+function renderActiveFiltersBar() {
+  const chips = getActiveFilterChips();
+  if (!chips.length) return '';
+  const chipHtml = chips.map(c =>
+    `<span class="active-filter-chip">${safe(c.label)} <button onclick="removeFilter('${c.key}')" aria-label="Quitar">×</button></span>`
+  ).join('');
+  return `<div class="active-filters">${chipHtml}<button class="clear-all-btn" onclick="clearAllFilters(true)">Limpiar todo</button></div>`;
+}
+
+function renderRecentHtml() {
+  const recent = getRecent();
+  if (!recent.length) return '<div class="empty"><div class="big">🎌</div><p>Escribe el nombre de un anime<br>para buscar en AniList</p></div>';
+  const items = recent.map(r=>`
+    <div class="recent-item" onclick="runRecentSearch('${safe(r.q)}')">
+      <div class="recent-thumb">${r.cover?`<img src="${safe(r.cover)}" loading="lazy" onerror="this.style.display='none'">`:'<span style="font-size:18px">🎌</span>'}</div>
+      <div class="recent-label">${safe(r.q)}</div>
+      <div class="recent-count">${r.count}</div>
+    </div>`).join('');
+  return `<div class="recent-header">
+    <span class="section-title" style="padding:12px 14px 6px;display:block">Búsquedas recientes</span>
+    <button class="recent-clear" onclick="clearRecent()">Borrar</button>
+  </div>
+  <div class="recent-list">${items}</div>`;
+}
+
+function runRecentSearch(q) {
+  const inp = document.getElementById('search-in');
+  if (inp) { inp.value = q; inp.dispatchEvent(new Event('input')); }
+}
+function setView(mode) {
+  viewMode = mode;
+  document.getElementById('vbtn-list')?.classList.toggle('active',mode==='list');
+  document.getElementById('vbtn-grid')?.classList.toggle('active',mode==='grid');
+  if (lastSearchResults.length) renderResults(lastSearchResults);
+}
+function renderResults(results) {
+  const el = document.getElementById('search-results');
+  if (!el) return;
+  if (!results.length) { el.innerHTML='<div class="empty"><div class="big">😶</div><p>Sin resultados</p></div>'; return; }
+  if (viewMode==='grid') {
+    el.innerHTML=`<div class="section-title">${results.length} resultados</div><div class="grid">${results.map(r=>gridCard(r)).join('')}</div>`;
+  } else {
+    el.innerHTML=`<div class="section-title">${results.length} resultados</div><div class="list-results">${results.map(r=>listCard(r)).join('')}</div>`;
+  }
+}
+
+function gridCard(r) {
+  const tracked = getAnimeList(r.id)||r.tracking;
+  const a = tracked ? getAnime(r.id) : null;
+  const emoji = {viendo:'▶️',interesante:'⭐',pendiente:'📌',completado:'✅'}[tracked]||'✓';
+  let badge = '';
+  if (tracked) {
+    const t = a?.totalEps || r.episodes;
+    if (a && r.format !== 'MOVIE' && tracked !== 'completado' && t) {
+      badge = `<div class="tracked-badge with-eps">${emoji} ${a.watchedEps||0}/${t}</div>`;
+    } else {
+      badge = `<div class="tracked-badge">${emoji}</div>`;
+    }
+  }
+  return `<div class="grid-card" onclick="openResultDetail(${JSON.stringify(r).replace(/"/g,'&quot;')})">
+    <div class="grid-poster">${imgTag(r.cover,'🎌')}${badge}</div>
+    <div class="grid-title">${safe(r.title)}</div>
+    <div class="grid-meta">${r.score?'⭐'+r.score+' · ':''}${r.format||'TV'}</div>
+  </div>`;
+}
+
+function listCard(r) {
+  const tracked = getAnimeList(r.id)||r.tracking;
+  const a = tracked ? getAnime(r.id) : null;
+  const meta = [
+    r.score?`<span>⭐ ${r.score}</span>`:'',
+    r.format?`<span>📺 ${r.format==='TV'?'Serie':r.format==='MOVIE'?'Película':r.format}</span>`:'',
+    r.episodes?`<span>🎞 ${r.episodes} ep</span>`:'',
+    r.startDate?`<span>📅 ${r.startDate.substring(0,7)}</span>`:'',
+  ].filter(Boolean).join('');
+  const trackedHtml = tracked?`<div class="tracked-chip">${{viendo:'▶️',interesante:'⭐',pendiente:'📌',completado:'✅'}[tracked]||'✓'} ${tracked}</div>`:'';
+  const nextHtml = r.nextEp?`<div class="result-next">📡 Ep ${r.nextEp.ep} → ${r.nextEp.airingAt}</div>`:'';
+  const genresHtml = r.genres?.length?`<div class="result-genres">${r.genres.join(' · ')}</div>`:'';
+
+  // NEW: ep counter when tracked (non-movie, non-completado)
+  let progressHtml = '';
+  if (a && r.format !== 'MOVIE' && tracked !== 'completado') {
+    const w = a.watchedEps || 0;
+    const t = a.totalEps || r.episodes || 0;
+    const p = t ? Math.round(w/t*100) : 0;
+    progressHtml = `<div class="result-progress-wrap">
+      <div class="estreno-ep-counter" onclick="event.stopPropagation()">
+        <button class="ep-btn" onclick="changeEpFromSearch(${r.id},-1)">−</button>
+        <span class="ep-count editable" data-search-ep="${r.id}" onclick="event.stopPropagation();openEpModal(${r.id})" title="Tap para editar">${w}${t?` / ${t}`:''}</span>
+        <button class="ep-btn" onclick="changeEpFromSearch(${r.id},1)">+</button>
+      </div>
+      ${t?`<div class="result-progress-bar"><div class="result-progress-bar-fill" style="width:${p}%"></div></div>`:''}
+    </div>`;
+  }
+
+  // NEW: existing links + "+ link" button (only when tracked)
+  let linksHtml = '';
+  if (a) {
+    const links = _getLinks(a);
+    const linkBtns = links.map((url, i) =>
+      `<button class="link-mini-btn" onclick="event.stopPropagation();openAnimeLink(${r.id},${i})" title="${safe(url)}">▶️ ${safe(_extractDomain(url))}</button>`
+    ).join('');
+    const addLink = links.length < MAX_LINKS_PER_ANIME
+      ? `<button class="link-mini-btn" style="border-style:dashed;background:none" onclick="event.stopPropagation();openLinkModal(${r.id})">🔗 + link</button>`
+      : '';
+    if (linkBtns || addLink) linksHtml = `<div class="result-links">${linkBtns}${addLink}</div>`;
+  }
+
+  const addBtns = LIST_OPTS.map(l=>
+    `<button class="qadd-btn${tracked===l.key?' active':''}" onclick="event.stopPropagation();quickAdd(${r.id},'${l.key}',this)">${l.emoji} ${l.label}</button>`
+  ).join('');
+  const nickHtml = a?.nickname ? `<div class="result-genres" style="opacity:1;color:var(--accent);font-weight:600">🏷️ ${safe(a.nickname)}</div>` : '';
+  return `<div class="result-card" onclick="openResultDetail(${JSON.stringify(r).replace(/"/g,'&quot;')})">
+    <div class="result-poster">${imgTag(r.cover,'🎌')}</div>
+    <div class="result-body">
+      ${trackedHtml}
+      <div class="result-title">${safe(r.title)}</div>
+      ${nickHtml}
+      <div class="result-meta">${meta}</div>
+      ${nextHtml}${genresHtml}
+      ${progressHtml}${linksHtml}
+      <div class="qadd-row">${addBtns}</div>
+    </div>
+  </div>`;
+}
+
+async function changeEpFromSearch(id, delta) {
+  haptic('light');
+  id = Number(id);
+  const a = getAnime(id);
+  if (!a) return;
+  const w = Math.max(0, (a.watchedEps || 0) + delta);
+  if (a.totalEps && w > a.totalEps) return;
+  a.watchedEps = w;
+  await updateEpInList(id, w);
+  // Update count in place + progress bar fill
+  const cnt = document.querySelector(`#search-results [data-search-ep="${id}"]`);
+  if (cnt) cnt.textContent = `${w}${a.totalEps?` / ${a.totalEps}`:''}`;
+  const t = a.totalEps;
+  if (t) {
+    const p = Math.round(w/t*100);
+    const bar = document.querySelector(`#search-results [data-search-ep="${id}"]`)
+      ?.closest('.result-progress-wrap')?.querySelector('.result-progress-bar-fill');
+    if (bar) bar.style.width = p + '%';
+  }
+}
+
+async function quickAdd(id, list, btn) {
+  haptic('medium');
+  if (lastSearchQuery && lastSearchResults.length) saveRecent(lastSearchQuery, lastSearchResults);
+  const r = lastSearchResults.find(x=>x.id===id);
+  if (!r) return;
+  await trackAnime(r, list);
+  btn.closest('.qadd-row')?.querySelectorAll('.qadd-btn').forEach(b=>b.classList.toggle('active',b===btn));
+  const card = btn.closest('.result-card');
+  if (card) {
+    const chip = card.querySelector('.tracked-chip');
+    const emoji = {viendo:'▶️',interesante:'⭐',pendiente:'📌',completado:'✅'}[list]||'✓';
+    if (chip) chip.textContent=`${emoji} ${list}`;
+    else card.querySelector('.result-body').insertAdjacentHTML('afterbegin',`<div class="tracked-chip">${emoji} ${list}</div>`);
+  }
+  toast(`✓ "${(r.title||'').substring(0,20)}" → ${list}`);
+}
+
+function openResultDetail(r) {
+  haptic('light');
+  if (lastSearchQuery && lastSearchResults.length) saveRecent(lastSearchQuery, lastSearchResults);
+  const tracked = getAnimeList(r.id)||r.tracking;
+  const a = tracked ? getAnime(r.id) : null;
+  document.getElementById('detail-title').textContent = r.title;
+  const badges = [
+    r.status?`<span class="detail-badge">${statusLabel(r.status)}</span>`:'',
+    r.format?`<span class="detail-badge">${r.format==='MOVIE'?'🎬 Película':r.format}</span>`:'',
+    r.episodes?`<span class="detail-badge">🎞 ${r.episodes} eps</span>`:'',
+    r.startDate?`<span class="detail-badge">📅 ${r.startDate.substring(0,7)}</span>`:'',
+    r.season?`<span class="detail-badge">🗓 ${r.season}</span>`:'',
+  ].join('');
+  const allOpts = [...LIST_OPTS, ...Object.entries(listMeta).map(([key,m])=>({key, emoji:m.emoji||'📂', label:m.name}))];
+  const addBtns = allOpts.map(l=>
+    `<div class="list-opt${tracked===l.key?' active':''}" onclick="addFromDetail(${r.id},'${l.key}',this,${JSON.stringify(r).replace(/"/g,'&quot;')})">${safe(l.emoji)} ${safe(l.label)}</div>`
+  ).join('') + `<div class="list-opt" style="border-style:dashed" onclick="openCreateListModal()">➕ Nueva</div>`;
+
+  // Episode counter section — shown when anime is tracked and not a movie/completado
+  let epSection = '';
+  if (a && r.format !== 'MOVIE' && tracked !== 'completado') {
+    const w = a.watchedEps || 0;
+    const t = a.totalEps || r.episodes || 0;
+    const p = t ? Math.round(w/t*100) : 0;
+    epSection = `<div class="detail-section">
+      <div class="detail-section-title">Progreso</div>
+      <div class="ep-big" id="epbig-rd">
+        <button class="ep-btn" onclick="_rdEp(${r.id},-1)">−</button>
+        <span class="ep-count editable" id="epc-rd" onclick="openEpModal(${r.id})" title="Tap para escribir">${w}<br><span style="font-size:11px;font-weight:400;color:var(--hint)">/ ${t||'?'}</span></span>
+        <button class="ep-btn" onclick="_rdEp(${r.id},1)">+</button>
+      </div>
+      ${t?`<div class="progress-bar" style="margin-top:9px"><div class="progress-fill" id="epfill-rd" style="width:${p}%"></div></div>
+      <div style="text-align:center;font-size:11px;color:var(--hint);margin-top:4px" id="epct-rd">${p}%</div>`:''}
+    </div>`;
+  }
+
+  // Rating section — shown only when tracked
+  const ratingSection = a ? `<div class="detail-section">
+    <div class="detail-section-title">Mi calificación</div>
+    ${_starsHtml(r.id, a.userRating||0, `stars-rd-${r.id}`)}
+  </div>` : '';
+
+  document.getElementById('detail-body').innerHTML = `
+    <div class="detail-hero">
+      <div class="detail-hero-img" onclick="openImgViewer('${safe(r.cover||r.coverImage||'')}')">${imgTag(r.cover||r.coverImage,'🎌')}</div>
+      <div class="detail-info">
+        <div class="detail-name">${safe(r.title)}</div>
+        <div class="detail-badges">${badges}</div>
+        ${r.score?`<div class="detail-score">⭐ ${r.score}<span style="font-size:12px;color:var(--hint);font-weight:400"> / 100</span></div>`:''}
+        ${r.genres?.length?`<div style="font-size:11px;color:var(--hint);margin-top:8px">${r.genres.join(' · ')}</div>`:''}
+      </div>
+    </div>
+    ${r.nextEp?`<div class="detail-section"><div style="font-size:13px;color:var(--link)">📡 Próx ep ${r.nextEp.ep}: ${r.nextEp.airingAt}</div></div>`:''}
+    ${epSection}
+    ${ratingSection}
+    <div class="detail-section">
+      <div class="detail-section-title">Agregar a lista</div>
+      <div class="list-selector">${addBtns}</div>
+    </div>
+    ${r.siteUrl?`<div class="detail-section"><button class="action-btn action-ghost" onclick="window.open('${safe(r.siteUrl)}','_blank')">🔗 Ver en AniList</button></div>`:''}`;
+  openDetail();
+}
+
+async function _rdEp(id, delta) {
+  haptic('light');
+  id = Number(id);
+  const a = getAnime(id);
+  if (!a) return;
+  const w = Math.max(0, (a.watchedEps||0) + delta);
+  if (a.totalEps && w > a.totalEps) return;
+  a.watchedEps = w;
+  await updateEpInList(id, w);
+  const t = a.totalEps || 0, p = t ? Math.round(w/t*100) : 0;
+  const ec = document.getElementById('epc-rd');
+  const ef = document.getElementById('epfill-rd');
+  const et = document.getElementById('epct-rd');
+  if (ec) ec.innerHTML = `${w}<br><span style="font-size:11px;font-weight:400;color:var(--hint)">/ ${t||'?'}</span>`;
+  if (ef) ef.style.width = p + '%';
+  if (et) et.textContent = p + '%';
+  if (currentTab === 'estrenos') renderDayList();
+}
+
+async function addFromDetail(id, list, el, r) {
+  haptic('medium');
+  if (r) await trackAnime(r, list);
+  el.closest('.list-selector')?.querySelectorAll('.list-opt').forEach(o=>o.classList.remove('active'));
+  el.classList.add('active');
+  toast(`✓ ${list}`);
+}
+
+// ── Overview (Listas tab) ─────────────────────────────────────────────────────
+function renderOverview() {
+  const colors = {
+    viendo:'#7c3aed', interesante:'#d97706', pendiente:'#0891b2',
+    completado:'#059669', descartado:'#9ca3af',
+  };
+  const total = getAllListKeys().reduce((s,k)=>s+(allLists[k]||[]).length, 0);
+  let html = '<div style="padding-top:6px">';
+  // Default lists first
+  for (const key of DEFAULT_LIST_KEYS) {
+    const meta = getListMeta(key);
+    const arr = allLists[key] || [];
+    const n = arr.length;
+    const ip = key === 'viendo' ? arr.filter(a => (a.watchedEps||0) < (a.totalEps||Infinity)).length : 0;
+    const bar = total ? Math.round(n/total*100) : 0;
+    const color = colors[key] || '#7c3aed';
+    html += `<div class="overview-card" onclick="setTab('${key}')">
+      <div class="ov-row">
+        <div class="ov-left"><div class="ov-icon">${meta.emoji}</div>
+          <div><div class="ov-label">${safe(meta.name)}</div>${ip?`<div class="ov-sub">${ip} en progreso</div>`:''}</div>
+        </div>
+        <div class="ov-count">${n}</div>
+      </div>
+      ${total>0?`<div class="ov-bar"><div class="ov-bar-fill" style="width:${bar}%;background:${color}"></div></div>`:''}
+    </div>`;
+  }
+  // Custom lists
+  const customKeys = Object.keys(listMeta);
+  if (customKeys.length) {
+    html += '<div class="section-title" style="padding:18px 14px 4px">Listas personalizadas</div>';
+    for (const key of customKeys) {
+      const meta = getListMeta(key);
+      const n = (allLists[key]||[]).length;
+      const bar = total ? Math.round(n/total*100) : 0;
+      html += `<div class="overview-card" onclick="setTab('${key}')">
+        <div class="ov-row">
+          <div class="ov-left"><div class="ov-icon">${meta.emoji}</div>
+            <div><div class="ov-label">${safe(meta.name)}</div><div class="ov-sub">Lista personalizada</div></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <button class="link-edit-btn" style="width:34px;height:34px" onclick="event.stopPropagation();editCustomList('${key}')" title="Editar">✏️</button>
+            <div class="ov-count">${n}</div>
+          </div>
+        </div>
+        ${total>0?`<div class="ov-bar"><div class="ov-bar-fill" style="width:${bar}%;background:#a78bfa"></div></div>`:''}
+      </div>`;
+    }
+  }
+  html += `<div style="padding:14px"><button class="link-add-btn" onclick="openCreateListModal()">➕ Nueva lista personalizada</button></div>`;
+  html += '</div>';
+  document.getElementById('content').innerHTML = html;
+}
+
+// ── List tabs ─────────────────────────────────────────────────────────────────
+function renderList(listName) {
+  const animes = (allLists[listName]||[]).slice().sort((a,b)=>(b.addedAt||0)-(a.addedAt||0));
+  const c = document.getElementById('content');
+  const meta = getListMeta(listName);
+  if (!animes.length) {
+    c.innerHTML = `<div class="empty"><div class="big">${meta.emoji}</div><p><b>${safe(meta.name)}</b> está vacía.<br>Busca anime para agregar.</p></div>`;
+    return;
+  }
+  c.innerHTML = '<div style="padding-top:4px">' + animes.map(a=>animeCard(a,listName)).join('') + '</div>';
+  // Background refresh of airing info (lazy, 6h TTL → silent if all fresh)
+  if (listName !== 'completado' && listName !== 'descartado') refreshTrackedAiring(listName);
+}
+
+function animeCard(a,listName){
+  const w=a.watchedEps||0,t=a.totalEps||0,p=t?pct(w,t):0,isMovie=a.format==='MOVIE';
+  const aired = getAiredEp(a);
+  let progressHtml='';
+  if(isMovie) progressHtml=`<div style="font-size:12px;color:${w>0?'#10b981':'var(--hint)'}">${w>0?'🎬 Vista':'🎬 No vista'}</div>`;
+  else if(listName!=='completado') {
+    // Aired vs watched gap
+    let airedHtml = '';
+    if (aired != null) {
+      const behind = aired - w;
+      let status = '';
+      if (behind > 0) status = `<span class="behind">${behind} pendiente${behind>1?'s':''}</span>`;
+      else if (behind === 0) status = `<span class="uptodate">al día ✓</span>`;
+      else status = `<span class="ahead">+${-behind} de adelanto</span>`;
+      airedHtml = `<div class="progress-aired">📡 ${aired} emitido${aired===1?'':'s'}${a.nextEp?.airingAt?` · próx ${a.nextEp.airingAt}`:''} · ${status}</div>`;
+    }
+    progressHtml = `<div class="progress-wrap">
+      <div class="progress-label"><span>${w} / ${t||'?'} eps</span><span>${t?p+'%':''}</span></div>
+      ${t?`<div class="progress-bar"><div class="progress-fill" style="width:${p}%"></div></div>`:''}
+      ${airedHtml}
+    </div>`;
+  }
+  const counter=listName!=='completado'&&!isMovie?`
+    <div class="ep-counter" onclick="event.stopPropagation()">
+      <button class="ep-btn" onclick="changeEp(${a.id},-1,'${listName}')">−</button>
+      <span class="ep-count editable" onclick="openEpModal(${a.id})" title="Tap para editar">${w}${t?' / '+t:' ep'}</span>
+      <button class="ep-btn" onclick="changeEp(${a.id},1,'${listName}')">+</button>
+    </div>`:'';
+  const miniStars = a.userRating ? `<div class="card-rating">${[1,2,3,4,5].map(n=>`<span class="card-star${a.userRating>=n?' filled':''}">★</span>`).join('')}</div>` : '';
+  return `<div class="card" onclick="openAnimeDetail(${a.id})">
+    <div class="card-poster">${imgTag(a.coverImage,'🎌')}</div>
+    <div class="card-body">
+      <div class="card-title">${safe(a.title)}</div>
+      <div class="card-meta">
+        ${a.status?`<span class="badge-s">${statusLabel(a.status)}</span>`:''}
+        ${a.format&&a.format!=='TV'?`<span class="badge-s">${a.format}</span>`:''}
+        ${a.averageScore?`<span class="badge-s">⭐${a.averageScore}</span>`:''}
+      </div>
+      ${progressHtml}${counter}${miniStars}
+    </div>
+  </div>`;
+}
+
+async function changeEp(id,delta,listName){
+  haptic('light');
+  const a=getAnime(id); if(!a) return;
+  const w=Math.max(0,(a.watchedEps||0)+delta);
+  if(a.totalEps&&w>a.totalEps) return;
+  a.watchedEps=w;
+  await updateEpInList(id,w);
+  renderList(listName);
+}
+
+// ── Detail sheet (my anime) ───────────────────────────────────────────────────
+function openAnimeDetail(id){
+  haptic('light');
+  const a=getAnime(id); if(!a) return;
+  detailAnime={...a,listName:getAnimeList(id)};
+  renderDetailBody(a,detailAnime.listName);
+  openDetail();
+}
+
+function renderDetailBody(a,listName){
+  const w=a.watchedEps||0,t=a.totalEps||0,p=t?pct(w,t):0,isMovie=a.format==='MOVIE';
+  document.getElementById('detail-title').textContent=a.title;
+  const allOpts = [...LIST_OPTS, ...Object.entries(listMeta).map(([key,m])=>({key, emoji:m.emoji||'📂', label:m.name}))];
+  const listOpts = allOpts.map(l=>`<div class="list-opt${listName===l.key?' active':''}" onclick="moveToList(${a.id},'${l.key}')">${safe(l.emoji)} ${safe(l.label)}</div>`).join('')
+    + `<div class="list-opt" style="border-style:dashed" onclick="openCreateListModal()">➕ Nueva</div>`;
+  const epSection=isMovie
+    ?`<div class="ep-big"><button class="ep-btn" style="width:100%;font-size:14px;font-weight:600" onclick="toggleMovie(${a.id},'${listName}')">${w>0?'⬜ Marcar no vista':'✅ Marcar vista'}</button></div>`
+    :`<div class="ep-big" id="epbig">
+        <button class="ep-btn" onclick="detailEp(-1)">−</button>
+        <span class="ep-count editable" id="epc" onclick="openEpModal(${a.id})" title="Tap para escribir el episodio">${w}<br><span style="font-size:11px;font-weight:400;color:var(--hint)">/ ${t||'?'}</span></span>
+        <button class="ep-btn" onclick="detailEp(1)">+</button>
+      </div>
+      ${t?`<div class="progress-bar" style="margin-top:9px"><div class="progress-fill" id="epfill" style="width:${p}%"></div></div>
+      <div style="text-align:center;font-size:11px;color:var(--hint);margin-top:4px" id="epct">${p}%</div>`:''}`;
+  document.getElementById('detail-body').innerHTML=`
+    <div class="detail-hero">
+      <div class="detail-hero-img" onclick="openImgViewer('${safe(a.coverImage||'')}')">${imgTag(a.coverImage,'🎌')}</div>
+      <div class="detail-info">
+        <div class="detail-name">${safe(a.title)}</div>
+        <div class="detail-badges">
+          ${a.status?`<span class="detail-badge">${statusLabel(a.status)}</span>`:''}
+          ${a.format?`<span class="detail-badge">${a.format}</span>`:''}
+          ${t?`<span class="detail-badge">${t} eps</span>`:''}
+        </div>
+        ${a.averageScore?`<div class="detail-score">⭐ ${a.averageScore}<span style="font-size:11px;color:var(--hint);font-weight:400"> / 100</span></div>`:''}
+      </div>
+    </div>
+    <div class="detail-section"><div class="detail-section-title">Progreso</div>${epSection}</div>
+    <div class="detail-section">
+      <div class="detail-section-title">Mi calificación</div>
+      ${_starsHtml(a.id, a.userRating||0, `stars-detail-${a.id}`)}
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">Mis links${_getLinks(a).length?` · ${_getLinks(a).length}/${MAX_LINKS_PER_ANIME}`:''}</div>
+      ${_getLinks(a).length
+        ? `<div class="link-list">
+            ${_getLinks(a).map((url, i) => `
+              <div class="link-row">
+                <button class="link-open-btn" onclick="openAnimeLink(${a.id},${i})">
+                  <span style="font-size:15px">▶️</span>
+                  <span class="link-domain">${safe(_extractDomain(url))}</span>
+                  <span class="link-arrow">→</span>
+                </button>
+                <button class="link-edit-btn" onclick="openLinkModal(${a.id},${i})" title="Editar">✏️</button>
+              </div>
+            `).join('')}
+            ${_getLinks(a).length < MAX_LINKS_PER_ANIME
+              ? `<button class="link-add-btn" onclick="openLinkModal(${a.id})">+ Agregar otro link</button>`
+              : ''}
+          </div>`
+        : `<button class="link-add-btn" onclick="openLinkModal(${a.id})">🔗 Agregar link (Crunchyroll, etc)</button>`
+      }
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">Apodo</div>
+      ${a.nickname
+        ? `<div class="link-row">
+            <button class="link-open-btn" style="cursor:default" onclick="event.stopPropagation()">
+              <span style="font-size:14px">🏷️</span>
+              <span class="link-domain">${safe(a.nickname)}</span>
+            </button>
+            <button class="link-edit-btn" onclick="openNickModal(${a.id})" title="Editar">✏️</button>
+          </div>`
+        : `<button class="link-add-btn" onclick="openNickModal(${a.id})">🏷️ Agregar apodo (busca más rápido)</button>`
+      }
+    </div>
+    <div class="detail-section"><div class="detail-section-title">Lista</div><div class="list-selector">${listOpts}</div></div>
+    <div class="detail-section">
+      ${a.siteUrl?`<button class="action-btn action-ghost" onclick="window.open('${safe(a.siteUrl)}','_blank')">🔗 Ver en AniList</button>`:''}
+      <button class="action-btn action-danger" onclick="deleteAnime(${a.id})">❌ Quitar de mis listas</button>
+    </div>`;
+}
+
+async function detailEp(delta){
+  if(!detailAnime) return; haptic('light');
+  const a=detailAnime, w=Math.max(0,(a.watchedEps||0)+delta);
+  if(a.totalEps&&w>a.totalEps) return;
+  a.watchedEps=w;
+  const t=a.totalEps||0,p=t?pct(w,t):0;
+  const ec=document.getElementById('epc'),ef=document.getElementById('epfill'),et=document.getElementById('epct');
+  if(ec) ec.innerHTML=`${w}<br><span style="font-size:11px;font-weight:400;color:var(--hint)">/ ${t||'?'}</span>`;
+  if(ef) ef.style.width=p+'%';
+  if(et) et.textContent=p+'%';
+  await updateEpInList(a.id,w);
+}
+
+async function toggleMovie(id,listName){
+  haptic('medium');
+  const a=getAnime(id); if(!a) return;
+  a.watchedEps=(a.watchedEps||0)>0?0:1;
+  await updateEpInList(id,a.watchedEps);
+  renderDetailBody(a,listName||getAnimeList(id));
+}
+
+async function moveToList(id,newList){
+  haptic('medium');
+  const a=getAnime(id)||detailAnime; if(!a) return;
+  await updateEpInList(id,a.watchedEps||0,newList);
+  detailAnime={...a,listName:newList};
+  renderDetailBody({...a},newList);
+  toast(`✓ Movido a ${newList}`);
+}
+
+async function deleteAnime(id){
+  haptic('heavy');
+  const a=getAnime(id)||detailAnime, title=a?a.title.substring(0,22):'Anime';
+  if(!confirm(`¿Quitar "${title}"?`)) return;
+  await removeFromLists(id);
+  closeDetail();
+  toast(`🗑️ "${title}" quitado`);
+  if(currentTab!=='buscar'&&currentTab!=='listas') renderList(currentTab);
+  else if(currentTab==='listas') renderOverview();
+}
+
+// ── Detail open/close ─────────────────────────────────────────────────────────
+function openDetail(){
+  const d=document.getElementById('detail');
+  d.classList.remove('closing');
+  requestAnimationFrame(()=>d.classList.add('open'));
+  if(tg?.BackButton) tg.BackButton.show();
+}
+function closeDetail(){
+  const d=document.getElementById('detail');
+  d.classList.add('closing'); d.classList.remove('open');
+  detailAnime=null;
+  if(tg?.BackButton) tg.BackButton.hide();
+}
+if(tg?.BackButton) tg.BackButton.onClick(()=>{
+  const fm = document.getElementById('filter-modal');
+  if (fm?.classList.contains('open')) { closeFilterModal(); return; }
+  const lstm = document.getElementById('list-modal');
+  if (lstm?.classList.contains('open')) { closeCreateListModal(); return; }
+  const em = document.getElementById('ep-modal');
+  if (em?.classList.contains('open')) { closeEpModal(); return; }
+  const nm = document.getElementById('nick-modal');
+  if (nm?.classList.contains('open')) { closeNickModal(); return; }
+  const lm = document.getElementById('link-modal');
+  if (lm?.classList.contains('open')) { closeLinkModal(); return; }
+  const iv = document.getElementById('img-viewer');
+  if (iv?.classList.contains('open')) { closeImgViewer(); return; }
+  if (document.getElementById('detail').classList.contains('open')) closeDetail();
+});
+
+// ── Connectivity status ───────────────────────────────────────────────────────
+function _setConnStatus(cls, txt, title) {
+  const el = document.getElementById('conn-status');
+  if (!el) return;
+  el.className = 'status-dot ' + cls;
+  el.textContent = txt;
+  el.title = title;
+}
+async function checkConnection() {
+  // Browser-level check first (instant)
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    _setConnStatus('status-offline', 'Sin red', 'Navegador sin conexión');
+    return;
+  }
+  _setConnStatus('status-loading', '…', 'Verificando…');
+  try {
+    // Ping our own Firebase Hosting (fast, cached, no rate limit)
+    const r = await Promise.race([
+      fetch('/favicon.ico?_=' + Date.now(), { cache: 'no-store' }),
+      new Promise((_,rej) => setTimeout(() => rej(new Error('timeout')), 8000)),
+    ]);
+    if (r.ok || r.status === 0) {
+      _setConnStatus('status-online', '☁️ Online', 'App independiente del PC (Firebase + AniList)');
+    } else throw new Error('bad status');
+  } catch {
+    // Last resort: trust navigator.onLine
+    if (navigator.onLine) {
+      _setConnStatus('status-online', '☁️ Online', 'Conexión disponible');
+    } else {
+      _setConnStatus('status-offline', 'Sin red', 'Sin conexión a internet');
+    }
+  }
+}
+window.addEventListener('online',  () => _setConnStatus('status-online', '☁️ Online', 'Conexión recuperada'));
+window.addEventListener('offline', () => _setConnStatus('status-offline', 'Sin red', 'Sin conexión'));
+
+// ── Image viewer (cover zoom + pan) ───────────────────────────────────────────
+const ivState = {
+  scale: 1, tx: 0, ty: 0,
+  lastX: 0, lastY: 0,           // last finger position (incremental delta tracking)
+  startDist: 0, startScale: 1,
+  isPanning: false, isPinching: false,
+  lastTap: 0,
+};
+function _ivApply() {
+  const img = document.getElementById('iv-img');
+  if (img) img.style.transform = `translate(${ivState.tx}px, ${ivState.ty}px) scale(${ivState.scale})`;
+}
+function _ivReset() {
+  ivState.scale = 1; ivState.tx = 0; ivState.ty = 0;
+  _ivApply();
+}
+function openImgViewer(src) {
+  if (!src) return;
+  haptic('light');
+  // Try upgrading URL to higher-res (medium → large)
+  const hi = src.replace('/medium/', '/large/');
+  const v = document.getElementById('img-viewer');
+  const img = document.getElementById('iv-img');
+  img.onerror = () => { img.onerror = null; img.src = src; }; // fallback to original
+  img.src = hi;
+  _ivReset();
+  v.classList.add('open');
+  const hint = document.getElementById('iv-hint');
+  if (hint) {
+    hint.classList.remove('fade');
+    setTimeout(() => hint.classList.add('fade'), 2400);
+  }
+}
+function closeImgViewer() {
+  haptic('light');
+  document.getElementById('img-viewer')?.classList.remove('open');
+}
+(function _setupImgViewer() {
+  function init() {
+    const v = document.getElementById('img-viewer');
+    if (!v) return;
+    const img = document.getElementById('iv-img');
+    const dist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+
+    v.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 2) {
+        ivState.isPinching = true;
+        ivState.isPanning  = false;
+        ivState.startDist  = dist(e.touches[0], e.touches[1]);
+        ivState.startScale = ivState.scale;
+      } else if (e.touches.length === 1) {
+        const now = Date.now();
+        if (now - ivState.lastTap < 280) {
+          // Double-tap → toggle zoom (and capture pan anchor in case user drags after)
+          if (ivState.scale > 1.15) _ivReset();
+          else { ivState.scale = 2.4; _ivApply(); }
+          ivState.lastTap   = 0;
+          ivState.isPanning = ivState.scale > 1;
+          ivState.lastX     = e.touches[0].clientX;
+          ivState.lastY     = e.touches[0].clientY;
+          return;
+        }
+        ivState.lastTap   = now;
+        ivState.isPanning = ivState.scale > 1;
+        ivState.lastX     = e.touches[0].clientX;
+        ivState.lastY     = e.touches[0].clientY;
+      }
+      img.classList.add('dragging');
+    }, { passive: true });
+
+    v.addEventListener('touchmove', (e) => {
+      if (ivState.isPinching && e.touches.length === 2) {
+        const d = dist(e.touches[0], e.touches[1]);
+        ivState.scale = Math.min(5, Math.max(1, ivState.startScale * (d / ivState.startDist)));
+        _ivApply();
+        e.preventDefault();
+      } else if (ivState.isPanning && e.touches.length === 1) {
+        // Incremental delta: feels natural and survives 2→1 finger transitions
+        const dx = e.touches[0].clientX - ivState.lastX;
+        const dy = e.touches[0].clientY - ivState.lastY;
+        ivState.tx += dx;
+        ivState.ty += dy;
+        ivState.lastX = e.touches[0].clientX;
+        ivState.lastY = e.touches[0].clientY;
+        _ivApply();
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    v.addEventListener('touchend', (e) => {
+      img.classList.remove('dragging');
+      if (e.touches.length < 2) ivState.isPinching = false;
+
+      // Transition: 2→1 fingers (pinch ended, one finger still on screen)
+      // → start panning with the remaining finger if zoomed
+      if (e.touches.length === 1 && ivState.scale > 1) {
+        ivState.isPanning = true;
+        ivState.lastX = e.touches[0].clientX;
+        ivState.lastY = e.touches[0].clientY;
+      } else if (e.touches.length === 0) {
+        ivState.isPanning = false;
+      }
+
+      // Snap back if zoomed out below 1
+      if (ivState.scale < 1.05) _ivReset();
+    });
+
+    // Mouse wheel zoom (desktop)
+    v.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      ivState.scale = Math.min(5, Math.max(1, ivState.scale + (-e.deltaY * 0.002)));
+      if (ivState.scale === 1) { ivState.tx = 0; ivState.ty = 0; }
+      _ivApply();
+    }, { passive: false });
+
+    // Mouse drag pan (desktop) — only active when zoomed
+    let mouseDragging = false;
+    v.addEventListener('mousedown', (e) => {
+      if (ivState.scale <= 1) return;
+      mouseDragging = true;
+      ivState.lastX = e.clientX;
+      ivState.lastY = e.clientY;
+      img.classList.add('dragging');
+      e.preventDefault();
+    });
+    window.addEventListener('mousemove', (e) => {
+      if (!mouseDragging) return;
+      ivState.tx += (e.clientX - ivState.lastX);
+      ivState.ty += (e.clientY - ivState.lastY);
+      ivState.lastX = e.clientX;
+      ivState.lastY = e.clientY;
+      _ivApply();
+    });
+    window.addEventListener('mouseup', () => {
+      if (!mouseDragging) return;
+      mouseDragging = false;
+      img.classList.remove('dragging');
+    });
+
+    // Tap on background closes
+    v.addEventListener('click', (e) => {
+      if (e.target === v || e.target.id === 'iv-canvas') closeImgViewer();
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+
+// ── User links (multi-link, per-anime) ────────────────────────────────────────
+const MAX_LINKS_PER_ANIME = 5;
+let _linkModalAnimeId = null;
+let _linkModalEditIdx = null; // null = adding new, number = editing existing
+
+function _extractDomain(url) {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '');
+    const main = host.split('.')[0];
+    return main.charAt(0).toUpperCase() + main.slice(1);
+  } catch { return 'Link'; }
+}
+
+function _getLinks(a) {
+  return Array.isArray(a?.userLinks) ? a.userLinks : (a?.userLink ? [a.userLink] : []);
+}
+
+function openLinkModal(id, idx) {
+  haptic('light');
+  _linkModalAnimeId = Number(id);
+  _linkModalEditIdx = (typeof idx === 'number') ? idx : null;
+  const a = getAnime(_linkModalAnimeId) || detailAnime;
+  const links = _getLinks(a);
+
+  // Cap reached when adding new
+  if (_linkModalEditIdx === null && links.length >= MAX_LINKS_PER_ANIME) {
+    toast(`⚠️ Máximo ${MAX_LINKS_PER_ANIME} links por anime`);
+    return;
+  }
+
+  const input = document.getElementById('link-input');
+  input.value = (_linkModalEditIdx !== null && links[_linkModalEditIdx]) ? links[_linkModalEditIdx] : '';
+  document.getElementById('link-modal-title').textContent =
+    _linkModalEditIdx !== null ? '🔗 Editar link' : '🔗 Agregar link';
+  document.getElementById('link-modal-delete').style.display =
+    _linkModalEditIdx !== null ? 'block' : 'none';
+  document.getElementById('link-modal').classList.add('open');
+  setTimeout(() => input.focus(), 80);
+}
+
+function closeLinkModal() {
+  document.getElementById('link-modal').classList.remove('open');
+  _linkModalAnimeId = null;
+  _linkModalEditIdx = null;
+}
+
+async function saveLinkFromModal() {
+  if (_linkModalAnimeId == null) return;
+  const url = document.getElementById('link-input').value.trim();
+  if (!url) { closeLinkModal(); return; } // empty = no-op
+  if (!/^https?:\/\//i.test(url)) {
+    toast('⚠️ Link debe empezar con http:// o https://');
+    return;
+  }
+  const a = getAnime(_linkModalAnimeId);
+  if (a) {
+    if (!Array.isArray(a.userLinks)) a.userLinks = [];
+    if (_linkModalEditIdx !== null) {
+      a.userLinks[_linkModalEditIdx] = url;
+      toast('✓ Link actualizado');
+    } else {
+      a.userLinks.push(url);
+      toast('✓ Link agregado');
+    }
+    await saveLists();
+    if (detailAnime?.id === _linkModalAnimeId) {
+      detailAnime.userLinks = a.userLinks;
+      renderDetailBody(a, detailAnime.listName);
+    }
+  }
+  closeLinkModal();
+}
+
+async function removeLinkFromModal() {
+  if (_linkModalAnimeId == null || _linkModalEditIdx == null) return;
+  const a = getAnime(_linkModalAnimeId);
+  if (a && Array.isArray(a.userLinks)) {
+    a.userLinks.splice(_linkModalEditIdx, 1);
+    await saveLists();
+    if (detailAnime?.id === _linkModalAnimeId) {
+      detailAnime.userLinks = a.userLinks;
+      renderDetailBody(a, detailAnime.listName);
+    }
+    toast('🗑️ Link eliminado');
+  }
+  closeLinkModal();
+}
+
+function openAnimeLink(id, idx) {
+  const a = getAnime(Number(id)) || detailAnime;
+  const links = _getLinks(a);
+  const url = links[idx || 0];
+  if (!url) return;
+  haptic('medium');
+  if (tg?.openLink) tg.openLink(url);
+  else window.open(url, '_blank', 'noopener');
+}
+
+// ── Nickname (alias para búsqueda rápida) ─────────────────────────────────────
+let _nickModalAnimeId = null;
+
+function openNickModal(id) {
+  haptic('light');
+  _nickModalAnimeId = Number(id);
+  const a = getAnime(_nickModalAnimeId) || detailAnime;
+  const input = document.getElementById('nick-input');
+  input.value = a?.nickname || '';
+  document.getElementById('nick-modal').classList.add('open');
+  setTimeout(() => input.focus(), 80);
+}
+function closeNickModal() {
+  document.getElementById('nick-modal').classList.remove('open');
+  _nickModalAnimeId = null;
+}
+async function saveNickFromModal() {
+  if (_nickModalAnimeId == null) return;
+  const nick = document.getElementById('nick-input').value.trim().slice(0, 40);
+  const a = getAnime(_nickModalAnimeId);
+  if (a) {
+    a.nickname = nick || null;
+    await saveLists();
+    if (detailAnime?.id === _nickModalAnimeId) {
+      detailAnime.nickname = a.nickname;
+      renderDetailBody(a, detailAnime.listName);
+    }
+    toast(nick ? '✓ Apodo guardado' : '✓ Apodo eliminado');
+  }
+  closeNickModal();
+}
+
+// ── Episode modal (tipear directo en lugar de clickear +/- mil veces) ───────
+let _epModalAnimeId = null;
+
+function openEpModal(id) {
+  haptic('light');
+  _epModalAnimeId = Number(id);
+  const a = getAnime(_epModalAnimeId) || detailAnime;
+  if (!a) return;
+  const input = document.getElementById('ep-input');
+  input.value = a.watchedEps || 0;
+  if (a.totalEps) input.max = a.totalEps; else input.removeAttribute('max');
+  document.getElementById('ep-modal-sub').textContent =
+    `${a.title.substring(0,42)} · actual: ${a.watchedEps||0}${a.totalEps?` / ${a.totalEps}`:''}`;
+  document.getElementById('ep-modal').classList.add('open');
+  setTimeout(() => { input.focus(); input.select(); }, 80);
+}
+
+function closeEpModal() {
+  document.getElementById('ep-modal').classList.remove('open');
+  _epModalAnimeId = null;
+}
+
+async function saveEpFromModal() {
+  if (_epModalAnimeId == null) return;
+  const a = getAnime(_epModalAnimeId);
+  if (!a) return;
+  const raw = document.getElementById('ep-input').value;
+  const v = Math.max(0, parseInt(raw, 10) || 0);
+  if (a.totalEps && v > a.totalEps) {
+    toast(`⚠️ Máximo ${a.totalEps} eps`);
+    return;
+  }
+  a.watchedEps = v;
+  await updateEpInList(a.id, v);
+
+  // Re-render whichever views are visible
+  if (detailAnime?.id === a.id) {
+    detailAnime.watchedEps = v;
+    renderDetailBody(a, detailAnime.listName);
+  }
+  // Search results in-place update
+  const cnt = document.querySelector(`#search-results [data-search-ep="${a.id}"]`);
+  if (cnt) cnt.textContent = `${v}${a.totalEps?` / ${a.totalEps}`:''}`;
+  const bar = cnt?.closest('.result-progress-wrap')?.querySelector('.result-progress-bar-fill');
+  if (bar && a.totalEps) bar.style.width = Math.round(v/a.totalEps*100) + '%';
+  // Day view (Estrenos) re-render
+  if (currentTab === 'estrenos') renderDayList();
+  // List tabs re-render
+  if (currentTab !== 'buscar' && currentTab !== 'estrenos') renderList(currentTab);
+
+  toast(`✓ Ep ${v}`);
+  closeEpModal();
+}
+
+// ── Search filters modal ──────────────────────────────────────────────────────
+function _buildFilterChips(containerId, options, key, current) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  let html = `<button class="filter-chip${!current?' active':''}" data-val="" onclick="_pickFilter('${key}','')">Cualquiera</button>`;
+  html += options.map(o =>
+    `<button class="filter-chip${current===o.v?' active':''}" data-val="${safe(o.v)}" onclick="_pickFilter('${key}','${safe(o.v)}')">${o.label}</button>`
+  ).join('');
+  el.innerHTML = html;
+}
+function _buildGenreChips(current) {
+  const el = document.getElementById('filter-genres');
+  if (!el) return;
+  el.innerHTML = GENRE_OPTS.map(g =>
+    `<button class="filter-chip multi${(current||[]).includes(g)?' active':''}" data-val="${safe(g)}" onclick="_toggleGenre('${safe(g)}')">${g}</button>`
+  ).join('');
+}
+function _buildTagChips(current) {
+  const el = document.getElementById('filter-tags');
+  if (!el) return;
+  el.innerHTML = TAG_OPTS.map(t =>
+    `<button class="filter-chip multi${(current||[]).includes(t)?' active':''}" data-val="${safe(t)}" onclick="_toggleTag('${safe(t)}')">${t}</button>`
+  ).join('');
+}
+function _toggleTag(t) {
+  haptic('light');
+  if (!Array.isArray(searchFilters.tags)) searchFilters.tags = [];
+  const i = searchFilters.tags.indexOf(t);
+  if (i === -1) searchFilters.tags.push(t);
+  else searchFilters.tags.splice(i, 1);
+  _buildTagChips(searchFilters.tags);
+}
+function _pickFilter(key, val) {
+  haptic('light');
+  searchFilters[key] = val || null;
+  // Re-render that section's chips so visual state updates
+  const opts = key==='season' ? SEASON_OPTS : key==='status' ? STATUS_OPTS : key==='format' ? FORMAT_OPTS : null;
+  if (opts) _buildFilterChips('filter-'+key+'s', opts, key, searchFilters[key]);
+}
+function _toggleGenre(g) {
+  haptic('light');
+  if (!Array.isArray(searchFilters.genres)) searchFilters.genres = [];
+  const i = searchFilters.genres.indexOf(g);
+  if (i === -1) searchFilters.genres.push(g);
+  else searchFilters.genres.splice(i, 1);
+  _buildGenreChips(searchFilters.genres);
+}
+function openFilterModal() {
+  haptic('light');
+  // Year dropdown
+  const yearSel = document.getElementById('filter-year');
+  if (!yearSel.options.length) {
+    const cur = new Date().getFullYear();
+    let opts = '<option value="">Cualquiera</option>';
+    for (let y = cur + 1; y >= 1960; y--) opts += `<option value="${y}">${y}</option>`;
+    yearSel.innerHTML = opts;
+  }
+  yearSel.value = searchFilters.year || '';
+  yearSel.onchange = () => { searchFilters.year = parseInt(yearSel.value, 10) || null; };
+
+  _buildFilterChips('filter-seasons',  SEASON_OPTS, 'season', searchFilters.season);
+  _buildFilterChips('filter-statuses', STATUS_OPTS, 'status', searchFilters.status);
+  _buildFilterChips('filter-formats',  FORMAT_OPTS, 'format', searchFilters.format);
+  _buildGenreChips(searchFilters.genres);
+  _buildTagChips(searchFilters.tags);
+
+  document.getElementById('filter-modal').classList.add('open');
+}
+function closeFilterModal() {
+  document.getElementById('filter-modal').classList.remove('open');
+}
+function applyFilters() {
+  closeFilterModal();
+  if (currentTab === 'buscar') {
+    renderSearch(); // re-renders with filter button state + active chips bar + triggers doSearch
+  }
+}
+function clearAllFilters(reload) {
+  searchFilters = { year: null, season: null, status: null, format: null, genres: [], tags: [] };
+  if (reload) {
+    if (currentTab === 'buscar') renderSearch();
+  } else {
+    // Update modal chips visually
+    const yearSel = document.getElementById('filter-year');
+    if (yearSel) yearSel.value = '';
+    _buildFilterChips('filter-seasons',  SEASON_OPTS, 'season', null);
+    _buildFilterChips('filter-statuses', STATUS_OPTS, 'status', null);
+    _buildFilterChips('filter-formats',  FORMAT_OPTS, 'format', null);
+    _buildGenreChips([]);
+    _buildTagChips([]);
+  }
+}
+function removeFilter(key) {
+  haptic('light');
+  if (key.startsWith('genre:')) {
+    const g = key.slice(6);
+    searchFilters.genres = (searchFilters.genres||[]).filter(x => x !== g);
+  } else if (key.startsWith('tag:')) {
+    const t = key.slice(4);
+    searchFilters.tags = (searchFilters.tags||[]).filter(x => x !== t);
+  } else {
+    searchFilters[key] = (key === 'genres' || key === 'tags') ? [] : null;
+  }
+  if (currentTab === 'buscar') renderSearch();
+}
+
+// ── Personal rating (1–5 stars) ───────────────────────────────────────────────
+function _starsHtml(id, rating, containerId) {
+  const stars = [1,2,3,4,5].map(n =>
+    `<button class="star-btn${(rating||0) >= n ? ' filled' : ''}" onclick="setRating(${id},${n},'${containerId}')" aria-label="${n} estrellas">★</button>`
+  ).join('');
+  const label = rating ? `${rating}/5` : 'Sin calificar';
+  const clear  = rating ? `<button class="rating-clear" onclick="setRating(${id},0,'${containerId}')">✕</button>` : '';
+  return `<div class="star-row" id="${containerId}">${stars}<span class="rating-label">${label}</span>${clear}</div>`;
+}
+
+async function setRating(id, rating, containerId) {
+  haptic('light');
+  id = Number(id);
+  const a = getAnime(id) || detailAnime;
+  if (!a) return;
+  a.userRating = (a.userRating === rating) ? 0 : (rating || 0); // tap same → clear
+  if (detailAnime?.id === id) detailAnime.userRating = a.userRating;
+  await saveLists();
+  // Update stars in-place
+  const container = document.getElementById(containerId);
+  if (container) container.outerHTML = _starsHtml(id, a.userRating, containerId);
+}
+
+// ── Custom list modal (create/edit/delete) ───────────────────────────────────
+let _editingListKey = null;
+function openCreateListModal() {
+  haptic('light');
+  _editingListKey = null;
+  document.getElementById('list-modal-title').textContent = '📂 Nueva lista';
+  document.getElementById('list-name-input').value = '';
+  document.getElementById('list-emoji-input').value = '';
+  document.getElementById('list-modal-delete').style.display = 'none';
+  document.getElementById('list-modal').classList.add('open');
+  setTimeout(() => document.getElementById('list-name-input').focus(), 80);
+}
+function editCustomList(key) {
+  haptic('light');
+  _editingListKey = key;
+  const meta = listMeta[key];
+  if (!meta) return;
+  document.getElementById('list-modal-title').textContent = '✏️ Editar lista';
+  document.getElementById('list-name-input').value = meta.name;
+  document.getElementById('list-emoji-input').value = meta.emoji || '';
+  document.getElementById('list-modal-delete').style.display = 'block';
+  document.getElementById('list-modal').classList.add('open');
+  setTimeout(() => document.getElementById('list-name-input').focus(), 80);
+}
+function closeCreateListModal() {
+  document.getElementById('list-modal').classList.remove('open');
+  _editingListKey = null;
+}
+async function saveCreateListFromModal() {
+  const name  = document.getElementById('list-name-input').value.trim();
+  const emoji = document.getElementById('list-emoji-input').value.trim() || '📂';
+  if (!name) { toast('⚠️ Ponle un nombre'); return; }
+  let key;
+  if (_editingListKey) {
+    await renameCustomList(_editingListKey, name, emoji);
+    key = _editingListKey;
+    toast('✓ Lista actualizada');
+  } else {
+    key = await createCustomList(name, emoji);
+    toast('✓ Lista creada');
+  }
+  closeCreateListModal();
+  if (currentTab === 'listas') renderOverview();
+  else if (detailAnime) renderDetailBody(getAnime(detailAnime.id) || detailAnime, getAnimeList(detailAnime.id));
+}
+async function deleteListFromModal() {
+  if (!_editingListKey) return;
+  const meta = listMeta[_editingListKey];
+  const items = allLists[_editingListKey] || [];
+  const msg = items.length > 0
+    ? `"${meta.name}" tiene ${items.length} anime. Los animes NO se borran, solo se quitan de esta lista. ¿Seguro?`
+    : `¿Eliminar "${meta.name}"?`;
+  if (!confirm(msg)) return;
+  await deleteCustomList(_editingListKey);
+  closeCreateListModal();
+  if (currentTab === 'listas') renderOverview();
+  else if (currentTab === _editingListKey) setTab('listas');
+  toast('🗑️ Lista eliminada');
+}
+
+// Search local lists (titles + nicknames) — used to surface tracked anime first
+function searchLocal(q) {
+  const needle = q.toLowerCase().trim();
+  if (!needle || needle.length < 2) return [];
+  const seen = new Set();
+  const matches = [];
+  for (const list of Object.values(allLists)) {
+    for (const a of list) {
+      if (seen.has(a.id)) continue;
+      const title = (a.title || '').toLowerCase();
+      const nick  = (a.nickname || '').toLowerCase();
+      if (title.includes(needle) || (nick && nick.includes(needle))) {
+        seen.add(a.id);
+        matches.push({
+          id:        a.id,
+          title:     a.title,
+          nickname:  a.nickname || null,
+          status:    a.status || null,
+          format:    a.format || 'TV',
+          score:     a.averageScore || null,
+          episodes:  a.totalEps || null,
+          genres:    [],
+          cover:     a.coverImage || null,
+          siteUrl:   a.siteUrl || null,
+          startDate: null,
+          nextEp:    null,
+          tracking:  getAnimeList(a.id),
+          _local:    true,
+        });
+      }
+    }
+  }
+  return matches;
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+(async()=>{
+  const startTab = window.location.hash === '#estrenos' ? 'estrenos' : 'buscar';
+  setTab(startTab);
+  await loadLists();
+  updateDots();
+  checkConnection();
+  // Pre-warm today's cache in background so Estrenos tab opens instantly
+  if (startTab !== 'estrenos') fetchDay(currentDay, false);
+})();
+</script>
+</body>
+</html>
