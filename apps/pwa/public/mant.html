@@ -763,7 +763,10 @@ function renderMachineList() {
     el.innerHTML = `<div class="empty-state">
       <div class="empty-icon">🏭</div>
       <div class="empty-title">Sin máquinas</div>
-      <div class="empty-sub">No hay máquinas en esta categoría</div></div>`
+      <div class="empty-sub">No hay máquinas en esta categoría</div>
+      <div class="empty-sub" style="margin-top:8px;font-size:11px;opacity:.6">
+        debug: ${machines.length} totales · filtro: ${activeCatFilter} · uid: ${(uid||'?').slice(0,12)}
+      </div></div>`
     return
   }
   el.innerHTML = filtered.map(m => machineItemHtml(m)).join('')
