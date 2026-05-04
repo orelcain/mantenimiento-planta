@@ -3198,19 +3198,20 @@ exports.mintTelegramAuthToken = onRequest({ region: 'us-central1' }, async (req,
  * No requiere autenticación — solo funciona con el chatId ya configurado en .env.
  */
 exports.setupMantApp = onRequest({ region: 'us-central1' }, async (req, res) => {
-  const chatId = process.env.TELEGRAM_CHAT_ID
+  // Acepta chatId desde query param (ej: ?chatId=-1003969255842) o desde .env
+  const chatId = req.query.chatId || process.env.TELEGRAM_CHAT_ID
   if (!chatId) {
-    res.status(500).json({ error: 'TELEGRAM_CHAT_ID no configurado en .env' })
+    res.status(400).json({ error: 'Pasá el chatId: GET /setupMantApp?chatId=-1003969255842' })
     return
   }
-  const ref = db.collection('telegramAuthorizedChats').doc(chatId)
+  const ref = db.collection('telegramAuthorizedChats').doc(String(chatId))
   const existing = await ref.get()
   if (existing.exists) {
     res.json({ status: 'already_exists', chatId, data: existing.data() })
     return
   }
   await ref.set({
-    nombre: 'Alertas Mantenimiento (dev)',
+    nombre: req.query.nombre || 'Alertas Mantenimiento (dev)',
     activo: true,
     creadoEn: FieldValue.serverTimestamp(),
     nota: 'Seeded automáticamente por setupMantApp',
