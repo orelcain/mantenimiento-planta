@@ -13,6 +13,7 @@ import { Search, X, Link2, Loader2, AlertTriangle, CheckCircle2, Package, Trash2
 import { collection, getDocs, query, where } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import type { Machine } from '@/types/repuestos'
+import { normalizeForSearch } from '@/utils/repuestos'
 
 type ModalStep = 'select' | 'confirming' | 'done'
 
@@ -45,11 +46,11 @@ export function LinkMachineModal({
 
   const filtered = useMemo(() => {
     if (!search.trim()) return machines
-    const q = search.toLowerCase()
+    const q = normalizeForSearch(search)
     return machines.filter(m =>
-      m.nombre.toLowerCase().includes(q) ||
-      m.marca?.toLowerCase().includes(q) ||
-      m.modelo?.toLowerCase().includes(q),
+      normalizeForSearch(m.nombre).includes(q) ||
+      normalizeForSearch(m.marca).includes(q) ||
+      normalizeForSearch(m.modelo).includes(q),
     )
   }, [machines, search])
 

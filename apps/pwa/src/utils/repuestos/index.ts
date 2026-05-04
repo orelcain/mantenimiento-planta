@@ -2,3 +2,4 @@ export { optimizeImage, validateImageFile, getImageDimensions, fileToBase64, dow
 export { exportRepuestosToExcel, exportCantidadesTemplate } from './exportToExcel'
 export { exportRepuestosToPDF, exportTagsReportToPDF } from './exportToPDF'
 export { exportTechnicalSheetToPDF, exportMultipleTechnicalSheetsToPDF } from './exportTechnicalSheet'
+export { normalizeForSearch, matchesSearch } from './searchNormalize'

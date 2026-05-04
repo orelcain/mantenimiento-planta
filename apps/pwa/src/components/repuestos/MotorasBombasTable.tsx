@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { Search, MoreVertical, Zap } from 'lucide-react'
 import { Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Badge } from '@/components/ui'
 import type { PlantAsset } from '@/types/repuestos'
+import { normalizeForSearch } from '@/utils/repuestos'
 
 interface MotorasBombasTableProps {
   assets: PlantAsset[]
@@ -21,16 +22,16 @@ export function MotorasBombasTable({ assets, loading, onSelect }: MotorasBombasT
       result = result.filter((a) => a.tipo === tipoFilter)
     }
 
-    // Búsqueda por texto
+    // Búsqueda por texto (sin acentos, case-insensitive)
     if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase()
+      const query = normalizeForSearch(searchQuery)
       result = result.filter((a) => {
         return (
-          a.equipo?.toLowerCase().includes(query) ||
-          a.area?.toLowerCase().includes(query) ||
-          a.componente?.toLowerCase().includes(query) ||
-          a.marca?.toLowerCase().includes(query) ||
-          a.codigoSAP?.toLowerCase().includes(query)
+          normalizeForSearch(a.equipo).includes(query) ||
+          normalizeForSearch(a.area).includes(query) ||
+          normalizeForSearch(a.componente).includes(query) ||
+          normalizeForSearch(a.marca).includes(query) ||
+          normalizeForSearch(a.codigoSAP).includes(query)
         )
       })
     }

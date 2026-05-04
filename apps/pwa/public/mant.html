@@ -783,7 +783,7 @@ function renderSearchBody(query){
     body.innerHTML = renderRecentsHtml()
     return
   }
-  const q = query.toUpperCase()
+  const q = normalizeSearch(query)
   const results = []
   for (const [machineId, reps] of Object.entries(repCache)){
     const m = machineMap[machineId]
@@ -799,8 +799,8 @@ function renderSearchBody(query){
     return
   }
   results.sort((a,b) => {
-    if (a.r.codigoSAP?.toUpperCase() === q) return -1
-    if (b.r.codigoSAP?.toUpperCase() === q) return 1
+    if (normalizeSearch(a.r.codigoSAP) === q) return -1
+    if (normalizeSearch(b.r.codigoSAP) === q) return 1
     return 0
   })
   body.innerHTML = `
@@ -817,17 +817,23 @@ async function loadAllAndSearch(query){
   const unloaded = machines.filter(m => !repCache[m.id])
   await Promise.all(unloaded.map(m => loadRepuestos(m.id).catch(()=>null)))
   const inp = document.getElementById('search-input')
-  if (inp && inp.value.trim().toUpperCase().includes(query.toUpperCase())) renderSearchBody(query)
+  if (inp && normalizeSearch(inp.value).includes(normalizeSearch(query))) renderSearchBody(query)
 }
 
-function matchesRepuesto(r, q){
-  return (r.codigoSAP || '').toUpperCase().includes(q)
-    || (r.textoBreve || '').toUpperCase().includes(q)
-    || (r.descripcion || '').toUpperCase().includes(q)
-    || (r.alias || '').toUpperCase().includes(q)
-    || (r.codigoFabricante || '').toUpperCase().includes(q)
-    || (r.nombreManual || '').toUpperCase().includes(q)
-    || (r.tipo || '').toUpperCase().includes(q)
+function normalizeSearch(s){
+  if (!s) return ''
+  return String(s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim()
+}
+
+function matchesRepuesto(r, normQ){
+  return normalizeSearch(r.codigoSAP).includes(normQ)
+    || normalizeSearch(r.textoBreve).includes(normQ)
+    || normalizeSearch(r.descripcion).includes(normQ)
+    || normalizeSearch(r.alias).includes(normQ)
+    || normalizeSearch(r.codigoFabricante).includes(normQ)
+    || normalizeSearch(r.nombreManual).includes(normQ)
+    || normalizeSearch(r.tipo).includes(normQ)
+    || normalizeSearch(r.ubicacionEnPlanta).includes(normQ)
 }
 
 function renderRecentsHtml(){

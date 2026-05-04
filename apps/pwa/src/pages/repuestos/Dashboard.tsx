@@ -23,6 +23,7 @@ import { useToast } from '@/hooks/useToast'
 import { useMachineContext, useCurrentMachine } from '@/contexts/MachineContext'
 import { useAuthStore, useIsAdmin } from '@/store/authStore'
 import type { Repuesto, EquipmentRepuesto, RepuestoFormData, TechnicalSpecs, MachineImage } from '@/types/repuestos'
+import { normalizeForSearch } from '@/utils/repuestos'
 // CategoryManager ahora se renderiza dentro de EquipmentNavigator
 import { ImportRepuestosModal } from './ImportRepuestosModal'
 import { ExportReportModal } from '@/components/repuestos/ExportReportModal'
@@ -769,14 +770,17 @@ export function RepuestosDashboard({
     let filtered = [...repuestos]
 
     if (debouncedSearchQuery.trim()) {
-      const query = debouncedSearchQuery.toLowerCase()
+      const query = normalizeForSearch(debouncedSearchQuery)
       filtered = filtered.filter((r) => {
         return (
-          r.codigoSAP?.toLowerCase().includes(query) ||
-          r.textoBreve?.toLowerCase().includes(query) ||
-          r.descripcion?.toLowerCase().includes(query) ||
-          r.codigoFabricante?.toLowerCase().includes(query) ||
-          r.ubicacionEnPlanta?.toLowerCase().includes(query)
+          normalizeForSearch(r.codigoSAP).includes(query) ||
+          normalizeForSearch(r.textoBreve).includes(query) ||
+          normalizeForSearch(r.descripcion).includes(query) ||
+          normalizeForSearch(r.codigoFabricante).includes(query) ||
+          normalizeForSearch(r.ubicacionEnPlanta).includes(query) ||
+          normalizeForSearch(r.alias).includes(query) ||
+          normalizeForSearch(r.nombreManual).includes(query) ||
+          normalizeForSearch(r.tipo).includes(query)
         )
       })
     }

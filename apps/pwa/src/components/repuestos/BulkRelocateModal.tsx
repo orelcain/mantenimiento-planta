@@ -12,6 +12,7 @@ import {
   Search, Package, Check,
 } from 'lucide-react'
 import type { Repuesto, Machine } from '@/types/repuestos'
+import { normalizeForSearch } from '@/utils/repuestos'
 import {
   Dialog,
   DialogContent,
@@ -58,12 +59,12 @@ export function BulkRelocateModal({
   // Filter repuestos by search
   const filteredRepuestos = useMemo(() => {
     if (!searchQuery.trim()) return repuestos
-    const q = searchQuery.toLowerCase()
+    const q = normalizeForSearch(searchQuery)
     return repuestos.filter(r =>
-      r.textoBreve?.toLowerCase().includes(q) ||
-      r.codigoSAP?.toLowerCase().includes(q) ||
-      r.codigoFabricante?.toLowerCase().includes(q) ||
-      r.descripcion?.toLowerCase().includes(q)
+      normalizeForSearch(r.textoBreve).includes(q) ||
+      normalizeForSearch(r.codigoSAP).includes(q) ||
+      normalizeForSearch(r.codigoFabricante).includes(q) ||
+      normalizeForSearch(r.descripcion).includes(q)
     )
   }, [repuestos, searchQuery])
 

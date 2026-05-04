@@ -17,6 +17,7 @@ import {
   Merge, ChevronDown, ChevronUp, Copy as CopyIcon, BookOpen,
 } from 'lucide-react'
 import type { Machine } from '@/types/repuestos'
+import { normalizeForSearch } from '@/utils/repuestos'
 import { useDuplicateScanner, type DuplicateGroup, type DuplicateEntry } from '@/hooks/repuestos/useDuplicateScanner'
 import { mergeRepuestos } from '@/services/mergeRepuestos'
 import { ManualSearchModal } from '@/components/repuestos/ManualSearchModal'
@@ -267,12 +268,12 @@ export function DuplicatesModal({
 
   const filteredGroups = searchFilter.trim()
     ? groups.filter(g => {
-        const q = searchFilter.toLowerCase()
+        const q = normalizeForSearch(searchFilter)
         return (
-          g.codigoSAP.toLowerCase().includes(q) ||
+          normalizeForSearch(g.codigoSAP).includes(q) ||
           g.entries.some(e =>
-            e.repuesto.textoBreve?.toLowerCase().includes(q) ||
-            e.machineName.toLowerCase().includes(q)
+            normalizeForSearch(e.repuesto.textoBreve).includes(q) ||
+            normalizeForSearch(e.machineName).includes(q)
           )
         )
       })
