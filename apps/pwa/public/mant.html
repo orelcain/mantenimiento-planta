@@ -834,6 +834,31 @@ async function loadRepuestos(machineId){
   return repCache[machineId]
 }
 
+/**
+ * Normaliza favoriteLists para que list.machineIds sea siempre la UNIÓN
+ * de todos los equipos de la lista (raíz + sub-listas + sub-sub-listas).
+ * Esto garantiza compatibilidad con la PWA que solo lee list.machineIds.
+ * Retorna true si se realizó algún cambio.
+ */
+function _normalizeFavLists(lists){
+  let changed = false
+  for (const list of lists || []) {
+    const allIds = new Set(list.machineIds || [])
+    for (const sl of list.subLists || []) {
+      for (const id of sl.machineIds || []) {
+        if (!allIds.has(id)){ allIds.add(id); changed = true }
+      }
+      for (const ssl of sl.subLists || []) {
+        for (const id of ssl.machineIds || []) {
+          if (!allIds.has(id)){ allIds.add(id); changed = true }
+        }
+      }
+    }
+    if (changed) list.machineIds = [...allIds]
+  }
+  return changed
+}
+
 async function loadPrefs(){
   if (!uid) return
   const doc = await db.collection('user_preferences').doc(uid).get()
@@ -843,6 +868,9 @@ async function loadPrefs(){
       favoriteLists:    d.favoriteLists    || [],
       repuestoFavLists: d.repuestoFavLists || {},
     }
+    // Fix one-shot: restaurar list.machineIds si datos fueron corrompidos
+    const fixed = _normalizeFavLists(prefs.favoriteLists)
+    if (fixed) saveAllPrefs().catch(() => {})  // fire-and-forget
   }
 }
 
@@ -858,6 +886,8 @@ function startPrefsListener(){
       favoriteLists:    d.favoriteLists    || [],
       repuestoFavLists: d.repuestoFavLists || {},
     }
+    // Normalizar: asegurar list.machineIds = unión de todos los equipos
+    _normalizeFavLists(next.favoriteLists)
     // Si las prefs no cambiaron (mismo writer somos nosotros), evitar re-render
     if (JSON.stringify(next) === JSON.stringify(prefs)) return
     prefs = next
@@ -1500,7 +1530,18 @@ async function saveManual(){
 function pushView(viewId, title, subtitle){
   const c = getContent()
   const prevId = document.querySelector('.view.active')?.id || `view-${currentTab}`
-  navStack.push({viewId: prevId, scrollTop: c.scrollTop})
+  // Si vamos de view-machine a view-machine (listas anidadas), guardamos snapshot
+  // del HTML + header para restaurarlo correctamente al volver
+  let snapshot = null
+  if (prevId === 'view-machine' && viewId === 'view-machine'){
+    const prevEl = document.getElementById('view-machine')
+    snapshot = {
+      html:     prevEl?.innerHTML || '',
+      title:    document.getElementById('hdr-title')?.textContent || '',
+      subtitle: document.getElementById('hdr-sub')?.textContent  || '',
+    }
+  }
+  navStack.push({viewId: prevId, scrollTop: c.scrollTop, snapshot})
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'))
   document.getElementById(viewId).classList.add('active')
   setHeader(title, subtitle, true)
@@ -1519,7 +1560,13 @@ function goBack(){
   const prev = navStack.pop()
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'))
   document.getElementById(prev.viewId).classList.add('active')
-  if (navStack.length === 0) tabHeader(currentTab)
+  // Si hay snapshot guardado, restaurar HTML + header de view-machine
+  if (prev.snapshot && prev.viewId === 'view-machine'){
+    document.getElementById('view-machine').innerHTML = prev.snapshot.html
+    setHeader(prev.snapshot.title, prev.snapshot.subtitle, navStack.length > 0)
+  } else if (navStack.length === 0){
+    tabHeader(currentTab)
+  }
   activeUploadCtx = null
   // Ocultar botones ✏️ ⭐ si volvemos a una vista que no es de repuesto
   if (prev.viewId !== 'view-repuesto'){
@@ -3272,27 +3319,24 @@ async function executeMoveToSubList(listName, machineId, fromIdx, toIdx){
   if (!list) return
   const subLists = list.subLists || []
 
-  // 1. Quitar del origen
-  if (fromIdx === -1){
-    // estaba en Sin categoría (machineIds raíz)
-    list.machineIds = (list.machineIds || []).filter(id => id !== machineId)
-  } else {
+  // list.machineIds es la UNIÓN de todos los equipos: no se toca aquí.
+  // Solo gestionamos la membresía en sl.machineIds (dentro de qué sub-lista cae).
+
+  // 1. Quitar de la sub-lista origen (si venía de una sub-lista)
+  if (fromIdx >= 0){
     const src = subLists[fromIdx]
     if (src) src.machineIds = (src.machineIds || []).filter(id => id !== machineId)
   }
+  // Si fromIdx === -1 el equipo estaba "sin categoría" (no en ninguna sl.machineIds) → nada que quitar
 
-  // 2. Agregar al destino
-  if (toIdx === -1){
-    // mover a Sin categoría (machineIds raíz)
-    if (!(list.machineIds || []).includes(machineId)){
-      list.machineIds = [...(list.machineIds || []), machineId]
-    }
-  } else {
+  // 2. Agregar a la sub-lista destino (si va a una sub-lista)
+  if (toIdx >= 0){
     const dst = subLists[toIdx]
     if (dst && !(dst.machineIds || []).includes(machineId)){
       dst.machineIds = [...(dst.machineIds || []), machineId]
     }
   }
+  // Si toIdx === -1 el equipo queda "sin categoría" → ya está en list.machineIds, no hay sl destino
 
   // Siempre re-renderizar en memoria (datos ya actualizados)
   const destName = toIdx === -1 ? 'Sin categoría' : subLists[toIdx]?.name || ''
@@ -3437,23 +3481,23 @@ async function executeMoveToSubSubList(listName, subListIdx, machineId, fromSubS
   if (!sl) return
   const subSubLists = sl.subLists || []
 
-  // 1. Quitar del origen
-  if (fromSubSubIdx === -1){
-    sl.machineIds = (sl.machineIds || []).filter(id => id !== machineId)
-  } else {
+  // sl.machineIds es la UNIÓN de todos los equipos de la sub-lista: no se toca aquí.
+  // Solo gestionamos la membresía en ssl.machineIds.
+
+  // 1. Quitar de la sub-sub-lista origen (si venía de una ssl)
+  if (fromSubSubIdx >= 0){
     const src = subSubLists[fromSubSubIdx]
     if (src) src.machineIds = (src.machineIds || []).filter(id => id !== machineId)
   }
+  // Si fromSubSubIdx === -1 estaba "sin categoría" dentro de la sub-lista → nada que quitar
 
-  // 2. Agregar al destino
-  if (toSubSubIdx === -1){
-    if (!(sl.machineIds || []).includes(machineId))
-      sl.machineIds = [...(sl.machineIds || []), machineId]
-  } else {
+  // 2. Agregar a la sub-sub-lista destino (si va a una ssl)
+  if (toSubSubIdx >= 0){
     const dst = subSubLists[toSubSubIdx]
     if (dst && !(dst.machineIds || []).includes(machineId))
       dst.machineIds = [...(dst.machineIds || []), machineId]
   }
+  // Si toSubSubIdx === -1 queda "sin categoría" dentro de la sub-lista → ya en sl.machineIds
 
   const destName = toSubSubIdx === -1 ? 'Sin categoría' : subSubLists[toSubSubIdx]?.name || ''
   // Re-renderizar la vista actual
@@ -4848,9 +4892,14 @@ async function _hierDoAddToList(list, idsToAdd, subListIdx){
     // Agregar a una sub-lista específica
     const sl = list.subLists[subListIdx]
     if (!sl) return
-    const existing = new Set(sl.machineIds || [])
-    for (const id of idsToAdd) existing.add(id)
-    sl.machineIds = [...existing]
+    // Agregar a la sub-lista
+    const existingSl = new Set(sl.machineIds || [])
+    for (const id of idsToAdd) existingSl.add(id)
+    sl.machineIds = [...existingSl]
+    // TAMBIÉN agregar a list.machineIds (unión total → compatibilidad PWA)
+    const existingTop = new Set(list.machineIds || [])
+    for (const id of idsToAdd) existingTop.add(id)
+    list.machineIds = [...existingTop]
     closeSheet()
     showToast(`Agregado a "${sl.name}" ✓`, 'ok')
   } else {
