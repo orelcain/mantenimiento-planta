@@ -703,8 +703,17 @@ async function loadMachines(){
 
 async function loadRepuestos(machineId){
   if (repCache[machineId]) return repCache[machineId]
-  const snap = await db.collection(`machines/${machineId}/repuestos`).orderBy('codigoSAP').get()
-  repCache[machineId] = snap.docs.map(d => ({id:d.id, ...d.data()}))
+  const collPath = getRepuestoCollPath(machineId)
+  let docs = []
+  try {
+    const snap = await db.collection(collPath).orderBy('codigoSAP').get()
+    docs = snap.docs
+  } catch(e){
+    // Algunos repuestos en hierarchy/ pueden no tener codigoSAP — fallback sin orderBy
+    const snap = await db.collection(collPath).get()
+    docs = snap.docs
+  }
+  repCache[machineId] = docs.map(d => ({id:d.id, ...d.data()}))
   return repCache[machineId]
 }
 
@@ -1007,7 +1016,24 @@ function renderManualesBody(manuales){
     listEl.innerHTML = emptyHtml('🔍','Sin resultados','Ningún documento coincide con el filtro')
     return
   }
-  listEl.innerHTML = `<div class="cell-group">${filtered.map(manualCellHtml).join('')}</div>`
+
+  // Agrupar por equipo (ownerId) — secciones alfabéticas
+  const groups = {}
+  for (const m of filtered){
+    const key = m.ownerId || '__sin'
+    const name = (m.ownerPath && m.ownerPath[0]) || m.ownerId || 'Sin equipo asociado'
+    if (!groups[key]) groups[key] = { name, items: [] }
+    groups[key].items.push(m)
+  }
+  const sorted = Object.entries(groups).sort(([,a],[,b]) => a.name.localeCompare(b.name, 'es'))
+
+  listEl.innerHTML = sorted.map(([key, g]) => `
+    <div class="section">
+      <span class="section-title">${escHtml(g.name)}</span>
+      <span class="section-count">${g.items.length}</span>
+    </div>
+    <div class="cell-group">${g.items.map(manualCellHtml).join('')}</div>
+  `).join('')
 }
 
 function manualesSearchInput(){
@@ -1046,8 +1072,59 @@ function openManualViewer(mData){
   const m = typeof mData === 'string' ? JSON.parse(mData) : mData
   if (!m?.url) return
   tgApp?.HapticFeedback?.selectionChanged?.()
+  // PDF e imagen → visor inline; link/video → externo (Telegram openLink)
+  if (m.tipo === 'pdf' || m.tipo === 'imagen'){
+    showInlineDocOverlay(m.url, m.titulo, m.tipo)
+    return
+  }
   if (tgApp?.openLink) tgApp.openLink(m.url)
   else window.open(m.url, '_blank')
+}
+
+// Visor inline PDF/imagen con fallback "Abrir externo"
+function showInlineDocOverlay(url, title, tipo){
+  let ov = document.getElementById('doc-overlay')
+  if (!ov){
+    ov = document.createElement('div')
+    ov.id = 'doc-overlay'
+    ov.style.cssText = 'position:fixed;inset:0;z-index:200;background:var(--bg);display:flex;flex-direction:column'
+    document.body.appendChild(ov)
+  }
+  const isPdf = tipo === 'pdf'
+  ov.innerHTML = `
+    <div style="padding:8px 12px;border-bottom:1px solid var(--border);
+      display:flex;align-items:center;gap:8px;background:var(--card)">
+      <button onclick="closeInlineDocOverlay()" style="background:none;border:none;
+        color:var(--text);font-size:18px;padding:4px 8px;cursor:pointer">✕</button>
+      <div style="flex:1;font-size:14px;font-weight:600;white-space:nowrap;
+        overflow:hidden;text-overflow:ellipsis">${escHtml(title || 'Documento')}</div>
+      <button onclick="openDocExternal('${escHtmlAttr(url)}')"
+        style="background:none;border:none;color:var(--accent);font-size:13px;
+        padding:4px 8px;cursor:pointer;font-weight:600">↗ Externo</button>
+    </div>
+    ${isPdf
+      ? `<iframe src="${escHtmlAttr(url)}#toolbar=1&view=FitH"
+          style="flex:1;border:none;background:#fff" allow="fullscreen" loading="lazy"></iframe>`
+      : `<div style="flex:1;overflow:auto;background:#000;display:flex;align-items:center;justify-content:center">
+          <img src="${escHtmlAttr(url)}" style="max-width:100%;max-height:100%;object-fit:contain">
+        </div>`}
+    ${isPdf ? `<div style="padding:6px 12px;font-size:11px;color:var(--hint);
+      text-align:center;background:var(--card);border-top:1px solid var(--border)">
+      Si no carga, usa "↗ Externo" arriba.
+    </div>` : ''}`
+  ov.style.display = 'flex'
+  setTgBack(closeInlineDocOverlay)
+}
+
+function closeInlineDocOverlay(){
+  const ov = document.getElementById('doc-overlay')
+  if (ov){ ov.style.display = 'none'; ov.innerHTML = '' }
+  setTgBack(null)
+}
+
+function openDocExternal(url){
+  if (tgApp?.openLink) tgApp.openLink(url)
+  else window.open(url, '_blank')
 }
 
 // ── Upload modal (admin/supervisor) ───────────────────────────────
@@ -2071,9 +2148,12 @@ async function openMachine(machineId, opts = {}){
     ${userRole === 'admin' ? `
       <div style="padding:0 12px 8px;display:flex;gap:8px">
         <button class="cell-action-btn" style="flex:1"
-          onclick="openMachineAddToListSheet('${escHtmlAttr(machineId)}')">➕ Agregar a lista</button>
+          onclick="openCreateRepuestoForm('${escHtmlAttr(machineId)}')">＋ Nuevo repuesto</button>
+        <button class="cell-action-btn" style="flex:1"
+          onclick="openMachineAddToListSheet('${escHtmlAttr(machineId)}')">📋 A lista</button>
       </div>` : ''}
     <div id="rep-list">${skeletonCells(5)}</div>
+    <div id="machine-manuales"></div>
   `
 
   // Load reps + favLists in parallel
@@ -2082,6 +2162,35 @@ async function openMachine(machineId, opts = {}){
     getMachineFavListsMerged(machineId),
   ])
   renderMachineBody(machineId, reps, favLists)
+  renderMachineManuales(machineId)
+}
+
+function renderMachineManuales(machineId){
+  const el = document.getElementById('machine-manuales')
+  if (!el) return
+  // Si el cache global no está, dispará carga lazy y vuelvé a renderizar
+  if (!__manualesCache){
+    el.innerHTML = ''
+    loadManuales().then(() => {
+      const stillThere = document.getElementById('machine-manuales')
+      if (stillThere) renderMachineManuales(machineId)
+    }).catch(() => {})
+    return
+  }
+  const m = machineMap[machineId]
+  const ownerName = m?.nombre || ''
+  // Match por ownerId exacto OR por ownerPath que contenga el nombre del equipo
+  const matches = __manualesCache.filter(x =>
+    x.ownerId === machineId
+    || (ownerName && (x.ownerPath || []).some(p => normalizeSearch(p) === normalizeSearch(ownerName)))
+  )
+  if (matches.length === 0){ el.innerHTML = ''; return }
+  el.innerHTML = `
+    <div class="section">
+      <span class="section-title">Manuales</span>
+      <span class="section-count">${matches.length}</span>
+    </div>
+    <div class="cell-group">${matches.map(manualCellHtml).join('')}</div>`
 }
 
 function renderMachineBody(machineId, reps, favLists){
@@ -2497,7 +2606,7 @@ async function onLbxMarkPrincipal(){
   const btn = document.getElementById('lbx-principal')
   btn.disabled = true; btn.textContent = '⭐ Aplicando…'
   try {
-    const docRef = db.collection(`machines/${machineId}/repuestos`).doc(repuestoId)
+    const docRef = db.collection(getRepuestoCollPath(machineId)).doc(repuestoId)
     const snap = await docRef.get()
     const fotos = (snap.exists ? snap.data().fotosReales : []) || []
     const newFotos = fotos.map(f => ({ ...f, esPrincipal: f.id === photoId }))
@@ -2529,7 +2638,7 @@ async function onLbxDelete(){
   const btn = document.getElementById('lbx-delete')
   btn.disabled = true; btn.textContent = '🗑️ Borrando…'
   try {
-    const docRef = db.collection(`machines/${machineId}/repuestos`).doc(repuestoId)
+    const docRef = db.collection(getRepuestoCollPath(machineId)).doc(repuestoId)
     const snap = await docRef.get()
     const fotos = (snap.exists ? snap.data().fotosReales : []) || []
     const target = fotos.find(f => f.id === photoId)
@@ -2935,7 +3044,7 @@ async function saveRepuestoEdit(machineId, repuestoId){
   }
 
   try {
-    const docRef = db.collection(`machines/${machineId}/repuestos`).doc(repuestoId)
+    const docRef = db.collection(getRepuestoCollPath(machineId)).doc(repuestoId)
     const reps = repCache[machineId] || []
     const idx = reps.findIndex(x => x.id === repuestoId)
     const before = idx >= 0 ? { ...reps[idx] } : null
@@ -2949,7 +3058,7 @@ async function saveRepuestoEdit(machineId, repuestoId){
     if (idx >= 0) reps[idx] = { ...reps[idx], ...updates }
     invalidateRepuestosCache()
 
-    await logAudit('update', `machines/${machineId}/repuestos`, repuestoId, before, updates,
+    await logAudit('update', getRepuestoCollPath(machineId), repuestoId, before, updates,
       `Editar repuesto ${updates.textoBreve || repuestoId}`)
 
     showToast('Cambios guardados ✓', 'ok')
@@ -2963,6 +3072,118 @@ async function saveRepuestoEdit(machineId, repuestoId){
     showToast('Error al guardar: ' + (err.message || ''), 'err')
     tgApp?.HapticFeedback?.notificationOccurred('error')
     btn.disabled = false; btn.textContent = 'Guardar'
+  }
+}
+
+// ── Crear repuesto nuevo (admin) ──────────────────────────────────
+function openCreateRepuestoForm(machineId){
+  if (userRole !== 'admin') return
+  const m = machineMap[machineId]
+  if (!m) return
+  editingRepuestoCtx = { machineId, repuestoId: null, isNew: true }
+  setHeader('Nuevo repuesto', m.nombre, true)
+  document.getElementById('hdr-edit').style.display = 'none'
+
+  const el = document.getElementById('view-machine')
+  el.innerHTML = `
+    <div class="form-card">
+      ${EDIT_FIELDS.map(([key, label, type, opts]) => {
+        if (type === 'textarea'){
+          return `<div class="form-row">
+            <label class="form-label" for="ef-${key}">${escHtml(label)}</label>
+            <textarea id="ef-${key}" class="form-textarea" rows="4"></textarea>
+          </div>`
+        }
+        const codeCls = opts.code ? ' code' : ''
+        const required = key === 'textoBreve' || key === 'codigoSAP'
+        const hintHtml = opts.hint ? `<div style="font-size:11px;color:var(--warn);margin-top:4px">⚠ ${escHtml(opts.hint)}</div>` : ''
+        return `<div class="form-row">
+          <label class="form-label" for="ef-${key}">${escHtml(label)}${required ? ' *' : ''}</label>
+          <input id="ef-${key}" class="form-input${codeCls}" type="${type}"
+            ${type === 'number' ? 'inputmode="numeric" step="any"' : ''}
+            ${required ? 'required' : ''}>
+          ${hintHtml}
+        </div>`
+      }).join('')}
+    </div>
+    <div class="form-actions">
+      <button class="btn-cancel" onclick="cancelCreateRepuesto('${escHtmlAttr(machineId)}')">Cancelar</button>
+      <button class="btn-save" id="btn-save-rep" onclick="saveNewRepuesto('${escHtmlAttr(machineId)}')">Crear</button>
+    </div>`
+  getContent().scrollTop = 0
+}
+
+function cancelCreateRepuesto(machineId){
+  editingRepuestoCtx = null
+  openMachine(machineId)
+}
+
+async function saveNewRepuesto(machineId){
+  if (userRole !== 'admin') return
+  const btn = document.getElementById('btn-save-rep')
+  btn.disabled = true; btn.textContent = 'Creando…'
+
+  const updates = {}
+  for (const [key, label, type] of EDIT_FIELDS){
+    const inp = document.getElementById(`ef-${key}`)
+    if (!inp) continue
+    let v = inp.value
+    if (type === 'number'){
+      if (v === '' || v == null) continue   // skip vacíos en creación
+      const n = Number(v)
+      if (Number.isNaN(n)){
+        showToast(`${label}: número inválido`, 'err')
+        btn.disabled = false; btn.textContent = 'Crear'
+        return
+      }
+      updates[key] = n
+    } else {
+      const trimmed = v.trim()
+      if (trimmed) updates[key] = trimmed
+    }
+  }
+
+  if (!updates.textoBreve){
+    showToast('El nombre es obligatorio', 'err')
+    btn.disabled = false; btn.textContent = 'Crear'
+    return
+  }
+  if (!updates.codigoSAP){
+    showToast('El código SAP es obligatorio', 'err')
+    btn.disabled = false; btn.textContent = 'Crear'
+    return
+  }
+  // Validar SAP único en este equipo
+  const reps = repCache[machineId] || []
+  if (reps.some(r => r.codigoSAP === updates.codigoSAP)){
+    showToast(`SAP ${updates.codigoSAP} ya existe en este equipo`, 'err')
+    btn.disabled = false; btn.textContent = 'Crear'
+    return
+  }
+
+  try {
+    const collPath = getRepuestoCollPath(machineId)
+    const doc = {
+      ...updates,
+      createdBy: currentUser?.uid || uid || '',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      source: 'miniapp',
+    }
+    const ref = await db.collection(collPath).add(doc)
+    if (!repCache[machineId]) repCache[machineId] = []
+    repCache[machineId].push({ id: ref.id, ...updates })
+    invalidateRepuestosCache()
+    await logAudit('create', collPath, ref.id, null, doc, `Crear repuesto ${updates.textoBreve}`)
+    showToast(`Repuesto "${updates.textoBreve}" creado ✓`, 'ok')
+    tgApp?.HapticFeedback?.notificationOccurred('success')
+    editingRepuestoCtx = null
+    openRepuesto(machineId, ref.id, { fromSave: true })
+  } catch(err){
+    console.error('create error', err)
+    showToast('Error al crear: ' + (err.message || ''), 'err')
+    tgApp?.HapticFeedback?.notificationOccurred('error')
+    btn.disabled = false; btn.textContent = 'Crear'
   }
 }
 
@@ -3178,7 +3399,34 @@ async function loadHierarchyTree(){
       hierarchyChildrenMap[pid].push(n)
     }
   }
+
+  // Sintetizar entries en machineMap para nodos hoja sin máquina vinculada
+  // — permite reutilizar openMachine() con hierarchyNodeIds (búsqueda global,
+  // navegación jerárquica, openRepuesto cross-tab)
+  for (const n of nodes){
+    const isLeaf = !(hierarchyChildrenMap[n.id]?.length > 0)
+    if (!isLeaf) continue
+    if (n.linkedMachineId) continue   // ya tiene una machine real
+    if (machineMap[n.id]) continue    // ya está
+    machineMap[n.id] = {
+      id: n.id,
+      nombre: n.nombre || 'Equipo',
+      seccion: LEVEL_LABELS[n.nivel||7] || 'Equipo',
+      hierarchyPath: Array.isArray(n.path) ? n.path.join(' › ') : '',
+      descripcion: n.descripcion || '',
+      _isHierarchyOnly: true,
+      activa: true,
+    }
+  }
+
   __hierarchyCache = { ts: now }
+}
+
+function getRepuestoCollPath(machineId){
+  const m = machineMap[machineId]
+  return m?._isHierarchyOnly
+    ? `hierarchy/${machineId}/repuestos`
+    : `machines/${machineId}/repuestos`
 }
 
 function isEquipNode(node){
@@ -3334,19 +3582,20 @@ function hierarchyOpenEquip(nodeId, machineId){
 async function openHierarchyEquipment(nodeId){
   const node = hierarchyNodesMap[nodeId]
   if (!node) return
-  pushView('view-machine', node.nombre, LEVEL_LABELS[node.nivel||7]||'Equipo')
-  const el = document.getElementById('view-machine')
-  el.innerHTML = skeletonCells(5)
-
-  try {
-    const snap = await db.collection(`hierarchy/${nodeId}/repuestos`).get()
-    const reps = snap.docs.map(d => ({id:d.id, source:'own', ...d.data()}))
-    // Store in repCache with nodeId key so search works
-    repCache[nodeId] = reps
-    renderMachineBody(nodeId, reps, [])
-  } catch(err){
-    el.innerHTML = emptyHtml('⚠️','Error','No se pudieron cargar los repuestos.')
+  // Asegurar entry sintética en machineMap (loadHierarchyTree ya la crea, pero
+  // por si esta función se llama antes de cargar el árbol completo)
+  if (!machineMap[nodeId]){
+    machineMap[nodeId] = {
+      id: nodeId,
+      nombre: node.nombre || 'Equipo',
+      seccion: LEVEL_LABELS[node.nivel||7] || 'Equipo',
+      hierarchyPath: Array.isArray(node.path) ? node.path.join(' › ') : '',
+      descripcion: node.descripcion || '',
+      _isHierarchyOnly: true,
+      activa: true,
+    }
   }
+  return openMachine(nodeId)
 }
 
 // ── F2.3 — Agregar nodo a lista de equipos ──────────────────────────
