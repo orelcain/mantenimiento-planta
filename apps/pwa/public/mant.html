@@ -492,7 +492,7 @@ async function init() {
     userRole     = data.role     || 'usuario'
     isAuthorized = data.authorized
     isLinked     = data.isLinked || false
-    firstName    = data.firstName || ''
+    firstName    = data.firstName || tgApp?.initDataUnsafe?.user?.first_name || ''
 
     if (!isAuthorized) {
       setLoadingError('Tu grupo de Telegram no está autorizado para usar esta app. Contactá al administrador.')
@@ -1160,14 +1160,15 @@ function onRepFavTap() {
 // ═══════════════════════════════════════════════════════════════════
 // FAVORITES VIEW
 // ═══════════════════════════════════════════════════════════════════
-function renderFavorites() {
+async function renderFavorites() {
   const el = document.getElementById('fav-body')
   const { favoriteLists, repuestoFavLists } = prefs
 
   let html = ''
 
   // ── Welcome header ──
-  const greeting = firstName || 'Hola'
+  const greetName = firstName || tgApp?.initDataUnsafe?.user?.first_name || ''
+  const greeting = greetName ? `Hola, ${escHtml(greetName)} 👋` : 'Hola 👋'
   const roleLabel = ({
     admin: '👑 Admin', supervisor: '🛡️ Supervisor',
     tecnico: '🔧 Técnico', usuario: '👁️ Solo lectura',
@@ -1177,7 +1178,7 @@ function renderFavorites() {
     : `<span style="font-size:10px;background:#f59e0b22;color:#f59e0b;padding:2px 6px;border-radius:4px;margin-left:6px">solo Telegram</span>`
 
   html += `<div style="padding:14px 14px 4px">
-    <div style="font-size:18px;font-weight:600">Hola, ${escHtml(greeting)} 👋</div>
+    <div style="font-size:18px;font-weight:600">${greeting}</div>
     <div style="font-size:12px;color:var(--hint);margin-top:2px">${roleLabel}${linkBadge}</div>
   </div>`
 
@@ -1189,21 +1190,20 @@ function renderFavorites() {
 
   if (favoriteLists.length === 0) {
     html += `<div style="padding:8px 14px 4px">
-      <div style="font-size:13px;color:var(--hint)">Guardá equipos en listas para acceso rápido. Usá ⭐ en el detalle de un equipo.</div>
+      <div style="font-size:13px;color:var(--hint)">Sin listas guardadas. Agregá equipos a favoritos desde la app principal.</div>
     </div>`
   } else {
-    html += favoriteLists.map((list, idx) => {
-      const names = (list.machineIds || []).map(id => machineMap[id]?.nombre || id)
+    html += favoriteLists.map((list) => {
+      // Use cached machineNames first, then live machineMap lookup
+      const names = (list.machineIds || []).map(id =>
+        list.machineNames?.[id] || machineMap[id]?.nombre || id
+      )
       return `<div class="fav-list-card">
         <div class="fav-list-header">
           <div class="fav-list-icon">📋</div>
           <div class="fav-list-meta">
             <div class="fav-list-name">${escHtml(list.name)}</div>
             <div class="fav-list-count">${list.machineIds?.length || 0} equipo(s)</div>
-          </div>
-          <div class="fav-list-actions">
-            <button class="fav-action-btn" title="Renombrar" onclick="renameMachineList(${idx})">✏️</button>
-            <button class="fav-action-btn" title="Eliminar" onclick="deleteMachineList(${idx})">🗑️</button>
           </div>
         </div>
         ${names.length > 0 ? `<div class="fav-machine-chips">
@@ -1213,21 +1213,33 @@ function renderFavorites() {
     }).join('')
   }
 
-  html += `<div class="add-list-btn" onclick="createMachineList()">
-    <span style="font-size:20px">＋</span> Nueva lista de equipos
-  </div>`
+  // ── Repuesto lists per machine/node ──
+  const repKeys = Object.keys(repuestoFavLists).filter(k => repuestoFavLists[k]?.length > 0)
+  if (repKeys.length > 0) {
+    // Keys may be hierarchy nodeIds — resolve names for any not found in machineMap
+    const nodeNameMap = {}
+    const unknownIds = repKeys.filter(id => !machineMap[id])
+    if (unknownIds.length > 0) {
+      await Promise.all(unknownIds.map(async nodeId => {
+        try {
+          const snap = await db.collection('hierarchy').doc(nodeId).get()
+          if (snap.exists) {
+            const d = snap.data()
+            const linkedId = d.linkedMachineId
+            nodeNameMap[nodeId] = (linkedId && machineMap[linkedId]?.nombre)
+              || d.nombre || d.name || nodeId
+          }
+        } catch { /* ignore */ }
+      }))
+    }
 
-  // ── Repuesto lists per machine ──
-  const repMachineIds = Object.keys(repuestoFavLists).filter(mid => repuestoFavLists[mid]?.length > 0)
-  if (repMachineIds.length > 0) {
     html += `<div class="section-hdr" style="margin-top:8px">
       <span class="section-title">Repuestos guardados</span>
     </div>`
 
-    html += repMachineIds.map(machineId => {
-      const machine = machineMap[machineId]
-      const machineName = machine?.nombre || machineId
-      const lists = repuestoFavLists[machineId] || []
+    html += repKeys.map(key => {
+      const machineName = machineMap[key]?.nombre || nodeNameMap[key] || key
+      const lists = repuestoFavLists[key] || []
       return `<div class="fav-list-card">
         <div class="fav-list-header">
           <div class="fav-list-icon">🔩</div>
@@ -1236,19 +1248,15 @@ function renderFavorites() {
             <div class="fav-list-count">${lists.reduce((s,l) => s + (l.repuestoIds?.length||0), 0)} repuesto(s) en ${lists.length} lista(s)</div>
           </div>
         </div>
-        ${lists.map((list, li) => `
+        ${lists.map((list) => `
           <div style="padding:0 14px 10px">
-            <div style="font-size:12px;font-weight:600;color:var(--hint);margin-bottom:6px;display:flex;align-items:center;justify-content:space-between">
-              <span>${escHtml(list.name)}</span>
-              <div style="display:flex;gap:4px">
-                <button class="fav-action-btn" onclick="renameRepList('${machineId}',${li})">✏️</button>
-                <button class="fav-action-btn" onclick="deleteRepList('${machineId}',${li})">🗑️</button>
-              </div>
+            <div style="font-size:12px;font-weight:600;color:var(--hint);margin-bottom:6px">
+              ${escHtml(list.name)}
             </div>
             ${(list.repuestoIds || []).map(rid => {
-              const reps = repCache[machineId] || []
+              const reps = repCache[key] || []
               const r = reps.find(x => x.id === rid)
-              return r ? `<div class="rep-item" style="padding:8px 0" onclick="openRepuesto('${machineId}','${rid}')">
+              return r ? `<div class="rep-item" style="padding:8px 0" onclick="openRepuesto('${key}','${rid}')">
                 <div class="rep-icon-box" style="width:32px;height:32px;font-size:16px">${repIcon(r.tipo)}</div>
                 <div class="rep-body">
                   <div class="rep-name" style="font-size:13px">${escHtml(r.textoBreve || r.alias || 'Sin nombre')}</div>
