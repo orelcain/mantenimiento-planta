@@ -1860,21 +1860,29 @@ function openMachineList(listName){
   _renderMachineListView(list)
 }
 
-function _machineCellForList(id, names){
+// moveCtx = { listName, fromIdx } | null
+// fromIdx: -1 = Sin categoría, ≥0 = índice de sub-lista
+function _machineCellForList(id, names, moveCtx){
   const m = machineMap[id] || {}
   const name = names?.[id] || m.nombre || id
   const color = m.color || '#5288c1'
+  const canAdmin = userRole === 'admin' || userRole === 'supervisor'
+  const moveBtn = (canAdmin && moveCtx) ? `
+    <button onclick="event.stopPropagation();showMoveToSubListSheet(${escHtmlAttr(JSON.stringify(moveCtx.listName))},'${escHtmlAttr(id)}',${moveCtx.fromIdx})"
+      title="Mover a otra sub-lista"
+      style="background:none;border:none;font-size:17px;cursor:pointer;padding:4px 6px;color:var(--hint);flex-shrink:0">📦</button>` : ''
   return `<div class="cell" onclick="openMachine('${escHtmlAttr(id)}')">
     <div class="cell-icon" style="background:${color}22;color:${color}">🏭</div>
     <div class="cell-body">
       <div class="cell-title">${escHtml(name)}</div>
       <div class="cell-sub">${escHtml([m.marca, m.modelo].filter(Boolean).join(' · ') || 'Equipo')}</div>
     </div>
+    ${moveBtn}
     <div class="cell-chevron">›</div>
   </div>`
 }
 
-function _renderMachineListView(list){
+function _renderMachineListView(list, { push = true } = {}){
   const canAdmin = userRole === 'admin' || userRole === 'supervisor'
   const subLists = list.subLists || []
   const allTopIds = list.machineIds || []
@@ -1884,7 +1892,8 @@ function _renderMachineListView(list){
   const ungrouped = allTopIds.filter(id => !inSubSet.has(id))
 
   const total = allTopIds.length + subLists.reduce((s, sl) => s + (sl.machineIds||[]).length, 0)
-  pushView('view-machine', list.name, pl(total, 'equipo', 'equipos'))
+  if (push) pushView('view-machine', list.name, pl(total, 'equipo', 'equipos'))
+  else setHeader(list.name, pl(total, 'equipo', 'equipos'), navStack.length > 0)
 
   const adminBar = canAdmin ? `
     <div style="display:flex;gap:8px;padding:10px 14px 6px;flex-wrap:wrap">
@@ -1926,13 +1935,15 @@ function _renderMachineListView(list){
     </div>` : ''
 
   // Equipos sin categoría
+  // El botón 📦 solo aparece si hay sub-listas a donde mover
+  const ungroupedMoveCtx = (canAdmin && subLists.length > 0) ? { listName: list.name, fromIdx: -1 } : null
   const ungroupedHtml = ungrouped.length > 0 ? `
     ${subLists.length > 0 ? `<div class="section" style="margin-top:8px">
       <span class="section-title">Sin categoría</span>
       <span class="section-count">${ungrouped.length}</span>
     </div>` : ''}
     <div class="cell-group">
-      ${ungrouped.map(id => _machineCellForList(id, list.machineNames)).join('')}
+      ${ungrouped.map(id => _machineCellForList(id, list.machineNames, ungroupedMoveCtx)).join('')}
     </div>` : ''
 
   const emptyMsg = total === 0 ? emptyHtml('📋','Lista vacía','Agregá equipos desde la pestaña Jerarquía') : ''
@@ -1941,14 +1952,16 @@ function _renderMachineListView(list){
     adminBar + subListsHtml + ungroupedHtml + emptyMsg
 }
 
-function openSubList(listName, subListIdx){
+function openSubList(listName, subListIdx, { push = true } = {}){
   const list = prefs.favoriteLists.find(l => l.name === listName)
   const sl   = list?.subLists?.[subListIdx]
   if (!sl) return
   const canAdmin = userRole === 'admin' || userRole === 'supervisor'
   const ids = sl.machineIds || []
+  const subtitle = `${list.name} · ${pl(ids.length,'equipo','equipos')}`
 
-  pushView('view-machine', sl.name, `${escHtml(list.name)} · ${pl(ids.length,'equipo','equipos')}`)
+  if (push) pushView('view-machine', sl.name, subtitle)
+  else setHeader(sl.name, subtitle, navStack.length > 0)
 
   const adminBar = canAdmin ? `
     <div style="display:flex;gap:8px;padding:10px 14px 6px">
@@ -1960,8 +1973,10 @@ function openSubList(listName, subListIdx){
                padding:6px 10px;border-radius:12px;font-size:12px;cursor:pointer">🗑️ Borrar</button>
     </div>` : ''
 
+  // El botón 📦 aparece si hay al menos otra sub-lista o la opción "Sin categoría"
+  const subMoveCtx = canAdmin ? { listName, fromIdx: subListIdx } : null
   const machinesHtml = ids.length
-    ? `<div class="cell-group">${ids.map(id => _machineCellForList(id, sl.machineNames)).join('')}</div>`
+    ? `<div class="cell-group">${ids.map(id => _machineCellForList(id, sl.machineNames, subMoveCtx)).join('')}</div>`
     : emptyHtml('📁','Sub-lista vacía','Agregá equipos desde la pestaña Jerarquía')
 
   document.getElementById('view-machine').innerHTML = adminBar + machinesHtml
@@ -3103,6 +3118,94 @@ function deleteSubList(listName, subListIdx){
       list.machineIds = [...(list.machineIds||[])].filter(id => !returning.includes(id) || existingTop.has(id))
       showToast('Error: ' + (err.message || ''), 'err')
     }
+  })
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// MOVER equipo entre sub-listas
+// fromIdx: -1 = Sin categoría  |  ≥0 = índice de sub-lista
+// toIdx:   -1 = Sin categoría  |  ≥0 = índice de sub-lista destino
+// ──────────────────────────────────────────────────────────────────────
+function showMoveToSubListSheet(listName, machineId, fromIdx){
+  const list = prefs.favoriteLists.find(l => l.name === listName)
+  if (!list) return
+  const subLists = list.subLists || []
+  const m = machineMap[machineId] || {}
+  const machineName = m.nombre || machineId
+
+  // Opciones: "Sin categoría" + todas las sub-listas excepto la actual
+  const options = []
+  if (fromIdx >= 0) options.push({ label: '📋 Sin categoría', toIdx: -1 })
+  subLists.forEach((sl, i) => {
+    if (i !== fromIdx) options.push({ label: `📁 ${sl.name}`, toIdx: i })
+  })
+
+  if (options.length === 0){
+    showToast('No hay otras sub-listas disponibles', 'info'); return
+  }
+
+  const lnAttr  = escHtmlAttr(JSON.stringify(listName))
+  const midAttr = escHtmlAttr(machineId)
+
+  document.getElementById('sheet-title').textContent = `Mover "${machineName}" a…`
+  document.getElementById('sheet-content').innerHTML = `
+    <div class="cell-group" style="margin:0">
+      ${options.map(o => `
+        <div class="sheet-row" onclick="executeMoveToSubList(${lnAttr},'${midAttr}',${fromIdx},${o.toIdx})">
+          <div class="ico">${o.toIdx === -1 ? '📋' : '📁'}</div>
+          <div class="body"><div class="name">${escHtml(o.label.replace(/^📋 |^📁 /,''))}</div></div>
+        </div>`).join('')}
+    </div>`
+
+  favSheetCtx = null
+  document.getElementById('sheet-overlay').classList.add('open')
+  requestAnimationFrame(() => document.getElementById('sheet').classList.add('open'))
+  tgApp?.HapticFeedback?.impactOccurred('light')
+}
+
+async function executeMoveToSubList(listName, machineId, fromIdx, toIdx){
+  closeSheet()
+  const list = prefs.favoriteLists.find(l => l.name === listName)
+  if (!list) return
+  const subLists = list.subLists || []
+
+  // 1. Quitar del origen
+  if (fromIdx === -1){
+    // estaba en Sin categoría (machineIds raíz)
+    list.machineIds = (list.machineIds || []).filter(id => id !== machineId)
+  } else {
+    const src = subLists[fromIdx]
+    if (src) src.machineIds = (src.machineIds || []).filter(id => id !== machineId)
+  }
+
+  // 2. Agregar al destino
+  if (toIdx === -1){
+    // mover a Sin categoría (machineIds raíz)
+    if (!(list.machineIds || []).includes(machineId)){
+      list.machineIds = [...(list.machineIds || []), machineId]
+    }
+  } else {
+    const dst = subLists[toIdx]
+    if (dst && !(dst.machineIds || []).includes(machineId)){
+      dst.machineIds = [...(dst.machineIds || []), machineId]
+    }
+  }
+
+  // Siempre re-renderizar en memoria (datos ya actualizados)
+  const destName = toIdx === -1 ? 'Sin categoría' : subLists[toIdx]?.name || ''
+  if (fromIdx >= 0){
+    openSubList(listName, fromIdx, { push: false })
+  } else {
+    _renderMachineListView(list, { push: false })
+  }
+
+  // Persistir en Firestore (falla silenciosamente en preview)
+  saveAllPrefs().then(() => {
+    showToast(`Movido a "${destName}" ✓`, 'ok')
+    tgApp?.HapticFeedback?.notificationOccurred('success')
+  }).catch(err => {
+    if (IS_PREVIEW) showToast(`Movido a "${destName}" (preview)`, 'ok')
+    else showToast('Error al guardar: ' + (err.message || ''), 'err')
   })
 }
 
