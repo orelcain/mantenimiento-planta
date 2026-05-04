@@ -528,6 +528,22 @@ function showApp(){
   renderSearchEmpty()
   // Pre-cargar repCache en background (mejora: muestra counts en cards)
   preloadRepCounts()
+  // Listeners real-time (sync con PWA y otros dispositivos)
+  startPrefsListener()
+  startMachinesListener()
+}
+
+/** Listener real-time de la colección machines.
+ *  Si admin edita un equipo en la PWA, los cambios aparecen acá sin reload. */
+let machinesUnsub = null
+function startMachinesListener(){
+  if (machinesUnsub) return
+  machinesUnsub = db.collection('machines').onSnapshot(snap => {
+    machines = snap.docs.map(d => ({id:d.id, ...d.data()}))
+      .sort((a,b) => (a.orden||0) - (b.orden||0))
+    machineMap = Object.fromEntries(machines.map(m => [m.id, m]))
+    if (currentTab === 'home') renderHomeCatalog()
+  }, err => console.warn('machines listener error', err))
 }
 
 async function preloadRepCounts(){
@@ -592,6 +608,35 @@ async function loadPrefs(){
       repuestoFavLists: d.repuestoFavLists || {},
     }
   }
+}
+
+/** Listener real-time: cambios hechos en la PWA o desde otro dispositivo se reflejan acá */
+let prefsUnsub = null
+let _ignoreNextPrefsUpdate = false  // flag para evitar re-render circular tras savePrefs local
+function startPrefsListener(){
+  if (!uid || prefsUnsub) return
+  prefsUnsub = db.collection('user_preferences').doc(uid).onSnapshot(snap => {
+    if (!snap.exists) return
+    const d = snap.data()
+    const next = {
+      favoriteLists:    d.favoriteLists    || [],
+      repuestoFavLists: d.repuestoFavLists || {},
+    }
+    // Si las prefs no cambiaron (mismo writer somos nosotros), evitar re-render
+    if (JSON.stringify(next) === JSON.stringify(prefs)) return
+    prefs = next
+    // Re-renderear home si está activa
+    if (currentTab === 'home') renderHome()
+    // Refresh fav button si estamos en detalle
+    const repView = document.getElementById('view-repuesto')
+    if (repView?.classList.contains('active') && activeUploadCtx){
+      updateFavBtnState(activeUploadCtx.machineId, activeUploadCtx.repuestoId)
+    }
+    // Si el sheet de favoritos está abierto, re-renderearlo
+    if (favSheetCtx){
+      openFavListsSheet(favSheetCtx.machineId, favSheetCtx.repuestoId)
+    }
+  }, err => console.warn('prefs listener error', err))
 }
 
 async function getLinkedNodeIds(machineId){
@@ -729,12 +774,38 @@ function renderHome(){
     <div id="home-greeting"></div>
     <div id="home-mylists"></div>
     <div id="home-repfav"></div>
+    <div id="home-recents"></div>
     <div id="home-catalog"></div>
   `
   renderHomeGreeting()
   renderHomeMyLists()
   renderHomeRepFav()    // async — resuelve nodeIds
+  renderHomeRecents()
   renderHomeCatalog()
+}
+
+function renderHomeRecents(){
+  const el = document.getElementById('home-recents')
+  if (!el) return
+  if (recentIds.length === 0){ el.innerHTML = ''; return }
+  // Solo top 5 en home (los más recientes)
+  const top = recentIds.slice(0, 5)
+  el.innerHTML = `
+    <div class="section">
+      <span class="section-title">Vistos recientemente</span>
+      <span class="section-count">${recentIds.length}</span>
+    </div>
+    <div class="cell-group">
+      ${top.map(rec => `
+        <div class="cell" onclick="openRepuesto('${escHtmlAttr(rec.machineId)}','${escHtmlAttr(rec.repuestoId)}')">
+          <div class="cell-icon">🕘</div>
+          <div class="cell-body">
+            <div class="cell-title">${escHtml(rec.name || 'Sin nombre')}</div>
+            <div class="cell-sub">${rec.code ? `SAP ${escHtml(rec.code)} · ` : ''}${escHtml(machineMap[rec.machineId]?.nombre || '')}</div>
+          </div>
+          <div class="cell-chevron">›</div>
+        </div>`).join('')}
+    </div>`
 }
 
 function renderHomeGreeting(){
@@ -1089,6 +1160,8 @@ function saveRecent(machineId, repuestoId, name, code){
   recentIds.unshift({machineId, repuestoId, name, code, ts: Date.now()})
   recentIds = recentIds.slice(0, MAX_RECENTS)
   localStorage.setItem('mant_recents', JSON.stringify(recentIds))
+  // Si home está montada, refrescar recientes (no costoso)
+  if (document.getElementById('home-recents')) renderHomeRecents()
 }
 
 // ═══════════════════════════════════════════════════════════════════
