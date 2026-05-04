@@ -139,19 +139,29 @@ header .logo-sub{font-size:10px;font-weight:400;color:var(--hint)}
 .chips-row{display:flex;gap:6px;padding:8px 12px;overflow-x:auto;
   scrollbar-width:none;-webkit-overflow-scrolling:touch;flex-shrink:0}
 .chips-row::-webkit-scrollbar{display:none}
+.chips-sticky{position:sticky;top:60px;background:var(--bg);z-index:9;
+  border-bottom:1px solid rgba(255,255,255,.04)}
+.chips-row::-webkit-scrollbar{display:none}
 .chip{padding:5px 12px;border-radius:99px;font-size:12px;font-weight:500;
   cursor:pointer;transition:all .15s;white-space:nowrap;flex-shrink:0;
   border:1px solid rgba(255,255,255,.1);color:var(--hint);background:none}
 .chip.active{background:var(--accent);color:var(--acctxt);border-color:var(--accent)}
 
 /* ── Detail view ────────────────────────────────────────────────────── */
-.detail-hero{padding:16px 14px 12px;border-bottom:1px solid rgba(255,255,255,.06);
-  display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
-.detail-title{font-size:18px;font-weight:700;line-height:1.3;flex:1;min-width:0}
-.detail-fav-btn{width:40px;height:40px;border-radius:50%;border:1.5px solid rgba(255,255,255,.12);
-  background:none;font-size:22px;cursor:pointer;display:flex;align-items:center;
-  justify-content:center;transition:all .15s;flex-shrink:0;color:var(--hint)}
+.detail-hero{padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);
+  display:flex;align-items:center;gap:10px;position:sticky;top:0;
+  background:var(--bg);z-index:10;backdrop-filter:blur(8px)}
+.detail-back-btn{width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,.1);
+  background:rgba(255,255,255,.04);font-size:18px;cursor:pointer;display:flex;align-items:center;
+  justify-content:center;flex-shrink:0;color:var(--text);padding:0;line-height:1}
+.detail-back-btn:active{background:rgba(255,255,255,.12);transform:scale(.95)}
+.detail-title{font-size:17px;font-weight:700;line-height:1.25;flex:1;min-width:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.detail-fav-btn{width:36px;height:36px;border-radius:50%;border:1.5px solid rgba(255,255,255,.12);
+  background:none;font-size:18px;cursor:pointer;display:flex;align-items:center;
+  justify-content:center;transition:all .15s;flex-shrink:0;color:var(--hint);padding:0;line-height:1}
 .detail-fav-btn.on{color:#f59e0b;border-color:#f59e0b;background:rgba(245,158,11,.1)}
+.detail-fav-btn:active{transform:scale(.95)}
 
 .info-section{padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.04)}
 .info-row{display:flex;justify-content:space-between;align-items:flex-start;
@@ -316,6 +326,7 @@ header .logo-sub{font-size:10px;font-weight:400;color:var(--hint)}
       <!-- ── MACHINE DETAIL VIEW ────────────────────────────────────── -->
       <div id="view-machine" class="view">
         <div id="machine-hero" class="detail-hero">
+          <button class="detail-back-btn" onclick="goBack()" aria-label="Volver">◀</button>
           <div class="detail-title" id="machine-title">—</div>
           <button id="machine-fav-btn" class="detail-fav-btn" onclick="onMachineFavTap()">⭐</button>
         </div>
@@ -326,6 +337,7 @@ header .logo-sub{font-size:10px;font-weight:400;color:var(--hint)}
       <!-- ── REPUESTO DETAIL VIEW ───────────────────────────────────── -->
       <div id="view-repuesto" class="view">
         <div id="rep-detail-hero" class="detail-hero">
+          <button class="detail-back-btn" onclick="goBack()" aria-label="Volver">◀</button>
           <div id="rep-detail-title" class="detail-title">—</div>
           <button id="rep-fav-btn" class="detail-fav-btn" onclick="onRepFavTap()">⭐</button>
         </div>
@@ -667,8 +679,12 @@ async function savePrefs() {
 // ═══════════════════════════════════════════════════════════════════
 // NAVIGATION
 // ═══════════════════════════════════════════════════════════════════
+function getContentEl() {
+  return document.getElementById('content')
+}
+
 function switchTab(tab) {
-  // Clear nav stack when switching tabs
+  // Cambiar de tab descarta el stack — el tab siempre está en su raíz
   navStack = []
   currentTab = tab
   tgApp?.BackButton.hide()
@@ -679,12 +695,25 @@ function switchTab(tab) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'))
   document.getElementById(`view-${tab}`).classList.add('active')
 
+  // Reset scroll al cambiar de tab
+  const c = getContentEl()
+  if (c) c.scrollTop = 0
+
   if (tab === 'favorites') renderFavorites()
 }
 
 function pushView(viewId, options = {}) {
-  navStack.push({ viewId: currentViewId(), options: {} })
+  // Guardar la vista anterior + scroll para restaurarlo al hacer back
+  const prevId = currentViewId()
+  const c = getContentEl()
+  navStack.push({
+    viewId: prevId,
+    scrollTop: c ? c.scrollTop : 0,
+    options: {},
+  })
   showView(viewId, options)
+  // Forward = scroll a top
+  if (c) c.scrollTop = 0
   tgApp?.BackButton.show()
 }
 
@@ -702,6 +731,9 @@ function goBack() {
   if (navStack.length === 0) return
   const prev = navStack.pop()
   showView(prev.viewId)
+  // Restaurar scroll de la vista anterior
+  const c = getContentEl()
+  if (c) c.scrollTop = prev.scrollTop || 0
   if (navStack.length === 0) tgApp?.BackButton.hide()
 }
 
@@ -980,9 +1012,9 @@ function renderMachineDetailBody(machineId, reps, favLists) {
     }
   }
 
-  // Chips de tags favoritos (si hay listas)
+  // Chips de tags favoritos (sticky bajo el hero, si hay listas)
   const chipsHtml = favLists.length > 0 ? `
-    <div class="chips-row" style="padding:8px 14px 0;overflow-x:auto;flex-wrap:nowrap">
+    <div class="chips-row chips-sticky">
       <div class="chip ${activeMachineRepFilter === null ? 'active' : ''}"
            onclick="setMachineRepFilter('${machineId}', null)">
         Todos <span style="opacity:.6">${reps.length}</span>
