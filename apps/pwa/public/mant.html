@@ -8,6 +8,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 
@@ -205,6 +206,33 @@ html,body{height:100%;background:var(--bg);color:var(--text);
 .notice{padding:12px 16px;font-size:13px;color:var(--hint);background:var(--bg2);
   margin:0 0 8px;border-left:3px solid var(--warn)}
 .notice b{color:var(--text)}
+
+/* ── Upload buttons (admin only) ────────────────────────────────────── */
+.upload-row{display:flex;gap:8px;padding:10px 14px 14px;background:var(--bg2)}
+.upload-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;
+  padding:11px 10px;border-radius:10px;border:1px dashed rgba(82,136,193,.45);
+  background:rgba(82,136,193,.08);color:var(--accent);
+  font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;line-height:1}
+.upload-btn:active{background:rgba(82,136,193,.16);transform:scale(.98)}
+.upload-btn:disabled{opacity:.5;cursor:not-allowed}
+.upload-btn .ico{font-size:18px}
+
+/* ── Upload progress overlay ────────────────────────────────────────── */
+#uploading{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:250;
+  display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px}
+#uploading.open{display:flex}
+#uploading .loader{width:40px;height:40px}
+#uploading-msg{color:#fff;font-size:14px;text-align:center;padding:0 24px;max-width:300px}
+
+/* ── Toast ──────────────────────────────────────────────────────────── */
+#toast{position:fixed;bottom:78px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:var(--bg2);color:var(--text);padding:11px 18px;border-radius:99px;
+  font-size:13px;font-weight:500;z-index:240;opacity:0;pointer-events:none;
+  transition:opacity .25s, transform .25s;border:1px solid var(--divider);
+  box-shadow:0 6px 20px rgba(0,0,0,.4);max-width:80vw;text-align:center}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.ok{border-color:var(--green);color:var(--green)}
+#toast.err{border-color:var(--danger);color:var(--danger)}
 </style>
 </head>
 <body>
@@ -252,6 +280,16 @@ html,body{height:100%;background:var(--bg);color:var(--text);
   <div id="lbx-cap" class="lbx-cap"></div>
 </div>
 
+<div id="uploading">
+  <div class="loader"></div>
+  <div id="uploading-msg">Subiendo foto…</div>
+</div>
+
+<div id="toast"></div>
+
+<input type="file" id="file-camera" accept="image/*" capture="environment" style="display:none">
+<input type="file" id="file-gallery" accept="image/*" style="display:none">
+
 <script>
 // ═══════════════════════════════════════════════════════════════════
 // CONFIG
@@ -265,9 +303,10 @@ firebase.initializeApp({
   projectId: "mantenimiento-planta-771a3",
   storageBucket: "mantenimiento-planta-771a3.firebasestorage.app",
 })
-const db   = firebase.firestore()
-const auth = firebase.auth()
-const tgApp = window.Telegram?.WebApp
+const db      = firebase.firestore()
+const auth    = firebase.auth()
+const storage = firebase.storage()
+const tgApp   = window.Telegram?.WebApp
 
 // ═══════════════════════════════════════════════════════════════════
 // VIEWPORT — fix scroll en Telegram WebView
@@ -484,6 +523,7 @@ function tabHeader(tab){
 function switchTab(tab){
   navStack = []
   currentTab = tab
+  activeUploadCtx = null
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'))
   document.getElementById(`nav-${tab}`).classList.add('active')
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'))
@@ -509,6 +549,7 @@ function goBack(){
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'))
   document.getElementById(prev.viewId).classList.add('active')
   if (navStack.length === 0) tabHeader(currentTab)
+  activeUploadCtx = null
   // Restore scroll
   requestAnimationFrame(() => { getContent().scrollTop = prev.scrollTop || 0 })
 }
@@ -956,7 +997,7 @@ function repIcon(tipo){
 // ═══════════════════════════════════════════════════════════════════
 // REPUESTO DETAIL
 // ═══════════════════════════════════════════════════════════════════
-async function openRepuesto(machineId, repuestoId){
+async function openRepuesto(machineId, repuestoId, opts = {}){
   let reps = repCache[machineId]
   if (!reps) reps = await loadRepuestos(machineId).catch(() => [])
   const r = reps.find(x => x.id === repuestoId)
@@ -965,8 +1006,14 @@ async function openRepuesto(machineId, repuestoId){
   const title = r.textoBreve || r.alias || r.descripcion || 'Repuesto'
   const subtitle = r.codigoSAP ? `SAP ${r.codigoSAP}` : (r.tipo || '')
 
-  pushView('view-repuesto', title, subtitle)
-  saveRecent(machineId, repuestoId, title, r.codigoSAP)
+  // Si vinimos de un upload, no apilamos vista nueva — solo re-renderizamos
+  if (!opts.fromUpload){
+    pushView('view-repuesto', title, subtitle)
+    saveRecent(machineId, repuestoId, title, r.codigoSAP)
+  } else {
+    setHeader(title, subtitle, true)
+  }
+  activeUploadCtx = { machineId, repuestoId }
 
   const photos = [...(r.fotosReales || []), ...(r.imagenesManual || [])]
     .sort((a,b) => (b.esPrincipal ? 1 : 0) - (a.esPrincipal ? 1 : 0))
@@ -1027,9 +1074,18 @@ async function openRepuesto(machineId, repuestoId){
       <div class="gallery">
         ${rest.map(img => `<img class="gallery-img" src="${escHtmlAttr(img.url)}" alt=""
           onclick="openLightbox('${escHtmlAttr(img.url)}','${escHtmlAttr(img.descripcion || img.tipo || '')}')">`).join('')}
-      </div>` : (!main ? `
+      </div>` : ''}
+
+    ${!main && rest.length === 0 ? `
       <div class="section"><span class="section-title">Fotos</span></div>
-      <div class="notice">Sin fotos. Agregalas desde la app principal.</div>` : '')}
+      ${userRole !== 'admin' ? `<div class="notice">Sin fotos. Agregalas desde la app principal.</div>` : ''}` : ''}
+
+    ${userRole === 'admin' ? `
+      <div class="section"><span class="section-title">Agregar foto</span></div>
+      <div class="upload-row">
+        <button class="upload-btn" onclick="pickPhoto('camera')"><span class="ico">📷</span> Cámara</button>
+        <button class="upload-btn" onclick="pickPhoto('gallery')"><span class="ico">🖼️</span> Galería</button>
+      </div>` : ''}
   `
 }
 
@@ -1044,6 +1100,149 @@ function openLightbox(url, caption){
 function closeLightbox(){
   document.getElementById('lightbox').classList.remove('open')
   document.getElementById('lbx-img').src = ''
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PHOTO UPLOAD (admin only)
+// ═══════════════════════════════════════════════════════════════════
+let activeUploadCtx = null  // {machineId, repuestoId} mientras detalle abierto
+
+function compressImage(file, maxW = 1200, maxH = 1200, quality = 0.85){
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => {
+      let { width, height } = img
+      const ratio = Math.min(maxW/width, maxH/height, 1)
+      width  = Math.round(width  * ratio)
+      height = Math.round(height * ratio)
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(img, 0, 0, width, height)
+      canvas.toBlob(blob => {
+        if (!blob) return reject(new Error('Compresión falló'))
+        resolve({ blob, width, height })
+      }, 'image/jpeg', quality)
+    }
+    img.onerror = () => reject(new Error('No se pudo leer la imagen'))
+    const reader = new FileReader()
+    reader.onload = e => { img.src = e.target.result }
+    reader.onerror = () => reject(new Error('No se pudo leer el archivo'))
+    reader.readAsDataURL(file)
+  })
+}
+
+async function uploadRepuestoPhoto(file, machineId, repuestoId){
+  if (userRole !== 'admin') throw new Error('Solo admin puede subir fotos')
+  if (!file.type.startsWith('image/')) throw new Error('Solo imágenes')
+  if (file.size > 15 * 1024 * 1024) throw new Error('Imagen demasiado grande (>15MB)')
+
+  showUploading('Optimizando imagen…')
+
+  // Comprimir (skip GIF/SVG)
+  let blob = file, width, height
+  const skipOpt = ['image/gif','image/svg+xml'].includes(file.type)
+  if (!skipOpt){
+    try {
+      const r = await compressImage(file, 1200, 1200, 0.85)
+      blob = r.blob; width = r.width; height = r.height
+    } catch(e){ console.warn('compress failed, using original', e) }
+  }
+
+  showUploading('Subiendo foto…')
+
+  const timestamp = Date.now()
+  const safeName = (file.name || 'photo.jpg').replace(/[^\w.\-]+/g, '_')
+  const fileName = `${timestamp}_${safeName.endsWith('.jpg') || safeName.endsWith('.jpeg') ? safeName : safeName.replace(/\.[^.]+$/,'') + '.jpg'}`
+  const path = `machines/${machineId}/repuestos/${repuestoId}/real/${fileName}`
+
+  const ref = storage.ref(path)
+  await ref.put(blob, { contentType: 'image/jpeg' })
+  const url = await ref.getDownloadURL()
+
+  const newImg = {
+    id: String(timestamp),
+    url,
+    descripcion: '',
+    orden: 0,
+    esPrincipal: false,
+    tipo: 'real',
+    createdAt: new Date(),
+    sizeOriginal: file.size,
+    sizeFinal: blob.size,
+    formatFinal: skipOpt ? 'original' : 'jpeg',
+    qualityFinal: skipOpt ? undefined : 0.85,
+    width, height,
+  }
+
+  showUploading('Guardando…')
+
+  // Re-leer doc + escribir array completo (consistente con la PWA)
+  const docRef = db.collection(`machines/${machineId}/repuestos`).doc(repuestoId)
+  const snap = await docRef.get()
+  const cur = snap.exists ? (snap.data().fotosReales || []) : []
+  await docRef.update({
+    fotosReales: [...cur, newImg],
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+  })
+
+  // Actualizar cache local
+  const reps = repCache[machineId] || []
+  const idx = reps.findIndex(x => x.id === repuestoId)
+  if (idx >= 0){
+    reps[idx] = { ...reps[idx], fotosReales: [...(reps[idx].fotosReales || []), newImg] }
+  }
+
+  return newImg
+}
+
+function pickPhoto(source){
+  if (!activeUploadCtx) return
+  const inp = document.getElementById(source === 'camera' ? 'file-camera' : 'file-gallery')
+  inp.value = ''
+  inp.click()
+}
+
+async function onPhotoSelected(ev){
+  const file = ev.target.files?.[0]
+  ev.target.value = ''
+  if (!file || !activeUploadCtx) return
+  const { machineId, repuestoId } = activeUploadCtx
+  try {
+    await uploadRepuestoPhoto(file, machineId, repuestoId)
+    hideUploading()
+    showToast('Foto agregada ✓', 'ok')
+    tgApp?.HapticFeedback?.notificationOccurred('success')
+    // Re-renderizar el detalle para mostrar la nueva foto
+    openRepuesto(machineId, repuestoId, { fromUpload: true })
+  } catch(err){
+    console.error('upload error', err)
+    hideUploading()
+    showToast('Error: ' + (err.message || 'No se pudo subir'), 'err')
+    tgApp?.HapticFeedback?.notificationOccurred('error')
+  }
+}
+
+document.getElementById('file-camera').addEventListener('change', onPhotoSelected)
+document.getElementById('file-gallery').addEventListener('change', onPhotoSelected)
+
+function showUploading(msg){
+  document.getElementById('uploading-msg').textContent = msg || 'Subiendo…'
+  document.getElementById('uploading').classList.add('open')
+}
+function hideUploading(){
+  document.getElementById('uploading').classList.remove('open')
+}
+
+let toastTimer = null
+function showToast(msg, type){
+  const el = document.getElementById('toast')
+  el.textContent = msg
+  el.className = type ? type : ''
+  el.classList.add('show')
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2400)
 }
 
 // ═══════════════════════════════════════════════════════════════════
