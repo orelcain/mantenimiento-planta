@@ -413,7 +413,7 @@ mark{background:rgba(var(--accent-rgb,82,136,193),.25);color:inherit;border-radi
     <div id="status" class="status s-loading">cargando</div>
   </header>
 
-  <div id="search-persistent" onclick="openSearchOverlay()">
+  <div id="search-persistent" onclick="onPersistentSearchTap()">
     <div class="search-persistent-wrap">
       <span class="search-persistent-icon">🔍</span>
       <span class="search-persistent-text" id="search-persistent-text">Buscar repuesto, equipo, SAP…</span>
@@ -570,8 +570,6 @@ let hierarchyStack      = []   // [{id, nombre}] nav stack
 let __hierarchyCache    = null // {nodes, ts}
 let hierSheetNodeId     = null // nodeId being added to list
 let hierSheetIsEquip    = false
-let hierLevelFilter     = ''
-let hierLevelFilterTimer = null
 let tgBackBtnHandler    = null // current Telegram BackButton handler
 
 const HIERARCHY_CACHE_TTL = 5 * 60 * 1000
@@ -1400,7 +1398,7 @@ async function saveManual(){
       ...(fileSize   && { fileSize }),
       ...(mimeType   && { mimeType }),
       descripcion: desc || '',
-      createdBy: currentUser?.uid || '',
+      createdBy: uid || '',
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
       source: 'miniapp',
@@ -1786,6 +1784,178 @@ function machineCellHtml(m){
 // ═══════════════════════════════════════════════════════════════════
 // SEARCH OVERLAY
 // ═══════════════════════════════════════════════════════════════════
+// Dispatcher: el bar persistente cambia de comportamiento según dónde estás
+function onPersistentSearchTap(){
+  const activeViewId = document.querySelector('.view.active')?.id
+  // 1) Estás en un equipo abierto → focusear su búsqueda interna
+  if (activeViewId === 'view-machine'){
+    const inp = document.getElementById('rep-search-input')
+    if (inp){ inp.focus(); inp.scrollIntoView({behavior:'smooth', block:'center'}); return }
+  }
+  // 2) Estás en Manuales (no en sub-vista) → focusear su búsqueda interna
+  if (activeViewId === 'view-manuales'){
+    const inp = document.getElementById('manuales-search')
+    if (inp){ inp.focus(); inp.scrollIntoView({behavior:'smooth', block:'center'}); return }
+  }
+  // 3) Estás en Jerarquía → overlay tree-wide
+  if (activeViewId === 'view-hierarchy'){
+    openHierSearchOverlay()
+    return
+  }
+  // 4) Default → overlay global
+  openSearchOverlay()
+}
+
+// ─── Hierarchy tree-wide search overlay ─────────────────────────────
+let hierSearchTimer = null
+function openHierSearchOverlay(){
+  let ov = document.getElementById('hier-search-overlay')
+  if (!ov){
+    ov = document.createElement('div')
+    ov.id = 'hier-search-overlay'
+    ov.style.cssText = 'position:fixed;inset:0;z-index:200;background:var(--bg);display:flex;flex-direction:column'
+    document.body.appendChild(ov)
+  }
+  ov.innerHTML = `
+    <div style="padding:8px 12px;border-bottom:1px solid var(--border);
+      display:flex;align-items:center;gap:8px;background:var(--card)">
+      <button onclick="closeHierSearchOverlay()" style="background:none;border:none;
+        color:var(--text);font-size:18px;padding:4px 8px;cursor:pointer">✕</button>
+      <div class="search-wrap" style="flex:1">
+        <span class="search-icon">🔍</span>
+        <input id="hier-search-input" class="search-input" type="search"
+          autocomplete="off" autocorrect="off" spellcheck="false"
+          placeholder="Buscar nodo, equipo o área en TODA la jerarquía…"
+          oninput="hierSearchInput()">
+      </div>
+    </div>
+    <div id="hier-search-body" style="flex:1;overflow:auto;-webkit-overflow-scrolling:touch"></div>`
+  ov.style.display = 'flex'
+  setTimeout(() => document.getElementById('hier-search-input')?.focus(), 80)
+  setTgBack(closeHierSearchOverlay)
+  tgApp?.HapticFeedback?.selectionChanged?.()
+  renderHierSearchBody()  // estado inicial vacío
+}
+
+function closeHierSearchOverlay(){
+  const ov = document.getElementById('hier-search-overlay')
+  if (ov){ ov.style.display = 'none'; ov.innerHTML = '' }
+  setTgBack(null)
+}
+
+function hierSearchInput(){
+  clearTimeout(hierSearchTimer)
+  hierSearchTimer = setTimeout(renderHierSearchBody, 180)
+}
+
+function renderHierSearchBody(){
+  const inp = document.getElementById('hier-search-input')
+  const body = document.getElementById('hier-search-body')
+  if (!body) return
+  const raw = inp?.value || ''
+  const q = normalizeSearch(raw).trim()
+
+  if (!q){
+    body.innerHTML = `<div style="padding:24px 16px;text-align:center;color:var(--hint);font-size:13px">
+      Escribí el nombre o código de un nodo, equipo o área.<br>
+      Buscamos en todos los niveles de la jerarquía.
+    </div>`
+    return
+  }
+  if (q.length < 2) return
+
+  // Búsqueda in-memory sobre hierarchyNodesMap (ya cargado y cacheado)
+  const matches = []
+  for (const n of Object.values(hierarchyNodesMap)){
+    if (n.activo === false) continue
+    if (normalizeSearch(n.nombre).includes(q) || normalizeSearch(n.codigo).includes(q)){
+      matches.push(n)
+    }
+    if (matches.length >= 80) break
+  }
+  // Orden: primero hojas (equipos), luego por nivel
+  matches.sort((a, b) => {
+    const aLeaf = isEquipNode(a), bLeaf = isEquipNode(b)
+    if (aLeaf !== bLeaf) return aLeaf ? -1 : 1
+    return (a.nivel || 0) - (b.nivel || 0)
+  })
+
+  if (matches.length === 0){
+    body.innerHTML = `<div style="padding:24px 16px">
+      ${emptyHtml('🔍','Sin coincidencias',`Ningún nodo coincide con "<b>${escHtml(raw)}</b>"`)}
+    </div>`
+    return
+  }
+
+  body.innerHTML = `<div class="cell-group" style="margin:8px 0">
+    ${matches.slice(0, 50).map(n => {
+      const isEquip = isEquipNode(n)
+      const lvl = n.nivel || 1
+      const lvlLabel = LEVEL_LABELS[lvl] || `N${lvl}`
+      const lvlColor = LEVEL_COLORS[lvl] || '#888'
+      const linkedMachine = machines.find(m => m.hierarchyNodeId === n.id)
+      const path = (n.path || []).slice(0, -1).join(' › ')
+      const handler = isEquip
+        ? `hierSearchOpenEquip('${escHtmlAttr(n.id)}','${escHtmlAttr(linkedMachine?.id||'')}')`
+        : `hierSearchNavigate('${escHtmlAttr(n.id)}')`
+      return `<div class="cell" onclick="${handler}">
+        <div class="cell-icon" style="background:${lvlColor}22;color:${lvlColor}">
+          ${isEquip?'⚙️':'📁'}
+        </div>
+        <div class="cell-body">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <div class="cell-title">${highlightMatch(n.nombre || 'Sin nombre', raw)}</div>
+            <span class="level-chip" style="background:${lvlColor}22;color:${lvlColor}">${lvlLabel}</span>
+          </div>
+          ${path ? `<div class="cell-sub" style="opacity:.7">${escHtml(path)}</div>` : ''}
+        </div>
+        <div class="cell-chevron">›</div>
+      </div>`
+    }).join('')}
+    ${matches.length > 50 ? `<div style="padding:10px 16px;font-size:11px;color:var(--hint);text-align:center">+${matches.length-50} más — refiná la búsqueda</div>` : ''}
+  </div>`
+}
+
+// Helper: reconstruye el stack desde un nodo cualquiera (vía parentId)
+function buildHierStackForNode(node){
+  const stack = []
+  let cur = node
+  while (cur){
+    stack.unshift({ id: cur.id, nombre: cur.nombre })
+    cur = cur.parentId ? hierarchyNodesMap[cur.parentId] : null
+  }
+  return stack
+}
+
+function hierSearchNavigate(nodeId){
+  const node = hierarchyNodesMap[nodeId]
+  if (!node) return
+  closeHierSearchOverlay()
+  if (currentTab !== 'hierarchy') switchTab('hierarchy')
+  hierarchyStack = buildHierStackForNode(node)
+  setTgBack(hierarchyStack.length ? hierarchyGoBack : null)
+  renderHierarchyLevel()
+  getContent().scrollTop = 0
+}
+
+function hierSearchOpenEquip(nodeId, machineId){
+  const node = hierarchyNodesMap[nodeId]
+  if (!node) return
+  closeHierSearchOverlay()
+  if (currentTab !== 'hierarchy') switchTab('hierarchy')
+  // Stack = ancestros (sin incluir el equipo, que se abre como vista)
+  const stack = []
+  let cur = node.parentId ? hierarchyNodesMap[node.parentId] : null
+  while (cur){
+    stack.unshift({ id: cur.id, nombre: cur.nombre })
+    cur = cur.parentId ? hierarchyNodesMap[cur.parentId] : null
+  }
+  hierarchyStack = stack
+  setTgBack(hierarchyStack.length ? hierarchyGoBack : null)
+  renderHierarchyLevel()
+  hierarchyOpenEquip(nodeId, machineId)
+}
+
 function openSearchOverlay(){
   prevTabBeforeSearch = currentTab
   // Default sub-tab según contexto: en Jerarquía esperan equipos, en otras → repuestos
@@ -1957,23 +2127,72 @@ function updateSearchProgress(msg, loaded, total){
     </div>` : ''}`
 }
 
+// Pre-calcula campos normalizados una sola vez para evitar normalizar en cada keystroke
+function ensureSearchableHaystacks(){
+  if (!__repuestosCache) return
+  for (const item of __repuestosCache){
+    if (item._hay) continue
+    const r = item.repuesto
+    item._hay = ' '
+      + normalizeSearch(r.codigoSAP || '') + ' '
+      + normalizeSearch(r.textoBreve || '') + ' '
+      + normalizeSearch(r.alias || '') + ' '
+      + normalizeSearch(r.codigoFabricante || r.codigoBaader || '') + ' '
+      + normalizeSearch(r.descripcion || '') + ' '
+      + normalizeSearch(item.machineName || '') + ' '
+  }
+}
+
 function searchGlobal(queryText){
   if (!__repuestosCache) return { repHits: [], machHits: [] }
+  ensureSearchableHaystacks()
   const nq = normalizeSearch(queryText)
   if (!nq) return { repHits: [], machHits: [] }
   const tokens = nq.split(' ').filter(Boolean)
 
-  const repHits = __repuestosCache
+  // FASE 1: filtro rápido — descartar items donde NINGÚN token aparece como
+  // substring (incluyendo sinónimos). Bajamos de ~4684 → ~50-300 candidatos.
+  const candidates = []
+  outer: for (const item of __repuestosCache){
+    const hay = item._hay
+    for (const t of tokens){
+      if (hay.includes(t)) continue
+      const syns = SYNONYM_LOOKUP[t]
+      if (syns && syns.some(s => hay.includes(s))) continue
+      // Token no encontrado y sin sinónimo → descartar (edit-distance fallback luego)
+      continue outer
+    }
+    candidates.push(item)
+  }
+
+  // FASE 2 (fallback): si hay pocos candidatos, expandir con edit-distance
+  // Esto es caro pero solo se hace cuando hay <3 matches y hay tokens largos
+  if (candidates.length < 3 && tokens.some(t => t.length >= 4)){
+    const seen = new Set(candidates)
+    for (const item of __repuestosCache){
+      if (seen.has(item)) continue
+      const words = item._hay.split(' ').filter(w => w.length >= 4)
+      const allMatch = tokens.every(t => {
+        if (item._hay.includes(t)) return true
+        if (t.length < 4) return false
+        return words.some(w => editDistanceAtMostOne(t, w))
+      })
+      if (allMatch){
+        candidates.push(item)
+        if (candidates.length >= 30) break
+      }
+    }
+  }
+
+  // FASE 3: scoring solo de candidatos (fast)
+  const repHits = candidates
     .map(item => ({ item, score: scoreRepResult(item.repuesto, item.machineName, nq, tokens) }))
     .filter(x => x.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, 50)
     .map(x => x.item)
 
-  const machHits = machines
-    .filter(m => matchesMachine(m, nq))
-    .slice(0, 20)
-
+  const machHits = machines.filter(m => matchesMachine(m, nq)).slice(0, 20)
   return { repHits, machHits }
 }
 
@@ -2034,7 +2253,7 @@ function renderSearchEmpty(){
     clearTimeout(searchTimer)
     if (q.length === 0){ renderSearchBody(''); return }
     if (q.length < 2) return
-    searchTimer = setTimeout(() => { saveSearchHistory(q); renderSearchBody(q) }, 280)
+    searchTimer = setTimeout(() => { saveSearchHistory(q); renderSearchBody(q) }, 350)
   })
   clr.addEventListener('click', () => { inp.value=''; clr.classList.remove('show'); renderSearchBody('') })
   renderSearchBody('')
@@ -2454,7 +2673,7 @@ async function addMachineToList(machineId, listIdx){
   const updated = [...(list.equipmentIds || []), machineId]
   prefs.favoriteLists[listIdx].equipmentIds = updated
   try {
-    await db.collection('user_preferences').doc(currentUser.uid).update({
+    await db.collection('user_preferences').doc(uid).update({
       [`favoriteLists.${listIdx}.equipmentIds`]: updated,
     })
     showToast(`Agregado a "${list.name}" ✓`, 'ok')
@@ -2472,7 +2691,7 @@ function machineCreateListAndAdd(machineId){
     const newList = { name: name.trim(), equipmentIds: [machineId] }
     prefs.favoriteLists.push(newList)
     try {
-      await db.collection('user_preferences').doc(currentUser.uid).update({
+      await db.collection('user_preferences').doc(uid).update({
         favoriteLists: prefs.favoriteLists,
       })
       showToast(`Lista "${newList.name}" creada ✓`, 'ok')
@@ -3282,7 +3501,7 @@ async function saveNewRepuesto(machineId){
     const collPath = getRepuestoCollPath(machineId)
     const doc = {
       ...updates,
-      createdBy: currentUser?.uid || uid || '',
+      createdBy: uid || '',
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
       source: 'miniapp',
@@ -3610,32 +3829,9 @@ function renderHierarchyLevel(){
       `).join('')}
     </div>`
 
-  // Filtro inline (busca en nombre + código del nivel actual)
-  const filterHtml = allNodes.length > 3 ? `
-    <div style="padding:0 12px 8px">
-      <input id="hier-level-filter" type="search" value="${escHtmlAttr(hierLevelFilter)}"
-        placeholder="Filtrar este nivel…" oninput="hierLevelFilterInput()"
-        style="width:100%;box-sizing:border-box;padding:7px 12px;border-radius:10px;
-        border:1.5px solid var(--border);background:var(--card);color:var(--text);
-        font-size:13px;outline:none">
-    </div>` : ''
-
-  // Aplicar filtro al nivel actual
-  let nodes = allNodes
-  if (hierLevelFilter){
-    const q = normalizeSearch(hierLevelFilter)
-    nodes = allNodes.filter(n =>
-      normalizeSearch(n.nombre).includes(q) || normalizeSearch(n.codigo).includes(q)
-    )
-  }
-
-  if (!allNodes.length){
-    el.innerHTML = breadHtml + emptyHtml('🔧','Sin elementos','Este nodo no tiene sub-elementos.')
-    return
-  }
+  const nodes = allNodes
   if (!nodes.length){
-    el.innerHTML = breadHtml + filterHtml + emptyHtml('🔍','Sin coincidencias',`Ningún nodo aquí coincide con "${escHtml(hierLevelFilter)}"`)
-    setTimeout(() => document.getElementById('hier-level-filter')?.focus(), 0)
+    el.innerHTML = breadHtml + emptyHtml('🔧','Sin elementos','Este nodo no tiene sub-elementos.')
     return
   }
 
@@ -3692,30 +3888,12 @@ function renderHierarchyLevel(){
 
   el.innerHTML = `
     ${breadHtml}
-    ${filterHtml}
-    <div class="cell-group" style="margin-top:4px">${nodesHtml}</div>
+    <div class="cell-group" style="margin-top:8px">${nodesHtml}</div>
     ${adminAddBtn}`
-  // Si había filtro escrito, mantener foco al re-render
-  if (hierLevelFilter){
-    const inp = document.getElementById('hier-level-filter')
-    if (inp){ inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length) }
-  }
-}
-
-function hierLevelFilterInput(){
-  const inp = document.getElementById('hier-level-filter')
-  if (!inp) return
-  clearTimeout(hierLevelFilterTimer)
-  const v = inp.value
-  hierLevelFilterTimer = setTimeout(() => {
-    hierLevelFilter = v
-    renderHierarchyLevel()
-  }, 180)
 }
 
 function hierarchyEnter(nodeId, nombre){
   hierarchyStack.push({id:nodeId, nombre})
-  hierLevelFilter = ''   // reset filtro al cambiar de nivel
   tgApp?.HapticFeedback?.selectionChanged?.()
   setTgBack(hierarchyGoBack)
   renderHierarchyLevel()
@@ -3724,7 +3902,6 @@ function hierarchyEnter(nodeId, nombre){
 
 function hierarchyGoBack(){
   hierarchyStack.pop()
-  hierLevelFilter = ''
   tgApp?.HapticFeedback?.selectionChanged?.()
   if (!hierarchyStack.length) setTgBack(null)
   renderHierarchyLevel()
@@ -3733,7 +3910,6 @@ function hierarchyGoBack(){
 
 function hierarchyGoTo(stackIdx){
   hierarchyStack = stackIdx < 0 ? [] : hierarchyStack.slice(0, stackIdx+1)
-  hierLevelFilter = ''
   tgApp?.HapticFeedback?.selectionChanged?.()
   setTgBack(hierarchyStack.length ? hierarchyGoBack : null)
   renderHierarchyLevel()
