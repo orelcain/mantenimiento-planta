@@ -2,8 +2,8 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Repuestos — @antarfood_mant_bot</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Repuestos · Antarfood</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
@@ -12,386 +12,244 @@
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 
 :root{
-  --bg:      var(--tg-theme-bg-color,#0d1117);
-  --bg2:     var(--tg-theme-secondary-bg-color,#161b22);
-  --text:    var(--tg-theme-text-color,#e6edf3);
-  --hint:    var(--tg-theme-hint-color,#7d8590);
-  --accent:  var(--tg-theme-button-color,#1f6feb);
+  --bg:      var(--tg-theme-bg-color,#17212b);
+  --bg2:     var(--tg-theme-secondary-bg-color,#232e3c);
+  --text:    var(--tg-theme-text-color,#f5f5f5);
+  --hint:    var(--tg-theme-hint-color,#7d8b99);
+  --accent:  var(--tg-theme-button-color,#5288c1);
   --acctxt:  var(--tg-theme-button-text-color,#ffffff);
-  --link:    var(--tg-theme-link-color,#58a6ff);
-  --danger:  #f85149;
-  --green:   #3fb950;
-  --nav-h:   60px;
-  --hdr-h:   52px;
-  --r:       10px;
+  --link:    var(--tg-theme-link-color,#6ab3f3);
+  --danger:  #e53935;
+  --green:   #4fae4e;
+  --warn:    #f5a623;
+  --divider: rgba(255,255,255,.07);
+  --hover:   rgba(255,255,255,.04);
+  --press:   rgba(255,255,255,.08);
+  --vh:      100dvh;
 }
 
-html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px}
-#app{display:flex;flex-direction:column;height:100dvh;overflow:hidden}
+html,body{height:100%;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,sans-serif;
+  font-size:15px;line-height:1.4;overflow:hidden;overscroll-behavior:none}
+
+#app{display:flex;flex-direction:column;height:var(--vh);width:100%;overflow:hidden}
 
 /* ── Header ─────────────────────────────────────────────────────────── */
-header{
-  height:var(--hdr-h);min-height:var(--hdr-h);
-  display:flex;align-items:center;justify-content:space-between;padding:0 14px;
-  background:var(--bg2);border-bottom:1px solid rgba(255,255,255,.06);
-  font-weight:700;font-size:16px;flex-shrink:0;
-}
-header .logo{display:flex;align-items:center;gap:9px}
-header .logo-icon{width:32px;height:32px;border-radius:50%;background:var(--accent);
-  display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
-header .logo-text{line-height:1.2}
-header .logo-sub{font-size:10px;font-weight:400;color:var(--hint)}
-.status-dot{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;
-  padding:2px 8px;border-radius:99px;flex-shrink:0}
-.status-dot::before{content:'';width:6px;height:6px;border-radius:50%;flex-shrink:0}
-.s-ok  {background:rgba(63,185,80,.15);color:var(--green)}
-.s-ok::before{background:var(--green);box-shadow:0 0 5px var(--green)}
-.s-err {background:rgba(248,81,73,.15);color:var(--danger)}
+.app-header{height:54px;min-height:54px;display:flex;align-items:center;
+  padding:0 8px;background:var(--bg2);border-bottom:1px solid var(--divider);
+  flex-shrink:0;gap:6px}
+.app-header .back-btn{width:40px;height:40px;border-radius:50%;border:none;
+  background:transparent;color:var(--text);font-size:22px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;line-height:1}
+.app-header .back-btn:active{background:var(--press)}
+.app-header .title-block{flex:1;min-width:0;padding:0 6px}
+.app-header .title{font-size:17px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2}
+.app-header .subtitle{font-size:12px;color:var(--hint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.app-header .status{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;
+  padding:3px 9px;border-radius:99px;flex-shrink:0;margin-right:6px}
+.app-header .status::before{content:'';width:6px;height:6px;border-radius:50%}
+.s-ok{background:rgba(79,174,78,.15);color:var(--green)}
+.s-ok::before{background:var(--green)}
+.s-err{background:rgba(229,57,53,.15);color:var(--danger)}
 .s-err::before{background:var(--danger)}
-.s-loading{background:rgba(125,133,144,.12);color:var(--hint)}
-.s-loading::before{background:var(--hint);animation:blink .9s ease-in-out infinite}
+.s-loading{background:rgba(125,139,153,.12);color:var(--hint)}
+.s-loading::before{background:var(--hint);animation:blink 1s ease-in-out infinite}
 @keyframes blink{0%,100%{opacity:.3}50%{opacity:1}}
 
-/* ── Content area ────────────────────────────────────────────────────── */
-#content{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
-.view{display:none}
+/* ── Content ────────────────────────────────────────────────────────── */
+#content{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.view{display:none;min-height:100%;padding-bottom:24px}
 .view.active{display:block}
 
 /* ── Bottom nav ─────────────────────────────────────────────────────── */
-.bottom-nav{height:var(--nav-h);min-height:var(--nav-h);display:flex;
-  background:var(--bg2);border-top:1px solid rgba(255,255,255,.06);flex-shrink:0}
+.bottom-nav{height:58px;min-height:58px;display:flex;background:var(--bg2);
+  border-top:1px solid var(--divider);flex-shrink:0;
+  padding-bottom:env(safe-area-inset-bottom)}
 .nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:3px;border:none;background:none;color:var(--hint);font-size:10px;font-weight:500;
+  gap:3px;border:none;background:none;color:var(--hint);font-size:11px;font-weight:500;
   cursor:pointer;transition:color .15s;position:relative;padding:0}
 .nav-btn .icon{font-size:22px;line-height:1}
 .nav-btn.active{color:var(--accent)}
-.nav-btn.active::after{content:'';position:absolute;top:0;left:20%;right:20%;
-  height:2px;background:var(--accent);border-radius:99px}
 
-/* ── Loading screen ─────────────────────────────────────────────────── */
-#loading-screen{position:fixed;inset:0;background:var(--bg);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:16px;z-index:100}
-.loader{width:36px;height:36px;border:3px solid rgba(255,255,255,.1);
+/* ── Loading ────────────────────────────────────────────────────────── */
+#loading{position:fixed;inset:0;background:var(--bg);z-index:200;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
+.loader{width:32px;height:32px;border:3px solid rgba(255,255,255,.1);
   border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-#loading-msg{color:var(--hint);font-size:14px}
-#loading-retry{display:none;margin-top:12px;padding:10px 24px;background:var(--accent);
-  color:var(--acctxt);border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer}
+#loading-msg{color:var(--hint);font-size:14px;padding:0 24px;text-align:center;max-width:340px}
+#loading-retry{display:none;margin-top:10px;padding:10px 22px;background:var(--accent);
+  color:var(--acctxt);border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer}
 
 /* ── Search bar ─────────────────────────────────────────────────────── */
-.search-bar{padding:10px 12px;position:sticky;top:0;background:var(--bg);
-  z-index:5;border-bottom:1px solid rgba(255,255,255,.04)}
+.search-bar{padding:10px 12px;background:var(--bg);border-bottom:1px solid var(--divider)}
 .search-wrap{position:relative}
-.search-input{width:100%;padding:9px 36px 9px 36px;background:var(--bg2);
-  border:1px solid rgba(255,255,255,.08);border-radius:var(--r);
-  color:var(--text);font-size:15px;outline:none;transition:border-color .2s}
+.search-input{width:100%;height:38px;padding:0 36px 0 36px;background:var(--bg2);
+  border:1px solid transparent;border-radius:10px;color:var(--text);
+  font-size:15px;outline:none;transition:border-color .15s}
 .search-input::placeholder{color:var(--hint)}
 .search-input:focus{border-color:var(--accent)}
-.search-icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);
+.search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);
   font-size:15px;pointer-events:none;color:var(--hint)}
-.search-clear{position:absolute;right:10px;top:50%;transform:translateY(-50%);
-  border:none;background:none;color:var(--hint);font-size:17px;cursor:pointer;
-  width:24px;height:24px;display:none;align-items:center;justify-content:center;
-  border-radius:50%;padding:0;line-height:1}
+.search-clear{position:absolute;right:8px;top:50%;transform:translateY(-50%);
+  border:none;background:rgba(255,255,255,.08);color:var(--hint);font-size:14px;
+  cursor:pointer;width:22px;height:22px;border-radius:50%;
+  display:none;align-items:center;justify-content:center;padding:0;line-height:1}
 .search-clear.show{display:flex}
 
 /* ── Section header ─────────────────────────────────────────────────── */
-.section-hdr{padding:14px 14px 6px;display:flex;align-items:center;justify-content:space-between}
-.section-title{font-size:13px;font-weight:600;color:var(--hint);text-transform:uppercase;letter-spacing:.5px}
-.section-count{font-size:12px;color:var(--hint)}
+.section{padding:16px 16px 6px;display:flex;align-items:center;justify-content:space-between}
+.section-title{font-size:13px;font-weight:600;color:var(--hint);
+  text-transform:uppercase;letter-spacing:.5px}
+.section-count{font-size:12px;color:var(--hint);font-weight:500}
 
-/* ── Empty / error states ─────────────────────────────────────────────── */
-.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;
-  padding:48px 24px;gap:12px;text-align:center}
-.empty-icon{font-size:48px;opacity:.4}
-.empty-title{font-weight:600;color:var(--text)}
-.empty-sub{font-size:13px;color:var(--hint);line-height:1.5}
-
-/* ── Repuesto list item ──────────────────────────────────────────────── */
-.rep-item{display:flex;align-items:center;padding:11px 14px;gap:12px;
-  cursor:pointer;transition:background .12s;border-bottom:1px solid rgba(255,255,255,.04)}
-.rep-item:active{background:rgba(255,255,255,.03)}
-.rep-icon-box{width:40px;height:40px;border-radius:8px;background:var(--bg2);
-  display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
-.rep-body{flex:1;min-width:0}
-.rep-name{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rep-code{font-size:11px;color:var(--link);font-family:monospace;margin-top:1px}
-.rep-meta{font-size:11px;color:var(--hint);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rep-fav{color:var(--hint);font-size:20px;flex-shrink:0;transition:color .15s}
-.rep-fav.on{color:#f59e0b}
-
-/* ── Machine card ───────────────────────────────────────────────────── */
-.machines-list{padding:8px 0}
-.machine-item{display:flex;align-items:center;padding:12px 14px;gap:12px;
-  cursor:pointer;transition:background .12s;border-bottom:1px solid rgba(255,255,255,.04)}
-.machine-item:active{background:rgba(255,255,255,.03)}
-.machine-color{width:44px;height:44px;border-radius:10px;
-  display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
-.machine-body{flex:1;min-width:0}
-.machine-name{font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.machine-sub{font-size:12px;color:var(--hint);margin-top:2px}
-.machine-badge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;
-  background:rgba(255,255,255,.08);color:var(--hint);flex-shrink:0;white-space:nowrap}
-.machine-badge.has-rep{background:rgba(31,111,235,.15);color:var(--link)}
-
-/* ── Chips (category filter) ────────────────────────────────────────── */
-.chips-row{display:flex;gap:6px;padding:8px 12px;overflow-x:auto;
-  scrollbar-width:none;-webkit-overflow-scrolling:touch;flex-shrink:0}
-.chips-row::-webkit-scrollbar{display:none}
-.chips-sticky{position:sticky;top:60px;background:var(--bg);z-index:9;
-  border-bottom:1px solid rgba(255,255,255,.04)}
-.chips-row::-webkit-scrollbar{display:none}
-.chip{padding:5px 12px;border-radius:99px;font-size:12px;font-weight:500;
-  cursor:pointer;transition:all .15s;white-space:nowrap;flex-shrink:0;
-  border:1px solid rgba(255,255,255,.1);color:var(--hint);background:none}
-.chip.active{background:var(--accent);color:var(--acctxt);border-color:var(--accent)}
-
-/* ── Detail view ────────────────────────────────────────────────────── */
-.detail-hero{padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);
-  display:flex;align-items:center;gap:10px;position:sticky;top:0;
-  background:var(--bg);z-index:10;backdrop-filter:blur(8px)}
-.detail-back-btn{width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,.1);
-  background:rgba(255,255,255,.04);font-size:18px;cursor:pointer;display:flex;align-items:center;
-  justify-content:center;flex-shrink:0;color:var(--text);padding:0;line-height:1}
-.detail-back-btn:active{background:rgba(255,255,255,.12);transform:scale(.95)}
-.detail-title{font-size:17px;font-weight:700;line-height:1.25;flex:1;min-width:0;
+/* ── Cell (Telegram-style list row) ─────────────────────────────────── */
+.cell{display:flex;align-items:center;padding:11px 16px;gap:12px;
+  cursor:pointer;transition:background .12s;background:var(--bg2);
+  position:relative}
+.cell:active{background:var(--press)}
+.cell + .cell::before{content:'';position:absolute;top:0;left:60px;right:0;
+  height:1px;background:var(--divider)}
+.cell-icon{width:38px;height:38px;border-radius:9px;background:rgba(255,255,255,.06);
+  display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0}
+.cell-body{flex:1;min-width:0}
+.cell-title{font-weight:500;font-size:15px;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;line-height:1.3}
+.cell-sub{font-size:12px;color:var(--hint);margin-top:2px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.detail-fav-btn{width:36px;height:36px;border-radius:50%;border:1.5px solid rgba(255,255,255,.12);
-  background:none;font-size:18px;cursor:pointer;display:flex;align-items:center;
-  justify-content:center;transition:all .15s;flex-shrink:0;color:var(--hint);padding:0;line-height:1}
-.detail-fav-btn.on{color:#f59e0b;border-color:#f59e0b;background:rgba(245,158,11,.1)}
-.detail-fav-btn:active{transform:scale(.95)}
+.cell-meta{font-size:11px;color:var(--link);font-family:ui-monospace,Menlo,monospace;margin-top:2px}
+.cell-trailing{color:var(--hint);font-size:14px;flex-shrink:0;display:flex;align-items:center;gap:6px}
+.cell-chevron{color:var(--hint);font-size:18px;flex-shrink:0;line-height:1}
+.cell-badge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;
+  background:rgba(82,136,193,.18);color:var(--link);flex-shrink:0;white-space:nowrap}
+.cell-badge.muted{background:rgba(255,255,255,.06);color:var(--hint)}
+.cell-badge.warn{background:rgba(245,166,35,.15);color:var(--warn)}
 
-.info-section{padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.04)}
+.cell-group{background:var(--bg2);margin:0 0 8px;overflow:hidden}
+.cell-group + .section{padding-top:10px}
+
+/* ── Chips ──────────────────────────────────────────────────────────── */
+.chips{display:flex;gap:7px;padding:10px 12px;overflow-x:auto;
+  scrollbar-width:none;-webkit-overflow-scrolling:touch;background:var(--bg)}
+.chips::-webkit-scrollbar{display:none}
+.chip{padding:7px 14px;border-radius:99px;font-size:13px;font-weight:500;
+  cursor:pointer;transition:all .15s;white-space:nowrap;flex-shrink:0;
+  border:1px solid var(--divider);color:var(--text);background:var(--bg2)}
+.chip:active{background:var(--press)}
+.chip.active{background:var(--accent);color:var(--acctxt);border-color:var(--accent)}
+.chip .count{opacity:.65;margin-left:5px;font-weight:400}
+.chip.active .count{opacity:.85}
+
+/* ── Info card ─────────────────────────────────────────────────────── */
+.info-card{background:var(--bg2);margin:0 0 8px;overflow:hidden}
 .info-row{display:flex;justify-content:space-between;align-items:flex-start;
-  padding:6px 0;border-bottom:1px solid rgba(255,255,255,.03);gap:12px}
-.info-row:last-child{border-bottom:none}
-.info-label{font-size:12px;color:var(--hint);flex-shrink:0;min-width:90px}
-.info-value{font-size:13px;text-align:right;word-break:break-all;font-weight:500}
-.info-value.code{font-family:monospace;color:var(--link);font-size:12px}
-.info-value.obs{text-align:left;color:var(--hint);font-size:12px;font-style:italic}
+  padding:11px 16px;gap:14px;position:relative}
+.info-row + .info-row::before{content:'';position:absolute;top:0;left:16px;right:16px;
+  height:1px;background:var(--divider)}
+.info-label{font-size:13px;color:var(--hint);flex-shrink:0;min-width:90px}
+.info-value{font-size:14px;text-align:right;word-break:break-word;font-weight:500;flex:1}
+.info-value.code{font-family:ui-monospace,Menlo,monospace;color:var(--link);font-size:13px}
+.info-value.obs{text-align:left;color:var(--text);font-size:13.5px;line-height:1.5;font-weight:400}
 
-.section-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;
-  color:var(--hint);padding:12px 14px 4px}
+/* ── Empty / error states ───────────────────────────────────────────── */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:60px 32px;gap:10px;text-align:center;min-height:240px}
+.empty-icon{font-size:54px;opacity:.35;line-height:1}
+.empty-title{font-weight:600;font-size:15px}
+.empty-sub{font-size:13px;color:var(--hint);line-height:1.5;max-width:280px}
 
-/* ── Photo gallery ──────────────────────────────────────────────────── */
-.gallery{display:flex;gap:8px;padding:8px 14px 12px;overflow-x:auto;
-  -webkit-overflow-scrolling:touch;scrollbar-width:none}
+/* ── Greeting ──────────────────────────────────────────────────────── */
+.hello{padding:18px 16px 8px}
+.hello-text{font-size:20px;font-weight:600;line-height:1.2}
+.hello-sub{font-size:13px;color:var(--hint);margin-top:4px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.tag{font-size:10px;font-weight:600;padding:2px 7px;border-radius:5px;text-transform:uppercase;letter-spacing:.4px}
+.tag.green{background:rgba(79,174,78,.15);color:var(--green)}
+.tag.warn{background:rgba(245,166,35,.15);color:var(--warn)}
+
+/* ── Photo gallery ─────────────────────────────────────────────────── */
+.gallery{display:flex;gap:8px;padding:10px 14px 14px;overflow-x:auto;
+  -webkit-overflow-scrolling:touch;scrollbar-width:none;background:var(--bg2)}
 .gallery::-webkit-scrollbar{display:none}
-.gallery-img{width:120px;height:90px;border-radius:8px;object-fit:cover;
-  flex-shrink:0;background:var(--bg2);cursor:pointer;border:1.5px solid rgba(255,255,255,.07)}
+.gallery-img{width:130px;height:96px;border-radius:9px;object-fit:cover;
+  flex-shrink:0;background:var(--bg);cursor:pointer}
 .gallery-img:active{opacity:.85}
-.gallery-empty{padding:12px 14px;color:var(--hint);font-size:13px}
 
-/* ── Lightbox ───────────────────────────────────────────────────────── */
-#lightbox{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:200;
+/* ── Photo hero ────────────────────────────────────────────────────── */
+.photo-hero{width:100%;aspect-ratio:16/10;background:var(--bg2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:64px;color:var(--hint);overflow:hidden;cursor:pointer}
+.photo-hero img{width:100%;height:100%;object-fit:cover}
+
+/* ── Lightbox ──────────────────────────────────────────────────────── */
+#lightbox{position:fixed;inset:0;background:rgba(0,0,0,.94);z-index:300;
   display:none;align-items:center;justify-content:center;flex-direction:column}
 #lightbox.open{display:flex}
-#lightbox img{max-width:95vw;max-height:80vh;border-radius:8px;object-fit:contain}
-#lightbox .lbx-close{position:absolute;top:16px;right:16px;color:#fff;font-size:28px;
-  cursor:pointer;background:rgba(0,0,0,.5);border-radius:50%;width:36px;height:36px;
-  display:flex;align-items:center;justify-content:center;border:none}
-#lightbox .lbx-caption{color:rgba(255,255,255,.7);font-size:12px;margin-top:8px;padding:0 16px;text-align:center}
+#lightbox img{max-width:96vw;max-height:82vh;border-radius:8px;object-fit:contain}
+#lightbox .lbx-close{position:absolute;top:env(safe-area-inset-top,12px);right:14px;
+  color:#fff;background:rgba(0,0,0,.4);border-radius:50%;width:38px;height:38px;
+  display:flex;align-items:center;justify-content:center;border:none;
+  font-size:22px;cursor:pointer}
+#lightbox .lbx-cap{color:rgba(255,255,255,.7);font-size:12px;margin-top:10px;padding:0 18px;text-align:center}
 
-/* ── Favorites ──────────────────────────────────────────────────────── */
-.fav-list-card{margin:8px 12px;border-radius:var(--r);background:var(--bg2);
-  border:1px solid rgba(255,255,255,.06);overflow:hidden}
-.fav-list-header{display:flex;align-items:center;padding:12px 14px;gap:10px;cursor:pointer}
-.fav-list-header:active{background:rgba(255,255,255,.03)}
-.fav-list-icon{font-size:20px;flex-shrink:0}
-.fav-list-meta{flex:1;min-width:0}
-.fav-list-name{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.fav-list-count{font-size:11px;color:var(--hint);margin-top:2px}
-.fav-list-actions{display:flex;gap:4px}
-.fav-action-btn{width:32px;height:32px;border-radius:8px;border:none;background:rgba(255,255,255,.06);
-  color:var(--hint);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
-.fav-action-btn:active{background:rgba(255,255,255,.1)}
-
-.fav-machine-chips{display:flex;gap:5px;padding:0 14px 10px;flex-wrap:wrap}
-.fav-machine-chip{padding:4px 10px;border-radius:99px;font-size:11px;background:rgba(255,255,255,.06);
-  color:var(--text);cursor:pointer;display:flex;align-items:center;gap:4px}
-.fav-machine-chip:active{background:rgba(255,255,255,.1)}
-
-.add-list-btn{display:flex;align-items:center;gap:8px;padding:12px 14px;cursor:pointer;
-  color:var(--accent);font-size:14px;font-weight:500;transition:opacity .15s}
-.add-list-btn:active{opacity:.7}
-
-/* ── Bottom sheet ────────────────────────────────────────────────────── */
-#sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:150;
-  display:none;opacity:0;transition:opacity .2s}
-#sheet-overlay.open{display:block;opacity:1}
-#sheet{position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-radius:20px 20px 0 0;
-  z-index:160;padding:0 0 env(safe-area-inset-bottom);transform:translateY(100%);
-  transition:transform .25s ease;max-height:70vh;overflow-y:auto}
-#sheet.open{transform:translateY(0)}
-.sheet-handle{width:36px;height:4px;border-radius:2px;background:rgba(255,255,255,.15);
-  margin:12px auto 4px}
-.sheet-title{font-size:16px;font-weight:700;padding:4px 16px 12px;
-  border-bottom:1px solid rgba(255,255,255,.06)}
-.sheet-list-item{display:flex;align-items:center;padding:13px 16px;gap:12px;cursor:pointer;
-  transition:background .12s;border-bottom:1px solid rgba(255,255,255,.04)}
-.sheet-list-item:active{background:rgba(255,255,255,.04)}
-.sheet-list-item .sli-icon{font-size:22px;flex-shrink:0;width:32px;text-align:center}
-.sheet-list-item .sli-text{flex:1;min-width:0}
-.sheet-list-item .sli-name{font-weight:500;font-size:14px}
-.sheet-list-item .sli-sub{font-size:11px;color:var(--hint);margin-top:1px}
-.sheet-list-item .sli-check{font-size:18px;color:var(--accent)}
-.sheet-new-list{display:flex;align-items:center;gap:10px;padding:13px 16px;cursor:pointer;
-  color:var(--accent);font-size:14px;font-weight:500}
-.sheet-new-list:active{opacity:.7}
-
-/* ── Input modal ─────────────────────────────────────────────────────── */
-#input-modal{position:fixed;inset:0;z-index:200;display:none;
-  align-items:center;justify-content:center;padding:24px}
-#input-modal.open{display:flex}
-#input-modal .modal-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.6)}
-#input-modal .modal-box{position:relative;background:var(--bg2);border-radius:14px;
-  padding:20px;width:100%;max-width:340px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
-#input-modal .modal-title{font-size:16px;font-weight:700;margin-bottom:14px}
-#input-modal input{width:100%;padding:10px 12px;background:var(--bg);border:1px solid rgba(255,255,255,.1);
-  border-radius:8px;color:var(--text);font-size:15px;outline:none;margin-bottom:14px}
-#input-modal input:focus{border-color:var(--accent)}
-.modal-btns{display:flex;gap:8px;justify-content:flex-end}
-.btn-cancel{padding:9px 18px;border-radius:8px;border:1px solid rgba(255,255,255,.1);
-  background:none;color:var(--hint);font-size:14px;cursor:pointer}
-.btn-ok{padding:9px 18px;border-radius:8px;border:none;background:var(--accent);
-  color:var(--acctxt);font-size:14px;font-weight:600;cursor:pointer}
-
-/* ── Type badge ──────────────────────────────────────────────────────── */
-.type-badge{display:inline-flex;padding:2px 7px;border-radius:5px;font-size:10px;
-  font-weight:600;background:rgba(255,255,255,.07);color:var(--hint);flex-shrink:0}
-
-/* ── Recents ─────────────────────────────────────────────────────────── */
-.recent-item{display:flex;align-items:center;padding:9px 14px;gap:10px;cursor:pointer;
-  transition:background .12s;border-bottom:1px solid rgba(255,255,255,.03)}
-.recent-item:active{background:rgba(255,255,255,.03)}
-.recent-icon{font-size:18px;width:32px;text-align:center;flex-shrink:0;color:var(--hint)}
-.recent-body{flex:1;min-width:0}
-.recent-name{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.recent-sub{font-size:11px;color:var(--hint);margin-top:1px}
-
-/* ── Skeleton ────────────────────────────────────────────────────────── */
+/* ── Skeleton ──────────────────────────────────────────────────────── */
 @keyframes shimmer{0%{background-position:-300px 0}100%{background-position:300px 0}}
-.skeleton{background:linear-gradient(90deg,var(--bg2) 0%,rgba(255,255,255,.06) 50%,var(--bg2) 100%);
-  background-size:600px 100%;animation:shimmer 1.4s infinite linear;border-radius:4px;display:block}
-.skeleton-text{height:14px;margin:5px 0}
+.skel{background:linear-gradient(90deg,var(--bg2) 0%,rgba(255,255,255,.06) 50%,var(--bg2) 100%);
+  background-size:600px 100%;animation:shimmer 1.4s infinite linear;border-radius:6px}
+.skel-cell{display:flex;align-items:center;padding:11px 16px;gap:12px;background:var(--bg2)}
+.skel-icon{width:38px;height:38px;border-radius:9px}
+.skel-line{height:13px;flex:1}
+.skel-line.short{max-width:120px;margin-top:6px}
+
+/* ── Inline notice ─────────────────────────────────────────────────── */
+.notice{padding:12px 16px;font-size:13px;color:var(--hint);background:var(--bg2);
+  margin:0 0 8px;border-left:3px solid var(--warn)}
+.notice b{color:var(--text)}
 </style>
 </head>
 <body>
+
 <div id="app">
+  <header class="app-header">
+    <button id="hdr-back" class="back-btn" style="display:none" onclick="goBack()" aria-label="Volver">‹</button>
+    <div class="title-block">
+      <div id="hdr-title" class="title">Repuestos</div>
+      <div id="hdr-sub"   class="subtitle">@antarfood_mant_bot</div>
+    </div>
+    <div id="status" class="status s-loading">cargando</div>
+  </header>
 
-  <!-- ══ LOADING SCREEN ═══════════════════════════════════════════════ -->
-  <div id="loading-screen">
-    <div class="loader"></div>
-    <div id="loading-msg">Autenticando…</div>
-    <button id="loading-retry" onclick="location.reload()">Reintentar</button>
-  </div>
+  <main id="content">
+    <div id="view-favorites" class="view active"></div>
+    <div id="view-search"    class="view"></div>
+    <div id="view-catalog"   class="view"></div>
+    <div id="view-machine"   class="view"></div>
+    <div id="view-repuesto"  class="view"></div>
+  </main>
 
-  <!-- ══ MAIN APP ══════════════════════════════════════════════════════ -->
-  <div id="main-app" style="display:none">
-    <header>
-      <div class="logo">
-        <div class="logo-icon">🔩</div>
-        <div class="logo-text">
-          Repuestos
-          <div class="logo-sub">@antarfood_mant_bot</div>
-        </div>
-      </div>
-      <div id="status-dot" class="status-dot s-loading">cargando</div>
-    </header>
-
-    <div id="content">
-
-      <!-- ── SEARCH VIEW ────────────────────────────────────────────── -->
-      <div id="view-search" class="view">
-        <div class="search-bar">
-          <div class="search-wrap">
-            <span class="search-icon">🔍</span>
-            <input id="search-input" class="search-input" type="search" autocomplete="off"
-              autocorrect="off" spellcheck="false"
-              placeholder="SAP, nombre, código fabricante…">
-            <button id="search-clear" class="search-clear" tabindex="-1">✕</button>
-          </div>
-        </div>
-        <div id="search-body"></div>
-      </div>
-
-      <!-- ── CATALOG VIEW ───────────────────────────────────────────── -->
-      <div id="view-catalog" class="view">
-        <div id="cat-chips" class="chips-row"></div>
-        <div id="machines-list" class="machines-list"></div>
-      </div>
-
-      <!-- ── MACHINE DETAIL VIEW ────────────────────────────────────── -->
-      <div id="view-machine" class="view">
-        <div id="machine-hero" class="detail-hero">
-          <button class="detail-back-btn" onclick="goBack()" aria-label="Volver">◀</button>
-          <div class="detail-title" id="machine-title">—</div>
-          <button id="machine-fav-btn" class="detail-fav-btn" onclick="onMachineFavTap()">⭐</button>
-        </div>
-        <div id="machine-info"></div>
-        <div id="machine-reps-section"></div>
-      </div>
-
-      <!-- ── REPUESTO DETAIL VIEW ───────────────────────────────────── -->
-      <div id="view-repuesto" class="view">
-        <div id="rep-detail-hero" class="detail-hero">
-          <button class="detail-back-btn" onclick="goBack()" aria-label="Volver">◀</button>
-          <div id="rep-detail-title" class="detail-title">—</div>
-          <button id="rep-fav-btn" class="detail-fav-btn" onclick="onRepFavTap()">⭐</button>
-        </div>
-        <div id="rep-detail-body"></div>
-      </div>
-
-      <!-- ── HOME (FAVORITES) VIEW — TAB 1 ───────────────────────────── -->
-      <div id="view-favorites" class="view active">
-        <div id="fav-body"></div>
-      </div>
-
-    </div><!-- /content -->
-
-    <nav class="bottom-nav">
-      <button class="nav-btn active" id="nav-favorites" onclick="switchTab('favorites')">
-        <span class="icon">⭐</span>Inicio
-      </button>
-      <button class="nav-btn" id="nav-search" onclick="switchTab('search')">
-        <span class="icon">🔍</span>Buscar
-      </button>
-      <button class="nav-btn" id="nav-catalog" onclick="switchTab('catalog')">
-        <span class="icon">🏭</span>Catálogo
-      </button>
-    </nav>
-  </div>
-
+  <nav class="bottom-nav">
+    <button class="nav-btn active" id="nav-favorites" onclick="switchTab('favorites')">
+      <span class="icon">⭐</span>Favoritos
+    </button>
+    <button class="nav-btn" id="nav-search" onclick="switchTab('search')">
+      <span class="icon">🔍</span>Buscar
+    </button>
+    <button class="nav-btn" id="nav-catalog" onclick="switchTab('catalog')">
+      <span class="icon">🏭</span>Catálogo
+    </button>
+  </nav>
 </div>
 
-<!-- ══ LIGHTBOX ═════════════════════════════════════════════════════════ -->
+<div id="loading">
+  <div class="loader"></div>
+  <div id="loading-msg">Autenticando…</div>
+  <button id="loading-retry" onclick="location.reload()">Reintentar</button>
+</div>
+
 <div id="lightbox" onclick="closeLightbox()">
   <button class="lbx-close" onclick="closeLightbox()">✕</button>
-  <img id="lightbox-img" src="" alt="">
-  <div id="lightbox-caption" class="lbx-caption"></div>
-</div>
-
-<!-- ══ BOTTOM SHEET ═════════════════════════════════════════════════════ -->
-<div id="sheet-overlay" onclick="closeSheet()"></div>
-<div id="sheet">
-  <div class="sheet-handle"></div>
-  <div id="sheet-title" class="sheet-title">Guardar en lista</div>
-  <div id="sheet-content"></div>
-</div>
-
-<!-- ══ INPUT MODAL ══════════════════════════════════════════════════════ -->
-<div id="input-modal">
-  <div class="modal-backdrop" onclick="closeModal()"></div>
-  <div class="modal-box">
-    <div id="modal-title" class="modal-title">Nueva lista</div>
-    <input id="modal-input" type="text" placeholder="Nombre de la lista" maxlength="40">
-    <div class="modal-btns">
-      <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
-      <button class="btn-ok" id="modal-ok">Crear</button>
-    </div>
-  </div>
+  <img id="lbx-img" src="" alt="">
+  <div id="lbx-cap" class="lbx-cap"></div>
 </div>
 
 <script>
@@ -399,7 +257,7 @@ header .logo-sub{font-size:10px;font-weight:400;color:var(--hint)}
 // CONFIG
 // ═══════════════════════════════════════════════════════════════════
 const CF_BASE = 'https://us-central1-mantenimiento-planta-771a3.cloudfunctions.net'
-const MAX_RECENTS = 8
+const MAX_RECENTS = 10
 
 firebase.initializeApp({
   apiKey: "AIzaSyBsJSh6x3ZGEyuXsM18dSWsJKyU7--KJss",
@@ -409,194 +267,144 @@ firebase.initializeApp({
 })
 const db   = firebase.firestore()
 const auth = firebase.auth()
-
 const tgApp = window.Telegram?.WebApp
+
+// ═══════════════════════════════════════════════════════════════════
+// VIEWPORT — fix scroll en Telegram WebView
+// ═══════════════════════════════════════════════════════════════════
+function setVH(){
+  const h = tgApp?.viewportStableHeight || tgApp?.viewportHeight || window.innerHeight
+  document.documentElement.style.setProperty('--vh', h + 'px')
+}
+setVH()
+tgApp?.onEvent?.('viewportChanged', setVH)
+window.addEventListener('resize', setVH)
 
 // ═══════════════════════════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════════════════════════
-let uid          = null
-let userRole     = 'usuario'   // 'admin' | 'supervisor' | 'tecnico' | 'usuario'
-let isAuthorized = false
-let isLinked     = false       // true si la cuenta TG está vinculada a un usuario PWA
-let firstName    = ''
-let currentTab   = 'favorites'
+let uid = null, userRole = 'usuario', isAuthorized = false, isLinked = false, firstName = ''
+let currentTab = 'favorites'
+let navStack = []   // [{viewId, title, subtitle, scrollTop}]
 
-// Navigation stack: [{view, machineId?, repuestoId?}]
-let navStack     = []
+let machines = [], machineMap = {}
+let categories = [], allCategoriesMap = {}, categoryDescendants = {}
+let repCache = {}              // machineId → repuesto[]
+let prefs = { favoriteLists: [], repuestoFavLists: {} }
+let machineLinkedNodes = {}    // machineId → [hierarchyNodeId]
+let nodeNameCache = {}         // nodeId → resolved name
 
-// Data cache
-let machines     = []          // sorted by orden
-let machineMap   = {}          // id → machine
-let categories   = []          // top-level only (for chips)
-let allCategoriesMap = {}      // id → category (full tree)
-let categoryDescendants = {}   // topLevelId → Set([topLevelId + descendants])
-let repCache     = {}          // machineId → repuesto[]
-let prefs        = { favoriteLists: [], repuestoFavLists: {}, bodegaWatchlist: [] }
-
-// Active filters
 let activeCatFilter = 'all'
-
-// Filtro activo de tag favorito en vista de máquina (null = "Todos")
 let activeMachineRepFilter = null
-
-// Cache: machineId → array de hierarchy nodeIds que apuntan a esta máquina (linkedMachineId)
-// Necesario porque repuestoFavLists está indexado por nodeId, no por machineId
-let machineLinkedNodes = {}
-
-// Search
-let searchTimer  = null
-
-// Recents (localStorage)
-let recentIds    = []          // [{ machineId, repuestoId, name, code, ts }]
-
-// Bottom-sheet context
-let sheetCtx     = null        // { type:'machine'|'repuesto', machineId, repuestoId? }
+let recentIds = []
+let searchTimer = null
 
 // ═══════════════════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════════════════
-async function init() {
+async function init(){
   tgApp?.ready()
   tgApp?.expand()
-  tgApp?.enableClosingConfirmation()
-  tgApp?.BackButton.onClick(goBack)
 
   loadRecents()
   setLoadingMsg('Autenticando…')
 
   const initData = tgApp?.initData
   if (!initData) {
-    setLoadingError('Abrí esta app desde el bot @antarfood_mant_bot en Telegram.')
+    setLoadingError('Abrí esta app desde el bot @antarfood_mant_bot.')
     return
   }
-
   try {
-    // Mint Firebase custom token
     const resp = await fetch(`${CF_BASE}/mintTelegramAuthToken`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ initData }),
     })
     if (!resp.ok) {
-      const err = await resp.json().catch(() => ({}))
-      setLoadingError(err.error || `Error ${resp.status} al autenticar`)
+      const err = await resp.json().catch(()=>({}))
+      setLoadingError(err.error || `Error ${resp.status}`)
       return
     }
     const data = await resp.json()
-
-    // Sign in with Firebase custom token
     setLoadingMsg('Iniciando sesión…')
     await auth.signInWithCustomToken(data.token)
-    uid          = data.uid
-    userRole     = data.role     || 'usuario'
+    uid = data.uid
+    userRole = data.role || 'usuario'
     isAuthorized = data.authorized
-    isLinked     = data.isLinked || false
-    firstName    = data.firstName || tgApp?.initDataUnsafe?.user?.first_name || ''
+    isLinked = data.isLinked || false
+    firstName = data.firstName || tgApp?.initDataUnsafe?.user?.first_name || ''
 
     if (!isAuthorized) {
-      setLoadingError('Tu grupo de Telegram no está autorizado para usar esta app. Contactá al administrador.')
+      setLoadingError('Tu grupo de Telegram no está autorizado. Contactá al administrador.')
       return
     }
-
     setLoadingMsg('Cargando datos…')
     await Promise.all([loadCategories(), loadMachines(), loadPrefs()])
-    showMainApp()
-
+    showApp()
   } catch (err) {
     console.error('init error', err)
     setLoadingError('Error de conexión: ' + (err.message || 'desconocido'))
   }
 }
 
-function setLoadingMsg(msg) {
-  document.getElementById('loading-msg').textContent = msg
-  document.getElementById('loading-retry').style.display = 'none'
-}
-function setLoadingError(msg) {
-  document.getElementById('loading-msg').textContent = msg
-  document.getElementById('loading-retry').style.display = 'block'
-}
+function setLoadingMsg(m){ document.getElementById('loading-msg').textContent = m
+  document.getElementById('loading-retry').style.display='none' }
+function setLoadingError(m){ document.getElementById('loading-msg').textContent = m
+  document.getElementById('loading-retry').style.display='block' }
 
-function showMainApp() {
-  document.getElementById('loading-screen').style.display = 'none'
-  document.getElementById('main-app').style.display = 'flex'
-  document.getElementById('main-app').style.flexDirection = 'column'
-  setStatus('ok', isAuthorized ? `${tgApp?.initDataUnsafe?.user?.first_name || 'Usuario'}` : 'solo lectura')
-
-  // Initial render
-  renderSearch('')
-  renderCatalog()
+function showApp(){
+  document.getElementById('loading').style.display = 'none'
+  setStatus('ok', isAuthorized ? 'conectado' : 'sólo lectura')
   renderFavorites()
+  renderCatalog()
+  renderSearchEmpty()
 }
 
-function setStatus(type, label) {
-  const dot = document.getElementById('status-dot')
-  dot.className = 'status-dot ' + (type === 'ok' ? 's-ok' : type === 'err' ? 's-err' : 's-loading')
-  dot.textContent = label || ''
+function setStatus(type, label){
+  const el = document.getElementById('status')
+  el.className = 'status ' + (type==='ok'?'s-ok':type==='err'?'s-err':'s-loading')
+  el.textContent = label
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// DATA LOADING
+// DATA
 // ═══════════════════════════════════════════════════════════════════
-async function loadCategories() {
+async function loadCategories(){
   const snap = await db.collection('machineCategories').get()
-  window.__debugRawCats = snap.size
-  const allCats = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+  const all = snap.docs.map(d => ({id:d.id, ...d.data()}))
     .filter(c => c.activa !== false && c.visible !== false)
-  allCategoriesMap = Object.fromEntries(allCats.map(c => [c.id, c]))
-  categories = allCats
-    .filter(c => !c.parentId)
-    .sort((a, b) => (a.orden || 0) - (b.orden || 0))
-  // Build descendants map: for each top-level cat, set of all descendant IDs (incl. self)
+  allCategoriesMap = Object.fromEntries(all.map(c => [c.id, c]))
+  categories = all.filter(c => !c.parentId).sort((a,b) => (a.orden||0) - (b.orden||0))
   categoryDescendants = {}
   for (const top of categories) {
     const set = new Set([top.id])
     const stack = [top.id]
-    while (stack.length) {
-      const parentId = stack.pop()
-      for (const c of allCats) {
-        if (c.parentId === parentId && !set.has(c.id)) {
-          set.add(c.id)
-          stack.push(c.id)
-        }
-      }
+    while (stack.length){
+      const p = stack.pop()
+      for (const c of all) if (c.parentId === p && !set.has(c.id)){ set.add(c.id); stack.push(c.id) }
     }
     categoryDescendants[top.id] = set
   }
-  window.__debugFilteredCats = categories.length
 }
 
-async function loadMachines() {
-  try {
-    const snap = await db.collection('machines').get()
-    window.__debugRawMachines = snap.size
-    // Mostrar TODAS (activas + archivadas) — la badge "Archivada" se renderiza aparte
-    machines = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      .sort((a, b) => {
-        // Activas primero, luego por orden
-        const aActive = a.activa !== false ? 0 : 1
-        const bActive = b.activa !== false ? 0 : 1
-        if (aActive !== bActive) return aActive - bActive
-        return (a.orden || 0) - (b.orden || 0)
-      })
-    machineMap = Object.fromEntries(machines.map(m => [m.id, m]))
-    window.__debugFilteredMachines = machines.length
-  } catch (e) {
-    window.__debugMachinesErr = String(e?.message || e)
-    throw e
-  }
+async function loadMachines(){
+  const snap = await db.collection('machines').get()
+  machines = snap.docs.map(d => ({id:d.id, ...d.data()})).sort((a,b) => {
+    const aA = a.activa !== false ? 0 : 1
+    const bA = b.activa !== false ? 0 : 1
+    if (aA !== bA) return aA - bA
+    return (a.orden||0) - (b.orden||0)
+  })
+  machineMap = Object.fromEntries(machines.map(m => [m.id, m]))
 }
 
-async function loadRepuestos(machineId) {
+async function loadRepuestos(machineId){
   if (repCache[machineId]) return repCache[machineId]
-  const snap = await db.collection(`machines/${machineId}/repuestos`)
-    .orderBy('codigoSAP').get()
-  repCache[machineId] = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+  const snap = await db.collection(`machines/${machineId}/repuestos`).orderBy('codigoSAP').get()
+  repCache[machineId] = snap.docs.map(d => ({id:d.id, ...d.data()}))
   return repCache[machineId]
 }
 
-async function loadPrefs() {
+async function loadPrefs(){
   if (!uid) return
   const doc = await db.collection('user_preferences').doc(uid).get()
   if (doc.exists) {
@@ -604,916 +412,669 @@ async function loadPrefs() {
     prefs = {
       favoriteLists:    d.favoriteLists    || [],
       repuestoFavLists: d.repuestoFavLists || {},
-      bodegaWatchlist:  d.bodegaWatchlist  || [],
     }
   }
 }
 
-/**
- * Busca los hierarchy nodes que linkean a una máquina (linkedMachineId == machineId)
- * y devuelve sus IDs. Cachea el resultado.
- * Necesario porque repuestoFavLists del PWA está indexado por hierarchy nodeId.
- */
-async function getLinkedNodeIds(machineId) {
+async function getLinkedNodeIds(machineId){
   if (machineLinkedNodes[machineId]) return machineLinkedNodes[machineId]
   try {
-    const snap = await db.collection('hierarchy')
-      .where('linkedMachineId', '==', machineId)
-      .get()
+    const snap = await db.collection('hierarchy').where('linkedMachineId','==',machineId).get()
     const ids = snap.docs.map(d => d.id)
     machineLinkedNodes[machineId] = ids
     return ids
-  } catch (e) {
-    console.warn('getLinkedNodeIds error', e)
-    machineLinkedNodes[machineId] = []
-    return []
-  }
+  } catch(e){ machineLinkedNodes[machineId] = []; return [] }
 }
 
-/**
- * Devuelve las RepuestoFavList del usuario para una máquina, fusionando
- * todas las del hierarchy. Cada entrada es { name, repuestoIds }.
- * Si hay listas con el mismo nombre en varios nodes, se mergean los IDs.
- */
-async function getMachineFavListsMerged(machineId) {
+async function getMachineFavListsMerged(machineId){
   const repFavLists = prefs.repuestoFavLists || {}
   const nodeIds = await getLinkedNodeIds(machineId)
-  // También chequear directamente por machineId por si se creó así desde la Mini App
   const keys = [...nodeIds, machineId]
-  const merged = new Map() // name → Set(repuestoIds)
-  for (const k of keys) {
-    const lists = repFavLists[k] || []
-    for (const l of lists) {
+  const merged = new Map()
+  for (const k of keys){
+    for (const l of (repFavLists[k] || [])) {
       if (!merged.has(l.name)) merged.set(l.name, new Set())
-      const set = merged.get(l.name)
-      ;(l.repuestoIds || []).forEach(id => set.add(id))
+      ;(l.repuestoIds || []).forEach(id => merged.get(l.name).add(id))
     }
   }
-  return Array.from(merged.entries()).map(([name, set]) => ({
-    name,
-    repuestoIds: Array.from(set),
-  }))
+  return Array.from(merged.entries()).map(([name, set]) => ({name, repuestoIds: Array.from(set)}))
 }
 
-/**
- * ¿Pertenece este repuesto a la lista (por nombre) en favoritos?
- * Matchea por id directo, o por convención inv-{codigoSAP}, o por codigoSAP.
- */
-function matchesRepFavList(rep, repIdSet) {
-  if (repIdSet.has(rep.id)) return true
-  if (rep.codigoSAP && repIdSet.has(`inv-${rep.codigoSAP}`)) return true
-  if (rep.codigoSAP && repIdSet.has(rep.codigoSAP)) return true
+function matchesRepFavList(rep, idSet){
+  if (idSet.has(rep.id)) return true
+  if (rep.codigoSAP && idSet.has(`inv-${rep.codigoSAP}`)) return true
+  if (rep.codigoSAP && idSet.has(rep.codigoSAP)) return true
   return false
 }
 
-async function savePrefs() {
-  if (!uid) return
-  await db.collection('user_preferences').doc(uid).set({
-    favoriteLists:    prefs.favoriteLists,
-    repuestoFavLists: prefs.repuestoFavLists,
-    bodegaWatchlist:  prefs.bodegaWatchlist,
-    updatedAt:        firebase.firestore.FieldValue.serverTimestamp(),
-  }, { merge: true })
+async function resolveNodeName(nodeId){
+  if (nodeNameCache[nodeId]) return nodeNameCache[nodeId]
+  try {
+    const snap = await db.collection('hierarchy').doc(nodeId).get()
+    if (snap.exists){
+      const d = snap.data()
+      const name = (d.linkedMachineId && machineMap[d.linkedMachineId]?.nombre)
+        || d.nombre || d.name || nodeId
+      nodeNameCache[nodeId] = name
+      return name
+    }
+  } catch {}
+  nodeNameCache[nodeId] = nodeId
+  return nodeId
 }
 
 // ═══════════════════════════════════════════════════════════════════
 // NAVIGATION
 // ═══════════════════════════════════════════════════════════════════
-function getContentEl() {
-  return document.getElementById('content')
+function getContent(){ return document.getElementById('content') }
+
+function setHeader(title, subtitle, withBack){
+  document.getElementById('hdr-title').textContent = title
+  document.getElementById('hdr-sub').textContent = subtitle || ''
+  document.getElementById('hdr-back').style.display = withBack ? 'flex' : 'none'
+  document.getElementById('hdr-sub').style.display = subtitle ? 'block' : 'none'
 }
 
-function switchTab(tab) {
-  // Cambiar de tab descarta el stack — el tab siempre está en su raíz
+function tabHeader(tab){
+  if (tab === 'favorites') setHeader('Repuestos','@antarfood_mant_bot', false)
+  else if (tab === 'search') setHeader('Buscar','SAP, nombre, código…', false)
+  else if (tab === 'catalog') setHeader('Catálogo', `${machines.length} equipos`, false)
+}
+
+function switchTab(tab){
   navStack = []
   currentTab = tab
-  tgApp?.BackButton.hide()
-
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'))
   document.getElementById(`nav-${tab}`).classList.add('active')
-
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'))
   document.getElementById(`view-${tab}`).classList.add('active')
-
-  // Reset scroll al cambiar de tab
-  const c = getContentEl()
-  if (c) c.scrollTop = 0
-
+  tabHeader(tab)
+  getContent().scrollTop = 0
   if (tab === 'favorites') renderFavorites()
 }
 
-function pushView(viewId, options = {}) {
-  // Guardar la vista anterior + scroll para restaurarlo al hacer back
-  const prevId = currentViewId()
-  const c = getContentEl()
-  navStack.push({
-    viewId: prevId,
-    scrollTop: c ? c.scrollTop : 0,
-    options: {},
-  })
-  showView(viewId, options)
-  // Forward = scroll a top
-  if (c) c.scrollTop = 0
-  tgApp?.BackButton.show()
-}
-
-function currentViewId() {
-  const active = document.querySelector('.view.active')
-  return active?.id || `view-${currentTab}`
-}
-
-function showView(viewId, options = {}) {
+function pushView(viewId, title, subtitle){
+  const c = getContent()
+  const prevId = document.querySelector('.view.active')?.id || `view-${currentTab}`
+  navStack.push({viewId: prevId, scrollTop: c.scrollTop})
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'))
-  document.getElementById(viewId)?.classList.add('active')
+  document.getElementById(viewId).classList.add('active')
+  setHeader(title, subtitle, true)
+  c.scrollTop = 0
 }
 
-function goBack() {
+function goBack(){
   if (navStack.length === 0) return
   const prev = navStack.pop()
-  showView(prev.viewId)
-  // Restaurar scroll de la vista anterior
-  const c = getContentEl()
-  if (c) c.scrollTop = prev.scrollTop || 0
-  if (navStack.length === 0) tgApp?.BackButton.hide()
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'))
+  document.getElementById(prev.viewId).classList.add('active')
+  if (navStack.length === 0) tabHeader(currentTab)
+  // Restore scroll
+  requestAnimationFrame(() => { getContent().scrollTop = prev.scrollTop || 0 })
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// SEARCH VIEW
-// ═══════════════════════════════════════════════════════════════════
-const searchInput = document.getElementById('search-input')
-const searchClear = document.getElementById('search-clear')
+// Telegram BackButton
+tgApp?.BackButton?.onClick(() => { if (navStack.length) goBack() })
 
-searchInput.addEventListener('input', () => {
-  const q = searchInput.value.trim()
-  searchClear.classList.toggle('show', q.length > 0)
-  clearTimeout(searchTimer)
-  if (q.length === 0) { renderSearch(''); return }
-  if (q.length < 2) return
-  searchTimer = setTimeout(() => renderSearch(q), 300)
-})
-searchClear.addEventListener('click', () => {
-  searchInput.value = ''
-  searchClear.classList.remove('show')
-  renderSearch('')
-})
+// ═══════════════════════════════════════════════════════════════════
+// FAVORITES VIEW
+// ═══════════════════════════════════════════════════════════════════
+async function renderFavorites(){
+  const el = document.getElementById('view-favorites')
+  const { favoriteLists, repuestoFavLists } = prefs
 
-function renderSearch(query) {
-  const body = document.getElementById('search-body')
-  if (!query) {
-    body.innerHTML = renderRecents()
-    return
-  }
-  const q = query.toUpperCase()
-  // Search across all cached repuestos first, then load remaining machines
-  const results = []
-  for (const [machineId, reps] of Object.entries(repCache)) {
-    const machine = machineMap[machineId]
-    for (const r of reps) {
-      if (matchesRepuesto(r, q)) results.push({ r, machine, machineId })
+  let html = ''
+
+  // Greeting
+  const name = firstName || tgApp?.initDataUnsafe?.user?.first_name || ''
+  const hello = name ? `Hola, ${escHtml(name)} 👋` : 'Hola 👋'
+  const role = ({admin:'Admin',supervisor:'Supervisor',tecnico:'Técnico',usuario:'Solo lectura'})[userRole] || userRole
+  const linkTag = isLinked
+    ? `<span class="tag green">vinculado</span>`
+    : `<span class="tag warn">solo Telegram</span>`
+  html += `<div class="hello">
+    <div class="hello-text">${hello}</div>
+    <div class="hello-sub">${escHtml(role)} ${linkTag}</div>
+  </div>`
+
+  // Machine lists
+  html += `<div class="section">
+    <span class="section-title">Listas de equipos</span>
+    <span class="section-count">${favoriteLists.length}</span>
+  </div>`
+
+  if (favoriteLists.length === 0){
+    html += `<div class="notice">Sin listas guardadas. Creá listas de equipos desde la <b>app principal</b> para verlas aquí.</div>`
+  } else {
+    for (const list of favoriteLists){
+      const ids = list.machineIds || []
+      html += `<div class="cell-group">
+        <div class="cell" onclick="openMachineList(${escHtml(JSON.stringify(list.name))})">
+          <div class="cell-icon">📋</div>
+          <div class="cell-body">
+            <div class="cell-title">${escHtml(list.name)}</div>
+            <div class="cell-sub">${ids.length} equipo(s)</div>
+          </div>
+          <div class="cell-chevron">›</div>
+        </div>`
+      // Show first 4 machines as preview cells
+      const preview = ids.slice(0,4)
+      for (const id of preview){
+        const m = machineMap[id]
+        const name = list.machineNames?.[id] || m?.nombre || id
+        const archived = m && m.activa === false
+        html += `<div class="cell" onclick="openMachine('${escHtmlAttr(id)}')">
+          <div class="cell-icon" style="background:${m?.color || '#5288c1'}22;color:${m?.color || '#5288c1'}">🏭</div>
+          <div class="cell-body">
+            <div class="cell-title">${escHtml(name)}</div>
+            ${m ? `<div class="cell-sub">${escHtml([m.marca, m.modelo].filter(Boolean).join(' · ') || 'Equipo')}</div>` : `<div class="cell-sub">No disponible</div>`}
+          </div>
+          ${archived ? `<span class="cell-badge muted">Archivada</span>` : ''}
+          <div class="cell-chevron">›</div>
+        </div>`
+      }
+      if (ids.length > 4){
+        html += `<div class="cell" onclick="openMachineList(${escHtml(JSON.stringify(list.name))})">
+          <div class="cell-icon" style="background:transparent">⋯</div>
+          <div class="cell-body">
+            <div class="cell-title" style="color:var(--accent);font-size:14px">Ver ${ids.length - 4} equipo(s) más</div>
+          </div>
+          <div class="cell-chevron">›</div>
+        </div>`
+      }
+      html += `</div>`
     }
   }
-  if (results.length === 0 && Object.keys(repCache).length < machines.length) {
-    // Load all machines asynchronously and re-render
-    body.innerHTML = `<div class="empty-state"><div class="loader"></div><div class="empty-sub">Buscando…</div></div>`
-    loadAllRepuestosAndSearch(query)
-    return
+
+  // Repuesto fav lists per machine/node
+  const repKeys = Object.keys(repuestoFavLists).filter(k => repuestoFavLists[k]?.length > 0)
+  if (repKeys.length > 0){
+    // Resolve node names for unknown keys (parallel)
+    await Promise.all(repKeys.filter(k => !machineMap[k]).map(resolveNodeName))
+
+    html += `<div class="section">
+      <span class="section-title">Repuestos guardados</span>
+      <span class="section-count">${repKeys.length}</span>
+    </div>`
+
+    for (const key of repKeys){
+      const m = machineMap[key]
+      const machineName = m?.nombre || nodeNameCache[key] || key
+      const lists = repuestoFavLists[key] || []
+      const total = lists.reduce((s,l) => s + (l.repuestoIds?.length || 0), 0)
+      // Resolved machineId for navigation: if key is nodeId, find linkedMachineId
+      const targetMachineId = m ? key : await getMachineIdFromNode(key)
+      html += `<div class="cell-group">
+        <div class="cell" onclick="${targetMachineId ? `openMachine('${escHtmlAttr(targetMachineId)}')` : ''}">
+          <div class="cell-icon" style="background:${m?.color || '#5288c1'}22;color:${m?.color || '#5288c1'}">🔩</div>
+          <div class="cell-body">
+            <div class="cell-title">${escHtml(machineName)}</div>
+            <div class="cell-sub">${total} repuesto(s) · ${lists.length} lista(s)</div>
+          </div>
+          <div class="cell-chevron">›</div>
+        </div>
+      </div>`
+    }
   }
-  if (results.length === 0) {
-    body.innerHTML = `<div class="empty-state">
-      <div class="empty-icon">🔍</div>
-      <div class="empty-title">Sin resultados</div>
-      <div class="empty-sub">No hay repuestos que coincidan con "<b>${escHtml(query)}</b>"</div></div>`
-    return
-  }
-  results.sort((a, b) => {
-    // Prioritize SAP code exact match
-    if (a.r.codigoSAP?.toUpperCase() === q) return -1
-    if (b.r.codigoSAP?.toUpperCase() === q) return 1
-    return 0
-  })
-  body.innerHTML = `
-    <div class="section-hdr">
-      <span class="section-title">Resultados</span>
-      <span class="section-count">${results.length}</span>
+
+  el.innerHTML = html
+}
+
+async function getMachineIdFromNode(nodeId){
+  try {
+    const snap = await db.collection('hierarchy').doc(nodeId).get()
+    if (snap.exists) return snap.data().linkedMachineId || null
+  } catch {}
+  return null
+}
+
+// Open a "machine list" — show all machines from a favoriteList
+function openMachineList(listName){
+  const list = prefs.favoriteLists.find(l => l.name === listName)
+  if (!list) return
+  const ids = list.machineIds || []
+  const mList = ids.map(id => ({...(machineMap[id] || {}), id, _name: list.machineNames?.[id] || machineMap[id]?.nombre || id}))
+  pushView('view-machine', list.name, `${ids.length} equipo(s)`)
+  const el = document.getElementById('view-machine')
+  el.innerHTML = `
+    <div class="cell-group">
+      ${mList.map(m => {
+        const archived = m.activa === false
+        return `<div class="cell" onclick="openMachine('${escHtmlAttr(m.id)}')">
+          <div class="cell-icon" style="background:${m.color || '#5288c1'}22;color:${m.color || '#5288c1'}">🏭</div>
+          <div class="cell-body">
+            <div class="cell-title">${escHtml(m._name)}</div>
+            <div class="cell-sub">${escHtml([m.marca, m.modelo].filter(Boolean).join(' · ') || 'Equipo')}</div>
+          </div>
+          ${archived ? `<span class="cell-badge muted">Archivada</span>` : ''}
+          <div class="cell-chevron">›</div>
+        </div>`
+      }).join('')}
     </div>
-    ${results.map(({ r, machine, machineId }) => repItemHtml(r, machineId, machine?.nombre)).join('')}`
-}
-
-async function loadAllRepuestosAndSearch(query) {
-  const unloaded = machines.filter(m => !repCache[m.id])
-  await Promise.all(unloaded.map(m => loadRepuestos(m.id)))
-  if (document.getElementById('search-input').value.trim().toUpperCase().includes(query.toUpperCase())) {
-    renderSearch(query)
-  }
-}
-
-function matchesRepuesto(r, q) {
-  return (r.codigoSAP      || '').toUpperCase().includes(q)
-    || (r.textoBreve        || '').toUpperCase().includes(q)
-    || (r.descripcion       || '').toUpperCase().includes(q)
-    || (r.alias             || '').toUpperCase().includes(q)
-    || (r.codigoFabricante  || '').toUpperCase().includes(q)
-    || (r.nombreManual      || '').toUpperCase().includes(q)
-    || (r.tipo              || '').toUpperCase().includes(q)
-}
-
-function repItemHtml(r, machineId, machineName) {
-  const isFav = isRepFav(machineId, r.id)
-  const icon  = repIcon(r.tipo)
-  const meta  = [machineName, r.tipo, r.seccion].filter(Boolean).join(' · ')
-  return `<div class="rep-item" onclick="openRepuesto('${machineId}','${r.id}')">
-    <div class="rep-icon-box">${icon}</div>
-    <div class="rep-body">
-      <div class="rep-name">${escHtml(r.textoBreve || r.descripcion || r.alias || 'Sin nombre')}</div>
-      ${r.codigoSAP ? `<div class="rep-code">SAP: ${escHtml(r.codigoSAP)}</div>` : ''}
-      ${meta ? `<div class="rep-meta">${escHtml(meta)}</div>` : ''}
-    </div>
-    <div class="rep-fav ${isFav ? 'on' : ''}" onclick="event.stopPropagation();toggleRepFavQuick('${machineId}','${r.id}',this)">★</div>
-  </div>`
-}
-
-function repIcon(tipo) {
-  const map = {
-    'RODAMIENTO':'⚙️','SELLO':'🔵','JUNTA':'🔵','SENSOR':'📡','MOTOR':'⚡',
-    'CORREA':'〰️','CADENA':'🔗','VALVULA':'🔧','FILTRO':'🔳','CUCHILLA':'🔪',
-    'ENGRANAJE':'⚙️','BOMBA':'💧',
-  }
-  if (!tipo) return '🔩'
-  const upper = tipo.toUpperCase()
-  for (const [k, v] of Object.entries(map)) if (upper.includes(k)) return v
-  return '🔩'
-}
-
-// ── Recents ──────────────────────────────────────────────────────────
-function loadRecents() {
-  try { recentIds = JSON.parse(localStorage.getItem('mant_recents') || '[]') } catch { recentIds = [] }
-}
-function saveRecent(machineId, repuestoId, name, code) {
-  recentIds = recentIds.filter(r => !(r.machineId === machineId && r.repuestoId === repuestoId))
-  recentIds.unshift({ machineId, repuestoId, name, code, ts: Date.now() })
-  recentIds = recentIds.slice(0, MAX_RECENTS)
-  localStorage.setItem('mant_recents', JSON.stringify(recentIds))
-}
-function renderRecents() {
-  if (recentIds.length === 0) {
-    return `<div class="empty-state">
-      <div class="empty-icon">🔍</div>
-      <div class="empty-title">Buscá repuestos</div>
-      <div class="empty-sub">Buscá por código SAP, nombre o código de fabricante</div></div>`
-  }
-  return `<div class="section-hdr"><span class="section-title">Vistos recientemente</span></div>
-    ${recentIds.map(rec => `
-    <div class="recent-item" onclick="openRepuesto('${rec.machineId}','${rec.repuestoId}')">
-      <div class="recent-icon">🕑</div>
-      <div class="recent-body">
-        <div class="recent-name">${escHtml(rec.name || 'Sin nombre')}</div>
-        <div class="recent-sub">${rec.code ? `SAP: ${escHtml(rec.code)}` : ''} · ${machineMap[rec.machineId]?.nombre || rec.machineId}</div>
-      </div>
-    </div>`).join('')}`
+    ${mList.length === 0 ? emptyHtml('📋','Lista vacía','No hay equipos en esta lista') : ''}
+  `
 }
 
 // ═══════════════════════════════════════════════════════════════════
 // CATALOG VIEW
 // ═══════════════════════════════════════════════════════════════════
-function renderCatalog() {
-  renderCatChips()
-  renderMachineList()
-}
+function renderCatalog(){
+  const el = document.getElementById('view-catalog')
+  const chips = `
+    <div class="chips">
+      <div class="chip ${activeCatFilter==='all'?'active':''}" onclick="setCatFilter('all')">Todos <span class="count">${machines.length}</span></div>
+      ${categories.map(c => {
+        const desc = categoryDescendants[c.id] || new Set([c.id])
+        const count = machines.filter(m => m.categoryId && desc.has(m.categoryId)).length
+        return `<div class="chip ${activeCatFilter===c.id?'active':''}" onclick="setCatFilter('${escHtmlAttr(c.id)}')">${escHtml(c.nombre)} <span class="count">${count}</span></div>`
+      }).join('')}
+    </div>`
 
-function renderCatChips() {
-  const el = document.getElementById('cat-chips')
-  el.innerHTML = `<div class="chip ${activeCatFilter === 'all' ? 'active' : ''}" onclick="setCatFilter('all')">Todas</div>`
-    + categories.map(c => `<div class="chip ${activeCatFilter === c.id ? 'active' : ''}" onclick="setCatFilter('${c.id}')">${escHtml(c.nombre)}</div>`).join('')
-}
-
-function setCatFilter(id) {
-  activeCatFilter = id
-  renderCatChips()
-  renderMachineList()
-}
-
-function renderMachineList() {
-  const el = document.getElementById('machines-list')
   let filtered
-  if (activeCatFilter === 'all') {
-    filtered = machines
-  } else {
-    const descendants = categoryDescendants[activeCatFilter] || new Set([activeCatFilter])
-    filtered = machines.filter(m => m.categoryId && descendants.has(m.categoryId))
+  if (activeCatFilter === 'all') filtered = machines
+  else {
+    const desc = categoryDescendants[activeCatFilter] || new Set([activeCatFilter])
+    filtered = machines.filter(m => m.categoryId && desc.has(m.categoryId))
   }
 
-  if (filtered.length === 0) {
-    el.innerHTML = `<div class="empty-state">
-      <div class="empty-icon">🏭</div>
-      <div class="empty-title">Sin máquinas</div>
-      <div class="empty-sub">No hay máquinas en esta categoría</div></div>`
+  const list = filtered.length === 0
+    ? emptyHtml('🏭','Sin equipos','No hay equipos en esta categoría')
+    : `<div class="cell-group">${filtered.map(machineCellHtml).join('')}</div>`
+
+  el.innerHTML = chips + list
+}
+
+function setCatFilter(id){
+  activeCatFilter = id
+  renderCatalog()
+}
+
+function machineCellHtml(m){
+  const archived = m.activa === false
+  const color = m.color || '#5288c1'
+  const cnt = repCache[m.id]?.length
+  return `<div class="cell" onclick="openMachine('${escHtmlAttr(m.id)}')">
+    <div class="cell-icon" style="background:${color}22;color:${color}">🏭</div>
+    <div class="cell-body">
+      <div class="cell-title">${escHtml(m.nombre)}</div>
+      <div class="cell-sub">${escHtml([m.marca, m.modelo].filter(Boolean).join(' · ') || 'Equipo')}</div>
+    </div>
+    ${cnt != null ? `<span class="cell-badge">${cnt}</span>` : ''}
+    ${archived ? `<span class="cell-badge muted">Archivada</span>` : ''}
+    <div class="cell-chevron">›</div>
+  </div>`
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SEARCH VIEW
+// ═══════════════════════════════════════════════════════════════════
+function renderSearchEmpty(){
+  const el = document.getElementById('view-search')
+  el.innerHTML = `
+    <div class="search-bar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input id="search-input" class="search-input" type="search" autocomplete="off"
+          autocorrect="off" spellcheck="false" placeholder="SAP, nombre, código fabricante…">
+        <button id="search-clear" class="search-clear">✕</button>
+      </div>
+    </div>
+    <div id="search-body"></div>`
+
+  const inp = document.getElementById('search-input')
+  const clr = document.getElementById('search-clear')
+  inp.addEventListener('input', () => {
+    const q = inp.value.trim()
+    clr.classList.toggle('show', q.length > 0)
+    clearTimeout(searchTimer)
+    if (q.length === 0) { renderSearchBody(''); return }
+    if (q.length < 2) return
+    searchTimer = setTimeout(() => renderSearchBody(q), 280)
+  })
+  clr.addEventListener('click', () => { inp.value=''; clr.classList.remove('show'); renderSearchBody('') })
+  renderSearchBody('')
+}
+
+function renderSearchBody(query){
+  const body = document.getElementById('search-body')
+  if (!body) return
+  if (!query){
+    body.innerHTML = renderRecentsHtml()
     return
   }
-  el.innerHTML = filtered.map(m => machineItemHtml(m)).join('')
+  const q = query.toUpperCase()
+  const results = []
+  for (const [machineId, reps] of Object.entries(repCache)){
+    const m = machineMap[machineId]
+    for (const r of reps) if (matchesRepuesto(r, q)) results.push({r, m, machineId})
+  }
+  if (results.length === 0 && Object.keys(repCache).length < machines.length){
+    body.innerHTML = `<div class="empty"><div class="loader"></div><div class="empty-sub">Buscando en todos los equipos…</div></div>`
+    loadAllAndSearch(query)
+    return
+  }
+  if (results.length === 0){
+    body.innerHTML = emptyHtml('🔍','Sin resultados',`No hay repuestos para "<b>${escHtml(query)}</b>"`)
+    return
+  }
+  results.sort((a,b) => {
+    if (a.r.codigoSAP?.toUpperCase() === q) return -1
+    if (b.r.codigoSAP?.toUpperCase() === q) return 1
+    return 0
+  })
+  body.innerHTML = `
+    <div class="section">
+      <span class="section-title">Resultados</span>
+      <span class="section-count">${results.length}</span>
+    </div>
+    <div class="cell-group">
+      ${results.map(({r,m,machineId}) => repCellHtml(r, machineId, m?.nombre)).join('')}
+    </div>`
 }
 
-function machineItemHtml(m) {
-  const reps = repCache[m.id]
-  const count = reps ? reps.length : null
-  const isArchived = m.activa === false
-  const badge = count === null ? '' :
-    count === 0 ? `<span class="machine-badge">Sin repuestos</span>` :
-    `<span class="machine-badge has-rep">${count} repuestos</span>`
-  const archivedBadge = isArchived
-    ? `<span class="machine-badge" style="background:#f59e0b22;color:#f59e0b">Archivada</span>`
-    : ''
-  const colorStyle = `background:${m.color || '#1f6feb'}22;color:${m.color || '#1f6feb'}`
-  const itemStyle = isArchived ? 'opacity:.6' : ''
-  return `<div class="machine-item" style="${itemStyle}" onclick="openMachine('${m.id}')">
-    <div class="machine-color" style="${colorStyle}">🏭</div>
-    <div class="machine-body">
-      <div class="machine-name">${escHtml(m.nombre)}</div>
-      <div class="machine-sub">${escHtml([m.marca, m.modelo].filter(Boolean).join(' · '))}</div>
+async function loadAllAndSearch(query){
+  const unloaded = machines.filter(m => !repCache[m.id])
+  await Promise.all(unloaded.map(m => loadRepuestos(m.id).catch(()=>null)))
+  const inp = document.getElementById('search-input')
+  if (inp && inp.value.trim().toUpperCase().includes(query.toUpperCase())) renderSearchBody(query)
+}
+
+function matchesRepuesto(r, q){
+  return (r.codigoSAP || '').toUpperCase().includes(q)
+    || (r.textoBreve || '').toUpperCase().includes(q)
+    || (r.descripcion || '').toUpperCase().includes(q)
+    || (r.alias || '').toUpperCase().includes(q)
+    || (r.codigoFabricante || '').toUpperCase().includes(q)
+    || (r.nombreManual || '').toUpperCase().includes(q)
+    || (r.tipo || '').toUpperCase().includes(q)
+}
+
+function renderRecentsHtml(){
+  if (recentIds.length === 0){
+    return emptyHtml('🔍','Buscá repuestos','Por código SAP, nombre, alias o código de fabricante')
+  }
+  return `
+    <div class="section">
+      <span class="section-title">Vistos recientemente</span>
+      <span class="section-count">${recentIds.length}</span>
     </div>
-    ${archivedBadge}
-    ${badge}
-  </div>`
+    <div class="cell-group">
+      ${recentIds.map(rec => `
+        <div class="cell" onclick="openRepuesto('${escHtmlAttr(rec.machineId)}','${escHtmlAttr(rec.repuestoId)}')">
+          <div class="cell-icon">🕘</div>
+          <div class="cell-body">
+            <div class="cell-title">${escHtml(rec.name || 'Sin nombre')}</div>
+            <div class="cell-sub">${rec.code ? `SAP: ${escHtml(rec.code)} · ` : ''}${escHtml(machineMap[rec.machineId]?.nombre || rec.machineId)}</div>
+          </div>
+          <div class="cell-chevron">›</div>
+        </div>`).join('')}
+    </div>`
+}
+
+function loadRecents(){
+  try { recentIds = JSON.parse(localStorage.getItem('mant_recents') || '[]') } catch { recentIds = [] }
+}
+function saveRecent(machineId, repuestoId, name, code){
+  recentIds = recentIds.filter(r => !(r.machineId === machineId && r.repuestoId === repuestoId))
+  recentIds.unshift({machineId, repuestoId, name, code, ts: Date.now()})
+  recentIds = recentIds.slice(0, MAX_RECENTS)
+  localStorage.setItem('mant_recents', JSON.stringify(recentIds))
 }
 
 // ═══════════════════════════════════════════════════════════════════
 // MACHINE DETAIL
 // ═══════════════════════════════════════════════════════════════════
-async function openMachine(machineId) {
-  const machine = machineMap[machineId]
-  if (!machine) return
-
-  // Reset filter cuando entrás a una máquina nueva
+async function openMachine(machineId){
+  const m = machineMap[machineId]
+  if (!m) return
   activeMachineRepFilter = null
 
-  // Push current view onto stack
-  pushView('view-machine')
+  pushView('view-machine', m.nombre, [m.marca, m.modelo].filter(Boolean).join(' · '))
 
-  // Header
-  document.getElementById('machine-title').textContent = machine.nombre
+  const el = document.getElementById('view-machine')
+  el.innerHTML = `
+    <div class="info-card">
+      ${[
+        ['Marca', m.marca],
+        ['Modelo', m.modelo],
+        ['Sección', m.seccion],
+        ['Ubicación', m.hierarchyPath],
+        m.activa === false ? ['Estado', 'Archivada'] : null,
+      ].filter(([_,v]) => v).map(([l,v]) => `
+        <div class="info-row">
+          <span class="info-label">${l}</span>
+          <span class="info-value">${escHtml(String(v))}</span>
+        </div>`).join('') || '<div class="info-row"><span class="info-value obs">Sin información adicional</span></div>'}
+    </div>
+    ${m.descripcion ? `
+      <div class="info-card">
+        <div class="info-row">
+          <span class="info-value obs">${escHtml(m.descripcion)}</span>
+        </div>
+      </div>` : ''}
+    <div class="section"><span class="section-title">Repuestos</span><span class="section-count" id="rep-count">…</span></div>
+    <div id="rep-chips"></div>
+    <div id="rep-list">${skeletonCells(5)}</div>
+  `
 
-  // Fav button state
-  const machFavBtn = document.getElementById('machine-fav-btn')
-  machFavBtn.dataset.machineId = machineId
-  updateMachineFavBtn(machineId)
-
-  // Machine info
-  const info = document.getElementById('machine-info')
-  const rows = [
-    machine.marca     ? ['Marca',    machine.marca]     : null,
-    machine.modelo    ? ['Modelo',   machine.modelo]    : null,
-    machine.descripcion ? ['Descripción', machine.descripcion] : null,
-    machine.hierarchyPath ? ['Ubicación', machine.hierarchyPath] : null,
-    machine.activa === false ? ['Estado', 'Archivada'] : null,
-  ].filter(Boolean)
-  info.innerHTML = rows.length ? `
-    <div class="info-section">
-      ${rows.map(([l,v]) => `<div class="info-row">
-        <span class="info-label">${l}</span>
-        <span class="info-value">${escHtml(v)}</span></div>`).join('')}
-    </div>` : ''
-
-  // Repuestos section
-  const repsSection = document.getElementById('machine-reps-section')
-  repsSection.innerHTML = `<div class="section-label">Cargando repuestos…</div>`
-
-  // Cargar repuestos + listas de favoritos en paralelo
+  // Load reps + favLists in parallel
   const [reps, favLists] = await Promise.all([
-    loadRepuestos(machineId),
+    loadRepuestos(machineId).catch(() => []),
     getMachineFavListsMerged(machineId),
   ])
-
-  renderMachineDetailBody(machineId, reps, favLists)
-  renderMachineList()
+  renderMachineBody(machineId, reps, favLists)
 }
 
-/**
- * Renderiza body de view-machine: chips de tags favoritos + listado filtrado.
- * Se reusa al cambiar de filtro sin tener que recargar repuestos.
- */
-function renderMachineDetailBody(machineId, reps, favLists) {
-  const repsSection = document.getElementById('machine-reps-section')
-  const machine = machineMap[machineId]
+function renderMachineBody(machineId, reps, favLists){
+  const m = machineMap[machineId]
+  const countEl = document.getElementById('rep-count')
+  const chipsEl = document.getElementById('rep-chips')
+  const listEl  = document.getElementById('rep-list')
+  if (!listEl) return  // user navigated away
 
-  if (reps.length === 0) {
-    repsSection.innerHTML = `<div class="empty-state">
-      <div class="empty-icon">📭</div>
-      <div class="empty-title">Sin repuestos</div>
-      <div class="empty-sub">Esta máquina no tiene repuestos cargados aún</div></div>`
+  if (reps.length === 0){
+    countEl.textContent = '0'
+    chipsEl.innerHTML = ''
+    listEl.innerHTML = emptyHtml('📭','Sin repuestos','Este equipo no tiene repuestos cargados aún')
     return
   }
 
-  // Filtrar según el chip activo
+  // Filter
   let filtered = reps
-  if (activeMachineRepFilter) {
+  if (activeMachineRepFilter){
     const list = favLists.find(l => l.name === activeMachineRepFilter)
-    if (list) {
+    if (list){
       const idSet = new Set(list.repuestoIds)
       filtered = reps.filter(r => matchesRepFavList(r, idSet))
     }
   }
 
-  // Chips de tags favoritos (sticky bajo el hero, si hay listas)
-  const chipsHtml = favLists.length > 0 ? `
-    <div class="chips-row chips-sticky">
-      <div class="chip ${activeMachineRepFilter === null ? 'active' : ''}"
-           onclick="setMachineRepFilter('${machineId}', null)">
-        Todos <span style="opacity:.6">${reps.length}</span>
+  // Chips
+  if (favLists.length > 0){
+    chipsEl.innerHTML = `<div class="chips">
+      <div class="chip ${activeMachineRepFilter===null?'active':''}" onclick="setMachineRepFilter('${escHtmlAttr(machineId)}', null)">
+        Todos <span class="count">${reps.length}</span>
       </div>
       ${favLists.map(l => {
-        const isActive = activeMachineRepFilter === l.name
-        const matchCount = reps.filter(r => matchesRepFavList(r, new Set(l.repuestoIds))).length
-        return `<div class="chip ${isActive ? 'active' : ''}"
-                     onclick="setMachineRepFilter('${machineId}', ${JSON.stringify(l.name)})">
-          ${escHtml(l.name)} <span style="opacity:.6">${matchCount}</span>
+        const cnt = reps.filter(r => matchesRepFavList(r, new Set(l.repuestoIds))).length
+        return `<div class="chip ${activeMachineRepFilter===l.name?'active':''}"
+                 onclick="setMachineRepFilter('${escHtmlAttr(machineId)}', ${escHtmlAttr(JSON.stringify(l.name))})">
+          ${escHtml(l.name)} <span class="count">${cnt}</span>
         </div>`
       }).join('')}
-    </div>` : ''
+    </div>`
+  } else {
+    chipsEl.innerHTML = ''
+  }
 
-  const headerLabel = activeMachineRepFilter ? `Repuestos · ${escHtml(activeMachineRepFilter)}` : 'Repuestos'
+  countEl.textContent = activeMachineRepFilter ? `${filtered.length}/${reps.length}` : `${reps.length}`
 
-  repsSection.innerHTML = `
-    ${chipsHtml}
-    <div class="section-hdr">
-      <span class="section-title">${headerLabel}</span>
-      <span class="section-count">${filtered.length}${activeMachineRepFilter ? `/${reps.length}` : ''}</span>
-    </div>
-    ${filtered.length === 0
-      ? `<div class="empty-state" style="padding:20px"><div class="empty-sub">Ningún repuesto coincide con esta lista</div></div>`
-      : filtered.map(r => repItemHtml(r, machineId, machine.nombre)).join('')}`
+  if (filtered.length === 0){
+    listEl.innerHTML = emptyHtml('🔍','Lista vacía','Ningún repuesto coincide con esta lista')
+  } else {
+    listEl.innerHTML = `<div class="cell-group">
+      ${filtered.map(r => repCellHtml(r, machineId, m.nombre)).join('')}
+    </div>`
+  }
 }
 
-/**
- * Cambia el filtro activo de tags favoritos en la vista de máquina y re-renderiza.
- */
-function setMachineRepFilter(machineId, listName) {
+function setMachineRepFilter(machineId, listName){
   activeMachineRepFilter = listName
-  // Re-render usando datos cacheados (no re-fetch)
   Promise.all([
     Promise.resolve(repCache[machineId] || []),
     getMachineFavListsMerged(machineId),
-  ]).then(([reps, favLists]) => renderMachineDetailBody(machineId, reps, favLists))
+  ]).then(([reps, favLists]) => renderMachineBody(machineId, reps, favLists))
 }
 
-function updateMachineFavBtn(machineId) {
-  const btn = document.getElementById('machine-fav-btn')
-  const anyList = prefs.favoriteLists.some(l => l.machineIds?.includes(machineId))
-  btn.classList.toggle('on', anyList)
+function repCellHtml(r, machineId, machineName){
+  const icon = repIcon(r.tipo)
+  const name = r.textoBreve || r.descripcion || r.alias || 'Sin nombre'
+  const sub = [r.tipo, machineName].filter(Boolean).join(' · ')
+  return `<div class="cell" onclick="openRepuesto('${escHtmlAttr(machineId)}','${escHtmlAttr(r.id)}')">
+    <div class="cell-icon">${icon}</div>
+    <div class="cell-body">
+      <div class="cell-title">${escHtml(name)}</div>
+      ${r.codigoSAP ? `<div class="cell-meta">SAP ${escHtml(r.codigoSAP)}</div>` : ''}
+      ${sub ? `<div class="cell-sub">${escHtml(sub)}</div>` : ''}
+    </div>
+    <div class="cell-chevron">›</div>
+  </div>`
 }
 
-function onMachineFavTap() {
-  const machineId = document.getElementById('machine-fav-btn').dataset.machineId
-  if (!machineId) return
-  openSheet('machine', machineId)
+function repIcon(tipo){
+  const map = {
+    'RODAMIENTO':'⚙️','SELLO':'🔵','JUNTA':'🔵','SENSOR':'📡','MOTOR':'⚡',
+    'CORREA':'〰️','CADENA':'🔗','VALVULA':'🔧','FILTRO':'🔳','CUCHILLA':'🔪',
+    'CUCHILLO':'🔪','RESORTE':'🌀','ENGRANAJE':'⚙️','BOMBA':'💧',
+  }
+  if (!tipo) return '🔩'
+  const u = tipo.toUpperCase()
+  for (const [k,v] of Object.entries(map)) if (u.includes(k)) return v
+  return '🔩'
 }
 
 // ═══════════════════════════════════════════════════════════════════
 // REPUESTO DETAIL
 // ═══════════════════════════════════════════════════════════════════
-async function openRepuesto(machineId, repuestoId) {
-  // Load if not cached
+async function openRepuesto(machineId, repuestoId){
   let reps = repCache[machineId]
-  if (!reps) reps = await loadRepuestos(machineId)
+  if (!reps) reps = await loadRepuestos(machineId).catch(() => [])
   const r = reps.find(x => x.id === repuestoId)
   if (!r) return
+  const m = machineMap[machineId]
+  const title = r.textoBreve || r.alias || r.descripcion || 'Repuesto'
+  const subtitle = r.codigoSAP ? `SAP ${r.codigoSAP}` : (r.tipo || '')
 
-  const machine = machineMap[machineId]
-  pushView('view-repuesto')
+  pushView('view-repuesto', title, subtitle)
+  saveRecent(machineId, repuestoId, title, r.codigoSAP)
 
-  // Save to recents
-  saveRecent(machineId, repuestoId, r.textoBreve || r.alias || r.descripcion, r.codigoSAP)
-
-  // Title
-  document.getElementById('rep-detail-title').textContent = r.textoBreve || r.alias || r.descripcion || 'Sin nombre'
-  const favBtn = document.getElementById('rep-fav-btn')
-  favBtn.dataset.machineId  = machineId
-  favBtn.dataset.repuestoId = repuestoId
-  favBtn.classList.toggle('on', isRepFav(machineId, repuestoId))
-
-  // Body
-  const body = document.getElementById('rep-detail-body')
+  const photos = [...(r.fotosReales || []), ...(r.imagenesManual || [])]
+    .sort((a,b) => (b.esPrincipal ? 1 : 0) - (a.esPrincipal ? 1 : 0))
+  const main = photos[0]
+  const rest = photos.slice(1)
 
   const idRows = [
-    r.codigoSAP        ? ['SAP',           r.codigoSAP,        true]  : null,
-    r.codigoFabricante ? ['Cód. fabricante',r.codigoFabricante, true]  : null,
-    r.alias            ? ['Alias',          r.alias,            false] : null,
-    r.nombreManual     ? ['Nombre manual',  r.nombreManual,     false] : null,
-    r.tipo             ? ['Tipo',           r.tipo,             false] : null,
-    r.seccion          ? ['Sección',        r.seccion,          false] : null,
-    r.numeroSerie      ? ['N° serie',       r.numeroSerie,      true]  : null,
-  ].filter(Boolean)
+    ['SAP', r.codigoSAP, true],
+    ['Cód. fabricante', r.codigoFabricante, true],
+    ['Alias', r.alias, false],
+    ['Nombre manual', r.nombreManual, false],
+    ['Tipo', r.tipo, false],
+    ['Sección', r.seccion, false],
+    ['N° serie', r.numeroSerie, true],
+  ].filter(([_,v]) => v)
 
   const useRows = [
-    ['Cant. por máquina', r.cantidadPorMaquina ?? '—', false],
-    r.ubicacionEnPlanta ? ['Ubicación',     r.ubicacionEnPlanta, false] : null,
-    machine ? ['Máquina',          machine.nombre,     false] : null,
-    // valorUnitario solo para roles con permisos (admin/supervisor/tecnico)
+    ['Cant. por equipo', r.cantidadPorMaquina ?? '—', false],
+    ['Ubicación', r.ubicacionEnPlanta, false],
+    ['Equipo', m?.nombre, false],
     (['admin','supervisor','tecnico'].includes(userRole) && r.valorUnitario != null)
-      ? ['Valor unitario', `$ ${r.valorUnitario.toLocaleString('es-CL')}`, false] : null,
-  ].filter(Boolean)
+      ? ['Valor unitario', `$ ${Number(r.valorUnitario).toLocaleString('es-CL')}`, false] : null,
+  ].filter(x => x && x[1] != null && x[1] !== '')
 
-  const allPhotos = [...(r.fotosReales || []), ...(r.imagenesManual || [])]
-    .sort((a, b) => (b.esPrincipal ? 1 : 0) - (a.esPrincipal ? 1 : 0))
-
-  body.innerHTML = `
-    ${idRows.length ? `
-    <div class="section-label">Identificación</div>
-    <div class="info-section">
-      ${idRows.map(([l,v,isCode]) => `<div class="info-row">
-        <span class="info-label">${l}</span>
-        <span class="info-value${isCode ? ' code' : ''}">${escHtml(String(v))}</span></div>`).join('')}
+  const el = document.getElementById('view-repuesto')
+  el.innerHTML = `
+    ${main ? `<div class="photo-hero" onclick="openLightbox('${escHtmlAttr(main.url)}','${escHtmlAttr(main.descripcion || '')}')">
+      <img src="${escHtmlAttr(main.url)}" alt="">
     </div>` : ''}
 
-    <div class="section-label">Uso en planta</div>
-    <div class="info-section">
-      ${useRows.map(([l,v,isCode]) => `<div class="info-row">
-        <span class="info-label">${l}</span>
-        <span class="info-value${isCode ? ' code' : ''}">${escHtml(String(v))}</span></div>`).join('')}
+    ${idRows.length ? `
+      <div class="section"><span class="section-title">Identificación</span></div>
+      <div class="info-card">
+        ${idRows.map(([l,v,c]) => `
+          <div class="info-row">
+            <span class="info-label">${l}</span>
+            <span class="info-value${c?' code':''}">${escHtml(String(v))}</span>
+          </div>`).join('')}
+      </div>` : ''}
+
+    <div class="section"><span class="section-title">Uso en planta</span></div>
+    <div class="info-card">
+      ${useRows.map(([l,v,c]) => `
+        <div class="info-row">
+          <span class="info-label">${l}</span>
+          <span class="info-value${c?' code':''}">${escHtml(String(v))}</span>
+        </div>`).join('')}
     </div>
 
     ${r.observaciones ? `
-    <div class="section-label">Observaciones</div>
-    <div class="info-section">
-      <div class="info-row"><span class="info-value obs">${escHtml(r.observaciones)}</span></div>
-    </div>` : ''}
+      <div class="section"><span class="section-title">Observaciones</span></div>
+      <div class="info-card">
+        <div class="info-row"><span class="info-value obs">${escHtml(r.observaciones)}</span></div>
+      </div>` : ''}
 
-    <div class="section-label">Fotos (${allPhotos.length})</div>
-    ${allPhotos.length === 0
-      ? `<div class="gallery-empty">Sin fotos. Se pueden agregar desde la PWA.</div>`
-      : `<div class="gallery">
-          ${allPhotos.map((img, i) => `<img class="gallery-img" src="${escHtml(img.url)}"
-            alt="${escHtml(img.descripcion || '')}"
-            onclick="openLightbox('${escHtml(img.url)}','${escHtml(img.descripcion || img.tipo || '')}')">`)
-          .join('')}
-        </div>`}
-    <div style="height:16px"></div>
+    ${rest.length > 0 ? `
+      <div class="section"><span class="section-title">Más fotos</span><span class="section-count">${rest.length}</span></div>
+      <div class="gallery">
+        ${rest.map(img => `<img class="gallery-img" src="${escHtmlAttr(img.url)}" alt=""
+          onclick="openLightbox('${escHtmlAttr(img.url)}','${escHtmlAttr(img.descripcion || img.tipo || '')}')">`).join('')}
+      </div>` : (!main ? `
+      <div class="section"><span class="section-title">Fotos</span></div>
+      <div class="notice">Sin fotos. Agregalas desde la app principal.</div>` : '')}
   `
-}
-
-function onRepFavTap() {
-  const btn = document.getElementById('rep-fav-btn')
-  const machineId  = btn.dataset.machineId
-  const repuestoId = btn.dataset.repuestoId
-  if (!machineId || !repuestoId) return
-  openSheet('repuesto', machineId, repuestoId)
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// FAVORITES VIEW
-// ═══════════════════════════════════════════════════════════════════
-async function renderFavorites() {
-  const el = document.getElementById('fav-body')
-  const { favoriteLists, repuestoFavLists } = prefs
-
-  let html = ''
-
-  // ── Welcome header ──
-  const greetName = firstName || tgApp?.initDataUnsafe?.user?.first_name || ''
-  const greeting = greetName ? `Hola, ${escHtml(greetName)} 👋` : 'Hola 👋'
-  const roleLabel = ({
-    admin: '👑 Admin', supervisor: '🛡️ Supervisor',
-    tecnico: '🔧 Técnico', usuario: '👁️ Solo lectura',
-  })[userRole] || userRole
-  const linkBadge = isLinked
-    ? `<span style="font-size:10px;background:#10b98122;color:#10b981;padding:2px 6px;border-radius:4px;margin-left:6px">vinculado</span>`
-    : `<span style="font-size:10px;background:#f59e0b22;color:#f59e0b;padding:2px 6px;border-radius:4px;margin-left:6px">solo Telegram</span>`
-
-  html += `<div style="padding:14px 14px 4px">
-    <div style="font-size:18px;font-weight:600">${greeting}</div>
-    <div style="font-size:12px;color:var(--hint);margin-top:2px">${roleLabel}${linkBadge}</div>
-  </div>`
-
-  // ── Machine lists ──
-  html += `<div class="section-hdr">
-    <span class="section-title">Listas de equipos</span>
-    <span class="section-count">${favoriteLists.length}</span>
-  </div>`
-
-  if (favoriteLists.length === 0) {
-    html += `<div style="padding:8px 14px 4px">
-      <div style="font-size:13px;color:var(--hint)">Sin listas guardadas. Agregá equipos a favoritos desde la app principal.</div>
-    </div>`
-  } else {
-    html += favoriteLists.map((list) => {
-      // Use cached machineNames first, then live machineMap lookup
-      const names = (list.machineIds || []).map(id =>
-        list.machineNames?.[id] || machineMap[id]?.nombre || id
-      )
-      return `<div class="fav-list-card">
-        <div class="fav-list-header">
-          <div class="fav-list-icon">📋</div>
-          <div class="fav-list-meta">
-            <div class="fav-list-name">${escHtml(list.name)}</div>
-            <div class="fav-list-count">${list.machineIds?.length || 0} equipo(s)</div>
-          </div>
-        </div>
-        ${names.length > 0 ? `<div class="fav-machine-chips">
-          ${names.map((n, mi) => `<div class="fav-machine-chip" onclick="openMachine('${escHtml(list.machineIds[mi])}')">${escHtml(n)}</div>`).join('')}
-        </div>` : ''}
-      </div>`
-    }).join('')
-  }
-
-  // ── Repuesto lists per machine/node ──
-  const repKeys = Object.keys(repuestoFavLists).filter(k => repuestoFavLists[k]?.length > 0)
-  if (repKeys.length > 0) {
-    // Keys may be hierarchy nodeIds — resolve names for any not found in machineMap
-    const nodeNameMap = {}
-    const unknownIds = repKeys.filter(id => !machineMap[id])
-    if (unknownIds.length > 0) {
-      await Promise.all(unknownIds.map(async nodeId => {
-        try {
-          const snap = await db.collection('hierarchy').doc(nodeId).get()
-          if (snap.exists) {
-            const d = snap.data()
-            const linkedId = d.linkedMachineId
-            nodeNameMap[nodeId] = (linkedId && machineMap[linkedId]?.nombre)
-              || d.nombre || d.name || nodeId
-          }
-        } catch { /* ignore */ }
-      }))
-    }
-
-    html += `<div class="section-hdr" style="margin-top:8px">
-      <span class="section-title">Repuestos guardados</span>
-    </div>`
-
-    html += repKeys.map(key => {
-      const machineName = machineMap[key]?.nombre || nodeNameMap[key] || key
-      const lists = repuestoFavLists[key] || []
-      return `<div class="fav-list-card">
-        <div class="fav-list-header">
-          <div class="fav-list-icon">🔩</div>
-          <div class="fav-list-meta">
-            <div class="fav-list-name">${escHtml(machineName)}</div>
-            <div class="fav-list-count">${lists.reduce((s,l) => s + (l.repuestoIds?.length||0), 0)} repuesto(s) en ${lists.length} lista(s)</div>
-          </div>
-        </div>
-        ${lists.map((list) => `
-          <div style="padding:0 14px 10px">
-            <div style="font-size:12px;font-weight:600;color:var(--hint);margin-bottom:6px">
-              ${escHtml(list.name)}
-            </div>
-            ${(list.repuestoIds || []).map(rid => {
-              const reps = repCache[key] || []
-              const r = reps.find(x => x.id === rid)
-              return r ? `<div class="rep-item" style="padding:8px 0" onclick="openRepuesto('${key}','${rid}')">
-                <div class="rep-icon-box" style="width:32px;height:32px;font-size:16px">${repIcon(r.tipo)}</div>
-                <div class="rep-body">
-                  <div class="rep-name" style="font-size:13px">${escHtml(r.textoBreve || r.alias || 'Sin nombre')}</div>
-                  ${r.codigoSAP ? `<div class="rep-code">SAP: ${escHtml(r.codigoSAP)}</div>` : ''}
-                </div>
-              </div>` : ''
-            }).join('')}
-          </div>`).join('')}
-      </div>`
-    }).join('')
-  }
-
-  el.innerHTML = html + '<div style="height:16px"></div>'
-}
-
-// ── Machine list CRUD ─────────────────────────────────────────────
-function createMachineList() {
-  showModal('Nueva lista de equipos', '', async (name) => {
-    if (!name.trim()) return
-    prefs.favoriteLists.push({ name: name.trim(), machineIds: [], machineNames: {} })
-    await savePrefs()
-    renderFavorites()
-  })
-}
-async function renameMachineList(idx) {
-  showModal('Renombrar lista', prefs.favoriteLists[idx].name, async (name) => {
-    if (!name.trim()) return
-    prefs.favoriteLists[idx].name = name.trim()
-    await savePrefs()
-    renderFavorites()
-  })
-}
-async function deleteMachineList(idx) {
-  prefs.favoriteLists.splice(idx, 1)
-  await savePrefs()
-  renderFavorites()
-}
-
-// ── Repuesto list CRUD ────────────────────────────────────────────
-async function renameRepList(machineId, li) {
-  const list = prefs.repuestoFavLists[machineId]?.[li]
-  if (!list) return
-  showModal('Renombrar lista', list.name, async (name) => {
-    if (!name.trim()) return
-    prefs.repuestoFavLists[machineId][li].name = name.trim()
-    await savePrefs()
-    renderFavorites()
-  })
-}
-async function deleteRepList(machineId, li) {
-  prefs.repuestoFavLists[machineId]?.splice(li, 1)
-  await savePrefs()
-  renderFavorites()
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// FAVORITES HELPERS
-// ═══════════════════════════════════════════════════════════════════
-function isMachineFav(machineId) {
-  return prefs.favoriteLists.some(l => l.machineIds?.includes(machineId))
-}
-function isRepFav(machineId, repuestoId) {
-  const lists = prefs.repuestoFavLists[machineId] || []
-  return lists.some(l => l.repuestoIds?.includes(repuestoId))
-}
-
-// Quick-toggle (add to first "Favoritos" list or create it)
-async function toggleRepFavQuick(machineId, repuestoId, el) {
-  if (!prefs.repuestoFavLists[machineId]) prefs.repuestoFavLists[machineId] = []
-  const lists = prefs.repuestoFavLists[machineId]
-  let defaultList = lists.find(l => l.name === 'Favoritos')
-  if (!defaultList) {
-    defaultList = { name: 'Favoritos', repuestoIds: [] }
-    lists.push(defaultList)
-  }
-  const idx = defaultList.repuestoIds.indexOf(repuestoId)
-  if (idx === -1) {
-    defaultList.repuestoIds.push(repuestoId)
-    el.classList.add('on')
-    tgApp?.HapticFeedback?.notificationOccurred('success')
-  } else {
-    defaultList.repuestoIds.splice(idx, 1)
-    el.classList.remove('on')
-  }
-  await savePrefs()
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// BOTTOM SHEET — Add to list
-// ═══════════════════════════════════════════════════════════════════
-function openSheet(type, machineId, repuestoId) {
-  sheetCtx = { type, machineId, repuestoId }
-  const overlay = document.getElementById('sheet-overlay')
-  const sheet   = document.getElementById('sheet')
-  const title   = document.getElementById('sheet-title')
-  const content = document.getElementById('sheet-content')
-
-  if (type === 'machine') {
-    title.textContent = 'Guardar equipo en lista'
-    const machine = machineMap[machineId]
-    content.innerHTML = prefs.favoriteLists.map((list, idx) => {
-      const inList = list.machineIds?.includes(machineId)
-      return `<div class="sheet-list-item" onclick="toggleMachineInList(${idx})">
-        <div class="sli-icon">📋</div>
-        <div class="sli-text">
-          <div class="sli-name">${escHtml(list.name)}</div>
-          <div class="sli-sub">${list.machineIds?.length || 0} equipos</div>
-        </div>
-        ${inList ? '<div class="sli-check">✓</div>' : ''}
-      </div>`
-    }).join('')
-    + `<div class="sheet-new-list" onclick="createMachineListFromSheet()">
-        <span style="font-size:20px">＋</span> Nueva lista
-      </div>`
-  } else {
-    title.textContent = 'Guardar repuesto en lista'
-    const lists = prefs.repuestoFavLists[machineId] || []
-    content.innerHTML = lists.map((list, idx) => {
-      const inList = list.repuestoIds?.includes(repuestoId)
-      return `<div class="sheet-list-item" onclick="toggleRepInList(${idx})">
-        <div class="sli-icon">📋</div>
-        <div class="sli-text">
-          <div class="sli-name">${escHtml(list.name)}</div>
-          <div class="sli-sub">${list.repuestoIds?.length || 0} repuestos</div>
-        </div>
-        ${inList ? '<div class="sli-check">✓</div>' : ''}
-      </div>`
-    }).join('')
-    + `<div class="sheet-new-list" onclick="createRepListFromSheet()">
-        <span style="font-size:20px">＋</span> Nueva lista
-      </div>`
-  }
-
-  overlay.classList.add('open')
-  requestAnimationFrame(() => sheet.classList.add('open'))
-}
-
-function closeSheet() {
-  document.getElementById('sheet-overlay').classList.remove('open')
-  document.getElementById('sheet').classList.remove('open')
-  sheetCtx = null
-}
-
-async function toggleMachineInList(idx) {
-  if (!sheetCtx) return
-  const { machineId } = sheetCtx
-  const list = prefs.favoriteLists[idx]
-  if (!list.machineIds) list.machineIds = []
-  const pos = list.machineIds.indexOf(machineId)
-  if (pos === -1) {
-    list.machineIds.push(machineId)
-    if (!list.machineNames) list.machineNames = {}
-    list.machineNames[machineId] = machineMap[machineId]?.nombre || machineId
-    tgApp?.HapticFeedback?.notificationOccurred('success')
-  } else {
-    list.machineIds.splice(pos, 1)
-  }
-  await savePrefs()
-  updateMachineFavBtn(machineId)
-  closeSheet()
-  renderFavorites()
-}
-
-async function toggleRepInList(idx) {
-  if (!sheetCtx) return
-  const { machineId, repuestoId } = sheetCtx
-  const lists = prefs.repuestoFavLists[machineId] || []
-  const list  = lists[idx]
-  if (!list.repuestoIds) list.repuestoIds = []
-  const pos = list.repuestoIds.indexOf(repuestoId)
-  if (pos === -1) {
-    list.repuestoIds.push(repuestoId)
-    tgApp?.HapticFeedback?.notificationOccurred('success')
-  } else {
-    list.repuestoIds.splice(pos, 1)
-  }
-  await savePrefs()
-  document.getElementById('rep-fav-btn').classList.toggle('on', isRepFav(machineId, repuestoId))
-  closeSheet()
-  renderFavorites()
-}
-
-function createMachineListFromSheet() {
-  closeSheet()
-  showModal('Nueva lista de equipos', '', async (name) => {
-    if (!name.trim()) return
-    prefs.favoriteLists.push({ name: name.trim(), machineIds: [], machineNames: {} })
-    if (sheetCtx?.machineId) {
-      // immediately add current machine
-      const newList = prefs.favoriteLists[prefs.favoriteLists.length - 1]
-      newList.machineIds.push(sheetCtx.machineId)
-      newList.machineNames[sheetCtx.machineId] = machineMap[sheetCtx.machineId]?.nombre || sheetCtx.machineId
-    }
-    await savePrefs()
-    renderFavorites()
-  })
-}
-
-function createRepListFromSheet() {
-  const ctx = { ...sheetCtx }
-  closeSheet()
-  showModal('Nueva lista de repuestos', '', async (name) => {
-    if (!name.trim()) return
-    if (!prefs.repuestoFavLists[ctx.machineId]) prefs.repuestoFavLists[ctx.machineId] = []
-    const newList = { name: name.trim(), repuestoIds: ctx.repuestoId ? [ctx.repuestoId] : [] }
-    prefs.repuestoFavLists[ctx.machineId].push(newList)
-    await savePrefs()
-    document.getElementById('rep-fav-btn').classList.toggle('on', isRepFav(ctx.machineId, ctx.repuestoId))
-    renderFavorites()
-    tgApp?.HapticFeedback?.notificationOccurred('success')
-  })
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// INPUT MODAL
-// ═══════════════════════════════════════════════════════════════════
-let _modalResolve = null
-function showModal(title, defaultValue, onOk) {
-  document.getElementById('modal-title').textContent = title
-  const inp = document.getElementById('modal-input')
-  inp.value = defaultValue || ''
-  document.getElementById('input-modal').classList.add('open')
-  inp.focus()
-  document.getElementById('modal-ok').onclick = async () => {
-    closeModal()
-    await onOk(inp.value)
-  }
-  inp.onkeydown = (e) => { if (e.key === 'Enter') document.getElementById('modal-ok').click() }
-}
-function closeModal() {
-  document.getElementById('input-modal').classList.remove('open')
 }
 
 // ═══════════════════════════════════════════════════════════════════
 // LIGHTBOX
 // ═══════════════════════════════════════════════════════════════════
-function openLightbox(url, caption) {
-  document.getElementById('lightbox-img').src = url
-  document.getElementById('lightbox-caption').textContent = caption || ''
+function openLightbox(url, caption){
+  document.getElementById('lbx-img').src = url
+  document.getElementById('lbx-cap').textContent = caption || ''
   document.getElementById('lightbox').classList.add('open')
 }
-function closeLightbox() {
+function closeLightbox(){
   document.getElementById('lightbox').classList.remove('open')
-  document.getElementById('lightbox-img').src = ''
+  document.getElementById('lbx-img').src = ''
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// UTILS
+// HELPERS
 // ═══════════════════════════════════════════════════════════════════
-function escHtml(str) {
-  if (str == null) return ''
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
+function emptyHtml(icon, title, sub){
+  return `<div class="empty">
+    <div class="empty-icon">${icon}</div>
+    <div class="empty-title">${title}</div>
+    <div class="empty-sub">${sub}</div>
+  </div>`
+}
+
+function skeletonCells(n){
+  return Array.from({length:n}, () => `
+    <div class="skel-cell">
+      <div class="skel-icon skel"></div>
+      <div style="flex:1">
+        <div class="skel-line skel"></div>
+        <div class="skel-line short skel"></div>
+      </div>
+    </div>`).join('')
+}
+
+function escHtml(s){
+  if (s == null) return ''
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;')
+}
+function escHtmlAttr(s){
+  return escHtml(s).replace(/`/g,'&#96;')
 }
 
 // ═══════════════════════════════════════════════════════════════════
