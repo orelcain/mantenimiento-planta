@@ -515,16 +515,27 @@ function setStatus(type, label) {
 // DATA LOADING
 // ═══════════════════════════════════════════════════════════════════
 async function loadCategories() {
-  const snap = await db.collection('machineCategories').orderBy('orden').get()
+  const snap = await db.collection('machineCategories').get()
+  window.__debugRawCats = snap.size
   categories = snap.docs.map(d => ({ id: d.id, ...d.data() }))
     .filter(c => c.activa !== false && c.visible !== false && !c.parentId)
+    .sort((a, b) => (a.orden || 0) - (b.orden || 0))
+  window.__debugFilteredCats = categories.length
 }
 
 async function loadMachines() {
-  const snap = await db.collection('machines').orderBy('orden').get()
-  machines   = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-    .filter(m => m.activa !== false)
-  machineMap = Object.fromEntries(machines.map(m => [m.id, m]))
+  try {
+    const snap = await db.collection('machines').get()
+    window.__debugRawMachines = snap.size
+    machines = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .filter(m => m.activa !== false)
+      .sort((a, b) => (a.orden || 0) - (b.orden || 0))
+    machineMap = Object.fromEntries(machines.map(m => [m.id, m]))
+    window.__debugFilteredMachines = machines.length
+  } catch (e) {
+    window.__debugMachinesErr = String(e?.message || e)
+    throw e
+  }
 }
 
 async function loadRepuestos(machineId) {
@@ -764,8 +775,14 @@ function renderMachineList() {
       <div class="empty-icon">🏭</div>
       <div class="empty-title">Sin máquinas</div>
       <div class="empty-sub">No hay máquinas en esta categoría</div>
-      <div class="empty-sub" style="margin-top:8px;font-size:11px;opacity:.6">
-        debug: ${machines.length} totales · filtro: ${activeCatFilter} · uid: ${(uid||'?').slice(0,12)}
+      <div class="empty-sub" style="margin-top:12px;font-size:10px;opacity:.7;text-align:left;background:#1118;padding:8px;border-radius:6px;font-family:monospace;line-height:1.4">
+        v=v3-debug<br>
+        machines.length=${machines.length} (raw=${window.__debugRawMachines ?? '?'}, filt=${window.__debugFilteredMachines ?? '?'})<br>
+        cats raw=${window.__debugRawCats ?? '?'}, filt=${window.__debugFilteredCats ?? '?'}<br>
+        filter=${activeCatFilter}<br>
+        uid=${uid || '?'}<br>
+        role=${userRole}<br>
+        err=${window.__debugMachinesErr || '-'}
       </div></div>`
     return
   }
