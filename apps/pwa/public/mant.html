@@ -658,33 +658,40 @@ async function init(){
     setLoadingMsg('Modo preview…')
     try {
       await auth.signInAnonymously()
-      uid = auth.currentUser?.uid || 'preview'
+      const previewUid = new URLSearchParams(location.search).get('uid')
+      uid = previewUid || auth.currentUser?.uid || 'preview'
       userRole = 'admin'
       isAuthorized = true
       isLinked = true
-      firstName = 'Preview'
+      firstName = previewUid ? 'Preview (real)' : 'Preview'
       setLoadingMsg('Cargando datos…')
       await Promise.all([loadCategories(), loadMachines()])
-      // Prefs mock — simula listas reales para que el home se vea poblado
-      const firstIds  = machines.slice(0, 9).map(m => m.id)
-      const secondIds = machines.slice(9, 24).map(m => m.id)
-      prefs = {
-        favoriteLists: [
-          { name: 'Equipos Planta Principal',  machineIds: firstIds  },
-          { name: 'Cintas Planta Principal',    machineIds: secondIds },
-        ],
-        repuestoFavLists: {},
-      }
-      // Recientes mock — simula los últimos 3 repuestos vistos
-      if (machines.length >= 2) {
-        recentIds = [
-          { machineId: machines[0].id, repuestoId: 'preview-rep-1',
-            name: 'Rodamiento SKF 6205',      code: '1000001234', ts: Date.now() - 3600000 },
-          { machineId: machines[1].id, repuestoId: 'preview-rep-2',
-            name: 'Sello mecánico 40mm',      code: '1000005678', ts: Date.now() - 54000000 },
-          { machineId: machines[0].id, repuestoId: 'preview-rep-3',
-            name: 'Correa dentada T5-450',    code: '',           ts: Date.now() - 61200000 },
-        ]
+
+      if (previewUid) {
+        // Datos reales del usuario de Telegram
+        await loadPrefs()
+        startPrefsListener()
+      } else {
+        // Sin UID → prefs de demostración con equipos reales
+        const firstIds  = machines.slice(0, 9).map(m => m.id)
+        const secondIds = machines.slice(9, 24).map(m => m.id)
+        prefs = {
+          favoriteLists: [
+            { name: 'Equipos Planta Principal', machineIds: firstIds  },
+            { name: 'Cintas Planta Principal',  machineIds: secondIds },
+          ],
+          repuestoFavLists: {},
+        }
+        if (machines.length >= 2) {
+          recentIds = [
+            { machineId: machines[0].id, repuestoId: 'preview-rep-1',
+              name: 'Rodamiento SKF 6205',   code: '1000001234', ts: Date.now() - 3600000 },
+            { machineId: machines[1].id, repuestoId: 'preview-rep-2',
+              name: 'Sello mecánico 40mm',   code: '1000005678', ts: Date.now() - 54000000 },
+            { machineId: machines[0].id, repuestoId: 'preview-rep-3',
+              name: 'Correa dentada T5-450', code: '',           ts: Date.now() - 61200000 },
+          ]
+        }
       }
       showApp()
     } catch(err) {
@@ -1655,11 +1662,30 @@ function renderHomeGreeting(){
   const linkTag = isLinked
     ? `<span class="tag green">vinculado</span>`
     : `<span class="tag warn">solo Telegram</span>`
+  const previewBtn = (!IS_PREVIEW && uid && userRole === 'admin') ? `
+    <button onclick="copyPreviewUrl()" style="margin-top:6px;background:none;border:1px solid var(--border);
+      color:var(--hint);padding:3px 10px;border-radius:12px;font-size:11px;cursor:pointer">
+      🔗 URL preview
+    </button>` : ''
   document.getElementById('home-greeting').innerHTML = `
     <div class="hello">
       <div class="hello-text">${hello}</div>
       <div class="hello-sub">${escHtml(role)} ${linkTag}</div>
+      ${previewBtn}
     </div>`
+}
+
+function copyPreviewUrl(){
+  const base = 'https://mantenimiento-planta-771a3.web.app/mant.html'
+  const url = `${base}?preview=1&uid=${uid}`
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(url).then(() => {
+      tgApp?.HapticFeedback?.notificationOccurred('success')
+      tgApp?.showAlert?.('URL copiada al portapapeles.\n\nÁbrela en el navegador de tu PC para ver la preview con tus datos reales.')
+    }).catch(() => tgApp?.showAlert?.(`Copiá esta URL:\n${url}`))
+  } else {
+    tgApp?.showAlert?.(`Tu URL de preview:\n${url}`)
+  }
 }
 
 function renderHomeMyLists(){
