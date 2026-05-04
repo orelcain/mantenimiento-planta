@@ -131,6 +131,17 @@ html,body{height:100%;background:var(--bg);color:var(--text);
 .cell-group{background:var(--bg2);margin:0 0 8px;overflow:hidden}
 .cell-group + .section{padding-top:10px}
 
+/* Card compuesta: cell + chips de subitems debajo (Repuestos guardados) */
+.compound-card{background:var(--bg2);margin:0 0 8px;overflow:hidden}
+.compound-card + .compound-card{margin-top:0}
+.cell-chips{display:flex;gap:6px;padding:0 14px 12px;flex-wrap:wrap}
+.cell-chip{padding:4px 10px;border-radius:99px;font-size:11.5px;font-weight:500;
+  background:rgba(255,255,255,.07);color:var(--text);cursor:pointer;
+  display:inline-flex;align-items:center;gap:5px;line-height:1.3;
+  border:1px solid rgba(255,255,255,.05);transition:background .12s}
+.cell-chip:active{background:rgba(255,255,255,.14)}
+.cell-chip .n{opacity:.6;font-size:11px;font-weight:400}
+
 /* ── Chips ──────────────────────────────────────────────────────────── */
 .chips{display:flex;gap:7px;padding:10px 12px;overflow-x:auto;
   scrollbar-width:none;-webkit-overflow-scrolling:touch;background:var(--bg);
@@ -817,8 +828,8 @@ async function renderHomeRepFav(){
       <span class="section-title">Repuestos guardados</span>
       <span class="section-count">${cards.length}</span>
     </div>
-    <div class="cell-group">
-      ${cards.map(({mid, machineName, m, lists, total}) => `
+    ${cards.map(({mid, machineName, m, lists, total}) => `
+      <div class="compound-card">
         <div class="cell" onclick="openMachine('${escHtmlAttr(mid)}')">
           <div class="cell-icon" style="background:${m?.color || '#5288c1'}22;color:${m?.color || '#5288c1'}">🔩</div>
           <div class="cell-body">
@@ -826,8 +837,20 @@ async function renderHomeRepFav(){
             <div class="cell-sub">${pl(total, 'repuesto', 'repuestos')} · ${pl(lists.length, 'lista', 'listas')}</div>
           </div>
           <div class="cell-chevron">›</div>
-        </div>`).join('')}
-    </div>`
+        </div>
+        ${lists.length > 0 ? `
+          <div class="cell-chips">
+            ${lists.map(l => `
+              <span class="cell-chip" onclick="event.stopPropagation();openMachineWithFilter('${escHtmlAttr(mid)}', ${escHtmlAttr(JSON.stringify(l.name))})">
+                📋 ${escHtml(l.name)} <span class="n">${l.repuestoIds.length}</span>
+              </span>`).join('')}
+          </div>` : ''}
+      </div>`).join('')}`
+}
+
+function openMachineWithFilter(machineId, listName){
+  // openMachine respeta opts.preFilter para abrir con un chip pre-activado
+  openMachine(machineId, { preFilter: listName })
 }
 
 function renderHomeCatalog(){
@@ -1071,10 +1094,10 @@ function saveRecent(machineId, repuestoId, name, code){
 // ═══════════════════════════════════════════════════════════════════
 // MACHINE DETAIL
 // ═══════════════════════════════════════════════════════════════════
-async function openMachine(machineId){
+async function openMachine(machineId, opts = {}){
   const m = machineMap[machineId]
   if (!m) return
-  activeMachineRepFilter = null
+  activeMachineRepFilter = opts.preFilter ?? null
   tgApp?.HapticFeedback?.selectionChanged?.()
 
   pushView('view-machine', m.nombre, [m.marca, m.modelo].filter(Boolean).join(' · '))
