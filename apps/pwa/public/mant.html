@@ -3780,9 +3780,9 @@ function showInputModal(title, defaultValue, placeholder, onOk){
   _modalCb = onOk
   document.getElementById('modal-ok').onclick = () => {
     const v = inp.value
+    const cb = _modalCb   // guardar ref ANTES de closeInputModal que la anula
     closeInputModal()
-    if (_modalCb) _modalCb(v)
-    _modalCb = null
+    if (cb) cb(v)
   }
   inp.onkeydown = (e) => { if (e.key === 'Enter') document.getElementById('modal-ok').click() }
 }
