@@ -832,7 +832,7 @@ function switchTab(tab){
   localStorage.setItem('mant_active_tab', tab)
   if (tab === 'home')      renderHome()
   if (tab === 'hierarchy') renderHierarchyTab()
-  if (tab === 'manuales')  renderManualesStub()
+  if (tab === 'manuales')  renderManualesTab()
   if (tab === 'search'){
     setTimeout(() => document.getElementById('search-input')?.focus(), 60)
   }
@@ -840,11 +840,321 @@ function switchTab(tab){
 
 function setTab(tab){ switchTab(tab) }
 
-function renderManualesStub(){
-  document.getElementById('view-manuales').innerHTML = `
-    <div style="padding:32px 20px;text-align:center">
-      ${emptyHtml('📚','Manuales y documentación','Próximamente: consulta y sube manuales, planos y fichas técnicas.')}
+// ═══════════════════════════════════════════════════════════════════
+// F4 — MANUALES TAB
+// ═══════════════════════════════════════════════════════════════════
+let __manualesCache    = null
+let __manualesCacheTs  = 0
+let manualesTypeFilter = null
+
+async function renderManualesTab(){
+  const el = document.getElementById('view-manuales')
+  if (!el) return
+  manualesTypeFilter = null
+  const canWrite = userRole === 'admin' || userRole === 'supervisor'
+  el.innerHTML = `
+    <div class="section-actions">
+      <div><span class="section-title">Documentación técnica</span></div>
+      ${canWrite ? `<button class="btn-text" onclick="openUploadManualModal()">+ Subir</button>` : ''}
+    </div>
+    <div id="manuales-type-chips"></div>
+    <div id="manuales-list">${skeletonCells(4)}</div>`
+  try {
+    renderManualesBody(await loadManuales())
+  } catch(e){
+    const l = document.getElementById('manuales-list')
+    if (l) l.innerHTML = emptyHtml('⚠️','Error al cargar','Verifica tu conexión e intenta de nuevo')
+  }
+}
+
+async function loadManuales(){
+  if (__manualesCache && Date.now() - __manualesCacheTs < HIERARCHY_CACHE_TTL) return __manualesCache
+  const snap = await db.collection('manuales').orderBy('createdAt','desc').limit(100).get()
+  __manualesCache = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+  __manualesCacheTs = Date.now()
+  return __manualesCache
+}
+
+function renderManualesBody(manuales){
+  const listEl  = document.getElementById('manuales-list')
+  const chipsEl = document.getElementById('manuales-type-chips')
+  if (!listEl) return
+
+  if (manuales.length === 0){
+    if (chipsEl) chipsEl.innerHTML = ''
+    listEl.innerHTML = emptyHtml('📚','Sin documentos',
+      (userRole==='admin'||userRole==='supervisor')
+        ? 'Sube el primer manual con el botón + Subir'
+        : 'Aún no hay documentos cargados')
+    return
+  }
+
+  const tipos = [...new Set(manuales.map(m => m.tipo).filter(Boolean))]
+  if (chipsEl && tipos.length > 1){
+    chipsEl.innerHTML = `<div class="chips" style="padding:0 12px 6px">
+      <div class="chip ${manualesTypeFilter===null?'active':''}" onclick="setManualesTypeFilter(null)">
+        Todos <span class="count">${manuales.length}</span></div>
+      ${tipos.map(t => {
+        const cnt = manuales.filter(m => m.tipo===t).length
+        return `<div class="chip ${manualesTypeFilter===t?'active':''}"
+                     onclick="setManualesTypeFilter('${escHtmlAttr(t)}')">
+          ${manualIcon(t)} ${escHtml(t[0].toUpperCase()+t.slice(1))}
+          <span class="count">${cnt}</span></div>`
+      }).join('')}
     </div>`
+  } else if (chipsEl){ chipsEl.innerHTML = '' }
+
+  const filtered = manualesTypeFilter ? manuales.filter(m => m.tipo===manualesTypeFilter) : manuales
+  if (filtered.length === 0){
+    listEl.innerHTML = emptyHtml('🔍','Sin resultados','Ningún documento coincide con el filtro')
+    return
+  }
+  listEl.innerHTML = `<div class="cell-group">${filtered.map(manualCellHtml).join('')}</div>`
+}
+
+function manualIcon(tipo){
+  return {pdf:'📄',imagen:'🖼️',link:'🔗',video:'🎬'}[tipo] || '📎'
+}
+
+function manualCellHtml(m){
+  const owner = (m.ownerPath||[]).join(' › ') || m.ownerId || ''
+  const size  = m.fileSize ? ` · ${(m.fileSize/1048576).toFixed(1)} MB` : ''
+  const when  = m.createdAt?.toDate ? relativeTime(m.createdAt.toDate().getTime()) : ''
+  const mData = escHtmlAttr(JSON.stringify({id:m.id,url:m.url,tipo:m.tipo,titulo:m.titulo}))
+  return `<div class="cell" onclick="openManualViewer(${mData})">
+    <div class="cell-icon" style="font-size:20px">${manualIcon(m.tipo)}</div>
+    <div class="cell-body">
+      <div class="cell-title">${escHtml(m.titulo||'Sin título')}</div>
+      ${owner ? `<div class="cell-meta">${escHtml(owner)}</div>` : ''}
+      <div class="cell-sub">${escHtml((m.tipo||'').toUpperCase())}${size}${when?` · ${when}`:''}</div>
+    </div>
+    <div class="cell-chevron">›</div>
+  </div>`
+}
+
+function setManualesTypeFilter(tipo){
+  manualesTypeFilter = tipo
+  if (__manualesCache) renderManualesBody(__manualesCache)
+}
+
+function openManualViewer(mData){
+  const m = typeof mData === 'string' ? JSON.parse(mData) : mData
+  if (!m?.url) return
+  tgApp?.HapticFeedback?.selectionChanged?.()
+  if (tgApp?.openLink) tgApp.openLink(m.url)
+  else window.open(m.url, '_blank')
+}
+
+// ── Upload modal (admin/supervisor) ───────────────────────────────
+function openUploadManualModal(){
+  if (userRole !== 'admin' && userRole !== 'supervisor') return
+  setHeader('Subir manual', 'Nuevo documento técnico', true)
+  setTgBack(cancelManualUpload)
+  const el = document.getElementById('view-manuales')
+  el.innerHTML = `
+    <div class="form-card">
+      <div class="form-row">
+        <label class="form-label">Tipo de propietario</label>
+        <select id="mup-owner-type" class="form-input">
+          <option value="equipo">Equipo</option>
+          <option value="area">Área</option>
+          <option value="planta">Planta</option>
+          <option value="repuesto">Repuesto</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Propietario</label>
+        <input id="mup-owner-search" class="form-input" type="text"
+          placeholder="Buscar equipo o área…" oninput="mupOwnerSearch()">
+        <div id="mup-owner-results" style="margin-top:4px"></div>
+        <input type="hidden" id="mup-owner-id">
+        <input type="hidden" id="mup-owner-name">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Título *</label>
+        <input id="mup-titulo" class="form-input" type="text" placeholder="Nombre del documento…">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Tipo de documento</label>
+        <select id="mup-tipo" class="form-input" onchange="mupTipoChange()">
+          <option value="pdf">PDF</option>
+          <option value="imagen">Imagen</option>
+          <option value="link">Link externo</option>
+          <option value="video">Video</option>
+        </select>
+      </div>
+      <div id="mup-file-row" class="form-row">
+        <label class="form-label">Archivo (máx. 50 MB)</label>
+        <input id="mup-file" type="file" accept=".pdf" class="form-input"
+          style="padding:6px;font-size:13px" onchange="mupAutoTitle()">
+      </div>
+      <div id="mup-url-row" class="form-row" style="display:none">
+        <label class="form-label">URL</label>
+        <input id="mup-url" class="form-input code" type="url" placeholder="https://…">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Descripción</label>
+        <textarea id="mup-desc" class="form-textarea" rows="3" placeholder="Opcional…"></textarea>
+      </div>
+    </div>
+    <div id="mup-progress" style="display:none;padding:8px 16px 4px">
+      <div style="height:4px;background:var(--border);border-radius:2px;overflow:hidden">
+        <div id="mup-progress-bar" style="height:100%;background:var(--accent);width:0%;transition:width .3s"></div>
+      </div>
+      <div id="mup-progress-text" style="font-size:12px;color:var(--hint);text-align:center;padding-top:4px">Subiendo…</div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-cancel" onclick="cancelManualUpload()">Cancelar</button>
+      <button class="btn-save" id="btn-save-manual" onclick="saveManual()">Subir</button>
+    </div>`
+}
+
+function cancelManualUpload(){
+  setTgBack(null)
+  renderManualesTab()
+}
+
+function mupTipoChange(){
+  const tipo = document.getElementById('mup-tipo')?.value
+  const fileRow = document.getElementById('mup-file-row')
+  const urlRow  = document.getElementById('mup-url-row')
+  const fileInp = document.getElementById('mup-file')
+  if (!fileRow || !urlRow) return
+  const isFile = tipo === 'pdf' || tipo === 'imagen'
+  fileRow.style.display = isFile ? '' : 'none'
+  urlRow.style.display  = isFile ? 'none' : ''
+  if (fileInp) fileInp.accept = tipo === 'imagen' ? 'image/*' : '.pdf'
+}
+
+function mupAutoTitle(){
+  const file = document.getElementById('mup-file')?.files?.[0]
+  if (!file) return
+  const titulo = document.getElementById('mup-titulo')
+  if (titulo && !titulo.value) titulo.value = file.name.replace(/\.[^.]+$/, '')
+}
+
+function mupOwnerSearch(){
+  const q = normalizeSearch(document.getElementById('mup-owner-search')?.value || '')
+  const ownerType = document.getElementById('mup-owner-type')?.value
+  const results   = document.getElementById('mup-owner-results')
+  if (!q || !results) return
+
+  let candidates = []
+  if (ownerType === 'equipo'){
+    machines.filter(m => normalizeSearch(m.nombre).includes(q)).slice(0,5)
+      .forEach(m => candidates.push({ id: m.id, name: m.nombre }))
+    Object.values(hierarchyNodesMap)
+      .filter(n => isEquipNode(n) && normalizeSearch(n.nombre).includes(q)).slice(0,4)
+      .forEach(n => candidates.push({ id: n.id, name: n.nombre }))
+  } else {
+    const levelMap = { planta: 2, area: 3 }
+    const lvl = levelMap[ownerType]
+    Object.values(hierarchyNodesMap)
+      .filter(n => (!lvl || n.nivel===lvl) && normalizeSearch(n.nombre).includes(q)).slice(0,8)
+      .forEach(n => candidates.push({ id: n.id, name: n.nombre }))
+  }
+
+  results.innerHTML = candidates.length === 0
+    ? `<div style="font-size:12px;color:var(--hint);padding:4px 0">Sin resultados</div>`
+    : `<div class="cell-group" style="margin-top:4px">
+        ${candidates.map(c => `
+          <div class="cell" style="padding:6px 12px"
+               onclick="mupSelectOwner('${escHtmlAttr(c.id)}','${escHtmlAttr(c.name)}')">
+            <div class="cell-body">
+              <div class="cell-title" style="font-size:13px">${escHtml(c.name)}</div>
+            </div>
+            <div style="color:var(--accent)">✓</div>
+          </div>`).join('')}
+      </div>`
+}
+
+function mupSelectOwner(id, name){
+  const search = document.getElementById('mup-owner-search')
+  const hidId  = document.getElementById('mup-owner-id')
+  const hidName= document.getElementById('mup-owner-name')
+  const results= document.getElementById('mup-owner-results')
+  if (search)  search.value = name
+  if (hidId)   hidId.value  = id
+  if (hidName) hidName.value = name
+  if (results) results.innerHTML = ''
+}
+
+async function saveManual(){
+  const btn      = document.getElementById('btn-save-manual')
+  const titulo   = document.getElementById('mup-titulo')?.value?.trim()
+  const ownerType= document.getElementById('mup-owner-type')?.value
+  const ownerId  = document.getElementById('mup-owner-id')?.value?.trim()
+  const ownerName= document.getElementById('mup-owner-name')?.value?.trim()
+  const tipo     = document.getElementById('mup-tipo')?.value
+  const desc     = document.getElementById('mup-desc')?.value?.trim()
+
+  if (!titulo)  { showToast('El título es obligatorio', 'err'); return }
+  if (!ownerId) { showToast('Seleccioná un propietario', 'err'); return }
+
+  btn.disabled = true; btn.textContent = 'Subiendo…'
+
+  const isFile = tipo === 'pdf' || tipo === 'imagen'
+  let url = '', storagePath = null, fileSize = null, mimeType = null
+
+  if (isFile){
+    const file = document.getElementById('mup-file')?.files?.[0]
+    if (!file){ showToast('Seleccioná un archivo', 'err'); btn.disabled=false; btn.textContent='Subir'; return }
+    if (file.size > 50*1024*1024){ showToast('Archivo demasiado grande (máx. 50 MB)', 'err'); btn.disabled=false; btn.textContent='Subir'; return }
+    fileSize = file.size; mimeType = file.type
+    const fname = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`
+    storagePath = `manuales/${ownerType}/${ownerId}/${fname}`
+    document.getElementById('mup-progress').style.display = 'block'
+    try {
+      const ref = storage.ref(storagePath)
+      const task = ref.put(file)
+      await new Promise((res, rej) => {
+        task.on('state_changed',
+          s => {
+            const pct = Math.round(s.bytesTransferred / s.totalBytes * 100)
+            const bar = document.getElementById('mup-progress-bar')
+            const txt = document.getElementById('mup-progress-text')
+            if (bar) bar.style.width = pct + '%'
+            if (txt) txt.textContent = `Subiendo… ${pct}%`
+          },
+          rej, res)
+      })
+      url = await ref.getDownloadURL()
+    } catch(e){
+      showToast('Error al subir: ' + (e.message||''), 'err')
+      btn.disabled=false; btn.textContent='Subir'
+      document.getElementById('mup-progress').style.display='none'
+      return
+    }
+  } else {
+    url = document.getElementById('mup-url')?.value?.trim()
+    if (!url){ showToast('Ingresá una URL válida', 'err'); btn.disabled=false; btn.textContent='Subir'; return }
+  }
+
+  try {
+    const doc = {
+      ownerType, ownerId,
+      ownerPath: ownerName ? [ownerName] : [],
+      titulo, tipo, url,
+      ...(storagePath && { storagePath }),
+      ...(fileSize   && { fileSize }),
+      ...(mimeType   && { mimeType }),
+      descripcion: desc || '',
+      createdBy: currentUser?.uid || '',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      source: 'miniapp',
+    }
+    const ref = await db.collection('manuales').add(doc)
+    await logAudit('create','manuales',ref.id,null,doc,`Subir manual: ${titulo}`)
+    __manualesCache = null; __manualesCacheTs = 0
+    showToast(`"${titulo}" subido ✓`, 'ok')
+    tgApp?.HapticFeedback?.notificationOccurred('success')
+    setTgBack(null)
+    renderManualesTab()
+  } catch(e){
+    showToast('Error al guardar: ' + (e.message||''), 'err')
+    btn.disabled=false; btn.textContent='Subir'
+  }
 }
 
 function pushView(viewId, title, subtitle){

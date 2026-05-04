@@ -1305,5 +1305,14 @@ service cloud.firestore {
     match /shoplogixShiftDelayChecks/{docId} {
       allow read, write: if false;
     }
+
+    // ============================================
+    // MANUALES — Documentación técnica (F4 2026-05-04)
+    // ============================================
+    match /manuales/{manualId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isSupervisor() && isValidDocSize();
+      allow delete: if isAdmin();
+    }
   }
 }
