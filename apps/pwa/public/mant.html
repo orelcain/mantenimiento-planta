@@ -515,16 +515,15 @@ function setStatus(type, label) {
 // DATA LOADING
 // ═══════════════════════════════════════════════════════════════════
 async function loadCategories() {
-  const snap = await db.collection('machineCategories')
-    .where('activa', '==', true).orderBy('orden').get()
+  const snap = await db.collection('machineCategories').orderBy('orden').get()
   categories = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-    .filter(c => c.visible !== false && !c.parentId)
+    .filter(c => c.activa !== false && c.visible !== false && !c.parentId)
 }
 
 async function loadMachines() {
-  const snap = await db.collection('machines')
-    .where('activa', '==', true).orderBy('orden').get()
+  const snap = await db.collection('machines').orderBy('orden').get()
   machines   = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .filter(m => m.activa !== false)
   machineMap = Object.fromEntries(machines.map(m => [m.id, m]))
 }
 
