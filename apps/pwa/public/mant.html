@@ -433,6 +433,9 @@ mark{background:rgba(var(--accent-rgb,82,136,193),.25);color:inherit;border-radi
     <button class="nav-btn active" id="nav-home" onclick="switchTab('home')">
       <span class="icon">🏠</span>Inicio
     </button>
+    <button class="nav-btn" id="nav-search" onclick="switchTab('search')">
+      <span class="icon">🔍</span>Buscar
+    </button>
     <button class="nav-btn" id="nav-hierarchy" onclick="switchTab('hierarchy')">
       <span class="icon">🌳</span>Jerarquía
     </button>
@@ -544,6 +547,7 @@ let prevTabBeforeSearch = 'home'
 let __repuestosCache = null   // flat [{repuesto, machineId, machineName}]
 let __repuestosCacheTs = 0
 let searchTabActive = 'repuestos'
+let searchFavOnly = false
 let __globalLoadInProgress = false
 
 const SYNONYM_GROUPS = [
@@ -678,7 +682,7 @@ function showApp(){
   setStatus('ok', isAuthorized ? 'conectado' : 'sólo lectura')
   // Restaurar tab activo de sesión anterior (default: home)
   const savedTab = localStorage.getItem('mant_active_tab') || 'home'
-  const validTabs = ['home', 'hierarchy', 'manuales']
+  const validTabs = ['home', 'search', 'hierarchy', 'manuales']
   switchTab(validTabs.includes(savedTab) ? savedTab : 'home')
   renderSearchEmpty()
   // Pre-cargar repCache en background
@@ -885,11 +889,17 @@ function switchTab(tab){
   getContent().scrollTop = 0
   tgApp?.HapticFeedback?.selectionChanged?.()
   localStorage.setItem('mant_active_tab', tab)
+  // Bar persistente: ocultar en Buscar (la propia tab tiene su input dedicado)
+  const sp = document.getElementById('search-persistent')
+  if (sp) sp.style.display = (tab === 'search') ? 'none' : ''
   if (tab === 'home')      renderHome()
   if (tab === 'hierarchy') renderHierarchyTab()
   if (tab === 'manuales')  renderManualesTab()
   if (tab === 'search'){
+    renderSearchEmpty()  // estructura input + chips + body
     setTimeout(() => document.getElementById('search-input')?.focus(), 60)
+    // Pre-cargar repuestos globales en background
+    loadAllRepuestos()
   }
 }
 
@@ -1802,8 +1812,14 @@ function onPersistentSearchTap(){
     openHierSearchOverlay()
     return
   }
-  // 4) Default → overlay global
-  openSearchOverlay()
+  // 4) Estás en una sub-vista profunda (repuesto, etc) → overlay global
+  // (no usamos switchTab porque perdería la pila de navegación)
+  if (navStack.length > 0){
+    openSearchOverlay()
+    return
+  }
+  // 5) Default (Home a nivel raíz) → ir a la pestaña Buscar
+  switchTab('search')
 }
 
 // ─── Hierarchy tree-wide search overlay ─────────────────────────────
@@ -1972,6 +1988,8 @@ function openSearchOverlay(){
 
 function closeSearchOverlay(){
   const el = document.getElementById('view-search')
+  // Solo cerrar si efectivamente está en modo overlay
+  if (!el.classList.contains('overlay')) return
   el.classList.remove('overlay')
   el.innerHTML = ''
   setTgBack(null)
@@ -2223,6 +2241,7 @@ function getSearchHistory(){
 // ═══════════════════════════════════════════════════════════════════
 function renderSearchEmpty(){
   const el = document.getElementById('view-search')
+  const isOverlay = el.classList.contains('overlay')
   el.innerHTML = `
     <div class="search-bar">
       <div style="display:flex;align-items:center;gap:8px;padding:0 4px 0 0">
@@ -2232,16 +2251,22 @@ function renderSearchEmpty(){
             autocorrect="off" spellcheck="false" placeholder="SAP, nombre, fabricante, alias…">
           <button id="search-clear" class="search-clear">✕</button>
         </div>
-        <button onclick="closeSearchOverlay()"
+        ${isOverlay ? `<button onclick="closeSearchOverlay()"
           style="background:none;border:none;color:var(--accent);font-size:14px;
           font-weight:600;cursor:pointer;padding:0 4px;white-space:nowrap;flex-shrink:0">
           Cerrar
-        </button>
+        </button>` : ''}
       </div>
     </div>
     <div id="search-progress"
       style="display:none;padding:6px 16px;font-size:12px;color:var(--sub);text-align:center;
       background:var(--card);border-bottom:1px solid var(--border)"></div>
+    <div style="padding:6px 12px 0">
+      <button id="search-favs-toggle" onclick="toggleSearchFavOnly()"
+        class="chip ${searchFavOnly?'active':''}" style="width:fit-content">
+        ★ Solo favoritos
+      </button>
+    </div>
     <div id="search-sub-tabs"></div>
     <div id="search-body"></div>`
 
@@ -2293,9 +2318,18 @@ function renderSearchBody(query){
     })
   }
 
+  // Filtro "Solo favoritos" — filtra resultados in-place
+  if (searchFavOnly){
+    repHits  = repHits.filter(isRepuestoFavorite)
+    machHits = machHits.filter(m => isMachineFavorite(m.id))
+  }
+
   if (repHits.length === 0 && machHits.length === 0){
     if (tabsEl) tabsEl.innerHTML = ''
-    body.innerHTML = emptyHtml('🔍','Sin resultados',`Sin coincidencias para "<b>${escHtml(query)}</b>"`)
+    body.innerHTML = emptyHtml('🔍','Sin resultados',
+      searchFavOnly
+        ? `Sin coincidencias entre tus favoritos para "<b>${escHtml(query)}</b>". Probá desactivar "★ Solo favoritos".`
+        : `Sin coincidencias para "<b>${escHtml(query)}</b>"`)
     return
   }
 
@@ -2341,6 +2375,34 @@ function renderSearchBody(query){
       ${machHits.map(m => machineCellHtml(m)).join('')}
     </div>`
   }
+}
+
+function toggleSearchFavOnly(){
+  searchFavOnly = !searchFavOnly
+  const btn = document.getElementById('search-favs-toggle')
+  if (btn) btn.classList.toggle('active', searchFavOnly)
+  const inp = document.getElementById('search-input')
+  renderSearchBody(inp?.value?.trim() || '')
+  tgApp?.HapticFeedback?.selectionChanged?.()
+}
+
+function isMachineFavorite(machineId){
+  return (prefs.favoriteLists || []).some(l =>
+    (l.equipmentIds || []).includes(machineId)
+    || (l.machineIds || []).includes(machineId)
+  )
+}
+
+function isRepuestoFavorite(item){
+  if (isMachineFavorite(item.machineId)) return true
+  const subLists = prefs.repuestoFavLists?.[item.machineId] || []
+  if (subLists.length === 0) return false
+  for (const l of subLists){
+    const idSet = new Set(l.repuestoIds || [])
+    if (idSet.has(item.repuesto.id)) return true
+    if (matchesRepFavList(item.repuesto, idSet)) return true
+  }
+  return false
 }
 
 function setSearchTab(tab, query){
