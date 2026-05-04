@@ -62,6 +62,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);
   -webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 .view{display:none;min-height:100%;padding-bottom:24px}
 .view.active{display:block}
+#view-home{padding-top:2px}
 
 /* ── Bottom nav ─────────────────────────────────────────────────────── */
 .bottom-nav{height:58px;min-height:58px;display:flex;background:var(--bg2);
@@ -121,9 +122,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cell-meta{font-size:11px;color:var(--link);font-family:ui-monospace,Menlo,monospace;margin-top:2px}
 .cell-trailing{color:var(--hint);font-size:14px;flex-shrink:0;display:flex;align-items:center;gap:6px}
-.cell-chevron{color:var(--hint);font-size:18px;flex-shrink:0;line-height:1}
+.cell-chevron{color:var(--hint);font-size:18px;flex-shrink:0;line-height:1;margin-left:6px}
 .cell-badge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;
-  background:rgba(82,136,193,.18);color:var(--link);flex-shrink:0;white-space:nowrap}
+  background:rgba(82,136,193,.18);color:var(--link);flex-shrink:0;white-space:nowrap;margin-right:2px}
 .cell-badge.muted{background:rgba(255,255,255,.06);color:var(--hint)}
 .cell-badge.warn{background:rgba(245,166,35,.15);color:var(--warn)}
 
@@ -132,8 +133,13 @@ html,body{height:100%;background:var(--bg);color:var(--text);
 
 /* ── Chips ──────────────────────────────────────────────────────────── */
 .chips{display:flex;gap:7px;padding:10px 12px;overflow-x:auto;
-  scrollbar-width:none;-webkit-overflow-scrolling:touch;background:var(--bg)}
+  scrollbar-width:none;-webkit-overflow-scrolling:touch;background:var(--bg);
+  /* fade-out a la derecha como indicador de scroll horizontal */
+  mask-image:linear-gradient(to right, black calc(100% - 18px), transparent 100%);
+  -webkit-mask-image:linear-gradient(to right, black calc(100% - 18px), transparent 100%)}
 .chips::-webkit-scrollbar{display:none}
+.chips.sticky-top{position:sticky;top:0;z-index:5;
+  border-bottom:1px solid var(--divider)}
 .chip{padding:7px 14px;border-radius:99px;font-size:13px;font-weight:500;
   cursor:pointer;transition:all .15s;white-space:nowrap;flex-shrink:0;
   border:1px solid var(--divider);color:var(--text);background:var(--bg2)}
@@ -654,6 +660,10 @@ function switchTab(tab){
   tabHeader(tab)
   getContent().scrollTop = 0
   if (tab === 'home') renderHome()
+  // Autofocus en input de búsqueda
+  if (tab === 'search'){
+    setTimeout(() => document.getElementById('search-input')?.focus(), 60)
+  }
 }
 
 function pushView(viewId, title, subtitle){
@@ -733,9 +743,19 @@ function renderHomeGreeting(){
 
 function renderHomeMyLists(){
   const el = document.getElementById('home-mylists')
-  const { favoriteLists } = prefs
-  if (!favoriteLists || favoriteLists.length === 0){
-    el.innerHTML = ''
+  const { favoriteLists, repuestoFavLists } = prefs
+  const hasLists = favoriteLists && favoriteLists.length > 0
+  const hasRepFavs = Object.keys(repuestoFavLists || {}).filter(k => repuestoFavLists[k]?.length > 0).length > 0
+  if (!hasLists){
+    // Onboarding suave si nunca guardó nada
+    if (!hasRepFavs){
+      el.innerHTML = `
+        <div class="notice" style="border-left-color:var(--accent)">
+          💡 <b>Tip:</b> tocá ⭐ en cualquier repuesto para guardarlo en una lista (Cuchillos, Sensores, Resortes…). Aparecerán acá.
+        </div>`
+    } else {
+      el.innerHTML = ''
+    }
     return
   }
   el.innerHTML = `
@@ -821,7 +841,7 @@ function renderHomeCatalog(){
     .filter(c => c._count > 0)
 
   const chipsHtml = `
-    <div class="chips">
+    <div class="chips sticky-top">
       <div class="chip ${activeCatFilter==='all'?'active':''}" onclick="setCatFilter('all')">Todos <span class="count">${machines.length}</span></div>
       ${visibleCats.map(c => `
         <div class="chip ${activeCatFilter===c.id?'active':''}" onclick="setCatFilter('${escHtmlAttr(c.id)}')">
@@ -1055,6 +1075,7 @@ async function openMachine(machineId){
   const m = machineMap[machineId]
   if (!m) return
   activeMachineRepFilter = null
+  tgApp?.HapticFeedback?.selectionChanged?.()
 
   pushView('view-machine', m.nombre, [m.marca, m.modelo].filter(Boolean).join(' · '))
 
@@ -1193,6 +1214,7 @@ async function openRepuesto(machineId, repuestoId, opts = {}){
 
   // Si vinimos de un upload o save, no apilamos vista nueva — solo re-renderizamos
   if (!opts.fromUpload && !opts.fromSave){
+    tgApp?.HapticFeedback?.selectionChanged?.()
     pushView('view-repuesto', title, subtitle)
     saveRecent(machineId, repuestoId, title, r.codigoSAP)
   } else {
