@@ -343,22 +343,18 @@ html,body{height:100%;background:var(--bg);color:var(--text);
   </header>
 
   <main id="content">
-    <div id="view-favorites" class="view active"></div>
+    <div id="view-home"      class="view active"></div>
     <div id="view-search"    class="view"></div>
-    <div id="view-catalog"   class="view"></div>
     <div id="view-machine"   class="view"></div>
     <div id="view-repuesto"  class="view"></div>
   </main>
 
   <nav class="bottom-nav">
-    <button class="nav-btn active" id="nav-favorites" onclick="switchTab('favorites')">
-      <span class="icon">⭐</span>Favoritos
+    <button class="nav-btn active" id="nav-home" onclick="switchTab('home')">
+      <span class="icon">🏠</span>Inicio
     </button>
     <button class="nav-btn" id="nav-search" onclick="switchTab('search')">
       <span class="icon">🔍</span>Buscar
-    </button>
-    <button class="nav-btn" id="nav-catalog" onclick="switchTab('catalog')">
-      <span class="icon">🏭</span>Catálogo
     </button>
   </nav>
 </div>
@@ -441,7 +437,7 @@ window.addEventListener('resize', setVH)
 // STATE
 // ═══════════════════════════════════════════════════════════════════
 let uid = null, userRole = 'usuario', isAuthorized = false, isLinked = false, firstName = ''
-let currentTab = 'favorites'
+let currentTab = 'home'
 let navStack = []   // [{viewId, title, subtitle, scrollTop}]
 
 let machines = [], machineMap = {}
@@ -511,9 +507,21 @@ function setLoadingError(m){ document.getElementById('loading-msg').textContent 
 function showApp(){
   document.getElementById('loading').style.display = 'none'
   setStatus('ok', isAuthorized ? 'conectado' : 'sólo lectura')
-  renderFavorites()
-  renderCatalog()
+  renderHome()
   renderSearchEmpty()
+  // Pre-cargar repCache en background (mejora: muestra counts en cards)
+  preloadRepCounts()
+}
+
+async function preloadRepCounts(){
+  // Cargar conteos de repuestos para los primeros equipos sin bloquear
+  const targets = machines.slice(0, 12)  // top 12 para no abrumar
+  for (const m of targets){
+    if (repCache[m.id]) continue
+    try { await loadRepuestos(m.id) } catch {}
+    // Re-renderizar el catalog si está visible (poco frecuente, batched)
+    if (currentTab === 'home') renderHomeCatalog()
+  }
 }
 
 function setStatus(type, label){
@@ -629,9 +637,8 @@ function setHeader(title, subtitle, withBack){
 }
 
 function tabHeader(tab){
-  if (tab === 'favorites') setHeader('Repuestos','@antarfood_mant_bot', false)
-  else if (tab === 'search') setHeader('Buscar','SAP, nombre, código…', false)
-  else if (tab === 'catalog') setHeader('Catálogo', `${machines.length} equipos`, false)
+  if (tab === 'home') setHeader('Repuestos', '@antarfood_mant_bot', false)
+  else if (tab === 'search') setHeader('Buscar', 'SAP, nombre, equipo…', false)
 }
 
 function switchTab(tab){
@@ -646,7 +653,7 @@ function switchTab(tab){
   document.getElementById(`view-${tab}`).classList.add('active')
   tabHeader(tab)
   getContent().scrollTop = 0
-  if (tab === 'favorites') renderFavorites()
+  if (tab === 'home') renderHome()
 }
 
 function pushView(viewId, title, subtitle){
@@ -688,152 +695,121 @@ tgApp?.BackButton?.onClick(() => { if (navStack.length) goBack() })
 // ═══════════════════════════════════════════════════════════════════
 // FAVORITES VIEW
 // ═══════════════════════════════════════════════════════════════════
-async function renderFavorites(){
-  const el = document.getElementById('view-favorites')
-  const { favoriteLists, repuestoFavLists } = prefs
+// ═══════════════════════════════════════════════════════════════════
+// HOME VIEW (unifica saludo + listas + catálogo)
+// ═══════════════════════════════════════════════════════════════════
 
-  let html = ''
+/** Pluralización inteligente: pl(1,'equipo','equipos') → "1 equipo" */
+function pl(n, sing, plur){ return `${n} ${n === 1 ? sing : plur}` }
 
-  // Greeting — trim para evitar "Hola, . 👋" o "Hola,   👋"
+function renderHome(){
+  const el = document.getElementById('view-home')
+  el.innerHTML = `
+    <div id="home-greeting"></div>
+    <div id="home-mylists"></div>
+    <div id="home-repfav"></div>
+    <div id="home-catalog"></div>
+  `
+  renderHomeGreeting()
+  renderHomeMyLists()
+  renderHomeRepFav()    // async — resuelve nodeIds
+  renderHomeCatalog()
+}
+
+function renderHomeGreeting(){
   const rawName = firstName || tgApp?.initDataUnsafe?.user?.first_name || ''
   const name = String(rawName).trim().replace(/^[.,;:\s]+|[.,;:\s]+$/g, '')
   const hello = name ? `Hola, ${escHtml(name)} 👋` : 'Hola 👋'
-  const role = ({admin:'Admin',supervisor:'Supervisor',tecnico:'Técnico',usuario:'Solo lectura'})[userRole] || userRole
+  const role = ({admin:'Admin', supervisor:'Supervisor', tecnico:'Técnico', usuario:'Solo lectura'})[userRole] || userRole
   const linkTag = isLinked
     ? `<span class="tag green">vinculado</span>`
     : `<span class="tag warn">solo Telegram</span>`
-  html += `<div class="hello">
-    <div class="hello-text">${hello}</div>
-    <div class="hello-sub">${escHtml(role)} ${linkTag}</div>
-  </div>`
+  document.getElementById('home-greeting').innerHTML = `
+    <div class="hello">
+      <div class="hello-text">${hello}</div>
+      <div class="hello-sub">${escHtml(role)} ${linkTag}</div>
+    </div>`
+}
 
-  // Machine lists
-  html += `<div class="section">
-    <span class="section-title">Listas de equipos</span>
-    <span class="section-count">${favoriteLists.length}</span>
-  </div>`
-
-  if (favoriteLists.length === 0){
-    html += `<div class="notice">Sin listas guardadas. Creá listas de equipos desde la <b>app principal</b> para verlas aquí.</div>`
-  } else {
-    for (const list of favoriteLists){
-      const ids = list.machineIds || []
-      html += `<div class="cell-group">
-        <div class="cell" onclick="openMachineList(${escHtml(JSON.stringify(list.name))})">
+function renderHomeMyLists(){
+  const el = document.getElementById('home-mylists')
+  const { favoriteLists } = prefs
+  if (!favoriteLists || favoriteLists.length === 0){
+    el.innerHTML = ''
+    return
+  }
+  el.innerHTML = `
+    <div class="section">
+      <span class="section-title">Mis listas</span>
+      <span class="section-count">${favoriteLists.length}</span>
+    </div>
+    <div class="cell-group">
+      ${favoriteLists.map(list => {
+        const ids = list.machineIds || []
+        return `<div class="cell" onclick="openMachineList(${escHtmlAttr(JSON.stringify(list.name))})">
           <div class="cell-icon">📋</div>
           <div class="cell-body">
             <div class="cell-title">${escHtml(list.name)}</div>
-            <div class="cell-sub">${ids.length} equipo(s)</div>
+            <div class="cell-sub">${pl(ids.length, 'equipo', 'equipos')}</div>
           </div>
           <div class="cell-chevron">›</div>
         </div>`
-      // Show first 4 machines as preview cells
-      const preview = ids.slice(0,4)
-      for (const id of preview){
-        const m = machineMap[id]
-        const name = list.machineNames?.[id] || m?.nombre || id
-        html += `<div class="cell" onclick="openMachine('${escHtmlAttr(id)}')">
-          <div class="cell-icon" style="background:${m?.color || '#5288c1'}22;color:${m?.color || '#5288c1'}">🏭</div>
-          <div class="cell-body">
-            <div class="cell-title">${escHtml(name)}</div>
-            ${m ? `<div class="cell-sub">${escHtml([m.marca, m.modelo].filter(Boolean).join(' · ') || 'Equipo')}</div>` : `<div class="cell-sub">No disponible</div>`}
-          </div>
-          <div class="cell-chevron">›</div>
-        </div>`
-      }
-      if (ids.length > 4){
-        html += `<div class="cell" onclick="openMachineList(${escHtml(JSON.stringify(list.name))})">
-          <div class="cell-icon" style="background:transparent">⋯</div>
-          <div class="cell-body">
-            <div class="cell-title" style="color:var(--accent);font-size:14px">Ver ${ids.length - 4} equipo(s) más</div>
-          </div>
-          <div class="cell-chevron">›</div>
-        </div>`
-      }
-      html += `</div>`
-    }
-  }
+      }).join('')}
+    </div>`
+}
 
-  // Repuesto fav lists per machine/node
-  const repKeys = Object.keys(repuestoFavLists).filter(k => repuestoFavLists[k]?.length > 0)
-  if (repKeys.length > 0){
-    // Resolve node names for unknown keys (parallel)
-    await Promise.all(repKeys.filter(k => !machineMap[k]).map(resolveNodeName))
+async function renderHomeRepFav(){
+  const el = document.getElementById('home-repfav')
+  const { repuestoFavLists } = prefs
+  const repKeys = Object.keys(repuestoFavLists || {}).filter(k => repuestoFavLists[k]?.length > 0)
+  if (repKeys.length === 0){ el.innerHTML = ''; return }
 
-    html += `<div class="section">
+  // Resolver nombres de nodeId no presentes en machineMap
+  await Promise.all(repKeys.filter(k => !machineMap[k]).map(resolveNodeName))
+
+  let html = `
+    <div class="section">
       <span class="section-title">Repuestos guardados</span>
       <span class="section-count">${repKeys.length}</span>
+    </div>
+    <div class="cell-group">`
+
+  for (const key of repKeys){
+    const m = machineMap[key]
+    const machineName = m?.nombre || nodeNameCache[key] || key
+    const lists = repuestoFavLists[key] || []
+    const total = lists.reduce((s,l) => s + (l.repuestoIds?.length || 0), 0)
+    const targetMachineId = m ? key : await getMachineIdFromNode(key)
+    html += `<div class="cell" onclick="${targetMachineId ? `openMachine('${escHtmlAttr(targetMachineId)}')` : ''}">
+      <div class="cell-icon" style="background:${m?.color || '#5288c1'}22;color:${m?.color || '#5288c1'}">🔩</div>
+      <div class="cell-body">
+        <div class="cell-title">${escHtml(machineName)}</div>
+        <div class="cell-sub">${pl(total, 'repuesto', 'repuestos')} · ${pl(lists.length, 'lista', 'listas')}</div>
+      </div>
+      <div class="cell-chevron">›</div>
     </div>`
-
-    for (const key of repKeys){
-      const m = machineMap[key]
-      const machineName = m?.nombre || nodeNameCache[key] || key
-      const lists = repuestoFavLists[key] || []
-      const total = lists.reduce((s,l) => s + (l.repuestoIds?.length || 0), 0)
-      // Resolved machineId for navigation: if key is nodeId, find linkedMachineId
-      const targetMachineId = m ? key : await getMachineIdFromNode(key)
-      html += `<div class="cell-group">
-        <div class="cell" onclick="${targetMachineId ? `openMachine('${escHtmlAttr(targetMachineId)}')` : ''}">
-          <div class="cell-icon" style="background:${m?.color || '#5288c1'}22;color:${m?.color || '#5288c1'}">🔩</div>
-          <div class="cell-body">
-            <div class="cell-title">${escHtml(machineName)}</div>
-            <div class="cell-sub">${total} repuesto(s) · ${lists.length} lista(s)</div>
-          </div>
-          <div class="cell-chevron">›</div>
-        </div>
-      </div>`
-    }
   }
-
+  html += `</div>`
   el.innerHTML = html
 }
 
-async function getMachineIdFromNode(nodeId){
-  try {
-    const snap = await db.collection('hierarchy').doc(nodeId).get()
-    if (snap.exists) return snap.data().linkedMachineId || null
-  } catch {}
-  return null
-}
+function renderHomeCatalog(){
+  const el = document.getElementById('home-catalog')
+  // Chips: Todos + categorías con count > 0
+  const visibleCats = categories
+    .map(c => {
+      const desc = categoryDescendants[c.id] || new Set([c.id])
+      return { ...c, _count: machines.filter(m => m.categoryId && desc.has(m.categoryId)).length }
+    })
+    .filter(c => c._count > 0)
 
-// Open a "machine list" — show all machines from a favoriteList
-function openMachineList(listName){
-  const list = prefs.favoriteLists.find(l => l.name === listName)
-  if (!list) return
-  const ids = list.machineIds || []
-  const mList = ids.map(id => ({...(machineMap[id] || {}), id, _name: list.machineNames?.[id] || machineMap[id]?.nombre || id}))
-  pushView('view-machine', list.name, `${ids.length} equipo(s)`)
-  const el = document.getElementById('view-machine')
-  el.innerHTML = `
-    <div class="cell-group">
-      ${mList.map(m => {
-        return `<div class="cell" onclick="openMachine('${escHtmlAttr(m.id)}')">
-          <div class="cell-icon" style="background:${m.color || '#5288c1'}22;color:${m.color || '#5288c1'}">🏭</div>
-          <div class="cell-body">
-            <div class="cell-title">${escHtml(m._name)}</div>
-            <div class="cell-sub">${escHtml([m.marca, m.modelo].filter(Boolean).join(' · ') || 'Equipo')}</div>
-          </div>
-          <div class="cell-chevron">›</div>
-        </div>`
-      }).join('')}
-    </div>
-    ${mList.length === 0 ? emptyHtml('📋','Lista vacía','No hay equipos en esta lista') : ''}
-  `
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// CATALOG VIEW
-// ═══════════════════════════════════════════════════════════════════
-function renderCatalog(){
-  const el = document.getElementById('view-catalog')
-  const chips = `
+  const chipsHtml = `
     <div class="chips">
       <div class="chip ${activeCatFilter==='all'?'active':''}" onclick="setCatFilter('all')">Todos <span class="count">${machines.length}</span></div>
-      ${categories.map(c => {
-        const desc = categoryDescendants[c.id] || new Set([c.id])
-        const count = machines.filter(m => m.categoryId && desc.has(m.categoryId)).length
-        return `<div class="chip ${activeCatFilter===c.id?'active':''}" onclick="setCatFilter('${escHtmlAttr(c.id)}')">${escHtml(c.nombre)} <span class="count">${count}</span></div>`
-      }).join('')}
+      ${visibleCats.map(c => `
+        <div class="chip ${activeCatFilter===c.id?'active':''}" onclick="setCatFilter('${escHtmlAttr(c.id)}')">
+          ${escHtml(c.nombre)} <span class="count">${c._count}</span>
+        </div>`).join('')}
     </div>`
 
   let filtered
@@ -847,12 +823,49 @@ function renderCatalog(){
     ? emptyHtml('🏭','Sin equipos','No hay equipos en esta categoría')
     : `<div class="cell-group">${filtered.map(machineCellHtml).join('')}</div>`
 
-  el.innerHTML = chips + list
+  el.innerHTML = `
+    <div class="section">
+      <span class="section-title">Todos los equipos</span>
+      <span class="section-count">${pl(filtered.length, 'equipo', 'equipos')}</span>
+    </div>
+    ${chipsHtml}
+    ${list}`
 }
 
 function setCatFilter(id){
   activeCatFilter = id
-  renderCatalog()
+  renderHomeCatalog()
+}
+
+async function getMachineIdFromNode(nodeId){
+  try {
+    const snap = await db.collection('hierarchy').doc(nodeId).get()
+    if (snap.exists) return snap.data().linkedMachineId || null
+  } catch {}
+  return null
+}
+
+// Abrir una "lista de equipos" — muestra todos los equipos de la lista
+function openMachineList(listName){
+  const list = prefs.favoriteLists.find(l => l.name === listName)
+  if (!list) return
+  const ids = list.machineIds || []
+  const mList = ids.map(id => ({...(machineMap[id] || {}), id, _name: list.machineNames?.[id] || machineMap[id]?.nombre || id}))
+  pushView('view-machine', list.name, pl(ids.length, 'equipo', 'equipos'))
+  const el = document.getElementById('view-machine')
+  el.innerHTML = mList.length === 0
+    ? emptyHtml('📋','Lista vacía','No hay equipos en esta lista')
+    : `<div class="cell-group">
+        ${mList.map(m => `
+          <div class="cell" onclick="openMachine('${escHtmlAttr(m.id)}')">
+            <div class="cell-icon" style="background:${m.color || '#5288c1'}22;color:${m.color || '#5288c1'}">🏭</div>
+            <div class="cell-body">
+              <div class="cell-title">${escHtml(m._name)}</div>
+              <div class="cell-sub">${escHtml([m.marca, m.modelo].filter(Boolean).join(' · ') || 'Equipo')}</div>
+            </div>
+            <div class="cell-chevron">›</div>
+          </div>`).join('')}
+      </div>`
 }
 
 function machineCellHtml(m){
@@ -907,33 +920,60 @@ function renderSearchBody(query){
     return
   }
   const q = normalizeSearch(query)
-  const results = []
+
+  // Equipos que matchean
+  const machineHits = machines.filter(m => matchesMachine(m, q))
+
+  // Repuestos que matchean (entre los cargados)
+  const repHits = []
   for (const [machineId, reps] of Object.entries(repCache)){
     const m = machineMap[machineId]
-    for (const r of reps) if (matchesRepuesto(r, q)) results.push({r, m, machineId})
+    for (const r of reps) if (matchesRepuesto(r, q)) repHits.push({r, m, machineId})
   }
-  if (results.length === 0 && Object.keys(repCache).length < machines.length){
-    body.innerHTML = `<div class="empty"><div class="loader"></div><div class="empty-sub">Buscando en todos los equipos…</div></div>`
-    loadAllAndSearch(query)
+
+  // Si aún no cargamos todos los repuestos, completar en background
+  if (Object.keys(repCache).length < machines.length){
+    loadAllAndSearch(query)  // dispara fetch + re-render cuando termine
+  }
+
+  if (machineHits.length === 0 && repHits.length === 0){
+    body.innerHTML = emptyHtml('🔍','Sin resultados',`No hay equipos ni repuestos para "<b>${escHtml(query)}</b>"`)
     return
   }
-  if (results.length === 0){
-    body.innerHTML = emptyHtml('🔍','Sin resultados',`No hay repuestos para "<b>${escHtml(query)}</b>"`)
-    return
-  }
-  results.sort((a,b) => {
+
+  repHits.sort((a,b) => {
     if (normalizeSearch(a.r.codigoSAP) === q) return -1
     if (normalizeSearch(b.r.codigoSAP) === q) return 1
     return 0
   })
+
   body.innerHTML = `
-    <div class="section">
-      <span class="section-title">Resultados</span>
-      <span class="section-count">${results.length}</span>
-    </div>
-    <div class="cell-group">
-      ${results.map(({r,m,machineId}) => repCellHtml(r, machineId, m?.nombre)).join('')}
-    </div>`
+    ${machineHits.length > 0 ? `
+      <div class="section">
+        <span class="section-title">Equipos</span>
+        <span class="section-count">${machineHits.length}</span>
+      </div>
+      <div class="cell-group">
+        ${machineHits.map(machineCellHtml).join('')}
+      </div>` : ''}
+    ${repHits.length > 0 ? `
+      <div class="section">
+        <span class="section-title">Repuestos</span>
+        <span class="section-count">${repHits.length}</span>
+      </div>
+      <div class="cell-group">
+        ${repHits.map(({r,m,machineId}) => repCellHtml(r, machineId, m?.nombre)).join('')}
+      </div>` : ''}
+    ${Object.keys(repCache).length < machines.length ? `
+      <div class="empty" style="padding:20px"><div class="empty-sub">Buscando en más equipos…</div></div>` : ''}`
+}
+
+function matchesMachine(m, normQ){
+  return normalizeSearch(m.nombre).includes(normQ)
+    || normalizeSearch(m.marca).includes(normQ)
+    || normalizeSearch(m.modelo).includes(normQ)
+    || normalizeSearch(m.descripcion).includes(normQ)
+    || normalizeSearch(m.seccion).includes(normQ)
 }
 
 async function loadAllAndSearch(query){
