@@ -1284,6 +1284,13 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // ── Telegram Mini App — whitelist de chats autorizados ───────────────────
+    // Escritura solo via Admin SDK (Cloud Functions). Admin puede gestionar desde PWA.
+    match /telegramAuthorizedChats/{chatId} {
+      allow read: if false;       // solo Admin SDK
+      allow write: if isAdmin();  // admins pueden agregar/quitar grupos desde PWA
+    }
+
     // ── Shoplogix Notification Config ────────────────────────────────────────
     // Config por planta: admins leen/escriben; usuarios autenticados solo leen.
     match /notificationConfig/{plantSlug} {

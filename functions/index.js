@@ -8,7 +8,8 @@ const { getFirestore, FieldValue } = require('firebase-admin/firestore')
 const { getDatabase } = require('firebase-admin/database')
 const { getMessaging } = require('firebase-admin/messaging')
 const { getStorage } = require('firebase-admin/storage')
-const { randomUUID } = require('crypto')
+const { randomUUID, createHmac } = require('crypto')
+const { getAuth } = require('firebase-admin/auth')
 
 initializeApp()
 
@@ -3067,6 +3068,123 @@ exports.setupTelegramTopics = onRequest({ region: 'us-central1' }, async (req, r
     instructions: 'Agregá estas líneas a functions/.env y re-deployer:',
     envLines,
   })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TELEGRAM MINI APP — Repuestos (mant.html)
+// Valida initData HMAC, emite Firebase Custom Token, mapea rol del grupo.
+//
+// Setup inicial: crear doc en Firestore telegramAuthorizedChats/{chatId}
+//   { nombre: 'Grupo Mantenimiento', activo: true }
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * POST /mintTelegramAuthToken
+ * Body: { initData: string }  (raw Telegram WebApp.initData)
+ * Returns: { token, uid, role, authorized, firstName }
+ *   role: 'tecnico' | 'usuario'
+ *   authorized: chat está en la whitelist de telegramAuthorizedChats
+ */
+exports.mintTelegramAuthToken = onRequest({ region: 'us-central1' }, async (req, res) => {
+  // CORS — Mini App corre en WebView de Telegram (origin varía)
+  res.set('Access-Control-Allow-Origin', '*')
+  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS')
+  res.set('Access-Control-Allow-Headers', 'Content-Type')
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return }
+
+  if (req.method !== 'POST') { res.status(405).json({ error: 'Method Not Allowed' }); return }
+
+  const { initData } = req.body || {}
+  if (!initData) { res.status(400).json({ error: 'initData requerido' }); return }
+
+  const botToken = process.env.TELEGRAM_BOT_TOKEN
+  if (!botToken) { res.status(500).json({ error: 'Bot token no configurado' }); return }
+
+  // 1. Validar HMAC-SHA256 (https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app)
+  const urlParams = new URLSearchParams(initData)
+  const hash = urlParams.get('hash')
+  if (!hash) { res.status(401).json({ error: 'Hash faltante' }); return }
+  urlParams.delete('hash')
+
+  const checkString = Array.from(urlParams.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => `${k}=${v}`)
+    .join('\n')
+
+  const secretKey = createHmac('sha256', 'WebAppData').update(botToken).digest()
+  const expectedHash = createHmac('sha256', secretKey).update(checkString).digest('hex')
+
+  if (expectedHash !== hash) {
+    logger.warn('mintTelegramAuthToken: HMAC inválido', { expected: expectedHash, got: hash })
+    res.status(401).json({ error: 'Datos de autenticación inválidos' })
+    return
+  }
+
+  // 2. Verificar antigüedad (máx 24h)
+  const authDate = parseInt(urlParams.get('auth_date') || '0', 10)
+  if (Math.floor(Date.now() / 1000) - authDate > 86400) {
+    res.status(401).json({ error: 'Sesión expirada, reabrir la app' })
+    return
+  }
+
+  // 3. Parsear usuario Telegram
+  let tgUser
+  try { tgUser = JSON.parse(urlParams.get('user') || '{}') } catch {
+    res.status(400).json({ error: 'Datos de usuario inválidos' }); return
+  }
+  if (!tgUser.id) { res.status(400).json({ error: 'user.id faltante' }); return }
+
+  // 4. Determinar chatId: del campo 'chat' en initData, o fallback al env
+  let chatId = process.env.TELEGRAM_CHAT_ID
+  try {
+    const chatData = urlParams.get('chat')
+    if (chatData) chatId = JSON.parse(chatData).id
+  } catch { /* usar fallback */ }
+
+  // 5. Verificar whitelist de chats autorizados
+  let authorized = false
+  let role = 'usuario'
+
+  if (chatId) {
+    const chatDoc = await db.collection('telegramAuthorizedChats').doc(String(chatId)).get()
+    if (chatDoc.exists && chatDoc.data().activo !== false) {
+      authorized = true
+      // Verificar rol del usuario en el grupo
+      const memberResult = await callTelegramApi('getChatMember', {
+        chat_id: chatId,
+        user_id: tgUser.id,
+      })
+      if (memberResult?.ok) {
+        const status = memberResult.result?.status
+        role = (status === 'creator' || status === 'administrator') ? 'tecnico' : 'usuario'
+      }
+    }
+  }
+
+  // 6. UID virtual y doc de usuario
+  const virtualUid = `tg_${tgUser.id}`
+  await db.collection('users').doc(virtualUid).set({
+    nombre: tgUser.first_name || 'Usuario',
+    apellido: tgUser.last_name || '',
+    email: `tg_${tgUser.id}@telegram.virtual`,
+    rol: authorized ? role : 'usuario',
+    activo: authorized,
+    telegramId: String(tgUser.id),
+    telegramUsername: tgUser.username || null,
+    isTelegramUser: true,
+    lastSeenAt: FieldValue.serverTimestamp(),
+  }, { merge: true })
+
+  // 7. Emitir Firebase Custom Token
+  const customToken = await getAuth().createCustomToken(virtualUid, {
+    isTelegramUser: true,
+    telegramId: String(tgUser.id),
+    role,
+    authorized,
+  })
+
+  logger.info('mintTelegramAuthToken: OK', { uid: virtualUid, role, authorized, chatId })
+  res.json({ token: customToken, uid: virtualUid, role, authorized, firstName: tgUser.first_name || '' })
 })
 
 // ═══════════════════════════════════════════════════════════════════════════

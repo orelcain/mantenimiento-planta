@@ -1,0 +1,1291 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Repuestos — @antarfood_mant_bot</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+
+:root{
+  --bg:      var(--tg-theme-bg-color,#0d1117);
+  --bg2:     var(--tg-theme-secondary-bg-color,#161b22);
+  --text:    var(--tg-theme-text-color,#e6edf3);
+  --hint:    var(--tg-theme-hint-color,#7d8590);
+  --accent:  var(--tg-theme-button-color,#1f6feb);
+  --acctxt:  var(--tg-theme-button-text-color,#ffffff);
+  --link:    var(--tg-theme-link-color,#58a6ff);
+  --danger:  #f85149;
+  --green:   #3fb950;
+  --nav-h:   60px;
+  --hdr-h:   52px;
+  --r:       10px;
+}
+
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px}
+#app{display:flex;flex-direction:column;height:100dvh;overflow:hidden}
+
+/* ── Header ─────────────────────────────────────────────────────────── */
+header{
+  height:var(--hdr-h);min-height:var(--hdr-h);
+  display:flex;align-items:center;justify-content:space-between;padding:0 14px;
+  background:var(--bg2);border-bottom:1px solid rgba(255,255,255,.06);
+  font-weight:700;font-size:16px;flex-shrink:0;
+}
+header .logo{display:flex;align-items:center;gap:9px}
+header .logo-icon{width:32px;height:32px;border-radius:50%;background:var(--accent);
+  display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+header .logo-text{line-height:1.2}
+header .logo-sub{font-size:10px;font-weight:400;color:var(--hint)}
+.status-dot{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;
+  padding:2px 8px;border-radius:99px;flex-shrink:0}
+.status-dot::before{content:'';width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.s-ok  {background:rgba(63,185,80,.15);color:var(--green)}
+.s-ok::before{background:var(--green);box-shadow:0 0 5px var(--green)}
+.s-err {background:rgba(248,81,73,.15);color:var(--danger)}
+.s-err::before{background:var(--danger)}
+.s-loading{background:rgba(125,133,144,.12);color:var(--hint)}
+.s-loading::before{background:var(--hint);animation:blink .9s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:.3}50%{opacity:1}}
+
+/* ── Content area ────────────────────────────────────────────────────── */
+#content{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+.view{display:none}
+.view.active{display:block}
+
+/* ── Bottom nav ─────────────────────────────────────────────────────── */
+.bottom-nav{height:var(--nav-h);min-height:var(--nav-h);display:flex;
+  background:var(--bg2);border-top:1px solid rgba(255,255,255,.06);flex-shrink:0}
+.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:3px;border:none;background:none;color:var(--hint);font-size:10px;font-weight:500;
+  cursor:pointer;transition:color .15s;position:relative;padding:0}
+.nav-btn .icon{font-size:22px;line-height:1}
+.nav-btn.active{color:var(--accent)}
+.nav-btn.active::after{content:'';position:absolute;top:0;left:20%;right:20%;
+  height:2px;background:var(--accent);border-radius:99px}
+
+/* ── Loading screen ─────────────────────────────────────────────────── */
+#loading-screen{position:fixed;inset:0;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:16px;z-index:100}
+.loader{width:36px;height:36px;border:3px solid rgba(255,255,255,.1);
+  border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#loading-msg{color:var(--hint);font-size:14px}
+#loading-retry{display:none;margin-top:12px;padding:10px 24px;background:var(--accent);
+  color:var(--acctxt);border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer}
+
+/* ── Search bar ─────────────────────────────────────────────────────── */
+.search-bar{padding:10px 12px;position:sticky;top:0;background:var(--bg);
+  z-index:5;border-bottom:1px solid rgba(255,255,255,.04)}
+.search-wrap{position:relative}
+.search-input{width:100%;padding:9px 36px 9px 36px;background:var(--bg2);
+  border:1px solid rgba(255,255,255,.08);border-radius:var(--r);
+  color:var(--text);font-size:15px;outline:none;transition:border-color .2s}
+.search-input::placeholder{color:var(--hint)}
+.search-input:focus{border-color:var(--accent)}
+.search-icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);
+  font-size:15px;pointer-events:none;color:var(--hint)}
+.search-clear{position:absolute;right:10px;top:50%;transform:translateY(-50%);
+  border:none;background:none;color:var(--hint);font-size:17px;cursor:pointer;
+  width:24px;height:24px;display:none;align-items:center;justify-content:center;
+  border-radius:50%;padding:0;line-height:1}
+.search-clear.show{display:flex}
+
+/* ── Section header ─────────────────────────────────────────────────── */
+.section-hdr{padding:14px 14px 6px;display:flex;align-items:center;justify-content:space-between}
+.section-title{font-size:13px;font-weight:600;color:var(--hint);text-transform:uppercase;letter-spacing:.5px}
+.section-count{font-size:12px;color:var(--hint)}
+
+/* ── Empty / error states ─────────────────────────────────────────────── */
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:48px 24px;gap:12px;text-align:center}
+.empty-icon{font-size:48px;opacity:.4}
+.empty-title{font-weight:600;color:var(--text)}
+.empty-sub{font-size:13px;color:var(--hint);line-height:1.5}
+
+/* ── Repuesto list item ──────────────────────────────────────────────── */
+.rep-item{display:flex;align-items:center;padding:11px 14px;gap:12px;
+  cursor:pointer;transition:background .12s;border-bottom:1px solid rgba(255,255,255,.04)}
+.rep-item:active{background:rgba(255,255,255,.03)}
+.rep-icon-box{width:40px;height:40px;border-radius:8px;background:var(--bg2);
+  display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.rep-body{flex:1;min-width:0}
+.rep-name{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rep-code{font-size:11px;color:var(--link);font-family:monospace;margin-top:1px}
+.rep-meta{font-size:11px;color:var(--hint);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rep-fav{color:var(--hint);font-size:20px;flex-shrink:0;transition:color .15s}
+.rep-fav.on{color:#f59e0b}
+
+/* ── Machine card ───────────────────────────────────────────────────── */
+.machines-list{padding:8px 0}
+.machine-item{display:flex;align-items:center;padding:12px 14px;gap:12px;
+  cursor:pointer;transition:background .12s;border-bottom:1px solid rgba(255,255,255,.04)}
+.machine-item:active{background:rgba(255,255,255,.03)}
+.machine-color{width:44px;height:44px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.machine-body{flex:1;min-width:0}
+.machine-name{font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.machine-sub{font-size:12px;color:var(--hint);margin-top:2px}
+.machine-badge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;
+  background:rgba(255,255,255,.08);color:var(--hint);flex-shrink:0;white-space:nowrap}
+.machine-badge.has-rep{background:rgba(31,111,235,.15);color:var(--link)}
+
+/* ── Chips (category filter) ────────────────────────────────────────── */
+.chips-row{display:flex;gap:6px;padding:8px 12px;overflow-x:auto;
+  scrollbar-width:none;-webkit-overflow-scrolling:touch;flex-shrink:0}
+.chips-row::-webkit-scrollbar{display:none}
+.chip{padding:5px 12px;border-radius:99px;font-size:12px;font-weight:500;
+  cursor:pointer;transition:all .15s;white-space:nowrap;flex-shrink:0;
+  border:1px solid rgba(255,255,255,.1);color:var(--hint);background:none}
+.chip.active{background:var(--accent);color:var(--acctxt);border-color:var(--accent)}
+
+/* ── Detail view ────────────────────────────────────────────────────── */
+.detail-hero{padding:16px 14px 12px;border-bottom:1px solid rgba(255,255,255,.06);
+  display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.detail-title{font-size:18px;font-weight:700;line-height:1.3;flex:1;min-width:0}
+.detail-fav-btn{width:40px;height:40px;border-radius:50%;border:1.5px solid rgba(255,255,255,.12);
+  background:none;font-size:22px;cursor:pointer;display:flex;align-items:center;
+  justify-content:center;transition:all .15s;flex-shrink:0;color:var(--hint)}
+.detail-fav-btn.on{color:#f59e0b;border-color:#f59e0b;background:rgba(245,158,11,.1)}
+
+.info-section{padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.04)}
+.info-row{display:flex;justify-content:space-between;align-items:flex-start;
+  padding:6px 0;border-bottom:1px solid rgba(255,255,255,.03);gap:12px}
+.info-row:last-child{border-bottom:none}
+.info-label{font-size:12px;color:var(--hint);flex-shrink:0;min-width:90px}
+.info-value{font-size:13px;text-align:right;word-break:break-all;font-weight:500}
+.info-value.code{font-family:monospace;color:var(--link);font-size:12px}
+.info-value.obs{text-align:left;color:var(--hint);font-size:12px;font-style:italic}
+
+.section-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;
+  color:var(--hint);padding:12px 14px 4px}
+
+/* ── Photo gallery ──────────────────────────────────────────────────── */
+.gallery{display:flex;gap:8px;padding:8px 14px 12px;overflow-x:auto;
+  -webkit-overflow-scrolling:touch;scrollbar-width:none}
+.gallery::-webkit-scrollbar{display:none}
+.gallery-img{width:120px;height:90px;border-radius:8px;object-fit:cover;
+  flex-shrink:0;background:var(--bg2);cursor:pointer;border:1.5px solid rgba(255,255,255,.07)}
+.gallery-img:active{opacity:.85}
+.gallery-empty{padding:12px 14px;color:var(--hint);font-size:13px}
+
+/* ── Lightbox ───────────────────────────────────────────────────────── */
+#lightbox{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:200;
+  display:none;align-items:center;justify-content:center;flex-direction:column}
+#lightbox.open{display:flex}
+#lightbox img{max-width:95vw;max-height:80vh;border-radius:8px;object-fit:contain}
+#lightbox .lbx-close{position:absolute;top:16px;right:16px;color:#fff;font-size:28px;
+  cursor:pointer;background:rgba(0,0,0,.5);border-radius:50%;width:36px;height:36px;
+  display:flex;align-items:center;justify-content:center;border:none}
+#lightbox .lbx-caption{color:rgba(255,255,255,.7);font-size:12px;margin-top:8px;padding:0 16px;text-align:center}
+
+/* ── Favorites ──────────────────────────────────────────────────────── */
+.fav-list-card{margin:8px 12px;border-radius:var(--r);background:var(--bg2);
+  border:1px solid rgba(255,255,255,.06);overflow:hidden}
+.fav-list-header{display:flex;align-items:center;padding:12px 14px;gap:10px;cursor:pointer}
+.fav-list-header:active{background:rgba(255,255,255,.03)}
+.fav-list-icon{font-size:20px;flex-shrink:0}
+.fav-list-meta{flex:1;min-width:0}
+.fav-list-name{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fav-list-count{font-size:11px;color:var(--hint);margin-top:2px}
+.fav-list-actions{display:flex;gap:4px}
+.fav-action-btn{width:32px;height:32px;border-radius:8px;border:none;background:rgba(255,255,255,.06);
+  color:var(--hint);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.fav-action-btn:active{background:rgba(255,255,255,.1)}
+
+.fav-machine-chips{display:flex;gap:5px;padding:0 14px 10px;flex-wrap:wrap}
+.fav-machine-chip{padding:4px 10px;border-radius:99px;font-size:11px;background:rgba(255,255,255,.06);
+  color:var(--text);cursor:pointer;display:flex;align-items:center;gap:4px}
+.fav-machine-chip:active{background:rgba(255,255,255,.1)}
+
+.add-list-btn{display:flex;align-items:center;gap:8px;padding:12px 14px;cursor:pointer;
+  color:var(--accent);font-size:14px;font-weight:500;transition:opacity .15s}
+.add-list-btn:active{opacity:.7}
+
+/* ── Bottom sheet ────────────────────────────────────────────────────── */
+#sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:150;
+  display:none;opacity:0;transition:opacity .2s}
+#sheet-overlay.open{display:block;opacity:1}
+#sheet{position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-radius:20px 20px 0 0;
+  z-index:160;padding:0 0 env(safe-area-inset-bottom);transform:translateY(100%);
+  transition:transform .25s ease;max-height:70vh;overflow-y:auto}
+#sheet.open{transform:translateY(0)}
+.sheet-handle{width:36px;height:4px;border-radius:2px;background:rgba(255,255,255,.15);
+  margin:12px auto 4px}
+.sheet-title{font-size:16px;font-weight:700;padding:4px 16px 12px;
+  border-bottom:1px solid rgba(255,255,255,.06)}
+.sheet-list-item{display:flex;align-items:center;padding:13px 16px;gap:12px;cursor:pointer;
+  transition:background .12s;border-bottom:1px solid rgba(255,255,255,.04)}
+.sheet-list-item:active{background:rgba(255,255,255,.04)}
+.sheet-list-item .sli-icon{font-size:22px;flex-shrink:0;width:32px;text-align:center}
+.sheet-list-item .sli-text{flex:1;min-width:0}
+.sheet-list-item .sli-name{font-weight:500;font-size:14px}
+.sheet-list-item .sli-sub{font-size:11px;color:var(--hint);margin-top:1px}
+.sheet-list-item .sli-check{font-size:18px;color:var(--accent)}
+.sheet-new-list{display:flex;align-items:center;gap:10px;padding:13px 16px;cursor:pointer;
+  color:var(--accent);font-size:14px;font-weight:500}
+.sheet-new-list:active{opacity:.7}
+
+/* ── Input modal ─────────────────────────────────────────────────────── */
+#input-modal{position:fixed;inset:0;z-index:200;display:none;
+  align-items:center;justify-content:center;padding:24px}
+#input-modal.open{display:flex}
+#input-modal .modal-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.6)}
+#input-modal .modal-box{position:relative;background:var(--bg2);border-radius:14px;
+  padding:20px;width:100%;max-width:340px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+#input-modal .modal-title{font-size:16px;font-weight:700;margin-bottom:14px}
+#input-modal input{width:100%;padding:10px 12px;background:var(--bg);border:1px solid rgba(255,255,255,.1);
+  border-radius:8px;color:var(--text);font-size:15px;outline:none;margin-bottom:14px}
+#input-modal input:focus{border-color:var(--accent)}
+.modal-btns{display:flex;gap:8px;justify-content:flex-end}
+.btn-cancel{padding:9px 18px;border-radius:8px;border:1px solid rgba(255,255,255,.1);
+  background:none;color:var(--hint);font-size:14px;cursor:pointer}
+.btn-ok{padding:9px 18px;border-radius:8px;border:none;background:var(--accent);
+  color:var(--acctxt);font-size:14px;font-weight:600;cursor:pointer}
+
+/* ── Type badge ──────────────────────────────────────────────────────── */
+.type-badge{display:inline-flex;padding:2px 7px;border-radius:5px;font-size:10px;
+  font-weight:600;background:rgba(255,255,255,.07);color:var(--hint);flex-shrink:0}
+
+/* ── Recents ─────────────────────────────────────────────────────────── */
+.recent-item{display:flex;align-items:center;padding:9px 14px;gap:10px;cursor:pointer;
+  transition:background .12s;border-bottom:1px solid rgba(255,255,255,.03)}
+.recent-item:active{background:rgba(255,255,255,.03)}
+.recent-icon{font-size:18px;width:32px;text-align:center;flex-shrink:0;color:var(--hint)}
+.recent-body{flex:1;min-width:0}
+.recent-name{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.recent-sub{font-size:11px;color:var(--hint);margin-top:1px}
+
+/* ── Skeleton ────────────────────────────────────────────────────────── */
+@keyframes shimmer{0%{background-position:-300px 0}100%{background-position:300px 0}}
+.skeleton{background:linear-gradient(90deg,var(--bg2) 0%,rgba(255,255,255,.06) 50%,var(--bg2) 100%);
+  background-size:600px 100%;animation:shimmer 1.4s infinite linear;border-radius:4px;display:block}
+.skeleton-text{height:14px;margin:5px 0}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ══ LOADING SCREEN ═══════════════════════════════════════════════ -->
+  <div id="loading-screen">
+    <div class="loader"></div>
+    <div id="loading-msg">Autenticando…</div>
+    <button id="loading-retry" onclick="location.reload()">Reintentar</button>
+  </div>
+
+  <!-- ══ MAIN APP ══════════════════════════════════════════════════════ -->
+  <div id="main-app" style="display:none">
+    <header>
+      <div class="logo">
+        <div class="logo-icon">🔩</div>
+        <div class="logo-text">
+          Repuestos
+          <div class="logo-sub">@antarfood_mant_bot</div>
+        </div>
+      </div>
+      <div id="status-dot" class="status-dot s-loading">cargando</div>
+    </header>
+
+    <div id="content">
+
+      <!-- ── SEARCH VIEW ────────────────────────────────────────────── -->
+      <div id="view-search" class="view active">
+        <div class="search-bar">
+          <div class="search-wrap">
+            <span class="search-icon">🔍</span>
+            <input id="search-input" class="search-input" type="search" autocomplete="off"
+              autocorrect="off" spellcheck="false"
+              placeholder="SAP, nombre, código fabricante…">
+            <button id="search-clear" class="search-clear" tabindex="-1">✕</button>
+          </div>
+        </div>
+        <div id="search-body"></div>
+      </div>
+
+      <!-- ── CATALOG VIEW ───────────────────────────────────────────── -->
+      <div id="view-catalog" class="view">
+        <div id="cat-chips" class="chips-row"></div>
+        <div id="machines-list" class="machines-list"></div>
+      </div>
+
+      <!-- ── MACHINE DETAIL VIEW ────────────────────────────────────── -->
+      <div id="view-machine" class="view">
+        <div id="machine-hero" class="detail-hero">
+          <div class="detail-title" id="machine-title">—</div>
+          <button id="machine-fav-btn" class="detail-fav-btn" onclick="onMachineFavTap()">⭐</button>
+        </div>
+        <div id="machine-info"></div>
+        <div id="machine-reps-section"></div>
+      </div>
+
+      <!-- ── REPUESTO DETAIL VIEW ───────────────────────────────────── -->
+      <div id="view-repuesto" class="view">
+        <div id="rep-detail-hero" class="detail-hero">
+          <div id="rep-detail-title" class="detail-title">—</div>
+          <button id="rep-fav-btn" class="detail-fav-btn" onclick="onRepFavTap()">⭐</button>
+        </div>
+        <div id="rep-detail-body"></div>
+      </div>
+
+      <!-- ── FAVORITES VIEW ─────────────────────────────────────────── -->
+      <div id="view-favorites" class="view">
+        <div id="fav-body"></div>
+      </div>
+
+    </div><!-- /content -->
+
+    <nav class="bottom-nav">
+      <button class="nav-btn active" id="nav-search" onclick="switchTab('search')">
+        <span class="icon">🔍</span>Buscar
+      </button>
+      <button class="nav-btn" id="nav-catalog" onclick="switchTab('catalog')">
+        <span class="icon">🏭</span>Catálogo
+      </button>
+      <button class="nav-btn" id="nav-favorites" onclick="switchTab('favorites')">
+        <span class="icon">⭐</span>Favoritos
+      </button>
+    </nav>
+  </div>
+
+</div>
+
+<!-- ══ LIGHTBOX ═════════════════════════════════════════════════════════ -->
+<div id="lightbox" onclick="closeLightbox()">
+  <button class="lbx-close" onclick="closeLightbox()">✕</button>
+  <img id="lightbox-img" src="" alt="">
+  <div id="lightbox-caption" class="lbx-caption"></div>
+</div>
+
+<!-- ══ BOTTOM SHEET ═════════════════════════════════════════════════════ -->
+<div id="sheet-overlay" onclick="closeSheet()"></div>
+<div id="sheet">
+  <div class="sheet-handle"></div>
+  <div id="sheet-title" class="sheet-title">Guardar en lista</div>
+  <div id="sheet-content"></div>
+</div>
+
+<!-- ══ INPUT MODAL ══════════════════════════════════════════════════════ -->
+<div id="input-modal">
+  <div class="modal-backdrop" onclick="closeModal()"></div>
+  <div class="modal-box">
+    <div id="modal-title" class="modal-title">Nueva lista</div>
+    <input id="modal-input" type="text" placeholder="Nombre de la lista" maxlength="40">
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
+      <button class="btn-ok" id="modal-ok">Crear</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════════════════════
+const CF_BASE = 'https://us-central1-mantenimiento-planta-771a3.cloudfunctions.net'
+const MAX_RECENTS = 8
+
+firebase.initializeApp({
+  apiKey: "AIzaSyBsJSh6x3ZGEyuXsM18dSWsJKyU7--KJss",
+  authDomain: "mantenimiento-planta-771a3.firebaseapp.com",
+  projectId: "mantenimiento-planta-771a3",
+  storageBucket: "mantenimiento-planta-771a3.firebasestorage.app",
+})
+const db   = firebase.firestore()
+const auth = firebase.auth()
+
+const tgApp = window.Telegram?.WebApp
+
+// ═══════════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════════
+let uid          = null
+let userRole     = 'usuario'   // 'tecnico' | 'usuario'
+let isAuthorized = false
+let currentTab   = 'search'
+
+// Navigation stack: [{view, machineId?, repuestoId?}]
+let navStack     = []
+
+// Data cache
+let machines     = []          // sorted by orden
+let machineMap   = {}          // id → machine
+let categories   = []
+let repCache     = {}          // machineId → repuesto[]
+let prefs        = { favoriteLists: [], repuestoFavLists: {}, bodegaWatchlist: [] }
+
+// Active filters
+let activeCatFilter = 'all'
+
+// Search
+let searchTimer  = null
+
+// Recents (localStorage)
+let recentIds    = []          // [{ machineId, repuestoId, name, code, ts }]
+
+// Bottom-sheet context
+let sheetCtx     = null        // { type:'machine'|'repuesto', machineId, repuestoId? }
+
+// ═══════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════
+async function init() {
+  tgApp?.ready()
+  tgApp?.expand()
+  tgApp?.enableClosingConfirmation()
+  tgApp?.BackButton.onClick(goBack)
+
+  loadRecents()
+  setLoadingMsg('Autenticando…')
+
+  const initData = tgApp?.initData
+  if (!initData) {
+    setLoadingError('Abrí esta app desde el bot @antarfood_mant_bot en Telegram.')
+    return
+  }
+
+  try {
+    // Mint Firebase custom token
+    const resp = await fetch(`${CF_BASE}/mintTelegramAuthToken`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ initData }),
+    })
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}))
+      setLoadingError(err.error || `Error ${resp.status} al autenticar`)
+      return
+    }
+    const data = await resp.json()
+
+    // Sign in with Firebase custom token
+    setLoadingMsg('Iniciando sesión…')
+    await auth.signInWithCustomToken(data.token)
+    uid          = data.uid
+    userRole     = data.role     || 'usuario'
+    isAuthorized = data.authorized
+
+    if (!isAuthorized) {
+      setLoadingError('Tu grupo de Telegram no está autorizado para usar esta app. Contactá al administrador.')
+      return
+    }
+
+    setLoadingMsg('Cargando datos…')
+    await Promise.all([loadCategories(), loadMachines(), loadPrefs()])
+    showMainApp()
+
+  } catch (err) {
+    console.error('init error', err)
+    setLoadingError('Error de conexión: ' + (err.message || 'desconocido'))
+  }
+}
+
+function setLoadingMsg(msg) {
+  document.getElementById('loading-msg').textContent = msg
+  document.getElementById('loading-retry').style.display = 'none'
+}
+function setLoadingError(msg) {
+  document.getElementById('loading-msg').textContent = msg
+  document.getElementById('loading-retry').style.display = 'block'
+}
+
+function showMainApp() {
+  document.getElementById('loading-screen').style.display = 'none'
+  document.getElementById('main-app').style.display = 'flex'
+  document.getElementById('main-app').style.flexDirection = 'column'
+  setStatus('ok', isAuthorized ? `${tgApp?.initDataUnsafe?.user?.first_name || 'Usuario'}` : 'solo lectura')
+
+  // Initial render
+  renderSearch('')
+  renderCatalog()
+  renderFavorites()
+}
+
+function setStatus(type, label) {
+  const dot = document.getElementById('status-dot')
+  dot.className = 'status-dot ' + (type === 'ok' ? 's-ok' : type === 'err' ? 's-err' : 's-loading')
+  dot.textContent = label || ''
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// DATA LOADING
+// ═══════════════════════════════════════════════════════════════════
+async function loadCategories() {
+  const snap = await db.collection('machineCategories')
+    .where('activa', '==', true).orderBy('orden').get()
+  categories = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .filter(c => c.visible !== false && !c.parentId)
+}
+
+async function loadMachines() {
+  const snap = await db.collection('machines')
+    .where('activa', '==', true).orderBy('orden').get()
+  machines   = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+  machineMap = Object.fromEntries(machines.map(m => [m.id, m]))
+}
+
+async function loadRepuestos(machineId) {
+  if (repCache[machineId]) return repCache[machineId]
+  const snap = await db.collection(`machines/${machineId}/repuestos`)
+    .orderBy('codigoSAP').get()
+  repCache[machineId] = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+  return repCache[machineId]
+}
+
+async function loadPrefs() {
+  if (!uid) return
+  const doc = await db.collection('user_preferences').doc(uid).get()
+  if (doc.exists) {
+    const d = doc.data()
+    prefs = {
+      favoriteLists:    d.favoriteLists    || [],
+      repuestoFavLists: d.repuestoFavLists || {},
+      bodegaWatchlist:  d.bodegaWatchlist  || [],
+    }
+  }
+}
+
+async function savePrefs() {
+  if (!uid) return
+  await db.collection('user_preferences').doc(uid).set({
+    favoriteLists:    prefs.favoriteLists,
+    repuestoFavLists: prefs.repuestoFavLists,
+    bodegaWatchlist:  prefs.bodegaWatchlist,
+    updatedAt:        firebase.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true })
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════════════════════════
+function switchTab(tab) {
+  // Clear nav stack when switching tabs
+  navStack = []
+  currentTab = tab
+  tgApp?.BackButton.hide()
+
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'))
+  document.getElementById(`nav-${tab}`).classList.add('active')
+
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'))
+  document.getElementById(`view-${tab}`).classList.add('active')
+
+  if (tab === 'favorites') renderFavorites()
+}
+
+function pushView(viewId, options = {}) {
+  navStack.push({ viewId: currentViewId(), options: {} })
+  showView(viewId, options)
+  tgApp?.BackButton.show()
+}
+
+function currentViewId() {
+  const active = document.querySelector('.view.active')
+  return active?.id || `view-${currentTab}`
+}
+
+function showView(viewId, options = {}) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'))
+  document.getElementById(viewId)?.classList.add('active')
+}
+
+function goBack() {
+  if (navStack.length === 0) return
+  const prev = navStack.pop()
+  showView(prev.viewId)
+  if (navStack.length === 0) tgApp?.BackButton.hide()
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SEARCH VIEW
+// ═══════════════════════════════════════════════════════════════════
+const searchInput = document.getElementById('search-input')
+const searchClear = document.getElementById('search-clear')
+
+searchInput.addEventListener('input', () => {
+  const q = searchInput.value.trim()
+  searchClear.classList.toggle('show', q.length > 0)
+  clearTimeout(searchTimer)
+  if (q.length === 0) { renderSearch(''); return }
+  if (q.length < 2) return
+  searchTimer = setTimeout(() => renderSearch(q), 300)
+})
+searchClear.addEventListener('click', () => {
+  searchInput.value = ''
+  searchClear.classList.remove('show')
+  renderSearch('')
+})
+
+function renderSearch(query) {
+  const body = document.getElementById('search-body')
+  if (!query) {
+    body.innerHTML = renderRecents()
+    return
+  }
+  const q = query.toUpperCase()
+  // Search across all cached repuestos first, then load remaining machines
+  const results = []
+  for (const [machineId, reps] of Object.entries(repCache)) {
+    const machine = machineMap[machineId]
+    for (const r of reps) {
+      if (matchesRepuesto(r, q)) results.push({ r, machine, machineId })
+    }
+  }
+  if (results.length === 0 && Object.keys(repCache).length < machines.length) {
+    // Load all machines asynchronously and re-render
+    body.innerHTML = `<div class="empty-state"><div class="loader"></div><div class="empty-sub">Buscando…</div></div>`
+    loadAllRepuestosAndSearch(query)
+    return
+  }
+  if (results.length === 0) {
+    body.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">🔍</div>
+      <div class="empty-title">Sin resultados</div>
+      <div class="empty-sub">No hay repuestos que coincidan con "<b>${escHtml(query)}</b>"</div></div>`
+    return
+  }
+  results.sort((a, b) => {
+    // Prioritize SAP code exact match
+    if (a.r.codigoSAP?.toUpperCase() === q) return -1
+    if (b.r.codigoSAP?.toUpperCase() === q) return 1
+    return 0
+  })
+  body.innerHTML = `
+    <div class="section-hdr">
+      <span class="section-title">Resultados</span>
+      <span class="section-count">${results.length}</span>
+    </div>
+    ${results.map(({ r, machine, machineId }) => repItemHtml(r, machineId, machine?.nombre)).join('')}`
+}
+
+async function loadAllRepuestosAndSearch(query) {
+  const unloaded = machines.filter(m => !repCache[m.id])
+  await Promise.all(unloaded.map(m => loadRepuestos(m.id)))
+  if (document.getElementById('search-input').value.trim().toUpperCase().includes(query.toUpperCase())) {
+    renderSearch(query)
+  }
+}
+
+function matchesRepuesto(r, q) {
+  return (r.codigoSAP      || '').toUpperCase().includes(q)
+    || (r.textoBreve        || '').toUpperCase().includes(q)
+    || (r.descripcion       || '').toUpperCase().includes(q)
+    || (r.alias             || '').toUpperCase().includes(q)
+    || (r.codigoFabricante  || '').toUpperCase().includes(q)
+    || (r.nombreManual      || '').toUpperCase().includes(q)
+    || (r.tipo              || '').toUpperCase().includes(q)
+}
+
+function repItemHtml(r, machineId, machineName) {
+  const isFav = isRepFav(machineId, r.id)
+  const icon  = repIcon(r.tipo)
+  const meta  = [machineName, r.tipo, r.seccion].filter(Boolean).join(' · ')
+  return `<div class="rep-item" onclick="openRepuesto('${machineId}','${r.id}')">
+    <div class="rep-icon-box">${icon}</div>
+    <div class="rep-body">
+      <div class="rep-name">${escHtml(r.textoBreve || r.descripcion || r.alias || 'Sin nombre')}</div>
+      ${r.codigoSAP ? `<div class="rep-code">SAP: ${escHtml(r.codigoSAP)}</div>` : ''}
+      ${meta ? `<div class="rep-meta">${escHtml(meta)}</div>` : ''}
+    </div>
+    <div class="rep-fav ${isFav ? 'on' : ''}" onclick="event.stopPropagation();toggleRepFavQuick('${machineId}','${r.id}',this)">★</div>
+  </div>`
+}
+
+function repIcon(tipo) {
+  const map = {
+    'RODAMIENTO':'⚙️','SELLO':'🔵','JUNTA':'🔵','SENSOR':'📡','MOTOR':'⚡',
+    'CORREA':'〰️','CADENA':'🔗','VALVULA':'🔧','FILTRO':'🔳','CUCHILLA':'🔪',
+    'ENGRANAJE':'⚙️','BOMBA':'💧',
+  }
+  if (!tipo) return '🔩'
+  const upper = tipo.toUpperCase()
+  for (const [k, v] of Object.entries(map)) if (upper.includes(k)) return v
+  return '🔩'
+}
+
+// ── Recents ──────────────────────────────────────────────────────────
+function loadRecents() {
+  try { recentIds = JSON.parse(localStorage.getItem('mant_recents') || '[]') } catch { recentIds = [] }
+}
+function saveRecent(machineId, repuestoId, name, code) {
+  recentIds = recentIds.filter(r => !(r.machineId === machineId && r.repuestoId === repuestoId))
+  recentIds.unshift({ machineId, repuestoId, name, code, ts: Date.now() })
+  recentIds = recentIds.slice(0, MAX_RECENTS)
+  localStorage.setItem('mant_recents', JSON.stringify(recentIds))
+}
+function renderRecents() {
+  if (recentIds.length === 0) {
+    return `<div class="empty-state">
+      <div class="empty-icon">🔍</div>
+      <div class="empty-title">Buscá repuestos</div>
+      <div class="empty-sub">Buscá por código SAP, nombre o código de fabricante</div></div>`
+  }
+  return `<div class="section-hdr"><span class="section-title">Vistos recientemente</span></div>
+    ${recentIds.map(rec => `
+    <div class="recent-item" onclick="openRepuesto('${rec.machineId}','${rec.repuestoId}')">
+      <div class="recent-icon">🕑</div>
+      <div class="recent-body">
+        <div class="recent-name">${escHtml(rec.name || 'Sin nombre')}</div>
+        <div class="recent-sub">${rec.code ? `SAP: ${escHtml(rec.code)}` : ''} · ${machineMap[rec.machineId]?.nombre || rec.machineId}</div>
+      </div>
+    </div>`).join('')}`
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CATALOG VIEW
+// ═══════════════════════════════════════════════════════════════════
+function renderCatalog() {
+  renderCatChips()
+  renderMachineList()
+}
+
+function renderCatChips() {
+  const el = document.getElementById('cat-chips')
+  el.innerHTML = `<div class="chip ${activeCatFilter === 'all' ? 'active' : ''}" onclick="setCatFilter('all')">Todas</div>`
+    + categories.map(c => `<div class="chip ${activeCatFilter === c.id ? 'active' : ''}" onclick="setCatFilter('${c.id}')">${escHtml(c.nombre)}</div>`).join('')
+}
+
+function setCatFilter(id) {
+  activeCatFilter = id
+  renderCatChips()
+  renderMachineList()
+}
+
+function renderMachineList() {
+  const el = document.getElementById('machines-list')
+  const filtered = activeCatFilter === 'all' ? machines
+    : machines.filter(m => m.categoryId === activeCatFilter)
+
+  if (filtered.length === 0) {
+    el.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">🏭</div>
+      <div class="empty-title">Sin máquinas</div>
+      <div class="empty-sub">No hay máquinas en esta categoría</div></div>`
+    return
+  }
+  el.innerHTML = filtered.map(m => machineItemHtml(m)).join('')
+}
+
+function machineItemHtml(m) {
+  const reps = repCache[m.id]
+  const count = reps ? reps.length : null
+  const badge = count === null ? '' :
+    count === 0 ? `<span class="machine-badge">Sin repuestos</span>` :
+    `<span class="machine-badge has-rep">${count} repuestos</span>`
+  const colorStyle = `background:${m.color || '#1f6feb'}22;color:${m.color || '#1f6feb'}`
+  return `<div class="machine-item" onclick="openMachine('${m.id}')">
+    <div class="machine-color" style="${colorStyle}">🏭</div>
+    <div class="machine-body">
+      <div class="machine-name">${escHtml(m.nombre)}</div>
+      <div class="machine-sub">${escHtml([m.marca, m.modelo].filter(Boolean).join(' · '))}</div>
+    </div>
+    ${badge}
+  </div>`
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// MACHINE DETAIL
+// ═══════════════════════════════════════════════════════════════════
+async function openMachine(machineId) {
+  const machine = machineMap[machineId]
+  if (!machine) return
+
+  // Push current view onto stack
+  pushView('view-machine')
+
+  // Header
+  document.getElementById('machine-title').textContent = machine.nombre
+
+  // Fav button state
+  const machFavBtn = document.getElementById('machine-fav-btn')
+  machFavBtn.dataset.machineId = machineId
+  updateMachineFavBtn(machineId)
+
+  // Machine info
+  const info = document.getElementById('machine-info')
+  const rows = [
+    machine.marca     ? ['Marca',    machine.marca]     : null,
+    machine.modelo    ? ['Modelo',   machine.modelo]    : null,
+    machine.descripcion ? ['Descripción', machine.descripcion] : null,
+    machine.hierarchyPath ? ['Ubicación', machine.hierarchyPath] : null,
+  ].filter(Boolean)
+  info.innerHTML = rows.length ? `
+    <div class="info-section">
+      ${rows.map(([l,v]) => `<div class="info-row">
+        <span class="info-label">${l}</span>
+        <span class="info-value">${escHtml(v)}</span></div>`).join('')}
+    </div>` : ''
+
+  // Repuestos section
+  const repsSection = document.getElementById('machine-reps-section')
+  repsSection.innerHTML = `<div class="section-label">Cargando repuestos…</div>`
+
+  loadRepuestos(machineId).then(reps => {
+    if (reps.length === 0) {
+      repsSection.innerHTML = `<div class="empty-state">
+        <div class="empty-icon">📭</div>
+        <div class="empty-title">Sin repuestos</div>
+        <div class="empty-sub">Esta máquina no tiene repuestos cargados aún</div></div>`
+      return
+    }
+    repsSection.innerHTML = `
+      <div class="section-hdr">
+        <span class="section-title">Repuestos</span>
+        <span class="section-count">${reps.length}</span>
+      </div>
+      ${reps.map(r => repItemHtml(r, machineId, machine.nombre)).join('')}`
+    // Trigger machine-list re-render to update badge
+    renderMachineList()
+  })
+}
+
+function updateMachineFavBtn(machineId) {
+  const btn = document.getElementById('machine-fav-btn')
+  const anyList = prefs.favoriteLists.some(l => l.machineIds?.includes(machineId))
+  btn.classList.toggle('on', anyList)
+}
+
+function onMachineFavTap() {
+  const machineId = document.getElementById('machine-fav-btn').dataset.machineId
+  if (!machineId) return
+  openSheet('machine', machineId)
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// REPUESTO DETAIL
+// ═══════════════════════════════════════════════════════════════════
+async function openRepuesto(machineId, repuestoId) {
+  // Load if not cached
+  let reps = repCache[machineId]
+  if (!reps) reps = await loadRepuestos(machineId)
+  const r = reps.find(x => x.id === repuestoId)
+  if (!r) return
+
+  const machine = machineMap[machineId]
+  pushView('view-repuesto')
+
+  // Save to recents
+  saveRecent(machineId, repuestoId, r.textoBreve || r.alias || r.descripcion, r.codigoSAP)
+
+  // Title
+  document.getElementById('rep-detail-title').textContent = r.textoBreve || r.alias || r.descripcion || 'Sin nombre'
+  const favBtn = document.getElementById('rep-fav-btn')
+  favBtn.dataset.machineId  = machineId
+  favBtn.dataset.repuestoId = repuestoId
+  favBtn.classList.toggle('on', isRepFav(machineId, repuestoId))
+
+  // Body
+  const body = document.getElementById('rep-detail-body')
+
+  const idRows = [
+    r.codigoSAP        ? ['SAP',           r.codigoSAP,        true]  : null,
+    r.codigoFabricante ? ['Cód. fabricante',r.codigoFabricante, true]  : null,
+    r.alias            ? ['Alias',          r.alias,            false] : null,
+    r.nombreManual     ? ['Nombre manual',  r.nombreManual,     false] : null,
+    r.tipo             ? ['Tipo',           r.tipo,             false] : null,
+    r.seccion          ? ['Sección',        r.seccion,          false] : null,
+    r.numeroSerie      ? ['N° serie',       r.numeroSerie,      true]  : null,
+  ].filter(Boolean)
+
+  const useRows = [
+    ['Cant. por máquina', r.cantidadPorMaquina ?? '—', false],
+    r.ubicacionEnPlanta ? ['Ubicación',     r.ubicacionEnPlanta, false] : null,
+    machine ? ['Máquina',          machine.nombre,     false] : null,
+    // valorUnitario solo para rol tecnico
+    (userRole === 'tecnico' && r.valorUnitario != null)
+      ? ['Valor unitario', `$ ${r.valorUnitario.toLocaleString('es-CL')}`, false] : null,
+  ].filter(Boolean)
+
+  const allPhotos = [...(r.fotosReales || []), ...(r.imagenesManual || [])]
+    .sort((a, b) => (b.esPrincipal ? 1 : 0) - (a.esPrincipal ? 1 : 0))
+
+  body.innerHTML = `
+    ${idRows.length ? `
+    <div class="section-label">Identificación</div>
+    <div class="info-section">
+      ${idRows.map(([l,v,isCode]) => `<div class="info-row">
+        <span class="info-label">${l}</span>
+        <span class="info-value${isCode ? ' code' : ''}">${escHtml(String(v))}</span></div>`).join('')}
+    </div>` : ''}
+
+    <div class="section-label">Uso en planta</div>
+    <div class="info-section">
+      ${useRows.map(([l,v,isCode]) => `<div class="info-row">
+        <span class="info-label">${l}</span>
+        <span class="info-value${isCode ? ' code' : ''}">${escHtml(String(v))}</span></div>`).join('')}
+    </div>
+
+    ${r.observaciones ? `
+    <div class="section-label">Observaciones</div>
+    <div class="info-section">
+      <div class="info-row"><span class="info-value obs">${escHtml(r.observaciones)}</span></div>
+    </div>` : ''}
+
+    <div class="section-label">Fotos (${allPhotos.length})</div>
+    ${allPhotos.length === 0
+      ? `<div class="gallery-empty">Sin fotos. Se pueden agregar desde la PWA.</div>`
+      : `<div class="gallery">
+          ${allPhotos.map((img, i) => `<img class="gallery-img" src="${escHtml(img.url)}"
+            alt="${escHtml(img.descripcion || '')}"
+            onclick="openLightbox('${escHtml(img.url)}','${escHtml(img.descripcion || img.tipo || '')}')">`)
+          .join('')}
+        </div>`}
+    <div style="height:16px"></div>
+  `
+}
+
+function onRepFavTap() {
+  const btn = document.getElementById('rep-fav-btn')
+  const machineId  = btn.dataset.machineId
+  const repuestoId = btn.dataset.repuestoId
+  if (!machineId || !repuestoId) return
+  openSheet('repuesto', machineId, repuestoId)
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// FAVORITES VIEW
+// ═══════════════════════════════════════════════════════════════════
+function renderFavorites() {
+  const el = document.getElementById('fav-body')
+  const { favoriteLists, repuestoFavLists } = prefs
+
+  let html = ''
+
+  // ── Machine lists ──
+  html += `<div class="section-hdr">
+    <span class="section-title">Listas de equipos</span>
+    <span class="section-count">${favoriteLists.length}</span>
+  </div>`
+
+  if (favoriteLists.length === 0) {
+    html += `<div style="padding:8px 14px 4px">
+      <div style="font-size:13px;color:var(--hint)">Guardá equipos en listas para acceso rápido. Usá ⭐ en el detalle de un equipo.</div>
+    </div>`
+  } else {
+    html += favoriteLists.map((list, idx) => {
+      const names = (list.machineIds || []).map(id => machineMap[id]?.nombre || id)
+      return `<div class="fav-list-card">
+        <div class="fav-list-header">
+          <div class="fav-list-icon">📋</div>
+          <div class="fav-list-meta">
+            <div class="fav-list-name">${escHtml(list.name)}</div>
+            <div class="fav-list-count">${list.machineIds?.length || 0} equipo(s)</div>
+          </div>
+          <div class="fav-list-actions">
+            <button class="fav-action-btn" title="Renombrar" onclick="renameMachineList(${idx})">✏️</button>
+            <button class="fav-action-btn" title="Eliminar" onclick="deleteMachineList(${idx})">🗑️</button>
+          </div>
+        </div>
+        ${names.length > 0 ? `<div class="fav-machine-chips">
+          ${names.map((n, mi) => `<div class="fav-machine-chip" onclick="openMachine('${escHtml(list.machineIds[mi])}')">${escHtml(n)}</div>`).join('')}
+        </div>` : ''}
+      </div>`
+    }).join('')
+  }
+
+  html += `<div class="add-list-btn" onclick="createMachineList()">
+    <span style="font-size:20px">＋</span> Nueva lista de equipos
+  </div>`
+
+  // ── Repuesto lists per machine ──
+  const repMachineIds = Object.keys(repuestoFavLists).filter(mid => repuestoFavLists[mid]?.length > 0)
+  if (repMachineIds.length > 0) {
+    html += `<div class="section-hdr" style="margin-top:8px">
+      <span class="section-title">Repuestos guardados</span>
+    </div>`
+
+    html += repMachineIds.map(machineId => {
+      const machine = machineMap[machineId]
+      const machineName = machine?.nombre || machineId
+      const lists = repuestoFavLists[machineId] || []
+      return `<div class="fav-list-card">
+        <div class="fav-list-header">
+          <div class="fav-list-icon">🔩</div>
+          <div class="fav-list-meta">
+            <div class="fav-list-name">${escHtml(machineName)}</div>
+            <div class="fav-list-count">${lists.reduce((s,l) => s + (l.repuestoIds?.length||0), 0)} repuesto(s) en ${lists.length} lista(s)</div>
+          </div>
+        </div>
+        ${lists.map((list, li) => `
+          <div style="padding:0 14px 10px">
+            <div style="font-size:12px;font-weight:600;color:var(--hint);margin-bottom:6px;display:flex;align-items:center;justify-content:space-between">
+              <span>${escHtml(list.name)}</span>
+              <div style="display:flex;gap:4px">
+                <button class="fav-action-btn" onclick="renameRepList('${machineId}',${li})">✏️</button>
+                <button class="fav-action-btn" onclick="deleteRepList('${machineId}',${li})">🗑️</button>
+              </div>
+            </div>
+            ${(list.repuestoIds || []).map(rid => {
+              const reps = repCache[machineId] || []
+              const r = reps.find(x => x.id === rid)
+              return r ? `<div class="rep-item" style="padding:8px 0" onclick="openRepuesto('${machineId}','${rid}')">
+                <div class="rep-icon-box" style="width:32px;height:32px;font-size:16px">${repIcon(r.tipo)}</div>
+                <div class="rep-body">
+                  <div class="rep-name" style="font-size:13px">${escHtml(r.textoBreve || r.alias || 'Sin nombre')}</div>
+                  ${r.codigoSAP ? `<div class="rep-code">SAP: ${escHtml(r.codigoSAP)}</div>` : ''}
+                </div>
+              </div>` : ''
+            }).join('')}
+          </div>`).join('')}
+      </div>`
+    }).join('')
+  }
+
+  el.innerHTML = html + '<div style="height:16px"></div>'
+}
+
+// ── Machine list CRUD ─────────────────────────────────────────────
+function createMachineList() {
+  showModal('Nueva lista de equipos', '', async (name) => {
+    if (!name.trim()) return
+    prefs.favoriteLists.push({ name: name.trim(), machineIds: [], machineNames: {} })
+    await savePrefs()
+    renderFavorites()
+  })
+}
+async function renameMachineList(idx) {
+  showModal('Renombrar lista', prefs.favoriteLists[idx].name, async (name) => {
+    if (!name.trim()) return
+    prefs.favoriteLists[idx].name = name.trim()
+    await savePrefs()
+    renderFavorites()
+  })
+}
+async function deleteMachineList(idx) {
+  prefs.favoriteLists.splice(idx, 1)
+  await savePrefs()
+  renderFavorites()
+}
+
+// ── Repuesto list CRUD ────────────────────────────────────────────
+async function renameRepList(machineId, li) {
+  const list = prefs.repuestoFavLists[machineId]?.[li]
+  if (!list) return
+  showModal('Renombrar lista', list.name, async (name) => {
+    if (!name.trim()) return
+    prefs.repuestoFavLists[machineId][li].name = name.trim()
+    await savePrefs()
+    renderFavorites()
+  })
+}
+async function deleteRepList(machineId, li) {
+  prefs.repuestoFavLists[machineId]?.splice(li, 1)
+  await savePrefs()
+  renderFavorites()
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// FAVORITES HELPERS
+// ═══════════════════════════════════════════════════════════════════
+function isMachineFav(machineId) {
+  return prefs.favoriteLists.some(l => l.machineIds?.includes(machineId))
+}
+function isRepFav(machineId, repuestoId) {
+  const lists = prefs.repuestoFavLists[machineId] || []
+  return lists.some(l => l.repuestoIds?.includes(repuestoId))
+}
+
+// Quick-toggle (add to first "Favoritos" list or create it)
+async function toggleRepFavQuick(machineId, repuestoId, el) {
+  if (!prefs.repuestoFavLists[machineId]) prefs.repuestoFavLists[machineId] = []
+  const lists = prefs.repuestoFavLists[machineId]
+  let defaultList = lists.find(l => l.name === 'Favoritos')
+  if (!defaultList) {
+    defaultList = { name: 'Favoritos', repuestoIds: [] }
+    lists.push(defaultList)
+  }
+  const idx = defaultList.repuestoIds.indexOf(repuestoId)
+  if (idx === -1) {
+    defaultList.repuestoIds.push(repuestoId)
+    el.classList.add('on')
+    tgApp?.HapticFeedback?.notificationOccurred('success')
+  } else {
+    defaultList.repuestoIds.splice(idx, 1)
+    el.classList.remove('on')
+  }
+  await savePrefs()
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// BOTTOM SHEET — Add to list
+// ═══════════════════════════════════════════════════════════════════
+function openSheet(type, machineId, repuestoId) {
+  sheetCtx = { type, machineId, repuestoId }
+  const overlay = document.getElementById('sheet-overlay')
+  const sheet   = document.getElementById('sheet')
+  const title   = document.getElementById('sheet-title')
+  const content = document.getElementById('sheet-content')
+
+  if (type === 'machine') {
+    title.textContent = 'Guardar equipo en lista'
+    const machine = machineMap[machineId]
+    content.innerHTML = prefs.favoriteLists.map((list, idx) => {
+      const inList = list.machineIds?.includes(machineId)
+      return `<div class="sheet-list-item" onclick="toggleMachineInList(${idx})">
+        <div class="sli-icon">📋</div>
+        <div class="sli-text">
+          <div class="sli-name">${escHtml(list.name)}</div>
+          <div class="sli-sub">${list.machineIds?.length || 0} equipos</div>
+        </div>
+        ${inList ? '<div class="sli-check">✓</div>' : ''}
+      </div>`
+    }).join('')
+    + `<div class="sheet-new-list" onclick="createMachineListFromSheet()">
+        <span style="font-size:20px">＋</span> Nueva lista
+      </div>`
+  } else {
+    title.textContent = 'Guardar repuesto en lista'
+    const lists = prefs.repuestoFavLists[machineId] || []
+    content.innerHTML = lists.map((list, idx) => {
+      const inList = list.repuestoIds?.includes(repuestoId)
+      return `<div class="sheet-list-item" onclick="toggleRepInList(${idx})">
+        <div class="sli-icon">📋</div>
+        <div class="sli-text">
+          <div class="sli-name">${escHtml(list.name)}</div>
+          <div class="sli-sub">${list.repuestoIds?.length || 0} repuestos</div>
+        </div>
+        ${inList ? '<div class="sli-check">✓</div>' : ''}
+      </div>`
+    }).join('')
+    + `<div class="sheet-new-list" onclick="createRepListFromSheet()">
+        <span style="font-size:20px">＋</span> Nueva lista
+      </div>`
+  }
+
+  overlay.classList.add('open')
+  requestAnimationFrame(() => sheet.classList.add('open'))
+}
+
+function closeSheet() {
+  document.getElementById('sheet-overlay').classList.remove('open')
+  document.getElementById('sheet').classList.remove('open')
+  sheetCtx = null
+}
+
+async function toggleMachineInList(idx) {
+  if (!sheetCtx) return
+  const { machineId } = sheetCtx
+  const list = prefs.favoriteLists[idx]
+  if (!list.machineIds) list.machineIds = []
+  const pos = list.machineIds.indexOf(machineId)
+  if (pos === -1) {
+    list.machineIds.push(machineId)
+    if (!list.machineNames) list.machineNames = {}
+    list.machineNames[machineId] = machineMap[machineId]?.nombre || machineId
+    tgApp?.HapticFeedback?.notificationOccurred('success')
+  } else {
+    list.machineIds.splice(pos, 1)
+  }
+  await savePrefs()
+  updateMachineFavBtn(machineId)
+  closeSheet()
+  renderFavorites()
+}
+
+async function toggleRepInList(idx) {
+  if (!sheetCtx) return
+  const { machineId, repuestoId } = sheetCtx
+  const lists = prefs.repuestoFavLists[machineId] || []
+  const list  = lists[idx]
+  if (!list.repuestoIds) list.repuestoIds = []
+  const pos = list.repuestoIds.indexOf(repuestoId)
+  if (pos === -1) {
+    list.repuestoIds.push(repuestoId)
+    tgApp?.HapticFeedback?.notificationOccurred('success')
+  } else {
+    list.repuestoIds.splice(pos, 1)
+  }
+  await savePrefs()
+  document.getElementById('rep-fav-btn').classList.toggle('on', isRepFav(machineId, repuestoId))
+  closeSheet()
+  renderFavorites()
+}
+
+function createMachineListFromSheet() {
+  closeSheet()
+  showModal('Nueva lista de equipos', '', async (name) => {
+    if (!name.trim()) return
+    prefs.favoriteLists.push({ name: name.trim(), machineIds: [], machineNames: {} })
+    if (sheetCtx?.machineId) {
+      // immediately add current machine
+      const newList = prefs.favoriteLists[prefs.favoriteLists.length - 1]
+      newList.machineIds.push(sheetCtx.machineId)
+      newList.machineNames[sheetCtx.machineId] = machineMap[sheetCtx.machineId]?.nombre || sheetCtx.machineId
+    }
+    await savePrefs()
+    renderFavorites()
+  })
+}
+
+function createRepListFromSheet() {
+  const ctx = { ...sheetCtx }
+  closeSheet()
+  showModal('Nueva lista de repuestos', '', async (name) => {
+    if (!name.trim()) return
+    if (!prefs.repuestoFavLists[ctx.machineId]) prefs.repuestoFavLists[ctx.machineId] = []
+    const newList = { name: name.trim(), repuestoIds: ctx.repuestoId ? [ctx.repuestoId] : [] }
+    prefs.repuestoFavLists[ctx.machineId].push(newList)
+    await savePrefs()
+    document.getElementById('rep-fav-btn').classList.toggle('on', isRepFav(ctx.machineId, ctx.repuestoId))
+    renderFavorites()
+    tgApp?.HapticFeedback?.notificationOccurred('success')
+  })
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// INPUT MODAL
+// ═══════════════════════════════════════════════════════════════════
+let _modalResolve = null
+function showModal(title, defaultValue, onOk) {
+  document.getElementById('modal-title').textContent = title
+  const inp = document.getElementById('modal-input')
+  inp.value = defaultValue || ''
+  document.getElementById('input-modal').classList.add('open')
+  inp.focus()
+  document.getElementById('modal-ok').onclick = async () => {
+    closeModal()
+    await onOk(inp.value)
+  }
+  inp.onkeydown = (e) => { if (e.key === 'Enter') document.getElementById('modal-ok').click() }
+}
+function closeModal() {
+  document.getElementById('input-modal').classList.remove('open')
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// LIGHTBOX
+// ═══════════════════════════════════════════════════════════════════
+function openLightbox(url, caption) {
+  document.getElementById('lightbox-img').src = url
+  document.getElementById('lightbox-caption').textContent = caption || ''
+  document.getElementById('lightbox').classList.add('open')
+}
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('open')
+  document.getElementById('lightbox-img').src = ''
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════════════════════════
+function escHtml(str) {
+  if (str == null) return ''
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// BOOT
+// ═══════════════════════════════════════════════════════════════════
+init()
+</script>
+</body>
+</html>
