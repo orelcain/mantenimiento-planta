@@ -27,6 +27,10 @@
   --hover:   rgba(255,255,255,.04);
   --press:   rgba(255,255,255,.08);
   --vh:      100dvh;
+  /* aliases usados en HTML generado por JS */
+  --border:  var(--divider);
+  --card:    var(--bg2);
+  --sub:     var(--hint);
 }
 
 html,body{height:100%;background:var(--bg);color:var(--text);
@@ -375,7 +379,7 @@ mark{background:rgba(var(--accent-rgb,82,136,193),.25);color:inherit;border-radi
 /* ── Search overlay ─────────────────────────────────────────────────── */
 #view-search.overlay{display:block;position:fixed;inset:0;z-index:100;
   background:var(--bg);overflow-y:auto;padding-bottom:24px}
-#view-search.overlay .search-bar{position:sticky;top:0;z-index:101;background:var(--bg)}
+#view-search .search-bar{position:sticky;top:0;z-index:101;background:var(--bg)}
 
 /* ── Recientes: acciones + paginación ──────────────────────────────── */
 .section-actions{display:flex;align-items:center;justify-content:space-between;
@@ -896,6 +900,7 @@ function switchTab(tab){
   if (tab === 'hierarchy') renderHierarchyTab()
   if (tab === 'manuales')  renderManualesTab()
   if (tab === 'search'){
+    searchFavOnly = false  // reset para cada apertura del tab
     renderSearchEmpty()  // estructura input + chips + body
     setTimeout(() => document.getElementById('search-input')?.focus(), 60)
     // Pre-cargar repuestos globales en background
@@ -1461,7 +1466,7 @@ function goBack(){
 }
 
 // Telegram BackButton
-tgApp?.BackButton?.onClick(() => { if (navStack.length) goBack() })
+tgApp?.BackButton?.onClick(() => { if (!tgBackBtnHandler && navStack.length) goBack() })
 
 // ═══════════════════════════════════════════════════════════════════
 // FAVORITES VIEW
@@ -2261,9 +2266,9 @@ function renderSearchEmpty(){
     <div id="search-progress"
       style="display:none;padding:6px 16px;font-size:12px;color:var(--sub);text-align:center;
       background:var(--card);border-bottom:1px solid var(--border)"></div>
-    <div style="padding:6px 12px 0">
+    <div class="chips" style="padding:4px 12px 0">
       <button id="search-favs-toggle" onclick="toggleSearchFavOnly()"
-        class="chip ${searchFavOnly?'active':''}" style="width:fit-content">
+        class="chip ${searchFavOnly?'active':''}">
         ★ Solo favoritos
       </button>
     </div>
@@ -2717,12 +2722,16 @@ function openMachineAddToListSheet(machineId){
       ${already ? '' : '<div class="cell-chevron">+</div>'}
     </div>`
   }).join('')
-  showSheet(`
-    <div class="sheet-header"><span class="sheet-title">Agregar a lista</span></div>
+  document.getElementById('sheet-title').textContent = 'Agregar a lista'
+  document.getElementById('sheet-content').innerHTML = `
     <div class="cell-group">${rows || emptyHtml('📋','Sin listas','Crea una lista desde Inicio → Mis listas')}</div>
     <div style="padding:8px 12px 4px">
       <button class="cell-action-btn" style="width:100%" onclick="machineCreateListAndAdd('${mid}')">+ Nueva lista</button>
-    </div>`)
+    </div>`
+  favSheetCtx = null
+  document.getElementById('sheet-overlay').classList.add('open')
+  requestAnimationFrame(() => document.getElementById('sheet').classList.add('open'))
+  tgApp?.HapticFeedback?.impactOccurred('light')
 }
 
 async function addMachineToList(machineId, listIdx){
