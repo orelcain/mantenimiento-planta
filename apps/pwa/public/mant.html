@@ -294,7 +294,7 @@ header .logo-sub{font-size:10px;font-weight:400;color:var(--hint)}
     <div id="content">
 
       <!-- ── SEARCH VIEW ────────────────────────────────────────────── -->
-      <div id="view-search" class="view active">
+      <div id="view-search" class="view">
         <div class="search-bar">
           <div class="search-wrap">
             <span class="search-icon">🔍</span>
@@ -332,22 +332,22 @@ header .logo-sub{font-size:10px;font-weight:400;color:var(--hint)}
         <div id="rep-detail-body"></div>
       </div>
 
-      <!-- ── FAVORITES VIEW ─────────────────────────────────────────── -->
-      <div id="view-favorites" class="view">
+      <!-- ── HOME (FAVORITES) VIEW — TAB 1 ───────────────────────────── -->
+      <div id="view-favorites" class="view active">
         <div id="fav-body"></div>
       </div>
 
     </div><!-- /content -->
 
     <nav class="bottom-nav">
-      <button class="nav-btn active" id="nav-search" onclick="switchTab('search')">
+      <button class="nav-btn active" id="nav-favorites" onclick="switchTab('favorites')">
+        <span class="icon">⭐</span>Inicio
+      </button>
+      <button class="nav-btn" id="nav-search" onclick="switchTab('search')">
         <span class="icon">🔍</span>Buscar
       </button>
       <button class="nav-btn" id="nav-catalog" onclick="switchTab('catalog')">
         <span class="icon">🏭</span>Catálogo
-      </button>
-      <button class="nav-btn" id="nav-favorites" onclick="switchTab('favorites')">
-        <span class="icon">⭐</span>Favoritos
       </button>
     </nav>
   </div>
@@ -404,9 +404,11 @@ const tgApp = window.Telegram?.WebApp
 // STATE
 // ═══════════════════════════════════════════════════════════════════
 let uid          = null
-let userRole     = 'usuario'   // 'tecnico' | 'usuario'
+let userRole     = 'usuario'   // 'admin' | 'supervisor' | 'tecnico' | 'usuario'
 let isAuthorized = false
-let currentTab   = 'search'
+let isLinked     = false       // true si la cuenta TG está vinculada a un usuario PWA
+let firstName    = ''
+let currentTab   = 'favorites'
 
 // Navigation stack: [{view, machineId?, repuestoId?}]
 let navStack     = []
@@ -422,6 +424,13 @@ let prefs        = { favoriteLists: [], repuestoFavLists: {}, bodegaWatchlist: [
 
 // Active filters
 let activeCatFilter = 'all'
+
+// Filtro activo de tag favorito en vista de máquina (null = "Todos")
+let activeMachineRepFilter = null
+
+// Cache: machineId → array de hierarchy nodeIds que apuntan a esta máquina (linkedMachineId)
+// Necesario porque repuestoFavLists está indexado por nodeId, no por machineId
+let machineLinkedNodes = {}
 
 // Search
 let searchTimer  = null
@@ -470,6 +479,8 @@ async function init() {
     uid          = data.uid
     userRole     = data.role     || 'usuario'
     isAuthorized = data.authorized
+    isLinked     = data.isLinked || false
+    firstName    = data.firstName || ''
 
     if (!isAuthorized) {
       setLoadingError('Tu grupo de Telegram no está autorizado para usar esta app. Contactá al administrador.')
@@ -584,6 +595,63 @@ async function loadPrefs() {
       bodegaWatchlist:  d.bodegaWatchlist  || [],
     }
   }
+}
+
+/**
+ * Busca los hierarchy nodes que linkean a una máquina (linkedMachineId == machineId)
+ * y devuelve sus IDs. Cachea el resultado.
+ * Necesario porque repuestoFavLists del PWA está indexado por hierarchy nodeId.
+ */
+async function getLinkedNodeIds(machineId) {
+  if (machineLinkedNodes[machineId]) return machineLinkedNodes[machineId]
+  try {
+    const snap = await db.collection('hierarchy')
+      .where('linkedMachineId', '==', machineId)
+      .get()
+    const ids = snap.docs.map(d => d.id)
+    machineLinkedNodes[machineId] = ids
+    return ids
+  } catch (e) {
+    console.warn('getLinkedNodeIds error', e)
+    machineLinkedNodes[machineId] = []
+    return []
+  }
+}
+
+/**
+ * Devuelve las RepuestoFavList del usuario para una máquina, fusionando
+ * todas las del hierarchy. Cada entrada es { name, repuestoIds }.
+ * Si hay listas con el mismo nombre en varios nodes, se mergean los IDs.
+ */
+async function getMachineFavListsMerged(machineId) {
+  const repFavLists = prefs.repuestoFavLists || {}
+  const nodeIds = await getLinkedNodeIds(machineId)
+  // También chequear directamente por machineId por si se creó así desde la Mini App
+  const keys = [...nodeIds, machineId]
+  const merged = new Map() // name → Set(repuestoIds)
+  for (const k of keys) {
+    const lists = repFavLists[k] || []
+    for (const l of lists) {
+      if (!merged.has(l.name)) merged.set(l.name, new Set())
+      const set = merged.get(l.name)
+      ;(l.repuestoIds || []).forEach(id => set.add(id))
+    }
+  }
+  return Array.from(merged.entries()).map(([name, set]) => ({
+    name,
+    repuestoIds: Array.from(set),
+  }))
+}
+
+/**
+ * ¿Pertenece este repuesto a la lista (por nombre) en favoritos?
+ * Matchea por id directo, o por convención inv-{codigoSAP}, o por codigoSAP.
+ */
+function matchesRepFavList(rep, repIdSet) {
+  if (repIdSet.has(rep.id)) return true
+  if (rep.codigoSAP && repIdSet.has(`inv-${rep.codigoSAP}`)) return true
+  if (rep.codigoSAP && repIdSet.has(rep.codigoSAP)) return true
+  return false
 }
 
 async function savePrefs() {
@@ -842,6 +910,9 @@ async function openMachine(machineId) {
   const machine = machineMap[machineId]
   if (!machine) return
 
+  // Reset filter cuando entrás a una máquina nueva
+  activeMachineRepFilter = null
+
   // Push current view onto stack
   pushView('view-machine')
 
@@ -860,6 +931,7 @@ async function openMachine(machineId) {
     machine.modelo    ? ['Modelo',   machine.modelo]    : null,
     machine.descripcion ? ['Descripción', machine.descripcion] : null,
     machine.hierarchyPath ? ['Ubicación', machine.hierarchyPath] : null,
+    machine.activa === false ? ['Estado', 'Archivada'] : null,
   ].filter(Boolean)
   info.innerHTML = rows.length ? `
     <div class="info-section">
@@ -872,23 +944,82 @@ async function openMachine(machineId) {
   const repsSection = document.getElementById('machine-reps-section')
   repsSection.innerHTML = `<div class="section-label">Cargando repuestos…</div>`
 
-  loadRepuestos(machineId).then(reps => {
-    if (reps.length === 0) {
-      repsSection.innerHTML = `<div class="empty-state">
-        <div class="empty-icon">📭</div>
-        <div class="empty-title">Sin repuestos</div>
-        <div class="empty-sub">Esta máquina no tiene repuestos cargados aún</div></div>`
-      return
+  // Cargar repuestos + listas de favoritos en paralelo
+  const [reps, favLists] = await Promise.all([
+    loadRepuestos(machineId),
+    getMachineFavListsMerged(machineId),
+  ])
+
+  renderMachineDetailBody(machineId, reps, favLists)
+  renderMachineList()
+}
+
+/**
+ * Renderiza body de view-machine: chips de tags favoritos + listado filtrado.
+ * Se reusa al cambiar de filtro sin tener que recargar repuestos.
+ */
+function renderMachineDetailBody(machineId, reps, favLists) {
+  const repsSection = document.getElementById('machine-reps-section')
+  const machine = machineMap[machineId]
+
+  if (reps.length === 0) {
+    repsSection.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">📭</div>
+      <div class="empty-title">Sin repuestos</div>
+      <div class="empty-sub">Esta máquina no tiene repuestos cargados aún</div></div>`
+    return
+  }
+
+  // Filtrar según el chip activo
+  let filtered = reps
+  if (activeMachineRepFilter) {
+    const list = favLists.find(l => l.name === activeMachineRepFilter)
+    if (list) {
+      const idSet = new Set(list.repuestoIds)
+      filtered = reps.filter(r => matchesRepFavList(r, idSet))
     }
-    repsSection.innerHTML = `
-      <div class="section-hdr">
-        <span class="section-title">Repuestos</span>
-        <span class="section-count">${reps.length}</span>
+  }
+
+  // Chips de tags favoritos (si hay listas)
+  const chipsHtml = favLists.length > 0 ? `
+    <div class="chips-row" style="padding:8px 14px 0;overflow-x:auto;flex-wrap:nowrap">
+      <div class="chip ${activeMachineRepFilter === null ? 'active' : ''}"
+           onclick="setMachineRepFilter('${machineId}', null)">
+        Todos <span style="opacity:.6">${reps.length}</span>
       </div>
-      ${reps.map(r => repItemHtml(r, machineId, machine.nombre)).join('')}`
-    // Trigger machine-list re-render to update badge
-    renderMachineList()
-  })
+      ${favLists.map(l => {
+        const isActive = activeMachineRepFilter === l.name
+        const matchCount = reps.filter(r => matchesRepFavList(r, new Set(l.repuestoIds))).length
+        return `<div class="chip ${isActive ? 'active' : ''}"
+                     onclick="setMachineRepFilter('${machineId}', ${JSON.stringify(l.name)})">
+          ${escHtml(l.name)} <span style="opacity:.6">${matchCount}</span>
+        </div>`
+      }).join('')}
+    </div>` : ''
+
+  const headerLabel = activeMachineRepFilter ? `Repuestos · ${escHtml(activeMachineRepFilter)}` : 'Repuestos'
+
+  repsSection.innerHTML = `
+    ${chipsHtml}
+    <div class="section-hdr">
+      <span class="section-title">${headerLabel}</span>
+      <span class="section-count">${filtered.length}${activeMachineRepFilter ? `/${reps.length}` : ''}</span>
+    </div>
+    ${filtered.length === 0
+      ? `<div class="empty-state" style="padding:20px"><div class="empty-sub">Ningún repuesto coincide con esta lista</div></div>`
+      : filtered.map(r => repItemHtml(r, machineId, machine.nombre)).join('')}`
+}
+
+/**
+ * Cambia el filtro activo de tags favoritos en la vista de máquina y re-renderiza.
+ */
+function setMachineRepFilter(machineId, listName) {
+  activeMachineRepFilter = listName
+  // Re-render usando datos cacheados (no re-fetch)
+  Promise.all([
+    Promise.resolve(repCache[machineId] || []),
+    getMachineFavListsMerged(machineId),
+  ]).then(([reps, favLists]) => renderMachineDetailBody(machineId, reps, favLists))
 }
 
 function updateMachineFavBtn(machineId) {
@@ -943,8 +1074,8 @@ async function openRepuesto(machineId, repuestoId) {
     ['Cant. por máquina', r.cantidadPorMaquina ?? '—', false],
     r.ubicacionEnPlanta ? ['Ubicación',     r.ubicacionEnPlanta, false] : null,
     machine ? ['Máquina',          machine.nombre,     false] : null,
-    // valorUnitario solo para rol tecnico
-    (userRole === 'tecnico' && r.valorUnitario != null)
+    // valorUnitario solo para roles con permisos (admin/supervisor/tecnico)
+    (['admin','supervisor','tecnico'].includes(userRole) && r.valorUnitario != null)
       ? ['Valor unitario', `$ ${r.valorUnitario.toLocaleString('es-CL')}`, false] : null,
   ].filter(Boolean)
 
@@ -1002,6 +1133,21 @@ function renderFavorites() {
   const { favoriteLists, repuestoFavLists } = prefs
 
   let html = ''
+
+  // ── Welcome header ──
+  const greeting = firstName || 'Hola'
+  const roleLabel = ({
+    admin: '👑 Admin', supervisor: '🛡️ Supervisor',
+    tecnico: '🔧 Técnico', usuario: '👁️ Solo lectura',
+  })[userRole] || userRole
+  const linkBadge = isLinked
+    ? `<span style="font-size:10px;background:#10b98122;color:#10b981;padding:2px 6px;border-radius:4px;margin-left:6px">vinculado</span>`
+    : `<span style="font-size:10px;background:#f59e0b22;color:#f59e0b;padding:2px 6px;border-radius:4px;margin-left:6px">solo Telegram</span>`
+
+  html += `<div style="padding:14px 14px 4px">
+    <div style="font-size:18px;font-weight:600">Hola, ${escHtml(greeting)} 👋</div>
+    <div style="font-size:12px;color:var(--hint);margin-top:2px">${roleLabel}${linkBadge}</div>
+  </div>`
 
   // ── Machine lists ──
   html += `<div class="section-hdr">
