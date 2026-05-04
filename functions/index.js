@@ -2504,7 +2504,8 @@ async function tgHandleKpi(chatId, topicId) {
 
 // ==================== MENÚ INTERACTIVO (INLINE KEYBOARDS) ====================
 
-const PWA_URL = 'https://orelcain.github.io/mantenimiento-planta/'
+const PWA_URL  = 'https://orelcain.github.io/mantenimiento-planta/'
+const MANT_URL = 'https://orelcain.github.io/mantenimiento-planta/mant.html'
 
 /**
  * /menu — Menú principal con botones interactivos
@@ -2523,6 +2524,9 @@ async function tgHandleMenu(chatId, topicId) {
       { text: '📊 Turno', callback_data: 'cmd:turno' },
       { text: '📈 KPIs', callback_data: 'cmd:kpi' },
       { text: '📡 Sensores', callback_data: 'cmd:sensores' },
+    ],
+    [
+      { text: '🔩 Repuestos', web_app: { url: MANT_URL } },
     ],
     [
       { text: '🌐 Abrir App Completa', url: PWA_URL },
@@ -3185,6 +3189,33 @@ exports.mintTelegramAuthToken = onRequest({ region: 'us-central1' }, async (req,
 
   logger.info('mintTelegramAuthToken: OK', { uid: virtualUid, role, authorized, chatId })
   res.json({ token: customToken, uid: virtualUid, role, authorized, firstName: tgUser.first_name || '' })
+})
+
+/**
+ * GET /setupMantApp
+ * Siembra telegramAuthorizedChats con el TELEGRAM_CHAT_ID del .env.
+ * Llamar UNA VEZ después del primer deploy: GET /setupMantApp
+ * No requiere autenticación — solo funciona con el chatId ya configurado en .env.
+ */
+exports.setupMantApp = onRequest({ region: 'us-central1' }, async (req, res) => {
+  const chatId = process.env.TELEGRAM_CHAT_ID
+  if (!chatId) {
+    res.status(500).json({ error: 'TELEGRAM_CHAT_ID no configurado en .env' })
+    return
+  }
+  const ref = db.collection('telegramAuthorizedChats').doc(chatId)
+  const existing = await ref.get()
+  if (existing.exists) {
+    res.json({ status: 'already_exists', chatId, data: existing.data() })
+    return
+  }
+  await ref.set({
+    nombre: 'Alertas Mantenimiento (dev)',
+    activo: true,
+    creadoEn: FieldValue.serverTimestamp(),
+    nota: 'Seeded automáticamente por setupMantApp',
+  })
+  res.json({ status: 'created', chatId, mensaje: 'Chat autorizado. La mini app ya puede autenticar usuarios de este grupo.' })
 })
 
 // ═══════════════════════════════════════════════════════════════════════════
