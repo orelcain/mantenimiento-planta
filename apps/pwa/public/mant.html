@@ -764,33 +764,50 @@ async function renderHomeRepFav(){
   const repKeys = Object.keys(repuestoFavLists || {}).filter(k => repuestoFavLists[k]?.length > 0)
   if (repKeys.length === 0){ el.innerHTML = ''; return }
 
-  // Resolver nombres de nodeId no presentes en machineMap
+  // Resolver cada key a su machineId destino y consolidar duplicados.
+  // Múltiples hierarchy nodeIds pueden apuntar al mismo equipo (linkedMachineId)
+  // → mergear en una sola card por equipo.
   await Promise.all(repKeys.filter(k => !machineMap[k]).map(resolveNodeName))
+  const machineIdsSet = new Set()
+  for (const k of repKeys){
+    if (machineMap[k]) machineIdsSet.add(k)
+    else {
+      const mid = await getMachineIdFromNode(k)
+      machineIdsSet.add(mid && machineMap[mid] ? mid : k)
+    }
+  }
+  const machineIds = Array.from(machineIdsSet)
 
-  let html = `
+  // Para cada machineId, calcular listas mergeadas (merge by name across keys)
+  const cards = []
+  for (const mid of machineIds){
+    const m = machineMap[mid]
+    const machineName = m?.nombre || nodeNameCache[mid] || mid
+    const lists = m
+      ? await getMachineFavListsMerged(mid)
+      : (repuestoFavLists[mid] || [])
+    const total = lists.reduce((s,l) => s + (l.repuestoIds?.length || 0), 0)
+    if (total > 0) cards.push({ mid, machineName, m, lists, total })
+  }
+
+  if (cards.length === 0){ el.innerHTML = ''; return }
+
+  el.innerHTML = `
     <div class="section">
       <span class="section-title">Repuestos guardados</span>
-      <span class="section-count">${repKeys.length}</span>
+      <span class="section-count">${cards.length}</span>
     </div>
-    <div class="cell-group">`
-
-  for (const key of repKeys){
-    const m = machineMap[key]
-    const machineName = m?.nombre || nodeNameCache[key] || key
-    const lists = repuestoFavLists[key] || []
-    const total = lists.reduce((s,l) => s + (l.repuestoIds?.length || 0), 0)
-    const targetMachineId = m ? key : await getMachineIdFromNode(key)
-    html += `<div class="cell" onclick="${targetMachineId ? `openMachine('${escHtmlAttr(targetMachineId)}')` : ''}">
-      <div class="cell-icon" style="background:${m?.color || '#5288c1'}22;color:${m?.color || '#5288c1'}">🔩</div>
-      <div class="cell-body">
-        <div class="cell-title">${escHtml(machineName)}</div>
-        <div class="cell-sub">${pl(total, 'repuesto', 'repuestos')} · ${pl(lists.length, 'lista', 'listas')}</div>
-      </div>
-      <div class="cell-chevron">›</div>
+    <div class="cell-group">
+      ${cards.map(({mid, machineName, m, lists, total}) => `
+        <div class="cell" onclick="openMachine('${escHtmlAttr(mid)}')">
+          <div class="cell-icon" style="background:${m?.color || '#5288c1'}22;color:${m?.color || '#5288c1'}">🔩</div>
+          <div class="cell-body">
+            <div class="cell-title">${escHtml(machineName)}</div>
+            <div class="cell-sub">${pl(total, 'repuesto', 'repuestos')} · ${pl(lists.length, 'lista', 'listas')}</div>
+          </div>
+          <div class="cell-chevron">›</div>
+        </div>`).join('')}
     </div>`
-  }
-  html += `</div>`
-  el.innerHTML = html
 }
 
 function renderHomeCatalog(){
