@@ -661,11 +661,31 @@ async function init(){
       uid = auth.currentUser?.uid || 'preview'
       userRole = 'admin'
       isAuthorized = true
-      isLinked = false
+      isLinked = true
       firstName = 'Preview'
       setLoadingMsg('Cargando datos…')
       await Promise.all([loadCategories(), loadMachines()])
-      prefs = { favoriteLists: [], repuestoFavLists: {} }
+      // Prefs mock — simula listas reales para que el home se vea poblado
+      const firstIds  = machines.slice(0, 9).map(m => m.id)
+      const secondIds = machines.slice(9, 24).map(m => m.id)
+      prefs = {
+        favoriteLists: [
+          { name: 'Equipos Planta Principal',  machineIds: firstIds  },
+          { name: 'Cintas Planta Principal',    machineIds: secondIds },
+        ],
+        repuestoFavLists: {},
+      }
+      // Recientes mock — simula los últimos 3 repuestos vistos
+      if (machines.length >= 2) {
+        recentIds = [
+          { machineId: machines[0].id, repuestoId: 'preview-rep-1',
+            name: 'Rodamiento SKF 6205',      code: '1000001234', ts: Date.now() - 3600000 },
+          { machineId: machines[1].id, repuestoId: 'preview-rep-2',
+            name: 'Sello mecánico 40mm',      code: '1000005678', ts: Date.now() - 54000000 },
+          { machineId: machines[0].id, repuestoId: 'preview-rep-3',
+            name: 'Correa dentada T5-450',    code: '',           ts: Date.now() - 61200000 },
+        ]
+      }
       showApp()
     } catch(err) {
       setLoadingError('Preview error: ' + (err.code || err.message))
