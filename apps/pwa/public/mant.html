@@ -545,12 +545,8 @@ async function loadCategories(){
 
 async function loadMachines(){
   const snap = await db.collection('machines').get()
-  machines = snap.docs.map(d => ({id:d.id, ...d.data()})).sort((a,b) => {
-    const aA = a.activa !== false ? 0 : 1
-    const bA = b.activa !== false ? 0 : 1
-    if (aA !== bA) return aA - bA
-    return (a.orden||0) - (b.orden||0)
-  })
+  machines = snap.docs.map(d => ({id:d.id, ...d.data()}))
+    .sort((a,b) => (a.orden||0) - (b.orden||0))
   machineMap = Object.fromEntries(machines.map(m => [m.id, m]))
 }
 
@@ -698,8 +694,9 @@ async function renderFavorites(){
 
   let html = ''
 
-  // Greeting
-  const name = firstName || tgApp?.initDataUnsafe?.user?.first_name || ''
+  // Greeting — trim para evitar "Hola, . 👋" o "Hola,   👋"
+  const rawName = firstName || tgApp?.initDataUnsafe?.user?.first_name || ''
+  const name = String(rawName).trim().replace(/^[.,;:\s]+|[.,;:\s]+$/g, '')
   const hello = name ? `Hola, ${escHtml(name)} 👋` : 'Hola 👋'
   const role = ({admin:'Admin',supervisor:'Supervisor',tecnico:'Técnico',usuario:'Solo lectura'})[userRole] || userRole
   const linkTag = isLinked
@@ -735,14 +732,12 @@ async function renderFavorites(){
       for (const id of preview){
         const m = machineMap[id]
         const name = list.machineNames?.[id] || m?.nombre || id
-        const archived = m && m.activa === false
         html += `<div class="cell" onclick="openMachine('${escHtmlAttr(id)}')">
           <div class="cell-icon" style="background:${m?.color || '#5288c1'}22;color:${m?.color || '#5288c1'}">🏭</div>
           <div class="cell-body">
             <div class="cell-title">${escHtml(name)}</div>
             ${m ? `<div class="cell-sub">${escHtml([m.marca, m.modelo].filter(Boolean).join(' · ') || 'Equipo')}</div>` : `<div class="cell-sub">No disponible</div>`}
           </div>
-          ${archived ? `<span class="cell-badge muted">Archivada</span>` : ''}
           <div class="cell-chevron">›</div>
         </div>`
       }
@@ -812,14 +807,12 @@ function openMachineList(listName){
   el.innerHTML = `
     <div class="cell-group">
       ${mList.map(m => {
-        const archived = m.activa === false
         return `<div class="cell" onclick="openMachine('${escHtmlAttr(m.id)}')">
           <div class="cell-icon" style="background:${m.color || '#5288c1'}22;color:${m.color || '#5288c1'}">🏭</div>
           <div class="cell-body">
             <div class="cell-title">${escHtml(m._name)}</div>
             <div class="cell-sub">${escHtml([m.marca, m.modelo].filter(Boolean).join(' · ') || 'Equipo')}</div>
           </div>
-          ${archived ? `<span class="cell-badge muted">Archivada</span>` : ''}
           <div class="cell-chevron">›</div>
         </div>`
       }).join('')}
@@ -863,7 +856,6 @@ function setCatFilter(id){
 }
 
 function machineCellHtml(m){
-  const archived = m.activa === false
   const color = m.color || '#5288c1'
   const cnt = repCache[m.id]?.length
   return `<div class="cell" onclick="openMachine('${escHtmlAttr(m.id)}')">
@@ -873,7 +865,6 @@ function machineCellHtml(m){
       <div class="cell-sub">${escHtml([m.marca, m.modelo].filter(Boolean).join(' · ') || 'Equipo')}</div>
     </div>
     ${cnt != null ? `<span class="cell-badge">${cnt}</span>` : ''}
-    ${archived ? `<span class="cell-badge muted">Archivada</span>` : ''}
     <div class="cell-chevron">›</div>
   </div>`
 }
@@ -1018,7 +1009,6 @@ async function openMachine(machineId){
         ['Modelo', m.modelo],
         ['Sección', m.seccion],
         ['Ubicación', m.hierarchyPath],
-        m.activa === false ? ['Estado', 'Archivada'] : null,
       ].filter(([_,v]) => v).map(([l,v]) => `
         <div class="info-row">
           <span class="info-label">${l}</span>
