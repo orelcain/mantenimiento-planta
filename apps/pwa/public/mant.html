@@ -1736,13 +1736,8 @@ function copyPreviewUrl(){
 }
 
 function listTotalCount(list){
-  const top = (list.machineIds || []).length
-  const sub = (list.subLists || []).reduce((s, sl) => {
-    const slRoot = (sl.machineIds || []).length
-    const slSub  = (sl.subLists || []).reduce((ss, ssl) => ss + (ssl.machineIds||[]).length, 0)
-    return s + slRoot + slSub
-  }, 0)
-  return top + sub
+  // list.machineIds es la unión de todos los equipos (raíz + sub-listas + sub-sub-listas)
+  return (list.machineIds || []).length
 }
 
 function renderHomeMyLists(){
@@ -1975,11 +1970,9 @@ function _renderMachineListView(list, { push = true } = {}){
     </div>
     <div class="cell-group">
       ${subLists.map((sl, idx) => {
-        const slRoot = (sl.machineIds || []).length
-        const slSub  = (sl.subLists || []).reduce((s, ssl) => s + (ssl.machineIds||[]).length, 0)
-        const cnt    = slRoot + slSub
+        // sl.machineIds es la unión de todos los equipos de la sub-lista
+        const cnt         = (sl.machineIds || []).length
         const subSubCount = (sl.subLists || []).length
-        const cntLabel = cnt + (subSubCount ? ` · ${subSubCount} sub-sub` : '')
         const actns = canAdmin ? `
           <button onclick="event.stopPropagation();renameSubList(${escHtmlAttr(JSON.stringify(list.name))},${idx})"
             style="background:none;border:none;color:var(--hint);font-size:16px;cursor:pointer;padding:4px">✏️</button>
@@ -2026,8 +2019,9 @@ function openSubList(listName, subListIdx, { push = true } = {}){
   // Equipos sin categoría dentro de esta sub-lista (no asignados a ninguna sub-sub)
   const inSubSubSet = new Set(subSubLists.flatMap(ssl => ssl.machineIds || []))
   const ungrouped   = allSlIds.filter(id => !inSubSubSet.has(id))
-  const slTotal     = allSlIds.length + subSubLists.reduce((s, ssl) => s + (ssl.machineIds||[]).length, 0)
-  const subtitle    = `${list.name} · ${pl(slTotal,'equipo','equipos')}`
+  // sl.machineIds es la unión total de la sub-lista; no sumar sub-sub (ya están incluidos)
+  const slTotal  = allSlIds.length
+  const subtitle = `${list.name} · ${pl(slTotal,'equipo','equipos')}`
 
   if (push) pushView('view-machine', sl.name, subtitle)
   else setHeader(sl.name, subtitle, navStack.length > 0)
