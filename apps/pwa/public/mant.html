@@ -846,6 +846,7 @@ function setTab(tab){ switchTab(tab) }
 let __manualesCache    = null
 let __manualesCacheTs  = 0
 let manualesTypeFilter = null
+let manualesSearchTimer = null
 
 async function renderManualesTab(){
   const el = document.getElementById('view-manuales')
@@ -855,24 +856,113 @@ async function renderManualesTab(){
   el.innerHTML = `
     <div class="section-actions">
       <div><span class="section-title">Documentación técnica</span></div>
-      ${canWrite ? `<button class="btn-text" onclick="openUploadManualModal()">+ Subir</button>` : ''}
+      ${canWrite ? `<button class="btn-text" style="color:var(--accent);font-weight:600"
+        onclick="openUploadManualModal()">+ Subir</button>` : ''}
+    </div>
+    <div id="manuales-progress" style="display:none;padding:6px 16px;font-size:12px;
+      color:var(--sub);text-align:center;background:var(--card);border-bottom:1px solid var(--border)"></div>
+    <div style="padding:0 12px 8px">
+      <input id="manuales-search" type="search" placeholder="Buscar por título o equipo…"
+        style="width:100%;box-sizing:border-box;padding:8px 12px;border-radius:10px;
+        border:1.5px solid var(--border);background:var(--card);color:var(--text);
+        font-size:14px;outline:none" oninput="manualesSearchInput()">
     </div>
     <div id="manuales-type-chips"></div>
     <div id="manuales-list">${skeletonCells(4)}</div>`
   try {
     renderManualesBody(await loadManuales())
   } catch(e){
+    console.error('manuales load failed', e)
     const l = document.getElementById('manuales-list')
-    if (l) l.innerHTML = emptyHtml('⚠️','Error al cargar','Verifica tu conexión e intenta de nuevo')
+    if (l) l.innerHTML = `
+      <div style="padding:32px 20px;text-align:center">
+        ${emptyHtml('⚠️','Error al cargar', escHtml(e?.message || 'Verifica tu conexión e intenta de nuevo'))}
+        <button class="upload-btn" style="margin-top:16px;max-width:200px"
+          onclick="renderManualesTab()">↻ Reintentar</button>
+      </div>`
   }
 }
 
 async function loadManuales(){
   if (__manualesCache && Date.now() - __manualesCacheTs < HIERARCHY_CACHE_TTL) return __manualesCache
-  const snap = await db.collection('manuales').orderBy('createdAt','desc').limit(100).get()
-  __manualesCache = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+
+  const results = []
+  const setManualesProgress = msg => {
+    const el = document.getElementById('manuales-progress')
+    if (!el) return
+    if (!msg){ el.style.display = 'none'; return }
+    el.style.display = 'block'; el.textContent = msg
+  }
+
+  // 1) Colección Firestore manuales/ (Mini App + futuro PWA)
+  try {
+    const snap = await db.collection('manuales').orderBy('createdAt','desc').limit(100).get()
+    snap.docs.forEach(d => {
+      const data = d.data()
+      results.push({ id: d.id, source: 'firestore', ...data })
+    })
+  } catch(e){ console.warn('manuales firestore failed', e) }
+
+  // 2) Legacy: Storage paths PWA — machines/{id}/manuales/ + equipment/{nodeId}/manuales/
+  setManualesProgress('Buscando manuales del PWA…')
+  const BATCH = 5
+
+  // 2a) Por máquina
+  for (let i = 0; i < machines.length; i += BATCH){
+    const batch = machines.slice(i, i + BATCH)
+    await Promise.all(batch.map(async m => {
+      try {
+        const list = await storage.ref(`machines/${m.id}/manuales`).listAll()
+        for (const item of list.items){
+          const url = await item.getDownloadURL().catch(() => null)
+          if (!url) continue
+          results.push({
+            id: `legacy_m_${m.id}_${item.name}`,
+            source: 'storage_legacy',
+            ownerType: 'equipo', ownerId: m.id,
+            ownerPath: [m.nombre || m.id],
+            titulo: item.name.replace(/^\d+_/,'').replace(/_\d+\.pdf$/i,'.pdf').replace(/_/g,' ').replace(/\.pdf$/i,''),
+            tipo: 'pdf', url,
+            storagePath: item.fullPath,
+            createdAt: null,
+          })
+        }
+      } catch { /* carpeta no existe — OK */ }
+    }))
+  }
+
+  // 2b) Por nodo equipo SAP (hierarchy)
+  try {
+    await loadHierarchyTree()
+    const eqNodes = Object.values(hierarchyNodesMap).filter(n => isEquipNode(n))
+    for (let i = 0; i < eqNodes.length; i += BATCH){
+      const batch = eqNodes.slice(i, i + BATCH)
+      await Promise.all(batch.map(async n => {
+        try {
+          const list = await storage.ref(`equipment/${n.id}/manuales`).listAll()
+          for (const item of list.items){
+            const url = await item.getDownloadURL().catch(() => null)
+            if (!url) continue
+            results.push({
+              id: `legacy_e_${n.id}_${item.name}`,
+              source: 'storage_legacy',
+              ownerType: 'equipo', ownerId: n.id,
+              ownerPath: [n.nombre || n.id],
+              titulo: item.name.replace(/^\d+_/,'').replace(/_\d+\.pdf$/i,'.pdf').replace(/_/g,' ').replace(/\.pdf$/i,''),
+              tipo: 'pdf', url,
+              storagePath: item.fullPath,
+              createdAt: null,
+            })
+          }
+        } catch { /* carpeta no existe — OK */ }
+      }))
+    }
+  } catch(e){ console.warn('legacy hierarchy manuals failed', e) }
+
+  setManualesProgress(null)
+  __manualesCache   = results
   __manualesCacheTs = Date.now()
-  return __manualesCache
+  return results
 }
 
 function renderManualesBody(manuales){
@@ -904,12 +994,27 @@ function renderManualesBody(manuales){
     </div>`
   } else if (chipsEl){ chipsEl.innerHTML = '' }
 
-  const filtered = manualesTypeFilter ? manuales.filter(m => m.tipo===manualesTypeFilter) : manuales
+  const searchQ = normalizeSearch(document.getElementById('manuales-search')?.value || '')
+  let filtered = manualesTypeFilter ? manuales.filter(m => m.tipo===manualesTypeFilter) : manuales
+  if (searchQ){
+    filtered = filtered.filter(m =>
+      normalizeSearch(m.titulo).includes(searchQ)
+      || normalizeSearch((m.ownerPath||[]).join(' ')).includes(searchQ)
+      || normalizeSearch(m.descripcion).includes(searchQ)
+    )
+  }
   if (filtered.length === 0){
     listEl.innerHTML = emptyHtml('🔍','Sin resultados','Ningún documento coincide con el filtro')
     return
   }
   listEl.innerHTML = `<div class="cell-group">${filtered.map(manualCellHtml).join('')}</div>`
+}
+
+function manualesSearchInput(){
+  clearTimeout(manualesSearchTimer)
+  manualesSearchTimer = setTimeout(() => {
+    if (__manualesCache) renderManualesBody(__manualesCache)
+  }, 220)
 }
 
 function manualIcon(tipo){
@@ -3051,7 +3156,12 @@ async function loadHierarchyTree(){
   const now = Date.now()
   if (__hierarchyCache && (now - __hierarchyCache.ts) < HIERARCHY_CACHE_TTL) return
 
-  const snap = await db.collection('hierarchy').where('activo','==',true).orderBy('orden').get()
+  // Mismo orden que la PWA (índice compuesto activo+nivel+orden ya existe)
+  const snap = await db.collection('hierarchy')
+    .where('activo','==',true)
+    .orderBy('nivel','asc')
+    .orderBy('orden','asc')
+    .get()
   const nodes = snap.docs.map(d => ({ id: d.id, ...d.data() }))
 
   hierarchyNodesMap = {}
@@ -3090,7 +3200,22 @@ async function renderHierarchyTab(){
   try {
     await loadHierarchyTree()
   } catch(err){
-    el.innerHTML = emptyHtml('⚠️','Error al cargar','No se pudo cargar la jerarquía. Revisá tu conexión.')
+    console.error('hierarchy load failed', err)
+    const msg = err?.code === 'failed-precondition'
+      ? 'Falta un índice en Firestore. Avisá a un admin.'
+      : (err?.message || 'No se pudo cargar la jerarquía. Revisá tu conexión.')
+    el.innerHTML = `
+      <div style="padding:32px 20px;text-align:center">
+        ${emptyHtml('⚠️','Error al cargar', escHtml(msg))}
+        <button class="upload-btn" style="margin-top:16px;max-width:200px"
+          onclick="renderHierarchyTab()">↻ Reintentar</button>
+      </div>`
+    return
+  }
+  if (hierarchyRoots.length === 0){
+    el.innerHTML = `<div style="padding:32px 20px;text-align:center">
+      ${emptyHtml('🌳','Jerarquía vacía','Aún no hay nodos cargados. Pídele al admin que cargue planta/áreas/equipos en la PWA.')}
+    </div>`
     return
   }
   renderHierarchyLevel()
