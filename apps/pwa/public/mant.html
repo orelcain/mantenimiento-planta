@@ -3011,16 +3011,18 @@ function renameMachineList(listName){
     if (idx < 0) return
     const prev = prefs.favoriteLists[idx].name
     prefs.favoriteLists[idx].name = trimmed
-    try {
-      await saveAllPrefs()
+    // Optimista: volver al home inmediatamente
+    goBack()
+    renderHomeMyLists()
+    tgApp?.HapticFeedback?.notificationOccurred('success')
+    saveAllPrefs().then(() => {
       showToast('Lista renombrada ✓', 'ok')
-      tgApp?.HapticFeedback?.notificationOccurred('success')
-      goBack()
-      renderHomeMyLists()
-    } catch(err){
+    }).catch(err => {
+      if (IS_PREVIEW) { showToast('Renombrada (solo preview)', 'ok'); return }
       prefs.favoriteLists[idx].name = prev
+      renderHomeMyLists()
       showToast('Error: ' + (err.message || ''), 'err')
-    }
+    })
   })
 }
 
@@ -3030,16 +3032,17 @@ function deleteMachineList(listName){
     const idx = prefs.favoriteLists.findIndex(l => l.name === listName)
     if (idx < 0) return
     const removed = prefs.favoriteLists.splice(idx, 1)
-    try {
-      await saveAllPrefs()
+    goBack()
+    renderHomeMyLists()
+    tgApp?.HapticFeedback?.notificationOccurred('success')
+    saveAllPrefs().then(() => {
       showToast('Lista borrada ✓', 'ok')
-      tgApp?.HapticFeedback?.notificationOccurred('success')
-      goBack()
-      renderHomeMyLists()
-    } catch(err){
+    }).catch(err => {
+      if (IS_PREVIEW) { showToast('Borrada (solo preview)', 'ok'); return }
       prefs.favoriteLists.splice(idx, 0, removed[0])
+      renderHomeMyLists()
       showToast('Error: ' + (err.message || ''), 'err')
-    }
+    })
   })
 }
 
@@ -3057,16 +3060,19 @@ function createSubList(listName){
     if (list.subLists.some(sl => sl.name === trimmed)){
       showToast('Ya existe una sub-lista con ese nombre', 'err'); return
     }
+    // Optimista: agregar + render inmediato
     list.subLists.push({ name: trimmed, machineIds: [] })
-    try {
-      await saveAllPrefs()
+    _renderMachineListView(list, { push: false })
+    tgApp?.HapticFeedback?.notificationOccurred('success')
+    // Persistir en background
+    saveAllPrefs().then(() => {
       showToast(`Sub-lista "${trimmed}" creada ✓`, 'ok')
-      tgApp?.HapticFeedback?.notificationOccurred('success')
-      _renderMachineListView(list)
-    } catch(err){
+    }).catch(err => {
+      if (IS_PREVIEW) { showToast(`Sub-lista creada (solo preview)`, 'ok'); return }
       list.subLists.pop()
-      showToast('Error: ' + (err.message || ''), 'err')
-    }
+      _renderMachineListView(list, { push: false })
+      showToast('Error al guardar: ' + (err.message || ''), 'err')
+    })
   })
 }
 
@@ -3083,15 +3089,15 @@ function renameSubList(listName, subListIdx){
     }
     const prev = sl.name
     sl.name = trimmed
-    try {
-      await saveAllPrefs()
+    _renderMachineListView(list, { push: false })
+    saveAllPrefs().then(() => {
       showToast('Sub-lista renombrada ✓', 'ok')
-      tgApp?.HapticFeedback?.notificationOccurred('success')
-      _renderMachineListView(list)
-    } catch(err){
+    }).catch(err => {
+      if (IS_PREVIEW) { showToast('Renombrada (solo preview)', 'ok'); return }
       sl.name = prev
+      _renderMachineListView(list, { push: false })
       showToast('Error: ' + (err.message || ''), 'err')
-    }
+    })
   })
 }
 
@@ -3102,22 +3108,22 @@ function deleteSubList(listName, subListIdx){
   const msg = `¿Borrar sub-lista "${sl.name}"?${sl.machineIds?.length ? ` Los ${sl.machineIds.length} equipos pasarán a Sin categoría.` : ''}`
   tgApp?.showConfirm(msg, async ok => {
     if (!ok) return
-    // Devolver sus máquinas al nivel raíz de la lista (sin categoría)
     const returning = sl.machineIds || []
     const existingTop = new Set(list.machineIds || [])
     for (const id of returning) existingTop.add(id)
     list.machineIds = [...existingTop]
     list.subLists.splice(subListIdx, 1)
-    try {
-      await saveAllPrefs()
+    _renderMachineListView(list, { push: false })
+    tgApp?.HapticFeedback?.notificationOccurred('success')
+    saveAllPrefs().then(() => {
       showToast('Sub-lista borrada ✓', 'ok')
-      tgApp?.HapticFeedback?.notificationOccurred('success')
-      _renderMachineListView(list)
-    } catch(err){
+    }).catch(err => {
+      if (IS_PREVIEW) { showToast('Borrada (solo preview)', 'ok'); return }
       list.subLists.splice(subListIdx, 0, sl)
       list.machineIds = [...(list.machineIds||[])].filter(id => !returning.includes(id) || existingTop.has(id))
+      _renderMachineListView(list, { push: false })
       showToast('Error: ' + (err.message || ''), 'err')
-    }
+    })
   })
 }
 
