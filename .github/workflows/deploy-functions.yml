@@ -40,6 +40,19 @@ jobs:
         # Versión fija para evitar cambios inesperados
         run: npm install -g firebase-tools@15.11.0
 
+      - name: Write functions .env (secrets → archivo)
+        env:
+          FUNCTIONS_ENV: ${{ secrets.FUNCTIONS_ENV }}
+        run: |
+          # Si el secret FUNCTIONS_ENV existe, escribirlo como functions/.env
+          # Esto asegura que las funciones nuevas tengan acceso a TELEGRAM_BOT_TOKEN, etc.
+          if [ -n "$FUNCTIONS_ENV" ]; then
+            printf '%s\n' "$FUNCTIONS_ENV" > functions/.env
+            echo "✅ functions/.env escrito desde FUNCTIONS_ENV secret"
+          else
+            echo "⚠️  FUNCTIONS_ENV secret no configurado — funciones nuevas pueden no tener env vars"
+          fi
+
       - name: Deploy Cloud Functions
         working-directory: .
         run: |
