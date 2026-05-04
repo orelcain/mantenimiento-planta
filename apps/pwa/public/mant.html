@@ -218,13 +218,14 @@ html,body{height:100%;background:var(--bg);color:var(--text);
   margin:0 0 8px;border-left:3px solid var(--warn)}
 .notice b{color:var(--text)}
 
-/* ── Edit button in header ─────────────────────────────────────────── */
-.edit-btn{width:38px;height:38px;border-radius:50%;border:none;
-  background:rgba(82,136,193,.14);color:var(--accent);font-size:16px;cursor:pointer;
+/* ── Header action buttons (edit / fav) ────────────────────────────── */
+.edit-btn{width:36px;height:36px;border-radius:50%;border:none;
+  background:rgba(82,136,193,.14);color:var(--text);font-size:16px;cursor:pointer;
   display:flex;align-items:center;justify-content:center;flex-shrink:0;line-height:1;
-  margin-right:6px}
-.edit-btn:active{background:rgba(82,136,193,.24);transform:scale(.95)}
-.edit-btn.is-saving{opacity:.5}
+  margin:0 3px;padding:0;font-family:inherit}
+.edit-btn:active{background:rgba(82,136,193,.28);transform:scale(.92)}
+.edit-btn:disabled{opacity:.5}
+.edit-btn.fav-on{background:rgba(245,166,35,.2);color:#f5a623}
 
 /* ── Form (edición de repuesto) ─────────────────────────────────────── */
 .form-card{background:var(--bg2);margin:0 0 8px;padding:0 0 4px}
@@ -266,6 +267,56 @@ html,body{height:100%;background:var(--bg);color:var(--text);
 #uploading .loader{width:40px;height:40px}
 #uploading-msg{color:#fff;font-size:14px;text-align:center;padding:0 24px;max-width:300px}
 
+/* ── Bottom sheet ───────────────────────────────────────────────────── */
+#sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:160;
+  display:none;opacity:0;transition:opacity .22s}
+#sheet-overlay.open{display:block;opacity:1}
+#sheet{position:fixed;left:0;right:0;bottom:0;background:var(--bg2);
+  border-radius:16px 16px 0 0;z-index:170;
+  padding-bottom:env(safe-area-inset-bottom);transform:translateY(100%);
+  transition:transform .25s ease;max-height:78vh;overflow-y:auto;
+  display:flex;flex-direction:column}
+#sheet.open{transform:translateY(0)}
+.sheet-handle{width:36px;height:4px;border-radius:2px;background:rgba(255,255,255,.18);
+  margin:10px auto 4px;flex-shrink:0}
+.sheet-title{font-size:16px;font-weight:700;padding:6px 16px 12px;
+  border-bottom:1px solid var(--divider);flex-shrink:0}
+.sheet-list{padding:4px 0}
+.sheet-row{display:flex;align-items:center;padding:13px 16px;gap:12px;
+  cursor:pointer;transition:background .12s;position:relative}
+.sheet-row:active{background:var(--press)}
+.sheet-row + .sheet-row::before{content:'';position:absolute;top:0;left:50px;right:16px;
+  height:1px;background:var(--divider)}
+.sheet-row .ico{font-size:20px;width:32px;flex-shrink:0;text-align:center;line-height:1}
+.sheet-row .body{flex:1;min-width:0}
+.sheet-row .name{font-size:14.5px;font-weight:500;line-height:1.3}
+.sheet-row .sub{font-size:11px;color:var(--hint);margin-top:2px}
+.sheet-row .check{width:24px;height:24px;border-radius:50%;border:1.5px solid rgba(255,255,255,.2);
+  flex-shrink:0;display:flex;align-items:center;justify-content:center;
+  font-size:14px;font-weight:700;color:transparent;transition:all .15s}
+.sheet-row.on .check{background:var(--accent);border-color:var(--accent);color:var(--acctxt)}
+.sheet-row.disabled{opacity:.5;pointer-events:none}
+.sheet-new{display:flex;align-items:center;gap:10px;padding:13px 16px;cursor:pointer;
+  color:var(--accent);font-size:14.5px;font-weight:500;
+  border-top:1px solid var(--divider)}
+.sheet-new:active{opacity:.7}
+.sheet-empty{padding:22px 16px;text-align:center;color:var(--hint);font-size:13px}
+.sheet-foot{padding:0 16px env(safe-area-inset-bottom,12px)}
+
+/* ── Modal (input) ───────────────────────────────────────────────────── */
+#input-modal{position:fixed;inset:0;z-index:230;display:none;
+  align-items:center;justify-content:center;padding:24px}
+#input-modal.open{display:flex}
+#input-modal .backdrop{position:absolute;inset:0;background:rgba(0,0,0,.6)}
+#input-modal .box{position:relative;background:var(--bg2);border-radius:14px;
+  padding:18px;width:100%;max-width:320px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+#input-modal .ttl{font-size:16px;font-weight:700;margin-bottom:12px}
+#input-modal input{width:100%;padding:10px 12px;background:var(--bg);
+  border:1px solid var(--divider);border-radius:8px;color:var(--text);
+  font-size:15px;outline:none;margin-bottom:14px;font-family:inherit}
+#input-modal input:focus{border-color:var(--accent)}
+#input-modal .btns{display:flex;gap:8px;justify-content:flex-end}
+
 /* ── Toast ──────────────────────────────────────────────────────────── */
 #toast{position:fixed;bottom:78px;left:50%;transform:translateX(-50%) translateY(20px);
   background:var(--bg2);color:var(--text);padding:11px 18px;border-radius:99px;
@@ -286,7 +337,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);
       <div id="hdr-title" class="title">Repuestos</div>
       <div id="hdr-sub"   class="subtitle">@antarfood_mant_bot</div>
     </div>
-    <button id="hdr-edit" class="edit-btn" style="display:none" aria-label="Editar"></button>
+    <button id="hdr-fav"  class="edit-btn" style="display:none" aria-label="Guardar en lista">⭐</button>
+    <button id="hdr-edit" class="edit-btn" style="display:none" aria-label="Editar">✏️</button>
     <div id="status" class="status s-loading">cargando</div>
   </header>
 
@@ -330,6 +382,25 @@ html,body{height:100%;background:var(--bg);color:var(--text);
 <div id="uploading">
   <div class="loader"></div>
   <div id="uploading-msg">Subiendo foto…</div>
+</div>
+
+<div id="sheet-overlay" onclick="closeSheet()"></div>
+<div id="sheet">
+  <div class="sheet-handle"></div>
+  <div id="sheet-title" class="sheet-title">Guardar en lista</div>
+  <div id="sheet-content" class="sheet-list"></div>
+</div>
+
+<div id="input-modal">
+  <div class="backdrop" onclick="closeInputModal()"></div>
+  <div class="box">
+    <div id="modal-title" class="ttl">Nombre</div>
+    <input id="modal-input" type="text" maxlength="40" placeholder="Ej. Cuchillos, Sensores, Resortes…">
+    <div class="btns">
+      <button class="btn-cancel" onclick="closeInputModal()">Cancelar</button>
+      <button class="btn-save" id="modal-ok" style="flex:0 0 auto;padding:10px 18px">OK</button>
+    </div>
+  </div>
 </div>
 
 <div id="toast"></div>
@@ -572,6 +643,7 @@ function switchTab(tab){
   currentTab = tab
   activeUploadCtx = null
   document.getElementById('hdr-edit').style.display = 'none'
+  document.getElementById('hdr-fav').style.display = 'none'
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'))
   document.getElementById(`nav-${tab}`).classList.add('active')
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'))
@@ -605,8 +677,11 @@ function goBack(){
   document.getElementById(prev.viewId).classList.add('active')
   if (navStack.length === 0) tabHeader(currentTab)
   activeUploadCtx = null
-  // Ocultar botón ✏️ si volvemos a una vista que no es de repuesto
-  if (prev.viewId !== 'view-repuesto') document.getElementById('hdr-edit').style.display = 'none'
+  // Ocultar botones ✏️ ⭐ si volvemos a una vista que no es de repuesto
+  if (prev.viewId !== 'view-repuesto'){
+    document.getElementById('hdr-edit').style.display = 'none'
+    document.getElementById('hdr-fav').style.display = 'none'
+  }
   // Restore scroll
   requestAnimationFrame(() => { getContent().scrollTop = prev.scrollTop || 0 })
 }
@@ -1078,7 +1153,13 @@ async function openRepuesto(machineId, repuestoId, opts = {}){
   }
   activeUploadCtx = { machineId, repuestoId }
 
-  // Mostrar botón ✏️ solo para admin
+  // Botón ⭐ favorito — disponible para cualquier usuario autenticado
+  const favBtn = document.getElementById('hdr-fav')
+  favBtn.style.display = 'flex'
+  favBtn.onclick = () => openFavListsSheet(machineId, repuestoId)
+  updateFavBtnState(machineId, repuestoId)
+
+  // Botón ✏️ editar — solo admin
   const editBtn = document.getElementById('hdr-edit')
   if (userRole === 'admin'){
     editBtn.style.display = 'flex'
@@ -1159,6 +1240,19 @@ async function openRepuesto(machineId, repuestoId, opts = {}){
         <button class="upload-btn" onclick="pickPhoto('gallery')"><span class="ico">🖼️</span> Galería</button>
       </div>` : ''}
   `
+}
+
+async function updateFavBtnState(machineId, repuestoId){
+  const favBtn = document.getElementById('hdr-fav')
+  if (!favBtn) return
+  const lists = await getMachineFavListsMerged(machineId)
+  const reps = repCache[machineId] || []
+  const r = reps.find(x => x.id === repuestoId)
+  const isInAny = lists.some(l => {
+    const set = new Set(l.repuestoIds || [])
+    return r ? matchesRepFavList(r, set) : set.has(repuestoId)
+  })
+  favBtn.classList.toggle('fav-on', isInAny)
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1278,6 +1372,278 @@ async function onLbxDelete(){
     showToast('Error: ' + (err.message || 'No se pudo borrar'), 'err')
     btn.disabled = false; btn.textContent = '🗑️ Borrar'
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// FAV LISTS — gestión de listas de repuestos por equipo
+// ═══════════════════════════════════════════════════════════════════
+let favSheetCtx = null  // {machineId, repuestoId}
+
+/** Key canónico para escribir las listas de un equipo:
+ *  primer hierarchy nodeId vinculado, o machineId si no hay vinculación. */
+async function getCanonicalRepFavKey(machineId){
+  const nodeIds = await getLinkedNodeIds(machineId)
+  return nodeIds[0] || machineId
+}
+
+/** Devuelve los keys posibles donde puede haber listas para esa máquina */
+async function getRelatedRepFavKeys(machineId){
+  const nodeIds = await getLinkedNodeIds(machineId)
+  return Array.from(new Set([...nodeIds, machineId]))
+}
+
+/** Persiste prefs.repuestoFavLists (y favoriteLists) en Firestore. */
+async function saveAllPrefs(){
+  if (!uid) throw new Error('No hay sesión')
+  await db.collection('user_preferences').doc(uid).set({
+    favoriteLists:    prefs.favoriteLists    || [],
+    repuestoFavLists: prefs.repuestoFavLists || {},
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true })
+}
+
+/** Abre el sheet para gestionar listas de favoritos del repuesto */
+async function openFavListsSheet(machineId, repuestoId){
+  favSheetCtx = { machineId, repuestoId }
+  const lists = await getMachineFavListsMerged(machineId)
+
+  const sheet = document.getElementById('sheet')
+  const overlay = document.getElementById('sheet-overlay')
+  const title = document.getElementById('sheet-title')
+  const content = document.getElementById('sheet-content')
+
+  title.textContent = 'Guardar en lista'
+
+  if (lists.length === 0){
+    content.innerHTML = `<div class="sheet-empty">Aún no tenés listas para este equipo.<br>Creá la primera abajo.</div>`
+  } else {
+    content.innerHTML = lists.map(l => {
+      const set = new Set(l.repuestoIds)
+      const reps = repCache[machineId] || []
+      const r = reps.find(x => x.id === repuestoId)
+      const isIn = r ? matchesRepFavList(r, set) : set.has(repuestoId)
+      return `<div class="sheet-row ${isIn ? 'on' : ''}" onclick="toggleRepInFavList(${escHtmlAttr(JSON.stringify(l.name))})">
+        <div class="ico">📋</div>
+        <div class="body">
+          <div class="name">${escHtml(l.name)}</div>
+          <div class="sub">${l.repuestoIds.length} repuesto(s)</div>
+        </div>
+        <button class="edit-btn" style="display:flex;width:30px;height:30px;font-size:13px"
+          onclick="event.stopPropagation();renameRepFavList(${escHtmlAttr(JSON.stringify(l.name))})" aria-label="Renombrar">✏️</button>
+        <button class="edit-btn" style="display:flex;width:30px;height:30px;font-size:13px;background:rgba(229,57,53,.14)"
+          onclick="event.stopPropagation();deleteRepFavList(${escHtmlAttr(JSON.stringify(l.name))})" aria-label="Borrar">🗑️</button>
+        <div class="check">✓</div>
+      </div>`
+    }).join('')
+  }
+
+  // Botón "Nueva lista"
+  content.innerHTML += `<div class="sheet-new" onclick="createRepFavList()">
+    <span style="font-size:20px">＋</span> Nueva lista de repuestos
+  </div>`
+
+  overlay.classList.add('open')
+  requestAnimationFrame(() => sheet.classList.add('open'))
+}
+
+function closeSheet(){
+  const ctx = favSheetCtx
+  document.getElementById('sheet-overlay').classList.remove('open')
+  document.getElementById('sheet').classList.remove('open')
+  favSheetCtx = null
+  if (ctx) updateFavBtnState(ctx.machineId, ctx.repuestoId)
+}
+
+async function toggleRepInFavList(listName){
+  if (!favSheetCtx) return
+  const { machineId, repuestoId } = favSheetCtx
+  const canonicalKey = await getCanonicalRepFavKey(machineId)
+  const relatedKeys = await getRelatedRepFavKeys(machineId)
+  const allLists = prefs.repuestoFavLists || {}
+
+  // ¿Está actualmente?
+  const reps = repCache[machineId] || []
+  const r = reps.find(x => x.id === repuestoId)
+  let alreadyIn = false
+  for (const k of relatedKeys){
+    const list = (allLists[k] || []).find(l => l.name === listName)
+    if (list){
+      const set = new Set(list.repuestoIds || [])
+      if (r ? matchesRepFavList(r, set) : set.has(repuestoId)){ alreadyIn = true; break }
+    }
+  }
+
+  // Trabajar sobre el canonical: traer/crear la lista ahí
+  if (!allLists[canonicalKey]) allLists[canonicalKey] = []
+  let list = allLists[canonicalKey].find(l => l.name === listName)
+  if (!list){
+    // Si existe en otro key, mover al canonical (consolida)
+    for (const k of relatedKeys){
+      if (k === canonicalKey) continue
+      const idx = (allLists[k] || []).findIndex(l => l.name === listName)
+      if (idx >= 0){
+        list = allLists[k][idx]
+        allLists[k].splice(idx, 1)
+        if (allLists[k].length === 0) delete allLists[k]
+        allLists[canonicalKey].push(list)
+        break
+      }
+    }
+    if (!list){
+      list = { name: listName, repuestoIds: [] }
+      allLists[canonicalKey].push(list)
+    }
+  }
+  list.repuestoIds = list.repuestoIds || []
+
+  if (alreadyIn){
+    // Quitar de TODAS las apariciones (consolidación)
+    for (const k of relatedKeys){
+      const lst = (allLists[k] || []).find(l => l.name === listName)
+      if (!lst) continue
+      lst.repuestoIds = (lst.repuestoIds || []).filter(id => {
+        if (id === repuestoId) return false
+        if (r?.codigoSAP && (id === `inv-${r.codigoSAP}` || id === r.codigoSAP)) return false
+        return true
+      })
+    }
+  } else {
+    if (!list.repuestoIds.includes(repuestoId)) list.repuestoIds.push(repuestoId)
+  }
+
+  prefs.repuestoFavLists = allLists
+  try {
+    await saveAllPrefs()
+    showToast(alreadyIn ? 'Quitado de la lista' : 'Agregado ✓', 'ok')
+    tgApp?.HapticFeedback?.selectionChanged?.()
+    // Re-render sheet (refresh estado)
+    openFavListsSheet(machineId, repuestoId)
+    // Re-render machine view si está visible (chips de fav)
+    refreshMachineDetailIfActive(machineId)
+  } catch(err){
+    console.error('toggle fav error', err)
+    showToast('Error: ' + (err.message || ''), 'err')
+  }
+}
+
+async function createRepFavList(){
+  if (!favSheetCtx) return
+  const { machineId, repuestoId } = favSheetCtx
+  showInputModal('Nueva lista', '', 'Ej. Cuchillos, Sensores, Resortes…', async (name) => {
+    name = (name || '').trim()
+    if (!name) return
+    const canonicalKey = await getCanonicalRepFavKey(machineId)
+    const allLists = prefs.repuestoFavLists || {}
+    if (!allLists[canonicalKey]) allLists[canonicalKey] = []
+    if (allLists[canonicalKey].some(l => l.name === name)){
+      showToast('Ya existe una lista con ese nombre', 'err')
+      return
+    }
+    allLists[canonicalKey].push({ name, repuestoIds: repuestoId ? [repuestoId] : [] })
+    prefs.repuestoFavLists = allLists
+    try {
+      await saveAllPrefs()
+      showToast('Lista creada ✓', 'ok')
+      tgApp?.HapticFeedback?.notificationOccurred('success')
+      openFavListsSheet(machineId, repuestoId)
+      refreshMachineDetailIfActive(machineId)
+    } catch(err){
+      showToast('Error: ' + (err.message || ''), 'err')
+    }
+  })
+}
+
+async function renameRepFavList(listName){
+  if (!favSheetCtx) return
+  const { machineId, repuestoId } = favSheetCtx
+  showInputModal('Renombrar lista', listName, 'Nuevo nombre', async (newName) => {
+    newName = (newName || '').trim()
+    if (!newName || newName === listName) return
+    const relatedKeys = await getRelatedRepFavKeys(machineId)
+    const allLists = prefs.repuestoFavLists || {}
+    // Verificar que el nuevo nombre no exista en ninguno de los keys
+    for (const k of relatedKeys){
+      if ((allLists[k] || []).some(l => l.name === newName)){
+        showToast('Ya existe una lista con ese nombre', 'err')
+        return
+      }
+    }
+    // Renombrar en TODOS los keys (consolidación silenciosa)
+    let renamed = false
+    for (const k of relatedKeys){
+      const list = (allLists[k] || []).find(l => l.name === listName)
+      if (list){ list.name = newName; renamed = true }
+    }
+    if (!renamed) return
+    prefs.repuestoFavLists = allLists
+    try {
+      await saveAllPrefs()
+      showToast('Lista renombrada ✓', 'ok')
+      openFavListsSheet(machineId, repuestoId)
+      refreshMachineDetailIfActive(machineId)
+    } catch(err){
+      showToast('Error: ' + (err.message || ''), 'err')
+    }
+  })
+}
+
+async function deleteRepFavList(listName){
+  if (!favSheetCtx) return
+  const ok = confirm(`¿Borrar la lista "${listName}"? Los repuestos seguirán existiendo.`)
+  if (!ok) return
+  const { machineId, repuestoId } = favSheetCtx
+  const relatedKeys = await getRelatedRepFavKeys(machineId)
+  const allLists = prefs.repuestoFavLists || {}
+  for (const k of relatedKeys){
+    if (!allLists[k]) continue
+    allLists[k] = allLists[k].filter(l => l.name !== listName)
+    if (allLists[k].length === 0) delete allLists[k]
+  }
+  prefs.repuestoFavLists = allLists
+  try {
+    await saveAllPrefs()
+    showToast('Lista borrada ✓', 'ok')
+    tgApp?.HapticFeedback?.notificationOccurred('warning')
+    openFavListsSheet(machineId, repuestoId)
+    refreshMachineDetailIfActive(machineId)
+  } catch(err){
+    showToast('Error: ' + (err.message || ''), 'err')
+  }
+}
+
+/** Re-renderiza el detalle de máquina si está visible — actualiza chips de favoritos */
+function refreshMachineDetailIfActive(machineId){
+  const view = document.getElementById('view-machine')
+  if (!view.classList.contains('active')) return
+  // Reusar el flujo existente: abrir de nuevo con fromSave para no apilar
+  const reps = repCache[machineId] || []
+  Promise.all([Promise.resolve(reps), getMachineFavListsMerged(machineId)])
+    .then(([reps, favLists]) => renderMachineBody(machineId, reps, favLists))
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// INPUT MODAL (text prompt)
+// ═══════════════════════════════════════════════════════════════════
+let _modalCb = null
+function showInputModal(title, defaultValue, placeholder, onOk){
+  document.getElementById('modal-title').textContent = title
+  const inp = document.getElementById('modal-input')
+  inp.value = defaultValue || ''
+  inp.placeholder = placeholder || ''
+  document.getElementById('input-modal').classList.add('open')
+  setTimeout(() => inp.focus(), 80)
+  _modalCb = onOk
+  document.getElementById('modal-ok').onclick = () => {
+    const v = inp.value
+    closeInputModal()
+    if (_modalCb) _modalCb(v)
+    _modalCb = null
+  }
+  inp.onkeydown = (e) => { if (e.key === 'Enter') document.getElementById('modal-ok').click() }
+}
+function closeInputModal(){
+  document.getElementById('input-modal').classList.remove('open')
+  _modalCb = null
 }
 
 // ═══════════════════════════════════════════════════════════════════
