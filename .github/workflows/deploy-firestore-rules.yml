@@ -1,4 +1,4 @@
-name: Deploy Firestore Rules & Indexes
+name: Deploy Firestore + Storage Rules & Indexes
 
 on:
   push:
@@ -6,6 +6,7 @@ on:
     paths:
       - 'firestore.rules'
       - 'firestore.indexes.json'
+      - 'storage.rules'
       - '.github/workflows/deploy-firestore-rules.yml'
   workflow_dispatch:
 
@@ -30,10 +31,10 @@ jobs:
       - name: Install Firebase CLI
         run: npm install -g firebase-tools@15.11.0
 
-      - name: Deploy Firestore Rules & Indexes
+      - name: Deploy Firestore + Storage Rules & Indexes
         run: |
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/sa.json
-          GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json firebase deploy --only firestore:rules,firestore:indexes --non-interactive
+          GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json firebase deploy --only firestore:rules,firestore:indexes,storage --non-interactive
           rm -f /tmp/sa.json
 
       - name: Notificar deploy exitoso

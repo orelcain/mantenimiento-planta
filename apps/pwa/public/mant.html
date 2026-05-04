@@ -184,14 +184,25 @@ html,body{height:100%;background:var(--bg);color:var(--text);
 
 /* ── Lightbox ──────────────────────────────────────────────────────── */
 #lightbox{position:fixed;inset:0;background:rgba(0,0,0,.94);z-index:300;
-  display:none;align-items:center;justify-content:center;flex-direction:column}
+  display:none;align-items:center;justify-content:center;flex-direction:column;
+  padding:env(safe-area-inset-top,12px) 0 env(safe-area-inset-bottom,12px)}
 #lightbox.open{display:flex}
-#lightbox img{max-width:96vw;max-height:82vh;border-radius:8px;object-fit:contain}
+#lightbox img{max-width:96vw;max-height:72vh;border-radius:8px;object-fit:contain}
 #lightbox .lbx-close{position:absolute;top:env(safe-area-inset-top,12px);right:14px;
   color:#fff;background:rgba(0,0,0,.4);border-radius:50%;width:38px;height:38px;
   display:flex;align-items:center;justify-content:center;border:none;
   font-size:22px;cursor:pointer}
-#lightbox .lbx-cap{color:rgba(255,255,255,.7);font-size:12px;margin-top:10px;padding:0 18px;text-align:center}
+#lightbox .lbx-cap{color:rgba(255,255,255,.75);font-size:12px;margin-top:10px;padding:0 18px;text-align:center}
+#lbx-actions{display:none;gap:8px;margin-top:14px;padding:0 14px}
+#lbx-actions.show{display:flex}
+.lbx-btn{padding:10px 16px;border-radius:99px;border:1px solid rgba(255,255,255,.2);
+  background:rgba(255,255,255,.08);color:#fff;font-size:13px;font-weight:600;
+  cursor:pointer;display:flex;align-items:center;gap:6px}
+.lbx-btn:active{background:rgba(255,255,255,.16)}
+.lbx-btn:disabled{opacity:.5;cursor:not-allowed}
+.lbx-btn.principal{background:rgba(245,166,35,.18);border-color:#f5a623;color:#f5a623}
+.lbx-btn.principal.is-active{background:#f5a623;color:#000}
+.lbx-btn.danger{background:rgba(229,57,53,.15);border-color:#e53935;color:#e53935}
 
 /* ── Skeleton ──────────────────────────────────────────────────────── */
 @keyframes shimmer{0%{background-position:-300px 0}100%{background-position:300px 0}}
@@ -206,6 +217,37 @@ html,body{height:100%;background:var(--bg);color:var(--text);
 .notice{padding:12px 16px;font-size:13px;color:var(--hint);background:var(--bg2);
   margin:0 0 8px;border-left:3px solid var(--warn)}
 .notice b{color:var(--text)}
+
+/* ── Edit button in header ─────────────────────────────────────────── */
+.edit-btn{width:38px;height:38px;border-radius:50%;border:none;
+  background:rgba(82,136,193,.14);color:var(--accent);font-size:16px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;line-height:1;
+  margin-right:6px}
+.edit-btn:active{background:rgba(82,136,193,.24);transform:scale(.95)}
+.edit-btn.is-saving{opacity:.5}
+
+/* ── Form (edición de repuesto) ─────────────────────────────────────── */
+.form-card{background:var(--bg2);margin:0 0 8px;padding:0 0 4px}
+.form-row{display:flex;flex-direction:column;padding:10px 16px;gap:5px;position:relative}
+.form-row + .form-row::before{content:'';position:absolute;top:0;left:16px;right:16px;
+  height:1px;background:var(--divider)}
+.form-label{font-size:11px;color:var(--hint);font-weight:600;
+  text-transform:uppercase;letter-spacing:.4px}
+.form-input,.form-textarea{width:100%;background:var(--bg);
+  border:1px solid var(--divider);border-radius:8px;padding:9px 11px;
+  color:var(--text);font-size:14.5px;outline:none;font-family:inherit;
+  transition:border-color .15s}
+.form-input:focus,.form-textarea:focus{border-color:var(--accent)}
+.form-input.code{font-family:ui-monospace,Menlo,monospace;color:var(--link)}
+.form-textarea{resize:none;min-height:78px;line-height:1.4}
+.form-actions{display:flex;gap:8px;padding:14px 14px 18px;background:var(--bg)}
+.btn-save{flex:2;padding:12px;border-radius:10px;border:none;background:var(--accent);
+  color:var(--acctxt);font-size:15px;font-weight:600;cursor:pointer}
+.btn-save:active{opacity:.85}
+.btn-save:disabled{opacity:.5;cursor:not-allowed}
+.btn-cancel{flex:1;padding:12px;border-radius:10px;border:1px solid var(--divider);
+  background:transparent;color:var(--text);font-size:15px;font-weight:500;cursor:pointer}
+.btn-cancel:active{background:var(--press)}
 
 /* ── Upload buttons (admin only) ────────────────────────────────────── */
 .upload-row{display:flex;gap:8px;padding:10px 14px 14px;background:var(--bg2)}
@@ -244,6 +286,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);
       <div id="hdr-title" class="title">Repuestos</div>
       <div id="hdr-sub"   class="subtitle">@antarfood_mant_bot</div>
     </div>
+    <button id="hdr-edit" class="edit-btn" style="display:none" aria-label="Editar"></button>
     <div id="status" class="status s-loading">cargando</div>
   </header>
 
@@ -274,10 +317,14 @@ html,body{height:100%;background:var(--bg);color:var(--text);
   <button id="loading-retry" onclick="location.reload()">Reintentar</button>
 </div>
 
-<div id="lightbox" onclick="closeLightbox()">
+<div id="lightbox">
   <button class="lbx-close" onclick="closeLightbox()">✕</button>
   <img id="lbx-img" src="" alt="">
   <div id="lbx-cap" class="lbx-cap"></div>
+  <div id="lbx-actions">
+    <button id="lbx-principal" class="lbx-btn principal" onclick="onLbxMarkPrincipal()"></button>
+    <button id="lbx-delete" class="lbx-btn danger" onclick="onLbxDelete()">🗑️ Borrar</button>
+  </div>
 </div>
 
 <div id="uploading">
@@ -524,6 +571,7 @@ function switchTab(tab){
   navStack = []
   currentTab = tab
   activeUploadCtx = null
+  document.getElementById('hdr-edit').style.display = 'none'
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'))
   document.getElementById(`nav-${tab}`).classList.add('active')
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'))
@@ -544,12 +592,21 @@ function pushView(viewId, title, subtitle){
 }
 
 function goBack(){
+  // Si estamos editando un repuesto, back = cancelar edición (no salir del detalle)
+  if (editingRepuestoCtx){
+    const { machineId, repuestoId } = editingRepuestoCtx
+    editingRepuestoCtx = null
+    openRepuesto(machineId, repuestoId, { fromSave: true })
+    return
+  }
   if (navStack.length === 0) return
   const prev = navStack.pop()
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'))
   document.getElementById(prev.viewId).classList.add('active')
   if (navStack.length === 0) tabHeader(currentTab)
   activeUploadCtx = null
+  // Ocultar botón ✏️ si volvemos a una vista que no es de repuesto
+  if (prev.viewId !== 'view-repuesto') document.getElementById('hdr-edit').style.display = 'none'
   // Restore scroll
   requestAnimationFrame(() => { getContent().scrollTop = prev.scrollTop || 0 })
 }
@@ -1012,14 +1069,23 @@ async function openRepuesto(machineId, repuestoId, opts = {}){
   const title = r.textoBreve || r.alias || r.descripcion || 'Repuesto'
   const subtitle = r.codigoSAP ? `SAP ${r.codigoSAP}` : (r.tipo || '')
 
-  // Si vinimos de un upload, no apilamos vista nueva — solo re-renderizamos
-  if (!opts.fromUpload){
+  // Si vinimos de un upload o save, no apilamos vista nueva — solo re-renderizamos
+  if (!opts.fromUpload && !opts.fromSave){
     pushView('view-repuesto', title, subtitle)
     saveRecent(machineId, repuestoId, title, r.codigoSAP)
   } else {
     setHeader(title, subtitle, true)
   }
   activeUploadCtx = { machineId, repuestoId }
+
+  // Mostrar botón ✏️ solo para admin
+  const editBtn = document.getElementById('hdr-edit')
+  if (userRole === 'admin'){
+    editBtn.style.display = 'flex'
+    editBtn.onclick = () => openRepuestoEdit(machineId, repuestoId)
+  } else {
+    editBtn.style.display = 'none'
+  }
 
   const photos = [...(r.fotosReales || []), ...(r.imagenesManual || [])]
     .sort((a,b) => (b.esPrincipal ? 1 : 0) - (a.esPrincipal ? 1 : 0))
@@ -1046,7 +1112,7 @@ async function openRepuesto(machineId, repuestoId, opts = {}){
 
   const el = document.getElementById('view-repuesto')
   el.innerHTML = `
-    ${main ? `<div class="photo-hero" onclick="openLightbox('${escHtmlAttr(main.url)}','${escHtmlAttr(main.descripcion || '')}')">
+    ${main ? `<div class="photo-hero" onclick="openLightboxRep('${escHtmlAttr(machineId)}','${escHtmlAttr(repuestoId)}','${escHtmlAttr(main.id)}')">
       <img src="${escHtmlAttr(main.url)}" alt="">
     </div>` : ''}
 
@@ -1079,7 +1145,7 @@ async function openRepuesto(machineId, repuestoId, opts = {}){
       <div class="section"><span class="section-title">Más fotos</span><span class="section-count">${rest.length}</span></div>
       <div class="gallery">
         ${rest.map(img => `<img class="gallery-img" src="${escHtmlAttr(img.url)}" alt=""
-          onclick="openLightbox('${escHtmlAttr(img.url)}','${escHtmlAttr(img.descripcion || img.tipo || '')}')">`).join('')}
+          onclick="openLightboxRep('${escHtmlAttr(machineId)}','${escHtmlAttr(repuestoId)}','${escHtmlAttr(img.id)}')">`).join('')}
       </div>` : ''}
 
     ${!main && rest.length === 0 ? `
@@ -1096,22 +1162,252 @@ async function openRepuesto(machineId, repuestoId, opts = {}){
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// LIGHTBOX
+// LIGHTBOX (+ photo actions admin)
 // ═══════════════════════════════════════════════════════════════════
-function openLightbox(url, caption){
+let lbxPhotoCtx = null  // {machineId, repuestoId, photoId, isPrincipal}
+
+function openLightboxRep(machineId, repuestoId, photoId){
+  const reps = repCache[machineId] || []
+  const r = reps.find(x => x.id === repuestoId)
+  if (!r) return
+  const photos = [...(r.fotosReales || []), ...(r.imagenesManual || [])]
+  const ph = photos.find(p => p.id === photoId)
+  if (!ph) return
+  // Solo permitir editar fotos reales (no las del manual original)
+  const isReal = (r.fotosReales || []).some(p => p.id === photoId)
+  const ctx = isReal ? { machineId, repuestoId, photoId, isPrincipal: !!ph.esPrincipal } : null
+  openLightbox(ph.url, ph.descripcion || ph.tipo || '', ctx)
+}
+
+function openLightbox(url, caption, ctx){
   document.getElementById('lbx-img').src = url
   document.getElementById('lbx-cap').textContent = caption || ''
+  const actions = document.getElementById('lbx-actions')
+  if (userRole === 'admin' && ctx){
+    lbxPhotoCtx = ctx
+    actions.classList.add('show')
+    const pBtn = document.getElementById('lbx-principal')
+    if (ctx.isPrincipal){
+      pBtn.classList.add('is-active')
+      pBtn.textContent = '⭐ Principal'
+      pBtn.disabled = true
+    } else {
+      pBtn.classList.remove('is-active')
+      pBtn.textContent = '⭐ Hacer principal'
+      pBtn.disabled = false
+    }
+  } else {
+    lbxPhotoCtx = null
+    actions.classList.remove('show')
+  }
   document.getElementById('lightbox').classList.add('open')
 }
+
 function closeLightbox(){
   document.getElementById('lightbox').classList.remove('open')
   document.getElementById('lbx-img').src = ''
+  lbxPhotoCtx = null
+}
+
+async function onLbxMarkPrincipal(){
+  if (!lbxPhotoCtx || userRole !== 'admin') return
+  const { machineId, repuestoId, photoId } = lbxPhotoCtx
+  const btn = document.getElementById('lbx-principal')
+  btn.disabled = true; btn.textContent = '⭐ Aplicando…'
+  try {
+    const docRef = db.collection(`machines/${machineId}/repuestos`).doc(repuestoId)
+    const snap = await docRef.get()
+    const fotos = (snap.exists ? snap.data().fotosReales : []) || []
+    const newFotos = fotos.map(f => ({ ...f, esPrincipal: f.id === photoId }))
+    await docRef.update({
+      fotosReales: newFotos,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    })
+    // Actualizar cache
+    const reps = repCache[machineId] || []
+    const idx = reps.findIndex(x => x.id === repuestoId)
+    if (idx >= 0) reps[idx] = { ...reps[idx], fotosReales: newFotos }
+
+    showToast('Foto principal actualizada ✓', 'ok')
+    tgApp?.HapticFeedback?.notificationOccurred('success')
+    closeLightbox()
+    openRepuesto(machineId, repuestoId, { fromSave: true })
+  } catch(err){
+    console.error('mark principal error', err)
+    showToast('Error: ' + (err.message || 'No se pudo aplicar'), 'err')
+    btn.disabled = false; btn.textContent = '⭐ Hacer principal'
+  }
+}
+
+async function onLbxDelete(){
+  if (!lbxPhotoCtx || userRole !== 'admin') return
+  const ok = confirm('¿Borrar esta foto? No se puede deshacer.')
+  if (!ok) return
+  const { machineId, repuestoId, photoId } = lbxPhotoCtx
+  const btn = document.getElementById('lbx-delete')
+  btn.disabled = true; btn.textContent = '🗑️ Borrando…'
+  try {
+    const docRef = db.collection(`machines/${machineId}/repuestos`).doc(repuestoId)
+    const snap = await docRef.get()
+    const fotos = (snap.exists ? snap.data().fotosReales : []) || []
+    const target = fotos.find(f => f.id === photoId)
+    const newFotos = fotos.filter(f => f.id !== photoId)
+    await docRef.update({
+      fotosReales: newFotos,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    })
+    // Borrar el archivo de Storage (best-effort)
+    if (target?.url){
+      try {
+        await storage.refFromURL(target.url).delete()
+      } catch(e){
+        console.warn('no se pudo borrar storage object (puede no existir)', e)
+      }
+    }
+    // Actualizar cache
+    const reps = repCache[machineId] || []
+    const idx = reps.findIndex(x => x.id === repuestoId)
+    if (idx >= 0) reps[idx] = { ...reps[idx], fotosReales: newFotos }
+
+    showToast('Foto borrada ✓', 'ok')
+    tgApp?.HapticFeedback?.notificationOccurred('success')
+    closeLightbox()
+    openRepuesto(machineId, repuestoId, { fromSave: true })
+  } catch(err){
+    console.error('delete photo error', err)
+    showToast('Error: ' + (err.message || 'No se pudo borrar'), 'err')
+    btn.disabled = false; btn.textContent = '🗑️ Borrar'
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// EDIT REPUESTO (admin only)
+// ═══════════════════════════════════════════════════════════════════
+const EDIT_FIELDS = [
+  // [key, label, type, opts]
+  ['textoBreve',         'Nombre',                'text',     { required: true }],
+  ['codigoSAP',          'Código SAP',            'text',     { code: true, hint: 'Clave externa — cuidá los typos' }],
+  ['codigoFabricante',   'Código fabricante',     'text',     { code: true }],
+  ['alias',              'Alias',                 'text',     {}],
+  ['nombreManual',       'Nombre del manual',     'text',     {}],
+  ['tipo',               'Tipo',                  'text',     {}],
+  ['seccion',            'Sección',               'text',     {}],
+  ['ubicacionEnPlanta',  'Ubicación en planta',   'text',     {}],
+  ['cantidadPorMaquina', 'Cantidad por equipo',   'number',   {}],
+  ['observaciones',      'Observaciones',         'textarea', {}],
+]
+
+function openRepuestoEdit(machineId, repuestoId){
+  if (userRole !== 'admin') return
+  const reps = repCache[machineId] || []
+  const r = reps.find(x => x.id === repuestoId)
+  if (!r) return
+
+  editingRepuestoCtx = { machineId, repuestoId }
+  const title = r.textoBreve || r.alias || r.descripcion || 'Repuesto'
+  setHeader('Editar repuesto', title, true)
+  // Ocultar botón ✏️ mientras editamos
+  document.getElementById('hdr-edit').style.display = 'none'
+
+  const el = document.getElementById('view-repuesto')
+  el.innerHTML = `
+    <div class="form-card">
+      ${EDIT_FIELDS.map(([key, label, type, opts]) => {
+        const val = r[key] != null ? String(r[key]) : ''
+        if (type === 'textarea'){
+          return `<div class="form-row">
+            <label class="form-label" for="ef-${key}">${escHtml(label)}</label>
+            <textarea id="ef-${key}" class="form-textarea" rows="4">${escHtml(val)}</textarea>
+          </div>`
+        }
+        const codeCls = opts.code ? ' code' : ''
+        const hintHtml = opts.hint ? `<div style="font-size:11px;color:var(--warn);margin-top:4px">⚠ ${escHtml(opts.hint)}</div>` : ''
+        return `<div class="form-row">
+          <label class="form-label" for="ef-${key}">${escHtml(label)}${opts.required ? ' *' : ''}</label>
+          <input id="ef-${key}" class="form-input${codeCls}" type="${type}" value="${escHtml(val)}"
+            ${type === 'number' ? 'inputmode="numeric" step="any"' : ''}
+            ${opts.required ? 'required' : ''}>
+          ${hintHtml}
+        </div>`
+      }).join('')}
+    </div>
+    <div class="form-actions">
+      <button class="btn-cancel" onclick="cancelRepuestoEdit('${escHtmlAttr(machineId)}','${escHtmlAttr(repuestoId)}')">Cancelar</button>
+      <button class="btn-save" id="btn-save-rep" onclick="saveRepuestoEdit('${escHtmlAttr(machineId)}','${escHtmlAttr(repuestoId)}')">Guardar</button>
+    </div>
+  `
+  // Scroll a top
+  getContent().scrollTop = 0
+}
+
+function cancelRepuestoEdit(machineId, repuestoId){
+  editingRepuestoCtx = null
+  openRepuesto(machineId, repuestoId, { fromSave: true })
+}
+
+async function saveRepuestoEdit(machineId, repuestoId){
+  if (userRole !== 'admin') return
+  const btn = document.getElementById('btn-save-rep')
+  btn.disabled = true
+  btn.textContent = 'Guardando…'
+
+  const updates = {}
+  for (const [key, label, type] of EDIT_FIELDS){
+    const inp = document.getElementById(`ef-${key}`)
+    if (!inp) continue
+    let v = inp.value
+    if (type === 'number'){
+      if (v === '' || v == null){ updates[key] = null; continue }
+      const n = Number(v)
+      if (Number.isNaN(n)){
+        showToast(`${label}: número inválido`, 'err')
+        btn.disabled = false; btn.textContent = 'Guardar'
+        return
+      }
+      updates[key] = n
+    } else {
+      updates[key] = v.trim()
+    }
+  }
+
+  // Validación mínima
+  if (!updates.textoBreve){
+    showToast('El nombre no puede estar vacío', 'err')
+    btn.disabled = false; btn.textContent = 'Guardar'
+    return
+  }
+
+  try {
+    const docRef = db.collection(`machines/${machineId}/repuestos`).doc(repuestoId)
+    await docRef.update({
+      ...updates,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    })
+
+    // Actualizar cache local
+    const reps = repCache[machineId] || []
+    const idx = reps.findIndex(x => x.id === repuestoId)
+    if (idx >= 0) reps[idx] = { ...reps[idx], ...updates }
+
+    showToast('Cambios guardados ✓', 'ok')
+    tgApp?.HapticFeedback?.notificationOccurred('success')
+
+    // Volver al detalle (in-place, sin apilar)
+    editingRepuestoCtx = null
+    openRepuesto(machineId, repuestoId, { fromSave: true })
+  } catch(err){
+    console.error('save error', err)
+    showToast('Error al guardar: ' + (err.message || ''), 'err')
+    tgApp?.HapticFeedback?.notificationOccurred('error')
+    btn.disabled = false; btn.textContent = 'Guardar'
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════
 // PHOTO UPLOAD (admin only)
 // ═══════════════════════════════════════════════════════════════════
 let activeUploadCtx = null  // {machineId, repuestoId} mientras detalle abierto
+let editingRepuestoCtx = null  // {machineId, repuestoId} mientras formulario edición abierto
 
 function compressImage(file, maxW = 1200, maxH = 1200, quality = 0.85){
   return new Promise((resolve, reject) => {
