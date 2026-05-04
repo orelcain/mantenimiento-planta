@@ -2526,7 +2526,7 @@ async function tgHandleMenu(chatId, topicId) {
       { text: '📡 Sensores', callback_data: 'cmd:sensores' },
     ],
     [
-      { text: '🔩 Repuestos', web_app: { url: MANT_URL } },
+      { text: '🔩 Repuestos', url: 'https://t.me/antarfood_mant_bot/repuestos' },
     ],
     [
       { text: '🌐 Abrir App Completa', url: PWA_URL },
