@@ -344,6 +344,26 @@ html,body{height:100%;background:var(--bg);color:var(--text);
 #toast.ok{border-color:var(--green);color:var(--green)}
 #toast.err{border-color:var(--danger);color:var(--danger)}
 
+/* ── Jerarquía ──────────────────────────────────────────────────────── */
+.hier-breadcrumb{display:flex;align-items:center;gap:0;padding:8px 12px 4px;
+  overflow-x:auto;scrollbar-width:none;background:var(--bg2);
+  border-bottom:1px solid var(--divider);flex-shrink:0}
+.hier-breadcrumb::-webkit-scrollbar{display:none}
+.hier-bread-item{background:none;border:none;color:var(--hint);font-size:13px;
+  cursor:pointer;white-space:nowrap;padding:4px 2px}
+.hier-bread-item.active{color:var(--text);font-weight:600}
+.hier-bread-sep{color:var(--divider);padding:0 4px;font-size:13px;flex-shrink:0}
+.level-chip{font-size:10px;font-weight:600;padding:2px 6px;border-radius:5px;
+  text-transform:uppercase;letter-spacing:.03em;flex-shrink:0}
+.cell-action-btn{background:none;border:1px solid var(--divider);color:var(--accent);
+  font-size:17px;width:32px;height:32px;border-radius:8px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.cell-action-btn:active{background:rgba(79,174,78,.12)}
+.btn-add-node{width:100%;padding:11px;background:rgba(79,174,78,.1);
+  border:1px dashed var(--accent);border-radius:10px;color:var(--accent);
+  font-size:14px;font-weight:600;cursor:pointer;text-align:center}
+.btn-add-node:active{background:rgba(79,174,78,.2)}
+
 /* ── Barra búsqueda persistente ─────────────────────────────────────── */
 #search-persistent{padding:8px 12px 4px;background:var(--bg);border-bottom:1px solid var(--divider)}
 .search-persistent-wrap{display:flex;align-items:center;gap:8px;background:var(--bg2);
@@ -512,10 +532,26 @@ let nodeNameCache = {}         // nodeId → resolved name
 
 let activeCatFilter = 'all'
 let activeMachineRepFilter = null
+let activeMachineTypeFilter = null
+let repSearchTimer = null
 let recentIds = []
 let recentsPage = 0
 let searchTimer = null
 let prevTabBeforeSearch = 'home'
+
+// F2 — Hierarchy state
+let hierarchyNodesMap   = {}   // nodeId → node
+let hierarchyChildrenMap = {}  // parentId → node[]
+let hierarchyRoots      = []   // top-level nodes
+let hierarchyStack      = []   // [{id, nombre}] nav stack
+let __hierarchyCache    = null // {nodes, ts}
+let hierSheetNodeId     = null // nodeId being added to list
+let hierSheetIsEquip    = false
+let tgBackBtnHandler    = null // current Telegram BackButton handler
+
+const HIERARCHY_CACHE_TTL = 5 * 60 * 1000
+const LEVEL_LABELS = {1:'Empresa',2:'Planta',3:'Área',4:'Sub-área',5:'Sistema',6:'Sub-sistema',7:'Equipo',8:'Elemento'}
+const LEVEL_COLORS = {1:'#5288c1',2:'#5288c1',3:'#4fae4e',4:'#4fae4e',5:'#e88a00',6:'#e88a00',7:'#9c6bb8',8:'#9c6bb8'}
 
 // ═══════════════════════════════════════════════════════════════════
 // INIT
@@ -772,7 +808,7 @@ function switchTab(tab){
   tgApp?.HapticFeedback?.selectionChanged?.()
   localStorage.setItem('mant_active_tab', tab)
   if (tab === 'home')      renderHome()
-  if (tab === 'hierarchy') renderHierarchyStub()
+  if (tab === 'hierarchy') renderHierarchyTab()
   if (tab === 'manuales')  renderManualesStub()
   if (tab === 'search'){
     setTimeout(() => document.getElementById('search-input')?.focus(), 60)
@@ -780,13 +816,6 @@ function switchTab(tab){
 }
 
 function setTab(tab){ switchTab(tab) }
-
-function renderHierarchyStub(){
-  document.getElementById('view-hierarchy').innerHTML = `
-    <div style="padding:32px 20px;text-align:center">
-      ${emptyHtml('🌳','Jerarquía de equipos','Próximamente: navega por planta, área y equipo para gestionar repuestos.')}
-    </div>`
-}
 
 function renderManualesStub(){
   document.getElementById('view-manuales').innerHTML = `
@@ -1338,6 +1367,7 @@ async function openMachine(machineId, opts = {}){
   const m = machineMap[machineId]
   if (!m) return
   activeMachineRepFilter = opts.preFilter ?? null
+  activeMachineTypeFilter = null
   tgApp?.HapticFeedback?.selectionChanged?.()
 
   pushView('view-machine', m.nombre, [m.marca, m.modelo].filter(Boolean).join(' · '))
@@ -1362,8 +1392,22 @@ async function openMachine(machineId, opts = {}){
           <span class="info-value obs">${escHtml(m.descripcion)}</span>
         </div>
       </div>` : ''}
-    <div class="section"><span class="section-title">Repuestos</span><span class="section-count" id="rep-count">…</span></div>
+    <div class="section">
+      <span class="section-title">Repuestos</span>
+      <span class="section-count" id="rep-count">…</span>
+    </div>
+    <div style="padding:0 12px 8px">
+      <input id="rep-search-input" type="search" placeholder="Buscar repuesto…"
+        style="width:100%;box-sizing:border-box;padding:8px 12px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);color:var(--text);font-size:14px;outline:none"
+        oninput="repSearchInput('${escHtmlAttr(machineId)}')">
+    </div>
+    <div id="rep-type-chips"></div>
     <div id="rep-chips"></div>
+    ${userRole === 'admin' ? `
+      <div style="padding:0 12px 8px;display:flex;gap:8px">
+        <button class="cell-action-btn" style="flex:1"
+          onclick="openMachineAddToListSheet('${escHtmlAttr(machineId)}')">➕ Agregar a lista</button>
+      </div>` : ''}
     <div id="rep-list">${skeletonCells(5)}</div>
   `
 
@@ -1377,50 +1421,88 @@ async function openMachine(machineId, opts = {}){
 
 function renderMachineBody(machineId, reps, favLists){
   const m = machineMap[machineId]
-  const countEl = document.getElementById('rep-count')
-  const chipsEl = document.getElementById('rep-chips')
-  const listEl  = document.getElementById('rep-list')
+  const countEl    = document.getElementById('rep-count')
+  const typeChips  = document.getElementById('rep-type-chips')
+  const chipsEl    = document.getElementById('rep-chips')
+  const listEl     = document.getElementById('rep-list')
   if (!listEl) return  // user navigated away
 
   if (reps.length === 0){
-    countEl.textContent = '0'
-    chipsEl.innerHTML = ''
+    if (countEl)   countEl.textContent = '0'
+    if (typeChips) typeChips.innerHTML = ''
+    if (chipsEl)   chipsEl.innerHTML = ''
     listEl.innerHTML = emptyHtml('📭','Sin repuestos','Este equipo no tiene repuestos cargados aún')
     return
   }
 
-  // Filter
+  // Search query from DOM
+  const searchQ = normalizeSearch(document.getElementById('rep-search-input')?.value || '')
+
+  // Type chips — unique tipos with ≥1 occurrence
+  const typeCounts = {}
+  for (const r of reps){
+    const t = r.tipo?.trim()
+    if (t) typeCounts[t] = (typeCounts[t] || 0) + 1
+  }
+  const tipos = Object.keys(typeCounts).sort()
+  if (typeChips){
+    typeChips.innerHTML = tipos.length > 1 ? `<div class="chips" style="padding:0 12px 4px">
+      <div class="chip ${activeMachineTypeFilter===null?'active':''}"
+           onclick="setMachineTypeFilter('${escHtmlAttr(machineId)}', null)">Todos</div>
+      ${tipos.map(t => `
+        <div class="chip ${activeMachineTypeFilter===t?'active':''}"
+             onclick="setMachineTypeFilter('${escHtmlAttr(machineId)}', '${escHtmlAttr(t)}')">
+          ${escHtml(t)} <span class="count">${typeCounts[t]}</span>
+        </div>`).join('')}
+    </div>` : ''
+  }
+
+  // Filter chain: favList → type → search
   let filtered = reps
   if (activeMachineRepFilter){
     const list = favLists.find(l => l.name === activeMachineRepFilter)
     if (list){
       const idSet = new Set(list.repuestoIds)
-      filtered = reps.filter(r => matchesRepFavList(r, idSet))
+      filtered = filtered.filter(r => matchesRepFavList(r, idSet))
+    }
+  }
+  if (activeMachineTypeFilter){
+    filtered = filtered.filter(r => (r.tipo?.trim() || '') === activeMachineTypeFilter)
+  }
+  if (searchQ){
+    filtered = filtered.filter(r =>
+      normalizeSearch(r.textoBreve || '').includes(searchQ) ||
+      normalizeSearch(r.codigoSAP || '').includes(searchQ) ||
+      normalizeSearch(r.alias || '').includes(searchQ) ||
+      normalizeSearch(r.descripcion || '').includes(searchQ)
+    )
+  }
+
+  // FavList chips
+  if (chipsEl){
+    if (favLists.length > 0){
+      chipsEl.innerHTML = `<div class="chips">
+        <div class="chip ${activeMachineRepFilter===null?'active':''}"
+             onclick="setMachineRepFilter('${escHtmlAttr(machineId)}', null)">
+          Todos <span class="count">${reps.length}</span>
+        </div>
+        ${favLists.map(l => {
+          const cnt = reps.filter(r => matchesRepFavList(r, new Set(l.repuestoIds))).length
+          return `<div class="chip ${activeMachineRepFilter===l.name?'active':''}"
+                   onclick="setMachineRepFilter('${escHtmlAttr(machineId)}', ${escHtmlAttr(JSON.stringify(l.name))})">
+            ${escHtml(l.name)} <span class="count">${cnt}</span>
+          </div>`
+        }).join('')}
+      </div>`
+    } else {
+      chipsEl.innerHTML = ''
     }
   }
 
-  // Chips
-  if (favLists.length > 0){
-    chipsEl.innerHTML = `<div class="chips">
-      <div class="chip ${activeMachineRepFilter===null?'active':''}" onclick="setMachineRepFilter('${escHtmlAttr(machineId)}', null)">
-        Todos <span class="count">${reps.length}</span>
-      </div>
-      ${favLists.map(l => {
-        const cnt = reps.filter(r => matchesRepFavList(r, new Set(l.repuestoIds))).length
-        return `<div class="chip ${activeMachineRepFilter===l.name?'active':''}"
-                 onclick="setMachineRepFilter('${escHtmlAttr(machineId)}', ${escHtmlAttr(JSON.stringify(l.name))})">
-          ${escHtml(l.name)} <span class="count">${cnt}</span>
-        </div>`
-      }).join('')}
-    </div>`
-  } else {
-    chipsEl.innerHTML = ''
-  }
-
-  countEl.textContent = activeMachineRepFilter ? `${filtered.length}/${reps.length}` : `${reps.length}`
+  if (countEl) countEl.textContent = filtered.length < reps.length ? `${filtered.length}/${reps.length}` : `${reps.length}`
 
   if (filtered.length === 0){
-    listEl.innerHTML = emptyHtml('🔍','Lista vacía','Ningún repuesto coincide con esta lista')
+    listEl.innerHTML = emptyHtml('🔍','Sin resultados','Ningún repuesto coincide con el filtro')
   } else {
     listEl.innerHTML = `<div class="cell-group">
       ${filtered.map(r => repCellHtml(r, machineId, m.nombre)).join('')}
@@ -1434,6 +1516,81 @@ function setMachineRepFilter(machineId, listName){
     Promise.resolve(repCache[machineId] || []),
     getMachineFavListsMerged(machineId),
   ]).then(([reps, favLists]) => renderMachineBody(machineId, reps, favLists))
+}
+
+function setMachineTypeFilter(machineId, tipo){
+  activeMachineTypeFilter = tipo
+  getMachineFavListsMerged(machineId).then(favLists =>
+    renderMachineBody(machineId, repCache[machineId] || [], favLists))
+}
+
+function repSearchInput(machineId){
+  clearTimeout(repSearchTimer)
+  repSearchTimer = setTimeout(() => {
+    getMachineFavListsMerged(machineId).then(favLists =>
+      renderMachineBody(machineId, repCache[machineId] || [], favLists))
+  }, 280)
+}
+
+function openMachineAddToListSheet(machineId){
+  if (userRole !== 'admin') return
+  const lists = prefs.favoriteLists || []
+  const mid = escHtmlAttr(machineId)
+  const rows = lists.map((l, i) => {
+    const already = (l.equipmentIds || []).includes(machineId)
+    return `<div class="cell" onclick="${already ? '' : `addMachineToList('${mid}',${i})`}" style="${already ? 'opacity:.45;pointer-events:none' : ''}">
+      <div class="cell-body"><div class="cell-title">${escHtml(l.name)}</div>
+        <div class="cell-sub">${(l.equipmentIds||[]).length} equipo(s)${already ? ' · Ya incluido' : ''}</div>
+      </div>
+      ${already ? '' : '<div class="cell-chevron">+</div>'}
+    </div>`
+  }).join('')
+  showSheet(`
+    <div class="sheet-header"><span class="sheet-title">Agregar a lista</span></div>
+    <div class="cell-group">${rows || emptyHtml('📋','Sin listas','Crea una lista desde Inicio → Mis listas')}</div>
+    <div style="padding:8px 12px 4px">
+      <button class="cell-action-btn" style="width:100%" onclick="machineCreateListAndAdd('${mid}')">+ Nueva lista</button>
+    </div>`)
+}
+
+async function addMachineToList(machineId, listIdx){
+  closeSheet()
+  const list = prefs.favoriteLists[listIdx]
+  if (!list) return
+  if ((list.equipmentIds || []).includes(machineId)){
+    showToast('Ya está en esta lista', 'info'); return
+  }
+  const updated = [...(list.equipmentIds || []), machineId]
+  prefs.favoriteLists[listIdx].equipmentIds = updated
+  try {
+    await db.collection('user_preferences').doc(currentUser.uid).update({
+      [`favoriteLists.${listIdx}.equipmentIds`]: updated,
+    })
+    showToast(`Agregado a "${list.name}" ✓`, 'ok')
+    tgApp?.HapticFeedback?.notificationOccurred('success')
+  } catch(err){
+    prefs.favoriteLists[listIdx].equipmentIds = updated.slice(0,-1)
+    showToast('Error al guardar', 'err')
+  }
+}
+
+function machineCreateListAndAdd(machineId){
+  closeSheet()
+  showInputModal('Nueva lista', '', 'Ej. Bombas, Sensores, Cuchillos…', async name => {
+    if (!name?.trim()) return
+    const newList = { name: name.trim(), equipmentIds: [machineId] }
+    prefs.favoriteLists.push(newList)
+    try {
+      await db.collection('user_preferences').doc(currentUser.uid).update({
+        favoriteLists: prefs.favoriteLists,
+      })
+      showToast(`Lista "${newList.name}" creada ✓`, 'ok')
+      tgApp?.HapticFeedback?.notificationOccurred('success')
+    } catch(err){
+      prefs.favoriteLists.pop()
+      showToast('Error al crear lista', 'err')
+    }
+  })
 }
 
 function repCellHtml(r, machineId, machineName){
@@ -1991,7 +2148,10 @@ const EDIT_FIELDS = [
   ['tipo',               'Tipo',                  'text',     {}],
   ['seccion',            'Sección',               'text',     {}],
   ['ubicacionEnPlanta',  'Ubicación en planta',   'text',     {}],
+  ['posicionManual',     'Posición manual',       'text',     {}],
+  ['numeroSerie',        'N° de serie',           'text',     { code: true }],
   ['cantidadPorMaquina', 'Cantidad por equipo',   'number',   {}],
+  ['valorUnitario',      'Valor unitario (USD)',  'number',   {}],
   ['observaciones',      'Observaciones',         'textarea', {}],
 ]
 
@@ -2077,15 +2237,20 @@ async function saveRepuestoEdit(machineId, repuestoId){
 
   try {
     const docRef = db.collection(`machines/${machineId}/repuestos`).doc(repuestoId)
+    const reps = repCache[machineId] || []
+    const idx = reps.findIndex(x => x.id === repuestoId)
+    const before = idx >= 0 ? { ...reps[idx] } : null
+
     await docRef.update({
       ...updates,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     })
 
     // Actualizar cache local
-    const reps = repCache[machineId] || []
-    const idx = reps.findIndex(x => x.id === repuestoId)
     if (idx >= 0) reps[idx] = { ...reps[idx], ...updates }
+
+    await logAudit('update', `machines/${machineId}/repuestos`, repuestoId, before, updates,
+      `Editar repuesto ${updates.textoBreve || repuestoId}`)
 
     showToast('Cambios guardados ✓', 'ok')
     tgApp?.HapticFeedback?.notificationOccurred('success')
@@ -2274,6 +2439,314 @@ function escHtml(s){
 }
 function escHtmlAttr(s){
   return escHtml(s).replace(/`/g,'&#96;')
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// F2 — HIERARCHY TAB
+// ═══════════════════════════════════════════════════════════════════
+
+function setTgBack(handler){
+  if (tgBackBtnHandler) tgApp?.BackButton?.offClick(tgBackBtnHandler)
+  tgBackBtnHandler = handler
+  if (handler){ tgApp?.BackButton?.show(); tgApp?.BackButton?.onClick(handler) }
+  else tgApp?.BackButton?.hide()
+}
+
+async function loadHierarchyTree(){
+  const now = Date.now()
+  if (__hierarchyCache && (now - __hierarchyCache.ts) < HIERARCHY_CACHE_TTL) return
+
+  const snap = await db.collection('hierarchy').where('activo','==',true).orderBy('orden').get()
+  const nodes = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+
+  hierarchyNodesMap = {}
+  hierarchyChildrenMap = {}
+  hierarchyRoots = []
+
+  for (const n of nodes) hierarchyNodesMap[n.id] = n
+  for (const n of nodes){
+    const pid = n.parentId
+    if (!pid || !hierarchyNodesMap[pid]){
+      hierarchyRoots.push(n)
+    } else {
+      if (!hierarchyChildrenMap[pid]) hierarchyChildrenMap[pid] = []
+      hierarchyChildrenMap[pid].push(n)
+    }
+  }
+  __hierarchyCache = { ts: now }
+}
+
+function isEquipNode(node){
+  return !(hierarchyChildrenMap[node.id]?.length > 0)
+}
+
+function countEquipDescendants(nodeId){
+  const children = hierarchyChildrenMap[nodeId] || []
+  if (!children.length) return 1
+  let c = 0
+  for (const ch of children) c += isEquipNode(ch) ? 1 : countEquipDescendants(ch.id)
+  return c
+}
+
+async function renderHierarchyTab(){
+  const el = document.getElementById('view-hierarchy')
+  if (!el) return
+  el.innerHTML = skeletonCells(6)
+  try {
+    await loadHierarchyTree()
+  } catch(err){
+    el.innerHTML = emptyHtml('⚠️','Error al cargar','No se pudo cargar la jerarquía. Revisá tu conexión.')
+    return
+  }
+  renderHierarchyLevel()
+}
+
+function renderHierarchyLevel(){
+  const el = document.getElementById('view-hierarchy')
+  if (!el) return
+
+  const currentId = hierarchyStack.length ? hierarchyStack[hierarchyStack.length-1].id : null
+  const nodes = currentId ? (hierarchyChildrenMap[currentId] || []) : hierarchyRoots
+
+  // Breadcrumb
+  const breadHtml = `
+    <div class="hier-breadcrumb">
+      <button class="hier-bread-item${!currentId?' active':''}" onclick="hierarchyGoTo(-1)">🌳 Planta</button>
+      ${hierarchyStack.map((item,i) => `
+        <span class="hier-bread-sep">›</span>
+        <button class="hier-bread-item${i===hierarchyStack.length-1?' active':''}"
+          onclick="hierarchyGoTo(${i})">${escHtml(item.nombre)}</button>
+      `).join('')}
+    </div>`
+
+  if (!nodes.length){
+    el.innerHTML = breadHtml + emptyHtml('🔧','Sin elementos','Este nodo no tiene sub-elementos.')
+    return
+  }
+
+  const nodesHtml = nodes.map(node => {
+    const isEquip = isEquipNode(node)
+    const nivel = node.nivel || 1
+    const levelLabel = LEVEL_LABELS[nivel] || `N${nivel}`
+    const levelColor = LEVEL_COLORS[nivel] || '#888'
+    const linkedMachine = machines.find(m => m.hierarchyNodeId === node.id)
+    const children = hierarchyChildrenMap[node.id] || []
+
+    let subHtml
+    if (isEquip){
+      const repCount = linkedMachine && repCache[linkedMachine.id]
+        ? repCache[linkedMachine.id].length : (node.repuestoCount ?? '…')
+      subHtml = `${node.codigo ? escHtml(node.codigo)+' · ' : ''}${repCount} rep`
+    } else {
+      const equipCount = countEquipDescendants(node.id)
+      subHtml = `${pl(children.length,'sub-nodo','sub-nodos')} · ${pl(equipCount,'equipo','equipos')}`
+    }
+
+    const addBtn = userRole==='admin' ? `
+      <button class="cell-action-btn"
+        onclick="event.stopPropagation();openHierAddToListSheet('${escHtmlAttr(node.id)}',${isEquip})"
+        title="Agregar a lista">＋</button>` : ''
+
+    const onclick = isEquip
+      ? `hierarchyOpenEquip('${escHtmlAttr(node.id)}','${escHtmlAttr(linkedMachine?.id||'')}')`
+      : `hierarchyEnter('${escHtmlAttr(node.id)}','${escHtmlAttr(node.nombre||'')}')`
+
+    return `
+      <div class="cell" onclick="${onclick}">
+        <div class="cell-icon" style="background:${levelColor}22;color:${levelColor}">
+          ${isEquip?'⚙️':'📁'}
+        </div>
+        <div class="cell-body">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <div class="cell-title">${escHtml(node.nombre||'Sin nombre')}</div>
+            <span class="level-chip" style="background:${levelColor}22;color:${levelColor}">${levelLabel}</span>
+          </div>
+          <div class="cell-sub">${subHtml}</div>
+        </div>
+        ${addBtn}
+        ${isEquip?'':'<div class="cell-chevron">›</div>'}
+      </div>`
+  }).join('')
+
+  const adminAddBtn = userRole==='admin' ? `
+    <div style="padding:10px 16px 4px">
+      <button class="btn-add-node" onclick="openAddHierNodeModal('${escHtmlAttr(currentId||'')}')">
+        + Agregar nodo aquí
+      </button>
+    </div>` : ''
+
+  el.innerHTML = `
+    ${breadHtml}
+    <div class="cell-group" style="margin-top:8px">${nodesHtml}</div>
+    ${adminAddBtn}`
+}
+
+function hierarchyEnter(nodeId, nombre){
+  hierarchyStack.push({id:nodeId, nombre})
+  tgApp?.HapticFeedback?.selectionChanged?.()
+  setTgBack(hierarchyGoBack)
+  renderHierarchyLevel()
+  getContent().scrollTop = 0
+}
+
+function hierarchyGoBack(){
+  hierarchyStack.pop()
+  tgApp?.HapticFeedback?.selectionChanged?.()
+  if (!hierarchyStack.length) setTgBack(null)
+  renderHierarchyLevel()
+  getContent().scrollTop = 0
+}
+
+function hierarchyGoTo(stackIdx){
+  hierarchyStack = stackIdx < 0 ? [] : hierarchyStack.slice(0, stackIdx+1)
+  tgApp?.HapticFeedback?.selectionChanged?.()
+  setTgBack(hierarchyStack.length ? hierarchyGoBack : null)
+  renderHierarchyLevel()
+  getContent().scrollTop = 0
+}
+
+function hierarchyOpenEquip(nodeId, machineId){
+  tgApp?.HapticFeedback?.selectionChanged?.()
+  if (machineId && machineMap[machineId]) openMachine(machineId)
+  else openHierarchyEquipment(nodeId)
+}
+
+async function openHierarchyEquipment(nodeId){
+  const node = hierarchyNodesMap[nodeId]
+  if (!node) return
+  pushView('view-machine', node.nombre, LEVEL_LABELS[node.nivel||7]||'Equipo')
+  const el = document.getElementById('view-machine')
+  el.innerHTML = skeletonCells(5)
+
+  try {
+    const snap = await db.collection(`hierarchy/${nodeId}/repuestos`).get()
+    const reps = snap.docs.map(d => ({id:d.id, source:'own', ...d.data()}))
+    // Store in repCache with nodeId key so search works
+    repCache[nodeId] = reps
+    renderMachineBody(nodeId, reps, [])
+  } catch(err){
+    el.innerHTML = emptyHtml('⚠️','Error','No se pudieron cargar los repuestos.')
+  }
+}
+
+// ── F2.3 — Agregar nodo a lista de equipos ──────────────────────────
+
+function openHierAddToListSheet(nodeId, isEquip){
+  if (userRole !== 'admin') return
+  hierSheetNodeId = nodeId
+  hierSheetIsEquip = isEquip
+
+  const title = document.getElementById('sheet-title')
+  const content = document.getElementById('sheet-content')
+  const node = hierarchyNodesMap[nodeId]
+
+  title.textContent = isEquip ? `Agregar "${node?.nombre||'equipo'}" a lista` : `Agregar área a lista de equipos`
+
+  const lists = prefs.favoriteLists || []
+  const listsHtml = lists.map((list,i) => {
+    const inList = list.machineIds?.includes(nodeId)
+    return `
+      <div class="sheet-row${inList?' on':''}" onclick="hierAddToList(${i})">
+        <div class="ico">${inList?'✅':'📋'}</div>
+        <div class="body">
+          <div class="name">${escHtml(list.name)}</div>
+          <div class="sub">${pl(list.machineIds?.length||0,'equipo','equipos')}</div>
+        </div>
+        ${inList?'<div class="check">✓</div>':''}
+      </div>`
+  }).join('')
+
+  content.innerHTML = (lists.length ? listsHtml : '<div class="sheet-empty">Aún no tenés listas de equipos. Creá la primera.</div>') + `
+    <div class="sheet-new" onclick="hierCreateListAndAdd()">
+      <span style="font-size:20px">＋</span> Nueva lista de equipos
+    </div>`
+
+  favSheetCtx = null  // limpiamos ctx de repuestos para que closeSheet no confunda
+  document.getElementById('sheet-overlay').classList.add('open')
+  requestAnimationFrame(() => document.getElementById('sheet').classList.add('open'))
+  tgApp?.HapticFeedback?.impactOccurred('light')
+}
+
+async function hierAddToList(listIdx){
+  const list = prefs.favoriteLists[listIdx]
+  if (!list) return
+  const nodeId = hierSheetNodeId
+
+  let idsToAdd = [nodeId]
+  if (!hierSheetIsEquip){
+    // Recolectar hojas descendientes
+    function collectLeaves(nid){
+      const ch = hierarchyChildrenMap[nid] || []
+      if (!ch.length) return [nid]
+      return ch.flatMap(c => isEquipNode(c) ? [c.id] : collectLeaves(c.id))
+    }
+    idsToAdd = collectLeaves(nodeId)
+    const newCount = idsToAdd.filter(id => !(list.machineIds||[]).includes(id)).length
+    if (!newCount){ showToast('Todos ya están en la lista','ok'); closeSheet(); return }
+    const ok = await new Promise(res => tgApp?.showConfirm(
+      `¿Agregar ${pl(idsToAdd.length,'equipo','equipos')} a "${list.name}"?`, res))
+    if (!ok){ closeSheet(); return }
+  }
+
+  const existing = new Set(list.machineIds || [])
+  for (const id of idsToAdd) existing.add(id)
+  list.machineIds = [...existing]
+
+  closeSheet()
+  showToast(`Agregado a "${list.name}" ✓`, 'ok')
+  tgApp?.HapticFeedback?.notificationOccurred('success')
+  await saveAllPrefs()
+}
+
+function hierCreateListAndAdd(){
+  closeSheet()
+  showInputModal('Nueva lista de equipos','','Nombre (ej: Bombas y motores)', async name => {
+    if (!name?.trim()) return
+    const newList = { name: name.trim(), machineIds: [hierSheetNodeId] }
+    prefs.favoriteLists = [...(prefs.favoriteLists||[]), newList]
+    await saveAllPrefs()
+    showToast(`Lista "${newList.name}" creada ✓`, 'ok')
+    tgApp?.HapticFeedback?.notificationOccurred('success')
+    if (currentTab === 'home') renderHome()
+  })
+}
+
+function openAddHierNodeModal(parentId){
+  if (userRole !== 'admin') return
+  showInputModal('Nuevo nodo','','Nombre del área o equipo', async name => {
+    if (!name?.trim()) return
+    try {
+      const parent = parentId ? hierarchyNodesMap[parentId] : null
+      const nivel = parent ? ((parent.nivel||1)+1) : 1
+      const codigo = name.trim().toUpperCase().replace(/\s+/g,'-').slice(0,20)
+      await db.collection('hierarchy').add({
+        nombre: name.trim(), codigo, nivel,
+        parentId: parentId||null, activo: true, orden: 999,
+        creadoPor: uid, creadoEn: firebase.firestore.FieldValue.serverTimestamp()
+      })
+      __hierarchyCache = null
+      showToast('Nodo creado ✓','ok')
+      tgApp?.HapticFeedback?.notificationOccurred('success')
+      await renderHierarchyTab()
+    } catch(err){
+      showToast('Error al crear: '+(err.message||''),'err')
+    }
+  })
+}
+
+// ── F2.5 — Audit log ────────────────────────────────────────────────
+
+async function logAudit(action, collection, documentId, before, after, label){
+  try {
+    await db.collection('audit_log').add({
+      action, collection, documentId,
+      documentLabel: label||documentId,
+      userId: uid, userName: firstName||'tg_user',
+      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+      before: before||null, after: after||null,
+      metadata: { source: 'miniapp' }
+    })
+  } catch(e){ console.warn('audit_log fail',e) }
 }
 
 // ═══════════════════════════════════════════════════════════════════
