@@ -3165,30 +3165,70 @@ exports.mintTelegramAuthToken = onRequest({ region: 'us-central1' }, async (req,
     }
   }
 
-  // 6. UID virtual y doc de usuario
-  const virtualUid = `tg_${tgUser.id}`
-  await db.collection('users').doc(virtualUid).set({
-    nombre: tgUser.first_name || 'Usuario',
-    apellido: tgUser.last_name || '',
-    email: `tg_${tgUser.id}@telegram.virtual`,
-    rol: authorized ? role : 'usuario',
-    activo: authorized,
-    telegramId: String(tgUser.id),
-    telegramUsername: tgUser.username || null,
-    isTelegramUser: true,
-    lastSeenAt: FieldValue.serverTimestamp(),
-  }, { merge: true })
+  // 6. Linkeo: ¿hay un usuario PWA existente con telegramId == tgUser.id?
+  //    Si sí → autenticamos como ESE uid (tu cuenta PWA real, hereda favoritos/listas).
+  //    Si no → fallback a uid virtual `tg_<id>`.
+  const tgIdStr = String(tgUser.id)
+  let resolvedUid = `tg_${tgUser.id}`
+  let isLinked = false
 
-  // 7. Emitir Firebase Custom Token
-  const customToken = await getAuth().createCustomToken(virtualUid, {
+  try {
+    const linkSnap = await db.collection('users')
+      .where('telegramId', '==', tgIdStr)
+      .limit(1)
+      .get()
+    if (!linkSnap.empty) {
+      const linkedDoc = linkSnap.docs[0]
+      const linkedData = linkedDoc.data()
+      // Solo linkear si el usuario PWA está activo
+      if (linkedData.activo !== false) {
+        resolvedUid = linkedDoc.id
+        isLinked = true
+        // Si el doc PWA tiene rol más alto, respetarlo (admin/supervisor/tecnico)
+        // Si rol es 'usuario' y el grupo TG lo hace 'tecnico', upgradear
+        const pwaRol = linkedData.rol
+        if (pwaRol && ['admin', 'supervisor', 'tecnico'].includes(pwaRol)) {
+          role = pwaRol
+        }
+        // Refrescar lastSeenAt + telegramUsername (no tocamos rol/activo)
+        await linkedDoc.ref.set({
+          telegramUsername: tgUser.username || null,
+          lastTelegramSeenAt: FieldValue.serverTimestamp(),
+        }, { merge: true })
+        logger.info('mintTelegramAuthToken: linked to PWA user', { tgId: tgIdStr, pwaUid: resolvedUid, role })
+      }
+    }
+  } catch (err) {
+    // Si la query falla, seguir con el flujo virtual
+    logger.warn('mintTelegramAuthToken: link lookup error', { err: String(err) })
+  }
+
+  // 7. Si no está linkeado, asegurar que existe el doc virtual `tg_<id>`
+  if (!isLinked) {
+    await db.collection('users').doc(resolvedUid).set({
+      nombre: tgUser.first_name || 'Usuario',
+      apellido: tgUser.last_name || '',
+      email: `tg_${tgUser.id}@telegram.virtual`,
+      rol: authorized ? role : 'usuario',
+      activo: authorized,
+      telegramId: tgIdStr,
+      telegramUsername: tgUser.username || null,
+      isTelegramUser: true,
+      lastSeenAt: FieldValue.serverTimestamp(),
+    }, { merge: true })
+  }
+
+  // 8. Emitir Firebase Custom Token
+  const customToken = await getAuth().createCustomToken(resolvedUid, {
     isTelegramUser: true,
-    telegramId: String(tgUser.id),
+    isLinked,
+    telegramId: tgIdStr,
     role,
     authorized,
   })
 
-  logger.info('mintTelegramAuthToken: OK', { uid: virtualUid, role, authorized, chatId })
-  res.json({ token: customToken, uid: virtualUid, role, authorized, firstName: tgUser.first_name || '' })
+  logger.info('mintTelegramAuthToken: OK', { uid: resolvedUid, role, authorized, isLinked, chatId })
+  res.json({ token: customToken, uid: resolvedUid, role, authorized, isLinked, firstName: tgUser.first_name || '' })
 })
 
 /**
