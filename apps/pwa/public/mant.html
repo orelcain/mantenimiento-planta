@@ -414,7 +414,9 @@ let navStack     = []
 // Data cache
 let machines     = []          // sorted by orden
 let machineMap   = {}          // id → machine
-let categories   = []
+let categories   = []          // top-level only (for chips)
+let allCategoriesMap = {}      // id → category (full tree)
+let categoryDescendants = {}   // topLevelId → Set([topLevelId + descendants])
 let repCache     = {}          // machineId → repuesto[]
 let prefs        = { favoriteLists: [], repuestoFavLists: {}, bodegaWatchlist: [] }
 
@@ -517,9 +519,28 @@ function setStatus(type, label) {
 async function loadCategories() {
   const snap = await db.collection('machineCategories').get()
   window.__debugRawCats = snap.size
-  categories = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-    .filter(c => c.activa !== false && c.visible !== false && !c.parentId)
+  const allCats = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .filter(c => c.activa !== false && c.visible !== false)
+  allCategoriesMap = Object.fromEntries(allCats.map(c => [c.id, c]))
+  categories = allCats
+    .filter(c => !c.parentId)
     .sort((a, b) => (a.orden || 0) - (b.orden || 0))
+  // Build descendants map: for each top-level cat, set of all descendant IDs (incl. self)
+  categoryDescendants = {}
+  for (const top of categories) {
+    const set = new Set([top.id])
+    const stack = [top.id]
+    while (stack.length) {
+      const parentId = stack.pop()
+      for (const c of allCats) {
+        if (c.parentId === parentId && !set.has(c.id)) {
+          set.add(c.id)
+          stack.push(c.id)
+        }
+      }
+    }
+    categoryDescendants[top.id] = set
+  }
   window.__debugFilteredCats = categories.length
 }
 
@@ -527,9 +548,15 @@ async function loadMachines() {
   try {
     const snap = await db.collection('machines').get()
     window.__debugRawMachines = snap.size
+    // Mostrar TODAS (activas + archivadas) — la badge "Archivada" se renderiza aparte
     machines = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      .filter(m => m.activa !== false)
-      .sort((a, b) => (a.orden || 0) - (b.orden || 0))
+      .sort((a, b) => {
+        // Activas primero, luego por orden
+        const aActive = a.activa !== false ? 0 : 1
+        const bActive = b.activa !== false ? 0 : 1
+        if (aActive !== bActive) return aActive - bActive
+        return (a.orden || 0) - (b.orden || 0)
+      })
     machineMap = Object.fromEntries(machines.map(m => [m.id, m]))
     window.__debugFilteredMachines = machines.length
   } catch (e) {
@@ -767,23 +794,19 @@ function setCatFilter(id) {
 
 function renderMachineList() {
   const el = document.getElementById('machines-list')
-  const filtered = activeCatFilter === 'all' ? machines
-    : machines.filter(m => m.categoryId === activeCatFilter)
+  let filtered
+  if (activeCatFilter === 'all') {
+    filtered = machines
+  } else {
+    const descendants = categoryDescendants[activeCatFilter] || new Set([activeCatFilter])
+    filtered = machines.filter(m => m.categoryId && descendants.has(m.categoryId))
+  }
 
   if (filtered.length === 0) {
     el.innerHTML = `<div class="empty-state">
       <div class="empty-icon">🏭</div>
       <div class="empty-title">Sin máquinas</div>
-      <div class="empty-sub">No hay máquinas en esta categoría</div>
-      <div class="empty-sub" style="margin-top:12px;font-size:10px;opacity:.7;text-align:left;background:#1118;padding:8px;border-radius:6px;font-family:monospace;line-height:1.4">
-        v=v3-debug<br>
-        machines.length=${machines.length} (raw=${window.__debugRawMachines ?? '?'}, filt=${window.__debugFilteredMachines ?? '?'})<br>
-        cats raw=${window.__debugRawCats ?? '?'}, filt=${window.__debugFilteredCats ?? '?'}<br>
-        filter=${activeCatFilter}<br>
-        uid=${uid || '?'}<br>
-        role=${userRole}<br>
-        err=${window.__debugMachinesErr || '-'}
-      </div></div>`
+      <div class="empty-sub">No hay máquinas en esta categoría</div></div>`
     return
   }
   el.innerHTML = filtered.map(m => machineItemHtml(m)).join('')
@@ -792,16 +815,22 @@ function renderMachineList() {
 function machineItemHtml(m) {
   const reps = repCache[m.id]
   const count = reps ? reps.length : null
+  const isArchived = m.activa === false
   const badge = count === null ? '' :
     count === 0 ? `<span class="machine-badge">Sin repuestos</span>` :
     `<span class="machine-badge has-rep">${count} repuestos</span>`
+  const archivedBadge = isArchived
+    ? `<span class="machine-badge" style="background:#f59e0b22;color:#f59e0b">Archivada</span>`
+    : ''
   const colorStyle = `background:${m.color || '#1f6feb'}22;color:${m.color || '#1f6feb'}`
-  return `<div class="machine-item" onclick="openMachine('${m.id}')">
+  const itemStyle = isArchived ? 'opacity:.6' : ''
+  return `<div class="machine-item" style="${itemStyle}" onclick="openMachine('${m.id}')">
     <div class="machine-color" style="${colorStyle}">🏭</div>
     <div class="machine-body">
       <div class="machine-name">${escHtml(m.nombre)}</div>
       <div class="machine-sub">${escHtml([m.marca, m.modelo].filter(Boolean).join(' · '))}</div>
     </div>
+    ${archivedBadge}
     ${badge}
   </div>`
 }
