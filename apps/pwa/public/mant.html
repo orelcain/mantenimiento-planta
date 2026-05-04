@@ -416,7 +416,7 @@ mark{background:rgba(var(--accent-rgb,82,136,193),.25);color:inherit;border-radi
   <div id="search-persistent" onclick="openSearchOverlay()">
     <div class="search-persistent-wrap">
       <span class="search-persistent-icon">🔍</span>
-      <span class="search-persistent-text">Buscar repuesto, equipo, SAP…</span>
+      <span class="search-persistent-text" id="search-persistent-text">Buscar repuesto, equipo, SAP…</span>
     </div>
   </div>
 
@@ -570,11 +570,58 @@ let hierarchyStack      = []   // [{id, nombre}] nav stack
 let __hierarchyCache    = null // {nodes, ts}
 let hierSheetNodeId     = null // nodeId being added to list
 let hierSheetIsEquip    = false
+let hierLevelFilter     = ''
+let hierLevelFilterTimer = null
 let tgBackBtnHandler    = null // current Telegram BackButton handler
 
 const HIERARCHY_CACHE_TTL = 5 * 60 * 1000
 const LEVEL_LABELS = {1:'Empresa',2:'Planta',3:'Área',4:'Sub-área',5:'Sistema',6:'Sub-sistema',7:'Equipo',8:'Elemento'}
 const LEVEL_COLORS = {1:'#5288c1',2:'#5288c1',3:'#4fae4e',4:'#4fae4e',5:'#e88a00',6:'#e88a00',7:'#9c6bb8',8:'#9c6bb8'}
+
+// ─── localStorage cache (persiste entre sesiones, ahorra reads Firebase) ───
+const LS_KEY_REPUESTOS = 'mant_repuestos_v2'
+const LS_KEY_MANUALES  = 'mant_manuales_v2'
+const LS_KEY_HIERARCHY = 'mant_hierarchy_v2'
+const LS_TTL_HIER  =  6 * 60 * 60 * 1000   //  6h — jerarquía cambia raro
+const LS_TTL_REP   =  2 * 60 * 60 * 1000   //  2h — repuestos cambian poco
+const LS_TTL_MAN   = 24 * 60 * 60 * 1000   // 24h — manuales casi no cambian
+
+function lsGet(key, maxAgeMs){
+  try {
+    const raw = localStorage.getItem(key)
+    if (!raw) return null
+    const obj = JSON.parse(raw)
+    if (!obj?.ts) return null
+    if (maxAgeMs && Date.now() - obj.ts > maxAgeMs) return null
+    return obj.data ?? null
+  } catch { return null }
+}
+function lsSet(key, data){
+  try {
+    localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data }))
+  } catch(e){
+    // Cuota llena → liberar y reintentar
+    try {
+      localStorage.removeItem(LS_KEY_REPUESTOS)
+      localStorage.removeItem(LS_KEY_MANUALES)
+      localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data }))
+    } catch { console.warn('localStorage quota exceeded for', key) }
+  }
+}
+function lsClearAll(){
+  for (const k of [LS_KEY_REPUESTOS, LS_KEY_MANUALES, LS_KEY_HIERARCHY]) {
+    try { localStorage.removeItem(k) } catch {}
+  }
+}
+// Convierte Firestore Timestamps a millis para serialización JSON
+function normalizeForCache(obj){
+  if (obj == null || typeof obj !== 'object') return obj
+  if (typeof obj.toDate === 'function') return obj.toDate().getTime()
+  if (Array.isArray(obj)) return obj.map(normalizeForCache)
+  const out = {}
+  for (const [k, v] of Object.entries(obj)) out[k] = normalizeForCache(v)
+  return out
+}
 
 // ═══════════════════════════════════════════════════════════════════
 // INIT
@@ -836,6 +883,7 @@ function switchTab(tab){
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'))
   document.getElementById(`view-${tab}`).classList.add('active')
   tabHeader(tab)
+  updateSearchPersistentPlaceholder(tab)
   getContent().scrollTop = 0
   tgApp?.HapticFeedback?.selectionChanged?.()
   localStorage.setItem('mant_active_tab', tab)
@@ -845,6 +893,14 @@ function switchTab(tab){
   if (tab === 'search'){
     setTimeout(() => document.getElementById('search-input')?.focus(), 60)
   }
+}
+
+function updateSearchPersistentPlaceholder(tab){
+  const txt = document.getElementById('search-persistent-text')
+  if (!txt) return
+  if (tab === 'hierarchy')      txt.textContent = 'Buscar nodo, equipo o área…'
+  else if (tab === 'manuales')  txt.textContent = 'Buscar manual o equipo…'
+  else                          txt.textContent = 'Buscar repuesto, equipo, SAP…'
 }
 
 function setTab(tab){ switchTab(tab) }
@@ -895,28 +951,46 @@ async function renderManualesTab(){
 async function loadManuales(){
   if (__manualesCache && Date.now() - __manualesCacheTs < HIERARCHY_CACHE_TTL) return __manualesCache
 
+  // 1) localStorage hit (TTL 24h — los manuales casi no cambian)
+  if (!__manualesCache){
+    const cached = lsGet(LS_KEY_MANUALES, LS_TTL_MAN)
+    if (cached){
+      __manualesCache = cached
+      __manualesCacheTs = Date.now()
+      return cached
+    }
+  }
+
   const results = []
-  const setManualesProgress = msg => {
+  const setManualesProgress = (msg, loaded, total) => {
     const el = document.getElementById('manuales-progress')
     if (!el) return
     if (!msg){ el.style.display = 'none'; return }
-    el.style.display = 'block'; el.textContent = msg
+    el.style.display = 'block'
+    const pct = (total && loaded != null) ? Math.round((loaded/total)*100) : null
+    el.innerHTML = `
+      <div style="font-size:12px;color:var(--sub)">${escHtml(msg)}${pct!=null?` · ${pct}%`:''}</div>
+      ${pct!=null?`<div style="height:3px;background:var(--border);border-radius:2px;margin-top:4px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:var(--accent);transition:width .25s"></div>
+      </div>`:''}`
   }
 
-  // 1) Colección Firestore manuales/ (Mini App + futuro PWA)
+  // 2) Firestore manuales/ (rápido, single query)
   try {
     const snap = await db.collection('manuales').orderBy('createdAt','desc').limit(100).get()
-    snap.docs.forEach(d => {
-      const data = d.data()
-      results.push({ id: d.id, source: 'firestore', ...data })
-    })
+    snap.docs.forEach(d => results.push({ id: d.id, source: 'firestore', ...d.data() }))
   } catch(e){ console.warn('manuales firestore failed', e) }
 
-  // 2) Legacy: Storage paths PWA — machines/{id}/manuales/ + equipment/{nodeId}/manuales/
-  setManualesProgress('Buscando manuales del PWA…')
-  const BATCH = 5
+  // 3) Legacy Storage paths del PWA — escaneo paralelo con progress
+  await loadHierarchyTree().catch(() => {})
+  const eqNodes = Object.values(hierarchyNodesMap || {}).filter(n => isEquipNode(n))
+  const total = machines.length + eqNodes.length
+  let done = 0
+  setManualesProgress(`Buscando manuales del PWA… 0 / ${total}`, 0, total)
 
-  // 2a) Por máquina
+  const BATCH = 12  // listAll es más rápido que getDocs, podemos paralelizar más
+
+  // 3a) Por máquina legacy
   for (let i = 0; i < machines.length; i += BATCH){
     const batch = machines.slice(i, i + BATCH)
     await Promise.all(batch.map(async m => {
@@ -938,39 +1012,40 @@ async function loadManuales(){
         }
       } catch { /* carpeta no existe — OK */ }
     }))
+    done += batch.length
+    setManualesProgress(`Buscando manuales del PWA… ${done} / ${total}`, done, total)
   }
 
-  // 2b) Por nodo equipo SAP (hierarchy)
-  try {
-    await loadHierarchyTree()
-    const eqNodes = Object.values(hierarchyNodesMap).filter(n => isEquipNode(n))
-    for (let i = 0; i < eqNodes.length; i += BATCH){
-      const batch = eqNodes.slice(i, i + BATCH)
-      await Promise.all(batch.map(async n => {
-        try {
-          const list = await storage.ref(`equipment/${n.id}/manuales`).listAll()
-          for (const item of list.items){
-            const url = await item.getDownloadURL().catch(() => null)
-            if (!url) continue
-            results.push({
-              id: `legacy_e_${n.id}_${item.name}`,
-              source: 'storage_legacy',
-              ownerType: 'equipo', ownerId: n.id,
-              ownerPath: [n.nombre || n.id],
-              titulo: item.name.replace(/^\d+_/,'').replace(/_\d+\.pdf$/i,'.pdf').replace(/_/g,' ').replace(/\.pdf$/i,''),
-              tipo: 'pdf', url,
-              storagePath: item.fullPath,
-              createdAt: null,
-            })
-          }
-        } catch { /* carpeta no existe — OK */ }
-      }))
-    }
-  } catch(e){ console.warn('legacy hierarchy manuals failed', e) }
+  // 3b) Por nodo equipo SAP (hierarchy)
+  for (let i = 0; i < eqNodes.length; i += BATCH){
+    const batch = eqNodes.slice(i, i + BATCH)
+    await Promise.all(batch.map(async n => {
+      try {
+        const list = await storage.ref(`equipment/${n.id}/manuales`).listAll()
+        for (const item of list.items){
+          const url = await item.getDownloadURL().catch(() => null)
+          if (!url) continue
+          results.push({
+            id: `legacy_e_${n.id}_${item.name}`,
+            source: 'storage_legacy',
+            ownerType: 'equipo', ownerId: n.id,
+            ownerPath: [n.nombre || n.id],
+            titulo: item.name.replace(/^\d+_/,'').replace(/_\d+\.pdf$/i,'.pdf').replace(/_/g,' ').replace(/\.pdf$/i,''),
+            tipo: 'pdf', url,
+            storagePath: item.fullPath,
+            createdAt: null,
+          })
+        }
+      } catch { /* carpeta no existe — OK */ }
+    }))
+    done += batch.length
+    setManualesProgress(`Buscando manuales del PWA… ${done} / ${total}`, done, total)
+  }
 
   setManualesProgress(null)
   __manualesCache   = results
   __manualesCacheTs = Date.now()
+  lsSet(LS_KEY_MANUALES, normalizeForCache(results))
   return results
 }
 
@@ -1050,7 +1125,11 @@ function manualIcon(tipo){
 function manualCellHtml(m){
   const owner = (m.ownerPath||[]).join(' › ') || m.ownerId || ''
   const size  = m.fileSize ? ` · ${(m.fileSize/1048576).toFixed(1)} MB` : ''
-  const when  = m.createdAt?.toDate ? relativeTime(m.createdAt.toDate().getTime()) : ''
+  // createdAt puede ser Timestamp Firestore o millis (cuando viene de localStorage)
+  const ts = typeof m.createdAt === 'number'
+    ? m.createdAt
+    : (m.createdAt?.toDate ? m.createdAt.toDate().getTime() : null)
+  const when = ts ? relativeTime(ts) : ''
   const mData = escHtmlAttr(JSON.stringify({id:m.id,url:m.url,tipo:m.tipo,titulo:m.titulo}))
   return `<div class="cell" onclick="openManualViewer(${mData})">
     <div class="cell-icon" style="font-size:20px">${manualIcon(m.tipo)}</div>
@@ -1329,6 +1408,7 @@ async function saveManual(){
     const ref = await db.collection('manuales').add(doc)
     await logAudit('create','manuales',ref.id,null,doc,`Subir manual: ${titulo}`)
     __manualesCache = null; __manualesCacheTs = 0
+    try { localStorage.removeItem(LS_KEY_MANUALES) } catch {}
     showToast(`"${titulo}" subido ✓`, 'ok')
     tgApp?.HapticFeedback?.notificationOccurred('success')
     setTgBack(null)
@@ -1391,6 +1471,15 @@ function renderHome(){
     <div id="home-greeting"></div>
     <div id="home-mylists"></div>
     <div id="home-recents"></div>
+    <div style="padding:18px 16px 8px;text-align:center">
+      <button onclick="refreshAllData()" style="background:none;border:1px solid var(--border);
+        color:var(--hint);padding:6px 14px;border-radius:14px;font-size:12px;cursor:pointer">
+        ↻ Refrescar datos
+      </button>
+      <div style="font-size:10.5px;color:var(--hint);margin-top:4px">
+        Los datos se guardan en este dispositivo (cache local)
+      </div>
+    </div>
   `
   renderHomeGreeting()
   renderHomeMyLists()
@@ -1699,6 +1788,8 @@ function machineCellHtml(m){
 // ═══════════════════════════════════════════════════════════════════
 function openSearchOverlay(){
   prevTabBeforeSearch = currentTab
+  // Default sub-tab según contexto: en Jerarquía esperan equipos, en otras → repuestos
+  searchTabActive = (currentTab === 'hierarchy') ? 'equipos' : 'repuestos'
   const el = document.getElementById('view-search')
   el.classList.add('overlay')
   renderSearchEmpty()
@@ -1782,6 +1873,17 @@ function scoreRepResult(r, machineName, nq, tokens){
 
 async function loadAllRepuestos(){
   if (__repuestosCache && Date.now() - __repuestosCacheTs < HIERARCHY_CACHE_TTL) return
+  // 1) localStorage hit → no Firestore reads (sólo para búsqueda global,
+  // repCache por equipo se llena on-demand vía loadRepuestos para evitar
+  // problemas con la dedup global por SAP)
+  if (!__repuestosCache){
+    const cached = lsGet(LS_KEY_REPUESTOS, LS_TTL_REP)
+    if (cached){
+      __repuestosCache = cached
+      __repuestosCacheTs = Date.now()
+      return
+    }
+  }
   if (__globalLoadInProgress) return
   __globalLoadInProgress = true
 
@@ -1795,22 +1897,28 @@ async function loadAllRepuestos(){
   }
 
   try {
+    // Asegurar jerarquía cargada para conocer total de unidades a escanear
+    await loadHierarchyTree()
     const activeMachines = machines.filter(m => m.activa !== false)
-    const BATCH = 8
-    updateSearchProgress(`Cargando equipos… 0 / ${activeMachines.length}`)
+    const leafNodes = Object.values(hierarchyNodesMap).filter(n => isEquipNode(n))
+    const totalUnits = activeMachines.length + leafNodes.length
+    let done = 0
+    const BATCH = 16
+
+    updateSearchProgress(`Cargando repuestos… 0 / ${totalUnits}`, 0, totalUnits)
+
+    // FASE 1: máquinas legacy
     for (let i = 0; i < activeMachines.length; i += BATCH){
       const batch = activeMachines.slice(i, i + BATCH)
       await Promise.all(batch.map(async m => {
         const reps = await loadRepuestos(m.id).catch(() => [])
         for (const r of reps) addRep(r, m.id, m.nombre)
       }))
-      updateSearchProgress(`Cargando equipos… ${Math.min(i + BATCH, activeMachines.length)} / ${activeMachines.length}`)
+      done += batch.length
+      updateSearchProgress(`Cargando repuestos… ${done} / ${totalUnits}`, done, totalUnits)
     }
 
-    // Hierarchy own-repuestos
-    updateSearchProgress('Cargando jerarquía…')
-    await loadHierarchyTree()
-    const leafNodes = Object.values(hierarchyNodesMap).filter(n => isEquipNode(n))
+    // FASE 2: hierarchy own-repuestos
     for (let i = 0; i < leafNodes.length; i += BATCH){
       const batch = leafNodes.slice(i, i + BATCH)
       await Promise.all(batch.map(async node => {
@@ -1818,11 +1926,14 @@ async function loadAllRepuestos(){
         if (!snap) return
         snap.docs.forEach(d => addRep({id: d.id, ...d.data()}, node.id, node.nombre))
       }))
+      done += batch.length
+      updateSearchProgress(`Cargando repuestos… ${done} / ${totalUnits}`, done, totalUnits)
     }
   } catch(e){ console.warn('loadAllRepuestos error', e) }
 
   __repuestosCache = results
   __repuestosCacheTs = Date.now()
+  lsSet(LS_KEY_REPUESTOS, normalizeForCache(results))
   __globalLoadInProgress = false
   updateSearchProgress(null)
 }
@@ -1830,14 +1941,20 @@ async function loadAllRepuestos(){
 function invalidateRepuestosCache(){
   __repuestosCache = null
   __repuestosCacheTs = 0
+  try { localStorage.removeItem(LS_KEY_REPUESTOS) } catch {}
 }
 
-function updateSearchProgress(msg){
+function updateSearchProgress(msg, loaded, total){
   const el = document.getElementById('search-progress')
   if (!el) return
   if (!msg){ el.style.display = 'none'; return }
   el.style.display = 'block'
-  el.textContent = msg
+  const pct = (total && loaded != null) ? Math.round((loaded / total) * 100) : null
+  el.innerHTML = `
+    <div style="font-size:12px;color:var(--sub)">${escHtml(msg)}${pct != null ? ` · ${pct}%` : ''}</div>
+    ${pct != null ? `<div style="height:3px;background:var(--border);border-radius:2px;margin-top:4px;overflow:hidden">
+      <div style="height:100%;width:${pct}%;background:var(--accent);transition:width .25s"></div>
+    </div>` : ''}`
 }
 
 function searchGlobal(queryText){
@@ -3377,14 +3494,27 @@ async function loadHierarchyTree(){
   const now = Date.now()
   if (__hierarchyCache && (now - __hierarchyCache.ts) < HIERARCHY_CACHE_TTL) return
 
-  // Mismo orden que la PWA (índice compuesto activo+nivel+orden ya existe)
+  // 1) localStorage (sobrevive sesiones, evita read Firebase en cada apertura)
+  const cached = lsGet(LS_KEY_HIERARCHY, LS_TTL_HIER)
+  if (cached){
+    rebuildHierarchyFromNodes(cached)
+    __hierarchyCache = { ts: now }
+    return
+  }
+
+  // 2) Firestore (con índice activo+nivel+orden)
   const snap = await db.collection('hierarchy')
     .where('activo','==',true)
     .orderBy('nivel','asc')
     .orderBy('orden','asc')
     .get()
   const nodes = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+  rebuildHierarchyFromNodes(nodes)
+  lsSet(LS_KEY_HIERARCHY, normalizeForCache(nodes))
+  __hierarchyCache = { ts: now }
+}
 
+function rebuildHierarchyFromNodes(nodes){
   hierarchyNodesMap = {}
   hierarchyChildrenMap = {}
   hierarchyRoots = []
@@ -3392,22 +3522,17 @@ async function loadHierarchyTree(){
   for (const n of nodes) hierarchyNodesMap[n.id] = n
   for (const n of nodes){
     const pid = n.parentId
-    if (!pid || !hierarchyNodesMap[pid]){
-      hierarchyRoots.push(n)
-    } else {
+    if (!pid || !hierarchyNodesMap[pid]) hierarchyRoots.push(n)
+    else {
       if (!hierarchyChildrenMap[pid]) hierarchyChildrenMap[pid] = []
       hierarchyChildrenMap[pid].push(n)
     }
   }
 
-  // Sintetizar entries en machineMap para nodos hoja sin máquina vinculada
-  // — permite reutilizar openMachine() con hierarchyNodeIds (búsqueda global,
-  // navegación jerárquica, openRepuesto cross-tab)
+  // Sintetizar machineMap para hojas sin máquina vinculada
   for (const n of nodes){
     const isLeaf = !(hierarchyChildrenMap[n.id]?.length > 0)
-    if (!isLeaf) continue
-    if (n.linkedMachineId) continue   // ya tiene una machine real
-    if (machineMap[n.id]) continue    // ya está
+    if (!isLeaf || n.linkedMachineId || machineMap[n.id]) continue
     machineMap[n.id] = {
       id: n.id,
       nombre: n.nombre || 'Equipo',
@@ -3418,8 +3543,6 @@ async function loadHierarchyTree(){
       activa: true,
     }
   }
-
-  __hierarchyCache = { ts: now }
 }
 
 function getRepuestoCollPath(machineId){
@@ -3474,7 +3597,7 @@ function renderHierarchyLevel(){
   if (!el) return
 
   const currentId = hierarchyStack.length ? hierarchyStack[hierarchyStack.length-1].id : null
-  const nodes = currentId ? (hierarchyChildrenMap[currentId] || []) : hierarchyRoots
+  const allNodes = currentId ? (hierarchyChildrenMap[currentId] || []) : hierarchyRoots
 
   // Breadcrumb
   const breadHtml = `
@@ -3487,8 +3610,32 @@ function renderHierarchyLevel(){
       `).join('')}
     </div>`
 
-  if (!nodes.length){
+  // Filtro inline (busca en nombre + código del nivel actual)
+  const filterHtml = allNodes.length > 3 ? `
+    <div style="padding:0 12px 8px">
+      <input id="hier-level-filter" type="search" value="${escHtmlAttr(hierLevelFilter)}"
+        placeholder="Filtrar este nivel…" oninput="hierLevelFilterInput()"
+        style="width:100%;box-sizing:border-box;padding:7px 12px;border-radius:10px;
+        border:1.5px solid var(--border);background:var(--card);color:var(--text);
+        font-size:13px;outline:none">
+    </div>` : ''
+
+  // Aplicar filtro al nivel actual
+  let nodes = allNodes
+  if (hierLevelFilter){
+    const q = normalizeSearch(hierLevelFilter)
+    nodes = allNodes.filter(n =>
+      normalizeSearch(n.nombre).includes(q) || normalizeSearch(n.codigo).includes(q)
+    )
+  }
+
+  if (!allNodes.length){
     el.innerHTML = breadHtml + emptyHtml('🔧','Sin elementos','Este nodo no tiene sub-elementos.')
+    return
+  }
+  if (!nodes.length){
+    el.innerHTML = breadHtml + filterHtml + emptyHtml('🔍','Sin coincidencias',`Ningún nodo aquí coincide con "${escHtml(hierLevelFilter)}"`)
+    setTimeout(() => document.getElementById('hier-level-filter')?.focus(), 0)
     return
   }
 
@@ -3545,12 +3692,30 @@ function renderHierarchyLevel(){
 
   el.innerHTML = `
     ${breadHtml}
-    <div class="cell-group" style="margin-top:8px">${nodesHtml}</div>
+    ${filterHtml}
+    <div class="cell-group" style="margin-top:4px">${nodesHtml}</div>
     ${adminAddBtn}`
+  // Si había filtro escrito, mantener foco al re-render
+  if (hierLevelFilter){
+    const inp = document.getElementById('hier-level-filter')
+    if (inp){ inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length) }
+  }
+}
+
+function hierLevelFilterInput(){
+  const inp = document.getElementById('hier-level-filter')
+  if (!inp) return
+  clearTimeout(hierLevelFilterTimer)
+  const v = inp.value
+  hierLevelFilterTimer = setTimeout(() => {
+    hierLevelFilter = v
+    renderHierarchyLevel()
+  }, 180)
 }
 
 function hierarchyEnter(nodeId, nombre){
   hierarchyStack.push({id:nodeId, nombre})
+  hierLevelFilter = ''   // reset filtro al cambiar de nivel
   tgApp?.HapticFeedback?.selectionChanged?.()
   setTgBack(hierarchyGoBack)
   renderHierarchyLevel()
@@ -3559,6 +3724,7 @@ function hierarchyEnter(nodeId, nombre){
 
 function hierarchyGoBack(){
   hierarchyStack.pop()
+  hierLevelFilter = ''
   tgApp?.HapticFeedback?.selectionChanged?.()
   if (!hierarchyStack.length) setTgBack(null)
   renderHierarchyLevel()
@@ -3567,10 +3733,34 @@ function hierarchyGoBack(){
 
 function hierarchyGoTo(stackIdx){
   hierarchyStack = stackIdx < 0 ? [] : hierarchyStack.slice(0, stackIdx+1)
+  hierLevelFilter = ''
   tgApp?.HapticFeedback?.selectionChanged?.()
   setTgBack(hierarchyStack.length ? hierarchyGoBack : null)
   renderHierarchyLevel()
   getContent().scrollTop = 0
+}
+
+// Refrescar datos manualmente — invalida todas las caches y recarga
+async function refreshAllData(){
+  if (!await new Promise(res => tgApp?.showConfirm
+    ? tgApp.showConfirm('¿Refrescar datos? Volverá a leer todo de Firebase.', res)
+    : res(confirm('¿Refrescar datos? Volverá a leer todo de Firebase.')))) return
+  invalidateRepuestosCache()
+  __manualesCache = null; __manualesCacheTs = 0
+  __hierarchyCache = null
+  hierarchyNodesMap = {}; hierarchyChildrenMap = {}; hierarchyRoots = []
+  // Limpiar entries sintéticas (las que tenían _isHierarchyOnly)
+  for (const k of Object.keys(machineMap)){
+    if (machineMap[k]?._isHierarchyOnly) delete machineMap[k]
+  }
+  repCache = {}
+  lsClearAll()
+  showToast('Datos refrescados ✓', 'ok')
+  tgApp?.HapticFeedback?.notificationOccurred('success')
+  // Re-renderizar el tab actual
+  if (currentTab === 'hierarchy') renderHierarchyTab()
+  else if (currentTab === 'manuales') renderManualesTab()
+  else renderHome()
 }
 
 function hierarchyOpenEquip(nodeId, machineId){
