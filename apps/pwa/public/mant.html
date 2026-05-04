@@ -4519,30 +4519,87 @@ async function hierAddToList(listIdx){
   if (!list) return
   const nodeId = hierSheetNodeId
 
+  // Recolectar IDs a agregar
   let idsToAdd = [nodeId]
   if (!hierSheetIsEquip){
-    // Recolectar hojas descendientes
     function collectLeaves(nid){
       const ch = hierarchyChildrenMap[nid] || []
       if (!ch.length) return [nid]
       return ch.flatMap(c => isEquipNode(c) ? [c.id] : collectLeaves(c.id))
     }
     idsToAdd = collectLeaves(nodeId)
-    const newCount = idsToAdd.filter(id => !(list.machineIds||[]).includes(id)).length
+    const newCount = idsToAdd.filter(id => !_listContainsId(list, id)).length
     if (!newCount){ showToast('Todos ya están en la lista','ok'); closeSheet(); return }
     const ok = await new Promise(res => tgApp?.showConfirm(
       `¿Agregar ${pl(idsToAdd.length,'equipo','equipos')} a "${list.name}"?`, res))
     if (!ok){ closeSheet(); return }
   }
 
-  const existing = new Set(list.machineIds || [])
-  for (const id of idsToAdd) existing.add(id)
-  list.machineIds = [...existing]
+  // Si la lista tiene sub-listas → preguntar destino
+  const subLists = list.subLists || []
+  if (subLists.length > 0){
+    hierShowSubListPicker(list, listIdx, idsToAdd)
+    return
+  }
 
-  closeSheet()
-  showToast(`Agregado a "${list.name}" ✓`, 'ok')
+  // Sin sub-listas → agregar directo al nivel raíz
+  _hierDoAddToList(list, idsToAdd, null)
+}
+
+/** Devuelve true si el machineId ya está en la lista (raíz o sub-listas) */
+function _listContainsId(list, id){
+  if ((list.machineIds || []).includes(id)) return true
+  return (list.subLists || []).some(sl => (sl.machineIds || []).includes(id))
+}
+
+/** Sheet secundario: elegir sub-lista destino */
+function hierShowSubListPicker(list, listIdx, idsToAdd){
+  const subLists = list.subLists || []
+  const title = document.getElementById('sheet-title')
+  const content = document.getElementById('sheet-content')
+  title.textContent = `¿En qué parte de "${list.name}"?`
+  content.innerHTML = `
+    <div class="cell-group" style="margin:0">
+      <div class="sheet-row" onclick="hierDoAddToSubList(${listIdx},null,${JSON.stringify(idsToAdd)})">
+        <div class="ico">📋</div>
+        <div class="body"><div class="name">Sin categoría</div>
+          <div class="sub">Nivel raíz de la lista</div></div>
+      </div>
+      ${subLists.map((sl, si) => `
+        <div class="sheet-row" onclick="hierDoAddToSubList(${listIdx},${si},${escHtmlAttr(JSON.stringify(idsToAdd))})">
+          <div class="ico">📁</div>
+          <div class="body"><div class="name">${escHtml(sl.name)}</div>
+            <div class="sub">${pl(sl.machineIds?.length||0,'equipo','equipos')}</div></div>
+        </div>`).join('')}
+    </div>`
+}
+
+async function hierDoAddToSubList(listIdx, subListIdx, idsToAdd){
+  const list = prefs.favoriteLists[listIdx]
+  if (!list) return
+  await _hierDoAddToList(list, idsToAdd, subListIdx)
+}
+
+async function _hierDoAddToList(list, idsToAdd, subListIdx){
+  if (subListIdx != null && subListIdx >= 0){
+    // Agregar a una sub-lista específica
+    const sl = list.subLists[subListIdx]
+    if (!sl) return
+    const existing = new Set(sl.machineIds || [])
+    for (const id of idsToAdd) existing.add(id)
+    sl.machineIds = [...existing]
+    closeSheet()
+    showToast(`Agregado a "${sl.name}" ✓`, 'ok')
+  } else {
+    // Agregar al nivel raíz (Sin categoría)
+    const existing = new Set(list.machineIds || [])
+    for (const id of idsToAdd) existing.add(id)
+    list.machineIds = [...existing]
+    closeSheet()
+    showToast(`Agregado a "${list.name}" ✓`, 'ok')
+  }
   tgApp?.HapticFeedback?.notificationOccurred('success')
-  await saveAllPrefs()
+  saveAllPrefs().catch(err => console.error('saveAllPrefs:', err))
 }
 
 function hierCreateListAndAdd(){
