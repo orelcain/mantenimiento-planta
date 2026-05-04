@@ -502,6 +502,22 @@ const CF_BASE = 'https://us-central1-mantenimiento-planta-771a3.cloudfunctions.n
 const MAX_RECENTS = 30
 const RECENTS_PER_PAGE = 5
 
+// ── Modo preview (desarrollo en browser sin Telegram) ─────────────────
+const IS_PREVIEW = new URLSearchParams(location.search).has('preview')
+if (IS_PREVIEW) {
+  if (!window.Telegram) window.Telegram = {}
+  window.Telegram.WebApp = {
+    initData: 'preview-mode', ready: ()=>{}, expand: ()=>{},
+    viewportStableHeight: window.innerHeight, viewportHeight: window.innerHeight,
+    initDataUnsafe: { user: { first_name: 'Preview' } },
+    HapticFeedback: { selectionChanged:()=>{}, notificationOccurred:()=>{}, impactOccurred:()=>{} },
+    BackButton: { show:()=>{}, hide:()=>{}, onClick:()=>{}, offClick:()=>{} },
+    showConfirm: (msg, cb) => cb(window.confirm(msg)),
+    openLink: (url) => window.open(url, '_blank'),
+    onEvent: ()=>{},
+  }
+}
+
 firebase.initializeApp({
   apiKey: "AIzaSyBsJSh6x3ZGEyuXsM18dSWsJKyU7--KJss",
   authDomain: "mantenimiento-planta-771a3.firebaseapp.com",
@@ -635,8 +651,29 @@ function normalizeForCache(obj){
 async function init(){
   tgApp?.ready()
   tgApp?.expand()
-
   loadRecents()
+
+  // ── Rama preview (browser sin Telegram) ───────────────────────────
+  if (IS_PREVIEW) {
+    setLoadingMsg('Modo preview…')
+    try {
+      await auth.signInAnonymously()
+      uid = auth.currentUser?.uid || 'preview'
+      userRole = 'admin'
+      isAuthorized = true
+      isLinked = false
+      firstName = 'Preview'
+      setLoadingMsg('Cargando datos…')
+      await Promise.all([loadCategories(), loadMachines()])
+      prefs = { favoriteLists: [], repuestoFavLists: {} }
+      showApp()
+    } catch(err) {
+      setLoadingError('Preview error: ' + (err.code || err.message))
+    }
+    return
+  }
+  // ─────────────────────────────────────────────────────────────────
+
   setLoadingMsg('Autenticando…')
 
   const initData = tgApp?.initData
