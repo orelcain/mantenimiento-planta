@@ -893,9 +893,10 @@ function switchTab(tab){
   getContent().scrollTop = 0
   tgApp?.HapticFeedback?.selectionChanged?.()
   localStorage.setItem('mant_active_tab', tab)
-  // Bar persistente: ocultar en Buscar (la propia tab tiene su input dedicado)
+  // Bar persistente: solo en Jerarquía (abre overlay árbol-completo)
+  // Home → redundante con tab Buscar; Manuales/Search → tienen su propio buscador
   const sp = document.getElementById('search-persistent')
-  if (sp) sp.style.display = (tab === 'search') ? 'none' : ''
+  if (sp) sp.style.display = (tab === 'hierarchy') ? '' : 'none'
   if (tab === 'home')      renderHome()
   if (tab === 'hierarchy') renderHierarchyTab()
   if (tab === 'manuales')  renderManualesTab()
