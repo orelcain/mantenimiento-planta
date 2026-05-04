@@ -99,6 +99,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);
   cursor:pointer;width:22px;height:22px;border-radius:50%;
   display:none;align-items:center;justify-content:center;padding:0;line-height:1}
 .search-clear.show{display:flex}
+mark{background:rgba(var(--accent-rgb,82,136,193),.25);color:inherit;border-radius:2px;padding:0 1px}
 
 /* ── Section header ─────────────────────────────────────────────────── */
 .section{padding:16px 16px 6px;display:flex;align-items:center;justify-content:space-between}
@@ -538,6 +539,28 @@ let recentIds = []
 let recentsPage = 0
 let searchTimer = null
 let prevTabBeforeSearch = 'home'
+
+// F3 — Global search state
+let __repuestosCache = null   // flat [{repuesto, machineId, machineName}]
+let __repuestosCacheTs = 0
+let searchTabActive = 'repuestos'
+let __globalLoadInProgress = false
+
+const SYNONYM_GROUPS = [
+  ['motor','motriz','motores'],
+  ['bomba','pump','bombas'],
+  ['reductor','motorreductor','gearbox'],
+  ['cinta','transportadora','conveyor','banda'],
+  ['valvula','valvulas'],
+  ['sensor','instrumento','transmisor'],
+  ['rodamiento','bearing','ruleman'],
+  ['sello','reten','retenedor'],
+]
+const SYNONYM_LOOKUP = SYNONYM_GROUPS.reduce((acc, grp) => {
+  const norm = grp.map(s => normalizeSearch(s))
+  for (const t of norm) acc[t] = norm.filter(x => x !== t)
+  return acc
+}, {})
 
 // F2 — Hierarchy state
 let hierarchyNodesMap   = {}   // nodeId → node
@@ -1188,18 +1211,183 @@ function openSearchOverlay(){
   el.classList.add('overlay')
   renderSearchEmpty()
   setTimeout(() => document.getElementById('search-input')?.focus(), 80)
-  tgApp?.BackButton?.show()
-  tgApp?.BackButton?.onClick(closeSearchOverlay)
+  setTgBack(closeSearchOverlay)
   tgApp?.HapticFeedback?.selectionChanged?.()
+  // Pre-cargar repuestos globales en background para que la 1ª búsqueda sea rápida
+  loadAllRepuestos()
 }
 
 function closeSearchOverlay(){
   const el = document.getElementById('view-search')
   el.classList.remove('overlay')
   el.innerHTML = ''
-  tgApp?.BackButton?.hide()
-  tgApp?.BackButton?.offClick(closeSearchOverlay)
+  setTgBack(null)
   tgApp?.HapticFeedback?.selectionChanged?.()
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// F3 — GLOBAL SEARCH ALGORITHMS
+// ═══════════════════════════════════════════════════════════════════
+function editDistanceAtMostOne(a, b){
+  if (a === b) return true
+  const la = a.length, lb = b.length
+  if (Math.abs(la - lb) > 1) return false
+  let i = 0, j = 0, edits = 0
+  while (i < la && j < lb){
+    if (a[i] === b[j]){ i++; j++; continue }
+    if (++edits > 1) return false
+    if (la > lb) i++; else if (lb > la) j++; else { i++; j++ }
+  }
+  if (i < la || j < lb) edits++
+  return edits <= 1
+}
+
+function tokenMatchesText(token, searchable, words){
+  if (searchable.includes(token)) return true
+  const syns = SYNONYM_LOOKUP[token]
+  if (syns?.some(s => searchable.includes(s))) return true
+  if (token.length >= 4 && words.some(w => w.length >= 4 && editDistanceAtMostOne(token, w))) return true
+  return false
+}
+
+function scoreRepResult(r, machineName, nq, tokens){
+  const name    = normalizeSearch(r.textoBreve || '')
+  const alias   = normalizeSearch(r.alias || '')
+  const sap     = normalizeSearch(r.codigoSAP || '')
+  const fab     = normalizeSearch(r.codigoFabricante || r.codigoBaader || '')
+  const desc    = normalizeSearch(r.descripcion || '')
+  const ubic    = normalizeSearch(r.ubicacionEnPlanta || '')
+  const mname   = normalizeSearch(machineName || '')
+  const searchable = `${name} ${alias} ${sap} ${fab} ${desc} ${ubic} ${mname}`
+  const words = searchable.split(' ').filter(Boolean)
+
+  for (const t of tokens) if (t && !tokenMatchesText(t, searchable, words)) return 0
+
+  let score = 1
+  if (sap === nq)  score += 220
+  if (fab === nq)  score += 180
+  if (name === nq) score += 170
+  if (sap.startsWith(nq))  score += 120
+  if (fab.startsWith(nq))  score += 95
+  if (name.startsWith(nq)) score += 90
+  if (name.includes(nq))   score += 65
+  if (alias.includes(nq))  score += 80
+  if (fab.includes(nq))    score += 50
+  if (desc.includes(nq))   score += 35
+  if (mname.includes(nq))  score += 25
+  if (ubic.includes(nq))   score += 20
+  for (const t of tokens){
+    if (!t) continue
+    if (name.includes(t))  score += 25
+    if (alias.includes(t)) score += 30
+    if (sap.includes(t))   score += 22
+    if (fab.includes(t))   score += 18
+    if (desc.includes(t))  score += 10
+    if (mname.includes(t)) score += 9
+  }
+  return score
+}
+
+async function loadAllRepuestos(){
+  if (__repuestosCache && Date.now() - __repuestosCacheTs < HIERARCHY_CACHE_TTL) return
+  if (__globalLoadInProgress) return
+  __globalLoadInProgress = true
+
+  const results = []
+  const existingKeys = new Set()
+  function addRep(r, machineId, machineName){
+    const k = `${r.codigoSAP||''}|${r.codigoFabricante||r.codigoBaader||''}|${r.textoBreve||''}`
+    if (k !== '||' && existingKeys.has(k)) return
+    existingKeys.add(k)
+    results.push({ repuesto: {...r, codigoFabricante: r.codigoFabricante || r.codigoBaader || ''}, machineId, machineName })
+  }
+
+  try {
+    const activeMachines = machines.filter(m => m.activa !== false)
+    const BATCH = 8
+    updateSearchProgress(`Cargando equipos… 0 / ${activeMachines.length}`)
+    for (let i = 0; i < activeMachines.length; i += BATCH){
+      const batch = activeMachines.slice(i, i + BATCH)
+      await Promise.all(batch.map(async m => {
+        const reps = await loadRepuestos(m.id).catch(() => [])
+        for (const r of reps) addRep(r, m.id, m.nombre)
+      }))
+      updateSearchProgress(`Cargando equipos… ${Math.min(i + BATCH, activeMachines.length)} / ${activeMachines.length}`)
+    }
+
+    // Hierarchy own-repuestos
+    updateSearchProgress('Cargando jerarquía…')
+    await loadHierarchyTree()
+    const leafNodes = Object.values(hierarchyNodesMap).filter(n => isEquipNode(n))
+    for (let i = 0; i < leafNodes.length; i += BATCH){
+      const batch = leafNodes.slice(i, i + BATCH)
+      await Promise.all(batch.map(async node => {
+        const snap = await db.collection('hierarchy').doc(node.id).collection('repuestos').get().catch(() => null)
+        if (!snap) return
+        snap.docs.forEach(d => addRep({id: d.id, ...d.data()}, node.id, node.nombre))
+      }))
+    }
+  } catch(e){ console.warn('loadAllRepuestos error', e) }
+
+  __repuestosCache = results
+  __repuestosCacheTs = Date.now()
+  __globalLoadInProgress = false
+  updateSearchProgress(null)
+}
+
+function invalidateRepuestosCache(){
+  __repuestosCache = null
+  __repuestosCacheTs = 0
+}
+
+function updateSearchProgress(msg){
+  const el = document.getElementById('search-progress')
+  if (!el) return
+  if (!msg){ el.style.display = 'none'; return }
+  el.style.display = 'block'
+  el.textContent = msg
+}
+
+function searchGlobal(queryText){
+  if (!__repuestosCache) return { repHits: [], machHits: [] }
+  const nq = normalizeSearch(queryText)
+  if (!nq) return { repHits: [], machHits: [] }
+  const tokens = nq.split(' ').filter(Boolean)
+
+  const repHits = __repuestosCache
+    .map(item => ({ item, score: scoreRepResult(item.repuesto, item.machineName, nq, tokens) }))
+    .filter(x => x.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 50)
+    .map(x => x.item)
+
+  const machHits = machines
+    .filter(m => matchesMachine(m, nq))
+    .slice(0, 20)
+
+  return { repHits, machHits }
+}
+
+function highlightMatch(text, rawQuery){
+  if (!rawQuery || !text) return escHtml(String(text || ''))
+  const norm = normalizeSearch(text)
+  const nq   = normalizeSearch(rawQuery)
+  const idx  = norm.indexOf(nq)
+  if (idx === -1 || nq.length === 0) return escHtml(String(text))
+  return escHtml(text.slice(0, idx))
+    + '<mark>' + escHtml(text.slice(idx, idx + nq.length)) + '</mark>'
+    + escHtml(text.slice(idx + nq.length))
+}
+
+function saveSearchHistory(query){
+  if (!query?.trim()) return
+  let hist = JSON.parse(localStorage.getItem('mant_search_history') || '[]')
+  hist = [query.trim(), ...hist.filter(q => q !== query.trim())].slice(0, 20)
+  localStorage.setItem('mant_search_history', JSON.stringify(hist))
+}
+
+function getSearchHistory(){
+  return JSON.parse(localStorage.getItem('mant_search_history') || '[]')
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1213,7 +1401,7 @@ function renderSearchEmpty(){
         <div class="search-wrap" style="flex:1">
           <span class="search-icon">🔍</span>
           <input id="search-input" class="search-input" type="search" autocomplete="off"
-            autocorrect="off" spellcheck="false" placeholder="SAP, nombre, código fabricante…">
+            autocorrect="off" spellcheck="false" placeholder="SAP, nombre, fabricante, alias…">
           <button id="search-clear" class="search-clear">✕</button>
         </div>
         <button onclick="closeSearchOverlay()"
@@ -1223,6 +1411,10 @@ function renderSearchEmpty(){
         </button>
       </div>
     </div>
+    <div id="search-progress"
+      style="display:none;padding:6px 16px;font-size:12px;color:var(--sub);text-align:center;
+      background:var(--card);border-bottom:1px solid var(--border)"></div>
+    <div id="search-sub-tabs"></div>
     <div id="search-body"></div>`
 
   const inp = document.getElementById('search-input')
@@ -1231,68 +1423,132 @@ function renderSearchEmpty(){
     const q = inp.value.trim()
     clr.classList.toggle('show', q.length > 0)
     clearTimeout(searchTimer)
-    if (q.length === 0) { renderSearchBody(''); return }
+    if (q.length === 0){ renderSearchBody(''); return }
     if (q.length < 2) return
-    searchTimer = setTimeout(() => renderSearchBody(q), 280)
+    searchTimer = setTimeout(() => { saveSearchHistory(q); renderSearchBody(q) }, 280)
   })
   clr.addEventListener('click', () => { inp.value=''; clr.classList.remove('show'); renderSearchBody('') })
   renderSearchBody('')
 }
 
 function renderSearchBody(query){
-  const body = document.getElementById('search-body')
+  const body   = document.getElementById('search-body')
+  const tabsEl = document.getElementById('search-sub-tabs')
   if (!body) return
+
   if (!query){
-    body.innerHTML = renderRecentsHtml()
-    return
-  }
-  const q = normalizeSearch(query)
-
-  // Equipos que matchean
-  const machineHits = machines.filter(m => matchesMachine(m, q))
-
-  // Repuestos que matchean (entre los cargados)
-  const repHits = []
-  for (const [machineId, reps] of Object.entries(repCache)){
-    const m = machineMap[machineId]
-    for (const r of reps) if (matchesRepuesto(r, q)) repHits.push({r, m, machineId})
-  }
-
-  // Si aún no cargamos todos los repuestos, completar en background
-  if (Object.keys(repCache).length < machines.length){
-    loadAllAndSearch(query)  // dispara fetch + re-render cuando termine
-  }
-
-  if (machineHits.length === 0 && repHits.length === 0){
-    body.innerHTML = emptyHtml('🔍','Sin resultados',`No hay equipos ni repuestos para "<b>${escHtml(query)}</b>"`)
+    if (tabsEl) tabsEl.innerHTML = ''
+    body.innerHTML = renderSearchHistoryHtml()
     return
   }
 
-  repHits.sort((a,b) => {
-    if (normalizeSearch(a.r.codigoSAP) === q) return -1
-    if (normalizeSearch(b.r.codigoSAP) === q) return 1
-    return 0
-  })
+  let repHits, machHits
 
-  body.innerHTML = `
-    ${machineHits.length > 0 ? `
-      <div class="section">
-        <span class="section-title">Equipos</span>
-        <span class="section-count">${machineHits.length}</span>
+  if (__repuestosCache){
+    // Global scored search
+    const res = searchGlobal(query)
+    repHits  = res.repHits
+    machHits = res.machHits
+  } else {
+    // Fallback: repuestos ya en repCache, carga el resto en background
+    const q = normalizeSearch(query)
+    machHits = machines.filter(m => matchesMachine(m, q))
+    repHits  = []
+    for (const [mId, reps] of Object.entries(repCache)){
+      for (const r of reps)
+        if (matchesRepuesto(r, q))
+          repHits.push({ repuesto: r, machineId: mId, machineName: machineMap[mId]?.nombre || '' })
+    }
+    loadAllRepuestos().then(() => {
+      const cur = document.getElementById('search-input')?.value?.trim()
+      if (cur === query) renderSearchBody(query)
+    })
+  }
+
+  if (repHits.length === 0 && machHits.length === 0){
+    if (tabsEl) tabsEl.innerHTML = ''
+    body.innerHTML = emptyHtml('🔍','Sin resultados',`Sin coincidencias para "<b>${escHtml(query)}</b>"`)
+    return
+  }
+
+  // Sub-tabs con conteos
+  if (tabsEl){
+    tabsEl.innerHTML = `<div class="chips" style="padding:6px 12px 2px">
+      <div class="chip ${searchTabActive==='repuestos'?'active':''}"
+           onclick="setSearchTab('repuestos','${escHtmlAttr(query)}')">
+        Repuestos <span class="count">${repHits.length}</span>
       </div>
-      <div class="cell-group">
-        ${machineHits.map(machineCellHtml).join('')}
-      </div>` : ''}
-    ${repHits.length > 0 ? `
-      <div class="section">
-        <span class="section-title">Repuestos</span>
-        <span class="section-count">${repHits.length}</span>
+      <div class="chip ${searchTabActive==='equipos'?'active':''}"
+           onclick="setSearchTab('equipos','${escHtmlAttr(query)}')">
+        Equipos <span class="count">${machHits.length}</span>
       </div>
-      <div class="cell-group">
-        ${repHits.map(({r,m,machineId}) => repCellHtml(r, machineId, m?.nombre)).join('')}
-      </div>` : ''}
-    ${Object.keys(repCache).length < machines.length ? `
-      <div class="empty" style="padding:20px"><div class="empty-sub">Buscando en más equipos…</div></div>` : ''}`
+    </div>`
+  }
+
+  if (searchTabActive === 'repuestos'){
+    if (repHits.length === 0){
+      body.innerHTML = emptyHtml('📦','Sin repuestos','Prueba la pestaña Equipos')
+      return
+    }
+    body.innerHTML = `<div class="cell-group">
+      ${repHits.map(({repuesto: r, machineId, machineName}) => `
+        <div class="cell" onclick="openRepuesto('${escHtmlAttr(machineId)}','${escHtmlAttr(r.id)}')">
+          <div class="cell-icon">${repIcon(r.tipo)}</div>
+          <div class="cell-body">
+            <div class="cell-title">${highlightMatch(r.textoBreve || r.alias || 'Sin nombre', query)}</div>
+            ${r.codigoSAP
+              ? `<div class="cell-meta">SAP ${highlightMatch(r.codigoSAP, query)}</div>` : ''}
+            <div class="cell-sub">${escHtml(machineName || '')}${r.tipo
+              ? ` · <span style="color:var(--accent-dim,var(--accent))">${escHtml(r.tipo)}</span>` : ''}</div>
+          </div>
+          <div class="cell-chevron">›</div>
+        </div>`).join('')}
+    </div>`
+  } else {
+    if (machHits.length === 0){
+      body.innerHTML = emptyHtml('🏭','Sin equipos','Prueba la pestaña Repuestos')
+      return
+    }
+    body.innerHTML = `<div class="cell-group">
+      ${machHits.map(m => machineCellHtml(m)).join('')}
+    </div>`
+  }
+}
+
+function setSearchTab(tab, query){
+  searchTabActive = tab
+  renderSearchBody(query || document.getElementById('search-input')?.value?.trim() || '')
+}
+
+function renderSearchHistoryHtml(){
+  const hist = getSearchHistory()
+  if (hist.length === 0)
+    return emptyHtml('🔍','Buscá repuestos','Por código SAP, nombre, alias o código de fabricante')
+  return `
+    <div class="section-actions">
+      <div><span class="section-title">Búsquedas recientes</span></div>
+      <button class="btn-text" onclick="clearSearchHistory()" style="color:var(--hint)">Limpiar</button>
+    </div>
+    <div class="cell-group">
+      ${hist.slice(0,10).map(q => `
+        <div class="cell" onclick="applySearchHistory('${escHtmlAttr(q)}')">
+          <div class="cell-icon" style="font-size:16px">🕐</div>
+          <div class="cell-body"><div class="cell-title">${escHtml(q)}</div></div>
+          <div class="cell-chevron">›</div>
+        </div>`).join('')}
+    </div>`
+}
+
+function clearSearchHistory(){
+  localStorage.removeItem('mant_search_history')
+  renderSearchBody('')
+}
+
+function applySearchHistory(query){
+  const inp = document.getElementById('search-input')
+  if (!inp) return
+  inp.value = query
+  inp.dispatchEvent(new Event('input'))
 }
 
 function matchesMachine(m, normQ){
@@ -1303,12 +1559,6 @@ function matchesMachine(m, normQ){
     || normalizeSearch(m.seccion).includes(normQ)
 }
 
-async function loadAllAndSearch(query){
-  const unloaded = machines.filter(m => !repCache[m.id])
-  await Promise.all(unloaded.map(m => loadRepuestos(m.id).catch(()=>null)))
-  const inp = document.getElementById('search-input')
-  if (inp && normalizeSearch(inp.value).includes(normalizeSearch(query))) renderSearchBody(query)
-}
 
 function normalizeSearch(s){
   if (!s) return ''
@@ -1728,7 +1978,41 @@ async function openRepuesto(machineId, repuestoId, opts = {}){
         <button class="upload-btn" onclick="pickPhoto('camera')"><span class="ico">📷</span> Cámara</button>
         <button class="upload-btn" onclick="pickPhoto('gallery')"><span class="ico">🖼️</span> Galería</button>
       </div>` : ''}
+
+    <div id="rep-cross-equipo"></div>
   `
+
+  // Sección "En estos equipos" — carga asíncrona desde cache global (no bloquea render)
+  if (r.codigoSAP) renderRepCrossEquipo(r.codigoSAP, machineId)
+}
+
+function renderRepCrossEquipo(codigoSAP, currentMachineId){
+  if (!__repuestosCache) return
+  const norm = normalizeSearch(codigoSAP)
+  const matches = __repuestosCache.filter(x =>
+    normalizeSearch(x.repuesto.codigoSAP) === norm && x.machineId !== currentMachineId
+  )
+  if (matches.length === 0) return
+  const el = document.getElementById('rep-cross-equipo')
+  if (!el) return
+  el.innerHTML = `
+    <div class="section">
+      <span class="section-title">En otros equipos</span>
+      <span class="section-count">${matches.length}</span>
+    </div>
+    <div class="cell-group">
+      ${matches.slice(0,5).map(x => `
+        <div class="cell" onclick="openRepuesto('${escHtmlAttr(x.machineId)}','${escHtmlAttr(x.repuesto.id)}')">
+          <div class="cell-icon">🏭</div>
+          <div class="cell-body">
+            <div class="cell-title">${escHtml(x.machineName)}</div>
+            ${x.repuesto.ubicacionEnPlanta
+              ? `<div class="cell-sub">${escHtml(x.repuesto.ubicacionEnPlanta)}</div>` : ''}
+          </div>
+          <div class="cell-chevron">›</div>
+        </div>`).join('')}
+      ${matches.length > 5 ? `<div style="padding:10px 16px;font-size:12px;color:var(--hint)">+${matches.length-5} más</div>` : ''}
+    </div>`
 }
 
 async function updateFavBtnState(machineId, repuestoId){
@@ -2246,8 +2530,9 @@ async function saveRepuestoEdit(machineId, repuestoId){
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     })
 
-    // Actualizar cache local
+    // Actualizar cache local + invalidar búsqueda global
     if (idx >= 0) reps[idx] = { ...reps[idx], ...updates }
+    invalidateRepuestosCache()
 
     await logAudit('update', `machines/${machineId}/repuestos`, repuestoId, before, updates,
       `Editar repuesto ${updates.textoBreve || repuestoId}`)
