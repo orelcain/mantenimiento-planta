@@ -1688,36 +1688,46 @@ function copyPreviewUrl(){
   }
 }
 
+function listTotalCount(list){
+  const top = (list.machineIds || []).length
+  const sub = (list.subLists || []).reduce((s, sl) => s + (sl.machineIds || []).length, 0)
+  return top + sub
+}
+
 function renderHomeMyLists(){
   const el = document.getElementById('home-mylists')
   const { favoriteLists, repuestoFavLists } = prefs
   const hasLists = favoriteLists && favoriteLists.length > 0
   const hasRepFavs = Object.keys(repuestoFavLists || {}).filter(k => repuestoFavLists[k]?.length > 0).length > 0
+  const canAdmin = userRole === 'admin' || userRole === 'supervisor'
   if (!hasLists){
-    // Onboarding suave si nunca guardó nada
-    if (!hasRepFavs){
-      el.innerHTML = `
-        <div class="notice" style="border-left-color:var(--accent)">
-          💡 <b>Tip:</b> tocá ⭐ en cualquier repuesto para guardarlo en una lista (Cuchillos, Sensores, Resortes…). Aparecerán acá.
-        </div>`
-    } else {
-      el.innerHTML = ''
-    }
+    el.innerHTML = `
+      <div class="section">
+        <span class="section-title">Mis listas</span>
+        ${canAdmin ? `<button onclick="createMachineListEmpty()" style="background:none;border:none;color:var(--accent);font-size:22px;line-height:1;cursor:pointer;padding:0 4px" title="Nueva lista">＋</button>` : ''}
+      </div>
+      ${!hasRepFavs ? `<div class="notice" style="border-left-color:var(--accent)">
+        💡 <b>Tip:</b> creá una lista y luego agregá equipos desde la jerarquía.
+      </div>` : ''}`
     return
   }
   el.innerHTML = `
     <div class="section">
       <span class="section-title">Mis listas</span>
+      <span style="flex:1"></span>
+      ${canAdmin ? `<button onclick="createMachineListEmpty()" style="background:none;border:none;color:var(--accent);font-size:22px;line-height:1;cursor:pointer;padding:0 6px 0 0" title="Nueva lista">＋</button>` : ''}
       <span class="section-count">${favoriteLists.length}</span>
     </div>
     <div class="cell-group">
       ${favoriteLists.map(list => {
-        const ids = list.machineIds || []
+        const total = listTotalCount(list)
+        const nSub  = (list.subLists || []).length
+        const subTxt = nSub > 0 ? ` · ${nSub} sub-${nSub === 1 ? 'lista' : 'listas'}` : ''
         return `<div class="cell" onclick="openMachineList(${escHtmlAttr(JSON.stringify(list.name))})">
           <div class="cell-icon">📋</div>
           <div class="cell-body">
             <div class="cell-title">${escHtml(list.name)}</div>
-            <div class="cell-sub">${pl(ids.length, 'equipo', 'equipos')}</div>
+            <div class="cell-sub">${pl(total, 'equipo', 'equipos')}${subTxt}</div>
           </div>
           <div class="cell-chevron">›</div>
         </div>`
@@ -1843,27 +1853,118 @@ async function getMachineIdFromNode(nodeId){
   return null
 }
 
-// Abrir una "lista de equipos" — muestra todos los equipos de la lista
+// Abrir una "lista de equipos" — muestra sub-listas + equipos sin categoría
 function openMachineList(listName){
   const list = prefs.favoriteLists.find(l => l.name === listName)
   if (!list) return
-  const ids = list.machineIds || []
-  const mList = ids.map(id => ({...(machineMap[id] || {}), id, _name: list.machineNames?.[id] || machineMap[id]?.nombre || id}))
-  pushView('view-machine', list.name, pl(ids.length, 'equipo', 'equipos'))
-  const el = document.getElementById('view-machine')
-  el.innerHTML = mList.length === 0
-    ? emptyHtml('📋','Lista vacía','No hay equipos en esta lista')
-    : `<div class="cell-group">
-        ${mList.map(m => `
-          <div class="cell" onclick="openMachine('${escHtmlAttr(m.id)}')">
-            <div class="cell-icon" style="background:${m.color || '#5288c1'}22;color:${m.color || '#5288c1'}">🏭</div>
-            <div class="cell-body">
-              <div class="cell-title">${escHtml(m._name)}</div>
-              <div class="cell-sub">${escHtml([m.marca, m.modelo].filter(Boolean).join(' · ') || 'Equipo')}</div>
-            </div>
-            <div class="cell-chevron">›</div>
-          </div>`).join('')}
-      </div>`
+  _renderMachineListView(list)
+}
+
+function _machineCellForList(id, names){
+  const m = machineMap[id] || {}
+  const name = names?.[id] || m.nombre || id
+  const color = m.color || '#5288c1'
+  return `<div class="cell" onclick="openMachine('${escHtmlAttr(id)}')">
+    <div class="cell-icon" style="background:${color}22;color:${color}">🏭</div>
+    <div class="cell-body">
+      <div class="cell-title">${escHtml(name)}</div>
+      <div class="cell-sub">${escHtml([m.marca, m.modelo].filter(Boolean).join(' · ') || 'Equipo')}</div>
+    </div>
+    <div class="cell-chevron">›</div>
+  </div>`
+}
+
+function _renderMachineListView(list){
+  const canAdmin = userRole === 'admin' || userRole === 'supervisor'
+  const subLists = list.subLists || []
+  const allTopIds = list.machineIds || []
+  // IDs ya asignados a alguna sub-lista
+  const inSubSet = new Set(subLists.flatMap(sl => sl.machineIds || []))
+  // IDs sin categoría = en machineIds pero NO en ninguna sub-lista
+  const ungrouped = allTopIds.filter(id => !inSubSet.has(id))
+
+  const total = allTopIds.length + subLists.reduce((s, sl) => s + (sl.machineIds||[]).length, 0)
+  pushView('view-machine', list.name, pl(total, 'equipo', 'equipos'))
+
+  const adminBar = canAdmin ? `
+    <div style="display:flex;gap:8px;padding:10px 14px 6px;flex-wrap:wrap">
+      <button onclick="renameMachineList(${escHtmlAttr(JSON.stringify(list.name))})"
+        style="flex:1;min-width:0;background:none;border:1px solid var(--border);color:var(--hint);
+               padding:6px 10px;border-radius:12px;font-size:12px;cursor:pointer">✏️ Renombrar</button>
+      <button onclick="deleteMachineList(${escHtmlAttr(JSON.stringify(list.name))})"
+        style="flex:1;min-width:0;background:none;border:1px solid var(--border);color:#e74c3c;
+               padding:6px 10px;border-radius:12px;font-size:12px;cursor:pointer">🗑️ Borrar lista</button>
+      <button onclick="createSubList(${escHtmlAttr(JSON.stringify(list.name))})"
+        style="width:100%;background:none;border:1px dashed var(--accent);color:var(--accent);
+               padding:7px 10px;border-radius:12px;font-size:13px;cursor:pointer">＋ Nueva sub-lista</button>
+    </div>` : ''
+
+  // Sub-listas
+  const subListsHtml = subLists.length > 0 ? `
+    <div class="section" style="margin-top:8px">
+      <span class="section-title">Sub-listas</span>
+      <span class="section-count">${subLists.length}</span>
+    </div>
+    <div class="cell-group">
+      ${subLists.map((sl, idx) => {
+        const cnt = (sl.machineIds || []).length
+        const actns = canAdmin ? `
+          <button onclick="event.stopPropagation();renameSubList(${escHtmlAttr(JSON.stringify(list.name))},${idx})"
+            style="background:none;border:none;color:var(--hint);font-size:16px;cursor:pointer;padding:4px">✏️</button>
+          <button onclick="event.stopPropagation();deleteSubList(${escHtmlAttr(JSON.stringify(list.name))},${idx})"
+            style="background:none;border:none;color:#e74c3c;font-size:16px;cursor:pointer;padding:4px">🗑️</button>` : ''
+        return `<div class="cell" onclick="openSubList(${escHtmlAttr(JSON.stringify(list.name))},${idx})" style="align-items:center">
+          <div class="cell-icon">📁</div>
+          <div class="cell-body">
+            <div class="cell-title">${escHtml(sl.name)}</div>
+            <div class="cell-sub">${pl(cnt, 'equipo', 'equipos')}</div>
+          </div>
+          ${actns}
+          <div class="cell-chevron">›</div>
+        </div>`
+      }).join('')}
+    </div>` : ''
+
+  // Equipos sin categoría
+  const ungroupedHtml = ungrouped.length > 0 ? `
+    ${subLists.length > 0 ? `<div class="section" style="margin-top:8px">
+      <span class="section-title">Sin categoría</span>
+      <span class="section-count">${ungrouped.length}</span>
+    </div>` : ''}
+    <div class="cell-group">
+      ${ungrouped.map(id => _machineCellForList(id, list.machineNames)).join('')}
+    </div>` : ''
+
+  const emptyMsg = total === 0 ? emptyHtml('📋','Lista vacía','Agregá equipos desde la pestaña Jerarquía') : ''
+
+  document.getElementById('view-machine').innerHTML =
+    adminBar + subListsHtml + ungroupedHtml + emptyMsg
+}
+
+function openSubList(listName, subListIdx){
+  const list = prefs.favoriteLists.find(l => l.name === listName)
+  const sl   = list?.subLists?.[subListIdx]
+  if (!sl) return
+  const canAdmin = userRole === 'admin' || userRole === 'supervisor'
+  const ids = sl.machineIds || []
+
+  pushView('view-machine', sl.name, `${escHtml(list.name)} · ${pl(ids.length,'equipo','equipos')}`)
+
+  const adminBar = canAdmin ? `
+    <div style="display:flex;gap:8px;padding:10px 14px 6px">
+      <button onclick="renameSubList(${escHtmlAttr(JSON.stringify(listName))},${subListIdx})"
+        style="flex:1;background:none;border:1px solid var(--border);color:var(--hint);
+               padding:6px 10px;border-radius:12px;font-size:12px;cursor:pointer">✏️ Renombrar</button>
+      <button onclick="deleteSubList(${escHtmlAttr(JSON.stringify(listName))},${subListIdx})"
+        style="flex:1;background:none;border:1px solid var(--border);color:#e74c3c;
+               padding:6px 10px;border-radius:12px;font-size:12px;cursor:pointer">🗑️ Borrar</button>
+    </div>` : ''
+
+  const machinesHtml = ids.length
+    ? `<div class="cell-group">${ids.map(id => _machineCellForList(id, sl.machineNames)).join('')}</div>`
+    : emptyHtml('📁','Sub-lista vacía','Agregá equipos desde la pestaña Jerarquía')
+
+  document.getElementById('view-machine').innerHTML = adminBar + machinesHtml
 }
 
 function machineCellHtml(m){
@@ -2854,6 +2955,153 @@ function machineCreateListAndAdd(machineId){
     } catch(err){
       prefs.favoriteLists.pop()
       showToast('Error al crear lista', 'err')
+    }
+  })
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// CRUD listas de equipos (desde home y desde detalle de lista)
+// ──────────────────────────────────────────────────────────────────────
+
+function createMachineListEmpty(){
+  showInputModal('Nueva lista de equipos', '', 'Ej: Cuchillos, Sensores, Bombas…', async name => {
+    if (!name?.trim()) return
+    const trimmed = name.trim()
+    if ((prefs.favoriteLists || []).some(l => l.name === trimmed)){
+      showToast('Ya existe una lista con ese nombre', 'err'); return
+    }
+    const newList = { name: trimmed, machineIds: [] }
+    prefs.favoriteLists = [...(prefs.favoriteLists || []), newList]
+    try {
+      await saveAllPrefs()
+      showToast(`Lista "${trimmed}" creada ✓`, 'ok')
+      tgApp?.HapticFeedback?.notificationOccurred('success')
+      renderHomeMyLists()
+    } catch(err){
+      prefs.favoriteLists.pop()
+      showToast('Error al crear: ' + (err.message || ''), 'err')
+    }
+  })
+}
+
+function renameMachineList(listName){
+  showInputModal('Renombrar lista', listName, 'Nuevo nombre', async newName => {
+    if (!newName?.trim()) return
+    const trimmed = newName.trim()
+    if (trimmed === listName) return
+    if ((prefs.favoriteLists || []).some(l => l.name === trimmed)){
+      showToast('Ya existe una lista con ese nombre', 'err'); return
+    }
+    const idx = prefs.favoriteLists.findIndex(l => l.name === listName)
+    if (idx < 0) return
+    const prev = prefs.favoriteLists[idx].name
+    prefs.favoriteLists[idx].name = trimmed
+    try {
+      await saveAllPrefs()
+      showToast('Lista renombrada ✓', 'ok')
+      tgApp?.HapticFeedback?.notificationOccurred('success')
+      goBack()
+      renderHomeMyLists()
+    } catch(err){
+      prefs.favoriteLists[idx].name = prev
+      showToast('Error: ' + (err.message || ''), 'err')
+    }
+  })
+}
+
+function deleteMachineList(listName){
+  tgApp?.showConfirm(`¿Borrar la lista "${listName}"? Se pierden las sub-listas y asignaciones.`, async ok => {
+    if (!ok) return
+    const idx = prefs.favoriteLists.findIndex(l => l.name === listName)
+    if (idx < 0) return
+    const removed = prefs.favoriteLists.splice(idx, 1)
+    try {
+      await saveAllPrefs()
+      showToast('Lista borrada ✓', 'ok')
+      tgApp?.HapticFeedback?.notificationOccurred('success')
+      goBack()
+      renderHomeMyLists()
+    } catch(err){
+      prefs.favoriteLists.splice(idx, 0, removed[0])
+      showToast('Error: ' + (err.message || ''), 'err')
+    }
+  })
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// CRUD sub-listas
+// ──────────────────────────────────────────────────────────────────────
+
+function createSubList(listName){
+  showInputModal('Nueva sub-lista', '', 'Ej: Cuchillos, Línea A, Turno día…', async name => {
+    if (!name?.trim()) return
+    const trimmed = name.trim()
+    const list = prefs.favoriteLists.find(l => l.name === listName)
+    if (!list) return
+    if (!list.subLists) list.subLists = []
+    if (list.subLists.some(sl => sl.name === trimmed)){
+      showToast('Ya existe una sub-lista con ese nombre', 'err'); return
+    }
+    list.subLists.push({ name: trimmed, machineIds: [] })
+    try {
+      await saveAllPrefs()
+      showToast(`Sub-lista "${trimmed}" creada ✓`, 'ok')
+      tgApp?.HapticFeedback?.notificationOccurred('success')
+      _renderMachineListView(list)
+    } catch(err){
+      list.subLists.pop()
+      showToast('Error: ' + (err.message || ''), 'err')
+    }
+  })
+}
+
+function renameSubList(listName, subListIdx){
+  const list = prefs.favoriteLists.find(l => l.name === listName)
+  const sl   = list?.subLists?.[subListIdx]
+  if (!sl) return
+  showInputModal('Renombrar sub-lista', sl.name, 'Nuevo nombre', async newName => {
+    if (!newName?.trim()) return
+    const trimmed = newName.trim()
+    if (trimmed === sl.name) return
+    if (list.subLists.some(s => s.name === trimmed)){
+      showToast('Ya existe una sub-lista con ese nombre', 'err'); return
+    }
+    const prev = sl.name
+    sl.name = trimmed
+    try {
+      await saveAllPrefs()
+      showToast('Sub-lista renombrada ✓', 'ok')
+      tgApp?.HapticFeedback?.notificationOccurred('success')
+      _renderMachineListView(list)
+    } catch(err){
+      sl.name = prev
+      showToast('Error: ' + (err.message || ''), 'err')
+    }
+  })
+}
+
+function deleteSubList(listName, subListIdx){
+  const list = prefs.favoriteLists.find(l => l.name === listName)
+  const sl   = list?.subLists?.[subListIdx]
+  if (!sl) return
+  const msg = `¿Borrar sub-lista "${sl.name}"?${sl.machineIds?.length ? ` Los ${sl.machineIds.length} equipos pasarán a Sin categoría.` : ''}`
+  tgApp?.showConfirm(msg, async ok => {
+    if (!ok) return
+    // Devolver sus máquinas al nivel raíz de la lista (sin categoría)
+    const returning = sl.machineIds || []
+    const existingTop = new Set(list.machineIds || [])
+    for (const id of returning) existingTop.add(id)
+    list.machineIds = [...existingTop]
+    list.subLists.splice(subListIdx, 1)
+    try {
+      await saveAllPrefs()
+      showToast('Sub-lista borrada ✓', 'ok')
+      tgApp?.HapticFeedback?.notificationOccurred('success')
+      _renderMachineListView(list)
+    } catch(err){
+      list.subLists.splice(subListIdx, 0, sl)
+      list.machineIds = [...(list.machineIds||[])].filter(id => !returning.includes(id) || existingTop.has(id))
+      showToast('Error: ' + (err.message || ''), 'err')
     }
   })
 }
