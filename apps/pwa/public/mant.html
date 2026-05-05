@@ -435,7 +435,8 @@ mark{background:rgba(var(--accent-rgb,82,136,193),.25);color:inherit;border-radi
     <div id="view-stock-report" class="view"></div>
     <div id="view-activity"     class="view"></div>
     <div id="view-qr-batch"    class="view"></div>
-    <div id="view-quick-count" class="view"></div>
+    <div id="view-quick-count"  class="view"></div>
+    <div id="view-cross-equipo" class="view"></div>
   </main>
 
   <nav class="bottom-nav">
@@ -4659,29 +4660,156 @@ function navigateToEquipoFromRep(nodeId, machineId){
 function renderRepCrossEquipo(codigoSAP, currentMachineId){
   if (!__repuestosCache) return
   const norm = normalizeSearch(codigoSAP)
-  const matches = __repuestosCache.filter(x =>
-    normalizeSearch(x.repuesto.codigoSAP) === norm && x.machineId !== currentMachineId
-  )
-  if (matches.length === 0) return
+  // Incluir también el equipo actual para el resumen de stock total
+  const all = __repuestosCache.filter(x => normalizeSearch(x.repuesto.codigoSAP) === norm)
+  const others = all.filter(x => x.machineId !== currentMachineId)
+  if (others.length === 0) return
   const el = document.getElementById('rep-cross-equipo')
   if (!el) return
+
+  // Nombre del repuesto para openCrossEquipoView
+  const repName = all[0]?.repuesto.textoBreve || codigoSAP
+  const totalStock = all.reduce((s, x) => s + (Number(x.repuesto.stockFisico) || 0), 0)
+
+  const PREVIEW_MAX = 4
+  const preview = others.slice(0, PREVIEW_MAX)
   el.innerHTML = `
-    <div class="section">
+    <div class="section" onclick="openCrossEquipoView('${escHtmlAttr(codigoSAP)}','${escHtmlAttr(repName)}','${escHtmlAttr(currentMachineId)}')"
+      style="cursor:pointer">
       <span class="section-title">En otros equipos</span>
-      <span class="section-count">${matches.length}</span>
+      <span class="section-count">${others.length}</span>
+      <span style="margin-left:auto;font-size:11px;color:var(--accent)">Ver todos ›</span>
     </div>
     <div class="cell-group">
-      ${matches.slice(0,5).map(x => `
-        <div class="cell" onclick="openRepuesto('${escHtmlAttr(x.machineId)}','${escHtmlAttr(x.repuesto.id)}')">
+      ${preview.map(x => {
+        const r = x.repuesto
+        const hasStock = r.stockFisico != null
+        const isLow = hasStock && r.stockMinimo != null && Number(r.stockFisico) < Number(r.stockMinimo)
+        const stockBadge = hasStock
+          ? `<span style="font-size:11px;font-weight:700;color:${isLow?'#ef4444':'var(--green)'}">
+               ${isLow?'⚠️':'📦'} ${r.stockFisico}${r.stockMinimo != null ? '/' + r.stockMinimo : ''}
+             </span>`
+          : ''
+        return `<div class="cell" onclick="openRepuesto('${escHtmlAttr(x.machineId)}','${escHtmlAttr(r.id)}')">
           <div class="cell-icon">🏭</div>
           <div class="cell-body">
             <div class="cell-title">${escHtml(x.machineName)}</div>
-            ${x.repuesto.ubicacionEnPlanta
-              ? `<div class="cell-sub">${escHtml(x.repuesto.ubicacionEnPlanta)}</div>` : ''}
+            ${r.ubicacionEnPlanta ? `<div class="cell-sub">${escHtml(r.ubicacionEnPlanta)}</div>` : ''}
+          </div>
+          ${stockBadge}
+          <div class="cell-chevron" style="margin-left:4px">›</div>
+        </div>`
+      }).join('')}
+      ${others.length > PREVIEW_MAX ? `
+        <div class="cell" onclick="openCrossEquipoView('${escHtmlAttr(codigoSAP)}','${escHtmlAttr(repName)}','${escHtmlAttr(currentMachineId)}')">
+          <div class="cell-icon" style="color:var(--accent)">📋</div>
+          <div class="cell-body">
+            <div class="cell-title" style="color:var(--accent)">Ver los ${others.length} equipos</div>
+            <div class="cell-sub">Stock total: ${totalStock} unidades</div>
           </div>
           <div class="cell-chevron">›</div>
-        </div>`).join('')}
-      ${matches.length > 5 ? `<div style="padding:10px 16px;font-size:12px;color:var(--hint)">+${matches.length-5} más</div>` : ''}
+        </div>` : ''}
+    </div>`
+}
+
+function openCrossEquipoView(codigoSAP, repName, currentMachineId){
+  pushView('view-cross-equipo', repName || codigoSAP, `SAP ${codigoSAP} · cross-equipo`)
+  renderCrossEquipoView(codigoSAP, repName, currentMachineId)
+}
+
+function renderCrossEquipoView(codigoSAP, repName, currentMachineId){
+  const el = document.getElementById('view-cross-equipo')
+  if (!el) return
+
+  if (!__repuestosCache){
+    el.innerHTML = `<div class="notice" style="margin:16px;text-align:center;padding:24px">
+      <div style="font-size:32px;margin-bottom:8px">⏳</div>
+      <div style="font-weight:600">Catálogo no cargado</div>
+      <div style="font-size:13px;color:var(--hint);margin-top:4px">Ve a Buscar y carga el catálogo primero</div>
+    </div>`
+    return
+  }
+
+  const norm = normalizeSearch(codigoSAP)
+  const all = __repuestosCache
+    .filter(x => normalizeSearch(x.repuesto.codigoSAP) === norm)
+    .sort((a, b) => {
+      // Equipo actual primero
+      if (a.machineId === currentMachineId) return -1
+      if (b.machineId === currentMachineId) return 1
+      // Luego más críticos (bajo mínimo)
+      const aLow = a.repuesto.stockMinimo != null && Number(a.repuesto.stockFisico) < Number(a.repuesto.stockMinimo)
+      const bLow = b.repuesto.stockMinimo != null && Number(b.repuesto.stockFisico) < Number(b.repuesto.stockMinimo)
+      if (aLow && !bLow) return -1
+      if (!aLow && bLow) return 1
+      return (a.machineName || '').localeCompare(b.machineName || '')
+    })
+
+  if (all.length === 0){
+    el.innerHTML = `<div style="text-align:center;padding:48px 24px;color:var(--hint)">Sin resultados en catálogo</div>`
+    return
+  }
+
+  const totalStock = all.reduce((s, x) => s + (Number(x.repuesto.stockFisico) || 0), 0)
+  const withMin = all.filter(x => x.repuesto.stockMinimo != null)
+  const bajoMin = withMin.filter(x => Number(x.repuesto.stockFisico) < Number(x.repuesto.stockMinimo))
+  const canAdmin = userRole === 'admin' || userRole === 'supervisor'
+
+  el.innerHTML = `
+    <div style="padding:12px 14px 8px">
+      <div style="font-size:12px;color:var(--hint);margin-bottom:6px">SAP ${escHtml(codigoSAP)}</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <div style="background:var(--card);border-radius:10px;padding:8px 14px;text-align:center;flex:1;min-width:80px">
+          <div style="font-size:20px;font-weight:700">${all.length}</div>
+          <div style="font-size:10px;color:var(--hint)">equipos</div>
+        </div>
+        <div style="background:var(--card);border-radius:10px;padding:8px 14px;text-align:center;flex:1;min-width:80px">
+          <div style="font-size:20px;font-weight:700">${totalStock}</div>
+          <div style="font-size:10px;color:var(--hint)">stock total</div>
+        </div>
+        ${bajoMin.length > 0 ? `
+        <div style="background:rgba(239,68,68,.12);border-radius:10px;padding:8px 14px;text-align:center;flex:1;min-width:80px">
+          <div style="font-size:20px;font-weight:700;color:#ef4444">${bajoMin.length}</div>
+          <div style="font-size:10px;color:#ef4444">bajo mínimo</div>
+        </div>` : ''}
+      </div>
+    </div>
+    <div class="cell-group" style="margin-top:4px">
+      ${all.map(x => {
+        const r = x.repuesto
+        const isCurrent = x.machineId === currentMachineId
+        const hasStock = r.stockFisico != null
+        const isLow = hasStock && r.stockMinimo != null && Number(r.stockFisico) < Number(r.stockMinimo)
+        const stockColor = isLow ? '#ef4444' : hasStock ? 'var(--green)' : 'var(--hint)'
+        const stockTxt = hasStock
+          ? `${r.stockFisico}${r.stockMinimo != null ? ' / ' + r.stockMinimo : ''}`
+          : '—'
+        return `<div class="cell" onclick="openRepuesto('${escHtmlAttr(x.machineId)}','${escHtmlAttr(r.id)}')">
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+            width:40px;height:40px;border-radius:10px;flex-shrink:0;font-size:11px;font-weight:700;
+            color:${stockColor};line-height:1.2;text-align:center;
+            background:${isLow?'rgba(239,68,68,.12)':hasStock?'rgba(79,174,78,.1)':'var(--card)'}">
+            ${isLow ? '⚠️' : hasStock ? '📦' : '·'}
+            <span style="font-size:10px">${hasStock ? r.stockFisico : ''}</span>
+          </div>
+          <div class="cell-body">
+            <div class="cell-title" style="${isCurrent?'color:var(--accent)':''}">${escHtml(x.machineName)}${isCurrent?' ✦':''}</div>
+            <div style="display:flex;gap:6px;align-items:center;margin-top:2px">
+              <span style="font-size:11px;color:${stockColor};font-weight:600">${stockTxt}</span>
+              ${r.ubicacionEnPlanta ? `<span style="font-size:11px;color:var(--hint)">· ${escHtml(r.ubicacionEnPlanta)}</span>` : ''}
+            </div>
+          </div>
+          ${canAdmin ? `<button onclick="event.stopPropagation();openStockConteoModal('${escHtmlAttr(x.machineId)}','${escHtmlAttr(r.id)}')"
+            style="background:rgba(79,174,78,.15);border:none;border-radius:8px;color:var(--green);
+              font-size:11px;font-weight:600;cursor:pointer;padding:5px 8px;flex-shrink:0">
+            📦
+          </button>` : ''}
+          <div class="cell-chevron">›</div>
+        </div>`
+      }).join('')}
+    </div>
+    <div style="padding:16px 12px 8px;text-align:center;font-size:11px;color:var(--hint)">
+      Datos del catálogo local
     </div>`
 }
 
