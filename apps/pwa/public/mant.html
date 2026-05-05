@@ -3671,6 +3671,37 @@ async function openRepuesto(machineId, repuestoId, opts = {}){
         </div>`).join('')}
     </div>
 
+    <div class="section"><span class="section-title">📦 Stock en bodega</span></div>
+    <div class="info-card">
+      ${(() => {
+        const has = r.stockFisico != null
+        const when = r.stockContadoEn ? relativeTime(r.stockContadoEn) : ''
+        const who = r.stockContadoPor ? escHtml(r.stockContadoPor) : ''
+        return `
+          <div class="info-row">
+            <span class="info-label">Cantidad</span>
+            <span class="info-value code" style="font-size:18px;font-weight:600">
+              ${has ? r.stockFisico : '—'}
+            </span>
+          </div>
+          ${has ? `
+            <div class="info-row">
+              <span class="info-label">Último conteo</span>
+              <span class="info-value" style="opacity:.85">${when}${who?` · ${who}`:''}</span>
+            </div>` : `
+            <div class="info-row">
+              <span class="info-value" style="opacity:.6">Sin contar aún</span>
+            </div>`}
+        `
+      })()}
+      <div style="padding:8px 12px 4px">
+        <button class="cell-action-btn" style="width:100%"
+          onclick="openStockConteoModal('${escHtmlAttr(machineId)}','${escHtmlAttr(repuestoId)}')">
+          📦 ${r.stockFisico != null ? 'Actualizar conteo' : 'Contar stock físico'}
+        </button>
+      </div>
+    </div>
+
     ${r.observaciones ? `
       <div class="section"><span class="section-title">Observaciones</span></div>
       <div class="info-card">
@@ -4158,6 +4189,55 @@ const EDIT_FIELDS = [
   ['observaciones',      'Observaciones',         'textarea', {}],
 ]
 
+// ═══════════════════════════════════════════════════════════════════
+// STOCK FÍSICO — conteo rápido individual (independiente del sistema
+// bodega_inventarios de la PWA principal). Guarda 3 campos en el doc:
+//   stockFisico, stockContadoEn (ms), stockContadoPor (nombre)
+// ═══════════════════════════════════════════════════════════════════
+function openStockConteoModal(machineId, repuestoId){
+  const reps = repCache[machineId] || []
+  const r = reps.find(x => x.id === repuestoId)
+  if (!r) return
+  const current = r.stockFisico != null ? String(r.stockFisico) : ''
+  showInputModal(
+    `Stock físico — ${r.textoBreve || 'Repuesto'}`,
+    current,
+    'Cantidad en bodega',
+    async (val) => {
+      if (val == null || val === '') return
+      const n = Number(String(val).replace(',', '.'))
+      if (!Number.isFinite(n) || n < 0){
+        showToast('Cantidad inválida', 'err'); return
+      }
+      await saveStockConteo(machineId, repuestoId, Math.round(n))
+    }
+  )
+  // Mejor UX en mobile: input numérico
+  const inp = document.getElementById('modal-input')
+  if (inp){ inp.type = 'number'; inp.inputMode = 'numeric'; inp.min = '0'; inp.step = '1' }
+}
+
+async function saveStockConteo(machineId, repuestoId, cantidad){
+  const path = getRepuestoCollPath(machineId)
+  const who = firstName || tgApp?.initDataUnsafe?.user?.first_name || 'usuario'
+  const ts = Date.now()
+  const update = { stockFisico: cantidad, stockContadoEn: ts, stockContadoPor: who }
+  // Optimista: actualizar cache + render
+  const r = (repCache[machineId] || []).find(x => x.id === repuestoId)
+  if (r) Object.assign(r, update)
+  const inGlobal = __repuestosCache?.find(x => x.repuesto.id === repuestoId && x.machineId === machineId)
+  if (inGlobal) Object.assign(inGlobal.repuesto, update)
+  openRepuesto(machineId, repuestoId, { fromSave: true })
+  tgApp?.HapticFeedback?.notificationOccurred?.('success')
+  try {
+    await db.doc(`${path}/${repuestoId}`).update(update)
+    showToast('Stock actualizado ✓', 'ok')
+  } catch (err) {
+    if (IS_PREVIEW){ showToast('Stock guardado (solo preview)', 'ok'); return }
+    showToast('Error: ' + (err.message || ''), 'err')
+  }
+}
+
 function openRepuestoEdit(machineId, repuestoId){
   if (userRole !== 'admin') return
   const reps = repCache[machineId] || []
@@ -4625,9 +4705,12 @@ function rebuildHierarchyFromNodes(nodes){
 
 function getRepuestoCollPath(machineId){
   const m = machineMap[machineId]
-  return m?._isHierarchyOnly
-    ? `hierarchy/${machineId}/repuestos`
-    : `machines/${machineId}/repuestos`
+  // Si el id corresponde a un nodo hierarchy (puro o vinculado), los repuestos
+  // propios viven en hierarchy/{id}/repuestos. Cubre el caso 'CINTA ACELERACION 1
+  // BALANZA ESTATICA' que no está en machines pero sí en hierarchy.
+  if (m?._isHierarchyOnly) return `hierarchy/${machineId}/repuestos`
+  if (!m && hierarchyNodesMap?.[machineId]) return `hierarchy/${machineId}/repuestos`
+  return `machines/${machineId}/repuestos`
 }
 
 function isEquipNode(node){
