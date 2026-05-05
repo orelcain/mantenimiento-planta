@@ -6231,21 +6231,35 @@ async function deleteHierNode(nodeId){
   const node = hierarchyNodesMap[nodeId]
   if (!node) return
   closeSheet()
-  const children = hierarchyChildrenMap[nodeId] || []
-  const linkedMachine = machines.find(m => m.hierarchyNodeId === nodeId)
 
+  // Recopilar TODOS los descendientes recursivamente
+  function collectDescendants(id){
+    const ids = [id]
+    for (const child of (hierarchyChildrenMap[id] || [])){
+      ids.push(...collectDescendants(child))
+    }
+    return ids
+  }
+  const allIds = collectDescendants(nodeId) // nodeId + todos sus descendientes
+
+  // Contar repuestos propios del nodo raíz para el aviso
   let repCount = 0
   try {
     const fullSnap = await db.collection(`hierarchy/${nodeId}/repuestos`).get()
     repCount = fullSnap.size
   } catch {}
 
+  const descendantCount = allIds.length - 1
+  const linkedMachine = machines.find(m => m.hierarchyNodeId === nodeId)
+
   const partes = []
-  if (children.length) partes.push(`${children.length} sub-nodo(s)`)
+  if (descendantCount > 0) partes.push(`${descendantCount} sub-nodo(s) y sus repuestos`)
   if (repCount) partes.push(`${repCount} repuesto(s) propios`)
   if (linkedMachine) partes.push(`vinculado a "${linkedMachine.nombre}"`)
 
-  const warning = partes.length ? `\n\n⚠️ Contiene: ${partes.join(' + ')}.\nLos sub-nodos quedarán huérfanos. Los repuestos del nodo se borrarán.` : ''
+  const warning = partes.length
+    ? `\n\n⚠️ Se eliminarán también: ${partes.join(' + ')}.`
+    : ''
   const msg = `Eliminar nodo "${node.nombre}"?${warning}\n\nEsta acción es irreversible.`
 
   const ok = await new Promise(res => tgApp?.showConfirm
@@ -6254,26 +6268,43 @@ async function deleteHierNode(nodeId){
   if (!ok) return
 
   try {
-    if (repCount > 0) {
-      const repSnap = await db.collection(`hierarchy/${nodeId}/repuestos`).get()
-      const batch = db.batch()
-      repSnap.docs.forEach(d => batch.delete(d.ref))
-      await batch.commit()
+    // Borrar repuestos + doc de cada nodo en cascada (batches de 400 ops)
+    const deleteOps = [] // refs a borrar
+    for (const id of allIds){
+      try {
+        const repSnap = await db.collection(`hierarchy/${id}/repuestos`).get()
+        repSnap.docs.forEach(d => deleteOps.push(d.ref))
+      } catch {}
+      deleteOps.push(db.collection('hierarchy').doc(id))
     }
-    await db.collection('hierarchy').doc(nodeId).delete()
+    // Ejecutar en batches de 400 (límite Firestore: 500)
+    for (let i = 0; i < deleteOps.length; i += 400){
+      const b = db.batch()
+      deleteOps.slice(i, i + 400).forEach(ref => b.delete(ref))
+      await b.commit()
+    }
 
-    delete hierarchyNodesMap[nodeId]
-    if (machineMap[nodeId]?._isHierarchyOnly) delete machineMap[nodeId]
-    delete repCache[nodeId]
+    // Limpiar estado local de todos los nodos eliminados
+    for (const id of allIds){
+      delete hierarchyNodesMap[id]
+      if (machineMap[id]?._isHierarchyOnly) delete machineMap[id]
+      delete repCache[id]
+      if (hierarchyChildrenMap[id]) delete hierarchyChildrenMap[id]
+    }
+    // Quitar nodeId de la lista de hijos de su padre
+    if (node.parentId && hierarchyChildrenMap[node.parentId]){
+      hierarchyChildrenMap[node.parentId] = hierarchyChildrenMap[node.parentId].filter(id => id !== nodeId)
+    }
     __hierarchyCache = null
     invalidateRepuestosCache()
 
     await logAudit('delete', 'hierarchy', nodeId,
-      { nombre: node.nombre, parentId: node.parentId, nivel: node.nivel, repCount, childCount: children.length },
+      { nombre: node.nombre, parentId: node.parentId, nivel: node.nivel, repCount,
+        childCount: descendantCount, allDeletedIds: allIds },
       null,
-      `Eliminar nodo: ${node.nombre}`)
+      `Eliminar nodo (cascada): ${node.nombre}${descendantCount ? ` + ${descendantCount} sub-nodos` : ''}`)
 
-    showToast('Nodo eliminado ✓','ok')
+    showToast(`Nodo eliminado ✓${descendantCount ? ` (+ ${descendantCount} sub-nodos)` : ''}`, 'ok')
     tgApp?.HapticFeedback?.notificationOccurred('success')
     await renderHierarchyTab()
   } catch(err){
