@@ -556,7 +556,6 @@ let nodeNameCache = {}         // nodeId → resolved name
 
 let activeCatFilter = 'all'
 let activeMachineRepFilter = null
-let activeMachineTypeFilter = null
 let repSearchTimer = null
 let recentIds = []
 let recentsPage = 0
@@ -2846,7 +2845,6 @@ async function openMachine(machineId, opts = {}){
   const m = machineMap[machineId]
   if (!m) return
   activeMachineRepFilter = opts.preFilter ?? null
-  activeMachineTypeFilter = null
   tgApp?.HapticFeedback?.selectionChanged?.()
 
   pushView('view-machine', m.nombre, [m.marca, m.modelo].filter(Boolean).join(' · '))
@@ -2880,7 +2878,6 @@ async function openMachine(machineId, opts = {}){
         style="width:100%;box-sizing:border-box;padding:8px 12px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);color:var(--text);font-size:14px;outline:none"
         oninput="repSearchInput('${escHtmlAttr(machineId)}')">
     </div>
-    <div id="rep-type-chips"></div>
     <div id="rep-chips"></div>
     ${userRole === 'admin' ? `
       <div style="padding:0 12px 8px;display:flex;gap:8px">
@@ -2933,14 +2930,12 @@ function renderMachineManuales(machineId){
 function renderMachineBody(machineId, reps, favLists){
   const m = machineMap[machineId]
   const countEl    = document.getElementById('rep-count')
-  const typeChips  = document.getElementById('rep-type-chips')
   const chipsEl    = document.getElementById('rep-chips')
   const listEl     = document.getElementById('rep-list')
   if (!listEl) return  // user navigated away
 
   if (reps.length === 0){
     if (countEl)   countEl.textContent = '0'
-    if (typeChips) typeChips.innerHTML = ''
     if (chipsEl)   chipsEl.innerHTML = ''
     listEl.innerHTML = emptyHtml('📭','Sin repuestos','Este equipo no tiene repuestos cargados aún')
     return
@@ -2949,26 +2944,7 @@ function renderMachineBody(machineId, reps, favLists){
   // Search query from DOM
   const searchQ = normalizeSearch(document.getElementById('rep-search-input')?.value || '')
 
-  // Type chips — unique tipos with ≥1 occurrence
-  const typeCounts = {}
-  for (const r of reps){
-    const t = r.tipo?.trim()
-    if (t) typeCounts[t] = (typeCounts[t] || 0) + 1
-  }
-  const tipos = Object.keys(typeCounts).sort()
-  if (typeChips){
-    typeChips.innerHTML = tipos.length > 1 ? `<div class="chips" style="padding:0 12px 4px">
-      <div class="chip ${activeMachineTypeFilter===null?'active':''}"
-           onclick="setMachineTypeFilter('${escHtmlAttr(machineId)}', null)">Todos</div>
-      ${tipos.map(t => `
-        <div class="chip ${activeMachineTypeFilter===t?'active':''}"
-             onclick="setMachineTypeFilter('${escHtmlAttr(machineId)}', '${escHtmlAttr(t)}')">
-          ${escHtml(t)} <span class="count">${typeCounts[t]}</span>
-        </div>`).join('')}
-    </div>` : ''
-  }
-
-  // Filter chain: favList → type → search
+  // Filter chain: favList → search
   let filtered = reps
   if (activeMachineRepFilter){
     const list = favLists.find(l => l.name === activeMachineRepFilter)
@@ -2976,9 +2952,6 @@ function renderMachineBody(machineId, reps, favLists){
       const idSet = new Set(list.repuestoIds)
       filtered = filtered.filter(r => matchesRepFavList(r, idSet))
     }
-  }
-  if (activeMachineTypeFilter){
-    filtered = filtered.filter(r => (r.tipo?.trim() || '') === activeMachineTypeFilter)
   }
   if (searchQ){
     filtered = filtered.filter(r =>
@@ -3027,12 +3000,6 @@ function setMachineRepFilter(machineId, listName){
     Promise.resolve(repCache[machineId] || []),
     getMachineFavListsMerged(machineId),
   ]).then(([reps, favLists]) => renderMachineBody(machineId, reps, favLists))
-}
-
-function setMachineTypeFilter(machineId, tipo){
-  activeMachineTypeFilter = tipo
-  getMachineFavListsMerged(machineId).then(favLists =>
-    renderMachineBody(machineId, repCache[machineId] || [], favLists))
 }
 
 function repSearchInput(machineId){
