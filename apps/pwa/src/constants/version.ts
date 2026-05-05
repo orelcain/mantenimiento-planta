@@ -11,7 +11,7 @@ export const APP_VERSION = '3.4.7' as const
 /**
  * Fecha de la versión actual
  */
-export const VERSION_DATE = '2026-05-04' as const
+export const VERSION_DATE = '2026-05-05' as const
 
 /**
  * Nombre de la versión (opcional)
