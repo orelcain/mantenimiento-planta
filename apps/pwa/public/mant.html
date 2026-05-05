@@ -3684,13 +3684,23 @@ async function openRepuesto(machineId, repuestoId, opts = {}){
         const has = r.stockFisico != null
         const when = r.stockContadoEn ? relativeTime(r.stockContadoEn) : ''
         const who = r.stockContadoPor ? escHtml(r.stockContadoPor) : ''
+        const min = r.stockMinimo
+        const isLow = has && min != null && r.stockFisico < min
+        const valueColor = isLow ? 'color:#ef4444' : ''
         return `
+          ${isLow ? `<div class="info-row" style="background:rgba(239,68,68,.12);padding:8px 12px;border-radius:6px;margin-bottom:6px">
+            <span class="info-value" style="color:#ef4444;font-weight:600">⚠️ Stock bajo (${r.stockFisico} < mínimo ${min})</span>
+          </div>` : ''}
           <div class="info-row">
             <span class="info-label">Cantidad</span>
-            <span class="info-value code" style="font-size:18px;font-weight:600">
+            <span class="info-value code" style="font-size:18px;font-weight:600;${valueColor}">
               ${has ? r.stockFisico : '—'}
             </span>
           </div>
+          ${min != null ? `<div class="info-row">
+            <span class="info-label">Mínimo</span>
+            <span class="info-value code">${min}</span>
+          </div>` : ''}
           ${has ? `
             <div class="info-row">
               <span class="info-label">Último conteo</span>
@@ -3699,12 +3709,30 @@ async function openRepuesto(machineId, repuestoId, opts = {}){
             <div class="info-row">
               <span class="info-value" style="opacity:.6">Sin contar aún</span>
             </div>`}
-        `
+          ${(r.stockHistorial || []).length > 1 ? `
+            <details style="padding:6px 12px;font-size:12px">
+              <summary style="cursor:pointer;color:var(--accent)">Historial (${r.stockHistorial.length})</summary>
+              <div style="margin-top:6px;padding-left:8px;border-left:2px solid var(--border)">
+                ${r.stockHistorial.slice(1, 10).map(h => {
+                  const diff = (r.stockHistorial[0]?.cantidad ?? h.cantidad) - h.cantidad
+                  const arrow = diff > 0 ? '↑' : diff < 0 ? '↓' : '·'
+                  return `<div style="padding:4px 0;color:var(--sub);display:flex;justify-content:space-between;gap:8px">
+                    <span><b style="color:var(--text)">${h.cantidad}</b> ${arrow} ${escHtml(h.por||'')}</span>
+                    <span style="opacity:.7">${relativeTime(h.ts)}</span>
+                  </div>`
+                }).join('')}
+              </div>
+            </details>` : ''}
+      `
       })()}
-      <div style="padding:8px 12px 4px">
-        <button class="cell-action-btn" style="width:100%"
+      <div style="padding:8px 12px 4px;display:flex;gap:6px">
+        <button class="cell-action-btn" style="flex:1"
           onclick="openStockConteoModal('${escHtmlAttr(machineId)}','${escHtmlAttr(repuestoId)}')">
-          📦 ${r.stockFisico != null ? 'Actualizar conteo' : 'Contar stock físico'}
+          📦 ${r.stockFisico != null ? 'Actualizar' : 'Contar stock'}
+        </button>
+        <button class="cell-action-btn" style="flex:0 0 auto;padding:0 10px" title="Stock mínimo"
+          onclick="openStockMinimoModal('${escHtmlAttr(machineId)}','${escHtmlAttr(repuestoId)}')">
+          📏
         </button>
       </div>
     </div>
@@ -3712,10 +3740,28 @@ async function openRepuesto(machineId, repuestoId, opts = {}){
     <div class="section"><span class="section-title">⚡ Acciones rápidas</span></div>
     <div style="padding:0 12px 8px;display:flex;flex-wrap:wrap;gap:8px">
       ${r.codigoSAP ? `<button class="cell-action-btn" style="flex:1 1 calc(50% - 4px);white-space:nowrap;min-width:0" onclick="copyRepSap('${escHtmlAttr(r.codigoSAP)}')">📋 Copiar SAP</button>` : ''}
+      ${r.codigoSAP ? `<button class="cell-action-btn" style="flex:1 1 calc(50% - 4px);white-space:nowrap;min-width:0" onclick="openQRModal('${escHtmlAttr(r.codigoSAP)}','${escHtmlAttr(r.textoBreve||'')}')">🔳 QR</button>` : ''}
       <button class="cell-action-btn" style="flex:1 1 calc(50% - 4px);white-space:nowrap;min-width:0" onclick="shareRepuesto('${escHtmlAttr(machineId)}','${escHtmlAttr(repuestoId)}')">🔗 Compartir</button>
       <button class="cell-action-btn" style="flex:1 1 calc(50% - 4px);white-space:nowrap;min-width:0" onclick="scrollToRepManuales()">📖 Manuales</button>
       ${equipoPath.nodeId ? `<button class="cell-action-btn" style="flex:1 1 calc(50% - 4px);white-space:nowrap;min-width:0" onclick="navigateToEquipoFromRep('${escHtmlAttr(equipoPath.nodeId)}','${escHtmlAttr(machineId)}')">🌳 Ver equipo</button>` : ''}
     </div>
+
+    ${(r.vinculosManual || []).length > 0 ? `
+      <div class="section">
+        <span class="section-title">🔖 Vínculos al manual</span>
+        <span class="section-count">${r.vinculosManual.length}</span>
+      </div>
+      <div class="cell-group">
+        ${r.vinculosManual.map(v => `
+          <div class="cell" onclick="openManualLink('${escHtmlAttr(v.url || v.manualUrl || '')}','${escHtmlAttr(v.pagina || v.page || '')}')">
+            <div class="cell-icon">📄</div>
+            <div class="cell-body">
+              <div class="cell-title">${escHtml(v.titulo || v.title || 'Manual')}</div>
+              <div class="cell-sub">${v.pagina || v.page ? `Pág. ${escHtml(String(v.pagina || v.page))}` : ''}${v.descripcion ? ` · ${escHtml(v.descripcion)}` : ''}</div>
+            </div>
+            <div class="cell-chevron">›</div>
+          </div>`).join('')}
+      </div>` : ''}
 
     ${r.observaciones ? `
       <div class="section"><span class="section-title">Observaciones</span></div>
@@ -3807,6 +3853,16 @@ function scrollToRepManuales(){
     el.scrollIntoView({ behavior: 'smooth', block: 'start' })
   } else {
     showToast('Sin manuales para este equipo', 'err')
+  }
+}
+
+function openManualLink(url, pagina){
+  if (!url){ showToast('Sin URL del manual', 'err'); return }
+  const fullUrl = pagina ? `${url}#page=${encodeURIComponent(pagina)}` : url
+  if (tgApp?.openLink){
+    tgApp.openLink(fullUrl)
+  } else {
+    window.open(fullUrl, '_blank')
   }
 }
 
@@ -4306,9 +4362,12 @@ async function saveStockConteo(machineId, repuestoId, cantidad){
   const path = getRepuestoCollPath(machineId)
   const who = firstName || tgApp?.initDataUnsafe?.user?.first_name || 'usuario'
   const ts = Date.now()
-  const update = { stockFisico: cantidad, stockContadoEn: ts, stockContadoPor: who }
-  // Optimista: actualizar cache + render
   const r = (repCache[machineId] || []).find(x => x.id === repuestoId)
+  // Historial: mantener últimos 10 conteos
+  const prevHist = Array.isArray(r?.stockHistorial) ? r.stockHistorial : []
+  const newEntry = { cantidad, ts, por: who }
+  const stockHistorial = [newEntry, ...prevHist].slice(0, 10)
+  const update = { stockFisico: cantidad, stockContadoEn: ts, stockContadoPor: who, stockHistorial }
   if (r) Object.assign(r, update)
   const inGlobal = __repuestosCache?.find(x => x.repuesto.id === repuestoId && x.machineId === machineId)
   if (inGlobal) Object.assign(inGlobal.repuesto, update)
@@ -4321,6 +4380,61 @@ async function saveStockConteo(machineId, repuestoId, cantidad){
     if (IS_PREVIEW){ showToast('Stock guardado (solo preview)', 'ok'); return }
     showToast('Error: ' + (err.message || ''), 'err')
   }
+}
+
+function openStockMinimoModal(machineId, repuestoId){
+  const reps = repCache[machineId] || []
+  const r = reps.find(x => x.id === repuestoId)
+  if (!r) return
+  showInputModal(
+    `Stock mínimo — ${r.textoBreve || 'Repuesto'}`,
+    r.stockMinimo != null ? String(r.stockMinimo) : '',
+    'Cantidad mínima en bodega',
+    async (val) => {
+      if (val == null) return
+      const trimmed = String(val).trim()
+      const path = getRepuestoCollPath(machineId)
+      const update = trimmed === ''
+        ? { stockMinimo: firebase.firestore.FieldValue.delete() }
+        : (() => {
+            const n = Number(trimmed.replace(',', '.'))
+            if (!Number.isFinite(n) || n < 0){ showToast('Cantidad inválida', 'err'); return null }
+            return { stockMinimo: Math.round(n) }
+          })()
+      if (!update) return
+      const localUpdate = trimmed === '' ? { stockMinimo: undefined } : update
+      Object.assign(r, localUpdate)
+      const inGlobal = __repuestosCache?.find(x => x.repuesto.id === repuestoId && x.machineId === machineId)
+      if (inGlobal) Object.assign(inGlobal.repuesto, localUpdate)
+      openRepuesto(machineId, repuestoId, { fromSave: true })
+      try {
+        await db.doc(`${path}/${repuestoId}`).update(update)
+        showToast('Stock mínimo actualizado ✓', 'ok')
+      } catch (err) {
+        if (IS_PREVIEW){ showToast('Guardado (solo preview)', 'ok'); return }
+        showToast('Error: ' + (err.message || ''), 'err')
+      }
+    }
+  )
+  const inp = document.getElementById('modal-input')
+  if (inp){ inp.type = 'number'; inp.inputMode = 'numeric'; inp.min = '0'; inp.step = '1' }
+}
+
+function openQRModal(sap, title){
+  if (!sap){ showToast('Sin código SAP', 'err'); return }
+  const url = `https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=10&data=${encodeURIComponent(sap)}`
+  const overlay = document.createElement('div')
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;cursor:pointer'
+  overlay.innerHTML = `
+    <div style="background:#fff;padding:16px;border-radius:12px;text-align:center;max-width:90vw">
+      <img src="${escHtmlAttr(url)}" alt="QR ${escHtmlAttr(sap)}" style="width:100%;max-width:280px;height:auto;display:block;margin:0 auto">
+      <div style="color:#000;font-size:14px;margin-top:12px;font-weight:600">${escHtml(sap)}</div>
+      ${title ? `<div style="color:#666;font-size:12px;margin-top:4px">${escHtml(title)}</div>` : ''}
+    </div>
+    <div style="color:#fff;font-size:12px;margin-top:16px;opacity:.7">Tocá fuera para cerrar</div>`
+  overlay.onclick = () => overlay.remove()
+  document.body.appendChild(overlay)
+  tgApp?.HapticFeedback?.selectionChanged?.()
 }
 
 function openRepuestoEdit(machineId, repuestoId){
