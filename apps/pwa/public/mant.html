@@ -1768,12 +1768,16 @@ function renderHomeMyLists(){
         const total = listTotalCount(list)
         const nSub  = (list.subLists || []).length
         const subTxt = nSub > 0 ? ` · ${nSub} sub-${nSub === 1 ? 'lista' : 'listas'}` : ''
-        return `<div class="cell" onclick="openMachineList(${escHtmlAttr(JSON.stringify(list.name))})">
+        const nameAttr = escHtmlAttr(JSON.stringify(list.name))
+        return `<div class="cell" onclick="openMachineList(${nameAttr})">
           <div class="cell-icon">📋</div>
           <div class="cell-body">
             <div class="cell-title">${escHtml(list.name)}</div>
             <div class="cell-sub">${pl(total, 'equipo', 'equipos')}${subTxt}</div>
           </div>
+          ${canAdmin ? `<button onclick="event.stopPropagation();renameMachineList(${nameAttr})"
+            style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:4px 8px"
+            title="Renombrar">✏️</button>` : ''}
           <div class="cell-chevron">›</div>
         </div>`
       }).join('')}
