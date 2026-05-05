@@ -760,6 +760,8 @@ function showApp(){
   // Listeners real-time (sync con PWA y otros dispositivos)
   startPrefsListener()
   startMachinesListener()
+  // Stock listeners: arranca con prefs actuales, se re-ajusta si cambian las listas
+  startFavMachinesStockListeners()
 }
 
 /** Listener real-time de la colección machines.
@@ -773,6 +775,70 @@ function startMachinesListener(){
     machineMap = Object.fromEntries(machines.map(m => [m.id, m]))
     if (currentTab === 'home') renderHomeCatalog()
   }, err => console.warn('machines listener error', err))
+}
+
+// ── Stock real-time listeners ─────────────────────────────────────
+// Escucha cambios de stock en las máquinas de las listas favoritas del usuario.
+// Alcance limitado (≤15 máquinas) → sin índices compuestos, bajo costo de lectura.
+const stockListeners = new Map()  // machineId → unsub fn
+
+function startFavMachinesStockListeners(){
+  // Reunir IDs únicos de las listas favoritas (raíz + sub-listas)
+  const ids = new Set()
+  for (const list of prefs.favoriteLists || []) {
+    for (const id of list.machineIds || []) ids.add(id)
+  }
+  const targets = [...ids].slice(0, 15)
+
+  // Detener listeners de máquinas que ya no están en favoritos
+  for (const [id, unsub] of stockListeners) {
+    if (!ids.has(id)) { try { unsub() } catch {} ; stockListeners.delete(id) }
+  }
+
+  for (const machineId of targets) {
+    if (stockListeners.has(machineId)) continue
+    const collPath = getRepuestoCollPath(machineId)
+    const unsub = db.collection(collPath)
+      .where('stockMinimo', '>=', 0)
+      .onSnapshot({ includeMetadataChanges: false }, snap => {
+        let changed = false
+        snap.docChanges().forEach(change => {
+          // Ignorar carga inicial si el repuesto ya está en cache (evita re-render masivo)
+          if (change.type === 'added' && repCache[machineId]?.some(r => r.id === change.doc.id)) return
+          const doc = change.doc
+          const data = doc.data()
+          const repId = doc.id
+          const stockFields = {
+            stockFisico: data.stockFisico,
+            stockMinimo: data.stockMinimo,
+            stockContadoEn: data.stockContadoEn,
+            stockContadoPor: data.stockContadoPor,
+            stockHistorial: data.stockHistorial,
+          }
+          // Actualizar repCache
+          const arr = repCache[machineId]
+          if (arr) {
+            const idx = arr.findIndex(r => r.id === repId)
+            if (idx >= 0) { Object.assign(arr[idx], stockFields); changed = true }
+          }
+          // Actualizar cache global
+          const gItem = __repuestosCache?.find(x => x.repuesto.id === repId && x.machineId === machineId)
+          if (gItem) { Object.assign(gItem.repuesto, stockFields); changed = true }
+        })
+        if (!changed) return
+        renderHomeStockAlert()
+        if (document.getElementById('view-stock-report')?.classList.contains('active')) renderStockReport()
+        // Si el detalle del repuesto afectado está abierto, re-renderizarlo
+        if (activeUploadCtx?.machineId === machineId &&
+            document.getElementById('view-repuesto')?.classList.contains('active')) {
+          openRepuesto(machineId, activeUploadCtx.repuestoId, { fromSave: true })
+        }
+      }, err => {
+        console.warn(`stock listener error [${machineId}]`, err?.message || err)
+        stockListeners.delete(machineId)
+      })
+    stockListeners.set(machineId, unsub)
+  }
 }
 
 async function preloadRepCounts(){
@@ -906,6 +972,8 @@ function startPrefsListener(){
     if (favSheetCtx){
       openFavListsSheet(favSheetCtx.machineId, favSheetCtx.repuestoId)
     }
+    // Ajustar listeners de stock para las nuevas listas favoritas
+    startFavMachinesStockListeners()
   }, err => console.warn('prefs listener error', err))
 }
 
