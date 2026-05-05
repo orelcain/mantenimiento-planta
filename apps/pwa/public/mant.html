@@ -898,6 +898,7 @@ async function loadRepuestos(machineId){
   // Solo cachear arrays NO vacíos: un cache vacío puede venir de una resolución
   // de path incorrecta (ej: hierarchy aún no cargado) y bloquear ediciones futuras.
   if (repCache[machineId]?.length > 0) return repCache[machineId]
+  const m = machineMap[machineId]
   const collPath = getRepuestoCollPath(machineId)
   let docs = []
   try {
@@ -908,7 +909,28 @@ async function loadRepuestos(machineId){
     const snap = await db.collection(collPath).get()
     docs = snap.docs
   }
-  repCache[machineId] = docs.map(d => ({id:d.id, ...d.data()}))
+  let results = docs.map(d => ({id:d.id, ...d.data()}))
+  // Si la máquina tiene hierarchyNodeId, también cargar repuestos propios del nodo jerarquía.
+  // Esto cubre el caso "máquina en machines/ vinculada a hierarchy/ donde los repuestos se
+  // registraron via vista de jerarquía" — los repuestos viven en hierarchy/{nodeId}/repuestos
+  // pero la lista fav apunta al machineId de machines/.
+  const hierNodeId = m?.hierarchyNodeId
+  if (hierNodeId && collPath !== `hierarchy/${hierNodeId}/repuestos`){
+    try {
+      const hierSnap = await db.collection(`hierarchy/${hierNodeId}/repuestos`).get()
+      const existingIds  = new Set(results.map(r => r.id))
+      const existingSAPs = new Set(results.map(r => r.codigoSAP).filter(Boolean))
+      for (const d of hierSnap.docs){
+        const hr = {id: d.id, ...d.data()}
+        if (!existingIds.has(hr.id) && !(hr.codigoSAP && existingSAPs.has(hr.codigoSAP))){
+          results.push(hr)
+          existingIds.add(hr.id)
+          if (hr.codigoSAP) existingSAPs.add(hr.codigoSAP)
+        }
+      }
+    } catch(e){ /* nodo sin repuestos propios, ignorar */ }
+  }
+  repCache[machineId] = results
   return repCache[machineId]
 }
 
@@ -1675,21 +1697,20 @@ function renderHome(){
   const el = document.getElementById('view-home')
   el.innerHTML = `
     <div id="home-greeting"></div>
+    <div id="home-sync"></div>
     <div id="home-stock-alert"></div>
     <div id="home-activity"></div>
     <div id="home-mylists"></div>
     <div id="home-recents"></div>
-    <div style="padding:18px 16px 8px;text-align:center">
+    <div style="padding:16px 16px 8px;text-align:center">
       <button onclick="refreshAllData()" style="background:none;border:1px solid var(--border);
-        color:var(--hint);padding:6px 14px;border-radius:14px;font-size:12px;cursor:pointer">
-        ↻ Refrescar datos
+        color:var(--hint);padding:5px 12px;border-radius:14px;font-size:11px;cursor:pointer">
+        ↻ Forzar recarga completa
       </button>
-      <div style="font-size:10.5px;color:var(--hint);margin-top:4px">
-        Los datos se guardan en este dispositivo (cache local)
-      </div>
     </div>
   `
   renderHomeGreeting()
+  renderHomeSync()
   renderHomeStockAlert()
   renderHomeActivity()
   renderHomeMyLists()
@@ -1826,6 +1847,55 @@ function copyPreviewUrl(){
   } else {
     tgApp?.showAlert?.(`Tu URL de preview:\n${url}`)
   }
+}
+
+function renderHomeSync(){
+  const el = document.getElementById('home-sync')
+  if (!el) return
+  const ts = __repuestosCacheTs
+  const loading = __globalLoadInProgress
+  let html = ''
+  if (loading){
+    html = `<div style="padding:4px 16px 0;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--hint)">
+      <span style="display:inline-block;animation:spin 1s linear infinite">⏳</span> Sincronizando catálogo…
+    </div>`
+  } else if (!ts){
+    html = `<div style="padding:4px 16px 0;display:flex;align-items:center;gap:6px">
+      <span style="font-size:12px;color:var(--warn)">⚠️ Catálogo no sincronizado</span>
+      <button onclick="syncCatalogFromHome()" style="background:var(--accent);border:none;
+        color:var(--acctxt);padding:3px 10px;border-radius:12px;font-size:11px;
+        font-weight:600;cursor:pointer">🔄 Sincronizar</button>
+    </div>`
+  } else {
+    const age = Date.now() - ts
+    const stale = age > 30 * 60 * 1000  // > 30 min
+    const ageStr = age < 60000 ? 'ahora mismo'
+      : age < 3600000 ? `hace ${Math.floor(age/60000)} min`
+      : `hace ${Math.floor(age/3600000)} h`
+    if (stale){
+      html = `<div style="padding:4px 16px 0;display:flex;align-items:center;gap:6px">
+        <span style="font-size:12px;color:var(--warn)">🕐 Catálogo desactualizado · ${ageStr}</span>
+        <button onclick="syncCatalogFromHome()" style="background:rgba(245,166,35,.15);border:1px solid var(--warn);
+          color:var(--warn);padding:3px 10px;border-radius:12px;font-size:11px;
+          font-weight:600;cursor:pointer">🔄 Sync</button>
+      </div>`
+    } else {
+      html = `<div style="padding:4px 16px 0;font-size:11px;color:var(--hint)">
+        ✓ Catálogo sincronizado · ${ageStr}
+      </div>`
+    }
+  }
+  el.innerHTML = html
+}
+
+async function syncCatalogFromHome(){
+  invalidateRepuestosCache()
+  renderHomeSync()
+  await loadAllRepuestos()
+  renderHomeSync()
+  renderHomeStockAlert()
+  showToast('Catálogo actualizado ✓', 'ok')
+  tgApp?.HapticFeedback?.notificationOccurred?.('success')
 }
 
 // ── Actividad de conteos (Audit Log) ─────────────────────────────
@@ -2121,7 +2191,11 @@ async function qcSave(){
   if (btn){ btn.disabled = true; btn.textContent = '…' }
 
   const { repuesto: r, machineId, machineName } = qcSelectedItem
-  // Reusar saveStockConteo sin navegar (silent=true mantiene la vista de conteo)
+  // Asegurar que repCache tenga el repuesto (viene de __repuestosCache, puede no estar en repCache)
+  // Esto es necesario para que saveStockConteo actualice el cache local correctamente
+  if (!repCache[machineId]) repCache[machineId] = []
+  if (!repCache[machineId].find(x => x.id === r.id)) repCache[machineId].push({ ...r })
+  // Guardar sin navegar (silent=true mantiene la vista de conteo)
   await saveStockConteo(machineId, r.id, cantidad, { silent: true })
 
   // Registrar en sesión local
@@ -3015,6 +3089,7 @@ async function loadAllRepuestos(){
   }
   if (__globalLoadInProgress) return
   __globalLoadInProgress = true
+  if (currentTab === 'home') renderHomeSync()
 
   const results = []
   const existingKeys = new Set()
@@ -3069,8 +3144,11 @@ async function loadAllRepuestos(){
   lsSet(LS_KEY_REPUESTOS, normalizeForCache(results))
   __globalLoadInProgress = false
   updateSearchProgress(null)
-  // Refrescar badge de stock en Home si está visible
-  if (currentTab === 'home') renderHomeStockAlert()
+  // Refrescar Home si está visible
+  if (currentTab === 'home'){
+    renderHomeSync()
+    renderHomeStockAlert()
+  }
 }
 
 function invalidateRepuestosCache(){
@@ -4342,13 +4420,45 @@ async function openRepuesto(machineId, repuestoId, opts = {}){
       </div>
     </div>
 
-    <div class="section"><span class="section-title">⚡ Acciones rápidas</span></div>
-    <div style="padding:0 12px 8px;display:flex;flex-wrap:wrap;gap:8px">
-      ${r.codigoSAP ? `<button class="cell-action-btn" style="flex:1 1 calc(50% - 4px);white-space:nowrap;min-width:0" onclick="copyRepSap('${escHtmlAttr(r.codigoSAP)}')">📋 Copiar SAP</button>` : ''}
-      ${r.codigoSAP ? `<button class="cell-action-btn" style="flex:1 1 calc(50% - 4px);white-space:nowrap;min-width:0" onclick="openQRModal('${escHtmlAttr(r.codigoSAP)}','${escHtmlAttr(r.textoBreve||'')}')">🔳 QR</button>` : ''}
-      <button class="cell-action-btn" style="flex:1 1 calc(50% - 4px);white-space:nowrap;min-width:0" onclick="shareRepuesto('${escHtmlAttr(machineId)}','${escHtmlAttr(repuestoId)}')">🔗 Compartir</button>
-      <button class="cell-action-btn" style="flex:1 1 calc(50% - 4px);white-space:nowrap;min-width:0" onclick="scrollToRepManuales()">📖 Manuales</button>
-      ${equipoPath.nodeId ? `<button class="cell-action-btn" style="flex:1 1 calc(50% - 4px);white-space:nowrap;min-width:0" onclick="navigateToEquipoFromRep('${escHtmlAttr(equipoPath.nodeId)}','${escHtmlAttr(machineId)}')">🌳 Ver equipo</button>` : ''}
+    <div class="section"><span class="section-title">⚡ Acciones</span></div>
+    <div style="padding:0 0 8px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none">
+      <div style="display:flex;gap:8px;padding:0 12px;width:max-content">
+        ${r.codigoSAP ? `<button onclick="copyRepSap('${escHtmlAttr(r.codigoSAP)}')"
+          style="display:flex;flex-direction:column;align-items:center;gap:3px;
+            background:var(--bg2);border:1px solid var(--divider);border-radius:12px;
+            padding:10px 14px;cursor:pointer;color:var(--text);min-width:64px">
+          <span style="font-size:20px">📋</span>
+          <span style="font-size:11px;font-weight:500;white-space:nowrap;color:var(--hint)">Copiar SAP</span>
+        </button>` : ''}
+        ${r.codigoSAP ? `<button onclick="openQRModal('${escHtmlAttr(r.codigoSAP)}','${escHtmlAttr(r.textoBreve||'')}')"
+          style="display:flex;flex-direction:column;align-items:center;gap:3px;
+            background:var(--bg2);border:1px solid var(--divider);border-radius:12px;
+            padding:10px 14px;cursor:pointer;color:var(--text);min-width:64px">
+          <span style="font-size:20px">🔳</span>
+          <span style="font-size:11px;font-weight:500;white-space:nowrap;color:var(--hint)">Ver QR</span>
+        </button>` : ''}
+        <button onclick="shareRepuesto('${escHtmlAttr(machineId)}','${escHtmlAttr(repuestoId)}')"
+          style="display:flex;flex-direction:column;align-items:center;gap:3px;
+            background:var(--bg2);border:1px solid var(--divider);border-radius:12px;
+            padding:10px 14px;cursor:pointer;color:var(--text);min-width:64px">
+          <span style="font-size:20px">🔗</span>
+          <span style="font-size:11px;font-weight:500;white-space:nowrap;color:var(--hint)">Compartir</span>
+        </button>
+        <button onclick="scrollToRepManuales()"
+          style="display:flex;flex-direction:column;align-items:center;gap:3px;
+            background:var(--bg2);border:1px solid var(--divider);border-radius:12px;
+            padding:10px 14px;cursor:pointer;color:var(--text);min-width:64px">
+          <span style="font-size:20px">📖</span>
+          <span style="font-size:11px;font-weight:500;white-space:nowrap;color:var(--hint)">Manuales</span>
+        </button>
+        ${equipoPath.nodeId ? `<button onclick="navigateToEquipoFromRep('${escHtmlAttr(equipoPath.nodeId)}','${escHtmlAttr(machineId)}')"
+          style="display:flex;flex-direction:column;align-items:center;gap:3px;
+            background:var(--bg2);border:1px solid var(--divider);border-radius:12px;
+            padding:10px 14px;cursor:pointer;color:var(--text);min-width:64px">
+          <span style="font-size:20px">🌳</span>
+          <span style="font-size:11px;font-weight:500;white-space:nowrap;color:var(--hint)">Ver equipo</span>
+        </button>` : ''}
+      </div>
     </div>
 
     ${(r.vinculosManual || []).length > 0 ? `
@@ -4441,9 +4551,9 @@ function shareRepuesto(machineId, repuestoId){
   const fab = r.codigoFabricante ? `\nCód. fab: ${r.codigoFabricante}` : ''
   const ubi = r.ubicacionEnPlanta ? `\nUbicación: ${r.ubicacionEnPlanta}` : ''
   const text = `🔧 ${title}${sap}${fab}${ubi}`
-  // En Telegram WebApp: switchInlineQuery copia para reenviar
-  if (tgApp?.switchInlineQuery){
-    tgApp.switchInlineQuery(text, ['users','groups'])
+  if (navigator.share){
+    navigator.share({ title: `🔧 ${title}`, text }).catch(() => {})
+    tgApp?.HapticFeedback?.notificationOccurred?.('success')
     return
   }
   navigator.clipboard?.writeText(text).then(() => {
@@ -5382,9 +5492,11 @@ async function uploadRepuestoPhoto(file, machineId, repuestoId){
   const timestamp = Date.now()
   const safeName = (file.name || 'photo.jpg').replace(/[^\w.\-]+/g, '_')
   const fileName = `${timestamp}_${safeName.endsWith('.jpg') || safeName.endsWith('.jpeg') ? safeName : safeName.replace(/\.[^.]+$/,'') + '.jpg'}`
-  const path = `machines/${machineId}/repuestos/${repuestoId}/real/${fileName}`
+  // Determinar ruta correcta según si el repuesto está en machines/ o hierarchy/
+  const collPath = getRepuestoCollPath(machineId)
+  const storagePath = `${collPath}/${repuestoId}/real/${fileName}`
 
-  const ref = storage.ref(path)
+  const ref = storage.ref(storagePath)
   await ref.put(blob, { contentType: 'image/jpeg' })
   const url = await ref.getDownloadURL()
 
@@ -5405,8 +5517,7 @@ async function uploadRepuestoPhoto(file, machineId, repuestoId){
 
   showUploading('Guardando…')
 
-  // Re-leer doc + escribir array completo (consistente con la PWA)
-  const docRef = db.collection(`machines/${machineId}/repuestos`).doc(repuestoId)
+  const docRef = db.collection(collPath).doc(repuestoId)
   const snap = await docRef.get()
   const cur = snap.exists ? (snap.data().fotosReales || []) : []
   await docRef.update({
@@ -5420,6 +5531,8 @@ async function uploadRepuestoPhoto(file, machineId, repuestoId){
   if (idx >= 0){
     reps[idx] = { ...reps[idx], fotosReales: [...(reps[idx].fotosReales || []), newImg] }
   }
+  const gItem = __repuestosCache?.find(x => x.repuesto.id === repuestoId && x.machineId === machineId)
+  if (gItem) gItem.repuesto.fotosReales = [...(gItem.repuesto.fotosReales || []), newImg]
 
   return newImg
 }
