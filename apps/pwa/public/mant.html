@@ -2509,13 +2509,21 @@ function renderSearchStats(){
   const ageMs = Date.now() - (__repuestosCacheTs || Date.now())
   const ageMin = Math.floor(ageMs / 60000)
   const ageTxt = ageMin < 1 ? 'recién' : ageMin === 1 ? 'hace 1 min' : `hace ${ageMin} min`
+  // Stale = más de 5min sin refrescar → alerta amarilla y botón destacado
+  const isStale = ageMin >= 5
   el.style.display = 'block'
-  el.innerHTML = `<div style="font-size:12px;color:var(--sub);display:flex;align-items:center;justify-content:center;gap:8px">
-    <span>📊 <b>${repCount.toLocaleString('es')}</b> repuestos · <b>${eqCount}</b> equipos · <span style="opacity:.7">${ageTxt}</span></span>
+  el.innerHTML = `<div style="font-size:12px;color:var(--sub);display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap">
+    <span>📊 <b>${repCount.toLocaleString('es')}</b> repuestos · <b>${eqCount}</b> equipos ·
+      <span style="${isStale?'color:#f59e0b;font-weight:600':'opacity:.7'}">${isStale?'⚠️ ':''}${ageTxt}</span>
+    </span>
     <button onclick="refreshSearchCatalog()" id="search-refresh-btn"
-      style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--accent);font-size:11px;cursor:pointer;padding:2px 8px"
-      title="Refrescar catálogo">🔄</button>
+      style="background:${isStale?'#f59e0b':'none'};border:1px solid ${isStale?'#f59e0b':'var(--border)'};border-radius:6px;color:${isStale?'#000':'var(--accent)'};font-size:11px;font-weight:${isStale?600:400};cursor:pointer;padding:2px 10px"
+      title="Refrescar catálogo desde Firestore">🔄${isStale?' Sincronizar':''}</button>
   </div>`
+  // Auto-refresh suave si está muy stale (>15min) y la pestaña está activa
+  if (ageMin >= 15 && currentTab === 'search' && !__globalLoadInProgress){
+    refreshSearchCatalog()
+  }
 }
 
 async function refreshSearchCatalog(){
