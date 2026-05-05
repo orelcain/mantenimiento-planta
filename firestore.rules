@@ -669,6 +669,17 @@ service cloud.firestore {
     }
 
     // ============================================
+    // STOCK AUDIT LOG — Conteos de bodega (Mini App + PWA)
+    // Read libre para usuarios autenticados (feed de actividad).
+    // Create por cualquier autenticado (queda registro de quién lo hizo).
+    // ============================================
+    match /stockAuditLog/{logId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidDocSize();
+      allow update, delete: if isAdmin();
+    }
+
+    // ============================================
     // PAPELERA — Soft delete restaurable (30 días)
     // ============================================
     match /trash/{trashId} {
