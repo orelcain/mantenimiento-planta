@@ -2711,7 +2711,10 @@ function renderSearchBody(query){
     machHits = machHits.filter(m => isMachineFavorite(m.id))
   } else if (searchFavFilter !== 'all'){
     const list = (prefs.favoriteLists || []).find(l => l.name === searchFavFilter)
-    const idSet = new Set(list?.machineIds || [])
+    // Expansión jerárquica: si la lista tiene un nodo padre, matchear también
+    // todos sus descendientes (ej: lista 'Cintas' con 'Eviscerado' debe traer
+    // repuestos de cualquier cinta dentro de esa rama).
+    const idSet = expandListIdsHierarchically(list?.machineIds || [])
     repHits  = repHits.filter(it => idSet.has(it.machineId))
     machHits = machHits.filter(m => idSet.has(m.id))
   }
@@ -4783,6 +4786,41 @@ function rebuildHierarchyFromNodes(nodes){
       activa: true,
     }
   }
+}
+
+// Expande IDs de lista de favoritos hacia descendientes hierarchy.
+// Si la lista contiene un machine con hierarchyNodeId, agrega también sus
+// descendientes. Si contiene un nodo hierarchy, agrega sus descendientes.
+function expandListIdsHierarchically(ids){
+  const out = new Set(ids || [])
+  if (!hierarchyNodesMap || !hierarchyChildrenMap) return out
+  const seedNodeIds = []
+  for (const id of ids || []){
+    if (hierarchyNodesMap[id]) seedNodeIds.push(id)
+    const m = machineMap[id]
+    if (m?.hierarchyNodeId && hierarchyNodesMap[m.hierarchyNodeId]){
+      seedNodeIds.push(m.hierarchyNodeId)
+      out.add(m.hierarchyNodeId)
+    }
+  }
+  // BFS desde cada seed: agrega todos los descendientes y los machines vinculados
+  const queue = [...seedNodeIds]
+  const visited = new Set(seedNodeIds)
+  while (queue.length){
+    const nodeId = queue.shift()
+    out.add(nodeId)
+    // Machines vinculadas al nodeId
+    for (const mid of Object.keys(machineMap)){
+      if (machineMap[mid]?.hierarchyNodeId === nodeId) out.add(mid)
+    }
+    const children = hierarchyChildrenMap[nodeId] || []
+    for (const child of children){
+      if (visited.has(child.id)) continue
+      visited.add(child.id)
+      queue.push(child.id)
+    }
+  }
+  return out
 }
 
 // Path jerárquico de un equipo: "PROCESO › EVISCERADO › CINTAS PP › ..."
