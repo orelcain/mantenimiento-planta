@@ -435,6 +435,7 @@ mark{background:rgba(var(--accent-rgb,82,136,193),.25);color:inherit;border-radi
     <div id="view-stock-report" class="view"></div>
     <div id="view-activity"     class="view"></div>
     <div id="view-qr-batch"    class="view"></div>
+    <div id="view-quick-count" class="view"></div>
   </main>
 
   <nav class="bottom-nav">
@@ -1798,10 +1799,18 @@ function renderHomeGreeting(){
       color:var(--hint);padding:3px 10px;border-radius:12px;font-size:11px;cursor:pointer">
       🔗 URL preview
     </button>` : ''
+  const canCount = userRole === 'admin' || userRole === 'supervisor' || userRole === 'tecnico'
+  const countBtn = canCount ? `
+    <button onclick="openQuickCountMode()" style="margin-top:8px;display:inline-flex;align-items:center;
+      gap:6px;background:var(--accent);border:none;color:var(--acctxt);padding:7px 16px;
+      border-radius:20px;font-size:13px;font-weight:600;cursor:pointer">
+      📦 Conteo rápido
+    </button>` : ''
   document.getElementById('home-greeting').innerHTML = `
     <div class="hello">
       <div class="hello-text">${hello}</div>
       <div class="hello-sub">${escHtml(role)} ${linkTag}</div>
+      ${countBtn}
       ${previewBtn}
     </div>`
 }
@@ -1918,6 +1927,251 @@ function renderActivityView(){
     <div style="padding:12px;text-align:center;font-size:11px;color:var(--hint)">
       Solo se guardan los últimos 20 registros
     </div>`
+}
+
+// ── Modo Conteo Rápido ───────────────────────────────────────────
+let quickCountSession = []    // [{machineId, repId, name, sap, cantidad, ts}]
+let qcSelectedItem    = null  // {repuesto, machineId, machineName} del item actual
+let qcSearchTimer     = null
+
+function openQuickCountMode(){
+  tgApp?.HapticFeedback?.selectionChanged?.()
+  pushView('view-quick-count', 'Conteo Rápido', 'Escanear o escribir SAP')
+  quickCountSession = []
+  qcSelectedItem = null
+  renderQuickCountView()
+  setTimeout(() => document.getElementById('qc-sap-input')?.focus(), 80)
+}
+
+function renderQuickCountView(){
+  const el = document.getElementById('view-quick-count')
+  if (!el) return
+  el.innerHTML = `
+    <div style="padding:12px 12px 0">
+
+      <!-- Input SAP -->
+      <div style="position:relative">
+        <input id="qc-sap-input" type="text" inputmode="text"
+          placeholder="Código SAP o nombre…"
+          autocomplete="off" autocorrect="off" spellcheck="false"
+          oninput="qcOnInput(this.value)"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();qcOnEnter()}"
+          style="width:100%;padding:12px 40px 12px 14px;font-size:16px;font-weight:600;
+            background:var(--bg2);border:2px solid var(--accent);border-radius:12px;
+            color:var(--text);outline:none;letter-spacing:.5px">
+        <button onclick="qcClearInput()" style="position:absolute;right:10px;top:50%;
+          transform:translateY(-50%);background:none;border:none;color:var(--hint);
+          font-size:20px;cursor:pointer;padding:4px;line-height:1">✕</button>
+      </div>
+
+      <div style="font-size:11px;color:var(--hint);text-align:center;margin-top:6px">
+        Escribí el SAP o nombre, o usá la pistola lectora
+      </div>
+    </div>
+
+    <!-- Zona de resultado / búsqueda -->
+    <div id="qc-result" style="padding:10px 12px 0"></div>
+
+    <!-- Input cantidad (oculto hasta encontrar repuesto) -->
+    <div id="qc-qty-area" style="display:none;padding:0 12px">
+      <div style="font-size:13px;color:var(--hint);margin-bottom:6px">Cantidad en bodega:</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button onclick="qcAdjustQty(-1)"
+          style="width:44px;height:44px;border-radius:50%;border:1px solid var(--border);
+            background:var(--bg2);color:var(--text);font-size:24px;cursor:pointer;flex-shrink:0">−</button>
+        <input id="qc-qty-input" type="number" inputmode="numeric" min="0" step="1"
+          value="0"
+          style="flex:1;text-align:center;font-size:32px;font-weight:700;padding:10px;
+            background:var(--bg2);border:2px solid var(--border);border-radius:10px;
+            color:var(--text);outline:none"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();qcSave()}">
+        <button onclick="qcAdjustQty(1)"
+          style="width:44px;height:44px;border-radius:50%;border:1px solid var(--border);
+            background:var(--bg2);color:var(--text);font-size:24px;cursor:pointer;flex-shrink:0">＋</button>
+      </div>
+      <button id="qc-save-btn" onclick="qcSave()"
+        style="width:100%;margin-top:10px;padding:13px;border-radius:12px;border:none;
+          background:var(--accent);color:var(--acctxt);font-size:16px;font-weight:700;cursor:pointer">
+        ✓ Guardar y siguiente
+      </button>
+    </div>
+
+    <!-- Sesión: items ya contados -->
+    <div id="qc-session" style="padding:12px 12px 24px"></div>`
+}
+
+function qcOnInput(val){
+  clearTimeout(qcSearchTimer)
+  qcSelectedItem = null
+  document.getElementById('qc-qty-area').style.display = 'none'
+  if (!val.trim()){
+    document.getElementById('qc-result').innerHTML = ''
+    return
+  }
+  qcSearchTimer = setTimeout(() => qcSearch(val.trim()), 180)
+}
+
+function qcSearch(query){
+  const resultEl = document.getElementById('qc-result')
+  if (!resultEl) return
+
+  if (!__repuestosCache){
+    resultEl.innerHTML = `<div style="text-align:center;padding:16px;color:var(--hint);font-size:13px">
+      Catálogo no cargado — ve a Buscar primero</div>`
+    return
+  }
+
+  const norm = normalizeSearch(query)
+  const bySAP = __repuestosCache.filter(x =>
+    normalizeSearch(x.repuesto.codigoSAP || '').includes(norm)
+  )
+  const byName = bySAP.length === 0
+    ? __repuestosCache.filter(x =>
+        normalizeSearch(x.repuesto.textoBreve || '').includes(norm) ||
+        normalizeSearch(x.repuesto.alias || '').includes(norm)
+      ).slice(0, 6)
+    : []
+
+  const hits = bySAP.length > 0 ? bySAP : byName
+
+  if (hits.length === 0){
+    resultEl.innerHTML = `<div style="text-align:center;padding:20px;color:var(--hint)">
+      <div style="font-size:28px;margin-bottom:6px">❓</div>
+      <div style="font-size:13px">SAP no encontrado en el catálogo</div>
+    </div>`
+    return
+  }
+
+  // Si hay exactamente una máquina para el SAP → selección automática
+  if (bySAP.length === 1){
+    qcSelectItem(bySAP[0])
+    return
+  }
+
+  // Varios resultados → mostrar lista para seleccionar
+  resultEl.innerHTML = `
+    <div style="font-size:12px;color:var(--hint);margin-bottom:6px">${hits.length} resultado${hits.length>1?'s':''} — seleccioná el equipo:</div>
+    <div class="cell-group">
+      ${hits.slice(0, 8).map(item => {
+        const r = item.repuesto
+        return `<div class="cell" onclick="qcSelectItem(${escHtmlAttr(JSON.stringify({repuesto:r, machineId:item.machineId, machineName:item.machineName}))})">
+          <div class="cell-body">
+            <div class="cell-title" style="font-size:13px">${escHtml(r.textoBreve || r.descripcion || 'Sin nombre')}</div>
+            <div class="cell-sub">${r.codigoSAP ? `SAP ${escHtml(r.codigoSAP)} · ` : ''}${escHtml(item.machineName || '')}</div>
+          </div>
+          <div class="cell-chevron">›</div>
+        </div>`
+      }).join('')}
+    </div>`
+}
+
+function qcSelectItem(item){
+  // item puede venir como objeto JS o como string JSON desde onclick
+  if (typeof item === 'string') item = JSON.parse(item)
+  qcSelectedItem = item
+  const r = item.repuesto
+  const resultEl = document.getElementById('qc-result')
+  const qtyArea  = document.getElementById('qc-qty-area')
+  if (!resultEl || !qtyArea) return
+
+  const hasStock = r.stockFisico != null
+  const isLow = hasStock && r.stockMinimo != null && r.stockFisico < r.stockMinimo
+
+  resultEl.innerHTML = `
+    <div style="background:var(--bg2);border-radius:10px;padding:12px;margin-bottom:10px;
+      border:1px solid ${isLow?'rgba(239,68,68,.4)':'var(--border)'}">
+      <div style="font-size:14px;font-weight:600">${escHtml(r.textoBreve || r.descripcion || 'Sin nombre')}</div>
+      <div style="font-size:12px;color:var(--hint);margin-top:3px">${r.codigoSAP ? `SAP ${escHtml(r.codigoSAP)} · ` : ''}${escHtml(item.machineName || '')}</div>
+      ${hasStock ? `<div style="font-size:12px;margin-top:6px;color:${isLow?'#ef4444':'var(--green)'}">
+        ${isLow?'⚠️':'✅'} Stock actual: <b>${r.stockFisico}</b>${r.stockMinimo!=null?` / mín ${r.stockMinimo}`:''}
+      </div>` : `<div style="font-size:12px;color:var(--hint);margin-top:6px">Sin contar aún</div>`}
+    </div>`
+
+  qtyArea.style.display = 'block'
+  const qtyInput = document.getElementById('qc-qty-input')
+  if (qtyInput){
+    qtyInput.value = hasStock ? String(r.stockFisico) : '0'
+    setTimeout(() => { qtyInput.focus(); qtyInput.select() }, 60)
+  }
+  tgApp?.HapticFeedback?.selectionChanged?.()
+}
+
+function qcOnEnter(){
+  if (qcSelectedItem) { qcSave(); return }
+  const val = document.getElementById('qc-sap-input')?.value?.trim()
+  if (val) qcSearch(val)
+}
+
+function qcAdjustQty(delta){
+  const inp = document.getElementById('qc-qty-input')
+  if (!inp) return
+  const v = Math.max(0, (parseInt(inp.value, 10) || 0) + delta)
+  inp.value = String(v)
+  tgApp?.HapticFeedback?.selectionChanged?.()
+}
+
+async function qcSave(){
+  if (!qcSelectedItem) return
+  const inp = document.getElementById('qc-qty-input')
+  const cantidad = parseInt(inp?.value ?? '0', 10)
+  if (!Number.isFinite(cantidad) || cantidad < 0){
+    showToast('Cantidad inválida', 'err'); return
+  }
+  const btn = document.getElementById('qc-save-btn')
+  if (btn){ btn.disabled = true; btn.textContent = '…' }
+
+  const { repuesto: r, machineId, machineName } = qcSelectedItem
+  // Reusar saveStockConteo sin navegar (silent=true mantiene la vista de conteo)
+  await saveStockConteo(machineId, r.id, cantidad, { silent: true })
+
+  // Registrar en sesión local
+  quickCountSession.unshift({
+    machineId, machineName, repId: r.id,
+    name: r.textoBreve || r.descripcion || 'Sin nombre',
+    sap: r.codigoSAP || '',
+    cantidad, ts: Date.now(),
+  })
+
+  // Reset para el próximo item
+  qcSelectedItem = null
+  document.getElementById('qc-result').innerHTML = ''
+  document.getElementById('qc-qty-area').style.display = 'none'
+  const sapInp = document.getElementById('qc-sap-input')
+  if (sapInp){ sapInp.value = ''; sapInp.focus() }
+  if (btn){ btn.disabled = false; btn.textContent = '✓ Guardar y siguiente' }
+
+  qcRenderSession()
+  tgApp?.HapticFeedback?.notificationOccurred?.('success')
+}
+
+function qcClearInput(){
+  const inp = document.getElementById('qc-sap-input')
+  if (inp){ inp.value = ''; inp.focus() }
+  qcSelectedItem = null
+  document.getElementById('qc-result').innerHTML = ''
+  document.getElementById('qc-qty-area').style.display = 'none'
+}
+
+function qcRenderSession(){
+  const el = document.getElementById('qc-session')
+  if (!el || quickCountSession.length === 0) return
+  el.innerHTML = `
+    <div style="font-size:12px;font-weight:600;color:var(--hint);padding:4px 0 8px;
+      border-top:1px solid var(--divider);margin-top:8px">
+      Esta sesión — ${quickCountSession.length} guardado${quickCountSession.length>1?'s':''}
+    </div>
+    ${quickCountSession.slice(0, 8).map(s => `
+      <div style="display:flex;align-items:center;gap:8px;padding:5px 0;
+        border-bottom:1px solid var(--divider)">
+        <span style="font-size:18px;flex-shrink:0">✅</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+            ${escHtml(s.name)}${s.sap?` · <span style="font-family:monospace">${escHtml(s.sap)}</span>`:''}
+          </div>
+          <div style="font-size:11px;color:var(--hint)">${escHtml(s.machineName)} · ${relativeTime(s.ts)}</div>
+        </div>
+        <span style="font-size:16px;font-weight:700;color:var(--accent);flex-shrink:0">${s.cantidad}</span>
+      </div>`).join('')}`
 }
 
 // ── Stock alert card en Home ──────────────────────────────────────
@@ -4709,7 +4963,8 @@ function openStockConteoModal(machineId, repuestoId){
   if (inp){ inp.type = 'number'; inp.inputMode = 'numeric'; inp.min = '0'; inp.step = '1' }
 }
 
-async function saveStockConteo(machineId, repuestoId, cantidad){
+// silent=true: no navegar al detalle (usado por modo conteo rápido)
+async function saveStockConteo(machineId, repuestoId, cantidad, { silent = false } = {}){
   const path = getRepuestoCollPath(machineId)
   const who = firstName || tgApp?.initDataUnsafe?.user?.first_name || 'usuario'
   const ts = Date.now()
@@ -4722,7 +4977,7 @@ async function saveStockConteo(machineId, repuestoId, cantidad){
   if (r) Object.assign(r, update)
   const inGlobal = __repuestosCache?.find(x => x.repuesto.id === repuestoId && x.machineId === machineId)
   if (inGlobal) Object.assign(inGlobal.repuesto, update)
-  openRepuesto(machineId, repuestoId, { fromSave: true })
+  if (!silent) openRepuesto(machineId, repuestoId, { fromSave: true })
   // Refrescar reporte de stock si está abierto, y badge en home
   if (document.getElementById('view-stock-report')?.classList.contains('active')) renderStockReport()
   renderHomeStockAlert()
