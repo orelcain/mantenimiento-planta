@@ -566,7 +566,8 @@ let prevTabBeforeSearch = 'home'
 let __repuestosCache = null   // flat [{repuesto, machineId, machineName}]
 let __repuestosCacheTs = 0
 let searchTabActive = 'repuestos'
-let searchFavOnly = false
+let searchFavFilter = 'all'  // 'all' | '*' (cualquier favorito) | nombre de lista
+let searchSapOnly = false
 let __globalLoadInProgress = false
 
 const SYNONYM_GROUPS = [
@@ -994,7 +995,8 @@ function switchTab(tab){
   if (tab === 'hierarchy') renderHierarchyTab()
   if (tab === 'manuales')  renderManualesTab()
   if (tab === 'search'){
-    searchFavOnly = false  // reset para cada apertura del tab
+    searchFavFilter = 'all'  // reset para cada apertura del tab
+    searchSapOnly = false
     renderSearchEmpty()  // estructura input + chips + body
     setTimeout(() => document.getElementById('search-input')?.focus(), 60)
     // Pre-cargar repuestos globales en background
@@ -2499,6 +2501,9 @@ function ensureSearchableHaystacks(){
       + normalizeSearch(r.alias || '') + ' '
       + normalizeSearch(r.codigoFabricante || r.codigoBaader || '') + ' '
       + normalizeSearch(r.descripcion || '') + ' '
+      + normalizeSearch(r.nombreManual || '') + ' '
+      + normalizeSearch(r.tipo || '') + ' '
+      + normalizeSearch(r.ubicacionEnPlanta || '') + ' '
       + normalizeSearch(item.machineName || '') + ' '
   }
 }
@@ -2603,11 +2608,8 @@ function renderSearchEmpty(){
     <div id="search-progress"
       style="display:none;padding:6px 16px;font-size:12px;color:var(--sub);text-align:center;
       background:var(--card);border-bottom:1px solid var(--border)"></div>
-    <div class="chips" style="padding:4px 12px 0">
-      <button id="search-favs-toggle" onclick="toggleSearchFavOnly()"
-        class="chip ${searchFavOnly?'active':''}">
-        ★ Solo favoritos
-      </button>
+    <div id="search-filter-chips" class="chips" style="padding:4px 12px 0;flex-wrap:wrap">
+      ${renderSearchFilterChips()}
     </div>
     <div id="search-sub-tabs"></div>
     <div id="search-body"></div>`
@@ -2660,18 +2662,28 @@ function renderSearchBody(query){
     })
   }
 
-  // Filtro "Solo favoritos" — filtra resultados in-place
-  if (searchFavOnly){
+  // Filtro por lista de favoritos
+  if (searchFavFilter === '*'){
     repHits  = repHits.filter(isRepuestoFavorite)
     machHits = machHits.filter(m => isMachineFavorite(m.id))
+  } else if (searchFavFilter !== 'all'){
+    const list = (prefs.favoriteLists || []).find(l => l.name === searchFavFilter)
+    const idSet = new Set(list?.machineIds || [])
+    repHits  = repHits.filter(it => idSet.has(it.machineId))
+    machHits = machHits.filter(m => idSet.has(m.id))
+  }
+
+  // Filtro "Solo con SAP" (aplica solo a repuestos)
+  if (searchSapOnly){
+    repHits = repHits.filter(it => (it.repuesto.codigoSAP || '').trim().length > 0)
   }
 
   if (repHits.length === 0 && machHits.length === 0){
     if (tabsEl) tabsEl.innerHTML = ''
+    const filterHint = (searchFavFilter !== 'all' || searchSapOnly)
+      ? ` con los filtros activos. Probá quitar filtros.` : ''
     body.innerHTML = emptyHtml('🔍','Sin resultados',
-      searchFavOnly
-        ? `Sin coincidencias entre tus favoritos para "<b>${escHtml(query)}</b>". Probá desactivar "★ Solo favoritos".`
-        : `Sin coincidencias para "<b>${escHtml(query)}</b>"`)
+      `Sin coincidencias para "<b>${escHtml(query)}</b>"${filterHint}`)
     return
   }
 
@@ -2719,10 +2731,35 @@ function renderSearchBody(query){
   }
 }
 
-function toggleSearchFavOnly(){
-  searchFavOnly = !searchFavOnly
-  const btn = document.getElementById('search-favs-toggle')
-  if (btn) btn.classList.toggle('active', searchFavOnly)
+function renderSearchFilterChips(){
+  const lists = prefs.favoriteLists || []
+  const chip = (key, label, active) =>
+    `<div class="chip ${active?'active':''}" onclick="setSearchFavFilter('${escHtmlAttr(key)}')">${label}</div>`
+  let html = chip('all', 'Todos', searchFavFilter === 'all')
+  if (lists.length > 0){
+    html += chip('*', '★ Cualquier favorito', searchFavFilter === '*')
+    for (const l of lists){
+      html += chip(l.name, escHtml(l.name), searchFavFilter === l.name)
+    }
+  }
+  html += `<div class="chip ${searchSapOnly?'active':''}" onclick="toggleSearchSapOnly()" style="margin-left:6px">
+    🏷️ Solo con SAP</div>`
+  return html
+}
+
+function setSearchFavFilter(key){
+  searchFavFilter = key
+  const chipsEl = document.getElementById('search-filter-chips')
+  if (chipsEl) chipsEl.innerHTML = renderSearchFilterChips()
+  const inp = document.getElementById('search-input')
+  renderSearchBody(inp?.value?.trim() || '')
+  tgApp?.HapticFeedback?.selectionChanged?.()
+}
+
+function toggleSearchSapOnly(){
+  searchSapOnly = !searchSapOnly
+  const chipsEl = document.getElementById('search-filter-chips')
+  if (chipsEl) chipsEl.innerHTML = renderSearchFilterChips()
   const inp = document.getElementById('search-input')
   renderSearchBody(inp?.value?.trim() || '')
   tgApp?.HapticFeedback?.selectionChanged?.()
