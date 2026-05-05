@@ -98,6 +98,11 @@ export interface Repuesto {
   technicalSpecs?: TechnicalSpecs;
   gallery?: MachineImage[];
 
+  /** Stock físico actual (unidades en bodega) — sincronizado con Mini App bot */
+  stockFisico?: number;
+  /** Cantidad mínima de stock — alerta si stockFisico < stockMinimo */
+  stockMinimo?: number;
+
   createdAt: Date;
   updatedAt: Date;
 }

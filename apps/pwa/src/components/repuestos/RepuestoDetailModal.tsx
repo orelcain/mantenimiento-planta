@@ -12,18 +12,19 @@
  * Accesible para TODOS los usuarios (no solo admin).
  */
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import {
   X, Package, MapPin, DollarSign, Hash, Tag,
   ClipboardList, Camera, BookOpen, MessageSquareText,
   Image as ImageIcon, ChevronLeft, ChevronRight,
-  Pencil, Check, X as XIcon,
+  Pencil, Check, X as XIcon, Warehouse, Plus, History,
 } from 'lucide-react'
-import { doc, updateDoc } from 'firebase/firestore'
+import { doc, updateDoc, addDoc, collection, getDocs, query, where, limit } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import { Dialog, DialogContent, Badge } from '@/components/ui'
 import type { Repuesto, ImagenRepuesto, MachineImage } from '@/types/repuestos'
 import { logger } from '@/lib/logger'
+import { useAuthStore } from '@/store/authStore'
 
 // ─── Helpers ────────────────────────────────────────────────
 
@@ -147,6 +148,7 @@ export function RepuestoDetailModal({
   machineId,
   onAliasUpdated,
 }: RepuestoDetailModalProps) {
+  const user = useAuthStore(s => s.user)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const [editingAlias, setEditingAlias] = useState(false)
   const [aliasValue, setAliasValue] = useState(rep.alias || '')
@@ -156,6 +158,92 @@ export function RepuestoDetailModal({
   const [tipoValue, setTipoValue] = useState(rep.tipo || '')
   const [savingTipo, setSavingTipo] = useState(false)
   const tipoInputRef = useRef<HTMLInputElement>(null)
+
+  // ── Stock state ──────────────────────────────────────────────
+  const [localStock, setLocalStock] = useState<number | undefined>(rep.stockFisico)
+  const [localMin, setLocalMin] = useState<number | undefined>(rep.stockMinimo)
+  const [editingMin, setEditingMin] = useState(false)
+  const [minVal, setMinVal] = useState('')
+  const [savingMin, setSavingMin] = useState(false)
+  const [showConteo, setShowConteo] = useState(false)
+  const [conteoVal, setConteoVal] = useState('')
+  const [savingConteo, setSavingConteo] = useState(false)
+  const [historial, setHistorial] = useState<{ cantidad: number; userName: string; ts: number; bajoMinimo: boolean | null }[]>([])
+  const [showHistorial, setShowHistorial] = useState(false)
+  const [loadingHistorial, setLoadingHistorial] = useState(false)
+
+  const hasStock = localStock !== undefined || localMin !== undefined
+  const isLow = localStock !== undefined && localMin !== undefined && localMin > 0 && localStock < localMin
+
+  const colPath = (rep as any).sourceCollection || (machineId ? `machines/${machineId}/repuestos` : null)
+
+  const saveMin = useCallback(async () => {
+    const val = parseInt(minVal, 10)
+    if (isNaN(val) || val < 0 || !colPath) return
+    setSavingMin(true)
+    try {
+      await updateDoc(doc(db, `${colPath}/${rep.id}`), { stockMinimo: val, updatedAt: new Date() })
+      setLocalMin(val)
+      setEditingMin(false)
+    } catch (err) {
+      logger.error('Error guardando mínimo', err instanceof Error ? err : new Error(String(err)))
+    } finally {
+      setSavingMin(false)
+    }
+  }, [minVal, colPath, rep.id])
+
+  const registrarConteo = useCallback(async () => {
+    const val = parseInt(conteoVal, 10)
+    if (isNaN(val) || val < 0 || !machineId || !colPath) return
+    setSavingConteo(true)
+    try {
+      await updateDoc(doc(db, `${colPath}/${rep.id}`), {
+        stockFisico: val,
+        updatedAt: new Date(),
+      })
+      const logEntry = {
+        userId: user?.id || '',
+        userName: user?.nombre || user?.email || 'usuario',
+        machineId,
+        machineName: machineName || machineId,
+        repuestoId: rep.id,
+        repuestoName: rep.textoBreve || rep.descripcion || rep.codigoSAP || '',
+        codigoSAP: rep.codigoSAP || '',
+        cantidad: val,
+        stockMinimo: localMin ?? null,
+        bajoMinimo: localMin !== undefined ? val < localMin : null,
+        ts: Date.now(),
+        source: 'pwa',
+      }
+      await addDoc(collection(db, 'stockAuditLog'), logEntry)
+      setLocalStock(val)
+      setHistorial(prev => [{ cantidad: val, userName: logEntry.userName, ts: logEntry.ts, bajoMinimo: logEntry.bajoMinimo }, ...prev].slice(0, 5))
+      setShowConteo(false)
+      setConteoVal('')
+    } catch (err) {
+      logger.error('Error registrando conteo', err instanceof Error ? err : new Error(String(err)))
+    } finally {
+      setSavingConteo(false)
+    }
+  }, [conteoVal, machineId, colPath, rep, user, machineName, localMin])
+
+  const loadHistorial = useCallback(async () => {
+    if (!machineId) return
+    setLoadingHistorial(true)
+    try {
+      const q = query(collection(db, 'stockAuditLog'), where('repuestoId', '==', rep.id), limit(10))
+      const snap = await getDocs(q)
+      const entries = snap.docs
+        .map(d => { const data = d.data(); return { cantidad: data.cantidad, userName: data.userName || '', ts: data.ts || 0, bajoMinimo: data.bajoMinimo ?? null } })
+        .sort((a, b) => b.ts - a.ts)
+        .slice(0, 5)
+      setHistorial(entries)
+    } catch (err) {
+      logger.warn('Error cargando historial stock')
+    } finally {
+      setLoadingHistorial(false)
+    }
+  }, [rep.id, machineId])
 
   const saveAlias = async () => {
     const colPath = (rep as any).sourceCollection || (machineId ? `machines/${machineId}/repuestos` : null)
@@ -392,6 +480,125 @@ export function RepuestoDetailModal({
                 )}
               </div>
             </Section>
+
+            {/* ── Stock ── */}
+            {hasStock && (
+              <Section title="Stock" icon={Warehouse}>
+                <div className="space-y-3">
+                  {/* KPIs */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className={`rounded-lg p-3 text-center ${isLow ? 'bg-red-500/10 border border-red-500/20' : 'bg-muted/20'}`}>
+                      <div className="text-[10px] text-muted-foreground uppercase tracking-wider">En Bodega</div>
+                      <div className={`text-2xl font-bold tabular-nums mt-0.5 ${isLow ? 'text-red-400' : 'text-foreground'}`}>
+                        {localStock ?? '—'}
+                      </div>
+                      {isLow && <div className="text-[9px] text-red-400 font-medium mt-0.5">⚠ Bajo mínimo</div>}
+                    </div>
+                    <div className="bg-muted/20 rounded-lg p-3 text-center relative">
+                      <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Mínimo</div>
+                      {editingMin ? (
+                        <div className="flex items-center gap-1 mt-1 justify-center">
+                          <input
+                            type="number" min={0} value={minVal}
+                            onChange={e => setMinVal(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter') saveMin(); if (e.key === 'Escape') setEditingMin(false) }}
+                            autoFocus
+                            className="w-16 h-8 rounded border border-primary/50 bg-background px-2 text-sm font-mono tabular-nums text-center focus:outline-none focus:ring-1 focus:ring-primary/50"
+                          />
+                          <button onClick={saveMin} disabled={savingMin} className="h-8 w-8 flex items-center justify-center rounded bg-primary/20 hover:bg-primary/30 text-primary">
+                            <Check className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={colPath ? () => { setMinVal(localMin !== undefined ? String(localMin) : ''); setEditingMin(true) } : undefined}
+                          className={`text-2xl font-bold tabular-nums text-foreground mt-0.5 block w-full ${colPath ? 'hover:text-primary cursor-pointer transition-colors group' : ''}`}
+                        >
+                          {localMin ?? '—'}
+                          {colPath && <Pencil className="h-2.5 w-2.5 inline ml-1 text-muted-foreground/30 group-hover:text-primary transition-colors" />}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Botón registrar conteo */}
+                  {machineId && !showConteo && (
+                    <button
+                      onClick={() => { setShowConteo(true); setConteoVal(localStock !== undefined ? String(localStock) : '') }}
+                      className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary text-sm font-medium transition-colors"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Registrar conteo
+                    </button>
+                  )}
+
+                  {/* Formulario inline */}
+                  {showConteo && (
+                    <div className="bg-muted/20 rounded-lg p-3 space-y-2">
+                      <div className="text-xs text-muted-foreground font-medium">Nueva cantidad en bodega</div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min={0}
+                          value={conteoVal}
+                          onChange={e => setConteoVal(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') registrarConteo(); if (e.key === 'Escape') setShowConteo(false) }}
+                          placeholder="0"
+                          autoFocus
+                          className="flex-1 h-9 rounded-lg border border-border bg-background px-3 text-sm font-mono tabular-nums text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                        />
+                        <button
+                          onClick={registrarConteo}
+                          disabled={savingConteo || !conteoVal}
+                          className="h-9 px-3 rounded-lg bg-primary text-primary-foreground text-sm font-medium disabled:opacity-40 hover:bg-primary/90 transition-colors"
+                        >
+                          {savingConteo ? '…' : <Check className="h-4 w-4" />}
+                        </button>
+                        <button
+                          onClick={() => setShowConteo(false)}
+                          className="h-9 px-2 rounded-lg hover:bg-muted/50 text-muted-foreground transition-colors"
+                        >
+                          <XIcon className="h-4 w-4" />
+                        </button>
+                      </div>
+                      {localMin !== undefined && conteoVal !== '' && !isNaN(parseInt(conteoVal)) && (
+                        <div className={`text-xs ${parseInt(conteoVal) < localMin ? 'text-red-400' : 'text-emerald-400'}`}>
+                          {parseInt(conteoVal) < localMin ? `⚠ Quedará bajo el mínimo (${localMin})` : `✓ Sobre el mínimo (${localMin})`}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Historial */}
+                  <button
+                    onClick={() => { if (!showHistorial) loadHistorial(); setShowHistorial(v => !v) }}
+                    className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <History className="h-3.5 w-3.5" />
+                    {showHistorial ? 'Ocultar historial' : 'Ver historial de conteos'}
+                  </button>
+                  {showHistorial && (
+                    <div className="space-y-1">
+                      {loadingHistorial && <div className="text-xs text-muted-foreground animate-pulse">Cargando…</div>}
+                      {!loadingHistorial && historial.length === 0 && (
+                        <div className="text-xs text-muted-foreground">Sin conteos registrados</div>
+                      )}
+                      {historial.map((h, i) => (
+                        <div key={i} className="flex items-center justify-between bg-muted/20 rounded-lg px-3 py-1.5 text-xs">
+                          <span className={`font-bold tabular-nums ${h.bajoMinimo ? 'text-red-400' : 'text-emerald-400'}`}>
+                            {h.bajoMinimo ? '⚠' : '✓'} {h.cantidad}
+                          </span>
+                          <span className="text-muted-foreground">{h.userName}</span>
+                          <span className="text-muted-foreground font-mono">
+                            {new Date(h.ts).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </Section>
+            )}
 
             {/* ── Observaciones ── */}
             {rep.observaciones && (
