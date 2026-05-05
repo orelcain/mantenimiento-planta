@@ -4500,6 +4500,26 @@ async function openRepuesto(machineId, repuestoId, opts = {}){
       <div class="upload-row">
         <button class="upload-btn" onclick="pickPhoto('camera')"><span class="ico">📷</span> Cámara</button>
         <button class="upload-btn" onclick="pickPhoto('gallery')"><span class="ico">🖼️</span> Galería</button>
+      </div>
+
+      <div class="section"><span class="section-title" style="color:var(--warn)">🛠️ Admin</span></div>
+      <div style="padding:0 0 8px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none">
+        <div style="display:flex;gap:8px;padding:0 12px;width:max-content">
+          <button onclick="openMoveRepuestoSheet('${escHtmlAttr(machineId)}','${escHtmlAttr(repuestoId)}')"
+            style="display:flex;flex-direction:column;align-items:center;gap:3px;
+              background:rgba(245,166,35,.12);border:1px solid var(--warn);border-radius:12px;
+              padding:10px 14px;cursor:pointer;color:var(--text);min-width:72px">
+            <span style="font-size:20px">📦</span>
+            <span style="font-size:11px;font-weight:500;white-space:nowrap;color:var(--warn)">Mover equipo</span>
+          </button>
+          <button onclick="deleteRepuestoFromMachine('${escHtmlAttr(machineId)}','${escHtmlAttr(repuestoId)}')"
+            style="display:flex;flex-direction:column;align-items:center;gap:3px;
+              background:rgba(229,57,53,.10);border:1px solid var(--danger);border-radius:12px;
+              padding:10px 14px;cursor:pointer;color:var(--text);min-width:72px">
+            <span style="font-size:20px">🗑️</span>
+            <span style="font-size:11px;font-weight:500;white-space:nowrap;color:var(--danger)">Eliminar</span>
+          </button>
+        </div>
       </div>` : ''}
 
     <div id="rep-cross-equipo"></div>
@@ -5833,8 +5853,8 @@ function renderHierarchyLevel(){
 
     const addBtn = userRole==='admin' ? `
       <button class="cell-action-btn"
-        onclick="event.stopPropagation();openHierAddToListSheet('${escHtmlAttr(node.id)}',${isEquip})"
-        title="Agregar a lista">＋</button>` : ''
+        onclick="event.stopPropagation();openHierAdminSheet('${escHtmlAttr(node.id)}',${isEquip})"
+        title="Acciones admin (editar, mover, eliminar)">⋮</button>` : ''
 
     const onclick = isEquip
       ? `hierarchyOpenEquip('${escHtmlAttr(node.id)}','${escHtmlAttr(linkedMachine?.id||'')}')`
@@ -6110,6 +6130,412 @@ function openAddHierNodeModal(parentId){
       showToast('Error al crear: '+(err.message||''),'err')
     }
   })
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ADMIN: Edición de jerarquía (admin only) — auditoría manual
+// ═══════════════════════════════════════════════════════════════════
+
+function openHierAdminSheet(nodeId, isEquip){
+  if (userRole !== 'admin') return
+  const node = hierarchyNodesMap[nodeId]
+  if (!node) return
+  const linkedMachine = machines.find(m => m.hierarchyNodeId === nodeId)
+  const sheet = document.getElementById('sheet')
+  const overlay = document.getElementById('sheet-overlay')
+  const title = document.getElementById('sheet-title')
+  const content = document.getElementById('sheet-content')
+  hierSheetNodeId = nodeId
+
+  title.textContent = node.nombre || 'Acciones admin'
+  const subtitle = `${LEVEL_LABELS[node.nivel]||'N'+node.nivel}${linkedMachine?` · vinculado a ${escHtml(linkedMachine.nombre)}`:''}`
+
+  content.innerHTML = `
+    <div style="padding:8px 16px 4px;font-size:12px;color:var(--hint)">${subtitle}</div>
+    <div class="sheet-row" onclick="openHierAddToListSheetFromAdmin('${escHtmlAttr(nodeId)}',${isEquip})">
+      <div class="ico">📋</div>
+      <div class="body"><div class="name">Agregar a lista</div></div>
+      <div class="cell-chevron">›</div>
+    </div>
+    <div class="sheet-row" onclick="editHierNodeName('${escHtmlAttr(nodeId)}')">
+      <div class="ico">✏️</div>
+      <div class="body"><div class="name">Editar nombre</div></div>
+      <div class="cell-chevron">›</div>
+    </div>
+    <div class="sheet-row" onclick="openMoveHierNodeSheet('${escHtmlAttr(nodeId)}')">
+      <div class="ico">📍</div>
+      <div class="body">
+        <div class="name">Mover a otro padre</div>
+        <div class="sub">Cambiar ubicación en la jerarquía</div>
+      </div>
+      <div class="cell-chevron">›</div>
+    </div>
+    ${!isEquip ? `<div class="sheet-row" onclick="openAddHierNodeModalFromAdmin('${escHtmlAttr(nodeId)}')">
+      <div class="ico">➕</div>
+      <div class="body"><div class="name">Crear sub-nodo aquí</div></div>
+      <div class="cell-chevron">›</div>
+    </div>` : ''}
+    <div class="sheet-row" onclick="deleteHierNode('${escHtmlAttr(nodeId)}')"
+      style="background:rgba(229,57,53,.06)">
+      <div class="ico">🗑️</div>
+      <div class="body"><div class="name" style="color:var(--danger)">Eliminar nodo</div></div>
+      <div class="cell-chevron">›</div>
+    </div>`
+
+  overlay.classList.add('open')
+  requestAnimationFrame(() => sheet.classList.add('open'))
+}
+
+function openHierAddToListSheetFromAdmin(nodeId, isEquip){
+  closeSheet()
+  setTimeout(() => openHierAddToListSheet(nodeId, isEquip), 50)
+}
+
+function openAddHierNodeModalFromAdmin(parentId){
+  closeSheet()
+  setTimeout(() => openAddHierNodeModal(parentId), 50)
+}
+
+function editHierNodeName(nodeId){
+  const node = hierarchyNodesMap[nodeId]
+  if (!node) return
+  closeSheet()
+  showInputModal('Editar nombre', node.nombre || '', 'Nuevo nombre del nodo', async (name) => {
+    const trimmed = (name || '').trim()
+    if (!trimmed || trimmed === node.nombre) return
+    const before = { nombre: node.nombre, codigo: node.codigo }
+    const newCodigo = trimmed.toUpperCase().replace(/\s+/g,'-').slice(0,40)
+    try {
+      await db.collection('hierarchy').doc(nodeId).update({
+        nombre: trimmed,
+        codigo: newCodigo,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedBy: uid,
+      })
+      node.nombre = trimmed
+      node.codigo = newCodigo
+      // También actualizar machineMap si era _isHierarchyOnly o vinculado
+      if (machineMap[nodeId]) machineMap[nodeId].nombre = trimmed
+      __hierarchyCache = null
+      await logAudit('update', 'hierarchy', nodeId, before, { nombre: trimmed, codigo: newCodigo }, `Renombrar nodo: ${before.nombre} → ${trimmed}`)
+      showToast('Nombre actualizado ✓','ok')
+      tgApp?.HapticFeedback?.notificationOccurred('success')
+      renderHierarchyLevel()
+    } catch(err){
+      showToast('Error: '+(err.message||''),'err')
+    }
+  })
+}
+
+async function deleteHierNode(nodeId){
+  const node = hierarchyNodesMap[nodeId]
+  if (!node) return
+  closeSheet()
+  const children = hierarchyChildrenMap[nodeId] || []
+  const linkedMachine = machines.find(m => m.hierarchyNodeId === nodeId)
+
+  let repCount = 0
+  try {
+    const fullSnap = await db.collection(`hierarchy/${nodeId}/repuestos`).get()
+    repCount = fullSnap.size
+  } catch {}
+
+  const partes = []
+  if (children.length) partes.push(`${children.length} sub-nodo(s)`)
+  if (repCount) partes.push(`${repCount} repuesto(s) propios`)
+  if (linkedMachine) partes.push(`vinculado a "${linkedMachine.nombre}"`)
+
+  const warning = partes.length ? `\n\n⚠️ Contiene: ${partes.join(' + ')}.\nLos sub-nodos quedarán huérfanos. Los repuestos del nodo se borrarán.` : ''
+  const msg = `Eliminar nodo "${node.nombre}"?${warning}\n\nEsta acción es irreversible.`
+
+  const ok = await new Promise(res => tgApp?.showConfirm
+    ? tgApp.showConfirm(msg, res)
+    : res(confirm(msg)))
+  if (!ok) return
+
+  try {
+    if (repCount > 0) {
+      const repSnap = await db.collection(`hierarchy/${nodeId}/repuestos`).get()
+      const batch = db.batch()
+      repSnap.docs.forEach(d => batch.delete(d.ref))
+      await batch.commit()
+    }
+    await db.collection('hierarchy').doc(nodeId).delete()
+
+    delete hierarchyNodesMap[nodeId]
+    if (machineMap[nodeId]?._isHierarchyOnly) delete machineMap[nodeId]
+    delete repCache[nodeId]
+    __hierarchyCache = null
+    invalidateRepuestosCache()
+
+    await logAudit('delete', 'hierarchy', nodeId,
+      { nombre: node.nombre, parentId: node.parentId, nivel: node.nivel, repCount, childCount: children.length },
+      null,
+      `Eliminar nodo: ${node.nombre}`)
+
+    showToast('Nodo eliminado ✓','ok')
+    tgApp?.HapticFeedback?.notificationOccurred('success')
+    await renderHierarchyTab()
+  } catch(err){
+    showToast('Error al eliminar: '+(err.message||''),'err')
+  }
+}
+
+function openMoveHierNodeSheet(nodeId){
+  closeSheet()
+  const node = hierarchyNodesMap[nodeId]
+  if (!node) return
+
+  // No se puede mover a sí mismo ni a un descendiente
+  const descendantIds = new Set([nodeId])
+  const stack = [nodeId]
+  while (stack.length){
+    const id = stack.pop()
+    const ch = hierarchyChildrenMap[id] || []
+    for (const c of ch){
+      descendantIds.add(c.id)
+      stack.push(c.id)
+    }
+  }
+
+  setTimeout(() => showNodePickerSheet(`Mover "${node.nombre}" a:`, {
+    excludeIds: descendantIds,
+    allowRoot: true,
+    rootLabel: '🏠 Raíz (sin padre)',
+  }, async (newParentId) => {
+    if (newParentId === node.parentId) {
+      showToast('Mismo padre, sin cambios','err')
+      return
+    }
+    await executeMoveHierNode(nodeId, newParentId)
+  }), 50)
+}
+
+async function executeMoveHierNode(nodeId, newParentId){
+  const node = hierarchyNodesMap[nodeId]
+  if (!node) return
+  const newParent = newParentId ? hierarchyNodesMap[newParentId] : null
+  const newNivel = newParent ? ((newParent.nivel||1)+1) : 1
+  const before = { parentId: node.parentId, nivel: node.nivel }
+  const after = { parentId: newParentId||null, nivel: newNivel }
+  try {
+    await db.collection('hierarchy').doc(nodeId).update({
+      parentId: newParentId||null,
+      nivel: newNivel,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedBy: uid,
+    })
+    node.parentId = newParentId||null
+    node.nivel = newNivel
+    __hierarchyCache = null
+    await logAudit('update', 'hierarchy', nodeId, before, after, `Mover nodo: ${node.nombre}`)
+    showToast('Nodo movido ✓','ok')
+    tgApp?.HapticFeedback?.notificationOccurred('success')
+    await renderHierarchyTab()
+  } catch(err){
+    showToast('Error: '+(err.message||''),'err')
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PICKER de nodo reutilizable (mover nodo / mover repuesto)
+// ═══════════════════════════════════════════════════════════════════
+let _nodePickerCb = null
+let _nodePickerOpts = null
+
+function showNodePickerSheet(title, opts, callback){
+  _nodePickerCb = callback
+  _nodePickerOpts = opts || {}
+  const sheet = document.getElementById('sheet')
+  const overlay = document.getElementById('sheet-overlay')
+  const titleEl = document.getElementById('sheet-title')
+  const content = document.getElementById('sheet-content')
+  titleEl.textContent = title
+  content.innerHTML = `
+    <div style="padding:8px 12px;position:sticky;top:0;background:var(--bg2);z-index:1;border-bottom:1px solid var(--divider)">
+      <input id="nodepicker-search" type="text" placeholder="Buscar nodo por nombre…"
+        autocomplete="off"
+        style="width:100%;padding:9px 12px;background:var(--bg);color:var(--text);
+          border:1px solid var(--divider);border-radius:8px;font-size:14px;outline:none"
+        oninput="renderNodePickerList()">
+    </div>
+    <div id="nodepicker-list"></div>`
+  renderNodePickerList()
+  overlay.classList.add('open')
+  requestAnimationFrame(() => sheet.classList.add('open'))
+  setTimeout(() => document.getElementById('nodepicker-search')?.focus(), 80)
+}
+
+function renderNodePickerList(){
+  const listEl = document.getElementById('nodepicker-list')
+  if (!listEl || !_nodePickerOpts) return
+  const q = normalizeSearch(document.getElementById('nodepicker-search')?.value || '')
+  const exclude = _nodePickerOpts.excludeIds || new Set()
+  const onlyEquipos = _nodePickerOpts.onlyEquipos
+
+  let nodes = Object.values(hierarchyNodesMap || {})
+  if (onlyEquipos) nodes = nodes.filter(n => isEquipNode(n))
+  if (exclude.size) nodes = nodes.filter(n => !exclude.has(n.id))
+  if (q) nodes = nodes.filter(n => normalizeSearch(n.nombre || '').includes(q))
+  nodes.sort((a,b) => ((a.nivel||0) - (b.nivel||0)) || (a.nombre||'').localeCompare(b.nombre||''))
+  const capped = nodes.slice(0, 100)
+
+  let html = ''
+  if (_nodePickerOpts.allowRoot && !q){
+    html += `<div class="sheet-row" onclick="onNodePickerSelect(null)">
+      <div class="ico">🏠</div>
+      <div class="body"><div class="name">${escHtml(_nodePickerOpts.rootLabel || '(Raíz)')}</div></div>
+    </div>`
+  }
+  html += capped.map(n => {
+    const path = buildHierStackForNode(n).slice(0,-1).map(s => s.nombre).join(' › ')
+    const isEq = isEquipNode(n)
+    const lvlLabel = LEVEL_LABELS[n.nivel] || ('N'+n.nivel)
+    return `<div class="sheet-row" onclick="onNodePickerSelect('${escHtmlAttr(n.id)}')">
+      <div class="ico">${isEq?'⚙️':'📁'}</div>
+      <div class="body">
+        <div class="name">${escHtml(n.nombre || 'Sin nombre')} <span style="font-size:10px;opacity:.6">${lvlLabel}</span></div>
+        ${path ? `<div class="sub" style="font-size:11px;opacity:.7">${escHtml(path)}</div>` : ''}
+      </div>
+    </div>`
+  }).join('')
+
+  if (!capped.length && (!_nodePickerOpts.allowRoot || q)){
+    html += `<div class="sheet-empty">Sin resultados${q?` para "${escHtml(q)}"`:''}</div>`
+  } else if (nodes.length > 100){
+    html += `<div style="padding:10px 16px;font-size:11px;color:var(--hint);text-align:center">
+      Mostrando 100 de ${nodes.length} — refiná la búsqueda</div>`
+  }
+  listEl.innerHTML = html
+}
+
+function onNodePickerSelect(nodeId){
+  const cb = _nodePickerCb
+  closeSheet()
+  _nodePickerCb = null
+  _nodePickerOpts = null
+  if (cb) cb(nodeId)
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ADMIN: Mover/Eliminar repuesto
+// ═══════════════════════════════════════════════════════════════════
+function openMoveRepuestoSheet(machineId, repuestoId){
+  if (userRole !== 'admin') return
+  const reps = repCache[machineId] || []
+  const r = reps.find(x => x.id === repuestoId)
+  if (!r) return
+  const repName = r.textoBreve || r.alias || r.codigoSAP || 'repuesto'
+  const exclude = new Set([machineId])
+  const m = machineMap[machineId]
+  if (m?.hierarchyNodeId) exclude.add(m.hierarchyNodeId)
+
+  showNodePickerSheet(`Mover "${repName}" a:`, {
+    excludeIds: exclude,
+    onlyEquipos: true,
+  }, async (toNodeId) => {
+    if (!toNodeId) return
+    await executeMoveRepuesto(machineId, repuestoId, toNodeId)
+  })
+}
+
+async function executeMoveRepuesto(fromMachineId, repuestoId, toMachineId){
+  const reps = repCache[fromMachineId] || []
+  const r = reps.find(x => x.id === repuestoId)
+  if (!r) return
+
+  const fromPath = getRepuestoCollPath(fromMachineId)
+  const toPath = getRepuestoCollPath(toMachineId)
+  if (fromPath === toPath){
+    showToast('Mismo equipo, sin cambios','err')
+    return
+  }
+
+  const fromName = machineMap[fromMachineId]?.nombre || hierarchyNodesMap[fromMachineId]?.nombre || fromMachineId
+  const toName = machineMap[toMachineId]?.nombre || hierarchyNodesMap[toMachineId]?.nombre || toMachineId
+  const repName = r.textoBreve || r.codigoSAP || repuestoId
+
+  const ok = await new Promise(res => tgApp?.showConfirm
+    ? tgApp.showConfirm(`Mover "${repName}"\nde: ${fromName}\na: ${toName}\n?`, res)
+    : res(confirm(`Mover ${repName} de ${fromName} a ${toName}?`)))
+  if (!ok) return
+
+  try {
+    const fromRef = db.collection(fromPath).doc(repuestoId)
+    const fromSnap = await fromRef.get()
+    if (!fromSnap.exists){
+      showToast('Documento no encontrado en origen','err')
+      return
+    }
+    const data = fromSnap.data()
+    const toCol = db.collection(toPath)
+    const existsInDest = await toCol.doc(repuestoId).get()
+    let newRef
+    const moveMeta = {
+      movedFrom: fromPath,
+      movedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      movedBy: uid,
+    }
+    if (existsInDest.exists){
+      newRef = await toCol.add({ ...data, ...moveMeta })
+    } else {
+      newRef = toCol.doc(repuestoId)
+      await newRef.set({ ...data, ...moveMeta })
+    }
+    await fromRef.delete()
+
+    repCache[fromMachineId] = (repCache[fromMachineId]||[]).filter(x => x.id !== repuestoId)
+    if (repCache[toMachineId]) {
+      repCache[toMachineId].push({ id: newRef.id, ...data })
+    }
+    if (__repuestosCache){
+      __repuestosCache = __repuestosCache.filter(x => !(x.repuesto.id === repuestoId && x.machineId === fromMachineId))
+      __repuestosCache.push({
+        repuesto: { id: newRef.id, ...data },
+        machineId: toMachineId,
+        machineName: toName,
+      })
+    }
+
+    await logAudit('move', fromPath, repuestoId,
+      { from: fromPath, to: toPath, fromName, toName },
+      { newId: newRef.id },
+      `Mover repuesto "${repName}": ${fromName} → ${toName}`)
+
+    showToast('Repuesto movido ✓','ok')
+    tgApp?.HapticFeedback?.notificationOccurred('success')
+    goBack()
+  } catch(err){
+    showToast('Error al mover: '+(err.message||''),'err')
+  }
+}
+
+async function deleteRepuestoFromMachine(machineId, repuestoId){
+  if (userRole !== 'admin') return
+  const reps = repCache[machineId] || []
+  const r = reps.find(x => x.id === repuestoId)
+  if (!r) return
+  const repName = r.textoBreve || r.alias || r.codigoSAP || 'repuesto'
+
+  const ok = await new Promise(res => tgApp?.showConfirm
+    ? tgApp.showConfirm(`⚠️ Eliminar "${repName}" definitivamente?\n\nEsta acción es irreversible.`, res)
+    : res(confirm(`Eliminar ${repName}?`)))
+  if (!ok) return
+
+  try {
+    const collPath = getRepuestoCollPath(machineId)
+    await db.collection(collPath).doc(repuestoId).delete()
+    repCache[machineId] = (repCache[machineId]||[]).filter(x => x.id !== repuestoId)
+    if (__repuestosCache){
+      __repuestosCache = __repuestosCache.filter(x => !(x.repuesto.id === repuestoId && x.machineId === machineId))
+    }
+    await logAudit('delete', collPath, repuestoId, { ...r }, null, `Eliminar repuesto "${repName}"`)
+    showToast('Repuesto eliminado ✓','ok')
+    tgApp?.HapticFeedback?.notificationOccurred('success')
+    goBack()
+  } catch(err){
+    showToast('Error al eliminar: '+(err.message||''),'err')
+  }
 }
 
 // ── F2.5 — Audit log ────────────────────────────────────────────────
