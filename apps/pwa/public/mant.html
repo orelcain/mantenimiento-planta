@@ -819,7 +819,9 @@ async function loadMachines(){
 }
 
 async function loadRepuestos(machineId){
-  if (repCache[machineId]) return repCache[machineId]
+  // Solo cachear arrays NO vacíos: un cache vacío puede venir de una resolución
+  // de path incorrecta (ej: hierarchy aún no cargado) y bloquear ediciones futuras.
+  if (repCache[machineId]?.length > 0) return repCache[machineId]
   const collPath = getRepuestoCollPath(machineId)
   let docs = []
   try {
@@ -3638,10 +3640,12 @@ async function openRepuesto(machineId, repuestoId, opts = {}){
     ['N° serie', r.numeroSerie, true],
   ].filter(([_,v]) => v)
 
+  const equipoPath = getEquipoPath(machineId)
   const useRows = [
+    ['Equipo', equipoPath.name || m?.nombre, false],
+    ['Ubicación jerárquica', equipoPath.path, false, 'path'],
     ['Cant. por equipo', r.cantidadPorMaquina ?? '—', false],
-    ['Ubicación', r.ubicacionEnPlanta, false],
-    ['Equipo', m?.nombre, false],
+    ['Ubicación física', r.ubicacionEnPlanta, false],
     (['admin','supervisor','tecnico'].includes(userRole) && r.valorUnitario != null)
       ? ['Valor unitario', `$ ${Number(r.valorUnitario).toLocaleString('es-CL')}`, false] : null,
   ].filter(x => x && x[1] != null && x[1] !== '')
@@ -3664,10 +3668,10 @@ async function openRepuesto(machineId, repuestoId, opts = {}){
 
     <div class="section"><span class="section-title">Uso en planta</span></div>
     <div class="info-card">
-      ${useRows.map(([l,v,c]) => `
+      ${useRows.map(([l,v,c,kind]) => `
         <div class="info-row">
           <span class="info-label">${l}</span>
-          <span class="info-value${c?' code':''}">${escHtml(String(v))}</span>
+          <span class="info-value${c?' code':''}" ${kind==='path'?'style="font-size:12px;opacity:.85;text-align:right;line-height:1.4"':''}>${escHtml(String(v))}</span>
         </div>`).join('')}
     </div>
 
@@ -3702,6 +3706,14 @@ async function openRepuesto(machineId, repuestoId, opts = {}){
       </div>
     </div>
 
+    <div class="section"><span class="section-title">⚡ Acciones rápidas</span></div>
+    <div style="padding:0 12px 8px;display:flex;flex-wrap:wrap;gap:8px">
+      ${r.codigoSAP ? `<button class="cell-action-btn" style="flex:1 1 calc(50% - 4px);white-space:nowrap;min-width:0" onclick="copyRepSap('${escHtmlAttr(r.codigoSAP)}')">📋 Copiar SAP</button>` : ''}
+      <button class="cell-action-btn" style="flex:1 1 calc(50% - 4px);white-space:nowrap;min-width:0" onclick="shareRepuesto('${escHtmlAttr(machineId)}','${escHtmlAttr(repuestoId)}')">🔗 Compartir</button>
+      <button class="cell-action-btn" style="flex:1 1 calc(50% - 4px);white-space:nowrap;min-width:0" onclick="scrollToRepManuales()">📖 Manuales</button>
+      ${equipoPath.nodeId ? `<button class="cell-action-btn" style="flex:1 1 calc(50% - 4px);white-space:nowrap;min-width:0" onclick="navigateToEquipoFromRep('${escHtmlAttr(equipoPath.nodeId)}','${escHtmlAttr(machineId)}')">🌳 Ver equipo</button>` : ''}
+    </div>
+
     ${r.observaciones ? `
       <div class="section"><span class="section-title">Observaciones</span></div>
       <div class="info-card">
@@ -3727,10 +3739,80 @@ async function openRepuesto(machineId, repuestoId, opts = {}){
       </div>` : ''}
 
     <div id="rep-cross-equipo"></div>
+    <div id="rep-equipo-manuales"></div>
   `
 
   // Sección "En estos equipos" — carga asíncrona desde cache global (no bloquea render)
   if (r.codigoSAP) renderRepCrossEquipo(r.codigoSAP, machineId)
+  // Manuales del equipo padre — reutiliza __manualesCache si está, lazy load si no
+  renderRepEquipoManuales(machineId, equipoPath.name)
+}
+
+function renderRepEquipoManuales(machineId, equipoName){
+  const el = document.getElementById('rep-equipo-manuales')
+  if (!el) return
+  if (!__manualesCache){
+    loadManuales().then(() => {
+      const still = document.getElementById('rep-equipo-manuales')
+      if (still) renderRepEquipoManuales(machineId, equipoName)
+    }).catch(() => {})
+    return
+  }
+  const matches = __manualesCache.filter(x =>
+    x.ownerId === machineId
+    || (equipoName && (x.ownerPath || []).some(p => normalizeSearch(p) === normalizeSearch(equipoName)))
+  )
+  if (matches.length === 0){ el.innerHTML = ''; return }
+  el.innerHTML = `
+    <div id="rep-manuales-anchor" class="section">
+      <span class="section-title">📖 Manuales del equipo</span>
+      <span class="section-count">${matches.length}</span>
+    </div>
+    <div class="cell-group">${matches.map(manualCellHtml).join('')}</div>`
+}
+
+function copyRepSap(sap){
+  navigator.clipboard?.writeText(String(sap)).then(() => {
+    showToast(`SAP ${sap} copiado ✓`, 'ok')
+    tgApp?.HapticFeedback?.notificationOccurred?.('success')
+  }).catch(() => showToast('No se pudo copiar', 'err'))
+}
+
+function shareRepuesto(machineId, repuestoId){
+  const reps = repCache[machineId] || []
+  const r = reps.find(x => x.id === repuestoId)
+  if (!r) return
+  const title = r.textoBreve || r.alias || 'Repuesto'
+  const sap = r.codigoSAP ? `\nSAP: ${r.codigoSAP}` : ''
+  const fab = r.codigoFabricante ? `\nCód. fab: ${r.codigoFabricante}` : ''
+  const ubi = r.ubicacionEnPlanta ? `\nUbicación: ${r.ubicacionEnPlanta}` : ''
+  const text = `🔧 ${title}${sap}${fab}${ubi}`
+  // En Telegram WebApp: switchInlineQuery copia para reenviar
+  if (tgApp?.switchInlineQuery){
+    tgApp.switchInlineQuery(text, ['users','groups'])
+    return
+  }
+  navigator.clipboard?.writeText(text).then(() => {
+    showToast('Datos del repuesto copiados ✓', 'ok')
+    tgApp?.HapticFeedback?.notificationOccurred?.('success')
+  }).catch(() => showToast('No se pudo copiar', 'err'))
+}
+
+function scrollToRepManuales(){
+  const el = document.getElementById('rep-manuales-anchor')
+  if (el){
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  } else {
+    showToast('Sin manuales para este equipo', 'err')
+  }
+}
+
+function navigateToEquipoFromRep(nodeId, machineId){
+  if (typeof hierSearchOpenEquip === 'function' && nodeId){
+    hierSearchOpenEquip(nodeId, machineId)
+  } else {
+    openMachine(machineId)
+  }
 }
 
 function renderRepCrossEquipo(codigoSAP, currentMachineId){
@@ -4701,6 +4783,28 @@ function rebuildHierarchyFromNodes(nodes){
       activa: true,
     }
   }
+}
+
+// Path jerárquico de un equipo: "PROCESO › EVISCERADO › CINTAS PP › ..."
+// Retorna { path: string, nodeId: string|null } — nodeId solo si está en hierarchy
+function getEquipoPath(machineId){
+  const m = machineMap[machineId]
+  // Caso 1: machine con hierarchyPath cacheado
+  if (m?.hierarchyPath){
+    return { path: m.hierarchyPath, nodeId: m.hierarchyNodeId || null, name: m.nombre }
+  }
+  // Caso 2: nodo hierarchy puro
+  const node = hierarchyNodesMap?.[machineId]
+  if (node){
+    const stack = buildHierStackForNode(node)
+    return { path: stack.map(s => s.nombre).join(' › '), nodeId: node.id, name: node.nombre }
+  }
+  // Caso 3: machine vinculada a hierarchy via hierarchyNodeId
+  if (m?.hierarchyNodeId && hierarchyNodesMap?.[m.hierarchyNodeId]){
+    const stack = buildHierStackForNode(hierarchyNodesMap[m.hierarchyNodeId])
+    return { path: stack.map(s => s.nombre).join(' › '), nodeId: m.hierarchyNodeId, name: m.nombre }
+  }
+  return { path: m?.nombre || '', nodeId: null, name: m?.nombre || '' }
 }
 
 function getRepuestoCollPath(machineId){
