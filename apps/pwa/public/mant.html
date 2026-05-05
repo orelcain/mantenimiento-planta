@@ -434,6 +434,7 @@ mark{background:rgba(var(--accent-rgb,82,136,193),.25);color:inherit;border-radi
     <div id="view-search"       class="view"></div>
     <div id="view-stock-report" class="view"></div>
     <div id="view-activity"     class="view"></div>
+    <div id="view-qr-batch"    class="view"></div>
   </main>
 
   <nav class="bottom-nav">
@@ -2007,9 +2008,13 @@ function renderStockReport(){
   }
 
   el.innerHTML = `
-    <div style="padding:12px 12px 4px;display:flex;align-items:center;gap:8px">
+    <div style="padding:12px 12px 4px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
       <span style="font-size:13px;color:var(--hint)">${items.length} repuesto${items.length>1?'s':''} requieren reposición</span>
       <span style="flex:1"></span>
+      ${(() => {
+        const qrItems = items.filter(i => i.repuesto.codigoSAP).map(i => ({ sap: i.repuesto.codigoSAP, name: i.repuesto.textoBreve || '', machineName: i.machineName || '' }))
+        return qrItems.length ? `<button onclick='openBatchQRView(${escHtmlAttr(JSON.stringify(qrItems))})' style="background:none;border:1px solid var(--border);color:var(--hint);padding:4px 10px;border-radius:8px;font-size:11px;cursor:pointer">🔳 QR lote</button>` : ''
+      })()}
       <button onclick="exportStockBajoText()" style="background:none;border:1px solid var(--border);
         color:var(--hint);padding:4px 10px;border-radius:8px;font-size:11px;cursor:pointer">📋 Copiar lista</button>
     </div>
@@ -4789,6 +4794,59 @@ function openQRModal(sap, title){
   overlay.onclick = () => overlay.remove()
   document.body.appendChild(overlay)
   tgApp?.HapticFeedback?.selectionChanged?.()
+}
+
+// items = [{sap, name, machineName}]
+function openBatchQRView(items){
+  if (!items?.length){ showToast('Sin códigos SAP para mostrar', 'err'); return }
+  tgApp?.HapticFeedback?.selectionChanged?.()
+  pushView('view-qr-batch', `QR Lote · ${items.length}`, `${items.length} código${items.length>1?'s':''}`)
+  renderBatchQRView(items)
+}
+
+function renderBatchQRView(items){
+  const el = document.getElementById('view-qr-batch')
+  if (!el) return
+  const QR_SIZE = 180   // px — balance entre legibilidad y cantidad por pantalla
+
+  el.innerHTML = `
+    <div style="padding:10px 12px 4px;display:flex;align-items:center;gap:8px">
+      <span style="font-size:12px;color:var(--hint)">${items.length} código${items.length>1?'s SAP':' SAP'} · escanea cada uno con la pistola</span>
+      <span style="flex:1"></span>
+      <button onclick="copyBatchSAPs(${escHtmlAttr(JSON.stringify(items.map(i=>i.sap)))})"
+        style="background:none;border:1px solid var(--border);color:var(--hint);
+          padding:4px 10px;border-radius:8px;font-size:11px;cursor:pointer">📋 Copiar lista</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;padding:8px 12px 24px">
+      ${items.map(item => `
+        <div style="background:var(--bg2);border-radius:10px;overflow:hidden;
+            border:1px solid var(--border);cursor:pointer"
+            onclick="openQRModal('${escHtmlAttr(item.sap)}','${escHtmlAttr(item.name)}')">
+          <div style="background:#fff;padding:8px;text-align:center">
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=${QR_SIZE}x${QR_SIZE}&margin=6&data=${encodeURIComponent(item.sap)}"
+              alt="QR ${escHtmlAttr(item.sap)}" width="${QR_SIZE}" height="${QR_SIZE}"
+              style="display:block;margin:0 auto;width:100%;max-width:${QR_SIZE}px;height:auto"
+              loading="lazy">
+          </div>
+          <div style="padding:6px 8px 8px">
+            <div style="font-size:12px;font-weight:700;font-family:monospace;color:var(--text)">${escHtml(item.sap)}</div>
+            <div style="font-size:11px;color:var(--hint);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(item.name)}</div>
+            ${item.machineName ? `<div style="font-size:10px;color:var(--sub);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(item.machineName)}</div>` : ''}
+          </div>
+        </div>`).join('')}
+    </div>`
+}
+
+function copyBatchSAPs(saps){
+  const text = Array.isArray(saps) ? saps.join('\n') : String(saps)
+  if (navigator.clipboard?.writeText){
+    navigator.clipboard.writeText(text).then(() => {
+      tgApp?.HapticFeedback?.notificationOccurred?.('success')
+      showToast('SAPs copiados ✓', 'ok')
+    }).catch(() => tgApp?.showAlert?.(text))
+  } else {
+    tgApp?.showAlert?.(text)
+  }
 }
 
 function openRepuestoEdit(machineId, repuestoId){
