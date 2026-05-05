@@ -2346,7 +2346,9 @@ function renderStockReport(){
         return qrItems.length ? `<button onclick='openBatchQRView(${escHtmlAttr(JSON.stringify(qrItems))})' style="background:none;border:1px solid var(--border);color:var(--hint);padding:4px 10px;border-radius:8px;font-size:11px;cursor:pointer">🔳 QR lote</button>` : ''
       })()}
       <button onclick="exportStockBajoText()" style="background:none;border:1px solid var(--border);
-        color:var(--hint);padding:4px 10px;border-radius:8px;font-size:11px;cursor:pointer">📋 Copiar lista</button>
+        color:var(--hint);padding:4px 10px;border-radius:8px;font-size:11px;cursor:pointer">📋 Copiar</button>
+      <button onclick="exportStockBajoCSV()" style="background:none;border:1px solid var(--border);
+        color:var(--hint);padding:4px 10px;border-radius:8px;font-size:11px;cursor:pointer">⬇️ CSV</button>
     </div>
     <div class="cell-group">
       ${items.map(item => {
@@ -2418,6 +2420,54 @@ function exportStockBajoText(){
     }).catch(() => tgApp?.showAlert?.(text))
   } else {
     tgApp?.showAlert?.(text)
+  }
+}
+
+function exportStockBajoCSV(){
+  const items = getStockBajoItems()
+  if (items.length === 0) return
+
+  const fecha = new Date().toLocaleDateString('es-CL').replace(/\//g, '-')
+  const BOM = '﻿' // UTF-8 BOM para Excel
+  const header = ['Nombre', 'SAP', 'Cod Fabricante', 'Stock Físico', 'Stock Mínimo', 'Déficit', 'Déficit %', 'Ubicación', 'Equipo']
+  const rows = items.map(item => {
+    const r = item.repuesto
+    const name = (r.textoBreve || r.descripcion || 'Sin nombre').replace(/"/g, '""')
+    const deficit = (r.stockMinimo || 0) - (r.stockFisico || 0)
+    const pct = r.stockMinimo ? Math.round((deficit / r.stockMinimo) * 100) : ''
+    const equipo = (item.machineName || '').replace(/"/g, '""')
+    const ubicacion = (r.ubicacionEnPlanta || '').replace(/"/g, '""')
+    return [
+      `"${name}"`,
+      r.codigoSAP || '',
+      r.codigoFabricante || '',
+      r.stockFisico ?? '',
+      r.stockMinimo ?? '',
+      deficit,
+      pct ? `${pct}%` : '',
+      `"${ubicacion}"`,
+      `"${equipo}"`,
+    ].join(',')
+  })
+
+  const csv = BOM + [header.join(','), ...rows].join('\r\n')
+
+  try {
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `stock-bajo-${fecha}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    tgApp?.HapticFeedback?.notificationOccurred?.('success')
+    showToast('CSV descargado ✓', 'ok')
+  } catch {
+    // Fallback: copiar CSV al clipboard
+    navigator.clipboard?.writeText(csv).then(() => showToast('CSV copiado al portapapeles ✓', 'ok'))
+      .catch(() => showToast('Error al exportar', 'err'))
   }
 }
 

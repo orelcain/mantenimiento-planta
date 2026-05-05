@@ -17,7 +17,7 @@ import {
   X, Package, MapPin, DollarSign, Hash, Tag,
   ClipboardList, Camera, BookOpen, MessageSquareText,
   Image as ImageIcon, ChevronLeft, ChevronRight,
-  Pencil, Check, X as XIcon, Warehouse, Plus, History,
+  Pencil, Check, X as XIcon, Warehouse, Plus, History, Download,
 } from 'lucide-react'
 import { doc, updateDoc, addDoc, collection, getDocs, query, where, limit } from 'firebase/firestore'
 import { db } from '@/services/firebase'
@@ -244,6 +244,31 @@ export function RepuestoDetailModal({
       setLoadingHistorial(false)
     }
   }, [rep.id, machineId])
+
+  const exportHistorialCSV = useCallback(() => {
+    const name = rep.textoBreve || rep.descripcion || rep.codigoSAP || 'repuesto'
+    const fecha = new Date().toLocaleDateString('es-CL').replace(/\//g, '-')
+    const BOM = '﻿'
+    const header = ['Fecha', 'Cantidad', 'Usuario', 'Bajo Mínimo', 'Equipo', 'SAP']
+    const rows = historial.map(h => [
+      new Date(h.ts).toLocaleString('es-CL'),
+      h.cantidad,
+      `"${h.userName.replace(/"/g, '""')}"`,
+      h.bajoMinimo === true ? 'Sí' : h.bajoMinimo === false ? 'No' : '',
+      `"${(machineName || '').replace(/"/g, '""')}"`,
+      rep.codigoSAP || '',
+    ].join(','))
+    const csv = BOM + [header.join(','), ...rows].join('\r\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `stock-${name.slice(0, 30).replace(/\s+/g, '-')}-${fecha}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }, [historial, rep, machineName])
 
   const saveAlias = async () => {
     const colPath = (rep as any).sourceCollection || (machineId ? `machines/${machineId}/repuestos` : null)
@@ -570,13 +595,25 @@ export function RepuestoDetailModal({
                   )}
 
                   {/* Historial */}
-                  <button
-                    onClick={() => { if (!showHistorial) loadHistorial(); setShowHistorial(v => !v) }}
-                    className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <History className="h-3.5 w-3.5" />
-                    {showHistorial ? 'Ocultar historial' : 'Ver historial de conteos'}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => { if (!showHistorial) loadHistorial(); setShowHistorial(v => !v) }}
+                      className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors flex-1"
+                    >
+                      <History className="h-3.5 w-3.5" />
+                      {showHistorial ? 'Ocultar historial' : 'Ver historial de conteos'}
+                    </button>
+                    {historial.length > 0 && (
+                      <button
+                        onClick={exportHistorialCSV}
+                        title="Descargar CSV"
+                        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        CSV
+                      </button>
+                    )}
+                  </div>
                   {showHistorial && (
                     <div className="space-y-1">
                       {loadingHistorial && <div className="text-xs text-muted-foreground animate-pulse">Cargando…</div>}
