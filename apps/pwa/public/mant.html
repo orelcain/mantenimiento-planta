@@ -60,6 +60,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);
 .s-loading{background:rgba(125,139,153,.12);color:var(--hint)}
 .s-loading::before{background:var(--hint);animation:blink 1s ease-in-out infinite}
 @keyframes blink{0%,100%{opacity:.3}50%{opacity:1}}
+@keyframes pulse-border{0%,100%{border-color:rgba(239,68,68,.3)}50%{border-color:rgba(239,68,68,.7)}}
 
 /* ── Content ────────────────────────────────────────────────────────── */
 #content{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;
@@ -425,12 +426,13 @@ mark{background:rgba(var(--accent-rgb,82,136,193),.25);color:inherit;border-radi
   </div>
 
   <main id="content">
-    <div id="view-home"       class="view active"></div>
-    <div id="view-hierarchy"  class="view"></div>
-    <div id="view-manuales"   class="view"></div>
-    <div id="view-machine"    class="view"></div>
-    <div id="view-repuesto"   class="view"></div>
-    <div id="view-search"     class="view"></div>
+    <div id="view-home"         class="view active"></div>
+    <div id="view-hierarchy"    class="view"></div>
+    <div id="view-manuales"     class="view"></div>
+    <div id="view-machine"      class="view"></div>
+    <div id="view-repuesto"     class="view"></div>
+    <div id="view-search"       class="view"></div>
+    <div id="view-stock-report" class="view"></div>
   </main>
 
   <nav class="bottom-nav">
@@ -1597,6 +1599,7 @@ function renderHome(){
   const el = document.getElementById('view-home')
   el.innerHTML = `
     <div id="home-greeting"></div>
+    <div id="home-stock-alert"></div>
     <div id="home-mylists"></div>
     <div id="home-recents"></div>
     <div style="padding:18px 16px 8px;text-align:center">
@@ -1610,6 +1613,7 @@ function renderHome(){
     </div>
   `
   renderHomeGreeting()
+  renderHomeStockAlert()
   renderHomeMyLists()
   renderHomeRecents()
 }
@@ -1735,6 +1739,161 @@ function copyPreviewUrl(){
     }).catch(() => tgApp?.showAlert?.(`Copiá esta URL:\n${url}`))
   } else {
     tgApp?.showAlert?.(`Tu URL de preview:\n${url}`)
+  }
+}
+
+// ── Stock alert card en Home ──────────────────────────────────────
+function getStockBajoItems(){
+  if (!__repuestosCache) return []
+  return __repuestosCache.filter(item => {
+    const r = item.repuesto
+    return r.stockFisico != null && r.stockMinimo != null && Number(r.stockFisico) < Number(r.stockMinimo)
+  }).sort((a, b) => {
+    // más crítico primero: mayor % de déficit
+    const defA = (a.repuesto.stockMinimo - a.repuesto.stockFisico) / (a.repuesto.stockMinimo || 1)
+    const defB = (b.repuesto.stockMinimo - b.repuesto.stockFisico) / (b.repuesto.stockMinimo || 1)
+    return defB - defA
+  })
+}
+
+function renderHomeStockAlert(){
+  const el = document.getElementById('home-stock-alert')
+  if (!el) return
+  const items = getStockBajoItems()
+  if (items.length === 0){
+    // Si hay cache y todo OK, mostrar badge verde; si no hay cache, no mostrar nada
+    if (!__repuestosCache){ el.innerHTML = ''; return }
+    el.innerHTML = `
+      <div onclick="openStockReport()" style="margin:8px 12px 0;padding:10px 14px;
+        background:rgba(79,174,78,.1);border:1px solid rgba(79,174,78,.25);
+        border-radius:10px;display:flex;align-items:center;gap:10px;cursor:pointer">
+        <span style="font-size:20px">✅</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;color:var(--green)">Stock OK</div>
+          <div style="font-size:11px;color:var(--hint)">Todos los repuestos sobre mínimo</div>
+        </div>
+        <span style="color:var(--hint);font-size:18px">›</span>
+      </div>`
+    return
+  }
+  el.innerHTML = `
+    <div onclick="openStockReport()" style="margin:8px 12px 0;padding:10px 14px;
+      background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);
+      border-radius:10px;display:flex;align-items:center;gap:10px;cursor:pointer;
+      animation:pulse-border 2s ease-in-out infinite">
+      <span style="font-size:20px">⚠️</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:700;color:#ef4444">${items.length} repuesto${items.length>1?'s':''} bajo mínimo</div>
+        <div style="font-size:11px;color:var(--hint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+          ${items.slice(0,3).map(i => escHtml(i.repuesto.textoBreve || i.repuesto.codigoSAP || '')).join(' · ')}${items.length>3?' …':''}
+        </div>
+      </div>
+      <span style="color:#ef4444;font-size:18px;font-weight:700">›</span>
+    </div>`
+}
+
+function openStockReport(){
+  tgApp?.HapticFeedback?.selectionChanged?.()
+  pushView('view-stock-report', 'Stock Bajo', 'Repuestos bajo mínimo')
+  renderStockReport()
+}
+
+function renderStockReport(){
+  const el = document.getElementById('view-stock-report')
+  if (!el) return
+  const items = getStockBajoItems()
+
+  if (!__repuestosCache){
+    el.innerHTML = `
+      <div class="notice" style="margin:16px">
+        <div style="text-align:center;padding:16px">
+          <div style="font-size:32px;margin-bottom:8px">⏳</div>
+          <div style="font-weight:600;margin-bottom:4px">Cargando catálogo…</div>
+          <div style="font-size:13px;color:var(--hint)">Ve a Buscar para cargar el catálogo primero</div>
+          <button onclick="switchTab('search');setTimeout(()=>loadAllRepuestos(),100)"
+            class="cell-action-btn" style="margin-top:12px">Cargar catálogo</button>
+        </div>
+      </div>`
+    return
+  }
+
+  if (items.length === 0){
+    el.innerHTML = `
+      <div style="text-align:center;padding:48px 24px">
+        <div style="font-size:48px;margin-bottom:12px">✅</div>
+        <div style="font-size:17px;font-weight:600;margin-bottom:6px">Todo en orden</div>
+        <div style="font-size:13px;color:var(--hint)">
+          Todos los repuestos con mínimo definido están sobre el umbral.
+        </div>
+      </div>`
+    return
+  }
+
+  el.innerHTML = `
+    <div style="padding:12px 12px 4px;display:flex;align-items:center;gap:8px">
+      <span style="font-size:13px;color:var(--hint)">${items.length} repuesto${items.length>1?'s':''} requieren reposición</span>
+      <span style="flex:1"></span>
+      <button onclick="exportStockBajoText()" style="background:none;border:1px solid var(--border);
+        color:var(--hint);padding:4px 10px;border-radius:8px;font-size:11px;cursor:pointer">📋 Copiar lista</button>
+    </div>
+    <div class="cell-group">
+      ${items.map(item => {
+        const r = item.repuesto
+        const deficit = r.stockMinimo - r.stockFisico
+        const pct = Math.round((deficit / r.stockMinimo) * 100)
+        const name = r.textoBreve || r.descripcion || r.alias || 'Sin nombre'
+        const urgency = pct >= 100 ? '#ef4444' : pct >= 50 ? '#f59e0b' : '#f59e0b'
+        const barFill = Math.min(100, 100 - pct)
+        return `<div class="cell" onclick="openRepuesto('${escHtmlAttr(item.machineId)}','${escHtmlAttr(r.id)}')">
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+            width:44px;height:44px;background:rgba(239,68,68,.12);border-radius:10px;
+            flex-shrink:0;font-size:11px;font-weight:700;color:${urgency};line-height:1.1;text-align:center">
+            <span>${r.stockFisico}</span>
+            <span style="font-size:9px;opacity:.7">/ ${r.stockMinimo}</span>
+          </div>
+          <div class="cell-body" style="gap:3px">
+            <div class="cell-title" style="font-size:13.5px">${escHtml(name)}</div>
+            ${r.codigoSAP ? `<div class="cell-meta">SAP ${escHtml(r.codigoSAP)}</div>` : ''}
+            <div style="display:flex;align-items:center;gap:6px;margin-top:2px">
+              <div style="flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden">
+                <div style="height:100%;width:${barFill}%;background:${urgency};border-radius:2px"></div>
+              </div>
+              <span style="font-size:10px;color:${urgency};font-weight:600">−${deficit} (${pct}%)</span>
+            </div>
+            <div style="font-size:11px;color:var(--hint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+              ${escHtml(item.machineName || '')}
+            </div>
+          </div>
+          <button onclick="event.stopPropagation();openStockConteoModal('${escHtmlAttr(item.machineId)}','${escHtmlAttr(r.id)}')"
+            style="background:rgba(79,174,78,.15);border:none;border-radius:8px;color:var(--green);
+              font-size:12px;font-weight:600;cursor:pointer;padding:6px 10px;white-space:nowrap;flex-shrink:0">
+            📦 Contar
+          </button>
+        </div>`
+      }).join('')}
+    </div>
+    <div style="padding:16px 12px 8px;text-align:center;font-size:11px;color:var(--hint)">
+      Datos del catálogo local · ${new Date(__repuestosCacheTs).toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'})}
+    </div>`
+}
+
+function exportStockBajoText(){
+  const items = getStockBajoItems()
+  if (items.length === 0) return
+  const lines = items.map(item => {
+    const r = item.repuesto
+    const name = r.textoBreve || r.descripcion || 'Sin nombre'
+    const sap = r.codigoSAP ? ` (SAP ${r.codigoSAP})` : ''
+    return `• ${name}${sap} — tiene ${r.stockFisico}, mínimo ${r.stockMinimo} [${item.machineName}]`
+  })
+  const text = `⚠️ Stock Bajo — ${new Date().toLocaleDateString('es-CL')}\n\n${lines.join('\n')}`
+  if (navigator.clipboard?.writeText){
+    navigator.clipboard.writeText(text).then(() => {
+      tgApp?.HapticFeedback?.notificationOccurred?.('success')
+      showToast('Lista copiada ✓', 'ok')
+    }).catch(() => tgApp?.showAlert?.(text))
+  } else {
+    tgApp?.showAlert?.(text)
   }
 }
 
@@ -2474,6 +2633,8 @@ async function loadAllRepuestos(){
   lsSet(LS_KEY_REPUESTOS, normalizeForCache(results))
   __globalLoadInProgress = false
   updateSearchProgress(null)
+  // Refrescar badge de stock en Home si está visible
+  if (currentTab === 'home') renderHomeStockAlert()
 }
 
 function invalidateRepuestosCache(){
@@ -4380,6 +4541,9 @@ async function saveStockConteo(machineId, repuestoId, cantidad){
   const inGlobal = __repuestosCache?.find(x => x.repuesto.id === repuestoId && x.machineId === machineId)
   if (inGlobal) Object.assign(inGlobal.repuesto, update)
   openRepuesto(machineId, repuestoId, { fromSave: true })
+  // Refrescar reporte de stock si está abierto, y badge en home
+  if (document.getElementById('view-stock-report')?.classList.contains('active')) renderStockReport()
+  renderHomeStockAlert()
   tgApp?.HapticFeedback?.notificationOccurred?.('success')
   try {
     await db.doc(`${path}/${repuestoId}`).update(update)
@@ -4415,6 +4579,8 @@ function openStockMinimoModal(machineId, repuestoId){
       const inGlobal = __repuestosCache?.find(x => x.repuesto.id === repuestoId && x.machineId === machineId)
       if (inGlobal) Object.assign(inGlobal.repuesto, localUpdate)
       openRepuesto(machineId, repuestoId, { fromSave: true })
+      if (document.getElementById('view-stock-report')?.classList.contains('active')) renderStockReport()
+      renderHomeStockAlert()
       try {
         await db.doc(`${path}/${repuestoId}`).update(update)
         showToast('Stock mínimo actualizado ✓', 'ok')
