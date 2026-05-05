@@ -2307,6 +2307,7 @@ function openStockReport(){
 function renderStockReport(){
   const el = document.getElementById('view-stock-report')
   if (!el) return
+  const canAdmin = userRole === 'admin' || userRole === 'supervisor'
   const items = getStockBajoItems()
 
   if (!__repuestosCache){
@@ -2354,12 +2355,17 @@ function renderStockReport(){
         const name = r.textoBreve || r.descripcion || r.alias || 'Sin nombre'
         const urgency = pct >= 100 ? '#ef4444' : pct >= 50 ? '#f59e0b' : '#f59e0b'
         const barFill = Math.min(100, 100 - pct)
-        return `<div class="cell" onclick="openRepuesto('${escHtmlAttr(item.machineId)}','${escHtmlAttr(r.id)}')">
-          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+        const midMin = escHtmlAttr(item.machineId)
+        const ridMin = escHtmlAttr(r.id)
+        return `<div class="cell" onclick="openRepuesto('${midMin}','${ridMin}')">
+          <div onclick="${canAdmin ? `event.stopPropagation();editStockMinimoInline('${midMin}','${ridMin}',${r.stockMinimo})` : ''}"
+            style="display:flex;flex-direction:column;align-items:center;justify-content:center;
             width:44px;height:44px;background:rgba(239,68,68,.12);border-radius:10px;
-            flex-shrink:0;font-size:11px;font-weight:700;color:${urgency};line-height:1.1;text-align:center">
+            flex-shrink:0;font-size:11px;font-weight:700;color:${urgency};line-height:1.1;text-align:center;
+            ${canAdmin ? 'cursor:pointer;' : ''}position:relative">
             <span>${r.stockFisico}</span>
             <span style="font-size:9px;opacity:.7">/ ${r.stockMinimo}</span>
+            ${canAdmin ? `<span style="position:absolute;bottom:-1px;right:-1px;font-size:8px;opacity:.55;line-height:1">✏️</span>` : ''}
           </div>
           <div class="cell-body" style="gap:3px">
             <div class="cell-title" style="font-size:13.5px">${escHtml(name)}</div>
@@ -2374,11 +2380,18 @@ function renderStockReport(){
               ${escHtml(item.machineName || '')}
             </div>
           </div>
-          <button onclick="event.stopPropagation();openStockConteoModal('${escHtmlAttr(item.machineId)}','${escHtmlAttr(r.id)}')"
-            style="background:rgba(79,174,78,.15);border:none;border-radius:8px;color:var(--green);
-              font-size:12px;font-weight:600;cursor:pointer;padding:6px 10px;white-space:nowrap;flex-shrink:0">
-            📦 Contar
-          </button>
+          <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
+            <button onclick="event.stopPropagation();openStockConteoModal('${midMin}','${ridMin}')"
+              style="background:rgba(79,174,78,.15);border:none;border-radius:8px;color:var(--green);
+                font-size:12px;font-weight:600;cursor:pointer;padding:6px 10px;white-space:nowrap">
+              📦 Contar
+            </button>
+            ${canAdmin ? `<button onclick="event.stopPropagation();editStockMinimoInline('${midMin}','${ridMin}',${r.stockMinimo})"
+              style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--hint);
+                font-size:11px;cursor:pointer;padding:3px 8px;white-space:nowrap">
+              ✏️ mín
+            </button>` : ''}
+          </div>
         </div>`
       }).join('')}
     </div>
@@ -2405,6 +2418,40 @@ function exportStockBajoText(){
   } else {
     tgApp?.showAlert?.(text)
   }
+}
+
+function editStockMinimoInline(machineId, repId, currentMin){
+  if (userRole !== 'admin' && userRole !== 'supervisor') return
+  const current = currentMin ?? ''
+  showInputModal('Editar mínimo de stock', String(current), 'Cantidad mínima (0 = sin mínimo)', async (val) => {
+    const parsed = parseInt(val, 10)
+    if (isNaN(parsed) || parsed < 0) { showToast('Valor inválido', 'err'); return }
+    if (parsed === currentMin) return
+
+    const collPath = getRepuestoCollPath(machineId)
+    try {
+      await db.doc(`${collPath}/${repId}`).update({
+        stockMinimo: parsed,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedBy: uid,
+      })
+      // Actualizar caches locales
+      if (repCache[machineId]){
+        const rep = repCache[machineId].find(r => r.id === repId)
+        if (rep) rep.stockMinimo = parsed
+      }
+      if (__repuestosCache){
+        const item = __repuestosCache.find(i => i.machineId === machineId && i.repuesto.id === repId)
+        if (item) item.repuesto.stockMinimo = parsed
+      }
+      tgApp?.HapticFeedback?.notificationOccurred?.('success')
+      showToast(`Mínimo actualizado a ${parsed} ✓`, 'ok')
+      renderStockReport()
+      renderHomeStockAlert()
+    } catch(err){
+      showToast('Error: ' + (err.message || ''), 'err')
+    }
+  })
 }
 
 function listTotalCount(list){
