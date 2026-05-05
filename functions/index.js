@@ -4354,3 +4354,56 @@ exports.animeEstrenosManual = onRequest(
     res.json({ ok: true });
   }
 );
+
+// ═══════════════════════════════════════════════════════════════════
+// STOCK BAJO MÍNIMO — Notificación al registrar conteo
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * stockAuditLog/{logId} onCreate → Push FCM + Telegram cuando bajoMinimo === true
+ * Fuente: bot Mini App o PWA (campo source: 'bot' | 'pwa')
+ */
+exports.onStockConteoCreated = onDocumentCreated('stockAuditLog/{logId}', async (event) => {
+  const data = event.data?.data()
+  if (!data) return
+
+  // Solo notificar cuando el stock queda bajo mínimo
+  if (data.bajoMinimo !== true) return
+
+  const {
+    repuestoName, machineName, cantidad, stockMinimo,
+    codigoSAP, userName, machineId, repuestoId, source,
+  } = data
+
+  const repLabel     = repuestoName || codigoSAP || 'Repuesto'
+  const machineLabel = machineName  || machineId  || 'Equipo'
+  const sourceLabel  = source === 'pwa' ? 'PWA' : 'Bot'
+  const title = '⚠️ Stock bajo mínimo'
+  const body  = `${repLabel} → ${cantidad}/${stockMinimo} en ${machineLabel}`
+
+  // ── FCM: admins y supervisores ──────────────────────────────
+  const adminIds = await getSupervisorsAndAdmins()
+  const tokens   = await getTokensForUsers(adminIds)
+
+  if (tokens.length > 0) {
+    await sendNotification(tokens, title, body, {
+      type:       'STOCK_BAJO',
+      machineId:  machineId  || '',
+      repuestoId: repuestoId || '',
+      url:        '/repuestos',
+    })
+    logger.info('Stock bajo notificado', { repLabel, machineLabel, cantidad, stockMinimo, tokens: tokens.length })
+  }
+
+  // ── Telegram: topic de repuestos ────────────────────────────
+  const repTopicId = getTopicId('repuestos')
+  await sendTelegramMessage(
+    `⚠️ <b>Stock bajo mínimo</b> <i>(${sourceLabel})</i>\n\n` +
+    `📦 <b>${repLabel}</b>\n` +
+    `🔢 Cantidad: <b>${cantidad}</b> (mín: ${stockMinimo})\n` +
+    `🏭 ${machineLabel}\n` +
+    `👤 ${userName || 'usuario'}`,
+    undefined,
+    { topicId: repTopicId }
+  )
+})
