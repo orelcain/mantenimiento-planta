@@ -167,8 +167,9 @@ export function RepuestoDetailModal({
   const [savingMin, setSavingMin] = useState(false)
   const [showConteo, setShowConteo] = useState(false)
   const [conteoVal, setConteoVal] = useState('')
+  const [conteoObs, setConteoObs] = useState('')
   const [savingConteo, setSavingConteo] = useState(false)
-  const [historial, setHistorial] = useState<{ cantidad: number; userName: string; ts: number; bajoMinimo: boolean | null }[]>([])
+  const [historial, setHistorial] = useState<{ cantidad: number; userName: string; ts: number; bajoMinimo: boolean | null; observaciones?: string }[]>([])
   const [showHistorial, setShowHistorial] = useState(false)
   const [loadingHistorial, setLoadingHistorial] = useState(false)
 
@@ -201,7 +202,8 @@ export function RepuestoDetailModal({
         stockFisico: val,
         updatedAt: new Date(),
       })
-      const logEntry = {
+      const obs = conteoObs.trim()
+      const logEntry: Record<string, unknown> = {
         userId: user?.id || '',
         userName: user?.nombre || user?.email || 'usuario',
         machineId,
@@ -215,17 +217,19 @@ export function RepuestoDetailModal({
         ts: Date.now(),
         source: 'pwa',
       }
+      if (obs) logEntry.observaciones = obs
       await addDoc(collection(db, 'stockAuditLog'), logEntry)
       setLocalStock(val)
-      setHistorial(prev => [{ cantidad: val, userName: logEntry.userName, ts: logEntry.ts, bajoMinimo: logEntry.bajoMinimo }, ...prev].slice(0, 5))
+      setHistorial(prev => [{ cantidad: val, userName: String(logEntry.userName), ts: Number(logEntry.ts), bajoMinimo: logEntry.bajoMinimo as boolean | null, observaciones: obs || undefined }, ...prev].slice(0, 5))
       setShowConteo(false)
       setConteoVal('')
+      setConteoObs('')
     } catch (err) {
       logger.error('Error registrando conteo', err instanceof Error ? err : new Error(String(err)))
     } finally {
       setSavingConteo(false)
     }
-  }, [conteoVal, machineId, colPath, rep, user, machineName, localMin])
+  }, [conteoVal, conteoObs, machineId, colPath, rep, user, machineName, localMin])
 
   const loadHistorial = useCallback(async () => {
     if (!machineId) return
@@ -234,7 +238,7 @@ export function RepuestoDetailModal({
       const q = query(collection(db, 'stockAuditLog'), where('repuestoId', '==', rep.id), limit(10))
       const snap = await getDocs(q)
       const entries = snap.docs
-        .map(d => { const data = d.data(); return { cantidad: data.cantidad, userName: data.userName || '', ts: data.ts || 0, bajoMinimo: data.bajoMinimo ?? null } })
+        .map(d => { const data = d.data(); return { cantidad: data.cantidad, userName: data.userName || '', ts: data.ts || 0, bajoMinimo: data.bajoMinimo ?? null, observaciones: data.observaciones || undefined } })
         .sort((a, b) => b.ts - a.ts)
         .slice(0, 5)
       setHistorial(entries)
@@ -249,12 +253,13 @@ export function RepuestoDetailModal({
     const name = rep.textoBreve || rep.descripcion || rep.codigoSAP || 'repuesto'
     const fecha = new Date().toLocaleDateString('es-CL').replace(/\//g, '-')
     const BOM = '﻿'
-    const header = ['Fecha', 'Cantidad', 'Usuario', 'Bajo Mínimo', 'Equipo', 'SAP']
+    const header = ['Fecha', 'Cantidad', 'Usuario', 'Bajo Mínimo', 'Observaciones', 'Equipo', 'SAP']
     const rows = historial.map(h => [
       new Date(h.ts).toLocaleString('es-CL'),
       h.cantidad,
       `"${h.userName.replace(/"/g, '""')}"`,
       h.bajoMinimo === true ? 'Sí' : h.bajoMinimo === false ? 'No' : '',
+      `"${(h.observaciones || '').replace(/"/g, '""')}"`,
       `"${(machineName || '').replace(/"/g, '""')}"`,
       rep.codigoSAP || '',
     ].join(','))
@@ -567,7 +572,7 @@ export function RepuestoDetailModal({
                           min={0}
                           value={conteoVal}
                           onChange={e => setConteoVal(e.target.value)}
-                          onKeyDown={e => { if (e.key === 'Enter') registrarConteo(); if (e.key === 'Escape') setShowConteo(false) }}
+                          onKeyDown={e => { if (e.key === 'Escape') setShowConteo(false) }}
                           placeholder="0"
                           autoFocus
                           className="flex-1 h-9 rounded-lg border border-border bg-background px-3 text-sm font-mono tabular-nums text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
@@ -580,7 +585,7 @@ export function RepuestoDetailModal({
                           {savingConteo ? '…' : <Check className="h-4 w-4" />}
                         </button>
                         <button
-                          onClick={() => setShowConteo(false)}
+                          onClick={() => { setShowConteo(false); setConteoObs('') }}
                           className="h-9 px-2 rounded-lg hover:bg-muted/50 text-muted-foreground transition-colors"
                         >
                           <XIcon className="h-4 w-4" />
@@ -591,6 +596,14 @@ export function RepuestoDetailModal({
                           {parseInt(conteoVal) < localMin ? `⚠ Quedará bajo el mínimo (${localMin})` : `✓ Sobre el mínimo (${localMin})`}
                         </div>
                       )}
+                      <textarea
+                        value={conteoObs}
+                        onChange={e => setConteoObs(e.target.value)}
+                        placeholder="Observaciones (opcional)"
+                        maxLength={200}
+                        rows={2}
+                        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
+                      />
                     </div>
                   )}
 
@@ -621,14 +634,19 @@ export function RepuestoDetailModal({
                         <div className="text-xs text-muted-foreground">Sin conteos registrados</div>
                       )}
                       {historial.map((h, i) => (
-                        <div key={i} className="flex items-center justify-between bg-muted/20 rounded-lg px-3 py-1.5 text-xs">
-                          <span className={`font-bold tabular-nums ${h.bajoMinimo ? 'text-red-400' : 'text-emerald-400'}`}>
-                            {h.bajoMinimo ? '⚠' : '✓'} {h.cantidad}
-                          </span>
-                          <span className="text-muted-foreground">{h.userName}</span>
-                          <span className="text-muted-foreground font-mono">
-                            {new Date(h.ts).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                          </span>
+                        <div key={i} className="bg-muted/20 rounded-lg px-3 py-1.5 text-xs space-y-0.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className={`font-bold tabular-nums ${h.bajoMinimo ? 'text-red-400' : 'text-emerald-400'}`}>
+                              {h.bajoMinimo ? '⚠' : '✓'} {h.cantidad}
+                            </span>
+                            <span className="text-muted-foreground truncate">{h.userName}</span>
+                            <span className="text-muted-foreground font-mono shrink-0">
+                              {new Date(h.ts).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          {h.observaciones && (
+                            <div className="text-muted-foreground italic truncate">"{h.observaciones}"</div>
+                          )}
                         </div>
                       ))}
                     </div>

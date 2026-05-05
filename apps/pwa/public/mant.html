@@ -338,6 +338,11 @@ mark{background:rgba(var(--accent-rgb,82,136,193),.25);color:inherit;border-radi
   border:1px solid var(--divider);border-radius:8px;color:var(--text);
   font-size:15px;outline:none;margin-bottom:14px;font-family:inherit}
 #input-modal input:focus{border-color:var(--accent)}
+#input-modal textarea#modal-obs{display:none;width:100%;padding:10px 12px;background:var(--bg);
+  border:1px solid var(--divider);border-radius:8px;color:var(--text);
+  font-size:13px;outline:none;margin-bottom:14px;font-family:inherit;resize:vertical;min-height:58px}
+#input-modal textarea#modal-obs:focus{border-color:var(--accent)}
+#input-modal.with-obs textarea#modal-obs{display:block}
 #input-modal .btns{display:flex;gap:8px;justify-content:flex-end}
 
 /* ── Toast ──────────────────────────────────────────────────────────── */
@@ -488,6 +493,7 @@ mark{background:rgba(var(--accent-rgb,82,136,193),.25);color:inherit;border-radi
   <div class="box">
     <div id="modal-title" class="ttl">Nombre</div>
     <input id="modal-input" type="text" maxlength="40" placeholder="Ej. Cuchillos, Sensores, Resortes…">
+    <textarea id="modal-obs" rows="2" maxlength="200" placeholder="Observaciones (opcional)"></textarea>
     <div class="btns">
       <button class="btn-cancel" onclick="closeInputModal()">Cancelar</button>
       <button class="btn-save" id="modal-ok" style="flex:0 0 auto;padding:10px 18px">OK</button>
@@ -1914,10 +1920,10 @@ function startActivityLogListener(){
     }, err => console.warn('activity listener error', err?.code || err))
 }
 
-async function logStockConteo(machineId, machineName, repuestoId, repuestoName, codigoSAP, cantidad, stockMinimo){
+async function logStockConteo(machineId, machineName, repuestoId, repuestoName, codigoSAP, cantidad, stockMinimo, observaciones){
   if (IS_PREVIEW) return   // no escribir en Firestore desde preview
   try {
-    await db.collection('stockAuditLog').add({
+    const doc = {
       userId:       uid || 'anon',
       userName:     firstName || tgApp?.initDataUnsafe?.user?.first_name || 'usuario',
       machineId,    machineName:  machineName  || machineId,
@@ -1928,7 +1934,9 @@ async function logStockConteo(machineId, machineName, repuestoId, repuestoName, 
       bajoMinimo:   stockMinimo != null ? cantidad < stockMinimo : null,
       ts:           Date.now(),
       source:       'bot',
-    })
+    }
+    if (observaciones) doc.observaciones = observaciones
+    await db.collection('stockAuditLog').add(doc)
   } catch(e){ console.warn('logStockConteo error', e?.message || e) }
 }
 
@@ -1968,6 +1976,7 @@ function activityEntryHtml(entry){
       <div style="font-size:11px;color:var(--hint);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
         ${machine} · ${when}${entry.source==='pwa'?' · PWA':''}
       </div>
+      ${entry.observaciones ? `<div style="font-size:11px;color:var(--sub);margin-top:2px;font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">"${escHtml(entry.observaciones)}"</div>` : ''}
     </div>
   </div>`
 }
@@ -4497,9 +4506,12 @@ async function openRepuesto(machineId, repuestoId, opts = {}){
                 ${r.stockHistorial.slice(1, 10).map(h => {
                   const diff = (r.stockHistorial[0]?.cantidad ?? h.cantidad) - h.cantidad
                   const arrow = diff > 0 ? '↑' : diff < 0 ? '↓' : '·'
-                  return `<div style="padding:4px 0;color:var(--sub);display:flex;justify-content:space-between;gap:8px">
-                    <span><b style="color:var(--text)">${h.cantidad}</b> ${arrow} ${escHtml(h.por||'')}</span>
-                    <span style="opacity:.7">${relativeTime(h.ts)}</span>
+                  return `<div style="padding:4px 0;color:var(--sub)">
+                    <div style="display:flex;justify-content:space-between;gap:8px">
+                      <span><b style="color:var(--text)">${h.cantidad}</b> ${arrow} ${escHtml(h.por||'')}</span>
+                      <span style="opacity:.7">${relativeTime(h.ts)}</span>
+                    </div>
+                    ${h.obs ? `<div style="font-style:italic;font-size:11px;opacity:.75;margin-top:1px">"${escHtml(h.obs)}"</div>` : ''}
                   </div>`
                 }).join('')}
               </div>
@@ -5249,24 +5261,30 @@ function refreshMachineDetailIfActive(machineId){
 // INPUT MODAL (text prompt)
 // ═══════════════════════════════════════════════════════════════════
 let _modalCb = null
-function showInputModal(title, defaultValue, placeholder, onOk){
+function showInputModal(title, defaultValue, placeholder, onOk, { withObs = false } = {}){
+  const modal = document.getElementById('input-modal')
   document.getElementById('modal-title').textContent = title
   const inp = document.getElementById('modal-input')
   inp.value = defaultValue || ''
   inp.placeholder = placeholder || ''
-  document.getElementById('input-modal').classList.add('open')
+  const obsEl = document.getElementById('modal-obs')
+  obsEl.value = ''
+  if (withObs) modal.classList.add('with-obs'); else modal.classList.remove('with-obs')
+  modal.classList.add('open')
   setTimeout(() => inp.focus(), 80)
   _modalCb = onOk
   document.getElementById('modal-ok').onclick = () => {
     const v = inp.value
+    const obs = withObs ? obsEl.value.trim() : ''
     const cb = _modalCb   // guardar ref ANTES de closeInputModal que la anula
     closeInputModal()
-    if (cb) cb(v)
+    if (cb) cb(v, obs)
   }
-  inp.onkeydown = (e) => { if (e.key === 'Enter') document.getElementById('modal-ok').click() }
+  inp.onkeydown = (e) => { if (e.key === 'Enter' && !withObs) document.getElementById('modal-ok').click() }
 }
 function closeInputModal(){
-  document.getElementById('input-modal').classList.remove('open')
+  const modal = document.getElementById('input-modal')
+  modal.classList.remove('open', 'with-obs')
   _modalCb = null
 }
 
@@ -5304,14 +5322,15 @@ function openStockConteoModal(machineId, repuestoId){
     `Stock físico — ${r.textoBreve || 'Repuesto'}`,
     current,
     'Cantidad en bodega',
-    async (val) => {
+    async (val, obs) => {
       if (val == null || val === '') return
       const n = Number(String(val).replace(',', '.'))
       if (!Number.isFinite(n) || n < 0){
         showToast('Cantidad inválida', 'err'); return
       }
-      await saveStockConteo(machineId, repuestoId, Math.round(n))
-    }
+      await saveStockConteo(machineId, repuestoId, Math.round(n), { observaciones: obs || '' })
+    },
+    { withObs: true }
   )
   // Mejor UX en mobile: input numérico
   const inp = document.getElementById('modal-input')
@@ -5319,14 +5338,14 @@ function openStockConteoModal(machineId, repuestoId){
 }
 
 // silent=true: no navegar al detalle (usado por modo conteo rápido)
-async function saveStockConteo(machineId, repuestoId, cantidad, { silent = false } = {}){
+async function saveStockConteo(machineId, repuestoId, cantidad, { silent = false, observaciones = '' } = {}){
   const path = getRepuestoCollPath(machineId)
   const who = firstName || tgApp?.initDataUnsafe?.user?.first_name || 'usuario'
   const ts = Date.now()
   const r = (repCache[machineId] || []).find(x => x.id === repuestoId)
   // Historial: mantener últimos 10 conteos
   const prevHist = Array.isArray(r?.stockHistorial) ? r.stockHistorial : []
-  const newEntry = { cantidad, ts, por: who }
+  const newEntry = { cantidad, ts, por: who, ...(observaciones ? { obs: observaciones } : {}) }
   const stockHistorial = [newEntry, ...prevHist].slice(0, 10)
   const update = { stockFisico: cantidad, stockContadoEn: ts, stockContadoPor: who, stockHistorial }
   if (r) Object.assign(r, update)
@@ -5339,7 +5358,7 @@ async function saveStockConteo(machineId, repuestoId, cantidad, { silent = false
   tgApp?.HapticFeedback?.notificationOccurred?.('success')
   // Audit log: registrar en Firestore (fire-and-forget, no bloquea UX)
   const machineName = machineMap[machineId]?.nombre || hierarchyNodesMap?.[machineId]?.nombre || machineId
-  logStockConteo(machineId, machineName, repuestoId, r?.textoBreve || '', r?.codigoSAP || '', cantidad, r?.stockMinimo ?? null)
+  logStockConteo(machineId, machineName, repuestoId, r?.textoBreve || '', r?.codigoSAP || '', cantidad, r?.stockMinimo ?? null, observaciones)
   try {
     await db.doc(`${path}/${repuestoId}`).update(update)
     showToast('Stock actualizado ✓', 'ok')
