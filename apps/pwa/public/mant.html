@@ -605,7 +605,7 @@ const LS_KEY_REPUESTOS = 'mant_repuestos_v2'
 const LS_KEY_MANUALES  = 'mant_manuales_v2'
 const LS_KEY_HIERARCHY = 'mant_hierarchy_v2'
 const LS_TTL_HIER  =  6 * 60 * 60 * 1000   //  6h — jerarquía cambia raro
-const LS_TTL_REP   =  2 * 60 * 60 * 1000   //  2h — repuestos cambian poco
+const LS_TTL_REP   =  5 * 60 * 1000        //  5min — sincronización rápida con PWA
 const LS_TTL_MAN   = 24 * 60 * 60 * 1000   // 24h — manuales casi no cambian
 
 function lsGet(key, maxAgeMs){
@@ -2431,10 +2431,12 @@ async function loadAllRepuestos(){
   try {
     // Asegurar jerarquía cargada para conocer total de unidades a escanear
     await loadHierarchyTree()
-    // No filtramos por activa: equipos archivados igual contienen repuestos válidos
-    // que el usuario debe poder buscar (ej: Baader 142 tiene activa=false pero 1803 reps)
+    // No filtramos por activa: equipos archivados igual contienen repuestos válidos.
+    // En hierarchy escaneamos TODOS los nodos activos (no solo leaf): un nodo
+    // intermedio puede tener repuestos propios (ej: 'CINTA ACELERACION 1 GRADER'
+    // tiene un MOTOREDUCTOR como subnodo y aún así tiene su propio repuesto SAP).
     const activeMachines = machines
-    const leafNodes = Object.values(hierarchyNodesMap).filter(n => isEquipNode(n))
+    const leafNodes = Object.values(hierarchyNodesMap).filter(n => n.activo !== false)
     const totalUnits = activeMachines.length + leafNodes.length
     let done = 0
     const BATCH = 16
@@ -2501,9 +2503,30 @@ function renderSearchStats(){
     el.innerHTML = `<div style="font-size:12px;color:var(--sub)">Cargando catálogo de repuestos…</div>`
     return
   }
-  const eqCount = machines.length + Object.values(hierarchyNodesMap || {}).filter(n => isEquipNode(n)).length
+  const eqCount = machines.length + Object.values(hierarchyNodesMap || {}).filter(n => n.activo !== false).length
+  const ageMs = Date.now() - (__repuestosCacheTs || Date.now())
+  const ageMin = Math.floor(ageMs / 60000)
+  const ageTxt = ageMin < 1 ? 'recién' : ageMin === 1 ? 'hace 1 min' : `hace ${ageMin} min`
   el.style.display = 'block'
-  el.innerHTML = `<div style="font-size:12px;color:var(--sub)">📊 Buscando entre <b>${repCount.toLocaleString('es')}</b> repuestos en <b>${eqCount}</b> equipos</div>`
+  el.innerHTML = `<div style="font-size:12px;color:var(--sub);display:flex;align-items:center;justify-content:center;gap:8px">
+    <span>📊 <b>${repCount.toLocaleString('es')}</b> repuestos · <b>${eqCount}</b> equipos · <span style="opacity:.7">${ageTxt}</span></span>
+    <button onclick="refreshSearchCatalog()" id="search-refresh-btn"
+      style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--accent);font-size:11px;cursor:pointer;padding:2px 8px"
+      title="Refrescar catálogo">🔄</button>
+  </div>`
+}
+
+async function refreshSearchCatalog(){
+  const btn = document.getElementById('search-refresh-btn')
+  if (btn){ btn.disabled = true; btn.textContent = '…' }
+  invalidateRepuestosCache()
+  await loadAllRepuestos()
+  ensureSearchableHaystacks()
+  const inp = document.getElementById('search-input')
+  renderSearchBody(inp?.value?.trim() || '')
+  renderSearchStats()
+  tgApp?.HapticFeedback?.notificationOccurred?.('success')
+  showToast('Catálogo actualizado ✓', 'ok')
 }
 
 // Pre-calcula campos normalizados una sola vez para evitar normalizar en cada keystroke
