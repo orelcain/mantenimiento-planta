@@ -2431,7 +2431,9 @@ async function loadAllRepuestos(){
   try {
     // Asegurar jerarquía cargada para conocer total de unidades a escanear
     await loadHierarchyTree()
-    const activeMachines = machines.filter(m => m.activa !== false)
+    // No filtramos por activa: equipos archivados igual contienen repuestos válidos
+    // que el usuario debe poder buscar (ej: Baader 142 tiene activa=false pero 1803 reps)
+    const activeMachines = machines
     const leafNodes = Object.values(hierarchyNodesMap).filter(n => isEquipNode(n))
     const totalUnits = activeMachines.length + leafNodes.length
     let done = 0
