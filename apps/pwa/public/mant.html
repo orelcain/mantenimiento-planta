@@ -433,6 +433,7 @@ mark{background:rgba(var(--accent-rgb,82,136,193),.25);color:inherit;border-radi
     <div id="view-repuesto"     class="view"></div>
     <div id="view-search"       class="view"></div>
     <div id="view-stock-report" class="view"></div>
+    <div id="view-activity"     class="view"></div>
   </main>
 
   <nav class="bottom-nav">
@@ -762,6 +763,11 @@ function showApp(){
   startMachinesListener()
   // Stock listeners: arranca con prefs actuales, se re-ajusta si cambian las listas
   startFavMachinesStockListeners()
+  // Audit log: listener real-time para el feed de actividad en Home
+  startActivityLogListener()
+  // Cargar catálogo global en background para que el badge de stock aparezca en Home
+  // sin necesidad de que el usuario visite Buscar primero
+  setTimeout(() => loadAllRepuestos(), 800)
 }
 
 /** Listener real-time de la colección machines.
@@ -1668,6 +1674,7 @@ function renderHome(){
   el.innerHTML = `
     <div id="home-greeting"></div>
     <div id="home-stock-alert"></div>
+    <div id="home-activity"></div>
     <div id="home-mylists"></div>
     <div id="home-recents"></div>
     <div style="padding:18px 16px 8px;text-align:center">
@@ -1682,6 +1689,7 @@ function renderHome(){
   `
   renderHomeGreeting()
   renderHomeStockAlert()
+  renderHomeActivity()
   renderHomeMyLists()
   renderHomeRecents()
 }
@@ -1808,6 +1816,107 @@ function copyPreviewUrl(){
   } else {
     tgApp?.showAlert?.(`Tu URL de preview:\n${url}`)
   }
+}
+
+// ── Actividad de conteos (Audit Log) ─────────────────────────────
+let activityLog = []        // cache local: [{userName, repuestoName, machineName, cantidad, stockMinimo, bajoMinimo, ts, source}]
+let activityLogUnsub = null
+
+function startActivityLogListener(){
+  if (activityLogUnsub) return
+  activityLogUnsub = db.collection('stockAuditLog')
+    .orderBy('ts', 'desc')
+    .limit(20)
+    .onSnapshot({ includeMetadataChanges: false }, snap => {
+      activityLog = snap.docs.map(d => d.data())
+      if (document.getElementById('home-activity')) renderHomeActivity()
+    }, err => console.warn('activity listener error', err?.code || err))
+}
+
+async function logStockConteo(machineId, machineName, repuestoId, repuestoName, codigoSAP, cantidad, stockMinimo){
+  if (IS_PREVIEW) return   // no escribir en Firestore desde preview
+  try {
+    await db.collection('stockAuditLog').add({
+      userId:       uid || 'anon',
+      userName:     firstName || tgApp?.initDataUnsafe?.user?.first_name || 'usuario',
+      machineId,    machineName:  machineName  || machineId,
+      repuestoId,   repuestoName: repuestoName || '',
+      codigoSAP:    codigoSAP   || '',
+      cantidad,
+      stockMinimo:  stockMinimo ?? null,
+      bajoMinimo:   stockMinimo != null ? cantidad < stockMinimo : null,
+      ts:           Date.now(),
+      source:       'bot',
+    })
+  } catch(e){ console.warn('logStockConteo error', e?.message || e) }
+}
+
+function renderHomeActivity(){
+  const el = document.getElementById('home-activity')
+  if (!el) return
+  if (activityLog.length === 0){ el.innerHTML = ''; return }
+
+  const shown = activityLog.slice(0, 5)
+  el.innerHTML = `
+    <div class="section-actions" style="padding-top:12px">
+      <span class="section-title">Actividad reciente</span>
+      ${activityLog.length > 5
+        ? `<button class="btn-text" onclick="openActivityView()">Ver todo (${activityLog.length})</button>`
+        : ''}
+    </div>
+    <div style="padding:0 12px">
+      ${shown.map(entry => activityEntryHtml(entry)).join('')}
+    </div>`
+}
+
+function activityEntryHtml(entry){
+  const icon = entry.bajoMinimo === true ? '⚠️' : entry.bajoMinimo === false ? '✅' : '📦'
+  const name = escHtml(entry.repuestoName || entry.codigoSAP || 'Repuesto')
+  const machine = escHtml(entry.machineName || entry.machineId || '')
+  const user = escHtml(entry.userName || 'usuario')
+  const qty = entry.cantidad ?? '?'
+  const when = relativeTime(entry.ts)
+  const isMe = entry.userId === uid
+  return `<div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;
+      border-bottom:1px solid var(--divider)">
+    <span style="font-size:17px;margin-top:1px;flex-shrink:0">${icon}</span>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+        <b style="color:${isMe?'var(--accent)':'var(--text)'}">${user}</b> contó <b>${qty}</b> · ${name}
+      </div>
+      <div style="font-size:11px;color:var(--hint);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+        ${machine} · ${when}${entry.source==='pwa'?' · PWA':''}
+      </div>
+    </div>
+  </div>`
+}
+
+function openActivityView(){
+  pushView('view-activity', 'Actividad', 'Historial de conteos')
+  renderActivityView()
+}
+
+function renderActivityView(){
+  const el = document.getElementById('view-activity')
+  if (!el) return
+  if (activityLog.length === 0){
+    el.innerHTML = `<div style="text-align:center;padding:48px 24px">
+      <div style="font-size:40px;margin-bottom:8px">📋</div>
+      <div style="font-weight:600">Sin actividad registrada</div>
+      <div style="font-size:13px;color:var(--hint);margin-top:4px">Los conteos de stock aparecerán acá</div>
+    </div>`
+    return
+  }
+  el.innerHTML = `
+    <div style="padding:12px 12px 4px;font-size:12px;color:var(--hint)">
+      Últimos ${activityLog.length} conteos de todos los usuarios
+    </div>
+    <div style="padding:0 12px">
+      ${activityLog.map(entry => activityEntryHtml(entry)).join('')}
+    </div>
+    <div style="padding:12px;text-align:center;font-size:11px;color:var(--hint)">
+      Solo se guardan los últimos 20 registros
+    </div>`
 }
 
 // ── Stock alert card en Home ──────────────────────────────────────
@@ -4613,6 +4722,9 @@ async function saveStockConteo(machineId, repuestoId, cantidad){
   if (document.getElementById('view-stock-report')?.classList.contains('active')) renderStockReport()
   renderHomeStockAlert()
   tgApp?.HapticFeedback?.notificationOccurred?.('success')
+  // Audit log: registrar en Firestore (fire-and-forget, no bloquea UX)
+  const machineName = machineMap[machineId]?.nombre || hierarchyNodesMap?.[machineId]?.nombre || machineId
+  logStockConteo(machineId, machineName, repuestoId, r?.textoBreve || '', r?.codigoSAP || '', cantidad, r?.stockMinimo ?? null)
   try {
     await db.doc(`${path}/${repuestoId}`).update(update)
     showToast('Stock actualizado ✓', 'ok')
