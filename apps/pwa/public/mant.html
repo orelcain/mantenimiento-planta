@@ -566,7 +566,7 @@ let navStack = []   // [{viewId, title, subtitle, scrollTop}]
 let machines = [], machineMap = {}
 let categories = [], allCategoriesMap = {}, categoryDescendants = {}
 let repCache = {}              // machineId → repuesto[]
-let prefs = { favoriteLists: [], repuestoFavLists: {} }
+let prefs = { favoriteLists: [], repuestoFavLists: {}, insumoFavLists: [] }
 let machineLinkedNodes = {}    // machineId → [hierarchyNodeId]
 let nodeNameCache = {}         // nodeId → resolved name
 
@@ -781,6 +781,8 @@ function showApp(){
   // Cargar catálogo global en background para que el badge de stock aparezca en Home
   // sin necesidad de que el usuario visite Buscar primero
   setTimeout(() => loadAllRepuestos(), 800)
+  // Pre-cargar insumos en background (permite contar bajo-mínimo en home stock alert)
+  setTimeout(() => loadInsumos().then(() => renderHomeStockAlert()).catch(() => {}), 1200)
 }
 
 /** Listener real-time de la colección machines.
@@ -978,6 +980,7 @@ async function loadPrefs(){
     prefs = {
       favoriteLists:    d.favoriteLists    || [],
       repuestoFavLists: d.repuestoFavLists || {},
+      insumoFavLists:   d.insumoFavLists   || [],
     }
     // Fix one-shot: restaurar list.machineIds si datos fueron corrompidos
     const fixed = _normalizeFavLists(prefs.favoriteLists)
@@ -996,6 +999,7 @@ function startPrefsListener(){
     const next = {
       favoriteLists:    d.favoriteLists    || [],
       repuestoFavLists: d.repuestoFavLists || {},
+      insumoFavLists:   d.insumoFavLists   || [],
     }
     // Normalizar: asegurar list.machineIds = unión de todos los equipos
     _normalizeFavLists(next.favoriteLists)
@@ -1082,6 +1086,7 @@ function tabHeader(tab){
   if (tab === 'hierarchy') setHeader('Jerarquía', 'Navegar planta completa', false)
   if (tab === 'manuales')  setHeader('Manuales', 'Documentación y planos', false)
   if (tab === 'search')    setHeader('Buscar', 'SAP, nombre, equipo…', false)
+  if (tab === 'insumos')   setHeader('Insumos', 'EPP, ferretería, químicos, empaque…', false)
 }
 
 function switchTab(tab){
@@ -1703,6 +1708,7 @@ let __insumosCacheTs  = 0
 let insumosFamiliaFilter = null
 let insumosStatusFilter  = 'activo'  // default oculta obsoletos
 let insumosStockOnly     = false
+let insumosBajoOnly      = false
 let insumosSearchTimer   = null
 const INSUMOS_CACHE_TTL  = 30 * 60 * 1000   // 30 min en memoria
 const INSUMOS_LS_TTL     = 24 * 3600 * 1000 // 24h en localStorage
@@ -1752,6 +1758,7 @@ async function renderInsumosTab(){
     </div>
     <div id="insumos-fam-chips"></div>
     <div id="insumos-status-chips"></div>
+    <div id="insumos-listas-chips"></div>
     <div id="insumos-list">${skeletonCells(4)}</div>`
   try {
     renderInsumosBody(await loadInsumos())
@@ -1789,6 +1796,11 @@ function toggleInsumosStockOnly(){
   if (__insumosCache) renderInsumosBody(__insumosCache)
 }
 
+function toggleInsumosBajoOnly(){
+  insumosBajoOnly = !insumosBajoOnly
+  if (__insumosCache) renderInsumosBody(__insumosCache)
+}
+
 function renderInsumosBody(items){
   const listEl = document.getElementById('insumos-list')
   const famEl  = document.getElementById('insumos-fam-chips')
@@ -1810,14 +1822,36 @@ function renderInsumosBody(items){
     </div>`
   }
 
-  // Status chips + stock toggle
+  // Status chips + stock toggle + bajo mínimo
   if (stEl){
+    // Bajo-mínimo coherente con status actual: cuenta lo que va a quedar visible
+    const bajoCount = items.filter(i =>
+      i.stockFisico != null && i.stockMinimo != null && i.stockFisico < i.stockMinimo
+      && (insumosStatusFilter === 'all' || i.status === insumosStatusFilter),
+    ).length
     stEl.innerHTML = `<div class="chips" style="padding:0 12px 6px">
       <div class="chip ${insumosStatusFilter==='all'?'active':''}" onclick="setInsumosStatusFilter('all')">Todos</div>
       <div class="chip ${insumosStatusFilter==='activo'?'active':''}" onclick="setInsumosStatusFilter('activo')">Activos</div>
       <div class="chip ${insumosStatusFilter==='obsoleto'?'active':''}" onclick="setInsumosStatusFilter('obsoleto')">Obsoletos</div>
       <div class="chip ${insumosStockOnly?'active':''}" onclick="toggleInsumosStockOnly()">Con stock</div>
+      ${bajoCount ? `<div class="chip ${insumosBajoOnly?'active':''}" onclick="toggleInsumosBajoOnly()" style="border-color:${insumosBajoOnly?'#ef4444':'rgba(239,68,68,.4)'};color:${insumosBajoOnly?'#fff':'#ef4444'};${insumosBajoOnly?'background:#ef4444':''}">⚠️ Bajo mín. <span class="count">${bajoCount}</span></div>` : ''}
     </div>`
+  }
+
+  // Listas favoritas chips (solo si hay listas)
+  const listasEl = document.getElementById('insumos-listas-chips')
+  const listas = getInsumoFavLists()
+  if (listasEl){
+    if (listas.length){
+      listasEl.innerHTML = `<div class="chips" style="padding:0 12px 6px">
+        ${listas.map(l => `
+          <div class="chip ${insumosListaFilter===l.name?'active':''}" onclick="setInsumosListaFilter(${escHtmlAttr(JSON.stringify(l.name))})">
+            ⭐ ${escHtml(l.name)} <span class="count">${(l.codigosSAP||[]).length}</span>
+          </div>`).join('')}
+      </div>`
+    } else {
+      listasEl.innerHTML = ''
+    }
   }
 
   // Filtrado
@@ -1826,6 +1860,12 @@ function renderInsumosBody(items){
   if (insumosFamiliaFilter) filtered = filtered.filter(i => i.familia === insumosFamiliaFilter)
   if (insumosStatusFilter !== 'all') filtered = filtered.filter(i => i.status === insumosStatusFilter)
   if (insumosStockOnly) filtered = filtered.filter(i => (i.stockFisico ?? 0) > 0)
+  if (insumosBajoOnly) filtered = filtered.filter(i => i.stockFisico != null && i.stockMinimo != null && i.stockFisico < i.stockMinimo)
+  if (insumosListaFilter){
+    const list = listas.find(l => l.name === insumosListaFilter)
+    const set = new Set(list?.codigosSAP || [])
+    filtered = filtered.filter(i => set.has(i.codigoSAP))
+  }
   if (q){
     filtered = filtered.filter(i =>
       normalizeSearch(i.codigoSAP).includes(q)
@@ -1894,7 +1934,13 @@ function insumoRowHtml(i){
 function openInsumoDetail(id){
   const item = (__insumosCache || []).find(i => i.id === id)
   if (!item) return
-  // Reusa estructura sheet existente para mostrar detalle
+  // Listas en las que ya está este insumo (para mostrar chips inline)
+  const inLists = getInsumoFavLists().filter(l => isInsumoInList(l, item.codigoSAP))
+  const inListsHtml = inLists.length
+    ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin:6px 0 0">
+        ${inLists.map(l => `<span style="font-size:10px;background:rgba(168,85,247,.18);color:#c084fc;padding:2px 7px;border-radius:10px">⭐ ${escHtml(l.name)}</span>`).join('')}
+      </div>`
+    : ''
   const html = `
     <div style="padding:16px">
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
@@ -1906,8 +1952,9 @@ function openInsumoDetail(id){
           : `<span style="font-size:10px;background:var(--sub);color:#fff;padding:2px 8px;border-radius:4px;font-weight:600">TRASLADAR</span>`}
         ${item.existeEnRepuestos ? `<span style="font-size:10px;background:var(--border);padding:2px 8px;border-radius:4px">también en Repuestos</span>` : ''}
       </div>
-      <h3 style="font-size:15px;margin:0 0 12px;line-height:1.3">${escHtml(item.textoBreve)}</h3>
-      <table style="width:100%;font-size:12px;border-collapse:collapse">
+      <h3 style="font-size:15px;margin:0 0 4px;line-height:1.3">${escHtml(item.textoBreve)}</h3>
+      ${inListsHtml}
+      <table style="width:100%;font-size:12px;border-collapse:collapse;margin-top:10px">
         ${detailRow('Familia', FAMILIA_LABELS_INS[item.familia] || item.familia)}
         ${detailRow('Sub-familia', item.subFamilia || '—')}
         ${detailRow('Ubicación catálogo', item.ubicacion || '—', true)}
@@ -1918,6 +1965,16 @@ function openInsumoDetail(id){
         ${detailRow('Stock mínimo', item.stockMinimo != null ? item.stockMinimo : '—')}
         ${item.observaciones ? detailRow('Observaciones', item.observaciones) : ''}
       </table>
+      <button onclick="openInsumoConteoModal('${escHtmlAttr(item.codigoSAP)}')"
+        style="margin-top:14px;width:100%;padding:12px;border:none;border-radius:10px;
+               background:rgba(34,197,94,.18);color:#4ade80;font-weight:600;font-size:14px;cursor:pointer">
+        📊 Contar stock
+      </button>
+      <button onclick="openInsumoFavListsSheet('${escHtmlAttr(item.codigoSAP)}')"
+        style="margin-top:8px;width:100%;padding:12px;border:none;border-radius:10px;
+               background:rgba(168,85,247,.15);color:#c084fc;font-weight:600;font-size:14px;cursor:pointer">
+        ⭐ Guardar en lista${inLists.length ? ` · cambiar (${inLists.length})` : ''}
+      </button>
     </div>`
   document.getElementById('sheet-title').textContent = '📦 Detalle de insumo'
   document.getElementById('sheet-content').innerHTML = html
@@ -1929,6 +1986,231 @@ function detailRow(label, value, mono){
     <td style="padding:6px 0;color:var(--sub);width:42%">${escHtml(label)}</td>
     <td style="padding:6px 0;${mono?'font-family:monospace;':''}">${escHtml(String(value))}</td>
   </tr>`
+}
+
+// ── F5b — Listas de favoritos transversales ───────────────────────────
+// Modelo: prefs.insumoFavLists = [{name: string, codigosSAP: string[]}]
+// Sin machineId/nodeId — los insumos son transversales a toda la planta.
+
+let insumoFavSheetCtx = null   // { codigoSAP } cuando abrimos el sheet de listas
+let insumosListaFilter = null  // nombre de lista activa como filtro en el tab
+
+function getInsumoFavLists(){
+  return Array.isArray(prefs.insumoFavLists) ? prefs.insumoFavLists : []
+}
+
+function isInsumoInList(list, codigoSAP){
+  return Array.isArray(list?.codigosSAP) && list.codigosSAP.includes(codigoSAP)
+}
+
+async function openInsumoFavListsSheet(codigoSAP){
+  insumoFavSheetCtx = { codigoSAP }
+  const lists = getInsumoFavLists()
+  const sheet = document.getElementById('sheet')
+  const overlay = document.getElementById('sheet-overlay')
+  document.getElementById('sheet-title').textContent = 'Guardar en lista'
+
+  const content = document.getElementById('sheet-content')
+  if (lists.length === 0){
+    content.innerHTML = `<div class="sheet-empty">Aún no tenés listas de insumos.<br>Creá la primera abajo.</div>`
+  } else {
+    content.innerHTML = lists.map(l => {
+      const isIn = isInsumoInList(l, codigoSAP)
+      return `<div class="sheet-row ${isIn ? 'on' : ''}" onclick="toggleInsumoInFavList(${escHtmlAttr(JSON.stringify(l.name))})">
+        <div class="ico">📋</div>
+        <div class="body">
+          <div class="name">${escHtml(l.name)}</div>
+          <div class="sub">${(l.codigosSAP || []).length} insumo(s)</div>
+        </div>
+        <button class="edit-btn" style="display:flex;width:30px;height:30px;font-size:13px"
+          onclick="event.stopPropagation();renameInsumoFavList(${escHtmlAttr(JSON.stringify(l.name))})" aria-label="Renombrar">✏️</button>
+        <button class="edit-btn" style="display:flex;width:30px;height:30px;font-size:13px;background:rgba(229,57,53,.14)"
+          onclick="event.stopPropagation();deleteInsumoFavList(${escHtmlAttr(JSON.stringify(l.name))})" aria-label="Borrar">🗑️</button>
+        <div class="check">✓</div>
+      </div>`
+    }).join('')
+  }
+  content.innerHTML += `<div class="sheet-new" onclick="createInsumoFavList()">
+    <span style="font-size:20px">＋</span> Nueva lista de insumos
+  </div>`
+
+  overlay.classList.add('open')
+  requestAnimationFrame(() => sheet.classList.add('open'))
+}
+
+async function toggleInsumoInFavList(listName){
+  if (!insumoFavSheetCtx) return
+  const { codigoSAP } = insumoFavSheetCtx
+  const lists = getInsumoFavLists()
+  let list = lists.find(l => l.name === listName)
+  if (!list){
+    list = { name: listName, codigosSAP: [] }
+    lists.push(list)
+  }
+  if (!Array.isArray(list.codigosSAP)) list.codigosSAP = []
+  const idx = list.codigosSAP.indexOf(codigoSAP)
+  if (idx >= 0) list.codigosSAP.splice(idx, 1)
+  else          list.codigosSAP.push(codigoSAP)
+  prefs.insumoFavLists = lists
+  try {
+    await saveAllPrefs()
+    tgApp?.HapticFeedback?.selectionChanged?.()
+    openInsumoFavListsSheet(codigoSAP)
+    if (__insumosCache) renderInsumosBody(__insumosCache)
+  } catch(err){
+    showToast('Error: ' + (err.message || ''), 'err')
+  }
+}
+
+async function createInsumoFavList(){
+  if (!insumoFavSheetCtx) return
+  const { codigoSAP } = insumoFavSheetCtx
+  showInputModal('Nueva lista de insumos', '', 'Ej. EPP turno noche, Ferretería rápida…', async (name) => {
+    name = (name || '').trim()
+    if (!name) return
+    const lists = getInsumoFavLists()
+    if (lists.some(l => l.name === name)){
+      showToast('Ya existe una lista con ese nombre', 'err')
+      return
+    }
+    lists.push({ name, codigosSAP: codigoSAP ? [codigoSAP] : [] })
+    prefs.insumoFavLists = lists
+    try {
+      await saveAllPrefs()
+      showToast('Lista creada ✓', 'ok')
+      tgApp?.HapticFeedback?.notificationOccurred?.('success')
+      openInsumoFavListsSheet(codigoSAP)
+      if (__insumosCache) renderInsumosBody(__insumosCache)
+    } catch(err){
+      showToast('Error: ' + (err.message || ''), 'err')
+    }
+  })
+}
+
+async function renameInsumoFavList(oldName){
+  if (!insumoFavSheetCtx) return
+  const { codigoSAP } = insumoFavSheetCtx
+  showInputModal('Renombrar lista', oldName, 'Nuevo nombre', async (newName) => {
+    newName = (newName || '').trim()
+    if (!newName || newName === oldName) return
+    const lists = getInsumoFavLists()
+    if (lists.some(l => l.name === newName)){
+      showToast('Ya existe una lista con ese nombre', 'err')
+      return
+    }
+    const list = lists.find(l => l.name === oldName)
+    if (!list) return
+    list.name = newName
+    if (insumosListaFilter === oldName) insumosListaFilter = newName
+    prefs.insumoFavLists = lists
+    try {
+      await saveAllPrefs()
+      showToast('Lista renombrada ✓', 'ok')
+      openInsumoFavListsSheet(codigoSAP)
+      if (__insumosCache) renderInsumosBody(__insumosCache)
+    } catch(err){
+      showToast('Error: ' + (err.message || ''), 'err')
+    }
+  })
+}
+
+async function deleteInsumoFavList(name){
+  if (!insumoFavSheetCtx) return
+  const ok = confirm(`¿Borrar la lista "${name}"? Los insumos seguirán existiendo.`)
+  if (!ok) return
+  const { codigoSAP } = insumoFavSheetCtx
+  const lists = getInsumoFavLists().filter(l => l.name !== name)
+  if (insumosListaFilter === name) insumosListaFilter = null
+  prefs.insumoFavLists = lists
+  try {
+    await saveAllPrefs()
+    showToast('Lista borrada ✓', 'ok')
+    tgApp?.HapticFeedback?.notificationOccurred?.('warning')
+    openInsumoFavListsSheet(codigoSAP)
+    if (__insumosCache) renderInsumosBody(__insumosCache)
+  } catch(err){
+    showToast('Error: ' + (err.message || ''), 'err')
+  }
+}
+
+function setInsumosListaFilter(name){
+  insumosListaFilter = (insumosListaFilter === name) ? null : name
+  if (__insumosCache) renderInsumosBody(__insumosCache)
+}
+
+// ── F5c — Conteo rápido de stock para insumos ──────────────────────────
+function openInsumoConteoModal(codigoSAP){
+  const item = (__insumosCache || []).find(i => i.codigoSAP === codigoSAP)
+  if (!item) return
+  const current = item.stockFisico != null ? String(item.stockFisico) : ''
+  showInputModal(
+    `Contar stock — ${item.textoBreve || codigoSAP}`,
+    current,
+    `Cantidad actual${item.unidadMedida ? ` (${item.unidadMedida})` : ''}`,
+    async (val, obs) => {
+      if (val == null) return
+      const trimmed = String(val).trim()
+      if (trimmed === ''){ showToast('Ingresa una cantidad', 'err'); return }
+      const n = Number(trimmed.replace(',', '.'))
+      if (!Number.isFinite(n) || n < 0){ showToast('Cantidad inválida', 'err'); return }
+      await saveInsumoStockConteo(codigoSAP, Math.round(n), { observaciones: (obs || '').trim() })
+    },
+    { withObs: true }
+  )
+  const inp = document.getElementById('modal-input')
+  if (inp){ inp.type = 'number'; inp.inputMode = 'numeric'; inp.min = '0'; inp.step = '1' }
+}
+
+async function saveInsumoStockConteo(codigoSAP, cantidad, { observaciones = '' } = {}){
+  const item = (__insumosCache || []).find(i => i.codigoSAP === codigoSAP)
+  if (!item){ showToast('Insumo no encontrado', 'err'); return }
+  const who = firstName || tgApp?.initDataUnsafe?.user?.first_name || 'usuario'
+  const ts = Date.now()
+  const prevHist = Array.isArray(item.stockHistorial) ? item.stockHistorial : []
+  const newEntry = { cantidad, ts, por: who, ...(observaciones ? { obs: observaciones } : {}) }
+  const stockHistorial = [newEntry, ...prevHist].slice(0, 10)
+  const update = {
+    stockFisico: cantidad,
+    stockContadoEn: ts,
+    stockContadoPor: who,
+    stockHistorial,
+  }
+  Object.assign(item, update)
+  if (__insumosCache) renderInsumosBody(__insumosCache)
+  tgApp?.HapticFeedback?.notificationOccurred?.('success')
+  logInsumoStockConteo(item, cantidad, observaciones)
+  try {
+    await db.collection('insumos').doc(codigoSAP).update(update)
+    showToast('Stock actualizado ✓', 'ok')
+    openInsumoDetail(codigoSAP)
+  } catch (err) {
+    if (IS_PREVIEW){ showToast('Guardado (solo preview)', 'ok'); openInsumoDetail(codigoSAP); return }
+    showToast('Error: ' + (err.message || ''), 'err')
+  }
+}
+
+async function logInsumoStockConteo(item, cantidad, observaciones){
+  if (IS_PREVIEW) return
+  try {
+    const doc = {
+      userId:       uid || 'anon',
+      userName:     firstName || tgApp?.initDataUnsafe?.user?.first_name || 'usuario',
+      kind:         'insumo',
+      codigoSAP:    item.codigoSAP,
+      insumoTexto:  item.textoBreve || '',
+      familia:      item.familia || '',
+      subFamilia:   item.subFamilia || '',
+      ubicacion:    item.ubicacion || '',
+      almacen:      item.almacen || '',
+      cantidad,
+      stockMinimo:  item.stockMinimo ?? null,
+      bajoMinimo:   item.stockMinimo != null ? cantidad < item.stockMinimo : null,
+      ts:           Date.now(),
+      source:       'bot',
+    }
+    if (observaciones) doc.observaciones = observaciones
+    await db.collection('stockAuditLog').add(doc)
+  } catch(e){ console.warn('logInsumoStockConteo error', e?.message || e) }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -2513,13 +2795,26 @@ function getStockBajoItems(){
   })
 }
 
+function getInsumosBajoMinimo(){
+  if (!__insumosCache) return []
+  return __insumosCache.filter(i =>
+    i.stockFisico != null && i.stockMinimo != null && Number(i.stockFisico) < Number(i.stockMinimo)
+  ).sort((a, b) => {
+    const defA = (a.stockMinimo - a.stockFisico) / (a.stockMinimo || 1)
+    const defB = (b.stockMinimo - b.stockFisico) / (b.stockMinimo || 1)
+    return defB - defA
+  })
+}
+
 function renderHomeStockAlert(){
   const el = document.getElementById('home-stock-alert')
   if (!el) return
-  const items = getStockBajoItems()
-  if (items.length === 0){
-    // Si hay cache y todo OK, mostrar badge verde; si no hay cache, no mostrar nada
-    if (!__repuestosCache){ el.innerHTML = ''; return }
+  const reps = getStockBajoItems()
+  const ins = getInsumosBajoMinimo()
+  const total = reps.length + ins.length
+  // Sin cache de ninguno → no mostrar
+  if (!__repuestosCache && !__insumosCache){ el.innerHTML = ''; return }
+  if (total === 0){
     el.innerHTML = `
       <div onclick="openStockReport()" style="margin:8px 12px 0;padding:10px 14px;
         background:rgba(79,174,78,.1);border:1px solid rgba(79,174,78,.25);
@@ -2527,12 +2822,20 @@ function renderHomeStockAlert(){
         <span style="font-size:20px">✅</span>
         <div style="flex:1;min-width:0">
           <div style="font-size:13px;font-weight:600;color:var(--green)">Stock OK</div>
-          <div style="font-size:11px;color:var(--hint)">Todos los repuestos sobre mínimo</div>
+          <div style="font-size:11px;color:var(--hint)">Todo sobre mínimo (repuestos${__insumosCache?' + insumos':''})</div>
         </div>
         <span style="color:var(--hint);font-size:18px">›</span>
       </div>`
     return
   }
+  // Hay items bajo mínimo: mostrar total + breakdown si hay ambos tipos
+  const breakdown = []
+  if (reps.length) breakdown.push(`${reps.length} repuesto${reps.length>1?'s':''}`)
+  if (ins.length)  breakdown.push(`${ins.length} insumo${ins.length>1?'s':''}`)
+  const sampleNames = [
+    ...reps.slice(0, 2).map(i => i.repuesto.textoBreve || i.repuesto.codigoSAP || ''),
+    ...ins.slice(0, 2).map(i => i.textoBreve || i.codigoSAP || ''),
+  ].slice(0, 3)
   el.innerHTML = `
     <div onclick="openStockReport()" style="margin:8px 12px 0;padding:10px 14px;
       background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);
@@ -2540,9 +2843,9 @@ function renderHomeStockAlert(){
       animation:pulse-border 2s ease-in-out infinite">
       <span style="font-size:20px">⚠️</span>
       <div style="flex:1;min-width:0">
-        <div style="font-size:13px;font-weight:700;color:#ef4444">${items.length} repuesto${items.length>1?'s':''} bajo mínimo</div>
+        <div style="font-size:13px;font-weight:700;color:#ef4444">${total} bajo mínimo · ${escHtml(breakdown.join(' + '))}</div>
         <div style="font-size:11px;color:var(--hint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-          ${items.slice(0,3).map(i => escHtml(i.repuesto.textoBreve || i.repuesto.codigoSAP || '')).join(' · ')}${items.length>3?' …':''}
+          ${sampleNames.map(escHtml).join(' · ')}${total>3?' …':''}
         </div>
       </div>
       <span style="color:#ef4444;font-size:18px;font-weight:700">›</span>
@@ -5275,6 +5578,7 @@ async function saveAllPrefs(){
   await db.collection('user_preferences').doc(uid).set({
     favoriteLists:    prefs.favoriteLists    || [],
     repuestoFavLists: prefs.repuestoFavLists || {},
+    insumoFavLists:   prefs.insumoFavLists   || [],
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
   }, { merge: true })
 }

@@ -670,10 +670,21 @@ service cloud.firestore {
 
     // ============================================
     // INSUMOS - Catálogo plano transversal (importado desde STOCK ALMACENES.xlsx)
+    // Update parcial (solo conteo) permitido a técnicos para flujo de bodega.
+    // Update completo (cambia familia/status/etc.) requiere supervisor + isValidInsumo.
     // ============================================
     match /insumos/{insumoId} {
       allow read: if isAuthenticated();
-      allow create, update: if isSupervisor() && isValidDocSize() && isValidInsumo();
+      allow create: if isSupervisor() && isValidDocSize() && isValidInsumo();
+      allow update: if isValidDocSize() && (
+        // Técnicos: solo campos de conteo de stock
+        (isTechnician()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'stockFisico', 'stockContadoEn', 'stockContadoPor', 'stockHistorial', 'updatedAt'
+          ]))
+        // Supervisor/admin: cualquier cambio, validando schema completo
+        || (isSupervisor() && isValidInsumo())
+      );
       allow delete: if isAdmin();
     }
 
