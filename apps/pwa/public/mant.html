@@ -1748,7 +1748,14 @@ async function renderInsumosTab(){
       <div><span class="section-title">📦 Insumos</span>
         <span style="font-size:11px;color:var(--sub);margin-left:6px">catálogo transversal</span>
       </div>
-      <div id="insumos-count" style="font-size:11px;color:var(--sub)"></div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <button onclick="openInsumoFavListsSheet(null)"
+          style="background:rgba(168,85,247,.14);border:none;color:#c084fc;
+                 padding:5px 11px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer">
+          ⭐ Mis listas
+        </button>
+        <div id="insumos-count" style="font-size:11px;color:var(--sub)"></div>
+      </div>
     </div>
     <div style="padding:0 12px 8px">
       <input id="insumos-search" type="search" placeholder="Buscar SAP, descripción, ubicación…"
@@ -2004,34 +2011,40 @@ function isInsumoInList(list, codigoSAP){
 }
 
 async function openInsumoFavListsSheet(codigoSAP){
+  // codigoSAP === null → modo gestión (ver/crear/renombrar/borrar sin toggle)
+  // codigoSAP === string → modo guardado (toggle ese SAP en cada lista)
   insumoFavSheetCtx = { codigoSAP }
   const lists = getInsumoFavLists()
   const sheet = document.getElementById('sheet')
   const overlay = document.getElementById('sheet-overlay')
-  document.getElementById('sheet-title').textContent = 'Guardar en lista'
+  const isManageMode = codigoSAP == null
+  document.getElementById('sheet-title').textContent = isManageMode ? 'Mis listas de insumos' : 'Guardar en lista'
 
   const content = document.getElementById('sheet-content')
   if (lists.length === 0){
     content.innerHTML = `<div class="sheet-empty">Aún no tenés listas de insumos.<br>Creá la primera abajo.</div>`
   } else {
     content.innerHTML = lists.map(l => {
-      const isIn = isInsumoInList(l, codigoSAP)
-      return `<div class="sheet-row ${isIn ? 'on' : ''}" onclick="toggleInsumoInFavList(${escHtmlAttr(JSON.stringify(l.name))})">
+      const isIn = isManageMode ? false : isInsumoInList(l, codigoSAP)
+      const rowOnclick = isManageMode
+        ? `onclick="closeSheet();setTimeout(()=>{setInsumosListaFilter(${escHtmlAttr(JSON.stringify(l.name))})},250)"`
+        : `onclick="toggleInsumoInFavList(${escHtmlAttr(JSON.stringify(l.name))})"`
+      return `<div class="sheet-row ${isIn ? 'on' : ''}" ${rowOnclick}>
         <div class="ico">📋</div>
         <div class="body">
           <div class="name">${escHtml(l.name)}</div>
-          <div class="sub">${(l.codigosSAP || []).length} insumo(s)</div>
+          <div class="sub">${(l.codigosSAP || []).length} insumo(s)${isManageMode ? ' · tocá para filtrar' : ''}</div>
         </div>
         <button class="edit-btn" style="display:flex;width:30px;height:30px;font-size:13px"
           onclick="event.stopPropagation();renameInsumoFavList(${escHtmlAttr(JSON.stringify(l.name))})" aria-label="Renombrar">✏️</button>
         <button class="edit-btn" style="display:flex;width:30px;height:30px;font-size:13px;background:rgba(229,57,53,.14)"
           onclick="event.stopPropagation();deleteInsumoFavList(${escHtmlAttr(JSON.stringify(l.name))})" aria-label="Borrar">🗑️</button>
-        <div class="check">✓</div>
+        ${isManageMode ? '' : '<div class="check">✓</div>'}
       </div>`
     }).join('')
   }
   content.innerHTML += `<div class="sheet-new" onclick="createInsumoFavList()">
-    <span style="font-size:20px">＋</span> Nueva lista de insumos
+    <span style="font-size:20px">＋</span> Nueva lista de insumos${isManageMode ? ' (vacía)' : ''}
   </div>`
 
   overlay.classList.add('open')
