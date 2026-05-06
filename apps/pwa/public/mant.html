@@ -455,8 +455,12 @@ mark{background:rgba(var(--accent-rgb,82,136,193),.25);color:inherit;border-radi
     <button class="nav-btn" id="nav-hierarchy" onclick="switchTab('hierarchy')">
       <span class="icon">🌳</span>Jerarquía
     </button>
-    <button class="nav-btn" id="nav-insumos" onclick="switchTab('insumos')">
+    <button class="nav-btn" id="nav-insumos" onclick="switchTab('insumos')" style="position:relative">
       <span class="icon">📦</span>Insumos
+      <span id="nav-insumos-badge" style="display:none;position:absolute;top:4px;right:14px;
+        min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#ef4444;
+        color:#fff;font-size:10px;font-weight:700;line-height:16px;text-align:center;
+        box-shadow:0 0 0 2px var(--bg);"></span>
     </button>
     <button class="nav-btn" id="nav-manuales" onclick="switchTab('manuales')">
       <span class="icon">📚</span>Manuales
@@ -1721,6 +1725,25 @@ const FAMILIA_LABELS_INS = {
   SIN_FAMILIA: 'Sin clasificar',
 }
 
+async function refreshInsumos(){
+  const btn = document.getElementById('insumos-refresh')
+  if (btn){ btn.disabled = true; btn.style.transform = 'rotate(360deg)'; btn.style.transition = 'transform 800ms ease-in-out' }
+  __insumosCache = null
+  __insumosCacheTs = 0
+  try { localStorage.removeItem(LS_KEY_INSUMOS) } catch {}
+  tgApp?.HapticFeedback?.impactOccurred?.('light')
+  try {
+    const out = await loadInsumos()
+    renderInsumosBody(out)
+    renderHomeStockAlert()
+    showToast('Catálogo actualizado ✓', 'ok')
+  } catch (e) {
+    showToast('Error al actualizar', 'err')
+  } finally {
+    if (btn){ btn.disabled = false; setTimeout(() => { btn.style.transform = ''; btn.style.transition = '' }, 850) }
+  }
+}
+
 async function loadInsumos(){
   if (__insumosCache && Date.now() - __insumosCacheTs < INSUMOS_CACHE_TTL) return __insumosCache
   // localStorage hit
@@ -1754,6 +1777,9 @@ async function renderInsumosTab(){
                  padding:5px 11px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer">
           ⭐ Mis listas
         </button>
+        <button id="insumos-refresh" onclick="refreshInsumos()" title="Forzar recarga"
+          style="background:none;border:none;color:var(--sub);padding:4px 6px;
+                 border-radius:6px;font-size:14px;cursor:pointer;line-height:1">↻</button>
         <div id="insumos-count" style="font-size:11px;color:var(--sub)"></div>
       </div>
     </div>
@@ -1971,7 +1997,25 @@ function openInsumoDetail(id){
         ${detailRow('Stock físico', item.stockFisico != null ? `${item.stockFisico} ${item.unidadMedida || ''}` : '—')}
         ${detailRow('Stock mínimo', item.stockMinimo != null ? item.stockMinimo : '—')}
         ${item.observaciones ? detailRow('Observaciones', item.observaciones) : ''}
+        ${item.stockContadoEn ? `<tr><td colspan="2" style="padding:8px 0 0;font-size:11px;color:var(--sub)">Última cuenta ${escHtml(relativeTime(item.stockContadoEn))} · ${escHtml(item.stockContadoPor || '')}</td></tr>` : ''}
       </table>
+      ${(Array.isArray(item.stockHistorial) && item.stockHistorial.length > 1) ? `
+        <details style="margin-top:10px;font-size:12px">
+          <summary style="cursor:pointer;color:var(--accent);padding:4px 0">Historial de conteos (${item.stockHistorial.length})</summary>
+          <div style="margin-top:6px;padding-left:10px;border-left:2px solid var(--border)">
+            ${item.stockHistorial.slice(1).map(h => {
+              const diff = (item.stockHistorial[0]?.cantidad ?? h.cantidad) - h.cantidad
+              const arrow = diff > 0 ? '↑' : diff < 0 ? '↓' : '·'
+              return `<div style="padding:4px 0;color:var(--sub)">
+                <div style="display:flex;justify-content:space-between;gap:8px">
+                  <span><b style="color:var(--text)">${h.cantidad}</b> ${item.unidadMedida || ''} ${arrow} ${escHtml(h.por||'')}</span>
+                  <span style="opacity:.7">${escHtml(relativeTime(h.ts))}</span>
+                </div>
+                ${h.obs ? `<div style="font-style:italic;font-size:11px;opacity:.75;margin-top:1px">"${escHtml(h.obs)}"</div>` : ''}
+              </div>`
+            }).join('')}
+          </div>
+        </details>` : ''}
       <button onclick="openInsumoConteoModal('${escHtmlAttr(item.codigoSAP)}')"
         style="margin-top:14px;width:100%;padding:12px;border:none;border-radius:10px;
                background:rgba(34,197,94,.18);color:#4ade80;font-weight:600;font-size:14px;cursor:pointer">
@@ -2822,7 +2866,20 @@ function getInsumosBajoMinimo(){
   })
 }
 
+function updateInsumosBadge(){
+  const badge = document.getElementById('nav-insumos-badge')
+  if (!badge) return
+  const n = getInsumosBajoMinimo().length
+  if (n > 0){
+    badge.textContent = n > 99 ? '99+' : String(n)
+    badge.style.display = ''
+  } else {
+    badge.style.display = 'none'
+  }
+}
+
 function renderHomeStockAlert(){
+  updateInsumosBadge()  // badge bottom-nav siempre coherente con el state actual
   const el = document.getElementById('home-stock-alert')
   if (!el) return
   const reps = getStockBajoItems()
