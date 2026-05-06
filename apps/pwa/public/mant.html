@@ -1985,7 +1985,10 @@ function openInsumoDetail(id){
     </div>`
   document.getElementById('sheet-title').textContent = '📦 Detalle de insumo'
   document.getElementById('sheet-content').innerHTML = html
-  openSheet()
+  const sheet = document.getElementById('sheet')
+  const overlay = document.getElementById('sheet-overlay')
+  overlay.classList.add('open')
+  requestAnimationFrame(() => sheet.classList.add('open'))
 }
 
 function detailRow(label, value, mono){
