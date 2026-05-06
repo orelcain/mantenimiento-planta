@@ -60,6 +60,7 @@ const DEFAULT_GROUPS: Group[] = [
     items: [
       { id: 'equipos', name: 'Equipos', href: '/equipment', groupId: 'equipamiento' },
       { id: 'repuestos', name: 'Repuestos', href: '/repuestos', groupId: 'equipamiento' },
+      { id: 'insumos', name: 'Insumos', href: '/insumos', groupId: 'equipamiento' },
       { id: 'sensores', name: 'Sensores', href: '/sensors', groupId: 'equipamiento' },
       { id: 'panel-sensores', name: 'Panel Sensores', href: '/sensors/monitor', groupId: 'equipamiento' },
     ],

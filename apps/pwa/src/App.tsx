@@ -51,6 +51,7 @@ const IncidentsPage = lazyWithReload(() => import('@/pages/IncidentsPage').then(
 const EquipmentPage = lazyWithReload(() => import('@/pages/EquipmentPage').then((mod) => ({ default: mod.EquipmentPage })))
 const PredictivePage = lazyWithReload(() => import('@/pages/PredictivePage').then((mod) => ({ default: mod.PredictivePage })))
 const RepuestosPage = lazyWithReload(() => import('@/pages/repuestos/RepuestosPage').then((mod) => ({ default: mod.RepuestosPage })))
+const InsumosPage = lazyWithReload(() => import('@/pages/insumos/InsumosPage').then((mod) => ({ default: mod.InsumosPage })))
 const MapPage = lazyWithReload(() =>
   import('@/pages/MapPage').then((mod: any) => ({ default: mod?.MapPage ?? mod?.default }))
 )
@@ -416,6 +417,7 @@ export function App() {
             } />
             <Route path="equipment" element={<EquipmentPage />} />
             <Route path="repuestos" element={<RepuestosPage />} />
+            <Route path="insumos" element={<InsumosPage />} />
             <Route path="predictive" element={<PredictivePage />} />
             <Route path="sensors" element={
               <Suspense fallback={<LoadingScreen />}>

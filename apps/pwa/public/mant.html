@@ -442,6 +442,7 @@ mark{background:rgba(var(--accent-rgb,82,136,193),.25);color:inherit;border-radi
     <div id="view-qr-batch"    class="view"></div>
     <div id="view-quick-count"  class="view"></div>
     <div id="view-cross-equipo" class="view"></div>
+    <div id="view-insumos"      class="view"></div>
   </main>
 
   <nav class="bottom-nav">
@@ -453,6 +454,9 @@ mark{background:rgba(var(--accent-rgb,82,136,193),.25);color:inherit;border-radi
     </button>
     <button class="nav-btn" id="nav-hierarchy" onclick="switchTab('hierarchy')">
       <span class="icon">🌳</span>Jerarquía
+    </button>
+    <button class="nav-btn" id="nav-insumos" onclick="switchTab('insumos')">
+      <span class="icon">📦</span>Insumos
     </button>
     <button class="nav-btn" id="nav-manuales" onclick="switchTab('manuales')">
       <span class="icon">📚</span>Manuales
@@ -1103,6 +1107,7 @@ function switchTab(tab){
   if (tab === 'home')      renderHome()
   if (tab === 'hierarchy') renderHierarchyTab()
   if (tab === 'manuales')  renderManualesTab()
+  if (tab === 'insumos')   renderInsumosTab()
   if (tab === 'search'){
     searchFavFilter = 'all'  // reset para cada apertura del tab
     searchSapOnly = false
@@ -1689,6 +1694,242 @@ function goBack(){
 
 // Telegram BackButton
 tgApp?.BackButton?.onClick(() => { if (!tgBackBtnHandler && navStack.length) goBack() })
+
+// ═══════════════════════════════════════════════════════════════════
+// F5 — INSUMOS TAB (catálogo plano transversal — STOCK ALMACENES)
+// ═══════════════════════════════════════════════════════════════════
+let __insumosCache    = null
+let __insumosCacheTs  = 0
+let insumosFamiliaFilter = null
+let insumosStatusFilter  = 'activo'  // default oculta obsoletos
+let insumosStockOnly     = false
+let insumosSearchTimer   = null
+const INSUMOS_CACHE_TTL  = 30 * 60 * 1000   // 30 min en memoria
+const INSUMOS_LS_TTL     = 24 * 3600 * 1000 // 24h en localStorage
+const LS_KEY_INSUMOS     = 'mant_insumos_cache_v1'
+
+const FAMILIA_LABELS_INS = {
+  REPUESTOS: 'Repuestos', INSUMOS_MANT: 'Insumos mant.', AREA: 'Áreas / EPP',
+  REFRIGERACION: 'Refrigeración', QUIMICOS: 'Químicos', HERRAMIENTAS: 'Herramientas',
+  EMPAQUE: 'Empaque', COMBUSTIBLE: 'Combustible', LUBRICANTES: 'Lubricantes',
+  SIN_FAMILIA: 'Sin clasificar',
+}
+
+async function loadInsumos(){
+  if (__insumosCache && Date.now() - __insumosCacheTs < INSUMOS_CACHE_TTL) return __insumosCache
+  // localStorage hit
+  if (!__insumosCache){
+    const cached = lsGet(LS_KEY_INSUMOS, INSUMOS_LS_TTL)
+    if (cached){
+      __insumosCache = cached
+      __insumosCacheTs = Date.now()
+      return cached
+    }
+  }
+  const snap = await db.collection('insumos').get()
+  const out = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+  __insumosCache   = out
+  __insumosCacheTs = Date.now()
+  try { lsSet(LS_KEY_INSUMOS, normalizeForCache(out)) } catch {}
+  return out
+}
+
+async function renderInsumosTab(){
+  const el = document.getElementById('view-insumos')
+  if (!el) return
+  el.innerHTML = `
+    <div class="section-actions">
+      <div><span class="section-title">📦 Insumos</span>
+        <span style="font-size:11px;color:var(--sub);margin-left:6px">catálogo transversal</span>
+      </div>
+      <div id="insumos-count" style="font-size:11px;color:var(--sub)"></div>
+    </div>
+    <div style="padding:0 12px 8px">
+      <input id="insumos-search" type="search" placeholder="Buscar SAP, descripción, ubicación…"
+        style="width:100%;box-sizing:border-box;padding:8px 12px;border-radius:10px;
+        border:1.5px solid var(--border);background:var(--card);color:var(--text);
+        font-size:14px;outline:none" oninput="insumosSearchInput()">
+    </div>
+    <div id="insumos-fam-chips"></div>
+    <div id="insumos-status-chips"></div>
+    <div id="insumos-list">${skeletonCells(4)}</div>`
+  try {
+    renderInsumosBody(await loadInsumos())
+  } catch(e){
+    console.error('insumos load failed', e)
+    const l = document.getElementById('insumos-list')
+    if (l) l.innerHTML = `
+      <div style="padding:32px 20px;text-align:center">
+        ${emptyHtml('⚠️','Error al cargar', escHtml(e?.message || 'Verifica tu conexión'))}
+        <button class="upload-btn" style="margin-top:16px;max-width:200px"
+          onclick="renderInsumosTab()">↻ Reintentar</button>
+      </div>`
+  }
+}
+
+function insumosSearchInput(){
+  clearTimeout(insumosSearchTimer)
+  insumosSearchTimer = setTimeout(() => {
+    if (__insumosCache) renderInsumosBody(__insumosCache)
+  }, 150)
+}
+
+function setInsumosFamiliaFilter(fam){
+  insumosFamiliaFilter = (insumosFamiliaFilter === fam) ? null : fam
+  if (__insumosCache) renderInsumosBody(__insumosCache)
+}
+
+function setInsumosStatusFilter(st){
+  insumosStatusFilter = st
+  if (__insumosCache) renderInsumosBody(__insumosCache)
+}
+
+function toggleInsumosStockOnly(){
+  insumosStockOnly = !insumosStockOnly
+  if (__insumosCache) renderInsumosBody(__insumosCache)
+}
+
+function renderInsumosBody(items){
+  const listEl = document.getElementById('insumos-list')
+  const famEl  = document.getElementById('insumos-fam-chips')
+  const stEl   = document.getElementById('insumos-status-chips')
+  const cntEl  = document.getElementById('insumos-count')
+  if (!listEl) return
+
+  // Familia chips (top 6 + Más…)
+  if (famEl){
+    const fams = {}
+    items.forEach(i => { fams[i.familia] = (fams[i.familia]||0) + 1 })
+    const top = Object.entries(fams).sort((a,b) => b[1]-a[1])
+    famEl.innerHTML = `<div class="chips" style="padding:0 12px 6px">
+      <div class="chip ${insumosFamiliaFilter===null?'active':''}" onclick="setInsumosFamiliaFilter(null)">
+        Todas <span class="count">${items.length}</span></div>
+      ${top.map(([f,n]) =>
+        `<div class="chip ${insumosFamiliaFilter===f?'active':''}" onclick="setInsumosFamiliaFilter('${escHtmlAttr(f)}')">
+          ${escHtml(FAMILIA_LABELS_INS[f] || f)} <span class="count">${n}</span></div>`).join('')}
+    </div>`
+  }
+
+  // Status chips + stock toggle
+  if (stEl){
+    stEl.innerHTML = `<div class="chips" style="padding:0 12px 6px">
+      <div class="chip ${insumosStatusFilter==='all'?'active':''}" onclick="setInsumosStatusFilter('all')">Todos</div>
+      <div class="chip ${insumosStatusFilter==='activo'?'active':''}" onclick="setInsumosStatusFilter('activo')">Activos</div>
+      <div class="chip ${insumosStatusFilter==='obsoleto'?'active':''}" onclick="setInsumosStatusFilter('obsoleto')">Obsoletos</div>
+      <div class="chip ${insumosStockOnly?'active':''}" onclick="toggleInsumosStockOnly()">Con stock</div>
+    </div>`
+  }
+
+  // Filtrado
+  const q = normalizeSearch(document.getElementById('insumos-search')?.value || '')
+  let filtered = items
+  if (insumosFamiliaFilter) filtered = filtered.filter(i => i.familia === insumosFamiliaFilter)
+  if (insumosStatusFilter !== 'all') filtered = filtered.filter(i => i.status === insumosStatusFilter)
+  if (insumosStockOnly) filtered = filtered.filter(i => (i.stockFisico ?? 0) > 0)
+  if (q){
+    filtered = filtered.filter(i =>
+      normalizeSearch(i.codigoSAP).includes(q)
+      || normalizeSearch(i.textoBreve).includes(q)
+      || normalizeSearch(i.subFamilia).includes(q)
+      || normalizeSearch(i.ubicacion).includes(q),
+    )
+  }
+
+  if (cntEl) cntEl.textContent = `${filtered.length.toLocaleString('es-CL')} de ${items.length.toLocaleString('es-CL')}`
+
+  if (filtered.length === 0){
+    listEl.innerHTML = emptyHtml('🔍','Sin resultados','Ajusta los filtros o búsqueda')
+    return
+  }
+
+  // Render — primeros 200 para evitar lag (3431 items)
+  const LIMIT = 200
+  const slice = filtered.slice(0, LIMIT)
+  listEl.innerHTML = `
+    <div style="padding:0 8px">
+      ${slice.map(i => insumoRowHtml(i)).join('')}
+    </div>
+    ${filtered.length > LIMIT ? `
+      <div style="padding:12px;text-align:center;color:var(--sub);font-size:12px">
+        Mostrando primeros ${LIMIT}. Refina la búsqueda para ver más específicos.
+      </div>` : ''}`
+}
+
+function insumoRowHtml(i){
+  const stockReal = i.stockFisico
+  const bajoMin = stockReal != null && i.stockMinimo != null && stockReal < i.stockMinimo
+  const stockBadge = stockReal != null
+    ? `<span style="font-weight:700;color:${bajoMin?'#ef4444':'var(--text)'}">${stockReal}</span> ${i.unidadMedida || ''}`
+    : `<span style="color:var(--sub);font-size:11px">—</span>`
+  const obsoletoBadge = i.status === 'obsoleto'
+    ? `<span style="font-size:9px;background:#ef4444;color:#fff;padding:1px 5px;border-radius:3px;font-weight:700;letter-spacing:.3px">OBSOLETO</span>`
+    : ''
+  const trasladarBadge = i.status === 'trasladar'
+    ? `<span style="font-size:9px;background:var(--sub);color:#fff;padding:1px 5px;border-radius:3px;font-weight:700;letter-spacing:.3px">TRASLADAR</span>`
+    : ''
+  const bajoBadge = bajoMin
+    ? `<span style="font-size:9px;background:#f59e0b;color:#fff;padding:1px 5px;border-radius:3px;font-weight:700;letter-spacing:.3px">BAJO</span>`
+    : ''
+  const ubic = i.ubicacion ? `<span style="font-family:monospace;font-size:11px;color:var(--sub)">📍 ${escHtml(i.ubicacion)}</span>` : ''
+  const alm = i.almacen ? `<span style="font-family:monospace;font-size:11px;color:var(--sub)">🏬 ${escHtml(i.almacen)}</span>` : ''
+
+  return `
+    <div onclick="openInsumoDetail('${escHtmlAttr(i.id)}')"
+         style="padding:10px 12px;margin:4px 0;background:var(--card);border:1px solid var(--border);
+                border-radius:10px;cursor:pointer;display:flex;gap:10px;align-items:flex-start">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:2px">
+          <code style="font-size:11px;font-weight:700;color:var(--accent)">${escHtml(i.codigoSAP)}</code>
+          <span style="font-size:10px;color:var(--sub)">${escHtml(FAMILIA_LABELS_INS[i.familia] || i.familia)}</span>
+          ${i.subFamilia ? `<span style="font-size:10px;background:var(--border);padding:1px 6px;border-radius:3px">${escHtml(i.subFamilia)}</span>` : ''}
+          ${obsoletoBadge}${trasladarBadge}${bajoBadge}
+        </div>
+        <div style="font-size:13px;line-height:1.3">${escHtml(i.textoBreve)}</div>
+        <div style="display:flex;gap:10px;margin-top:4px;flex-wrap:wrap">${ubic}${alm}</div>
+      </div>
+      <div style="text-align:right;min-width:60px">${stockBadge}</div>
+    </div>`
+}
+
+function openInsumoDetail(id){
+  const item = (__insumosCache || []).find(i => i.id === id)
+  if (!item) return
+  // Reusa estructura sheet existente para mostrar detalle
+  const html = `
+    <div style="padding:16px">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+        <code style="font-size:13px;font-weight:700;color:var(--accent)">${escHtml(item.codigoSAP)}</code>
+        ${item.status === 'activo'
+          ? `<span style="font-size:10px;background:#16a34a;color:#fff;padding:2px 8px;border-radius:4px;font-weight:600">ACTIVO</span>`
+          : item.status === 'obsoleto'
+          ? `<span style="font-size:10px;background:#ef4444;color:#fff;padding:2px 8px;border-radius:4px;font-weight:600">OBSOLETO</span>`
+          : `<span style="font-size:10px;background:var(--sub);color:#fff;padding:2px 8px;border-radius:4px;font-weight:600">TRASLADAR</span>`}
+        ${item.existeEnRepuestos ? `<span style="font-size:10px;background:var(--border);padding:2px 8px;border-radius:4px">también en Repuestos</span>` : ''}
+      </div>
+      <h3 style="font-size:15px;margin:0 0 12px;line-height:1.3">${escHtml(item.textoBreve)}</h3>
+      <table style="width:100%;font-size:12px;border-collapse:collapse">
+        ${detailRow('Familia', FAMILIA_LABELS_INS[item.familia] || item.familia)}
+        ${detailRow('Sub-familia', item.subFamilia || '—')}
+        ${detailRow('Ubicación catálogo', item.ubicacion || '—', true)}
+        ${detailRow('Ubicación física', item.ubicacionFisica || '—')}
+        ${detailRow('Almacén', item.almacen || '—', true)}
+        ${detailRow('Unidad', item.unidadMedida || '—', true)}
+        ${detailRow('Stock físico', item.stockFisico != null ? `${item.stockFisico} ${item.unidadMedida || ''}` : '—')}
+        ${detailRow('Stock mínimo', item.stockMinimo != null ? item.stockMinimo : '—')}
+        ${item.observaciones ? detailRow('Observaciones', item.observaciones) : ''}
+      </table>
+    </div>`
+  document.getElementById('sheet-title').textContent = '📦 Detalle de insumo'
+  document.getElementById('sheet-content').innerHTML = html
+  openSheet()
+}
+
+function detailRow(label, value, mono){
+  return `<tr>
+    <td style="padding:6px 0;color:var(--sub);width:42%">${escHtml(label)}</td>
+    <td style="padding:6px 0;${mono?'font-family:monospace;':''}">${escHtml(String(value))}</td>
+  </tr>`
+}
 
 // ═══════════════════════════════════════════════════════════════════
 // FAVORITES VIEW

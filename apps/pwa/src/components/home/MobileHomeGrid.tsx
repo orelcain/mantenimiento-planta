@@ -116,6 +116,7 @@ const GROUPS: Record<UserRole, TileGroup[]> = {
       label: 'Recursos',
       tiles: [
         { id: 'repuestos', label: 'Repuestos',     sublabel: 'Stock & manuales',   icon: Package,       href: '/repuestos',       color: 'blue'    },
+        { id: 'insumos',   label: 'Insumos',       sublabel: 'EPP & ferretería',   icon: Package,       href: '/insumos',         color: 'purple'  },
         { id: 'equipos',   label: 'Equipos',       sublabel: 'Ficha técnica',      icon: Wrench,        href: '/equipment',       color: 'slate'   },
         { id: 'mapa',      label: 'Mapa Planta',   sublabel: 'Vista de zonas',     icon: Map,           href: '/map',             color: 'emerald' },
         { id: 'clima',     label: 'Clima Puerto',  sublabel: 'Condiciones',        icon: CloudSun,      href: '/clima-puerto',    color: 'slate'   },

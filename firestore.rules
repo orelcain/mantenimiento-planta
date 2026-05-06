@@ -170,6 +170,23 @@ service cloud.firestore {
         && (!('fotos' in d) || d.fotos is list);
     }
 
+    function isValidInsumo() {
+      let d = request.resource.data;
+      return d.codigoSAP is string && d.codigoSAP.size() >= 1 && d.codigoSAP.size() <= 50
+        && d.textoBreve is string && d.textoBreve.size() >= 1 && d.textoBreve.size() <= 500
+        && d.familia in ['REPUESTOS','INSUMOS_MANT','AREA','REFRIGERACION','QUIMICOS','HERRAMIENTAS','EMPAQUE','COMBUSTIBLE','LUBRICANTES','SIN_FAMILIA']
+        && d.status in ['activo','obsoleto','trasladar']
+        && (!('subFamilia' in d) || d.subFamilia is string || d.subFamilia == null)
+        && (!('ubicacion' in d) || d.ubicacion is string || d.ubicacion == null)
+        && (!('ubicacionFisica' in d) || d.ubicacionFisica is string || d.ubicacionFisica == null)
+        && (!('unidadMedida' in d) || d.unidadMedida is string || d.unidadMedida == null)
+        && (!('almacen' in d) || d.almacen in ['M001','M004','M008'] || d.almacen == null)
+        && (!('stockFisico' in d) || d.stockFisico is number || d.stockFisico == null)
+        && (!('stockMinimo' in d) || d.stockMinimo is number || d.stockMinimo == null)
+        && (!('existeEnRepuestos' in d) || d.existeEnRepuestos is bool || d.existeEnRepuestos == null)
+        && (!('observaciones' in d) || d.observaciones is string || d.observaciones == null);
+    }
+
     function isValidBodegaInventario() {
       let d = request.resource.data;
       return d.nombre is string && d.nombre.size() >= 1 && d.nombre.size() <= 200
@@ -649,6 +666,15 @@ service cloud.firestore {
         allow update: if isTechnician();
         allow delete: if isAdmin();
       }
+    }
+
+    // ============================================
+    // INSUMOS - Catálogo plano transversal (importado desde STOCK ALMACENES.xlsx)
+    // ============================================
+    match /insumos/{insumoId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isSupervisor() && isValidDocSize() && isValidInsumo();
+      allow delete: if isAdmin();
     }
 
     // ============================================
