@@ -1150,8 +1150,13 @@ async function init(){
       return
     }
 
-    // 3) PWA standalone sin sesión y sin token → instructivo
-    setLoadingError('Para activar la PWA: 1) abrí el bot @antarfood_mant_bot en Telegram con red. 2) tap "📲 Instalar PWA" en el home del bot. 3) pegá el link copiado en Safari y agregá a Pantalla de Inicio.')
+    // 3) PWA standalone sin sesión y sin token: mostrar UI para pegar token
+    //    Si offline, no hay nada que hacer.
+    if (!navigator.onLine){
+      setLoadingError('PWA no activada y sin red. Conectate a Wi-Fi y abrí esta app de nuevo para activarla con tu token de Telegram.')
+      return
+    }
+    showStandaloneActivationUI()
     return
   }
 
@@ -1239,6 +1244,97 @@ function setLoadingMsg(m){ document.getElementById('loading-msg').textContent = 
   document.getElementById('loading-retry').style.display='none' }
 function setLoadingError(m){ document.getElementById('loading-msg').textContent = m
   document.getElementById('loading-retry').style.display='block' }
+
+// UI para que el usuario pegue su token de activación (solo en PWA standalone
+// sin sesión cacheada y con red). Tras activar, descarga todos los datos y
+// los guarda en LocalStorage para uso offline futuro.
+function showStandaloneActivationUI(){
+  const loading = document.getElementById('loading')
+  if (!loading) return
+  loading.innerHTML = `
+    <div style="max-width:340px;margin:auto;padding:32px 20px;text-align:center">
+      <div style="font-size:48px;margin-bottom:16px">📲</div>
+      <h2 style="font-size:20px;font-weight:600;margin-bottom:8px;color:var(--text)">Activá tu PWA</h2>
+      <p style="font-size:13px;color:var(--hint);line-height:1.5;margin-bottom:20px">
+        1) Abrí el bot <b>@antarfood_mant_bot</b> en Telegram<br>
+        2) Tap el botón <b>📲 Instalar PWA</b><br>
+        3) Pegá acá el código que se copió:
+      </p>
+      <textarea id="activation-token-input" rows="4" placeholder="Pegá tu token acá…"
+        style="width:100%;box-sizing:border-box;padding:10px;border-radius:8px;
+        border:1.5px solid var(--border);background:var(--card);color:var(--text);
+        font-family:monospace;font-size:11px;outline:none;resize:vertical"></textarea>
+      <button onclick="activateStandaloneFromToken()" id="activation-btn"
+        style="width:100%;margin-top:14px;background:var(--accent);border:none;
+        color:var(--acctxt);padding:12px;border-radius:10px;font-size:14px;
+        font-weight:600;cursor:pointer">
+        Activar PWA
+      </button>
+      <p id="activation-status" style="font-size:12px;color:var(--hint);margin-top:12px;min-height:18px"></p>
+    </div>`
+}
+
+async function activateStandaloneFromToken(){
+  const inp = document.getElementById('activation-token-input')
+  const btn = document.getElementById('activation-btn')
+  const status = document.getElementById('activation-status')
+  const raw = (inp?.value || '').trim()
+  if (!raw){ if (status) status.textContent = '⚠️ Pegá el token primero'; return }
+  if (btn){ btn.disabled = true; btn.textContent = 'Activando…' }
+  if (status) status.textContent = ''
+  try {
+    // El token puede venir solo (eyJ…) o como URL completa con #token=…
+    let token = raw
+    let extra = {}
+    if (raw.includes('#')){
+      const fragHash = raw.split('#')[1] || ''
+      const params = new URLSearchParams(fragHash)
+      const t = params.get('token')
+      if (t){
+        token = t
+        extra = {
+          role: params.get('role') || 'usuario',
+          auth: params.get('auth') !== '0',
+          linked: params.get('linked') === '1',
+          name: decodeURIComponent(params.get('name') || 'Usuario'),
+        }
+      }
+    }
+    if (status) status.textContent = 'Autenticando…'
+    await auth.signInWithCustomToken(token)
+    const fbUser = auth.currentUser
+    if (!fbUser) throw new Error('Auth no quedó activa')
+    uid = fbUser.uid
+    userRole = extra.role || 'admin'  // fallback admin si vino solo el token
+    isAuthorized = extra.auth !== false
+    isLinked = !!extra.linked
+    firstName = (extra.name || 'Usuario') + ' (PWA)'
+    try { lsSet('mant_user_session', { uid, userRole, isAuthorized, isLinked, firstName }) } catch {}
+    if (status) status.textContent = 'Descargando datos para offline…'
+    // Cargar todo lo necesario para offline
+    await Promise.all([
+      loadCategories().catch(e => console.warn('cat', e?.message)),
+      loadMachines().catch(e => console.warn('mach', e?.message)),
+      loadPrefs().catch(e => console.warn('prefs', e?.message)),
+    ])
+    if (status) status.textContent = 'Descargando repuestos e insumos…'
+    // Pre-cargar repuestos e insumos en LS para cada equipo
+    try { await loadAllRepuestos() } catch(e){ console.warn('reps', e?.message) }
+    try { await loadInsumos() } catch(e){ console.warn('ins', e?.message) }
+    if (status) status.textContent = '✓ Listo. Cargando app…'
+    // Restaurar la pantalla normal
+    const loading = document.getElementById('loading')
+    if (loading){ loading.style.display = 'flex'; loading.innerHTML = `
+      <div class="loader"></div>
+      <div id="loading-msg">Cargando…</div>
+      <button id="loading-retry" onclick="location.reload()">Reintentar</button>` }
+    showApp()
+  } catch(err){
+    console.error('[standalone] activate failed', err)
+    if (status) status.textContent = '⚠️ ' + (err?.message || 'Token inválido o expirado')
+    if (btn){ btn.disabled = false; btn.textContent = 'Reintentar' }
+  }
+}
 
 function showApp(){
   document.getElementById('loading').style.display = 'none'
@@ -3347,9 +3443,9 @@ function renderHomeGreeting(){
     </div>`
 }
 
-// Genera URL con token de instalación para la PWA standalone.
-// El token va en URL fragment (#token=...) — fragments no se envían al server,
-// no aparecen en logs ni en el referrer header.
+// Copia un token de auth para activar la PWA standalone.
+// El token se pega DENTRO de la PWA (en su pantalla de "Activar"), no en una URL.
+// Esto evita problemas de truncate y de iOS Safari/standalone storage separado.
 async function copyPwaInstallUrl(){
   if (!tgApp?.initData){
     tgApp?.showAlert?.('Solo funciona desde el bot Telegram con red.')
@@ -3367,31 +3463,25 @@ async function copyPwaInstallUrl(){
       return
     }
     const data = await resp.json()
-    const base = 'https://orelcain.github.io/mantenimiento-planta/mant.html'
-    const fragment = new URLSearchParams({
-      token: data.token,
-      role: data.role || 'usuario',
-      auth: data.authorized ? '1' : '0',
-      linked: data.isLinked ? '1' : '0',
-      name: encodeURIComponent(data.firstName || firstName || 'Usuario'),
-    }).toString()
-    const url = `${base}?standalone=1#${fragment}`
     updateNetworkStatus()
 
-    const msg = '📲 Instalación de PWA en iPhone:\n\n' +
-      '1) Copia esta URL\n' +
-      '2) Pegala en Safari (no en Telegram)\n' +
-      '3) Tap "Compartir" → "Agregar a pantalla de inicio"\n' +
-      '4) Tap el ícono "Antarfood Mant" en tu home\n\n' +
-      '⏰ Token válido por ~1 hora. Si expira, generá otro.'
+    const msg = '📲 Activá la PWA en iPhone:\n\n' +
+      '1) Si no tenés instalado el ícono:\n' +
+      '   • Abrí Safari\n' +
+      '   • Andá a: orelcain.github.io/mantenimiento-planta/mant.html?standalone=1\n' +
+      '   • Tap Compartir → Agregar a pantalla de inicio\n\n' +
+      '2) Tap el ícono Antarfood Mant en tu home\n' +
+      '3) Pegá el token copiado en el campo que aparece\n' +
+      '4) Tap Activar\n\n' +
+      '⏰ Token válido ~1h. Si expira, generá otro.'
 
     if (navigator.clipboard?.writeText){
-      navigator.clipboard.writeText(url).then(() => {
+      navigator.clipboard.writeText(data.token).then(() => {
         tgApp?.HapticFeedback?.notificationOccurred?.('success')
-        tgApp?.showAlert?.('URL copiada al portapapeles ✓\n\n' + msg)
-      }).catch(() => tgApp?.showAlert?.(msg + '\n\nURL:\n' + url))
+        tgApp?.showAlert?.('Token copiado al portapapeles ✓\n\n' + msg)
+      }).catch(() => tgApp?.showAlert?.(msg + '\n\nToken:\n' + data.token))
     } else {
-      tgApp?.showAlert?.(msg + '\n\nURL:\n' + url)
+      tgApp?.showAlert?.(msg + '\n\nToken:\n' + data.token)
     }
   } catch(err){
     console.error('install token error', err)
