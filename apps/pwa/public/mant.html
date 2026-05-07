@@ -667,6 +667,219 @@ function normalizeForCache(obj){
   return out
 }
 
+// ─── IndexedDB cache de PDFs/imágenes de manuales (offline support) ───
+// Almacena Blobs grandes (decenas de MB) que no caben en localStorage.
+// Útil para abrir manuales sin internet en planta y cargar instantáneamente.
+const IDB_DB_NAME      = 'mant_manuales_cache'
+const IDB_DB_VER       = 1
+const IDB_STORE        = 'pdfs'
+const IDB_TTL_MS       = 30 * 24 * 60 * 60 * 1000   // 30 días
+const IDB_MAX_BYTES    = 200 * 1024 * 1024          // 200 MB tope total
+let __idbPromise       = null
+let __manualCachedKeys = new Set()                  // claves cacheadas (sync, para indicador en UI)
+let __currentBlobUrl   = null                       // blob URL del visor abierto (para revoke)
+
+function idbOpen(){
+  if (__idbPromise) return __idbPromise
+  __idbPromise = new Promise(resolve => {
+    if (!('indexedDB' in window)){ resolve(null); return }
+    let req
+    try { req = indexedDB.open(IDB_DB_NAME, IDB_DB_VER) }
+    catch(e){ console.warn('IDB open threw', e); resolve(null); return }
+    req.onupgradeneeded = () => {
+      const db = req.result
+      if (!db.objectStoreNames.contains(IDB_STORE)){
+        const store = db.createObjectStore(IDB_STORE)
+        store.createIndex('ts', 'ts')
+      }
+    }
+    req.onsuccess = () => resolve(req.result)
+    req.onerror   = () => { console.warn('IDB open failed', req.error); resolve(null) }
+    req.onblocked = () => { console.warn('IDB open blocked'); resolve(null) }
+  })
+  return __idbPromise
+}
+
+function idbStore(mode){
+  return idbOpen().then(db => {
+    if (!db) return null
+    try { return db.transaction(IDB_STORE, mode).objectStore(IDB_STORE) }
+    catch(e){ console.warn('IDB tx failed', e); return null }
+  })
+}
+
+async function idbGet(key){
+  const store = await idbStore('readonly')
+  if (!store) return null
+  return new Promise(resolve => {
+    const r = store.get(key)
+    r.onsuccess = () => resolve(r.result || null)
+    r.onerror   = () => resolve(null)
+  })
+}
+
+async function idbSet(key, record){
+  const store = await idbStore('readwrite')
+  if (!store) return { ok: false, quotaExceeded: false }
+  return new Promise(resolve => {
+    let r
+    try { r = store.put(record, key) }
+    catch(e){ resolve({ ok: false, quotaExceeded: e?.name === 'QuotaExceededError' }); return }
+    r.onsuccess = () => resolve({ ok: true })
+    r.onerror   = () => {
+      const err = r.error
+      const quota = err?.name === 'QuotaExceededError' || err?.code === 22
+      resolve({ ok: false, quotaExceeded: quota })
+    }
+  })
+}
+
+async function idbDelete(key){
+  const store = await idbStore('readwrite')
+  if (!store) return false
+  return new Promise(resolve => {
+    const r = store.delete(key)
+    r.onsuccess = () => resolve(true)
+    r.onerror   = () => resolve(false)
+  })
+}
+
+async function idbList(){
+  // → [{ key, ts, sizeBytes, url, titulo, storagePath }, …]  (sin Blobs, ligero)
+  const store = await idbStore('readonly')
+  if (!store) return []
+  return new Promise(resolve => {
+    const out = []
+    const r = store.openCursor()
+    r.onsuccess = () => {
+      const cur = r.result
+      if (cur){
+        const v = cur.value || {}
+        out.push({
+          key: cur.key,
+          ts: v.ts || 0,
+          sizeBytes: v.sizeBytes || 0,
+          url: v.url || '',
+          titulo: v.titulo || '',
+          storagePath: v.storagePath || null,
+        })
+        cur.continue()
+      } else resolve(out)
+    }
+    r.onerror = () => resolve(out)
+  })
+}
+
+async function idbClearAll(){
+  const store = await idbStore('readwrite')
+  if (!store) return false
+  return new Promise(resolve => {
+    const r = store.clear()
+    r.onsuccess = () => resolve(true)
+    r.onerror   = () => resolve(false)
+  })
+}
+
+// Clave estable de cache para un manual.
+// Prioridad: storagePath (legacy + nuevos) → firestore docId → URL canónica (sin token).
+function manualCacheKey(m){
+  if (!m) return null
+  if (m.storagePath) return `sp:${m.storagePath}`
+  if (m.id) return `fs:${m.id}`
+  if (m.url) return `url:${m.url.split('?')[0]}`
+  return null
+}
+
+async function refreshCachedKeys(){
+  try {
+    const list = await idbList()
+    __manualCachedKeys = new Set(list.map(x => x.key))
+  } catch(e){ console.warn('refreshCachedKeys failed', e) }
+}
+
+async function purgeOldManuales(){
+  try {
+    const list = await idbList()
+    if (!list.length) return { purged: 0, totalBefore: 0 }
+    const now = Date.now()
+    let purged = 0
+    // 1) TTL: borrar entradas > 30 días
+    for (const item of list){
+      if (now - (item.ts || 0) > IDB_TTL_MS){
+        await idbDelete(item.key)
+        __manualCachedKeys.delete(item.key)
+        purged++
+      }
+    }
+    // 2) LRU: si excede tope total, borrar más antiguos hasta caber
+    const survivors = list.filter(x => __manualCachedKeys.has(x.key))
+    let total = survivors.reduce((s, x) => s + (x.sizeBytes || 0), 0)
+    if (total > IDB_MAX_BYTES){
+      const sorted = [...survivors].sort((a, b) => (a.ts || 0) - (b.ts || 0))
+      for (const item of sorted){
+        if (total <= IDB_MAX_BYTES) break
+        await idbDelete(item.key)
+        __manualCachedKeys.delete(item.key)
+        total -= (item.sizeBytes || 0)
+        purged++
+      }
+    }
+    if (purged > 0) console.log(`[manualCache] purga: ${purged} entradas eliminadas`)
+    return { purged }
+  } catch(e){
+    console.warn('purgeOldManuales failed', e)
+    return { purged: 0 }
+  }
+}
+
+// Resuelve URL para abrir un manual: cache hit → blob URL inmediato; miss → fetch + cachear.
+// Lanza Error con mensaje legible si offline + no cacheado.
+async function fetchAndCacheManual(m){
+  const key = manualCacheKey(m)
+  if (!key) throw new Error('Manual sin identificador válido')
+
+  // 1) Cache hit
+  const cached = await idbGet(key)
+  if (cached?.blob){
+    // LRU touch — actualizar ts en background, no bloqueante
+    idbSet(key, { ...cached, ts: Date.now() }).catch(() => {})
+    return { blobUrl: URL.createObjectURL(cached.blob), fromCache: true }
+  }
+
+  // 2) Cache miss: necesitamos red
+  if (!navigator.onLine){
+    throw new Error('Sin conexión y este manual aún no está descargado.')
+  }
+  let resp
+  try { resp = await fetch(m.url) }
+  catch(e){ throw new Error('No se pudo descargar: ' + (e.message || 'error de red')) }
+  if (!resp.ok) throw new Error(`Descarga falló (HTTP ${resp.status})`)
+  const blob = await resp.blob()
+
+  // 3) Guardar (manejando quota llena con un retry tras purga)
+  const record = {
+    blob,
+    ts: Date.now(),
+    sizeBytes: blob.size,
+    url: m.url,
+    titulo: m.titulo || '',
+    storagePath: m.storagePath || null,
+  }
+  let res = await idbSet(key, record)
+  if (!res.ok && res.quotaExceeded){
+    console.warn('[manualCache] quota lleno, purgando y reintentando')
+    await purgeOldManuales()
+    res = await idbSet(key, record)
+  }
+  if (res.ok){
+    __manualCachedKeys.add(key)
+    console.log(`[manualCache] cached: ${m.titulo} (${(blob.size/1048576).toFixed(1)} MB)`)
+  } else {
+    console.warn('[manualCache] no se pudo cachear (continuamos sin cache)')
+  }
+  return { blobUrl: URL.createObjectURL(blob), fromCache: false }
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════════════════
@@ -789,6 +1002,17 @@ function showApp(){
   setTimeout(() => loadAllRepuestos(), 800)
   // Pre-cargar insumos en background (permite contar bajo-mínimo en home stock alert)
   setTimeout(() => loadInsumos().then(() => renderHomeStockAlert()).catch(() => {}), 1200)
+  // Cache offline de manuales (IndexedDB):
+  //  1) leer claves cacheadas para mostrar el badge 📥 en la lista
+  //  2) purga en background: TTL 30d + LRU si excede 200MB
+  setTimeout(async () => {
+    await refreshCachedKeys()
+    if (currentTab === 'manuales' && __manualesCache) renderManualesBody(__manualesCache)
+    if (currentTab === 'home') renderHomeCacheInfo()
+    await purgeOldManuales()
+    await refreshCachedKeys()
+    if (currentTab === 'home') renderHomeCacheInfo()
+  }, 1500)
 }
 
 /** Listener real-time de la colección machines.
@@ -1364,11 +1588,19 @@ function manualCellHtml(m){
     ? m.createdAt
     : (m.createdAt?.toDate ? m.createdAt.toDate().getTime() : null)
   const when = ts ? relativeTime(ts) : ''
-  const mData = escHtmlAttr(JSON.stringify({id:m.id,url:m.url,tipo:m.tipo,titulo:m.titulo}))
+  // storagePath se incluye para que openManualViewer pueda construir la cache key correcta
+  const mData = escHtmlAttr(JSON.stringify({
+    id:m.id, url:m.url, tipo:m.tipo, titulo:m.titulo, storagePath:m.storagePath || null,
+  }))
+  // 📥 verde si el manual ya está descargado offline
+  const cached = __manualCachedKeys.has(manualCacheKey(m))
+  const cachedBadge = cached
+    ? `<span style="font-size:11px;color:var(--green);margin-left:6px" title="Descargado para offline">📥</span>`
+    : ''
   return `<div class="cell" onclick="openManualViewer(${mData})">
     <div class="cell-icon" style="font-size:20px">${manualIcon(m.tipo)}</div>
     <div class="cell-body">
-      <div class="cell-title">${escHtml(m.titulo||'Sin título')}</div>
+      <div class="cell-title">${escHtml(m.titulo||'Sin título')}${cachedBadge}</div>
       ${owner ? `<div class="cell-meta">${escHtml(owner)}</div>` : ''}
       <div class="cell-sub">${escHtml((m.tipo||'').toUpperCase())}${size}${when?` · ${when}`:''}</div>
     </div>
@@ -1381,21 +1613,51 @@ function setManualesTypeFilter(tipo){
   if (__manualesCache) renderManualesBody(__manualesCache)
 }
 
-function openManualViewer(mData){
+async function openManualViewer(mData){
   const m = typeof mData === 'string' ? JSON.parse(mData) : mData
   if (!m?.url) return
   tgApp?.HapticFeedback?.selectionChanged?.()
-  // PDF e imagen → visor inline; link/video → externo (Telegram openLink)
+  // PDF e imagen → visor inline (con cache IndexedDB); link/video → externo
   if (m.tipo === 'pdf' || m.tipo === 'imagen'){
-    showInlineDocOverlay(m.url, m.titulo, m.tipo)
+    showInlineDocOverlay(null, m.titulo, m.tipo, { state: 'loading', externalUrl: m.url })
+    try {
+      const { blobUrl, fromCache } = await fetchAndCacheManual(m)
+      showInlineDocOverlay(blobUrl, m.titulo, m.tipo, {
+        state: 'ready', externalUrl: m.url, fromCache,
+      })
+      // Si descargamos por primera vez y el tab Manuales sigue visible, refrescar para mostrar el badge 📥
+      if (!fromCache && currentTab === 'manuales' && __manualesCache){
+        renderManualesBody(__manualesCache)
+      }
+    } catch(e){
+      console.warn('[manualCache] open failed', e)
+      const offline = !navigator.onLine
+      showInlineDocOverlay(null, m.titulo, m.tipo, {
+        state: 'error',
+        errorMsg: e?.message || 'No pude abrir el manual',
+        externalUrl: offline ? null : m.url,
+      })
+    }
     return
   }
   if (tgApp?.openLink) tgApp.openLink(m.url)
   else window.open(m.url, '_blank')
 }
 
-// Visor inline PDF/imagen con fallback "Abrir externo"
-function showInlineDocOverlay(url, title, tipo){
+// Visor inline PDF/imagen con fallback "Abrir externo".
+// state: 'loading' | 'ready' | 'error'  (default: 'ready' si url presente)
+function showInlineDocOverlay(url, title, tipo, opts){
+  opts = opts || {}
+  const state = opts.state || (url ? 'ready' : 'loading')
+  const externalUrl = opts.externalUrl || (state === 'ready' ? url : '')
+
+  // Liberar blob URL anterior si vamos a reemplazarlo
+  if (__currentBlobUrl && __currentBlobUrl !== url){
+    try { URL.revokeObjectURL(__currentBlobUrl) } catch {}
+    __currentBlobUrl = null
+  }
+  if (url && typeof url === 'string' && url.startsWith('blob:')) __currentBlobUrl = url
+
   let ov = document.getElementById('doc-overlay')
   if (!ov){
     ov = document.createElement('div')
@@ -1404,24 +1666,49 @@ function showInlineDocOverlay(url, title, tipo){
     document.body.appendChild(ov)
   }
   const isPdf = tipo === 'pdf'
+  const cacheBadge = (state === 'ready' && opts.fromCache)
+    ? `<span style="font-size:10px;color:var(--green);background:rgba(79,174,78,.15);padding:2px 6px;border-radius:8px;margin-left:6px;font-weight:600">📥 offline</span>`
+    : ''
+  const headerExtBtn = externalUrl
+    ? `<button onclick="openDocExternal('${escHtmlAttr(externalUrl)}')"
+         style="background:none;border:none;color:var(--accent);font-size:13px;
+         padding:4px 8px;cursor:pointer;font-weight:600">↗ Externo</button>`
+    : ''
+
+  let body = ''
+  if (state === 'loading'){
+    body = `<div style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;padding:20px">
+      <div style="width:42px;height:42px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite"></div>
+      <div style="font-size:13px;color:var(--hint)">Descargando manual…</div>
+    </div>`
+  } else if (state === 'error'){
+    body = `<div style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;padding:24px;text-align:center">
+      <div style="font-size:36px">${!navigator.onLine ? '📡' : '⚠️'}</div>
+      <div style="font-size:14px;color:var(--text);max-width:280px;line-height:1.4">${escHtml(opts.errorMsg || 'Error al abrir')}</div>
+      ${externalUrl ? `<button onclick="openDocExternal('${escHtmlAttr(externalUrl)}')"
+        style="background:var(--accent);border:none;color:var(--acctxt);padding:8px 18px;
+        border-radius:14px;font-size:13px;font-weight:600;cursor:pointer">↗ Abrir online</button>`:''}
+    </div>`
+  } else if (isPdf){
+    body = `<iframe src="${escHtmlAttr(url)}#toolbar=1&view=FitH"
+      style="flex:1;border:none;background:#fff" allow="fullscreen" loading="lazy"></iframe>`
+  } else {
+    body = `<div style="flex:1;overflow:auto;background:#000;display:flex;align-items:center;justify-content:center">
+      <img src="${escHtmlAttr(url)}" style="max-width:100%;max-height:100%;object-fit:contain">
+    </div>`
+  }
+
   ov.innerHTML = `
     <div style="padding:8px 12px;border-bottom:1px solid var(--border);
       display:flex;align-items:center;gap:8px;background:var(--card)">
       <button onclick="closeInlineDocOverlay()" style="background:none;border:none;
         color:var(--text);font-size:18px;padding:4px 8px;cursor:pointer">✕</button>
       <div style="flex:1;font-size:14px;font-weight:600;white-space:nowrap;
-        overflow:hidden;text-overflow:ellipsis">${escHtml(title || 'Documento')}</div>
-      <button onclick="openDocExternal('${escHtmlAttr(url)}')"
-        style="background:none;border:none;color:var(--accent);font-size:13px;
-        padding:4px 8px;cursor:pointer;font-weight:600">↗ Externo</button>
+        overflow:hidden;text-overflow:ellipsis">${escHtml(title || 'Documento')}${cacheBadge}</div>
+      ${headerExtBtn}
     </div>
-    ${isPdf
-      ? `<iframe src="${escHtmlAttr(url)}#toolbar=1&view=FitH"
-          style="flex:1;border:none;background:#fff" allow="fullscreen" loading="lazy"></iframe>`
-      : `<div style="flex:1;overflow:auto;background:#000;display:flex;align-items:center;justify-content:center">
-          <img src="${escHtmlAttr(url)}" style="max-width:100%;max-height:100%;object-fit:contain">
-        </div>`}
-    ${isPdf ? `<div style="padding:6px 12px;font-size:11px;color:var(--hint);
+    ${body}
+    ${(isPdf && state === 'ready') ? `<div style="padding:6px 12px;font-size:11px;color:var(--hint);
       text-align:center;background:var(--card);border-top:1px solid var(--border)">
       Si no carga, usa "↗ Externo" arriba.
     </div>` : ''}`
@@ -1432,6 +1719,10 @@ function showInlineDocOverlay(url, title, tipo){
 function closeInlineDocOverlay(){
   const ov = document.getElementById('doc-overlay')
   if (ov){ ov.style.display = 'none'; ov.innerHTML = '' }
+  if (__currentBlobUrl){
+    try { URL.revokeObjectURL(__currentBlobUrl) } catch {}
+    __currentBlobUrl = null
+  }
   setTgBack(null)
 }
 
@@ -2294,7 +2585,8 @@ function renderHome(){
     <div id="home-activity"></div>
     <div id="home-mylists"></div>
     <div id="home-recents"></div>
-    <div style="padding:16px 16px 8px;text-align:center">
+    <div id="home-cache-info" style="padding:10px 16px 0;text-align:center"></div>
+    <div style="padding:10px 16px 8px;text-align:center">
       <button onclick="refreshAllData()" style="background:none;border:1px solid var(--border);
         color:var(--hint);padding:5px 12px;border-radius:14px;font-size:11px;cursor:pointer">
         ↻ Forzar recarga completa
@@ -2307,6 +2599,56 @@ function renderHome(){
   renderHomeActivity()
   renderHomeMyLists()
   renderHomeRecents()
+  renderHomeCacheInfo()
+}
+
+async function renderHomeCacheInfo(){
+  const el = document.getElementById('home-cache-info')
+  if (!el) return
+  let list = []
+  try { list = await idbList() } catch {}
+  if (!list.length){
+    el.innerHTML = `<div style="font-size:11px;color:var(--hint)">📥 Sin manuales descargados</div>`
+    return
+  }
+  const totalBytes = list.reduce((s, x) => s + (x.sizeBytes || 0), 0)
+  const totalMB = totalBytes >= 1048576
+    ? `${(totalBytes/1048576).toFixed(1)} MB`
+    : `${Math.round(totalBytes/1024)} KB`
+  el.innerHTML = `
+    <div style="display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center">
+      <span style="font-size:11px;color:var(--hint)">📥 ${list.length} ${list.length===1?'manual':'manuales'} offline · ${totalMB}</span>
+      <button onclick="clearManualesCache()" style="background:none;border:1px solid var(--border);
+        color:var(--hint);padding:3px 10px;border-radius:12px;font-size:11px;cursor:pointer">
+        🗑 Liberar espacio
+      </button>
+    </div>`
+}
+
+function clearManualesCache(){
+  if (!tgApp?.showConfirm){
+    if (!confirm('¿Borrar todos los manuales descargados?\nLa próxima vez deberán volver a descargarse.')) return
+    doClearManualesCache()
+    return
+  }
+  tgApp.showConfirm('¿Borrar todos los manuales descargados?\nLa próxima vez deberán volver a descargarse.', ok => {
+    if (ok) doClearManualesCache()
+  })
+}
+
+async function doClearManualesCache(){
+  await idbClearAll()
+  __manualCachedKeys.clear()
+  if (__currentBlobUrl){
+    try { URL.revokeObjectURL(__currentBlobUrl) } catch {}
+    __currentBlobUrl = null
+  }
+  showToast('Caché de manuales borrada ✓', 'ok')
+  tgApp?.HapticFeedback?.notificationOccurred?.('success')
+  renderHomeCacheInfo()
+  if (currentTab === 'manuales' && __manualesCache){
+    renderManualesBody(__manualesCache)
+  }
 }
 
 function relativeTime(ts){
