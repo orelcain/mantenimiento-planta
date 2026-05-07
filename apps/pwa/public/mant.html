@@ -4,6 +4,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Repuestos · Antarfood</title>
+<!-- Service Worker: cachea mant.html + Firebase SDK + Telegram WebApp + PDF.js
+     para que el bot CARGUE cuando no hay red. Sin esto el WebView falla al hacer
+     GET de mant.html y muestra "no internet" antes de ejecutar nada. -->
+<script>
+if ('serviceWorker' in navigator) {
+  // Path al SW: el FCM SW (ya existente) extiende su lógica para cubrir el shell del bot.
+  // Se registra desde la raíz del deploy (./firebase-messaging-sw.js) con scope './'.
+  // Si la PWA principal ya lo había registrado, este register() es idempotente.
+  navigator.serviceWorker.register('./firebase-messaging-sw.js', { scope: './' })
+    .then(reg => console.log('[sw] registered', reg.scope))
+    .catch(err => console.warn('[sw] register failed', err))
+}
+</script>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>

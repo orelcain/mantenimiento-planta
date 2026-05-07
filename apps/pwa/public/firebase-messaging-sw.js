@@ -47,6 +47,47 @@ const baseUrl = getBaseUrl()
 const CACHE_NAME = 'assets-cache-v1'
 const HEAVY_ASSET_RE = /\.(glb|gltf|bin|jpg|jpeg|png|webp|svg)$/i
 
+// ─── App Shell para el bot Mini App (mant.html) ────────────────────
+// Permite que el bot ABRA sin red. Sin esto, el WebView de Telegram falla
+// al hacer GET de mant.html y muestra "no internet" antes de ejecutar
+// cualquier JS. La precarga ocurre en el evento `install` del SW.
+const SHELL_CACHE = 'mant-shell-v3'
+const SHELL_URLS = [
+  './mant.html',
+  'https://telegram.org/js/telegram-web-app.js',
+  'https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js',
+  'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js',
+  'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js',
+  'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js',
+  // PDF.js (visor cross-platform) — opcional, si falla bg cache no rompe nada
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',
+]
+
+self.addEventListener('install', (event) => {
+  event.waitUntil((async () => {
+    const cache = await caches.open(SHELL_CACHE)
+    // addAll falla si UNA URL falla. Cargamos individuales con tolerancia.
+    await Promise.allSettled(SHELL_URLS.map(async url => {
+      try {
+        const resp = await fetch(url, { mode: url.startsWith('http') ? 'cors' : 'same-origin' })
+        if (resp.ok) await cache.put(url, resp.clone())
+      } catch (e){ console.warn('[sw] shell precache miss', url, e?.message) }
+    }))
+    console.log('[sw] shell precached')
+  })())
+  self.skipWaiting()  // activar nuevo SW sin esperar a que se cierren clientes
+})
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil((async () => {
+    // Limpiar caches viejas del shell (mantener CACHE_NAME para FCM)
+    const keys = await caches.keys()
+    await Promise.all(keys.filter(k => k.startsWith('mant-shell-') && k !== SHELL_CACHE).map(k => caches.delete(k)))
+    await self.clients.claim()
+  })())
+})
+
 // Manejar mensajes en background.
 // El backend envía data-only (sin payload.notification) para evitar la
 // auto-display del SDK FCM que sumada a este handler producía duplicados.
@@ -108,17 +149,49 @@ self.addEventListener('notificationclick', (event) => {
   )
 })
 
-// Cache heavy assets for offline use
+// Cache heavy assets + app shell for offline use
 self.addEventListener('fetch', (event) => {
   const request = event.request
   if (request.method !== 'GET') return
   const url = new URL(request.url)
 
-  // Only cache same-origin and storage assets
+  // ── App Shell del bot: mant.html + dependencias críticas ──
+  // Estrategia stale-while-revalidate: devuelve cache (instant offline),
+  // refresca en background cuando hay red.
+  const isMantHtml = url.pathname.endsWith('/mant.html')
+  const isShellAsset = (
+    url.hostname === 'telegram.org' && url.pathname.includes('telegram-web-app.js')
+  ) || (
+    url.hostname === 'www.gstatic.com' && url.pathname.startsWith('/firebasejs/10.12.0/')
+  ) || (
+    url.hostname === 'cdnjs.cloudflare.com' && url.pathname.includes('/pdf.js/')
+  )
+
+  if (isMantHtml || isShellAsset){
+    event.respondWith((async () => {
+      const cache = await caches.open(SHELL_CACHE)
+      const cached = await cache.match(request, { ignoreSearch: isMantHtml })
+      const networkPromise = fetch(request).then(res => {
+        if (res && res.ok) cache.put(request, res.clone())
+        return res
+      }).catch(() => null)
+      // SWR: si tenemos cache, devolverla ya. Si no, esperar la red.
+      if (cached){
+        event.waitUntil(networkPromise)
+        return cached
+      }
+      const fresh = await networkPromise
+      if (fresh) return fresh
+      // Sin red ni cache: error 503 explicito
+      return new Response('Offline y sin cache', { status: 503, statusText: 'offline-no-cache' })
+    })())
+    return
+  }
+
+  // ── Heavy assets (modelos, imágenes) ──
   const isSameOrigin = url.origin === self.location.origin
   const isStorage = url.hostname.includes('firebasestorage')
   if (!isSameOrigin && !isStorage) return
-
   if (!HEAVY_ASSET_RE.test(url.pathname)) return
 
   event.respondWith(
