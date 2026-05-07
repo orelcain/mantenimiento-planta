@@ -2527,6 +2527,63 @@ async function tgHandleAbrir(chatId, topicId) {
   await sendTelegramButtons(text, chatId, buttons, { topicId })
 }
 
+/** Devuelve el chat ID al usuario (helper de onboarding para autorizar grupos nuevos). */
+async function tgHandleChatId(chatId, chatTitle, chatType, topicId) {
+  await sendTelegramMessage(
+    `🆔 <b>Chat info</b>\n\n` +
+    `<b>ID:</b> <code>${chatId}</code>\n` +
+    `<b>Tipo:</b> ${chatType || 'desconocido'}\n` +
+    (chatTitle ? `<b>Nombre:</b> ${chatTitle}\n` : '') +
+    `\nUn admin puede autorizar este chat con /autorizar (solo creador del grupo).`,
+    chatId, { topicId }
+  )
+}
+
+/**
+ * Auto-agrega el chat actual a `telegramAuthorizedChats` si quien invoca es
+ * creator/admin del grupo. Onboarding self-service para evitar tener que
+ * editar Firestore manualmente.
+ */
+async function tgHandleAutorizar(chatId, chatTitle, chatType, telegramUserId, topicId) {
+  // En chats privados no tiene sentido (siempre autorizados)
+  if (chatType === 'private') {
+    await sendTelegramMessage('✅ Los chats privados ya están siempre autorizados.', chatId, { topicId })
+    return
+  }
+  // Verificar que el invocador sea creator/admin del grupo
+  let isAdmin = false
+  try {
+    const memberResult = await callTelegramApi('getChatMember', { chat_id: chatId, user_id: telegramUserId })
+    if (memberResult?.ok) {
+      const status = memberResult.result?.status
+      isAdmin = (status === 'creator' || status === 'administrator')
+    }
+  } catch (e) { logger.warn('getChatMember failed', e) }
+  if (!isAdmin) {
+    await sendTelegramMessage('❌ Solo el creador o administradores del grupo pueden autorizarlo.', chatId, { topicId })
+    return
+  }
+  // Persistir
+  try {
+    await db.collection('telegramAuthorizedChats').doc(String(chatId)).set({
+      activo: true,
+      title: chatTitle || null,
+      type: chatType || null,
+      authorizedBy: String(telegramUserId),
+      authorizedAt: FieldValue.serverTimestamp(),
+    }, { merge: true })
+    await sendTelegramMessage(
+      `✅ <b>Chat autorizado</b>\n\n` +
+      `Ya podés usar todos los comandos del bot acá.\n` +
+      `Probá /abrir para postear el banner pineable.`,
+      chatId, { topicId }
+    )
+  } catch (e) {
+    logger.error('Error authorizing chat', e)
+    await sendTelegramMessage('❌ Error al autorizar. Revisá los logs.', chatId, { topicId })
+  }
+}
+
 async function tgHandleMenu(chatId, topicId) {
   const buttons = [
     [
@@ -2901,14 +2958,32 @@ exports.telegramWebhook = onRequest({ region: 'us-central1' }, async (req, res) 
   }
 
   const chatId = String(message.chat?.id)
+  const chatType = message.chat?.type   // 'private' | 'group' | 'supergroup' | 'channel'
+  const chatTitle = message.chat?.title || message.chat?.username || null
   const fromName = message.from?.first_name || 'Técnico'
   const telegramUserId = String(message.from?.id || 'unknown')
   const incomingTopicId = message.message_thread_id || undefined
+  const rawText = (message.text || '').trim()
 
-  // Verificar chat autorizado
-  const allowedChatId = process.env.TELEGRAM_CHAT_ID
-  if (allowedChatId && chatId !== allowedChatId) {
-    logger.warn('Telegram message from unauthorized chat', { chatId })
+  // Verificar chat autorizado:
+  //   1. /chatid y /autorizar → siempre permitidos (helpers de onboarding)
+  //   2. Chat privado con el bot → siempre autorizado
+  //   3. Chat en env TELEGRAM_CHAT_ID → autorizado (compat)
+  //   4. Chat en whitelist Firestore `telegramAuthorizedChats` con activo:true → autorizado
+  const isOnboardingCmd = /^\/(chatid|autorizar)\b/i.test(rawText)
+  let authorized = isOnboardingCmd || chatType === 'private'
+  if (!authorized) {
+    const allowedChatId = process.env.TELEGRAM_CHAT_ID
+    if (allowedChatId && chatId === allowedChatId) authorized = true
+  }
+  if (!authorized) {
+    try {
+      const chatDoc = await db.collection('telegramAuthorizedChats').doc(chatId).get()
+      if (chatDoc.exists && chatDoc.data().activo !== false) authorized = true
+    } catch (e) { logger.warn('Error checking chat whitelist', { chatId, error: e?.message }) }
+  }
+  if (!authorized) {
+    logger.warn('Telegram message from unauthorized chat', { chatId, chatType, chatTitle })
     res.status(200).send('ok')
     return
   }
@@ -2931,6 +3006,10 @@ exports.telegramWebhook = onRequest({ region: 'us-central1' }, async (req, res) 
       await tgHandleMenu(chatId, incomingTopicId)
     } else if (/^\/(abrir|app)/i.test(text)) {
       await tgHandleAbrir(chatId, incomingTopicId)
+    } else if (/^\/chatid/i.test(text)) {
+      await tgHandleChatId(chatId, chatTitle, chatType, incomingTopicId)
+    } else if (/^\/autorizar/i.test(text)) {
+      await tgHandleAutorizar(chatId, chatTitle, chatType, telegramUserId, incomingTopicId)
     } else if (/^\/incidencia/i.test(text)) {
       await tgHandleIncidencia(chatId, text, fromName, telegramUserId, incomingTopicId)
     } else if (/^\/estado/i.test(text)) {
