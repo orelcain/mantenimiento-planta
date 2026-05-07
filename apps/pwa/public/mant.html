@@ -3,7 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Repuestos · Antarfood</title>
+<title>Antarfood Mantenimiento</title>
+<!-- PWA installable: Telegram en iOS bloquea Mini Apps cuando "esperando conexión",
+     pero la PWA installable corre en Safari standalone, donde Service Workers SÍ
+     funcionan offline robusto. Tap "Compartir → Agregar a pantalla de inicio". -->
+<link rel="manifest" href="./mant-manifest.json">
+<meta name="theme-color" content="#17212b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Antarfood Mant">
+<link rel="apple-touch-icon" href="./icons/icon-192.svg">
+<link rel="apple-touch-icon" sizes="192x192" href="./icons/icon-192.svg">
+<link rel="apple-touch-icon" sizes="512x512" href="./icons/icon-512.svg">
+<link rel="icon" type="image/svg+xml" href="./icons/icon-192.svg">
 <!-- Service Worker: cachea mant.html + Firebase SDK + Telegram WebApp + PDF.js
      para que el bot CARGUE cuando no hay red. Sin esto el WebView falla al hacer
      GET de mant.html y muestra "no internet" antes de ejecutar nada. -->
@@ -541,6 +553,17 @@ const CF_BASE = 'https://us-central1-mantenimiento-planta-771a3.cloudfunctions.n
 const MAX_RECENTS = 30
 const RECENTS_PER_PAGE = 5
 
+// ── Modo standalone PWA (instalada en home screen, sin Telegram) ──────
+// En iOS: se detecta con navigator.standalone (Safari Add-to-Home-Screen)
+// En Android: se detecta con display-mode: standalone (Chrome installable)
+// En este modo el bot corre fuera de Telegram → no hay initData → usamos
+// la sesión cacheada en localStorage para auto-login offline.
+const IS_STANDALONE = (
+  window.matchMedia?.('(display-mode: standalone)').matches ||
+  window.navigator.standalone === true ||
+  new URLSearchParams(location.search).has('standalone')
+)
+
 // ── Modo preview (desarrollo en browser sin Telegram) ─────────────────
 const IS_PREVIEW = new URLSearchParams(location.search).has('preview')
 if (IS_PREVIEW) {
@@ -1066,12 +1089,6 @@ async function init(){
 
   setLoadingMsg('Autenticando…')
 
-  const initData = tgApp?.initData
-  if (!initData) {
-    setLoadingError('Abrí esta app desde el bot @antarfood_mant_bot.')
-    return
-  }
-
   // ─── Esperar restauración de auth desde IndexedDB de Firebase ───
   // Firebase Auth web persiste el sign-in por defecto en IDB.
   // En offline, auth.currentUser puede estar disponible de la sesión anterior.
@@ -1079,9 +1096,43 @@ async function init(){
     const unsub = auth.onAuthStateChanged(() => { unsub(); resolve() })
   })
 
+  const cachedSession = lsGet('mant_user_session', null)
+
+  // ─── Modo PWA standalone (instalada en home screen, FUERA de Telegram) ───
+  // Telegram en iOS bloquea Mini Apps cuando "esperando conexión". La PWA
+  // standalone corre en Safari standalone donde Service Workers funcionan
+  // robusto offline. Auto-login con sesión cacheada de la última visita Telegram.
+  if (IS_STANDALONE && cachedSession){
+    console.log('[standalone] auto-login con sesión cacheada')
+    uid = cachedSession.uid
+    userRole = cachedSession.userRole || 'usuario'
+    isAuthorized = !!cachedSession.isAuthorized
+    isLinked = !!cachedSession.isLinked
+    firstName = (cachedSession.firstName || '') + ' (PWA)'
+    setLoadingMsg(navigator.onLine ? 'Cargando (modo PWA)…' : 'Modo offline (PWA cacheada)…')
+    await Promise.all([
+      loadCategories().catch(e => console.warn('[standalone] loadCategories falló', e?.message)),
+      loadMachines().catch(e => console.warn('[standalone] loadMachines falló', e?.message)),
+      loadPrefs().catch(e => console.warn('[standalone] loadPrefs falló', e?.message)),
+    ])
+    showApp()
+    return
+  }
+
+  // En PWA standalone sin sesión previa: explicar que falta el bootstrap
+  if (IS_STANDALONE && !cachedSession){
+    setLoadingError('Primero abrí el bot @antarfood_mant_bot en Telegram con red, así se guarda tu sesión. Luego abrí la PWA y funcionará offline.')
+    return
+  }
+
+  const initData = tgApp?.initData
+  if (!initData) {
+    setLoadingError('Abrí esta app desde el bot @antarfood_mant_bot.')
+    return
+  }
+
   // ─── Modo offline: si no hay red Y tenemos sesión cacheada Y auth válida ───
   // → usar sesión local sin hacer mint, cargar datos desde caches Firestore + LS
-  const cachedSession = lsGet('mant_user_session', null)
   if (!navigator.onLine && cachedSession && auth.currentUser){
     console.log('[offline] iniciando con sesión cacheada')
     uid = cachedSession.uid
