@@ -832,52 +832,74 @@ async function purgeOldManuales(){
   }
 }
 
-// Resuelve URL para abrir un manual: cache hit → blob URL inmediato; miss → fetch + cachear.
-// Lanza Error con mensaje legible si offline + no cacheado.
-async function fetchAndCacheManual(m){
+// Descarga un PDF a IndexedDB en background (no bloqueante).
+// Devuelve true si se cacheó, false si falló (logs warn en consola).
+async function backgroundCacheManual(m){
   const key = manualCacheKey(m)
-  if (!key) throw new Error('Manual sin identificador válido')
-
-  // 1) Cache hit
-  const cached = await idbGet(key)
-  if (cached?.blob){
-    // LRU touch — actualizar ts en background, no bloqueante
-    idbSet(key, { ...cached, ts: Date.now() }).catch(() => {})
-    return { blobUrl: URL.createObjectURL(cached.blob), fromCache: true }
-  }
-
-  // 2) Cache miss: necesitamos red
-  if (!navigator.onLine){
-    throw new Error('Sin conexión y este manual aún no está descargado.')
-  }
+  if (!key) return false
+  if (__manualCachedKeys.has(key)) return true
+  if (!navigator.onLine) return false
   let resp
   try { resp = await fetch(m.url) }
-  catch(e){ throw new Error('No se pudo descargar: ' + (e.message || 'error de red')) }
-  if (!resp.ok) throw new Error(`Descarga falló (HTTP ${resp.status})`)
+  catch(e){ console.warn('[manualCache] bg fetch failed', e); return false }
+  if (!resp.ok){ console.warn('[manualCache] bg HTTP', resp.status); return false }
   const blob = await resp.blob()
-
-  // 3) Guardar (manejando quota llena con un retry tras purga)
   const record = {
-    blob,
-    ts: Date.now(),
-    sizeBytes: blob.size,
-    url: m.url,
-    titulo: m.titulo || '',
-    storagePath: m.storagePath || null,
+    blob, ts: Date.now(), sizeBytes: blob.size,
+    url: m.url, titulo: m.titulo || '', storagePath: m.storagePath || null,
   }
   let res = await idbSet(key, record)
   if (!res.ok && res.quotaExceeded){
-    console.warn('[manualCache] quota lleno, purgando y reintentando')
     await purgeOldManuales()
     res = await idbSet(key, record)
   }
   if (res.ok){
     __manualCachedKeys.add(key)
-    console.log(`[manualCache] cached: ${m.titulo} (${(blob.size/1048576).toFixed(1)} MB)`)
-  } else {
-    console.warn('[manualCache] no se pudo cachear (continuamos sin cache)')
+    console.log(`[manualCache] cached bg: ${m.titulo} (${(blob.size/1048576).toFixed(1)} MB)`)
+    return true
   }
-  return { blobUrl: URL.createObjectURL(blob), fromCache: false }
+  return false
+}
+
+// Resuelve la URL a usar para abrir un manual.
+//   - Con red → URL directa del Storage (Range requests funcionan, PDFs grandes cargan completos);
+//     dispara la descarga al IDB en background para futuro offline.
+//   - Sin red → blob URL desde IDB si existe; si no, lanza error.
+//
+// Notar: el blob URL en iframe puede mostrar solo primera página de PDFs grandes en algunos
+// visores (Telegram WebView, iOS Safari) por limitación de Range requests sobre blob URLs.
+// Por eso priorizamos la URL directa cuando hay red — sólo recurrimos al blob si NO hay red.
+async function resolveManualUrl(m){
+  const key = manualCacheKey(m)
+  if (!key) throw new Error('Manual sin identificador válido')
+
+  // ── Caso offline: única opción es blob URL del IDB ──
+  if (!navigator.onLine){
+    const cached = await idbGet(key)
+    if (cached?.blob){
+      idbSet(key, { ...cached, ts: Date.now() }).catch(() => {})
+      return { url: URL.createObjectURL(cached.blob), fromCache: true, mode: 'blob' }
+    }
+    throw new Error('Sin conexión y este manual aún no está descargado.')
+  }
+
+  // ── Caso online: usar URL directa del Storage (mejor renderizado) ──
+  // En paralelo: descargar al IDB en background si no está, para futuro offline.
+  if (!__manualCachedKeys.has(key)){
+    backgroundCacheManual(m).then(ok => {
+      // Cuando termine la descarga, refrescar lista para mostrar el badge 📥
+      if (ok && currentTab === 'manuales' && __manualesCache){
+        renderManualesBody(__manualesCache)
+      }
+    }).catch(() => {})
+  } else {
+    // Ya cacheado — actualizar ts (LRU touch) en background
+    idbGet(key).then(rec => {
+      if (rec) idbSet(key, { ...rec, ts: Date.now() }).catch(() => {})
+    }).catch(() => {})
+  }
+  const fromCache = __manualCachedKeys.has(key)
+  return { url: m.url, fromCache, mode: 'direct' }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1617,18 +1639,19 @@ async function openManualViewer(mData){
   const m = typeof mData === 'string' ? JSON.parse(mData) : mData
   if (!m?.url) return
   tgApp?.HapticFeedback?.selectionChanged?.()
-  // PDF e imagen → visor inline (con cache IndexedDB); link/video → externo
+  // PDF e imagen → visor inline; link/video → externo
   if (m.tipo === 'pdf' || m.tipo === 'imagen'){
+    // Online: URL directa (Range requests OK, PDFs grandes cargan todas las páginas).
+    // Offline: blob URL desde IDB si existe.
     showInlineDocOverlay(null, m.titulo, m.tipo, { state: 'loading', externalUrl: m.url })
     try {
-      const { blobUrl, fromCache } = await fetchAndCacheManual(m)
-      showInlineDocOverlay(blobUrl, m.titulo, m.tipo, {
-        state: 'ready', externalUrl: m.url, fromCache,
+      const { url, fromCache, mode } = await resolveManualUrl(m)
+      showInlineDocOverlay(url, m.titulo, m.tipo, {
+        state: 'ready',
+        externalUrl: m.url,           // siempre el original para "↗ Externo"
+        fromCache,                     // muestra badge "📥 offline" si ya estaba cacheado
+        offlineMode: mode === 'blob',  // visor de blob solo en modo offline
       })
-      // Si descargamos por primera vez y el tab Manuales sigue visible, refrescar para mostrar el badge 📥
-      if (!fromCache && currentTab === 'manuales' && __manualesCache){
-        renderManualesBody(__manualesCache)
-      }
     } catch(e){
       console.warn('[manualCache] open failed', e)
       const offline = !navigator.onLine
@@ -1710,7 +1733,9 @@ function showInlineDocOverlay(url, title, tipo, opts){
     ${body}
     ${(isPdf && state === 'ready') ? `<div style="padding:6px 12px;font-size:11px;color:var(--hint);
       text-align:center;background:var(--card);border-top:1px solid var(--border)">
-      Si no carga, usa "↗ Externo" arriba.
+      ${opts.offlineMode
+        ? '📡 Modo offline · si no se ven todas las páginas, abrí con "↗ Externo" cuando vuelva la conexión.'
+        : 'Si no carga, usa "↗ Externo" arriba.'}
     </div>` : ''}`
   ov.style.display = 'flex'
   setTgBack(closeInlineDocOverlay)
