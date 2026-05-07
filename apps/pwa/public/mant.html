@@ -3030,7 +3030,90 @@ async function renderHomeCacheInfo(){
         color:var(--hint);padding:3px 10px;border-radius:12px;font-size:11px;cursor:pointer">
         🗑 Liberar espacio
       </button>
+      <button onclick="showOfflineDiagnostic()" style="background:none;border:1px solid var(--border);
+        color:var(--hint);padding:3px 10px;border-radius:12px;font-size:11px;cursor:pointer">
+        🔍 Diagnóstico
+      </button>
     </div>`
+}
+
+// Panel de diagnóstico para el usuario: muestra si el SW está activo, qué está
+// cacheado, estado de auth/red, etc. Útil para reportar problemas de offline.
+async function showOfflineDiagnostic(){
+  const lines = []
+  lines.push(`📡 Red: ${navigator.onLine ? '🟢 Online' : '🔴 Offline'}`)
+
+  // Service Worker
+  if ('serviceWorker' in navigator){
+    try {
+      const reg = await navigator.serviceWorker.getRegistration('./')
+      if (reg){
+        const states = {
+          installing: !!reg.installing,
+          waiting: !!reg.waiting,
+          active: !!reg.active,
+          controller: !!navigator.serviceWorker.controller,
+        }
+        lines.push(`⚙️ SW: ${reg.active ? '🟢 activo' : '🟡 ' + JSON.stringify(states)}`)
+        lines.push(`   scope: ${reg.scope}`)
+        lines.push(`   controller: ${navigator.serviceWorker.controller ? 'sí' : 'NO (recargá página)'}`)
+      } else {
+        lines.push(`⚙️ SW: 🔴 NO REGISTRADO — la app no abrirá offline`)
+      }
+    } catch(e){ lines.push(`⚙️ SW: error ${e?.message}`) }
+  } else {
+    lines.push(`⚙️ SW: 🔴 navegador no soporta Service Worker`)
+  }
+
+  // Caches
+  if ('caches' in window){
+    try {
+      const keys = await caches.keys()
+      for (const k of keys){
+        const c = await caches.open(k)
+        const all = await c.keys()
+        lines.push(`📦 ${k}: ${all.length} entradas`)
+      }
+    } catch(e){ lines.push(`📦 caches: error ${e?.message}`) }
+  }
+
+  // Sesión auth
+  const session = lsGet('mant_user_session', null)
+  lines.push(`🔐 Sesión LS: ${session ? `✓ ${session.userRole}` : '🔴 vacía'}`)
+  lines.push(`🔐 Auth user: ${auth.currentUser?.uid ? '✓' : '🔴 sin user'}`)
+
+  // Datos cacheados
+  const cats = lsGet(LS_KEY_CATEGORIES, null)
+  const machs = lsGet(LS_KEY_MACHINES, null)
+  lines.push(`📂 Categorías LS: ${cats?.length || 0}`)
+  lines.push(`🔧 Máquinas LS: ${machs?.length || 0}`)
+
+  // Repuestos por equipo
+  let repCount = 0, repItems = 0
+  try {
+    for (let i = 0; i < localStorage.length; i++){
+      const k = localStorage.key(i)
+      if (k?.startsWith(LS_PREFIX_REPCACHE)){
+        const data = lsGet(k, null)
+        if (data?.length){ repCount++; repItems += data.length }
+      }
+    }
+  } catch {}
+  lines.push(`⚙️ Repuestos LS: ${repCount} equipos · ${repItems} reps`)
+
+  // Manuales
+  let manuales = []
+  try { manuales = await idbList() } catch {}
+  lines.push(`📚 Manuales IDB: ${manuales.length}`)
+  lines.push(`🌐 Insumos memoria: ${(__insumosCache || []).length}`)
+
+  // Render
+  const text = lines.join('\n')
+  if (tgApp?.showAlert){
+    tgApp.showAlert(text)
+  } else {
+    alert(text)
+  }
 }
 
 function clearManualesCache(){
