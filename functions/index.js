@@ -2538,7 +2538,26 @@ async function tgHandleStart(chatId, fromName, chatType, topicId) {
   }
 }
 
-async function tgHandleAbrir(chatId, topicId) {
+async function tgHandleAbrir(chatId, chatType, telegramUserId, topicId) {
+  // En grupos, restringir a creator/administrator. En privados cualquier
+  // usuario puede invocarlo (chat 1:1 con el bot ya implica intencionalidad).
+  if (chatType !== 'private') {
+    let isAdmin = false
+    try {
+      const memberResult = await callTelegramApi('getChatMember', { chat_id: chatId, user_id: telegramUserId })
+      if (memberResult?.ok) {
+        const status = memberResult.result?.status
+        isAdmin = (status === 'creator' || status === 'administrator')
+      }
+    } catch (e) { logger.warn('getChatMember failed in /abrir', e) }
+    if (!isAdmin) {
+      // Silencio: el comando no aparece en el autocomplete para no-admins, así
+      // que llegar acá implica que tiparon manualmente. No respondemos para no
+      // hacer ruido en el grupo.
+      logger.info('Silent ignore /abrir from non-admin', { chatId, telegramUserId })
+      return
+    }
+  }
   // Usamos Direct Link `t.me/<bot>/<app>` en lugar de `web_app:{url}`. Razón:
   // los botones `web_app` en `inline_keyboard` son rechazados por Telegram en
   // grupos cuando el URL no coincide exactamente con el dominio configurado
@@ -3043,7 +3062,7 @@ exports.telegramWebhook = onRequest({ region: 'us-central1' }, async (req, res) 
     if (/^\/start/i.test(text)) {
       await tgHandleStart(chatId, fromName, chatType, incomingTopicId)
     } else if (/^\/(abrir|app)/i.test(text)) {
-      await tgHandleAbrir(chatId, incomingTopicId)
+      await tgHandleAbrir(chatId, chatType, telegramUserId, incomingTopicId)
     } else if (/^\/autorizar/i.test(text)) {
       await tgHandleAutorizar(chatId, chatTitle, chatType, telegramUserId, incomingTopicId)
     } else if (/^\/chatid/i.test(text)) {
@@ -3130,13 +3149,22 @@ exports.setTelegramWebhook = onRequest({ region: 'us-central1' }, async (req, re
 
 /**
  * Registra/limpia los comandos del bot en BotFather (autocomplete del input).
- * Política UX (2026-05-07): mostrar SOLO /abrir y /autorizar al usuario.
- * Los demás comandos legacy quedan ocultos del autocomplete pero siguen
- * funcionando si alguien los conoce (por compat con links viejos).
+ * Política UX (2026-05-07): comandos invisibles para miembros comunes.
+ *
+ * Por scope:
+ *   - default                      → vacío (cuando no aplica otro scope más
+ *                                     específico, no se muestra nada)
+ *   - all_private_chats            → [/abrir]  (cualquier usuario en privado
+ *                                     con el bot puede abrir la app)
+ *   - all_group_chats              → vacío    (miembros comunes en grupos NO
+ *                                     ven nada al escribir "/")
+ *   - all_chat_administrators      → [/abrir, /autorizar]  (admins/creators
+ *                                     de grupos sí ven los comandos)
+ *
+ * La restricción de ejecución (no autocompletado) se valida adicionalmente
+ * en cada handler con getChatMember.
  *
  * GET /setBotCommands — ejecutar una sola vez tras deploy. Idempotente.
- * Aplica `setMyCommands` a los 3 scopes principales (default, all_private_chats,
- * all_group_chats) para que el autocomplete sea coherente en todos los contextos.
  */
 exports.setBotCommands = onRequest({ region: 'us-central1' }, async (req, res) => {
   const token = process.env.TELEGRAM_BOT_TOKEN
@@ -3144,23 +3172,21 @@ exports.setBotCommands = onRequest({ region: 'us-central1' }, async (req, res) =
     res.status(500).json({ error: 'TELEGRAM_BOT_TOKEN no configurado' })
     return
   }
-  const commands = [
-    { command: 'abrir',     description: 'Abrir el catálogo (banner pineable)' },
-    { command: 'autorizar', description: 'Autorizar este chat para usar el bot' },
-  ]
-  const scopes = [
-    { type: 'default' },
-    { type: 'all_private_chats' },
-    { type: 'all_group_chats' },
-    { type: 'all_chat_administrators' },
+  const cmdAbrir     = { command: 'abrir',     description: 'Abrir el catálogo (banner pineable)' }
+  const cmdAutorizar = { command: 'autorizar', description: 'Autorizar este chat para usar el bot' }
+  const plan = [
+    { scope: { type: 'default' },                  commands: [] },
+    { scope: { type: 'all_private_chats' },        commands: [cmdAbrir] },
+    { scope: { type: 'all_group_chats' },          commands: [] },
+    { scope: { type: 'all_chat_administrators' },  commands: [cmdAbrir, cmdAutorizar] },
   ]
   const results = []
   try {
-    for (const scope of scopes) {
+    for (const { scope, commands } of plan) {
       const r = await callTelegramApi('setMyCommands', { commands, scope })
-      results.push({ scope: scope.type, ok: r?.ok === true, result: r })
+      results.push({ scope: scope.type, commandCount: commands.length, ok: r?.ok === true, result: r })
     }
-    res.json({ commands, results })
+    res.json({ plan, results })
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
