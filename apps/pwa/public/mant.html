@@ -648,8 +648,11 @@ const LS_KEY_REPUESTOS = 'mant_repuestos_v2'
 const LS_KEY_MANUALES  = 'mant_manuales_v2'
 const LS_KEY_HIERARCHY = 'mant_hierarchy_v2'
 const LS_TTL_HIER  =  6 * 60 * 60 * 1000   //  6h — jerarquía cambia raro
-const LS_TTL_REP   =  5 * 60 * 1000        //  5min — sincronización rápida con PWA
+const LS_TTL_REP   = 24 * 60 * 60 * 1000   // 24h — listeners onSnapshot mantienen freshness con red,
+                                            //       y cuando offline usamos cache aunque expire (offline-first)
 const LS_TTL_MAN   = 24 * 60 * 60 * 1000   // 24h — manuales casi no cambian
+// Prefijo de claves para cache por equipo: mant_repcache_<machineId>
+const LS_PREFIX_REPCACHE = 'mant_repcache_'
 
 function lsGet(key, maxAgeMs){
   try {
@@ -657,7 +660,8 @@ function lsGet(key, maxAgeMs){
     if (!raw) return null
     const obj = JSON.parse(raw)
     if (!obj?.ts) return null
-    if (maxAgeMs && Date.now() - obj.ts > maxAgeMs) return null
+    // Offline-first: si no hay red, usar cache aunque haya expirado (mejor datos viejos que pantalla en blanco)
+    if (maxAgeMs && navigator.onLine && Date.now() - obj.ts > maxAgeMs) return null
     return obj.data ?? null
   } catch { return null }
 }
@@ -923,6 +927,67 @@ async function resolveManualUrl(m){
   return { url: m.url, fromCache, mode: 'direct' }
 }
 
+// ─── PDF.js (visor robusto cross-platform: Telegram WebView, iOS, Android) ───
+// El visor nativo `<iframe src="pdf">` solo carga la primera página en muchos
+// WebViews (Range requests inconsistentes con blob URLs y algunos PDFs).
+// PDF.js renderiza cada página en <canvas> y funciona en todas partes.
+// Carga lazy desde CDN — solo cuando el usuario abre un PDF.
+const PDFJS_VERSION = '3.11.174'
+const PDFJS_BASE = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}`
+let __pdfJsPromise = null
+
+function loadPdfJs(){
+  if (__pdfJsPromise) return __pdfJsPromise
+  __pdfJsPromise = new Promise((resolve, reject) => {
+    if (window.pdfjsLib){ resolve(window.pdfjsLib); return }
+    const s = document.createElement('script')
+    s.src = `${PDFJS_BASE}/pdf.min.js`
+    s.onload = () => {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = `${PDFJS_BASE}/pdf.worker.min.js`
+      resolve(window.pdfjsLib)
+    }
+    s.onerror = () => { __pdfJsPromise = null; reject(new Error('No se pudo cargar PDF.js')) }
+    document.head.appendChild(s)
+  })
+  return __pdfJsPromise
+}
+
+// Renderiza todas las páginas del PDF dentro de `container` (vertical scroll).
+// `url` puede ser URL directa (HTTP) o blob URL.
+// `progressEl` (opcional) recibe textContent con "Página N/M".
+async function renderPdfIntoContainer(url, container, progressEl){
+  const pdfjsLib = await loadPdfJs()
+  if (progressEl) progressEl.textContent = 'Abriendo PDF…'
+  // pdfjs hace fetch internamente; soporta tanto URL directa como blob:
+  const loadingTask = pdfjsLib.getDocument({
+    url,
+    // Mejorar soporte CORS para Firebase Storage URLs
+    withCredentials: false,
+    isEvalSupported: false,
+  })
+  const pdf = await loadingTask.promise
+  container.innerHTML = ''
+  const N = pdf.numPages
+  // Escala basada en ancho del container para que el PDF se ajuste.
+  const containerWidth = Math.max(280, container.clientWidth - 16)
+  for (let n = 1; n <= N; n++){
+    if (progressEl) progressEl.textContent = `Página ${n} / ${N}`
+    const page = await pdf.getPage(n)
+    const baseViewport = page.getViewport({ scale: 1 })
+    const scale = containerWidth / baseViewport.width
+    const viewport = page.getViewport({ scale })
+    const canvas = document.createElement('canvas')
+    canvas.style.cssText = 'display:block;margin:0 auto 6px;max-width:100%;height:auto;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.4);border-radius:2px'
+    canvas.width = Math.floor(viewport.width)
+    canvas.height = Math.floor(viewport.height)
+    container.appendChild(canvas)
+    const ctx = canvas.getContext('2d', { alpha: false })
+    await page.render({ canvasContext: ctx, viewport }).promise
+  }
+  if (progressEl) progressEl.textContent = `${N} página${N === 1 ? '' : 's'}`
+  return N
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════════════════
@@ -1062,10 +1127,32 @@ function showApp(){
   }, 1500)
 }
 
+// Hidrata repCache (memoria) desde localStorage para todos los equipos cacheados.
+// Garantiza que abrir el detalle de un equipo NUNCA toque la red si tenemos datos viejos.
+function hydrateRepCacheFromLocalStorage(){
+  let count = 0, items = 0
+  try {
+    for (let i = 0; i < localStorage.length; i++){
+      const key = localStorage.key(i)
+      if (!key?.startsWith(LS_PREFIX_REPCACHE)) continue
+      const machineId = key.slice(LS_PREFIX_REPCACHE.length)
+      const data = lsGet(key, LS_TTL_REP)
+      if (data?.length > 0){
+        repCache[machineId] = data
+        count++
+        items += data.length
+      }
+    }
+  } catch(e){ console.warn('hydrateRepCache failed', e) }
+  if (count > 0) console.log(`[offline] hidratados ${count} equipos · ${items} repuestos desde localStorage`)
+}
+
 // Precarga datos clave en paralelo. Usa la cache IndexedDB de Firestore como
 // almacén — los reads quedan persistidos automáticamente. No bloquea showApp.
 function preloadAllForOffline(){
-  // Disparar en paralelo, no esperar ninguno
+  // 1) Hidratar memoria desde localStorage (instantáneo, sin red)
+  hydrateRepCacheFromLocalStorage()
+  // 2) Disparar refresh desde Firestore en paralelo (con red llena cache; sin red usa IDB persistence)
   loadAllRepuestos()
     .then(() => { if (currentTab === 'home') renderHomeStockAlert() })
     .catch(e => console.warn('preload repuestos failed', e?.message || e))
@@ -1246,6 +1333,18 @@ async function loadRepuestos(machineId){
   // Solo cachear arrays NO vacíos: un cache vacío puede venir de una resolución
   // de path incorrecta (ej: hierarchy aún no cargado) y bloquear ediciones futuras.
   if (repCache[machineId]?.length > 0) return repCache[machineId]
+  // 1) Hidratar desde localStorage si existe (offline-friendly: TTL 24h, ignora TTL si offline)
+  const lsKey = LS_PREFIX_REPCACHE + machineId
+  const lsHit = lsGet(lsKey, LS_TTL_REP)
+  if (lsHit?.length > 0){
+    repCache[machineId] = lsHit
+    // Si hay red, refrescar en background sin bloquear (best-effort)
+    if (navigator.onLine){
+      _refreshRepuestosFromServer(machineId).catch(() => {})
+    }
+    return repCache[machineId]
+  }
+  // 2) Sin cache: fetch a Firestore. Si offline, Firestore SDK leerá de su IDB persistence.
   const m = machineMap[machineId]
   const collPath = getRepuestoCollPath(machineId)
   let docs = []
@@ -1279,7 +1378,49 @@ async function loadRepuestos(machineId){
     } catch(e){ /* nodo sin repuestos propios, ignorar */ }
   }
   repCache[machineId] = results
+  // Persistir en localStorage para sobrevivir reinicios sin red
+  if (results.length > 0){
+    try { lsSet(lsKey, normalizeForCache(results)) } catch {}
+  }
   return repCache[machineId]
+}
+
+// Refresca repuestos de un equipo desde server y actualiza cache (memoria + localStorage).
+// Usado cuando lsHit ya devolvió datos: actualizamos en background sin bloquear UI.
+async function _refreshRepuestosFromServer(machineId){
+  const m = machineMap[machineId]
+  if (!m) return
+  const collPath = getRepuestoCollPath(machineId)
+  const lsKey = LS_PREFIX_REPCACHE + machineId
+  let docs = []
+  try {
+    const snap = await db.collection(collPath).orderBy('codigoSAP').get({ source: 'server' })
+    docs = snap.docs
+  } catch(e){
+    try { docs = (await db.collection(collPath).get({ source: 'server' })).docs }
+    catch { return }  // sin server, mantener cache
+  }
+  let results = docs.map(d => ({id:d.id, ...d.data()}))
+  const hierNodeId = m.hierarchyNodeId
+  if (hierNodeId && collPath !== `hierarchy/${hierNodeId}/repuestos`){
+    try {
+      const hierSnap = await db.collection(`hierarchy/${hierNodeId}/repuestos`).get({ source: 'server' })
+      const existingIds  = new Set(results.map(r => r.id))
+      const existingSAPs = new Set(results.map(r => r.codigoSAP).filter(Boolean))
+      for (const d of hierSnap.docs){
+        const hr = {id: d.id, ...d.data()}
+        if (!existingIds.has(hr.id) && !(hr.codigoSAP && existingSAPs.has(hr.codigoSAP))){
+          results.push(hr)
+          existingIds.add(hr.id)
+          if (hr.codigoSAP) existingSAPs.add(hr.codigoSAP)
+        }
+      }
+    } catch {}
+  }
+  if (results.length > 0){
+    repCache[machineId] = results
+    try { lsSet(lsKey, normalizeForCache(results)) } catch {}
+  }
 }
 
 /**
@@ -1796,8 +1937,15 @@ function showInlineDocOverlay(url, title, tipo, opts){
         border-radius:14px;font-size:13px;font-weight:600;cursor:pointer">↗ Abrir online</button>`:''}
     </div>`
   } else if (isPdf){
-    body = `<iframe src="${escHtmlAttr(url)}#toolbar=1&view=FitH"
-      style="flex:1;border:none;background:#fff" allow="fullscreen" loading="lazy"></iframe>`
+    // Contenedor scrollable donde PDF.js renderizará las páginas como canvas.
+    body = `<div id="pdf-canvas-container" style="flex:1;overflow:auto;background:#1a1a1a;
+      padding:8px;-webkit-overflow-scrolling:touch">
+      <div style="display:flex;align-items:center;justify-content:center;flex-direction:column;
+        gap:10px;color:var(--hint);font-size:13px;padding:40px 20px">
+        <div style="width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite"></div>
+        <span id="pdf-render-progress">Abriendo PDF…</span>
+      </div>
+    </div>`
   } else {
     body = `<div style="flex:1;overflow:auto;background:#000;display:flex;align-items:center;justify-content:center">
       <img src="${escHtmlAttr(url)}" style="max-width:100%;max-height:100%;object-fit:contain">
@@ -1814,14 +1962,35 @@ function showInlineDocOverlay(url, title, tipo, opts){
       ${headerExtBtn}
     </div>
     ${body}
-    ${(isPdf && state === 'ready') ? `<div style="padding:6px 12px;font-size:11px;color:var(--hint);
+    ${(isPdf && state === 'ready') ? `<div id="pdf-status-bar" style="padding:6px 12px;font-size:11px;color:var(--hint);
       text-align:center;background:var(--card);border-top:1px solid var(--border)">
-      ${opts.offlineMode
-        ? '📡 Modo offline · si no se ven todas las páginas, abrí con "↗ Externo" cuando vuelva la conexión.'
-        : 'Si no carga, usa "↗ Externo" arriba.'}
+      ${opts.offlineMode ? '📡 Modo offline · ' : ''}<span id="pdf-page-count">renderizando…</span>
     </div>` : ''}`
   ov.style.display = 'flex'
   setTgBack(closeInlineDocOverlay)
+
+  // Render PDF con PDF.js (async, no bloquea UI)
+  if (isPdf && state === 'ready' && url){
+    const container = ov.querySelector('#pdf-canvas-container')
+    const progressEl = ov.querySelector('#pdf-page-count')
+    if (container){
+      // Pequeño delay para que el browser pinte el spinner antes del trabajo pesado
+      setTimeout(() => {
+        renderPdfIntoContainer(url, container, progressEl)
+          .catch(err => {
+            console.warn('[pdfjs] render falló', err)
+            container.innerHTML = `<div style="color:#ddd;text-align:center;padding:30px 20px;font-size:13px;line-height:1.5">
+              <div style="font-size:32px;margin-bottom:10px">⚠️</div>
+              <div>No se pudo renderizar el PDF.<br>${escHtml(err?.message || '')}</div>
+              ${externalUrl ? `<button onclick="openDocExternal('${escHtmlAttr(externalUrl)}')"
+                style="margin-top:14px;background:var(--accent);border:none;color:var(--acctxt);
+                padding:8px 18px;border-radius:14px;font-size:13px;font-weight:600;cursor:pointer">↗ Abrir online</button>` : ''}
+            </div>`
+            if (progressEl) progressEl.textContent = 'error'
+          })
+      }, 30)
+    }
+  }
 }
 
 function closeInlineDocOverlay(){
