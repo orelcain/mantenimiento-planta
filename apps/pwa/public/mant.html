@@ -447,10 +447,10 @@ mark{background:rgba(var(--accent-rgb,82,136,193),.25);color:inherit;border-radi
 
   <nav class="bottom-nav">
     <button class="nav-btn active" id="nav-home" onclick="switchTab('home')">
-      <span class="icon">🏠</span>Inicio
+      <span class="icon">🏠</span>Listas rápidas
     </button>
     <button class="nav-btn" id="nav-search" onclick="switchTab('search')">
-      <span class="icon">🔍</span>Buscar
+      <span class="icon">🔍</span>Repuestos
     </button>
     <button class="nav-btn" id="nav-hierarchy" onclick="switchTab('hierarchy')">
       <span class="icon">🌳</span>Jerarquía
@@ -1086,10 +1086,10 @@ function setHeader(title, subtitle, withBack){
 }
 
 function tabHeader(tab){
-  if (tab === 'home')      setHeader('Repuestos', '@antarfood_mant_bot', false)
+  if (tab === 'home')      setHeader('Listas rápidas', '@antarfood_mant_bot', false)
   if (tab === 'hierarchy') setHeader('Jerarquía', 'Navegar planta completa', false)
   if (tab === 'manuales')  setHeader('Manuales', 'Documentación y planos', false)
-  if (tab === 'search')    setHeader('Buscar', 'SAP, nombre, equipo…', false)
+  if (tab === 'search')    setHeader('Repuestos', 'SAP, nombre, equipo…', false)
   if (tab === 'insumos')   setHeader('Insumos', 'EPP, ferretería, químicos, empaque…', false)
 }
 
@@ -2398,9 +2398,6 @@ function renderHomeRecents(){
 }
 
 function renderHomeGreeting(){
-  const rawName = firstName || tgApp?.initDataUnsafe?.user?.first_name || ''
-  const name = String(rawName).trim().replace(/^[.,;:\s]+|[.,;:\s]+$/g, '')
-  const hello = name ? `Hola, ${escHtml(name)} 👋` : 'Hola 👋'
   const role = ({admin:'Admin', supervisor:'Supervisor', tecnico:'Técnico', usuario:'Solo lectura'})[userRole] || userRole
   const linkTag = isLinked
     ? `<span class="tag green">vinculado</span>`
@@ -2419,7 +2416,6 @@ function renderHomeGreeting(){
     </button>` : ''
   document.getElementById('home-greeting').innerHTML = `
     <div class="hello">
-      <div class="hello-text">${hello}</div>
       <div class="hello-sub">${escHtml(role)} ${linkTag}</div>
       ${countBtn}
       ${previewBtn}
