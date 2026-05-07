@@ -2517,6 +2517,27 @@ const MANT_URL = 'https://orelcain.github.io/mantenimiento-planta/mant.html'
  * desde dentro de un grupo. Reemplaza al Menu Button del bot que solo funciona
  * en chats privados — un admin del grupo pinea este mensaje y queda fijo arriba.
  */
+/**
+ * /start — disparado automáticamente por Telegram cuando un usuario abre el
+ * bot por primera vez (en privado o desde un Direct Link). En grupos también
+ * se invoca al agregar el bot. Damos bienvenida + atajo para abrir la app.
+ */
+async function tgHandleStart(chatId, fromName, chatType, topicId) {
+  const isPrivate = chatType === 'private'
+  const greeting = fromName ? `¡Hola, ${fromName}! 👋` : '¡Hola! 👋'
+  const text = isPrivate
+    ? `${greeting}\n\nSoy el bot de mantenimiento de planta Antarfood. Tocá el botón para abrir el catálogo (repuestos, insumos, manuales, conteos).`
+    : `${greeting}\n\nSoy el bot de mantenimiento. En este grupo, un admin debe usar /autorizar y luego /abrir para postear el banner con la app.`
+  const buttons = isPrivate
+    ? [[{ text: '📦 Abrir Mantenimiento', url: 'https://t.me/antarfood_mant_bot/repuestos' }]]
+    : null
+  if (buttons) {
+    await sendTelegramButtons(text, chatId, buttons, { topicId })
+  } else {
+    await sendTelegramMessage(text, chatId, { topicId })
+  }
+}
+
 async function tgHandleAbrir(chatId, topicId) {
   // Usamos Direct Link `t.me/<bot>/<app>` en lugar de `web_app:{url}`. Razón:
   // los botones `web_app` en `inline_keyboard` son rechazados por Telegram en
@@ -3008,40 +3029,30 @@ exports.telegramWebhook = onRequest({ region: 'us-central1' }, async (req, res) 
       return
     }
 
-    if (/^\/(menu|start)/i.test(text)) {
-      await tgHandleMenu(chatId, incomingTopicId)
+    // ── Switch de comandos ─────────────────────────────────────────────
+    // Política UX (2026-05-07): toda la operativa pasa por la Mini App.
+    // Solo se exponen 2 comandos públicos:
+    //   /abrir       → postea banner pineable con botón a la Mini App
+    //   /autorizar   → onboarding (creator/admin del grupo)
+    // Helpers internos (no listados en BotFather, accesibles si se conocen):
+    //   /chatid      → info del chat (debug)
+    //   /start       → bienvenida automática de Telegram al abrir el bot
+    // Los handlers legacy (/incidencia, /estado, /equipo, /repuesto, /turno,
+    // /kpi, /sensores, /ayuda, /menu) quedan en el código pero desconectados;
+    // están listos por si en el futuro queremos volver a exponerlos.
+    if (/^\/start/i.test(text)) {
+      await tgHandleStart(chatId, fromName, chatType, incomingTopicId)
     } else if (/^\/(abrir|app)/i.test(text)) {
       await tgHandleAbrir(chatId, incomingTopicId)
-    } else if (/^\/chatid/i.test(text)) {
-      await tgHandleChatId(chatId, chatTitle, chatType, incomingTopicId)
     } else if (/^\/autorizar/i.test(text)) {
       await tgHandleAutorizar(chatId, chatTitle, chatType, telegramUserId, incomingTopicId)
-    } else if (/^\/incidencia/i.test(text)) {
-      await tgHandleIncidencia(chatId, text, fromName, telegramUserId, incomingTopicId)
-    } else if (/^\/estado/i.test(text)) {
-      await tgHandleEstado(chatId, incomingTopicId)
-    } else if (/^\/(ayuda|help)/i.test(text)) {
-      await tgHandleAyuda(chatId, incomingTopicId)
-    } else if (/^\/sensores?/i.test(text)) {
-      await tgHandleSensores(chatId, incomingTopicId)
-    } else if (/^\/equipo/i.test(text)) {
-      await tgHandleEquipo(chatId, text, incomingTopicId)
-    } else if (/^\/repuestos/i.test(text)) {
-      await tgHandleRepuestosMaquina(chatId, text, incomingTopicId)
-    } else if (/^\/repuesto/i.test(text)) {
-      await tgHandleRepuesto(chatId, text, incomingTopicId)
-    } else if (/^\/turno/i.test(text)) {
-      await tgHandleTurno(chatId, incomingTopicId)
-    } else if (/^\/kpi/i.test(text)) {
-      await tgHandleKpi(chatId, incomingTopicId)
-    } else if (!text.startsWith('/')) {
-      if (text.length >= 10) {
-        await tgHandleIncidencia(chatId, `/incidencia ${text}`, fromName, telegramUserId, incomingTopicId)
-      } else {
-        await sendTelegramMessage('ℹ️ Usá /menu o /ayuda para ver los comandos.', chatId, { topicId: incomingTopicId })
+    } else if (/^\/chatid/i.test(text)) {
+      await tgHandleChatId(chatId, chatTitle, chatType, incomingTopicId)
+    } else if (text.startsWith('/')) {
+      // Cualquier otro comando: silencio en grupos, respuesta breve en privados
+      if (chatType === 'private') {
+        await sendTelegramMessage('Usá /abrir para abrir el catálogo.', chatId, { topicId: incomingTopicId })
       }
-    } else {
-      await sendTelegramMessage('❓ Comando no reconocido. Usá /menu o /ayuda.', chatId, { topicId: incomingTopicId })
     }
   } catch (error) {
     logger.error('Error handling Telegram command', error)
@@ -3112,6 +3123,44 @@ exports.setTelegramWebhook = onRequest({ region: 'us-central1' }, async (req, re
     })
     const result = await response.json()
     res.json({ webhookUrl, telegram: result })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+/**
+ * Registra/limpia los comandos del bot en BotFather (autocomplete del input).
+ * Política UX (2026-05-07): mostrar SOLO /abrir y /autorizar al usuario.
+ * Los demás comandos legacy quedan ocultos del autocomplete pero siguen
+ * funcionando si alguien los conoce (por compat con links viejos).
+ *
+ * GET /setBotCommands — ejecutar una sola vez tras deploy. Idempotente.
+ * Aplica `setMyCommands` a los 3 scopes principales (default, all_private_chats,
+ * all_group_chats) para que el autocomplete sea coherente en todos los contextos.
+ */
+exports.setBotCommands = onRequest({ region: 'us-central1' }, async (req, res) => {
+  const token = process.env.TELEGRAM_BOT_TOKEN
+  if (!token) {
+    res.status(500).json({ error: 'TELEGRAM_BOT_TOKEN no configurado' })
+    return
+  }
+  const commands = [
+    { command: 'abrir',     description: 'Abrir el catálogo (banner pineable)' },
+    { command: 'autorizar', description: 'Autorizar este chat para usar el bot' },
+  ]
+  const scopes = [
+    { type: 'default' },
+    { type: 'all_private_chats' },
+    { type: 'all_group_chats' },
+    { type: 'all_chat_administrators' },
+  ]
+  const results = []
+  try {
+    for (const scope of scopes) {
+      const r = await callTelegramApi('setMyCommands', { commands, scope })
+      results.push({ scope: scope.type, ok: r?.ok === true, result: r })
+    }
+    res.json({ commands, results })
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
