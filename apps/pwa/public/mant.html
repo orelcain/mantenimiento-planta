@@ -1101,27 +1101,57 @@ async function init(){
   // ─── Modo PWA standalone (instalada en home screen, FUERA de Telegram) ───
   // Telegram en iOS bloquea Mini Apps cuando "esperando conexión". La PWA
   // standalone corre en Safari standalone donde Service Workers funcionan
-  // robusto offline. Auto-login con sesión cacheada de la última visita Telegram.
-  if (IS_STANDALONE && cachedSession){
-    console.log('[standalone] auto-login con sesión cacheada')
-    uid = cachedSession.uid
-    userRole = cachedSession.userRole || 'usuario'
-    isAuthorized = !!cachedSession.isAuthorized
-    isLinked = !!cachedSession.isLinked
-    firstName = (cachedSession.firstName || '') + ' (PWA)'
-    setLoadingMsg(navigator.onLine ? 'Cargando (modo PWA)…' : 'Modo offline (PWA cacheada)…')
-    await Promise.all([
-      loadCategories().catch(e => console.warn('[standalone] loadCategories falló', e?.message)),
-      loadMachines().catch(e => console.warn('[standalone] loadMachines falló', e?.message)),
-      loadPrefs().catch(e => console.warn('[standalone] loadPrefs falló', e?.message)),
-    ])
-    showApp()
-    return
-  }
+  // robusto offline. Para autenticarse usa un token de instalación que
+  // generaste desde el bot Telegram con red (#token=... en fragment).
+  if (IS_STANDALONE){
+    // 1) Si hay #token=XXX&role=YYY&name=ZZZ en fragment → primer install
+    const fragHash = location.hash.startsWith('#') ? location.hash.slice(1) : ''
+    const fragParams = new URLSearchParams(fragHash)
+    const installToken = fragParams.get('token')
+    if (installToken){
+      setLoadingMsg('Activando PWA…')
+      try {
+        await auth.signInWithCustomToken(installToken)
+        const fbUser = auth.currentUser
+        if (!fbUser) throw new Error('Auth no quedó activa tras el sign-in')
+        uid = fbUser.uid
+        userRole = fragParams.get('role') || 'usuario'
+        isAuthorized = fragParams.get('auth') !== '0'
+        isLinked = fragParams.get('linked') === '1'
+        firstName = decodeURIComponent(fragParams.get('name') || 'Usuario')
+        // Persistir sesión para futuros opens offline
+        try { lsSet('mant_user_session', { uid, userRole, isAuthorized, isLinked, firstName }) } catch {}
+        // Limpiar fragment de la URL para no exponer el token (si user comparte la URL)
+        try { history.replaceState(null, '', location.pathname + location.search) } catch {}
+        console.log('[standalone] activado con token de instalación, uid=', uid)
+      } catch(err){
+        console.error('[standalone] token install falló', err)
+        setLoadingError('Token de instalación inválido o expirado. Volvé al bot Telegram con red y generá uno nuevo desde "📲 Instalar PWA".')
+        return
+      }
+    }
 
-  // En PWA standalone sin sesión previa: explicar que falta el bootstrap
-  if (IS_STANDALONE && !cachedSession){
-    setLoadingError('Primero abrí el bot @antarfood_mant_bot en Telegram con red, así se guarda tu sesión. Luego abrí la PWA y funcionará offline.')
+    // 2) Cargar con sesión cacheada (recién activada o de antes)
+    const cachedNow = lsGet('mant_user_session', null)
+    if (cachedNow){
+      console.log('[standalone] sesión activa, cargando datos')
+      uid = cachedNow.uid
+      userRole = cachedNow.userRole || 'usuario'
+      isAuthorized = !!cachedNow.isAuthorized
+      isLinked = !!cachedNow.isLinked
+      firstName = (cachedNow.firstName || '') + (cachedNow.firstName?.includes('PWA') ? '' : ' (PWA)')
+      setLoadingMsg(navigator.onLine ? 'Cargando (PWA)…' : 'Modo offline (PWA)…')
+      await Promise.all([
+        loadCategories().catch(e => console.warn('[standalone] loadCategories', e?.message)),
+        loadMachines().catch(e => console.warn('[standalone] loadMachines', e?.message)),
+        loadPrefs().catch(e => console.warn('[standalone] loadPrefs', e?.message)),
+      ])
+      showApp()
+      return
+    }
+
+    // 3) PWA standalone sin sesión y sin token → instructivo
+    setLoadingError('Para activar la PWA: 1) abrí el bot @antarfood_mant_bot en Telegram con red. 2) tap "📲 Instalar PWA" en el home del bot. 3) pegá el link copiado en Safari y agregá a Pantalla de Inicio.')
     return
   }
 
@@ -3300,12 +3330,74 @@ function renderHomeGreeting(){
       border-radius:20px;font-size:13px;font-weight:600;cursor:pointer">
       📦 Conteo rápido
     </button>` : ''
+  // Botón "Instalar PWA" — solo cuando estamos en Telegram (no ya standalone) con red.
+  // Permite generar URL con token de auth para activar la PWA en Safari y tener
+  // offline real en iPhone (donde Telegram WebView no soporta SW confiable).
+  const installPwaBtn = (!IS_STANDALONE && !IS_PREVIEW && uid && navigator.onLine) ? `
+    <button onclick="copyPwaInstallUrl()" style="margin-top:6px;background:none;border:1px solid var(--accent);
+      color:var(--accent);padding:5px 12px;border-radius:14px;font-size:12px;cursor:pointer;font-weight:600">
+      📲 Instalar PWA (offline)
+    </button>` : ''
   document.getElementById('home-greeting').innerHTML = `
     <div class="hello">
       <div class="hello-sub">${escHtml(role)} ${linkTag}</div>
       ${countBtn}
+      ${installPwaBtn}
       ${previewBtn}
     </div>`
+}
+
+// Genera URL con token de instalación para la PWA standalone.
+// El token va en URL fragment (#token=...) — fragments no se envían al server,
+// no aparecen en logs ni en el referrer header.
+async function copyPwaInstallUrl(){
+  if (!tgApp?.initData){
+    tgApp?.showAlert?.('Solo funciona desde el bot Telegram con red.')
+    return
+  }
+  setStatus('loading', 'Generando token…')
+  try {
+    const resp = await fetch(`${CF_BASE}/mintTelegramAuthToken`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ initData: tgApp.initData }),
+    })
+    if (!resp.ok){
+      tgApp?.showAlert?.('Error generando token. Probá de nuevo.')
+      updateNetworkStatus()
+      return
+    }
+    const data = await resp.json()
+    const base = 'https://orelcain.github.io/mantenimiento-planta/mant.html'
+    const fragment = new URLSearchParams({
+      token: data.token,
+      role: data.role || 'usuario',
+      auth: data.authorized ? '1' : '0',
+      linked: data.isLinked ? '1' : '0',
+      name: encodeURIComponent(data.firstName || firstName || 'Usuario'),
+    }).toString()
+    const url = `${base}?standalone=1#${fragment}`
+    updateNetworkStatus()
+
+    const msg = '📲 Instalación de PWA en iPhone:\n\n' +
+      '1) Copia esta URL\n' +
+      '2) Pegala en Safari (no en Telegram)\n' +
+      '3) Tap "Compartir" → "Agregar a pantalla de inicio"\n' +
+      '4) Tap el ícono "Antarfood Mant" en tu home\n\n' +
+      '⏰ Token válido por ~1 hora. Si expira, generá otro.'
+
+    if (navigator.clipboard?.writeText){
+      navigator.clipboard.writeText(url).then(() => {
+        tgApp?.HapticFeedback?.notificationOccurred?.('success')
+        tgApp?.showAlert?.('URL copiada al portapapeles ✓\n\n' + msg)
+      }).catch(() => tgApp?.showAlert?.(msg + '\n\nURL:\n' + url))
+    } else {
+      tgApp?.showAlert?.(msg + '\n\nURL:\n' + url)
+    }
+  } catch(err){
+    console.error('install token error', err)
+    tgApp?.showAlert?.('Error: ' + (err.message || 'desconocido'))
+    updateNetworkStatus()
+  }
 }
 
 function copyPreviewUrl(){
