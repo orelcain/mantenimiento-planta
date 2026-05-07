@@ -1134,7 +1134,7 @@ async function init(){
     // 2) Cargar con sesión cacheada (recién activada o de antes)
     const cachedNow = lsGet('mant_user_session', null)
     if (cachedNow){
-      console.log('[standalone] sesión activa, cargando datos')
+      console.log('[standalone] sesión activa en LS, cargando datos')
       uid = cachedNow.uid
       userRole = cachedNow.userRole || 'usuario'
       isAuthorized = !!cachedNow.isAuthorized
@@ -1150,8 +1150,41 @@ async function init(){
       return
     }
 
-    // 3) PWA standalone sin sesión y sin token: mostrar UI para pegar token
-    //    Si offline, no hay nada que hacer.
+    // 3) FALLBACK: LS perdido (iOS Safari standalone a veces lo limpia)
+    //    pero Firebase Auth IDB persistió → reconstruir sesión sin token
+    if (auth.currentUser){
+      console.log('[standalone] LS vacío pero auth IDB persistió, reconstruyendo sesión', auth.currentUser.uid)
+      uid = auth.currentUser.uid
+      // Defaults razonables; se sobreescriben con userDoc si tenemos red
+      userRole = 'admin'
+      isAuthorized = true
+      isLinked = false
+      firstName = (auth.currentUser.displayName || 'Usuario') + ' (PWA)'
+      // Si hay red, intentar leer userDoc para datos precisos
+      if (navigator.onLine){
+        try {
+          const userDoc = await db.collection('users').doc(uid).get()
+          if (userDoc.exists){
+            const d = userDoc.data()
+            userRole = d.rol || userRole
+            isAuthorized = d.activo !== false
+            firstName = ((d.nombre || 'Usuario') + (d.apellido ? ' ' + d.apellido[0] + '.' : '')) + ' (PWA)'
+          }
+        } catch(e){ console.warn('userDoc read fail', e?.message) }
+      }
+      // Persistir nueva sesión en LS (intentamos otra vez por si el bug fue transitorio)
+      try { lsSet('mant_user_session', { uid, userRole, isAuthorized, isLinked, firstName }) } catch {}
+      setLoadingMsg(navigator.onLine ? 'Cargando (PWA)…' : 'Modo offline (PWA)…')
+      await Promise.all([
+        loadCategories().catch(e => console.warn('cat', e?.message)),
+        loadMachines().catch(e => console.warn('mach', e?.message)),
+        loadPrefs().catch(e => console.warn('prefs', e?.message)),
+      ])
+      showApp()
+      return
+    }
+
+    // 4) Sin LS y sin auth IDB: mostrar UI para pegar token (si hay red)
     if (!navigator.onLine){
       setLoadingError('PWA no activada y sin red. Conectate a Wi-Fi y abrí esta app de nuevo para activarla con tu token de Telegram.')
       return
