@@ -651,6 +651,13 @@ const LS_TTL_HIER  =  6 * 60 * 60 * 1000   //  6h — jerarquía cambia raro
 const LS_TTL_REP   = 24 * 60 * 60 * 1000   // 24h — listeners onSnapshot mantienen freshness con red,
                                             //       y cuando offline usamos cache aunque expire (offline-first)
 const LS_TTL_MAN   = 24 * 60 * 60 * 1000   // 24h — manuales casi no cambian
+const LS_TTL_CAT   = 7 * 24 * 60 * 60 * 1000   // 7d — categorías cambian rarísimo
+const LS_TTL_MACH  = 24 * 60 * 60 * 1000   // 24h — listener mantiene freshness con red
+const LS_TTL_PREFS = 24 * 60 * 60 * 1000   // 24h — listener mantiene freshness con red
+// Claves de cache para datos críticos del bootstrap offline
+const LS_KEY_CATEGORIES = 'mant_categories_v1'
+const LS_KEY_MACHINES   = 'mant_machines_v1'
+const LS_KEY_PREFS      = 'mant_prefs_v1'
 // Prefijo de claves para cache por equipo: mant_repcache_<machineId>
 const LS_PREFIX_REPCACHE = 'mant_repcache_'
 
@@ -1051,6 +1058,36 @@ async function init(){
     setLoadingError('Abrí esta app desde el bot @antarfood_mant_bot.')
     return
   }
+
+  // ─── Esperar restauración de auth desde IndexedDB de Firebase ───
+  // Firebase Auth web persiste el sign-in por defecto en IDB.
+  // En offline, auth.currentUser puede estar disponible de la sesión anterior.
+  await new Promise(resolve => {
+    const unsub = auth.onAuthStateChanged(() => { unsub(); resolve() })
+  })
+
+  // ─── Modo offline: si no hay red Y tenemos sesión cacheada Y auth válida ───
+  // → usar sesión local sin hacer mint, cargar datos desde caches Firestore + LS
+  const cachedSession = lsGet('mant_user_session', null)
+  if (!navigator.onLine && cachedSession && auth.currentUser){
+    console.log('[offline] iniciando con sesión cacheada')
+    uid = cachedSession.uid
+    userRole = cachedSession.userRole || 'usuario'
+    isAuthorized = !!cachedSession.isAuthorized
+    isLinked = !!cachedSession.isLinked
+    firstName = cachedSession.firstName || ''
+    setLoadingMsg('Modo offline (sesión cacheada)…')
+    // Cargar todo con tolerancia a errores: Firestore con persistence devolverá cache hits.
+    // Si una falla por completo, seguimos con lo que tengamos en memoria/LS.
+    await Promise.all([
+      loadCategories().catch(e => console.warn('[offline] loadCategories falló', e?.message)),
+      loadMachines().catch(e => console.warn('[offline] loadMachines falló', e?.message)),
+      loadPrefs().catch(e => console.warn('[offline] loadPrefs falló', e?.message)),
+    ])
+    showApp()
+    return
+  }
+
   try {
     const resp = await fetch(`${CF_BASE}/mintTelegramAuthToken`, {
       method:'POST', headers:{'Content-Type':'application/json'},
@@ -1074,11 +1111,32 @@ async function init(){
       setLoadingError('Tu grupo de Telegram no está autorizado. Contactá al administrador.')
       return
     }
+    // Persistir sesión para que el próximo cold-start sin red funcione
+    try { lsSet('mant_user_session', { uid, userRole, isAuthorized, isLinked, firstName }) } catch {}
+
     setLoadingMsg('Cargando datos…')
     await Promise.all([loadCategories(), loadMachines(), loadPrefs()])
     showApp()
   } catch (err) {
     console.error('init error', err)
+    // Fallback offline: si la mint falló por red pero tenemos sesión cacheada + auth válida,
+    // procedemos en modo offline en vez de bloquear al usuario en pantalla de error.
+    if (!navigator.onLine && cachedSession && auth.currentUser){
+      console.log('[offline] mint falló, fallback a sesión cacheada')
+      uid = cachedSession.uid
+      userRole = cachedSession.userRole || 'usuario'
+      isAuthorized = !!cachedSession.isAuthorized
+      isLinked = !!cachedSession.isLinked
+      firstName = cachedSession.firstName || ''
+      setLoadingMsg('Modo offline (sin red)…')
+      await Promise.all([
+        loadCategories().catch(() => {}),
+        loadMachines().catch(() => {}),
+        loadPrefs().catch(() => {}),
+      ])
+      showApp()
+      return
+    }
     setLoadingError('Error de conexión: ' + (err.message || 'desconocido'))
   }
 }
@@ -1172,6 +1230,10 @@ function startMachinesListener(){
     machines = snap.docs.map(d => ({id:d.id, ...d.data()}))
       .sort((a,b) => (a.orden||0) - (b.orden||0))
     machineMap = Object.fromEntries(machines.map(m => [m.id, m]))
+    // Persistir en localStorage para sobrevivir reinicios sin red
+    if (machines.length > 0){
+      try { lsSet(LS_KEY_MACHINES, normalizeForCache(machines)) } catch {}
+    }
     if (currentTab === 'home') renderHomeCatalog()
   }, err => console.warn('machines listener error', err))
 }
@@ -1304,10 +1366,8 @@ function trackWrite(promise){
 // ═══════════════════════════════════════════════════════════════════
 // DATA
 // ═══════════════════════════════════════════════════════════════════
-async function loadCategories(){
-  const snap = await db.collection('machineCategories').get()
-  const all = snap.docs.map(d => ({id:d.id, ...d.data()}))
-    .filter(c => c.activa !== false && c.visible !== false)
+// Helper: aplica resultados de categories a globals
+function _applyCategoriesData(all){
   allCategoriesMap = Object.fromEntries(all.map(c => [c.id, c]))
   categories = all.filter(c => !c.parentId).sort((a,b) => (a.orden||0) - (b.orden||0))
   categoryDescendants = {}
@@ -1322,11 +1382,51 @@ async function loadCategories(){
   }
 }
 
+async function loadCategories(){
+  // 1) Hidratar desde localStorage si existe (instantáneo, offline-friendly)
+  const lsHit = lsGet(LS_KEY_CATEGORIES, LS_TTL_CAT)
+  if (lsHit?.length > 0){
+    _applyCategoriesData(lsHit)
+    if (navigator.onLine){
+      // Refresh en background sin bloquear
+      db.collection('machineCategories').get().then(snap => {
+        const all = snap.docs.map(d => ({id:d.id, ...d.data()}))
+          .filter(c => c.activa !== false && c.visible !== false)
+        if (all.length > 0){
+          _applyCategoriesData(all)
+          try { lsSet(LS_KEY_CATEGORIES, normalizeForCache(all)) } catch {}
+        }
+      }).catch(e => console.warn('refresh categories bg', e?.message))
+    }
+    return
+  }
+  // 2) Sin LS: fetch directo (Firestore con persistence usará IDB si offline)
+  const snap = await db.collection('machineCategories').get()
+  const all = snap.docs.map(d => ({id:d.id, ...d.data()}))
+    .filter(c => c.activa !== false && c.visible !== false)
+  _applyCategoriesData(all)
+  if (all.length > 0){
+    try { lsSet(LS_KEY_CATEGORIES, normalizeForCache(all)) } catch {}
+  }
+}
+
 async function loadMachines(){
+  // 1) Hidratar desde localStorage primero
+  const lsHit = lsGet(LS_KEY_MACHINES, LS_TTL_MACH)
+  if (lsHit?.length > 0){
+    machines = [...lsHit].sort((a,b) => (a.orden||0) - (b.orden||0))
+    machineMap = Object.fromEntries(machines.map(m => [m.id, m]))
+    // El listener real-time `startMachinesListener` se encargará del refresh con red
+    return
+  }
+  // 2) Sin LS: fetch directo
   const snap = await db.collection('machines').get()
   machines = snap.docs.map(d => ({id:d.id, ...d.data()}))
     .sort((a,b) => (a.orden||0) - (b.orden||0))
   machineMap = Object.fromEntries(machines.map(m => [m.id, m]))
+  if (machines.length > 0){
+    try { lsSet(LS_KEY_MACHINES, normalizeForCache(machines)) } catch {}
+  }
 }
 
 async function loadRepuestos(machineId){
@@ -1450,6 +1550,20 @@ function _normalizeFavLists(lists){
 
 async function loadPrefs(){
   if (!uid) return
+  // 1) Hidratar desde localStorage si existe (instantáneo, offline-friendly)
+  const lsKey = `${LS_KEY_PREFS}_${uid}`  // por usuario
+  const lsHit = lsGet(lsKey, LS_TTL_PREFS)
+  if (lsHit){
+    prefs = {
+      favoriteLists:    lsHit.favoriteLists    || [],
+      repuestoFavLists: lsHit.repuestoFavLists || {},
+      insumoFavLists:   lsHit.insumoFavLists   || [],
+    }
+    _normalizeFavLists(prefs.favoriteLists)
+    // El listener startPrefsListener se encargará del refresh con red
+    return
+  }
+  // 2) Sin LS: fetch directo
   const doc = await db.collection('user_preferences').doc(uid).get()
   if (doc.exists) {
     const d = doc.data()
@@ -1458,6 +1572,8 @@ async function loadPrefs(){
       repuestoFavLists: d.repuestoFavLists || {},
       insumoFavLists:   d.insumoFavLists   || [],
     }
+    // Persistir
+    try { lsSet(lsKey, normalizeForCache(prefs)) } catch {}
     // Fix one-shot: restaurar list.machineIds si datos fueron corrompidos
     const fixed = _normalizeFavLists(prefs.favoriteLists)
     if (fixed) saveAllPrefs().catch(() => {})  // fire-and-forget
@@ -1479,6 +1595,8 @@ function startPrefsListener(){
     }
     // Normalizar: asegurar list.machineIds = unión de todos los equipos
     _normalizeFavLists(next.favoriteLists)
+    // Persistir en localStorage para sobrevivir reinicios sin red
+    try { lsSet(`${LS_KEY_PREFS}_${uid}`, normalizeForCache(next)) } catch {}
     // Si las prefs no cambiaron (mismo writer somos nosotros), evitar re-render
     if (JSON.stringify(next) === JSON.stringify(prefs)) return
     prefs = next
