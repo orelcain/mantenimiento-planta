@@ -59,6 +59,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);
 .s-err::before{background:var(--danger)}
 .s-loading{background:rgba(125,139,153,.12);color:var(--hint)}
 .s-loading::before{background:var(--hint);animation:blink 1s ease-in-out infinite}
+.s-offline{background:rgba(245,166,35,.18);color:var(--warn)}
+.s-offline::before{background:var(--warn)}
+.s-syncing{background:rgba(82,136,193,.18);color:var(--accent)}
+.s-syncing::before{background:var(--accent);animation:blink 1s ease-in-out infinite}
 @keyframes blink{0%,100%{opacity:.3}50%{opacity:1}}
 @keyframes pulse-border{0%,100%{border-color:rgba(239,68,68,.3)}50%{border-color:rgba(239,68,68,.7)}}
 
@@ -551,6 +555,23 @@ const auth    = firebase.auth()
 const storage = firebase.storage()
 const tgApp   = window.Telegram?.WebApp
 
+// ─── Firestore persistence (offline support) ─────────────────────────
+// Activa cache local IndexedDB: reads sin red salen del cache, writes se encolan.
+// Cuando vuelve la red, Firestore SDK sincroniza solo (no necesitamos lógica custom).
+// synchronizeTabs:true permite múltiples pestañas (PWA + bot abiertos a la vez).
+//
+// Errores manejados:
+//  - failed-precondition: otra pestaña sin synchronizeTabs ya activó persistence (raro con flag true)
+//  - unimplemented: navegador sin IndexedDB (Telegram WebView lo soporta universalmente)
+let __firestorePersistenceReady = false
+db.enablePersistence({ synchronizeTabs: true })
+  .then(() => { __firestorePersistenceReady = true; console.log('✅ Firestore persistence activa') })
+  .catch(err => {
+    if (err.code === 'failed-precondition') console.warn('Firestore persistence: otra pestaña ya tiene exclusiva')
+    else if (err.code === 'unimplemented') console.warn('Firestore persistence: navegador no soportado')
+    else console.warn('Firestore persistence falló:', err)
+  })
+
 // ═══════════════════════════════════════════════════════════════════
 // VIEWPORT — fix scroll en Telegram WebView
 // ═══════════════════════════════════════════════════════════════════
@@ -1004,7 +1025,7 @@ function setLoadingError(m){ document.getElementById('loading-msg').textContent 
 
 function showApp(){
   document.getElementById('loading').style.display = 'none'
-  setStatus('ok', isAuthorized ? 'conectado' : 'sólo lectura')
+  updateNetworkStatus()  // pinta el pill segun estado de red + pendientes
   // Restaurar tab activo de sesión anterior (default: home)
   const savedTab = localStorage.getItem('mant_active_tab') || 'home'
   const validTabs = ['home', 'search', 'hierarchy', 'manuales']
@@ -1019,14 +1040,18 @@ function showApp(){
   startFavMachinesStockListeners()
   // Audit log: listener real-time para el feed de actividad en Home
   startActivityLogListener()
-  // Cargar catálogo global en background para que el badge de stock aparezca en Home
-  // sin necesidad de que el usuario visite Buscar primero
-  setTimeout(() => loadAllRepuestos(), 800)
-  // Pre-cargar insumos en background (permite contar bajo-mínimo en home stock alert)
-  setTimeout(() => loadInsumos().then(() => renderHomeStockAlert()).catch(() => {}), 1200)
-  // Cache offline de manuales (IndexedDB):
-  //  1) leer claves cacheadas para mostrar el badge 📥 en la lista
-  //  2) purga en background: TTL 30d + LRU si excede 200MB
+  // Pre-carga agresiva para que TODO esté en cache de Firestore (IndexedDB)
+  // antes de que el usuario potencialmente pierda señal en planta.
+  //
+  // Disparamos en paralelo sin esperar — cada uno llena su pedazo del cache:
+  //  · loadAllRepuestos: catálogo global (necesario para buscar offline)
+  //  · loadInsumos: insumos (badge bajo-mínimo + tab Insumos offline)
+  //  · loadHierarchyTree: árbol completo (jerarquía navegable offline)
+  //
+  // La persistence de Firestore garantiza que estos reads quedan en IndexedDB
+  // local, así futuros snapshots/getDocs leerán de ahí cuando no haya red.
+  preloadAllForOffline()
+  // Cache offline de manuales (IndexedDB propio): claves cacheadas + purga
   setTimeout(async () => {
     await refreshCachedKeys()
     if (currentTab === 'manuales' && __manualesCache) renderManualesBody(__manualesCache)
@@ -1035,6 +1060,20 @@ function showApp(){
     await refreshCachedKeys()
     if (currentTab === 'home') renderHomeCacheInfo()
   }, 1500)
+}
+
+// Precarga datos clave en paralelo. Usa la cache IndexedDB de Firestore como
+// almacén — los reads quedan persistidos automáticamente. No bloquea showApp.
+function preloadAllForOffline(){
+  // Disparar en paralelo, no esperar ninguno
+  loadAllRepuestos()
+    .then(() => { if (currentTab === 'home') renderHomeStockAlert() })
+    .catch(e => console.warn('preload repuestos failed', e?.message || e))
+  loadInsumos()
+    .then(() => { if (currentTab === 'home') renderHomeStockAlert() })
+    .catch(e => console.warn('preload insumos failed', e?.message || e))
+  loadHierarchyTree()
+    .catch(e => console.warn('preload hierarchy failed', e?.message || e))
 }
 
 /** Listener real-time de la colección machines.
@@ -1127,8 +1166,52 @@ async function preloadRepCounts(){
 
 function setStatus(type, label){
   const el = document.getElementById('status')
-  el.className = 'status ' + (type==='ok'?'s-ok':type==='err'?'s-err':'s-loading')
+  if (!el) return
+  const cls = ({
+    ok:      's-ok',
+    err:     's-err',
+    loading: 's-loading',
+    offline: 's-offline',
+    syncing: 's-syncing',
+  })[type] || 's-loading'
+  el.className = 'status ' + cls
   el.textContent = label
+}
+
+// ─── Estado de red + pendientes (para indicador del header) ──────────
+let __isOnline = navigator.onLine
+let __pendingWrites = 0          // counter manual: writes en vuelo
+
+function updateNetworkStatus(){
+  if (!__isOnline){
+    const lbl = __pendingWrites > 0
+      ? `Sin red · ${__pendingWrites} pend.`
+      : 'Sin conexión'
+    setStatus('offline', lbl)
+    return
+  }
+  if (__pendingWrites > 0){
+    setStatus('syncing', `Sincronizando… ${__pendingWrites}`)
+    return
+  }
+  // Online y sin pendientes: respetar el label de auth que ya estaba puesto
+  // (showApp() pone 'conectado' o 'sólo lectura' al cargar)
+  setStatus('ok', isAuthorized ? 'conectado' : 'sólo lectura')
+}
+
+window.addEventListener('online',  () => { __isOnline = true;  updateNetworkStatus() })
+window.addEventListener('offline', () => { __isOnline = false; updateNetworkStatus() })
+
+// Envuelve una promesa de write para que el contador refleje "en vuelo".
+// En modo offline, Firestore SDK encola la write y la promise NO resuelve
+// hasta que vuelva la red — perfecto para contar pendientes reales.
+function trackWrite(promise){
+  __pendingWrites++
+  updateNetworkStatus()
+  return promise.finally(() => {
+    __pendingWrites = Math.max(0, __pendingWrites - 1)
+    updateNetworkStatus()
+  })
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -2558,7 +2641,7 @@ async function saveInsumoStockConteo(codigoSAP, cantidad, { observaciones = '' }
   tgApp?.HapticFeedback?.notificationOccurred?.('success')
   logInsumoStockConteo(item, cantidad, observaciones)
   try {
-    await db.collection('insumos').doc(codigoSAP).update(update)
+    await trackWrite(db.collection('insumos').doc(codigoSAP).update(update))
     showToast('Stock actualizado ✓', 'ok')
     openInsumoDetail(codigoSAP)
   } catch (err) {
@@ -4904,9 +4987,9 @@ async function addMachineToList(machineId, listIdx){
   const updated = [...(list.equipmentIds || []), machineId]
   prefs.favoriteLists[listIdx].equipmentIds = updated
   try {
-    await db.collection('user_preferences').doc(uid).update({
+    await trackWrite(db.collection('user_preferences').doc(uid).update({
       [`favoriteLists.${listIdx}.equipmentIds`]: updated,
-    })
+    }))
     showToast(`Agregado a "${list.name}" ✓`, 'ok')
     tgApp?.HapticFeedback?.notificationOccurred('success')
   } catch(err){
@@ -4922,9 +5005,9 @@ function machineCreateListAndAdd(machineId){
     const newList = { name: name.trim(), equipmentIds: [machineId] }
     prefs.favoriteLists.push(newList)
     try {
-      await db.collection('user_preferences').doc(uid).update({
+      await trackWrite(db.collection('user_preferences').doc(uid).update({
         favoriteLists: prefs.favoriteLists,
-      })
+      }))
       showToast(`Lista "${newList.name}" creada ✓`, 'ok')
       tgApp?.HapticFeedback?.notificationOccurred('success')
     } catch(err){
@@ -6013,12 +6096,12 @@ async function saveAllPrefs(){
   // dispararía el onSnapshot listener y revertiría prefs con los datos del servidor.
   if (IS_PREVIEW) return
   if (!uid) throw new Error('No hay sesión')
-  await db.collection('user_preferences').doc(uid).set({
+  await trackWrite(db.collection('user_preferences').doc(uid).set({
     favoriteLists:    prefs.favoriteLists    || [],
     repuestoFavLists: prefs.repuestoFavLists || {},
     insumoFavLists:   prefs.insumoFavLists   || [],
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-  }, { merge: true })
+  }, { merge: true }))
 }
 
 /** Abre el sheet para gestionar listas de favoritos del repuesto */
@@ -6343,7 +6426,7 @@ async function saveStockConteo(machineId, repuestoId, cantidad, { silent = false
   const machineName = machineMap[machineId]?.nombre || hierarchyNodesMap?.[machineId]?.nombre || machineId
   logStockConteo(machineId, machineName, repuestoId, r?.textoBreve || '', r?.codigoSAP || '', cantidad, r?.stockMinimo ?? null, observaciones)
   try {
-    await db.doc(`${path}/${repuestoId}`).update(update)
+    await trackWrite(db.doc(`${path}/${repuestoId}`).update(update))
     showToast('Stock actualizado ✓', 'ok')
   } catch (err) {
     if (IS_PREVIEW){ showToast('Stock guardado (solo preview)', 'ok'); return }
