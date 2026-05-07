@@ -2125,6 +2125,8 @@ async function tgHandleAyuda(chatId, topicId) {
     '/kpi — Indicadores del día\n\n' +
     '<b>📡 Sensores</b>\n' +
     '/sensores — Lecturas en tiempo real con semáforo\n\n' +
+    '<b>📦 Mini App (catálogo)</b>\n' +
+    '/abrir — Mensaje pineable con botón para abrir la app desde grupos\n\n' +
     '<b>ℹ️ General</b>\n' +
     '/ayuda — Este menú\n\n' +
     '💡 También podés escribir el problema directamente sin comandos.',
@@ -2510,6 +2512,21 @@ const MANT_URL = 'https://orelcain.github.io/mantenimiento-planta/mant.html'
 /**
  * /menu — Menú principal con botones interactivos
  */
+/**
+ * Mensaje "banner" pineable: 1 botón web_app grande para abrir la Mini App
+ * desde dentro de un grupo. Reemplaza al Menu Button del bot que solo funciona
+ * en chats privados — un admin del grupo pinea este mensaje y queda fijo arriba.
+ */
+async function tgHandleAbrir(chatId, topicId) {
+  const buttons = [
+    [{ text: '📦 Abrir Mantenimiento', web_app: { url: MANT_URL } }],
+  ]
+  const text = '🏭 <b>Mantenimiento Antarfood</b>\n\n' +
+    'Tocá el botón para abrir el catálogo (repuestos, insumos, manuales, conteos).\n\n' +
+    '<i>💡 Tip: pineá este mensaje para tenerlo siempre a mano.</i>'
+  await sendTelegramButtons(text, chatId, buttons, { topicId })
+}
+
 async function tgHandleMenu(chatId, topicId) {
   const buttons = [
     [
@@ -2912,6 +2929,8 @@ exports.telegramWebhook = onRequest({ region: 'us-central1' }, async (req, res) 
 
     if (/^\/(menu|start)/i.test(text)) {
       await tgHandleMenu(chatId, incomingTopicId)
+    } else if (/^\/(abrir|app)/i.test(text)) {
+      await tgHandleAbrir(chatId, incomingTopicId)
     } else if (/^\/incidencia/i.test(text)) {
       await tgHandleIncidencia(chatId, text, fromName, telegramUserId, incomingTopicId)
     } else if (/^\/estado/i.test(text)) {
