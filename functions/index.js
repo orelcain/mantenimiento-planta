@@ -2518,8 +2518,14 @@ const MANT_URL = 'https://orelcain.github.io/mantenimiento-planta/mant.html'
  * en chats privados — un admin del grupo pinea este mensaje y queda fijo arriba.
  */
 async function tgHandleAbrir(chatId, topicId) {
+  // Usamos Direct Link `t.me/<bot>/<app>` en lugar de `web_app:{url}`. Razón:
+  // los botones `web_app` en `inline_keyboard` son rechazados por Telegram en
+  // grupos cuando el URL no coincide exactamente con el dominio configurado
+  // por BotFather. El Direct Link a la Mini App registrada (/newapp en
+  // BotFather → short_name "repuestos") funciona universalmente: abre la
+  // Mini App nativa dentro de Telegram sin redirect externo.
   const buttons = [
-    [{ text: '📦 Abrir Mantenimiento', web_app: { url: MANT_URL } }],
+    [{ text: '📦 Abrir Mantenimiento', url: 'https://t.me/antarfood_mant_bot/repuestos' }],
   ]
   const text = '🏭 <b>Mantenimiento Antarfood</b>\n\n' +
     'Tocá el botón para abrir el catálogo (repuestos, insumos, manuales, conteos).\n\n' +
