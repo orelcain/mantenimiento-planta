@@ -463,6 +463,14 @@ export function subscribeShoplogixShiftAuto(
   const heard: boolean[] = candidates.map(() => false)
   const unsubs: Array<() => void> = []
 
+  /**
+   * Umbral de validez para fallback `Unscheduled`. Sin esto, días donde la
+   * máquina solo está encendida sin asignar a turno (e.g. arranque/parada
+   * con 5-20 ciclos sueltos) se mostrarían como Turno 3 madrugada con esos
+   * ciclos espurios. Coherente con `loadOne` en GraderHistoricalCalendar.
+   */
+  const UNSCHEDULED_MIN_CYCLES = 50
+
   candidates.forEach((candidateId, idx) => {
     const u = subscribeShoplogixShift(dateKey, candidateId, plantSlug, (result) => {
       if (!active) return
@@ -471,7 +479,8 @@ export function subscribeShoplogixShiftAuto(
       const totalCycles = result.snapshot?.machines?.reduce(
         (sum, m) => sum + (m.totalCycles || 0), 0,
       ) ?? 0
-      const hasRealData = result.snapshot !== null && totalCycles > 0
+      const isUnscheduledNoise = candidateId === 'Unscheduled' && totalCycles < UNSCHEDULED_MIN_CYCLES
+      const hasRealData = result.snapshot !== null && totalCycles > 0 && !isUnscheduledNoise
 
       // Si nadie ha ganado todavía y este candidato trae data → propagar y fijar ganador
       if (winner.idx === null && hasRealData) {

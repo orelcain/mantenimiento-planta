@@ -2834,19 +2834,34 @@ export function GraderHistoricalCalendar({
                             <span className="text-[9px] font-bold tabular-nums">{slxDayValue}</span>
                           </button>
                         )}
-                        {hasSlxNight && slxNightNav && (
-                          <button
-                            className={cn('flex items-center justify-between rounded px-1 py-px leading-none transition-colors w-full', nightColorClass)}
-                            title={`Ver Turno noche · ${slxNightCycles.toLocaleString('es-CL')} ciclos Baader${slxNightUptimePct > 0 ? ` · ${slxNightUptimePct.toFixed(0)}% uptime` : ''}`}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              navigate(`/analisis-grader/turno/${slxNightNav.cfDateKey}__${encodeURIComponent(slxNightNav.shiftId)}${lineaQ}`)
-                            }}
-                          >
-                            <span className="text-[8px] font-medium opacity-80">N</span>
-                            <span className="text-[9px] font-bold tabular-nums">{slxNightValue}</span>
-                          </button>
-                        )}
+                        {hasSlxNight && slxNightNav && (() => {
+                          // Diferenciar label segun el shift real:
+                          //   Turno 3 → M (madrugada, 00:00-07:45)
+                          //   Turno 1 → 1 (mañana temprano)
+                          //   Turno noche legacy → N
+                          // Esto evita confusion en Yal donde el dia 7 puede mostrar
+                          // chip Excel "N" (turno noche cargado) Y chip SLX "M"
+                          // (madrugada T3) — son dos turnos distintos del mismo dia.
+                          const nightLabel = slxNightNav.shiftId === 'Turno 3' ? 'M'
+                            : slxNightNav.shiftId === 'Turno 1' ? '1'
+                            : 'N'
+                          const nightTooltipName = slxNightNav.shiftId === 'Turno 3' ? 'Turno 3 (madrugada)'
+                            : slxNightNav.shiftId === 'Turno 1' ? 'Turno 1 (mañana)'
+                            : 'Turno noche'
+                          return (
+                            <button
+                              className={cn('flex items-center justify-between rounded px-1 py-px leading-none transition-colors w-full', nightColorClass)}
+                              title={`Ver ${nightTooltipName} · ${slxNightCycles.toLocaleString('es-CL')} ciclos Baader${slxNightUptimePct > 0 ? ` · ${slxNightUptimePct.toFixed(0)}% uptime` : ''}`}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                navigate(`/analisis-grader/turno/${slxNightNav.cfDateKey}__${encodeURIComponent(slxNightNav.shiftId)}${lineaQ}`)
+                              }}
+                            >
+                              <span className="text-[8px] font-medium opacity-80">{nightLabel}</span>
+                              <span className="text-[9px] font-bold tabular-nums">{slxNightValue}</span>
+                            </button>
+                          )
+                        })()}
                       </>
                     )
                   })()}
