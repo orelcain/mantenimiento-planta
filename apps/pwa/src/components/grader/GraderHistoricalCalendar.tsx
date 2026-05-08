@@ -2716,10 +2716,20 @@ export function GraderHistoricalCalendar({
               const dimByFilter = filterUntagged && chipsForDay.length > 0 && !dayHasUntagged
 
               return (
-                <button
+                /**
+                 * Día del calendario como `<div role="button">` (no `<button>`).
+                 * El día contiene chips D/N clicables que SON `<button>` reales
+                 * (ver más abajo) — HTML inválido tener `<button>` dentro de
+                 * `<button>`. Mantenemos accesibilidad con role + tabIndex +
+                 * onKeyDown (Enter/Space ejecutan el click).
+                 */
+                <div
                   key={dayKey}
+                  role="button"
+                  tabIndex={dimByFilter ? -1 : 0}
                   className={cn(
-                    'min-h-[56px] p-1 border rounded-md text-left transition-all flex flex-col gap-px',
+                    'min-h-[56px] p-1 border rounded-md text-left transition-all flex flex-col gap-px cursor-pointer',
+                    'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1',
                     isToday(day) && !isSelected && 'border-primary/60 bg-primary/5',
                     isSelected && 'ring-2 ring-primary border-primary bg-primary/8',
                     !hasData && !hasAnySlx && dayUploads.length === 0 && 'opacity-40',
@@ -2733,6 +2743,13 @@ export function GraderHistoricalCalendar({
                   onClick={() => {
                     userInteractedRef.current = true
                     setSelectedDate(day)
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      userInteractedRef.current = true
+                      setSelectedDate(day)
+                    }
                   }}
                 >
                   <div className="flex items-center justify-between">
@@ -2884,7 +2901,7 @@ export function GraderHistoricalCalendar({
                       ) : null}
                     </div>
                   )}
-                </button>
+                </div>
               )
             })}
           </div>

@@ -68,7 +68,17 @@ export function AnalisisGraderWizardPage() {
   const lineId = (searchParams.get('linea') as PlantLineId | null) ?? DEFAULT_PLANT_LINE_ID
   const lineConfig = getPlantLineConfig(lineId)
   const handleLineSelect = (id: PlantLineId) => {
-    setSearchParams((prev) => { prev.set('linea', id); return prev }, { replace: true })
+    // Guard: no hacer nada si ya está seleccionada (evita re-render innecesario
+    // que se percibe como "refresh" al re-clickear la tab activa).
+    if (id === lineId) return
+    // Usar nuevo URLSearchParams en lugar de mutar prev (mutación in-place no
+    // dispara correctamente el cambio en React Router en algunos casos y puede
+    // causar re-mounts duros que parecen refrescos).
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      next.set('linea', id)
+      return next
+    }, { replace: true })
   }
 
   const [parsedData, setParsedData] = useState<ParsedMatrixData | null>(null)
