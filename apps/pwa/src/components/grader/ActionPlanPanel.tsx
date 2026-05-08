@@ -23,6 +23,13 @@ interface ActionPlanPanelProps {
   relatedRunbooks?: Runbook[]
   /** Callback para triggers que abren modales en el padre (belt-rpm, gate-change) */
   onActionTrigger?: (trigger: ActionTrigger) => void
+  /**
+   * Descriptor opcional que reemplaza el subtítulo genérico cuando aplica.
+   * Útil para que cada planta indique con qué reglas se generaron las
+   * sugerencias (ej. Yal: "Reglas: peso bajo, proximidad, throughput, uptime
+   * Baader"; Chonchi: por defecto sin descriptor).
+   */
+  rulesDescriptor?: string
 }
 
 // ============================================================================
@@ -136,7 +143,7 @@ function ActionItem({
   )
 }
 
-export function ActionPlanPanel({ shiftDocId, suggestions, status, relatedRunbooks = [], onActionTrigger }: ActionPlanPanelProps) {
+export function ActionPlanPanel({ shiftDocId, suggestions, status, relatedRunbooks = [], onActionTrigger, rulesDescriptor }: ActionPlanPanelProps) {
   const storageKey = `grader-actions-checked-${shiftDocId}`
   const user = useAuthStore(s => s.user)
 
@@ -232,6 +239,11 @@ export function ActionPlanPanel({ shiftDocId, suggestions, status, relatedRunboo
           {status === 'live'
             ? 'Acciones sugeridas para el turno en curso — marcá las que ya realizaste'
             : 'Resumen de acciones para este turno'}
+          {rulesDescriptor && (
+            <span className="block mt-1 text-[10px] text-muted-foreground/70 italic">
+              {rulesDescriptor}
+            </span>
+          )}
         </CardDescription>
       </CardHeader>
 

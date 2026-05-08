@@ -272,7 +272,7 @@ export function PlantKPIBoard({
                 barColor={kpis.quality !== null
                   ? (kpis.quality >= 0.95 ? 'bg-emerald-500' : kpis.quality >= 0.85 ? 'bg-amber-500' : 'bg-rose-500')
                   : undefined}
-                note={kpis.quality === null ? 'Sin Grader' : undefined}
+                note={kpis.quality === null ? (plantSlug === 'yal' ? 'No clasifica' : 'Sin Grader') : undefined}
               />
             </div>
 

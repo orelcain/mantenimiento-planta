@@ -12,13 +12,14 @@
 import { useMemo, useState, useCallback, useEffect } from 'react'
 import { useNavigate, Navigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, Button, Badge } from '@/components/ui'
-import { Activity, ArrowLeft, CheckCircle2, Clock, GitBranch, SlidersHorizontal, History } from 'lucide-react'
+import { Activity, AlertCircle, ArrowLeft, CheckCircle2, Clock, GitBranch, SlidersHorizontal, History } from 'lucide-react'
 import { usePermissionsStore } from '@/store'
 import { GateChangeModal } from '@/components/grader/modals/GateChangeModal'
 import { computeShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import { DEFAULT_SHIFT_SCHEDULE } from '@/services/grader/graderShiftSchedule'
 import { listSnapshots } from '@/services/grader/graderConfigSnapshot.service'
 import type { GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
+import { getPlantLineConfig } from '@/config/plantLines'
 
 function todayKey() {
   return new Date().toISOString().slice(0, 10)
@@ -78,6 +79,11 @@ export function GraderQuickChangePage() {
 
   if (!canSee('analisisGrader')) return <Navigate to="/" replace />
 
+  // Cambio rápido solo aplica a plantas con gates clasificadoras (Chonchi).
+  // Yal eviscera sin clasificar — no hay gates que cambiar.
+  const plantLineCfg = getPlantLineConfig(searchParams.get('linea'))
+  const isClassificationPlant = plantLineCfg.isClassificationPlant !== false
+
   const latest = snapshots.length > 0 ? snapshots[snapshots.length - 1] : null
   const activeGates = latest?.gates.filter(g => g.active) ?? []
 
@@ -104,8 +110,29 @@ export function GraderQuickChangePage() {
         <span className="text-sm font-semibold ml-auto">Cambio rápido</span>
       </div>
 
-      {/* Estado del turno */}
-      {activeDisplay ? (
+      {/* Cambio rápido no aplica a plantas sin clasificación (Yal) */}
+      {!isClassificationPlant ? (
+        <Card className="border-amber-500/30 bg-amber-500/5">
+          <CardContent className="p-6 flex flex-col items-center gap-3 text-center">
+            <AlertCircle className="w-8 h-8 text-amber-400" />
+            <p className="font-medium">Cambio de gate no aplica</p>
+            <p className="text-sm text-muted-foreground">
+              <b>{plantLineCfg.label}</b> es planta de eviscerado simplificado — sus
+              gates físicas alimentan las 3 Baaders pero no clasifican producto. No hay
+              gates de calibre/calidad que reconfigurar.
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate(`/analisis-grader?linea=${plantLineCfg.id}`)}
+              className="mt-1 gap-1.5"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              Volver a Análisis de Turno
+            </Button>
+          </CardContent>
+        </Card>
+      ) : activeDisplay ? (
         <>
           {/* Banner: EN VIVO (turno activo) o RETROACTIVO (override por param) */}
           {overrideDisplay ? (
@@ -238,7 +265,7 @@ export function GraderQuickChangePage() {
               className="mt-1 gap-1.5"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              Ir al landing
+              Volver a Análisis de Turno
             </Button>
           </CardContent>
         </Card>

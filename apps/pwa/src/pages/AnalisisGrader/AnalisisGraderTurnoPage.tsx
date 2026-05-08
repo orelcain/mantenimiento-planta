@@ -1335,6 +1335,7 @@ export function AnalisisGraderTurnoPage() {
                   shiftDocId={shiftDocId}
                   suggestions={yalSuggestions}
                   status={shiftWindow.status}
+                  rulesDescriptor="Reglas: P0 vs típico Yal · peso bajo · proximidad · throughput vs target Baader · uptime upstream"
                 />
               )}
 

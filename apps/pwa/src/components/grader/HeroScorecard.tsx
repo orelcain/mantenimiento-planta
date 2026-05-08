@@ -101,7 +101,13 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, marelHgC
             </Badge>
           )}
           {shiftWindow.status === 'closed' && (
-            <Badge variant="outline" className="text-xs px-2 py-0">CERRADO</Badge>
+            <Badge
+              variant="outline"
+              className="text-xs px-2 py-0 border-zinc-600/50 text-zinc-400"
+              title={`Turno cerrado · ${new Date(shiftWindow.startAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })} → ${new Date(shiftWindow.endAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}`}
+            >
+              CERRADO
+            </Badge>
           )}
         </div>
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -138,7 +144,7 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, marelHgC
             />
             <MetricTile
               label="Peso kg"
-              value={summary.totalWeightKg != null ? summary.totalWeightKg.toFixed(0) : '—'}
+              value={summary.totalWeightKg != null ? Math.round(summary.totalWeightKg).toLocaleString('es-CL') : '—'}
               tooltip="Peso bruto total registrado por el Marelec en el turno (suma de las piezas pesadas individualmente)."
             />
           </div>

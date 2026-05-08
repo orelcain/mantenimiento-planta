@@ -1001,10 +1001,11 @@ export function UpstreamMachinesPanel({
 
             {empty && (
               <div className="text-xs text-slate-500 py-3 space-y-1">
-                <p>📡 <strong className="text-slate-300">Integración con Shoplogix en desarrollo.</strong></p>
+                <p>📡 <strong className="text-slate-300">Sin datos Shoplogix para este turno.</strong></p>
                 <p className="text-slate-600">
-                  Próximamente: estado en vivo de las 3 Baaders 142, paros, Micro Detenciones
-                  y correlación con los P0 del Grader. Ver <code className="text-slate-400">docs/SHOPLOGIX_INTEGRATION_PLAN.md</code>.
+                  {plantSlug === 'yal'
+                    ? 'La integración Shoplogix Yal aún no está conectada a Firestore. Cuando esté lista, mostrará el estado en vivo de las 3 Baaders 142, paros, Micro Detenciones y correlación con los P0 del Grader.'
+                    : 'Cuando la integración esté lista, mostrará estado en vivo de las 3 Baaders 142, paros, Micro Detenciones y correlación con los P0 del Grader.'}
                 </p>
               </div>
             )}
