@@ -124,11 +124,18 @@ export function ShiftGatesConfigAccordion({ shiftDocId, configSnapshots, onSaved
   }
 
   const activeCount = gates.filter(g => g.active).length
+  const allActive = activeCount === gates.length
+  const allInactive = activeCount === 0
+
+  // Helpers para selección bulk: más rápido que marcar/desmarcar 1 a 1.
+  const setAllActive = (active: boolean) => {
+    setGates(prev => prev.map(g => ({ ...g, active })))
+  }
 
   return (
     <Card>
       <CardHeader className="pb-0 pt-3">
-        <CardTitle className="text-sm flex items-center gap-2">
+        <CardTitle className="text-sm flex items-center gap-2 flex-wrap">
           <SlidersHorizontal className="w-4 h-4 text-muted-foreground" />
           Editar configuración de gates
           <span className="text-[11px] font-normal text-muted-foreground ml-1">
@@ -138,6 +145,28 @@ export function ShiftGatesConfigAccordion({ shiftDocId, configSnapshots, onSaved
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted/40 text-muted-foreground border border-border/40 ml-1">
               solo lectura
             </span>
+          )}
+          {open && allowEdit && (
+            <div className="flex items-center gap-1 ml-1" role="group" aria-label="Selección masiva">
+              <button
+                type="button"
+                onClick={() => setAllActive(false)}
+                disabled={allInactive}
+                className="text-[10px] px-1.5 py-0.5 rounded border border-red-500/30 text-red-500 hover:bg-red-500/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                title="Desactivar todas las gates — útil para limpiar y elegir una a una"
+              >
+                Desactivar todas
+              </button>
+              <button
+                type="button"
+                onClick={() => setAllActive(true)}
+                disabled={allActive}
+                className="text-[10px] px-1.5 py-0.5 rounded border border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                title="Activar todas las gates"
+              >
+                Activar todas
+              </button>
+            </div>
           )}
           <button
             onClick={() => setOpen(v => !v)}

@@ -147,7 +147,7 @@ export function InfoTooltip({
         onBlur={hide}
       >
         <Icon
-          className="text-muted-foreground/60 hover:text-blue-400 transition-colors duration-150"
+          className="text-blue-400/80 hover:text-blue-300 transition-colors duration-150"
           style={{ width: iconSize, height: iconSize }}
         />
       </span>
