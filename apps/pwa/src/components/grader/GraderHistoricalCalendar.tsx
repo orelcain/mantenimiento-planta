@@ -2665,11 +2665,17 @@ export function GraderHistoricalCalendar({
               //     bajo el día anterior por la convención "día laboral" del CF).
               // prevDayKey siempre computado (necesario para badge SLX + chips noche)
               const prevDayKey = addDaysToDateKey(dayKey, -1)
-              // En Yal el Excel del turno noche NO cubre los otros turnos —
-              // siempre mostrar SLX disponibles para complementar.
-              const showSlx = !hasData || plantLine.isClassificationPlant === false
-              const slxNewDay   = showSlx ? (slxTotalsByShift.get(`${dayKey}__Turno 2`) ?? 0) : 0
-              const slxLegDay   = showSlx ? (slxTotalsByShift.get(`${dayKey}__Turno día`) ?? 0) : 0
+              // En Yal el Excel del turno noche cubre ~12:03→02:32 — SOLAPA
+              // con el SLX Turno 2 (15:15→00:00) que mediria los mismos
+              // ciclos Baader. Para evitar mostrar 3 chips solapados:
+              //   - Si hay Excel cargado en Yal: ocultar SLX `D` (cubierto)
+              //   - Mantener SLX `M` (madrugada T3 prev = perido ANTES del Excel)
+              // Asi quedan 2 turnos visualmente coherentes: M (madrugada) + N (Excel).
+              const isYalWithExcel = hasData && plantLine.isClassificationPlant === false
+              const showSlx     = !hasData || plantLine.isClassificationPlant === false
+              const showSlxDay  = showSlx && !isYalWithExcel
+              const slxNewDay   = showSlxDay ? (slxTotalsByShift.get(`${dayKey}__Turno 2`) ?? 0) : 0
+              const slxLegDay   = showSlxDay ? (slxTotalsByShift.get(`${dayKey}__Turno día`) ?? 0) : 0
               const slxDayCycles   = slxNewDay > 0 ? slxNewDay : slxLegDay
               // shiftId real para navegar desde chip día
               const slxDayNav = slxNewDay > 0
