@@ -33,6 +33,7 @@ import {
   resolveAxisWindow,
   buildMarkLines,
   buildMarkAreas,
+  buildPauseBoundaryMarkLines,
   buildBaaderTimelineMarkers,
   buildConfigSegmentMarkAreas,
 } from './shiftTimelineHelpers'
@@ -752,6 +753,7 @@ export function ShiftTimelineView({
     const { shiftMarkLines, thresholdLines, uploadLines, actionLines, configChangeLines, lotChangeLines } =
       buildMarkLines(shiftDoc, shiftWindow, configSnapshots, buckets, alertThreshold, criticalThreshold, productionWindow)
     const deadTimeAreas = buildMarkAreas(pauses ?? [], productionWindow)
+    const pauseBoundaryLines = buildPauseBoundaryMarkLines(pauses ?? [], productionWindow)
 
     // Bandas tintadas por verdict de cada segmento entre cambios de config.
     // Cierra el bucle con `GateChangeImpactCard`: la card lista cada cambio
@@ -1111,6 +1113,7 @@ export function ShiftTimelineView({
               ...lotChangeLines,
               ...shiftMarkLines,
               ...thresholdLines,
+              ...pauseBoundaryLines,
             ],
           },
           markArea: deadTimeAreas.length > 0 ? {
@@ -1243,9 +1246,9 @@ export function ShiftTimelineView({
               title={
                 coverage.unclassifiedMin > 0
                   ? canAnnotate
-                    ? `${coverage.unclassifiedMin} min sin clasificar — click para ir al primer paro sin tag`
-                    : `${coverage.unclassifiedMin} min sin clasificar de ${coverage.totalMin} min totales`
-                  : `${coverage.totalMin} min totales — todo el tiempo clasificado`
+                    ? `Cobertura ${coverage.pct}%: porcentaje del tiempo de paro que tiene una causa asignada (tag). Faltan ${coverage.unclassifiedMin} min sin clasificar de ${coverage.totalMin} min totales — click para ir al primer paro sin tag.`
+                    : `Cobertura ${coverage.pct}%: porcentaje del tiempo de paro con causa asignada. ${coverage.unclassifiedMin} min sin clasificar de ${coverage.totalMin} min totales.`
+                  : `Cobertura ${coverage.pct}%: todos los ${coverage.totalMin} min de paros del turno tienen causa asignada (tag) — análisis completo.`
               }
               onClick={canAnnotate && coverage.unclassifiedMin > 0 ? handleCoverageBadgeClick : undefined}
             >

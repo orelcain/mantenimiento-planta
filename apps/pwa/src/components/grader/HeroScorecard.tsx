@@ -32,11 +32,15 @@ interface MetricTileProps {
   label: string
   value: string
   sub?: string
+  tooltip?: string
 }
 
-function MetricTile({ label, value, sub }: MetricTileProps) {
+function MetricTile({ label, value, sub, tooltip }: MetricTileProps) {
   return (
-    <div className="text-center">
+    <div
+      className={tooltip ? 'text-center cursor-help' : 'text-center'}
+      title={tooltip}
+    >
       <div className="text-lg font-semibold tabular-nums">{value}</div>
       <div className="text-xs text-muted-foreground">{label}</div>
       {sub && <div className="text-xs text-muted-foreground/70">{sub}</div>}
@@ -125,20 +129,26 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, marelHgC
             <MetricTile
               label="Piezas"
               value={summary.totalPieces.toLocaleString('es-CL')}
+              tooltip="Total de piezas pesadas por el Marelec en el turno (incluye OK + P0). Fuente: Excel Pieza a Pieza."
             />
             <MetricTile
               label="pz/min"
               value={throughputPerMin}
+              tooltip="Throughput promedio del turno: piezas totales ÷ minutos productivos (excluye colación y paros). Es la velocidad efectiva de la línea."
             />
             <MetricTile
               label="Peso kg"
               value={summary.totalWeightKg != null ? summary.totalWeightKg.toFixed(0) : '—'}
+              tooltip="Peso bruto total registrado por el Marelec en el turno (suma de las piezas pesadas individualmente)."
             />
           </div>
           {baaderTotal > 0 && upstreamSnapshot && (
             <div className="pt-2 border-t border-border/40 space-y-1.5">
               <div className="flex items-baseline justify-between flex-wrap gap-2 text-xs">
-                <div className="flex items-baseline gap-2">
+                <div
+                  className="flex items-baseline gap-2 cursor-help"
+                  title="Total de ciclos procesados por las 3 evisceradoras Baader 142 corriente arriba del Marelec. Cada ciclo = 1 salmón eviscerado. Fuente: Shoplogix."
+                >
                   <span className="font-semibold text-muted-foreground uppercase tracking-wider">
                     Upstream Baader
                   </span>
@@ -176,11 +186,15 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, marelHgC
                   const sharePct = (m.totalCycles / baaderTotal) * 100
                   const uptimePct = (m.shiftRuntime * 100).toFixed(0)
                   return (
-                    <div key={m.machineid} className="text-center">
+                    <div
+                      key={m.machineid}
+                      className="text-center cursor-help"
+                      title={`${m.machineName} — ${m.totalCycles.toLocaleString('es-CL')} ciclos en el turno. % línea = participación de esta máquina en el total de las 3 (${sharePct.toFixed(0)}%). % uptime = fracción del turno en estado Uptime/produciendo según Shoplogix (${uptimePct}%).`}
+                    >
                       <div className="text-base font-semibold tabular-nums">
                         {m.totalCycles.toLocaleString('es-CL')}
                       </div>
-                      <div className="text-xs text-muted-foreground truncate" title={m.machineName}>
+                      <div className="text-xs text-muted-foreground truncate">
                         {m.machineName}
                       </div>
                       <div className="text-[10px] text-muted-foreground/70 tabular-nums">

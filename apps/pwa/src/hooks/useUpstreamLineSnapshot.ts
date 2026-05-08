@@ -32,8 +32,15 @@ export interface UseUpstreamLineSnapshotResult {
  * mientras no esté la integración con Firestore). Apagable con
  * `VITE_SHOPLOGIX_DEMO=0` en apps/pwa/.env.local para probar el estado vacío.
  * En producción: siempre false (nunca demo data).
+ *
+ * IMPORTANTE: la demo data está hecha con `CHONCHI_EVISCERADORAS` y simula
+ * paros + bandas violetas del Baader. Si la planta NO es chonchi, los
+ * markers visuales son fake (paros que NO existieron en esa planta) y
+ * confunden la lectura del turno. Por eso bloqueamos demo para plantas
+ * distintas de chonchi.
  */
-function isDemoEnabled(): boolean {
+function isDemoEnabled(plantSlug: PlantSlug): boolean {
+  if (plantSlug !== 'chonchi') return false
   const env = import.meta.env
   const flag = (env.VITE_SHOPLOGIX_DEMO ?? '').toString()
   if (flag === '0' || flag === 'false') return false
@@ -81,8 +88,8 @@ export function useUpstreamLineSnapshot(
           setLoading(false)
           setError(null)
         } else {
-          // Sin datos en Firestore → fallback demo (DEV) o vacío (PROD)
-          if (isDemoEnabled()) {
+          // Sin datos en Firestore → fallback demo (DEV chonchi) o vacío
+          if (isDemoEnabled(plantSlug)) {
             setSnapshot(buildDemoLineSnapshot())
             setSource('demo')
             setSyncedAt(new Date())

@@ -296,8 +296,33 @@ export function buildMarkLines(
 // ── Mark areas (bandas de pausas) ─────────────────────────────────────────────
 
 /**
+ * Umbral en minutos a partir del cual una pausa se considera "dominante":
+ * su markArea cubre suficiente fracción del timeline como para tapar barras
+ * y línea P0% si se renderiza con la opacity normal del tag. A partir de
+ * este umbral aplicamos opacity reducida y bordes verticales (markLines)
+ * para conservar la indicación temporal sin oclusión visual.
+ */
+const PAUSE_DOMINANT_THRESHOLD_MIN = 25
+
+/** Reduce la opacity de un color rgba(r,g,b,a) por un factor. */
+function dimRgba(rgba: string, factor: number): string {
+  const m = rgba.match(/^rgba?\(([^,]+),([^,]+),([^,]+)(?:,([^,]+))?\)$/)
+  if (!m) return rgba
+  const r = m[1]?.trim()
+  const g = m[2]?.trim()
+  const b = m[3]?.trim()
+  const a = parseFloat(m[4]?.trim() ?? '1')
+  return `rgba(${r},${g},${b},${(a * factor).toFixed(3)})`
+}
+
+/**
  * Construye el array de markArea data para ECharts a partir de las pausas del turno.
  * Solo incluye pausas que SOLAPAN con el productionWindow (si está definido).
+ *
+ * Para pausas dominantes (>= 25 min con tag), atenúa la banda al ~30% de su
+ * opacity normal — el ojo conserva la pista de "aquí hubo pausa" sin que la
+ * banda tape barras y línea P0%. Los bordes nítidos los aporta
+ * `buildPauseBoundaryMarkLines` (markLines verticales).
  */
 export function buildMarkAreas(
   pauses: Pause[],
@@ -315,17 +340,21 @@ export function buildMarkAreas(
     const durMin = Math.round(p.durationSec / 60)
     const effectiveTag = resolveEffectiveTag(p)
     const rangeAdjusted = !!p.adjustedBy
+    const isDominant = durMin >= PAUSE_DOMINANT_THRESHOLD_MIN
 
     let areaColor: string
     let labelColor: string
     let labelText: string
     if (effectiveTag) {
-      areaColor = effectiveTag.bandFill
+      // Pausas dominantes: atenuar al 35% para que no tapen el chart.
+      // Los markLines verticales aportan bordes nítidos en su lugar.
+      areaColor = isDominant ? dimRgba(effectiveTag.bandFill, 0.35) : effectiveTag.bandFill
       labelColor = effectiveTag.color
       labelText = `${effectiveTag.label.split(' ')[0]} ${durMin}min${rangeAdjusted ? ' *' : ''}`
     } else {
-      const opacityByTier = p.tier === 'parada' ? 0.12 : p.tier === 'larga' ? 0.09 : 0.06
-      areaColor = `rgba(148,163,184,${opacityByTier})`
+      const baseOpacity = p.tier === 'parada' ? 0.12 : p.tier === 'larga' ? 0.09 : 0.06
+      const opacity = isDominant ? baseOpacity * 0.4 : baseOpacity
+      areaColor = `rgba(148,163,184,${opacity.toFixed(3)})`
       labelColor = '#94a3b8'
       labelText = `${durMin}min${rangeAdjusted ? ' *' : ''}`
     }
@@ -340,6 +369,50 @@ export function buildMarkAreas(
       { xAxis: tB },
     ]
   })
+}
+
+/**
+ * MarkLines verticales en los bordes de pausas dominantes (>= 25 min con
+ * tag o cualquier tier 'parada'). Compensa la atenuación de la banda en
+ * `buildMarkAreas`: el ojo identifica el inicio/fin del paro nítidamente
+ * sin que la banda tape el chart.
+ *
+ * Genera 2 markLines por pausa dominante (inicio + fin), con color del tag
+ * efectivo y opacity moderada.
+ */
+export function buildPauseBoundaryMarkLines(
+  pauses: Pause[],
+  productionWindow: ProductionWindow | null,
+): object[] {
+  const pausesInWindow = pauses.filter((p) => {
+    if (!productionWindow) return true
+    const pStart = Date.parse(p.startAt)
+    const pEnd = Date.parse(p.endAt)
+    return pEnd >= productionWindow.startMs && pStart <= productionWindow.endMs
+  })
+  const lines: object[] = []
+  for (const p of pausesInWindow) {
+    const durMin = Math.round(p.durationSec / 60)
+    const effectiveTag = resolveEffectiveTag(p)
+    const isDominant = durMin >= PAUSE_DOMINANT_THRESHOLD_MIN
+    if (!isDominant) continue
+    const color = effectiveTag?.color ?? (p.tier === 'parada' ? '#94a3b8' : '#cbd5e1')
+    lines.push(
+      {
+        name: `pause-start-${p.id}`,
+        xAxis: fmtTime(p.startAt),
+        lineStyle: { color, type: 'dashed' as const, width: 1, opacity: 0.5 },
+        symbol: 'none' as const,
+      },
+      {
+        name: `pause-end-${p.id}`,
+        xAxis: fmtTime(p.endAt),
+        lineStyle: { color, type: 'dashed' as const, width: 1, opacity: 0.5 },
+        symbol: 'none' as const,
+      },
+    )
+  }
+  return lines
 }
 
 // ── Bandas de segmentos por cambio de config ─────────────────────────────────
