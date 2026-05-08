@@ -34,6 +34,19 @@ export interface PlantLineConfig {
    * Se usa como fallback cuando no hay config guardada en Firestore para la planta.
    */
   defaultShiftSchedule?: GraderShiftSchedule[]
+  /**
+   * Si true (default), la planta clasifica producto en 12 gates por
+   * calibre+calidad (Marelec MS4/12 de Chonchi). Si false, es una planta
+   * de eviscerado simplificado (Yal) donde las "gates" son solo las que
+   * alimentan las Baaders y no hay clasificación por calidad.
+   *
+   * Cuando false, el TurnoPage oculta:
+   *   - ActionPlanPanel (sugerencias IA hardcoded para Chonchi)
+   *   - ShiftConfigPanel (config 12 gates)
+   *   - GateEvolutionChart + GateChangeImpactCard
+   * Y muestra un banner explicando el flujo simplificado.
+   */
+  isClassificationPlant?: boolean
 }
 
 export const PLANT_LINES: readonly PlantLineConfig[] = [
@@ -44,6 +57,7 @@ export const PLANT_LINES: readonly PlantLineConfig[] = [
     plantSlug: 'chonchi',
     hasGraderData: true,
     shoplogixEnabled: true,
+    isClassificationPlant: true,   // Marelec MS4/12 con 12 gates por calibre+calidad
   },
   {
     id: 'yal-eviscerado',
@@ -52,6 +66,8 @@ export const PLANT_LINES: readonly PlantLineConfig[] = [
     plantSlug: 'yal',
     hasGraderData: true,   // El Excel de la Grader Yal tiene el mismo formato
     shoplogixEnabled: true,
+    isClassificationPlant: false,  // Yal solo eviscera, no clasifica. Las gates del
+                                   // Excel son las que alimentan las 3 Baaders.
     // Yal opera con 3 turnos en Shoplogix (T1/T2/T3) además de los labels del Grader.
     // Horarios confirmados en Shoplogix UI (1 May 2026):
     //   Turno 1:   07:45 – 15:15  (mañana)

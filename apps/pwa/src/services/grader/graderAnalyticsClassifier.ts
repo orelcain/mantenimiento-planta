@@ -160,6 +160,9 @@ export function classifyRecordToMatrix(
   if (parsed === 'no_leido_fotocelula') return 'no_leido_fotocelula'
   if (parsed === 'too_close_too_long') return 'too_close_too_long'
   if (parsed === 'puerta_no_preparada') return 'puerta_no_preparada'
+  if (parsed === 'fuera_de_limites') {
+    // Continuar con descomposición derivada abajo.
+  }
 
   // (2) "Fuera de límites" — intentar descomposición derivada
   let perPieceG = ('weightPerPieceGrams' in record)
@@ -168,8 +171,21 @@ export function classifyRecordToMatrix(
   if (!perPieceG && record.weightKg && record.pieces > 0) {
     perPieceG = (record.weightKg / record.pieces) * 1000
   }
-  // Peso anómalo (<10g) — probable fallo de sensor
-  if (perPieceG == null || perPieceG < 10) return 'no_leido_fotocelula'
+  // Peso anómalo (<10g) — probable fallo de sensor.
+  // SOLO aplicar la heurística cuando NO hay errorStr explícito (gate=0
+  // inferido). Si el Marelec reportó el error, respetarlo: en Yal los
+  // rechazos por "Peso por debajo del mínimo" tienen peso=0kg y caían
+  // en esta rama → se mostraban como "No leído por fotocélula" cuando en
+  // realidad eran rechazos legítimos por peso bajo.
+  const hasExplicitError = !!errorStr && errorStr.trim().length > 0
+  if (!hasExplicitError && (perPieceG == null || perPieceG < 10)) {
+    return 'no_leido_fotocelula'
+  }
+  // Si tiene error explícito pero peso 0, respetar la causa parsed (otro o
+  // fuera_de_limites según el mapping).
+  if (hasExplicitError && (perPieceG == null || perPieceG === 0)) {
+    return parsed === 'fuera_de_limites' ? 'fuera_de_limites' : 'otro'
+  }
 
   // (2a) Peso no encaja en ningún calibre configurado
   const matchedRange = weightRanges.find(

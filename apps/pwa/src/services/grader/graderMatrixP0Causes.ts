@@ -226,8 +226,16 @@ export function parseMatrixErrorString(raw: string): MatrixP0Cause {
   if ((s.includes('puerta') || s.includes('door')) && (s.includes('prepar') || s.includes('ready'))) {
     return 'puerta_no_preparada'
   }
-  // Prioridad 2: too_close_too_long (puede contener "long" o "close")
-  if (s.includes('too close') || s.includes('too long') || s.includes('demasiado cerca') || s.includes('demasiado largo')) {
+  // Prioridad 2: too_close_too_long (Chonchi y Yal usan distintas frases).
+  // Yal Marelec reporta "No puede pesar. Productos demasiado próximos" cuando
+  // 2+ piezas pasan tan cerca que la balanza no puede separar pesos individuales
+  // → es semánticamente el mismo evento que "Too close or too long".
+  if (
+    s.includes('too close') || s.includes('too long')
+    || s.includes('demasiado cerca') || s.includes('demasiado largo')
+    || s.includes('demasiado próximo') || s.includes('demasiado proximo')
+    || s.includes('no puede pesar')
+  ) {
     return 'too_close_too_long'
   }
   // Prioridad 3: fotocélula — usar "not read by" específico para evitar match con "not ready"
@@ -237,7 +245,13 @@ export function parseMatrixErrorString(raw: string): MatrixP0Cause {
   // "fuera de rango"/"fuera de límites" → quedan como fuera_de_limites (oficial Matrix).
   // La descomposición derivada (calibre/calidad/conservación/producto) se hace
   // cuando hay pieceRecords con calidad/conservación/producto en graderAnalytics.
-  if (isFuera && (s.includes('rango') || s.includes('range') || s.includes('límit') || s.includes('limit'))) {
+  // Yal Marelec reporta "Peso por debajo del mínimo" cuando la pieza pesa menos
+  // del rango físico mínimo de la balanza — semánticamente "fuera de límites".
+  if (
+    (isFuera && (s.includes('rango') || s.includes('range') || s.includes('límit') || s.includes('limit')))
+    || s.includes('peso por debajo') || s.includes('peso bajo el mínimo') || s.includes('peso bajo el minimo')
+    || s.includes('weight below') || s.includes('below minimum')
+  ) {
     return 'fuera_de_limites'
   }
   return 'otro'

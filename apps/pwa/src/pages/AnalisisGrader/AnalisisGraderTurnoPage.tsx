@@ -9,8 +9,8 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useParams, useNavigate, Navigate, useSearchParams } from 'react-router-dom'
 import { logger } from '@/lib/logger'
-import { Button, Card, CardContent, Spinner, Badge } from '@/components/ui'
-import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag, FileText, WifiOff, ChevronDown, RefreshCw, Zap, Scale } from 'lucide-react'
+import { Button, Card, CardContent, CardHeader, CardTitle, Spinner, Badge } from '@/components/ui'
+import { ArrowLeft, Settings2, AlertCircle, AlertTriangle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag, FileText, WifiOff, ChevronDown, RefreshCw, Zap, Scale } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { usePermissionsStore } from '@/store'
 import { useAuthStore, useIsAdmin, useIsSupervisor } from '@/store/authStore'
@@ -266,6 +266,13 @@ export function AnalisisGraderTurnoPage() {
   const wizardUrl = plantLineCfg.id !== DEFAULT_PLANT_LINE_ID
     ? `/analisis-grader/wizard?linea=${plantLineCfg.id}`
     : '/analisis-grader/wizard'
+
+  // Plantas con clasificación (Chonchi MS4/12) muestran 12 gates, sugerencias
+  // IA Marelec-specific (fotocélula, eye-sync, velocidad cinta), y análisis
+  // por gate. Plantas de eviscerado simplificado (Yal) ocultan todo eso —
+  // su Excel viene del Marelec pero las "gates" son solo las que alimentan
+  // las 3 Baaders y no hay clasificación por calidad.
+  const isClassificationPlant = plantLineCfg.isClassificationPlant !== false
 
   // Schedule efectivo de la planta — Yal define T1/T2/T3, Chonchi día/noche.
   // Sin esto el chart de Yal Turno 3 caería al fallback 08:00→08:00 (24h)
@@ -1272,15 +1279,44 @@ export function AnalisisGraderTurnoPage() {
               )}
             </div>
 
-            {/* Acciones — mobile row 2 (protagonismo), desktop derecha full-height */}
+            {/* Acciones — mobile row 2 (protagonismo), desktop derecha full-height.
+                Solo se muestra en plantas con clasificación (Chonchi). En Yal las
+                sugerencias actuales asumen fotocélula/eye-sync/velocidad cinta
+                de la MS4/12 y no aplican — pendiente generador específico Yal. */}
             <div className="lg:col-start-3 lg:row-span-2 space-y-4" data-no-swipe>
-              <ActionPlanPanel
-                shiftDocId={shiftDocId}
-                suggestions={suggestions}
-                status={shiftWindow.status}
-                relatedRunbooks={triggeredRunbooks}
-                onActionTrigger={handleActionTrigger}
-              />
+              {isClassificationPlant && (
+                <ActionPlanPanel
+                  shiftDocId={shiftDocId}
+                  suggestions={suggestions}
+                  status={shiftWindow.status}
+                  relatedRunbooks={triggeredRunbooks}
+                  onActionTrigger={handleActionTrigger}
+                />
+              )}
+              {!isClassificationPlant && (
+                <Card className="border-amber-500/30 bg-amber-500/5">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-amber-400" />
+                      Análisis IA pendiente para {plantLineCfg.label}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-xs text-muted-foreground space-y-2">
+                    <p>
+                      Las sugerencias actuales (limpiar fotocélula, eye-sync,
+                      velocidad de cinta) son específicas del Marelec MS4/12
+                      con clasificación de Chonchi. <b>{plantLineCfg.label}</b> es
+                      planta de eviscerado simplificado — sin clasificación por
+                      calidad ni gates clasificadoras.
+                    </p>
+                    <p>
+                      Pendiente: generador de sugerencias específico para Yal
+                      (rechazos por peso bajo, distribución pesos, throughput
+                      vs target Baader).
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Modales lanzados desde ActionPlanPanel */}
               <GateChangeModal
@@ -1317,8 +1353,10 @@ export function AnalisisGraderTurnoPage() {
             </div>
           </div>
 
-          {/* Config de gates del turno — posición B (antes del timeline, visible sin scroll) */}
-          {configSnapshots.length > 0 && (
+          {/* Config de gates del turno — posición B (antes del timeline, visible sin scroll).
+              Solo en plantas que clasifican (Chonchi). Yal no clasifica → las gates
+              del Excel son solo las que alimentan las 3 Baaders. */}
+          {isClassificationPlant && configSnapshots.length > 0 && (
             <ShiftConfigPanel
               shiftDocId={shiftDocId}
               shiftDoc={shiftDoc}
@@ -1411,8 +1449,11 @@ export function AnalisisGraderTurnoPage() {
             criticalThreshold={criticalThreshold}
           />
 
-          {/* Distribución por gate — balance del turno */}
-          {summary.gateDistribution && summary.gateDistribution.length > 0 && (
+          {/* Bloques específicos de Chonchi: distribución por gate, impacto de
+              cambios mid-turno, evolución de gates. Yal no aplica — sus 3-4
+              gates físicas no clasifican y los charts asumen 12 gates con
+              calibre+calidad asignados. */}
+          {isClassificationPlant && summary.gateDistribution && summary.gateDistribution.length > 0 && (
             <GateBreakdownCard
               gateDistribution={summary.gateDistribution}
               configSnapshots={configSnapshots}
@@ -1424,16 +1465,14 @@ export function AnalisisGraderTurnoPage() {
             />
           )}
 
-          {/* Impacto de cambios de gate — P0% antes/después */}
-          {enrichedTimelineBuckets.length > 0 && configSnapshots.length > 0 && (
+          {isClassificationPlant && enrichedTimelineBuckets.length > 0 && configSnapshots.length > 0 && (
             <GateChangeImpactCard
               timelineBuckets={enrichedTimelineBuckets}
               configSnapshots={configSnapshots}
             />
           )}
 
-          {/* Evolución de gates a lo largo del turno (piezas/min por gate) */}
-          {enrichedTimelineBuckets.length > 0 && configSnapshots.length > 0 && (
+          {isClassificationPlant && enrichedTimelineBuckets.length > 0 && configSnapshots.length > 0 && (
             <GateEvolutionChart
               timelineBuckets={enrichedTimelineBuckets}
               configSnapshots={configSnapshots}

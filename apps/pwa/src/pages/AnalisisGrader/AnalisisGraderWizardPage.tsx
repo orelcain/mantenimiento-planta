@@ -468,7 +468,11 @@ export function AnalisisGraderWizardPage() {
         const [dateKey, shiftId] = key.split('|')
         if (!dateKey || !shiftId) continue
         const summaryId = buildDailySummaryId(dateKey, shiftId, effectivePlantLineId)
-        const allRecs = [...segment.pieceRecords, ...segment.gate0Records]
+        // pieceRecords YA incluye gate=0 (ver mergeParsedData). No concatenar
+        // gate0Records — eso causaba duplicación: cada pieza gate=0 quedaba
+        // guardada 2 veces en Firestore (manifestado en Yal: 7 piezas reales,
+        // 14 docs en pieceRecords subcollection).
+        const allRecs = segment.pieceRecords
         if (allRecs.length === 0) continue
         const firestoreRecs: FirestorePieceRecord[] = allRecs.map((r) => ({
           ts: r.ts,
