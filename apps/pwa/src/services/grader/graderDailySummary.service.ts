@@ -603,18 +603,23 @@ export async function listPieceRecords(summaryId: string): Promise<FirestorePiec
  */
 export async function listGate0PieceRecords(summaryId: string): Promise<FirestorePieceRecord[]> {
   const q = query(pieceRecordsCol(summaryId), where('gate', '==', 0))
-  let records: FirestorePieceRecord[] = []
+  // Privilegiar SERVER sobre cache local. Antes la lógica era cache-first y
+  // si encontraba cualquier doc cacheado lo retornaba sin consultar server →
+  // tras un cleanup (ej. dedup de duplicados) el cliente seguía mostrando
+  // los registros viejos hasta que se vencía el cache. Ahora consulta server
+  // siempre (Firestore SDK fallea a cache automaticamente si está offline).
   try {
-    const cached = await getDocsFromCache(q)
-    if (!cached.empty) records = cached.docs.map((d) => d.data() as FirestorePieceRecord)
-  } catch {
-    // Cache miss — continuar con red
-  }
-  if (records.length === 0) {
     const snap = await getDocs(q)
-    records = snap.docs.map((d) => d.data() as FirestorePieceRecord)
+    return snap.docs.map((d) => d.data() as FirestorePieceRecord).sort((a, b) => a.ts.localeCompare(b.ts))
+  } catch {
+    // Sin red → fallback a cache. Aquí sí aceptamos staleness.
+    try {
+      const cached = await getDocsFromCache(q)
+      return cached.docs.map((d) => d.data() as FirestorePieceRecord).sort((a, b) => a.ts.localeCompare(b.ts))
+    } catch {
+      return []
+    }
   }
-  return records.sort((a, b) => a.ts.localeCompare(b.ts))
 }
 
 /**

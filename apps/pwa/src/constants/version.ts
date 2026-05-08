@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '3.9.1' as const
+export const APP_VERSION = '3.9.2' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-05-08' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'feat(grader): tooltip upstream + InfoTooltip mas visible + bulk gates + reclassify Yal' as const
+export const VERSION_NAME = 'fix(grader): listGate0PieceRecords server-first (no servir cache stale)' as const
 
 /**
  * Nota:

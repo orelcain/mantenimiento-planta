@@ -1,7 +1,7 @@
 {
-  "version": "3.9.1",
+  "version": "3.9.2",
   "buildDate": "2026-05-08",
-  "buildTimestamp": 1778252928172,
+  "buildTimestamp": 1778253251925,
   "features": [
     "Grader: GatesConfigPage dividido en 6 sub-componentes (2715→1200 líneas, -56%)",
     "Grader: ProductoTab, CintasTab, DistanciasTab, DanfossTab, NeumaticaTab, VerificacionTab",
