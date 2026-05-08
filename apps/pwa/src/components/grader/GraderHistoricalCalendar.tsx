@@ -2388,7 +2388,7 @@ export function GraderHistoricalCalendar({
                       </Button>
                     )}
                   </div>
-                  {isSelectedSlide && (
+                  {isSelectedSlide && plantLine.isClassificationPlant !== false && (
                     <QuickGateChangeButton
                       shiftDocId={`${hist.dateKey}__${hist.shiftId}`}
                       variant="compact"
@@ -3152,7 +3152,9 @@ export function GraderHistoricalCalendar({
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 uppercase tracking-wide">
                 <Clock className="h-3.5 w-3.5" />
-                Sin Excel cargado todavía
+                {plantLine.isClassificationPlant === false
+                  ? 'Sin Excel del Marelec cargado todavía'
+                  : 'Sin Excel cargado todavía'}
               </p>
               <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2">
                 {/* Chonchi: 2 turnos fijos (día/noche) con slxKey → T2/T1.
@@ -3256,11 +3258,13 @@ export function GraderHistoricalCalendar({
                       )}
 
                       <div className="flex flex-col gap-1">
-                        <QuickGateChangeButton
-                          shiftDocId={`${cfDateKey}__${shiftId}`}
-                          variant="compact"
-                          className="w-full h-6 text-[10px]"
-                        />
+                        {plantLine.isClassificationPlant !== false && (
+                          <QuickGateChangeButton
+                            shiftDocId={`${cfDateKey}__${shiftId}`}
+                            variant="compact"
+                            className="w-full h-6 text-[10px]"
+                          />
+                        )}
                         {hasSlx && (
                           <button
                             onClick={() => navigate(`/analisis-grader/turno/${cfDateKey}__${encodeURIComponent(shiftId)}${lineaQuery}`)}

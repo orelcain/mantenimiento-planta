@@ -237,7 +237,7 @@ export function PlantKPIBoard({
                 barColor={kpis.oee !== null
                   ? (kpis.oee >= 0.85 ? 'bg-emerald-500' : kpis.oee >= 0.65 ? 'bg-sky-500' : kpis.oee >= 0.5 ? 'bg-amber-500' : 'bg-rose-500')
                   : 'bg-muted'}
-                note={kpis.graderOnly ? 'Sin Shoplogix' : kpis.oee === null ? 'Sin Q' : undefined}
+                note={kpis.graderOnly ? 'Sin Shoplogix' : kpis.oee === null ? (plantSlug === 'yal' ? 'A·P solamente' : 'Sin Q') : undefined}
               />
               <KPICard
                 label="Disponibilidad"

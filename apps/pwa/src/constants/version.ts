@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '3.16.0' as const
+export const APP_VERSION = '3.17.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-05-08' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'fix(grader-yal): barras P0 visibles + subtitle eviscerado + nombres evisceradoras + badge P0 oculto Yal + tooltip dispersion' as const
+export const VERSION_NAME = 'fix(grader-yal): OEE A.P solamente + cambiar gate oculto + Sin Excel del Marelec' as const
 
 /**
  * Nota:
