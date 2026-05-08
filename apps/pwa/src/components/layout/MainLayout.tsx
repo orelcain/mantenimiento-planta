@@ -479,14 +479,20 @@ export function MainLayout() {
         Ir al contenido principal
       </a>
 
-      {/* ══════ DESKTOP SIDEBAR (static flex item, in document flow) ══════ */}
+      {/* ══════ DESKTOP SIDEBAR (static flex item, in document flow) ══════
+          El sticky vive en el WRAPPER outer (no en el inner) y se ancla al
+          flex parent `<div className="min-h-screen bg-background flex">`,
+          que crece con el documento. Así el sidebar queda fijo en top:0
+          mientras el main hace scroll. El inner es solo un contenedor de
+          ancho fijo (w-64) para que el contenido no se reflowee durante
+          la animación de colapsado del wrapper. */}
       <div
         className={cn(
-          'hidden lg:flex flex-col flex-shrink-0 bg-card border-r transition-[width] duration-200 overflow-hidden',
+          'hidden lg:flex flex-col flex-shrink-0 bg-card border-r transition-[width] duration-200 overflow-hidden h-screen sticky top-0',
           shouldHideDesktopSidebar ? 'w-0' : 'w-64'
         )}
       >
-        <div className="w-64 min-w-[16rem] flex flex-col h-screen sticky top-0">
+        <div className="w-64 flex flex-col h-full">
           {/* Logo */}
           <div className="flex items-center justify-between h-16 px-4 border-b">
             <div className="flex items-center gap-2">
