@@ -10,7 +10,8 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, Button, Badge } from '@/components/ui'
-import { BarChart3, Loader2, CheckCircle2, Calendar, BookOpen, Activity, Upload } from 'lucide-react'
+import { BarChart3, Loader2, CheckCircle2, Calendar, BookOpen, Activity, Upload, AlertCircle } from 'lucide-react'
+import { logger } from '@/lib/logger'
 import { useAuthStore, usePermissionsStore } from '@/store'
 import { AnalisisGraderUploadPage, type FileParsed } from './AnalisisGraderUploadPage'
 import { GraderHistoricalCalendar, type SlxMonthlyStats } from '@/components/grader/GraderHistoricalCalendar'
@@ -92,6 +93,9 @@ export function AnalisisGraderWizardPage() {
 
   const [savingToCalendar, setSavingToCalendar] = useState(false)
   const [savedToCalendar, setSavedToCalendar] = useState(false)
+  // Mensaje de error específico cuando el save a Firestore falla. Antes el
+  // catch era silencioso y el banner se quedaba en "guardando…" sin avisar.
+  const [saveError, setSaveError] = useState<string | null>(null)
   // IDs de turnos del banner multi-día que ya existen en Firestore
   const [multiDayExistingIds, setMultiDayExistingIds] = useState<Set<string>>(new Set())
 
@@ -352,6 +356,11 @@ export function AnalisisGraderWizardPage() {
 
   const handleUploadComplete = useCallback((data: ParsedMatrixData) => {
     setParsedData(data)
+    // Si el usuario subió otro Excel después de uno ya guardado, ocultar el
+    // banner verde "Guardado correctamente" — ahora hay un upload nuevo que
+    // todavía no fue persistido. El banner azul "listo para guardar" toma su
+    // lugar.
+    setSavedToCalendar(false)
     setConfig((prev) => ({
       ...prev,
       startAt: data.inferred.startAt || prev.startAt,
@@ -406,6 +415,7 @@ export function AnalisisGraderWizardPage() {
   const handleSaveToCalendar = useCallback(async () => {
     if (!multiDayInfo || !user?.id) return
     setSavingToCalendar(true)
+    setSaveError(null)
     try {
       const batchId = crypto.randomUUID()
       const sourceNames = parsedData?.files.map((f) => f.name) ?? []
@@ -495,12 +505,40 @@ export function AnalisisGraderWizardPage() {
       }
 
       setSavedToCalendar(true)
-      // El calendario embebido abajo se actualiza solo en el siguiente render.
-      // No necesitamos navegar a otra página (ya no hay /analisis-grader/calendario).
-    } catch {
+
+      // Limpiar el state del upload: banner azul "listo para guardar", botón
+      // Cancelar y badge "Cargar Excel N" desaparecen. parsedData=null hace
+      // que multiDayInfo se vuelva null y el banner se cierre solo. El banner
+      // verde "guardado" usa una flag separada (savedToCalendar).
+      setUploadedFiles([])
+      setParsedData(null)
+
+      // Si fue un solo turno, llevar directo al detalle del turno guardado
+      // para que el usuario vea el resultado de inmediato. Para multi-día,
+      // quedarse en el wizard con el calendario actualizado abajo (el usuario
+      // elige qué turno revisar primero).
+      if (multiDayInfo.totalSegments === 1) {
+        const [, segment] = multiDayInfo.entries[0]!
+        const shiftDocId = `${segment.sessionDate}__${segment.shiftId}`
+        const lineaParam = lineId !== DEFAULT_PLANT_LINE_ID ? `?linea=${lineId}` : ''
+        // Pequeño delay para que se vea el banner verde "guardado" antes de navegar
+        setTimeout(() => {
+          navigate(`/analisis-grader/turno/${encodeURIComponent(shiftDocId)}${lineaParam}`)
+        }, 1200)
+      }
+    } catch (err) {
+      // En error: quedar en el wizard con los archivos aún cargados para que
+      // el usuario pueda reintentar sin volver a subir. Loggear el error real
+      // (antes el catch era silencioso → si Firestore rechazaba por reglas o
+      // tipos, el banner se quedaba en "redirigiendo" para siempre y el usuario
+      // no sabía qué pasó).
+      const message = err instanceof Error ? err.message : String(err)
+      logger.error('[grader] Error guardando turno en calendario', err instanceof Error ? err : new Error(message))
+      setSaveError(message)
+    } finally {
       setSavingToCalendar(false)
     }
-  }, [multiDayInfo, parsedData, user?.id, gates, lineId])
+  }, [multiDayInfo, parsedData, user?.id, gates, lineId, navigate])
 
   if (!canSee('analisisGrader')) return <Navigate to="/" replace />
 
@@ -606,13 +644,35 @@ export function AnalisisGraderWizardPage() {
           </CardContent>
         </Card>
       )}
-      {multiDayInfo && savedToCalendar && (
+      {savedToCalendar && (
         <Card className="border-emerald-500/40 bg-emerald-500/10">
           <CardContent className="py-3 px-4 flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
             <p className="text-sm text-emerald-300 font-medium">
-              {multiDayInfo.totalSegments} turno{multiDayInfo.totalSegments > 1 ? 's' : ''} guardado{multiDayInfo.totalSegments > 1 ? 's' : ''} en <b>{lineConfig.label}</b> — redirigiendo al calendario…
+              Guardado correctamente en <b>{lineConfig.label}</b> · revisá el calendario abajo o cargá otro Excel.
             </p>
+          </CardContent>
+        </Card>
+      )}
+      {saveError && (
+        <Card className="border-red-500/40 bg-red-500/10">
+          <CardContent className="py-3 px-4 flex items-start gap-2">
+            <AlertCircle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-red-300 font-medium">No se pudo guardar el turno</p>
+              <p className="text-xs text-red-200/80 mt-0.5 break-words">{saveError}</p>
+              <p className="text-[11px] text-red-200/60 mt-1">
+                El Excel sigue cargado en cola — podés volver a presionar "Guardar en Calendario" para reintentar.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-red-300 hover:bg-red-500/20 shrink-0"
+              onClick={() => setSaveError(null)}
+            >
+              Cerrar
+            </Button>
           </CardContent>
         </Card>
       )}
