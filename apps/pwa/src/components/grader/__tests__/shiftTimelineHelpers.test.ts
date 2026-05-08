@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   buildBaaderTimelineMarkers,
+  buildConfigSegmentMarkAreas,
   buildScatterData,
   computeProductionWindow,
   median,
@@ -8,9 +9,12 @@ import {
   scatterCriticalZone,
   scatterSlopeMagnitude,
   usableScatterPoints,
+  verdictBandColor,
   type ProductionWindow,
   type ScatterSeriesData,
 } from '../shiftTimelineHelpers'
+import type { GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
+import type { SegmentVerdict } from '@/services/grader/graderP0Segmentation'
 import type {
   UpstreamLineSnapshot,
   UpstreamMachineShift,
@@ -560,5 +564,144 @@ describe('scatterSlopeMagnitude', () => {
       },
     ]
     expect(scatterSlopeMagnitude(series)).toBeNull()
+  })
+})
+
+// ── verdictBandColor + buildConfigSegmentMarkAreas ───────────────────────────
+//
+// Tests del helper visual que tinta segmentos del timeline entre cambios de
+// config de gates (FASE 27, refactor Fase A — sesión 2026-05-07).
+// Cierra el bucle visual con `GateChangeImpactCard`: el card muestra delta
+// numérico, el timeline tinta el segmento del color del verdict.
+
+describe('verdictBandColor', () => {
+  it('asigna emerald para improved', () => {
+    expect(verdictBandColor('improved')).toBe('rgba(16, 185, 129, 0.07)')
+  })
+
+  it('asigna rose para worsened', () => {
+    expect(verdictBandColor('worsened')).toBe('rgba(244, 63, 94, 0.07)')
+  })
+
+  it('asigna slate para neutral', () => {
+    expect(verdictBandColor('neutral')).toBe('rgba(148, 163, 184, 0.04)')
+  })
+
+  it('retorna null para insufficient-data — no se tinta', () => {
+    // Diseño: si no hay datos suficientes, no comunicamos un veredicto.
+    expect(verdictBandColor('insufficient-data')).toBeNull()
+  })
+})
+
+describe('buildConfigSegmentMarkAreas', () => {
+  // Helpers locales para construir snapshots y verdicts mínimos.
+  function mkSnap(id: string, atIso: string, synthetic = false): GateConfigSnapshot {
+    return {
+      id,
+      shiftDocId: '2026-02-26__Turno día',
+      at: atIso,
+      changedBy: { uid: 'u', name: 'Test' },
+      gates: [],
+      changes: [],
+      ...(synthetic ? { synthetic: true } : {}),
+    } as GateConfigSnapshot
+  }
+
+  function mkVerdict(status: SegmentVerdict['status'], delta = 0): SegmentVerdict {
+    return {
+      beforePct: 0, afterPct: 0, afterMinutes: 0, afterPieces: 999,
+      delta, status,
+    }
+  }
+
+  const window: ProductionWindow = {
+    startTs: '2026-02-26T09:00:00.000Z',
+    endTs:   '2026-02-26T17:00:00.000Z',
+    startMs: Date.parse('2026-02-26T09:00:00.000Z'),
+    endMs:   Date.parse('2026-02-26T17:00:00.000Z'),
+    dummyLots: new Set(),
+    excludedPieces: 0,
+  }
+
+  it('retorna [] cuando no hay snapshots', () => {
+    expect(buildConfigSegmentMarkAreas([], new Map(), window)).toEqual([])
+    expect(buildConfigSegmentMarkAreas(undefined, new Map(), window)).toEqual([])
+  })
+
+  it('retorna [] cuando productionWindow es null', () => {
+    const snaps = [mkSnap('a', '2026-02-26T10:00:00.000Z')]
+    const verdicts = new Map([['a', mkVerdict('improved', -2)]])
+    expect(buildConfigSegmentMarkAreas(snaps, verdicts, null)).toEqual([])
+  })
+
+  it('ignora snapshots synthetic (config inicial inferida)', () => {
+    const snaps = [mkSnap('a', '2026-02-26T10:00:00.000Z', true)]
+    const verdicts = new Map([['a', mkVerdict('improved', -2)]])
+    // Synthetic se filtra antes de mirar verdict → 0 areas
+    expect(buildConfigSegmentMarkAreas(snaps, verdicts, window)).toEqual([])
+  })
+
+  it('genera 1 area por snap manual con verdict tintable', () => {
+    const snaps = [
+      mkSnap('a', '2026-02-26T10:00:00.000Z'),
+      mkSnap('b', '2026-02-26T13:00:00.000Z'),
+    ]
+    const verdicts = new Map([
+      ['a', mkVerdict('improved', -2)],
+      ['b', mkVerdict('worsened', 3)],
+    ])
+    const areas = buildConfigSegmentMarkAreas(snaps, verdicts, window)
+    expect(areas).toHaveLength(2)
+    // Primer area: 10:00 → 13:00 (improved → emerald)
+    expect((areas[0]![0] as { xAxis: string }).xAxis).toBe('10:00')
+    expect((areas[0]![1] as { xAxis: string }).xAxis).toBe('13:00')
+    expect((areas[0]![0] as { itemStyle: { color: string } }).itemStyle.color).toBe('rgba(16, 185, 129, 0.07)')
+    // Segundo area: 13:00 → 17:00 (worsened → rose, hasta fin de window)
+    expect((areas[1]![0] as { xAxis: string }).xAxis).toBe('13:00')
+    expect((areas[1]![1] as { xAxis: string }).xAxis).toBe('17:00')
+    expect((areas[1]![0] as { itemStyle: { color: string } }).itemStyle.color).toBe('rgba(244, 63, 94, 0.07)')
+  })
+
+  it('descarta segmentos con status insufficient-data (sin tinte)', () => {
+    const snaps = [mkSnap('a', '2026-02-26T10:00:00.000Z')]
+    const verdicts = new Map([['a', mkVerdict('insufficient-data')]])
+    expect(buildConfigSegmentMarkAreas(snaps, verdicts, window)).toEqual([])
+  })
+
+  it('descarta snapshots fuera del productionWindow', () => {
+    // Snapshots con `at` 2 meses después del turno (caso real: registros
+    // retroactivos hechos hoy sobre un turno histórico). Mi filtro los
+    // descarta correctamente para no pintar bandas falsas.
+    const snaps = [mkSnap('a', '2026-05-07T12:00:00.000Z')]
+    const verdicts = new Map([['a', mkVerdict('improved', -2)]])
+    expect(buildConfigSegmentMarkAreas(snaps, verdicts, window)).toEqual([])
+  })
+
+  it('descarta snapshots SIN verdict (Map sin entrada para el id)', () => {
+    const snaps = [mkSnap('a', '2026-02-26T10:00:00.000Z')]
+    // Sin entry → el helper no inventa veredicto, prefiere no tintar.
+    expect(buildConfigSegmentMarkAreas(snaps, new Map(), window)).toEqual([])
+  })
+
+  it('mantiene orden cronológico aunque los snapshots vengan desordenados', () => {
+    const snaps = [
+      mkSnap('b', '2026-02-26T13:00:00.000Z'),
+      mkSnap('a', '2026-02-26T10:00:00.000Z'),
+    ]
+    const verdicts = new Map([
+      ['a', mkVerdict('improved', -2)],
+      ['b', mkVerdict('neutral')],
+    ])
+    const areas = buildConfigSegmentMarkAreas(snaps, verdicts, window)
+    expect((areas[0]![0] as { xAxis: string }).xAxis).toBe('10:00')
+    expect((areas[1]![0] as { xAxis: string }).xAxis).toBe('13:00')
+  })
+
+  it('descarta segmentos con tA === tB (duración 0)', () => {
+    // Edge case: snapshot exactamente al fin de productionWindow → tA===tB
+    const snaps = [mkSnap('a', '2026-02-26T17:00:00.000Z')]
+    const verdicts = new Map([['a', mkVerdict('improved', -2)]])
+    // El segmento iría de 17:00 a 17:00 (fin window) → vacío, se descarta.
+    expect(buildConfigSegmentMarkAreas(snaps, verdicts, window)).toEqual([])
   })
 })

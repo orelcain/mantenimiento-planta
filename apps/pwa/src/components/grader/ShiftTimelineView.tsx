@@ -34,6 +34,7 @@ import {
   buildMarkLines,
   buildMarkAreas,
   buildBaaderTimelineMarkers,
+  buildConfigSegmentMarkAreas,
 } from './shiftTimelineHelpers'
 import {
   DEFAULT_P0_ALERT_PCT,
@@ -43,6 +44,7 @@ import {
   p0StatusHex,
 } from '@/services/grader/graderP0Thresholds'
 import {
+  computeSegmentVerdicts,
   verdictColor,
   verdictLabel,
   verdictArrow,
@@ -751,6 +753,22 @@ export function ShiftTimelineView({
       buildMarkLines(shiftDoc, shiftWindow, configSnapshots, buckets, alertThreshold, criticalThreshold, productionWindow)
     const deadTimeAreas = buildMarkAreas(pauses ?? [], productionWindow)
 
+    // Bandas tintadas por verdict de cada segmento entre cambios de config.
+    // Cierra el bucle con `GateChangeImpactCard`: la card lista cada cambio
+    // con su delta P0%, el timeline tinta el SEGMENTO DESPUÉS del cambio con
+    // el color del verdict. Tintes muy tenues (4-7%) para no tapar barras/línea.
+    const configSegmentVerdicts = computeSegmentVerdicts(configSnapshots ?? [], buckets)
+    const configSegmentMarkAreas = buildConfigSegmentMarkAreas(
+      configSnapshots,
+      configSegmentVerdicts,
+      productionWindow,
+    ).filter(([a, b]) => {
+      // Solo incluir si ambos extremos existen en el axis actual
+      const tA = (a as { xAxis?: string }).xAxis
+      const tB = (b as { xAxis?: string }).xAxis
+      return tA != null && tB != null && axisIndexByLabel.has(tA) && axisIndexByLabel.has(tB)
+    })
+
     // Marcadores Baader — usados SOLO para enriquecer el tooltip del chart
     // con la sección "⚠ Upstream parado". El sub-grid visual fue retirado
     // tras feedback del usuario (no aportaba en el formato compacto). La
@@ -968,6 +986,27 @@ export function ShiftTimelineView({
         },
       },
       series: [
+        // ── Bandas de segmentos por verdict de cambio de config ───────────────
+        // Serie fantasma (z:0, invisible) que tinta cada segmento entre cambios
+        // manuales de config con el color del verdict (improved/worsened/neutral).
+        // Se declara PRIMERO para quedar visualmente al fondo — las baader bands
+        // y barras/línea se dibujan encima. Tintes muy tenues (4-7%).
+        ...(configSegmentMarkAreas.length > 0 ? [{
+          name: '__config_segments__',
+          type: 'line' as const,
+          yAxisIndex: 0,
+          data: new Array(lineTimes.length).fill(null) as null[],
+          lineStyle: { opacity: 0, width: 0 },
+          symbol: 'none',
+          silent: true,
+          z: 0,
+          tooltip: { show: false },
+          markArea: {
+            silent: true,
+            emphasis: { disabled: true },
+            data: configSegmentMarkAreas,
+          },
+        }] : []),
         // ── Baader upstream stop bands ────────────────────────────────────────
         // Serie fantasma (z:0, invisible) cuya única misión es hospedar el
         // markArea con las zonas de paros Baader. Se renderiza PRIMERO para

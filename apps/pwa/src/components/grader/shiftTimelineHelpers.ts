@@ -11,6 +11,7 @@ import type { TimelineBucket, MatrixP0Cause, Pause } from '@/services/grader/typ
 import type { GraderShiftDoc } from '@/services/grader/graderShifts.service'
 import type { ShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import type { GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
+import type { SegmentVerdict, VerdictStatus } from '@/services/grader/graderP0Segmentation'
 import type { UpstreamLineSnapshot, UpstreamMachineState } from '@/services/shoplogix/types'
 import { resolveEffectiveTag } from '@/services/grader/graderPauseTags'
 
@@ -331,6 +332,92 @@ export function buildMarkAreas(
       { xAxis: tB },
     ]
   })
+}
+
+// ── Bandas de segmentos por cambio de config ─────────────────────────────────
+
+/**
+ * Color de fondo (rgba) de la banda de un segmento, según el verdict del
+ * cambio de config que abrió ese segmento.
+ *
+ * Tintes muy tenues (4-7%) — el objetivo es que el ojo perciba "esto es un
+ * segmento distinto" sin tapar barras y línea P0%. Para `insufficient-data`
+ * retornamos null → la banda no se pinta (no hay verdict que comunicar).
+ *
+ * Las opacidades alinean con `verdictColor()` de `graderP0Segmentation`:
+ *  - improved → emerald (verde)
+ *  - worsened → rose (rojo)
+ *  - neutral → slate (gris)
+ */
+export function verdictBandColor(status: VerdictStatus): string | null {
+  switch (status) {
+    case 'improved':          return 'rgba(16, 185, 129, 0.07)'  // emerald-500 7%
+    case 'worsened':          return 'rgba(244, 63, 94, 0.07)'   // rose-500 7%
+    case 'neutral':           return 'rgba(148, 163, 184, 0.04)' // slate-400 4%
+    case 'insufficient-data': return null
+  }
+}
+
+/**
+ * Construye los markArea para resaltar los SEGMENTOS del turno entre cambios
+ * manuales de config de gates. Cada banda cubre el rango `[snap.at, nextSnap.at)`
+ * (o hasta el fin del turno) y se tinta según el verdict del segmento (si lo hay).
+ *
+ * Útil para que el ojo perciba a qué segmento del timeline corresponde cada
+ * P0% antes/después que muestra `GateChangeImpactCard`.
+ *
+ * Reglas:
+ *  - Snapshots `synthetic` se ignoran (representan config inicial inferida).
+ *  - Si no hay verdict para el snapshot → no se tinta (puede haberse perdido
+ *    timelineBuckets en el Map, mejor no mentir).
+ *  - Si el segmento queda fuera de `productionWindow` → se descarta.
+ *  - Si `tA === tB` (segmento de duración 0) → se descarta para evitar bandas
+ *    invisibles que el tooltip pueda activar accidentalmente.
+ *  - Para `insufficient-data` → no se pinta (verdictBandColor retorna null).
+ */
+export function buildConfigSegmentMarkAreas(
+  configSnapshots: GateConfigSnapshot[] | undefined,
+  verdicts: Map<string, SegmentVerdict>,
+  productionWindow: ProductionWindow | null,
+): Array<[object, object]> {
+  if (!configSnapshots || configSnapshots.length === 0) return []
+  if (!productionWindow) return []
+
+  const manualSnaps = configSnapshots
+    .filter((s) => !s.synthetic)
+    .sort((a, b) => a.at.localeCompare(b.at))
+
+  if (manualSnaps.length === 0) return []
+
+  const productionEndIso = new Date(productionWindow.endMs).toISOString()
+  const result: Array<[object, object]> = []
+
+  for (let i = 0; i < manualSnaps.length; i++) {
+    const snap = manualSnaps[i]!
+    const verdict = verdicts.get(snap.id)
+    if (!verdict) continue
+
+    const color = verdictBandColor(verdict.status)
+    if (!color) continue
+
+    const startIso = snap.at
+    const endIso = manualSnaps[i + 1]?.at ?? productionEndIso
+
+    const startMs = Date.parse(startIso)
+    const endMs = Date.parse(endIso)
+    if (endMs < productionWindow.startMs || startMs > productionWindow.endMs) continue
+
+    const tA = fmtTime(startIso)
+    const tB = fmtTime(endIso)
+    if (tA === tB) continue
+
+    result.push([
+      { xAxis: tA, itemStyle: { color, borderWidth: 0 } },
+      { xAxis: tB },
+    ])
+  }
+
+  return result
 }
 
 // ── Bandas Baader sobre el sub-grid del timeline Grader ────────────────────────

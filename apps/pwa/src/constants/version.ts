@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '3.4.7' as const
+export const APP_VERSION = '3.5.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-05-07' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'fix(upstream): badge SLX desfasado + auto-scale charts con datos fuera de ventana' as const
+export const VERSION_NAME = 'feat(grader): bandas tintadas por verdict en timeline para cada segmento entre cambios de config' as const
 
 /**
  * Nota:
