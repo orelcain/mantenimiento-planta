@@ -30,6 +30,7 @@ import {
   FileText,
   Gauge,
   Bell,
+  Wrench,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 
@@ -112,6 +113,14 @@ const ADMIN_ITEMS: AdminItem[] = [
   },
 
   // ── Configuración general (no requieren re-auth, son admin pero menos sensibles) ─
+  {
+    to: '/admin/dev-modules',
+    title: 'Módulos en desarrollo',
+    description: 'Mostrar/ocultar items del menú lateral que aún están en desarrollo. La preferencia se guarda en este dispositivo.',
+    icon: <Wrench className="w-5 h-5" />,
+    iconColor: 'text-purple-400',
+    section: 'config',
+  },
   {
     to: '/settings',
     title: 'Configuración',

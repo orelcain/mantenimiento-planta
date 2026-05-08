@@ -71,6 +71,7 @@ const SensorsPage = lazyWithReload(() => import('@/pages/SensorsPage').then((mod
 const SensorsMonitorPage = lazyWithReload(() => import('@/pages/SensorsMonitorPage').then((mod) => ({ default: mod.SensorsMonitorPage })))
 const MapsAdminPage = lazyWithReload(() => import('@/pages/admin/MapsAdminPage').then((mod) => ({ default: mod.MapsAdminPage })))
 const SidebarEditorPage = lazyWithReload(() => import('@/pages/SidebarEditorPage').then((mod) => ({ default: mod.SidebarEditorPage })))
+const DevModulesPage = lazyWithReload(() => import('@/pages/admin/DevModulesPage').then((mod) => ({ default: mod.DevModulesPage })))
 const InspectionsPage = lazyWithReload(() => import('@/pages/InspectionsPage').then((mod) => ({ default: mod.InspectionsPage })))
 const ETTPage = lazyWithReload(() => import('@/pages/admin/ETTPage').then((mod) => ({ default: mod.ETTPage })))
 const PermissionsPage = lazyWithReload(() => import('@/pages/admin/PermissionsPage').then((mod) => ({ default: mod.PermissionsPage })))
@@ -516,6 +517,13 @@ export function App() {
                     <SidebarEditorPage />
                   </Suspense>
                 </RequireReAuth>
+              </AdminRoute>
+            } />
+            <Route path="admin/dev-modules" element={
+              <AdminRoute>
+                <Suspense fallback={<LoadingScreen />}>
+                  <DevModulesPage />
+                </Suspense>
               </AdminRoute>
             } />
             <Route path="admin/machine-capacity" element={

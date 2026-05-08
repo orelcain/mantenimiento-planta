@@ -47,39 +47,63 @@ import { useUploadQueueStore } from '@/store/uploadQueueStore'
 import { saveUserPermissionsOverride, getUserPermissionsOverride } from '@/services/permissions'
 import { loadSidebarConfig } from '@/services/sidebarConfig'
 import { useHighContrast } from '@/hooks/useHighContrast'
+import { useDevModulesVisibility } from '@/hooks/useDevModulesVisibility'
 
 import type { AppModule } from '@/types/permissions'
 import { ChatBot } from '@/components/chat/ChatBot'
 import { logger } from '@/lib/logger'
 
-interface NavItem { name: string; href: string; icon: React.ElementType; module?: AppModule }
+interface NavItem {
+  name: string
+  href: string
+  icon: React.ElementType
+  module?: AppModule
+  /**
+   * Cuando true, el item NO aparece en el sidebar a menos que el admin lo
+   * habilite explícitamente desde `/admin/dev-modules` (per-dispositivo,
+   * localStorage). Sirve para mantener limpio el menú mientras hay módulos
+   * a medio terminar sin necesidad de borrar la ruta del repo.
+   */
+  inDevelopment?: boolean
+}
 interface NavGroup { id: string; label: string; items: NavItem[]; defaultOpen?: boolean; adminOnly?: boolean }
+
+export const DEV_NAV_ITEMS: ReadonlyArray<{ name: string; href: string }> = [
+  { name: 'Incidencias',         href: '/incidents'        },
+  { name: 'Evidencias',          href: '/photo-evidence'   },
+  { name: 'Preventivo',          href: '/preventive'       },
+  { name: 'Predictivo',          href: '/predictive'       },
+  { name: 'Planificador Gantt',  href: '/gantt'            },
+  { name: 'Equipos',             href: '/equipment'        },
+  { name: 'Sensores',            href: '/sensors'          },
+  { name: 'Panel Sensores',      href: '/sensors/monitor'  },
+] as const
 
 const navGroups: NavGroup[] = [
   {
     id: 'principal', label: 'Principal', defaultOpen: true,
     items: [
       { name: 'Dashboard', href: '/', icon: LayoutDashboard, module: 'dashboard' },
-      { name: 'Incidencias', href: '/incidents', icon: AlertTriangle, module: 'incidencias' },
-      { name: 'Evidencias', href: '/photo-evidence', icon: Camera, module: 'fotoevidencia' },
+      { name: 'Incidencias', href: '/incidents', icon: AlertTriangle, module: 'incidencias', inDevelopment: true },
+      { name: 'Evidencias', href: '/photo-evidence', icon: Camera, module: 'fotoevidencia', inDevelopment: true },
     ],
   },
   {
     id: 'planificacion', label: 'Planificación',
     items: [
-      { name: 'Preventivo', href: '/preventive', icon: CalendarClock, module: 'preventivo' },
-      { name: 'Predictivo', href: '/predictive', icon: Activity },
-      { name: 'Planificador Gantt', href: '/gantt', icon: CalendarClock, module: 'gantt' },
+      { name: 'Preventivo', href: '/preventive', icon: CalendarClock, module: 'preventivo', inDevelopment: true },
+      { name: 'Predictivo', href: '/predictive', icon: Activity, inDevelopment: true },
+      { name: 'Planificador Gantt', href: '/gantt', icon: CalendarClock, module: 'gantt', inDevelopment: true },
       { name: 'Calendario Mantención', href: '/calendario-mantencion', icon: CalendarClock, module: 'calendarioMantencion' },
     ],
   },
   {
     id: 'equipamiento', label: 'Equipamiento',
     items: [
-      { name: 'Equipos', href: '/equipment', icon: Wrench, module: 'equipos' },
+      { name: 'Equipos', href: '/equipment', icon: Wrench, module: 'equipos', inDevelopment: true },
       { name: 'Repuestos', href: '/repuestos', icon: Package, module: 'repuestos' },
-      { name: 'Sensores', href: '/sensors', icon: Cpu, module: 'sensores' },
-      { name: 'Panel Sensores', href: '/sensors/monitor', icon: Activity, module: 'sensores' },
+      { name: 'Sensores', href: '/sensors', icon: Cpu, module: 'sensores', inDevelopment: true },
+      { name: 'Panel Sensores', href: '/sensors/monitor', icon: Activity, module: 'sensores', inDevelopment: true },
     ],
   },
   {
@@ -326,11 +350,19 @@ export function MainLayout() {
       ]
     : navGroups
 
+  const { isVisible: isDevModuleVisible } = useDevModulesVisibility()
+
   const visibleGroups = orderedNavGroups
     .filter(g => !g.adminOnly || isAdmin)
     .map(g => ({
       ...g,
-      items: g.items.filter(item => !item.module || canSee(item.module)),
+      items: g.items.filter(item => {
+        if (item.module && !canSee(item.module)) return false
+        // Items en desarrollo: ocultos por default. Solo visibles si el admin
+        // los activó en `/admin/dev-modules` (localStorage por-dispositivo).
+        if (item.inDevelopment && !isDevModuleVisible(item.href)) return false
+        return true
+      }),
     }))
     .filter(g => g.items.length > 0)
 
@@ -397,7 +429,14 @@ export function MainLayout() {
   ]
   const activeContext = Object.keys(contextualTabsMap).find(prefix => location.pathname.startsWith(prefix))
   const contextualTabs = (activeContext ? contextualTabsMap[activeContext] : undefined) ?? defaultContextual
-  const bottomNavItems = [...fixedTabs, ...contextualTabs].filter(item => !item.module || canSee(item.module))
+  const bottomNavItems = [...fixedTabs, ...contextualTabs]
+    .filter(item => !item.module || canSee(item.module))
+    // Si el href corresponde a un módulo en desarrollo no habilitado, ocultar
+    // también del bottom nav para mantener consistencia con el sidebar.
+    .filter(item => {
+      const isDev = DEV_NAV_ITEMS.some(d => d.href === item.href)
+      return !isDev || isDevModuleVisible(item.href)
+    })
 
   const currentPageName = allNavigation.find(item =>
     item.href === '/'
