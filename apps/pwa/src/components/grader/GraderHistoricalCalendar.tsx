@@ -2664,7 +2664,6 @@ export function GraderHistoricalCalendar({
               //   - Turno 3 con dateKey CF == dayKey-1 (madrugada del día — almacenado
               //     bajo el día anterior por la convención "día laboral" del CF).
               // prevDayKey siempre computado (necesario para badge SLX + chips noche)
-              const prevDayKey = addDaysToDateKey(dayKey, -1)
               // ── Convención simple Día/Noche para Yal ─────────────────────
               // Yal opera con 2 turnos conceptuales:
               //   • "Turno día" = mañana + tarde (mapea a SLX T1 07:45-15:15
