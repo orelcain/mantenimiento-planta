@@ -956,8 +956,13 @@ export function GraderHistoricalCalendar({
   const carouselDragRef = useRef<{ startX: number; vx: number; lastX: number; lastT: number; navigating: boolean } | null>(null)
   const carouselMomentumRef = useRef<number | null>(null) // rafId de la inercia activa
   const carouselStateRef = useRef<{ sortedDayKeys: string[]; currentIdx: number }>({ sortedDayKeys: [], currentIdx: 0 })
-  // Siempre true: el calendario abre en hoy. El botón "Último" navega al último registro.
-  const autoSelectedRef = useRef(true)
+  // El calendario auto-selecciona el último día con datos Grader la primera
+  // vez que se monta. Si el usuario clickea otro día → marca `userInteractedRef`
+  // y deja de auto-mover. Sin esto, el día seleccionado quedaba en HOY aunque
+  // los datos cargados fueran de un día anterior — generaba el bug del
+  // "Resumen 2026-05-08" cuando los datos eran del 2026-05-07.
+  const autoSelectedRef = useRef(false)
+  const userInteractedRef = useRef(false)
 
   useEffect(() => { onMonthChange?.(currentMonth) }, [currentMonth, onMonthChange])
 
@@ -1061,7 +1066,6 @@ export function GraderHistoricalCalendar({
   }, [currentMonth, effectiveInitialKey, plantLineId, onSummariesLoaded])
 
   useEffect(() => {
-    if (autoSelectedRef.current) return
     const histKeys = Array.from(historicalByDate.keys()).sort()
     const latestHist = histKeys[histKeys.length - 1]
     const latestUpload = uploads.length > 0
@@ -1074,13 +1078,30 @@ export function GraderHistoricalCalendar({
     slxDays.sort()
     const latestSlx = slxDays[slxDays.length - 1]
     const latest = latestHist ?? latestUpload ?? latestSlx
-    if (latest) {
-      const latestDate = new Date(`${latest}T00:00:00`)
+
+    // Race condition fix (2026-05-08): el effect corría antes de que la query
+    // de historicalByDate terminara. Caía a `latestSlx` (hoy con Shoplogix
+    // live) y marcaba autoSelectedRef. Cuando llegaba el summary del 7-may
+    // (Grader), no se re-seleccionaba → el usuario veía día 8 con ring pero
+    // resumen del 7-may incorrecto.
+    //
+    // Fix: si llega un latestHist (Grader es prioritario) MÁS RECIENTE que
+    // lo que ya está auto-seleccionado, actualizar. Si el usuario YA
+    // interactuó (`userInteractedRef`), respetar su selección.
+    if (!latest) return
+    if (userInteractedRef.current) return
+
+    const latestDate = new Date(`${latest}T00:00:00`)
+    const currentSelectedKey = selectedDate?.toISOString().slice(0, 10) ?? ''
+    const shouldUpdate = !autoSelectedRef.current
+      || (!!latestHist && latestHist > currentSelectedKey)
+
+    if (shouldUpdate) {
       setSelectedDate(latestDate)
       setCurrentMonth(new Date(latestDate.getFullYear(), latestDate.getMonth(), 1))
       autoSelectedRef.current = true
     }
-  }, [historicalByDate, uploads, slxByShift])
+  }, [historicalByDate, uploads, slxByShift, selectedDate])
 
   const days = getDaysInMonth(currentMonth)
 
@@ -2101,9 +2122,16 @@ export function GraderHistoricalCalendar({
             const slxBaader = slxTotalsByShift.get(hist.id) ?? 0
             const baaderLossPct = slxBaader > 0 ? Math.max(0, (slxBaader - hist.totalPieces) / slxBaader * 100) : 0
             const showLossBadge = slxBaader > 100 && baaderLossPct > 5
+            // Preservar `?linea=` del calendario al navegar al TurnoPage. Sin
+            // esto, click "Ver detalle" desde pestaña Yal cae a chonchi default
+            // y el TurnoPage no encuentra el summary Yal (busca con id sin
+            // prefix). El bug se manifiesta como "Solo Shoplogix" en el detalle.
+            const navTurnoLineaQuery = plantLineId !== DEFAULT_PLANT_LINE_ID
+              ? `?linea=${encodeURIComponent(plantLineId)}`
+              : ''
             const navigateToTurno = () =>
               navigate(
-                `/analisis-grader/turno/${hist.dateKey}__${encodeURIComponent(hist.shiftId)}`,
+                `/analisis-grader/turno/${hist.dateKey}__${encodeURIComponent(hist.shiftId)}${navTurnoLineaQuery}`,
               )
             // Click en cuerpo de card: en slide seleccionado alterna selectedHistorical
             // (legacy del wizard); en slides adyacentes navega directo al TurnoPage.
@@ -2569,7 +2597,7 @@ export function GraderHistoricalCalendar({
                       : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
                   )}
                 >
-                  {v === 'p0' ? 'P0%' : v === 'piezas' ? 'No P0' : 'UPT'}
+                  {v === 'p0' ? 'P0%' : v === 'piezas' ? 'Pzs OK' : 'UPT'}
                 </button>
               ))}
             </div>
@@ -2702,7 +2730,10 @@ export function GraderHistoricalCalendar({
                     dimByFilter && 'opacity-20 pointer-events-none',
                     dayHasUntagged && !isSelected && 'border-amber-400/70 bg-amber-500/5',
                   )}
-                  onClick={() => setSelectedDate(day)}
+                  onClick={() => {
+                    userInteractedRef.current = true
+                    setSelectedDate(day)
+                  }}
                 >
                   <div className="flex items-center justify-between">
                     <span className={cn(
