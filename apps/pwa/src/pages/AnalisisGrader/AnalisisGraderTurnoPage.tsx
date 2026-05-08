@@ -1444,19 +1444,24 @@ export function AnalisisGraderTurnoPage() {
             dataSource={upstreamLine.source}
           />
 
-          {/* Correlación automática Grader↔Baader (Fase 3 iter 2) — debajo de los 3 gantts */}
-          <UpstreamCorrelationCard
-            pauses={pauses}
-            snapshot={upstreamLine.snapshot}
-          />
+          {/* Correlación automática Grader↔Baader y scatter — solo aplican
+              en plantas donde el Grader Marelec MS4/12 procesa downstream de
+              las Baader. Yal evisera y va directo a camión, sin Grader → no
+              hay correlación posible. */}
+          {isClassificationPlant && (
+            <UpstreamCorrelationCard
+              pauses={pauses}
+              snapshot={upstreamLine.snapshot}
+            />
+          )}
 
-          {/* Scatter ritmo Baader vs P0% Grader (Fase 3 iter 3) — usa el
-              umbral crítico configurado por el usuario, no un hardcoded */}
-          <UpstreamScatterCard
-            snapshot={upstreamLine.snapshot}
-            timelineBuckets={enrichedTimelineBuckets}
-            criticalThreshold={criticalThreshold}
-          />
+          {isClassificationPlant && (
+            <UpstreamScatterCard
+              snapshot={upstreamLine.snapshot}
+              timelineBuckets={enrichedTimelineBuckets}
+              criticalThreshold={criticalThreshold}
+            />
+          )}
 
           {/* Bloques específicos de Chonchi: distribución por gate, impacto de
               cambios mid-turno, evolución de gates. Yal no aplica — sus 3-4
@@ -1496,41 +1501,49 @@ export function AnalisisGraderTurnoPage() {
             conservacionBreakdown={summary.conservacionBreakdown}
           />
 
-          {/* Historial de cambios de configuración del turno */}
-          <ConfigChangeHistory
-            shiftDocId={shiftDocId}
-            snapshots={configSnapshots}
-            timelineBuckets={enrichedTimelineBuckets}
-            onChange={reloadConfigSnapshots}
-            allowEdit={shiftWindow?.status === 'live'}
-          />
+          {/* Historial de cambios de configuración del turno — solo Chonchi
+              (gates con calibre+calidad). Yal no clasifica → no aplica. */}
+          {isClassificationPlant && (
+            <ConfigChangeHistory
+              shiftDocId={shiftDocId}
+              snapshots={configSnapshots}
+              timelineBuckets={enrichedTimelineBuckets}
+              onChange={reloadConfigSnapshots}
+              allowEdit={shiftWindow?.status === 'live'}
+            />
+          )}
 
-          {/* ── Sección IA ─────────────────────────────────────────────── */}
-          <Card>
-            <CardContent className="py-3 px-4 space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-violet-500" />
-                  <span className="text-sm font-medium">Análisis IA</span>
+          {/* Sección IA — solo Chonchi. El generador asume gates de
+              clasificación, calibres, asignación calidad — todos conceptos
+              que no aplican a Yal. La IA Yal-específica está pendiente
+              (banner amber arriba avisa al usuario). */}
+          {isClassificationPlant && (
+            <Card>
+              <CardContent className="py-3 px-4 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-violet-500" />
+                    <span className="text-sm font-medium">Análisis IA</span>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleGenerateAI}
+                    disabled={aiLoading || !summary}
+                    className="text-xs"
+                  >
+                    {aiLoading
+                      ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Analizando…</>
+                      : <><Sparkles className="h-3.5 w-3.5 mr-1.5" />{aiOutput ? 'Regenerar' : 'Generar análisis'}</>}
+                  </Button>
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleGenerateAI}
-                  disabled={aiLoading || !summary}
-                  className="text-xs"
-                >
-                  {aiLoading
-                    ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Analizando…</>
-                    : <><Sparkles className="h-3.5 w-3.5 mr-1.5" />{aiOutput ? 'Regenerar' : 'Generar análisis'}</>}
-                </Button>
-              </div>
-              {aiError && (
-                <p className="text-xs text-destructive">{aiError}</p>
-              )}
-            </CardContent>
-          </Card>
-          {aiOutput && <AIOutputPanel output={aiOutput} />}
+                {aiError && (
+                  <p className="text-xs text-destructive">{aiError}</p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+          {isClassificationPlant && aiOutput && <AIOutputPanel output={aiOutput} />}
 
           {/* Nota: el contador de cambios de config (FASE 27) ya vive en
               el badge del panel ConfigChangeHistory de arriba — eliminado
@@ -1608,46 +1621,50 @@ export function AnalisisGraderTurnoPage() {
             </div>
           )}
 
-          {/* Configuración de este turno — inline expandible */}
-          <Card className="overflow-hidden">
-            <button
-              onClick={() => setShowConfigPanel(v => !v)}
-              className="w-full px-4 py-3 flex items-center justify-between text-sm hover:bg-muted/30 transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <Settings2 className="w-4 h-4 text-muted-foreground" />
-                <span className="font-medium">Configuración de este turno</span>
-                {turnoGates.filter(g => g.active).length > 0 && (
-                  <Badge variant="outline" className="text-xs font-normal">
-                    {turnoGates.filter(g => g.active).length} gates activas
-                  </Badge>
-                )}
-              </div>
-              <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${showConfigPanel ? 'rotate-180' : ''}`} />
-            </button>
-            {showConfigPanel && (
-              <div className="border-t">
-                <AnalisisGraderGatesConfigPage
-                  tabbed
-                  gates={turnoGates}
-                  config={turnoConfig}
-                  parsedData={EMPTY_PARSED_DATA as Parameters<typeof AnalisisGraderGatesConfigPage>[0]['parsedData']}
-                  onComplete={handleTurnoConfigApply}
-                  shiftDocId={shiftDocId}
-                  shiftCalibreOverride={calibreOverride}
-                  onShiftRangesSaved={setCalibrerOverride}
-                  shiftThresholdsOverride={turnoThresholdsOverride}
-                  onShiftThresholdsSaved={(t) => {
-                    setTurnoThresholdsOverride(t)
-                    if (t) {
-                      setAlertThreshold(t.pointZeroPctWarn)
-                      setCriticalThreshold(t.pointZeroPctCritical)
-                    }
-                  }}
-                />
-              </div>
-            )}
-          </Card>
+          {/* Configuración de este turno — solo Chonchi (12 gates clasificadoras
+              con calibre+calidad, rangos por calibre, umbrales P0). Yal no
+              clasifica → este panel no aplica. */}
+          {isClassificationPlant && (
+            <Card className="overflow-hidden">
+              <button
+                onClick={() => setShowConfigPanel(v => !v)}
+                className="w-full px-4 py-3 flex items-center justify-between text-sm hover:bg-muted/30 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <Settings2 className="w-4 h-4 text-muted-foreground" />
+                  <span className="font-medium">Configuración de este turno</span>
+                  {turnoGates.filter(g => g.active).length > 0 && (
+                    <Badge variant="outline" className="text-xs font-normal">
+                      {turnoGates.filter(g => g.active).length} gates activas
+                    </Badge>
+                  )}
+                </div>
+                <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${showConfigPanel ? 'rotate-180' : ''}`} />
+              </button>
+              {showConfigPanel && (
+                <div className="border-t">
+                  <AnalisisGraderGatesConfigPage
+                    tabbed
+                    gates={turnoGates}
+                    config={turnoConfig}
+                    parsedData={EMPTY_PARSED_DATA as Parameters<typeof AnalisisGraderGatesConfigPage>[0]['parsedData']}
+                    onComplete={handleTurnoConfigApply}
+                    shiftDocId={shiftDocId}
+                    shiftCalibreOverride={calibreOverride}
+                    onShiftRangesSaved={setCalibrerOverride}
+                    shiftThresholdsOverride={turnoThresholdsOverride}
+                    onShiftThresholdsSaved={(t) => {
+                      setTurnoThresholdsOverride(t)
+                      if (t) {
+                        setAlertThreshold(t.pointZeroPctWarn)
+                        setCriticalThreshold(t.pointZeroPctCritical)
+                      }
+                    }}
+                  />
+                </div>
+              )}
+            </Card>
+          )}
         </>
       )}
 
