@@ -10,7 +10,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, Button, Badge } from '@/components/ui'
-import { BarChart3, Loader2, CheckCircle2, Calendar, BookOpen, Activity } from 'lucide-react'
+import { BarChart3, Loader2, CheckCircle2, Calendar, BookOpen, Activity, Upload } from 'lucide-react'
 import { useAuthStore, usePermissionsStore } from '@/store'
 import { AnalisisGraderUploadPage, type FileParsed } from './AnalisisGraderUploadPage'
 import { GraderHistoricalCalendar, type SlxMonthlyStats } from '@/components/grader/GraderHistoricalCalendar'
@@ -140,8 +140,11 @@ export function AnalisisGraderWizardPage() {
     }
   }, [analyticsResult])
 
-  // Detectar si el archivo cargado cubre múltiples días → mostrar banner "Guardar en Calendario"
-  // También aplica a archivos P0-solo (gate0Records sin pieceRecords)
+  // Info del Excel cargado: segmentos detectados (día × turno) por timestamp.
+  // Antes solo se exponía cuando había MÁS de 1 día (banner "multi-día"). Eso
+  // dejaba a los Excels de un solo turno SIN forma de guardar — el wizard
+  // mostraba el dashboard pero nunca persistía nada en Firestore. Ahora
+  // exponemos siempre que haya ≥1 segmento, y el banner se adapta al copy.
   const multiDayInfo = useMemo(() => {
     if (!parsedData) return null
     const totalRecords = parsedData.pieceRecords.length + parsedData.gate0Records.length
@@ -151,8 +154,8 @@ export function AnalisisGraderWizardPage() {
     const gate0Unique = dedupeGate0Records(parsedData.gate0Records).unique
     const segmentMap = segmentByDayAndShift(pieceUnique, gate0Unique)
     const entries = sortedSegmentEntries(segmentMap)
+    if (entries.length === 0) return null
     const uniqueDays = new Set(entries.map(([, s]) => s.sessionDate)).size
-    if (uniqueDays <= 1) return null
     const isP0Only = parsedData.pieceRecords.length === 0
     return { entries, uniqueDays, totalSegments: entries.length, isP0Only }
   }, [parsedData])
@@ -507,15 +510,8 @@ export function AnalisisGraderWizardPage() {
                 : `${lineConfig.description} · datos Shoplogix`}
             </p>
           </div>
-          {/* Carga de archivos — solo cuando hay datos Grader */}
-          {lineConfig.hasGraderData && (
-            <AnalisisGraderUploadPage
-              compact
-              onComplete={handleUploadComplete}
-              initialFiles={uploadedFiles}
-              onFilesChange={setUploadedFiles}
-            />
-          )}
+          {/* El botón "Cargar Excel" se movió al lado de las pestañas de
+              planta para que quede claro a qué planta se está cargando. */}
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {lineConfig.hasGraderData && autosaveState !== 'idle' && (
@@ -559,6 +555,25 @@ export function AnalisisGraderWizardPage() {
               </Badge>
             )}
           </div>
+          {/* Botón "Cargar Excel" contextual a la pestaña seleccionada.
+              Antes vivía en el header global → era ambiguo a qué planta
+              estabas cargando. Ahora queda DEBAJO de las pestañas: el
+              `lineId` de la pestaña activa se propaga al guardar el doc
+              con el prefix correcto (`yal-eviscerado__...` cuando aplica). */}
+          {lineConfig.hasGraderData && (
+            <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-2.5">
+              <div className="flex items-center gap-2 mb-1.5 text-[11px] text-blue-300/80">
+                <Upload className="h-3 w-3 shrink-0" />
+                <span>Cargar Excel del Grader · <b className="text-blue-200">{lineConfig.label}</b></span>
+              </div>
+              <AnalisisGraderUploadPage
+                compact
+                onComplete={handleUploadComplete}
+                initialFiles={uploadedFiles}
+                onFilesChange={setUploadedFiles}
+              />
+            </div>
+          )}
           <PlantKPIBoard
             plantSlug={lineConfig.plantSlug}
             graderSummaries={calendarSummaries}
@@ -586,7 +601,7 @@ export function AnalisisGraderWizardPage() {
         plantLineId={lineId}
       />
 
-      {/* Banners multi-día */}
+      {/* Banner: turnos detectados — listo para guardar */}
       {multiDayInfo && !savedToCalendar && (
         <Card className="border-sky-500/30 bg-sky-500/5">
           <CardContent className="py-3 px-4 flex items-center justify-between gap-3 flex-wrap">
@@ -595,10 +610,16 @@ export function AnalisisGraderWizardPage() {
               <div className="text-sm min-w-0">
                 <p>
                   <span className="font-medium">
-                    {multiDayInfo.isP0Only ? 'Archivo P0 multi-día' : 'Archivo multi-día detectado'}
+                    {multiDayInfo.isP0Only
+                      ? `Archivo P0 — ${multiDayInfo.totalSegments} turno${multiDayInfo.totalSegments > 1 ? 's' : ''}`
+                      : multiDayInfo.uniqueDays > 1
+                        ? 'Archivo multi-día detectado'
+                        : `${multiDayInfo.totalSegments} turno${multiDayInfo.totalSegments > 1 ? 's' : ''} detectado${multiDayInfo.totalSegments > 1 ? 's' : ''} — listo para guardar`}
                   </span>
                   <span className="text-muted-foreground ml-2">
-                    {multiDayInfo.uniqueDays} días · {multiDayInfo.totalSegments} turnos
+                    {multiDayInfo.uniqueDays > 1 && `${multiDayInfo.uniqueDays} días · `}
+                    {multiDayInfo.entries.map(([, s]) => `${s.sessionDate} · ${s.shiftId}`).slice(0, 3).join(' / ')}
+                    {multiDayInfo.entries.length > 3 && ` …+${multiDayInfo.entries.length - 3}`}
                     {multiDayInfo.isP0Only && ' — actualizará causas P0 sin borrar datos PP'}
                   </span>
                 </p>
@@ -631,7 +652,7 @@ export function AnalisisGraderWizardPage() {
           <CardContent className="py-3 px-4 flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
             <p className="text-sm text-emerald-700 dark:text-emerald-400 font-medium">
-              {multiDayInfo.totalSegments} turnos guardados — redirigiendo al calendario…
+              {multiDayInfo.totalSegments} turno{multiDayInfo.totalSegments > 1 ? 's' : ''} guardado{multiDayInfo.totalSegments > 1 ? 's' : ''} — redirigiendo al calendario…
             </p>
           </CardContent>
         </Card>
