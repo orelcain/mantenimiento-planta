@@ -541,6 +541,70 @@ export function AnalisisGraderWizardPage() {
         </div>
       </div>
 
+      {/* Banner: turnos detectados — listo para guardar.
+          Posicionado ARRIBA (después del header, antes del Grid de pestañas)
+          para que sea visible al instante después de soltar un Excel. Antes
+          vivía al fondo de la página (bajo el calendario) y el usuario no lo
+          veía → daba la impresión de que "no pasaba nada". */}
+      {multiDayInfo && !savedToCalendar && (
+        <Card className="border-sky-500/40 bg-sky-500/10 shadow-md ring-1 ring-sky-500/20">
+          <CardContent className="py-3 px-4 flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2 min-w-0">
+              <Upload className="h-4 w-4 text-sky-400 shrink-0 animate-pulse" />
+              <div className="text-sm min-w-0">
+                <p>
+                  <span className="font-semibold text-sky-100">
+                    {multiDayInfo.isP0Only
+                      ? `Archivo P0 — ${multiDayInfo.totalSegments} turno${multiDayInfo.totalSegments > 1 ? 's' : ''}`
+                      : multiDayInfo.uniqueDays > 1
+                        ? 'Archivo multi-día detectado'
+                        : `${multiDayInfo.totalSegments} turno${multiDayInfo.totalSegments > 1 ? 's' : ''} detectado${multiDayInfo.totalSegments > 1 ? 's' : ''} — listo para guardar`}
+                  </span>
+                  <span className="text-muted-foreground ml-2">
+                    {multiDayInfo.uniqueDays > 1 && `${multiDayInfo.uniqueDays} días · `}
+                    {multiDayInfo.entries.map(([, s]) => `${s.sessionDate} · ${s.shiftId}`).slice(0, 3).join(' / ')}
+                    {multiDayInfo.entries.length > 3 && ` …+${multiDayInfo.entries.length - 3}`}
+                    {multiDayInfo.isP0Only && ' — actualizará causas P0 sin borrar datos PP'}
+                  </span>
+                </p>
+                <p className="text-[11px] text-sky-300/70 mt-0.5">
+                  Se guardará en <b>{lineConfig.label}</b>
+                  {multiDayCounts && multiDayCounts.replace > 0 && (
+                    <>
+                      {' · '}
+                      <span className="text-emerald-400 font-medium">{multiDayCounts.new} nuevo{multiDayCounts.new !== 1 ? 's' : ''}</span>
+                      <span className="text-muted-foreground"> · </span>
+                      <span className="text-amber-400 font-medium">{multiDayCounts.replace} reemplazo{multiDayCounts.replace !== 1 ? 's' : ''}</span>
+                    </>
+                  )}
+                </p>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              disabled={savingToCalendar}
+              onClick={handleSaveToCalendar}
+              className="bg-sky-600 hover:bg-sky-700 text-white shrink-0 shadow-sm"
+            >
+              {savingToCalendar
+                ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Guardando…</>
+                : <><Calendar className="h-3.5 w-3.5 mr-1.5" />Guardar en Calendario</>
+              }
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+      {multiDayInfo && savedToCalendar && (
+        <Card className="border-emerald-500/40 bg-emerald-500/10">
+          <CardContent className="py-3 px-4 flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+            <p className="text-sm text-emerald-300 font-medium">
+              {multiDayInfo.totalSegments} turno{multiDayInfo.totalSegments > 1 ? 's' : ''} guardado{multiDayInfo.totalSegments > 1 ? 's' : ''} en <b>{lineConfig.label}</b> — redirigiendo al calendario…
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* ═══ Grid 2-col que arranca en las pestañas de planta ═══ */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
 
@@ -600,63 +664,6 @@ export function AnalisisGraderWizardPage() {
         onDateSelect={setSelectedDateKey}
         plantLineId={lineId}
       />
-
-      {/* Banner: turnos detectados — listo para guardar */}
-      {multiDayInfo && !savedToCalendar && (
-        <Card className="border-sky-500/30 bg-sky-500/5">
-          <CardContent className="py-3 px-4 flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-2 min-w-0">
-              <Calendar className="h-4 w-4 text-sky-500 shrink-0" />
-              <div className="text-sm min-w-0">
-                <p>
-                  <span className="font-medium">
-                    {multiDayInfo.isP0Only
-                      ? `Archivo P0 — ${multiDayInfo.totalSegments} turno${multiDayInfo.totalSegments > 1 ? 's' : ''}`
-                      : multiDayInfo.uniqueDays > 1
-                        ? 'Archivo multi-día detectado'
-                        : `${multiDayInfo.totalSegments} turno${multiDayInfo.totalSegments > 1 ? 's' : ''} detectado${multiDayInfo.totalSegments > 1 ? 's' : ''} — listo para guardar`}
-                  </span>
-                  <span className="text-muted-foreground ml-2">
-                    {multiDayInfo.uniqueDays > 1 && `${multiDayInfo.uniqueDays} días · `}
-                    {multiDayInfo.entries.map(([, s]) => `${s.sessionDate} · ${s.shiftId}`).slice(0, 3).join(' / ')}
-                    {multiDayInfo.entries.length > 3 && ` …+${multiDayInfo.entries.length - 3}`}
-                    {multiDayInfo.isP0Only && ' — actualizará causas P0 sin borrar datos PP'}
-                  </span>
-                </p>
-                {multiDayCounts && multiDayCounts.replace > 0 && (
-                  <p className="text-xs mt-0.5">
-                    <span className="text-emerald-600 font-medium">{multiDayCounts.new} nuevos</span>
-                    <span className="text-muted-foreground"> · </span>
-                    <span className="text-amber-600 font-medium">{multiDayCounts.replace} reemplazos</span>
-                    <span className="text-muted-foreground"> (se sobrescribirán)</span>
-                  </p>
-                )}
-              </div>
-            </div>
-            <Button
-              size="sm"
-              disabled={savingToCalendar}
-              onClick={handleSaveToCalendar}
-              className="bg-sky-600 hover:bg-sky-700 text-white shrink-0"
-            >
-              {savingToCalendar
-                ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Guardando…</>
-                : <><Calendar className="h-3.5 w-3.5 mr-1.5" />Guardar en Calendario</>
-              }
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-      {multiDayInfo && savedToCalendar && (
-        <Card className="border-emerald-500/30 bg-emerald-500/5">
-          <CardContent className="py-3 px-4 flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
-            <p className="text-sm text-emerald-700 dark:text-emerald-400 font-medium">
-              {multiDayInfo.totalSegments} turno{multiDayInfo.totalSegments > 1 ? 's' : ''} guardado{multiDayInfo.totalSegments > 1 ? 's' : ''} — redirigiendo al calendario…
-            </p>
-          </CardContent>
-        </Card>
-      )}
 
       {/* ═══ PANTALLA 2: Dashboard de análisis (full width) ═══ */}
       {hasData && analyticsResult && (

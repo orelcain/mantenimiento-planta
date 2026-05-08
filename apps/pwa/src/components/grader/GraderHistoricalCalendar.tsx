@@ -2619,6 +2619,11 @@ export function GraderHistoricalCalendar({
 
               const missingPiece = hasData && dayHistorical.some((s) => s.hasPieceData === false)
               const missingGate0 = hasData && dayHistorical.some((s) => s.hasGate0Data === false)
+              // Datos presentes (positivo): si TODOS los turnos del día tienen
+              // PP/P0 cargado, mostramos badge verde para que el usuario vea
+              // de un vistazo qué días ya están completos vs sólo Shoplogix.
+              const hasAllPiece = hasData && dayHistorical.every((s) => s.hasPieceData === true)
+              const hasAllGate0 = hasData && dayHistorical.every((s) => s.hasGate0Data === true)
               const isSelected = selectedDate?.toDateString() === day.toDateString()
 
               // Indicadores Shoplogix para días sin datos Grader.
@@ -2829,15 +2834,23 @@ export function GraderHistoricalCalendar({
                     </span>
                   )}
 
-                  {/* Missing data badges */}
-                  {(missingPiece || missingGate0) && (
+                  {/* Badges de fuente de datos: rojo = falta, verde = presente.
+                      Permite identificar de un vistazo qué días tienen PP/P0
+                      Excel cargado vs sólo Shoplogix (sin badges). Si está
+                      mixto (algunos turnos tienen PP, otros no), gana el badge
+                      de "falta" para que el usuario sepa que hay trabajo pendiente. */}
+                  {(missingPiece || missingGate0 || hasAllPiece || hasAllGate0) && (
                     <div className="mt-auto flex gap-0.5">
-                      {missingPiece && (
-                        <span className="text-[7px] leading-3 px-0.5 rounded bg-red-500/20 text-red-600 font-medium">PP</span>
-                      )}
-                      {missingGate0 && (
-                        <span className="text-[7px] leading-3 px-0.5 rounded bg-red-500/20 text-red-600 font-medium">P0</span>
-                      )}
+                      {missingPiece ? (
+                        <span title="Falta archivo PIEZA_PIEZA en algún turno" className="text-[7px] leading-3 px-0.5 rounded bg-red-500/20 text-red-600 font-medium">PP</span>
+                      ) : hasAllPiece ? (
+                        <span title="Todos los turnos tienen PIEZA_PIEZA cargado" className="text-[7px] leading-3 px-0.5 rounded bg-emerald-500/20 text-emerald-500 font-medium">PP</span>
+                      ) : null}
+                      {missingGate0 ? (
+                        <span title="Falta archivo PUERTA_0 en algún turno" className="text-[7px] leading-3 px-0.5 rounded bg-red-500/20 text-red-600 font-medium">P0</span>
+                      ) : hasAllGate0 ? (
+                        <span title="Todos los turnos tienen PUERTA_0 cargado" className="text-[7px] leading-3 px-0.5 rounded bg-emerald-500/20 text-emerald-500 font-medium">P0</span>
+                      ) : null}
                     </div>
                   )}
                 </button>
