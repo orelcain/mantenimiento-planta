@@ -9,8 +9,8 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useParams, useNavigate, Navigate, useSearchParams } from 'react-router-dom'
 import { logger } from '@/lib/logger'
-import { Button, Card, CardContent, CardHeader, CardTitle, Spinner, Badge } from '@/components/ui'
-import { ArrowLeft, Settings2, AlertCircle, AlertTriangle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag, FileText, WifiOff, ChevronDown, RefreshCw, Zap, Scale } from 'lucide-react'
+import { Button, Card, CardContent, Spinner, Badge } from '@/components/ui'
+import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag, FileText, WifiOff, ChevronDown, RefreshCw, Zap, Scale } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { usePermissionsStore } from '@/store'
 import { useAuthStore, useIsAdmin, useIsSupervisor } from '@/store/authStore'
@@ -51,6 +51,7 @@ import { ActionPlanPanel } from '@/components/grader/ActionPlanPanel'
 import { MarelHgCaptureCard } from '@/components/grader/MarelHgCaptureCard'
 import { subscribeMarelHgCapture, type MarelHgCapture } from '@/services/grader/graderMarelHg.service'
 import { deriveSuggestions } from '@/services/grader/actionPlanSuggestions'
+import { deriveYalSuggestions } from '@/services/grader/graderInsightsYal'
 import { correlatePausesWithUpstream, summarizeCorrelations } from '@/services/shoplogix/shoplogixCorrelation'
 import { listShoplogixShiftIdsForDay } from '@/services/shoplogix/shoplogixShift.service'
 import { buildScatterData, scatterSlopeMagnitude } from '@/components/grader/shiftTimelineHelpers'
@@ -845,6 +846,36 @@ export function AnalisisGraderTurnoPage() {
     [summary, dominant, suggestionContext],
   )
 
+  /**
+   * Sugerencias específicas para plantas sin clasificación (Yal). Las reglas
+   * de Chonchi (limpiar fotocélula, ajustar eye-sync, cambiar gates) no
+   * aplican porque Yal solo eviscera. Aquí se generan acciones basadas en
+   * peso bajo, proximidad, throughput y uptime Baader.
+   */
+  const yalSuggestions = useMemo(() => {
+    if (isClassificationPlant) return []
+    if (!summary) return []
+    // Duración productiva: preferir `durationMinutes` (calculado por el
+    // segmenter desde minutos activos reales — misma fuente que el card de
+    // KPIs del hero). Fallback a productionWindow si no estuviera.
+    let shiftMinutes = summary.durationMinutes ?? 0
+    if (shiftMinutes === 0) {
+      const productionWindow = computeProductionWindow(enrichedTimelineBuckets)
+      if (productionWindow) {
+        shiftMinutes = (productionWindow.endMs - productionWindow.startMs) / 60_000
+      } else if (shiftWindow) {
+        shiftMinutes = (Date.parse(shiftWindow.endAt) - Date.parse(shiftWindow.startAt)) / 60_000
+      }
+    }
+    return deriveYalSuggestions({
+      p0Pct: summary.pointZeroPct ?? 0,
+      totalPieces: summary.totalPieces ?? 0,
+      byMatrixCause,
+      shiftMinutes,
+      upstreamSnapshot: upstreamLine.snapshot,
+    })
+  }, [isClassificationPlant, summary, byMatrixCause, enrichedTimelineBuckets, shiftWindow, upstreamLine.snapshot])
+
   const triggeredRunbooks = useMemo(
     () => findTriggeredRunbooks(dominant, summary?.pointZeroPct ?? 0),
     [dominant, summary],
@@ -1286,9 +1317,9 @@ export function AnalisisGraderTurnoPage() {
             </div>
 
             {/* Acciones — mobile row 2 (protagonismo), desktop derecha full-height.
-                Solo se muestra en plantas con clasificación (Chonchi). En Yal las
-                sugerencias actuales asumen fotocélula/eye-sync/velocidad cinta
-                de la MS4/12 y no aplican — pendiente generador específico Yal. */}
+                Chonchi: deriveSuggestions con reglas Marelec MS4/12 (fotocélula,
+                eye-sync, gates). Yal: deriveYalSuggestions con reglas eviscerado
+                (peso bajo, proximidad, throughput Baader, uptime upstream). */}
             <div className="lg:col-start-3 lg:row-span-2 space-y-4" data-no-swipe>
               {isClassificationPlant && (
                 <ActionPlanPanel
@@ -1300,28 +1331,11 @@ export function AnalisisGraderTurnoPage() {
                 />
               )}
               {!isClassificationPlant && (
-                <Card className="border-amber-500/30 bg-amber-500/5">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <AlertTriangle className="w-4 h-4 text-amber-400" />
-                      Análisis IA pendiente para {plantLineCfg.label}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="text-xs text-muted-foreground space-y-2">
-                    <p>
-                      Las sugerencias actuales (limpiar fotocélula, eye-sync,
-                      velocidad de cinta) son específicas del Marelec MS4/12
-                      con clasificación de Chonchi. <b>{plantLineCfg.label}</b> es
-                      planta de eviscerado simplificado — sin clasificación por
-                      calidad ni gates clasificadoras.
-                    </p>
-                    <p>
-                      Pendiente: generador de sugerencias específico para Yal
-                      (rechazos por peso bajo, distribución pesos, throughput
-                      vs target Baader).
-                    </p>
-                  </CardContent>
-                </Card>
+                <ActionPlanPanel
+                  shiftDocId={shiftDocId}
+                  suggestions={yalSuggestions}
+                  status={shiftWindow.status}
+                />
               )}
 
               {/* Modales lanzados desde ActionPlanPanel */}
