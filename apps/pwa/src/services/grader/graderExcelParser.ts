@@ -62,6 +62,18 @@ function parseNum(v: unknown): number | undefined {
 }
 
 /** Parsea fecha+hora combinando columnas Fecha y Hora */
+/**
+ * Convierte (Y, M, D, h, m, s) a un ISO string preservando el wall-clock
+ * tal cual aparece en el Excel — convención `Z-as-wall-clock-local` que
+ * usa todo el módulo. Usar setHours/toISOString convertía TZ local→UTC
+ * y desfasaba las horas (ej: 00:03 Chile UTC-4 → 04:03 UTC, mostrado
+ * después como "04:03" cuando se lee con getUTCHours).
+ */
+function toWallClockIso(y: number, mo: number, d: number, h = 0, mi = 0, s = 0): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${y}-${pad(mo)}-${pad(d)}T${pad(h)}:${pad(mi)}:${pad(s)}.000Z`
+}
+
 function parseDatetime(dateVal: unknown, timeVal: unknown): string | undefined {
   if (dateVal == null) return undefined
 
@@ -69,52 +81,62 @@ function parseDatetime(dateVal: unknown, timeVal: unknown): string | undefined {
   if (typeof dateVal === 'number') {
     const excelDate = XLSX.SSF.parse_date_code(dateVal)
     if (!excelDate) return undefined
-    const d = new Date(excelDate.y, excelDate.m - 1, excelDate.d)
+    let h = 0, mi = 0, s = 0
 
     if (timeVal != null) {
       if (typeof timeVal === 'number') {
         const totalSeconds = Math.round(timeVal * 86400)
-        d.setHours(Math.floor(totalSeconds / 3600))
-        d.setMinutes(Math.floor((totalSeconds % 3600) / 60))
-        d.setSeconds(totalSeconds % 60)
+        h = Math.floor(totalSeconds / 3600)
+        mi = Math.floor((totalSeconds % 3600) / 60)
+        s = totalSeconds % 60
       } else {
         const parts = String(timeVal).match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/)
         if (parts) {
-          d.setHours(Number(parts[1]), Number(parts[2]), Number(parts[3] || 0))
+          h = Number(parts[1])
+          mi = Number(parts[2])
+          s = Number(parts[3] || 0)
         }
       }
     }
-    return d.toISOString()
+    return toWallClockIso(excelDate.y, excelDate.m, excelDate.d, h, mi, s)
   }
 
-  // Si es string
+  // Si es string: extraer Y/M/D evitando que `new Date(string)` aplique TZ
   const ds = String(dateVal).trim()
-  let base = new Date(ds)
+  let y: number | null = null, mo: number | null = null, d: number | null = null
 
-  // Intentar formato dd/mm/yyyy o dd-mm-yyyy
-  if (isNaN(base.getTime())) {
-    const m = ds.match(/(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})/)
+  // ISO yyyy-mm-dd o yyyy/mm/dd
+  let m = ds.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/)
+  if (m) {
+    y = Number(m[1]); mo = Number(m[2]); d = Number(m[3])
+  } else {
+    // dd/mm/yyyy o dd-mm-yyyy
+    m = ds.match(/(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})/)
     if (m) {
-      const year = m[3]!.length === 2 ? 2000 + Number(m[3]) : Number(m[3])
-      base = new Date(year, Number(m[2]) - 1, Number(m[1]))
+      y = m[3]!.length === 2 ? 2000 + Number(m[3]) : Number(m[3])
+      mo = Number(m[2]); d = Number(m[1])
+    } else {
+      // Último recurso: dejar que Date parsee, pero leer con getFull*() para evitar TZ
+      const tmp = new Date(ds)
+      if (!isNaN(tmp.getTime())) {
+        y = tmp.getFullYear(); mo = tmp.getMonth() + 1; d = tmp.getDate()
+      }
     }
   }
+  if (y == null || mo == null || d == null) return undefined
 
-  if (isNaN(base.getTime())) return undefined
-
+  let h = 0, mi = 0, s = 0
   if (timeVal != null && typeof timeVal !== 'number') {
     const parts = String(timeVal).match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/)
-    if (parts) {
-      base.setHours(Number(parts[1]), Number(parts[2]), Number(parts[3] || 0))
-    }
+    if (parts) { h = Number(parts[1]); mi = Number(parts[2]); s = Number(parts[3] || 0) }
   } else if (typeof timeVal === 'number') {
     const totalSeconds = Math.round(timeVal * 86400)
-    base.setHours(Math.floor(totalSeconds / 3600))
-    base.setMinutes(Math.floor((totalSeconds % 3600) / 60))
-    base.setSeconds(totalSeconds % 60)
+    h = Math.floor(totalSeconds / 3600)
+    mi = Math.floor((totalSeconds % 3600) / 60)
+    s = totalSeconds % 60
   }
 
-  return base.toISOString()
+  return toWallClockIso(y, mo, d, h, mi, s)
 }
 
 /** Normaliza calidad a GraderQuality */
@@ -406,7 +428,10 @@ function col(map: ColumnMap, ...variants: string[]): number | undefined {
 function parsePiezaPieza(rows: unknown[][], headerIdx: number, colMap: ColumnMap): PieceRecord[] {
   const records: PieceRecord[] = []
   const iGate = col(colMap, 'gate', 'compuerta', 'puerta')
-  const iPieces = col(colMap, 'cantidad de piezas', 'cant. piezas', 'piezas', 'qty', 'cantidad')
+  // 'piezas real' va PRIMERO porque es el nombre exacto en Excels Yal y debe
+  // ganar al exact match antes de que la variante 'piezas' caiga al fuzzy
+  // match con "Peso de las piezas" (que sumaría kg en lugar de unidades).
+  const iPieces = col(colMap, 'cantidad de piezas', 'cant. piezas', 'piezas real', 'piezas reales', 'qty', 'cantidad', 'piezas')
   const iWeight = col(colMap, 'peso de las piezas', 'peso piezas', 'weight')
   const iWeightGrams = col(colMap, 'peso en gr', 'peso en gramos', 'weight gr', 'weight grams')
   const iQuality = col(colMap, 'calidad', 'quality')
@@ -477,7 +502,9 @@ function parsePiezaPieza(rows: unknown[][], headerIdx: number, colMap: ColumnMap
 function parsePuerta0(rows: unknown[][], headerIdx: number, colMap: ColumnMap): Gate0Record[] {
   const records: Gate0Record[] = []
   const iError = col(colMap, 'error', 'motivo', 'causa', 'reason')
-  const iPieces = col(colMap, 'cantidad de piezas', 'cant. piezas', 'piezas', 'qty', 'cantidad')
+  // Mismo orden que en parsePiezaPieza para evitar que 'piezas' matchee
+  // 'peso de las piezas' por fuzzy include.
+  const iPieces = col(colMap, 'cantidad de piezas', 'cant. piezas', 'piezas real', 'piezas reales', 'qty', 'cantidad', 'piezas')
   const iWeight = col(colMap, 'peso de las piezas', 'peso piezas', 'weight')
   const iWeightGrams = col(colMap, 'peso en gr', 'peso en gramos', 'weight gr', 'weight grams')
   const iDate = col(colMap, 'fecha', 'date')
