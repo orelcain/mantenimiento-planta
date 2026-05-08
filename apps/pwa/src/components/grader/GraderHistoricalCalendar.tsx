@@ -2665,31 +2665,42 @@ export function GraderHistoricalCalendar({
               //     bajo el día anterior por la convención "día laboral" del CF).
               // prevDayKey siempre computado (necesario para badge SLX + chips noche)
               const prevDayKey = addDaysToDateKey(dayKey, -1)
-              // En Yal el Excel del turno noche cubre ~12:03→02:32 — SOLAPA
-              // con el SLX Turno 2 (15:15→00:00) que mediria los mismos
-              // ciclos Baader. Para evitar mostrar 3 chips solapados:
-              //   - Si hay Excel cargado en Yal: ocultar SLX `D` (cubierto)
-              //   - Mantener SLX `M` (madrugada T3 prev = perido ANTES del Excel)
-              // Asi quedan 2 turnos visualmente coherentes: M (madrugada) + N (Excel).
-              const isYalWithExcel = hasData && plantLine.isClassificationPlant === false
-              const showSlx     = !hasData || plantLine.isClassificationPlant === false
-              const showSlxDay  = showSlx && !isYalWithExcel
-              const slxNewDay   = showSlxDay ? (slxTotalsByShift.get(`${dayKey}__Turno 2`) ?? 0) : 0
+              // ── Convención simple Día/Noche para Yal ─────────────────────
+              // Yal opera con 2 turnos conceptuales:
+              //   • "Turno día" = mañana + tarde (mapea a SLX T1 07:45-15:15
+              //     + T2 15:15-00:00 sumados; o legado "Turno día").
+              //   • "Turno noche" = noche que arranca a las 23:00 del Y y
+              //     cubre la madrugada del Y+1 (mapea a SLX T3 del Y; o
+              //     legado "Turno noche").
+              // El T3 SLX (23:00→07:45) pertenece al día Y donde ARRANCA, NO
+              // al Y+1 donde termina su madrugada. No hay turno "madrugada"
+              // separado.
+              //
+              // Si Excel cargado para un turno del Y, su chip se ve via
+              // renderShiftChip arriba — y se oculta el chip SLX equivalente
+              // para no duplicar (Excel y SLX miden distinta cosa: Marelec
+              // piezas downstream vs Baader cycles upstream del MISMO período).
+              const hasExcelDay   = chipsForDay.some(c => c.role === 'primary' && (c.shiftId === 'Turno día' || c.shiftId === 'Turno 1' || c.shiftId === 'Turno 2'))
+              const hasExcelNight = chipsForDay.some(c => c.role === 'primary' && (c.shiftId === 'Turno noche' || c.shiftId === 'Turno 3'))
+              const showSlx       = !hasData || plantLine.isClassificationPlant === false
+              const showSlxDay    = showSlx && !hasExcelDay
+              const showSlxNight  = showSlx && !hasExcelNight
+              const slxT1Cycles = showSlxDay ? (slxTotalsByShift.get(`${dayKey}__Turno 1`) ?? 0) : 0
+              const slxT2Cycles = showSlxDay ? (slxTotalsByShift.get(`${dayKey}__Turno 2`) ?? 0) : 0
               const slxLegDay   = showSlxDay ? (slxTotalsByShift.get(`${dayKey}__Turno día`) ?? 0) : 0
-              const slxDayCycles   = slxNewDay > 0 ? slxNewDay : slxLegDay
-              // shiftId real para navegar desde chip día
-              const slxDayNav = slxNewDay > 0
+              const slxNewDay   = slxT1Cycles + slxT2Cycles  // suma "mañana+tarde"
+              const slxDayCycles = slxNewDay > 0 ? slxNewDay : slxLegDay
+              // shiftId para navegar (preferir T2 si tiene más cycles)
+              const slxDayNav = slxT2Cycles >= slxT1Cycles && slxT2Cycles > 0
                 ? { cfDateKey: dayKey, shiftId: 'Turno 2' }
-                : slxLegDay > 0 ? { cfDateKey: dayKey, shiftId: 'Turno día' } : null
-              const slxT3Cycles = showSlx ? (slxTotalsByShift.get(`${prevDayKey}__Turno 3`) ?? 0) : 0
-              const slxT1Cycles = showSlx ? (slxTotalsByShift.get(`${dayKey}__Turno 1`)     ?? 0) : 0
-              const slxLegNight = showSlx ? (slxTotalsByShift.get(`${dayKey}__Turno noche`) ?? 0) : 0
-              const slxNewNight = Math.max(slxT3Cycles, slxT1Cycles)
-              const slxNightCycles = slxNewNight > 0 ? slxNewNight : slxLegNight
-              // shiftId real para navegar desde chip noche (prefiere T3 madrugada si es mayor)
-              const slxNightNav = slxT3Cycles >= slxT1Cycles && slxT3Cycles > 0
-                ? { cfDateKey: prevDayKey, shiftId: 'Turno 3' }
                 : slxT1Cycles > 0 ? { cfDateKey: dayKey, shiftId: 'Turno 1' }
+                : slxLegDay > 0 ? { cfDateKey: dayKey, shiftId: 'Turno día' } : null
+              // Noche: T3 SLX del PROPIO día (arranca 23:00 del Y).
+              const slxT3Cycles = showSlxNight ? (slxTotalsByShift.get(`${dayKey}__Turno 3`) ?? 0) : 0
+              const slxLegNight = showSlxNight ? (slxTotalsByShift.get(`${dayKey}__Turno noche`) ?? 0) : 0
+              const slxNightCycles = slxT3Cycles > 0 ? slxT3Cycles : slxLegNight
+              const slxNightNav = slxT3Cycles > 0
+                ? { cfDateKey: dayKey, shiftId: 'Turno 3' }
                 : slxLegNight > 0 ? { cfDateKey: dayKey, shiftId: 'Turno noche' } : null
               const hasSlxDay   = slxDayCycles   > 0
               const hasSlxNight = slxNightCycles > 0
@@ -2698,16 +2709,21 @@ export function GraderHistoricalCalendar({
               // (se verifica independiente de hasData para mostrar badge incluso en días Grader)
               const hasSLXBadge = (slxTotalsByShift.get(`${dayKey}__Turno 2`) ?? 0) > 0
                 || (slxTotalsByShift.get(`${dayKey}__Turno día`) ?? 0) > 0
-                || (slxTotalsByShift.get(`${prevDayKey}__Turno 3`) ?? 0) > 0
+                || (slxTotalsByShift.get(`${dayKey}__Turno 3`) ?? 0) > 0
                 || (slxTotalsByShift.get(`${dayKey}__Turno 1`) ?? 0) > 0
                 || (slxTotalsByShift.get(`${dayKey}__Turno noche`) ?? 0) > 0
-              // Uptime% desde slxByShift (ya cargado por loadOne en el preloader mensual)
-              const slxDayShiftKey = slxNewDay > 0 ? `${dayKey}__Turno 2` : `${dayKey}__Turno día`
+              // Uptime% desde slxByShift. Para "Día" (T1+T2) se promedia el
+              // uptime cuando hay ambos. Para "Noche" se usa T3 del propio día.
               const slxDayUptimePct = hasSlxDay
-                ? (slxByShift.get(slxDayShiftKey)?.avgShiftRuntime ?? 0) * 100 : 0
-              const slxNightShiftKey = slxT3Cycles >= slxT1Cycles && slxT3Cycles > 0
-                ? `${prevDayKey}__Turno 3`
-                : slxT1Cycles > 0 ? `${dayKey}__Turno 1` : `${dayKey}__Turno noche`
+                ? (() => {
+                    const ut1 = slxT1Cycles > 0 ? (slxByShift.get(`${dayKey}__Turno 1`)?.avgShiftRuntime ?? 0) : null
+                    const ut2 = slxT2Cycles > 0 ? (slxByShift.get(`${dayKey}__Turno 2`)?.avgShiftRuntime ?? 0) : null
+                    const utLeg = slxLegDay > 0 ? (slxByShift.get(`${dayKey}__Turno día`)?.avgShiftRuntime ?? 0) : null
+                    const samples = [ut1, ut2, utLeg].filter((x): x is number => x !== null)
+                    return samples.length > 0 ? (samples.reduce((a, b) => a + b, 0) / samples.length) * 100 : 0
+                  })()
+                : 0
+              const slxNightShiftKey = slxT3Cycles > 0 ? `${dayKey}__Turno 3` : `${dayKey}__Turno noche`
               const slxNightUptimePct = hasSlxNight
                 ? (slxByShift.get(slxNightShiftKey)?.avgShiftRuntime ?? 0) * 100 : 0
               // Día confirmado sin producción: Shoplogix ya fue escaneado y no hay ciclos
@@ -2840,34 +2856,19 @@ export function GraderHistoricalCalendar({
                             <span className="text-[9px] font-bold tabular-nums">{slxDayValue}</span>
                           </button>
                         )}
-                        {hasSlxNight && slxNightNav && (() => {
-                          // Diferenciar label segun el shift real:
-                          //   Turno 3 → M (madrugada, 00:00-07:45)
-                          //   Turno 1 → 1 (mañana temprano)
-                          //   Turno noche legacy → N
-                          // Esto evita confusion en Yal donde el dia 7 puede mostrar
-                          // chip Excel "N" (turno noche cargado) Y chip SLX "M"
-                          // (madrugada T3) — son dos turnos distintos del mismo dia.
-                          const nightLabel = slxNightNav.shiftId === 'Turno 3' ? 'M'
-                            : slxNightNav.shiftId === 'Turno 1' ? '1'
-                            : 'N'
-                          const nightTooltipName = slxNightNav.shiftId === 'Turno 3' ? 'Turno 3 (madrugada)'
-                            : slxNightNav.shiftId === 'Turno 1' ? 'Turno 1 (mañana)'
-                            : 'Turno noche'
-                          return (
-                            <button
-                              className={cn('flex items-center justify-between rounded px-1 py-px leading-none transition-colors w-full', nightColorClass)}
-                              title={`Ver ${nightTooltipName} · ${slxNightCycles.toLocaleString('es-CL')} ciclos Baader${slxNightUptimePct > 0 ? ` · ${slxNightUptimePct.toFixed(0)}% uptime` : ''}`}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                navigate(`/analisis-grader/turno/${slxNightNav.cfDateKey}__${encodeURIComponent(slxNightNav.shiftId)}${lineaQ}`)
-                              }}
-                            >
-                              <span className="text-[8px] font-medium opacity-80">{nightLabel}</span>
-                              <span className="text-[9px] font-bold tabular-nums">{slxNightValue}</span>
-                            </button>
-                          )
-                        })()}
+                        {hasSlxNight && slxNightNav && (
+                          <button
+                            className={cn('flex items-center justify-between rounded px-1 py-px leading-none transition-colors w-full', nightColorClass)}
+                            title={`Ver Turno noche · ${slxNightCycles.toLocaleString('es-CL')} ciclos Baader${slxNightUptimePct > 0 ? ` · ${slxNightUptimePct.toFixed(0)}% uptime` : ''}${slxNightNav.shiftId === 'Turno 3' ? ' (arranca 23:00 — cubre madrugada)' : ''}`}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              navigate(`/analisis-grader/turno/${slxNightNav.cfDateKey}__${encodeURIComponent(slxNightNav.shiftId)}${lineaQ}`)
+                            }}
+                          >
+                            <span className="text-[8px] font-medium opacity-80">N</span>
+                            <span className="text-[9px] font-bold tabular-nums">{slxNightValue}</span>
+                          </button>
+                        )}
                       </>
                     )
                   })()}
