@@ -147,19 +147,27 @@ export interface AxisWindow {
 
 /**
  * Computa el rango y la serie de labels minuto a minuto para el eje X del chart.
- * El rango arranca 10 min antes del primer bucket con datos y termina 10 min después.
+ * El rango arranca `paddingMin` minutos antes del primer bucket y termina
+ * `paddingMin` después del último.
+ *
+ * Padding por defecto: 2 min (antes era 10). Para turnos cortos como Yal
+ * (~90 min con colación de 51) un padding de 10 min representaba ~22% del
+ * eje vacío en cada extremo. Con 2 min queda visualmente pegado al rango
+ * productivo real, sin perder marca para mark-lines de inicio/fin.
  */
 export function resolveAxisWindow(
   buckets: TimelineBucket[],
   shiftWindow: ShiftTimeWindow,
+  paddingMin: number = 2,
 ): AxisWindow {
   const firstBucket = buckets[0]
   const lastBucket = buckets[buckets.length - 1]
+  const padMs = paddingMin * 60_000
   const effectiveStartMs = firstBucket
-    ? Date.parse(firstBucket.tsMin) - 10 * 60_000
+    ? Date.parse(firstBucket.tsMin) - padMs
     : Date.parse(shiftWindow.startAt)
   const effectiveEndMs = lastBucket
-    ? Date.parse(lastBucket.tsMin) + 10 * 60_000
+    ? Date.parse(lastBucket.tsMin) + padMs
     : Date.parse(shiftWindow.endAt)
 
   const maxSlots = 24 * 60

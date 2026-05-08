@@ -90,6 +90,13 @@ interface P0CausesPanelProps {
   selectedCauses?: Set<MatrixP0Cause>
   /** Toggle add/remove una causa del set seleccionado. */
   onToggleCause?: (cause: MatrixP0Cause) => void
+  /**
+   * Cuando true (Chonchi), el copy menciona Matrix HMI / unsorted pcs.
+   * Cuando false (Yal), copy genérico — Yal no usa HMI Matrix de MS4/12 ni
+   * exporta archivo Punto Cero separado: los rechazos vienen embebidos en
+   * el mismo Excel PP con `gate=0`.
+   */
+  isClassificationPlant?: boolean
 }
 
 interface CauseRowProps {
@@ -361,7 +368,7 @@ function SubCauseRow({
   )
 }
 
-export function P0CausesPanel({ byMatrixCause, totalP0Pct, unsortedPcs, selectedCauses, onToggleCause }: P0CausesPanelProps) {
+export function P0CausesPanel({ byMatrixCause, totalP0Pct, unsortedPcs, selectedCauses, onToggleCause, isClassificationPlant = true }: P0CausesPanelProps) {
   const [expanded, setExpanded] = useState<MatrixP0Cause | null>(null)
   const hasCauseData = byMatrixCause != null
   const selSet = selectedCauses ?? new Set<MatrixP0Cause>()
@@ -370,6 +377,16 @@ export function P0CausesPanel({ byMatrixCause, totalP0Pct, unsortedPcs, selected
     setExpanded(expanded === cause ? null : cause)
   }
 
+  // Copy adaptativo: Chonchi menciona Matrix HMI explícito, Yal genérico.
+  const sectionTitle = isClassificationPlant ? 'Vista Matrix oficial' : 'Causas de rechazo'
+  const sectionSubtitle = isClassificationPlant ? 'como aparece en el HMI' : 'según Excel pieza a pieza'
+  const noDataCopy = isClassificationPlant
+    ? <>Sin el archivo <strong>Punto Cero</strong> exportado de Matrix no podemos mostrar las causas. Subilo junto al Excel de Pieza a Pieza para el análisis completo.</>
+    : <>Sin causas de rechazo clasificadas para este turno. Verificá que el Excel haya subido correctamente.</>
+  const fallbackDescription = isClassificationPlant
+    ? 'cargá el Excel P0 para ver las causas'
+    : 'sin desglose de causas disponible'
+
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -377,15 +394,14 @@ export function P0CausesPanel({ byMatrixCause, totalP0Pct, unsortedPcs, selected
         <CardDescription>
           {hasCauseData
             ? `${totalP0Pct.toFixed(1)}% de piezas rechazadas — cada causa suma al total`
-            : `${totalP0Pct.toFixed(1)}% de piezas rechazadas — cargá el Excel P0 para ver las causas`}
+            : `${totalP0Pct.toFixed(1)}% de piezas rechazadas — ${fallbackDescription}`}
         </CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-4">
         {!hasCauseData && (
           <div className="text-xs text-muted-foreground bg-muted/40 rounded-md p-3">
-            Sin el archivo <strong>Punto Cero</strong> exportado de Matrix no podemos mostrar las causas.
-            Subilo junto al Excel de Pieza a Pieza para el análisis completo.
+            {noDataCopy}
           </div>
         )}
 
@@ -394,9 +410,9 @@ export function P0CausesPanel({ byMatrixCause, totalP0Pct, unsortedPcs, selected
             {/* ─── Vista Matrix oficial — 4 filas, paraguas expandible ─ */}
             <section>
               <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-2">
-                <span>Vista Matrix oficial</span>
+                <span>{sectionTitle}</span>
                 <span className="h-px flex-1 bg-border" />
-                <span className="text-[9px] font-normal normal-case tracking-normal">como aparece en el HMI</span>
+                <span className="text-[9px] font-normal normal-case tracking-normal">{sectionSubtitle}</span>
               </h3>
               <div className="space-y-2">
                 {MATRIX_CAUSE_ORDER_OFFICIAL.map(cause => {
@@ -457,8 +473,17 @@ export function P0CausesPanel({ byMatrixCause, totalP0Pct, unsortedPcs, selected
             {/* ─── Footer: total unsorted pcs ──────────────────────────── */}
             {typeof unsortedPcs === 'number' && unsortedPcs > 0 && (
               <div className="text-[11px] text-muted-foreground pt-1 border-t border-border/40">
-                Total <span className="font-mono text-muted-foreground/80">unsorted pcs</span> (Matrix):{' '}
-                <span className="font-mono font-medium text-foreground/80">{unsortedPcs.toLocaleString('es-CL')}</span>
+                {isClassificationPlant ? (
+                  <>
+                    Total <span className="font-mono text-muted-foreground/80">unsorted pcs</span> (Matrix):{' '}
+                    <span className="font-mono font-medium text-foreground/80">{unsortedPcs.toLocaleString('es-CL')}</span>
+                  </>
+                ) : (
+                  <>
+                    Total piezas rechazadas:{' '}
+                    <span className="font-mono font-medium text-foreground/80">{unsortedPcs.toLocaleString('es-CL')}</span>
+                  </>
+                )}
               </div>
             )}
           </>

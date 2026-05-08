@@ -38,15 +38,22 @@ export function ShiftBreakdownsCard({
   conservacionBreakdown,
 }: Props) {
   const lots = lotsInShift ?? []
+  // Mostrar solo categorías con desglose REAL (≥ 2 valores). Si toda la
+  // categoría es un solo valor (ej. Yal donde calidad="Salar" 100%), el
+  // breakdown no aporta info — solo ruido visual. Lots se mantiene siempre
+  // (saber que el turno fue 1 lote único es info útil).
   const calidadEntries = sortedEntries(calidadBreakdown)
   const productoEntries = sortedEntries(productoBreakdown)
   const conservacionEntries = sortedEntries(conservacionBreakdown)
+  const calidadVisible = calidadEntries.length >= 2
+  const productoVisible = productoEntries.length >= 2
+  const conservacionVisible = conservacionEntries.length >= 2
 
   const hasAny =
     lots.length > 0 ||
-    calidadEntries.length > 0 ||
-    productoEntries.length > 0 ||
-    conservacionEntries.length > 0
+    calidadVisible ||
+    productoVisible ||
+    conservacionVisible
 
   if (!hasAny) return null
 
@@ -90,7 +97,7 @@ export function ShiftBreakdownsCard({
           )}
 
           {/* Calidad */}
-          {calidadEntries.length > 0 && (
+          {calidadVisible && (
             <div className="space-y-1.5">
               <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-400">
                 <Award className="w-3.5 h-3.5" />
@@ -110,7 +117,7 @@ export function ShiftBreakdownsCard({
           )}
 
           {/* Producto */}
-          {productoEntries.length > 0 && (
+          {productoVisible && (
             <div className="space-y-1.5">
               <div className="flex items-center gap-1.5 text-xs font-medium text-amber-400">
                 <Boxes className="w-3.5 h-3.5" />
@@ -130,7 +137,7 @@ export function ShiftBreakdownsCard({
           )}
 
           {/* Conservación */}
-          {conservacionEntries.length > 0 && (
+          {conservacionVisible && (
             <div className="space-y-1.5">
               <div className="flex items-center gap-1.5 text-xs font-medium text-cyan-400">
                 <Snowflake className="w-3.5 h-3.5" />

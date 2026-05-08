@@ -1355,6 +1355,7 @@ export function AnalisisGraderTurnoPage() {
                   else next.add(cause)
                   return next
                 })}
+                isClassificationPlant={isClassificationPlant}
               />
             </div>
           </div>
