@@ -61,7 +61,7 @@ import { UpstreamMachinesPanel } from '@/components/grader/UpstreamMachinesPanel
 import { UpstreamCorrelationCard } from '@/components/grader/UpstreamCorrelationCard'
 import { UpstreamScatterCard } from '@/components/grader/UpstreamScatterCard'
 import { useUpstreamLineSnapshot } from '@/hooks/useUpstreamLineSnapshot'
-import { getPlantLineConfig } from '@/config/plantLines'
+import { getPlantLineConfig, DEFAULT_PLANT_LINE_ID } from '@/config/plantLines'
 import { findTriggeredRunbooks } from '@/services/grader/graderRunbooks'
 import { analyzeGraderFromSummary } from '@/services/grader/graderSummaryAI'
 import { loadSeasonBenchmark, type SeasonBenchmark } from '@/services/grader/graderBenchmarks'
@@ -259,6 +259,13 @@ export function AnalisisGraderTurnoPage() {
 
   // Línea upstream (Shoplogix) — usa el plantSlug correcto según la pestaña activa
   const upstreamLine = useUpstreamLineSnapshot(dateKey || null, shiftLabel || null, plantLineCfg.plantSlug)
+
+  // URL al wizard preservando el `?linea=` actual. Sin esto, cargar Excel
+  // desde un turno de Yal envía al wizard sin planta → guarda el doc en la
+  // línea default (chonchi) y el turno de Yal nunca lo encuentra.
+  const wizardUrl = plantLineCfg.id !== DEFAULT_PLANT_LINE_ID
+    ? `/analisis-grader/wizard?linea=${plantLineCfg.id}`
+    : '/analisis-grader/wizard'
 
   // Schedule efectivo de la planta — Yal define T1/T2/T3, Chonchi día/noche.
   // Sin esto el chart de Yal Turno 3 caería al fallback 08:00→08:00 (24h)
@@ -1136,7 +1143,7 @@ export function AnalisisGraderTurnoPage() {
                 size="sm"
                 variant="outline"
                 className="h-7 text-xs border-sky-500/40 text-sky-400 hover:bg-sky-500/10 shrink-0"
-                onClick={() => navigate('/analisis-grader/wizard')}
+                onClick={() => navigate(wizardUrl)}
               >
                 <Upload className="w-3 h-3 mr-1.5" />
                 Cargar Excel
@@ -1167,7 +1174,7 @@ export function AnalisisGraderTurnoPage() {
             <p className="text-sm text-muted-foreground">
               Cargá el primer Excel de Matrix para ver el estado del proceso.
             </p>
-            <Button onClick={() => navigate('/analisis-grader/wizard')} className="gap-2 mt-1">
+            <Button onClick={() => navigate(wizardUrl)} className="gap-2 mt-1">
               <Upload className="w-4 h-4" />
               Cargar Excel
             </Button>
@@ -1217,7 +1224,7 @@ export function AnalisisGraderTurnoPage() {
                   size="sm"
                   variant="outline"
                   className="h-7 text-xs border-sky-700/60 text-sky-400 hover:bg-sky-950 shrink-0 mt-0.5"
-                  onClick={() => navigate('/analisis-grader/wizard')}
+                  onClick={() => navigate(wizardUrl)}
                 >
                   <Upload className="w-3 h-3 mr-1" />
                   Cargar Excel

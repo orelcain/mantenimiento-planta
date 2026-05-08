@@ -223,7 +223,15 @@ export function AnalisisGraderLandingPage() {
     navigate(`/analisis-grader/turno/${dateKey}__${encodeURIComponent(shiftId)}`)
   }
 
-  const goToUpload = () => navigate('/analisis-grader/wizard')
+  // Preservar `?linea=` al ir al wizard. Sin esto, subir Excel desde la
+  // pestaña de Yal lo guardaría en chonchi (default) y no aparecería al
+  // volver a la pestaña Yal.
+  const goToUpload = () => {
+    const url = lineId !== DEFAULT_PLANT_LINE_ID
+      ? `/analisis-grader/wizard?linea=${lineId}`
+      : '/analisis-grader/wizard'
+    navigate(url)
+  }
 
   const lastShiftVerdict = lastClosedShift ? verdictFromP0Pct(lastClosedShift.pointZeroPct) : 'ok'
 
