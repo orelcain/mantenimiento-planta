@@ -2886,19 +2886,25 @@ export function GraderHistoricalCalendar({
                       Permite identificar de un vistazo qué días tienen PP/P0
                       Excel cargado vs sólo Shoplogix (sin badges). Si está
                       mixto (algunos turnos tienen PP, otros no), gana el badge
-                      de "falta" para que el usuario sepa que hay trabajo pendiente. */}
-                  {(missingPiece || missingGate0 || hasAllPiece || hasAllGate0) && (
+                      de "falta" para que el usuario sepa que hay trabajo pendiente.
+                      En plantas no clasificadoras (Yal) NO existe archivo P0
+                      separado — los rechazos vienen en el mismo PP con gate=0.
+                      El badge P0 confunde porque aparece "verde" sin que se haya
+                      cargado nada extra; lo ocultamos. */}
+                  {(missingPiece || (plantLine.isClassificationPlant !== false && missingGate0) || hasAllPiece || (plantLine.isClassificationPlant !== false && hasAllGate0)) && (
                     <div className="mt-auto flex gap-0.5">
                       {missingPiece ? (
                         <span title="Falta archivo PIEZA_PIEZA en algún turno" className="text-[7px] leading-3 px-0.5 rounded bg-red-500/20 text-red-600 font-medium">PP</span>
                       ) : hasAllPiece ? (
                         <span title="Todos los turnos tienen PIEZA_PIEZA cargado" className="text-[7px] leading-3 px-0.5 rounded bg-emerald-500/20 text-emerald-500 font-medium">PP</span>
                       ) : null}
-                      {missingGate0 ? (
-                        <span title="Falta archivo PUERTA_0 en algún turno" className="text-[7px] leading-3 px-0.5 rounded bg-red-500/20 text-red-600 font-medium">P0</span>
-                      ) : hasAllGate0 ? (
-                        <span title="Todos los turnos tienen PUERTA_0 cargado" className="text-[7px] leading-3 px-0.5 rounded bg-emerald-500/20 text-emerald-500 font-medium">P0</span>
-                      ) : null}
+                      {plantLine.isClassificationPlant !== false && (
+                        missingGate0 ? (
+                          <span title="Falta archivo PUERTA_0 en algún turno" className="text-[7px] leading-3 px-0.5 rounded bg-red-500/20 text-red-600 font-medium">P0</span>
+                        ) : hasAllGate0 ? (
+                          <span title="Todos los turnos tienen PUERTA_0 cargado" className="text-[7px] leading-3 px-0.5 rounded bg-emerald-500/20 text-emerald-500 font-medium">P0</span>
+                        ) : null
+                      )}
                     </div>
                   )}
                 </div>

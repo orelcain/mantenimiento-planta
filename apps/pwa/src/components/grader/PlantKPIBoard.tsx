@@ -312,7 +312,7 @@ export function PlantKPIBoard({
                   key={m.machineid}
                   className="flex items-center gap-2 text-[11px] bg-muted/10 rounded px-2 py-1 border border-border/20"
                 >
-                  <span className="text-muted-foreground w-24 shrink-0 truncate">{m.machineName}</span>
+                  <span className="text-muted-foreground w-32 shrink-0 truncate" title={m.machineName}>{m.machineName}</span>
                   <span className={cn('w-12 tabular-nums', availColor(m.availability))}>
                     A {pct(m.availability, 0)}
                   </span>

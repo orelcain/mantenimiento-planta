@@ -152,7 +152,7 @@ function CauseRow({ cause, stats, totalP0Pct, expanded, selected, onToggle, onSe
             <div className="mt-1.5 h-1 bg-muted rounded-full overflow-hidden w-full">
               <div
                 className={cn('h-full rounded-full transition-all', colors.bar)}
-                style={{ width: `${Math.min(100, stats.pct)}%` }}
+                style={{ width: stats.pct > 0 ? `max(2px, ${Math.min(100, stats.pct)}%)` : '0%' }}
               />
             </div>
           </div>
@@ -260,7 +260,7 @@ function UmbrellaCauseRow({
             <div className="mt-1.5 h-1 bg-muted rounded-full overflow-hidden w-full">
               <div
                 className={cn('h-full rounded-full transition-all', colors.bar)}
-                style={{ width: `${Math.min(100, umbrellaStats.pct)}%` }}
+                style={{ width: umbrellaStats.pct > 0 ? `max(2px, ${Math.min(100, umbrellaStats.pct)}%)` : '0%' }}
               />
             </div>
           </div>

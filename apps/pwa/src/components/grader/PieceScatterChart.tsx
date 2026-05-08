@@ -192,7 +192,10 @@ export function PieceScatterChart({ gate0Pieces }: PieceScatterChartProps) {
           <div className="flex items-center gap-2 min-w-0">
             <Crosshair className="w-4 h-4 text-violet-400 shrink-0" />
             <span className="font-medium text-sm">Dispersión P0 por pieza</span>
-            <span className="text-xs text-muted-foreground tabular-nums truncate">
+            <span
+              className="text-xs text-muted-foreground tabular-nums truncate cursor-help"
+              title={`Cada punto = 1 pieza P0 (rechazada). Eje X = momento de paso por el Marelec, eje Y = peso en gramos. ${hasWeight ? `${Math.round(weightPct)}% de las piezas P0 tienen peso registrado por el Marelec — el resto pasaron por gate=0 sin peso (típicamente "no leído por fotocélula" o "productos demasiado próximos").` : 'Ninguna de estas piezas tiene peso registrado — el Marelec no pudo pesarlas individualmente.'}`}
+            >
               · {processed.length} piezas
               {hasWeight ? ` · ${Math.round(weightPct)}% con peso` : ''}
             </span>

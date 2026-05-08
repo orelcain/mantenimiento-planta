@@ -570,7 +570,9 @@ export function AnalisisGraderWizardPage() {
             </h1>
             <p className="text-xs lg:text-sm text-muted-foreground mt-0.5">
               {lineConfig.hasGraderData
-                ? 'Línea completa Grader + Baaders — carga de Excel del Grader'
+                ? lineConfig.isClassificationPlant === false
+                  ? `${lineConfig.label} · eviscerado simplificado — Excel del Marelec`
+                  : 'Línea completa Grader + Baaders — carga de Excel del Grader'
                 : `${lineConfig.description} · datos Shoplogix`}
             </p>
           </div>
