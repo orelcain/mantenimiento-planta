@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '3.10.0' as const
+export const APP_VERSION = '3.10.1' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-05-08' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'fix(grader): timeline UI/UX - eje P0 adaptativo + bandas baader sutiles + tooltip compacto' as const
+export const VERSION_NAME = 'fix(grader): Marel HG oculto en Yal + causas P0 vacias filtradas' as const
 
 /**
  * Nota:

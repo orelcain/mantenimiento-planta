@@ -1239,19 +1239,22 @@ export function AnalisisGraderTurnoPage() {
               )}
             </div>
 
-            {/* Marel HG — manual, requiere Grader */}
-            <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-950/30 border border-amber-900/40">
-              <Scale className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-amber-300">Marel HG — Corta-cabeza</p>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Ingreso manual de captura de la pantalla Marel. Disponible al cargar el Excel Grader.
-                </p>
+            {/* Marel HG (corta-cabeza) — solo Chonchi. Yal no tiene
+                corta-cabeza, los salmones salen evisecerados con cabeza. */}
+            {isClassificationPlant && (
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-950/30 border border-amber-900/40">
+                <Scale className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-amber-300">Marel HG — Corta-cabeza</p>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Ingreso manual de captura de la pantalla Marel. Disponible al cargar el Excel Grader.
+                  </p>
+                </div>
+                <Badge variant="outline" className="text-[10px] border-amber-700/60 text-amber-400 shrink-0 mt-0.5">
+                  requiere Grader
+                </Badge>
               </div>
-              <Badge variant="outline" className="text-[10px] border-amber-700/60 text-amber-400 shrink-0 mt-0.5">
-                requiere Grader
-              </Badge>
-            </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -1270,7 +1273,10 @@ export function AnalisisGraderTurnoPage() {
                 upstreamSnapshot={upstreamLine.snapshot}
                 marelHgCapture={marelHgCapture}
               />
-              {(upstreamLine.snapshot || marelHgCapture) && (
+              {/* Marel HG (corta-cabeza) solo aplica en Chonchi — Yal solo
+                  eviscera, los salmones salen con cabeza al camión. Ocultar
+                  card y banner para no confundir al usuario Yal. */}
+              {isClassificationPlant && (upstreamLine.snapshot || marelHgCapture) && (
                 <MarelHgCaptureCard
                   summaryId={effectiveSummaryId}
                   capture={marelHgCapture}

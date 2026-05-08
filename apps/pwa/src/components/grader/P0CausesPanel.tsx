@@ -411,6 +411,10 @@ export function P0CausesPanel({ byMatrixCause, totalP0Pct, unsortedPcs, selected
                       + derivedStats.reduce((s, d) => s + d.stats.pieces, 0)
                     const umbrellaPct = selfStats.pct
                       + derivedStats.reduce((s, d) => s + d.stats.pct, 0)
+                    // Si paraguas + derivadas todas en 0, no renderizar la fila
+                    // (reduce ruido visual: en Yal típicamente solo 2 de 4
+                    // causas oficiales aplican).
+                    if (umbrellaPieces === 0) return null
                     const umbrellaStats = {
                       ...selfStats,
                       pieces: umbrellaPieces,
@@ -432,6 +436,8 @@ export function P0CausesPanel({ byMatrixCause, totalP0Pct, unsortedPcs, selected
                       />
                     )
                   }
+                  // Filtrar causas oficiales sin piezas
+                  if (byMatrixCause[cause].pieces === 0) return null
                   return (
                     <CauseRow
                       key={cause}
