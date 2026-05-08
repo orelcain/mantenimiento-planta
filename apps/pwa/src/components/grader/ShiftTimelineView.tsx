@@ -796,17 +796,18 @@ export function ShiftTimelineView({
 
     // Baader stop bands → markArea translúcidas detrás del chart Grader.
     // Una entrada por evento de pausa de cada máquina. El overlap natural entre
-    // múltiples máquinas crea un efecto de densidad visual:
-    //   1 Baader parada  → ~9% opacidad (violet-500)
-    //   2 Baaders paradas → ~18% (overlap natural de dos capas)
-    //   3 Baaders paradas → ~27% — zona claramente visible
+    // múltiples máquinas crea un efecto de densidad visual.
+    // Opacity ajustada (2026-05-08) de 0.15 a 0.06 — antes en turnos donde las
+    // 3 Baader paraban simultáneamente (colación, reuniones inicio, etc.) las
+    // bandas se acumulaban a >45% y cubrían toda la línea P0% y barras stacked.
+    // Con 0.06: 1 Baader=6%, 2=12%, 3=18% — visible pero no oclusivo.
     // Solo incluimos bandas cuyos extremos existen en el axis actual.
     const baaderBandMarkAreas = baaderMarkers.bands
       .filter(b => b.tA !== b.tB && axisIndexByLabel.has(b.tA) && axisIndexByLabel.has(b.tB))
       .map(b => [
         {
           xAxis: b.tA as string,
-          itemStyle: { color: 'rgba(139,92,246,0.15)', borderWidth: 0 },
+          itemStyle: { color: 'rgba(139,92,246,0.06)', borderWidth: 0 },
         },
         { xAxis: b.tB as string },
       ])
@@ -864,12 +865,18 @@ export function ShiftTimelineView({
           // el foco es la tendencia del turno completo.
           const meaningful = cumulativeP0Pcts.filter((_, i) => (cumPiecesByBucket[i] ?? 0) >= P0_LINE_MIN_PIECES)
           const finalP0 = summaryP0Pct ?? (meaningful.length > 0 ? meaningful[meaningful.length - 1]! : 0)
-          const reference = Math.max(finalP0, criticalThreshold)
+          // Para el max, usar el P0 final real. El criticalThreshold solo
+          // garantiza un mínimo razonable (1pt) para que la línea threshold
+          // se vea — pero no forzar max=10 cuando el P0 real es 0.2%, eso
+          // hacía que la línea quedara pegada al fondo del eje (caso Yal).
+          const reference = Math.max(finalP0, Math.min(criticalThreshold, 1))
           // Tiers: cada uno garantiza que la línea real ocupe ~30-60% del
           // eje vertical — no aplastada (<10%) ni fuera de rango (>100%).
           let max: number
           let interval: number
-          if (reference <= 2)      { max = 5;   interval = 1 }
+          if (reference <= 0.5)    { max = 1;   interval = 0.2 }   // Yal típico: P0 ~0.2%
+          else if (reference <= 1) { max = 2;   interval = 0.5 }
+          else if (reference <= 2) { max = 5;   interval = 1 }
           else if (reference <= 5) { max = 10;  interval = 2 }
           else if (reference <= 10){ max = 20;  interval = 5 }
           else if (reference <= 25){ max = 40;  interval = 10 }
@@ -970,15 +977,29 @@ export function ShiftTimelineView({
             const v = Array.isArray(sp.value) ? sp.value[1] : sp.value
             lines.push(`<span style="color:${sp.color}">●</span> ${sp.seriesName}: ${v}g`)
           }
-          // Upstream: si el minuto cae dentro de bandas Baader, listar las
-          // máquinas paradas y la razón. Hace visible la correlación Grader↔
-          // Baader desde el tooltip, sin hover separado por banda.
+          // Upstream: si el minuto cae dentro de bandas Baader, agrupar por
+          // razón y mostrar resumen. Antes listaba todas las (máquina × razón)
+          // separadamente — en colación con 3 Baader paradas → 9-12 entries
+          // verticales que tapaban el chart. Ahora compacto: "3× COLACION".
           if (typeof time === 'string' && bandsByMinuteLabel.size > 0) {
             const activeBands = bandsByMinuteLabel.get(time)
             if (activeBands && activeBands.length > 0) {
-              lines.push('<span style="color:#94a3b8">⚠ Upstream parado:</span>')
+              // Agrupar por reason. Conservar primer color (similar entre máquinas
+              // para misma razón).
+              const byReason = new Map<string, { count: number; totalMin: number; color: string }>()
               for (const b of activeBands) {
-                lines.push(`&nbsp;&nbsp;<span style="color:${b.color}">▮</span> ${b.machine}: <b>${b.reason}</b> (${b.durationMin}m)`)
+                const cur = byReason.get(b.reason)
+                if (cur) { cur.count++; cur.totalMin += b.durationMin }
+                else { byReason.set(b.reason, { count: 1, totalMin: b.durationMin, color: b.color }) }
+              }
+              const sorted = [...byReason.entries()].sort(([, a], [, b]) => b.totalMin - a.totalMin)
+              lines.push('<span style="color:#94a3b8">⚠ Upstream parado:</span>')
+              for (const [reason, info] of sorted.slice(0, 4)) {
+                const machinesLabel = info.count === 1 ? '1 Baader' : `${info.count} Baaders`
+                lines.push(`&nbsp;&nbsp;<span style="color:${info.color}">▮</span> <b>${reason}</b> · ${machinesLabel}`)
+              }
+              if (sorted.length > 4) {
+                lines.push(`&nbsp;&nbsp;<span style="color:#71717a">…+${sorted.length - 4} razones más</span>`)
               }
             }
           }
