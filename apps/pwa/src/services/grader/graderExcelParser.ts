@@ -307,27 +307,51 @@ export function detectFileKind(sheetRows: unknown[][], filename?: string): Matri
     if (hasPieces) return 'PUERTA_0'
   }
 
-  // Check each kind (order matters: more specific first)
-  // PUERTA_0 has "error" column - very distinctive.
-  // La columna "Error" es exclusiva del archivo Puerta 0 de la máquina Marelec.
-  // Si el archivo tiene "Error" + "Cantidad de piezas", es PUERTA_0 sin importar
-  // que también tenga "Calidad" u otras columnas.
+  // ── Detección por mezcla de columnas ──────────────────────────────────────
+  //
+  // El archivo PIEZA_PIEZA del Marelec Yal SÍ tiene una columna "Error"
+  // (donde marca rechazos como "No puede pesar", "Peso por debajo del mínimo",
+  // "No aplicable" para gates productivos). Si solo miramos Error+Pieces,
+  // confundimos PIEZA_PIEZA Yal con PUERTA_0.
+  //
+  // Discriminador correcto: PIEZA_PIEZA tiene Gate + Pieces + (Especie/Peso/
+  // Calidad/Calibre). PUERTA_0 puro casi nunca trae Especie ni Peso por pieza.
+  // El filename "Pieza a Pieza Yal_..." también es señal fuerte.
+  const hasGate = matchesGroup(['gate', 'compuerta', 'puerta'])
+  const hasPieces = matchesGroup(['cantidad de piezas', 'cant. piezas', 'piezas', 'qty', 'cantidad'])
+  const hasError = matchesGroup(['error', 'motivo', 'causa', 'reason'])
+  const hasEspecie = matchesGroup(['especie', 'species'])
+  const hasPeso = matchesGroup(['peso de las piezas', 'peso piezas', 'peso', 'weight'])
+  const hasQuality = headers.some((h) => h.includes('calidad') || h.includes('quality'))
+  const hasCalibre = headers.some((h) => h.includes('calibre') || h.includes('size'))
+  const ppSignals = (hasEspecie ? 1 : 0) + (hasPeso ? 1 : 0) + (hasQuality ? 1 : 0) + (hasCalibre ? 1 : 0)
+
+  // PIEZA_PIEZA fuerte: Gate + Pieces + ≥1 señal de PP → vence a Error
+  if (hasGate && hasPieces && ppSignals >= 1) {
+    return 'PIEZA_PIEZA'
+  }
+
+  // Filename hint PP fuerte: nombre incluye "pieza" o "piece" + tiene Gate o Pieces
+  if (filenameHintPP && (hasGate || hasPieces)) {
+    return 'PIEZA_PIEZA'
+  }
+
+  // PUERTA_0 puro: Error + Pieces (sin señales fuertes de PP)
   const hasPuerta0 = DETECTION_SCHEMAS.PUERTA_0.required.every(matchesGroup)
   if (hasPuerta0) {
     return 'PUERTA_0'
   }
 
-  // PIEZA_PIEZA: has gate + pieces + usually quality/calibre
+  // Fallback PIEZA_PIEZA mínimo: Gate + Pieces sin más señales
   if (DETECTION_SCHEMAS.PIEZA_PIEZA.required.every(matchesGroup)) {
-    const hasQuality = headers.some((h) => h.includes('calidad') || h.includes('quality'))
-    const hasCalibre = headers.some((h) => h.includes('calibre') || h.includes('size'))
-    if (hasQuality || hasCalibre) return 'PIEZA_PIEZA'
-    // If no quality/calibre but has error, it's PUERTA_0
-    if (hasPuerta0) return 'PUERTA_0'
-    // Filename hint as tiebreaker
-    if (filenameHintP0) return 'PUERTA_0'
-    return 'PIEZA_PIEZA' // default if has gate + pieces
+    if (hasError) {
+      // sin señales PP pero tiene Error → probablemente PUERTA_0
+      if (filenameHintP0) return 'PUERTA_0'
+    }
+    return 'PIEZA_PIEZA'
   }
+  // hasError variable usada arriba — silenciar warning de no-uso del else path
+  void hasError
 
   if (DETECTION_SCHEMAS.PORC_CALIDAD.required.every(matchesGroup)) return 'PORC_CALIDAD'
   if (DETECTION_SCHEMAS.TOTAL_PIEZAS_POR_FOLIO.required.every(matchesGroup)) return 'TOTAL_PIEZAS_POR_FOLIO'

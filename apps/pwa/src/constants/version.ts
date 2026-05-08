@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '3.7.1' as const
+export const APP_VERSION = '3.8.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-05-07' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'fix(grader): banner upload arriba visible al instante + badges PP/P0 verdes en calendario' as const
+export const VERSION_NAME = 'fix(grader): parser detecta formato Yal como PP + boton cancelar subida' as const
 
 /**
  * Nota:

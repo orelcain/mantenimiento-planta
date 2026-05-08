@@ -359,6 +359,18 @@ export function AnalisisGraderWizardPage() {
     }))
   }, [])
 
+  // Cuando el usuario cancela los archivos en cola desde el botón X del
+  // UploadPage compact, `uploadedFiles` queda vacío. Reseteamos parsedData
+  // para que el banner "turnos detectados" desaparezca y la pantalla vuelva
+  // al estado limpio. Sin esto, el parsedData previo seguía vivo y el banner
+  // mostraba turnos de un upload que el usuario ya canceló.
+  useEffect(() => {
+    if (uploadedFiles.length === 0 && parsedData) {
+      setParsedData(null)
+      setSavedToCalendar(false)
+    }
+  }, [uploadedFiles.length, parsedData])
+
   const handleApplyGateSuggestion = useCallback((payload: { gateNumber: number; calibre: string; quality: string }) => {
     setGates((prev) => prev.map((gate) => {
       if (gate.gateNumber !== payload.gateNumber) return gate

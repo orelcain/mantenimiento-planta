@@ -406,6 +406,23 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
             </Badge>
           )}
         </button>
+        {/* Botón cancelar: limpia archivos en cola sin guardar. Útil cuando
+            el wizard detecta mal el formato o subiste el archivo equivocado. */}
+        {files.length > 0 && !parsing && (
+          <button
+            type="button"
+            onClick={() => {
+              updateFiles(() => [])
+              setError(null)
+              if (inputRef.current) inputRef.current.value = ''
+            }}
+            className="flex items-center gap-1 px-2 py-1.5 rounded-md border border-red-500/40 text-red-500 text-xs font-medium hover:bg-red-500/10 transition-colors"
+            title="Cancelar — limpia los archivos en cola"
+          >
+            <X className="h-3 w-3" />
+            Cancelar
+          </button>
+        )}
         {turnoRange && (
           <span className="text-xs text-muted-foreground">
             {turnoRange.date} · {turnoRange.start}–{turnoRange.end} · {fmt(turnoRange.totalPieces)} pzs
