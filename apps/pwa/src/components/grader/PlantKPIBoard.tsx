@@ -226,6 +226,26 @@ export function PlantKPIBoard({
               </p>
             )}
 
+            {/* Banner: producción mínima → KPIs no representativos.
+                Caso real Yal día 8-may: 10 cycles totales (8+2+0) — el A=100% y
+                pz/min de cada Baader son matemáticamente válidos pero no
+                describen un día productivo. */}
+            {(() => {
+              if (kpis.graderOnly) return null
+              const totalCycles = kpis.machines.reduce((a, m) => a + (m.totalCycles ?? 0), 0)
+              const SIGNIFICANT_CYCLES_THRESHOLD = 100
+              if (totalCycles >= SIGNIFICANT_CYCLES_THRESHOLD) return null
+              return (
+                <p className="text-[10px] text-amber-400/90 flex items-start gap-1 pb-0.5">
+                  <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
+                  <span>
+                    Período sin producción significativa ({totalCycles.toLocaleString('es-CL')} ciclos totales).
+                    Los KPIs son matemáticamente válidos pero no describen un período productivo.
+                  </span>
+                </p>
+              )
+            })()}
+
             {/* ── Fila 1: OEE + A + P + Q ── */}
             <div className="grid grid-cols-4 gap-1.5">
               <KPICard

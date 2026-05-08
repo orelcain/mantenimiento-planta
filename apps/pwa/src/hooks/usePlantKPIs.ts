@@ -34,6 +34,10 @@ export interface MachineKPI {
   mtbfHours: number
   failureCount: number
   shoplogixTargetCpm: number | null
+  /** Total de ciclos de la máquina en el período. Útil para detectar
+   *  períodos sin producción real donde A/P son matemáticamente válidos
+   *  pero no representan un día productivo. */
+  totalCycles: number
 }
 
 export interface PlantKPIs {
@@ -92,6 +96,7 @@ function computeMachineKPI(m: UpstreamMachineShift): MachineKPI {
     mtbfHours:          downtimes.length > 0 ? uptimeSec / downtimes.length / 3600 : uptimeSec / 3600,
     failureCount:       downtimes.length,
     shoplogixTargetCpm: firstInterval ? firstInterval.expectedCycles / 5 : null,
+    totalCycles:        m.totalCycles ?? 0,
   }
 }
 
@@ -130,6 +135,7 @@ function aggregateShifts(
       mtbfHours:          nFailures > 0 ? totalUptimeSec / nFailures / 3600 : totalUptimeSec / 3600,
       failureCount:       nFailures,
       shoplogixTargetCpm: firstInterval ? firstInterval.expectedCycles / 5 : null,
+      totalCycles:        ms.reduce((a, m) => a + (m.totalCycles ?? 0), 0),
     })
   }
 

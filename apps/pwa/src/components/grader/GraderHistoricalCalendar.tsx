@@ -2654,7 +2654,10 @@ export function GraderHistoricalCalendar({
               const hasAllGate0 = hasData && dayHistorical.every((s) => s.hasGate0Data === true)
               const isSelected = selectedDate?.toDateString() === day.toDateString()
 
-              // Indicadores Shoplogix para días sin datos Grader.
+              // Indicadores Shoplogix para días sin datos Grader (o con datos
+              // PARCIALES en plantas no clasificadoras como Yal — el Excel solo
+              // cubre 1 turno, los demás turnos del día deben mostrarse via SLX).
+              //
               // Convención calendárica: el día visual `dayKey` muestra
               //   - Turno 2 / Turno día con dateKey CF == dayKey (tarde-noche del día)
               //   - Turno 1 con dateKey CF == dayKey (mañana del día)
@@ -2662,16 +2665,19 @@ export function GraderHistoricalCalendar({
               //     bajo el día anterior por la convención "día laboral" del CF).
               // prevDayKey siempre computado (necesario para badge SLX + chips noche)
               const prevDayKey = addDaysToDateKey(dayKey, -1)
-              const slxNewDay   = !hasData ? (slxTotalsByShift.get(`${dayKey}__Turno 2`) ?? 0) : 0
-              const slxLegDay   = !hasData ? (slxTotalsByShift.get(`${dayKey}__Turno día`) ?? 0) : 0
+              // En Yal el Excel del turno noche NO cubre los otros turnos —
+              // siempre mostrar SLX disponibles para complementar.
+              const showSlx = !hasData || plantLine.isClassificationPlant === false
+              const slxNewDay   = showSlx ? (slxTotalsByShift.get(`${dayKey}__Turno 2`) ?? 0) : 0
+              const slxLegDay   = showSlx ? (slxTotalsByShift.get(`${dayKey}__Turno día`) ?? 0) : 0
               const slxDayCycles   = slxNewDay > 0 ? slxNewDay : slxLegDay
               // shiftId real para navegar desde chip día
               const slxDayNav = slxNewDay > 0
                 ? { cfDateKey: dayKey, shiftId: 'Turno 2' }
                 : slxLegDay > 0 ? { cfDateKey: dayKey, shiftId: 'Turno día' } : null
-              const slxT3Cycles = !hasData ? (slxTotalsByShift.get(`${prevDayKey}__Turno 3`) ?? 0) : 0
-              const slxT1Cycles = !hasData ? (slxTotalsByShift.get(`${dayKey}__Turno 1`)     ?? 0) : 0
-              const slxLegNight = !hasData ? (slxTotalsByShift.get(`${dayKey}__Turno noche`) ?? 0) : 0
+              const slxT3Cycles = showSlx ? (slxTotalsByShift.get(`${prevDayKey}__Turno 3`) ?? 0) : 0
+              const slxT1Cycles = showSlx ? (slxTotalsByShift.get(`${dayKey}__Turno 1`)     ?? 0) : 0
+              const slxLegNight = showSlx ? (slxTotalsByShift.get(`${dayKey}__Turno noche`) ?? 0) : 0
               const slxNewNight = Math.max(slxT3Cycles, slxT1Cycles)
               const slxNightCycles = slxNewNight > 0 ? slxNewNight : slxLegNight
               // shiftId real para navegar desde chip noche (prefiere T3 madrugada si es mayor)
@@ -2787,8 +2793,11 @@ export function GraderHistoricalCalendar({
                     .filter((chip) => chip.role === 'primary')
                     .map((chip) => renderShiftChip(chip, filterUntagged ? (untaggedCounts.get(chip.summaryId) ?? null) : null, calendarView, slxByShift))}
 
-                  {/* Chips Shoplogix para días sin datos Grader — clicables → TurnoPage */}
-                  {!hasData && hasAnySlx && (() => {
+                  {/* Chips Shoplogix para días sin datos Grader — clicables → TurnoPage.
+                      En Yal (plantas no clasificadoras) también mostrar SLX
+                      cuando hasData=true — el Excel del turno noche no cubre
+                      los demás turnos del día. */}
+                  {showSlx && hasAnySlx && (() => {
                     const lineaQ = plantLineId !== DEFAULT_PLANT_LINE_ID
                       ? `?linea=${encodeURIComponent(plantLineId)}`
                       : ''
