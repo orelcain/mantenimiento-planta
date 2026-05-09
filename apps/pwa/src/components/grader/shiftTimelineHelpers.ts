@@ -159,16 +159,26 @@ export function resolveAxisWindow(
   buckets: TimelineBucket[],
   shiftWindow: ShiftTimeWindow,
   paddingMin: number = 2,
+  outerBounds?: { startMs: number; endMs: number } | null,
 ): AxisWindow {
   const firstBucket = buckets[0]
   const lastBucket = buckets[buckets.length - 1]
   const padMs = paddingMin * 60_000
-  const effectiveStartMs = firstBucket
+  let effectiveStartMs = firstBucket
     ? Date.parse(firstBucket.tsMin) - padMs
     : Date.parse(shiftWindow.startAt)
-  const effectiveEndMs = lastBucket
+  let effectiveEndMs = lastBucket
     ? Date.parse(lastBucket.tsMin) + padMs
     : Date.parse(shiftWindow.endAt)
+
+  // outerBounds (típicamente rango SLX completo) extiende el eje para que el
+  // Grader se vea como una "isla" dentro del turno upstream. El supervisor
+  // identifica visualmente la cobertura Grader vs el turno real → señal para
+  // subir más Excel parciales.
+  if (outerBounds) {
+    if (Number.isFinite(outerBounds.startMs)) effectiveStartMs = Math.min(effectiveStartMs, outerBounds.startMs)
+    if (Number.isFinite(outerBounds.endMs))   effectiveEndMs   = Math.max(effectiveEndMs, outerBounds.endMs)
+  }
 
   const maxSlots = 24 * 60
   const totalMinutes = Math.min(maxSlots, Math.max(1, Math.round((effectiveEndMs - effectiveStartMs) / 60_000)))

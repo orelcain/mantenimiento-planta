@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '3.21.2' as const
+export const APP_VERSION = '3.21.3' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-05-09' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'fix(upstream-panel): eje base usa rango SLX completo, Grader se adapta dentro' as const
+export const VERSION_NAME = 'fix(grader-timeline): chart Grader extiende eje a SLX + remueve fondo violeta' as const
 
 /**
  * Nota:
