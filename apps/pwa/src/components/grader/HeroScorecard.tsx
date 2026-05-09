@@ -40,26 +40,6 @@ const VERDICT_STYLE = {
   },
 }
 
-interface MetricTileProps {
-  label: string
-  value: string
-  sub?: string
-  tooltip?: string
-}
-
-function MetricTile({ label, value, sub, tooltip }: MetricTileProps) {
-  return (
-    <div
-      className={tooltip ? 'text-center cursor-help' : 'text-center'}
-      title={tooltip}
-    >
-      <div className="text-lg font-semibold tabular-nums">{value}</div>
-      <div className="text-xs text-muted-foreground">{label}</div>
-      {sub && <div className="text-xs text-muted-foreground/70">{sub}</div>}
-    </div>
-  )
-}
-
 interface HeroScorecardProps {
   summary: GraderDailySummary
   shiftWindow: ShiftTimeWindow
