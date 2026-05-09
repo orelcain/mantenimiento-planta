@@ -261,3 +261,39 @@ export function fullShiftLabel(shiftId: string): string {
 export function isShiftDayLike(shiftId: string): boolean {
   return getShiftMeta(shiftId).isDayLike
 }
+
+// ============================================================================
+// UMBRAL DE RUIDO PARA TURNOS SHOPLOGIX
+// ============================================================================
+// Un turno productivo real procesa cientos a decenas de miles de ciclos
+// Baader. Cualquier turno con menos de SLX_NOISE_THRESHOLD ciclos es ruido:
+// estados Unscheduled mal taggeados, paros con algún ciclo aislado, datos
+// residuales pre-startup, etc.
+//
+// IMPORTANTE: cualquier UI que muestre datos SLX al usuario (chips,
+// badges, cards, panels mensuales) DEBE filtrar con esta constante para
+// evitar mostrar "D 4" o "Mejor turno · 5 cic" como si fueran datos reales.
+//
+// Alineado con UNSCHEDULED_MIN_CYCLES en shoplogixShift.service.ts.
+
+export const SLX_NOISE_THRESHOLD = 50
+
+/**
+ * `true` si un total de ciclos representa un turno productivo significativo
+ * (no ruido). Usar este helper en lugar de comparar contra `> 0` para que
+ * sea inevitable aplicar el umbral correcto en cualquier nueva UI.
+ */
+export function isSignificantCycleCount(totalCycles: number | null | undefined): boolean {
+  if (totalCycles == null || !Number.isFinite(totalCycles)) return false
+  return totalCycles >= SLX_NOISE_THRESHOLD
+}
+
+/**
+ * `true` si un SlxShiftCache tiene producción significativa.
+ * Acepta cualquier objeto con `.totalCycles` (cache real o virtual).
+ */
+export function isSignificantSlxShift(
+  cache: { totalCycles?: number } | null | undefined,
+): boolean {
+  return isSignificantCycleCount(cache?.totalCycles)
+}

@@ -62,6 +62,7 @@ import {
   cfKeysForVisualDay,
   addDaysToDateKey,
   getShiftMeta,
+  isSignificantCycleCount,
 } from '@/services/grader/graderShiftDisplay'
 import { MachineTrendMiniChart } from './UpstreamMachinesPanel'
 import { getPlantLineConfig, DEFAULT_PLANT_LINE_ID, type PlantLineId } from '@/config/plantLines'
@@ -1093,9 +1094,10 @@ export function GraderHistoricalCalendar({
     const latestUpload = uploads.length > 0
       ? uploads.map((u) => u.sessionDate || toDateKey(u.inferred?.startAt)).filter(Boolean).sort().slice(-1)[0]
       : undefined
-    // Fallback: último día con datos Shoplogix (útil cuando no hay Excel, ej. Yal)
+    // Fallback: último día con datos Shoplogix significativos (umbral >=50,
+    // descarta turnos ruidosos para no auto-seleccionar un día con 4 ciclos).
     const slxDays = [...slxByShift.entries()]
-      .filter(([, v]) => v.totalCycles > 0)
+      .filter(([, v]) => isSignificantCycleCount(v.totalCycles))
       .map(([k]) => k.split('__')[0]!)
     slxDays.sort()
     const latestSlx = slxDays[slxDays.length - 1]
@@ -1166,8 +1168,10 @@ export function GraderHistoricalCalendar({
     const year  = currentMonth.getFullYear()
     const month = currentMonth.getMonth()
     const prefix = `${year}-${String(month + 1).padStart(2, '0')}-`
+    // Solo días con turnos SLX significativos (>=SLX_NOISE_THRESHOLD ciclos).
+    // Días que solo tienen ruido no entran al carrusel ni a las flechas ◀▶.
     for (const [cacheKey, cycles] of slxTotalsByShift) {
-      if (cycles > 0) {
+      if (isSignificantCycleCount(cycles)) {
         const dateKey = cacheKey.split('__')[0] ?? ''
         if (dateKey.startsWith(prefix)) keys.add(dateKey)
       }
@@ -1219,9 +1223,8 @@ export function GraderHistoricalCalendar({
       const hasExcelDay = seenShifts.has('Turno día')
         || seenShifts.has('Turno 1') || seenShifts.has('Turno 2')
       const hasExcelNight = seenShifts.has('Turno noche') || seenShifts.has('Turno 3')
-      // Umbral mínimo para crear card virtual SLX. Por debajo de 50 ciclos es
-      // ruido (igual que SLX_NOISE_THRESHOLD del calendar y stats mensuales).
-      const VIRTUAL_NOISE_THRESHOLD = 50
+      // Filtro de ruido SLX vía helper centralizado: por debajo del umbral
+      // SLX_NOISE_THRESHOLD no se crea card virtual (sería ruido visible).
 
       // Día: T1+T2 nuevos (sumados) o legacy "Turno día"
       if (!hasExcelDay) {
@@ -1230,7 +1233,7 @@ export function GraderHistoricalCalendar({
         const tLeg = slxTotalsByShift.get(`${key}__Turno día`) ?? 0
         const newDayCycles = t1 + t2
 
-        if (newDayCycles >= VIRTUAL_NOISE_THRESHOLD) {
+        if (isSignificantCycleCount(newDayCycles)) {
           const cT1 = slxByShift.get(`${key}__Turno 1`)
           const cT2 = slxByShift.get(`${key}__Turno 2`)
           const start = cT1?.scheduledStart ?? cT2?.scheduledStart ?? null
@@ -1261,7 +1264,7 @@ export function GraderHistoricalCalendar({
             },
             chip: null,
           })
-        } else if (tLeg >= VIRTUAL_NOISE_THRESHOLD) {
+        } else if (isSignificantCycleCount(tLeg)) {
           const c = slxByShift.get(`${key}__Turno día`)
           out.push({
             summary: {
@@ -1288,7 +1291,7 @@ export function GraderHistoricalCalendar({
       if (!hasExcelNight) {
         const t3 = slxTotalsByShift.get(`${key}__Turno 3`) ?? 0
         const tLegN = slxTotalsByShift.get(`${key}__Turno noche`) ?? 0
-        if (t3 >= VIRTUAL_NOISE_THRESHOLD) {
+        if (isSignificantCycleCount(t3)) {
           const c = slxByShift.get(`${key}__Turno 3`)
           out.push({
             summary: {
@@ -1308,7 +1311,7 @@ export function GraderHistoricalCalendar({
             },
             chip: null,
           })
-        } else if (tLegN >= VIRTUAL_NOISE_THRESHOLD) {
+        } else if (isSignificantCycleCount(tLegN)) {
           const c = slxByShift.get(`${key}__Turno noche`)
           out.push({
             summary: {
@@ -1837,21 +1840,18 @@ export function GraderHistoricalCalendar({
     let totalCycles = 0
     let sumUptime = 0
     const daySet = new Set<string>()
-    // Umbral mínimo de ciclos para considerar un turno como "real" en stats
-    // mensuales. Por debajo de este, el turno se descarta como ruido. Mismo
-    // criterio que los chips del calendar (SLX_NOISE_THRESHOLD = 50).
-    const MONTHLY_NOISE_THRESHOLD = 50
     // Iterar todos los shifts del mapa (soporta Turno día/noche legado + Turno 1/2/3 nuevo)
-    // De-duplicar: si existe nuevo formato, ignorar legado equivalente del mismo día.
+    // De-duplicar: si existe nuevo formato significativo, ignorar legado del mismo día.
+    // Filtro de ruido vía `isSignificantCycleCount` (umbral SLX_NOISE_THRESHOLD).
     for (const [key, cache] of slxByShift) {
       if (!key.startsWith(prefix)) continue
-      if (cache.totalCycles < MONTHLY_NOISE_THRESHOLD) continue
+      if (!isSignificantCycleCount(cache.totalCycles)) continue
       const dk      = key.slice(0, 10)   // 'YYYY-MM-DD'
       const shiftId = key.slice(12)      // 'Turno X' (saltar 'YYYY-MM-DD__')
-      // Skip legado si ya existe nuevo formato para ese día (con datos significativos)
-      if (shiftId === 'Turno día'   && (slxByShift.get(`${dk}__Turno 2`)?.totalCycles    ?? 0) >= MONTHLY_NOISE_THRESHOLD) continue
-      if (shiftId === 'Turno noche' && ((slxByShift.get(`${dk}__Turno 1`)?.totalCycles   ?? 0) >= MONTHLY_NOISE_THRESHOLD
-                                      || (slxByShift.get(`${dk}__Turno 3`)?.totalCycles  ?? 0) >= MONTHLY_NOISE_THRESHOLD)) continue
+      // Skip legado si ya existe nuevo formato significativo para ese día
+      if (shiftId === 'Turno día'   && isSignificantCycleCount(slxByShift.get(`${dk}__Turno 2`)?.totalCycles)) continue
+      if (shiftId === 'Turno noche' && (isSignificantCycleCount(slxByShift.get(`${dk}__Turno 1`)?.totalCycles)
+                                      || isSignificantCycleCount(slxByShift.get(`${dk}__Turno 3`)?.totalCycles))) continue
       const uptimePct = cache.avgShiftRuntime * 100
       withData.push({ dateKey: dk, shiftId, uptimePct, totalCycles: cache.totalCycles })
       totalCycles += cache.totalCycles
@@ -1889,18 +1889,17 @@ export function GraderHistoricalCalendar({
     const month = currentMonth.getMonth()
     const prefix = `${year}-${String(month + 1).padStart(2, '0')}-`
     const reasonMap = new Map<string, { durationSec: number; color: string; count: number }>()
-    // Mismo umbral que stats mensuales: turnos con <50 ciclos son ruido
-    // y sus paros no se computan al pareto del mes.
-    const PARETO_NOISE_THRESHOLD = 50
+    // Filtro de ruido SLX vía helper centralizado: turnos con <SLX_NOISE_THRESHOLD
+    // ciclos no aportan al pareto del mes (paros aislados, datos pre-startup).
     for (const [key, cache] of slxByShift) {
       if (!key.startsWith(prefix)) continue
-      if (cache.totalCycles < PARETO_NOISE_THRESHOLD) continue
+      if (!isSignificantCycleCount(cache.totalCycles)) continue
       const dk      = key.slice(0, 10)
       const shiftId = key.slice(12)
-      // Saltar legado si ya existe nuevo formato (igual que slxMonthlyStats)
-      if (shiftId === 'Turno día'   && (slxByShift.get(`${dk}__Turno 2`)?.totalCycles    ?? 0) >= PARETO_NOISE_THRESHOLD) continue
-      if (shiftId === 'Turno noche' && ((slxByShift.get(`${dk}__Turno 1`)?.totalCycles   ?? 0) >= PARETO_NOISE_THRESHOLD
-                                      || (slxByShift.get(`${dk}__Turno 3`)?.totalCycles  ?? 0) >= PARETO_NOISE_THRESHOLD)) continue
+      // Saltar legado si ya existe nuevo formato significativo (igual que slxMonthlyStats)
+      if (shiftId === 'Turno día'   && isSignificantCycleCount(slxByShift.get(`${dk}__Turno 2`)?.totalCycles)) continue
+      if (shiftId === 'Turno noche' && (isSignificantCycleCount(slxByShift.get(`${dk}__Turno 1`)?.totalCycles)
+                                      || isSignificantCycleCount(slxByShift.get(`${dk}__Turno 3`)?.totalCycles))) continue
       for (const s of cache.states) {
         if (s.type !== 'downtime') continue
         const reason = s.name || s.reason || 'Sin causa'
@@ -1972,21 +1971,21 @@ export function GraderHistoricalCalendar({
     const night: MachineTrendPoint[] = []
     for (let d = 1; d <= daysInMonth; d++) {
       const dk = `${prefix}${String(d).padStart(2, '0')}`
-      // Day: Turno 2 (nuevo) > Turno día (legado)
+      // Day: Turno 2 (nuevo) > Turno día (legado). Solo ciclos significativos.
       const dayCache = slxByShift.get(`${dk}__Turno 2`) ?? slxByShift.get(`${dk}__Turno día`) ?? null
-      if (dayCache && dayCache.totalCycles > 0) {
+      if (dayCache && isSignificantCycleCount(dayCache.totalCycles)) {
         const shiftId = slxByShift.has(`${dk}__Turno 2`) ? 'Turno 2' : 'Turno día'
         day.push({ dateKey: dk, shiftId, overallRatio: dayCache.overallRatio, shiftRuntime: dayCache.avgShiftRuntime, totalCycles: dayCache.totalCycles })
       }
       // Night: el de mayor ciclos entre Turno 1/3 (nuevo) > Turno noche (legado)
       const newNights = (['Turno 1', 'Turno 3'] as string[])
         .map(id => ({ id, c: slxByShift.get(`${dk}__${id}`) ?? null }))
-        .filter((x): x is { id: string; c: SlxShiftCache } => x.c !== null && x.c.totalCycles > 0)
+        .filter((x): x is { id: string; c: SlxShiftCache } => x.c !== null && isSignificantCycleCount(x.c.totalCycles))
         .sort((a, b) => b.c.totalCycles - a.c.totalCycles)
       const nightEntry  = newNights[0] ?? null
       const nightCache  = nightEntry?.c ?? slxByShift.get(`${dk}__Turno noche`) ?? null
       const nightShiftId = nightEntry?.id ?? 'Turno noche'
-      if (nightCache && nightCache.totalCycles > 0) {
+      if (nightCache && isSignificantCycleCount(nightCache.totalCycles)) {
         night.push({ dateKey: dk, shiftId: nightShiftId, overallRatio: nightCache.overallRatio, shiftRuntime: nightCache.avgShiftRuntime, totalCycles: nightCache.totalCycles })
       }
     }
@@ -2927,24 +2926,20 @@ export function GraderHistoricalCalendar({
               const slxNightNav = slxT3Cycles > 0
                 ? { cfDateKey: dayKey, shiftId: 'Turno 3' }
                 : slxLegNight > 0 ? { cfDateKey: dayKey, shiftId: 'Turno noche' } : null
-              // Umbral mínimo para considerar un turno SLX como "real".
-              // Por debajo de este número, los chips/badges se ocultan porque
-              // representan ruido (estados Unscheduled residuales, paros con
-              // algún ciclo aislado, datos pre-startup). Un turno productivo
-              // tiene cientos a decenas de miles de ciclos. Alineado con
-              // UNSCHEDULED_MIN_CYCLES en shoplogixShift.service.ts.
-              const SLX_NOISE_THRESHOLD = 50
-              const hasSlxDay   = slxDayCycles   >= SLX_NOISE_THRESHOLD
-              const hasSlxNight = slxNightCycles >= SLX_NOISE_THRESHOLD
+              // Filtra ruido SLX (turnos con <SLX_NOISE_THRESHOLD ciclos).
+              // Centralizado en `isSignificantCycleCount` para garantizar
+              // consistencia con chips, stats mensuales, pareto y virtuals.
+              const hasSlxDay   = isSignificantCycleCount(slxDayCycles)
+              const hasSlxNight = isSignificantCycleCount(slxNightCycles)
               const hasAnySlx   = hasSlxDay || hasSlxNight
               // Badge de fuente: SLX existe si hay ciclos significativos en
               // cualquier turno del día (se verifica independiente de hasData
-              // para mostrar badge incluso en días Grader). Mismo umbral 50.
-              const hasSLXBadge = (slxTotalsByShift.get(`${dayKey}__Turno 2`) ?? 0) >= SLX_NOISE_THRESHOLD
-                || (slxTotalsByShift.get(`${dayKey}__Turno día`) ?? 0) >= SLX_NOISE_THRESHOLD
-                || (slxTotalsByShift.get(`${dayKey}__Turno 3`) ?? 0) >= SLX_NOISE_THRESHOLD
-                || (slxTotalsByShift.get(`${dayKey}__Turno 1`) ?? 0) >= SLX_NOISE_THRESHOLD
-                || (slxTotalsByShift.get(`${dayKey}__Turno noche`) ?? 0) >= SLX_NOISE_THRESHOLD
+              // para mostrar badge incluso en días Grader).
+              const hasSLXBadge = isSignificantCycleCount(slxTotalsByShift.get(`${dayKey}__Turno 2`))
+                || isSignificantCycleCount(slxTotalsByShift.get(`${dayKey}__Turno día`))
+                || isSignificantCycleCount(slxTotalsByShift.get(`${dayKey}__Turno 3`))
+                || isSignificantCycleCount(slxTotalsByShift.get(`${dayKey}__Turno 1`))
+                || isSignificantCycleCount(slxTotalsByShift.get(`${dayKey}__Turno noche`))
               // Uptime% desde slxByShift. Para "Día" (T1+T2) se promedia el
               // uptime cuando hay ambos. Para "Noche" se usa T3 del propio día.
               const slxDayUptimePct = hasSlxDay

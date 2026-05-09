@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '3.27.3' as const
+export const APP_VERSION = '3.27.4' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-05-09' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'fix(calendar): umbral 50 ciclos para descartar chips SLX ruido (D 4, D 5)' as const
+export const VERSION_NAME = 'refactor(slx-noise): umbral centralizado isSignificantCycleCount evita regresión' as const
 
 /**
  * Nota:
