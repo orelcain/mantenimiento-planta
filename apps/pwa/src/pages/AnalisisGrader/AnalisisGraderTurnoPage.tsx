@@ -1317,6 +1317,7 @@ export function AnalisisGraderTurnoPage() {
                 shiftWindow={shiftWindow}
                 upstreamSnapshot={upstreamLine.snapshot}
                 marelHgCapture={marelHgCapture}
+                upstreamSyncedAt={upstreamLine.syncedAt}
               />
               {/* Marel HG (corta-cabeza) solo aplica en Chonchi — Yal solo
                   eviscera, los salmones salen con cabeza al camión. Ocultar
