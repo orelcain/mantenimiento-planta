@@ -680,6 +680,17 @@ export interface GraderDailySummary {
   /** Cantidad de pausas (≥5min) persistidas en sub-coll `meta/pauses`. */
   pausesCount?: number;
 
+  // ── Marcadores runtime-only (NO se persisten a Firestore) ──────────────────
+  /**
+   * Marca un summary "virtual" construido en cliente desde datos Shoplogix
+   * cuando NO existe Excel cargado para ese turno (ej. Yal con SLX-only).
+   * Permite mostrar una card en el panel "Resumen del día" para que el usuario
+   * vea el turno aunque no haya Excel. Nunca se escribe a Firestore.
+   */
+  isSlxVirtual?: boolean;
+  /** Fracción uptime SLX (0-1) — solo virtuals. Sustituye P0% en la card. */
+  slxUptimeFraction?: number;
+
   // NOTA: Los agregados por minuto para el timeline chart NO viven en este
   // doc. Están en la sub-collection `graderDailySummaries/{id}/meta/timeline`
   // (ver saveTimelineAggregates / loadTimelineAggregates). Motivo: las queries

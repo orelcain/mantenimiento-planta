@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '3.21.5' as const
+export const APP_VERSION = '3.22.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-05-09' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'fix(hero-scorecard): separar Shoplogix (en vivo) de Grader (subido) en columnas' as const
+export const VERSION_NAME = 'feat(grader-calendar): summaries virtuales SLX para turnos sin Excel (Yal)' as const
 
 /**
  * Nota:

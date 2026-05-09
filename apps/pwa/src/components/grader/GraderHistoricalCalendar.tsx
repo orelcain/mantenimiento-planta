@@ -325,7 +325,7 @@ function enrichEntriesByKind(
         fragSuffix = 'sal'
       } else if (
         (chip?.direction === 'same' && summary.shiftId === 'Turno noche') ||
-        (!chip && summary.shiftId === 'Turno noche')
+        (!chip && (summary.shiftId === 'Turno noche' || summary.shiftId === 'Turno 3'))
       ) {
         kind = 'noche'
         sortMin = getStartMinutesUTC(summary.startAt) ?? 21 * 60
@@ -1185,15 +1185,143 @@ export function GraderHistoricalCalendar({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, []) // refs y setters de useState son estables entre renders
 
+  // Construye "summaries virtuales" desde datos Shoplogix para shifts SIN Excel.
+  // Solo aplica a plantas SLX-only (isClassificationPlant === false, ej. Yal).
+  // Permite ver el turno en el panel "Resumen del día" aunque el usuario no
+  // haya cargado el Excel del Marelec — evita que la card desaparezca cuando
+  // existen ciclos Baader medidos por Shoplogix.
+  const buildSlxVirtualSummaries = useCallback(
+    (key: string, seenShifts: Set<string>): Array<{ summary: GraderDailySummary; chip: null }> => {
+      if (plantLine.isClassificationPlant !== false) return []
+      const out: Array<{ summary: GraderDailySummary; chip: null }> = []
+      const hasExcelDay = seenShifts.has('Turno día')
+        || seenShifts.has('Turno 1') || seenShifts.has('Turno 2')
+      const hasExcelNight = seenShifts.has('Turno noche') || seenShifts.has('Turno 3')
+
+      // Día: T1+T2 nuevos (sumados) o legacy "Turno día"
+      if (!hasExcelDay) {
+        const t1 = slxTotalsByShift.get(`${key}__Turno 1`) ?? 0
+        const t2 = slxTotalsByShift.get(`${key}__Turno 2`) ?? 0
+        const tLeg = slxTotalsByShift.get(`${key}__Turno día`) ?? 0
+        const newDayCycles = t1 + t2
+
+        if (newDayCycles > 0) {
+          const cT1 = slxByShift.get(`${key}__Turno 1`)
+          const cT2 = slxByShift.get(`${key}__Turno 2`)
+          const start = cT1?.scheduledStart ?? cT2?.scheduledStart ?? null
+          const end = cT2?.scheduledEnd ?? cT1?.scheduledEnd ?? null
+          const samples = [
+            t1 > 0 ? cT1?.avgShiftRuntime : null,
+            t2 > 0 ? cT2?.avgShiftRuntime : null,
+          ].filter((x): x is number => typeof x === 'number' && x > 0)
+          const avgUptime = samples.length > 0
+            ? samples.reduce((a, b) => a + b, 0) / samples.length : 0
+          // Navegación: preferir el turno con más ciclos (más representativo)
+          const navShift = t2 >= t1 && t2 > 0 ? 'Turno 2' : 'Turno 1'
+          out.push({
+            summary: {
+              id: `slx-virtual:${key}__day`,
+              dateKey: key,
+              shiftId: navShift,
+              plantLineId,
+              totalPieces: newDayCycles,
+              pointZeroPieces: 0,
+              pointZeroPct: 0,
+              startAt: start ? start.toISOString() : undefined,
+              endAt: end ? end.toISOString() : undefined,
+              updatedBy: 'shoplogix',
+              updatedAt: '',
+              isSlxVirtual: true,
+              slxUptimeFraction: avgUptime,
+            },
+            chip: null,
+          })
+        } else if (tLeg > 0) {
+          const c = slxByShift.get(`${key}__Turno día`)
+          out.push({
+            summary: {
+              id: `slx-virtual:${key}__dia-legacy`,
+              dateKey: key,
+              shiftId: 'Turno día',
+              plantLineId,
+              totalPieces: tLeg,
+              pointZeroPieces: 0,
+              pointZeroPct: 0,
+              startAt: c?.scheduledStart?.toISOString(),
+              endAt: c?.scheduledEnd?.toISOString(),
+              updatedBy: 'shoplogix',
+              updatedAt: '',
+              isSlxVirtual: true,
+              slxUptimeFraction: c?.avgShiftRuntime ?? 0,
+            },
+            chip: null,
+          })
+        }
+      }
+
+      // Noche: T3 (arranca en este día) o legacy "Turno noche"
+      if (!hasExcelNight) {
+        const t3 = slxTotalsByShift.get(`${key}__Turno 3`) ?? 0
+        const tLegN = slxTotalsByShift.get(`${key}__Turno noche`) ?? 0
+        if (t3 > 0) {
+          const c = slxByShift.get(`${key}__Turno 3`)
+          out.push({
+            summary: {
+              id: `slx-virtual:${key}__t3`,
+              dateKey: key,
+              shiftId: 'Turno 3',
+              plantLineId,
+              totalPieces: t3,
+              pointZeroPieces: 0,
+              pointZeroPct: 0,
+              startAt: c?.scheduledStart?.toISOString(),
+              endAt: c?.scheduledEnd?.toISOString(),
+              updatedBy: 'shoplogix',
+              updatedAt: '',
+              isSlxVirtual: true,
+              slxUptimeFraction: c?.avgShiftRuntime ?? 0,
+            },
+            chip: null,
+          })
+        } else if (tLegN > 0) {
+          const c = slxByShift.get(`${key}__Turno noche`)
+          out.push({
+            summary: {
+              id: `slx-virtual:${key}__noche-legacy`,
+              dateKey: key,
+              shiftId: 'Turno noche',
+              plantLineId,
+              totalPieces: tLegN,
+              pointZeroPieces: 0,
+              pointZeroPct: 0,
+              startAt: c?.scheduledStart?.toISOString(),
+              endAt: c?.scheduledEnd?.toISOString(),
+              updatedBy: 'shoplogix',
+              updatedAt: '',
+              isSlxVirtual: true,
+              slxUptimeFraction: c?.avgShiftRuntime ?? 0,
+            },
+            chip: null,
+          })
+        }
+      }
+
+      return out
+    },
+    [plantLine.isClassificationPlant, plantLineId, slxByShift, slxTotalsByShift],
+  )
+
   // Summaries a mostrar en el panel "Resumen del día" para el día seleccionado.
   // Combina:
   //  - Contribuciones calendáricas reales (chips primary/secondary)
   //  - Summaries con dateKey legacy === selectedKey que no aportan (huérfanos)
-  // Orden: primary > secondary > orphan-source; D antes que N dentro de cada rol.
+  //  - Virtuales SLX para shifts sin Excel (plantas SLX-only)
+  // Orden: primary > secondary > orphan-source > virtual; D antes que N dentro de cada rol.
   const summariesForSelectedDay = useMemo(() => {
     if (!selectedKey) return [] as Array<{ summary: GraderDailySummary; chip: ShiftChipDescriptor | null }>
     const out: Array<{ summary: GraderDailySummary; chip: ShiftChipDescriptor | null }> = []
     const seen = new Set<string>()
+    const seenShifts = new Set<string>()
     const dayChips = chipsByDate.get(selectedKey) ?? []
 
     // 1. Aportes reales (primary + secondary)
@@ -1203,6 +1331,7 @@ export function GraderHistoricalCalendar({
       if (s && !seen.has(s.id)) {
         out.push({ summary: s, chip })
         seen.add(s.id)
+        seenShifts.add(s.shiftId)
       }
     }
     // 2. Huérfanos: summaries con dateKey legacy === selectedKey sin aporte
@@ -1211,20 +1340,29 @@ export function GraderHistoricalCalendar({
       const orphanChip = dayChips.find((c) => c.summaryId === s.id && c.role === 'orphan-source') ?? null
       out.push({ summary: s, chip: orphanChip })
       seen.add(s.id)
+      seenShifts.add(s.shiftId)
     }
-    // Ordenamiento determinista
+    // 3. Virtuales SLX para turnos sin Excel (Yal y similares)
+    for (const v of buildSlxVirtualSummaries(selectedKey, seenShifts)) out.push(v)
+
+    // Ordenamiento determinista (virtuales al final dentro de cada shift)
     const roleOrder: Record<string, number> = { primary: 0, secondary: 1, 'orphan-source': 2 }
-    const shiftOrder: Record<string, number> = { 'Turno día': 0, 'Turno noche': 1 }
+    const shiftOrder: Record<string, number> = {
+      'Turno día': 0, 'Turno 1': 0, 'Turno 2': 0,
+      'Turno noche': 1, 'Turno 3': 1,
+    }
     out.sort((a, b) => {
-      const ra = roleOrder[a.chip?.role ?? 'primary'] ?? 0
-      const rb = roleOrder[b.chip?.role ?? 'primary'] ?? 0
+      const aVirt = a.summary.isSlxVirtual ? 1 : 0
+      const bVirt = b.summary.isSlxVirtual ? 1 : 0
+      const ra = aVirt ? 3 : (roleOrder[a.chip?.role ?? 'primary'] ?? 0)
+      const rb = bVirt ? 3 : (roleOrder[b.chip?.role ?? 'primary'] ?? 0)
       if (ra !== rb) return ra - rb
       const sa = shiftOrder[a.summary.shiftId] ?? 9
       const sb = shiftOrder[b.summary.shiftId] ?? 9
       return sa - sb
     })
     return out
-  }, [selectedKey, chipsByDate, historicalByDate, summariesById])
+  }, [selectedKey, chipsByDate, historicalByDate, summariesById, buildSlxVirtualSummaries])
 
   // Generalización de summariesForSelectedDay para cualquier clave (slides adyacentes)
   const getSummariesForDay = useCallback(
@@ -1232,20 +1370,28 @@ export function GraderHistoricalCalendar({
       if (!key) return []
       const out: Array<{ summary: GraderDailySummary; chip: ShiftChipDescriptor | null }> = []
       const seen = new Set<string>()
+      const seenShifts = new Set<string>()
       const dayChips = chipsByDate.get(key) ?? []
       for (const chip of dayChips) {
         if (chip.role === 'orphan-source') continue
         const s = summariesById.get(chip.summaryId)
-        if (s && !seen.has(s.id)) { out.push({ summary: s, chip }); seen.add(s.id) }
+        if (s && !seen.has(s.id)) {
+          out.push({ summary: s, chip })
+          seen.add(s.id)
+          seenShifts.add(s.shiftId)
+        }
       }
       for (const s of historicalByDate.get(key) ?? []) {
         if (seen.has(s.id)) continue
         const orphanChip = dayChips.find((c) => c.summaryId === s.id && c.role === 'orphan-source') ?? null
-        out.push({ summary: s, chip: orphanChip }); seen.add(s.id)
+        out.push({ summary: s, chip: orphanChip })
+        seen.add(s.id)
+        seenShifts.add(s.shiftId)
       }
+      for (const v of buildSlxVirtualSummaries(key, seenShifts)) out.push(v)
       return out
     },
-    [chipsByDate, historicalByDate, summariesById],
+    [chipsByDate, historicalByDate, summariesById, buildSlxVirtualSummaries],
   )
 
   // Slides adyacentes (Paso 3b): claves y entradas del día anterior y siguiente
@@ -2112,7 +2258,10 @@ export function GraderHistoricalCalendar({
                 ? ''
                 : `${visibleIdx}/${visibleCount}`
             const meta = KIND_META[kind]
-            const status = p0StatusFromPct(hist.pointZeroPct)
+            const isVirtual = hist.isSlxVirtual === true
+            // Virtuals SLX: no hay P0% real → usar 'ok' (color emerald) por defecto
+            // y mostrar uptime% en su lugar del P0%.
+            const status = isVirtual ? 'ok' : p0StatusFromPct(hist.pointZeroPct)
             const fragPieces = chip?.pieces ?? hist.totalPieces
             const fragP0Pieces = chip?.pointZeroPieces ?? hist.pointZeroPieces
             const fragWeight = chip?.weightKg ?? hist.totalWeightKg
@@ -2135,9 +2284,12 @@ export function GraderHistoricalCalendar({
               )
             // Click en cuerpo de card: en slide seleccionado alterna selectedHistorical
             // (legacy del wizard); en slides adyacentes navega directo al TurnoPage.
-            const onCardClick = isSelectedSlide
-              ? () => setSelectedHistorical(isActiveForConfig ? null : hist)
-              : navigateToTurno
+            // Virtuals SLX no se seleccionan en el store (no son persisted) → navegan directo.
+            const onCardClick = isVirtual
+              ? navigateToTurno
+              : isSelectedSlide
+                ? () => setSelectedHistorical(isActiveForConfig ? null : hist)
+                : navigateToTurno
 
 
             // ── Salida (orphan-source): strip compacto que invita a deslizar
@@ -2251,7 +2403,7 @@ export function GraderHistoricalCalendar({
                         {configChangeCounts.get(hist.id)}
                       </span>
                     )}
-                    {showLossBadge && (
+                    {showLossBadge && !isVirtual && (
                       <span
                         className="inline-flex items-center gap-0.5 text-[9px] px-1 py-0.5 rounded bg-rose-500/15 text-rose-600 border border-rose-500/30 font-medium shrink-0"
                         title={`Grader registró ${hist.totalPieces.toLocaleString('es-CL')} piezas. Baader 142 procesó ${slxBaader.toLocaleString('es-CL')} upstream. Posible pérdida de data en este turno (~${baaderLossPct.toFixed(1)}%).`}
@@ -2260,15 +2412,32 @@ export function GraderHistoricalCalendar({
                         −{baaderLossPct.toFixed(0)}% vs Baader
                       </span>
                     )}
-                  </div>
-                  <span
-                    className={cn(
-                      'text-xl font-bold tabular-nums',
-                      p0StatusColor(status),
+                    {isVirtual && (
+                      <span
+                        className="inline-flex items-center gap-0.5 text-[9px] px-1 py-0.5 rounded bg-sky-500/15 text-sky-500 border border-sky-500/30 font-medium shrink-0"
+                        title="Sin Excel del Marelec cargado. Datos derivados de Shoplogix (ciclos Baader)."
+                      >
+                        Solo Shoplogix
+                      </span>
                     )}
-                  >
-                    {hist.pointZeroPct}%
-                  </span>
+                  </div>
+                  {isVirtual ? (
+                    <span
+                      className="text-xl font-bold tabular-nums text-sky-500"
+                      title={`Uptime promedio Baader (${((hist.slxUptimeFraction ?? 0) * 100).toFixed(0)}% del turno).`}
+                    >
+                      {((hist.slxUptimeFraction ?? 0) * 100).toFixed(0)}%
+                    </span>
+                  ) : (
+                    <span
+                      className={cn(
+                        'text-xl font-bold tabular-nums',
+                        p0StatusColor(status),
+                      )}
+                    >
+                      {hist.pointZeroPct}%
+                    </span>
+                  )}
                 </div>
                 <p className="text-[11px] text-muted-foreground leading-tight">
                   {hist.shiftId}
@@ -2279,8 +2448,11 @@ export function GraderHistoricalCalendar({
                   {chip?.pctOfShift != null && chip.pctOfShift < 100 && (
                     <span className="opacity-70"> · {Math.round(chip.pctOfShift)}% del turno aquí</span>
                   )}
+                  {isVirtual && (
+                    <span className="opacity-70"> · Uptime Baader</span>
+                  )}
                 </p>
-                {hist.hasPieceData !== undefined && (!hist.hasPieceData || !hist.hasGate0Data) && (
+                {!isVirtual && hist.hasPieceData !== undefined && (!hist.hasPieceData || !hist.hasGate0Data) && (
                   <div className="flex flex-wrap gap-1">
                     {!hist.hasPieceData && (
                       <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/15 text-red-600 font-medium">
@@ -2296,14 +2468,16 @@ export function GraderHistoricalCalendar({
                 )}
                 <div className="grid grid-cols-2 gap-1.5 text-xs">
                   <div className="rounded bg-background/60 px-2 py-1">
-                    <p className="text-muted-foreground">Piezas</p>
+                    <p className="text-muted-foreground">{isVirtual ? 'Ciclos Baader' : 'Piezas'}</p>
                     <p className="font-semibold tabular-nums">{fragPieces.toLocaleString('es-CL')}</p>
                   </div>
-                  <div className="rounded bg-background/60 px-2 py-1">
-                    <p className="text-muted-foreground">P0 piezas</p>
-                    <p className="font-semibold tabular-nums">{fragP0Pieces.toLocaleString('es-CL')}</p>
-                  </div>
-                  {fragWeight != null && (
+                  {!isVirtual && (
+                    <div className="rounded bg-background/60 px-2 py-1">
+                      <p className="text-muted-foreground">P0 piezas</p>
+                      <p className="font-semibold tabular-nums">{fragP0Pieces.toLocaleString('es-CL')}</p>
+                    </div>
+                  )}
+                  {!isVirtual && fragWeight != null && (
                     <div className="rounded bg-background/60 px-2 py-1">
                       <p className="text-muted-foreground">Peso</p>
                       <p className="font-semibold tabular-nums">
@@ -2313,7 +2487,7 @@ export function GraderHistoricalCalendar({
                       </p>
                     </div>
                   )}
-                  {(() => {
+                  {!isVirtual && (() => {
                     const rate = safeRate(hist)
                     return rate != null ? (
                       <div className="rounded bg-background/60 px-2 py-1">
@@ -2322,8 +2496,16 @@ export function GraderHistoricalCalendar({
                       </div>
                     ) : null
                   })()}
+                  {isVirtual && (
+                    <div className="rounded bg-sky-500/5 border border-sky-500/20 px-2 py-1 col-span-1">
+                      <p className="text-muted-foreground">P0%</p>
+                      <p className="font-semibold tabular-nums text-muted-foreground/70">
+                        — sin Excel
+                      </p>
+                    </div>
+                  )}
                 </div>
-                {hist.topP0Causes && hist.topP0Causes.length > 0 && (
+                {!isVirtual && hist.topP0Causes && hist.topP0Causes.length > 0 && (
                   <div className="text-xs space-y-0.5">
                     <p className="text-muted-foreground font-medium">Top causas P0:</p>
                     {hist.topP0Causes.slice(0, 3).map((c, i) => {
@@ -2373,7 +2555,7 @@ export function GraderHistoricalCalendar({
                       <Eye className="h-3 w-3" />
                       Ver detalle →
                     </Button>
-                    {isSelectedSlide && (
+                    {isSelectedSlide && !isVirtual && (
                       <Button
                         size="sm"
                         variant="outline"
@@ -2388,7 +2570,7 @@ export function GraderHistoricalCalendar({
                       </Button>
                     )}
                   </div>
-                  {isSelectedSlide && plantLine.isClassificationPlant !== false && (
+                  {isSelectedSlide && !isVirtual && plantLine.isClassificationPlant !== false && (
                     <QuickGateChangeButton
                       shiftDocId={`${hist.dateKey}__${hist.shiftId}`}
                       variant="compact"
