@@ -268,6 +268,20 @@ export function AnalisisGraderTurnoPage() {
     ? `/analisis-grader/wizard?linea=${plantLineCfg.id}`
     : '/analisis-grader/wizard'
 
+  // URL al wizard pre-cargada con el contexto del turno actual: date+shift
+  // sirven para que el upload asocie automáticamente el doc al mismo turno
+  // (sin importar el timestamp del Excel). Tras guardar, el wizard auto-vuelve
+  // a la página del turno (totalSegments=1 → navigate). Permite cargas
+  // parciales múltiples durante un turno en curso sin elegir manualmente.
+  const wizardUrlForTurno = useMemo(() => {
+    if (!dateKey || !shiftLabel) return wizardUrl
+    const params = new URLSearchParams()
+    if (plantLineCfg.id !== DEFAULT_PLANT_LINE_ID) params.set('linea', plantLineCfg.id)
+    params.set('date', dateKey)
+    params.set('shift', shiftLabel)
+    return `/analisis-grader/wizard?${params.toString()}`
+  }, [wizardUrl, plantLineCfg.id, dateKey, shiftLabel])
+
   // Plantas con clasificación (Chonchi MS4/12) muestran 12 gates, sugerencias
   // IA Marelec-specific (fotocélula, eye-sync, velocidad cinta), y análisis
   // por gate. Plantas de eviscerado simplificado (Yal) ocultan todo eso —
@@ -1410,6 +1424,7 @@ export function AnalisisGraderTurnoPage() {
             isOnline={isOnline}
             chartImageRef={chartImageRef}
             upstreamSnapshot={upstreamLine.snapshot}
+            onUploadClick={isAdmin ? () => navigate(wizardUrlForTurno) : undefined}
           />
 
           {/* Dispersión segundo a segundo de piezas P0 (drill-down del timeline) */}

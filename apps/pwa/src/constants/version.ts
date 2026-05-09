@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '3.21.3' as const
+export const APP_VERSION = '3.21.4' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-05-09' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'fix(grader-timeline): chart Grader extiende eje a SLX + remueve fondo violeta' as const
+export const VERSION_NAME = 'feat(grader-timeline): boton Cargar Excel inline en header del Timeline' as const
 
 /**
  * Nota:
