@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '3.23.0' as const
+export const APP_VERSION = '3.23.1' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-05-09' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'feat(grader-calendar): tooltips fuente·unidad + Único turno + labels T1/T2/T3 Yal' as const
+export const VERSION_NAME = 'security: parchar 7 vulns dependabot (fast-uri, fast-xml-builder, babel)' as const
 
 /**
  * Nota:

@@ -11,6 +11,9 @@ overrides:
   '@tootallnate/once': '>=3.0.1'
   '@xmldom/xmldom': '>=0.9.10'
   fast-xml-parser: '>=5.7.0'
+  fast-xml-builder: '>=1.1.7'
+  fast-uri: '>=3.1.2'
+  '@babel/plugin-transform-modules-systemjs': '>=7.29.4'
   postcss: '>=8.5.10'
   uuid: '>=14.0.0'
 
@@ -673,8 +676,8 @@ packages:
     peerDependencies:
       '@babel/core': ^7.0.0-0
 
-  '@babel/plugin-transform-modules-systemjs@7.29.0':
-    resolution: {integrity: sha512-PrujnVFbOdUpw4UHiVwKvKRLMMic8+eC0CuNlxjsyZUiBjhFdPsewdXCkveh2KqBA9/waD0W1b4hXSOBQJezpQ==}
+  '@babel/plugin-transform-modules-systemjs@7.29.4':
+    resolution: {integrity: sha512-N7QmZ0xRZfjHOfZeQLJjwgX2zS9pdGHSVl/cjSGlo4dXMqvurfxXDMKY4RqEKzPozV78VMcd0lxyG13mlbKc4w==}
     engines: {node: '>=6.9.0'}
     peerDependencies:
       '@babel/core': ^7.0.0-0
@@ -3398,11 +3401,11 @@ packages:
   fast-png@6.4.0:
     resolution: {integrity: sha512-kAqZq1TlgBjZcLr5mcN6NP5Rv4V2f22z00c3g8vRrwkcqjerx7BEhPbOnWCPqaHUl2XWQBJQvOT/FQhdMT7X/Q==}
 
-  fast-uri@3.1.0:
-    resolution: {integrity: sha512-iPeeDKJSWf4IEOasVVrknXpaBV0IApz/gp7S2bb7Z4Lljbl2MGJRqInZiUrQwV16cpzw/D3S5j5Julj/gT52AA==}
+  fast-uri@3.1.2:
+    resolution: {integrity: sha512-rVjf7ArG3LTk+FS6Yw81V1DLuZl1bRbNrev6Tmd/9RaroeeRRJhAt7jg/6YFxbvAQXUCavSoZhPPj6oOx+5KjQ==}
 
-  fast-xml-builder@1.1.5:
-    resolution: {integrity: sha512-4TJn/8FKLeslLAH3dnohXqE3QSoxkhvaMzepOIZytwJXZO69Bfz0HBdDHzOTOon6G59Zrk6VQ2bEiv1t61rfkA==}
+  fast-xml-builder@1.2.0:
+    resolution: {integrity: sha512-00aAWieqff+ZJhsXA4g1g7M8k+7AYoMUUHF+/zFb5U6Uv/P0Vl4QZo84/IcufzYalLuEj9928bXN9PbbFzMF0Q==}
 
   fast-xml-parser@5.7.2:
     resolution: {integrity: sha512-P7oW7tLbYnhOLQk/Gv7cZgzgMPP/XN03K02/Jy6Y/NHzyIAIpxuZIM/YqAkfiXFPxA2CTm7NtCijK9EDu09u2w==}
@@ -5582,6 +5585,10 @@ packages:
     resolution: {integrity: sha512-7rVi2KMfwfWFl+GpPg6m80IVMWXLRjO+PxTq7V2CDhoGak0wzYzFgUY2m4XJ47OGdXd8eLE8EmwfAmdjw7lC1g==}
     hasBin: true
 
+  xml-naming@0.1.0:
+    resolution: {integrity: sha512-k8KO9hrMyNk6tUWqUfkTEZbezRRpONVOzUTnc97VnCvyj6Tf9lyUR9EDAIeiVLv56jsMcoXEwjW8Kv5yPY52lw==}
+    engines: {node: '>=16.0.0'}
+
   xml@1.0.1:
     resolution: {integrity: sha512-huCv9IH9Tcf95zuYCsQraZtWnJvBtLVE0QHMOs8bWyZAFZNDcYjsPq1nEx8jKA9y+Beo9v+7OBPRisQTjinQMw==}
 
@@ -6125,7 +6132,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@babel/plugin-transform-modules-systemjs@7.29.0(@babel/core@7.29.0)':
+  '@babel/plugin-transform-modules-systemjs@7.29.4(@babel/core@7.29.0)':
     dependencies:
       '@babel/core': 7.29.0
       '@babel/helper-module-transforms': 7.28.6(@babel/core@7.29.0)
@@ -6341,7 +6348,7 @@ snapshots:
       '@babel/plugin-transform-member-expression-literals': 7.27.1(@babel/core@7.29.0)
       '@babel/plugin-transform-modules-amd': 7.27.1(@babel/core@7.29.0)
       '@babel/plugin-transform-modules-commonjs': 7.28.6(@babel/core@7.29.0)
-      '@babel/plugin-transform-modules-systemjs': 7.29.0(@babel/core@7.29.0)
+      '@babel/plugin-transform-modules-systemjs': 7.29.4(@babel/core@7.29.0)
       '@babel/plugin-transform-modules-umd': 7.27.1(@babel/core@7.29.0)
       '@babel/plugin-transform-named-capturing-groups-regex': 7.29.0(@babel/core@7.29.0)
       '@babel/plugin-transform-new-target': 7.27.1(@babel/core@7.29.0)
@@ -8438,7 +8445,7 @@ snapshots:
   ajv@8.18.0:
     dependencies:
       fast-deep-equal: 3.1.3
-      fast-uri: 3.1.0
+      fast-uri: 3.1.2
       json-schema-traverse: 1.0.0
       require-from-string: 2.0.2
 
@@ -9223,17 +9230,18 @@ snapshots:
       iobuffer: 5.4.0
       pako: 2.1.0
 
-  fast-uri@3.1.0: {}
+  fast-uri@3.1.2: {}
 
-  fast-xml-builder@1.1.5:
+  fast-xml-builder@1.2.0:
     dependencies:
       path-expression-matcher: 1.5.0
+      xml-naming: 0.1.0
     optional: true
 
   fast-xml-parser@5.7.2:
     dependencies:
       '@nodable/entities': 2.1.0
-      fast-xml-builder: 1.1.5
+      fast-xml-builder: 1.2.0
       path-expression-matcher: 1.5.0
       strnum: 2.2.3
     optional: true
@@ -11585,6 +11593,9 @@ snapshots:
   xml-js@1.6.11:
     dependencies:
       sax: 1.4.4
+
+  xml-naming@0.1.0:
+    optional: true
 
   xml@1.0.1: {}
 
