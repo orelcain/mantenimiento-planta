@@ -892,16 +892,21 @@ export function UpstreamMachinesPanel({
         <div className="w-full flex items-center justify-between gap-3 flex-wrap">
           <button
             onClick={() => setCollapsed(c => !c)}
-            className="flex items-center gap-2 group min-w-0 flex-1"
+            className="flex items-center gap-2 group min-w-0 flex-1 flex-wrap"
             aria-expanded={!collapsed}
           >
             {collapsed
               ? <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
               : <ChevronDown  className="w-4 h-4 text-slate-400 shrink-0" />}
             <Zap className="w-4 h-4 text-violet-400 shrink-0" />
-            {/* Mobile: label corto. Desktop: label completo. Trunca si necesario. */}
+            {/* 2 niveles:
+                - <sm (mobile portrait): "Línea Baader 142"
+                - sm+ (landscape mobile / tablet / desktop): "Línea upstream Baader 142"
+                Versiones más largas no caben sin truncate cuando hay KPIs +
+                badges al lado. La denominación "Evisceradoras" es redundante:
+                un Baader 142 es ya implícitamente una evisceradora. */}
             <span className="font-medium text-sm truncate text-left">
-              <span className="hidden sm:inline">Línea upstream — Evisceradoras Baader 142</span>
+              <span className="hidden sm:inline">Línea upstream Baader 142</span>
               <span className="sm:hidden">Línea Baader 142</span>
             </span>
             {snapshot && (
