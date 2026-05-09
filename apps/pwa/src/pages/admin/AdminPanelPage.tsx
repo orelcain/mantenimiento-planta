@@ -31,6 +31,7 @@ import {
   Gauge,
   Bell,
   Wrench,
+  LayoutDashboard,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 
@@ -119,6 +120,14 @@ const ADMIN_ITEMS: AdminItem[] = [
     description: 'Mostrar/ocultar items del menú lateral que aún están en desarrollo. La preferencia se guarda en este dispositivo.',
     icon: <Wrench className="w-5 h-5" />,
     iconColor: 'text-purple-400',
+    section: 'config',
+  },
+  {
+    to: '/admin/default-route',
+    title: 'Página de inicio por defecto',
+    description: 'Define qué módulo se carga al entrar a la app (la home "/"). Por defecto: Análisis de Turno.',
+    icon: <LayoutDashboard className="w-5 h-5" />,
+    iconColor: 'text-emerald-400',
     section: 'config',
   },
   {
