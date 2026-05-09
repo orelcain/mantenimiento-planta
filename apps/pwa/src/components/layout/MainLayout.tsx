@@ -83,7 +83,7 @@ const navGroups: NavGroup[] = [
   {
     id: 'principal', label: 'Principal', defaultOpen: true,
     items: [
-      { name: 'Dashboard', href: '/', icon: LayoutDashboard, module: 'dashboard' },
+      { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, module: 'dashboard', inDevelopment: true },
       { name: 'Incidencias', href: '/incidents', icon: AlertTriangle, module: 'incidencias', inDevelopment: true },
       { name: 'Evidencias', href: '/photo-evidence', icon: Camera, module: 'fotoevidencia', inDevelopment: true },
     ],

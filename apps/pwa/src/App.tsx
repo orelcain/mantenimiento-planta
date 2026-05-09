@@ -47,6 +47,7 @@ const lazyWithReload = (fn: () => Promise<any>) =>
 
 // Code Splitting con autorecarga
 const DashboardPage = lazyWithReload(() => import('@/pages/DashboardPage').then((mod) => ({ default: mod.DashboardPage })))
+import { HomeRedirect } from '@/components/HomeRedirect'
 const IncidentsPage = lazyWithReload(() => import('@/pages/IncidentsPage').then((mod) => ({ default: mod.IncidentsPage })))
 const EquipmentPage = lazyWithReload(() => import('@/pages/EquipmentPage').then((mod) => ({ default: mod.EquipmentPage })))
 const PredictivePage = lazyWithReload(() => import('@/pages/PredictivePage').then((mod) => ({ default: mod.PredictivePage })))
@@ -72,6 +73,7 @@ const SensorsMonitorPage = lazyWithReload(() => import('@/pages/SensorsMonitorPa
 const MapsAdminPage = lazyWithReload(() => import('@/pages/admin/MapsAdminPage').then((mod) => ({ default: mod.MapsAdminPage })))
 const SidebarEditorPage = lazyWithReload(() => import('@/pages/SidebarEditorPage').then((mod) => ({ default: mod.SidebarEditorPage })))
 const DevModulesPage = lazyWithReload(() => import('@/pages/admin/DevModulesPage').then((mod) => ({ default: mod.DevModulesPage })))
+const DefaultRoutePage = lazyWithReload(() => import('@/pages/admin/DefaultRoutePage').then((mod) => ({ default: mod.DefaultRoutePage })))
 const InspectionsPage = lazyWithReload(() => import('@/pages/InspectionsPage').then((mod) => ({ default: mod.InspectionsPage })))
 const ETTPage = lazyWithReload(() => import('@/pages/admin/ETTPage').then((mod) => ({ default: mod.ETTPage })))
 const PermissionsPage = lazyWithReload(() => import('@/pages/admin/PermissionsPage').then((mod) => ({ default: mod.PermissionsPage })))
@@ -396,7 +398,8 @@ export function App() {
               </PrivateRoute>
             }
           >
-            <Route index element={<DashboardPage />} />
+            <Route index element={<HomeRedirect />} />
+            <Route path="dashboard" element={<DashboardPage />} />
             <Route path="incidents" element={<IncidentsPage />} />
             {/* Visor Planta 3D — reemplaza al editor de terreno como vista principal */}
             <Route path="map" element={
@@ -523,6 +526,13 @@ export function App() {
               <AdminRoute>
                 <Suspense fallback={<LoadingScreen />}>
                   <DevModulesPage />
+                </Suspense>
+              </AdminRoute>
+            } />
+            <Route path="admin/default-route" element={
+              <AdminRoute>
+                <Suspense fallback={<LoadingScreen />}>
+                  <DefaultRoutePage />
                 </Suspense>
               </AdminRoute>
             } />

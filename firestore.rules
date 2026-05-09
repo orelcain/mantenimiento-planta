@@ -1274,6 +1274,16 @@ service cloud.firestore {
     }
 
     // ============================================
+    // APP CONFIG — Configuración global (defaultRoute, wipOverrides, etc.)
+    // ============================================
+    // Cualquier user autenticado puede leer (HomeRedirect lee defaultRoute
+    // al entrar a `/`). Solo admin escribe.
+    match /appConfig/{docId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ============================================
     // LEARNING CONTENT — Centro de Aprendizaje
     // Contenido publico de lectura, admin para escritura
     // Estructura: learningContent/{machineSlug}/{section}/{docId}
