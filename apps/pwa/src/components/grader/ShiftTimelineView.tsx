@@ -268,6 +268,20 @@ export function ShiftTimelineView({
     [timelineBuckets],
   )
 
+  // SLX outer bounds — extender el eje X del chart Grader para abarcar el
+  // rango completo del turno Shoplogix. Cuando hay snapshot SLX, el chart
+  // Grader queda como "isla" dentro del turno upstream → el supervisor ve
+  // qué fracción del turno tiene Excel cargado y cuál falta (señal para
+  // subir más uploads parciales).
+  const slxOuterBounds = useMemo<{ startMs: number; endMs: number } | null>(() => {
+    const m = upstreamSnapshot?.machines[0]
+    if (!m) return null
+    const startMs = m.shiftStart.getTime()
+    const endMs   = m.shiftEnd.getTime()
+    if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) return null
+    return { startMs, endMs }
+  }, [upstreamSnapshot])
+
   // ── Emite rango temporal del zoom al parent ──────────────────────────────
   // Calcula el rango temporal real (ms) a partir de un % de zoom y propaga a
   // (a) callback prop legacy `onZoomRangeChange` si está, (b) context global
@@ -295,7 +309,7 @@ export function ShiftTimelineView({
     if (buckets.length === 0) { emit(null); return }
     // Full zoom (100%): emite null para que el caller use su rango completo
     if (startPct <= 0.5 && endPct >= 99.5) { emit(null); return }
-    const axis = resolveAxisWindow(buckets, shiftWindow)
+    const axis = resolveAxisWindow(buckets, shiftWindow, 2, slxOuterBounds)
     const spanMs = axis.effectiveEndMs - axis.effectiveStartMs
     // Snap al MINUTO EXACTO: el axis category del Grader usa
     // Math.round(idx_fraccional) sobre slots de 1min cada uno. Si emitimos
@@ -310,7 +324,7 @@ export function ShiftTimelineView({
       startMs: axis.effectiveStartMs + startMinIdx * 60_000,
       endMs:   axis.effectiveStartMs + endMinIdx * 60_000,
     })
-  }, [onZoomRangeChange, timelineSync, timelineBuckets, shiftWindow, productionWindow])
+  }, [onZoomRangeChange, timelineSync, timelineBuckets, shiftWindow, productionWindow, slxOuterBounds])
 
   // Segmentos horarios: un botón por hora del turno, coloreados por densidad P0.
   // startPct/endPct son los porcentajes del axis que corresponden a esa hora,
@@ -323,7 +337,7 @@ export function ShiftTimelineView({
     }
     const buckets = timelineBuckets.filter(b => b.pieces > 0 && inWin(b.tsMin))
     if (buckets.length < 2) return []
-    const axis = resolveAxisWindow(buckets, shiftWindow)
+    const axis = resolveAxisWindow(buckets, shiftWindow, 2, slxOuterBounds)
     const spanMs = axis.effectiveEndMs - axis.effectiveStartMs
     if (spanMs <= 0) return []
 
@@ -349,7 +363,7 @@ export function ShiftTimelineView({
       })
       .filter(s => s.endPct > s.startPct)
       .slice(0, 8)
-  }, [timelineBuckets, productionWindow, shiftWindow])
+  }, [timelineBuckets, productionWindow, shiftWindow, slxOuterBounds])
 
   // ── Anchor del axis para conversión index↔ms (hover cross-chart) ────────
   // Refleja el effectiveStartMs que produce resolveAxisWindow para el rango
@@ -362,9 +376,9 @@ export function ShiftTimelineView({
     }
     const buckets = timelineBuckets.filter((b) => b.pieces > 0 && inProductionWindow(b.tsMin))
     if (buckets.length === 0) return null
-    const axis = resolveAxisWindow(buckets, shiftWindow)
+    const axis = resolveAxisWindow(buckets, shiftWindow, 2, slxOuterBounds)
     return axis.effectiveStartMs
-  }, [timelineBuckets, productionWindow, shiftWindow])
+  }, [timelineBuckets, productionWindow, shiftWindow, slxOuterBounds])
 
   // ── Publica los lot changes al context (Fase 4c) ─────────────────────────
   // Detecta cambios de lote en los buckets activos y los publica como
@@ -657,7 +671,7 @@ export function ShiftTimelineView({
     }
     const buckets = timelineBuckets.filter((b) => b.pieces > 0 && inPW(b.tsMin))
     if (buckets.length < 2) return
-    const axis = resolveAxisWindow(buckets, shiftWindow)
+    const axis = resolveAxisWindow(buckets, shiftWindow, 2, slxOuterBounds)
     const totalMs = axis.effectiveEndMs - axis.effectiveStartMs
     if (totalMs <= 0) return
     const windowMs = 10 * 60_000
@@ -668,7 +682,7 @@ export function ShiftTimelineView({
     setZoomState({ start: startPct, end: endPct })
     setActiveZoom('zoom')
     emitZoomRange(startPct, endPct)
-  }, [timelineBuckets, productionWindow, shiftWindow, emitZoomRange])
+  }, [timelineBuckets, productionWindow, shiftWindow, emitZoomRange, slxOuterBounds])
 
   const chartOption = useMemo(() => {
     // Filtrar buckets: solo los del rango productivo real. Los pre/post-turno
@@ -700,7 +714,7 @@ export function ShiftTimelineView({
     // sin el spike artificial del arranque/calibración.
 
     // Eje X dinámico: helper puro extraído en M11 (resolveAxisWindow).
-    const { lineTimes, axisIndexByLabel } = resolveAxisWindow(buckets, shiftWindow)
+    const { lineTimes, axisIndexByLabel } = resolveAxisWindow(buckets, shiftWindow, 2, slxOuterBounds)
 
     // Alinear data al axis expandido. Los slots sin bucket quedan null —
     // connectNulls en la serie line hace que la línea siga conectada.
@@ -796,23 +810,14 @@ export function ShiftTimelineView({
       }
     }
 
-    // Baader stop bands → markArea translúcidas detrás del chart Grader.
-    // Una entrada por evento de pausa de cada máquina. El overlap natural entre
-    // múltiples máquinas crea un efecto de densidad visual.
-    // Opacity ajustada (2026-05-08) de 0.15 a 0.06 — antes en turnos donde las
-    // 3 Baader paraban simultáneamente (colación, reuniones inicio, etc.) las
-    // bandas se acumulaban a >45% y cubrían toda la línea P0% y barras stacked.
-    // Con 0.06: 1 Baader=6%, 2=12%, 3=18% — visible pero no oclusivo.
-    // Solo incluimos bandas cuyos extremos existen en el axis actual.
-    const baaderBandMarkAreas = baaderMarkers.bands
-      .filter(b => b.tA !== b.tB && axisIndexByLabel.has(b.tA) && axisIndexByLabel.has(b.tB))
-      .map(b => [
-        {
-          xAxis: b.tA as string,
-          itemStyle: { color: 'rgba(139,92,246,0.06)', borderWidth: 0 },
-        },
-        { xAxis: b.tB as string },
-      ])
+    // Baader stop bands → REMOVIDO 2026-05-09. Anteriormente las bandas de
+    // paros Baader se renderizaban como markArea translúcidas detrás del
+    // chart Grader. Aún con opacity 0.06, la suma de 3 máquinas en colación
+    // simultánea cubría >18% del chart con un tono violeta que opacaba la
+    // lectura de barras stacked y línea P0%. La info detallada vive en el
+    // panel UpstreamMachinesPanel sincronizado por zoom; las pausas también
+    // siguen disponibles en el tooltip via `bandsByMinuteLabel`.
+    const baaderBandMarkAreas: never[] = []
 
     // Máximo del eje Pzs/min sobredimensionado ~43% para que las barras
     // ocupen solo ~70% de la altura del chart (visualmente menos aplastadas).
