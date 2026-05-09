@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v3.98.0**
+## Versión Actual: **v3.99.0**
 
 **Fecha de lanzamiento**: 22 de mayo de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,9 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v3.99.0 — Fix HomeRedirect detecta viewport (18/07/2026)
+- 📱 **Mobile va a `/dashboard`** (muestra `MobileHomeGrid`), **desktop** usa la ruta configurada en `appConfig/defaultRoute`
 
 ### v3.98.0 — Repuestos: catálogo Enzunchadora TP-6000 (18/07/2026)
 - 📦 **Catálogo Enzunchadora TP-6000** en el buscador de códigos de fabricante, con cruce códigos de distribuidor (Garibaldi) ↔ SAP
