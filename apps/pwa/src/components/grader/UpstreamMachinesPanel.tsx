@@ -767,48 +767,68 @@ export function UpstreamMachinesPanel({
 
   // Ventana temporal a usar para alinear el Gantt.
   // Prioridad de fuentes (Synchronized Timeline):
-  //   1. Context `useTimelineSync().range` — si la página está dentro de un
-  //      <TimelineSyncProvider>, el zoom del Grader se propaga al panel via
-  //      este state global. NUNCA cae a shift.shiftStart por máquina.
-  //   2. Prop `shiftWindow` legacy — uso anterior (compatibilidad).
-  //   3. Sin source: cada máquina usa su propio shift.shiftStart/End.
+  //   1. Context `useTimelineSync().range` — si hay zoom activo del Grader,
+  //      ese zoom se propaga al panel via este state global.
+  //   2. SLX scheduled bounds (snapshot.machines[0]) — la ventana COMPLETA
+  //      del turno Shoplogix. Esto es la fuente preferida porque Shoplogix
+  //      registra continuamente y el Grader Excel se sube manualmente y
+  //      varias veces durante el turno; la ventana SLX no debe encogerse
+  //      al sub-rango Grader. Más uploads Grader durante el turno se ven
+  //      como "islas" de datos dentro del eje SLX completo.
+  //   3. Prop `shiftWindow` legacy — fallback cuando no hay snapshot SLX
+  //      (turno sin datos upstream o pre-suscripción).
   const timelineSync = useTimelineSyncOptional()
   const [windowStart, windowEnd] = useMemo<[Date | undefined, Date | undefined]>(() => {
-    // 1. Context (prioridad máxima cuando está disponible y no es null)
+    // 1. Context (zoom del Grader sincronizado)
     if (timelineSync?.range) {
       return [new Date(timelineSync.range.startMs), new Date(timelineSync.range.endMs)]
     }
-    // 2. Prop legacy
+    // 2. SLX bounds — preferido cuando hay snapshot. Usamos shiftStart/End
+    // (rango real con datos, crece conforme avanza el turno) en vez de
+    // scheduledStart/End (planeado, deja huecos vacíos cuando el turno aún
+    // no termina o las máquinas pararon antes).
+    const slxMachine = snapshot?.machines[0]
+    if (slxMachine) {
+      const s = slxMachine.shiftStart
+      const e = slxMachine.shiftEnd
+      if (s && e && !isNaN(s.getTime()) && !isNaN(e.getTime())) return [s, e]
+    }
+    // 3. Prop legacy (fallback sin snapshot)
     if (shiftWindow?.startAt && shiftWindow?.endAt) {
       const s = new Date(shiftWindow.startAt)
       const e = new Date(shiftWindow.endAt)
       if (!isNaN(s.getTime()) && !isNaN(e.getTime())) return [s, e]
     }
-    // 3. Fallback: cada máquina usa su propio shiftStart/End downstream
+    // 4. Cada máquina usa su propio shiftStart/End downstream
     return [undefined, undefined]
-  }, [timelineSync?.range, shiftWindow?.startAt, shiftWindow?.endAt])
+  }, [timelineSync?.range, snapshot, shiftWindow?.startAt, shiftWindow?.endAt])
 
   // ¿Hay zoom activo? Source of truth: context.range. null = no zoom (vista
   // completa del turno alineada al Grader). Cualquier valor = zoom activo.
   const isLineZoomActive = timelineSync?.range != null
 
   // Detección de desfase SLX: si la primera máquina tiene shiftStart >24h fuera
-  // de windowStart, el doc Firestore tiene datos de OTRO DÍA (bug CF).
+  // del schedule esperado del turno (prop `shiftWindow`), el doc Firestore tiene
+  // datos de OTRO DÍA (bug CF).
   //
-  // Threshold 24h (antes 6h): el threshold previo de 6h trippeaba falsamente
-  // cuando la suscripción cae al fallback "Unscheduled" cuyos bounds cubren
-  // todo el día (08:00→08:00, gap ~15h con un turno noche 23:00-07:45).
-  // En ese caso la data SÍ es del día correcto; sólo el doc tiene scope wider.
-  // Bug real (turno equivocado) tiene gap ≥ 24h (al menos un día completo).
+  // Comparamos contra `shiftWindow` (schedule de la planta) y NO contra
+  // `windowStart` — porque `windowStart` ahora se deriva del propio snapshot
+  // SLX, así que comparar contra él daría siempre gap=0.
+  //
+  // Threshold 24h: por debajo es legítimo (e.g. Yal Turno día Grader 7:00-14:45
+  // mapea a SLX Turno 2 15:15-00:00 → gap 8h, válido). Bug real tiene gap ≥ 24h.
   // No aplica a datos demo — esos tienen timestamps fijos intencionalmente.
   const slxWindowMismatch = useMemo(() => {
     if (dataSource === 'demo') return null
-    if (!snapshot || snapshot.machines.length === 0 || !windowStart) return null
+    if (!snapshot || snapshot.machines.length === 0) return null
+    if (!shiftWindow?.startAt) return null
     const m = snapshot.machines[0]!
-    const gapHours = Math.abs(m.shiftStart.getTime() - windowStart.getTime()) / 3_600_000
+    const expectedStartMs = new Date(shiftWindow.startAt).getTime()
+    if (isNaN(expectedStartMs)) return null
+    const gapHours = Math.abs(m.shiftStart.getTime() - expectedStartMs) / 3_600_000
     if (gapHours <= 24) return null
     return { actualStart: m.shiftStart, actualEnd: m.shiftEnd }
-  }, [dataSource, snapshot, windowStart])
+  }, [dataSource, snapshot, shiftWindow?.startAt])
 
   // Cuando hay desfase, los charts usan su propio rango (auto-scale)
   // para que el supervisor pueda ver los datos aunque no correspondan al turno.
