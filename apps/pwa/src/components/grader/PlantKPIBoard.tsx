@@ -327,37 +327,63 @@ export function PlantKPIBoard({
 
             {/* ── Detalle por máquina (solo con Shoplogix) ──
                 Mobile: machineName más estrecho (w-16) + ocultar pz/min target
-                que es info no crítica en mobile. Desktop: ancho completo. */}
+                que es info no crítica en mobile. Desktop: ancho completo.
+                Cada KPI tiene tooltip explicativo (`title`) accesible vía hover
+                en desktop y long-press en touch. */}
             {!kpis.graderOnly && <div className="grid gap-1 pt-0.5">
-              {kpis.machines.map((m, idx) => (
+              {kpis.machines.map((m, idx) => {
+                const availPctTxt = m.availability !== null ? `${(m.availability * 100).toFixed(0)}%` : 'sin datos'
+                const perfPctTxt  = m.performance  !== null ? `${(m.performance  * 100).toFixed(0)}%` : 'sin datos'
+                const mttrTxt     = m.mttrMin > 0 ? fmtMin(m.mttrMin) : 'sin paros'
+                return (
                 <div
                   key={m.machineid}
                   className="flex items-center gap-2 text-[11px] bg-muted/10 rounded px-2 py-1 border border-border/20"
+                  title={`${m.machineName} — Baader 142 N°${idx + 1}\nDisponibilidad ${availPctTxt} · Rendimiento ${perfPctTxt} · MTTR ${mttrTxt} · ${m.failureCount} paros`}
                 >
-                  <span className="text-muted-foreground w-14 sm:w-32 shrink-0 truncate" title={m.machineName}>
+                  <span
+                    className="text-muted-foreground w-14 sm:w-32 shrink-0 truncate"
+                    title={`${m.machineName} — Evisceradora Baader 142 N°${idx + 1}`}
+                  >
                     <span className="hidden sm:inline">{m.machineName}</span>
                     <span className="sm:hidden">Ev {idx + 1}</span>
                   </span>
-                  <span className={cn('w-10 sm:w-12 tabular-nums', availColor(m.availability))}>
+                  <span
+                    className={cn('w-10 sm:w-12 tabular-nums', availColor(m.availability))}
+                    title={`Disponibilidad: ${availPctTxt}\n% del tiempo planificado en que la máquina estuvo activa (uptime / horario del turno).\n\n≥85% normal · 70-85% bajo · <70% crítico`}
+                  >
                     A {pct(m.availability, 0)}
                   </span>
-                  <span className={cn('w-10 sm:w-12 tabular-nums', perfColor(m.performance))}>
+                  <span
+                    className={cn('w-10 sm:w-12 tabular-nums', perfColor(m.performance))}
+                    title={`Rendimiento: ${perfPctTxt}\n% de la velocidad nominal alcanzada (ciclos reales / ciclos esperados según target ${m.shoplogixTargetCpm?.toFixed(1) ?? '—'} pz/min).\n\n≥90% normal · 75-90% bajo · <75% crítico`}
+                  >
                     P {pct(m.performance, 0)}
                   </span>
-                  <span className={cn('w-14 sm:w-16 tabular-nums', mttrColor(m.mttrMin))}>
+                  <span
+                    className={cn('w-14 sm:w-16 tabular-nums', mttrColor(m.mttrMin))}
+                    title={`MTTR (Mean Time To Repair): ${mttrTxt}\nDuración promedio de cada paro. Solo cuenta paros tipo 'Break' (≥5 min).\n\n<5 min excelente · 5-15 min aceptable · >15 min crítico`}
+                  >
                     {fmtMin(m.mttrMin)}
                   </span>
-                  <span className="text-muted-foreground/60 tabular-nums">
+                  <span
+                    className="text-muted-foreground/60 tabular-nums"
+                    title={`Paros: ${m.failureCount} eventos\nCantidad de paros detectados por Shoplogix (intervalos de tipo 'Break' ≥5 min). No incluye micro-detenciones (<5 min).`}
+                  >
                     {m.failureCount} <span className="hidden sm:inline">paro{m.failureCount !== 1 ? 's' : ''}</span>
                     <span className="sm:hidden">par</span>
                   </span>
                   {m.shoplogixTargetCpm !== null && (
-                    <span className="ml-auto text-muted-foreground/50 tabular-nums hidden sm:inline">
+                    <span
+                      className="ml-auto text-muted-foreground/50 tabular-nums hidden sm:inline"
+                      title={`Target nominal: ${m.shoplogixTargetCpm.toFixed(1)} piezas/min\nVelocidad de referencia configurada en Shoplogix para esta máquina. Driver del cálculo de Rendimiento (P).`}
+                    >
                       {m.shoplogixTargetCpm.toFixed(1)} pz/min
                     </span>
                   )}
                 </div>
-              ))}
+                )
+              })}
             </div>}
           </>
         )}
