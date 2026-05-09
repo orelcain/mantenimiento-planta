@@ -400,30 +400,51 @@ export async function loadShoplogixShift(
 }
 
 /**
- * Mapeo de labels del Grader → IDs reales que escribe el CF de Shoplogix.
+ * Mapeo de labels del Grader → IDs reales que escribe el CF de Shoplogix,
+ * por planta.
  *
- * El CF escribe con los IDs que devuelve la API de Shoplogix ("Turno 1/2/3"
- * y variantes con asterisco para múltiples instancias del mismo turno en
- * un día). Yal puede tener Turno 3 + Turno 3* (cross-midnight) en el mismo día.
+ * El CF escribe con los IDs que devuelve la API de Shoplogix. Chonchi usa
+ * "Turno día"/"Turno noche" nativos. Yal usa "Turno 1/2/3" + variantes con
+ * asterisco para múltiples instancias del mismo turno en un día.
  *
- * El Grader usa "Turno día" y "Turno noche". Para que el panel de upstream
- * funcione, intentamos candidatos en orden hasta encontrar datos reales.
+ * Para que el panel de upstream funcione cuando el Grader Excel etiqueta
+ * "Turno día"/"Turno noche" en Yal, mapeamos al equivalente Shoplogix por
+ * overlap horario:
+ *   T1 (07:45-15:15) + T2 (15:15-00:00) componen "Turno día"
+ *   T3 (23:00-07:45) compone "Turno noche"
  *
  * Fallback `Unscheduled`: cuando Shoplogix no logra atribuir intervals a un
  * turno específico, la producción real cae en intervals "Unscheduled".
  * Caso real Yal: 2,275 cycles diarios estaban en Unscheduled. Sin este
  * fallback, la UI mostraba "Sin datos" aunque hubiera producción.
  */
-export const GRADER_TO_SLX_SHIFT_CANDIDATES: Record<string, string[]> = {
-  // Chonchi (Grader labels nativos): solo el doc exacto, sin cruzar a Yal.
-  // Evita doble-conteo: 'Turno noche' no debe pisar 'Turno 3'/'Unscheduled' de Yal.
-  'Turno día':   ['Turno día'],
-  'Turno noche': ['Turno noche'],
-  // Yal (3 turnos Shoplogix + variantes asterisco)
-  'Turno 1':     ['Turno 1', 'Turno 1*'],
-  'Turno 2':     ['Turno 2', 'Turno 2*'],
-  'Turno 3':     ['Turno 3', 'Turno 3*', 'Unscheduled'],
+const SHIFT_CANDIDATES_BY_PLANT: Record<PlantSlug, Record<string, string[]>> = {
+  chonchi: {
+    // Chonchi (Grader labels nativos): solo el doc exacto.
+    'Turno día':   ['Turno día'],
+    'Turno noche': ['Turno noche'],
+    // Variantes Shoplogix (defensivo, casi nunca usadas en chonchi)
+    'Turno 1':     ['Turno 1', 'Turno 1*'],
+    'Turno 2':     ['Turno 2', 'Turno 2*'],
+    'Turno 3':     ['Turno 3', 'Turno 3*', 'Unscheduled'],
+  },
+  yal: {
+    // Yal: Shoplogix usa Turno 1/2/3, el Grader Excel suele etiquetar día/noche.
+    // El listener paralelo elige al primer candidato con producción real (>0 ciclos).
+    'Turno día':   ['Turno día', 'Turno 1', 'Turno 1*', 'Turno 2', 'Turno 2*'],
+    'Turno noche': ['Turno noche', 'Turno 3', 'Turno 3*', 'Unscheduled'],
+    'Turno 1':     ['Turno 1', 'Turno 1*'],
+    'Turno 2':     ['Turno 2', 'Turno 2*'],
+    'Turno 3':     ['Turno 3', 'Turno 3*', 'Unscheduled'],
+  },
 }
+
+export function getSlxShiftCandidates(shiftId: string, plantSlug: PlantSlug = 'chonchi'): string[] {
+  return SHIFT_CANDIDATES_BY_PLANT[plantSlug]?.[shiftId] ?? [shiftId]
+}
+
+/** @deprecated Usar `getSlxShiftCandidates(shiftId, plantSlug)`. Solo cubre chonchi. */
+export const GRADER_TO_SLX_SHIFT_CANDIDATES: Record<string, string[]> = SHIFT_CANDIDATES_BY_PLANT.chonchi
 
 /**
  * Suscripción con fallback automático de shiftId.
@@ -443,7 +464,7 @@ export function subscribeShoplogixShiftAuto(
   plantSlug: PlantSlug = 'chonchi',
   onUpdate: (result: LoadShoplogixShiftResult) => void,
 ): () => void {
-  const candidates = GRADER_TO_SLX_SHIFT_CANDIDATES[shiftId] ?? [shiftId]
+  const candidates = getSlxShiftCandidates(shiftId, plantSlug)
   let active = true
 
   // Mantener subscripciones a TODOS los candidatos en paralelo. La primera que

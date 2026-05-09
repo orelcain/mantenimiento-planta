@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '3.21.0' as const
+export const APP_VERSION = '3.21.1' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -11,12 +11,12 @@ export const APP_VERSION = '3.21.0' as const
 /**
  * Fecha de la versión actual
  */
-export const VERSION_DATE = '2026-05-08' as const
+export const VERSION_DATE = '2026-05-09' as const
 
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'fix(grader-yal): convencion Dia/Noche simple - T3 SLX pertenece al dia donde arranca' as const
+export const VERSION_NAME = 'fix(shoplogix-yal): mapeo candidatos por planta - Turno dia abarca T1+T2 SLX' as const
 
 /**
  * Nota:

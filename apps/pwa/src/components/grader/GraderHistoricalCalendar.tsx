@@ -53,7 +53,7 @@ import { DayComparisonModal } from './DayComparisonModal'
 import { useAuthStore } from '@/store'
 import { useGraderSelectionStore } from '@/store/graderSelectionStore'
 import { p0StatusFromPct, p0StatusColor, DEFAULT_P0_ALERT_PCT, DEFAULT_P0_CRITICAL_PCT, type P0Status } from '@/services/grader/graderP0Thresholds'
-import { loadShoplogixShift, listShoplogixShiftDocIdsForMonth, subscribeShoplogixShiftAuto, GRADER_TO_SLX_SHIFT_CANDIDATES } from '@/services/shoplogix/shoplogixShift.service'
+import { loadShoplogixShift, listShoplogixShiftDocIdsForMonth, subscribeShoplogixShiftAuto, getSlxShiftCandidates } from '@/services/shoplogix/shoplogixShift.service'
 import type { MachineTrendPoint } from '@/services/shoplogix/shoplogixShift.service'
 import type { UpstreamMachineState } from '@/services/shoplogix/types'
 import {
@@ -1438,7 +1438,7 @@ export function GraderHistoricalCalendar({
 
     const loadOne = async (dk: string, shiftId: string, forceServer: boolean): Promise<number> => {
       const key = `${dk}__${shiftId}`
-      const allCandidates = [shiftId, ...(GRADER_TO_SLX_SHIFT_CANDIDATES[shiftId] ?? []).filter(c => c !== shiftId)]
+      const allCandidates = [shiftId, ...getSlxShiftCandidates(shiftId, plantSlug).filter(c => c !== shiftId)]
 
       // Turno nombrado primero; si devuelve 0 ciclos, probar candidatos fallback (e.g. Unscheduled)
       let resolvedRes = await loadShoplogixShift(dk, shiftId, plantSlug, forceServer).catch(() => null)
@@ -1523,7 +1523,7 @@ export function GraderHistoricalCalendar({
             toLoad.push({ dk, dkMs, shiftId })
           } else {
             // Verificar si algún candidato fallback existe (e.g. Unscheduled)
-            const hasFallback = (GRADER_TO_SLX_SHIFT_CANDIDATES[shiftId] ?? [])
+            const hasFallback = getSlxShiftCandidates(shiftId, plantSlug)
               .some(c => c !== shiftId && existingSet.has(`${dk}_${c}`))
             if (hasFallback) {
               toLoad.push({ dk, dkMs, shiftId })  // loadOne encontrará el fallback
