@@ -10,7 +10,10 @@ import { deriveBaaderRejection, type MarelHgCapture } from '@/services/grader/gr
 /** Formatea diferencia de tiempo en relativo corto: "hace 58s" / "hace 1h 12m". */
 function fmtSyncRelative(at: Date | null | undefined): string {
   if (!at) return '—'
-  const diffSec = Math.max(0, Math.floor((Date.now() - at.getTime()) / 1000))
+  // Guard: Invalid Date → getTime() retorna NaN → strings tipo "hace NaNh"
+  const ts = at.getTime()
+  if (!Number.isFinite(ts)) return '—'
+  const diffSec = Math.max(0, Math.floor((Date.now() - ts) / 1000))
   if (diffSec < 60) return `hace ${diffSec}s`
   const min = Math.floor(diffSec / 60)
   if (min < 60) return `hace ${min}m`

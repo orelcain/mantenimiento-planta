@@ -10,7 +10,7 @@ import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useParams, useNavigate, Navigate, useSearchParams } from 'react-router-dom'
 import { logger } from '@/lib/logger'
 import { Button, Card, CardContent, Spinner, Badge } from '@/components/ui'
-import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag, FileText, WifiOff, ChevronDown, RefreshCw, Zap, Scale } from 'lucide-react'
+import { ArrowLeft, Settings2, AlertCircle, Upload, Activity, Sparkles, Loader2, ChevronLeft, ChevronRight, Share2, Copy, Check, QrCode, Download, Tag, FileText, WifiOff, ChevronDown, RefreshCw, Zap, Scale, Sun, Sunset, Moon, Sunrise } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { usePermissionsStore } from '@/store'
 import { useAuthStore, useIsAdmin, useIsSupervisor } from '@/store/authStore'
@@ -935,6 +935,53 @@ export function AnalisisGraderTurnoPage() {
     return `${dayName} ${dayNum} ${monthName}`
   }, [dateKey, shiftLabel])
 
+  // Horario start–end del turno (HH:mm → HH:mm) y un ícono representativo según
+  // la franja horaria de inicio. Fuente preferida:
+  //   1. summary.startAt / endAt (cuando hay Excel cargado)
+  //   2. shiftWindow del schedule de la planta (sin Excel)
+  // Si no hay ninguno, retornamos null y el header no muestra el horario.
+  const shiftScheduleInfo = useMemo<{
+    startTime: string
+    endTime: string
+    /** Hora de inicio (0-23) en wall-clock-as-UTC para mapear a ícono */
+    startHour: number
+    /** Tipo de franja: mañana/tarde/noche/madrugada para tooltip */
+    period: 'madrugada' | 'mañana' | 'tarde' | 'noche'
+  } | null>(() => {
+    const startIso = summary?.startAt ?? shiftWindow?.startAt
+    const endIso = summary?.endAt ?? shiftWindow?.endAt
+    if (!startIso || !endIso) return null
+    const startTime = startIso.slice(11, 16)
+    const endTime = endIso.slice(11, 16)
+    const startHour = Number(startIso.slice(11, 13))
+    let period: 'madrugada' | 'mañana' | 'tarde' | 'noche'
+    if (startHour < 6)       period = 'madrugada'
+    else if (startHour < 12) period = 'mañana'
+    else if (startHour < 19) period = 'tarde'
+    else                     period = 'noche'
+    return { startTime, endTime, startHour, period }
+  }, [summary?.startAt, summary?.endAt, shiftWindow?.startAt, shiftWindow?.endAt])
+
+  const ShiftPeriodIcon = useMemo(() => {
+    if (!shiftScheduleInfo) return null
+    switch (shiftScheduleInfo.period) {
+      case 'madrugada': return Sunrise
+      case 'mañana':    return Sun
+      case 'tarde':     return Sunset
+      case 'noche':     return Moon
+    }
+  }, [shiftScheduleInfo])
+
+  const shiftPeriodColor = useMemo(() => {
+    if (!shiftScheduleInfo) return ''
+    switch (shiftScheduleInfo.period) {
+      case 'madrugada': return 'text-sky-400'
+      case 'mañana':    return 'text-amber-400'
+      case 'tarde':     return 'text-orange-400'
+      case 'noche':     return 'text-indigo-400'
+    }
+  }, [shiftScheduleInfo])
+
   // ── Shoplogix manual refresh ─────────────────────────────────────────────
   const handleSlxRefresh = useCallback(async () => {
     if (slxSyncing) return
@@ -1027,15 +1074,31 @@ export function AnalisisGraderTurnoPage() {
           </Button>
           {dateKey && shiftLabel && (
             <div className="flex flex-col sm:flex-row sm:items-center gap-x-2 gap-y-0 min-w-0 flex-1">
-              {/* Mobile: stack vertical (fecha primero, turno secundario).
-                  Desktop: una línea con separador. */}
-              <span className="text-sm font-medium truncate order-2 sm:order-1">
-                {shiftLabel}
-              </span>
-              <span className="text-sm text-muted-foreground hidden sm:inline order-2">·</span>
+              {/* Mobile: stack vertical (fecha primero, turno+horario+ícono debajo).
+                  Desktop: una línea con separador y todos los elementos inline. */}
               <span className="text-sm text-muted-foreground truncate order-1 sm:order-3 font-medium sm:font-normal text-foreground sm:text-muted-foreground">
                 {dateLabel}
               </span>
+              <span className="text-sm text-muted-foreground hidden sm:inline order-2">·</span>
+              <div className="flex items-center gap-1.5 order-2 sm:order-1 min-w-0 flex-wrap">
+                {ShiftPeriodIcon && (
+                  <ShiftPeriodIcon
+                    className={`w-3.5 h-3.5 shrink-0 ${shiftPeriodColor}`}
+                    aria-label={shiftScheduleInfo?.period}
+                  />
+                )}
+                <span className="text-sm font-medium shrink-0">
+                  {shiftLabel}
+                </span>
+                {shiftScheduleInfo && (
+                  <span
+                    className="text-[11px] tabular-nums text-muted-foreground/80 shrink-0"
+                    title={`Horario del turno: ${shiftScheduleInfo.startTime} → ${shiftScheduleInfo.endTime} (${shiftScheduleInfo.period})`}
+                  >
+                    {shiftScheduleInfo.startTime}–{shiftScheduleInfo.endTime}
+                  </span>
+                )}
+              </div>
               <div className="flex items-center gap-1 order-3 sm:order-4 shrink-0">
                 {summary?.turnoLabel && (
                   <Badge
@@ -1196,14 +1259,19 @@ export function AnalisisGraderTurnoPage() {
             dateKey={dateKey}
           />
 
-          {/* Banner informativo con acción de carga + refresh */}
+          {/* Banner informativo con acción de carga + refresh.
+              Mobile: texto en línea propia (basis-full) para evitar comprimirse
+              en una columna vertical de 1 palabra cuando los botones le roban
+              ancho. Desktop: una sola línea con todos los elementos. */}
           <div className="flex flex-wrap items-center gap-2 px-3 py-2 rounded-md bg-sky-500/10 border border-sky-500/30 text-sky-400 text-sm">
-            <Activity className="w-4 h-4 shrink-0" />
-            <span className="flex-1 min-w-0">
-              {shiftWindow?.status === 'live'
-                ? 'Turno en curso · Sin datos Grader aún — vista basada en Shoplogix'
-                : 'Sin Excel Grader para este turno · mostrando datos Shoplogix'}
-            </span>
+            <div className="flex items-center gap-2 basis-full sm:basis-auto sm:flex-1 min-w-0">
+              <Activity className="w-4 h-4 shrink-0" />
+              <span className="flex-1 min-w-0">
+                {shiftWindow?.status === 'live'
+                  ? 'Turno en curso · Sin datos Grader aún — vista basada en Shoplogix'
+                  : 'Sin Excel del Grader · mostrando datos Shoplogix'}
+              </span>
+            </div>
 
             {/* Contador de tiempo desde último sync */}
             {slxBestSyncedAt && (

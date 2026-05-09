@@ -104,13 +104,15 @@ export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, date
       </div>
 
       {/* ── Body ───────────────────────────────────────────────────────── */}
-      <CardContent className={cn('p-4 space-y-4', style.bg)}>
+      <CardContent className={cn('p-3 sm:p-4 space-y-3 sm:space-y-4', style.bg)}>
 
-        {/* Fila 1: hero ciclos + KPIs principales */}
-        <div className="flex items-center gap-6">
+        {/* Fila 1: hero ciclos + KPIs principales.
+            Mobile: hero arriba (full width) + KPIs abajo en grid-3.
+            Desktop: hero a la izquierda + KPIs al centro con borde. */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
           {/* Hero */}
           <div className="shrink-0">
-            <div className={cn('text-5xl font-bold tabular-nums', style.numColor)}>
+            <div className={cn('text-4xl sm:text-5xl font-bold tabular-nums leading-none', style.numColor)}>
               {totalCycles.toLocaleString('es-CL')}
             </div>
             <div className="text-xs uppercase tracking-wider text-muted-foreground mt-1">
@@ -119,12 +121,15 @@ export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, date
             <div className="text-xs mt-1 font-medium">{style.label}</div>
           </div>
 
-          {/* KPIs secundarios */}
-          <div className="flex-1 border-l pl-6 grid grid-cols-3 gap-3">
+          {/* KPIs secundarios — borde solo en desktop (en mobile rompe línea) */}
+          <div className="flex-1 sm:border-l sm:pl-6 grid grid-cols-3 gap-2 sm:gap-3">
             {/* Uptime promedio */}
             <div className="text-center">
               <div className="flex items-center justify-center gap-1 mb-0.5">
-                <div className="text-xs text-muted-foreground">Uptime prom.</div>
+                <div className="text-xs text-muted-foreground">
+                  <span className="hidden sm:inline">Uptime prom.</span>
+                  <span className="sm:hidden">Uptime</span>
+                </div>
                 <InfoTooltip
                   text={`% promedio del turno en que las máquinas estuvieron activas.\n\n≥ 70% normal · 40–70% bajo · < 40% crítico\n\nPromedio de las ${snapshot.machines.length} evisceradoras.`}
                   iconSize={10} position="top"
@@ -157,7 +162,8 @@ export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, date
             <div className="text-center">
               <div className="flex items-center justify-center gap-1 mb-0.5">
                 <div className="text-xs text-muted-foreground">
-                  {isClosed ? 'máq. con datos' : 'máq. activas'}
+                  <span className="hidden sm:inline">{isClosed ? 'máq. con datos' : 'máq. activas'}</span>
+                  <span className="sm:hidden">{isClosed ? 'máq.' : 'activas'}</span>
                 </div>
                 <InfoTooltip
                   text={isClosed
@@ -197,14 +203,17 @@ export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, date
               <span className="tabular-nums font-semibold">{totalCycles.toLocaleString('es-CL')}</span>
               <span className="text-muted-foreground">ciclos totales</span>
             </div>
-            <div className="grid grid-cols-3 gap-3">
-              {snapshot.machines.map((m) => {
+            <div className="grid grid-cols-3 gap-2 sm:gap-3">
+              {snapshot.machines.map((m, idx) => {
                 const sharePct = totalCycles > 0 ? (m.totalCycles / totalCycles) * 100 : 0
                 const uptimePct = (m.shiftRuntime ?? 0) * 100
+                // Label corto en mobile: "Ev 1/2/3". Desktop: nombre completo.
+                const shortLabel = `Ev ${idx + 1}`
                 return (
-                  <div key={m.machineid} className="rounded-md bg-muted/20 border border-border/30 px-3 py-2">
+                  <div key={m.machineid} className="rounded-md bg-muted/20 border border-border/30 px-2 sm:px-3 py-1.5 sm:py-2">
                     <div className="text-[11px] text-muted-foreground truncate mb-1" title={m.machineName}>
-                      {m.machineName}
+                      <span className="hidden sm:inline">{m.machineName}</span>
+                      <span className="sm:hidden">{shortLabel}</span>
                     </div>
                     <div className="text-base font-semibold tabular-nums">
                       {m.totalCycles.toLocaleString('es-CL')}

@@ -892,17 +892,21 @@ export function UpstreamMachinesPanel({
         <div className="w-full flex items-center justify-between gap-3 flex-wrap">
           <button
             onClick={() => setCollapsed(c => !c)}
-            className="flex items-center gap-2 group shrink-0"
+            className="flex items-center gap-2 group min-w-0 flex-1"
             aria-expanded={!collapsed}
           >
             {collapsed
-              ? <ChevronRight className="w-4 h-4 text-slate-400" />
-              : <ChevronDown  className="w-4 h-4 text-slate-400" />}
-            <Zap className="w-4 h-4 text-violet-400" />
-            <span className="font-medium text-sm">Línea upstream — Evisceradoras Baader 142</span>
+              ? <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+              : <ChevronDown  className="w-4 h-4 text-slate-400 shrink-0" />}
+            <Zap className="w-4 h-4 text-violet-400 shrink-0" />
+            {/* Mobile: label corto. Desktop: label completo. Trunca si necesario. */}
+            <span className="font-medium text-sm truncate text-left">
+              <span className="hidden sm:inline">Línea upstream — Evisceradoras Baader 142</span>
+              <span className="sm:hidden">Línea Baader 142</span>
+            </span>
             {snapshot && (
-              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-violet-900/60 text-violet-400">
-                {snapshot.machines.length} máquinas
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-violet-900/60 text-violet-400 shrink-0">
+                {snapshot.machines.length} máq
               </Badge>
             )}
             {dataSource === 'demo' && (

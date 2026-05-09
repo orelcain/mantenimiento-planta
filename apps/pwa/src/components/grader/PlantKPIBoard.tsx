@@ -325,28 +325,34 @@ export function PlantKPIBoard({
             </div>
             )}
 
-            {/* ── Detalle por máquina (solo con Shoplogix) ── */}
+            {/* ── Detalle por máquina (solo con Shoplogix) ──
+                Mobile: machineName más estrecho (w-16) + ocultar pz/min target
+                que es info no crítica en mobile. Desktop: ancho completo. */}
             {!kpis.graderOnly && <div className="grid gap-1 pt-0.5">
-              {kpis.machines.map((m) => (
+              {kpis.machines.map((m, idx) => (
                 <div
                   key={m.machineid}
                   className="flex items-center gap-2 text-[11px] bg-muted/10 rounded px-2 py-1 border border-border/20"
                 >
-                  <span className="text-muted-foreground w-32 shrink-0 truncate" title={m.machineName}>{m.machineName}</span>
-                  <span className={cn('w-12 tabular-nums', availColor(m.availability))}>
+                  <span className="text-muted-foreground w-14 sm:w-32 shrink-0 truncate" title={m.machineName}>
+                    <span className="hidden sm:inline">{m.machineName}</span>
+                    <span className="sm:hidden">Ev {idx + 1}</span>
+                  </span>
+                  <span className={cn('w-10 sm:w-12 tabular-nums', availColor(m.availability))}>
                     A {pct(m.availability, 0)}
                   </span>
-                  <span className={cn('w-12 tabular-nums', perfColor(m.performance))}>
+                  <span className={cn('w-10 sm:w-12 tabular-nums', perfColor(m.performance))}>
                     P {pct(m.performance, 0)}
                   </span>
-                  <span className={cn('w-16 tabular-nums', mttrColor(m.mttrMin))}>
+                  <span className={cn('w-14 sm:w-16 tabular-nums', mttrColor(m.mttrMin))}>
                     {fmtMin(m.mttrMin)}
                   </span>
                   <span className="text-muted-foreground/60 tabular-nums">
-                    {m.failureCount} paro{m.failureCount !== 1 ? 's' : ''}
+                    {m.failureCount} <span className="hidden sm:inline">paro{m.failureCount !== 1 ? 's' : ''}</span>
+                    <span className="sm:hidden">par</span>
                   </span>
                   {m.shoplogixTargetCpm !== null && (
-                    <span className="ml-auto text-muted-foreground/50 tabular-nums">
+                    <span className="ml-auto text-muted-foreground/50 tabular-nums hidden sm:inline">
                       {m.shoplogixTargetCpm.toFixed(1)} pz/min
                     </span>
                   )}
