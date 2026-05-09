@@ -1163,7 +1163,7 @@ export function ShiftTimelineView({
         }),
       ],
     }
-  }, [timelineBuckets, shiftDoc, shiftWindow, configSnapshots, causesArr, piecesByCause, scatterAxisShow, gate0Pieces, pauses, productionWindow, bucketByLabel, summaryP0Pct, alertThreshold, criticalThreshold, zoomState, upstreamSnapshot])
+  }, [timelineBuckets, shiftDoc, shiftWindow, configSnapshots, causesArr, piecesByCause, scatterAxisShow, gate0Pieces, pauses, productionWindow, bucketByLabel, summaryP0Pct, alertThreshold, criticalThreshold, zoomState, upstreamSnapshot, slxOuterBounds])
 
   // ── Cobertura del turno ────────────────────────────────────────────────
   // Mide cuánto del turno está "entendido" (operación + colación + micros
