@@ -231,14 +231,29 @@ function renderShiftChip(
         ? (slxUptimePct != null ? `${slxUptimePct.toFixed(0)}%` : '—')
         : `${p0.toFixed(1)}%`
 
+  // Tooltip enriquecido: identifica la fuente (Marelec/Excel), la métrica
+  // visible y los valores adicionales relevantes. Importante en plantas
+  // mixtas (Yal) donde la celda puede mostrar 2 chips simultáneos:
+  // chip Excel arriba (piezas clasificadas Marelec) y chip SLX abajo
+  // (ciclos Baader Shoplogix).
+  const piecesText = chip.pieces != null ? chip.pieces.toLocaleString('es-CL') : '—'
+  const p0Text = `${p0.toFixed(1)}%`
+  const uptimeText = slxUptimePct != null ? `${slxUptimePct.toFixed(0)}%` : '—'
+  const directionSuffix = chip.direction === 'enters'
+    ? ` (madrugada — turno arrancó ${chip.shiftDateKey})`
+    : chip.direction === 'exits'
+      ? ` (${Math.round(chip.pctOfShift ?? 100)}% de la carga aquí, resto mañana)`
+      : ''
+  const tooltipPrimary =
+    `${chip.shiftId}${directionSuffix}\n`
+    + `• ${piecesText} piezas clasificadas (Marelec/Excel)\n`
+    + `• P0: ${p0Text}`
+    + (slxUptimePct != null ? `\n• Uptime Baader: ${uptimeText} (Shoplogix)` : '')
+
   return (
     <div
       key={key}
-      title={chip.direction === 'enters'
-        ? `${chip.shiftId} arrancó ${chip.shiftDateKey} — este día recibió ${Math.round(chip.pctOfShift ?? 100)}% de la carga (madrugada)`
-        : chip.direction === 'exits'
-          ? `${chip.shiftId} arranca este día — ${Math.round(chip.pctOfShift ?? 100)}% de su carga fue aquí, el resto continúa mañana`
-          : `${chip.shiftId} de este día`}
+      title={tooltipPrimary}
       className={cn('flex items-center justify-between rounded px-1 py-px leading-none', activeColor)}
     >
       <span className="text-[8px] font-medium opacity-70">{label}</span>
@@ -866,6 +881,12 @@ export interface SlxMonthlyStats {
   turnosWithData: number
   dayShiftsWithData: number
   nightShiftsWithData: number
+  /** Yal: turnos T1 (mañana, 07:45-14:45) con datos. Subset de dayShiftsWithData. */
+  t1ShiftsWithData?: number
+  /** Yal: turnos T2 (tarde, 14:45-00:00) con datos. Subset de dayShiftsWithData. */
+  t2ShiftsWithData?: number
+  /** Yal: turnos T3 (noche+madrugada, 23:00-07:45) con datos. Igual a nightShiftsWithData en Yal. */
+  t3ShiftsWithData?: number
   daysWithData: number
   bestShift: { dateKey: string; shiftId: string; uptimePct: number; totalCycles: number } | null
   worstShift: { dateKey: string; shiftId: string; uptimePct: number; totalCycles: number } | null
@@ -1559,7 +1580,11 @@ export function GraderHistoricalCalendar({
         })
     }
     return () => { cancelled = true }
-  }, [selectedKey, slxByShift])
+    // plantSlug es derivado de plantLineId; otro effect limpia slxByShift cuando
+    // plantLineId cambia (línea ~1007), por lo que no necesitamos plantSlug acá
+    // como dep para reactivar la carga — pero sí lo agregamos para callar el
+    // warning de exhaustive-deps y mantener correctness si la planta cambia.
+  }, [selectedKey, slxByShift, plantSlug])
 
   // Pre-carga mensual de Shoplogix.
   // Estrategia en 3 fases:
@@ -1827,13 +1852,20 @@ export function GraderHistoricalCalendar({
     }
     if (withData.length === 0) return null
     const sorted = [...withData].sort((a, b) => b.uptimePct - a.uptimePct)
-    const isDayShift = (id: string) => id === 'Turno día' || id === 'Turno 2'
+    // Convención Yal: T1 (07:45-14:45 mañana) y T2 (14:45-00:00 tarde) son DÍA;
+    // T3 (23:00-07:45 noche+madrugada) es NOCHE. Legacy "Turno día"/"Turno noche"
+    // mantienen su mapeo. Antes T1 caía erróneamente en noche por descarte.
+    const isDayShift = (id: string) =>
+      id === 'Turno día' || id === 'Turno 1' || id === 'Turno 2'
     return {
       totalCycles,
       avgUptimePct: sumUptime / withData.length,
       turnosWithData: withData.length,
       dayShiftsWithData:   withData.filter(e => isDayShift(e.shiftId)).length,
       nightShiftsWithData: withData.filter(e => !isDayShift(e.shiftId)).length,
+      t1ShiftsWithData:    withData.filter(e => e.shiftId === 'Turno 1').length,
+      t2ShiftsWithData:    withData.filter(e => e.shiftId === 'Turno 2').length,
+      t3ShiftsWithData:    withData.filter(e => e.shiftId === 'Turno 3').length,
       daysWithData: daySet.size,
       bestShift:  sorted[0] ?? null,
       worstShift: sorted[sorted.length - 1] ?? null,
@@ -3027,7 +3059,14 @@ export function GraderHistoricalCalendar({
                         {hasSlxDay && slxDayNav && (
                           <button
                             className={cn('flex items-center justify-between rounded px-1 py-px leading-none transition-colors w-full', dayColorClass)}
-                            title={`Ver Turno día · ${slxDayCycles.toLocaleString('es-CL')} ciclos Baader${slxDayUptimePct > 0 ? ` · ${slxDayUptimePct.toFixed(0)}% uptime` : ''}`}
+                            title={
+                              `Turno día (Shoplogix)\n`
+                              + `• ${slxDayCycles.toLocaleString('es-CL')} ciclos Baader\n`
+                              + (slxDayUptimePct > 0 ? `• Uptime: ${slxDayUptimePct.toFixed(0)}%\n` : '')
+                              + (hasExcelDay
+                                ? '• Sin Excel del Marelec — solo conteo upstream'
+                                : '• Click para ver detalle Shoplogix')
+                            }
                             onClick={(e) => {
                               e.stopPropagation()
                               navigate(`/analisis-grader/turno/${slxDayNav.cfDateKey}__${encodeURIComponent(slxDayNav.shiftId)}${lineaQ}`)
@@ -3040,7 +3079,15 @@ export function GraderHistoricalCalendar({
                         {hasSlxNight && slxNightNav && (
                           <button
                             className={cn('flex items-center justify-between rounded px-1 py-px leading-none transition-colors w-full', nightColorClass)}
-                            title={`Ver Turno noche · ${slxNightCycles.toLocaleString('es-CL')} ciclos Baader${slxNightUptimePct > 0 ? ` · ${slxNightUptimePct.toFixed(0)}% uptime` : ''}${slxNightNav.shiftId === 'Turno 3' ? ' (arranca 23:00 — cubre madrugada)' : ''}`}
+                            title={
+                              `Turno noche (Shoplogix)`
+                              + (slxNightNav.shiftId === 'Turno 3' ? ' — arranca 23:00, cubre madrugada' : '')
+                              + `\n• ${slxNightCycles.toLocaleString('es-CL')} ciclos Baader\n`
+                              + (slxNightUptimePct > 0 ? `• Uptime: ${slxNightUptimePct.toFixed(0)}%\n` : '')
+                              + (hasExcelNight
+                                ? '• Sin Excel del Marelec — solo conteo upstream'
+                                : '• Click para ver detalle Shoplogix')
+                            }
                             onClick={(e) => {
                               e.stopPropagation()
                               navigate(`/analisis-grader/turno/${slxNightNav.cfDateKey}__${encodeURIComponent(slxNightNav.shiftId)}${lineaQ}`)
@@ -3642,29 +3689,51 @@ export function GraderHistoricalCalendar({
                         <span className="text-muted-foreground mx-0.5">/</span>
                         <span className="text-indigo-400">{slxMonthlyStats.nightShiftsWithData}</span>
                       </p>
+                      {/* Yal: breakdown T1/T2/T3 cuando aplica (≥1 turno T1/T2/T3 cargado) */}
+                      {plantLine.isClassificationPlant === false
+                        && ((slxMonthlyStats.t1ShiftsWithData ?? 0)
+                            + (slxMonthlyStats.t2ShiftsWithData ?? 0)
+                            + (slxMonthlyStats.t3ShiftsWithData ?? 0)) > 0 && (
+                        <p className="text-[9px] text-muted-foreground/80 tabular-nums mt-0.5 leading-tight">
+                          T1 <span className="text-amber-400/90">{slxMonthlyStats.t1ShiftsWithData ?? 0}</span>
+                          {' · '}
+                          T2 <span className="text-amber-400/90">{slxMonthlyStats.t2ShiftsWithData ?? 0}</span>
+                          {' · '}
+                          T3 <span className="text-indigo-400/90">{slxMonthlyStats.t3ShiftsWithData ?? 0}</span>
+                        </p>
+                      )}
                     </div>
                   </div>
-                  {/* Mejor turno — fecha mostrada en convención calendárica */}
-                  {slxMonthlyStats.bestShift && (
-                    <div className="rounded border border-emerald-500/20 bg-emerald-500/5 px-2.5 py-1.5 space-y-0.5">
-                      <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
-                        <TrendingUp className="h-3 w-3 text-emerald-400" />
-                        Mejor turno
+                  {/* Mejor / Único turno — colapsa a "Único" cuando solo 1
+                       turno existe en el mes para evitar mostrar Mejor=Peor.  */}
+                  {slxMonthlyStats.bestShift && (() => {
+                    const isOnlyOne = slxMonthlyStats.turnosWithData === 1
+                      || (slxMonthlyStats.worstShift != null
+                        && slxMonthlyStats.bestShift.dateKey === slxMonthlyStats.worstShift.dateKey
+                        && slxMonthlyStats.bestShift.shiftId === slxMonthlyStats.worstShift.shiftId)
+                    return (
+                      <div className="rounded border border-emerald-500/20 bg-emerald-500/5 px-2.5 py-1.5 space-y-0.5">
+                        <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
+                          <TrendingUp className="h-3 w-3 text-emerald-400" />
+                          {isOnlyOne ? 'Único turno cargado' : 'Mejor turno'}
+                        </div>
+                        <p className="text-xs font-semibold text-emerald-400">
+                          {getShiftDisplayDateKey(slxMonthlyStats.bestShift.dateKey, slxMonthlyStats.bestShift.shiftId).slice(5)}
+                          {' · '}{(slxMonthlyStats.bestShift.shiftId === 'Turno día' || slxMonthlyStats.bestShift.shiftId === 'Turno 1' || slxMonthlyStats.bestShift.shiftId === 'Turno 2') ? '☀' : '🌙'}
+                          {' · '}<span className="font-bold">{slxMonthlyStats.bestShift.uptimePct.toFixed(0)}%</span>
+                          <span className="text-muted-foreground font-normal">
+                            {' · '}{slxMonthlyStats.bestShift.totalCycles >= 1000
+                              ? `${(slxMonthlyStats.bestShift.totalCycles / 1000).toFixed(1)}k`
+                              : slxMonthlyStats.bestShift.totalCycles} cic
+                          </span>
+                        </p>
                       </div>
-                      <p className="text-xs font-semibold text-emerald-400">
-                        {getShiftDisplayDateKey(slxMonthlyStats.bestShift.dateKey, slxMonthlyStats.bestShift.shiftId).slice(5)}
-                        {' · '}{slxMonthlyStats.bestShift.shiftId === 'Turno día' ? '☀' : '🌙'}
-                        {' · '}<span className="font-bold">{slxMonthlyStats.bestShift.uptimePct.toFixed(0)}%</span>
-                        <span className="text-muted-foreground font-normal">
-                          {' · '}{slxMonthlyStats.bestShift.totalCycles >= 1000
-                            ? `${(slxMonthlyStats.bestShift.totalCycles / 1000).toFixed(1)}k`
-                            : slxMonthlyStats.bestShift.totalCycles} cic
-                        </span>
-                      </p>
-                    </div>
-                  )}
-                  {/* Peor turno — fecha mostrada en convención calendárica */}
-                  {slxMonthlyStats.worstShift && (
+                    )
+                  })()}
+                  {/* Peor turno — solo si difiere del mejor (más de 1 turno cargado) */}
+                  {slxMonthlyStats.worstShift && slxMonthlyStats.bestShift && slxMonthlyStats.turnosWithData > 1
+                    && !(slxMonthlyStats.bestShift.dateKey === slxMonthlyStats.worstShift.dateKey
+                         && slxMonthlyStats.bestShift.shiftId === slxMonthlyStats.worstShift.shiftId) && (
                     <div className="rounded border border-rose-500/20 bg-rose-500/5 px-2.5 py-1.5 space-y-0.5">
                       <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
                         <TrendingDown className="h-3 w-3 text-rose-400" />
@@ -3672,7 +3741,7 @@ export function GraderHistoricalCalendar({
                       </div>
                       <p className="text-xs font-semibold text-rose-400">
                         {getShiftDisplayDateKey(slxMonthlyStats.worstShift.dateKey, slxMonthlyStats.worstShift.shiftId).slice(5)}
-                        {' · '}{slxMonthlyStats.worstShift.shiftId === 'Turno día' ? '☀' : '🌙'}
+                        {' · '}{(slxMonthlyStats.worstShift.shiftId === 'Turno día' || slxMonthlyStats.worstShift.shiftId === 'Turno 1' || slxMonthlyStats.worstShift.shiftId === 'Turno 2') ? '☀' : '🌙'}
                         {' · '}<span className="font-bold">{slxMonthlyStats.worstShift.uptimePct.toFixed(0)}%</span>
                         <span className="text-muted-foreground font-normal">
                           {' · '}{slxMonthlyStats.worstShift.totalCycles >= 1000

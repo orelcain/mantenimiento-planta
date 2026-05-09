@@ -95,20 +95,30 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats }: P
     )
   }
 
-  const shiftLabel = (s: GraderDailySummary) => s.shiftId === 'Turno día' ? 'Día' : 'Noche'
+  // Mapeo de shiftId a label corto. Yal usa T1/T2/T3 además de los legacy
+  // Turno día/Turno noche — sin este mapeo todos caían como "Noche".
+  const shortShiftLabel = (shiftId: string) => {
+    if (shiftId === 'Turno día') return 'Día'
+    if (shiftId === 'Turno noche') return 'Noche'
+    if (shiftId === 'Turno 1') return 'T1 mañana'
+    if (shiftId === 'Turno 2') return 'T2 tarde'
+    if (shiftId === 'Turno 3') return 'T3 noche'
+    return shiftId
+  }
+  const shiftLabel = (s: GraderDailySummary) => shortShiftLabel(s.shiftId)
   const p0Color    = stats ? p0StatusColor(p0StatusFromPct(stats.p0Avg)) : 'text-muted-foreground'
 
   // Mejor/Peor: preferir Grader (P0%), fallback Shoplogix (uptime)
   const best = stats
     ? { value: `${fmtDec(stats.best.pointZeroPct, 2)}%`,  metric: 'P0%',   date: `${stats.best.primaryDateKey.slice(5)}  · ${shiftLabel(stats.best)}` }
     : slxStats?.bestShift
-      ? { value: `${slxStats.bestShift.uptimePct.toFixed(0)}%`, metric: 'uptime', date: `${slxStats.bestShift.dateKey.slice(5)} · ${slxStats.bestShift.shiftId === 'Turno día' ? 'Día' : 'Noche'}` }
+      ? { value: `${slxStats.bestShift.uptimePct.toFixed(0)}%`, metric: 'uptime', date: `${slxStats.bestShift.dateKey.slice(5)} · ${shortShiftLabel(slxStats.bestShift.shiftId)}` }
       : null
 
   const worst = stats
     ? { value: `${fmtDec(stats.worst.pointZeroPct, 2)}%`, metric: 'P0%',   date: `${stats.worst.primaryDateKey.slice(5)} · ${shiftLabel(stats.worst)}` }
     : slxStats?.worstShift
-      ? { value: `${slxStats.worstShift.uptimePct.toFixed(0)}%`, metric: 'uptime', date: `${slxStats.worstShift.dateKey.slice(5)} · ${slxStats.worstShift.shiftId === 'Turno día' ? 'Día' : 'Noche'}` }
+      ? { value: `${slxStats.worstShift.uptimePct.toFixed(0)}%`, metric: 'uptime', date: `${slxStats.worstShift.dateKey.slice(5)} · ${shortShiftLabel(slxStats.worstShift.shiftId)}` }
       : null
 
   const dayShifts   = stats?.dayShifts   ?? slxStats?.dayShiftsWithData   ?? 0
