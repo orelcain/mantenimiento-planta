@@ -146,9 +146,9 @@ function CauseRow({ cause, stats, totalP0Pct, expanded, selected, onToggle, onSe
           </span>
           <div className="flex-1 min-w-0">
             <div className="font-medium text-sm flex items-center gap-1.5 min-w-0">
-              <span className="truncate">{def.label}</span>
+              <span className="break-words">{def.label}</span>
             </div>
-            <div className="text-xs text-muted-foreground truncate">{def.description}</div>
+            <div className="text-xs text-muted-foreground break-words line-clamp-2">{def.description}</div>
             <div className="mt-1.5 h-1 bg-muted rounded-full overflow-hidden w-full">
               <div
                 className={cn('h-full rounded-full transition-all', colors.bar)}
@@ -156,7 +156,7 @@ function CauseRow({ cause, stats, totalP0Pct, expanded, selected, onToggle, onSe
               />
             </div>
           </div>
-          <div className="text-right shrink-0 min-w-[68px]">
+          <div className="text-right shrink-0 min-w-[60px] sm:min-w-[68px]">
             <div className="font-mono font-bold text-sm">
               {pctOfTotal.toFixed(2)}%
               <span className="text-[9px] font-normal text-muted-foreground/80 ml-0.5">total</span>
@@ -250,13 +250,13 @@ function UmbrellaCauseRow({
             <Icon className="w-4 h-4" />
           </span>
           <div className="flex-1 min-w-0">
-            <div className="font-medium text-sm flex items-center gap-1.5 min-w-0">
-              <span className="truncate">{def.label}</span>
+            <div className="font-medium text-sm flex flex-wrap items-center gap-1.5 min-w-0">
+              <span className="break-words">{def.label}</span>
               <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted font-mono text-muted-foreground shrink-0">
                 paraguas · 6 sub
               </span>
             </div>
-            <div className="text-xs text-muted-foreground truncate">{def.description}</div>
+            <div className="text-xs text-muted-foreground break-words line-clamp-2">{def.description}</div>
             <div className="mt-1.5 h-1 bg-muted rounded-full overflow-hidden w-full">
               <div
                 className={cn('h-full rounded-full transition-all', colors.bar)}

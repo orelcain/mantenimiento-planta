@@ -227,15 +227,16 @@ function DowntimeParetoBar({ reasons }: { reasons: ReasonAggregate[] }) {
           <div
             key={r.reason}
             className="flex items-center gap-1.5 text-[10px]"
-            title={`${r.count} evento${r.count !== 1 ? 's' : ''} · ${fmtDurationSec(r.durationSec)} total`}
+            title={`${r.reason || 'Sin categoría'} · ${r.count} evento${r.count !== 1 ? 's' : ''} · ${fmtDurationSec(r.durationSec)} total`}
           >
             {/* Color del state (viene de Shoplogix) */}
             <span
               className="w-2 h-2 rounded-sm shrink-0 ring-1 ring-slate-900/60"
               style={{ backgroundColor: r.color }}
             />
-            {/* Etiqueta — ancho fijo para alinear las barras */}
-            <span className="text-slate-300 truncate shrink-0 w-[7.5rem]">
+            {/* Etiqueta — desktop: width fija 7.5rem + truncate.
+                Mobile: max 9rem + line-clamp-2 (puede ocupar 2 líneas). */}
+            <span className="text-slate-300 shrink-0 w-[7.5rem] sm:w-[7.5rem] truncate sm:truncate leading-tight">
               {r.reason || 'Sin categoría'}
             </span>
             {/* Barra proporcional — transformOrigin left para el scaleX 0→1 */}

@@ -1026,35 +1026,39 @@ export function AnalisisGraderTurnoPage() {
             <span className="hidden sm:inline">Análisis de Turno</span>
           </Button>
           {dateKey && shiftLabel && (
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-sm font-medium truncate">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-x-2 gap-y-0 min-w-0 flex-1">
+              {/* Mobile: stack vertical (fecha primero, turno secundario).
+                  Desktop: una línea con separador. */}
+              <span className="text-sm font-medium truncate order-2 sm:order-1">
                 {shiftLabel}
               </span>
-              <span className="text-sm text-muted-foreground hidden sm:inline">·</span>
-              <span className="text-sm text-muted-foreground truncate">
+              <span className="text-sm text-muted-foreground hidden sm:inline order-2">·</span>
+              <span className="text-sm text-muted-foreground truncate order-1 sm:order-3 font-medium sm:font-normal text-foreground sm:text-muted-foreground">
                 {dateLabel}
               </span>
-              {summary?.turnoLabel && (
-                <Badge
-                  variant="outline"
-                  className="text-[10px] px-1.5 py-0 shrink-0 border-violet-500/40 text-violet-400"
-                  title="Turno de producción (columna Turno del Excel)"
-                >
-                  Turno {summary.turnoLabel}
-                </Badge>
-              )}
-              {shiftWindow && (
-                <Badge
-                  variant="outline"
-                  className={`text-[10px] px-1.5 py-0 shrink-0 ${
-                    shiftWindow.status === 'live'
-                      ? 'border-red-500/50 text-red-400'
-                      : 'border-muted-foreground/30 text-muted-foreground'
-                  }`}
-                >
-                  {shiftWindow.status === 'live' ? 'EN VIVO' : 'CERRADO'}
-                </Badge>
-              )}
+              <div className="flex items-center gap-1 order-3 sm:order-4 shrink-0">
+                {summary?.turnoLabel && (
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] px-1.5 py-0 shrink-0 border-violet-500/40 text-violet-400"
+                    title="Turno de producción (columna Turno del Excel)"
+                  >
+                    Turno {summary.turnoLabel}
+                  </Badge>
+                )}
+                {shiftWindow && (
+                  <Badge
+                    variant="outline"
+                    className={`text-[10px] px-1.5 py-0 shrink-0 ${
+                      shiftWindow.status === 'live'
+                        ? 'border-red-500/50 text-red-400'
+                        : 'border-muted-foreground/30 text-muted-foreground'
+                    }`}
+                  >
+                    {shiftWindow.status === 'live' ? 'EN VIVO' : 'CERRADO'}
+                  </Badge>
+                )}
+              </div>
             </div>
           )}
         </div>

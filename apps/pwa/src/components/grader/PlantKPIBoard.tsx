@@ -246,8 +246,8 @@ export function PlantKPIBoard({
               )
             })()}
 
-            {/* ── Fila 1: OEE + A + P + Q ── */}
-            <div className="grid grid-cols-4 gap-1.5">
+            {/* ── Fila 1: OEE + A + P + Q ── 2x2 mobile, 4col desde sm */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
               <KPICard
                 label="OEE"
                 tooltip={DEFS.oee.desc}

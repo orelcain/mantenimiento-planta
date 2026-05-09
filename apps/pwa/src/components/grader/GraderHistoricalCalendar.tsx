@@ -3101,7 +3101,10 @@ export function GraderHistoricalCalendar({
                     )
                   })()}
 
-                  {/* Chips placeholder D/N para días sin datos Grader ni SLX productivo — navegan al ready-state */}
+                  {/* Chips placeholder D/N para días sin datos Grader ni SLX productivo — navegan al ready-state.
+                      Mobile (<sm): ocultos para reducir ruido visual en el grid; el día sin datos
+                      solo muestra el número, lo que permite enfocar la atención en los días con data.
+                      Desktop: visibles como atajos directos a TurnoPage en estado vacío. */}
                   {!hasData && !hasAnySlx && dayUploads.length === 0 && (() => {
                     const lineaQ = plantLineId !== DEFAULT_PLANT_LINE_ID
                       ? `?linea=${encodeURIComponent(plantLineId)}`
@@ -3109,7 +3112,7 @@ export function GraderHistoricalCalendar({
                     return (
                       <>
                         <button
-                          className="flex items-center justify-between rounded px-1 py-px leading-none transition-colors w-full bg-slate-800/40 text-slate-600 hover:bg-slate-700/40 hover:text-slate-400"
+                          className="hidden sm:flex items-center justify-between rounded px-1 py-px leading-none transition-colors w-full bg-slate-800/40 text-slate-600 hover:bg-slate-700/40 hover:text-slate-400"
                           title={`Ver Turno día ${dayKey} — sin datos registrados`}
                           onClick={(e) => {
                             e.stopPropagation()
@@ -3120,7 +3123,7 @@ export function GraderHistoricalCalendar({
                           <span className="text-[9px] opacity-30">—</span>
                         </button>
                         <button
-                          className="flex items-center justify-between rounded px-1 py-px leading-none transition-colors w-full bg-slate-800/40 text-slate-600 hover:bg-slate-700/40 hover:text-slate-400"
+                          className="hidden sm:flex items-center justify-between rounded px-1 py-px leading-none transition-colors w-full bg-slate-800/40 text-slate-600 hover:bg-slate-700/40 hover:text-slate-400"
                           title={`Ver Turno noche ${dayKey} — sin datos registrados`}
                           onClick={(e) => {
                             e.stopPropagation()
@@ -3134,9 +3137,10 @@ export function GraderHistoricalCalendar({
                     )
                   })()}
 
-                  {/* Sin proceso: día escaneado por Shoplogix sin producción */}
+                  {/* Sin proceso: día escaneado por Shoplogix sin producción.
+                      Oculto en mobile (ruido visual repetido para días vacíos). */}
                   {dayScanned && (
-                    <span className="text-[8px] text-muted-foreground/40 mt-auto block text-center leading-none">
+                    <span className="hidden sm:block text-[8px] text-muted-foreground/40 mt-auto text-center leading-none">
                       sin proceso
                     </span>
                   )}

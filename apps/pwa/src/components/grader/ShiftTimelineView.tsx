@@ -1297,9 +1297,9 @@ export function ShiftTimelineView({
           )}
         </CardTitle>
       {hasData && (
-        <div className="flex items-center gap-2 px-6 pb-2">
-          {/* Zoom horario dinámico */}
-          <div className="flex flex-wrap border border-border/40 rounded-md overflow-hidden text-[11px]">
+        <div className="flex items-center gap-2 px-6 pb-2 flex-wrap">
+          {/* Zoom horario dinámico — scroll horizontal en mobile, wrap en desktop */}
+          <div className="flex flex-nowrap sm:flex-wrap border border-border/40 rounded-md overflow-x-auto sm:overflow-hidden text-[11px] max-w-full scrollbar-thin">
             <button
               onClick={() => {
                 setActiveZoom('turno')
@@ -1307,7 +1307,7 @@ export function ShiftTimelineView({
                 emitZoomRange(0, 100)
               }}
               className={cn(
-                'px-2 py-0.5 font-medium transition-colors',
+                'shrink-0 px-2 py-0.5 font-medium transition-colors',
                 activeZoom === 'turno'
                   ? 'bg-primary/20 text-primary'
                   : 'text-muted-foreground hover:text-foreground hover:bg-muted/30',
@@ -1332,7 +1332,7 @@ export function ShiftTimelineView({
                   }}
                   title={`${seg.label}: P0% ${seg.p0Pct.toFixed(1)}%, ${seg.pieces.toLocaleString('es-CL')} pzas`}
                   className={cn(
-                    'px-2 py-0.5 font-medium transition-colors border-l border-border/30',
+                    'shrink-0 px-2 py-0.5 font-medium transition-colors border-l border-border/30',
                     activeZoom === segId
                       ? 'bg-primary/20 text-primary'
                       : `${colorClass} hover:bg-muted/30`,
