@@ -14,7 +14,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, Button } from '@/components/ui'
 import { ArrowLeft, LayoutDashboard, Save, CheckCircle2 } from 'lucide-react'
-import { useToast } from '@/hooks/use-toast'
+import { useToast } from '@/hooks/useToast'
 import {
   DEFAULT_HOME_PATH,
   loadDefaultRouteConfig,
