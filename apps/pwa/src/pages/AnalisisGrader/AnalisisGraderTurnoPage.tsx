@@ -476,10 +476,15 @@ export function AnalisisGraderTurnoPage() {
 
   // ── Navegación contextual prev/next ─────────────────────────────────────
 
-  // Carga shifts del rango ±20 días para construir cadena de navegación.
-  // Para plantas con Excel: usa graderDailySummaries (ordena por dateKey + shiftId).
-  // Para plantas sin Excel (ej. Yal): consulta Firestore Shoplogix para encontrar
-  // qué turnos existen en los días adyacentes y navega entre ellos.
+  // Carga shifts del rango ±20 días (Excel) + ±10 días (Shoplogix) para
+  // construir UNA cadena cronológica unificada. Esto permite saltar entre
+  // turnos del mismo día Y entre días, incluso si los días adyacentes solo
+  // tienen Shoplogix (sin Excel cargado) — caso típico Yal.
+  //
+  // Reglas de merge para evitar duplicar el mismo período:
+  //   • Excel "Turno día"   ≡ SLX "Turno 1" + "Turno 2" del mismo día
+  //   • Excel "Turno noche" ≡ SLX "Turno 3"             del mismo día
+  // Cuando hay Excel para el lado, se omiten sus equivalentes SLX.
   const [adjacentShifts, setAdjacentShifts] = useState<{ prev: { dateKey: string; shiftId: string } | null; next: { dateKey: string; shiftId: string } | null }>({ prev: null, next: null })
 
   useEffect(() => {
@@ -491,70 +496,89 @@ export function AnalisisGraderTurnoPage() {
     const toDate = new Date(`${dateKey}T12:00:00Z`)
     toDate.setUTCDate(toDate.getUTCDate() + 20)
 
-    listDailySummariesByRange(
-      fromDate.toISOString().slice(0, 10),
-      toDate.toISOString().slice(0, 10),
-      plantLineCfg.id,
-    ).then(async list => {
+    const SLX_NEARBY_DAYS = 10  // ±10 días alrededor del actual para SLX
+    const isSlxAware = plantLineCfg.isClassificationPlant === false
+
+    ;(async () => {
+      // 1. Excel summaries en ±20 días
+      const excelList = await listDailySummariesByRange(
+        fromDate.toISOString().slice(0, 10),
+        toDate.toISOString().slice(0, 10),
+        plantLineCfg.id,
+      ).catch(() => [] as Array<{ dateKey: string; shiftId: string }>)
       if (cancelled) return
 
-      if (list.length > 0) {
-        // Con Excel: orden cronológico por dateKey, luego por número de turno
-        const shiftRank = (id: string) => {
-          const m = id.match(/^Turno (\d+)$/)
-          if (m) return parseInt(m[1]!, 10)
-          return id.includes('día') ? 100 : 101
+      // 2. Shoplogix ±10 días en paralelo (solo plantas SLX-aware como Yal)
+      const slxByDay = new Map<string, string[]>()
+      if (isSlxAware) {
+        const baseTs = new Date(`${dateKey}T12:00:00Z`).getTime()
+        const queries: Array<Promise<{ dk: string; ids: string[] }>> = []
+        for (let d = -SLX_NEARBY_DAYS; d <= SLX_NEARBY_DAYS; d++) {
+          const dk = new Date(baseTs + d * 86_400_000).toISOString().slice(0, 10)
+          queries.push(
+            listShoplogixShiftIdsForDay(dk, plantLineCfg.plantSlug)
+              .then(ids => ({ dk, ids }))
+              .catch(() => ({ dk, ids: [] as string[] })),
+          )
         }
-        const sorted = [...list].sort((a, b) =>
-          a.dateKey !== b.dateKey
-            ? a.dateKey.localeCompare(b.dateKey)
-            : shiftRank(a.shiftId) - shiftRank(b.shiftId),
-        )
-        const idx = sorted.findIndex(s => s.dateKey === dateKey && s.shiftId === shiftLabel)
-        if (idx !== -1) {
-          setAdjacentShifts({
-            prev: idx > 0 ? { dateKey: sorted[idx - 1]!.dateKey, shiftId: sorted[idx - 1]!.shiftId } : null,
-            next: idx < sorted.length - 1 ? { dateKey: sorted[idx + 1]!.dateKey, shiftId: sorted[idx + 1]!.shiftId } : null,
-          })
-          return
-        }
+        const results = await Promise.all(queries)
+        if (cancelled) return
+        for (const { dk, ids } of results) slxByDay.set(dk, ids)
       }
 
-      // Sin Excel (o turno no encontrado en summaries) → consultar Shoplogix Firestore
-      const base = new Date(`${dateKey}T12:00:00Z`).getTime()
-      const DAY  = 86_400_000
-      const prevKey = new Date(base - DAY).toISOString().slice(0, 10)
-      const nextKey = new Date(base + DAY).toISOString().slice(0, 10)
-
-      const [prevIds, currIds, nextIds] = await Promise.all([
-        listShoplogixShiftIdsForDay(prevKey, plantLineCfg.plantSlug),
-        listShoplogixShiftIdsForDay(dateKey, plantLineCfg.plantSlug),
-        listShoplogixShiftIdsForDay(nextKey, plantLineCfg.plantSlug),
-      ])
-      if (cancelled) return
-
-      // Orden numérico dentro de cada día (Turno 1 < 2 < 3, luego Turno día/noche)
+      // 3. Helpers de orden y filtrado
       const shiftRank = (id: string) => {
         const m = id.match(/^Turno (\d+)$/)
         if (m) return parseInt(m[1]!, 10)
         return id.includes('día') ? 100 : 101
       }
-      const sort = (ids: string[]) => [...ids].sort((a, b) => shiftRank(a) - shiftRank(b))
-
       // "Unscheduled" en Shoplogix son intervalos sin turno asignado — generalmente
-      // ruido (0 ciclos) entre turnos. Excluido del carrusel de flechas para evitar
-      // saltos a una vista vacía. Si tiene producción real, sigue accesible vía
-      // calendario (que aplica su propio filtro <50 ciclos).
-      // Excepción: si el shift actual ES "Unscheduled" (caso raro, llegada vía link
-      // directo), lo dejamos para que el carrusel funcione desde ese punto.
+      // ruido (0 ciclos). Excluido del carrusel para evitar saltos a vista vacía.
+      // Excepción: si el shift actual ES "Unscheduled", lo dejamos.
       const dropUnscheduled = (id: string) =>
         id !== 'Unscheduled' || shiftLabel === 'Unscheduled'
 
-      const flat: Array<{ dateKey: string; shiftId: string }> = [
-        ...sort(prevIds).filter(dropUnscheduled).map(s => ({ dateKey: prevKey, shiftId: s })),
-        ...sort(currIds).filter(dropUnscheduled).map(s => ({ dateKey,         shiftId: s })),
-        ...sort(nextIds).filter(dropUnscheduled).map(s => ({ dateKey: nextKey, shiftId: s })),
-      ]
+      // 4. Agrupar Excel por día
+      const excelByDay = new Map<string, string[]>()
+      for (const s of excelList) {
+        if (!excelByDay.has(s.dateKey)) excelByDay.set(s.dateKey, [])
+        excelByDay.get(s.dateKey)!.push(s.shiftId)
+      }
+
+      // 5. Construir flat ordenado cronológicamente (Excel + SLX deduped)
+      const allDays = new Set<string>([...excelByDay.keys(), ...slxByDay.keys()])
+      const sortedDays = [...allDays].sort()
+      const seen = new Set<string>()
+      const flat: Array<{ dateKey: string; shiftId: string }> = []
+
+      for (const dk of sortedDays) {
+        const excelShifts = (excelByDay.get(dk) ?? []).sort((a, b) => shiftRank(a) - shiftRank(b))
+        const slxShifts = (slxByDay.get(dk) ?? []).filter(dropUnscheduled).sort((a, b) => shiftRank(a) - shiftRank(b))
+
+        const hasExcelDay = excelShifts.some(s => s === 'Turno día' || s === 'Turno 1' || s === 'Turno 2')
+        const hasExcelNight = excelShifts.some(s => s === 'Turno noche' || s === 'Turno 3')
+
+        // Mezcla cronológica dentro del día: ranks 1/2/'Turno día'/100 vs 3/'Turno noche'/101
+        const merged: string[] = [...excelShifts]
+        for (const s of slxShifts) {
+          const isDayShift = s === 'Turno 1' || s === 'Turno 2' || s === 'Turno día'
+          const isNightShift = s === 'Turno 3' || s === 'Turno noche'
+          if (isDayShift && hasExcelDay) continue
+          if (isNightShift && hasExcelNight) continue
+          if (merged.includes(s)) continue
+          merged.push(s)
+        }
+        merged.sort((a, b) => shiftRank(a) - shiftRank(b))
+
+        for (const s of merged) {
+          const key = `${dk}__${s}`
+          if (seen.has(key)) continue
+          seen.add(key)
+          flat.push({ dateKey: dk, shiftId: s })
+        }
+      }
+
+      if (cancelled) return
       const idx = flat.findIndex(e => e.dateKey === dateKey && e.shiftId === shiftLabel)
       setAdjacentShifts(idx === -1
         ? { prev: null, next: null }
@@ -563,12 +587,12 @@ export function AnalisisGraderTurnoPage() {
             next: idx < flat.length - 1    ? flat[idx + 1]! : null,
           },
       )
-    }).catch(() => {
+    })().catch(() => {
       if (!cancelled) setAdjacentShifts({ prev: null, next: null })
     })
 
     return () => { cancelled = true }
-  }, [dateKey, shiftLabel, plantLineCfg.id, plantLineCfg.plantSlug])
+  }, [dateKey, shiftLabel, plantLineCfg.id, plantLineCfg.plantSlug, plantLineCfg.isClassificationPlant])
 
   const goToShift = useCallback((target: { dateKey: string; shiftId: string }) => {
     // BUGFIX: preservar ?linea= para mantener la planta activa al navegar
@@ -1081,7 +1105,11 @@ export function AnalisisGraderTurnoPage() {
             onClick={() => adjacentShifts.prev && goToShift(adjacentShifts.prev)}
             disabled={!adjacentShifts.prev}
             className="gap-1"
-            title={adjacentShifts.prev ? `Turno anterior (←)` : 'Sin turno anterior'}
+            title={adjacentShifts.prev
+              ? `Turno anterior (←) · ${adjacentShifts.prev.dateKey === dateKey
+                  ? `mismo día · ${adjacentShifts.prev.shiftId}`
+                  : `${adjacentShifts.prev.dateKey} · ${adjacentShifts.prev.shiftId}`}`
+              : 'Sin turno anterior'}
           >
             <ChevronLeft className="w-4 h-4" />
             <span className="hidden md:inline text-xs">Anterior</span>
@@ -1092,7 +1120,11 @@ export function AnalisisGraderTurnoPage() {
             onClick={() => adjacentShifts.next && goToShift(adjacentShifts.next)}
             disabled={!adjacentShifts.next}
             className="gap-1"
-            title={adjacentShifts.next ? `Turno siguiente (→)` : 'Sin turno siguiente'}
+            title={adjacentShifts.next
+              ? `Turno siguiente (→) · ${adjacentShifts.next.dateKey === dateKey
+                  ? `mismo día · ${adjacentShifts.next.shiftId}`
+                  : `${adjacentShifts.next.dateKey} · ${adjacentShifts.next.shiftId}`}`
+              : 'Sin turno siguiente'}
           >
             <span className="hidden md:inline text-xs">Siguiente</span>
             <ChevronRight className="w-4 h-4" />

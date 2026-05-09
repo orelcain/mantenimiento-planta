@@ -1,14 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-<<<<<<< HEAD
-## Versión Actual: **v3.23.2**
-=======
-<<<<<<< HEAD
-## Versión Actual: **v3.23.1**
-=======
-## Versión Actual: **v3.22.1**
->>>>>>> 40ea0d3 (feat(home): default route configurable + Dashboard oculto del sidebar)
->>>>>>> 8842762 (feat(home): default route configurable + Dashboard oculto del sidebar)
+## Versión Actual: **v3.24.0**
 
 **Fecha de lanzamiento**: 17 de abril de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
