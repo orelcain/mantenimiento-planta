@@ -117,6 +117,13 @@ interface ShiftTimelineViewProps {
    * mismo rango visible.
    */
   onZoomRangeChange?: (range: { startMs: number; endMs: number } | null) => void
+  /**
+   * Callback opcional: cuando está presente, se renderiza un botón
+   * "Cargar Excel" en el header del Timeline. Permite cargar más
+   * uploads parciales sin salir de la página del turno (útil cuando
+   * el turno está en curso y se sube Grader Excel cada cierto tiempo).
+   */
+  onUploadClick?: () => void
 }
 
 /**
@@ -162,6 +169,7 @@ export function ShiftTimelineView({
   chartImageRef,
   upstreamSnapshot,
   onZoomRangeChange,
+  onUploadClick,
 }: ShiftTimelineViewProps) {
   // ── Estado del diálogo de anotación (Fase 3) ──────────────────────────
   const canAnnotate = !!summaryId && !!adminUid
@@ -1275,6 +1283,17 @@ export function ShiftTimelineView({
                 <span className="text-muted-foreground font-normal">· {productionWindow.dummyLots.size} lote{productionWindow.dummyLots.size > 1 ? 's' : ''} dummy</span>
               )}
             </span>
+          )}
+          {onUploadClick && (
+            <button
+              type="button"
+              onClick={onUploadClick}
+              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border border-sky-500/40 bg-sky-500/10 text-sky-400 hover:bg-sky-500/20 active:bg-sky-500/30 transition-colors text-[11px] font-medium"
+              title="Cargar otro Excel del Grader para complementar este turno (turnos en curso suben Excel parciales múltiples veces)."
+            >
+              <Upload className="w-3 h-3" />
+              Cargar Excel
+            </button>
           )}
         </CardTitle>
       {hasData && (
