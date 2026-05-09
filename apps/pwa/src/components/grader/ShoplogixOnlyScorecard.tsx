@@ -7,9 +7,10 @@
  */
 import { cn } from '@/lib/utils'
 import { Badge, Card, CardContent, InfoTooltip } from '@/components/ui'
-import { Activity, Clock } from 'lucide-react'
+import { Activity, Clock, Sun, Sunset, Moon, Sunrise } from 'lucide-react'
 import type { UpstreamLineSnapshot } from '@/services/shoplogix/types'
 import type { ShiftTimeWindow } from '@/services/grader/graderShiftStatus'
+import { getShiftMeta } from '@/services/grader/graderShiftDisplay'
 
 const VERDICT_STYLE = {
   ok: {
@@ -78,12 +79,21 @@ export function ShoplogixOnlyScorecard({ snapshot, shiftWindow, shiftLabel, date
   const uptimeTextColor = (pct: number) =>
     pct >= 70 ? 'text-emerald-400' : pct >= 40 ? 'text-amber-400' : 'text-red-400'
 
+  // Metadata canónica del turno (label + ícono + color) — single source of truth
+  const shiftMeta = getShiftMeta(shiftLabel)
+  const ShiftIcon = shiftMeta.iconName === 'Sun' ? Sun
+    : shiftMeta.iconName === 'Sunset' ? Sunset
+    : shiftMeta.iconName === 'Moon' ? Moon
+    : shiftMeta.iconName === 'Sunrise' ? Sunrise
+    : null
+
   return (
     <Card className={cn('border-2 overflow-hidden', style.border)}>
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between px-4 py-2 bg-muted/30 border-b">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-medium text-sm">{shiftLabel}</span>
+          {ShiftIcon && <ShiftIcon className={cn('w-3.5 h-3.5 shrink-0', shiftMeta.textColorClass)} />}
+          <span className="font-medium text-sm" title={shiftMeta.label}>{shiftMeta.label}</span>
           <span className="text-muted-foreground text-sm">· {dateKey}</span>
           {shiftWindow?.status === 'live' && (
             <Badge className="bg-red-500 text-white animate-pulse text-xs px-2 py-0">

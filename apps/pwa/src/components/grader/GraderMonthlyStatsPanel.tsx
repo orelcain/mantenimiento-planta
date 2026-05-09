@@ -10,6 +10,7 @@ import type { GraderDailySummary } from '@/services/grader/types'
 import { getCauseLabel } from '@/services/grader/graderMatrixP0Causes'
 import { p0StatusFromPct, p0StatusColor } from '@/services/grader/graderP0Thresholds'
 import { aggregateByCalendarDay } from '@/services/grader/graderCalendarAggregation'
+import { getShiftMeta } from '@/services/grader/graderShiftDisplay'
 import { fmt, fmtDec } from '@/lib/format'
 import type { SlxMonthlyStats } from './GraderHistoricalCalendar'
 
@@ -95,15 +96,14 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats }: P
     )
   }
 
-  // Mapeo de shiftId a label corto. Yal usa T1/T2/T3 además de los legacy
-  // Turno día/Turno noche — sin este mapeo todos caían como "Noche".
+  // Mapeo de shiftId a label vía helper centralizado (getShiftMeta).
+  // Soporta legacy ("Turno día/noche") y nuevo formato Yal ("Turno 1/2/3").
   const shortShiftLabel = (shiftId: string) => {
-    if (shiftId === 'Turno día') return 'Día'
-    if (shiftId === 'Turno noche') return 'Noche'
-    if (shiftId === 'Turno 1') return 'T1 mañana'
-    if (shiftId === 'Turno 2') return 'T2 tarde'
-    if (shiftId === 'Turno 3') return 'T3 noche'
-    return shiftId
+    const meta = getShiftMeta(shiftId)
+    // Para T1/T2/T3 mostrar "T1 mañana" etc; para legado solo "Día"/"Noche".
+    return meta.period === 'mañana' || meta.period === 'tarde' || meta.period === 'noche'
+      ? `${meta.shortLabel} ${meta.period}`
+      : meta.shortLabel
   }
   const shiftLabel = (s: GraderDailySummary) => shortShiftLabel(s.shiftId)
   const p0Color    = stats ? p0StatusColor(p0StatusFromPct(stats.p0Avg)) : 'text-muted-foreground'

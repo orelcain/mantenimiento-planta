@@ -23,7 +23,7 @@ import { getShiftDoc } from '@/services/grader/graderShifts.service'
 import { computeShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import type { ShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import { DEFAULT_SHIFT_SCHEDULE } from '@/services/grader/graderShiftSchedule'
-import { getShiftDisplayDateKey } from '@/services/grader/graderShiftDisplay'
+import { getShiftDisplayDateKey, getShiftMeta } from '@/services/grader/graderShiftDisplay'
 import { parseMatrixErrorString } from '@/services/grader/graderMatrixP0Causes'
 import { HeroScorecard } from '@/components/grader/HeroScorecard'
 import { ShoplogixOnlyScorecard } from '@/components/grader/ShoplogixOnlyScorecard'
@@ -935,52 +935,42 @@ export function AnalisisGraderTurnoPage() {
     return `${dayName} ${dayNum} ${monthName}`
   }, [dateKey, shiftLabel])
 
-  // Horario start–end del turno (HH:mm → HH:mm) y un ícono representativo según
-  // la franja horaria de inicio. Fuente preferida:
+  // Metadata canónica del turno (label, shortLabel, ícono, color, schedule).
+  // Single source of truth — todos los componentes que muestren este turno
+  // deben usar getShiftMeta para evitar mezclar denominaciones.
+  const shiftMeta = useMemo(() => getShiftMeta(shiftLabel ?? ''), [shiftLabel])
+
+  // Horario start–end real del turno (HH:mm → HH:mm). Fuente preferida:
   //   1. summary.startAt / endAt (cuando hay Excel cargado)
   //   2. shiftWindow del schedule de la planta (sin Excel)
-  // Si no hay ninguno, retornamos null y el header no muestra el horario.
+  //   3. shiftMeta.scheduleHint (fallback estático "07:45–14:45" según T1/T2/T3)
   const shiftScheduleInfo = useMemo<{
     startTime: string
     endTime: string
-    /** Hora de inicio (0-23) en wall-clock-as-UTC para mapear a ícono */
-    startHour: number
-    /** Tipo de franja: mañana/tarde/noche/madrugada para tooltip */
-    period: 'madrugada' | 'mañana' | 'tarde' | 'noche'
   } | null>(() => {
     const startIso = summary?.startAt ?? shiftWindow?.startAt
     const endIso = summary?.endAt ?? shiftWindow?.endAt
-    if (!startIso || !endIso) return null
-    const startTime = startIso.slice(11, 16)
-    const endTime = endIso.slice(11, 16)
-    const startHour = Number(startIso.slice(11, 13))
-    let period: 'madrugada' | 'mañana' | 'tarde' | 'noche'
-    if (startHour < 6)       period = 'madrugada'
-    else if (startHour < 12) period = 'mañana'
-    else if (startHour < 19) period = 'tarde'
-    else                     period = 'noche'
-    return { startTime, endTime, startHour, period }
-  }, [summary?.startAt, summary?.endAt, shiftWindow?.startAt, shiftWindow?.endAt])
+    if (startIso && endIso) {
+      return { startTime: startIso.slice(11, 16), endTime: endIso.slice(11, 16) }
+    }
+    // Fallback al hint del shiftMeta (07:45–14:45 etc) parseado
+    if (shiftMeta.scheduleHint) {
+      const [s, e] = shiftMeta.scheduleHint.split('–')
+      if (s && e) return { startTime: s, endTime: e }
+    }
+    return null
+  }, [summary?.startAt, summary?.endAt, shiftWindow?.startAt, shiftWindow?.endAt, shiftMeta.scheduleHint])
 
+  // Ícono lucide según el período del shift (resuelto por getShiftMeta).
   const ShiftPeriodIcon = useMemo(() => {
-    if (!shiftScheduleInfo) return null
-    switch (shiftScheduleInfo.period) {
-      case 'madrugada': return Sunrise
-      case 'mañana':    return Sun
-      case 'tarde':     return Sunset
-      case 'noche':     return Moon
+    switch (shiftMeta.iconName) {
+      case 'Sun':     return Sun
+      case 'Sunset':  return Sunset
+      case 'Moon':    return Moon
+      case 'Sunrise': return Sunrise
+      default:        return null
     }
-  }, [shiftScheduleInfo])
-
-  const shiftPeriodColor = useMemo(() => {
-    if (!shiftScheduleInfo) return ''
-    switch (shiftScheduleInfo.period) {
-      case 'madrugada': return 'text-sky-400'
-      case 'mañana':    return 'text-amber-400'
-      case 'tarde':     return 'text-orange-400'
-      case 'noche':     return 'text-indigo-400'
-    }
-  }, [shiftScheduleInfo])
+  }, [shiftMeta.iconName])
 
   // ── Shoplogix manual refresh ─────────────────────────────────────────────
   const handleSlxRefresh = useCallback(async () => {
@@ -1083,17 +1073,17 @@ export function AnalisisGraderTurnoPage() {
               <div className="flex items-center gap-1.5 order-2 sm:order-1 min-w-0 flex-wrap">
                 {ShiftPeriodIcon && (
                   <ShiftPeriodIcon
-                    className={`w-3.5 h-3.5 shrink-0 ${shiftPeriodColor}`}
-                    aria-label={shiftScheduleInfo?.period}
+                    className={`w-3.5 h-3.5 shrink-0 ${shiftMeta.textColorClass}`}
+                    aria-label={shiftMeta.period}
                   />
                 )}
-                <span className="text-sm font-medium shrink-0">
-                  {shiftLabel}
+                <span className="text-sm font-medium shrink-0" title={shiftMeta.label}>
+                  {shiftMeta.label}
                 </span>
                 {shiftScheduleInfo && (
                   <span
                     className="text-[11px] tabular-nums text-muted-foreground/80 shrink-0"
-                    title={`Horario del turno: ${shiftScheduleInfo.startTime} → ${shiftScheduleInfo.endTime} (${shiftScheduleInfo.period})`}
+                    title={`Horario del turno: ${shiftScheduleInfo.startTime} → ${shiftScheduleInfo.endTime} (${shiftMeta.period})`}
                   >
                     {shiftScheduleInfo.startTime}–{shiftScheduleInfo.endTime}
                   </span>

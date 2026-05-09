@@ -61,6 +61,7 @@ import {
   isMidnightShift,
   cfKeysForVisualDay,
   addDaysToDateKey,
+  getShiftMeta,
 } from '@/services/grader/graderShiftDisplay'
 import { MachineTrendMiniChart } from './UpstreamMachinesPanel'
 import { getPlantLineConfig, DEFAULT_PLANT_LINE_ID, type PlantLineId } from '@/config/plantLines'
@@ -152,9 +153,9 @@ function renderShiftChip(
   view: CalendarView,
   slxByShift: Map<string, SlxShiftCache>,
 ): JSX.Element {
-  const baseLetter = chip.shiftId === 'Turno día' ? 'D' : 'N'
-  // Siempre D o N — el tooltip aclara si es madrugada o salida.
-  const label = baseLetter
+  // Label canónico del turno (D, N, T1, T2, T3, etc.) vía helper centralizado.
+  const meta = getShiftMeta(chip.shiftId)
+  const label = meta.shortLabel
   const key = `${chip.summaryId}-${chip.role}-${chip.renderInDateKey}`
   const p0 = chip.pointZeroPct
   const colorByP0 = p0 >= DEFAULT_P0_CRITICAL_PCT
@@ -3723,7 +3724,9 @@ export function GraderHistoricalCalendar({
                         </div>
                         <p className="text-xs font-semibold text-emerald-400">
                           {getShiftDisplayDateKey(slxMonthlyStats.bestShift.dateKey, slxMonthlyStats.bestShift.shiftId).slice(5)}
-                          {' · '}{(slxMonthlyStats.bestShift.shiftId === 'Turno día' || slxMonthlyStats.bestShift.shiftId === 'Turno 1' || slxMonthlyStats.bestShift.shiftId === 'Turno 2') ? '☀' : '🌙'}
+                          {' · '}<span title={getShiftMeta(slxMonthlyStats.bestShift.shiftId).label}>
+                            {getShiftMeta(slxMonthlyStats.bestShift.shiftId).emoji} {getShiftMeta(slxMonthlyStats.bestShift.shiftId).shortLabel}
+                          </span>
                           {' · '}<span className="font-bold">{slxMonthlyStats.bestShift.uptimePct.toFixed(0)}%</span>
                           <span className="text-muted-foreground font-normal">
                             {' · '}{slxMonthlyStats.bestShift.totalCycles >= 1000
@@ -3745,7 +3748,9 @@ export function GraderHistoricalCalendar({
                       </div>
                       <p className="text-xs font-semibold text-rose-400">
                         {getShiftDisplayDateKey(slxMonthlyStats.worstShift.dateKey, slxMonthlyStats.worstShift.shiftId).slice(5)}
-                        {' · '}{(slxMonthlyStats.worstShift.shiftId === 'Turno día' || slxMonthlyStats.worstShift.shiftId === 'Turno 1' || slxMonthlyStats.worstShift.shiftId === 'Turno 2') ? '☀' : '🌙'}
+                        {' · '}<span title={getShiftMeta(slxMonthlyStats.worstShift.shiftId).label}>
+                          {getShiftMeta(slxMonthlyStats.worstShift.shiftId).emoji} {getShiftMeta(slxMonthlyStats.worstShift.shiftId).shortLabel}
+                        </span>
                         {' · '}<span className="font-bold">{slxMonthlyStats.worstShift.uptimePct.toFixed(0)}%</span>
                         <span className="text-muted-foreground font-normal">
                           {' · '}{slxMonthlyStats.worstShift.totalCycles >= 1000

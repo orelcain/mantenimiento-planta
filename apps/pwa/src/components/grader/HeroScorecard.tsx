@@ -1,6 +1,7 @@
 import { cn } from '@/lib/utils'
 import { Badge, Card, CardContent } from '@/components/ui'
-import { Activity, Clock, Radio, FileSpreadsheet } from 'lucide-react'
+import { Activity, Clock, Radio, FileSpreadsheet, Sun, Sunset, Moon, Sunrise } from 'lucide-react'
+import { getShiftMeta } from '@/services/grader/graderShiftDisplay'
 import { verdictFromP0Pct } from '@/services/grader/graderThresholds'
 import type { ShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import type { GraderDailySummary } from '@/services/grader/types'
@@ -84,12 +85,21 @@ export function HeroScorecard({ summary, shiftWindow, upstreamSnapshot, marelHgC
       ? `${summary.durationMinutes} min`
       : '—'
 
+  // Metadata canónica del turno (label, ícono, color) — single source of truth
+  const shiftMeta = getShiftMeta(summary.shiftId)
+  const ShiftIcon = shiftMeta.iconName === 'Sun' ? Sun
+    : shiftMeta.iconName === 'Sunset' ? Sunset
+    : shiftMeta.iconName === 'Moon' ? Moon
+    : shiftMeta.iconName === 'Sunrise' ? Sunrise
+    : null
+
   return (
     <Card className={cn('border-2 overflow-hidden', style.border)}>
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2 bg-muted/30 border-b">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-medium text-sm">{summary.shiftId}</span>
+          {ShiftIcon && <ShiftIcon className={cn('w-3.5 h-3.5 shrink-0', shiftMeta.textColorClass)} />}
+          <span className="font-medium text-sm" title={shiftMeta.label}>{shiftMeta.label}</span>
           <span className="text-muted-foreground text-sm">· {summary.dateKey}</span>
           {shiftWindow.status === 'live' && (
             <Badge className="bg-red-500 text-white animate-pulse text-xs px-2 py-0">

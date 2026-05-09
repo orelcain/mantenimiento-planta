@@ -114,3 +114,150 @@ export function slxKeyForVisualShift(visualDay: string, shiftId: string): string
   const cfDateKey = getCfDateKeyForDisplayDay(visualDay, shiftId)
   return `${cfDateKey}__${shiftId}`
 }
+
+// ============================================================================
+// CONVENCIÓN UNIFICADA DE DENOMINACIÓN + ICONOS POR SHIFT
+// ============================================================================
+// Todos los componentes que muestren un turno al usuario deben usar
+// `getShiftMeta(shiftId)` para evitar mezclas tipo "Turno día" + "T1" + iconos
+// distintos en distintas vistas.
+//
+// Convención de períodos:
+//   - mañana      (06–12) → Sun (amber)
+//   - tarde       (12–19) → Sunset (orange)
+//   - noche       (19–07) → Moon (indigo)
+//   - dia         → Sun (amber) — Excel "Turno día" o T1+T2 sumados
+//   - noche-corta → Moon (indigo) — Excel "Turno noche" sin precisar T3
+//
+// Mapeo de shiftId → período + label + shortLabel:
+//   Turno 1     → mañana      | "Turno 1 — Mañana"  | "T1"
+//   Turno 2     → tarde       | "Turno 2 — Tarde"   | "T2"
+//   Turno 3     → noche       | "Turno 3 — Noche"   | "T3"
+//   Turno día   → dia         | "Turno día"         | "Día"
+//   Turno noche → noche-corta | "Turno noche"       | "Noche"
+
+export type ShiftPeriod = 'mañana' | 'tarde' | 'noche' | 'dia' | 'noche-corta' | 'desconocido'
+
+export interface ShiftMeta {
+  /** Label completo para tooltips/desktop ("Turno 1 — Mañana") */
+  label: string
+  /** Label corto para badges/mobile ("T1", "Día", "Noche") */
+  shortLabel: string
+  /** Período conceptual del turno (driver para color e ícono) */
+  period: ShiftPeriod
+  /** Tailwind class para color de texto del ícono y badges */
+  textColorClass: string
+  /** Tailwind class para fondo sutil de chips/cards */
+  bgColorClass: string
+  /** Tailwind class para borde sutil */
+  borderColorClass: string
+  /** Nombre de icon component de lucide-react (importar el ícono donde se use) */
+  iconName: 'Sun' | 'Sunset' | 'Moon' | 'Sunrise' | 'Clock'
+  /** Emoji equivalente (solo para tooltips o casos sin import de iconos) */
+  emoji: string
+  /** Si este turno suma al "día" (T1, T2, Turno día) o a la "noche" (T3, Turno noche) */
+  isDayLike: boolean
+  /** Descripción horaria típica (Yal) */
+  scheduleHint: string
+}
+
+const SHIFT_META_TABLE: Record<string, ShiftMeta> = {
+  'Turno 1': {
+    label: 'Turno 1 — Mañana',
+    shortLabel: 'T1',
+    period: 'mañana',
+    textColorClass: 'text-amber-400',
+    bgColorClass: 'bg-amber-500/10',
+    borderColorClass: 'border-amber-500/30',
+    iconName: 'Sun',
+    emoji: '☀',
+    isDayLike: true,
+    scheduleHint: '07:45–14:45',
+  },
+  'Turno 2': {
+    label: 'Turno 2 — Tarde',
+    shortLabel: 'T2',
+    period: 'tarde',
+    textColorClass: 'text-orange-400',
+    bgColorClass: 'bg-orange-500/10',
+    borderColorClass: 'border-orange-500/30',
+    iconName: 'Sunset',
+    emoji: '🌅',
+    isDayLike: true,
+    scheduleHint: '14:45–00:00',
+  },
+  'Turno 3': {
+    label: 'Turno 3 — Noche',
+    shortLabel: 'T3',
+    period: 'noche',
+    textColorClass: 'text-indigo-400',
+    bgColorClass: 'bg-indigo-500/10',
+    borderColorClass: 'border-indigo-500/30',
+    iconName: 'Moon',
+    emoji: '🌙',
+    isDayLike: false,
+    scheduleHint: '23:00–07:45',
+  },
+  'Turno día': {
+    label: 'Turno día',
+    shortLabel: 'Día',
+    period: 'dia',
+    textColorClass: 'text-amber-400',
+    bgColorClass: 'bg-amber-500/10',
+    borderColorClass: 'border-amber-500/30',
+    iconName: 'Sun',
+    emoji: '☀',
+    isDayLike: true,
+    scheduleHint: '07:45–00:00',
+  },
+  'Turno noche': {
+    label: 'Turno noche',
+    shortLabel: 'Noche',
+    period: 'noche-corta',
+    textColorClass: 'text-indigo-400',
+    bgColorClass: 'bg-indigo-500/10',
+    borderColorClass: 'border-indigo-500/30',
+    iconName: 'Moon',
+    emoji: '🌙',
+    isDayLike: false,
+    scheduleHint: '23:00–07:45',
+  },
+}
+
+const FALLBACK_META: ShiftMeta = {
+  label: 'Turno desconocido',
+  shortLabel: '?',
+  period: 'desconocido',
+  textColorClass: 'text-muted-foreground',
+  bgColorClass: 'bg-muted/20',
+  borderColorClass: 'border-muted-foreground/30',
+  iconName: 'Clock',
+  emoji: '⏱',
+  isDayLike: false,
+  scheduleHint: '',
+}
+
+/**
+ * Helper canónico para obtener metadata de display de un turno. Cualquier
+ * componente que muestre etiqueta o ícono de un turno debe usar esto en
+ * lugar de hardcodear strings/iconos. Soporta legacy ("Turno día/noche")
+ * y nuevo formato Shoplogix ("Turno 1/2/3").
+ */
+export function getShiftMeta(shiftId: string): ShiftMeta {
+  return SHIFT_META_TABLE[shiftId] ?? FALLBACK_META
+}
+
+/** Atajo: solo el label corto ("T1", "Día", "Noche"). */
+export function shortShiftLabel(shiftId: string): string {
+  return getShiftMeta(shiftId).shortLabel
+}
+
+/** Atajo: solo el label completo ("Turno 1 — Mañana"). */
+export function fullShiftLabel(shiftId: string): string {
+  return getShiftMeta(shiftId).label
+}
+
+/** Atajo: si este shift cuenta como "día" para agregaciones D/N. */
+export function isShiftDayLike(shiftId: string): boolean {
+  return getShiftMeta(shiftId).isDayLike
+}
