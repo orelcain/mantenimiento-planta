@@ -1,6 +1,6 @@
 import type { Model3D } from '@/types/models3d'
 
-export type InteractiveExperienceId = 'tobogan' | 'sopladorasBaader142'
+export type InteractiveExperienceId = 'tobogan' | 'sopladorasBaader142' | 'plataformaPonton'
 
 export interface StandaloneInteractiveExperience {
   id: InteractiveExperienceId
@@ -25,6 +25,15 @@ const SOPLADORAS_BAADER142_EXPERIENCE_ALIASES = [
   'sopladora baader 142.glb',
 ]
 
+const PLATAFORMA_PONTON_EXPERIENCE_ALIASES = [
+  'plataforma ponton',
+  'plataforma-ponton',
+  'plataforma_ponton',
+  'plataforma ponton acopio',
+  'ponton acopio',
+  'plataforma_ponton.glb',
+]
+
 export interface InteractiveExperienceDescriptor {
   id: InteractiveExperienceId
   label: string
@@ -46,6 +55,14 @@ export const STANDALONE_INTERACTIVE_EXPERIENCES: StandaloneInteractiveExperience
       'Base operativa para definir estados por sopladora, modos de trabajo y secuencias de inspeccion antes de conectarlo al modelo 3D.',
     route: '/visor-3d/interactividad/sopladoras-baader-142',
     sourceLabel: 'Base operativa',
+  },
+  {
+    id: 'plataformaPonton',
+    label: 'Plataforma Ponton Acopio',
+    description:
+      'Propuesta de plataforma para acceso a las retenciones de bombas de succion con animacion de apertura de puerta y subida/bajada de ductos.',
+    route: '/visor-3d/interactividad/plataforma-ponton',
+    sourceLabel: 'Propuesta diseno',
   },
 ]
 
@@ -82,6 +99,13 @@ export function getInteractiveExperienceForModel(
     return {
       id: 'sopladorasBaader142',
       label: 'Sopladoras Baader 142',
+    }
+  }
+
+  if (PLATAFORMA_PONTON_EXPERIENCE_ALIASES.some((alias) => searchableText.includes(alias))) {
+    return {
+      id: 'plataformaPonton',
+      label: 'Plataforma Ponton Acopio',
     }
   }
 

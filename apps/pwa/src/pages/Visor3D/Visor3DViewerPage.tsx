@@ -63,6 +63,7 @@ import { ColorPalette } from '@/components/visor3d/ColorPalette'
 import { AnnotationListItems } from '@/components/visor3d/AnnotationListItems'
 import { SopladorasBaader142InteractiveExperience } from '@/components/visor3d/interactive/SopladorasBaader142InteractiveExperience'
 import { ToboganInteractiveExperience } from '@/components/visor3d/interactive/ToboganInteractiveExperience'
+import { PlataformaPontonInteractiveExperience } from '@/components/visor3d/interactive/PlataformaPontonInteractiveExperience'
 import { getInteractiveExperienceForModel } from '@/components/visor3d/interactive/experienceRegistry'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import type { Model3D, MaterialOverride, Annotation3D, AnnotationStatus, AnnotationPriority } from '@/types/models3d'
@@ -976,6 +977,11 @@ export function Visor3DViewerPage() {
             modelFormat={model.format}
             canEditMappings={isAdmin}
             currentUserId={user?.id ?? 'admin'}
+            className="h-full"
+          />
+        ) : interactiveExperience?.id === 'plataformaPonton' ? (
+          <PlataformaPontonInteractiveExperience
+            modelName={model.name}
             className="h-full"
           />
         ) : null}
