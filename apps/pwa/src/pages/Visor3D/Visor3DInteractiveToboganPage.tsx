@@ -1,10 +1,12 @@
 import { ArrowLeft, ExternalLink, Waves } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { Button, Badge } from '@/components/ui'
 import { ToboganInteractiveExperience } from '@/components/visor3d/interactive/ToboganInteractiveExperience'
 import { ShareInteractiveButton } from '@/components/visor3d/ShareInteractiveButton'
 
 export function Visor3DInteractiveToboganPage() {
+  const { pathname } = useLocation()
+  const isPublicView = pathname.startsWith('/v/')
   const shareUrl = `${window.location.origin}/mantenimiento-planta/v/interactive/tobogan`
 
   return (
@@ -24,18 +26,22 @@ export function Visor3DInteractiveToboganPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="gap-1.5" asChild>
-            <Link to="/visor-3d">
-              <ArrowLeft className="h-4 w-4" />
-              Volver al visor
-            </Link>
-          </Button>
-          <Button variant="outline" size="sm" className="gap-1.5" asChild>
-            <a href="https://orelcain.github.io/tobogan-app/" target="_blank" rel="noreferrer">
-              <ExternalLink className="h-4 w-4" />
-              Abrir fuente
-            </a>
-          </Button>
+          {!isPublicView && (
+            <Button variant="outline" size="sm" className="gap-1.5" asChild>
+              <Link to="/visor-3d">
+                <ArrowLeft className="h-4 w-4" />
+                Volver al visor
+              </Link>
+            </Button>
+          )}
+          {!isPublicView && (
+            <Button variant="outline" size="sm" className="gap-1.5" asChild>
+              <a href="https://orelcain.github.io/tobogan-app/" target="_blank" rel="noreferrer">
+                <ExternalLink className="h-4 w-4" />
+                Abrir fuente
+              </a>
+            </Button>
+          )}
           <ShareInteractiveButton
             url={shareUrl}
             title="Interactividad Tobogan Decomiso"

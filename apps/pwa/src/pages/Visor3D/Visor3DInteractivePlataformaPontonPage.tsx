@@ -1,10 +1,12 @@
 import { ArrowLeft, Anchor } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { Badge, Button } from '@/components/ui'
 import { PlataformaPontonInteractiveExperience } from '@/components/visor3d/interactive/PlataformaPontonInteractiveExperience'
 import { ShareInteractiveButton } from '@/components/visor3d/ShareInteractiveButton'
 
 export function Visor3DInteractivePlataformaPontonPage() {
+  const { pathname } = useLocation()
+  const isPublicView = pathname.startsWith('/v/')
   const shareUrl = `${window.location.origin}/mantenimiento-planta/v/interactive/plataforma-ponton`
 
   return (
@@ -25,12 +27,14 @@ export function Visor3DInteractivePlataformaPontonPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="gap-1.5" asChild>
-            <Link to="/visor-3d">
-              <ArrowLeft className="h-4 w-4" />
-              Volver al visor
-            </Link>
-          </Button>
+          {!isPublicView && (
+            <Button variant="outline" size="sm" className="gap-1.5" asChild>
+              <Link to="/visor-3d">
+                <ArrowLeft className="h-4 w-4" />
+                Volver al visor
+              </Link>
+            </Button>
+          )}
           <ShareInteractiveButton
             url={shareUrl}
             title="Plataforma Pontón Acopio"

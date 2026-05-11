@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ArrowLeft, AirVent, Box, Loader2 } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { Badge, Button } from '@/components/ui'
 import { SopladorasBaader142InteractiveExperience } from '@/components/visor3d/interactive/SopladorasBaader142InteractiveExperience'
 import { ShareInteractiveButton } from '@/components/visor3d/ShareInteractiveButton'
@@ -9,6 +9,8 @@ import { getInteractiveExperienceForModel } from '@/components/visor3d/interacti
 import type { Model3D, Model3DFormat } from '@/types/models3d'
 
 export function Visor3DInteractiveBaader142Page() {
+  const { pathname } = useLocation()
+  const isPublicView = pathname.startsWith('/v/')
   const shareUrl = `${window.location.origin}/mantenimiento-planta/v/interactive/baader-142`
   const [modelId, setModelId] = useState<string | undefined>()
   const [modelUrl, setModelUrl] = useState<string | undefined>()
@@ -47,13 +49,15 @@ export function Visor3DInteractiveBaader142Page() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="gap-1.5" asChild>
-            <Link to="/visor-3d">
-              <ArrowLeft className="h-4 w-4" />
-              Volver al visor
-            </Link>
-          </Button>
-          {modelUrl && (
+          {!isPublicView && (
+            <Button variant="outline" size="sm" className="gap-1.5" asChild>
+              <Link to="/visor-3d">
+                <ArrowLeft className="h-4 w-4" />
+                Volver al visor
+              </Link>
+            </Button>
+          )}
+          {!isPublicView && modelUrl && (
             <Button variant="outline" size="sm" className="gap-1.5" asChild>
               <Link to="/visor-3d">
                 <Box className="h-4 w-4" />
