@@ -13,7 +13,7 @@ import {
 import * as THREE from 'three'
 import { Badge, Button } from '@/components/ui'
 import { cn } from '@/lib/utils'
-import { Camera, Compass, DoorOpen, ArrowUpFromLine, Wind } from 'lucide-react'
+import { Camera, Compass, DoorOpen, ArrowUpFromLine } from 'lucide-react'
 
 const GLB_URL = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/models3d/plataforma_ponton.glb`
 
@@ -144,8 +144,8 @@ function AnimatedWater({
     const maxFoamAt = 0.18 * windStrength
 
     for (let i = 0; i < positions.count; i++) {
-      const ox = orig[i * 3]
-      const oy = orig[i * 3 + 1]
+      const ox = orig[i * 3] ?? 0
+      const oy = orig[i * 3 + 1] ?? 0
       const u = ox * wx + oy * wy
       const v = -ox * wy + oy * wx
 
@@ -169,7 +169,7 @@ function AnimatedWater({
       colors[i * 3 + 2] = baseB + (foamB - baseB) * f
     }
     positions.needsUpdate = true
-    geometry.attributes.color.needsUpdate = true
+    if (geometry.attributes.color) geometry.attributes.color.needsUpdate = true
     geometry.computeVertexNormals()
   })
 
@@ -315,9 +315,10 @@ function HullSplashes({ windStrength = 1.0 }: { windStrength?: number }) {
   // Cada trigger, dispara desde un origen aleatorio
   const idx = trigger % origins.length
 
-  return origins.length > 0 ? (
+  const currentOrigin = origins[idx]
+  return currentOrigin ? (
     <SplashBurst
-      origin={origins[idx]}
+      origin={currentOrigin}
       triggerKey={trigger}
       count={18}
       velocityScale={0.6 * windStrength}
@@ -417,10 +418,11 @@ function WindyBuoys({
     const groups: Record<string, THREE.Object3D[]> = {}
     scene.traverse((obj) => {
       const match = obj.name.match(/^(Boya_\d+)_/)
-      if (match) {
+      if (match && match[1]) {
         const key = match[1]
-        if (!groups[key]) groups[key] = []
-        groups[key].push(obj)
+        const arr = groups[key] ?? []
+        arr.push(obj)
+        groups[key] = arr
       }
     })
 
@@ -429,6 +431,7 @@ function WindyBuoys({
       if (pieces.length === 0) continue
       // Centro de la boya: usar el cuerpo principal (Boya_N_cuerpo)
       const cuerpo = pieces.find((p) => p.name.endsWith('_cuerpo')) ?? pieces[0]
+      if (!cuerpo) continue
       // World position del cuerpo
       const wp = new THREE.Vector3()
       cuerpo.getWorldPosition(wp)
@@ -528,12 +531,10 @@ export function PlataformaPontonInteractiveExperience({
   const [s1Arriba, setS1Arriba] = useState(false)
   const [s2Arriba, setS2Arriba] = useState(false)
   const [vista, setVista] = useState<CameraPreset>('orbital')
-  // Control de viento — afecta olas + boyas + cuerdas + frecuencia de splashes
-  const [viento, setViento] = useState<'calma' | 'brisa' | 'fuerte'>('brisa')
+  // Viento fijo en Calma — afecta olas + boyas + cuerdas + frecuencia de splashes
+  const viento = 'calma' as const
   const windConfig = {
     calma: { strength: 0.35, label: 'Calma' },
-    brisa: { strength: 1.0, label: 'Brisa' },
-    fuerte: { strength: 1.8, label: 'Marejada' },
   } as const
 
   // Triggers de splash cuando se levanta cada sistema
@@ -652,25 +653,6 @@ export function PlataformaPontonInteractiveExperience({
           >
             {id === 'orbital' ? <Compass className="h-3.5 w-3.5" /> : null}
             {CAMERA_VIEWS[id].label}
-          </Button>
-        ))}
-      </div>
-
-      {/* Selector de viento (afecta agua + boyas) */}
-      <div className="flex flex-wrap items-center gap-1.5 border-b bg-muted/20 px-3 py-1.5">
-        <span className="text-[11px] font-medium text-muted-foreground flex items-center gap-1.5">
-          <Wind className="h-3.5 w-3.5" />
-          Viento:
-        </span>
-        {(Object.keys(windConfig) as Array<keyof typeof windConfig>).map((id) => (
-          <Button
-            key={id}
-            size="sm"
-            variant={viento === id ? 'default' : 'ghost'}
-            onClick={() => setViento(id)}
-            className="h-6 px-2 text-[10px]"
-          >
-            {windConfig[id].label}
           </Button>
         ))}
       </div>
