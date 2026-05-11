@@ -2,8 +2,11 @@ import { ArrowLeft, ExternalLink, Waves } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Button, Badge } from '@/components/ui'
 import { ToboganInteractiveExperience } from '@/components/visor3d/interactive/ToboganInteractiveExperience'
+import { ShareInteractiveButton } from '@/components/visor3d/ShareInteractiveButton'
 
 export function Visor3DInteractiveToboganPage() {
+  const shareUrl = `${window.location.origin}/mantenimiento-planta/v/interactive/tobogan`
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -33,6 +36,11 @@ export function Visor3DInteractiveToboganPage() {
               Abrir fuente
             </a>
           </Button>
+          <ShareInteractiveButton
+            url={shareUrl}
+            title="Interactividad Tobogan Decomiso"
+            description="Demo interactiva del tobogan de decomiso."
+          />
         </div>
       </div>
 

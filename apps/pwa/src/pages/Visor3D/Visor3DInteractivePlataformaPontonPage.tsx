@@ -2,8 +2,11 @@ import { ArrowLeft, Anchor } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Badge, Button } from '@/components/ui'
 import { PlataformaPontonInteractiveExperience } from '@/components/visor3d/interactive/PlataformaPontonInteractiveExperience'
+import { ShareInteractiveButton } from '@/components/visor3d/ShareInteractiveButton'
 
 export function Visor3DInteractivePlataformaPontonPage() {
+  const shareUrl = `${window.location.origin}/mantenimiento-planta/v/interactive/plataforma-ponton`
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -28,6 +31,11 @@ export function Visor3DInteractivePlataformaPontonPage() {
               Volver al visor
             </Link>
           </Button>
+          <ShareInteractiveButton
+            url={shareUrl}
+            title="Plataforma Pontón Acopio"
+            description="Propuesta interactiva de plataforma para acceso a retenciones de bombas de succión."
+          />
         </div>
       </div>
 

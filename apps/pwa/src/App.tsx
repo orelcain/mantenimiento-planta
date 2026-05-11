@@ -268,6 +268,14 @@ export function App() {
             }
           />
           <Route
+            path="/v/interactive/plataforma-ponton"
+            element={
+              <Suspense fallback={<LoadingScreen />}>
+                <Visor3DInteractivePlataformaPontonPage />
+              </Suspense>
+            }
+          />
+          <Route
             path="/v/:modelId"
             element={
               <Suspense fallback={<LoadingScreen />}>

@@ -3,11 +3,13 @@ import { ArrowLeft, AirVent, Box, Loader2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Badge, Button } from '@/components/ui'
 import { SopladorasBaader142InteractiveExperience } from '@/components/visor3d/interactive/SopladorasBaader142InteractiveExperience'
+import { ShareInteractiveButton } from '@/components/visor3d/ShareInteractiveButton'
 import { subscribeToModels3D } from '@/services/models3d'
 import { getInteractiveExperienceForModel } from '@/components/visor3d/interactive/experienceRegistry'
 import type { Model3D, Model3DFormat } from '@/types/models3d'
 
 export function Visor3DInteractiveBaader142Page() {
+  const shareUrl = `${window.location.origin}/mantenimiento-planta/v/interactive/baader-142`
   const [modelId, setModelId] = useState<string | undefined>()
   const [modelUrl, setModelUrl] = useState<string | undefined>()
   const [modelFormat, setModelFormat] = useState<Model3DFormat | undefined>()
@@ -59,6 +61,11 @@ export function Visor3DInteractiveBaader142Page() {
               </Link>
             </Button>
           )}
+          <ShareInteractiveButton
+            url={shareUrl}
+            title="Sopladoras Baader 142"
+            description="Interactividad de sopladoras Baader 142 — estados, secuencias e inspecciones."
+          />
         </div>
       </div>
 
