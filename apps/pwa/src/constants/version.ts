@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '3.28.0' as const
+export const APP_VERSION = '3.28.1' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-05-12' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'feat(aria): Tool Registry + 6 tools shift.*/period.* (Sprint 1 ARIA-JARVIS)' as const
+export const VERSION_NAME = 'feat(aria): +6 tools incidents/equipment (Sprint 2 ARIA-JARVIS · 12 tools totales)' as const
 
 /**
  * Nota:
