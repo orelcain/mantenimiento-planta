@@ -9,6 +9,7 @@ import { checkThinkingAllowance, recordThinkingUsage, getAriaConfig } from './ar
 import { orchestrateStream, detectTaskType, type AgentStatusEvent } from './ariaOrchestrator'
 import { logger } from '@/lib/logger'
 import { buildLearningContext, trackEquipmentProblem } from './ariaLearning'
+import { buildAriaContext } from './aria/contextEngine'
 import type { Incident } from '@/types'
 import type { Machine, Repuesto } from '@/types/repuestos'
 
@@ -2541,6 +2542,21 @@ export async function sendChatMessage(
       role: 'system',
       content: `DATOS ACTUALES DE LA PLANTA (usa estos datos para responder):\n\n${ragContext}`,
     })
+  }
+
+  // ARIA Tool Registry — datos exactos consultados via tools registradas
+  // (turno actual, KPIs Grader, agregados por período, etc.)
+  try {
+    const ariaCtx = await buildAriaContext(resolvedQuery)
+    if (ariaCtx.hasResults) {
+      messages.push({ role: 'system', content: ariaCtx.contextBlock })
+      logger.info('[chatbot] ARIA tools invocadas', {
+        count: ariaCtx.invocations.length,
+        tools: ariaCtx.invocations.map(i => i.tool).join(','),
+      })
+    }
+  } catch (err) {
+    logger.error('[chatbot] Error en ARIA context engine', err instanceof Error ? err : undefined)
   }
 
   // #2 — Inyectar análisis visual de fotos adjuntas
