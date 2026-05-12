@@ -145,7 +145,7 @@ registerTool({
   ],
   triggers: [
     /\b(ayer|anteayer|antier|anoche)\b/i,
-    /\bd[ií]a\s+\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?\b/i,
+    /\bd[ií]a\s+\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?\b/i,
   ],
   execute: async (params) => {
     let date = (params.date as string) || daysAgo(1)
@@ -420,7 +420,7 @@ export function inferToolParams(toolName: string, userMessage: string): Record<s
       params.date = daysAgo(1)
     }
     // patrón "día DD/MM" o "día DD-MM" → calcular del año actual
-    const m = lower.match(/d[ií]a\s+(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/)
+    const m = lower.match(/d[ií]a\s+(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?/)
     if (m) {
       const day = parseInt(m[1] || '0', 10)
       const month = parseInt(m[2] || '0', 10)
