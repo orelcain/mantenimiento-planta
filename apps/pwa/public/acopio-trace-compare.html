@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<title>Comparativa Trace HMI Yal — Original vs vtracer</title>
+<style>
+  body { margin:0; background:#0b0f17; color:#e8eef7; font-family:-apple-system,Segoe UI,sans-serif; font-size:13px }
+  header { padding:10px 16px; background:#000; border-bottom:1px solid #1f2733; display:flex; gap:14px; align-items:center; flex-wrap:wrap }
+  header h1 { margin:0; font-size:14px }
+  header .info { color:#8aa0b4 }
+  .grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; padding:8px }
+  .col { background:#141a24; border:1px solid #1f2733; border-radius:4px; overflow:hidden }
+  .col .label { padding:6px 10px; background:#0e131c; border-bottom:1px solid #1f2733; display:flex; justify-content:space-between; align-items:center }
+  .col .label b { font-size:12px }
+  .col .label .meta { color:#8aa0b4; font-size:11px }
+  .col .frame { background:#000; display:flex; justify-content:center; align-items:center; padding:0; min-height:300px }
+  .col img, .col object { display:block; max-width:100%; height:auto }
+  .controls { display:inline-flex; align-items:center; gap:8px; margin-left:auto }
+  .controls input[type=range] { width:100px; accent-color:#3aa1ff }
+</style>
+</head>
+<body>
+<header>
+  <h1>Comparativa Trace HMI Yal — Original vs vtracer auto</h1>
+  <div class="info">3 versiones lado a lado. Misma posición de pixeles porque las 3 tienen viewBox idéntico.</div>
+  <div class="controls">
+    Zoom: <input type="range" id="zoom" min="50" max="300" value="100" step="10"><span id="zoomVal">100%</span>
+  </div>
+</header>
+<div class="grid">
+  <div class="col">
+    <div class="label"><b>1. ORIGINAL (foto)</b><span class="meta">JPG 209 KB · 1280×720</span></div>
+    <div class="frame"><img id="img1" src="hmi-yal.jpg"></div>
+  </div>
+  <div class="col">
+    <div class="label"><b>2. vtracer DEFAULT</b><span class="meta">SVG 1.4 MB · 3091 lines · vector</span></div>
+    <div class="frame"><object id="img2" type="image/svg+xml" data="hmi-yal-trace.svg" style="width:100%"></object></div>
+  </div>
+  <div class="col">
+    <div class="label"><b>3. vtracer DETAILED</b><span class="meta">SVG 2.7 MB · 6840 lines · vector fino</span></div>
+    <div class="frame"><object id="img3" type="image/svg+xml" data="hmi-yal-trace-detailed.svg" style="width:100%"></object></div>
+  </div>
+</div>
+<script>
+  const z = document.getElementById('zoom');
+  const v = document.getElementById('zoomVal');
+  z.addEventListener('input', e => {
+    const s = +e.target.value;
+    v.textContent = s + '%';
+    document.querySelectorAll('.col img, .col object').forEach(el => {
+      el.style.width = s + '%';
+    });
+  });
+</script>
+</body>
+</html>
