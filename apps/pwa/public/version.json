@@ -1,10 +1,10 @@
 {
-  "version": "3.28.0",
-  "buildDate": "2026-05-11",
-  "buildTimestamp": 1778554262913,
+  "version": "3.29.0",
+  "buildDate": "2026-05-12",
+  "buildTimestamp": 1778625600000,
   "features": [
-    "Grader: GatesConfigPage dividido en 6 sub-componentes (2715→1200 líneas, -56%)",
-    "Grader: ProductoTab, CintasTab, DistanciasTab, DanfossTab, NeumaticaTab, VerificacionTab",
-    "Grader: FASE 7 — fix Firestore rules + useConfigChangeLogger enabledRef + historial deps"
+    "HMI Bombeo Acopio S2: clon SIMATIC Siemens (SVG inline, simulador interactivo)",
+    "HMI Bombeo S2: 10 válvulas + 19 segmentos de tubería + 10 readouts con data-key",
+    "HMI Bombeo S2: 3 presets (Estado normal, Tanque A descargando, Sin bombeo)"
   ]
 }

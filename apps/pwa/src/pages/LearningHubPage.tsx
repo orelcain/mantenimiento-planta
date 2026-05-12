@@ -5,7 +5,7 @@
  */
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Cpu, BookOpen, ArrowRight, Scale } from 'lucide-react'
+import { Cpu, BookOpen, ArrowRight, Scale, Factory } from 'lucide-react'
 import { useAuthStore } from '@/store'
 import {
   groupMachinesByArea,
@@ -50,6 +50,17 @@ const SPECIAL_MODULES: SpecialModule[] = [
     href: '/aprendizaje/hmi-grader',
     color: '#44dd88',
     stats: 'Modo práctica · 12 pockets',
+  },
+  {
+    id: 'hmi-bombeo-s2',
+    title: 'HMI Bombeo Acopio S2',
+    subtitle: 'SIMATIC HMI Siemens',
+    description:
+      'Simulador interactivo del HMI del sistema 2 de bombeo en acopio. Permite cambiar estado de válvulas (y10–y14), líneas y readouts de presión/caudal.',
+    icon: Factory,
+    href: '/aprendizaje/hmi-bombeo-s2',
+    color: '#7ec8ff',
+    stats: '10 válvulas · 3 escenarios',
   },
 ]
 

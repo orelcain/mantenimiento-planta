@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#000000">
+<title>SIMATIC HMI — Bombeo Acopio S2</title>
+<style>
+  *,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: #1a1c22; font-family: Arial, sans-serif; overflow: hidden; color: #ccc; }
+
+  /* ── Marco SIEMENS exterior ── */
+  #device {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(180deg, #3a3a3a 0%, #2a2a2a 50%, #1a1a1a 100%);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    border-radius: 6px;
+    box-shadow: inset 0 0 0 2px #555;
+  }
+  .bezel-top {
+    height: 38px;
+    background: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 100%);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 24px;
+    flex-shrink: 0;
+  }
+  .siemens-logo {
+    color: #00a1e0;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    font-family: Arial, sans-serif;
+  }
+  .simatic-label {
+    color: #ddd;
+    font-size: 11px;
+    letter-spacing: 1px;
+  }
+  .bezel-bot {
+    height: 18px;
+    background: linear-gradient(180deg, #1a1a1a 0%, #0a0a0a 100%);
+    flex-shrink: 0;
+  }
+  .bezel-right-touch {
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%) rotate(90deg);
+    transform-origin: center;
+    color: #bbb;
+    font-size: 10px;
+    letter-spacing: 6px;
+    pointer-events: none;
+    text-shadow: 0 0 1px #000;
+  }
+
+  /* ── Pantalla activa ── */
+  #screen-wrap {
+    flex: 1;
+    margin: 0 32px;
+    background: #000;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid #111;
+  }
+
+  svg.hmi {
+    width: 100%;
+    height: 100%;
+    display: block;
+    user-select: none;
+  }
+
+  /* ── Panel derecho de botones ── */
+  .btn-panel {
+    position: absolute;
+    right: 6px;
+    top: 6px;
+    bottom: 6px;
+    width: 158px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    z-index: 10;
+  }
+  .btn-cell {
+    flex: 1;
+    border: 2px solid #2255cc;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 3px 6px;
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #000;
+    cursor: pointer;
+    user-select: none;
+    background: #cccccc;
+    line-height: 1.05;
+    transition: filter .1s;
+    font-family: Arial, sans-serif;
+  }
+  .btn-cell:active { filter: brightness(0.85); }
+  .btn-cell.green { background: #58c358; }
+  .btn-cell.blue  { background: #cbe7ed; }
+  .btn-cell.white { background: #f0f0f0; }
+  .btn-label { flex: 1; text-align: left; }
+  .btn-icon  { flex-shrink: 0; width: 36px; height: 28px; display: flex; align-items: center; justify-content: center; }
+  .btn-icon svg { width: 100%; height: 100%; }
+
+  /* ── Estilos SVG comunes ── */
+  .pipe       { fill: none; stroke-linecap: butt; stroke-linejoin: miter; }
+  .pipe-thick { stroke-width: 4; }
+  .pipe-med   { stroke-width: 3; }
+  .stroke-green { stroke: #00e000; }
+  .stroke-red   { stroke: #ff0000; }
+  .stroke-cyan  { stroke: #00d0ff; }
+
+  .label-white { fill: #ffffff; font-family: Arial, sans-serif; font-size: 11px; }
+  .label-yellow{ fill: #f7d34a; font-family: Arial, sans-serif; font-size: 11px; }
+  .label-bold  { font-weight: 700; }
+
+  .readout-box { fill: #ffffff; stroke: #cccccc; stroke-width: 0.5; }
+  .readout-box.hi { fill: #ffffff; stroke: #000; stroke-width: 1.5; }
+  .readout-txt { fill: #000; font-family: Arial, sans-serif; font-size: 11px; text-anchor: middle; dominant-baseline: middle; font-weight: 700; }
+
+  .led-on-green { fill: #44ff44; filter: drop-shadow(0 0 3px #44ff44); }
+  .led-off      { fill: #1a1a1a; stroke: #444; stroke-width: 0.5; }
+
+  /* Valvulas */
+  .valve g.body { stroke: #000; stroke-width: 0.6; }
+  .valve.closed g.body { fill: #ff2020; }
+  .valve.open   g.body { fill: #00e000; }
+  .valve.cyan   g.body { fill: #00d0ff; }
+  .valve-handle { stroke: #ddd; stroke-width: 1.2; stroke-linecap: round; }
+
+  /* Motor / bomba */
+  .motor-body  { fill: #1eb01e; stroke: #042; stroke-width: 0.6; }
+  .motor-shaft { fill: #4a4a4a; stroke: #000; stroke-width: 0.5; }
+  .motor-fins  { stroke: #126612; stroke-width: 0.5; fill: #1ea01e; }
+
+  /* Cilindro/tanques azules (look 3D) */
+  .tank-body { stroke: #0c5eb0; stroke-width: 1.4; }
+</style>
+</head>
+<body>
+
+<div id="device">
+  <!-- Header con SIEMENS / SIMATIC HMI -->
+  <div class="bezel-top">
+    <span class="siemens-logo">SIEMENS</span>
+    <span class="simatic-label">SIMATIC HMI</span>
+  </div>
+  <span class="bezel-right-touch">TOUCH</span>
+
+  <!-- Pantalla HMI -->
+  <div id="screen-wrap">
+    <svg class="hmi" viewBox="0 0 1280 720" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <!-- Gradiente cilindro azul tipo SIMATIC -->
+        <linearGradient id="tankGrad" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0"    stop-color="#2c5a8a"/>
+          <stop offset="0.18" stop-color="#5a9ccc"/>
+          <stop offset="0.45" stop-color="#a8d4f0"/>
+          <stop offset="0.55" stop-color="#a8d4f0"/>
+          <stop offset="0.82" stop-color="#5a9ccc"/>
+          <stop offset="1"    stop-color="#2c5a8a"/>
+        </linearGradient>
+        <linearGradient id="tankTop" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#7ab4dc"/>
+          <stop offset="1" stop-color="#3c70a0"/>
+        </linearGradient>
+        <linearGradient id="airTank" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0"    stop-color="#3a72a6"/>
+          <stop offset="0.5"  stop-color="#a8d4f0"/>
+          <stop offset="1"    stop-color="#3a72a6"/>
+        </linearGradient>
+        <linearGradient id="cabGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#bfc4cc"/>
+          <stop offset="1" stop-color="#7a818a"/>
+        </linearGradient>
+      </defs>
+
+      <!-- ═══════════════════════════════════════════
+           CAPA 1 — RED DE TUBERIAS (FONDO)
+           Los colores son data-bindable via data-key
+           ═══════════════════════════════════════════ -->
+
+      <!-- Loop verde superior (proceso activo) -->
+      <!-- 1a: subida desde Bomba Sello y sube por izquierda -->
+      <path class="pipe pipe-thick stroke-green" data-key="pipe.mainTop"
+            d="M 120 580 L 120 92 L 620 92 L 620 175" />
+      <!-- 1b: tramo superior largo hacia tanque B -->
+      <path class="pipe pipe-thick stroke-green" data-key="pipe.toTankB"
+            d="M 620 92 L 745 92 L 745 175" />
+
+      <!-- Pipe horizontal rojo medio (y10.3 — y10.4) -->
+      <path class="pipe pipe-thick stroke-red" data-key="pipe.row103104"
+            d="M 200 215 L 510 215" />
+      <!-- Sube a y11.1 (Venteo Vacío) -->
+      <path class="pipe pipe-thick stroke-red" data-key="pipe.y111up"
+            d="M 200 215 L 200 145 L 175 145" />
+      <!-- Sube a y11.2 (Venteo Presión) -->
+      <path class="pipe pipe-thick stroke-red" data-key="pipe.y112up"
+            d="M 510 215 L 510 145 L 540 145" />
+
+      <!-- Pipe horizontal rojo inferior (y10.1 — y10.2) -->
+      <path class="pipe pipe-thick stroke-red" data-key="pipe.row101102"
+            d="M 200 275 L 510 275" />
+
+      <!-- Bajadas a compresores (verdes) -->
+      <path class="pipe pipe-thick stroke-green" data-key="pipe.toC1"
+            d="M 200 275 L 200 380 L 260 380" />
+      <path class="pipe pipe-thick stroke-green" data-key="pipe.toC2"
+            d="M 200 275 L 200 530 L 260 530" />
+
+      <!-- Pipes verdes saliendo de compresores hacia derecha (los flow meters) -->
+      <path class="pipe pipe-thick stroke-green" data-key="pipe.outC1"
+            d="M 470 380 L 580 380" />
+      <path class="pipe pipe-thick stroke-green" data-key="pipe.outC2"
+            d="M 470 530 L 580 530" />
+
+      <!-- Bajadas verdes a tanques A y B (proceso) -->
+      <path class="pipe pipe-thick stroke-green" data-key="pipe.toTankA"
+            d="M 620 175 L 620 250" />
+
+      <!-- Pipe cyan agua sello — sube desde Bomba Sello, se ramifica a y14.1 y y14.2 -->
+      <path class="pipe pipe-med stroke-cyan" data-key="pipe.sealMain"
+            d="M 95 580 L 95 400 L 175 400" />
+      <path class="pipe pipe-med stroke-cyan" data-key="pipe.sealToC2"
+            d="M 95 400 L 95 545 L 175 545" />
+
+      <!-- Bottom: tubo verde desde tanques hacia YAL y abajo -->
+      <path class="pipe pipe-thick stroke-green" data-key="pipe.tankAout"
+            d="M 620 555 L 620 600 L 680 600" />
+      <path class="pipe pipe-thick stroke-green" data-key="pipe.tankBout"
+            d="M 745 555 L 745 600 L 685 600" />
+      <path class="pipe pipe-thick stroke-green" data-key="pipe.yalDown"
+            d="M 682 600 L 682 660" />
+
+      <!-- Pipe roja inferior (descarga) -->
+      <path class="pipe pipe-med stroke-red" data-key="pipe.descarga"
+            d="M 350 660 L 680 660" />
+
+      <!-- Pipe cyan agua aire abajo a tanque de aire -->
+      <path class="pipe pipe-med stroke-cyan" data-key="pipe.airBottom"
+            d="M 460 670 L 460 700 L 565 700" />
+      <path class="pipe pipe-med stroke-red" data-key="pipe.airRight"
+            d="M 560 660 L 560 700" />
+
+      <!-- ═══════════════════════════════════════════
+           CAPA 2 — VALVULAS (10 unidades, todas data-bindable)
+           ═══════════════════════════════════════════ -->
+
+      <!-- y11.1 — Venteo Vacío -->
+      <g class="valve closed" id="v_y111" data-key="valve.y111" transform="translate(155 130)">
+        <g class="body">
+          <polygon points="0,0 14,7 14,-7"/>
+          <polygon points="28,0 14,7 14,-7"/>
+        </g>
+        <line class="valve-handle" x1="14" y1="-7" x2="14" y2="-16"/>
+        <rect x="9" y="-19" width="10" height="4" rx="1" fill="#fff" stroke="#000" stroke-width="0.5"/>
+      </g>
+      <text class="label-white" x="120" y="120">y11.1</text>
+      <text class="label-white" x="78" y="172">Venteo</text>
+      <text class="label-white" x="80" y="184">Vacío</text>
+
+      <!-- y10.3 -->
+      <g class="valve closed" id="v_y103" data-key="valve.y103" transform="translate(245 215) rotate(90)">
+        <g class="body">
+          <polygon points="0,0 14,7 14,-7"/>
+          <polygon points="28,0 14,7 14,-7"/>
+        </g>
+        <line class="valve-handle" x1="14" y1="-7" x2="14" y2="-16"/>
+        <rect x="9" y="-19" width="10" height="4" rx="1" fill="#fff" stroke="#000" stroke-width="0.5"/>
+      </g>
+      <text class="label-white" x="222" y="205">y10.3</text>
+
+      <!-- y10.4 -->
+      <g class="valve closed" id="v_y104" data-key="valve.y104" transform="translate(390 215) rotate(90)">
+        <g class="body">
+          <polygon points="0,0 14,7 14,-7"/>
+          <polygon points="28,0 14,7 14,-7"/>
+        </g>
+        <line class="valve-handle" x1="14" y1="-7" x2="14" y2="-16"/>
+        <rect x="9" y="-19" width="10" height="4" rx="1" fill="#fff" stroke="#000" stroke-width="0.5"/>
+      </g>
+      <text class="label-white" x="367" y="205">y10.4</text>
+
+      <!-- y11.2 — Venteo Presión -->
+      <g class="valve closed" id="v_y112" data-key="valve.y112" transform="translate(525 130)">
+        <g class="body">
+          <polygon points="0,0 14,7 14,-7"/>
+          <polygon points="28,0 14,7 14,-7"/>
+        </g>
+        <line class="valve-handle" x1="14" y1="-7" x2="14" y2="-16"/>
+        <rect x="9" y="-19" width="10" height="4" rx="1" fill="#fff" stroke="#000" stroke-width="0.5"/>
+      </g>
+      <text class="label-white" x="555" y="120">y11.2</text>
+      <text class="label-white" x="555" y="158">Venteo</text>
+      <text class="label-white" x="555" y="170">Presión</text>
+
+      <!-- y10.1 -->
+      <g class="valve closed" id="v_y101" data-key="valve.y101" transform="translate(245 275) rotate(90)">
+        <g class="body">
+          <polygon points="0,0 14,7 14,-7"/>
+          <polygon points="28,0 14,7 14,-7"/>
+        </g>
+        <line class="valve-handle" x1="14" y1="-7" x2="14" y2="-16"/>
+        <rect x="9" y="-19" width="10" height="4" rx="1" fill="#fff" stroke="#000" stroke-width="0.5"/>
+      </g>
+      <text class="label-white" x="222" y="262">y10.1</text>
+
+      <!-- y10.2 -->
+      <g class="valve closed" id="v_y102" data-key="valve.y102" transform="translate(390 275) rotate(90)">
+        <g class="body">
+          <polygon points="0,0 14,7 14,-7"/>
+          <polygon points="28,0 14,7 14,-7"/>
+        </g>
+        <line class="valve-handle" x1="14" y1="-7" x2="14" y2="-16"/>
+        <rect x="9" y="-19" width="10" height="4" rx="1" fill="#fff" stroke="#000" stroke-width="0.5"/>
+      </g>
+      <text class="label-white" x="367" y="262">y10.2</text>
+
+      <!-- y14.1 (cyan — agua sello) -->
+      <g class="valve cyan" id="v_y141" data-key="valve.y141" transform="translate(155 400) rotate(90)">
+        <g class="body">
+          <polygon points="0,0 12,6 12,-6"/>
+          <polygon points="24,0 12,6 12,-6"/>
+        </g>
+        <rect x="8" y="-14" width="8" height="4" rx="1" fill="#222"/>
+      </g>
+      <text class="label-white" x="130" y="408">y14.1</text>
+
+      <!-- y14.2 (cyan — agua sello) -->
+      <g class="valve cyan" id="v_y142" data-key="valve.y142" transform="translate(155 545) rotate(90)">
+        <g class="body">
+          <polygon points="0,0 12,6 12,-6"/>
+          <polygon points="24,0 12,6 12,-6"/>
+        </g>
+        <rect x="8" y="-14" width="8" height="4" rx="1" fill="#222"/>
+      </g>
+      <text class="label-white" x="130" y="552">y14.2</text>
+
+      <!-- y12 (verde, abajo derecha) -->
+      <g class="valve open" id="v_y12" data-key="valve.y12" transform="translate(555 660)">
+        <g class="body">
+          <polygon points="0,0 14,7 14,-7"/>
+          <polygon points="28,0 14,7 14,-7"/>
+        </g>
+        <line class="valve-handle" x1="14" y1="-7" x2="14" y2="-16"/>
+        <rect x="9" y="-19" width="10" height="4" rx="1" fill="#fff" stroke="#000" stroke-width="0.5"/>
+      </g>
+      <text class="label-white" x="540" y="650">y12</text>
+
+      <!-- y13 (verde, abajo centro debajo YAL) -->
+      <g class="valve open" id="v_y13" data-key="valve.y13" transform="translate(682 660) rotate(90)">
+        <g class="body">
+          <polygon points="0,0 14,7 14,-7"/>
+          <polygon points="28,0 14,7 14,-7"/>
+        </g>
+        <line class="valve-handle" x1="14" y1="-7" x2="14" y2="-16"/>
+        <rect x="9" y="-19" width="10" height="4" rx="1" fill="#fff" stroke="#000" stroke-width="0.5"/>
+      </g>
+      <text class="label-white" x="700" y="652">y13</text>
+
+      <!-- ═══════════════════════════════════════════
+           CAPA 3 — COMPRESORES C1 y C2 + BOMBA SELLO
+           ═══════════════════════════════════════════ -->
+
+      <!-- Compresor C1 -->
+      <g transform="translate(260 350)">
+        <text class="label-white" x="80" y="-5">Comp.</text>
+        <text class="label-white" x="80" y="6">Vacío</text>
+        <!-- carcasa principal -->
+        <rect class="motor-body" x="0" y="10" width="120" height="50" rx="3"/>
+        <!-- aletas/fins -->
+        <line class="motor-fins" x1="15" y1="10" x2="15" y2="60"/>
+        <line class="motor-fins" x1="25" y1="10" x2="25" y2="60"/>
+        <line class="motor-fins" x1="35" y1="10" x2="35" y2="60"/>
+        <line class="motor-fins" x1="45" y1="10" x2="45" y2="60"/>
+        <line class="motor-fins" x1="55" y1="10" x2="55" y2="60"/>
+        <line class="motor-fins" x1="65" y1="10" x2="65" y2="60"/>
+        <!-- eje -->
+        <rect class="motor-shaft" x="120" y="22" width="20" height="26"/>
+        <!-- motor cilíndrico -->
+        <rect class="motor-body" x="140" y="14" width="70" height="42" rx="4"/>
+        <circle cx="175" cy="35" r="14" fill="#0e6e0e" stroke="#042" stroke-width="0.5"/>
+        <text class="label-white label-bold" x="60" y="42" text-anchor="middle" style="font-size:13px;">C1</text>
+        <!-- base -->
+        <rect fill="#888" stroke="#555" stroke-width="0.5" x="-5" y="60" width="220" height="6"/>
+      </g>
+
+      <!-- Compresor C2 -->
+      <g transform="translate(260 500)">
+        <text class="label-white" x="80" y="-5">Comp.</text>
+        <text class="label-white" x="80" y="6">Vacío</text>
+        <rect class="motor-body" x="0" y="10" width="120" height="50" rx="3"/>
+        <line class="motor-fins" x1="15" y1="10" x2="15" y2="60"/>
+        <line class="motor-fins" x1="25" y1="10" x2="25" y2="60"/>
+        <line class="motor-fins" x1="35" y1="10" x2="35" y2="60"/>
+        <line class="motor-fins" x1="45" y1="10" x2="45" y2="60"/>
+        <line class="motor-fins" x1="55" y1="10" x2="55" y2="60"/>
+        <line class="motor-fins" x1="65" y1="10" x2="65" y2="60"/>
+        <rect class="motor-shaft" x="120" y="22" width="20" height="26"/>
+        <rect class="motor-body" x="140" y="14" width="70" height="42" rx="4"/>
+        <circle cx="175" cy="35" r="14" fill="#0e6e0e" stroke="#042" stroke-width="0.5"/>
+        <text class="label-white label-bold" x="60" y="42" text-anchor="middle" style="font-size:13px;">C2</text>
+        <rect fill="#888" stroke="#555" stroke-width="0.5" x="-5" y="60" width="220" height="6"/>
+      </g>
+
+      <!-- Flow meters -->
+      <rect class="readout-box" x="320" y="395" width="80" height="20" rx="1" data-key="box.flowC1"/>
+      <text class="readout-txt" x="360" y="406" data-key="text.flowC1">52 l/min</text>
+
+      <rect class="readout-box" x="320" y="545" width="80" height="20" rx="1" data-key="box.flowC2"/>
+      <text class="readout-txt" x="360" y="556" data-key="text.flowC2">59 l/min</text>
+
+      <!-- Bomba Sello (bottom-left) -->
+      <g transform="translate(50 600)">
+        <text class="label-white" x="30" y="-8" text-anchor="middle">Bomba</text>
+        <text class="label-white" x="30" y="3"  text-anchor="middle">Sello</text>
+        <rect class="motor-body" x="0" y="10" width="34" height="22" rx="2"/>
+        <rect class="motor-shaft" x="34" y="14" width="8" height="14"/>
+        <rect class="motor-body" x="42" y="8" width="28" height="32" rx="3"/>
+        <circle cx="56" cy="24" r="10" fill="#0e6e0e" stroke="#042" stroke-width="0.5"/>
+        <!-- base triangular -->
+        <polygon points="0,42 70,42 35,60" fill="#666" stroke="#333" stroke-width="0.5"/>
+        <rect fill="#999" x="25" y="60" width="20" height="3"/>
+      </g>
+
+      <!-- ═══════════════════════════════════════════
+           CAPA 4 — TANQUES A y B (cilindros 3D)
+           ═══════════════════════════════════════════ -->
+
+      <!-- Tanque A -->
+      <g transform="translate(595 240)">
+        <!-- top dome -->
+        <ellipse class="tank-body" cx="40" cy="0" rx="40" ry="10" fill="url(#tankTop)"/>
+        <!-- entrada superior -->
+        <rect class="tank-body" x="35" y="-22" width="10" height="14" fill="url(#tankGrad)"/>
+        <ellipse fill="#a8d4f0" stroke="#0c5eb0" stroke-width="0.6" cx="40" cy="-22" rx="5" ry="2"/>
+        <!-- body -->
+        <rect class="tank-body" x="0" y="0" width="80" height="280" fill="url(#tankGrad)"/>
+        <!-- bottom dome -->
+        <ellipse class="tank-body" cx="40" cy="280" rx="40" ry="10" fill="url(#tankGrad)"/>
+        <!-- nervio horizontal (banda) cerca arriba -->
+        <rect fill="#1976d2" x="0" y="20" width="80" height="5" opacity="0.6"/>
+        <!-- nervio horizontal (banda) abajo -->
+        <rect fill="#1976d2" x="0" y="260" width="80" height="5" opacity="0.6"/>
+        <!-- LED status -->
+        <circle class="led-off" id="led_A" data-key="led.tankA" cx="20" cy="45" r="6"/>
+        <text class="label-bold" fill="#fff" font-family="Arial" font-size="13" x="55" y="50">A</text>
+        <!-- Etiqueta pressure -->
+        <rect class="readout-box" x="-3" y="80" width="88" height="20" data-key="box.PA"/>
+        <text class="readout-txt" x="40" y="91" data-key="text.PA">+1.7 bar</text>
+        <!-- Carga -->
+        <text class="label-bold" fill="#fff" font-family="Arial" font-size="12" x="-2" y="138">Carga</text>
+        <rect class="readout-box" x="40" y="128" width="40" height="16" data-key="box.cargaA"/>
+        <text class="readout-txt" x="60" y="137" data-key="text.cargaA">24 s</text>
+        <!-- Desc -->
+        <text class="label-bold" fill="#fff" font-family="Arial" font-size="12" x="-2" y="160">Desc.</text>
+        <rect class="readout-box hi" x="40" y="150" width="40" height="16" data-key="box.descA"/>
+        <text class="readout-txt" x="60" y="159" data-key="text.descA">24 s</text>
+      </g>
+
+      <!-- Tanque B -->
+      <g transform="translate(720 240)">
+        <ellipse class="tank-body" cx="40" cy="0" rx="40" ry="10" fill="url(#tankTop)"/>
+        <rect class="tank-body" x="35" y="-22" width="10" height="14" fill="url(#tankGrad)"/>
+        <ellipse fill="#a8d4f0" stroke="#0c5eb0" stroke-width="0.6" cx="40" cy="-22" rx="5" ry="2"/>
+        <rect class="tank-body" x="0" y="0" width="80" height="280" fill="url(#tankGrad)"/>
+        <ellipse class="tank-body" cx="40" cy="280" rx="40" ry="10" fill="url(#tankGrad)"/>
+        <rect fill="#1976d2" x="0" y="20" width="80" height="5" opacity="0.6"/>
+        <rect fill="#1976d2" x="0" y="260" width="80" height="5" opacity="0.6"/>
+        <!-- LED encendido verde -->
+        <circle class="led-on-green" id="led_B" data-key="led.tankB" cx="20" cy="45" r="6"/>
+        <text class="label-bold" fill="#fff" font-family="Arial" font-size="13" x="55" y="50">B</text>
+        <rect class="readout-box" x="-3" y="80" width="88" height="20" data-key="box.PB"/>
+        <text class="readout-txt" x="40" y="91" data-key="text.PB">-0.2 bar</text>
+        <text class="label-bold" fill="#fff" font-family="Arial" font-size="12" x="-2" y="138">Carga</text>
+        <rect class="readout-box" x="40" y="128" width="40" height="16" data-key="box.cargaB"/>
+        <text class="readout-txt" x="60" y="137" data-key="text.cargaB">9 s</text>
+        <text class="label-bold" fill="#fff" font-family="Arial" font-size="12" x="-2" y="160">Desc.</text>
+        <rect class="readout-box" x="40" y="150" width="40" height="16" data-key="box.descB"/>
+        <text class="readout-txt" x="60" y="159" data-key="text.descB">12 s</text>
+      </g>
+
+      <!-- YAL label entre tanques abajo -->
+      <text class="label-bold" fill="#fff" font-family="Arial" font-size="20" x="670" y="585">YAL</text>
+
+      <!-- ═══════════════════════════════════════════
+           CAPA 5 — EQUIPAMIENTO INFERIOR
+           ═══════════════════════════════════════════ -->
+
+      <!-- Símbolo alarma silenciada arriba izquierda (X roja) -->
+      <g transform="translate(35 50)">
+        <text fill="#ff2020" font-family="Arial" font-size="26" font-weight="700">⛌</text>
+      </g>
+
+      <!-- Tablero PLC gris (control cabinet) -->
+      <g transform="translate(380 580)">
+        <rect fill="url(#cabGrad)" stroke="#444" stroke-width="0.8" x="0" y="0" width="80" height="100"/>
+        <rect fill="#222" stroke="#000" stroke-width="0.5" x="6" y="6" width="68" height="60"/>
+        <!-- pantalla led pequeña -->
+        <rect fill="#0a0a0a" stroke="#222" stroke-width="0.5" x="56" y="74" width="14" height="6"/>
+        <circle fill="#3a8" cx="63" cy="77" r="1.2"/>
+        <!-- base -->
+        <rect fill="#666" x="-4" y="100" width="88" height="4"/>
+      </g>
+
+      <!-- Tanque de aire 6.8 bar (bottom center, cilindro azul vertical) -->
+      <g transform="translate(540 600)">
+        <!-- top dome -->
+        <ellipse fill="url(#airTank)" stroke="#0c5eb0" stroke-width="0.8" cx="25" cy="0" rx="25" ry="5"/>
+        <!-- body -->
+        <rect fill="url(#airTank)" stroke="#0c5eb0" stroke-width="0.8" x="0" y="0" width="50" height="60"/>
+        <!-- bottom -->
+        <ellipse fill="url(#airTank)" stroke="#0c5eb0" stroke-width="0.8" cx="25" cy="60" rx="25" ry="5"/>
+        <!-- patas -->
+        <rect fill="#666" x="2" y="64" width="4" height="8"/>
+        <rect fill="#666" x="44" y="64" width="4" height="8"/>
+        <!-- readout 6.8 bar -->
+        <rect class="readout-box" x="-2" y="22" width="54" height="18" data-key="box.airBar"/>
+        <text class="readout-txt" x="25" y="32" data-key="text.airBar">6.8 bar</text>
+      </g>
+
+      <!-- D&C logo (bottom-left) -->
+      <g transform="translate(40 670)">
+        <text fill="#ed8636" font-family="Arial Black, Arial" font-size="22" font-weight="900">D&amp;C</text>
+        <text fill="#888" font-family="Arial" font-size="6" x="0" y="12">INGENIERÍA &amp; AUTOMATIZACIÓN</text>
+      </g>
+
+      <!-- ═══════════════════════════════════════════
+           CAPA 6 — FOOTER (Flujo + Timestamp)
+           ═══════════════════════════════════════════ -->
+      <text class="label-white" x="430" y="708">Flujo B. Barrido:</text>
+      <rect class="readout-box" x="540" y="697" width="90" height="18" data-key="box.flujoBarrido"/>
+      <text class="readout-txt" x="585" y="707" data-key="text.flujoBarrido">31.6 m3/h</text>
+
+      <rect class="readout-box" x="900" y="697" width="200" height="20" data-key="box.timestamp"/>
+      <text class="readout-txt" x="1000" y="708" data-key="text.timestamp">5/12/2026 4:07:27 PM</text>
+
+    </svg>
+
+    <!-- ═══════════════════════════════════════════
+         PANEL DE BOTONES (DERECHA, sobre la pantalla)
+         ═══════════════════════════════════════════ -->
+    <div class="btn-panel">
+      <div class="btn-cell green" data-key="btn.stopC1">
+        <span class="btn-label">Stop<br/>C1</span>
+        <span class="btn-icon"><svg viewBox="0 0 36 28"><rect x="2" y="8" width="14" height="14" rx="1" fill="#1ea01e" stroke="#042" stroke-width="0.8"/><rect x="16" y="11" width="14" height="8" fill="#1ea01e" stroke="#042" stroke-width="0.8"/><circle cx="23" cy="15" r="4" fill="#0c6c0c"/></svg></span>
+      </div>
+      <div class="btn-cell green" data-key="btn.stopC2">
+        <span class="btn-label">Stop<br/>C2</span>
+        <span class="btn-icon"><svg viewBox="0 0 36 28"><rect x="2" y="8" width="14" height="14" rx="1" fill="#1ea01e" stroke="#042" stroke-width="0.8"/><rect x="16" y="11" width="14" height="8" fill="#1ea01e" stroke="#042" stroke-width="0.8"/><circle cx="23" cy="15" r="4" fill="#0c6c0c"/></svg></span>
+      </div>
+      <div class="btn-cell white" data-key="btn.startAtlas">
+        <span class="btn-label">Start<br/>Atlas</span>
+        <span class="btn-icon"><svg viewBox="0 0 36 28"><rect x="6" y="2" width="24" height="24" fill="#ddd" stroke="#444" stroke-width="0.5"/><rect x="8" y="5" width="20" height="10" fill="#222"/><rect x="10" y="18" width="16" height="4" fill="#aaa"/></svg></span>
+      </div>
+      <div class="btn-cell green" data-key="btn.stopBAnillo">
+        <span class="btn-label">Stop<br/>B. Anillo</span>
+        <span class="btn-icon"><svg viewBox="0 0 36 28"><rect x="2" y="9" width="12" height="12" rx="1" fill="#1ea01e" stroke="#042" stroke-width="0.8"/><rect x="14" y="11" width="14" height="8" fill="#1ea01e" stroke="#042" stroke-width="0.8"/></svg></span>
+      </div>
+      <div class="btn-cell green" data-key="btn.detenerBombeo">
+        <span class="btn-label">Detener<br/>Bombeo</span>
+        <span class="btn-icon"><svg viewBox="0 0 36 28"><polygon points="10,4 28,14 10,24" fill="#1ea01e" stroke="#042" stroke-width="0.8"/></svg></span>
+      </div>
+      <div class="btn-cell blue" data-key="btn.descargaTkA">
+        <span class="btn-label">Descarga<br/>Manual TkA</span>
+        <span class="btn-icon"><svg viewBox="0 0 36 28"><path d="M8 16 L14 8 L20 12 L20 22 L8 22 Z" fill="#fff" stroke="#000" stroke-width="0.6"/><circle cx="22" cy="10" r="1.5" fill="#000"/></svg></span>
+      </div>
+      <div class="btn-cell blue" data-key="btn.descargaTkB">
+        <span class="btn-label">Descarga<br/>Manual TkB</span>
+        <span class="btn-icon"><svg viewBox="0 0 36 28"><path d="M8 16 L14 8 L20 12 L20 22 L8 22 Z" fill="#fff" stroke="#000" stroke-width="0.6"/><circle cx="22" cy="10" r="1.5" fill="#000"/></svg></span>
+      </div>
+      <div class="btn-cell green" data-key="btn.bomBarrStop">
+        <span class="btn-label">Bom. Barr.<br/>Stop</span>
+        <span class="btn-icon"><svg viewBox="0 0 36 28"><circle cx="18" cy="14" r="9" fill="#e066c6" stroke="#883" stroke-width="0.6"/><circle cx="18" cy="14" r="3" fill="#444"/><path d="M18 5 L21 14 L18 23 L15 14 Z" fill="#fff" opacity="0.5"/></svg></span>
+      </div>
+      <div class="btn-cell white" data-key="btn.bombeoPlanta">
+        <span class="btn-label">Bombeo<br/>Planta</span>
+        <span class="btn-icon"><svg viewBox="0 0 36 28"><rect x="6" y="6" width="24" height="18" fill="#888" stroke="#333" stroke-width="0.6"/><rect x="9" y="9" width="4" height="4" fill="#222"/><rect x="15" y="9" width="4" height="4" fill="#222"/><rect x="21" y="9" width="4" height="4" fill="#222"/><rect x="12" y="16" width="12" height="8" fill="#666"/></svg></span>
+      </div>
+      <div class="btn-cell white" data-key="btn.controlWinches">
+        <span class="btn-label">Control<br/>Winches</span>
+        <span class="btn-icon"><svg viewBox="0 0 36 28"><rect x="8" y="10" width="14" height="10" rx="1" fill="#1ea01e" stroke="#042" stroke-width="0.6"/><rect x="22" y="12" width="8" height="6" fill="#1ea01e" stroke="#042" stroke-width="0.6"/><circle cx="15" cy="15" r="3" fill="#0c6c0c"/></svg></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="bezel-bot"></div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   HMI Bombeo Acopio S2 — Runtime
+   - Recibe { type:'hmi:init', values, readonly } via postMessage
+   - Aplica colores y números a los elementos con data-key
+   - Modo simulador: click en válvulas toggles open/closed
+   ═══════════════════════════════════════════════════════════ */
+(function(){
+  'use strict';
+
+  let readonly = false;
+
+  // Estado actual de todos los elementos con data-key
+  const state = {};
+
+  // ── Mapa de valores por defecto ───────────────────────────
+  const DEFAULTS = {
+    // Pipes (color string: 'green'|'red'|'cyan')
+    'pipe.mainTop':    'green',
+    'pipe.toTankB':    'green',
+    'pipe.row103104':  'red',
+    'pipe.y111up':     'red',
+    'pipe.y112up':     'red',
+    'pipe.row101102':  'red',
+    'pipe.toC1':       'green',
+    'pipe.toC2':       'green',
+    'pipe.outC1':      'green',
+    'pipe.outC2':      'green',
+    'pipe.toTankA':    'green',
+    'pipe.sealMain':   'cyan',
+    'pipe.sealToC2':   'cyan',
+    'pipe.tankAout':   'green',
+    'pipe.tankBout':   'green',
+    'pipe.yalDown':    'green',
+    'pipe.descarga':   'red',
+    'pipe.airBottom':  'cyan',
+    'pipe.airRight':   'red',
+    // Valves (state: 'open'|'closed'|'cyan')
+    'valve.y111': 'closed',
+    'valve.y112': 'closed',
+    'valve.y101': 'closed',
+    'valve.y102': 'closed',
+    'valve.y103': 'closed',
+    'valve.y104': 'closed',
+    'valve.y141': 'cyan',
+    'valve.y142': 'cyan',
+    'valve.y12':  'open',
+    'valve.y13':  'open',
+    // Readouts (text)
+    'text.PA':        '+1.7 bar',
+    'text.PB':        '-0.2 bar',
+    'text.cargaA':    '24 s',
+    'text.descA':     '24 s',
+    'text.cargaB':    '9 s',
+    'text.descB':     '12 s',
+    'text.flowC1':    '52 l/min',
+    'text.flowC2':    '59 l/min',
+    'text.airBar':    '6.8 bar',
+    'text.flujoBarrido': '31.6 m3/h',
+    'text.timestamp': new Date().toLocaleString('es-CL', {hour12:true}),
+    // LEDs (state: 'on-green'|'off')
+    'led.tankA': 'off',
+    'led.tankB': 'on-green',
+    // Buttons (extra state for color override)
+    'btn.stopC1': 'green',
+    'btn.stopC2': 'green',
+    'btn.startAtlas': 'white',
+    'btn.stopBAnillo': 'green',
+    'btn.detenerBombeo': 'green',
+    'btn.descargaTkA': 'blue',
+    'btn.descargaTkB': 'blue',
+    'btn.bomBarrStop': 'green',
+    'btn.bombeoPlanta': 'white',
+    'btn.controlWinches': 'white',
+  };
+
+  // ── Apply state to DOM ───────────────────────────────────
+  function applyValue(key, value){
+    state[key] = value;
+    const els = document.querySelectorAll('[data-key="' + key + '"]');
+    els.forEach(el => {
+      if (key.startsWith('pipe.')) {
+        el.classList.remove('stroke-green','stroke-red','stroke-cyan');
+        el.classList.add('stroke-' + value);
+      } else if (key.startsWith('valve.')) {
+        el.classList.remove('open','closed','cyan');
+        el.classList.add(value);
+      } else if (key.startsWith('led.')) {
+        el.classList.remove('led-on-green','led-off');
+        el.classList.add(value === 'on-green' ? 'led-on-green' : 'led-off');
+      } else if (key.startsWith('text.')) {
+        el.textContent = value;
+      } else if (key.startsWith('btn.')) {
+        el.classList.remove('green','blue','white');
+        el.classList.add(value);
+      }
+    });
+  }
+
+  function applyAll(values){
+    const merged = Object.assign({}, DEFAULTS, values || {});
+    Object.keys(merged).forEach(k => applyValue(k, merged[k]));
+  }
+
+  // ── Clicks: toggle válvulas y botones (modo simulador) ───
+  function onClick(e){
+    if (readonly) return;
+    const t = e.target.closest('[data-key]');
+    if (!t) return;
+    const key = t.getAttribute('data-key');
+    if (key.startsWith('valve.')){
+      const cur = state[key] || 'closed';
+      const next = cur === 'open' ? 'closed' : (cur === 'closed' ? 'open' : 'cyan');
+      applyValue(key, next);
+      parent.postMessage({type:'hmi:change', key, value: next}, '*');
+    }
+  }
+
+  // ── postMessage entrada ──────────────────────────────────
+  window.addEventListener('message', (e) => {
+    const msg = e.data;
+    if (!msg || typeof msg !== 'object') return;
+    if (msg.type === 'hmi:init'){
+      readonly = !!msg.readonly;
+      applyAll(msg.values);
+    } else if (msg.type === 'hmi:set'){
+      applyValue(msg.key, msg.value);
+    } else if (msg.type === 'hmi:applyAll'){
+      applyAll(msg.values);
+    }
+  });
+
+  // ── Init ─────────────────────────────────────────────────
+  document.addEventListener('click', onClick);
+  applyAll({});
+
+  // ── Timestamp live ───────────────────────────────────────
+  setInterval(() => {
+    const t = new Date().toLocaleString('es-CL', {hour12:true});
+    applyValue('text.timestamp', t);
+  }, 1000);
+
+  // Notificar a parent que estamos listos
+  parent.postMessage({type:'hmi:ready'}, '*');
+})();
+</script>
+
+</body>
+</html>

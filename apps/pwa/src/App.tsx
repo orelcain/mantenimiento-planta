@@ -85,6 +85,7 @@ const Visor3DListPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DList
 const Visor3DViewerPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DViewerPage').then((mod) => ({ default: mod.Visor3DViewerPage })))
 const Visor3DPublicPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DPublicPage').then((mod) => ({ default: mod.Visor3DPublicPage })))
 const HmiKnuroPublicPage = lazyWithReload(() => import('@/pages/HmiKnuroPublicPage').then((mod) => ({ default: mod.HmiKnuroPublicPage })))
+const HmiBombeoS2PublicPage = lazyWithReload(() => import('@/pages/HmiBombeoS2PublicPage').then((mod) => ({ default: mod.HmiBombeoS2PublicPage })))
 const Visor3DInteractiveToboganPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DInteractiveToboganPage').then((mod) => ({ default: mod.Visor3DInteractiveToboganPage })))
 const Visor3DInteractiveBaader142Page = lazyWithReload(() => import('@/pages/Visor3D/Visor3DInteractiveBaader142Page').then((mod) => ({ default: mod.Visor3DInteractiveBaader142Page })))
 const Visor3DInteractivePlataformaPontonPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DInteractivePlataformaPontonPage').then((mod) => ({ default: mod.Visor3DInteractivePlataformaPontonPage })))
@@ -357,6 +358,14 @@ export function App() {
               element={
                 <Suspense fallback={<LoadingScreen />}>
                   <HmiGraderPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/aprendizaje/hmi-bombeo-s2"
+              element={
+                <Suspense fallback={<LoadingScreen />}>
+                  <HmiBombeoS2PublicPage />
                 </Suspense>
               }
             />

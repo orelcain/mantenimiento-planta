@@ -3,7 +3,7 @@
  * Se muestra al fondo de cada sub-pagina para saltar entre maquinas sin volver al hub.
  */
 import { useNavigate } from 'react-router-dom'
-import { Cpu, Home } from 'lucide-react'
+import { Cpu, Home, Factory } from 'lucide-react'
 import { LEARNING_MACHINES, type LearningMachine } from '@/data/learningMachines'
 
 interface OtherLearningModulesStripProps {
@@ -39,6 +39,13 @@ function buildItems(currentSlug?: string): StripItem[] {
       href: '/aprendizaje/hmi-knuro',
       icon: Cpu,
       color: '#44ddaa',
+    },
+    {
+      key: 'hmi-bombeo-s2',
+      label: 'HMI Bombeo S2',
+      href: '/aprendizaje/hmi-bombeo-s2',
+      icon: Factory,
+      color: '#7ec8ff',
     },
   ].filter(item => item.key !== currentSlug)
 
