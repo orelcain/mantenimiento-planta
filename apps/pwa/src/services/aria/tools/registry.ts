@@ -42,6 +42,8 @@ export function matchTools(userMessage: string): ToolMatch[] {
 
 /**
  * Ejecuta una tool por nombre con params.
+ * Emite telemetry: `[ariaTools] tool=X ms=Y ok=Z [error=...]` para visibilidad
+ * en producción (qué se dispara, cuánto tarda, qué falla).
  */
 export async function executeTool(
   name: string,
@@ -49,14 +51,23 @@ export async function executeTool(
 ): Promise<ToolResult> {
   const tool = REGISTRY.get(name)
   if (!tool) {
+    logger.warn(`[ariaTools] tool=${name} ok=false error=not-registered`)
     return { ok: false, error: `Tool no registrada: ${name}` }
   }
+  const t0 = Date.now()
   try {
     const result = await tool.execute(params)
+    const ms = Date.now() - t0
+    if (result.ok) {
+      logger.info(`[ariaTools] tool=${name} ms=${ms} ok=true`)
+    } else {
+      logger.warn(`[ariaTools] tool=${name} ms=${ms} ok=false error="${result.error || 'unknown'}"`)
+    }
     return result
   } catch (err) {
+    const ms = Date.now() - t0
     const msg = err instanceof Error ? err.message : String(err)
-    logger.error(`[ariaTools] Tool ${name} falló: ${msg}`)
+    logger.error(`[ariaTools] tool=${name} ms=${ms} ok=false throw="${msg}"`)
     return { ok: false, error: msg }
   }
 }

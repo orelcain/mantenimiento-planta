@@ -2564,10 +2564,9 @@ export async function sendChatMessage(
     const ariaCtx = await buildAriaContext(resolvedQuery)
     if (ariaCtx.hasResults) {
       messages.push({ role: 'system', content: ariaCtx.contextBlock })
-      logger.info('[chatbot] ARIA tools invocadas', {
-        count: ariaCtx.invocations.length,
-        tools: ariaCtx.invocations.map(i => i.tool).join(','),
-      })
+      const okCount = ariaCtx.invocations.filter(i => i.ok).length
+      const toolList = ariaCtx.invocations.map(i => `${i.tool}${i.ok ? '' : '✗'}`).join(',')
+      logger.info(`[chatbot] ARIA tools ok=${okCount}/${ariaCtx.invocations.length} tools=[${toolList}]`)
     }
   } catch (err) {
     logger.error('[chatbot] Error en ARIA context engine', err instanceof Error ? err : undefined)
