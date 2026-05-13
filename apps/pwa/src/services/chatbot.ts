@@ -2491,8 +2491,9 @@ export async function sendChatMessage(
   // Sprint 3 ARIA-JARVIS — Snapshot situacional (turno + Grader + incidencias
   // + equipos). Reemplaza el "TURNO ACTUAL" plano por un bloque rico que
   // ARIA usa proactivamente. Cache 5min interno, timeout 4s por sub-query.
+  // Sprint 3.5: usuario actual va aparte del cache (no contamina entre users).
   try {
-    const situational = await buildSituationalContextBlock()
+    const situational = await buildSituationalContextBlock({ userId, userName })
     if (situational) {
       messages.push({ role: 'system', content: situational })
     } else {

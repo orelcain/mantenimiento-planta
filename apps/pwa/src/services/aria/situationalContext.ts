@@ -165,29 +165,48 @@ export async function buildSituationalSnapshot(force = false): Promise<Situation
 }
 
 /**
+ * Opciones de contexto NO-cacheable: van separadas del snapshot porque
+ * cambian por sesión/usuario y no deben quedarse en el cache TTL.
+ */
+export interface SituationalContextOpts {
+  userId?: string | undefined
+  userName?: string | undefined
+}
+
+/**
  * Formatea el snapshot como bloque markdown listo para inyectar como
  * system message en el prompt del LLM. Tono operativo y compacto.
+ * Opcionalmente incorpora info del usuario actual (que NO está cacheado
+ * dentro del snapshot — evita contaminación cruzada entre usuarios).
  */
-export function formatSituationalSnapshot(s: SituationalSnapshot): string {
-  return [
+export function formatSituationalSnapshot(s: SituationalSnapshot, opts?: SituationalContextOpts): string {
+  const lines: string[] = [
     '📡 CONTEXTO SITUACIONAL (snapshot del estado de la planta — úsalo proactivamente):',
     '',
+  ]
+  if (opts?.userName || opts?.userId) {
+    const who = opts.userName || `usuario ${opts.userId}`
+    lines.push(`• **Usuario actual**: ${who}`)
+  }
+  lines.push(
     `• **Turno**: ${s.shift.label} (${s.shift.range}) · hora local ${s.shift.hora}`,
     `• **Grader hoy**: ${s.graderToday.text}`,
     `• **Incidencias**: ${s.incidents.text}`,
     `• **Equipos**: ${s.equipment.text}`,
     '',
-    'INSTRUCCIONES: este contexto es siempre vigente — NO digas "no sé" sobre estos datos. Si la pregunta del usuario los toca tangencialmente, menciónalos brevemente al inicio (ej: "tenés 2 críticas abiertas, una de ellas en la baader 200…"). Mantén la respuesta breve y operacional.',
-  ].join('\n')
+    'INSTRUCCIONES: este contexto es siempre vigente — NO digas "no sé" sobre estos datos. Si la pregunta del usuario los toca tangencialmente, menciónalos brevemente al inicio (ej: "tenés 2 críticas abiertas, una de ellas en la baader 200…"). Si conocés el nombre del usuario, podés dirigirte a él/ella por su nombre cuando sea natural. Mantené la respuesta breve y operacional.',
+  )
+  return lines.join('\n')
 }
 
 /**
- * Convenience: snapshot + format en una llamada.
+ * Convenience: snapshot + format en una llamada. El opts (userId/userName)
+ * va aparte para que el cache TTL solo cubra los datos operacionales pesados.
  */
-export async function buildSituationalContextBlock(): Promise<string> {
+export async function buildSituationalContextBlock(opts?: SituationalContextOpts): Promise<string> {
   try {
     const snap = await buildSituationalSnapshot()
-    return formatSituationalSnapshot(snap)
+    return formatSituationalSnapshot(snap, opts)
   } catch (err) {
     logger.error('[situationalContext] error building snapshot', err instanceof Error ? err : undefined)
     return ''
