@@ -67,6 +67,30 @@ function shiftWindow(dateKey, shiftId) {
 }
 
 /**
+ * Deriva el `dateKey` calendario (YYYY-MM-DD) al que pertenece un turno,
+ * a partir de su `scheduledStart` real (wall-clock-as-UTC).
+ *
+ * Esto garantiza coherencia con la convención de Shoplogix UI: el turno se
+ * archiva en el día en que arrancó, sin importar la ventana de consulta del
+ * CF (que cubre 08:00→08:00 para captar también turnos que cruzan medianoche).
+ *
+ * Ejemplos:
+ *   - T3 que arranca 00:00 del 13-may → dateKey "2026-05-13"
+ *   - T3 que arranca 22:00 del 12-may (cruza medianoche) → dateKey "2026-05-12"
+ *   - T2 que arranca 14:45 del 13-may → dateKey "2026-05-13"
+ *
+ * Sin esta función, todos los turnos asumen el dateKey de la ventana de
+ * consulta — y un T3 que arranca 00:00 del día N se guardaba bajo dateKey N-1
+ * porque la ventana del CF para N-1 va de 08:00 (N-1) → 08:00 (N).
+ */
+function shiftDateKeyFromStart(scheduledStart) {
+  const y = scheduledStart.getUTCFullYear()
+  const m = String(scheduledStart.getUTCMonth() + 1).padStart(2, '0')
+  const d = String(scheduledStart.getUTCDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+/**
  * Deriva turnos reales desde el campo `shift` de los intervalos de producción.
  * Retorna array ordenado por scheduledStart.
  *
@@ -272,10 +296,23 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
             }),
         }
 
+        // dateKey del doc = día calendario donde ARRANCA el turno (no la ventana
+        // de consulta del CF). Esto garantiza coherencia con Shoplogix UI:
+        //
+        //   - T3 que arranca 00:00 del 13-may → shiftDateKey "2026-05-13"
+        //   - T3 que arranca 22:00 del 12-may → shiftDateKey "2026-05-12"
+        //
+        // Sin esto, el T3 que arranca 00:00 del día N se guardaba bajo dateKey
+        // N-1 porque la ventana de consulta del CF para N-1 cubre 08:00 (N-1)
+        // → 08:00 (N), entonces el T3 0-7:45 del día N caía dentro.
+        // El frontend al consultar "T3 del 13" no lo encontraba (estaba bajo
+        // dateKey=12) y caía al fallback Unscheduled, mostrando data falsa.
+        const shiftDateKey = shiftDateKeyFromStart(group.scheduledStart)
+
         const doc = normalizeShift({
           production:    filteredProd,
           summary:       rawSumm,
-          dateKey,
+          dateKey:       shiftDateKey,
           shiftId:       group.shiftId,
           shiftStartAt:  group.scheduledStart,
           shiftEndAt:    group.scheduledEnd,
@@ -284,7 +321,7 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
         })
 
         const ref = db.doc(
-          `shoplogix/${plantSlug}/shifts/${dateKey}_${group.shiftId}/machines/${machines[i].machineid}`,
+          `shoplogix/${plantSlug}/shifts/${shiftDateKey}_${group.shiftId}/machines/${machines[i].machineid}`,
         )
         await ref.set(doc, { merge: true })
 
@@ -326,9 +363,10 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
       }
     }
 
-    // Metadata del doc padre del turno
-    await db.doc(`shoplogix/${plantSlug}/shifts/${dateKey}_${group.shiftId}`).set({
-      dateKey,
+    // Metadata del doc padre del turno — dateKey derivado del scheduledStart real
+    const parentShiftDateKey = shiftDateKeyFromStart(group.scheduledStart)
+    await db.doc(`shoplogix/${plantSlug}/shifts/${parentShiftDateKey}_${group.shiftId}`).set({
+      dateKey:        parentShiftDateKey,
       shiftId:        group.shiftId,
       scheduledStart: group.scheduledStart,
       scheduledEnd:   group.scheduledEnd,
@@ -338,7 +376,7 @@ async function syncDay({ db, accessToken, cookie, plantSlug = 'chonchi', dateKey
     }, { merge: true })
 
     allShiftResults.push({ shiftId: group.shiftId, machines: shiftMachineResults })
-    logger.info(`[shoplogix-syncDay][${plantSlug}] ${dateKey} ${group.shiftId} OK`, { machines: shiftMachineResults })
+    logger.info(`[shoplogix-syncDay][${plantSlug}] ${parentShiftDateKey} ${group.shiftId} OK (window dateKey=${dateKey})`, { machines: shiftMachineResults })
   }
 
   return { plantSlug, dateKey, shiftGroups: shiftGroups.map(g => g.shiftId), results: allShiftResults }
@@ -455,6 +493,7 @@ module.exports = {
   shiftWindow,
   fullDayWindow,
   deriveShiftGroups,
+  shiftDateKeyFromStart,
   currentShiftKey,
   currentDateKey,
   syncDay,
