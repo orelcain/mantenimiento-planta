@@ -8,6 +8,29 @@ import { registerTool } from './registry'
 import { getCurrentShift } from '../../chatbot'
 import { listDailySummariesByRange } from '../../grader/graderDailySummary.service'
 import type { GraderDailySummary } from '../../grader/types'
+import { PLANT_LINES } from '@/config/plantLines'
+
+// ─── Detección de planta desde texto libre ────────────────────────────
+
+/**
+ * Mapea menciones de planta en el texto del usuario al `plantLineId`
+ * concreto usado por `listDailySummariesByRange`. Conservador: solo
+ * dispara si el match es inequívoco (yal/chonchi/principal/filete).
+ * Si no hay match, devuelve undefined → la tool usa default global.
+ */
+export function detectPlantLineId(text: string): string | undefined {
+  const lower = text.toLowerCase()
+  if (/\b(yal|planta\s+yal)\b/.test(lower)) return 'yal-eviscerado'
+  if (/\bfilete\b/.test(lower) && /\b(chonchi|principal|p\.?\s*principal)\b/.test(lower)) {
+    return 'chonchi-filete'
+  }
+  if (/\b(chonchi|p\.?\s*principal|planta\s+principal)\b/.test(lower)) return 'chonchi-eviscerado'
+  return undefined
+}
+
+function getPlantLabel(plantLineId: string): string {
+  return PLANT_LINES.find(p => p.id === plantLineId)?.label || plantLineId
+}
 
 // ─── Utilidades fecha ──────────────────────────────────────────────────
 
@@ -102,22 +125,31 @@ registerTool({
   name: 'shift.today',
   category: 'shift',
   description:
-    'Resumen de todos los turnos cargados hoy: piezas, P0%, throughput (piezas/h), calibre dominante, top causas P0, tiempo muerto',
-  params: [],
+    'Resumen de todos los turnos cargados hoy: piezas, P0%, throughput (piezas/h), calibre dominante, top causas P0, tiempo muerto. Opcionalmente filtrable por planta (yal/chonchi/filete).',
+  params: [
+    {
+      name: 'plantLineId',
+      type: 'string',
+      required: false,
+      description: 'Filtrar por planta (yal-eviscerado, chonchi-eviscerado, chonchi-filete)',
+    },
+  ],
   triggers: [
     /\b(hoy|d[ií]a\s+actual|del\s+d[ií]a)\b.*\b(turno|p0|piezas?|producci[oó]n|calibre|ciclos?\/?h|throughput|rendimiento|kpi|resumen|c[oó]mo\s+va|c[oó]mo\s+vamos|mttr|tiempo\s+muerto|downtime|pausas?)\b/i,
     /\b(mttr|p0%?|ciclos?\/?h|throughput|calibre\s+dominante|tiempo\s+muerto|downtime|piezas?\/?h)\b.*\b(hoy|d[ií]a)\b/i,
     /\b(c[oó]mo\s+va\s+el\s+turno|c[oó]mo\s+vamos|resumen\s+de\s+hoy|qu[eé]\s+tal\s+(el\s+)?turno|c[oó]mo\s+est[aá]\s+el\s+turno|c[oó]mo\s+anda)\b/i,
   ],
-  execute: async () => {
+  execute: async (params) => {
     const today = todayKey()
-    const summaries = await listDailySummariesByRange(today, today)
+    const plantLineId = params.plantLineId as string | undefined
+    const summaries = await listDailySummariesByRange(today, today, plantLineId)
+    const plantSuffix = plantLineId ? ` · ${getPlantLabel(plantLineId)}` : ''
     if (summaries.length === 0) {
       return {
         ok: true,
-        data: { date: today, count: 0 },
-        summary: `Aún no hay datos de Grader cargados para hoy (${today}). El Excel del turno se carga al cierre, así que es normal si el turno está en curso.`,
-        label: 'Turnos hoy',
+        data: { date: today, plantLineId, count: 0 },
+        summary: `Aún no hay datos de Grader cargados para hoy (${today})${plantSuffix}. El Excel del turno se carga al cierre, así que es normal si el turno está en curso.`,
+        label: `Turnos hoy${plantSuffix}`,
       }
     }
     const lines = summaries.map(summarizeShift).join('\n\n')
@@ -126,9 +158,87 @@ registerTool({
     const p0Pct = totalPieces > 0 ? (totalP0 / totalPieces) * 100 : 0
     return {
       ok: true,
-      data: { date: today, count: summaries.length, summaries, totalPieces, p0Pct },
-      summary: `Turnos cargados hoy (${today}) — ${summaries.length} turno(s), ${fmtNum(totalPieces)} piezas, P0% global ${fmtPct(p0Pct)}:\n\n${lines}`,
-      label: 'Turnos hoy',
+      data: { date: today, plantLineId, count: summaries.length, summaries, totalPieces, p0Pct },
+      summary: `Turnos cargados hoy (${today})${plantSuffix} — ${summaries.length} turno(s), ${fmtNum(totalPieces)} piezas, P0% global ${fmtPct(p0Pct)}:\n\n${lines}`,
+      label: `Turnos hoy${plantSuffix}`,
+    }
+  },
+})
+
+// ─── shift.lastByPlant ─────────────────────────────────────────────────
+
+registerTool({
+  name: 'shift.lastByPlant',
+  category: 'shift',
+  description:
+    'Devuelve el último turno cerrado de una planta (yal/chonchi/filete), con hora de inicio y cierre. Resuelve preguntas como "¿a qué hora terminó el último turno de Yal?", "¿cuándo cerró Chonchi anoche?".',
+  params: [
+    {
+      name: 'plantLineId',
+      type: 'string',
+      required: false,
+      default: 'chonchi-eviscerado',
+      description: 'ID de planta (yal-eviscerado, chonchi-eviscerado, chonchi-filete)',
+    },
+    { name: 'daysBack', type: 'number', required: false, default: 30, description: 'Buscar dentro de últimos N días' },
+  ],
+  triggers: [
+    /\b(a\s+qu?[eé]\s+)?hora\s+(termin[oó]|cerr[oó]|acab[oó]|finaliz[oó])\b/i,
+    /\b[uú]ltimo\s+turno\s+(de|del|en)\b/i,
+    /\bcu[aá]ndo\s+(termin[oó]|cerr[oó])\s+(el\s+)?[uú]ltimo\s+turno\b/i,
+    /\b[uú]ltima\s+jornada\b/i,
+    /\b(termin[oó]|cerr[oó])\s+(yal|chonchi|principal|filete)\b/i,
+  ],
+  execute: async (params) => {
+    const plantLineId = (params.plantLineId as string) || 'chonchi-eviscerado'
+    const daysBack = (params.daysBack as number) || 30
+    const start = daysAgo(daysBack)
+    const end = todayKey()
+    const summaries = await listDailySummariesByRange(start, end, plantLineId)
+    const plantLabel = getPlantLabel(plantLineId)
+    const withEndAt = summaries.filter(s => s.endAt)
+    if (withEndAt.length === 0) {
+      return {
+        ok: true,
+        data: { plantLineId, count: 0 },
+        summary: `Sin turnos cerrados con timestamp registrados para **${plantLabel}** en los últimos ${daysBack} días. El campo endAt se llena al guardar el turno desde la app — turnos antiguos pueden no tenerlo.`,
+        label: `Último turno ${plantLabel}`,
+      }
+    }
+    // Ordenar por endAt descendente (ISO strings ordenables lexicográficamente)
+    const sorted = [...withEndAt].sort((a, b) => (b.endAt || '').localeCompare(a.endAt || ''))
+    const last = sorted[0]!
+    // Humanizar timestamps
+    let endHuman = last.endAt || '—'
+    let startHuman = last.startAt || '—'
+    try {
+      if (last.endAt) {
+        endHuman = new Date(last.endAt).toLocaleString('es-CL', {
+          day: '2-digit', month: '2-digit', year: 'numeric',
+          hour: '2-digit', minute: '2-digit',
+        })
+      }
+      if (last.startAt) {
+        startHuman = new Date(last.startAt).toLocaleString('es-CL', {
+          day: '2-digit', month: '2-digit',
+          hour: '2-digit', minute: '2-digit',
+        })
+      }
+    } catch {
+      // mantener strings raw si parse falla
+    }
+    return {
+      ok: true,
+      data: { plantLineId, plantLabel, last },
+      summary: [
+        `Último turno cerrado de **${plantLabel}**:`,
+        `- Turno: ${last.shiftId} (${last.dateKey})${last.turnoLabel ? ` · ${last.turnoLabel}` : ''}`,
+        `- Inicio: ${startHuman}`,
+        `- **Fin: ${endHuman}**`,
+        `- Piezas: ${fmtNum(last.totalPieces)} · P0% ${fmtPct(last.pointZeroPct)}`,
+        last.durationMinutes ? `- Duración: ${last.durationMinutes} min` : '',
+      ].filter(Boolean).join('\n'),
+      label: `Último turno ${plantLabel}`,
     }
   },
 })
@@ -411,7 +521,7 @@ registerTool({
   name: 'period.kpi',
   category: 'shift',
   description:
-    'Devuelve UN KPI específico (p0/throughput/pieces) agregado en un período. Más conciso que period.summary cuando la pregunta es puntual.',
+    'Devuelve UN KPI específico (p0/throughput/pieces) agregado en un período. Más conciso que period.summary cuando la pregunta es puntual. Filtrable por planta.',
   params: [
     {
       name: 'metric',
@@ -422,6 +532,12 @@ registerTool({
       description: 'KPI a devolver',
     },
     { name: 'daysBack', type: 'number', required: false, default: 7, description: 'Días hacia atrás' },
+    {
+      name: 'plantLineId',
+      type: 'string',
+      required: false,
+      description: 'Filtrar por planta (yal-eviscerado, chonchi-eviscerado, chonchi-filete)',
+    },
   ],
   triggers: [
     /\b(cu[aá]l\s+es\s+(el|la)\s+(p0|throughput|piezas|producci[oó]n|rendimiento)).*\b(mes|semana|d[ií]a|hoy)\b/i,
@@ -432,17 +548,19 @@ registerTool({
   execute: async (params) => {
     const metric = (params.metric as Metric) || 'p0'
     const daysBack = (params.daysBack as number) || 7
+    const plantLineId = params.plantLineId as string | undefined
     const periodLabel =
       daysBack === 30 ? 'este mes' : daysBack === 7 ? 'esta semana' : `últimos ${daysBack} días`
+    const plantSuffix = plantLineId ? ` · ${getPlantLabel(plantLineId)}` : ''
     const start = daysAgo(daysBack)
     const end = todayKey()
-    const summaries = await listDailySummariesByRange(start, end)
+    const summaries = await listDailySummariesByRange(start, end, plantLineId)
     if (summaries.length === 0) {
       return {
         ok: true,
-        data: { metric, daysBack, count: 0 },
-        summary: `Sin datos cargados para ${periodLabel}.`,
-        label: `${METRIC_LABEL[metric]} ${periodLabel}`,
+        data: { metric, daysBack, plantLineId, count: 0 },
+        summary: `Sin datos cargados para ${periodLabel}${plantSuffix}.`,
+        label: `${METRIC_LABEL[metric]} ${periodLabel}${plantSuffix}`,
       }
     }
     let value: number
@@ -474,9 +592,9 @@ registerTool({
     if (worst && worst !== best) detail.push(`peor: ${worst.dateKey} ${worst.shiftId} (${formatMetric(worst, metric)})`)
     return {
       ok: true,
-      data: { metric, daysBack, value, count: summaries.length, best, worst },
-      summary: `${METRIC_LABEL[metric]} ${periodLabel}: **${valueText}** (basado en ${summaries.length} turnos)${detail.length ? '\n' + detail.join(' · ') : ''}`,
-      label: `${METRIC_LABEL[metric]} ${periodLabel}`,
+      data: { metric, daysBack, plantLineId, value, count: summaries.length, best, worst },
+      summary: `${METRIC_LABEL[metric]} ${periodLabel}${plantSuffix}: **${valueText}** (basado en ${summaries.length} turnos)${detail.length ? '\n' + detail.join(' · ') : ''}`,
+      label: `${METRIC_LABEL[metric]} ${periodLabel}${plantSuffix}`,
     }
   },
 })
@@ -521,6 +639,15 @@ export function inferToolParams(toolName: string, userMessage: string): Record<s
         params.date = `${year}-${mStr}-${dStr}`
       }
     }
+  }
+  // Detección de planta para tools que aceptan plantLineId
+  if (
+    toolName === 'shift.today' ||
+    toolName === 'shift.lastByPlant' ||
+    toolName === 'period.kpi'
+  ) {
+    const plant = detectPlantLineId(userMessage)
+    if (plant) params.plantLineId = plant
   }
   return params
 }
