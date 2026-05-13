@@ -11,9 +11,11 @@ export { clearRegistry, executeTool, getTool, listTools, matchTools, registerToo
 import './grader'
 import './incidents'
 import './equipment'
+import './repuestos'
 
 import { inferToolParams as inferGraderParams } from './grader'
 import { inferEquipmentParams } from './equipment'
+import { inferRepuestosParams } from './repuestos'
 
 /**
  * Inferencia combinada — enruta al inference del dominio correspondiente
@@ -25,6 +27,9 @@ export function inferToolParams(toolName: string, userMessage: string): Record<s
   }
   if (toolName.startsWith('equipment.') || toolName.startsWith('incidents.')) {
     return inferEquipmentParams(toolName, userMessage)
+  }
+  if (toolName.startsWith('repuestos.')) {
+    return inferRepuestosParams(toolName, userMessage)
   }
   return {}
 }

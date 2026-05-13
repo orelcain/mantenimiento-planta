@@ -6,6 +6,7 @@
  */
 import { registerTool } from './registry'
 import { getIncidents } from '../../incidents'
+import { findEquipmentByText } from '../../chatActions'
 import type { Incident, IncidentStatus, IncidentPriority } from '@/types'
 
 const STATUS_OPEN: IncidentStatus[] = ['pendiente', 'confirmada', 'en_proceso']
@@ -213,6 +214,71 @@ registerTool({
       data: { count: sorted.length, incidents: sorted },
       summary: `Últimas ${sorted.length} incidencias:\n\n${body}`,
       label: 'Incidencias recientes',
+    }
+  },
+})
+
+// ─── incidents.byEquipment ─────────────────────────────────────────────
+
+registerTool({
+  name: 'incidents.byEquipment',
+  category: 'incidents',
+  description:
+    'Lista incidencias asociadas a un equipo específico. Resuelve el equipo por texto libre (nombre, código). Útil para "incidencias de la baader 200", "qué le pasó al motor X", "historial del compresor".',
+  params: [
+    {
+      name: 'equipmentText',
+      type: 'string',
+      required: false,
+      description: 'Nombre o código del equipo a buscar',
+    },
+    { name: 'limit', type: 'number', required: false, default: 10, description: 'Máx resultados' },
+  ],
+  triggers: [
+    /\b(incidencias?|fallas?|reportes?|historial)\s+(de|del|en|para)\s+(la?|el)?\s*(baader|grader|marel|cinta|motor|bomba|compresor|sensor|valvula|v[aá]lvula|reductor|filete|eviscerador|empacadora)/i,
+    /\b(qu[eé]\s+(le\s+)?pas[oó]\s+(a|al|con))\b/i,
+    /\b(historial\s+de\s+fallas?)\b/i,
+  ],
+  execute: async (params) => {
+    const equipmentText = (params.equipmentText as string) || ''
+    const limit = (params.limit as number) || 10
+    if (!equipmentText.trim()) {
+      return {
+        ok: false,
+        error: 'Falta texto del equipo a buscar',
+        label: 'Incidencias por equipo',
+      }
+    }
+    const equipment = await findEquipmentByText(equipmentText)
+    if (!equipment) {
+      return {
+        ok: true,
+        data: { equipmentText, count: 0 },
+        summary: `No encontré un equipo que coincida con "${equipmentText}". Probá con el nombre completo o código.`,
+        label: 'Incidencias por equipo',
+      }
+    }
+    const list = await getIncidents({ equipmentId: equipment.id, limit })
+    if (list.length === 0) {
+      return {
+        ok: true,
+        data: { equipmentId: equipment.id, equipmentName: equipment.nombre, count: 0 },
+        summary: `${equipment.nombre} (${equipment.codigo}) no tiene incidencias registradas. ✅`,
+        label: `Incidencias de ${equipment.nombre}`,
+      }
+    }
+    const sorted = [...list].sort((a, b) => {
+      const ta = a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a.createdAt as string).getTime()
+      const tb = b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b.createdAt as string).getTime()
+      return tb - ta
+    })
+    const openCount = sorted.filter(i => STATUS_OPEN.includes(i.status)).length
+    const body = sorted.map(summarizeIncident).join('\n')
+    return {
+      ok: true,
+      data: { equipmentId: equipment.id, equipmentName: equipment.nombre, count: sorted.length, openCount, incidents: sorted },
+      summary: `Incidencias de ${equipment.nombre} (${equipment.codigo}) — total ${sorted.length}, ${openCount} abiertas:\n\n${body}`,
+      label: `Incidencias de ${equipment.nombre}`,
     }
   },
 })

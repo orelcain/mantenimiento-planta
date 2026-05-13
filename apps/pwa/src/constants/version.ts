@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '3.28.2' as const
+export const APP_VERSION = '3.28.3' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-05-13' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'feat(aria): conciencia situacional siempre-on (Sprint 3 ARIA-JARVIS)' as const
+export const VERSION_NAME = 'feat(aria): +3 tools byEquipment/byZone/repuestos.search (Sprint 2.5 · 15 tools)' as const
 
 /**
  * Nota:
