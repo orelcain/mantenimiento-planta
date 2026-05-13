@@ -28,25 +28,24 @@ export interface UseUpstreamLineSnapshotResult {
 }
 
 /**
- * Flag: en DEV muestra demo data por defecto (para poder ver el panel
- * mientras no esté la integración con Firestore). Apagable con
- * `VITE_SHOPLOGIX_DEMO=0` en apps/pwa/.env.local para probar el estado vacío.
- * En producción: siempre false (nunca demo data).
+ * Flag: demo data DESACTIVADA por defecto en cualquier entorno (incluido DEV).
+ * Solo se activa con `VITE_SHOPLOGIX_DEMO=1` explícito en apps/pwa/.env.local.
+ *
+ * Razón: ya pasó que en operación se confunden cifras demo con cifras reales
+ * (turnos en temporada baja mostraban 11.203 ciclos fake como si fueran del
+ * turno actual). El default seguro es "no mostrar datos sintéticos jamás";
+ * quien quiera ver el panel sin datos reales debe activarlo a mano.
  *
  * IMPORTANTE: la demo data está hecha con `CHONCHI_EVISCERADORAS` y simula
  * paros + bandas violetas del Baader. Si la planta NO es chonchi, los
  * markers visuales son fake (paros que NO existieron en esa planta) y
  * confunden la lectura del turno. Por eso bloqueamos demo para plantas
- * distintas de chonchi.
+ * distintas de chonchi aunque la flag esté activa.
  */
 function isDemoEnabled(plantSlug: PlantSlug): boolean {
   if (plantSlug !== 'chonchi') return false
-  const env = import.meta.env
-  const flag = (env.VITE_SHOPLOGIX_DEMO ?? '').toString()
-  if (flag === '0' || flag === 'false') return false
-  if (flag === '1' || flag === 'true')  return true
-  // Default: DEV=on, PROD=off
-  return env.DEV === true
+  const flag = (import.meta.env.VITE_SHOPLOGIX_DEMO ?? '').toString()
+  return flag === '1' || flag === 'true'
 }
 
 export function useUpstreamLineSnapshot(

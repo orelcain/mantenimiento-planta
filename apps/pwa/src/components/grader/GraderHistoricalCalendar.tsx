@@ -63,6 +63,8 @@ import {
   addDaysToDateKey,
   getShiftMeta,
   isSignificantCycleCount,
+  isLowActivityCycleCount,
+  SLX_LOW_ACTIVITY_THRESHOLD,
 } from '@/services/grader/graderShiftDisplay'
 import { MachineTrendMiniChart } from './UpstreamMachinesPanel'
 import { getPlantLineConfig, DEFAULT_PLANT_LINE_ID, type PlantLineId } from '@/config/plantLines'
@@ -538,7 +540,16 @@ function buildDayTimelineBlocks(
       status === 'alert' ? 'bg-amber-500/65'   :
                            'bg-rose-500/65'
 
-    const base  = hist.shiftId === 'Turno día' ? 'D' : 'N'
+    // Etiqueta del bloque = shiftId real de Shoplogix, no convención
+    // inventada (D/N). Para Turno día/noche dejamos D/N por compat con
+    // Chonchi; para T1/T2/T3 mostramos el número tal cual.
+    const base =
+      hist.shiftId === 'Turno día'   ? 'D'  :
+      hist.shiftId === 'Turno noche' ? 'N'  :
+      hist.shiftId === 'Turno 1'     ? 'T1' :
+      hist.shiftId === 'Turno 2'     ? 'T2' :
+      hist.shiftId === 'Turno 3'     ? 'T3' :
+      hist.shiftId
     const label =
       direction === 'enters' ? `→${base}` :
       direction === 'exits'  ? `${base}→` :
@@ -792,6 +803,7 @@ interface SlxDisplayShift {
 function slxDisplayShifts(
   visualDay: string,
   slxByShift: Map<string, { totalCycles?: number }>,
+  options?: { isClassificationPlant?: boolean },
 ): SlxDisplayShift[] {
   const { ownDay, prevDay } = cfKeysForVisualDay(visualDay)
   const collected: SlxDisplayShift[] = []
@@ -815,9 +827,14 @@ function slxDisplayShifts(
   const ids = new Set(collected.map(c => c.shiftId))
   const hasT2    = ids.has('Turno 2')
   const hasT1or3 = ids.has('Turno 1') || ids.has('Turno 3')
+
+  // Para plantas no-clasificadoras (Yal): NUNCA mostrar `Turno día`/`Turno noche`,
+  // sin importar lo que tenga Firestore. Esos docs son ruido residual del sync.
+  const dropLegacyForNonClassif = options?.isClassificationPlant === false
+
   const deduped = collected
-    .filter(c => !(c.shiftId === 'Turno día'   && hasT2))
-    .filter(c => !(c.shiftId === 'Turno noche' && hasT1or3))
+    .filter(c => !(c.shiftId === 'Turno día'   && (hasT2 || dropLegacyForNonClassif)))
+    .filter(c => !(c.shiftId === 'Turno noche' && (hasT1or3 || dropLegacyForNonClassif)))
 
   // Orden calendárico (Turno 3 madrugada va primero, luego día, luego noche)
   const ord: Record<string, number> = {
@@ -1264,7 +1281,11 @@ export function GraderHistoricalCalendar({
             },
             chip: null,
           })
-        } else if (isSignificantCycleCount(tLeg)) {
+        } else if (isSignificantCycleCount(tLeg) && plantLine.isClassificationPlant !== false) {
+          // Fallback legacy "Turno día" solo aplica a plantas clasificadoras (Chonchi).
+          // En Yal y otras no-clasificadoras la nomenclatura correcta es T1/T2/T3;
+          // un doc legacy `Turno día` ahí es ruido residual (sync mal configurado) y
+          // confunde porque pisa los turnos numerados reales.
           const c = slxByShift.get(`${key}__Turno día`)
           out.push({
             summary: {
@@ -1311,7 +1332,10 @@ export function GraderHistoricalCalendar({
             },
             chip: null,
           })
-        } else if (isSignificantCycleCount(tLegN)) {
+        } else if (isSignificantCycleCount(tLegN) && plantLine.isClassificationPlant !== false) {
+          // Mismo razonamiento que el fallback "Turno día" legacy: en plantas
+          // no-clasificadoras (Yal) la noche real es Turno 3 (madrugada) o no hay;
+          // un doc legacy `Turno noche` ahí es ruido residual del sync upstream.
           const c = slxByShift.get(`${key}__Turno noche`)
           out.push({
             summary: {
@@ -2403,6 +2427,11 @@ export function GraderHistoricalCalendar({
 
             // ── Card completa (día / noche)
             const isHovered = hoveredFragId === fragId
+            // Card SLX-virtual con ciclos bajo el umbral de operación normal:
+            // estilo ámbar dashed + badge advirtiendo. No se filtra la card —
+            // la data existe y se muestra; solo se distingue para que el
+            // operador NO la lea como producción normal.
+            const isLowActivity = isVirtual && isLowActivityCycleCount(fragPieces)
             return (
               <div
                 key={hist.id}
@@ -2421,7 +2450,9 @@ export function GraderHistoricalCalendar({
                 onMouseLeave={() => setHoveredFragId(null)}
                 className={cn(
                   'rounded-lg border-2 border-l-4 px-3 py-2.5 space-y-2 cursor-pointer transition-all',
-                  P0_CARD_CLASS[status],
+                  isLowActivity
+                    ? 'border-dashed border-amber-500/40 bg-amber-500/5'
+                    : P0_CARD_CLASS[status],
                   isActiveForConfig &&
                     'ring-2 ring-emerald-500 ring-offset-1 ring-offset-background',
                   isHovered && !isActiveForConfig &&
@@ -2431,7 +2462,13 @@ export function GraderHistoricalCalendar({
                 <div className="flex items-baseline justify-between gap-2">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="text-base leading-none">{meta.icon}</span>
-                    <p className="text-sm font-semibold">{meta.title}</p>
+                    <p className="text-sm font-semibold">
+                      {/* Yal: usar el shiftId real de Shoplogix (Turno 1/2/3) en
+                          lugar de la convención inventada "Día/Noche". Chonchi:
+                          KIND_META.title sigue siendo Día/Noche/Madrugada como
+                          se ha mostrado siempre. */}
+                      {plantLine.isClassificationPlant === false ? hist.shiftId : meta.title}
+                    </p>
                     {orderText && (
                       <span className="text-[9px] font-bold tracking-wider px-1.5 py-0.5 rounded-full bg-muted/60 text-muted-foreground">
                         {orderText}
@@ -2461,6 +2498,15 @@ export function GraderHistoricalCalendar({
                         title="Sin Excel del Marelec cargado. Datos derivados de Shoplogix (ciclos Baader)."
                       >
                         Solo Shoplogix
+                      </span>
+                    )}
+                    {isLowActivity && (
+                      <span
+                        className="inline-flex items-center gap-0.5 text-[9px] px-1 py-0.5 rounded bg-amber-500/15 text-amber-500 border border-amber-500/30 font-medium shrink-0"
+                        title={`Solo ${fragPieces.toLocaleString('es-CL')} ciclos en este turno (menos de ${SLX_LOW_ACTIVITY_THRESHOLD}). Puede ser mantenimiento, limpieza, sensor en vacío o un proceso muy corto. Revisar antes de leerlo como producción normal.`}
+                      >
+                        <AlertTriangle className="w-2.5 h-2.5" />
+                        Actividad baja
                       </span>
                     )}
                   </div>
@@ -2909,9 +2955,13 @@ export function GraderHistoricalCalendar({
               const showSlx       = !hasData || plantLine.isClassificationPlant === false
               const showSlxDay    = showSlx && !hasExcelDay
               const showSlxNight  = showSlx && !hasExcelNight
+              // Para plantas no-clasificadoras (Yal): ignorar docs legacy
+              // `Turno día`/`Turno noche` en Firestore — son ruido del sync
+              // upstream (la planta opera con T1/T2/T3, no con Día/Noche).
+              const useLegacyDayNight = plantLine.isClassificationPlant !== false
               const slxT1Cycles = showSlxDay ? (slxTotalsByShift.get(`${dayKey}__Turno 1`) ?? 0) : 0
               const slxT2Cycles = showSlxDay ? (slxTotalsByShift.get(`${dayKey}__Turno 2`) ?? 0) : 0
-              const slxLegDay   = showSlxDay ? (slxTotalsByShift.get(`${dayKey}__Turno día`) ?? 0) : 0
+              const slxLegDay   = (showSlxDay && useLegacyDayNight) ? (slxTotalsByShift.get(`${dayKey}__Turno día`) ?? 0) : 0
               const slxNewDay   = slxT1Cycles + slxT2Cycles  // suma "mañana+tarde"
               const slxDayCycles = slxNewDay > 0 ? slxNewDay : slxLegDay
               // shiftId para navegar (preferir T2 si tiene más cycles)
@@ -2921,7 +2971,7 @@ export function GraderHistoricalCalendar({
                 : slxLegDay > 0 ? { cfDateKey: dayKey, shiftId: 'Turno día' } : null
               // Noche: T3 SLX del PROPIO día (arranca 23:00 del Y).
               const slxT3Cycles = showSlxNight ? (slxTotalsByShift.get(`${dayKey}__Turno 3`) ?? 0) : 0
-              const slxLegNight = showSlxNight ? (slxTotalsByShift.get(`${dayKey}__Turno noche`) ?? 0) : 0
+              const slxLegNight = (showSlxNight && useLegacyDayNight) ? (slxTotalsByShift.get(`${dayKey}__Turno noche`) ?? 0) : 0
               const slxNightCycles = slxT3Cycles > 0 ? slxT3Cycles : slxLegNight
               const slxNightNav = slxT3Cycles > 0
                 ? { cfDateKey: dayKey, shiftId: 'Turno 3' }
@@ -3056,9 +3106,17 @@ export function GraderHistoricalCalendar({
                       : upt >= 40 ? 'bg-amber-500/15 text-amber-400 hover:bg-amber-500/25'
                       : upt > 0  ? 'bg-red-500/15 text-red-400 hover:bg-red-500/25'
                       : 'bg-sky-500/15 text-sky-400 hover:bg-sky-500/25'
-                    const dayColorClass   = slxUptimeClass(slxDayUptimePct)
-                    const nightColorClass = slxNightUptimePct > 0
-                      ? slxUptimeClass(slxNightUptimePct)
+                    // "Baja actividad": el turno existe pero los ciclos están
+                    // muy por debajo de operación normal — puede ser limpieza,
+                    // sensor en vacío, o test. NO se filtra (la data es real)
+                    // pero se distingue visualmente con borde punteado ámbar
+                    // para que el operador no lo confunda con producción.
+                    const isDayLowActivity   = isLowActivityCycleCount(slxDayCycles)
+                    const isNightLowActivity = isLowActivityCycleCount(slxNightCycles)
+                    const lowActivityClass = 'bg-amber-500/5 text-amber-500/70 hover:bg-amber-500/15 border border-dashed border-amber-500/30'
+                    const dayColorClass   = isDayLowActivity   ? lowActivityClass : slxUptimeClass(slxDayUptimePct)
+                    const nightColorClass = isNightLowActivity ? lowActivityClass
+                      : slxNightUptimePct > 0 ? slxUptimeClass(slxNightUptimePct)
                       : 'bg-indigo-500/15 text-indigo-400 hover:bg-indigo-500/25'
                     // Valor mostrado según vista
                     const slxDayValue = calendarView === 'uptime'
@@ -3069,13 +3127,32 @@ export function GraderHistoricalCalendar({
                       ? (slxNightUptimePct > 0 ? `${slxNightUptimePct.toFixed(0)}%` : '—')
                       : calendarView === 'p0' ? '—'
                       : slxNightCycles.toLocaleString('es-CL')
+                    // Label del chip — en plantas clasificadoras (Chonchi) usa D/N;
+                    // en no-clasificadoras (Yal) usa la nomenclatura real del turno
+                    // (T1/T2/T3) para no confundir con la convención Día/Noche del
+                    // Grader. Si por alguna razón sigue siendo legacy día/noche en
+                    // un doc, se respeta el shiftId que tenga.
+                    const isNonClassif = plantLine.isClassificationPlant === false
+                    const labelFor = (shiftId: string | undefined, fallback: 'D' | 'N'): string => {
+                      if (!shiftId) return fallback
+                      if (!isNonClassif) return fallback
+                      if (shiftId === 'Turno 1') return 'T1'
+                      if (shiftId === 'Turno 2') return 'T2'
+                      if (shiftId === 'Turno 3') return 'T3'
+                      return fallback
+                    }
+                    const slxDayLabel   = labelFor(slxDayNav?.shiftId, 'D')
+                    const slxNightLabel = labelFor(slxNightNav?.shiftId, 'N')
                     return (
                       <>
                         {hasSlxDay && slxDayNav && (
                           <button
                             className={cn('flex items-center justify-between rounded px-1 py-px leading-none transition-colors w-full', dayColorClass)}
                             title={
-                              `Turno día (Shoplogix)\n`
+                              (isDayLowActivity
+                                ? `⚠ Actividad baja (<${SLX_LOW_ACTIVITY_THRESHOLD} ciclos) — revisar si fue producción real, mantenimiento o ruido del sensor\n`
+                                : '')
+                              + `Turno día (Shoplogix)\n`
                               + `• ${slxDayCycles.toLocaleString('es-CL')} ciclos Baader\n`
                               + (slxDayUptimePct > 0 ? `• Uptime: ${slxDayUptimePct.toFixed(0)}%\n` : '')
                               + (hasExcelDay
@@ -3087,7 +3164,7 @@ export function GraderHistoricalCalendar({
                               navigate(`/analisis-grader/turno/${slxDayNav.cfDateKey}__${encodeURIComponent(slxDayNav.shiftId)}${lineaQ}`)
                             }}
                           >
-                            <span className="text-[8px] font-medium opacity-80">D</span>
+                            <span className="text-[8px] font-medium opacity-80">{slxDayLabel}</span>
                             <span className="text-[9px] font-bold tabular-nums">{slxDayValue}</span>
                           </button>
                         )}
@@ -3095,7 +3172,10 @@ export function GraderHistoricalCalendar({
                           <button
                             className={cn('flex items-center justify-between rounded px-1 py-px leading-none transition-colors w-full', nightColorClass)}
                             title={
-                              `Turno noche (Shoplogix)`
+                              (isNightLowActivity
+                                ? `⚠ Actividad baja (<${SLX_LOW_ACTIVITY_THRESHOLD} ciclos) — revisar si fue producción real, mantenimiento o ruido del sensor\n`
+                                : '')
+                              + `Turno noche (Shoplogix)`
                               + (slxNightNav.shiftId === 'Turno 3' ? ' — arranca 23:00, cubre madrugada' : '')
                               + `\n• ${slxNightCycles.toLocaleString('es-CL')} ciclos Baader\n`
                               + (slxNightUptimePct > 0 ? `• Uptime: ${slxNightUptimePct.toFixed(0)}%\n` : '')
@@ -3108,7 +3188,7 @@ export function GraderHistoricalCalendar({
                               navigate(`/analisis-grader/turno/${slxNightNav.cfDateKey}__${encodeURIComponent(slxNightNav.shiftId)}${lineaQ}`)
                             }}
                           >
-                            <span className="text-[8px] font-medium opacity-80">N</span>
+                            <span className="text-[8px] font-medium opacity-80">{slxNightLabel}</span>
                             <span className="text-[9px] font-bold tabular-nums">{slxNightValue}</span>
                           </button>
                         )}
@@ -3292,25 +3372,20 @@ export function GraderHistoricalCalendar({
                         {slideKey ? slideKey.slice(5) : '—'}
                       </span>
                     </div>
-                    {/* ── Barra timeline 24h — 3 capas: bloques Grader / Shoplogix / eje hora ── */}
+                    {/* ── Barra timeline 24h compacta — 3 capas: bloques Grader / Shoplogix / eje hora ── */}
                     <div
                       className="relative overflow-hidden border-y border-border/25 bg-muted/15"
-                      style={{ height: '56px' }}
+                      style={{ height: '36px' }}
                       title={slideKey ? `Timeline ${slideKey}` : undefined}
                     >
-                      {/* ── Capa 1: grid de horas ── */}
+                      {/* ── Capa 1: grid de horas (compactado, solo ticks principales) ── */}
                       {/* Medianoche */}
                       <div className="absolute inset-y-0 left-0 w-px bg-white/25 z-10 pointer-events-none" />
-                      {/* Ticks cada 3h — más claros en las horas principales (6/12/18) */}
-                      {[3, 6, 9, 12, 15, 18, 21].map(h => (
+                      {/* Ticks solo en horas principales (6/12/18) — los intermedios saturan en altura reducida */}
+                      {[6, 12, 18].map(h => (
                         <div
                           key={h}
-                          className={cn(
-                            'absolute top-0 pointer-events-none z-10',
-                            [6, 12, 18].includes(h)
-                              ? 'bottom-0 w-px bg-white/20'
-                              : 'bottom-5 w-px bg-border/30',
-                          )}
+                          className="absolute inset-y-0 w-px bg-white/15 pointer-events-none z-10"
                           style={{ left: `${(h / 24) * 100}%` }}
                         />
                       ))}
@@ -3340,8 +3415,8 @@ export function GraderHistoricalCalendar({
                           style={{
                             left:            `${gap.leftPct}%`,
                             width:           `${gap.widthPct}%`,
-                            top:             '3px',
-                            bottom:          '18px',
+                            top:             '2px',
+                            bottom:          '11px',
                             transformOrigin: 'left center',
                           }}
                           title="Sin turno activo (paro programado)"
@@ -3376,8 +3451,8 @@ export function GraderHistoricalCalendar({
                             style={{
                               left:   `${b.leftPct}%`,
                               width:  `max(${b.widthPct}%, 0.8%)`,
-                              top:    '3px',
-                              bottom: '18px',
+                              top:    '2px',
+                              bottom: '11px',
                               borderRadius:
                                 b.nightSide === 'start' ? '0 3px 3px 0' :
                                 b.nightSide === 'end'   ? '3px 0 0 3px' :
@@ -3442,7 +3517,7 @@ export function GraderHistoricalCalendar({
                       { shiftId: 'Turno día',   cfDateKey: selectedKey!, slxKey: `${selectedKey}__Turno 2` },
                       { shiftId: 'Turno noche', cfDateKey: selectedKey!, slxKey: `${selectedKey}__Turno 1` },
                     ]
-                  : slxDisplayShifts(selectedKey, slxByShift)
+                  : slxDisplayShifts(selectedKey, slxByShift, { isClassificationPlant: plantLine.isClassificationPlant })
                 ).map(({ shiftId, cfDateKey, slxKey }) => {
                   const hasSlx = (slxByShift.get(slxKey)?.states?.length ?? 0) > 0
                   const lineaQuery = plantLineId !== DEFAULT_PLANT_LINE_ID

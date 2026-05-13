@@ -279,6 +279,20 @@ export function isShiftDayLike(shiftId: string): boolean {
 export const SLX_NOISE_THRESHOLD = 50
 
 /**
+ * Umbral de "baja actividad". Turnos con ciclos entre SLX_NOISE_THRESHOLD y
+ * este valor son significativos (no ruido) pero no representan operación
+ * normal — pueden ser mantenimiento, limpieza, test o sensor reportando
+ * en vacío. La UI los muestra con styling distinto (badge ámbar) para que
+ * el operador NO los confunda con un turno productivo normal, sin filtrar
+ * la data (los ciclos existen y deben ser visibles).
+ *
+ * Un turno Yal/Chonchi productivo normal tiene miles a decenas de miles de
+ * ciclos por 8h. 500 deja amplio margen para captar turnos parcialmente
+ * cortos sin marcarlos como bajos.
+ */
+export const SLX_LOW_ACTIVITY_THRESHOLD = 500
+
+/**
  * `true` si un total de ciclos representa un turno productivo significativo
  * (no ruido). Usar este helper en lugar de comparar contra `> 0` para que
  * sea inevitable aplicar el umbral correcto en cualquier nueva UI.
@@ -286,6 +300,16 @@ export const SLX_NOISE_THRESHOLD = 50
 export function isSignificantCycleCount(totalCycles: number | null | undefined): boolean {
   if (totalCycles == null || !Number.isFinite(totalCycles)) return false
   return totalCycles >= SLX_NOISE_THRESHOLD
+}
+
+/**
+ * `true` si el turno tiene ciclos pero por debajo del umbral de operación
+ * normal. Distinto a "ruido" (que se filtra) — esta data se MUESTRA con
+ * advertencia visual para que el operador la revise.
+ */
+export function isLowActivityCycleCount(totalCycles: number | null | undefined): boolean {
+  if (totalCycles == null || !Number.isFinite(totalCycles)) return false
+  return totalCycles >= SLX_NOISE_THRESHOLD && totalCycles < SLX_LOW_ACTIVITY_THRESHOLD
 }
 
 /**

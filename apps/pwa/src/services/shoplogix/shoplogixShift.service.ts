@@ -431,11 +431,18 @@ const SHIFT_CANDIDATES_BY_PLANT: Record<PlantSlug, Record<string, string[]>> = {
   yal: {
     // Yal: Shoplogix usa Turno 1/2/3, el Grader Excel suele etiquetar día/noche.
     // El listener paralelo elige al primer candidato con producción real (>0 ciclos).
+    //
+    // NUNCA caer a `Unscheduled` como fallback de un turno nombrado. Verificado
+    // 2026-05-13 con screenshots reales: el doc `Unscheduled` representa horas
+    // entre turnos (mantenimiento, limpieza, calibración) y NO es un turno real.
+    // Disfrazarlo como `Turno 3` o `Turno noche` mentía al operador con datos
+    // de otra ventana horaria. Si Shoplogix no sincroniza el T3 real es bug del
+    // sync upstream, no se compensa con data espuria.
     'Turno día':   ['Turno día', 'Turno 1', 'Turno 1*', 'Turno 2', 'Turno 2*'],
-    'Turno noche': ['Turno noche', 'Turno 3', 'Turno 3*', 'Unscheduled'],
+    'Turno noche': ['Turno noche', 'Turno 3', 'Turno 3*'],
     'Turno 1':     ['Turno 1', 'Turno 1*'],
     'Turno 2':     ['Turno 2', 'Turno 2*'],
-    'Turno 3':     ['Turno 3', 'Turno 3*', 'Unscheduled'],
+    'Turno 3':     ['Turno 3', 'Turno 3*'],
   },
 }
 

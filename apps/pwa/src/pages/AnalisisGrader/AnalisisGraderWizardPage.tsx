@@ -10,7 +10,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, Button, Badge } from '@/components/ui'
-import { BarChart3, Loader2, CheckCircle2, Calendar, BookOpen, Activity, Upload, AlertCircle, ChevronDown } from 'lucide-react'
+import { BarChart3, Loader2, CheckCircle2, Calendar, BookOpen, Upload, AlertCircle, ChevronDown } from 'lucide-react'
 import { logger } from '@/lib/logger'
 import { cn } from '@/lib/utils'
 import { useAuthStore, usePermissionsStore } from '@/store'
@@ -18,6 +18,7 @@ import { AnalisisGraderUploadPage, type FileParsed } from './AnalisisGraderUploa
 import { GraderHistoricalCalendar, type SlxMonthlyStats } from '@/components/grader/GraderHistoricalCalendar'
 import { GraderMonthlyStatsPanel } from '@/components/grader/GraderMonthlyStatsPanel'
 import { PlantLineTabs } from '@/components/grader/PlantLineTabs'
+import { CurrentShiftChip } from '@/components/grader/CurrentShiftChip'
 import { PlantKPIBoard } from '@/components/grader/PlantKPIBoard'
 import { getPlantLineConfig, DEFAULT_PLANT_LINE_ID, type PlantLineId } from '@/config/plantLines'
 import { AnalisisGraderDashboardPage } from './AnalisisGraderDashboardPage'
@@ -719,12 +720,7 @@ export function AnalisisGraderWizardPage() {
         <div className="space-y-4">
           <div className="flex items-center gap-3 flex-wrap">
             <PlantLineTabs selected={lineId} onSelect={handleLineSelect} className="w-full" />
-            {lineId !== DEFAULT_PLANT_LINE_ID && lineConfig.shoplogixEnabled && (
-              <Badge className="text-xs bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 gap-1.5 px-2.5 py-1">
-                <Activity className="h-3 w-3 shrink-0 animate-pulse" />
-                En proceso
-              </Badge>
-            )}
+            <CurrentShiftChip plantLineId={lineId} />
           </div>
           {/* Botón "Cargar Excel" contextual a la pestaña seleccionada.
               Antes vivía en el header global → era ambiguo a qué planta
