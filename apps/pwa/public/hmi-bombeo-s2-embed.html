@@ -546,6 +546,89 @@
       <rect class="readout-box" x="900" y="697" width="200" height="20" data-key="box.timestamp"/>
       <text class="readout-txt" x="1000" y="708" data-key="text.timestamp">5/12/2026 4:07:27 PM</text>
 
+      <!-- ═══════════════════════════════════════════
+           GRILLA 12×8 (A–L × 1–8) — toggle via ?grid=1
+           Cells: 106.67 × 90 px en viewBox 1280×720
+           Cols A→L de izquierda a derecha
+           Rows 1→8 de arriba a abajo
+           ═══════════════════════════════════════════ -->
+      <g id="hmi-grid" style="display:none;" pointer-events="none">
+        <!-- Lineas verticales (13 lineas para 12 cols) -->
+        <g stroke="#4488ff" stroke-width="0.6" opacity="0.45">
+          <line x1="0"       y1="0" x2="0"       y2="720"/>
+          <line x1="106.67"  y1="0" x2="106.67"  y2="720"/>
+          <line x1="213.33"  y1="0" x2="213.33"  y2="720"/>
+          <line x1="320"     y1="0" x2="320"     y2="720"/>
+          <line x1="426.67"  y1="0" x2="426.67"  y2="720"/>
+          <line x1="533.33"  y1="0" x2="533.33"  y2="720"/>
+          <line x1="640"     y1="0" x2="640"     y2="720"/>
+          <line x1="746.67"  y1="0" x2="746.67"  y2="720"/>
+          <line x1="853.33"  y1="0" x2="853.33"  y2="720"/>
+          <line x1="960"     y1="0" x2="960"     y2="720"/>
+          <line x1="1066.67" y1="0" x2="1066.67" y2="720"/>
+          <line x1="1173.33" y1="0" x2="1173.33" y2="720"/>
+          <line x1="1280"    y1="0" x2="1280"    y2="720"/>
+        </g>
+        <!-- Lineas horizontales (9 lineas para 8 rows) -->
+        <g stroke="#4488ff" stroke-width="0.6" opacity="0.45">
+          <line x1="0" y1="0"   x2="1280" y2="0"  />
+          <line x1="0" y1="90"  x2="1280" y2="90" />
+          <line x1="0" y1="180" x2="1280" y2="180"/>
+          <line x1="0" y1="270" x2="1280" y2="270"/>
+          <line x1="0" y1="360" x2="1280" y2="360"/>
+          <line x1="0" y1="450" x2="1280" y2="450"/>
+          <line x1="0" y1="540" x2="1280" y2="540"/>
+          <line x1="0" y1="630" x2="1280" y2="630"/>
+          <line x1="0" y1="720" x2="1280" y2="720"/>
+        </g>
+        <!-- Etiquetas A-L (top edge) -->
+        <g fill="#7fc4ff" font-family="Arial" font-size="12" font-weight="700" text-anchor="middle" opacity="0.95">
+          <rect x="0"       y="0" width="106.67" height="18" fill="#000" opacity="0.5"/>
+          <rect x="106.67"  y="0" width="106.67" height="18" fill="#000" opacity="0.5"/>
+          <rect x="213.33"  y="0" width="106.67" height="18" fill="#000" opacity="0.5"/>
+          <rect x="320"     y="0" width="106.67" height="18" fill="#000" opacity="0.5"/>
+          <rect x="426.67"  y="0" width="106.67" height="18" fill="#000" opacity="0.5"/>
+          <rect x="533.33"  y="0" width="106.67" height="18" fill="#000" opacity="0.5"/>
+          <rect x="640"     y="0" width="106.67" height="18" fill="#000" opacity="0.5"/>
+          <rect x="746.67"  y="0" width="106.67" height="18" fill="#000" opacity="0.5"/>
+          <rect x="853.33"  y="0" width="106.67" height="18" fill="#000" opacity="0.5"/>
+          <rect x="960"     y="0" width="106.67" height="18" fill="#000" opacity="0.5"/>
+          <rect x="1066.67" y="0" width="106.67" height="18" fill="#000" opacity="0.5"/>
+          <rect x="1173.33" y="0" width="106.67" height="18" fill="#000" opacity="0.5"/>
+          <text x="53.33"   y="14">A</text>
+          <text x="160"     y="14">B</text>
+          <text x="266.67"  y="14">C</text>
+          <text x="373.33"  y="14">D</text>
+          <text x="480"     y="14">E</text>
+          <text x="586.67"  y="14">F</text>
+          <text x="693.33"  y="14">G</text>
+          <text x="800"     y="14">H</text>
+          <text x="906.67"  y="14">I</text>
+          <text x="1013.33" y="14">J</text>
+          <text x="1120"    y="14">K</text>
+          <text x="1226.67" y="14">L</text>
+        </g>
+        <!-- Etiquetas 1-8 (left edge) -->
+        <g fill="#7fc4ff" font-family="Arial" font-size="12" font-weight="700" opacity="0.95">
+          <rect x="0" y="0"   width="14" height="90" fill="#000" opacity="0.5"/>
+          <rect x="0" y="90"  width="14" height="90" fill="#000" opacity="0.5"/>
+          <rect x="0" y="180" width="14" height="90" fill="#000" opacity="0.5"/>
+          <rect x="0" y="270" width="14" height="90" fill="#000" opacity="0.5"/>
+          <rect x="0" y="360" width="14" height="90" fill="#000" opacity="0.5"/>
+          <rect x="0" y="450" width="14" height="90" fill="#000" opacity="0.5"/>
+          <rect x="0" y="540" width="14" height="90" fill="#000" opacity="0.5"/>
+          <rect x="0" y="630" width="14" height="90" fill="#000" opacity="0.5"/>
+          <text x="4" y="52">1</text>
+          <text x="4" y="142">2</text>
+          <text x="4" y="232">3</text>
+          <text x="4" y="322">4</text>
+          <text x="4" y="412">5</text>
+          <text x="4" y="502">6</text>
+          <text x="4" y="592">7</text>
+          <text x="4" y="682">8</text>
+        </g>
+      </g>
+
     </svg>
 
     <!-- ═══════════════════════════════════════════
@@ -729,6 +812,24 @@
       applyAll(msg.values);
     }
   });
+
+  // ── URL params: ?grid=1 muestra grilla, ?overlay=1 muestra foto translucida ──
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('grid') === '1') {
+    const g = document.getElementById('hmi-grid');
+    if (g) g.style.display = '';
+  }
+  if (urlParams.get('overlay') === '1') {
+    // Inserta la foto como capa background semi-transparente bajo el SVG
+    const wrap = document.getElementById('screen-wrap');
+    if (wrap) {
+      const img = document.createElement('img');
+      img.src = 'hmi-bombeo-s2-photo.jpg';
+      img.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;opacity:0.35;pointer-events:none;z-index:1;';
+      img.onerror = () => { img.style.display = 'none'; };
+      wrap.insertBefore(img, wrap.firstChild);
+    }
+  }
 
   // ── Init ─────────────────────────────────────────────────
   document.addEventListener('click', onClick);

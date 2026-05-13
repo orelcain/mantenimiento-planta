@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>HMI Bombeo S2 — Comparador foto vs clon (grilla 12×8)</title>
+<style>
+  *,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    background: #0a1628;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    color: #d8e4f0;
+    overflow: hidden;
+  }
+
+  /* Header */
+  header {
+    height: 44px;
+    background: #0d1f3c;
+    border-bottom: 1px solid #1e3a5f;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 16px;
+    flex-shrink: 0;
+  }
+  header h1 {
+    font-size: 13px;
+    font-weight: 700;
+    color: #7ec8ff;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  header .controls {
+    display: flex;
+    gap: 10px;
+    margin-left: auto;
+    font-size: 11px;
+    color: #6a90b8;
+    align-items: center;
+  }
+  header .controls label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    user-select: none;
+  }
+  header .controls input[type="range"] {
+    width: 100px;
+  }
+
+  /* Split view */
+  #split {
+    display: flex;
+    height: calc(100% - 44px);
+    gap: 1px;
+    background: #1e3a5f;
+  }
+  .pane {
+    flex: 1;
+    background: #000;
+    position: relative;
+    overflow: hidden;
+  }
+  .pane-label {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 20;
+    background: rgba(13,31,60,0.85);
+    border: 1px solid #1e3a5f;
+    border-radius: 3px;
+    padding: 3px 8px;
+    font-size: 10px;
+    color: #7ec8ff;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 700;
+    pointer-events: none;
+  }
+
+  /* Photo pane */
+  #photo-pane .photo-container {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    background: #000;
+  }
+  #photo-pane img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+  }
+  #photo-pane .photo-missing {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #6a90b8;
+    font-size: 12px;
+    line-height: 1.6;
+    text-align: center;
+    padding: 24px;
+  }
+  #photo-pane .photo-missing code {
+    background: #1a2f4d;
+    padding: 2px 6px;
+    border-radius: 3px;
+    color: #7ec8ff;
+    font-family: 'Courier New', monospace;
+  }
+  #photo-pane .photo-missing .hint {
+    margin-top: 12px;
+    font-size: 10px;
+    color: #4a6f8e;
+    max-width: 480px;
+  }
+
+  /* Grid overlay sobre la foto */
+  #photo-pane .grid-overlay {
+    position: absolute;
+    pointer-events: none;
+    inset: 0;
+  }
+  #photo-pane .grid-overlay svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Iframe pane */
+  #svg-pane iframe {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    display: block;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>HMI Bombeo Acopio S2 — Compare</h1>
+  <div class="controls">
+    <label>
+      <input type="checkbox" id="toggle-grid" checked>
+      Grilla 12×8
+    </label>
+    <label>
+      Opacidad foto:
+      <input type="range" id="photo-opacity" min="0" max="100" value="100">
+    </label>
+    <label>
+      Zoom foto:
+      <input type="range" id="photo-zoom" min="100" max="200" value="100">
+    </label>
+  </div>
+</header>
+
+<div id="split">
+  <!-- IZQUIERDA: Foto real + grilla -->
+  <div class="pane" id="photo-pane">
+    <div class="pane-label">Foto real</div>
+    <div class="photo-container" id="photo-container">
+      <img id="photo-img" src="hmi-bombeo-s2-photo.jpg" alt="HMI real" onerror="this.parentElement.innerHTML='<div class=&quot;photo-missing&quot;><div>📸 Falta la foto</div><div style=&quot;margin-top:8px;&quot;>Guarda la foto del HMI cortada (solo pantalla negra, sin marco SIEMENS) en:</div><code>apps/pwa/public/hmi-bombeo-s2-photo.jpg</code><div class=&quot;hint&quot;>Tip: usa el editor de fotos del celular para recortar solo el área negra activa de la pantalla. Aspect ratio ideal 16:9. Si te queda más ancha o más alta no hay problema — la grilla se ajusta proporcionalmente.</div></div>'">
+      <div class="grid-overlay">
+        <svg viewBox="0 0 1280 720" preserveAspectRatio="none" id="photo-grid-svg">
+          <!-- Lineas se inyectan via JS -->
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- DERECHA: Nuestro SVG con grilla -->
+  <div class="pane" id="svg-pane">
+    <div class="pane-label">Clon SVG</div>
+    <iframe id="clon-iframe" src="hmi-bombeo-s2-embed.html?grid=1" title="Clon HMI"></iframe>
+  </div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  // ── Configuracion grilla 12×8 sobre viewBox 1280×720 ──
+  const COLS = 12;
+  const ROWS = 8;
+  const VBW = 1280;
+  const VBH = 720;
+  const cw = VBW / COLS;  // 106.67
+  const rh = VBH / ROWS;  // 90
+  const COL_LETTERS = ['A','B','C','D','E','F','G','H','I','J','K','L'];
+
+  // ── Construye la grilla SVG de la izquierda (foto) ──
+  function buildGrid() {
+    const svg = document.getElementById('photo-grid-svg');
+    if (!svg) return;
+    let html = '';
+    // Lineas verticales
+    html += '<g stroke="#4488ff" stroke-width="0.8" opacity="0.55">';
+    for (let i = 0; i <= COLS; i++){
+      const x = i * cw;
+      html += '<line x1="'+x+'" y1="0" x2="'+x+'" y2="'+VBH+'"/>';
+    }
+    html += '</g>';
+    // Lineas horizontales
+    html += '<g stroke="#4488ff" stroke-width="0.8" opacity="0.55">';
+    for (let j = 0; j <= ROWS; j++){
+      const y = j * rh;
+      html += '<line x1="0" y1="'+y+'" x2="'+VBW+'" y2="'+y+'"/>';
+    }
+    html += '</g>';
+    // Etiquetas columnas (top)
+    html += '<g font-family="Arial" font-size="14" font-weight="700" text-anchor="middle">';
+    for (let i = 0; i < COLS; i++){
+      const x = i * cw + cw/2;
+      html += '<rect x="'+(i*cw)+'" y="0" width="'+cw+'" height="20" fill="#000" opacity="0.55"/>';
+      html += '<text x="'+x+'" y="15" fill="#7fc4ff">'+COL_LETTERS[i]+'</text>';
+    }
+    html += '</g>';
+    // Etiquetas filas (left)
+    html += '<g font-family="Arial" font-size="14" font-weight="700">';
+    for (let j = 0; j < ROWS; j++){
+      const y = j * rh + rh/2;
+      html += '<rect x="0" y="'+(j*rh)+'" width="18" height="'+rh+'" fill="#000" opacity="0.55"/>';
+      html += '<text x="4" y="'+(y+5)+'" fill="#7fc4ff">'+(j+1)+'</text>';
+    }
+    html += '</g>';
+    svg.innerHTML = html;
+  }
+
+  // ── Toggle grilla en ambos lados ──
+  const gridToggle = document.getElementById('toggle-grid');
+  gridToggle.addEventListener('change', () => {
+    const show = gridToggle.checked;
+    document.querySelector('#photo-pane .grid-overlay').style.display = show ? '' : 'none';
+    // Comunica con iframe via postMessage
+    const iframe = document.getElementById('clon-iframe');
+    const newSrc = 'hmi-bombeo-s2-embed.html' + (show ? '?grid=1' : '');
+    iframe.src = newSrc;
+  });
+
+  // ── Opacidad foto ──
+  const photoOpacity = document.getElementById('photo-opacity');
+  photoOpacity.addEventListener('input', () => {
+    const img = document.getElementById('photo-img');
+    if (img) img.style.opacity = (photoOpacity.value / 100).toString();
+  });
+
+  // ── Zoom foto (para acercarse al area del screen si la foto tiene mucho marco) ──
+  const photoZoom = document.getElementById('photo-zoom');
+  photoZoom.addEventListener('input', () => {
+    const img = document.getElementById('photo-img');
+    if (img) {
+      const scale = photoZoom.value / 100;
+      img.style.transform = 'scale(' + scale + ')';
+      img.style.transformOrigin = 'center center';
+    }
+  });
+
+  // ── Init ──
+  buildGrid();
+})();
+</script>
+
+</body>
+</html>
