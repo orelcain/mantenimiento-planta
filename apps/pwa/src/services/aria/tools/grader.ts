@@ -397,6 +397,90 @@ registerTool({
   },
 })
 
+// ─── period.kpi ────────────────────────────────────────────────────────
+
+/**
+ * Devuelve UN solo KPI agregado del período (vs period.summary que devuelve
+ * varios). Útil para preguntas puntuales: "¿P0% del mes?", "¿throughput
+ * promedio esta semana?", "¿cuántas piezas llevamos?".
+ *
+ * Si el período tiene 0 turnos, devuelve mensaje informativo.
+ * Si hay turnos, devuelve el valor + breakdown ligero (mejor/peor/promedio).
+ */
+registerTool({
+  name: 'period.kpi',
+  category: 'shift',
+  description:
+    'Devuelve UN KPI específico (p0/throughput/pieces) agregado en un período. Más conciso que period.summary cuando la pregunta es puntual.',
+  params: [
+    {
+      name: 'metric',
+      type: 'string',
+      enum: ['p0', 'throughput', 'pieces'],
+      required: false,
+      default: 'p0',
+      description: 'KPI a devolver',
+    },
+    { name: 'daysBack', type: 'number', required: false, default: 7, description: 'Días hacia atrás' },
+  ],
+  triggers: [
+    /\b(cu[aá]l\s+es\s+(el|la)\s+(p0|throughput|piezas|producci[oó]n|rendimiento)).*\b(mes|semana|d[ií]a|hoy)\b/i,
+    /\b(p0%?\s+(del|de\s+(la|el))\s+(mes|semana|d[ií]a))\b/i,
+    /\b(throughput\s+(del|de\s+(la|el))\s+(mes|semana|d[ií]a))\b/i,
+    /\b(cu[aá]nt[ao]s?\s+(piezas|ciclos)\s+(llevamos|llev[aá]mos|tenemos))\b/i,
+  ],
+  execute: async (params) => {
+    const metric = (params.metric as Metric) || 'p0'
+    const daysBack = (params.daysBack as number) || 7
+    const periodLabel =
+      daysBack === 30 ? 'este mes' : daysBack === 7 ? 'esta semana' : `últimos ${daysBack} días`
+    const start = daysAgo(daysBack)
+    const end = todayKey()
+    const summaries = await listDailySummariesByRange(start, end)
+    if (summaries.length === 0) {
+      return {
+        ok: true,
+        data: { metric, daysBack, count: 0 },
+        summary: `Sin datos cargados para ${periodLabel}.`,
+        label: `${METRIC_LABEL[metric]} ${periodLabel}`,
+      }
+    }
+    let value: number
+    let valueText: string
+    if (metric === 'p0') {
+      // P0% ponderado por piezas totales
+      const totalPieces = summaries.reduce((acc, s) => acc + s.totalPieces, 0)
+      const totalP0 = summaries.reduce((acc, s) => acc + s.pointZeroPieces, 0)
+      value = totalPieces > 0 ? (totalP0 / totalPieces) * 100 : 0
+      valueText = fmtPct(value)
+    } else if (metric === 'pieces') {
+      value = summaries.reduce((acc, s) => acc + s.totalPieces, 0)
+      valueText = fmtNum(value)
+    } else {
+      // throughput promedio sobre turnos con dato
+      const withRate = summaries.filter(s => typeof s.productionRatePerHour === 'number')
+      value =
+        withRate.length > 0
+          ? withRate.reduce((acc, s) => acc + (s.productionRatePerHour || 0), 0) / withRate.length
+          : 0
+      valueText = `${fmtNum(value)} piezas/h`
+    }
+    // Best/worst para contexto (siempre por la misma métrica, "best" según semántica de p0 ya)
+    const ranked = rankByMetric(summaries, metric, metric !== 'p0')
+    const best = ranked[0]
+    const worst = ranked[ranked.length - 1]
+    const detail: string[] = []
+    if (best) detail.push(`mejor turno: ${best.dateKey} ${best.shiftId} (${formatMetric(best, metric)})`)
+    if (worst && worst !== best) detail.push(`peor: ${worst.dateKey} ${worst.shiftId} (${formatMetric(worst, metric)})`)
+    return {
+      ok: true,
+      data: { metric, daysBack, value, count: summaries.length, best, worst },
+      summary: `${METRIC_LABEL[metric]} ${periodLabel}: **${valueText}** (basado en ${summaries.length} turnos)${detail.length ? '\n' + detail.join(' · ') : ''}`,
+      label: `${METRIC_LABEL[metric]} ${periodLabel}`,
+    }
+  },
+})
+
 // ─── Inferencia de params adicionales desde texto libre ────────────────
 
 /**
@@ -405,7 +489,12 @@ registerTool({
  */
 export function inferToolParams(toolName: string, userMessage: string): Record<string, unknown> {
   const params: Record<string, unknown> = {}
-  if (toolName === 'period.summary' || toolName === 'period.best' || toolName === 'period.worst') {
+  if (
+    toolName === 'period.summary' ||
+    toolName === 'period.best' ||
+    toolName === 'period.worst' ||
+    toolName === 'period.kpi'
+  ) {
     const { daysBack } = detectPeriodFromText(userMessage)
     params.daysBack = daysBack
     if (toolName !== 'period.summary') {

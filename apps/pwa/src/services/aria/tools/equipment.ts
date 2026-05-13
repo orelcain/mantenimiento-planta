@@ -289,7 +289,7 @@ export function inferEquipmentParams(toolName: string, userMessage: string): Rec
     if (q) params.equipmentText = q
   }
 
-  if (toolName === 'equipment.byZone') {
+  if (toolName === 'equipment.byZone' || toolName === 'incidents.byZone') {
     // Detecta nombre de zona en el texto
     const zoneKeywords = ['filete', 'eviscerado', 'empaque', 'acopio', 'despacho', 'recepción', 'recepcion', 'bodega']
     for (const kw of zoneKeywords) {

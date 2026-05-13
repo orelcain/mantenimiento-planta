@@ -7,7 +7,9 @@
 import { registerTool } from './registry'
 import { getIncidents } from '../../incidents'
 import { findEquipmentByText } from '../../chatActions'
-import type { Incident, IncidentStatus, IncidentPriority } from '@/types'
+import { getZones } from '../../zones'
+import { normalizeText } from '../../chatbot'
+import type { Incident, IncidentStatus, IncidentPriority, Zone } from '@/types'
 
 const STATUS_OPEN: IncidentStatus[] = ['pendiente', 'confirmada', 'en_proceso']
 
@@ -279,6 +281,70 @@ registerTool({
       data: { equipmentId: equipment.id, equipmentName: equipment.nombre, count: sorted.length, openCount, incidents: sorted },
       summary: `Incidencias de ${equipment.nombre} (${equipment.codigo}) — total ${sorted.length}, ${openCount} abiertas:\n\n${body}`,
       label: `Incidencias de ${equipment.nombre}`,
+    }
+  },
+})
+
+// ─── incidents.byZone ──────────────────────────────────────────────────
+
+registerTool({
+  name: 'incidents.byZone',
+  category: 'incidents',
+  description:
+    'Lista incidencias filtradas por zona/área (filete, eviscerado, empaque, acopio, etc.). Resuelve la zona por fuzzy match contra getZones().',
+  params: [
+    { name: 'zoneText', type: 'string', required: false, description: 'Nombre o código de zona' },
+    { name: 'limit', type: 'number', required: false, default: 10, description: 'Máx resultados' },
+  ],
+  triggers: [
+    /\b(incidencias?|fallas?|problemas?|qu[eé]\s+pas[oó])\s+(en|del?)\s+(filete|eviscerado|empaque|acopio|despacho|recepci[oó]n|bodega|sala|[aá]rea|zona)/i,
+    /\b(c[oó]mo\s+va\s+(filete|eviscerado|empaque|acopio))\b/i,
+  ],
+  execute: async (params) => {
+    const zoneText = (params.zoneText as string) || ''
+    const limit = (params.limit as number) || 10
+    if (!zoneText.trim()) {
+      return { ok: false, error: 'Falta nombre de zona', label: 'Incidencias por zona' }
+    }
+    const needle = normalizeText(zoneText)
+    const allZones = await getZones()
+    const matchedZones = allZones.filter((z: Zone) => {
+      const hay = normalizeText(`${z.nombre} ${z.codigo} ${z.descripcion || ''}`)
+      return hay.includes(needle) || needle.includes(normalizeText(z.nombre))
+    })
+    if (matchedZones.length === 0) {
+      return {
+        ok: true,
+        data: { zoneText, count: 0 },
+        summary: `No encontré una zona que coincida con "${zoneText}".`,
+        label: 'Incidencias por zona',
+      }
+    }
+    const matched = matchedZones.sort((a, b) => a.nombre.length - b.nombre.length)[0]
+    if (!matched) {
+      return { ok: false, error: 'Sin match', label: 'Incidencias por zona' }
+    }
+    const list = await getIncidents({ zoneId: matched.id, limit })
+    if (list.length === 0) {
+      return {
+        ok: true,
+        data: { zoneId: matched.id, zoneName: matched.nombre, count: 0 },
+        summary: `La zona "${matched.nombre}" no tiene incidencias registradas. ✅`,
+        label: `Incidencias en ${matched.nombre}`,
+      }
+    }
+    const sorted = [...list].sort((a, b) => {
+      const ta = a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a.createdAt as string).getTime()
+      const tb = b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b.createdAt as string).getTime()
+      return tb - ta
+    })
+    const openCount = sorted.filter(i => STATUS_OPEN.includes(i.status)).length
+    const body = sorted.map(summarizeIncident).join('\n')
+    return {
+      ok: true,
+      data: { zoneId: matched.id, zoneName: matched.nombre, count: sorted.length, openCount, incidents: sorted },
+      summary: `Incidencias en "${matched.nombre}" — total ${sorted.length}, ${openCount} abiertas:\n\n${body}`,
+      label: `Incidencias en ${matched.nombre}`,
     }
   },
 })
