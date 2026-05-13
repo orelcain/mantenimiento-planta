@@ -793,6 +793,7 @@ export function AnalisisGraderGatesConfigPage({
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Formato HH:MM. El turno noche puede cruzar medianoche (fin menor que inicio).
+              <span className="block mt-0.5">La cuota objetivo de cada turno se define desde el detalle del turno (Análisis de Turno).</span>
             </p>
             <div className="mt-3 grid gap-2">
               {shiftSchedule.map((shift, idx) => (
@@ -822,6 +823,11 @@ export function AnalisisGraderGatesConfigPage({
                       className="h-8 w-28 text-xs"
                     />
                   </div>
+                  {shift.quota && shift.quota.value > 0 && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/5 text-primary/80 border border-primary/20 tabular-nums" title="Cuota actual (editable desde el detalle del turno)">
+                      Cuota: {shift.quota.value.toLocaleString('es-CL')} {shift.quota.unit === 'kg' ? 'kg' : 'pz'}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>

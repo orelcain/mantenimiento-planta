@@ -17,12 +17,12 @@ import { useAuthStore, useIsAdmin, useIsSupervisor } from '@/store/authStore'
 import { getDailySummary, buildDailySummaryId, loadTimelineAggregates, subscribePausesAggregates, listDailySummariesByRange, listGate0PieceRecords, type FirestorePieceRecord } from '@/services/grader/graderDailySummary.service'
 import { createPublicToken, revokePublicToken } from '@/services/grader/graderPublicToken.service'
 import type { Pause, MicroDetentionsSummary } from '@/services/grader/types'
-import { getModuleRanges } from '@/services/grader/graderModuleConfig.service'
+import { getModuleRanges, saveModuleShiftSchedule } from '@/services/grader/graderModuleConfig.service'
 import { listSnapshots, saveConfigSnapshot, type GateConfigSnapshot } from '@/services/grader/graderConfigSnapshot.service'
 import { getShiftDoc } from '@/services/grader/graderShifts.service'
 import { computeShiftTimeWindow } from '@/services/grader/graderShiftStatus'
 import type { ShiftTimeWindow } from '@/services/grader/graderShiftStatus'
-import { DEFAULT_SHIFT_SCHEDULE } from '@/services/grader/graderShiftSchedule'
+import { DEFAULT_SHIFT_SCHEDULE, normalizeShiftSchedule } from '@/services/grader/graderShiftSchedule'
 import { getShiftDisplayDateKey, getShiftMeta } from '@/services/grader/graderShiftDisplay'
 import { parseMatrixErrorString } from '@/services/grader/graderMatrixP0Causes'
 import { HeroScorecard } from '@/components/grader/HeroScorecard'
@@ -40,6 +40,7 @@ import { BeltRpmModal } from '@/components/grader/modals/BeltRpmModal'
 import type { ActionTrigger } from '@/services/grader/actionPlanSuggestions'
 import { ConfigChangeHistory } from '@/components/grader/ConfigChangeHistory'
 import { ShiftConfigPanel } from '@/components/grader/ShiftConfigPanel'
+import { ShiftQuotaCard } from '@/components/grader/ShiftQuotaCard'
 import { PauseAnnotationDialog } from '@/components/grader/PauseAnnotationDialog'
 import { resolveEffectiveTag } from '@/services/grader/graderPauseTags'
 import { exportTurnToPDF } from '@/services/grader/graderTurnToPDF'
@@ -67,7 +68,7 @@ import { findTriggeredRunbooks } from '@/services/grader/graderRunbooks'
 import { analyzeGraderFromSummary } from '@/services/grader/graderSummaryAI'
 import { loadSeasonBenchmark, type SeasonBenchmark } from '@/services/grader/graderBenchmarks'
 import { AIOutputPanel } from '@/components/grader/GraderInlinePanels'
-import type { GraderDailySummary, MatrixP0Cause, PointZeroClassification, TimelineBucket, GraderAnalysisConfig, GateAssignment, CalibreWeightRange } from '@/services/grader/types'
+import type { GraderDailySummary, MatrixP0Cause, PointZeroClassification, TimelineBucket, GraderAnalysisConfig, GateAssignment, CalibreWeightRange, GraderShiftSchedule, ShiftQuota } from '@/services/grader/types'
 import type { GraderShiftDoc } from '@/services/grader/graderShifts.service'
 import type { AIGraderOutput } from '@/services/grader/types'
 import { AnalisisGraderGatesConfigPage } from './AnalisisGraderGatesConfigPage'
@@ -308,6 +309,45 @@ export function AnalisisGraderTurnoPage() {
         : null,
     )
   }, [dateKey, shiftLabel, plantSchedule])
+
+  // Cuota del turno actual — leída del shiftSchedule guardado en Firestore.
+  // Editable inline desde la propia ShiftQuotaCard en el detalle del turno.
+  // Falla silenciosamente si Firestore no responde — la cuota es opcional.
+  const [currentShiftQuota, setCurrentShiftQuota] = useState<GraderShiftSchedule['quota']>(undefined)
+  useEffect(() => {
+    if (!shiftLabel) {
+      setCurrentShiftQuota(undefined)
+      return
+    }
+    let cancelled = false
+    getModuleRanges(plantLineCfg.id)
+      .then((cfg) => {
+        if (cancelled) return
+        const normalized = normalizeShiftSchedule(cfg?.shiftSchedule, plantLineCfg.defaultShiftSchedule)
+        const entry = normalized.find((s) => s.shiftId === shiftLabel)
+        setCurrentShiftQuota(entry?.quota)
+      })
+      .catch(() => {
+        if (!cancelled) setCurrentShiftQuota(undefined)
+      })
+    return () => { cancelled = true }
+  }, [shiftLabel, plantLineCfg.id, plantLineCfg.defaultShiftSchedule])
+
+  const handleSaveShiftQuota = useCallback(async (next: ShiftQuota | null) => {
+    if (!shiftLabel || !user) return
+    const cfg = await getModuleRanges(plantLineCfg.id)
+    const current = normalizeShiftSchedule(cfg?.shiftSchedule, plantLineCfg.defaultShiftSchedule)
+    const updated: GraderShiftSchedule[] = current.map((s) => {
+      if (s.shiftId !== shiftLabel) return s
+      if (next == null) {
+        const { quota: _omit, ...rest } = s
+        return rest
+      }
+      return { ...s, quota: next }
+    })
+    await saveModuleShiftSchedule({ schedule: updated, updatedBy: user.id, plantLineId: plantLineCfg.id })
+    setCurrentShiftQuota(next ?? undefined)
+  }, [shiftLabel, user, plantLineCfg.id, plantLineCfg.defaultShiftSchedule])
 
   // P1-2 — Toast al reconectar (false → true)
   useEffect(() => {
@@ -1412,6 +1452,14 @@ export function AnalisisGraderTurnoPage() {
                 upstreamSnapshot={upstreamLine.snapshot}
                 marelHgCapture={marelHgCapture}
                 upstreamSyncedAt={upstreamLine.syncedAt}
+              />
+              <ShiftQuotaCard
+                quota={currentShiftQuota}
+                summary={summary}
+                shiftWindow={shiftWindow}
+                shoplogixCycles={upstreamLine.snapshot?.machines.reduce((s, m) => s + (m.totalCycles ?? 0), 0) ?? null}
+                allowEdit={isAdmin || isSupervisor}
+                onSave={handleSaveShiftQuota}
               />
               {/* Marel HG (corta-cabeza) solo aplica en Chonchi — Yal solo
                   eviscera, los salmones salen con cabeza al camión. Ocultar

@@ -70,12 +70,19 @@ export function normalizeShiftSchedule(
   }
   for (const item of schedule || []) {
     if (!item.shiftId || !map.has(item.shiftId)) continue
+    const quota = item.quota && Number.isFinite(item.quota.value) && item.quota.value > 0
+      ? {
+          value: Math.max(0, Math.round(item.quota.value)),
+          unit: item.quota.unit === 'kg' ? ('kg' as const) : ('pieces' as const),
+        }
+      : undefined
     map.set(item.shiftId, {
       shiftId: item.shiftId,
       startHour: clampHour(item.startHour ?? 0),
       startMinute: clampMinute(item.startMinute ?? 0),
       endHour: clampHour(item.endHour ?? 0),
       endMinute: clampMinute(item.endMinute ?? 0),
+      ...(quota ? { quota } : {}),
     })
   }
   return base.map((item) => map.get(item.shiftId)!).map((item) => ({ ...item }))

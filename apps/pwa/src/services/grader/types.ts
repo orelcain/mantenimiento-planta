@@ -570,12 +570,27 @@ export interface GraderModuleConfig {
  * Tipo string genérico al final → permite añadir variantes futuras sin
  * tocar este archivo.
  */
+export interface ShiftQuota {
+  /** Meta numérica del turno (kg producidos o piezas procesadas, según unit). */
+  value: number;
+  /** Unidad de la cuota. */
+  unit: 'kg' | 'pieces';
+  /**
+   * NOTA: la fuente de avance es siempre Grader (Marelec) — es la única que
+   * pesa físicamente cada pieza. Shoplogix se usa solo como proxy live
+   * mientras no hay Excel del Grader cargado, con etiqueta "estimado".
+   * Cualquier `source` heredado de cuotas antiguas se ignora.
+   */
+}
+
 export interface GraderShiftSchedule {
   shiftId: 'Turno día' | 'Turno noche' | 'Turno 1' | 'Turno 2' | 'Turno 3' | string;
   startHour: number;   // 0-23
   startMinute: number; // 0-59
   endHour: number;     // 0-23 (puede ser menor si cruza medianoche)
   endMinute: number;   // 0-59
+  /** Cuota objetivo del turno (opcional). Si no está, la TurnoPage no muestra la card. */
+  quota?: ShiftQuota;
 }
 
 // ============================================================================
