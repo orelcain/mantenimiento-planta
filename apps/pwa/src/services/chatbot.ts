@@ -10,6 +10,7 @@ import { orchestrateStream, detectTaskType, type AgentStatusEvent } from './aria
 import { logger } from '@/lib/logger'
 import { buildLearningContext, trackEquipmentProblem } from './ariaLearning'
 import { buildAriaContext } from './aria/contextEngine'
+import { buildSituationalContextBlock } from './aria/situationalContext'
 import type { Incident } from '@/types'
 import type { Machine, Repuesto } from '@/types/repuestos'
 
@@ -2487,12 +2488,24 @@ export async function sendChatMessage(
     }
   }
 
-  // #9 — Inyectar contexto de turno/shift
-  const shift = getCurrentShift()
-  messages.push({
-    role: 'system',
-    content: `TURNO ACTUAL: ${shift.label} (${shift.range}). Hora: ${new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}. Personaliza tu respuesta al turno actual cuando sea relevante.`,
-  })
+  // Sprint 3 ARIA-JARVIS — Snapshot situacional (turno + Grader + incidencias
+  // + equipos). Reemplaza el "TURNO ACTUAL" plano por un bloque rico que
+  // ARIA usa proactivamente. Cache 5min interno, timeout 4s por sub-query.
+  try {
+    const situational = await buildSituationalContextBlock()
+    if (situational) {
+      messages.push({ role: 'system', content: situational })
+    } else {
+      // Fallback al bloque mínimo si snapshot falla por completo
+      const shift = getCurrentShift()
+      messages.push({
+        role: 'system',
+        content: `TURNO ACTUAL: ${shift.label} (${shift.range}). Hora: ${new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}.`,
+      })
+    }
+  } catch (err) {
+    logger.error('[chatbot] Error inyectando contexto situacional', err instanceof Error ? err : undefined)
+  }
 
   // Inyectar contexto de APRENDIZAJE (knowledge base + patrones)
   try {
