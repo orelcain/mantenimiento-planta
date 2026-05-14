@@ -409,6 +409,102 @@ export function MachineTrendMiniChart({ points }: { points: MachineTrendPoint[] 
   )
 }
 
+/**
+ * Gráfico mensual con una línea de uptime% por Baader (multi-serie).
+ * Usado en la vista panorámica cuando el toggle "Por máquina" está activo —
+ * permite ver qué Baader cayó en uptime en qué día.
+ *
+ * Series: { name (ej. "Ev 1"), color, points: MachineTrendPoint[] (uno por día) }.
+ * El X axis es la unión ordenada de dateKeys; las máquinas que no tienen
+ * dato en un día determinado dejan un hueco (gaps en la línea).
+ */
+export function BaaderTrendMultiChart({
+  series,
+}: {
+  series: Array<{ name: string; color: string; points: MachineTrendPoint[] }>
+}) {
+  // Unión ordenada de dateKeys
+  const allDateKeys = [...new Set(series.flatMap((s) => s.points.map((p) => p.dateKey)))].sort()
+  if (allDateKeys.length < 2) {
+    return (
+      <p className="text-[10px] text-slate-600 italic py-1">
+        Sin suficientes turnos históricos aún (mín. 2)
+      </p>
+    )
+  }
+  const labels = allDateKeys.map((dk) => {
+    const d = new Date(`${dk}T12:00:00`)
+    return d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' })
+  })
+  // Para cada serie: alinear con allDateKeys, null donde no haya dato
+  const dataSeries = series.map((s) => {
+    const byDate = new Map(s.points.map((p) => [p.dateKey, p.shiftRuntime * 100]))
+    return {
+      name: s.name,
+      type: 'line' as const,
+      data: allDateKeys.map((dk) => {
+        const v = byDate.get(dk)
+        return v == null ? null : +v.toFixed(1)
+      }),
+      smooth: 0.3,
+      symbol: 'circle',
+      symbolSize: 4,
+      connectNulls: false,
+      lineStyle: { color: s.color, width: 1.5 },
+      itemStyle: { color: s.color },
+    }
+  })
+  const option = {
+    backgroundColor: 'transparent',
+    grid: { left: 28, right: 6, top: 18, bottom: 20, containLabel: false },
+    legend: {
+      top: 0,
+      right: 4,
+      itemWidth: 8,
+      itemHeight: 8,
+      textStyle: { color: '#94a3b8', fontSize: 9 },
+    },
+    xAxis: {
+      type: 'category' as const,
+      data: labels,
+      axisLabel: { color: '#475569', fontSize: 8 },
+      axisLine: { lineStyle: { color: '#1e293b' } },
+      axisTick: { show: false },
+    },
+    yAxis: {
+      type: 'value' as const,
+      min: 0,
+      max: 100,
+      axisLabel: { color: '#475569', fontSize: 8, formatter: (v: number) => `${v}` },
+      splitLine: { lineStyle: { color: '#1e293b', type: 'dashed' as const } },
+      axisLine: { show: false },
+    },
+    tooltip: {
+      trigger: 'axis' as const,
+      backgroundColor: '#1f2937',
+      borderColor: '#374151',
+      textStyle: { color: '#f1f5f9', fontSize: 10 },
+      formatter: (params: Array<{ color: string; seriesName: string; value: number | null; dataIndex: number }>) => {
+        if (!params.length) return ''
+        const dk = allDateKeys[params[0]!.dataIndex] ?? ''
+        const rows = params
+          .filter((p) => p.value != null)
+          .map((p) => `<span style="color:${p.color}">●</span> ${p.seriesName}: <b>${(p.value as number).toFixed(0)}% uptime</b>`)
+          .join('<br/>')
+        return `<div style="font-size:9px;color:#94a3b8">${dk}</div>${rows}`
+      },
+    },
+    series: dataSeries,
+  }
+  return (
+    <ReactECharts
+      option={option}
+      style={{ height: 96, width: '100%' }}
+      opts={{ renderer: 'canvas' }}
+    />
+  )
+}
+
 // ============================================================================
 // Subcomponentes visuales
 // ============================================================================

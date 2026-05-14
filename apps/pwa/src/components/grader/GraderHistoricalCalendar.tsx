@@ -39,6 +39,7 @@ import { resolveEffectiveTag } from '@/services/grader/graderPauseTags'
 import { parseFile, mergeParsedData } from '@/services/grader/graderExcelParser'
 import { getCauseLabel } from '@/services/grader/graderMatrixP0Causes'
 import { isMaintenanceState, computeMaintenanceTotals } from '@/services/grader/shoplogixMaintenance'
+import { BaaderTrendMultiChart } from '@/components/grader/UpstreamMachinesPanel'
 import {
   DEFAULT_SHIFT_SCHEDULE,
   inferShiftIdFromSchedule,
@@ -992,6 +993,9 @@ export function GraderHistoricalCalendar({
   // `isMaintenanceState` considera avería (type='downtime' y reason ∉ lista
   // operacional: FALTA MMPP, CONTRASTACION, CAMBIO LOTE/MMPP, AJUSTE OPERADOR).
   const [paretoMaintOnly, setParetoMaintOnly] = useState<boolean>(false)
+  // Toggle: tendencia agregada (1 línea por turno) vs. por máquina (3 líneas
+  // de uptime% — una por Baader). Útil para detectar qué Baader cayó qué día.
+  const [trendByMachine, setTrendByMachine] = useState<boolean>(false)
   // Cache totales Baader por shift — para indicador de "data Grader perdida"
   // (cuando Grader.totalPieces < Baader.totalCycles * 0.95 = >5% loss).
   const [slxTotalsByShift, setSlxTotalsByShift] = useState<Map<string, number>>(new Map())
@@ -2213,6 +2217,61 @@ export function GraderHistoricalCalendar({
       const nightShiftId = nightEntry?.id ?? 'Turno noche'
       if (nightCache && isSignificantCycleCount(nightCache.totalCycles)) {
         night.push({ dateKey: dk, shiftId: nightShiftId, overallRatio: nightCache.overallRatio, shiftRuntime: nightCache.avgShiftRuntime, totalCycles: nightCache.totalCycles })
+      }
+    }
+    return { day, night }
+  }, [slxByShift, currentMonth])
+
+  // Tendencia por Baader individual (uptime% por máquina por día).
+  // Estructura: { day/night → Map<machineid, { name, points: MachineTrendPoint[] }> }
+  // Cada punto reutiliza el shape MachineTrendPoint pero su `shiftRuntime`
+  // proviene de pm.shiftRuntime (la máquina específica), no del avg agregado.
+  // overallRatio queda como el del turno (per-machine no aplica sin expected).
+  const monthTrendByMachine = useMemo<{
+    day:   Map<string, { name: string; points: MachineTrendPoint[] }>
+    night: Map<string, { name: string; points: MachineTrendPoint[] }>
+  }>(() => {
+    const year  = currentMonth.getFullYear()
+    const month = currentMonth.getMonth()
+    const daysInMonth = new Date(year, month + 1, 0).getDate()
+    const prefix = `${year}-${String(month + 1).padStart(2, '0')}-`
+    const day   = new Map<string, { name: string; points: MachineTrendPoint[] }>()
+    const night = new Map<string, { name: string; points: MachineTrendPoint[] }>()
+    const pushPm = (
+      target: Map<string, { name: string; points: MachineTrendPoint[] }>,
+      cache: SlxShiftCache,
+      dk: string,
+      shiftId: string,
+    ) => {
+      for (const pm of cache.perMachine ?? []) {
+        const entry = target.get(pm.machineid)
+        const point: MachineTrendPoint = {
+          dateKey:      dk,
+          shiftId,
+          overallRatio: cache.overallRatio,
+          shiftRuntime: pm.shiftRuntime,
+          totalCycles:  pm.totalCycles,
+        }
+        if (entry) entry.points.push(point)
+        else target.set(pm.machineid, { name: pm.name, points: [point] })
+      }
+    }
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dk = `${prefix}${String(d).padStart(2, '0')}`
+      const dayCache = slxByShift.get(`${dk}__Turno 2`) ?? slxByShift.get(`${dk}__Turno día`) ?? null
+      if (dayCache && isSignificantCycleCount(dayCache.totalCycles)) {
+        const shiftId = slxByShift.has(`${dk}__Turno 2`) ? 'Turno 2' : 'Turno día'
+        pushPm(day, dayCache, dk, shiftId)
+      }
+      const newNights = (['Turno 1', 'Turno 3'] as string[])
+        .map(id => ({ id, c: slxByShift.get(`${dk}__${id}`) ?? null }))
+        .filter((x): x is { id: string; c: SlxShiftCache } => x.c !== null && isSignificantCycleCount(x.c.totalCycles))
+        .sort((a, b) => b.c.totalCycles - a.c.totalCycles)
+      const nightEntry  = newNights[0] ?? null
+      const nightCache  = nightEntry?.c ?? slxByShift.get(`${dk}__Turno noche`) ?? null
+      const nightShiftId = nightEntry?.id ?? 'Turno noche'
+      if (nightCache && isSignificantCycleCount(nightCache.totalCycles)) {
+        pushPm(night, nightCache, dk, nightShiftId)
       }
     }
     return { day, night }
@@ -4371,42 +4430,89 @@ export function GraderHistoricalCalendar({
 
               </div>
 
-              {/* ── Fila tendencia Baader: por turno (Yal: T2/T3 · Chonchi: Día/Noche) ── */}
+              {/* ── Fila tendencia Baader: por turno (Yal: T2/T3 · Chonchi: Día/Noche) ──
+                  Toggle "Por máquina" cambia entre agregado (ritmo+uptime de la línea)
+                  y per-machine (3 líneas, uptime% de cada Baader). */}
               {(monthTrendPoints.day.length >= 2 || monthTrendPoints.night.length >= 2) && (() => {
                 const isYal = plantLine.isClassificationPlant === false
                 const dayLabel   = isYal ? '🌇 Tendencia Baader · Turno 2' : '☀ Tendencia Baader · Turno Día'
                 const nightLabel = isYal ? '🌙 Tendencia Baader · Turno 3' : '🌙 Tendencia Baader · Turno Noche'
+                // Paleta consistente por Baader (M0 sky, M1 violet, M2 amber).
+                const machineColors = ['rgba(56,189,248,0.95)', 'rgba(167,139,250,0.95)', 'rgba(251,191,36,0.95)']
+                const toMultiSeries = (
+                  byMachine: Map<string, { name: string; points: MachineTrendPoint[] }>,
+                ) => [...byMachine.entries()]
+                  .sort(([, a], [, b]) => a.name.localeCompare(b.name, 'es'))
+                  .map(([, v], idx) => ({
+                    name:   v.name.replace(/^YAL\s+/i, '').replace(/Evisceradora/i, 'Ev'),
+                    color:  machineColors[idx % machineColors.length] ?? '#94a3b8',
+                    points: v.points,
+                  }))
+                const daySeries   = toMultiSeries(monthTrendByMachine.day)
+                const nightSeries = toMultiSeries(monthTrendByMachine.night)
                 return (
-                <div className="col-span-full grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-border/40">
-                  {monthTrendPoints.day.length >= 2 && (
-                    <div className="space-y-1">
-                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
-                        {dayLabel}
-                        <InfoTooltip
-                          title={isYal ? 'Tendencia · Ritmo del Turno 2' : 'Tendencia · Ritmo del turno día'}
-                          text="% productividad real vs objetivo a lo largo del mes. Un valor de 100% significa que las Baader procesaron exactamente las piezas que Shoplogix esperaba; >100% es sobre-objetivo, <100% es bajo-objetivo."
-                          formula="Ritmo = ciclos_reales / ciclos_esperados × 100"
-                          example="80% = procesó 4.000 piezas cuando se esperaban 5.000."
-                          iconSize={10}
-                        />
-                      </p>
-                      <MachineTrendMiniChart points={monthTrendPoints.day} />
-                    </div>
-                  )}
-                  {monthTrendPoints.night.length >= 2 && (
-                    <div className="space-y-1">
-                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
-                        {nightLabel}
-                        <InfoTooltip
-                          title={isYal ? 'Tendencia · Ritmo del Turno 3' : 'Tendencia · Ritmo del turno noche'}
-                          text="% productividad real vs objetivo a lo largo del mes. Mismo cálculo que el de día — compara qué tan cerca del target operaron las Baader."
-                          formula="Ritmo = ciclos_reales / ciclos_esperados × 100"
-                          iconSize={10}
-                        />
-                      </p>
-                      <MachineTrendMiniChart points={monthTrendPoints.night} />
-                    </div>
-                  )}
+                <div className="col-span-full pt-2 border-t border-border/40 space-y-2">
+                  {/* Toggle Por máquina */}
+                  <div className="flex items-center justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setTrendByMachine((v) => !v)}
+                      className={cn(
+                        'text-[9px] px-2 py-0.5 rounded border transition-colors',
+                        trendByMachine
+                          ? 'bg-primary/15 text-primary border-primary/30'
+                          : 'bg-muted/30 text-muted-foreground border-border/40 hover:bg-muted/50',
+                      )}
+                      title="Alternar entre tendencia agregada (1 línea: ritmo+uptime de la línea) y por máquina (3 líneas: uptime% de cada Baader)"
+                    >
+                      {trendByMachine ? '⚙ Por máquina' : '⚙ Agregado'}
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {monthTrendPoints.day.length >= 2 && (
+                      <div className="space-y-1">
+                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
+                          {dayLabel}
+                          <InfoTooltip
+                            title={isYal ? 'Tendencia · Ritmo del Turno 2' : 'Tendencia · Ritmo del turno día'}
+                            text={trendByMachine
+                              ? '% uptime de cada Baader (Ev 1/2/3) a lo largo del mes. Útil para detectar qué máquina cayó en un día específico.'
+                              : '% productividad real vs objetivo a lo largo del mes. Un valor de 100% significa que las Baader procesaron exactamente las piezas que Shoplogix esperaba; >100% es sobre-objetivo, <100% es bajo-objetivo.'}
+                            formula={trendByMachine
+                              ? 'uptime_máquina = tiempo_procesando / duración_turno'
+                              : 'Ritmo = ciclos_reales / ciclos_esperados × 100'}
+                            example={trendByMachine
+                              ? 'Ev 1 al 70% y Ev 3 al 30% el mismo día → Ev 3 tuvo más paros.'
+                              : '80% = procesó 4.000 piezas cuando se esperaban 5.000.'}
+                            iconSize={10}
+                          />
+                        </p>
+                        {trendByMachine && daySeries.length > 0
+                          ? <BaaderTrendMultiChart series={daySeries} />
+                          : <MachineTrendMiniChart points={monthTrendPoints.day} />}
+                      </div>
+                    )}
+                    {monthTrendPoints.night.length >= 2 && (
+                      <div className="space-y-1">
+                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
+                          {nightLabel}
+                          <InfoTooltip
+                            title={isYal ? 'Tendencia · Ritmo del Turno 3' : 'Tendencia · Ritmo del turno noche'}
+                            text={trendByMachine
+                              ? '% uptime de cada Baader (Ev 1/2/3) a lo largo del mes en el turno noche.'
+                              : '% productividad real vs objetivo a lo largo del mes. Mismo cálculo que el de día — compara qué tan cerca del target operaron las Baader.'}
+                            formula={trendByMachine
+                              ? 'uptime_máquina = tiempo_procesando / duración_turno'
+                              : 'Ritmo = ciclos_reales / ciclos_esperados × 100'}
+                            iconSize={10}
+                          />
+                        </p>
+                        {trendByMachine && nightSeries.length > 0
+                          ? <BaaderTrendMultiChart series={nightSeries} />
+                          : <MachineTrendMiniChart points={monthTrendPoints.night} />}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 )
               })()}
