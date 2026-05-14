@@ -38,6 +38,7 @@ import {
 import { resolveEffectiveTag } from '@/services/grader/graderPauseTags'
 import { parseFile, mergeParsedData } from '@/services/grader/graderExcelParser'
 import { getCauseLabel } from '@/services/grader/graderMatrixP0Causes'
+import { isMaintenanceState, computeMaintenanceTotals } from '@/services/grader/shoplogixMaintenance'
 import {
   DEFAULT_SHIFT_SCHEDULE,
   inferShiftIdFromSchedule,
@@ -929,6 +930,14 @@ export interface SlxMonthlyStats {
     totalCycles: number
     shiftCount: number
     avgUptimePct: number
+    /** Avería macro (paros relevantes, sin Micro Detencion): seg acumulados. */
+    maintMacroSec: number
+    /** Cantidad de eventos macro en el mes (para MTTR = sec/count). */
+    maintMacroCount: number
+    /** Micro Detencion: seg acumulados (interferencias breves). */
+    maintMicroSec: number
+    /** Cantidad de eventos Micro Detencion en el mes. */
+    maintMicroCount: number
   }>
   turnosWithData: number
   dayShiftsWithData: number
@@ -979,6 +988,10 @@ export function GraderHistoricalCalendar({
   const [slxByShift, setSlxByShift] = useState<Map<string, SlxShiftCache>>(new Map())
   // Filtro del pareto mensual: 'all' = todas las Baaders, o un machineid específico.
   const [paretoMachineFilter, setParetoMachineFilter] = useState<string>('all')
+  // Filtro "Solo mantención": cuando es true, el pareto solo cuenta states que
+  // `isMaintenanceState` considera avería (type='downtime' y reason ∉ lista
+  // operacional: FALTA MMPP, CONTRASTACION, CAMBIO LOTE/MMPP, AJUSTE OPERADOR).
+  const [paretoMaintOnly, setParetoMaintOnly] = useState<boolean>(false)
   // Cache totales Baader por shift — para indicador de "data Grader perdida"
   // (cuando Grader.totalPieces < Baader.totalCycles * 0.95 = >5% loss).
   const [slxTotalsByShift, setSlxTotalsByShift] = useState<Map<string, number>>(new Map())
@@ -1944,8 +1957,18 @@ export function GraderHistoricalCalendar({
     let totalCycles = 0
     let sumUptime = 0
     let totalUptimeSec = 0
-    // Acumulador por Baader: machineid → { name, uptimeSec, totalCycles, shiftCount, sumUptimePct }
-    const perMachineAcc = new Map<string, { name: string; uptimeSec: number; totalCycles: number; shiftCount: number; sumUptimePct: number }>()
+    // Acumulador por Baader: machineid → uptime + ciclos + counts MTTR macro/micro
+    const perMachineAcc = new Map<string, {
+      name: string
+      uptimeSec: number
+      totalCycles: number
+      shiftCount: number
+      sumUptimePct: number
+      maintMacroSec: number
+      maintMacroCount: number
+      maintMicroSec: number
+      maintMicroCount: number
+    }>()
     const daySet = new Set<string>()
     // Iterar todos los shifts del mapa (soporta Turno día/noche legado + Turno 1/2/3 nuevo)
     // De-duplicar: si existe nuevo formato significativo, ignorar legado del mismo día.
@@ -1966,21 +1989,30 @@ export function GraderHistoricalCalendar({
       // Suma de las 3 Baaders (no solo M0), coherente con totalCycles que también
       // suma las 3. Representa horas-máquina totales procesando del mes.
       totalUptimeSec += cache.totalUptimeSecAllMachines ?? 0
-      // Agregación por Baader individual del mes
+      // Agregación por Baader individual del mes (uptime + MTTR macro/micro)
       for (const pm of cache.perMachine ?? []) {
+        const maint = computeMaintenanceTotals(pm.states)
         const acc = perMachineAcc.get(pm.machineid)
         if (acc) {
-          acc.uptimeSec    += pm.uptimeSec
-          acc.totalCycles  += pm.totalCycles
-          acc.shiftCount   += 1
-          acc.sumUptimePct += pm.shiftRuntime * 100
+          acc.uptimeSec       += pm.uptimeSec
+          acc.totalCycles     += pm.totalCycles
+          acc.shiftCount      += 1
+          acc.sumUptimePct    += pm.shiftRuntime * 100
+          acc.maintMacroSec   += maint.macroSec
+          acc.maintMacroCount += maint.macroCount
+          acc.maintMicroSec   += maint.microSec
+          acc.maintMicroCount += maint.microCount
         } else {
           perMachineAcc.set(pm.machineid, {
-            name:         pm.name,
-            uptimeSec:    pm.uptimeSec,
-            totalCycles:  pm.totalCycles,
-            shiftCount:   1,
-            sumUptimePct: pm.shiftRuntime * 100,
+            name:            pm.name,
+            uptimeSec:       pm.uptimeSec,
+            totalCycles:     pm.totalCycles,
+            shiftCount:      1,
+            sumUptimePct:    pm.shiftRuntime * 100,
+            maintMacroSec:   maint.macroSec,
+            maintMacroCount: maint.macroCount,
+            maintMicroSec:   maint.microSec,
+            maintMicroCount: maint.microCount,
           })
         }
       }
@@ -1996,11 +2028,15 @@ export function GraderHistoricalCalendar({
     const perMachineMonth = [...perMachineAcc.entries()]
       .map(([machineid, v]) => ({
         machineid,
-        name:         v.name,
-        uptimeSec:    v.uptimeSec,
-        totalCycles:  v.totalCycles,
-        shiftCount:   v.shiftCount,
-        avgUptimePct: v.shiftCount > 0 ? v.sumUptimePct / v.shiftCount : 0,
+        name:            v.name,
+        uptimeSec:       v.uptimeSec,
+        totalCycles:     v.totalCycles,
+        shiftCount:      v.shiftCount,
+        avgUptimePct:    v.shiftCount > 0 ? v.sumUptimePct / v.shiftCount : 0,
+        maintMacroSec:   v.maintMacroSec,
+        maintMacroCount: v.maintMacroCount,
+        maintMicroSec:   v.maintMicroSec,
+        maintMicroCount: v.maintMicroCount,
       }))
       .sort((a, b) => a.name.localeCompare(b.name, 'es'))
 
@@ -2062,6 +2098,9 @@ export function GraderHistoricalCalendar({
         // paros programados según reason del supervisor), downtime (averías),
         // setup (cambios). Excluir solo uptime (producción real).
         if (s.type === 'uptime') continue
+        // Toggle "Solo mantención": dejar solo states clasificados como avería
+        // (type='downtime' menos reasons operacionales). Ver shoplogixMaintenance.ts.
+        if (paretoMaintOnly && !isMaintenanceState(s)) continue
         // Clave del bucket: preferir `reason` específico (la causa que el
         // supervisor o sistema agregó: COLACION, MMPP, REUNION INICIO TURNO,
         // Paro Programado, etc.). Fallback a `name` (la categoría genérica
@@ -2079,7 +2118,7 @@ export function GraderHistoricalCalendar({
     return [...reasonMap.entries()]
       .map(([name, v]) => ({ name, ...v }))
       .sort((a, b) => b.durationSec - a.durationSec)
-  }, [slxByShift, currentMonth, paretoMachineFilter])
+  }, [slxByShift, currentMonth, paretoMachineFilter, paretoMaintOnly])
 
   // ── Panel panorámico: disponibilidad diaria D/N del mes ──────────────────
   const availabilityTrend = useMemo((): Array<{
@@ -3972,15 +4011,37 @@ export function GraderHistoricalCalendar({
                             pm.avgUptimePct >= 70 ? 'text-emerald-300'
                             : pm.avgUptimePct >= 40 ? 'text-amber-300'
                             : 'text-rose-300'
+                          // MTTR = total seg / N° eventos. 0 si no hubo eventos.
+                          const mttrMacroSec = pm.maintMacroCount > 0
+                            ? pm.maintMacroSec / pm.maintMacroCount : 0
+                          const mttrMicroSec = pm.maintMicroCount > 0
+                            ? pm.maintMicroSec / pm.maintMicroCount : 0
+                          const fmtMttr = (sec: number) => {
+                            if (sec <= 0) return '—'
+                            if (sec < 60) return `${Math.round(sec)}s`
+                            const m = Math.floor(sec / 60)
+                            const s = Math.round(sec % 60)
+                            return s === 0 ? `${m}m` : `${m}m${s}s`
+                          }
                           return (
                             <div
                               key={pm.machineid}
-                              className="rounded bg-muted/30 border border-border/30 px-1.5 py-0.5 text-[9px] tabular-nums leading-tight"
-                              title={`${pm.name}\n${pm.totalCycles.toLocaleString('es-CL')} ciclos · ${pm.shiftCount} turno${pm.shiftCount === 1 ? '' : 's'}`}
+                              className="rounded bg-muted/30 border border-border/30 px-1.5 py-0.5 text-[9px] tabular-nums leading-tight space-y-0.5"
+                              title={`${pm.name}\n${pm.totalCycles.toLocaleString('es-CL')} ciclos · ${pm.shiftCount} turno${pm.shiftCount === 1 ? '' : 's'}\n\nMTTR macro: ${fmtMttr(mttrMacroSec)} (${pm.maintMacroCount} ev · ${fmtSecPanoramic(pm.maintMacroSec)} total)\nMTTR micro: ${fmtMttr(mttrMicroSec)} (${pm.maintMicroCount} ev · ${fmtSecPanoramic(pm.maintMicroSec)} total)`}
                             >
-                              <span className="text-muted-foreground/70 font-medium">{shortName}</span>
-                              <span className="text-foreground/80 ml-1">{fmtSecPanoramic(pm.uptimeSec)}</span>
-                              <span className={cn('ml-1', uptimeColor)}>{pm.avgUptimePct.toFixed(0)}%</span>
+                              <div className="flex items-center gap-1">
+                                <span className="text-muted-foreground/70 font-medium">{shortName}</span>
+                                <span className="text-foreground/80">{fmtSecPanoramic(pm.uptimeSec)}</span>
+                                <span className={cn(uptimeColor)}>{pm.avgUptimePct.toFixed(0)}%</span>
+                              </div>
+                              {(pm.maintMacroCount > 0 || pm.maintMicroCount > 0) && (
+                                <div className="flex items-center gap-1 text-[8px] text-muted-foreground/80">
+                                  <span className="text-amber-400/80">🔧</span>
+                                  <span>mac {fmtMttr(mttrMacroSec)}<span className="text-muted-foreground/50">·{pm.maintMacroCount}</span></span>
+                                  <span className="text-muted-foreground/40">|</span>
+                                  <span>mic {fmtMttr(mttrMicroSec)}<span className="text-muted-foreground/50">·{pm.maintMicroCount}</span></span>
+                                </div>
+                              )}
                             </div>
                           )
                         })}
@@ -4146,6 +4207,21 @@ export function GraderHistoricalCalendar({
                           </button>
                         )
                       })}
+                      {/* Separador visual + toggle Solo mantención */}
+                      <span className="w-px bg-border/60 self-stretch mx-0.5" aria-hidden />
+                      <button
+                        type="button"
+                        onClick={() => setParetoMaintOnly((v) => !v)}
+                        className={cn(
+                          'text-[9px] px-1.5 py-0.5 rounded border transition-colors',
+                          paretoMaintOnly
+                            ? 'bg-amber-500/15 text-amber-500 border-amber-500/40'
+                            : 'bg-muted/30 text-muted-foreground border-border/40 hover:bg-muted/50',
+                        )}
+                        title="Solo paros tipo avería (excluye COLACION, MMPP, CUMPLIMIENTO CUOTA y otros paros operacionales). type='downtime' menos reasons operativos."
+                      >
+                        {paretoMaintOnly ? '🔧 Solo mantención' : '🔧 Solo mantención'}
+                      </button>
                     </div>
                   )}
                   {monthParetoData.length === 0 ? (
