@@ -159,20 +159,25 @@
 
     <defs>
       <!-- Primitivos válvulas (reutilizables) -->
-      <g id="valveRed">
-        <polygon points="-19,-16 0,0 -19,16" fill="#ff1616" stroke="#ff7171" stroke-width="1.2"/>
-        <polygon points="19,-16 0,0 19,16" fill="#ff1616" stroke="#ff7171" stroke-width="1.2"/>
-        <rect x="-6" y="-25" width="12" height="50" fill="#ff1616"/>
-      </g>
-      <g id="valveGreen">
-        <polygon points="-19,-16 0,0 -19,16" fill="#00f525" stroke="#9dff9d" stroke-width="1.2"/>
-        <polygon points="19,-16 0,0 19,16" fill="#00f525" stroke="#9dff9d" stroke-width="1.2"/>
-        <rect x="-6" y="-25" width="12" height="50" fill="#00f525"/>
-      </g>
       <g id="manualValve">
-        <rect x="-16" y="-8" width="32" height="16" rx="2" fill="#65bfff" stroke="#c8f0ff" stroke-width="2"/>
-        <line x1="0" y1="-25" x2="0" y2="-8" stroke="#65bfff" stroke-width="3"/>
-        <line x1="-11" y1="-25" x2="11" y2="-25" stroke="#65bfff" stroke-width="3"/>
+        <rect x="-16" y="-8" width="32" height="16" rx="2" fill="currentColor" stroke="#c8f0ff" stroke-width="2"/>
+        <line x1="0" y1="-25" x2="0" y2="-8" stroke="currentColor" stroke-width="3"/>
+        <line x1="-11" y1="-25" x2="11" y2="-25" stroke="currentColor" stroke-width="3"/>
+      </g>
+
+      <!-- Símbolo P&ID válvula mariposa con manivela tipo "T" (referencia foto JPG).
+           Manivela COMPACTA: T-bar chica arriba + stem fino, no tapa labels.
+           Color heredado de <g> padre via currentColor. -->
+      <g id="valveFull">
+        <!-- T-bar superior pegada al bowtie -->
+        <rect x="-9" y="-19" width="18" height="7" fill="currentColor"/>
+        <!-- Stem grueso (6 px) y largo (10 px) que entra al cuerpo del bowtie -->
+        <rect x="-3" y="-12" width="6" height="10" fill="currentColor"/>
+        <!-- Mariposa (bowtie: dos triángulos punta a punta) -->
+        <polygon points="-19,-11 0,0 -19,11" fill="currentColor" stroke="#000000" stroke-width="0.6"/>
+        <polygon points="19,-11  0,0 19,11"  fill="currentColor" stroke="#000000" stroke-width="0.6"/>
+        <!-- Disco central (eje de la mariposa) - cubre el stem en el centro -->
+        <circle cx="0" cy="0" r="1.6" fill="#000000"/>
       </g>
 
       <radialGradient id="ledGlow" cx="0.4" cy="0.4" r="0.6">
@@ -207,9 +212,24 @@
     <!-- ════════════════════════════════════════════════
          LAYER 1 · FONDO (PNG-en-SVG idéntico a foto real)
          ════════════════════════════════════════════════ -->
-    <image href="hmi-yal-photo.svg" xlink:href="hmi-yal-photo.svg"
+    <image href="hmi-yal-clean.jpg" xlink:href="hmi-yal-clean.jpg"
            x="0" y="0" width="1448" height="1086"
            preserveAspectRatio="xMidYMid slice"/>
+
+    <!-- ════════════════════════════════════════════════
+         LAYER 1.5 · CAÑERÍAS SVG editables (color por estado de válvula)
+         Cada path tiene data-driven-by="valve.XXX" para enlazar a una válvula.
+         Cuando la válvula cambia estado, el pipe se recolorea automáticamente.
+         Coords aproximadas — afinar visualmente con ?edit=1.
+         ════════════════════════════════════════════════ -->
+    <g class="pipes" fill="none" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+      <!-- y14.1 → C1 (línea venteo vacío izquierda) -->
+      <path data-pipe="y141-c1" data-driven-by="valve.y141"
+            d="M 296 461 L 360 461" stroke="#00f525"/>
+      <!-- y14.2 → C2 (línea venteo vacío izquierda 2) -->
+      <path data-pipe="y142-c2" data-driven-by="valve.y142"
+            d="M 294 655 L 360 655" stroke="#00f525"/>
+    </g>
 
     <!-- ════════════════════════════════════════════════
          LAYER 2 · OVERLAYS INTERACTIVOS
@@ -218,19 +238,20 @@
          ════════════════════════════════════════════════ -->
     <g class="interactive">
 
-      <!-- ─── 10 VÁLVULAS (coords AJUSTADAS A MANO + rotación 90° para las horizontales) ─── -->
-      <!-- Verticales (mantienen orientación) -->
-      <g data-key="valve.y111" transform="translate(264,204)"><use href="#valveGreen"/></g>
-      <g data-key="valve.y112" transform="translate(658,209)"><use href="#valveGreen"/></g>
-      <g data-key="valve.y13"  transform="translate(885,737)"><use href="#valveRed"/></g>
-      <!-- Horizontales (rotadas 90°) -->
-      <g data-key="valve.y103" transform="translate(364,242) rotate(90)"><use href="#valveRed"/></g>
-      <g data-key="valve.y101" transform="translate(366,299) rotate(90)"><use href="#valveRed"/></g>
-      <g data-key="valve.y104" transform="translate(551,242) rotate(90)"><use href="#valveRed"/></g>
-      <g data-key="valve.y102" transform="translate(553,298) rotate(90)"><use href="#valveRed"/></g>
-      <g data-key="valve.y141" transform="translate(296,456) rotate(90)"><use href="#valveGreen"/></g>
-      <g data-key="valve.y142" transform="translate(286,648) rotate(90)"><use href="#valveGreen"/></g>
-      <g data-key="valve.y12"  transform="translate(659,725) rotate(90)"><use href="#valveRed"/></g>
+      <!-- ─── 10 VÁLVULAS (coords + rotaciones alineadas al JPG, sesión 2026-05-14) ─── -->
+      <!-- Verticales/diagonales con manivela hacia los costados -->
+      <g data-key="valve.y111" transform="translate(264,204) rotate(270)" color="#00f525"><use href="#valveFull"/></g>
+      <g data-key="valve.y112" transform="translate(655,207) rotate(270)" color="#00f525"><use href="#valveFull"/></g>
+      <g data-key="valve.y13"  transform="translate(884,736) rotate(270)" color="#ff1616"><use href="#valveFull"/></g>
+      <!-- Horizontales con manivela hacia arriba (rotate 0 = orientación default) -->
+      <g data-key="valve.y103" transform="translate(365,245)" color="#ff1616"><use href="#valveFull"/></g>
+      <g data-key="valve.y101" transform="translate(365,303)" color="#ff1616"><use href="#valveFull"/></g>
+      <g data-key="valve.y104" transform="translate(556,246)" color="#ff1616"><use href="#valveFull"/></g>
+      <g data-key="valve.y102" transform="translate(556,303)" color="#ff1616"><use href="#valveFull"/></g>
+      <g data-key="valve.y141" transform="translate(296,461)" color="#00f525"><use href="#valveFull"/></g>
+      <g data-key="valve.y142" transform="translate(294,655)" color="#00f525"><use href="#valveFull"/></g>
+      <!-- y12 con manivela a la izquierda -->
+      <g data-key="valve.y12"  transform="translate(656,723) rotate(270)" color="#ff1616"><use href="#valveFull"/></g>
 
       <!-- ─── 11 READOUTS (coords AJUSTADAS A MANO) ─── -->
       <g data-readout="PA" transform="translate(749,415)">
@@ -316,13 +337,6 @@
   let readonly = false;
   const state = {};
 
-  const VALVE_HREF = {
-    'open':   '#valveGreen',
-    'closed': '#valveRed',
-    'cyan':   '#manualValve',
-    'manual': '#manualValve',
-  };
-
   const DEFAULTS = {
     'valve.y111': 'open',     'valve.y112': 'open',
     'valve.y101': 'closed',   'valve.y102': 'closed',
@@ -349,16 +363,32 @@
 
   function applyValue(key, value){
     state[key] = value;
+    // Pipes manejados por esta válvula: recolorear según estado.
+    if (key.startsWith('valve.')) {
+      const pipeColor = value === 'open' ? '#00f525'
+                      : (value === 'manual' || value === 'cyan') ? '#65bfff'
+                      : '#ff1616';
+      document.querySelectorAll('[data-driven-by="' + key + '"]').forEach(p => {
+        p.setAttribute('stroke', pipeColor);
+      });
+    }
     const els = document.querySelectorAll('[data-key="' + key + '"]');
     if (!els.length) return;
     els.forEach(el => {
       if (key.startsWith('valve.')) {
+        // Todas las válvulas: shape vía <use>, color en <g> padre (currentColor).
+        // Manual/cyan usa shape distinto (#manualValve, handle cuadrado), las demás #valveFull (mariposa).
         const use = el.querySelector('use');
         if (use) {
-          const href = VALVE_HREF[value] || '#valveRed';
+          const isManual = (value === 'manual' || value === 'cyan');
+          const href = isManual ? '#manualValve' : '#valveFull';
           use.setAttribute('href', href);
           use.setAttribute('xlink:href', href);
         }
+        const color = value === 'open'   ? '#00f525'
+                    : (value === 'manual' || value === 'cyan') ? '#65bfff'
+                    : '#ff1616';
+        el.setAttribute('color', color);
       } else if (key.startsWith('text.')) {
         el.textContent = value;
       } else if (key.startsWith('led.')) {
@@ -659,7 +689,12 @@
             lines.push('  <text class="readoutTxt" x="'+v.w/2+'" y="'+v.h/2+'">VALOR</text>');
             lines.push('</g>');
           } else {
-            lines.push('<g data-key="'+k+'" transform="'+transform+'"><use href="#valveRed"/></g>');
+            const value = state[k] || 'closed';
+            const color = value === 'open' ? '#00f525'
+                        : (value === 'manual' || value === 'cyan') ? '#65bfff'
+                        : '#ff1616';
+            const href = (value === 'manual' || value === 'cyan') ? '#manualValve' : '#valveFull';
+            lines.push('<g data-key="'+k+'" transform="'+transform+'" color="'+color+'"><use href="'+href+'"/></g>');
           }
         } else if (v.kind === 'circle-cxcy') {
           const r = v.el.getAttribute('r');
