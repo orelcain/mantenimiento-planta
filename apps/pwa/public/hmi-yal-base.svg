@@ -1,0 +1,347 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <title>HMI YAL - réplica vectorial editable</title>
+  <desc>Recreación vectorial editable basada en la pantalla HMI proporcionada.</desc>
+
+  <defs>
+    <linearGradient id="bezel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3d4448"/>
+      <stop offset="50%" stop-color="#6f777b"/>
+      <stop offset="100%" stop-color="#2f3437"/>
+    </linearGradient>
+
+    <linearGradient id="blueTank" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7bc6ff"/>
+      <stop offset="45%" stop-color="#4d9fde"/>
+      <stop offset="100%" stop-color="#1f67a9"/>
+    </linearGradient>
+
+    <radialGradient id="glass" cx="40%" cy="25%" r="75%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="50%" stop-color="#6fb9f4" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#0a4f91" stop-opacity="0.08"/>
+    </radialGradient>
+
+    <linearGradient id="motorGreen" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#009820"/>
+      <stop offset="50%" stop-color="#37dd39"/>
+      <stop offset="100%" stop-color="#006b16"/>
+    </linearGradient>
+
+    <linearGradient id="panelGray" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#eeeeee"/>
+      <stop offset="55%" stop-color="#8b8b8b"/>
+      <stop offset="100%" stop-color="#5a5a5a"/>
+    </linearGradient>
+
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="2" dy="3" stdDeviation="2.5" flood-color="#000000" flood-opacity="0.55"/>
+    </filter>
+
+    <filter id="glowGreen">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <style>
+      .screenText { font-family: Arial, Helvetica, sans-serif; fill:#ffffff; font-weight:700; }
+      .smallText { font-family: Arial, Helvetica, sans-serif; fill:#ffffff; font-size:15px; font-weight:700; }
+      .tinyText { font-family: Arial, Helvetica, sans-serif; fill:#ffffff; font-size:13px; font-weight:700; }
+      .blackText { font-family: Arial, Helvetica, sans-serif; fill:#111111; font-size:17px; font-weight:700; }
+      .valueText { font-family: Arial, Helvetica, sans-serif; fill:#111111; font-size:18px; font-weight:700; }
+      .pipeGreen { fill:none; stroke:#20ff20; stroke-width:6; stroke-linecap:square; stroke-linejoin:miter; filter:url(#glowGreen); }
+      .pipeRed { fill:none; stroke:#ff1717; stroke-width:6; stroke-linecap:square; stroke-linejoin:miter; }
+      .pipeCyan { fill:none; stroke:#00e9ff; stroke-width:6; stroke-linecap:square; stroke-linejoin:miter; }
+      .pipeBlue { fill:none; stroke:#107dff; stroke-width:5; stroke-linecap:square; stroke-linejoin:miter; }
+      .outlineWhite { stroke:#ffffff; stroke-width:2; fill:none; }
+      .buttonText { font-family: Arial, Helvetica, sans-serif; font-size:19px; font-weight:700; fill:#ffffff; }
+      .tag { font-family: Arial, Helvetica, sans-serif; font-size:17px; font-weight:700; fill:#ffffff; }
+    </style>
+
+    <g id="valveRed">
+      <polygon points="-17,-14 0,0 -17,14" fill="#ff1616" stroke="#ff7171" stroke-width="1"/>
+      <polygon points="17,-14 0,0 17,14" fill="#ff1616" stroke="#ff7171" stroke-width="1"/>
+      <rect x="-5" y="-22" width="10" height="44" fill="#ff1616"/>
+    </g>
+
+    <g id="valveGreen">
+      <polygon points="-17,-14 0,0 -17,14" fill="#00f525" stroke="#9dff9d" stroke-width="1"/>
+      <polygon points="17,-14 0,0 17,14" fill="#00f525" stroke="#9dff9d" stroke-width="1"/>
+      <rect x="-5" y="-22" width="10" height="44" fill="#00f525"/>
+    </g>
+
+    <g id="manualValve">
+      <rect x="-14" y="-7" width="28" height="14" rx="2" fill="#65bfff" stroke="#c8f0ff" stroke-width="2"/>
+      <line x1="0" y1="-22" x2="0" y2="-7" stroke="#65bfff" stroke-width="3"/>
+      <line x1="-10" y1="-22" x2="10" y2="-22" stroke="#65bfff" stroke-width="3"/>
+    </g>
+
+    <g id="greenMotor">
+      <rect x="0" y="10" width="88" height="45" rx="8" fill="url(#motorGreen)" stroke="#074d12" stroke-width="2"/>
+      <rect x="10" y="5" width="54" height="9" fill="#00891d"/>
+      <rect x="-12" y="21" width="18" height="25" rx="4" fill="#0fac32" stroke="#053f0e"/>
+      <rect x="84" y="16" width="22" height="34" rx="4" fill="#007914" stroke="#053f0e"/>
+      <line x1="16" y1="15" x2="16" y2="52" stroke="#00480e" stroke-width="2"/>
+      <line x1="28" y1="15" x2="28" y2="52" stroke="#00480e" stroke-width="2"/>
+      <line x1="40" y1="15" x2="40" y2="52" stroke="#00480e" stroke-width="2"/>
+      <line x1="52" y1="15" x2="52" y2="52" stroke="#00480e" stroke-width="2"/>
+      <line x1="64" y1="15" x2="64" y2="52" stroke="#00480e" stroke-width="2"/>
+    </g>
+
+    <g id="compressor">
+      <rect x="0" y="20" width="105" height="45" rx="7" fill="url(#motorGreen)" stroke="#073f0d" stroke-width="2"/>
+      <circle cx="14" cy="42" r="11" fill="#00af26" stroke="#064c10" stroke-width="2"/>
+      <rect x="105" y="31" width="16" height="22" fill="#006a16"/>
+      <rect x="121" y="14" width="85" height="56" rx="8" fill="url(#motorGreen)" stroke="#073f0d" stroke-width="2"/>
+      <line x1="132" y1="20" x2="132" y2="66" stroke="#00480e" stroke-width="2"/>
+      <line x1="143" y1="20" x2="143" y2="66" stroke="#00480e" stroke-width="2"/>
+      <line x1="154" y1="20" x2="154" y2="66" stroke="#00480e" stroke-width="2"/>
+      <line x1="165" y1="20" x2="165" y2="66" stroke="#00480e" stroke-width="2"/>
+      <line x1="176" y1="20" x2="176" y2="66" stroke="#00480e" stroke-width="2"/>
+      <rect x="70" y="10" width="38" height="12" fill="#00aa22" stroke="#073f0d" stroke-width="2"/>
+      <rect x="90" y="0" width="18" height="10" fill="#00aa22" stroke="#073f0d" stroke-width="2"/>
+      <rect x="44" y="66" width="25" height="8" fill="#0b2c0d"/>
+      <rect x="154" y="66" width="25" height="8" fill="#0b2c0d"/>
+    </g>
+  </defs>
+
+  <!-- Physical HMI bezel -->
+  <rect x="0" y="0" width="1280" height="720" rx="18" fill="url(#bezel)" stroke="#c6cdd0" stroke-width="3"/>
+  <rect x="48" y="25" width="1188" height="665" rx="8" fill="#050505" stroke="#070707" stroke-width="2"/>
+  <text x="995" y="64" class="screenText" font-size="32">SIMATIC HMI</text>
+  <rect x="1182" y="115" width="82" height="238" fill="#80858a" opacity="0.9"/>
+  <text x="1212" y="128" transform="rotate(90,1212,128)" font-family="Arial" font-size="52" fill="#050505" letter-spacing="3">TOUCH</text>
+
+  <!-- Active HMI screen area -->
+  <rect x="74" y="80" width="1120" height="612" fill="#070707"/>
+  <rect x="77" y="83" width="1114" height="606" fill="#020202" opacity="0.95"/>
+
+  <!-- Siemens text label -->
+  <rect x="82" y="48" width="138" height="34" fill="#008a80" stroke="#0aa89e" stroke-width="2"/>
+  <text x="91" y="73" font-family="Arial, Helvetica, sans-serif" font-size="26" font-weight="700" fill="#ffffff">SIEMENS</text>
+
+  <!-- Logo-like service block -->
+  <rect x="78" y="590" width="190" height="70" fill="#ffffff" stroke="#bfbfbf" stroke-width="2"/>
+  <text x="88" y="640" font-family="Arial Black, Arial" font-size="70" font-weight="900" fill="#0a0a0a">DC</text>
+  <circle cx="175" cy="637" r="11" fill="#ffd400" stroke="#000" stroke-width="2"/>
+  <text x="92" y="656" font-family="Arial" font-size="12" fill="#333333">DIESEL &amp; GAS SERVICES</text>
+
+  <!-- Red crossed icon -->
+  <g transform="translate(130,135)">
+    <circle cx="0" cy="0" r="24" fill="none" stroke="#24bfff" stroke-width="4"/>
+    <path d="M-12,-13 L0,10 L12,-13" stroke="#24bfff" stroke-width="4" fill="none"/>
+    <line x1="-26" y1="-26" x2="26" y2="26" stroke="#ff2828" stroke-width="6"/>
+    <line x1="26" y1="-26" x2="-26" y2="26" stroke="#ff2828" stroke-width="6"/>
+  </g>
+
+  <!-- Main green and red pipe network -->
+  <path class="pipeGreen" d="M232 145 L275 145 L275 304 L398 304 L398 385 L279 385 L279 236"/>
+  <path class="pipeGreen" d="M279 236 L624 236 L624 130 L670 130 L670 166"/>
+  <path class="pipeGreen" d="M505 236 L505 135 L830 135 L830 408"/>
+  <path class="pipeGreen" d="M533 236 L533 105 L970 105 L970 378"/>
+  <path class="pipeGreen" d="M279 304 L390 304 M279 385 L390 385"/>
+  <path class="pipeCyan" d="M205 470 L205 350 L232 350 M205 470 L166 470 L166 605"/>
+  <path class="pipeCyan" d="M166 470 L166 435 L279 435"/>
+  <path class="pipeRed" d="M279 216 L650 216"/>
+  <path class="pipeRed" d="M279 265 L650 265 L650 553 L590 553"/>
+  <path class="pipeRed" d="M650 265 L650 593 L473 593"/>
+  <path class="pipeRed" d="M650 553 L650 593"/>
+
+  <!-- Valves and labels (data-key agregado para runtime postMessage) -->
+  <g data-key="valve.y111" transform="translate(279,145)" style="cursor:pointer"><use href="#valveGreen"/></g>
+  <text x="294" y="148" class="tag">y11.1</text>
+  <text x="197" y="183" class="smallText">Venteo</text>
+  <text x="197" y="203" class="smallText">Vacío</text>
+
+  <g data-key="valve.y112" transform="translate(670,166)" style="cursor:pointer"><use href="#valveGreen"/></g>
+  <text x="685" y="148" class="tag">y11.2</text>
+  <text x="703" y="183" class="smallText">Venteo</text>
+  <text x="703" y="203" class="smallText">Presión</text>
+
+  <g data-key="valve.y103" transform="translate(350,216)" style="cursor:pointer"><use href="#valveRed"/></g>
+  <text x="280" y="211" class="tag">y10.3</text>
+  <g data-key="valve.y101" transform="translate(350,265)" style="cursor:pointer"><use href="#valveRed"/></g>
+  <text x="280" y="260" class="tag">y10.1</text>
+
+  <g data-key="valve.y104" transform="translate(525,216)" style="cursor:pointer"><use href="#valveRed"/></g>
+  <text x="456" y="211" class="tag">y10.4</text>
+  <g data-key="valve.y102" transform="translate(525,265)" style="cursor:pointer"><use href="#valveRed"/></g>
+  <text x="456" y="260" class="tag">y10.2</text>
+
+  <g data-key="valve.y141" transform="translate(279,350)" style="cursor:pointer"><use href="#valveGreen"/></g>
+  <text x="247" y="331" class="tag">y14.1</text>
+  <g data-key="valve.y142" transform="translate(279,435)" style="cursor:pointer"><use href="#valveGreen"/></g>
+  <text x="247" y="420" class="tag">y14.2</text>
+
+  <g data-key="valve.y12" transform="translate(650,530)" style="cursor:pointer"><use href="#valveRed"/></g>
+  <text x="610" y="514" class="tag">y12</text>
+
+  <g data-key="valve.y104manual" transform="translate(582,553)" style="cursor:pointer"><use href="#manualValve"/></g>
+  <g data-key="valve.y102manual" transform="translate(473,593)" style="cursor:pointer"><use href="#manualValve"/></g>
+
+  <!-- Compressor rows -->
+  <g transform="translate(387,300)" filter="url(#softShadow)">
+    <use href="#compressor"/>
+    <text x="62" y="52" class="screenText" font-size="28">C1</text>
+  </g>
+  <rect x="367" y="411" width="96" height="30" fill="#ffffff" stroke="#aaaaaa" stroke-width="2"/>
+  <text data-key="text.flowC1" x="388" y="432" class="blackText">52 l/min</text>
+  <rect x="510" y="354" width="72" height="12" fill="#d8d8d8"/>
+  <rect x="510" y="366" width="146" height="20" fill="#c8c8c8"/>
+  <text x="415" y="288" class="smallText">Comp.</text>
+  <text x="415" y="309" class="smallText">Vacío</text>
+
+  <g transform="translate(387,405)" filter="url(#softShadow)">
+    <use href="#compressor"/>
+    <text x="62" y="52" class="screenText" font-size="28">C2</text>
+  </g>
+  <rect x="367" y="506" width="96" height="30" fill="#ffffff" stroke="#aaaaaa" stroke-width="2"/>
+  <text data-key="text.flowC2" x="388" y="527" class="blackText">59 l/min</text>
+  <rect x="510" y="459" width="72" height="12" fill="#d8d8d8"/>
+  <rect x="510" y="471" width="146" height="20" fill="#c8c8c8"/>
+  <text x="415" y="392" class="smallText">Comp.</text>
+  <text x="415" y="413" class="smallText">Vacío</text>
+
+  <!-- Bomba sello -->
+  <g transform="translate(85,490)" filter="url(#softShadow)">
+    <use href="#greenMotor"/>
+    <polygon points="105,25 145,10 145,55 105,45" fill="#00a521" stroke="#073f0d" stroke-width="2"/>
+    <rect x="0" y="55" width="150" height="18" fill="#00a521" stroke="#073f0d" stroke-width="2"/>
+  </g>
+  <text x="95" y="462" class="smallText">Bomba</text>
+  <text x="95" y="482" class="smallText">Sello</text>
+
+  <!-- Ground/triangle symbol -->
+  <g transform="translate(178,585)">
+    <line x1="0" y1="-55" x2="0" y2="0" stroke="#00e9ff" stroke-width="5"/>
+    <line x1="-20" y1="0" x2="20" y2="0" stroke="#00e9ff" stroke-width="5"/>
+    <line x1="-15" y1="12" x2="15" y2="12" stroke="#00e9ff" stroke-width="5"/>
+    <line x1="-10" y1="24" x2="10" y2="24" stroke="#00e9ff" stroke-width="5"/>
+  </g>
+
+  <!-- Cabinet and pressure tank -->
+  <rect x="280" y="510" width="135" height="148" fill="url(#panelGray)" stroke="#27ff27" stroke-width="4"/>
+  <line x1="350" y1="510" x2="350" y2="658" stroke="#29d5ff" stroke-width="5"/>
+  <rect x="380" y="575" width="25" height="55" fill="#2e2e2e" stroke="#111"/>
+  <rect x="388" y="587" width="12" height="10" fill="#777"/>
+  <circle cx="398" cy="614" r="5" fill="#ff7b00"/>
+
+  <g transform="translate(514,548)" filter="url(#softShadow)">
+    <rect x="0" y="0" width="80" height="135" rx="34" fill="url(#blueTank)" stroke="#b7dbff" stroke-width="2"/>
+    <rect x="0" y="60" width="80" height="35" fill="#ffffff" stroke="#666666" stroke-width="1"/>
+    <text data-key="text.airBar" x="14" y="83" class="valueText">6.4 bar</text>
+    <rect x="14" y="130" width="52" height="8" fill="#1e66aa"/>
+    <rect x="8" y="138" width="12" height="8" fill="#163f66"/>
+    <rect x="60" y="138" width="12" height="8" fill="#163f66"/>
+  </g>
+
+  <!-- YAL vessels -->
+  <text x="795" y="445" class="screenText" font-size="28">YAL</text>
+  <path d="M820 165 C822 122 868 122 870 165" fill="none" stroke="#0065d8" stroke-width="12"/>
+  <path d="M753 192 C760 145 798 132 834 132 L936 132 C970 132 1000 154 1006 192" fill="url(#blueTank)" stroke="#0a3f77" stroke-width="2"/>
+  <rect x="741" y="186" width="55" height="45" rx="8" fill="url(#blueTank)" stroke="#0a3f77" stroke-width="2"/>
+  <rect x="961" y="186" width="55" height="45" rx="8" fill="url(#blueTank)" stroke="#0a3f77" stroke-width="2"/>
+
+  <!-- Vessel A -->
+  <g filter="url(#softShadow)">
+    <path d="M720 230 Q780 205 838 230 L838 410 Q825 455 781 490 Q738 455 720 410 Z" fill="url(#blueTank)" stroke="#0a3f77" stroke-width="2"/>
+    <path d="M720 230 Q780 205 838 230 L838 410 Q779 433 720 410 Z" fill="url(#glass)"/>
+    <rect x="753" y="302" width="96" height="36" fill="#ffffff" stroke="#333333" stroke-width="2"/>
+    <text data-key="text.PA" x="766" y="326" class="valueText">+1.1 bar</text>
+    <text x="820" y="287" class="screenText" font-size="28">A</text>
+    <circle cx="759" cy="260" r="14" fill="#f8f8f8" stroke="#333" stroke-width="2"/>
+    <circle cx="721" cy="248" r="11" fill="#1b6fea" stroke="#9bd2ff" stroke-width="2"/>
+    <circle data-key="led.tankA" cx="721" cy="248" r="6" fill="#44ff35"/>
+    <text x="722" y="386" class="smallText">Carga</text>
+    <rect x="779" y="366" width="55" height="32" fill="#eeeeee" stroke="#333"/>
+    <text data-key="text.cargaA" x="793" y="389" class="valueText">28 s</text>
+    <text x="722" y="425" class="smallText">Desc.</text>
+    <rect x="779" y="405" width="55" height="32" fill="#eeeeee" stroke="#333"/>
+    <text data-key="text.descA" x="793" y="428" class="valueText">0 s</text>
+  </g>
+
+  <!-- Vessel B -->
+  <g filter="url(#softShadow)">
+    <path d="M878 230 Q937 205 996 230 L996 410 Q979 455 936 490 Q894 455 878 410 Z" fill="url(#blueTank)" stroke="#0a3f77" stroke-width="2"/>
+    <path d="M878 230 Q937 205 996 230 L996 410 Q936 433 878 410 Z" fill="url(#glass)"/>
+    <rect x="910" y="302" width="96" height="36" fill="#ffffff" stroke="#333333" stroke-width="2"/>
+    <text data-key="text.PB" x="925" y="326" class="valueText">-0.0 bar</text>
+    <text x="973" y="287" class="screenText" font-size="28">B</text>
+    <circle cx="916" cy="260" r="14" fill="#f8f8f8" stroke="#333" stroke-width="2"/>
+    <circle cx="879" cy="248" r="11" fill="#1b6fea" stroke="#9bd2ff" stroke-width="2"/>
+    <circle data-key="led.tankB" cx="879" cy="248" r="6" fill="#ffffff"/>
+    <text x="880" y="386" class="smallText">Carga</text>
+    <rect x="938" y="366" width="55" height="32" fill="#eeeeee" stroke="#333"/>
+    <text data-key="text.cargaB" x="957" y="389" class="valueText">0 s</text>
+    <text x="880" y="425" class="smallText">Desc.</text>
+    <rect x="938" y="405" width="55" height="32" fill="#eeeeee" stroke="#333"/>
+    <text data-key="text.descB" x="948" y="428" class="valueText">41 s</text>
+  </g>
+
+  <!-- Blue pipes from vessels to lower separator -->
+  <path d="M777 488 C760 510 752 528 778 542 L820 566" fill="none" stroke="#3185d2" stroke-width="24" stroke-linecap="round"/>
+  <path d="M940 488 C955 510 963 528 936 542 L895 566" fill="none" stroke="#3185d2" stroke-width="24" stroke-linecap="round"/>
+  <rect x="760" y="517" width="60" height="18" fill="#3185d2" stroke="#0a3f77" stroke-width="2"/>
+  <rect x="900" y="517" width="60" height="18" fill="#3185d2" stroke="#0a3f77" stroke-width="2"/>
+
+  <path d="M780 578 L936 578 L910 660 L810 660 Z" fill="url(#blueTank)" stroke="#0a3f77" stroke-width="2" filter="url(#softShadow)"/>
+  <path d="M792 588 Q858 615 924 588 L910 660 L810 660 Z" fill="url(#glass)"/>
+  <rect x="834" y="548" width="48" height="56" fill="#3185d2" stroke="#0a3f77" stroke-width="2"/>
+  <g data-key="valve.y13" transform="translate(858,565)" style="cursor:pointer"><use href="#valveRed"/></g>
+  <text x="836" y="520" class="tag">y13</text>
+  <circle data-key="led.yal" cx="857" cy="626" r="13" fill="#65ff35" stroke="#ffffff" stroke-width="3"/>
+  <rect x="824" y="660" width="75" height="5" fill="#005bd1"/>
+
+  <!-- Right side control panel -->
+  <rect x="1037" y="102" width="224" height="560" fill="#003aa0" stroke="#ffffff" stroke-width="4"/>
+  <rect x="1048" y="115" width="202" height="48" fill="#19f10b" stroke="#ffffff" stroke-width="3"/>
+  <rect x="1048" y="178" width="202" height="48" fill="#19f10b" stroke="#ffffff" stroke-width="3"/>
+  <rect x="1048" y="241" width="202" height="56" fill="#19f10b" stroke="#ffffff" stroke-width="3"/>
+  <rect x="1048" y="312" width="202" height="48" fill="#19f10b" stroke="#ffffff" stroke-width="3"/>
+  <rect x="1048" y="375" width="202" height="56" fill="url(#panelGray)" stroke="#ffffff" stroke-width="3"/>
+  <rect x="1048" y="446" width="202" height="56" fill="url(#panelGray)" stroke="#ffffff" stroke-width="3"/>
+  <rect x="1048" y="517" width="202" height="56" fill="url(#panelGray)" stroke="#ffffff" stroke-width="3"/>
+  <rect x="1048" y="588" width="202" height="56" fill="url(#panelGray)" stroke="#ffffff" stroke-width="3"/>
+
+  <text x="1065" y="138" class="buttonText" fill="#000000">Stop</text>
+  <text x="1065" y="158" class="buttonText" fill="#000000">C1</text>
+  <text x="1065" y="202" class="buttonText" fill="#000000">Stop</text>
+  <text x="1065" y="222" class="buttonText" fill="#000000">C2</text>
+  <text x="1065" y="265" class="buttonText" fill="#000000">Stop</text>
+  <text x="1065" y="287" class="buttonText" fill="#000000">Atlas</text>
+  <text x="1065" y="337" class="buttonText" fill="#000000">Stop</text>
+  <text x="1065" y="357" class="buttonText" fill="#000000">B. Anillo</text>
+  <text x="1065" y="399" class="buttonText">Iniciar</text>
+  <text x="1065" y="421" class="buttonText">Bombeo</text>
+  <text x="1065" y="470" class="buttonText">Descarga</text>
+  <text x="1065" y="492" class="buttonText">Manual TkA</text>
+  <text x="1065" y="541" class="buttonText">Descarga</text>
+  <text x="1065" y="563" class="buttonText">Manual TkB</text>
+  <text x="1065" y="612" class="buttonText">Control</text>
+  <text x="1065" y="634" class="buttonText">Winches</text>
+
+  <!-- Right button miniature icons -->
+  <g transform="translate(1148,126) scale(0.55)"><use href="#compressor"/></g>
+  <g transform="translate(1148,189) scale(0.55)"><use href="#compressor"/></g>
+  <rect x="1178" y="248" width="38" height="42" fill="url(#panelGray)" stroke="#333"/>
+  <g transform="translate(1142,319) scale(0.48)"><use href="#greenMotor"/></g>
+  <rect x="1178" y="386" width="42" height="42" rx="3" fill="#18bbbb" stroke="#004f4f" stroke-width="2"/>
+  <rect x="1190" y="398" width="20" height="20" fill="#ffffff"/>
+  <rect x="1178" y="457" width="42" height="42" rx="3" fill="#1da0b4" stroke="#003d44" stroke-width="2"/>
+  <path d="M1186 464 L1212 490" stroke="#ffe0bd" stroke-width="9" stroke-linecap="round"/>
+  <path d="M1190 466 L1218 486" stroke="#f7bb7a" stroke-width="8" stroke-linecap="round"/>
+  <rect x="1178" y="528" width="42" height="42" rx="3" fill="#1da0b4" stroke="#003d44" stroke-width="2"/>
+  <path d="M1186 535 L1212 561" stroke="#ffe0bd" stroke-width="9" stroke-linecap="round"/>
+  <path d="M1190 537 L1218 557" stroke="#f7bb7a" stroke-width="8" stroke-linecap="round"/>
+  <g transform="translate(1176,598) scale(0.55)"><use href="#greenMotor"/></g>
+
+  <!-- Footer values -->
+  <text x="616" y="660" class="screenText" font-size="20">Flujo B. Barrido:</text>
+  <rect x="770" y="641" width="112" height="31" fill="#ffffff" stroke="#b8b8b8" stroke-width="2"/>
+  <text data-key="text.flujoBarrido" x="786" y="664" class="valueText">0.0 m3/h</text>
+  <rect x="940" y="642" width="293" height="36" fill="#0c0c0c" stroke="#2c67ff" stroke-width="3"/>
+  <text data-key="text.timestamp" x="948" y="668" class="screenText" font-size="26">3/15/2026 10:05:43 AM</text>
+</svg>

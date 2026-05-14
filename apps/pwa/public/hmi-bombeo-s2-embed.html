@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#000000">
+<title>SIMATIC HMI — Bombeo Acopio S2 (YAL)</title>
+<style>
+  *,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    background: #1a1c22;
+    font-family: Arial, sans-serif;
+    overflow: hidden;
+    color: #ccc;
+  }
+  #hmi-stage {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #0a0a0a;
+    padding: 0;
+  }
+  #hmi-stage svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    user-select: none;
+    max-width: 100%;
+    max-height: 100%;
+  }
+  body.compare-mode #hmi-stage { padding: 0; background: #000; }
+  html.in-iframe, html.in-iframe body { padding: 0; min-height: 0; }
+  #hmi-stage svg [data-key^="valve."] { cursor: pointer; }
+  #hmi-stage svg [data-key^="valve."]:hover { filter: brightness(1.3); }
+
+  /* DEBUG mode (?debug=1): contornos amarillos en todos los overlays */
+  body.debug .interactive rect { stroke: #ffd400 !important; stroke-width: 3 !important; }
+  body.debug .interactive g[data-key] { outline: 2px dashed #ffd400; }
+  body.debug .interactive circle[data-key] { stroke: #ffd400 !important; stroke-width: 2 !important; }
+
+  /* EDIT mode (?edit=1): elementos draggable + panel de coords */
+  body.edit #hmi-stage svg [data-key],
+  body.edit #hmi-stage svg [data-readout] { cursor: move !important; }
+  body.edit #hmi-stage svg .interactive [data-key],
+  body.edit #hmi-stage svg .interactive [data-readout] { outline: 1px dashed #00ffaa; }
+  body.edit #hmi-stage svg .interactive [data-key]:hover,
+  body.edit #hmi-stage svg .interactive [data-readout]:hover {
+    outline: 2px solid #00ffaa;
+    filter: drop-shadow(0 0 4px #00ffaa);
+  }
+  body.edit #hmi-stage svg .interactive [data-key].selected,
+  body.edit #hmi-stage svg .interactive [data-readout].selected {
+    outline: 3px solid #ff66ff;
+  }
+  #edit-panel {
+    position: fixed;
+    top: 8px;
+    right: 8px;
+    width: 320px;
+    max-height: 95vh;
+    background: rgba(13, 31, 60, 0.96);
+    border: 1px solid #00ffaa;
+    border-radius: 6px;
+    padding: 10px;
+    color: #d8e4f0;
+    font-family: 'Consolas', monospace;
+    font-size: 11px;
+    overflow-y: auto;
+    z-index: 1000;
+    display: none;
+  }
+  body.edit #edit-panel { display: block; }
+  #edit-panel h3 {
+    color: #00ffaa;
+    font-size: 13px;
+    margin-bottom: 8px;
+    letter-spacing: 1px;
+  }
+  #edit-panel .row {
+    display: flex;
+    justify-content: space-between;
+    padding: 3px 5px;
+    border-bottom: 1px solid #1e3a5f;
+    cursor: pointer;
+  }
+  #edit-panel .row:hover { background: #1a2f4d; }
+  #edit-panel .row.active { background: #2a4f7d; color: #00ffaa; }
+  #edit-panel .key { color: #7ec8ff; }
+  #edit-panel .coords { color: #ffd400; }
+  #edit-panel .actions {
+    margin-top: 8px;
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+  #edit-panel button {
+    background: #0d1f3c;
+    color: #00ffaa;
+    border: 1px solid #00ffaa;
+    padding: 4px 8px;
+    font-family: 'Consolas', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    border-radius: 3px;
+  }
+  #edit-panel button:hover { background: #1a3a7d; }
+  #edit-panel textarea {
+    width: 100%;
+    height: 200px;
+    background: #050a14;
+    color: #d8e4f0;
+    border: 1px solid #1e3a5f;
+    font-family: 'Consolas', monospace;
+    font-size: 10px;
+    padding: 4px;
+    margin-top: 6px;
+    resize: vertical;
+  }
+  #edit-panel .hint {
+    color: #7a90b0;
+    font-size: 10px;
+    line-height: 1.5;
+    padding: 6px 0;
+    border-top: 1px solid #1e3a5f;
+    margin-top: 6px;
+  }
+</style>
+</head>
+<body>
+
+<div id="edit-panel">
+  <h3>✎ MODO EDICIÓN</h3>
+  <div class="hint">
+    <b>Drag</b> overlay con outline verde para moverlo.<br/>
+    <b>Click fila</b> para seleccionar (outline rosado).<br/>
+    <b>Flechas</b> = mover 1px (Shift=5px, Ctrl=10px)<br/>
+    <b>R</b> = rotar 90° · <b>Shift+R</b> = rotar −90°<br/>
+    <b>A/D</b> = ±5 width caja · <b>W/S</b> = ±5 height caja
+  </div>
+  <div id="edit-list"></div>
+  <div class="actions">
+    <button id="btn-copy-json">📋 Copiar JSON</button>
+    <button id="btn-copy-svg">📋 Copiar SVG actualizado</button>
+    <button id="btn-reset">↻ Reset</button>
+  </div>
+  <textarea id="edit-output" placeholder="JSON / SVG aparecerá aquí al copiar..." readonly></textarea>
+</div>
+
+<div id="hmi-stage">
+  <!-- viewBox 1448x1086 matchea el PNG-en-SVG de fondo -->
+  <svg xmlns="http://www.w3.org/2000/svg"
+       xmlns:xlink="http://www.w3.org/1999/xlink"
+       viewBox="0 0 1448 1086"
+       preserveAspectRatio="xMidYMid meet">
+
+    <defs>
+      <!-- Primitivos válvulas (reutilizables) -->
+      <g id="valveRed">
+        <polygon points="-19,-16 0,0 -19,16" fill="#ff1616" stroke="#ff7171" stroke-width="1.2"/>
+        <polygon points="19,-16 0,0 19,16" fill="#ff1616" stroke="#ff7171" stroke-width="1.2"/>
+        <rect x="-6" y="-25" width="12" height="50" fill="#ff1616"/>
+      </g>
+      <g id="valveGreen">
+        <polygon points="-19,-16 0,0 -19,16" fill="#00f525" stroke="#9dff9d" stroke-width="1.2"/>
+        <polygon points="19,-16 0,0 19,16" fill="#00f525" stroke="#9dff9d" stroke-width="1.2"/>
+        <rect x="-6" y="-25" width="12" height="50" fill="#00f525"/>
+      </g>
+      <g id="manualValve">
+        <rect x="-16" y="-8" width="32" height="16" rx="2" fill="#65bfff" stroke="#c8f0ff" stroke-width="2"/>
+        <line x1="0" y1="-25" x2="0" y2="-8" stroke="#65bfff" stroke-width="3"/>
+        <line x1="-11" y1="-25" x2="11" y2="-25" stroke="#65bfff" stroke-width="3"/>
+      </g>
+
+      <radialGradient id="ledGlow" cx="0.4" cy="0.4" r="0.6">
+        <stop offset="0"   stop-color="#aaffaa"/>
+        <stop offset="0.5" stop-color="#44ff44"/>
+        <stop offset="1"   stop-color="#1a8a1a"/>
+      </radialGradient>
+      <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="2.5" result="blur"/>
+        <feMerge>
+          <feMergeNode in="blur"/>
+          <feMergeNode in="SourceGraphic"/>
+        </feMerge>
+      </filter>
+
+      <style>
+        text.readoutTxt {
+          font-family: Arial, Helvetica, sans-serif;
+          font-size: 22px; font-weight: 700;
+          fill: #111; text-anchor: middle;
+          dominant-baseline: middle;
+        }
+        text.tsTxt {
+          font-family: Arial, Helvetica, sans-serif;
+          font-size: 26px; font-weight: 700;
+          fill: #ffffff; text-anchor: middle;
+          dominant-baseline: middle;
+        }
+      </style>
+    </defs>
+
+    <!-- ════════════════════════════════════════════════
+         LAYER 1 · FONDO (PNG-en-SVG idéntico a foto real)
+         ════════════════════════════════════════════════ -->
+    <image href="hmi-yal-photo.svg" xlink:href="hmi-yal-photo.svg"
+           x="0" y="0" width="1448" height="1086"
+           preserveAspectRatio="xMidYMid slice"/>
+
+    <!-- ════════════════════════════════════════════════
+         LAYER 2 · OVERLAYS INTERACTIVOS
+         Coords MEDIDAS DIRECTAMENTE sobre el PNG (1448×1086)
+         con grilla densa cada 25/50px.
+         ════════════════════════════════════════════════ -->
+    <g class="interactive">
+
+      <!-- ─── 10 VÁLVULAS (coords AJUSTADAS A MANO + rotación 90° para las horizontales) ─── -->
+      <!-- Verticales (mantienen orientación) -->
+      <g data-key="valve.y111" transform="translate(264,204)"><use href="#valveGreen"/></g>
+      <g data-key="valve.y112" transform="translate(658,209)"><use href="#valveGreen"/></g>
+      <g data-key="valve.y13"  transform="translate(885,737)"><use href="#valveRed"/></g>
+      <!-- Horizontales (rotadas 90°) -->
+      <g data-key="valve.y103" transform="translate(364,242) rotate(90)"><use href="#valveRed"/></g>
+      <g data-key="valve.y101" transform="translate(366,299) rotate(90)"><use href="#valveRed"/></g>
+      <g data-key="valve.y104" transform="translate(551,242) rotate(90)"><use href="#valveRed"/></g>
+      <g data-key="valve.y102" transform="translate(553,298) rotate(90)"><use href="#valveRed"/></g>
+      <g data-key="valve.y141" transform="translate(296,456) rotate(90)"><use href="#valveGreen"/></g>
+      <g data-key="valve.y142" transform="translate(286,648) rotate(90)"><use href="#valveGreen"/></g>
+      <g data-key="valve.y12"  transform="translate(659,725) rotate(90)"><use href="#valveRed"/></g>
+
+      <!-- ─── 11 READOUTS (coords AJUSTADAS A MANO) ─── -->
+      <g data-readout="PA" transform="translate(749,415)">
+        <rect class="readoutBg" width="105" height="35" fill="#fff" stroke="#bbb" stroke-width="0.6"/>
+        <text data-key="text.PA" class="readoutTxt" x="52.5" y="20">+1.1 bar</text>
+      </g>
+
+      <g data-readout="cargaA" transform="translate(708,475)">
+        <!-- Rect cubre Carga + valor; fondo azul tanque + caja blanca a la derecha -->
+        <rect width="156" height="30" fill="#1a4a80" stroke="#0a2f50" stroke-width="0.6"/>
+        <rect x="79" width="77" height="30" fill="#fff" stroke="#888" stroke-width="0.6"/>
+        <text class="readoutTxt" x="15" y="15" style="font-size:16px;fill:#fff;text-anchor:start">Carga</text>
+        <text data-key="text.cargaA" class="readoutTxt" x="117.5" y="15" style="font-size:18px">28 s</text>
+      </g>
+
+      <g data-readout="descA" transform="translate(707,516)">
+        <rect width="156" height="30" fill="#1a4a80" stroke="#0a2f50" stroke-width="0.6"/>
+        <rect x="79" width="77" height="30" fill="#fff" stroke="#888" stroke-width="0.6"/>
+        <text class="readoutTxt" x="15" y="15" style="font-size:16px;fill:#fff;text-anchor:start">Desc.</text>
+        <text data-key="text.descA" class="readoutTxt" x="117.5" y="15" style="font-size:18px">0 s</text>
+      </g>
+
+      <g data-readout="PB" transform="translate(912,415)">
+        <rect class="readoutBg" width="105" height="35" fill="#fff" stroke="#bbb" stroke-width="0.6"/>
+        <text data-key="text.PB" class="readoutTxt" x="52.5" y="20">-0.0 bar</text>
+      </g>
+
+      <g data-readout="cargaB" transform="translate(872,478)">
+        <rect width="156" height="30" fill="#1a4a80" stroke="#0a2f50" stroke-width="0.6"/>
+        <rect x="79" width="77" height="30" fill="#fff" stroke="#888" stroke-width="0.6"/>
+        <text class="readoutTxt" x="15" y="15" style="font-size:16px;fill:#fff;text-anchor:start">Carga</text>
+        <text data-key="text.cargaB" class="readoutTxt" x="117.5" y="15" style="font-size:18px">0 s</text>
+      </g>
+
+      <g data-readout="descB" transform="translate(871,518)">
+        <rect width="156" height="30" fill="#1a4a80" stroke="#0a2f50" stroke-width="0.6"/>
+        <rect x="79" width="77" height="30" fill="#fff" stroke="#888" stroke-width="0.6"/>
+        <text class="readoutTxt" x="15" y="15" style="font-size:16px;fill:#fff;text-anchor:start">Desc.</text>
+        <text data-key="text.descB" class="readoutTxt" x="117.5" y="15" style="font-size:18px">41 s</text>
+      </g>
+
+      <g data-readout="flowC1" transform="translate(308,485)">
+        <rect class="readoutBg" width="80" height="30" fill="#fff" stroke="#aaa" stroke-width="0.6"/>
+        <text data-key="text.flowC1" class="readoutTxt" x="40" y="15" style="font-size:16px">52 l/min</text>
+      </g>
+
+      <g data-readout="flowC2" transform="translate(307,677)">
+        <rect class="readoutBg" width="80" height="30" fill="#fff" stroke="#aaa" stroke-width="0.6"/>
+        <text data-key="text.flowC2" class="readoutTxt" x="40" y="15" style="font-size:16px">59 l/min</text>
+      </g>
+
+      <g data-readout="airBar" transform="translate(526,859)">
+        <rect class="readoutBg" width="65" height="25" fill="#fff" stroke="#666" stroke-width="0.6"/>
+        <text data-key="text.airBar" class="readoutTxt" x="32.5" y="12.5" style="font-size:14px">6.4 bar</text>
+      </g>
+
+      <g data-readout="flujoBarrido" transform="translate(843,940)">
+        <rect class="readoutBg" width="105" height="35" fill="#fff" stroke="#b8b8b8" stroke-width="0.6"/>
+        <text data-key="text.flujoBarrido" class="readoutTxt" x="52.5" y="20" style="font-size:18px">0.0 m3/h</text>
+      </g>
+
+      <g data-readout="timestamp" transform="translate(940,943)">
+        <rect class="readoutBg" width="445" height="50" fill="#0c0c0c" stroke="#2c67ff" stroke-width="2"/>
+        <text data-key="text.timestamp" class="tsTxt" x="222" y="27" style="font-size:20px">3/15/2026 10:05:43 AM</text>
+      </g>
+
+      <!-- ─── 3 LEDs (coords AJUSTADAS A MANO) ─── -->
+      <circle data-key="led.tankA" cx="805" cy="366" r="8" fill="#44ff35" filter="url(#glow)"/>
+      <circle data-key="led.tankB" cx="964" cy="366" r="8" fill="#ffffff"/>
+      <circle data-key="led.yal"   cx="883" cy="802" r="15" fill="#65ff35" stroke="#fff" stroke-width="3" filter="url(#glow)"/>
+
+    </g>
+  </svg>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   HMI Bombeo Acopio S2 / YAL — Runtime (approach PNG fondo + overlays)
+   ─────────────────────────────────────────────────────────── */
+(function(){
+  'use strict';
+
+  let readonly = false;
+  const state = {};
+
+  const VALVE_HREF = {
+    'open':   '#valveGreen',
+    'closed': '#valveRed',
+    'cyan':   '#manualValve',
+    'manual': '#manualValve',
+  };
+
+  const DEFAULTS = {
+    'valve.y111': 'open',     'valve.y112': 'open',
+    'valve.y101': 'closed',   'valve.y102': 'closed',
+    'valve.y103': 'closed',   'valve.y104': 'closed',
+    'valve.y141': 'open',     'valve.y142': 'open',
+    'valve.y12':  'closed',   'valve.y13':  'closed',
+    'valve.y104manual': 'manual',
+    'valve.y102manual': 'manual',
+    'text.PA':            '+1.1 bar',
+    'text.PB':            '-0.0 bar',
+    'text.cargaA':        '28 s',
+    'text.descA':         '0 s',
+    'text.cargaB':        '0 s',
+    'text.descB':         '41 s',
+    'text.flowC1':        '52 l/min',
+    'text.flowC2':        '59 l/min',
+    'text.airBar':        '6.4 bar',
+    'text.flujoBarrido':  '0.0 m3/h',
+    'text.timestamp':     new Date().toLocaleString('es-CL', { hour12: true }),
+    'led.tankA':          'on-green',
+    'led.tankB':          'off',
+    'led.yal':            'on-green',
+  };
+
+  function applyValue(key, value){
+    state[key] = value;
+    const els = document.querySelectorAll('[data-key="' + key + '"]');
+    if (!els.length) return;
+    els.forEach(el => {
+      if (key.startsWith('valve.')) {
+        const use = el.querySelector('use');
+        if (use) {
+          const href = VALVE_HREF[value] || '#valveRed';
+          use.setAttribute('href', href);
+          use.setAttribute('xlink:href', href);
+        }
+      } else if (key.startsWith('text.')) {
+        el.textContent = value;
+      } else if (key.startsWith('led.')) {
+        const fill = value === 'on-green' ? '#44ff35'
+                   : value === 'on-red'   ? '#ff3535'
+                   : '#ffffff';
+        el.setAttribute('fill', fill);
+      }
+    });
+  }
+
+  function applyAll(values){
+    Object.entries(values || {}).forEach(([k,v]) => applyValue(k, v));
+  }
+
+  function attachValveClicks(){
+    document.querySelectorAll('[data-key^="valve."]').forEach(el => {
+      el.addEventListener('click', () => {
+        if (readonly) return;
+        const key = el.getAttribute('data-key');
+        const current = state[key] || 'closed';
+        if (current === 'manual') return;
+        const next = current === 'closed' ? 'open' : 'closed';
+        applyValue(key, next);
+        sendMessage('hmi:save-state', { key, value: next });
+        sendMessage('hmi:log-event', { type: 'valve-toggle', key, value: next });
+      });
+    });
+  }
+
+  const inIframe = window.parent !== window;
+  if (inIframe) document.documentElement.classList.add('in-iframe');
+
+  function sendMessage(type, data){
+    if (!inIframe) return;
+    window.parent.postMessage(Object.assign({ type, source: 'hmi-yal' }, data), '*');
+  }
+
+  window.addEventListener('message', (event) => {
+    const msg = event.data;
+    if (!msg || typeof msg !== 'object' || !msg.type) return;
+    if (msg.type === 'hmi:init') {
+      readonly = !!msg.readonly;
+      applyAll(Object.assign({}, DEFAULTS, msg.values || {}));
+    } else if (msg.type === 'hmi:set') {
+      applyValue(msg.key, msg.value);
+    } else if (msg.type === 'hmi:applyAll') {
+      applyAll(msg.values);
+    }
+  });
+
+  function startTimestampTick(){
+    setInterval(() => {
+      applyValue('text.timestamp', new Date().toLocaleString('es-CL', { hour12: true }));
+    }, 1000);
+  }
+
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('nobezel') === '1') {
+    document.body.classList.add('compare-mode');
+  }
+  if (urlParams.get('debug') === '1') {
+    document.body.classList.add('debug');
+  }
+  if (urlParams.get('edit') === '1') {
+    document.body.classList.add('edit');
+  }
+
+  // ───── MODO EDICIÓN: drag-and-drop + resize + rotate ──────
+  function initEditMode(){
+    const svg = document.querySelector('#hmi-stage svg');
+    if (!svg) return;
+    const editList = document.getElementById('edit-list');
+    const editOutput = document.getElementById('edit-output');
+
+    // Snapshot inicial: solo grupos draggeables (data-key + data-readout)
+    // FILTRA children de un padre con data-key/readout para no duplicar.
+    const initialCoords = {};
+    const candidates = svg.querySelectorAll('[data-key], [data-readout]');
+    candidates.forEach(el => {
+      // Skip si tiene un parent ancestor también con data-key/data-readout
+      let p = el.parentElement;
+      while (p && p !== svg) {
+        if (p.hasAttribute('data-key') || p.hasAttribute('data-readout')) return;
+        p = p.parentElement;
+      }
+      const key = el.getAttribute('data-readout')
+                ? 'readout.' + el.getAttribute('data-readout')
+                : el.getAttribute('data-key');
+      const tag = el.tagName.toLowerCase();
+      let x, y, rot=0, w=0, h=0, kind;
+      if (tag === 'g') {
+        const tr = el.getAttribute('transform') || '';
+        const mT = tr.match(/translate\(([-\d.]+)[,\s]+([-\d.]+)\)/);
+        const mR = tr.match(/rotate\(([-\d.]+)\)/);
+        x = mT ? parseFloat(mT[1]) : 0;
+        y = mT ? parseFloat(mT[2]) : 0;
+        rot = mR ? parseFloat(mR[1]) : 0;
+        kind = 'g-translate';
+        // Si es readout group: leer width/height del rect interno
+        const innerRect = el.querySelector('rect.readoutBg, rect');
+        if (innerRect) {
+          w = parseFloat(innerRect.getAttribute('width')) || 0;
+          h = parseFloat(innerRect.getAttribute('height')) || 0;
+        }
+      } else if (tag === 'rect') {
+        x = parseFloat(el.getAttribute('x')) || 0;
+        y = parseFloat(el.getAttribute('y')) || 0;
+        w = parseFloat(el.getAttribute('width')) || 0;
+        h = parseFloat(el.getAttribute('height')) || 0;
+        kind = 'rect-xy';
+      } else if (tag === 'circle') {
+        x = parseFloat(el.getAttribute('cx')) || 0;
+        y = parseFloat(el.getAttribute('cy')) || 0;
+        kind = 'circle-cxcy';
+      } else if (tag === 'text') {
+        x = parseFloat(el.getAttribute('x')) || 0;
+        y = parseFloat(el.getAttribute('y')) || 0;
+        kind = 'text-xy';
+      } else { return; }
+      initialCoords[key] = { x, y, rot, w, h, kind, el };
+    });
+
+    function renderList(){
+      editList.innerHTML = '';
+      Object.entries(initialCoords).forEach(([key, info]) => {
+        const row = document.createElement('div');
+        row.className = 'row';
+        row.dataset.editkey = key;
+        let extra = '';
+        if (info.w) extra = ' '+info.w+'×'+info.h;
+        if (info.rot) extra += ' ↻'+info.rot+'°';
+        row.innerHTML = '<span class="key">'+key+'</span>' +
+                        '<span class="coords">('+Math.round(info.x)+','+Math.round(info.y)+')'+extra+'</span>';
+        row.addEventListener('click', () => {
+          selectKey(key);
+        });
+        editList.appendChild(row);
+      });
+    }
+    renderList();
+
+    function selectKey(key){
+      document.querySelectorAll('#edit-panel .row').forEach(r => r.classList.remove('active'));
+      const row = editList.querySelector('[data-editkey="'+key+'"]');
+      if (row) row.classList.add('active');
+      document.querySelectorAll('.interactive [data-key],[data-readout]').forEach(e => e.classList.remove('selected'));
+      if (initialCoords[key]) initialCoords[key].el.classList.add('selected');
+      currentSelected = key;
+    }
+
+    function updateTransform(el, x, y, rot){
+      let t = 'translate(' + x + ',' + y + ')';
+      if (rot) t += ' rotate(' + rot + ')';
+      el.setAttribute('transform', t);
+    }
+
+    function updateCoordOnElement(info){
+      const { el, kind, x, y, rot, w, h } = info;
+      if (kind === 'g-translate') {
+        updateTransform(el, x, y, rot);
+        // Si tiene rect interno editable de size
+        if (w && h) {
+          const innerRect = el.querySelector('rect.readoutBg, rect');
+          if (innerRect) {
+            innerRect.setAttribute('width', w);
+            innerRect.setAttribute('height', h);
+            // Re-center text inside group (anchor middle)
+            const innerText = el.querySelector('text');
+            if (innerText) {
+              innerText.setAttribute('x', w/2);
+              innerText.setAttribute('y', h/2);
+            }
+          }
+        }
+      } else if (kind === 'rect-xy') {
+        el.setAttribute('x', x);
+        el.setAttribute('y', y);
+        if (w) el.setAttribute('width', w);
+        if (h) el.setAttribute('height', h);
+      } else if (kind === 'circle-cxcy') {
+        el.setAttribute('cx', x);
+        el.setAttribute('cy', y);
+      } else if (kind === 'text-xy') {
+        el.setAttribute('x', x);
+        el.setAttribute('y', y);
+      }
+    }
+
+    function refreshRow(key){
+      const info = initialCoords[key];
+      if (!info) return;
+      const row = editList.querySelector('[data-editkey="'+key+'"]');
+      if (!row) return;
+      let extra = '';
+      if (info.w) extra = ' '+info.w+'×'+info.h;
+      if (info.rot) extra += ' ↻'+info.rot+'°';
+      row.querySelector('.coords').textContent = '('+Math.round(info.x)+','+Math.round(info.y)+')'+extra;
+    }
+
+    let currentSelected = null;
+
+    // Convert mouse coords → SVG viewBox coords
+    function svgPoint(x, y){
+      const pt = svg.createSVGPoint();
+      pt.x = x; pt.y = y;
+      return pt.matrixTransform(svg.getScreenCTM().inverse());
+    }
+
+    // Drag state
+    let dragKey = null, dragStartSvg = null, dragStartCoord = null;
+
+    svg.addEventListener('mousedown', (e) => {
+      const el = e.target.closest('[data-key], [data-readout]');
+      if (!el) return;
+      const key = el.getAttribute('data-readout')
+                ? 'readout.' + el.getAttribute('data-readout')
+                : el.getAttribute('data-key');
+      if (!initialCoords[key]) return;
+      e.preventDefault();
+      dragKey = key;
+      dragStartSvg = svgPoint(e.clientX, e.clientY);
+      dragStartCoord = { x: initialCoords[key].x, y: initialCoords[key].y };
+      selectKey(key);
+    });
+    window.addEventListener('mousemove', (e) => {
+      if (!dragKey) return;
+      const pt = svgPoint(e.clientX, e.clientY);
+      const dx = pt.x - dragStartSvg.x;
+      const dy = pt.y - dragStartSvg.y;
+      const info = initialCoords[dragKey];
+      info.x = Math.round(dragStartCoord.x + dx);
+      info.y = Math.round(dragStartCoord.y + dy);
+      updateCoordOnElement(info);
+      refreshRow(dragKey);
+    });
+    window.addEventListener('mouseup', () => { dragKey = null; });
+
+    // Teclas:
+    //   Flechas      → mover 1px (Shift=5, Ctrl=10)
+    //   R            → rotar 90° (válvula)
+    //   Shift+R      → rotar -90°
+    //   W/S          → ajustar height del rect (W=+5, S=-5)
+    //   A/D          → ajustar width del rect (D=+5, A=-5)
+    window.addEventListener('keydown', (e) => {
+      if (!document.body.classList.contains('edit')) return;
+      if (!currentSelected) return;
+      const info = initialCoords[currentSelected]; if (!info) return;
+      let handled = false;
+      const step = e.shiftKey ? 5 : (e.ctrlKey ? 10 : 1);
+      if (e.key === 'ArrowUp')    { info.y -= step; handled = true; }
+      else if (e.key === 'ArrowDown')  { info.y += step; handled = true; }
+      else if (e.key === 'ArrowLeft')  { info.x -= step; handled = true; }
+      else if (e.key === 'ArrowRight') { info.x += step; handled = true; }
+      else if (e.key === 'r' || e.key === 'R') {
+        const delta = e.shiftKey ? -90 : 90;
+        info.rot = ((info.rot || 0) + delta) % 360;
+        handled = true;
+      }
+      else if (info.w !== undefined) {
+        if (e.key === 'd' || e.key === 'D') { info.w = Math.max(10, info.w + 5); handled = true; }
+        else if (e.key === 'a' || e.key === 'A') { info.w = Math.max(10, info.w - 5); handled = true; }
+        else if (e.key === 'w' || e.key === 'W') { info.h = Math.max(8, info.h - 5); handled = true; }
+        else if (e.key === 's' || e.key === 'S') { info.h = Math.max(8, info.h + 5); handled = true; }
+      }
+      if (!handled) return;
+      e.preventDefault();
+      updateCoordOnElement(info);
+      refreshRow(currentSelected);
+    });
+
+    // Export buttons
+    document.getElementById('btn-copy-json').addEventListener('click', () => {
+      const out = {};
+      Object.entries(initialCoords).forEach(([k, v]) => {
+        const o = { x: v.x, y: v.y };
+        if (v.rot) o.rot = v.rot;
+        if (v.w) { o.w = v.w; o.h = v.h; }
+        out[k] = o;
+      });
+      const json = JSON.stringify(out, null, 2);
+      editOutput.value = json;
+      navigator.clipboard?.writeText(json).then(() => {
+        editOutput.placeholder = '✓ JSON copiado al clipboard';
+      });
+    });
+
+    document.getElementById('btn-copy-svg').addEventListener('click', () => {
+      const lines = [];
+      Object.entries(initialCoords).forEach(([k, v]) => {
+        const transform = v.rot
+          ? 'translate('+v.x+','+v.y+') rotate('+v.rot+')'
+          : 'translate('+v.x+','+v.y+')';
+        if (v.kind === 'g-translate') {
+          if (v.w) {
+            lines.push('<g data-readout="'+k.replace('readout.','')+'" transform="'+transform+'">');
+            lines.push('  <rect class="readoutBg" width="'+v.w+'" height="'+v.h+'" fill="#fff" stroke="#bbb"/>');
+            lines.push('  <text class="readoutTxt" x="'+v.w/2+'" y="'+v.h/2+'">VALOR</text>');
+            lines.push('</g>');
+          } else {
+            lines.push('<g data-key="'+k+'" transform="'+transform+'"><use href="#valveRed"/></g>');
+          }
+        } else if (v.kind === 'circle-cxcy') {
+          const r = v.el.getAttribute('r');
+          lines.push('<circle data-key="'+k+'" cx="'+v.x+'" cy="'+v.y+'" r="'+r+'"/>');
+        }
+      });
+      editOutput.value = lines.join('\n');
+      navigator.clipboard?.writeText(editOutput.value);
+    });
+
+    document.getElementById('btn-reset').addEventListener('click', () => {
+      window.location.reload();
+    });
+  }
+  if (urlParams.get('edit') === '1') {
+    window.addEventListener('load', () => setTimeout(initEditMode, 100));
+  }
+  if (urlParams.get('test') === 'toggle') {
+    window.addEventListener('load', () => setTimeout(() => {
+      ['valve.y101', 'valve.y102', 'valve.y111'].forEach(k => {
+        const el = document.querySelector('[data-key="' + k + '"]');
+        if (el) el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+    }, 100));
+  }
+
+  function bootstrap(){
+    applyAll(DEFAULTS);
+    attachValveClicks();
+    startTimestampTick();
+    sendMessage('hmi:ready', {});
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootstrap);
+  } else {
+    bootstrap();
+  }
+})();
+</script>
+
+</body>
+</html>
