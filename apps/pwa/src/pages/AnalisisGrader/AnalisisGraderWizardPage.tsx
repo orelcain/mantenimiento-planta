@@ -777,6 +777,7 @@ export function AnalisisGraderWizardPage() {
           currentMonth={calendarMonth}
           summaries={calendarSummaries}
           slxStats={calendarSlxStats}
+          isClassificationPlant={lineConfig.isClassificationPlant !== false}
         />
       </div>
 

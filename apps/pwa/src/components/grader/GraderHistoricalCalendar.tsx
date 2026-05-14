@@ -883,6 +883,26 @@ interface SlxShiftCache {
   overallRatio: number
   /** Total ciclos sumados de todas las Baaders del turno */
   totalCycles: number
+  /** Suma de uptime de TODAS las máquinas del turno (M0+M1+M2). En contraste,
+   *  `breakdown.uptimeSec` es solo de M0. Usado para "horas-máquina procesadas"
+   *  del mes, coherente con que `totalCycles` también sume las 3. */
+  totalUptimeSecAllMachines: number
+  /** Desglose por Baader individual del turno. Necesario para mostrar horas y
+   *  paros por máquina (Ev 1 / Ev 2 / Ev 3). Cuando el array tiene 3 entries
+   *  son las 3 Baaders en orden de Shoplogix (M0, M1, M2). */
+  perMachine: Array<{
+    machineid: string
+    name: string
+    /** Segundos en estado uptime del turno. */
+    uptimeSec: number
+    /** Total de ciclos (piezas) procesados por esta máquina en el turno. */
+    totalCycles: number
+    /** Fracción de uptime (0..1) sobre la duración total del turno. */
+    shiftRuntime: number
+    /** Lista de states (uptime/break/downtime/setup) para esta máquina — usado
+     *  para reconstruir el pareto filtrando por máquina. */
+    states: UpstreamMachineState[]
+  }>
   breakdown: {
     uptimeSec: number
     breakSec: number
@@ -897,6 +917,19 @@ interface SlxShiftCache {
 export interface SlxMonthlyStats {
   totalCycles: number
   avgUptimePct: number       // 0-100
+  /** Total segundos procesando (uptime) sumados de todos los turnos del mes. */
+  totalUptimeSec: number
+  /** Desglose por Baader individual del mes: uptime acumulado, ciclos totales,
+   *  N° turnos con data y % uptime promedio por máquina. Solo incluye máquinas
+   *  con al menos 1 turno significativo del mes. */
+  perMachineMonth: Array<{
+    machineid: string
+    name: string
+    uptimeSec: number
+    totalCycles: number
+    shiftCount: number
+    avgUptimePct: number
+  }>
   turnosWithData: number
   dayShiftsWithData: number
   nightShiftsWithData: number
@@ -944,6 +977,8 @@ export function GraderHistoricalCalendar({
   // Ref para el contenedor del pareto mensual (animación scaleX)
   const monthParetoRef = useRef<HTMLDivElement>(null)
   const [slxByShift, setSlxByShift] = useState<Map<string, SlxShiftCache>>(new Map())
+  // Filtro del pareto mensual: 'all' = todas las Baaders, o un machineid específico.
+  const [paretoMachineFilter, setParetoMachineFilter] = useState<string>('all')
   // Cache totales Baader por shift — para indicador de "data Grader perdida"
   // (cuando Grader.totalPieces < Baader.totalCycles * 0.95 = >5% loss).
   const [slxTotalsByShift, setSlxTotalsByShift] = useState<Map<string, number>>(new Map())
@@ -1577,6 +1612,17 @@ export function GraderHistoricalCalendar({
           const avgShiftRuntime = machines.length > 0
             ? machines.reduce((s, m) => s + (m.shiftRuntime ?? 0), 0) / machines.length
             : 0
+          const totalUptimeSecAllMachines = machines.reduce(
+            (s, m) => s + (m.shiftRuntimeBreakdown?.uptimeSec ?? 0), 0,
+          )
+          const perMachine = machines.map((m) => ({
+            machineid:    m.machineid,
+            name:         m.machineName,
+            uptimeSec:    m.shiftRuntimeBreakdown?.uptimeSec ?? 0,
+            totalCycles:  m.totalCycles ?? 0,
+            shiftRuntime: m.shiftRuntime ?? 0,
+            states:       m.states ?? [],
+          }))
           const cache: SlxShiftCache = {
             states,
             shiftStart:     m0?.shiftStart     ?? null,
@@ -1587,6 +1633,8 @@ export function GraderHistoricalCalendar({
             avgShiftRuntime,
             overallRatio:   m0?.overallRatio   ?? 0,
             totalCycles,
+            totalUptimeSecAllMachines,
+            perMachine,
             breakdown: m0?.shiftRuntimeBreakdown ? {
               uptimeSec:          m0.shiftRuntimeBreakdown.uptimeSec,
               breakSec:           m0.shiftRuntimeBreakdown.breakSec,
@@ -1604,7 +1652,10 @@ export function GraderHistoricalCalendar({
             setSlxByShift((prev) => new Map(prev).set(key, {
               states: [], shiftStart: null, shiftEnd: null,
               scheduledStart: null, scheduledEnd: null,
-              shiftRuntime: 0, avgShiftRuntime: 0, overallRatio: 0, totalCycles: 0, breakdown: null,
+              shiftRuntime: 0, avgShiftRuntime: 0, overallRatio: 0, totalCycles: 0,
+              totalUptimeSecAllMachines: 0,
+              perMachine: [],
+              breakdown: null,
             }))
             setSlxTotalsByShift((prev) => new Map(prev).set(key, 0))
           }
@@ -1635,7 +1686,10 @@ export function GraderHistoricalCalendar({
     const EMPTY_CACHE: SlxShiftCache = {
       states: [], shiftStart: null, shiftEnd: null,
       scheduledStart: null, scheduledEnd: null,
-      shiftRuntime: 0, avgShiftRuntime: 0, overallRatio: 0, totalCycles: 0, breakdown: null,
+      shiftRuntime: 0, avgShiftRuntime: 0, overallRatio: 0, totalCycles: 0,
+      totalUptimeSecAllMachines: 0,
+      perMachine: [],
+      breakdown: null,
     }
 
     const loadOne = async (dk: string, shiftId: string, forceServer: boolean): Promise<number> => {
@@ -1678,6 +1732,17 @@ export function GraderHistoricalCalendar({
       const avgShiftRuntime2 = mAll.length > 0
         ? mAll.reduce((s, m) => s + (m.shiftRuntime ?? 0), 0) / mAll.length
         : 0
+      const totalUptimeSecAllMachines2 = mAll.reduce(
+        (s, m) => s + (m.shiftRuntimeBreakdown?.uptimeSec ?? 0), 0,
+      )
+      const perMachine2 = mAll.map((m) => ({
+        machineid:    m.machineid,
+        name:         m.machineName,
+        uptimeSec:    m.shiftRuntimeBreakdown?.uptimeSec ?? 0,
+        totalCycles:  m.totalCycles ?? 0,
+        shiftRuntime: m.shiftRuntime ?? 0,
+        states:       m.states ?? [],
+      }))
       const cache: SlxShiftCache = {
         states,
         shiftStart:     m0?.shiftStart     ?? null,
@@ -1688,6 +1753,8 @@ export function GraderHistoricalCalendar({
         avgShiftRuntime: avgShiftRuntime2,
         overallRatio:   m0?.overallRatio   ?? 0,
         totalCycles:    cycles,
+        totalUptimeSecAllMachines: totalUptimeSecAllMachines2,
+        perMachine: perMachine2,
         breakdown: m0?.shiftRuntimeBreakdown ? {
           uptimeSec:          m0.shiftRuntimeBreakdown.uptimeSec,
           breakSec:           m0.shiftRuntimeBreakdown.breakSec,
@@ -1826,6 +1893,17 @@ export function GraderHistoricalCalendar({
         const avgShiftRuntime = mAll.length > 0
           ? mAll.reduce((s, m) => s + (m.shiftRuntime ?? 0), 0) / mAll.length
           : 0
+        const totalUptimeSecAllMachines3 = mAll.reduce(
+          (s, m) => s + (m.shiftRuntimeBreakdown?.uptimeSec ?? 0), 0,
+        )
+        const perMachine3 = mAll.map((m) => ({
+          machineid:    m.machineid,
+          name:         m.machineName,
+          uptimeSec:    m.shiftRuntimeBreakdown?.uptimeSec ?? 0,
+          totalCycles:  m.totalCycles ?? 0,
+          shiftRuntime: m.shiftRuntime ?? 0,
+          states:       m.states ?? [],
+        }))
         const cache: SlxShiftCache = {
           states:         m0?.states         ?? [],
           shiftStart:     m0?.shiftStart     ?? null,
@@ -1836,6 +1914,8 @@ export function GraderHistoricalCalendar({
           avgShiftRuntime,
           overallRatio:   m0?.overallRatio   ?? 0,
           totalCycles:    cycles,
+          totalUptimeSecAllMachines: totalUptimeSecAllMachines3,
+          perMachine: perMachine3,
           breakdown: m0?.shiftRuntimeBreakdown ? {
             uptimeSec:          m0.shiftRuntimeBreakdown.uptimeSec,
             breakSec:           m0.shiftRuntimeBreakdown.breakSec,
@@ -1863,6 +1943,9 @@ export function GraderHistoricalCalendar({
     const withData: ShiftEntry[] = []
     let totalCycles = 0
     let sumUptime = 0
+    let totalUptimeSec = 0
+    // Acumulador por Baader: machineid → { name, uptimeSec, totalCycles, shiftCount, sumUptimePct }
+    const perMachineAcc = new Map<string, { name: string; uptimeSec: number; totalCycles: number; shiftCount: number; sumUptimePct: number }>()
     const daySet = new Set<string>()
     // Iterar todos los shifts del mapa (soporta Turno día/noche legado + Turno 1/2/3 nuevo)
     // De-duplicar: si existe nuevo formato significativo, ignorar legado del mismo día.
@@ -1878,8 +1961,29 @@ export function GraderHistoricalCalendar({
                                       || isSignificantCycleCount(slxByShift.get(`${dk}__Turno 3`)?.totalCycles))) continue
       const uptimePct = cache.avgShiftRuntime * 100
       withData.push({ dateKey: dk, shiftId, uptimePct, totalCycles: cache.totalCycles })
-      totalCycles += cache.totalCycles
-      sumUptime   += uptimePct
+      totalCycles    += cache.totalCycles
+      sumUptime      += uptimePct
+      // Suma de las 3 Baaders (no solo M0), coherente con totalCycles que también
+      // suma las 3. Representa horas-máquina totales procesando del mes.
+      totalUptimeSec += cache.totalUptimeSecAllMachines ?? 0
+      // Agregación por Baader individual del mes
+      for (const pm of cache.perMachine ?? []) {
+        const acc = perMachineAcc.get(pm.machineid)
+        if (acc) {
+          acc.uptimeSec    += pm.uptimeSec
+          acc.totalCycles  += pm.totalCycles
+          acc.shiftCount   += 1
+          acc.sumUptimePct += pm.shiftRuntime * 100
+        } else {
+          perMachineAcc.set(pm.machineid, {
+            name:         pm.name,
+            uptimeSec:    pm.uptimeSec,
+            totalCycles:  pm.totalCycles,
+            shiftCount:   1,
+            sumUptimePct: pm.shiftRuntime * 100,
+          })
+        }
+      }
       daySet.add(dk)
     }
     if (withData.length === 0) return null
@@ -1889,9 +1993,22 @@ export function GraderHistoricalCalendar({
     // mantienen su mapeo. Antes T1 caía erróneamente en noche por descarte.
     const isDayShift = (id: string) =>
       id === 'Turno día' || id === 'Turno 1' || id === 'Turno 2'
+    const perMachineMonth = [...perMachineAcc.entries()]
+      .map(([machineid, v]) => ({
+        machineid,
+        name:         v.name,
+        uptimeSec:    v.uptimeSec,
+        totalCycles:  v.totalCycles,
+        shiftCount:   v.shiftCount,
+        avgUptimePct: v.shiftCount > 0 ? v.sumUptimePct / v.shiftCount : 0,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'es'))
+
     return {
       totalCycles,
       avgUptimePct: sumUptime / withData.length,
+      totalUptimeSec,
+      perMachineMonth,
       turnosWithData: withData.length,
       dayShiftsWithData:   withData.filter(e => isDayShift(e.shiftId)).length,
       nightShiftsWithData: withData.filter(e => !isDayShift(e.shiftId)).length,
@@ -1912,7 +2029,7 @@ export function GraderHistoricalCalendar({
     const year  = currentMonth.getFullYear()
     const month = currentMonth.getMonth()
     const prefix = `${year}-${String(month + 1).padStart(2, '0')}-`
-    const reasonMap = new Map<string, { durationSec: number; color: string; count: number }>()
+    const reasonMap = new Map<string, { durationSec: number; color: string; count: number; type: string }>()
     // Filtro de ruido SLX vía helper centralizado: turnos con <SLX_NOISE_THRESHOLD
     // ciclos no aportan al pareto del mes (paros aislados, datos pre-startup).
     for (const [key, cache] of slxByShift) {
@@ -1924,46 +2041,92 @@ export function GraderHistoricalCalendar({
       if (shiftId === 'Turno día'   && isSignificantCycleCount(slxByShift.get(`${dk}__Turno 2`)?.totalCycles)) continue
       if (shiftId === 'Turno noche' && (isSignificantCycleCount(slxByShift.get(`${dk}__Turno 1`)?.totalCycles)
                                       || isSignificantCycleCount(slxByShift.get(`${dk}__Turno 3`)?.totalCycles))) continue
-      for (const s of cache.states) {
-        if (s.type !== 'downtime') continue
-        const reason = s.name || s.reason || 'Sin causa'
+      // Fuente de states según filtro:
+      //   - 'all' → suma states de las 3 Baaders (perMachine.flatMap). Antes
+      //     usaba `cache.states` que es SOLO M0 → "Todas" daba lo mismo que
+      //     "Ev 1" (M0). Bug detectado al hacer click en el filtro.
+      //   - machineid específico → states solo de esa Baader.
+      // Fallback al cache.states (M0) si perMachine está vacío (caches legacy).
+      let sourceStates: UpstreamMachineState[]
+      if (paretoMachineFilter === 'all') {
+        const hasPerMachine = (cache.perMachine?.length ?? 0) > 0
+        sourceStates = hasPerMachine
+          ? cache.perMachine.flatMap((m) => m.states)
+          : cache.states
+      } else {
+        const pm = cache.perMachine?.find((m) => m.machineid === paretoMachineFilter)
+        sourceStates = pm?.states ?? []
+      }
+      for (const s of sourceStates) {
+        // Incluir TODAS las paradas (no solo downtime): break (colación, MMPP,
+        // paros programados según reason del supervisor), downtime (averías),
+        // setup (cambios). Excluir solo uptime (producción real).
+        if (s.type === 'uptime') continue
+        // Clave del bucket: preferir `reason` específico (la causa que el
+        // supervisor o sistema agregó: COLACION, MMPP, REUNION INICIO TURNO,
+        // Paro Programado, etc.). Fallback a `name` (la categoría genérica
+        // tipo "Detencion" / "Micro Detencion"). Sin reason ni name → "Sin causa".
+        const reason = s.reason?.trim() || s.name?.trim() || 'Sin causa'
         const entry  = reasonMap.get(reason)
         if (entry) {
           entry.durationSec += s.durationSec
           entry.count       += 1
         } else {
-          reasonMap.set(reason, { durationSec: s.durationSec, color: s.color, count: 1 })
+          reasonMap.set(reason, { durationSec: s.durationSec, color: s.color, count: 1, type: s.type })
         }
       }
     }
     return [...reasonMap.entries()]
       .map(([name, v]) => ({ name, ...v }))
       .sort((a, b) => b.durationSec - a.durationSec)
-  }, [slxByShift, currentMonth])
+  }, [slxByShift, currentMonth, paretoMachineFilter])
 
   // ── Panel panorámico: disponibilidad diaria D/N del mes ──────────────────
-  const availabilityTrend = useMemo((): Array<{ dk: string; day: SlxShiftCache | null; night: SlxShiftCache | null }> => {
+  const availabilityTrend = useMemo((): Array<{
+    dk: string
+    day: SlxShiftCache | null
+    night: SlxShiftCache | null
+    /** shiftId real del slot "día" para mostrar como label (T1/T2/Día según convención). */
+    dayShiftId: string | null
+    /** shiftId real del slot "noche" (T3/Noche). */
+    nightShiftId: string | null
+  }> => {
     const year  = currentMonth.getFullYear()
     const month = currentMonth.getMonth()
     const prefix     = `${year}-${String(month + 1).padStart(2, '0')}-`
     const daysInMonth = new Date(year, month + 1, 0).getDate()
-    const result: Array<{ dk: string; day: SlxShiftCache | null; night: SlxShiftCache | null }> = []
+    const result: Array<{ dk: string; day: SlxShiftCache | null; night: SlxShiftCache | null; dayShiftId: string | null; nightShiftId: string | null }> = []
     for (let d = 1; d <= daysInMonth; d++) {
       const dk = `${prefix}${String(d).padStart(2, '0')}`
-      // Nuevo formato tiene precedencia. Fallback a legado solo si no hay dato nuevo.
-      const dayCache = slxByShift.get(`${dk}__Turno 2`)
-        ?? slxByShift.get(`${dk}__Turno día`)
-        ?? null
-      const nightCache =
-        ([slxByShift.get(`${dk}__Turno 1`), slxByShift.get(`${dk}__Turno 3`)]
-            .filter((c): c is SlxShiftCache => c != null && (c.totalCycles ?? 0) > 0)
-            .sort((a, b) => (b.totalCycles ?? 0) - (a.totalCycles ?? 0))[0] ?? null)
-        ?? slxByShift.get(`${dk}__Turno noche`)
-        ?? null
+      // Slot "día": preferir T2 (tarde Yal), luego Turno día (Chonchi).
+      const t2 = slxByShift.get(`${dk}__Turno 2`)
+      const legacyDay = slxByShift.get(`${dk}__Turno día`)
+      const dayCache = (t2 && (t2.totalCycles ?? 0) > 0) ? t2 : legacyDay ?? null
+      const dayShiftId = (t2 && (t2.totalCycles ?? 0) > 0)
+        ? 'Turno 2'
+        : ((legacyDay?.totalCycles ?? 0) > 0 ? 'Turno día' : null)
+      // Slot "noche": mejor entre T1/T3 con datos (más ciclos), fallback Turno noche.
+      const candidates: Array<[string, SlxShiftCache | undefined]> = [
+        ['Turno 1', slxByShift.get(`${dk}__Turno 1`)],
+        ['Turno 3', slxByShift.get(`${dk}__Turno 3`)],
+      ]
+      const nightChosen = candidates
+        .filter((entry): entry is [string, SlxShiftCache] => entry[1] != null && (entry[1].totalCycles ?? 0) > 0)
+        .sort((a, b) => (b[1].totalCycles ?? 0) - (a[1].totalCycles ?? 0))[0]
+      const legacyNight = slxByShift.get(`${dk}__Turno noche`)
+      const nightCache = nightChosen?.[1] ?? legacyNight ?? null
+      const nightShiftId = nightChosen?.[0]
+        ?? ((legacyNight?.totalCycles ?? 0) > 0 ? 'Turno noche' : null)
       const dayHasData   = (dayCache?.totalCycles   ?? 0) > 0
       const nightHasData = (nightCache?.totalCycles ?? 0) > 0
       if (!dayHasData && !nightHasData) continue
-      result.push({ dk, day: dayHasData ? dayCache : null, night: nightHasData ? nightCache : null })
+      result.push({
+        dk,
+        day:   dayHasData   ? dayCache   : null,
+        night: nightHasData ? nightCache : null,
+        dayShiftId:   dayHasData   ? dayShiftId   : null,
+        nightShiftId: nightHasData ? nightShiftId : null,
+      })
     }
     return result
   }, [slxByShift, currentMonth])
@@ -3752,24 +3915,89 @@ export function GraderHistoricalCalendar({
 
                 {/* ── Col 1: KPIs mensuales Shoplogix ── */}
                 <div className="space-y-3">
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
                     Métricas del mes
+                    <InfoTooltip
+                      title="Métricas del mes"
+                      text="Todas las cifras de esta vista panorámica vienen de Shoplogix (lectura directa de las Baader 142). No depende del Excel del Grader — refleja la operación física de la línea upstream."
+                      iconSize={11}
+                    />
                   </p>
-                  {/* Avg uptime destacado */}
-                  <div className="flex items-baseline gap-2">
-                    <span className={cn(
-                      'text-3xl font-bold tabular-nums',
-                      slxMonthlyStats.avgUptimePct >= 70 ? 'text-emerald-400' :
-                      slxMonthlyStats.avgUptimePct >= 40 ? 'text-amber-400' : 'text-rose-400',
-                    )}>
-                      {slxMonthlyStats.avgUptimePct.toFixed(0)}%
-                    </span>
-                    <span className="text-xs text-muted-foreground">uptime promedio</span>
+                  {/* Avg uptime destacado + horas procesadas */}
+                  <div className="space-y-0.5">
+                    <div className="flex items-baseline gap-2">
+                      <span className={cn(
+                        'text-3xl font-bold tabular-nums',
+                        slxMonthlyStats.avgUptimePct >= 70 ? 'text-emerald-400' :
+                        slxMonthlyStats.avgUptimePct >= 40 ? 'text-amber-400' : 'text-rose-400',
+                      )}>
+                        {slxMonthlyStats.avgUptimePct.toFixed(0)}%
+                      </span>
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        uptime promedio
+                        <InfoTooltip
+                          title="Uptime promedio del mes"
+                          text="% de tiempo del turno en que las Baader 142 estuvieron procesando piezas activamente. Excluye paros programados, colación y micro-detenciones."
+                          formula="uptime = tiempo_procesando / tiempo_turno"
+                          example="70%+ verde · 40-69% ámbar · <40% rojo"
+                          iconSize={11}
+                        />
+                      </span>
+                    </div>
+                    {/* Horas-máquina totales: suma del uptimeSec de las 3 Baaders
+                        para todos los turnos del mes. Coherente con `totalCycles`
+                        (que también suma las 3). NO es el "tiempo de operación de
+                        la línea" — si las 3 Baaders procesan 1h en paralelo, esto
+                        marca 3h porque cada máquina produjo 1h de piezas. */}
+                    {slxMonthlyStats.totalUptimeSec > 0 && (
+                      <p className="text-[10px] text-muted-foreground/70 tabular-nums flex items-center gap-1">
+                        {fmtSecPanoramic(slxMonthlyStats.totalUptimeSec)} máquina · procesando
+                        <InfoTooltip
+                          title="Horas-máquina del mes"
+                          text="Suma de tiempo procesando de las 3 Baader 142 a lo largo del mes (M0+M1+M2). Si las 3 trabajan 1 hora en paralelo, esto cuenta 3 horas-máquina."
+                          formula="∑(uptimeSec de cada Baader) en todos los turnos del mes"
+                          example={`${fmtSecPanoramic(slxMonthlyStats.totalUptimeSec)} = capacidad total de procesamiento usada · coherente con ${slxMonthlyStats.totalCycles.toLocaleString('es-CL')} ciclos del mes (suma de las 3 máquinas).`}
+                          iconSize={10}
+                        />
+                      </p>
+                    )}
+                    {/* Desglose por Baader individual: horas + % uptime + ciclos.
+                        Permite ver si una máquina trabajó significativamente más
+                        o menos que las demás. */}
+                    {slxMonthlyStats.perMachineMonth.length > 0 && (
+                      <div className="flex flex-wrap gap-1 pt-0.5">
+                        {slxMonthlyStats.perMachineMonth.map((pm) => {
+                          const shortName = pm.name.replace(/^YAL\s+/i, '').replace(/Evisceradora/i, 'Ev')
+                          const uptimeColor =
+                            pm.avgUptimePct >= 70 ? 'text-emerald-300'
+                            : pm.avgUptimePct >= 40 ? 'text-amber-300'
+                            : 'text-rose-300'
+                          return (
+                            <div
+                              key={pm.machineid}
+                              className="rounded bg-muted/30 border border-border/30 px-1.5 py-0.5 text-[9px] tabular-nums leading-tight"
+                              title={`${pm.name}\n${pm.totalCycles.toLocaleString('es-CL')} ciclos · ${pm.shiftCount} turno${pm.shiftCount === 1 ? '' : 's'}`}
+                            >
+                              <span className="text-muted-foreground/70 font-medium">{shortName}</span>
+                              <span className="text-foreground/80 ml-1">{fmtSecPanoramic(pm.uptimeSec)}</span>
+                              <span className={cn('ml-1', uptimeColor)}>{pm.avgUptimePct.toFixed(0)}%</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
                   {/* Mini KPIs */}
                   <div className="grid grid-cols-2 gap-1.5">
                     <div className="rounded bg-muted/40 px-2 py-1.5">
-                      <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Ciclos Baader</p>
+                      <p className="text-[9px] text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                        Ciclos Baader
+                        <InfoTooltip
+                          title="Ciclos Baader del mes"
+                          text="Suma de piezas evisceradas por las 3 Baader 142 durante todos los turnos del mes. 1 ciclo = 1 pez procesado."
+                          iconSize={10}
+                        />
+                      </p>
                       <p className="text-sm font-semibold tabular-nums">
                         {slxMonthlyStats.totalCycles >= 1000
                           ? `${(slxMonthlyStats.totalCycles / 1000).toFixed(1)}k`
@@ -3777,23 +4005,29 @@ export function GraderHistoricalCalendar({
                       </p>
                     </div>
                     <div className="rounded bg-muted/40 px-2 py-1.5">
-                      <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Turnos D/N</p>
-                      <p className="text-sm font-semibold tabular-nums">
-                        <span className="text-amber-400">{slxMonthlyStats.dayShiftsWithData}</span>
-                        <span className="text-muted-foreground mx-0.5">/</span>
-                        <span className="text-indigo-400">{slxMonthlyStats.nightShiftsWithData}</span>
+                      <p className="text-[9px] text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                        {plantLine.isClassificationPlant === false ? 'Turnos T1/T2/T3' : 'Turnos D/N'}
+                        <InfoTooltip
+                          title="Turnos con data"
+                          text={plantLine.isClassificationPlant === false
+                            ? "Conteo de turnos del mes según la nomenclatura real de Shoplogix: T1 (mañana, 07:45-15:15), T2 (tarde, 15:15-00:00), T3 (madrugada, 23:00-07:45). Solo cuenta turnos con producción significativa."
+                            : "Conteo de turnos del mes con producción significativa. D = Turno día (07-19), N = Turno noche (19-07)."}
+                          iconSize={10}
+                        />
                       </p>
-                      {/* Yal: breakdown T1/T2/T3 cuando aplica (≥1 turno T1/T2/T3 cargado) */}
-                      {plantLine.isClassificationPlant === false
-                        && ((slxMonthlyStats.t1ShiftsWithData ?? 0)
-                            + (slxMonthlyStats.t2ShiftsWithData ?? 0)
-                            + (slxMonthlyStats.t3ShiftsWithData ?? 0)) > 0 && (
-                        <p className="text-[9px] text-muted-foreground/80 tabular-nums mt-0.5 leading-tight">
-                          T1 <span className="text-amber-400/90">{slxMonthlyStats.t1ShiftsWithData ?? 0}</span>
-                          {' · '}
-                          T2 <span className="text-amber-400/90">{slxMonthlyStats.t2ShiftsWithData ?? 0}</span>
-                          {' · '}
-                          T3 <span className="text-indigo-400/90">{slxMonthlyStats.t3ShiftsWithData ?? 0}</span>
+                      {plantLine.isClassificationPlant === false ? (
+                        <p className="text-sm font-semibold tabular-nums">
+                          <span className="text-amber-400/90">{slxMonthlyStats.t1ShiftsWithData ?? 0}</span>
+                          <span className="text-muted-foreground/60 mx-0.5">/</span>
+                          <span className="text-orange-400/90">{slxMonthlyStats.t2ShiftsWithData ?? 0}</span>
+                          <span className="text-muted-foreground/60 mx-0.5">/</span>
+                          <span className="text-indigo-400/90">{slxMonthlyStats.t3ShiftsWithData ?? 0}</span>
+                        </p>
+                      ) : (
+                        <p className="text-sm font-semibold tabular-nums">
+                          <span className="text-amber-400">{slxMonthlyStats.dayShiftsWithData}</span>
+                          <span className="text-muted-foreground mx-0.5">/</span>
+                          <span className="text-indigo-400">{slxMonthlyStats.nightShiftsWithData}</span>
                         </p>
                       )}
                     </div>
@@ -3810,6 +4044,13 @@ export function GraderHistoricalCalendar({
                         <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
                           <TrendingUp className="h-3 w-3 text-emerald-400" />
                           {isOnlyOne ? 'Único turno cargado' : 'Mejor turno'}
+                          <InfoTooltip
+                            title={isOnlyOne ? 'Único turno con data' : 'Mejor turno del mes'}
+                            text={isOnlyOne
+                              ? 'Solo hay un turno con producción significativa en el mes — por eso no hay Mejor vs Peor.'
+                              : 'Turno del mes con mayor % de uptime (más tiempo procesando ininterrumpidamente). Tiene en cuenta solo Shoplogix, no requiere Excel del Grader.'}
+                            iconSize={10}
+                          />
                         </div>
                         <p className="text-xs font-semibold text-emerald-400">
                           {getShiftDisplayDateKey(slxMonthlyStats.bestShift.dateKey, slxMonthlyStats.bestShift.shiftId).slice(5)}
@@ -3834,6 +4075,11 @@ export function GraderHistoricalCalendar({
                       <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
                         <TrendingDown className="h-3 w-3 text-rose-400" />
                         Peor turno
+                        <InfoTooltip
+                          title="Peor turno del mes"
+                          text="Turno con menor % de uptime — más tiempo parado, en break o con micro-detenciones. Útil para identificar el día/turno a auditar primero."
+                          iconSize={10}
+                        />
                       </div>
                       <p className="text-xs font-semibold text-rose-400">
                         {getShiftDisplayDateKey(slxMonthlyStats.worstShift.dateKey, slxMonthlyStats.worstShift.shiftId).slice(5)}
@@ -3853,9 +4099,55 @@ export function GraderHistoricalCalendar({
 
                 {/* ── Col 2: Pareto de paros del mes (upstream Baader) ── */}
                 <div className="space-y-2">
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
                     Top paros upstream · {monthNames[currentMonth.getMonth()]}
+                    <InfoTooltip
+                      title="Top paros del mes"
+                      text="Todas las causas de detención reportadas por Shoplogix para las Baader 142, agrupadas por la razón específica que registra el supervisor (Colación, MMPP, Paro Programado, Reunión inicio turno, etc.). Filtra por máquina para identificar qué Baader concentra más paros."
+                      example="MMPP arriba = falta materia prima. Paro Programado alto = revisar planificación. Click 'Ev 1/2/3' para filtrar por máquina y calcular MTTR específico."
+                      iconSize={10}
+                    />
                   </p>
+                  {/* Toggle: Todas / Ev 1 / Ev 2 / Ev 3.
+                      Permite filtrar el pareto por máquina específica, útil para
+                      identificar qué Baader tuvo más paros de cada tipo y para
+                      separar mantenimiento de otras causas. */}
+                  {slxMonthlyStats.perMachineMonth.length > 1 && (
+                    <div className="flex flex-wrap gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setParetoMachineFilter('all')}
+                        className={cn(
+                          'text-[9px] px-1.5 py-0.5 rounded border transition-colors',
+                          paretoMachineFilter === 'all'
+                            ? 'bg-primary/15 text-primary border-primary/30'
+                            : 'bg-muted/30 text-muted-foreground border-border/40 hover:bg-muted/50',
+                        )}
+                      >
+                        Todas
+                      </button>
+                      {slxMonthlyStats.perMachineMonth.map((pm) => {
+                        const shortName = pm.name.replace(/^YAL\s+/i, '').replace(/Evisceradora/i, 'Ev')
+                        const active = paretoMachineFilter === pm.machineid
+                        return (
+                          <button
+                            key={pm.machineid}
+                            type="button"
+                            onClick={() => setParetoMachineFilter(pm.machineid)}
+                            className={cn(
+                              'text-[9px] px-1.5 py-0.5 rounded border transition-colors tabular-nums',
+                              active
+                                ? 'bg-primary/15 text-primary border-primary/30'
+                                : 'bg-muted/30 text-muted-foreground border-border/40 hover:bg-muted/50',
+                            )}
+                            title={`Filtrar paros solo de ${pm.name}`}
+                          >
+                            {shortName}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
                   {monthParetoData.length === 0 ? (
                     <p className="text-[11px] text-muted-foreground italic">Sin datos de paros para este mes</p>
                   ) : (
@@ -3909,8 +4201,14 @@ export function GraderHistoricalCalendar({
 
                 {/* ── Col 3: Disponibilidad diaria D/N (stacked bars por día) ── */}
                 <div className="space-y-2">
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
                     Disponibilidad diaria · {monthNames[currentMonth.getMonth()]}
+                    <InfoTooltip
+                      title="Disponibilidad diaria"
+                      text="Una barra apilada por día y por turno (D y N) mostrando cómo se distribuyó el tiempo: Uptime (verde, procesando) · Breaks (ámbar, colación/cambio) · Paro (rojo, falla o falta de MMPP) · Setup (violeta, ajustes)."
+                      example="Click en la fecha lleva al detalle del día."
+                      iconSize={10}
+                    />
                   </p>
                   {availabilityTrend.length === 0 ? (
                     <p className="text-[11px] text-muted-foreground italic">Cargando datos del mes...</p>
@@ -3932,7 +4230,7 @@ export function GraderHistoricalCalendar({
                         </div>
                       </div>
                       {/* Filas por día */}
-                      {availabilityTrend.map(({ dk, day, night }) => {
+                      {availabilityTrend.map(({ dk, day, night, dayShiftId, nightShiftId }) => {
                         const buildAvailBar = (cache: SlxShiftCache | null) => {
                           if (!cache || !cache.breakdown) {
                             return <div className="flex-1 h-3 rounded-sm bg-muted/20 opacity-40" />
@@ -3971,9 +4269,19 @@ export function GraderHistoricalCalendar({
                             >
                               {dk.slice(5)}
                             </span>
-                            <span className="text-[8px] text-amber-500/60 shrink-0">D</span>
+                            <span className="text-[8px] text-amber-500/60 shrink-0 w-5 text-center">
+                              {dayShiftId === 'Turno 2' ? 'T2'
+                                : dayShiftId === 'Turno 1' ? 'T1'
+                                : dayShiftId === 'Turno día' ? 'D'
+                                : dayShiftId === null ? '—' : 'D'}
+                            </span>
                             {buildAvailBar(day)}
-                            <span className="text-[8px] text-indigo-400/60 shrink-0">N</span>
+                            <span className="text-[8px] text-indigo-400/60 shrink-0 w-5 text-center">
+                              {nightShiftId === 'Turno 3' ? 'T3'
+                                : nightShiftId === 'Turno 1' ? 'T1'
+                                : nightShiftId === 'Turno noche' ? 'N'
+                                : nightShiftId === null ? '—' : 'N'}
+                            </span>
                             {buildAvailBar(night)}
                             <span className="text-muted-foreground/50 tabular-nums shrink-0 w-14 text-right text-[9px]">
                               {dayUptimeStr}/{nightUptimeStr}
@@ -3987,27 +4295,45 @@ export function GraderHistoricalCalendar({
 
               </div>
 
-              {/* ── Fila tendencia Baader: Día / Noche (debajo de las 3 cols) ── */}
-              {(monthTrendPoints.day.length >= 2 || monthTrendPoints.night.length >= 2) && (
+              {/* ── Fila tendencia Baader: por turno (Yal: T2/T3 · Chonchi: Día/Noche) ── */}
+              {(monthTrendPoints.day.length >= 2 || monthTrendPoints.night.length >= 2) && (() => {
+                const isYal = plantLine.isClassificationPlant === false
+                const dayLabel   = isYal ? '🌇 Tendencia Baader · Turno 2' : '☀ Tendencia Baader · Turno Día'
+                const nightLabel = isYal ? '🌙 Tendencia Baader · Turno 3' : '🌙 Tendencia Baader · Turno Noche'
+                return (
                 <div className="col-span-full grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-border/40">
                   {monthTrendPoints.day.length >= 2 && (
                     <div className="space-y-1">
-                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                        ☀ Tendencia Baader · Turno Día
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
+                        {dayLabel}
+                        <InfoTooltip
+                          title={isYal ? 'Tendencia · Ritmo del Turno 2' : 'Tendencia · Ritmo del turno día'}
+                          text="% productividad real vs objetivo a lo largo del mes. Un valor de 100% significa que las Baader procesaron exactamente las piezas que Shoplogix esperaba; >100% es sobre-objetivo, <100% es bajo-objetivo."
+                          formula="Ritmo = ciclos_reales / ciclos_esperados × 100"
+                          example="80% = procesó 4.000 piezas cuando se esperaban 5.000."
+                          iconSize={10}
+                        />
                       </p>
                       <MachineTrendMiniChart points={monthTrendPoints.day} />
                     </div>
                   )}
                   {monthTrendPoints.night.length >= 2 && (
                     <div className="space-y-1">
-                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                        🌙 Tendencia Baader · Turno Noche
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1">
+                        {nightLabel}
+                        <InfoTooltip
+                          title={isYal ? 'Tendencia · Ritmo del Turno 3' : 'Tendencia · Ritmo del turno noche'}
+                          text="% productividad real vs objetivo a lo largo del mes. Mismo cálculo que el de día — compara qué tan cerca del target operaron las Baader."
+                          formula="Ritmo = ciclos_reales / ciclos_esperados × 100"
+                          iconSize={10}
+                        />
                       </p>
                       <MachineTrendMiniChart points={monthTrendPoints.night} />
                     </div>
                   )}
                 </div>
-              )}
+                )
+              })()}
 
             </CardContent>
           </Card>

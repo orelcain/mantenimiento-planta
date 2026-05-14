@@ -57,6 +57,16 @@ export function InfoTooltip({
     timeoutRef.current = setTimeout(() => setVisible(false), 200)
   }, [])
 
+  const toggle = useCallback((e: React.MouseEvent | React.PointerEvent) => {
+    // En touch (móvil/tablet) los eventos onMouseEnter NO se disparan — sin este
+    // toggle el tooltip nunca se muestra. preventDefault evita doble-trigger
+    // hover↔click en touch devices que también emiten mouseenter sintético.
+    e.preventDefault()
+    e.stopPropagation()
+    clearTimeout(timeoutRef.current)
+    setVisible((v) => !v)
+  }, [])
+
   const updateTooltipPosition = useCallback(() => {
     if (!visible || !tooltipRef.current || !containerRef.current) return
 
@@ -126,6 +136,22 @@ export function InfoTooltip({
 
   useEffect(() => () => clearTimeout(timeoutRef.current), [])
 
+  // Tap-out en móvil: si el tooltip está visible y el usuario toca fuera del
+  // trigger o del tooltip, cerrar. Usa pointerdown (cubre mouse + touch + pen)
+  // en captura para no perder el evento si otro handler lo consume.
+  useEffect(() => {
+    if (!visible) return
+    const onPointerDown = (e: PointerEvent) => {
+      const target = e.target as Node | null
+      if (!target) return
+      if (containerRef.current?.contains(target)) return
+      if (tooltipRef.current?.contains(target)) return
+      setVisible(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown, true)
+    return () => document.removeEventListener('pointerdown', onPointerDown, true)
+  }, [visible])
+
   const arrowClasses: Record<string, string> = {
     top: 'top-full left-1/2 -translate-x-1/2 border-l-transparent border-r-transparent border-b-transparent border-t-[#1e293b] dark:border-t-[#1e293b]',
     bottom: 'bottom-full left-1/2 -translate-x-1/2 border-l-transparent border-r-transparent border-t-transparent border-b-[#1e293b] dark:border-b-[#1e293b]',
@@ -140,11 +166,24 @@ export function InfoTooltip({
     <>
       <span
         ref={containerRef}
-        className={cn('relative inline-flex items-center cursor-help', className)}
+        role="button"
+        tabIndex={0}
+        aria-label={title || text || 'Más información'}
+        aria-expanded={visible}
+        className={cn('relative inline-flex items-center cursor-help select-none', className)}
         onMouseEnter={show}
         onMouseLeave={hide}
         onFocus={show}
         onBlur={hide}
+        onClick={toggle}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            setVisible((v) => !v)
+          } else if (e.key === 'Escape') {
+            setVisible(false)
+          }
+        }}
       >
         <Icon
           className="text-blue-400/80 hover:text-blue-300 transition-colors duration-150"

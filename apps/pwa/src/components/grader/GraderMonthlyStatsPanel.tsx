@@ -5,7 +5,7 @@
  */
 import { useMemo } from 'react'
 import { Card, CardContent } from '@/components/ui'
-import { TrendingDown, TrendingUp, AlertTriangle, BarChart3, Sun, Moon } from 'lucide-react'
+import { TrendingDown, TrendingUp, AlertTriangle, BarChart3, Sun, Moon, Sunset, Sunrise } from 'lucide-react'
 import type { GraderDailySummary } from '@/services/grader/types'
 import { getCauseLabel } from '@/services/grader/graderMatrixP0Causes'
 import { p0StatusFromPct, p0StatusColor } from '@/services/grader/graderP0Thresholds'
@@ -23,9 +23,16 @@ interface Props {
   currentMonth: Date
   summaries: GraderDailySummary[]
   slxStats?: SlxMonthlyStats | null
+  /**
+   * Si la planta clasifica (Chonchi) → grid Día/Noche.
+   * Si NO clasifica (Yal y similares) → grid T1/T2/T3 (la nomenclatura real
+   * que Shoplogix usa para esa planta). Default true para preservar el
+   * comportamiento de Chonchi cuando se omita el prop.
+   */
+  isClassificationPlant?: boolean
 }
 
-export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats }: Props) {
+export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isClassificationPlant = true }: Props) {
   const monthLabel = `${MONTH_NAMES[currentMonth.getMonth()]} ${currentMonth.getFullYear()}`
 
   const stats = useMemo(() => {
@@ -71,11 +78,14 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats }: P
     const enrich = (s: GraderDailySummary) => ({ ...s, primaryDateKey: primaryDateKeyBySummary.get(s.id) ?? s.dateKey })
 
     const dayShifts   = valid.filter(s => s.shiftId === 'Turno día').length
-    const nightShifts = valid.length - dayShifts
+    const nightShifts = valid.filter(s => s.shiftId === 'Turno noche').length
+    const t1Shifts    = valid.filter(s => s.shiftId === 'Turno 1').length
+    const t2Shifts    = valid.filter(s => s.shiftId === 'Turno 2').length
+    const t3Shifts    = valid.filter(s => s.shiftId === 'Turno 3').length
 
     return {
       turnos: valid.length, uniqueDays, startedDays,
-      dayShifts, nightShifts,
+      dayShifts, nightShifts, t1Shifts, t2Shifts, t3Shifts,
       totalPieces, totalWeightKg, p0Avg, causas,
       best:  enrich(bestSummary),
       worst: enrich(worstSummary),
@@ -125,6 +135,14 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats }: P
   const nightShifts = stats?.nightShifts ?? slxStats?.nightShiftsWithData ?? 0
   const daysCount   = stats?.uniqueDays  ?? slxStats?.daysWithData        ?? 0
   const turnosCount = stats?.turnos      ?? slxStats?.turnosWithData      ?? 0
+  // T1/T2/T3 counts — Yal-only. Refleja la nomenclatura real de Shoplogix.
+  // El Grader (stats) cuenta por shiftId del Excel, que casi nunca usa T1/T2/T3
+  // en Yal (suele tener "Turno día"/"Turno noche" del Marelec). Por eso para
+  // T1/T2/T3 priorizamos slxStats (Shoplogix = verdad) y solo caemos a stats
+  // si Shoplogix está ausente.
+  const t1Shifts = slxStats?.t1ShiftsWithData ?? stats?.t1Shifts ?? 0
+  const t2Shifts = slxStats?.t2ShiftsWithData ?? stats?.t2Shifts ?? 0
+  const t3Shifts = slxStats?.t3ShiftsWithData ?? stats?.t3Shifts ?? 0
 
   return (
     <div className="space-y-2 lg:sticky lg:top-4">
@@ -212,25 +230,53 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats }: P
         </Card>
       </div>
 
-      {/* ── Fila 3: Distribución Día / Noche ── */}
+      {/* ── Fila 3: Distribución de turnos —
+          Chonchi (clasificadora) → Día / Noche.
+          Yal y otras no-clasificadoras → T1 / T2 / T3 (nomenclatura real
+          de Shoplogix, sin inventar Día/Noche). */}
       <Card>
         <CardContent className="py-1.5 px-4">
           <p className="text-[10px] text-muted-foreground uppercase tracking-wide text-center mb-1">Turnos</p>
-          <div className="flex justify-around text-center">
-            <div>
-              <p className="text-xl font-bold leading-none">{dayShifts}</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
-                <Sun className="w-3 h-3 text-amber-500" /> Día
-              </p>
+          {isClassificationPlant ? (
+            <div className="flex justify-around text-center">
+              <div>
+                <p className="text-xl font-bold leading-none">{dayShifts}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
+                  <Sun className="w-3 h-3 text-amber-500" /> Día
+                </p>
+              </div>
+              <div className="w-px bg-border" />
+              <div>
+                <p className="text-xl font-bold leading-none">{nightShifts}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
+                  <Moon className="w-3 h-3 text-indigo-400" /> Noche
+                </p>
+              </div>
             </div>
-            <div className="w-px bg-border" />
-            <div>
-              <p className="text-xl font-bold leading-none">{nightShifts}</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
-                <Moon className="w-3 h-3 text-indigo-400" /> Noche
-              </p>
+          ) : (
+            <div className="flex justify-around text-center">
+              <div>
+                <p className="text-xl font-bold leading-none">{t1Shifts}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
+                  <Sunrise className="w-3 h-3 text-amber-400" /> T1
+                </p>
+              </div>
+              <div className="w-px bg-border" />
+              <div>
+                <p className="text-xl font-bold leading-none">{t2Shifts}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
+                  <Sunset className="w-3 h-3 text-orange-400" /> T2
+                </p>
+              </div>
+              <div className="w-px bg-border" />
+              <div>
+                <p className="text-xl font-bold leading-none">{t3Shifts}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
+                  <Moon className="w-3 h-3 text-indigo-400" /> T3
+                </p>
+              </div>
             </div>
-          </div>
+          )}
         </CardContent>
       </Card>
 
