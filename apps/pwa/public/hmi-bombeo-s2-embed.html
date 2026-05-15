@@ -53,8 +53,18 @@
     filter: drop-shadow(0 0 4px #00ffaa);
   }
   body.edit #hmi-stage svg .interactive [data-key].selected,
-  body.edit #hmi-stage svg .interactive [data-readout].selected {
+  body.edit #hmi-stage svg .interactive [data-readout].selected,
+  body.edit #hmi-stage svg .covers [data-key].selected {
     outline: 3px solid #ff66ff;
+  }
+  /* Covers: negro puro siempre. En edit sólo cursor move + outline rosado al seleccionar via panel. */
+  #hmi-stage svg .covers [data-key] { cursor: default; }
+  body.edit #hmi-stage svg .covers [data-key] { cursor: move; }
+  /* Pipe seleccionada para eliminar (click en edit mode): stroke más grueso + glow */
+  body.edit #hmi-stage svg [data-pipe] { cursor: pointer; }
+  body.edit #hmi-stage svg [data-pipe].selected-pipe {
+    stroke-width: 14 !important;
+    filter: drop-shadow(0 0 6px #ff66ff);
   }
   #edit-panel {
     position: fixed;
@@ -128,6 +138,47 @@
     border-top: 1px solid #1e3a5f;
     margin-top: 6px;
   }
+
+  /* CYCLE control panel — replicates real PLC sequence from videos */
+  #cycle-panel {
+    position: fixed;
+    bottom: 8px;
+    left: 8px;
+    background: rgba(13, 31, 60, 0.96);
+    border: 1px solid #2c67ff;
+    border-radius: 6px;
+    padding: 8px 10px;
+    color: #d8e4f0;
+    font-family: 'Consolas', monospace;
+    font-size: 12px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    z-index: 999;
+    flex-wrap: wrap;
+    max-width: 95vw;
+  }
+  #cycle-panel button {
+    background: #0d1f3c;
+    color: #7ec8ff;
+    border: 1px solid #2c67ff;
+    padding: 4px 10px;
+    font-family: 'Consolas', monospace;
+    font-size: 12px;
+    cursor: pointer;
+    border-radius: 3px;
+  }
+  #cycle-panel button:hover { background: #1a3a7d; color: #fff; }
+  #cycle-panel button.active { background: #2c67ff; color: #fff; }
+  #cycle-panel #cycle-status {
+    color: #00ffaa;
+    font-weight: bold;
+    min-width: 90px;
+  }
+  #cycle-panel #cycle-status.paused { color: #ffd400; }
+  #cycle-panel label { color: #7a90b0; font-size: 11px; }
+  #cycle-panel input[type=range] { width: 80px; vertical-align: middle; }
+  body.edit #cycle-panel { display: none; }
 </style>
 </head>
 <body>
@@ -139,7 +190,12 @@
     <b>Click fila</b> para seleccionar (outline rosado).<br/>
     <b>Flechas</b> = mover 1px (Shift=5px, Ctrl=10px)<br/>
     <b>R</b> = rotar 90° · <b>Shift+R</b> = rotar −90°<br/>
-    <b>A/D</b> = ±5 width caja · <b>W/S</b> = ±5 height caja
+    <b>A/D</b> = ±5 width readout · <b>W/S</b> = ±5 height readout<br/>
+    <b>W/S sobre círculo (LED)</b> = ±1 radio<br/>
+    <b>+/-</b> sobre readout = ±1px font (Shift=±2) · <b>Z</b> = reset font<br/>
+    <b>H/L</b> mueve valor izq/der · <b>K/J</b> mueve valor arriba/abajo (Shift=±5)<br/>
+    <b>Click pipe</b> = seleccionar (rosado glow) · <b>Del</b> = eliminar seleccionado<br/>
+    <b>Rueda</b> = zoom · <b>Espacio+drag</b> = pan · <b>Ctrl+0</b> = reset zoom
   </div>
   <div id="edit-list"></div>
   <div class="actions">
@@ -147,7 +203,44 @@
     <button id="btn-copy-svg">📋 Copiar SVG actualizado</button>
     <button id="btn-reset">↻ Reset</button>
   </div>
+  <div style="margin-top:10px;padding-top:8px;border-top:1px solid #1e3a5f;">
+    <div style="color:#7ec8ff;font-size:11px;margin-bottom:4px;">PIPES — config próxima pipe:</div>
+    <input id="pipe-name" placeholder="pipe-name (default: pipe-N)" style="width:100%;background:#050a14;color:#d8e4f0;border:1px solid #1e3a5f;padding:3px 5px;font-family:Consolas;font-size:11px;margin-bottom:3px;"/>
+    <input id="pipe-rule" placeholder="active-when (vacío = siempre activa)" style="width:100%;background:#050a14;color:#d8e4f0;border:1px solid #1e3a5f;padding:3px 5px;font-family:Consolas;font-size:11px;margin-bottom:3px;"/>
+    <input id="pipe-color" placeholder="active-color hex (vacío = verde)" style="width:100%;background:#050a14;color:#d8e4f0;border:1px solid #1e3a5f;padding:3px 5px;font-family:Consolas;font-size:11px;margin-bottom:3px;"/>
+    <div style="display:flex;gap:4px;margin-bottom:6px;">
+      <button type="button" data-color="#00f525" title="Verde gas/vacío"
+              style="flex:1;background:#00f525;color:#000;border:1px solid #00cc1d;padding:3px;font-size:10px;font-weight:bold;cursor:pointer;border-radius:3px;">🟢 verde</button>
+      <button type="button" data-color="#65bfff" title="Cyan agua/sello"
+              style="flex:1;background:#65bfff;color:#000;border:1px solid #4aa0d8;padding:3px;font-size:10px;font-weight:bold;cursor:pointer;border-radius:3px;">🔵 cyan</button>
+      <button type="button" data-color="#ff1616" title="Rojo presión/inactivo"
+              style="flex:1;background:#ff1616;color:#fff;border:1px solid #cc0000;padding:3px;font-size:10px;font-weight:bold;cursor:pointer;border-radius:3px;">🔴 rojo</button>
+    </div>
+    <div class="actions">
+      <button id="btn-new-pipe">✏️ Nueva pipe</button>
+      <button id="btn-del-last-pipe">🗑 Borrar última</button>
+      <button id="btn-clear-log">🧹 Limpiar log</button>
+    </div>
+    <div class="actions" style="margin-top:4px;">
+      <button id="btn-delete-selected" style="background:#5a1a1a;color:#ffaaaa;border-color:#ff5555;flex:1;">🗑 ELIMINAR seleccionado (Del)</button>
+    </div>
+    <div class="actions" style="margin-top:4px;">
+      <button id="btn-copy-pipes-block" style="background:#1a4f1d;color:#aaffaa;border-color:#00ffaa;">📦 Copiar BLOQUE pipes (todo)</button>
+    </div>
+  </div>
   <textarea id="edit-output" placeholder="JSON / SVG aparecerá aquí al copiar..." readonly></textarea>
+</div>
+
+<!-- Panel de control del ciclo (replica del PLC real, deducido de IMG_1522.MOV) -->
+<div id="cycle-panel">
+  <button id="cycle-play" title="Iniciar ciclo">▶ Play</button>
+  <button id="cycle-pause" title="Pausar">⏸ Pausa</button>
+  <button id="cycle-reset" title="Reset Fase A inicio">↻ Reset</button>
+  <span id="cycle-status" class="paused">Pausado</span>
+  <label>vel</label>
+  <input id="cycle-speed" type="range" min="0.25" max="8" step="0.25" value="1"/>
+  <span id="cycle-speed-val">1×</span>
+  <span id="cycle-info" style="color:#7ec8ff">Fase A · t=0s</span>
 </div>
 
 <div id="hmi-stage">
@@ -217,18 +310,56 @@
            preserveAspectRatio="xMidYMid slice"/>
 
     <!-- ════════════════════════════════════════════════
+         LAYER 1.2 · TAPADORES (rects negros para ocultar logos del JPG)
+         Editable en ?edit=1 (drag para mover · A/D/W/S para redimensionar).
+         ════════════════════════════════════════════════ -->
+    <g class="covers">
+      <!-- Tapa logo D&C diesel & gas services (bottom-left corner del HMI) -->
+      <rect data-key="cover.dyc-logo" x="84" y="881" width="185" height="100"
+            fill="#000000"/>
+    </g>
+
+    <!-- ════════════════════════════════════════════════
          LAYER 1.5 · CAÑERÍAS SVG editables (color por estado de válvula)
-         Cada path tiene data-driven-by="valve.XXX" para enlazar a una válvula.
-         Cuando la válvula cambia estado, el pipe se recolorea automáticamente.
-         Coords aproximadas — afinar visualmente con ?edit=1.
+         data-active-when="<expresión booleana de válvulas>" o "true" para siempre-activa.
+         data-active-color="#hex" override del verde default (cyan para agua, etc).
+         Coords dibujadas vía edit mode (?edit=1, botón ✏️ Nueva pipe).
          ════════════════════════════════════════════════ -->
     <g class="pipes" fill="none" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
-      <!-- y14.1 → C1 (línea venteo vacío izquierda) -->
-      <path data-pipe="y141-c1" data-driven-by="valve.y141"
-            d="M 296 461 L 360 461" stroke="#00f525"/>
-      <!-- y14.2 → C2 (línea venteo vacío izquierda 2) -->
-      <path data-pipe="y142-c2" data-driven-by="valve.y142"
-            d="M 294 655 L 360 655" stroke="#00f525"/>
+      <!-- ─── Venteo Presión: top row (y=245) — Tanque B ─── -->
+      <path data-pipe="feed-y103" data-active-when="valve.y103" d="M 265 245 L 346 245" stroke="#ff1616"/>
+      <path data-pipe="bridge-y103-y104" data-active-when="valve.y103 || valve.y104" d="M 384 245 L 537 246" stroke="#ff1616"/>
+      <path data-pipe="y104-feed" data-active-when="valve.y104" d="M 575 246 L 656 246" stroke="#ff1616"/>
+
+      <!-- ─── Venteo Presión: bottom row (y=303) — Tanque A ─── -->
+      <path data-pipe="feed-y101" data-active-when="valve.y101" d="M 265 303 L 346 303" stroke="#ff1616"/>
+      <path data-pipe="bridge-y101-y102" data-active-when="valve.y101 || valve.y102" d="M 384 303 L 537 303" stroke="#ff1616"/>
+      <path data-pipe="y102-feed" data-active-when="valve.y102" d="M 575 303 L 656 303" stroke="#ff1616"/>
+
+      <!-- ─── Venteo vacío extendido (red verde — reglas a asignar en sesión con video) ─── -->
+      <path data-pipe="vv-cross-y111" data-active-when="true" data-active-color="#00f525" d="M 213 185 L 213 161 L 264 161 L 264 183" stroke="#ff1616"/>
+      <path data-pipe="vv-y111-down-c1" data-active-when="true" data-active-color="#00f525" d="M 263 225 L 263 560 L 300 560" stroke="#ff1616"/>
+      <path data-pipe="vv-c1-out-up" data-active-when="true" data-active-color="#00f525" d="M 334 559 L 416 559 L 416 594" stroke="#ff1616"/>
+      <path data-pipe="vv-c1-out-2" data-active-when="true" data-active-color="#00f525" d="M 495 594 L 495 545 L 530 545 L 530 568" stroke="#ff1616"/>
+      <path data-pipe="vv-y141-to-c1" data-active-when="true" data-active-color="#00f525" d="M 267 366 L 299 366" stroke="#ff1616"/>
+      <path data-pipe="vv-c1-up-1" data-active-when="true" data-active-color="#00f525" d="M 334 367 L 416 367 L 416 401" stroke="#ff1616"/>
+      <path data-pipe="vv-c1-up-2" data-active-when="true" data-active-color="#00f525" d="M 495 401 L 495 353 L 529 353 L 529 375" stroke="#ff1616"/>
+      <path data-pipe="vv-cross-y112" data-active-when="true" data-active-color="#00f525" d="M 704 184 L 704 164 L 656 164 L 656 187" stroke="#ff1616"/>
+      <path data-pipe="vv-y112-trunk" data-active-when="true" data-active-color="#00f525" d="M 656 227 L 656 703" stroke="#ff1616"/>
+      <path data-pipe="vv-y112-tail-1" data-active-when="true" data-active-color="#00f525" d="M 655 744 L 655 928 L 643 928" stroke="#ff1616"/>
+      <path data-pipe="vv-base-1" data-active-when="true" data-active-color="#00f525" d="M 608 929 L 595 929" stroke="#ff1616"/>
+      <path data-pipe="vv-base-2" data-active-when="true" data-active-color="#00f525" d="M 518 929 L 504 929" stroke="#ff1616"/>
+      <path data-pipe="vv-base-3" data-active-when="true" data-active-color="#00f525" d="M 470 929 L 435 929" stroke="#ff1616"/>
+      <path data-pipe="vv-base-up" data-active-when="true" data-active-color="#00f525" d="M 459 924 L 459 755 L 475 755" stroke="#ff1616"/>
+      <path data-pipe="vv-base-cross" data-active-when="true" data-active-color="#00f525" d="M 508 755 L 651 755" stroke="#ff1616"/>
+      <path data-pipe="vv-atlas-box" data-active-when="equipment.atlas" data-active-color="#00f525" d="M 435 963 L 435 771 L 290 771 L 290 963 L 435 963" stroke="#ff1616"/>
+      <path data-pipe="vv-y104-up" data-active-when="true" data-active-color="#00f525" d="M 466 298 L 466 253" stroke="#ff1616"/>
+      <path data-pipe="vv-y104-to-tankB" data-active-when="true" data-active-color="#00f525" d="M 467 236 L 467 145 L 766 145 L 766 349" stroke="#ff1616"/>
+      <path data-pipe="vv-y103-to-tankA" data-active-when="true" data-active-color="#00f525" d="M 437 239 L 437 129 L 921 129 L 921 349" stroke="#ff1616"/>
+
+      <!-- ─── y13 (hidrófugo/pera) ─── -->
+      <path data-pipe="y13-down" data-active-when="true" data-active-color="#ff1616" d="M 884 776 L 884 756" stroke="#ff1616"/>
+      <path data-pipe="y13-up-right" data-active-when="true" data-active-color="#ff1616" d="M 884 715 L 884 685 L 902 685 L 902 706" stroke="#ff1616"/>
     </g>
 
     <!-- ════════════════════════════════════════════════
@@ -254,74 +385,73 @@
       <g data-key="valve.y12"  transform="translate(656,723) rotate(270)" color="#ff1616"><use href="#valveFull"/></g>
 
       <!-- ─── 11 READOUTS (coords AJUSTADAS A MANO) ─── -->
-      <g data-readout="PA" transform="translate(749,415)">
-        <rect class="readoutBg" width="105" height="35" fill="#fff" stroke="#bbb" stroke-width="0.6"/>
-        <text data-key="text.PA" class="readoutTxt" x="52.5" y="20">+1.1 bar</text>
+      <g data-readout="PA" transform="translate(749,411)">
+        <rect class="readoutBg" width="105" height="45" fill="#fff" stroke="#bbb" stroke-width="0.6"/>
+        <text data-key="text.PA" class="readoutTxt" x="52.5" y="22.5" style="font-size:24px">+1.1 bar</text>
       </g>
 
-      <g data-readout="cargaA" transform="translate(708,475)">
-        <!-- Rect cubre Carga + valor; fondo azul tanque + caja blanca a la derecha -->
-        <rect width="156" height="30" fill="#1a4a80" stroke="#0a2f50" stroke-width="0.6"/>
-        <rect x="79" width="77" height="30" fill="#fff" stroke="#888" stroke-width="0.6"/>
-        <text class="readoutTxt" x="15" y="15" style="font-size:16px;fill:#fff;text-anchor:start">Carga</text>
-        <text data-key="text.cargaA" class="readoutTxt" x="117.5" y="15" style="font-size:18px">28 s</text>
+      <g data-readout="cargaA" transform="translate(741,470)">
+        <rect width="121" height="40" fill="#1a4a80" stroke="#0a2f50" stroke-width="0.6"/>
+        <rect x="61.28" width="59.72" height="40" fill="#fff" stroke="#888" stroke-width="0.6"/>
+        <text class="readoutTxt" x="11.63" y="20" style="font-size:16px;fill:#fff;text-anchor:start">Carga</text>
+        <text data-key="text.cargaA" class="readoutTxt" x="91.14" y="20" style="font-size:21px">28 s</text>
       </g>
 
-      <g data-readout="descA" transform="translate(707,516)">
-        <rect width="156" height="30" fill="#1a4a80" stroke="#0a2f50" stroke-width="0.6"/>
-        <rect x="79" width="77" height="30" fill="#fff" stroke="#888" stroke-width="0.6"/>
-        <text class="readoutTxt" x="15" y="15" style="font-size:16px;fill:#fff;text-anchor:start">Desc.</text>
-        <text data-key="text.descA" class="readoutTxt" x="117.5" y="15" style="font-size:18px">0 s</text>
+      <g data-readout="descA" transform="translate(742,514)">
+        <rect width="121" height="35" fill="#1a4a80" stroke="#0a2f50" stroke-width="0.6"/>
+        <rect x="61.28" width="59.72" height="35" fill="#fff" stroke="#888" stroke-width="0.6"/>
+        <text class="readoutTxt" x="11.63" y="17.5" style="font-size:16px;fill:#fff;text-anchor:start">Desc.</text>
+        <text data-key="text.descA" class="readoutTxt" x="91.14" y="17.5" style="font-size:22px">0 s</text>
       </g>
 
-      <g data-readout="PB" transform="translate(912,415)">
-        <rect class="readoutBg" width="105" height="35" fill="#fff" stroke="#bbb" stroke-width="0.6"/>
-        <text data-key="text.PB" class="readoutTxt" x="52.5" y="20">-0.0 bar</text>
+      <g data-readout="PB" transform="translate(912,412)">
+        <rect class="readoutBg" width="105" height="40" fill="#fff" stroke="#bbb" stroke-width="0.6"/>
+        <text data-key="text.PB" class="readoutTxt" x="52.5" y="20" style="font-size:24px">-0.0 bar</text>
       </g>
 
-      <g data-readout="cargaB" transform="translate(872,478)">
-        <rect width="156" height="30" fill="#1a4a80" stroke="#0a2f50" stroke-width="0.6"/>
-        <rect x="79" width="77" height="30" fill="#fff" stroke="#888" stroke-width="0.6"/>
-        <text class="readoutTxt" x="15" y="15" style="font-size:16px;fill:#fff;text-anchor:start">Carga</text>
-        <text data-key="text.cargaB" class="readoutTxt" x="117.5" y="15" style="font-size:18px">0 s</text>
+      <g data-readout="cargaB" transform="translate(902,469)">
+        <rect width="121" height="40" fill="#1a4a80" stroke="#0a2f50" stroke-width="0.6"/>
+        <rect x="61.28" width="59.72" height="40" fill="#fff" stroke="#888" stroke-width="0.6"/>
+        <text class="readoutTxt" x="11.63" y="20" style="font-size:16px;fill:#fff;text-anchor:start">Carga</text>
+        <text data-key="text.cargaB" class="readoutTxt" x="91.14" y="20" style="font-size:21px">0 s</text>
       </g>
 
-      <g data-readout="descB" transform="translate(871,518)">
-        <rect width="156" height="30" fill="#1a4a80" stroke="#0a2f50" stroke-width="0.6"/>
-        <rect x="79" width="77" height="30" fill="#fff" stroke="#888" stroke-width="0.6"/>
-        <text class="readoutTxt" x="15" y="15" style="font-size:16px;fill:#fff;text-anchor:start">Desc.</text>
-        <text data-key="text.descB" class="readoutTxt" x="117.5" y="15" style="font-size:18px">41 s</text>
+      <g data-readout="descB" transform="translate(901,514)">
+        <rect width="121" height="35" fill="#1a4a80" stroke="#0a2f50" stroke-width="0.6"/>
+        <rect x="61.28" width="59.72" height="35" fill="#fff" stroke="#888" stroke-width="0.6"/>
+        <text class="readoutTxt" x="11.63" y="17.5" style="font-size:16px;fill:#fff;text-anchor:start">Desc.</text>
+        <text data-key="text.descB" class="readoutTxt" x="91.14" y="17.5" style="font-size:21px">41 s</text>
       </g>
 
-      <g data-readout="flowC1" transform="translate(308,485)">
-        <rect class="readoutBg" width="80" height="30" fill="#fff" stroke="#aaa" stroke-width="0.6"/>
-        <text data-key="text.flowC1" class="readoutTxt" x="40" y="15" style="font-size:16px">52 l/min</text>
+      <g data-readout="flowC1" transform="translate(302,485)">
+        <rect class="readoutBg" width="95" height="30" fill="#fff" stroke="#aaa" stroke-width="0.6"/>
+        <text data-key="text.flowC1" class="readoutTxt" x="47.5" y="15" style="font-size:20px">52 l/min</text>
       </g>
 
-      <g data-readout="flowC2" transform="translate(307,677)">
-        <rect class="readoutBg" width="80" height="30" fill="#fff" stroke="#aaa" stroke-width="0.6"/>
-        <text data-key="text.flowC2" class="readoutTxt" x="40" y="15" style="font-size:16px">59 l/min</text>
+      <g data-readout="flowC2" transform="translate(301,677)">
+        <rect class="readoutBg" width="95" height="30" fill="#fff" stroke="#aaa" stroke-width="0.6"/>
+        <text data-key="text.flowC2" class="readoutTxt" x="47.5" y="15" style="font-size:20px">59 l/min</text>
       </g>
 
-      <g data-readout="airBar" transform="translate(526,859)">
-        <rect class="readoutBg" width="65" height="25" fill="#fff" stroke="#666" stroke-width="0.6"/>
-        <text data-key="text.airBar" class="readoutTxt" x="32.5" y="12.5" style="font-size:14px">6.4 bar</text>
+      <g data-readout="airBar" transform="translate(522,851)">
+        <rect class="readoutBg" width="70" height="35" fill="#fff" stroke="#666" stroke-width="0.6"/>
+        <text data-key="text.airBar" class="readoutTxt" x="35" y="17.5" style="font-size:20px">6.4 bar</text>
       </g>
 
-      <g data-readout="flujoBarrido" transform="translate(843,940)">
-        <rect class="readoutBg" width="105" height="35" fill="#fff" stroke="#b8b8b8" stroke-width="0.6"/>
-        <text data-key="text.flujoBarrido" class="readoutTxt" x="52.5" y="20" style="font-size:18px">0.0 m3/h</text>
+      <g data-readout="flujoBarrido" transform="translate(835,936)">
+        <rect class="readoutBg" width="120" height="40" fill="#fff" stroke="#b8b8b8" stroke-width="0.6"/>
+        <text data-key="text.flujoBarrido" class="readoutTxt" x="60" y="22.86" style="font-size:22px">0.0 m3/h</text>
       </g>
 
-      <g data-readout="timestamp" transform="translate(940,943)">
-        <rect class="readoutBg" width="445" height="50" fill="#0c0c0c" stroke="#2c67ff" stroke-width="2"/>
-        <text data-key="text.timestamp" class="tsTxt" x="222" y="27" style="font-size:20px">3/15/2026 10:05:43 AM</text>
+      <g data-readout="timestamp" transform="translate(1032,944)">
+        <rect class="readoutBg" width="335" height="35" fill="#0c0c0c" stroke="#2c67ff" stroke-width="2"/>
+        <text data-key="text.timestamp" class="tsTxt" x="167.12" y="18.9" style="font-size:20px">3/15/2026 10:05:43 AM</text>
       </g>
 
       <!-- ─── 3 LEDs (coords AJUSTADAS A MANO) ─── -->
-      <circle data-key="led.tankA" cx="805" cy="366" r="8" fill="#44ff35" filter="url(#glow)"/>
-      <circle data-key="led.tankB" cx="964" cy="366" r="8" fill="#ffffff"/>
-      <circle data-key="led.yal"   cx="883" cy="802" r="15" fill="#65ff35" stroke="#fff" stroke-width="3" filter="url(#glow)"/>
+      <circle data-key="led.tankA" cx="804" cy="366" r="17" fill="#44ff35" filter="url(#glow)"/>
+      <circle data-key="led.tankB" cx="964" cy="366" r="18" fill="#ffffff"/>
+      <circle data-key="led.yal"   cx="885" cy="802" r="15" fill="#65ff35" stroke="#fff" stroke-width="3" filter="url(#glow)"/>
 
     </g>
   </svg>
@@ -359,18 +489,51 @@
     'led.tankA':          'on-green',
     'led.tankB':          'off',
     'led.yal':            'on-green',
+    // Equipment (estado de cada máquina del sistema). 'on' o 'off'.
+    'equipment.atlas':    'off',   // Compresor presión Atlas GA-90
+    'equipment.c1':       'off',   // Bomba vacío C1
+    'equipment.c2':       'off',   // Bomba vacío C2
+    'equipment.sello':    'off',   // Bomba sello (B. Anillo)
+    'equipment.bombeo':   'off',   // Ciclo de bombeo global (Iniciar Bombeo)
+    'equipment.bBarrido': 'off',   // Bomba barrido
   };
+
+  // Colores pipe:
+  //   rojo #ff1616 = inactivo (default)
+  //   verde        = activo (alguna válvula del rule open)
+  const PIPE_INACTIVE = '#ff1616';
+  const PIPE_ACTIVE   = '#00f525';
+
+  // Cache compilada: ruleStr → fn(state) → bool
+  const _ruleCache = {};
+  function compileRule(expr){
+    if (_ruleCache[expr]) return _ruleCache[expr];
+    // Tokens soportados: "valve.xxx" (open), "equipment.xxx" (on), || && ! ( ) true false
+    const safe = expr
+      .replace(/valve\.([\w]+)/g,     "(s['valve.$1']==='open')")
+      .replace(/equipment\.([\w]+)/g, "(s['equipment.$1']==='on')");
+    const fn = new Function('s', 'return ' + safe + ';');
+    _ruleCache[expr] = fn;
+    return fn;
+  }
+
+  function recalcPipes(){
+    document.querySelectorAll('[data-active-when]').forEach(p => {
+      const expr = p.getAttribute('data-active-when');
+      let active = false;
+      try { active = !!compileRule(expr)(state); } catch (e) { active = false; }
+      // Cada pipe puede declarar su propio color activo (data-active-color),
+      // útil para líneas de agua/sello (cyan) que no usan verde gas.
+      const activeColor = p.getAttribute('data-active-color') || PIPE_ACTIVE;
+      p.setAttribute('stroke', active ? activeColor : PIPE_INACTIVE);
+    });
+  }
 
   function applyValue(key, value){
     state[key] = value;
-    // Pipes manejados por esta válvula: recolorear según estado.
-    if (key.startsWith('valve.')) {
-      const pipeColor = value === 'open' ? '#00f525'
-                      : (value === 'manual' || value === 'cyan') ? '#65bfff'
-                      : '#ff1616';
-      document.querySelectorAll('[data-driven-by="' + key + '"]').forEach(p => {
-        p.setAttribute('stroke', pipeColor);
-      });
+    // Cualquier cambio de válvula o equipment → recalcular pipes
+    if (key.startsWith('valve.') || key.startsWith('equipment.')) {
+      recalcPipes();
     }
     const els = document.querySelectorAll('[data-key="' + key + '"]');
     if (!els.length) return;
@@ -488,12 +651,46 @@
         y = mT ? parseFloat(mT[2]) : 0;
         rot = mR ? parseFloat(mR[1]) : 0;
         kind = 'g-translate';
-        // Si es readout group: leer width/height del rect interno
-        const innerRect = el.querySelector('rect.readoutBg, rect');
-        if (innerRect) {
-          w = parseFloat(innerRect.getAttribute('width')) || 0;
-          h = parseFloat(innerRect.getAttribute('height')) || 0;
+        // Snapshot de TODOS los rects/textos internos con sus posiciones ORIGINALES
+        // (para escalar proporcionalmente readouts compuestos: cargaA, descA, cargaB, descB)
+        const innerRectsList = [];
+        el.querySelectorAll('rect').forEach(r => {
+          innerRectsList.push({
+            el: r,
+            origX: parseFloat(r.getAttribute('x') || '0'),
+            origY: parseFloat(r.getAttribute('y') || '0'),
+            origW: parseFloat(r.getAttribute('width') || '0'),
+            origH: parseFloat(r.getAttribute('height') || '0'),
+          });
+        });
+        const innerTextsList = [];
+        el.querySelectorAll('text').forEach(t => {
+          // Capturar font-size original (inline style o computed)
+          const style = t.getAttribute('style') || '';
+          const m = style.match(/font-size\s*:\s*(\d+(?:\.\d+)?)\s*px/);
+          const origFs = m ? parseFloat(m[1]) : parseFloat(getComputedStyle(t).fontSize) || 16;
+          innerTextsList.push({
+            el: t,
+            origX: parseFloat(t.getAttribute('x') || '0'),
+            origY: parseFloat(t.getAttribute('y') || '0'),
+            origFs,
+            currentFs: origFs,
+          });
+        });
+        if (innerRectsList.length) {
+          // Usamos el rect "outer" (el primero) como referencia de tamaño total
+          w = innerRectsList[0].origW;
+          h = innerRectsList[0].origH;
         }
+        // Stash para usar en updateCoordOnElement
+        initialCoords[key] = {
+          x, y, rot, w, h, kind, el,
+          innerRects: innerRectsList,
+          innerTexts: innerTextsList,
+          origOuterW: w,
+          origOuterH: h,
+        };
+        return;
       } else if (tag === 'rect') {
         x = parseFloat(el.getAttribute('x')) || 0;
         y = parseFloat(el.getAttribute('y')) || 0;
@@ -503,7 +700,10 @@
       } else if (tag === 'circle') {
         x = parseFloat(el.getAttribute('cx')) || 0;
         y = parseFloat(el.getAttribute('cy')) || 0;
+        const rVal = parseFloat(el.getAttribute('r')) || 0;
         kind = 'circle-cxcy';
+        initialCoords[key] = { x, y, rot, w, h, kind, el, r: rVal };
+        return;
       } else if (tag === 'text') {
         x = parseFloat(el.getAttribute('x')) || 0;
         y = parseFloat(el.getAttribute('y')) || 0;
@@ -520,6 +720,7 @@
         row.dataset.editkey = key;
         let extra = '';
         if (info.w) extra = ' '+info.w+'×'+info.h;
+        if (info.r) extra += ' r='+info.r;
         if (info.rot) extra += ' ↻'+info.rot+'°';
         row.innerHTML = '<span class="key">'+key+'</span>' +
                         '<span class="coords">('+Math.round(info.x)+','+Math.round(info.y)+')'+extra+'</span>';
@@ -550,19 +751,34 @@
       const { el, kind, x, y, rot, w, h } = info;
       if (kind === 'g-translate') {
         updateTransform(el, x, y, rot);
-        // Si tiene rect interno editable de size
-        if (w && h) {
-          const innerRect = el.querySelector('rect.readoutBg, rect');
-          if (innerRect) {
-            innerRect.setAttribute('width', w);
-            innerRect.setAttribute('height', h);
-            // Re-center text inside group (anchor middle)
-            const innerText = el.querySelector('text');
-            if (innerText) {
-              innerText.setAttribute('x', w/2);
-              innerText.setAttribute('y', h/2);
+        // Si tiene rects internos: escalado PROPORCIONAL de TODOS los rects + textos
+        // (necesario para readouts compuestos cargaA/descA/cargaB/descB: 2 rects + 2 textos)
+        if (w && h && info.innerRects && info.innerRects.length && info.origOuterW > 0) {
+          const sw = w / info.origOuterW;
+          const sh = h / info.origOuterH;
+          info.innerRects.forEach(r => {
+            r.el.setAttribute('x', r.origX * sw);
+            r.el.setAttribute('width', r.origW * sw);
+            r.el.setAttribute('height', r.origH * sh);
+            if (r.origY) r.el.setAttribute('y', r.origY * sh);
+          });
+          // Escala font-size proporcional a min(sw,sh) para que el texto crezca/achique con la caja sin distorsión
+          const fsScale = Math.min(sw, sh);
+          info.innerTexts.forEach(t => {
+            // Aplica offset manual (xOffset/yOffset) sobre la posición escalada
+            t.el.setAttribute('x', t.origX * sw + (t.xOffset || 0));
+            t.el.setAttribute('y', t.origY * sh + (t.yOffset || 0));
+            // Sólo auto-scale si no fue tocado manualmente por +/-
+            if (!t.fontManuallySet) {
+              const newFs = +(t.origFs * fsScale).toFixed(2);
+              t.currentFs = newFs;
+              const oldStyle = t.el.getAttribute('style') || '';
+              const newStyle = oldStyle.match(/font-size/)
+                ? oldStyle.replace(/font-size\s*:\s*[\d.]+px/, 'font-size:' + newFs + 'px')
+                : (oldStyle ? oldStyle + ';' : '') + 'font-size:' + newFs + 'px';
+              t.el.setAttribute('style', newStyle);
             }
-          }
+          });
         }
       } else if (kind === 'rect-xy') {
         el.setAttribute('x', x);
@@ -572,6 +788,7 @@
       } else if (kind === 'circle-cxcy') {
         el.setAttribute('cx', x);
         el.setAttribute('cy', y);
+        if (info.r !== undefined && info.r > 0) el.setAttribute('r', info.r);
       } else if (kind === 'text-xy') {
         el.setAttribute('x', x);
         el.setAttribute('y', y);
@@ -585,6 +802,7 @@
       if (!row) return;
       let extra = '';
       if (info.w) extra = ' '+info.w+'×'+info.h;
+      if (info.r) extra += ' r='+info.r;
       if (info.rot) extra += ' ↻'+info.rot+'°';
       row.querySelector('.coords').textContent = '('+Math.round(info.x)+','+Math.round(info.y)+')'+extra;
     }
@@ -601,9 +819,32 @@
     // Drag state
     let dragKey = null, dragStartSvg = null, dragStartCoord = null;
 
+    let selectedPipe = null;
+    function clearSelectedPipe(){
+      if (selectedPipe) selectedPipe.classList.remove('selected-pipe');
+      selectedPipe = null;
+    }
+    function selectPipe(pathEl){
+      clearSelectedPipe();
+      selectedPipe = pathEl;
+      if (selectedPipe) selectedPipe.classList.add('selected-pipe');
+    }
+
     svg.addEventListener('mousedown', (e) => {
+      // Si el click cae sobre un pipe en la capa pipes, seleccionarlo (para drag o delete).
+      // Las pipes no son draggeables (son <path>), pero quedan seleccionadas para Delete.
+      const pipeEl = e.target.closest('[data-pipe]');
+      if (pipeEl && !drawingPoints) {
+        selectPipe(pipeEl);
+        // No iniciar drag, sólo seleccionar
+        return;
+      }
       const el = e.target.closest('[data-key], [data-readout]');
-      if (!el) return;
+      if (!el) {
+        clearSelectedPipe();
+        return;
+      }
+      clearSelectedPipe();
       const key = el.getAttribute('data-readout')
                 ? 'readout.' + el.getAttribute('data-readout')
                 : el.getAttribute('data-key');
@@ -647,6 +888,68 @@
         const delta = e.shiftKey ? -90 : 90;
         info.rot = ((info.rot || 0) + delta) % 360;
         handled = true;
+      }
+      else if (info.kind === 'g-translate' && info.innerTexts && 'hjklHJKL'.includes(e.key)) {
+        // Mover el texto de VALOR (data-key) dentro del readout sin tocar la caja.
+        // Estilo vim: H=izq, L=der, K=arriba, J=abajo. Shift = ±5
+        const valTargets = info.innerTexts.filter(t => t.el.hasAttribute('data-key'));
+        const step = e.shiftKey ? 5 : 1;
+        const k = e.key.toLowerCase();
+        valTargets.forEach(t => {
+          if (k === 'h')      t.xOffset = (t.xOffset || 0) - step;
+          else if (k === 'l') t.xOffset = (t.xOffset || 0) + step;
+          else if (k === 'k') t.yOffset = (t.yOffset || 0) - step;
+          else if (k === 'j') t.yOffset = (t.yOffset || 0) + step;
+          // Aplicar inmediatamente (sin esperar a que se redimensione la caja)
+          const sw = info.origOuterW > 0 ? info.w / info.origOuterW : 1;
+          const sh = info.origOuterH > 0 ? info.h / info.origOuterH : 1;
+          t.el.setAttribute('x', t.origX * sw + (t.xOffset || 0));
+          t.el.setAttribute('y', t.origY * sh + (t.yOffset || 0));
+        });
+        handled = true;
+      }
+      else if (info.kind === 'g-translate' && info.innerTexts && (e.key === '+' || e.key === '-' || e.key === '=' || e.key === 'z' || e.key === 'Z')) {
+        // +/- y Z afectan SÓLO el texto del VALOR (el que tiene data-key, ej: text.cargaA).
+        // Los labels estáticos ("Carga", "Desc.") quedan intactos.
+        // Si querés que afecte a TODOS los textos del readout: Shift+T como modificador (opcional).
+        const targets = info.innerTexts.filter(t => t.el.hasAttribute('data-key'));
+        // Fallback: si no hay ningún texto con data-key (caso readout de 1 solo texto sin key),
+        // tocamos todos los textos del grupo.
+        const effective = targets.length ? targets : info.innerTexts;
+
+        const applyFs = (t, fs) => {
+          const oldStyle = t.el.getAttribute('style') || '';
+          const newStyle = oldStyle.match(/font-size/)
+            ? oldStyle.replace(/font-size\s*:\s*[\d.]+px/, 'font-size:' + fs + 'px')
+            : (oldStyle ? oldStyle + ';' : '') + 'font-size:' + fs + 'px';
+          t.el.setAttribute('style', newStyle);
+        };
+
+        if (e.key === 'z' || e.key === 'Z') {
+          effective.forEach(t => {
+            t.fontManuallySet = false;
+            t.currentFs = t.origFs;
+            applyFs(t, t.origFs);
+          });
+          handled = true;
+        } else {
+          const fsStep = e.shiftKey ? 2 : 1;
+          const delta = (e.key === '-') ? -fsStep : fsStep;
+          effective.forEach(t => {
+            t.fontManuallySet = true;
+            t.currentFs = Math.max(6, (t.currentFs || t.origFs) + delta);
+            applyFs(t, t.currentFs);
+          });
+          handled = true;
+        }
+      }
+      else if (info.kind === 'circle-cxcy' && info.r !== undefined) {
+        // Círculos (LEDs/pilotos): W/S = radio ±1, A/D = radio ±5 (shift = más)
+        const rStep = (e.shiftKey ? 5 : 1);
+        if (e.key === 'w' || e.key === 'W')      { info.r = Math.max(1, info.r + rStep); handled = true; }
+        else if (e.key === 's' || e.key === 'S') { info.r = Math.max(1, info.r - rStep); handled = true; }
+        else if (e.key === 'd' || e.key === 'D') { info.r = Math.max(1, info.r + 5); handled = true; }
+        else if (e.key === 'a' || e.key === 'A') { info.r = Math.max(1, info.r - 5); handled = true; }
       }
       else if (info.w !== undefined) {
         if (e.key === 'd' || e.key === 'D') { info.w = Math.max(10, info.w + 5); handled = true; }
@@ -708,6 +1011,359 @@
     document.getElementById('btn-reset').addEventListener('click', () => {
       window.location.reload();
     });
+
+    // ───── HUD coords + "Nueva pipe" tool ─────
+    const hud = document.createElement('div');
+    hud.id = 'svg-coord-hud';
+    hud.style.cssText = 'position:fixed;top:8px;left:8px;background:rgba(0,0,0,0.85);color:#00ffaa;padding:6px 10px;font-family:Consolas,monospace;font-size:14px;font-weight:bold;border:1px solid #00ffaa;border-radius:4px;z-index:1001;pointer-events:none;min-width:280px;';
+    hud.innerHTML = 'SVG: (–, –) <span id="zoom-badge" style="margin-left:8px;color:#7ec8ff;font-size:11px;">[100%]</span> <span id="snap-badge" style="margin-left:8px;color:#888;font-size:11px;">[G:snap-5]</span>';
+    document.body.appendChild(hud);
+
+    // ───── ZOOM con rueda + PAN con espacio ─────
+    const baseW = 1448, baseH = 1086;
+    let viewBox = { x: 0, y: 0, w: baseW, h: baseH };
+    function applyVB(){
+      svg.setAttribute('viewBox', viewBox.x + ' ' + viewBox.y + ' ' + viewBox.w + ' ' + viewBox.h);
+      const zp = Math.round(baseW / viewBox.w * 100);
+      const zb = document.getElementById('zoom-badge'); if (zb) zb.textContent = '[' + zp + '%]';
+    }
+    svg.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 0.85 : 1.18;
+      const newW = viewBox.w * factor, newH = viewBox.h * factor;
+      if (newW > baseW * 4 || newW < baseW * 0.1) return;
+      const pt = svgPoint(e.clientX, e.clientY);
+      const rx = (pt.x - viewBox.x) / viewBox.w, ry = (pt.y - viewBox.y) / viewBox.h;
+      viewBox.x = pt.x - rx * newW;
+      viewBox.y = pt.y - ry * newH;
+      viewBox.w = newW; viewBox.h = newH;
+      applyVB();
+    }, { passive: false });
+    let spaceHeld = false, panning = false, panStart = null;
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' && !drawingPoints && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
+        spaceHeld = true; document.body.style.cursor = 'grab'; e.preventDefault();
+      }
+      if ((e.key === '0' || e.key === 'Home') && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        viewBox = { x: 0, y: 0, w: baseW, h: baseH }; applyVB();
+      }
+    });
+    window.addEventListener('keyup', (e) => {
+      if (e.code === 'Space') { spaceHeld = false; document.body.style.cursor = ''; }
+    });
+    let justPanned = false;
+    svg.addEventListener('mousedown', (e) => {
+      if (spaceHeld || e.button === 1) {
+        e.preventDefault();
+        e.stopPropagation();
+        panning = true;
+        panStart = { x: e.clientX, y: e.clientY, vbx: viewBox.x, vby: viewBox.y };
+        document.body.style.cursor = 'grabbing';
+      }
+    }, true);
+    // Bloquear el click que dispara después de mouseup de un pan
+    svg.addEventListener('click', (e) => {
+      if (justPanned) { e.stopPropagation(); e.preventDefault(); justPanned = false; }
+    }, true);
+    window.addEventListener('mousemove', (e) => {
+      if (!panning) return;
+      const ctm = svg.getScreenCTM();
+      const sx = ctm.a || 1, sy = ctm.d || 1;
+      viewBox.x = panStart.vbx - (e.clientX - panStart.x) / sx;
+      viewBox.y = panStart.vby - (e.clientY - panStart.y) / sy;
+      applyVB();
+    });
+    window.addEventListener('mouseup', () => {
+      if (panning) { panning = false; justPanned = true; document.body.style.cursor = spaceHeld ? 'grab' : ''; }
+    });
+
+    // Precisión: snap-a-grilla (toggle G), snap ortogonal auto, crosshair + preview segmento
+    let snapToGrid = false;
+    const SNAP_STEP = 5;
+    const ORTHO_TOLERANCE = 12;
+
+    function snapPoint(rawX, rawY, lastPoint){
+      let x = rawX, y = rawY;
+      if (snapToGrid) {
+        x = Math.round(x / SNAP_STEP) * SNAP_STEP;
+        y = Math.round(y / SNAP_STEP) * SNAP_STEP;
+      }
+      if (lastPoint) {
+        const dx = Math.abs(x - lastPoint.x);
+        const dy = Math.abs(y - lastPoint.y);
+        if (dx < ORTHO_TOLERANCE && dx <= dy) x = lastPoint.x;
+        else if (dy < ORTHO_TOLERANCE && dy < dx) y = lastPoint.y;
+      }
+      return { x: Math.round(x), y: Math.round(y) };
+    }
+
+    // Crosshair (líneas que cruzan donde está el cursor)
+    const cross = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    cross.setAttribute('id', 'cross-cursor');
+    cross.style.display = 'none';
+    cross.style.pointerEvents = 'none';
+    const crossH = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    crossH.setAttribute('stroke', '#65bfff'); crossH.setAttribute('stroke-width', '0.7'); crossH.setAttribute('stroke-dasharray', '4 4');
+    const crossV = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    crossV.setAttribute('stroke', '#65bfff'); crossV.setAttribute('stroke-width', '0.7'); crossV.setAttribute('stroke-dasharray', '4 4');
+    cross.appendChild(crossH); cross.appendChild(crossV);
+    svg.appendChild(cross);
+
+    // Preview del próximo segmento (desde último punto al cursor)
+    const segPreview = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    segPreview.setAttribute('stroke', '#ff66ff');
+    segPreview.setAttribute('stroke-width', '3');
+    segPreview.setAttribute('stroke-dasharray', '6 4');
+    segPreview.setAttribute('opacity', '0.7');
+    segPreview.style.pointerEvents = 'none';
+    segPreview.style.display = 'none';
+    svg.appendChild(segPreview);
+
+    // Drawing mode state
+    let drawingPoints = null;
+    let drawingPreview = null;
+    let drawingDots = [];
+    let pipeCounter = 0;
+
+    svg.addEventListener('mousemove', (e) => {
+      const pt = svgPoint(e.clientX, e.clientY);
+      // Compute snap point if drawing
+      let coord = { x: Math.round(pt.x), y: Math.round(pt.y) };
+      if (drawingPoints) {
+        const last = drawingPoints[drawingPoints.length - 1];
+        coord = snapPoint(pt.x, pt.y, last);
+        // Crosshair on
+        cross.style.display = '';
+        crossH.setAttribute('x1', 0); crossH.setAttribute('x2', 1448);
+        crossH.setAttribute('y1', coord.y); crossH.setAttribute('y2', coord.y);
+        crossV.setAttribute('y1', 0); crossV.setAttribute('y2', 1086);
+        crossV.setAttribute('x1', coord.x); crossV.setAttribute('x2', coord.x);
+        // Segment preview
+        if (last) {
+          segPreview.style.display = '';
+          segPreview.setAttribute('x1', last.x); segPreview.setAttribute('y1', last.y);
+          segPreview.setAttribute('x2', coord.x); segPreview.setAttribute('y2', coord.y);
+        }
+      } else {
+        cross.style.display = 'none';
+        segPreview.style.display = 'none';
+      }
+      const zoomPct = Math.round(baseW / viewBox.w * 100);
+      hud.innerHTML = 'SVG: (' + coord.x + ', ' + coord.y + ')'
+        + ' <span id="zoom-badge" style="margin-left:8px;color:#7ec8ff;font-size:11px;">[' + zoomPct + '%]</span>'
+        + ' <span id="snap-badge" style="margin-left:8px;color:' + (snapToGrid?'#00ffaa':'#888') + ';font-size:11px;">[G:snap-' + SNAP_STEP + (snapToGrid?' ON':'') + ']</span>';
+    });
+
+    function startDrawing(){
+      drawingPoints = [];
+      drawingPreview = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      drawingPreview.setAttribute('fill', 'none');
+      drawingPreview.setAttribute('stroke', '#ff66ff');
+      drawingPreview.setAttribute('stroke-width', 4);
+      drawingPreview.setAttribute('stroke-dasharray', '6 4');
+      drawingPreview.style.pointerEvents = 'none';
+      svg.appendChild(drawingPreview);
+      hud.style.color = '#ff66ff';
+      hud.style.borderColor = '#ff66ff';
+      document.body.classList.add('drawing-pipe');
+    }
+
+    const userAddedPipes = []; // track los <path> nuevos insertados, para "borrar última"
+
+    function endDrawing(commit, rearm){
+      if (!drawingPoints) return;
+      if (drawingPreview && drawingPreview.parentNode) drawingPreview.parentNode.removeChild(drawingPreview);
+      drawingDots.forEach(d => { if (d.parentNode) d.parentNode.removeChild(d); });
+      drawingDots = [];
+      if (commit && drawingPoints.length >= 2) {
+        pipeCounter++;
+        const d = 'M ' + drawingPoints.map(p => p.x + ' ' + p.y).join(' L ');
+        // Leer inputs de config (si vacíos → defaults)
+        const nameInput = document.getElementById('pipe-name');
+        const ruleInput = document.getElementById('pipe-rule');
+        const colorInput = document.getElementById('pipe-color');
+        const name  = (nameInput?.value.trim()  || 'pipe-' + pipeCounter).replace(/[^\w-]/g, '');
+        // Si dejaste el campo vacío (o el placeholder histórico "valve.XXX"), → siempre activa
+        let rule = ruleInput?.value.trim() || '';
+        if (!rule || rule === 'valve.XXX') rule = 'true';
+        const color = (colorInput?.value.trim() || '').replace(/[^#0-9a-fA-F]/g, '');
+
+        // Insertar el path REAL en <g class="pipes">
+        const pipesGroup = svg.querySelector('g.pipes');
+        if (pipesGroup) {
+          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          path.setAttribute('data-pipe', name);
+          path.setAttribute('data-active-when', rule);
+          if (color) path.setAttribute('data-active-color', color);
+          path.setAttribute('d', d);
+          path.setAttribute('stroke', '#ff1616');
+          pipesGroup.appendChild(path);
+          userAddedPipes.push(path);
+          // Recalcular (por si la regla ya matchea estado actual)
+          if (typeof recalcPipes === 'function') recalcPipes();
+        }
+
+        // Append snippet en log (para registro)
+        const attrs = 'data-pipe="' + name + '" data-active-when="' + rule + '"'
+                    + (color ? ' data-active-color="' + color + '"' : '');
+        const snippet = '<path ' + attrs + '\n      d="' + d + '" stroke="#ff1616"/>';
+        const sep = editOutput.value ? '\n' : '';
+        editOutput.value = (editOutput.value || '') + sep + snippet;
+        navigator.clipboard?.writeText(editOutput.value);
+        editOutput.placeholder = '✓ Pipe #' + pipeCounter + ' "' + name + '" (' + drawingPoints.length + ' pts) insertada al SVG en vivo.';
+      }
+      drawingPoints = null;
+      drawingPreview = null;
+      if (rearm) {
+        startDrawing();
+      } else {
+        cross.style.display = 'none';
+        segPreview.style.display = 'none';
+        hud.style.color = '#00ffaa';
+        hud.style.borderColor = '#00ffaa';
+        document.body.classList.remove('drawing-pipe');
+      }
+    }
+
+    document.getElementById('btn-new-pipe').addEventListener('click', () => {
+      if (drawingPoints) { endDrawing(false, false); return; }
+      startDrawing();
+    });
+    document.getElementById('btn-clear-log').addEventListener('click', () => {
+      editOutput.value = '';
+      pipeCounter = 0;
+      editOutput.placeholder = 'Log limpio — pipeCounter reseteado.';
+    });
+
+    function deleteSelectedElement(){
+      // Prioridad: pipe seleccionado por click > elemento del panel
+      let target = null, label = '';
+      if (selectedPipe) {
+        target = selectedPipe;
+        label = 'pipe "' + (selectedPipe.getAttribute('data-pipe') || '?') + '"';
+      } else if (currentSelected && initialCoords[currentSelected]) {
+        target = initialCoords[currentSelected].el;
+        label = currentSelected;
+      }
+      if (!target) {
+        editOutput.placeholder = '⚠ Nada seleccionado. Click un pipe o una fila del panel.';
+        return;
+      }
+      if (!confirm('¿Eliminar ' + label + '? Esta acción no es reversible (pero la pipe queda en el HTML hasta que la persistas).')) return;
+      const removed = target.parentNode?.removeChild(target);
+      // Limpiar referencias
+      if (currentSelected && initialCoords[currentSelected]?.el === target) {
+        delete initialCoords[currentSelected];
+        currentSelected = null;
+        renderList();
+      }
+      clearSelectedPipe();
+      editOutput.placeholder = '🗑 Eliminado: ' + label + ' — usá "📦 Copiar BLOQUE pipes" o "📋 Copiar SVG" para persistir el cambio al HTML';
+    }
+
+    document.getElementById('btn-delete-selected').addEventListener('click', deleteSelectedElement);
+
+    // Color preset buttons: setean el input pipe-color al hex elegido
+    document.querySelectorAll('#edit-panel button[data-color]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const inp = document.getElementById('pipe-color');
+        if (inp) { inp.value = btn.getAttribute('data-color'); inp.focus(); }
+      });
+    });
+
+    document.getElementById('btn-del-last-pipe').addEventListener('click', () => {
+      const last = userAddedPipes.pop();
+      if (!last) { editOutput.placeholder = 'No hay pipes nuevas para borrar'; return; }
+      if (last.parentNode) last.parentNode.removeChild(last);
+      // Recortar la última snippet del log también
+      const lines = editOutput.value.split(/\n(?=<path )/);
+      lines.pop();
+      editOutput.value = lines.join('\n');
+      editOutput.placeholder = '🗑 Última pipe borrada del SVG y del log';
+    });
+
+    // Botón estrella: dump del bloque <g class="pipes"> completo, listo para pegar al archivo
+    document.getElementById('btn-copy-pipes-block').addEventListener('click', () => {
+      const pipesGroup = svg.querySelector('g.pipes');
+      if (!pipesGroup) return;
+      const lines = ['<g class="pipes" fill="none" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">'];
+      pipesGroup.querySelectorAll('[data-pipe]').forEach(p => {
+        const attrs = [];
+        for (const a of p.attributes) {
+          if (a.name === 'stroke') continue; // lo agregamos al final con valor default
+          attrs.push(a.name + '="' + a.value + '"');
+        }
+        // Stroke default rojo inactivo; recalcPipes lo pintará verde/cyan según rule
+        lines.push('  <path ' + attrs.join(' ') + ' stroke="#ff1616"/>');
+      });
+      lines.push('</g>');
+      const out = lines.join('\n');
+      editOutput.value = out;
+      navigator.clipboard?.writeText(out);
+      editOutput.placeholder = '📦 Bloque completo copiado (' + pipesGroup.querySelectorAll('[data-pipe]').length + ' pipes). Pegá en HTML reemplazando <g class="pipes">...</g>';
+    });
+
+    svg.addEventListener('click', (e) => {
+      if (!drawingPoints) return;
+      // Ignorar clicks que caen sobre overlays interactivos
+      if (e.target.closest('.interactive [data-key]') || e.target.closest('.interactive [data-readout]')) return;
+      e.stopPropagation();
+      const pt = svgPoint(e.clientX, e.clientY);
+      const last = drawingPoints[drawingPoints.length - 1];
+      const p = snapPoint(pt.x, pt.y, last);
+      drawingPoints.push(p);
+      // Update preview path
+      const d = 'M ' + drawingPoints.map(pp => pp.x + ' ' + pp.y).join(' L ');
+      drawingPreview.setAttribute('d', d);
+      // Add visual dot
+      const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      dot.setAttribute('cx', p.x);
+      dot.setAttribute('cy', p.y);
+      dot.setAttribute('r', 5);
+      dot.setAttribute('fill', '#ff66ff');
+      dot.setAttribute('stroke', '#fff');
+      dot.setAttribute('stroke-width', 1.5);
+      dot.style.pointerEvents = 'none';
+      svg.appendChild(dot);
+      drawingDots.push(dot);
+    }, true);
+
+    window.addEventListener('keydown', (e) => {
+      // Si el usuario está tipeando en un input/textarea, no disparar shortcuts
+      const tag = document.activeElement?.tagName;
+      const typing = (tag === 'INPUT' || tag === 'TEXTAREA');
+      // DEL: eliminar elemento seleccionado (pipe o item del panel)
+      if (!typing && (e.key === 'Delete') && !drawingPoints) {
+        e.preventDefault();
+        deleteSelectedElement();
+        return;
+      }
+      // Toggle snap-a-grilla con G (siempre, no sólo en draw)
+      if (!typing && (e.key === 'g' || e.key === 'G') && !e.ctrlKey && !e.metaKey) {
+        snapToGrid = !snapToGrid;
+        // Forzar refresh del badge HUD en próximo mousemove (o ya):
+        const badge = document.getElementById('snap-badge');
+        if (badge) {
+          badge.style.color = snapToGrid ? '#00ffaa' : '#888';
+          badge.textContent = '[G:snap-' + SNAP_STEP + (snapToGrid?' ON':'') + ']';
+        }
+      }
+      if (!drawingPoints) return;
+      if (typing) return; // no disparar enter/esc/backspace si estás en input
+      if (e.key === 'Enter')   { e.preventDefault(); endDrawing(true, true); }   // commit + rearm
+      else if (e.key === 'Escape') { e.preventDefault(); endDrawing(false, false); } // cancel + exit
+      else if (e.key === 'Backspace' && drawingPoints.length > 0) {
+        e.preventDefault();
+        drawingPoints.pop();
+        const last = drawingDots.pop();
+        if (last && last.parentNode) last.parentNode.removeChild(last);
+        const d = drawingPoints.length
+          ? 'M ' + drawingPoints.map(pp => pp.x + ' ' + pp.y).join(' L ')
+          : '';
+        drawingPreview.setAttribute('d', d);
+      }
+    });
   }
   if (urlParams.get('edit') === '1') {
     window.addEventListener('load', () => setTimeout(initEditMode, 100));
@@ -721,9 +1377,210 @@
     }, 100));
   }
 
+  // ═══════════════════════════════════════════════════════════
+  // MOTOR DE CICLO — réplica del PLC real (ciclo_yal_referencia.json)
+  // Fase A: A descarga (presión) + B carga (vacío) + venteo
+  // Fase B: A carga (vacío) + B descarga (presión) + venteo
+  // ═══════════════════════════════════════════════════════════
+  const CYCLE = {
+    t_carga_A: 26, t_desc_A: 39, t_carga_B: 27, t_desc_B: 39,
+    t_venteo: 6,   t_led_drop: 15,
+    phase: 'A', t_in_phase: 0, fired: new Set(), running: false, speed: 1.0,
+    last_carga_A: 28, last_desc_A: 0, last_carga_B: 0, last_desc_B: 41,
+    timer: null, _lastTick: 0,
+  };
+
+  function cycleSetInitialState(phase){
+    if (phase === 'A') {
+      // Tacho A descargando (presión), Tacho B cargando (vacío)
+      applyValue('valve.y101', 'closed');   // vacío→A OFF
+      applyValue('valve.y102', 'open');     // presión→A ON  (descarga A)
+      applyValue('valve.y103', 'open');     // vacío→B ON    (carga B)
+      applyValue('valve.y104', 'closed');   // presión→B OFF
+      applyValue('valve.y111', 'closed');   // venteo vacío
+      applyValue('valve.y112', 'closed');   // venteo presión
+      applyValue('valve.y12',  'open');     // salida compresor GA90
+      applyValue('valve.y13',  'open');     // hidrófugo
+      applyValue('valve.y141', 'open');     // sello C1
+      applyValue('valve.y142', 'open');     // sello C2
+      applyValue('led.tankA', 'on-green');  // A lleno (al inicio de descarga)
+      applyValue('led.tankB', 'off');       // B vacío (al inicio de carga)
+      applyValue('led.yal',   'on-green');  // hidrófugo con flujo
+    } else {
+      // Tacho A cargando (vacío), Tacho B descargando (presión)
+      applyValue('valve.y101', 'open');     // vacío→A ON     (carga A)
+      applyValue('valve.y102', 'closed');
+      applyValue('valve.y103', 'closed');
+      applyValue('valve.y104', 'open');     // presión→B ON   (descarga B)
+      applyValue('valve.y111', 'closed');
+      applyValue('valve.y112', 'closed');
+      applyValue('valve.y12',  'open');
+      applyValue('valve.y13',  'open');
+      applyValue('valve.y141', 'open');
+      applyValue('valve.y142', 'open');
+      applyValue('led.tankA', 'off');
+      applyValue('led.tankB', 'on-green');
+      applyValue('led.yal',   'on-green');
+    }
+  }
+
+  function cycleTickEvents(){
+    const c = CYCLE;
+    const t = c.t_in_phase;
+
+    if (c.phase === 'A') {
+      // Evento: nivel A baja (LED A: verde→gris)
+      if (t >= c.t_led_drop && !c.fired.has('A_drain')) {
+        applyValue('led.tankA', 'off');
+        c.fired.add('A_drain');
+      }
+      // Evento: Tacho B lleno → cortar vacío + abrir venteo vacío
+      if (t >= c.t_carga_B && !c.fired.has('B_full')) {
+        applyValue('led.tankB', 'on-green');
+        applyValue('valve.y103', 'closed');
+        applyValue('valve.y111', 'open');
+        c.last_carga_B = Math.round(t);
+        c.fired.add('B_full');
+      }
+      // Evento: descarga A completa → cortar presión + abrir venteo presión + cerrar y13
+      if (t >= c.t_desc_A && !c.fired.has('A_discharge_done')) {
+        applyValue('led.yal',   'off');
+        applyValue('valve.y102', 'closed');
+        applyValue('valve.y112', 'open');
+        applyValue('valve.y13',  'closed');
+        c.last_desc_A = Math.round(t);
+        c.fired.add('A_discharge_done');
+      }
+      // Evento: venteo completo → conmutar a Fase B
+      const ventEnd = Math.max(c.t_carga_B, c.t_desc_A) + c.t_venteo;
+      if (t >= ventEnd) {
+        applyValue('valve.y111', 'closed');
+        applyValue('valve.y112', 'closed');
+        c.phase = 'B';
+        c.t_in_phase = 0;
+        c.fired = new Set();
+        cycleSetInitialState('B');
+        return;
+      }
+    } else {
+      if (t >= c.t_led_drop && !c.fired.has('B_drain')) {
+        applyValue('led.tankB', 'off');
+        c.fired.add('B_drain');
+      }
+      if (t >= c.t_carga_A && !c.fired.has('A_full')) {
+        applyValue('led.tankA', 'on-green');
+        applyValue('valve.y101', 'closed');
+        applyValue('valve.y111', 'open');
+        c.last_carga_A = Math.round(t);
+        c.fired.add('A_full');
+      }
+      if (t >= c.t_desc_B && !c.fired.has('B_discharge_done')) {
+        applyValue('led.yal',   'off');
+        applyValue('valve.y104', 'closed');
+        applyValue('valve.y112', 'open');
+        applyValue('valve.y13',  'closed');
+        c.last_desc_B = Math.round(t);
+        c.fired.add('B_discharge_done');
+      }
+      const ventEnd = Math.max(c.t_carga_A, c.t_desc_B) + c.t_venteo;
+      if (t >= ventEnd) {
+        applyValue('valve.y111', 'closed');
+        applyValue('valve.y112', 'closed');
+        c.phase = 'A';
+        c.t_in_phase = 0;
+        c.fired = new Set();
+        cycleSetInitialState('A');
+        return;
+      }
+    }
+
+    // Readouts: contador del que está corriendo + último completado del otro
+    if (c.phase === 'A') {
+      applyValue('text.descA',  Math.min(Math.round(t), c.t_desc_A)  + ' s');
+      applyValue('text.cargaB', Math.min(Math.round(t), c.t_carga_B) + ' s');
+      applyValue('text.cargaA', c.last_carga_A + ' s');
+      applyValue('text.descB',  c.last_desc_B  + ' s');
+    } else {
+      applyValue('text.cargaA', Math.min(Math.round(t), c.t_carga_A) + ' s');
+      applyValue('text.descB',  Math.min(Math.round(t), c.t_desc_B)  + ' s');
+      applyValue('text.descA',  c.last_desc_A  + ' s');
+      applyValue('text.cargaB', c.last_carga_B + ' s');
+    }
+
+    // Info panel
+    const info = document.getElementById('cycle-info');
+    if (info) info.textContent = 'Fase ' + c.phase + ' · t=' + t.toFixed(1) + 's';
+  }
+
+  function cyclePlay(){
+    if (CYCLE.running) return;
+    // Si arrancamos de cero (boot o tras Reset), encender equipment y aplicar el estado inicial.
+    // Si t_in_phase > 0 es un resume desde Pausa: no tocar nada.
+    if (CYCLE.t_in_phase === 0) {
+      // Equipment ON: Atlas + bombas vacío + sello necesarios para el ciclo
+      applyValue('equipment.atlas',  'on');
+      applyValue('equipment.c1',     'on');
+      applyValue('equipment.c2',     'on');
+      applyValue('equipment.sello',  'on');
+      applyValue('equipment.bombeo', 'on');
+      cycleSetInitialState(CYCLE.phase);
+    }
+    CYCLE.running = true;
+    CYCLE._lastTick = performance.now();
+    const statusEl = document.getElementById('cycle-status');
+    if (statusEl) { statusEl.textContent = 'Corriendo'; statusEl.classList.remove('paused'); }
+    CYCLE.timer = setInterval(() => {
+      const now = performance.now();
+      const dt = (now - CYCLE._lastTick) / 1000 * CYCLE.speed;
+      CYCLE._lastTick = now;
+      CYCLE.t_in_phase += dt;
+      cycleTickEvents();
+    }, 80);
+  }
+  function cyclePause(){
+    if (!CYCLE.running) return;
+    CYCLE.running = false;
+    if (CYCLE.timer) { clearInterval(CYCLE.timer); CYCLE.timer = null; }
+    const statusEl = document.getElementById('cycle-status');
+    if (statusEl) { statusEl.textContent = 'Pausado'; statusEl.classList.add('paused'); }
+  }
+  function cycleReset(){
+    cyclePause();
+    CYCLE.phase = 'A'; CYCLE.t_in_phase = 0; CYCLE.fired = new Set();
+    CYCLE.last_carga_A = 28; CYCLE.last_desc_A = 0;
+    CYCLE.last_carga_B = 0;  CYCLE.last_desc_B = 41;
+    // Apagar equipment (sistema completo OFF como en planta apagada)
+    applyValue('equipment.atlas',  'off');
+    applyValue('equipment.c1',     'off');
+    applyValue('equipment.c2',     'off');
+    applyValue('equipment.sello',  'off');
+    applyValue('equipment.bombeo', 'off');
+    applyValue('equipment.bBarrido','off');
+    cycleSetInitialState('A');
+    const info = document.getElementById('cycle-info');
+    if (info) info.textContent = 'Fase A · t=0s';
+  }
+
+  function attachCycleUI(){
+    const playBtn = document.getElementById('cycle-play');
+    const pauseBtn = document.getElementById('cycle-pause');
+    const resetBtn = document.getElementById('cycle-reset');
+    const speedInput = document.getElementById('cycle-speed');
+    const speedVal = document.getElementById('cycle-speed-val');
+    if (!playBtn) return;
+    playBtn.addEventListener('click', cyclePlay);
+    pauseBtn.addEventListener('click', cyclePause);
+    resetBtn.addEventListener('click', cycleReset);
+    speedInput.addEventListener('input', () => {
+      CYCLE.speed = parseFloat(speedInput.value);
+      speedVal.textContent = CYCLE.speed + '×';
+    });
+  }
+
   function bootstrap(){
     applyAll(DEFAULTS);
     attachValveClicks();
+    attachCycleUI();
     startTimestampTick();
     sendMessage('hmi:ready', {});
   }
