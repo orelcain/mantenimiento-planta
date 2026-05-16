@@ -5,7 +5,7 @@
  */
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Cpu, BookOpen, ArrowRight, Scale } from 'lucide-react'
+import { Cpu, BookOpen, ArrowRight, Scale, Wind } from 'lucide-react'
 import { useAuthStore } from '@/store'
 import {
   groupMachinesByArea,
@@ -50,6 +50,17 @@ const SPECIAL_MODULES: SpecialModule[] = [
     href: '/aprendizaje/hmi-grader',
     color: '#44dd88',
     stats: 'Modo práctica · 12 pockets',
+  },
+  {
+    id: 'hmi-bombeo-s2',
+    title: 'HMI Bombeo Acopio S2 (YAL)',
+    subtitle: 'Simulador del ciclo PLC',
+    description:
+      'Simulador interactivo del HMI Simatic de bombeo Sistema 2 (planta Yal). Motor de ciclo Fase A ↔ Fase B con eventos PLC reales (carga vacío + descarga presión + venteo). Botones sidebar clickeables.',
+    icon: Wind,
+    href: '/aprendizaje/hmi-bombeo-s2',
+    color: '#65c8ff',
+    stats: 'Ciclo ~90 s · 10 válvulas',
   },
 ]
 

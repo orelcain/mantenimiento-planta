@@ -1,10 +1,10 @@
 {
-  "version": "3.28.7",
-  "buildDate": "2026-05-13",
-  "buildTimestamp": 1778690098411,
+  "version": "3.29.0",
+  "buildDate": "2026-05-15",
+  "buildTimestamp": 1778897254226,
   "features": [
-    "Grader: GatesConfigPage dividido en 6 sub-componentes (2715→1200 líneas, -56%)",
-    "Grader: ProductoTab, CintasTab, DistanciasTab, DanfossTab, NeumaticaTab, VerificacionTab",
-    "Grader: FASE 7 — fix Firestore rules + useConfigChangeLogger enabledRef + historial deps"
+    "HMI Yal: 10 botones sidebar clickeables (toggle equipment + cycle Play/Pause)",
+    "HMI Yal: reglas booleanas 19 pipes refinadas — validadas pixel-perfect contra video (Fase A + Fase B + transición)",
+    "HMI Yal: ruta /aprendizaje/hmi-bombeo-s2 + entry en LearningHub + simulador integrado a PWA"
   ]
 }
