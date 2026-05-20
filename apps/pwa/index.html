@@ -5,6 +5,32 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="theme-color" content="#121212" />
     <meta name="description" content="Sistema de gestión de mantenimiento industrial y levantamiento de incidencias" />
+    <!--
+      Content Security Policy — defensa en profundidad contra XSS.
+      Mantener permisivo para `script-src` y `style-src` para no romper la app
+      hoy; lo estricto vive en directivas que la app no necesita relajar:
+        object-src 'none' — bloquea <object>, <embed>, <applet> (vectores legacy).
+        base-uri 'self'   — bloquea <base href="evil.com"> que reescribe URLs relativas.
+        form-action 'self' — evita formularios que se exfiltren a otros dominios.
+        frame-ancestors 'none' — bloquea iframes externos (clickjacking).
+      Endurecer `script-src 'self'` (sin unsafe-inline) cuando se migren los
+      dos <script> inline de abajo a archivos con hash conocido.
+    -->
+    <meta http-equiv="Content-Security-Policy" content="
+      default-src 'self';
+      script-src 'self' 'unsafe-inline' https://accounts.google.com https://www.gstatic.com https://www.google.com https://www.recaptcha.net;
+      style-src 'self' 'unsafe-inline';
+      img-src 'self' data: blob: https:;
+      font-src 'self' data:;
+      connect-src 'self' https: wss:;
+      frame-src 'self' https://accounts.google.com https://www.google.com https://www.recaptcha.net;
+      worker-src 'self' blob:;
+      object-src 'none';
+      base-uri 'self';
+      form-action 'self';
+      frame-ancestors 'none';
+      upgrade-insecure-requests
+    " />
     <!-- Google Identity Services -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <link rel="icon" type="image/svg+xml" href="/mantenimiento-planta/icons/icon.svg" />
