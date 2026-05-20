@@ -25,9 +25,16 @@ setter_analysis.txt
 # Local env files - IMPORTANTE: Nunca commitear credenciales
 .env
 .env.local
+.env.development
+.env.production
 .env.*.local
 apps/pwa/.env
 apps/pwa/.env.local
+apps/pwa/.env.development
+apps/pwa/.env.production
+# .env.example sí se commitea (solo nombres de variables, sin valores)
+!.env.example
+!apps/pwa/.env.example
 
 # IDE
 .idea

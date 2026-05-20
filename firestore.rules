@@ -1337,9 +1337,13 @@ service cloud.firestore {
       allow read, write: if false; // solo Admin SDK (Cloud Functions)
     }
 
-    // ── AnimeTracker Mini App (bot personal, sin auth) ──────────────────────
+    // ── AnimeTracker Mini App (bot personal) ────────────────────────────────
+    // Solo Admin SDK (Cloud Functions). Antes era `allow read, write: if true`,
+    // pero eso permitía a cualquiera en internet llenar la colección con basura
+    // (denial-of-wallet trivial sobre el plan Firestore). El bot accede vía
+    // Cloud Function, no necesita reglas abiertas en el cliente.
     match /animelists/{userId} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
 
     // ── Telegram Mini App — whitelist de chats autorizados ───────────────────
