@@ -5,6 +5,7 @@ import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager
 import { getStorage } from 'firebase/storage'
 import { getDatabase } from 'firebase/database'
 import { getMessaging, isSupported } from 'firebase/messaging'
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'firebase/app-check'
 
 // Configuración de Firebase desde variables de entorno (.env.local)
 // NUNCA hardcodear keys aquí — configurar en .env.local o CI/CD build vars
@@ -24,6 +25,36 @@ if (!firebaseConfig.apiKey) {
 
 // Inicializar Firebase
 const app = initializeApp(firebaseConfig)
+
+// ─── App Check ────────────────────────────────────────────────────────────
+// Valida que las peticiones a Firebase vengan de esta app real (no de un script
+// con la API key copiada del bundle público). Bloquea bots/abuso a Cloud
+// Functions, Firestore y Storage cuando `enforceAppCheck` está activo en el
+// backend.
+//
+// Para activar:
+//   1. Crear un site key de reCAPTCHA Enterprise en Google Cloud Console.
+//   2. Registrar el dominio en Firebase Console → App Check.
+//   3. Setear VITE_RECAPTCHA_SITE_KEY en build vars (deploy.yml + .env.local).
+//   4. Subir gradualmente `enforceAppCheck: true` en los proxies de IA
+//      (functions/index.js) una vez que el front esté enviando tokens.
+//
+// Si la env var no está seteada, App Check no se inicializa — la app sigue
+// funcionando con la protección actual (Firestore Rules + request.auth).
+const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY
+if (recaptchaSiteKey) {
+  try {
+    initializeAppCheck(app, {
+      provider: new ReCaptchaEnterpriseProvider(recaptchaSiteKey),
+      isTokenAutoRefreshEnabled: true,
+    })
+    console.log('✅ App Check initialized (reCAPTCHA Enterprise)')
+  } catch (error) {
+    console.error('App Check init failed (continuing without):', error)
+  }
+} else if (import.meta.env.PROD) {
+  console.warn('⚠ VITE_RECAPTCHA_SITE_KEY no configurada — App Check inactivo en producción')
+}
 
 // Servicios básicos
 export const auth = getAuth(app)
