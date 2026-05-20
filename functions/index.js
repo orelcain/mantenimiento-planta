@@ -3665,11 +3665,15 @@ exports.shoplogixSyncHttp = onRequest(
         // Bearer mode: limpiar token guardado para forzar re-login en el próximo intento
         if (auth.mode === 'bearer') await shoplogixTokenStore.clearStoredToken(db)
         logger.error('[shoplogixSyncHttp] AUTH_EXPIRED', { mode: auth.mode })
-        res.status(401).json({ error: 'AUTH_EXPIRED', message: err.message, authMode: auth.mode })
+        // No exponer authMode al cliente (info de qué mecanismo está activo
+        // ayuda a un atacante a focalizar). Detalle en logger.
+        res.status(401).json({ error: 'AUTH_EXPIRED' })
         return
       }
+      // No retornar err.message al cliente — puede contener paths internos,
+      // nombres de colecciones, IPs de upstream. El detalle queda en logger.
       logger.error('[shoplogixSyncHttp] error', { err: err.message, stack: err.stack })
-      res.status(500).json({ error: err.message })
+      res.status(500).json({ error: 'INTERNAL_ERROR' })
     }
   },
 )
@@ -3944,7 +3948,8 @@ exports.shoplogixCleanupLegacy = onRequest(
       })
     } catch (err) {
       logger.error('[shoplogixCleanupLegacy] error', { err: err.message, stack: err.stack })
-      res.status(500).json({ error: err.message })
+      // Mensaje genérico al cliente — detalle queda en logger.
+      res.status(500).json({ error: 'INTERNAL_ERROR' })
     }
   },
 )
