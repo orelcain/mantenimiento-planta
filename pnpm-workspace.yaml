@@ -52,3 +52,11 @@ overrides:
   underscore@<=1.13.7: '>=1.13.8'
   vite@<=6.4.1: '>=6.4.2'
   vite@>=6.0.0 <=6.4.1: '>=6.4.2'
+  # CVE-2026-44292/93/94 (code injection, DoS, prototype pollution en protobufjs).
+  # Solo afecta a firebase-admin (functions/), no al bundle del frontend.
+  protobufjs@>=8.0.0 <8.2.0: '>=8.2.0'
+  '@protobufjs/utf8@<1.1.1': '>=1.1.1'
+  # brace-expansion 5.x DoS via ReDoS
+  brace-expansion@>=5.0.0 <5.0.6: '>=5.0.6'
+  # ws CVE-2024-* DoS via HTTP headers (afecta @firebase/database via faye-websocket)
+  ws@>=8.0.0 <8.20.1: '>=8.20.1'
