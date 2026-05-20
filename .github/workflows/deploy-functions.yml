@@ -68,7 +68,7 @@ jobs:
             -H "Tags: rocket" \
             -H "Priority: default" \
             -d "Firebase Functions actualizadas correctamente en main 🚀" \
-            https://ntfy.sh/mis-notificaciones-claude || true
+            https://ntfy.sh/${{ secrets.NTFY_TOPIC }} || true
 
       - name: Notificar deploy fallido
         if: failure()
@@ -78,4 +78,4 @@ jobs:
             -H "Tags: warning" \
             -H "Priority: high" \
             -d "El deploy de Firebase Functions falló. Revisa los logs en GitHub Actions." \
-            https://ntfy.sh/mis-notificaciones-claude || true
+            https://ntfy.sh/${{ secrets.NTFY_TOPIC }} || true

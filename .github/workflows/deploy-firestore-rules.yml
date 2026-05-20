@@ -45,7 +45,7 @@ jobs:
             -H "Tags: shield" \
             -H "Priority: default" \
             -d "Firestore rules e indexes actualizados en main" \
-            https://ntfy.sh/mis-notificaciones-claude || true
+            https://ntfy.sh/${{ secrets.NTFY_TOPIC }} || true
 
       - name: Notificar deploy fallido
         if: failure()
@@ -55,4 +55,4 @@ jobs:
             -H "Tags: warning" \
             -H "Priority: high" \
             -d "El deploy de Firestore rules fallo. Revisa los logs." \
-            https://ntfy.sh/mis-notificaciones-claude || true
+            https://ntfy.sh/${{ secrets.NTFY_TOPIC }} || true

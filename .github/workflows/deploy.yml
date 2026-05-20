@@ -129,7 +129,7 @@ jobs:
             -H "Tags: rocket" \
             -H "Priority: default" \
             -d "GitHub Pages actualizado correctamente 🚀" \
-            https://ntfy.sh/mis-notificaciones-claude || true
+            https://ntfy.sh/${{ secrets.NTFY_TOPIC }} || true
 
       - name: Notificar deploy fallido (ntfy)
         if: failure()
@@ -139,4 +139,4 @@ jobs:
             -H "Tags: warning" \
             -H "Priority: high" \
             -d "El deploy a GitHub Pages falló. Revisa los logs." \
-            https://ntfy.sh/mis-notificaciones-claude || true
+            https://ntfy.sh/${{ secrets.NTFY_TOPIC }} || true
