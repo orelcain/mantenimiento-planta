@@ -373,7 +373,52 @@ Después de cada `git push`, verificar con `gh run list --limit 5` que el workfl
 - GitHub: `orelcain/mantenimiento-planta`
 - Produccion: `https://orelcain.github.io/mantenimiento-planta/`
 - CI status: 4/4 workflows 🟢
-- Seguridad: 26 colecciones Firestore validadas, 0 vulnerabilidades runtime prod
+- Seguridad: 26 colecciones Firestore validadas + 19 commits hardening en PR #69 (~88% threat model cubierto post-merge; ver "PENDIENTE — SECURITY post-merge PR #69")
+
+## Cambios recientes (sesión 2026-05-20 — Security hardening, PR #69, 19 commits)
+
+Branch: `claude/review-api-security-tSc6u` — PR https://github.com/orelcain/mantenimiento-planta/pull/69 (draft).
+
+Auditoría profunda en 5 rondas + fixes. **~88% del threat model "webapp moderna" cubierto** post-merge (antes era ~60%).
+
+### Ronda 1 — Fugas críticas + endpoints sin auth
+- `54066ca` Stop leaking `VITE_GROQ_API_KEY` y `VITE_GEMINI_API_KEY` al bundle público de GitHub Pages (Vite inlinea `import.meta.env.VITE_*` literalmente). Removidas de `deploy.yml` y de todas las referencias en código.
+- `e4573c7` Helper `authenticateAdminRequest(req, res)` en `functions/index.js` aplicado a 11 endpoints (Telegram setup x4, Shoplogix admin x5, runClimaPortoCheck, animeEstrenosManual, cacheDmStatus). Acepta `Authorization: Bearer <idToken>` con rol admin **o** `x-admin-secret` matching `ADMIN_API_SECRET` env.
+- `892ce5e` `telegramWebhook` valida `X-Telegram-Bot-Api-Secret-Token` contra `TELEGRAM_WEBHOOK_SECRET`. `setTelegramWebhook` ahora forwardea el secret a Telegram.
+- `9b179fe` `animelists` Firestore rule de `allow read, write: if true` → `if false` (solo Admin SDK). `.env.development` quitado de git + reglas explícitas en `.gitignore`.
+- `406e567` `firebase.ts` inicializa App Check condicional con `VITE_RECAPTCHA_SITE_KEY` (no-op hasta provisionar).
+
+### Ronda 2 — XSS, storage, HMAC, CSP
+- `f94884a` Nuevo `apps/pwa/src/lib/htmlEscape.ts` aplicado en print preview QR repuestos (`BodegaView.tsx:1539`) y export PDF (`pdfExport.ts:696`). Antes los campos de Firestore se interpolaban sin escape en `document.write`.
+- `133a787` Storage Rules: `/maps/{locationId}` y `/graderUploads` ahora hacen `firestore.get()` para validar rol admin/supervisor (antes solo `auth != null` aunque el comentario decía "solo admin").
+- `67ccf3d` `mintTelegramAuthToken` usa `crypto.timingSafeEqual()` para HMAC y no loggea los valores de hash en mismatch.
+- `88191ea` Meta CSP en `index.html` + headers CSP/HSTS en `firebase.json`. Estricto en `object-src 'none'`, `base-uri 'self'`, `form-action 'self'`, `frame-ancestors 'none'`.
+
+### Ronda 3 — Elevación, exposición, enumeración
+- `3c86d84` `users/{userId}` rule: self-registration sin invite limitada a `rol == 'usuario'`. Con invite, cross-doc `get(inviteCodes/{id})` valida que `invite.rol == request.resource.data.rol` y `invite.activo == true`. Cierra el bypass de `signUpWithInviteCode` vía `setDoc` directo. `auth.ts` ahora escribe `inviteCodeUsed: invite.id` en el user doc.
+- `4fc6354` `ntfy.sh/mis-notificaciones-claude` hardcoded → `${{ secrets.NTFY_TOPIC }}` en los 3 workflows.
+- `6483da9` `graderPublicTokens` TTL 7d → 24h (`EXPIRY_DAYS = 1`). Doc contiene KPIs operacionales y la URL `allow read: if true` puede filtrarse.
+- `a9cd704` Login: mismo mensaje "Credenciales inválidas" para `auth/user-not-found` y `auth/wrong-password` (anti email enumeration).
+
+### Ronda 4 — Endurecer CSP, generic errors
+- `0390548` Inline scripts pre-React movidos a `apps/pwa/public/boot.js`. CSP `script-src` ya NO incluye `'unsafe-inline'`. style-src lo mantiene (Tailwind/React generan style inline pervasivos).
+- `908bae4` `shoplogixSyncHttp` y `shoplogixCleanupLegacy` ya no retornan `err.message` al cliente — respuesta `{error: 'INTERNAL_ERROR'}`, detalle en `logger.error`.
+- `028d751` Mismo patrón en `setTelegramWebhook`, `setBotCommands`, `cacheDmStatus`.
+
+### Ronda 5 — Dependencias, password policy, lockout, session timeout
+- `0de155f` Overrides en `pnpm-workspace.yaml` para `protobufjs >=8.0.0 <8.2.0 → 8.2.0+` (CVE-2026-44292/93/94 code injection + DoS + prototype pollution en firebase-admin), `@protobufjs/utf8 <1.1.1`, `brace-expansion 5.0.0-5.0.5 → 5.0.6+` (ReDoS), `ws 8.0.0-8.20.0 → 8.20.1+` (DoS via HTTP headers). `turbo ^2.3.3 → ^2.9.14`. **Pendiente regenerar lockfile localmente** (CDN SheetJS bloqueado en entorno web).
+- `6b0b9c6` `createPasswordSchema`: agregada regla `[a-z]`, reject de patrones obvios (`123…`, `qwerty…`, `aaaaaa…`). Max bumped 50 → 72 chars (bcrypt natural). Nueva clase `PersistentRateLimiter` en `lib/rate-limit.ts` (localStorage-backed, solo cuenta fallos). LoginPage: 5 fallos en 10 min → lockout, sobrevive a `location.reload()`. Success limpia el contador.
+- `1b5f369` Nuevo `apps/pwa/src/hooks/useSessionTimeout.ts` montado en `App.tsx`. Listeners de mousedown/keydown/touchstart/scroll (throttled 1/min) + poll 60s + visibilitychange. Timeout bajado de 24h → 12h.
+
+### Hallazgos pendientes (NO fixeados — decisión documentada)
+- **MFA TOTP full** — descartado por friction técnicos planta; requiere upgrade Identity Platform. Cubrimos ~80% del beneficio con los 3 quick wins (password rules + lockout persistente + session timeout).
+- **Audit log estructurado** — solo existe para repuestos. Sin logs de login admin, cambio de rol, modificación credenciales.
+- **Print/PDF en Blob URL** — ventanas `window.open('') + document.write` heredan CSP del padre en Chrome. Riesgo bajo porque ya escapamos inputs.
+- **`signUpWithInviteCode` como Cloud Function** — la solución cleaner es server-side con Admin SDK. El fix cross-doc ya cierra el agujero.
+
+### Acciones manuales requeridas tras merge (ver sección "Pendientes priorizados → SECURITY")
+
+---
 
 ## Cambios recientes (sesión 2026-05-03 — Shoplogix Notification System + dedup fix)
 
@@ -946,6 +991,32 @@ Con Haversine A→D = dimensión real del recinto en metros. El DWG ya tiene cot
 - 🔲 **Fase 3b — Edición manual de rangos de pausas** — drag handles en bandas Timeline (~2-3 días)
 - 🔲 **Fase 4 — CRUD admin de tags** — gestión Firestore de `graderPauseTags` (~2-3 días)
 - ✅ **pieceRecords productivas** — 383 turnos × 5.37M records ya en Firestore (verificado dry-run 2026-04-26: 0 nuevos en todos los segmentos)
+
+---
+
+### PENDIENTE — SECURITY post-merge PR #69 (sesión 2026-05-20)
+
+**Sin estos pasos, ~6 de los 19 commits del PR son no-ops o fixes parciales.**
+
+🔴 **P0 — Antes de cerrar el PR**:
+1. **Regenerar lockfile** (`pnpm install --no-frozen-lockfile && git add pnpm-lock.yaml && git commit`) — los overrides de `pnpm-workspace.yaml` (protobufjs/ws/brace-expansion/turbo) NO se aplican al bundle hasta que el lockfile se actualice. En entorno web Claude no funciona por bloqueo de CDN SheetJS — correr local del owner.
+2. **Rotar `VITE_GROQ_API_KEY` y `VITE_GEMINI_API_KEY`** en Groq y Google AI Studio. Lo que esté en GitHub Secrets ya está en el bundle de producción cacheado. Crear keys nuevas, ponerlas como secrets de Cloud Functions (`GROQ_API_KEY` / `GEMINI_API_KEY`, sin `VITE_`). Quitar las viejas de GitHub Secrets.
+
+🟡 **P1 — Tras merge**:
+3. `firebase functions:secrets:set ADMIN_API_SECRET` — un slug random (uuidgen). Habilita el header `x-admin-secret` para 11 endpoints HTTP admin protegidos en `e4573c7`.
+4. `firebase functions:secrets:set TELEGRAM_WEBHOOK_SECRET` — un slug random. Sin esto, `telegramWebhook` loggea warning recurrente pero sigue aceptando requests.
+5. **Re-ejecutar `setTelegramWebhook`** con `x-admin-secret` una vez seteados los secrets — Telegram aprende el nuevo `secret_token` y empieza a mandarlo en el header.
+6. **GitHub Actions Secret `NTFY_TOPIC`** — slug random. Sin esto los workflows mandan a `https://ntfy.sh/` que es 404.
+7. **Firebase Console → Authentication → Settings → Email Enumeration Protection** ON.
+
+🟡 **P2 — Defense in depth (opcional)**:
+8. Provisionar reCAPTCHA Enterprise site key en GCP. Setearla como GitHub Secret `VITE_RECAPTCHA_SITE_KEY`. App Check empieza a inicializarse en frontend. Monitorear métricas 1 semana. Después flip `enforceAppCheck: false → true` en `groqProxy`/`geminiProxy`/`deepseekProxy`.
+
+**Deuda no fixeada (decisión consciente)**:
+- MFA TOTP (friction técnicos planta + requiere Identity Platform)
+- Audit log estructurado de eventos de seguridad (login admin, cambio rol, creds)
+- Print/PDF refactor a Blob URL (riesgo bajo, inputs ya escapados)
+- `signUpWithInviteCode` como Cloud Function (cross-doc validation ya cierra el agujero)
 
 ---
 
