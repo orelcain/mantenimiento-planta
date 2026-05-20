@@ -144,6 +144,75 @@ export class Cooldown {
 }
 
 /**
+ * Rate limiter persistente (localStorage) — sobrevive a reload de página.
+ *
+ * Diferente del RateLimiter en memoria, que un atacante puede esquivar con
+ * `location.reload()`. Use casos: login attempts, password reset requests,
+ * cualquier endpoint sensible que un humano usa raras veces.
+ *
+ * Por defecto solo cuenta fallos (`record()` se llama manual en el catch del
+ * caller, no en el flujo exitoso). Eso evita lockouts a usuarios legítimos
+ * que entran a la primera.
+ */
+export class PersistentRateLimiter {
+  private key: string
+  private maxFailures: number
+  private windowMs: number
+
+  constructor(key: string, maxFailures: number, windowMs: number) {
+    this.key = `rate-limit:${key}`
+    this.maxFailures = maxFailures
+    this.windowMs = windowMs
+  }
+
+  private read(): number[] {
+    try {
+      const raw = localStorage.getItem(this.key)
+      if (!raw) return []
+      const parsed = JSON.parse(raw)
+      return Array.isArray(parsed) ? parsed.filter((t) => typeof t === 'number') : []
+    } catch {
+      return []
+    }
+  }
+
+  private write(ts: number[]): void {
+    try {
+      localStorage.setItem(this.key, JSON.stringify(ts))
+    } catch { /* quota / disabled storage — fail open */ }
+  }
+
+  /** ¿El usuario está bloqueado ahora mismo? (no consume intento, solo chequea) */
+  isBlocked(): boolean {
+    const now = Date.now()
+    const recent = this.read().filter((ts) => ts > now - this.windowMs)
+    this.write(recent)
+    return recent.length >= this.maxFailures
+  }
+
+  /** Registrar un intento fallido. Idempotente por timestamp. */
+  recordFailure(): void {
+    const now = Date.now()
+    const recent = this.read().filter((ts) => ts > now - this.windowMs)
+    recent.push(now)
+    this.write(recent)
+  }
+
+  /** Limpiar el historial después de un éxito (so the next session arranca limpio). */
+  reset(): void {
+    try { localStorage.removeItem(this.key) } catch { /* ignore */ }
+  }
+
+  /** Tiempo en ms hasta que el intento más viejo expire. */
+  timeUntilUnblock(): number {
+    const recent = this.read()
+    if (recent.length < this.maxFailures) return 0
+    const oldest = recent[0] ?? Date.now()
+    return Math.max(0, (oldest + this.windowMs) - Date.now())
+  }
+}
+
+/**
  * Queue de acciones con límite de procesamiento simultáneo
  */
 export class ActionQueue<T = any> {

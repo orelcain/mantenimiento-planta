@@ -19,12 +19,20 @@ export const passwordSchema = z.string()
   .min(6, 'La contraseña debe tener al menos 6 caracteres')
   .max(50, 'La contraseña no puede tener más de 50 caracteres')
 
-// Para crear/cambiar contraseña — política segura
+// Para crear/cambiar contraseña — política segura.
+// Mínimo 12 chars + mayúscula + minúscula + número evita las contraseñas
+// más débiles que aún cumplían "6 chars" del default de Firebase Auth.
+// No agregamos requisito de símbolo: bajo retorno en seguridad real y la
+// fricción aumenta el uso de patrones predecibles (`Password1!` vs `password1`).
 export const createPasswordSchema = z.string()
   .min(12, 'La contraseña debe tener al menos 12 caracteres')
-  .max(50, 'La contraseña no puede tener más de 50 caracteres')
+  .max(72, 'La contraseña no puede tener más de 72 caracteres')
   .regex(/[A-Z]/, 'Debe contener al menos una letra mayúscula')
+  .regex(/[a-z]/, 'Debe contener al menos una letra minúscula')
   .regex(/[0-9]/, 'Debe contener al menos un número')
+  .refine((p) => !/^(.)\1+$/.test(p), 'La contraseña no puede ser un solo carácter repetido')
+  .refine((p) => !/^(012|123|234|345|456|567|678|789|890|abc|qwe|asd|zxc)/i.test(p),
+    'La contraseña no puede empezar con una secuencia obvia (123, abc, qwerty…)')
 
 export const nameSchema = z.string()
   .min(2, 'Nombre muy corto')

@@ -23,11 +23,13 @@ import {
 import { useAuthStore } from '@/store'
 import { loginSchema, signUpSchema } from '@/lib/validation'
 import { logger } from '@/lib/logger'
-import { RateLimiter } from '@/lib/rate-limit'
+import { PersistentRateLimiter } from '@/lib/rate-limit'
 import { APP_VERSION } from '@/constants/version'
 
-// Max 5 intentos de login/registro cada 2 minutos
-const authRateLimiter = new RateLimiter(5, 2 * 60 * 1000)
+// Max 5 FALLOS de login/registro cada 10 minutos, persistido en localStorage.
+// Solo cuenta fallos (no éxitos) → usuario legítimo nunca queda bloqueado.
+// Persistido en localStorage → un atacante automatizado no esquiva con reload.
+const authRateLimiter = new PersistentRateLimiter('login-attempts', 5, 10 * 60 * 1000)
 
 type AuthMode = 'login' | 'register'
 
@@ -101,10 +103,11 @@ export function LoginPage() {
     setError(null)
     setValidationErrors({})
 
-    // Rate limit: max 5 intentos cada 2 min
-    if (!authRateLimiter.canExecute()) {
-      const waitSec = Math.ceil(authRateLimiter.timeUntilNext() / 1000)
-      setError(`Demasiados intentos. Espera ${waitSec}s antes de intentar de nuevo.`)
+    // Lockout: bloqueado tras 5 fallos en 10 min (persistido en localStorage,
+    // sobrevive a reload). Solo se cuenta el fallo, no el intento exitoso.
+    if (authRateLimiter.isBlocked()) {
+      const waitMin = Math.ceil(authRateLimiter.timeUntilUnblock() / 60_000)
+      setError(`Demasiados intentos fallidos. Reintenta en ${waitMin} minuto${waitMin === 1 ? '' : 's'}.`)
       return
     }
 
@@ -154,9 +157,16 @@ export function LoginPage() {
       }
       
       setUser(user)
+      // Login OK → limpiar el historial de fallos del rate limiter para que
+      // la próxima sesión arranque limpia.
+      authRateLimiter.reset()
       logger.info(`${mode} successful`, { userId: user.id, email: user.email })
       navigate(redirectTo)
     } catch (err: unknown) {
+      // Fallo real → contamos para el lockout. Errores de validación cliente
+      // (Zod) salen antes con un `return` y no llegan acá, así que no inflan
+      // el contador.
+      authRateLimiter.recordFailure()
       const errorObj = err instanceof Error ? err : new Error('Authentication error')
       logger.error('Auth error', errorObj)
       setError(getErrorMessage((err as any).code || (err as any).message))
