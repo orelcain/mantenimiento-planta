@@ -190,8 +190,13 @@ export async function signUpWithInviteCode(
     updatedAt: new Date(),
   }
 
+  // Guardar el ID del invite consumido — la regla Firestore lo usa para
+  // validar cross-doc que el rol del usuario coincida con el rol del invite
+  // (evita que alguien se cree con `rol: 'supervisor'` saltándose esta función
+  // y mandando un setDoc directo).
   await setDoc(doc(db, 'users', credential.user.uid), {
     ...userData,
+    inviteCodeUsed: invite.id,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     notificationPrefs: { processStarted: { chonchi: true, yal: true } },

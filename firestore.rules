@@ -392,12 +392,29 @@ service cloud.firestore {
           // Admin puede crear/sembrar cualquier perfil
           isAdmin()
           ||
-          // Auto-creación: solo tu propio doc, sin poder auto-asignarse admin
+          // Auto-creación: solo tu propio doc, sin poder auto-asignarse admin.
+          // Para roles distintos de 'usuario' se exige consumir un invite code
+          // (admin-emitido) y el rol del invite tiene que coincidir con el rol
+          // del doc — sin esto un atacante podía hacer setDoc directo con
+          // `rol: 'supervisor'` saltándose signUpWithInviteCode().
           (
             isOwner(userId)
             && request.resource.data.email == request.auth.token.email
-            && request.resource.data.rol in ['supervisor', 'tecnico', 'usuario']
             && request.resource.data.activo == true
+            && (
+              // Self-register sin invite → solo rol usuario
+              request.resource.data.rol == 'usuario'
+              ||
+              // Self-register con invite → rol y activo del invite deben coincidir
+              (
+                request.resource.data.rol in ['supervisor', 'tecnico']
+                && 'inviteCodeUsed' in request.resource.data
+                && request.resource.data.inviteCodeUsed is string
+                && exists(/databases/$(database)/documents/inviteCodes/$(request.resource.data.inviteCodeUsed))
+                && get(/databases/$(database)/documents/inviteCodes/$(request.resource.data.inviteCodeUsed)).data.rol == request.resource.data.rol
+                && get(/databases/$(database)/documents/inviteCodes/$(request.resource.data.inviteCodeUsed)).data.activo == true
+              )
+            )
           )
         );
       
