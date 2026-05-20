@@ -1269,7 +1269,7 @@ exports.cacheDmStatus = onRequest(
       res.json({ ok: true })
     } catch (e) {
       logger.error('cacheDmStatus error', e.message)
-      res.status(500).json({ error: e.message })
+      res.status(500).json({ error: 'INTERNAL_ERROR' })
     }
   }
 )
@@ -3254,7 +3254,8 @@ exports.setTelegramWebhook = onRequest({ region: 'us-central1' }, async (req, re
       warning: webhookSecret ? undefined : 'TELEGRAM_WEBHOOK_SECRET no seteado — webhook acepta requests sin validar origen',
     })
   } catch (error) {
-    res.status(500).json({ error: error.message })
+    logger.error('[setTelegramWebhook] error', { err: error.message })
+    res.status(500).json({ error: 'INTERNAL_ERROR' })
   }
 })
 
@@ -3301,7 +3302,8 @@ exports.setBotCommands = onRequest({ region: 'us-central1' }, async (req, res) =
     }
     res.json({ plan, results })
   } catch (error) {
-    res.status(500).json({ error: error.message })
+    logger.error('[setBotCommands] error', { err: error.message })
+    res.status(500).json({ error: 'INTERNAL_ERROR' })
   }
 })
 
