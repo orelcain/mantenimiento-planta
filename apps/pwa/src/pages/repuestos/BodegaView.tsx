@@ -32,6 +32,7 @@ import type {
 } from '@/hooks/repuestos/useBodega'
 import type { Machine } from '@/types/repuestos'
 import { useAuthStore } from '@/store/authStore'
+import { escapeHtml } from '@/lib/htmlEscape'
 
 type BodegaTab = 'stock' | 'inventarios' | 'movimientos' | 'estadisticas'
 type StockFilter = 'todos' | 'configurados' | 'bajo' | 'sin' | 'sinConfig' | 'favoritos'
@@ -1535,8 +1536,16 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
     const w = window.open('', '_blank', 'width=400,height=500')
     if (!w) return
     const svg = document.getElementById('bodega-qr-svg')
+    // svgHtml viene del DOM ya renderizado por React (QRCodeSVG), no de input de usuario
     const svgHtml = svg ? new XMLSerializer().serializeToString(svg) : ''
-    w.document.write(`<html><head><title>QR ${item.codigoSAP}</title><style>body{font-family:sans-serif;text-align:center;padding:20px}h2{margin:0 0 4px}p{margin:2px 0;color:#666;font-size:12px}.qr{margin:16px auto}</style></head><body><h2>${item.textoBreve}</h2><p>${item.codigoSAP}</p>${item.codigoFabricante ? `<p>${item.codigoFabricante}</p>` : ''}<div class="qr">${svgHtml}</div><p>${item.ubicacionBodega || ''}</p><script>setTimeout(()=>{window.print();window.close()},300)</script></body></html>`)
+    // Escapar todos los campos del item — vienen de Firestore donde otros usuarios
+    // pueden haberlos escrito. Sin escape un atacante podría inyectar <script> en
+    // los metadatos del repuesto y ejecutar JS cuando alguien imprime el QR.
+    const titulo = escapeHtml(item.textoBreve)
+    const sap = escapeHtml(item.codigoSAP)
+    const fabricante = item.codigoFabricante ? escapeHtml(item.codigoFabricante) : ''
+    const ubicacion = escapeHtml(item.ubicacionBodega || '')
+    w.document.write(`<html><head><title>QR ${sap}</title><style>body{font-family:sans-serif;text-align:center;padding:20px}h2{margin:0 0 4px}p{margin:2px 0;color:#666;font-size:12px}.qr{margin:16px auto}</style></head><body><h2>${titulo}</h2><p>${sap}</p>${fabricante ? `<p>${fabricante}</p>` : ''}<div class="qr">${svgHtml}</div><p>${ubicacion}</p><script>setTimeout(()=>{window.print();window.close()},300)</script></body></html>`)
     w.document.close()
   }
 

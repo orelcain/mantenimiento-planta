@@ -6,6 +6,7 @@
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import type { PhotoComparison, PhotoEvidence, PhotoEvidenceStatus, PhotoItem } from '@/types'
+import { escapeHtml } from '@/lib/htmlEscape'
 
 // Configuración del PDF
 const PDF_CONFIG = {
@@ -693,11 +694,15 @@ async function downloadAsPDF(canvases: HTMLCanvasElement[], title: string): Prom
     `
   }).join('')
 
+  // El title puede venir de un campo del usuario (ej. `evidence.titulo`); escapar
+  // para evitar XSS via `</title><script>...</script>` cuando alguien imprime un
+  // reporte de evidencia con título manipulado.
+  const safeTitle = escapeHtml(title)
   printWindow.document.write(`
     <!DOCTYPE html>
     <html>
     <head>
-      <title>${title}</title>
+      <title>${safeTitle}</title>
       <style>
         @page {
           size: A4;
