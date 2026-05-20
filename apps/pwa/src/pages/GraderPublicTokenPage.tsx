@@ -1,6 +1,6 @@
 /**
  * Vista pública de un turno Grader compartido via token.
- * No requiere autenticación. Token expiración: 7 días.
+ * No requiere autenticación. Token expiración: 24h.
  */
 
 import { useEffect, useState } from 'react'
@@ -63,7 +63,7 @@ export function GraderPublicTokenPage() {
         </p>
         <p className="text-sm max-w-xs">
           {status === 'expired'
-            ? 'Los links de turno son válidos por 7 días. Pide al supervisor que genere uno nuevo.'
+            ? 'Los links de turno son válidos por 24h. Pide al supervisor que genere uno nuevo.'
             : 'El link no es válido o fue eliminado.'}
         </p>
         <button

@@ -3,7 +3,13 @@
  *
  * El token almacena un snapshot denormalizado (summary + timelineBuckets +
  * pauses) directamente en el doc de Firestore. Regla: `allow read: if true`.
- * Expiración: 7 días. El check se hace en el cliente.
+ * Expiración: 24h. El check se hace en el cliente.
+ *
+ * Antes el TTL era 7 días — se acortó a 24h porque el doc contiene datos
+ * operacionales del turno (KPIs, pausas, lotes) y si la URL del token se
+ * filtra por WhatsApp/email/captura, esa ventana de exposición debería ser
+ * lo más corta posible. Si el supervisor necesita compartir más de un día,
+ * regenera el token.
  *
  * Colección: graderPublicTokens
  * ID doc: UUID v4 generado con crypto.randomUUID()
@@ -14,7 +20,7 @@ import { db } from '../firebase'
 import type { GraderDailySummary, TimelineBucket, Pause } from './types'
 
 const COLLECTION = 'graderPublicTokens'
-const EXPIRY_DAYS = 7
+const EXPIRY_DAYS = 1
 
 export interface GraderPublicTokenDoc {
   token: string
