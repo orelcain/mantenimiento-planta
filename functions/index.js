@@ -8,7 +8,7 @@ const { getFirestore, FieldValue } = require('firebase-admin/firestore')
 const { getDatabase } = require('firebase-admin/database')
 const { getMessaging } = require('firebase-admin/messaging')
 const { getStorage } = require('firebase-admin/storage')
-const { randomUUID, createHmac } = require('crypto')
+const { randomUUID, createHmac, timingSafeEqual } = require('crypto')
 const { getAuth } = require('firebase-admin/auth')
 
 initializeApp()
@@ -3412,8 +3412,21 @@ exports.mintTelegramAuthToken = onRequest({ region: 'us-central1' }, async (req,
   const secretKey = createHmac('sha256', 'WebAppData').update(botToken).digest()
   const expectedHash = createHmac('sha256', secretKey).update(checkString).digest('hex')
 
-  if (expectedHash !== hash) {
-    logger.warn('mintTelegramAuthToken: HMAC inválido', { expected: expectedHash, got: hash })
+  // Comparación constant-time para evitar timing attacks (la diferencia es
+  // diminuta sobre una red ruidosa, pero es la práctica correcta para HMAC).
+  // Si los buffers tienen distinta longitud timingSafeEqual lanza, por eso el
+  // check de length previo.
+  let hashOk = false
+  try {
+    const a = Buffer.from(expectedHash, 'hex')
+    const b = Buffer.from(hash, 'hex')
+    hashOk = a.length === b.length && timingSafeEqual(a, b)
+  } catch { /* hash mal formado */ }
+
+  if (!hashOk) {
+    // No loguear los hashes — son derivados del bot token y darían pistas a
+    // un atacante con acceso al log para construir el secret offline.
+    logger.warn('mintTelegramAuthToken: HMAC inválido', { ip: req.ip })
     res.status(401).json({ error: 'Datos de autenticación inválidos' })
     return
   }
