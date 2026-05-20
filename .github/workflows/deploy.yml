@@ -52,7 +52,7 @@ jobs:
       - name: Build PWA
         working-directory: apps/pwa
         env:
-          # Firebase config (pública por diseño — seguridad via Firestore rules)
+          # Firebase config (pública por diseño — seguridad via Firestore rules + App Check)
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: mantenimiento-planta-771a3.firebaseapp.com
           VITE_FIREBASE_DATABASE_URL: https://mantenimiento-planta-771a3-default-rtdb.firebaseio.com
@@ -60,9 +60,11 @@ jobs:
           VITE_FIREBASE_STORAGE_BUCKET: mantenimiento-planta-771a3.firebasestorage.app
           VITE_FIREBASE_MESSAGING_SENDER_ID: "1019421112530"
           VITE_FIREBASE_APP_ID: "1:1019421112530:web:9afd9962e0b53152f8d50b"
-          # AI (Cloud Functions son el canal principal, keys como fallback)
-          VITE_GROQ_API_KEY: ${{ secrets.VITE_GROQ_API_KEY }}
-          VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
+          # App Check (reCAPTCHA Enterprise site key — pública por diseño, valida origen)
+          VITE_RECAPTCHA_SITE_KEY: ${{ secrets.VITE_RECAPTCHA_SITE_KEY }}
+          # NO inyectar API keys de IA en el bundle. Toda llamada a Groq/Gemini/Deepseek
+          # va por Cloud Functions proxy (groqProxy/geminiProxy/deepseekProxy) que leen
+          # las keys desde GCP Secret Manager y validan request.auth + App Check.
         run: pnpm build
 
       - name: Include Chonchi weather demo

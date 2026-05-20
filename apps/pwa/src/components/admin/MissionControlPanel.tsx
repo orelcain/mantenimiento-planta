@@ -647,11 +647,12 @@ export function MissionControlPanel() {
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-[11px] text-muted-foreground">
-            Si las env vars del build no incluyen una API key, puedes agregarla aquí. Las keys se guardan cifradas en Firestore.
+            Las llamadas a IA pasan por Cloud Functions proxy con las keys en GCP Secret Manager.
+            Estos inputs son solo para overrides admin en runtime (NO se inyectan al bundle).
           </p>
           {(['deepseek', 'groq', 'gemini'] as const).map(provider => {
             const providerLabel: Record<string, string> = { deepseek: 'DeepSeek', groq: 'Groq (Qwen/Llama)', gemini: 'Gemini (Google)' }
-            const envVar: Record<string, string> = { deepseek: 'VITE_DEEPSEEK_API_KEY', groq: 'VITE_GROQ_API_KEY', gemini: 'VITE_GEMINI_API_KEY' }
+            const envVar: Record<string, string> = { deepseek: 'DEEPSEEK_API_KEY', groq: 'GROQ_API_KEY', gemini: 'GEMINI_API_KEY' }
             const hasSavedKey = !!config.providerKeys?.[provider]
             return (
               <div key={provider} className="flex items-center gap-2">

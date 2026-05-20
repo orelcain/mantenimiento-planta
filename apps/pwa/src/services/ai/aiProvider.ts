@@ -372,7 +372,7 @@ class MockAIProvider implements AIProvider {
       whatToCheckNext: ['Verificar fotocélulas', 'Revisar rangos en Matrix', 'Comparar con turnos anteriores'],
       disclaimers: [
         '⚠ Análisis generado sin IA real (modo local).',
-        'Configura VITE_GROQ_API_KEY para obtener diagnóstico profesional con IA.',
+        'El proxy Cloud Function (groqProxy) no respondió o no está deployado.',
       ],
     }
   }

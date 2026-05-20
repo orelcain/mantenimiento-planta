@@ -125,8 +125,6 @@ export function PredictivePage() {
   const [testTempSlope, setTestTempSlope] = useState(0.2)
   const [testHumSlope, setTestHumSlope] = useState(0.3)
 
-  const hasGroqKey = Boolean(import.meta.env.VITE_GROQ_API_KEY)
-
   const equipmentWithSensorIds = useMemo(() => {
     const ids = new Set<string>()
     devices.forEach((d) => {
@@ -576,7 +574,7 @@ export function PredictivePage() {
                     size="sm"
                     variant="outline"
                     onClick={applyAiThresholds}
-                    disabled={aiThresholdsLoading || !hasGroqKey || readings.length < 5}
+                    disabled={aiThresholdsLoading || readings.length < 5}
                   >
                     {aiThresholdsLoading ? 'IA…' : 'Sugerir umbrales IA'}
                   </Button>
@@ -604,11 +602,6 @@ export function PredictivePage() {
               <div className="text-xs text-muted-foreground">
                 Ajusta umbrales de temperatura/humedad y tendencias. Usa IA para sugerencias basadas en lecturas reales.
               </div>
-              {!hasGroqKey && (
-                <div className="text-xs text-muted-foreground">
-                  Configura VITE_GROQ_API_KEY para habilitar sugerencias IA.
-                </div>
-              )}
               {aiThresholdsError && (
                 <div className="text-xs text-destructive">{aiThresholdsError}</div>
               )}
@@ -1147,16 +1140,11 @@ export function PredictivePage() {
                       size="sm"
                       variant="outline"
                       onClick={generateAiForecast}
-                      disabled={aiLoading || readings.length < 5 || !hasGroqKey}
+                      disabled={aiLoading || readings.length < 5}
                     >
                       {aiLoading ? 'Generando…' : 'Generar'}
                     </Button>
                   </div>
-                  {!hasGroqKey && (
-                    <div className="text-xs text-muted-foreground">
-                      Configura VITE_GROQ_API_KEY para habilitar IA.
-                    </div>
-                  )}
                   {aiError && (
                     <div className="text-xs text-destructive">{aiError}</div>
                   )}
