@@ -177,7 +177,76 @@ async function answerCallbackQuery(callbackQueryId, text) {
   })
 }
 
+// ==================== AUTH HELPERS (HTTP endpoints) ====================
 
+/**
+ * Verifica un Firebase ID token desde el header `Authorization: Bearer <token>`
+ * y opcionalmente exige rol admin (lookup en `users/{uid}.rol === 'admin'`).
+ *
+ * Para endpoints administrativos de mantenimiento (`onRequest`), usar siempre
+ * en lugar de confiar solo en CORS (CORS no protege contra clientes no-browser
+ * como curl).
+ *
+ * Alternativa para automatización server-to-server: header `x-admin-secret`
+ * comparado contra `process.env.ADMIN_API_SECRET` (declarar como secret en
+ * Cloud Functions deploy). Solo aceptar esa ruta cuando el secret esté seteado.
+ *
+ * Responde 401/403 a `res` y devuelve `null` si la validación falla — el caller
+ * NO debe seguir procesando.
+ *
+ * @returns {Promise<{uid: string, isAdmin: boolean} | null>}
+ */
+async function authenticateAdminRequest(req, res, { requireAdmin = true } = {}) {
+  // Ruta 1: header secreto (server-to-server / curl manual del owner)
+  const adminSecret = process.env.ADMIN_API_SECRET
+  const providedSecret = req.headers['x-admin-secret']
+  if (adminSecret && providedSecret) {
+    if (providedSecret === adminSecret) {
+      return { uid: 'service-account', isAdmin: true }
+    }
+    res.status(403).json({ error: 'FORBIDDEN', message: 'x-admin-secret inválido' })
+    return null
+  }
+
+  // Ruta 2: Firebase ID token
+  const authHeader = req.headers.authorization || ''
+  const match = authHeader.match(/^Bearer\s+(.+)$/i)
+  if (!match) {
+    res.status(401).json({
+      error: 'UNAUTHENTICATED',
+      message: 'Requiere Authorization: Bearer <idToken> o header x-admin-secret',
+    })
+    return null
+  }
+
+  let decoded
+  try {
+    decoded = await getAuth().verifyIdToken(match[1])
+  } catch (err) {
+    logger.warn('[auth] verifyIdToken failed', { err: err.message })
+    res.status(401).json({ error: 'INVALID_TOKEN', message: 'Token inválido o expirado' })
+    return null
+  }
+
+  if (!requireAdmin) {
+    return { uid: decoded.uid, isAdmin: false }
+  }
+
+  // Lookup rol en Firestore (custom claims podría usarse si se setean alguna vez)
+  try {
+    const userSnap = await db.collection('users').doc(decoded.uid).get()
+    const rol = userSnap.exists ? (userSnap.data().rol || userSnap.data().role) : null
+    if (rol !== 'admin') {
+      res.status(403).json({ error: 'FORBIDDEN', message: 'Requiere rol admin' })
+      return null
+    }
+    return { uid: decoded.uid, isAdmin: true }
+  } catch (err) {
+    logger.error('[auth] lookup users/{uid} failed', { uid: decoded.uid, err: err.message })
+    res.status(500).json({ error: 'AUTH_LOOKUP_FAILED' })
+    return null
+  }
+}
 
 /**
  * Obtener tokens de un usuario específico
@@ -1179,6 +1248,11 @@ exports.cacheDmStatus = onRequest(
   { region: 'us-central1', cors: ALLOWED_ORIGINS, maxInstances: 5 },
   async (req, res) => {
     if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' })
+    // Requiere x-admin-secret (caller es un scraper externo, no un usuario logueado).
+    // Una vez seteado ADMIN_API_SECRET en Cloud Functions config, el scraper debe
+    // mandar el header `x-admin-secret: <value>`. Sin esto, cualquiera puede
+    // falsificar el estado del clima.
+    if (!(await authenticateAdminRequest(req, res))) return
     const d = req.body
     if (!d || typeof d.found !== 'boolean') return res.status(400).json({ error: 'invalid payload' })
     try {
@@ -1609,6 +1683,7 @@ exports.checkClimaPortoAlert = onSchedule(
 exports.runClimaPortoCheck = onRequest(
   { region: 'us-central1', cors: ALLOWED_ORIGINS, timeoutSeconds: 30, memory: '256MiB' },
   async (req, res) => {
+    if (!(await authenticateAdminRequest(req, res))) return
     const result = await _runClimaCheck('http')
     res.json({ ok: !result?.error, ...result })
   }
@@ -3125,6 +3200,8 @@ exports.onGraderSummaryCreated = onDocumentCreated('graderDailySummaries/{summar
  * GET https://us-central1-mantenimiento-planta-771a3.cloudfunctions.net/setTelegramWebhook
  */
 exports.setTelegramWebhook = onRequest({ region: 'us-central1' }, async (req, res) => {
+  if (!(await authenticateAdminRequest(req, res))) return
+
   const token = process.env.TELEGRAM_BOT_TOKEN
   if (!token) {
     res.status(500).json({ error: 'TELEGRAM_BOT_TOKEN no configurado' })
@@ -3134,14 +3211,25 @@ exports.setTelegramWebhook = onRequest({ region: 'us-central1' }, async (req, re
   const webhookUrl =
     'https://us-central1-mantenimiento-planta-771a3.cloudfunctions.net/telegramWebhook'
 
+  // Secret token para que `telegramWebhook` pueda validar que el caller es Telegram.
+  // Si no está seteado, advertir en la respuesta (el webhook quedará sin validación).
+  const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET
+  const payload = { url: webhookUrl }
+  if (webhookSecret) payload.secret_token = webhookSecret
+
   try {
     const response = await fetch(`${TELEGRAM_API_BASE}/bot${token}/setWebhook`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: webhookUrl }),
+      body: JSON.stringify(payload),
     })
     const result = await response.json()
-    res.json({ webhookUrl, telegram: result })
+    res.json({
+      webhookUrl,
+      telegram: result,
+      secretTokenConfigured: Boolean(webhookSecret),
+      warning: webhookSecret ? undefined : 'TELEGRAM_WEBHOOK_SECRET no seteado — webhook acepta requests sin validar origen',
+    })
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
@@ -3167,6 +3255,8 @@ exports.setTelegramWebhook = onRequest({ region: 'us-central1' }, async (req, re
  * GET /setBotCommands — ejecutar una sola vez tras deploy. Idempotente.
  */
 exports.setBotCommands = onRequest({ region: 'us-central1' }, async (req, res) => {
+  if (!(await authenticateAdminRequest(req, res))) return
+
   const token = process.env.TELEGRAM_BOT_TOKEN
   if (!token) {
     res.status(500).json({ error: 'TELEGRAM_BOT_TOKEN no configurado' })
@@ -3198,6 +3288,8 @@ exports.setBotCommands = onRequest({ region: 'us-central1' }, async (req, res) =
  * Pre-req: el grupo debe tener "Temas" habilitados y el bot debe ser admin.
  */
 exports.setupTelegramTopics = onRequest({ region: 'us-central1' }, async (req, res) => {
+  if (!(await authenticateAdminRequest(req, res))) return
+
   const token = process.env.TELEGRAM_BOT_TOKEN
   const chatId = process.env.TELEGRAM_CHAT_ID
   if (!token || !chatId) {
@@ -3414,9 +3506,12 @@ exports.mintTelegramAuthToken = onRequest({ region: 'us-central1' }, async (req,
  * GET /setupMantApp
  * Siembra telegramAuthorizedChats con el TELEGRAM_CHAT_ID del .env.
  * Llamar UNA VEZ después del primer deploy: GET /setupMantApp
- * No requiere autenticación — solo funciona con el chatId ya configurado en .env.
+ * Requiere autenticación admin (Authorization: Bearer <idToken> con rol admin
+ * o header x-admin-secret cuando ADMIN_API_SECRET está configurado).
  */
 exports.setupMantApp = onRequest({ region: 'us-central1' }, async (req, res) => {
+  if (!(await authenticateAdminRequest(req, res))) return
+
   // Acepta chatId desde query param (ej: ?chatId=-1003969255842) o desde .env
   const chatId = req.query.chatId || process.env.TELEGRAM_CHAT_ID
   if (!chatId) {
@@ -3505,6 +3600,8 @@ exports.shoplogixSyncHttp = onRequest(
     cors: ALLOWED_ORIGINS,
   },
   async (req, res) => {
+    if (!(await authenticateAdminRequest(req, res))) return
+
     const auth = await resolveShoplogixAuth(logger)
     if (auth.mode === 'none') {
       res.status(500).json({
@@ -3726,6 +3823,8 @@ exports.shoplogixCleanupLegacy = onRequest(
     cors: ALLOWED_ORIGINS,
   },
   async (req, res) => {
+    if (!(await authenticateAdminRequest(req, res))) return
+
     const { plantSlug = 'chonchi', from, to } = req.query || {}
     // dryRun=true por defecto: requiere pasar explícitamente dryRun=false para borrar
     const dryRun = req.query.dryRun !== 'false'
@@ -3826,6 +3925,8 @@ exports.shoplogixDumpShift = onRequest(
     cors: ALLOWED_ORIGINS,
   },
   async (req, res) => {
+    if (!(await authenticateAdminRequest(req, res))) return
+
     const { plantSlug = 'yal', dateKey, shiftId } = req.query || {}
     if (!dateKey) { res.status(400).json({ error: 'dateKey requerido' }); return }
 
@@ -3883,6 +3984,8 @@ exports.shoplogixBackfillRange = onRequest(
     cors: ALLOWED_ORIGINS,
   },
   async (req, res) => {
+    if (!(await authenticateAdminRequest(req, res))) return
+
     const { plantSlug = 'chonchi', from, to } = req.query || {}
     if (!from || !to) {
       res.status(400).json({ error: 'BAD_REQUEST', message: 'Requiere from=YYYY-MM-DD y to=YYYY-MM-DD' })
@@ -3969,6 +4072,8 @@ exports.shoplogixProbe = onRequest(
     cors: ALLOWED_ORIGINS,
   },
   async (req, res) => {
+    if (!(await authenticateAdminRequest(req, res))) return
+
     const auth = await resolveShoplogixAuth(logger)
     if (auth.mode === 'none') {
       res.status(500).json({ error: 'NO_AUTH' })
@@ -4527,6 +4632,7 @@ exports.animeEstrenosManual = onRequest(
   { region: 'us-central1', secrets: ['ANIME_BOT_TOKEN'] },
   async (req, res) => {
     if (req.method !== 'POST') { res.status(405).send('POST only'); return; }
+    if (!(await authenticateAdminRequest(req, res))) return;
     const token = process.env.ANIME_BOT_TOKEN;
     if (!token) { res.status(500).json({ error: 'ANIME_BOT_TOKEN no configurado' }); return; }
     await _runAnimeEstrenos(token);
