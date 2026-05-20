@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '3.29.0' as const
+export const APP_VERSION = '3.30.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-05-20' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'feat(hmi-yal): sidebar clickeable + reglas pipes validadas con video + ruta /aprendizaje/hmi-bombeo-s2' as const
+export const VERSION_NAME = 'feat(hmi-yal): validador manual con video real + paint mode + snapshots persistentes' as const
 
 /**
  * Nota:

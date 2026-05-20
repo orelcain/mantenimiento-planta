@@ -1,10 +1,11 @@
 {
-  "version": "3.29.0",
-  "buildDate": "2026-05-15",
-  "buildTimestamp": 1778897254226,
+  "version": "3.30.0",
+  "buildDate": "2026-05-16",
+  "buildTimestamp": 1778983752000,
   "features": [
-    "HMI Yal: 10 botones sidebar clickeables (toggle equipment + cycle Play/Pause)",
-    "HMI Yal: reglas booleanas 19 pipes refinadas — validadas pixel-perfect contra video (Fase A + Fase B + transición)",
-    "HMI Yal: ruta /aprendizaje/hmi-bombeo-s2 + entry en LearningHub + simulador integrado a PWA"
+    "HMI Yal: validador manual con video real PLC (IMG_1522.mp4 13MB) lado a lado del simulador",
+    "HMI Yal: sync video↔simulador (auto-aplica state al cruzar bookmarks) + frame-step preciso (±33ms)",
+    "HMI Yal: paint mode (click pipes → toggle override verde/rojo/auto) + snapshots persistentes en LocalStorage + Export JSON",
+    "HMI Yal: reglas pipes refinadas con T-junctions reales (bridges separados por sistema vacío/presión, codos venteo subdivididos)"
   ]
 }

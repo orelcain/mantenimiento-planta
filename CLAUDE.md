@@ -368,7 +368,7 @@ Después de cada `git push`, verificar con `gh run list --limit 5` que el workfl
 
 ## Version actual
 
-- **v3.29.0** (2026-05-15) — "feat(hmi-yal): sidebar clickeable + reglas pipes validadas con video + ruta /aprendizaje/hmi-bombeo-s2"
+- **v3.30.0** (2026-05-16) — "feat(hmi-yal): validador manual con video real + paint mode + snapshots persistentes"
 - Proyecto Firebase: `mantenimiento-planta-771a3`
 - GitHub: `orelcain/mantenimiento-planta`
 - Produccion: `https://orelcain.github.io/mantenimiento-planta/`

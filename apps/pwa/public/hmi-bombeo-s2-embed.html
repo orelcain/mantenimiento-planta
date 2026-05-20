@@ -199,6 +199,22 @@
   #cycle-panel label { color: #7a90b0; font-size: 11px; }
   #cycle-panel input[type=range] { width: 80px; vertical-align: middle; }
   body.edit #cycle-panel { display: none; }
+  /* Cuando el HMI está embebido en HmiBombeoS2PublicPage (con video controls), ocultar cycle-panel */
+  body.embedded #cycle-panel { display: none !important; }
+
+  /* Paint mode: click en pipes para forzar verde/rojo manualmente */
+  body.paint-mode [data-pipe] {
+    cursor: pointer;
+    stroke-width: 10 !important;
+  }
+  body.paint-mode [data-pipe]:hover {
+    filter: drop-shadow(0 0 6px #ff66ff);
+  }
+  /* Pipes con override manual: borde dotted magenta para distinguir */
+  [data-pipe][data-override] {
+    stroke-dasharray: 3 4;
+    filter: drop-shadow(0 0 3px #ff66ff);
+  }
 </style>
 </head>
 <body>
@@ -346,15 +362,21 @@
          Coords dibujadas vía edit mode (?edit=1, botón ✏️ Nueva pipe).
          ════════════════════════════════════════════════ -->
     <g class="pipes" fill="none" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
-      <!-- ─── Venteo Presión: top row (y=245) — Tanque B ─── -->
-      <path data-pipe="feed-y103" data-active-when="valve.y103" d="M 265 245 L 346 245" stroke="#ff1616"/>
-      <path data-pipe="bridge-y103-y104" data-active-when="valve.y103 || valve.y104" d="M 384 245 L 537 246" stroke="#ff1616"/>
-      <path data-pipe="y104-feed" data-active-when="valve.y104" d="M 575 246 L 656 246" stroke="#ff1616"/>
+      <!-- ─── Header VACÍO (fila top, izq de cada y10): tramo entre T-junction y la válvula ─── -->
+      <!-- feed-y103 = tramo HEADER VACÍO desde T1 (que une y11.1 + tronco-vacío) hasta y10.3 -->
+      <path data-pipe="feed-y103" data-active-when="valve.y103 &amp;&amp; (equipment.c1 || equipment.c2)" data-active-color="#00f525" d="M 265 245 L 346 245" stroke="#ff1616"/>
+      <!-- bridge-y103-y104 = tramo HEADER PRESIÓN desde T3 (que une y11.2 + tronco-presión) hasta y10.4 -->
+      <path data-pipe="bridge-y103-y104" data-active-when="valve.y104 &amp;&amp; equipment.atlas" data-active-color="#00f525" d="M 384 245 L 537 246" stroke="#ff1616"/>
+      <!-- y104-feed = tramo der de y10.4, sigue hacia ramal que sube a tank B -->
+      <path data-pipe="y104-feed" data-active-when="valve.y104 &amp;&amp; equipment.atlas" data-active-color="#00f525" d="M 575 246 L 656 246" stroke="#ff1616"/>
 
-      <!-- ─── Venteo Presión: bottom row (y=303) — Tanque A ─── -->
-      <path data-pipe="feed-y101" data-active-when="valve.y101" d="M 265 303 L 346 303" stroke="#ff1616"/>
-      <path data-pipe="bridge-y101-y102" data-active-when="valve.y101 || valve.y102" d="M 384 303 L 537 303" stroke="#ff1616"/>
-      <path data-pipe="y102-feed" data-active-when="valve.y102" d="M 575 303 L 656 303" stroke="#ff1616"/>
+      <!-- ─── Headers fila bottom (y=303): análogo para tank A ─── -->
+      <!-- feed-y101 = tramo HEADER VACÍO desde T2 (vacío) hasta y10.1 -->
+      <path data-pipe="feed-y101" data-active-when="valve.y101 &amp;&amp; (equipment.c1 || equipment.c2)" data-active-color="#00f525" d="M 265 303 L 346 303" stroke="#ff1616"/>
+      <!-- bridge-y101-y102 = tramo HEADER PRESIÓN desde T4 hasta y10.2 -->
+      <path data-pipe="bridge-y101-y102" data-active-when="valve.y102 &amp;&amp; equipment.atlas" data-active-color="#00f525" d="M 384 303 L 537 303" stroke="#ff1616"/>
+      <!-- y102-feed = tramo der de y10.2 hacia ramal que sube a tank A -->
+      <path data-pipe="y102-feed" data-active-when="valve.y102 &amp;&amp; equipment.atlas" data-active-color="#00f525" d="M 575 303 L 656 303" stroke="#ff1616"/>
 
       <!-- ─── Red verde (vacío + presión) — reglas topológicas iter 1 (refinar con video) ─── -->
       <!-- Convenciones:
@@ -369,9 +391,11 @@
       <path data-pipe="vv-cross-y112" data-active-when="valve.y112" data-active-color="#00f525" d="M 704 184 L 704 164 L 656 164 L 656 187" stroke="#ff1616"/>
 
       <!-- Línea vacío principal: tronco y11.1↔C1/C2 + ramas C1 -->
-      <!-- Tronco vertical: activo cuando alguna bomba vacuum succiona + algún destino aspirando (y10.1/y10.3) -->
-      <!-- O cuando el venteo y11.1 está abierto (igualación a atmosférica = flow al exterior) -->
-      <path data-pipe="vv-y111-down-c1" data-active-when="(equipment.c1 || equipment.c2) &amp;&amp; (valve.y101 || valve.y103 || valve.y111)" data-active-color="#00f525" d="M 263 225 L 263 560 L 300 560" stroke="#ff1616"/>
+      <!-- SUBDIVIDIDO (iter 3 con video): el codo cortito de y11.1 al T-junction es independiente del tronco principal -->
+      <!-- vv-y111-elbow: tramo de y11.1 a T1 (~20px). Verde solo cuando y11.1 abre (venteo). -->
+      <path data-pipe="vv-y111-elbow"   data-active-when="valve.y111" data-active-color="#00f525" d="M 263 225 L 263 245" stroke="#ff1616"/>
+      <!-- vv-y111-down-c1: el resto del tronco (T1 ↓ T2 ↓ codo C1). Activo cuando hay flow real en la línea de succión. -->
+      <path data-pipe="vv-y111-down-c1" data-active-when="(equipment.c1 || equipment.c2) &amp;&amp; (valve.y101 || valve.y103 || valve.y111)" data-active-color="#00f525" d="M 263 245 L 263 560 L 300 560" stroke="#ff1616"/>
       <path data-pipe="vv-c1-out-up"    data-active-when="equipment.c1 &amp;&amp; (valve.y101 || valve.y103 || valve.y111)" data-active-color="#00f525" d="M 334 559 L 416 559 L 416 594" stroke="#ff1616"/>
       <path data-pipe="vv-c1-out-2"     data-active-when="equipment.c1 &amp;&amp; (valve.y101 || valve.y103 || valve.y111)" data-active-color="#00f525" d="M 495 594 L 495 545 L 530 545 L 530 568" stroke="#ff1616"/>
       <path data-pipe="vv-y141-to-c1"   data-active-when="valve.y141 &amp;&amp; equipment.c1 &amp;&amp; (valve.y101 || valve.y103 || valve.y111)" data-active-color="#00f525" d="M 267 366 L 299 366" stroke="#ff1616"/>
@@ -379,9 +403,11 @@
       <path data-pipe="vv-c1-up-2"      data-active-when="valve.y141 &amp;&amp; equipment.c1 &amp;&amp; (valve.y101 || valve.y103 || valve.y111)" data-active-color="#00f525" d="M 495 401 L 495 353 L 529 353 L 529 375" stroke="#ff1616"/>
 
       <!-- Tronco línea presión: y11.2 ↔ tanques ↔ Atlas -->
-      <!-- Activo cuando Atlas comprime + algún destino (y10.2/y10.4/y11.2) está abierto -->
-      <!-- Validado f_0048: durante transición fase con todas y10/y11 closed, el tronco se ve rojo -->
-      <path data-pipe="vv-y112-trunk"  data-active-when="equipment.atlas &amp;&amp; (valve.y102 || valve.y104 || valve.y112)" data-active-color="#00f525" d="M 656 227 L 656 703" stroke="#ff1616"/>
+      <!-- SUBDIVIDIDO (iter 3 con video): el codo cortito de y11.2 al T-junction es independiente del tronco principal -->
+      <!-- vv-y112-elbow: tramo de y11.2 a T3 (~20px). Verde solo cuando y11.2 abre (venteo). -->
+      <path data-pipe="vv-y112-elbow"  data-active-when="valve.y112" data-active-color="#00f525" d="M 656 227 L 656 247" stroke="#ff1616"/>
+      <!-- vv-y112-trunk: el resto del tronco vertical (T3 ↓ T4 ↓ codo a base Atlas). Activo si Atlas + algún destino abierto. -->
+      <path data-pipe="vv-y112-trunk"  data-active-when="equipment.atlas &amp;&amp; (valve.y102 || valve.y104 || valve.y112)" data-active-color="#00f525" d="M 656 247 L 656 703" stroke="#ff1616"/>
       <path data-pipe="vv-y112-tail-1" data-active-when="equipment.atlas &amp;&amp; (valve.y102 || valve.y104 || valve.y112)" data-active-color="#00f525" d="M 655 744 L 655 928 L 643 928" stroke="#ff1616"/>
 
       <!-- Base inferior (salida Atlas hacia el header de presión) -->
@@ -397,9 +423,9 @@
       <path data-pipe="vv-y104-to-tankB"  data-active-when="valve.y104 &amp;&amp; equipment.atlas" data-active-color="#00f525" d="M 467 236 L 467 145 L 766 145 L 766 349" stroke="#ff1616"/>
       <path data-pipe="vv-y103-to-tankA"  data-active-when="valve.y103 &amp;&amp; (equipment.c1 || equipment.c2)" data-active-color="#00f525" d="M 437 239 L 437 129 L 921 129 L 921 349" stroke="#ff1616"/>
 
-      <!-- ─── y13 (hidrófugo/pera) ─── -->
-      <path data-pipe="y13-down" data-active-when="true" data-active-color="#ff1616" d="M 884 776 L 884 756" stroke="#ff1616"/>
-      <path data-pipe="y13-up-right" data-active-when="true" data-active-color="#ff1616" d="M 884 715 L 884 685 L 902 685 L 902 706" stroke="#ff1616"/>
+      <!-- ─── y13 (hidrófugo/pera) — verde cuando y13 OPEN (descarga activa) ─── -->
+      <path data-pipe="y13-down" data-active-when="valve.y13" data-active-color="#00f525" d="M 884 776 L 884 756" stroke="#ff1616"/>
+      <path data-pipe="y13-up-right" data-active-when="valve.y13" data-active-color="#00f525" d="M 884 715 L 884 685 L 902 685 L 902 706" stroke="#ff1616"/>
     </g>
 
     <!-- ════════════════════════════════════════════════
@@ -573,12 +599,20 @@
 
   function recalcPipes(){
     document.querySelectorAll('[data-active-when]').forEach(p => {
+      // Override manual (paint mode): si data-override = 'on'/'off', usar ese estado en vez de la regla
+      const override = p.getAttribute('data-override');
+      const activeColor = p.getAttribute('data-active-color') || PIPE_ACTIVE;
+      if (override === 'on') {
+        p.setAttribute('stroke', activeColor);
+        return;
+      } else if (override === 'off') {
+        p.setAttribute('stroke', PIPE_INACTIVE);
+        return;
+      }
+      // Sin override: evaluar regla normalmente
       const expr = p.getAttribute('data-active-when');
       let active = false;
       try { active = !!compileRule(expr)(state); } catch (e) { active = false; }
-      // Cada pipe puede declarar su propio color activo (data-active-color),
-      // útil para líneas de agua/sello (cyan) que no usan verde gas.
-      const activeColor = p.getAttribute('data-active-color') || PIPE_ACTIVE;
       p.setAttribute('stroke', active ? activeColor : PIPE_INACTIVE);
     });
   }
@@ -721,8 +755,50 @@
       applyValue(msg.key, msg.value);
     } else if (msg.type === 'hmi:applyAll') {
       applyAll(msg.values);
+    } else if (msg.type === 'hmi:paint-mode') {
+      // Activar/desactivar modo edición manual (click en pipes → toggle override)
+      document.body.classList.toggle('paint-mode', !!msg.on);
+    } else if (msg.type === 'hmi:clear-overrides') {
+      // Limpiar todos los overrides manuales y volver a evaluar las reglas
+      document.querySelectorAll('[data-pipe][data-override]').forEach(p => p.removeAttribute('data-override'));
+      recalcPipes();
+      sendMessage('hmi:overrides-cleared', {});
+    } else if (msg.type === 'hmi:set-pipe-override') {
+      // Setear override de una pipe específica (usado por applySnapshot al restaurar)
+      const pipe = document.querySelector('[data-pipe="' + msg.pipe + '"]');
+      if (pipe) {
+        if (!msg.override || msg.override === 'auto') pipe.removeAttribute('data-override');
+        else pipe.setAttribute('data-override', msg.override);
+        recalcPipes();
+      }
+    } else if (msg.type === 'hmi:get-state') {
+      // Snapshot completo del estado actual: valores + overrides de pipes
+      const overrides = {};
+      document.querySelectorAll('[data-pipe][data-override]').forEach(p => {
+        overrides[p.getAttribute('data-pipe')] = p.getAttribute('data-override');
+      });
+      sendMessage('hmi:state-snapshot', { state: Object.assign({}, state), overrides });
     }
   });
+
+  /* Paint mode: click en pipe → cycle override (none → on → off → none) */
+  function attachPipeClicks(){
+    document.querySelectorAll('[data-pipe]').forEach(p => {
+      p.addEventListener('click', (ev) => {
+        if (!document.body.classList.contains('paint-mode')) return;
+        ev.stopPropagation();
+        const cur = p.getAttribute('data-override');
+        let next;
+        if (!cur)        next = 'on';   // none → on (forzar verde)
+        else if (cur === 'on')  next = 'off';  // on → off (forzar rojo)
+        else                    next = null;   // off → none (volver a auto)
+        if (next === null) p.removeAttribute('data-override');
+        else p.setAttribute('data-override', next);
+        recalcPipes();
+        sendMessage('hmi:pipe-override-changed', { pipe: p.getAttribute('data-pipe'), override: next });
+      });
+    });
+  }
 
   function startTimestampTick(){
     setInterval(() => {
@@ -739,6 +815,10 @@
   }
   if (urlParams.get('edit') === '1') {
     document.body.classList.add('edit');
+  }
+  // Modo embedded: HMI dentro de HmiBombeoS2PublicPage (oculta cycle-panel — controles vienen del wrapper)
+  if (urlParams.get('embedded') === '1') {
+    document.body.classList.add('embedded');
   }
 
   // ───── MODO EDICIÓN: drag-and-drop + resize + rotate ──────
@@ -1702,6 +1782,7 @@
     applyAll(DEFAULTS);
     attachValveClicks();
     attachButtonClicks();
+    attachPipeClicks();
     attachCycleUI();
     startTimestampTick();
     refreshSidebarButtons();
