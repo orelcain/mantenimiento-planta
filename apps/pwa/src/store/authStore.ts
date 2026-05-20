@@ -2,7 +2,14 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { User } from '@/types'
 
-const INACTIVITY_TIMEOUT_MS = 24 * 60 * 60 * 1000 // 24 horas — un turno completo + margen
+/**
+ * Inactividad antes de forzar re-login.
+ * 12h cubre un turno extendido (turnos típicos son 8h). Antes era 24h, pero
+ * en un PC compartido del piso de planta esa ventana es suficientemente larga
+ * para que alguien entre con la sesión de otro técnico. 12h obliga al primer
+ * login del día.
+ */
+export const INACTIVITY_TIMEOUT_MS = 12 * 60 * 60 * 1000
 
 interface AuthState {
   user: User | null

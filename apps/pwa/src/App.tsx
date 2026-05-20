@@ -6,6 +6,7 @@ import { logger } from '@/lib/logger'
 import { LoadingScreen } from '@/components/ui'
 import { MainLayout } from '@/components/layout'
 import { RequireReAuth } from '@/components/auth/RequireReAuth'
+import { useSessionTimeout } from '@/hooks/useSessionTimeout'
 import { HelpProvider } from '@/components/help'
 import { MachineProvider } from '@/contexts/MachineContext'
 import { initializeHierarchySystem, isHierarchyInitialized } from '@/services/hierarchyInit'
@@ -181,6 +182,11 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 export function App() {
   const { setUser, setLoading } = useAuthStore()
   const { loadPermissions, clearPermissions } = usePermissionsStore()
+
+  // Forzar re-login tras 12h de inactividad. Sin esto, una pestaña abierta
+  // queda autenticada indefinidamente (Firebase Auth no expira sesiones del
+  // lado del cliente solo).
+  useSessionTimeout()
 
   // Escuchar cambios en la autenticación
   useEffect(() => {
