@@ -7,18 +7,22 @@
     <meta name="description" content="Sistema de gestión de mantenimiento industrial y levantamiento de incidencias" />
     <!--
       Content Security Policy — defensa en profundidad contra XSS.
-      Mantener permisivo para `script-src` y `style-src` para no romper la app
-      hoy; lo estricto vive en directivas que la app no necesita relajar:
+      script-src ya NO incluye 'unsafe-inline' para el documento principal:
+      el único bootstrap pre-React vive en /boot.js (no inline). style-src
+      mantiene 'unsafe-inline' porque Tailwind/React generan style attrs
+      inline pervasivos; endurecer eso requiere refactor mayor.
         object-src 'none' — bloquea <object>, <embed>, <applet> (vectores legacy).
         base-uri 'self'   — bloquea <base href="evil.com"> que reescribe URLs relativas.
         form-action 'self' — evita formularios que se exfiltren a otros dominios.
         frame-ancestors 'none' — bloquea iframes externos (clickjacking).
-      Endurecer `script-src 'self'` (sin unsafe-inline) cuando se migren los
-      dos <script> inline de abajo a archivos con hash conocido.
+      Nota: las ventanas de impresión (window.open('') + document.write con
+      <script> inline en BodegaView.tsx / pdfExport.ts) heredan este CSP en
+      algunos navegadores. Si fallan tras este cambio, mover a Blob URL o
+      srcdoc en lugar de document.write.
     -->
     <meta http-equiv="Content-Security-Policy" content="
       default-src 'self';
-      script-src 'self' 'unsafe-inline' https://accounts.google.com https://www.gstatic.com https://www.google.com https://www.recaptcha.net;
+      script-src 'self' https://accounts.google.com https://www.gstatic.com https://www.google.com https://www.recaptcha.net;
       style-src 'self' 'unsafe-inline';
       img-src 'self' data: blob: https:;
       font-src 'self' data:;
@@ -37,25 +41,8 @@
     <link rel="apple-touch-icon" href="/mantenimiento-planta/icons/icon-192.svg" />
     <link rel="manifest" href="/mantenimiento-planta/manifest.json" />
     <title>Mantenimiento Industrial</title>
-    <!-- SPA redirect: restaurar la URL original guardada por 404.html (GitHub Pages) -->
-    <script>
-      (function() {
-        var redirect = sessionStorage.getItem('spa-redirect');
-        if (redirect) {
-          sessionStorage.removeItem('spa-redirect');
-          window.history.replaceState(null, null, redirect);
-        }
-      })();
-    </script>
-    <!-- Script inline para aplicar tema antes de que React cargue (evita flash) -->
-    <script>
-      (function() {
-        const theme = localStorage.getItem('app-theme') || 'dark';
-        if (theme === 'dark') {
-          document.documentElement.classList.add('dark');
-        }
-      })();
-    </script>
+    <!-- Bootstrap pre-React (SPA redirect + tema) — extraído de inline para CSP estricta -->
+    <script src="/mantenimiento-planta/boot.js"></script>
   </head>
   <body class="bg-background text-foreground">
     <div id="root"></div>
