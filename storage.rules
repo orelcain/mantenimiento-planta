@@ -1,6 +1,21 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+    // ── Helpers ─────────────────────────────────────────────────────────────
+    // Lookup rol del usuario en Firestore. Agrega 1 lectura extra por write,
+    // pero es el único camino para distinguir admin de usuario regular sin
+    // custom claims. Si el doc no existe (caller no se ha auto-registrado
+    // todavía) el get falla y la regla niega → seguro por default.
+    function getUserRol() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.rol;
+    }
+    function isAdmin() {
+      return request.auth != null && getUserRol() == 'admin';
+    }
+    function isSupervisorOrAdmin() {
+      return request.auth != null && getUserRol() in ['admin', 'supervisor'];
+    }
+
     // Permitir lectura SOLO autenticados (antes público)
     match /{allPaths=**} {
       allow read: if request.auth != null;
@@ -64,21 +79,25 @@ service firebase.storage {
         && request.resource.contentType.matches('image/.*');
     }
     
-    // Planos de planta (solo admin) - subcarpetas por ubicación
+    // Planos de planta — solo admin (el plano es referencia para todo el sitio,
+    // un usuario regular no debería poder sobreescribirlo). Comentario decía
+    // "solo admin" pero la regla pre-fix solo verificaba `auth != null`.
     match /maps/{locationId}/{fileName} {
-      allow write: if request.auth != null
+      allow write: if isAdmin()
         && request.resource.size < 20 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
     }
 
-    // Uploads Grader (Excel)
+    // Uploads Grader (Excel) — los Excel los suben supervisores/admin durante
+    // el turno. Un usuario regular no opera el grader, así que no debería
+    // poder inyectar archivos al pipeline.
     match /graderUploads/{uploadId}/{fileName} {
-      allow create, update: if request.auth != null
+      allow create, update: if isSupervisorOrAdmin()
         && request.resource.size < 50 * 1024 * 1024
         && (request.resource.contentType.matches('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
             || request.resource.contentType.matches('application/vnd.ms-excel')
             || request.resource.contentType.matches('text/csv'));
-      allow read, delete: if request.auth != null;
+      allow read, delete: if isSupervisorOrAdmin();
     }
     
     // Fotos de inspecciones (items de inspección)
