@@ -3043,11 +3043,34 @@ async function cbComando(chatId, messageId, params, topicId) {
 /**
  * Webhook de Telegram — recibe mensajes/comandos del bot.
  * Registrar con: GET /setTelegramWebhook (una sola vez tras deploy)
+ *
+ * Validación de origen: cuando TELEGRAM_WEBHOOK_SECRET está seteado, Telegram
+ * envía el header `X-Telegram-Bot-Api-Secret-Token` con ese valor en cada
+ * request. Cualquier request que no traiga el header o traiga uno distinto se
+ * rechaza con 401 — evita que terceros forjen mensajes/callbacks falsos.
+ *
+ * Si TELEGRAM_WEBHOOK_SECRET no está configurado el endpoint sigue funcionando
+ * pero loguea un warning recurrente (forzar setup en producción).
  */
 exports.telegramWebhook = onRequest({ region: 'us-central1' }, async (req, res) => {
   if (req.method !== 'POST') {
     res.status(405).send('Method Not Allowed')
     return
+  }
+
+  const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET
+  if (expectedSecret) {
+    const provided = req.headers['x-telegram-bot-api-secret-token']
+    if (provided !== expectedSecret) {
+      logger.warn('[telegramWebhook] secret token mismatch — request rechazado', {
+        hasHeader: Boolean(provided),
+        ip: req.ip,
+      })
+      res.status(401).send('Unauthorized')
+      return
+    }
+  } else {
+    logger.warn('[telegramWebhook] TELEGRAM_WEBHOOK_SECRET no configurado — webhook acepta cualquier origen')
   }
 
   const update = req.body
