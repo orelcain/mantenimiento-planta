@@ -300,7 +300,20 @@ sidebarConfig
 notificationConfig  ← config notif Shoplogix por planta
 shoplogixNotifState ← dedup state por máquina-turno (solo backend)
 shoplogixShiftDelayChecks ← control alertas inicio turno (solo backend)
+animelists          ← ⚠️ EXTERNO — no tocar. Usado por bot @anime_estreno_bot
 ```
+
+### ⚠️ Acoplamiento externo: bot `@anime_estreno_bot`
+Este proyecto Firebase (`mantenimiento-planta-771a3`) está **compartido** con un bot Telegram personal de Danilo (`@anime_estreno_bot`, implementado en Node-RED + Mini App HTML standalone). El bot usa la colección `animelists` para tracking de animes.
+
+**Implicaciones:**
+- **Editar `firestore.rules` requiere preservar acceso a `animelists`.** Si por error las nuevas rules deniegan acceso a esa colección, el bot deja de funcionar silenciosamente.
+- **Comprobar antes de hacer cambios de rules globales** (ej: regla deny-all por defecto al inicio del archivo).
+- **Restaurar la API key Firebase a otro valor afecta al bot** — la key actual `AIzaSyBs...KJss` está hardcoded en `flows.json` del bot.
+
+**Repo del bot:** `github.com/orelcain/anime-estreno-bot` (privado) — backup en `D:/ANIME_ESTRENO_BOT/`. Documentación completa: `CONTEXT.md` de ese repo.
+
+**Si se quiere desacoplar:** mover el bot a su propio proyecto Firebase. Es refactor manual sobre el flow Node-RED.
 
 ## Skills disponibles (.claude/skills/)
 
