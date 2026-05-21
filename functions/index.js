@@ -4462,12 +4462,13 @@ async function _runAnimeEstrenos(botToken) {
     }
   }
 
-  // Separate tracked vs discovery
+  // Clasificar en 3 grupos: premieres (ep 1, sigas o no), tracked (ep>1 seguidos), discovery (ep>1 no seguidos)
   const FMT = { MOVIE:'🎬', ONA:'🖥️', OVA:'📀', SPECIAL:'🌟', TV:'📺', TV_SHORT:'📺' };
   const LIST_EMOJI = { viendo:'▶️', interesante:'⭐', pendiente:'📌', completado:'✅', descartado:'❌' };
 
-  const tracked   = [];
-  const discovery = [];
+  const premieres = [];   // ep 1 — destacados arriba (lo verdaderamente nuevo)
+  const tracked   = [];   // ep>1 de series que sigues
+  const discovery = [];   // ep>1 de series que no sigues
 
   for (const s of schedules) {
     const m  = s.media;
@@ -4478,8 +4479,13 @@ async function _runAnimeEstrenos(botToken) {
     const ep    = s.episode;
     const time  = new Date(s.airingAt * 1000).toLocaleTimeString('es-CL', { hour:'2-digit', minute:'2-digit', timeZone:'America/Santiago' });
     const line  = `${fmt} <b>${title}</b> ep${ep}${score} · ${time}`;
-    if (trackedIds.has(id)) {
-      const emoji = LIST_EMOJI[trackedMap[id]] || '▶️';
+    const isTracked = trackedIds.has(id);
+    const emoji = isTracked ? (LIST_EMOJI[trackedMap[id]] || '▶️') : '';
+
+    if (ep === 1) {
+      // Premiere: si la sigues muestra el emoji de tu lista; si no, solo la línea (el fmt ya trae 🎬/📺/etc)
+      premieres.push(emoji ? `${emoji} ${line}` : line);
+    } else if (isTracked) {
       tracked.push(`${emoji} ${line}`);
     } else {
       discovery.push(line);
@@ -4491,8 +4497,12 @@ async function _runAnimeEstrenos(botToken) {
   const dateCapitalized = dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1);
   let text = `📺 <b>Estrenos del día — ${dateCapitalized}</b>\n`;
 
+  if (premieres.length) {
+    text += `\n🆕 <b>Estrenos nuevos · ep 1 (${premieres.length}):</b>\n`;
+    text += premieres.join('\n');
+  }
   if (tracked.length) {
-    text += `\n⭐ <b>Tus series (${tracked.length}):</b>\n`;
+    text += `\n\n⭐ <b>Tus series (${tracked.length}):</b>\n`;
     text += tracked.join('\n');
   }
   if (discovery.length) {
@@ -4515,7 +4525,7 @@ async function _runAnimeEstrenos(botToken) {
   // Mark as sent in Firestore
   await db.collection('anime_notifications').doc(dateKey).set({
     sent: true, sentAt: FieldValue.serverTimestamp(),
-    tracked: tracked.length, discovery: discovery.length, total: schedules.length,
+    premieres: premieres.length, tracked: tracked.length, discovery: discovery.length, total: schedules.length,
   });
 }
 
