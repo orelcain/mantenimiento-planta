@@ -339,7 +339,7 @@ El bot Telegram personal de Danigo **`@anime_estreno_bot`** (display: AnimeTrack
 
 **Documentación exhaustiva:** `docs/anime-bot-CONTEXT.md` (620 líneas, 15 secciones) — fuente de verdad versionada. El Project "AnimeTracker Bot" en claude.ai web usa una copia. Al editar, correr `bash sync-claude-ai-bot.sh` para regenerar `_claude_ai_bot_upload/` y re-subir al Project.
 
-**Bug latente conocido (timezone):** `_runAnimeEstrenos` calcula `dateKey` con `today.setHours(0,0,0,0).toISOString()` = UTC, pero muestra fechas al usuario en `America/Santiago`. Cron `23:00 Santiago` = 03:00 UTC día siguiente → log dice día N+1 pero mensaje muestra día N. Impacto bajo en cron diario; puede causar doble-envío/skip con `animeEstrenosManual` cerca de medianoche. Fix sugerido en `docs/anime-bot-CONTEXT.md` sección 13.
+**Timezone (CORREGIDO 2026-05-20, commit `69f88c2a`):** `_runAnimeEstrenos` ahora calcula `dateKey` en `America/Santiago` (antes era UTC vía `toISOString()`, desincronizado del cron 23:00 Santiago). Usa helper `_tzOffsetMin()` DST-safe. Si en el futuro tocas la lógica de fechas del bot, mantener todo en Santiago (dateKey, from query AniList, dateLabel).
 
 ### Cómo editar y deployar el bot
 

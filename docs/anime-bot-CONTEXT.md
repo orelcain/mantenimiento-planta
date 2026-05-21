@@ -121,7 +121,8 @@ Bot personal de tracking de anime con Mini App embebida en Telegram. Funcionalid
 │ │ schedule: 'every day 23:00'         │ │
 │ │ timezone: America/Santiago          │ │
 │ │ secret: ANIME_BOT_TOKEN             │ │
-│ │ → fetch AniList airing tomorrow     │ │
+│ │ → fetch AniList airing HOY          │ │
+│ │   (medianoche Santiago → now+1h)    │ │
 │ │ → separar tracked vs discovery      │ │
 │ │ → enviar a Telegram                 │ │
 │ └─────────────────────────────────────┘ │
@@ -508,9 +509,18 @@ firebase functions:log --only telegramWebhook --project mantenimiento-planta-771
 - **Acoplamiento con PWA mantenimiento-planta:** modificar `firestore.rules` sin preservar regla `animelists` rompe el bot silenciosamente. (Advertido también en CLAUDE.md de mantenimiento-planta.)
 - **Funciones del bot conviven con 25+ funciones de la PWA en `functions/index.js`** (4588 líneas total). Refactor o renaming requiere cuidado.
 
-### Bug latente: timezone UTC vs Santiago en `dateKey` (descubierto 2026-05-20)
+### ✅ Bug timezone UTC vs Santiago — CORREGIDO 2026-05-20 (commit `69f88c2a`)
 
-**Síntoma:** desincronización entre `dateKey` del log y la fecha mostrada al usuario en mensajes.
+**El fix ya está aplicado.** Solución:
+- `dateKey` usa `new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santiago' })`
+- Helper `_tzOffsetMin(date, tz)` calcula offset DST-safe (-240 CLT / -180 CLST)
+- `from` query = medianoche Santiago real (`Date.UTC(y,mo-1,d) - offsetMin*60000`)
+- `dateLabel` derivado de `dateKey` → coherente con dedup
+- Validado: cron 03:00 UTC → dateKey `2026-05-20` Santiago, dateLabel "20 de mayo"
+
+Lo de abajo se conserva como referencia histórica del bug original.
+
+**Síntoma original (ya no ocurre):** desincronización entre `dateKey` del log y la fecha mostrada al usuario en mensajes.
 
 **Causa:**
 ```js
