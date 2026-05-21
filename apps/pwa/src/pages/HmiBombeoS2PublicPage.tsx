@@ -854,31 +854,35 @@ export function HmiBombeoS2PublicPage() {
                 return <div className="text-blue-300 text-center text-xs py-6">Sin cambios entre los snapshots.</div>
               }
               const byCategory = diff.reduce<Record<string, DiffEntry[]>>((acc, d) => {
-                if (!acc[d.category]) acc[d.category] = []
-                acc[d.category].push(d)
+                const list = acc[d.category] ?? (acc[d.category] = [])
+                list.push(d)
                 return acc
               }, {})
               const order: DiffCategory[] = ['Válvulas', 'Equipos', 'LEDs', 'Readouts', 'Overrides']
               return (
                 <>
                   <div className="text-[10px] text-cyan-400 mb-3">{diff.length} cambio{diff.length === 1 ? '' : 's'} detectado{diff.length === 1 ? '' : 's'}</div>
-                  {order.filter(c => byCategory[c]).map(c => (
-                    <div key={c} className="mb-3">
-                      <div className="text-cyan-400 text-[11px] font-semibold uppercase tracking-wide mb-1">{c} <span className="text-cyan-600">({byCategory[c].length})</span></div>
-                      <table className="w-full text-[10px] font-mono">
-                        <tbody>
-                          {byCategory[c].map(d => (
-                            <tr key={d.key} className="border-b border-[#1e3a5f]/30">
-                              <td className="text-blue-300 py-0.5 pr-2">{d.key}</td>
-                              <td className="text-red-300 py-0.5 pr-1 text-right">{d.from}</td>
-                              <td className="text-cyan-600 py-0.5 px-1">→</td>
-                              <td className="text-green-300 py-0.5">{d.to}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ))}
+                  {order.map(c => {
+                    const entries = byCategory[c]
+                    if (!entries || entries.length === 0) return null
+                    return (
+                      <div key={c} className="mb-3">
+                        <div className="text-cyan-400 text-[11px] font-semibold uppercase tracking-wide mb-1">{c} <span className="text-cyan-600">({entries.length})</span></div>
+                        <table className="w-full text-[10px] font-mono">
+                          <tbody>
+                            {entries.map(d => (
+                              <tr key={d.key} className="border-b border-[#1e3a5f]/30">
+                                <td className="text-blue-300 py-0.5 pr-2">{d.key}</td>
+                                <td className="text-red-300 py-0.5 pr-1 text-right">{d.from}</td>
+                                <td className="text-cyan-600 py-0.5 px-1">→</td>
+                                <td className="text-green-300 py-0.5">{d.to}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )
+                  })}
                 </>
               )
             })()}

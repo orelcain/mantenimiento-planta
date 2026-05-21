@@ -1,7 +1,7 @@
 {
-  "version": "3.32.0",
+  "version": "3.32.1",
   "buildDate": "2026-05-20",
-  "buildTimestamp": 1779323096228,
+  "buildTimestamp": 1779324223725,
   "features": [
     "HMI Yal: validador manual con video real PLC (IMG_1522.mp4 13MB) lado a lado del simulador",
     "HMI Yal: sync video↔simulador (auto-aplica state al cruzar bookmarks) + frame-step preciso (±33ms)",
