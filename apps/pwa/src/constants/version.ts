@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '3.32.1' as const
+export const APP_VERSION = '3.32.2' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-05-20' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'fix(hmi-yal): typecheck strict en diffSnapshots modal (noUncheckedIndexedAccess)' as const
+export const VERSION_NAME = 'chore(grader): elimina ShiftGatesConfigAccordion dead code (nunca importado)' as const
 
 /**
  * Nota:
