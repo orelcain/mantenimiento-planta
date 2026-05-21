@@ -358,6 +358,14 @@ El bot Telegram personal de Danigo **`@anime_estreno_bot`** (display: AnimeTrack
    - Mini App: abrir desde el botón del bot o vía `https://mantenimiento-planta-771a3.web.app/anime.html` (con initData válido)
    - Logs: `firebase functions:log --only telegramWebhook` o `--only animeEstrenosDiarios`
 
+**⚠️ La Mini App (`anime.html`) requiere DEPLOY MANUAL de Firebase Hosting.**
+NINGÚN workflow deploya hosting. `deploy.yml` → solo GitHub Pages. La Mini App de Telegram carga desde `mantenimiento-planta-771a3.web.app/anime.html` (Firebase Hosting), NO GitHub Pages. Tras editar `apps/pwa/public/anime.html`, el `git push` NO la actualiza en producción. Hay que:
+```
+cd apps/pwa && pnpm build          # genera dist/ con anime.html actualizado
+cd .. && firebase deploy --only hosting --project mantenimiento-planta-771a3
+```
+Verificar: `curl -s https://mantenimiento-planta-771a3.web.app/anime.html | grep <marca-del-cambio>`. Mismo aplica a `mant.html` (Mini App de planta).
+
 **Deploy manual (si los workflows fallan):**
 ```
 firebase deploy --only functions:telegramWebhook,functions:animeEstrenosDiarios,functions:animeEstrenosManual,functions:mintTelegramAuthToken,functions:setTelegramWebhook,functions:setupTelegramTopics --project mantenimiento-planta-771a3
