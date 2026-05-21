@@ -300,7 +300,8 @@ sidebarConfig
 notificationConfig  ← config notif Shoplogix por planta
 shoplogixNotifState ← dedup state por máquina-turno (solo backend)
 shoplogixShiftDelayChecks ← control alertas inicio turno (solo backend)
-animelists          ← ⚠️ EXTERNO — no tocar. Usado por bot @anime_estreno_bot
+animelists          ← ⚠️ Usado por bot @anime_estreno_bot — rule debe permanecer `if true`
+anime_notifications ← ⚠️ Usado por bot @anime_estreno_bot — dedup de envíos diarios por dateKey
 ```
 
 ### 🤖 Bot `@anime_estreno_bot` — vive dentro de este repo
@@ -322,10 +323,17 @@ El bot Telegram personal de Danigo **`@anime_estreno_bot`** (display: AnimeTrack
 - **Estado actual rules:** `allow read, write: if true` para `animelists` (sin auth, asume bot personal)
 
 **Implicaciones de tocar este código:**
-- **Modificar `firestore.rules`:** preservar acceso a `animelists` o el bot se cae silenciosamente
-- **Modificar `functions/index.js`:** las 6 functions del bot conviven con las 25+ functions de la PWA. Cuidado al refactorizar o renombrar exports
-- **Modificar `apps/pwa/public/anime.html`:** afecta directamente la Mini App en producción al hacer deploy de hosting
-- **Bot Token y secrets:** viven en Firebase Functions config (`firebase functions:config:get`), no en código
+- **Modificar `firestore.rules`:** preservar acceso a **ambas** colecciones del bot:
+  - `animelists/{userId}` (línea ~1341, rule actual `allow read, write: if true`) — **NO endurecer sin actualizar primero la Mini App** porque `anime.html` NO autentica con Firebase Auth, solo confía en la rule permissive.
+  - `anime_notifications/{dateKey}` — **no tiene rule explícita en firestore.rules actual.** Si aplicas un deny-all global, el bot envía notificaciones diarias DUPLICADAS porque no puede chequear "ya envié hoy".
+- **Modificar `functions/index.js`:** las 6 functions del bot conviven con las 25+ functions de la PWA. Cuidado al refactorizar o renombrar exports.
+- **Modificar `apps/pwa/public/anime.html`:** afecta directamente la Mini App en producción al hacer deploy de hosting.
+- **Bot Token y secrets:** viven en Firebase Functions config (`firebase functions:config:get`), no en código.
+
+**Verdad importante del bot de anime (verificada 2026-05-20):**
+- `@anime_estreno_bot` **NO procesa webhook entrante.** Es un bot pasivo: solo (a) envía notif diaria via `animeEstrenosDiarios` y (b) expone Menu Button "Abrir Mini App". Toda la interactividad real está en la Mini App.
+- `_runAnimeEstrenos` (línea ~4416 de `functions/index.js`) lee `animelists/52949422` (chat ID hardcoded en const `ANIME_CHAT_ID`) y escribe `anime_notifications/{YYYY-MM-DD}` para dedup.
+- Estructura `animelists/{userId}`: keys = nombres de listas (`viendo`, `interesante`, `pendiente`, `completado`, `descartado`), valores = arrays de `{id, title, episode, total, poster, ...campos AniList}`.
 
 **Backup histórico (Node-RED v0):** `github.com/orelcain/anime-estreno-bot-nodered-archive` (privado) — captura cómo era el bot ANTES de migrar a Cloud Functions (mediados 2025). NO restaurar como bot funcional — duplicaría el bot que ya corre 24/7.
 
