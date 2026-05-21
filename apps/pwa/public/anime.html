@@ -810,6 +810,16 @@ const ANILIST_RELATIONS_GQL = `query($id:Int){
     }
   }
 }`;
+// Query para "¿Dónde ver?" — links oficiales de streaming desde AniList
+const ANILIST_WATCH_GQL = `query($id:Int){Media(id:$id,type:ANIME){externalLinks{site url type language}}}`;
+// Sitios oficiales conocidos → emoji. Fallback 📺 para el resto.
+const WATCH_SITE_EMOJI = {
+  'Crunchyroll':'🟠', 'Netflix':'🔴', 'Hulu':'🟢', 'YouTube':'▶️',
+  'Bilibili TV':'🔵', 'Bilibili':'🔵', 'bilibili':'🔵',
+  'Tencent Video':'🐧', 'WeTV':'🟣', 'iQIYI':'💚', 'Youku':'🅾️',
+  'HIDIVE':'🔶', 'Amazon Prime Video':'📦', 'Disney Plus':'🏰',
+  'Hulu':'🟢', 'Funimation':'🟪', 'VRV':'🟡',
+};
 const RELATION_LABEL = {
   PREQUEL:'Precuela', SEQUEL:'Secuela', SIDE_STORY:'Historia paralela',
   ALTERNATIVE:'Alternativa', ADAPTATION:'Adaptación', PARENT:'Obra original',
@@ -1787,6 +1797,53 @@ function openAnimeDetail(id){
   detailAnime={...a,listName:getAnimeList(id)};
   renderDetailBody(a,detailAnime.listName);
   openDetail();
+  loadWhereToWatch(id);
+}
+
+// "¿Dónde ver?" — consulta externalLinks oficiales de AniList y los muestra como botones.
+const _wtwCache = {};
+async function loadWhereToWatch(id){
+  const body = document.getElementById('wtw-body-'+id);
+  if(!body) return;
+  try{
+    let links = _wtwCache[id];
+    if(!links){
+      const resp = await fetch('https://graphql.anilist.co', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ query: ANILIST_WATCH_GQL, variables:{ id: Number(id) } }),
+      });
+      const json = await resp.json();
+      links = (json?.data?.Media?.externalLinks || []).filter(l => l.type === 'STREAMING');
+      _wtwCache[id] = links;
+    }
+    const cur = document.getElementById('wtw-body-'+id);
+    if(!cur) return; // detalle ya cerrado
+    if(!links.length){
+      cur.innerHTML = '<span style="color:var(--hint);font-size:13px">No encontrado en plataformas oficiales conocidas. Prueba con “Mis links”.</span>';
+      return;
+    }
+    cur.innerHTML = '<div class="link-list">' + links.map(l => {
+      const emoji = WATCH_SITE_EMOJI[l.site] || '📺';
+      const lang = l.language ? ` · ${safe(l.language)}` : '';
+      return `<div class="link-row">
+        <button class="link-open-btn" onclick="openExternal('${safe(l.url)}')">
+          <span style="font-size:15px">${emoji}</span>
+          <span class="link-domain">${safe(l.site)}${lang}</span>
+          <span class="link-arrow">→</span>
+        </button>
+      </div>`;
+    }).join('') + '</div>';
+  }catch(e){
+    const cur = document.getElementById('wtw-body-'+id);
+    if(cur) cur.innerHTML = '<span style="color:var(--hint);font-size:13px">No se pudo cargar (sin conexión a AniList).</span>';
+  }
+}
+// Abre un link externo desde la Mini App (Telegram WebApp o navegador)
+function openExternal(url){
+  haptic('medium');
+  if (tg?.openLink) tg.openLink(url);
+  else window.open(url, '_blank', 'noopener');
 }
 
 function renderDetailBody(a,listName){
@@ -1839,6 +1896,10 @@ function renderDetailBody(a,listName){
             <button class="link-edit-btn" onclick="openNotesModal(${a.id})" title="Editar">✏️</button>
            </div>`
         : `<button class="link-add-btn" onclick="openNotesModal(${a.id})">📝 Agregar nota personal</button>`}
+    </div>
+    <div class="detail-section" id="wtw-section-${a.id}">
+      <div class="detail-section-title">📺 ¿Dónde ver?</div>
+      <div id="wtw-body-${a.id}" style="color:var(--hint);font-size:13px">Buscando plataformas oficiales…</div>
     </div>
     <div class="detail-section">
       <div class="detail-section-title">Mis links${_getLinks(a).length?` · ${_getLinks(a).length}/${MAX_LINKS_PER_ANIME}`:''}</div>
