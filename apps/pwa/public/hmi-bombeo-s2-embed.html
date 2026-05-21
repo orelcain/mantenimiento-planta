@@ -215,6 +215,23 @@
     stroke-dasharray: 3 4;
     filter: drop-shadow(0 0 3px #ff66ff);
   }
+
+  /* Paint mode extendido a LEDs: click cycla color (on-green → on-red → off → on-green) */
+  body.paint-mode [data-key^="led."] {
+    cursor: pointer;
+  }
+  body.paint-mode [data-key^="led."]:hover {
+    filter: drop-shadow(0 0 8px #ff66ff);
+  }
+  /* Paint mode extendido a readouts: click abre prompt para editar texto. Excluye timestamp (auto-tick). */
+  body.paint-mode [data-readout]:not([data-readout="timestamp"]) {
+    cursor: pointer;
+  }
+  body.paint-mode [data-readout]:not([data-readout="timestamp"]):hover .readoutBg {
+    stroke: #ff66ff;
+    stroke-width: 2;
+    filter: drop-shadow(0 0 6px #ff66ff);
+  }
 </style>
 </head>
 <body>
@@ -796,6 +813,49 @@
         else p.setAttribute('data-override', next);
         recalcPipes();
         sendMessage('hmi:pipe-override-changed', { pipe: p.getAttribute('data-pipe'), override: next });
+      });
+    });
+  }
+
+  /* Paint mode: click en LED → cycle color (on-green → on-red → off → on-green).
+     LEDs SON estado (no derivados de reglas), por eso van directo a applyValue.
+     Limitación conocida: si el ciclo está corriendo, los eventos del motor
+     pueden sobreescribir el valor manual. Usar con video pausado. */
+  function attachLedClicks(){
+    document.querySelectorAll('[data-key^="led."]').forEach(el => {
+      el.addEventListener('click', (ev) => {
+        if (!document.body.classList.contains('paint-mode')) return;
+        ev.stopPropagation();
+        const key = el.getAttribute('data-key');
+        const cur = state[key];
+        const next = cur === 'on-green' ? 'on-red'
+                   : cur === 'on-red'   ? 'off'
+                   :                      'on-green';
+        applyValue(key, next);
+        sendMessage('hmi:save-state', { key, value: next });
+        sendMessage('hmi:led-edit', { key, value: next });
+      });
+    });
+  }
+
+  /* Paint mode: click en readout → prompt() para nuevo texto.
+     Excluye 'timestamp' (auto-tick cada 1s). */
+  function attachReadoutClicks(){
+    document.querySelectorAll('[data-readout]').forEach(g => {
+      const readoutId = g.getAttribute('data-readout');
+      if (readoutId === 'timestamp') return;
+      g.addEventListener('click', (ev) => {
+        if (!document.body.classList.contains('paint-mode')) return;
+        ev.stopPropagation();
+        const textEl = g.querySelector('text[data-key^="text."]');
+        if (!textEl) return;
+        const key = textEl.getAttribute('data-key');
+        const current = state[key] != null ? state[key] : textEl.textContent;
+        const next = window.prompt('Nuevo valor para ' + readoutId + ':', current);
+        if (next === null) return;
+        applyValue(key, next);
+        sendMessage('hmi:save-state', { key, value: next });
+        sendMessage('hmi:readout-edit', { key, value: next });
       });
     });
   }
@@ -1783,6 +1843,8 @@
     attachValveClicks();
     attachButtonClicks();
     attachPipeClicks();
+    attachLedClicks();
+    attachReadoutClicks();
     attachCycleUI();
     startTimestampTick();
     refreshSidebarButtons();
