@@ -4413,10 +4413,20 @@ async function _sendTelegram(botToken, chatId, text, replyMarkup) {
   return r.json();
 }
 
+// Offset de un timezone en minutos para una fecha dada (DST-safe).
+// Chile alterna CLT (UTC-4) y CLST (UTC-3) — calcular dinámicamente, no hardcodear.
+function _tzOffsetMin(date, timeZone) {
+  const utc = new Date(date.toLocaleString('en-US', { timeZone: 'UTC' }));
+  const tz  = new Date(date.toLocaleString('en-US', { timeZone }));
+  return Math.round((tz.getTime() - utc.getTime()) / 60000);
+}
+
 async function _runAnimeEstrenos(botToken) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const dateKey = today.toISOString().substring(0, 10);
+  // Día calendario en Santiago. FIX timezone (2026-05-20): antes dateKey usaba UTC
+  // vía toISOString(), desfasado del cron 23:00 Santiago (= 03:00 UTC día siguiente).
+  // Causaba: log decía día N+1, mensaje al usuario mostraba día N. Ahora todo es Santiago.
+  const now = new Date();
+  const dateKey = now.toLocaleDateString('en-CA', { timeZone: 'America/Santiago' }); // "YYYY-MM-DD" Santiago
 
   // Check if already sent today
   const sentDoc = await db.collection('anime_notifications').doc(dateKey).get();
@@ -4425,8 +4435,10 @@ async function _runAnimeEstrenos(botToken) {
     return;
   }
 
-  // Query AniList: episodes aired today (midnight → now + buffer)
-  const from = Math.floor(today.getTime() / 1000);
+  // Query AniList: episodes aired today (medianoche Santiago → now + buffer)
+  const [y, mo, d] = dateKey.split('-').map(Number);
+  const offsetMin = _tzOffsetMin(now, 'America/Santiago'); // -240 (CLT) o -180 (CLST)
+  const from = Math.floor((Date.UTC(y, mo - 1, d, 0, 0, 0) - offsetMin * 60000) / 1000);
   const to   = Math.floor(Date.now() / 1000) + 3600;
   const GQL = `query($f:Int,$t:Int){Page(page:1,perPage:50){airingSchedules(airingAt_greater:$f,airingAt_lesser:$t){episode airingAt media{id title{romaji english}averageScore format}}}}`;
   const json = await _queryAniList(GQL, { f: from, t: to });
@@ -4474,8 +4486,8 @@ async function _runAnimeEstrenos(botToken) {
     }
   }
 
-  // Build message
-  const dateLabel = today.toLocaleDateString('es-CL', { weekday:'long', day:'numeric', month:'long', timeZone:'America/Santiago' });
+  // Build message — dateLabel derivado de dateKey (mediodía UTC → día calendario = dateKey) para coherencia con el dedup
+  const dateLabel = new Date(`${dateKey}T12:00:00Z`).toLocaleDateString('es-CL', { weekday:'long', day:'numeric', month:'long', timeZone:'UTC' });
   const dateCapitalized = dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1);
   let text = `📺 <b>Estrenos del día — ${dateCapitalized}</b>\n`;
 
