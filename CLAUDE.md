@@ -1009,8 +1009,10 @@ Con Haversine A→D = dimensión real del recinto en metros. El DWG ya tiene cot
 - ✅ 9 warnings ESLint + cap bajado a 5
 
 **P1 — Estructural (requiere planeación Opus):**
-- 🔲 **Refactor config Grader Fase A** — mover 12 Gates + Física al turno (`AnalisisGraderTurnoPage`), botón "Cambié gate" mid-turno + segmentación automática. **Requiere refactor storage Firestore.** (1-2 días, NECESITA OPUS)
+- ✅ **Refactor config Grader Fase A (Gates)** — audit 2026-05-20 reveló que el grueso ya estaba hecho en sesiones previas: storage Firestore (`graderShifts/{id}/configHistory/{snapId}`), editor inline embebido en TurnoPage (línea 1820 con `tabbed`+`shiftDocId`), QuickGateChangeButton mid-turno, `computeSegmentVerdicts` segmentación P0% antes/después (29 tests). Sub-task A — cleanup `ShiftGatesConfigAccordion` dead code (210 líneas) hecho en v3.32.2. Sub-tasks B+C ver abajo.
 - ✅ **GlobalSettingsModal en home** — move estructural completado 2026-04-26: rangos de GatesConfigPage ahora read-only, botón abre GlobalSettingsModal con reload al cerrar
+- 🔲 **Refactor Fase A · sub-B** — convertir ruta global `/analisis-grader/config` (tab Gates) en banner "Defaults · edita en el turno" + CTA al turno activo. Hoy sigue editable global, genera confusión. (~30-60min, bajo riesgo)
+- 🔲 **Refactor Fase A · sub-C** — mover **Física** al turno (NeumaticaTab, ProductoTab, DistanciasTab, DanfossTab, VerificacionTab — ~3182 líneas). Esto sí es 1-2 días reales, NECESITA OPUS para planear migración Firestore + backward compat.
 
 **P2 — Mejoras chicas:**
 - 🔲 **Fase 3b — Edición manual de rangos de pausas** — drag handles en bandas Timeline (~2-3 días)
@@ -1085,10 +1087,11 @@ Con Haversine A→D = dimensión real del recinto en metros. El DWG ya tiene cot
 **Quick wins completados en iter 10:**
 - ✅ **#5 QuickGateChangeButton deshabilitado en turno cerrado** (v2.147.0) — `allowEdit` prop cascada TurnoPage→ConfigChangeHistory→QuickGateChangeButton. Tooltip explica motivo.
 - ✅ **#4 Badge 🔧 en calendario histórico** (v2.148.0) — lazy-load count de snapshots manuales al seleccionar un día. Badge amber con icono Wrench + tooltip en la tarjeta de turno.
+- ✅ **#2 Ruta mobile `/grader/quick-change?turno=X`** — confirmado en audit 2026-05-20: ya estaba implementada en commits previos (7bc94d34 + 1267f267 + 894fd9b6 + 4b973e62). Container max-w-md, CTA h-14, banner RETROACTIVO con `?turno=X`. Pendiente en CLAUDE.md era stale.
 
 **P1 — Alta prioridad**
 
-- 🔲 **Refactor config Grader — Fase A** — mover las 12 Gates + configuración Física al acordeón del detalle de turno (`AnalisisGraderTurnoPage`), en lugar de vivir solo en la página de config global. Botón "Cambié gate" mid-turno + segmentación automática antes/después del cambio. Plan de 3 fases acordado sesión 2026-04-19. Es el pendiente estructural más importante.
+- ✅ **Refactor config Grader Fase A · Gates** — ver sección "PENDIENTE — Análisis de Turno" arriba para estado actual (audit 2026-05-20). Resumen: gates ya migradas, sub-A dead code cleanup hecho v3.32.2, sub-B (ruta global read-only) + sub-C (Física al turno) quedan separados.
 - ✅ **#1 GlobalSettingsModal en home** — COMPLETADO 2026-04-26: move estructural rangos GatesConfigPage → GlobalSettingsModal. Tab rangos ahora read-only + botón "Editar rangos en configuración global" que abre modal con reload de Firestore al cerrar.
 
 **P2 — Media prioridad**
