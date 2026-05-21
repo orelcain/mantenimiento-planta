@@ -303,17 +303,31 @@ shoplogixShiftDelayChecks ← control alertas inicio turno (solo backend)
 animelists          ← ⚠️ EXTERNO — no tocar. Usado por bot @anime_estreno_bot
 ```
 
-### ⚠️ Acoplamiento externo: bot `@anime_estreno_bot`
-Este proyecto Firebase (`mantenimiento-planta-771a3`) está **compartido** con un bot Telegram personal de Danilo (`@anime_estreno_bot`, implementado en Node-RED + Mini App HTML standalone). El bot usa la colección `animelists` para tracking de animes.
+### 🤖 Bot `@anime_estreno_bot` — vive dentro de este repo
 
-**Implicaciones:**
-- **Editar `firestore.rules` requiere preservar acceso a `animelists`.** Si por error las nuevas rules deniegan acceso a esa colección, el bot deja de funcionar silenciosamente.
-- **Comprobar antes de hacer cambios de rules globales** (ej: regla deny-all por defecto al inicio del archivo).
-- **Restaurar la API key Firebase a otro valor afecta al bot** — la key actual `AIzaSyBs...KJss` está hardcoded en `flows.json` del bot.
+El bot Telegram personal de Danigo **`@anime_estreno_bot`** (display: AnimeTracker) está implementado dentro de este monorepo. NO es un proyecto separado a pesar de su nombre.
 
-**Repo del bot:** `github.com/orelcain/anime-estreno-bot` (privado) — backup en `D:/ANIME_ESTRENO_BOT/`. Documentación completa: `CONTEXT.md` de ese repo.
+**Componentes del bot en este repo:**
+- **Backend:** `functions/index.js` — Cloud Functions deployadas en `mantenimiento-planta-771a3`:
+  - `telegramWebhook` (≈línea 2972) — recibe updates de Telegram (long-running HTTPS)
+  - `setTelegramWebhook` (≈3127) — configura URL del webhook
+  - `setupTelegramTopics` (≈3200) — setup topics de grupo
+  - `mintTelegramAuthToken` (≈3271) — emite tokens auth para la Mini App (firma para validar `initData` Telegram)
+  - `animeEstrenosDiarios` (≈4510) — scheduled diario, notifica películas/OVAs/specials que estrenan hoy
+  - `animeEstrenosManual` (≈4526) — trigger HTTP manual del mismo
+- **Mini App:** `apps/pwa/public/anime.html` (3000 líneas) — UI Telegram WebApp. Carga `telegram-web-app.js` + Firebase JS SDK
+- **Hosting:** `https://mantenimiento-planta-771a3.web.app/anime.html`
+- **Datos:** colección Firestore `animelists/{userId}` (ver rule actual línea ~1341 `firestore.rules`)
+- **Auth:** `mintTelegramAuthToken` valida `initData` de Telegram y emite custom token Firebase
+- **Estado actual rules:** `allow read, write: if true` para `animelists` (sin auth, asume bot personal)
 
-**Si se quiere desacoplar:** mover el bot a su propio proyecto Firebase. Es refactor manual sobre el flow Node-RED.
+**Implicaciones de tocar este código:**
+- **Modificar `firestore.rules`:** preservar acceso a `animelists` o el bot se cae silenciosamente
+- **Modificar `functions/index.js`:** las 6 functions del bot conviven con las 25+ functions de la PWA. Cuidado al refactorizar o renombrar exports
+- **Modificar `apps/pwa/public/anime.html`:** afecta directamente la Mini App en producción al hacer deploy de hosting
+- **Bot Token y secrets:** viven en Firebase Functions config (`firebase functions:config:get`), no en código
+
+**Backup histórico (Node-RED v0):** `github.com/orelcain/anime-estreno-bot-nodered-archive` (privado) — captura cómo era el bot ANTES de migrar a Cloud Functions (mediados 2025). NO restaurar como bot funcional — duplicaría el bot que ya corre 24/7.
 
 ## Skills disponibles (.claude/skills/)
 
