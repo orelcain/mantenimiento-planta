@@ -150,6 +150,41 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toFixed(2).padStart(5, '0')}`
 }
 
+type DiffCategory = 'Válvulas' | 'Equipos' | 'LEDs' | 'Readouts' | 'Overrides'
+
+interface DiffEntry {
+  category: DiffCategory
+  key: string
+  from: string
+  to: string
+}
+
+function categorizeKey(key: string): DiffCategory {
+  if (key.startsWith('valve.')) return 'Válvulas'
+  if (key.startsWith('equipment.')) return 'Equipos'
+  if (key.startsWith('led.')) return 'LEDs'
+  return 'Readouts'  // text.* y fallback
+}
+
+/** Diff puro entre dos snapshots: state vector + overrides. text.timestamp se excluye (auto-tick). */
+function diffSnapshots(a: Snapshot, b: Snapshot): DiffEntry[] {
+  const out: DiffEntry[] = []
+  const stateKeys = new Set([...Object.keys(a.state), ...Object.keys(b.state)])
+  for (const key of stateKeys) {
+    if (key === 'text.timestamp') continue
+    const va = a.state[key] ?? '(missing)'
+    const vb = b.state[key] ?? '(missing)'
+    if (va !== vb) out.push({ category: categorizeKey(key), key, from: va, to: vb })
+  }
+  const ovKeys = new Set([...Object.keys(a.overrides), ...Object.keys(b.overrides)])
+  for (const key of ovKeys) {
+    const va = a.overrides[key] || '(auto)'
+    const vb = b.overrides[key] || '(auto)'
+    if (va !== vb) out.push({ category: 'Overrides', key, from: va, to: vb })
+  }
+  return out
+}
+
 export function HmiBombeoS2PublicPage() {
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -181,6 +216,10 @@ export function HmiBombeoS2PublicPage() {
   const [captureName, setCaptureName] = useState('')
   const [captureDescription, setCaptureDescription] = useState('')
   const pendingSnapshotPayloadRef = useRef<{ state: Record<string, string>; overrides: Record<string, string> } | null>(null)
+
+  /* Diff snapshots: selección + modal */
+  const [diffFirstId, setDiffFirstId] = useState<string | null>(null)
+  const [diffPair, setDiffPair] = useState<[Snapshot, Snapshot] | null>(null)
 
   /* Persistir snapshots cada cambio */
   useEffect(() => {
@@ -216,7 +255,22 @@ export function HmiBombeoS2PublicPage() {
 
   const deleteSnapshot = useCallback((id: string) => {
     setSnapshots(prev => prev.filter(s => s.id !== id))
+    // Si el snapshot eliminado estaba en la selección de diff, cancelarla
+    setDiffFirstId(prev => prev === id ? null : prev)
   }, [])
+
+  /* Diff workflow: 1er click selecciona, 2do click abre modal, mismo click cancela */
+  const handleDiffClick = useCallback((snap: Snapshot) => {
+    setDiffFirstId(prev => {
+      if (!prev) return snap.id
+      if (prev === snap.id) return null
+      const a = snapshots.find(s => s.id === prev)
+      if (a) setDiffPair([a, snap])
+      return null
+    })
+  }, [snapshots])
+
+  const closeDiffModal = useCallback(() => setDiffPair(null), [])
 
   /* Aplicar un snapshot al simulador + seek video */
   const applySnapshot = useCallback((snap: Snapshot) => {
@@ -731,9 +785,18 @@ export function HmiBombeoS2PublicPage() {
               <Download className="h-3 w-3" />
             </button>
           </div>
+          {diffFirstId && (
+            <div className="bg-cyan-900/40 border border-cyan-700 rounded mb-2 p-1.5 text-cyan-200 text-[10px] flex items-center gap-1">
+              <GitCompare className="h-3 w-3 flex-shrink-0" />
+              <span className="flex-1 leading-tight">Click otro snap para comparar con <span className="font-mono text-cyan-100">{snapshots.find(s => s.id === diffFirstId)?.name}</span></span>
+              <button onClick={() => setDiffFirstId(null)} title="Cancelar diff" className="text-cyan-400 hover:text-cyan-100 flex-shrink-0">
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          )}
           <div className="flex flex-col gap-1">
             {snapshots.map(s => (
-              <div key={s.id} className="bg-[#0a1628] border border-[#1e3a5f] hover:border-cyan-700 rounded p-1.5 flex items-start gap-1 group">
+              <div key={s.id} className={`bg-[#0a1628] border rounded p-1.5 flex items-start gap-1 group transition-colors ${diffFirstId === s.id ? 'border-cyan-400 ring-2 ring-cyan-400/40' : 'border-[#1e3a5f] hover:border-cyan-700'}`}>
                 <button onClick={() => applySnapshot(s)} className="flex-1 text-left" title={s.description || 'Aplicar al simulador y saltar al timestamp del video'}>
                   <div className="text-[11px] text-cyan-200 font-mono leading-tight">{s.name}</div>
                   <div className="text-[9px] text-[#5a8ab8] font-mono">
@@ -742,11 +805,83 @@ export function HmiBombeoS2PublicPage() {
                   </div>
                   {s.description && <div className="text-[9px] text-blue-300/70 italic mt-0.5 truncate">{s.description}</div>}
                 </button>
+                <button
+                  onClick={() => handleDiffClick(s)}
+                  className={`flex-shrink-0 p-0.5 transition-opacity ${diffFirstId === s.id ? 'opacity-100 text-cyan-300' : 'opacity-0 group-hover:opacity-100 text-cyan-500 hover:text-cyan-300'}`}
+                  title={diffFirstId === s.id ? 'Cancelar selección' : diffFirstId ? 'Comparar con seleccionado' : 'Iniciar diff'}
+                >
+                  <GitCompare className="h-3 w-3" />
+                </button>
                 <button onClick={() => deleteSnapshot(s.id)} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 transition-opacity flex-shrink-0 p-0.5" title="Eliminar snapshot">
                   <Trash2 className="h-3 w-3" />
                 </button>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Diff modal — comparación entre dos snapshots */}
+      {diffPair && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ background: 'rgba(0,0,0,0.7)' }}
+          onClick={closeDiffModal}
+        >
+          <div
+            className="bg-[#0d1f3c] border border-cyan-800 rounded-xl p-5 w-[720px] max-w-[95vw] max-h-[85vh] overflow-y-auto shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-cyan-300 font-semibold text-sm flex items-center gap-2">
+                <GitCompare className="h-4 w-4" />
+                Diff:
+                <span className="text-blue-200 font-mono">{diffPair[0].name}</span>
+                <span className="text-cyan-500">→</span>
+                <span className="text-blue-200 font-mono">{diffPair[1].name}</span>
+              </h2>
+              <button onClick={closeDiffModal} className="text-cyan-400 hover:text-cyan-200" title="Cerrar">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="text-[10px] text-blue-400 font-mono mb-3 border-b border-cyan-900 pb-2">
+              t={formatTime(diffPair[0].videoTimestamp)} → t={formatTime(diffPair[1].videoTimestamp)}
+              <span className="ml-2 text-cyan-500">(Δ={(diffPair[1].videoTimestamp - diffPair[0].videoTimestamp).toFixed(2)}s)</span>
+            </div>
+            {(() => {
+              const diff = diffSnapshots(diffPair[0], diffPair[1])
+              if (diff.length === 0) {
+                return <div className="text-blue-300 text-center text-xs py-6">Sin cambios entre los snapshots.</div>
+              }
+              const byCategory = diff.reduce<Record<string, DiffEntry[]>>((acc, d) => {
+                if (!acc[d.category]) acc[d.category] = []
+                acc[d.category].push(d)
+                return acc
+              }, {})
+              const order: DiffCategory[] = ['Válvulas', 'Equipos', 'LEDs', 'Readouts', 'Overrides']
+              return (
+                <>
+                  <div className="text-[10px] text-cyan-400 mb-3">{diff.length} cambio{diff.length === 1 ? '' : 's'} detectado{diff.length === 1 ? '' : 's'}</div>
+                  {order.filter(c => byCategory[c]).map(c => (
+                    <div key={c} className="mb-3">
+                      <div className="text-cyan-400 text-[11px] font-semibold uppercase tracking-wide mb-1">{c} <span className="text-cyan-600">({byCategory[c].length})</span></div>
+                      <table className="w-full text-[10px] font-mono">
+                        <tbody>
+                          {byCategory[c].map(d => (
+                            <tr key={d.key} className="border-b border-[#1e3a5f]/30">
+                              <td className="text-blue-300 py-0.5 pr-2">{d.key}</td>
+                              <td className="text-red-300 py-0.5 pr-1 text-right">{d.from}</td>
+                              <td className="text-cyan-600 py-0.5 px-1">→</td>
+                              <td className="text-green-300 py-0.5">{d.to}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ))}
+                </>
+              )
+            })()}
           </div>
         </div>
       )}
