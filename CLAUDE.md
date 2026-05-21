@@ -329,6 +329,41 @@ El bot Telegram personal de Danigo **`@anime_estreno_bot`** (display: AnimeTrack
 
 **Backup histórico (Node-RED v0):** `github.com/orelcain/anime-estreno-bot-nodered-archive` (privado) — captura cómo era el bot ANTES de migrar a Cloud Functions (mediados 2025). NO restaurar como bot funcional — duplicaría el bot que ya corre 24/7.
 
+### Cómo editar y deployar el bot
+
+**Flujo estándar (cambios de código):**
+1. **Editar local** según el componente:
+   - Lógica del bot / cron / webhook → `functions/index.js` (líneas ~2972 a ~4530)
+   - UI Mini App → `apps/pwa/public/anime.html`
+   - Reglas de acceso → `firestore.rules` sección `animelists/{userId}` (~línea 1341)
+2. **Testear Mini App local:** Claude Preview `anime-app` puerto 5758 sirve el archivo actual de `apps/pwa/public/anime.html`. Para testear con Telegram auth real (initData), hay que abrir desde Telegram contra producción — no hay shortcut local para esto.
+3. **Commit + push.** Workflows GitHub Actions deployan automáticamente:
+   - `deploy-functions.yml` → Cloud Functions (incluye las 6 del bot)
+   - `deploy.yml` → Firebase Hosting (incluye `anime.html`)
+   - `deploy-firestore-rules.yml` → `firestore.rules` (solo si se modificó)
+4. **Verificar en producción:**
+   - Bot: probar `/start` o `/nav` en Telegram desde el chat con `@anime_estreno_bot`
+   - Mini App: abrir desde el botón del bot o vía `https://mantenimiento-planta-771a3.web.app/anime.html` (con initData válido)
+   - Logs: `firebase functions:log --only telegramWebhook` o `--only animeEstrenosDiarios`
+
+**Deploy manual (si los workflows fallan):**
+```
+firebase deploy --only functions:telegramWebhook,functions:animeEstrenosDiarios,functions:animeEstrenosManual,functions:mintTelegramAuthToken,functions:setTelegramWebhook,functions:setupTelegramTopics --project mantenimiento-planta-771a3
+firebase deploy --only hosting --project mantenimiento-planta-771a3
+firebase deploy --only firestore:rules --project mantenimiento-planta-771a3
+```
+
+**Secrets (BOT_TOKEN, etc.):** viven en Firebase Functions Config, no en código. Para verlos:
+```
+firebase functions:config:get --project mantenimiento-planta-771a3
+```
+
+**Rotar BOT_TOKEN si se compromete:**
+1. `@BotFather` → `/revoke` → nuevo token
+2. `firebase functions:config:set telegram.bot_token="nuevo_token" --project mantenimiento-planta-771a3`
+3. `firebase deploy --only functions --project mantenimiento-planta-771a3`
+4. Llamar `setTelegramWebhook` HTTPS para re-registrar webhook con el nuevo token
+
 ## Skills disponibles (.claude/skills/)
 
 ### Flujo de sesion
