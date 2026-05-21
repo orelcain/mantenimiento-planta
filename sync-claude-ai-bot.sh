@@ -18,11 +18,12 @@ mkdir -p "$OUT"
 
 echo "🔄 Sincronizando $OUT/ ..."
 
-# 1. CONTEXT.md (el documento maestro ya está acá, mantener actualizado)
-if [ -f "$OUT/CONTEXT.md" ]; then
-  echo "  ✅ CONTEXT.md (ya existe — editar manualmente si arquitectura cambió)"
+# 1. CONTEXT.md — fuente de verdad versionada en docs/anime-bot-CONTEXT.md
+if [ -f docs/anime-bot-CONTEXT.md ]; then
+  cp docs/anime-bot-CONTEXT.md "$OUT/CONTEXT.md"
+  echo "  ✅ CONTEXT.md (desde docs/anime-bot-CONTEXT.md — fuente versionada)"
 else
-  echo "  ⚠️  CONTEXT.md NO existe en $OUT/ — generarlo manualmente la primera vez"
+  echo "  ⚠️  docs/anime-bot-CONTEXT.md NO existe — editar ese archivo (es la fuente de verdad)"
 fi
 
 # 2. Mini App actual
@@ -30,8 +31,6 @@ cp apps/pwa/public/anime.html "$OUT/"
 echo "  ✅ anime.html"
 
 # 3. Extraer secciones del bot de functions/index.js
-#    Líneas ~2972-3290 (handlers Telegram bot + mintTelegramAuthToken)
-#    Líneas ~4400-4540 (animeEstrenosDiarios, animeEstrenosManual, _runAnimeEstrenos)
 {
   echo "// =============================================================="
   echo "// EXTRACTO: Funciones del bot @anime_estreno_bot"
@@ -39,16 +38,24 @@ echo "  ✅ anime.html"
   echo "// Generado por sync-claude-ai-bot.sh — NO EDITAR DIRECTO"
   echo "// =============================================================="
   echo ""
-  echo "// ─── BLOQUE 1: telegramWebhook + setTelegramWebhook + setupTelegramTopics + mintTelegramAuthToken ───"
+  echo "// ─── BLOQUE 0: Init Firebase Admin SDK (líneas 1-30) ───"
+  echo "// IMPORTANTE: Cloud Functions usan Admin SDK que BYPASEA firestore.rules."
+  echo "// Por eso anime_notifications/ funciona aunque no tenga rule explícita."
+  echo ""
+  sed -n '1,30p' functions/index.js
+  echo ""
+  echo ""
+  echo "// ─── BLOQUE 1: telegramWebhook + setTelegramWebhook + setupTelegramTopics + mintTelegramAuthToken (líneas ~2965-3320) ───"
   echo "// (handlers Telegram compartidos con bot de planta. mintTelegramAuthToken también usado por Mini App de planta)"
   echo ""
   sed -n '2965,3320p' functions/index.js
   echo ""
   echo ""
-  echo "// ─── BLOQUE 2: animeEstrenosDiarios + animeEstrenosManual + _runAnimeEstrenos (helper) ───"
+  echo "// ─── BLOQUE 2: ANIME_CHAT_ID constant + animeEstrenosDiarios + animeEstrenosManual + _runAnimeEstrenos (líneas ~4385-4540) ───"
   echo "// (las únicas funciones puramente de anime)"
+  echo "// NOTA: dateKey usa toISOString() — es UTC, no Santiago. Ver CONTEXT.md sección 13 sobre bug latente timezone."
   echo ""
-  sed -n '4400,4540p' functions/index.js
+  sed -n '4385,4540p' functions/index.js
 } > "$OUT/bot-functions-extract.js"
 echo "  ✅ bot-functions-extract.js (extracción de functions/index.js)"
 

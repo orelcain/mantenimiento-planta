@@ -337,6 +337,10 @@ El bot Telegram personal de Danigo **`@anime_estreno_bot`** (display: AnimeTrack
 
 **Backup histórico (Node-RED v0):** `github.com/orelcain/anime-estreno-bot-nodered-archive` (privado) — captura cómo era el bot ANTES de migrar a Cloud Functions (mediados 2025). NO restaurar como bot funcional — duplicaría el bot que ya corre 24/7.
 
+**Documentación exhaustiva:** `docs/anime-bot-CONTEXT.md` (620 líneas, 15 secciones) — fuente de verdad versionada. El Project "AnimeTracker Bot" en claude.ai web usa una copia. Al editar, correr `bash sync-claude-ai-bot.sh` para regenerar `_claude_ai_bot_upload/` y re-subir al Project.
+
+**Bug latente conocido (timezone):** `_runAnimeEstrenos` calcula `dateKey` con `today.setHours(0,0,0,0).toISOString()` = UTC, pero muestra fechas al usuario en `America/Santiago`. Cron `23:00 Santiago` = 03:00 UTC día siguiente → log dice día N+1 pero mensaje muestra día N. Impacto bajo en cron diario; puede causar doble-envío/skip con `animeEstrenosManual` cerca de medianoche. Fix sugerido en `docs/anime-bot-CONTEXT.md` sección 13.
+
 ### Cómo editar y deployar el bot
 
 **Flujo estándar (cambios de código):**
