@@ -330,6 +330,11 @@ El bot Telegram personal de Danigo **`@anime_estreno_bot`** (display: AnimeTrack
 - **Modificar `apps/pwa/public/anime.html`:** afecta directamente la Mini App en producción al hacer deploy de hosting.
 - **Bot Token y secrets:** viven en Firebase Functions config (`firebase functions:config:get`), no en código.
 
+**Mini App `anime.html` tiene DOS funciones de render del detalle** — al agregar cualquier feature al detalle de un anime, tocar AMBAS:
+- `renderDetailBody(a, listName)` — detalle de animes ya en tu lista (Viendo/Pendiente/etc.)
+- `openResultDetail(r)` — detalle de resultados de búsqueda + estrenos (aún no en lista)
+- `openSagaEntryDetail(id, r)` reusa las dos anteriores según si está en lista (no requiere cambios propios).
+
 **Verdad importante del bot de anime (verificada 2026-05-20):**
 - `@anime_estreno_bot` **NO procesa webhook entrante.** Es un bot pasivo: solo (a) envía notif diaria via `animeEstrenosDiarios` y (b) expone Menu Button "Abrir Mini App". Toda la interactividad real está en la Mini App.
 - `_runAnimeEstrenos` (línea ~4416 de `functions/index.js`) lee `animelists/52949422` (chat ID hardcoded en const `ANIME_CHAT_ID`) y escribe `anime_notifications/{YYYY-MM-DD}` para dedup.
