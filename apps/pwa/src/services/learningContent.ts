@@ -235,6 +235,64 @@ export async function getMachineContentCounts(
   }
 }
 
+export interface MachineContentMeta extends MachineContentCounts {
+  /** updatedAt (ms) más reciente entre las 4 secciones, o null si no hay contenido */
+  lastUpdatedAt: number | null
+}
+
+/** Como getMachineContentCounts, pero además devuelve el updatedAt más reciente
+ *  (para el badge "Nuevo"). Reusa los mismos getDocs (sin lecturas extra). */
+export async function getMachineContentMeta(
+  machineSlug: string
+): Promise<MachineContentMeta> {
+  const [manual, procedures, flows, diagnosis] = await Promise.all([
+    getDocs(sectionCollection(machineSlug, 'manual')),
+    getDocs(sectionCollection(machineSlug, 'procedures')),
+    getDocs(sectionCollection(machineSlug, 'flows')),
+    getDocs(sectionCollection(machineSlug, 'diagnosis')),
+  ])
+  let lastUpdatedAt: number | null = null
+  for (const snap of [manual, procedures, flows, diagnosis]) {
+    for (const d of snap.docs) {
+      const u = (d.data() as { updatedAt?: number }).updatedAt
+      if (typeof u === 'number' && (lastUpdatedAt === null || u > lastUpdatedAt)) lastUpdatedAt = u
+    }
+  }
+  return {
+    manual: manual.size,
+    procedures: procedures.size,
+    flows: flows.size,
+    diagnosis: diagnosis.size,
+    lastUpdatedAt,
+  }
+}
+
+export interface SymptomHit {
+  machineSlug: string
+  diagnosisId: string
+  symptom: string
+}
+
+/** Carga los síntomas de diagnóstico de las máquinas indicadas (para búsqueda
+ *  por síntoma en el hub). Solo lee la sección diagnosis de cada slug. */
+export async function getSymptomsForMachines(machineSlugs: string[]): Promise<SymptomHit[]> {
+  const results = await Promise.all(
+    machineSlugs.map(async slug => {
+      try {
+        const snap = await getDocs(sectionCollection(slug, 'diagnosis'))
+        return snap.docs.map(d => ({
+          machineSlug: slug,
+          diagnosisId: d.id,
+          symptom: (d.data() as DiagnosisEntry).symptom ?? '',
+        }))
+      } catch {
+        return [] as SymptomHit[]
+      }
+    })
+  )
+  return results.flat().filter(h => h.symptom.trim().length > 0)
+}
+
 /** Genera un ID unico basado en timestamp + random */
 export function generateContentId(prefix = ''): string {
   return `${prefix}${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
