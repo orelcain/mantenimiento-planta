@@ -356,20 +356,26 @@ El bot Telegram personal de Danigo **`@anime_estreno_bot`** (display: AnimeTrack
 2. **Testear Mini App local:** Claude Preview `anime-app` puerto 5758 sirve el archivo actual de `apps/pwa/public/anime.html`. Para testear con Telegram auth real (initData), hay que abrir desde Telegram contra producción — no hay shortcut local para esto.
 3. **Commit + push.** Workflows GitHub Actions deployan automáticamente:
    - `deploy-functions.yml` → Cloud Functions (incluye las 6 del bot)
-   - `deploy.yml` → Firebase Hosting (incluye `anime.html`)
+   - `deploy.yml` → GitHub Pages (PWA principal canónica)
+   - `deploy-miniapps.yml` → Firebase Hosting (Mini Apps `anime.html` / `mant.html`), trigger en cambios a `apps/pwa/public/**`
    - `deploy-firestore-rules.yml` → `firestore.rules` (solo si se modificó)
 4. **Verificar en producción:**
    - Bot: probar `/start` o `/nav` en Telegram desde el chat con `@anime_estreno_bot`
    - Mini App: abrir desde el botón del bot o vía `https://mantenimiento-planta-771a3.web.app/anime.html` (con initData válido)
    - Logs: `firebase functions:log --only telegramWebhook` o `--only animeEstrenosDiarios`
 
-**⚠️ La Mini App (`anime.html`) requiere DEPLOY MANUAL de Firebase Hosting.**
-NINGÚN workflow deploya hosting. `deploy.yml` → solo GitHub Pages. La Mini App de Telegram carga desde `mantenimiento-planta-771a3.web.app/anime.html` (Firebase Hosting), NO GitHub Pages. Tras editar `apps/pwa/public/anime.html`, el `git push` NO la actualiza en producción. Hay que:
+**Deploy de las Mini Apps a Firebase Hosting — AHORA AUTOMÁTICO.**
+`deploy-miniapps.yml` deploya Firebase Hosting en cada push a `main` que toque `apps/pwa/public/**` (Mini Apps + assets estáticos: manifest, icons, `firebase-messaging-sw.js`). Hace `pnpm build` (base path por defecto, idéntico al manual) + `firebase deploy --only hosting` con el service account (`secrets.FIREBASE_SERVICE_ACCOUNT`). Las Mini Apps son self-contained (`anime.html`: 100% CDN; `mant.html`: rutas relativas), por eso funcionan servidas desde el root de web.app aunque el bundle de la PWA use base `/mantenimiento-planta/`.
+
+> **Nota:** la PWA principal en `web.app` (root) NO se usa — la canónica es GitHub Pages. En `web.app` el `index.html` apunta a `/mantenimiento-planta/assets/…` (base GH Pages) que no resuelven ahí, así que la PWA-en-web.app queda rota por diseño; solo las Mini Apps importan en ese dominio.
+
+Tras editar `apps/pwa/public/anime.html` o `mant.html`, basta con `git push`. Verificar: `curl -s https://mantenimiento-planta-771a3.web.app/anime.html | grep <marca-del-cambio>`.
+
+**Deploy manual de hosting (solo si el workflow falla):**
 ```
-cd apps/pwa && pnpm build          # genera dist/ con anime.html actualizado
+cd apps/pwa && pnpm build          # genera dist/ con las Mini Apps actualizadas
 cd .. && firebase deploy --only hosting --project mantenimiento-planta-771a3
 ```
-Verificar: `curl -s https://mantenimiento-planta-771a3.web.app/anime.html | grep <marca-del-cambio>`. Mismo aplica a `mant.html` (Mini App de planta).
 
 **Deploy manual (si los workflows fallan):**
 ```

@@ -1,0 +1,103 @@
+name: Deploy Mini Apps to Firebase Hosting
+# Deploya a Firebase Hosting (mantenimiento-planta-771a3.web.app) cuando cambian
+# las Mini Apps de Telegram (apps/pwa/public/anime.html, mant.html) o sus assets
+# estaticos (manifest, icons, firebase-messaging-sw.js, etc.).
+#
+# Automatiza el procedimiento manual que estaba documentado en CLAUDE.md:
+#   cd apps/pwa && pnpm build && cd .. && firebase deploy --only hosting
+#
+# Approach: build completo de la PWA con el base path por defecto (/mantenimiento-planta/),
+# identico al deploy manual. Las Mini Apps son self-contained (anime.html: 100% CDN;
+# mant.html: rutas relativas ./mant-manifest.json, ./icons/, ./firebase-messaging-sw.js)
+# por lo que NO dependen del base path y funcionan servidas desde el root de web.app.
+# La PWA principal en web.app NO se usa (la canonica es GitHub Pages); su estado en
+# web.app es identico al del deploy manual previo.
+#
+# Reutiliza el secret FIREBASE_SERVICE_ACCOUNT (mismo mecanismo que deploy-functions.yml
+# y deploy-firestore-rules.yml).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/pwa/public/**'
+      - 'firebase.json'
+      - '.github/workflows/deploy-miniapps.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: firebase-hosting-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: '24'
+
+jobs:
+  deploy:
+    name: Build PWA & Deploy Hosting
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install pnpm
+        run: npm install -g pnpm@10.33.0
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build PWA
+        working-directory: apps/pwa
+        env:
+          # Firebase config (publica por diseno — seguridad via Firestore rules)
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: mantenimiento-planta-771a3.firebaseapp.com
+          VITE_FIREBASE_DATABASE_URL: https://mantenimiento-planta-771a3-default-rtdb.firebaseio.com
+          VITE_FIREBASE_PROJECT_ID: mantenimiento-planta-771a3
+          VITE_FIREBASE_STORAGE_BUCKET: mantenimiento-planta-771a3.firebasestorage.app
+          VITE_FIREBASE_MESSAGING_SENDER_ID: "1019421112530"
+          VITE_FIREBASE_APP_ID: "1:1019421112530:web:9afd9962e0b53152f8d50b"
+          # AI (Cloud Functions son el canal principal, keys como fallback)
+          VITE_GROQ_API_KEY: ${{ secrets.VITE_GROQ_API_KEY }}
+          VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
+        run: pnpm build
+
+      - name: Install Firebase CLI
+        # Version fija para evitar cambios inesperados (igual que los otros workflows)
+        run: npm install -g firebase-tools@15.11.0
+
+      - name: Deploy to Firebase Hosting
+        run: |
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/sa.json
+          GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json firebase deploy --only hosting --project mantenimiento-planta-771a3 --non-interactive
+          rm -f /tmp/sa.json
+
+      - name: Notificar deploy exitoso (ntfy)
+        if: success()
+        run: |
+          curl -s -X POST \
+            -H "Title: Mini Apps desplegadas" \
+            -H "Tags: rocket" \
+            -H "Priority: default" \
+            -d "Firebase Hosting actualizado (anime.html / mant.html)" \
+            https://ntfy.sh/mis-notificaciones-claude || true
+
+      - name: Notificar deploy fallido (ntfy)
+        if: failure()
+        run: |
+          curl -s -X POST \
+            -H "Title: Deploy Mini Apps fallo" \
+            -H "Tags: warning" \
+            -H "Priority: high" \
+            -d "El deploy de Firebase Hosting fallo. Revisa los logs en GitHub Actions." \
+            https://ntfy.sh/mis-notificaciones-claude || true
