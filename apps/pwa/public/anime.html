@@ -1578,6 +1578,10 @@ function openResultDetail(r) {
         <span class="saga-arrow">›</span>
       </button>
     </div>
+    <div class="detail-section" id="wtw-section-${r.id}">
+      <div class="detail-section-title">📺 ¿Dónde ver?</div>
+      <div id="wtw-body-${r.id}" style="color:var(--hint);font-size:13px">Buscando plataformas oficiales…</div>
+    </div>
     ${r.nextEp?`<div class="detail-section"><div style="font-size:13px;color:var(--link)">📡 Próx ep ${r.nextEp.ep}: ${r.nextEp.airingAt}</div></div>`:''}
     ${epSection}
     ${ratingSection}
@@ -1587,6 +1591,7 @@ function openResultDetail(r) {
     </div>
     ${r.siteUrl?`<div class="detail-section"><button class="action-btn action-ghost" onclick="window.open('${safe(r.siteUrl)}','_blank')">🔗 Ver en AniList</button></div>`:''}`;
   openDetail();
+  loadWhereToWatch(r.id);
 }
 
 async function _rdEp(id, delta) {
