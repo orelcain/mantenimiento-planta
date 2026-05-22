@@ -405,23 +405,47 @@ export function LearningHubPage() {
             </section>
 
             {/* ── Máquinas — orden de proceso físico ── */}
-            {Object.entries(machinesByArea).map(([area, machines], areaIdx) => (
-              <section key={area}>
-                <SectionLabel n={String(areaIdx + 2).padStart(2, '0')}>{area}</SectionLabel>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mt-5">
-                  {machines.map(machine => (
-                    <MachineCard
-                      key={machine.slug}
-                      machine={machine}
-                      meta={metaMap[machine.slug]}
-                      isFav={favorites.includes(machine.slug)}
-                      onToggleFav={() => handleToggleFav(machine.slug)}
-                      onClick={() => goMachine(machine)}
-                    />
-                  ))}
-                </div>
-              </section>
-            ))}
+            {Object.entries(machinesByArea).map(([area, machines], areaIdx) => {
+              // Editorial: documentadas como cards prominentes; en preparación como
+              // chips compactos. Rompe la grilla uniforme y prioriza lo que tiene contenido.
+              const documented = machines.filter(m => hasAnyContent(m, metaMap[m.slug]))
+              const pending = machines.filter(m => !hasAnyContent(m, metaMap[m.slug]))
+              return (
+                <section key={area}>
+                  <SectionLabel n={String(areaIdx + 2).padStart(2, '0')}>{area}</SectionLabel>
+
+                  {documented.length > 0 && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mt-5">
+                      {documented.map(machine => (
+                        <MachineCard
+                          key={machine.slug}
+                          machine={machine}
+                          meta={metaMap[machine.slug]}
+                          isFav={favorites.includes(machine.slug)}
+                          onToggleFav={() => handleToggleFav(machine.slug)}
+                          onClick={() => goMachine(machine)}
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {pending.length > 0 && (
+                    <div className="mt-4">
+                      <p className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider font-semibold mb-2.5" style={{ color: C.inkLo }}>
+                        <Clock className="h-3 w-3" />
+                        En preparación
+                        <span className="tabular-nums" style={{ color: C.inkGhost }}>· {pending.length}</span>
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {pending.map(machine => (
+                          <PendingChip key={machine.slug} machine={machine} onClick={() => goMachine(machine)} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </section>
+              )
+            })}
           </>
         )}
       </main>
@@ -467,6 +491,21 @@ function QuickChip({ machine, onClick }: { machine: LearningMachine; onClick: ()
       style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.ink }}
     >
       <Icon className="h-3.5 w-3.5" style={{ color: machine.color }} />
+      {machine.name}
+    </button>
+  )
+}
+
+// Chip compacto para máquinas sin contenido (en preparación) — borde punteado.
+function PendingChip({ machine, onClick }: { machine: LearningMachine; onClick: () => void }) {
+  const Icon = machine.icon
+  return (
+    <button
+      onClick={onClick}
+      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8] transition-colors hover:brightness-125"
+      style={{ background: C.bgPanel, border: `1px dashed ${C.border}`, color: C.inkMid }}
+    >
+      <Icon className="h-3.5 w-3.5" style={{ color: machine.color, opacity: 0.7 }} />
       {machine.name}
     </button>
   )
