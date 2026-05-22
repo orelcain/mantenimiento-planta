@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Data técnica en monoespaciado (IBM Plex Mono) ──────────────────────────
+   `tabular-nums` ya marca números de datos en toda la app (KPIs, conteos, %,
+   tiempos, IDs, fechas). Mapearlos a mono = lectura tipo instrumento/PLC e
+   identidad propia (anti "dashboard genérico"). Una sola regla, cascadea a
+   las 61 superficies que usan tabular-nums. Reversible. */
+.tabular-nums {
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
 /* Ocultar elementos en landscape móvil (celular horizontal) */
 @media (orientation: landscape) and (max-height: 500px) {
   .landscape-mobile-hidden { display: none !important; }

@@ -70,6 +70,8 @@ export default {
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
+        // Mono técnico para datos/lecturas (KPIs, códigos, timestamps, IDs)
+        mono: ['"IBM Plex Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
       animation: {
         'spin-slow': 'spin 3s linear infinite',
