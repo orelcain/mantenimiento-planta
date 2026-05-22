@@ -142,6 +142,33 @@ Batch 3 (Haiku 4.5, ~5 min)   Verificar CI + confirmar deploy
    existentes con el método: *qué decisión opera, qué datos ya tenemos, dónde caen los
    falsos positivos*. Suele resultar en mejoras de los existentes en lugar de uno nuevo.
 
+### Sistema de diseño — IBM Plex + AquaChile (establecido 2026-05-22)
+
+Meta: que NO se vea como "dashboard hecho por IA genérica". Identidad propia.
+
+1. **Tokens AquaChile** (`apps/pwa/tailwind.config.js`): tema dark azul-tintado.
+   `background #0d1722` · `card #16242f` · `border #22384a` · `primary #2E75B6` (+escala)
+   · `foreground #e9eef3` (NUNCA `#fff`/`#000`) · `ring #5aa6e8`. destructive/success/warning
+   se mantienen vivos (status). Cambiar tokens = re-tema ~75% de la app (es token-based).
+2. **Paleta del módulo Aprendizaje** (`apps/pwa/src/data/learningTheme.ts`, `LC`): hub +
+   admin + machine page usan `import { LC }` (inline styles). Hub: `import { LC as C }`.
+3. **Tipografía IBM Plex** (self-hosted, `@fontsource`, imports en `main.tsx`):
+   `font-sans` = IBM Plex Sans (UI), `font-mono` = IBM Plex Mono (datos). **Regla global en
+   `index.css`: `.tabular-nums → mono`** — para que un número lea como instrumento, darle
+   clase `tabular-nums`. Datos = mono; texto/labels = sans. NO uppercase en labels largos (truncan).
+4. **Patrones editoriales reutilizables**: acordeón single-open (grid 0fr→1fr); cards
+   prominentes vs chips punteados ("documentado vs en preparación"); empty states que
+   ENSEÑAN (cuadro punteado + copy accionable, no "nada acá"); KPI card con valor prominente.
+5. **GOTCHA Vite**: agregar dependencia de fuente o cambiar `tailwind.config` (fontFamily/
+   colors) NO se toma en caliente → **reiniciar dev server** (`preview_stop` + `preview_start`).
+   HMR/reload del browser no alcanza (síntoma: `font-mono` cae al mono default de Tailwind).
+6. Aplicar con la skill `impeccable` (registro product). El craft VISIBLE viene de cambiar
+   layout/interacción sobre contenido real, no de pulir cajas densas/vacías.
+
+**Pendiente (rollout bespoke por módulo)**: títulos display, quebrar grillas, cards — cada
+header de página está hardcodeado distinto (no hay `PageHeader` compartido; considerar crearlo).
+Hecho: Aprendizaje 100% · Análisis de Turno (KPI+mono) · Repuestos (empty state). Resto: solo fundamentos.
+
 ### Preview y pruebas visuales (OBLIGATORIO leer antes de usar browser)
 
 **Regla principal: verificar en preview SIEMPRE después de cada avance**, antes de hacer commit.
@@ -467,6 +494,15 @@ Después de cada `git push`, verificar con `gh run list --limit 5` que el workfl
 - Produccion: `https://orelcain.github.io/mantenimiento-planta/`
 - CI status: 4/4 workflows 🟢
 - Seguridad: 26 colecciones Firestore validadas, 0 vulnerabilidades runtime prod
+
+## Cambios recientes (sesión 2026-05-22 — Sistema de diseño AquaChile + IBM Plex, 6 commits `0b5b0215..34042a1f`)
+
+Transformación anti "IA genérica". Ver sección **"Sistema de diseño — IBM Plex + AquaChile"** arriba.
+- Tokens AquaChile globales (tailwind.config) + paleta `LC` (`learningTheme.ts`) compartida del módulo Aprendizaje.
+- Sistema tipográfico **IBM Plex** (Sans UI + Mono datos via `.tabular-nums` global). Deps `@fontsource/ibm-plex-{sans,mono}`.
+- Centro de Aprendizaje 100% editorial (editor diagnóstico título+vista previa+re-auth, acordeón, hub cards-vs-chips).
+- Análisis de Turno: KPI card craft + data en mono. Repuestos: empty state editorial.
+- **Pendiente**: rollout bespoke por módulo (títulos display/grillas) — considerar `PageHeader` reutilizable.
 
 ## Cambios recientes (sesión 2026-05-03 — Shoplogix Notification System + dedup fix)
 
