@@ -1,14 +1,17 @@
 /**
- * useDevModulesVisibility — Visibilidad por-dispositivo de los items del sidebar
- * marcados con `inDevelopment: true`.
+ * useDevModulesVisibility — Visibilidad por-dispositivo de los items del sidebar.
  *
- * Por default todos están ocultos (incluido para admin), evitando ruido visual
- * de módulos a medio terminar. Desde `/admin/dev-modules` el admin activa los
- * que quiera ver en su dispositivo.
+ * Maneja TODOS los módulos, no solo los `inDevelopment`. El default depende del
+ * tipo de item y lo decide quien consume el hook vía el 2º argumento de
+ * `isVisible(href, defaultVisible)`:
+ *   - módulos en desarrollo → `defaultVisible = false` (ocultos hasta activar)
+ *   - módulos de producción → `defaultVisible = true` (visibles hasta ocultar)
+ * El mapa en localStorage solo guarda overrides explícitos (true/false); la
+ * ausencia de una clave significa "usar el default".
  *
  * Persiste en localStorage `mant_dev_modules_visible` como JSON
  * `Record<href, boolean>`. NO se sincroniza entre dispositivos a propósito —
- * cada admin decide qué probar en su PC.
+ * cada admin decide qué ver en su PC.
  *
  * Para que MainLayout y la página admin se mantengan sincronizados sin
  * refrescar, despachamos un CustomEvent local cuando cambia el set.
@@ -53,7 +56,10 @@ export function useDevModulesVisibility() {
     }
   }, [])
 
-  const isVisible = useCallback((href: string) => map[href] === true, [map])
+  const isVisible = useCallback(
+    (href: string, defaultVisible = false) => map[href] ?? defaultVisible,
+    [map],
+  )
 
   const setVisible = useCallback((href: string, visible: boolean) => {
     const next = { ...readMap(), [href]: visible }

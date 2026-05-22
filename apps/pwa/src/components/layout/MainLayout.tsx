@@ -68,17 +68,6 @@ interface NavItem {
 }
 interface NavGroup { id: string; label: string; items: NavItem[]; defaultOpen?: boolean; adminOnly?: boolean }
 
-export const DEV_NAV_ITEMS: ReadonlyArray<{ name: string; href: string }> = [
-  { name: 'Incidencias',         href: '/incidents'        },
-  { name: 'Evidencias',          href: '/photo-evidence'   },
-  { name: 'Preventivo',          href: '/preventive'       },
-  { name: 'Predictivo',          href: '/predictive'       },
-  { name: 'Planificador Gantt',  href: '/gantt'            },
-  { name: 'Equipos',             href: '/equipment'        },
-  { name: 'Sensores',            href: '/sensors'          },
-  { name: 'Panel Sensores',      href: '/sensors/monitor'  },
-] as const
-
 const navGroups: NavGroup[] = [
   {
     id: 'principal', label: 'Principal', defaultOpen: true,
@@ -135,6 +124,39 @@ const navGroups: NavGroup[] = [
     ],
   },
 ]
+
+/**
+ * Hrefs que NUNCA pueden ocultarse desde `/admin/dev-modules`. Salvaguarda
+ * anti-bloqueo: `/admin` es la única vía de vuelta al toggle, así que si se
+ * pudiera ocultar el admin quedaría sin forma de revertir.
+ */
+const LOCKED_HREFS = new Set<string>(['/admin'])
+
+export interface NavItemMeta {
+  name: string
+  href: string
+  /** Etiqueta del grupo al que pertenece (para seccionar la página admin). */
+  group: string
+  inDevelopment: boolean
+  /** Si true, no puede ocultarse (ver {@link LOCKED_HREFS}). */
+  locked: boolean
+}
+
+/**
+ * Catálogo plano de TODOS los items del sidebar con su metadata, derivado de
+ * `navGroups`. Lo consume `/admin/dev-modules` para listar y togglear cualquier
+ * módulo (en desarrollo o de producción) y el bottom-nav para respetar la misma
+ * visibilidad.
+ */
+export const ALL_NAV_ITEMS: ReadonlyArray<NavItemMeta> = navGroups.flatMap((g) =>
+  g.items.map((it) => ({
+    name: it.name,
+    href: it.href,
+    group: g.label,
+    inDevelopment: it.inDevelopment === true,
+    locked: LOCKED_HREFS.has(it.href),
+  })),
+)
 
 export function MainLayout() {
   const navigate = useNavigate()
@@ -350,7 +372,7 @@ export function MainLayout() {
       ]
     : navGroups
 
-  const { isVisible: isDevModuleVisible } = useDevModulesVisibility()
+  const { isVisible: isModuleVisible } = useDevModulesVisibility()
 
   const visibleGroups = orderedNavGroups
     .filter(g => !g.adminOnly || isAdmin)
@@ -358,9 +380,11 @@ export function MainLayout() {
       ...g,
       items: g.items.filter(item => {
         if (item.module && !canSee(item.module)) return false
-        // Items en desarrollo: ocultos por default. Solo visibles si el admin
-        // los activó en `/admin/dev-modules` (localStorage por-dispositivo).
-        if (item.inDevelopment && !isDevModuleVisible(item.href)) return false
+        // Visibilidad por-dispositivo (toggle en `/admin/dev-modules`):
+        // dev oculto por default, producción visible por default. `/admin` queda
+        // siempre visible — es la vía de vuelta al toggle (anti-bloqueo).
+        if (LOCKED_HREFS.has(item.href)) return true
+        if (!isModuleVisible(item.href, !item.inDevelopment)) return false
         return true
       }),
     }))
@@ -431,11 +455,13 @@ export function MainLayout() {
   const contextualTabs = (activeContext ? contextualTabsMap[activeContext] : undefined) ?? defaultContextual
   const bottomNavItems = [...fixedTabs, ...contextualTabs]
     .filter(item => !item.module || canSee(item.module))
-    // Si el href corresponde a un módulo en desarrollo no habilitado, ocultar
-    // también del bottom nav para mantener consistencia con el sidebar.
+    // Respetar la misma visibilidad que el sidebar: si el href está oculto
+    // (dev no activado o producción ocultada), sacarlo también del bottom nav.
     .filter(item => {
-      const isDev = DEV_NAV_ITEMS.some(d => d.href === item.href)
-      return !isDev || isDevModuleVisible(item.href)
+      if (LOCKED_HREFS.has(item.href)) return true
+      const meta = ALL_NAV_ITEMS.find(m => m.href === item.href)
+      const defaultVisible = meta ? !meta.inDevelopment : true
+      return isModuleVisible(item.href, defaultVisible)
     })
 
   const currentPageName = allNavigation.find(item =>
