@@ -574,16 +574,20 @@ export function App() {
             } />
             <Route path="aprendizaje/admin" element={
               <AdminRoute>
-                <Suspense fallback={<LoadingScreen />}>
-                  <LearningAdminPage />
-                </Suspense>
+                <RequireReAuth reason="para administrar el Centro de Aprendizaje">
+                  <Suspense fallback={<LoadingScreen />}>
+                    <LearningAdminPage />
+                  </Suspense>
+                </RequireReAuth>
               </AdminRoute>
             } />
             <Route path="aprendizaje/admin/:slug" element={
               <AdminRoute>
-                <Suspense fallback={<LoadingScreen />}>
-                  <LearningAdminMachinePage />
-                </Suspense>
+                <RequireReAuth reason="para administrar el Centro de Aprendizaje">
+                  <Suspense fallback={<LoadingScreen />}>
+                    <LearningAdminMachinePage />
+                  </Suspense>
+                </RequireReAuth>
               </AdminRoute>
             } />
             <Route path="visor-3d" element={

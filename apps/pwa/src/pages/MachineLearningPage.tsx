@@ -8,10 +8,11 @@
 import { useEffect, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import {
-  ArrowLeft, BookOpen, ListChecks, GitBranch, AlertTriangle, Clock, Loader2,
+  ArrowLeft, BookOpen, ListChecks, GitBranch, AlertTriangle, Clock, Loader2, Wrench, ChevronDown,
 } from 'lucide-react'
 import { useAuthStore } from '@/store'
 import { findMachineBySlug, type LearningSection } from '@/data/learningMachines'
+import { LC } from '@/data/learningTheme'
 import {
   listProcedures,
   listManualSections,
@@ -141,22 +142,22 @@ export function MachineLearningPage() {
   return (
     <div
       className={`${heightClass} w-full`}
-      style={{ background: 'linear-gradient(135deg, #0a1628 0%, #0d1f3c 50%, #0a1628 100%)' }}
+      style={{ background: `linear-gradient(135deg, ${LC.bg} 0%, ${LC.bgPanel} 50%, ${LC.bg} 100%)` }}
     >
       {/* Header */}
       <div className="max-w-4xl mx-auto px-4 pt-8 pb-4 sm:px-6 sm:pt-12">
         <button
           onClick={() => navigate('/aprendizaje')}
           className="flex items-center gap-2 text-sm mb-3 -ml-2 px-2 py-3 rounded-lg transition-colors"
-          style={{ color: '#5a7a9a', minHeight: '44px' }}
-          onMouseEnter={e => (e.currentTarget.style.color = '#7ab8ff')}
-          onMouseLeave={e => (e.currentTarget.style.color = '#5a7a9a')}
+          style={{ color: LC.inkLo, minHeight: '44px' }}
+          onMouseEnter={e => (e.currentTarget.style.color = LC.aquaBright)}
+          onMouseLeave={e => (e.currentTarget.style.color = LC.inkLo)}
         >
           <ArrowLeft className="h-5 w-5" />
           Centro de Aprendizaje
         </button>
 
-        <div className="flex items-center gap-1.5 text-xs mb-4" style={{ color: '#6a90b8' }}>
+        <div className="flex items-center gap-1.5 text-xs mb-4" style={{ color: LC.inkLo }}>
           <span>Aprendizaje</span>
           <span>/</span>
           <span style={{ color: machine.color }}>{machine.name}</span>
@@ -170,14 +171,14 @@ export function MachineLearningPage() {
             <Icon className="h-7 w-7" style={{ color: machine.color }} />
           </div>
           <div className="min-w-0 flex-1">
-            <h1 className="text-2xl sm:text-3xl font-bold text-white">{machine.name}</h1>
-            <p className="text-xs uppercase tracking-wider mt-1" style={{ color: '#6a90b8' }}>
+            <h1 className="text-2xl sm:text-3xl font-bold text-[#e9eef3]">{machine.name}</h1>
+            <p className="text-xs uppercase tracking-wider mt-1" style={{ color: LC.inkLo }}>
               {machine.area}
             </p>
           </div>
         </div>
 
-        <p className="text-sm leading-relaxed" style={{ color: '#aab8c8' }}>
+        <p className="text-sm leading-relaxed" style={{ color: LC.inkMid }}>
           {machine.description}
         </p>
       </div>
@@ -203,20 +204,20 @@ export function MachineLearningPage() {
                 onClick={() => setActiveTab(tab.id)}
                 className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl transition-all relative"
                 style={{
-                  background: isActive ? `${machine.color}1a` : 'rgba(22,28,42,0.6)',
-                  border: `1px solid ${isActive ? machine.color + '55' : '#1e3a5f'}`,
+                  background: isActive ? `${machine.color}1a` : LC.surface,
+                  border: `1px solid ${isActive ? machine.color + '55' : LC.border}`,
                   minHeight: '76px',
                 }}
               >
                 <TabIcon
                   className="h-5 w-5"
                   style={{
-                    color: isActive ? machine.color : hasContent ? '#8a9aaa' : '#4a5a6a',
+                    color: isActive ? machine.color : hasContent ? LC.inkMid : LC.inkGhost,
                   }}
                 />
                 <span
                   className="text-xs font-semibold text-center leading-tight"
-                  style={{ color: isActive ? machine.color : '#8a9aaa' }}
+                  style={{ color: isActive ? machine.color : LC.inkMid }}
                 >
                   <span className="sm:hidden">{tab.shortLabel}</span>
                   <span className="hidden sm:inline">{tab.label}</span>
@@ -236,14 +237,14 @@ export function MachineLearningPage() {
       {/* Content area */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-6 pb-12">
         <div className="mb-4">
-          <h2 className="text-lg font-semibold text-white">{activeTabData.label}</h2>
-          <p className="text-xs mt-0.5" style={{ color: '#6a90b8' }}>
+          <h2 className="text-lg font-semibold text-[#e9eef3]">{activeTabData.label}</h2>
+          <p className="text-xs mt-0.5" style={{ color: LC.inkLo }}>
             {activeTabData.description}
           </p>
         </div>
 
         {loadingTab ? (
-          <div className="flex items-center justify-center py-12" style={{ color: '#6a90b8' }}>
+          <div className="flex items-center justify-center py-12" style={{ color: LC.inkLo }}>
             <Loader2 className="h-5 w-5 animate-spin mr-2" />
             Cargando...
           </div>
@@ -258,9 +259,9 @@ export function MachineLearningPage() {
         ) : sectionEnabled ? (
           <div
             className="rounded-xl p-6"
-            style={{ background: 'rgba(22,28,42,0.8)', border: '1px solid #1e3a5f' }}
+            style={{ background: LC.surface, border: `1px solid ${LC.border}` }}
           >
-            <p className="text-sm" style={{ color: '#aab8c8' }}>
+            <p className="text-sm" style={{ color: LC.inkMid }}>
               Contenido disponible — proximamente cargado desde Firestore.
             </p>
           </div>
@@ -285,13 +286,13 @@ function ProceduresList({ procedures, color }: { procedures: Procedure[]; color:
         <article
           key={proc.id}
           className="rounded-xl overflow-hidden"
-          style={{ background: 'rgba(22,28,42,0.8)', border: '1px solid #1e3a5f' }}
+          style={{ background: LC.surface, border: `1px solid ${LC.border}` }}
         >
           <div className="h-1" style={{ background: color, opacity: 0.9 }} />
           <div className="p-5">
-            <h3 className="text-base font-semibold text-white mb-1">{proc.title}</h3>
+            <h3 className="text-base font-semibold text-[#e9eef3] mb-1">{proc.title}</h3>
             {proc.description && (
-              <p className="text-sm mb-4" style={{ color: '#aab8c8' }}>
+              <p className="text-sm mb-4" style={{ color: LC.inkMid }}>
                 {proc.description}
               </p>
             )}
@@ -305,9 +306,9 @@ function ProceduresList({ procedures, color }: { procedures: Procedure[]; color:
                     {step.order}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-white">{step.title}</p>
+                    <p className="text-sm font-semibold text-[#e9eef3]">{step.title}</p>
                     {step.description && (
-                      <p className="text-xs mt-1 leading-relaxed whitespace-pre-wrap" style={{ color: '#aab8c8' }}>
+                      <p className="text-xs mt-1 leading-relaxed whitespace-pre-wrap" style={{ color: LC.inkMid }}>
                         {step.description}
                       </p>
                     )}
@@ -345,7 +346,7 @@ function ManualList({ sections, color }: { sections: ManualSection[]; color: str
         <article
           key={sec.id}
           className="rounded-xl overflow-hidden"
-          style={{ background: 'rgba(22,28,42,0.8)', border: '1px solid #1e3a5f' }}
+          style={{ background: LC.surface, border: `1px solid ${LC.border}` }}
         >
           <div className="h-1" style={{ background: color, opacity: 0.9 }} />
           <div className="p-5">
@@ -356,11 +357,11 @@ function ManualList({ sections, color }: { sections: ManualSection[]; color: str
               >
                 {sec.order}
               </span>
-              <h3 className="text-base font-semibold text-white">{sec.title}</h3>
+              <h3 className="text-base font-semibold text-[#e9eef3]">{sec.title}</h3>
             </div>
             <p
               className="text-sm leading-relaxed whitespace-pre-wrap"
-              style={{ color: '#c0d0e0' }}
+              style={{ color: LC.inkMid }}
             >
               {sec.content}
             </p>
@@ -373,53 +374,112 @@ function ManualList({ sections, color }: { sections: ManualSection[]; color: str
 
 
 function DiagnosisList({ entries, color }: { entries: DiagnosisEntry[]; color: string }) {
+  // Acordeón: una fila abierta a la vez. Arranca con la primera abierta.
+  const [openId, setOpenId] = useState<string | null>(entries[0]?.id ?? null)
+
   return (
-    <div className="space-y-4">
-      {entries.map(entry => (
-        <article
-          key={entry.id}
-          className="rounded-xl overflow-hidden"
-          style={{ background: 'rgba(22,28,42,0.8)', border: '1px solid #1e3a5f' }}
-        >
-          <div className="h-1" style={{ background: '#ff8844', opacity: 0.9 }} />
-          <div className="p-5">
-            <div className="mb-3">
-              <p className="text-[10px] uppercase tracking-wider font-semibold mb-1 text-orange-400">
-                Síntoma
-              </p>
-              <h3 className="text-base font-semibold text-white leading-snug whitespace-pre-wrap">
-                {entry.symptom}
-              </h3>
-            </div>
-
-            <div className="mb-3">
-              <p className="text-[10px] uppercase tracking-wider font-semibold mb-1.5 text-orange-400">
-                Causas posibles
-              </p>
-              <ul className="space-y-1.5">
-                {entry.possibleCauses.map((cause, idx) => (
-                  <li key={idx} className="flex gap-2 text-sm" style={{ color: '#c0d0e0' }}>
-                    <span className="text-orange-400 flex-shrink-0">•</span>
-                    <span className="flex-1 whitespace-pre-wrap">{cause}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div
-              className="rounded-lg p-3"
-              style={{ background: `${color}10`, border: `1px solid ${color}30` }}
+    <div className="space-y-2.5">
+      {entries.map((entry, idx) => {
+        const open = openId === entry.id
+        return (
+          <article
+            key={entry.id}
+            className="rounded-2xl overflow-hidden transition-colors"
+            style={{
+              background: LC.surface,
+              border: `1px solid ${open ? LC.borderHi : LC.border}`,
+              boxShadow: open ? '0 4px 14px rgba(0,0,0,0.28)' : '0 1px 2px rgba(0,0,0,0.3)',
+            }}
+          >
+            {/* Fila clickeable: índice + título + preview del síntoma */}
+            <button
+              type="button"
+              onClick={() => setOpenId(open ? null : entry.id)}
+              aria-expanded={open}
+              className="w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors"
+              style={{ background: open ? LC.surfaceHi : 'transparent' }}
             >
-              <p className="text-[10px] uppercase tracking-wider font-semibold mb-1" style={{ color }}>
-                Solución
-              </p>
-              <p className="text-sm whitespace-pre-wrap" style={{ color: '#d0dce8' }}>
-                {entry.solution}
-              </p>
+              <span
+                className="flex items-center justify-center w-7 h-7 rounded-lg font-bold text-sm flex-shrink-0 tabular-nums"
+                style={{ background: `${color}22`, color }}
+              >
+                {idx + 1}
+              </span>
+              <span className="flex-1 min-w-0">
+                <span className="block text-sm font-bold leading-snug" style={{ color: LC.ink }}>
+                  {entry.title || entry.symptom}
+                </span>
+                {!open && entry.symptom && (
+                  <span className="block text-xs mt-0.5 truncate" style={{ color: LC.inkLo }}>
+                    {entry.symptom}
+                  </span>
+                )}
+              </span>
+              <ChevronDown
+                className="h-4 w-4 flex-shrink-0 transition-transform duration-200"
+                style={{ color: open ? color : LC.inkLo, transform: open ? 'rotate(180deg)' : 'none' }}
+              />
+            </button>
+
+            {/* Cuerpo con animación de altura (grid 0fr→1fr, sin saltos) */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateRows: open ? '1fr' : '0fr',
+                transition: 'grid-template-rows 260ms cubic-bezier(0.22,1,0.36,1)',
+              }}
+            >
+              <div style={{ overflow: 'hidden', minHeight: 0 }}>
+                <div
+                  className="px-4 pb-4 pt-4 space-y-5"
+                  style={{ borderTop: `1px solid ${LC.border}` }}
+                >
+                  {/* Síntoma */}
+                  <div>
+                    <p className="text-[10px] uppercase tracking-[0.14em] font-semibold mb-1.5" style={{ color: LC.inkLo }}>
+                      Síntoma
+                    </p>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: LC.ink }}>
+                      {entry.symptom}
+                    </p>
+                  </div>
+
+                  {/* Causas */}
+                  <div>
+                    <p className="text-[10px] uppercase tracking-[0.14em] font-semibold mb-2" style={{ color: LC.inkLo }}>
+                      Causas posibles
+                    </p>
+                    <ul className="space-y-2">
+                      {entry.possibleCauses.map((cause, i) => (
+                        <li key={i} className="flex gap-2.5 text-sm leading-relaxed" style={{ color: LC.inkMid }}>
+                          <span
+                            className="mt-[7px] w-1.5 h-1.5 rounded-full flex-shrink-0"
+                            style={{ background: color }}
+                          />
+                          <span className="flex-1 whitespace-pre-wrap">{cause}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Solución — payoff destacado */}
+                  <div className="rounded-xl p-4" style={{ background: `${color}0e`, border: `1px solid ${color}33` }}>
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <Wrench className="h-3.5 w-3.5" style={{ color }} />
+                      <p className="text-[10px] uppercase tracking-[0.14em] font-bold" style={{ color }}>
+                        Solución
+                      </p>
+                    </div>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: LC.ink }}>
+                      {entry.solution}
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-        </article>
-      ))}
+          </article>
+        )
+      })}
     </div>
   )
 }
@@ -436,7 +496,7 @@ function EmptySection({
   return (
     <div
       className="rounded-xl p-8 text-center"
-      style={{ background: 'rgba(22,28,42,0.5)', border: '1px dashed #2a4a6a' }}
+      style={{ background: LC.surface, border: `1px dashed ${LC.borderHi}` }}
     >
       <div
         className="flex items-center justify-center w-14 h-14 rounded-full mx-auto mb-4"
@@ -444,12 +504,12 @@ function EmptySection({
       >
         <Clock className="h-7 w-7" style={{ color, opacity: 0.7 }} />
       </div>
-      <h3 className="text-base font-semibold text-white mb-2">Sección en preparación</h3>
-      <p className="text-sm mb-1" style={{ color: '#aab8c8' }}>
-        La sección <strong style={{ color: '#fff' }}>{tabLabel}</strong> de{' '}
-        <strong style={{ color: '#fff' }}>{machineName}</strong> aún no tiene contenido publicado.
+      <h3 className="text-base font-semibold text-[#e9eef3] mb-2">Sección en preparación</h3>
+      <p className="text-sm mb-1" style={{ color: LC.inkMid }}>
+        La sección <strong style={{ color: LC.ink }}>{tabLabel}</strong> de{' '}
+        <strong style={{ color: LC.ink }}>{machineName}</strong> aún no tiene contenido publicado.
       </p>
-      <p className="text-xs mt-4" style={{ color: '#6a90b8' }}>
+      <p className="text-xs mt-4" style={{ color: LC.inkLo }}>
         El administrador puede agregar contenido desde el panel de administración.
       </p>
     </div>

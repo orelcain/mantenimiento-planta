@@ -64,6 +64,9 @@ export interface Flow {
 
 export interface DiagnosisEntry {
   id: string
+  /** Título corto e indicativo del diagnóstico (etiqueta del catálogo). */
+  title: string
+  /** Descripción detallada del síntoma observado. */
   symptom: string
   possibleCauses: string[]
   solution: string
@@ -270,6 +273,7 @@ export async function getMachineContentMeta(
 export interface SymptomHit {
   machineSlug: string
   diagnosisId: string
+  title: string
   symptom: string
 }
 
@@ -280,17 +284,21 @@ export async function getSymptomsForMachines(machineSlugs: string[]): Promise<Sy
     machineSlugs.map(async slug => {
       try {
         const snap = await getDocs(sectionCollection(slug, 'diagnosis'))
-        return snap.docs.map(d => ({
-          machineSlug: slug,
-          diagnosisId: d.id,
-          symptom: (d.data() as DiagnosisEntry).symptom ?? '',
-        }))
+        return snap.docs.map(d => {
+          const data = d.data() as DiagnosisEntry
+          return {
+            machineSlug: slug,
+            diagnosisId: d.id,
+            title: data.title ?? '',
+            symptom: data.symptom ?? '',
+          }
+        })
       } catch {
         return [] as SymptomHit[]
       }
     })
   )
-  return results.flat().filter(h => h.symptom.trim().length > 0)
+  return results.flat().filter(h => h.title.trim().length > 0 || h.symptom.trim().length > 0)
 }
 
 /** Genera un ID unico basado en timestamp + random */

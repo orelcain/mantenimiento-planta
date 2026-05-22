@@ -8,42 +8,44 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Tema oscuro industrial
-        background: '#121212',
-        foreground: '#ffffff',
+        // Tema oscuro AquaChile (neutros tintados al azul de marca).
+        // Fuente de verdad de la paleta del módulo: src/data/learningTheme.ts (LC).
+        // Status (destructive/success/warning) se mantienen vivos para que resalten.
+        background: '#0d1722',
+        foreground: '#e9eef3',
         card: {
-          DEFAULT: '#1e1e1e',
-          foreground: '#ffffff',
+          DEFAULT: '#16242f',
+          foreground: '#e9eef3',
         },
         popover: {
-          DEFAULT: '#1e1e1e',
-          foreground: '#ffffff',
+          DEFAULT: '#16242f',
+          foreground: '#e9eef3',
         },
         primary: {
-          DEFAULT: '#2196f3',
+          DEFAULT: '#2E75B6',
           foreground: '#ffffff',
-          50: '#e3f2fd',
-          100: '#bbdefb',
-          200: '#90caf9',
-          300: '#64b5f6',
-          400: '#42a5f5',
-          500: '#2196f3',
-          600: '#1e88e5',
-          700: '#1976d2',
-          800: '#1565c0',
-          900: '#0d47a1',
+          50: '#eaf3fb',
+          100: '#cfe2f3',
+          200: '#9DC3E6',
+          300: '#79afde',
+          400: '#5aa6e8',
+          500: '#2E75B6',
+          600: '#2a6aa6',
+          700: '#245a8c',
+          800: '#1f4a73',
+          900: '#173a5a',
         },
         secondary: {
-          DEFAULT: '#424242',
-          foreground: '#ffffff',
+          DEFAULT: '#2b3d4c',
+          foreground: '#e9eef3',
         },
         muted: {
-          DEFAULT: '#2a2a2a',
-          foreground: '#a0a0a0',
+          DEFAULT: '#15212c',
+          foreground: '#9db0c2',
         },
         accent: {
-          DEFAULT: '#2a2a2a',
-          foreground: '#ffffff',
+          DEFAULT: '#1f3445',
+          foreground: '#e9eef3',
         },
         destructive: {
           DEFAULT: '#f44336',
@@ -57,9 +59,9 @@ export default {
           DEFAULT: '#ff9800',
           foreground: '#000000',
         },
-        border: '#333333',
-        input: '#333333',
-        ring: '#2196f3',
+        border: '#22384a',
+        input: '#22384a',
+        ring: '#5aa6e8',
       },
       borderRadius: {
         lg: '0.75rem',

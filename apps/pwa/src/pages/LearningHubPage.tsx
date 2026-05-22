@@ -21,8 +21,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { animate, stagger } from 'animejs'
-import { Cpu, ArrowRight, Scale, Wind, FileText, ListChecks, Workflow, Stethoscope, Clock, Search, Star, X, Sparkles } from 'lucide-react'
+import { Cpu, ArrowRight, Scale, Wind, FileText, ListChecks, Workflow, Stethoscope, Clock, Search, Star, X, Sparkles, Lock } from 'lucide-react'
 import { useAuthStore } from '@/store'
+import { usePermissions } from '@/hooks/usePermissions'
 import { InfoTooltip } from '@/components/ui'
 import {
   groupMachinesByArea,
@@ -35,28 +36,9 @@ import {
   type SymptomHit,
 } from '@/services/learningContent'
 import { getFavorites, toggleFavorite, getRecents, pushRecent } from '@/utils/learningHubPrefs'
+import { LC as C } from '@/data/learningTheme'
 
-// ── Paleta DARK + AquaChile ────────────────────────────────────────────────────
-const C = {
-  bg:        '#0d1722',
-  bgPanel:   '#0f1d2b',
-  surface:   '#16242f',
-  ink:       '#e9eef3',
-  inkMid:    '#9db0c2',
-  inkLo:     '#6d8298',
-  inkGhost:  '#51677b',
-  aqua:      '#2E75B6',
-  aquaBright:'#5aa6e8',
-  aquaLight: '#9DC3E6',
-  aquaSoft:  'rgba(46,117,182,0.16)',
-  border:    '#22384a',
-  borderHi:  '#2f4d65',
-  prep:      '#cf9f54',
-  prepSoft:  'rgba(207,159,84,0.13)',
-  nuevo:     '#3fb98f',
-  nuevoSoft: 'rgba(63,185,143,0.14)',
-  star:      '#f0c14b',
-} as const
+// ── Paleta DARK + AquaChile: ver import { LC as C } arriba (compartida con admin) ──
 
 const NEW_WINDOW_MS = 14 * 24 * 60 * 60 * 1000
 
@@ -129,6 +111,7 @@ function BathymetryBackdrop() {
 export function LearningHubPage() {
   const navigate = useNavigate()
   const { isAuthenticated } = useAuthStore()
+  const { isAdmin } = usePermissions()
   const machinesByArea = groupMachinesByArea()
   const allMachines = useMemo(() => Object.values(machinesByArea).flat(), [machinesByArea])
 
@@ -185,7 +168,7 @@ export function LearningHubPage() {
   const machineHits = searching ? allMachines.filter(m => norm(m.name).includes(q)) : []
   const simHits = searching ? SPECIAL_MODULES.filter(s => norm(s.title).includes(q) || norm(s.subtitle).includes(q)) : []
   const symptomHits = searching
-    ? symptoms.filter(h => norm(h.symptom).includes(q)).slice(0, 8)
+    ? symptoms.filter(h => norm(h.title).includes(q) || norm(h.symptom).includes(q)).slice(0, 8)
     : []
   const noResults = searching && machineHits.length === 0 && simHits.length === 0 && symptomHits.length === 0
 
@@ -244,6 +227,17 @@ export function LearningHubPage() {
       >
         <BathymetryBackdrop />
         <div className="relative max-w-5xl w-full mx-auto px-5 pt-7 pb-6 sm:px-8 sm:pt-9 sm:pb-7">
+          {isAdmin && (
+            <button
+              onClick={() => navigate('/aprendizaje/admin')}
+              title="Administrar contenido — pedirá confirmar identidad"
+              className="absolute top-4 right-5 sm:top-5 sm:right-8 z-10 flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold tracking-wide outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8] transition-colors active:scale-95"
+              style={{ background: C.surface, border: `1px solid ${C.borderHi}`, color: C.aquaLight }}
+            >
+              <Lock className="h-3.5 w-3.5" />
+              Administrar
+            </button>
+          )}
           <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
             <div className="min-w-0">
               <div className="flex items-center gap-2 mb-1.5">
@@ -365,7 +359,10 @@ export function LearningHubPage() {
                             >
                               <Stethoscope className="h-4 w-4 flex-shrink-0" style={{ color: C.aquaLight }} />
                               <span className="flex-1 min-w-0">
-                                <span className="block text-sm truncate" style={{ color: C.ink }}>{hit.symptom}</span>
+                                <span className="block text-sm truncate" style={{ color: C.ink }}>{hit.title || hit.symptom}</span>
+                                {hit.title && hit.symptom && (
+                                  <span className="block text-[11px] truncate" style={{ color: C.inkMid }}>{hit.symptom}</span>
+                                )}
                                 {m && <span className="block text-[11px]" style={{ color: C.inkLo }}>{m.name}</span>}
                               </span>
                               <ArrowRight className="h-4 w-4 flex-shrink-0 transition-transform group-hover:translate-x-1" style={{ color: C.aquaBright }} />

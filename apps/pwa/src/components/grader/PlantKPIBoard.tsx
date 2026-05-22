@@ -113,19 +113,19 @@ interface KPICardProps {
 
 function KPICard({ label, tooltip, value, valueColor, barValue, barMax = 1, barColor, note }: KPICardProps) {
   return (
-    <div className="bg-muted/20 rounded-md px-2 py-1.5 border border-border/30">
-      <div className="flex items-center justify-between gap-1">
-        <div className="text-[10px] font-medium leading-tight truncate">{label}</div>
+    <div className="bg-muted/20 rounded-lg px-2.5 py-2 border border-border/40 hover:border-border/70 transition-colors">
+      <div className="flex items-center justify-between gap-1 mb-1">
+        <div className="text-[10px] font-medium text-muted-foreground leading-tight truncate">{label}</div>
         <InfoTooltip text={tooltip} iconSize={11} position="top" />
       </div>
-      <div className={cn('text-base font-bold tabular-nums leading-tight', valueColor)}>{value}</div>
+      <div className={cn('text-xl font-bold tabular-nums leading-none', valueColor)}>{value}</div>
       {barValue !== null && (
-        <div className="h-1 bg-muted/40 rounded-full overflow-hidden mt-1">
+        <div className="h-1.5 bg-muted/50 rounded-full overflow-hidden mt-1.5">
           <div className={cn('h-full rounded-full transition-all', barColor ?? 'bg-primary')}
                style={{ width: barWidth(barValue, barMax) }} />
         </div>
       )}
-      {note && <p className="text-[9px] text-muted-foreground/60 mt-0.5 leading-tight truncate">{note}</p>}
+      {note && <p className="text-[9px] text-muted-foreground/60 mt-1 leading-tight truncate">{note}</p>}
     </div>
   )
 }
@@ -315,10 +315,10 @@ export function PlantKPIBoard({
                 barValue={kpis.mtbfHours > 0 ? Math.min(1, kpis.mtbfHours / 4) : null}
                 barColor={kpis.mtbfHours >= 2 ? 'bg-emerald-500' : kpis.mtbfHours >= 1 ? 'bg-amber-500' : 'bg-rose-500'}
               />
-              <div className="bg-muted/20 rounded-md px-2 py-1.5 border border-border/30">
-                <div className="text-[10px] font-medium leading-tight">N° Paros</div>
-                <div className="text-base font-bold tabular-nums leading-tight">{kpis.failureCount}</div>
-                <p className="text-[9px] text-muted-foreground/60 mt-0.5 leading-tight">
+              <div className="bg-muted/20 rounded-lg px-2.5 py-2 border border-border/40 hover:border-border/70 transition-colors">
+                <div className="text-[10px] font-medium text-muted-foreground leading-tight mb-1">N° Paros</div>
+                <div className="text-xl font-bold tabular-nums leading-none">{kpis.failureCount}</div>
+                <p className="text-[9px] text-muted-foreground/60 mt-1 leading-tight">
                   eventos · {kpis.shiftsCount > 1 ? `${kpis.shiftsCount} turnos` : 'turno'}
                 </p>
               </div>

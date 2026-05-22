@@ -12,9 +12,10 @@ import { useEffect, useRef, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft, Plus, Trash2, Edit3, Save, X, ChevronUp, ChevronDown, Loader2,
-  ListChecks, BookOpen, GitBranch, AlertTriangle, ImagePlus,
+  ListChecks, BookOpen, GitBranch, AlertTriangle, ImagePlus, Eye,
 } from 'lucide-react'
 import { findMachineBySlug } from '@/data/learningMachines'
+import { LC } from '@/data/learningTheme'
 import {
   listProcedures,
   saveProcedure,
@@ -59,13 +60,15 @@ export function LearningAdminMachinePage() {
   }
 
   const Icon = machine.icon
+  const previewPath = machine.customRoute || `/aprendizaje/maquina/${machine.slug}`
+  const previewUrl = `${import.meta.env.BASE_URL.replace(/\/$/, '')}${previewPath}`
 
   return (
-    <div className="min-h-full w-full p-4 sm:p-6 max-w-5xl mx-auto">
+    <div className="min-h-full w-full p-4 sm:p-6 max-w-5xl mx-auto" style={{ color: LC.ink }}>
       {/* Header */}
       <button
         onClick={() => navigate('/aprendizaje/admin')}
-        className="flex items-center gap-2 text-sm mb-4 -ml-2 px-2 py-3 rounded-lg transition-colors text-muted-foreground hover:text-foreground"
+        className="flex items-center gap-2 text-sm mb-4 -ml-2 px-2 py-3 rounded-lg transition-colors text-[#9db0c2] hover:text-[#e9eef3]"
         style={{ minHeight: '44px' }}
       >
         <ArrowLeft className="h-4 w-4" />
@@ -82,14 +85,23 @@ export function LearningAdminMachinePage() {
         >
           <Icon className="h-7 w-7" style={{ color: machine.color }} />
         </div>
-        <div>
+        <div className="flex-1 min-w-0">
           <h1 className="text-2xl font-bold">{machine.name}</h1>
-          <p className="text-sm text-muted-foreground">Editor de contenido · {machine.area}</p>
+          <p className="text-sm text-[#9db0c2]">Editor de contenido · {machine.area}</p>
         </div>
+        <button
+          onClick={() => window.open(previewUrl, '_blank', 'noopener')}
+          className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[#2f4d65] text-sm text-[#9DC3E6] hover:bg-[#1b2f3f] transition-colors flex-shrink-0"
+          title="Ver como lo ve el técnico — solo lectura, abre en pestaña nueva"
+          style={{ minHeight: '40px' }}
+        >
+          <Eye className="h-4 w-4" />
+          <span className="hidden sm:inline">Vista previa</span>
+        </button>
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-1 mb-4 border-b border-border overflow-x-auto">
+      <div className="flex items-center gap-1 mb-4 border-b border-[#22384a] overflow-x-auto">
         {TAB_DEFS.map(tab => {
           const TabIcon = tab.icon
           const isActive = activeTab === tab.id
@@ -99,8 +111,8 @@ export function LearningAdminMachinePage() {
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                 isActive
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-muted-foreground hover:text-foreground'
+                  ? 'border-[#5aa6e8] text-[#5aa6e8]'
+                  : 'border-transparent text-[#6d8298] hover:text-[#e9eef3]'
               }`}
             >
               <TabIcon className="h-4 w-4" />
@@ -274,7 +286,7 @@ function ProcedureForm({
           value={procedure.title}
           onChange={e => setProcedure({ ...procedure, title: e.target.value })}
           placeholder="Ej: Calibración de celdas de carga"
-          className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+          className="w-full px-3 py-2.5 rounded-lg border border-[#22384a] bg-[#16242f] text-sm focus:outline-none focus:ring-2 focus:ring-[#5aa6e8]/60"
         />
       </FormField>
 
@@ -284,19 +296,19 @@ function ProcedureForm({
           onChange={e => setProcedure({ ...procedure, description: e.target.value })}
           placeholder="Qué hace este procedimiento y cuándo se usa"
           rows={2}
-          className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/40"
+          className="w-full px-3 py-2.5 rounded-lg border border-[#22384a] bg-[#16242f] text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#5aa6e8]/60"
         />
       </FormField>
 
       {/* Steps */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Pasos <span className="text-destructive">*</span>
+          <label className="text-xs font-semibold uppercase tracking-wider text-[#9db0c2]">
+            Pasos <span className="text-[#e0697d]">*</span>
           </label>
           <button
             onClick={addStep}
-            className="flex items-center gap-1 text-xs font-medium text-primary hover:bg-primary/10 px-2 py-1 rounded"
+            className="flex items-center gap-1 text-xs font-medium text-[#5aa6e8] hover:bg-[#5aa6e8]/10 px-2 py-1 rounded"
           >
             <Plus className="h-3.5 w-3.5" />
             Añadir paso
@@ -305,17 +317,17 @@ function ProcedureForm({
 
         <div className="space-y-3">
           {procedure.steps.map((step, index) => (
-            <div key={index} className="p-3 rounded-lg border border-border bg-card/50">
+            <div key={index} className="p-3 rounded-lg border border-[#22384a] bg-[#16242f]/50">
               <div className="flex items-start gap-2">
                 <div className="flex flex-col items-center gap-1">
-                  <span className="flex items-center justify-center w-7 h-7 rounded-full bg-primary/15 text-primary font-bold text-xs">
+                  <span className="flex items-center justify-center w-7 h-7 rounded-full bg-[#5aa6e8]/15 text-[#5aa6e8] font-bold text-xs">
                     {step.order}
                   </span>
                   <div className="flex flex-col">
                     <button
                       onClick={() => moveStep(index, -1)}
                       disabled={index === 0}
-                      className="p-0.5 hover:bg-accent rounded disabled:opacity-30"
+                      className="p-0.5 hover:bg-[#1b2f3f] rounded disabled:opacity-30"
                       title="Subir"
                     >
                       <ChevronUp className="h-3 w-3" />
@@ -323,7 +335,7 @@ function ProcedureForm({
                     <button
                       onClick={() => moveStep(index, 1)}
                       disabled={index === procedure.steps.length - 1}
-                      className="p-0.5 hover:bg-accent rounded disabled:opacity-30"
+                      className="p-0.5 hover:bg-[#1b2f3f] rounded disabled:opacity-30"
                       title="Bajar"
                     >
                       <ChevronDown className="h-3 w-3" />
@@ -336,14 +348,14 @@ function ProcedureForm({
                     value={step.title}
                     onChange={e => updateStep(index, { title: e.target.value })}
                     placeholder="Título del paso"
-                    className="w-full px-2.5 py-1.5 rounded border border-border bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary/40"
+                    className="w-full px-2.5 py-1.5 rounded border border-[#22384a] bg-[#16242f] text-sm focus:outline-none focus:ring-1 focus:ring-[#5aa6e8]/60"
                   />
                   <textarea
                     value={step.description}
                     onChange={e => updateStep(index, { description: e.target.value })}
                     placeholder="Descripción detallada del paso"
                     rows={2}
-                    className="w-full px-2.5 py-1.5 rounded border border-border bg-background text-xs resize-none focus:outline-none focus:ring-1 focus:ring-primary/40"
+                    className="w-full px-2.5 py-1.5 rounded border border-[#22384a] bg-[#16242f] text-xs resize-none focus:outline-none focus:ring-1 focus:ring-[#5aa6e8]/60"
                   />
                   <StepImageUploader
                     machineSlug={machineSlug}
@@ -355,7 +367,7 @@ function ProcedureForm({
                 <button
                   onClick={() => removeStep(index)}
                   disabled={procedure.steps.length <= 1}
-                  className="p-1.5 hover:bg-destructive/20 text-destructive rounded disabled:opacity-30"
+                  className="p-1.5 hover:bg-[#e0697d]/15 text-[#e0697d] rounded disabled:opacity-30"
                   title="Eliminar paso"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
@@ -420,11 +432,12 @@ function StepImageUploader({
           <img
             src={imageUrl}
             alt="Imagen del paso"
-            className="max-h-32 rounded border border-border"
+            className="max-h-32 rounded border border-[#22384a]"
           />
           <button
             onClick={handleRemove}
-            className="absolute -top-2 -right-2 flex items-center justify-center w-6 h-6 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            className="absolute -top-2 -right-2 flex items-center justify-center w-6 h-6 rounded-full text-white hover:opacity-90"
+            style={{ background: '#e0697d' }}
             title="Eliminar imagen"
           >
             <X className="h-3.5 w-3.5" />
@@ -434,7 +447,7 @@ function StepImageUploader({
         <button
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
-          className="flex items-center gap-1.5 text-xs text-primary hover:bg-primary/10 px-2 py-1 rounded disabled:opacity-50"
+          className="flex items-center gap-1.5 text-xs text-[#5aa6e8] hover:bg-[#5aa6e8]/10 px-2 py-1 rounded disabled:opacity-50"
         >
           {uploading ? (
             <>
@@ -460,7 +473,7 @@ function StepImageUploader({
           e.target.value = ''
         }}
       />
-      {error && <p className="text-[11px] text-destructive mt-1">{error}</p>}
+      {error && <p className="text-[11px] text-[#e0697d] mt-1">{error}</p>}
     </div>
   )
 }
@@ -580,7 +593,7 @@ function ManualSectionForm({
             min={1}
             value={section.order}
             onChange={e => setSection({ ...section, order: Number(e.target.value) || 1 })}
-            className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+            className="w-full px-3 py-2.5 rounded-lg border border-[#22384a] bg-[#16242f] text-sm focus:outline-none focus:ring-2 focus:ring-[#5aa6e8]/60"
           />
         </FormField>
         <FormField label="Título de la sección" required className="flex-1">
@@ -589,7 +602,7 @@ function ManualSectionForm({
             value={section.title}
             onChange={e => setSection({ ...section, title: e.target.value })}
             placeholder="Ej: Ajuste de cuchillas"
-            className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+            className="w-full px-3 py-2.5 rounded-lg border border-[#22384a] bg-[#16242f] text-sm focus:outline-none focus:ring-2 focus:ring-[#5aa6e8]/60"
           />
         </FormField>
       </div>
@@ -600,7 +613,7 @@ function ManualSectionForm({
           onChange={e => setSection({ ...section, content: e.target.value })}
           placeholder="Texto del manual. Soporta saltos de línea."
           rows={10}
-          className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-sm resize-y focus:outline-none focus:ring-2 focus:ring-primary/40"
+          className="w-full px-3 py-2.5 rounded-lg border border-[#22384a] bg-[#16242f] text-sm resize-y focus:outline-none focus:ring-2 focus:ring-[#5aa6e8]/60"
         />
       </FormField>
 
@@ -751,7 +764,7 @@ function FlowForm({
           value={flow.title}
           onChange={e => setFlow({ ...flow, title: e.target.value })}
           placeholder="Ej: ¿Qué hago cuando el motor se detiene?"
-          className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+          className="w-full px-3 py-2.5 rounded-lg border border-[#22384a] bg-[#16242f] text-sm focus:outline-none focus:ring-2 focus:ring-[#5aa6e8]/60"
         />
       </FormField>
 
@@ -761,18 +774,18 @@ function FlowForm({
           onChange={e => setFlow({ ...flow, trigger: e.target.value })}
           placeholder="Condición que dispara este flujo (ej: alarma de sobretemperatura)"
           rows={2}
-          className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/40"
+          className="w-full px-3 py-2.5 rounded-lg border border-[#22384a] bg-[#16242f] text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#5aa6e8]/60"
         />
       </FormField>
 
       <div>
         <div className="flex items-center justify-between mb-2">
-          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Acciones a seguir <span className="text-destructive">*</span>
+          <label className="text-xs font-semibold uppercase tracking-wider text-[#9db0c2]">
+            Acciones a seguir <span className="text-[#e0697d]">*</span>
           </label>
           <button
             onClick={addAction}
-            className="flex items-center gap-1 text-xs font-medium text-primary hover:bg-primary/10 px-2 py-1 rounded"
+            className="flex items-center gap-1 text-xs font-medium text-[#5aa6e8] hover:bg-[#5aa6e8]/10 px-2 py-1 rounded"
           >
             <Plus className="h-3.5 w-3.5" />
             Añadir acción
@@ -783,21 +796,21 @@ function FlowForm({
           {flow.actions.map((action, index) => (
             <div key={index} className="flex items-start gap-2">
               <div className="flex flex-col items-center pt-1.5">
-                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/15 text-primary font-bold text-[11px]">
+                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[#5aa6e8]/15 text-[#5aa6e8] font-bold text-[11px]">
                   {index + 1}
                 </span>
                 <div className="flex flex-col">
                   <button
                     onClick={() => moveAction(index, -1)}
                     disabled={index === 0}
-                    className="p-0.5 hover:bg-accent rounded disabled:opacity-30"
+                    className="p-0.5 hover:bg-[#1b2f3f] rounded disabled:opacity-30"
                   >
                     <ChevronUp className="h-3 w-3" />
                   </button>
                   <button
                     onClick={() => moveAction(index, 1)}
                     disabled={index === flow.actions.length - 1}
-                    className="p-0.5 hover:bg-accent rounded disabled:opacity-30"
+                    className="p-0.5 hover:bg-[#1b2f3f] rounded disabled:opacity-30"
                   >
                     <ChevronDown className="h-3 w-3" />
                   </button>
@@ -808,12 +821,12 @@ function FlowForm({
                 onChange={e => updateAction(index, e.target.value)}
                 placeholder="Describir acción"
                 rows={2}
-                className="flex-1 px-3 py-2 rounded-lg border border-border bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/40"
+                className="flex-1 px-3 py-2 rounded-lg border border-[#22384a] bg-[#16242f] text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#5aa6e8]/60"
               />
               <button
                 onClick={() => removeAction(index)}
                 disabled={flow.actions.length <= 1}
-                className="p-1.5 hover:bg-destructive/20 text-destructive rounded disabled:opacity-30"
+                className="p-1.5 hover:bg-[#e0697d]/15 text-[#e0697d] rounded disabled:opacity-30"
                 title="Eliminar acción"
               >
                 <Trash2 className="h-3.5 w-3.5" />
@@ -854,6 +867,7 @@ function DiagnosisEditor({ machineSlug }: { machineSlug: string }) {
   function handleNew() {
     setEditing({
       id: generateContentId('diag_'),
+      title: '',
       symptom: '',
       possibleCauses: [''],
       solution: '',
@@ -896,8 +910,8 @@ function DiagnosisEditor({ machineSlug }: { machineSlug: string }) {
       {entries.map(entry => (
         <ItemCard
           key={entry.id}
-          title={entry.symptom}
-          subtitle={entry.possibleCauses.slice(0, 2).join(' · ')}
+          title={entry.title || entry.symptom}
+          subtitle={entry.symptom || entry.possibleCauses.slice(0, 2).join(' · ')}
           meta={`${entry.possibleCauses.length} causa${entry.possibleCauses.length !== 1 ? 's' : ''} · Actualizado ${formatDate(entry.updatedAt)}`}
           onEdit={() => setEditing(entry)}
           onDelete={() => handleDelete(entry.id)}
@@ -938,6 +952,7 @@ function DiagnosisForm({
   }
 
   const canSave =
+    entry.title.trim().length > 0 &&
     entry.symptom.trim().length > 0 &&
     entry.solution.trim().length > 0 &&
     entry.possibleCauses.some(c => c.trim().length > 0)
@@ -954,24 +969,34 @@ function DiagnosisForm({
 
   return (
     <div className="space-y-4">
+      <FormField label="Título" required>
+        <input
+          type="text"
+          value={entry.title}
+          onChange={e => setEntry({ ...entry, title: e.target.value })}
+          placeholder="Ej: Mal corte / apertura de vientre deficiente"
+          className="w-full px-3 py-2.5 rounded-lg border border-[#22384a] bg-[#16242f] text-sm focus:outline-none focus:ring-2 focus:ring-[#5aa6e8]/60"
+        />
+      </FormField>
+
       <FormField label="Síntoma" required>
         <textarea
           value={entry.symptom}
           onChange={e => setEntry({ ...entry, symptom: e.target.value })}
-          placeholder="Ej: La máquina vibra excesivamente al arrancar"
+          placeholder="Ej: El pescado sale con el corte de vientre irregular o incompleto"
           rows={2}
-          className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/40"
+          className="w-full px-3 py-2.5 rounded-lg border border-[#22384a] bg-[#16242f] text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#5aa6e8]/60"
         />
       </FormField>
 
       <div>
         <div className="flex items-center justify-between mb-2">
-          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Causas posibles <span className="text-destructive">*</span>
+          <label className="text-xs font-semibold uppercase tracking-wider text-[#9db0c2]">
+            Causas posibles <span className="text-[#e0697d]">*</span>
           </label>
           <button
             onClick={addCause}
-            className="flex items-center gap-1 text-xs font-medium text-primary hover:bg-primary/10 px-2 py-1 rounded"
+            className="flex items-center gap-1 text-xs font-medium text-[#5aa6e8] hover:bg-[#5aa6e8]/10 px-2 py-1 rounded"
           >
             <Plus className="h-3.5 w-3.5" />
             Añadir causa
@@ -989,12 +1014,12 @@ function DiagnosisForm({
                 value={cause}
                 onChange={e => updateCause(index, e.target.value)}
                 placeholder="Causa probable"
-                className="flex-1 px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                className="flex-1 px-3 py-2 rounded-lg border border-[#22384a] bg-[#16242f] text-sm focus:outline-none focus:ring-2 focus:ring-[#5aa6e8]/60"
               />
               <button
                 onClick={() => removeCause(index)}
                 disabled={entry.possibleCauses.length <= 1}
-                className="p-1.5 hover:bg-destructive/20 text-destructive rounded disabled:opacity-30"
+                className="p-1.5 hover:bg-[#e0697d]/15 text-[#e0697d] rounded disabled:opacity-30"
                 title="Eliminar causa"
               >
                 <Trash2 className="h-3.5 w-3.5" />
@@ -1010,7 +1035,7 @@ function DiagnosisForm({
           onChange={e => setEntry({ ...entry, solution: e.target.value })}
           placeholder="Procedimiento de corrección recomendado"
           rows={4}
-          className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-sm resize-y focus:outline-none focus:ring-2 focus:ring-primary/40"
+          className="w-full px-3 py-2.5 rounded-lg border border-[#22384a] bg-[#16242f] text-sm resize-y focus:outline-none focus:ring-2 focus:ring-[#5aa6e8]/60"
         />
       </FormField>
 
@@ -1049,13 +1074,13 @@ function CollectionListView({
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-[#9db0c2]">
           {count === 0 ? `Aún no hay ${plural}.` : `${count} ${count !== 1 ? plural : singular}`}
         </p>
         <button
           onClick={onNew}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
-          style={{ minHeight: '40px' }}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-opacity hover:opacity-90 active:scale-[0.98]"
+          style={{ minHeight: '40px', background: `linear-gradient(90deg, ${LC.aqua}, ${LC.aquaBright})`, color: '#fff' }}
         >
           <Plus className="h-4 w-4" />
           {newLabel}
@@ -1063,15 +1088,15 @@ function CollectionListView({
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-12 text-muted-foreground">
+        <div className="flex items-center justify-center py-12 text-[#9db0c2]">
           <Loader2 className="h-5 w-5 animate-spin mr-2" />
           Cargando...
         </div>
       ) : count === 0 ? (
-        <div className="p-8 text-center rounded-xl border border-dashed border-border bg-accent/10">
-          <EmptyIcon className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-50" />
+        <div className="p-8 text-center rounded-xl border border-dashed border-[#2f4d65] bg-[#16242f]/40">
+          <EmptyIcon className="h-12 w-12 mx-auto mb-3 text-[#6d8298] opacity-60" />
           <p className="text-sm font-medium mb-1">{emptyTitle}</p>
-          <p className="text-xs text-muted-foreground">{emptyHint}</p>
+          <p className="text-xs text-[#9db0c2]">{emptyHint}</p>
         </div>
       ) : (
         <div className="space-y-3">{children}</div>
@@ -1094,26 +1119,26 @@ function ItemCard({
   onDelete: () => void
 }) {
   return (
-    <div className="p-4 rounded-xl border border-border bg-card hover:border-primary/30 transition-colors">
+    <div className="group p-4 rounded-xl border border-[#22384a] bg-[#16242f] hover:border-[#2f4d65] hover:bg-[#1b2f3f] transition-colors">
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <h3 className="font-semibold text-sm">{title}</h3>
           {subtitle && (
-            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{subtitle}</p>
+            <p className="text-xs text-[#9db0c2] mt-0.5 line-clamp-2">{subtitle}</p>
           )}
-          {meta && <p className="text-[11px] text-muted-foreground mt-1.5">{meta}</p>}
+          {meta && <p className="text-[11px] text-[#9db0c2] mt-1.5">{meta}</p>}
         </div>
         <div className="flex items-center gap-1">
           <button
             onClick={onEdit}
-            className="p-2 rounded hover:bg-accent transition-colors"
+            className="p-2 rounded hover:bg-[#1b2f3f] transition-colors"
             title="Editar"
           >
             <Edit3 className="h-4 w-4" />
           </button>
           <button
             onClick={onDelete}
-            className="p-2 rounded hover:bg-destructive/20 text-destructive transition-colors"
+            className="p-2 rounded hover:bg-[#e0697d]/15 text-[#e0697d] transition-colors"
             title="Eliminar"
           >
             <Trash2 className="h-4 w-4" />
@@ -1137,8 +1162,8 @@ function FormField({
 }) {
   return (
     <div className={className}>
-      <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5 text-muted-foreground">
-        {label} {required && <span className="text-destructive">*</span>}
+      <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5 text-[#9db0c2]">
+        {label} {required && <span className="text-[#e0697d]">*</span>}
       </label>
       {children}
     </div>
@@ -1157,11 +1182,11 @@ function FormActions({
   onSave: () => void
 }) {
   return (
-    <div className="flex items-center justify-end gap-2 pt-4 border-t border-border">
+    <div className="flex items-center justify-end gap-2 pt-4 border-t border-[#22384a]">
       <button
         onClick={onCancel}
         disabled={saving}
-        className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-sm hover:bg-accent transition-colors"
+        className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[#22384a] text-sm hover:bg-[#1b2f3f] transition-colors"
       >
         <X className="h-4 w-4" />
         Cancelar
@@ -1169,7 +1194,8 @@ function FormActions({
       <button
         onClick={onSave}
         disabled={!canSave || saving}
-        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+        className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-opacity hover:opacity-90 active:scale-[0.98] disabled:opacity-40 disabled:active:scale-100"
+        style={{ background: `linear-gradient(90deg, ${LC.aqua}, ${LC.aquaBright})`, color: '#fff' }}
       >
         {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
         Guardar
