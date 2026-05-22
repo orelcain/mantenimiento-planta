@@ -362,13 +362,19 @@ export function CalendarioMantencionPage() {
     return (valid as string[]).includes(fromUrl ?? '') ? (fromUrl as TabId) : 'edicion'
   })
 
-  // Sincronizar tab a URL param
+  // Sincronizar tab a URL param (solo navega si el valor realmente difiere; navegar
+  // incondicionalmente en cada montaje provocaba un remontaje en bucle de la página).
   useEffect(() => {
-    setSearchParams(p => {
-      if (activeTab && activeTab !== 'edicion') p.set('tab', activeTab); else p.delete('tab')
-      return p
+    const currentTab = searchParams.get('tab')
+    const desiredTab = activeTab && activeTab !== 'edicion' ? activeTab : null
+    if (currentTab === desiredTab) return
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (desiredTab) next.set('tab', desiredTab)
+      else next.delete('tab')
+      return next
     }, { replace: true })
-  }, [activeTab, setSearchParams])
+  }, [activeTab, searchParams, setSearchParams])
   const [newTechName, setNewTechName] = useState('')
   const [newTechRut, setNewTechRut] = useState('')
   const [newTechGroup, setNewTechGroup] = useState('A')
