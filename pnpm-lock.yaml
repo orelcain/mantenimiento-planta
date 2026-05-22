@@ -54,6 +54,9 @@ importers:
       '@fontsource/ibm-plex-mono':
         specifier: ^5.2.7
         version: 5.2.7
+      '@fontsource/ibm-plex-sans':
+        specifier: ^5.2.8
+        version: 5.2.8
       '@geoman-io/leaflet-geoman-free':
         specifier: ^2.19.3
         version: 2.19.3(leaflet@1.9.4)
@@ -1345,6 +1348,9 @@ packages:
 
   '@fontsource/ibm-plex-mono@5.2.7':
     resolution: {integrity: sha512-MKAb8qV+CaiMQn2B0dIi1OV3565NYzp3WN5b4oT6LTkk+F0jR6j0ZN+5BKJiIhffDC3rtBULsYZE65+0018z9w==}
+
+  '@fontsource/ibm-plex-sans@5.2.8':
+    resolution: {integrity: sha512-eztSXjDhPhcpxNIiGTgMebdLP9qS4rWkysuE1V7c+DjOR0qiezaiDaTwQE7bTnG5HxAY/8M43XKDvs3cYq6ZYQ==}
 
   '@geoman-io/leaflet-geoman-free@2.19.3':
     resolution: {integrity: sha512-HjbEpfAEUs0NyI1Dhvz3SMVG6m0pAN/1Eo0tRKsz9cpaROTrFtmJGY22swEir1Uj/8IeGF1NJId38C5Fu+nZGQ==}
@@ -6911,6 +6917,8 @@ snapshots:
   '@floating-ui/utils@0.2.10': {}
 
   '@fontsource/ibm-plex-mono@5.2.7': {}
+
+  '@fontsource/ibm-plex-sans@5.2.8': {}
 
   '@geoman-io/leaflet-geoman-free@2.19.3(leaflet@1.9.4)':
     dependencies:

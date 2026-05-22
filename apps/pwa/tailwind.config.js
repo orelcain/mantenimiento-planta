@@ -69,7 +69,8 @@ export default {
         sm: '0.25rem',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        // UI en IBM Plex Sans (tipo de ingeniería con carácter, no Inter genérico)
+        sans: ['"IBM Plex Sans"', 'system-ui', 'sans-serif'],
         // Mono técnico para datos/lecturas (KPIs, códigos, timestamps, IDs)
         mono: ['"IBM Plex Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
