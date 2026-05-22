@@ -1,11 +1,10 @@
 {
-  "version": "3.32.2",
-  "buildDate": "2026-05-20",
-  "buildTimestamp": 1779325461503,
+  "version": "3.32.3",
+  "buildDate": "2026-05-22",
+  "buildTimestamp": 1779450283310,
   "features": [
-    "HMI Yal: validador manual con video real PLC (IMG_1522.mp4 13MB) lado a lado del simulador",
-    "HMI Yal: sync video↔simulador (auto-aplica state al cruzar bookmarks) + frame-step preciso (±33ms)",
-    "HMI Yal: paint mode (click pipes → toggle override verde/rojo/auto) + snapshots persistentes en LocalStorage + Export JSON",
-    "HMI Yal: reglas pipes refinadas con T-junctions reales (bridges separados por sistema vacío/presión, codos venteo subdivididos)"
+    "Panel Admin: el panel de módulos del sidebar ahora lista los 19 items en dos secciones (En desarrollo / En producción)",
+    "Panel Admin: se puede mostrar u ocultar cualquier módulo a conveniencia (antes solo los ocultos en desarrollo)",
+    "Panel Admin: Panel Admin queda fijo (no ocultable) como salvaguarda anti-bloqueo"
   ]
 }

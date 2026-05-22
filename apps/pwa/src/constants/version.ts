@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '3.32.2' as const
+export const APP_VERSION = '3.32.3' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-05-22' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'chore(grader): elimina ShiftGatesConfigAccordion dead code (nunca importado)' as const
+export const VERSION_NAME = 'feat(admin): gestionar visibilidad de todos los módulos del sidebar' as const
 
 /**
  * Nota:

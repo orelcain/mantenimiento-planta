@@ -1,14 +1,20 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v3.32.2**
+## Versión Actual: **v3.32.3**
 
-**Fecha de lanzamiento**: 17 de abril de 2026  \
+**Fecha de lanzamiento**: 22 de mayo de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
 **Build**: ✅ Stable
 
 ---
 
 ## 📋 Información de la Versión
+
+### v3.32.3 — Panel Admin: visibilidad de TODOS los módulos del sidebar (22/05/2026)
+- 🧩 **Panel "Módulos del sidebar" (`/admin/dev-modules`)**: ahora lista los 19 items en dos secciones (**En desarrollo** ocultos por default / **En producción** visibles por default) en vez de solo los ocultos
+- 👁️ **Mostrar u ocultar cualquier módulo a conveniencia**: la preferencia se guarda por dispositivo (localStorage), no afecta a otros usuarios
+- 🔒 **Salvaguarda anti-bloqueo**: el switch de **Panel Admin** queda fijo (no ocultable) — es la única vía de vuelta al toggle
+- 🛠️ Refactor interno: `DEV_NAV_ITEMS` → `ALL_NAV_ITEMS` (catálogo completo con metadata `inDevelopment`/`locked`); filtro de sidebar y bottom-nav generalizado con default por tipo
 
 ### v2.115.0 — FASE 12: Landing unificado + Vista Turno /turno/:shiftId (17/04/2026)
 - 🏠 **Nueva Landing `/analisis-grader`**: hero con botón upload + live shift detector + grid de turnos recientes (14 días) + calendario histórico + accesos rápidos
