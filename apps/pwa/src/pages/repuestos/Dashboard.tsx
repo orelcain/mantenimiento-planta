@@ -1105,13 +1105,15 @@ export function RepuestosDashboard({
 
         {/* ═══ Detalle de la máquina seleccionada ═══ */}
         {!currentMachine && !selectedEquipmentInfo ? (
-          <div className="border-t border-border/40 pt-8 flex flex-col items-center justify-center text-center gap-3 py-12">
-            <div className="p-4 rounded-full bg-muted/50">
-              <Package className="h-8 w-8 text-muted-foreground/60" />
+          <div className="border-t border-border/40 pt-8 flex flex-col items-center justify-center text-center gap-4 py-14">
+            <div className="flex items-center justify-center w-16 h-16 rounded-2xl border border-dashed border-primary/30 bg-primary/5">
+              <Package className="h-7 w-7 text-primary/70" />
             </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Ningún equipo seleccionado</p>
-              <p className="text-xs text-muted-foreground/70 mt-1">Selecciona un equipo del panel superior para ver sus repuestos</p>
+            <div className="max-w-xs">
+              <p className="text-sm font-semibold">Elegí un equipo para ver sus repuestos</p>
+              <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
+                Buscá o seleccioná un equipo en el panel de arriba y verás su catálogo de repuestos, fotos y stock.
+              </p>
             </div>
           </div>
         ) : (
