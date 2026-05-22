@@ -162,7 +162,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
         <Card className={stats ? '' : 'opacity-40'}>
           <CardContent className="pt-2 pb-2 px-3">
             <p className="text-[10px] text-muted-foreground mb-0.5">P0% promedio</p>
-            <p className={`text-xl font-bold leading-none ${p0Color}`}>
+            <p className={`text-xl font-bold leading-none tabular-nums ${p0Color}`}>
               {stats ? `${fmtDec(stats.p0Avg, 2)}%` : '—'}
             </p>
             {stats && (
@@ -178,7 +178,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
         <Card className={slxStats ? '' : 'opacity-40'}>
           <CardContent className="pt-2 pb-2 px-3">
             <p className="text-[10px] text-muted-foreground mb-0.5">Ciclos Baader</p>
-            <p className={`text-xl font-bold leading-none ${slxStats ? 'text-sky-400' : 'text-muted-foreground'}`}>
+            <p className={`text-xl font-bold leading-none tabular-nums ${slxStats ? 'text-sky-400' : 'text-muted-foreground'}`}>
               {slxStats
                 ? (slxStats.totalCycles >= 1000
                     ? `${(slxStats.totalCycles / 1000).toFixed(1)}k`
@@ -207,7 +207,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
                 Mejor · {best?.metric ?? '—'}
               </p>
             </div>
-            <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400 leading-none">
+            <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400 leading-none tabular-nums">
               {best?.value ?? '—'}
             </p>
             {best && <p className="text-[10px] text-muted-foreground mt-0.5">{best.date}</p>}
@@ -222,7 +222,7 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
                 Peor · {worst?.metric ?? '—'}
               </p>
             </div>
-            <p className="text-lg font-bold text-rose-600 dark:text-rose-400 leading-none">
+            <p className="text-lg font-bold text-rose-600 dark:text-rose-400 leading-none tabular-nums">
               {worst?.value ?? '—'}
             </p>
             {worst && <p className="text-[10px] text-muted-foreground mt-0.5">{worst.date}</p>}
@@ -240,14 +240,14 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
           {isClassificationPlant ? (
             <div className="flex justify-around text-center">
               <div>
-                <p className="text-xl font-bold leading-none">{dayShifts}</p>
+                <p className="text-xl font-bold leading-none tabular-nums">{dayShifts}</p>
                 <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
                   <Sun className="w-3 h-3 text-amber-500" /> Día
                 </p>
               </div>
               <div className="w-px bg-border" />
               <div>
-                <p className="text-xl font-bold leading-none">{nightShifts}</p>
+                <p className="text-xl font-bold leading-none tabular-nums">{nightShifts}</p>
                 <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
                   <Moon className="w-3 h-3 text-indigo-400" /> Noche
                 </p>
@@ -256,21 +256,21 @@ export function GraderMonthlyStatsPanel({ currentMonth, summaries, slxStats, isC
           ) : (
             <div className="flex justify-around text-center">
               <div>
-                <p className="text-xl font-bold leading-none">{t1Shifts}</p>
+                <p className="text-xl font-bold leading-none tabular-nums">{t1Shifts}</p>
                 <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
                   <Sunrise className="w-3 h-3 text-amber-400" /> T1
                 </p>
               </div>
               <div className="w-px bg-border" />
               <div>
-                <p className="text-xl font-bold leading-none">{t2Shifts}</p>
+                <p className="text-xl font-bold leading-none tabular-nums">{t2Shifts}</p>
                 <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
                   <Sunset className="w-3 h-3 text-orange-400" /> T2
                 </p>
               </div>
               <div className="w-px bg-border" />
               <div>
-                <p className="text-xl font-bold leading-none">{t3Shifts}</p>
+                <p className="text-xl font-bold leading-none tabular-nums">{t3Shifts}</p>
                 <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center justify-center gap-1">
                   <Moon className="w-3 h-3 text-indigo-400" /> T3
                 </p>
