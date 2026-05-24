@@ -19,6 +19,7 @@ apps/pwa/public/maps/*.png
 !apps/pwa/public/maps/recinto-2023.png
 # Excepción: base del módulo Planos de Aguas (asset del proyecto, requerido por la app)
 !apps/pwa/public/planos-aguas-assets/plano-base.png
+!apps/pwa/public/planos-aguas-assets/plano-base-dark.png
 
 # Ruflo / claude-flow agent artifacts
 .swarm/

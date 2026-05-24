@@ -214,6 +214,7 @@
     <div class="spacer"></div>
     <div class="stats" id="stats"></div>
     <div class="acts">
+      <button class="hbtn" id="btnTheme" title="Alternar plano claro / oscuro">Oscuro</button>
       <button class="hbtn" id="btnStats">Resumen</button>
       <button class="hbtn" id="btnQR">QR</button>
       <button class="hbtn" id="btnEdit">Editar</button>
@@ -234,7 +235,7 @@
   <div class="main">
     <div class="stagewrap" id="stage">
       <div class="world" id="world">
-        <img class="base" id="base" src="planos-aguas-assets/plano-base.png" alt="Plano nuevo PN10" />
+        <img class="base" id="base" src="planos-aguas-assets/plano-base-dark.png" alt="Plano nuevo PN10" />
       </div>
       <svg class="draw" id="draw" xmlns="http://www.w3.org/2000/svg"></svg>
       <div class="markers" id="markers"></div>
@@ -727,12 +728,23 @@ function genQR(url){const box=document.getElementById('qrbox');
   if(window.qrcode){draw();return;}const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js';s.onload=draw;s.onerror=()=>{box.innerHTML='<div style="font-size:12px;color:#555">Sin conexión: comparte la URL.</div>';};document.head.appendChild(s);}
 document.getElementById('modal').addEventListener('click',e=>{if(e.target.id==='modal')e.currentTarget.classList.remove('open');});
 
+/* ============ THEME (plano claro / oscuro) ============ */
+const THEME_KEY='planosAguas.theme';
+let darkPlan=localStorage.getItem(THEME_KEY)!=='light'; // por defecto: oscuro
+function applyTheme(){
+  const src=darkPlan?'planos-aguas-assets/plano-base-dark.png':'planos-aguas-assets/plano-base.png';
+  if(!base.getAttribute('src').endsWith(src))base.src=src;
+  const b=document.getElementById('btnTheme');b.classList.toggle('on',darkPlan);b.textContent=darkPlan?'Claro':'Oscuro';
+}
+document.getElementById('btnTheme').onclick=()=>{darkPlan=!darkPlan;localStorage.setItem(THEME_KEY,darkPlan?'dark':'light');applyTheme();};
+
 /* ============ TOAST ============ */
 let toastT;function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2000);}
 
 /* ============ INIT ============ */
 (async function(){
   await openDB();await refreshPhotoIds();
+  applyTheme();
   const go=()=>{drawInit();fit();renderMarkers();renderShapes();};
   if(base.complete&&base.naturalWidth)go();else base.onload=go;
   // Re-ajustar si el contenedor cambia de tamaño (p.ej. dentro del PWA) y el usuario aún no movió la vista.
