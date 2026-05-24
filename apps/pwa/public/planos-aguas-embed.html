@@ -176,7 +176,7 @@
   .draw .pipe{fill:none;stroke-linecap:round;stroke-linejoin:round}
   .draw .pipe.dulce{stroke:var(--drawDulce)} .draw .pipe.salada{stroke:var(--drawSalada)}
   .draw .mask{stroke:none}
-  .draw .dot{stroke:#fff} .draw .dot.dulce{fill:var(--drawDulce)} .draw .dot.salada{fill:var(--drawSalada)}
+  .draw .dot{stroke:none} .draw .dot.dulce{fill:var(--drawDulce)} .draw .dot.salada{fill:var(--drawSalada)}
   .draw .lbl{font-family:var(--mono);font-weight:600;paint-order:stroke;stroke:#fff;text-anchor:middle;dominant-baseline:central}
   .draw .lbl.dulce{fill:var(--drawDulce)} .draw .lbl.salada{fill:var(--drawSalada)}
   .draw .live{stroke-dasharray:9 7;opacity:.75}
@@ -202,7 +202,9 @@
   .seg button.on{background:var(--aquaSoft);color:var(--aquaBright)}
   .seg.kind button[data-k="dulce"].on{background:rgba(47,170,90,.22);color:var(--drawDulce)}
   .seg.kind button[data-k="salada"].on{background:rgba(63,169,212,.22);color:var(--drawSalada)}
-  .mcol{width:30px;height:30px;border:1px solid var(--border);border-radius:6px;background:var(--surface);cursor:pointer;padding:2px}
+  .mcol{width:30px;height:30px;border:1px solid var(--border);border-radius:6px;background:var(--surface);cursor:pointer;padding:2px;display:none}
+  body.tool-mask .mcol{display:inline-block}
+  body.tool-mask .seg.kind,body.tool-select .seg.kind,body.tool-pin .seg.kind{display:none}
   .ctx{display:none;gap:6px;align-items:center}
   body.drafting .ctx.draft{display:flex}
   body.has-sel .ctx.sel{display:flex}
@@ -273,7 +275,7 @@
         <span class="ctx sel">
           <button class="btn danger" id="eDelShape">🗑 Borrar figura</button>
         </span>
-        <button class="btn" id="eRestore">Restaurar ocultos</button>
+        <button class="btn" id="eRestore" title="Vuelve a mostrar los pines del plano que fueron borrados (no afecta a los pines agregados a mano)">Restaurar pines borrados</button>
         <button class="btn" id="eExport">Export JSON</button>
         <button class="btn primary" id="eDone">Listo</button>
       </div>
@@ -319,65 +321,65 @@
 <script>
 /* ============ DATASET ============ */
 const DEFAULT_POINTS = [
- {id:'AS-1',t:'s',lab:'1',x:23.23,y:22.84,st:'ok',zona:'Cosecha'},
- {id:'AS-2',t:'s',lab:'2',x:20.52,y:38.33,st:'ok',zona:'Cosecha'},
- {id:'AS-3',t:'s',lab:'3',x:25.79,y:23.83,st:'ok',zona:'Cosecha'},
- {id:'AS-4',t:'s',lab:'4',x:27.96,y:20.13,st:'ok',zona:'Cosecha / ingreso'},
- {id:'AS-5',t:'s',lab:'5',x:44.71,y:15.58,st:'ok',zona:'Calibrado / emparrillado'},
- {id:'AS-6',t:'s',lab:'6',x:47.15,y:22.99,st:'ok',zona:'Calibrado / emparrillado'},
- {id:'AS-7',t:'s',lab:'7',x:44.48,y:29.11,st:'ok',zona:'Calibrado / emparrillado'},
- {id:'AS-8',t:'s',lab:'8',x:41.69,y:30.06,st:'ok',zona:'Calibrado / emparrillado'},
- {id:'AS-9',t:'s',lab:'9',x:39.82,y:30.02,st:'ok',zona:'Calibrado / emparrillado'},
- {id:'AS-10',t:'s',lab:'10',x:36.93,y:29.95,st:'ok',zona:'Calibrado / emparrillado'},
- {id:'AS-11',t:'s',lab:'11',x:42.62,y:31.89,st:'ok',zona:'Calibrado / emparrillado'},
- {id:'AS-12',t:'s',lab:'12',x:46.43,y:15.62,st:'ok',zona:'Calibrado / emparrillado'},
- {id:'AS-17',t:'s',lab:'17',x:52.3,y:28.7,st:'ok',zona:'Pasillo túneles'},
- {id:'AS-18',t:'s',lab:'18',x:52.26,y:30.71,st:'ok',zona:'Pasillo túneles'},
- {id:'AS-19',t:'s',lab:'19',x:60.44,y:63.84,st:'ok',zona:'Sala de máquinas'},
- {id:'AS-21',t:'s',lab:'21',x:36.4,y:21.75,st:'ok',zona:'Calibrado / emparrillado'},
- {id:'AS-22',t:'s',lab:'22',x:24.9,y:31.32,st:'ok',zona:'Cosecha'},
- {id:'AS-40',t:'s',lab:'40',x:48.98,y:55.62,st:'nuevo',zona:'Pasillo túneles'},
- {id:'AS-41',t:'s',lab:'41',x:37.56,y:75.21,st:'nuevo',zona:'Bodega / baños y duchas'},
- {id:'AS-42',t:'s',lab:'42',x:31.52,y:8.54,st:'nuevo',zona:'Cosecha (sup.)'},
- {id:'AS-43',t:'s',lab:'43',x:32.03,y:8.54,st:'nuevo',zona:'Cosecha (sup.)'},
- {id:'AD-A',t:'d',lab:'A',x:29.83,y:41.03,st:'ok',zona:'Cosecha'},
- {id:'AD-AA',t:'d',lab:'AA',x:35.29,y:75.17,st:'ok',zona:'Bodega / baños y duchas'},
- {id:'AD-AB',t:'d',lab:'AB',x:89.09,y:15.66,st:'ok',zona:'Generador'},
- {id:'AD-B',t:'d',lab:'B',x:46.27,y:55.7,st:'ok',zona:'Calibrado / emparrillado'},
- {id:'AD-BA',t:'d',lab:'BA',x:32.47,y:52.15,st:'nuevo',zona:'Cosecha'},
- {id:'AD-BB',t:'d',lab:'BB',x:50.86,y:66.07,st:'nuevo',zona:'Sala de máquinas'},
- {id:'AD-BC',t:'d',lab:'BC',x:55.06,y:67.63,st:'nuevo',zona:'Sala de máquinas'},
- {id:'AD-BD',t:'d',lab:'BD',x:92.06,y:66.67,st:'nuevo',zona:'Sala de máquinas'},
- {id:'AD-BE',t:'d',lab:'BE',x:94.99,y:66.79,st:'nuevo',zona:'Sala de máquinas'},
- {id:'AD-BF',t:'d',lab:'BF',x:40.62,y:59.86,st:'nuevo',zona:'Calibrado / emparrillado'},
- {id:'AD-BG',t:'d',lab:'BG',x:24.17,y:60.3,st:'nuevo',zona:'Cosecha'},
- {id:'AD-BH',t:'d',lab:'BH',x:23.42,y:20.03,st:'nuevo',zona:'Cosecha'},
- {id:'AD-BI',t:'d',lab:'BI',x:24.26,y:32.32,st:'nuevo',zona:'Cosecha'},
- {id:'AD-BJ',t:'d',lab:'BJ',x:24.56,y:36.01,st:'nuevo',zona:'Cosecha'},
- {id:'AD-D',t:'d',lab:'D',x:40.78,y:31.89,st:'ok',zona:'Calibrado / emparrillado'},
- {id:'AD-E',t:'d',lab:'E',x:38.3,y:35.93,st:'ok',zona:'Calibrado / emparrillado'},
- {id:'AD-EA',t:'d',lab:'EA',x:30.21,y:8.55,st:'nuevo',zona:'Cosecha (sup.)'},
- {id:'AD-EB',t:'d',lab:'EB',x:30.7,y:8.54,st:'nuevo',zona:'Cosecha (sup.)'},
- {id:'AD-F',t:'d',lab:'F',x:30.9,y:38.87,st:'ok',zona:'Cosecha'},
- {id:'AD-G',t:'d',lab:'G',x:55.66,y:24.04,st:'ok',zona:'Pasillo túneles'},
- {id:'AD-H',t:'d',lab:'H',x:56.95,y:63.64,st:'ok',zona:'Sala de máquinas'},
- {id:'AD-I',t:'d',lab:'I',x:58.45,y:63.64,st:'ok',zona:'Sala de máquinas'},
- {id:'AD-K',t:'d',lab:'K',x:70.56,y:32.5,st:'ok',zona:'Zona empaque'},
- {id:'AD-LL',t:'d',lab:'LL',x:37.25,y:55.73,st:'ok',zona:'Calibrado / emparrillado'},
- {id:'AD-M',t:'d',lab:'M',x:62.22,y:46.22,st:'ok',zona:'Zona empaque'},
- {id:'AD-N',t:'d',lab:'N',x:65.49,y:37.61,st:'ok',zona:'Zona empaque'},
- {id:'AD-P',t:'d',lab:'P',x:45.65,y:59.45,st:'ok',zona:'Calibrado / emparrillado'},
- {id:'AD-Q',t:'d',lab:'Q',x:43.06,y:61.66,st:'ok',zona:'Calibrado / emparrillado'},
- {id:'AD-R',t:'d',lab:'R',x:36.8,y:24.86,st:'ok',zona:'Calibrado / emparrillado'},
- {id:'AD-S',t:'d',lab:'S',x:39.06,y:24.76,st:'ok',zona:'Calibrado / emparrillado'},
- {id:'AD-T',t:'d',lab:'T',x:41.26,y:25.34,st:'ok',zona:'Calibrado / emparrillado'},
- {id:'AD-U',t:'d',lab:'U',x:33.76,y:39.29,st:'ok',zona:'Cosecha'},
- {id:'AD-V',t:'d',lab:'V',x:33.42,y:31.93,st:'nuevo',zona:'Cosecha'},
- {id:'AD-W',t:'d',lab:'W',x:31.55,y:44.2,st:'ok',zona:'Cosecha'},
- {id:'AD-X',t:'d',lab:'X',x:20.23,y:53.81,st:'nuevo',zona:'Cosecha'},
- {id:'AD-Z',t:'d',lab:'Z',x:36.53,y:75.54,st:'ok',zona:'Bodega / baños y duchas'},
- {id:'AD-N2',t:'d',lab:'Ñ',x:63.28,y:59.51,st:'nuevo',zona:'Pasillo túneles',flag:"Ñ existe en el plano nuevo; en Calidad figura Ó. Verificar si son la misma bajada."},
- {id:'AD-O',t:'d',lab:'Ó',x:43.09,y:55.82,st:'falta',zona:'Calibrado / emparrillado',flag:"Verificar si Ó (Calidad) = Ñ (plano nuevo) o es otra bajada."},
+ {id:"AS-1",t:"s",lab:"1",x:23.95,y:22.96,st:"ok",zona:"Cosecha"},
+ {id:"AS-2",t:"s",lab:"2",x:20.86,y:38.86,st:"ok",zona:"Cosecha"},
+ {id:"AS-3",t:"s",lab:"3",x:26.51,y:23.88,st:"ok",zona:"Cosecha"},
+ {id:"AS-4",t:"s",lab:"4",x:28.68,y:20.05,st:"ok",zona:"Cosecha / ingreso"},
+ {id:"AS-5",t:"s",lab:"5",x:45.29,y:16.17,st:"ok",zona:"Calibrado / emparrillado"},
+ {id:"AS-6",t:"s",lab:"6",x:47.6,y:22.43,st:"ok",zona:"Calibrado / emparrillado"},
+ {id:"AS-7",t:"s",lab:"7",x:44.56,y:28.44,st:"ok",zona:"Calibrado / emparrillado"},
+ {id:"AS-8",t:"s",lab:"8",x:41.68,y:29.59,st:"ok",zona:"Calibrado / emparrillado"},
+ {id:"AS-9",t:"s",lab:"9",x:39.5,y:29.53,st:"ok",zona:"Calibrado / emparrillado"},
+ {id:"AS-10",t:"s",lab:"10",x:37.35,y:29.45,st:"ok",zona:"Calibrado / emparrillado"},
+ {id:"AS-11",t:"s",lab:"11",x:42.52,y:31.28,st:"ok",zona:"Calibrado / emparrillado"},
+ {id:"AS-12",t:"s",lab:"12",x:45.85,y:16.17,st:"ok",zona:"Calibrado / emparrillado"},
+ {id:"AS-17",t:"s",lab:"17",x:51.57,y:28.68,st:"ok",zona:"Pasillo túneles"},
+ {id:"AS-18",t:"s",lab:"18",x:51.55,y:30.66,st:"ok",zona:"Pasillo túneles"},
+ {id:"AS-19",t:"s",lab:"19",x:60.45,y:63.1,st:"ok",zona:"Sala de máquinas"},
+ {id:"AS-21",t:"s",lab:"21",x:36.28,y:20.33,st:"ok",zona:"Calibrado / emparrillado"},
+ {id:"AS-22",t:"s",lab:"22",x:24.66,y:32.28,st:"ok",zona:"Cosecha"},
+ {id:"AS-40",t:"s",lab:"40",x:48.25,y:55.98,st:"nuevo",zona:"Pasillo túneles"},
+ {id:"AS-41",t:"s",lab:"41",x:36.9,y:74.7,st:"nuevo",zona:"Bodega / baños y duchas"},
+ {id:"AS-42",t:"s",lab:"42",x:31.56,y:9.77,st:"nuevo",zona:"Cosecha (sup.)"},
+ {id:"AS-43",t:"s",lab:"43",x:32.09,y:9.77,st:"nuevo",zona:"Cosecha (sup.)"},
+ {id:"AD-A",t:"d",lab:"A",x:29.31,y:40.49,st:"ok",zona:"Cosecha"},
+ {id:"AD-AA",t:"d",lab:"AA",x:36.03,y:74.71,st:"ok",zona:"Bodega / baños y duchas"},
+ {id:"AD-AB",t:"d",lab:"AB",x:88.33,y:16.04,st:"ok",zona:"Generador"},
+ {id:"AD-B",t:"d",lab:"B",x:46.28,y:56.15,st:"ok",zona:"Calibrado / emparrillado"},
+ {id:"AD-BA",t:"d",lab:"BA",x:32.73,y:52.8,st:"nuevo",zona:"Cosecha"},
+ {id:"AD-BB",t:"d",lab:"BB",x:51.65,y:67.1,st:"nuevo",zona:"Sala de máquinas"},
+ {id:"AD-BC",t:"d",lab:"BC",x:54.25,y:67.1,st:"nuevo",zona:"Sala de máquinas"},
+ {id:"AD-BD",t:"d",lab:"BD",x:92.67,y:65.77,st:"nuevo",zona:"Sala de máquinas"},
+ {id:"AD-BE",t:"d",lab:"BE",x:94.38,y:65.9,st:"nuevo",zona:"Sala de máquinas"},
+ {id:"AD-BF",t:"d",lab:"BF",x:40.55,y:59.15,st:"nuevo",zona:"Calibrado / emparrillado"},
+ {id:"AD-BG",t:"d",lab:"BG",x:23.43,y:59.5,st:"nuevo",zona:"Cosecha"},
+ {id:"AD-BH",t:"d",lab:"BH",x:23.91,y:20.85,st:"nuevo",zona:"Cosecha"},
+ {id:"AD-BI",t:"d",lab:"BI",x:23.89,y:32.64,st:"nuevo",zona:"Cosecha"},
+ {id:"AD-BJ",t:"d",lab:"BJ",x:23.92,y:35.31,st:"nuevo",zona:"Cosecha"},
+ {id:"AD-D",t:"d",lab:"D",x:40.77,y:31.36,st:"ok",zona:"Calibrado / emparrillado"},
+ {id:"AD-E",t:"d",lab:"E",x:37.71,y:35.35,st:"ok",zona:"Calibrado / emparrillado"},
+ {id:"AD-EA",t:"d",lab:"EA",x:30.21,y:9.71,st:"nuevo",zona:"Cosecha (sup.)"},
+ {id:"AD-EB",t:"d",lab:"EB",x:30.73,y:9.77,st:"nuevo",zona:"Cosecha (sup.)"},
+ {id:"AD-F",t:"d",lab:"F",x:30.21,y:39.26,st:"ok",zona:"Cosecha"},
+ {id:"AD-G",t:"d",lab:"G",x:56.09,y:23.45,st:"ok",zona:"Pasillo túneles"},
+ {id:"AD-H",t:"d",lab:"H",x:57.46,y:62.97,st:"ok",zona:"Sala de máquinas"},
+ {id:"AD-I",t:"d",lab:"I",x:57.93,y:62.97,st:"ok",zona:"Sala de máquinas"},
+ {id:"AD-K",t:"d",lab:"K",x:70.94,y:31.95,st:"ok",zona:"Zona empaque"},
+ {id:"AD-LL",t:"d",lab:"LL",x:36.66,y:56.13,st:"ok",zona:"Calibrado / emparrillado"},
+ {id:"AD-M",t:"d",lab:"M",x:62.25,y:46.9,st:"ok",zona:"Zona empaque"},
+ {id:"AD-N",t:"d",lab:"N",x:66.03,y:37.05,st:"ok",zona:"Zona empaque"},
+ {id:"AD-P",t:"d",lab:"P",x:45.1,y:58.85,st:"ok",zona:"Calibrado / emparrillado"},
+ {id:"AD-Q",t:"d",lab:"Q",x:43.62,y:61.11,st:"ok",zona:"Calibrado / emparrillado"},
+ {id:"AD-R",t:"d",lab:"R",x:36.98,y:23.94,st:"ok",zona:"Calibrado / emparrillado"},
+ {id:"AD-S",t:"d",lab:"S",x:39.12,y:23.92,st:"ok",zona:"Calibrado / emparrillado"},
+ {id:"AD-T",t:"d",lab:"T",x:41.29,y:24.03,st:"ok",zona:"Calibrado / emparrillado"},
+ {id:"AD-U",t:"d",lab:"U",x:33.13,y:39.89,st:"ok",zona:"Cosecha"},
+ {id:"AD-V",t:"d",lab:"V",x:32.86,y:32.43,st:"nuevo",zona:"Cosecha"},
+ {id:"AD-W",t:"d",lab:"W",x:31.6,y:44.84,st:"ok",zona:"Cosecha"},
+ {id:"AD-X",t:"d",lab:"X",x:20.19,y:53.18,st:"nuevo",zona:"Cosecha"},
+ {id:"AD-Z",t:"d",lab:"Z",x:36.44,y:74.72,st:"ok",zona:"Bodega / baños y duchas"},
+ {id:"AD-N2",t:"d",lab:"Ñ",x:63.9,y:58.89,st:"nuevo",zona:"Pasillo túneles",flag:"Ñ existe en el plano nuevo; en Calidad figura Ó. Verificar si son la misma bajada."},
+ {id:"AD-O",t:"d",lab:"Ó",x:42.73,y:57.24,st:"falta",zona:"Calibrado / emparrillado",flag:"Verificar si Ó (Calidad) = Ñ (plano nuevo) o es otra bajada."},
 ];
 const ESTADO_TXT={ok:'En ambos planos',falta:'Solo en Calidad — falta en plano nuevo',nuevo:'Solo en plano nuevo'};
 const STORE_KEY='planosAguas.v3';
@@ -394,7 +396,7 @@ function load(){
 function saveLocal(){localStorage.setItem(STORE_KEY,JSON.stringify(state));}
 
 /* ============ CLOUD SYNC (Firebase) — posiciones / notas / dibujos ============ */
-const cloud={db:null,auth:null,storage:null,user:null,ready:false,applying:false,pushT:0};
+const cloud={db:null,auth:null,storage:null,user:null,ready:false,applying:false,dirty:false,docMissing:false,pushT:0};
 function cloudDoc(){return cloud.db.collection('planosAguas').doc('main');}
 function initCloud(){
   try{
@@ -402,17 +404,18 @@ function initCloud(){
     firebase.initializeApp({apiKey:"AIzaSyBsJSh6x3ZGEyuXsM18dSWsJKyU7--KJss",authDomain:"mantenimiento-planta-771a3.firebaseapp.com",projectId:"mantenimiento-planta-771a3",storageBucket:"mantenimiento-planta-771a3.firebasestorage.app"});
     cloud.db=firebase.firestore(); cloud.auth=firebase.auth();
     try{cloud.storage=firebase.storage();}catch(_){}
-    cloud.auth.onAuthStateChanged(u=>{cloud.user=u||null;});
+    cloud.auth.onAuthStateChanged(u=>{cloud.user=u||null; if(u&&cloud.docMissing)trySeed();}); // siembra cuando la sesión carga tarde
     cloudDoc().onSnapshot(onCloudSnap,e=>console.warn('[planos] onSnapshot',e&&e.code));
   }catch(e){console.warn('[planos] Firebase no disponible, modo local',e);}
 }
+function localHasData(){return Object.keys(state.over).length||state.extra.length||state.removed.length||(state.shapes||[]).length||Object.keys(state.notas).length||Object.keys(state.photos||{}).length;}
+function trySeed(){ if(cloud.user&&localHasData()){cloud.docMissing=false;pushCloud(true);} }
 function onCloudSnap(snap){
+  if(snap.metadata&&snap.metadata.hasPendingWrites)return; // eco local de mi propia escritura → ignorar
   cloud.ready=true;
-  if(!snap.exists){
-    const has=Object.keys(state.over).length||state.extra.length||state.removed.length||(state.shapes||[]).length||Object.keys(state.notas).length||Object.keys(state.photos||{}).length;
-    if(has&&cloud.user)pushCloud(true); // migración: sembrar correcciones locales
-    return;
-  }
+  if(!snap.exists){ cloud.docMissing=true; trySeed(); return; } // migración: sembrar correcciones locales
+  cloud.docMissing=false;
+  if(cloud.dirty)return; // tengo cambios locales sin confirmar → no pisarlos con el remoto
   const r=snap.data();
   cloud.applying=true;
   state.over=r.over||{}; state.notas=r.notas||{};
@@ -426,12 +429,13 @@ function onCloudSnap(snap){
 }
 function pushCloud(now){
   if(!cloud.db)return;
+  cloud.dirty=true;
   clearTimeout(cloud.pushT);
   const doIt=()=>cloudDoc().set({
       over:state.over,notas:state.notas,extra:state.extra,removed:state.removed,shapes:state.shapes,photos:state.photos||{},
       updatedAt:firebase.firestore.FieldValue.serverTimestamp()
-    },{merge:true}).catch(()=>{}); // sin permiso (no supervisor) u offline → queda local
-  if(now)doIt(); else cloud.pushT=setTimeout(doIt,800);
+    },{merge:true}).then(()=>{cloud.dirty=false;}).catch(()=>{cloud.dirty=false;}); // sin permiso (no supervisor) u offline → queda local
+  if(now)doIt(); else cloud.pushT=setTimeout(doIt,500);
 }
 function save(){saveLocal(); if(!cloud.applying) pushCloud();}
 
@@ -621,7 +625,7 @@ document.getElementById('eRestore').onclick=()=>{const n=state.removed.length;st
 document.getElementById('eExport').onclick=()=>{const data=JSON.stringify({points:points(),state},null,2);const b=new Blob([data],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='planos-aguas-datos.json';a.click();toast('JSON exportado');};
 
 /* ============ DRAW LAYER (cañerías / puntos / etiquetas / máscara) ============ */
-const PIPE_W=16, DOT_R=18, LBL_SZE=46, LBL_HALO=7;
+const PIPE_W=5, DOT_R=13, LBL_SZE=40, LBL_HALO=6;
 let tool='pin', kind='dulce', maskColor='#ffffff';
 let draft=null, draftCursor=null, selShape=null, drag=null;
 const HINTS={
