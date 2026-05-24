@@ -18,7 +18,7 @@ export function PlanosAguasPage() {
   const iframeSrc = useMemo(() => {
     const basePath = import.meta.env.BASE_URL || '/'
     const v = import.meta.env.VITE_APP_VERSION || Date.now().toString().slice(0, 8)
-    return `${basePath}planos-aguas.html?v=${v}`
+    return `${basePath}planos-aguas-embed.html?v=${v}`
   }, [])
 
   return (
