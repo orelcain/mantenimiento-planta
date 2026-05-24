@@ -638,8 +638,6 @@ function removePoint(id){
   state.shapes=(state.shapes||[]).filter(s=>s.bajada!==id);                              // borra punto/etiqueta/cañería vinculados
   save();renderMarkers();renderShapes();toast('Punto eliminado');
 }
-function doRestore(){const n=state.removed.length;state.removed=[];save();renderMarkers();toast(n?('Restaurados '+n+' pin(es)'):'No hay pines borrados');}
-function doExport(){const data=JSON.stringify({points:points(),state},null,2);const b=new Blob([data],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='planos-aguas-datos.json';a.click();toast('JSON exportado');}
 
 /* ============ DRAW LAYER + EDITOR GUIADO ============ */
 const PIPE_W=5, DOT_R=13, LBL_SZE=18, LBL_HALO=3;
@@ -689,10 +687,28 @@ function renderEditbar(){
     s+=`<span class="tagx">MÁSCARA</span><span class="wcap">color</span><input type="color" class="mcol" id="maskColor" value="${maskColor}"><button class="btn primary" id="eFinish">✓ Terminar</button><button class="btn" id="eCancel">✗ Cancelar</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
     setHint('Tapar elementos: clic vértices del polígono · doble-clic o Terminar.');
   }else if(tool==='select'){
-    s+=`<span class="tagx">EDITAR DIBUJO</span><span class="wcap">clic una figura → mover / arrastrar vértices</span><button class="btn danger" id="eDelShape">🗑 Borrar figura</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
-    setHint('Clic una cañería / etiqueta / máscara para moverla o editar sus vértices.');
+    const sh=selShape?getShape(selShape):null;
+    if(draft&&draft.editId){
+      s+=`<span class="tagx">CAÑERÍA</span><span class="wcap">grosor</span><button class="tbtn" id="wizWm">−</button><input type="range" id="wizW" min="2" max="14" value="${draft.w||pipeW}"><button class="tbtn" id="wizWp">+</button><span class="wnum" id="wizWv">${draft.w||pipeW}</span><button class="tbtn ${snapAngles?'on':''}" id="wizSnap">⊾ 45/90</button><button class="btn primary" id="eFinish">✓ Terminar</button><button class="btn" id="eCancel">✗ Cancelar</button>`;
+      setHint('Clic puntos para extender el trazo · doble-clic o Terminar · Retroceso borra el último.');
+    }else if(!sh){
+      s+=`<span class="tagx">EDITAR DIBUJO</span><span class="wcap">clic una figura para editarla</span><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
+      setHint('Clic una cañería / etiqueta / máscara para moverla, editar sus vértices o sus opciones.');
+    }else if(sh.type==='pipe'){
+      s+=`<span class="tagx">CAÑERÍA</span><span class="wcap">grosor</span><button class="tbtn" id="selWm">−</button><input type="range" id="selW" min="2" max="14" value="${sh.w||PIPE_W}"><button class="tbtn" id="selWp">+</button><span class="wnum" id="selWv">${sh.w||PIPE_W}</span><button class="btn" id="selCont">Continuar trazo</button><button class="btn" id="selRedraw">Redibujar</button><button class="btn danger" id="eDelShape">🗑 Borrar</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
+      setHint('Arrastra vértices · doble-clic un vértice = borrarlo · Continuar/Redibujar el trazo.');
+    }else if(sh.type==='label'){
+      s+=`<span class="tagx">ETIQUETA</span><span class="wcap">tamaño</span><button class="tbtn" id="selSm">−</button><input type="range" id="selS" min="8" max="48" value="${sh.size||LBL_SZE}"><button class="tbtn" id="selSp">+</button><span class="wnum" id="selSv">${sh.size||LBL_SZE}</span><button class="btn danger" id="eDelShape">🗑 Borrar</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
+      setHint('Arrastra la etiqueta para reposicionarla · ajusta su tamaño.');
+    }else if(sh.type==='mask'){
+      s+=`<span class="tagx">MÁSCARA</span><span class="wcap">color</span><input type="color" class="mcol" id="selColor" value="${sh.fill||'#ffffff'}"><button class="btn danger" id="eDelShape">🗑 Borrar</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
+      setHint('Arrastra vértices · cambia el color de relleno.');
+    }else{
+      s+=`<span class="tagx">PUNTO</span><button class="btn danger" id="eDelShape">🗑 Borrar</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
+      setHint('Arrastra el punto para moverlo.');
+    }
   }else{
-    s+=`<span class="tagx">EDICIÓN</span><button class="btn primary" id="ewCrear">+ Crear bajada de agua</button><button class="btn" id="ewMask">Máscara</button><button class="btn" id="ewSelect">Editar dibujo</button><span class="ebsp"></span><button class="btn" id="eRestore">Restaurar pines</button><button class="btn" id="eExport">Export</button><button class="btn primary" id="eDone">Listo</button>`;
+    s+=`<span class="tagx">EDICIÓN</span><button class="btn primary" id="ewCrear">+ Crear bajada de agua</button><button class="btn" id="ewMask">Máscara</button><button class="btn" id="ewSelect">Editar dibujo</button><span class="ebsp"></span><button class="btn primary" id="eDone">Listo</button>`;
     setHint('Arrastra pines para moverlos · clic un pin para ver/editar · o crea una bajada.');
   }
   eb.innerHTML=s;wireEditbar();
@@ -702,14 +718,22 @@ function wireEditbar(){
   if($('ewCrear'))$('ewCrear').onclick=startWizard;
   if($('ewMask'))$('ewMask').onclick=()=>setTool('mask');
   if($('ewSelect'))$('ewSelect').onclick=()=>setTool('select');
-  if($('eRestore'))$('eRestore').onclick=doRestore;
-  if($('eExport'))$('eExport').onclick=doExport;
   if($('eDone'))$('eDone').onclick=exitEdit;
-  if($('ebBack'))$('ebBack').onclick=()=>{cancelDraft();setTool('pin');};
+  if($('ebBack'))$('ebBack').onclick=()=>{cancelDraft();selShape=null;setTool('pin');};
   if($('eFinish'))$('eFinish').onclick=finishDraft;
   if($('eCancel'))$('eCancel').onclick=cancelDraft;
   if($('eDelShape'))$('eDelShape').onclick=delSelShape;
   if($('maskColor'))$('maskColor').oninput=e=>{maskColor=e.target.value;};
+  // controles por figura seleccionada (Editar dibujo)
+  if($('selW'))$('selW').oninput=e=>setShapeW(selShape,+e.target.value);
+  if($('selWm'))$('selWm').onclick=()=>setShapeW(selShape,(getShape(selShape).w||PIPE_W)-1);
+  if($('selWp'))$('selWp').onclick=()=>setShapeW(selShape,(getShape(selShape).w||PIPE_W)+1);
+  if($('selS'))$('selS').oninput=e=>setShapeSize(selShape,+e.target.value);
+  if($('selSm'))$('selSm').onclick=()=>setShapeSize(selShape,(getShape(selShape).size||LBL_SZE)-1);
+  if($('selSp'))$('selSp').onclick=()=>setShapeSize(selShape,(getShape(selShape).size||LBL_SZE)+1);
+  if($('selColor'))$('selColor').oninput=e=>{const sh=getShape(selShape);if(sh){sh.fill=e.target.value;save();renderShapes();}};
+  if($('selCont'))$('selCont').onclick=()=>continuePipe(selShape);
+  if($('selRedraw'))$('selRedraw').onclick=()=>redrawPipe(selShape);
   document.querySelectorAll('#wizKind button').forEach(b=>b.onclick=()=>wizType(b.dataset.k));
   if($('wizCorr'))$('wizCorr').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();wizCorrOk();}};
   if($('wizCorrOk'))$('wizCorrOk').onclick=wizCorrOk;
@@ -730,9 +754,14 @@ function onEditClick(e){
   if(w.x<-baseW()*.15||w.x>baseW()*1.15||w.y<-baseH()*.15||w.y>baseH()*1.15)return;
   if(wiz){ if(wiz.step==='ubic')placeBajadaPoint(w); else if(wiz.step==='pipe')draftAdd(w); return; }
   if(tool==='mask')draftAdd(w);
-  else if(tool==='select'){selShape=null;renderShapes();}
+  else if(tool==='select'&&!draft){selShape=null;renderShapes();renderEditbar();}
 }
-function delSelShape(){if(!selShape){toast('Selecciona una figura primero');return;}if(confirm('¿Borrar esta figura?')){state.shapes=state.shapes.filter(s=>s.id!==selShape);selShape=null;save();renderShapes();toast('Figura borrada');}}
+function delSelShape(){if(!selShape){toast('Selecciona una figura primero');return;}if(confirm('¿Borrar esta figura?')){state.shapes=state.shapes.filter(s=>s.id!==selShape);selShape=null;save();renderShapes();renderEditbar();toast('Figura borrada');}}
+function setShapeW(id,v){const sh=getShape(id);if(!sh)return;sh.w=Math.max(2,Math.min(14,v|0));save();renderShapes();const wv=document.getElementById('selWv');if(wv)wv.textContent=sh.w;const sl=document.getElementById('selW');if(sl&&+sl.value!==sh.w)sl.value=sh.w;}
+function setShapeSize(id,v){const sh=getShape(id);if(!sh)return;sh.size=Math.max(8,Math.min(48,v|0));save();renderShapes();const wv=document.getElementById('selSv');if(wv)wv.textContent=sh.size;const sl=document.getElementById('selS');if(sl&&+sl.value!==sh.size)sl.value=sh.size;}
+function continuePipe(id){const sh=getShape(id);if(!sh||sh.type!=='pipe')return;draft={type:'pipe',kind:sh.kind,w:sh.w||pipeW,editId:id,pts:JSON.parse(JSON.stringify(sh.pts))};document.body.classList.add('drafting');selShape=null;renderShapes();renderEditbar();toast('Continuá la cañería · doble-clic o Terminar');}
+function redrawPipe(id){const sh=getShape(id);if(!sh||sh.type!=='pipe')return;draft={type:'pipe',kind:sh.kind,w:sh.w||pipeW,editId:id,pts:[sh.pts[0].slice()]};document.body.classList.add('drafting');selShape=null;renderShapes();renderEditbar();toast('Redibuja desde el punto de bajada');}
+function delVertex(id,i){const sh=getShape(id);if(!sh||!sh.pts||sh.pts.length<=2)return;sh.pts.splice(i,1);save();renderShapes();toast('Vértice borrado');}
 function snapPt(prev,x,y){const dx=x-prev[0],dy=y-prev[1],a=Math.round(Math.atan2(dy,dx)/(Math.PI/4))*(Math.PI/4),d=Math.hypot(dx,dy);return {x:prev[0]+Math.cos(a)*d,y:prev[1]+Math.sin(a)*d};}
 
 /* ---- Wizard Crear bajada: tipo → ubicar (punto+pin) → correlativo → cañería ---- */
@@ -781,6 +810,7 @@ function draftAdd(w){
 function finishDraft(){
   if(wiz&&wiz.step==='pipe'){finishPipeWizard();return;}
   if(!draft)return;
+  if(draft.editId){const sh=getShape(draft.editId);if(sh&&draft.pts.length>=2){sh.pts=draft.pts;sh.w=draft.w||sh.w;save();toast('Cañería actualizada');}draft=null;draftCursor=null;document.body.classList.remove('drafting');renderShapes();renderEditbar();return;}
   const min=draft.type==='mask'?3:2;
   if(draft.pts.length>=min){
     const sh={id:'sh-'+Date.now(),type:draft.type,pts:draft.pts};
@@ -789,7 +819,7 @@ function finishDraft(){
   }
   draft=null;draftCursor=null;document.body.classList.remove('drafting');renderShapes();
 }
-function cancelDraft(){draft=null;draftCursor=null;document.body.classList.remove('drafting');renderShapes();}
+function cancelDraft(){draft=null;draftCursor=null;document.body.classList.remove('drafting');renderShapes();renderEditbar();}
 window.addEventListener('keydown',e=>{
   if(!draft)return;
   if(e.key==='Enter'){e.preventDefault();finishDraft();}
@@ -814,7 +844,7 @@ function shapeSVG(sh){
   }
   if(sh.type==='mask')return `<polygon class="shape mask" data-id="${sh.id}" fill="${sh.fill||'#ffffff'}" points="${sh.pts.map(p=>p.join(',')).join(' ')}"/>`;
   if(sh.type==='dot')return `<circle class="shape dot ${sh.kind}" data-id="${sh.id}" cx="${sh.x}" cy="${sh.y}" r="${DOT_R}" stroke-width="3"/>`;
-  if(sh.type==='label')return `<text class="shape lbl ${sh.kind}" data-id="${sh.id}" x="${sh.x}" y="${sh.y}" font-size="${LBL_SZE}" stroke-width="${LBL_HALO}">${esc(sh.text)}</text>`;
+  if(sh.type==='label')return `<text class="shape lbl ${sh.kind}" data-id="${sh.id}" x="${sh.x}" y="${sh.y}" font-size="${sh.size||LBL_SZE}" stroke-width="${LBL_HALO}">${esc(sh.text)}</text>`;
   return '';
 }
 function draftSVG(){
@@ -837,7 +867,7 @@ function selectionSVG(){
     else s+=`<path class="sel-outline" d="M${sh.pts.map(p=>p[0]+' '+p[1]).join(' L ')}"/>`;
     sh.pts.forEach((p,i)=>{s+=`<circle class="vh" data-vi="${i}" cx="${p[0]}" cy="${p[1]}" r="${(8/view.s).toFixed(2)}"/>`;});
   }else{
-    const r=(sh.type==='label'?LBL_SZE*.7:DOT_R+8);
+    const r=(sh.type==='label'?(sh.size||LBL_SZE)*.7:DOT_R+8);
     s+=`<circle class="sel-outline" cx="${sh.x}" cy="${sh.y}" r="${r}"/>`;
     s+=`<circle class="vh" data-vi="0" cx="${sh.x}" cy="${sh.y}" r="${(8/view.s).toFixed(2)}"/>`;
   }
@@ -856,8 +886,11 @@ function updateLive(){const el=drawEl.querySelector('#draftLive');if(!el||!draft
 /* seleccionar / mover / arrastrar vértices */
 function attachShapeEvents(){
   if(!document.body.classList.contains('tool-select'))return;
-  drawEl.querySelectorAll('.shape').forEach(el=>el.addEventListener('pointerdown',ev=>{ev.stopPropagation();selShape=el.dataset.id;startDrag('body',selShape,null,ev);renderShapes();}));
-  drawEl.querySelectorAll('.vh').forEach(el=>el.addEventListener('pointerdown',ev=>{ev.stopPropagation();startDrag('vertex',selShape,+el.dataset.vi,ev);}));
+  drawEl.querySelectorAll('.shape').forEach(el=>el.addEventListener('pointerdown',ev=>{ev.stopPropagation();const was=selShape;selShape=el.dataset.id;startDrag('body',selShape,null,ev);renderShapes();if(was!==selShape)renderEditbar();}));
+  drawEl.querySelectorAll('.vh').forEach(el=>{
+    el.addEventListener('pointerdown',ev=>{ev.stopPropagation();startDrag('vertex',selShape,+el.dataset.vi,ev);});
+    el.addEventListener('dblclick',ev=>{ev.stopPropagation();delVertex(selShape,+el.dataset.vi);});
+  });
 }
 function startDrag(mode,id,vi,e){
   const sh=getShape(id);if(!sh)return;
