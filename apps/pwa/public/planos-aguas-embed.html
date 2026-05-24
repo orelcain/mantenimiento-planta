@@ -7,6 +7,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <style>
   :root{
     --bg:#0c1620; --bgPanel:#0e1b27; --surface:#15232e; --surfaceHi:#1b2e3c;
@@ -386,7 +389,48 @@ function load(){
   if(!Array.isArray(s.shapes))s.shapes=[];
   return s;
 }
-function save(){localStorage.setItem(STORE_KEY,JSON.stringify(state));}
+function saveLocal(){localStorage.setItem(STORE_KEY,JSON.stringify(state));}
+
+/* ============ CLOUD SYNC (Firebase) — posiciones / notas / dibujos ============ */
+const cloud={db:null,auth:null,user:null,ready:false,applying:false,pushT:0};
+function cloudDoc(){return cloud.db.collection('planosAguas').doc('main');}
+function initCloud(){
+  try{
+    if(!window.firebase)return;
+    firebase.initializeApp({apiKey:"AIzaSyBsJSh6x3ZGEyuXsM18dSWsJKyU7--KJss",authDomain:"mantenimiento-planta-771a3.firebaseapp.com",projectId:"mantenimiento-planta-771a3",storageBucket:"mantenimiento-planta-771a3.firebasestorage.app"});
+    cloud.db=firebase.firestore(); cloud.auth=firebase.auth();
+    cloud.auth.onAuthStateChanged(u=>{cloud.user=u||null;});
+    cloudDoc().onSnapshot(onCloudSnap,e=>console.warn('[planos] onSnapshot',e&&e.code));
+  }catch(e){console.warn('[planos] Firebase no disponible, modo local',e);}
+}
+function onCloudSnap(snap){
+  cloud.ready=true;
+  if(!snap.exists){
+    const has=Object.keys(state.over).length||state.extra.length||state.removed.length||(state.shapes||[]).length||Object.keys(state.notas).length;
+    if(has&&cloud.user)pushCloud(true); // migración: sembrar correcciones locales
+    return;
+  }
+  const r=snap.data();
+  cloud.applying=true;
+  state.over=r.over||{}; state.notas=r.notas||{};
+  state.extra=Array.isArray(r.extra)?r.extra:[];
+  state.removed=Array.isArray(r.removed)?r.removed:[];
+  state.shapes=Array.isArray(r.shapes)?r.shapes:[];
+  saveLocal();
+  cloud.applying=false;
+  if(typeof renderMarkers==='function'){renderMarkers();renderShapes();if(sel)openPanel(sel);}
+}
+function pushCloud(now){
+  if(!cloud.db)return;
+  clearTimeout(cloud.pushT);
+  const doIt=()=>cloudDoc().set({
+      over:state.over,notas:state.notas,extra:state.extra,removed:state.removed,shapes:state.shapes,
+      updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+    },{merge:true}).catch(()=>{}); // sin permiso (no supervisor) u offline → queda local
+  if(now)doIt(); else cloud.pushT=setTimeout(doIt,800);
+}
+function save(){saveLocal(); if(!cloud.applying) pushCloud();}
+
 function points(){
   const base=DEFAULT_POINTS.filter(p=>!state.removed.includes(p.id)).map(p=>{const o=state.over[p.id]||{};return Object.assign({},p,o);});
   return base.concat(state.extra||[]);
@@ -745,6 +789,7 @@ let toastT;function toast(m){const t=document.getElementById('toast');t.textCont
 (async function(){
   await openDB();await refreshPhotoIds();
   applyTheme();
+  initCloud();
   const go=()=>{drawInit();fit();renderMarkers();renderShapes();};
   if(base.complete&&base.naturalWidth)go();else base.onload=go;
   // Re-ajustar si el contenedor cambia de tamaño (p.ej. dentro del PWA) y el usuario aún no movió la vista.

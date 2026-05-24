@@ -1337,6 +1337,17 @@ service cloud.firestore {
       allow read, write: if false; // solo Admin SDK (Cloud Functions)
     }
 
+    // ============================================
+    // PLANOS DE AGUAS — comparador de bajadas (PWA + QR)
+    // Lectura pública (QR sin login, igual que Visor 3D models3d).
+    // Escritura solo supervisores/admin (correcciones de posición, dibujos).
+    // Doc único: planosAguas/main = {over, notas, extra, removed, shapes, photos, updatedAt}
+    // ============================================
+    match /planosAguas/{docId} {
+      allow read: if true;
+      allow write: if isSupervisor() && isValidDocSize();
+    }
+
     // ── AnimeTracker Mini App (bot personal, sin auth) ──────────────────────
     match /animelists/{userId} {
       allow read, write: if true;
