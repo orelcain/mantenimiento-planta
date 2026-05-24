@@ -109,6 +109,7 @@ function AnalisisGraderDetalleRedirect() {
 const GanttModulePage = lazyWithReload(() => import('@/pages/gantt/GanttModulePage').then((mod) => ({ default: mod.GanttModulePage })))
 const AriaActionsPage = lazyWithReload(() => import('@/pages/AriaActionsPage').then((mod) => ({ default: mod.AriaActionsPage })))
 const ClimaPortPage = lazyWithReload(() => import('@/pages/ClimaPortPage').then((mod) => ({ default: mod.ClimaPortPage })))
+const PlanosAguasPage = lazyWithReload(() => import('@/pages/PlanosAguasPage').then((mod) => ({ default: mod.PlanosAguasPage })))
 const CalendarioMantencionPage = lazyWithReload(() => import('@/pages/CalendarioMantencionPage').then((mod) => ({ default: mod.CalendarioMantencionPage })))
 const HmiKnuroPage = lazyWithReload(() => import('@/pages/HmiKnuroPage').then((mod) => ({ default: mod.HmiKnuroPage })))
 const HmiGraderPage = lazyWithReload(() => import('@/pages/HmiGraderPage').then((mod) => ({ default: mod.HmiGraderPage })))
@@ -669,6 +670,11 @@ export function App() {
                   <ClimaPortPage />
                 </Suspense>
               </AdminRoute>
+            } />
+            <Route path="planos-aguas" element={
+              <Suspense fallback={<LoadingScreen />}>
+                <PlanosAguasPage />
+              </Suspense>
             } />
             <Route path="hmi-knuro" element={
               <AdminRoute>

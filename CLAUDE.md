@@ -283,7 +283,7 @@ apps/pwa/src/
 | **Principal** | Dashboard, Incidencias, Evidencias |
 | **Planificacion** | Inspecciones, Preventivo, Predictivo, Gantt, Calendario |
 | **Equipamiento** | Equipos, Repuestos, Sensores, Panel Sensores |
-| **Herramientas** | Visor de Mapas, Visor 3D, Analisis Grader |
+| **Herramientas** | Visor de Mapas, Visor 3D, Analisis Grader, Planos de Aguas (inDevelopment) |
 | **Aprendizaje** | Centro de Aprendizaje (/aprendizaje) |
 | **Admin** | Configuracion, Jerarquias, Mapas, ETT, Clima Puerto, HMI Knuro, Baader 200, Editor Sidebar |
 
@@ -1054,6 +1054,16 @@ Con Haversine A→D = dimensión real del recinto en metros. El DWG ya tiene cot
 ---
 
 ## Pendientes priorizados
+
+### PENDIENTE — Editor "Planos de Aguas" (próxima sesión · 2026-05-24)
+
+Módulo nuevo **Planos de Aguas** ✅ funcionando: `apps/pwa/public/planos-aguas.html` (standalone) embebido vía `PlanosAguasPage.tsx` en ruta `/planos-aguas` (item menú Herramientas `inDevelopment` → activar en `/admin/dev-modules`). Compara bajadas de agua dulce/salada del plano nuevo PN10 (AQUA014). Base = PDF alta-res, 59 pines leídos de la capa de texto del PDF (posiciones exactas), tema "plano técnico" (Space Grotesk + IBM Plex Mono, cajetín), fotos por punto (IndexedDB), filtros, resumen, QR. Comparación: 39 en ambos · 19 solo plano nuevo · 1 falta (Ó).
+
+**PENDIENTE editor detallado (acordado, bajada pin+dibujo SEPARADOS):**
+- 🔲 CRUD de pines + **cambiar estado** en el panel (nuevo↔normal↔falta — el "nuevo" es estado de espera hasta confirmar que la bajada va ahí).
+- 🔲 Dibujar **cañerías verde/celeste** (polilíneas SVG), **íconos de bajada** y **etiquetas PP** en el estilo del plano (capa SVG vectorial sobre el plano).
+- 🔲 Herramienta **máscara**: polígono relleno color de fondo (blanco) punto a punto para tapar elementos del plano (es imagen).
+- Detalle técnico completo en memoria auto: `project_planos_aguas_planta.md`.
 
 ### PENDIENTE — Análisis de Turno (actualizado sesión 2026-04-26)
 

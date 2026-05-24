@@ -24,6 +24,7 @@ import {
   BarChart3,
   Bot,
   CloudSun,
+  Droplets,
   BookOpen,
   GraduationCap,
   Upload,
@@ -102,6 +103,7 @@ const navGroups: NavGroup[] = [
       { name: 'Visor 3D', href: '/visor-3d', icon: Box },
       { name: 'Análisis de Turno', href: '/analisis-grader', icon: BarChart3, module: 'analisisGrader' },
       { name: 'Clima Puerto', href: '/clima-puerto', icon: CloudSun, module: 'climaPuerto' as AppModule },
+      { name: 'Planos de Aguas', href: '/planos-aguas', icon: Droplets, inDevelopment: true },
       { name: 'HMI Knuro', href: '/hmi-knuro', icon: Cpu },
       { name: 'Baader 200', href: '/baader-200', icon: BookOpen },
     ],
@@ -188,6 +190,7 @@ export function MainLayout() {
   const isClimaRoute = location.pathname.startsWith('/clima-puerto')
   const isHmiKnuroRoute = location.pathname.startsWith('/hmi-knuro')
   const isBaader200Route = location.pathname.startsWith('/baader-200')
+  const isPlanosAguasRoute = location.pathname.startsWith('/planos-aguas')
   const isAprendizajeRoute = location.pathname.startsWith('/aprendizaje')
   const isMapRoute = location.pathname.startsWith('/map')
   const shouldHideDesktopSidebar =
@@ -1104,7 +1107,7 @@ export function MainLayout() {
         <main
           id="main-content"
           className={`${
-            isClimaRoute || isHmiKnuroRoute || isBaader200Route || isMapRoute
+            isClimaRoute || isHmiKnuroRoute || isBaader200Route || isMapRoute || isPlanosAguasRoute
               ? 'h-[calc(100vh-3.5rem-4rem)] lg:h-[calc(100vh-3.5rem)] p-0 overflow-hidden'
               : isAprendizajeRoute
               ? 'p-0 w-full max-w-[100vw] overflow-x-hidden pb-16 lg:pb-0'

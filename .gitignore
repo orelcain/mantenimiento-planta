@@ -17,6 +17,8 @@ apps/pwa/vite.config.d.ts
 apps/pwa/public/maps/*.png
 # Excepción: imagen aérea de referencia del recinto (asset del proyecto)
 !apps/pwa/public/maps/recinto-2023.png
+# Excepción: base del módulo Planos de Aguas (asset del proyecto, requerido por la app)
+!apps/pwa/public/planos-aguas/plano-base.png
 
 # Ruflo / claude-flow agent artifacts
 .swarm/
