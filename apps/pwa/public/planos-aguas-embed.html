@@ -118,12 +118,6 @@
   .btn.danger{color:var(--salada);border-color:rgba(224,105,125,.32)}
   .warn{background:var(--faltaSoft);border:1px solid rgba(232,162,61,.3);color:#f0c074;font-size:11.5px;padding:9px 10px;border-radius:7px;margin-top:8px;line-height:1.55}
 
-  .legend{position:absolute;left:12px;bottom:12px;background:var(--bgPanel);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow);z-index:18;padding:11px 13px}
-  .legend .lh{font-family:var(--mono);font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:var(--inkLo);font-weight:500;margin-bottom:8px;padding-bottom:7px;border-bottom:1px solid var(--border)}
-  .legend .lr{display:flex;align-items:center;gap:9px;margin:6px 0;color:var(--inkMid);font-size:12px}
-  .legend .sw{width:12px;height:12px;border-radius:2px;flex-shrink:0}
-  .legend .ring{background:transparent;box-shadow:inset 0 0 0 2.5px currentColor}
-
   .zoomb{position:absolute;right:12px;top:12px;display:flex;flex-direction:column;gap:6px;z-index:18;align-items:stretch}
   .zoomb button{width:38px;height:38px;border-radius:6px;border:1px solid var(--border);background:var(--bgPanel);color:var(--inkMid);font-size:18px;cursor:pointer;box-shadow:var(--shadow);transition:.13s var(--ease)}
   .zoomb button:hover{color:var(--ink);border-color:var(--borderHi);background:var(--surfaceHi)}
@@ -146,7 +140,29 @@
   .toast{position:fixed;left:50%;bottom:74px;transform:translateX(-50%) translateY(20px);background:var(--surfaceHi);border:1px solid var(--borderHi);color:var(--ink);padding:10px 17px;border-radius:8px;font-family:var(--mono);font-size:11.5px;letter-spacing:.3px;opacity:0;transition:.26s var(--ease);z-index:60;pointer-events:none;box-shadow:var(--shadow)}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
-  @media(max-width:600px){.tblock .ttl{font-size:15px} .panel{width:312px}}
+  @media(max-width:700px){
+    header{padding:0 10px;min-height:46px}
+    .tblock{padding:7px 11px 7px 0}
+    .tblock .ttl{font-size:14px;letter-spacing:1px}
+    .tblock .ttl::before{height:15px}
+    .tblock .meta{display:none}
+    .acts{padding-left:10px;gap:5px}
+    .hbtn{padding:6px 9px;font-size:9.5px;letter-spacing:.4px}
+    .toolbar{padding:6px 10px;gap:5px}
+    .chip{padding:4px 8px;font-size:9.5px;gap:5px}
+    .chip .dot{width:8px;height:8px} .chip .ring{width:9px;height:9px}
+    .sep{display:none}
+    .search{font-size:12px;padding:5px 9px;min-width:110px}
+    .zoomb{right:8px;top:8px;gap:5px}
+    .zoomb button{width:32px;height:32px;font-size:16px}
+    .zlvl{font-size:9px}
+    .panel{width:88vw}
+    .editbar{padding:7px 9px;gap:6px;font-size:10px}
+    .editbar .tagx{display:none}
+    .tbtn,.seg button{padding:5px 7px;font-size:9px;letter-spacing:.4px}
+    .mcol{width:26px;height:26px}
+    #editHint{max-width:62vw;font-size:9px;padding:4px 8px}
+  }
   ::-webkit-scrollbar{width:9px;height:9px}
   ::-webkit-scrollbar-thumb{background:var(--borderHi);border-radius:9px}
   ::-webkit-scrollbar-track{background:transparent}
@@ -230,13 +246,6 @@
         <div class="zlvl" id="zlvl">100%</div>
       </div>
 
-      <div class="legend">
-        <div class="lh">Leyenda</div>
-        <div class="lr"><span class="sw" style="background:var(--dulce)"></span>Agua dulce</div>
-        <div class="lr"><span class="sw" style="background:var(--salada)"></span>Agua salada</div>
-        <div class="lr"><span class="sw ring" style="color:var(--falta)"></span>Falta en plano nuevo</div>
-        <div class="lr"><span class="sw ring" style="color:var(--nuevo)"></span>Solo en plano nuevo</div>
-      </div>
 
       <div class="editbar">
         <span class="tagx">EDICIÓN</span>
@@ -420,23 +429,37 @@ function scheduleView(){if(_raf)return;_raf=requestAnimationFrame(()=>{_raf=0;ap
 function fit(){const bw=baseW(),bh=baseH(),r=stage.getBoundingClientRect();const s=Math.min(r.width/bw,r.height/bh)*0.97;view.s=s;view.x=(r.width-bw*s)/2;view.y=(r.height-bh*s)/2;applyView();}
 function worldPx(clientX,clientY){const r=world.getBoundingClientRect();return {x:(clientX-r.left)/view.s,y:(clientY-r.top)/view.s};}
 
-let panning=false,sp={x:0,y:0},sv={x:0,y:0},pinch=null;
+/* gestos: pan con 1 puntero, pinch-zoom con 2 (anclado al punto medio entre dedos) */
+let panning=false,sp={x:0,y:0},sv={x:0,y:0};
+const pointers=new Map();let pinch=null,pinchHappened=false;
+function pdist(){const p=[...pointers.values()];return Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y);}
+function midStage(){const r=stage.getBoundingClientRect(),p=[...pointers.values()];return {cx:(p[0].x+p[1].x)/2-r.left,cy:(p[0].y+p[1].y)/2-r.top};}
+function startPinch(){const {cx,cy}=midStage();pinch={d0:pdist(),s0:view.s,wx:(cx-view.x)/view.s,wy:(cy-view.y)/view.s};pinchHappened=true;panning=false;stage.classList.remove('grabbing');}
 stage.addEventListener('pointerdown',e=>{
-  if(e.target.closest('.mk')||e.target.closest('.zoomb')||e.target.closest('.legend')||e.target.closest('.editbar')||e.target.closest('#draw'))return;
-  panning=true;userMoved=true;stage.classList.add('grabbing');sp={x:e.clientX,y:e.clientY};sv={x:view.x,y:view.y};stage.setPointerCapture(e.pointerId);
+  if(e.target.closest('.mk')||e.target.closest('.zoomb')||e.target.closest('.editbar')||e.target.closest('#draw'))return;
+  pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});try{stage.setPointerCapture(e.pointerId);}catch(_){}
+  if(pointers.size===1){panning=true;userMoved=true;pinchHappened=false;stage.classList.add('grabbing');sp={x:e.clientX,y:e.clientY};sv={x:view.x,y:view.y};}
+  else if(pointers.size===2){startPinch();}
 });
-stage.addEventListener('pointermove',e=>{if(!panning)return;view.x=sv.x+(e.clientX-sp.x);view.y=sv.y+(e.clientY-sp.y);scheduleView();});
-stage.addEventListener('pointermove',e=>{if(draft&&!panning&&!drag){draftCursor=worldPx(e.clientX,e.clientY);updateLive();}});
-stage.addEventListener('pointerup',e=>{
-  if(panning&&Math.abs(e.clientX-sp.x)<4&&Math.abs(e.clientY-sp.y)<4&&document.body.classList.contains('edit')){onEditClick(e);}
-  panning=false;stage.classList.remove('grabbing');
+stage.addEventListener('pointermove',e=>{
+  if(pointers.has(e.pointerId))pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(pinch&&pointers.size>=2){const f=pdist()/pinch.d0,ns=Math.max(0.1,Math.min(8,pinch.s0*f)),{cx,cy}=midStage();view.s=ns;view.x=cx-pinch.wx*ns;view.y=cy-pinch.wy*ns;scheduleView();}
+  else if(panning&&pointers.size===1){view.x=sv.x+(e.clientX-sp.x);view.y=sv.y+(e.clientY-sp.y);scheduleView();}
 });
+stage.addEventListener('pointermove',e=>{if(draft&&!panning&&!pinch&&!drag&&pointers.size===0){draftCursor=worldPx(e.clientX,e.clientY);updateLive();}});
+function endPointer(e){
+  const had=pointers.has(e.pointerId);pointers.delete(e.pointerId);
+  if(pointers.size<2)pinch=null;
+  if(pointers.size===1){const p=[...pointers.values()][0];panning=true;sp={x:p.x,y:p.y};sv={x:view.x,y:view.y};}
+  else if(pointers.size===0){
+    if(had&&panning&&!pinchHappened&&Math.abs(e.clientX-sp.x)<4&&Math.abs(e.clientY-sp.y)<4&&document.body.classList.contains('edit')){onEditClick(e);}
+    panning=false;pinchHappened=false;stage.classList.remove('grabbing');
+  }
+}
+stage.addEventListener('pointerup',endPointer);
+stage.addEventListener('pointercancel',endPointer);
 stage.addEventListener('dblclick',e=>{if(draft){draft.pts.pop();finishDraft();}});
 stage.addEventListener('wheel',e=>{e.preventDefault();userMoved=true;const r=stage.getBoundingClientRect();const mx=e.clientX-r.left,my=e.clientY-r.top;const f=e.deltaY<0?1.12:1/1.12;const ns=Math.max(0.1,Math.min(8,view.s*f));view.x=mx-(mx-view.x)*(ns/view.s);view.y=my-(my-view.y)*(ns/view.s);view.s=ns;scheduleView();},{passive:false});
-stage.addEventListener('touchstart',e=>{if(e.touches.length===2)pinch=dist(e);},{passive:false});
-stage.addEventListener('touchmove',e=>{if(e.touches.length===2&&pinch){e.preventDefault();userMoved=true;const d=dist(e),f=d/pinch,r=stage.getBoundingClientRect();const mx=(e.touches[0].clientX+e.touches[1].clientX)/2-r.left,my=(e.touches[0].clientY+e.touches[1].clientY)/2-r.top;const ns=Math.max(0.1,Math.min(8,view.s*f));view.x=mx-(mx-view.x)*(ns/view.s);view.y=my-(my-view.y)*(ns/view.s);view.s=ns;scheduleView();pinch=d;}},{passive:false});
-stage.addEventListener('touchend',e=>{if(e.touches.length<2)pinch=null;});
-function dist(e){const a=e.touches[0],b=e.touches[1];return Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);}
 document.getElementById('zin').onclick=()=>{userMoved=true;zoomC(1.25);};
 document.getElementById('zout').onclick=()=>{userMoved=true;zoomC(1/1.25);};
 document.getElementById('zfit').onclick=()=>{userMoved=true;fit();};
