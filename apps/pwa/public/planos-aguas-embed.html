@@ -10,6 +10,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <style>
   :root{
     --bg:#0c1620; --bgPanel:#0e1b27; --surface:#15232e; --surfaceHi:#1b2e3c;
@@ -384,21 +385,23 @@ const STORE_KEY='planosAguas.v3';
 /* ============ STATE ============ */
 let state=load();
 function load(){
-  let s={over:{},notas:{},extra:[],removed:[],shapes:[]};
+  let s={over:{},notas:{},extra:[],removed:[],shapes:[],photos:{}};
   try{const r=JSON.parse(localStorage.getItem(STORE_KEY));if(r)s=Object.assign(s,r);}catch(e){}
   if(!Array.isArray(s.shapes))s.shapes=[];
+  if(!s.photos||typeof s.photos!=='object')s.photos={};
   return s;
 }
 function saveLocal(){localStorage.setItem(STORE_KEY,JSON.stringify(state));}
 
 /* ============ CLOUD SYNC (Firebase) — posiciones / notas / dibujos ============ */
-const cloud={db:null,auth:null,user:null,ready:false,applying:false,pushT:0};
+const cloud={db:null,auth:null,storage:null,user:null,ready:false,applying:false,pushT:0};
 function cloudDoc(){return cloud.db.collection('planosAguas').doc('main');}
 function initCloud(){
   try{
     if(!window.firebase)return;
     firebase.initializeApp({apiKey:"AIzaSyBsJSh6x3ZGEyuXsM18dSWsJKyU7--KJss",authDomain:"mantenimiento-planta-771a3.firebaseapp.com",projectId:"mantenimiento-planta-771a3",storageBucket:"mantenimiento-planta-771a3.firebasestorage.app"});
     cloud.db=firebase.firestore(); cloud.auth=firebase.auth();
+    try{cloud.storage=firebase.storage();}catch(_){}
     cloud.auth.onAuthStateChanged(u=>{cloud.user=u||null;});
     cloudDoc().onSnapshot(onCloudSnap,e=>console.warn('[planos] onSnapshot',e&&e.code));
   }catch(e){console.warn('[planos] Firebase no disponible, modo local',e);}
@@ -406,7 +409,7 @@ function initCloud(){
 function onCloudSnap(snap){
   cloud.ready=true;
   if(!snap.exists){
-    const has=Object.keys(state.over).length||state.extra.length||state.removed.length||(state.shapes||[]).length||Object.keys(state.notas).length;
+    const has=Object.keys(state.over).length||state.extra.length||state.removed.length||(state.shapes||[]).length||Object.keys(state.notas).length||Object.keys(state.photos||{}).length;
     if(has&&cloud.user)pushCloud(true); // migración: sembrar correcciones locales
     return;
   }
@@ -416,6 +419,7 @@ function onCloudSnap(snap){
   state.extra=Array.isArray(r.extra)?r.extra:[];
   state.removed=Array.isArray(r.removed)?r.removed:[];
   state.shapes=Array.isArray(r.shapes)?r.shapes:[];
+  state.photos=(r.photos&&typeof r.photos==='object')?r.photos:{};
   saveLocal();
   cloud.applying=false;
   if(typeof renderMarkers==='function'){renderMarkers();renderShapes();if(sel)openPanel(sel);}
@@ -424,7 +428,7 @@ function pushCloud(now){
   if(!cloud.db)return;
   clearTimeout(cloud.pushT);
   const doIt=()=>cloudDoc().set({
-      over:state.over,notas:state.notas,extra:state.extra,removed:state.removed,shapes:state.shapes,
+      over:state.over,notas:state.notas,extra:state.extra,removed:state.removed,shapes:state.shapes,photos:state.photos||{},
       updatedAt:firebase.firestore.FieldValue.serverTimestamp()
     },{merge:true}).catch(()=>{}); // sin permiso (no supervisor) u offline → queda local
   if(now)doIt(); else cloud.pushT=setTimeout(doIt,800);
@@ -519,7 +523,7 @@ function renderMarkers(){
   points().forEach(p=>{
     if(p.x==null||p.y==null)return;
     const m=document.createElement('div');
-    m.className='mk '+p.t+' st-'+p.st+(photoIds.has(p.id)?' has-photo':'')+(sel===p.id?' sel':'');
+    m.className='mk '+p.t+' st-'+p.st+((photoIds.has(p.id)||(state.photos&&state.photos[p.id]))?' has-photo':'')+(sel===p.id?' sel':'');
     if(!(filters[p.t]&&filters[p.st]&&matchSearch(p)))m.classList.add('dim');
     m._wx=p.x/100*baseW(); m._wy=p.y/100*baseH(); placeMk(m);
     m.innerHTML=`<div class="pin"><b>${p.lab}</b></div>`+(p.st!=='ok'?`<div class="badge">${p.st==='falta'?'!':'+'}</div>`:'');
@@ -560,17 +564,37 @@ async function openPanel(id){
   document.getElementById('pEstadoEditRow').style.display=editing?'block':'none';
   document.querySelectorAll('#pEstadoSeg button').forEach(b=>b.classList.toggle('on',b.dataset.st===p.st));
   const ph=document.getElementById('pPhoto');ph.innerHTML='Cargando…';const data=await getPhoto(id);
-  ph.innerHTML=data?`<img src="${data}">`:'Sin foto. Pega (Ctrl+V) o sube una imagen.';
+  const psrc=data||(state.photos&&state.photos[id])||null;
+  ph.innerHTML=psrc?`<img src="${psrc}">`:'Sin foto. Pega (Ctrl+V) o sube una imagen.';
   document.getElementById('panel').classList.add('open');
 }
 document.getElementById('pClose').onclick=()=>{document.getElementById('panel').classList.remove('open');sel=null;document.querySelectorAll('.mk.sel').forEach(n=>n.classList.remove('sel'));};
 document.getElementById('pNotas').addEventListener('input',e=>{if(sel){state.notas[sel]=e.target.value;save();}});
-async function setPhoto(src){if(!sel)return;const data=await downscale(src);await putPhoto(sel,data);await refreshPhotoIds();document.getElementById('pPhoto').innerHTML=`<img src="${data}">`;renderMarkers();toast('Foto guardada');}
+async function setPhoto(src){
+  if(!sel)return;const id=sel;
+  const data=await downscale(src);
+  await putPhoto(id,data);await refreshPhotoIds();
+  document.getElementById('pPhoto').innerHTML=`<img src="${data}">`;renderMarkers();
+  if(cloud.storage&&cloud.user){
+    try{
+      const ref=cloud.storage.ref('planosAguas/'+id+'.jpg');
+      await ref.putString(data,'data_url',{contentType:'image/jpeg'});
+      state.photos=state.photos||{};state.photos[id]=await ref.getDownloadURL();
+      save();toast('Foto guardada y sincronizada');
+    }catch(e){toast('Foto guardada (local; sin sync)');}
+  }else toast('Foto guardada (local)');
+}
 function downscale(src){return new Promise(res=>{const img=new Image();img.onload=()=>{const max=1280;let{width:w,height:h}=img;if(w>max||h>max){const r=Math.min(max/w,max/h);w*=r;h*=r;}const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);res(c.toDataURL('image/jpeg',0.82));};img.src=src;});}
 document.getElementById('pFile').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const fr=new FileReader();fr.onload=()=>setPhoto(fr.result);fr.readAsDataURL(f);});
 document.getElementById('pPaste').onclick=async()=>{try{const items=await navigator.clipboard.read();for(const it of items)for(const ty of it.types)if(ty.startsWith('image/')){const b=await it.getType(ty);const fr=new FileReader();fr.onload=()=>setPhoto(fr.result);fr.readAsDataURL(b);return;}toast('No hay imagen en el portapapeles');}catch(e){toast('Usa Ctrl+V para pegar');}};
 window.addEventListener('paste',e=>{if(!document.getElementById('panel').classList.contains('open'))return;const it=[...e.clipboardData.items].find(i=>i.type.startsWith('image/'));if(it){const fr=new FileReader();fr.onload=()=>setPhoto(fr.result);fr.readAsDataURL(it.getAsFile());}});
-document.getElementById('pDel').onclick=async()=>{if(!sel)return;await delPhoto(sel);await refreshPhotoIds();document.getElementById('pPhoto').innerHTML='Sin foto. Pega (Ctrl+V) o sube una imagen.';renderMarkers();toast('Foto quitada');};
+document.getElementById('pDel').onclick=async()=>{
+  if(!sel)return;const id=sel;
+  await delPhoto(id);await refreshPhotoIds();
+  if(state.photos&&state.photos[id]){delete state.photos[id];save();}
+  if(cloud.storage&&cloud.user){try{await cloud.storage.ref('planosAguas/'+id+'.jpg').delete();}catch(e){}}
+  document.getElementById('pPhoto').innerHTML='Sin foto. Pega (Ctrl+V) o sube una imagen.';renderMarkers();toast('Foto quitada');
+};
 document.getElementById('pDelPoint').onclick=()=>{if(sel&&confirm('¿Eliminar el punto '+sel+'?\n(Si es del plano, lo puedes recuperar con "Restaurar ocultos".)')){removePoint(sel);document.getElementById('pClose').click();}};
 /* Fase 1: cambiar estado del pin */
 function setEstado(id,st){
