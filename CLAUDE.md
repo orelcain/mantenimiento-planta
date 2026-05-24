@@ -247,6 +247,16 @@ GitHub (orelcain/mantenimiento-planta) ← FUENTE DE VERDAD ÚNICA
 - **PC trabajo**: claude.ai accede directo a GitHub, sin carpeta local ni OneDrive.
 - **No usar OneDrive para código**: rompe `node_modules` y pelea con `.git/objects`. Si quieres backup extra, usar 1 zip mensual del proyecto sin node_modules.
 
+## Planos: formato OSCURO estándar (OBLIGATORIO para todo plano nuevo)
+
+Todo módulo que muestre un plano (entregable AutoCAD blanco típico de los servicios) debe ofrecer una **versión oscura por defecto** (fondo navy, líneas claras, colores de líneas preservados) con toggle claro/oscuro. Pedido explícito del usuario (2026-05-24, validado en Planos de Aguas): sube contraste, integra con el tema dark de la PWA y se ve profesional.
+
+- **Pre-hornear** el PNG oscuro offline — NO usar `filter:invert()` CSS en runtime (penaliza pan/zoom).
+- Técnica: **inversión de LUMINANCIA** (HSL `L→1-L`, conservar H y S) → fondo blanco se oscurece, líneas negras se aclaran, y los colores (verde/cian agua, etc.) se mantienen. Un `invert()` plano rotaría los colores (verde→magenta). Elevar el punto negro al navy `#0c1620`.
+- Script reutilizable: **`scripts/make-dark-plano.py entrada.png salida-dark.png`** (numpy+PIL; si faltan `uv pip install --system numpy pillow`).
+- Servir ambos PNG (claro + `*-dark.png`), default oscuro, preferencia en localStorage. Versionar los PNG con excepción en `.gitignore`.
+- Referencia: módulo Planos de Aguas (`public/planos-aguas-embed.html`, ruta `/planos-aguas`).
+
 ## Stack
 
 | Capa | Tecnologia |
