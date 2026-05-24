@@ -180,8 +180,8 @@
   .draw .rect,.draw .circle{fill:none;stroke:var(--struct)}
   .draw .measure{stroke:var(--star);stroke-dasharray:7 5;vector-effect:non-scaling-stroke;stroke-width:1.5}
   .draw .mtxt{fill:var(--star);font-family:var(--mono);font-weight:600;paint-order:stroke;stroke:#0c1620;stroke-width:3;text-anchor:middle}
-  .draw .cotaline{stroke:var(--star);stroke-width:2;fill:none}
-  .draw .cota{fill:var(--star);font-family:var(--mono);font-weight:600;font-size:20px;paint-order:stroke;stroke:#0c1620;stroke-width:4;text-anchor:middle;pointer-events:none}
+  .draw .cotaline{stroke:var(--struct);stroke-width:2;fill:none}
+  .draw .cota{fill:var(--struct);font-family:var(--mono);font-weight:600;font-size:20px;paint-order:stroke;stroke:#0c1620;stroke-width:4;text-anchor:middle;pointer-events:none}
   .draw .mask{stroke:none}
   .draw .dot{stroke:none} .draw .dot.dulce{fill:var(--drawDulce)} .draw .dot.salada{fill:var(--drawSalada)} .draw .dot.caliente{fill:var(--drawCaliente)}
   .draw .lbl{font-family:var(--mono);font-weight:600;stroke:none;text-anchor:middle;dominant-baseline:central}
@@ -388,7 +388,7 @@ const STORE_KEY='planosAguas.v3';
 /* ============ STATE ============ */
 let state=load();
 function load(){
-  let s={over:{},notas:{},extra:[],removed:[],shapes:[],photos:{},scale:null};
+  let s={over:{},notas:{},extra:[],removed:[],shapes:[],photos:{},scale:null,unit:'mm'};
   try{const r=JSON.parse(localStorage.getItem(STORE_KEY));if(r)s=Object.assign(s,r);}catch(e){}
   if(!Array.isArray(s.shapes))s.shapes=[];
   if(!s.photos||typeof s.photos!=='object')s.photos={};
@@ -715,7 +715,7 @@ function renderEditbar(){
     s+=`<span class="tagx">${cal?'CALIBRAR ESCALA':'MEDIR'}</span><span class="wcap">clic 2 puntos${cal?' sobre una cota conocida':''}</span>`;
     if(!cal)s+=`<button class="tbtn ${cotaMode?'on':''}" id="mCota" title="Deja la medida fija como cota en el plano">+ Agregar cota</button>`;
     s+=((draft||pend2)?`<button class="btn" id="eCancel">✗ Cancelar</button>`:'')+
-      (state.scale?`<span class="wcap">1px = ${state.scale.toFixed(3)} mm</span>`:`<span class="wcap" style="color:var(--falta)">sin calibrar</span>`)+
+      (state.scale?`<span class="wcap">unidad</span><span class="seg" id="unitSeg">`+['mm','cm','m'].map(u=>`<button data-u="${u}" class="${(state.unit||'mm')===u?'on':''}">${u}</button>`).join('')+`</span>`:`<span class="wcap" style="color:var(--falta)">sin calibrar</span>`)+
       `<span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
     setHint(cal?'Marca 2 puntos sobre una cota y escribe su medida real en mm.':(cotaMode?'Clic 2 puntos para dejar una cota fija en el plano.':'Marca 2 puntos para ver la distancia. Activa "Agregar cota" para fijarla.'));
   }else if(tool==='mask'){
@@ -730,7 +730,7 @@ function renderEditbar(){
       s+=`<span class="tagx">EDITAR DIBUJO</span><span class="wcap">clic una figura para editarla</span><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
       setHint('Clic una cañería / etiqueta / máscara para moverla, editar sus vértices o sus opciones.');
     }else if(sh.type==='pipe'){
-      s+=`<span class="tagx">CAÑERÍA</span><span class="wcap">grosor</span><button class="tbtn" id="selWm">−</button><input type="range" id="selW" min="2" max="14" value="${sh.w||PIPE_W}"><button class="tbtn" id="selWp">+</button><span class="wnum" id="selWv">${sh.w||PIPE_W}</span><button class="btn" id="selCont">Continuar trazo</button><button class="btn" id="selRedraw">Redibujar</button><button class="btn danger" id="eDelShape">🗑 Borrar</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
+      s+=`<span class="tagx">${sh.kind==='struct'?'LÍNEA':'CAÑERÍA'}</span><span class="wcap">grosor</span><button class="tbtn" id="selWm">−</button><input type="range" id="selW" min="1" max="14" value="${sh.w||PIPE_W}"><button class="tbtn" id="selWp">+</button><span class="wnum" id="selWv">${sh.w||PIPE_W}</span><button class="btn" id="selCont">Continuar trazo</button><button class="btn" id="selRedraw">Redibujar</button>${sh.kind==='struct'?`<button class="tbtn ${sh.cota!==false?'on':''}" id="selCota">Cota</button>`:''}<button class="btn danger" id="eDelShape">🗑 Borrar</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
       setHint('Arrastra vértices · doble-clic un vértice = borrarlo · Continuar/Redibujar el trazo.');
     }else if(sh.type==='rect'||sh.type==='circle'){
       s+=`<span class="tagx">${sh.type==='rect'?'RECTÁNGULO':'CÍRCULO'}</span><span class="wcap">grosor</span><button class="tbtn" id="selWm">−</button><input type="range" id="selW" min="1" max="14" value="${sh.sw||PIPE_W}"><button class="tbtn" id="selWp">+</button><span class="wnum" id="selWv">${sh.sw||PIPE_W}</span><button class="tbtn ${sh.cota!==false?'on':''}" id="selCota">Cota</button><button class="btn danger" id="eDelShape">🗑 Borrar</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
@@ -741,6 +741,9 @@ function renderEditbar(){
     }else if(sh.type==='mask'){
       s+=`<span class="tagx">MÁSCARA</span><span class="wcap">color</span><input type="color" class="mcol" id="selColor" value="${sh.fill||'#ffffff'}"><button class="btn danger" id="eDelShape">🗑 Borrar</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
       setHint('Arrastra vértices · cambia el color de relleno.');
+    }else if(sh.type==='cota'){
+      s+=`<span class="tagx">COTA</span><span class="wcap">arrastra sus extremos para ajustar</span><button class="btn danger" id="eDelShape">🗑 Borrar</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
+      setHint('Cota fija. Arrastra sus extremos o bórrala si no la querés.');
     }else{
       s+=`<span class="tagx">PUNTO</span><button class="btn danger" id="eDelShape">🗑 Borrar</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
       setHint('Arrastra el punto para moverlo.');
@@ -782,6 +785,7 @@ function wireEditbar(){
   if($('selRedraw'))$('selRedraw').onclick=()=>redrawPipe(selShape);
   if($('selCota'))$('selCota').onclick=()=>{const sh=getShape(selShape);if(sh){sh.cota=(sh.cota===false);save();renderShapes();renderEditbar();}};
   if($('mCota'))$('mCota').onclick=()=>{cotaMode=!cotaMode;renderEditbar();};
+  document.querySelectorAll('#unitSeg button').forEach(b=>b.onclick=()=>{state.unit=b.dataset.u;save();renderShapes();renderEditbar();});
   document.querySelectorAll('#wizKind button').forEach(b=>b.onclick=()=>wizType(b.dataset.k));
   if($('wizCorr'))$('wizCorr').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();wizCorrOk();}};
   if($('wizCorrOk'))$('wizCorrOk').onclick=wizCorrOk;
@@ -807,6 +811,7 @@ function onEditClick(e){
   else if(tool==='select'&&!draft){selShape=null;renderShapes();renderEditbar();}
 }
 function twoClick(w){
+  const sn=snapNodes(w);w={x:sn.x,y:sn.y};
   if(!pend2){pend2={x:+w.x.toFixed(1),y:+w.y.toFixed(1)};draftCursor={x:w.x,y:w.y};document.body.classList.add('drafting');renderShapes();renderEditbar();return;}
   const p1=pend2,p2={x:+w.x.toFixed(1),y:+w.y.toFixed(1)};pend2=null;document.body.classList.remove('drafting');
   if(tool==='rect'){const x=Math.min(p1.x,p2.x),y=Math.min(p1.y,p2.y),rw=Math.abs(p2.x-p1.x),rh=Math.abs(p2.y-p1.y);if(rw>2&&rh>2){state.shapes.push({id:'sh-'+Date.now(),type:'rect',kind:'struct',x,y,rw:+rw.toFixed(1),rh:+rh.toFixed(1),sw:pipeW});save();toast('Rectángulo agregado');}}
@@ -826,8 +831,10 @@ function pendSVG(){
   if(tool==='measure'||tool==='calib'){const d=Math.hypot(c.x-p1.x,c.y-p1.y);return `<path class="measure" d="M${p1.x} ${p1.y} L${c.x} ${c.y}"/>`+measLbl((p1.x+c.x)/2,(p1.y+c.y)/2-6,lenTxt(d));}
   return '';
 }
-function lenTxt(px){return state.scale?Math.round(px*state.scale)+' mm':Math.round(px)+' px';}
-function dimTxt(w,h){return state.scale?(Math.round(w*state.scale)+'×'+Math.round(h*state.scale)+' mm'):(Math.round(w)+'×'+Math.round(h)+' px');}
+function unitLbl(){return state.unit||'mm';}
+function fmtVal(mm){const u=unitLbl();if(u==='m')return (mm/1000).toFixed(2);if(u==='cm')return (mm/10).toFixed(mm<100?1:0);return ''+Math.round(mm);}
+function lenTxt(px){return state.scale?fmtVal(px*state.scale)+' '+unitLbl():Math.round(px)+' px';}
+function dimTxt(w,h){return state.scale?(fmtVal(w*state.scale)+' × '+fmtVal(h*state.scale)+' '+unitLbl()):(Math.round(w)+' × '+Math.round(h)+' px');}
 function measLbl(x,y,t){return `<text class="mtxt" x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-size="${(13/view.s).toFixed(1)}">${esc(t)}</text>`;}
 function delSelShape(){if(!selShape){toast('Selecciona una figura primero');return;}if(confirm('¿Borrar esta figura?')){state.shapes=state.shapes.filter(s=>s.id!==selShape);selShape=null;save();renderShapes();renderEditbar();toast('Figura borrada');}}
 function setShapeW(id,v){const sh=getShape(id);if(!sh)return;v=Math.max(1,Math.min(14,v|0));if(sh.type==='rect'||sh.type==='circle')sh.sw=v;else sh.w=v;save();renderShapes();const wv=document.getElementById('selWv');if(wv)wv.textContent=v;const sl=document.getElementById('selW');if(sl&&+sl.value!==v)sl.value=v;}
@@ -836,6 +843,19 @@ function continuePipe(id){const sh=getShape(id);if(!sh||sh.type!=='pipe')return;
 function redrawPipe(id){const sh=getShape(id);if(!sh||sh.type!=='pipe')return;draft={type:'pipe',kind:sh.kind,w:sh.w||pipeW,editId:id,pts:[sh.pts[0].slice()]};document.body.classList.add('drafting');selShape=null;renderShapes();renderEditbar();toast('Redibuja desde el punto de bajada');}
 function delVertex(id,i){const sh=getShape(id);if(!sh||!sh.pts||sh.pts.length<=2)return;sh.pts.splice(i,1);save();renderShapes();toast('Vértice borrado');}
 function snapPt(prev,x,y){const dx=x-prev[0],dy=y-prev[1],a=Math.round(Math.atan2(dy,dx)/(Math.PI/4))*(Math.PI/4),d=Math.hypot(dx,dy);return {x:prev[0]+Math.cos(a)*d,y:prev[1]+Math.sin(a)*d};}
+/* imán a nodos: aristas/vértices de figuras y pines (precisión al empalmar) */
+function snapNodes(w){
+  const th=12/view.s; let best=null,bd=th;
+  const tp=(x,y)=>{const d=Math.hypot(w.x-x,w.y-y);if(d<bd){bd=d;best=[x,y];}};
+  (state.shapes||[]).forEach(s=>{
+    if(s.pts)s.pts.forEach(p=>tp(p[0],p[1]));
+    else if(s.type==='rect'){tp(s.x,s.y);tp(s.x+s.rw,s.y);tp(s.x+s.rw,s.y+s.rh);tp(s.x,s.y+s.rh);tp(s.x+s.rw/2,s.y+s.rh/2);}
+    else if(s.type==='circle')tp(s.cx,s.cy);
+    else if(s.type==='dot'||s.type==='label')tp(s.x,s.y);
+  });
+  points().forEach(p=>{if(p.x!=null)tp(p.x/100*baseW(),p.y/100*baseH());});
+  return best?{x:best[0],y:best[1],hit:true}:{x:w.x,y:w.y,hit:false};
+}
 
 /* ---- Wizard Crear bajada: tipo → ubicar (punto+pin) → correlativo → cañería ---- */
 function startWizard(){wiz={step:'tipo',t:'d',corr:''};setTool('bajada');}
@@ -884,8 +904,9 @@ function doCalib(p1,p2){
 /* polilínea / polígono (con snap 45/90 + grosor en cañerías) */
 function draftAdd(w){
   if(!draft){const isS=tool==='sline';draft={type:isS?'pipe':tool,kind:isS?'struct':kind,fill:maskColor,w:pipeW,pts:[]};document.body.classList.add('drafting');}
-  let x=+w.x.toFixed(1),y=+w.y.toFixed(1);
-  if(draft.type==='pipe'&&snapAngles&&draft.pts.length){const last=draft.pts[draft.pts.length-1],sp=snapPt(last,w.x,w.y);x=+sp.x.toFixed(1);y=+sp.y.toFixed(1);}
+  const sn=snapNodes(w);let x,y;
+  if(sn.hit){x=+sn.x.toFixed(1);y=+sn.y.toFixed(1);}                       // imán a nodo (prioritario)
+  else{x=+w.x.toFixed(1);y=+w.y.toFixed(1);if(draft.type==='pipe'&&snapAngles&&draft.pts.length){const last=draft.pts[draft.pts.length-1],sp=snapPt(last,w.x,w.y);x=+sp.x.toFixed(1);y=+sp.y.toFixed(1);}}
   draft.pts.push([x,y]);renderShapes();
 }
 function finishDraft(){
@@ -930,20 +951,20 @@ function shapeSVG(sh){
   if(sh.type==='mask')return `<polygon class="shape mask" data-id="${sh.id}" fill="${sh.fill||'#ffffff'}" points="${sh.pts.map(p=>p.join(',')).join(' ')}"/>`;
   if(sh.type==='dot')return `<circle class="shape dot ${sh.kind}" data-id="${sh.id}" cx="${sh.x}" cy="${sh.y}" r="${DOT_R}" stroke-width="3"/>`;
   if(sh.type==='label')return `<text class="shape lbl ${sh.kind}" data-id="${sh.id}" x="${sh.x}" y="${sh.y}" font-size="${sh.size||LBL_SZE}" stroke-width="${LBL_HALO}">${esc(sh.text)}</text>`;
-  if(sh.type==='cota'){const a=sh.pts[0],b=sh.pts[1],len=Math.hypot(b[0]-a[0],b[1]-a[1]),t=state.scale?Math.round(len*state.scale)+' mm':Math.round(len)+' px';return `<path class="shape cotaline" data-id="${sh.id}" d="M${a[0]} ${a[1]} L${b[0]} ${b[1]}"/><text class="cota" x="${((a[0]+b[0])/2).toFixed(1)}" y="${((a[1]+b[1])/2-10).toFixed(1)}">${esc(t)}</text>`;}
+  if(sh.type==='cota'){const a=sh.pts[0],b=sh.pts[1],len=Math.hypot(b[0]-a[0],b[1]-a[1]),d='M'+a[0]+' '+a[1]+' L'+b[0]+' '+b[1];return (selectable?`<path class="shape hit" data-id="${sh.id}" d="${d}"/>`:'')+`<path class="shape cotaline" data-id="${sh.id}" d="${d}"/><text class="cota" x="${((a[0]+b[0])/2).toFixed(1)}" y="${((a[1]+b[1])/2-10).toFixed(1)}">${esc(lenTxt(len))}</text>`;}
   return '';
 }
 /* cotas automáticas de las formas de estructura (cuando hay escala calibrada) */
 function cotaSVG(sh){
   if(!state.scale||sh.cota===false)return '';
   const off=14;
-  if(sh.type==='rect'){const wmm=Math.round(sh.rw*state.scale),hmm=Math.round(sh.rh*state.scale);
-    return `<text class="cota" x="${(sh.x+sh.rw/2).toFixed(1)}" y="${(sh.y-off).toFixed(1)}">${wmm} mm</text>`
-         + `<text class="cota" x="${(sh.x-off).toFixed(1)}" y="${(sh.y+sh.rh/2).toFixed(1)}" transform="rotate(-90 ${(sh.x-off).toFixed(1)} ${(sh.y+sh.rh/2).toFixed(1)})">${hmm} mm</text>`;}
-  if(sh.type==='circle'){const d=Math.round(sh.r*2*state.scale),per=Math.round(2*Math.PI*sh.r*state.scale);
-    return `<text class="cota" x="${sh.cx}" y="${(sh.cy-sh.r-off).toFixed(1)}">Ø ${d} · P ${per} mm</text>`;}
+  if(sh.type==='rect')
+    return `<text class="cota" x="${(sh.x+sh.rw/2).toFixed(1)}" y="${(sh.y-off).toFixed(1)}">${lenTxt(sh.rw)}</text>`
+         + `<text class="cota" x="${(sh.x-off).toFixed(1)}" y="${(sh.y+sh.rh/2).toFixed(1)}" transform="rotate(-90 ${(sh.x-off).toFixed(1)} ${(sh.y+sh.rh/2).toFixed(1)})">${lenTxt(sh.rh)}</text>`;
+  if(sh.type==='circle')
+    return `<text class="cota" x="${sh.cx}" y="${(sh.cy-sh.r-off).toFixed(1)}">Ø ${lenTxt(sh.r*2)} · P ${lenTxt(2*Math.PI*sh.r)}</text>`;
   if(sh.type==='pipe'&&sh.kind==='struct'&&sh.pts.length>1){let len=0;for(let i=1;i<sh.pts.length;i++)len+=Math.hypot(sh.pts[i][0]-sh.pts[i-1][0],sh.pts[i][1]-sh.pts[i-1][1]);const mid=sh.pts[Math.floor(sh.pts.length/2)];
-    return `<text class="cota" x="${mid[0]}" y="${(mid[1]-off).toFixed(1)}">L ${Math.round(len*state.scale)} mm</text>`;}
+    return `<text class="cota" x="${mid[0]}" y="${(mid[1]-off).toFixed(1)}">L ${lenTxt(len)}</text>`;}
   return '';
 }
 function draftSVG(){
@@ -961,8 +982,8 @@ function draftSVG(){
 function selectionSVG(){
   const sh=getShape(selShape);if(!sh)return '';
   let s='';
-  if(sh.type==='rect')return `<rect class="sel-outline" x="${sh.x}" y="${sh.y}" width="${sh.rw}" height="${sh.rh}"/>`;
-  if(sh.type==='circle')return `<circle class="sel-outline" cx="${sh.cx}" cy="${sh.cy}" r="${sh.r}"/>`;
+  if(sh.type==='rect'){const r=(8/view.s).toFixed(2);return `<rect class="sel-outline" x="${sh.x}" y="${sh.y}" width="${sh.rw}" height="${sh.rh}"/>`+[[sh.x,sh.y],[sh.x+sh.rw,sh.y],[sh.x+sh.rw,sh.y+sh.rh],[sh.x,sh.y+sh.rh]].map((c,i)=>`<circle class="vh" data-vi="${i}" cx="${c[0].toFixed(1)}" cy="${c[1].toFixed(1)}" r="${r}"/>`).join('');}
+  if(sh.type==='circle'){const r=(8/view.s).toFixed(2);return `<circle class="sel-outline" cx="${sh.cx}" cy="${sh.cy}" r="${sh.r}"/>`+`<circle class="vh" data-vi="0" cx="${(sh.cx+sh.r).toFixed(1)}" cy="${sh.cy}" r="${r}"/>`;}
   if(sh.pts){
     if(sh.type==='mask')s+=`<polygon class="sel-outline" points="${sh.pts.map(p=>p.join(',')).join(' ')}"/>`;
     else s+=`<path class="sel-outline" d="M${sh.pts.map(p=>p[0]+' '+p[1]).join(' L ')}"/>`;
@@ -990,26 +1011,32 @@ function attachShapeEvents(){
   if(!document.body.classList.contains('tool-select'))return;
   drawEl.querySelectorAll('.shape').forEach(el=>el.addEventListener('pointerdown',ev=>{ev.stopPropagation();const was=selShape;selShape=el.dataset.id;startDrag('body',selShape,null,ev);renderShapes();if(was!==selShape)renderEditbar();}));
   drawEl.querySelectorAll('.vh').forEach(el=>{
-    el.addEventListener('pointerdown',ev=>{ev.stopPropagation();startDrag('vertex',selShape,+el.dataset.vi,ev);});
+    el.addEventListener('pointerdown',ev=>{ev.stopPropagation();const sh=getShape(selShape);const m=sh&&sh.type==='rect'?'rcorner':(sh&&sh.type==='circle'?'cradius':'vertex');startDrag(m,selShape,+el.dataset.vi,ev);});
     el.addEventListener('dblclick',ev=>{ev.stopPropagation();delVertex(selShape,+el.dataset.vi);});
   });
 }
 function startDrag(mode,id,vi,e){
   const sh=getShape(id);if(!sh)return;
   cloud.busy=true;
-  drag={mode,id,vi,sx:worldPx(e.clientX,e.clientY),orig:sh.pts?{pts:JSON.parse(JSON.stringify(sh.pts))}:(sh.type==='circle'?{cx:sh.cx,cy:sh.cy}:{x:sh.x,y:sh.y})};
+  drag={mode,id,vi,sx:worldPx(e.clientX,e.clientY),orig:JSON.parse(JSON.stringify(sh))};
   window.addEventListener('pointermove',dragMove);window.addEventListener('pointerup',dragUp);
 }
 function dragMove(e){
   if(!drag)return;
-  const w=worldPx(e.clientX,e.clientY),sh=getShape(drag.id);if(!sh)return;
+  const w=worldPx(e.clientX,e.clientY),sh=getShape(drag.id),o=drag.orig;if(!sh)return;
+  const dx=w.x-drag.sx.x,dy=w.y-drag.sx.y;
   if(drag.mode==='vertex'){
     if(sh.pts)sh.pts[drag.vi]=[+w.x.toFixed(1),+w.y.toFixed(1)];else{sh.x=+w.x.toFixed(1);sh.y=+w.y.toFixed(1);}
-  }else{
-    const dx=w.x-drag.sx.x,dy=w.y-drag.sx.y;
-    if(sh.pts)sh.pts=drag.orig.pts.map(p=>[+(p[0]+dx).toFixed(1),+(p[1]+dy).toFixed(1)]);
-    else if(sh.type==='circle'){sh.cx=+(drag.orig.cx+dx).toFixed(1);sh.cy=+(drag.orig.cy+dy).toFixed(1);}
-    else{sh.x=+(drag.orig.x+dx).toFixed(1);sh.y=+(drag.orig.y+dy).toFixed(1);}
+  }else if(drag.mode==='rcorner'){
+    const c=[[o.x,o.y],[o.x+o.rw,o.y],[o.x+o.rw,o.y+o.rh],[o.x,o.y+o.rh]],fx=c[(drag.vi+2)%4];
+    sh.x=+Math.min(fx[0],w.x).toFixed(1);sh.y=+Math.min(fx[1],w.y).toFixed(1);
+    sh.rw=+Math.abs(w.x-fx[0]).toFixed(1);sh.rh=+Math.abs(w.y-fx[1]).toFixed(1);
+  }else if(drag.mode==='cradius'){
+    sh.r=+Math.max(2,Math.hypot(w.x-sh.cx,w.y-sh.cy)).toFixed(1);
+  }else{ // body
+    if(sh.pts)sh.pts=o.pts.map(p=>[+(p[0]+dx).toFixed(1),+(p[1]+dy).toFixed(1)]);
+    else if(sh.type==='circle'){sh.cx=+(o.cx+dx).toFixed(1);sh.cy=+(o.cy+dy).toFixed(1);}
+    else{sh.x=+(o.x+dx).toFixed(1);sh.y=+(o.y+dy).toFixed(1);}
   }
   renderShapes();
 }
