@@ -183,6 +183,7 @@
   .draw .snaphit{fill:none;stroke:var(--star);stroke-width:2;vector-effect:non-scaling-stroke;pointer-events:none}
   .draw .cotaline{stroke:var(--struct);stroke-width:2;fill:none}
   .draw .cota{fill:var(--struct);font-family:var(--mono);font-weight:500;paint-order:stroke;stroke:#0c1620;stroke-width:2;text-anchor:middle;pointer-events:none}
+  body.edit.tool-select .draw .cotadrag{pointer-events:auto;cursor:move}
   .draw .mask{stroke:none}
   .draw .dot{stroke:none} .draw .dot.dulce{fill:var(--drawDulce)} .draw .dot.salada{fill:var(--drawSalada)} .draw .dot.caliente{fill:var(--drawCaliente)}
   .draw .lbl{font-family:var(--mono);font-weight:600;stroke:none;text-anchor:middle;dominant-baseline:central}
@@ -969,14 +970,12 @@ function shapeSVG(sh){
 /* cotas automáticas de las formas de estructura (cuando hay escala calibrada) */
 function cotaSVG(sh){
   if(!state.scale||sh.cota===false||state.showCotas===false)return '';
-  const off=14,fz=sh.cotaSize||20,u=sh.cotaUnit;
-  if(sh.type==='rect')
-    return `<text class="cota" font-size="${fz}" x="${(sh.x+sh.rw/2).toFixed(1)}" y="${(sh.y-off).toFixed(1)}">${lenTxt(sh.rw,u)}</text>`
-         + `<text class="cota" font-size="${fz}" x="${(sh.x-off).toFixed(1)}" y="${(sh.y+sh.rh/2).toFixed(1)}" transform="rotate(-90 ${(sh.x-off).toFixed(1)} ${(sh.y+sh.rh/2).toFixed(1)})">${lenTxt(sh.rh,u)}</text>`;
-  if(sh.type==='circle')
-    return `<text class="cota" font-size="${fz}" x="${sh.cx}" y="${(sh.cy-sh.r-off).toFixed(1)}">Ø ${lenTxt(sh.r*2,u)} · P ${lenTxt(2*Math.PI*sh.r,u)}</text>`;
+  const off=14,fz=sh.cotaSize||20,u=sh.cotaUnit,sel=document.body.classList.contains('tool-select'),O=sh.cotaOff||{},cls='cota'+(sel?' cotadrag':'');
+  const txt=(ck,bx,by,t,rot)=>{const o=O[ck]||[0,0],x=bx+o[0],y=by+o[1],tr=rot?` transform="rotate(-90 ${x.toFixed(1)} ${y.toFixed(1)})"`:'';return `<text class="${cls}" data-id="${sh.id}" data-ck="${ck}" font-size="${fz}" x="${x.toFixed(1)}" y="${y.toFixed(1)}"${tr}>${esc(t)}</text>`;};
+  if(sh.type==='rect')return txt('w',sh.x+sh.rw/2,sh.y-off,lenTxt(sh.rw,u))+txt('h',sh.x-off,sh.y+sh.rh/2,lenTxt(sh.rh,u),true);
+  if(sh.type==='circle')return txt('d',sh.cx,sh.cy-sh.r-off,'Ø '+lenTxt(sh.r*2,u)+' · P '+lenTxt(2*Math.PI*sh.r,u));
   if(sh.type==='pipe'&&sh.kind==='struct'&&sh.pts.length>1){let len=0;for(let i=1;i<sh.pts.length;i++)len+=Math.hypot(sh.pts[i][0]-sh.pts[i-1][0],sh.pts[i][1]-sh.pts[i-1][1]);const mid=sh.pts[Math.floor(sh.pts.length/2)];
-    return `<text class="cota" font-size="${fz}" x="${mid[0]}" y="${(mid[1]-off).toFixed(1)}">L ${lenTxt(len,u)}</text>`;}
+    return txt('l',mid[0],mid[1]-off,'L '+lenTxt(len,u));}
   return '';
 }
 function draftSVG(){
@@ -1027,6 +1026,14 @@ function attachShapeEvents(){
     el.addEventListener('pointerdown',ev=>{ev.stopPropagation();const sh=getShape(selShape);const m=sh&&sh.type==='rect'?'rcorner':(sh&&sh.type==='circle'?'cradius':'vertex');startDrag(m,selShape,+el.dataset.vi,ev);});
     el.addEventListener('dblclick',ev=>{ev.stopPropagation();delVertex(selShape,+el.dataset.vi);});
   });
+  drawEl.querySelectorAll('.cotadrag').forEach(el=>el.addEventListener('pointerdown',ev=>{ev.stopPropagation();startCotaDrag(el.dataset.id,el.dataset.ck,ev);}));
+}
+function startCotaDrag(id,ck,e){
+  const sh=getShape(id);if(!sh)return;cloud.busy=true;
+  const o=(sh.cotaOff&&sh.cotaOff[ck])||[0,0],sx=worldPx(e.clientX,e.clientY);
+  const mv=ev=>{const w=worldPx(ev.clientX,ev.clientY);sh.cotaOff=sh.cotaOff||{};sh.cotaOff[ck]=[+(o[0]+w.x-sx.x).toFixed(1),+(o[1]+w.y-sx.y).toFixed(1)];renderShapes();};
+  const up=()=>{window.removeEventListener('pointermove',mv);window.removeEventListener('pointerup',up);cloud.busy=false;save();renderShapes();};
+  window.addEventListener('pointermove',mv);window.addEventListener('pointerup',up);
 }
 function startDrag(mode,id,vi,e){
   const sh=getShape(id);if(!sh)return;
