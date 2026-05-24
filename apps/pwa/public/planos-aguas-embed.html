@@ -17,7 +17,7 @@
     --ink:#eef2f6; --inkMid:#9bafc1; --inkLo:#697f92; --ghost:#4c6076;
     --aqua:#2E75B6; --aquaBright:#5aa6e8; --aquaLight:#9DC3E6; --aquaSoft:rgba(46,117,182,.16);
     --border:#21384a; --borderHi:#30506a;
-    --dulce:#2faa5a; --salada:#3fa9d4; --caliente:#ff8c42;
+    --dulce:#0eff23; --salada:#0cffff; --caliente:#ff8c42; /* exactos del plano (verde/cian) */
     --drawDulce:var(--dulce); --drawSalada:var(--salada); --drawCaliente:var(--caliente);
     --ok:#3fb98f; --falta:#e8a23d; --nuevo:#b08fe0; --verif:#2dd4bf; --star:#f0c14b;
     --okSoft:rgba(63,185,143,.14); --faltaSoft:rgba(232,162,61,.15); --nuevoSoft:rgba(176,143,224,.16); --verifSoft:rgba(45,212,191,.16);
@@ -79,7 +79,7 @@
   .markers .mk{pointer-events:auto}
   .mk{position:absolute;transform:translate(-50%,-100%) scale(var(--pk,1));transform-origin:50% 100%;display:flex;flex-direction:column;align-items:center;cursor:pointer;z-index:5}
   .mk .pin{width:25px;height:25px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;border:2px solid rgba(255,255,255,.92);box-shadow:0 3px 7px rgba(0,0,0,.55);transition:filter .12s var(--ease)}
-  .mk .pin b{transform:rotate(45deg);color:#fff;font-size:11px;font-weight:700;line-height:1;font-family:var(--mono)}
+  .mk .pin b{transform:rotate(45deg);color:#0c1620;font-size:11px;font-weight:700;line-height:1;font-family:var(--mono)}
   .mk.s .pin{background:var(--salada)}
   .mk.d .pin{background:var(--dulce)}
   .mk.c .pin{background:var(--caliente)}
@@ -97,7 +97,7 @@
   .panel{width:344px;max-width:86vw;background:var(--bgPanel);border-left:1px solid var(--border);display:flex;flex-direction:column;transform:translateX(100%);transition:transform .24s var(--ease);position:absolute;right:0;top:0;bottom:0;z-index:30;box-shadow:var(--shadow)}
   .panel.open{transform:none}
   .panel .ph{padding:15px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
-  .panel .ph .tag{font-size:18px;font-weight:700;color:#fff;border-radius:8px;width:46px;height:46px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:var(--mono)}
+  .panel .ph .tag{font-size:18px;font-weight:700;color:#0c1620;border-radius:8px;width:46px;height:46px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:var(--mono)}
   .panel .ph .tag.s{background:var(--salada)} .panel .ph .tag.d{background:var(--dulce)} .panel .ph .tag.c{background:var(--caliente)}
   .panel .ph .hid{font-family:var(--mono);font-weight:600;font-size:13px;letter-spacing:.5px}
   .panel .ph .x{margin-left:auto;border:1px solid var(--border);background:var(--surface);color:var(--inkMid);border-radius:6px;width:32px;height:32px;font-size:15px;cursor:pointer;transition:.13s var(--ease)}
