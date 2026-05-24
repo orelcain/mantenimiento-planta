@@ -19,6 +19,7 @@
     --border:#21384a; --borderHi:#30506a;
     --dulce:#0eff23; --salada:#0cffff; --caliente:#ff8c42; /* exactos del plano (verde/cian) */
     --drawDulce:var(--dulce); --drawSalada:var(--salada); --drawCaliente:var(--caliente);
+    --struct:#c8ccd0; /* gris de líneas estructurales del plano */
     --ok:#3fb98f; --falta:#e8a23d; --nuevo:#b08fe0; --verif:#2dd4bf; --star:#f0c14b;
     --okSoft:rgba(63,185,143,.14); --faltaSoft:rgba(232,162,61,.15); --nuevoSoft:rgba(176,143,224,.16); --verifSoft:rgba(45,212,191,.16);
     --shadow:0 12px 38px rgba(0,0,0,.5);
@@ -175,11 +176,14 @@
   /* ===== capa de dibujo vectorial (SVG) ===== */
   .draw{position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:none;z-index:5;will-change:transform;overflow:visible}
   .draw .pipe{fill:none;stroke-linecap:round;stroke-linejoin:round}
-  .draw .pipe.dulce{stroke:var(--drawDulce)} .draw .pipe.salada{stroke:var(--drawSalada)} .draw .pipe.caliente{stroke:var(--drawCaliente)}
+  .draw .pipe.dulce{stroke:var(--drawDulce)} .draw .pipe.salada{stroke:var(--drawSalada)} .draw .pipe.caliente{stroke:var(--drawCaliente)} .draw .pipe.struct{stroke:var(--struct)}
+  .draw .rect,.draw .circle{fill:none;stroke:var(--struct)}
+  .draw .measure{stroke:var(--star);stroke-dasharray:7 5;vector-effect:non-scaling-stroke;stroke-width:1.5}
+  .draw .mtxt{fill:var(--star);font-family:var(--mono);font-weight:600;paint-order:stroke;stroke:#0c1620;stroke-width:3;text-anchor:middle}
   .draw .mask{stroke:none}
   .draw .dot{stroke:none} .draw .dot.dulce{fill:var(--drawDulce)} .draw .dot.salada{fill:var(--drawSalada)} .draw .dot.caliente{fill:var(--drawCaliente)}
   .draw .lbl{font-family:var(--mono);font-weight:600;stroke:none;text-anchor:middle;dominant-baseline:central}
-  .draw .lbl.dulce{fill:var(--drawDulce)} .draw .lbl.salada{fill:var(--drawSalada)} .draw .lbl.caliente{fill:var(--drawCaliente)}
+  .draw .lbl.dulce{fill:var(--drawDulce)} .draw .lbl.salada{fill:var(--drawSalada)} .draw .lbl.caliente{fill:var(--drawCaliente)} .draw .lbl.struct{fill:var(--struct)}
   .draw .live{stroke-dasharray:9 7;opacity:.75}
   .draw .sel-outline{fill:none;stroke:var(--star);stroke-dasharray:6 5;vector-effect:non-scaling-stroke;stroke-width:2;pointer-events:none}
   .draw .dv{fill:var(--star);stroke:#0c1620;stroke-width:1;pointer-events:none}
@@ -190,7 +194,9 @@
   body.edit.tool-select .draw .pipe{pointer-events:none}
   body.edit.tool-select .draw .hit{pointer-events:stroke;stroke:transparent;fill:none}
   body.edit.tool-pipe .stagewrap,body.edit.tool-mask .stagewrap,
-  body.edit.tool-bajada .stagewrap,body.edit.tool-label .stagewrap{cursor:crosshair}
+  body.edit.tool-bajada .stagewrap,body.edit.tool-label .stagewrap,
+  body.edit.tool-rect .stagewrap,body.edit.tool-circle .stagewrap,body.edit.tool-sline .stagewrap,
+  body.edit.tool-measure .stagewrap,body.edit.tool-calib .stagewrap{cursor:crosshair}
 
   /* ===== paleta de herramientas en la editbar ===== */
   .palette{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
@@ -380,7 +386,7 @@ const STORE_KEY='planosAguas.v3';
 /* ============ STATE ============ */
 let state=load();
 function load(){
-  let s={over:{},notas:{},extra:[],removed:[],shapes:[],photos:{}};
+  let s={over:{},notas:{},extra:[],removed:[],shapes:[],photos:{},scale:null};
   try{const r=JSON.parse(localStorage.getItem(STORE_KEY));if(r)s=Object.assign(s,r);}catch(e){}
   if(!Array.isArray(s.shapes))s.shapes=[];
   if(!s.photos||typeof s.photos!=='object')s.photos={};
@@ -492,7 +498,11 @@ stage.addEventListener('pointermove',e=>{
   if(pinch&&pointers.size>=2){const f=pdist()/pinch.d0,ns=Math.max(0.1,Math.min(8,pinch.s0*f)),{cx,cy}=midStage();view.s=ns;view.x=cx-pinch.wx*ns;view.y=cy-pinch.wy*ns;scheduleView();}
   else if(panning&&pointers.size===1){view.x=sv.x+(e.clientX-sp.x);view.y=sv.y+(e.clientY-sp.y);scheduleView();}
 });
-stage.addEventListener('pointermove',e=>{if(draft&&!panning&&!pinch&&!drag&&pointers.size===0){draftCursor=worldPx(e.clientX,e.clientY);updateLive();}});
+stage.addEventListener('pointermove',e=>{
+  if(panning||pinch||drag||pointers.size)return;
+  if(draft){draftCursor=worldPx(e.clientX,e.clientY);updateLive();}
+  else if(pend2){draftCursor=worldPx(e.clientX,e.clientY);renderShapes();}
+});
 function endPointer(e){
   const had=pointers.has(e.pointerId);pointers.delete(e.pointerId);
   if(pointers.size<2)pinch=null;
@@ -630,7 +640,7 @@ function setLab(id,lab){
 document.getElementById('pLab').addEventListener('change',e=>{if(sel)setLab(sel,e.target.value);});
 
 /* ============ EDIT ============ */
-function exitEdit(){cancelDraft();wiz=null;selShape=null;document.body.classList.remove('edit','tool-pin','tool-pipe','tool-bajada','tool-label','tool-mask','tool-select','has-sel','drafting');document.getElementById('btnEdit').classList.remove('on');renderShapes();renderMarkers();renderEditbar();}
+function exitEdit(){cancelDraft();wiz=null;selShape=null;structMode=false;pend2=null;document.body.classList.remove('edit','has-sel','drafting');document.body.classList.remove(...TOOLCLS);document.getElementById('btnEdit').classList.remove('on');renderShapes();renderMarkers();renderEditbar();}
 document.getElementById('btnEdit').onclick=()=>{const on=document.body.classList.toggle('edit');document.getElementById('btnEdit').classList.toggle('on',on);if(on){wiz=null;setTool('pin');renderMarkers();toast('Modo edición ON');}else{exitEdit();toast('Modo edición OFF');}};
 function removePoint(id){
   if((state.extra||[]).some(p=>p.id===id))state.extra=state.extra.filter(p=>p.id!==id); // bajada agregada a mano
@@ -642,7 +652,7 @@ function removePoint(id){
 /* ============ DRAW LAYER + EDITOR GUIADO ============ */
 const PIPE_W=5, DOT_R=13, LBL_SZE=18, LBL_HALO=3;
 let tool='pin', kind='dulce', maskColor='#ffffff', pipeW=5, snapAngles=true, wiz=null;
-let draft=null, draftCursor=null, selShape=null, drag=null;
+let draft=null, draftCursor=null, selShape=null, drag=null, structMode=false, pend2=null;
 function nomT(t){return t==='d'?'Dulce':t==='c'?'Caliente':'Salada';}
 function preT(t){return t==='d'?'AD':t==='c'?'AC':'AS';}
 function kindOf(t){return t==='d'?'dulce':t==='c'?'caliente':'salada';}
@@ -654,10 +664,12 @@ function nextCorr(t){
   for(const a of L)for(const b of L){if(!used.has(a+b))return a+b;}
   return 'X';
 }
+const TOOLCLS=['tool-pin','tool-pipe','tool-bajada','tool-label','tool-mask','tool-select','tool-rect','tool-circle','tool-sline','tool-measure','tool-calib'];
 function setTool(t){
   if(draft&&!(wiz&&wiz.step==='pipe'))cancelDraft();
+  pend2=null;document.body.classList.remove('drafting');
   tool=t;selShape=null;
-  document.body.classList.remove('tool-pin','tool-pipe','tool-bajada','tool-label','tool-mask','tool-select');
+  document.body.classList.remove(...TOOLCLS);
   document.body.classList.add('tool-'+t);
   renderShapes();renderEditbar();
 }
@@ -683,6 +695,25 @@ function renderEditbar(){
       setHint('Clic puntos hasta el troncal · doble-clic o Terminar · Retroceso borra el último.');
     }
     s+=`<span class="ebsp"></span><button class="btn" id="wizCancel">✗ Cancelar</button>`;
+  }else if(structMode){
+    s+=`<span class="tagx">ESTRUCTURA</span>`+
+      `<button class="tbtn ${tool==='rect'?'on':''}" id="esRect">▭ Rect</button>`+
+      `<button class="tbtn ${tool==='circle'?'on':''}" id="esCirc">◯ Círculo</button>`+
+      `<button class="tbtn ${tool==='sline'?'on':''}" id="esLine">╱ Línea</button>`+
+      `<button class="tbtn ${tool==='label'?'on':''}" id="esLabel">Aa Etiqueta</button>`+
+      `<span class="ebsp"></span><span class="wcap">grosor</span><button class="tbtn" id="wizWm">−</button><input type="range" id="wizW" min="1" max="14" value="${pipeW}"><button class="tbtn" id="wizWp">+</button><span class="wnum" id="wizWv">${pipeW}</span>`+
+      (tool==='sline'?`<button class="tbtn ${snapAngles?'on':''}" id="wizSnap">⊾ 45/90</button>`:'')+
+      (draft?`<button class="btn primary" id="eFinish">✓ Terminar</button>`:'')+
+      ((draft||pend2)?`<button class="btn" id="eCancel">✗ Cancelar</button>`:'')+
+      `<span class="ebsp"></span><button class="btn" id="ebBack2">← Volver</button>`;
+    setHint(tool==='rect'?'Clic 2 esquinas del rectángulo (muestra medidas en vivo).':tool==='circle'?'Clic el centro y luego el borde.':tool==='sline'?'Clic puntos · doble-clic o Terminar.':tool==='label'?'Clic donde va el rótulo (texto libre).':'Elige una forma para dibujar estructuras.');
+  }else if(tool==='measure'||tool==='calib'){
+    const cal=tool==='calib';
+    s+=`<span class="tagx">${cal?'CALIBRAR ESCALA':'MEDIR'}</span><span class="wcap">${cal?'clic 2 puntos sobre una cota conocida':'clic 2 puntos'}</span>`+
+      ((draft||pend2)?`<button class="btn" id="eCancel">✗ Cancelar</button>`:'')+
+      (state.scale?`<span class="wcap">1px = ${state.scale.toFixed(3)} mm</span>`:`<span class="wcap" style="color:var(--falta)">sin calibrar</span>`)+
+      `<span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
+    setHint(cal?'Marca 2 puntos sobre una cota y escribe su medida real en mm.':'Marca 2 puntos para ver la distancia (en mm si calibraste).');
   }else if(tool==='mask'){
     s+=`<span class="tagx">MÁSCARA</span><span class="wcap">color</span><input type="color" class="mcol" id="maskColor" value="${maskColor}"><button class="btn primary" id="eFinish">✓ Terminar</button><button class="btn" id="eCancel">✗ Cancelar</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
     setHint('Tapar elementos: clic vértices del polígono · doble-clic o Terminar.');
@@ -697,6 +728,9 @@ function renderEditbar(){
     }else if(sh.type==='pipe'){
       s+=`<span class="tagx">CAÑERÍA</span><span class="wcap">grosor</span><button class="tbtn" id="selWm">−</button><input type="range" id="selW" min="2" max="14" value="${sh.w||PIPE_W}"><button class="tbtn" id="selWp">+</button><span class="wnum" id="selWv">${sh.w||PIPE_W}</span><button class="btn" id="selCont">Continuar trazo</button><button class="btn" id="selRedraw">Redibujar</button><button class="btn danger" id="eDelShape">🗑 Borrar</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
       setHint('Arrastra vértices · doble-clic un vértice = borrarlo · Continuar/Redibujar el trazo.');
+    }else if(sh.type==='rect'||sh.type==='circle'){
+      s+=`<span class="tagx">${sh.type==='rect'?'RECTÁNGULO':'CÍRCULO'}</span><span class="wcap">grosor</span><button class="tbtn" id="selWm">−</button><input type="range" id="selW" min="1" max="14" value="${sh.sw||PIPE_W}"><button class="tbtn" id="selWp">+</button><span class="wnum" id="selWv">${sh.sw||PIPE_W}</span><button class="btn danger" id="eDelShape">🗑 Borrar</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
+      setHint('Arrastra la forma para moverla · ajusta el grosor.');
     }else if(sh.type==='label'){
       s+=`<span class="tagx">ETIQUETA</span><span class="wcap">tamaño</span><button class="tbtn" id="selSm">−</button><input type="range" id="selS" min="8" max="48" value="${sh.size||LBL_SZE}"><button class="tbtn" id="selSp">+</button><span class="wnum" id="selSv">${sh.size||LBL_SZE}</span><button class="btn danger" id="eDelShape">🗑 Borrar</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
       setHint('Arrastra la etiqueta para reposicionarla · ajusta su tamaño.');
@@ -708,26 +742,34 @@ function renderEditbar(){
       setHint('Arrastra el punto para moverlo.');
     }
   }else{
-    s+=`<span class="tagx">EDICIÓN</span><button class="btn primary" id="ewCrear">+ Crear bajada de agua</button><button class="btn" id="ewMask">Máscara</button><button class="btn" id="ewSelect">Editar dibujo</button><span class="ebsp"></span><button class="btn primary" id="eDone">Listo</button>`;
-    setHint('Arrastra pines para moverlos · clic un pin para ver/editar · o crea una bajada.');
+    s+=`<span class="tagx">EDICIÓN</span><button class="btn primary" id="ewCrear">+ Crear bajada de agua</button><button class="btn" id="ewStruct">+ Estructura</button><button class="btn" id="ewMask">Máscara</button><button class="btn" id="ewSelect">Editar dibujo</button><button class="btn" id="ewCalib">Escala</button><button class="btn" id="ewMeasure">Medir</button><span class="ebsp"></span><button class="btn primary" id="eDone">Listo</button>`;
+    setHint('Arrastra pines · clic un pin para ver/editar · crea bajadas, estructuras o mide a escala.');
   }
   eb.innerHTML=s;wireEditbar();
 }
 function wireEditbar(){
   const $=id=>document.getElementById(id);
   if($('ewCrear'))$('ewCrear').onclick=startWizard;
+  if($('ewStruct'))$('ewStruct').onclick=()=>{structMode=true;setTool('rect');};
   if($('ewMask'))$('ewMask').onclick=()=>setTool('mask');
   if($('ewSelect'))$('ewSelect').onclick=()=>setTool('select');
+  if($('ewCalib'))$('ewCalib').onclick=()=>setTool('calib');
+  if($('ewMeasure'))$('ewMeasure').onclick=()=>setTool('measure');
   if($('eDone'))$('eDone').onclick=exitEdit;
   if($('ebBack'))$('ebBack').onclick=()=>{cancelDraft();selShape=null;setTool('pin');};
+  if($('ebBack2'))$('ebBack2').onclick=()=>{structMode=false;cancelDraft();setTool('pin');};
+  if($('esRect'))$('esRect').onclick=()=>setTool('rect');
+  if($('esCirc'))$('esCirc').onclick=()=>setTool('circle');
+  if($('esLine'))$('esLine').onclick=()=>setTool('sline');
+  if($('esLabel'))$('esLabel').onclick=()=>setTool('label');
   if($('eFinish'))$('eFinish').onclick=finishDraft;
   if($('eCancel'))$('eCancel').onclick=cancelDraft;
   if($('eDelShape'))$('eDelShape').onclick=delSelShape;
   if($('maskColor'))$('maskColor').oninput=e=>{maskColor=e.target.value;};
   // controles por figura seleccionada (Editar dibujo)
   if($('selW'))$('selW').oninput=e=>setShapeW(selShape,+e.target.value);
-  if($('selWm'))$('selWm').onclick=()=>setShapeW(selShape,(getShape(selShape).w||PIPE_W)-1);
-  if($('selWp'))$('selWp').onclick=()=>setShapeW(selShape,(getShape(selShape).w||PIPE_W)+1);
+  if($('selWm'))$('selWm').onclick=()=>{const sh=getShape(selShape);setShapeW(selShape,(sh.sw||sh.w||PIPE_W)-1);};
+  if($('selWp'))$('selWp').onclick=()=>{const sh=getShape(selShape);setShapeW(selShape,(sh.sw||sh.w||PIPE_W)+1);};
   if($('selS'))$('selS').oninput=e=>setShapeSize(selShape,+e.target.value);
   if($('selSm'))$('selSm').onclick=()=>setShapeSize(selShape,(getShape(selShape).size||LBL_SZE)-1);
   if($('selSp'))$('selSp').onclick=()=>setShapeSize(selShape,(getShape(selShape).size||LBL_SZE)+1);
@@ -751,13 +793,35 @@ function getShape(id){return (state.shapes||[]).find(s=>s.id===id);}
 function onEditClick(e){
   if(e.target.closest('.mk')||e.target.closest('#draw'))return;
   const w=worldPx(e.clientX,e.clientY);
-  if(w.x<-baseW()*.15||w.x>baseW()*1.15||w.y<-baseH()*.15||w.y>baseH()*1.15)return;
+  if(Math.abs(w.x)>baseW()*3||Math.abs(w.y)>baseH()*3)return; // lienzo extendido (dibujar fuera del plano)
   if(wiz){ if(wiz.step==='ubic')placeBajadaPoint(w); else if(wiz.step==='pipe')draftAdd(w); return; }
-  if(tool==='mask')draftAdd(w);
+  if(tool==='mask'||tool==='sline')draftAdd(w);
+  else if(tool==='rect'||tool==='circle'||tool==='measure'||tool==='calib')twoClick(w);
+  else if(tool==='label')addLabel(w);
   else if(tool==='select'&&!draft){selShape=null;renderShapes();renderEditbar();}
 }
+function twoClick(w){
+  if(!pend2){pend2={x:+w.x.toFixed(1),y:+w.y.toFixed(1)};draftCursor={x:w.x,y:w.y};document.body.classList.add('drafting');renderShapes();renderEditbar();return;}
+  const p1=pend2,p2={x:+w.x.toFixed(1),y:+w.y.toFixed(1)};pend2=null;document.body.classList.remove('drafting');
+  if(tool==='rect'){const x=Math.min(p1.x,p2.x),y=Math.min(p1.y,p2.y),rw=Math.abs(p2.x-p1.x),rh=Math.abs(p2.y-p1.y);if(rw>2&&rh>2){state.shapes.push({id:'sh-'+Date.now(),type:'rect',kind:'struct',x,y,rw:+rw.toFixed(1),rh:+rh.toFixed(1),sw:pipeW});save();toast('Rectángulo agregado');}}
+  else if(tool==='circle'){const r=Math.hypot(p2.x-p1.x,p2.y-p1.y);if(r>2){state.shapes.push({id:'sh-'+Date.now(),type:'circle',kind:'struct',cx:p1.x,cy:p1.y,r:+r.toFixed(1),sw:pipeW});save();toast('Círculo agregado');}}
+  else if(tool==='measure'){showMeasure(p1,p2);}
+  else if(tool==='calib'){doCalib(p1,p2);}
+  renderShapes();renderEditbar();
+}
+function pendSVG(){
+  if(!pend2||!draftCursor)return '';
+  const p1=pend2,c=draftCursor;
+  if(tool==='rect'){const x=Math.min(p1.x,c.x),y=Math.min(p1.y,c.y),rw=Math.abs(c.x-p1.x),rh=Math.abs(c.y-p1.y);return `<rect class="rect" x="${x}" y="${y}" width="${rw}" height="${rh}" stroke-width="${pipeW}" opacity=".8"/>`+measLbl((x+rw/2),y-6,dimTxt(rw,rh));}
+  if(tool==='circle'){const r=Math.hypot(c.x-p1.x,c.y-p1.y);return `<circle class="circle" cx="${p1.x}" cy="${p1.y}" r="${r}" stroke-width="${pipeW}" opacity=".8"/>`+measLbl(p1.x,p1.y-r-6,'Ø '+lenTxt(r*2));}
+  if(tool==='measure'||tool==='calib'){const d=Math.hypot(c.x-p1.x,c.y-p1.y);return `<path class="measure" d="M${p1.x} ${p1.y} L${c.x} ${c.y}"/>`+measLbl((p1.x+c.x)/2,(p1.y+c.y)/2-6,lenTxt(d));}
+  return '';
+}
+function lenTxt(px){return state.scale?Math.round(px*state.scale)+' mm':Math.round(px)+' px';}
+function dimTxt(w,h){return state.scale?(Math.round(w*state.scale)+'×'+Math.round(h*state.scale)+' mm'):(Math.round(w)+'×'+Math.round(h)+' px');}
+function measLbl(x,y,t){return `<text class="mtxt" x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-size="${(13/view.s).toFixed(1)}">${esc(t)}</text>`;}
 function delSelShape(){if(!selShape){toast('Selecciona una figura primero');return;}if(confirm('¿Borrar esta figura?')){state.shapes=state.shapes.filter(s=>s.id!==selShape);selShape=null;save();renderShapes();renderEditbar();toast('Figura borrada');}}
-function setShapeW(id,v){const sh=getShape(id);if(!sh)return;sh.w=Math.max(2,Math.min(14,v|0));save();renderShapes();const wv=document.getElementById('selWv');if(wv)wv.textContent=sh.w;const sl=document.getElementById('selW');if(sl&&+sl.value!==sh.w)sl.value=sh.w;}
+function setShapeW(id,v){const sh=getShape(id);if(!sh)return;v=Math.max(1,Math.min(14,v|0));if(sh.type==='rect'||sh.type==='circle')sh.sw=v;else sh.w=v;save();renderShapes();const wv=document.getElementById('selWv');if(wv)wv.textContent=v;const sl=document.getElementById('selW');if(sl&&+sl.value!==v)sl.value=v;}
 function setShapeSize(id,v){const sh=getShape(id);if(!sh)return;sh.size=Math.max(8,Math.min(48,v|0));save();renderShapes();const wv=document.getElementById('selSv');if(wv)wv.textContent=sh.size;const sl=document.getElementById('selS');if(sl&&+sl.value!==sh.size)sl.value=sh.size;}
 function continuePipe(id){const sh=getShape(id);if(!sh||sh.type!=='pipe')return;draft={type:'pipe',kind:sh.kind,w:sh.w||pipeW,editId:id,pts:JSON.parse(JSON.stringify(sh.pts))};document.body.classList.add('drafting');selShape=null;renderShapes();renderEditbar();toast('Continuá la cañería · doble-clic o Terminar');}
 function redrawPipe(id){const sh=getShape(id);if(!sh||sh.type!=='pipe')return;draft={type:'pipe',kind:sh.kind,w:sh.w||pipeW,editId:id,pts:[sh.pts[0].slice()]};document.body.classList.add('drafting');selShape=null;renderShapes();renderEditbar();toast('Redibuja desde el punto de bajada');}
@@ -799,10 +863,18 @@ function finishPipeWizard(){
   draft=null;draftCursor=null;document.body.classList.remove('drafting');wiz=null;setTool('pin');renderShapes();
 }
 function wizCancel(){cancelDraft();wiz=null;setTool('pin');}
+/* ---- escala (cotas) ---- */
+function showMeasure(p1,p2){toast('Distancia: '+lenTxt(Math.hypot(p2.x-p1.x,p2.y-p1.y)));}
+function doCalib(p1,p2){
+  const d=Math.hypot(p2.x-p1.x,p2.y-p1.y);if(d<1){toast('Puntos muy juntos');return;}
+  const mm=prompt('Distancia REAL entre los 2 puntos (mm) — usá una cota del plano:',state.scale?Math.round(d*state.scale):'');
+  const v=parseFloat((mm||'').replace(',','.'));if(!v||v<=0)return;
+  state.scale=v/d;save();toast('Escala calibrada · ahora podés medir y dibujar a mm');renderEditbar();
+}
 
 /* polilínea / polígono (con snap 45/90 + grosor en cañerías) */
 function draftAdd(w){
-  if(!draft){draft={type:tool,kind,fill:maskColor,w:pipeW,pts:[]};document.body.classList.add('drafting');}
+  if(!draft){const isS=tool==='sline';draft={type:isS?'pipe':tool,kind:isS?'struct':kind,fill:maskColor,w:pipeW,pts:[]};document.body.classList.add('drafting');}
   let x=+w.x.toFixed(1),y=+w.y.toFixed(1);
   if(draft.type==='pipe'&&snapAngles&&draft.pts.length){const last=draft.pts[draft.pts.length-1],sp=snapPt(last,w.x,w.y);x=+sp.x.toFixed(1);y=+sp.y.toFixed(1);}
   draft.pts.push([x,y]);renderShapes();
@@ -819,8 +891,9 @@ function finishDraft(){
   }
   draft=null;draftCursor=null;document.body.classList.remove('drafting');renderShapes();
 }
-function cancelDraft(){draft=null;draftCursor=null;document.body.classList.remove('drafting');renderShapes();renderEditbar();}
+function cancelDraft(){draft=null;draftCursor=null;pend2=null;document.body.classList.remove('drafting');renderShapes();renderEditbar();}
 window.addEventListener('keydown',e=>{
+  if(pend2&&e.key==='Escape'){e.preventDefault();cancelDraft();return;}
   if(!draft)return;
   if(e.key==='Enter'){e.preventDefault();finishDraft();}
   else if(e.key==='Escape'){e.preventDefault();if(wiz)wizCancel();else cancelDraft();}
@@ -829,9 +902,10 @@ window.addEventListener('keydown',e=>{
 
 /* etiqueta libre (un solo clic) */
 function addLabel(w){
-  const def=kind==='dulce'?'PP AD-':kind==='caliente'?'PP AC-':'PP AS-';
+  const k=structMode?'struct':kind;
+  const def=structMode?'':(kind==='dulce'?'PP AD-':kind==='caliente'?'PP AC-':'PP AS-');
   const t=prompt('Texto de la etiqueta:',def);if(t==null||!t.trim())return;
-  state.shapes.push({id:'sh-'+Date.now(),type:'label',kind,x:+w.x.toFixed(1),y:+w.y.toFixed(1),text:t.trim()});save();renderShapes();toast('Etiqueta agregada');
+  state.shapes.push({id:'sh-'+Date.now(),type:'label',kind:k,x:+w.x.toFixed(1),y:+w.y.toFixed(1),text:t.trim()});save();renderShapes();toast('Etiqueta agregada');
 }
 
 /* render de la capa SVG */
@@ -842,6 +916,8 @@ function shapeSVG(sh){
     let s=selectable?`<path class="shape hit" data-id="${sh.id}" d="${d}"/>`:'';
     return s+`<path class="shape pipe ${sh.kind}" data-id="${sh.id}" d="${d}" stroke-width="${sh.w||PIPE_W}"/>`;
   }
+  if(sh.type==='rect')return `<rect class="shape rect" data-id="${sh.id}" x="${sh.x}" y="${sh.y}" width="${sh.rw}" height="${sh.rh}" stroke-width="${sh.sw||PIPE_W}"/>`;
+  if(sh.type==='circle')return `<circle class="shape circle" data-id="${sh.id}" cx="${sh.cx}" cy="${sh.cy}" r="${sh.r}" stroke-width="${sh.sw||PIPE_W}"/>`;
   if(sh.type==='mask')return `<polygon class="shape mask" data-id="${sh.id}" fill="${sh.fill||'#ffffff'}" points="${sh.pts.map(p=>p.join(',')).join(' ')}"/>`;
   if(sh.type==='dot')return `<circle class="shape dot ${sh.kind}" data-id="${sh.id}" cx="${sh.x}" cy="${sh.y}" r="${DOT_R}" stroke-width="3"/>`;
   if(sh.type==='label')return `<text class="shape lbl ${sh.kind}" data-id="${sh.id}" x="${sh.x}" y="${sh.y}" font-size="${sh.size||LBL_SZE}" stroke-width="${LBL_HALO}">${esc(sh.text)}</text>`;
@@ -862,6 +938,8 @@ function draftSVG(){
 function selectionSVG(){
   const sh=getShape(selShape);if(!sh)return '';
   let s='';
+  if(sh.type==='rect')return `<rect class="sel-outline" x="${sh.x}" y="${sh.y}" width="${sh.rw}" height="${sh.rh}"/>`;
+  if(sh.type==='circle')return `<circle class="sel-outline" cx="${sh.cx}" cy="${sh.cy}" r="${sh.r}"/>`;
   if(sh.pts){
     if(sh.type==='mask')s+=`<polygon class="sel-outline" points="${sh.pts.map(p=>p.join(',')).join(' ')}"/>`;
     else s+=`<path class="sel-outline" d="M${sh.pts.map(p=>p[0]+' '+p[1]).join(' L ')}"/>`;
@@ -877,6 +955,7 @@ function renderShapes(){
   let svg='';
   (state.shapes||[]).forEach(sh=>svg+=shapeSVG(sh));
   if(draft)svg+=draftSVG();
+  if(pend2)svg+=pendSVG();
   if(selShape&&document.body.classList.contains('tool-select'))svg+=selectionSVG();
   drawEl.innerHTML=svg;updateHandleScale();attachShapeEvents();
   document.body.classList.toggle('has-sel',!!(selShape&&document.body.classList.contains('tool-select')));
@@ -895,7 +974,7 @@ function attachShapeEvents(){
 function startDrag(mode,id,vi,e){
   const sh=getShape(id);if(!sh)return;
   cloud.busy=true;
-  drag={mode,id,vi,sx:worldPx(e.clientX,e.clientY),orig:sh.pts?{pts:JSON.parse(JSON.stringify(sh.pts))}:{x:sh.x,y:sh.y}};
+  drag={mode,id,vi,sx:worldPx(e.clientX,e.clientY),orig:sh.pts?{pts:JSON.parse(JSON.stringify(sh.pts))}:(sh.type==='circle'?{cx:sh.cx,cy:sh.cy}:{x:sh.x,y:sh.y})};
   window.addEventListener('pointermove',dragMove);window.addEventListener('pointerup',dragUp);
 }
 function dragMove(e){
@@ -906,6 +985,7 @@ function dragMove(e){
   }else{
     const dx=w.x-drag.sx.x,dy=w.y-drag.sx.y;
     if(sh.pts)sh.pts=drag.orig.pts.map(p=>[+(p[0]+dx).toFixed(1),+(p[1]+dy).toFixed(1)]);
+    else if(sh.type==='circle'){sh.cx=+(drag.orig.cx+dx).toFixed(1);sh.cy=+(drag.orig.cy+dy).toFixed(1);}
     else{sh.x=+(drag.orig.x+dx).toFixed(1);sh.y=+(drag.orig.y+dy).toFixed(1);}
   }
   renderShapes();
