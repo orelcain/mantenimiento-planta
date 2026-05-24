@@ -506,6 +506,14 @@ stage.addEventListener('pointermove',e=>{
   if(panning||pinch||drag||pointers.size)return;
   if(draft){draftCursor=worldPx(e.clientX,e.clientY);updateLive();}
   else if(pend2){draftCursor=worldPx(e.clientX,e.clientY);renderShapes();}
+  else if(document.body.classList.contains('edit')){ // imán visible al pasar el cursor (antes de clic)
+    const cap=['rect','circle','sline','measure','calib','mask'].includes(tool)||(wiz&&wiz.step==='pipe');
+    const hs=drawEl.querySelector('#hoverSnap');if(!hs)return;
+    if(!cap){hs.style.display='none';return;}
+    const sn=snapNodes(worldPx(e.clientX,e.clientY));
+    if(sn.hit){hs.setAttribute('cx',sn.x);hs.setAttribute('cy',sn.y);hs.setAttribute('r',(7/view.s).toFixed(2));hs.style.display='';}
+    else hs.style.display='none';
+  }
 });
 function endPointer(e){
   const had=pointers.has(e.pointerId);pointers.delete(e.pointerId);
@@ -1013,6 +1021,7 @@ function renderShapes(){
   if(draft)svg+=draftSVG();
   if(pend2)svg+=pendSVG();
   if(selShape&&document.body.classList.contains('tool-select'))svg+=selectionSVG();
+  if(document.body.classList.contains('edit'))svg+=`<circle id="hoverSnap" class="snaphit" cx="0" cy="0" r="0" style="display:none"/>`;
   drawEl.innerHTML=svg;updateHandleScale();attachShapeEvents();
   document.body.classList.toggle('has-sel',!!(selShape&&document.body.classList.contains('tool-select')));
 }
