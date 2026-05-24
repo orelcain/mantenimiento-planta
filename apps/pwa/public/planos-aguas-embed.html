@@ -17,8 +17,8 @@
     --ink:#eef2f6; --inkMid:#9bafc1; --inkLo:#697f92; --ghost:#4c6076;
     --aqua:#2E75B6; --aquaBright:#5aa6e8; --aquaLight:#9DC3E6; --aquaSoft:rgba(46,117,182,.16);
     --border:#21384a; --borderHi:#30506a;
-    --dulce:#4a97d6; --salada:#e0697d;
-    --drawDulce:#2faa5a; --drawSalada:#3fa9d4;
+    --dulce:#2faa5a; --salada:#3fa9d4; --caliente:#ff8c42;
+    --drawDulce:var(--dulce); --drawSalada:var(--salada); --drawCaliente:var(--caliente);
     --ok:#3fb98f; --falta:#e8a23d; --nuevo:#b08fe0; --star:#f0c14b;
     --okSoft:rgba(63,185,143,.14); --faltaSoft:rgba(232,162,61,.15); --nuevoSoft:rgba(176,143,224,.16);
     --shadow:0 12px 38px rgba(0,0,0,.5);
@@ -82,6 +82,7 @@
   .mk .pin b{transform:rotate(45deg);color:#fff;font-size:11px;font-weight:700;line-height:1;font-family:var(--mono)}
   .mk.s .pin{background:var(--salada)}
   .mk.d .pin{background:var(--dulce)}
+  .mk.c .pin{background:var(--caliente)}
   .mk.st-falta .pin{box-shadow:0 0 0 3px var(--falta),0 0 12px var(--faltaSoft),0 3px 7px rgba(0,0,0,.55)}
   .mk.st-nuevo .pin{box-shadow:0 0 0 3px var(--nuevo),0 0 12px var(--nuevoSoft),0 3px 7px rgba(0,0,0,.55)}
   .mk:hover{z-index:9}
@@ -97,7 +98,7 @@
   .panel.open{transform:none}
   .panel .ph{padding:15px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
   .panel .ph .tag{font-size:18px;font-weight:700;color:#fff;border-radius:8px;width:46px;height:46px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:var(--mono)}
-  .panel .ph .tag.s{background:var(--salada)} .panel .ph .tag.d{background:var(--dulce)}
+  .panel .ph .tag.s{background:var(--salada)} .panel .ph .tag.d{background:var(--dulce)} .panel .ph .tag.c{background:var(--caliente)}
   .panel .ph .hid{font-family:var(--mono);font-weight:600;font-size:13px;letter-spacing:.5px}
   .panel .ph .x{margin-left:auto;border:1px solid var(--border);background:var(--surface);color:var(--inkMid);border-radius:6px;width:32px;height:32px;font-size:15px;cursor:pointer;transition:.13s var(--ease)}
   .panel .ph .x:hover{color:var(--ink);border-color:var(--borderHi)}
@@ -174,11 +175,11 @@
   /* ===== capa de dibujo vectorial (SVG) ===== */
   .draw{position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:none;z-index:5;will-change:transform;overflow:visible}
   .draw .pipe{fill:none;stroke-linecap:round;stroke-linejoin:round}
-  .draw .pipe.dulce{stroke:var(--drawDulce)} .draw .pipe.salada{stroke:var(--drawSalada)}
+  .draw .pipe.dulce{stroke:var(--drawDulce)} .draw .pipe.salada{stroke:var(--drawSalada)} .draw .pipe.caliente{stroke:var(--drawCaliente)}
   .draw .mask{stroke:none}
-  .draw .dot{stroke:none} .draw .dot.dulce{fill:var(--drawDulce)} .draw .dot.salada{fill:var(--drawSalada)}
+  .draw .dot{stroke:none} .draw .dot.dulce{fill:var(--drawDulce)} .draw .dot.salada{fill:var(--drawSalada)} .draw .dot.caliente{fill:var(--drawCaliente)}
   .draw .lbl{font-family:var(--mono);font-weight:600;paint-order:stroke;stroke:#fff;text-anchor:middle;dominant-baseline:central}
-  .draw .lbl.dulce{fill:var(--drawDulce)} .draw .lbl.salada{fill:var(--drawSalada)}
+  .draw .lbl.dulce{fill:var(--drawDulce)} .draw .lbl.salada{fill:var(--drawSalada)} .draw .lbl.caliente{fill:var(--drawCaliente)}
   .draw .live{stroke-dasharray:9 7;opacity:.75}
   .draw .sel-outline{fill:none;stroke:var(--star);stroke-dasharray:6 5;vector-effect:non-scaling-stroke;stroke-width:2;pointer-events:none}
   .draw .dv{fill:var(--star);stroke:#0c1620;stroke-width:1;pointer-events:none}
@@ -189,7 +190,7 @@
   body.edit.tool-select .draw .pipe{pointer-events:none}
   body.edit.tool-select .draw .hit{pointer-events:stroke;stroke:transparent;fill:none}
   body.edit.tool-pipe .stagewrap,body.edit.tool-mask .stagewrap,
-  body.edit.tool-dot .stagewrap,body.edit.tool-label .stagewrap{cursor:crosshair}
+  body.edit.tool-bajada .stagewrap,body.edit.tool-label .stagewrap{cursor:crosshair}
 
   /* ===== paleta de herramientas en la editbar ===== */
   .palette{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
@@ -202,6 +203,7 @@
   .seg button.on{background:var(--aquaSoft);color:var(--aquaBright)}
   .seg.kind button[data-k="dulce"].on{background:rgba(47,170,90,.22);color:var(--drawDulce)}
   .seg.kind button[data-k="salada"].on{background:rgba(63,169,212,.22);color:var(--drawSalada)}
+  .seg.kind button[data-k="caliente"].on{background:rgba(255,140,66,.22);color:var(--drawCaliente)}
   .mcol{width:30px;height:30px;border:1px solid var(--border);border-radius:6px;background:var(--surface);cursor:pointer;padding:2px;display:none}
   body.tool-mask .mcol{display:inline-block}
   body.tool-mask .seg.kind,body.tool-select .seg.kind,body.tool-pin .seg.kind{display:none}
@@ -230,6 +232,7 @@
   <div class="toolbar">
     <span class="chip" data-f="d"><span class="dot" style="background:var(--dulce)"></span>Dulce</span>
     <span class="chip" data-f="s"><span class="dot" style="background:var(--salada)"></span>Salada</span>
+    <span class="chip" data-f="c"><span class="dot" style="background:var(--caliente)"></span>Caliente</span>
     <span class="sep"></span>
     <span class="chip" data-f="ok"><span class="dot" style="background:var(--ok)"></span>Coincide</span>
     <span class="chip" data-f="falta"><span class="ring" style="color:var(--falta)"></span>Falta en plano</span>
@@ -258,15 +261,15 @@
         <span class="tagx">EDICIÓN</span>
         <div class="palette">
           <button class="tbtn on" data-tool="pin">Mover/Pin</button>
+          <button class="tbtn" data-tool="bajada">Bajada</button>
           <button class="tbtn" data-tool="pipe">Cañería</button>
-          <button class="tbtn" data-tool="dot">Punto</button>
           <button class="tbtn" data-tool="label">Etiqueta</button>
           <button class="tbtn" data-tool="mask">Máscara</button>
           <input type="color" class="mcol" id="maskColor" value="#ffffff" title="Color de la máscara">
           <button class="tbtn" data-tool="select">Seleccionar</button>
         </div>
         <div class="seg kind" id="kindSeg" title="Color de cañería / punto / etiqueta">
-          <button data-k="dulce" class="on">Dulce</button><button data-k="salada">Salada</button>
+          <button data-k="dulce" class="on">Dulce</button><button data-k="salada">Salada</button><button data-k="caliente">Caliente</button>
         </div>
         <span class="ctx draft">
           <button class="btn primary" id="eFinish">✓ Terminar</button>
@@ -298,6 +301,10 @@
             <button data-st="ok">En ambos</button><button data-st="falta">Falta</button><button data-st="nuevo">Nuevo</button>
           </div>
           <div style="font-family:var(--mono);font-size:9.5px;color:var(--inkLo);letter-spacing:.4px;margin-top:7px;line-height:1.5">"Nuevo" = en espera hasta confirmar que la bajada va ahí.</div>
+        </div>
+        <div class="row" id="pLabEditRow" style="display:none"><label>Correlativo del pin</label>
+          <input id="pLab" class="search" style="max-width:none;width:100%" />
+          <div style="font-family:var(--mono);font-size:9.5px;color:var(--inkLo);letter-spacing:.4px;margin-top:6px;line-height:1.5">Cambia la letra/número que muestra el pin (para sincronizar con otro depto). No cambia el ID interno.</div>
         </div>
         <div class="row"><label>Foto referencial</label>
           <div class="photo" id="pPhoto">Sin foto. Pega (Ctrl+V) o sube una imagen.</div>
@@ -519,7 +526,7 @@ document.getElementById('zfit').onclick=()=>{userMoved=true;fit();};
 function zoomC(f){const r=stage.getBoundingClientRect(),mx=r.width/2,my=r.height/2,ns=Math.max(0.1,Math.min(8,view.s*f));view.x=mx-(mx-view.x)*(ns/view.s);view.y=my-(my-view.y)*(ns/view.s);view.s=ns;applyView();}
 
 /* ============ MARKERS ============ */
-const filters={d:true,s:true,ok:true,falta:true,nuevo:true};
+const filters={d:true,s:true,c:true,ok:true,falta:true,nuevo:true};
 let searchTxt='';
 function renderMarkers(){
   markersEl.querySelectorAll('.mk').forEach(n=>n.remove());
@@ -556,16 +563,19 @@ let sel=null;
 async function openPanel(id){
   const p=points().find(x=>x.id===id);if(!p)return;sel=id;
   document.querySelectorAll('.mk').forEach(n=>n.classList.toggle('sel',n.dataset.id===id));
+  const tipoNom=p.t==='d'?'Dulce':p.t==='c'?'Caliente':'Salada';
   document.getElementById('pTag').textContent=p.lab;document.getElementById('pTag').className='tag '+p.t;
-  document.getElementById('pId').textContent=p.id+' · agua '+(p.t==='d'?'dulce':'salada');
+  document.getElementById('pId').textContent=p.id+' · agua '+tipoNom.toLowerCase();
   document.getElementById('pEstado').innerHTML=`<span class="estado ${p.st}">${p.st==='ok'?'En ambos':p.st==='falta'?'Falta en plano':'Solo plano nuevo'}</span>`;
-  document.getElementById('pTipo').textContent=(p.t==='d'?'Dulce':'Salada')+' — '+ESTADO_TXT[p.st];
+  document.getElementById('pTipo').textContent=tipoNom+' — '+ESTADO_TXT[p.st];
   document.getElementById('pZona').textContent=p.zona||'—';
   document.getElementById('pNotas').value=state.notas[id]||'';
   document.getElementById('pWarn').innerHTML=p.flag?`<div class="warn">⚠️ ${p.flag}</div>`:'';
   const editing=document.body.classList.contains('edit');
   document.getElementById('pEditRow').style.display=editing?'block':'none';
   document.getElementById('pEstadoEditRow').style.display=editing?'block':'none';
+  document.getElementById('pLabEditRow').style.display=editing?'block':'none';
+  document.getElementById('pLab').value=p.lab;
   document.querySelectorAll('#pEstadoSeg button').forEach(b=>b.classList.toggle('on',b.dataset.st===p.st));
   const ph=document.getElementById('pPhoto');ph.innerHTML='Cargando…';const data=await getPhoto(id);
   const psrc=data||(state.photos&&state.photos[id])||null;
@@ -609,9 +619,18 @@ function setEstado(id,st){
   toast('Estado: '+(st==='ok'?'En ambos':st==='falta'?'Falta':'Nuevo'));
 }
 document.querySelectorAll('#pEstadoSeg button').forEach(b=>b.onclick=()=>{if(sel)setEstado(sel,b.dataset.st);});
+/* editar correlativo del pin (id estable; solo cambia la etiqueta mostrada) */
+function setLab(id,lab){
+  lab=(lab||'').trim();if(!lab)return;
+  const dp=DEFAULT_POINTS.find(p=>p.id===id);
+  if(dp){state.over[id]=Object.assign({},state.over[id],{lab});}
+  else{const ex=(state.extra||[]).find(p=>p.id===id);if(ex)ex.lab=lab;}
+  save();renderMarkers();document.getElementById('pTag').textContent=lab;
+}
+document.getElementById('pLab').addEventListener('change',e=>{if(sel)setLab(sel,e.target.value);});
 
 /* ============ EDIT ============ */
-function exitEdit(){cancelDraft();selShape=null;document.body.classList.remove('edit','tool-pin','tool-pipe','tool-dot','tool-label','tool-mask','tool-select','has-sel');document.getElementById('btnEdit').classList.remove('on');renderShapes();renderMarkers();}
+function exitEdit(){cancelDraft();selShape=null;document.body.classList.remove('edit','tool-pin','tool-pipe','tool-bajada','tool-label','tool-mask','tool-select','has-sel');document.getElementById('btnEdit').classList.remove('on');renderShapes();renderMarkers();}
 document.getElementById('btnEdit').onclick=()=>{const on=document.body.classList.toggle('edit');if(on){document.getElementById('btnEdit').classList.add('on');setTool('pin');renderMarkers();toast('Modo edición ON');}else{exitEdit();toast('Modo edición OFF');}};
 document.getElementById('eDone').onclick=exitEdit;
 function addPointAt(e){const w=worldPx(e.clientX,e.clientY);const pc={x:w.x/baseW()*100,y:w.y/baseH()*100};
@@ -629,17 +648,17 @@ const PIPE_W=5, DOT_R=13, LBL_SZE=40, LBL_HALO=6;
 let tool='pin', kind='dulce', maskColor='#ffffff';
 let draft=null, draftCursor=null, selShape=null, drag=null;
 const HINTS={
-  pin:'Arrastra pines · toca vacío = pin nuevo · cambia estado / borra desde el panel',
+  pin:'Arrastra pines para reubicarlos · cambia estado / correlativo / borra desde el panel',
+  bajada:'Clic donde está la bajada → elige tipo y correlativo → dibuja la cañería al troncal',
   pipe:'Clic = vértice · doble-clic o ✓ Terminar · Esc cancela · Retroceso borra el último',
-  dot:'Clic en el plano = punto de bajada (color según Dulce / Salada)',
-  label:'Clic en el plano = etiqueta (PP AD- / PP AS-)',
+  label:'Clic en el plano = etiqueta (PP AD- / PP AS- / PP AC-)',
   mask:'Clic = vértice del polígono · doble-clic o ✓ Terminar · elige el color arriba',
   select:'Clic una figura para moverla o arrastrar sus vértices · papelera para borrar'};
 function setTool(t){
   if(draft)cancelDraft();
   tool=t;selShape=null;
   document.querySelectorAll('.tbtn[data-tool]').forEach(b=>b.classList.toggle('on',b.dataset.tool===t));
-  document.body.classList.remove('tool-pin','tool-pipe','tool-dot','tool-label','tool-mask','tool-select');
+  document.body.classList.remove('tool-pin','tool-pipe','tool-bajada','tool-label','tool-mask','tool-select');
   document.body.classList.add('tool-'+t);
   document.getElementById('editHintTxt').textContent=HINTS[t]||'';
   renderShapes();
@@ -656,12 +675,69 @@ function onEditClick(e){
   const w=worldPx(e.clientX,e.clientY);
   if(w.x<-baseW()*.15||w.x>baseW()*1.15||w.y<-baseH()*.15||w.y>baseH()*1.15)return;
   switch(tool){
-    case 'pin': addPointAt(e); break;
+    case 'bajada': startBajada(w); break;
     case 'pipe': case 'mask': draftAdd(w); break;
-    case 'dot': addDot(w); break;
     case 'label': addLabel(w); break;
     case 'select': selShape=null; renderShapes(); break;
+    // 'pin' (Mover): tocar vacío no crea nada; las bajadas se crean con la herramienta Bajada
   }
+}
+
+/* ---- flujo Crear bajada: tipo → correlativo → pin + etiqueta → cañería ---- */
+let pendBajada=null;
+function nextCorr(t){
+  const used=new Set(points().filter(p=>p.t===t).map(p=>String(p.lab).toUpperCase()));
+  if(t==='s'){const nums=[...used].map(n=>parseInt(n,10)).filter(n=>!isNaN(n));let n=(nums.length?Math.max(...nums):0)+1;while(used.has(String(n)))n++;return String(n);}
+  const L='ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  for(const a of L)if(!used.has(a))return a;
+  for(const a of L)for(const b of L){if(!used.has(a+b))return a+b;}
+  return 'X';
+}
+function kindOf(t){return t==='d'?'dulce':t==='c'?'caliente':'salada';}
+function startBajada(w){pendBajada={x:w.x,y:w.y};openBajadaModal('d');}
+function openBajadaModal(t){
+  const corr=nextCorr(t), pre=t==='d'?'PP AD-':t==='c'?'PP AC-':'PP AS-';
+  const nom=k=>k==='d'?'Dulce':k==='c'?'Caliente':'Salada';
+  const c=document.getElementById('modalCard');
+  c.innerHTML=`<h3>Nueva bajada</h3>
+    <div style="display:flex;gap:7px;margin-bottom:14px" id="bjTipos">
+      ${['d','s','c'].map(k=>`<button class="btn ${k===t?'primary':''}" data-t="${k}" style="flex:1">${nom(k)}</button>`).join('')}
+    </div>
+    <label style="display:block;font-family:var(--mono);font-size:9.5px;color:var(--inkLo);text-transform:uppercase;letter-spacing:1.3px;margin-bottom:6px">Correlativo (editable)</label>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span class="mono" style="color:var(--inkMid);font-size:14px">${pre}</span>
+      <input id="bjCorr" class="search" style="max-width:none;flex:1" value="${corr}">
+    </div>
+    <div class="mono" style="font-size:10px;color:var(--inkLo);margin-top:7px">El pin mostrará <b id="bjPrev" style="color:var(--ink)">${corr}</b>. Cámbialo si otro depto usa otra letra/número.</div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn" id="bjCancel" style="flex:1">Cancelar</button>
+      <button class="btn primary" id="bjOk" style="flex:1">Crear y dibujar cañería</button>
+    </div>`;
+  document.getElementById('modal').classList.add('open');
+  c.querySelectorAll('#bjTipos button').forEach(b=>b.onclick=()=>openBajadaModal(b.dataset.t));
+  const inp=c.querySelector('#bjCorr');
+  inp.oninput=()=>{c.querySelector('#bjPrev').textContent=inp.value||'—';};
+  setTimeout(()=>{inp.focus();inp.select();},30);
+  c.querySelector('#bjCancel').onclick=()=>{document.getElementById('modal').classList.remove('open');pendBajada=null;};
+  c.querySelector('#bjOk').onclick=()=>commitBajada(t);
+}
+function commitBajada(t){
+  if(!pendBajada)return;
+  const corr=(document.getElementById('bjCorr').value||'').trim();
+  if(!corr){toast('Pon un correlativo');return;}
+  const pre=t==='d'?'AD':t==='c'?'AC':'AS', id=pre+'-'+corr;
+  if(points().some(p=>p.id===id)&&!confirm('Ya existe '+id+'. ¿Crear igual?'))return;
+  const x=pendBajada.x/baseW()*100, y=pendBajada.y/baseH()*100, k=kindOf(t);
+  state.extra.push({id,t,lab:corr,x,y,st:'nuevo',zona:'Agregado manualmente',custom:true});
+  state.shapes.push({id:'sh-'+Date.now(),type:'label',kind:k,x:+pendBajada.x.toFixed(1),y:+(pendBajada.y+DOT_R*2.6).toFixed(1),text:'PP '+pre+'-'+corr});
+  save();renderMarkers();renderShapes();
+  document.getElementById('modal').classList.remove('open');
+  // pasar a dibujar la cañería anclada al pin
+  kind=k; setTool('pipe');
+  draft={type:'pipe',kind:k,fill:maskColor,pts:[[+pendBajada.x.toFixed(1),+pendBajada.y.toFixed(1)]]};
+  document.body.classList.add('drafting'); renderShapes();
+  toast('Bajada '+id+' creada — dibuja la cañería al troncal');
+  pendBajada=null;
 }
 
 /* polilínea / polígono */
@@ -692,7 +768,7 @@ window.addEventListener('keydown',e=>{
 /* punto y etiqueta (un solo clic) */
 function addDot(w){state.shapes.push({id:'sh-'+Date.now(),type:'dot',kind,x:+w.x.toFixed(1),y:+w.y.toFixed(1)});save();renderShapes();toast('Punto agregado');}
 function addLabel(w){
-  const def=kind==='dulce'?'PP AD-':'PP AS-';
+  const def=kind==='dulce'?'PP AD-':kind==='caliente'?'PP AC-':'PP AS-';
   const t=prompt('Texto de la etiqueta:',def);if(t==null||!t.trim())return;
   state.shapes.push({id:'sh-'+Date.now(),type:'label',kind,x:+w.x.toFixed(1),y:+w.y.toFixed(1),text:t.trim()});save();renderShapes();toast('Etiqueta agregada');
 }
