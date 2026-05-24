@@ -20,7 +20,7 @@ import {
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'
 import { db, storage } from '@/services/firebase'
 import { generateId } from '@/lib/utils'
-import { compressImage } from '@/services/storage'
+import { processImageForUpload, IMAGE_PRESETS } from '@/utils/images/processImage'
 import { logger } from '@/lib/logger'
 import type {
   MapLocation,
@@ -142,8 +142,8 @@ export async function uploadMapVersion(
   userId: string,
   descripcion?: string
 ): Promise<MapVersion> {
-  // Comprimir imagen (max 2500px, 85% quality para mapas detallados)
-  const compressed = await compressImage(file, 2500, 0.85)
+  // Plano: preset de alta resolución (detalle fino).
+  const { file: compressed } = await processImageForUpload(file, IMAGE_PRESETS.plan)
 
   // Obtener dimensiones
   const dimensions = await getImageDimensions(compressed)
@@ -706,7 +706,7 @@ export async function uploadInspectionItemPhoto(
   inspectionId: string,
   file: File
 ): Promise<{ url: string; descripcion: string }> {
-  const compressed = await compressImage(file, 1200, 0.8)
+  const { file: compressed } = await processImageForUpload(file, IMAGE_PRESETS.photo)
   const ext = compressed.type.includes('webp') ? 'webp' : 'jpg'
   const photoId = generateId()
   const storagePath = `inspections/${inspectionId}/${itemId}/${photoId}.${ext}`

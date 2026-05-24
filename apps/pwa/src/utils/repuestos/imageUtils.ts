@@ -1,5 +1,10 @@
+import { processImageForUpload } from '@/utils/images/processImage'
+
 /**
- * Optimiza una imagen reduciendo su tamaño y calidad
+ * Optimiza una imagen reduciendo su tamaño y calidad.
+ *
+ * @deprecated Preferir `processImageForUpload` directamente. Este wrapper delega
+ * en el helper unificado y se mantiene por compatibilidad.
  * @param file Archivo de imagen original
  * @param maxWidth Ancho máximo en píxeles (default: 1200)
  * @param maxHeight Alto máximo en píxeles (default: 1200)
@@ -12,75 +17,13 @@ export async function optimizeImage(
   maxHeight: number = 1200,
   quality: number = 0.8
 ): Promise<{ file: File; width: number; height: number }> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    
-    reader.onerror = () => reject(new Error('Error al leer el archivo'))
-    
-    reader.onload = (e) => {
-      const img = new Image()
-      
-      img.onerror = () => reject(new Error('Error al cargar la imagen'))
-      
-      img.onload = () => {
-        try {
-          // Calcular nuevas dimensiones manteniendo aspecto
-          let { width, height } = img
-          
-          if (width > maxWidth) {
-            height = (height * maxWidth) / width
-            width = maxWidth
-          }
-          
-          if (height > maxHeight) {
-            width = (width * maxHeight) / height
-            height = maxHeight
-          }
-          
-          // Crear canvas y redimensionar
-          const canvas = document.createElement('canvas')
-          canvas.width = width
-          canvas.height = height
-          
-          const ctx = canvas.getContext('2d')
-          if (!ctx) {
-            reject(new Error('No se pudo crear el contexto del canvas'))
-            return
-          }
-          
-          // Dibujar imagen redimensionada
-          ctx.drawImage(img, 0, 0, width, height)
-          
-          // Convertir a blob
-          canvas.toBlob(
-            (blob) => {
-              if (!blob) {
-                reject(new Error('Error al crear el blob de la imagen'))
-                return
-              }
-              
-              // Crear nuevo archivo
-              const fileName = file.name.replace(/\.[^/.]+$/, "") + ".webp"
-              const optimizedFile = new File([blob], fileName, {
-                type: 'image/webp',
-                lastModified: Date.now(),
-              })
-              
-              resolve({ file: optimizedFile, width, height })
-            },
-            'image/webp',
-            quality
-          )
-        } catch (error) {
-          reject(error)
-        }
-      }
-      
-      img.src = e.target?.result as string
-    }
-    
-    reader.readAsDataURL(file)
-  })
+  const result = await processImageForUpload(file, { maxWidth, maxHeight, quality })
+  if (result.width > 0 && result.height > 0) {
+    return { file: result.file, width: result.width, height: result.height }
+  }
+  // Formatos no recomprimidos (GIF/SVG): medir dimensiones reales.
+  const dims = await getImageDimensions(result.file)
+  return { file: result.file, width: dims.width, height: dims.height }
 }
 
 /**
@@ -89,7 +32,7 @@ export async function optimizeImage(
  * @param maxSizeMB Tamaño máximo en MB (default: 10)
  * @returns true si es válido, mensaje de error si no
  */
-export function validateImageFile(file: File, maxSizeMB: number = 10): string | true {
+export function validateImageFile(file: File, maxSizeMB: number = 25): string | true {
   // Validar tipo
   const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']
   if (!validTypes.includes(file.type)) {

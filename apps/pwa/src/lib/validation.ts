@@ -49,7 +49,10 @@ export const tituloSchema = z.string()
 // ============================================================================
 
 export const FILE_CONSTRAINTS = {
-  MAX_SIZE: 5 * 1024 * 1024, // 5MB
+  // Límite del archivo ORIGINAL (antes de optimizar). La app comprime a WebP
+  // antes de subir, así que se permiten fotos pesadas de celular; el tamaño
+  // final lo topan las reglas de Storage (storage.rules).
+  MAX_SIZE: 25 * 1024 * 1024, // 25MB
   ALLOWED_IMAGE_TYPES: ['image/jpeg', 'image/png', 'image/webp'] as const,
   MAX_IMAGES_PER_INCIDENT: 10,
 }

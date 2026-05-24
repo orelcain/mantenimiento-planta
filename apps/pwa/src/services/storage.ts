@@ -9,6 +9,7 @@ import { storage } from './firebase'
 import { generateId } from '@/lib/utils'
 import { validateFile } from '@/lib/validation'
 import { logger } from '@/lib/logger'
+import { processImageForUpload, IMAGE_PRESETS } from '@/utils/images/processImage'
 
 // Subir imagen de incidencia
 export async function uploadIncidentPhoto(
@@ -29,7 +30,7 @@ export async function uploadIncidentPhoto(
 
   try {
     // Siempre convertir a WebP con buena calidad
-    const fileToUpload = await compressImage(file, 1920, 0.88, true)
+    const { file: fileToUpload } = await processImageForUpload(file, IMAGE_PRESETS.photo)
 
     const fileName = `${generateId()}.webp`
     const storageRef = ref(storage, `incidents/${incidentId}/${fileName}`)
@@ -71,7 +72,7 @@ export async function uploadEquipmentPhoto(
   try {
     // Siempre convertir a WebP y comprimir si es necesario
     // Mantener calidad alta (0.88) para buena visualización
-    const fileToUpload = await compressImage(file, 1920, 0.88, true)
+    const { file: fileToUpload } = await processImageForUpload(file, IMAGE_PRESETS.photo)
 
     const fileName = `${generateId()}.webp`
     const storageRef = ref(storage, `equipment/${equipmentId}/${fileName}`)
@@ -113,7 +114,7 @@ export async function uploadGanttCommentPhoto(
   })
 
   try {
-    const fileToUpload = await compressImage(file, 1920, 0.88, true)
+    const { file: fileToUpload } = await processImageForUpload(file, IMAGE_PRESETS.photo)
     const fileName = `${generateId()}.webp`
     const storageRef = ref(storage, `gantt/${taskId}/comments/${commentDraftId}/${fileName}`)
 
@@ -133,11 +134,12 @@ export async function uploadUserPhoto(
   userId: string,
   file: File
 ): Promise<string> {
-  const fileExtension = file.name.split('.').pop() || 'jpg'
+  const { file: fileToUpload } = await processImageForUpload(file, IMAGE_PRESETS.avatar)
+  const fileExtension = fileToUpload.type === 'image/webp' ? 'webp' : 'jpg'
   const fileName = `avatar.${fileExtension}`
   const storageRef = ref(storage, `users/${userId}/${fileName}`)
-  
-  await uploadBytes(storageRef, file)
+
+  await uploadBytes(storageRef, fileToUpload, { contentType: fileToUpload.type })
   return getDownloadURL(storageRef)
 }
 
@@ -146,11 +148,13 @@ export async function uploadFloorPlan(
   file: File,
   name?: string
 ): Promise<string> {
-  const fileExtension = file.name.split('.').pop() || 'png'
+  // Planos: preset de alta resolución (detalle fino) en vez de subir crudo.
+  const { file: fileToUpload } = await processImageForUpload(file, IMAGE_PRESETS.plan)
+  const fileExtension = fileToUpload.type === 'image/webp' ? 'webp' : 'jpg'
   const fileName = name ? `${name}.${fileExtension}` : `map_${Date.now()}.${fileExtension}`
   const storageRef = ref(storage, `maps/${fileName}`)
-  
-  await uploadBytes(storageRef, file)
+
+  await uploadBytes(storageRef, fileToUpload, { contentType: fileToUpload.type })
   return getDownloadURL(storageRef)
 }
 
@@ -180,90 +184,26 @@ export async function deleteFile(url: string): Promise<void> {
   }
 }
 
-// Comprimir imagen antes de subir (mejorado con soporte WebP)
+/**
+ * Comprimir imagen antes de subir.
+ *
+ * @deprecated Preferir `processImageForUpload` (con presets de `IMAGE_PRESETS`)
+ * para nuevos usos. Este wrapper delega en el helper unificado y se mantiene por
+ * compatibilidad con los call sites existentes.
+ */
 export async function compressImage(
   file: File,
   maxWidth: number = 1920,
   quality: number = 0.8,
   useWebP: boolean = true
 ): Promise<File> {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    const objectUrl = URL.createObjectURL(file)
-    img.src = objectUrl
-    
-    img.onload = () => {
-      const canvas = document.createElement('canvas')
-      let { width, height } = img
-      
-      if (width > maxWidth) {
-        height = (height * maxWidth) / width
-        width = maxWidth
-      }
-      
-      canvas.width = width
-      canvas.height = height
-      
-      const ctx = canvas.getContext('2d')
-      if (!ctx) {
-        reject(new Error('No se pudo crear contexto de canvas'))
-        return
-      }
-      
-      ctx.drawImage(img, 0, 0, width, height)
-      
-      const nameWithoutExt = file.name.replace(/\.[^/.]+$/, '')
-
-      const finalize = (blob: Blob, mimeType: string, extension: string) => {
-        const compressedFile = new File([blob], `${nameWithoutExt}.${extension}`, {
-          type: mimeType,
-          lastModified: Date.now(),
-        })
-        resolve(compressedFile)
-      }
-
-      const tryJpeg = () => {
-        canvas.toBlob(
-          (jpegBlob) => {
-            if (!jpegBlob) {
-              reject(new Error('No se pudo comprimir la imagen'))
-              return
-            }
-            finalize(jpegBlob, 'image/jpeg', 'jpg')
-          },
-          'image/jpeg',
-          quality
-        )
-      }
-
-      if (useWebP) {
-        canvas.toBlob(
-          (webpBlob) => {
-            // Check if backend returned valid WebP. 
-            // Some browsers (iOS < 14, some Android) return PNG if WebP is not supported for encoding.
-            // PNG is lossless and much larger, so we must avoid it.
-            if (!webpBlob || webpBlob.type !== 'image/webp') {
-              logger.warn('WebP compression not supported or returned PNG. Falling back to JPEG.')
-              tryJpeg()
-              return
-            }
-            finalize(webpBlob, 'image/webp', 'webp')
-          },
-          'image/webp',
-          quality
-        )
-      } else {
-        tryJpeg()
-      }
-
-      URL.revokeObjectURL(objectUrl)
-    }
-    
-    img.onerror = () => {
-      URL.revokeObjectURL(objectUrl)
-      reject(new Error('Error cargando imagen'))
-    }
+  const result = await processImageForUpload(file, {
+    maxWidth,
+    maxHeight: maxWidth,
+    quality,
+    preferWebP: useWebP,
   })
+  return result.file
 }
 // Subir imagen del mapa/plano (sin compresión, mantiene resolución original)
 export async function uploadMapImage(file: File): Promise<string> {
@@ -365,7 +305,7 @@ export async function uploadBodegaPhoto(codigoSAP: string, file: File): Promise<
   const validation = validateFile(file)
   if (!validation.valid) throw new Error(validation.error)
 
-  const fileToUpload = await compressImage(file, 1200, 0.85, true)
+  const { file: fileToUpload } = await processImageForUpload(file, IMAGE_PRESETS.photo)
   const fileName = `${generateId()}.webp`
   const storageRef = ref(storage, `bodega/${codigoSAP}/fotos/${fileName}`)
 

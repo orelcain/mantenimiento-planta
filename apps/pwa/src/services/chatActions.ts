@@ -489,7 +489,7 @@ export function formatDraftForDisplay(draft: IncidentDraft): string {
 
 // ─── Subir foto desde chat ───────────────────────────────────────────
 
-import { uploadIncidentPhoto, compressImage } from './storage'
+import { uploadIncidentPhoto } from './storage'
 
 /**
  * Sube una foto desde el chat y retorna la URL.
@@ -497,12 +497,10 @@ import { uploadIncidentPhoto, compressImage } from './storage'
  */
 export async function uploadChatPhoto(userId: string, file: File): Promise<string> {
   try {
-    // Comprimir imagen a WebP
-    const compressed = await compressImage(file, 1920, 0.85, true)
-    // Usar un bucket path temporal para chat uploads
+    // uploadIncidentPhoto optimiza a WebP internamente (preset photo).
     const tempId = `chat_${userId}_${Date.now()}`
-    const url = await uploadIncidentPhoto(tempId, compressed)
-    logger.info('chatActions: photo uploaded from chat', { userId, size: compressed.size })
+    const url = await uploadIncidentPhoto(tempId, file)
+    logger.info('chatActions: photo uploaded from chat', { userId, size: file.size })
     return url
   } catch (err) {
     logger.error('chatActions: error uploading chat photo', err instanceof Error ? err : undefined)

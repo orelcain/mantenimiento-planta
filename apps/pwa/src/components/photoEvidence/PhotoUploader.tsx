@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { Camera, X, Image as ImageIcon, Plus } from 'lucide-react'
 import { Button, Spinner } from '@/components/ui'
-import { compressImage } from '@/services/storage'
+import { processImageForUpload, IMAGE_PRESETS } from '@/utils/images/processImage'
 import { logger } from '@/lib/logger'
 
 interface PhotoUploaderProps {
@@ -43,8 +43,8 @@ export function PhotoUploader({
       if (!file.type.startsWith('image/')) continue
 
       try {
-        // Comprimir imagen
-        const compressed = await compressImage(file, 1920, 0.8)
+        // Optimizar a WebP con objetivo de peso (preset photo)
+        const { file: compressed } = await processImageForUpload(file, IMAGE_PRESETS.photo)
         
         // Crear preview
         const preview = await new Promise<string>((resolve) => {

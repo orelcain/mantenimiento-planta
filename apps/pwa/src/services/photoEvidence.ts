@@ -24,7 +24,7 @@ import {
 import { db, storage } from './firebase'
 import type { PhotoEvidence, PhotoItem, PhotoEvidenceStatus, PhotoComparison, PhotoPairMeta, PhotoPairPhotos } from '@/types'
 import { generateId } from '@/lib/utils'
-import { compressImage } from './storage'
+import { processImageForUpload, IMAGE_PRESETS } from '@/utils/images/processImage'
 import { logger } from '@/lib/logger'
 import { enqueueEvidenceUpload } from '@/services/offlineUploadQueue'
 
@@ -98,16 +98,14 @@ export async function uploadEvidencePhoto(
   try {
     const photoId = generateId()
 
+    // Procesar siempre (también offline, para no encolar el crudo en IndexedDB).
+    const { file: fileToUpload } = await processImageForUpload(file, IMAGE_PRESETS.photo)
+
     if (!navigator.onLine) {
-      await enqueueEvidenceUpload(evidenceId, file, type, photoId)
+      await enqueueEvidenceUpload(evidenceId, fileToUpload, type, photoId)
       logger.warn('Offline upload queued', { evidenceId, photoId, type })
       return { id: photoId, url: `pending:${photoId}` }
     }
-
-    // Comprimir imagen si es mayor a 1MB
-    const fileToUpload = file.size > 1024 * 1024
-      ? await compressImage(file, 1920, 0.8, true)
-      : file
 
     const fileExtension =
       fileToUpload.name.split('.').pop() ||

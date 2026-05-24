@@ -3,7 +3,7 @@ import { ref, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject, l
 import { storage } from '@/services/firebase';
 import { logger } from '@/lib/logger';
 import type { ImagenRepuesto } from '@/types/repuestos';
-import { optimizeImage } from '@/utils/repuestos';
+import { processImageForUpload, IMAGE_PRESETS } from '@/utils/images/processImage';
 
 export function useStorage(machineId: string | null, manualStoragePath?: string) {
   const [uploading, setUploading] = useState(false);
@@ -48,11 +48,13 @@ export function useStorage(machineId: string | null, manualStoragePath?: string)
 
       if (shouldOptimize) {
         try {
-          const quality = options?.quality ?? 0.85;
-          const result = await optimizeImage(file, 1200, 1200, quality);
+          const result = await processImageForUpload(file, {
+            ...IMAGE_PRESETS.photo,
+            quality: options?.quality ?? IMAGE_PRESETS.photo.quality,
+          });
           fileToUpload = result.file;
-          width = result.width;
-          height = result.height;
+          width = result.width || undefined;
+          height = result.height || undefined;
         } catch (err) {
           logger.warn('[useStorage] No se pudo optimizar imagen; subiendo original');
           fileToUpload = file;

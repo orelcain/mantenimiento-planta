@@ -20,7 +20,7 @@ import {
 } from 'firebase/firestore'
 import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage'
 import { db, storage } from './firebase'
-import { compressImage } from './storage'
+import { processImageForUpload, IMAGE_PRESETS } from '@/utils/images/processImage'
 
 // ─────────────────────────────────────────────────────────────
 // TIPOS
@@ -320,7 +320,7 @@ export async function uploadLearningImage(
   entityId: string,
   file: File
 ): Promise<string> {
-  const compressed = await compressImage(file, 1600, 0.82, true)
+  const { file: compressed } = await processImageForUpload(file, IMAGE_PRESETS.photo)
   const imageId = `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
   const ext = compressed.type.includes('webp') ? 'webp' : 'jpg'
   const path = `learningContent/${machineSlug}/${section}/${entityId}/${imageId}.${ext}`

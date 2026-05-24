@@ -16,7 +16,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { db } from './firebase'
 import { storage } from './firebase'
 import { generateId } from '@/lib/utils'
-import { compressImage } from './storage'
+import { processImageForUpload, IMAGE_PRESETS } from '@/utils/images/processImage'
 import { logger } from '@/lib/logger'
 import type { Annotation3D, AnnotationStatus, AnnotationPriority, Point3D } from '@/types/models3d'
 
@@ -112,7 +112,7 @@ export async function uploadAnnotationPhotos(
   
   for (const file of files) {
     // Compress + convert to WebP
-    const compressed = await compressImage(file, 1920, 0.85, true)
+    const { file: compressed } = await processImageForUpload(file, IMAGE_PRESETS.photo)
     const photoId = generateId()
     const ext = compressed.type.includes('webp') ? 'webp' : 'jpg'
     const storagePath = `models3d/${modelId}/annotations/${annotationId}/${photoId}.${ext}`

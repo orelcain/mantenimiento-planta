@@ -14,7 +14,8 @@ import {
 } from '@/components/ui'
 import { useAuthStore, useAppStore } from '@/store'
 import { createIncident, updateIncident } from '@/services/incidents'
-import { uploadIncidentPhoto, compressImage } from '@/services/storage'
+import { uploadIncidentPhoto } from '@/services/storage'
+import { processImageForUpload, IMAGE_PRESETS } from '@/utils/images/processImage'
 import { refineText, extractSymptomsFromDescription, isAIConfigured } from '@/services/ai'
 import type { IncidentPriority, Incident, Equipment } from '@/types'
 import { HierarchyLevel } from '@/types/hierarchy'
@@ -273,8 +274,8 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
     for (const file of files) {
       if (photos.length >= 5) break
       
-      // Comprimir imagen (ya usa WebP por defecto en storage.ts)
-      const compressed = await compressImage(file, 1920, 0.8)
+      // Optimizar a WebP con objetivo de peso (preset photo). El servicio es idempotente.
+      const { file: compressed } = await processImageForUpload(file, IMAGE_PRESETS.photo)
       setPhotos((prev) => [...prev, compressed])
       
       // Crear preview y obtener metadatos
