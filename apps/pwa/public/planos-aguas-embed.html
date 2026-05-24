@@ -180,6 +180,7 @@
   .draw .rect,.draw .circle{fill:none;stroke:var(--struct)}
   .draw .measure{stroke:var(--star);stroke-dasharray:7 5;vector-effect:non-scaling-stroke;stroke-width:1.5}
   .draw .mtxt{fill:var(--star);font-family:var(--mono);font-weight:600;paint-order:stroke;stroke:#0c1620;stroke-width:3;text-anchor:middle}
+  .draw .snaphit{fill:none;stroke:var(--star);stroke-width:2;vector-effect:non-scaling-stroke;pointer-events:none}
   .draw .cotaline{stroke:var(--struct);stroke-width:2;fill:none}
   .draw .cota{fill:var(--struct);font-family:var(--mono);font-weight:600;font-size:20px;paint-order:stroke;stroke:#0c1620;stroke-width:4;text-anchor:middle;pointer-events:none}
   .draw .mask{stroke:none}
@@ -388,7 +389,7 @@ const STORE_KEY='planosAguas.v3';
 /* ============ STATE ============ */
 let state=load();
 function load(){
-  let s={over:{},notas:{},extra:[],removed:[],shapes:[],photos:{},scale:null,unit:'mm'};
+  let s={over:{},notas:{},extra:[],removed:[],shapes:[],photos:{},scale:null,unit:'mm',showCotas:true};
   try{const r=JSON.parse(localStorage.getItem(STORE_KEY));if(r)s=Object.assign(s,r);}catch(e){}
   if(!Array.isArray(s.shapes))s.shapes=[];
   if(!s.photos||typeof s.photos!=='object')s.photos={};
@@ -713,7 +714,7 @@ function renderEditbar(){
   }else if(tool==='measure'||tool==='calib'){
     const cal=tool==='calib';
     s+=`<span class="tagx">${cal?'CALIBRAR ESCALA':'MEDIR'}</span><span class="wcap">clic 2 puntos${cal?' sobre una cota conocida':''}</span>`;
-    if(!cal)s+=`<button class="tbtn ${cotaMode?'on':''}" id="mCota" title="Deja la medida fija como cota en el plano">+ Agregar cota</button>`;
+    if(!cal)s+=`<button class="tbtn ${cotaMode?'on':''}" id="mCota" title="Deja la medida fija como cota en el plano">+ Agregar cota</button><button class="tbtn ${state.showCotas!==false?'on':''}" id="mShowCota" title="Mostrar/ocultar las cotas de las formas">Cotas</button>`;
     s+=((draft||pend2)?`<button class="btn" id="eCancel">✗ Cancelar</button>`:'')+
       (state.scale?`<span class="wcap">unidad</span><span class="seg" id="unitSeg">`+['mm','cm','m'].map(u=>`<button data-u="${u}" class="${(state.unit||'mm')===u?'on':''}">${u}</button>`).join('')+`</span>`:`<span class="wcap" style="color:var(--falta)">sin calibrar</span>`)+
       `<span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
@@ -785,6 +786,7 @@ function wireEditbar(){
   if($('selRedraw'))$('selRedraw').onclick=()=>redrawPipe(selShape);
   if($('selCota'))$('selCota').onclick=()=>{const sh=getShape(selShape);if(sh){sh.cota=(sh.cota===false);save();renderShapes();renderEditbar();}};
   if($('mCota'))$('mCota').onclick=()=>{cotaMode=!cotaMode;renderEditbar();};
+  if($('mShowCota'))$('mShowCota').onclick=()=>{state.showCotas=(state.showCotas===false);save();renderShapes();renderEditbar();};
   document.querySelectorAll('#unitSeg button').forEach(b=>b.onclick=()=>{state.unit=b.dataset.u;save();renderShapes();renderEditbar();});
   document.querySelectorAll('#wizKind button').forEach(b=>b.onclick=()=>wizType(b.dataset.k));
   if($('wizCorr'))$('wizCorr').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();wizCorrOk();}};
@@ -825,10 +827,11 @@ function twoClick(w){
 }
 function pendSVG(){
   if(!pend2||!draftCursor)return '';
-  const p1=pend2,c=draftCursor;
-  if(tool==='rect'){const x=Math.min(p1.x,c.x),y=Math.min(p1.y,c.y),rw=Math.abs(c.x-p1.x),rh=Math.abs(c.y-p1.y);return `<rect class="rect" x="${x}" y="${y}" width="${rw}" height="${rh}" stroke-width="${pipeW}" opacity=".8"/>`+measLbl((x+rw/2),y-6,dimTxt(rw,rh));}
-  if(tool==='circle'){const r=Math.hypot(c.x-p1.x,c.y-p1.y);return `<circle class="circle" cx="${p1.x}" cy="${p1.y}" r="${r}" stroke-width="${pipeW}" opacity=".8"/>`+measLbl(p1.x,p1.y-r-6,'Ø '+lenTxt(r*2));}
-  if(tool==='measure'||tool==='calib'){const d=Math.hypot(c.x-p1.x,c.y-p1.y);return `<path class="measure" d="M${p1.x} ${p1.y} L${c.x} ${c.y}"/>`+measLbl((p1.x+c.x)/2,(p1.y+c.y)/2-6,lenTxt(d));}
+  const p1=pend2,sn=snapNodes(draftCursor),c={x:sn.hit?sn.x:draftCursor.x,y:sn.hit?sn.y:draftCursor.y};
+  const ind=sn.hit?`<circle class="snaphit" cx="${c.x}" cy="${c.y}" r="${(7/view.s).toFixed(2)}"/>`:'';
+  if(tool==='rect'){const x=Math.min(p1.x,c.x),y=Math.min(p1.y,c.y),rw=Math.abs(c.x-p1.x),rh=Math.abs(c.y-p1.y);return `<rect class="rect" x="${x}" y="${y}" width="${rw}" height="${rh}" stroke-width="${pipeW}" opacity=".8"/>`+measLbl((x+rw/2),y-6,dimTxt(rw,rh))+ind;}
+  if(tool==='circle'){const r=Math.hypot(c.x-p1.x,c.y-p1.y);return `<circle class="circle" cx="${p1.x}" cy="${p1.y}" r="${r}" stroke-width="${pipeW}" opacity=".8"/>`+measLbl(p1.x,p1.y-r-6,'Ø '+lenTxt(r*2))+ind;}
+  if(tool==='measure'||tool==='calib'){const d=Math.hypot(c.x-p1.x,c.y-p1.y);return `<path class="measure" d="M${p1.x} ${p1.y} L${c.x} ${c.y}"/>`+measLbl((p1.x+c.x)/2,(p1.y+c.y)/2-6,lenTxt(d))+ind;}
   return '';
 }
 function unitLbl(){return state.unit||'mm';}
@@ -956,7 +959,7 @@ function shapeSVG(sh){
 }
 /* cotas automáticas de las formas de estructura (cuando hay escala calibrada) */
 function cotaSVG(sh){
-  if(!state.scale||sh.cota===false)return '';
+  if(!state.scale||sh.cota===false||state.showCotas===false)return '';
   const off=14;
   if(sh.type==='rect')
     return `<text class="cota" x="${(sh.x+sh.rw/2).toFixed(1)}" y="${(sh.y-off).toFixed(1)}">${lenTxt(sh.rw)}</text>`
@@ -976,6 +979,7 @@ function draftSVG(){
   const extra=draft.type==='mask'?' stroke="#999"':'';
   s+=`<path class="${cls}" d="${d}" stroke-width="${draft.w||PIPE_W}"${extra}/>`;
   s+=`<path id="draftLive" class="${cls}" d="" stroke-width="${draft.w||PIPE_W}"${extra}/>`;
+  s+=`<circle id="snapInd" class="snaphit" cx="0" cy="0" r="0" style="display:none"/>`;
   draft.pts.forEach(p=>{s+=`<circle class="dv" cx="${p[0]}" cy="${p[1]}" r="${(8/view.s).toFixed(2)}"/>`;});
   return s;
 }
@@ -1004,7 +1008,7 @@ function renderShapes(){
   drawEl.innerHTML=svg;updateHandleScale();attachShapeEvents();
   document.body.classList.toggle('has-sel',!!(selShape&&document.body.classList.contains('tool-select')));
 }
-function updateLive(){const el=drawEl.querySelector('#draftLive');if(!el||!draft||!draft.pts.length||!draftCursor)return;const last=draft.pts[draft.pts.length-1];let cx=draftCursor.x,cy=draftCursor.y;if(draft.type==='pipe'&&snapAngles){const sp=snapPt(last,cx,cy);cx=sp.x;cy=sp.y;}el.setAttribute('d',`M${last[0]} ${last[1]} L${cx.toFixed(1)} ${cy.toFixed(1)}`);}
+function updateLive(){const el=drawEl.querySelector('#draftLive');if(!el||!draft||!draft.pts.length||!draftCursor)return;const last=draft.pts[draft.pts.length-1];const sn=snapNodes(draftCursor);let cx,cy;if(sn.hit){cx=sn.x;cy=sn.y;}else{cx=draftCursor.x;cy=draftCursor.y;if(draft.type==='pipe'&&snapAngles){const sp=snapPt(last,cx,cy);cx=sp.x;cy=sp.y;}}el.setAttribute('d',`M${last[0]} ${last[1]} L${cx.toFixed(1)} ${cy.toFixed(1)}`);const ind=drawEl.querySelector('#snapInd');if(ind){if(sn.hit){ind.setAttribute('cx',cx);ind.setAttribute('cy',cy);ind.setAttribute('r',(7/view.s).toFixed(2));ind.style.display='';}else ind.style.display='none';}}
 
 /* seleccionar / mover / arrastrar vértices */
 function attachShapeEvents(){
