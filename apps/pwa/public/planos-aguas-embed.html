@@ -19,8 +19,8 @@
     --border:#21384a; --borderHi:#30506a;
     --dulce:#2faa5a; --salada:#3fa9d4; --caliente:#ff8c42;
     --drawDulce:var(--dulce); --drawSalada:var(--salada); --drawCaliente:var(--caliente);
-    --ok:#3fb98f; --falta:#e8a23d; --nuevo:#b08fe0; --star:#f0c14b;
-    --okSoft:rgba(63,185,143,.14); --faltaSoft:rgba(232,162,61,.15); --nuevoSoft:rgba(176,143,224,.16);
+    --ok:#3fb98f; --falta:#e8a23d; --nuevo:#b08fe0; --verif:#2dd4bf; --star:#f0c14b;
+    --okSoft:rgba(63,185,143,.14); --faltaSoft:rgba(232,162,61,.15); --nuevoSoft:rgba(176,143,224,.16); --verifSoft:rgba(45,212,191,.16);
     --shadow:0 12px 38px rgba(0,0,0,.5);
     --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
     --disp:'Space Grotesk','IBM Plex Mono',system-ui,sans-serif;
@@ -88,7 +88,7 @@
   .mk:hover{z-index:9}
   .mk:hover .pin{filter:brightness(1.14)}
   .mk .badge{position:absolute;top:-7px;right:-7px;width:15px;height:15px;border-radius:50%;font-size:10px;display:flex;align-items:center;justify-content:center;color:#0d1722;border:1.5px solid var(--bg);font-weight:700;font-family:var(--mono)}
-  .mk.st-falta .badge{background:var(--falta)} .mk.st-nuevo .badge{background:var(--nuevo)}
+  .mk.st-falta .badge{background:var(--falta)} .mk.st-nuevo .badge{background:var(--nuevo)} .mk.st-verif .badge{background:var(--verif)}
   .mk.has-photo .pin::after{content:"";position:absolute;width:8px;height:8px;background:var(--ok);border:1.5px solid var(--bg);border-radius:50%;transform:rotate(45deg);right:-3px;bottom:-3px}
   .mk.sel .pin{outline:3px solid var(--star);outline-offset:2px}
   .mk.dim{opacity:.14}
@@ -105,7 +105,7 @@
   .panel .body{padding:16px 15px;overflow:auto;flex:1}
   .estado{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:4px;font-family:var(--mono);font-size:10px;letter-spacing:.6px;text-transform:uppercase;font-weight:600}
   .estado::before{content:"";width:7px;height:7px;border-radius:1px;background:currentColor}
-  .estado.ok{color:var(--ok);background:var(--okSoft)} .estado.falta{color:var(--falta);background:var(--faltaSoft)} .estado.nuevo{color:var(--nuevo);background:var(--nuevoSoft)}
+  .estado.ok{color:var(--ok);background:var(--okSoft)} .estado.falta{color:var(--falta);background:var(--faltaSoft)} .estado.nuevo{color:var(--nuevo);background:var(--nuevoSoft)} .estado.verif{color:var(--verif);background:var(--verifSoft)}
   .row{margin:15px 0;border-top:1px solid var(--border);padding-top:13px}
   .row:first-child{border-top:none;padding-top:0}
   .row label{display:block;font-family:var(--mono);font-size:9.5px;color:var(--inkLo);text-transform:uppercase;letter-spacing:1.3px;margin-bottom:6px;font-weight:500}
@@ -201,6 +201,7 @@
   .seg button{background:var(--surface);border:none;border-right:1px solid var(--border);color:var(--inkMid);padding:6px 10px;font-family:var(--mono);font-size:10px;letter-spacing:.6px;text-transform:uppercase;cursor:pointer;transition:.12s var(--ease)}
   .seg button:last-child{border-right:none}
   .seg button.on{background:var(--aquaSoft);color:var(--aquaBright)}
+  #pEstadoSeg{display:flex;width:100%} #pEstadoSeg button{flex:1;padding:6px 4px}
   .seg.kind button[data-k="dulce"].on{background:rgba(47,170,90,.22);color:var(--drawDulce)}
   .seg.kind button[data-k="salada"].on{background:rgba(63,169,212,.22);color:var(--drawSalada)}
   .seg.kind button[data-k="caliente"].on{background:rgba(255,140,66,.22);color:var(--drawCaliente)}
@@ -237,6 +238,7 @@
     <span class="chip" data-f="ok"><span class="dot" style="background:var(--ok)"></span>Coincide</span>
     <span class="chip" data-f="falta"><span class="ring" style="color:var(--falta)"></span>Falta en plano</span>
     <span class="chip" data-f="nuevo"><span class="ring" style="color:var(--nuevo)"></span>Nuevo</span>
+    <span class="chip" data-f="verif"><span class="dot" style="background:var(--verif)"></span>Verificada</span>
     <span class="sep"></span>
     <input class="search" id="search" placeholder="Buscar: AS-3, B, cosecha…" />
   </div>
@@ -298,9 +300,9 @@
         <div class="row"><label>Zona</label><div class="val" id="pZona"></div></div>
         <div class="row" id="pEstadoEditRow" style="display:none"><label>Cambiar estado</label>
           <div class="seg" id="pEstadoSeg">
-            <button data-st="ok">En ambos</button><button data-st="falta">Falta</button><button data-st="nuevo">Nuevo</button>
+            <button data-st="ok">Ambos</button><button data-st="falta">Falta</button><button data-st="nuevo">Nuevo</button><button data-st="verif">Verif.</button>
           </div>
-          <div style="font-family:var(--mono);font-size:9.5px;color:var(--inkLo);letter-spacing:.4px;margin-top:7px;line-height:1.5">"Nuevo" = en espera hasta confirmar que la bajada va ahí.</div>
+          <div style="font-family:var(--mono);font-size:9.5px;color:var(--inkLo);letter-spacing:.4px;margin-top:7px;line-height:1.5">"Nuevo" = en espera · "Verificada" = confirmada en terreno (entra a la lista normal).</div>
         </div>
         <div class="row" id="pLabEditRow" style="display:none"><label>Correlativo del pin</label>
           <input id="pLab" class="search" style="max-width:none;width:100%" />
@@ -388,7 +390,7 @@ const DEFAULT_POINTS = [
  {id:"AD-N2",t:"d",lab:"Ñ",x:63.9,y:58.89,st:"nuevo",zona:"Pasillo túneles",flag:"Ñ existe en el plano nuevo; en Calidad figura Ó. Verificar si son la misma bajada."},
  {id:"AD-O",t:"d",lab:"Ó",x:42.73,y:57.24,st:"falta",zona:"Calibrado / emparrillado",flag:"Verificar si Ó (Calidad) = Ñ (plano nuevo) o es otra bajada."},
 ];
-const ESTADO_TXT={ok:'En ambos planos',falta:'Solo en Calidad — falta en plano nuevo',nuevo:'Solo en plano nuevo'};
+const ESTADO_TXT={ok:'En ambos planos',falta:'Solo en Calidad — falta en plano nuevo',nuevo:'Solo en plano nuevo',verif:'Verificada — confirmada en terreno'};
 const STORE_KEY='planosAguas.v3';
 
 /* ============ STATE ============ */
@@ -526,7 +528,7 @@ document.getElementById('zfit').onclick=()=>{userMoved=true;fit();};
 function zoomC(f){const r=stage.getBoundingClientRect(),mx=r.width/2,my=r.height/2,ns=Math.max(0.1,Math.min(8,view.s*f));view.x=mx-(mx-view.x)*(ns/view.s);view.y=my-(my-view.y)*(ns/view.s);view.s=ns;applyView();}
 
 /* ============ MARKERS ============ */
-const filters={d:true,s:true,c:true,ok:true,falta:true,nuevo:true};
+const filters={d:true,s:true,c:true,ok:true,falta:true,nuevo:true,verif:true};
 let searchTxt='';
 function renderMarkers(){
   markersEl.querySelectorAll('.mk').forEach(n=>n.remove());
@@ -537,7 +539,7 @@ function renderMarkers(){
     m.className='mk '+p.t+' st-'+p.st+((photoIds.has(p.id)||(state.photos&&state.photos[p.id]))?' has-photo':'')+(sel===p.id?' sel':'');
     if(!(filters[p.t]&&filters[p.st]&&matchSearch(p)))m.classList.add('dim');
     m._wx=p.x/100*baseW(); m._wy=p.y/100*baseH(); placeMk(m);
-    m.innerHTML=`<div class="pin"><b>${p.lab}</b></div>`+(p.st!=='ok'?`<div class="badge">${p.st==='falta'?'!':'+'}</div>`:'');
+    m.innerHTML=`<div class="pin"><b>${p.lab}</b></div>`+(p.st!=='ok'?`<div class="badge">${p.st==='falta'?'!':p.st==='verif'?'✓':'+'}</div>`:'');
     m.dataset.id=p.id;attachMarker(m,p);frag.appendChild(m);
   });
   markersEl.appendChild(frag);
@@ -569,7 +571,7 @@ function renderStats(){
   const ps=points(),cnt=st=>ps.filter(p=>p.st===st).length;
   const cell=(lab,val,col)=>`<div class="stat"><span class="sl" style="color:${col}">${lab}</span><b>${val}</b></div>`;
   document.getElementById('stats').innerHTML=
-    cell('En ambos',cnt('ok'),'var(--ok)')+cell('Falta',cnt('falta'),'var(--falta)')+cell('Nuevo',cnt('nuevo'),'var(--nuevo)');
+    cell('En ambos',cnt('ok'),'var(--ok)')+cell('Falta',cnt('falta'),'var(--falta)')+cell('Nuevo',cnt('nuevo'),'var(--nuevo)')+cell('Verif.',cnt('verif'),'var(--verif)');
 }
 
 /* ============ PANEL ============ */
@@ -580,7 +582,7 @@ async function openPanel(id){
   const tipoNom=p.t==='d'?'Dulce':p.t==='c'?'Caliente':'Salada';
   document.getElementById('pTag').textContent=p.lab;document.getElementById('pTag').className='tag '+p.t;
   document.getElementById('pId').textContent=p.id+' · agua '+tipoNom.toLowerCase();
-  document.getElementById('pEstado').innerHTML=`<span class="estado ${p.st}">${p.st==='ok'?'En ambos':p.st==='falta'?'Falta en plano':'Solo plano nuevo'}</span>`;
+  document.getElementById('pEstado').innerHTML=`<span class="estado ${p.st}">${p.st==='ok'?'En ambos':p.st==='falta'?'Falta en plano':p.st==='verif'?'Verificada':'Solo plano nuevo'}</span>`;
   document.getElementById('pTipo').textContent=tipoNom+' — '+ESTADO_TXT[p.st];
   document.getElementById('pZona').textContent=p.zona||'—';
   document.getElementById('pNotas').value=state.notas[id]||'';
@@ -630,7 +632,7 @@ function setEstado(id,st){
   if(dp){state.over[id]=Object.assign({},state.over[id],{st});}
   else{const ex=(state.extra||[]).find(p=>p.id===id);if(ex)ex.st=st;}
   save();renderMarkers();if(sel===id)openPanel(id);
-  toast('Estado: '+(st==='ok'?'En ambos':st==='falta'?'Falta':'Nuevo'));
+  toast('Estado: '+(st==='ok'?'En ambos':st==='falta'?'Falta':st==='verif'?'Verificada':'Nuevo'));
 }
 document.querySelectorAll('#pEstadoSeg button').forEach(b=>b.onclick=()=>{if(sel)setEstado(sel,b.dataset.st);});
 /* editar correlativo del pin (id estable; solo cambia la etiqueta mostrada) */
@@ -875,6 +877,7 @@ document.getElementById('btnStats').onclick=()=>{
     <div style="color:var(--inkMid);font-size:12px;margin:2px 0 8px;padding-left:2px">Salada: <span class="mono">${labs('falta','s')}</span><br>Dulce: <span class="mono">${labs('falta','d')}</span></div>
     <div style="display:flex;align-items:center;gap:7px;margin:6px 0"><span class="estado nuevo">Solo plano nuevo</span><b class="mono" style="margin-left:auto">${cnt('nuevo')}</b></div>
     <div style="color:var(--inkMid);font-size:12px;margin:2px 0;padding-left:2px">Salada: <span class="mono">${labs('nuevo','s')}</span><br>Dulce: <span class="mono">${labs('nuevo','d')}</span></div>
+    <div style="display:flex;align-items:center;gap:7px;margin:6px 0"><span class="estado verif">Verificada</span><b class="mono" style="margin-left:auto">${cnt('verif')}</b></div>
     <div class="warn" style="margin-top:12px">El plano nuevo <b>incluye todas</b> las bajadas de la referencia de Calidad (incluidas 1-4 y 22 en Cosecha) y agrega varias nuevas. La única sin equivalente directo es <b>Ó</b> (¿= Ñ del plano?). Conviene confirmar con el servicio caso a caso.</div></div>
    <button class="btn primary" style="margin-top:15px;width:100%" onclick="document.getElementById('modal').classList.remove('open')">Cerrar</button>`;
   document.getElementById('modal').classList.add('open');
