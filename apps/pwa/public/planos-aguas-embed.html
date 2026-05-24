@@ -180,6 +180,8 @@
   .draw .rect,.draw .circle{fill:none;stroke:var(--struct)}
   .draw .measure{stroke:var(--star);stroke-dasharray:7 5;vector-effect:non-scaling-stroke;stroke-width:1.5}
   .draw .mtxt{fill:var(--star);font-family:var(--mono);font-weight:600;paint-order:stroke;stroke:#0c1620;stroke-width:3;text-anchor:middle}
+  .draw .cotaline{stroke:var(--star);stroke-width:2;fill:none}
+  .draw .cota{fill:var(--star);font-family:var(--mono);font-weight:600;font-size:20px;paint-order:stroke;stroke:#0c1620;stroke-width:4;text-anchor:middle;pointer-events:none}
   .draw .mask{stroke:none}
   .draw .dot{stroke:none} .draw .dot.dulce{fill:var(--drawDulce)} .draw .dot.salada{fill:var(--drawSalada)} .draw .dot.caliente{fill:var(--drawCaliente)}
   .draw .lbl{font-family:var(--mono);font-weight:600;stroke:none;text-anchor:middle;dominant-baseline:central}
@@ -652,7 +654,7 @@ function removePoint(id){
 /* ============ DRAW LAYER + EDITOR GUIADO ============ */
 const PIPE_W=5, DOT_R=13, LBL_SZE=18, LBL_HALO=3;
 let tool='pin', kind='dulce', maskColor='#ffffff', pipeW=5, snapAngles=true, wiz=null;
-let draft=null, draftCursor=null, selShape=null, drag=null, structMode=false, pend2=null;
+let draft=null, draftCursor=null, selShape=null, drag=null, structMode=false, pend2=null, cotaMode=false;
 function nomT(t){return t==='d'?'Dulce':t==='c'?'Caliente':'Salada';}
 function preT(t){return t==='d'?'AD':t==='c'?'AC':'AS';}
 function kindOf(t){return t==='d'?'dulce':t==='c'?'caliente':'salada';}
@@ -668,6 +670,7 @@ const TOOLCLS=['tool-pin','tool-pipe','tool-bajada','tool-label','tool-mask','to
 function setTool(t){
   if(draft&&!(wiz&&wiz.step==='pipe'))cancelDraft();
   pend2=null;document.body.classList.remove('drafting');
+  if(t!=='measure')cotaMode=false;
   tool=t;selShape=null;
   document.body.classList.remove(...TOOLCLS);
   document.body.classList.add('tool-'+t);
@@ -709,11 +712,12 @@ function renderEditbar(){
     setHint(tool==='rect'?'Clic 2 esquinas del rectángulo (muestra medidas en vivo).':tool==='circle'?'Clic el centro y luego el borde.':tool==='sline'?'Clic puntos · doble-clic o Terminar.':tool==='label'?'Clic donde va el rótulo (texto libre).':'Elige una forma para dibujar estructuras.');
   }else if(tool==='measure'||tool==='calib'){
     const cal=tool==='calib';
-    s+=`<span class="tagx">${cal?'CALIBRAR ESCALA':'MEDIR'}</span><span class="wcap">${cal?'clic 2 puntos sobre una cota conocida':'clic 2 puntos'}</span>`+
-      ((draft||pend2)?`<button class="btn" id="eCancel">✗ Cancelar</button>`:'')+
+    s+=`<span class="tagx">${cal?'CALIBRAR ESCALA':'MEDIR'}</span><span class="wcap">clic 2 puntos${cal?' sobre una cota conocida':''}</span>`;
+    if(!cal)s+=`<button class="tbtn ${cotaMode?'on':''}" id="mCota" title="Deja la medida fija como cota en el plano">+ Agregar cota</button>`;
+    s+=((draft||pend2)?`<button class="btn" id="eCancel">✗ Cancelar</button>`:'')+
       (state.scale?`<span class="wcap">1px = ${state.scale.toFixed(3)} mm</span>`:`<span class="wcap" style="color:var(--falta)">sin calibrar</span>`)+
       `<span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
-    setHint(cal?'Marca 2 puntos sobre una cota y escribe su medida real en mm.':'Marca 2 puntos para ver la distancia (en mm si calibraste).');
+    setHint(cal?'Marca 2 puntos sobre una cota y escribe su medida real en mm.':(cotaMode?'Clic 2 puntos para dejar una cota fija en el plano.':'Marca 2 puntos para ver la distancia. Activa "Agregar cota" para fijarla.'));
   }else if(tool==='mask'){
     s+=`<span class="tagx">MÁSCARA</span><span class="wcap">color</span><input type="color" class="mcol" id="maskColor" value="${maskColor}"><button class="btn primary" id="eFinish">✓ Terminar</button><button class="btn" id="eCancel">✗ Cancelar</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
     setHint('Tapar elementos: clic vértices del polígono · doble-clic o Terminar.');
@@ -729,8 +733,8 @@ function renderEditbar(){
       s+=`<span class="tagx">CAÑERÍA</span><span class="wcap">grosor</span><button class="tbtn" id="selWm">−</button><input type="range" id="selW" min="2" max="14" value="${sh.w||PIPE_W}"><button class="tbtn" id="selWp">+</button><span class="wnum" id="selWv">${sh.w||PIPE_W}</span><button class="btn" id="selCont">Continuar trazo</button><button class="btn" id="selRedraw">Redibujar</button><button class="btn danger" id="eDelShape">🗑 Borrar</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
       setHint('Arrastra vértices · doble-clic un vértice = borrarlo · Continuar/Redibujar el trazo.');
     }else if(sh.type==='rect'||sh.type==='circle'){
-      s+=`<span class="tagx">${sh.type==='rect'?'RECTÁNGULO':'CÍRCULO'}</span><span class="wcap">grosor</span><button class="tbtn" id="selWm">−</button><input type="range" id="selW" min="1" max="14" value="${sh.sw||PIPE_W}"><button class="tbtn" id="selWp">+</button><span class="wnum" id="selWv">${sh.sw||PIPE_W}</span><button class="btn danger" id="eDelShape">🗑 Borrar</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
-      setHint('Arrastra la forma para moverla · ajusta el grosor.');
+      s+=`<span class="tagx">${sh.type==='rect'?'RECTÁNGULO':'CÍRCULO'}</span><span class="wcap">grosor</span><button class="tbtn" id="selWm">−</button><input type="range" id="selW" min="1" max="14" value="${sh.sw||PIPE_W}"><button class="tbtn" id="selWp">+</button><span class="wnum" id="selWv">${sh.sw||PIPE_W}</span><button class="tbtn ${sh.cota!==false?'on':''}" id="selCota">Cota</button><button class="btn danger" id="eDelShape">🗑 Borrar</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
+      setHint('Arrastra la forma para moverla · ajusta el grosor · "Cota" muestra/oculta medidas.');
     }else if(sh.type==='label'){
       s+=`<span class="tagx">ETIQUETA</span><span class="wcap">tamaño</span><button class="tbtn" id="selSm">−</button><input type="range" id="selS" min="8" max="48" value="${sh.size||LBL_SZE}"><button class="tbtn" id="selSp">+</button><span class="wnum" id="selSv">${sh.size||LBL_SZE}</span><button class="btn danger" id="eDelShape">🗑 Borrar</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
       setHint('Arrastra la etiqueta para reposicionarla · ajusta su tamaño.');
@@ -776,6 +780,8 @@ function wireEditbar(){
   if($('selColor'))$('selColor').oninput=e=>{const sh=getShape(selShape);if(sh){sh.fill=e.target.value;save();renderShapes();}};
   if($('selCont'))$('selCont').onclick=()=>continuePipe(selShape);
   if($('selRedraw'))$('selRedraw').onclick=()=>redrawPipe(selShape);
+  if($('selCota'))$('selCota').onclick=()=>{const sh=getShape(selShape);if(sh){sh.cota=(sh.cota===false);save();renderShapes();renderEditbar();}};
+  if($('mCota'))$('mCota').onclick=()=>{cotaMode=!cotaMode;renderEditbar();};
   document.querySelectorAll('#wizKind button').forEach(b=>b.onclick=()=>wizType(b.dataset.k));
   if($('wizCorr'))$('wizCorr').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();wizCorrOk();}};
   if($('wizCorrOk'))$('wizCorrOk').onclick=wizCorrOk;
@@ -805,7 +811,10 @@ function twoClick(w){
   const p1=pend2,p2={x:+w.x.toFixed(1),y:+w.y.toFixed(1)};pend2=null;document.body.classList.remove('drafting');
   if(tool==='rect'){const x=Math.min(p1.x,p2.x),y=Math.min(p1.y,p2.y),rw=Math.abs(p2.x-p1.x),rh=Math.abs(p2.y-p1.y);if(rw>2&&rh>2){state.shapes.push({id:'sh-'+Date.now(),type:'rect',kind:'struct',x,y,rw:+rw.toFixed(1),rh:+rh.toFixed(1),sw:pipeW});save();toast('Rectángulo agregado');}}
   else if(tool==='circle'){const r=Math.hypot(p2.x-p1.x,p2.y-p1.y);if(r>2){state.shapes.push({id:'sh-'+Date.now(),type:'circle',kind:'struct',cx:p1.x,cy:p1.y,r:+r.toFixed(1),sw:pipeW});save();toast('Círculo agregado');}}
-  else if(tool==='measure'){showMeasure(p1,p2);}
+  else if(tool==='measure'){
+    if(cotaMode){state.shapes.push({id:'sh-'+Date.now(),type:'cota',pts:[[p1.x,p1.y],[p2.x,p2.y]]});save();toast('Cota agregada');}
+    else showMeasure(p1,p2);
+  }
   else if(tool==='calib'){doCalib(p1,p2);}
   renderShapes();renderEditbar();
 }
@@ -921,6 +930,20 @@ function shapeSVG(sh){
   if(sh.type==='mask')return `<polygon class="shape mask" data-id="${sh.id}" fill="${sh.fill||'#ffffff'}" points="${sh.pts.map(p=>p.join(',')).join(' ')}"/>`;
   if(sh.type==='dot')return `<circle class="shape dot ${sh.kind}" data-id="${sh.id}" cx="${sh.x}" cy="${sh.y}" r="${DOT_R}" stroke-width="3"/>`;
   if(sh.type==='label')return `<text class="shape lbl ${sh.kind}" data-id="${sh.id}" x="${sh.x}" y="${sh.y}" font-size="${sh.size||LBL_SZE}" stroke-width="${LBL_HALO}">${esc(sh.text)}</text>`;
+  if(sh.type==='cota'){const a=sh.pts[0],b=sh.pts[1],len=Math.hypot(b[0]-a[0],b[1]-a[1]),t=state.scale?Math.round(len*state.scale)+' mm':Math.round(len)+' px';return `<path class="shape cotaline" data-id="${sh.id}" d="M${a[0]} ${a[1]} L${b[0]} ${b[1]}"/><text class="cota" x="${((a[0]+b[0])/2).toFixed(1)}" y="${((a[1]+b[1])/2-10).toFixed(1)}">${esc(t)}</text>`;}
+  return '';
+}
+/* cotas automáticas de las formas de estructura (cuando hay escala calibrada) */
+function cotaSVG(sh){
+  if(!state.scale||sh.cota===false)return '';
+  const off=14;
+  if(sh.type==='rect'){const wmm=Math.round(sh.rw*state.scale),hmm=Math.round(sh.rh*state.scale);
+    return `<text class="cota" x="${(sh.x+sh.rw/2).toFixed(1)}" y="${(sh.y-off).toFixed(1)}">${wmm} mm</text>`
+         + `<text class="cota" x="${(sh.x-off).toFixed(1)}" y="${(sh.y+sh.rh/2).toFixed(1)}" transform="rotate(-90 ${(sh.x-off).toFixed(1)} ${(sh.y+sh.rh/2).toFixed(1)})">${hmm} mm</text>`;}
+  if(sh.type==='circle'){const d=Math.round(sh.r*2*state.scale),per=Math.round(2*Math.PI*sh.r*state.scale);
+    return `<text class="cota" x="${sh.cx}" y="${(sh.cy-sh.r-off).toFixed(1)}">Ø ${d} · P ${per} mm</text>`;}
+  if(sh.type==='pipe'&&sh.kind==='struct'&&sh.pts.length>1){let len=0;for(let i=1;i<sh.pts.length;i++)len+=Math.hypot(sh.pts[i][0]-sh.pts[i-1][0],sh.pts[i][1]-sh.pts[i-1][1]);const mid=sh.pts[Math.floor(sh.pts.length/2)];
+    return `<text class="cota" x="${mid[0]}" y="${(mid[1]-off).toFixed(1)}">L ${Math.round(len*state.scale)} mm</text>`;}
   return '';
 }
 function draftSVG(){
@@ -953,7 +976,7 @@ function selectionSVG(){
 }
 function renderShapes(){
   let svg='';
-  (state.shapes||[]).forEach(sh=>svg+=shapeSVG(sh));
+  (state.shapes||[]).forEach(sh=>{svg+=shapeSVG(sh);svg+=cotaSVG(sh);});
   if(draft)svg+=draftSVG();
   if(pend2)svg+=pendSVG();
   if(selShape&&document.body.classList.contains('tool-select'))svg+=selectionSVG();
