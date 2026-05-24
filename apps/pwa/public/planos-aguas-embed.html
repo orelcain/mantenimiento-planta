@@ -403,7 +403,7 @@ function load(){
 function saveLocal(){localStorage.setItem(STORE_KEY,JSON.stringify(state));}
 
 /* ============ CLOUD SYNC (Firebase) — posiciones / notas / dibujos ============ */
-const cloud={db:null,auth:null,storage:null,user:null,ready:false,applying:false,dirty:false,docMissing:false,pushT:0};
+const cloud={db:null,auth:null,storage:null,user:null,ready:false,applying:false,dirty:false,busy:false,docMissing:false,pushT:0};
 function cloudDoc(){return cloud.db.collection('planosAguas').doc('main');}
 function initCloud(){
   try{
@@ -422,7 +422,7 @@ function onCloudSnap(snap){
   cloud.ready=true;
   if(!snap.exists){ cloud.docMissing=true; trySeed(); return; } // migración: sembrar correcciones locales
   cloud.docMissing=false;
-  if(cloud.dirty)return; // tengo cambios locales sin confirmar → no pisarlos con el remoto
+  if(cloud.dirty||cloud.busy)return; // cambios locales sin confirmar o arrastre en curso → no pisar
   const r=snap.data();
   cloud.applying=true;
   state.over=r.over||{}; state.notas=r.notas||{};
@@ -545,11 +545,25 @@ function renderMarkers(){
 }
 function matchSearch(p){if(!searchTxt)return true;const q=searchTxt.toLowerCase();return p.id.toLowerCase().includes(q)||p.lab.toLowerCase().includes(q)||(p.zona||'').toLowerCase().includes(q);}
 function attachMarker(m,p){
-  let dragging=false,moved=false;
-  m.addEventListener('pointerdown',e=>{e.stopPropagation();if(document.body.classList.contains('edit')){dragging=true;moved=false;m.setPointerCapture(e.pointerId);}});
-  m.addEventListener('pointermove',e=>{if(!dragging)return;moved=true;const w=worldPx(e.clientX,e.clientY);m._wx=w.x;m._wy=w.y;placeMk(m);m._w=w;});
-  m.addEventListener('pointerup',e=>{if(dragging&&moved&&m._w){const pc={x:m._w.x/baseW()*100,y:m._w.y/baseH()*100};state.over[p.id]=Object.assign({},state.over[p.id],{x:pc.x,y:pc.y});save();toast('Posición guardada: '+p.id);}dragging=false;});
-  m.addEventListener('click',e=>{e.stopPropagation();if(!moved)openPanel(p.id);});
+  // arrastre vía listeners en window (no depende de setPointerCapture, que falla en el iframe)
+  m.addEventListener('pointerdown',e=>{
+    e.stopPropagation();e.preventDefault();
+    const canDrag=document.body.classList.contains('edit')&&tool==='pin';
+    const sx=e.clientX,sy=e.clientY; let moved=false;
+    if(canDrag)cloud.busy=true; // evita que un snapshot re-renderice y rompa el arrastre
+    const mv=ev=>{
+      if(!canDrag)return;
+      if(!moved&&(Math.abs(ev.clientX-sx)>3||Math.abs(ev.clientY-sy)>3))moved=true;
+      if(moved){const w=worldPx(ev.clientX,ev.clientY);m._wx=w.x;m._wy=w.y;placeMk(m);m._w=w;}
+    };
+    const up=ev=>{
+      window.removeEventListener('pointermove',mv);window.removeEventListener('pointerup',up);
+      cloud.busy=false;
+      if(moved&&m._w){const pc={x:m._w.x/baseW()*100,y:m._w.y/baseH()*100};state.over[p.id]=Object.assign({},state.over[p.id],{x:pc.x,y:pc.y});save();toast('Posición guardada: '+p.id);}
+      else openPanel(p.id); // clic sin arrastrar = abrir panel (en cualquier modo)
+    };
+    window.addEventListener('pointermove',mv);window.addEventListener('pointerup',up);
+  });
 }
 function renderStats(){
   const ps=points(),cnt=st=>ps.filter(p=>p.st===st).length;
@@ -633,18 +647,16 @@ document.getElementById('pLab').addEventListener('change',e=>{if(sel)setLab(sel,
 function exitEdit(){cancelDraft();selShape=null;document.body.classList.remove('edit','tool-pin','tool-pipe','tool-bajada','tool-label','tool-mask','tool-select','has-sel');document.getElementById('btnEdit').classList.remove('on');renderShapes();renderMarkers();}
 document.getElementById('btnEdit').onclick=()=>{const on=document.body.classList.toggle('edit');if(on){document.getElementById('btnEdit').classList.add('on');setTool('pin');renderMarkers();toast('Modo edición ON');}else{exitEdit();toast('Modo edición OFF');}};
 document.getElementById('eDone').onclick=exitEdit;
-function addPointAt(e){const w=worldPx(e.clientX,e.clientY);const pc={x:w.x/baseW()*100,y:w.y/baseH()*100};
-  if(pc.x<-10||pc.x>110||pc.y<-10||pc.y>110)return;
-  const lab=prompt('Etiqueta del punto (ej: 23, X):');if(!lab)return;
-  const t=confirm('¿Es agua DULCE? (Aceptar=Dulce / Cancelar=Salada)')?'d':'s';
-  const id=(t==='d'?'AD-':'AS-')+lab+'-x'+Date.now().toString().slice(-4);
-  state.extra.push({id,t,lab,x:pc.x,y:pc.y,st:'nuevo',zona:'Agregado manualmente',custom:true});save();renderMarkers();openPanel(id);}
-function removePoint(id){if(id.includes('-x'))state.extra=state.extra.filter(p=>p.id!==id);else if(!state.removed.includes(id))state.removed.push(id);save();renderMarkers();toast('Punto eliminado');}
+function removePoint(id){
+  if((state.extra||[]).some(p=>p.id===id))state.extra=state.extra.filter(p=>p.id!==id); // bajada agregada a mano
+  else if(!state.removed.includes(id))state.removed.push(id);                            // pin del plano → ocultar
+  save();renderMarkers();renderShapes();toast('Punto eliminado');
+}
 document.getElementById('eRestore').onclick=()=>{const n=state.removed.length;state.removed=[];save();renderMarkers();toast(n?('Restaurados '+n+' punto(s) del plano'):'No hay puntos ocultos');};
 document.getElementById('eExport').onclick=()=>{const data=JSON.stringify({points:points(),state},null,2);const b=new Blob([data],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='planos-aguas-datos.json';a.click();toast('JSON exportado');};
 
 /* ============ DRAW LAYER (cañerías / puntos / etiquetas / máscara) ============ */
-const PIPE_W=5, DOT_R=13, LBL_SZE=40, LBL_HALO=6;
+const PIPE_W=5, DOT_R=13, LBL_SZE=18, LBL_HALO=3;
 let tool='pin', kind='dulce', maskColor='#ffffff';
 let draft=null, draftCursor=null, selShape=null, drag=null;
 const HINTS={
@@ -830,6 +842,7 @@ function attachShapeEvents(){
 }
 function startDrag(mode,id,vi,e){
   const sh=getShape(id);if(!sh)return;
+  cloud.busy=true;
   drag={mode,id,vi,sx:worldPx(e.clientX,e.clientY),orig:sh.pts?{pts:JSON.parse(JSON.stringify(sh.pts))}:{x:sh.x,y:sh.y}};
   window.addEventListener('pointermove',dragMove);window.addEventListener('pointerup',dragUp);
 }
@@ -845,7 +858,7 @@ function dragMove(e){
   }
   renderShapes();
 }
-function dragUp(){if(drag){save();drag=null;}window.removeEventListener('pointermove',dragMove);window.removeEventListener('pointerup',dragUp);renderShapes();}
+function dragUp(){if(drag){save();drag=null;}cloud.busy=false;window.removeEventListener('pointermove',dragMove);window.removeEventListener('pointerup',dragUp);renderShapes();}
 document.getElementById('eDelShape').onclick=()=>{if(selShape&&confirm('¿Borrar esta figura?')){state.shapes=state.shapes.filter(s=>s.id!==selShape);selShape=null;save();renderShapes();toast('Figura borrada');}};
 
 /* ============ FILTERS ============ */
