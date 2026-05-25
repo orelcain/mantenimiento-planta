@@ -500,7 +500,8 @@ function onCloudSnap(snap){
   if(!snap.exists){ cloud.docMissing=true; trySeed(); return; } // migración: sembrar correcciones locales
   cloud.docMissing=false;
   if(cloud.dirty||cloud.busy)return; // cambios locales sin confirmar o arrastre en curso → no pisar
-  const r=snap.data();
+  const raw=snap.data()||{};
+  const r=raw.blob?(function(){try{return JSON.parse(raw.blob);}catch(e){return {};}})():raw; // doc guarda todo como JSON (evita arrays anidados)
   cloud.applying=true;
   state.over=r.over||{}; state.notas=r.notas||{};
   state.extra=Array.isArray(r.extra)?r.extra:[];
@@ -525,7 +526,7 @@ function pushCloud(now){
       const r=await bridgeSend('save',{payload:payloadCloud()});
       cloud.writing=false;cloud.dirty=false;cloud.lastWrite=r.ok?'ok':(r.code||'error');renderSync();return;
     }
-    return cloudDoc().set(Object.assign(payloadCloud(),{updatedAt:firebase.firestore.FieldValue.serverTimestamp()}),{merge:true})
+    return cloudDoc().set({blob:JSON.stringify(payloadCloud()),updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true})
     .then(()=>{cloud.dirty=false;cloud.writing=false;cloud.lastWrite='ok';renderSync();})
     .catch(e=>{cloud.dirty=false;cloud.writing=false;cloud.lastWrite=(e&&e.code)||'error';renderSync();}); // sin permiso (no supervisor) u offline → queda local
   };

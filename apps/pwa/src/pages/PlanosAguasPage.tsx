@@ -45,7 +45,8 @@ export function PlanosAguasPage() {
       if (m.type === 'hello') {
         sendBridge()
       } else if (m.type === 'save') {
-        setDoc(doc(db, 'planosAguas', 'main'), { ...(m.payload ?? {}), updatedAt: serverTimestamp() }, { merge: true })
+        // Guardamos todo como un único JSON (blob): Firestore no admite arrays anidados (pts: [[x,y]...])
+        setDoc(doc(db, 'planosAguas', 'main'), { blob: JSON.stringify(m.payload ?? {}), updatedAt: serverTimestamp() }, { merge: true })
           .then(() => post({ __planos: true, type: 'save-result', ok: true, reqId: m.reqId }))
           .catch((err) => post({ __planos: true, type: 'save-result', ok: false, code: err?.code ?? 'error', reqId: m.reqId }))
       } else if (m.type === 'upload' && m.path && m.dataUrl) {
