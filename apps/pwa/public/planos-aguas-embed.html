@@ -118,6 +118,12 @@
   .photo{width:100%;border:1px dashed var(--borderHi);border-radius:8px;min-height:130px;display:flex;align-items:center;justify-content:center;color:var(--inkLo);font-size:11.5px;text-align:center;overflow:hidden;background:var(--surface);position:relative;padding:10px}
   .photo img{width:100%;display:block;border-radius:5px}
   .pbtns{display:flex;gap:7px;margin-top:8px;flex-wrap:wrap}
+  .gal{display:flex;flex-wrap:wrap;gap:7px;min-height:8px}
+  .gal .ph2{position:relative;width:78px;height:78px;border-radius:7px;overflow:hidden;border:1px solid var(--border);background:var(--surface);cursor:zoom-in}
+  .gal .ph2 img{width:100%;height:100%;object-fit:cover;display:block}
+  .gal .ph2 .galRm{position:absolute;top:2px;right:2px;width:21px;height:21px;border-radius:5px;border:none;background:rgba(8,15,24,.85);color:var(--salada);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0}
+  .gal .ph2 .galRm:hover{background:rgba(8,15,24,.95)}
+  .gal .empty{font-family:var(--mono);font-size:10.5px;color:var(--inkLo);letter-spacing:.3px;padding:5px 2px}
   .btn{border:1px solid var(--border);background:var(--surface);color:var(--inkMid);border-radius:6px;padding:7px 11px;font-family:var(--mono);font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;font-weight:500;transition:.13s var(--ease)}
   .btn:hover{border-color:var(--borderHi);color:var(--ink);background:var(--surfaceHi)}
   .btn:active{transform:translateY(1px)}
@@ -171,6 +177,10 @@
     .mcol{width:26px;height:26px}
     #editHint{max-width:62vw;font-size:9px;padding:4px 8px}
   }
+  /* modo solo-lectura (QR): sin afordancias de edición */
+  body.ro #btnEdit{display:none}
+  body.ro #pEditToggleRow{display:none!important}
+  body.ro .galAdd,body.ro .galRm{display:none!important}
   ::-webkit-scrollbar{width:9px;height:9px}
   ::-webkit-scrollbar-thumb{background:var(--borderHi);border-radius:9px}
   ::-webkit-scrollbar-track{background:transparent}
@@ -258,10 +268,7 @@
     <span class="chip" data-f="s"><span class="dot" style="background:var(--salada)"></span>Salada</span>
     <span class="chip" data-f="c"><span class="dot" style="background:var(--caliente)"></span>Caliente</span>
     <span class="sep"></span>
-    <span class="chip" data-f="ok"><span class="dot" style="background:var(--ok)"></span>Coincide</span>
-    <span class="chip" data-f="falta"><span class="ring" style="color:var(--falta)"></span>Falta en plano</span>
     <span class="chip" data-f="nuevo"><span class="ring" style="color:var(--nuevo)"></span>Nuevo</span>
-    <span class="chip" data-f="verif"><span class="dot" style="background:var(--verif)"></span>Verificada</span>
     <span class="sep"></span>
     <input class="search" id="search" placeholder="Buscar: AS-3, B, cosecha…" />
   </div>
@@ -315,17 +322,28 @@
           <input id="pLab" class="search" style="max-width:none;width:100%" />
           <div style="font-family:var(--mono);font-size:9.5px;color:var(--inkLo);letter-spacing:.4px;margin-top:6px;line-height:1.5">Cambia la letra/número que muestra el pin (para sincronizar con otro depto). No cambia el ID interno.</div>
         </div>
+        <div class="row" id="pZonaEditRow" style="display:none"><label>Cambiar zona</label>
+          <input id="pZonaInput" class="search" style="max-width:none;width:100%" list="zonasList" placeholder="Elegí o escribí una zona…" />
+          <div style="font-family:var(--mono);font-size:9.5px;color:var(--inkLo);letter-spacing:.4px;margin-top:6px;line-height:1.5">Elegí una zona de la lista o escribí una nueva (queda guardada para reusar).</div>
+        </div>
         <div class="row" id="pBajadaEditRow" style="display:none"><label>Cañería de la bajada</label>
           <button class="btn" id="pRedraw" style="width:100%">✎ Redibujar cañería</button>
           <div style="font-family:var(--mono);font-size:9.5px;color:var(--inkLo);letter-spacing:.4px;margin-top:6px;line-height:1.5">Borra el trazo actual y dibuja uno nuevo desde el punto de la bajada (clic puntos · doble-clic o Terminar).</div>
         </div>
-        <div class="row"><label>Foto referencial</label>
-          <div class="photo" id="pPhoto">Sin foto. Pega (Ctrl+V) o sube una imagen.</div>
-          <div class="pbtns">
-            <button class="btn" id="pPaste">📋 Pegar</button>
-            <label class="btn">📁 Subir<input type="file" id="pFile" accept="image/*" hidden></label>
-            <button class="btn danger" id="pDel">🗑 Quitar</button>
+        <div class="row"><label>Fotos · Entretecho (dónde está arriba)</label>
+          <div class="gal" id="galEnt"></div>
+          <div class="pbtns galAdd">
+            <button class="btn" data-cat="ent" data-act="paste" title="Pegar una imagen copiada (Ctrl+V)">Pegar imagen</button>
+            <label class="btn" title="Subir una foto desde el dispositivo">Subir foto<input type="file" data-cat="ent" accept="image/*" hidden></label>
           </div>
+        </div>
+        <div class="row"><label>Fotos · En planta (dónde está abajo)</label>
+          <div class="gal" id="galPla"></div>
+          <div class="pbtns galAdd">
+            <button class="btn" data-cat="pla" data-act="paste" title="Pegar una imagen copiada (Ctrl+V)">Pegar imagen</button>
+            <label class="btn" title="Subir una foto desde el dispositivo">Subir foto<input type="file" data-cat="pla" accept="image/*" hidden></label>
+          </div>
+          <div style="font-family:var(--mono);font-size:9.5px;color:var(--inkLo);letter-spacing:.4px;margin-top:7px;line-height:1.5">Podés agregar varias fotos por sección (panorámicas, gran angular). Tocá una para ampliarla.</div>
         </div>
         <div class="row"><label>Notas</label><textarea id="pNotas" placeholder="Observaciones, estado de la llave, material, etc."></textarea></div>
         <div id="pWarn"></div>
@@ -337,6 +355,7 @@
 
 <div class="modal" id="modal"><div class="card" id="modalCard"></div></div>
 <div class="toast" id="toast"></div>
+<datalist id="zonasList"></datalist>
 
 <script>
 /* ============ DATASET ============ */
@@ -403,15 +422,30 @@ const DEFAULT_POINTS = [
 ];
 const ESTADO_TXT={ok:'En ambos planos',falta:'Solo en Calidad — falta en plano nuevo',nuevo:'Solo en plano nuevo',verif:'Verificada — confirmada en terreno'};
 const STORE_KEY='planosAguas.v3';
+/* Modo solo-lectura para el QR (?view=1): sin edición, solo ver el plano actualizado */
+const READONLY = new URLSearchParams(location.search).get('view')==='1';
+if(READONLY)document.body.classList.add('ro');
 
 /* ============ STATE ============ */
 let state=load();
 function load(){
-  let s={over:{},notas:{},extra:[],removed:[],shapes:[],photos:{},scale:null,unit:'mm',showCotas:true};
+  let s={over:{},notas:{},extra:[],removed:[],shapes:[],photos:{},zonas:[],scale:null,unit:'mm',showCotas:true};
   try{const r=JSON.parse(localStorage.getItem(STORE_KEY));if(r)s=Object.assign(s,r);}catch(e){}
   if(!Array.isArray(s.shapes))s.shapes=[];
+  if(!Array.isArray(s.zonas))s.zonas=[];
   if(!s.photos||typeof s.photos!=='object')s.photos={};
+  normPhotos(s);
   return s;
+}
+const DEFAULT_ZONAS=['Cosecha','Eviscerado','Fileteado','Emparrillado','Empaque','Calibrado','Pasillo túneles','Sala de máquinas','Bodega','Baños y duchas','Generador','Lavado de bins'];
+/* migra fotos viejas (string URL única) → modelo nuevo {ent:[{u,k}], pla:[]} */
+function normPhotos(s){
+  const ph=s.photos||{};
+  for(const id in ph){const v=ph[id];
+    if(typeof v==='string'){ph[id]={ent:[{u:v,k:id}],pla:[]};}
+    else if(v&&typeof v==='object'){if(!Array.isArray(v.ent))v.ent=[];if(!Array.isArray(v.pla))v.pla=[];}
+    else delete ph[id];}
+  s.photos=ph;
 }
 function saveLocal(){localStorage.setItem(STORE_KEY,JSON.stringify(state));}
 
@@ -443,6 +477,8 @@ function onCloudSnap(snap){
   state.removed=Array.isArray(r.removed)?r.removed:[];
   state.shapes=Array.isArray(r.shapes)?r.shapes:[];
   state.photos=(r.photos&&typeof r.photos==='object')?r.photos:{};
+  state.zonas=Array.isArray(r.zonas)?r.zonas:[];
+  normPhotos(state);
   saveLocal();
   cloud.applying=false;
   if(typeof renderMarkers==='function'){renderMarkers();renderShapes();if(sel)openPanel(sel);}
@@ -452,7 +488,7 @@ function pushCloud(now){
   cloud.dirty=true;
   clearTimeout(cloud.pushT);
   const doIt=()=>cloudDoc().set({
-      over:state.over,notas:state.notas,extra:state.extra,removed:state.removed,shapes:state.shapes,photos:state.photos||{},
+      over:state.over,notas:state.notas,extra:state.extra,removed:state.removed,shapes:state.shapes,photos:state.photos||{},zonas:state.zonas||[],
       updatedAt:firebase.firestore.FieldValue.serverTimestamp()
     },{merge:true}).then(()=>{cloud.dirty=false;}).catch(()=>{cloud.dirty=false;}); // sin permiso (no supervisor) u offline → queda local
   if(now)doIt(); else cloud.pushT=setTimeout(doIt,500);
@@ -560,10 +596,10 @@ function renderMarkers(){
   points().forEach(p=>{
     if(p.x==null||p.y==null)return;
     const m=document.createElement('div');
-    m.className='mk '+p.t+' st-'+p.st+((photoIds.has(p.id)||(state.photos&&state.photos[p.id]))?' has-photo':'')+(sel===p.id?' sel':'');
+    m.className='mk '+p.t+' st-'+p.st+(hasPhoto(p.id)?' has-photo':'')+(sel===p.id?' sel':'');
     if(!(filters[p.t]&&filters[p.st]&&matchSearch(p)))m.classList.add('dim');
     m._wx=p.x/100*baseW(); m._wy=p.y/100*baseH(); placeMk(m);
-    m.innerHTML=`<div class="pin"><b>${p.lab}</b></div>`+(p.st!=='ok'?`<div class="badge">${p.st==='falta'?'!':p.st==='verif'?'✓':'+'}</div>`:'');
+    m.innerHTML=`<div class="pin"><b>${p.lab}</b></div>`+(p.st==='falta'||p.st==='nuevo'?`<div class="badge">${p.st==='falta'?'!':'+'}</div>`:''); // verif y ok: pin normal, sin badge
     m.dataset.id=p.id;attachMarker(m,p);frag.appendChild(m);
   });
   markersEl.appendChild(frag);
@@ -612,47 +648,76 @@ async function openPanel(id){
   document.getElementById('pTipo').textContent=tipoNom+' — '+ESTADO_TXT[p.st];
   document.getElementById('pZona').textContent=p.zona||'—';
   document.getElementById('pNotas').value=state.notas[id]||'';
+  document.getElementById('pNotas').readOnly=READONLY;
   document.getElementById('pWarn').innerHTML=p.flag?`<div class="warn">⚠️ ${p.flag}</div>`:'';
   const globalEdit=document.body.classList.contains('edit');
-  const editing=globalEdit||panelEdit;
-  ['pEstadoEditRow','pLabEditRow','pTipoEditRow','pBajadaEditRow','pEditRow'].forEach(rid=>{const el=document.getElementById(rid);if(el)el.style.display=editing?'block':'none';});
-  const tr=document.getElementById('pEditToggleRow');if(tr)tr.style.display=globalEdit?'none':'block';
+  const editing=!READONLY&&(globalEdit||panelEdit);
+  ['pEstadoEditRow','pLabEditRow','pTipoEditRow','pBajadaEditRow','pZonaEditRow','pEditRow'].forEach(rid=>{const el=document.getElementById(rid);if(el)el.style.display=editing?'block':'none';});
+  const tr=document.getElementById('pEditToggleRow');if(tr)tr.style.display=(globalEdit||READONLY)?'none':'block';
   const tg=document.getElementById('pEditToggle');if(tg)tg.textContent=panelEdit?'✓ Cerrar edición':'✎ Editar esta bajada';
   document.getElementById('pLab').value=p.lab;
+  document.getElementById('pZonaInput').value=p.zona||'';
+  buildZonasDatalist();
   document.querySelectorAll('#pEstadoSeg button').forEach(b=>b.classList.toggle('on',b.dataset.st===p.st));
   document.querySelectorAll('#pTipoSeg button').forEach(b=>b.classList.toggle('on',b.dataset.t===p.t));
-  const ph=document.getElementById('pPhoto');ph.innerHTML='Cargando…';const data=await getPhoto(id);
-  const psrc=data||(state.photos&&state.photos[id])||null;
-  ph.innerHTML=psrc?`<img src="${psrc}">`:'Sin foto. Pega (Ctrl+V) o sube una imagen.';
+  renderGalleries(id);
   document.getElementById('panel').classList.add('open');
 }
 document.getElementById('pClose').onclick=()=>{document.getElementById('panel').classList.remove('open');sel=null;panelEdit=false;document.querySelectorAll('.mk.sel').forEach(n=>n.classList.remove('sel'));};
 document.getElementById('pNotas').addEventListener('input',e=>{if(sel){state.notas[sel]=e.target.value;save();}});
-async function setPhoto(src){
-  if(!sel)return;const id=sel;
+/* ---- Fotos: 2 secciones (ent=entretecho / pla=en planta), varias por sección ---- */
+function downscale(src){return new Promise(res=>{const img=new Image();img.onload=()=>{const max=1600;let{width:w,height:h}=img;if(w>max||h>max){const r=Math.min(max/w,max/h);w*=r;h*=r;}const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);res(c.toDataURL('image/jpeg',0.85));};img.src=src;});}
+function hasPhoto(id){const p=state.photos&&state.photos[id];return !!(p&&((p.ent&&p.ent.length)||(p.pla&&p.pla.length)));}
+async function renderGalleries(id){
+  for(const cat of ['ent','pla']){
+    const el=document.getElementById(cat==='ent'?'galEnt':'galPla');if(!el)continue;
+    const arr=(state.photos[id]&&state.photos[id][cat])||[];
+    if(!arr.length){el.innerHTML='<div class="empty">Sin fotos.</div>';continue;}
+    el.innerHTML='';
+    for(const it of arr){
+      const local=await getPhoto(it.k);const src=local||it.u;if(!src)continue;
+      const d=document.createElement('div');d.className='ph2';
+      d.innerHTML=`<img src="${src}" alt="">`+(READONLY?'':`<button class="galRm" title="Quitar foto">✕</button>`);
+      d.querySelector('img').onclick=()=>openImg(src);
+      const rm=d.querySelector('.galRm');if(rm)rm.onclick=ev=>{ev.stopPropagation();removePhotoItem(id,cat,it.k);};
+      el.appendChild(d);
+    }
+  }
+}
+function openImg(src){const c=document.getElementById('modalCard');c.innerHTML=`<img src="${src}" style="max-width:100%;max-height:80vh;border-radius:8px;display:block;margin:0 auto"><button class="btn primary" style="margin-top:13px;width:100%" onclick="document.getElementById('modal').classList.remove('open')">Cerrar</button>`;document.getElementById('modal').classList.add('open');}
+async function addPhoto(id,cat,src){
+  if(!id||READONLY)return;
   const data=await downscale(src);
-  await putPhoto(id,data);await refreshPhotoIds();
-  document.getElementById('pPhoto').innerHTML=`<img src="${data}">`;renderMarkers();
+  const k=id+'|'+cat+'|'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  await putPhoto(k,data);
+  state.photos[id]=state.photos[id]||{ent:[],pla:[]};
+  if(!Array.isArray(state.photos[id][cat]))state.photos[id][cat]=[];
+  const item={u:null,k};state.photos[id][cat].push(item);
+  save();renderGalleries(id);renderMarkers();
   if(cloud.storage&&cloud.user){
-    try{
-      const ref=cloud.storage.ref('planosAguas/'+id+'.jpg');
-      await ref.putString(data,'data_url',{contentType:'image/jpeg'});
-      state.photos=state.photos||{};state.photos[id]=await ref.getDownloadURL();
-      save();toast('Foto guardada y sincronizada');
-    }catch(e){toast('Foto guardada (local; sin sync)');}
+    try{const ref=cloud.storage.ref('planosAguas/'+id+'/'+k+'.jpg');await ref.putString(data,'data_url',{contentType:'image/jpeg'});item.u=await ref.getDownloadURL();save();toast('Foto guardada y sincronizada');}
+    catch(e){toast('Foto guardada (local; sin sync)');}
   }else toast('Foto guardada (local)');
 }
-function downscale(src){return new Promise(res=>{const img=new Image();img.onload=()=>{const max=1280;let{width:w,height:h}=img;if(w>max||h>max){const r=Math.min(max/w,max/h);w*=r;h*=r;}const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);res(c.toDataURL('image/jpeg',0.82));};img.src=src;});}
-document.getElementById('pFile').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const fr=new FileReader();fr.onload=()=>setPhoto(fr.result);fr.readAsDataURL(f);});
-document.getElementById('pPaste').onclick=async()=>{try{const items=await navigator.clipboard.read();for(const it of items)for(const ty of it.types)if(ty.startsWith('image/')){const b=await it.getType(ty);const fr=new FileReader();fr.onload=()=>setPhoto(fr.result);fr.readAsDataURL(b);return;}toast('No hay imagen en el portapapeles');}catch(e){toast('Usa Ctrl+V para pegar');}};
-window.addEventListener('paste',e=>{if(!document.getElementById('panel').classList.contains('open'))return;const it=[...e.clipboardData.items].find(i=>i.type.startsWith('image/'));if(it){const fr=new FileReader();fr.onload=()=>setPhoto(fr.result);fr.readAsDataURL(it.getAsFile());}});
-document.getElementById('pDel').onclick=async()=>{
-  if(!sel)return;const id=sel;
-  await delPhoto(id);await refreshPhotoIds();
-  if(state.photos&&state.photos[id]){delete state.photos[id];save();}
-  if(cloud.storage&&cloud.user){try{await cloud.storage.ref('planosAguas/'+id+'.jpg').delete();}catch(e){}}
-  document.getElementById('pPhoto').innerHTML='Sin foto. Pega (Ctrl+V) o sube una imagen.';renderMarkers();toast('Foto quitada');
-};
+async function removePhotoItem(id,cat,k){
+  if(!confirm('¿Quitar esta foto?'))return;
+  await delPhoto(k);
+  const arr=(state.photos[id]&&state.photos[id][cat])||[];const i=arr.findIndex(x=>x.k===k);if(i>=0)arr.splice(i,1);
+  save();renderGalleries(id);renderMarkers();
+  if(cloud.storage&&cloud.user){try{await cloud.storage.ref('planosAguas/'+id+'/'+k+'.jpg').delete();}catch(e){}}
+  toast('Foto quitada');
+}
+let activePhotoCat='ent';
+function readImgFile(file,cb){const fr=new FileReader();fr.onload=()=>cb(fr.result);fr.readAsDataURL(file);}
+document.querySelectorAll('.galAdd input[type=file]').forEach(inp=>inp.addEventListener('change',()=>{
+  const cat=inp.dataset.cat;activePhotoCat=cat;const f=inp.files[0];if(!f||!sel)return;readImgFile(f,d=>addPhoto(sel,cat,d));inp.value='';
+}));
+document.querySelectorAll('.galAdd button[data-act=paste]').forEach(btn=>btn.onclick=async()=>{
+  const cat=btn.dataset.cat;activePhotoCat=cat;if(!sel)return;
+  try{const items=await navigator.clipboard.read();for(const it of items)for(const ty of it.types)if(ty.startsWith('image/')){const b=await it.getType(ty);readImgFile(b,d=>addPhoto(sel,cat,d));return;}toast('No hay imagen en el portapapeles. Copiá una y reintentá (o Ctrl+V).');}
+  catch(e){toast('Copiá una imagen y pegá con Ctrl+V (con el panel abierto).');}
+});
+window.addEventListener('paste',e=>{if(READONLY||!sel||!document.getElementById('panel').classList.contains('open'))return;const it=[...((e.clipboardData&&e.clipboardData.items)||[])].find(i=>i.type.startsWith('image/'));if(it){readImgFile(it.getAsFile(),d=>addPhoto(sel,activePhotoCat||'ent',d));}});
 document.getElementById('pDelPoint').onclick=()=>{if(sel&&confirm('¿Eliminar el punto '+sel+'?\n(Si es del plano, lo puedes recuperar con "Restaurar ocultos".)')){removePoint(sel);document.getElementById('pClose').click();}};
 /* Fase 1: cambiar estado del pin */
 function setEstado(id,st){
@@ -705,10 +770,31 @@ function redrawBajadaFromPin(id){
   document.body.classList.add('drafting');renderShapes();renderEditbar();
   toast('Redibuja la cañería de '+id+' · clic puntos · doble-clic o Terminar');
 }
+/* zonas: lista de sugerencias (defaults + usadas + custom) y asignación editable */
+function zonasAll(){
+  const set=new Set(DEFAULT_ZONAS);
+  (state.zonas||[]).forEach(z=>{if(z)set.add(z);});
+  points().forEach(p=>{if(p.zona)set.add(p.zona);});
+  return [...set].sort((a,b)=>a.localeCompare(b,'es'));
+}
+function buildZonasDatalist(){
+  const dl=document.getElementById('zonasList');if(!dl)return;
+  dl.innerHTML=zonasAll().map(z=>`<option value="${esc(z)}"></option>`).join('');
+}
+function setZona(id,zona){
+  zona=(zona||'').trim();
+  const dp=DEFAULT_POINTS.find(p=>p.id===id);
+  if(dp){state.over[id]=Object.assign({},state.over[id],{zona});}
+  else{const ex=(state.extra||[]).find(p=>p.id===id);if(ex)ex.zona=zona;}
+  if(zona&&!DEFAULT_ZONAS.includes(zona)&&!(state.zonas||[]).includes(zona)){state.zonas=state.zonas||[];state.zonas.push(zona);}
+  save();buildZonasDatalist();
+  const z=document.getElementById('pZona');if(z&&sel===id)z.textContent=zona||'—';
+}
+document.getElementById('pZonaInput').addEventListener('change',e=>{if(sel)setZona(sel,e.target.value);});
 
 /* ============ EDIT ============ */
 function exitEdit(){cancelDraft();wiz=null;selShape=null;structMode=false;pend2=null;document.body.classList.remove('edit','has-sel','drafting');document.body.classList.remove(...TOOLCLS);document.getElementById('btnEdit').classList.remove('on');renderShapes();renderMarkers();renderEditbar();}
-document.getElementById('btnEdit').onclick=()=>{const on=document.body.classList.toggle('edit');document.getElementById('btnEdit').classList.toggle('on',on);if(on){wiz=null;setTool('pin');renderMarkers();toast('Modo edición ON');}else{exitEdit();toast('Modo edición OFF');}};
+document.getElementById('btnEdit').onclick=()=>{if(READONLY)return;const on=document.body.classList.toggle('edit');document.getElementById('btnEdit').classList.toggle('on',on);if(on){wiz=null;setTool('pin');renderMarkers();toast('Modo edición ON');}else{exitEdit();toast('Modo edición OFF');}};
 function removePoint(id){
   if((state.extra||[]).some(p=>p.id===id))state.extra=state.extra.filter(p=>p.id!==id); // bajada agregada a mano
   else if(!state.removed.includes(id))state.removed.push(id);                            // pin del plano → ocultar
@@ -1172,8 +1258,8 @@ document.getElementById('btnStats').onclick=()=>{
 };
 
 /* ============ QR ============ */
-document.getElementById('btnQR').onclick=()=>{const url=location.href.split('#')[0];const c=document.getElementById('modalCard');
-  c.innerHTML=`<h3>Compartir vista</h3><div id="qrbox">Generando…</div><div class="urlbox">${url}</div><button class="btn primary" style="margin-top:13px;width:100%" onclick="document.getElementById('modal').classList.remove('open')">Cerrar</button>`;
+document.getElementById('btnQR').onclick=()=>{const u=new URL(location.href);u.searchParams.set('view','1');u.hash='';const url=u.toString();const c=document.getElementById('modalCard');
+  c.innerHTML=`<h3>Compartir vista (solo lectura)</h3><div id="qrbox">Generando…</div><div class="urlbox">${url}</div><div style="font-family:var(--mono);font-size:9.5px;color:var(--inkLo);letter-spacing:.4px;margin-top:8px;line-height:1.5">Este enlace abre el plano en modo solo-lectura, siempre actualizado. No permite editar.</div><button class="btn primary" style="margin-top:13px;width:100%" onclick="document.getElementById('modal').classList.remove('open')">Cerrar</button>`;
   document.getElementById('modal').classList.add('open');genQR(url);};
 function genQR(url){const box=document.getElementById('qrbox');
   function draw(){try{const t=qrcode(0,'M');t.addData(url);t.make();box.innerHTML=t.createSvgTag({cellSize:5,margin:2});}catch(e){box.innerHTML='<div style="font-size:12px;color:#555">No se pudo generar el QR.<br>Copia la URL.</div>';}}
