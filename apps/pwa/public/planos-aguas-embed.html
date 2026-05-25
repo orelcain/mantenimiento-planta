@@ -53,6 +53,10 @@
   .hbtn:hover{border-color:var(--borderHi);color:var(--ink);background:var(--surfaceHi)}
   .hbtn:active{transform:translateY(1px)}
   .hbtn.on{background:var(--aqua);border-color:var(--aqua);color:#fff}
+  #btnSync::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block;margin-right:2px}
+  .hbtn.sok{border-color:var(--ok);color:var(--ok)}
+  .hbtn.swarn{border-color:var(--falta);color:var(--falta)}
+  .hbtn.sbusy{border-color:var(--aquaBright);color:var(--aquaBright)}
 
   .toolbar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:8px 16px;background:var(--bgPanel);border-bottom:1px solid var(--border);z-index:15}
   .chip{border:1px solid var(--border);background:var(--surface);color:var(--ink);border-radius:6px;padding:5px 11px;font-family:var(--mono);font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;cursor:pointer;user-select:none;display:inline-flex;gap:7px;align-items:center;transition:.12s var(--ease)}
@@ -179,6 +183,7 @@
   }
   /* modo solo-lectura (QR): sin afordancias de edición */
   body.ro #btnEdit{display:none}
+  body.ro #btnSync{display:none}
   body.ro #pEditToggleRow{display:none!important}
   body.ro .galAdd,body.ro .galRm{display:none!important}
   ::-webkit-scrollbar{width:9px;height:9px}
@@ -256,6 +261,7 @@
     <div class="spacer"></div>
     <div class="stats" id="stats"></div>
     <div class="acts">
+      <button class="hbtn" id="btnSync" title="Estado de sincronización · clic para sincronizar / exportar">Local</button>
       <button class="hbtn" id="btnTheme" title="Alternar plano claro / oscuro">Oscuro</button>
       <button class="hbtn" id="btnStats">Resumen</button>
       <button class="hbtn" id="btnQR">QR</button>
@@ -450,7 +456,7 @@ function normPhotos(s){
 function saveLocal(){localStorage.setItem(STORE_KEY,JSON.stringify(state));}
 
 /* ============ CLOUD SYNC (Firebase) — posiciones / notas / dibujos ============ */
-const cloud={db:null,auth:null,storage:null,user:null,ready:false,applying:false,dirty:false,busy:false,docMissing:false,pushT:0};
+const cloud={db:null,auth:null,storage:null,user:null,ready:false,applying:false,dirty:false,busy:false,docMissing:false,pushT:0,writing:false,lastWrite:null};
 function cloudDoc(){return cloud.db.collection('planosAguas').doc('main');}
 function initCloud(){
   try{
@@ -458,9 +464,10 @@ function initCloud(){
     firebase.initializeApp({apiKey:"AIzaSyBsJSh6x3ZGEyuXsM18dSWsJKyU7--KJss",authDomain:"mantenimiento-planta-771a3.firebaseapp.com",projectId:"mantenimiento-planta-771a3",storageBucket:"mantenimiento-planta-771a3.firebasestorage.app"});
     cloud.db=firebase.firestore(); cloud.auth=firebase.auth();
     try{cloud.storage=firebase.storage();}catch(_){}
-    cloud.auth.onAuthStateChanged(u=>{cloud.user=u||null; if(u&&cloud.docMissing)trySeed();}); // siembra cuando la sesión carga tarde
-    cloudDoc().onSnapshot(onCloudSnap,e=>console.warn('[planos] onSnapshot',e&&e.code));
+    cloud.auth.onAuthStateChanged(u=>{cloud.user=u||null; renderSync(); if(u&&cloud.docMissing)trySeed();}); // siembra cuando la sesión carga tarde
+    cloudDoc().onSnapshot(onCloudSnap,e=>{cloud.lastWrite=(e&&e.code)||'error';console.warn('[planos] onSnapshot',e&&e.code);renderSync();});
   }catch(e){console.warn('[planos] Firebase no disponible, modo local',e);}
+  renderSync();
 }
 function localHasData(){return Object.keys(state.over).length||state.extra.length||state.removed.length||(state.shapes||[]).length||Object.keys(state.notas).length||Object.keys(state.photos||{}).length;}
 function trySeed(){ if(cloud.user&&localHasData()){cloud.docMissing=false;pushCloud(true);} }
@@ -482,15 +489,21 @@ function onCloudSnap(snap){
   saveLocal();
   cloud.applying=false;
   if(typeof renderMarkers==='function'){renderMarkers();renderShapes();if(sel)openPanel(sel);}
+  renderSync();
 }
 function pushCloud(now){
   if(!cloud.db)return;
   cloud.dirty=true;
   clearTimeout(cloud.pushT);
-  const doIt=()=>cloudDoc().set({
+  const doIt=()=>{
+    cloud.writing=true;renderSync();
+    return cloudDoc().set({
       over:state.over,notas:state.notas,extra:state.extra,removed:state.removed,shapes:state.shapes,photos:state.photos||{},zonas:state.zonas||[],
       updatedAt:firebase.firestore.FieldValue.serverTimestamp()
-    },{merge:true}).then(()=>{cloud.dirty=false;}).catch(()=>{cloud.dirty=false;}); // sin permiso (no supervisor) u offline → queda local
+    },{merge:true})
+    .then(()=>{cloud.dirty=false;cloud.writing=false;cloud.lastWrite='ok';renderSync();})
+    .catch(e=>{cloud.dirty=false;cloud.writing=false;cloud.lastWrite=(e&&e.code)||'error';renderSync();}); // sin permiso (no supervisor) u offline → queda local
+  };
   if(now)doIt(); else cloud.pushT=setTimeout(doIt,500);
 }
 function save(){saveLocal(); if(!cloud.applying) pushCloud();}
@@ -1275,6 +1288,61 @@ function applyTheme(){
   const b=document.getElementById('btnTheme');b.classList.toggle('on',darkPlan);b.textContent=darkPlan?'Claro':'Oscuro';
 }
 document.getElementById('btnTheme').onclick=()=>{darkPlan=!darkPlan;localStorage.setItem(THEME_KEY,darkPlan?'dark':'light');applyTheme();if(vecPage&&view.s>=VEC_MIN_S)vecRender();};
+
+/* ============ ESTADO DE SINCRONIZACIÓN + EXPORT/IMPORT ============ */
+function syncState(){
+  if(!cloud.db)return {t:'Local',cls:'swarn',tip:'Sin Firebase (offline). Cambios solo en este dispositivo.',d:'Firebase no está disponible ahora. Tus cambios se guardan en este dispositivo.'};
+  if(cloud.writing)return {t:'Guardando…',cls:'sbusy',tip:'Sincronizando con la nube…',d:'Guardando en la nube…'};
+  if(!cloud.user)return {t:'Solo local',cls:'swarn',tip:'Sin sesión de supervisor en el plano.',d:'No hay sesión de Firebase en el plano: iniciá sesión como supervisor en la PWA para sincronizar. Por ahora tus cambios quedan SOLO en este dispositivo (no se ven en el celular ni por QR).'};
+  if(cloud.lastWrite==='permission-denied')return {t:'Solo local',cls:'swarn',tip:'Tu usuario no es supervisor/admin.',d:'Tu usuario no tiene permiso de supervisor/admin, así que no puede guardar en la nube. Cambios solo en este dispositivo.'};
+  if(cloud.lastWrite&&cloud.lastWrite!=='ok')return {t:'Sin conexión',cls:'swarn',tip:'No se pudo guardar ('+cloud.lastWrite+').',d:'No se pudo guardar en la nube ('+cloud.lastWrite+'). Reintentá cuando vuelva la conexión.'};
+  if(cloud.lastWrite==='ok')return {t:'En la nube ✓',cls:'sok',tip:'Sincronizado con la nube.',d:'Tus cambios están en la nube y se ven en otros dispositivos (celular, QR).'};
+  return {t:'Local',cls:'',tip:'Aún sin cambios sincronizados en esta sesión.',d:'Todavía no se sincronizó ningún cambio en esta sesión. Hacé un cambio o tocá "Sincronizar ahora".'};
+}
+function renderSync(){const b=document.getElementById('btnSync');if(!b)return;const s=syncState();b.textContent=s.t;b.classList.remove('sok','swarn','sbusy');if(s.cls)b.classList.add(s.cls);b.title=s.tip;}
+function forceSync(){
+  if(!cloud.db){toast('Firebase no disponible ahora');return;}
+  if(!cloud.user){toast('No hay sesión de supervisor en el plano');renderSync();return;}
+  cloud.dirty=false;pushCloud(true);toast('Sincronizando…');
+}
+async function exportData(){
+  const photos=JSON.parse(JSON.stringify(state.photos||{}));
+  for(const id in photos){for(const cat of ['ent','pla']){for(const it of (photos[id][cat]||[])){try{const d=await getPhoto(it.k);if(d)it.d=d;}catch(e){}}}}
+  const data=JSON.stringify({v:3,over:state.over,notas:state.notas,extra:state.extra,removed:state.removed,shapes:state.shapes,photos,zonas:state.zonas});
+  const blob=new Blob([data],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='planos-aguas-'+new Date().toISOString().slice(0,10)+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1500);
+  toast('Copia exportada (.json)');
+}
+async function importData(json){
+  let r;try{r=JSON.parse(json);}catch(e){toast('Archivo inválido');return;}
+  if(!r||typeof r!=='object'){toast('Archivo inválido');return;}
+  if(!confirm('Importar REEMPLAZA los datos de este dispositivo por los del archivo. ¿Continuar?'))return;
+  state.over=r.over||{};state.notas=r.notas||{};state.extra=Array.isArray(r.extra)?r.extra:[];state.removed=Array.isArray(r.removed)?r.removed:[];state.shapes=Array.isArray(r.shapes)?r.shapes:[];state.zonas=Array.isArray(r.zonas)?r.zonas:[];
+  const ph=(r.photos&&typeof r.photos==='object')?r.photos:{};
+  for(const id in ph){for(const cat of ['ent','pla']){for(const it of ((ph[id]&&ph[id][cat])||[])){if(it.d){try{await putPhoto(it.k,it.d);}catch(e){}delete it.d;}}}}
+  state.photos=ph;normPhotos(state);
+  saveLocal();
+  if(typeof renderMarkers==='function'){renderMarkers();renderShapes();}
+  if(typeof buildZonasDatalist==='function')buildZonasDatalist();
+  if(cloud.user)pushCloud(true);
+  toast('Datos importados'+(cloud.user?' · sincronizando…':' (local)'));
+}
+function openSyncModal(){
+  const s=syncState();const c=document.getElementById('modalCard');
+  c.innerHTML=`<h3>Sincronización</h3>
+    <div style="font-size:13px;line-height:1.55;color:var(--ink)">${esc(s.d)}</div>
+    <div class="pbtns" style="margin-top:14px">
+      <button class="btn primary" id="syNow">Sincronizar ahora</button>
+      <button class="btn" id="syExp">Exportar copia (.json)</button>
+      <label class="btn">Importar copia<input type="file" id="syImp" accept="application/json,.json" hidden></label>
+    </div>
+    <div style="font-family:var(--mono);font-size:9.5px;color:var(--inkLo);letter-spacing:.4px;margin-top:11px;line-height:1.55">"Sincronizar ahora" sube TODO lo de este dispositivo a la nube (requiere sesión supervisor). Exportar/Importar mueve tus datos entre dispositivos u orígenes (incluye las fotos).</div>
+    <button class="btn primary" style="margin-top:13px;width:100%" onclick="document.getElementById('modal').classList.remove('open')">Cerrar</button>`;
+  document.getElementById('modal').classList.add('open');
+  document.getElementById('syNow').onclick=()=>{forceSync();setTimeout(()=>document.getElementById('modal').classList.remove('open'),500);};
+  document.getElementById('syExp').onclick=exportData;
+  document.getElementById('syImp').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const fr=new FileReader();fr.onload=()=>importData(fr.result);fr.readAsText(f);});
+}
+document.getElementById('btnSync').onclick=openSyncModal;
 
 /* ============ CAPA VECTOR NÍTIDA (PDF.js, mejora progresiva) ============
    El PNG es la base instantánea (pan/zoom fluido, móvil intacto). Al acercar
