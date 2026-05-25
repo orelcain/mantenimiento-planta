@@ -1065,15 +1065,13 @@ Con Haversine A→D = dimensión real del recinto en metros. El DWG ya tiene cot
 
 ## Pendientes priorizados
 
-### PENDIENTE — Editor "Planos de Aguas" (próxima sesión · 2026-05-24)
+### Planos de Aguas — estado al 2026-05-25
 
-Módulo nuevo **Planos de Aguas** ✅ funcionando: `apps/pwa/public/planos-aguas.html` (standalone) embebido vía `PlanosAguasPage.tsx` en ruta `/planos-aguas` (item menú Herramientas `inDevelopment` → activar en `/admin/dev-modules`). Compara bajadas de agua dulce/salada del plano nuevo PN10 (AQUA014). Base = PDF alta-res, 59 pines leídos de la capa de texto del PDF (posiciones exactas), tema "plano técnico" (Space Grotesk + IBM Plex Mono, cajetín), fotos por punto (IndexedDB), filtros, resumen, QR. Comparación: 39 en ambos · 19 solo plano nuevo · 1 falta (Ó).
+Módulo **Planos de Aguas** ✅ en producción: `apps/pwa/public/planos-aguas-embed.html` (standalone, ~1500 líneas vanilla JS) embebido vía `PlanosAguasPage.tsx` en `/planos-aguas`. **Un solo plano** PN10 (AQUA014), tema oscuro. Mini-CAD: crear bajada (tipo dulce/salada/caliente + correlativo + cañería con snap), **editar bajada desde el pin** (tipo/estado/correlativo/zona/redibujar, incluso fuera de Editar), cotas a escala con **valor manual** y reubicables, estructura (rect/círculo/línea/máscara/etiqueta), **fotos en 2 secciones** (entretecho/planta, multi-imagen), **zona editable** (datalist), **capa vector PDF.js** nítida al acercar, **QR solo-lectura** (`?view=1`).
 
-**PENDIENTE editor detallado (acordado, bajada pin+dibujo SEPARADOS):**
-- 🔲 CRUD de pines + **cambiar estado** en el panel (nuevo↔normal↔falta — el "nuevo" es estado de espera hasta confirmar que la bajada va ahí).
-- 🔲 Dibujar **cañerías verde/celeste** (polilíneas SVG), **íconos de bajada** y **etiquetas PP** en el estilo del plano (capa SVG vectorial sobre el plano).
-- 🔲 Herramienta **máscara**: polígono relleno color de fondo (blanco) punto a punto para tapar elementos del plano (es imagen).
-- Detalle técnico completo en memoria auto: `project_planos_aguas_planta.md`.
+- **2 estados** (comparación con Calidad ELIMINADA): **Confirmada** / **Por confirmar**.
+- **Sync**: Firestore `planosAguas/main` = `{blob: JSON del estado}` (Firestore no admite arrays anidados). Escritura vía **PUENTE postMessage**: el iframe NO hereda la sesión Firebase del PWA → `PlanosAguasPage.tsx` (autenticado) hace las escrituras Firestore/Storage; lecturas públicas por el iframe. Chip de estado de sync + Export/Import JSON.
+- **Pendientes**: colores de agua sensibles al tema CLARO; snap a puntos medios de aristas; fix `NanoBanana` `.github/scripts/check_nanobanana.py:78`. Detalle técnico completo en memoria auto `project_planos_aguas_planta.md`.
 
 ### PENDIENTE — Análisis de Turno (actualizado sesión 2026-04-26)
 
