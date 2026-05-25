@@ -5,22 +5,33 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Puerto Chonchi · Centro Meteo Operativo</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet" />
   <style>
     :root {
       color-scheme: dark;
-      --bg: #051a2d;
-      --surface: #0a273d;
-      --card: #10344e;
-      --card-hover: #174b6f;
-      --brand-primary: #00a6b2;
-      --brand-primary-dark: #007e86;
-      --text: #e5e5e5;
-      --text-bright: #ffffff;
-      --muted: #90a4b8;
-      --good: #4cd7a0;
-      --mid: #f4c95d;
-      --bad: #ff6b6b;
+      /* === Tokens EXACTOS del PWA (tailwind.config.js) — superficies planas, sin gradientes === */
+      --bg: #0d1722;            /* background */
+      --surface: #15212c;       /* muted */
+      --card: #16242f;          /* card */
+      --card-hover: #1f3445;    /* accent */
+      --line: #22384a;          /* border */
+      --line-soft: rgba(34,56,74,0.55);
+      --brand-primary: #2E75B6; /* primary */
+      --brand-primary-dark: #245a8c;
+      --brand-ink: #5aa6e8;     /* primary-400 (texto azul sobre oscuro) */
+      --text-bright: #e9eef3;   /* foreground */
+      --text: #d7e0e8;
+      --muted: #9db0c2;         /* muted-foreground */
+      /* Estado operativo (status vivos del app) */
+      --good: #4caf50;          /* success */
+      --mid: #ff9800;           /* warning */
+      --bad: #f44336;           /* destructive */
+      --ink-on-status: #e9eef3;
+      --radius: 0.75rem;        /* lg */
+      --radius-sm: 0.5rem;      /* md */
+      --font-ui: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', monospace;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -29,12 +40,16 @@
 
     body {
       min-height: 100vh;
-      font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      font-family: var(--font-ui);
       color: var(--text);
       background: var(--bg);
       overflow-x: hidden;
       -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
     }
+
+    /* Números siempre tabulares y en mono donde importa la lectura de cifras */
+    .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-feature-settings: 'tnum' 1; }
 
     /* ─── NAVBAR ─── */
     .navbar {
@@ -45,8 +60,9 @@
       align-items: center;
       justify-content: space-between;
       padding: 0 4%;
-      height: 64px;
-      background: linear-gradient(180deg, rgba(2, 20, 34, 0.9) 0%, transparent 100%);
+      height: 56px;
+      background: var(--bg);
+      border-bottom: 1px solid var(--line);
       transition: background 0.3s;
     }
 
@@ -147,9 +163,9 @@
 
     .hero-map-wrap {
       position: relative;
-      border-radius: 8px;
+      border-radius: var(--radius-sm);
       overflow: hidden;
-      box-shadow: 0 12px 60px rgba(0,0,0,0.7);
+      border: 1px solid var(--line);
     }
 
     .hero-map-wrap::after {
@@ -230,7 +246,7 @@
       box-shadow: 0 2px 20px rgba(0,0,0,0.5);
     }
 
-    .windy-focus .hero {
+    .windy-focus .map-section {
       position: relative;
       z-index: 130;
     }
@@ -257,10 +273,24 @@
       height: 100%;
     }
 
+    .windy-focus .shell,
+    .windy-focus .map-section .section-head,
     .windy-focus .layer-bar,
-    .windy-focus .content {
+    .windy-focus .footer {
       visibility: hidden;
       pointer-events: none;
+    }
+
+    /* Mapa reubicado: contenedor centrado + chip "ahora" */
+    .map-section {
+      max-width: 1120px;
+      margin: clamp(12px, 2vw, 18px) auto 0;
+      padding: 0 clamp(14px, 4vw, 32px) 0;
+    }
+    .map-section .map-frame { height: clamp(220px, 30vh, 340px); }
+    .map-now .cond-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--good); animation: pulseDot 2s ease-in-out infinite;
     }
 
     @keyframes pulseDot {
@@ -881,17 +911,10 @@
     /* ─── PORT TIMELINE (CHART) ─── */
     .port-timeline-card {
       background: var(--card);
-      border-radius: 10px;
+      border-radius: var(--radius-sm);
       overflow: hidden;
       position: relative;
       margin-bottom: 16px;
-    }
-    .port-timeline-card::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 3px;
-      background: linear-gradient(90deg, var(--muted), var(--brand-primary), var(--good));
     }
     .ptl-header {
       display: flex;
@@ -1647,6 +1670,403 @@
         padding: 0 2%;
       }
     }
+    /* ════════════════════════════════════════════════════════════
+       REDISEÑO 2026 — condensado, jerarquizado (3 tiers)
+       ════════════════════════════════════════════════════════════ */
+    .shell { max-width: 1120px; margin: 0 auto; padding: 0 clamp(14px, 4vw, 32px) 36px; }
+
+    .tier { margin-top: clamp(14px, 2.2vw, 22px); }
+
+    .section-head {
+      display: flex; align-items: baseline; gap: 10px;
+      margin: 0 0 14px;
+    }
+    .section-head h2 {
+      font-size: clamp(0.78rem, 1.4vw, 0.86rem);
+      font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--muted);
+    }
+    .section-head .sh-note { font-size: 0.74rem; color: var(--muted); opacity: 0.75; font-weight: 500; }
+
+    /* Navbar refinada */
+    .navbar.scrolled { background: oklch(0.17 0.028 248 / 0.92); backdrop-filter: blur(10px); }
+    .nav-logo { color: var(--brand-ink); }
+    .nav-badge { background: oklch(0.30 0.04 248 / 0.7); border: 1px solid var(--line-soft); }
+    .btn-reload { background: var(--brand-primary); border-radius: 8px; }
+    .btn-reload:hover { background: var(--brand-primary-dark); }
+    .btn-map-focus { border-radius: 8px; border-color: var(--line); }
+
+    /* ─── TIER 1 · VEREDICTO ─────────────────────────────────── */
+    /* Estado comunicado por: tinte oscuro sutil + riel superior + tipografía de color.
+       (No un relleno saturado: el ámbar saturado se vuelve "barro".) */
+    .verdict {
+      position: relative;
+      border-radius: var(--radius);
+      overflow: hidden;
+      border: 1px solid var(--line);
+      background: var(--card);
+    }
+    .verdict::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: var(--brand-primary);
+    }
+    .verdict.status-open::before { background: var(--good); }
+    .verdict.status-restricted::before { background: var(--mid); }
+    .verdict.status-closed::before { background: var(--bad); }
+
+    .vd-grid {
+      display: grid;
+      grid-template-columns: 1.6fr 1fr;
+      gap: clamp(14px, 2vw, 24px);
+      padding: clamp(15px, 2.2vw, 20px);
+    }
+    .vd-main { min-width: 0; }
+    .vd-eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: 0.7rem; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase;
+      color: var(--muted);
+    }
+    .vd-eyebrow .port-live-dot { margin: 0; }
+    /* El status grande vive en #portStatus (JS lo llena). Color = estado. */
+    .verdict .port-big-status {
+      font-size: clamp(2.4rem, 6.8vw, 3.6rem);
+      font-weight: 700; line-height: 1.0; letter-spacing: -0.025em;
+      color: var(--text-bright); margin: 8px 0 0;
+    }
+    .verdict .port-big-status.open { color: var(--good); }
+    .verdict .port-big-status.restricted { color: var(--mid); }
+    .verdict .port-big-status.closed { color: var(--bad); }
+    .verdict .port-big-status > div { /* el locationHtml inyectado */
+      font-size: 0.78rem !important; font-weight: 500; letter-spacing: 0;
+      color: var(--muted) !important; margin-top: 8px !important;
+    }
+    .vd-carta {
+      font-size: 0.9rem; line-height: 1.55; color: var(--text);
+      margin: 14px 0 0; max-width: 58ch;
+    }
+    .vd-carta strong { color: var(--text-bright); }
+    .vd-conditions { color: var(--text-dim, var(--muted)) !important; }
+    .vd-conditions strong { color: var(--text-bright); }
+    .vd-decision {
+      margin: 16px 0 0; padding: 12px 15px;
+      border-radius: var(--radius-sm);
+      background: oklch(1 0 0 / 0.035);
+      border: 1px solid var(--line);
+      font-size: 0.92rem; font-weight: 600; letter-spacing: 0.005em;
+      color: var(--text-bright);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .vd-decision::before {
+      content: ''; width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0;
+      background: var(--brand-primary);
+    }
+    .vd-decision.ok::before { background: var(--good); }
+    .vd-decision.warn::before { background: var(--mid); }
+    .vd-decision.danger::before { background: var(--bad); }
+    .vd-drivers { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 14px; }
+    .vd-drivers:empty { display: none; }
+    .verdict .port-reason-tag {
+      background: oklch(1 0 0 / 0.05);
+      color: var(--text);
+      border: 1px solid var(--line-soft);
+      font-weight: 500; font-size: 0.77rem; border-radius: 6px;
+    }
+    .verdict .port-reason-tag.danger { color: var(--bad); background: oklch(0.58 0.17 27 / 0.12); border-color: oklch(0.58 0.17 27 / 0.25); }
+    .verdict .port-reason-tag.warn { color: var(--mid); background: oklch(0.62 0.13 85 / 0.12); border-color: oklch(0.62 0.13 85 / 0.25); }
+    .verdict .port-reason-tag.ok { color: var(--good); background: oklch(0.55 0.12 162 / 0.12); border-color: oklch(0.55 0.12 162 / 0.25); }
+
+    /* Lado derecho del veredicto: reapertura o despeje */
+    .vd-side {
+      display: flex; flex-direction: column; justify-content: center;
+      gap: 12px; min-width: 0;
+      padding-left: clamp(0px, 2vw, 24px);
+      border-left: 1px solid var(--line);
+    }
+    #zonaProbSection.vd-reopen {
+      display: block; margin: 0; padding: 0; background: none; border: none;
+    }
+    .vd-clear { text-align: center; color: var(--muted); }
+    .vd-clear .big {
+      width: 56px; height: 56px; margin: 0 auto 4px; display: flex; align-items: center; justify-content: center;
+      border-radius: 50%; border: 1.5px solid oklch(0.55 0.12 162 / 0.5); color: var(--good); font-size: 1.5rem;
+    }
+    .vd-clear .lbl { font-size: 0.84rem; font-weight: 500; margin-top: 8px; max-width: 26ch; margin-inline: auto; }
+
+    /* Callout restricción oficial DIRECTEMAR (texto real SITPORT) */
+    .vd-oficial {
+      margin: 0 clamp(18px,3vw,28px) clamp(14px,2vw,18px);
+      padding: 13px 15px;
+      border-radius: var(--radius-sm);
+      background: oklch(0.99 0.01 248 / 0.08);
+      border: 1px solid oklch(0.99 0.01 248 / 0.16);
+      color: var(--ink-on-status);
+      font-size: 0.85rem; line-height: 1.5;
+    }
+    .vd-oficial .of-h { font-weight: 700; display: flex; align-items: center; gap: 7px; margin-bottom: 7px; letter-spacing: 0.01em; }
+    .vd-oficial .of-cond { color: var(--ink-on-status); }
+    .vd-oficial .of-row { display: flex; flex-wrap: wrap; gap: 5px 16px; margin-top: 3px; opacity: 0.95; }
+    .vd-oficial .of-carta {
+      margin-top: 9px; display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 11px; border-radius: 7px; font-size: 0.8rem; font-weight: 600;
+      background: oklch(0.55 0.12 162 / 0.20);
+    }
+    .vd-oficial .of-src { display: inline-block; margin-top: 9px; margin-left: 10px; font-size: 0.76rem; opacity: 0.78; color: var(--ink-on-status); text-decoration: underline; }
+    .vd-oficial .of-sep { opacity: 0.4; }
+    .vd-oficial .of-cond { font-weight: 700; }
+    .vd-oficial .of-f { display: inline-flex; align-items: baseline; gap: 5px; }
+    .vd-oficial .of-k { font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 700; color: var(--muted); }
+
+    /* Puntos de estado limpios (reemplazan emoji de colores) */
+    .dm-zone-status-badge { display: inline-flex; align-items: center; }
+    .dm-zone-status-badge::before {
+      content: ''; width: 8px; height: 8px; border-radius: 50%; background: currentColor;
+      margin-right: 7px; flex-shrink: 0;
+    }
+    .dm-zone-status-badge.unknown::before { opacity: 0.45; }
+
+    /* Acciones preventivas con viñeta sutil (no lista plana) */
+    .preventive-action { position: relative; padding: 7px 10px 7px 24px; }
+    .preventive-action::before {
+      content: ''; position: absolute; left: 11px; top: 0.95em; width: 5px; height: 5px;
+      border-radius: 50%; background: var(--brand-primary); opacity: 0.75;
+    }
+
+    /* Pills de capa más sobrias (menos "pill genérica de IA") */
+    .layer-bar { gap: 6px; padding: 14px 0 0; }
+    .layer-pill {
+      border-radius: 8px; border: 1px solid var(--line);
+      background: oklch(1 0 0 / 0.02); color: var(--muted);
+      font-weight: 600; font-size: 0.78rem; padding: 7px 15px;
+    }
+    .layer-pill:hover { background: oklch(1 0 0 / 0.05); color: var(--text); border-color: var(--line); }
+    .layer-pill.active {
+      background: oklch(0.65 0.12 242 / 0.16); color: var(--brand-ink);
+      border-color: oklch(0.65 0.12 242 / 0.5);
+    }
+
+    /* Franja fuente oficial */
+    .official {
+      display: flex; align-items: center; flex-wrap: wrap; gap: 10px 16px;
+      padding: 11px clamp(18px, 3vw, 28px);
+      border-top: 1px solid oklch(0.99 0.01 248 / 0.12);
+      background: oklch(0.14 0.026 248 / 0.45);
+      font-size: 0.78rem; color: var(--muted);
+    }
+    .official .of-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-weight: 700; letter-spacing: 0.04em; color: var(--text-bright);
+    }
+    .official .of-medicion { color: var(--text); }
+    .official .of-medicion strong { color: var(--text-bright); }
+    .official .of-spacer { margin-left: auto; }
+    .official a { color: var(--brand-ink); text-decoration: none; font-weight: 600; }
+    .official a:hover { text-decoration: underline; }
+    .official .dm-refresh { border-radius: 7px; }
+
+    /* Zonas condensadas dentro del veredicto */
+    .vd-zones {
+      display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 8px;
+      padding: 0 clamp(18px, 3vw, 28px) clamp(16px, 2.2vw, 22px);
+    }
+    .verdict .dm-zone-card { background: oklch(0.14 0.026 248 / 0.4); border-color: var(--line-soft); }
+    #dmConflict:not(:empty) {
+      margin: 0 clamp(18px,3vw,28px) clamp(14px,2vw,20px);
+    }
+
+    /* ─── BOLETÍN OFICIAL DIRECTEMAR (héroe) ──────────────────── */
+    .boletin {
+      position: relative; border-radius: var(--radius); overflow: hidden;
+      background: var(--card);
+      border: 1px solid var(--line);
+    }
+    .boletin::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--brand-primary); }
+    .boletin.bl-restr::before { background: var(--mid); }
+    .boletin.bl-restr { border-color: oklch(0.62 0.13 85 / 0.40); }
+    .boletin.bl-open::before { background: var(--good); }
+    .boletin.bl-open { border-color: oklch(0.55 0.12 162 / 0.35); }
+    .boletin.bl-error::before { background: var(--muted); }
+
+    .bl-head {
+      display: flex; align-items: center; gap: 11px;
+      padding: 12px clamp(14px,2.2vw,20px);
+      border-bottom: 1px solid var(--line);
+      background: var(--surface);
+    }
+    .bl-seal {
+      width: 34px; height: 34px; flex-shrink: 0; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      border: 1.5px solid var(--brand-ink); color: var(--brand-ink);
+    }
+    .bl-seal svg { width: 19px; height: 19px; }
+    .bl-head-txt { flex: 1; min-width: 0; }
+    .bl-auth { font-weight: 700; font-size: 0.8rem; letter-spacing: 0.08em; color: var(--text-bright); }
+    .bl-sub { font-size: 0.72rem; color: var(--muted); margin-top: 1px; }
+    .bl-live { display: flex; align-items: center; gap: 10px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+    .bl-ts { font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); }
+
+    .bl-body { padding: clamp(15px,2.2vw,20px) clamp(14px,2.2vw,20px); }
+    .bl-label { font-size: 0.64rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+    .bl-condicion {
+      font-size: clamp(1.5rem, 3.6vw, 2.1rem); font-weight: 700; line-height: 1.05;
+      letter-spacing: -0.02em; color: var(--text-bright); margin: 5px 0 2px;
+    }
+    .bl-condicion.restricted { color: var(--mid); }
+    .bl-condicion.open { color: var(--good); }
+    .bl-condicion.err { color: var(--muted); }
+    .bl-sujeto { font-size: 0.92rem; color: var(--text); }
+
+    .boletin .vd-oficial { margin: 18px 0 0; background: oklch(1 0 0 / 0.03); border-color: var(--line-soft); color: var(--text); }
+    .boletin .vd-oficial .of-cond, .boletin .vd-oficial .of-src { color: var(--text-bright); }
+    .bl-sensor { margin-top: 14px; font-size: 0.84rem; color: var(--text); }
+    .bl-sensor strong { color: var(--text-bright); }
+    .bl-k { font-size: 0.64rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-right: 7px; }
+    .bl-zones-label { display: block; font-size: 0.64rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin: 20px 0 9px; }
+    .boletin .vd-zones { padding: 0; grid-template-columns: 1.3fr 1fr 1fr; }
+    .boletin .dm-zone-card { background: oklch(0.14 0.022 248 / 0.5); border-color: var(--line-soft); }
+    .bl-fuente { margin-top: 16px; padding-top: 13px; border-top: 1px solid var(--line); font-size: 0.74rem; color: var(--muted); }
+    .bl-fuente a { color: var(--brand-ink); font-weight: 600; text-decoration: none; }
+    .bl-fuente a:hover { text-decoration: underline; }
+
+    /* Separador mayor: OFICIAL ↑  /  PROPIO ↓ */
+    .section-major { margin-top: clamp(28px,4vw,42px); padding-top: 18px; border-top: 1px solid var(--line); }
+    .section-major h2 { font-size: clamp(0.95rem,1.9vw,1.1rem); color: var(--text-bright); letter-spacing: 0.01em; text-transform: none; font-weight: 700; }
+
+    /* Democión del veredicto computado → lectura operativa secundaria */
+    #tier-operativa { margin-top: 14px; }
+    #tier-operativa .verdict::before { display: none; }
+    #tier-operativa .verdict,
+    #tier-operativa .verdict.status-open,
+    #tier-operativa .verdict.status-restricted,
+    #tier-operativa .verdict.status-closed {
+      background: var(--card); border-color: var(--line);
+      box-shadow: none;
+    }
+    #tier-operativa .port-big-status { font-size: clamp(1.25rem, 2.6vw, 1.6rem); margin-top: 4px; }
+    #tier-operativa #dmConflict:not(:empty) { margin: 12px 0 0; }
+    .lectura-foot { margin-top: 14px; font-size: 0.72rem; color: var(--muted); }
+    @media (max-width: 700px) { .boletin .vd-zones { grid-template-columns: 1fr; } }
+
+    /* ─── TIER 2 · PRÓXIMAS 24H ──────────────────────────────── */
+    .n24 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    .n24-card {
+      background: var(--card); border: 1px solid var(--line);
+      border-radius: var(--radius); padding: 18px 20px;
+    }
+    .n24-prob { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .n24-prob .pb {
+      border-radius: var(--radius-sm); padding: 14px;
+      background: var(--surface); border: 1px solid var(--line-soft);
+    }
+    .n24-prob .pb .pb-l {
+      font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
+    }
+    .n24-prob .pb .pb-v { font-size: 1.6rem; font-weight: 700; margin-top: 4px; line-height: 1; }
+    .n24-prob .pb .pb-v.yes { color: var(--bad); }
+    .n24-prob .pb .pb-v.no { color: var(--good); }
+    .n24-prob .pb .pb-v .pct { font-size: 0.9rem; color: var(--muted); font-weight: 600; }
+    .n24-sub { font-size: 0.84rem; color: var(--text); line-height: 1.5; margin-top: 12px; }
+    .n24-window {
+      margin-top: 12px; padding: 11px 13px; border-radius: var(--radius-sm);
+      background: oklch(0.30 0.08 85 / 0.16); border: 1px solid oklch(0.62 0.13 85 / 0.32);
+      font-size: 0.86rem; color: var(--text);
+    }
+    .n24-window.high { background: oklch(0.30 0.10 27 / 0.16); border-color: oklch(0.58 0.17 27 / 0.4); }
+    .n24-window.low  { background: oklch(0.30 0.07 162 / 0.14); border-color: oklch(0.55 0.12 162 / 0.32); }
+    .n24-window .wl { font-size: 0.66rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 3px; }
+    .n24-review { font-size: 0.78rem; color: var(--muted); margin-top: 10px; }
+    .n24-actions-title {
+      font-size: 0.68rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 10px;
+    }
+    .verdict .vd-decision, .n24-card .preventive-action { font-family: var(--font-ui); }
+    .n24-stats { display: flex; gap: 10px; margin-top: 14px; }
+    .n24-stat {
+      flex: 1; background: var(--surface); border: 1px solid var(--line-soft);
+      border-radius: var(--radius-sm); padding: 11px 13px;
+    }
+    .n24-stat .ns-l { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+    .n24-stat .ns-v { font-size: 1.25rem; font-weight: 700; color: var(--text-bright); margin-top: 3px; }
+
+    /* Override patrones prohibidos (side-stripe borders → borde completo + tinte) */
+    .decision-now { border-left: none !important; }
+    .preventive-alert { border-left: none !important; border: 1px solid var(--line-soft); }
+    .preventive-alert.high { border-color: oklch(0.58 0.17 27 / 0.4); }
+    .preventive-alert.low { border-color: oklch(0.55 0.12 162 / 0.32); }
+    .preventive-action { border-radius: var(--radius-sm); }
+    .footer-warn { border-left: none !important; border: 1px solid oklch(0.62 0.13 85 / 0.3); }
+    .err { border-left: none !important; border: 1px solid oklch(0.58 0.17 27 / 0.4); }
+    .dm-conflict { border-left: none !important; border: 1px solid oklch(0.58 0.17 27 / 0.4); border-radius: var(--radius-sm); }
+
+    /* ─── TIER 3 · CONTEXTO ──────────────────────────────────── */
+    .ctx-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+    .ctx-grid > * { min-width: 0; } /* permite scroll-x interno de la tira */
+
+    /* Tira de pronóstico condensada (reemplaza la tabla) */
+    .fc-strip {
+      display: grid; grid-auto-flow: column; grid-auto-columns: minmax(118px, 1fr);
+      gap: 8px; overflow-x: auto; padding-bottom: 4px;
+      scroll-snap-type: x proximity;
+    }
+    .fc-strip::-webkit-scrollbar { height: 5px; }
+    .fc-strip::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+    .fc-day {
+      scroll-snap-align: start;
+      background: var(--card); border: 1px solid var(--line);
+      border-radius: var(--radius-sm); padding: 13px 12px;
+      display: flex; flex-direction: column; gap: 7px;
+      position: relative; overflow: hidden;
+      appearance: none; font: inherit; color: inherit; text-align: left; cursor: pointer;
+      transition: border-color 0.18s, transform 0.18s;
+    }
+    .fc-day:hover { border-color: var(--brand-primary); transform: translateY(-2px); }
+    .fc-day.sel { border-color: var(--brand-primary); box-shadow: 0 0 0 1px var(--brand-primary) inset; }
+    .fc-day.is-today { border-color: var(--brand-primary); }
+    /* Detalle horario reusado: quitar side-stripe prohibido */
+    #fcDetail .hourly-timeline { border-left: none; border: 1px solid var(--line-soft); border-radius: var(--radius-sm); }
+    .fc-day .fc-rk { position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+    .fc-day .fc-rk.risk-low { background: var(--good); }
+    .fc-day .fc-rk.risk-mid { background: var(--mid); }
+    .fc-day .fc-rk.risk-high { background: var(--bad); }
+    .fc-day .fc-date { font-size: 0.74rem; font-weight: 700; color: var(--text-bright); text-transform: capitalize; }
+    .fc-day .fc-date .td { color: var(--brand-ink); font-weight: 700; font-size: 0.62rem; letter-spacing: 0.05em; }
+    .fc-day .fc-ico { line-height: 0; color: oklch(0.74 0.055 238); }
+    .fc-day .fc-temp { font-size: 0.8rem; color: var(--text); }
+    .fc-day .fc-temp .mx { color: var(--text-bright); font-weight: 600; }
+    .fc-day .fc-metrics { font-size: 0.72rem; color: var(--text); line-height: 1.5; }
+    .fc-day .fc-k { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; }
+    .fc-day .fc-risk {
+      margin-top: auto; font-size: 0.72rem; font-weight: 700;
+      padding: 4px 8px; border-radius: 6px; text-align: center;
+    }
+    .fc-day .fc-risk.risk-low { color: var(--good); background: oklch(0.55 0.12 162 / 0.14); }
+    .fc-day .fc-risk.risk-mid { color: var(--mid); background: oklch(0.62 0.13 85 / 0.14); }
+    .fc-day .fc-risk.risk-high { color: var(--bad); background: oklch(0.58 0.17 27 / 0.16); }
+
+    /* Mapa (reubicado en contexto) */
+    .ctx-map .hero-map-wrap { box-shadow: 0 14px 44px oklch(0.10 0.03 248 / 0.5); border: 1px solid var(--line); }
+    .ctx-map .map-frame { height: clamp(360px, 46vh, 560px); }
+    .ctx-map .layer-bar { padding: 12px 0 0; }
+
+    /* Línea temporal mantiene su tarjeta; solo borde acorde */
+    .port-timeline-card { border: 1px solid var(--line); }
+
+    /* ─── RESPONSIVE TIERS ───────────────────────────────────── */
+    @media (max-width: 880px) {
+      .vd-grid { grid-template-columns: 1fr; }
+      .vd-side { border-left: none; padding-left: 0; border-top: 1px solid oklch(0.99 0.01 248 / 0.14); padding-top: 16px; }
+      .n24 { grid-template-columns: 1fr; }
+      .vd-zones { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 560px) {
+      .n24-prob { grid-template-columns: 1fr 1fr; }
+      .n24-stats { flex-direction: column; }
+      .official { font-size: 0.74rem; }
+      .verdict .port-big-status { font-size: clamp(1.9rem, 9vw, 2.6rem); }
+    }
   </style>
 </head>
 <body>
@@ -1667,312 +2087,273 @@
     </div>
   </nav>
 
-  <!-- HERO — LIVE MAP -->
-  <section class="hero">
+  <!-- ═══════════════ MAPA EN VIVO · WINDY (arriba del todo, centrado en Chonchi) ═══════════════ -->
+  <section class="map-section" id="mapSection">
+    <div class="section-head"><h2>Mapa en vivo · Windy — Chonchi</h2><span class="sh-note">ECMWF · Open-Meteo</span></div>
     <div class="hero-map-wrap">
       <iframe
         id="windyMap"
         class="map-frame"
-        src="https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=%C2%B0C&metricWind=km%2Fh&zoom=8&overlay=wind&product=ecmwf&level=surface&lat=-42.62&lon=-73.77&detailLat=-42.62&detailLon=-73.77&marker=false&message=false"
+        src="https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=%C2%B0C&metricWind=km%2Fh&zoom=9&overlay=wind&product=ecmwf&level=surface&lat=-42.62&lon=-73.77&detailLat=-42.62&detailLon=-73.77&marker=true&message=false"
         allowfullscreen
         loading="lazy"
       ></iframe>
-      <div class="hero-overlay">
-        <h1 class="hero-title">Clima en Tiempo Real</h1>
-        <p class="hero-subtitle">Meteograma operativo · Open-Meteo Weather + Marine · ECMWF</p>
-        <div class="hero-condition" id="heroCondition">
-          <span class="cond-dot"></span>
-          <span id="nowCode">Cargando...</span>
-        </div>
+      <div class="map-now" style="position:absolute;top:14px;left:14px;z-index:4;display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border-radius:8px;background:oklch(0.17 0.028 248 / 0.78);backdrop-filter:blur(6px);color:var(--text-bright);font-size:0.82rem;font-weight:600;pointer-events:none">
+        <span class="cond-dot"></span><span id="nowCode">Cargando…</span>
       </div>
+    </div>
+    <div class="layer-bar">
+      <button class="layer-pill active" data-layer="wind">Viento</button>
+      <button class="layer-pill" data-layer="rain">Lluvia</button>
+      <button class="layer-pill" data-layer="waves">Oleaje</button>
+      <button class="layer-pill" data-layer="temp">Temperatura</button>
+      <button class="layer-pill" data-layer="clouds">Nubes</button>
+      <button class="layer-pill" data-layer="pressure">Presión</button>
     </div>
   </section>
 
-  <!-- LAYER SELECTOR -->
-  <div class="layer-bar">
-    <button class="layer-pill active" data-layer="wind">💨 Viento</button>
-    <button class="layer-pill" data-layer="rain">🌧️ Lluvia</button>
-    <button class="layer-pill" data-layer="waves">🌊 Oleaje</button>
-    <button class="layer-pill" data-layer="temp">🌡️ Temperatura</button>
-    <button class="layer-pill" data-layer="clouds">☁️ Nubes</button>
-    <button class="layer-pill" data-layer="pressure">📊 Presión</button>
-  </div>
+  <main class="shell">
 
-  <main class="content">
-
-    <!-- ═══════════════ ESTADO DEL PUERTO ═══════════════ -->
-    <section class="row">
-      <div class="row-title"><span class="accent-bar"></span>Estado del Puerto · Chonchi — Bahía de Yal</div>
-      <div style="margin-bottom:12px;padding:8px 14px;background:rgba(0,166,178,0.08);border-left:3px solid var(--brand-primary);border-radius:0 6px 6px 0;font-size:0.82rem;color:var(--muted);line-height:1.4">
-        📍 <strong style="color:var(--text-bright)">Bahía de Yal, Chonchi</strong> — Centro de Acopio <strong style="color:var(--brand-primary)">Antarfood</strong> · Chiloé, Región de Los Lagos
-      </div>
-
-      <!-- DIRECTEMAR OFICIAL — datos en vivo desde SITPORT -->
-      <div class="directemar-panel dm-loading" id="dmPanel">
-        <div class="dm-header">
-          <div style="display:flex;align-items:center;gap:8px">
-            <span style="font-size:1.1rem">🛡️</span>
-            <span style="font-weight:800;font-size:0.88rem;color:var(--text-bright);letter-spacing:0.3px">DIRECTEMAR OFICIAL · SITPORT</span>
-            <span class="dm-badge" id="dmBadge">CONSULTANDO</span>
-          </div>
-          <button class="dm-refresh" id="dmRefreshBtn" title="Consultar SITPORT ahora">⟳ Consultar</button>
-        </div>
-        <div class="dm-body">
-          <div class="dm-grid">
-            <div class="dm-status-side">
-              <div class="dm-big-icon" id="dmIcon">⏳</div>
-              <div class="dm-big-status loading" id="dmStatus">CONSULTANDO...</div>
-              <div class="dm-restricciones none" id="dmRestricciones">—</div>
-            </div>
-            <div class="dm-detail-side">
-              <div class="dm-detail-row">
-                <div class="dm-detail-item">
-                  <div class="dml">Medición Estación Chonchi</div>
-                  <div class="dmv" id="dmMedicion">Consultando datos de sensores DIRECTEMAR...</div>
-                </div>
-                <div class="dm-detail-item">
-                  <div class="dml">Restricciones activas</div>
-                  <div id="dmRestrTags"><span class="dm-restriccion-tag warn">Consultando...</span></div>
-                </div>
-              </div>
-              <div class="dm-detail-row">
-                <div class="dm-detail-item">
-                  <div class="dml">Capitanía jurisdiccional</div>
-                  <div class="dmv">Capitanía de Puerto de <strong>Castro</strong> · QUINZONA</div>
-                </div>
-              </div>
-              <div class="dm-detail-row" style="margin-top:6px">
-                <div class="dm-detail-item" style="width:100%">
-                  <div class="dml">Estado por Zona · QUINZONA</div>
-                  <div class="dm-zones-row" id="dmZonasRow">
-                    <div class="dm-zone-card zone-unknown" id="dmZonaBahia">
-                      <div class="dm-zone-name">📍 Bahía de Yal <span style="opacity:0.5;font-size:0.72em;font-weight:400">(Chonchi)</span></div>
-                      <div class="dm-zone-status-badge unknown" id="dmZonaBahiaStatus">—</div>
-                      <div class="dm-zone-detail" id="dmZonaBahiaDetail">Consultando...</div>
-                      <div class="dm-zone-restr-text" id="dmZonaBahiaRestr" style="display:none"></div>
-                    </div>
-                    <div class="dm-zone-card zone-unknown" id="dmZonaQueilen">
-                      <div class="dm-zone-name">🗺️ Queilen</div>
-                      <div class="dm-zone-status-badge unknown" id="dmZonaQuilenStatus">—</div>
-                      <div class="dm-zone-detail" id="dmZonaQuilenDetail">Consultando...</div>
-                      <div class="dm-zone-restr-text" id="dmZonaQuilenRestr" style="display:none"></div>
-                    </div>
-                    <div class="dm-zone-card zone-unknown" id="dmZonaPuqueldon">
-                      <div class="dm-zone-name">🗺️ Puqueldon</div>
-                      <div class="dm-zone-status-badge unknown" id="dmZonaPuqueldonStatus">—</div>
-                      <div class="dm-zone-detail" id="dmZonaPuqueldonDetail">Consultando...</div>
-                      <div class="dm-zone-restr-text" id="dmZonaPuqueldonRestr" style="display:none"></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <!-- Pronóstico de reapertura: aparece debajo de la zona cerrada -->
-              <div id="zonaProbSection" style="display:none;margin-top:12px;padding:12px 14px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid rgba(255,255,255,0.08)">
-                <div style="font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px" id="openingZoneLabel">Pronóstico de reapertura</div>
-                <div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap">
-                  <div class="msc-opening-gauge" style="margin-bottom:0;flex-shrink:0">
-                    <div class="msc-opening-ring" id="openingRing" style="width:88px;height:88px">
-                      <svg viewBox="0 0 120 120" class="msc-ring-svg">
-                        <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="10"/>
-                        <circle cx="60" cy="60" r="52" fill="none" stroke="var(--good)" stroke-width="10" stroke-linecap="round" stroke-dasharray="326.7" stroke-dashoffset="326.7" id="openingArc" transform="rotate(-90 60 60)"/>
-                      </svg>
-                      <div class="msc-opening-pct" id="openingPct" style="font-size:1.1rem">--%</div>
-                    </div>
-                  </div>
-                  <div style="flex:1;min-width:120px">
-                    <div class="msc-opening-label" id="openingLabel">Evaluando...</div>
-                    <div class="msc-opening-detail" id="openingDetail"></div>
-                    <div class="msc-opening-windows" id="openingWindows"></div>
-                  </div>
-                </div>
-              </div>
-              <div id="dmConflict"></div>
-              <div class="dm-source">
-                <span id="dmTimestamp">Consultando SITPORT...</span>
-                <span>·</span>
-                <a href="https://sitport.directemar.cl" target="_blank" rel="noopener">Abrir SITPORT ↗</a>
-                <span>·</span>
-                <span id="dmAutoRefresh">Auto-refresh: 5 min</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Horario Meteo, Countdown & Probabilidad de Apertura -->
-      <div class="meteo-schedule-card" id="meteoScheduleCard">
-        <div class="msc-header">
-          <div style="display:flex;align-items:center;gap:8px">
-            <span style="font-size:1.1rem">⏱️</span>
-            <span style="font-weight:800;font-size:0.88rem;color:var(--text-bright);letter-spacing:0.3px">HORARIO METEO · CAPITANÍA DE PUERTO</span>
-          </div>
-        </div>
-        <div class="msc-body">
-          <div class="msc-grid">
-            <!-- Countdown al próximo meteo -->
-            <div class="msc-countdown-side">
-              <div class="msc-label">Próxima actualización meteo</div>
-              <div class="msc-countdown" id="meteoCountdown">--:--:--</div>
-              <div class="msc-countdown-sub" id="meteoCountdownSub">Calculando...</div>
-            </div>
-            <!-- Horarios oficiales -->
-            <div class="msc-schedule-side">
-              <div class="msc-label">Horarios de observación — Estación Chonchi</div>
-              <div class="msc-schedule-grid" id="meteoScheduleGrid">
-                <div class="msc-time-slot" data-hour="0"><span class="msc-time">00:00</span><span class="msc-slot-label">Medianoche</span></div>
-                <div class="msc-time-slot" data-hour="3"><span class="msc-time">03:00</span><span class="msc-slot-label">Madrugada</span></div>
-                <div class="msc-time-slot" data-hour="6"><span class="msc-time">06:00</span><span class="msc-slot-label">Matutino</span></div>
-                <div class="msc-time-slot" data-hour="9"><span class="msc-time">09:00</span><span class="msc-slot-label">Media mañana</span></div>
-                <div class="msc-time-slot" data-hour="12"><span class="msc-time">12:00</span><span class="msc-slot-label">Mediodía</span></div>
-                <div class="msc-time-slot" data-hour="15"><span class="msc-time">15:00</span><span class="msc-slot-label">Tarde</span></div>
-                <div class="msc-time-slot" data-hour="18"><span class="msc-time">18:00</span><span class="msc-slot-label">Vespertino</span></div>
-                <div class="msc-time-slot" data-hour="21"><span class="msc-time">21:00</span><span class="msc-slot-label">Nocturno</span></div>
-              </div>
-              <div class="msc-note">Estación automática actualiza ~cada 10 min. Boletines sinópticos OMM cada 3h (ciclo completo 24h).</div>
-              <div class="msc-last-update" id="meteoLastUpdate">Última medición: consultando...</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Línea Temporal del Estado del Puerto -->
-      <div class="port-timeline-card" id="portTimelineCard">
-        <div class="ptl-header">
-          <div style="display:flex;align-items:center;gap:8px">
-            <span style="font-size:1.1rem">📊</span>
-            <span style="font-weight:800;font-size:0.88rem;color:var(--text-bright);letter-spacing:0.3px">LÍNEA TEMPORAL · ESTADO DEL PUERTO</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-            <div class="ptl-legend">
-              <div class="ptl-legend-item"><div style="width:24px;height:0;border-top:2.5px solid #ff6b6b"></div>Historial real</div>
-              <div class="ptl-legend-item"><div style="width:24px;height:0;border-top:2px dashed #ff6b6b"></div>Pronóstico</div>
-              <div class="ptl-legend-item"><div class="ptl-legend-dot" style="background:var(--good)"></div>Abierto (&lt;40)</div>
-              <div class="ptl-legend-item"><div class="ptl-legend-dot" style="background:var(--mid)"></div>Restricción (40-65)</div>
-              <div class="ptl-legend-item"><div class="ptl-legend-dot" style="background:var(--bad)"></div>Cierre (&gt;65)</div>
-            </div>
-            <button class="ptl-expand-btn" id="ptlExpandBtn" onclick="ptlOpenOverlay()">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/>
-                <line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>
-              </svg>
-              Ampliar
-            </button>
-          </div>
-        </div>
-        <div class="ptl-body">
-          <div class="ptl-chart-wrap">
-            <canvas id="portTimelineChart"></canvas>
-          </div>
-        </div>
-        <div class="ptl-dm-status" id="ptlDmStatus">Estado DIRECTEMAR: consultando...</div>
-      </div>
-
-      <!-- Overlay fullscreen del gráfico -->
-      <div class="ptl-overlay" id="ptlOverlay">
-        <div class="ptl-overlay-header">
-          <div>
-            <div class="ptl-overlay-title">
-              <span>📊</span>
-              <span>LÍNEA TEMPORAL · ESTADO DEL PUERTO</span>
-            </div>
-            <div class="ptl-overlay-legend" style="margin-top:6px">
-              <div class="ptl-overlay-legend-item"><div style="width:20px;height:0;border-top:2px solid #ff6b6b"></div>Historial real</div>
-              <div class="ptl-overlay-legend-item"><div style="width:20px;height:0;border-top:2px dashed #ff6b6b"></div>Pronóstico</div>
-              <div class="ptl-overlay-legend-item"><div style="width:8px;height:8px;border-radius:50%;background:var(--good)"></div>Abierto (&lt;40)</div>
-              <div class="ptl-overlay-legend-item"><div style="width:8px;height:8px;border-radius:50%;background:var(--mid)"></div>Restricción (40-65)</div>
-              <div class="ptl-overlay-legend-item"><div style="width:8px;height:8px;border-radius:50%;background:var(--bad)"></div>Cierre (&gt;65)</div>
-            </div>
-          </div>
-          <div style="font-size:0.65rem;color:var(--muted);text-align:right;flex-shrink:0;margin-left:8px;line-height:1.5">
-            ← desliza →<br>
-            <span style="font-size:0.58rem;opacity:0.6">7 días</span>
-          </div>
-        </div>
-        <div class="ptl-overlay-body" id="ptlOverlayBody">
-          <div class="ptl-overlay-scroll">
-            <div class="ptl-overlay-chart-inner">
-              <canvas id="portTimelineChartOverlay"></canvas>
-            </div>
-          </div>
-        </div>
-        <div class="ptl-overlay-status" id="ptlOverlayStatus">Estado DIRECTEMAR: consultando...</div>
-        <div class="ptl-overlay-footer">
-          <button class="ptl-overlay-close-bar" onclick="ptlCloseOverlay()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+    <!-- ═══════════════ BOLETÍN OFICIAL DIRECTEMAR · SITPORT (héroe) ═══════════════ -->
+    <section class="tier" id="tier-boletin">
+      <article class="boletin" id="boletin">
+        <header class="bl-head">
+          <div class="bl-seal" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="5" r="2"/><path d="M12 7v13M5 13a7 7 0 0 0 14 0M5 13H3m2 0 2-2m12 2h2m-2 0-2-2M8 9h8"/>
             </svg>
-            Cerrar vista ampliada
-          </button>
+          </div>
+          <div class="bl-head-txt">
+            <div class="bl-auth">DIRECTEMAR · SITPORT</div>
+            <div class="bl-sub">Capitanía de Puerto de Chonchi · Armada de Chile</div>
+          </div>
+          <div class="bl-live">
+            <span class="of-badge" id="dmBadge">CONSULTANDO</span>
+            <span class="bl-ts" id="dmTimestamp">—</span>
+            <button class="dm-refresh" id="dmRefreshBtn" title="Consultar SITPORT ahora">Consultar</button>
+          </div>
+        </header>
+
+        <div class="bl-body">
+          <div class="bl-condicion-wrap">
+            <div class="bl-label">Condición oficial vigente</div>
+            <div class="bl-condicion" id="blCondicion">Consultando SITPORT…</div>
+            <div class="bl-sujeto" id="blSujeto">Bahía de Yal · jurisdicción de Chonchi</div>
+          </div>
+
+          <!-- Acta de restricción real (texto literal de SITPORT) -->
+          <div class="vd-oficial" id="dmOficial" style="display:none"></div>
+
+          <!-- Sensores de la estación oficial -->
+          <div class="bl-sensor"><span class="bl-k">Estación Chonchi</span> <span id="dmMedicion">Consultando sensores…</span></div>
+
+          <!-- Estado por zona · jurisdicción Chonchi -->
+          <div class="bl-zones-label">Estado por zona · jurisdicción Chonchi</div>
+          <div class="vd-zones">
+            <div class="dm-zone-card zone-unknown" id="dmZonaBahia">
+              <div class="dm-zone-name">Bahía de Yal <span style="opacity:0.5;font-size:0.72em;font-weight:400">(Chonchi)</span></div>
+              <div class="dm-zone-status-badge unknown" id="dmZonaBahiaStatus">—</div>
+              <div class="dm-zone-detail" id="dmZonaBahiaDetail">Consultando...</div>
+              <div class="dm-zone-restr-text" id="dmZonaBahiaRestr" style="display:none"></div>
+            </div>
+            <div class="dm-zone-card zone-unknown" id="dmZonaQueilen">
+              <div class="dm-zone-name">Queilen</div>
+              <div class="dm-zone-status-badge unknown" id="dmZonaQuilenStatus">—</div>
+              <div class="dm-zone-detail" id="dmZonaQuilenDetail">Consultando...</div>
+              <div class="dm-zone-restr-text" id="dmZonaQuilenRestr" style="display:none"></div>
+            </div>
+            <div class="dm-zone-card zone-unknown" id="dmZonaPuqueldon">
+              <div class="dm-zone-name">Puqueldón</div>
+              <div class="dm-zone-status-badge unknown" id="dmZonaPuqueldonStatus">—</div>
+              <div class="dm-zone-detail" id="dmZonaPuqueldonDetail">Consultando...</div>
+              <div class="dm-zone-restr-text" id="dmZonaPuqueldonRestr" style="display:none"></div>
+            </div>
+          </div>
+
+          <div class="bl-fuente">Fuente oficial: <a href="https://sitport.directemar.cl" target="_blank" rel="noopener">SITPORT · DIRECTEMAR ↗</a> · se actualiza cada 5 min</div>
+        </div>
+      </article>
+    </section>
+
+    <!-- ═══════════════ PRONÓSTICO PROPIO · ESTIMACIÓN NO OFICIAL ═══════════════ -->
+    <div class="section-head section-major" id="head-propio">
+      <h2>Pronóstico propio</h2>
+      <span class="sh-note">estimación con modelo de clima (Open-Meteo) · no es DIRECTEMAR</span>
+    </div>
+
+    <section class="tier" id="tier-operativa">
+      <div class="verdict" id="portCard">
+        <div class="vd-grid">
+          <div class="vd-main">
+            <span class="vd-eyebrow"><span class="port-live-dot" id="portDot"></span>Lectura operativa · estimación propia</span>
+            <div class="port-big-status" id="portStatus">Evaluando condiciones…</div>
+            <p class="vd-carta" id="portCarta"></p>
+            <p class="vd-conditions" id="portConditions"></p>
+            <div class="vd-decision" id="decisionNow">Evaluando recomendación…</div>
+            <div class="vd-drivers port-reasons" id="portReasons"></div>
+            <div class="vd-drivers port-closure-drivers" id="closureDrivers"></div>
+            <div id="dmConflict"></div>
+            <div class="lectura-foot"><span id="portTime"></span></div>
+          </div>
+          <div class="vd-side">
+            <div id="zonaProbSection" class="vd-reopen" style="display:none">
+              <div class="msc-label" id="openingZoneLabel" style="margin-bottom:10px;color:var(--muted)">Pronóstico de reapertura</div>
+              <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;justify-content:center">
+                <div class="msc-opening-gauge" style="margin-bottom:0;flex-shrink:0">
+                  <div class="msc-opening-ring" id="openingRing" style="width:108px;height:108px">
+                    <svg viewBox="0 0 120 120" class="msc-ring-svg">
+                      <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="10"/>
+                      <circle cx="60" cy="60" r="52" fill="none" stroke="var(--good)" stroke-width="10" stroke-linecap="round" stroke-dasharray="326.7" stroke-dashoffset="326.7" id="openingArc" transform="rotate(-90 60 60)"/>
+                    </svg>
+                    <div class="msc-opening-pct" id="openingPct" style="font-size:1.3rem">--%</div>
+                  </div>
+                </div>
+                <div style="flex:1;min-width:140px">
+                  <div class="msc-opening-label" id="openingLabel">Evaluando...</div>
+                  <div class="msc-opening-detail" id="openingDetail"></div>
+                  <div class="msc-opening-windows" id="openingWindows"></div>
+                </div>
+              </div>
+            </div>
+            <div class="vd-clear" id="vdClear">
+              <div class="big"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:26px;height:26px"><polyline points="20 6 9 17 4 12"/></svg></div>
+              <div class="lbl">Sin restricciones oficiales vigentes en Bahía de Yal</div>
+            </div>
+          </div>
         </div>
       </div>
+    </section>
 
-      <!-- Elementos ocultos requeridos por funciones JS (no visibles en UI) -->
-      <div style="display:none" id="portCard">
-        <div id="portIcon"></div><div id="portStatus"></div>
-        <div id="portDot"></div><div id="portTime"></div>
-        <div id="portConditions"></div><div id="portCarta"></div>
-        <div id="portReasons"></div><div id="decisionNow"></div>
-        <div id="decisionReview"></div><div id="closureHeadline"></div>
-        <div id="restrictionHeadline"></div><div id="closureSub"></div>
-        <div id="closureUncertainty"></div><div id="closureWhy"></div>
-        <div id="closureDrivers"></div><div id="preventiveAlert"></div>
-        <div id="preventiveAlertTitle"></div><div id="preventiveAlertText"></div>
-        <div id="preventiveActions"></div>
+    <!-- ═══════════════ TIER 2 · PRÓXIMAS 24H ═══════════════ -->
+    <section class="tier" id="tier-24">
+      <div class="section-head"><h2>Próximas 24 horas</h2><span class="sh-note">proyección operativa multivariable</span></div>
+      <div class="n24">
+        <div class="n24-card">
+          <div class="n24-prob">
+            <div class="pb">
+              <div class="pb-l">Cierre probable</div>
+              <div class="pb-v num" id="closureHeadline">—</div>
+            </div>
+            <div class="pb">
+              <div class="pb-l">Restricción probable</div>
+              <div class="pb-v num" id="restrictionHeadline">—</div>
+            </div>
+          </div>
+          <div class="n24-sub" id="closureSub"></div>
+          <div class="n24-window" id="preventiveAlert">
+            <span class="wl" id="preventiveAlertTitle">Ventana de riesgo</span>
+            <span id="preventiveAlertText"></span>
+          </div>
+          <div class="n24-review" id="decisionReview"></div>
+          <div class="n24-stats">
+            <div class="n24-stat"><div class="ns-l">Racha máx · 7 días</div><div class="ns-v num" id="maxGust">—</div></div>
+            <div class="n24-stat"><div class="ns-l">Ola máx · 7 días</div><div class="ns-v num" id="maxWave">—</div></div>
+          </div>
+        </div>
+        <div class="n24-card">
+          <div class="n24-actions-title">Acciones recomendadas</div>
+          <div class="preventive-actions" id="preventiveActions"></div>
+        </div>
       </div>
     </section>
 
-    <!-- KPI ROW -->
-    <section class="row">
-      <div class="row-title"><span class="accent-bar"></span>Resumen de la Semana</div>
-      <div class="kpi-scroll">
-        <article class="kpi-card">
-          <div class="kpi-label">Estado Semanal</div>
-          <div class="kpi-value" id="weeklyStatus">Cargando...</div>
-        </article>
-        <article class="kpi-card">
-          <div class="kpi-label" title="Cantidad de días dentro de los próximos 7 con riesgo ALTO por pronóstico diario.">Días Riesgo Alto</div>
-          <div class="kpi-value" id="highDays">-</div>
-        </article>
+    <!-- ═══════════════ TIER 3 · CONTEXTO ═══════════════ -->
+    <section class="tier" id="tier-context">
+      <div class="ctx-grid">
+        <div>
+          <div class="section-head"><h2>Línea temporal del estado</h2><span class="sh-note">historial real + pronóstico 7 días</span></div>
+          <div class="port-timeline-card" id="portTimelineCard">
+            <div class="ptl-header">
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="font-weight:700;font-size:0.84rem;color:var(--text-bright);letter-spacing:0.02em">Índice de riesgo de cierre</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                <div class="ptl-legend">
+                  <div class="ptl-legend-item"><div style="width:24px;height:0;border-top:2.5px solid #ff6b6b"></div>Historial real</div>
+                  <div class="ptl-legend-item"><div style="width:24px;height:0;border-top:2px dashed #ff6b6b"></div>Pronóstico</div>
+                  <div class="ptl-legend-item"><div class="ptl-legend-dot" style="background:var(--good)"></div>Abierto (&lt;40)</div>
+                  <div class="ptl-legend-item"><div class="ptl-legend-dot" style="background:var(--mid)"></div>Restricción (40-65)</div>
+                  <div class="ptl-legend-item"><div class="ptl-legend-dot" style="background:var(--bad)"></div>Cierre (&gt;65)</div>
+                </div>
+                <button class="ptl-expand-btn" id="ptlExpandBtn" onclick="ptlOpenOverlay()">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/>
+                    <line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>
+                  </svg>
+                  Ampliar
+                </button>
+              </div>
+            </div>
+            <div class="ptl-body">
+              <div class="ptl-chart-wrap">
+                <canvas id="portTimelineChart"></canvas>
+              </div>
+            </div>
+            <div class="ptl-dm-status" id="ptlDmStatus">Estado DIRECTEMAR: consultando...</div>
+          </div>
+        </div>
 
-        <article class="kpi-card">
-          <div class="kpi-label" title="Máxima racha pronosticada en 7 días. Puede no ocurrir en las próximas 24h.">Racha Máx Semanal</div>
-          <div class="kpi-value" id="maxGust">-</div>
-          <div class="kpi-sub" id="maxGustScope">Ventana: próximos 7 días</div>
-        </article>
-        <article class="kpi-card">
-          <div class="kpi-label" title="Altura de ola máxima pronosticada en 7 días. No implica cierre inmediato por sí sola.">Ola Máx Semanal</div>
-          <div class="kpi-value" id="maxWave">-</div>
-          <div class="kpi-sub" id="maxWaveScope">Ventana: próximos 7 días</div>
-        </article>
+        <div>
+          <div class="section-head"><h2>Pronóstico 7 días</h2><span class="sh-note">riesgo de cierre por día</span></div>
+          <div class="fc-strip" id="fcStrip"></div>
+        </div>
       </div>
     </section>
 
-    <!-- TABLE ROW -->
-    <section class="row">
-      <div class="row-title"><span class="accent-bar"></span>Pronóstico Detallado <span style="font-size:0.65em;color:var(--muted);font-weight:400;">— toca un día para ver detalle horario</span></div>
-      <div class="table-card">
-        <table>
-          <thead>
-            <tr>
-              <th>Día</th>
-              <th>Tiempo</th>
-              <th>T° min/max</th>
-              <th>Lluvia</th>
-              <th>Viento máx.</th>
-              <th>Racha máx.</th>
-              <th>Ola máx.</th>
-              <th>Riesgo Puerto</th>
-            </tr>
-          </thead>
-          <tbody id="tbody"></tbody>
-        </table>
+    <!-- Overlay fullscreen del gráfico (position:fixed) -->
+    <div class="ptl-overlay" id="ptlOverlay">
+      <div class="ptl-overlay-header">
+        <div>
+          <div class="ptl-overlay-title">
+            <span>LÍNEA TEMPORAL · ESTADO DEL PUERTO</span>
+          </div>
+          <div class="ptl-overlay-legend" style="margin-top:6px">
+            <div class="ptl-overlay-legend-item"><div style="width:20px;height:0;border-top:2px solid #ff6b6b"></div>Historial real</div>
+            <div class="ptl-overlay-legend-item"><div style="width:20px;height:0;border-top:2px dashed #ff6b6b"></div>Pronóstico</div>
+            <div class="ptl-overlay-legend-item"><div style="width:8px;height:8px;border-radius:50%;background:var(--good)"></div>Abierto (&lt;40)</div>
+            <div class="ptl-overlay-legend-item"><div style="width:8px;height:8px;border-radius:50%;background:var(--mid)"></div>Restricción (40-65)</div>
+            <div class="ptl-overlay-legend-item"><div style="width:8px;height:8px;border-radius:50%;background:var(--bad)"></div>Cierre (&gt;65)</div>
+          </div>
+        </div>
+        <div style="font-size:0.65rem;color:var(--muted);text-align:right;flex-shrink:0;margin-left:8px;line-height:1.5">
+          ← desliza →<br>
+          <span style="font-size:0.58rem;opacity:0.6">7 días</span>
+        </div>
       </div>
-    </section>
+      <div class="ptl-overlay-body" id="ptlOverlayBody">
+        <div class="ptl-overlay-scroll">
+          <div class="ptl-overlay-chart-inner">
+            <canvas id="portTimelineChartOverlay"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="ptl-overlay-status" id="ptlOverlayStatus">Estado DIRECTEMAR: consultando...</div>
+      <div class="ptl-overlay-footer">
+        <button class="ptl-overlay-close-bar" onclick="ptlCloseOverlay()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+          Cerrar vista ampliada
+        </button>
+      </div>
+    </div>
+
+    <!-- Stubs ocultos requeridos por funciones JS (no visibles) -->
+    <div style="display:none" aria-hidden="true">
+      <span id="portIcon"></span>
+      <span id="closureUncertainty"></span>
+      <span id="closureWhy"></span>
+      <span id="weeklyStatus"></span>
+      <span id="highDays"></span>
+      <span id="maxGustScope"></span>
+      <span id="maxWaveScope"></span>
+      <div id="dmPanel"><span id="dmIcon"></span><span id="dmStatus"></span><span id="dmRestricciones"></span><span id="dmRestrTags"></span></div>
+    </div>
 
     <!-- FOOTER -->
     <div class="footer">
       <div class="footer-warn">
-        ⚠ Estimación orientativa para planificación. El cierre real de puerto debe validarse con DIRECTEMAR / Capitanía de Puerto y avisos oficiales vigentes.
+        Estimación orientativa para planificación. El cierre real de puerto debe validarse con DIRECTEMAR / Capitanía de Puerto y avisos oficiales vigentes.
       </div>
       <p class="footer-meta" id="updatedAt"></p>
     </div>
@@ -2164,7 +2545,7 @@
 
     function setFxMode(mode) {
       const bgModeEl = document.getElementById('bgMode');
-      if (bgModeEl) bgModeEl.textContent = mode === 'rain' ? '🌧 Lluvia activa' : '☀ Cielo operativo';
+      if (bgModeEl) bgModeEl.textContent = mode === 'rain' ? 'Lluvia activa' : 'Cielo operativo';
     }
 
     /* ─── CHARTS (Marine palette) ─── */
@@ -2240,7 +2621,7 @@
           ctx.stroke();
           ctx.setLineDash([]);
           ctx.fillStyle = marker.color;
-          ctx.font = '700 11px Inter';
+          ctx.font = '700 11px "IBM Plex Mono", monospace';
           ctx.textAlign = 'right';
           ctx.fillText(marker.label, chartArea.right - 6, y - 4);
           ctx.restore();
@@ -2579,85 +2960,94 @@
       });
     }
 
+    // Iconos de clima en SVG monocromo (sin emoji) — stroke = currentColor.
+    function weatherEmoji(c) {
+      const svg = (p) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" width="26" height="26">${p}</svg>`;
+      const cloud = '<path d="M7.5 16h8a3 3 0 0 0 .2-6 4.6 4.6 0 0 0-8.8-1.3A3.4 3.4 0 0 0 7.5 16Z"/>';
+      const sun = '<circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.2 5.2l1.4 1.4M17.4 17.4l1.4 1.4M18.8 5.2l-1.4 1.4M6.6 17.4l-1.4 1.4"/>';
+      if ([0, 1].includes(c)) return svg(sun);
+      if (c === 2) return svg('<circle cx="8.5" cy="8" r="2.8"/><path d="M8.5 2.6v1.4M3.6 8H5M12 8h1.4M5 4.4l1 1"/>' + cloud);
+      if (c === 3) return svg(cloud);
+      if ([45, 48].includes(c)) return svg('<path d="M4 8h16M4 12h16M6 16h12M8 20h8"/>');
+      if ([51, 53, 55].includes(c)) return svg(cloud + '<path d="M9.5 18.5v1.6M14 18.5v1.6"/>');
+      if ([61, 63, 65, 80, 81, 82].includes(c)) return svg(cloud + '<path d="M8.5 18l-1 3M12 18l-1 3M15.5 18l-1 3"/>');
+      if ([71, 73, 75].includes(c)) return svg(cloud + '<path d="M9 19.5h.01M12.5 19.5h.01M10.7 21.5h.01M14 21.5h.01"/>');
+      if ([95, 96, 99].includes(c)) return svg(cloud + '<path d="M13 17l-3 4.2h3l-1 3"/>');
+      return svg(cloud);
+    }
+
+    // Rediseño 2026: tira condensada de 7 días (reemplaza la tabla detallada).
     function renderTable(days) {
-      const tbody = document.getElementById('tbody');
-      tbody.innerHTML = '';
+      const strip = document.getElementById('fcStrip');
+      if (!strip) return;
+      strip.innerHTML = '';
       const todayStr = new Date().toISOString().slice(0, 10);
-      for (const d of days) {
-        const isToday = d.date === todayStr;
 
-        // Fila del día (clickeable)
-        const tr = document.createElement('tr');
-        tr.className = 'day-row' + (isToday ? ' today-row' : '');
-        tr.innerHTML = `
-          <td><span class="expand-arrow">▶</span>${isToday ? '<span class="today-badge">HOY</span>' : ''}${toCLDate(d.date)}</td>
-          <td>${weatherCodeMap[d.weatherCode] ?? '—'}</td>
-          <td>${num(d.tMin)}° / ${num(d.tMax)}°</td>
-          <td>${num(d.rain)} mm</td>
-          <td>${num(d.wind)} km/h</td>
-          <td>${num(d.gust)} km/h</td>
-          <td>${num(d.wave)} m</td>
-          <td><span class="chip ${d.risk.cls}" title="${d.risk.reason || ''}">${d.risk.level} · ${d.risk.pct}%</span></td>
-        `;
-        tbody.appendChild(tr);
-
-        // Fila de detalle horario (oculta)
-        const detailTr = document.createElement('tr');
-        detailTr.className = 'hourly-detail-row';
-        const detailTd = document.createElement('td');
-        detailTd.colSpan = 8;
-        detailTd.innerHTML = '<div class="hourly-wrap"></div>';
-        detailTr.appendChild(detailTd);
-        tbody.appendChild(detailTr);
-
-        // Toggle expand/collapse
-        tr.addEventListener('click', () => {
-          const isOpen = detailTr.classList.contains('open');
-          // Cerrar todas las demás
-          tbody.querySelectorAll('.hourly-detail-row.open').forEach(r => r.classList.remove('open'));
-          tbody.querySelectorAll('.day-row.expanded').forEach(r => r.classList.remove('expanded'));
-          if (!isOpen) {
-            tr.classList.add('expanded');
-            detailTr.classList.add('open');
-            const wrap = detailTr.querySelector('.hourly-wrap');
-            if (!wrap.dataset.loaded) {
-              wrap.dataset.loaded = '1';
-              const hours = getHourlyForDay(d.date);
-              if (hours.length === 0) {
-                wrap.innerHTML = '<div style="padding:12px 14px;color:var(--muted);font-size:0.8rem;">Sin datos horarios para este día</div>';
-              } else {
-                const maxPct = Math.max(...hours.map(h => h.risk.pct), 1);
-                const peakHour = hours.reduce((a, b) => a.risk.pct >= b.risk.pct ? a : b);
-                wrap.innerHTML = `<div class="hourly-timeline">
-                  <div class="ht-legend">
-                    <span class="lg-low">Bajo &lt;35%</span>
-                    <span class="lg-mid">Medio 35-64%</span>
-                    <span class="lg-high">Alto ≥65%</span>
-                    <span style="margin-left:auto">▲ Pico: ${peakHour.hour} (${peakHour.risk.pct}%) · 🌬${num(peakHour.gust)}km/h · 🌊${peakHour.wave.toFixed(1)}m</span>
-                  </div>
-                  <div class="ht-bars">
-                    ${hours.map(h => {
-                      const barH = Math.max(6, Math.round((h.risk.pct / 100) * 80));
-                      const isPeak = h.hour === peakHour.hour;
-                      return `<div class="ht-bar">
-                        <div class="ht-tip">
-                          <strong>${h.hour}</strong> — <span class="tip-val">${h.risk.pct}% ${h.risk.level}</span><br>
-                          🌬 ${num(h.gust)} km/h · 💨 ${num(h.wind)} km/h<br>
-                          🌊 ${h.wave.toFixed(1)}m${h.rain > 0 ? ` · 🌧 ${h.rain.toFixed(1)}mm` : ''}<br>
-                          ${weatherCodeMap[h.code] ?? ''}
-                        </div>
-                        <div class="ht-pct" style="color:${h.risk.cls === 'risk-high' ? '#ff6b6b' : h.risk.cls === 'risk-mid' ? '#f5c518' : '#46d369'}">${h.risk.pct}</div>
-                        <div class="ht-fill ${h.risk.cls}" style="height:${barH}px"></div>
-                        <div class="ht-hour${isPeak ? ' ht-peak' : ''}">${h.hour.slice(0,2)}</div>
-                      </div>`;
-                    }).join('')}
-                  </div>
-                </div>`;
-              }
-            }
-          }
-        });
+      // Contenedor compartido para el detalle horario (click en un día)
+      let detail = document.getElementById('fcDetail');
+      if (!detail) {
+        detail = document.createElement('div');
+        detail.id = 'fcDetail';
+        detail.style.cssText = 'margin-top:10px;display:none';
+        strip.after(detail);
       }
+      detail.style.display = 'none';
+      detail.innerHTML = '';
+      let openDate = null;
+
+      days.forEach((d) => {
+        const isToday = d.date === todayStr;
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = 'fc-day' + (isToday ? ' is-today' : '');
+        card.innerHTML = `
+          <span class="fc-rk ${d.risk.cls}"></span>
+          <div class="fc-date">${isToday ? '<span class="td">HOY</span> ' : ''}${toCLDate(d.date)}</div>
+          <div class="fc-ico" title="${weatherCodeMap[d.weatherCode] ?? ''}">${weatherEmoji(d.weatherCode)}</div>
+          <div class="fc-temp"><span class="mx num">${num(d.tMax, 0)}°</span> <span class="num" style="opacity:0.6">${num(d.tMin, 0)}°</span></div>
+          <div class="fc-metrics"><span class="fc-k">Racha</span> <span class="num">${num(d.gust, 0)}</span> · <span class="fc-k">Ola</span> <span class="num">${num(d.wave, 1)}</span> m</div>
+          <div class="fc-risk ${d.risk.cls}">${d.risk.level} · <span class="num">${d.risk.pct}%</span></div>
+        `;
+        card.addEventListener('click', () => {
+          strip.querySelectorAll('.fc-day.sel').forEach((c) => c.classList.remove('sel'));
+          if (openDate === d.date) { detail.style.display = 'none'; openDate = null; return; }
+          openDate = d.date;
+          card.classList.add('sel');
+          const hours = getHourlyForDay(d.date);
+          detail.style.display = 'block';
+          if (!hours.length) {
+            detail.innerHTML = '<div style="padding:12px 14px;color:var(--muted);font-size:0.82rem">Sin datos horarios para este día</div>';
+            return;
+          }
+          const peakHour = hours.reduce((a, b) => a.risk.pct >= b.risk.pct ? a : b);
+          detail.innerHTML = `<div class="hourly-timeline">
+            <div class="ht-legend">
+              <span class="lg-low">Bajo &lt;35%</span>
+              <span class="lg-mid">Medio 35-64%</span>
+              <span class="lg-high">Alto ≥65%</span>
+              <span style="margin-left:auto">${toCLDate(d.date)} · ▲ Pico ${peakHour.hour} (${peakHour.risk.pct}%)</span>
+            </div>
+            <div class="ht-bars">
+              ${hours.map((h) => {
+                const barH = Math.max(6, Math.round((h.risk.pct / 100) * 80));
+                const isPeak = h.hour === peakHour.hour;
+                return `<div class="ht-bar">
+                  <div class="ht-tip">
+                    <strong>${h.hour}</strong> — <span class="tip-val">${h.risk.pct}% ${h.risk.level}</span><br>
+                    Racha ${num(h.gust)} · Viento ${num(h.wind)} km/h<br>
+                    Ola ${h.wave.toFixed(1)} m${h.rain > 0 ? ` · Lluvia ${h.rain.toFixed(1)} mm` : ''}<br>
+                    ${weatherCodeMap[h.code] ?? ''}
+                  </div>
+                  <div class="ht-pct" style="color:${h.risk.cls === 'risk-high' ? '#ff6b6b' : h.risk.cls === 'risk-mid' ? '#f5c518' : '#46d369'}">${h.risk.pct}</div>
+                  <div class="ht-fill ${h.risk.cls}" style="height:${barH}px"></div>
+                  <div class="ht-hour${isPeak ? ' ht-peak' : ''}">${h.hour.slice(0, 2)}</div>
+                </div>`;
+              }).join('')}
+            </div>
+          </div>`;
+        });
+        strip.appendChild(card);
+      });
     }
 
     function computeNextReviewSuggestion(outlook) {
@@ -2738,7 +3128,7 @@
       const reasonsEl = document.getElementById('portReasons');
 
       // Status class
-      card.className = 'port-status-card';
+      card.className = 'verdict';
       statusEl.className = 'port-big-status';
       dotEl.className = 'port-live-dot';
 
@@ -2746,19 +3136,19 @@
         card.classList.add('status-closed');
         statusEl.classList.add('closed');
         dotEl.classList.add('closed');
-        statusEl.textContent = '🚫 PUERTO CERRADO';
+        statusEl.textContent = 'PUERTO CERRADO';
         iconEl.textContent = '⛔';
       } else if (port.status === 'RESTRINGIDO') {
         card.classList.add('status-restricted');
         statusEl.classList.add('restricted');
         dotEl.classList.add('restricted');
-        statusEl.textContent = '⚠️ RESTRINGIDO';
+        statusEl.textContent = 'RESTRINGIDO';
         iconEl.textContent = '⚠️';
       } else {
         card.classList.add('status-open');
         statusEl.classList.add('open');
         dotEl.classList.add('open');
-        statusEl.textContent = '✅ ABIERTO';
+        statusEl.textContent = 'ABIERTO';
         iconEl.textContent = '⚓';
       }
 
@@ -2770,11 +3160,11 @@
 
       // Carta info
       if (port.status === 'CERRADO') {
-        cartaEl.innerHTML = '<span style="color:#ff6b6b;font-weight:800">❌ NO PERMITIDO</span> — Puerto cerrado, no se emiten cartas. Navegación <strong>totalmente prohibida</strong>.';
+        cartaEl.innerHTML = '<span style="color:#ff6b6b;font-weight:800">NO PERMITIDO</span> — Puerto cerrado, no se emiten cartas. Navegación <strong>totalmente prohibida</strong>.';
       } else if (port.status === 'RESTRINGIDO') {
-        cartaEl.innerHTML = '<span style="color:#f4c95d;font-weight:800">📋 CON AUTORIZACIÓN</span> — Zarpe posible con carta de la Capitanía de Puerto de Castro. Solo aguas interiores protegidas, horario diurno.';
+        cartaEl.innerHTML = '<span style="color:#f4c95d;font-weight:800">CON AUTORIZACIÓN</span> — Zarpe posible con carta de la Capitanía de Puerto de Castro. Solo aguas interiores protegidas, horario diurno.';
       } else {
-        cartaEl.innerHTML = '<span style="color:#4cd7a0;font-weight:800">✅ LIBRE</span> — Zarpe habilitado con documentación regular. Carta estándar vigente.';
+        cartaEl.innerHTML = '<span style="color:#4cd7a0;font-weight:800">LIBRE</span> — Zarpe habilitado con documentación regular. Carta estándar vigente.';
       }
 
       // Reasons
@@ -2911,13 +3301,13 @@
       decisionEl.classList.remove('ok', 'warn', 'danger');
       if (outlook.closeLikely || outlook.nowStatus === 'CERRADO') {
         decisionEl.classList.add('danger');
-        decisionEl.textContent = 'DECISIÓN RECOMENDADA AHORA: ⛔ Preparar cierre y limitar salidas';
+        decisionEl.textContent = 'Recomendado ahora: preparar cierre y limitar salidas';
       } else if (outlook.restrictLikely || outlook.nowStatus === 'RESTRINGIDO') {
         decisionEl.classList.add('warn');
-        decisionEl.textContent = 'DECISIÓN RECOMENDADA AHORA: ⚠ Operar con restricción y carta';
+        decisionEl.textContent = 'Recomendado ahora: operar con restricción y carta';
       } else {
         decisionEl.classList.add('ok');
-        decisionEl.textContent = 'DECISIÓN RECOMENDADA AHORA: ✅ Operar normal con monitoreo';
+        decisionEl.textContent = 'Recomendado ahora: operar normal con monitoreo';
       }
       decisionEl.title = 'Recomendación táctica inmediata basada en estado actual + probabilidad 24h.';
       decisionReviewEl.textContent = computeNextReviewSuggestion(outlook);
@@ -2925,21 +3315,11 @@
 
       headlineEl.classList.remove('yes', 'no');
       restrictionEl.classList.remove('yes', 'no');
-      if (outlook.closeLikely) {
-        headlineEl.classList.add('yes');
-        headlineEl.textContent = `CIERRE PROBABLE: SÍ (${outlook.closeProbability}%)`;
-      } else {
-        headlineEl.classList.add('no');
-        headlineEl.textContent = `CIERRE PROBABLE: NO (${outlook.closeProbability}%)`;
-      }
+      headlineEl.classList.add(outlook.closeLikely ? 'yes' : 'no');
+      headlineEl.innerHTML = `${outlook.closeLikely ? 'SÍ' : 'NO'} <span class="pct">${outlook.closeProbability}%</span>`;
 
-      if (outlook.restrictLikely) {
-        restrictionEl.classList.add('yes');
-        restrictionEl.textContent = `RESTRICCIÓN PROBABLE: SÍ (${outlook.restrictProbability}%)`;
-      } else {
-        restrictionEl.classList.add('no');
-        restrictionEl.textContent = `RESTRICCIÓN PROBABLE: NO (${outlook.restrictProbability}%)`;
-      }
+      restrictionEl.classList.add(outlook.restrictLikely ? 'yes' : 'no');
+      restrictionEl.innerHTML = `${outlook.restrictLikely ? 'SÍ' : 'NO'} <span class="pct">${outlook.restrictProbability}%</span>`;
 
       headlineEl.title = 'Probabilidad de cierre calculada para próximas 24 horas con datos horarios multivariable.';
       restrictionEl.title = 'Probabilidad de restricción operativa (aunque no cierre total) para próximas 24 horas.';
@@ -2989,20 +3369,20 @@
       const minVisibility = Math.min(...samples.map((s) => s.visibility ?? 10000), 10000);
       const minPressure = Math.min(...samples.map((s) => s.pressure ?? 1015), 1015);
 
-      actions.push('✅ Confirmar estado oficial DIRECTEMAR antes de cada zarpe.');
+      actions.push('Confirmar estado oficial DIRECTEMAR antes de cada zarpe.');
 
       if (outlook.closeLikely) {
-        actions.push('🚨 Activar plan de contingencia de faena y reducir salidas no críticas.');
+        actions.push('Activar plan de contingencia de faena y reducir salidas no críticas.');
       } else if (outlook.restrictLikely) {
-        actions.push('⚠️ Preparar operación restringida y revisar cartas de zarpe preventivas.');
+        actions.push('Preparar operación restringida y revisar cartas de zarpe preventivas.');
       } else {
-        actions.push('🟡 Mantener monitoreo cada 60 minutos durante la ventana preventiva.');
+        actions.push('Mantener monitoreo cada 60 minutos durante la ventana preventiva.');
       }
 
-      if (maxGust >= 50) actions.push('💨 Reforzar amarras, cabos y fondeo por rachas elevadas.');
-      if (maxWave >= 2.2) actions.push('🌊 Limitar maniobras en borda y evitar cruces expuestos al oleaje.');
-      if (minVisibility <= 5000) actions.push('🌫️ Elevar protocolo de navegación con baja visibilidad (radar/VHF permanente).');
-      if (minPressure <= 1003) actions.push('📉 Preparar escalamiento por caída de presión y deterioro rápido del tiempo.');
+      if (maxGust >= 50) actions.push('Reforzar amarras, cabos y fondeo por rachas elevadas.');
+      if (maxWave >= 2.2) actions.push('Limitar maniobras en borda y evitar cruces expuestos al oleaje.');
+      if (minVisibility <= 5000) actions.push('Elevar protocolo de navegación con baja visibilidad (radar/VHF permanente).');
+      if (minPressure <= 1003) actions.push('Preparar escalamiento por caída de presión y deterioro rápido del tiempo.');
 
       return actions.slice(0, 5);
     }
@@ -3177,7 +3557,7 @@
      * Retorna: { found, restricciones, estado, navesMayores, navesMenores,
      *            restriccionBahia, medicion, subPuertos[], nearby[], timestamp }
      */
-    function extractChonchiData(ports, bahias = null, capRestrData = null) {
+    function extractChonchiData(ports, bahias = null, capRestrData = null, restrDetalle = null) {
       const result = {
         found: false,
         restricciones: 0,
@@ -3185,6 +3565,10 @@
         navesMayores: false,
         navesMenores: false,
         restriccionBahia: false,
+        restringido: false,
+        restriccionInfo: null,
+        condicionOficial: null,
+        cartasContinuidad: false,
         medicion: null,
         subPuertos: [],
         nearby: [],
@@ -3232,9 +3616,11 @@
       const extractFlags = entry => {
         const r = entry?.restricciones ?? {};
         return {
+          restringido:     r.restringido     ?? false,
           navesMenores:    r.navesMenores    ?? false,
           navesMayores:    r.navesMayores    ?? false,
           restriccionBahia: r.restriccionBahia ?? false,
+          valor: entry?.valor ?? null,
           viento: entry?.medicionMeteo?.velocidadViento ?? null,
           dirViento: entry?.medicionMeteo?.textoDireccionViento ?? null,
         };
@@ -3263,11 +3649,21 @@
 
       // ── 3. Restricciones de Chonchi/Bahía de Yal
       if (chonchiEntry) {
-        // Datos individuales directos de Chonchi
+        // consultaBahias confirma si la bahía Chonchi está en rojo (restringida) — sin tipo.
         const f = extractFlags(chonchiEntry);
-        result.navesMenores    = f.navesMenores;
+        result.navesMenores    = f.navesMenores;     // false: no se usan para el ESTADO
         result.navesMayores    = f.navesMayores;
         result.restriccionBahia = f.restriccionBahia;
+        result.restringido     = f.restringido;
+        result.valorBahia      = f.valor;
+        // El TIPO real de restricción SÍ viene en Totalgeneral (Capitanía Chonchi).
+        // Verificado en SITPORT: condición "puerto variable", naves menores restringidas por
+        // viento, naves mayores habilitadas. Lo guardamos solo como DETALLE (no fuerza CERRADO).
+        const capR = capitania.restricciones ?? {};
+        result.tipoNavesMenores = capR.navesMenores ?? false;
+        result.tipoNavesMayores = capR.navesMayores ?? false;
+        result.tipoBahia        = capR.restriccionBahia ?? false;
+        result.numeroRestricciones = capR.numeroRestricciones ?? null;
       } else {
         // Sin datos individuales → enfoque de substracción sobre la Capitanía
         const capR = capitania.restricciones ?? {};
@@ -3293,9 +3689,43 @@
         }
       }
 
+      // ── Detalle OFICIAL real por bahía (consultaRestricciones) — la misma fuente que el sitio SITPORT.
+      //    Registros bahia=119 = Chonchi/Bahía de Yal (no agregado de la Capitanía).
+      if (Array.isArray(restrDetalle)) {
+        const recs119 = restrDetalle.filter(r => r.bahia === 119);
+        if (recs119.length) {
+          result.restringido = true;
+          const navesTxt = recs119.map(r => (r.NaveRecibe || '').toUpperCase()).join(' ');
+          result.tipoNavesMenores = /MENOR/.test(navesTxt) || result.tipoNavesMenores;
+          result.tipoNavesMayores = /MAYOR/.test(navesTxt) || result.tipoNavesMayores;
+          const parseFecha = (s) => {
+            if (!s) return null;
+            const clean = String(s).replace(/:(\d{3})$/, '').trim(); // "…13:38:00:000" → "…13:38:00"
+            const d = new Date(clean + ' UTC'); // SITPORT entrega UTC
+            return isNaN(d.getTime()) ? null : d;
+          };
+          result.restriccionInfo = recs119.map(r => ({
+            naves: (r.NaveRecibe || '').replace(/&LT;/gi, '<').trim() || null,
+            motivo: r.MotivoRestriccion || null,
+            detalle: (r.Detalle || '').trim() || null,
+            tipoRestriccion: r.tiporestriccion || null,
+            area: r.AreaRestriccion || null,
+            inicio: parseFecha(r.FCinicio),
+            termino: parseFecha(r.FCTermino),
+            observacion: (r.Observacion || '').trim() || null,
+          }));
+          const obs = (recs119[0].Observacion || '').toUpperCase();
+          result.condicionOficial = obs.includes('PUERTO VARIABLE') ? 'Puerto variable'
+            : obs.includes('CERRAD') ? 'Puerto cerrado'
+            : obs.includes('ABIERT') ? 'Puerto abierto'
+            : 'Con restricción';
+          result.cartasContinuidad = /CARTAS? DE CONTINUIDAD/.test(obs);
+        }
+      }
+
       if (result.estado !== 'DESCONOCIDO') {
         // estado===null: path normal (chonchiEntry encontrado, o path de substracción sin restricciones desconocidas)
-        result.restricciones = (result.navesMenores || result.navesMayores || result.restriccionBahia) ? 1 : 0;
+        result.restricciones = (result.navesMenores || result.navesMayores || result.restriccionBahia || result.restringido) ? 1 : 0;
         result.estado = result.restricciones > 0 ? 'CON RESTRICCIÓN' : 'SIN RESTRICCIÓN';
       }
 
@@ -3336,7 +3766,8 @@
         const f = extractFlags(queilenEntry);
         result.subPuertos.push({
           nombre: (queilenEntry.reparticion?.nombre ?? queilenEntry.nombre ?? 'QUEILEN').replace(/CAPITAN[ÍI]A DE PUERTO /i, '').trim(),
-          restricciones: (f.navesMenores || f.navesMayores || f.restriccionBahia) ? 1 : 0,
+          restricciones: (f.navesMenores || f.navesMayores || f.restriccionBahia || f.restringido) ? 1 : 0,
+          restringido: f.restringido,
           navesMenores: f.navesMenores,
           navesMayores: f.navesMayores,
           restriccionBahia: f.restriccionBahia,
@@ -3349,7 +3780,8 @@
         const f = extractFlags(puqueldonEntry);
         result.subPuertos.push({
           nombre: (puqueldonEntry.reparticion?.nombre ?? puqueldonEntry.nombre ?? 'PUQUELDON').replace(/CAPITAN[ÍI]A DE PUERTO /i, '').trim(),
-          restricciones: (f.navesMenores || f.navesMayores || f.restriccionBahia) ? 1 : 0,
+          restricciones: (f.navesMenores || f.navesMayores || f.restriccionBahia || f.restringido) ? 1 : 0,
+          restringido: f.restringido,
           navesMenores: f.navesMenores,
           navesMayores: f.navesMayores,
           restriccionBahia: f.restriccionBahia,
@@ -3412,18 +3844,20 @@
         const chonchibahias = all
           .filter(b => b.CdReparticion === CHONCHI_REPARTICION_ID)
           .map(b => {
-            const tieneRestriccion = b.valor === 1 || b.color === 'danger';
+            const tieneRestriccion = b.valor >= 1 || b.color === 'danger';
             return {
               nombre: (b.NMBahia ?? '').toUpperCase(),
               IDBahia: b.IDBahia,
               CdReparticion: b.CdReparticion,
               color: b.color,
               valor: b.valor,
-              // Campos de compatibilidad con extractFlags/nameOfB
+              // SITPORT a nivel de bahía SOLO informa si hay restricción (rojo) o no — NO el tipo.
+              // No fabricamos naves menores/mayores/cierre de bahía: usamos un flag genérico.
               restricciones: {
-                navesMenores:    tieneRestriccion,
-                navesMayores:    tieneRestriccion,
-                restriccionBahia: tieneRestriccion,
+                restringido:      tieneRestriccion,
+                navesMenores:     false,
+                navesMayores:     false,
+                restriccionBahia: false,
               },
             };
           });
@@ -3478,19 +3912,52 @@
       }
     }
 
+    /**
+     * Detalle REAL de restricciones por bahía desde consultaRestricciones (POST).
+     * Es la fuente que usa el propio sitio SITPORT para el panel "Restricciones <BAHÍA>"
+     * (tipo, naves afectadas, motivo, vigencia, observación). Filtra a la jurisdicción
+     * Chonchi: 119 (Chonchi/Bahía de Yal), 155 (Queilen), 205 (Puqueldón).
+     */
+    async function fetchConsultaRestricciones() {
+      try {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 10000);
+        const resp = await fetch('https://orion.directemar.cl/sitport/back/users/consultaRestricciones', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json, text/plain, */*' },
+          body: JSON.stringify({}),
+          signal: ctrl.signal,
+        });
+        clearTimeout(timer);
+        if (!resp.ok) return null;
+        const data = await resp.json();
+        const all = Array.isArray(data?.recordset) ? data.recordset
+                  : Array.isArray(data?.recordsets?.[0]) ? data.recordsets[0]
+                  : Array.isArray(data) ? data : null;
+        if (!all) return null;
+        const chonchi = all.filter(r => [119, 155, 205].includes(r.bahia));
+        console.log('✅ consultaRestricciones OK —', chonchi.length, 'restricciones jurisdicción Chonchi');
+        return chonchi;
+      } catch (e) {
+        console.log('⚠️ consultaRestricciones no disponible:', e.message);
+        return null;
+      }
+    }
+
     async function fetchDirectemarStatus(force = false) {
       if (!force && _dmCache && (Date.now() - _dmCache._ts < 120000)) return _dmCache;
-      // Lanzar las tres fuentes en paralelo
-      const [ports, bahiasFromConsulta, capRestrData] = await Promise.all([
+      // Lanzar las fuentes en paralelo
+      const [ports, bahiasFromConsulta, capRestrData, restrDetalle] = await Promise.all([
         fetchSitportData(),
         fetchConsultaBahias(),
         fetchConsultaCapuertoRestriccion(),
+        fetchConsultaRestricciones(),
       ]);
       // Si consultaBahias no devolvió datos, intentar discovery GET como fallback
       const bahias = bahiasFromConsulta
         ?? (_sitportBahiasData ? _sitportBahiasData : await discoverSitportBahiasEndpoint());
       if (!ports) return null;
-      const parsed = extractChonchiData(ports, bahias, capRestrData);
+      const parsed = extractChonchiData(ports, bahias, capRestrData, restrDetalle);
       parsed._ts = Date.now();
       _dmCache = parsed;
 
@@ -3568,13 +4035,21 @@
       const currentHour = cl.hour;
       const currentMin = cl.minute;
 
-      // Actualizar última medición
+      // Rediseño 2026: tarjeta de horario meteo removida de la UI.
+      // Conservamos el cálculo de _lastMeteoDate; el resto es no-op si los elementos no existen.
       const lastUpdateEl = document.getElementById('meteoLastUpdate');
-      if (dm && dm.medicion && dm.medicion.date) {
-        lastUpdateEl.innerHTML = `📡 Última medición estación: <strong>${dm.medicion.date}</strong>`;
-        _lastMeteoDate = dm.medicion.rawFecha ?? null;
-      } else {
-        lastUpdateEl.textContent = 'Última medición: sin datos';
+      if (dm && dm.medicion && dm.medicion.rawFecha) _lastMeteoDate = dm.medicion.rawFecha;
+      if (lastUpdateEl) {
+        if (dm && dm.medicion && dm.medicion.date) {
+          lastUpdateEl.innerHTML = `📡 Última medición estación: <strong>${dm.medicion.date}</strong>`;
+        } else {
+          lastUpdateEl.textContent = 'Última medición: sin datos';
+        }
+      }
+      if (!document.getElementById('meteoScheduleGrid')) {
+        // Sin grilla: devolver próxima hora meteo para el resto del flujo (sin tocar DOM).
+        let nh = METEO_HOURS.find(h => h > currentHour);
+        return nh ?? METEO_HOURS[0];
       }
 
       // Highlight schedule slots
@@ -3618,6 +4093,8 @@
      */
     function startMeteoCountdown(nextHour) {
       if (_countdownInterval) clearInterval(_countdownInterval);
+      // Rediseño 2026: countdown removido de la UI.
+      if (!document.getElementById('meteoCountdown')) return;
 
       function tick() {
         const diff = msUntilNextMeteoHour(nextHour);
@@ -3687,7 +4164,10 @@
         }
       }
       // Mostrar sección solo cuando hay restricción activa
-      if (sectionEl) sectionEl.style.display = (dm && dm.found && dmRestricted) ? '' : 'none';
+      const showReopen = !!(dm && dm.found && dmRestricted);
+      if (sectionEl) sectionEl.style.display = showReopen ? '' : 'none';
+      const vdClearEl = document.getElementById('vdClear');
+      if (vdClearEl) vdClearEl.style.display = showReopen ? 'none' : '';
       if (zoneLabelEl) {
         const action = dmRestricted ? 'Pronóstico de reapertura' : 'Probabilidad de apertura';
         zoneLabelEl.textContent = `${action} · ${zoneName}`;
@@ -3713,13 +4193,13 @@
         statusClass = openProb >= 50 ? 'open' : openProb >= 25 ? 'restricted' : 'closed';
 
         if (openProb >= 50) {
-          labelText = '🟢 Condiciones mejorando';
+          labelText = 'Condiciones mejorando';
           detailText = `Pronóstico indica mejoría. Prob. cierre: ${closePct}%, restricción: ${restrictPct}%. La Capitanía podría levantar restricciones en próximo boletín.`;
         } else if (openProb >= 25) {
-          labelText = '🟡 Apertura parcial posible';
+          labelText = 'Apertura parcial posible';
           detailText = `Condiciones aún adversas. Prob. cierre: ${closePct}%, restricción: ${restrictPct}%. Monitorear próximo boletín DIRECTEMAR.`;
         } else {
-          labelText = '🔴 Apertura poco probable';
+          labelText = 'Apertura poco probable';
           detailText = `Condiciones severas persisten. Prob. cierre: ${closePct}%, restricción: ${restrictPct}%. Esperar mejoría significativa.`;
         }
       } else {
@@ -3730,13 +4210,13 @@
         statusClass = openProb >= 60 ? 'open' : openProb >= 35 ? 'restricted' : 'closed';
 
         if (openProb >= 60) {
-          labelText = '✅ Se mantiene abierto';
+          labelText = 'Se mantiene abierto';
           detailText = `Condiciones estables. Prob. cierre próx 24h: ${closePct}%. Operación normal.`;
         } else if (openProb >= 35) {
-          labelText = '⚠️ Cierre posible próximas horas';
+          labelText = 'Cierre posible próximas horas';
           detailText = `Deterioro esperado. Prob. cierre: ${closePct}%, restricción: ${restrictPct}%. Planificar contingencia.`;
         } else {
-          labelText = '🚨 Cierre probable pronto';
+          labelText = 'Cierre probable pronto';
           detailText = `Deterioro inminente. Prob. cierre: ${closePct}%. Limitar salidas y preparar plan de cierre.`;
         }
       }
@@ -3760,7 +4240,7 @@
           windowsEl.innerHTML = '<div style="font-size:0.65rem;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.5px;font-weight:700">Ventanas favorables (próx. 24h)</div>' +
             goodWindows.map(w => {
               const cls = w.quality === 'buena' ? 'favorable' : 'marginal';
-              return `<span class="msc-window-tag ${cls}">${w.icon} ${w.from}–${w.to}</span>`;
+              return `<span class="msc-window-tag ${cls}">${w.from}–${w.to}</span>`;
             }).join('');
         } else {
           windowsEl.innerHTML = '<div style="font-size:0.68rem;color:var(--muted);font-style:italic">Sin ventanas favorables en próximas 24h</div>';
@@ -3844,7 +4324,7 @@
         // Label
         ctx.shadowBlur = 0;
         ctx.fillStyle = '#00a6b2';
-        ctx.font = '700 10px Inter';
+        ctx.font = '700 10px "IBM Plex Mono", monospace';
         ctx.textAlign = 'center';
         const labelY = chartArea.top - 4;
         const pad = 14;
@@ -4106,19 +4586,21 @@
       // Update DM status text — basado en Chonchi/Bahía de Yal específicamente
       if (dm && dm.found) {
         _dmGlobalStatus = dm;
-        const chonchiRestr = dm.restriccionBahia || dm.navesMenores || dm.navesMayores;
+        const chonchiRestr = dm.restriccionBahia || dm.navesMenores || dm.navesMayores || dm.restringido;
         const isUnknownDm  = dm.estado === 'DESCONOCIDO';
-        const icon  = isUnknownDm ? '⚠️' : chonchiRestr ? '🔴' : '🟢';
         const estado = isUnknownDm ? 'ZONA CON RESTRICCIÓN' : chonchiRestr ? 'CON RESTRICCIÓN' : 'ABIERTO';
         let detail = '';
         if (isUnknownDm) detail = ' · Restricción en Capitanía · origen sin confirmar · Ver zonas';
-        else if (dm.restriccionBahia) detail += ' · Bahía cerrada';
-        else if (dm.navesMenores) detail += ' · Naves menores restringidas';
-        else if (dm.navesMayores) detail += ' · Naves mayores restringidas';
+        else if (dm.tipoNavesMenores || dm.tipoNavesMayores) {
+          const t = [];
+          if (dm.tipoNavesMenores) t.push('naves menores');
+          if (dm.tipoNavesMayores) t.push('naves mayores');
+          detail = ' · restricción a ' + t.join(' y ');
+        } else if (chonchiRestr) detail = dm.condicionOficial ? ' · ' + dm.condicionOficial : ' · restricción oficial vigente';
         else detail = ' · Sin restricciones en Bahía de Yal';
-        dmStatusEl.innerHTML = `${icon} <strong>DIRECTEMAR AHORA: ${estado}</strong>${detail} · Chonchi / Bahía de Yal`;
+        dmStatusEl.innerHTML = `<strong>DIRECTEMAR ahora: ${estado}</strong>${detail} · Chonchi / Bahía de Yal`;
       } else {
-        dmStatusEl.innerHTML = '⏳ Sin datos DIRECTEMAR en este momento';
+        dmStatusEl.innerHTML = 'Sin datos DIRECTEMAR en este momento';
       }
 
       // Destroy previous
@@ -4209,10 +4691,10 @@
                   if (idx == null) return '';
                   const ri = riskData[idx] ?? riskForecast[idx] ?? 0;
                   const isPast = riskData[idx] !== null;
-                  let estado = '🟢 ABIERTO';
-                  if (ri >= 65) estado = '🔴 CERRADO';
-                  else if (ri >= 40) estado = '🟡 RESTRINGIDO';
-                  return `\n${isPast ? '📌 Historial real' : '🔮 Pronóstico'}\nEstado: ${estado}`;
+                  let estado = 'ABIERTO';
+                  if (ri >= 65) estado = 'CERRADO';
+                  else if (ri >= 40) estado = 'RESTRINGIDO';
+                  return `\n${isPast ? 'Historial real' : 'Pronóstico'}\nEstado: ${estado}`;
                 }
               }
             },
@@ -4316,7 +4798,69 @@
       buildPortTimelineOnCanvas('portTimelineChart', weather, marine, dm);
     }
 
+    /**
+     * Muestra la restricción OFICIAL real de Chonchi/Bahía de Yal tal como la publica SITPORT
+     * (condición, naves afectadas, motivo, vigencia, cartas de continuidad). Fuente: consultaRestricciones.
+     */
+    function renderDirectemarOficial(dm) {
+      const el = document.getElementById('dmOficial');
+      if (!el) return;
+      const info = (dm && dm.found) ? dm.restriccionInfo : null;
+      if (!info || !info.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+      const fmt = (d) => d ? d.toLocaleString('es-CL', { timeZone: 'America/Santiago', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }) + ' h' : null;
+      const cond = dm.condicionOficial || 'Con restricción';
+      const field = (k, v) => v ? `<span class="of-f"><span class="of-k">${k}</span> ${v}</span>` : '';
+      const rows = info.map(r => {
+        const causa = (r.detalle || r.motivo || '').replace(/\.\s*$/, '');
+        return `<div class="of-row">${field('Naves', r.naves)}${field('Motivo', causa)}${field('Tipo', r.tipoRestriccion)}${field('Vigente desde', fmt(r.inicio))}</div>`;
+      }).join('');
+      const carta = dm.cartasContinuidad ? `<div class="of-carta">Se aceptan cartas de continuidad</div>` : '';
+      el.innerHTML =
+        `<div class="of-h">DIRECTEMAR · SITPORT <span class="of-sep">—</span> <span class="of-cond">${cond}</span></div>` +
+        rows + carta +
+        `<a class="of-src" href="https://sitport.directemar.cl" target="_blank" rel="noopener">Texto oficial en SITPORT ↗</a>`;
+      el.style.display = '';
+    }
+
+    /**
+     * Llena la condición OFICIAL grande del boletín héroe (lo que dice SITPORT, sin nuestro modelo).
+     */
+    function renderBoletin(dm) {
+      const condEl = document.getElementById('blCondicion');
+      const sujEl  = document.getElementById('blSujeto');
+      const boletin = document.getElementById('boletin');
+      if (!condEl || !boletin) return;
+      boletin.classList.remove('bl-open', 'bl-restr', 'bl-error');
+      condEl.className = 'bl-condicion';
+      if (!dm || !dm.found) {
+        boletin.classList.add('bl-error');
+        condEl.classList.add('err');
+        condEl.textContent = 'SITPORT no disponible';
+        sujEl.textContent = 'No se pudo consultar la autoridad marítima · reintenta';
+        return;
+      }
+      const restringido = dm.restriccionBahia || dm.navesMenores || dm.navesMayores || dm.restringido;
+      if (dm.estado === 'DESCONOCIDO') {
+        boletin.classList.add('bl-restr');
+        condEl.classList.add('restricted');
+        condEl.textContent = 'Restricción en la jurisdicción';
+        sujEl.textContent = 'Origen sin confirmar · ver estado por zona';
+      } else if (restringido) {
+        boletin.classList.add('bl-restr');
+        condEl.classList.add('restricted');
+        condEl.textContent = (dm.condicionOficial || 'Con restricción').toUpperCase();
+        sujEl.textContent = 'Bahía de Yal · jurisdicción de Chonchi';
+      } else {
+        boletin.classList.add('bl-open');
+        condEl.classList.add('open');
+        condEl.textContent = 'Sin restricciones vigentes';
+        sujEl.textContent = 'Bahía de Yal · jurisdicción de Chonchi';
+      }
+    }
+
     function renderDirectemarPanel(dm) {
+      renderDirectemarOficial(dm);
+      renderBoletin(dm);
       const panel = document.getElementById('dmPanel');
       const badge = document.getElementById('dmBadge');
       const icon = document.getElementById('dmIcon');
@@ -4362,16 +4906,16 @@
       // Estado basado en flags booleanos de Chonchi (no en numeroRestricciones que puede
       // reflejar el total de la Capitanía incluyendo Queilen/Puqueldon)
       const isUnknown = dm.estado === 'DESCONOCIDO';
-      const hasRestr  = dm.restriccionBahia || dm.navesMenores || dm.navesMayores;
+      const hasRestr  = dm.restriccionBahia || dm.navesMenores || dm.navesMayores || dm.restringido;
       panel.className = 'directemar-panel ' + (isUnknown ? 'dm-restricted' : hasRestr ? 'dm-restricted' : 'dm-open');
       badge.className = 'dm-badge live' + (isUnknown || hasRestr ? '' : ' ok');
-      badge.textContent = isUnknown || hasRestr ? '🔴 EN VIVO' : '🟢 EN VIVO';
+      badge.textContent = 'EN VIVO';
       icon.textContent = isUnknown ? '⚠️' : hasRestr ? '⛔' : '⚓';
       status.className = 'dm-big-status ' + (isUnknown ? 'restricted' : hasRestr ? 'restricted' : 'open');
       if (isUnknown) {
         status.innerHTML = '⚠️ RESTRICCIÓN EN ZONA' + locationHtml;
       } else {
-        status.innerHTML = (hasRestr ? '🚫 CON RESTRICCIÓN' : '✅ ABIERTO') + locationHtml;
+        status.innerHTML = (hasRestr ? 'CON RESTRICCIÓN' : 'ABIERTO') + locationHtml;
       }
       restr.className = 'dm-restricciones ' + (isUnknown || hasRestr ? 'has' : 'none');
       let restrSummary = '';
@@ -4380,15 +4924,16 @@
       else if (dm.navesMenores && dm.navesMayores) restrSummary = 'Naves mayores y menores restringidas';
       else if (dm.navesMenores) restrSummary = 'Naves menores restringidas';
       else if (dm.navesMayores) restrSummary = 'Naves mayores restringidas';
+      else if (dm.restringido) restrSummary = 'Restricción oficial vigente (tipo no informado por SITPORT)';
       restr.textContent = (isUnknown || hasRestr) ? restrSummary : 'Sin restricciones en Bahía de Yal';
 
       // Medición meteorológica
       if (dm.medicion && dm.medicion.temp !== null) {
         const m = dm.medicion;
         const wind_kmh = m.windSpeed !== null ? (m.windSpeed * 1.852).toFixed(1) : '—';
-        const rainHtml = m.rain > 0 ? ` · 🌧️ <strong>${m.rain} mm/h</strong>` : '';
-        medicion.innerHTML = `🌡️ <strong>${m.temp}°C</strong> · 💨 <strong>${m.windSpeed ?? '—'} ${m.unidadViento ?? 'nds'} ${m.windDir ?? ''}</strong> (${wind_kmh} km/h) · 📊 <strong>${m.pressure ?? '—'} ${m.unidadPresion ?? 'hPa'}</strong>${rainHtml}` +
-          (m.date ? ` · 📅 ${m.date}` : '');
+        const rainHtml = m.rain > 0 ? ` · Lluvia <strong>${m.rain} mm/h</strong>` : '';
+        medicion.innerHTML = `Sensor: <strong>${m.temp}°C</strong> · <strong>${m.windSpeed ?? '—'} ${m.unidadViento ?? 'nds'} ${m.windDir ?? ''}</strong> (${wind_kmh} km/h) · <strong>${m.pressure ?? '—'} ${m.unidadPresion ?? 'hPa'}</strong>${rainHtml}` +
+          (m.date ? ` · ${m.date}` : '');
       } else {
         medicion.innerHTML = '<span style="color:var(--muted)">Sin medición automática reportada</span>';
       }
@@ -4423,21 +4968,21 @@
         if (restriccionBahia || (navesMayores && navesMenores) || (restricciones > 1 && navesMayores)) {
           card.className = 'dm-zone-card zone-closed';
           statusEl.className = 'dm-zone-status-badge closed';
-          statusEl.textContent = '🔴 CERRADO';
+          statusEl.textContent = 'CERRADO';
         } else if (hasRestr) {
           card.className = 'dm-zone-card zone-restricted';
           statusEl.className = 'dm-zone-status-badge restricted';
-          statusEl.textContent = '🟡 RESTRINGIDO';
+          statusEl.textContent = 'RESTRINGIDO';
         } else {
           card.className = 'dm-zone-card zone-open';
           statusEl.className = 'dm-zone-status-badge open';
-          statusEl.textContent = '🟢 ABIERTO';
+          statusEl.textContent = 'ABIERTO';
         }
         let detail = hasRestr ? `${restricciones} restricción${restricciones > 1 ? 'es' : ''}` : 'Sin restricciones';
         if (navesMenores) detail += ' · ⛵ Menores';
         if (navesMayores) detail += ' · 🚢 Mayores';
         if (restriccionBahia) detail += ' · 🌊 Bahía';
-        if (viento !== null && viento !== undefined) detail += ` · 💨 ${viento} nds`;
+        if (viento !== null && viento !== undefined) detail += ` · viento ${viento} nds`;
         detailEl.textContent = detail;
         // Mostrar detalle textual de restricción (datos de la Capitanía)
         if (restrTextEl) {
@@ -4462,13 +5007,13 @@
         if (card && statusEl && detailEl) {
           card.className = 'dm-zone-card zone-unknown';
           statusEl.className = 'dm-zone-status-badge unknown';
-          statusEl.textContent = '⚠️ SIN DATO';
+          statusEl.textContent = 'SIN DATO';
           detailEl.textContent = 'La Capitanía tiene restricciones en otra zona · Ver Queilen';
           if (restrEl) restrEl.style.display = 'none';
         }
       } else {
         renderZoneCard('dmZonaBahia', 'dmZonaBahiaStatus', 'dmZonaBahiaDetail',
-          dm.navesMenores || dm.navesMayores || dm.restriccionBahia,
+          dm.navesMenores || dm.navesMayores || dm.restriccionBahia || dm.restringido,
           dm.navesMenores, dm.navesMayores, dm.restriccionBahia,
           dm.restricciones, dm.medicion?.windSpeed ?? null, false,
           'dmZonaBahiaRestr', dm.chonchiRestrText ?? null);
@@ -4478,13 +5023,13 @@
       const subQ = dm.subPuertos?.find(p => p.nombre?.toUpperCase().includes('QUEILEN'));
       const subP = dm.subPuertos?.find(p => p.nombre?.toUpperCase().includes('PUQUELDON') || p.nombre?.toUpperCase().includes('PUQUELDÓN'));
       renderZoneCard('dmZonaQueilen', 'dmZonaQuilenStatus', 'dmZonaQuilenDetail',
-        !!(subQ?.navesMenores || subQ?.navesMayores || subQ?.restriccionBahia),
+        !!(subQ?.navesMenores || subQ?.navesMayores || subQ?.restriccionBahia || subQ?.restringido),
         subQ?.navesMenores ?? false, subQ?.navesMayores ?? false,
         subQ?.restriccionBahia ?? false, subQ?.restricciones ?? 0,
         subQ?.viento ?? null, !subQ,
         'dmZonaQuilenRestr', subQ?.restrText ?? null);
       renderZoneCard('dmZonaPuqueldon', 'dmZonaPuqueldonStatus', 'dmZonaPuqueldonDetail',
-        !!(subP?.navesMenores || subP?.navesMayores || subP?.restriccionBahia),
+        !!(subP?.navesMenores || subP?.navesMayores || subP?.restriccionBahia || subP?.restringido),
         subP?.navesMenores ?? false, subP?.navesMayores ?? false,
         subP?.restriccionBahia ?? false, subP?.restricciones ?? 0,
         subP?.viento ?? null, !subP,
@@ -4527,16 +5072,28 @@
 
       // Estado de CHONCHI/Bahía de Yal basado en flags booleanos (no en numeroRestricciones
       // que puede reflejar el total de la Capitanía, no del puerto individual).
-      const chonchiRestr = dm.restriccionBahia || dm.navesMenores || dm.navesMayores;
+      // SITPORT a nivel de bahía solo informa "con restricción / sin restricción" (rojo/verde),
+      // NO el tipo ni si es cierre total. Decisión de producto: un "rojo" oficial = RESTRINGIDO.
+      // El cierre total (CERRADO) solo lo declara el modelo de clima (racha≥40, oleaje, tormenta).
+      const chonchiRestr = dm.restriccionBahia || dm.navesMenores || dm.navesMayores || dm.restringido;
       let dmStatus;
       if (dm.restriccionBahia || (dm.navesMayores && dm.navesMenores)) {
-        dmStatus = 'CERRADO';
+        dmStatus = 'CERRADO'; // solo si SITPORT algún día expone cierre explícito
       } else if (chonchiRestr) {
         dmStatus = 'RESTRINGIDO';
       } else {
         dmStatus = 'ABIERTO';
       }
       const dmRestr = chonchiRestr;
+
+      // Detalle REAL del tipo de restricción (desde Totalgeneral / SITPORT), no inventado.
+      const dmTipos = [];
+      if (dm.tipoNavesMenores) dmTipos.push('naves menores');
+      if (dm.tipoNavesMayores) dmTipos.push('naves mayores');
+      if (dm.tipoBahia) dmTipos.push('bahía');
+      const dmRestrLabel = dmTipos.length
+        ? `DIRECTEMAR · Chonchi: restricción a ${dmTipos.join(' · ')}`
+        : 'DIRECTEMAR · Chonchi: restricción oficial vigente';
 
       const card = document.getElementById('portCard');
       const statusEl = document.getElementById('portStatus');
@@ -4553,7 +5110,7 @@
 
       if (dmSev > modelSev) {
         // DIRECTEMAR prevalece siempre
-        card.className = 'port-status-card';
+        card.className = 'verdict';
         statusEl.className = 'port-big-status';
         dotEl.className = 'port-live-dot';
 
@@ -4562,7 +5119,7 @@
         if (dm.navesMayores) dmReasonTags += '<span class="port-reason-tag danger">🚢 Naves mayores restringidas</span>';
         if (dm.navesMenores) dmReasonTags += '<span class="port-reason-tag danger">⛵ Naves menores restringidas</span>';
         if (!dm.restriccionBahia && !dm.navesMayores && !dm.navesMenores && dmRestr) {
-          dmReasonTags += `<span class="port-reason-tag danger">DIRECTEMAR: ${dm.restricciones} restricción(es)</span>`;
+          dmReasonTags += `<span class="port-reason-tag warn">${dmRestrLabel}</span>`;
         }
         const modelReasons = (portNow?.reasons || []).filter(r => r.cls !== 'ok').map(r => `<span class="port-reason-tag ${r.cls}">${r.text}</span>`).join('');
 
@@ -4570,24 +5127,28 @@
           card.classList.add('status-closed');
           statusEl.classList.add('closed');
           dotEl.classList.add('closed');
-          statusEl.textContent = '🚫 PUERTO CERRADO';
+          statusEl.textContent = 'PUERTO CERRADO';
           iconEl.textContent = '⛔';
-          cartaEl.innerHTML = '<span style="color:#ff6b6b;font-weight:800">❌ NO PERMITIDO</span> — Puerto cerrado por DIRECTEMAR. Navegación <strong>totalmente prohibida</strong>.';
+          cartaEl.innerHTML = '<span style="color:#ff6b6b;font-weight:800">NO PERMITIDO</span> — Puerto cerrado por DIRECTEMAR. Navegación <strong>totalmente prohibida</strong>.';
         } else {
           card.classList.add('status-restricted');
           statusEl.classList.add('restricted');
           dotEl.classList.add('restricted');
-          statusEl.textContent = '⚠️ RESTRINGIDO';
+          statusEl.textContent = 'RESTRINGIDO';
           iconEl.textContent = '⚠️';
-          cartaEl.innerHTML = '<span style="color:#f4c95d;font-weight:800">📋 CON AUTORIZACIÓN</span> — Zarpe posible con carta de la Capitanía de Puerto de Castro. Solo aguas interiores protegidas, horario diurno.';
+          cartaEl.innerHTML = '<span style="color:#f4c95d;font-weight:800">CON AUTORIZACIÓN</span> — Zarpe posible con carta de la Capitanía de Puerto de Castro. Solo aguas interiores protegidas, horario diurno.';
         }
 
         timeEl.textContent = 'Evaluado: ' + new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) + ' hrs — estado oficial DIRECTEMAR';
         reasonsEl.innerHTML = dmReasonTags + modelReasons;
         return { status: dmStatus, carta: dmStatus !== 'CERRADO', reasons: [{ text: `DIRECTEMAR: ${dmStatus}`, cls: 'danger' }] };
-      } else if (!dmRestr && portNow?.status !== 'ABIERTO') {
+      } else if (dmRestr) {
+        // El modelo de clima determina el titular, pero DIRECTEMAR igual reporta restricción
+        // en Bahía de Yal/Chonchi → la surface en los drivers para no ocultarla.
+        reasonsEl.innerHTML += `<span class="port-reason-tag warn">${dmRestrLabel}</span>`;
+      } else if (portNow?.status !== 'ABIERTO') {
         // DIRECTEMAR sin restricciones pero modelo dice cerrado/restringido
-        reasonsEl.innerHTML += '<span class="port-reason-tag ok">DIRECTEMAR: Sin restricciones oficiales</span>';
+        reasonsEl.innerHTML += '<span class="port-reason-tag ok">DIRECTEMAR: sin restricciones oficiales</span>';
       }
       return portNow;
     }
@@ -4710,7 +5271,7 @@
     }
 
     /* ─── WINDY MAP LAYER TOGGLE ─── */
-    const WINDY_BASE = 'https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=%C2%B0C&metricWind=km%2Fh&zoom=8&product=ecmwf&level=surface&lat=-42.62&lon=-73.77&detailLat=-42.62&detailLon=-73.77&marker=true&message=false';
+    const WINDY_BASE = 'https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=%C2%B0C&metricWind=km%2Fh&zoom=9&product=ecmwf&level=surface&lat=-42.62&lon=-73.77&detailLat=-42.62&detailLon=-73.77&marker=true&message=false';
 
     function setWindyLayer(layer) {
       const iframe = document.getElementById('windyMap');
