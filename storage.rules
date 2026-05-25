@@ -9,7 +9,8 @@ service firebase.storage {
     // Planos de Aguas — fotos referenciales por bajada (PWA + QR)
     // Subida/borrado por usuario autenticado; el QR público las ve vía el token
     // del downloadURL guardado en Firestore (planosAguas/main.photos).
-    match /planosAguas/{fileName} {
+    // {allPaths=**} para cubrir la subcarpeta por bajada: planosAguas/{id}/{k}.jpg
+    match /planosAguas/{allPaths=**} {
       allow write: if request.auth != null
         && request.resource.size < 5 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
