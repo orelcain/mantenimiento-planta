@@ -1,34 +1,85 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore'
+import { ref as storageRef, uploadString, getDownloadURL, deleteObject } from 'firebase/storage'
+import { db, storage, auth } from '../services/firebase'
 
 /**
  * Módulo Planos de Aguas — Planta Principal.
  *
- * Compara las bajadas de agua dulce/salada entre la referencia de Calidad y el
- * plano nuevo PN10 (AQUA014). Carga el HTML standalone
- * (public/planos-aguas.html) dentro de un iframe a pantalla completa.
+ * Carga el HTML standalone (public/planos-aguas-embed.html) en un iframe.
  *
- * El HTML embebido ya trae sus propios controles (filtros, fundido/cuadrar capa
- * Calidad, fotos por punto, resumen, QR, modo edición).
+ * Sincronización: el iframe NO hereda la sesión de Firebase del PWA (storage
+ * particionado), por lo que sus escrituras a Firestore se denegaban en silencio.
+ * Acá actuamos de PUENTE: el iframe nos pide guardar/subir/borrar vía postMessage
+ * y nosotros (que SÍ estamos autenticados) ejecutamos la operación en Firestore /
+ * Storage. Las lecturas siguen haciéndose desde el iframe (regla read:if true).
  *
- * Acceso: ruta privada (cualquier usuario autenticado). La vista también es
- * consultable por QR sin login porque `planos-aguas.html` es un archivo estático
- * público servido directamente.
+ * Acceso por QR (sin login): planos-aguas-embed.html es estático y público; en ese
+ * caso no hay puente y el iframe solo lee (modo ?view=1 = solo lectura).
  */
 export function PlanosAguasPage() {
+  const iframeRef = useRef<HTMLIFrameElement>(null)
+
   const iframeSrc = useMemo(() => {
     const basePath = import.meta.env.BASE_URL || '/'
     const v = import.meta.env.VITE_APP_VERSION || Date.now().toString().slice(0, 8)
     return `${basePath}planos-aguas-embed.html?v=${v}`
   }, [])
 
+  useEffect(() => {
+    const ORIGIN = window.location.origin
+    const post = (msg: Record<string, unknown>) => {
+      iframeRef.current?.contentWindow?.postMessage(msg, ORIGIN)
+    }
+    const sendBridge = () => {
+      const u = auth.currentUser
+      post({ __planos: true, type: 'bridge', authed: !!u, uid: u?.uid ?? null })
+    }
+
+    const onMsg = (e: MessageEvent) => {
+      if (e.origin !== ORIGIN) return
+      if (e.source !== iframeRef.current?.contentWindow) return
+      const m = e.data as { __planos?: boolean; type?: string; reqId?: number; payload?: Record<string, unknown>; path?: string; dataUrl?: string }
+      if (!m || m.__planos !== true) return
+
+      if (m.type === 'hello') {
+        sendBridge()
+      } else if (m.type === 'save') {
+        setDoc(doc(db, 'planosAguas', 'main'), { ...(m.payload ?? {}), updatedAt: serverTimestamp() }, { merge: true })
+          .then(() => post({ __planos: true, type: 'save-result', ok: true, reqId: m.reqId }))
+          .catch((err) => post({ __planos: true, type: 'save-result', ok: false, code: err?.code ?? 'error', reqId: m.reqId }))
+      } else if (m.type === 'upload' && m.path && m.dataUrl) {
+        const r = storageRef(storage, m.path)
+        uploadString(r, m.dataUrl, 'data_url', { contentType: 'image/jpeg' })
+          .then(() => getDownloadURL(r))
+          .then((url) => post({ __planos: true, type: 'upload-result', ok: true, url, reqId: m.reqId }))
+          .catch((err) => post({ __planos: true, type: 'upload-result', ok: false, code: err?.code ?? 'error', reqId: m.reqId }))
+      } else if (m.type === 'delete-photo' && m.path) {
+        deleteObject(storageRef(storage, m.path)).catch(() => {})
+      }
+    }
+
+    window.addEventListener('message', onMsg)
+    const unsubAuth = auth.onAuthStateChanged(() => sendBridge())
+    return () => {
+      window.removeEventListener('message', onMsg)
+      unsubAuth()
+    }
+  }, [])
+
   return (
     <div className="h-full w-full">
       <iframe
+        ref={iframeRef}
         src={iframeSrc}
         title="Planos de Aguas — Planta Principal"
         className="w-full h-full border-0"
         allow="fullscreen; clipboard-read; clipboard-write"
         sandbox="allow-scripts allow-same-origin allow-popups allow-downloads allow-modals"
+        onLoad={() => {
+          const u = auth.currentUser
+          iframeRef.current?.contentWindow?.postMessage({ __planos: true, type: 'bridge', authed: !!u, uid: u?.uid ?? null }, window.location.origin)
+        }}
       />
     </div>
   )

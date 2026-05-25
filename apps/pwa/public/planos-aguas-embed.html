@@ -458,6 +458,29 @@ function saveLocal(){localStorage.setItem(STORE_KEY,JSON.stringify(state));}
 /* ============ CLOUD SYNC (Firebase) — posiciones / notas / dibujos ============ */
 const cloud={db:null,auth:null,storage:null,user:null,ready:false,applying:false,dirty:false,busy:false,docMissing:false,pushT:0,writing:false,lastWrite:null};
 function cloudDoc(){return cloud.db.collection('planosAguas').doc('main');}
+
+/* ===== Puente con la PWA padre =====
+   El iframe NO hereda la sesión de Firebase del PWA (storage particionado), así que sus
+   escrituras se deniegan. La PWA padre SÍ está autenticada: le delegamos guardar/subir/borrar
+   vía postMessage. Las LECTURAS siguen por el Firebase propio del iframe (regla read:if true). */
+const bridge={active:false,authed:false,reqId:0,pend:{}};
+function inIframe(){try{return window.parent&&window.parent!==window;}catch(e){return true;}}
+function bridgeSend(type,extra){return new Promise(res=>{
+  if(!bridge.active){res({ok:false,code:'no-bridge'});return;}
+  const reqId=++bridge.reqId;bridge.pend[reqId]=res;
+  window.parent.postMessage(Object.assign({__planos:true,type,reqId},extra),'*');
+  setTimeout(()=>{if(bridge.pend[reqId]){delete bridge.pend[reqId];res({ok:false,code:'timeout'});}},20000);
+});}
+window.addEventListener('message',e=>{
+  const m=e.data;if(!m||m.__planos!==true)return;
+  if(m.type==='bridge'){bridge.active=true;bridge.authed=!!m.authed;if(typeof renderSync==='function')renderSync();if(bridge.authed&&cloud.docMissing)trySeed();} // solo siembra si el doc NO existe (no pisa la nube)
+  else if(m.type==='save-result'||m.type==='upload-result'){const r=bridge.pend[m.reqId];if(r){delete bridge.pend[m.reqId];r(m);}}
+});
+function bridgeHello(tries){
+  if(!inIframe())return;
+  try{window.parent.postMessage({__planos:true,type:'hello'},'*');}catch(e){}
+  if(!bridge.active&&(tries||0)<12)setTimeout(()=>bridgeHello((tries||0)+1),350);
+}
 function initCloud(){
   try{
     if(!window.firebase)return;
@@ -470,7 +493,7 @@ function initCloud(){
   renderSync();
 }
 function localHasData(){return Object.keys(state.over).length||state.extra.length||state.removed.length||(state.shapes||[]).length||Object.keys(state.notas).length||Object.keys(state.photos||{}).length;}
-function trySeed(){ if(cloud.user&&localHasData()){cloud.docMissing=false;pushCloud(true);} }
+function trySeed(){ if((cloud.user||bridge.authed)&&localHasData()){cloud.docMissing=false;pushCloud(true);} }
 function onCloudSnap(snap){
   if(snap.metadata&&snap.metadata.hasPendingWrites)return; // eco local de mi propia escritura → ignorar
   cloud.ready=true;
@@ -491,16 +514,18 @@ function onCloudSnap(snap){
   if(typeof renderMarkers==='function'){renderMarkers();renderShapes();if(sel)openPanel(sel);}
   renderSync();
 }
+function payloadCloud(){return {over:state.over,notas:state.notas,extra:state.extra,removed:state.removed,shapes:state.shapes,photos:state.photos||{},zonas:state.zonas||[]};}
 function pushCloud(now){
-  if(!cloud.db)return;
+  if(!cloud.db&&!bridge.active)return;
   cloud.dirty=true;
   clearTimeout(cloud.pushT);
-  const doIt=()=>{
+  const doIt=async()=>{
     cloud.writing=true;renderSync();
-    return cloudDoc().set({
-      over:state.over,notas:state.notas,extra:state.extra,removed:state.removed,shapes:state.shapes,photos:state.photos||{},zonas:state.zonas||[],
-      updatedAt:firebase.firestore.FieldValue.serverTimestamp()
-    },{merge:true})
+    if(bridge.active){ // delegar a la PWA padre (autenticada)
+      const r=await bridgeSend('save',{payload:payloadCloud()});
+      cloud.writing=false;cloud.dirty=false;cloud.lastWrite=r.ok?'ok':(r.code||'error');renderSync();return;
+    }
+    return cloudDoc().set(Object.assign(payloadCloud(),{updatedAt:firebase.firestore.FieldValue.serverTimestamp()}),{merge:true})
     .then(()=>{cloud.dirty=false;cloud.writing=false;cloud.lastWrite='ok';renderSync();})
     .catch(e=>{cloud.dirty=false;cloud.writing=false;cloud.lastWrite=(e&&e.code)||'error';renderSync();}); // sin permiso (no supervisor) u offline → queda local
   };
@@ -707,7 +732,10 @@ async function addPhoto(id,cat,src){
   if(!Array.isArray(state.photos[id][cat]))state.photos[id][cat]=[];
   const item={u:null,k};state.photos[id][cat].push(item);
   save();renderGalleries(id);renderMarkers();
-  if(cloud.storage&&cloud.user){
+  if(bridge.active){ // subir vía PWA padre (autenticada)
+    const r=await bridgeSend('upload',{path:'planosAguas/'+id+'/'+k+'.jpg',dataUrl:data});
+    if(r.ok&&r.url){item.u=r.url;save();toast('Foto guardada y sincronizada');}else toast('Foto guardada (local; '+(r.code||'sin sync')+')');
+  }else if(cloud.storage&&cloud.user){
     try{const ref=cloud.storage.ref('planosAguas/'+id+'/'+k+'.jpg');await ref.putString(data,'data_url',{contentType:'image/jpeg'});item.u=await ref.getDownloadURL();save();toast('Foto guardada y sincronizada');}
     catch(e){toast('Foto guardada (local; sin sync)');}
   }else toast('Foto guardada (local)');
@@ -717,7 +745,8 @@ async function removePhotoItem(id,cat,k){
   await delPhoto(k);
   const arr=(state.photos[id]&&state.photos[id][cat])||[];const i=arr.findIndex(x=>x.k===k);if(i>=0)arr.splice(i,1);
   save();renderGalleries(id);renderMarkers();
-  if(cloud.storage&&cloud.user){try{await cloud.storage.ref('planosAguas/'+id+'/'+k+'.jpg').delete();}catch(e){}}
+  if(bridge.active){bridgeSend('delete-photo',{path:'planosAguas/'+id+'/'+k+'.jpg'});}
+  else if(cloud.storage&&cloud.user){try{await cloud.storage.ref('planosAguas/'+id+'/'+k+'.jpg').delete();}catch(e){}}
   toast('Foto quitada');
 }
 let activePhotoCat='ent';
@@ -1291,18 +1320,19 @@ document.getElementById('btnTheme').onclick=()=>{darkPlan=!darkPlan;localStorage
 
 /* ============ ESTADO DE SINCRONIZACIÓN + EXPORT/IMPORT ============ */
 function syncState(){
-  if(!cloud.db)return {t:'Local',cls:'swarn',tip:'Sin Firebase (offline). Cambios solo en este dispositivo.',d:'Firebase no está disponible ahora. Tus cambios se guardan en este dispositivo.'};
   if(cloud.writing)return {t:'Guardando…',cls:'sbusy',tip:'Sincronizando con la nube…',d:'Guardando en la nube…'};
-  if(!cloud.user)return {t:'Solo local',cls:'swarn',tip:'Sin sesión de supervisor en el plano.',d:'No hay sesión de Firebase en el plano: iniciá sesión como supervisor en la PWA para sincronizar. Por ahora tus cambios quedan SOLO en este dispositivo (no se ven en el celular ni por QR).'};
   if(cloud.lastWrite==='permission-denied')return {t:'Solo local',cls:'swarn',tip:'Tu usuario no es supervisor/admin.',d:'Tu usuario no tiene permiso de supervisor/admin, así que no puede guardar en la nube. Cambios solo en este dispositivo.'};
   if(cloud.lastWrite&&cloud.lastWrite!=='ok')return {t:'Sin conexión',cls:'swarn',tip:'No se pudo guardar ('+cloud.lastWrite+').',d:'No se pudo guardar en la nube ('+cloud.lastWrite+'). Reintentá cuando vuelva la conexión.'};
   if(cloud.lastWrite==='ok')return {t:'En la nube ✓',cls:'sok',tip:'Sincronizado con la nube.',d:'Tus cambios están en la nube y se ven en otros dispositivos (celular, QR).'};
-  return {t:'Local',cls:'',tip:'Aún sin cambios sincronizados en esta sesión.',d:'Todavía no se sincronizó ningún cambio en esta sesión. Hacé un cambio o tocá "Sincronizar ahora".'};
+  const conn = (bridge.active && bridge.authed) || (cloud.db && cloud.user);
+  if(conn)return {t:'Conectado',cls:'',tip:'Conectado a la nube. Hacé un cambio para guardar.',d:'Conectado a la nube. Hacé un cambio o tocá "Sincronizar ahora" para subir todo lo de este dispositivo.'};
+  if(!cloud.db&&!inIframe())return {t:'Local',cls:'swarn',tip:'Sin Firebase (offline).',d:'Firebase no está disponible ahora. Tus cambios se guardan en este dispositivo.'};
+  return {t:'Solo local',cls:'swarn',tip:'Sin sesión de supervisor para el plano.',d:'No hay sesión de supervisor disponible para el plano: tus cambios quedan SOLO en este dispositivo (no se ven en el celular ni por QR). Si estás en la PWA, asegurate de estar logueado como supervisor; si recién abrís, esperá unos segundos a que conecte.'};
 }
 function renderSync(){const b=document.getElementById('btnSync');if(!b)return;const s=syncState();b.textContent=s.t;b.classList.remove('sok','swarn','sbusy');if(s.cls)b.classList.add(s.cls);b.title=s.tip;}
 function forceSync(){
-  if(!cloud.db){toast('Firebase no disponible ahora');return;}
-  if(!cloud.user){toast('No hay sesión de supervisor en el plano');renderSync();return;}
+  if(!cloud.db&&!bridge.active){toast('Firebase no disponible ahora');return;}
+  if(!bridge.active&&!cloud.user){toast('No hay sesión de supervisor en el plano');renderSync();return;}
   cloud.dirty=false;pushCloud(true);toast('Sincronizando…');
 }
 async function exportData(){
@@ -1407,6 +1437,7 @@ let toastT;function toast(m){const t=document.getElementById('toast');t.textCont
   await openDB();await refreshPhotoIds();
   applyTheme();
   initCloud();
+  bridgeHello();
   const go=()=>{drawInit();fit();renderMarkers();renderShapes();};
   if(base.complete&&base.naturalWidth)go();else base.onload=go;
   // Re-ajustar si el contenedor cambia de tamaño (p.ej. dentro del PWA) y el usuario aún no movió la vista.
