@@ -203,7 +203,7 @@
   body.edit.tool-select .draw .cotadrag{pointer-events:auto;cursor:move}
   .draw .mask{stroke:none}
   .draw .dot{stroke:none} .draw .dot.dulce{fill:var(--drawDulce)} .draw .dot.salada{fill:var(--drawSalada)} .draw .dot.caliente{fill:var(--drawCaliente)}
-  .draw .lbl{font-family:var(--mono);font-weight:600;stroke:none;text-anchor:middle;dominant-baseline:central}
+  .draw .lbl{font-family:var(--mono);font-weight:400;stroke:none;text-anchor:middle;dominant-baseline:central}
   .draw .lbl.dulce{fill:var(--drawDulce)} .draw .lbl.salada{fill:var(--drawSalada)} .draw .lbl.caliente{fill:var(--drawCaliente)} .draw .lbl.struct{fill:var(--struct)}
   .draw .live{stroke-dasharray:9 7;opacity:.75}
   .draw .sel-outline{fill:none;stroke:var(--star);stroke-dasharray:6 5;vector-effect:non-scaling-stroke;stroke-width:2;pointer-events:none}
@@ -846,7 +846,7 @@ function removePoint(id){
 }
 
 /* ============ DRAW LAYER + EDITOR GUIADO ============ */
-const PIPE_W=5, DOT_R=13, LBL_SZE=18, LBL_HALO=3;
+const PIPE_W=5, DOT_R=13, LBL_SZE=16, LBL_HALO=3;
 let tool='pin', kind='dulce', maskColor='#ffffff', pipeW=5, snapAngles=true, wiz=null;
 let draft=null, draftCursor=null, selShape=null, drag=null, structMode=false, pend2=null, cotaMode=false;
 function nomT(t){return t==='d'?'Dulce':t==='c'?'Caliente':'Salada';}
