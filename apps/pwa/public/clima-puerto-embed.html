@@ -1981,10 +1981,13 @@
     .n24-window.low  { background: oklch(0.30 0.07 162 / 0.14); border-color: oklch(0.55 0.12 162 / 0.32); }
     .n24-window .wl { font-size: 0.66rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 3px; }
     .n24-review { font-size: 0.78rem; color: var(--muted); margin-top: 10px; }
-    .n24-actions-title {
+    .n24-actions-title, .n24-card-title {
       font-size: 0.68rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
       color: var(--muted); margin-bottom: 10px;
     }
+    .n24-card .n24-review { margin-bottom: 10px; }
+    .fc-peak { font-size: 0.78rem; color: var(--muted); margin: -4px 0 10px; }
+    .fc-peak .num { color: var(--text-bright); font-weight: 600; }
     .verdict .vd-decision, .n24-card .preventive-action { font-family: var(--font-ui); }
     .n24-stats { display: flex; gap: 10px; margin-top: 14px; }
     .n24-stat {
@@ -2222,6 +2225,7 @@
       <div class="section-head"><h2>Próximas 24 horas</h2></div>
       <div class="n24">
         <div class="n24-card">
+          <div class="n24-card-title">¿Cierra o restringe?</div>
           <div class="n24-prob">
             <div class="pb">
               <div class="pb-l">Cierre probable</div>
@@ -2233,19 +2237,15 @@
             </div>
           </div>
           <div class="n24-sub" id="closureSub"></div>
-          <div class="vd-drivers port-closure-drivers" id="closureDrivers"></div>
           <div class="n24-window" id="preventiveAlert">
             <span class="wl" id="preventiveAlertTitle">Ventana de riesgo</span>
             <span id="preventiveAlertText"></span>
           </div>
-          <div class="n24-review" id="decisionReview"></div>
-          <div class="n24-stats">
-            <div class="n24-stat"><div class="ns-l">Racha máx · 7 días</div><div class="ns-v num" id="maxGust">—</div></div>
-            <div class="n24-stat"><div class="ns-l">Ola máx · 7 días</div><div class="ns-v num" id="maxWave">—</div></div>
-          </div>
+          <div class="vd-drivers port-closure-drivers" id="closureDrivers"></div>
         </div>
         <div class="n24-card">
-          <div class="n24-actions-title">Acciones recomendadas</div>
+          <div class="n24-card-title">Qué hacer</div>
+          <div class="n24-review" id="decisionReview"></div>
           <div class="preventive-actions" id="preventiveActions"></div>
         </div>
       </div>
@@ -2289,6 +2289,7 @@
 
         <div>
           <div class="section-head"><h2>Pronóstico 7 días</h2><span class="sh-note">riesgo de cierre por día</span></div>
+          <div class="fc-peak">Pico de la semana: <span class="num" id="maxGust">—</span> racha · <span class="num" id="maxWave">—</span> oleaje</div>
           <div class="fc-strip" id="fcStrip"></div>
         </div>
       </div>
