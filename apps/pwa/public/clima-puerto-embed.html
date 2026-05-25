@@ -3462,6 +3462,8 @@
     const SUB_PUERTOS_CHONCHI = ['QUEILEN', 'PUQUELDON'];
     let _dmCache = null;
     let _dmTimer = null;
+    let _fullTimer = null;      // refresco completo periódico (clima + recálculo de todo)
+    let _lastLoadTs = 0;        // timestamp del último loadData (para refresco al volver)
     let _sitportBahiasData = null; // Cache de datos individuales de bahías
 
     /**
@@ -5165,7 +5167,25 @@
       }, 5 * 60 * 1000);
     }
 
+    // Refresco COMPLETO periódico: re-fetch clima + SITPORT y recálculo de TODAS las
+    // evaluaciones (outlook 24h, drivers, reapertura, 7 días, timeline) + cambio de día.
+    // Open-Meteo actualiza ~cada hora; 15 min capta cambios y el cruce de medianoche.
+    function startFullAutoRefresh() {
+      if (_fullTimer) clearInterval(_fullTimer);
+      _fullTimer = setInterval(() => {
+        if (document.visibilityState === 'visible') loadData();
+      }, 15 * 60 * 1000);
+    }
+
+    // Al volver a la pestaña tras un rato, refrescar si los datos están añejos (>10 min).
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && Date.now() - _lastLoadTs > 10 * 60 * 1000) {
+        loadData();
+      }
+    });
+
     async function loadData() {
+      _lastLoadTs = Date.now();
       const errorEl = document.getElementById('error');
       errorEl.style.display = 'none';
       document.getElementById('weeklyStatus').textContent = 'Cargando...';
@@ -5289,6 +5309,7 @@
     });
     loadData();
     startDirectemarAutoRefresh();
+    startFullAutoRefresh();
   </script>
 </body>
 </html>
