@@ -149,6 +149,7 @@
   .modal.open{display:flex;animation:fade .18s var(--ease)}
   @keyframes fade{from{opacity:0}to{opacity:1}}
   .modal .card{background:var(--bgPanel);border:1px solid var(--border);border-radius:12px;padding:22px;max-width:380px;width:100%;text-align:left;box-shadow:var(--shadow)}
+  .modal .card.wide{width:min(94vw,940px);max-width:min(94vw,940px)}
   .modal .card h3{margin:0 0 14px;font-family:var(--mono);font-weight:600;font-size:13px;letter-spacing:1px;text-transform:uppercase;color:var(--inkMid);padding-bottom:11px;border-bottom:1px solid var(--border)}
   #qrbox{display:flex;justify-content:center;min-height:180px;align-items:center;background:#fff;border-radius:8px;padding:14px}
   .urlbox{font-size:11px;word-break:break-all;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:8px;margin-top:11px;color:var(--inkMid);font-family:var(--mono)}
@@ -749,7 +750,30 @@ function retryUpload(id,cat,it,data){
     if(url){it.u=url;save();toast('Foto sincronizada');if(sel===id)renderGalleries(id);}
   })();
 }
-function openImg(src){const c=document.getElementById('modalCard');c.innerHTML=`<img src="${src}" style="max-width:100%;max-height:80vh;border-radius:8px;display:block;margin:0 auto"><button class="btn primary" style="margin-top:13px;width:100%" onclick="document.getElementById('modal').classList.remove('open')">Cerrar</button>`;document.getElementById('modal').classList.add('open');}
+function openImg(src){
+  const c=document.getElementById('modalCard');c.classList.add('wide');
+  c.innerHTML=`<div id="imgVp" style="position:relative;overflow:hidden;width:100%;height:72vh;background:#0a121c;border-radius:8px;touch-action:none;cursor:grab"><img id="imgZ" src="${src}" style="position:absolute;left:0;top:0;transform-origin:0 0;user-select:none;-webkit-user-drag:none;max-width:none" draggable="false"></div>
+    <div style="font-family:var(--mono);font-size:9.5px;color:var(--inkLo);letter-spacing:.4px;margin-top:8px;text-align:center">Rueda / pellizco para zoom · arrastrar para mover · doble-clic para acercar</div>
+    <button class="btn primary" style="margin-top:11px;width:100%" onclick="document.getElementById('modal').classList.remove('open');this.closest('.card').classList.remove('wide')">Cerrar</button>`;
+  document.getElementById('modal').classList.add('open');setupImgZoom();
+}
+/* visor de imagen con pan + zoom (rueda/pellizco/arrastrar/doble-clic) */
+function setupImgZoom(){
+  const vp=document.getElementById('imgVp'),img=document.getElementById('imgZ');if(!vp||!img)return;
+  let v={x:0,y:0,s:1},fitS=1;
+  const apply=()=>{img.style.transform=`translate(${v.x}px,${v.y}px) scale(${v.s})`;};
+  function fit(){const r=vp.getBoundingClientRect(),iw=img.naturalWidth||r.width,ih=img.naturalHeight||r.height;fitS=Math.min(r.width/iw,r.height/ih)||1;v.s=fitS;v.x=(r.width-iw*fitS)/2;v.y=(r.height-ih*fitS)/2;apply();}
+  function zoomAt(cx,cy,f){const r=vp.getBoundingClientRect(),px=cx-r.left,py=cy-r.top,wx=(px-v.x)/v.s,wy=(py-v.y)/v.s;v.s=Math.max(fitS*0.9,Math.min(fitS*14,v.s*f));v.x=px-wx*v.s;v.y=py-wy*v.s;apply();}
+  function tryFit(n){const r=vp.getBoundingClientRect();if((r.width<5||!img.naturalWidth)&&(n||0)<25){return setTimeout(()=>tryFit((n||0)+1),50);}fit();}
+  img.addEventListener('load',()=>tryFit(0)); tryFit(0);
+  vp.addEventListener('wheel',e=>{e.preventDefault();zoomAt(e.clientX,e.clientY,e.deltaY<0?1.2:1/1.2);},{passive:false});
+  vp.addEventListener('dblclick',e=>{if(v.s>fitS*1.5)fit();else zoomAt(e.clientX,e.clientY,2.6);});
+  const pts=new Map();let pan=null,pinch=null;
+  vp.addEventListener('pointerdown',e=>{pts.set(e.pointerId,{x:e.clientX,y:e.clientY});try{vp.setPointerCapture(e.pointerId);}catch(_){}if(pts.size===1){pan={x:e.clientX,y:e.clientY,vx:v.x,vy:v.y};vp.style.cursor='grabbing';}else if(pts.size===2){const p=[...pts.values()];pinch={d:Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y)};pan=null;}});
+  vp.addEventListener('pointermove',e=>{if(!pts.has(e.pointerId))return;pts.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pinch&&pts.size>=2){const p=[...pts.values()],nd=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y);zoomAt((p[0].x+p[1].x)/2,(p[0].y+p[1].y)/2,nd/pinch.d);pinch.d=nd;}else if(pan&&pts.size===1){v.x=pan.vx+(e.clientX-pan.x);v.y=pan.vy+(e.clientY-pan.y);apply();}});
+  const end=e=>{pts.delete(e.pointerId);if(pts.size<2)pinch=null;if(pts.size===0){pan=null;vp.style.cursor='grab';}};
+  vp.addEventListener('pointerup',end);vp.addEventListener('pointercancel',end);
+}
 async function addPhoto(id,cat,src){
   if(!id||READONLY)return;
   const data=await downscale(src);
@@ -1330,7 +1354,7 @@ document.getElementById('btnQR').onclick=()=>{const u=new URL(location.href);u.s
 function genQR(url){const box=document.getElementById('qrbox');
   function draw(){try{const t=qrcode(0,'M');t.addData(url);t.make();box.innerHTML=t.createSvgTag({cellSize:5,margin:2});}catch(e){box.innerHTML='<div style="font-size:12px;color:#555">No se pudo generar el QR.<br>Copia la URL.</div>';}}
   if(window.qrcode){draw();return;}const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js';s.onload=draw;s.onerror=()=>{box.innerHTML='<div style="font-size:12px;color:#555">Sin conexión: comparte la URL.</div>';};document.head.appendChild(s);}
-document.getElementById('modal').addEventListener('click',e=>{if(e.target.id==='modal')e.currentTarget.classList.remove('open');});
+document.getElementById('modal').addEventListener('click',e=>{if(e.target.id==='modal'){e.currentTarget.classList.remove('open');document.getElementById('modalCard').classList.remove('wide');}});
 
 /* ============ THEME (plano claro / oscuro) ============ */
 const THEME_KEY='planosAguas.theme';

@@ -257,6 +257,14 @@ Todo módulo que muestre un plano (entregable AutoCAD blanco típico de los serv
 - Servir ambos PNG (claro + `*-dark.png`), default oscuro, preferencia en localStorage. Versionar los PNG con excepción en `.gitignore`.
 - Referencia: módulo Planos de Aguas (`public/planos-aguas-embed.html`, ruta `/planos-aguas`).
 
+## Fotos: visor con PAN + ZOOM (OBLIGATORIO en toda la PWA)
+
+Toda foto que se muestre ampliada en la PWA (referenciales, evidencias, repuestos, incidencias, manuales, planos, etc.) **debe abrirse en un visor con pan + zoom**, no en una imagen estática. Pedido explícito del usuario (2026-05-25, validado en Planos de Aguas). Sirve para inspeccionar detalle (bajadas, fallas, números de parte).
+
+- Gestos: **rueda** (zoom anclado al cursor) · **pellizco** (móvil) · **arrastrar** para panear · **doble-clic/tap** para acercar/alejar. Ajustar (fit) al abrir.
+- Implementación de referencia: `openImg()` + `setupImgZoom()` en `public/planos-aguas-embed.html` (vanilla, modelo de punteros, `transform: translate+scale`). Para React, usar/crear un componente `ImageViewer` reutilizable con la misma UX.
+- **Pendiente de rollout**: aplicar el visor a los demás módulos que hoy muestran fotos sin zoom.
+
 ## Stack
 
 | Capa | Tecnologia |
