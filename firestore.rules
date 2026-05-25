@@ -1331,7 +1331,10 @@ service cloud.firestore {
     // shoplogixToken: tokens OAuth gestionados por las Cloud Functions —
     // no debe leerse desde el cliente bajo ninguna circunstancia.
     match /system/shoplogixCredentials {
-      allow read, write: if isAdmin();
+      // Endurecido 2026-05-25: ningún cliente lee/escribe directo (la password no
+      // debe salir al cliente). Gestión solo vía callables shoplogixCreds* (admin
+      // validado server-side) + lectura del backend con Admin SDK.
+      allow read, write: if false;
     }
     match /system/shoplogixToken {
       allow read, write: if false; // solo Admin SDK (Cloud Functions)

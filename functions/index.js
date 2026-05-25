@@ -3652,6 +3652,44 @@ exports.shoplogixTokenRefresh = onSchedule(
   },
 )
 
+// ── Gestión de credenciales Shoplogix — SOLO vía callable con check admin server-side.
+//    La regla Firestore de system/shoplogixCredentials es `if false`: ningún cliente lee
+//    la password (las Cloud Functions usan Admin SDK). La password NUNCA sale al cliente.
+async function _assertAdminCaller(request) {
+  const uid = request.auth?.uid
+  if (!uid) throw new HttpsError('unauthenticated', 'Login requerido')
+  const snap = await db.collection('users').doc(uid).get()
+  if (!snap.exists || snap.data()?.rol !== 'admin') {
+    throw new HttpsError('permission-denied', 'Solo administradores')
+  }
+}
+
+exports.shoplogixCredsGet = onCall({ region: 'us-central1' }, async (request) => {
+  await _assertAdminCaller(request)
+  const snap = await db.doc('system/shoplogixCredentials').get()
+  if (!snap.exists) return { user: null, hasPassword: false, setAt: null }
+  const d = snap.data() || {}
+  const setAt = d.set_at && typeof d.set_at.toDate === 'function' ? d.set_at.toDate().toISOString() : null
+  // Devuelve solo metadata — la password jamás se retorna al cliente.
+  return { user: d.user ?? null, hasPassword: !!d.password, setAt }
+})
+
+exports.shoplogixCredsSet = onCall({ region: 'us-central1' }, async (request) => {
+  await _assertAdminCaller(request)
+  const user = String(request.data?.user ?? '').trim()
+  const password = String(request.data?.password ?? '')
+  if (!user.includes('@')) throw new HttpsError('invalid-argument', 'Usuario debe ser un email válido')
+  if (password.length < 4) throw new HttpsError('invalid-argument', 'Contraseña debe tener al menos 4 caracteres')
+  await db.doc('system/shoplogixCredentials').set({ user, password, set_at: FieldValue.serverTimestamp() })
+  return { ok: true }
+})
+
+exports.shoplogixCredsDelete = onCall({ region: 'us-central1' }, async (request) => {
+  await _assertAdminCaller(request)
+  await db.doc('system/shoplogixCredentials').delete()
+  return { ok: true }
+})
+
 /**
  * Trigger manual de sync Shoplogix — llamado desde el botón "Actualizar ahora"
  * en la PWA. Autentica el usuario, sincroniza el turno solicitado (o el actual)
