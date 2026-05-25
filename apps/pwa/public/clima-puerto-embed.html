@@ -2182,11 +2182,9 @@
           <div class="vd-main">
             <span class="vd-eyebrow"><span class="port-live-dot" id="portDot"></span>Lectura operativa · estimación propia</span>
             <div class="port-big-status" id="portStatus">Evaluando condiciones…</div>
-            <p class="vd-carta" id="portCarta"></p>
             <p class="vd-conditions" id="portConditions"></p>
             <div class="vd-decision" id="decisionNow">Evaluando recomendación…</div>
             <div class="vd-drivers port-reasons" id="portReasons"></div>
-            <div class="vd-drivers port-closure-drivers" id="closureDrivers"></div>
             <div id="dmConflict"></div>
             <div class="lectura-foot"><span id="portTime"></span></div>
           </div>
@@ -2235,6 +2233,7 @@
             </div>
           </div>
           <div class="n24-sub" id="closureSub"></div>
+          <div class="vd-drivers port-closure-drivers" id="closureDrivers"></div>
           <div class="n24-window" id="preventiveAlert">
             <span class="wl" id="preventiveAlertTitle">Ventana de riesgo</span>
             <span id="preventiveAlertText"></span>
@@ -3119,7 +3118,7 @@
       const dotEl = document.getElementById('portDot');
       const timeEl = document.getElementById('portTime');
       const condEl = document.getElementById('portConditions');
-      const cartaEl = document.getElementById('portCarta');
+      const cartaEl = document.getElementById('portCarta') || {}; // portCarta removido del DOM (la carta la cubre el boletín oficial + la decisión)
       const reasonsEl = document.getElementById('portReasons');
 
       // Status class
@@ -5095,7 +5094,7 @@
       const iconEl = document.getElementById('portIcon');
       const dotEl = document.getElementById('portDot');
       const timeEl = document.getElementById('portTime');
-      const cartaEl = document.getElementById('portCarta');
+      const cartaEl = document.getElementById('portCarta') || {}; // portCarta removido del DOM (la carta la cubre el boletín oficial + la decisión)
       const reasonsEl = document.getElementById('portReasons');
 
       // Si el estado DIRECTEMAR es más restrictivo que el modelo → override
