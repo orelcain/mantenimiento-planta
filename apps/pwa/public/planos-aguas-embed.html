@@ -516,13 +516,17 @@ function onCloudSnap(snap){
   state.shapes=Array.isArray(r.shapes)?r.shapes:[];
   state.photos=(r.photos&&typeof r.photos==='object')?r.photos:{};
   state.zonas=Array.isArray(r.zonas)?r.zonas:[];
+  // calibración y preferencias de cota — solo aplicar si el remoto las trae explícitas (legacy blobs no las tienen)
+  if('scale' in r) state.scale=(typeof r.scale==='number'&&isFinite(r.scale))?r.scale:null;
+  if('unit' in r) state.unit=(r.unit==='cm'||r.unit==='m'||r.unit==='mm')?r.unit:'mm';
+  if('showCotas' in r) state.showCotas=r.showCotas!==false;
   normPhotos(state);
   saveLocal();
   cloud.applying=false;
-  if(typeof renderMarkers==='function'){renderMarkers();renderShapes();if(sel)openPanel(sel);}
+  if(typeof renderMarkers==='function'){renderMarkers();renderShapes();if(sel)openPanel(sel);if(typeof renderEditbar==='function')renderEditbar();}
   renderSync();
 }
-function payloadCloud(){return {over:state.over,notas:state.notas,extra:state.extra,removed:state.removed,shapes:state.shapes,photos:state.photos||{},zonas:state.zonas||[]};}
+function payloadCloud(){return {over:state.over,notas:state.notas,extra:state.extra,removed:state.removed,shapes:state.shapes,photos:state.photos||{},zonas:state.zonas||[],scale:(state.scale!=null?state.scale:null),unit:state.unit||'mm',showCotas:state.showCotas!==false};}
 function pushCloud(now){
   if(!cloud.db&&!bridge.active)return;
   cloud.dirty=true;
@@ -539,7 +543,30 @@ function pushCloud(now){
   };
   if(now)doIt(); else cloud.pushT=setTimeout(doIt,500);
 }
-function save(){saveLocal(); if(!cloud.applying) pushCloud();}
+/* ===== BACKUPS rotativos en localStorage =====
+   Anti-incidente: si la nube falla en silencio o el localStorage del origen se rompe,
+   guardamos un snapshot del payload cada ~2 min (máximo 5) bajo otra clave.
+   Recuperación manual desde DevTools:
+     JSON.parse(localStorage.getItem('planosAguas.backups.v1'))
+       → [{at,blob},...] (más reciente primero). `blob` es el JSON del payload.
+   El blob tiene la misma forma que `payloadCloud()` y puede importarse con
+   "Importar JSON" envolviéndolo en {payload: <blob>} o pegándolo en el doc remoto. */
+const BACKUP_KEY='planosAguas.backups.v1', BACKUP_MAX=5, BACKUP_MIN_MS=120000;
+let _lastBackupAt=0;
+function snapshotBackup(){
+  const now=Date.now(); if(now-_lastBackupAt<BACKUP_MIN_MS)return;
+  try{
+    const blob=JSON.stringify(payloadCloud());
+    if(blob.length<50)return; // estado vacío, no vale la pena
+    const list=JSON.parse(localStorage.getItem(BACKUP_KEY)||'[]');
+    if(list[0]&&list[0].blob===blob)return; // sin cambios desde el último snapshot
+    list.unshift({at:now,blob});
+    while(list.length>BACKUP_MAX)list.pop();
+    localStorage.setItem(BACKUP_KEY,JSON.stringify(list));
+    _lastBackupAt=now;
+  }catch(e){/* quota o JSON: ignorar, no romper el save */}
+}
+function save(){saveLocal(); snapshotBackup(); if(!cloud.applying) pushCloud();}
 
 function points(){
   const base=DEFAULT_POINTS.filter(p=>!state.removed.includes(p.id)).map(p=>{const o=state.over[p.id]||{};return Object.assign({},p,o);});

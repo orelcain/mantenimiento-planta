@@ -36,6 +36,12 @@ export function PlanosAguasPage() {
       post({ __planos: true, type: 'bridge', authed: !!u, uid: u?.uid ?? null })
     }
 
+    // Defensa en profundidad: el iframe corre el HTML del bundle (mismo origen, riesgo bajo)
+    // pero limitamos los paths de Storage al prefijo del módulo para evitar que un bug
+    // o un futuro contenido injectado escriba/borre fuera de `planosAguas/`.
+    const isAllowedPath = (p: unknown): p is string =>
+      typeof p === 'string' && /^planosAguas\/[A-Za-z0-9_\-./]+\.(jpg|jpeg|png|webp)$/i.test(p) && !p.includes('..')
+
     const onMsg = (e: MessageEvent) => {
       if (e.origin !== ORIGIN) return
       if (e.source !== iframeRef.current?.contentWindow) return
@@ -49,13 +55,18 @@ export function PlanosAguasPage() {
         setDoc(doc(db, 'planosAguas', 'main'), { blob: JSON.stringify(m.payload ?? {}), updatedAt: serverTimestamp() }, { merge: true })
           .then(() => post({ __planos: true, type: 'save-result', ok: true, reqId: m.reqId }))
           .catch((err) => post({ __planos: true, type: 'save-result', ok: false, code: err?.code ?? 'error', reqId: m.reqId }))
-      } else if (m.type === 'upload' && m.path && m.dataUrl) {
+      } else if (m.type === 'upload' && m.dataUrl) {
+        if (!isAllowedPath(m.path)) {
+          post({ __planos: true, type: 'upload-result', ok: false, code: 'invalid-path', reqId: m.reqId })
+          return
+        }
         const r = storageRef(storage, m.path)
         uploadString(r, m.dataUrl, 'data_url', { contentType: 'image/jpeg' })
           .then(() => getDownloadURL(r))
           .then((url) => post({ __planos: true, type: 'upload-result', ok: true, url, reqId: m.reqId }))
           .catch((err) => post({ __planos: true, type: 'upload-result', ok: false, code: err?.code ?? 'error', reqId: m.reqId }))
-      } else if (m.type === 'delete-photo' && m.path) {
+      } else if (m.type === 'delete-photo') {
+        if (!isAllowedPath(m.path)) return
         deleteObject(storageRef(storage, m.path)).catch(() => {})
       }
     }
