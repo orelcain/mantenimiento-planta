@@ -94,6 +94,9 @@
   body.no-recinto .world img.recinto{display:none}
 
   .markers{position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:none;z-index:6;will-change:transform}
+  .vectors{position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:none;z-index:3;display:none;will-change:transform;overflow:visible}
+  .vectors g.vlayer{fill:none}
+  .vectors g.vlayer path,.vectors g.vlayer polyline,.vectors g.vlayer line,.vectors g.vlayer circle{vector-effect:non-scaling-stroke}
   .markers .mk{pointer-events:auto}
   /* capa vector nítida (PDF.js) — sobre el PNG, debajo de los dibujos; aparece al acercar */
   #vcanvas{position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:none;z-index:4;display:none;will-change:transform;image-rendering:auto}
@@ -324,6 +327,7 @@
     <span class="chip" data-f="nuevo"><span class="ring" style="color:var(--nuevo)"></span>Por confirmar<b class="cnt" data-cnt="pend">0</b></span>
     <span class="sep"></span>
     <span class="chip on" id="chipRecinto" title="Mostrar / ocultar capa recinto (estanques, Yal, generador, mar)"><span class="dot" style="background:var(--ghost)"></span>Recinto</span>
+    <span class="chip off" id="chipVector" title="Capa vectorial DXF (muros, cercos, ventanas, cámaras, estanques) — nítido a cualquier zoom"><span class="dot" style="background:#84cc16"></span>Vector</span>
     <button class="hbtn" id="btnFineRec" title="Ajuste fino: opacidad + posición de la capa recinto" style="padding:5px 10px;font-size:12px;line-height:1">⚙</button>
     <span class="sep"></span>
     <input class="search" id="search" placeholder="Buscar: AS-3, B, cosecha…" />
@@ -336,6 +340,7 @@
         <img class="base" id="base" src="planos-aguas-assets/plano-base-dark.png" alt="Plano nuevo PN10" />
       </div>
       <canvas id="vcanvas"></canvas>
+      <svg class="vectors" id="vectors" xmlns="http://www.w3.org/2000/svg"></svg>
       <svg class="draw" id="draw" xmlns="http://www.w3.org/2000/svg"></svg>
       <div class="markers" id="markers"></div>
 
@@ -367,6 +372,9 @@
           <button id="frCopy" class="primary">Copiar matriz CSS</button>
         </div>
         <div class="frHint">Mover/rotar/escalar aplica al recinto (alrededor del centro del plano-base). Si la posición queda perfecta, "Copiar matriz" y pegámela acá para grabarla como baseline.</div>
+        <div style="height:1px;background:var(--border);margin:10px 0 6px"></div>
+        <h4 style="margin:0 0 6px 0">Capas vectoriales (DXF) <span style="font-weight:400;color:var(--inkLo);font-size:9px">se ven al activar VECTOR</span></h4>
+        <div id="vecLayersList" style="max-height:280px;overflow:auto;padding-right:4px"></div>
       </div>
     </div>
 
@@ -741,6 +749,7 @@ function applyView(){
   world.style.transform=`translate3d(${view.x}px,${view.y}px,0) scale(${view.s})`;
   markersEl.style.transform=`translate3d(${view.x}px,${view.y}px,0)`;
   drawEl.style.transform=`translate3d(${view.x}px,${view.y}px,0)`;
+  try{if(typeof vectorLoaded!=='undefined'&&vectorLoaded&&vectorVisible){vectorsEl.setAttribute('width',6272*view.s);vectorsEl.setAttribute('height',3600*view.s);vectorsEl.style.transform=`translate3d(${view.x}px,${view.y}px,0)`;}}catch(_){}
   if(view.s!==_lastS){_lastS=view.s;layoutMarkers();markersEl.style.setProperty('--pk',Math.max(1,view.s).toFixed(3));
     drawEl.setAttribute('width',baseW()*view.s);drawEl.setAttribute('height',baseH()*view.s);updateHandleScale();
     document.getElementById('zlvl').textContent=Math.round(view.s*100)+'%';}
@@ -1639,6 +1648,79 @@ function applyRecinto(){
 document.getElementById('chipRecinto').onclick=()=>{recintoVisible=!recintoVisible;localStorage.setItem(RECINTO_KEY,String(recintoVisible));applyRecinto();};
 applyRecinto();
 
+/* ============ CAPA VECTORIAL DXF (Fase 6) ============
+   17 GeoJSONs del DXF Antar (enero/2020) renderizados como <svg> nítido a cualquier zoom.
+   Matriz DXF→plano-base calibrada con aligner_dxf2.html (LSQ 6 puntos, RMS 1.69 px).
+   Carga lazy: fetch+build solo al activar por primera vez. */
+const VEC_KEY='planosAguas.vectorVisible';
+const VEC_LAY_KEY='planosAguas.vectorLayers';
+const VEC_LAYERS=['023_MUROS_2','MURO','CIMENTACION','PLANTA','CERCO','VENTANAS','ESCALERA','BARRERA','CAMARA','CAMINO','AGUA','ESTANQUE-AGUA','A_PV','BENCINA','GENERADOR','LOTEA','DIBUJO'];
+const VEC_COLORS={'023_MUROS_2':'#94a3b8','MURO':'#cbd5e1','AGUA':'#0cffff','A_PV':'#5aa6e8','BARRERA':'#f59e0b','BENCINA':'#fb923c','CAMARA':'#a78bfa','CAMINO':'#fbbf24','CERCO':'#84cc16','CIMENTACION':'#fb7185','DIBUJO':'#94a3b8','ESCALERA':'#22d3ee','ESTANQUE-AGUA':'#06b6d4','GENERADOR':'#ef4444','LOTEA':'#a8a29e','PLANTA':'#10b981','VENTANAS':'#e879f9'};
+const VEC_DEFAULT_ON=['MURO','023_MUROS_2','CERCO','CIMENTACION','VENTANAS','ESCALERA','CAMARA','ESTANQUE-AGUA','GENERADOR','PLANTA'];
+const VEC_CSS_MATRIX='matrix(125.856849, -253.214226, -252.708692, -126.207990, -252998.025, 113724.111)';
+let vectorVisible=localStorage.getItem(VEC_KEY)==='true';
+let vectorLayers=(()=>{try{const v=JSON.parse(localStorage.getItem(VEC_LAY_KEY)||'null');return Array.isArray(v)?new Set(v):new Set(VEC_DEFAULT_ON);}catch(e){return new Set(VEC_DEFAULT_ON);}})();
+let vectorLoaded=false,vectorLoading=false;
+const vectorsEl=document.getElementById('vectors');
+
+function vecCoordsBboxRec(c,bb){if(!c)return;if(typeof c[0]==='number'){bb[0]=Math.min(bb[0],c[0]);bb[1]=Math.min(bb[1],c[1]);bb[2]=Math.max(bb[2],c[0]);bb[3]=Math.max(bb[3],c[1]);return;}for(const x of c)vecCoordsBboxRec(x,bb);}
+function vecPathD(g){let d='';const ln=(L)=>{L.forEach((p,i)=>{d+=(i===0?'M':'L')+p[0].toFixed(3)+' '+p[1].toFixed(3)+' ';});};if(g.type==='LineString')ln(g.coordinates);else if(g.type==='MultiLineString')g.coordinates.forEach(ln);else if(g.type==='Polygon')g.coordinates.forEach(r=>{ln(r);d+='Z ';});else if(g.type==='MultiPolygon')g.coordinates.forEach(p=>p.forEach(r=>{ln(r);d+='Z ';}));else if(g.type==='Point'){const r=0.2;d+=`M${g.coordinates[0]-r} ${g.coordinates[1]} a ${r} ${r} 0 1 0 ${2*r} 0 a ${r} ${r} 0 1 0 -${2*r} 0 `;}return d;}
+
+async function vectorLoad(){
+  if(vectorLoaded||vectorLoading)return;
+  vectorLoading=true;
+  try{
+    const results=await Promise.all(VEC_LAYERS.map(async lyr=>{
+      try{const r=await fetch(`planos-aguas-assets/geojsons/${lyr}.geojson`);if(!r.ok)return null;const gj=await r.json();const paths=gj.features.map(ft=>vecPathD(ft.geometry)).filter(Boolean);return{lyr,paths,count:gj.features.length};}catch(e){console.warn('vec load',lyr,e);return null;}
+    }));
+    let html=`<g class="vroot" transform="${VEC_CSS_MATRIX}">`;
+    for(const r of results){if(!r)continue;html+=`<g class="vlayer vl-${r.lyr}" data-lyr="${r.lyr}" stroke="${VEC_COLORS[r.lyr]||'#999'}" stroke-width="1" stroke-opacity="0.85" style="display:${vectorLayers.has(r.lyr)?'':'none'}">`;for(const d of r.paths)html+=`<path d="${d}"/>`;html+=`</g>`;}
+    html+=`</g>`;
+    vectorsEl.setAttribute('viewBox','0 0 6272 3600');
+    vectorsEl.innerHTML=html;
+    vectorLoaded=true;vectorLayoutSync();vectorPanelRender();
+  }finally{vectorLoading=false;}
+}
+
+function vectorLayoutSync(){
+  if(!vectorLoaded)return;
+  vectorsEl.setAttribute('width',6272*view.s);
+  vectorsEl.setAttribute('height',3600*view.s);
+  vectorsEl.style.transform=`translate3d(${view.x}px,${view.y}px,0)`;
+}
+
+function applyVector(){
+  const c=document.getElementById('chipVector');if(c)c.classList.toggle('off',!vectorVisible);
+  if(vectorVisible){
+    vectorsEl.style.display='block';
+    if(!vectorLoaded)vectorLoad();
+    else vectorLayoutSync();
+  }else{vectorsEl.style.display='none';}
+}
+
+function vectorToggleLayer(lyr){
+  if(vectorLayers.has(lyr))vectorLayers.delete(lyr);else vectorLayers.add(lyr);
+  localStorage.setItem(VEC_LAY_KEY,JSON.stringify([...vectorLayers]));
+  const g=vectorsEl.querySelector(`.vl-${lyr}`);if(g)g.style.display=vectorLayers.has(lyr)?'':'none';
+  vectorPanelRender();
+}
+
+function vectorPanelRender(){
+  const cont=document.getElementById('vecLayersList');if(!cont)return;
+  cont.innerHTML='';
+  for(const lyr of VEC_LAYERS){
+    const row=document.createElement('div');row.className='frRow';row.style.cssText='display:flex;align-items:center;gap:7px;padding:2px 0';
+    const on=vectorLayers.has(lyr);
+    row.innerHTML=`<input type="checkbox" ${on?'checked':''} style="accent-color:${VEC_COLORS[lyr]};cursor:pointer"><div style="width:11px;height:11px;border-radius:2px;background:${VEC_COLORS[lyr]};flex-shrink:0"></div><span style="flex:1;font-family:var(--mono);font-size:10.5px;color:var(--ink);cursor:pointer">${lyr}</span>`;
+    row.querySelector('input').onchange=()=>vectorToggleLayer(lyr);
+    row.querySelector('span').onclick=()=>row.querySelector('input').click();
+    cont.appendChild(row);
+  }
+}
+
+document.getElementById('chipVector').onclick=()=>{vectorVisible=!vectorVisible;localStorage.setItem(VEC_KEY,String(vectorVisible));applyVector();};
+applyVector();
+
 /* ============ AJUSTE FINO RECINTO (Fase 3 calibracion) ============
    Matriz base = la calculada en Fase 1 (recinto-reducido 8000x5659 -> plano-base 6272x3600).
    El panel deja al usuario aplicar deltas en vivo (opacidad + dx + dy + rotacion + escala)
@@ -1692,7 +1774,7 @@ document.getElementById('frCopy').onclick=async()=>{
   try{await navigator.clipboard.writeText(css); alert(msg+'\n\n(Copiada al portapapeles)');}
   catch(e){prompt('Copiá manualmente:', css);}
 };
-document.getElementById('btnFineRec').onclick=()=>{const p=document.getElementById('frPanel');p.style.display=(p.style.display==='none'||!p.style.display)?'block':'none';};
+document.getElementById('btnFineRec').onclick=()=>{const p=document.getElementById('frPanel');p.style.display=(p.style.display==='none'||!p.style.display)?'block':'none';if(p.style.display==='block')vectorPanelRender();};
 document.getElementById('frClose').onclick=()=>{document.getElementById('frPanel').style.display='none';};
 frBindUI();
 frApply();

@@ -1,0 +1,8 @@
+{
+"type": "FeatureCollection",
+"name": "SELECT",
+"features": [
+{ "type": "Feature", "properties": { "Layer": "GENERADOR", "PaperSpace": null, "SubClasses": null, "Linetype": null, "EntityHandle": "1D1EE3E3", "Text": null }, "geometry": { "type": "LineString", "coordinates": [ [ 749.305473245199551, -643.088370862908732, 0.0 ], [ 749.30272400669287, -642.21627097642488, 0.0 ] ] } },
+{ "type": "Feature", "properties": { "Layer": "GENERADOR", "PaperSpace": null, "SubClasses": null, "Linetype": null, "EntityHandle": "1D1EE3E4", "Text": null }, "geometry": { "type": "LineString", "coordinates": [ [ 749.326118211981452, -643.384290916083046, 0.0 ], [ 749.322496092517213, -642.235300035063119, 0.0 ] ] } }
+]
+}

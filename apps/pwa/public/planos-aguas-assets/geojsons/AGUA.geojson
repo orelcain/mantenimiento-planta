@@ -1,0 +1,7 @@
+{
+"type": "FeatureCollection",
+"name": "SELECT",
+"features": [
+{ "type": "Feature", "properties": { "Layer": "AGUA", "PaperSpace": null, "SubClasses": null, "Linetype": null, "EntityHandle": "1D1EE484", "Text": null }, "geometry": { "type": "LineString", "coordinates": [ [ 792.612658324055019, -624.583831643078838, 0.0 ], [ 791.69536317549148, -624.834357020823745, 0.0 ], [ 790.606219386219209, -625.104379636365593, 0.0 ], [ 789.471804344771726, -625.399897479979245, 0.0 ], [ 783.949181482856602, -627.00412026579852, 0.0 ] ] } }
+]
+}
