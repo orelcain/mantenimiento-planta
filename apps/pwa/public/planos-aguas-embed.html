@@ -167,6 +167,11 @@
   .toast .toast-btn.primary{background:var(--aqua,#2E75B6);border-color:transparent;color:#fff}
   .toast .toast-btn.primary:hover{filter:brightness(1.1)}
 
+  /* Input inline para editar etiquetas / cotas en el lugar (reemplaza prompt() nativo) */
+  .inline-edit{position:absolute;z-index:55;font-family:var(--mono);font-size:13px;letter-spacing:.4px;background:var(--surfaceHi);border:1px solid var(--aqua);color:var(--ink);padding:6px 10px;border-radius:6px;min-width:160px;max-width:min(80vw,320px);box-shadow:var(--shadow);outline:none;transform:translate(-50%,-50%)}
+  .inline-edit::placeholder{color:var(--inkLo);opacity:.65;font-size:11.5px}
+  @media(max-width:700px){.inline-edit{font-size:15px;padding:9px 12px;min-width:180px;min-height:40px}}
+
   @media(max-width:700px){
     header{padding:0 10px;min-height:46px}
     .tblock{padding:7px 11px 7px 0}
@@ -174,21 +179,26 @@
     .tblock .ttl::before{height:15px}
     .tblock .meta{display:none}
     .acts{padding-left:10px;gap:5px}
-    .hbtn{padding:6px 9px;font-size:9.5px;letter-spacing:.4px}
-    .toolbar{padding:6px 10px;gap:5px}
-    .chip{padding:4px 8px;font-size:9.5px;gap:5px}
+    /* tap targets ≥38px en móvil (HIG ~44, ajustado para que entren) */
+    .hbtn{padding:9px 11px;font-size:10px;letter-spacing:.4px;min-height:38px}
+    .toolbar{padding:6px 10px;gap:5px;flex-wrap:wrap}
+    .chip{padding:8px 10px;font-size:10px;gap:5px;min-height:36px}
     .chip .dot{width:8px;height:8px} .chip .ring{width:9px;height:9px}
     .sep{display:none}
-    .search{font-size:12px;padding:5px 9px;min-width:110px}
+    .search{font-size:13px;padding:8px 10px;min-width:110px;min-height:38px}
     .zoomb{right:8px;top:8px;gap:5px}
-    .zoomb button{width:32px;height:32px;font-size:16px}
-    .zlvl{font-size:9px}
+    .zoomb button{width:40px;height:40px;font-size:18px}
+    .zlvl{font-size:10px;min-height:24px;padding:3px 8px}
     .panel{width:88vw}
-    .editbar{padding:7px 9px;gap:6px;font-size:10px}
+    /* editbar permite wrap y los botones tienen tap target cómodo en móvil */
+    .editbar{padding:8px 9px;gap:7px;font-size:10.5px;flex-wrap:wrap}
     .editbar .tagx{display:none}
-    .tbtn,.seg button{padding:5px 7px;font-size:9px;letter-spacing:.4px}
-    .mcol{width:26px;height:26px}
-    #editHint{max-width:62vw;font-size:9px;padding:4px 8px}
+    .tbtn,.seg button{padding:9px 11px;font-size:10px;letter-spacing:.4px;min-height:38px}
+    .btn{padding:9px 12px;font-size:10.5px;min-height:38px}
+    .wstep{gap:6px;flex-wrap:wrap}
+    .editbar input[type=text],.editbar input[type=number]{min-height:36px;font-size:13px;padding:6px 9px}
+    .mcol{width:32px;height:32px}
+    #editHint{max-width:62vw;font-size:10px;padding:6px 9px}
   }
   /* modo solo-lectura (QR): sin afordancias de edición */
   body.ro #btnEdit{display:none}
@@ -1206,12 +1216,27 @@ function snapNodes(w){
   const th=14/view.s; let best=null,bd=th,bn=false;
   // nodos (prioridad): se aceptan con umbral pleno
   const tp=(x,y)=>{const d=Math.hypot(w.x-x,w.y-y);if(d<th&&(!bn||d<bd)){bd=d;best=[x,y];bn=true;}};
-  // aristas: solo si no hay un nodo más cerca
+  // punto medio de una arista (cuenta como NODO, prioridad alta — clave para alinear con centros de paredes/válvulas)
+  const tmid=(ax,ay,bx,by)=>tp((ax+bx)/2,(ay+by)/2);
+  // aristas: solo si no hay un nodo más cerca (proyección perpendicular)
   const tseg=(ax,ay,bx,by)=>{const dx=bx-ax,dy=by-ay,L2=dx*dx+dy*dy;if(L2<1)return;let t=((w.x-ax)*dx+(w.y-ay)*dy)/L2;t=Math.max(0,Math.min(1,t));const px=ax+t*dx,py=ay+t*dy,d=Math.hypot(w.x-px,w.y-py);if(d<th&&!bn&&d<bd){bd=d;best=[px,py];}};
   (state.shapes||[]).forEach(s=>{
-    if(s.pts){s.pts.forEach(p=>tp(p[0],p[1]));for(let i=1;i<s.pts.length;i++)tseg(s.pts[i-1][0],s.pts[i-1][1],s.pts[i][0],s.pts[i][1]);if(s.type==='mask'&&s.pts.length>2)tseg(s.pts[s.pts.length-1][0],s.pts[s.pts.length-1][1],s.pts[0][0],s.pts[0][1]);}
-    else if(s.type==='rect'){const c=[[s.x,s.y],[s.x+s.rw,s.y],[s.x+s.rw,s.y+s.rh],[s.x,s.y+s.rh]];c.forEach(p=>tp(p[0],p[1]));tp(s.x+s.rw/2,s.y+s.rh/2);for(let i=0;i<4;i++)tseg(c[i][0],c[i][1],c[(i+1)%4][0],c[(i+1)%4][1]);}
-    else if(s.type==='circle')tp(s.cx,s.cy);
+    if(s.pts){
+      s.pts.forEach(p=>tp(p[0],p[1]));
+      for(let i=1;i<s.pts.length;i++){tmid(s.pts[i-1][0],s.pts[i-1][1],s.pts[i][0],s.pts[i][1]);tseg(s.pts[i-1][0],s.pts[i-1][1],s.pts[i][0],s.pts[i][1]);}
+      if(s.type==='mask'&&s.pts.length>2){tmid(s.pts[s.pts.length-1][0],s.pts[s.pts.length-1][1],s.pts[0][0],s.pts[0][1]);tseg(s.pts[s.pts.length-1][0],s.pts[s.pts.length-1][1],s.pts[0][0],s.pts[0][1]);}
+    }
+    else if(s.type==='rect'){
+      const c=[[s.x,s.y],[s.x+s.rw,s.y],[s.x+s.rw,s.y+s.rh],[s.x,s.y+s.rh]];
+      c.forEach(p=>tp(p[0],p[1]));
+      tp(s.x+s.rw/2,s.y+s.rh/2); // centro
+      for(let i=0;i<4;i++){tmid(c[i][0],c[i][1],c[(i+1)%4][0],c[(i+1)%4][1]);tseg(c[i][0],c[i][1],c[(i+1)%4][0],c[(i+1)%4][1]);}
+    }
+    else if(s.type==='circle'){
+      tp(s.cx,s.cy); // centro
+      // puntos cardinales en el borde — útiles para conectar cañerías a válvulas/discos
+      tp(s.cx+s.r,s.cy); tp(s.cx-s.r,s.cy); tp(s.cx,s.cy+s.r); tp(s.cx,s.cy-s.r);
+    }
     else if(s.type==='dot'||s.type==='label')tp(s.x,s.y);
   });
   points().forEach(p=>{if(p.x!=null)tp(p.x/100*baseW(),p.y/100*baseH());});
@@ -1292,12 +1317,52 @@ window.addEventListener('keydown',e=>{
   else if(e.key==='Backspace'){e.preventDefault();if(draft.pts.length>1){draft.pts.pop();renderShapes();}}
 });
 
-/* etiqueta libre (un solo clic) */
+/* Input inline reutilizable: muestra un <input> absoluto sobre el stage en coords del mundo
+   (x,y en espacio del plano). Enter o blur confirman → onConfirm(value). Esc cancela → onCancel.
+   Si ya hay otro input inline abierto, se cierra (un solo input a la vez). */
+let _inlineInput=null;
+function inlineEditable(opts){
+  if(_inlineInput){_inlineInput.remove();_inlineInput=null;}
+  const sx=opts.x*view.s+view.x, sy=opts.y*view.s+view.y;
+  const inp=document.createElement('input');
+  inp.type='text';
+  inp.className='inline-edit';
+  inp.value=opts.value||'';
+  if(opts.placeholder)inp.placeholder=opts.placeholder;
+  inp.style.left=sx+'px';
+  inp.style.top=sy+'px';
+  document.getElementById('stage').appendChild(inp);
+  _inlineInput=inp;
+  let done=false;
+  const finish=(confirm)=>{
+    if(done)return;done=true;
+    const v=inp.value;
+    inp.remove();if(_inlineInput===inp)_inlineInput=null;
+    if(confirm)opts.onConfirm&&opts.onConfirm(v);
+    else opts.onCancel&&opts.onCancel();
+  };
+  inp.addEventListener('keydown',e=>{
+    if(e.key==='Enter'){e.preventDefault();finish(true);}
+    else if(e.key==='Escape'){e.preventDefault();finish(false);}
+  });
+  inp.addEventListener('blur',()=>setTimeout(()=>finish(true),0));
+  setTimeout(()=>{inp.focus();inp.select();},20);
+}
+
+/* etiqueta libre (un solo clic) — usa input inline en vez del prompt() nativo */
 function addLabel(w){
   const k=structMode?'struct':kind;
   const def=structMode?'':(kind==='dulce'?'PP AD-':kind==='caliente'?'PP AC-':'PP AS-');
-  const t=prompt('Texto de la etiqueta:',def);if(t==null||!t.trim())return;
-  state.shapes.push({id:'sh-'+Date.now(),type:'label',kind:k,x:+w.x.toFixed(1),y:+w.y.toFixed(1),text:t.trim()});save();renderShapes();toast('Etiqueta agregada');
+  inlineEditable({
+    x:w.x,y:w.y,
+    value:def,
+    placeholder:'Texto de la etiqueta…',
+    onConfirm:(t)=>{
+      if(!t||!t.trim())return;
+      state.shapes.push({id:'sh-'+Date.now(),type:'label',kind:k,x:+w.x.toFixed(1),y:+w.y.toFixed(1),text:t.trim()});
+      save();renderShapes();toast('Etiqueta agregada');
+    },
+  });
 }
 
 /* render de la capa SVG */
@@ -1328,15 +1393,26 @@ function cotaAuto(sh,ck){
 /* texto a mostrar: override manual si existe, si no el automático */
 function cotaShow(sh,ck){const m=sh.cotaTxt&&sh.cotaTxt[ck];return (m!=null&&m!=='')?m:cotaAuto(sh,ck);}
 function hasManualCota(sh,ck){return !!(sh.cotaTxt&&sh.cotaTxt[ck]!=null&&sh.cotaTxt[ck]!=='');}
-/* editar el texto/valor manual de una cota (vacío = volver a automático) */
+/* editar el texto/valor manual de una cota (vacío = volver a automático) — input inline */
 function editCotaText(id,ck){
   const sh=getShape(id);if(!sh)return;
   const cur=(sh.cotaTxt&&sh.cotaTxt[ck])||'';
-  const v=prompt('Texto de la cota (vacío = automático: '+cotaAuto(sh,ck)+'):',cur);
-  if(v==null)return;
-  sh.cotaTxt=sh.cotaTxt||{};const t=v.trim();
-  if(t)sh.cotaTxt[ck]=t; else delete sh.cotaTxt[ck];
-  save();renderShapes();toast(t?'Cota: valor manual':'Cota: valor automático');
+  // posición del input: centro/etiqueta de la cota según el tipo de shape
+  let cx=0,cy=0;
+  if(sh.type==='rect'){cx=sh.x+sh.rw/2;cy=sh.y+sh.rh/2;}
+  else if(sh.type==='circle'){cx=sh.cx;cy=sh.cy;}
+  else if(sh.type==='cota'&&sh.pts&&sh.pts.length>=2){const a=sh.pts[0],b=sh.pts[1];cx=(a[0]+b[0])/2;cy=(a[1]+b[1])/2-10;}
+  else if(sh.type==='pipe'&&sh.pts&&sh.pts.length>=2){const mid=Math.floor(sh.pts.length/2);cx=sh.pts[mid][0];cy=sh.pts[mid][1];}
+  inlineEditable({
+    x:cx,y:cy,
+    value:cur,
+    placeholder:'auto: '+cotaAuto(sh,ck),
+    onConfirm:(v)=>{
+      sh.cotaTxt=sh.cotaTxt||{};const t=v.trim();
+      if(t)sh.cotaTxt[ck]=t; else delete sh.cotaTxt[ck];
+      save();renderShapes();toast(t?'Cota: valor manual':'Cota: valor automático');
+    },
+  });
 }
 /* cotas de las formas de estructura (auto con escala, o manual siempre) */
 function cotaSVG(sh){
@@ -1628,6 +1704,10 @@ function toast(m,opts){
   if(base.complete&&base.naturalWidth)go();else base.onload=go;
   // Re-ajustar si el contenedor cambia de tamaño (p.ej. dentro del PWA) y el usuario aún no movió la vista.
   if(window.ResizeObserver){let t;new ResizeObserver(()=>{clearTimeout(t);t=setTimeout(()=>{if(!userMoved)fit();},120);}).observe(stage);}
+  // Hint pinch primera vez en móvil — para que el usuario sepa que existen los gestos sin manual.
+  if(window.innerWidth<=700&&!READONLY&&!localStorage.getItem('planosAguas.hintPinch')){
+    setTimeout(()=>{toast('Pellizcá para zoom · arrastrá con un dedo para mover');localStorage.setItem('planosAguas.hintPinch','1');},1500);
+  }
 })();
 </script>
 <!-- Cargador PDF.js (ESM) para la capa vector nítida. Si falla (offline/CDN), el PNG sigue funcionando. -->
