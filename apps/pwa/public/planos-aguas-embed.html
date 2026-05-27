@@ -79,7 +79,12 @@
       var(--bg);}
   .stagewrap.grabbing{cursor:grabbing}
   .world{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform;backface-visibility:hidden}
-  .world img.base{display:block;user-select:none;-webkit-user-drag:none;box-shadow:0 0 0 1px var(--border);position:relative;z-index:1}
+  .world img.base{display:block;user-select:none;-webkit-user-drag:none;box-shadow:0 0 0 1px var(--border);position:relative;z-index:1;
+    /* Fase 4: zonas recortadas con tool "Recortar plano" revelan el recinto debajo */
+    clip-path:var(--baseClip,none)}
+  /* contorno guía de los recortes mientras se está en modo edición */
+  .draw .cut-base-outline{fill:rgba(46,117,182,0.10);stroke:var(--aquaBright);stroke-width:1.5;stroke-dasharray:8 5;vector-effect:non-scaling-stroke;pointer-events:none}
+  body.edit .draw .cut-base-outline.sel{stroke:var(--star);stroke-dasharray:6 4;fill:rgba(240,193,75,0.12)}
   /* capa recinto: posicionada detrás del plano-base con transform afín (Fase 1 georreferenciación).
      matrix CSS = (a, c, b, d, tx, ty) en nuestra notación. Mapea recinto-base.jpg 8000x5659 a coords del plano-base 6272x3600.
      Ver scripts/recinto-expansion/fase2_config.json */
@@ -240,7 +245,7 @@
   body.edit.tool-select .draw .shape{pointer-events:auto;cursor:move}
   body.edit.tool-select .draw .pipe{pointer-events:none}
   body.edit.tool-select .draw .hit{pointer-events:stroke;stroke:transparent;fill:none}
-  body.edit.tool-pipe .stagewrap,body.edit.tool-mask .stagewrap,
+  body.edit.tool-pipe .stagewrap,body.edit.tool-mask .stagewrap,body.edit.tool-cut-base .stagewrap,
   body.edit.tool-bajada .stagewrap,body.edit.tool-label .stagewrap,
   body.edit.tool-rect .stagewrap,body.edit.tool-circle .stagewrap,body.edit.tool-sline .stagewrap,
   body.edit.tool-measure .stagewrap,body.edit.tool-calib .stagewrap{cursor:crosshair}
@@ -1070,7 +1075,7 @@ function nextCorr(t){
   for(const a of L)for(const b of L){if(!used.has(a+b))return a+b;}
   return 'X';
 }
-const TOOLCLS=['tool-pin','tool-pipe','tool-bajada','tool-label','tool-mask','tool-select','tool-rect','tool-circle','tool-sline','tool-measure','tool-calib'];
+const TOOLCLS=['tool-pin','tool-pipe','tool-bajada','tool-label','tool-mask','tool-cut-base','tool-select','tool-rect','tool-circle','tool-sline','tool-measure','tool-calib'];
 function setTool(t){
   if(draft&&!(wiz&&wiz.step==='pipe'))cancelDraft();
   pend2=null;document.body.classList.remove('drafting');
@@ -1125,6 +1130,9 @@ function renderEditbar(){
   }else if(tool==='mask'){
     s+=`<span class="tagx">MÁSCARA</span><span class="wcap">color</span><input type="color" class="mcol" id="maskColor" value="${maskColor}"><button class="btn primary" id="eFinish">✓ Terminar</button><button class="btn" id="eCancel">✗ Cancelar</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
     setHint('Tapar elementos: clic vértices del polígono · doble-clic o Terminar.');
+  }else if(tool==='cut-base'){
+    s+=`<span class="tagx">RECORTAR PLANO</span><span class="wcap">revela el recinto debajo</span><button class="btn primary" id="eFinish">✓ Terminar</button><button class="btn" id="eCancel">✗ Cancelar</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
+    setHint('Clic vértices del polígono · doble-clic o Terminar · esa zona del plano principal desaparece y se ve el recinto debajo.');
   }else if(tool==='select'){
     const sh=selShape?getShape(selShape):null;
     if(draft&&draft.editId){
@@ -1145,6 +1153,9 @@ function renderEditbar(){
     }else if(sh.type==='mask'){
       s+=`<span class="tagx">MÁSCARA</span><span class="wcap">color</span><input type="color" class="mcol" id="selColor" value="${sh.fill||'#ffffff'}"><button class="btn danger" id="eDelShape">🗑 Borrar</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
       setHint('Arrastra vértices · cambia el color de relleno.');
+    }else if(sh.type==='cut-base'){
+      s+=`<span class="tagx">RECORTE DE PLANO</span><span class="wcap">revela recinto debajo</span><button class="btn danger" id="eDelShape">🗑 Borrar</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
+      setHint('Arrastra vértices del recorte · doble-clic vértice = borrarlo · Borrar = el plano principal vuelve a taparse ahí.');
     }else if(sh.type==='cota'){
       s+=`<span class="tagx">COTA</span>${cotaCtl(sh)}<button class="btn danger" id="eDelShape">🗑 Borrar</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
       setHint('Arrastra el texto para reubicarlo · doble-clic = editar su valor · mueve los extremos para remedir · elige unidad y tamaño.');
@@ -1153,8 +1164,8 @@ function renderEditbar(){
       setHint('Arrastra el punto para moverlo.');
     }
   }else{
-    s+=`<span class="tagx">EDICIÓN</span><button class="btn primary" id="ewCrear">+ Crear bajada de agua</button><button class="btn" id="ewStruct">+ Estructura</button><button class="btn" id="ewMask">Máscara</button><button class="btn" id="ewSelect">Editar dibujo</button><button class="btn" id="ewCalib">Escala</button><button class="btn" id="ewMeasure">Medir</button><span class="ebsp"></span><button class="btn primary" id="eDone">Listo</button>`;
-    setHint('Arrastra pines · clic un pin para ver/editar · crea bajadas, estructuras o mide a escala.');
+    s+=`<span class="tagx">EDICIÓN</span><button class="btn primary" id="ewCrear">+ Crear bajada de agua</button><button class="btn" id="ewStruct">+ Estructura</button><button class="btn" id="ewMask">Máscara</button><button class="btn" id="ewCutBase">✂ Recortar plano</button><button class="btn" id="ewSelect">Editar dibujo</button><button class="btn" id="ewCalib">Escala</button><button class="btn" id="ewMeasure">Medir</button><span class="ebsp"></span><button class="btn primary" id="eDone">Listo</button>`;
+    setHint('Arrastra pines · clic un pin para ver/editar · crea bajadas, estructuras, recorta el plano o mide a escala.');
   }
   eb.innerHTML=s;wireEditbar();
 }
@@ -1163,6 +1174,7 @@ function wireEditbar(){
   if($('ewCrear'))$('ewCrear').onclick=startWizard;
   if($('ewStruct'))$('ewStruct').onclick=()=>{structMode=true;setTool('rect');};
   if($('ewMask'))$('ewMask').onclick=()=>setTool('mask');
+  if($('ewCutBase'))$('ewCutBase').onclick=()=>setTool('cut-base');
   if($('ewSelect'))$('ewSelect').onclick=()=>setTool('select');
   if($('ewCalib'))$('ewCalib').onclick=()=>setTool('calib');
   if($('ewMeasure'))$('ewMeasure').onclick=()=>setTool('measure');
@@ -1213,7 +1225,7 @@ function onEditClick(e){
   const w=worldPx(e.clientX,e.clientY);
   if(Math.abs(w.x)>baseW()*3||Math.abs(w.y)>baseH()*3)return; // lienzo extendido (dibujar fuera del plano)
   if(wiz){ if(wiz.step==='ubic')placeBajadaPoint(w); else if(wiz.step==='pipe')draftAdd(w); return; }
-  if(tool==='mask'||tool==='sline')draftAdd(w);
+  if(tool==='mask'||tool==='cut-base'||tool==='sline')draftAdd(w);
   else if(tool==='rect'||tool==='circle'||tool==='measure'||tool==='calib')twoClick(w);
   else if(tool==='label')addLabel(w);
   else if(tool==='select'&&!draft){selShape=null;renderShapes();renderEditbar();}
@@ -1344,11 +1356,14 @@ function finishDraft(){
   if(wiz&&wiz.step==='pipe'){finishPipeWizard();return;}
   if(!draft)return;
   if(draft.editId){const sh=getShape(draft.editId);if(sh&&draft.pts.length>=2){sh.pts=draft.pts;sh.w=draft.w||sh.w;save();toast('Cañería actualizada');}draft=null;draftCursor=null;document.body.classList.remove('drafting');renderShapes();renderEditbar();return;}
-  const min=draft.type==='mask'?3:2;
+  const min=(draft.type==='mask'||draft.type==='cut-base')?3:2;
   if(draft.pts.length>=min){
     const sh={id:'sh-'+Date.now(),type:draft.type,pts:draft.pts};
-    if(draft.type==='mask')sh.fill=draft.fill;else{sh.kind=draft.kind;sh.w=draft.w||PIPE_W;}
-    state.shapes.push(sh);save();toast(draft.type==='mask'?'Máscara agregada':'Cañería agregada');
+    if(draft.type==='mask')sh.fill=draft.fill;
+    else if(draft.type==='cut-base'){/* no extra props */}
+    else{sh.kind=draft.kind;sh.w=draft.w||PIPE_W;}
+    state.shapes.push(sh);save();
+    toast(draft.type==='mask'?'Máscara agregada':draft.type==='cut-base'?'Recorte de plano agregado · plano principal revela el recinto':'Cañería agregada');
   }
   draft=null;draftCursor=null;document.body.classList.remove('drafting');renderShapes();
 }
@@ -1420,6 +1435,13 @@ function shapeSVG(sh){
   if(sh.type==='rect')return `<rect class="shape rect" data-id="${sh.id}" x="${sh.x}" y="${sh.y}" width="${sh.rw}" height="${sh.rh}" stroke-width="${sh.sw||PIPE_W}"/>`;
   if(sh.type==='circle')return `<circle class="shape circle" data-id="${sh.id}" cx="${sh.cx}" cy="${sh.cy}" r="${sh.r}" stroke-width="${sh.sw||PIPE_W}"/>`;
   if(sh.type==='mask')return `<polygon class="shape mask" data-id="${sh.id}" fill="${sh.fill||'#ffffff'}" points="${sh.pts.map(p=>p.join(',')).join(' ')}"/>`;
+  if(sh.type==='cut-base'){
+    // Solo se ve el contorno aqua en modo edición (CSS .cut-base-outline). El efecto real es CSS clip-path en el #base.
+    const editing=document.body.classList.contains('edit');
+    if(!editing&&!selectable)return '';
+    const selCls=(selShape===sh.id)?' sel':'';
+    return `<polygon class="shape cut-base-outline${selCls}" data-id="${sh.id}" points="${sh.pts.map(p=>p.join(',')).join(' ')}"/>`;
+  }
   if(sh.type==='dot')return `<circle class="shape dot ${sh.kind}" data-id="${sh.id}" cx="${sh.x}" cy="${sh.y}" r="${DOT_R}" stroke-width="3"/>`;
   if(sh.type==='label')return `<text class="shape lbl ${sh.kind}" data-id="${sh.id}" x="${sh.x}" y="${sh.y}" font-size="${sh.size||LBL_SZE}" stroke-width="${LBL_HALO}">${esc(sh.text)}</text>`;
   if(sh.type==='cota'){const a=sh.pts[0],b=sh.pts[1],d='M'+a[0]+' '+a[1]+' L'+b[0]+' '+b[1];const cls='cota'+(selectable?' cotadrag':'');const O=(sh.cotaOff&&sh.cotaOff.m)||[0,0];const mx=(a[0]+b[0])/2+O[0],my=(a[1]+b[1])/2-10+O[1];return (selectable?`<path class="shape hit" data-id="${sh.id}" d="${d}"/>`:'')+`<path class="shape cotaline" data-id="${sh.id}" d="${d}"/><text class="${cls}" data-id="${sh.id}" data-ck="m" font-size="${sh.cotaSize||20}" x="${mx.toFixed(1)}" y="${my.toFixed(1)}">${esc(cotaShow(sh,'m'))}</text>`;}
@@ -1472,9 +1494,10 @@ function draftSVG(){
   if(!draft||!draft.pts.length)return '';
   let s='';
   if(draft.type==='mask')s+=`<polygon class="mask" fill="${draft.fill}" opacity=".5" points="${draft.pts.map(p=>p.join(',')).join(' ')}"/>`;
+  if(draft.type==='cut-base')s+=`<polygon class="cut-base-outline" points="${draft.pts.map(p=>p.join(',')).join(' ')}"/>`;
   const d='M'+draft.pts.map(p=>p[0]+' '+p[1]).join(' L ');
-  const cls=draft.type==='mask'?'pipe live':'pipe '+draft.kind+' live';
-  const extra=draft.type==='mask'?' stroke="#999"':'';
+  const cls=(draft.type==='mask'||draft.type==='cut-base')?'pipe live':'pipe '+draft.kind+' live';
+  const extra=(draft.type==='mask')?' stroke="#999"':(draft.type==='cut-base')?' stroke="#5aa6e8"':'';
   s+=`<path class="${cls}" d="${d}" stroke-width="${draft.w||PIPE_W}"${extra}/>`;
   s+=`<path id="draftLive" class="${cls}" d="" stroke-width="${draft.w||PIPE_W}"${extra}/>`;
   s+=`<circle id="snapInd" class="snaphit" cx="0" cy="0" r="0" style="display:none"/>`;
@@ -1487,7 +1510,7 @@ function selectionSVG(){
   if(sh.type==='rect'){const r=(8/view.s).toFixed(2);return `<rect class="sel-outline" x="${sh.x}" y="${sh.y}" width="${sh.rw}" height="${sh.rh}"/>`+[[sh.x,sh.y],[sh.x+sh.rw,sh.y],[sh.x+sh.rw,sh.y+sh.rh],[sh.x,sh.y+sh.rh]].map((c,i)=>`<circle class="vh" data-vi="${i}" cx="${c[0].toFixed(1)}" cy="${c[1].toFixed(1)}" r="${r}"/>`).join('');}
   if(sh.type==='circle'){const r=(8/view.s).toFixed(2);return `<circle class="sel-outline" cx="${sh.cx}" cy="${sh.cy}" r="${sh.r}"/>`+`<circle class="vh" data-vi="0" cx="${(sh.cx+sh.r).toFixed(1)}" cy="${sh.cy}" r="${r}"/>`;}
   if(sh.pts){
-    if(sh.type==='mask')s+=`<polygon class="sel-outline" points="${sh.pts.map(p=>p.join(',')).join(' ')}"/>`;
+    if(sh.type==='mask'||sh.type==='cut-base')s+=`<polygon class="sel-outline" points="${sh.pts.map(p=>p.join(',')).join(' ')}"/>`;
     else s+=`<path class="sel-outline" d="M${sh.pts.map(p=>p[0]+' '+p[1]).join(' L ')}"/>`;
     sh.pts.forEach((p,i)=>{s+=`<circle class="vh" data-vi="${i}" cx="${p[0]}" cy="${p[1]}" r="${(8/view.s).toFixed(2)}"/>`;});
   }else{
@@ -1506,6 +1529,18 @@ function renderShapes(){
   if(document.body.classList.contains('edit'))svg+=`<circle id="hoverSnap" class="snaphit" cx="0" cy="0" r="0" style="display:none"/>`;
   drawEl.innerHTML=svg;updateHandleScale();attachShapeEvents();
   document.body.classList.toggle('has-sel',!!(selShape&&document.body.classList.contains('tool-select')));
+  applyBaseCutMask();
+}
+/* Aplica los shapes type='cut-base' como CSS clip-path al #base con regla evenodd:
+   contorno exterior = rectángulo del plano (todo visible) + cada polígono cut-base = agujero. */
+function applyBaseCutMask(){
+  const bs=document.getElementById('base');if(!bs)return;
+  const cuts=(state.shapes||[]).filter(s=>s.type==='cut-base'&&Array.isArray(s.pts)&&s.pts.length>=3);
+  if(!cuts.length){bs.style.clipPath='none';return;}
+  const W=baseW(),H=baseH();
+  let path=`M0,0 L${W},0 L${W},${H} L0,${H} Z`;
+  cuts.forEach(s=>{path+=' M'+s.pts.map((p,i)=>(i===0?'':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ')+' Z';});
+  bs.style.clipPath=`path(evenodd,'${path}')`;
 }
 function updateLive(){const el=drawEl.querySelector('#draftLive');if(!el||!draft||!draft.pts.length||!draftCursor)return;const last=draft.pts[draft.pts.length-1];const sn=snapNodes(draftCursor);let cx,cy;if(sn.hit){cx=sn.x;cy=sn.y;}else{cx=draftCursor.x;cy=draftCursor.y;if(draft.type==='pipe'&&snapAngles){const sp=snapPt(last,cx,cy);cx=sp.x;cy=sp.y;}}el.setAttribute('d',`M${last[0]} ${last[1]} L${cx.toFixed(1)} ${cy.toFixed(1)}`);const ind=drawEl.querySelector('#snapInd');if(ind){if(sn.hit){ind.setAttribute('cx',cx);ind.setAttribute('cy',cy);ind.setAttribute('r',(7/view.s).toFixed(2));ind.style.display='';}else ind.style.display='none';}}
 
