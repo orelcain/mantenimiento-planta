@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { X, Download } from 'lucide-react'
 import type { ImagenRepuesto } from '@/types/repuestos'
 import {
   Dialog,
@@ -7,6 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui'
+import { ImageLightbox } from '@/components/ui/ImageLightbox'
 
 interface RepuestoPhotosModalProps {
   open: boolean
@@ -23,17 +23,9 @@ export function RepuestoPhotosModal({
   imagenesManual,
   repuestoName,
 }: RepuestoPhotosModalProps) {
-  const [selectedPhoto, setSelectedPhoto] = useState<ImagenRepuesto | null>(null)
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const allPhotos = [...fotosReales, ...imagenesManual]
-
-  const handleDownload = (photo: ImagenRepuesto) => {
-    if (photo.url) {
-      const a = document.createElement('a')
-      a.href = photo.url
-      a.download = photo.url?.split('/').pop() || 'foto'
-      a.click()
-    }
-  }
+  const allPhotoUrls = allPhotos.map(p => p.url).filter((u): u is string => !!u)
 
   return (
     <>
@@ -53,7 +45,11 @@ export function RepuestoPhotosModal({
                     <div
                       key={`real-${idx}`}
                       className="relative group rounded-lg overflow-hidden bg-muted aspect-square cursor-pointer"
-                      onClick={() => setSelectedPhoto(foto)}
+                      onClick={() => {
+                        if (!foto.url) return
+                        const i = allPhotoUrls.indexOf(foto.url)
+                        setLightboxIndex(i >= 0 ? i : 0)
+                      }}
                     >
                       {foto.url ? (
                         <img
@@ -84,7 +80,11 @@ export function RepuestoPhotosModal({
                     <div
                       key={`manual-${idx}`}
                       className="relative group rounded-lg overflow-hidden bg-muted aspect-square cursor-pointer"
-                      onClick={() => setSelectedPhoto(img)}
+                      onClick={() => {
+                        if (!img.url) return
+                        const i = allPhotoUrls.indexOf(img.url)
+                        setLightboxIndex(i >= 0 ? i : 0)
+                      }}
                     >
                       {img.url ? (
                         <img
@@ -115,48 +115,17 @@ export function RepuestoPhotosModal({
         </DialogContent>
       </Dialog>
 
-      {/* Visor de foto ampliada — z-[60] para estar encima del dialog padre z-50 */}
-      {selectedPhoto && (
-        <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center">
-          <div className="relative w-full h-full flex items-center justify-center p-4">
-            {/* Botón cerrar */}
-            <button
-              onClick={() => setSelectedPhoto(null)}
-              className="absolute top-4 right-4 z-10 p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
-            >
-              <X className="h-6 w-6 text-white" />
-            </button>
-
-            {/* Botón descargar */}
-            {selectedPhoto.url && (
-              <button
-                onClick={() => handleDownload(selectedPhoto)}
-                className="absolute bottom-4 right-4 z-10 p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
-                title="Descargar"
-              >
-                <Download className="h-6 w-6 text-white" />
-              </button>
-            )}
-
-            {/* Imagen */}
-            {selectedPhoto.url ? (
-              <img
-                src={selectedPhoto.url}
-                alt="Foto expandida"
-                className="max-w-full max-h-full object-contain"
-              />
-            ) : (
-              <div className="text-white text-lg">Sin imagen disponible</div>
-            )}
-
-            {/* Nombre/descripción */}
-            {selectedPhoto.descripcion && (
-              <div className="absolute bottom-4 left-4 text-white text-sm bg-black/50 px-3 py-2 rounded">
-                {selectedPhoto.descripcion}
-              </div>
-            )}
-          </div>
-        </div>
+      {/* Visor de foto ampliada con pan+zoom (componente unificado @/components/ui/ImageLightbox).
+          Trade-off conocido vs visor anterior: se pierde el botón "Descargar" y el caption con
+          `foto.descripcion`. A cambio: pan+zoom+pinch+doble-tap+teclado+navegación entre las
+          fotos del repuesto (reales + manual). Si descargar duele lo bastante, se suma al global
+          como prop opcional `onDownload?:(url:string)=>void` sin romper los demás callsites. */}
+      {lightboxIndex !== null && allPhotoUrls.length > 0 && (
+        <ImageLightbox
+          photos={allPhotoUrls}
+          initialIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+        />
       )}
     </>
   )
