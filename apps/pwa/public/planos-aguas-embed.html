@@ -161,6 +161,11 @@
 
   .toast{position:fixed;left:50%;bottom:74px;transform:translateX(-50%) translateY(20px);background:var(--surfaceHi);border:1px solid var(--borderHi);color:var(--ink);padding:10px 17px;border-radius:8px;font-family:var(--mono);font-size:11.5px;letter-spacing:.3px;opacity:0;transition:.26s var(--ease);z-index:60;pointer-events:none;box-shadow:var(--shadow)}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toast.has-actions{pointer-events:auto;display:flex;gap:10px;align-items:center;padding:9px 11px 9px 15px}
+  .toast .toast-btn{font:inherit;background:transparent;border:1px solid var(--borderHi);color:var(--ink);padding:5px 11px;border-radius:6px;cursor:pointer;letter-spacing:.4px;text-transform:uppercase;font-size:10.5px;white-space:nowrap}
+  .toast .toast-btn:hover{background:var(--surface)}
+  .toast .toast-btn.primary{background:var(--aqua,#2E75B6);border-color:transparent;color:#fff}
+  .toast .toast-btn.primary:hover{filter:brightness(1.1)}
 
   @media(max-width:700px){
     header{padding:0 10px;min-height:46px}
@@ -462,8 +467,16 @@ function normPhotos(s){
 }
 function saveLocal(){localStorage.setItem(STORE_KEY,JSON.stringify(state));}
 
-/* ============ CLOUD SYNC (Firebase) — posiciones / notas / dibujos ============ */
-const cloud={db:null,auth:null,storage:null,user:null,ready:false,applying:false,dirty:false,busy:false,docMissing:false,pushT:0,writing:false,lastWrite:null};
+/* ============ CLOUD SYNC (Firebase) — posiciones / notas / dibujos ============
+   - `dirty`: tengo cambios locales sin pushear (true entre `save()` y `pushCloud` exitoso).
+   - `pendingRemote`: snapshot remoto que LLEGÓ durante mi edición (dirty/busy). Si toco
+     "Aplicar" del toast de conflicto, se aplica vía applyCloudRaw. Si no, el siguiente
+     push exitoso lo sobrescribe (last-write-wins documentado).
+   - `lastSeenAt`: timestamp local del último snapshot aplicado, para evitar mostrar el
+     toast de conflicto al cargar (cuando el snap inicial llega antes de cualquier edición).
+   - `retryCount`/`nextRetryAt`: cola offline. Backoff exponencial 2,4,8,...30s capped.
+     Reset a 0 cuando push sale OK o cuando el evento `online` lo dispara manualmente. */
+const cloud={db:null,auth:null,storage:null,user:null,ready:false,applying:false,dirty:false,busy:false,docMissing:false,pushT:0,writing:false,lastWrite:null,lastSeenAt:0,pendingRemote:null,retryCount:0,retryT:0,nextRetryAt:0};
 function cloudDoc(){return cloud.db.collection('planosAguas').doc('main');}
 
 /* ===== Puente con la PWA padre =====
@@ -501,14 +514,7 @@ function initCloud(){
 }
 function localHasData(){return Object.keys(state.over).length||state.extra.length||state.removed.length||(state.shapes||[]).length||Object.keys(state.notas).length||Object.keys(state.photos||{}).length;}
 function trySeed(){ if((cloud.user||bridge.authed)&&localHasData()){cloud.docMissing=false;pushCloud(true);} }
-function onCloudSnap(snap){
-  if(snap.metadata&&snap.metadata.hasPendingWrites)return; // eco local de mi propia escritura → ignorar
-  cloud.ready=true;
-  if(!snap.exists){ cloud.docMissing=true; trySeed(); return; } // migración: sembrar correcciones locales
-  cloud.docMissing=false;
-  if(cloud.dirty||cloud.busy)return; // cambios locales sin confirmar o arrastre en curso → no pisar
-  const raw=snap.data()||{};
-  const r=raw.blob?(function(){try{return JSON.parse(raw.blob);}catch(e){return {};}})():raw; // doc guarda todo como JSON (evita arrays anidados)
+function applyCloudRaw(r){
   cloud.applying=true;
   state.over=r.over||{}; state.notas=r.notas||{};
   state.extra=Array.isArray(r.extra)?r.extra:[];
@@ -523,10 +529,65 @@ function onCloudSnap(snap){
   normPhotos(state);
   saveLocal();
   cloud.applying=false;
+  cloud.lastSeenAt=Date.now();
   if(typeof renderMarkers==='function'){renderMarkers();renderShapes();if(sel)openPanel(sel);if(typeof renderEditbar==='function')renderEditbar();}
   renderSync();
 }
+function onCloudSnap(snap){
+  if(snap.metadata&&snap.metadata.hasPendingWrites)return; // eco local de mi propia escritura → ignorar
+  cloud.ready=true;
+  if(!snap.exists){ cloud.docMissing=true; trySeed(); return; } // migración: sembrar correcciones locales
+  cloud.docMissing=false;
+  const raw=snap.data()||{};
+  const r=raw.blob?(function(){try{return JSON.parse(raw.blob);}catch(e){return {};}})():raw; // doc guarda todo como JSON (evita arrays anidados)
+  if(cloud.dirty||cloud.busy){
+    // conflicto: otro supervisor pusheó mientras yo edito. NO sobrescribir; ofrecer "Aplicar".
+    // Sin acción: el próximo push exitoso mío pisa el remoto (last-write-wins documentado).
+    cloud.pendingRemote=r;
+    if(typeof showConflictToast==='function')showConflictToast();
+    return;
+  }
+  applyCloudRaw(r);
+}
+function showConflictToast(){
+  toast('Otro supervisor guardó cambios en la nube',{
+    persistent:true,
+    actions:[
+      {label:'Aplicar',primary:true,fn:()=>{
+        const r=cloud.pendingRemote; cloud.pendingRemote=null;
+        // descartar mi push debounceado (el "Aplicar" significa "tirar lo mío y traer el del otro")
+        clearTimeout(cloud.pushT); cloud.dirty=false; cloud.writing=false;
+        if(r)applyCloudRaw(r);
+      }},
+      {label:'Seguir editando',fn:()=>{/* no-op; el siguiente push mío pisará al otro */}},
+    ],
+  });
+}
 function payloadCloud(){return {over:state.over,notas:state.notas,extra:state.extra,removed:state.removed,shapes:state.shapes,photos:state.photos||{},zonas:state.zonas||[],scale:(state.scale!=null?state.scale:null),unit:state.unit||'mm',showCotas:state.showCotas!==false};}
+/* Cola offline: si el push falla (red caída, timeout del puente, etc.) lo reintentamos con
+   backoff exponencial 2,4,8,16,30s capped. `permission-denied` NO se reintenta (es config).
+   `scheduleRetry` se llama en cualquier error transient; `onSyncSuccess` lo limpia todo. */
+const RETRY_MAX=8;
+function onSyncSuccess(){
+  cloud.dirty=false; cloud.writing=false; cloud.lastWrite='ok';
+  cloud.retryCount=0; cloud.nextRetryAt=0;
+  clearTimeout(cloud.retryT); cloud.retryT=0;
+  renderSync();
+}
+function isRetryable(code){
+  // codes terminales: permission-denied (necesita re-login o cambio de rol), invalid-path.
+  // Todo lo demás (unavailable, deadline-exceeded, network-error, timeout, 'error') reintenta.
+  return code!=='permission-denied'&&code!=='invalid-path';
+}
+function scheduleRetry(){
+  if(cloud.retryCount>=RETRY_MAX){renderSync();return;}
+  cloud.retryCount++;
+  const delay=Math.min(2000*Math.pow(2,cloud.retryCount-1),30000);
+  cloud.nextRetryAt=Date.now()+delay;
+  clearTimeout(cloud.retryT);
+  cloud.retryT=setTimeout(()=>{ cloud.retryT=0; cloud.nextRetryAt=0; if(cloud.dirty||(cloud.lastWrite&&cloud.lastWrite!=='ok'))pushCloud(true); },delay);
+  renderSync();
+}
 function pushCloud(now){
   if(!cloud.db&&!bridge.active)return;
   cloud.dirty=true;
@@ -535,14 +596,32 @@ function pushCloud(now){
     cloud.writing=true;renderSync();
     if(bridge.active){ // delegar a la PWA padre (autenticada)
       const r=await bridgeSend('save',{payload:payloadCloud()});
-      cloud.writing=false;cloud.dirty=false;cloud.lastWrite=r.ok?'ok':(r.code||'error');renderSync();return;
+      cloud.writing=false;
+      if(r&&r.ok){onSyncSuccess();return;}
+      cloud.lastWrite=(r&&r.code)||'error';
+      renderSync();
+      if(isRetryable(cloud.lastWrite))scheduleRetry();
+      return;
     }
     return cloudDoc().set({blob:JSON.stringify(payloadCloud()),updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true})
-    .then(()=>{cloud.dirty=false;cloud.writing=false;cloud.lastWrite='ok';renderSync();})
-    .catch(e=>{cloud.dirty=false;cloud.writing=false;cloud.lastWrite=(e&&e.code)||'error';renderSync();}); // sin permiso (no supervisor) u offline → queda local
+    .then(()=>{onSyncSuccess();})
+    .catch(e=>{
+      cloud.writing=false;
+      cloud.lastWrite=(e&&e.code)||'error';
+      renderSync();
+      if(isRetryable(cloud.lastWrite))scheduleRetry();
+      // NOTA: NO seteamos cloud.dirty=false en error — el blob actual no llegó a la nube, queda pendiente de retry/manual sync.
+    });
   };
   if(now)doIt(); else cloud.pushT=setTimeout(doIt,500);
 }
+/* Al volver la red, forzar un push si hay cambios pendientes o el último push falló. */
+window.addEventListener('online',()=>{
+  if(cloud.dirty||(cloud.lastWrite&&cloud.lastWrite!=='ok'&&isRetryable(cloud.lastWrite))){
+    cloud.retryCount=0; cloud.nextRetryAt=0; clearTimeout(cloud.retryT); cloud.retryT=0;
+    pushCloud(true);
+  }
+});
 /* ===== BACKUPS rotativos en localStorage =====
    Anti-incidente: si la nube falla en silencio o el localStorage del origen se rompe,
    guardamos un snapshot del payload cada ~2 min (máximo 5) bajo otra clave.
@@ -1396,8 +1475,14 @@ document.getElementById('btnTheme').onclick=()=>{darkPlan=!darkPlan;localStorage
 /* ============ ESTADO DE SINCRONIZACIÓN + EXPORT/IMPORT ============ */
 function syncState(){
   if(cloud.writing)return {t:'Guardando…',cls:'sbusy',tip:'Sincronizando con la nube…',d:'Guardando en la nube…'};
+  if(cloud.retryT){
+    return {t:'Reintentando…',cls:'swarn',tip:'Reintento automático (intento '+cloud.retryCount+'/'+RETRY_MAX+'). Último error: '+cloud.lastWrite,d:'Hubo un error de red al guardar ('+cloud.lastWrite+'). Reintentamos automáticamente con espera creciente. Cuando vuelva la conexión podés tocar "Sincronizar ahora".'};
+  }
   if(cloud.lastWrite==='permission-denied')return {t:'Solo local',cls:'swarn',tip:'Tu usuario no es supervisor/admin.',d:'Tu usuario no tiene permiso de supervisor/admin, así que no puede guardar en la nube. Cambios solo en este dispositivo.'};
-  if(cloud.lastWrite&&cloud.lastWrite!=='ok')return {t:'Sin conexión',cls:'swarn',tip:'No se pudo guardar ('+cloud.lastWrite+').',d:'No se pudo guardar en la nube ('+cloud.lastWrite+'). Reintentá cuando vuelva la conexión.'};
+  if(cloud.lastWrite&&cloud.lastWrite!=='ok'){
+    const offline=!navigator.onLine;
+    return {t:offline?'Sin conexión':'Pendiente',cls:'swarn',tip:'No se pudo guardar ('+cloud.lastWrite+').',d:offline?'Sin conexión. Cuando vuelva la red reintento automático.':'No se pudo guardar en la nube ('+cloud.lastWrite+'). Reintento automático activo.'};
+  }
   if(cloud.lastWrite==='ok')return {t:'En la nube ✓',cls:'sok',tip:'Sincronizado con la nube.',d:'Tus cambios están en la nube y se ven en otros dispositivos (celular, QR).'};
   const conn = (bridge.active && bridge.authed) || (cloud.db && cloud.user);
   if(conn)return {t:'Conectado',cls:'',tip:'Conectado a la nube. Hacé un cambio para guardar.',d:'Conectado a la nube. Hacé un cambio o tocá "Sincronizar ahora" para subir todo lo de este dispositivo.'};
@@ -1504,8 +1589,34 @@ async function vecRender(){
   vcanvas.style.transform='';vcanvas.style.display='block';vecRS=view.s;vecRX=view.x;vecRY=view.y;vecHasFrame=true;
 }
 
-/* ============ TOAST ============ */
-let toastT;function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2000);}
+/* ============ TOAST ============
+   `toast(msg)` — simple, 2s, no clickeable.
+   `toast(msg,{persistent:true,actions:[{label,fn,primary?}...]})` — queda hasta que el
+   usuario toca un botón (cada botón ejecuta su `fn` y cierra el toast). El segundo modo
+   se usa hoy para el aviso de conflicto multi-supervisor (showConflictToast). */
+let toastT;
+function closeToast(){const t=document.getElementById('toast');if(!t)return;t.classList.remove('show','has-actions');t.innerHTML='';clearTimeout(toastT);toastT=0;}
+function toast(m,opts){
+  const t=document.getElementById('toast');if(!t)return;
+  clearTimeout(toastT);toastT=0;
+  if(opts&&Array.isArray(opts.actions)&&opts.actions.length){
+    t.innerHTML='';
+    const span=document.createElement('span');span.textContent=m;t.appendChild(span);
+    opts.actions.forEach(a=>{
+      const b=document.createElement('button');
+      b.className='toast-btn'+(a.primary?' primary':'');
+      b.textContent=a.label;
+      b.onclick=()=>{try{a.fn&&a.fn();}finally{closeToast();}};
+      t.appendChild(b);
+    });
+    t.classList.add('show','has-actions');
+    return;
+  }
+  t.classList.remove('has-actions');
+  t.textContent=m;
+  t.classList.add('show');
+  toastT=setTimeout(()=>{t.classList.remove('show');toastT=0;},2000);
+}
 
 /* ============ INIT ============ */
 (async function(){
