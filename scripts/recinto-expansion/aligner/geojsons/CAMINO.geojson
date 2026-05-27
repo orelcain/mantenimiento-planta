@@ -1,7 +1,0 @@
-{
-"type": "FeatureCollection",
-"name": "SELECT",
-"features": [
-{ "type": "Feature", "properties": { "Layer": "CAMINO", "PaperSpace": null, "SubClasses": null, "Linetype": null, "EntityHandle": "1D1EE309", "Text": null }, "geometry": { "type": "LineString", "coordinates": [ [ 753.68265479713466, -625.522592461065756, 0.0 ], [ 753.687955770800386, -625.535120102197766, 0.0 ] ] } }
-]
-}

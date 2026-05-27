@@ -1,7 +1,0 @@
-{
-"type": "FeatureCollection",
-"name": "SELECT",
-"features": [
-{ "type": "Feature", "properties": { "Layer": "PLANTA", "PaperSpace": null, "SubClasses": null, "Linetype": null, "EntityHandle": "1D1EE36C", "Text": null }, "geometry": { "type": "LineString", "coordinates": [ [ 751.422244735436379, -636.547880227014161, 0.0 ], [ 751.802724831362184, -637.304501340707588, 0.0 ], [ 752.369829528951868, -638.44418372799646, 0.0 ], [ 754.991135365666082, -643.655768096718248, 0.0 ] ] } }
-]
-}
