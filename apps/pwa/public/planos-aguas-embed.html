@@ -79,7 +79,14 @@
       var(--bg);}
   .stagewrap.grabbing{cursor:grabbing}
   .world{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform;backface-visibility:hidden}
-  .world img.base{display:block;user-select:none;-webkit-user-drag:none;box-shadow:0 0 0 1px var(--border)}
+  .world img.base{display:block;user-select:none;-webkit-user-drag:none;box-shadow:0 0 0 1px var(--border);position:relative;z-index:1}
+  /* capa recinto: posicionada detrás del plano-base con transform afín (Fase 1 georreferenciación).
+     matrix CSS = (a, c, b, d, tx, ty) en nuestra notación. Mapea recinto-base.jpg 8000x5659 a coords del plano-base 6272x3600.
+     Ver scripts/recinto-expansion/fase2_config.json */
+  .world img.recinto{position:absolute;left:0;top:0;transform-origin:0 0;
+    transform:matrix(1.359377,-2.733696,2.736778,1.363547,-12569.75,6323.29);
+    pointer-events:none;user-select:none;-webkit-user-drag:none;opacity:.92;z-index:0;display:block}
+  body.no-recinto .world img.recinto{display:none}
 
   .markers{position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:none;z-index:6;will-change:transform}
   .markers .mk{pointer-events:auto}
@@ -268,6 +275,22 @@
   .ebsp{width:1px;height:20px;background:var(--border);margin:0 3px}
   .editbar input[type=range]{width:88px;accent-color:var(--aquaBright);cursor:pointer;vertical-align:middle}
   .editbar input[type=color].mcol{display:inline-block}
+
+  /* ===== panel ajuste fino recinto (Fase 3 — calibrar capa recinto sobre plano-base) ===== */
+  .frPanel{position:absolute;top:10px;right:62px;z-index:25;background:var(--bgPanel);border:1px solid var(--border);border-radius:8px;padding:10px 12px;box-shadow:var(--shadow);font-family:var(--mono);min-width:260px;max-width:92vw}
+  .frPanel h4{margin:0 0 8px 0;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--star);font-weight:700;display:flex;justify-content:space-between;align-items:center}
+  .frPanel h4 .x{cursor:pointer;background:none;border:none;color:var(--inkMid);font-size:16px;padding:0 4px}
+  .frPanel h4 .x:hover{color:var(--ink)}
+  .frRow{display:grid;grid-template-columns:64px 1fr 56px;gap:8px;align-items:center;margin:5px 0}
+  .frRow label{color:var(--inkLo);letter-spacing:.6px;text-transform:uppercase;font-weight:500;font-size:9.5px}
+  .frRow input[type=range]{accent-color:var(--aquaBright);height:18px;cursor:pointer;width:100%}
+  .frRow .v{color:var(--ink);font-size:10.5px;text-align:right;font-weight:600}
+  .frBtns{display:flex;gap:6px;margin-top:9px}
+  .frBtns button{flex:1;background:var(--surface);border:1px solid var(--border);color:var(--inkMid);border-radius:5px;padding:7px 8px;font-family:var(--mono);font-size:9.5px;letter-spacing:.6px;text-transform:uppercase;cursor:pointer;transition:.12s var(--ease)}
+  .frBtns button:hover{border-color:var(--borderHi);color:var(--ink)}
+  .frBtns button.primary{background:var(--aqua);border-color:var(--aqua);color:#fff}
+  .frHint{font-size:9px;color:var(--inkLo);margin-top:7px;letter-spacing:.3px;line-height:1.4}
+  @media(max-width:700px){.frPanel{right:8px;top:auto;bottom:64px;min-width:260px}}
 </style>
 </head>
 <body>
@@ -295,12 +318,16 @@
     <span class="sep"></span>
     <span class="chip" data-f="nuevo"><span class="ring" style="color:var(--nuevo)"></span>Por confirmar<b class="cnt" data-cnt="pend">0</b></span>
     <span class="sep"></span>
+    <span class="chip on" id="chipRecinto" title="Mostrar / ocultar capa recinto (estanques, Yal, generador, mar)"><span class="dot" style="background:var(--ghost)"></span>Recinto</span>
+    <button class="hbtn" id="btnFineRec" title="Ajuste fino: opacidad + posición de la capa recinto" style="padding:5px 10px;font-size:12px;line-height:1">⚙</button>
+    <span class="sep"></span>
     <input class="search" id="search" placeholder="Buscar: AS-3, B, cosecha…" />
   </div>
 
   <div class="main">
     <div class="stagewrap" id="stage">
       <div class="world" id="world">
+        <img class="recinto" id="recinto" src="planos-aguas-assets/recinto-base-dark.jpg" alt="Recinto Antarfood Chonchi" draggable="false" />
         <img class="base" id="base" src="planos-aguas-assets/plano-base-dark.png" alt="Plano nuevo PN10" />
       </div>
       <canvas id="vcanvas"></canvas>
@@ -318,6 +345,23 @@
       <div class="editbar" id="editbar"></div>
       <div class="editbar" id="editHint" style="bottom:auto;top:8px;font-size:10px;padding:5px 11px;background:var(--bgPanel)">
         <span class="mini" id="editHintTxt"></span>
+      </div>
+
+      <!-- panel ajuste fino capas recinto + plano-base (Fase 3 calibracion) -->
+      <div class="frPanel" id="frPanel" style="display:none">
+        <h4>Ajuste fino · capas <button class="x" id="frClose" title="Cerrar">✕</button></h4>
+        <div class="frRow"><label>Opac. Plano</label><input type="range" id="frPlanoOpac" min="0" max="100" value="100"><span class="v" id="frPlanoOpacV">100%</span></div>
+        <div class="frRow"><label>Opac. Recinto</label><input type="range" id="frOpac" min="0" max="100" value="92"><span class="v" id="frOpacV">92%</span></div>
+        <div style="height:1px;background:var(--border);margin:8px 0 4px"></div>
+        <div class="frRow"><label>Mover X</label><input type="range" id="frDx" min="-1500" max="1500" value="0" step="1"><span class="v" id="frDxV">0</span></div>
+        <div class="frRow"><label>Mover Y</label><input type="range" id="frDy" min="-1500" max="1500" value="0" step="1"><span class="v" id="frDyV">0</span></div>
+        <div class="frRow"><label>Rotar °</label><input type="range" id="frRot" min="-5" max="5" value="0" step="0.02"><span class="v" id="frRotV">0.00°</span></div>
+        <div class="frRow"><label>Escala %</label><input type="range" id="frScale" min="-10" max="10" value="0" step="0.05"><span class="v" id="frScaleV">0.00%</span></div>
+        <div class="frBtns">
+          <button id="frReset">Resetear</button>
+          <button id="frCopy" class="primary">Copiar matriz CSS</button>
+        </div>
+        <div class="frHint">Mover/rotar/escalar aplica al recinto (alrededor del centro del plano-base). Si la posición queda perfecta, "Copiar matriz" y pegámela acá para grabarla como baseline.</div>
       </div>
     </div>
 
@@ -1544,9 +1588,79 @@ let darkPlan=localStorage.getItem(THEME_KEY)!=='light'; // por defecto: oscuro
 function applyTheme(){
   const src=darkPlan?'planos-aguas-assets/plano-base-dark.png':'planos-aguas-assets/plano-base.png';
   if(!base.getAttribute('src').endsWith(src))base.src=src;
+  const rec=document.getElementById('recinto');
+  if(rec){const rsrc=darkPlan?'planos-aguas-assets/recinto-base-dark.jpg':'planos-aguas-assets/recinto-base.jpg';if(!rec.getAttribute('src').endsWith(rsrc))rec.src=rsrc;}
   const b=document.getElementById('btnTheme');b.classList.toggle('on',darkPlan);b.textContent=darkPlan?'Claro':'Oscuro';
 }
 document.getElementById('btnTheme').onclick=()=>{darkPlan=!darkPlan;localStorage.setItem(THEME_KEY,darkPlan?'dark':'light');applyTheme();if(vecPage&&view.s>=VEC_MIN_S)vecRender();};
+
+/* ============ CAPA RECINTO (toggle visibilidad) ============ */
+const RECINTO_KEY='planosAguas.recintoVisible';
+let recintoVisible=localStorage.getItem(RECINTO_KEY)!=='false'; // default visible
+function applyRecinto(){
+  document.body.classList.toggle('no-recinto',!recintoVisible);
+  const c=document.getElementById('chipRecinto');if(c)c.classList.toggle('off',!recintoVisible);
+}
+document.getElementById('chipRecinto').onclick=()=>{recintoVisible=!recintoVisible;localStorage.setItem(RECINTO_KEY,String(recintoVisible));applyRecinto();};
+applyRecinto();
+
+/* ============ AJUSTE FINO RECINTO (Fase 3 calibracion) ============
+   Matriz base = la calculada en Fase 1 (recinto-reducido 8000x5659 -> plano-base 6272x3600).
+   El panel deja al usuario aplicar deltas en vivo (opacidad + dx + dy + rotacion + escala)
+   y copiar la matriz CSS resultante para grabarla como nuevo baseline si calza mejor.
+   Centro de rotacion/escala = centro del plano-base (3136, 1800) — asi rotar no descoloca el edificio. */
+const REC_OPAC_KEY='planosAguas.recintoOpacity';
+const PLANO_OPAC_KEY='planosAguas.planoOpacity';
+const FR_BASE={a:1.359377,b:2.736778,c:-2.733696,d:1.363547,e:-12569.7458,f:6323.2850};
+const FR_CX=3136, FR_CY=1800;
+const FR={opac:+(localStorage.getItem(REC_OPAC_KEY)||92),planoOpac:+(localStorage.getItem(PLANO_OPAC_KEY)||100),dx:0,dy:0,rot:0,scale:0};
+function frApply(){
+  const rec=document.getElementById('recinto'); if(rec){
+    rec.style.opacity=(FR.opac/100).toFixed(3);
+    const t=[
+      `translate(${FR.dx}px,${FR.dy}px)`,
+      `translate(${FR_CX}px,${FR_CY}px)`,
+      `rotate(${FR.rot}deg)`,
+      `scale(${1+FR.scale/100})`,
+      `translate(${-FR_CX}px,${-FR_CY}px)`,
+      `matrix(${FR_BASE.a},${FR_BASE.c},${FR_BASE.b},${FR_BASE.d},${FR_BASE.e},${FR_BASE.f})`
+    ].join(' ');
+    rec.style.transform=t;
+  }
+  const bs=document.getElementById('base'); if(bs){bs.style.opacity=(FR.planoOpac/100).toFixed(3);}
+}
+function frFmt(key,v){return (key==='opac'||key==='planoOpac')?v.toFixed(0)+'%':key==='rot'?v.toFixed(2)+'°':key==='scale'?v.toFixed(2)+'%':v.toFixed(0);}
+function frBindUI(){
+  ['opac','planoOpac','dx','dy','rot','scale'].forEach(k=>{
+    const id={opac:'frOpac',planoOpac:'frPlanoOpac',dx:'frDx',dy:'frDy',rot:'frRot',scale:'frScale'}[k];
+    const vid={opac:'frOpacV',planoOpac:'frPlanoOpacV',dx:'frDxV',dy:'frDyV',rot:'frRotV',scale:'frScaleV'}[k];
+    const el=document.getElementById(id), vel=document.getElementById(vid);
+    el.value=FR[k]; vel.textContent=frFmt(k,FR[k]);
+    el.oninput=()=>{FR[k]=+el.value; vel.textContent=frFmt(k,FR[k]); frApply();
+      if(k==='opac')localStorage.setItem(REC_OPAC_KEY,String(FR.opac));
+      if(k==='planoOpac')localStorage.setItem(PLANO_OPAC_KEY,String(FR.planoOpac));
+    };
+  });
+}
+document.getElementById('frReset').onclick=()=>{FR.dx=FR.dy=FR.rot=FR.scale=0; frBindUI(); frApply();};
+document.getElementById('frCopy').onclick=async()=>{
+  // Calcula matriz total: T(dx,dy) * T(cx,cy) * R(rot) * S(1+ds) * T(-cx,-cy) * matrix(base)
+  const c=Math.cos(FR.rot*Math.PI/180), s=Math.sin(FR.rot*Math.PI/180), sc=1+FR.scale/100;
+  const a1=c*sc, b1=-s*sc, c1=s*sc, d1=c*sc;
+  const e1=-a1*FR_CX - b1*FR_CY + FR_CX + FR.dx;
+  const f1=-c1*FR_CX - d1*FR_CY + FR_CY + FR.dy;
+  const A=FR_BASE.a, B=FR_BASE.b, E=FR_BASE.e, C=FR_BASE.c, D=FR_BASE.d, F=FR_BASE.f;
+  const Mfa=a1*A+b1*C, Mfb=a1*B+b1*D, Mfe=a1*E+b1*F+e1;
+  const Mfc=c1*A+d1*C, Mfd=c1*B+d1*D, Mff=c1*E+d1*F+f1;
+  const css=`matrix(${Mfa.toFixed(6)},${Mfc.toFixed(6)},${Mfb.toFixed(6)},${Mfd.toFixed(6)},${Mfe.toFixed(4)},${Mff.toFixed(4)})`;
+  const msg=`Matriz CSS calibrada:\n\n${css}\n\nReemplazá la línea transform en .world img.recinto del CSS.`;
+  try{await navigator.clipboard.writeText(css); alert(msg+'\n\n(Copiada al portapapeles)');}
+  catch(e){prompt('Copiá manualmente:', css);}
+};
+document.getElementById('btnFineRec').onclick=()=>{const p=document.getElementById('frPanel');p.style.display=(p.style.display==='none'||!p.style.display)?'block':'none';};
+document.getElementById('frClose').onclick=()=>{document.getElementById('frPanel').style.display='none';};
+frBindUI();
+frApply();
 
 /* ============ ESTADO DE SINCRONIZACIÓN + EXPORT/IMPORT ============ */
 function syncState(){
