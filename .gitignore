@@ -81,3 +81,6 @@ manhwa-video-gen/
 # Carpetas staging para Project knowledge de claude.ai (regenerables, no versionar)
 _claude_ai_bot_upload/
 _claude_ai_upload/
+
+# Traspaso de sesión (skill traspaso-limpio) — artefacto temporal, no versionar
+/traspaso.md
