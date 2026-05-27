@@ -32,6 +32,7 @@ import type {
 } from '@/hooks/repuestos/useBodega'
 import type { Machine } from '@/types/repuestos'
 import { useAuthStore } from '@/store/authStore'
+import { ImageLightbox } from '@/components/ui/ImageLightbox'
 
 type BodegaTab = 'stock' | 'inventarios' | 'movimientos' | 'estadisticas'
 type StockFilter = 'todos' | 'configurados' | 'bajo' | 'sin' | 'sinConfig' | 'favoritos'
@@ -1496,7 +1497,7 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [showQR, setShowQR] = useState(false)
-  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
 
   useEffect(() => {
     if (!item.bodegaId) { setLoading(false); return }
@@ -1668,7 +1669,7 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
             {item.fotos && item.fotos.length > 0 ? (
               <div className="p-2 grid grid-cols-4 gap-1.5">
                 {item.fotos.map((url, i) => (
-                  <div key={i} className="relative group aspect-square rounded-lg overflow-hidden border border-border/50 cursor-pointer" onClick={() => setLightboxUrl(url)}>
+                  <div key={i} className="relative group aspect-square rounded-lg overflow-hidden border border-border/50 cursor-pointer" onClick={() => setLightboxIndex(i)}>
                     <img src={url} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" loading="lazy" />
                     {removePhoto && (
                       <button onClick={e => { e.stopPropagation(); removePhoto(item.codigoSAP, url) }}
@@ -1784,12 +1785,13 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
           )}
         </div>
       </div>
-      {/* Lightbox */}
-      {lightboxUrl && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4" onClick={() => setLightboxUrl(null)}>
-          <button onClick={() => setLightboxUrl(null)} className="absolute top-4 right-4 p-2 rounded-full bg-black/50 text-white hover:bg-black/70"><X className="h-6 w-6" /></button>
-          <img src={lightboxUrl} alt="Foto repuesto" className="max-w-full max-h-full rounded-lg object-contain" />
-        </div>
+      {/* Lightbox con pan+zoom (componente unificado @/components/ui/ImageLightbox) */}
+      {lightboxIndex !== null && item.fotos && item.fotos.length > 0 && (
+        <ImageLightbox
+          photos={item.fotos}
+          initialIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+        />
       )}
     </div>
   )

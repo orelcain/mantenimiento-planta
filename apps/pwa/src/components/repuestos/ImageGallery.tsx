@@ -11,11 +11,12 @@
  * - Compresión automática (webp)
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import { useStorage } from '@/hooks/repuestos/useStorage';
 import { useCurrentMachine } from '@/contexts/MachineContext';
 import type { ImagenRepuesto } from '@/types/repuestos';
 import { logger } from '@/lib/logger';
+import { ImageLightbox } from '@/components/ui/ImageLightbox';
 
 interface ImageGalleryProps {
   repuestoId: string;
@@ -40,8 +41,15 @@ export function ImageGallery({
   
   const [dragActive, setDragActive] = useState(false);
   const [uploadType, setUploadType] = useState<'manual' | 'real'>('real');
-  const [lightboxImage, setLightboxImage] = useState<ImagenRepuesto | null>(null);
-  
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  // Array unificado para que el lightbox pueda navegar entre TODAS las fotos
+  // del repuesto (manual + real). El orden coincide con el render: manual primero.
+  const allImages = useMemo(
+    () => [...imagenesManual, ...fotosReales],
+    [imagenesManual, fotosReales],
+  );
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDrag = (e: React.DragEvent) => {
@@ -106,7 +114,10 @@ export function ImageGallery({
     <div
       key={image.id}
       className="relative group cursor-pointer rounded-lg overflow-hidden border-2 border-gray-200 hover:border-blue-400 transition-all"
-      onClick={() => setLightboxImage(image)}
+      onClick={() => {
+        const idx = allImages.findIndex(im => im.id === image.id);
+        setLightboxIndex(idx >= 0 ? idx : 0);
+      }}
     >
       <img
         src={image.url}
@@ -242,23 +253,13 @@ export function ImageGallery({
         </div>
       )}
 
-      {/* Lightbox */}
-      {lightboxImage && (
-        <div
-          className="fixed inset-0 bg-black/90 z-[60] flex items-center justify-center p-4"
-          onClick={() => setLightboxImage(null)}
-        >
-          <div className="max-w-4xl max-h-full">
-            <img
-              src={lightboxImage.url}
-              alt={lightboxImage.descripcion}
-              className="max-w-full max-h-[90vh] object-contain"
-            />
-            <p className="text-white text-center mt-4">
-              {lightboxImage.descripcion}
-            </p>
-          </div>
-        </div>
+      {/* Lightbox con pan+zoom (componente unificado @/components/ui/ImageLightbox) */}
+      {lightboxIndex !== null && allImages.length > 0 && (
+        <ImageLightbox
+          photos={allImages.map(im => im.url)}
+          initialIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+        />
       )}
     </div>
   );
