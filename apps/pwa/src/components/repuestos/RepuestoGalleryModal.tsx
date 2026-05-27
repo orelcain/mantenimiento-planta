@@ -12,6 +12,7 @@ import {
 import {
   Dialog, DialogContent, DialogTitle, Button, Badge,
 } from '@/components/ui'
+import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import type { Repuesto, MachineImage } from '@/types/repuestos'
 import { useStorage } from '@/hooks/repuestos/useStorage'
 import { useToast } from '@/hooks/useToast'
@@ -49,6 +50,7 @@ export function RepuestoGalleryModal({
 }: RepuestoGalleryModalProps) {
   const [gallery, setGallery] = useState<MachineImage[]>([])
   const [saving, setSaving] = useState(false)
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
   const { uploadImage, uploading } = useStorage(machineId || null)
@@ -114,6 +116,7 @@ export function RepuestoGalleryModal({
   if (!repuesto) return null
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0">
         {/* Header */}
@@ -177,10 +180,11 @@ export function RepuestoGalleryModal({
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {gallery.map((img) => (
+                {gallery.map((img, idx) => (
                   <div
                     key={img.id}
-                    className="group relative aspect-square bg-muted rounded-lg overflow-hidden border border-border"
+                    className="group relative aspect-square bg-muted rounded-lg overflow-hidden border border-border cursor-pointer"
+                    onClick={() => setLightboxIndex(idx)}
                   >
                     <img src={img.url} alt="Gallery item" className="w-full h-full object-cover" loading="lazy" />
 
@@ -255,5 +259,14 @@ export function RepuestoGalleryModal({
         </div>
       </DialogContent>
     </Dialog>
+    {/* Lightbox con pan+zoom para ampliar las miniaturas de la galería */}
+    {lightboxIndex !== null && gallery.length > 0 && (
+      <ImageLightbox
+        photos={gallery.map(g => g.url)}
+        initialIndex={lightboxIndex}
+        onClose={() => setLightboxIndex(null)}
+      />
+    )}
+    </>
   )
 }

@@ -12,16 +12,17 @@
  * Accesible para TODOS los usuarios (no solo admin).
  */
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import {
-  X, Package, MapPin, DollarSign, Hash, Tag,
+  Package, MapPin, DollarSign, Hash, Tag,
   ClipboardList, Camera, BookOpen, MessageSquareText,
-  Image as ImageIcon, ChevronLeft, ChevronRight,
+  Image as ImageIcon,
   Pencil, Check, X as XIcon, Warehouse, Plus, History, Download,
 } from 'lucide-react'
 import { doc, updateDoc, addDoc, collection, getDocs, query, where, limit } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import { Dialog, DialogContent, Badge } from '@/components/ui'
+import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import type { Repuesto, ImagenRepuesto, MachineImage } from '@/types/repuestos'
 import { logger } from '@/lib/logger'
 import { useAuthStore } from '@/store/authStore'
@@ -45,62 +46,6 @@ const TECH_TYPE_LABELS: Record<string, string> = {
   general: 'General',
   pump: 'Bomba',
   conveyor: 'Cinta',
-}
-
-// ─── Image Lightbox ─────────────────────────────────────────
-
-interface LightboxImage {
-  url: string
-  label: string
-  tipo: string
-}
-
-function ImageLightbox({
-  images,
-  index,
-  onClose,
-  onPrev,
-  onNext,
-}: {
-  images: LightboxImage[]
-  index: number
-  onClose: () => void
-  onPrev: () => void
-  onNext: () => void
-}) {
-  // Precargar vecinas (debe estar antes de cualquier early return)
-  useEffect(() => {
-    [images[index - 1]?.url, images[index + 1]?.url].forEach(src => {
-      if (src) { const i = new Image(); i.src = src }
-    })
-  }, [index, images])
-
-  const img = images[index]
-  if (!img) return null
-  return (
-    <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="relative max-w-3xl max-h-[85vh] flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
-        <button onClick={onClose} className="absolute -top-3 -right-3 z-10 h-8 w-8 rounded-full bg-background/90 border border-border flex items-center justify-center hover:bg-destructive hover:text-destructive-foreground transition-colors">
-          <X className="h-4 w-4" />
-        </button>
-
-        <img src={img.url} alt={img.label} className="max-w-full max-h-[75vh] object-contain rounded-xl shadow-2xl" />
-
-        <div className="flex items-center gap-4 mt-3">
-          <button onClick={onPrev} disabled={images.length <= 1} className="h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white disabled:opacity-30 transition-colors">
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <div className="text-center">
-            <div className="text-white/90 text-sm truncate max-w-[250px]">{img.label}</div>
-            <div className="text-white/50 text-xs">{img.tipo} · {index + 1}/{images.length}</div>
-          </div>
-          <button onClick={onNext} disabled={images.length <= 1} className="h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white disabled:opacity-30 transition-colors">
-            <ChevronRight className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-    </div>
-  )
 }
 
 // ─── Section component ──────────────────────────────────────
@@ -314,7 +259,7 @@ export function RepuestoDetailModal({
   }
 
   // ── Collect all images ──
-  const allImages: LightboxImage[] = []
+  const allImages: { url: string; label: string; tipo: string }[] = []
 
   rep.fotosReales?.forEach((img: ImagenRepuesto) => {
     allImages.push({ url: img.url, label: img.descripcion || 'Foto real', tipo: 'Foto real' })
@@ -730,14 +675,12 @@ export function RepuestoDetailModal({
         </DialogContent>
       </Dialog>
 
-      {/* Lightbox */}
+      {/* Lightbox con pan+zoom (componente unificado @/components/ui/ImageLightbox) */}
       {lightboxIndex !== null && (
         <ImageLightbox
-          images={allImages}
-          index={lightboxIndex}
+          photos={allImages.map(i => i.url)}
+          initialIndex={lightboxIndex}
           onClose={() => setLightboxIndex(null)}
-          onPrev={() => setLightboxIndex((prev) => (prev! - 1 + allImages.length) % allImages.length)}
-          onNext={() => setLightboxIndex((prev) => (prev! + 1) % allImages.length)}
         />
       )}
     </>
