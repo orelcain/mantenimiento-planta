@@ -1,0 +1,7 @@
+{
+"type": "FeatureCollection",
+"name": "SELECT",
+"features": [
+{ "type": "Feature", "properties": { "Layer": "LOTEA", "PaperSpace": null, "SubClasses": null, "Linetype": null, "EntityHandle": "1D1EE2D2", "Text": null }, "geometry": { "type": "LineString", "coordinates": [ [ 785.985433939128484, -615.53156388707805, 0.0 ], [ 786.178162470795996, -615.546134774573034, 0.0 ], [ 793.071047431564921, -611.915547222999407, 0.0 ], [ 793.148062917317702, -612.543383419545762, 0.0 ], [ 786.453648015489193, -616.069147556576127, 0.0 ], [ 786.235595094262067, -616.443768696109373, 0.0 ] ] } }
+]
+}

@@ -19,6 +19,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["serve", "-l", "5501", "apps/pwa/public/dev-mockups"],
       "port": 5501
+    },
+    {
+      "name": "aligner-dxf",
+      "runtimeExecutable": "py",
+      "runtimeArgs": ["-3.11", "scripts/recinto-expansion/aligner/serve.py"],
+      "port": 5800
     }
   ]
 }

@@ -7,6 +7,12 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [3.32.3] - 2026-05-27
+### Mejorado - Centro de Aprendizaje Baader 200
+- Baader 200 queda integrado al formato estandar de cuatro secciones: Manual, Procedimientos, Flujos y Diagnostico.
+- El contenido existente del manual Baader 200 se adapta a tarjetas tecnicas con medidas, puntos clave, notas y referencias visuales.
+- El panel admin permite editar overrides de contenido Baader 200 sin perder la base generada desde el manual actual.
+
 ## [2.70.23] - 2026-03-08
 ### Corregido — Hotfix de deploy para visor de mapas
 - **TypeScript estricto en CI**: se corrigen accesos potencialmente `undefined` en la lógica de color topográfico y curvas de nivel del terreno.

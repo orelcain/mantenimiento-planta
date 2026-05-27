@@ -20,6 +20,7 @@ import {
 } from 'firebase/firestore'
 import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage'
 import { db, storage } from './firebase'
+import { getB200Sections, ALL_DEFAULT_SECTIONS, type B200Section } from './baader200Learning'
 import { processImageForUpload, IMAGE_PRESETS } from '@/utils/images/processImage'
 
 // ─────────────────────────────────────────────────────────────
@@ -90,17 +91,223 @@ function sectionDoc(machineSlug: string, section: LearningSectionKey, id: string
   return doc(db, ROOT, machineSlug, section, id)
 }
 
+const B200_LEARNING_SLUG = 'baader-200'
+const B200_CONTENT_UPDATED_AT = new Date('2026-05-27T00:00:00-04:00').getTime()
+type StoredOverride<T> = T & { _deleted?: boolean }
+
+async function listStoredProcedures(machineSlug: string): Promise<StoredOverride<Procedure>[]> {
+  const q = query(sectionCollection(machineSlug, 'procedures'), orderBy('updatedAt', 'desc'))
+  const snap = await getDocs(q)
+  return snap.docs.map(d => {
+    const data = d.data() as StoredOverride<Procedure>
+    return { ...data, id: d.id }
+  })
+}
+
+async function listStoredManualSections(machineSlug: string): Promise<StoredOverride<ManualSection>[]> {
+  const q = query(sectionCollection(machineSlug, 'manual'), orderBy('order', 'asc'))
+  const snap = await getDocs(q)
+  return snap.docs.map(d => ({ ...(d.data() as StoredOverride<ManualSection>), id: d.id }))
+}
+
+async function listStoredFlows(machineSlug: string): Promise<StoredOverride<Flow>[]> {
+  const q = query(sectionCollection(machineSlug, 'flows'), orderBy('updatedAt', 'desc'))
+  const snap = await getDocs(q)
+  return snap.docs.map(d => ({ ...(d.data() as StoredOverride<Flow>), id: d.id }))
+}
+
+async function listStoredDiagnosis(machineSlug: string): Promise<StoredOverride<DiagnosisEntry>[]> {
+  const q = query(sectionCollection(machineSlug, 'diagnosis'), orderBy('updatedAt', 'desc'))
+  const snap = await getDocs(q)
+  return snap.docs.map(d => ({ ...(d.data() as StoredOverride<DiagnosisEntry>), id: d.id }))
+}
+
+function mergeB200Overrides<T extends { id: string; updatedAt: number }>(
+  base: T[],
+  stored: StoredOverride<T>[],
+): T[] {
+  const storedById = new Map(stored.map(item => [item.id, item]))
+  const merged = base
+    .filter(item => storedById.get(item.id)?._deleted !== true)
+    .map(item => {
+      const override = storedById.get(item.id)
+      return override && !override._deleted ? stripDeleted(override) : item
+    })
+  const extra = stored
+    .filter(item => !item._deleted && !base.some(baseItem => baseItem.id === item.id))
+    .map(stripDeleted)
+  return [...merged, ...extra].sort((a, b) => b.updatedAt - a.updatedAt)
+}
+
+function stripDeleted<T extends { _deleted?: boolean }>(item: T): T {
+  const clean = { ...item }
+  delete clean._deleted
+  return clean
+}
+
+async function getBaader200SourceSections(): Promise<B200Section[]> {
+  try {
+    const sections = await getB200Sections()
+    return sections.length > 0 ? sections : toB200Sections(ALL_DEFAULT_SECTIONS)
+  } catch {
+    return toB200Sections(ALL_DEFAULT_SECTIONS)
+  }
+}
+
+function toB200Sections(sections: Omit<B200Section, 'updatedAt' | 'updatedBy'>[]): B200Section[] {
+  return sections.map(section => ({
+    ...section,
+    updatedAt: new Date(B200_CONTENT_UPDATED_AT),
+    updatedBy: 'seed',
+  }))
+}
+
+function b200MeasurementsText(section: B200Section): string[] {
+  if (section.measurements.length === 0) return []
+  return [
+    'Medidas / tolerancias:',
+    ...section.measurements.map(m => {
+      const value = [m.value, m.unit].filter(Boolean).join(' ')
+      return `- ${m.name}: ${value}${m.note ? ` (${m.note})` : ''}`
+    }),
+  ]
+}
+
+function b200NotesText(section: B200Section): string[] {
+  if (section.notes.length === 0) return []
+  return ['Notas operativas:', ...section.notes.map(note => `- ${note}`)]
+}
+
+function b200ImagesText(section: B200Section): string[] {
+  if (section.images.length === 0) return []
+  return [
+    'Referencias visuales:',
+    ...section.images.map(image => `- ${image.caption || 'Imagen'}: ${image.url}`),
+  ]
+}
+
+function b200ManualContent(section: B200Section): string {
+  return [
+    section.description,
+    ...b200MeasurementsText(section),
+    'Puntos clave:',
+    ...section.steps.map(step => `- ${step.important ? '[CRITICO] ' : ''}${step.text}`),
+    ...b200NotesText(section),
+    ...b200ImagesText(section),
+  ].filter(Boolean).join('\n\n')
+}
+
+function b200DiagnosisSolution(section: B200Section): string {
+  return [
+    'Ejecutar las verificaciones en orden y corregir el primer ajuste fuera de condicion.',
+    ...b200MeasurementsText(section),
+    ...b200NotesText(section),
+    ...b200ImagesText(section),
+  ].filter(Boolean).join('\n\n')
+}
+
+async function listB200ManualSections(): Promise<ManualSection[]> {
+  const sections = await getBaader200SourceSections()
+  const base = sections
+    .filter(section => section.type === 'ajuste')
+    .map(section => ({
+      id: `b200-manual-${section.id}`,
+      title: section.title,
+      content: b200ManualContent(section),
+      order: section.order,
+      createdAt: B200_CONTENT_UPDATED_AT,
+      updatedAt: section.updatedAt.getTime(),
+    }))
+  const stored = await listStoredManualSections(B200_LEARNING_SLUG)
+  return mergeB200Overrides(base, stored).sort((a, b) => a.order - b.order)
+}
+
+async function listB200Procedures(): Promise<Procedure[]> {
+  const sections = await getBaader200SourceSections()
+  const base = sections
+    .filter(section => section.type === 'seguridad' || section.type === 'precaucion')
+    .map(section => ({
+      id: `b200-procedure-${section.id}`,
+      title: section.title,
+      description: [
+        section.description,
+        ...b200MeasurementsText(section),
+        ...b200NotesText(section),
+      ].filter(Boolean).join('\n\n'),
+      steps: section.steps.map((step, index) => ({
+        order: index + 1,
+        title: step.important ? 'Paso critico' : `Paso ${index + 1}`,
+        description: step.text,
+        imageUrl: index === 0 ? section.images[0]?.url ?? null : null,
+      })),
+      createdAt: B200_CONTENT_UPDATED_AT,
+      updatedAt: section.updatedAt.getTime(),
+      createdBy: 'baader200-adapter',
+    }))
+  const stored = await listStoredProcedures(B200_LEARNING_SLUG)
+  return mergeB200Overrides(base, stored)
+}
+
+async function listB200Flows(): Promise<Flow[]> {
+  const sections = await getBaader200SourceSections()
+  const base = sections
+    .filter(section => section.type === 'troubleshooting')
+    .map(section => ({
+      id: `b200-flow-${section.id}`,
+      title: `Resolver: ${section.title}`,
+      trigger: section.description,
+      actions: [
+        ...section.steps.map(step => step.text),
+        'Aplicar correccion, producir muestra y validar el filete antes de liberar la condicion.',
+      ],
+      createdAt: B200_CONTENT_UPDATED_AT,
+      updatedAt: section.updatedAt.getTime(),
+    }))
+  const stored = await listStoredFlows(B200_LEARNING_SLUG)
+  return mergeB200Overrides(base, stored)
+}
+
+async function listB200Diagnosis(): Promise<DiagnosisEntry[]> {
+  const sections = await getBaader200SourceSections()
+  const base = sections
+    .filter(section => section.type === 'troubleshooting')
+    .map(section => ({
+      id: `b200-diagnosis-${section.id}`,
+      title: section.title,
+      symptom: section.description,
+      possibleCauses: section.steps.map(step => step.text),
+      solution: b200DiagnosisSolution(section),
+      createdAt: B200_CONTENT_UPDATED_AT,
+      updatedAt: section.updatedAt.getTime(),
+    }))
+  const stored = await listStoredDiagnosis(B200_LEARNING_SLUG)
+  return mergeB200Overrides(base, stored)
+}
+
+async function getB200ContentCounts(): Promise<MachineContentCounts> {
+  const [manual, procedures, flows, diagnosis] = await Promise.all([
+    listB200ManualSections(),
+    listB200Procedures(),
+    listB200Flows(),
+    listB200Diagnosis(),
+  ])
+  return {
+    manual: manual.length,
+    procedures: procedures.length,
+    flows: flows.length,
+    diagnosis: diagnosis.length,
+  }
+}
+
 // ─────────────────────────────────────────────────────────────
 // PROCEDURES
 // ─────────────────────────────────────────────────────────────
 
 export async function listProcedures(machineSlug: string): Promise<Procedure[]> {
-  const q = query(sectionCollection(machineSlug, 'procedures'), orderBy('updatedAt', 'desc'))
-  const snap = await getDocs(q)
-  return snap.docs.map(d => {
-    const data = d.data() as Procedure
-    return { ...data, id: d.id }
-  })
+  if (machineSlug === B200_LEARNING_SLUG) return listB200Procedures()
+
+  return listStoredProcedures(machineSlug)
+    .then(list => list.filter(item => !item._deleted).map(stripDeleted))
 }
 
 export async function getProcedure(machineSlug: string, id: string): Promise<Procedure | null> {
@@ -128,6 +335,10 @@ export async function saveProcedure(
 }
 
 export async function deleteProcedure(machineSlug: string, id: string): Promise<void> {
+  if (machineSlug === B200_LEARNING_SLUG && id.startsWith('b200-procedure-')) {
+    await setDoc(sectionDoc(machineSlug, 'procedures', id), { _deleted: true, updatedAt: Date.now() }, { merge: true })
+    return
+  }
   await deleteDoc(sectionDoc(machineSlug, 'procedures', id))
 }
 
@@ -136,9 +347,10 @@ export async function deleteProcedure(machineSlug: string, id: string): Promise<
 // ─────────────────────────────────────────────────────────────
 
 export async function listManualSections(machineSlug: string): Promise<ManualSection[]> {
-  const q = query(sectionCollection(machineSlug, 'manual'), orderBy('order', 'asc'))
-  const snap = await getDocs(q)
-  return snap.docs.map(d => ({ ...(d.data() as ManualSection), id: d.id }))
+  if (machineSlug === B200_LEARNING_SLUG) return listB200ManualSections()
+
+  return listStoredManualSections(machineSlug)
+    .then(list => list.filter(item => !item._deleted).map(stripDeleted))
 }
 
 export async function saveManualSection(
@@ -154,6 +366,10 @@ export async function saveManualSection(
 }
 
 export async function deleteManualSection(machineSlug: string, id: string): Promise<void> {
+  if (machineSlug === B200_LEARNING_SLUG && id.startsWith('b200-manual-')) {
+    await setDoc(sectionDoc(machineSlug, 'manual', id), { _deleted: true, updatedAt: Date.now() }, { merge: true })
+    return
+  }
   await deleteDoc(sectionDoc(machineSlug, 'manual', id))
 }
 
@@ -162,9 +378,10 @@ export async function deleteManualSection(machineSlug: string, id: string): Prom
 // ─────────────────────────────────────────────────────────────
 
 export async function listFlows(machineSlug: string): Promise<Flow[]> {
-  const q = query(sectionCollection(machineSlug, 'flows'), orderBy('updatedAt', 'desc'))
-  const snap = await getDocs(q)
-  return snap.docs.map(d => ({ ...(d.data() as Flow), id: d.id }))
+  if (machineSlug === B200_LEARNING_SLUG) return listB200Flows()
+
+  return listStoredFlows(machineSlug)
+    .then(list => list.filter(item => !item._deleted).map(stripDeleted))
 }
 
 export async function saveFlow(
@@ -180,6 +397,10 @@ export async function saveFlow(
 }
 
 export async function deleteFlow(machineSlug: string, id: string): Promise<void> {
+  if (machineSlug === B200_LEARNING_SLUG && id.startsWith('b200-flow-')) {
+    await setDoc(sectionDoc(machineSlug, 'flows', id), { _deleted: true, updatedAt: Date.now() }, { merge: true })
+    return
+  }
   await deleteDoc(sectionDoc(machineSlug, 'flows', id))
 }
 
@@ -188,9 +409,10 @@ export async function deleteFlow(machineSlug: string, id: string): Promise<void>
 // ─────────────────────────────────────────────────────────────
 
 export async function listDiagnosis(machineSlug: string): Promise<DiagnosisEntry[]> {
-  const q = query(sectionCollection(machineSlug, 'diagnosis'), orderBy('updatedAt', 'desc'))
-  const snap = await getDocs(q)
-  return snap.docs.map(d => ({ ...(d.data() as DiagnosisEntry), id: d.id }))
+  if (machineSlug === B200_LEARNING_SLUG) return listB200Diagnosis()
+
+  return listStoredDiagnosis(machineSlug)
+    .then(list => list.filter(item => !item._deleted).map(stripDeleted))
 }
 
 export async function saveDiagnosis(
@@ -206,6 +428,10 @@ export async function saveDiagnosis(
 }
 
 export async function deleteDiagnosis(machineSlug: string, id: string): Promise<void> {
+  if (machineSlug === B200_LEARNING_SLUG && id.startsWith('b200-diagnosis-')) {
+    await setDoc(sectionDoc(machineSlug, 'diagnosis', id), { _deleted: true, updatedAt: Date.now() }, { merge: true })
+    return
+  }
   await deleteDoc(sectionDoc(machineSlug, 'diagnosis', id))
 }
 
@@ -224,6 +450,8 @@ export interface MachineContentCounts {
 export async function getMachineContentCounts(
   machineSlug: string
 ): Promise<MachineContentCounts> {
+  if (machineSlug === B200_LEARNING_SLUG) return getB200ContentCounts()
+
   const [manual, procedures, flows, diagnosis] = await Promise.all([
     getDocs(sectionCollection(machineSlug, 'manual')),
     getDocs(sectionCollection(machineSlug, 'procedures')),
@@ -248,6 +476,11 @@ export interface MachineContentMeta extends MachineContentCounts {
 export async function getMachineContentMeta(
   machineSlug: string
 ): Promise<MachineContentMeta> {
+  if (machineSlug === B200_LEARNING_SLUG) {
+    const counts = await getB200ContentCounts()
+    return { ...counts, lastUpdatedAt: B200_CONTENT_UPDATED_AT }
+  }
+
   const [manual, procedures, flows, diagnosis] = await Promise.all([
     getDocs(sectionCollection(machineSlug, 'manual')),
     getDocs(sectionCollection(machineSlug, 'procedures')),
@@ -283,6 +516,16 @@ export async function getSymptomsForMachines(machineSlugs: string[]): Promise<Sy
   const results = await Promise.all(
     machineSlugs.map(async slug => {
       try {
+        if (slug === B200_LEARNING_SLUG) {
+          const diagnosis = await listB200Diagnosis()
+          return diagnosis.map(entry => ({
+            machineSlug: slug,
+            diagnosisId: entry.id,
+            title: entry.title,
+            symptom: entry.symptom,
+          }))
+        }
+
         const snap = await getDocs(sectionCollection(slug, 'diagnosis'))
         return snap.docs.map(d => {
           const data = d.data() as DiagnosisEntry

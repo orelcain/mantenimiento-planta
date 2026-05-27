@@ -72,8 +72,7 @@ export const LEARNING_MACHINES: LearningMachine[] = [
     description: 'Fileteadora Baader 200 — manual tecnico completo con ajustes, medidas y calibracion.',
     icon: BookOpen,
     color: '#4499ff',
-    customRoute: '/aprendizaje/baader-200',
-    sections: { manual: true, procedures: false, flows: false, diagnosis: false },
+    sections: { manual: true, procedures: true, flows: true, diagnosis: true },
   },
   {
     slug: 'marel-filete',

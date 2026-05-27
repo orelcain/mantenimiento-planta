@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft, BookOpen, ListChecks, GitBranch, AlertTriangle, Clock, Loader2, Wrench, ChevronDown,
+  Ruler, Image as ImageIcon, FileText,
 } from 'lucide-react'
 import { useAuthStore } from '@/store'
 import { findMachineBySlug, type LearningSection } from '@/data/learningMachines'
@@ -292,7 +293,7 @@ function ProceduresList({ procedures, color }: { procedures: Procedure[]; color:
           <div className="p-5">
             <h3 className="text-base font-semibold text-[#e9eef3] mb-1">{proc.title}</h3>
             {proc.description && (
-              <p className="text-sm mb-4" style={{ color: LC.inkMid }}>
+              <p className="text-sm mb-4 whitespace-pre-wrap" style={{ color: LC.inkMid }}>
                 {proc.description}
               </p>
             )}
@@ -342,33 +343,193 @@ function ProceduresList({ procedures, color }: { procedures: Procedure[]; color:
 function ManualList({ sections, color }: { sections: ManualSection[]; color: string }) {
   return (
     <div className="space-y-4">
-      {sections.map(sec => (
-        <article
-          key={sec.id}
-          className="rounded-xl overflow-hidden"
-          style={{ background: LC.surface, border: `1px solid ${LC.border}` }}
-        >
-          <div className="h-1" style={{ background: color, opacity: 0.9 }} />
-          <div className="p-5">
-            <div className="flex items-center gap-2 mb-2">
-              <span
-                className="flex items-center justify-center w-6 h-6 rounded-full font-bold text-[11px]"
-                style={{ background: `${color}25`, color }}
-              >
-                {sec.order}
-              </span>
-              <h3 className="text-base font-semibold text-[#e9eef3]">{sec.title}</h3>
+      {sections.map(sec => {
+        const blocks = parseManualContent(sec.content)
+        return (
+          <article
+            key={sec.id}
+            className="rounded-xl overflow-hidden"
+            style={{ background: LC.surface, border: `1px solid ${LC.border}` }}
+          >
+            <div className="h-1" style={{ background: color, opacity: 0.9 }} />
+            <div className="p-5">
+              <div className="flex items-start gap-3 mb-4">
+                <span
+                  className="flex items-center justify-center w-7 h-7 rounded-lg font-bold text-[11px] flex-shrink-0 tabular-nums"
+                  style={{ background: `${color}25`, color }}
+                >
+                  {sec.order}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-base font-semibold leading-tight text-[#e9eef3]">{sec.title}</h3>
+                  {blocks.description && (
+                    <p className="text-sm leading-relaxed mt-1.5" style={{ color: LC.inkMid }}>
+                      {blocks.description}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid gap-3">
+                {blocks.measurements.length > 0 && (
+                  <ManualBlock
+                    icon={Ruler}
+                    title="Medidas / tolerancias"
+                    color={color}
+                    items={blocks.measurements}
+                    variant="measure"
+                  />
+                )}
+                {blocks.keyPoints.length > 0 && (
+                  <ManualBlock
+                    icon={FileText}
+                    title="Puntos clave"
+                    color={color}
+                    items={blocks.keyPoints}
+                  />
+                )}
+                {blocks.notes.length > 0 && (
+                  <ManualBlock
+                    icon={AlertTriangle}
+                    title="Notas operativas"
+                    color={color}
+                    items={blocks.notes}
+                    variant="note"
+                  />
+                )}
+                {blocks.images.length > 0 && (
+                  <ManualImages images={blocks.images} color={color} />
+                )}
+              </div>
             </div>
-            <p
-              className="text-sm leading-relaxed whitespace-pre-wrap"
-              style={{ color: LC.inkMid }}
-            >
-              {sec.content}
-            </p>
-          </div>
-        </article>
-      ))}
+          </article>
+        )
+      })}
     </div>
+  )
+}
+
+interface ManualContentBlocks {
+  description: string
+  measurements: string[]
+  keyPoints: string[]
+  notes: string[]
+  images: { label: string; url: string }[]
+}
+
+function parseManualContent(content: string): ManualContentBlocks {
+  const blocks: ManualContentBlocks = {
+    description: '',
+    measurements: [],
+    keyPoints: [],
+    notes: [],
+    images: [],
+  }
+  let current: keyof Omit<ManualContentBlocks, 'description' | 'images'> | 'images' | 'description' = 'description'
+  const description: string[] = []
+
+  for (const raw of content.split('\n')) {
+    const line = raw.trim()
+    if (!line) continue
+    if (line === 'Medidas / tolerancias:') { current = 'measurements'; continue }
+    if (line === 'Puntos clave:') { current = 'keyPoints'; continue }
+    if (line === 'Notas operativas:') { current = 'notes'; continue }
+    if (line === 'Referencias visuales:') { current = 'images'; continue }
+
+    const value = line.startsWith('- ') ? line.slice(2) : line
+    if (current === 'description') {
+      description.push(value)
+    } else if (current === 'images') {
+      const match = value.match(/^(.*?):\s*(https?:\/\/\S+|\/\S+)$/)
+      blocks.images.push(match ? { label: match[1] || 'Imagen', url: match[2] ?? '' } : { label: value, url: '' })
+    } else {
+      blocks[current].push(value)
+    }
+  }
+
+  blocks.description = description.join('\n')
+  return blocks
+}
+
+function ManualBlock({
+  icon: Icon,
+  title,
+  color,
+  items,
+  variant = 'default',
+}: {
+  icon: React.ElementType
+  title: string
+  color: string
+  items: string[]
+  variant?: 'default' | 'measure' | 'note'
+}) {
+  const background = variant === 'note' ? `${color}0d` : LC.surfaceHi
+  return (
+    <section className="rounded-xl p-4" style={{ background, border: `1px solid ${variant === 'note' ? color + '33' : LC.border}` }}>
+      <div className="flex items-center gap-2 mb-3">
+        <Icon className="h-4 w-4" style={{ color }} />
+        <h4 className="text-xs uppercase tracking-[0.14em] font-bold" style={{ color }}>
+          {title}
+        </h4>
+      </div>
+      <ul className={variant === 'measure' ? 'grid gap-2 sm:grid-cols-2' : 'space-y-2'}>
+        {items.map((item, index) => (
+          <li
+            key={`${item}-${index}`}
+            className={variant === 'measure' ? 'rounded-lg px-3 py-2 text-sm' : 'flex gap-2.5 text-sm leading-relaxed'}
+            style={variant === 'measure'
+              ? { background: `${color}10`, border: `1px solid ${color}22`, color: LC.ink }
+              : { color: LC.inkMid }}
+          >
+            {variant === 'measure' ? (
+              <span className="whitespace-pre-wrap">{item}</span>
+            ) : (
+              <>
+                <span className="mt-[7px] w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: color }} />
+                <span className="flex-1 whitespace-pre-wrap">{item}</span>
+              </>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+function ManualImages({ images, color }: { images: { label: string; url: string }[]; color: string }) {
+  return (
+    <section className="rounded-xl p-4" style={{ background: LC.surfaceHi, border: `1px solid ${LC.border}` }}>
+      <div className="flex items-center gap-2 mb-3">
+        <ImageIcon className="h-4 w-4" style={{ color }} />
+        <h4 className="text-xs uppercase tracking-[0.14em] font-bold" style={{ color }}>
+          Referencias visuales
+        </h4>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {images.map((image, index) => (
+          <a
+            key={`${image.label}-${index}`}
+            href={image.url || undefined}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group rounded-lg overflow-hidden"
+            style={{ background: LC.surface, border: `1px solid ${color}30` }}
+          >
+            {image.url ? (
+              <img src={image.url} alt={image.label} loading="lazy" className="h-36 w-full object-cover" />
+            ) : (
+              <div className="h-24 flex items-center justify-center" style={{ color: LC.inkGhost }}>
+                <ImageIcon className="h-6 w-6" />
+              </div>
+            )}
+            <div className="px-3 py-2 text-xs leading-snug" style={{ color: LC.inkMid }}>
+              {image.label}
+            </div>
+          </a>
+        ))}
+      </div>
+    </section>
   )
 }
 

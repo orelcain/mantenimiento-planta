@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Aligner DXF · Fase 6.2</title>
+<style>
+  :root {
+    --bg: #0c1620; --fg: #e6edf3; --muted: #94a3b8;
+    --aqua: #2E75B6; --aquaBright: #5aa6e8; --accent: #ff6b6b;
+    --border: #1f2933; --good: #22c55e;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); font-family: ui-sans-serif, system-ui; height: 100%; overflow: hidden; }
+  header { position: fixed; top: 0; left: 0; right: 0; height: 56px; background: #0a1320; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 14px; padding: 0 14px; z-index: 20; }
+  header h1 { font-size: 13px; margin: 0; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+  header .badge { background: var(--aqua); color: white; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+  header .hint { color: var(--muted); font-size: 11px; max-width: 480px; line-height: 1.4; }
+  header .actions { margin-left: auto; display: flex; gap: 6px; }
+  header button { background: #1a2532; color: var(--fg); border: 1px solid var(--border); padding: 7px 11px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+  header button.primary { background: var(--aqua); border-color: var(--aqua); }
+  header button:hover { background: #243245; }
+
+  main { position: fixed; top: 56px; left: 0; right: 340px; bottom: 0; background: #050a10; }
+  .viewport { position: absolute; inset: 0; overflow: hidden; cursor: crosshair; user-select: none; }
+  .viewport.panning { cursor: grabbing; }
+  .stage { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+  .stage img { display: block; pointer-events: none; -webkit-user-drag: none; }
+  .stage svg.dxf { position: absolute; left: 0; top: 0; pointer-events: none; transform-origin: 0 0; overflow: visible; }
+  .stage svg.dxf .layer path, .stage svg.dxf .layer polyline, .stage svg.dxf .layer line, .stage svg.dxf .layer circle, .stage svg.dxf .layer polygon { vector-effect: non-scaling-stroke; fill: none; }
+  .coords-hud { position: absolute; bottom: 8px; left: 8px; background: rgba(0,0,0,0.7); color: var(--muted); padding: 5px 11px; border-radius: 4px; font-family: ui-monospace, monospace; font-size: 11px; }
+
+  aside { position: fixed; top: 56px; right: 0; bottom: 0; width: 340px; background: #0a1320; border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+  aside h3 { margin: 11px 14px 6px; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+  .sliders { padding: 4px 14px 6px; border-bottom: 1px solid var(--border); }
+  .srow { display: grid; grid-template-columns: 64px 1fr 60px; gap: 8px; align-items: center; margin: 4px 0; font-family: ui-monospace, monospace; }
+  .srow label { color: var(--muted); font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; }
+  .srow input[type=range] { accent-color: var(--aquaBright); height: 18px; cursor: pointer; width: 100%; }
+  .srow .v { color: var(--fg); font-size: 11px; text-align: right; font-weight: 600; }
+
+  .layers { padding: 4px 14px 6px; flex: 1; overflow: auto; }
+  .layer-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-family: ui-monospace, monospace; font-size: 10.5px; }
+  .layer-row input[type=checkbox] { accent-color: var(--aquaBright); cursor: pointer; }
+  .layer-row .sw { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; }
+  .layer-row .nm { color: var(--fg); cursor: pointer; flex: 1; }
+  .layer-row .cnt { color: var(--muted); font-size: 9.5px; }
+
+  .json-out { padding: 8px 14px 12px; border-top: 1px solid var(--border); background: #08111c; }
+  .json-out textarea { width: 100%; height: 90px; background: #020608; color: var(--good); border: 1px solid var(--border); border-radius: 4px; padding: 6px; font-family: ui-monospace, monospace; font-size: 10px; resize: none; }
+  .ok-strip { padding: 4px 8px; background: #133a1f; color: var(--good); border: 1px solid #166534; border-radius: 3px; font-size: 11px; margin-top: 6px; display: none; }
+  .ok-strip.show { display: block; }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="badge">Fase 6.2</span>
+  <h1>Aligner DXF &middot; calibrar GeoJSONs sobre recinto raster</h1>
+  <span class="hint">Rueda=zoom &middot; Click der=pan &middot; Tocar sliders para ajustar la transformaci&oacute;n del SVG sobre el raster. Click capa = ocultar/mostrar.</span>
+  <div class="actions">
+    <button id="btnFit">Fit</button>
+    <button id="btnReset">Reset matriz</button>
+    <button id="btnAuto">Auto-calibrar</button>
+    <button id="btnCopy" class="primary">Copiar matriz</button>
+  </div>
+</header>
+
+<main>
+  <div class="coords-hud" id="coords">DXF: (&mdash;,&mdash;) &middot; recinto: (&mdash;,&mdash;)</div>
+  <div class="viewport" id="vp">
+    <div class="stage" id="stage">
+      <img id="imgR" alt="recinto">
+      <svg class="dxf" id="dxfSvg" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+  </div>
+</main>
+
+<aside>
+  <h3>Matriz DXF &rarr; recinto reducido (8000&times;5659)</h3>
+  <div class="sliders">
+    <div class="srow"><label>Escala</label><input type="range" id="sScale" min="50" max="500" value="200" step="0.5"><span class="v" id="sScaleV">200</span></div>
+    <div class="srow"><label>Offset X</label><input type="range" id="sOx" min="-12000" max="12000" value="-146000" step="50"><span class="v" id="sOxV">&mdash;</span></div>
+    <div class="srow"><label>Offset Y</label><input type="range" id="sOy" min="-12000" max="20000" value="0" step="50"><span class="v" id="sOyV">&mdash;</span></div>
+    <div class="srow"><label>Rotar &deg;</label><input type="range" id="sRot" min="-180" max="180" value="0" step="0.5"><span class="v" id="sRotV">0&deg;</span></div>
+    <div class="srow"><label>Flip Y</label><input type="range" id="sFlip" min="0" max="1" value="0" step="1"><span class="v" id="sFlipV">no</span></div>
+    <div class="srow"><label>Opacidad</label><input type="range" id="sOpac" min="0" max="100" value="80"><span class="v" id="sOpacV">80%</span></div>
+  </div>
+  <h3>Capas DXF</h3>
+  <div class="layers" id="layers"></div>
+  <div class="json-out">
+    <h3 style="margin-left:0">Matriz JSON</h3>
+    <textarea id="jsonOut" readonly></textarea>
+    <div class="ok-strip" id="okStrip">Copiado al clipboard.</div>
+  </div>
+</aside>
+
+<script>
+// Colores por capa
+const LAYER_COLORS = {
+  '023_MUROS_2':'#94a3b8','MURO':'#cbd5e1','AGUA':'#0cffff','A_PV':'#5aa6e8',
+  'BARRERA':'#f59e0b','BENCINA':'#fb923c','CAMARA':'#a78bfa','CAMINO':'#fbbf24',
+  'CERCO':'#84cc16','CIMENTACION':'#fb7185','DIBUJO':'#94a3b8','ESCALERA':'#22d3ee',
+  'ESTANQUE-AGUA':'#06b6d4','GENERADOR':'#ef4444','LOTEA':'#a8a29e','PLANTA':'#10b981',
+  'VENTANAS':'#e879f9'
+};
+
+const LAYERS = ['023_MUROS_2','AGUA','A_PV','BARRERA','BENCINA','CAMARA','CAMINO','CERCO','CIMENTACION','DIBUJO','ESCALERA','ESTANQUE-AGUA','GENERADOR','LOTEA','MURO','PLANTA','VENTANAS'];
+
+const state = {
+  scale: 1, tx: 0, ty: 0,
+  dxfData: {},  // {layer: {features, color, visible}}
+  // matriz DXF -> recinto reducido
+  // forma: x_red = scale * (cos*rot*x + (flip?+:-)sin*rot*y) + ox
+  //        y_red = scale * (sin*rot*x + (flip?-:+)cos*rot*y) + oy
+  // (simpler: applied as separate steps in CSS transform)
+  m: { sc: 200, ox: -146000, oy: 0, rot: 0, flip: 0, opac: 80 },
+};
+
+const vp = document.getElementById('vp');
+const stage = document.getElementById('stage');
+const imgR = document.getElementById('imgR');
+const dxfSvg = document.getElementById('dxfSvg');
+const coordsEl = document.getElementById('coords');
+
+function applyView() {
+  stage.style.transform = `translate(${state.tx}px,${state.ty}px) scale(${state.scale})`;
+}
+function fit() {
+  const r = vp.getBoundingClientRect();
+  const sx = r.width / imgR.naturalWidth;
+  const sy = r.height / imgR.naturalHeight;
+  state.scale = Math.min(sx, sy) * 0.95;
+  state.tx = (r.width - imgR.naturalWidth * state.scale) / 2;
+  state.ty = (r.height - imgR.naturalHeight * state.scale) / 2;
+  applyView();
+}
+
+// Composicion CSS de la transformacion del SVG dentro del stage:
+// Esquema simple: viewBox del SVG = bbox DXF. Luego transform CSS = T(ox,oy) * S(sc) * R(rot) * F(flip)
+// Posicionamos en coords del recinto display. recinto display (4000px) = recinto reducido (8000px) * 0.5
+// Por lo que el SVG actua en coords del recinto display: dividimos por 2 al final.
+function dxfSvgTransform() {
+  const m = state.m;
+  const k = 0.5; // recinto display vs reducido
+  const flipY = m.flip ? -1 : 1;
+  // transform applied left-to-right: visual is right-to-left in matrix multiplication.
+  // queremos: punto DXF (x,y) -> recinto display: ((m.sc*(cos*x - flipY*sin*y) + m.ox)*k, (m.sc*(sin*x + flipY*cos*y) + m.oy)*k)
+  // SVG coords son los del DXF (viewBox = bbox DXF).
+  // Una forma directa: matrix(a,b,c,d,tx,ty) en CSS aplica:
+  //   x' = a*x + c*y + tx
+  //   y' = b*x + d*y + ty
+  // con valores en px del CONTENEDOR (que para el SVG es 0..ancho del DXF en SVG coords, pero como hacemos transform-origin 0 0 y el SVG tiene viewBox = bbox DXF y width/height en px nativos del DXF... mejor lo dejo simple).
+  // Simplifico: aplico transform CSS al SVG con escala k*sc y rotacion+translate.
+  const rotRad = m.rot * Math.PI / 180;
+  const c = Math.cos(rotRad), s = Math.sin(rotRad);
+  const a = k * m.sc * c;
+  const b = k * m.sc * s;
+  const cc = k * m.sc * (-s) * flipY;
+  const dd = k * m.sc * c * flipY;
+  const tx = k * m.ox;
+  const ty = k * m.oy;
+  return `matrix(${a.toFixed(6)},${b.toFixed(6)},${cc.toFixed(6)},${dd.toFixed(6)},${tx.toFixed(2)},${ty.toFixed(2)})`;
+}
+
+function applyDxfMatrix() {
+  dxfSvg.style.transform = dxfSvgTransform();
+  dxfSvg.style.opacity = (state.m.opac/100).toFixed(3);
+  renderJSON();
+}
+
+async function loadGeoJson(layer) {
+  const r = await fetch(`geojsons/${layer}.geojson`);
+  if (!r.ok) { console.warn('no', layer); return null; }
+  return r.json();
+}
+
+function coordsBboxRecursive(coords, bbox) {
+  if (!coords) return;
+  if (typeof coords[0] === 'number') {
+    bbox[0] = Math.min(bbox[0], coords[0]); bbox[1] = Math.min(bbox[1], coords[1]);
+    bbox[2] = Math.max(bbox[2], coords[0]); bbox[3] = Math.max(bbox[3], coords[1]);
+    return;
+  }
+  for (const c of coords) coordsBboxRecursive(c, bbox);
+}
+
+function pathDFromGeom(g) {
+  // Convierte un geometry GeoJSON a un path d=. Acepta LineString, MultiLineString, Polygon, MultiPolygon, Point.
+  let d = '';
+  const handle = (line) => {
+    line.forEach((p, i) => { d += (i === 0 ? 'M' : 'L') + p[0].toFixed(3) + ' ' + p[1].toFixed(3) + ' '; });
+  };
+  if (g.type === 'LineString') handle(g.coordinates);
+  else if (g.type === 'MultiLineString') g.coordinates.forEach(handle);
+  else if (g.type === 'Polygon') g.coordinates.forEach(ring => { handle(ring); d += 'Z '; });
+  else if (g.type === 'MultiPolygon') g.coordinates.forEach(poly => poly.forEach(ring => { handle(ring); d += 'Z '; }));
+  else if (g.type === 'Point') {
+    const r = 0.2;
+    d += `M${g.coordinates[0]-r} ${g.coordinates[1]} a ${r} ${r} 0 1 0 ${2*r} 0 a ${r} ${r} 0 1 0 -${2*r} 0 `;
+  }
+  return d;
+}
+
+async function loadAllLayers() {
+  const overall = [Infinity, Infinity, -Infinity, -Infinity];
+  for (const lyr of LAYERS) {
+    const gj = await loadGeoJson(lyr);
+    if (!gj) continue;
+    const bbox = [Infinity, Infinity, -Infinity, -Infinity];
+    const paths = [];
+    for (const ft of gj.features) {
+      coordsBboxRecursive(ft.geometry.coordinates, bbox);
+      paths.push(pathDFromGeom(ft.geometry));
+    }
+    state.dxfData[lyr] = { paths, bbox, count: gj.features.length, color: LAYER_COLORS[lyr] || '#999', visible: true };
+    for (let i = 0; i < 4; i++) overall[i] = i < 2 ? Math.min(overall[i], bbox[i]) : Math.max(overall[i], bbox[i]);
+  }
+  // Set viewBox al bbox total
+  const [xmin, ymin, xmax, ymax] = overall;
+  const w = xmax - xmin, h = ymax - ymin;
+  dxfSvg.setAttribute('viewBox', `${xmin} ${ymin} ${w} ${h}`);
+  dxfSvg.style.width = w + 'px'; dxfSvg.style.height = h + 'px';
+  dxfSvg.dataset.bbox = overall.join(',');
+  // construir grupos
+  let html = '';
+  for (const [lyr, d] of Object.entries(state.dxfData)) {
+    html += `<g class="layer layer-${lyr}" data-layer="${lyr}" stroke="${d.color}" stroke-width="0.05">`;
+    d.paths.forEach(pd => { if (pd) html += `<path d="${pd}"/>`; });
+    html += `</g>`;
+  }
+  dxfSvg.innerHTML = html;
+  renderLayersList();
+  // Auto-fit inicial: encajar bbox DXF dentro del recinto reducido
+  autoCalibrate();
+}
+
+function renderLayersList() {
+  const c = document.getElementById('layers');
+  c.innerHTML = '';
+  for (const [lyr, d] of Object.entries(state.dxfData)) {
+    const row = document.createElement('div');
+    row.className = 'layer-row';
+    row.innerHTML = `<input type="checkbox" ${d.visible?'checked':''}><div class="sw" style="background:${d.color}"></div><span class="nm">${lyr}</span><span class="cnt">${d.count}</span>`;
+    row.querySelector('input').onchange = (e) => {
+      d.visible = e.target.checked;
+      const g = dxfSvg.querySelector(`g.layer-${lyr}`);
+      if (g) g.style.display = d.visible ? '' : 'none';
+    };
+    row.querySelector('.nm').onclick = () => row.querySelector('input').click();
+    c.appendChild(row);
+  }
+}
+
+function autoCalibrate() {
+  // Asume DXF bbox -> centro del recinto reducido, escala que entre comodamente.
+  const bb = dxfSvg.dataset.bbox.split(',').map(Number);
+  const [xmin, ymin, xmax, ymax] = bb;
+  const wDxf = xmax - xmin, hDxf = ymax - ymin;
+  // Target: que el bbox DXF cubra aproximadamente el recinto reducido (8000x5659)
+  const sc = Math.min(8000 / wDxf, 5659 / hDxf) * 0.95;
+  state.m.sc = sc;
+  state.m.rot = 0;
+  state.m.flip = 1; // DXF Y suele ir hacia arriba; raster hacia abajo
+  // offset: poner centro del bbox transformado en centro del recinto
+  // x' = sc * (cos*x - flipY*sin*y) + ox. Con rot=0, x' = sc*x + ox. flip=1: y' = sc*-y + oy
+  // queremos: x_centro=4000, y_centro=2829
+  const cxDxf = (xmin + xmax)/2, cyDxf = (ymin + ymax)/2;
+  state.m.ox = 4000 - sc * cxDxf;
+  state.m.oy = 2829 - sc * (-cyDxf);
+  syncSlidersFromState();
+  applyDxfMatrix();
+}
+
+function syncSlidersFromState() {
+  const m = state.m;
+  document.getElementById('sScale').value = m.sc;
+  document.getElementById('sScaleV').textContent = m.sc.toFixed(1);
+  document.getElementById('sOx').min = -50000; document.getElementById('sOx').max = 50000;
+  document.getElementById('sOx').value = m.ox;
+  document.getElementById('sOxV').textContent = m.ox.toFixed(0);
+  document.getElementById('sOy').min = -50000; document.getElementById('sOy').max = 50000;
+  document.getElementById('sOy').value = m.oy;
+  document.getElementById('sOyV').textContent = m.oy.toFixed(0);
+  document.getElementById('sRot').value = m.rot;
+  document.getElementById('sRotV').textContent = m.rot.toFixed(1) + '°';
+  document.getElementById('sFlip').value = m.flip;
+  document.getElementById('sFlipV').textContent = m.flip ? 'sí' : 'no';
+  document.getElementById('sOpac').value = m.opac;
+  document.getElementById('sOpacV').textContent = m.opac + '%';
+}
+
+function bindSlider(id, vid, key, fmt) {
+  const el = document.getElementById(id), v = document.getElementById(vid);
+  el.oninput = () => {
+    state.m[key] = +el.value;
+    v.textContent = fmt(state.m[key]);
+    applyDxfMatrix();
+  };
+}
+bindSlider('sScale','sScaleV','sc',v=>v.toFixed(1));
+bindSlider('sOx','sOxV','ox',v=>v.toFixed(0));
+bindSlider('sOy','sOyV','oy',v=>v.toFixed(0));
+bindSlider('sRot','sRotV','rot',v=>v.toFixed(1)+'°');
+bindSlider('sFlip','sFlipV','flip',v=>v?'sí':'no');
+bindSlider('sOpac','sOpacV','opac',v=>v+'%');
+
+document.getElementById('btnFit').onclick = fit;
+document.getElementById('btnReset').onclick = autoCalibrate;
+document.getElementById('btnAuto').onclick = autoCalibrate;
+document.getElementById('btnCopy').onclick = async () => {
+  renderJSON();
+  try { await navigator.clipboard.writeText(document.getElementById('jsonOut').value); const s = document.getElementById('okStrip'); s.classList.add('show'); setTimeout(()=>s.classList.remove('show'),1500); }
+  catch(e) { alert('No se pudo copiar.'); }
+};
+
+function renderJSON() {
+  const m = state.m;
+  const rotRad = m.rot * Math.PI / 180;
+  const c = Math.cos(rotRad), s = Math.sin(rotRad);
+  const flipY = m.flip ? -1 : 1;
+  // Matriz DXF -> recinto reducido (8000x5659)
+  const A = m.sc * c, B = m.sc * (-s) * flipY, E = m.ox;
+  const C = m.sc * s, D = m.sc * c * flipY, F = m.oy;
+  const payload = {
+    generated_at: new Date().toISOString(),
+    note: "Matriz DXF -> recinto reducido (8000x5659). Aplicar luego matriz reducido -> plano-base.",
+    matrix_dxf_to_recinto_reduced: { a:A, b:B, c:C, d:D, e:E, f:F },
+    sliders: m,
+  };
+  document.getElementById('jsonOut').value = JSON.stringify(payload, null, 2);
+}
+
+// View interactions
+vp.addEventListener('wheel', e => {
+  e.preventDefault();
+  const r = vp.getBoundingClientRect();
+  const mx = e.clientX - r.left, my = e.clientY - r.top;
+  const f = Math.exp(-e.deltaY * 0.0015);
+  const ns = Math.max(0.02, Math.min(20, state.scale * f));
+  state.tx = mx - (mx - state.tx) * (ns / state.scale);
+  state.ty = my - (my - state.ty) * (ns / state.scale);
+  state.scale = ns;
+  applyView();
+}, { passive: false });
+let dragging = false, lx = 0, ly = 0;
+vp.addEventListener('mousedown', e => {
+  if (e.button !== 0) { dragging = true; lx = e.clientX; ly = e.clientY; vp.classList.add('panning'); e.preventDefault(); }
+});
+window.addEventListener('mousemove', e => {
+  if (dragging) { state.tx += e.clientX - lx; state.ty += e.clientY - ly; lx = e.clientX; ly = e.clientY; applyView(); }
+});
+window.addEventListener('mouseup', () => { dragging = false; vp.classList.remove('panning'); });
+vp.addEventListener('contextmenu', e => e.preventDefault());
+vp.addEventListener('mousemove', e => {
+  const r = vp.getBoundingClientRect();
+  const mx = e.clientX - r.left, my = e.clientY - r.top;
+  const dx = (mx - state.tx) / state.scale;  // px en recinto display
+  const dy = (my - state.ty) / state.scale;
+  const rx = Math.round(dx * 2), ry = Math.round(dy * 2);  // recinto reducido
+  coordsEl.textContent = `recinto display: (${Math.round(dx)},${Math.round(dy)}) · recinto reducido: (${rx},${ry})`;
+});
+
+async function main() {
+  const meta = await fetch('meta.json').then(r=>r.json());
+  imgR.src = 'imgs/' + meta.recinto.filename;
+  await new Promise(r => imgR.onload = r);
+  fit();
+  await loadAllLayers();
+}
+main();
+</script>
+</body>
+</html>

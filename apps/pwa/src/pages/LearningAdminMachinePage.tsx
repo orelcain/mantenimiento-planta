@@ -571,14 +571,44 @@ function ManualSectionForm({
   onCancel: () => void
 }) {
   const [section, setSection] = useState<ManualSection>(initial)
+  const [manualFields, setManualFields] = useState<ManualFields>(() => parseManualFields(initial.content))
   const [saving, setSaving] = useState(false)
-  const canSave = section.title.trim().length > 0 && section.content.trim().length > 0
+  const canSave = section.title.trim().length > 0 && hasManualFieldsContent(manualFields)
+
+  function updateArrayField(
+    key: 'measurements' | 'keyPoints' | 'notes',
+    index: number,
+    value: string,
+  ) {
+    setManualFields(fields => ({
+      ...fields,
+      [key]: fields[key].map((item, i) => (i === index ? value : item)),
+    }))
+  }
+
+  function addArrayField(key: 'measurements' | 'keyPoints' | 'notes') {
+    setManualFields(fields => ({ ...fields, [key]: [...fields[key], ''] }))
+  }
+
+  function removeArrayField(key: 'measurements' | 'keyPoints' | 'notes', index: number) {
+    setManualFields(fields => {
+      const next = fields[key].filter((_, i) => i !== index)
+      return { ...fields, [key]: next.length > 0 ? next : [''] }
+    })
+  }
+
+  function updateImage(index: number, patch: Partial<ManualImageField>) {
+    setManualFields(fields => ({
+      ...fields,
+      images: fields.images.map((image, i) => (i === index ? { ...image, ...patch } : image)),
+    }))
+  }
 
   async function handleSubmit() {
     if (!canSave) return
     setSaving(true)
     try {
-      await onSave(section)
+      await onSave({ ...section, content: buildManualContent(manualFields) })
     } finally {
       setSaving(false)
     }
@@ -607,15 +637,52 @@ function ManualSectionForm({
         </FormField>
       </div>
 
-      <FormField label="Contenido" required>
+      <FormField label="Descripcion" required>
         <textarea
-          value={section.content}
-          onChange={e => setSection({ ...section, content: e.target.value })}
+          value={manualFields.description}
+          onChange={e => setManualFields(fields => ({ ...fields, description: e.target.value }))}
           placeholder="Texto del manual. Soporta saltos de línea."
-          rows={10}
+          rows={3}
           className="w-full px-3 py-2.5 rounded-lg border border-[#22384a] bg-[#16242f] text-sm resize-y focus:outline-none focus:ring-2 focus:ring-[#5aa6e8]/60"
         />
       </FormField>
+
+      <EditableTextList
+        label="Medidas / tolerancias"
+        addLabel="Anadir medida"
+        items={manualFields.measurements}
+        placeholder="Ej: Distancia entre ventrales y dorsales: 12 mm"
+        onAdd={() => addArrayField('measurements')}
+        onChange={(index, value) => updateArrayField('measurements', index, value)}
+        onRemove={index => removeArrayField('measurements', index)}
+      />
+
+      <EditableTextList
+        label="Puntos clave"
+        addLabel="Anadir punto"
+        items={manualFields.keyPoints}
+        placeholder="Ej: Verificar con silleta en posicion de reposo."
+        onAdd={() => addArrayField('keyPoints')}
+        onChange={(index, value) => updateArrayField('keyPoints', index, value)}
+        onRemove={index => removeArrayField('keyPoints', index)}
+      />
+
+      <EditableTextList
+        label="Notas operativas"
+        addLabel="Anadir nota"
+        items={manualFields.notes}
+        placeholder="Ej: Con materia prima bajo 0C se requiere mayor presion."
+        onAdd={() => addArrayField('notes')}
+        onChange={(index, value) => updateArrayField('notes', index, value)}
+        onRemove={index => removeArrayField('notes', index)}
+      />
+
+      <ManualImagesEditor
+        images={manualFields.images}
+        onAdd={() => setManualFields(fields => ({ ...fields, images: [...fields.images, { label: '', url: '' }] }))}
+        onChange={updateImage}
+        onRemove={index => setManualFields(fields => ({ ...fields, images: fields.images.filter((_, i) => i !== index) }))}
+      />
 
       <FormActions saving={saving} canSave={canSave} onCancel={onCancel} onSave={handleSubmit} />
     </div>
@@ -625,6 +692,209 @@ function ManualSectionForm({
 // ═════════════════════════════════════════════════════════════
 // FLOWS EDITOR
 // ═════════════════════════════════════════════════════════════
+
+interface ManualImageField {
+  label: string
+  url: string
+}
+
+interface ManualFields {
+  description: string
+  measurements: string[]
+  keyPoints: string[]
+  notes: string[]
+  images: ManualImageField[]
+}
+
+function parseManualFields(content: string): ManualFields {
+  const fields: ManualFields = {
+    description: '',
+    measurements: [''],
+    keyPoints: [''],
+    notes: [''],
+    images: [],
+  }
+  let current: 'description' | 'measurements' | 'keyPoints' | 'notes' | 'images' = 'description'
+  const description: string[] = []
+  const measurements: string[] = []
+  const keyPoints: string[] = []
+  const notes: string[] = []
+
+  for (const raw of content.split('\n')) {
+    const line = raw.trim()
+    if (!line) continue
+    if (line === 'Medidas / tolerancias:') { current = 'measurements'; continue }
+    if (line === 'Puntos clave:') { current = 'keyPoints'; continue }
+    if (line === 'Notas operativas:') { current = 'notes'; continue }
+    if (line === 'Referencias visuales:') { current = 'images'; continue }
+
+    const value = line.startsWith('- ') ? line.slice(2) : line
+    if (current === 'description') {
+      description.push(value)
+    } else if (current === 'measurements') {
+      measurements.push(value)
+    } else if (current === 'keyPoints') {
+      keyPoints.push(value)
+    } else if (current === 'notes') {
+      notes.push(value)
+    } else {
+      const match = value.match(/^(.*?):\s*(https?:\/\/\S+|\/\S+)$/)
+      fields.images.push(match ? { label: match[1] || 'Imagen', url: match[2] ?? '' } : { label: value, url: '' })
+    }
+  }
+
+  fields.description = description.join('\n')
+  fields.measurements = measurements.length > 0 ? measurements : ['']
+  fields.keyPoints = keyPoints.length > 0 ? keyPoints : ['']
+  fields.notes = notes.length > 0 ? notes : ['']
+  return fields
+}
+
+function buildManualContent(fields: ManualFields): string {
+  return [
+    fields.description.trim(),
+    ...buildListBlock('Medidas / tolerancias:', fields.measurements),
+    ...buildListBlock('Puntos clave:', fields.keyPoints),
+    ...buildListBlock('Notas operativas:', fields.notes),
+    ...buildImageBlock(fields.images),
+  ].filter(Boolean).join('\n\n')
+}
+
+function buildListBlock(title: string, items: string[]): string[] {
+  const clean = items.map(item => item.trim()).filter(Boolean)
+  return clean.length > 0 ? [title, ...clean.map(item => `- ${item}`)] : []
+}
+
+function buildImageBlock(images: ManualImageField[]): string[] {
+  const clean = images.filter(image => image.label.trim().length > 0 || image.url.trim().length > 0)
+  return clean.length > 0
+    ? ['Referencias visuales:', ...clean.map(image => `- ${image.label.trim() || 'Imagen'}: ${image.url.trim()}`)]
+    : []
+}
+
+function hasManualFieldsContent(fields: ManualFields): boolean {
+  return fields.description.trim().length > 0 ||
+    fields.measurements.some(item => item.trim().length > 0) ||
+    fields.keyPoints.some(item => item.trim().length > 0) ||
+    fields.notes.some(item => item.trim().length > 0) ||
+    fields.images.some(image => image.label.trim().length > 0 || image.url.trim().length > 0)
+}
+
+function EditableTextList({
+  label,
+  addLabel,
+  items,
+  placeholder,
+  onAdd,
+  onChange,
+  onRemove,
+}: {
+  label: string
+  addLabel: string
+  items: string[]
+  placeholder: string
+  onAdd: () => void
+  onChange: (index: number, value: string) => void
+  onRemove: (index: number) => void
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <label className="text-xs font-semibold uppercase tracking-wider text-[#9db0c2]">{label}</label>
+        <button
+          onClick={onAdd}
+          className="flex items-center gap-1 text-xs font-medium text-[#5aa6e8] hover:bg-[#5aa6e8]/10 px-2 py-1 rounded"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          {addLabel}
+        </button>
+      </div>
+      <div className="space-y-2">
+        {items.map((item, index) => (
+          <div key={index} className="flex items-start gap-2">
+            <span className="flex items-center justify-center w-6 h-6 mt-2 rounded-full bg-[#5aa6e8]/15 text-[#5aa6e8] font-bold text-[11px]">
+              {index + 1}
+            </span>
+            <textarea
+              value={item}
+              onChange={e => onChange(index, e.target.value)}
+              placeholder={placeholder}
+              rows={2}
+              className="flex-1 px-3 py-2 rounded-lg border border-[#22384a] bg-[#16242f] text-sm resize-y focus:outline-none focus:ring-2 focus:ring-[#5aa6e8]/60"
+            />
+            <button
+              onClick={() => onRemove(index)}
+              className="p-1.5 mt-1 hover:bg-[#e0697d]/15 text-[#e0697d] rounded"
+              title="Eliminar"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ManualImagesEditor({
+  images,
+  onAdd,
+  onChange,
+  onRemove,
+}: {
+  images: ManualImageField[]
+  onAdd: () => void
+  onChange: (index: number, patch: Partial<ManualImageField>) => void
+  onRemove: (index: number) => void
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <label className="text-xs font-semibold uppercase tracking-wider text-[#9db0c2]">Referencias visuales</label>
+        <button
+          onClick={onAdd}
+          className="flex items-center gap-1 text-xs font-medium text-[#5aa6e8] hover:bg-[#5aa6e8]/10 px-2 py-1 rounded"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Anadir imagen
+        </button>
+      </div>
+      {images.length === 0 ? (
+        <p className="text-xs text-[#6d8298] rounded-lg border border-dashed border-[#22384a] px-3 py-3">
+          Sin imagenes asociadas.
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {images.map((image, index) => (
+            <div key={index} className="grid gap-2 sm:grid-cols-[1fr_1.4fr_auto] p-3 rounded-lg border border-[#22384a] bg-[#16242f]/50">
+              <input
+                type="text"
+                value={image.label}
+                onChange={e => onChange(index, { label: e.target.value })}
+                placeholder="Etiqueta"
+                className="px-3 py-2 rounded-lg border border-[#22384a] bg-[#16242f] text-sm focus:outline-none focus:ring-2 focus:ring-[#5aa6e8]/60"
+              />
+              <input
+                type="text"
+                value={image.url}
+                onChange={e => onChange(index, { url: e.target.value })}
+                placeholder="URL de imagen"
+                className="px-3 py-2 rounded-lg border border-[#22384a] bg-[#16242f] text-sm focus:outline-none focus:ring-2 focus:ring-[#5aa6e8]/60"
+              />
+              <button
+                onClick={() => onRemove(index)}
+                className="p-2 hover:bg-[#e0697d]/15 text-[#e0697d] rounded justify-self-start"
+                title="Eliminar imagen"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 function FlowsEditor({ machineSlug }: { machineSlug: string }) {
   const [flows, setFlows] = useState<Flow[]>([])

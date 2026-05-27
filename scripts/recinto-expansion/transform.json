@@ -1,0 +1,86 @@
+{
+  "generated_at": "2026-05-27T14:22:36.195Z",
+  "method": "least-squares 6-param affine, 4 correspondences (over-determined)",
+  "matrix": {
+    "a": 0.580775184287634,
+    "b": 1.1692508373433597,
+    "c": -1.1679341983035556,
+    "d": 0.5825567028665438,
+    "e": -12569.745821068136,
+    "f": 6323.28500002319,
+    "note": "x' = a*x + b*y + e ; y' = c*x + d*y + f  (recinto -> plano-base, en px)"
+  },
+  "css_matrix": "matrix(0.58077518, -1.16793420, 1.16925084, 0.58255670, -12569.7458, 6323.2850)",
+  "css_matrix_note": "CSS matrix(a,b,c,d,tx,ty) usa orden distinto: (a,c,b,d,e,f) -> matrix(a,c,b,d,e,f)",
+  "decomposition": {
+    "sx": 1.3043657869828174,
+    "sy": 1.306338330097868,
+    "rotation_deg_from_atan2_ca": -63.560355272606266,
+    "rotation_deg_from_atan2_neg_b_d": -63.5161033840851,
+    "determinant": 1.7039425157936912
+  },
+  "residuals_px_plano": {
+    "per_point": [
+      2.562,
+      1.085,
+      0.481,
+      1.959
+    ],
+    "rms": 1.718,
+    "max": 2.562
+  },
+  "recinto_corners_in_plano_coords": [
+    {
+      "recinto": [
+        0,
+        0
+      ],
+      "plano": [
+        -12569.75,
+        6323.29
+      ]
+    },
+    {
+      "recinto": [
+        18725,
+        0
+      ],
+      "plano": [
+        -1694.73,
+        -15546.28
+      ]
+    },
+    {
+      "recinto": [
+        18725,
+        13245
+      ],
+      "plano": [
+        13792.0,
+        -7830.32
+      ]
+    },
+    {
+      "recinto": [
+        0,
+        13245
+      ],
+      "plano": [
+        2916.98,
+        14039.25
+      ]
+    }
+  ],
+  "bbox_in_plano_coords": {
+    "x_min": -12569.75,
+    "y_min": -15546.28,
+    "x_max": 13792.0,
+    "y_max": 14039.25,
+    "width": 26361.74,
+    "height": 29585.53
+  },
+  "plano_base_size": {
+    "w": 6272,
+    "h": 3600
+  }
+}

@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Recinto Recorte · Fase 3.8</title>
+<style>
+  :root {
+    --bg: #0c1620; --fg: #e6edf3; --muted: #94a3b8;
+    --aqua: #2E75B6; --aquaBright: #5aa6e8; --accent: #ff6b6b;
+    --border: #1f2933; --good: #22c55e; --warn: #f59e0b;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; height: 100%; overflow: hidden; }
+  header { position: fixed; top: 0; left: 0; right: 0; height: 56px; background: #0a1320; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 16px; padding: 0 16px; z-index: 10; }
+  header h1 { font-size: 13px; margin: 0; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+  header .badge { background: var(--aqua); color: white; padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+  header .actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  header button { background: #1a2532; color: var(--fg); border: 1px solid var(--border); padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+  header button:hover { background: #243245; }
+  header button.primary { background: var(--aqua); border-color: var(--aqua); }
+  header button.danger { background: #b91c1c; border-color: #b91c1c; }
+  header .hint { color: var(--muted); font-size: 11px; max-width: 540px; line-height: 1.4; }
+
+  main { position: fixed; top: 56px; left: 0; right: 380px; bottom: 0; background: #050a10; border-right: 1px solid var(--border); }
+  .viewport { position: absolute; inset: 0; overflow: hidden; cursor: crosshair; user-select: none; }
+  .viewport.panning { cursor: grabbing; }
+  .stage { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+  .stage img { display: block; pointer-events: none; -webkit-user-drag: none; }
+  .stage svg { position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible; }
+  .pane-coords { position: absolute; bottom: 8px; left: 8px; z-index: 5; background: rgba(0,0,0,0.7); color: var(--muted); padding: 4px 10px; border-radius: 4px; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11px; }
+  .plano-toggle { position: absolute; top: 8px; left: 8px; z-index: 5; background: rgba(0,0,0,0.7); padding: 6px 10px; border-radius: 4px; display: flex; gap: 12px; align-items: center; font-size: 11px; color: var(--fg); }
+  .plano-toggle input[type=range] { width: 100px; accent-color: var(--aquaBright); }
+  .plano-toggle label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+
+  aside { position: fixed; top: 56px; right: 0; bottom: 0; width: 380px; background: #0a1320; display: flex; flex-direction: column; }
+  aside h3 { margin: 12px 16px 6px 16px; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  .points-list { flex: 1; overflow: auto; padding: 0 16px 12px; }
+  .points-list table { width: 100%; border-collapse: collapse; font-family: ui-monospace, monospace; font-size: 11px; }
+  .points-list th { text-align: left; color: var(--muted); padding: 4px 6px; border-bottom: 1px solid var(--border); font-weight: 600; }
+  .points-list td { padding: 3px 6px; border-bottom: 1px solid #0e1822; }
+  .points-list td.idx { color: var(--accent); font-weight: 700; }
+  .json-box { padding: 8px 16px 12px; }
+  .json-box textarea { width: 100%; height: 110px; background: #020608; color: var(--good); border: 1px solid var(--border); border-radius: 4px; padding: 6px; font-family: ui-monospace, monospace; font-size: 10px; resize: none; }
+  .ok-strip { padding: 4px 8px; background: #133a1f; color: var(--good); border: 1px solid #166534; border-radius: 3px; font-size: 11px; margin-top: 6px; display: none; }
+  .ok-strip.show { display: block; }
+
+  /* shapes */
+  .poly-line { fill: rgba(255,107,107,0.18); stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; }
+  .poly-preview { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 7 5; vector-effect: non-scaling-stroke; }
+  .vh { fill: var(--accent); stroke: white; stroke-width: 1.5; cursor: grab; pointer-events: auto; }
+  .vh-num { fill: white; font-family: ui-monospace, monospace; font-size: 11px; font-weight: 700; text-anchor: middle; pointer-events: none; }
+  .plano-outline { fill: rgba(46,117,182,0.10); stroke: var(--aquaBright); stroke-width: 1.5; stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="badge">Fase 3.8</span>
+  <h1>Recorte custom · Dibuj&aacute; el pol&iacute;gono de la zona a BORRAR del recinto</h1>
+  <div class="actions">
+    <span class="hint">Click izq = agregar v&eacute;rtice &middot; Doble-click o Enter = cerrar &middot; Backspace = borrar &uacute;ltimo &middot; Esc = cancelar &middot; Rueda = zoom &middot; Click der = pan</span>
+    <button id="btnReset">Reset zoom</button>
+    <button id="btnClear" class="danger">Limpiar pol&iacute;gono</button>
+    <button id="btnExport" class="primary">Exportar JSON</button>
+  </div>
+</header>
+
+<main>
+  <div class="plano-toggle">
+    <label><input type="checkbox" id="togPlano" checked> Mostrar plano-base</label>
+    <span>Opacidad: <input type="range" id="planoOpac" min="0" max="100" value="60"> <span id="planoOpacV">60%</span></span>
+  </div>
+  <div class="pane-coords" id="coords">orig: (&mdash;, &mdash;)</div>
+  <div class="viewport" id="vp">
+    <div class="stage" id="stage">
+      <img id="imgR" alt="recinto">
+      <img id="imgP" alt="plano-base" style="position:absolute;left:0;top:0;transform-origin:0 0">
+      <svg id="ovl"></svg>
+    </div>
+  </div>
+</main>
+
+<aside>
+  <h3>V&eacute;rtices del pol&iacute;gono (coords recinto reducido 8000x5659)</h3>
+  <div class="points-list">
+    <table id="ptsTable">
+      <thead><tr><th>#</th><th>X</th><th>Y</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <div class="json-box">
+    <h3 style="margin-left:0">JSON export</h3>
+    <textarea id="jsonOut" readonly></textarea>
+    <div class="ok-strip" id="okStrip">Copiado al clipboard.</div>
+  </div>
+</aside>
+
+<script>
+let meta = null;
+// Matriz reducido -> plano (de Fase 2). La invertimos para mostrar plano sobre recinto.
+const MAT_RED2PLANO = {
+  a: 1.359377, b: 2.736778,
+  c: -2.733696, d: 1.363547,
+  e: -12569.7458, f: 6323.2850
+};
+// Invertir 2x2:
+function invMat(M) {
+  const det = M.a*M.d - M.b*M.c;
+  const ia = M.d/det, ib = -M.b/det, ic = -M.c/det, id = M.a/det;
+  const ie = -(ia*M.e + ib*M.f);
+  const if_ = -(ic*M.e + id*M.f);
+  return {a:ia,b:ib,c:ic,d:id,e:ie,f:if_};
+}
+const MAT_PLANO2RED = invMat(MAT_RED2PLANO);
+
+const state = {
+  scale: 1, tx: 0, ty: 0,
+  poly: [], // array of {x, y} in DISPLAY coords (recinto display)
+  hoverIdx: -1,
+};
+
+const vp = document.getElementById('vp');
+const stage = document.getElementById('stage');
+const imgR = document.getElementById('imgR');
+const imgP = document.getElementById('imgP');
+const ovl = document.getElementById('ovl');
+const coordsEl = document.getElementById('coords');
+
+function apply() {
+  stage.style.transform = `translate(${state.tx}px, ${state.ty}px) scale(${state.scale})`;
+}
+function fit() {
+  const r = vp.getBoundingClientRect();
+  const sx = r.width / imgR.naturalWidth;
+  const sy = r.height / imgR.naturalHeight;
+  state.scale = Math.min(sx, sy) * 0.97;
+  state.tx = (r.width - imgR.naturalWidth * state.scale) / 2;
+  state.ty = (r.height - imgR.naturalHeight * state.scale) / 2;
+  apply();
+}
+
+function positionPlanoOverRecinto() {
+  // El recinto se muestra a 4000 px display.
+  // Coords del recinto reducido (8000x5659) <-> display recinto: factor 0.5 (display/reducido)
+  // Para colocar el plano (3000x1722) sobre el recinto display:
+  //  punto del recinto reducido -> coord display recinto: dividir por 2 (4000/8000)
+  //  el plano (en su sistema original 6272x3600) hay que mapearlo al recinto reducido via PLANO2RED, y luego dividir por 2 para coord display.
+  // CSS para imgP (display nat 3000x1722, originales 6272x3600):
+  //  el plano se renderiza con dimensiones naturales del display de plano: si lo cargamos a 3000 px, hay scale interno 3000/6272 = 0.478
+  //  Para no complicar, hago el plano width = 6272 (px del plano original) y aplico transform que lo lleve a coords del recinto display.
+  // Voy con la version DIRECTA: width nativo del plano (6272 si pongo width attr), y transform = matrix(plano->recinto_reducido) * (0.5 scale para display)
+  // Mejor: width=6272 forzado en CSS, transform = matrix(MAT_PLANO2RED) escalada por 0.5
+  imgP.style.width = '6272px';
+  imgP.style.height = '3600px';
+  const M = MAT_PLANO2RED;
+  const k = 0.5; // recinto display (4000) vs reducido (8000) = 4000/8000 = 0.5
+  // Compose: (k * I) * MAT_PLANO2RED
+  imgP.style.transform = `matrix(${(M.a*k).toFixed(6)}, ${(M.c*k).toFixed(6)}, ${(M.b*k).toFixed(6)}, ${(M.d*k).toFixed(6)}, ${(M.e*k).toFixed(2)}, ${(M.f*k).toFixed(2)})`;
+  imgP.style.opacity = (document.getElementById('planoOpac').value / 100);
+  imgP.style.display = document.getElementById('togPlano').checked ? 'block' : 'none';
+}
+
+function disp2red(x, y) {
+  // display (recinto en 4000 px) -> reducido (recinto 8000 px)
+  return { x: x * 2, y: y * 2 };
+}
+function red2disp(x, y) { return { x: x / 2, y: y / 2 }; }
+
+vp.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const r = vp.getBoundingClientRect();
+  const mx = e.clientX - r.left;
+  const my = e.clientY - r.top;
+  const f = Math.exp(-e.deltaY * 0.0015);
+  const ns = Math.max(0.05, Math.min(20, state.scale * f));
+  state.tx = mx - (mx - state.tx) * (ns / state.scale);
+  state.ty = my - (my - state.ty) * (ns / state.scale);
+  state.scale = ns;
+  apply();
+}, { passive: false });
+
+let dragging = false, lastX = 0, lastY = 0;
+vp.addEventListener('mousedown', (e) => {
+  if (e.button === 2 || e.button === 1) {
+    e.preventDefault();
+    dragging = true;
+    lastX = e.clientX; lastY = e.clientY;
+    vp.classList.add('panning');
+  } else if (e.button === 0) {
+    const r = vp.getBoundingClientRect();
+    const mx = e.clientX - r.left;
+    const my = e.clientY - r.top;
+    const dx = (mx - state.tx) / state.scale;
+    const dy = (my - state.ty) / state.scale;
+    if (dx < 0 || dy < 0 || dx > imgR.naturalWidth || dy > imgR.naturalHeight) return;
+    state.poly.push({ x: dx, y: dy });
+    render();
+  }
+});
+window.addEventListener('mousemove', (e) => {
+  if (dragging) {
+    state.tx += (e.clientX - lastX);
+    state.ty += (e.clientY - lastY);
+    lastX = e.clientX; lastY = e.clientY;
+    apply();
+  }
+});
+window.addEventListener('mouseup', () => {
+  if (dragging) { dragging = false; vp.classList.remove('panning'); }
+});
+vp.addEventListener('contextmenu', (e) => e.preventDefault());
+vp.addEventListener('mousemove', (e) => {
+  const r = vp.getBoundingClientRect();
+  const mx = e.clientX - r.left;
+  const my = e.clientY - r.top;
+  const dx = (mx - state.tx) / state.scale;
+  const dy = (my - state.ty) / state.scale;
+  const red = disp2red(dx, dy);
+  coordsEl.textContent = `recinto reducido: (${Math.round(red.x)}, ${Math.round(red.y)})  ·  display: (${Math.round(dx)}, ${Math.round(dy)})`;
+});
+vp.addEventListener('dblclick', (e) => {
+  // dbl-click cierra el poly visualmente (no agrega vertice extra)
+  // ya viene del mousedown un click izq antes; lo restamos si los puntos coinciden
+  if (state.poly.length >= 2) {
+    const last = state.poly[state.poly.length-1];
+    const prev = state.poly[state.poly.length-2];
+    if (Math.hypot(last.x-prev.x, last.y-prev.y) < 5/state.scale) state.poly.pop();
+  }
+  render();
+});
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { state.poly = []; render(); }
+  else if (e.key === 'Backspace') { state.poly.pop(); render(); }
+  else if (e.key === 'Enter') { render(); /* sin cerrar extra */ }
+});
+
+document.getElementById('btnReset').onclick = fit;
+document.getElementById('btnClear').onclick = () => { state.poly = []; render(); };
+document.getElementById('btnExport').onclick = async () => {
+  renderJSON();
+  try {
+    await navigator.clipboard.writeText(document.getElementById('jsonOut').value);
+    const s = document.getElementById('okStrip'); s.classList.add('show'); setTimeout(()=>s.classList.remove('show'), 1500);
+  } catch (e) { alert('No se pudo copiar (clipboard bloqueado). Selecciona el JSON manualmente.'); }
+};
+document.getElementById('togPlano').onchange = positionPlanoOverRecinto;
+document.getElementById('planoOpac').oninput = (e) => {
+  document.getElementById('planoOpacV').textContent = e.target.value + '%';
+  positionPlanoOverRecinto();
+};
+
+function render() {
+  // limpia overlay
+  ovl.setAttribute('width', imgR.naturalWidth);
+  ovl.setAttribute('height', imgR.naturalHeight);
+  ovl.setAttribute('viewBox', `0 0 ${imgR.naturalWidth} ${imgR.naturalHeight}`);
+  ovl.style.width = imgR.naturalWidth + 'px';
+  ovl.style.height = imgR.naturalHeight + 'px';
+  let s = '';
+  // Plano-base outline (cuadrilátero del plano-base en coords del recinto display)
+  // 4 esquinas del plano (0,0),(6272,0),(6272,3600),(0,3600) -> recinto reducido via PLANO2RED -> display /2
+  const M = MAT_PLANO2RED;
+  const corners = [[0,0],[6272,0],[6272,3600],[0,3600]].map(([x,y])=>{
+    const rx = M.a*x + M.b*y + M.e;
+    const ry = M.c*x + M.d*y + M.f;
+    return { x: rx/2, y: ry/2 };
+  });
+  s += `<polygon class="plano-outline" points="${corners.map(p=>p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ')}"/>`;
+  // Polígono dibujado
+  if (state.poly.length >= 3) {
+    s += `<polygon class="poly-line" points="${state.poly.map(p=>p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ')}"/>`;
+  } else if (state.poly.length === 2) {
+    s += `<polyline class="poly-preview" points="${state.poly.map(p=>p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ')}"/>`;
+  }
+  // Vértices
+  const rH = 7 / state.scale;
+  state.poly.forEach((p, i) => {
+    s += `<circle class="vh" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${rH.toFixed(2)}"/>`;
+    s += `<text class="vh-num" x="${p.x.toFixed(1)}" y="${(p.y - rH - 2).toFixed(1)}" font-size="${(14/state.scale).toFixed(1)}">${i+1}</text>`;
+  });
+  ovl.innerHTML = s;
+  renderTable();
+  renderJSON();
+}
+
+function renderTable() {
+  const tbody = document.querySelector('#ptsTable tbody');
+  tbody.innerHTML = '';
+  state.poly.forEach((p, i) => {
+    const red = disp2red(p.x, p.y);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td class="idx">${i+1}</td><td>${Math.round(red.x)}</td><td>${Math.round(red.y)}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderJSON() {
+  const payload = {
+    generated_at: new Date().toISOString(),
+    note: "Polígono de la zona a BORRAR del recinto (coords del recinto reducido 8000x5659)",
+    recinto_size: { w: 8000, h: 5659 },
+    feather_px: 60,
+    polygon: state.poly.map((p, i) => {
+      const red = disp2red(p.x, p.y);
+      return { idx: i+1, x: Math.round(red.x), y: Math.round(red.y) };
+    })
+  };
+  document.getElementById('jsonOut').value = JSON.stringify(payload, null, 2);
+}
+
+async function main() {
+  meta = await fetch('meta.json').then(r => r.json());
+  imgR.src = 'imgs/' + meta.recinto.filename;
+  imgP.src = 'imgs/' + meta.plano.filename;
+  await Promise.all([
+    new Promise(r => imgR.onload = r),
+    new Promise(r => imgP.onload = r),
+  ]);
+  positionPlanoOverRecinto();
+  fit();
+  render();
+}
+main();
+</script>
+</body>
+</html>
