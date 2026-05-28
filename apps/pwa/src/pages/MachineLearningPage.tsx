@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft, BookOpen, ListChecks, GitBranch, AlertTriangle, Clock, Loader2, Wrench, ChevronDown,
-  Ruler, Image as ImageIcon, FileText,
+  Ruler, Image as ImageIcon, FileText, Gauge, ClipboardCheck, ShieldCheck, Activity,
 } from 'lucide-react'
 import { useAuthStore } from '@/store'
 import { findMachineBySlug, type LearningSection } from '@/data/learningMachines'
@@ -126,6 +126,7 @@ export function MachineLearningPage() {
 
   const Icon = machine.icon
   const activeTabData = TABS.find(t => t.id === activeTab)!
+  const ActiveIcon = activeTabData.icon
   // Habilitado si hay items reales en Firestore para ese tab
   const activeCount =
     activeTab === 'procedures'
@@ -143,13 +144,17 @@ export function MachineLearningPage() {
   return (
     <div
       className={`${heightClass} w-full`}
-      style={{ background: `linear-gradient(135deg, ${LC.bg} 0%, ${LC.bgPanel} 50%, ${LC.bg} 100%)` }}
+      style={{
+        background:
+          `radial-gradient(circle at 18% 0%, ${machine.color}14 0, transparent 32%), ` +
+          `linear-gradient(180deg, ${LC.bgPanel} 0%, ${LC.bg} 38%, ${LC.bg} 100%)`,
+      }}
     >
       {/* Header */}
-      <div className="max-w-4xl mx-auto px-4 pt-8 pb-4 sm:px-6 sm:pt-12">
+      <div className="max-w-6xl mx-auto px-4 pt-6 pb-4 sm:px-6 sm:pt-10">
         <button
           onClick={() => navigate('/aprendizaje')}
-          className="flex items-center gap-2 text-sm mb-3 -ml-2 px-2 py-3 rounded-lg transition-colors"
+          className="flex items-center gap-2 text-sm mb-5 -ml-2 px-2 py-3 rounded-lg transition-colors"
           style={{ color: LC.inkLo, minHeight: '44px' }}
           onMouseEnter={e => (e.currentTarget.style.color = LC.aquaBright)}
           onMouseLeave={e => (e.currentTarget.style.color = LC.inkLo)}
@@ -158,35 +163,90 @@ export function MachineLearningPage() {
           Centro de Aprendizaje
         </button>
 
-        <div className="flex items-center gap-1.5 text-xs mb-4" style={{ color: LC.inkLo }}>
-          <span>Aprendizaje</span>
-          <span>/</span>
-          <span style={{ color: machine.color }}>{machine.name}</span>
-        </div>
+        <section
+          className="overflow-hidden rounded-lg"
+          style={{ background: LC.surface, border: `1px solid ${LC.border}` }}
+        >
+          <div className="grid lg:grid-cols-[1fr_340px]">
+            <div className="p-5 sm:p-6 lg:p-7">
+              <div className="flex items-center gap-1.5 text-xs mb-5" style={{ color: LC.inkLo }}>
+                <span>Aprendizaje</span>
+                <span>/</span>
+                <span style={{ color: machine.color }}>{machine.name}</span>
+              </div>
 
-        <div className="flex items-start gap-4 mb-3">
-          <div
-            className="flex items-center justify-center w-14 h-14 rounded-2xl flex-shrink-0"
-            style={{ background: `${machine.color}18`, border: `1px solid ${machine.color}40` }}
-          >
-            <Icon className="h-7 w-7" style={{ color: machine.color }} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h1 className="text-2xl sm:text-3xl font-bold text-[#e9eef3]">{machine.name}</h1>
-            <p className="text-xs uppercase tracking-wider mt-1" style={{ color: LC.inkLo }}>
-              {machine.area}
-            </p>
-          </div>
-        </div>
+              <div className="flex items-start gap-4">
+                <div
+                  className="flex items-center justify-center w-16 h-16 rounded-lg flex-shrink-0"
+                  style={{
+                    background: `linear-gradient(145deg, ${machine.color}24, #151a20)`,
+                    border: `1px solid ${machine.color}45`,
+                    boxShadow: `inset 0 0 0 1px ${machine.color}12`,
+                  }}
+                >
+                  <Icon className="h-8 w-8" style={{ color: machine.color }} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <span
+                      className="rounded px-2 py-1 text-[10px] font-bold uppercase"
+                      style={{ color: machine.color, background: `${machine.color}16`, border: `1px solid ${machine.color}30` }}
+                    >
+                      Dossier tecnico
+                    </span>
+                    <span className="text-[10px] uppercase tracking-[0.18em]" style={{ color: LC.inkLo }}>
+                      {machine.area}
+                    </span>
+                  </div>
+                  <h1 className="text-2xl sm:text-4xl font-bold leading-tight text-[#e9eef3]">{machine.name}</h1>
+                  <p className="text-sm leading-relaxed mt-3 max-w-2xl" style={{ color: LC.inkMid }}>
+                    {machine.description}
+                  </p>
+                </div>
+              </div>
 
-        <p className="text-sm leading-relaxed" style={{ color: LC.inkMid }}>
-          {machine.description}
-        </p>
+              <div className="grid gap-2 sm:grid-cols-4 mt-6">
+                <MachineMetric icon={BookOpen} label="Manual" value={machine.sections.manual ? 'Activo' : 'Pendiente'} color={machine.color} tone="blue" />
+                <MachineMetric icon={ClipboardCheck} label="Proced." value={machine.sections.procedures ? 'Activo' : 'Pendiente'} color="#22c55e" tone="green" />
+                <MachineMetric icon={GitBranch} label="Flujos" value={machine.sections.flows ? 'Activo' : 'Pendiente'} color="#eab308" tone="amber" />
+                <MachineMetric icon={Activity} label="Diagnostico" value={machine.sections.diagnosis ? 'Activo' : 'Pendiente'} color="#f97316" tone="orange" />
+              </div>
+            </div>
+
+            <aside
+              className="p-5 sm:p-6 lg:border-l"
+              style={{ background: '#151a20', borderColor: LC.border }}
+            >
+              <div className="flex items-center gap-2 mb-4">
+                <Gauge className="h-4 w-4" style={{ color: machine.color }} />
+                <h2 className="text-xs font-bold uppercase tracking-[0.16em]" style={{ color: LC.ink }}>
+                  Lectura rapida
+                </h2>
+              </div>
+              <div className="space-y-3">
+                <DossierRow label="Uso" value="Consulta en terreno" />
+                <DossierRow label="Contenido" value="Ajustes, fallas y referencias" />
+                <DossierRow label="Formato" value="Editable desde admin" />
+              </div>
+              <div className="mt-5 rounded-md p-3" style={{ background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.28)' }}>
+                <div className="flex gap-2">
+                  <ShieldCheck className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: '#eab308' }} />
+                  <p className="text-xs leading-relaxed" style={{ color: LC.inkMid }}>
+                    Prioriza medidas, tolerancias y acciones verificables antes de intervenir el equipo.
+                  </p>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </section>
       </div>
 
       {/* Tabs */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 mt-4">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 mt-3">
+        <div
+          className="grid grid-cols-2 sm:grid-cols-4 gap-px overflow-hidden rounded-lg"
+          style={{ background: LC.border, border: `1px solid ${LC.border}` }}
+        >
           {TABS.map(tab => {
             const TabIcon = tab.icon
             const isActive = activeTab === tab.id
@@ -203,21 +263,20 @@ export function MachineLearningPage() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl transition-all relative"
+                className="flex items-center justify-center sm:justify-start gap-2 px-3 py-3 transition-all relative"
                 style={{
-                  background: isActive ? `${machine.color}1a` : LC.surface,
-                  border: `1px solid ${isActive ? machine.color + '55' : LC.border}`,
-                  minHeight: '76px',
+                  background: isActive ? `${machine.color}18` : LC.surface,
+                  minHeight: '58px',
                 }}
               >
                 <TabIcon
-                  className="h-5 w-5"
+                  className="h-4 w-4 flex-shrink-0"
                   style={{
                     color: isActive ? machine.color : hasContent ? LC.inkMid : LC.inkGhost,
                   }}
                 />
                 <span
-                  className="text-xs font-semibold text-center leading-tight"
+                  className="text-xs font-semibold leading-tight"
                   style={{ color: isActive ? machine.color : LC.inkMid }}
                 >
                   <span className="sm:hidden">{tab.shortLabel}</span>
@@ -236,12 +295,20 @@ export function MachineLearningPage() {
       </div>
 
       {/* Content area */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-6 pb-12">
-        <div className="mb-4">
-          <h2 className="text-lg font-semibold text-[#e9eef3]">{activeTabData.label}</h2>
-          <p className="text-xs mt-0.5" style={{ color: LC.inkLo }}>
-            {activeTabData.description}
-          </p>
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 pb-12">
+        <div className="mb-5 flex items-start gap-3">
+          <div
+            className="flex h-10 w-10 items-center justify-center rounded-lg"
+            style={{ background: `${machine.color}16`, border: `1px solid ${machine.color}30` }}
+          >
+            <ActiveIcon className="h-5 w-5" style={{ color: machine.color }} />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-[#e9eef3]">{activeTabData.label}</h2>
+            <p className="text-xs mt-0.5" style={{ color: LC.inkLo }}>
+              {activeTabData.description}
+            </p>
+          </div>
         </div>
 
         {loadingTab ? (
@@ -280,29 +347,89 @@ export function MachineLearningPage() {
   )
 }
 
+function MachineMetric({
+  icon: Icon,
+  label,
+  value,
+  color,
+  tone,
+}: {
+  icon: React.ElementType
+  label: string
+  value: string
+  color: string
+  tone: 'blue' | 'green' | 'amber' | 'orange'
+}) {
+  const active = value === 'Activo'
+  const toneBg = {
+    blue: `${color}12`,
+    green: 'rgba(34,197,94,0.10)',
+    amber: 'rgba(234,179,8,0.10)',
+    orange: 'rgba(249,115,22,0.10)',
+  }[tone]
+  const toneBorder = {
+    blue: `${color}24`,
+    green: 'rgba(34,197,94,0.24)',
+    amber: 'rgba(234,179,8,0.24)',
+    orange: 'rgba(249,115,22,0.24)',
+  }[tone]
+  return (
+    <div className="rounded-md px-3 py-2" style={{ background: active ? toneBg : LC.surfaceHi, border: `1px solid ${active ? toneBorder : LC.border}` }}>
+      <div className="flex items-center gap-2">
+        <Icon className="h-3.5 w-3.5" style={{ color: active ? color : LC.inkGhost }} />
+        <span className="text-[10px] uppercase tracking-[0.14em]" style={{ color: LC.inkLo }}>
+          {label}
+        </span>
+      </div>
+      <p className="mt-1 text-sm font-semibold" style={{ color: active ? LC.ink : LC.inkLo }}>
+        {value}
+      </p>
+    </div>
+  )
+}
+
+function DossierRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-4 border-b pb-2 last:border-b-0 last:pb-0" style={{ borderColor: LC.border }}>
+      <span className="text-[10px] uppercase tracking-[0.14em]" style={{ color: LC.inkLo }}>
+        {label}
+      </span>
+      <span className="text-xs font-medium text-right" style={{ color: LC.ink }}>
+        {value}
+      </span>
+    </div>
+  )
+}
+
 function ProceduresList({ procedures, color }: { procedures: Procedure[]; color: string }) {
   return (
-    <div className="space-y-4">
+    <div className="grid gap-4 lg:grid-cols-2">
       {procedures.map(proc => (
         <article
           key={proc.id}
-          className="rounded-xl overflow-hidden"
+          className="rounded-lg overflow-hidden"
           style={{ background: LC.surface, border: `1px solid ${LC.border}` }}
         >
-          <div className="h-1" style={{ background: color, opacity: 0.9 }} />
+          <div className="h-1" style={{ background: `linear-gradient(90deg, ${color}, ${color}55)` }} />
           <div className="p-5">
+            <div className="mb-4 flex items-center gap-2">
+              <ClipboardCheck className="h-4 w-4" style={{ color }} />
+              <span className="text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color }}>
+                Procedimiento
+              </span>
+            </div>
             <h3 className="text-base font-semibold text-[#e9eef3] mb-1">{proc.title}</h3>
             {proc.description && (
               <p className="text-sm mb-4 whitespace-pre-wrap" style={{ color: LC.inkMid }}>
                 {proc.description}
               </p>
             )}
-            <ol className="space-y-4 mt-4">
+            <ol className="space-y-0 mt-4 border-l" style={{ borderColor: `${color}35` }}>
               {proc.steps.map(step => (
-                <li key={step.order} className="flex gap-3">
+                <li key={step.order} className="relative flex gap-3 pb-4 pl-4 last:pb-0">
                   <span
-                    className="flex items-center justify-center w-7 h-7 rounded-full font-bold text-xs flex-shrink-0"
-                    style={{ background: `${color}25`, color }}
+                    className="absolute -left-[14px] flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold"
+                    style={{ background: LC.bg, color, border: `1px solid ${color}55` }}
                   >
                     {step.order}
                   </span>
@@ -342,69 +469,106 @@ function ProceduresList({ procedures, color }: { procedures: Procedure[]; color:
 
 function ManualList({ sections, color }: { sections: ManualSection[]; color: string }) {
   return (
-    <div className="space-y-4">
-      {sections.map(sec => {
-        const blocks = parseManualContent(sec.content)
-        return (
-          <article
-            key={sec.id}
-            className="rounded-xl overflow-hidden"
-            style={{ background: LC.surface, border: `1px solid ${LC.border}` }}
-          >
-            <div className="h-1" style={{ background: color, opacity: 0.9 }} />
-            <div className="p-5">
-              <div className="flex items-start gap-3 mb-4">
+    <div className="grid gap-5 lg:grid-cols-[260px_1fr]">
+      <aside className="hidden lg:block">
+        <div className="sticky top-4 rounded-lg p-4" style={{ background: LC.surface, border: `1px solid ${LC.border}` }}>
+          <div className="mb-3 flex items-center gap-2">
+            <BookOpen className="h-4 w-4" style={{ color }} />
+            <h3 className="text-xs font-bold uppercase tracking-[0.16em]" style={{ color: LC.ink }}>
+              Indice tecnico
+            </h3>
+          </div>
+          <nav className="space-y-1">
+            {sections.map(sec => (
+              <a
+                key={sec.id}
+                href={`#manual-${sec.id}`}
+                className="group flex items-center gap-2 rounded-md px-2 py-2 text-xs transition-colors"
+                style={{ color: LC.inkMid }}
+              >
                 <span
-                  className="flex items-center justify-center w-7 h-7 rounded-lg font-bold text-[11px] flex-shrink-0 tabular-nums"
-                  style={{ background: `${color}25`, color }}
+                  className="flex h-5 w-5 items-center justify-center rounded text-[10px] font-bold tabular-nums"
+                  style={{ background: `${color}16`, color }}
                 >
                   {sec.order}
                 </span>
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-base font-semibold leading-tight text-[#e9eef3]">{sec.title}</h3>
-                  {blocks.description && (
-                    <p className="text-sm leading-relaxed mt-1.5" style={{ color: LC.inkMid }}>
-                      {blocks.description}
-                    </p>
-                  )}
+                <span className="leading-snug">{sec.title}</span>
+              </a>
+            ))}
+          </nav>
+        </div>
+      </aside>
+
+      <div className="space-y-4">
+        {sections.map(sec => {
+          const blocks = parseManualContent(sec.content)
+          return (
+            <article
+              id={`manual-${sec.id}`}
+              key={sec.id}
+              className="overflow-hidden rounded-lg scroll-mt-6"
+              style={{ background: LC.surface, border: `1px solid ${LC.border}` }}
+            >
+              <div className="grid sm:grid-cols-[104px_1fr]">
+                <div
+                  className="flex items-center justify-between gap-3 border-b px-5 py-4 sm:block sm:border-b-0 sm:border-r"
+                  style={{ borderColor: LC.border, background: LC.surfaceHi }}
+                >
+                  <span className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: LC.inkLo }}>
+                    Ajuste
+                  </span>
+                  <span className="block text-3xl font-bold tabular-nums sm:mt-2" style={{ color }}>
+                    {String(sec.order).padStart(2, '0')}
+                  </span>
+                </div>
+
+                <div className="p-5">
+                  <div className="mb-5">
+                    <h3 className="text-lg font-semibold leading-tight text-[#e9eef3]">{sec.title}</h3>
+                    {blocks.description && (
+                      <p className="text-sm leading-relaxed mt-2 whitespace-pre-wrap" style={{ color: LC.inkMid }}>
+                        {blocks.description}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="grid gap-3">
+                    {blocks.measurements.length > 0 && (
+                      <ManualBlock
+                        icon={Ruler}
+                        title="Medidas / tolerancias"
+                        color={color}
+                        items={blocks.measurements}
+                        variant="measure"
+                      />
+                    )}
+                    {blocks.keyPoints.length > 0 && (
+                      <ManualBlock
+                        icon={FileText}
+                        title="Puntos clave"
+                        color={color}
+                        items={blocks.keyPoints}
+                      />
+                    )}
+                    {blocks.notes.length > 0 && (
+                      <ManualBlock
+                        icon={AlertTriangle}
+                        title="Notas operativas"
+                        color={color}
+                        items={blocks.notes}
+                        variant="note"
+                      />
+                    )}
+                    {blocks.images.length > 0 && (
+                      <ManualImages images={blocks.images} color={color} />
+                    )}
+                  </div>
                 </div>
               </div>
-
-              <div className="grid gap-3">
-                {blocks.measurements.length > 0 && (
-                  <ManualBlock
-                    icon={Ruler}
-                    title="Medidas / tolerancias"
-                    color={color}
-                    items={blocks.measurements}
-                    variant="measure"
-                  />
-                )}
-                {blocks.keyPoints.length > 0 && (
-                  <ManualBlock
-                    icon={FileText}
-                    title="Puntos clave"
-                    color={color}
-                    items={blocks.keyPoints}
-                  />
-                )}
-                {blocks.notes.length > 0 && (
-                  <ManualBlock
-                    icon={AlertTriangle}
-                    title="Notas operativas"
-                    color={color}
-                    items={blocks.notes}
-                    variant="note"
-                  />
-                )}
-                {blocks.images.length > 0 && (
-                  <ManualImages images={blocks.images} color={color} />
-                )}
-              </div>
-            </div>
-          </article>
-        )
-      })}
+            </article>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -466,7 +630,7 @@ function ManualBlock({
 }) {
   const background = variant === 'note' ? `${color}0d` : LC.surfaceHi
   return (
-    <section className="rounded-xl p-4" style={{ background, border: `1px solid ${variant === 'note' ? color + '33' : LC.border}` }}>
+    <section className="rounded-md p-4" style={{ background, border: `1px solid ${variant === 'note' ? color + '33' : LC.border}` }}>
       <div className="flex items-center gap-2 mb-3">
         <Icon className="h-4 w-4" style={{ color }} />
         <h4 className="text-xs uppercase tracking-[0.14em] font-bold" style={{ color }}>
@@ -477,7 +641,7 @@ function ManualBlock({
         {items.map((item, index) => (
           <li
             key={`${item}-${index}`}
-            className={variant === 'measure' ? 'rounded-lg px-3 py-2 text-sm' : 'flex gap-2.5 text-sm leading-relaxed'}
+            className={variant === 'measure' ? 'rounded-md px-3 py-2 text-sm' : 'flex gap-2.5 text-sm leading-relaxed'}
             style={variant === 'measure'
               ? { background: `${color}10`, border: `1px solid ${color}22`, color: LC.ink }
               : { color: LC.inkMid }}
@@ -499,7 +663,7 @@ function ManualBlock({
 
 function ManualImages({ images, color }: { images: { label: string; url: string }[]; color: string }) {
   return (
-    <section className="rounded-xl p-4" style={{ background: LC.surfaceHi, border: `1px solid ${LC.border}` }}>
+    <section className="rounded-md p-4" style={{ background: LC.surfaceHi, border: `1px solid ${LC.border}` }}>
       <div className="flex items-center gap-2 mb-3">
         <ImageIcon className="h-4 w-4" style={{ color }} />
         <h4 className="text-xs uppercase tracking-[0.14em] font-bold" style={{ color }}>
@@ -513,11 +677,11 @@ function ManualImages({ images, color }: { images: { label: string; url: string 
             href={image.url || undefined}
             target="_blank"
             rel="noopener noreferrer"
-            className="group rounded-lg overflow-hidden"
+            className="group overflow-hidden rounded-md"
             style={{ background: LC.surface, border: `1px solid ${color}30` }}
           >
             {image.url ? (
-              <img src={image.url} alt={image.label} loading="lazy" className="h-36 w-full object-cover" />
+              <img src={image.url} alt={image.label} loading="lazy" className="h-40 w-full object-cover grayscale-[15%] transition group-hover:grayscale-0" />
             ) : (
               <div className="h-24 flex items-center justify-center" style={{ color: LC.inkGhost }}>
                 <ImageIcon className="h-6 w-6" />
@@ -539,13 +703,13 @@ function DiagnosisList({ entries, color }: { entries: DiagnosisEntry[]; color: s
   const [openId, setOpenId] = useState<string | null>(entries[0]?.id ?? null)
 
   return (
-    <div className="space-y-2.5">
+    <div className="grid gap-3 lg:grid-cols-2">
       {entries.map((entry, idx) => {
         const open = openId === entry.id
         return (
           <article
             key={entry.id}
-            className="rounded-2xl overflow-hidden transition-colors"
+            className="overflow-hidden rounded-lg transition-colors"
             style={{
               background: LC.surface,
               border: `1px solid ${open ? LC.borderHi : LC.border}`,
@@ -561,7 +725,7 @@ function DiagnosisList({ entries, color }: { entries: DiagnosisEntry[]; color: s
               style={{ background: open ? LC.surfaceHi : 'transparent' }}
             >
               <span
-                className="flex items-center justify-center w-7 h-7 rounded-lg font-bold text-sm flex-shrink-0 tabular-nums"
+                className="flex items-center justify-center w-7 h-7 rounded-md font-bold text-sm flex-shrink-0 tabular-nums"
                 style={{ background: `${color}22`, color }}
               >
                 {idx + 1}
@@ -624,7 +788,7 @@ function DiagnosisList({ entries, color }: { entries: DiagnosisEntry[]; color: s
                   </div>
 
                   {/* Solución — payoff destacado */}
-                  <div className="rounded-xl p-4" style={{ background: `${color}0e`, border: `1px solid ${color}33` }}>
+                  <div className="rounded-md p-4" style={{ background: `${color}0e`, border: `1px solid ${color}33` }}>
                     <div className="flex items-center gap-1.5 mb-1.5">
                       <Wrench className="h-3.5 w-3.5" style={{ color }} />
                       <p className="text-[10px] uppercase tracking-[0.14em] font-bold" style={{ color }}>
