@@ -106,9 +106,9 @@
   body.edit.tool-del-plano .planoVectors g.plvlayer path{pointer-events:stroke;cursor:crosshair}
   body.edit.tool-del-plano .planoVectors g.plvlayer path:hover{stroke:#facc15;stroke-width:6;stroke-opacity:1;filter:drop-shadow(0 0 5px rgba(250,204,21,.7))}
   body.edit.tool-del-plano .stagewrap{cursor:crosshair}
-  /* "Usar solo vectorial": oculta el .png raster + el canvas PDF.js. Solo se ve el SVG vectorial. */
+  /* "Usar solo vectorial": oculta el .png raster del base. El canvas PDF.js (#vcanvas)
+     se mantiene activo como fallback nítido a zoom alto — combina con el SVG vectorial. */
   body.plano-vec-only .world img.base{display:none}
-  body.plano-vec-only #vcanvas{display:none!important}
   .markers .mk{pointer-events:auto}
   /* capa vector nítida (PDF.js) — sobre el PNG, debajo de los dibujos; aparece al acercar */
   #vcanvas{position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:none;z-index:4;display:none;will-change:transform;image-rendering:auto}
@@ -1816,15 +1816,18 @@ applyVector();
 const PV_KEY='planosAguas.planoVecVisible';
 const PV_LAY_KEY='planosAguas.planoVecLayers';
 const PV_ONLY_KEY='planosAguas.planoVecOnly';
-const PV_LAYERS=['agua-dulce','agua-salada','muros','exteriores','texto-negro','cotas-rojas'];
-const PV_LABELS={'agua-dulce':'Agua dulce','agua-salada':'Agua salada','muros':'Muros / arquitectura','exteriores':'Cerco / exteriores','texto-negro':'Texto / cotas','cotas-rojas':'Cotas rojas (cajetín)'};
-const PV_COLORS={'agua-dulce':'#0eff23','agua-salada':'#0cffff','muros':'#cbd5e1','exteriores':'#fb923c','texto-negro':'#e2e8f0','cotas-rojas':'#ef4444'};
-const PV_STROKE_W={'agua-dulce':4,'agua-salada':4,'muros':2,'exteriores':2,'texto-negro':1.5,'cotas-rojas':1.5};
-// Default ON: cañerias + muros + exteriores. OFF: texto y cotas (lo que el usuario suele querer ocultar).
-const PV_DEFAULT_ON=['agua-dulce','agua-salada','muros','exteriores'];
+const PV_LAYERS=['agua-dulce','agua-salada','muros','equipos','exteriores','texto-negro','cotas-rojas'];
+const PV_LABELS={'agua-dulce':'Agua dulce','agua-salada':'Agua salada','muros':'Muros / arquitectura','equipos':'Equipos / mesas / Baader','exteriores':'Cerco / exteriores','texto-negro':'Texto / cotas','cotas-rojas':'Cotas rojas (cajetín)'};
+const PV_COLORS={'agua-dulce':'#0eff23','agua-salada':'#0cffff','muros':'#cbd5e1','equipos':'#94a3b8','exteriores':'#fb923c','texto-negro':'#e2e8f0','cotas-rojas':'#ef4444'};
+const PV_STROKE_W={'agua-dulce':4,'agua-salada':4,'muros':2,'equipos':1.5,'exteriores':2,'texto-negro':1.5,'cotas-rojas':1.5};
+// Default ON: cañerias + muros + equipos + exteriores. OFF: texto y cotas (lo que el usuario suele querer ocultar).
+const PV_DEFAULT_ON=['agua-dulce','agua-salada','muros','equipos','exteriores'];
 let planoVecVisible=localStorage.getItem(PV_KEY)==='true';
 let planoVecOnly=localStorage.getItem(PV_ONLY_KEY)==='true';
-let planoVecLayers=(()=>{try{const v=JSON.parse(localStorage.getItem(PV_LAY_KEY)||'null');if(Array.isArray(v))return new Set(v);return new Set(PV_DEFAULT_ON);}catch(e){return new Set(PV_DEFAULT_ON);}})();
+// PV_OLD_DEFAULT: set de la sesion previa (sin la categoria 'equipos').
+// Si el usuario tiene exactamente eso en localStorage, migrarlo al nuevo default que incluye equipos.
+const PV_OLD_DEFAULT=['agua-dulce','agua-salada','muros','exteriores'];
+let planoVecLayers=(()=>{try{const v=JSON.parse(localStorage.getItem(PV_LAY_KEY)||'null');if(Array.isArray(v)){const s=new Set(v);const isOld=PV_OLD_DEFAULT.every(c=>s.has(c))&&s.size===PV_OLD_DEFAULT.length;if(isOld)return new Set(PV_DEFAULT_ON);return s;}return new Set(PV_DEFAULT_ON);}catch(e){return new Set(PV_DEFAULT_ON);}})();
 const planoVecLoaded=new Set();     // capas ya fetcheadas e insertadas
 const planoVecLoading=new Set();    // en vuelo
 const planoVecEl=document.getElementById('planoVectors');
