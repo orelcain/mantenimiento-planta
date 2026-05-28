@@ -263,6 +263,7 @@
   body.edit.tool-pipe .stagewrap,body.edit.tool-mask .stagewrap,body.edit.tool-cut-base .stagewrap,
   body.edit.tool-bajada .stagewrap,body.edit.tool-label .stagewrap,
   body.edit.tool-rect .stagewrap,body.edit.tool-circle .stagewrap,body.edit.tool-sline .stagewrap,
+  body.edit.tool-polygon .stagewrap,
   body.edit.tool-measure .stagewrap,body.edit.tool-calib .stagewrap{cursor:crosshair}
 
   /* ===== paleta de herramientas en la editbar ===== */
@@ -1116,6 +1117,8 @@ function removePoint(id){
 /* ============ DRAW LAYER + EDITOR GUIADO ============ */
 const PIPE_W=5, DOT_R=13, LBL_SZE=16, LBL_HALO=3;
 let tool='pin', kind='dulce', maskColor='#ffffff', pipeW=5, snapAngles=true, wiz=null;
+let structColor='';        // color custom de líneas/formas de estructura ('' = gris --struct por defecto)
+let pvSnap=true;           // imán a los vértices del Plano vec (para calcar el plano original)
 let draft=null, draftCursor=null, selShape=null, drag=null, structMode=false, pend2=null, cotaMode=false;
 function nomT(t){return t==='d'?'Dulce':t==='c'?'Caliente':'Salada';}
 function preT(t){return t==='d'?'AD':t==='c'?'AC':'AS';}
@@ -1128,7 +1131,7 @@ function nextCorr(t){
   for(const a of L)for(const b of L){if(!used.has(a+b))return a+b;}
   return 'X';
 }
-const TOOLCLS=['tool-pin','tool-pipe','tool-bajada','tool-label','tool-mask','tool-cut-base','tool-select','tool-rect','tool-circle','tool-sline','tool-measure','tool-calib','tool-del-plano'];
+const TOOLCLS=['tool-pin','tool-pipe','tool-bajada','tool-label','tool-mask','tool-cut-base','tool-select','tool-rect','tool-circle','tool-sline','tool-polygon','tool-measure','tool-calib','tool-del-plano'];
 function setTool(t){
   if(draft&&!(wiz&&wiz.step==='pipe'))cancelDraft();
   pend2=null;document.body.classList.remove('drafting');
@@ -1161,17 +1164,22 @@ function renderEditbar(){
     }
     s+=`<span class="ebsp"></span><button class="btn" id="wizCancel">✗ Cancelar</button>`;
   }else if(structMode){
+    const planoTenue=(typeof FR!=='undefined'&&FR.planoOpac<60);
     s+=`<span class="tagx">ESTRUCTURA</span>`+
       `<button class="tbtn ${tool==='rect'?'on':''}" id="esRect">▭ Rect</button>`+
       `<button class="tbtn ${tool==='circle'?'on':''}" id="esCirc">◯ Círculo</button>`+
       `<button class="tbtn ${tool==='sline'?'on':''}" id="esLine">╱ Línea</button>`+
+      `<button class="tbtn ${tool==='polygon'?'on':''}" id="esPoly" title="Polígono cerrado (calcar salas, equipos)">⬡ Polígono</button>`+
       `<button class="tbtn ${tool==='label'?'on':''}" id="esLabel">Aa Etiqueta</button>`+
-      `<span class="ebsp"></span><span class="wcap">grosor</span><button class="tbtn" id="wizWm">−</button><input type="range" id="wizW" min="1" max="14" value="${pipeW}"><button class="tbtn" id="wizWp">+</button><span class="wnum" id="wizWv">${pipeW}</span>`+
-      (tool==='sline'?`<button class="tbtn ${snapAngles?'on':''}" id="wizSnap">⊾ 45/90</button>`:'')+
+      `<span class="ebsp"></span><input type="color" class="mcol" id="structColorPick" value="${structColor||'#c8ccd0'}" title="Color de la línea/forma">`+
+      `<span class="wcap">grosor</span><button class="tbtn" id="wizWm">−</button><input type="range" id="wizW" min="1" max="14" value="${pipeW}"><button class="tbtn" id="wizWp">+</button><span class="wnum" id="wizWv">${pipeW}</span>`+
+      ((tool==='sline'||tool==='polygon')?`<button class="tbtn ${snapAngles?'on':''}" id="wizSnap" title="Imantar ángulos 45/90">⊾ 45/90</button>`:'')+
+      `<button class="tbtn ${planoTenue?'on':''}" id="esTenue" title="Atenuar el plano-base para ver mejor tu dibujo">👁 Tenue</button>`+
+      (planoVecVisible?`<button class="tbtn ${pvSnap?'on':''}" id="esPvSnap" title="Imantar el cursor a las líneas del Plano vec (calcar exacto)">🧲 Imán plano</button>`:'')+
       (draft?`<button class="btn primary" id="eFinish">✓ Terminar</button>`:'')+
       ((draft||pend2)?`<button class="btn" id="eCancel">✗ Cancelar</button>`:'')+
       `<span class="ebsp"></span><button class="btn" id="ebBack2">← Volver</button>`;
-    setHint(tool==='rect'?'Clic 2 esquinas del rectángulo (muestra medidas en vivo).':tool==='circle'?'Clic el centro y luego el borde.':tool==='sline'?'Clic puntos · doble-clic o Terminar.':tool==='label'?'Clic donde va el rótulo (texto libre).':'Elige una forma para dibujar estructuras.');
+    setHint(tool==='rect'?'Clic 2 esquinas del rectángulo (muestra medidas en vivo).':tool==='circle'?'Clic el centro y luego el borde.':tool==='sline'?'Clic puntos · doble-clic o Terminar.':tool==='polygon'?'Clic vértices · doble-clic o Terminar = cierra el polígono.':tool==='label'?'Clic donde va el rótulo (texto libre).':'Elige una forma para dibujar estructuras.');
   }else if(tool==='measure'||tool==='calib'){
     const cal=tool==='calib';
     s+=`<span class="tagx">${cal?'CALIBRAR ESCALA':'MEDIR'}</span><span class="wcap">clic 2 puntos${cal?' sobre una cota conocida':''}</span>`;
@@ -1255,7 +1263,11 @@ function wireEditbar(){
   if($('esRect'))$('esRect').onclick=()=>setTool('rect');
   if($('esCirc'))$('esCirc').onclick=()=>setTool('circle');
   if($('esLine'))$('esLine').onclick=()=>setTool('sline');
+  if($('esPoly'))$('esPoly').onclick=()=>setTool('polygon');
   if($('esLabel'))$('esLabel').onclick=()=>setTool('label');
+  if($('structColorPick'))$('structColorPick').oninput=e=>{structColor=e.target.value;};
+  if($('esTenue'))$('esTenue').onclick=togglePlanoTenue;
+  if($('esPvSnap'))$('esPvSnap').onclick=()=>{pvSnap=!pvSnap;renderEditbar();toast(pvSnap?'Imán al Plano vec ON':'Imán al Plano vec OFF');};
   if($('eFinish'))$('eFinish').onclick=finishDraft;
   if($('eCancel'))$('eCancel').onclick=cancelDraft;
   if($('eDelShape'))$('eDelShape').onclick=delSelShape;
@@ -1296,7 +1308,7 @@ function onEditClick(e){
   const w=worldPx(e.clientX,e.clientY);
   if(Math.abs(w.x)>baseW()*3||Math.abs(w.y)>baseH()*3)return; // lienzo extendido (dibujar fuera del plano)
   if(wiz){ if(wiz.step==='ubic')placeBajadaPoint(w); else if(wiz.step==='pipe')draftAdd(w); return; }
-  if(tool==='mask'||tool==='cut-base'||tool==='sline')draftAdd(w);
+  if(tool==='mask'||tool==='cut-base'||tool==='sline'||tool==='polygon')draftAdd(w);
   else if(tool==='rect'||tool==='circle'||tool==='measure'||tool==='calib')twoClick(w);
   else if(tool==='label')addLabel(w);
   else if(tool==='select'&&!draft){selShape=null;renderShapes();renderEditbar();}
@@ -1305,8 +1317,8 @@ function twoClick(w){
   const sn=snapNodes(w);w={x:sn.x,y:sn.y};
   if(!pend2){pend2={x:+w.x.toFixed(1),y:+w.y.toFixed(1)};draftCursor={x:w.x,y:w.y};document.body.classList.add('drafting');renderShapes();renderEditbar();return;}
   const p1=pend2,p2={x:+w.x.toFixed(1),y:+w.y.toFixed(1)};pend2=null;document.body.classList.remove('drafting');
-  if(tool==='rect'){const x=Math.min(p1.x,p2.x),y=Math.min(p1.y,p2.y),rw=Math.abs(p2.x-p1.x),rh=Math.abs(p2.y-p1.y);if(rw>2&&rh>2){state.shapes.push({id:'sh-'+Date.now(),type:'rect',kind:'struct',x,y,rw:+rw.toFixed(1),rh:+rh.toFixed(1),sw:pipeW});save();toast('Rectángulo agregado');}}
-  else if(tool==='circle'){const r=Math.hypot(p2.x-p1.x,p2.y-p1.y);if(r>2){state.shapes.push({id:'sh-'+Date.now(),type:'circle',kind:'struct',cx:p1.x,cy:p1.y,r:+r.toFixed(1),sw:pipeW});save();toast('Círculo agregado');}}
+  if(tool==='rect'){const x=Math.min(p1.x,p2.x),y=Math.min(p1.y,p2.y),rw=Math.abs(p2.x-p1.x),rh=Math.abs(p2.y-p1.y);if(rw>2&&rh>2){const sh={id:'sh-'+Date.now(),type:'rect',kind:'struct',x,y,rw:+rw.toFixed(1),rh:+rh.toFixed(1),sw:pipeW};if(structColor)sh.color=structColor;state.shapes.push(sh);save();toast('Rectángulo agregado');}}
+  else if(tool==='circle'){const r=Math.hypot(p2.x-p1.x,p2.y-p1.y);if(r>2){const sh={id:'sh-'+Date.now(),type:'circle',kind:'struct',cx:p1.x,cy:p1.y,r:+r.toFixed(1),sw:pipeW};if(structColor)sh.color=structColor;state.shapes.push(sh);save();toast('Círculo agregado');}}
   else if(tool==='measure'){
     if(cotaMode){state.shapes.push({id:'sh-'+Date.now(),type:'cota',pts:[[p1.x,p1.y],[p2.x,p2.y]]});save();toast('Cota agregada');}
     else showMeasure(p1,p2);
@@ -1367,6 +1379,13 @@ function snapNodes(w){
     else if(s.type==='dot'||s.type==='label')tp(s.x,s.y);
   });
   points().forEach(p=>{if(p.x!=null)tp(p.x/100*baseW(),p.y/100*baseH());});
+  // imán a vértices del Plano vec (para calcar el plano original) — solo si la capa está activa
+  if(typeof planoVecVisible!=='undefined'&&planoVecVisible&&pvSnap&&planoVecSnapGrid.size){
+    const gx0=Math.floor(w.x/PV_SNAP_CELL),gy0=Math.floor(w.y/PV_SNAP_CELL);
+    for(let gx=gx0-1;gx<=gx0+1;gx++)for(let gy=gy0-1;gy<=gy0+1;gy++){
+      const a=planoVecSnapGrid.get(gx+','+gy);if(a)for(let i=0;i<a.length;i++)tp(a[i][0],a[i][1]);
+    }
+  }
   return best?{x:best[0],y:best[1],hit:true}:{x:w.x,y:w.y,hit:false};
 }
 
@@ -1417,7 +1436,7 @@ function doCalib(p1,p2){
 
 /* polilínea / polígono (con snap 45/90 + grosor en cañerías) */
 function draftAdd(w){
-  if(!draft){const isS=tool==='sline';draft={type:isS?'pipe':tool,kind:isS?'struct':kind,fill:maskColor,w:pipeW,pts:[]};document.body.classList.add('drafting');}
+  if(!draft){const isS=tool==='sline'||tool==='polygon';draft={type:isS?'pipe':tool,kind:isS?'struct':kind,fill:maskColor,w:pipeW,pts:[],closed:tool==='polygon',color:(isS&&structColor)?structColor:undefined};document.body.classList.add('drafting');}
   const sn=snapNodes(w);let x,y;
   if(sn.hit){x=+sn.x.toFixed(1);y=+sn.y.toFixed(1);}                       // imán a nodo (prioritario)
   else{x=+w.x.toFixed(1);y=+w.y.toFixed(1);if(draft.type==='pipe'&&snapAngles&&draft.pts.length){const last=draft.pts[draft.pts.length-1],sp=snapPt(last,w.x,w.y);x=+sp.x.toFixed(1);y=+sp.y.toFixed(1);}}
@@ -1432,13 +1451,21 @@ function finishDraft(){
     const sh={id:'sh-'+Date.now(),type:draft.type,pts:draft.pts};
     if(draft.type==='mask')sh.fill=draft.fill;
     else if(draft.type==='cut-base'){/* no extra props */}
-    else{sh.kind=draft.kind;sh.w=draft.w||PIPE_W;}
+    else{sh.kind=draft.kind;sh.w=draft.w||PIPE_W;if(draft.closed)sh.closed=true;if(draft.color)sh.color=draft.color;}
     state.shapes.push(sh);save();
-    toast(draft.type==='mask'?'Máscara agregada':draft.type==='cut-base'?'Recorte de plano agregado · plano principal revela el recinto':'Cañería agregada');
+    toast(draft.type==='mask'?'Máscara agregada':draft.type==='cut-base'?'Recorte de plano agregado · plano principal revela el recinto':draft.closed?'Polígono agregado':'Línea agregada');
   }
   draft=null;draftCursor=null;document.body.classList.remove('drafting');renderShapes();
 }
 function cancelDraft(){draft=null;draftCursor=null;pend2=null;document.body.classList.remove('drafting');renderShapes();renderEditbar();}
+/* atajo: atenuar/restaurar el plano-base raster para ver mejor el dibujo al calcar */
+function togglePlanoTenue(){
+  if(typeof FR==='undefined')return;
+  FR.planoOpac=(FR.planoOpac<60)?100:35;
+  localStorage.setItem(PLANO_OPAC_KEY,String(FR.planoOpac));
+  if(typeof frApply==='function')frApply();
+  renderEditbar();
+}
 window.addEventListener('keydown',e=>{
   if(pend2&&e.key==='Escape'){e.preventDefault();cancelDraft();return;}
   if(!draft)return;
@@ -1499,12 +1526,13 @@ function addLabel(w){
 function shapeSVG(sh){
   const selectable=document.body.classList.contains('tool-select');
   if(sh.type==='pipe'){
-    const d='M'+sh.pts.map(p=>p[0]+' '+p[1]).join(' L ');
+    const d='M'+sh.pts.map(p=>p[0]+' '+p[1]).join(' L ')+(sh.closed?' Z':'');
+    const col=sh.color?` stroke="${sh.color}"`:'';
     let s=selectable?`<path class="shape hit" data-id="${sh.id}" d="${d}"/>`:'';
-    return s+`<path class="shape pipe ${sh.kind}" data-id="${sh.id}" d="${d}" stroke-width="${sh.w||PIPE_W}"/>`;
+    return s+`<path class="shape pipe ${sh.kind}" data-id="${sh.id}" d="${d}" stroke-width="${sh.w||PIPE_W}"${col}/>`;
   }
-  if(sh.type==='rect')return `<rect class="shape rect" data-id="${sh.id}" x="${sh.x}" y="${sh.y}" width="${sh.rw}" height="${sh.rh}" stroke-width="${sh.sw||PIPE_W}"/>`;
-  if(sh.type==='circle')return `<circle class="shape circle" data-id="${sh.id}" cx="${sh.cx}" cy="${sh.cy}" r="${sh.r}" stroke-width="${sh.sw||PIPE_W}"/>`;
+  if(sh.type==='rect')return `<rect class="shape rect" data-id="${sh.id}" x="${sh.x}" y="${sh.y}" width="${sh.rw}" height="${sh.rh}" stroke-width="${sh.sw||PIPE_W}"${sh.color?` stroke="${sh.color}"`:''}/>`;
+  if(sh.type==='circle')return `<circle class="shape circle" data-id="${sh.id}" cx="${sh.cx}" cy="${sh.cy}" r="${sh.r}" stroke-width="${sh.sw||PIPE_W}"${sh.color?` stroke="${sh.color}"`:''}/>`;
   if(sh.type==='mask')return `<polygon class="shape mask" data-id="${sh.id}" fill="${sh.fill||'#ffffff'}" points="${sh.pts.map(p=>p.join(',')).join(' ')}"/>`;
   if(sh.type==='cut-base'){
     // Solo se ve el contorno aqua en modo edición (CSS .cut-base-outline). El efecto real es CSS clip-path en el #base.
@@ -1834,6 +1862,17 @@ const planoVecEl=document.getElementById('planoVectors');
 
 function planoVecPathD(g){let d='';const ln=(L)=>{L.forEach((p,i)=>{d+=(i===0?'M':'L')+p[0]+' '+p[1]+' ';});};if(g.type==='LineString')ln(g.coordinates);else if(g.type==='MultiLineString')g.coordinates.forEach(ln);return d;}
 
+/* Spatial grid de vértices del Plano vec para SNAP al calcar (lookup O(1) por celda).
+   Se puebla al cargar cada capa. snapNodes() consulta las 9 celdas vecinas al cursor. */
+const PV_SNAP_CELL=40;
+const planoVecSnapGrid=new Map();
+function pvSnapAdd(x,y){const k=Math.floor(x/PV_SNAP_CELL)+','+Math.floor(y/PV_SNAP_CELL);let a=planoVecSnapGrid.get(k);if(!a){a=[];planoVecSnapGrid.set(k,a);}a.push([x,y]);}
+function pvSnapIndexFeatures(features){
+  for(const ft of (features||[])){const g=ft&&ft.geometry;if(!g)continue;
+    const polys=g.type==='LineString'?[g.coordinates]:(g.type==='MultiLineString'?g.coordinates:[]);
+    for(const poly of polys)for(const pt of poly)pvSnapAdd(pt[0],pt[1]);}
+}
+
 async function planoVecLoadLayer(cat){
   if(planoVecLoaded.has(cat)||planoVecLoading.has(cat))return;
   planoVecLoading.add(cat);
@@ -1853,6 +1892,7 @@ async function planoVecLoadLayer(cat){
     html+=`</g>`;
     planoVecEl.insertAdjacentHTML('beforeend',html);
     planoVecLoaded.add(cat);
+    pvSnapIndexFeatures(gj.features);
     applyRemovedPlanoPaths();
   }catch(e){console.warn('planoVec load',cat,e);}
   finally{planoVecLoading.delete(cat);}
