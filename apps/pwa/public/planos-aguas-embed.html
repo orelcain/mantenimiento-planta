@@ -374,7 +374,15 @@
         <div class="frHint">Mover/rotar/escalar aplica al recinto (alrededor del centro del plano-base). Si la posición queda perfecta, "Copiar matriz" y pegámela acá para grabarla como baseline.</div>
         <div style="height:1px;background:var(--border);margin:10px 0 6px"></div>
         <h4 style="margin:0 0 6px 0">Capas vectoriales (DXF) <span style="font-weight:400;color:var(--inkLo);font-size:9px">se ven al activar VECTOR</span></h4>
-        <div id="vecLayersList" style="max-height:280px;overflow:auto;padding-right:4px"></div>
+        <div style="display:flex;gap:6px;align-items:center;padding:3px 0 6px 0;font-family:var(--mono);font-size:10.5px">
+          <input type="checkbox" id="vecClipToggle" style="accent-color:var(--aquaBright);cursor:pointer">
+          <label for="vecClipToggle" style="cursor:pointer;flex:1" title="El vector se ve SOLO dentro de los polígonos cut-base (zonas donde el plano-base está recortado). Útil para revelar bodega/exteriores sin duplicar el edificio principal.">Vector solo en zonas recortadas</label>
+        </div>
+        <div style="display:flex;gap:6px;padding:3px 0">
+          <button id="vecResetLayers" title="Restablecer capas al default conservador" style="flex:1;background:#1a2532;color:var(--ink);border:1px solid var(--border);padding:5px;border-radius:3px;cursor:pointer;font-size:10px;text-transform:uppercase;letter-spacing:.05em;font-family:var(--mono)">Restablecer capas</button>
+          <button id="vecAllOff" style="flex:1;background:#1a2532;color:var(--ink);border:1px solid var(--border);padding:5px;border-radius:3px;cursor:pointer;font-size:10px;text-transform:uppercase;letter-spacing:.05em;font-family:var(--mono)">Apagar todas</button>
+        </div>
+        <div id="vecLayersList" style="max-height:240px;overflow:auto;padding-right:4px"></div>
       </div>
     </div>
 
@@ -1545,11 +1553,14 @@ function renderShapes(){
 function applyBaseCutMask(){
   const bs=document.getElementById('base');if(!bs)return;
   const cuts=(state.shapes||[]).filter(s=>s.type==='cut-base'&&Array.isArray(s.pts)&&s.pts.length>=3);
-  if(!cuts.length){bs.style.clipPath='none';return;}
-  const W=baseW(),H=baseH();
-  let path=`M0,0 L${W},0 L${W},${H} L0,${H} Z`;
-  cuts.forEach(s=>{path+=' M'+s.pts.map((p,i)=>(i===0?'':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ')+' Z';});
-  bs.style.clipPath=`path(evenodd,'${path}')`;
+  if(!cuts.length){bs.style.clipPath='none';}else{
+    const W=baseW(),H=baseH();
+    let path=`M0,0 L${W},0 L${W},${H} L0,${H} Z`;
+    cuts.forEach(s=>{path+=' M'+s.pts.map((p,i)=>(i===0?'':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ')+' Z';});
+    bs.style.clipPath=`path(evenodd,'${path}')`;
+  }
+  // Sincronizar clip inverso del vector
+  try{if(typeof vectorClipUpdate==='function')vectorClipUpdate();}catch(_){}
 }
 function updateLive(){const el=drawEl.querySelector('#draftLive');if(!el||!draft||!draft.pts.length||!draftCursor)return;const last=draft.pts[draft.pts.length-1];const sn=snapNodes(draftCursor);let cx,cy;if(sn.hit){cx=sn.x;cy=sn.y;}else{cx=draftCursor.x;cy=draftCursor.y;if(draft.type==='pipe'&&snapAngles){const sp=snapPt(last,cx,cy);cx=sp.x;cy=sp.y;}}el.setAttribute('d',`M${last[0]} ${last[1]} L${cx.toFixed(1)} ${cy.toFixed(1)}`);const ind=drawEl.querySelector('#snapInd');if(ind){if(sn.hit){ind.setAttribute('cx',cx);ind.setAttribute('cy',cy);ind.setAttribute('r',(7/view.s).toFixed(2));ind.style.display='';}else ind.style.display='none';}}
 
@@ -1656,10 +1667,17 @@ const VEC_KEY='planosAguas.vectorVisible';
 const VEC_LAY_KEY='planosAguas.vectorLayers';
 const VEC_LAYERS=['023_MUROS_2','MURO','CIMENTACION','PLANTA','CERCO','VENTANAS','ESCALERA','BARRERA','CAMARA','CAMINO','AGUA','ESTANQUE-AGUA','A_PV','BENCINA','GENERADOR','LOTEA','DIBUJO'];
 const VEC_COLORS={'023_MUROS_2':'#94a3b8','MURO':'#cbd5e1','AGUA':'#0cffff','A_PV':'#5aa6e8','BARRERA':'#f59e0b','BENCINA':'#fb923c','CAMARA':'#a78bfa','CAMINO':'#fbbf24','CERCO':'#84cc16','CIMENTACION':'#fb7185','DIBUJO':'#94a3b8','ESCALERA':'#22d3ee','ESTANQUE-AGUA':'#06b6d4','GENERADOR':'#ef4444','LOTEA':'#a8a29e','PLANTA':'#10b981','VENTANAS':'#e879f9'};
-const VEC_DEFAULT_ON=['MURO','023_MUROS_2','CERCO','CIMENTACION','VENTANAS','ESCALERA','CAMARA','ESTANQUE-AGUA','GENERADOR','PLANTA'];
+// Default conservador: solo capas externas que el plano-base NO tiene (cerco perimetral,
+// estanques, generador, caminos, etc). Las que duplican el edificio principal (muros,
+// cimentaciones, ventanas, escaleras) van OFF — el usuario las activa selectivamente si quiere.
+const VEC_DEFAULT_ON=['CERCO','ESTANQUE-AGUA','GENERADOR','AGUA','A_PV','CAMINO','BENCINA','BARRERA','LOTEA','PLANTA','DIBUJO','CAMARA'];
+const VEC_OLD_DEFAULT=['MURO','023_MUROS_2','CERCO','CIMENTACION','VENTANAS','ESCALERA','CAMARA','ESTANQUE-AGUA','GENERADOR','PLANTA'];
 const VEC_CSS_MATRIX='matrix(125.856849, -253.214226, -252.708692, -126.207990, -252998.025, 113724.111)';
+const VEC_CLIP_KEY='planosAguas.vectorClipToCuts';
 let vectorVisible=localStorage.getItem(VEC_KEY)==='true';
-let vectorLayers=(()=>{try{const v=JSON.parse(localStorage.getItem(VEC_LAY_KEY)||'null');return Array.isArray(v)?new Set(v):new Set(VEC_DEFAULT_ON);}catch(e){return new Set(VEC_DEFAULT_ON);}})();
+let vectorClipToCuts=localStorage.getItem(VEC_CLIP_KEY)==='true';
+let vectorLayers=(()=>{try{const v=JSON.parse(localStorage.getItem(VEC_LAY_KEY)||'null');if(Array.isArray(v)){// Migrar usuarios con el default viejo al nuevo
+  const s=new Set(v);const isOld=VEC_OLD_DEFAULT.every(l=>s.has(l))&&s.size===VEC_OLD_DEFAULT.length;if(isOld)return new Set(VEC_DEFAULT_ON);return s;}return new Set(VEC_DEFAULT_ON);}catch(e){return new Set(VEC_DEFAULT_ON);}})();
 let vectorLoaded=false,vectorLoading=false;
 const vectorsEl=document.getElementById('vectors');
 
@@ -1673,12 +1691,12 @@ async function vectorLoad(){
     const results=await Promise.all(VEC_LAYERS.map(async lyr=>{
       try{const r=await fetch(`planos-aguas-assets/geojsons/${lyr}.geojson`);if(!r.ok)return null;const gj=await r.json();const paths=gj.features.map(ft=>vecPathD(ft.geometry)).filter(Boolean);return{lyr,paths,count:gj.features.length};}catch(e){console.warn('vec load',lyr,e);return null;}
     }));
-    let html=`<g class="vroot" transform="${VEC_CSS_MATRIX}">`;
+    let html=`<defs><clipPath id="vecCut" clipPathUnits="userSpaceOnUse"><path id="vecCutPath" d=""/></clipPath></defs><g class="vroot" id="vroot" transform="${VEC_CSS_MATRIX}">`;
     for(const r of results){if(!r)continue;html+=`<g class="vlayer vl-${r.lyr}" data-lyr="${r.lyr}" stroke="${VEC_COLORS[r.lyr]||'#999'}" stroke-width="1" stroke-opacity="0.85" style="display:${vectorLayers.has(r.lyr)?'':'none'}">`;for(const d of r.paths)html+=`<path d="${d}"/>`;html+=`</g>`;}
     html+=`</g>`;
     vectorsEl.setAttribute('viewBox','0 0 6272 3600');
     vectorsEl.innerHTML=html;
-    vectorLoaded=true;vectorLayoutSync();vectorPanelRender();
+    vectorLoaded=true;vectorLayoutSync();vectorClipUpdate();vectorPanelRender();
   }finally{vectorLoading=false;}
 }
 
@@ -1694,8 +1712,23 @@ function applyVector(){
   if(vectorVisible){
     vectorsEl.style.display='block';
     if(!vectorLoaded)vectorLoad();
-    else vectorLayoutSync();
+    else{vectorLayoutSync();vectorClipUpdate();}
   }else{vectorsEl.style.display='none';}
+}
+
+/* clip-path inverso: muestra el vector SOLO dentro de los polígonos cut-base.
+   Útil para revelar zonas externas (bodega, estanques) sin duplicar el plano principal.
+   El path d= se genera concatenando los cut-base como sub-paths cerrados. */
+function vectorClipUpdate(){
+  if(!vectorLoaded)return;
+  const vroot=document.getElementById('vroot');if(!vroot)return;
+  const cutPath=document.getElementById('vecCutPath');
+  const cuts=(state&&state.shapes||[]).filter(s=>s.type==='cut-base'&&Array.isArray(s.pts)&&s.pts.length>=3);
+  if(!vectorClipToCuts||!cuts.length){vroot.removeAttribute('clip-path');if(cutPath)cutPath.setAttribute('d','');return;}
+  let d='';
+  cuts.forEach(s=>{d+='M'+s.pts.map((p,i)=>(i===0?'':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ')+' Z ';});
+  if(cutPath)cutPath.setAttribute('d',d);
+  vroot.setAttribute('clip-path','url(#vecCut)');
 }
 
 function vectorToggleLayer(lyr){
@@ -1720,6 +1753,12 @@ function vectorPanelRender(){
 
 document.getElementById('chipVector').onclick=()=>{vectorVisible=!vectorVisible;localStorage.setItem(VEC_KEY,String(vectorVisible));applyVector();};
 applyVector();
+
+function vectorPanelExtrasRender(){
+  const cb=document.getElementById('vecClipToggle');if(cb){cb.checked=vectorClipToCuts;cb.onchange=()=>{vectorClipToCuts=cb.checked;localStorage.setItem(VEC_CLIP_KEY,String(vectorClipToCuts));vectorClipUpdate();};}
+  const br=document.getElementById('vecResetLayers');if(br)br.onclick=()=>{vectorLayers=new Set(VEC_DEFAULT_ON);localStorage.setItem(VEC_LAY_KEY,JSON.stringify([...vectorLayers]));vectorsEl.querySelectorAll('.vlayer').forEach(g=>{const lyr=g.dataset.lyr;g.style.display=vectorLayers.has(lyr)?'':'none';});vectorPanelRender();};
+  const bo=document.getElementById('vecAllOff');if(bo)bo.onclick=()=>{vectorLayers=new Set();localStorage.setItem(VEC_LAY_KEY,JSON.stringify([]));vectorsEl.querySelectorAll('.vlayer').forEach(g=>{g.style.display='none';});vectorPanelRender();};
+}
 
 /* ============ AJUSTE FINO RECINTO (Fase 3 calibracion) ============
    Matriz base = la calculada en Fase 1 (recinto-reducido 8000x5659 -> plano-base 6272x3600).
@@ -1774,7 +1813,7 @@ document.getElementById('frCopy').onclick=async()=>{
   try{await navigator.clipboard.writeText(css); alert(msg+'\n\n(Copiada al portapapeles)');}
   catch(e){prompt('Copiá manualmente:', css);}
 };
-document.getElementById('btnFineRec').onclick=()=>{const p=document.getElementById('frPanel');p.style.display=(p.style.display==='none'||!p.style.display)?'block':'none';if(p.style.display==='block')vectorPanelRender();};
+document.getElementById('btnFineRec').onclick=()=>{const p=document.getElementById('frPanel');p.style.display=(p.style.display==='none'||!p.style.display)?'block':'none';if(p.style.display==='block'){vectorPanelRender();vectorPanelExtrasRender();}};
 document.getElementById('frClose').onclick=()=>{document.getElementById('frPanel').style.display='none';};
 frBindUI();
 frApply();
