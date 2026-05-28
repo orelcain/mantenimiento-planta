@@ -151,10 +151,10 @@ export function MachineLearningPage() {
       }}
     >
       {/* Header */}
-      <div className="max-w-6xl mx-auto px-4 pt-6 pb-4 sm:px-6 sm:pt-10">
+      <div className="max-w-6xl mx-auto px-4 pt-4 pb-3 sm:px-6 sm:pt-10 sm:pb-4">
         <button
           onClick={() => navigate('/aprendizaje')}
-          className="flex items-center gap-2 text-sm mb-5 -ml-2 px-2 py-3 rounded-lg transition-colors"
+          className="flex items-center gap-2 text-sm mb-3 -ml-2 px-2 py-2 rounded-lg transition-colors sm:mb-5 sm:py-3"
           style={{ color: LC.inkLo, minHeight: '44px' }}
           onMouseEnter={e => (e.currentTarget.style.color = LC.aquaBright)}
           onMouseLeave={e => (e.currentTarget.style.color = LC.inkLo)}
@@ -175,16 +175,16 @@ export function MachineLearningPage() {
                 <span style={{ color: machine.color }}>{machine.name}</span>
               </div>
 
-              <div className="flex items-start gap-4">
+              <div className="flex items-start gap-3 sm:gap-4">
                 <div
-                  className="flex items-center justify-center w-16 h-16 rounded-lg flex-shrink-0"
+                  className="flex items-center justify-center w-12 h-12 rounded-lg flex-shrink-0 sm:h-16 sm:w-16"
                   style={{
                     background: `linear-gradient(145deg, ${machine.color}24, #151a20)`,
                     border: `1px solid ${machine.color}45`,
                     boxShadow: `inset 0 0 0 1px ${machine.color}12`,
                   }}
                 >
-                  <Icon className="h-8 w-8" style={{ color: machine.color }} />
+                  <Icon className="h-6 w-6 sm:h-8 sm:w-8" style={{ color: machine.color }} />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2 mb-2">
@@ -198,14 +198,14 @@ export function MachineLearningPage() {
                       {machine.area}
                     </span>
                   </div>
-                  <h1 className="text-2xl sm:text-4xl font-bold leading-tight text-[#e9eef3]">{machine.name}</h1>
+                  <h1 className="text-[1.7rem] sm:text-4xl font-bold leading-tight text-[#e9eef3]">{machine.name}</h1>
                   <p className="text-sm leading-relaxed mt-3 max-w-2xl" style={{ color: LC.inkMid }}>
                     {machine.description}
                   </p>
                 </div>
               </div>
 
-              <div className="grid gap-2 sm:grid-cols-4 mt-6">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 mt-5 sm:mt-6">
                 <MachineMetric icon={BookOpen} label="Manual" value={machine.sections.manual ? 'Activo' : 'Pendiente'} color={machine.color} tone="blue" />
                 <MachineMetric icon={ClipboardCheck} label="Proced." value={machine.sections.procedures ? 'Activo' : 'Pendiente'} color="#22c55e" tone="green" />
                 <MachineMetric icon={GitBranch} label="Flujos" value={machine.sections.flows ? 'Activo' : 'Pendiente'} color="#eab308" tone="amber" />
@@ -214,7 +214,7 @@ export function MachineLearningPage() {
             </div>
 
             <aside
-              className="p-5 sm:p-6 lg:border-l"
+              className="hidden p-5 sm:block sm:p-6 lg:border-l"
               style={{ background: '#151a20', borderColor: LC.border }}
             >
               <div className="flex items-center gap-2 mb-4">
@@ -242,9 +242,9 @@ export function MachineLearningPage() {
       </div>
 
       {/* Tabs */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 mt-3">
+      <div className="sticky top-0 z-20 max-w-6xl mx-auto px-4 sm:static sm:px-6 mt-3">
         <div
-          className="grid grid-cols-2 sm:grid-cols-4 gap-px overflow-hidden rounded-lg"
+          className="grid grid-cols-2 sm:grid-cols-4 gap-px overflow-hidden rounded-lg backdrop-blur"
           style={{ background: LC.border, border: `1px solid ${LC.border}` }}
         >
           {TABS.map(tab => {
@@ -295,7 +295,7 @@ export function MachineLearningPage() {
       </div>
 
       {/* Content area */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 pb-12">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-5 sm:pt-6 pb-28 sm:pb-12">
         <div className="mb-5 flex items-start gap-3">
           <div
             className="flex h-10 w-10 items-center justify-center rounded-lg"

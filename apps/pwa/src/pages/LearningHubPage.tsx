@@ -252,7 +252,7 @@ export function LearningHubPage() {
                 >
                   Centro de Aprendizaje
                 </span>
-                <span className="text-[10px] uppercase tracking-[0.18em]" style={{ color: C.inkLo }}>
+                <span className="hidden text-[10px] uppercase tracking-[0.18em] sm:inline" style={{ color: C.inkLo }}>
                   Centro de Aprendizaje · AquaChile
                 </span>
               </div>
@@ -270,7 +270,7 @@ export function LearningHubPage() {
             </div>
 
             <div
-              className="flex items-center gap-5 shrink-0 rounded-md p-4"
+              className="hidden items-center gap-5 shrink-0 rounded-md p-4 md:flex"
               style={{ background: '#151a20', border: `1px solid ${C.border}` }}
             >
               <div className="flex items-baseline gap-1.5">
@@ -312,7 +312,7 @@ export function LearningHubPage() {
               onChange={e => setQuery(e.target.value)}
               placeholder="Buscar máquina o simulador…"
               aria-label="Buscar en el Centro de Aprendizaje"
-              className="w-full rounded-lg py-2.5 pl-10 pr-9 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8] transition-shadow"
+              className="w-full rounded-lg py-3 pl-10 pr-9 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[#5aa6e8] transition-shadow sm:py-2.5"
               style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.ink }}
             />
             {query && (
@@ -329,7 +329,7 @@ export function LearningHubPage() {
         </div>
       </header>
 
-      <main ref={mainRef} className="flex-1 max-w-6xl w-full mx-auto px-5 pt-7 pb-10 sm:px-8 sm:pt-8 space-y-10">
+      <main ref={mainRef} className="flex-1 max-w-6xl w-full mx-auto px-4 pt-6 pb-28 sm:px-8 sm:pt-8 sm:pb-10 space-y-9 sm:space-y-10">
         {searching ? (
           // ── Resultados de búsqueda ──
           <section>
