@@ -97,6 +97,18 @@
   .vectors{position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:none;z-index:3;display:none;will-change:transform;overflow:visible}
   .vectors g.vlayer{fill:none}
   .vectors g.vlayer path,.vectors g.vlayer polyline,.vectors g.vlayer line,.vectors g.vlayer circle{vector-effect:non-scaling-stroke}
+  /* capa vectorial del plano-base hidraulico (paths PDF extraidos) */
+  .planoVectors{position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:none;z-index:4;display:none;will-change:transform;overflow:visible}
+  .planoVectors g.plvlayer{fill:none}
+  .planoVectors g.plvlayer path{vector-effect:non-scaling-stroke}
+  /* tool del-plano: paths clickeables + hover-highlight + crosshair */
+  body.edit.tool-del-plano .planoVectors{pointer-events:auto}
+  body.edit.tool-del-plano .planoVectors g.plvlayer path{pointer-events:stroke;cursor:crosshair}
+  body.edit.tool-del-plano .planoVectors g.plvlayer path:hover{stroke:#facc15;stroke-width:6;stroke-opacity:1;filter:drop-shadow(0 0 5px rgba(250,204,21,.7))}
+  body.edit.tool-del-plano .stagewrap{cursor:crosshair}
+  /* "Usar solo vectorial": oculta el .png raster + el canvas PDF.js. Solo se ve el SVG vectorial. */
+  body.plano-vec-only .world img.base{display:none}
+  body.plano-vec-only #vcanvas{display:none!important}
   .markers .mk{pointer-events:auto}
   /* capa vector nítida (PDF.js) — sobre el PNG, debajo de los dibujos; aparece al acercar */
   #vcanvas{position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:none;z-index:4;display:none;will-change:transform;image-rendering:auto}
@@ -328,6 +340,7 @@
     <span class="sep"></span>
     <span class="chip on" id="chipRecinto" title="Mostrar / ocultar capa recinto (estanques, Yal, generador, mar)"><span class="dot" style="background:var(--ghost)"></span>Recinto</span>
     <span class="chip off" id="chipVector" title="Capa vectorial DXF (muros, cercos, ventanas, cámaras, estanques) — nítido a cualquier zoom"><span class="dot" style="background:#84cc16"></span>Vector</span>
+    <span class="chip off" id="chipPlanoVec" title="Capa vectorial del plano-base hidráulico (cañerías, muros, exteriores). Nítido a cualquier zoom y editable línea por línea"><span class="dot" style="background:#0eff23"></span>Plano vec</span>
     <button class="hbtn" id="btnFineRec" title="Ajuste fino: opacidad + posición de la capa recinto" style="padding:5px 10px;font-size:12px;line-height:1">⚙</button>
     <span class="sep"></span>
     <input class="search" id="search" placeholder="Buscar: AS-3, B, cosecha…" />
@@ -341,6 +354,7 @@
       </div>
       <canvas id="vcanvas"></canvas>
       <svg class="vectors" id="vectors" xmlns="http://www.w3.org/2000/svg"></svg>
+      <svg class="planoVectors" id="planoVectors" xmlns="http://www.w3.org/2000/svg"></svg>
       <svg class="draw" id="draw" xmlns="http://www.w3.org/2000/svg"></svg>
       <div class="markers" id="markers"></div>
 
@@ -383,6 +397,17 @@
           <button id="vecAllOff" style="flex:1;background:#1a2532;color:var(--ink);border:1px solid var(--border);padding:5px;border-radius:3px;cursor:pointer;font-size:10px;text-transform:uppercase;letter-spacing:.05em;font-family:var(--mono)">Apagar todas</button>
         </div>
         <div id="vecLayersList" style="max-height:240px;overflow:auto;padding-right:4px"></div>
+        <div style="height:1px;background:var(--border);margin:10px 0 6px"></div>
+        <h4 style="margin:0 0 6px 0">Plano-base vectorial <span style="font-weight:400;color:var(--inkLo);font-size:9px">se ven al activar PLANO VEC</span></h4>
+        <div style="display:flex;gap:6px;align-items:center;padding:3px 0 6px 0;font-family:var(--mono);font-size:10.5px">
+          <input type="checkbox" id="plvOnlyToggle" style="accent-color:var(--aquaBright);cursor:pointer">
+          <label for="plvOnlyToggle" style="cursor:pointer;flex:1" title="Oculta la imagen raster del plano-base. Solo se ve la capa vectorial (más nítida y editable).">Usar solo vectorial (sin .png)</label>
+        </div>
+        <div style="display:flex;gap:6px;padding:3px 0">
+          <button id="plvResetLayers" title="Restablecer capas del plano-base" style="flex:1;background:#1a2532;color:var(--ink);border:1px solid var(--border);padding:5px;border-radius:3px;cursor:pointer;font-size:10px;text-transform:uppercase;letter-spacing:.05em;font-family:var(--mono)">Restablecer capas</button>
+          <button id="plvAllOff" style="flex:1;background:#1a2532;color:var(--ink);border:1px solid var(--border);padding:5px;border-radius:3px;cursor:pointer;font-size:10px;text-transform:uppercase;letter-spacing:.05em;font-family:var(--mono)">Apagar todas</button>
+        </div>
+        <div id="plvLayersList" style="max-height:200px;overflow:auto;padding-right:4px"></div>
       </div>
     </div>
 
@@ -522,10 +547,11 @@ if(READONLY)document.body.classList.add('ro');
 /* ============ STATE ============ */
 let state=load();
 function load(){
-  let s={over:{},notas:{},extra:[],removed:[],shapes:[],photos:{},zonas:[],scale:null,unit:'mm',showCotas:true};
+  let s={over:{},notas:{},extra:[],removed:[],removedPlanoPaths:[],shapes:[],photos:{},zonas:[],scale:null,unit:'mm',showCotas:true};
   try{const r=JSON.parse(localStorage.getItem(STORE_KEY));if(r)s=Object.assign(s,r);}catch(e){}
   if(!Array.isArray(s.shapes))s.shapes=[];
   if(!Array.isArray(s.zonas))s.zonas=[];
+  if(!Array.isArray(s.removedPlanoPaths))s.removedPlanoPaths=[];
   if(!s.photos||typeof s.photos!=='object')s.photos={};
   normPhotos(s);
   return s;
@@ -587,13 +613,16 @@ function initCloud(){
   }catch(e){console.warn('[planos] Firebase no disponible, modo local',e);}
   renderSync();
 }
-function localHasData(){return Object.keys(state.over).length||state.extra.length||state.removed.length||(state.shapes||[]).length||Object.keys(state.notas).length||Object.keys(state.photos||{}).length;}
+function localHasData(){return Object.keys(state.over).length||state.extra.length||state.removed.length||(state.removedPlanoPaths||[]).length||(state.shapes||[]).length||Object.keys(state.notas).length||Object.keys(state.photos||{}).length;}
 function trySeed(){ if((cloud.user||bridge.authed)&&localHasData()){cloud.docMissing=false;pushCloud(true);} }
 function applyCloudRaw(r){
   cloud.applying=true;
   state.over=r.over||{}; state.notas=r.notas||{};
   state.extra=Array.isArray(r.extra)?r.extra:[];
   state.removed=Array.isArray(r.removed)?r.removed:[];
+  // removedPlanoPaths: solo override si el cloud trae el campo explícito.
+  // Si no (blobs legacy pre-Fase 7), preservar lo que ya tiene state — evita pisar la edición local.
+  if('removedPlanoPaths' in r) state.removedPlanoPaths=Array.isArray(r.removedPlanoPaths)?r.removedPlanoPaths:[];
   state.shapes=Array.isArray(r.shapes)?r.shapes:[];
   state.photos=(r.photos&&typeof r.photos==='object')?r.photos:{};
   state.zonas=Array.isArray(r.zonas)?r.zonas:[];
@@ -606,6 +635,12 @@ function applyCloudRaw(r){
   cloud.applying=false;
   cloud.lastSeenAt=Date.now();
   if(typeof renderMarkers==='function'){renderMarkers();renderShapes();if(sel)openPanel(sel);if(typeof renderEditbar==='function')renderEditbar();}
+  // re-aplicar removidos del plano-base a la capa vectorial (si ya está cargada)
+  if(typeof applyRemovedPlanoPaths==='function'){
+    // primero reset display de todos los paths (en caso de que un ID se haya quitado de la lista cross-device)
+    if(planoVecEl)planoVecEl.querySelectorAll('path[data-pid]').forEach(p=>{p.style.display='';});
+    applyRemovedPlanoPaths();
+  }
   renderSync();
 }
 function onCloudSnap(snap){
@@ -638,7 +673,7 @@ function showConflictToast(){
     ],
   });
 }
-function payloadCloud(){return {over:state.over,notas:state.notas,extra:state.extra,removed:state.removed,shapes:state.shapes,photos:state.photos||{},zonas:state.zonas||[],scale:(state.scale!=null?state.scale:null),unit:state.unit||'mm',showCotas:state.showCotas!==false};}
+function payloadCloud(){return {over:state.over,notas:state.notas,extra:state.extra,removed:state.removed,removedPlanoPaths:state.removedPlanoPaths||[],shapes:state.shapes,photos:state.photos||{},zonas:state.zonas||[],scale:(state.scale!=null?state.scale:null),unit:state.unit||'mm',showCotas:state.showCotas!==false};}
 /* Cola offline: si el push falla (red caída, timeout del puente, etc.) lo reintentamos con
    backoff exponencial 2,4,8,16,30s capped. `permission-denied` NO se reintenta (es config).
    `scheduleRetry` se llama en cualquier error transient; `onSyncSuccess` lo limpia todo. */
@@ -758,6 +793,7 @@ function applyView(){
   markersEl.style.transform=`translate3d(${view.x}px,${view.y}px,0)`;
   drawEl.style.transform=`translate3d(${view.x}px,${view.y}px,0)`;
   try{if(typeof vectorLoaded!=='undefined'&&vectorLoaded&&vectorVisible){vectorsEl.setAttribute('width',6272*view.s);vectorsEl.setAttribute('height',3600*view.s);vectorsEl.style.transform=`translate3d(${view.x}px,${view.y}px,0)`;}}catch(_){}
+  try{if(typeof planoVecVisible!=='undefined'&&planoVecVisible){planoVecEl.setAttribute('width',6272*view.s);planoVecEl.setAttribute('height',3600*view.s);planoVecEl.style.transform=`translate3d(${view.x}px,${view.y}px,0)`;}}catch(_){}
   if(view.s!==_lastS){_lastS=view.s;layoutMarkers();markersEl.style.setProperty('--pk',Math.max(1,view.s).toFixed(3));
     drawEl.setAttribute('width',baseW()*view.s);drawEl.setAttribute('height',baseH()*view.s);updateHandleScale();
     document.getElementById('zlvl').textContent=Math.round(view.s*100)+'%';}
@@ -1092,7 +1128,7 @@ function nextCorr(t){
   for(const a of L)for(const b of L){if(!used.has(a+b))return a+b;}
   return 'X';
 }
-const TOOLCLS=['tool-pin','tool-pipe','tool-bajada','tool-label','tool-mask','tool-cut-base','tool-select','tool-rect','tool-circle','tool-sline','tool-measure','tool-calib'];
+const TOOLCLS=['tool-pin','tool-pipe','tool-bajada','tool-label','tool-mask','tool-cut-base','tool-select','tool-rect','tool-circle','tool-sline','tool-measure','tool-calib','tool-del-plano'];
 function setTool(t){
   if(draft&&!(wiz&&wiz.step==='pipe'))cancelDraft();
   pend2=null;document.body.classList.remove('drafting');
@@ -1150,6 +1186,10 @@ function renderEditbar(){
   }else if(tool==='cut-base'){
     s+=`<span class="tagx">RECORTAR PLANO</span><span class="wcap">revela el recinto debajo</span><button class="btn primary" id="eFinish">✓ Terminar</button><button class="btn" id="eCancel">✗ Cancelar</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
     setHint('Clic vértices del polígono · doble-clic o Terminar · esa zona del plano principal desaparece y se ve el recinto debajo.');
+  }else if(tool==='del-plano'){
+    const n=(state.removedPlanoPaths||[]).length;
+    s+=`<span class="tagx">LIMPIAR PLANO</span><span class="wcap">clic líneas del plano para borrarlas</span><span class="wnum">${n} borradas</span><button class="btn" id="dpRestore" ${n?'':'disabled'}>↺ Restablecer todo</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
+    setHint('Pasa el cursor sobre las líneas: se resaltan amarillo. Clic en una = se borra del plano (queda guardado y sincronizado).');
   }else if(tool==='select'){
     const sh=selShape?getShape(selShape):null;
     if(draft&&draft.editId){
@@ -1181,7 +1221,7 @@ function renderEditbar(){
       setHint('Arrastra el punto para moverlo.');
     }
   }else{
-    s+=`<span class="tagx">EDICIÓN</span><button class="btn primary" id="ewCrear">+ Crear bajada de agua</button><button class="btn" id="ewStruct">+ Estructura</button><button class="btn" id="ewMask">Máscara</button><button class="btn" id="ewCutBase">✂ Recortar plano</button><button class="btn" id="ewSelect">Editar dibujo</button><button class="btn" id="ewCalib">Escala</button><button class="btn" id="ewMeasure">Medir</button><span class="ebsp"></span><button class="btn primary" id="eDone">Listo</button>`;
+    s+=`<span class="tagx">EDICIÓN</span><button class="btn primary" id="ewCrear">+ Crear bajada de agua</button><button class="btn" id="ewStruct">+ Estructura</button><button class="btn" id="ewMask">Máscara</button><button class="btn" id="ewCutBase">✂ Recortar plano</button><button class="btn" id="ewDelPlano" title="Borrar líneas individuales del plano-base (cotas, etiquetas, cañerías). Requiere capa PLANO VEC activada.">🧽 Limpiar plano</button><button class="btn" id="ewSelect">Editar dibujo</button><button class="btn" id="ewCalib">Escala</button><button class="btn" id="ewMeasure">Medir</button><span class="ebsp"></span><button class="btn primary" id="eDone">Listo</button>`;
     setHint('Arrastra pines · clic un pin para ver/editar · crea bajadas, estructuras, recorta el plano o mide a escala.');
   }
   eb.innerHTML=s;wireEditbar();
@@ -1192,6 +1232,20 @@ function wireEditbar(){
   if($('ewStruct'))$('ewStruct').onclick=()=>{structMode=true;setTool('rect');};
   if($('ewMask'))$('ewMask').onclick=()=>setTool('mask');
   if($('ewCutBase'))$('ewCutBase').onclick=()=>setTool('cut-base');
+  if($('ewDelPlano'))$('ewDelPlano').onclick=()=>{
+    // Asegurar que la capa vectorial esté activada — si no, no se puede clickear nada
+    if(typeof planoVecVisible!=='undefined'&&!planoVecVisible){
+      planoVecVisible=true;localStorage.setItem(PV_KEY,'true');applyPlanoVec();toast('Activé "Plano vec" — ya puedes clickear las líneas');
+    }
+    setTool('del-plano');
+  };
+  if($('dpRestore'))$('dpRestore').onclick=()=>{
+    const n=(state.removedPlanoPaths||[]).length;if(!n)return;
+    if(!confirm(`Restablecer ${n} línea${n===1?'':'s'} borrada${n===1?'':'s'} del plano? Volverán a aparecer.`))return;
+    state.removedPlanoPaths=[];save();
+    if(planoVecEl)planoVecEl.querySelectorAll('path[data-pid]').forEach(p=>{p.style.display='';});
+    renderEditbar();toast('Plano restablecido');
+  };
   if($('ewSelect'))$('ewSelect').onclick=()=>setTool('select');
   if($('ewCalib'))$('ewCalib').onclick=()=>setTool('calib');
   if($('ewMeasure'))$('ewMeasure').onclick=()=>setTool('measure');
@@ -1754,10 +1808,152 @@ function vectorPanelRender(){
 document.getElementById('chipVector').onclick=()=>{vectorVisible=!vectorVisible;localStorage.setItem(VEC_KEY,String(vectorVisible));applyVector();};
 applyVector();
 
+/* ============ CAPA VECTORIAL PLANO-BASE (Fase 7) ============
+   6 GeoJSONs extraidos del PDF AQUA014-HID-PL-015_C1 con extract_plano_to_geojson.py.
+   Coords ya en sistema render-px del plano-base (0..6272, 0..3600) — sin matriz CSS.
+   Carga lazy POR CAPA: cada GeoJSON se fetch+inserta solo al activar su checkbox.
+   Cada path lleva data-pid="p:cat:idx" para futuro tool "Borrar línea del plano". */
+const PV_KEY='planosAguas.planoVecVisible';
+const PV_LAY_KEY='planosAguas.planoVecLayers';
+const PV_ONLY_KEY='planosAguas.planoVecOnly';
+const PV_LAYERS=['agua-dulce','agua-salada','muros','exteriores','texto-negro','cotas-rojas'];
+const PV_LABELS={'agua-dulce':'Agua dulce','agua-salada':'Agua salada','muros':'Muros / arquitectura','exteriores':'Cerco / exteriores','texto-negro':'Texto / cotas','cotas-rojas':'Cotas rojas (cajetín)'};
+const PV_COLORS={'agua-dulce':'#0eff23','agua-salada':'#0cffff','muros':'#cbd5e1','exteriores':'#fb923c','texto-negro':'#e2e8f0','cotas-rojas':'#ef4444'};
+const PV_STROKE_W={'agua-dulce':4,'agua-salada':4,'muros':2,'exteriores':2,'texto-negro':1.5,'cotas-rojas':1.5};
+// Default ON: cañerias + muros + exteriores. OFF: texto y cotas (lo que el usuario suele querer ocultar).
+const PV_DEFAULT_ON=['agua-dulce','agua-salada','muros','exteriores'];
+let planoVecVisible=localStorage.getItem(PV_KEY)==='true';
+let planoVecOnly=localStorage.getItem(PV_ONLY_KEY)==='true';
+let planoVecLayers=(()=>{try{const v=JSON.parse(localStorage.getItem(PV_LAY_KEY)||'null');if(Array.isArray(v))return new Set(v);return new Set(PV_DEFAULT_ON);}catch(e){return new Set(PV_DEFAULT_ON);}})();
+const planoVecLoaded=new Set();     // capas ya fetcheadas e insertadas
+const planoVecLoading=new Set();    // en vuelo
+const planoVecEl=document.getElementById('planoVectors');
+
+function planoVecPathD(g){let d='';const ln=(L)=>{L.forEach((p,i)=>{d+=(i===0?'M':'L')+p[0]+' '+p[1]+' ';});};if(g.type==='LineString')ln(g.coordinates);else if(g.type==='MultiLineString')g.coordinates.forEach(ln);return d;}
+
+async function planoVecLoadLayer(cat){
+  if(planoVecLoaded.has(cat)||planoVecLoading.has(cat))return;
+  planoVecLoading.add(cat);
+  try{
+    const r=await fetch(`planos-aguas-assets/geojsons/plano-${cat}.geojson`);
+    if(!r.ok){console.warn('planoVec fetch fail',cat,r.status);return;}
+    const gj=await r.json();
+    const color=PV_COLORS[cat]||'#aaa';
+    const sw=PV_STROKE_W[cat]||1.5;
+    const on=planoVecLayers.has(cat);
+    let html=`<g class="plvlayer plv-${cat}" data-cat="${cat}" stroke="${color}" stroke-width="${sw}" stroke-opacity="0.9" stroke-linecap="round" stroke-linejoin="round" style="display:${on?'':'none'}">`;
+    for(const ft of (gj.features||[])){
+      const d=planoVecPathD(ft.geometry);if(!d)continue;
+      const pid=(ft.properties&&ft.properties.id)||'';
+      html+=`<path d="${d}" data-pid="${pid}"/>`;
+    }
+    html+=`</g>`;
+    planoVecEl.insertAdjacentHTML('beforeend',html);
+    planoVecLoaded.add(cat);
+    applyRemovedPlanoPaths();
+  }catch(e){console.warn('planoVec load',cat,e);}
+  finally{planoVecLoading.delete(cat);}
+}
+
+/* Esconde los paths con data-pid presente en state.removedPlanoPaths.
+   Se llama al cargar cada capa (lazy) y tras aplicar payload de la nube. */
+function applyRemovedPlanoPaths(){
+  if(!planoVecEl)return;
+  const set=new Set(state.removedPlanoPaths||[]);
+  if(!set.size)return;
+  planoVecEl.querySelectorAll('path[data-pid]').forEach(p=>{
+    if(set.has(p.dataset.pid))p.style.display='none';
+  });
+}
+
+function planoVecLayoutSync(){
+  if(!planoVecVisible)return;
+  planoVecEl.setAttribute('width',6272*view.s);
+  planoVecEl.setAttribute('height',3600*view.s);
+  planoVecEl.style.transform=`translate3d(${view.x}px,${view.y}px,0)`;
+}
+
+function applyPlanoVec(){
+  const c=document.getElementById('chipPlanoVec');if(c)c.classList.toggle('off',!planoVecVisible);
+  if(planoVecVisible){
+    planoVecEl.setAttribute('viewBox','0 0 6272 3600');
+    planoVecEl.style.display='block';
+    planoVecLayoutSync();
+    // fetch lazy de las capas activas que aun no esten cargadas
+    for(const cat of planoVecLayers){if(!planoVecLoaded.has(cat))planoVecLoadLayer(cat);}
+  }else{planoVecEl.style.display='none';}
+}
+
+/* "Solo vectorial": oculta el .png base + canvas PDF.js. La capa vectorial pasa
+   a ser el único plano. Requiere planoVecVisible=true para que se vea algo. */
+function applyPlanoVecOnly(){
+  document.body.classList.toggle('plano-vec-only',planoVecOnly);
+  // si el usuario activa "solo vectorial" pero la capa está OFF, activarla para evitar pantalla en blanco
+  if(planoVecOnly&&!planoVecVisible){
+    planoVecVisible=true;localStorage.setItem(PV_KEY,'true');applyPlanoVec();
+  }
+}
+
+function planoVecToggleLayer(cat){
+  const willBeOn=!planoVecLayers.has(cat);
+  if(willBeOn)planoVecLayers.add(cat);else planoVecLayers.delete(cat);
+  localStorage.setItem(PV_LAY_KEY,JSON.stringify([...planoVecLayers]));
+  if(willBeOn&&!planoVecLoaded.has(cat)){
+    planoVecLoadLayer(cat).then(()=>{const g=planoVecEl.querySelector(`.plv-${cat}`);if(g)g.style.display='';planoVecPanelRender();});
+  }else{
+    const g=planoVecEl.querySelector(`.plv-${cat}`);if(g)g.style.display=willBeOn?'':'none';
+    planoVecPanelRender();
+  }
+}
+
+function planoVecPanelRender(){
+  const cont=document.getElementById('plvLayersList');if(!cont)return;
+  cont.innerHTML='';
+  for(const cat of PV_LAYERS){
+    const row=document.createElement('div');row.className='frRow';row.style.cssText='display:flex;align-items:center;gap:7px;padding:2px 0';
+    const on=planoVecLayers.has(cat);
+    row.innerHTML=`<input type="checkbox" ${on?'checked':''} style="accent-color:${PV_COLORS[cat]};cursor:pointer"><div style="width:11px;height:11px;border-radius:2px;background:${PV_COLORS[cat]};flex-shrink:0"></div><span style="flex:1;font-family:var(--mono);font-size:10.5px;color:var(--ink);cursor:pointer">${PV_LABELS[cat]||cat}</span>`;
+    row.querySelector('input').onchange=()=>planoVecToggleLayer(cat);
+    row.querySelector('span').onclick=()=>row.querySelector('input').click();
+    cont.appendChild(row);
+  }
+}
+
+document.getElementById('chipPlanoVec').onclick=()=>{planoVecVisible=!planoVecVisible;localStorage.setItem(PV_KEY,String(planoVecVisible));applyPlanoVec();};
+applyPlanoVec();
+applyPlanoVecOnly();
+
+/* click en path con tool='del-plano': marca como removido + oculta + save() */
+planoVecEl.addEventListener('click',(e)=>{
+  if(typeof tool!=='undefined'&&tool!=='del-plano')return;
+  const p=e.target.closest('path[data-pid]');if(!p)return;
+  const pid=p.dataset.pid;if(!pid)return;
+  if(!Array.isArray(state.removedPlanoPaths))state.removedPlanoPaths=[];
+  if(state.removedPlanoPaths.includes(pid))return;
+  state.removedPlanoPaths.push(pid);
+  p.style.display='none';
+  save();
+  if(typeof renderEditbar==='function')renderEditbar();
+});
+
 function vectorPanelExtrasRender(){
   const cb=document.getElementById('vecClipToggle');if(cb){cb.checked=vectorClipToCuts;cb.onchange=()=>{vectorClipToCuts=cb.checked;localStorage.setItem(VEC_CLIP_KEY,String(vectorClipToCuts));vectorClipUpdate();};}
   const br=document.getElementById('vecResetLayers');if(br)br.onclick=()=>{vectorLayers=new Set(VEC_DEFAULT_ON);localStorage.setItem(VEC_LAY_KEY,JSON.stringify([...vectorLayers]));vectorsEl.querySelectorAll('.vlayer').forEach(g=>{const lyr=g.dataset.lyr;g.style.display=vectorLayers.has(lyr)?'':'none';});vectorPanelRender();};
   const bo=document.getElementById('vecAllOff');if(bo)bo.onclick=()=>{vectorLayers=new Set();localStorage.setItem(VEC_LAY_KEY,JSON.stringify([]));vectorsEl.querySelectorAll('.vlayer').forEach(g=>{g.style.display='none';});vectorPanelRender();};
+  // plano-base vectorial
+  planoVecPanelRender();
+  const pvo=document.getElementById('plvOnlyToggle');if(pvo){pvo.checked=planoVecOnly;pvo.onchange=()=>{planoVecOnly=pvo.checked;localStorage.setItem(PV_ONLY_KEY,String(planoVecOnly));applyPlanoVecOnly();};}
+  const pr=document.getElementById('plvResetLayers');if(pr)pr.onclick=()=>{
+    planoVecLayers=new Set(PV_DEFAULT_ON);localStorage.setItem(PV_LAY_KEY,JSON.stringify([...planoVecLayers]));
+    if(planoVecVisible){for(const cat of planoVecLayers){if(!planoVecLoaded.has(cat))planoVecLoadLayer(cat);}}
+    planoVecEl.querySelectorAll('.plvlayer').forEach(g=>{const cat=g.dataset.cat;g.style.display=planoVecLayers.has(cat)?'':'none';});
+    planoVecPanelRender();
+  };
+  const po=document.getElementById('plvAllOff');if(po)po.onclick=()=>{
+    planoVecLayers=new Set();localStorage.setItem(PV_LAY_KEY,JSON.stringify([]));
+    planoVecEl.querySelectorAll('.plvlayer').forEach(g=>{g.style.display='none';});
+    planoVecPanelRender();
+  };
 }
 
 /* ============ AJUSTE FINO RECINTO (Fase 3 calibracion) ============
@@ -1852,7 +2048,7 @@ async function importData(json){
   let r;try{r=JSON.parse(json);}catch(e){toast('Archivo inválido');return;}
   if(!r||typeof r!=='object'){toast('Archivo inválido');return;}
   if(!confirm('Importar REEMPLAZA los datos de este dispositivo por los del archivo. ¿Continuar?'))return;
-  state.over=r.over||{};state.notas=r.notas||{};state.extra=Array.isArray(r.extra)?r.extra:[];state.removed=Array.isArray(r.removed)?r.removed:[];state.shapes=Array.isArray(r.shapes)?r.shapes:[];state.zonas=Array.isArray(r.zonas)?r.zonas:[];
+  state.over=r.over||{};state.notas=r.notas||{};state.extra=Array.isArray(r.extra)?r.extra:[];state.removed=Array.isArray(r.removed)?r.removed:[];state.removedPlanoPaths=Array.isArray(r.removedPlanoPaths)?r.removedPlanoPaths:[];state.shapes=Array.isArray(r.shapes)?r.shapes:[];state.zonas=Array.isArray(r.zonas)?r.zonas:[];
   const ph=(r.photos&&typeof r.photos==='object')?r.photos:{};
   for(const id in ph){for(const cat of ['ent','pla']){for(const it of ((ph[id]&&ph[id][cat])||[])){if(it.d){try{await putPhoto(it.k,it.d);}catch(e){}delete it.d;}}}}
   state.photos=ph;normPhotos(state);
