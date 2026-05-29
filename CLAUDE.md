@@ -1083,8 +1083,9 @@ Script listo en rama `claude/add-sumitomo-motors-repuestos-FBTar`, **falta corre
   node scripts/seed-sumitomo-motors.js --dry-run   # previsualizar
   node scripts/seed-sumitomo-motors.js             # insertar (idempotente, skip si existe)
   ```
-- **Idempotente**: docId determinístico `asset-sumitomo-<slug>` → re-correrlo NO duplica. `--force` sobrescribe campos.
-- **Datos** (equipo · modelo proveedor · SAP): Cinta desperdicio Baader 200 / Cinta desperdicio filete / Cinta filete / Cinta transversal Baader 142 / Cinta curva → `RNYM08-1320B-30` · `3300124073` · | Cinta Z elevadora HG → `RNYM1-1320A-30` · `3300124072` | Cinta alimentación Baader 142 → `RNYM1-1320A-7` · `3300124071` | Cinta alimentación Gea → `RNYMS05-1320C-30` · `3300124070`.
+- **Idempotente**: docId determinístico `asset-sumitomo-<slug>` → re-correrlo NO duplica. `--force` sobrescribe campos + re-sube fotos.
+- **Datos** (equipo · modelo proveedor · SAP): Cinta desperdicio Baader 200 / Cinta desperdicio filete / Cinta filete / Cinta transversal Baader 142 / Cinta curva → `RNYM08-1320B-30` · `3300124073` · | Cinta Z elevadora HG → `RNYM1-1320A-30` · `3300124072` | Cinta alimentación Baader 142 → `RNYM1-1320A-7` · `3300124071` | Cinta alimentación Gea → `RNYMS05-1320C-30` · `3300124070`. `descripcionSAP` real tomada de las etiquetas físicas (ej. SAP 3300124073 = "MOTOR REDUCTOR MOD RNYM08 48,3 RPM").
+- **Fotos**: dejar las fotos en `scripts/sumitomo-photos/` nombradas por SAP (`3300124073.jpg`, etc. — ver README de esa carpeta). El script las sube a Storage `plantAssets/<assetId>/` y las deja como imagen principal. El SAP 3300124073 (5 motores) comparte una sola foto. Las fotos NO se versionan (`.gitignore`). Si falta una, ese motor se crea sin imagen (re-correr con `--force` luego de agregarla).
 - Nota: `PlantAsset` no tiene campo de cantidad → "1 unidad por planta" = 1 doc por motor; el dato queda anotado en `observaciones`. Los 3 que comparten SAP/modelo son motores físicos distintos (3 docs).
 
 ### Planos de Aguas — estado al 2026-05-25
