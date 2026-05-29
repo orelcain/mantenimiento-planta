@@ -1073,6 +1073,20 @@ Con Haversine A→D = dimensión real del recinto en metros. El DWG ya tiene cot
 
 ## Pendientes priorizados
 
+### 🖥️ PENDIENTE PC — Seed 8 motores SUMITOMO en `plantAssets` (2026-05-29)
+
+Script listo en rama `claude/add-sumitomo-motors-repuestos-FBTar`, **falta correrlo desde el PC** (este entorno remoto no tiene `serviceAccountKey.json`, no puede escribir a Firestore).
+
+- **Qué hace**: inserta 8 motores Sumitomo nuevos (reemplazan SEW) en la colección `plantAssets`, `tipo: 'motor'`, `area: 'PLANTA CHONCHI'` (planta principal), `marca: 'Sumitomo'`, `eje: '30mm'`. Se ven en Repuestos → tabla Motores/Bombas.
+- **Cómo correr** (con `serviceAccountKey.json` en la raíz):
+  ```
+  node scripts/seed-sumitomo-motors.js --dry-run   # previsualizar
+  node scripts/seed-sumitomo-motors.js             # insertar (idempotente, skip si existe)
+  ```
+- **Idempotente**: docId determinístico `asset-sumitomo-<slug>` → re-correrlo NO duplica. `--force` sobrescribe campos.
+- **Datos** (equipo · modelo proveedor · SAP): Cinta desperdicio Baader 200 / Cinta desperdicio filete / Cinta filete / Cinta transversal Baader 142 / Cinta curva → `RNYM08-1320B-30` · `3300124073` · | Cinta Z elevadora HG → `RNYM1-1320A-30` · `3300124072` | Cinta alimentación Baader 142 → `RNYM1-1320A-7` · `3300124071` | Cinta alimentación Gea → `RNYMS05-1320C-30` · `3300124070`.
+- Nota: `PlantAsset` no tiene campo de cantidad → "1 unidad por planta" = 1 doc por motor; el dato queda anotado en `observaciones`. Los 3 que comparten SAP/modelo son motores físicos distintos (3 docs).
+
 ### Planos de Aguas — estado al 2026-05-25
 
 Módulo **Planos de Aguas** ✅ en producción: `apps/pwa/public/planos-aguas-embed.html` (standalone, ~1500 líneas vanilla JS) embebido vía `PlanosAguasPage.tsx` en `/planos-aguas`. **Un solo plano** PN10 (AQUA014), tema oscuro. Mini-CAD: crear bajada (tipo dulce/salada/caliente + correlativo + cañería con snap), **editar bajada desde el pin** (tipo/estado/correlativo/zona/redibujar, incluso fuera de Editar), cotas a escala con **valor manual** y reubicables, estructura (rect/círculo/línea/máscara/etiqueta), **fotos en 2 secciones** (entretecho/planta, multi-imagen), **zona editable** (datalist), **capa vector PDF.js** nítida al acercar, **QR solo-lectura** (`?view=1`).
