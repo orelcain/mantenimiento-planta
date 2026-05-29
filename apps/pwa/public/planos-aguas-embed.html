@@ -1122,6 +1122,7 @@ const PIPE_W=5, DOT_R=13, LBL_SZE=16, LBL_HALO=3;
 let tool='pin', kind='dulce', maskColor='#ffffff', pipeW=5, snapAngles=true, wiz=null;
 let structColor='';        // color custom de líneas/formas de estructura ('' = gris --struct por defecto)
 let pvSnap=true;           // imán a los vértices del Plano vec (para calcar el plano original)
+let cropInvert=false;      // recorte recinto: false=conservar interior · true=quitar interior
 let draft=null, draftCursor=null, selShape=null, drag=null, structMode=false, pend2=null, cotaMode=false;
 function nomT(t){return t==='d'?'Dulce':t==='c'?'Caliente':'Salada';}
 function preT(t){return t==='d'?'AD':t==='c'?'AC':'AS';}
@@ -1198,8 +1199,8 @@ function renderEditbar(){
     s+=`<span class="tagx">RECORTAR PLANO</span><span class="wcap">revela el recinto debajo</span><button class="btn primary" id="eFinish">✓ Terminar</button><button class="btn" id="eCancel">✗ Cancelar</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
     setHint('Clic vértices del polígono · doble-clic o Terminar · esa zona del plano principal desaparece y se ve el recinto debajo.');
   }else if(tool==='crop-recinto'){
-    s+=`<span class="tagx">RECORTAR RECINTO</span><span class="wcap">conserva solo el interior (el cerco)</span><button class="btn primary" id="eFinish">✓ Terminar</button><button class="btn" id="eCancel">✗ Cancelar</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
-    setHint('Hacé zoom y clic en los vértices del cerco · doble-clic o Terminar · se ve SOLO lo de adentro del recinto.');
+    s+=`<span class="tagx">RECORTAR RECINTO</span><button class="tbtn ${cropInvert?'':'on'}" id="cropModeKeep" title="Se conserva lo de adentro del polígono">Conservar dentro</button><button class="tbtn ${cropInvert?'on':''}" id="cropModeRemove" title="Se elimina lo de adentro del polígono">Quitar dentro</button><button class="btn primary" id="eFinish">✓ Terminar</button><button class="btn" id="eCancel">✗ Cancelar</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
+    setHint(cropInvert?'QUITAR: lo que encuadres se elimina del recinto (el resto queda). Zoom + clic vértices · doble-clic o Terminar.':'CONSERVAR: queda solo lo de adentro del polígono. Zoom + clic vértices · doble-clic o Terminar.');
   }else if(tool==='del-plano'){
     const n=(state.removedPlanoPaths||[]).length;
     s+=`<span class="tagx">LIMPIAR PLANO</span><span class="wcap">clic líneas del plano para borrarlas</span><span class="wnum">${n} borradas</span><button class="btn" id="dpRestore" ${n?'':'disabled'}>↺ Restablecer todo</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
@@ -1228,8 +1229,8 @@ function renderEditbar(){
       s+=`<span class="tagx">RECORTE DE PLANO</span><span class="wcap">revela recinto debajo</span><button class="btn danger" id="eDelShape">🗑 Borrar</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
       setHint('Arrastra vértices del recorte · doble-clic vértice = borrarlo · Borrar = el plano principal vuelve a taparse ahí.');
     }else if(sh.type==='crop-recinto'){
-      s+=`<span class="tagx">RECORTE DE RECINTO</span><span class="wcap">conserva solo el interior</span><button class="btn danger" id="eDelShape">🗑 Borrar</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
-      setHint('Arrastra vértices para ajustar el límite · doble-clic vértice = borrarlo · Borrar = el recinto vuelve a verse completo.');
+      s+=`<span class="tagx">RECORTE DE RECINTO</span><span class="wcap">${sh.invert?'quita el interior':'conserva el interior'}</span><button class="btn" id="cropInvertBtn" title="Da vuelta el recorte: conservar↔quitar lo de adentro">⇄ Invertir</button><button class="btn danger" id="eDelShape">🗑 Borrar</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
+      setHint('⇄ Invertir = alterna conservar/quitar lo de adentro · arrastra vértices para ajustar · doble-clic vértice = borrarlo · Borrar = recinto completo.');
     }else if(sh.type==='cota'){
       s+=`<span class="tagx">COTA</span>${cotaCtl(sh)}<button class="btn danger" id="eDelShape">🗑 Borrar</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
       setHint('Arrastra el texto para reubicarlo · doble-clic = editar su valor · mueve los extremos para remedir · elige unidad y tamaño.');
@@ -1253,6 +1254,9 @@ function wireEditbar(){
     if(typeof recintoVisible!=='undefined'&&!recintoVisible){recintoVisible=true;localStorage.setItem(RECINTO_KEY,'true');applyRecinto();toast('Activé RECINTO para que veas el cerco');}
     setTool('crop-recinto');
   };
+  if($('cropModeKeep'))$('cropModeKeep').onclick=()=>{cropInvert=false;renderEditbar();};
+  if($('cropModeRemove'))$('cropModeRemove').onclick=()=>{cropInvert=true;renderEditbar();};
+  if($('cropInvertBtn'))$('cropInvertBtn').onclick=()=>{const sh=getShape(selShape);if(sh){sh.invert=!sh.invert;save();renderShapes();renderEditbar();toast(sh.invert?'Ahora QUITA lo de adentro':'Ahora CONSERVA lo de adentro');}};
   if($('ewDelPlano'))$('ewDelPlano').onclick=()=>{
     // Asegurar que la capa vectorial esté activada — si no, no se puede clickear nada
     if(typeof planoVecVisible!=='undefined'&&!planoVecVisible){
@@ -1463,7 +1467,8 @@ function finishDraft(){
   if(draft.pts.length>=min){
     const sh={id:'sh-'+Date.now(),type:draft.type,pts:draft.pts};
     if(draft.type==='mask')sh.fill=draft.fill;
-    else if(draft.type==='cut-base'||draft.type==='crop-recinto'){/* no extra props */}
+    else if(draft.type==='crop-recinto'){if(cropInvert)sh.invert=true;}
+    else if(draft.type==='cut-base'){/* no extra props */}
     else{sh.kind=draft.kind;sh.w=draft.w||PIPE_W;if(draft.closed)sh.closed=true;if(draft.color)sh.color=draft.color;}
     state.shapes.push(sh);save();
     toast(draft.type==='mask'?'Máscara agregada':draft.type==='cut-base'?'Recorte de plano agregado · plano principal revela el recinto':draft.type==='crop-recinto'?'Recorte de recinto agregado · se ve solo el interior':draft.closed?'Polígono agregado':'Línea agregada');
@@ -1680,11 +1685,20 @@ function applyRecintoCrop(){
   const [a,b,c,d,e,f]=m, det=a*d-b*c;
   if(Math.abs(det)<1e-9){rec.style.clipPath='none';return;}
   const inv=(X,Y)=>{const dx=X-e,dy=Y-f;return [(d*dx-c*dy)/det,(-b*dx+a*dy)/det];};
-  let path='';
-  crops.forEach(s=>{
-    path+='M'+s.pts.map((p,i)=>{const q=inv(p[0],p[1]);return (i?'L':'')+q[0].toFixed(1)+' '+q[1].toFixed(1);}).join(' ')+' Z ';
-  });
-  rec.style.clipPath=`path('${path.trim()}')`;
+  const polyPath=s=>'M'+s.pts.map((p,i)=>{const q=inv(p[0],p[1]);return (i?'L':'')+q[0].toFixed(1)+' '+q[1].toFixed(1);}).join(' ')+' Z ';
+  // keep = conservar interior (default) · remove = quitar interior (invert)
+  const keep=crops.filter(s=>!s.invert), remove=crops.filter(s=>s.invert);
+  let path='', evenodd=false;
+  if(keep.length){
+    path=keep.map(polyPath).join('');
+    if(remove.length){path+=remove.map(polyPath).join('');evenodd=true;} // remove hace agujero dentro del keep
+  }else{
+    // solo "quitar": rectángulo del img completo + agujeros (evenodd)
+    const W=rec.naturalWidth||8000,H=rec.naturalHeight||5659;
+    path=`M0 0 L${W} 0 L${W} ${H} L0 ${H} Z `+remove.map(polyPath).join('');
+    evenodd=true;
+  }
+  rec.style.clipPath=evenodd?`path(evenodd,'${path.trim()}')`:`path('${path.trim()}')`;
 }
 function updateLive(){const el=drawEl.querySelector('#draftLive');if(!el||!draft||!draft.pts.length||!draftCursor)return;const last=draft.pts[draft.pts.length-1];const sn=snapNodes(draftCursor);let cx,cy;if(sn.hit){cx=sn.x;cy=sn.y;}else{cx=draftCursor.x;cy=draftCursor.y;if(draft.type==='pipe'&&snapAngles){const sp=snapPt(last,cx,cy);cx=sp.x;cy=sp.y;}}el.setAttribute('d',`M${last[0]} ${last[1]} L${cx.toFixed(1)} ${cy.toFixed(1)}`);const ind=drawEl.querySelector('#snapInd');if(ind){if(sn.hit){ind.setAttribute('cx',cx);ind.setAttribute('cy',cy);ind.setAttribute('r',(7/view.s).toFixed(2));ind.style.display='';}else ind.style.display='none';}}
 
