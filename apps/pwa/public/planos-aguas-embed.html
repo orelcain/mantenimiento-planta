@@ -85,6 +85,9 @@
   /* contorno guía de los recortes mientras se está en modo edición */
   .draw .cut-base-outline{fill:rgba(46,117,182,0.10);stroke:var(--aquaBright);stroke-width:1.5;stroke-dasharray:8 5;vector-effect:non-scaling-stroke;pointer-events:none}
   body.edit .draw .cut-base-outline.sel{stroke:var(--star);stroke-dasharray:6 4;fill:rgba(240,193,75,0.12)}
+  /* recorte del recinto: contorno verde (lo que se CONSERVA) */
+  .draw .crop-recinto-outline{fill:rgba(16,185,129,0.06);stroke:#10d978;stroke-width:1.5;stroke-dasharray:10 6;vector-effect:non-scaling-stroke;pointer-events:none}
+  body.edit .draw .crop-recinto-outline.sel{stroke:var(--star);stroke-dasharray:6 4;fill:rgba(240,193,75,0.12)}
   /* capa recinto: posicionada detrás del plano-base con transform afín (Fase 1 georreferenciación).
      matrix CSS = (a, c, b, d, tx, ty) en nuestra notación. Mapea recinto-base.jpg 8000x5659 a coords del plano-base 6272x3600.
      Ver scripts/recinto-expansion/fase2_config.json */
@@ -260,7 +263,7 @@
   body.edit.tool-select .draw .shape{pointer-events:auto;cursor:move}
   body.edit.tool-select .draw .pipe{pointer-events:none}
   body.edit.tool-select .draw .hit{pointer-events:stroke;stroke:transparent;fill:none}
-  body.edit.tool-pipe .stagewrap,body.edit.tool-mask .stagewrap,body.edit.tool-cut-base .stagewrap,
+  body.edit.tool-pipe .stagewrap,body.edit.tool-mask .stagewrap,body.edit.tool-cut-base .stagewrap,body.edit.tool-crop-recinto .stagewrap,
   body.edit.tool-bajada .stagewrap,body.edit.tool-label .stagewrap,
   body.edit.tool-rect .stagewrap,body.edit.tool-circle .stagewrap,body.edit.tool-sline .stagewrap,
   body.edit.tool-polygon .stagewrap,
@@ -1131,7 +1134,7 @@ function nextCorr(t){
   for(const a of L)for(const b of L){if(!used.has(a+b))return a+b;}
   return 'X';
 }
-const TOOLCLS=['tool-pin','tool-pipe','tool-bajada','tool-label','tool-mask','tool-cut-base','tool-select','tool-rect','tool-circle','tool-sline','tool-polygon','tool-measure','tool-calib','tool-del-plano'];
+const TOOLCLS=['tool-pin','tool-pipe','tool-bajada','tool-label','tool-mask','tool-cut-base','tool-crop-recinto','tool-select','tool-rect','tool-circle','tool-sline','tool-polygon','tool-measure','tool-calib','tool-del-plano'];
 function setTool(t){
   if(draft&&!(wiz&&wiz.step==='pipe'))cancelDraft();
   pend2=null;document.body.classList.remove('drafting');
@@ -1194,6 +1197,9 @@ function renderEditbar(){
   }else if(tool==='cut-base'){
     s+=`<span class="tagx">RECORTAR PLANO</span><span class="wcap">revela el recinto debajo</span><button class="btn primary" id="eFinish">✓ Terminar</button><button class="btn" id="eCancel">✗ Cancelar</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
     setHint('Clic vértices del polígono · doble-clic o Terminar · esa zona del plano principal desaparece y se ve el recinto debajo.');
+  }else if(tool==='crop-recinto'){
+    s+=`<span class="tagx">RECORTAR RECINTO</span><span class="wcap">conserva solo el interior (el cerco)</span><button class="btn primary" id="eFinish">✓ Terminar</button><button class="btn" id="eCancel">✗ Cancelar</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
+    setHint('Hacé zoom y clic en los vértices del cerco · doble-clic o Terminar · se ve SOLO lo de adentro del recinto.');
   }else if(tool==='del-plano'){
     const n=(state.removedPlanoPaths||[]).length;
     s+=`<span class="tagx">LIMPIAR PLANO</span><span class="wcap">clic líneas del plano para borrarlas</span><span class="wnum">${n} borradas</span><button class="btn" id="dpRestore" ${n?'':'disabled'}>↺ Restablecer todo</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
@@ -1221,6 +1227,9 @@ function renderEditbar(){
     }else if(sh.type==='cut-base'){
       s+=`<span class="tagx">RECORTE DE PLANO</span><span class="wcap">revela recinto debajo</span><button class="btn danger" id="eDelShape">🗑 Borrar</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
       setHint('Arrastra vértices del recorte · doble-clic vértice = borrarlo · Borrar = el plano principal vuelve a taparse ahí.');
+    }else if(sh.type==='crop-recinto'){
+      s+=`<span class="tagx">RECORTE DE RECINTO</span><span class="wcap">conserva solo el interior</span><button class="btn danger" id="eDelShape">🗑 Borrar</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
+      setHint('Arrastra vértices para ajustar el límite · doble-clic vértice = borrarlo · Borrar = el recinto vuelve a verse completo.');
     }else if(sh.type==='cota'){
       s+=`<span class="tagx">COTA</span>${cotaCtl(sh)}<button class="btn danger" id="eDelShape">🗑 Borrar</button><span class="ebsp"></span><button class="btn" id="ebBack">← Volver</button>`;
       setHint('Arrastra el texto para reubicarlo · doble-clic = editar su valor · mueve los extremos para remedir · elige unidad y tamaño.');
@@ -1229,7 +1238,7 @@ function renderEditbar(){
       setHint('Arrastra el punto para moverlo.');
     }
   }else{
-    s+=`<span class="tagx">EDICIÓN</span><button class="btn primary" id="ewCrear">+ Crear bajada de agua</button><button class="btn" id="ewStruct">+ Estructura</button><button class="btn" id="ewMask">Máscara</button><button class="btn" id="ewCutBase">✂ Recortar plano</button><button class="btn" id="ewDelPlano" title="Borrar líneas individuales del plano-base (cotas, etiquetas, cañerías). Requiere capa PLANO VEC activada.">🧽 Limpiar plano</button><button class="btn" id="ewSelect">Editar dibujo</button><button class="btn" id="ewCalib">Escala</button><button class="btn" id="ewMeasure">Medir</button><span class="ebsp"></span><button class="btn primary" id="eDone">Listo</button>`;
+    s+=`<span class="tagx">EDICIÓN</span><button class="btn primary" id="ewCrear">+ Crear bajada de agua</button><button class="btn" id="ewStruct">+ Estructura</button><button class="btn" id="ewMask">Máscara</button><button class="btn" id="ewCutBase">✂ Recortar plano</button><button class="btn" id="ewCropRecinto" title="Dibujá el límite del cerco: se conserva solo lo de adentro del recinto, lo de afuera se oculta.">✂ Recortar recinto</button><button class="btn" id="ewDelPlano" title="Borrar líneas individuales del plano-base (cotas, etiquetas, cañerías). Requiere capa PLANO VEC activada.">🧽 Limpiar plano</button><button class="btn" id="ewSelect">Editar dibujo</button><button class="btn" id="ewCalib">Escala</button><button class="btn" id="ewMeasure">Medir</button><span class="ebsp"></span><button class="btn primary" id="eDone">Listo</button>`;
     setHint('Arrastra pines · clic un pin para ver/editar · crea bajadas, estructuras, recorta el plano o mide a escala.');
   }
   eb.innerHTML=s;wireEditbar();
@@ -1240,6 +1249,10 @@ function wireEditbar(){
   if($('ewStruct'))$('ewStruct').onclick=()=>{structMode=true;setTool('rect');};
   if($('ewMask'))$('ewMask').onclick=()=>setTool('mask');
   if($('ewCutBase'))$('ewCutBase').onclick=()=>setTool('cut-base');
+  if($('ewCropRecinto'))$('ewCropRecinto').onclick=()=>{
+    if(typeof recintoVisible!=='undefined'&&!recintoVisible){recintoVisible=true;localStorage.setItem(RECINTO_KEY,'true');applyRecinto();toast('Activé RECINTO para que veas el cerco');}
+    setTool('crop-recinto');
+  };
   if($('ewDelPlano'))$('ewDelPlano').onclick=()=>{
     // Asegurar que la capa vectorial esté activada — si no, no se puede clickear nada
     if(typeof planoVecVisible!=='undefined'&&!planoVecVisible){
@@ -1308,7 +1321,7 @@ function onEditClick(e){
   const w=worldPx(e.clientX,e.clientY);
   if(Math.abs(w.x)>baseW()*3||Math.abs(w.y)>baseH()*3)return; // lienzo extendido (dibujar fuera del plano)
   if(wiz){ if(wiz.step==='ubic')placeBajadaPoint(w); else if(wiz.step==='pipe')draftAdd(w); return; }
-  if(tool==='mask'||tool==='cut-base'||tool==='sline'||tool==='polygon')draftAdd(w);
+  if(tool==='mask'||tool==='cut-base'||tool==='crop-recinto'||tool==='sline'||tool==='polygon')draftAdd(w);
   else if(tool==='rect'||tool==='circle'||tool==='measure'||tool==='calib')twoClick(w);
   else if(tool==='label')addLabel(w);
   else if(tool==='select'&&!draft){selShape=null;renderShapes();renderEditbar();}
@@ -1446,14 +1459,14 @@ function finishDraft(){
   if(wiz&&wiz.step==='pipe'){finishPipeWizard();return;}
   if(!draft)return;
   if(draft.editId){const sh=getShape(draft.editId);if(sh&&draft.pts.length>=2){sh.pts=draft.pts;sh.w=draft.w||sh.w;save();toast('Cañería actualizada');}draft=null;draftCursor=null;document.body.classList.remove('drafting');renderShapes();renderEditbar();return;}
-  const min=(draft.type==='mask'||draft.type==='cut-base')?3:2;
+  const min=(draft.type==='mask'||draft.type==='cut-base'||draft.type==='crop-recinto')?3:2;
   if(draft.pts.length>=min){
     const sh={id:'sh-'+Date.now(),type:draft.type,pts:draft.pts};
     if(draft.type==='mask')sh.fill=draft.fill;
-    else if(draft.type==='cut-base'){/* no extra props */}
+    else if(draft.type==='cut-base'||draft.type==='crop-recinto'){/* no extra props */}
     else{sh.kind=draft.kind;sh.w=draft.w||PIPE_W;if(draft.closed)sh.closed=true;if(draft.color)sh.color=draft.color;}
     state.shapes.push(sh);save();
-    toast(draft.type==='mask'?'Máscara agregada':draft.type==='cut-base'?'Recorte de plano agregado · plano principal revela el recinto':draft.closed?'Polígono agregado':'Línea agregada');
+    toast(draft.type==='mask'?'Máscara agregada':draft.type==='cut-base'?'Recorte de plano agregado · plano principal revela el recinto':draft.type==='crop-recinto'?'Recorte de recinto agregado · se ve solo el interior':draft.closed?'Polígono agregado':'Línea agregada');
   }
   draft=null;draftCursor=null;document.body.classList.remove('drafting');renderShapes();
 }
@@ -1541,6 +1554,13 @@ function shapeSVG(sh){
     const selCls=(selShape===sh.id)?' sel':'';
     return `<polygon class="shape cut-base-outline${selCls}" data-id="${sh.id}" points="${sh.pts.map(p=>p.join(',')).join(' ')}"/>`;
   }
+  if(sh.type==='crop-recinto'){
+    // Contorno verde en edición (lo que se CONSERVA del recinto). El efecto real es clip-path en el #recinto.
+    const editing=document.body.classList.contains('edit');
+    if(!editing&&!selectable)return '';
+    const selCls=(selShape===sh.id)?' sel':'';
+    return `<polygon class="shape crop-recinto-outline${selCls}" data-id="${sh.id}" points="${sh.pts.map(p=>p.join(',')).join(' ')}"/>`;
+  }
   if(sh.type==='dot')return `<circle class="shape dot ${sh.kind}" data-id="${sh.id}" cx="${sh.x}" cy="${sh.y}" r="${DOT_R}" stroke-width="3"/>`;
   if(sh.type==='label')return `<text class="shape lbl ${sh.kind}" data-id="${sh.id}" x="${sh.x}" y="${sh.y}" font-size="${sh.size||LBL_SZE}" stroke-width="${LBL_HALO}">${esc(sh.text)}</text>`;
   if(sh.type==='cota'){const a=sh.pts[0],b=sh.pts[1],d='M'+a[0]+' '+a[1]+' L'+b[0]+' '+b[1];const cls='cota'+(selectable?' cotadrag':'');const O=(sh.cotaOff&&sh.cotaOff.m)||[0,0];const mx=(a[0]+b[0])/2+O[0],my=(a[1]+b[1])/2-10+O[1];return (selectable?`<path class="shape hit" data-id="${sh.id}" d="${d}"/>`:'')+`<path class="shape cotaline" data-id="${sh.id}" d="${d}"/><text class="${cls}" data-id="${sh.id}" data-ck="m" font-size="${sh.cotaSize||20}" x="${mx.toFixed(1)}" y="${my.toFixed(1)}">${esc(cotaShow(sh,'m'))}</text>`;}
@@ -1594,9 +1614,10 @@ function draftSVG(){
   let s='';
   if(draft.type==='mask')s+=`<polygon class="mask" fill="${draft.fill}" opacity=".5" points="${draft.pts.map(p=>p.join(',')).join(' ')}"/>`;
   if(draft.type==='cut-base')s+=`<polygon class="cut-base-outline" points="${draft.pts.map(p=>p.join(',')).join(' ')}"/>`;
+  if(draft.type==='crop-recinto')s+=`<polygon class="crop-recinto-outline" points="${draft.pts.map(p=>p.join(',')).join(' ')}"/>`;
   const d='M'+draft.pts.map(p=>p[0]+' '+p[1]).join(' L ');
-  const cls=(draft.type==='mask'||draft.type==='cut-base')?'pipe live':'pipe '+draft.kind+' live';
-  const extra=(draft.type==='mask')?' stroke="#999"':(draft.type==='cut-base')?' stroke="#5aa6e8"':'';
+  const cls=(draft.type==='mask'||draft.type==='cut-base'||draft.type==='crop-recinto')?'pipe live':'pipe '+draft.kind+' live';
+  const extra=(draft.type==='mask')?' stroke="#999"':(draft.type==='cut-base')?' stroke="#5aa6e8"':(draft.type==='crop-recinto')?' stroke="#10d978"':'';
   s+=`<path class="${cls}" d="${d}" stroke-width="${draft.w||PIPE_W}"${extra}/>`;
   s+=`<path id="draftLive" class="${cls}" d="" stroke-width="${draft.w||PIPE_W}"${extra}/>`;
   s+=`<circle id="snapInd" class="snaphit" cx="0" cy="0" r="0" style="display:none"/>`;
@@ -1609,7 +1630,7 @@ function selectionSVG(){
   if(sh.type==='rect'){const r=(8/view.s).toFixed(2);return `<rect class="sel-outline" x="${sh.x}" y="${sh.y}" width="${sh.rw}" height="${sh.rh}"/>`+[[sh.x,sh.y],[sh.x+sh.rw,sh.y],[sh.x+sh.rw,sh.y+sh.rh],[sh.x,sh.y+sh.rh]].map((c,i)=>`<circle class="vh" data-vi="${i}" cx="${c[0].toFixed(1)}" cy="${c[1].toFixed(1)}" r="${r}"/>`).join('');}
   if(sh.type==='circle'){const r=(8/view.s).toFixed(2);return `<circle class="sel-outline" cx="${sh.cx}" cy="${sh.cy}" r="${sh.r}"/>`+`<circle class="vh" data-vi="0" cx="${(sh.cx+sh.r).toFixed(1)}" cy="${sh.cy}" r="${r}"/>`;}
   if(sh.pts){
-    if(sh.type==='mask'||sh.type==='cut-base')s+=`<polygon class="sel-outline" points="${sh.pts.map(p=>p.join(',')).join(' ')}"/>`;
+    if(sh.type==='mask'||sh.type==='cut-base'||sh.type==='crop-recinto')s+=`<polygon class="sel-outline" points="${sh.pts.map(p=>p.join(',')).join(' ')}"/>`;
     else s+=`<path class="sel-outline" d="M${sh.pts.map(p=>p[0]+' '+p[1]).join(' L ')}"/>`;
     sh.pts.forEach((p,i)=>{s+=`<circle class="vh" data-vi="${i}" cx="${p[0]}" cy="${p[1]}" r="${(8/view.s).toFixed(2)}"/>`;});
   }else{
@@ -1643,6 +1664,27 @@ function applyBaseCutMask(){
   }
   // Sincronizar clip inverso del vector
   try{if(typeof vectorClipUpdate==='function')vectorClipUpdate();}catch(_){}
+  applyRecintoCrop();
+}
+/* Recorte del recinto: deja visible SOLO el interior de los polígonos crop-recinto.
+   Los pts están en coords del #world (plano-base). El #recinto img vive en su espacio
+   local (8000×5659) con una matriz CSS; invierto esa matriz (leída en runtime, incluye
+   ajuste fino) para convertir los pts a px locales del img y armar el clip-path. */
+function applyRecintoCrop(){
+  const rec=document.getElementById('recinto');if(!rec)return;
+  const crops=(state.shapes||[]).filter(s=>s.type==='crop-recinto'&&Array.isArray(s.pts)&&s.pts.length>=3);
+  if(!crops.length){rec.style.clipPath='none';return;}
+  // matriz efectiva del img: local → world
+  let m=[1.359377,-2.733696,2.736778,1.363547,-12569.75,6323.29];
+  try{const cs=getComputedStyle(rec).transform;const mm=cs&&cs.match(/matrix\(([^)]+)\)/);if(mm)m=mm[1].split(',').map(Number);}catch(_){}
+  const [a,b,c,d,e,f]=m, det=a*d-b*c;
+  if(Math.abs(det)<1e-9){rec.style.clipPath='none';return;}
+  const inv=(X,Y)=>{const dx=X-e,dy=Y-f;return [(d*dx-c*dy)/det,(-b*dx+a*dy)/det];};
+  let path='';
+  crops.forEach(s=>{
+    path+='M'+s.pts.map((p,i)=>{const q=inv(p[0],p[1]);return (i?'L':'')+q[0].toFixed(1)+' '+q[1].toFixed(1);}).join(' ')+' Z ';
+  });
+  rec.style.clipPath=`path('${path.trim()}')`;
 }
 function updateLive(){const el=drawEl.querySelector('#draftLive');if(!el||!draft||!draft.pts.length||!draftCursor)return;const last=draft.pts[draft.pts.length-1];const sn=snapNodes(draftCursor);let cx,cy;if(sn.hit){cx=sn.x;cy=sn.y;}else{cx=draftCursor.x;cy=draftCursor.y;if(draft.type==='pipe'&&snapAngles){const sp=snapPt(last,cx,cy);cx=sp.x;cy=sp.y;}}el.setAttribute('d',`M${last[0]} ${last[1]} L${cx.toFixed(1)} ${cy.toFixed(1)}`);const ind=drawEl.querySelector('#snapInd');if(ind){if(sn.hit){ind.setAttribute('cx',cx);ind.setAttribute('cy',cy);ind.setAttribute('r',(7/view.s).toFixed(2));ind.style.display='';}else ind.style.display='none';}}
 
