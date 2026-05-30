@@ -84,3 +84,7 @@ _claude_ai_upload/
 
 # Traspaso de sesión (skill traspaso-limpio) — artefacto temporal, no versionar
 /traspaso.md
+
+# Fotos locales de los motores Sumitomo (seed) — se suben a Storage, no al repo
+/scripts/sumitomo-photos/*
+!/scripts/sumitomo-photos/README.md
