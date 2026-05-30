@@ -10,12 +10,17 @@ import { usePlantMaps } from '@/hooks/repuestos/usePlantMaps'
 import type { PlantAsset } from '@/types/repuestos'
 
 export function CatalogoBases() {
-  const { assets, loading: assetsLoading, error: assetsError, addMarker, deleteMarker } = usePlantAssets()
+  const { assets, loading: assetsLoading, error: assetsError, addMarker, deleteMarker, updateAsset, addImagen, deleteImagen } = usePlantAssets()
   const { maps, loading: mapsLoading, error: mapsError } = usePlantMaps()
   const { toast } = useToast()
 
-  const [selectedAsset, setSelectedAsset] = useState<PlantAsset | null>(null)
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
+  // Derivar del array vivo para que el modal refleje ediciones/fotos al instante
+  const selectedAsset = useMemo(
+    () => assets.find((a: PlantAsset) => a.id === selectedAssetId) ?? null,
+    [assets, selectedAssetId],
+  )
 
   // Agrupar assets por tipo
   const stats = useMemo(() => {
@@ -29,7 +34,7 @@ export function CatalogoBases() {
   }, [assets])
 
   const handleAssetSelect = (asset: PlantAsset) => {
-    setSelectedAsset(asset)
+    setSelectedAssetId(asset.id)
     setShowDetailModal(true)
   }
 
@@ -199,7 +204,7 @@ export function CatalogoBases() {
                       a.marcadores?.some((m: any) => m.id === marker.id)
                     )
                     if (asset) {
-                      setSelectedAsset(asset)
+                      setSelectedAssetId(asset.id)
                       setShowDetailModal(true)
                     }
                   }}
@@ -212,11 +217,14 @@ export function CatalogoBases() {
         </TabsContent>
       </Tabs>
 
-      {/* Modal de detalles */}
+      {/* Modal de detalles (editable) */}
       <AssetDetailModal
         asset={selectedAsset}
         open={showDetailModal}
         onOpenChange={setShowDetailModal}
+        onUpdate={updateAsset}
+        onAddImage={addImagen}
+        onDeleteImage={deleteImagen}
       />
     </div>
   )
