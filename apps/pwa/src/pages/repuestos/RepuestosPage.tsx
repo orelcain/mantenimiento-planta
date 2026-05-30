@@ -12,13 +12,14 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Layers, Search, Package } from 'lucide-react'
+import { Layers, Search, Package, Cog } from 'lucide-react'
 import { RepuestosDashboard } from './Dashboard'
 import { BuscadorGlobal } from './BuscadorGlobal'
 import { BodegaView } from './BodegaView'
+import { CatalogoBases } from './CatalogoBases'
 import { useMachineContext } from '@/contexts/MachineContext'
 
-type Tab = 'equipo' | 'buscar' | 'bodega'
+type Tab = 'equipo' | 'buscar' | 'bodega' | 'bases'
 
 const STORAGE_KEY = 'repuestos-active-tab'
 
@@ -26,7 +27,7 @@ const STORAGE_KEY = 'repuestos-active-tab'
 function getDefaultTab(): Tab {
   try {
     const saved = localStorage.getItem(STORAGE_KEY) as Tab | null
-    if (saved === 'equipo' || saved === 'buscar' || saved === 'bodega') return saved
+    if (saved === 'equipo' || saved === 'buscar' || saved === 'bodega' || saved === 'bases') return saved
     // En móvil, el buscador es más útil por defecto
     if (typeof window !== 'undefined' && window.innerWidth < 640) return 'buscar'
   } catch { /* noop */ }
@@ -42,9 +43,10 @@ interface TabDef {
 }
 
 const TABS: TabDef[] = [
-  { id: 'equipo',  label: 'Por equipo',  mobileLabel: 'Equipo',  icon: Layers  },
-  { id: 'buscar',  label: 'Buscar pieza', mobileLabel: 'Buscar', icon: Search  },
-  { id: 'bodega',  label: 'Bodega',       mobileLabel: 'Bodega', icon: Package },
+  { id: 'equipo',  label: 'Por equipo',     mobileLabel: 'Equipo',  icon: Layers  },
+  { id: 'buscar',  label: 'Buscar pieza',   mobileLabel: 'Buscar',  icon: Search  },
+  { id: 'bases',   label: 'Motores/Bombas', mobileLabel: 'Motores', icon: Cog     },
+  { id: 'bodega',  label: 'Bodega',         mobileLabel: 'Bodega',  icon: Package },
 ]
 
 export function RepuestosPage() {
@@ -150,6 +152,12 @@ export function RepuestosPage() {
               onQueryConsumed={handleQueryConsumed}
               onViewInCatalog={handleViewInCatalog}
             />
+          )}
+        </div>
+
+        <div className={activeTab === 'bases' ? '' : 'hidden'}>
+          {mountedTabs.has('bases') && (
+            <CatalogoBases />
           )}
         </div>
 
