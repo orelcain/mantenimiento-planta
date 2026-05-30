@@ -51,10 +51,10 @@ export const LEARNING_MACHINES: LearningMachine[] = [
     slug: 'baader-142',
     name: 'Evisceradora Baader 142 N3',
     area: 'Planta Principal',
-    description: 'Maquina evisceradora para procesamiento primario de pescado.',
+    description: 'Maquina evisceradora para procesamiento primario de pescado. Contenido base trazado al manual BAADER 142 y referencias locales verificadas.',
     icon: Scissors,
     color: '#ff8844',
-    sections: { manual: false, procedures: false, flows: false, diagnosis: false },
+    sections: { manual: true, procedures: false, flows: false, diagnosis: false },
   },
   {
     slug: 'grader',

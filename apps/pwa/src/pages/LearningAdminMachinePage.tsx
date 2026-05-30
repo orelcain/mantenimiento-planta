@@ -9,7 +9,7 @@
  *   - Diagnostico (sintoma -> causas -> solucion)
  */
 import { useEffect, useRef, useState } from 'react'
-import { Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft, Plus, Trash2, Edit3, Save, X, ChevronUp, ChevronDown, Loader2,
   ListChecks, BookOpen, GitBranch, AlertTriangle, ImagePlus, Eye,
@@ -49,10 +49,16 @@ const TAB_DEFS: { id: AdminTab; label: string; icon: React.ElementType }[] = [
   { id: 'diagnosis', label: 'Diagnóstico', icon: AlertTriangle },
 ]
 
+function isAdminTab(value: string | null): value is AdminTab {
+  return value === 'procedures' || value === 'manual' || value === 'flows' || value === 'diagnosis'
+}
+
 export function LearningAdminMachinePage() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState<AdminTab>('procedures')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const initialTab = searchParams.get('tab')
+  const [activeTab, setActiveTab] = useState<AdminTab>(isAdminTab(initialTab) ? initialTab : 'procedures')
   const machine = slug ? findMachineBySlug(slug) : undefined
 
   if (!machine) {
@@ -108,7 +114,10 @@ export function LearningAdminMachinePage() {
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                setActiveTab(tab.id)
+                setSearchParams({ tab: tab.id }, { replace: true })
+              }}
               className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                 isActive
                   ? 'border-[#5aa6e8] text-[#5aa6e8]'
@@ -529,6 +538,7 @@ function ManualEditor({ machineSlug }: { machineSlug: string }) {
     return (
       <ManualSectionForm
         initial={editing}
+        machineSlug={machineSlug}
         onSave={handleSave}
         onCancel={() => setEditing(null)}
       />
@@ -563,10 +573,12 @@ function ManualEditor({ machineSlug }: { machineSlug: string }) {
 
 function ManualSectionForm({
   initial,
+  machineSlug,
   onSave,
   onCancel,
 }: {
   initial: ManualSection
+  machineSlug: string
   onSave: (s: ManualSection) => void | Promise<void>
   onCancel: () => void
 }) {
@@ -679,6 +691,8 @@ function ManualSectionForm({
 
       <ManualImagesEditor
         images={manualFields.images}
+        machineSlug={machineSlug}
+        sectionId={section.id}
         onAdd={() => setManualFields(fields => ({ ...fields, images: [...fields.images, { label: '', url: '' }] }))}
         onChange={updateImage}
         onRemove={index => setManualFields(fields => ({ ...fields, images: fields.images.filter((_, i) => i !== index) }))}
@@ -838,27 +852,61 @@ function EditableTextList({
 
 function ManualImagesEditor({
   images,
+  machineSlug,
+  sectionId,
   onAdd,
   onChange,
   onRemove,
 }: {
   images: ManualImageField[]
+  machineSlug: string
+  sectionId: string
   onAdd: () => void
   onChange: (index: number, patch: Partial<ManualImageField>) => void
   onRemove: (index: number) => void
 }) {
+  const [uploadingIndex, setUploadingIndex] = useState<number | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleUpload(index: number, file: File) {
+    setUploadingIndex(index)
+    setError(null)
+    try {
+      const previous = images[index]?.url
+      const url = await uploadLearningImage(machineSlug, 'manual', sectionId, file)
+      onChange(index, { url })
+      if (previous) await deleteLearningImage(previous)
+    } catch (e) {
+      logger.error('Error al subir referencia visual', e instanceof Error ? e : new Error(String(e)))
+      setError('No se pudo subir la imagen. Intenta nuevamente.')
+    } finally {
+      setUploadingIndex(null)
+    }
+  }
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-2">
-        <label className="text-xs font-semibold uppercase tracking-wider text-[#9db0c2]">Referencias visuales</label>
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+        <div>
+          <label className="text-xs font-semibold uppercase tracking-wider text-[#9db0c2]">Referencias visuales</label>
+          <p className="mt-1 text-xs text-[#6d8298]">
+            Agrega una o varias imagenes. Puedes subir archivo o pegar una URL existente.
+          </p>
+        </div>
         <button
+          type="button"
           onClick={onAdd}
           className="flex items-center gap-1 text-xs font-medium text-[#5aa6e8] hover:bg-[#5aa6e8]/10 px-2 py-1 rounded"
         >
           <Plus className="h-3.5 w-3.5" />
-          Anadir imagen
+          Agregar referencia
         </button>
       </div>
+      {error && (
+        <p className="mb-2 rounded-lg border border-[#e0697d]/30 bg-[#e0697d]/10 px-3 py-2 text-xs text-[#f1a3ae]">
+          {error}
+        </p>
+      )}
       {images.length === 0 ? (
         <p className="text-xs text-[#6d8298] rounded-lg border border-dashed border-[#22384a] px-3 py-3">
           Sin imagenes asociadas.
@@ -866,22 +914,60 @@ function ManualImagesEditor({
       ) : (
         <div className="space-y-3">
           {images.map((image, index) => (
-            <div key={index} className="grid gap-2 sm:grid-cols-[1fr_1.4fr_auto] p-3 rounded-lg border border-[#22384a] bg-[#16242f]/50">
-              <input
-                type="text"
-                value={image.label}
-                onChange={e => onChange(index, { label: e.target.value })}
-                placeholder="Etiqueta"
-                className="px-3 py-2 rounded-lg border border-[#22384a] bg-[#16242f] text-sm focus:outline-none focus:ring-2 focus:ring-[#5aa6e8]/60"
-              />
-              <input
-                type="text"
-                value={image.url}
-                onChange={e => onChange(index, { url: e.target.value })}
-                placeholder="URL de imagen"
-                className="px-3 py-2 rounded-lg border border-[#22384a] bg-[#16242f] text-sm focus:outline-none focus:ring-2 focus:ring-[#5aa6e8]/60"
-              />
+            <div key={index} className="grid gap-3 p-3 rounded-lg border border-[#22384a] bg-[#16242f]/50 lg:grid-cols-[132px_1fr_auto]">
+              <div className="flex h-24 items-center justify-center overflow-hidden rounded-lg border border-[#22384a] bg-[#0f1b24]">
+                {image.url ? (
+                  <img src={image.url} alt={image.label || 'Referencia visual'} className="h-full w-full object-contain" />
+                ) : (
+                  <ImagePlus className="h-6 w-6 text-[#6d8298]" />
+                )}
+              </div>
+              <div className="grid gap-2">
+                <input
+                  type="text"
+                  value={image.label}
+                  onChange={e => onChange(index, { label: e.target.value })}
+                  placeholder="Etiqueta visible"
+                  className="px-3 py-2 rounded-lg border border-[#22384a] bg-[#16242f] text-sm focus:outline-none focus:ring-2 focus:ring-[#5aa6e8]/60"
+                />
+                <input
+                  type="text"
+                  value={image.url}
+                  onChange={e => onChange(index, { url: e.target.value })}
+                  placeholder="URL de imagen o ruta publica"
+                  className="px-3 py-2 rounded-lg border border-[#22384a] bg-[#16242f] text-sm focus:outline-none focus:ring-2 focus:ring-[#5aa6e8]/60"
+                />
+                <div className="flex flex-wrap gap-2">
+                  <label className="inline-flex cursor-pointer items-center gap-1 rounded px-2 py-1 text-xs font-medium text-[#5aa6e8] hover:bg-[#5aa6e8]/10">
+                    <ImagePlus className="h-3.5 w-3.5" />
+                    {uploadingIndex === index ? 'Subiendo...' : 'Subir imagen'}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={uploadingIndex !== null}
+                      onChange={event => {
+                        const file = event.target.files?.[0]
+                        event.target.value = ''
+                        if (file) void handleUpload(index, file)
+                      }}
+                    />
+                  </label>
+                  {image.url && (
+                    <a
+                      href={image.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-[#9db0c2] hover:bg-[#22384a]"
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      Probar enlace
+                    </a>
+                  )}
+                </div>
+              </div>
               <button
+                type="button"
                 onClick={() => onRemove(index)}
                 className="p-2 hover:bg-[#e0697d]/15 text-[#e0697d] rounded justify-self-start"
                 title="Eliminar imagen"
