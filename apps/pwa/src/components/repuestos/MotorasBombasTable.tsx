@@ -47,7 +47,8 @@ export function MotorasBombasTable({ assets, loading, onSelect }: MotorasBombasT
           normalizeForSearch(a.componente).includes(query) ||
           normalizeForSearch(a.marca).includes(query) ||
           normalizeForSearch(a.modeloTipo).includes(query) ||
-          normalizeForSearch(a.codigoSAP).includes(query)
+          normalizeForSearch(a.codigoSAP).includes(query) ||
+          normalizeForSearch(a.descripcionSAP).includes(query)
         )
       })
     }
@@ -95,6 +96,7 @@ export function MotorasBombasTable({ assets, loading, onSelect }: MotorasBombasT
                 <th className="px-4 py-2 text-left font-semibold">Tipo</th>
                 <th className="px-4 py-2 text-left font-semibold">Equipo</th>
                 <th className="px-4 py-2 text-left font-semibold">Modelo</th>
+                <th className="px-4 py-2 text-left font-semibold">SAP</th>
                 <th className="px-4 py-2 text-left font-semibold">Área</th>
                 <th className="px-4 py-2 text-left font-semibold">Componente</th>
                 <th className="px-4 py-2 text-left font-semibold">Marca</th>
@@ -105,7 +107,7 @@ export function MotorasBombasTable({ assets, loading, onSelect }: MotorasBombasT
             <tbody className="divide-y">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">
+                  <td colSpan={10} className="px-4 py-8 text-center text-muted-foreground">
                     {searchQuery || tipoFilter !== 'all'
                       ? 'No se encontraron motores o bombas'
                       : 'No hay motores o bombas registradas'}
@@ -155,16 +157,27 @@ export function MotorasBombasTable({ assets, loading, onSelect }: MotorasBombasT
                         </Badge>
                       </td>
                       <td className="px-4 py-3 font-medium text-foreground">{asset.equipo || '-'}</td>
-                      {/* Modelo + SAP */}
+                      {/* Modelo */}
                       <td className="px-4 py-3">
                         {asset.modeloTipo ? (
                           <span className="font-mono text-xs text-foreground">{asset.modeloTipo}</span>
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}
-                        {asset.codigoSAP && (
-                          <span className="block font-mono text-[10px] text-muted-foreground">
-                            SAP {asset.codigoSAP}
+                      </td>
+                      {/* SAP + descripción SAP */}
+                      <td className="px-4 py-3">
+                        {asset.codigoSAP ? (
+                          <span className="font-mono text-xs text-foreground">{asset.codigoSAP}</span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                        {asset.descripcionSAP && (
+                          <span
+                            className="block max-w-[180px] text-[10px] leading-tight text-muted-foreground"
+                            title={asset.descripcionSAP}
+                          >
+                            {asset.descripcionSAP}
                           </span>
                         )}
                       </td>

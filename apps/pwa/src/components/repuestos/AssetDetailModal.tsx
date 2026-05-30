@@ -66,6 +66,13 @@ export function AssetDetailModal({ asset, open, onOpenChange }: AssetDetailModal
                   <p className="text-sm font-medium mt-1">{asset.marca || '-'}</p>
                 </div>
 
+                {asset.descripcionSAP && (
+                  <div className="col-span-2">
+                    <label className="text-xs font-medium text-muted-foreground">Descripción SAP</label>
+                    <p className="text-sm font-medium mt-1">{asset.descripcionSAP}</p>
+                  </div>
+                )}
+
                 <div>
                   <label className="text-xs font-medium text-muted-foreground">Modelo/Tipo</label>
                   <p className="text-sm font-medium mt-1">{asset.modeloTipo || '-'}</p>
