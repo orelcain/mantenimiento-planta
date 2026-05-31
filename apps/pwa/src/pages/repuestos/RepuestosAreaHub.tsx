@@ -17,6 +17,7 @@ import { Badge, Button, Input, Select, SelectTrigger, SelectValue, SelectContent
 import { AreaSidebar } from '@/components/repuestos/AreaSidebar'
 import { AssetDetailModal } from '@/components/repuestos/AssetDetailModal'
 import { RepuestoDetailPanel } from '@/components/repuestos/RepuestoDetailPanel'
+import { AssetDetailPanel } from '@/components/repuestos/AssetDetailPanel'
 import { usePlantAssets } from '@/hooks/repuestos/usePlantAssets'
 import { useHierarchyAreaTree, type AreaTreeNode } from '@/hooks/useHierarchyAreaTree'
 import { useGlobalSearch } from '@/hooks/repuestos/useGlobalSearch'
@@ -346,8 +347,11 @@ export function RepuestosAreaHub() {
                       return (
                         <tr
                           key={a.id}
-                          onClick={() => { setSelectedAssetId(a.id); setShowDetail(true) }}
-                          className="cursor-pointer transition-colors hover:bg-muted/40"
+                          onClick={() => { setSelectedAssetId(a.id); setSelectedRepSap(null) }}
+                          className={[
+                            'cursor-pointer transition-colors',
+                            selectedAssetId === a.id ? 'bg-primary/10 ring-1 ring-inset ring-primary/40' : 'hover:bg-muted/40',
+                          ].join(' ')}
                         >
                           <td className="px-3 py-2">
                             {thumb ? (
@@ -443,7 +447,7 @@ export function RepuestosAreaHub() {
                         return (
                           <tr
                             key={r.codigoSAP}
-                            onClick={() => setSelectedRepSap(r.codigoSAP)}
+                            onClick={() => { setSelectedRepSap(r.codigoSAP); setSelectedAssetId(null) }}
                             className={[
                               'cursor-pointer transition-colors',
                               isSel ? 'bg-primary/10 ring-1 ring-inset ring-primary/40' : 'hover:bg-muted/40',
@@ -514,7 +518,17 @@ export function RepuestosAreaHub() {
         />
       )}
 
-      {/* Detalle motor/bomba (modal editable existente) */}
+      {/* Panel lateral de detalle del motor/bomba (no modal; edición vía modal) */}
+      {!selectedRep && selectedAsset && (
+        <AssetDetailPanel
+          asset={selectedAsset}
+          areaName={showingAll ? 'Todas las áreas' : (selectedNode?.nombre ?? '')}
+          onClose={() => setSelectedAssetId(null)}
+          onEdit={() => setShowDetail(true)}
+        />
+      )}
+
+      {/* Edición motor/bomba (modal editable existente, abierto desde el panel) */}
       <AssetDetailModal
         asset={selectedAsset}
         open={showDetail}

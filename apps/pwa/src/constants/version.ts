@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '3.33.0' as const
+export const APP_VERSION = '3.33.1' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-05-31' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'feat(repuestos): hub área-first (sidebar áreas + tabla stock + panel detalle)' as const
+export const VERSION_NAME = 'refactor(repuestos): detalle de motor/bomba en panel lateral (no modal)' as const
 
 /**
  * Nota:
