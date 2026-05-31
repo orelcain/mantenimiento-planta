@@ -7,17 +7,30 @@
  * última actualización (último movimiento) · Ver movimientos.
  */
 import { useState, useEffect, useCallback } from 'react'
-import { X, Copy, Check, History, ImageOff, Loader2, ArrowDownCircle, ArrowUpCircle, Settings2 } from 'lucide-react'
-import { Button } from '@/components/ui'
+import { X, Copy, Check, History, ImageOff, Loader2, ArrowDownCircle, ArrowUpCircle, Settings2, Pencil } from 'lucide-react'
+import { Button, Input } from '@/components/ui'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import type { AreaRepuestoRow } from '@/hooks/repuestos/useAreaRepuestos'
 import type { MovimientoBodega } from '@/hooks/repuestos/useBodega'
+
+export interface UbicacionEstructurada { pasillo?: string; estante?: string; nivel?: string }
 
 interface RepuestoDetailPanelProps {
   item: AreaRepuestoRow | null
   areaName: string
   onClose: () => void
   loadMovimientos: (bodegaDocId: string, max?: number) => Promise<MovimientoBodega[]>
+  onSaveLocation: (codigoSAP: string, loc: UbicacionEstructurada) => Promise<void>
+}
+
+/** Texto de ubicación: estructurada (Pasillo/Estante/Nivel) o el string libre legacy. */
+function formatUbicacion(item: AreaRepuestoRow): string {
+  const parts: string[] = []
+  if (item.pasillo) parts.push(`Pasillo ${item.pasillo}`)
+  if (item.estante) parts.push(`Estante ${item.estante}`)
+  if (item.nivel) parts.push(`Nivel ${item.nivel}`)
+  if (parts.length) return parts.join(' / ')
+  return item.ubicacionBodega || '—'
 }
 
 function Field({ label, value }: { label: string; value: string }) {
@@ -41,17 +54,34 @@ function fmtDate(d: Date): string {
   } catch { return '' }
 }
 
-export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos }: RepuestoDetailPanelProps) {
+export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, onSaveLocation }: RepuestoDetailPanelProps) {
   const [copied, setCopied] = useState(false)
   const [movs, setMovs] = useState<MovimientoBodega[] | null>(null)
   const [movsLoading, setMovsLoading] = useState(false)
   const [showMovs, setShowMovs] = useState(false)
   const [lightbox, setLightbox] = useState<string[] | null>(null)
+  const [editLoc, setEditLoc] = useState(false)
+  const [locForm, setLocForm] = useState<UbicacionEstructurada>({})
+  const [savingLoc, setSavingLoc] = useState(false)
+
+  const startEditLoc = useCallback(() => {
+    setLocForm({ pasillo: item?.pasillo ?? '', estante: item?.estante ?? '', nivel: item?.nivel ?? '' })
+    setEditLoc(true)
+  }, [item])
+
+  const saveLoc = useCallback(async () => {
+    if (!item) return
+    setSavingLoc(true)
+    try { await onSaveLocation(item.codigoSAP, locForm); setEditLoc(false) }
+    finally { setSavingLoc(false) }
+  }, [item, locForm, onSaveLocation])
 
   const bodegaDocId = item?.bodegaId
   const sap = item?.codigoSAP ?? ''
 
   // Cargar movimientos al cambiar de repuesto (para "última actualización")
+  useEffect(() => { setEditLoc(false) }, [sap])
+
   useEffect(() => {
     setMovs(null); setShowMovs(false)
     if (!bodegaDocId) return
@@ -147,7 +177,37 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos }
         {/* Bodega / Ubicación */}
         <div className="mt-3 divide-y divide-border/60 border-y border-border/60">
           <Field label="Bodega" value={bodega} />
-          <Field label="Ubicación" value={item.ubicacionBodega || '—'} />
+          {/* Ubicación estructurada (editable) */}
+          <div className="py-1.5">
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Ubicación</span>
+              {!editLoc && (
+                <span className="flex items-center gap-1.5 text-right text-[13px] font-medium text-foreground">
+                  {formatUbicacion(item)}
+                  {item.bodegaId && (
+                    <button onClick={startEditLoc} className="rounded p-0.5 text-muted-foreground hover:text-primary" title="Editar ubicación">
+                      <Pencil className="h-3 w-3" />
+                    </button>
+                  )}
+                </span>
+              )}
+            </div>
+            {editLoc && (
+              <div className="mt-2 space-y-2">
+                <div className="grid grid-cols-3 gap-2">
+                  <Input value={locForm.pasillo ?? ''} onChange={(e) => setLocForm((f) => ({ ...f, pasillo: e.target.value }))} placeholder="Pasillo" className="h-8 text-xs" />
+                  <Input value={locForm.estante ?? ''} onChange={(e) => setLocForm((f) => ({ ...f, estante: e.target.value }))} placeholder="Estante" className="h-8 text-xs" />
+                  <Input value={locForm.nivel ?? ''} onChange={(e) => setLocForm((f) => ({ ...f, nivel: e.target.value }))} placeholder="Nivel" className="h-8 text-xs" />
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" className="h-7 flex-1" onClick={saveLoc} disabled={savingLoc}>
+                    {savingLoc ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Guardar'}
+                  </Button>
+                  <Button size="sm" variant="outline" className="h-7" onClick={() => setEditLoc(false)} disabled={savingLoc}>Cancelar</Button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Última actualización */}

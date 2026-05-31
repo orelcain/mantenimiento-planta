@@ -41,6 +41,10 @@ export interface BodegaOverlay {
   stockMinimo: number
   stockMaximo?: number
   ubicacionBodega: string
+  /** Ubicación estructurada (opcional) — Pasillo / Estante / Nivel */
+  pasillo?: string
+  estante?: string
+  nivel?: string
   proveedor?: string
   costoCompra?: number
   unidad: string
@@ -66,6 +70,10 @@ export interface BodegaMergedItem {
   stockMinimo: number
   stockMaximo?: number
   ubicacionBodega: string
+  /** Ubicación estructurada (opcional) — Pasillo / Estante / Nivel */
+  pasillo?: string
+  estante?: string
+  nivel?: string
   proveedor?: string
   costoCompra?: number
   unidad: string
@@ -94,6 +102,10 @@ export interface BodegaStockData {
   stockMinimo: number
   stockMaximo?: number
   ubicacionBodega: string
+  /** Ubicación estructurada (opcional) — Pasillo / Estante / Nivel */
+  pasillo?: string
+  estante?: string
+  nivel?: string
   proveedor?: string
   costoCompra?: number
   unidad: string
@@ -234,6 +246,9 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
           stockMinimo: data.stockMinimo ?? 0,
           stockMaximo: data.stockMaximo ?? undefined,
           ubicacionBodega: data.ubicacionBodega || '',
+          pasillo: data.pasillo || undefined,
+          estante: data.estante || undefined,
+          nivel: data.nivel || undefined,
           proveedor: data.proveedor || undefined,
           costoCompra: data.costoCompra ?? undefined,
           unidad: data.unidad || 'pzas',
@@ -293,6 +308,9 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
         stockMinimo: overlay?.stockMinimo ?? 0,
         stockMaximo: overlay?.stockMaximo,
         ubicacionBodega: overlay?.ubicacionBodega || '',
+        pasillo: overlay?.pasillo,
+        estante: overlay?.estante,
+        nivel: overlay?.nivel,
         proveedor: overlay?.proveedor,
         costoCompra: overlay?.costoCompra,
         unidad: overlay?.unidad || 'pzas',

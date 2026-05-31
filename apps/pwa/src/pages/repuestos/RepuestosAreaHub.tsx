@@ -93,7 +93,7 @@ export function RepuestosAreaHub() {
 
   const { allRepuestos, loadAll, loaded: repuestosLoaded, loading: repuestosLoading } = useGlobalSearch(machines)
   useEffect(() => { if (machines.length) loadAll() }, [machines, loadAll])
-  const { items: bodegaItems, loading: bodegaLoading, loadMovimientos } = useBodega(allRepuestos)
+  const { items: bodegaItems, loading: bodegaLoading, loadMovimientos, saveStock } = useBodega(allRepuestos)
 
   // membership repuesto(machineId) → área: vía equipment cache, con fallback a ancestría directa
   const machineInArea = useCallback(
@@ -204,6 +204,33 @@ export function RepuestosAreaHub() {
   const selectedRep = useMemo(
     () => areaRepuestos.find((r) => r.codigoSAP === selectedRepSap) ?? null,
     [areaRepuestos, selectedRepSap],
+  )
+
+  // Guardar ubicación estructurada (preserva el resto del stock del item).
+  // Firestore no admite `undefined` (sin ignoreUndefinedProperties) → se stripean.
+  const handleSaveLocation = useCallback(
+    async (sap: string, loc: { pasillo?: string; estante?: string; nivel?: string }) => {
+      const it = bodegaItems.find((b) => b.codigoSAP === sap)
+      const payload: Record<string, unknown> = {
+        stockActual: it?.stockActual ?? 0,
+        stockMinimo: it?.stockMinimo ?? 0,
+        ubicacionBodega: it?.ubicacionBodega ?? '',
+        unidad: it?.unidad ?? 'pzas',
+        // strings vacíos (no undefined) → permiten limpiar el campo
+        pasillo: loc.pasillo?.trim() ?? '',
+        estante: loc.estante?.trim() ?? '',
+        nivel: loc.nivel?.trim() ?? '',
+      }
+      // Preservar opcionales solo si están definidos (evita undefined en Firestore)
+      if (it?.stockMaximo != null) payload.stockMaximo = it.stockMaximo
+      if (it?.proveedor != null) payload.proveedor = it.proveedor
+      if (it?.costoCompra != null) payload.costoCompra = it.costoCompra
+      if (it?.leadTime != null) payload.leadTime = it.leadTime
+      if (it?.categoria != null) payload.categoria = it.categoria
+      if (it?.observaciones != null) payload.observaciones = it.observaciones
+      await saveStock(sap, payload as unknown as Parameters<typeof saveStock>[1])
+    },
+    [bodegaItems, saveStock],
   )
 
   const repuestosBusy = !repuestosLoaded || repuestosLoading || bodegaLoading || pathsLoading || eqLoading
@@ -515,6 +542,7 @@ export function RepuestosAreaHub() {
           areaName={showingAll ? 'Todas las áreas' : (selectedNode?.nombre ?? '')}
           onClose={() => setSelectedRepSap(null)}
           loadMovimientos={loadMovimientos}
+          onSaveLocation={handleSaveLocation}
         />
       )}
 
