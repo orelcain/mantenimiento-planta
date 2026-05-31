@@ -1,0 +1,5 @@
+# Imágenes extraídas del docx (pesadas, no versionar)
+media/
+# Intermedios de extracción
+document_order.json
+image_context.json

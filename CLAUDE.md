@@ -1073,20 +1073,23 @@ Con Haversine A→D = dimensión real del recinto en metros. El DWG ya tiene cot
 
 ## Pendientes priorizados
 
-### 🖥️ PENDIENTE PC — Seed 8 motores SUMITOMO en `plantAssets` (2026-05-29)
+### ✅ HECHO — Catálogo Motores/Bombas + Levantamiento por áreas (2026-05-31)
 
-Script listo en rama `claude/add-sumitomo-motors-repuestos-FBTar`, **falta correrlo desde el PC** (este entorno remoto no tiene `serviceAccountKey.json`, no puede escribir a Firestore).
+Toda esta línea quedó **en producción** (data directa a Firestore/Storage, sin deploy; la UI sí se deployó vía PRs #70-74):
 
-- **Qué hace**: inserta 8 motores Sumitomo nuevos (reemplazan SEW) en la colección `plantAssets`, `tipo: 'motor'`, `area: 'PLANTA CHONCHI'` (planta principal), `marca: 'Sumitomo'`, `eje: '30mm'`. Se ven en Repuestos → tabla Motores/Bombas.
-- **Cómo correr** (con `serviceAccountKey.json` en la raíz):
-  ```
-  node scripts/seed-sumitomo-motors.js --dry-run   # previsualizar
-  node scripts/seed-sumitomo-motors.js             # insertar (idempotente, skip si existe)
-  ```
-- **Idempotente**: docId determinístico `asset-sumitomo-<slug>` → re-correrlo NO duplica. `--force` sobrescribe campos + re-sube fotos.
-- **Datos** (equipo · modelo proveedor · SAP): Cinta desperdicio Baader 200 / Cinta desperdicio filete / Cinta filete / Cinta transversal Baader 142 / Cinta curva → `RNYM08-1320B-30` · `3300124073` · | Cinta Z elevadora HG → `RNYM1-1320A-30` · `3300124072` | Cinta alimentación Baader 142 → `RNYM1-1320A-7` · `3300124071` | Cinta alimentación Gea → `RNYMS05-1320C-30` · `3300124070`. `descripcionSAP` real tomada de las etiquetas físicas (ej. SAP 3300124073 = "MOTOR REDUCTOR MOD RNYM08 48,3 RPM").
-- **Fotos**: dejar las fotos en `scripts/sumitomo-photos/` nombradas por SAP (`3300124073.jpg`, etc. — ver README de esa carpeta). El script las sube a Storage `plantAssets/<assetId>/` y las deja como imagen principal. El SAP 3300124073 (5 motores) comparte una sola foto. Las fotos NO se versionan (`.gitignore`). Si falta una, ese motor se crea sin imagen (re-correr con `--force` luego de agregarla).
-- Nota: `PlantAsset` no tiene campo de cantidad → "1 unidad por planta" = 1 doc por motor; el dato queda anotado en `observaciones`. Los 3 que comparten SAP/modelo son motores físicos distintos (3 docs).
+- **Seed 8 motores SUMITOMO** (`scripts/seed-sumitomo-motors.js`) — 8 docs `plantAssets` PLANTA CHONCHI + 4 fotos por SAP. ✅
+- **Pestaña "Motores/Bombas"** en Repuestos (`RepuestosPage` monta `CatalogoBases`, antes era código muerto sin rutear). Columnas Foto (miniatura → visor pan/zoom `ImageLightbox`) · Modelo · SAP (+descripción SAP). Búsqueda por equipo/modelo/marca/SAP/descripción. **Organizada por áreas**: chips de filtro por subárea + secciones agrupadas.
+- **Editor in-app** del detalle (`AssetDetailModal` editable): edita marca/modelo/SAP/specs + **sube fotos desde el celular** (`capture=environment` → WebP → Storage `plantAssets/<id>/imagenes/`), marcar principal / eliminar. Así se completan los huecos en terreno.
+- **Levantamiento importado** del doc `v2.1.1.1_LEVANTAMIENTO EQUIPOS PLANTA CHONCHI.docx`: **9 áreas, 65 equipos, 87 fotos** (8 con SAP real). Pipeline reproducible en `scripts/levantamiento-import/` (`extract_media_map.py` saca fotos+orden; JSONs curados por área) + `scripts/seed-levantamiento.js` (idempotente `asset-lev-<slug>`, `--dry-run`/`--force`/`--no-photos`, soporta `subarea`/`codigoSAP` por equipo). Mapeo plano: 1 motor/bomba = 1 doc; estructura/cinta/mantención → `observaciones`. Tachos de vacío y medidor de caudal omitidos (no son motor/bomba). Total `plantAssets`: 134 (65 lev + 8 sumitomo + 61 stubs viejos "Diverso/Motoreductor").
+
+### 🔭 PENDIENTE (proyecto /ultraplan) — Módulo Repuestos "área-first"
+
+Orientar **todo** el módulo Repuestos por áreas con lenguaje visual unificado. Los datos YA están área-orientados (`types/repuestos.ts`: `Área → Equipo/Máquina → Repuestos`, colección `hierarchy` + `hierarchyPath`; ~4.684 repuestos). Falta unificar la **navegación**: una entrada "por área" que muestre de una las máquinas + repuestos + motores/bombas (`plantAssets`) de esa área bajo el mismo lente (hoy `plantAssets` y `hierarchy/repuestos` viven separados; el área es el puente). **OJO escala**: 134 motores/bombas → chips+tabla plana OK; 4.684 repuestos → requiere drill-down área→máquina→repuesto (NO tabla plana). Es el rediseño del módulo completo (~5.500 líneas, 4 vistas: Por equipo/Buscar/Bodega/Motores-Bombas) → **abrir con `/ultraplan` en sesión dedicada**, sin romper Bodega/Buscador.
+
+### 🖥️ Seed 8 motores SUMITOMO — referencia del script (HECHO ✅)
+- **Idempotente**: docId `asset-sumitomo-<slug>`. `--force` sobrescribe + re-sube fotos.
+- **Datos** (equipo · modelo · SAP): Baader 200 / desperdicio filete / filete / transversal Baader 142 / curva → `RNYM08-1320B-30` · `3300124073` | Z elevadora HG → `RNYM1-1320A-30` · `3300124072` | alimentación Baader 142 → `RNYM1-1320A-7` · `3300124071` | alimentación Gea → `RNYMS05-1320C-30` · `3300124070`.
+- Fotos en `scripts/sumitomo-photos/` por SAP (gitignored). SAP 3300124073 (5 motores) comparte foto.
 
 ### Planos de Aguas — estado al 2026-05-25
 

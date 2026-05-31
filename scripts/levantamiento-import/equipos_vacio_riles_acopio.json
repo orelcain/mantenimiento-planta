@@ -1,0 +1,62 @@
+{
+  "_meta": {
+    "fuente": "v2.1.1.1_LEVANTAMIENTO EQUIPOS PLANTA CHONCHI.docx",
+    "area_doc": "SISTEMA VACIO / PLANTA RILES / ACOPIO YAL",
+    "mapeo": "plano: 1 motor/bomba = 1 PlantAsset; subárea/area por equipo; SAP donde existe; specs -> observaciones",
+    "app_area": "PLANTA CHONCHI",
+    "nota": "Tachos de vacío y medidor de caudal omitidos (no son motor/bomba). Fotos por contexto de documento."
+  },
+  "equipos": [
+    { "conjunto": "Bomba de Vacío N°1 — Repaso Manual Salida Baader 142 (Bomba)", "subarea": "SISTEMA VACIO", "tipo": "bomba", "marca": "SIHI", "modeloTipo": "LPHX65327AB", "fotos": ["image50.jpeg"], "flags": ["ACTUALIZAR INFORMACION"] },
+    { "conjunto": "Bomba de Vacío N°1 — Repaso Manual Salida Baader 142 (Motor)", "subarea": "SISTEMA VACIO", "tipo": "motor", "marca": "SIEMENS", "modeloTipo": "1CV1184B", "potencia": "22 kW", "corriente": "44,5 A", "voltaje": "380 V", "obs_extra": "RPM 1465. IP55. Rodamientos 6210-Z3 (2u).", "fotos": ["image50.jpeg"] },
+
+    { "conjunto": "Bomba de Vacío N°2 — Repaso Manual Salida Baader 142 (Bomba)", "subarea": "SISTEMA VACIO", "tipo": "bomba", "marca": "SIHI", "modeloTipo": "LPHX65327AB", "fotos": ["image51.jpeg"], "flags": ["ACTUALIZAR INFORMACION"] },
+    { "conjunto": "Bomba de Vacío N°2 — Repaso Manual Salida Baader 142 (Motor)", "subarea": "SISTEMA VACIO", "tipo": "motor", "marca": "SIEMENS", "modeloTipo": "1CV1184B", "potencia": "22 kW", "corriente": "44,5 A", "voltaje": "380 V", "obs_extra": "RPM 1465. IP55. Rodamientos 6210-Z3 (2u).", "fotos": ["image51.jpeg"] },
+
+    { "conjunto": "Bomba de Vacío N°3 — Baader 3 Antigua (Bomba)", "subarea": "SISTEMA VACIO", "tipo": "bomba", "marca": "SIHI", "modeloTipo": "LPHX65327AB", "fotos": ["image52.jpeg"], "flags": ["ACTUALIZAR INFORMACION"] },
+    { "conjunto": "Bomba de Vacío N°3 — Baader 3 Antigua (Motor)", "subarea": "SISTEMA VACIO", "tipo": "motor", "marca": "SIEMENS", "modeloTipo": "1CV1184B", "potencia": "22 kW", "corriente": "44,5 A", "voltaje": "380 V", "obs_extra": "RPM 1465. IP55. Rodamientos 6210-Z3 (2u).", "fotos": ["image52.jpeg"] },
+
+    { "conjunto": "Bomba de Vacío N°1 — Tolvas de Vacío Riles (Bomba)", "subarea": "SISTEMA VACIO", "tipo": "bomba", "marca": "SIHI", "modeloTipo": "LPHX 65327 AB", "caudalM3h": "695 m³/hr", "fotos": ["image53.jpeg"], "flags": ["ACTUALIZAR INFORMACION"] },
+    { "conjunto": "Bomba de Vacío N°1 — Tolvas de Vacío Riles (Motor)", "subarea": "SISTEMA VACIO", "tipo": "motor", "marca": "SIHI", "modeloTipo": "T1CR 180L-4", "potencia": "22 kW", "corriente": "43 A", "voltaje": "380 V", "obs_extra": "RPM 1450. IP55.", "fotos": ["image53.jpeg"] },
+
+    { "conjunto": "Bomba de Vacío N°2 — Tolvas de Vacío Riles (Bomba)", "subarea": "SISTEMA VACIO", "tipo": "bomba", "marca": "SIHI", "modeloTipo": "LPHX 65327 AB", "caudalM3h": "695 m³/hr", "fotos": ["image54.jpeg"] },
+    { "conjunto": "Bomba de Vacío N°2 — Tolvas de Vacío Riles (Motor)", "subarea": "SISTEMA VACIO", "tipo": "motor", "marca": "SIHI", "modeloTipo": "T1CR 180L-4", "potencia": "22 kW", "corriente": "43 A", "voltaje": "380 V", "obs_extra": "RPM 1450. IP55.", "fotos": ["image54.jpeg"] },
+
+    { "conjunto": "Bomba de Vacío N°3 — Tolvas de Vacío Riles (Bomba)", "subarea": "SISTEMA VACIO", "tipo": "bomba", "marca": "SIHI", "modeloTipo": "LPHX 65327 AB", "caudalM3h": "720 m³/hr", "fotos": ["image55.jpeg"] },
+    { "conjunto": "Bomba de Vacío N°3 — Tolvas de Vacío Riles (Motor)", "subarea": "SISTEMA VACIO", "tipo": "motor", "marca": "SIEMENS", "modeloTipo": "1CV1184B", "potencia": "22 kW", "corriente": "42,5 A", "voltaje": "380 V", "obs_extra": "RPM 1465. IP55.", "fotos": ["image55.jpeg"] },
+
+    { "conjunto": "Bomba Pasillo Agua Sangre Riles N°1 (Bomba)", "subarea": "PLANTA RILES", "tipo": "bomba", "marca": "SIHI", "modeloTipo": "SPL2", "codigoSAP": "3300098751", "descripcionSAP": "BOMBA CENTRIFUGA AUTOCEBANTE, SIHI SPL 2", "obs_extra": "Bomba centrífuga autocebante. N° serie 906299.", "fotos": ["image56.jpeg"], "flags": ["ACTUALIZAR INFORMACION"] },
+    { "conjunto": "Bomba Pasillo Agua Sangre Riles N°1 (Motor)", "subarea": "PLANTA RILES", "tipo": "motor", "marca": "SIHI", "modeloTipo": "LMH-1911/800020836369/013", "potencia": "11 kW", "corriente": "22 A", "obs_extra": "RPM 2910. Rodamientos 6209 2Z C3.", "fotos": ["image56.jpeg"] },
+
+    { "conjunto": "Bomba Pasillo Agua Sangre Riles N°2 (Bomba)", "subarea": "PLANTA RILES", "tipo": "bomba", "marca": "SIHI", "modeloTipo": "SPL2", "codigoSAP": "3300098751", "descripcionSAP": "BOMBA CENTRIFUGA AUTOCEBANTE, SIHI SPL 2", "obs_extra": "Bomba centrífuga autocebante. N° serie 906289.", "fotos": ["image57.jpeg"] },
+    { "conjunto": "Bomba Pasillo Agua Sangre Riles N°2 (Motor)", "subarea": "PLANTA RILES", "tipo": "motor", "marca": "SIHI", "modeloTipo": "LMH-1910/800020718402/004", "potencia": "11 kW", "corriente": "22 A", "obs_extra": "RPM 2910. Rodamientos 6209 2Z C3.", "fotos": ["image57.jpeg"] },
+
+    { "conjunto": "Bomba de Saturación DAF (Bomba)", "subarea": "PLANTA RILES", "tipo": "bomba", "marca": "EDUR", "modeloTipo": "LBU 603 D160L", "caudalM3h": "30–40 m³/hr", "obs_extra": "Altura 57 m. RPM 2900. T° 20°C. Presión trabajo 10 bar. N° fab. 423693 (2015).", "fotos": ["image58.jpeg"], "flags": ["ACTUALIZAR INFORMACION"] },
+    { "conjunto": "Bomba de Saturación DAF (Motor)", "subarea": "PLANTA RILES", "tipo": "motor", "marca": "KAISER", "modeloTipo": "ECPA-160MB-2HE", "potencia": "15 kW", "corriente": "27 A", "voltaje": "380 V", "obs_extra": "RPM 2930.", "fotos": ["image58.jpeg"] },
+
+    { "conjunto": "Bomba Contingencia Emisario Riles (Bomba)", "subarea": "PLANTA RILES", "tipo": "bomba", "marca": "SIHI", "modeloTipo": "SPL2", "codigoSAP": "3300098751", "descripcionSAP": "BOMBA CENTRIFUGA AUTOCEBANTE, SIHI SPL 2", "obs_extra": "Bomba centrífuga autocebante. N° serie 610071.", "fotos": ["image59.jpeg"], "flags": ["ACTUALIZAR INFORMACION"] },
+    { "conjunto": "Bomba Contingencia Emisario Riles (Motor)", "subarea": "PLANTA RILES", "tipo": "motor", "marca": "SIEMENS", "modeloTipo": "1AV1162A / 1LE10021DA234AA4", "potencia": "11 kW", "corriente": "21 A", "obs_extra": "RPM 2925. IP55. Rodamientos 6209-2ZC3 (2u).", "fotos": ["image59.jpeg"] },
+
+    { "conjunto": "Acopio Yal — Bomba Refrigeración para Bombas de Vacío (Bomba)", "area": "PLANTA YAL", "subarea": "ACOPIO YAL", "tipo": "bomba", "marca": "SIHI", "modeloTipo": "NOWA 3226 AB BKS OC", "caudalM3h": "5 m³/hora", "codigoSAP": "3300108790", "descripcionSAP": "Bomba Centrifuga MOD NOWA 3226 AB BKS OC", "obs_extra": "Presión 25 mts. Diámetro propulsor 264 mm.", "fotos": ["image61.jpeg"], "flags": ["ACTUALIZAR INFORMACION"] },
+    { "conjunto": "Acopio Yal — Bomba Refrigeración para Bombas de Vacío (Motor)", "area": "PLANTA YAL", "subarea": "ACOPIO YAL", "tipo": "motor", "marca": "SIEMENS", "modeloTipo": "", "potencia": "2,2 kW", "voltaje": "380 V", "obs_extra": "Velocidad 1450 rpm. 3/380V/50Hz.", "fotos": ["image61.jpeg"] },
+
+    { "conjunto": "Acopio Yal — Bomba de Vacío N°1 (Bomba)", "area": "PLANTA YAL", "subarea": "ACOPIO YAL", "tipo": "bomba", "marca": "FLOWSERVE (SIHI)", "modeloTipo": "LPHA 70123 BN", "caudalM3h": "870–1040 m³/hr", "potencia": "28 kW", "obs_extra": "Presión 120 mBar. RPM 1175. Alimenta vacío al sistema de bombeo N°2 (Sala Yal).", "fotos": ["image62.jpeg"] },
+    { "conjunto": "Acopio Yal — Bomba de Vacío N°1 (Motor)", "area": "PLANTA YAL", "subarea": "ACOPIO YAL", "tipo": "motor", "marca": "SIEMENS (SIHI)", "modeloTipo": "1LL0102-2DC0 3-4AA4", "potencia": "45 kW", "corriente": "84 A", "voltaje": "380 V", "obs_extra": "RPM 1180. Rodamientos 6217 C3 (2u).", "fotos": ["image62.jpeg"] },
+
+    { "conjunto": "Acopio Yal — Bomba de Vacío N°2 (Bomba)", "area": "PLANTA YAL", "subarea": "ACOPIO YAL", "tipo": "bomba", "marca": "FLOWSERVE (SIHI)", "modeloTipo": "LPHA 70123 BN", "caudalM3h": "870–1040 m³/hr", "potencia": "28 kW", "obs_extra": "Presión 120 mBar. RPM 1175. Alimenta vacío al sistema de bombeo N°1 (Planta Principal).", "fotos": ["image63.jpeg"] },
+    { "conjunto": "Acopio Yal — Bomba de Vacío N°2 (Motor)", "area": "PLANTA YAL", "subarea": "ACOPIO YAL", "tipo": "motor", "marca": "WEG", "modeloTipo": "W22", "potencia": "45 kW (60 HP)", "corriente": "89,4 A", "voltaje": "380 V", "obs_extra": "RPM 985. Rodamientos 6216 C3 (2u).", "fotos": ["image63.jpeg"] },
+
+    { "conjunto": "Acopio Yal — Bomba de Vacío N°3 (Bomba)", "area": "PLANTA YAL", "subarea": "ACOPIO YAL", "tipo": "bomba", "marca": "FLOWSERVE (SIHI)", "modeloTipo": "LPHA 70123 BN", "caudalM3h": "870–1040 m³/hr", "potencia": "28 kW", "obs_extra": "Presión 120 mBar. RPM 1175. Alimenta vacío al sistema de bombeo N°1 (Planta Principal).", "fotos": ["image64.jpeg"] },
+    { "conjunto": "Acopio Yal — Bomba de Vacío N°3 (Motor)", "area": "PLANTA YAL", "subarea": "ACOPIO YAL", "tipo": "motor", "marca": "SIEMENS (SIHI)", "modeloTipo": "1LL0102-2DC0 3-4AA4", "potencia": "45 kW", "corriente": "84 A", "voltaje": "380 V", "obs_extra": "RPM 1180. Rodamientos 6217 C3 (2u).", "fotos": ["image64.jpeg"] },
+
+    { "conjunto": "Acopio Yal — Compresor de Aire N°1", "area": "PLANTA YAL", "subarea": "ACOPIO YAL", "tipo": "motor", "marca": "Atlas Copco", "modeloTipo": "GA-11FF", "potencia": "11 kW", "obs_extra": "Compresor. Año/serie 2012/CAI709583. Presión 7,25 bar. Capacidad 25 l/min. Alimenta aire a bloques de electroválvulas sistemas N°1 y N°2.", "fotos": ["image65.jpeg"] },
+    { "conjunto": "Acopio Yal — Compresor de Aire N°2", "area": "PLANTA YAL", "subarea": "ACOPIO YAL", "tipo": "motor", "marca": "Atlas Copco", "modeloTipo": "GA-90", "potencia": "90 kW (125 HP)", "obs_extra": "Compresor. Año/serie 2014/API619520. Presión 7,25 bar. RPM 2978. Capacidad 281,2 l/s (16,87 m³/min). Alimenta estanques sistema N°1.", "fotos": ["image66.jpeg"] },
+    { "conjunto": "Acopio Yal — Compresor de Aire N°3", "area": "PLANTA YAL", "subarea": "ACOPIO YAL", "tipo": "motor", "marca": "Atlas Copco", "modeloTipo": "GA-90", "potencia": "90 kW (125 HP)", "obs_extra": "Compresor. Año/serie 2017/API626616. Presión 7,25 bar. RPM 2978. Capacidad 281,2 l/s (16,87 m³/min). Alimenta estanques sistema N°2.", "fotos": ["image67.jpeg"] },
+
+    { "conjunto": "Acopio Yal — Bomba de Flujo Sistema 1 (Bomba)", "area": "PLANTA YAL", "subarea": "ACOPIO YAL", "tipo": "bomba", "marca": "SIHI", "modeloTipo": "NOWA 12540 AB BKS OB 2", "caudalM3h": "240 m³/h", "codigoSAP": "3300098754", "descripcionSAP": "Bomba Centrifuga SIHI MOD NOWA 12540 AB", "obs_extra": "Acoplamiento Omega 20. N° serie 181154183. Válvula retención 6\".", "fotos": ["image68.jpeg"] },
+    { "conjunto": "Acopio Yal — Bomba de Flujo Sistema 1 (Motor)", "area": "PLANTA YAL", "subarea": "ACOPIO YAL", "tipo": "motor", "marca": "SIHI", "modeloTipo": "T3CR 250M-4", "potencia": "55 kW", "corriente": "101,95 A", "voltaje": "380 V", "obs_extra": "RPM 1470. IP55. N° serie E2015Y006000018.", "fotos": ["image68.jpeg"] },
+
+    { "conjunto": "Acopio Yal — Bomba de Flujo Sistema 2 (Bomba)", "area": "PLANTA YAL", "subarea": "ACOPIO YAL", "tipo": "bomba", "marca": "SIHI", "modeloTipo": "NOWA 12526 AB BKS OC 2", "caudalM3h": "250 m³/h", "codigoSAP": "3100024865", "descripcionSAP": "Bomba Centrifuga SIHI MOD NOWA 12526 AB", "obs_extra": "Acoplamiento Flender 125.", "fotos": ["image69.jpeg"] },
+    { "conjunto": "Acopio Yal — Bomba de Flujo Sistema 2 (Motor)", "area": "PLANTA YAL", "subarea": "ACOPIO YAL", "tipo": "motor", "marca": "SIHI", "modeloTipo": "1LE0102 1EB4 3-4AA4", "potencia": "22 kW", "corriente": "11,5 A", "voltaje": "380 V", "obs_extra": "RPM 1425. Rodamientos 6210 Z C3 (2u).", "fotos": ["image69.jpeg"] }
+  ]
+}
