@@ -7,12 +7,12 @@
  * Pendiente por fase:
  *  - Fase 2: tabla de repuestos del área (catálogo + bodega) con stock/paginación.
  *  - Fase 3: panel de detalle lateral del repuesto.
- *  - Fase 5: selector "Bodega ▾" + columna Bodega.
+ *  - Fase 5: filtro "Tipo ▾" + columna Tipo (una sola bodega; agrupación por tipo de repuesto).
  *  - Fase 6: "+ Solicitar repuesto".
  *  - Fase 7: búsqueda global del topbar + promover hub a vista por defecto.
  */
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { Search, ChevronRight, ChevronLeft, Cog, ImageOff, Plus, Warehouse, ListChecks } from 'lucide-react'
+import { Search, ChevronRight, ChevronLeft, Cog, ImageOff, Plus, ListChecks } from 'lucide-react'
 import { Badge, Button, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui'
 import { AreaSidebar } from '@/components/repuestos/AreaSidebar'
 import { AssetDetailModal } from '@/components/repuestos/AssetDetailModal'
@@ -40,6 +40,9 @@ function thumbOf(asset: PlantAsset): string | undefined {
   )
   return imgs[0]?.url || undefined
 }
+
+/** Etiqueta de tipo de repuesto (texto libre del catálogo); vacío → "Sin clasificar". */
+const tipoLabelOf = (tipo?: string): string => (tipo || '').trim() || 'Sin clasificar'
 
 const STOCK_META: Record<StockStatus, { label: string; dot: string; text: string }> = {
   ok: { label: 'Disponible', dot: 'bg-emerald-500', text: 'text-emerald-500' },
@@ -114,6 +117,7 @@ export function RepuestosAreaHub() {
   const [repQuery, setRepQuery] = useState('')
   const [repEquipoFilter, setRepEquipoFilter] = useState<string>('all')
   const [repStockFilter, setRepStockFilter] = useState<StockFilter>('all')
+  const [repTipoFilter, setRepTipoFilter] = useState<string>('all')
   const [repPage, setRepPage] = useState(0)
   const [repPageSize, setRepPageSize] = useState(25)
 
@@ -173,10 +177,23 @@ export function RepuestosAreaHub() {
     return [...s].sort((a, b) => a.localeCompare(b))
   }, [areaRepuestos])
 
+  // Opciones del filtro "Tipo" presentes en el área, ordenadas por frecuencia (con conteo)
+  const tipoOptions = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const r of areaRepuestos) {
+      const t = tipoLabelOf(r.tipo)
+      counts.set(t, (counts.get(t) ?? 0) + 1)
+    }
+    return [...counts.entries()]
+      .map(([value, count]) => ({ value, count }))
+      .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value))
+  }, [areaRepuestos])
+
   // Filtrado (buscar + equipo + stock)
   const filteredRep = useMemo(() => {
     let res = areaRepuestos
     if (repStockFilter !== 'all') res = res.filter((r) => r.stockStatus === repStockFilter)
+    if (repTipoFilter !== 'all') res = res.filter((r) => tipoLabelOf(r.tipo) === repTipoFilter)
     if (repEquipoFilter !== 'all') res = res.filter((r) => r.equipos.some((e) => e.machineName === repEquipoFilter))
     const q = normalizeForSearch(repQuery)
     if (q) {
@@ -189,10 +206,13 @@ export function RepuestosAreaHub() {
       )
     }
     return res
-  }, [areaRepuestos, repStockFilter, repEquipoFilter, repQuery])
+  }, [areaRepuestos, repStockFilter, repTipoFilter, repEquipoFilter, repQuery])
 
   // Reset de página al cambiar área/filtros
-  useEffect(() => { setRepPage(0) }, [selectedAreaId, showingAll, repQuery, repEquipoFilter, repStockFilter, repPageSize])
+  useEffect(() => { setRepPage(0) }, [selectedAreaId, showingAll, repQuery, repEquipoFilter, repStockFilter, repTipoFilter, repPageSize])
+
+  // Los tipos dependen del área → al cambiar de área el filtro de tipo vuelve a "Todos"
+  useEffect(() => { setRepTipoFilter('all') }, [selectedAreaId, showingAll])
 
   const totalPages = Math.max(1, Math.ceil(filteredRep.length / repPageSize))
   const page = Math.min(repPage, totalPages - 1)
@@ -296,10 +316,6 @@ export function RepuestosAreaHub() {
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input disabled placeholder="Buscar SAP, repuesto, equipo o fabricante… (Fase 7)" className="pl-9" />
           </div>
-          <Button variant="outline" size="sm" disabled className="gap-1.5">
-            <Warehouse className="h-4 w-4" /> Bodega
-            <ChevronRight className="h-3 w-3 rotate-90 opacity-60" />
-          </Button>
           <Button size="sm" disabled className="gap-1.5">
             <Plus className="h-4 w-4" /> Solicitar repuesto
           </Button>
@@ -428,6 +444,13 @@ export function RepuestosAreaHub() {
                   {equipoOptions.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
                 </SelectContent>
               </Select>
+              <Select value={repTipoFilter} onValueChange={setRepTipoFilter}>
+                <SelectTrigger className="w-[180px]"><SelectValue placeholder="Todos los tipos" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los tipos</SelectItem>
+                  {tipoOptions.map((t) => <SelectItem key={t.value} value={t.value}>{t.value} ({t.count})</SelectItem>)}
+                </SelectContent>
+              </Select>
               <Select value={repStockFilter} onValueChange={(v) => setRepStockFilter(v as StockFilter)}>
                 <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -460,7 +483,7 @@ export function RepuestosAreaHub() {
                         <th className="px-3 py-2 font-semibold">Repuesto</th>
                         <th className="px-3 py-2 font-semibold">Equipo</th>
                         <th className="px-3 py-2 font-semibold">Stock</th>
-                        <th className="px-3 py-2 font-semibold">Bodega</th>
+                        <th className="px-3 py-2 font-semibold">Tipo</th>
                         <th className="w-8 px-3 py-2" />
                       </tr>
                     </thead>
@@ -469,7 +492,6 @@ export function RepuestosAreaHub() {
                         const meta = STOCK_META[r.stockStatus]
                         const equipo = r.equipos[0]?.machineName ?? '-'
                         const extra = r.equipos.length > 1 ? ` +${r.equipos.length - 1}` : ''
-                        const bodega = r.ubicacionBodega || (r.bodegaId ? 'Bodega Principal' : '—')
                         const isSel = selectedRepSap === r.codigoSAP
                         return (
                           <tr
@@ -483,7 +505,6 @@ export function RepuestosAreaHub() {
                             <td className="px-3 py-2 font-mono text-xs">{r.codigoSAP || '-'}</td>
                             <td className="px-3 py-2">
                               <div className="font-medium text-foreground">{r.textoBreve || r.alias || '(sin nombre)'}</div>
-                              {r.tipo && <div className="text-[10px] text-muted-foreground">{r.tipo}</div>}
                             </td>
                             <td className="px-3 py-2 text-muted-foreground">{equipo}<span className="text-muted-foreground/60">{extra}</span></td>
                             <td className="px-3 py-2">
@@ -493,7 +514,9 @@ export function RepuestosAreaHub() {
                                 <span className={['text-[10px]', meta.text].join(' ')}>{meta.label}</span>
                               </div>
                             </td>
-                            <td className="px-3 py-2 text-muted-foreground">{bodega}</td>
+                            <td className="px-3 py-2">
+                              <span className="inline-block rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">{tipoLabelOf(r.tipo)}</span>
+                            </td>
                             <td className="px-3 py-2 text-muted-foreground/40"><ChevronRight className="h-4 w-4" /></td>
                           </tr>
                         )

@@ -151,7 +151,7 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
         <div className="divide-y divide-border/60 border-y border-border/60">
           <Field label="Equipo" value={item.equipos[0]?.machineName ?? '-'} />
           <Field label="Área" value={areaName} />
-          <Field label="Categoría" value={item.tipo ?? '-'} />
+          <Field label="Tipo" value={item.tipo?.trim() || 'Sin clasificar'} />
           <Field label="Fabricante" value={item.codigoFabricante ?? '-'} />
           <Field label="Unidad" value={item.unidad ?? '-'} />
         </div>
