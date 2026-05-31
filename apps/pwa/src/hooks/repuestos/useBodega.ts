@@ -277,16 +277,19 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
     reloadBodega()
   }, [reloadBodega])
 
-  // ── Merge: solo repuestos con código SAP ──
-  const items = useMemo((): BodegaMergedItem[] => {
+  // ── Merge: TODOS los repuestos (con y sin SAP) + stock cuando hay SAP ──
+  // Clave de deduplicación: SAP si existe; si no, código de fabricante; si no, id único.
+  // El stock (overlay de bodega) solo se engancha cuando el repuesto tiene SAP.
+  const allItems = useMemo((): BodegaMergedItem[] => {
     const byKey = new Map<string, BodegaMergedItem>()
 
     for (const r of catalogRepuestos) {
       const rep = r.repuesto
       const sap = (rep.codigoSAP || '').trim()
-      if (!sap) continue // ← SOLO con SAP
+      const fab = (rep.codigoFabricante || '').trim()
+      const key = sap || (fab ? `fab:${fab}` : `id:${r.machineId}:${rep.id}`)
 
-      const existing = byKey.get(sap)
+      const existing = byKey.get(key)
       if (existing) {
         if (!existing.equipos.find(e => e.machineId === r.machineId)) {
           existing.equipos.push({ machineId: r.machineId, machineName: r.machineName })
@@ -294,8 +297,8 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
         continue
       }
 
-      const overlay = bodegaOverlays.get(sap)
-      byKey.set(sap, {
+      const overlay = sap ? bodegaOverlays.get(sap) : undefined
+      byKey.set(key, {
         codigoSAP: sap,
         codigoFabricante: rep.codigoFabricante || '',
         textoBreve: rep.textoBreve || rep.descripcion || '',
@@ -319,16 +322,23 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
         categoria: overlay?.categoria,
         observaciones: overlay?.observaciones,
         fotos: overlay?.fotos,
-        isWatched: watchlist.has(sap),
+        isWatched: sap ? watchlist.has(sap) : false,
       })
     }
 
-    return [...byKey.values()].sort((a, b) => {
-      if (a.bodegaId && !b.bodegaId) return -1
-      if (!a.bodegaId && b.bodegaId) return 1
-      return a.textoBreve.localeCompare(b.textoBreve, 'es')
-    })
+    return [...byKey.values()].sort((a, b) => a.textoBreve.localeCompare(b.textoBreve, 'es'))
   }, [catalogRepuestos, bodegaOverlays, watchlist])
+
+  // Solo repuestos con SAP (lo que consume Bodega): subconjunto de allItems con su orden propio.
+  const items = useMemo((): BodegaMergedItem[] => {
+    return allItems
+      .filter(i => i.codigoSAP)
+      .sort((a, b) => {
+        if (a.bodegaId && !b.bodegaId) return -1
+        if (!a.bodegaId && b.bodegaId) return 1
+        return a.textoBreve.localeCompare(b.textoBreve, 'es')
+      })
+  }, [allItems])
 
   // ── Guardar/actualizar stock ──
   const saveStock = useCallback(async (codigoSAP: string, data: BodegaStockData) => {
@@ -653,6 +663,7 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
 
   return {
     items,
+    allItems,
     loading: bodegaLoading,
     stats,
     saveStock,

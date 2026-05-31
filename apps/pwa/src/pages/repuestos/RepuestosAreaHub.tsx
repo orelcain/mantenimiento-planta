@@ -65,7 +65,13 @@ function KpiCard({ value, label, accent, hint, bar }: { value: string | number; 
   )
 }
 
-export function RepuestosAreaHub() {
+interface RepuestosAreaHubProps {
+  /** Query inicial (al saltar desde "Buscar similar" de otras vistas). */
+  initialQuery?: string
+  onQueryConsumed?: () => void
+}
+
+export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAreaHubProps = {}) {
   const { areaTree, findNode, getNodePath, expandNode } = useHierarchyAreaTree()
   const { assets, loading: assetsLoading, updateAsset, addImagen, deleteImagen } = usePlantAssets()
 
@@ -100,7 +106,8 @@ export function RepuestosAreaHub() {
 
   const { allRepuestos, loadAll, loaded: repuestosLoaded, loading: repuestosLoading } = useGlobalSearch(machines)
   useEffect(() => { if (machines.length) loadAll() }, [machines, loadAll])
-  const { items: bodegaItems, loading: bodegaLoading, loadMovimientos, saveStock } = useBodega(allRepuestos)
+  // allItems = TODOS los repuestos del área (con y sin SAP); el stock se engancha si hay SAP.
+  const { allItems: bodegaItems, loading: bodegaLoading, loadMovimientos, saveStock } = useBodega(allRepuestos)
 
   // membership repuesto(machineId) → área: vía equipment cache, con fallback a ancestría directa
   const machineInArea = useCallback(
@@ -200,6 +207,15 @@ export function RepuestosAreaHub() {
     if (repQuery.trim() && filteredAssets.length > 0) setShowEquipos(true)
   }, [repQuery, filteredAssets.length])
 
+  // "Buscar similar" desde otras vistas → cargar query en la búsqueda global del hub
+  useEffect(() => {
+    if (initialQuery && initialQuery.trim()) {
+      setRepQuery(initialQuery)
+      setShowingAll(true)
+      onQueryConsumed?.()
+    }
+  }, [initialQuery, onQueryConsumed])
+
   // Repuestos del área (catálogo + bodega) y KPIs de stock derivados
   const areaRepuestos = useAreaRepuestos(bodegaItems, { showingAll, selectedAreaId, machineInArea })
   const stockKpis = useMemo(() => {
@@ -209,9 +225,11 @@ export function RepuestosAreaHub() {
       else if (r.stockStatus === 'low') low++
       else if (r.stockStatus === 'out') out++
     }
-    const total = areaRepuestos.length
-    const pct = (n: number) => (total > 0 ? Math.round((n / total) * 100) : 0)
-    return { total, ok, low, out, pctOk: pct(ok), pctLow: pct(low), pctOut: pct(out) }
+    const total = areaRepuestos.length // todos los repuestos del área (con y sin SAP)
+    const configurados = ok + low + out // solo los que tienen stock configurado (SAP en bodega)
+    // Los % de stock son relativos a los configurados, no al total (que incluye sin-SAP)
+    const pct = (n: number) => (configurados > 0 ? Math.round((n / configurados) * 100) : 0)
+    return { total, configurados, ok, low, out, pctOk: pct(ok), pctLow: pct(low), pctOut: pct(out) }
   }, [areaRepuestos])
 
   // Opciones del filtro "Equipo" (nombres distintos del área)
@@ -430,7 +448,7 @@ export function RepuestosAreaHub() {
 
           {/* KPIs */}
           <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <KpiCard value={repuestosBusy ? '…' : stockKpis.total} label="Repuestos totales" accent="text-primary" bar="border-l-primary" />
+            <KpiCard value={repuestosBusy ? '…' : stockKpis.total} label="Repuestos totales" accent="text-primary" bar="border-l-primary" hint={repuestosBusy ? undefined : `${stockKpis.configurados} con stock`} />
             <KpiCard value={repuestosBusy ? '…' : stockKpis.ok} label="Stock disponible" accent="text-emerald-500" hint={repuestosBusy ? undefined : `${stockKpis.pctOk}%`} bar="border-l-emerald-500" />
             <KpiCard value={repuestosBusy ? '…' : stockKpis.low} label="Stock bajo" accent="text-amber-500" hint={repuestosBusy ? undefined : `${stockKpis.pctLow}%`} bar="border-l-amber-500" />
             <KpiCard value={repuestosBusy ? '…' : stockKpis.out} label="Sin stock" accent="text-red-500" hint={repuestosBusy ? undefined : `${stockKpis.pctOut}%`} bar="border-l-red-500" />

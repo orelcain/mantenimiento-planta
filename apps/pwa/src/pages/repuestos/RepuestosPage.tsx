@@ -12,15 +12,14 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Layers, Search, Package, Map, LayoutGrid } from 'lucide-react'
+import { Layers, Package, Map, LayoutGrid } from 'lucide-react'
 import { RepuestosDashboard } from './Dashboard'
-import { BuscadorGlobal } from './BuscadorGlobal'
 import { BodegaView } from './BodegaView'
 import { CatalogoBases } from './CatalogoBases'
 import { RepuestosAreaHub } from './RepuestosAreaHub'
 import { useMachineContext } from '@/contexts/MachineContext'
 
-type Tab = 'areas' | 'equipo' | 'buscar' | 'bodega' | 'bases'
+type Tab = 'areas' | 'equipo' | 'bodega' | 'bases'
 
 const STORAGE_KEY = 'repuestos-active-tab'
 
@@ -28,7 +27,7 @@ const STORAGE_KEY = 'repuestos-active-tab'
 function getDefaultTab(): Tab {
   try {
     const saved = localStorage.getItem(STORAGE_KEY) as Tab | null
-    if (saved === 'areas' || saved === 'equipo' || saved === 'buscar' || saved === 'bodega' || saved === 'bases') return saved
+    if (saved === 'areas' || saved === 'equipo' || saved === 'bodega' || saved === 'bases') return saved
   } catch { /* noop */ }
   // El hub área-first es responsive (drawer en móvil) → default único en todas las pantallas
   return 'areas'
@@ -43,11 +42,10 @@ interface TabDef {
 }
 
 const TABS: TabDef[] = [
-  { id: 'areas',   label: 'Áreas',        mobileLabel: 'Áreas',  icon: LayoutGrid },
-  { id: 'equipo',  label: 'Por equipo',   mobileLabel: 'Equipo', icon: Layers  },
-  { id: 'buscar',  label: 'Buscar pieza', mobileLabel: 'Buscar', icon: Search  },
-  { id: 'bases',   label: 'Mapas',        mobileLabel: 'Mapas',  icon: Map     },
-  { id: 'bodega',  label: 'Bodega',       mobileLabel: 'Bodega', icon: Package },
+  { id: 'areas',   label: 'Áreas',      mobileLabel: 'Áreas',  icon: LayoutGrid },
+  { id: 'equipo',  label: 'Por equipo', mobileLabel: 'Equipo', icon: Layers  },
+  { id: 'bases',   label: 'Mapas',      mobileLabel: 'Mapas',  icon: Map     },
+  { id: 'bodega',  label: 'Bodega',     mobileLabel: 'Bodega', icon: Package },
 ]
 
 export function RepuestosPage() {
@@ -85,10 +83,10 @@ export function RepuestosPage() {
     setJumpMachineId(null)
   }, [])
 
-  // ── "Buscar similar" desde Catálogo ────────────────────────────
+  // ── "Buscar similar" desde Catálogo/Bodega → búsqueda global del hub Áreas ──
   const handleSearchSimilar = useCallback((query: string) => {
     setJumpQuery(query)
-    setActiveTab('buscar')
+    setActiveTab('areas')
   }, [])
 
   // Limpiar jumpQuery una vez consumido
@@ -138,7 +136,7 @@ export function RepuestosPage() {
 
         <div className={activeTab === 'areas' ? 'h-full' : 'hidden'}>
           {mountedTabs.has('areas') && (
-            <RepuestosAreaHub />
+            <RepuestosAreaHub initialQuery={jumpQuery} onQueryConsumed={handleQueryConsumed} />
           )}
         </div>
 
@@ -148,16 +146,6 @@ export function RepuestosPage() {
               jumpMachineId={jumpMachineId}
               onJumpConsumed={handleJumpConsumed}
               onSearchSimilar={handleSearchSimilar}
-            />
-          )}
-        </div>
-
-        <div className={activeTab === 'buscar' ? 'p-3 sm:p-6' : 'hidden'}>
-          {mountedTabs.has('buscar') && (
-            <BuscadorGlobal
-              initialQuery={jumpQuery}
-              onQueryConsumed={handleQueryConsumed}
-              onViewInCatalog={handleViewInCatalog}
             />
           )}
         </div>
