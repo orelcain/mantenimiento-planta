@@ -55,9 +55,9 @@ const STOCK_META: Record<StockStatus, { label: string; dot: string; text: string
   unset: { label: 'Sin config', dot: 'bg-muted-foreground/40', text: 'text-muted-foreground' },
 }
 
-function KpiCard({ value, label, accent, hint }: { value: string | number; label: string; accent: string; hint?: string }) {
+function KpiCard({ value, label, accent, hint, bar }: { value: string | number; label: string; accent: string; hint?: string; bar?: string }) {
   return (
-    <div className="rounded-xl border border-border bg-card px-4 py-3">
+    <div className={['rounded-xl border border-l-4 border-border bg-card px-4 py-3', bar].filter(Boolean).join(' ')}>
       <div className={['text-2xl font-bold tabular-nums', accent].join(' ')}>{value}</div>
       <div className="text-xs text-muted-foreground">{label}</div>
       {hint && <div className="mt-0.5 text-[10px] text-muted-foreground/60">{hint}</div>}
@@ -407,8 +407,13 @@ export function RepuestosAreaHub() {
               )}
               <div className="flex items-center gap-2">
                 <h1 className="truncate text-xl font-bold text-foreground">{title}</h1>
-                {selectedNode && (
+                {selectedNode && !repQuery.trim() && (
                   <Badge variant="secondary" className="tabular-nums">{eqCount} equipos</Badge>
+                )}
+                {repQuery.trim() && (
+                  <Badge variant="secondary" className="gap-1">
+                    <Search className="h-3 w-3" /> «{repQuery.trim()}»
+                  </Badge>
                 )}
               </div>
             </div>
@@ -425,10 +430,10 @@ export function RepuestosAreaHub() {
 
           {/* KPIs */}
           <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <KpiCard value={repuestosBusy ? '…' : stockKpis.total} label="Repuestos totales" accent="text-primary" />
-            <KpiCard value={repuestosBusy ? '…' : stockKpis.ok} label="Stock disponible" accent="text-emerald-500" hint={repuestosBusy ? undefined : `${stockKpis.pctOk}%`} />
-            <KpiCard value={repuestosBusy ? '…' : stockKpis.low} label="Stock bajo" accent="text-amber-500" hint={repuestosBusy ? undefined : `${stockKpis.pctLow}%`} />
-            <KpiCard value={repuestosBusy ? '…' : stockKpis.out} label="Sin stock" accent="text-red-500" hint={repuestosBusy ? undefined : `${stockKpis.pctOut}%`} />
+            <KpiCard value={repuestosBusy ? '…' : stockKpis.total} label="Repuestos totales" accent="text-primary" bar="border-l-primary" />
+            <KpiCard value={repuestosBusy ? '…' : stockKpis.ok} label="Stock disponible" accent="text-emerald-500" hint={repuestosBusy ? undefined : `${stockKpis.pctOk}%`} bar="border-l-emerald-500" />
+            <KpiCard value={repuestosBusy ? '…' : stockKpis.low} label="Stock bajo" accent="text-amber-500" hint={repuestosBusy ? undefined : `${stockKpis.pctLow}%`} bar="border-l-amber-500" />
+            <KpiCard value={repuestosBusy ? '…' : stockKpis.out} label="Sin stock" accent="text-red-500" hint={repuestosBusy ? undefined : `${stockKpis.pctOut}%`} bar="border-l-red-500" />
           </div>
 
           {/* Motores/Bombas del área (toggle "Ver equipos del área") */}
