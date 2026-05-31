@@ -461,8 +461,8 @@ export function RepuestosAreaHub() {
                       <th className="w-14 px-3 py-2 text-center font-semibold">Foto</th>
                       <th className="px-3 py-2 font-semibold">Equipo</th>
                       <th className="px-3 py-2 font-semibold">Tipo</th>
-                      <th className="px-3 py-2 font-semibold">Modelo</th>
-                      <th className="px-3 py-2 font-semibold">SAP</th>
+                      <th className="hidden px-3 py-2 font-semibold md:table-cell">Modelo</th>
+                      <th className="hidden px-3 py-2 font-semibold md:table-cell">SAP</th>
                       <th className="w-10 px-3 py-2" />
                     </tr>
                   </thead>
@@ -487,14 +487,22 @@ export function RepuestosAreaHub() {
                               </div>
                             )}
                           </td>
-                          <td className="px-3 py-2 font-medium text-foreground">{a.equipo || '-'}</td>
+                          <td className="px-3 py-2 font-medium text-foreground">
+                            {a.equipo || '-'}
+                            {/* En móvil, modelo + SAP van como subtítulo (columnas ocultas) */}
+                            {(a.modeloTipo || a.codigoSAP) && (
+                              <div className="mt-0.5 font-mono text-[10px] font-normal text-muted-foreground md:hidden">
+                                {[a.modeloTipo, a.codigoSAP].filter(Boolean).join(' · ')}
+                              </div>
+                            )}
+                          </td>
                           <td className="px-3 py-2">
                             <Badge variant={a.tipo === 'motor' ? 'default' : 'secondary'}>
                               {a.tipo === 'motor' ? 'Motor' : 'Bomba'}
                             </Badge>
                           </td>
-                          <td className="px-3 py-2 font-mono text-xs text-foreground">{a.modeloTipo || '-'}</td>
-                          <td className="px-3 py-2 font-mono text-xs">{a.codigoSAP || <span className="text-muted-foreground">-</span>}</td>
+                          <td className="hidden px-3 py-2 font-mono text-xs text-foreground md:table-cell">{a.modeloTipo || '-'}</td>
+                          <td className="hidden px-3 py-2 font-mono text-xs md:table-cell">{a.codigoSAP || <span className="text-muted-foreground">-</span>}</td>
                           <td className="px-3 py-2 text-muted-foreground"><ChevronRight className="h-4 w-4" /></td>
                         </tr>
                       )
@@ -546,7 +554,16 @@ export function RepuestosAreaHub() {
             </div>
 
             {repuestosBusy ? (
-              <div className="rounded-lg border border-border py-10 text-center text-sm text-muted-foreground">Cargando repuestos…</div>
+              <div className="overflow-hidden rounded-lg border border-border">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-3 border-b border-border px-3 py-3 last:border-0">
+                    <div className="h-3 w-20 shrink-0 animate-pulse rounded bg-muted" />
+                    <div className="h-3 flex-1 animate-pulse rounded bg-muted" />
+                    <div className="hidden h-3 w-24 animate-pulse rounded bg-muted sm:block" />
+                    <div className="h-3 w-12 shrink-0 animate-pulse rounded bg-muted" />
+                  </div>
+                ))}
+              </div>
             ) : filteredRep.length === 0 ? (
               <div className="rounded-lg border border-dashed border-border py-10 text-center text-sm text-muted-foreground">
                 {!selectedAreaId && !showingAll
