@@ -321,6 +321,10 @@ export interface PlantAsset {
   equipo: string;
   area: string;
   subarea: string;
+  /** ID del nodo en la jerarquía técnica (colección 'hierarchy'). Vínculo área-first. */
+  hierarchyNodeId?: string;
+  /** Path legible: "CHONCHI > PLANTA CHONCHI > PROCESO > EVISCERADO". */
+  hierarchyPath?: string;
   componente: string;
   codigoSAP: string;
   descripcionSAP: string;

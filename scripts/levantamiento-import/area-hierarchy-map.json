@@ -1,0 +1,33 @@
+{
+  "_meta": {
+    "proposito": "Mapa cerrado subarea levantamiento -> codigo nodo de la coleccion 'hierarchy'. La clave estable de hierarchy es 'codigo' (los docId son auto-generados). La migracion resuelve codigo -> docId en runtime.",
+    "decididoCon": "usuario (sesion 2026-05-31)",
+    "totalEquipos": 65,
+    "claveNormalizada": "Las claves de 'map' se comparan normalizadas (NFD sin acentos, mayusculas, trim) contra plantAsset.subarea."
+  },
+  "newNodes": [
+    {
+      "codigo": "AQ-IN-CHO-PCHO-PROC-VACI",
+      "nombre": "SISTEMA VACIO",
+      "padreCodigo": "AQ-IN-CHO-PCHO-PROC",
+      "nota": "Unico nodo nuevo a crear. 12 equipos de vacio lo justifican como area propia bajo Planta Chonchi > Proceso."
+    }
+  ],
+  "map": {
+    "EVISCERADO HG": "AQ-IN-CHO-PCHO-PROC-EVIS",
+    "EMPAQUE": "AQ-IN-CHO-PCHO-PROC-EMPQ",
+    "PLANTA RILES": "AQ-IN-CHO-EXTE-PRIL",
+    "RED INCENDIO": "AQ-IN-CHO-EXTE-RINC",
+    "COSECHA": "AQ-IN-CHO-PCHO-PROC-SACR",
+    "SERVICIOS GENERALES": "AQ-IN-CHO-PCHO-EXTE-SMAQ",
+    "BOMBAS AGUA MAR": "AQ-IN-CHO-ACOP-CAAM",
+    "ACOPIO YAL": "AQ-IN-CHO-ACOP",
+    "SISTEMA VACIO": "AQ-IN-CHO-PCHO-PROC-VACI"
+  },
+  "notas": {
+    "ACOPIO YAL": "Nodo ACOPIO existente, cuelga directo de la raiz AQ-IN-CHO. NO crear sub-nodo, NO anidar bajo Planta Yal.",
+    "COSECHA": "= SACRIFICIO (matanza salmon).",
+    "SERVICIOS GENERALES": "= SALA DE MAQUINAS (Planta Chonchi > Exteriores).",
+    "BOMBAS AGUA MAR": "= CASETA AGUA MAR (bajo ACOPIO)."
+  }
+}

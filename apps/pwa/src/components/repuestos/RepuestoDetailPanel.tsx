@@ -1,0 +1,193 @@
+/**
+ * RepuestoDetailPanel — Panel lateral derecho de detalle del repuesto (Fase 3).
+ *
+ * Columna fija a la derecha del hub (NO modal flotante), fiel al mockup:
+ * foto · nombre · SAP+copiar · EQUIPO/ÁREA/CATEGORÍA/FABRICANTE/UNIDAD ·
+ * tarjeta de stock (Disponible/Mínimo/Máximo) · Bodega · Ubicación ·
+ * última actualización (último movimiento) · Ver movimientos.
+ */
+import { useState, useEffect, useCallback } from 'react'
+import { X, Copy, Check, History, ImageOff, Loader2, ArrowDownCircle, ArrowUpCircle, Settings2 } from 'lucide-react'
+import { Button } from '@/components/ui'
+import { ImageLightbox } from '@/components/ui/ImageLightbox'
+import type { AreaRepuestoRow } from '@/hooks/repuestos/useAreaRepuestos'
+import type { MovimientoBodega } from '@/hooks/repuestos/useBodega'
+
+interface RepuestoDetailPanelProps {
+  item: AreaRepuestoRow | null
+  areaName: string
+  onClose: () => void
+  loadMovimientos: (bodegaDocId: string, max?: number) => Promise<MovimientoBodega[]>
+}
+
+function Field({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 py-1.5">
+      <span className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</span>
+      <span className="text-right text-[13px] font-medium text-foreground">{value || '-'}</span>
+    </div>
+  )
+}
+
+const MOV_META: Record<MovimientoBodega['tipo'], { icon: typeof ArrowDownCircle; cls: string; label: string }> = {
+  entrada: { icon: ArrowDownCircle, cls: 'text-emerald-500', label: 'Entrada' },
+  salida: { icon: ArrowUpCircle, cls: 'text-red-500', label: 'Salida' },
+  ajuste: { icon: Settings2, cls: 'text-amber-500', label: 'Ajuste' },
+}
+
+function fmtDate(d: Date): string {
+  try {
+    return d.toLocaleString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  } catch { return '' }
+}
+
+export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos }: RepuestoDetailPanelProps) {
+  const [copied, setCopied] = useState(false)
+  const [movs, setMovs] = useState<MovimientoBodega[] | null>(null)
+  const [movsLoading, setMovsLoading] = useState(false)
+  const [showMovs, setShowMovs] = useState(false)
+  const [lightbox, setLightbox] = useState<string[] | null>(null)
+
+  const bodegaDocId = item?.bodegaId
+  const sap = item?.codigoSAP ?? ''
+
+  // Cargar movimientos al cambiar de repuesto (para "última actualización")
+  useEffect(() => {
+    setMovs(null); setShowMovs(false)
+    if (!bodegaDocId) return
+    let alive = true
+    setMovsLoading(true)
+    loadMovimientos(bodegaDocId, 50)
+      .then((m) => { if (alive) setMovs(m) })
+      .catch(() => { if (alive) setMovs([]) })
+      .finally(() => { if (alive) setMovsLoading(false) })
+    return () => { alive = false }
+  }, [bodegaDocId, loadMovimientos])
+
+  const copySap = useCallback(() => {
+    if (!sap) return
+    navigator.clipboard?.writeText(sap).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    }).catch(() => {})
+  }, [sap])
+
+  if (!item) return null
+
+  const photo = item.fotos?.[0]
+  const ultimo = movs && movs.length > 0 ? movs[0] : null
+  const bodega = item.ubicacionBodega || (item.bodegaId ? 'Bodega Principal' : '—')
+
+  return (
+    <aside className="flex h-full w-[340px] shrink-0 flex-col border-l border-border bg-card/40">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-border px-4 py-3">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Detalle del repuesto</span>
+        <button onClick={onClose} className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Cerrar">
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4">
+        {/* Foto */}
+        <div className="mb-3 flex justify-center">
+          {photo ? (
+            <button
+              onClick={() => setLightbox(item.fotos ?? null)}
+              className="overflow-hidden rounded-lg border border-border transition hover:ring-2 hover:ring-primary"
+            >
+              <img src={photo} alt={item.textoBreve} className="h-32 w-full max-w-[280px] object-cover" />
+            </button>
+          ) : (
+            <div className="flex h-28 w-full max-w-[280px] items-center justify-center rounded-lg border border-dashed border-border text-muted-foreground/50">
+              <ImageOff className="h-7 w-7" />
+            </div>
+          )}
+        </div>
+
+        {/* Nombre + SAP */}
+        <h2 className="text-base font-bold leading-tight text-foreground">{item.textoBreve || '(sin nombre)'}</h2>
+        <div className="mb-3 mt-1 flex items-center gap-2">
+          <span className="text-[11px] uppercase tracking-wide text-muted-foreground">SAP</span>
+          <span className="font-mono text-sm text-foreground">{sap || '-'}</span>
+          {sap && (
+            <button onClick={copySap} className="rounded p-0.5 text-muted-foreground hover:text-primary" title="Copiar SAP">
+              {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+            </button>
+          )}
+        </div>
+
+        {/* Campos */}
+        <div className="divide-y divide-border/60 border-y border-border/60">
+          <Field label="Equipo" value={item.equipos[0]?.machineName ?? '-'} />
+          <Field label="Área" value={areaName} />
+          <Field label="Categoría" value={item.tipo ?? '-'} />
+          <Field label="Fabricante" value={item.codigoFabricante ?? '-'} />
+          <Field label="Unidad" value={item.unidad ?? '-'} />
+        </div>
+
+        {/* Tarjeta de stock */}
+        <div className="mt-4 grid grid-cols-3 gap-px overflow-hidden rounded-lg border border-border bg-border text-center">
+          <div className="bg-card px-2 py-3">
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Disponible</div>
+            <div className={['text-2xl font-bold tabular-nums', item.stockStatus === 'out' ? 'text-red-500' : item.stockStatus === 'low' ? 'text-amber-500' : 'text-emerald-500'].join(' ')}>
+              {item.bodegaId ? item.stockActual : '—'}
+            </div>
+          </div>
+          <div className="bg-card px-2 py-3">
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Mínimo</div>
+            <div className="text-2xl font-bold tabular-nums text-foreground">{item.bodegaId ? item.stockMinimo : '—'}</div>
+          </div>
+          <div className="bg-card px-2 py-3">
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Máximo</div>
+            <div className="text-2xl font-bold tabular-nums text-foreground">{item.stockMaximo ?? '—'}</div>
+          </div>
+        </div>
+
+        {/* Bodega / Ubicación */}
+        <div className="mt-3 divide-y divide-border/60 border-y border-border/60">
+          <Field label="Bodega" value={bodega} />
+          <Field label="Ubicación" value={item.ubicacionBodega || '—'} />
+        </div>
+
+        {/* Última actualización */}
+        <div className="mt-3 text-[11px] text-muted-foreground">
+          <div className="uppercase tracking-wide">Última actualización</div>
+          {movsLoading ? (
+            <div className="mt-1 flex items-center gap-1.5"><Loader2 className="h-3 w-3 animate-spin" /> cargando…</div>
+          ) : ultimo ? (
+            <div className="mt-0.5 text-foreground">{fmtDate(ultimo.createdAt)} <span className="text-muted-foreground">· por {ultimo.realizadoPorNombre || '—'}</span></div>
+          ) : (
+            <div className="mt-0.5">Sin movimientos registrados</div>
+          )}
+        </div>
+
+        {/* Ver movimientos */}
+        {bodegaDocId && (
+          <Button variant="outline" size="sm" className="mt-3 w-full gap-1.5" onClick={() => setShowMovs((s) => !s)} disabled={movsLoading || !movs?.length}>
+            <History className="h-4 w-4" /> {showMovs ? 'Ocultar movimientos' : `Ver movimientos${movs?.length ? ` (${movs.length})` : ''}`}
+          </Button>
+        )}
+
+        {showMovs && movs && movs.length > 0 && (
+          <div className="mt-2 space-y-1.5">
+            {movs.map((m) => {
+              const meta = MOV_META[m.tipo]
+              const Icon = meta.icon
+              return (
+                <div key={m.id} className="flex items-center gap-2 rounded-md border border-border/60 px-2 py-1.5 text-xs">
+                  <Icon className={['h-3.5 w-3.5 shrink-0', meta.cls].join(' ')} />
+                  <span className="font-medium">{meta.label}</span>
+                  <span className="tabular-nums">{m.cantidad}</span>
+                  <span className="ml-auto text-[10px] text-muted-foreground">{fmtDate(m.createdAt)}</span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {lightbox && <ImageLightbox photos={lightbox} onClose={() => setLightbox(null)} />}
+    </aside>
+  )
+}

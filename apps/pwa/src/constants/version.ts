@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '3.32.3' as const
+export const APP_VERSION = '3.33.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-05-31' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'feat(admin): gestionar visibilidad de todos los módulos del sidebar' as const
+export const VERSION_NAME = 'feat(repuestos): hub área-first (sidebar áreas + tabla stock + panel detalle)' as const
 
 /**
  * Nota:

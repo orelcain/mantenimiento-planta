@@ -38,6 +38,8 @@ const fromDoc = (id: string, data: Record<string, unknown>): PlantAsset => {
     equipo: cleanText(data.equipo),
     area: cleanText(data.area),
     subarea: cleanText(data.subarea),
+    hierarchyNodeId: data.hierarchyNodeId ? String(data.hierarchyNodeId) : undefined,
+    hierarchyPath: data.hierarchyPath ? String(data.hierarchyPath) : undefined,
     componente: cleanText(data.componente),
     codigoSAP: cleanText(data.codigoSAP),
     descripcionSAP: cleanText(data.descripcionSAP),
