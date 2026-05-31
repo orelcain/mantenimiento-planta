@@ -563,9 +563,9 @@ export function RepuestosAreaHub() {
                       <tr>
                         <th className="px-3 py-2 font-semibold">SAP</th>
                         <th className="px-3 py-2 font-semibold">Repuesto</th>
-                        <th className="px-3 py-2 font-semibold">Equipo</th>
+                        <th className="hidden px-3 py-2 font-semibold md:table-cell">Equipo</th>
                         <th className="px-3 py-2 font-semibold">Stock</th>
-                        <th className="px-3 py-2 font-semibold">Tipo</th>
+                        <th className="hidden px-3 py-2 font-semibold md:table-cell">Tipo</th>
                         <th className="w-8 px-3 py-2" />
                       </tr>
                     </thead>
@@ -587,8 +587,12 @@ export function RepuestosAreaHub() {
                             <td className="px-3 py-2 font-mono text-xs">{r.codigoSAP || '-'}</td>
                             <td className="px-3 py-2">
                               <div className="font-medium text-foreground">{r.textoBreve || r.alias || '(sin nombre)'}</div>
+                              {/* En móvil, equipo + tipo van como subtítulo (columnas ocultas) */}
+                              <div className="mt-0.5 text-[10px] text-muted-foreground md:hidden">
+                                {equipo}{extra} · {tipoLabelOf(r.tipo)}
+                              </div>
                             </td>
-                            <td className="px-3 py-2 text-muted-foreground">{equipo}<span className="text-muted-foreground/60">{extra}</span></td>
+                            <td className="hidden px-3 py-2 text-muted-foreground md:table-cell">{equipo}<span className="text-muted-foreground/60">{extra}</span></td>
                             <td className="px-3 py-2">
                               <div className="flex items-center gap-1.5">
                                 <span className={['h-2 w-2 rounded-full', meta.dot].join(' ')} />
@@ -596,7 +600,7 @@ export function RepuestosAreaHub() {
                                 <span className={['text-[10px]', meta.text].join(' ')}>{meta.label}</span>
                               </div>
                             </td>
-                            <td className="px-3 py-2">
+                            <td className="hidden px-3 py-2 md:table-cell">
                               <span className="inline-block rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">{tipoLabelOf(r.tipo)}</span>
                             </td>
                             <td className="px-3 py-2 text-muted-foreground/40"><ChevronRight className="h-4 w-4" /></td>

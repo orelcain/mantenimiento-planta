@@ -29,9 +29,8 @@ function getDefaultTab(): Tab {
   try {
     const saved = localStorage.getItem(STORAGE_KEY) as Tab | null
     if (saved === 'areas' || saved === 'equipo' || saved === 'buscar' || saved === 'bodega' || saved === 'bases') return saved
-    // En móvil, el buscador es más útil por defecto (el hub aún no es responsive)
-    if (typeof window !== 'undefined' && window.innerWidth < 640) return 'buscar'
   } catch { /* noop */ }
+  // El hub área-first es responsive (drawer en móvil) → default único en todas las pantallas
   return 'areas'
 }
 
