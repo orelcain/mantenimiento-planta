@@ -1,0 +1,79 @@
+{
+  "_meta": {
+    "fuente": "v2.1.1.1_LEVANTAMIENTO EQUIPOS PLANTA CHONCHI.docx",
+    "area_doc": "AREA COSECHA PLANTA",
+    "mapeo": "plano: 1 motor/bomba = 1 PlantAsset; estructura/mantención -> observaciones",
+    "app_area": "PLANTA CHONCHI",
+    "app_subarea": "COSECHA",
+    "nota": "Sin código SAP en el documento. Fotos mapeadas por orden de documento y verificadas visualmente (placas SIHI/SEW)."
+  },
+  "equipos": [
+    {
+      "conjunto": "Retorno Agua Descarga Camiones — Bomba",
+      "tipo": "bomba",
+      "marca": "SIHI",
+      "modeloTipo": "SLP2",
+      "caudalM3h": "695–780 m³/hr",
+      "flags": ["ACTUALIZAR INFORMACION (caudal/presión)"],
+      "obs_extra": "Bomba centrífuga autocebante. Presión 33 mbar (a confirmar).",
+      "mantencion": ["Revisión estructural: Semanal", "Engrase de rodamientos: Mensual", "Revisión nivel de aceite: Mensual", "Cambio de sello mecánico y rodamientos bomba: Anual"],
+      "fotos": ["image10.png", "image8.jpeg"]
+    },
+    {
+      "conjunto": "Retorno Agua Descarga Camiones — Motor Eléctrico",
+      "tipo": "motor",
+      "marca": "SIHI",
+      "modeloTipo": "T3CR 160M1-2",
+      "potencia": "11 kW",
+      "voltaje": "380/660 V",
+      "corriente": "20,4/11,7 A",
+      "obs_extra": "RPM 2920. IE3.",
+      "mantencion": ["Revisión estructural: Semanal", "Engrase de rodamientos: Mensual", "Revisión nivel de aceite: Mensual"],
+      "fotos": ["image9.png", "image8.jpeg"]
+    },
+    {
+      "conjunto": "Chiller — Moto Reductor",
+      "tipo": "motor",
+      "marca": "SEW",
+      "modeloTipo": "SA567788RK",
+      "potencia": "22 kW",
+      "flags": ["ACTUALIZAR INFORMACION"],
+      "mantencion": ["Revisión estructural: Semanal", "Revisión nivel aceite moto-reductor: Mensual", "Lubricación cadena: Mensual"],
+      "fotos": ["image11.jpeg"]
+    },
+    {
+      "conjunto": "Chiller — Recirculado (Bomba)",
+      "tipo": "bomba",
+      "marca": "SIHI",
+      "modeloTipo": "BKS OC 2",
+      "caudalM3h": "150 m³/hr",
+      "flags": ["ACTUALIZAR INFORMACION"],
+      "mantencion": ["Cambio de rodete bomba: Anual", "Cambio de rodamientos: Anual"],
+      "fotos": []
+    },
+    {
+      "conjunto": "Chiller — Recirculado (Motor Eléctrico)",
+      "tipo": "motor",
+      "marca": "",
+      "modeloTipo": "T3CR 180L-4",
+      "potencia": "22 kW",
+      "flags": ["ACTUALIZAR INFORMACION"],
+      "mantencion": [],
+      "fotos": []
+    },
+    {
+      "conjunto": "Desangrador — Moto-Reductor",
+      "tipo": "motor",
+      "marca": "SEW",
+      "modeloTipo": "KA87R57DRN100L4",
+      "potencia": "3 kW",
+      "voltaje": "220/380 V",
+      "corriente": "11,7/6,8 A",
+      "eje": "55 mm (eje hueco, a confirmar)",
+      "flags": ["ACTUALIZAR INFORMACION"],
+      "obs_extra": "Equipo Desangrador modelo CFLOW. Peso motor 12,9 kg.",
+      "mantencion": ["Revisión estructural: Semanal", "Revisión nivel aceite motor-reductor: Mensual", "Lubricación cadena: Mensual", "Cambio de rodamientos: Anual"],
+      "fotos": ["image13.png", "image12.jpeg", "image14.png"]
+    }
+  ]
+}

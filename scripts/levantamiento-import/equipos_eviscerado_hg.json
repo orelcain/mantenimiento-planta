@@ -1,0 +1,127 @@
+{
+  "_meta": {
+    "fuente": "v2.1.1.1_LEVANTAMIENTO EQUIPOS PLANTA CHONCHI.docx",
+    "area_doc": "AREA EVICERADO HG",
+    "mapeo": "plano: 1 motor/bomba = 1 PlantAsset; estructura/cinta/mantención -> observaciones",
+    "app_area": "PLANTA CHONCHI",
+    "app_subarea": "EVISCERADO HG",
+    "nota": "Sin código SAP en el documento (queda vacío, se completa luego en la app). Fotos mapeadas por orden de documento y verificadas visualmente."
+  },
+  "equipos": [
+    {
+      "conjunto": "Cinta Z lado Marel (Cuello de Cisnes)",
+      "tipo": "motor",
+      "marca": "SEW",
+      "modeloTipo": "",
+      "potencia": "1,5 kW",
+      "flags": ["ACTUALIZAR INFORMACION", "SIN PLACA MOTOR"],
+      "estructura": "Rodamientos GYE30-KRR-B-FA107-VA (8u); Sensor óptico T18SP6DQ (1u)",
+      "cinta": "MPB paso 2\", apertura 0–22%; PE blanco; 1195×13000 mm; paleta PE alto 6\" lisa/curva c/300-200 mm; Sprocket Z10SQ40 (14u)",
+      "mantencion": ["Engrase rodamientos: Semanal", "Revisión sensor óptico: Semanal", "Nivel aceite motorreductor: Mensual", "Cambio de cintas: Anual", "Cambio de sprocket: Anual", "Overhaul general: Anual"],
+      "fotos": ["image15.jpeg", "image16.jpeg", "image17.jpeg"]
+    },
+    {
+      "conjunto": "Cinta Azul Larga Marel",
+      "tipo": "motor",
+      "marca": "SEW",
+      "modeloTipo": "SA47/TDRN80M4",
+      "potencia": "0,75 kW",
+      "eje": "30 cm (doc)",
+      "flags": ["ACTUALIZAR INFORMACION", "SIN PLACA MOTOR"],
+      "estructura": "Rodamientos SUC206 (4u); Brida/Chumacera F206 (4u)",
+      "cinta": "(sin datos en doc)",
+      "mantencion": ["Engrase rodamientos: Semanal", "Revisión sensor óptico: Semanal", "Nivel aceite motorreductor: Mensual", "Cambio de cintas: Anual", "Cambio de sprocket: Anual", "Overhaul general: Anual"],
+      "fotos": ["image3.jpeg", "image4.jpeg", "image5.png", "image6.jpeg"]
+    },
+    {
+      "conjunto": "Baader 142 N°1 — Motor cinta prismas salida",
+      "tipo": "motor",
+      "marca": "Nord Drivesystems",
+      "modeloTipo": "SK 20F IEC80 (placa)",
+      "potencia": "",
+      "obs_extra": "Placa: Type SK 20F IEC80, i 47.38, n2 30 rpm, M2 242 Nm, año 2022.",
+      "mantencion": [],
+      "fotos": ["image18.png", "image19.png"]
+    },
+    {
+      "conjunto": "Baader 142 — Conjunto Repaso Viseras (Bomba)",
+      "tipo": "bomba",
+      "marca": "Circor",
+      "modeloTipo": "AEB 1 E 0200",
+      "caudalM3h": "(sin valor en doc)",
+      "obs_extra": "Placa Circor/Allweiler AEB 1 E 0200, año 2023.",
+      "mantencion": ["Engrase rodamientos: Semanal", "Revisión sensor óptico: Semanal", "Nivel aceite motorreductor: Mensual", "Cambio de cintas: Anual", "Cambio de sprocket: Anual", "Overhaul general: Anual"],
+      "fotos": ["image20.jpeg", "image7.jpeg"]
+    },
+    {
+      "conjunto": "Baader 142 — Conjunto Repaso Viseras (Motor Eléctrico)",
+      "tipo": "motor",
+      "marca": "",
+      "modeloTipo": "RF47DRN80M4",
+      "potencia": "0,75 kW",
+      "mantencion": [],
+      "fotos": ["image21.jpeg", "image22.jpeg"]
+    },
+    {
+      "conjunto": "Cinta Transversal Salida Baader 142 (motor anterior SEW — respaldo)",
+      "tipo": "motor",
+      "marca": "SEW",
+      "modeloTipo": "SA47/TDRN80M4",
+      "potencia": "0,75 kW",
+      "flags": ["ACTUALIZAR INFORMACION", "MOTOR ANTERIOR / RESPALDO"],
+      "estructura": "Rodamientos SUC206 (4u); Brida F206 (4u)",
+      "cinta": "(sin datos en doc)",
+      "_relacion": "Motor SEW ANTERIOR de esta cinta. El motor ACTUAL es el Sumitomo RNYM08 (SAP 3300124073, registro 'Cinta transversal Baader 142'). Se conserva como referencia/respaldo.",
+      "mantencion": ["Engrase rodamientos: Semanal", "Revisión sensor óptico: Semanal", "Nivel aceite motorreductor: Mensual", "Cambio de cintas: Anual", "Cambio de sprocket: Anual", "Overhaul general: Anual"],
+      "fotos": ["image23.jpeg", "image24.jpeg", "image25.jpeg"]
+    },
+    {
+      "conjunto": "Cinta Zeta Grader",
+      "tipo": "motor",
+      "marca": "SEW",
+      "modeloTipo": "",
+      "potencia": "1,5 kW",
+      "flags": ["ACTUALIZAR INFORMACION", "SIN PLACA MOTOR"],
+      "estructura": "Rodamientos GYE30-KRR-B-FA107-VA (8u); Sensor óptico T18SP6DQ (1u)",
+      "cinta": "MPB paso 2\", apertura 0–22%; PE blanco; 1195×13000 mm; Sprocket Z10SQ40 (14u)",
+      "mantencion": ["Engrase rodamientos: Semanal", "Revisión sensor óptico: Semanal", "Nivel aceite motorreductor: Mensual", "Cambio de cintas: Anual", "Cambio de sprocket: Anual", "Overhaul general: Anual"],
+      "fotos": ["image26.jpeg", "image27.png", "image28.png"]
+    },
+    {
+      "conjunto": "Cinta Aceleración 1 Grader (Moto Tambor)",
+      "tipo": "motor",
+      "marca": "SEW",
+      "modeloTipo": "",
+      "potencia": "0,37 kW",
+      "corriente": "0,46 A (consumo en proceso, 24/10/2024)",
+      "cinta": "S4 paso 1,5\", apertura 20%; PE blanco; 297×4500 mm; Sprocket Inox AISI304L Ø140 mm (3u)",
+      "mantencion": ["Engrase rodamientos: Semanal", "Nivel aceite motorreductor: Mensual", "Cambio de cintas: Anual", "Cambio de sprocket: Anual", "Overhaul general: Anual"],
+      "fotos": ["image29.jpeg", "image30.png"]
+    },
+    {
+      "conjunto": "Cinta Aceleración 2 Grader",
+      "tipo": "motor",
+      "marca": "SEW",
+      "modeloTipo": "",
+      "potencia": "0,37 kW",
+      "estructura": "Sensor óptico T18SP6RQ (emisor) / T186EQ (receptor)",
+      "cinta": "S4 paso 1,5\", apertura 20%; PE blanco; 297×4500 mm; Sprocket Inox AISI304L Ø140 mm (3u)",
+      "mantencion": ["Engrase rodamientos: Semanal", "Revisión sensor óptico: Semanal", "Nivel aceite motorreductor: Mensual", "Cambio de cintas: Anual", "Cambio de sprocket: Anual", "Overhaul general: Anual"],
+      "fotos": ["image31.jpeg", "image32.png", "image33.png"]
+    },
+    {
+      "conjunto": "Cinta Flippers Clasificado Grader",
+      "tipo": "motor",
+      "marca": "SEW",
+      "modeloTipo": "SA57TDRS100M4",
+      "potencia": "3 kW",
+      "corriente": "3,05 A (24/10/2024)",
+      "flags": ["ACTUALIZAR INFORMACION", "SIN PLACA MOTOR"],
+      "estructura": "Cilindro neumático DAMPER SGV2",
+      "cinta": "SMPB paso 1\", apertura 0%; PE blanco; 297×35000 mm; Sprocket Inox AISI304L Ø180 mm (3u)",
+      "obs_extra": "Potencia en proceso 0,58–0,83 kW (25/09/2024)",
+      "mantencion": ["Lubricación cilindros (vástagos): Semanal", "Engrase rodamientos: Semanal", "Nivel aceite motorreductor: Mensual", "Cambio de cintas: Anual", "Cambio de sprocket: Anual", "Overhaul general: Anual"],
+      "fotos": ["image34.jpeg", "image35.png", "image36.png", "image37.jpeg", "image38.jpeg"]
+    }
+  ]
+}

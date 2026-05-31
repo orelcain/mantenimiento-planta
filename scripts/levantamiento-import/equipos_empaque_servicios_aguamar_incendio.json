@@ -1,0 +1,94 @@
+{
+  "_meta": {
+    "fuente": "v2.1.1.1_LEVANTAMIENTO EQUIPOS PLANTA CHONCHI.docx",
+    "area_doc": "EMPAQUE / SERVICIOS GENERALES / BOMBAS AGUA MAR / RED INCENDIO",
+    "mapeo": "plano: 1 motor/bomba = 1 PlantAsset; subárea por equipo; specs/mantención -> observaciones",
+    "app_area": "PLANTA CHONCHI",
+    "nota": "Fotos por orden/contexto de documento. Agua Mar trae código SAP real (3100024866)."
+  },
+  "equipos": [
+    { "conjunto": "Empacadora E-Pack Fishken", "subarea": "EMPAQUE", "tipo": "motor", "marca": "SEW", "modeloTipo": "R107R77DRS90L4", "potencia": "0,75 kW",
+      "obs_extra": "Máquina FISHKEN EPACKV.3 (2018). Celdas de carga FLINTEC PC7 100Kg C3 (28u). Filtro FRL Festo LFR-D-MIDI-A K543. Cinta SMPB paso 1\" PE blanco 700×8500 mm, sprocket Z12SQ40 (12u), rodamientos SF-204 (4u).",
+      "mantencion": ["Reapriete fijación celdas de carga: Semanal", "Reapriete fijación capachos: Semanal", "Engrase rodamientos cinta: Mensual", "Cambio rodamientos/cinta: Anual", "Overhaul proveedor: Anual"],
+      "fotos": ["image39.jpeg"] },
+
+    { "conjunto": "Glaceador Automático", "subarea": "EMPAQUE", "tipo": "motor", "marca": "SEW", "modeloTipo": "FA67/A/G",
+      "obs_extra": "Máquina TECSUR Glaceador Doble/Automático, serie 0001-1 (2017). Velocidad 18 rpm. Retén reductor 55-90-10. Rodamientos SF-210 (2u).",
+      "mantencion": ["Engrase de rodamientos: Semanal", "Revisión estructural: Mensual", "Overhaul completa: Anual"],
+      "fotos": ["image40.jpg"] },
+
+    { "conjunto": "Enzunchadora N°1", "subarea": "EMPAQUE", "tipo": "motor", "marca": "Garibaldi", "modeloTipo": "TP-6000-1S", "voltaje": "220 V", "corriente": "9 A",
+      "flags": ["EQUIPO (no es motor/bomba puro)"],
+      "obs_extra": "Enzunchadora acero inoxidable. Serie B59920. 220V/50Hz/9A. T° trabajo 0–40°C. Fab. Abril 2022.",
+      "mantencion": ["Limpieza equipo: Semanal", "Reapriete y lubricación partes móviles: Semanal", "Revisión estructural: Mensual", "Overhaul completa: Anual"],
+      "fotos": ["image41.jpeg", "image42.jpeg"] },
+
+    { "conjunto": "Compresor de Aire Planta N°1", "subarea": "SERVICIOS GENERALES", "tipo": "motor", "marca": "Atlas Copco", "modeloTipo": "GA-22", "potencia": "22 kW (30 HP)",
+      "flags": ["ACTUALIZAR INFORMACION"],
+      "obs_extra": "Compresor de aire. Capacidad 60,2 l/min. Presión 7,25 bar. 2940 RPM.",
+      "mantencion": ["Purga de agua: Semanal", "Revisión mangueras/tubines: Mensual", "Mantención general: Cada 4000 h"],
+      "fotos": ["image43.jpg"] },
+
+    { "conjunto": "Compresor de Aire Planta N°2", "subarea": "SERVICIOS GENERALES", "tipo": "motor", "marca": "Atlas Copco", "modeloTipo": "GA-11", "potencia": "11 kW (18 HP)",
+      "flags": ["ACTUALIZAR INFORMACION"],
+      "obs_extra": "Compresor de aire. Capacidad 25 l/min. Presión 10 bar.",
+      "mantencion": ["Purga de agua: Semanal", "Revisión mangueras/tubines: Mensual", "Mantención general: Cada 4000 h"],
+      "fotos": ["image44.jpeg"] },
+
+    { "conjunto": "Sistema Succión de Peces (Fishtank) — Motor Eléctrico", "subarea": "SERVICIOS GENERALES", "tipo": "motor", "marca": "SIHI", "modeloTipo": "Y2-180L-4", "potencia": "22 kW", "corriente": "42,71 A",
+      "flags": ["ACTUALIZAR INFORMACION"],
+      "obs_extra": "RPM 1470. Rodamiento 6210 (2u).",
+      "mantencion": ["Puesta en marcha equipo: Semanal", "Engrase rodamientos motor: Mensual", "Cambio rodamientos y mantención motor: 12 meses"],
+      "fotos": ["image45.jpeg"] },
+
+    { "conjunto": "Sistema Succión de Peces (Fishtank) — Bomba", "subarea": "SERVICIOS GENERALES", "tipo": "bomba", "marca": "SIHI", "modeloTipo": "LPHX 65327 AB", "caudalM3h": "695–780 m³/hr",
+      "flags": ["ACTUALIZAR INFORMACION"],
+      "obs_extra": "Presión 33 mbar. Sensor de nivel FTL20 (2u).",
+      "mantencion": ["Engrase rodamientos bomba: Mensual", "Cambio de sello y rodamientos bomba: 12 meses"],
+      "fotos": ["image45.jpeg"] },
+
+    { "conjunto": "Caldera Planta", "subarea": "SERVICIOS GENERALES", "tipo": "motor", "marca": "Fonderine SIME", "modeloTipo": "2R10",
+      "flags": ["EQUIPO (caldera, no es motor/bomba)", "ACTUALIZAR INFORMACION"],
+      "obs_extra": "Caldera. Fab. 2004, N° fábrica 3407188442. Volumen agua 151 L. T° trabajo 0–95°C. Quemador RIELLO 40G20. Combustible diésel 8–18 kg/hr.",
+      "mantencion": ["Carga de combustible: Semanal", "Inspección general: Semanal", "Mantención general: Anual"],
+      "fotos": ["image46.jpeg"] },
+
+    { "conjunto": "Bombas Agua Mar — Conjunto N°1 (Bomba)", "subarea": "BOMBAS AGUA MAR", "tipo": "bomba", "marca": "SIHI", "modeloTipo": "SC4026", "caudalM3h": "25 m³/hora",
+      "codigoSAP": "3100024866", "descripcionSAP": "BOMBA CENTRIFUGA MOD SC 4026",
+      "flags": ["ACTUALIZAR INFORMACION"],
+      "obs_extra": "Presión 70 mts. Diámetro propulsor 245 mm.",
+      "mantencion": ["Revisión filtros retención (agua salada): Mensual", "Engrase/lubricación rodamientos: Mensual", "Cambio rodamientos: Anual", "Cambio sello mecánico: Anual"],
+      "fotos": ["image47.jpeg"] },
+
+    { "conjunto": "Bombas Agua Mar — Conjunto N°1 (Motor)", "subarea": "BOMBAS AGUA MAR", "tipo": "motor", "marca": "SIHI", "modeloTipo": "T1CR 130M1 2", "potencia": "11 kW", "corriente": "22 A",
+      "flags": ["ACTUALIZAR INFORMACION"],
+      "obs_extra": "Velocidad 2910 rpm.",
+      "mantencion": ["Engrase/lubricación rodamientos: Mensual", "Barnizado estator: Anual", "Cambio rodamientos: Anual"],
+      "fotos": ["image47.jpeg"] },
+
+    { "conjunto": "Bombas Agua Mar — Conjunto N°2 (Bomba)", "subarea": "BOMBAS AGUA MAR", "tipo": "bomba", "marca": "SIHI", "modeloTipo": "SC4026", "caudalM3h": "25 m³/hora",
+      "codigoSAP": "3100024866", "descripcionSAP": "BOMBA CENTRIFUGA MOD SC 4026",
+      "flags": ["ACTUALIZAR INFORMACION"],
+      "obs_extra": "Presión 70 mts. Diámetro propulsor 245 mm.",
+      "mantencion": ["Revisión filtros retención (agua salada): Mensual", "Engrase/lubricación rodamientos: Mensual", "Cambio rodamientos: Anual", "Cambio sello mecánico: Anual"],
+      "fotos": ["image48.jpeg"] },
+
+    { "conjunto": "Bombas Agua Mar — Conjunto N°2 (Motor)", "subarea": "BOMBAS AGUA MAR", "tipo": "motor", "marca": "SIHI", "modeloTipo": "T1CR 130M1 2", "potencia": "11 kW", "corriente": "22 A",
+      "flags": ["ACTUALIZAR INFORMACION"],
+      "obs_extra": "Velocidad 2910 rpm.",
+      "mantencion": ["Engrase/lubricación rodamientos: Mensual", "Cambio rodamientos: Anual"],
+      "fotos": ["image48.jpeg"] },
+
+    { "conjunto": "Bomba Red de Incendio N°1 (Bomba)", "subarea": "RED INCENDIO", "tipo": "bomba", "marca": "SIHI", "modeloTipo": "SC80/20-85", "caudalM3h": "114 m³/hr",
+      "flags": ["ACTUALIZAR INFORMACION"],
+      "obs_extra": "N° serie 10219110445. Diámetro propulsor 195 mm. Presión (H) 46 m.",
+      "mantencion": ["Engrase/lubricación rodamientos: Mensual", "Barnizado estator: Anual", "Cambio sello mecánico: Anual", "Cambio rodamientos: Anual"],
+      "fotos": ["image49.jpeg"] },
+
+    { "conjunto": "Bomba Red de Incendio N°1 (Motor)", "subarea": "RED INCENDIO", "tipo": "motor", "marca": "SIHI", "modeloTipo": "T1CR 200L1-2", "potencia": "30 kW", "corriente": "56,47 A",
+      "flags": ["ACTUALIZAR INFORMACION"],
+      "obs_extra": "Velocidad 2920 RPM. IP 56.",
+      "mantencion": ["Engrase/lubricación rodamientos: Mensual", "Cambio rodamientos: Anual"],
+      "fotos": ["image49.jpeg"] }
+  ]
+}
