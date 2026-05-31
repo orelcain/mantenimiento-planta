@@ -1082,9 +1082,23 @@ Toda esta línea quedó **en producción** (data directa a Firestore/Storage, si
 - **Editor in-app** del detalle (`AssetDetailModal` editable): edita marca/modelo/SAP/specs + **sube fotos desde el celular** (`capture=environment` → WebP → Storage `plantAssets/<id>/imagenes/`), marcar principal / eliminar. Así se completan los huecos en terreno.
 - **Levantamiento importado** del doc `v2.1.1.1_LEVANTAMIENTO EQUIPOS PLANTA CHONCHI.docx`: **9 áreas, 65 equipos, 87 fotos** (8 con SAP real). Pipeline reproducible en `scripts/levantamiento-import/` (`extract_media_map.py` saca fotos+orden; JSONs curados por área) + `scripts/seed-levantamiento.js` (idempotente `asset-lev-<slug>`, `--dry-run`/`--force`/`--no-photos`, soporta `subarea`/`codigoSAP` por equipo). Mapeo plano: 1 motor/bomba = 1 doc; estructura/cinta/mantención → `observaciones`. Tachos de vacío y medidor de caudal omitidos (no son motor/bomba). Total `plantAssets`: 134 (65 lev + 8 sumitomo + 61 stubs viejos "Diverso/Motoreductor").
 
-### 🔭 PENDIENTE (proyecto /ultraplan) — Módulo Repuestos "área-first"
+### 🚧 EN CURSO — Módulo Repuestos "área-first" (F0–F4 HECHO ✅, F5–F7 pendientes)
 
-Orientar **todo** el módulo Repuestos por áreas con lenguaje visual unificado. Los datos YA están área-orientados (`types/repuestos.ts`: `Área → Equipo/Máquina → Repuestos`, colección `hierarchy` + `hierarchyPath`; ~4.684 repuestos). Falta unificar la **navegación**: una entrada "por área" que muestre de una las máquinas + repuestos + motores/bombas (`plantAssets`) de esa área bajo el mismo lente (hoy `plantAssets` y `hierarchy/repuestos` viven separados; el área es el puente). **OJO escala**: 134 motores/bombas → chips+tabla plana OK; 4.684 repuestos → requiere drill-down área→máquina→repuesto (NO tabla plana). Es el rediseño del módulo completo (~5.500 líneas, 4 vistas: Por equipo/Buscar/Bodega/Motores-Bombas) → **abrir con `/ultraplan` en sesión dedicada**, sin romper Bodega/Buscador.
+Rediseño que colapsa los 4 tabs en un **lente único área-first** (mockup AquaChile). Plan de 8 fases. Vive como pestaña nueva **"Áreas (Nuevo)"** en `RepuestosPage` (NO default aún; se promueve en F7 para no romper el módulo vivo).
+
+**HECHO y deployado (v3.33.0 → v3.34.0):**
+- **F0** — `plantAssets` vinculados a la jerarquía por área. Clave estable de `hierarchy` = campo `codigo` (docId auto-gen). Mapa cerrado `scripts/levantamiento-import/area-hierarchy-map.json` (9 subáreas→codigo) + `scripts/migrate-plantassets-hierarchy.js` (idempotente, dry-run, crea nodo SISTEMA VACIO). 65 M/B vinculados (`hierarchyNodeId`/`hierarchyPath` en `PlantAsset`).
+- **F1–F3** — `RepuestosAreaHub.tsx` + `AreaSidebar.tsx` + `RepuestoDetailPanel.tsx` (panel lateral fijo, no modal) + `AssetDetailPanel.tsx`. Sidebar de áreas (conteos equipos+M/B), KPIs de stock, tabla SAP/Repuesto/Equipo/Stock/Bodega con filtros (buscar/equipo/stock) + paginación, panel lateral de detalle (stock mín/máx, bodega, ubicación, movimientos).
+- **F4** — ubicación estructurada Pasillo/Estante/Nivel editable en el panel.
+
+**Hallazgos clave (para retomar):** los ~4.688 repuestos viven en `machines/{id}/repuestos` (NO en hierarchy); las máquinas con repuestos están **archivadas** (`activa=false`) → construir `machines[]` desde el **equipment cache** (`useGlobalEquipmentSearch('',999)`+`getGlobalEquipmentCache()`; cada equipo trae `linkedMachineId`+`path`). Membership área = ancestría (`useHierarchyPaths`, parentId+path; cadenas a veces rotas). **Firestore SIN `ignoreUndefinedProperties`** → stripear undefined antes de `saveStock`/`setDoc`.
+
+**PENDIENTE (próxima sesión):**
+- **F5 Múltiples bodegas** (la pesada): colección `bodegas/{id}` + reestructura `bodega/{codigoSAP}` → `bodega/{bodegaId}/{codigoSAP}` + **migración con dry-run** + `useBodega` bodega-aware + selector **"Bodega ▾"** topbar + columna Bodega real. NO romper la pestaña Bodega viva (2.281 líneas: inventario/ABC/stock muerto/movimientos). Commit propio.
+- **F6 Solicitar repuesto**: colección `solicitudes_repuestos/{id}` (estados pendiente/aprobada/entregada) + modal + botón "+ Solicitar repuesto".
+- **F7 Paridad + consolidación**: búsqueda global del topbar (sobre `useGlobalSearch`+plantAssets) · promover hub a default · retirar tab Motores/Bombas (conservar `MapasViewer`) · fix warning `key` preexistente en `MotorasBombasTable`.
+
+Detalle completo + gotchas en memoria auto `project_repuestos_area_first.md`.
 
 ### 🖥️ Seed 8 motores SUMITOMO — referencia del script (HECHO ✅)
 - **Idempotente**: docId `asset-sumitomo-<slug>`. `--force` sobrescribe + re-sube fotos.
