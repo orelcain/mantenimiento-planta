@@ -12,7 +12,7 @@
  *  - Fase 7: búsqueda global del topbar + promover hub a vista por defecto.
  */
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { Search, ChevronRight, ChevronLeft, Cog, ImageOff, Plus, ListChecks, ClipboardList } from 'lucide-react'
+import { Search, ChevronRight, ChevronLeft, Cog, ImageOff, Plus, ListChecks, ClipboardList, Menu } from 'lucide-react'
 import { Badge, Button, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui'
 import { AreaSidebar } from '@/components/repuestos/AreaSidebar'
 import { AssetDetailModal } from '@/components/repuestos/AssetDetailModal'
@@ -135,6 +135,9 @@ export function RepuestosAreaHub() {
   const [solicitarRepuesto, setSolicitarRepuesto] = useState<RepuestoLite | null>(null)
   const [solicitudesOpen, setSolicitudesOpen] = useState(false)
 
+  // Drawer del sidebar de áreas en móvil
+  const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false)
+
   const openSolicitar = useCallback((rep: RepuestoLite | null) => {
     setSolicitarRepuesto(rep)
     setSolicitarOpen(true)
@@ -178,6 +181,24 @@ export function RepuestosAreaHub() {
     if (!selectedAreaId) return []
     return linkedAssets.filter((a) => isUnder(a.hierarchyNodeId, selectedAreaId))
   }, [linkedAssets, showingAll, selectedAreaId, isUnder])
+
+  // Búsqueda global: motores/bombas que matchean la query (equipo/modelo/SAP/marca/componente)
+  const filteredAssets = useMemo(() => {
+    const q = normalizeForSearch(repQuery)
+    if (!q) return areaAssets
+    return areaAssets.filter((a) =>
+      normalizeForSearch(a.equipo).includes(q) ||
+      normalizeForSearch(a.modeloTipo ?? '').includes(q) ||
+      normalizeForSearch(a.codigoSAP ?? '').includes(q) ||
+      normalizeForSearch(a.marca ?? '').includes(q) ||
+      normalizeForSearch(a.componente ?? '').includes(q),
+    )
+  }, [areaAssets, repQuery])
+
+  // Al buscar y haber M/B coincidentes, abrir la sección de equipos para no ocultarlos
+  useEffect(() => {
+    if (repQuery.trim() && filteredAssets.length > 0) setShowEquipos(true)
+  }, [repQuery, filteredAssets.length])
 
   // Repuestos del área (catálogo + bodega) y KPIs de stock derivados
   const areaRepuestos = useAreaRepuestos(bodegaItems, { showingAll, selectedAreaId, machineInArea })
@@ -335,12 +356,21 @@ export function RepuestosAreaHub() {
         onToggleNode={handleToggleNode}
         onShowAll={handleShowAll}
         showingAll={showingAll}
+        mobileOpen={sidebarMobileOpen}
+        onMobileClose={() => setSidebarMobileOpen(false)}
       />
 
       {/* Columna principal */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Header del módulo: búsqueda global + acciones (cableado en fases posteriores) */}
         <div className="flex items-center gap-2 border-b border-border px-4 py-2.5">
+          <button
+            onClick={() => setSidebarMobileOpen(true)}
+            className="shrink-0 rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground sm:hidden"
+            aria-label="Abrir áreas"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
           <div className="relative max-w-md flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -389,7 +419,7 @@ export function RepuestosAreaHub() {
               onClick={() => setShowEquipos((s) => !s)}
             >
               <ListChecks className="h-4 w-4" /> Ver equipos del área
-              {areaAssets.length > 0 && <span className="tabular-nums opacity-70">({areaAssets.length})</span>}
+              {filteredAssets.length > 0 && <span className="tabular-nums opacity-70">({filteredAssets.length})</span>}
             </Button>
           </div>
 
@@ -407,14 +437,16 @@ export function RepuestosAreaHub() {
             <div className="mb-2 flex items-center gap-2">
               <Cog className="h-4 w-4 text-cyan-500" />
               <h2 className="text-sm font-semibold text-foreground">Motores y bombas del área</h2>
-              <span className="text-xs text-muted-foreground tabular-nums">({areaAssets.length})</span>
+              <span className="text-xs text-muted-foreground tabular-nums">({filteredAssets.length})</span>
             </div>
 
             {assetsLoading ? (
               <div className="rounded-lg border border-border py-8 text-center text-sm text-muted-foreground">Cargando…</div>
-            ) : areaAssets.length === 0 ? (
+            ) : filteredAssets.length === 0 ? (
               <div className="rounded-lg border border-dashed border-border py-8 text-center text-sm text-muted-foreground">
-                {selectedAreaId ? 'Esta área no tiene motores/bombas registrados.' : 'Selecciona un área en la izquierda.'}
+                {repQuery.trim()
+                  ? 'Ningún motor/bomba coincide con la búsqueda.'
+                  : selectedAreaId ? 'Esta área no tiene motores/bombas registrados.' : 'Selecciona un área en la izquierda.'}
               </div>
             ) : (
               <div className="overflow-hidden rounded-lg border border-border">
@@ -430,7 +462,7 @@ export function RepuestosAreaHub() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {areaAssets.map((a) => {
+                    {filteredAssets.map((a) => {
                       const thumb = thumbOf(a)
                       return (
                         <tr

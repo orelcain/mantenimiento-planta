@@ -111,7 +111,7 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
   const bodega = item.ubicacionBodega || (item.bodegaId ? 'Bodega Principal' : '—')
 
   return (
-    <aside className="flex h-full w-[340px] shrink-0 flex-col border-l border-border bg-card/40">
+    <aside className="fixed inset-0 z-50 flex h-full w-full flex-col border-l border-border bg-card sm:static sm:z-auto sm:w-[340px] sm:shrink-0 sm:bg-card/40">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Detalle del repuesto</span>

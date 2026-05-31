@@ -3,7 +3,7 @@
  *
  * Dialog simple: tabla de solicitudes con estado y avance pendiente→aprobada→entregada.
  */
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Loader2, ClipboardList, ArrowRight, Check } from 'lucide-react'
 import {
   Badge,
@@ -44,8 +44,30 @@ function fmtDate(d: Date): string {
   } catch { return '' }
 }
 
+type Filtro = 'all' | SolicitudEstado
+
 export function SolicitudesPanel({ open, onOpenChange, solicitudes, loading, onAvanzar }: Props) {
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [filtro, setFiltro] = useState<Filtro>('all')
+
+  const counts = useMemo(() => ({
+    all: solicitudes.length,
+    pendiente: solicitudes.filter((s) => s.estado === 'pendiente').length,
+    aprobada: solicitudes.filter((s) => s.estado === 'aprobada').length,
+    entregada: solicitudes.filter((s) => s.estado === 'entregada').length,
+  }), [solicitudes])
+
+  const visibles = useMemo(
+    () => (filtro === 'all' ? solicitudes : solicitudes.filter((s) => s.estado === filtro)),
+    [solicitudes, filtro],
+  )
+
+  const CHIPS: { key: Filtro; label: string }[] = [
+    { key: 'all', label: 'Todas' },
+    { key: 'pendiente', label: 'Pendientes' },
+    { key: 'aprobada', label: 'Aprobadas' },
+    { key: 'entregada', label: 'Entregadas' },
+  ]
 
   const avanzar = async (s: SolicitudRepuesto) => {
     const next = ESTADO_SIGUIENTE[s.estado]
@@ -64,6 +86,24 @@ export function SolicitudesPanel({ open, onOpenChange, solicitudes, loading, onA
           </DialogTitle>
         </DialogHeader>
 
+        {/* Filtro por estado */}
+        {!loading && solicitudes.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {CHIPS.map((c) => (
+              <button
+                key={c.key}
+                onClick={() => setFiltro(c.key)}
+                className={[
+                  'rounded-full px-2.5 py-1 text-xs font-medium transition-colors',
+                  filtro === c.key ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/70',
+                ].join(' ')}
+              >
+                {c.label} <span className="tabular-nums opacity-70">({counts[c.key]})</span>
+              </button>
+            ))}
+          </div>
+        )}
+
         {loading ? (
           <div className="py-10 text-center text-sm text-muted-foreground">
             <Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" /> Cargando…
@@ -71,6 +111,10 @@ export function SolicitudesPanel({ open, onOpenChange, solicitudes, loading, onA
         ) : solicitudes.length === 0 ? (
           <div className="rounded-lg border border-dashed border-border py-10 text-center text-sm text-muted-foreground">
             Aún no hay solicitudes. Usa “+ Solicitar repuesto”.
+          </div>
+        ) : visibles.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-border py-10 text-center text-sm text-muted-foreground">
+            No hay solicitudes en este estado.
           </div>
         ) : (
           <div className="max-h-[60vh] overflow-y-auto rounded-lg border border-border">
@@ -85,7 +129,7 @@ export function SolicitudesPanel({ open, onOpenChange, solicitudes, loading, onA
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {solicitudes.map((s) => {
+                {visibles.map((s) => {
                   const meta = ESTADO_META[s.estado]
                   const next = ESTADO_SIGUIENTE[s.estado]
                   return (

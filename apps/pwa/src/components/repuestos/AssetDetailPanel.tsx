@@ -49,7 +49,7 @@ export function AssetDetailPanel({ asset, areaName, onClose, onEdit }: AssetDeta
   const photo = photos[0]
 
   return (
-    <aside className="flex h-full w-[340px] shrink-0 flex-col border-l border-border bg-card/40">
+    <aside className="fixed inset-0 z-50 flex h-full w-full flex-col border-l border-border bg-card sm:static sm:z-auto sm:w-[340px] sm:shrink-0 sm:bg-card/40">
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Detalle del equipo</span>
         <button onClick={onClose} className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Cerrar">
