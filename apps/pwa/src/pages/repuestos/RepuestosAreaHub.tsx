@@ -343,7 +343,17 @@ export function RepuestosAreaHub() {
         <div className="flex items-center gap-2 border-b border-border px-4 py-2.5">
           <div className="relative max-w-md flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input disabled placeholder="Buscar SAP, repuesto, equipo o fabricante… (Fase 7)" className="pl-9" />
+            <Input
+              value={repQuery}
+              onChange={(e) => {
+                const v = e.target.value
+                setRepQuery(v)
+                // Búsqueda global: al teclear, mostrar todas las áreas para no ocultar coincidencias
+                if (v.trim() && !showingAll) setShowingAll(true)
+              }}
+              placeholder="Buscar SAP, repuesto, equipo o fabricante…"
+              className="pl-9"
+            />
           </div>
           <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setSolicitudesOpen(true)}>
             <ClipboardList className="h-4 w-4" /> Solicitudes

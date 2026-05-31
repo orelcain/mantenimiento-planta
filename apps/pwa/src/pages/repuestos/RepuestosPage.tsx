@@ -12,7 +12,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Layers, Search, Package, Cog, LayoutGrid } from 'lucide-react'
+import { Layers, Search, Package, Map, LayoutGrid } from 'lucide-react'
 import { RepuestosDashboard } from './Dashboard'
 import { BuscadorGlobal } from './BuscadorGlobal'
 import { BodegaView } from './BodegaView'
@@ -29,10 +29,10 @@ function getDefaultTab(): Tab {
   try {
     const saved = localStorage.getItem(STORAGE_KEY) as Tab | null
     if (saved === 'areas' || saved === 'equipo' || saved === 'buscar' || saved === 'bodega' || saved === 'bases') return saved
-    // En móvil, el buscador es más útil por defecto
+    // En móvil, el buscador es más útil por defecto (el hub aún no es responsive)
     if (typeof window !== 'undefined' && window.innerWidth < 640) return 'buscar'
   } catch { /* noop */ }
-  return 'equipo'
+  return 'areas'
 }
 
 interface TabDef {
@@ -44,11 +44,11 @@ interface TabDef {
 }
 
 const TABS: TabDef[] = [
-  { id: 'areas',   label: 'Áreas',          mobileLabel: 'Áreas',   icon: LayoutGrid, badge: 'Nuevo' },
-  { id: 'equipo',  label: 'Por equipo',     mobileLabel: 'Equipo',  icon: Layers  },
-  { id: 'buscar',  label: 'Buscar pieza',   mobileLabel: 'Buscar',  icon: Search  },
-  { id: 'bases',   label: 'Motores/Bombas', mobileLabel: 'Motores', icon: Cog     },
-  { id: 'bodega',  label: 'Bodega',         mobileLabel: 'Bodega',  icon: Package },
+  { id: 'areas',   label: 'Áreas',        mobileLabel: 'Áreas',  icon: LayoutGrid },
+  { id: 'equipo',  label: 'Por equipo',   mobileLabel: 'Equipo', icon: Layers  },
+  { id: 'buscar',  label: 'Buscar pieza', mobileLabel: 'Buscar', icon: Search  },
+  { id: 'bases',   label: 'Mapas',        mobileLabel: 'Mapas',  icon: Map     },
+  { id: 'bodega',  label: 'Bodega',       mobileLabel: 'Bodega', icon: Package },
 ]
 
 export function RepuestosPage() {

@@ -1,8 +1,7 @@
 import { useState, useMemo } from 'react'
 import { Package, AlertTriangle } from 'lucide-react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, LoadingScreen, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, LoadingScreen } from '@/components/ui'
 import { useToast } from '@/hooks/useToast'
-import { MotorasBombasTable } from '@/components/repuestos/MotorasBombasTable'
 import { MapasViewer } from '@/components/repuestos/MapasViewer'
 import { AssetDetailModal } from '@/components/repuestos/AssetDetailModal'
 import { usePlantAssets } from '@/hooks/repuestos/usePlantAssets'
@@ -32,11 +31,6 @@ export function CatalogoBases() {
       conMarcadores: assets.filter((a: PlantAsset) => (a.marcadores?.length ?? 0) > 0).length,
     }
   }, [assets])
-
-  const handleAssetSelect = (asset: PlantAsset) => {
-    setSelectedAssetId(asset.id)
-    setShowDetailModal(true)
-  }
 
   const handleCreateMarker = async (assetId: string, mapId: string, x: number, y: number, label?: string) => {
     try {
@@ -90,9 +84,9 @@ export function CatalogoBases() {
     <div className="p-6 space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Catálogo de Bases</h1>
+        <h1 className="text-2xl font-bold text-foreground">Mapas de planta</h1>
         <p className="text-muted-foreground">
-          Motores, bombas y componentes de la planta. Visualiza ubicaciones en mapas interactivos.
+          Ubica motores y bombas en los planos interactivos. El catálogo por área vive ahora en la pestaña “Áreas”.
         </p>
       </div>
 
@@ -148,74 +142,41 @@ export function CatalogoBases() {
         </Card>
       </div>
 
-      {/* Contenido principal */}
-      <Tabs defaultValue="tabla" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="tabla">
-            <Package className="h-4 w-4 mr-2" />
-            Tabla de Bases
-          </TabsTrigger>
-          <TabsTrigger value="mapas">
-            <Package className="h-4 w-4 mr-2" />
-            Mapas
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="tabla" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Motores y Bombas</CardTitle>
-              <CardDescription>
-                Catálogo completo de equipos rotatorios de la planta. Busca por equipo, área, marca o código.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <MotorasBombasTable
-                assets={assets}
-                loading={assetsLoading}
-                onSelect={handleAssetSelect}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="mapas" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Visualización en Mapas</CardTitle>
-              <CardDescription>
-                Ubica los motores y bombas en los mapas de la planta. Haz clic en los marcadores para ver detalles.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {maps.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No hay mapas disponibles</p>
-                </div>
-              ) : (
-                <MapasViewer
-                  maps={maps}
-                  assets={assets}
-                  loading={mapsLoading}
-                  selectedAssetId={selectedAsset?.id || null}
-                  onMarkerClick={(marker) => {
-                    const asset = assets.find((a: PlantAsset) =>
-                      a.marcadores?.some((m: any) => m.id === marker.id)
-                    )
-                    if (asset) {
-                      setSelectedAssetId(asset.id)
-                      setShowDetailModal(true)
-                    }
-                  }}
-                  onCreateMarker={handleCreateMarker}
-                  onDeleteMarker={handleDeleteMarker}
-                />
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      {/* Visualización en Mapas */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Visualización en Mapas</CardTitle>
+          <CardDescription>
+            Ubica los motores y bombas en los mapas de la planta. Haz clic en los marcadores para ver detalles.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {maps.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>No hay mapas disponibles</p>
+            </div>
+          ) : (
+            <MapasViewer
+              maps={maps}
+              assets={assets}
+              loading={mapsLoading}
+              selectedAssetId={selectedAsset?.id || null}
+              onMarkerClick={(marker) => {
+                const asset = assets.find((a: PlantAsset) =>
+                  a.marcadores?.some((m: any) => m.id === marker.id)
+                )
+                if (asset) {
+                  setSelectedAssetId(asset.id)
+                  setShowDetailModal(true)
+                }
+              }}
+              onCreateMarker={handleCreateMarker}
+              onDeleteMarker={handleDeleteMarker}
+            />
+          )}
+        </CardContent>
+      </Card>
 
       {/* Modal de detalles (editable) */}
       <AssetDetailModal
