@@ -809,6 +809,51 @@ exports.onPreventiveExecutionCreated = onDocumentCreated('preventiveExecutions/{
   })
 })
 
+/**
+ * Solicitud de repuesto creada → avisar al grupo de mantención (Telegram, topic Repuestos)
+ * + push FCM a supervisores/admins. Disparado desde el hub área-first de Repuestos.
+ */
+exports.onSolicitudRepuestoCreated = onDocumentCreated('solicitudes_repuestos/{solicitudId}', async (event) => {
+  const sol = event.data?.data()
+  const solicitudId = event.params.solicitudId
+  if (!sol) return
+
+  // Escape mínimo para HTML de Telegram (los campos vienen de texto libre del usuario)
+  const esc = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+  const nombre = esc(sol.textoBreve) || '(sin nombre)'
+  const sap = esc(sol.codigoSAP) || '—'
+  const cantidad = sol.cantidad ?? 1
+  const solicitante = esc(sol.solicitadoPorNombre) || 'Desconocido'
+  const obs = sol.observaciones ? `\n📝 ${esc(sol.observaciones)}` : ''
+
+  // Telegram → topic de Repuestos (cae a General si no está configurado)
+  await sendTelegramMessage(
+    `📦 <b>Nueva solicitud de repuesto</b>\n\n` +
+    `🔧 ${nombre}\n` +
+    `🏷️ SAP ${sap}  ·  Cantidad: <b>${cantidad}</b>\n` +
+    `👤 ${solicitante}${obs}\n` +
+    `🔗 <a href="https://orelcain.github.io/mantenimiento-planta/repuestos">Ver en Repuestos</a>`,
+    undefined, { topicId: getTopicId('repuestos') }
+  )
+
+  // Push FCM a supervisores/admins
+  try {
+    const supervisors = await getSupervisorsAndAdmins()
+    const tokens = dedupeTokens(await getTokensForUsers(supervisors))
+    if (tokens.length > 0) {
+      await sendNotification(tokens, '📦 Nueva solicitud de repuesto', `${nombre} ×${cantidad} — ${solicitante}`, {
+        type: 'SOLICITUD_REPUESTO_CREATED',
+        solicitudId,
+        codigoSAP: sol.codigoSAP || '',
+        url: '/mantenimiento-planta/repuestos',
+      })
+    }
+  } catch (err) {
+    logger.error('Error enviando push de solicitud de repuesto', err)
+  }
+})
+
 // ==================== GROQ AI PROXY ====================
 
 /**
