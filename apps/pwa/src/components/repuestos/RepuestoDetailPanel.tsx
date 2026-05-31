@@ -7,7 +7,7 @@
  * última actualización (último movimiento) · Ver movimientos.
  */
 import { useState, useEffect, useCallback } from 'react'
-import { X, Copy, Check, History, ImageOff, Loader2, ArrowDownCircle, ArrowUpCircle, Settings2, Pencil } from 'lucide-react'
+import { X, Copy, Check, History, ImageOff, Loader2, ArrowDownCircle, ArrowUpCircle, Settings2, Pencil, Plus } from 'lucide-react'
 import { Button, Input } from '@/components/ui'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import type { AreaRepuestoRow } from '@/hooks/repuestos/useAreaRepuestos'
@@ -21,6 +21,8 @@ interface RepuestoDetailPanelProps {
   onClose: () => void
   loadMovimientos: (bodegaDocId: string, max?: number) => Promise<MovimientoBodega[]>
   onSaveLocation: (codigoSAP: string, loc: UbicacionEstructurada) => Promise<void>
+  /** Abrir el modal de solicitud prellenado con este repuesto (Fase 6). */
+  onSolicitar?: (item: AreaRepuestoRow) => void
 }
 
 /** Texto de ubicación: estructurada (Pasillo/Estante/Nivel) o el string libre legacy. */
@@ -54,7 +56,7 @@ function fmtDate(d: Date): string {
   } catch { return '' }
 }
 
-export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, onSaveLocation }: RepuestoDetailPanelProps) {
+export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, onSaveLocation, onSolicitar }: RepuestoDetailPanelProps) {
   const [copied, setCopied] = useState(false)
   const [movs, setMovs] = useState<MovimientoBodega[] | null>(null)
   const [movsLoading, setMovsLoading] = useState(false)
@@ -146,6 +148,13 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
             </button>
           )}
         </div>
+
+        {/* Acción: solicitar repuesto */}
+        {onSolicitar && (
+          <Button size="sm" className="mb-3 w-full gap-1.5" onClick={() => onSolicitar(item)}>
+            <Plus className="h-4 w-4" /> Solicitar repuesto
+          </Button>
+        )}
 
         {/* Campos */}
         <div className="divide-y divide-border/60 border-y border-border/60">

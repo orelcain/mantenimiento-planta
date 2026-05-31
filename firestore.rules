@@ -668,6 +668,19 @@ service cloud.firestore {
       }
     }
 
+    // Solicitudes de repuesto (área-first F6) — cualquier usuario autenticado solicita;
+    // técnicos+ avanzan el estado (pendiente→aprobada→entregada); admin elimina.
+    match /solicitudes_repuestos/{solicitudId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated()
+        && request.resource.data.solicitadoPor == request.auth.uid
+        && request.resource.data.estado == 'pendiente'
+        && request.resource.data.codigoSAP is string
+        && request.resource.data.cantidad is number;
+      allow update: if isTechnician();
+      allow delete: if isAdmin();
+    }
+
     // ============================================
     // INSUMOS - Catálogo plano transversal (importado desde STOCK ALMACENES.xlsx)
     // Update parcial (solo conteo) permitido a técnicos para flujo de bodega.

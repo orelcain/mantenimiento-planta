@@ -12,12 +12,16 @@
  *  - Fase 7: búsqueda global del topbar + promover hub a vista por defecto.
  */
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { Search, ChevronRight, ChevronLeft, Cog, ImageOff, Plus, ListChecks } from 'lucide-react'
+import { Search, ChevronRight, ChevronLeft, Cog, ImageOff, Plus, ListChecks, ClipboardList } from 'lucide-react'
 import { Badge, Button, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui'
 import { AreaSidebar } from '@/components/repuestos/AreaSidebar'
 import { AssetDetailModal } from '@/components/repuestos/AssetDetailModal'
 import { RepuestoDetailPanel } from '@/components/repuestos/RepuestoDetailPanel'
 import { AssetDetailPanel } from '@/components/repuestos/AssetDetailPanel'
+import { SolicitarRepuestoModal, type RepuestoLite } from '@/components/repuestos/SolicitarRepuestoModal'
+import { SolicitudesPanel } from '@/components/repuestos/SolicitudesPanel'
+import { useSolicitudes } from '@/hooks/repuestos/useSolicitudes'
+import { useAuthStore } from '@/store/authStore'
 import { usePlantAssets } from '@/hooks/repuestos/usePlantAssets'
 import { useHierarchyAreaTree, type AreaTreeNode } from '@/hooks/useHierarchyAreaTree'
 import { useGlobalSearch } from '@/hooks/repuestos/useGlobalSearch'
@@ -124,6 +128,25 @@ export function RepuestosAreaHub() {
   // Repuesto seleccionado → panel lateral de detalle
   const [selectedRepSap, setSelectedRepSap] = useState<string | null>(null)
 
+  // ── Solicitudes de repuesto (Fase 6) ──
+  const user = useAuthStore((s) => s.user)
+  const { solicitudes, loading: solicitudesLoading, pendientesCount, crearSolicitud, avanzarEstado } = useSolicitudes()
+  const [solicitarOpen, setSolicitarOpen] = useState(false)
+  const [solicitarRepuesto, setSolicitarRepuesto] = useState<RepuestoLite | null>(null)
+  const [solicitudesOpen, setSolicitudesOpen] = useState(false)
+
+  const openSolicitar = useCallback((rep: RepuestoLite | null) => {
+    setSolicitarRepuesto(rep)
+    setSolicitarOpen(true)
+  }, [])
+
+  const handleCrearSolicitud = useCallback(
+    async (data: Parameters<typeof crearSolicitud>[0]) => {
+      await crearSolicitud(data, user?.id ?? 'anon', user?.nombre ?? 'Anónimo')
+    },
+    [crearSolicitud, user],
+  )
+
   // Persistir selección
   useEffect(() => {
     try {
@@ -188,6 +211,12 @@ export function RepuestosAreaHub() {
       .map(([value, count]) => ({ value, count }))
       .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value))
   }, [areaRepuestos])
+
+  // Opciones para el selector del modal de solicitud (repuestos del área con SAP)
+  const solicitarOptions = useMemo<RepuestoLite[]>(
+    () => areaRepuestos.map((r) => ({ codigoSAP: r.codigoSAP, textoBreve: r.textoBreve })),
+    [areaRepuestos],
+  )
 
   // Filtrado (buscar + equipo + stock)
   const filteredRep = useMemo(() => {
@@ -316,7 +345,13 @@ export function RepuestosAreaHub() {
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input disabled placeholder="Buscar SAP, repuesto, equipo o fabricante… (Fase 7)" className="pl-9" />
           </div>
-          <Button size="sm" disabled className="gap-1.5">
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setSolicitudesOpen(true)}>
+            <ClipboardList className="h-4 w-4" /> Solicitudes
+            {pendientesCount > 0 && (
+              <Badge variant="secondary" className="ml-0.5 tabular-nums">{pendientesCount}</Badge>
+            )}
+          </Button>
+          <Button size="sm" className="gap-1.5" onClick={() => openSolicitar(null)}>
             <Plus className="h-4 w-4" /> Solicitar repuesto
           </Button>
         </div>
@@ -566,6 +601,7 @@ export function RepuestosAreaHub() {
           onClose={() => setSelectedRepSap(null)}
           loadMovimientos={loadMovimientos}
           onSaveLocation={handleSaveLocation}
+          onSolicitar={(r) => openSolicitar({ codigoSAP: r.codigoSAP, textoBreve: r.textoBreve })}
         />
       )}
 
@@ -587,6 +623,22 @@ export function RepuestosAreaHub() {
         onUpdate={updateAsset}
         onAddImage={addImagen}
         onDeleteImage={deleteImagen}
+      />
+
+      {/* Solicitar repuesto (Fase 6) */}
+      <SolicitarRepuestoModal
+        open={solicitarOpen}
+        onOpenChange={setSolicitarOpen}
+        repuesto={solicitarRepuesto}
+        options={solicitarOptions}
+        onSubmit={handleCrearSolicitud}
+      />
+      <SolicitudesPanel
+        open={solicitudesOpen}
+        onOpenChange={setSolicitudesOpen}
+        solicitudes={solicitudes}
+        loading={solicitudesLoading}
+        onAvanzar={avanzarEstado}
       />
     </div>
   )
