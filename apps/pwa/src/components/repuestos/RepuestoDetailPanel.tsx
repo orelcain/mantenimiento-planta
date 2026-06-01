@@ -7,7 +7,7 @@
  * última actualización (último movimiento) · Ver movimientos.
  */
 import { useState, useEffect, useCallback } from 'react'
-import { X, Copy, Check, History, ImageOff, Loader2, ArrowDownCircle, ArrowUpCircle, Settings2, Pencil, Plus, FileText, Image as ImageIcon, Images, BookOpen, ArrowRightLeft, Trash2, SquarePen, FileSearch, Star } from 'lucide-react'
+import { X, Copy, Check, History, ImageOff, Loader2, ArrowDownCircle, ArrowUpCircle, Settings2, Pencil, Plus, FileText, Image as ImageIcon, Images, BookOpen, ArrowRightLeft, Trash2, SquarePen, FileSearch, Star, ListPlus } from 'lucide-react'
 import { Button, Input } from '@/components/ui'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import { InlineEditName } from '@/components/repuestos/InlineEditName'
@@ -49,6 +49,8 @@ interface RepuestoDetailPanelProps {
   isFavorite?: boolean
   /** Alternar favorito. */
   onToggleFavorite?: () => void
+  /** Abrir el gestor de listas con nombre para este repuesto. */
+  onAddToList?: () => void
 }
 
 /** Botón de acción compacto del panel (icono + etiqueta). */
@@ -98,7 +100,7 @@ function fmtDate(d: Date): string {
   } catch { return '' }
 }
 
-export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, onSaveLocation, onSolicitar, isAdmin, onRename, onEditRepuesto, onDeleteRepuesto, onRelocate, onSpecs, onPhotos, onGallery, onManual, onManualSearch, isFavorite, onToggleFavorite }: RepuestoDetailPanelProps) {
+export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, onSaveLocation, onSolicitar, isAdmin, onRename, onEditRepuesto, onDeleteRepuesto, onRelocate, onSpecs, onPhotos, onGallery, onManual, onManualSearch, isFavorite, onToggleFavorite, onAddToList }: RepuestoDetailPanelProps) {
   const [copied, setCopied] = useState(false)
   const [movs, setMovs] = useState<MovimientoBodega[] | null>(null)
   const [movsLoading, setMovsLoading] = useState(false)
@@ -235,6 +237,13 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
         {onManualSearch && (
           <Button variant="outline" size="sm" className="mb-3 w-full gap-1.5" onClick={onManualSearch}>
             <FileSearch className="h-4 w-4" /> Buscar en manual
+          </Button>
+        )}
+
+        {/* Agregar a lista de favoritos con nombre */}
+        {onAddToList && (
+          <Button variant="outline" size="sm" className="mb-3 w-full gap-1.5" onClick={onAddToList}>
+            <ListPlus className="h-4 w-4" /> Agregar a lista
           </Button>
         )}
 

@@ -33,7 +33,7 @@ import { useGlobalEquipmentSearch, getGlobalEquipmentCache } from '@/hooks/useGl
 import { useBodega } from '@/hooks/repuestos/useBodega'
 import { useAreaRepuestos, type StockStatus, type AreaRepuestoRow } from '@/hooks/repuestos/useAreaRepuestos'
 import { useHierarchyPaths } from '@/hooks/repuestos/useHierarchyPaths'
-import { getRepuestoFavs, saveRepuestoFavs } from '@/services/userPreferences'
+import { getRepuestoFavs, saveRepuestoFavs, getRepuestoFavListsGlobal, saveRepuestoFavListsGlobal, type RepuestoFavList } from '@/services/userPreferences'
 import { useRepuestoCrud } from '@/hooks/repuestos/useRepuestoCrud'
 import { useRepuestos } from '@/hooks/repuestos/useRepuestos'
 import { useToast } from '@/hooks/useToast'
@@ -211,6 +211,36 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
       return next
     })
   }, [user?.id])
+
+  // ── Listas de favoritos con nombre (globales por usuario, keyed por rowKey) ──
+  const [favLists, setFavLists] = useState<RepuestoFavList[]>([])
+  const [listFilter, setListFilter] = useState<string>('all')
+  const [addToListRowKey, setAddToListRowKey] = useState<string | null>(null) // repuesto objetivo del modal
+  const [newListName, setNewListName] = useState('')
+  useEffect(() => {
+    if (!user?.id) return
+    getRepuestoFavListsGlobal(user.id).then(setFavLists).catch(() => {})
+  }, [user?.id])
+  const persistLists = useCallback((lists: RepuestoFavList[]) => {
+    setFavLists(lists)
+    if (user?.id) saveRepuestoFavListsGlobal(user.id, lists)
+  }, [user?.id])
+  const toggleInList = useCallback((listName: string, rowKey: string) => {
+    persistLists(favLists.map((l) => {
+      if (l.name !== listName) return l
+      const has = l.repuestoIds.includes(rowKey)
+      return { ...l, repuestoIds: has ? l.repuestoIds.filter((id) => id !== rowKey) : [...l.repuestoIds, rowKey] }
+    }))
+  }, [favLists, persistLists])
+  const createListWith = useCallback((name: string, rowKey: string) => {
+    const clean = name.trim()
+    if (!clean || favLists.some((l) => l.name === clean)) return
+    persistLists([...favLists, { name: clean, repuestoIds: [rowKey] }])
+  }, [favLists, persistLists])
+  const deleteList = useCallback((name: string) => {
+    persistLists(favLists.filter((l) => l.name !== name))
+    setListFilter((f) => (f === name ? 'all' : f))
+  }, [favLists, persistLists])
   useEffect(() => {
     if (isAdmin) getTrashCount().then(setTrashCount).catch(() => {})
   }, [isAdmin, trashOpen])
@@ -351,6 +381,11 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   const filteredRep = useMemo(() => {
     let res = areaRepuestos
     if (repFavOnly) res = res.filter((r) => favKeys.has(r.rowKey))
+    if (listFilter !== 'all') {
+      const l = favLists.find((x) => x.name === listFilter)
+      const ids = new Set(l?.repuestoIds ?? [])
+      res = res.filter((r) => ids.has(r.rowKey))
+    }
     if (repStockFilter !== 'all') res = res.filter((r) => r.stockStatus === repStockFilter)
     if (repTipoFilter !== 'all') res = res.filter((r) => tipoLabelOf(r.tipo) === repTipoFilter)
     if (repEquipoFilter !== 'all') res = res.filter((r) => r.equipos.some((e) => e.machineName === repEquipoFilter))
@@ -365,10 +400,10 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
       )
     }
     return res
-  }, [areaRepuestos, repFavOnly, favKeys, repStockFilter, repTipoFilter, repEquipoFilter, repQuery])
+  }, [areaRepuestos, repFavOnly, favKeys, listFilter, favLists, repStockFilter, repTipoFilter, repEquipoFilter, repQuery])
 
   // Reset de página al cambiar área/filtros
-  useEffect(() => { setRepPage(0) }, [selectedAreaId, showingAll, repQuery, repEquipoFilter, repStockFilter, repTipoFilter, repFavOnly, repPageSize])
+  useEffect(() => { setRepPage(0) }, [selectedAreaId, showingAll, repQuery, repEquipoFilter, repStockFilter, repTipoFilter, repFavOnly, listFilter, repPageSize])
 
   // Los tipos dependen del área → al cambiar de área el filtro de tipo vuelve a "Todos"
   useEffect(() => { setRepTipoFilter('all') }, [selectedAreaId, showingAll])
@@ -932,6 +967,15 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                 <Star className={['h-4 w-4', repFavOnly ? 'fill-current' : ''].join(' ')} /> Favoritos
                 {favKeys.size > 0 && <span className="tabular-nums opacity-70">({favKeys.size})</span>}
               </Button>
+              {favLists.length > 0 && (
+                <Select value={listFilter} onValueChange={setListFilter}>
+                  <SelectTrigger className="w-[170px]"><SelectValue placeholder="Lista" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas las listas</SelectItem>
+                    {favLists.map((l) => <SelectItem key={l.name} value={l.name}>{l.name} ({l.repuestoIds.length})</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             {repuestosBusy ? (
@@ -1075,6 +1119,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
           onManualSearch={() => startAction('manualSearch')}
           isFavorite={favKeys.has(selectedRep.rowKey)}
           onToggleFavorite={() => toggleFav(selectedRep.rowKey)}
+          onAddToList={() => setAddToListRowKey(selectedRep.rowKey)}
         />
       )}
 
@@ -1210,6 +1255,58 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
         categories={[]}
         machineName={showingAll ? 'Todas las áreas' : (selectedNode?.nombre ?? 'Área')}
       />
+
+      {/* Gestor de listas de favoritos con nombre (para el repuesto objetivo) */}
+      {addToListRowKey && ((rk: string) => {
+        const row = areaRepuestos.find((r) => r.rowKey === rk)
+        return (
+          <Dialog open onOpenChange={(o) => { if (!o) { setAddToListRowKey(null); setNewListName('') } }}>
+            <DialogContent className="max-w-sm">
+              <DialogHeader>
+                <DialogTitle className="text-base">Agregar a lista</DialogTitle>
+                <DialogDescription className="truncate">{row?.textoBreve || row?.codigoSAP || 'Repuesto'}</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-1.5">
+                {favLists.length === 0 && <p className="text-xs text-muted-foreground">Aún no tienes listas. Crea una abajo.</p>}
+                {favLists.map((l) => {
+                  const inList = l.repuestoIds.includes(rk)
+                  return (
+                    <div
+                      key={l.name}
+                      className={[
+                        'flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition',
+                        inList ? 'border-amber-400/40 bg-amber-400/10 text-amber-500' : 'border-border bg-card text-foreground',
+                      ].join(' ')}
+                    >
+                      <button onClick={() => toggleInList(l.name, rk)} className="flex flex-1 items-center gap-2 text-left">
+                        <Star className={['h-3.5 w-3.5 shrink-0', inList ? 'fill-current' : 'text-muted-foreground/40'].join(' ')} />
+                        <span className="flex-1 truncate">{l.name}</span>
+                        <span className="text-[10px] text-muted-foreground tabular-nums">{l.repuestoIds.length}</span>
+                        {inList && <span className="text-[10px]">En lista</span>}
+                      </button>
+                      <button
+                        onClick={() => deleteList(l.name)}
+                        className="rounded p-0.5 text-muted-foreground/50 hover:text-destructive"
+                        title="Eliminar lista"
+                        aria-label="Eliminar lista"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+              <form
+                onSubmit={(e) => { e.preventDefault(); if (!newListName.trim()) return; createListWith(newListName, rk); setNewListName('') }}
+                className="mt-2 flex gap-2"
+              >
+                <Input value={newListName} onChange={(e) => setNewListName(e.target.value)} placeholder="Nueva lista…" className="h-8 text-xs" />
+                <Button type="submit" size="sm" disabled={!newListName.trim()} className="h-8">Crear</Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )
+      })(addToListRowKey)}
 
       {/* Crear repuesto */}
       <RepuestoFormModal

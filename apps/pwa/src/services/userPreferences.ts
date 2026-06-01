@@ -33,6 +33,8 @@ export interface UserPreferencesData {
   repuestoFavLists?: Record<string, RepuestoFavList[]>
   /** Repuestos favoritos GLOBALES del hub área-first (rowKeys estables, no por equipo). */
   repuestoFavs?: string[]
+  /** Listas de favoritos con nombre, GLOBALES del hub (repuestoIds = rowKeys estables). */
+  repuestoFavListsGlobal?: RepuestoFavList[]
   updatedAt?: unknown
 }
 
@@ -119,6 +121,31 @@ export async function saveRepuestoFavs(userId: string, favs: string[]): Promise<
     }, { merge: true })
   } catch (err) {
     logger.error('Error saving repuesto favs', err instanceof Error ? err : new Error(String(err)))
+  }
+}
+
+// ── Listas de favoritos con nombre, GLOBALES (hub área-first) ──
+// repuestoIds = rowKeys estables (mismo criterio que repuestoFavs). Un repuesto
+// puede estar en varias listas. Reemplazo del legacy per-equipment para el hub.
+
+export async function getRepuestoFavListsGlobal(userId: string): Promise<RepuestoFavList[]> {
+  try {
+    const snap = await getDoc(doc(db, COL, userId))
+    if (snap.exists()) return (snap.data().repuestoFavListsGlobal as RepuestoFavList[]) || []
+  } catch (err) {
+    logger.error('Error loading repuesto fav lists (global)', err instanceof Error ? err : new Error(String(err)))
+  }
+  return []
+}
+
+export async function saveRepuestoFavListsGlobal(userId: string, lists: RepuestoFavList[]): Promise<void> {
+  try {
+    await setDoc(doc(db, COL, userId), {
+      repuestoFavListsGlobal: lists,
+      updatedAt: serverTimestamp(),
+    }, { merge: true })
+  } catch (err) {
+    logger.error('Error saving repuesto fav lists (global)', err instanceof Error ? err : new Error(String(err)))
   }
 }
 
