@@ -12,7 +12,7 @@
  *  - Fase 7: búsqueda global del topbar + promover hub a vista por defecto.
  */
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
-import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ListChecks, ClipboardList, Menu, GitMerge, History, Trash2, Star, Upload, Download, ArrowUpDown, Eye, EyeOff, Package, X, Loader2, Wrench, Settings2, Archive } from 'lucide-react'
+import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ListChecks, ClipboardList, Menu, GitMerge, History, Trash2, Star, Upload, Download, ArrowUpDown, Eye, EyeOff, Package, X, Loader2, Wrench, Settings2, Archive, ArrowRightLeft } from 'lucide-react'
 import { Badge, Button, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui'
 import { AreaSidebar } from '@/components/repuestos/AreaSidebar'
 import { AssetDetailModal } from '@/components/repuestos/AssetDetailModal'
@@ -44,6 +44,7 @@ import { RepuestoGalleryModal } from '@/components/repuestos/RepuestoGalleryModa
 import { RepuestoManualModal } from '@/components/repuestos/RepuestoManualModal'
 import { ManualSearchModal } from '@/components/repuestos/ManualSearchModal'
 import { RelocateRepuestoModal } from '@/components/repuestos/RelocateRepuestoModal'
+import { BulkRelocateModal } from '@/components/repuestos/BulkRelocateModal'
 import { ImportRepuestosModal } from './ImportRepuestosModal'
 import { ExportReportModal } from '@/components/repuestos/ExportReportModal'
 import { normalizeForSearch } from '@/utils/repuestos'
@@ -218,6 +219,13 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   const [exportOpen, setExportOpen] = useState(false)
   // importCatalogoDesdeExcel se liga a la máquina destino elegida del área.
   const { importCatalogoDesdeExcel } = useRepuestos(importTargetMachine?.id ?? null)
+
+  // ── Reubicación masiva (G3, Wave 2) ──
+  const [bulkPicker, setBulkPicker] = useState(false)
+  const [bulkSourceMachine, setBulkSourceMachine] = useState<Machine | null>(null)
+  const [bulkOpen, setBulkOpen] = useState(false)
+  // repuestos + bulkRelocateRepuestos se ligan a la máquina ORIGEN elegida.
+  const { repuestos: bulkSourceRepuestos, bulkRelocateRepuestos } = useRepuestos(bulkSourceMachine?.id ?? null)
 
   // ── Favoritos de repuestos (globales por usuario, keyed por rowKey) ──
   const [favKeys, setFavKeys] = useState<Set<string>>(new Set())
@@ -800,6 +808,20 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
     }
   }, [areaMachines, toast])
 
+  // Reubicación masiva: elige equipo ORIGEN del área (o directo si hay uno)
+  const startBulkRelocate = useCallback(() => {
+    if (areaMachines.length === 0) {
+      toast({ variant: 'destructive', title: 'Selecciona un área con equipos', description: 'La reubicación masiva mueve repuestos de un equipo del área a otro.' })
+      return
+    }
+    if (areaMachines.length === 1 && areaMachines[0]) {
+      setBulkSourceMachine(areaMachines[0])
+      setBulkOpen(true)
+    } else {
+      setBulkPicker(true)
+    }
+  }, [areaMachines, toast])
+
   const handleImportSuccess = useCallback(async (message: string) => {
     toast({ title: 'Importación exitosa', description: message, variant: 'success' })
     setImportOpen(false)
@@ -1165,6 +1187,11 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
               {isAdmin && (selectedAreaId || showingAll) && (
                 <Button variant="outline" size="sm" className="gap-1.5" onClick={startCreate} title="Agregar repuesto a un equipo del área">
                   <Plus className="h-4 w-4" /> Repuesto
+                </Button>
+              )}
+              {isAdmin && (selectedAreaId || showingAll) && (
+                <Button variant="outline" size="sm" className="gap-1.5" onClick={startBulkRelocate} title="Reubicar varios repuestos de un equipo a otro">
+                  <ArrowRightLeft className="h-4 w-4" /> Reubicar lote
                 </Button>
               )}
               <Button
@@ -1752,6 +1779,41 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Selector de equipo ORIGEN para "Reubicar lote" (G3) */}
+      <Dialog open={bulkPicker} onOpenChange={(o) => !o && setBulkPicker(false)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-base">¿Desde qué equipo?</DialogTitle>
+            <DialogDescription>Elige el equipo de origen; luego seleccionas qué repuestos mover y a qué equipo destino.</DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[50vh] space-y-1.5 overflow-y-auto">
+            {areaMachines.map((m) => (
+              <button
+                key={m.id}
+                onClick={() => { setBulkSourceMachine(m); setBulkPicker(false); setBulkOpen(true) }}
+                className="flex w-full items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-left text-sm font-medium text-foreground transition hover:bg-muted/40 hover:border-primary/40"
+              >
+                <Cog className="h-4 w-4 shrink-0 text-cyan-500" />
+                <span className="truncate">{m.nombre || m.id}</span>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reubicación masiva (mueve repuestos de bulkSourceMachine a otro equipo) */}
+      {bulkSourceMachine && (
+        <BulkRelocateModal
+          open={bulkOpen}
+          onOpenChange={(o) => { setBulkOpen(o); if (!o) setBulkSourceMachine(null) }}
+          repuestos={bulkSourceRepuestos}
+          currentMachine={bulkSourceMachine}
+          machines={machines}
+          onBulkRelocate={bulkRelocateRepuestos}
+          onSuccess={() => { setBulkOpen(false); setBulkSourceMachine(null); invalidateGlobalRepuestosCache(); loadAll() }}
+        />
+      )}
 
       {/* Importar Excel (carga en machines/{importTargetMachine}/repuestos) */}
       <ImportRepuestosModal
