@@ -7,9 +7,10 @@
  * última actualización (último movimiento) · Ver movimientos.
  */
 import { useState, useEffect, useCallback } from 'react'
-import { X, Copy, Check, History, ImageOff, Loader2, ArrowDownCircle, ArrowUpCircle, Settings2, Pencil, Plus } from 'lucide-react'
+import { X, Copy, Check, History, ImageOff, Loader2, ArrowDownCircle, ArrowUpCircle, Settings2, Pencil, Plus, FileText, Image as ImageIcon, Images, BookOpen, ArrowRightLeft, Trash2, SquarePen } from 'lucide-react'
 import { Button, Input } from '@/components/ui'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
+import { InlineEditName } from '@/components/repuestos/InlineEditName'
 import type { AreaRepuestoRow } from '@/hooks/repuestos/useAreaRepuestos'
 import type { MovimientoBodega } from '@/hooks/repuestos/useBodega'
 
@@ -23,6 +24,41 @@ interface RepuestoDetailPanelProps {
   onSaveLocation: (codigoSAP: string, loc: UbicacionEstructurada) => Promise<void>
   /** Abrir el modal de solicitud prellenado con este repuesto (Fase 6). */
   onSolicitar?: (item: AreaRepuestoRow) => void
+  // ── Acciones por repuesto (Wave 1: rescate de "Por equipo") ──
+  /** ¿el usuario es admin? Habilita editar/renombrar/reubicar/eliminar. */
+  isAdmin?: boolean
+  /** Renombrar (textoBreve) inline desde el título. Solo admin. */
+  onRename?: (newName: string) => Promise<void>
+  /** Editar repuesto (form completo). Solo admin. */
+  onEditRepuesto?: () => void
+  /** Eliminar (soft delete → papelera). Solo admin. */
+  onDeleteRepuesto?: () => void
+  /** Reubicar a otra máquina. Solo admin. */
+  onRelocate?: () => void
+  /** Ver/editar ficha técnica. */
+  onSpecs?: () => void
+  /** Ver fotos (reales + de manual). */
+  onPhotos?: () => void
+  /** Ver/editar galería. */
+  onGallery?: () => void
+  /** Ver vínculos al manual. */
+  onManual?: () => void
+}
+
+/** Botón de acción compacto del panel (icono + etiqueta). */
+function ActionBtn({ icon: Icon, label, onClick, danger }: { icon: typeof FileText; label: string; onClick: () => void; danger?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      className={[
+        'flex flex-col items-center gap-1 rounded-lg border border-border bg-card px-2 py-2 text-[10px] font-medium transition',
+        danger ? 'text-red-500 hover:bg-red-500/10 hover:border-red-500/40' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+      ].join(' ')}
+    >
+      <Icon className="h-4 w-4" />
+      {label}
+    </button>
+  )
 }
 
 /** Texto de ubicación: estructurada (Pasillo/Estante/Nivel) o el string libre legacy. */
@@ -56,7 +92,7 @@ function fmtDate(d: Date): string {
   } catch { return '' }
 }
 
-export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, onSaveLocation, onSolicitar }: RepuestoDetailPanelProps) {
+export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, onSaveLocation, onSolicitar, isAdmin, onRename, onEditRepuesto, onDeleteRepuesto, onRelocate, onSpecs, onPhotos, onGallery, onManual }: RepuestoDetailPanelProps) {
   const [copied, setCopied] = useState(false)
   const [movs, setMovs] = useState<MovimientoBodega[] | null>(null)
   const [movsLoading, setMovsLoading] = useState(false)
@@ -138,7 +174,18 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
         </div>
 
         {/* Nombre + SAP */}
-        <h2 className="text-base font-bold leading-tight text-foreground">{item.textoBreve || '(sin nombre)'}</h2>
+        {isAdmin && onRename ? (
+          <InlineEditName
+            value={item.textoBreve || ''}
+            onSave={onRename}
+            canEdit
+            placeholder="(sin nombre)"
+            textClassName="text-base font-bold leading-tight text-foreground"
+            inputClassName="text-base font-bold leading-tight"
+          />
+        ) : (
+          <h2 className="text-base font-bold leading-tight text-foreground">{item.textoBreve || '(sin nombre)'}</h2>
+        )}
         <div className="mb-3 mt-1 flex items-center gap-2">
           <span className="text-[11px] uppercase tracking-wide text-muted-foreground">SAP</span>
           <span className="font-mono text-sm text-foreground">{sap || '-'}</span>
@@ -154,6 +201,25 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
           <Button size="sm" className="mb-3 w-full gap-1.5" onClick={() => onSolicitar(item)}>
             <Plus className="h-4 w-4" /> Solicitar repuesto
           </Button>
+        )}
+
+        {/* Acciones de consulta (todos los usuarios) */}
+        {(onSpecs || onPhotos || onGallery || onManual) && (
+          <div className="mb-3 grid grid-cols-4 gap-1.5">
+            {onSpecs && <ActionBtn icon={FileText} label="Ficha" onClick={onSpecs} />}
+            {onPhotos && <ActionBtn icon={ImageIcon} label="Fotos" onClick={onPhotos} />}
+            {onGallery && <ActionBtn icon={Images} label="Galería" onClick={onGallery} />}
+            {onManual && <ActionBtn icon={BookOpen} label="Manual" onClick={onManual} />}
+          </div>
+        )}
+
+        {/* Acciones de edición (solo admin) */}
+        {isAdmin && (onEditRepuesto || onRelocate || onDeleteRepuesto) && (
+          <div className="mb-3 grid grid-cols-3 gap-1.5">
+            {onEditRepuesto && <ActionBtn icon={SquarePen} label="Editar" onClick={onEditRepuesto} />}
+            {onRelocate && <ActionBtn icon={ArrowRightLeft} label="Reubicar" onClick={onRelocate} />}
+            {onDeleteRepuesto && <ActionBtn icon={Trash2} label="Eliminar" onClick={onDeleteRepuesto} danger />}
+          </div>
         )}
 
         {/* Campos */}

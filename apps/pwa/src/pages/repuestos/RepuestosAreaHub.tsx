@@ -13,7 +13,7 @@
  */
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { Search, ChevronRight, ChevronLeft, Cog, ImageOff, Plus, ListChecks, ClipboardList, Menu, GitMerge, History, Trash2 } from 'lucide-react'
-import { Badge, Button, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui'
+import { Badge, Button, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui'
 import { AreaSidebar } from '@/components/repuestos/AreaSidebar'
 import { AssetDetailModal } from '@/components/repuestos/AssetDetailModal'
 import { RepuestoDetailPanel } from '@/components/repuestos/RepuestoDetailPanel'
@@ -28,13 +28,24 @@ import { TrashPanel } from '@/components/repuestos/TrashPanel'
 import { getTrashCount } from '@/services/auditLog'
 import { usePlantAssets } from '@/hooks/repuestos/usePlantAssets'
 import { useHierarchyAreaTree, type AreaTreeNode } from '@/hooks/useHierarchyAreaTree'
-import { useGlobalSearch } from '@/hooks/repuestos/useGlobalSearch'
+import { useGlobalSearch, invalidateGlobalRepuestosCache, type GlobalSearchResult } from '@/hooks/repuestos/useGlobalSearch'
 import { useGlobalEquipmentSearch, getGlobalEquipmentCache } from '@/hooks/useGlobalEquipmentSearch'
 import { useBodega } from '@/hooks/repuestos/useBodega'
-import { useAreaRepuestos, type StockStatus } from '@/hooks/repuestos/useAreaRepuestos'
+import { useAreaRepuestos, type StockStatus, type AreaRepuestoRow } from '@/hooks/repuestos/useAreaRepuestos'
 import { useHierarchyPaths } from '@/hooks/repuestos/useHierarchyPaths'
+import { useRepuestoCrud } from '@/hooks/repuestos/useRepuestoCrud'
+import { useRepuestos } from '@/hooks/repuestos/useRepuestos'
+import { useToast } from '@/hooks/useToast'
+import { RepuestoFormModal } from '@/components/repuestos/RepuestoForm'
+import { TechnicalSpecsModal } from '@/components/repuestos/TechnicalSpecsModal'
+import { RepuestoPhotosModal } from '@/components/repuestos/RepuestoPhotosModal'
+import { RepuestoGalleryModal } from '@/components/repuestos/RepuestoGalleryModal'
+import { RepuestoManualModal } from '@/components/repuestos/RepuestoManualModal'
+import { RelocateRepuestoModal } from '@/components/repuestos/RelocateRepuestoModal'
 import { normalizeForSearch } from '@/utils/repuestos'
-import type { PlantAsset, Machine } from '@/types/repuestos'
+import type { PlantAsset, Machine, RepuestoFormData, TechnicalSpecs, MachineImage } from '@/types/repuestos'
+
+type RepAction = 'edit' | 'specs' | 'photos' | 'gallery' | 'manual' | 'relocate' | 'delete'
 
 type StockFilter = 'all' | StockStatus
 const PAGE_SIZES = [8, 25, 50]
@@ -155,6 +166,19 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   const [auditLogOpen, setAuditLogOpen] = useState(false)
   const [trashOpen, setTrashOpen] = useState(false)
   const [trashCount, setTrashCount] = useState(0)
+
+  // ── Acciones por repuesto (Wave 1: rescate de "Por equipo") ──
+  const { toast } = useToast()
+  const { createRepuesto: crudCreate, updateRepuesto: crudUpdate, deleteRepuesto: crudDelete } = useRepuestoCrud()
+  const [actionTarget, setActionTarget] = useState<{ kind: RepAction; source: GlobalSearchResult } | null>(null)
+  const [equipoPicker, setEquipoPicker] = useState<{ kind: RepAction; sources: GlobalSearchResult[] } | null>(null)
+  const [createOpen, setCreateOpen] = useState(false)
+  const [createTargetMachine, setCreateTargetMachine] = useState<Machine | null>(null)
+  const [createPicker, setCreatePicker] = useState(false)
+  const [savingRep, setSavingRep] = useState(false)
+  // Reubicación: useRepuestos se liga a la máquina ORIGEN del repuesto elegido.
+  const relocateMachineId = actionTarget?.kind === 'relocate' ? actionTarget.source.machineId : null
+  const { relocateRepuesto } = useRepuestos(relocateMachineId)
   useEffect(() => {
     if (isAdmin) getTrashCount().then(setTrashCount).catch(() => {})
   }, [isAdmin, trashOpen])
@@ -355,6 +379,179 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
     [bodegaItems, saveStock],
   )
 
+  // ══════════════════════════════════════════════════════════════════
+  //  Acciones por repuesto (Wave 1) — resolver el doc subyacente desde
+  //  la fila AGREGADA. Una fila puede mapear a >1 doc (mismo SAP en
+  //  varios equipos). La fuente real son los `allRepuestos` de useGlobalSearch.
+  // ══════════════════════════════════════════════════════════════════
+
+  // Set de machineIds reales → distingue colección `machines/` vs `hierarchy/`.
+  const machineIdSet = useMemo(() => new Set(machines.map((m) => m.id)), [machines])
+  const colPathOf = useCallback(
+    (mId: string) => (machineIdSet.has(mId) ? `machines/${mId}/repuestos` : `hierarchy/${mId}/repuestos`),
+    [machineIdSet],
+  )
+
+  // Resuelve los docs Repuesto subyacentes a una fila (mismo criterio de clave que useBodega).
+  const resolveSources = useCallback(
+    (row: AreaRepuestoRow): GlobalSearchResult[] => {
+      const sap = (row.codigoSAP || '').trim()
+      if (sap) return allRepuestos.filter((r) => (r.repuesto.codigoSAP || '').trim() === sap)
+      const fab = (row.codigoFabricante || '').trim()
+      if (fab) {
+        return allRepuestos.filter(
+          (r) => !(r.repuesto.codigoSAP || '').trim() && (r.repuesto.codigoFabricante || '').trim() === fab,
+        )
+      }
+      return allRepuestos.filter(
+        (r) =>
+          !(r.repuesto.codigoSAP || '').trim() &&
+          !(r.repuesto.codigoFabricante || '').trim() &&
+          r.repuesto.textoBreve === row.textoBreve &&
+          row.equipos.some((e) => e.machineId === r.machineId),
+      )
+    },
+    [allRepuestos],
+  )
+
+  // Máquinas (equipos) del área seleccionada — destino para "+ Repuesto".
+  const areaMachines = useMemo(() => {
+    if (showingAll) return machines
+    if (!selectedAreaId) return []
+    return machines.filter((m) => machineInArea(m.id, selectedAreaId))
+  }, [machines, showingAll, selectedAreaId, machineInArea])
+
+  // Refrescar catálogo tras una mutación (invalida cache de módulo + recarga).
+  const refreshCatalog = useCallback(async () => {
+    invalidateGlobalRepuestosCache()
+    await loadAll()
+  }, [loadAll])
+
+  // Disparar una acción sobre el repuesto seleccionado; pide elegir equipo si hay >1.
+  const startAction = useCallback(
+    (kind: RepAction) => {
+      if (!selectedRep) return
+      const sources = resolveSources(selectedRep)
+      if (sources.length === 0) {
+        toast({ variant: 'destructive', title: 'No se encontró el repuesto base', description: 'Recarga la página e intenta de nuevo.' })
+        return
+      }
+      if (sources.length === 1 && sources[0]) setActionTarget({ kind, source: sources[0] })
+      else setEquipoPicker({ kind, sources })
+    },
+    [selectedRep, resolveSources, toast],
+  )
+
+  // Renombrar (textoBreve): aplica a TODOS los equipos que comparten identidad.
+  const handleRenameRep = useCallback(
+    async (newName: string) => {
+      if (!selectedRep) return
+      const sources = resolveSources(selectedRep)
+      for (const s of sources) {
+        await crudUpdate(colPathOf(s.machineId), s.repuesto.id, { textoBreve: newName }, s.repuesto)
+      }
+      await refreshCatalog()
+    },
+    [selectedRep, resolveSources, crudUpdate, colPathOf, refreshCatalog],
+  )
+
+  // Editar (form completo) → solo el equipo elegido.
+  const handleEditSubmit = useCallback(
+    async (payload: RepuestoFormData) => {
+      if (!actionTarget) return
+      setSavingRep(true)
+      try {
+        const { source } = actionTarget
+        await crudUpdate(colPathOf(source.machineId), source.repuesto.id, { ...payload }, source.repuesto)
+        toast({ title: 'Repuesto actualizado', variant: 'success' })
+        setActionTarget(null)
+        await refreshCatalog()
+      } catch (err) {
+        toast({ variant: 'destructive', title: 'Error al guardar', description: err instanceof Error ? err.message : '' })
+      } finally {
+        setSavingRep(false)
+      }
+    },
+    [actionTarget, crudUpdate, colPathOf, refreshCatalog, toast],
+  )
+
+  const handleSaveSpecs = useCallback(
+    async (repuestoId: string, specs: TechnicalSpecs, _gallery: MachineImage[]) => {
+      if (!actionTarget) return
+      await crudUpdate(colPathOf(actionTarget.source.machineId), repuestoId, { technicalSpecs: specs }, actionTarget.source.repuesto)
+      toast({ title: 'Ficha técnica actualizada', variant: 'success' })
+      await refreshCatalog()
+    },
+    [actionTarget, crudUpdate, colPathOf, refreshCatalog, toast],
+  )
+
+  const handleSaveGallery = useCallback(
+    async (repuestoId: string, gallery: MachineImage[]) => {
+      if (!actionTarget) return
+      await crudUpdate(colPathOf(actionTarget.source.machineId), repuestoId, { gallery }, actionTarget.source.repuesto)
+      toast({ title: 'Galería actualizada', variant: 'success' })
+      await refreshCatalog()
+    },
+    [actionTarget, crudUpdate, colPathOf, refreshCatalog, toast],
+  )
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!actionTarget || actionTarget.kind !== 'delete') return
+    setSavingRep(true)
+    try {
+      const { source } = actionTarget
+      await crudDelete(colPathOf(source.machineId), source.repuesto.id)
+      toast({ title: 'Repuesto movido a la papelera', variant: 'success' })
+      setActionTarget(null)
+      setSelectedRepSap(null)
+      await refreshCatalog()
+    } catch (err) {
+      toast({ variant: 'destructive', title: 'Error al eliminar', description: err instanceof Error ? err.message : '' })
+    } finally {
+      setSavingRep(false)
+    }
+  }, [actionTarget, crudDelete, colPathOf, refreshCatalog, toast])
+
+  // "+ Repuesto": elige equipo destino del área (o directo si hay uno solo).
+  const startCreate = useCallback(() => {
+    if (areaMachines.length === 0) {
+      toast({ variant: 'destructive', title: 'Selecciona un área con equipos', description: 'El repuesto se crea asociado a un equipo del área.' })
+      return
+    }
+    if (areaMachines.length === 1 && areaMachines[0]) {
+      setCreateTargetMachine(areaMachines[0])
+      setCreateOpen(true)
+    } else {
+      setCreatePicker(true)
+    }
+  }, [areaMachines, toast])
+
+  const handleCreateSubmit = useCallback(
+    async (payload: RepuestoFormData) => {
+      if (!createTargetMachine) return
+      setSavingRep(true)
+      try {
+        await crudCreate(`machines/${createTargetMachine.id}/repuestos`, payload)
+        toast({ title: 'Repuesto creado', variant: 'success' })
+        setCreateOpen(false)
+        await refreshCatalog()
+      } catch (err) {
+        toast({ variant: 'destructive', title: 'Error al crear', description: err instanceof Error ? err.message : '' })
+      } finally {
+        setSavingRep(false)
+      }
+    },
+    [createTargetMachine, crudCreate, refreshCatalog, toast],
+  )
+
+  // Datos del repuesto/equipo objetivo de la acción en curso.
+  const actionRep = actionTarget?.source.repuesto ?? null
+  const actionMachineId = actionTarget?.source.machineId
+  const actionMachine = useMemo(
+    () => (actionMachineId ? machines.find((m) => m.id === actionMachineId) ?? null : null),
+    [actionMachineId, machines],
+  )
+
   const repuestosBusy = !repuestosLoaded || repuestosLoading || bodegaLoading || pathsLoading || eqLoading
 
   const breadcrumb = useMemo(
@@ -486,15 +683,22 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                 )}
               </div>
             </div>
-            <Button
-              variant={showEquipos ? 'default' : 'outline'}
-              size="sm"
-              className="gap-1.5"
-              onClick={() => setShowEquipos((s) => !s)}
-            >
-              <ListChecks className="h-4 w-4" /> Ver equipos del área
-              {filteredAssets.length > 0 && <span className="tabular-nums opacity-70">({filteredAssets.length})</span>}
-            </Button>
+            <div className="flex items-center gap-2">
+              {isAdmin && (selectedAreaId || showingAll) && (
+                <Button variant="outline" size="sm" className="gap-1.5" onClick={startCreate} title="Agregar repuesto a un equipo del área">
+                  <Plus className="h-4 w-4" /> Repuesto
+                </Button>
+              )}
+              <Button
+                variant={showEquipos ? 'default' : 'outline'}
+                size="sm"
+                className="gap-1.5"
+                onClick={() => setShowEquipos((s) => !s)}
+              >
+                <ListChecks className="h-4 w-4" /> Ver equipos del área
+                {filteredAssets.length > 0 && <span className="tabular-nums opacity-70">({filteredAssets.length})</span>}
+              </Button>
+            </div>
           </div>
 
           {/* KPIs */}
@@ -756,6 +960,15 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
           loadMovimientos={loadMovimientos}
           onSaveLocation={handleSaveLocation}
           onSolicitar={(r) => openSolicitar({ codigoSAP: r.codigoSAP, textoBreve: r.textoBreve })}
+          isAdmin={isAdmin}
+          onRename={isAdmin ? handleRenameRep : undefined}
+          onEditRepuesto={isAdmin ? () => startAction('edit') : undefined}
+          onDeleteRepuesto={isAdmin ? () => startAction('delete') : undefined}
+          onRelocate={isAdmin ? () => startAction('relocate') : undefined}
+          onSpecs={() => startAction('specs')}
+          onPhotos={() => startAction('photos')}
+          onGallery={() => startAction('gallery')}
+          onManual={() => startAction('manual')}
         />
       )}
 
@@ -798,11 +1011,158 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
       {/* Herramientas admin de catálogo (rescatadas de "Por equipo") */}
       {isAdmin && (
         <>
-          <DuplicatesModal open={duplicatesOpen} onOpenChange={setDuplicatesOpen} machines={machines} onDone={() => { /* refresca solo */ }} />
+          <DuplicatesModal open={duplicatesOpen} onOpenChange={setDuplicatesOpen} machines={machines} onDone={() => { invalidateGlobalRepuestosCache(); loadAll() }} />
           <AuditLogPanel open={auditLogOpen} onOpenChange={setAuditLogOpen} />
           <TrashPanel open={trashOpen} onOpenChange={setTrashOpen} />
         </>
       )}
+
+      {/* ── Acciones por repuesto (Wave 1) ── */}
+
+      {/* Selector de equipo cuando un repuesto vive en >1 equipo */}
+      <Dialog open={!!equipoPicker} onOpenChange={(o) => !o && setEquipoPicker(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-base">¿Sobre qué equipo?</DialogTitle>
+            <DialogDescription>Este repuesto está registrado en varios equipos. Elige sobre cuál aplicar la acción.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            {equipoPicker?.sources.map((s) => (
+              <button
+                key={`${s.machineId}:${s.repuesto.id}`}
+                onClick={() => { setActionTarget({ kind: equipoPicker.kind, source: s }); setEquipoPicker(null) }}
+                className="flex w-full items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-left text-sm font-medium text-foreground transition hover:bg-muted/40 hover:border-primary/40"
+              >
+                <Cog className="h-4 w-4 shrink-0 text-cyan-500" />
+                <span className="truncate">{s.machineName}</span>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Selector de equipo destino para "+ Repuesto" */}
+      <Dialog open={createPicker} onOpenChange={(o) => !o && setCreatePicker(false)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-base">¿A qué equipo?</DialogTitle>
+            <DialogDescription>El nuevo repuesto se asociará al equipo seleccionado del área.</DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[50vh] space-y-1.5 overflow-y-auto">
+            {areaMachines.map((m) => (
+              <button
+                key={m.id}
+                onClick={() => { setCreateTargetMachine(m); setCreatePicker(false); setCreateOpen(true) }}
+                className="flex w-full items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-left text-sm font-medium text-foreground transition hover:bg-muted/40 hover:border-primary/40"
+              >
+                <Cog className="h-4 w-4 shrink-0 text-cyan-500" />
+                <span className="truncate">{m.nombre || m.id}</span>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Crear repuesto */}
+      <RepuestoFormModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        mode="create"
+        machineName={createTargetMachine?.nombre ?? ''}
+        onSubmit={handleCreateSubmit}
+        loading={savingRep}
+      />
+
+      {/* Editar repuesto */}
+      <RepuestoFormModal
+        open={actionTarget?.kind === 'edit'}
+        onClose={() => setActionTarget(null)}
+        mode="edit"
+        machineName={actionMachine?.nombre ?? actionTarget?.source.machineName ?? ''}
+        initialData={actionTarget?.kind === 'edit' ? actionRep : undefined}
+        onSubmit={handleEditSubmit}
+        loading={savingRep}
+      />
+
+      {/* Ficha técnica */}
+      {actionTarget?.kind === 'specs' && actionRep && (
+        <TechnicalSpecsModal
+          open
+          onOpenChange={(o) => !o && setActionTarget(null)}
+          repuesto={actionRep}
+          machineId={actionMachineId}
+          onSave={handleSaveSpecs}
+          readOnly={!isAdmin}
+        />
+      )}
+
+      {/* Galería */}
+      {actionTarget?.kind === 'gallery' && actionRep && (
+        <RepuestoGalleryModal
+          open
+          onOpenChange={(o) => !o && setActionTarget(null)}
+          repuesto={actionRep}
+          machineId={actionMachineId}
+          onSave={handleSaveGallery}
+          readOnly={!isAdmin}
+        />
+      )}
+
+      {/* Fotos (solo lectura) */}
+      {actionTarget?.kind === 'photos' && actionRep && (
+        <RepuestoPhotosModal
+          open
+          onOpenChange={(o) => !o && setActionTarget(null)}
+          fotosReales={actionRep.fotosReales || []}
+          imagenesManual={actionRep.imagenesManual || []}
+          repuestoName={actionRep.textoBreve || actionRep.codigoSAP || 'Repuesto'}
+        />
+      )}
+
+      {/* Vínculos al manual */}
+      {actionTarget?.kind === 'manual' && actionRep && (
+        <RepuestoManualModal
+          open
+          onOpenChange={(o) => !o && setActionTarget(null)}
+          repuesto={actionRep}
+        />
+      )}
+
+      {/* Reubicar */}
+      {actionTarget?.kind === 'relocate' && actionRep && actionMachine && (
+        <RelocateRepuestoModal
+          open
+          onOpenChange={(o) => !o && setActionTarget(null)}
+          repuesto={actionRep}
+          currentMachine={actionMachine}
+          machines={machines}
+          onRelocate={relocateRepuesto}
+          onSuccess={() => {
+            setActionTarget(null)
+            toast({ title: 'Repuesto reubicado', description: 'El repuesto fue movido a la nueva máquina.' })
+            invalidateGlobalRepuestosCache(); loadAll()
+          }}
+        />
+      )}
+
+      {/* Confirmar eliminación */}
+      <Dialog open={actionTarget?.kind === 'delete'} onOpenChange={(o) => !o && setActionTarget(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-base">Eliminar repuesto</DialogTitle>
+            <DialogDescription>
+              Se moverá a la papelera (recuperable). {actionRep ? `"${actionRep.textoBreve || actionRep.codigoSAP}"` : ''}
+              {actionMachine ? ` — equipo ${actionMachine.nombre}` : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setActionTarget(null)} disabled={savingRep}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleConfirmDelete} disabled={savingRep}>
+              {savingRep ? 'Eliminando…' : 'Eliminar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
