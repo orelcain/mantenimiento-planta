@@ -12,7 +12,7 @@
  *  - Fase 7: búsqueda global del topbar + promover hub a vista por defecto.
  */
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { Search, ChevronRight, ChevronLeft, Cog, ImageOff, Plus, ListChecks, ClipboardList, Menu, GitMerge, History, Trash2, Star, Upload, Download } from 'lucide-react'
+import { Search, ChevronRight, ChevronLeft, ChevronDown, Cog, ImageOff, Plus, ListChecks, ClipboardList, Menu, GitMerge, History, Trash2, Star, Upload, Download } from 'lucide-react'
 import { Badge, Button, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui'
 import { AreaSidebar } from '@/components/repuestos/AreaSidebar'
 import { AssetDetailModal } from '@/components/repuestos/AssetDetailModal'
@@ -33,7 +33,7 @@ import { useGlobalEquipmentSearch, getGlobalEquipmentCache } from '@/hooks/useGl
 import { useBodega } from '@/hooks/repuestos/useBodega'
 import { useAreaRepuestos, type StockStatus, type AreaRepuestoRow } from '@/hooks/repuestos/useAreaRepuestos'
 import { useHierarchyPaths } from '@/hooks/repuestos/useHierarchyPaths'
-import { getRepuestoFavs, saveRepuestoFavs, getRepuestoFavListsGlobal, saveRepuestoFavListsGlobal, type RepuestoFavList } from '@/services/userPreferences'
+import { getRepuestoFavs, saveRepuestoFavs, getRepuestoFavListsGlobal, saveRepuestoFavListsGlobal, getUserPreferences, type RepuestoFavList, type FavList } from '@/services/userPreferences'
 import { useRepuestoCrud } from '@/hooks/repuestos/useRepuestoCrud'
 import { useRepuestos } from '@/hooks/repuestos/useRepuestos'
 import { useToast } from '@/hooks/useToast'
@@ -120,6 +120,19 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
     }
     return { machines: [...machinesMap.values()], machineAreas: areas }
     // eqLoading dispara el recálculo cuando el cache (no reactivo) termina de cargar
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eqLoading])
+
+  // Nombre amigable por machineId/equipId (para los chips de favoritos de equipos):
+  // alias o nombre del equipo desde el cache, igual que EquipmentNavigator.
+  const equipNameMap = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const e of (getGlobalEquipmentCache() || [])) {
+      const label = e.alias || e.nombre || e.id
+      m.set(e.id, label)
+      if (e.linkedMachineId) m.set(e.linkedMachineId, label)
+    }
+    return m
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eqLoading])
 
@@ -241,6 +254,39 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
     persistLists(favLists.filter((l) => l.name !== name))
     setListFilter((f) => (f === name ? 'all' : f))
   }, [favLists, persistLists])
+
+  // ── Favoritos de EQUIPOS (listas con nombre del legacy "Por equipo") ──
+  // Solo lectura en el hub: viven en user_preferences/{uid}.favoriteLists (machineIds).
+  const [equipFavLists, setEquipFavLists] = useState<FavList[]>([])
+  const [favBarClosed, setFavBarClosed] = useState<Record<string, boolean>>({})
+  useEffect(() => {
+    if (!user?.id) return
+    getUserPreferences(user.id).then((p) => setEquipFavLists(p.favoriteLists || [])).catch(() => {})
+  }, [user?.id])
+
+  // Clic en chip de equipo → ir a su área + filtrar la tabla a ese equipo.
+  const handleFavEquipClick = useCallback((favKey: string) => {
+    const eq = getGlobalEquipmentCache() || []
+    const e = eq.find((x) => (x.linkedMachineId || x.id) === favKey) || eq.find((x) => x.id === favKey)
+    const areaId = e?.parentId || (e?.path && e.path.length ? e.path[e.path.length - 1] : null)
+    if (areaId) {
+      setSelectedAreaId(areaId)
+      setShowingAll(false)
+      setOpenNodes((prev) => {
+        const next = { ...prev }
+        getNodePath(areaId).forEach((n) => { next[n.id] = true })
+        return next
+      })
+    } else {
+      setShowingAll(true)
+      setSelectedAreaId(null)
+    }
+    const m = machines.find((x) => x.id === favKey || (!!e?.linkedMachineId && x.id === e.linkedMachineId))
+    setRepEquipoFilter(m ? m.nombre : 'all')
+    setSelectedRowKey(null)
+    setSelectedAssetId(null)
+    setSidebarMobileOpen(false)
+  }, [machines, getNodePath])
   useEffect(() => {
     if (isAdmin) getTrashCount().then(setTrashCount).catch(() => {})
   }, [isAdmin, trashOpen])
@@ -779,6 +825,45 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+          {/* Favoritos de equipos (listas con nombre rescatadas de "Por equipo") */}
+          {equipFavLists.length > 0 && (
+            <div className="mb-5 rounded-xl border border-border bg-card/40 p-3">
+              <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> Favoritos de equipos
+              </div>
+              <div className="space-y-2">
+                {equipFavLists.map((list) => {
+                  const closed = favBarClosed[list.name]
+                  return (
+                    <div key={list.name}>
+                      <button
+                        onClick={() => setFavBarClosed((p) => ({ ...p, [list.name]: !p[list.name] }))}
+                        className="flex items-center gap-1.5 text-[11px] font-semibold text-foreground"
+                      >
+                        <ChevronDown className={['h-3.5 w-3.5 transition-transform', closed ? '-rotate-90' : ''].join(' ')} />
+                        {list.name}
+                        <span className="tabular-nums text-muted-foreground/60">({list.machineIds.length})</span>
+                      </button>
+                      {!closed && (
+                        <div className="mt-1.5 flex flex-wrap gap-1.5 pl-5">
+                          {list.machineIds.map((id) => (
+                            <button
+                              key={id}
+                              onClick={() => handleFavEquipClick(id)}
+                              className="rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-medium text-foreground transition hover:border-primary/50 hover:bg-primary/10 hover:text-primary"
+                            >
+                              {list.machineNames?.[id] || equipNameMap.get(id) || id}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Cabecera del área */}
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
