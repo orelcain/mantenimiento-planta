@@ -12,7 +12,7 @@
  *  - Fase 7: búsqueda global del topbar + promover hub a vista por defecto.
  */
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { Search, ChevronRight, ChevronLeft, Cog, ImageOff, Plus, ListChecks, ClipboardList, Menu } from 'lucide-react'
+import { Search, ChevronRight, ChevronLeft, Cog, ImageOff, Plus, ListChecks, ClipboardList, Menu, GitMerge, History, Trash2 } from 'lucide-react'
 import { Badge, Button, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui'
 import { AreaSidebar } from '@/components/repuestos/AreaSidebar'
 import { AssetDetailModal } from '@/components/repuestos/AssetDetailModal'
@@ -21,7 +21,11 @@ import { AssetDetailPanel } from '@/components/repuestos/AssetDetailPanel'
 import { SolicitarRepuestoModal, type RepuestoLite } from '@/components/repuestos/SolicitarRepuestoModal'
 import { SolicitudesPanel } from '@/components/repuestos/SolicitudesPanel'
 import { useSolicitudes } from '@/hooks/repuestos/useSolicitudes'
-import { useAuthStore } from '@/store/authStore'
+import { useAuthStore, useIsAdmin } from '@/store/authStore'
+import { DuplicatesModal } from '@/components/repuestos/DuplicatesModal'
+import { AuditLogPanel } from '@/components/repuestos/AuditLogPanel'
+import { TrashPanel } from '@/components/repuestos/TrashPanel'
+import { getTrashCount } from '@/services/auditLog'
 import { usePlantAssets } from '@/hooks/repuestos/usePlantAssets'
 import { useHierarchyAreaTree, type AreaTreeNode } from '@/hooks/useHierarchyAreaTree'
 import { useGlobalSearch } from '@/hooks/repuestos/useGlobalSearch'
@@ -145,6 +149,16 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   // Drawer del sidebar de áreas en móvil
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false)
 
+  // ── Herramientas admin (gestión de catálogo) ──
+  const isAdmin = useIsAdmin()
+  const [duplicatesOpen, setDuplicatesOpen] = useState(false)
+  const [auditLogOpen, setAuditLogOpen] = useState(false)
+  const [trashOpen, setTrashOpen] = useState(false)
+  const [trashCount, setTrashCount] = useState(0)
+  useEffect(() => {
+    if (isAdmin) getTrashCount().then(setTrashCount).catch(() => {})
+  }, [isAdmin, trashOpen])
+
   const openSolicitar = useCallback((rep: RepuestoLite | null) => {
     setSolicitarRepuesto(rep)
     setSolicitarOpen(true)
@@ -230,6 +244,26 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
     // Los % de stock son relativos a los configurados, no al total (que incluye sin-SAP)
     const pct = (n: number) => (configurados > 0 ? Math.round((n / configurados) * 100) : 0)
     return { total, configurados, ok, low, out, pctOk: pct(ok), pctLow: pct(low), pctOut: pct(out) }
+  }, [areaRepuestos])
+
+  // KPIs de catálogo (cobertura): con/sin SAP, tipos distintos, valor referencial
+  const catalogStats = useMemo(() => {
+    let conSAP = 0
+    let valor = 0
+    const tipos = new Set<string>()
+    for (const r of areaRepuestos) {
+      if (r.codigoSAP) conSAP++
+      tipos.add(tipoLabelOf(r.tipo))
+      valor += (r.costoCompra ?? r.valorUnitario ?? 0) * (r.stockActual || 0)
+    }
+    const total = areaRepuestos.length
+    return {
+      conSAP,
+      sinSAP: total - conSAP,
+      pctSAP: total > 0 ? Math.round((conSAP / total) * 100) : 0,
+      tipos: tipos.size,
+      valor,
+    }
   }, [areaRepuestos])
 
   // Opciones del filtro "Equipo" (nombres distintos del área)
@@ -412,6 +446,23 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
           <Button size="sm" className="gap-1.5" onClick={() => openSolicitar(null)}>
             <Plus className="h-4 w-4" /> Solicitar repuesto
           </Button>
+          {/* Herramientas admin de catálogo (solo admin, ocultas en móvil) */}
+          {isAdmin && (
+            <div className="hidden items-center gap-1 border-l border-border pl-2 sm:flex">
+              <button onClick={() => setDuplicatesOpen(true)} title="Escáner de duplicados" className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+                <GitMerge className="h-4 w-4" />
+              </button>
+              <button onClick={() => setAuditLogOpen(true)} title="Historial de cambios" className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+                <History className="h-4 w-4" />
+              </button>
+              <button onClick={() => setTrashOpen(true)} title="Papelera" className="relative rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+                <Trash2 className="h-4 w-4" />
+                {trashCount > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white tabular-nums">{trashCount}</span>
+                )}
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 sm:p-6">
@@ -453,6 +504,23 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
             <KpiCard value={repuestosBusy ? '…' : stockKpis.low} label="Stock bajo" accent="text-amber-500" hint={repuestosBusy ? undefined : `${stockKpis.pctLow}%`} bar="border-l-amber-500" />
             <KpiCard value={repuestosBusy ? '…' : stockKpis.out} label="Sin stock" accent="text-red-500" hint={repuestosBusy ? undefined : `${stockKpis.pctOut}%`} bar="border-l-red-500" />
           </div>
+
+          {/* KPIs de catálogo (cobertura) */}
+          {!repuestosBusy && stockKpis.total > 0 && (
+            <div className="mb-6 -mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+              <span><b className="text-foreground tabular-nums">{catalogStats.conSAP}</b> con SAP <span className="opacity-60">({catalogStats.pctSAP}%)</span></span>
+              <span className="opacity-40">·</span>
+              <span><b className="text-foreground tabular-nums">{catalogStats.sinSAP}</b> sin SAP</span>
+              <span className="opacity-40">·</span>
+              <span><b className="text-foreground tabular-nums">{catalogStats.tipos}</b> tipos distintos</span>
+              {catalogStats.valor > 0 && (
+                <>
+                  <span className="opacity-40">·</span>
+                  <span>valor inventario <b className="text-foreground tabular-nums">${catalogStats.valor.toLocaleString('es-CL')}</b></span>
+                </>
+              )}
+            </div>
+          )}
 
           {/* Motores/Bombas del área (toggle "Ver equipos del área") */}
           {showEquipos && (
@@ -726,6 +794,15 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
         loading={solicitudesLoading}
         onAvanzar={avanzarEstado}
       />
+
+      {/* Herramientas admin de catálogo (rescatadas de "Por equipo") */}
+      {isAdmin && (
+        <>
+          <DuplicatesModal open={duplicatesOpen} onOpenChange={setDuplicatesOpen} machines={machines} onDone={() => { /* refresca solo */ }} />
+          <AuditLogPanel open={auditLogOpen} onOpenChange={setAuditLogOpen} />
+          <TrashPanel open={trashOpen} onOpenChange={setTrashOpen} />
+        </>
+      )}
     </div>
   )
 }
