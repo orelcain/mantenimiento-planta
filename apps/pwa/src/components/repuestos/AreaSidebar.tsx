@@ -16,6 +16,8 @@ interface AreaSidebarProps {
   onSelectArea: (node: AreaTreeNode) => void
   /** Conteo de motores/bombas por nodeId (incl. descendientes) para el badge secundario. */
   assetCountByNode?: Record<string, number>
+  /** Conteo de repuestos por nodeId (incl. descendientes) para el badge "N rep". */
+  repCountByNode?: Record<string, number>
   openNodes: Record<string, boolean>
   onToggleNode: (id: string) => void
   onShowAll: () => void
@@ -33,15 +35,16 @@ function countEquip(node: AreaTreeNode): number {
 }
 
 function AreaRow({
-  node, depth, selectedAreaId, onSelectArea, assetCountByNode, openNodes, onToggleNode,
+  node, depth, selectedAreaId, onSelectArea, assetCountByNode, repCountByNode, openNodes, onToggleNode,
 }: {
   node: AreaTreeNode; depth: number
-} & Pick<AreaSidebarProps, 'selectedAreaId' | 'onSelectArea' | 'assetCountByNode' | 'openNodes' | 'onToggleNode'>) {
+} & Pick<AreaSidebarProps, 'selectedAreaId' | 'onSelectArea' | 'assetCountByNode' | 'repCountByNode' | 'openNodes' | 'onToggleNode'>) {
   const isSelected = selectedAreaId === node.id
   const isOpen = !!openNodes[node.id]
   const hasChildren = node.children.length > 0 || node.hasMoreChildren
   const eqCount = countEquip(node)
   const assetCount = assetCountByNode?.[node.id] ?? 0
+  const repCount = repCountByNode?.[node.id] ?? 0
 
   return (
     <>
@@ -80,6 +83,9 @@ function AreaRow({
             {assetCount > 0 && (
               <span className="tabular-nums text-cyan-500">· {assetCount} M/B</span>
             )}
+            {repCount > 0 && (
+              <span className="tabular-nums text-emerald-500">· {repCount} rep</span>
+            )}
           </div>
         </div>
       </div>
@@ -94,6 +100,7 @@ function AreaRow({
               selectedAreaId={selectedAreaId}
               onSelectArea={onSelectArea}
               assetCountByNode={assetCountByNode}
+              repCountByNode={repCountByNode}
               openNodes={openNodes}
               onToggleNode={onToggleNode}
             />
@@ -105,7 +112,7 @@ function AreaRow({
 }
 
 export function AreaSidebar({
-  selectedAreaId, onSelectArea, assetCountByNode, openNodes, onToggleNode, onShowAll, showingAll,
+  selectedAreaId, onSelectArea, assetCountByNode, repCountByNode, openNodes, onToggleNode, onShowAll, showingAll,
   mobileOpen = false, onMobileClose,
 }: AreaSidebarProps) {
   const { areaTree, loading } = useHierarchyAreaTree()
@@ -159,6 +166,7 @@ export function AreaSidebar({
               selectedAreaId={selectedAreaId}
               onSelectArea={handleSelect}
               assetCountByNode={assetCountByNode}
+              repCountByNode={repCountByNode}
               openNodes={openNodes}
               onToggleNode={onToggleNode}
             />

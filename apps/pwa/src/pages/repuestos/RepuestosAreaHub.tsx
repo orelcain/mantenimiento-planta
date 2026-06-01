@@ -323,6 +323,22 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
     return out
   }, [areaTree, linkedAssets, isUnder])
 
+  // Conteo de repuestos por nodeId (badge "N rep" del sidebar). Una pasada sobre
+  // los items: cada repuesto cuenta en todas las áreas ancestras de sus equipos
+  // (misma lógica que machineInArea → coincide con areaRepuestos.length del área).
+  const repCountByNode = useMemo(() => {
+    const out: Record<string, number> = {}
+    for (const it of bodegaItems) {
+      const nodes = new Set<string>()
+      for (const eq of it.equipos) {
+        const set = machineAreas.get(eq.machineId)
+        if (set) for (const a of set) nodes.add(a)
+      }
+      for (const n of nodes) out[n] = (out[n] ?? 0) + 1
+    }
+    return out
+  }, [bodegaItems, machineAreas])
+
   const selectedNode = useMemo(
     () => (selectedAreaId ? findNode(selectedAreaId) : null),
     [selectedAreaId, findNode],
@@ -757,6 +773,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
         selectedAreaId={selectedAreaId}
         onSelectArea={handleSelectArea}
         assetCountByNode={assetCountByNode}
+        repCountByNode={repCountByNode}
         openNodes={openNodes}
         onToggleNode={handleToggleNode}
         onShowAll={handleShowAll}
