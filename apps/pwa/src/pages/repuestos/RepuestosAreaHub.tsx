@@ -11,8 +11,8 @@
  *  - Fase 6: "+ Solicitar repuesto".
  *  - Fase 7: búsqueda global del topbar + promover hub a vista por defecto.
  */
-import { useState, useMemo, useEffect, useCallback } from 'react'
-import { Search, ChevronRight, ChevronLeft, ChevronDown, Cog, ImageOff, Plus, ListChecks, ClipboardList, Menu, GitMerge, History, Trash2, Star, Upload, Download } from 'lucide-react'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
+import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ListChecks, ClipboardList, Menu, GitMerge, History, Trash2, Star, Upload, Download } from 'lucide-react'
 import { Badge, Button, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui'
 import { AreaSidebar } from '@/components/repuestos/AreaSidebar'
 import { AssetDetailModal } from '@/components/repuestos/AssetDetailModal'
@@ -50,6 +50,7 @@ import { normalizeForSearch } from '@/utils/repuestos'
 import type { PlantAsset, Machine, RepuestoFormData, TechnicalSpecs, MachineImage } from '@/types/repuestos'
 
 type RepAction = 'edit' | 'specs' | 'photos' | 'gallery' | 'manual' | 'manualSearch' | 'relocate' | 'delete'
+type SortCol = 'codigoSAP' | 'textoBreve' | 'equipo' | 'stock' | 'tipo'
 
 type StockFilter = 'all' | StockStatus
 const PAGE_SIZES = [8, 25, 50]
@@ -470,12 +471,87 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   // Los tipos dependen del área → al cambiar de área el filtro de tipo vuelve a "Todos"
   useEffect(() => { setRepTipoFilter('all') }, [selectedAreaId, showingAll])
 
-  const totalPages = Math.max(1, Math.ceil(filteredRep.length / repPageSize))
+  // Ordenamiento de columnas (3-clics: asc → desc → off), como "Por equipo".
+  const [repSortColumn, setRepSortColumn] = useState<SortCol | null>(null)
+  const [repSortDir, setRepSortDir] = useState<'asc' | 'desc'>('asc')
+  const toggleSort = useCallback((col: SortCol) => {
+    if (repSortColumn === col) {
+      if (repSortDir === 'asc') setRepSortDir('desc')
+      else { setRepSortColumn(null); setRepSortDir('asc') }
+    } else {
+      setRepSortColumn(col); setRepSortDir('asc')
+    }
+  }, [repSortColumn, repSortDir])
+
+  // Encabezado ordenable (función, no componente anidado, para no romper lint).
+  const renderSortTh = (col: SortCol, label: string, className?: string) => (
+    <th
+      key={col}
+      className={['cursor-pointer select-none px-3 py-2 font-semibold transition-colors hover:text-foreground', className].filter(Boolean).join(' ')}
+      onClick={() => toggleSort(col)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        {repSortColumn === col
+          ? (repSortDir === 'asc' ? <ChevronUp className="h-3.5 w-3.5 text-primary" /> : <ChevronDown className="h-3.5 w-3.5 text-primary" />)
+          : <ChevronDown className="h-3.5 w-3.5 opacity-20" />}
+      </span>
+    </th>
+  )
+
+  const sortedRep = useMemo(() => {
+    if (!repSortColumn) return filteredRep
+    const dir = repSortDir === 'asc' ? 1 : -1
+    const val = (r: AreaRepuestoRow): string | number => {
+      switch (repSortColumn) {
+        case 'codigoSAP': return r.codigoSAP || ''
+        case 'textoBreve': return r.textoBreve || r.alias || ''
+        case 'equipo': return r.equipos[0]?.machineName || ''
+        case 'stock': return r.bodegaId ? r.stockActual : -1
+        case 'tipo': return tipoLabelOf(r.tipo)
+      }
+    }
+    return [...filteredRep].sort((a, b) => {
+      const va = val(a), vb = val(b)
+      if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir
+      return String(va).localeCompare(String(vb), 'es') * dir
+    })
+  }, [filteredRep, repSortColumn, repSortDir])
+
+  const totalPages = Math.max(1, Math.ceil(sortedRep.length / repPageSize))
   const page = Math.min(repPage, totalPages - 1)
   const pagedRep = useMemo(
-    () => filteredRep.slice(page * repPageSize, page * repPageSize + repPageSize),
-    [filteredRep, page, repPageSize],
+    () => sortedRep.slice(page * repPageSize, page * repPageSize + repPageSize),
+    [sortedRep, page, repPageSize],
   )
+
+  // Recordar preferencias del hub por usuario (área-independientes): tamaño de
+  // página, filtro de stock, solo-favoritos y ordenamiento.
+  const prefsKey = useMemo(() => `repuestos-hub-prefs:${user?.id ?? 'anon'}`, [user?.id])
+  const prefsHydrated = useRef(false)
+  useEffect(() => {
+    prefsHydrated.current = false
+    try {
+      const raw = localStorage.getItem(prefsKey)
+      if (raw) {
+        const p = JSON.parse(raw) as { pageSize?: number; stockFilter?: string; favOnly?: boolean; sortColumn?: SortCol | null; sortDir?: 'asc' | 'desc' }
+        if (typeof p.pageSize === 'number' && PAGE_SIZES.includes(p.pageSize)) setRepPageSize(p.pageSize)
+        if (p.stockFilter) setRepStockFilter(p.stockFilter as StockFilter)
+        if (typeof p.favOnly === 'boolean') setRepFavOnly(p.favOnly)
+        if (p.sortColumn !== undefined) setRepSortColumn(p.sortColumn)
+        if (p.sortDir === 'asc' || p.sortDir === 'desc') setRepSortDir(p.sortDir)
+      }
+    } catch { /* noop */ }
+    prefsHydrated.current = true
+  }, [prefsKey])
+  useEffect(() => {
+    if (!prefsHydrated.current) return
+    try {
+      localStorage.setItem(prefsKey, JSON.stringify({
+        pageSize: repPageSize, stockFilter: repStockFilter, favOnly: repFavOnly, sortColumn: repSortColumn, sortDir: repSortDir,
+      }))
+    } catch { /* noop */ }
+  }, [prefsKey, repPageSize, repStockFilter, repFavOnly, repSortColumn, repSortDir])
 
   const selectedRep = useMemo(
     () => areaRepuestos.find((r) => r.rowKey === selectedRowKey) ?? null,
@@ -1105,11 +1181,11 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                   <table className="w-full text-sm">
                     <thead className="border-b border-border bg-muted/40 text-left">
                       <tr>
-                        <th className="px-3 py-2 font-semibold">SAP</th>
-                        <th className="px-3 py-2 font-semibold">Repuesto</th>
-                        <th className="hidden px-3 py-2 font-semibold md:table-cell">Equipo</th>
-                        <th className="px-3 py-2 font-semibold">Stock</th>
-                        <th className="hidden px-3 py-2 font-semibold md:table-cell">Tipo</th>
+                        {renderSortTh('codigoSAP', 'SAP')}
+                        {renderSortTh('textoBreve', 'Repuesto')}
+                        {renderSortTh('equipo', 'Equipo', 'hidden md:table-cell')}
+                        {renderSortTh('stock', 'Stock')}
+                        {renderSortTh('tipo', 'Tipo', 'hidden md:table-cell')}
                         <th className="w-8 px-3 py-2" />
                       </tr>
                     </thead>
