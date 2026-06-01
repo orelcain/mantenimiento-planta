@@ -12,7 +12,7 @@
  *  - Fase 7: búsqueda global del topbar + promover hub a vista por defecto.
  */
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { Search, ChevronRight, ChevronLeft, Cog, ImageOff, Plus, ListChecks, ClipboardList, Menu, GitMerge, History, Trash2, Star } from 'lucide-react'
+import { Search, ChevronRight, ChevronLeft, Cog, ImageOff, Plus, ListChecks, ClipboardList, Menu, GitMerge, History, Trash2, Star, Upload, Download } from 'lucide-react'
 import { Badge, Button, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui'
 import { AreaSidebar } from '@/components/repuestos/AreaSidebar'
 import { AssetDetailModal } from '@/components/repuestos/AssetDetailModal'
@@ -44,6 +44,8 @@ import { RepuestoGalleryModal } from '@/components/repuestos/RepuestoGalleryModa
 import { RepuestoManualModal } from '@/components/repuestos/RepuestoManualModal'
 import { ManualSearchModal } from '@/components/repuestos/ManualSearchModal'
 import { RelocateRepuestoModal } from '@/components/repuestos/RelocateRepuestoModal'
+import { ImportRepuestosModal } from './ImportRepuestosModal'
+import { ExportReportModal } from '@/components/repuestos/ExportReportModal'
 import { normalizeForSearch } from '@/utils/repuestos'
 import type { PlantAsset, Machine, RepuestoFormData, TechnicalSpecs, MachineImage } from '@/types/repuestos'
 
@@ -182,6 +184,14 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   // Reubicación: useRepuestos se liga a la máquina ORIGEN del repuesto elegido.
   const relocateMachineId = actionTarget?.kind === 'relocate' ? actionTarget.source.machineId : null
   const { relocateRepuesto } = useRepuestos(relocateMachineId)
+
+  // ── Importar / Exportar (Wave 3) ──
+  const [importPicker, setImportPicker] = useState(false)
+  const [importTargetMachine, setImportTargetMachine] = useState<Machine | null>(null)
+  const [importOpen, setImportOpen] = useState(false)
+  const [exportOpen, setExportOpen] = useState(false)
+  // importCatalogoDesdeExcel se liga a la máquina destino elegida del área.
+  const { importCatalogoDesdeExcel } = useRepuestos(importTargetMachine?.id ?? null)
 
   // ── Favoritos de repuestos (globales por usuario, keyed por rowKey) ──
   const [favKeys, setFavKeys] = useState<Set<string>>(new Set())
@@ -575,6 +585,48 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
     [actionMachineId, machines],
   )
 
+  // ── Importar Excel: elige equipo destino del área (o directo si hay uno) ──
+  const startImport = useCallback(() => {
+    if (areaMachines.length === 0) {
+      toast({ variant: 'destructive', title: 'Selecciona un área con equipos', description: 'La importación carga repuestos en un equipo del área.' })
+      return
+    }
+    if (areaMachines.length === 1 && areaMachines[0]) {
+      setImportTargetMachine(areaMachines[0])
+      setImportOpen(true)
+    } else {
+      setImportPicker(true)
+    }
+  }, [areaMachines, toast])
+
+  const handleImportSuccess = useCallback(async (message: string) => {
+    toast({ title: 'Importación exitosa', description: message, variant: 'success' })
+    setImportOpen(false)
+    await refreshCatalog()
+  }, [toast, refreshCatalog])
+
+  const handleImportError = useCallback((message: string) => {
+    toast({ variant: 'destructive', title: 'Error al importar', description: message })
+  }, [toast])
+
+  // ── Exportar: docs Repuesto del área (resueltos desde allRepuestos) ──
+  // keyOfDoc replica la clave del merge de useBodega → para mapear doc ↔ fila visible.
+  const keyOfDoc = useCallback((rep: { codigoSAP?: string; codigoFabricante?: string; id: string }, machineId: string) => {
+    const sap = (rep.codigoSAP || '').trim()
+    if (sap) return sap
+    const fab = (rep.codigoFabricante || '').trim()
+    return fab ? `fab:${fab}` : `id:${machineId}:${rep.id}`
+  }, [])
+  const areaDocs = useMemo(
+    () => allRepuestos.filter((r) => showingAll || (!!selectedAreaId && machineInArea(r.machineId, selectedAreaId))),
+    [allRepuestos, showingAll, selectedAreaId, machineInArea],
+  )
+  const exportRepuestos = useMemo(() => areaDocs.map((r) => r.repuesto), [areaDocs])
+  const exportFiltered = useMemo(() => {
+    const visibleKeys = new Set(filteredRep.map((row) => row.rowKey))
+    return areaDocs.filter((r) => visibleKeys.has(keyOfDoc(r.repuesto, r.machineId))).map((r) => r.repuesto)
+  }, [areaDocs, filteredRep, keyOfDoc])
+
   const repuestosBusy = !repuestosLoaded || repuestosLoading || bodegaLoading || pathsLoading || eqLoading
 
   const breadcrumb = useMemo(
@@ -669,6 +721,12 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
           {/* Herramientas admin de catálogo (solo admin, ocultas en móvil) */}
           {isAdmin && (
             <div className="hidden items-center gap-1 border-l border-border pl-2 sm:flex">
+              <button onClick={startImport} title="Importar repuestos desde Excel" className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+                <Upload className="h-4 w-4" />
+              </button>
+              <button onClick={() => setExportOpen(true)} title="Exportar reporte" className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+                <Download className="h-4 w-4" />
+              </button>
               <button onClick={() => setDuplicatesOpen(true)} title="Escáner de duplicados" className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
                 <GitMerge className="h-4 w-4" />
               </button>
@@ -1110,6 +1168,48 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Selector de equipo destino para "Importar Excel" */}
+      <Dialog open={importPicker} onOpenChange={(o) => !o && setImportPicker(false)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-base">¿A qué equipo importar?</DialogTitle>
+            <DialogDescription>Los repuestos del Excel se cargarán en el equipo seleccionado del área.</DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[50vh] space-y-1.5 overflow-y-auto">
+            {areaMachines.map((m) => (
+              <button
+                key={m.id}
+                onClick={() => { setImportTargetMachine(m); setImportPicker(false); setImportOpen(true) }}
+                className="flex w-full items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-left text-sm font-medium text-foreground transition hover:bg-muted/40 hover:border-primary/40"
+              >
+                <Cog className="h-4 w-4 shrink-0 text-cyan-500" />
+                <span className="truncate">{m.nombre || m.id}</span>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Importar Excel (carga en machines/{importTargetMachine}/repuestos) */}
+      <ImportRepuestosModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onSuccess={handleImportSuccess}
+        onError={handleImportError}
+        machineName={importTargetMachine?.nombre ?? ''}
+        importCatalogoDesdeExcel={importCatalogoDesdeExcel}
+      />
+
+      {/* Exportar reporte (docs del área; respeta filtros visibles) */}
+      <ExportReportModal
+        isOpen={exportOpen}
+        onClose={() => setExportOpen(false)}
+        repuestos={exportRepuestos}
+        filteredRepuestos={exportFiltered}
+        categories={[]}
+        machineName={showingAll ? 'Todas las áreas' : (selectedNode?.nombre ?? 'Área')}
+      />
 
       {/* Crear repuesto */}
       <RepuestoFormModal
