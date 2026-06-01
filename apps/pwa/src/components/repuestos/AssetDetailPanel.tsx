@@ -9,6 +9,7 @@ import { useState, useCallback } from 'react'
 import { X, Copy, Check, ImageOff, Pencil, Zap } from 'lucide-react'
 import { Badge, Button } from '@/components/ui'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
+import { MachineManualPanel } from '@/components/repuestos/MachineManualPanel'
 import type { PlantAsset } from '@/types/repuestos'
 
 interface AssetDetailPanelProps {
@@ -107,6 +108,11 @@ export function AssetDetailPanel({ asset, areaName, onClose, onEdit }: AssetDeta
         <Button variant="outline" size="sm" className="mt-4 w-full gap-1.5" onClick={onEdit}>
           <Pencil className="h-4 w-4" /> Editar / subir fotos
         </Button>
+
+        {/* Manuales PDF del equipo (Wave 2) — almacén equipment/{nodeId}/manuales */}
+        <div className="mt-4 border-t border-border/60 pt-4">
+          <MachineManualPanel storageId={asset.hierarchyNodeId || asset.id} displayName={asset.equipo} />
+        </div>
       </div>
 
       {lightbox && <ImageLightbox photos={lightbox} onClose={() => setLightbox(null)} />}

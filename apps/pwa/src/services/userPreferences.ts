@@ -31,6 +31,8 @@ export interface UserPreferencesData {
   bodegaWatchlist: string[]
   /** Repuestos favoritos por equipo: key = nodeId del equipo */
   repuestoFavLists?: Record<string, RepuestoFavList[]>
+  /** Repuestos favoritos GLOBALES del hub área-first (rowKeys estables, no por equipo). */
+  repuestoFavs?: string[]
   updatedAt?: unknown
 }
 
@@ -92,6 +94,31 @@ export async function saveRepuestoFavLists(userId: string, equipmentId: string, 
     }, { merge: true })
   } catch (err) {
     logger.error('Error saving repuesto fav lists', err instanceof Error ? err : new Error(String(err)))
+  }
+}
+
+// ── Repuestos favoritos GLOBALES (hub área-first) ──
+// Keyed por rowKey estable del item agregado (sap || fab:<fab> || id:<machineId>:<repId>),
+// no por doc-id ni por equipo → un favorito sigue al repuesto a través de la vista agregada.
+
+export async function getRepuestoFavs(userId: string): Promise<string[]> {
+  try {
+    const snap = await getDoc(doc(db, COL, userId))
+    if (snap.exists()) return (snap.data().repuestoFavs as string[]) || []
+  } catch (err) {
+    logger.error('Error loading repuesto favs', err instanceof Error ? err : new Error(String(err)))
+  }
+  return []
+}
+
+export async function saveRepuestoFavs(userId: string, favs: string[]): Promise<void> {
+  try {
+    await setDoc(doc(db, COL, userId), {
+      repuestoFavs: favs,
+      updatedAt: serverTimestamp(),
+    }, { merge: true })
+  } catch (err) {
+    logger.error('Error saving repuesto favs', err instanceof Error ? err : new Error(String(err)))
   }
 }
 

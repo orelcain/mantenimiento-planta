@@ -7,7 +7,7 @@
  * última actualización (último movimiento) · Ver movimientos.
  */
 import { useState, useEffect, useCallback } from 'react'
-import { X, Copy, Check, History, ImageOff, Loader2, ArrowDownCircle, ArrowUpCircle, Settings2, Pencil, Plus, FileText, Image as ImageIcon, Images, BookOpen, ArrowRightLeft, Trash2, SquarePen } from 'lucide-react'
+import { X, Copy, Check, History, ImageOff, Loader2, ArrowDownCircle, ArrowUpCircle, Settings2, Pencil, Plus, FileText, Image as ImageIcon, Images, BookOpen, ArrowRightLeft, Trash2, SquarePen, FileSearch, Star } from 'lucide-react'
 import { Button, Input } from '@/components/ui'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import { InlineEditName } from '@/components/repuestos/InlineEditName'
@@ -43,6 +43,12 @@ interface RepuestoDetailPanelProps {
   onGallery?: () => void
   /** Ver vínculos al manual. */
   onManual?: () => void
+  /** Buscar el código de fabricante dentro del PDF del manual (ManualSearchModal). */
+  onManualSearch?: () => void
+  /** ¿el repuesto está en favoritos? */
+  isFavorite?: boolean
+  /** Alternar favorito. */
+  onToggleFavorite?: () => void
 }
 
 /** Botón de acción compacto del panel (icono + etiqueta). */
@@ -92,7 +98,7 @@ function fmtDate(d: Date): string {
   } catch { return '' }
 }
 
-export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, onSaveLocation, onSolicitar, isAdmin, onRename, onEditRepuesto, onDeleteRepuesto, onRelocate, onSpecs, onPhotos, onGallery, onManual }: RepuestoDetailPanelProps) {
+export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, onSaveLocation, onSolicitar, isAdmin, onRename, onEditRepuesto, onDeleteRepuesto, onRelocate, onSpecs, onPhotos, onGallery, onManual, onManualSearch, isFavorite, onToggleFavorite }: RepuestoDetailPanelProps) {
   const [copied, setCopied] = useState(false)
   const [movs, setMovs] = useState<MovimientoBodega[] | null>(null)
   const [movsLoading, setMovsLoading] = useState(false)
@@ -151,9 +157,21 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Detalle del repuesto</span>
-        <button onClick={onClose} className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Cerrar">
-          <X className="h-4 w-4" />
-        </button>
+        <div className="flex items-center gap-1">
+          {onToggleFavorite && (
+            <button
+              onClick={onToggleFavorite}
+              className={['rounded p-1 transition', isFavorite ? 'text-amber-400' : 'text-muted-foreground hover:text-amber-400'].join(' ')}
+              title={isFavorite ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+              aria-label="Favorito"
+            >
+              <Star className={['h-4 w-4', isFavorite ? 'fill-current' : ''].join(' ')} />
+            </button>
+          )}
+          <button onClick={onClose} className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Cerrar">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
@@ -211,6 +229,13 @@ export function RepuestoDetailPanel({ item, areaName, onClose, loadMovimientos, 
             {onGallery && <ActionBtn icon={Images} label="Galería" onClick={onGallery} />}
             {onManual && <ActionBtn icon={BookOpen} label="Manual" onClick={onManual} />}
           </div>
+        )}
+
+        {/* Buscar código de fabricante dentro del PDF del manual de la máquina */}
+        {onManualSearch && (
+          <Button variant="outline" size="sm" className="mb-3 w-full gap-1.5" onClick={onManualSearch}>
+            <FileSearch className="h-4 w-4" /> Buscar en manual
+          </Button>
         )}
 
         {/* Acciones de edición (solo admin) */}

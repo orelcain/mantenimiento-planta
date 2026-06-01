@@ -12,7 +12,7 @@
  *  - Fase 7: búsqueda global del topbar + promover hub a vista por defecto.
  */
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { Search, ChevronRight, ChevronLeft, Cog, ImageOff, Plus, ListChecks, ClipboardList, Menu, GitMerge, History, Trash2 } from 'lucide-react'
+import { Search, ChevronRight, ChevronLeft, Cog, ImageOff, Plus, ListChecks, ClipboardList, Menu, GitMerge, History, Trash2, Star } from 'lucide-react'
 import { Badge, Button, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui'
 import { AreaSidebar } from '@/components/repuestos/AreaSidebar'
 import { AssetDetailModal } from '@/components/repuestos/AssetDetailModal'
@@ -33,6 +33,7 @@ import { useGlobalEquipmentSearch, getGlobalEquipmentCache } from '@/hooks/useGl
 import { useBodega } from '@/hooks/repuestos/useBodega'
 import { useAreaRepuestos, type StockStatus, type AreaRepuestoRow } from '@/hooks/repuestos/useAreaRepuestos'
 import { useHierarchyPaths } from '@/hooks/repuestos/useHierarchyPaths'
+import { getRepuestoFavs, saveRepuestoFavs } from '@/services/userPreferences'
 import { useRepuestoCrud } from '@/hooks/repuestos/useRepuestoCrud'
 import { useRepuestos } from '@/hooks/repuestos/useRepuestos'
 import { useToast } from '@/hooks/useToast'
@@ -41,11 +42,12 @@ import { TechnicalSpecsModal } from '@/components/repuestos/TechnicalSpecsModal'
 import { RepuestoPhotosModal } from '@/components/repuestos/RepuestoPhotosModal'
 import { RepuestoGalleryModal } from '@/components/repuestos/RepuestoGalleryModal'
 import { RepuestoManualModal } from '@/components/repuestos/RepuestoManualModal'
+import { ManualSearchModal } from '@/components/repuestos/ManualSearchModal'
 import { RelocateRepuestoModal } from '@/components/repuestos/RelocateRepuestoModal'
 import { normalizeForSearch } from '@/utils/repuestos'
 import type { PlantAsset, Machine, RepuestoFormData, TechnicalSpecs, MachineImage } from '@/types/repuestos'
 
-type RepAction = 'edit' | 'specs' | 'photos' | 'gallery' | 'manual' | 'relocate' | 'delete'
+type RepAction = 'edit' | 'specs' | 'photos' | 'gallery' | 'manual' | 'manualSearch' | 'relocate' | 'delete'
 
 type StockFilter = 'all' | StockStatus
 const PAGE_SIZES = [8, 25, 50]
@@ -180,6 +182,25 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   // Reubicación: useRepuestos se liga a la máquina ORIGEN del repuesto elegido.
   const relocateMachineId = actionTarget?.kind === 'relocate' ? actionTarget.source.machineId : null
   const { relocateRepuesto } = useRepuestos(relocateMachineId)
+
+  // ── Favoritos de repuestos (globales por usuario, keyed por rowKey) ──
+  const [favKeys, setFavKeys] = useState<Set<string>>(new Set())
+  const [repFavOnly, setRepFavOnly] = useState(false)
+  useEffect(() => {
+    if (!user?.id) return
+    getRepuestoFavs(user.id).then((arr) => setFavKeys(new Set(arr))).catch(() => {})
+  }, [user?.id])
+  const toggleFav = useCallback((rowKey: string) => {
+    const uid = user?.id
+    if (!uid) return
+    setFavKeys((prev) => {
+      const next = new Set(prev)
+      if (next.has(rowKey)) next.delete(rowKey)
+      else next.add(rowKey)
+      saveRepuestoFavs(uid, [...next])
+      return next
+    })
+  }, [user?.id])
   useEffect(() => {
     if (isAdmin) getTrashCount().then(setTrashCount).catch(() => {})
   }, [isAdmin, trashOpen])
@@ -319,6 +340,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   // Filtrado (buscar + equipo + stock)
   const filteredRep = useMemo(() => {
     let res = areaRepuestos
+    if (repFavOnly) res = res.filter((r) => favKeys.has(r.rowKey))
     if (repStockFilter !== 'all') res = res.filter((r) => r.stockStatus === repStockFilter)
     if (repTipoFilter !== 'all') res = res.filter((r) => tipoLabelOf(r.tipo) === repTipoFilter)
     if (repEquipoFilter !== 'all') res = res.filter((r) => r.equipos.some((e) => e.machineName === repEquipoFilter))
@@ -333,10 +355,10 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
       )
     }
     return res
-  }, [areaRepuestos, repStockFilter, repTipoFilter, repEquipoFilter, repQuery])
+  }, [areaRepuestos, repFavOnly, favKeys, repStockFilter, repTipoFilter, repEquipoFilter, repQuery])
 
   // Reset de página al cambiar área/filtros
-  useEffect(() => { setRepPage(0) }, [selectedAreaId, showingAll, repQuery, repEquipoFilter, repStockFilter, repTipoFilter, repPageSize])
+  useEffect(() => { setRepPage(0) }, [selectedAreaId, showingAll, repQuery, repEquipoFilter, repStockFilter, repTipoFilter, repFavOnly, repPageSize])
 
   // Los tipos dependen del área → al cambiar de área el filtro de tipo vuelve a "Todos"
   useEffect(() => { setRepTipoFilter('all') }, [selectedAreaId, showingAll])
@@ -842,6 +864,16 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                   <SelectItem value="unset">Sin config.</SelectItem>
                 </SelectContent>
               </Select>
+              <Button
+                variant={repFavOnly ? 'default' : 'outline'}
+                size="sm"
+                className="gap-1.5"
+                onClick={() => setRepFavOnly((v) => !v)}
+                title="Mostrar solo repuestos favoritos"
+              >
+                <Star className={['h-4 w-4', repFavOnly ? 'fill-current' : ''].join(' ')} /> Favoritos
+                {favKeys.size > 0 && <span className="tabular-nums opacity-70">({favKeys.size})</span>}
+              </Button>
             </div>
 
             {repuestosBusy ? (
@@ -911,7 +943,19 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                             <td className="hidden px-3 py-2 md:table-cell">
                               <span className="inline-block rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">{tipoLabelOf(r.tipo)}</span>
                             </td>
-                            <td className="px-3 py-2 text-muted-foreground/40"><ChevronRight className="h-4 w-4" /></td>
+                            <td className="px-3 py-2">
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); toggleFav(r.rowKey) }}
+                                  className={['rounded p-0.5 transition', favKeys.has(r.rowKey) ? 'text-amber-400' : 'text-muted-foreground/30 hover:text-amber-400'].join(' ')}
+                                  title={favKeys.has(r.rowKey) ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+                                  aria-label="Favorito"
+                                >
+                                  <Star className={['h-4 w-4', favKeys.has(r.rowKey) ? 'fill-current' : ''].join(' ')} />
+                                </button>
+                                <ChevronRight className="h-4 w-4 text-muted-foreground/40" />
+                              </div>
+                            </td>
                           </tr>
                         )
                       })}
@@ -970,6 +1014,9 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
           onPhotos={() => startAction('photos')}
           onGallery={() => startAction('gallery')}
           onManual={() => startAction('manual')}
+          onManualSearch={() => startAction('manualSearch')}
+          isFavorite={favKeys.has(selectedRep.rowKey)}
+          onToggleFavorite={() => toggleFav(selectedRep.rowKey)}
         />
       )}
 
@@ -1126,6 +1173,18 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
           open
           onOpenChange={(o) => !o && setActionTarget(null)}
           repuesto={actionRep}
+        />
+      )}
+
+      {/* Buscar código de fabricante dentro del PDF del manual de la máquina */}
+      {actionTarget?.kind === 'manualSearch' && actionRep && actionMachine && (
+        <ManualSearchModal
+          open
+          onOpenChange={(o) => !o && setActionTarget(null)}
+          machine={actionMachine}
+          repuesto={actionRep}
+          initialVinculo={actionRep.vinculosManual?.find((v) => v.machineId === actionMachineId) ?? actionRep.vinculosManual?.[0]}
+          isAdmin={isAdmin}
         />
       )}
 
