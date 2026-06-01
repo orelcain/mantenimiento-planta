@@ -56,6 +56,7 @@ import { useEquipmentForArea, invalidateEquipmentCache } from '@/hooks/useEquipm
 import { EquipmentCard } from '@/components/repuestos/EquipmentCard'
 import { MachineManager } from '@/components/repuestos/MachineManager'
 import { EquipmentHeaderPhoto } from '@/components/repuestos/EquipmentHeaderPhoto'
+import { MachineManualPanel } from '@/components/repuestos/MachineManualPanel'
 import { InlineEditName } from '@/components/repuestos/InlineEditName'
 import { useMachines } from '@/hooks/repuestos/useMachines'
 import type { PlantAsset, Machine, RepuestoFormData, TechnicalSpecs, MachineImage } from '@/types/repuestos'
@@ -2142,17 +2143,23 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
         </DialogContent>
       </Dialog>
 
-      {/* G1: fotos del equipo SAP seleccionado (clic en una tarjeta de la sección admin) */}
+      {/* G1+G5: fotos y manuales del equipo SAP (clic en una tarjeta de la sección admin) */}
       <Dialog open={!!photoEquip} onOpenChange={(o) => !o && setPhotoEquip(null)}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-h-[85vh] max-w-md overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-base">Fotos del equipo</DialogTitle>
-            <DialogDescription className="truncate">{photoEquip?.name}</DialogDescription>
+            <DialogTitle className="text-base">Equipo · {photoEquip?.name}</DialogTitle>
+            <DialogDescription className="truncate">Fotos y manuales del equipo.</DialogDescription>
           </DialogHeader>
           <div className="flex items-center gap-3">
             {photoEquip && <EquipmentHeaderPhoto equipmentId={photoEquip.id} />}
             <p className="text-xs text-muted-foreground">Toca la miniatura para ampliar (zoom/paneo) o la cámara para subir una foto del equipo desde el celular.</p>
           </div>
+          {/* G5: manuales PDF a nivel equipo (nodo hierarchy) */}
+          {photoEquip && (
+            <div className="mt-2 border-t border-border pt-3">
+              <MachineManualPanel storageId={photoEquip.id} displayName={photoEquip.name} />
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
