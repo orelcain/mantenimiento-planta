@@ -12,7 +12,7 @@
  *  - Fase 7: búsqueda global del topbar + promover hub a vista por defecto.
  */
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
-import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ListChecks, ClipboardList, Menu, GitMerge, History, Trash2, Star, Upload, Download, ArrowUpDown, Eye, EyeOff, Package, X, Loader2, Wrench } from 'lucide-react'
+import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ListChecks, ClipboardList, Menu, GitMerge, History, Trash2, Star, Upload, Download, ArrowUpDown, Eye, EyeOff, Package, X, Loader2, Wrench, Settings2 } from 'lucide-react'
 import { Badge, Button, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui'
 import { AreaSidebar } from '@/components/repuestos/AreaSidebar'
 import { AssetDetailModal } from '@/components/repuestos/AssetDetailModal'
@@ -53,6 +53,7 @@ import { logger } from '@/lib/logger'
 import { getHmiTooltipPwd } from '@/services/hmiKnuro'
 import { useEquipmentForArea, invalidateEquipmentCache } from '@/hooks/useEquipmentForArea'
 import { EquipmentCard } from '@/components/repuestos/EquipmentCard'
+import { MachineManager } from '@/components/repuestos/MachineManager'
 import type { PlantAsset, Machine, RepuestoFormData, TechnicalSpecs, MachineImage } from '@/types/repuestos'
 
 type RepAction = 'edit' | 'specs' | 'photos' | 'gallery' | 'manual' | 'manualSearch' | 'relocate' | 'delete'
@@ -191,6 +192,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   const [auditLogOpen, setAuditLogOpen] = useState(false)
   const [trashOpen, setTrashOpen] = useState(false)
   const [trashCount, setTrashCount] = useState(0)
+  const [machineManagerOpen, setMachineManagerOpen] = useState(false) // G4: CRUD máquinas manuales
 
   // ── Acciones por repuesto (Wave 1: rescate de "Por equipo") ──
   const { toast } = useToast()
@@ -1054,6 +1056,9 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
           {/* Herramientas admin de catálogo (solo admin, ocultas en móvil) */}
           {isAdmin && (
             <div className="hidden items-center gap-1 border-l border-border pl-2 sm:flex">
+              <button onClick={() => setMachineManagerOpen(true)} title="Gestionar equipos (máquinas manuales)" className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+                <Settings2 className="h-4 w-4" />
+              </button>
               <button onClick={startImport} title="Importar repuestos desde Excel" className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
                 <Upload className="h-4 w-4" />
               </button>
@@ -1614,6 +1619,16 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
           <DuplicatesModal open={duplicatesOpen} onOpenChange={setDuplicatesOpen} machines={machines} onDone={() => { invalidateGlobalRepuestosCache(); loadAll() }} />
           <AuditLogPanel open={auditLogOpen} onOpenChange={setAuditLogOpen} />
           <TrashPanel open={trashOpen} onOpenChange={setTrashOpen} />
+          {/* G4: gestor de máquinas manuales (CRUD + asignar área) */}
+          <Dialog open={machineManagerOpen} onOpenChange={setMachineManagerOpen}>
+            <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="text-base">Gestionar equipos</DialogTitle>
+                <DialogDescription>Crear, editar, archivar o eliminar máquinas manuales y asignarles área.</DialogDescription>
+              </DialogHeader>
+              <MachineManager onCreated={() => { invalidateGlobalRepuestosCache(); loadAll() }} />
+            </DialogContent>
+          </Dialog>
         </>
       )}
 
