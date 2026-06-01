@@ -8,8 +8,20 @@
  * Reutiliza useHierarchyAreaTree (mismo árbol que EquipmentNavigator).
  */
 import { useMemo } from 'react'
-import { ChevronRight, Layers, Loader2, List, X } from 'lucide-react'
+import { ChevronRight, Layers, Loader2, List, X, Star } from 'lucide-react'
 import { useHierarchyAreaTree, type AreaTreeNode } from '@/hooks/useHierarchyAreaTree'
+
+/** Poda el árbol a las áreas favoritas (o con descendientes favoritos). */
+function filterForFavorites(nodes: AreaTreeNode[], favIds: Set<string>): AreaTreeNode[] {
+  const out: AreaTreeNode[] = []
+  for (const node of nodes) {
+    const filteredChildren = filterForFavorites(node.children, favIds)
+    if (favIds.has(node.id) || filteredChildren.length > 0) {
+      out.push({ ...node, children: filteredChildren })
+    }
+  }
+  return out
+}
 
 interface AreaSidebarProps {
   selectedAreaId: string | null
@@ -18,6 +30,12 @@ interface AreaSidebarProps {
   assetCountByNode?: Record<string, number>
   /** Conteo de repuestos por nodeId (incl. descendientes) para el badge "N rep". */
   repCountByNode?: Record<string, number>
+  /** Áreas favoritas (nodeIds) — compartido con "Por equipo" (localStorage hierarchy-favorites). */
+  favoriteAreaIds?: Set<string>
+  onToggleAreaFav?: (id: string) => void
+  /** Mostrar solo áreas favoritas. */
+  favoritesOnly?: boolean
+  onToggleFavoritesOnly?: () => void
   openNodes: Record<string, boolean>
   onToggleNode: (id: string) => void
   onShowAll: () => void
@@ -35,16 +53,17 @@ function countEquip(node: AreaTreeNode): number {
 }
 
 function AreaRow({
-  node, depth, selectedAreaId, onSelectArea, assetCountByNode, repCountByNode, openNodes, onToggleNode,
+  node, depth, selectedAreaId, onSelectArea, assetCountByNode, repCountByNode, favoriteAreaIds, onToggleAreaFav, openNodes, onToggleNode,
 }: {
   node: AreaTreeNode; depth: number
-} & Pick<AreaSidebarProps, 'selectedAreaId' | 'onSelectArea' | 'assetCountByNode' | 'repCountByNode' | 'openNodes' | 'onToggleNode'>) {
+} & Pick<AreaSidebarProps, 'selectedAreaId' | 'onSelectArea' | 'assetCountByNode' | 'repCountByNode' | 'favoriteAreaIds' | 'onToggleAreaFav' | 'openNodes' | 'onToggleNode'>) {
   const isSelected = selectedAreaId === node.id
   const isOpen = !!openNodes[node.id]
   const hasChildren = node.children.length > 0 || node.hasMoreChildren
   const eqCount = countEquip(node)
   const assetCount = assetCountByNode?.[node.id] ?? 0
   const repCount = repCountByNode?.[node.id] ?? 0
+  const isFav = !!favoriteAreaIds?.has(node.id)
 
   return (
     <>
@@ -88,6 +107,20 @@ function AreaRow({
             )}
           </div>
         </div>
+
+        {onToggleAreaFav && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onToggleAreaFav(node.id) }}
+            className={[
+              'shrink-0 rounded p-0.5 transition',
+              isFav ? 'text-amber-400' : 'text-muted-foreground/30 opacity-0 group-hover:opacity-100 hover:text-amber-400',
+            ].join(' ')}
+            title={isFav ? 'Quitar de áreas favoritas' : 'Marcar área como favorita'}
+            aria-label="Área favorita"
+          >
+            <Star className={['h-3.5 w-3.5', isFav ? 'fill-current' : ''].join(' ')} />
+          </button>
+        )}
       </div>
 
       {isOpen && node.children.length > 0 && (
@@ -101,6 +134,8 @@ function AreaRow({
               onSelectArea={onSelectArea}
               assetCountByNode={assetCountByNode}
               repCountByNode={repCountByNode}
+              favoriteAreaIds={favoriteAreaIds}
+              onToggleAreaFav={onToggleAreaFav}
               openNodes={openNodes}
               onToggleNode={onToggleNode}
             />
@@ -112,16 +147,18 @@ function AreaRow({
 }
 
 export function AreaSidebar({
-  selectedAreaId, onSelectArea, assetCountByNode, repCountByNode, openNodes, onToggleNode, onShowAll, showingAll,
+  selectedAreaId, onSelectArea, assetCountByNode, repCountByNode, favoriteAreaIds, onToggleAreaFav,
+  favoritesOnly = false, onToggleFavoritesOnly, openNodes, onToggleNode, onShowAll, showingAll,
   mobileOpen = false, onMobileClose,
 }: AreaSidebarProps) {
   const { areaTree, loading } = useHierarchyAreaTree()
 
   // Saltar la raíz única (CHONCHI) y mostrar sus hijos directamente, como EquipmentNavigator.
   const roots = useMemo(() => {
-    if (areaTree.length === 1 && areaTree[0]!.children.length > 0) return areaTree[0]!.children
-    return areaTree
-  }, [areaTree])
+    const base = (areaTree.length === 1 && areaTree[0]!.children.length > 0) ? areaTree[0]!.children : areaTree
+    if (favoritesOnly && favoriteAreaIds && favoriteAreaIds.size > 0) return filterForFavorites(base, favoriteAreaIds)
+    return base
+  }, [areaTree, favoritesOnly, favoriteAreaIds])
 
   // En móvil, seleccionar un área cierra el drawer
   const handleSelect = (node: AreaTreeNode) => { onSelectArea(node); onMobileClose?.() }
@@ -145,9 +182,21 @@ export function AreaSidebar({
       >
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-border">
         <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Áreas</span>
-        <button onClick={onMobileClose} className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground sm:hidden" aria-label="Cerrar áreas">
-          <X className="h-4 w-4" />
-        </button>
+        <div className="flex items-center gap-1">
+          {onToggleFavoritesOnly && (
+            <button
+              onClick={onToggleFavoritesOnly}
+              className={['rounded p-1 transition', favoritesOnly ? 'text-amber-400' : 'text-muted-foreground hover:text-amber-400'].join(' ')}
+              title={favoritesOnly ? 'Ver todas las áreas' : 'Ver solo áreas favoritas'}
+              aria-label="Solo áreas favoritas"
+            >
+              <Star className={['h-4 w-4', favoritesOnly ? 'fill-current' : ''].join(' ')} />
+            </button>
+          )}
+          <button onClick={onMobileClose} className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground sm:hidden" aria-label="Cerrar áreas">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto py-1">
@@ -167,6 +216,8 @@ export function AreaSidebar({
               onSelectArea={handleSelect}
               assetCountByNode={assetCountByNode}
               repCountByNode={repCountByNode}
+              favoriteAreaIds={favoriteAreaIds}
+              onToggleAreaFav={onToggleAreaFav}
               openNodes={openNodes}
               onToggleNode={onToggleNode}
             />

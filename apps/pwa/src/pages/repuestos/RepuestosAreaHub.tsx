@@ -265,7 +265,22 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
     getUserPreferences(user.id).then((p) => setEquipFavLists(p.favoriteLists || [])).catch(() => {})
   }, [user?.id])
 
-  // Clic en chip de equipo → ir a su área + filtrar la tabla a ese equipo.
+  // Áreas favoritas (estrella en el árbol) — compartido con "Por equipo" (localStorage).
+  const [favoriteAreaIds, setFavoriteAreaIds] = useState<Set<string>>(() => {
+    try { const s = localStorage.getItem('hierarchy-favorites'); return s ? new Set(JSON.parse(s) as string[]) : new Set<string>() } catch { return new Set<string>() }
+  })
+  const [areaFavOnly, setAreaFavOnly] = useState(false)
+  const toggleAreaFav = useCallback((id: string) => {
+    setFavoriteAreaIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      try { localStorage.setItem('hierarchy-favorites', JSON.stringify([...next])) } catch { /* noop */ }
+      return next
+    })
+  }, [])
+
+  // Clic en chip de equipo → ir a su área + filtrar la tabla a ese equipo + revelar equipos.
   const handleFavEquipClick = useCallback((favKey: string) => {
     const eq = getGlobalEquipmentCache() || []
     const e = eq.find((x) => (x.linkedMachineId || x.id) === favKey) || eq.find((x) => x.id === favKey)
@@ -284,6 +299,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
     }
     const m = machines.find((x) => x.id === favKey || (!!e?.linkedMachineId && x.id === e.linkedMachineId))
     setRepEquipoFilter(m ? m.nombre : 'all')
+    setShowEquipos(true)
     setSelectedRowKey(null)
     setSelectedAssetId(null)
     setSidebarMobileOpen(false)
@@ -850,6 +866,10 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
         onSelectArea={handleSelectArea}
         assetCountByNode={assetCountByNode}
         repCountByNode={repCountByNode}
+        favoriteAreaIds={favoriteAreaIds}
+        onToggleAreaFav={toggleAreaFav}
+        favoritesOnly={areaFavOnly}
+        onToggleFavoritesOnly={() => setAreaFavOnly((v) => !v)}
         openNodes={openNodes}
         onToggleNode={handleToggleNode}
         onShowAll={handleShowAll}
