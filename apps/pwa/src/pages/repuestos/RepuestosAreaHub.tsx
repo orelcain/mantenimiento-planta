@@ -12,7 +12,7 @@
  *  - Fase 7: búsqueda global del topbar + promover hub a vista por defecto.
  */
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
-import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ListChecks, ClipboardList, Menu, GitMerge, History, Trash2, Star, Upload, Download, ArrowUpDown, Eye, EyeOff, Package, X, Loader2, Wrench, Settings2 } from 'lucide-react'
+import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ListChecks, ClipboardList, Menu, GitMerge, History, Trash2, Star, Upload, Download, ArrowUpDown, Eye, EyeOff, Package, X, Loader2, Wrench, Settings2, Archive } from 'lucide-react'
 import { Badge, Button, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui'
 import { AreaSidebar } from '@/components/repuestos/AreaSidebar'
 import { AssetDetailModal } from '@/components/repuestos/AssetDetailModal'
@@ -55,6 +55,8 @@ import { useEquipmentForArea, invalidateEquipmentCache } from '@/hooks/useEquipm
 import { EquipmentCard } from '@/components/repuestos/EquipmentCard'
 import { MachineManager } from '@/components/repuestos/MachineManager'
 import { EquipmentHeaderPhoto } from '@/components/repuestos/EquipmentHeaderPhoto'
+import { InlineEditName } from '@/components/repuestos/InlineEditName'
+import { useMachines } from '@/hooks/repuestos/useMachines'
 import type { PlantAsset, Machine, RepuestoFormData, TechnicalSpecs, MachineImage } from '@/types/repuestos'
 
 type RepAction = 'edit' | 'specs' | 'photos' | 'gallery' | 'manual' | 'manualSearch' | 'relocate' | 'delete'
@@ -995,6 +997,22 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
     setEqDeleting(false)
   }, [eqDeleteTarget, eqDeleteClave, user, refreshEquip])
 
+  // G7: equipos MANUALES (colección `machines`) asignados al área seleccionada.
+  // Distinto de los nodos hierarchy (equipos SAP). Rename + archivar inline.
+  const { machines: manualMachines, updateMachine: updateManualMachine, archiveMachine: archiveManualMachine } = useMachines()
+  const manualMachinesInArea = useMemo(
+    () => manualMachines.filter((m) => m.activa && m.hierarchyNodeId === selectedAreaId),
+    [manualMachines, selectedAreaId],
+  )
+  const handleRenameManualMachine = useCallback(
+    async (id: string, name: string) => { await updateManualMachine(id, { nombre: name }) },
+    [updateManualMachine],
+  )
+  const handleArchiveManualMachine = useCallback(
+    async (m: Machine) => { if (!confirm(`¿Archivar "${m.nombre}" de equipos manuales?`)) return; await archiveManualMachine(m.id) },
+    [archiveManualMachine],
+  )
+
   const selectedAsset = useMemo(
     () => assets.find((a) => a.id === selectedAssetId) ?? null,
     [assets, selectedAssetId],
@@ -1368,6 +1386,39 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                           onToggleHidden={handleToggleEquipHidden}
                           onDeleteEquipment={handleDeleteEquipment}
                         />
+                      ))}
+                    </div>
+                  )}
+
+                  {/* G7: equipos manuales (colección machines) asignados a esta área */}
+                  {manualMachinesInArea.length > 0 && (
+                    <div className="border-t border-border/40">
+                      <div className="bg-muted/10 px-3 py-1.5">
+                        <span className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Equipos manuales ({manualMachinesInArea.length})</span>
+                      </div>
+                      {manualMachinesInArea.map((m) => (
+                        <div key={m.id} className="group flex items-center gap-2.5 border-b border-border/20 px-3 py-[7px] last:border-b-0 hover:bg-muted/25">
+                          <span className="h-[9px] w-[9px] shrink-0 rounded-full" style={{ backgroundColor: m.color || '#3b82f6' }} />
+                          <div className="min-w-0 flex-1">
+                            <InlineEditName
+                              value={m.nombre}
+                              onSave={(name) => handleRenameManualMachine(m.id, name)}
+                              canEdit
+                              className="w-full"
+                              textClassName="block truncate text-[11.5px] font-medium leading-snug text-foreground"
+                            />
+                            {[m.marca, m.modelo].filter(Boolean).length > 0 && (
+                              <span className="mt-px block truncate text-[9.5px] leading-tight text-muted-foreground/70">{[m.marca, m.modelo].filter(Boolean).join(' · ')}</span>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => handleArchiveManualMachine(m)}
+                            className="hidden h-5 w-5 shrink-0 items-center justify-center rounded text-muted-foreground/40 transition-all hover:bg-amber-500/10 hover:text-amber-500 group-hover:flex"
+                            title="Archivar equipo manual"
+                          >
+                            <Archive className="h-3 w-3" />
+                          </button>
+                        </div>
                       ))}
                     </div>
                   )}
