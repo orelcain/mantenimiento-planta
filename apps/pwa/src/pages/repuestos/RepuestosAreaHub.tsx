@@ -12,7 +12,7 @@
  *  - Fase 7: búsqueda global del topbar + promover hub a vista por defecto.
  */
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
-import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ListChecks, ClipboardList, Menu, GitMerge, History, Trash2, Star, Upload, Download } from 'lucide-react'
+import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ListChecks, ClipboardList, Menu, GitMerge, History, Trash2, Star, Upload, Download, ArrowUpDown, Eye, EyeOff, Package, X, Loader2, Wrench } from 'lucide-react'
 import { Badge, Button, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui'
 import { AreaSidebar } from '@/components/repuestos/AreaSidebar'
 import { AssetDetailModal } from '@/components/repuestos/AssetDetailModal'
@@ -25,7 +25,7 @@ import { useAuthStore, useIsAdmin } from '@/store/authStore'
 import { DuplicatesModal } from '@/components/repuestos/DuplicatesModal'
 import { AuditLogPanel } from '@/components/repuestos/AuditLogPanel'
 import { TrashPanel } from '@/components/repuestos/TrashPanel'
-import { getTrashCount } from '@/services/auditLog'
+import { getTrashCount, moveToTrash } from '@/services/auditLog'
 import { usePlantAssets } from '@/hooks/repuestos/usePlantAssets'
 import { useHierarchyAreaTree, type AreaTreeNode } from '@/hooks/useHierarchyAreaTree'
 import { useGlobalSearch, invalidateGlobalRepuestosCache, type GlobalSearchResult } from '@/hooks/repuestos/useGlobalSearch'
@@ -47,6 +47,12 @@ import { RelocateRepuestoModal } from '@/components/repuestos/RelocateRepuestoMo
 import { ImportRepuestosModal } from './ImportRepuestosModal'
 import { ExportReportModal } from '@/components/repuestos/ExportReportModal'
 import { normalizeForSearch } from '@/utils/repuestos'
+import { Timestamp, addDoc, collection, doc, updateDoc, deleteDoc, getDoc } from 'firebase/firestore'
+import { db } from '@/services/firebase'
+import { logger } from '@/lib/logger'
+import { getHmiTooltipPwd } from '@/services/hmiKnuro'
+import { useEquipmentForArea, invalidateEquipmentCache } from '@/hooks/useEquipmentForArea'
+import { EquipmentCard } from '@/components/repuestos/EquipmentCard'
 import type { PlantAsset, Machine, RepuestoFormData, TechnicalSpecs, MachineImage } from '@/types/repuestos'
 
 type RepAction = 'edit' | 'specs' | 'photos' | 'gallery' | 'manual' | 'manualSearch' | 'relocate' | 'delete'
@@ -852,6 +858,139 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
     setSelectedAreaId(null)
   }, [])
 
+  // ══════════════════════════════════════════════════════════════════
+  //  Admin de estructura de equipos del área (rescate de "Por equipo").
+  //  Gestiona NODOS de la colección `hierarchy` (equipos SAP del árbol),
+  //  entidad distinta de los PlantAssets (motores/bombas) de "Ver equipos
+  //  del área". Reusa EquipmentCard (rename/código/sub-equipo internos) +
+  //  useEquipmentForArea. selectedAreaId ya es el id del nodo hierarchy.
+  // ══════════════════════════════════════════════════════════════════
+  const [showEquipAdmin, setShowEquipAdmin] = useState(false)
+  const [equipRefreshKey, setEquipRefreshKey] = useState(0)
+  const { equipment: areaEquipment, loading: equipmentLoading } = useEquipmentForArea(
+    showEquipAdmin ? selectedAreaId : null,
+    equipRefreshKey,
+  )
+
+  // Conteo de repuestos por máquina vinculada (badge "N rep." de EquipmentCard)
+  const repCountByMachine = useMemo(() => {
+    const m: Record<string, number> = {}
+    for (const it of bodegaItems) for (const eq of it.equipos) m[eq.machineId] = (m[eq.machineId] ?? 0) + 1
+    return m
+  }, [bodegaItems])
+
+  const [showHiddenEq, setShowHiddenEq] = useState(false)
+  const hiddenEqCount = useMemo(() => areaEquipment.filter((e) => e.oculto).length, [areaEquipment])
+  const visibleEquipment = useMemo(
+    () => (showHiddenEq ? areaEquipment : areaEquipment.filter((e) => !e.oculto)),
+    [areaEquipment, showHiddenEq],
+  )
+
+  // Agregar equipo (inline) + reordenar
+  const [eqReorderMode, setEqReorderMode] = useState(false)
+  const [addingEquipment, setAddingEquipment] = useState(false)
+  const [newEqName, setNewEqName] = useState('')
+  const [newEqCode, setNewEqCode] = useState('')
+  const [savingNewEq, setSavingNewEq] = useState(false)
+  const newEqInputRef = useRef<HTMLInputElement>(null)
+  useEffect(() => { if (addingEquipment) newEqInputRef.current?.focus() }, [addingEquipment])
+
+  const refreshEquip = useCallback(() => {
+    invalidateEquipmentCache(selectedAreaId ?? undefined)
+    setEquipRefreshKey((k) => k + 1)
+  }, [selectedAreaId])
+
+  const handleAddEquipmentToArea = useCallback(async () => {
+    const name = newEqName.trim()
+    if (!name || !selectedAreaId) return
+    const selNode = findNode(selectedAreaId)
+    setSavingNewEq(true)
+    try {
+      const nextLevel = selNode ? (selNode.nivel as number) + 1 : 5
+      await addDoc(collection(db, 'hierarchy'), {
+        nombre: name.toUpperCase(),
+        codigo: newEqCode.trim(),
+        nivel: nextLevel,
+        parentId: selectedAreaId,
+        path: getNodePath(selectedAreaId).map((n) => n.id),
+        orden: areaEquipment.length,
+        activo: true,
+        creadoPor: 'admin',
+        creadoEn: Timestamp.now(),
+        actualizadoEn: Timestamp.now(),
+      })
+      refreshEquip()
+    } catch (err) {
+      logger.error('Error al agregar equipo', err instanceof Error ? err : new Error(String(err)))
+    } finally {
+      setSavingNewEq(false); setAddingEquipment(false); setNewEqName(''); setNewEqCode('')
+    }
+  }, [newEqName, newEqCode, selectedAreaId, findNode, getNodePath, areaEquipment.length, refreshEquip])
+
+  const handleToggleEquipHidden = useCallback(async (equipmentId: string, hidden: boolean) => {
+    try {
+      await updateDoc(doc(db, 'hierarchy', equipmentId), { oculto: hidden, actualizadoEn: Timestamp.now() })
+      refreshEquip()
+    } catch (err) {
+      logger.error('Error toggling hidden', err instanceof Error ? err : new Error(String(err)))
+    }
+  }, [refreshEquip])
+
+  const handleMoveEquipment = useCallback(async (equipmentId: string, direction: 'up' | 'down') => {
+    const idx = areaEquipment.findIndex((e) => e.id === equipmentId)
+    if (idx < 0) return
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1
+    if (swapIdx < 0 || swapIdx >= areaEquipment.length) return
+    const eqA = areaEquipment[idx]!, eqB = areaEquipment[swapIdx]!
+    try {
+      await Promise.all([
+        updateDoc(doc(db, 'hierarchy', eqA.id), { orden: swapIdx, actualizadoEn: Timestamp.now() }),
+        updateDoc(doc(db, 'hierarchy', eqB.id), { orden: idx, actualizadoEn: Timestamp.now() }),
+      ])
+      refreshEquip()
+    } catch (err) {
+      logger.error('Error reordering equipment', err instanceof Error ? err : new Error(String(err)))
+    }
+  }, [areaEquipment, refreshEquip])
+
+  // Eliminar equipo (con clave admin → papelera)
+  const [eqDeleteTarget, setEqDeleteTarget] = useState<{ id: string; name: string } | null>(null)
+  const [eqDeleteClave, setEqDeleteClave] = useState('')
+  const [eqDeleteError, setEqDeleteError] = useState('')
+  const [eqDeleting, setEqDeleting] = useState(false)
+  const handleDeleteEquipment = useCallback((equipmentId: string, name: string) => {
+    setEqDeleteTarget({ id: equipmentId, name }); setEqDeleteClave(''); setEqDeleteError('')
+  }, [])
+  const confirmEquipDelete = useCallback(async () => {
+    if (!eqDeleteTarget || !eqDeleteClave.trim()) return
+    setEqDeleting(true); setEqDeleteError('')
+    try {
+      const correctPwd = await getHmiTooltipPwd()
+      if (eqDeleteClave.trim() !== correctPwd) { setEqDeleteError('Clave incorrecta'); setEqDeleting(false); return }
+      const docRef = doc(db, 'hierarchy', eqDeleteTarget.id)
+      const snap = await getDoc(docRef)
+      if (snap.exists()) {
+        const data = snap.data()
+        await moveToTrash({
+          originalCollection: 'hierarchy',
+          originalId: eqDeleteTarget.id,
+          documentLabel: eqDeleteTarget.name,
+          data: data as Record<string, unknown>,
+          userId: user?.id || '',
+          userName: `${user?.nombre || ''} ${user?.apellido || ''}`.trim(),
+          metadata: { parentId: (data.parentId as string) || '' },
+        })
+      }
+      await deleteDoc(docRef)
+      refreshEquip()
+      setEqDeleteTarget(null)
+    } catch (err) {
+      logger.error('Error deleting equipment', err instanceof Error ? err : new Error(String(err)))
+      setEqDeleteError('Error al eliminar')
+    }
+    setEqDeleting(false)
+  }, [eqDeleteTarget, eqDeleteClave, user, refreshEquip])
+
   const selectedAsset = useMemo(
     () => assets.find((a) => a.id === selectedAssetId) ?? null,
     [assets, selectedAssetId],
@@ -1116,6 +1255,118 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
               </div>
             )}
           </section>
+          )}
+
+          {/* Estructura de equipos del área (admin) — nodos hierarchy, distinto de PlantAssets */}
+          {isAdmin && selectedAreaId && (
+            <section className="mb-6">
+              <button
+                onClick={() => setShowEquipAdmin((s) => !s)}
+                className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground"
+              >
+                <Wrench className="h-4 w-4 text-amber-500" />
+                Estructura de equipos del área (admin)
+                <ChevronDown className={['h-4 w-4 text-muted-foreground transition-transform', showEquipAdmin ? '' : '-rotate-90'].join(' ')} />
+              </button>
+
+              {showEquipAdmin && (
+                <div className="overflow-hidden rounded-lg border border-border">
+                  {/* Toolbar: conteo + ver ocultos + reordenar + agregar */}
+                  <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-3 py-2">
+                    <span className="text-xs font-semibold text-muted-foreground tabular-nums">{visibleEquipment.length} equipos</span>
+                    {hiddenEqCount > 0 && (
+                      <button
+                        onClick={() => setShowHiddenEq((v) => !v)}
+                        className={['flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors', showHiddenEq ? 'bg-amber-500/15 text-amber-500' : 'bg-muted/60 text-muted-foreground/60 hover:bg-muted hover:text-muted-foreground'].join(' ')}
+                        title={showHiddenEq ? 'Ocultar equipos ocultos' : `Ver ${hiddenEqCount} oculto(s)`}
+                      >
+                        {showHiddenEq ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                        {hiddenEqCount}
+                      </button>
+                    )}
+                    <div className="ml-auto flex items-center gap-1">
+                      <button
+                        onClick={() => setEqReorderMode((v) => !v)}
+                        className={['flex h-7 w-7 items-center justify-center rounded transition-colors', eqReorderMode ? 'bg-primary/20 text-primary' : 'text-muted-foreground/60 hover:bg-primary/20 hover:text-primary'].join(' ')}
+                        title={eqReorderMode ? 'Salir de reordenar' : 'Reordenar equipos'}
+                      >
+                        <ArrowUpDown className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => setAddingEquipment(true)}
+                        className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground/60 transition-colors hover:bg-primary/20 hover:text-primary"
+                        title="Agregar equipo"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Formulario inline agregar equipo */}
+                  {addingEquipment && (
+                    <div className="flex items-center gap-1.5 border-b border-primary/20 bg-primary/5 px-3 py-2">
+                      <Plus className="h-3.5 w-3.5 shrink-0 text-primary/50" />
+                      <input
+                        ref={newEqInputRef}
+                        value={newEqName}
+                        onChange={(e) => setNewEqName(e.target.value.toUpperCase())}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleAddEquipmentToArea(); if (e.key === 'Escape') setAddingEquipment(false) }}
+                        placeholder="Nombre del equipo"
+                        className="h-7 min-w-0 flex-1 rounded border border-primary/40 bg-background px-1.5 text-[11px] uppercase text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                      />
+                      <input
+                        value={newEqCode}
+                        onChange={(e) => setNewEqCode(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleAddEquipmentToArea(); if (e.key === 'Escape') setAddingEquipment(false) }}
+                        placeholder="Código (opc.)"
+                        className="h-7 w-24 rounded border border-border bg-background px-1.5 font-mono text-[10px] text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                      />
+                      <button onClick={handleAddEquipmentToArea} disabled={savingNewEq || !newEqName.trim()} className="flex h-7 w-7 items-center justify-center rounded bg-primary/20 text-primary transition-colors hover:bg-primary/30 disabled:opacity-40">
+                        {savingNewEq ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+                      </button>
+                      <button onClick={() => setAddingEquipment(false)} className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted/50">
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Lista de equipos SAP del área */}
+                  {equipmentLoading ? (
+                    <div className="flex items-center justify-center gap-2 py-10">
+                      <Loader2 className="h-5 w-5 animate-spin text-primary/50" />
+                      <span className="text-xs text-muted-foreground">Cargando equipos…</span>
+                    </div>
+                  ) : visibleEquipment.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center gap-1.5 px-4 py-10 text-center">
+                      <Package className="h-7 w-7 text-muted-foreground/30" />
+                      <p className="text-xs text-muted-foreground">Esta área no tiene equipos SAP. Usa «+» para agregar.</p>
+                    </div>
+                  ) : (
+                    <div>
+                      {visibleEquipment.map((eq, idx) => (
+                        <EquipmentCard
+                          key={eq.id}
+                          equipment={eq}
+                          isActive={false}
+                          onClick={() => {}}
+                          repuestosCounts={repCountByMachine}
+                          isAdmin={isAdmin}
+                          onAliasUpdated={refreshEquip}
+                          onChildAdded={refreshEquip}
+                          reorderMode={eqReorderMode}
+                          isFirst={idx === 0}
+                          isLast={idx === visibleEquipment.length - 1}
+                          onMoveUp={() => handleMoveEquipment(eq.id, 'up')}
+                          onMoveDown={() => handleMoveEquipment(eq.id, 'down')}
+                          onToggleHidden={handleToggleEquipHidden}
+                          onDeleteEquipment={handleDeleteEquipment}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </section>
           )}
 
           {/* Tabla de repuestos del área (catálogo + bodega) */}
@@ -1618,6 +1869,34 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Confirmar eliminación de equipo (estructura hierarchy) con clave admin */}
+      {eqDeleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setEqDeleteTarget(null)}>
+          <div className="w-96 rounded-xl border border-border bg-card p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="mb-1 text-sm font-bold text-foreground">Eliminar equipo</h3>
+            <p className="mb-4 text-xs text-muted-foreground">
+              ¿Eliminar <strong className="text-foreground">{eqDeleteTarget.name}</strong> permanentemente? Se moverá a la papelera. Ingresa la clave de edición para confirmar.
+            </p>
+            <input
+              type="password"
+              value={eqDeleteClave}
+              onChange={(e) => { setEqDeleteClave(e.target.value); setEqDeleteError('') }}
+              onKeyDown={(e) => { if (e.key === 'Enter') confirmEquipDelete() }}
+              placeholder="Clave de edición…"
+              className="mb-2 h-9 w-full rounded-lg border border-border bg-muted/30 px-3 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-red-500/40"
+              autoFocus
+            />
+            {eqDeleteError && <p className="mb-2 text-xs text-red-400">{eqDeleteError}</p>}
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setEqDeleteTarget(null)} className="rounded-lg px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted/30 hover:text-foreground">Cancelar</button>
+              <button onClick={confirmEquipDelete} disabled={eqDeleting || !eqDeleteClave.trim()} className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-1.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20 disabled:opacity-50">
+                {eqDeleting ? 'Eliminando…' : 'Eliminar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
