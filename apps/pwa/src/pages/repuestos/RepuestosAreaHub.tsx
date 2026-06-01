@@ -54,6 +54,7 @@ import { getHmiTooltipPwd } from '@/services/hmiKnuro'
 import { useEquipmentForArea, invalidateEquipmentCache } from '@/hooks/useEquipmentForArea'
 import { EquipmentCard } from '@/components/repuestos/EquipmentCard'
 import { MachineManager } from '@/components/repuestos/MachineManager'
+import { EquipmentHeaderPhoto } from '@/components/repuestos/EquipmentHeaderPhoto'
 import type { PlantAsset, Machine, RepuestoFormData, TechnicalSpecs, MachineImage } from '@/types/repuestos'
 
 type RepAction = 'edit' | 'specs' | 'photos' | 'gallery' | 'manual' | 'manualSearch' | 'relocate' | 'delete'
@@ -193,6 +194,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   const [trashOpen, setTrashOpen] = useState(false)
   const [trashCount, setTrashCount] = useState(0)
   const [machineManagerOpen, setMachineManagerOpen] = useState(false) // G4: CRUD máquinas manuales
+  const [photoEquip, setPhotoEquip] = useState<{ id: string; name: string } | null>(null) // G1: fotos por equipo
 
   // ── Acciones por repuesto (Wave 1: rescate de "Por equipo") ──
   const { toast } = useToast()
@@ -1352,8 +1354,8 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                         <EquipmentCard
                           key={eq.id}
                           equipment={eq}
-                          isActive={false}
-                          onClick={() => {}}
+                          isActive={photoEquip?.id === eq.id}
+                          onClick={(e) => setPhotoEquip({ id: e.id, name: e.alias || e.nombre })}
                           repuestosCounts={repCountByMachine}
                           isAdmin={isAdmin}
                           onAliasUpdated={refreshEquip}
@@ -1912,6 +1914,20 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
           </div>
         </div>
       )}
+
+      {/* G1: fotos del equipo SAP seleccionado (clic en una tarjeta de la sección admin) */}
+      <Dialog open={!!photoEquip} onOpenChange={(o) => !o && setPhotoEquip(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-base">Fotos del equipo</DialogTitle>
+            <DialogDescription className="truncate">{photoEquip?.name}</DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center gap-3">
+            {photoEquip && <EquipmentHeaderPhoto equipmentId={photoEquip.id} />}
+            <p className="text-xs text-muted-foreground">Toca la miniatura para ampliar (zoom/paneo) o la cámara para subir una foto del equipo desde el celular.</p>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -1,7 +1,7 @@
 {
-  "version": "3.52.0",
+  "version": "3.53.0",
   "buildDate": "2026-06-01",
-  "buildTimestamp": 1780355348554,
+  "buildTimestamp": 1780355620517,
   "features": [
     "Panel Admin: el panel de módulos del sidebar ahora lista los 19 items en dos secciones (En desarrollo / En producción)",
     "Panel Admin: se puede mostrar u ocultar cualquier módulo a conveniencia (antes solo los ocultos en desarrollo)",
