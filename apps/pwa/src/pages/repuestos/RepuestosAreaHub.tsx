@@ -148,7 +148,8 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   const [repPageSize, setRepPageSize] = useState(25)
 
   // Repuesto seleccionado → panel lateral de detalle
-  const [selectedRepSap, setSelectedRepSap] = useState<string | null>(null)
+  // Selección por rowKey estable (NO codigoSAP: vacío en repuestos sin SAP → colisiona).
+  const [selectedRowKey, setSelectedRowKey] = useState<string | null>(null)
 
   // ── Solicitudes de repuesto (Fase 6) ──
   const user = useAuthStore((s) => s.user)
@@ -348,8 +349,8 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   )
 
   const selectedRep = useMemo(
-    () => areaRepuestos.find((r) => r.codigoSAP === selectedRepSap) ?? null,
-    [areaRepuestos, selectedRepSap],
+    () => areaRepuestos.find((r) => r.rowKey === selectedRowKey) ?? null,
+    [areaRepuestos, selectedRowKey],
   )
 
   // Guardar ubicación estructurada (preserva el resto del stock del item).
@@ -503,7 +504,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
       await crudDelete(colPathOf(source.machineId), source.repuesto.id)
       toast({ title: 'Repuesto movido a la papelera', variant: 'success' })
       setActionTarget(null)
-      setSelectedRepSap(null)
+      setSelectedRowKey(null)
       await refreshCatalog()
     } catch (err) {
       toast({ variant: 'destructive', title: 'Error al eliminar', description: err instanceof Error ? err.message : '' })
@@ -762,7 +763,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                       return (
                         <tr
                           key={a.id}
-                          onClick={() => { setSelectedAssetId(a.id); setSelectedRepSap(null) }}
+                          onClick={() => { setSelectedAssetId(a.id); setSelectedRowKey(null) }}
                           className={[
                             'cursor-pointer transition-colors',
                             selectedAssetId === a.id ? 'bg-primary/10 ring-1 ring-inset ring-primary/40' : 'hover:bg-muted/40',
@@ -881,11 +882,11 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                         const meta = STOCK_META[r.stockStatus]
                         const equipo = r.equipos[0]?.machineName ?? '-'
                         const extra = r.equipos.length > 1 ? ` +${r.equipos.length - 1}` : ''
-                        const isSel = selectedRepSap === r.codigoSAP
+                        const isSel = selectedRowKey === r.rowKey
                         return (
                           <tr
-                            key={r.codigoSAP}
-                            onClick={() => { setSelectedRepSap(r.codigoSAP); setSelectedAssetId(null) }}
+                            key={r.rowKey}
+                            onClick={() => { setSelectedRowKey(r.rowKey); setSelectedAssetId(null) }}
                             className={[
                               'cursor-pointer transition-colors',
                               isSel ? 'bg-primary/10 ring-1 ring-inset ring-primary/40' : 'hover:bg-muted/40',
@@ -956,7 +957,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
         <RepuestoDetailPanel
           item={selectedRep}
           areaName={showingAll ? 'Todas las áreas' : (selectedNode?.nombre ?? '')}
-          onClose={() => setSelectedRepSap(null)}
+          onClose={() => setSelectedRowKey(null)}
           loadMovimientos={loadMovimientos}
           onSaveLocation={handleSaveLocation}
           onSolicitar={(r) => openSolicitar({ codigoSAP: r.codigoSAP, textoBreve: r.textoBreve })}

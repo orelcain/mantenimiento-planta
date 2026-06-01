@@ -58,6 +58,9 @@ export interface BodegaOverlay {
 }
 
 export interface BodegaMergedItem {
+  /** Clave estable y única del item agregado (sap || fab:<fab> || id:<machineId>:<repId>).
+   *  Para selección/keys de React: codigoSAP NO sirve (vacío en repuestos sin SAP). */
+  rowKey: string
   codigoSAP: string
   codigoFabricante: string
   textoBreve: string
@@ -299,6 +302,7 @@ export function useBodega(catalogRepuestos: GlobalSearchResult[]) {
 
       const overlay = sap ? bodegaOverlays.get(sap) : undefined
       byKey.set(key, {
+        rowKey: key,
         codigoSAP: sap,
         codigoFabricante: rep.codigoFabricante || '',
         textoBreve: rep.textoBreve || rep.descripcion || '',
