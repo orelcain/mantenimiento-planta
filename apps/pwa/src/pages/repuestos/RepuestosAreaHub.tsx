@@ -12,7 +12,7 @@
  *  - Fase 7: búsqueda global del topbar + promover hub a vista por defecto.
  */
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
-import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ListChecks, ClipboardList, Menu, GitMerge, History, Trash2, Star, Upload, Download, ArrowUpDown, Eye, EyeOff, Package, X, Loader2, Wrench, Settings2, Archive, ArrowRightLeft } from 'lucide-react'
+import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ListChecks, ClipboardList, Menu, GitMerge, History, Trash2, Star, Upload, Download, ArrowUpDown, Eye, EyeOff, Package, X, Loader2, Wrench, Settings2, Archive, ArrowRightLeft, MoreVertical } from 'lucide-react'
 import { Badge, Button, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui'
 import { AreaSidebar } from '@/components/repuestos/AreaSidebar'
 import { AssetDetailModal } from '@/components/repuestos/AssetDetailModal'
@@ -89,9 +89,9 @@ const STOCK_META: Record<StockStatus, { label: string; dot: string; text: string
 
 function KpiCard({ value, label, accent, hint, bar }: { value: string | number; label: string; accent: string; hint?: string; bar?: string }) {
   return (
-    <div className={['rounded-xl border border-l-4 border-border bg-card px-4 py-3', bar].filter(Boolean).join(' ')}>
-      <div className={['text-2xl font-bold tabular-nums', accent].join(' ')}>{value}</div>
-      <div className="text-xs text-muted-foreground">{label}</div>
+    <div className={['rounded-xl border border-l-4 border-border bg-card px-3 py-2.5 sm:px-4 sm:py-3', bar].filter(Boolean).join(' ')}>
+      <div className={['text-xl font-bold tabular-nums sm:text-2xl', accent].join(' ')}>{value}</div>
+      <div className="text-[11px] text-muted-foreground sm:text-xs">{label}</div>
       {hint && <div className="mt-0.5 text-[10px] text-muted-foreground/60">{hint}</div>}
     </div>
   )
@@ -198,6 +198,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   const [trashOpen, setTrashOpen] = useState(false)
   const [trashCount, setTrashCount] = useState(0)
   const [machineManagerOpen, setMachineManagerOpen] = useState(false) // G4: CRUD máquinas manuales
+  const [adminMenuOpen, setAdminMenuOpen] = useState(false) // overflow herramientas admin (móvil)
   const [photoEquip, setPhotoEquip] = useState<{ id: string; name: string } | null>(null) // G1: fotos por equipo
 
   // ── Acciones por repuesto (Wave 1: rescate de "Por equipo") ──
@@ -281,6 +282,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   // Solo lectura en el hub: viven en user_preferences/{uid}.favoriteLists (machineIds).
   const [equipFavLists, setEquipFavLists] = useState<FavList[]>([])
   const [favBarClosed, setFavBarClosed] = useState<Record<string, boolean>>({})
+  const [favBarOpen, setFavBarOpen] = useState(false) // barra de favoritos colapsada por defecto (UX)
   useEffect(() => {
     if (!user?.id) return
     getUserPreferences(user.id).then((p) => setEquipFavLists(p.favoriteLists || [])).catch(() => {})
@@ -1100,6 +1102,20 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
 
   const title = showingAll ? 'Todas las áreas' : (selectedNode?.nombre ?? 'Selecciona un área')
 
+  // Herramientas admin de catálogo — compartidas entre toolbar desktop y overflow móvil.
+  const adminTools = isAdmin
+    ? [
+        { key: 'manage', icon: Settings2, label: 'Gestionar equipos', onClick: () => setMachineManagerOpen(true) },
+        { key: 'import', icon: Upload, label: 'Importar Excel', onClick: startImport },
+        { key: 'export', icon: Download, label: 'Exportar reporte', onClick: () => setExportOpen(true) },
+        { key: 'dup', icon: GitMerge, label: 'Escáner de duplicados', onClick: () => setDuplicatesOpen(true) },
+        { key: 'audit', icon: History, label: 'Historial de cambios', onClick: () => setAuditLogOpen(true) },
+        { key: 'trash', icon: Trash2, label: 'Papelera', onClick: () => setTrashOpen(true), badge: trashCount },
+      ]
+    : []
+
+  const equipFavTotal = equipFavLists.reduce((n, l) => n + l.machineIds.length, 0)
+
   return (
     <div className="flex h-full bg-background">
       <AreaSidebar
@@ -1121,8 +1137,8 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
 
       {/* Columna principal */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        {/* Header del módulo: búsqueda global + acciones (cableado en fases posteriores) */}
-        <div className="flex items-center gap-2 border-b border-border px-4 py-2.5">
+        {/* Header del módulo: búsqueda global + acciones */}
+        <div className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2.5 sm:px-4">
           <button
             onClick={() => setSidebarMobileOpen(true)}
             className="shrink-0 rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground sm:hidden"
@@ -1130,7 +1146,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
           >
             <Menu className="h-5 w-5" />
           </button>
-          <div className="relative max-w-md flex-1">
+          <div className="relative min-w-[160px] max-w-md flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={repQuery}
@@ -1145,53 +1161,82 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
             />
           </div>
           <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setSolicitudesOpen(true)}>
-            <ClipboardList className="h-4 w-4" /> Solicitudes
+            <ClipboardList className="h-4 w-4" /> <span className="hidden sm:inline">Solicitudes</span>
             {pendientesCount > 0 && (
               <Badge variant="secondary" className="ml-0.5 tabular-nums">{pendientesCount}</Badge>
             )}
           </Button>
           <Button size="sm" className="gap-1.5" onClick={() => openSolicitar(null)}>
-            <Plus className="h-4 w-4" /> Solicitar repuesto
+            <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Solicitar repuesto</span><span className="sm:hidden">Solicitar</span>
           </Button>
-          {/* Herramientas admin de catálogo (solo admin, ocultas en móvil) */}
+          {/* Herramientas admin: toolbar en desktop (≥sm) */}
           {isAdmin && (
             <div className="hidden items-center gap-1 border-l border-border pl-2 sm:flex">
-              <button onClick={() => setMachineManagerOpen(true)} title="Gestionar equipos (máquinas manuales)" className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
-                <Settings2 className="h-4 w-4" />
-              </button>
-              <button onClick={startImport} title="Importar repuestos desde Excel" className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
-                <Upload className="h-4 w-4" />
-              </button>
-              <button onClick={() => setExportOpen(true)} title="Exportar reporte" className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
-                <Download className="h-4 w-4" />
-              </button>
-              <button onClick={() => setDuplicatesOpen(true)} title="Escáner de duplicados" className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
-                <GitMerge className="h-4 w-4" />
-              </button>
-              <button onClick={() => setAuditLogOpen(true)} title="Historial de cambios" className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
-                <History className="h-4 w-4" />
-              </button>
-              <button onClick={() => setTrashOpen(true)} title="Papelera" className="relative rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
-                <Trash2 className="h-4 w-4" />
+              {adminTools.map((t) => {
+                const Icon = t.icon
+                return (
+                  <button key={t.key} onClick={t.onClick} title={t.label} className="relative rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+                    <Icon className="h-4 w-4" />
+                    {t.badge ? (
+                      <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white tabular-nums">{t.badge}</span>
+                    ) : null}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+          {/* Herramientas admin: overflow en móvil (<sm) */}
+          {isAdmin && (
+            <div className="relative sm:hidden">
+              <button onClick={() => setAdminMenuOpen((v) => !v)} title="Herramientas admin" aria-label="Herramientas admin" className="relative rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground">
+                <MoreVertical className="h-5 w-5" />
                 {trashCount > 0 && (
                   <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white tabular-nums">{trashCount}</span>
                 )}
               </button>
+              {adminMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setAdminMenuOpen(false)} />
+                  <div className="absolute left-0 z-50 mt-1 w-56 max-w-[calc(100vw-1.5rem)] rounded-lg border border-border bg-card p-1 shadow-xl">
+                    {adminTools.map((t) => {
+                      const Icon = t.icon
+                      return (
+                        <button
+                          key={t.key}
+                          onClick={() => { t.onClick(); setAdminMenuOpen(false) }}
+                          className="flex w-full items-center gap-2.5 rounded px-2.5 py-2.5 text-left text-sm text-foreground hover:bg-muted/50"
+                        >
+                          <Icon className="h-4 w-4 text-muted-foreground" />
+                          <span className="flex-1">{t.label}</span>
+                          {t.badge ? (
+                            <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white tabular-nums">{t.badge}</span>
+                          ) : null}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-          {/* Favoritos de equipos (listas con nombre) — gestionables por admin (G2) */}
+          {/* Favoritos de equipos (listas con nombre) — colapsada por defecto + gestionable por admin (G2) */}
           {(equipFavLists.length > 0 || isAdmin) && (
             <div className="mb-5 rounded-xl border border-border bg-card/40 p-3">
-              <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+              <button
+                onClick={() => setFavBarOpen((v) => !v)}
+                className="flex w-full items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground"
+              >
                 <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> Favoritos de equipos
-              </div>
-              {equipFavLists.length === 0 ? (
-                <p className="pl-5 text-[11px] text-muted-foreground/70">Marca equipos con ⭐ en «Estructura de equipos del área (admin)» para crear listas.</p>
+                {equipFavLists.length > 0 && <span className="tabular-nums text-muted-foreground/60">({equipFavTotal})</span>}
+                <ChevronDown className={['ml-auto h-3.5 w-3.5 transition-transform', favBarOpen ? '' : '-rotate-90'].join(' ')} />
+              </button>
+              {favBarOpen && (equipFavLists.length === 0 ? (
+                <p className="mt-2 pl-5 text-[11px] text-muted-foreground/70">Marca equipos con ⭐ en «Estructura de equipos del área (admin)» para crear listas.</p>
               ) : (
-                <div className="space-y-2">
+                <div className="mt-2 space-y-2">
                   {equipFavLists.map((list) => {
                     const closed = favBarClosed[list.name]
                     return (
@@ -1240,7 +1285,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                     )
                   })}
                 </div>
-              )}
+              ))}
             </div>
           )}
 
