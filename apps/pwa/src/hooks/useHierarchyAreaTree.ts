@@ -22,9 +22,20 @@ import {
   isEquipmentNode,
 } from '@/types/hierarchy'
 
+// Equipo SAP (hoja) que cuelga de un área en el sidebar.
+export interface EquipmentLeaf {
+  id: string
+  nombre: string
+  alias?: string
+  codigo: string
+  oculto?: boolean
+  linkedMachineId?: string
+}
+
 // Nodo de área para el sidebar — extiende con conteo de equipos hijos
 export interface AreaTreeNode extends HierarchyNodeWithChildren {
   children: AreaTreeNode[]
+  equipment: EquipmentLeaf[] // Equipos SAP directos (hijos numéricos), para mostrarlos en el árbol del sidebar
   equipmentCount: number    // Equipos SAP directos (hijos con código numérico)
   hasMoreChildren: boolean  // true si hay hijos-área no cargados aún
   isLoading?: boolean       // true mientras se cargan hijos
@@ -62,6 +73,7 @@ function buildAreaTree(nodes: HierarchyNode[]): AreaTreeNode[] {
     nodeMap.set(node.id, {
       ...node,
       children: [],
+      equipment: [],
       equipmentCount: equipmentByParent.get(node.id) || 0,
       hasMoreChildren: false,
     })
@@ -78,6 +90,31 @@ function buildAreaTree(nodes: HierarchyNode[]): AreaTreeNode[] {
     } else {
       rootNodes.push(treeNode)
     }
+  }
+
+  // Adjuntar equipos (hijos numéricos / sin código) a su área padre, ordenados por `orden`.
+  const equipByParent = new Map<string, { leaf: EquipmentLeaf; orden: number }[]>()
+  for (const n of nodes) {
+    if (!isAreaNode(n) && n.parentId && nodeMap.has(n.parentId)) {
+      const arr = equipByParent.get(n.parentId) ?? []
+      arr.push({
+        leaf: {
+          id: n.id,
+          nombre: n.nombre,
+          alias: (n as HierarchyNode & { alias?: string }).alias,
+          codigo: n.codigo,
+          oculto: (n as HierarchyNode & { oculto?: boolean }).oculto ?? false,
+          linkedMachineId: (n as HierarchyNode & { linkedMachineId?: string }).linkedMachineId,
+        },
+        orden: (n as HierarchyNode & { orden?: number }).orden ?? 0,
+      })
+      equipByParent.set(n.parentId, arr)
+    }
+  }
+  for (const [parentId, arr] of equipByParent) {
+    arr.sort((a, b) => a.orden - b.orden)
+    const parent = nodeMap.get(parentId)
+    if (parent) parent.equipment = arr.map((x) => x.leaf)
   }
 
   return rootNodes

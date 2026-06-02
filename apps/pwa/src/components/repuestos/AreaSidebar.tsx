@@ -8,8 +8,8 @@
  * Reutiliza useHierarchyAreaTree (mismo árbol que EquipmentNavigator).
  */
 import { useMemo } from 'react'
-import { ChevronRight, Layers, Loader2, List, X, Star } from 'lucide-react'
-import { useHierarchyAreaTree, type AreaTreeNode } from '@/hooks/useHierarchyAreaTree'
+import { ChevronRight, Layers, Loader2, List, X, Star, Cog } from 'lucide-react'
+import { useHierarchyAreaTree, type AreaTreeNode, type EquipmentLeaf } from '@/hooks/useHierarchyAreaTree'
 
 /** Poda el árbol a las áreas favoritas (o con descendientes favoritos). */
 function filterForFavorites(nodes: AreaTreeNode[], favIds: Set<string>): AreaTreeNode[] {
@@ -52,6 +52,29 @@ function countEquip(node: AreaTreeNode): number {
   return total
 }
 
+/** Fila de equipo (hoja) bajo un área — clic selecciona el área padre. */
+function EquipmentRow({ leaf, depth, onClick }: { leaf: EquipmentLeaf; depth: number; onClick: () => void }) {
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onClick}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } }}
+      style={{ paddingLeft: `${10 + depth * 14}px` }}
+      className="group relative flex items-center gap-2 pr-2 py-1.5 cursor-pointer select-none border-l-2 border-l-transparent text-foreground/70 transition-colors hover:bg-muted/40 hover:text-foreground"
+      title={leaf.nombre}
+    >
+      <Cog className="h-3.5 w-3.5 shrink-0 text-cyan-500/60" />
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-[12px] leading-tight">{leaf.alias || leaf.nombre}</div>
+        {leaf.codigo && (
+          <div className="truncate font-mono text-[9.5px] leading-tight text-muted-foreground/60">{leaf.codigo}</div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function AreaRow({
   node, depth, selectedAreaId, onSelectArea, assetCountByNode, repCountByNode, favoriteAreaIds, onToggleAreaFav, openNodes, onToggleNode,
 }: {
@@ -59,7 +82,8 @@ function AreaRow({
 } & Pick<AreaSidebarProps, 'selectedAreaId' | 'onSelectArea' | 'assetCountByNode' | 'repCountByNode' | 'favoriteAreaIds' | 'onToggleAreaFav' | 'openNodes' | 'onToggleNode'>) {
   const isSelected = selectedAreaId === node.id
   const isOpen = !!openNodes[node.id]
-  const hasChildren = node.children.length > 0 || node.hasMoreChildren
+  const visibleEquip = node.equipment.filter((e) => !e.oculto)
+  const hasChildren = node.children.length > 0 || node.hasMoreChildren || visibleEquip.length > 0
   const eqCount = countEquip(node)
   const assetCount = assetCountByNode?.[node.id] ?? 0
   const repCount = repCountByNode?.[node.id] ?? 0
@@ -123,7 +147,7 @@ function AreaRow({
         )}
       </div>
 
-      {isOpen && node.children.length > 0 && (
+      {isOpen && (node.children.length > 0 || visibleEquip.length > 0) && (
         <div>
           {node.children.map((child) => (
             <AreaRow
@@ -138,6 +162,14 @@ function AreaRow({
               onToggleAreaFav={onToggleAreaFav}
               openNodes={openNodes}
               onToggleNode={onToggleNode}
+            />
+          ))}
+          {visibleEquip.map((eq) => (
+            <EquipmentRow
+              key={eq.id}
+              leaf={eq}
+              depth={depth + 1}
+              onClick={() => onSelectArea(node)}
             />
           ))}
         </div>

@@ -1116,6 +1116,10 @@ Detalle completo, inventario de ~22 features y gotchas en memoria auto `project_
 - 🔲 Señal de los KPIs de stock cuando no hay stock configurado (hoy 3 de 4 KPIs muestran 0 y "Sin stock 100%" sobre los configurados → bajo aporte; considerar enfatizar cobertura SAP en su lugar).
 - 🔲 Micro-interacciones (transición al seleccionar fila/área, feedback al togglear favorito).
 
+**Sidebar de áreas con equipos (v3.61.0 — incremento 1):** el `AreaSidebar` ahora muestra los equipos SAP (nodos `hierarchy` numéricos) colgando de su área según la jerarquía, al expandir. Implementación aditiva: `useHierarchyAreaTree` adjunta `equipment: EquipmentLeaf[]` a cada `AreaTreeNode` desde los nodos ya cargados en `allNodes` (sin refetch); `AreaSidebar` los renderiza como filas hoja (icono Cog, alias/nombre + código mono), ocultando `oculto`. Verificado: EVISCERADO muestra sus 6 equipos visibles (paridad con "Estructura de equipos del área"). Clic en un equipo selecciona su área padre.
+- 🔲 **Incremento 2 (siguiente):** clic en equipo → filtrar la tabla por ese equipo (necesita patrón apply-diferido tipo `jumpQuery` porque al cambiar de área `equipoOptions` se recalcula; el match `EquipmentLeaf.alias/nombre` ↔ `repuesto.equipos[].machineName` es best-effort por el `linkedMachineId`).
+- 🔲 **Incremento 3:** sub-equipos (hijos numéricos de un equipo) anidados en el árbol; hoy solo se muestra 1 nivel (equipos directos del área).
+
 ### 🖥️ Seed 8 motores SUMITOMO — referencia del script (HECHO ✅)
 - **Idempotente**: docId `asset-sumitomo-<slug>`. `--force` sobrescribe + re-sube fotos.
 - **Datos** (equipo · modelo · SAP): Baader 200 / desperdicio filete / filete / transversal Baader 142 / curva → `RNYM08-1320B-30` · `3300124073` | Z elevadora HG → `RNYM1-1320A-30` · `3300124072` | alimentación Baader 142 → `RNYM1-1320A-7` · `3300124071` | alimentación Gea → `RNYMS05-1320C-30` · `3300124070`.
