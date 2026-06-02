@@ -191,6 +191,18 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   // Drawer del sidebar de áreas en móvil
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false)
 
+  // Contraer el sidebar de áreas en desktop (persistido), como el sidebar general de la app
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try { return localStorage.getItem('repuestos-area-sidebar-collapsed') === '1' } catch { return false }
+  })
+  const toggleSidebarCollapse = useCallback(() => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev
+      try { localStorage.setItem('repuestos-area-sidebar-collapsed', next ? '1' : '0') } catch { /* noop */ }
+      return next
+    })
+  }, [])
+
   // ── Herramientas admin (gestión de catálogo) ──
   const isAdmin = useIsAdmin()
   const [duplicatesOpen, setDuplicatesOpen] = useState(false)
@@ -1117,7 +1129,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   const equipFavTotal = equipFavLists.reduce((n, l) => n + l.machineIds.length, 0)
 
   return (
-    <div className="flex h-full bg-background">
+    <div className="relative flex h-full bg-background">
       <AreaSidebar
         selectedAreaId={selectedAreaId}
         onSelectArea={handleSelectArea}
@@ -1133,7 +1145,22 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
         showingAll={showingAll}
         mobileOpen={sidebarMobileOpen}
         onMobileClose={() => setSidebarMobileOpen(false)}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={toggleSidebarCollapse}
       />
+
+      {/* Edge-tab para reabrir el sidebar contraído (solo desktop) */}
+      {sidebarCollapsed && (
+        <button
+          type="button"
+          onClick={toggleSidebarCollapse}
+          className="absolute left-0 top-1/2 z-20 hidden h-14 w-6 -translate-y-1/2 items-center justify-center rounded-r-lg border border-l-0 border-border bg-card/80 shadow-md backdrop-blur-sm transition-all duration-200 hover:w-8 hover:bg-muted sm:flex"
+          title="Expandir panel de áreas"
+          aria-label="Expandir áreas"
+        >
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+        </button>
+      )}
 
       {/* Columna principal */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">

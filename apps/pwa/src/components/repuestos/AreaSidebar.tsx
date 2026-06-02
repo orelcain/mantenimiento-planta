@@ -8,7 +8,7 @@
  * Reutiliza useHierarchyAreaTree (mismo árbol que EquipmentNavigator).
  */
 import { useMemo } from 'react'
-import { ChevronRight, Layers, Loader2, List, X, Star, Cog } from 'lucide-react'
+import { ChevronRight, ChevronsLeft, Layers, Loader2, List, X, Star, Cog } from 'lucide-react'
 import { useHierarchyAreaTree, type AreaTreeNode, type EquipmentLeaf } from '@/hooks/useHierarchyAreaTree'
 
 /** Poda el árbol a las áreas favoritas (o con descendientes favoritos). */
@@ -43,6 +43,9 @@ interface AreaSidebarProps {
   /** Móvil: el sidebar es un drawer; controlado desde el hub. */
   mobileOpen?: boolean
   onMobileClose?: () => void
+  /** Desktop: contraer el sidebar (oculta el panel, deja un edge-tab para reabrir). */
+  collapsed?: boolean
+  onToggleCollapse?: () => void
 }
 
 /** Cuenta equipos recursivos (propios + descendientes cargados). */
@@ -64,11 +67,11 @@ function EquipmentRow({ leaf, depth, onClick }: { leaf: EquipmentLeaf; depth: nu
       className="group relative flex items-center gap-2 pr-2 py-1.5 cursor-pointer select-none border-l-2 border-l-transparent text-foreground/70 transition-colors hover:bg-muted/40 hover:text-foreground"
       title={leaf.nombre}
     >
-      <Cog className="h-3.5 w-3.5 shrink-0 text-cyan-500/60" />
+      <Cog className="h-3 w-3 shrink-0 text-cyan-500/60" />
       <div className="min-w-0 flex-1">
-        <div className="truncate text-[12px] leading-tight">{leaf.alias || leaf.nombre}</div>
+        <div className="truncate text-[11px] leading-tight">{leaf.alias || leaf.nombre}</div>
         {leaf.codigo && (
-          <div className="truncate font-mono text-[9.5px] leading-tight text-muted-foreground/60">{leaf.codigo}</div>
+          <div className="truncate font-mono text-[9px] leading-tight text-muted-foreground/60">{leaf.codigo}</div>
         )}
       </div>
     </div>
@@ -120,8 +123,8 @@ function AreaRow({
         )}
 
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[13px] font-medium leading-tight">{node.nombre}</div>
-          <div className="flex items-center gap-2 text-[10.5px] leading-tight text-muted-foreground">
+          <div className="truncate text-[12px] font-medium leading-tight">{node.nombre}</div>
+          <div className="flex items-center gap-2 text-[10px] leading-tight text-muted-foreground">
             <span className="tabular-nums">{eqCount} equipos</span>
             {assetCount > 0 && (
               <span className="tabular-nums text-cyan-500">· {assetCount} M/B</span>
@@ -181,7 +184,7 @@ function AreaRow({
 export function AreaSidebar({
   selectedAreaId, onSelectArea, assetCountByNode, repCountByNode, favoriteAreaIds, onToggleAreaFav,
   favoritesOnly = false, onToggleFavoritesOnly, openNodes, onToggleNode, onShowAll, showingAll,
-  mobileOpen = false, onMobileClose,
+  mobileOpen = false, onMobileClose, collapsed = false, onToggleCollapse,
 }: AreaSidebarProps) {
   const { areaTree, loading } = useHierarchyAreaTree()
 
@@ -204,12 +207,12 @@ export function AreaSidebar({
       )}
       <aside
         className={[
-          'flex h-full w-60 shrink-0 flex-col border-r border-border bg-card/40',
+          'flex h-full w-72 shrink-0 flex-col border-r border-border bg-card/40',
           // Base (móvil): drawer fijo deslizable
           'fixed inset-y-0 left-0 z-40 shadow-xl transition-transform duration-200',
           mobileOpen ? 'translate-x-0' : '-translate-x-full',
-          // Desktop: estático, siempre visible
-          'sm:static sm:z-auto sm:translate-x-0 sm:shadow-none',
+          // Desktop: estático, siempre visible (oculto si está contraído)
+          collapsed ? 'sm:hidden' : 'sm:static sm:z-auto sm:translate-x-0 sm:shadow-none',
         ].join(' ')}
       >
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-border">
@@ -223,6 +226,11 @@ export function AreaSidebar({
               aria-label="Solo áreas favoritas"
             >
               <Star className={['h-4 w-4', favoritesOnly ? 'fill-current' : ''].join(' ')} />
+            </button>
+          )}
+          {onToggleCollapse && (
+            <button onClick={onToggleCollapse} className="hidden rounded p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground sm:block" title="Contraer panel de áreas" aria-label="Contraer áreas">
+              <ChevronsLeft className="h-4 w-4" />
             </button>
           )}
           <button onClick={onMobileClose} className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground sm:hidden" aria-label="Cerrar áreas">
