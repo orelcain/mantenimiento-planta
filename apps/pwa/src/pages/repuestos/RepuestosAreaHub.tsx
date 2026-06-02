@@ -1309,7 +1309,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
               {isAdmin && (selectedAreaId || showingAll) && (
                 <Button variant="outline" size="sm" className="gap-1.5" onClick={startCreate} title="Agregar repuesto a un equipo del área">
                   <Plus className="h-4 w-4" /> Repuesto
@@ -1596,22 +1596,24 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                   className="pl-9"
                 />
               </div>
+              {/* Selects: 2-up en móvil (grid), fila única en ≥sm (sm:contents disuelve el grid) */}
+              <div className="grid grid-cols-2 gap-2 sm:contents">
               <Select value={repEquipoFilter} onValueChange={setRepEquipoFilter}>
-                <SelectTrigger className="w-[190px]"><SelectValue placeholder="Todos los equipos" /></SelectTrigger>
+                <SelectTrigger className="w-full sm:w-[190px]"><SelectValue placeholder="Todos los equipos" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos los equipos</SelectItem>
                   {equipoOptions.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
                 </SelectContent>
               </Select>
               <Select value={repTipoFilter} onValueChange={setRepTipoFilter}>
-                <SelectTrigger className="w-[180px]"><SelectValue placeholder="Todos los tipos" /></SelectTrigger>
+                <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Todos los tipos" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos los tipos</SelectItem>
                   {tipoOptions.map((t) => <SelectItem key={t.value} value={t.value}>{t.value} ({t.count})</SelectItem>)}
                 </SelectContent>
               </Select>
               <Select value={repStockFilter} onValueChange={(v) => setRepStockFilter(v as StockFilter)}>
-                <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-full sm:w-[150px]"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Stock: Todos</SelectItem>
                   <SelectItem value="ok">Disponible</SelectItem>
@@ -1620,6 +1622,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                   <SelectItem value="unset">Sin config.</SelectItem>
                 </SelectContent>
               </Select>
+              </div>
               <Button
                 variant={repFavOnly ? 'default' : 'outline'}
                 size="sm"
@@ -1666,7 +1669,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                   <table className="w-full text-sm">
                     <thead className="border-b border-border bg-muted/40 text-left">
                       <tr>
-                        {renderSortTh('codigoSAP', 'SAP')}
+                        {renderSortTh('codigoSAP', 'SAP', 'hidden md:table-cell')}
                         {renderSortTh('textoBreve', 'Repuesto')}
                         {renderSortTh('equipo', 'Equipo', 'hidden md:table-cell')}
                         {renderSortTh('stock', 'Stock')}
@@ -1689,11 +1692,12 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                               isSel ? 'bg-primary/10 ring-1 ring-inset ring-primary/40' : 'hover:bg-muted/40',
                             ].join(' ')}
                           >
-                            <td className="px-3 py-2 font-mono text-xs">{r.codigoSAP || '-'}</td>
+                            <td className="hidden px-3 py-2 font-mono text-xs md:table-cell">{r.codigoSAP || '-'}</td>
                             <td className="px-3 py-2">
                               <div className="font-medium text-foreground">{r.textoBreve || r.alias || '(sin nombre)'}</div>
-                              {/* En móvil, equipo + tipo van como subtítulo (columnas ocultas) */}
+                              {/* En móvil, SAP + equipo + tipo van como subtítulo (columnas ocultas) */}
                               <div className="mt-0.5 text-[10px] text-muted-foreground md:hidden">
+                                {r.codigoSAP && <span className="font-mono text-muted-foreground/80">{r.codigoSAP} · </span>}
                                 {equipo}{extra} · {tipoLabelOf(r.tipo)}
                               </div>
                             </td>

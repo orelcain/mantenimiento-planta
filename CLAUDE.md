@@ -1106,6 +1106,16 @@ Rediseño que colapsó los tabs en un **lente único área-first** (`RepuestosAr
 
 Detalle completo, inventario de ~22 features y gotchas en memoria auto `project_repuestos_area_first.md`. Plan F5 reformulado: `~/.claude/plans/stateless-prancing-sunset.md`.
 
+**Pulido UX móvil del hub (v3.60.0 — audit UX 2026-06-02):** verificado por DOM en preview (375/768/1280).
+- ✅ Botones de cabecera (Repuesto/Reubicar lote/Ver equipos del área) se recortaban fuera del viewport móvil (405px en 375px → "Ver equipos del área" inaccesible). Fix: `flex-wrap items-center justify-end` en el contenedor.
+- ✅ Columna SAP desperdiciaba ~82px en móvil (mayoría "-"). Fix: `hidden md:table-cell` en th+td; el SAP se pliega al subtítulo móvil en mono cuando existe (junto a equipo·tipo).
+- ✅ Filtros (3 selects) ocupaban ~5 filas apiladas en móvil. Fix: wrapper `grid grid-cols-2 gap-2 sm:contents` + triggers `w-full sm:w-[Npx]` → 2-up en móvil, fila única intacta en ≥sm (cero regresión desktop, validado top/anchos idénticos).
+
+**P2 audit pendiente (bajo valor, opcional):**
+- 🔲 Touch targets ≥40px: estrella de favorito en filas mide 17×17px; select triggers 34px de alto. Subir hit-area sin romper densidad (la fila completa ya abre el detalle, la estrella es la única acción fina).
+- 🔲 Señal de los KPIs de stock cuando no hay stock configurado (hoy 3 de 4 KPIs muestran 0 y "Sin stock 100%" sobre los configurados → bajo aporte; considerar enfatizar cobertura SAP en su lugar).
+- 🔲 Micro-interacciones (transición al seleccionar fila/área, feedback al togglear favorito).
+
 ### 🖥️ Seed 8 motores SUMITOMO — referencia del script (HECHO ✅)
 - **Idempotente**: docId `asset-sumitomo-<slug>`. `--force` sobrescribe + re-sube fotos.
 - **Datos** (equipo · modelo · SAP): Baader 200 / desperdicio filete / filete / transversal Baader 142 / curva → `RNYM08-1320B-30` · `3300124073` | Z elevadora HG → `RNYM1-1320A-30` · `3300124072` | alimentación Baader 142 → `RNYM1-1320A-7` · `3300124071` | alimentación Gea → `RNYMS05-1320C-30` · `3300124070`.
