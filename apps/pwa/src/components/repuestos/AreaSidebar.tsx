@@ -36,6 +36,10 @@ interface AreaSidebarProps {
   /** Mostrar solo áreas favoritas. */
   favoritesOnly?: boolean
   onToggleFavoritesOnly?: () => void
+  /** Clic en un equipo (hoja) → filtrar la tabla a ese equipo. Si no se pasa, selecciona el área padre. */
+  onSelectEquipment?: (areaNode: AreaTreeNode, leaf: EquipmentLeaf) => void
+  /** Clave del equipo seleccionado (linkedMachineId || nodeId) para resaltarlo. */
+  selectedEquipKey?: string | null
   openNodes: Record<string, boolean>
   onToggleNode: (id: string) => void
   onShowAll: () => void
@@ -55,8 +59,8 @@ function countEquip(node: AreaTreeNode): number {
   return total
 }
 
-/** Fila de equipo (hoja) bajo un área — clic selecciona el área padre. */
-function EquipmentRow({ leaf, depth, onClick }: { leaf: EquipmentLeaf; depth: number; onClick: () => void }) {
+/** Fila de equipo (hoja) bajo un área — clic filtra la tabla a ese equipo. */
+function EquipmentRow({ leaf, depth, selected, onClick }: { leaf: EquipmentLeaf; depth: number; selected: boolean; onClick: () => void }) {
   return (
     <div
       role="button"
@@ -64,10 +68,15 @@ function EquipmentRow({ leaf, depth, onClick }: { leaf: EquipmentLeaf; depth: nu
       onClick={onClick}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } }}
       style={{ paddingLeft: `${10 + depth * 14}px` }}
-      className="group relative flex items-center gap-2 pr-2 py-1.5 cursor-pointer select-none border-l-2 border-l-transparent text-foreground/70 transition-colors hover:bg-muted/40 hover:text-foreground"
+      className={[
+        'group relative flex items-center gap-2 pr-2 py-1.5 cursor-pointer select-none border-l-2 transition-colors',
+        selected
+          ? 'border-l-primary bg-primary/10 text-primary'
+          : 'border-l-transparent text-foreground/70 hover:bg-muted/40 hover:text-foreground',
+      ].join(' ')}
       title={leaf.nombre}
     >
-      <Cog className="h-3 w-3 shrink-0 text-cyan-500/60" />
+      <Cog className={['h-3 w-3 shrink-0', selected ? 'text-primary' : 'text-cyan-500/60'].join(' ')} />
       <div className="min-w-0 flex-1">
         <div className="truncate text-[11px] leading-tight">{leaf.alias || leaf.nombre}</div>
         {leaf.codigo && (
@@ -79,10 +88,10 @@ function EquipmentRow({ leaf, depth, onClick }: { leaf: EquipmentLeaf; depth: nu
 }
 
 function AreaRow({
-  node, depth, selectedAreaId, onSelectArea, assetCountByNode, repCountByNode, favoriteAreaIds, onToggleAreaFav, openNodes, onToggleNode,
+  node, depth, selectedAreaId, onSelectArea, onSelectEquipment, selectedEquipKey, assetCountByNode, repCountByNode, favoriteAreaIds, onToggleAreaFav, openNodes, onToggleNode,
 }: {
   node: AreaTreeNode; depth: number
-} & Pick<AreaSidebarProps, 'selectedAreaId' | 'onSelectArea' | 'assetCountByNode' | 'repCountByNode' | 'favoriteAreaIds' | 'onToggleAreaFav' | 'openNodes' | 'onToggleNode'>) {
+} & Pick<AreaSidebarProps, 'selectedAreaId' | 'onSelectArea' | 'onSelectEquipment' | 'selectedEquipKey' | 'assetCountByNode' | 'repCountByNode' | 'favoriteAreaIds' | 'onToggleAreaFav' | 'openNodes' | 'onToggleNode'>) {
   const isSelected = selectedAreaId === node.id
   const isOpen = !!openNodes[node.id]
   const visibleEquip = node.equipment.filter((e) => !e.oculto)
@@ -159,6 +168,8 @@ function AreaRow({
               depth={depth + 1}
               selectedAreaId={selectedAreaId}
               onSelectArea={onSelectArea}
+              onSelectEquipment={onSelectEquipment}
+              selectedEquipKey={selectedEquipKey}
               assetCountByNode={assetCountByNode}
               repCountByNode={repCountByNode}
               favoriteAreaIds={favoriteAreaIds}
@@ -172,7 +183,8 @@ function AreaRow({
               key={eq.id}
               leaf={eq}
               depth={depth + 1}
-              onClick={() => onSelectArea(node)}
+              selected={!!selectedEquipKey && (selectedEquipKey === eq.id || selectedEquipKey === eq.linkedMachineId)}
+              onClick={() => (onSelectEquipment ? onSelectEquipment(node, eq) : onSelectArea(node))}
             />
           ))}
         </div>
@@ -182,7 +194,7 @@ function AreaRow({
 }
 
 export function AreaSidebar({
-  selectedAreaId, onSelectArea, assetCountByNode, repCountByNode, favoriteAreaIds, onToggleAreaFav,
+  selectedAreaId, onSelectArea, onSelectEquipment, selectedEquipKey, assetCountByNode, repCountByNode, favoriteAreaIds, onToggleAreaFav,
   favoritesOnly = false, onToggleFavoritesOnly, openNodes, onToggleNode, onShowAll, showingAll,
   mobileOpen = false, onMobileClose, collapsed = false, onToggleCollapse,
 }: AreaSidebarProps) {
@@ -254,6 +266,8 @@ export function AreaSidebar({
               depth={0}
               selectedAreaId={selectedAreaId}
               onSelectArea={handleSelect}
+              onSelectEquipment={onSelectEquipment}
+              selectedEquipKey={selectedEquipKey}
               assetCountByNode={assetCountByNode}
               repCountByNode={repCountByNode}
               favoriteAreaIds={favoriteAreaIds}

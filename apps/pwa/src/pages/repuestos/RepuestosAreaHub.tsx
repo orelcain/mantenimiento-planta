@@ -12,7 +12,7 @@
  *  - Fase 7: búsqueda global del topbar + promover hub a vista por defecto.
  */
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
-import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ListChecks, ClipboardList, Menu, GitMerge, History, Trash2, Star, Upload, Download, ArrowUpDown, Eye, EyeOff, Package, X, Loader2, Wrench, Settings2, Archive, ArrowRightLeft, MoreVertical } from 'lucide-react'
+import { Search, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Cog, ImageOff, Plus, ClipboardList, Menu, GitMerge, History, Trash2, Star, Upload, Download, ArrowUpDown, Eye, EyeOff, Package, X, Loader2, Wrench, Settings2, Archive, ArrowRightLeft, MoreVertical } from 'lucide-react'
 import { Badge, Button, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui'
 import { AreaSidebar } from '@/components/repuestos/AreaSidebar'
 import { AssetDetailModal } from '@/components/repuestos/AssetDetailModal'
@@ -167,7 +167,8 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   const [openNodes, setOpenNodes] = useState<Record<string, boolean>>({})
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null)
   const [showDetail, setShowDetail] = useState(false)
-  const [showEquipos, setShowEquipos] = useState(false)
+  // Equipo seleccionado desde el sidebar / chips de favoritos (clave = linkedMachineId || nodeId) para resaltarlo.
+  const [selectedEquipKey, setSelectedEquipKey] = useState<string | null>(null)
 
   // Filtros + paginación de la tabla de repuestos
   const [repQuery, setRepQuery] = useState('')
@@ -391,7 +392,8 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
     }
     const m = machines.find((x) => x.id === favKey || (!!e?.linkedMachineId && x.id === e.linkedMachineId))
     setRepEquipoFilter(m ? m.nombre : 'all')
-    setShowEquipos(true)
+    // Clave = id del NODO del equipo (para resaltarlo en el sidebar y reducir los M/B a ese equipo).
+    setSelectedEquipKey(e?.id ?? favKey)
     setSelectedRowKey(null)
     setSelectedAssetId(null)
     setSidebarMobileOpen(false)
@@ -453,12 +455,14 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
     [selectedAreaId, findNode],
   )
 
-  // Motores/bombas del área seleccionada (por ancestría)
+  // Motores/bombas del alcance: si hay un equipo seleccionado, solo los de ese equipo
+  // (por ancestría del nodo); si no, los del área seleccionada.
   const areaAssets = useMemo(() => {
     if (showingAll) return linkedAssets
+    if (selectedEquipKey) return linkedAssets.filter((a) => isUnder(a.hierarchyNodeId, selectedEquipKey))
     if (!selectedAreaId) return []
     return linkedAssets.filter((a) => isUnder(a.hierarchyNodeId, selectedAreaId))
-  }, [linkedAssets, showingAll, selectedAreaId, isUnder])
+  }, [linkedAssets, showingAll, selectedEquipKey, selectedAreaId, isUnder])
 
   // Búsqueda global: motores/bombas que matchean la query (equipo/modelo/SAP/marca/componente)
   const filteredAssets = useMemo(() => {
@@ -473,11 +477,6 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
     )
   }, [areaAssets, repQuery])
 
-  // Al buscar y haber M/B coincidentes, abrir la sección de equipos para no ocultarlos
-  useEffect(() => {
-    if (repQuery.trim() && filteredAssets.length > 0) setShowEquipos(true)
-  }, [repQuery, filteredAssets.length])
-
   // "Buscar similar" desde otras vistas → cargar query en la búsqueda global del hub
   useEffect(() => {
     if (initialQuery && initialQuery.trim()) {
@@ -489,31 +488,41 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
 
   // Repuestos del área (catálogo + bodega) y KPIs de stock derivados
   const areaRepuestos = useAreaRepuestos(bodegaItems, { showingAll, selectedAreaId, machineInArea })
+
+  // Repuestos en el alcance actual: si hay un equipo seleccionado (filtro de equipo
+  // activo), todo el panel (KPIs, cobertura, tipos, tabla) se reduce a ese equipo.
+  const scopedRepuestos = useMemo(
+    () => (repEquipoFilter === 'all'
+      ? areaRepuestos
+      : areaRepuestos.filter((r) => r.equipos.some((e) => e.machineName === repEquipoFilter))),
+    [areaRepuestos, repEquipoFilter],
+  )
+
   const stockKpis = useMemo(() => {
     let ok = 0, low = 0, out = 0
-    for (const r of areaRepuestos) {
+    for (const r of scopedRepuestos) {
       if (r.stockStatus === 'ok') ok++
       else if (r.stockStatus === 'low') low++
       else if (r.stockStatus === 'out') out++
     }
-    const total = areaRepuestos.length // todos los repuestos del área (con y sin SAP)
+    const total = scopedRepuestos.length // todos los repuestos del alcance (con y sin SAP)
     const configurados = ok + low + out // solo los que tienen stock configurado (SAP en bodega)
     // Los % de stock son relativos a los configurados, no al total (que incluye sin-SAP)
     const pct = (n: number) => (configurados > 0 ? Math.round((n / configurados) * 100) : 0)
     return { total, configurados, ok, low, out, pctOk: pct(ok), pctLow: pct(low), pctOut: pct(out) }
-  }, [areaRepuestos])
+  }, [scopedRepuestos])
 
   // KPIs de catálogo (cobertura): con/sin SAP, tipos distintos, valor referencial
   const catalogStats = useMemo(() => {
     let conSAP = 0
     let valor = 0
     const tipos = new Set<string>()
-    for (const r of areaRepuestos) {
+    for (const r of scopedRepuestos) {
       if (r.codigoSAP) conSAP++
       tipos.add(tipoLabelOf(r.tipo))
       valor += (r.costoCompra ?? r.valorUnitario ?? 0) * (r.stockActual || 0)
     }
-    const total = areaRepuestos.length
+    const total = scopedRepuestos.length
     return {
       conSAP,
       sinSAP: total - conSAP,
@@ -521,7 +530,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
       tipos: tipos.size,
       valor,
     }
-  }, [areaRepuestos])
+  }, [scopedRepuestos])
 
   // Opciones del filtro "Equipo" (nombres distintos del área)
   const equipoOptions = useMemo(() => {
@@ -530,17 +539,17 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
     return [...s].sort((a, b) => a.localeCompare(b))
   }, [areaRepuestos])
 
-  // Opciones del filtro "Tipo" presentes en el área, ordenadas por frecuencia (con conteo)
+  // Opciones del filtro "Tipo" presentes en el alcance, ordenadas por frecuencia (con conteo)
   const tipoOptions = useMemo(() => {
     const counts = new Map<string, number>()
-    for (const r of areaRepuestos) {
+    for (const r of scopedRepuestos) {
       const t = tipoLabelOf(r.tipo)
       counts.set(t, (counts.get(t) ?? 0) + 1)
     }
     return [...counts.entries()]
       .map(([value, count]) => ({ value, count }))
       .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value))
-  }, [areaRepuestos])
+  }, [scopedRepuestos])
 
   // Opciones para el selector del modal de solicitud (repuestos del área con SAP)
   const solicitarOptions = useMemo<RepuestoLite[]>(
@@ -548,9 +557,9 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
     [areaRepuestos],
   )
 
-  // Filtrado (buscar + equipo + stock)
+  // Filtrado (buscar + stock + tipo + fav) sobre el alcance ya reducido por equipo.
   const filteredRep = useMemo(() => {
-    let res = areaRepuestos
+    let res = scopedRepuestos
     if (repFavOnly) res = res.filter((r) => favKeys.has(r.rowKey))
     if (listFilter !== 'all') {
       const l = favLists.find((x) => x.name === listFilter)
@@ -559,7 +568,6 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
     }
     if (repStockFilter !== 'all') res = res.filter((r) => r.stockStatus === repStockFilter)
     if (repTipoFilter !== 'all') res = res.filter((r) => tipoLabelOf(r.tipo) === repTipoFilter)
-    if (repEquipoFilter !== 'all') res = res.filter((r) => r.equipos.some((e) => e.machineName === repEquipoFilter))
     const q = normalizeForSearch(repQuery)
     if (q) {
       res = res.filter((r) =>
@@ -571,7 +579,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
       )
     }
     return res
-  }, [areaRepuestos, repFavOnly, favKeys, listFilter, favLists, repStockFilter, repTipoFilter, repEquipoFilter, repQuery])
+  }, [scopedRepuestos, repFavOnly, favKeys, listFilter, favLists, repStockFilter, repTipoFilter, repQuery])
 
   // Reset de página al cambiar área/filtros
   useEffect(() => { setRepPage(0) }, [selectedAreaId, showingAll, repQuery, repEquipoFilter, repStockFilter, repTipoFilter, repFavOnly, listFilter, repPageSize])
@@ -937,6 +945,11 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   const handleSelectArea = useCallback((node: AreaTreeNode) => {
     setSelectedAreaId(node.id)
     setShowingAll(false)
+    // Seleccionar el área (no un equipo) limpia el filtro de equipo → muestra todo el área.
+    setRepEquipoFilter('all')
+    setSelectedEquipKey(null)
+    setSelectedRowKey(null)
+    setSelectedAssetId(null)
     // Abrir ancestros para contexto
     setOpenNodes((prev) => {
       const next = { ...prev }
@@ -956,6 +969,8 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   const handleShowAll = useCallback(() => {
     setShowingAll(true)
     setSelectedAreaId(null)
+    setRepEquipoFilter('all')
+    setSelectedEquipKey(null)
   }, [])
 
   // ══════════════════════════════════════════════════════════════════
@@ -1147,6 +1162,8 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
         onMobileClose={() => setSidebarMobileOpen(false)}
         collapsed={sidebarCollapsed}
         onToggleCollapse={toggleSidebarCollapse}
+        onSelectEquipment={(_node, leaf) => handleFavEquipClick(leaf.linkedMachineId || leaf.id)}
+        selectedEquipKey={selectedEquipKey}
       />
 
       {/* Edge-tab para reabrir el sidebar contraído (solo desktop) */}
@@ -1335,6 +1352,15 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                   </Badge>
                 )}
               </div>
+              {repEquipoFilter !== 'all' && (
+                <button
+                  onClick={() => { setRepEquipoFilter('all'); setSelectedEquipKey(null) }}
+                  className="mt-1 inline-flex max-w-full items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary transition hover:bg-primary/20"
+                  title="Quitar filtro de equipo — ver todos los repuestos del área"
+                >
+                  <Cog className="h-3 w-3 shrink-0" /> <span className="truncate">{repEquipoFilter}</span> <X className="h-3 w-3 shrink-0 opacity-70" />
+                </button>
+              )}
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2">
               {isAdmin && (selectedAreaId || showingAll) && (
@@ -1347,15 +1373,6 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                   <ArrowRightLeft className="h-4 w-4" /> Reubicar lote
                 </Button>
               )}
-              <Button
-                variant={showEquipos ? 'default' : 'outline'}
-                size="sm"
-                className="gap-1.5"
-                onClick={() => setShowEquipos((s) => !s)}
-              >
-                <ListChecks className="h-4 w-4" /> Ver equipos del área
-                {filteredAssets.length > 0 && <span className="tabular-nums opacity-70">({filteredAssets.length})</span>}
-              </Button>
             </div>
           </div>
 
@@ -1384,8 +1401,8 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
             </div>
           )}
 
-          {/* Motores/Bombas del área (toggle "Ver equipos del área") */}
-          {showEquipos && (
+          {/* Motores/Bombas del área — se muestran automáticamente cuando el área/equipo seleccionado tiene M/B */}
+          {filteredAssets.length > 0 && (
           <section className="mb-6">
             <div className="mb-2 flex items-center gap-2">
               <Cog className="h-4 w-4 text-cyan-500" />
@@ -1625,7 +1642,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
               </div>
               {/* Selects: 2-up en móvil (grid), fila única en ≥sm (sm:contents disuelve el grid) */}
               <div className="grid grid-cols-2 gap-2 sm:contents">
-              <Select value={repEquipoFilter} onValueChange={setRepEquipoFilter}>
+              <Select value={repEquipoFilter} onValueChange={(v) => { setRepEquipoFilter(v); setSelectedEquipKey(null) }}>
                 <SelectTrigger className="w-full sm:w-[190px]"><SelectValue placeholder="Todos los equipos" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos los equipos</SelectItem>
