@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '3.63.0' as const
+export const APP_VERSION = '3.64.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-06-02' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'feat(repuestos): seleccionar un equipo en el sidebar enfoca todo el panel a ese equipo + motores/bombas automáticos' as const
+export const VERSION_NAME = 'feat(repuestos): favoritos de equipos desde el sidebar + filtro "ver solo favoritos" (áreas y equipos)' as const
 
 /**
  * Nota:

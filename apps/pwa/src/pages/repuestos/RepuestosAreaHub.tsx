@@ -309,6 +309,8 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
     if (user?.id) saveFavoriteLists(user.id, lists)
   }, [user?.id])
   const isEquipFav = useCallback((id: string) => equipFavLists.some((l) => l.machineIds.includes(id)), [equipFavLists])
+  // Set plano de claves favoritas de equipos (machineIds de todas las listas) para el sidebar.
+  const equipFavKeys = useMemo(() => new Set(equipFavLists.flatMap((l) => l.machineIds)), [equipFavLists])
   const [favEquipPicker, setFavEquipPicker] = useState<{ machineId: string; displayName: string } | null>(null)
   const [newEquipListName, setNewEquipListName] = useState('')
   // Estrella: si ya está en alguna lista → quitar de todas; si no → abrir selector.
@@ -1164,6 +1166,8 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
         onToggleCollapse={toggleSidebarCollapse}
         onSelectEquipment={(_node, leaf) => handleFavEquipClick(leaf.linkedMachineId || leaf.id)}
         selectedEquipKey={selectedEquipKey}
+        equipFavKeys={equipFavKeys}
+        onToggleEquipFav={(leaf) => handleEquipStar(leaf.linkedMachineId || leaf.id, undefined, leaf.alias || leaf.nombre)}
       />
 
       {/* Edge-tab para reabrir el sidebar contraído (solo desktop) */}

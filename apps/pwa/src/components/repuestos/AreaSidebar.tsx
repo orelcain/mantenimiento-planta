@@ -11,12 +11,18 @@ import { useMemo } from 'react'
 import { ChevronRight, ChevronsLeft, Layers, Loader2, List, X, Star, Cog } from 'lucide-react'
 import { useHierarchyAreaTree, type AreaTreeNode, type EquipmentLeaf } from '@/hooks/useHierarchyAreaTree'
 
-/** Poda el árbol a las áreas favoritas (o con descendientes favoritos). */
-function filterForFavorites(nodes: AreaTreeNode[], favIds: Set<string>): AreaTreeNode[] {
+/** Un equipo (hoja) es favorito si su clave (linkedMachineId || nodeId) está en el set. */
+function isLeafFav(leaf: EquipmentLeaf, equipFavKeys?: Set<string>): boolean {
+  return !!equipFavKeys && equipFavKeys.has(leaf.linkedMachineId || leaf.id)
+}
+
+/** Poda el árbol a las áreas favoritas, las que tienen equipos favoritos, o con descendientes favoritos. */
+function filterForFavorites(nodes: AreaTreeNode[], favIds: Set<string>, equipFavKeys?: Set<string>): AreaTreeNode[] {
   const out: AreaTreeNode[] = []
   for (const node of nodes) {
-    const filteredChildren = filterForFavorites(node.children, favIds)
-    if (favIds.has(node.id) || filteredChildren.length > 0) {
+    const filteredChildren = filterForFavorites(node.children, favIds, equipFavKeys)
+    const hasFavEquip = node.equipment.some((e) => !e.oculto && isLeafFav(e, equipFavKeys))
+    if (favIds.has(node.id) || hasFavEquip || filteredChildren.length > 0) {
       out.push({ ...node, children: filteredChildren })
     }
   }
@@ -40,6 +46,9 @@ interface AreaSidebarProps {
   onSelectEquipment?: (areaNode: AreaTreeNode, leaf: EquipmentLeaf) => void
   /** Clave del equipo seleccionado (linkedMachineId || nodeId) para resaltarlo. */
   selectedEquipKey?: string | null
+  /** Claves de equipos favoritos (linkedMachineId || nodeId) para la estrella + filtro de favoritos. */
+  equipFavKeys?: Set<string>
+  onToggleEquipFav?: (leaf: EquipmentLeaf) => void
   openNodes: Record<string, boolean>
   onToggleNode: (id: string) => void
   onShowAll: () => void
@@ -60,7 +69,9 @@ function countEquip(node: AreaTreeNode): number {
 }
 
 /** Fila de equipo (hoja) bajo un área — clic filtra la tabla a ese equipo. */
-function EquipmentRow({ leaf, depth, selected, onClick }: { leaf: EquipmentLeaf; depth: number; selected: boolean; onClick: () => void }) {
+function EquipmentRow({ leaf, depth, selected, onClick, isFav, onToggleFav }: {
+  leaf: EquipmentLeaf; depth: number; selected: boolean; onClick: () => void; isFav?: boolean; onToggleFav?: () => void
+}) {
   return (
     <div
       role="button"
@@ -83,18 +94,32 @@ function EquipmentRow({ leaf, depth, selected, onClick }: { leaf: EquipmentLeaf;
           <div className="truncate font-mono text-[9px] leading-tight text-muted-foreground/60">{leaf.codigo}</div>
         )}
       </div>
+      {onToggleFav && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleFav() }}
+          className={[
+            'shrink-0 rounded p-0.5 transition',
+            isFav ? 'text-amber-400' : 'text-muted-foreground/30 opacity-0 group-hover:opacity-100 hover:text-amber-400',
+          ].join(' ')}
+          title={isFav ? 'Quitar de favoritos' : 'Marcar equipo como favorito'}
+          aria-label="Equipo favorito"
+        >
+          <Star className={['h-3 w-3', isFav ? 'fill-current' : ''].join(' ')} />
+        </button>
+      )}
     </div>
   )
 }
 
 function AreaRow({
-  node, depth, selectedAreaId, onSelectArea, onSelectEquipment, selectedEquipKey, assetCountByNode, repCountByNode, favoriteAreaIds, onToggleAreaFav, openNodes, onToggleNode,
+  node, depth, selectedAreaId, onSelectArea, onSelectEquipment, selectedEquipKey, equipFavKeys, onToggleEquipFav, favoritesOnly, assetCountByNode, repCountByNode, favoriteAreaIds, onToggleAreaFav, openNodes, onToggleNode,
 }: {
   node: AreaTreeNode; depth: number
-} & Pick<AreaSidebarProps, 'selectedAreaId' | 'onSelectArea' | 'onSelectEquipment' | 'selectedEquipKey' | 'assetCountByNode' | 'repCountByNode' | 'favoriteAreaIds' | 'onToggleAreaFav' | 'openNodes' | 'onToggleNode'>) {
+} & Pick<AreaSidebarProps, 'selectedAreaId' | 'onSelectArea' | 'onSelectEquipment' | 'selectedEquipKey' | 'equipFavKeys' | 'onToggleEquipFav' | 'favoritesOnly' | 'assetCountByNode' | 'repCountByNode' | 'favoriteAreaIds' | 'onToggleAreaFav' | 'openNodes' | 'onToggleNode'>) {
   const isSelected = selectedAreaId === node.id
   const isOpen = !!openNodes[node.id]
-  const visibleEquip = node.equipment.filter((e) => !e.oculto)
+  // Con "solo favoritos" activo, las hojas se limitan a equipos favoritos.
+  const visibleEquip = node.equipment.filter((e) => !e.oculto && (!favoritesOnly || isLeafFav(e, equipFavKeys)))
   const hasChildren = node.children.length > 0 || node.hasMoreChildren || visibleEquip.length > 0
   const eqCount = countEquip(node)
   const assetCount = assetCountByNode?.[node.id] ?? 0
@@ -170,6 +195,9 @@ function AreaRow({
               onSelectArea={onSelectArea}
               onSelectEquipment={onSelectEquipment}
               selectedEquipKey={selectedEquipKey}
+              equipFavKeys={equipFavKeys}
+              onToggleEquipFav={onToggleEquipFav}
+              favoritesOnly={favoritesOnly}
               assetCountByNode={assetCountByNode}
               repCountByNode={repCountByNode}
               favoriteAreaIds={favoriteAreaIds}
@@ -185,6 +213,8 @@ function AreaRow({
               depth={depth + 1}
               selected={!!selectedEquipKey && (selectedEquipKey === eq.id || selectedEquipKey === eq.linkedMachineId)}
               onClick={() => (onSelectEquipment ? onSelectEquipment(node, eq) : onSelectArea(node))}
+              isFav={isLeafFav(eq, equipFavKeys)}
+              onToggleFav={onToggleEquipFav ? () => onToggleEquipFav(eq) : undefined}
             />
           ))}
         </div>
@@ -194,7 +224,7 @@ function AreaRow({
 }
 
 export function AreaSidebar({
-  selectedAreaId, onSelectArea, onSelectEquipment, selectedEquipKey, assetCountByNode, repCountByNode, favoriteAreaIds, onToggleAreaFav,
+  selectedAreaId, onSelectArea, onSelectEquipment, selectedEquipKey, equipFavKeys, onToggleEquipFav, assetCountByNode, repCountByNode, favoriteAreaIds, onToggleAreaFav,
   favoritesOnly = false, onToggleFavoritesOnly, openNodes, onToggleNode, onShowAll, showingAll,
   mobileOpen = false, onMobileClose, collapsed = false, onToggleCollapse,
 }: AreaSidebarProps) {
@@ -203,9 +233,14 @@ export function AreaSidebar({
   // Saltar la raíz única (CHONCHI) y mostrar sus hijos directamente, como EquipmentNavigator.
   const roots = useMemo(() => {
     const base = (areaTree.length === 1 && areaTree[0]!.children.length > 0) ? areaTree[0]!.children : areaTree
-    if (favoritesOnly && favoriteAreaIds && favoriteAreaIds.size > 0) return filterForFavorites(base, favoriteAreaIds)
+    // "Solo favoritos": conserva áreas favoritas o con equipos favoritos.
+    if (favoritesOnly) {
+      const favAreas = favoriteAreaIds ?? new Set<string>()
+      const favEquip = equipFavKeys ?? new Set<string>()
+      if (favAreas.size > 0 || favEquip.size > 0) return filterForFavorites(base, favAreas, favEquip)
+    }
     return base
-  }, [areaTree, favoritesOnly, favoriteAreaIds])
+  }, [areaTree, favoritesOnly, favoriteAreaIds, equipFavKeys])
 
   // En móvil, seleccionar un área cierra el drawer
   const handleSelect = (node: AreaTreeNode) => { onSelectArea(node); onMobileClose?.() }
@@ -234,8 +269,8 @@ export function AreaSidebar({
             <button
               onClick={onToggleFavoritesOnly}
               className={['rounded p-1 transition', favoritesOnly ? 'text-amber-400' : 'text-muted-foreground hover:text-amber-400'].join(' ')}
-              title={favoritesOnly ? 'Ver todas las áreas' : 'Ver solo áreas favoritas'}
-              aria-label="Solo áreas favoritas"
+              title={favoritesOnly ? 'Ver todo' : 'Ver solo favoritos (áreas y equipos)'}
+              aria-label="Solo favoritos"
             >
               <Star className={['h-4 w-4', favoritesOnly ? 'fill-current' : ''].join(' ')} />
             </button>
@@ -268,6 +303,9 @@ export function AreaSidebar({
               onSelectArea={handleSelect}
               onSelectEquipment={onSelectEquipment}
               selectedEquipKey={selectedEquipKey}
+              equipFavKeys={equipFavKeys}
+              onToggleEquipFav={onToggleEquipFav}
+              favoritesOnly={favoritesOnly}
               assetCountByNode={assetCountByNode}
               repCountByNode={repCountByNode}
               favoriteAreaIds={favoriteAreaIds}
