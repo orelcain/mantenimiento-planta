@@ -80,14 +80,14 @@ function EquipmentRow({ leaf, depth, selected, onClick, isFav, onToggleFav }: {
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } }}
       style={{ paddingLeft: `${10 + depth * 14}px` }}
       className={[
-        'group relative flex items-center gap-2 pr-2 py-1.5 cursor-pointer select-none border-l-2 transition-colors',
+        'group relative flex items-center gap-2 pr-2 py-2 cursor-pointer select-none border-l-2 transition-colors',
         selected
           ? 'border-l-primary bg-primary/10 text-primary'
           : 'border-l-transparent text-foreground/70 hover:bg-muted/40 hover:text-foreground',
       ].join(' ')}
       title={leaf.nombre}
     >
-      <Cog className={['h-3 w-3 shrink-0', selected ? 'text-primary' : 'text-cyan-500/60'].join(' ')} />
+      <Cog className={['h-3.5 w-3.5 shrink-0', selected ? 'text-primary' : 'text-cyan-500/60'].join(' ')} />
       <div className="min-w-0 flex-1">
         <div className="truncate text-[11px] leading-tight">{leaf.alias || leaf.nombre}</div>
         {leaf.codigo && (
@@ -98,7 +98,7 @@ function EquipmentRow({ leaf, depth, selected, onClick, isFav, onToggleFav }: {
         <button
           onClick={(e) => { e.stopPropagation(); onToggleFav() }}
           className={[
-            'shrink-0 rounded p-0.5 transition',
+            'shrink-0 rounded p-1 transition',
             isFav ? 'text-amber-400' : 'text-muted-foreground/30 opacity-0 group-hover:opacity-100 hover:text-amber-400',
           ].join(' ')}
           title={isFav ? 'Quitar de favoritos' : 'Marcar equipo como favorito'}
@@ -145,26 +145,30 @@ function AreaRow({
         {hasChildren ? (
           <button
             onClick={(e) => { e.stopPropagation(); onToggleNode(node.id) }}
-            className="shrink-0 -ml-1 flex h-4 w-4 items-center justify-center rounded hover:bg-muted"
+            className="-ml-1 flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-muted"
             aria-label={isOpen ? 'Colapsar' : 'Expandir'}
           >
             {node.isLoading
-              ? <Loader2 className="h-3 w-3 animate-spin text-primary/60" />
-              : <ChevronRight className={['h-3.5 w-3.5 transition-transform', isOpen ? 'rotate-90' : ''].join(' ')} />}
+              ? <Loader2 className="h-3.5 w-3.5 animate-spin text-primary/60" />
+              : <ChevronRight className={['h-4 w-4 transition-transform', isOpen ? 'rotate-90' : ''].join(' ')} />}
           </button>
         ) : (
-          <Layers className="h-3.5 w-3.5 shrink-0 opacity-50" />
+          <span className="-ml-1 flex h-6 w-6 shrink-0 items-center justify-center">
+            <Layers className="h-3.5 w-3.5 opacity-50" />
+          </span>
         )}
 
         <div className="min-w-0 flex-1">
           <div className="truncate text-[12px] font-medium leading-tight">{node.nombre}</div>
-          <div className="flex items-center gap-2 text-[10px] leading-tight text-muted-foreground">
+          {/* Meta en una sola línea (trunca si no entra). Orden por relevancia en Repuestos:
+              equipos · rep · M/B → al truncar se corta primero el M/B (menos crítico). */}
+          <div className="truncate text-[10px] leading-tight text-muted-foreground">
             <span className="tabular-nums">{eqCount} equipos</span>
-            {assetCount > 0 && (
-              <span className="tabular-nums text-cyan-500">· {assetCount} M/B</span>
-            )}
             {repCount > 0 && (
-              <span className="tabular-nums text-emerald-500">· {repCount} rep</span>
+              <span className="tabular-nums text-emerald-500"> · {repCount} rep</span>
+            )}
+            {assetCount > 0 && (
+              <span className="tabular-nums text-cyan-500"> · {assetCount} M/B</span>
             )}
           </div>
         </div>
@@ -173,7 +177,7 @@ function AreaRow({
           <button
             onClick={(e) => { e.stopPropagation(); onToggleAreaFav(node.id) }}
             className={[
-              'shrink-0 rounded p-0.5 transition',
+              'shrink-0 rounded p-1 transition',
               isFav ? 'text-amber-400' : 'text-muted-foreground/30 opacity-0 group-hover:opacity-100 hover:text-amber-400',
             ].join(' ')}
             title={isFav ? 'Quitar de áreas favoritas' : 'Marcar área como favorita'}
