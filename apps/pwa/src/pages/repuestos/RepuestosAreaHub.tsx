@@ -1271,7 +1271,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                                   {list.machineNames?.[id] || equipNameMap.get(id) || id}
                                 </button>
                                 {isAdmin && (
-                                  <span className="hidden items-center pr-1 group-hover:inline-flex">
+                                  <span className="inline-flex items-center pr-1 [@media(hover:hover)]:hidden [@media(hover:hover)]:group-hover:inline-flex">
                                     <button onClick={() => moveEquipInList(list.name, idx, 'up')} disabled={idx === 0} title="Subir" className="px-0.5 text-muted-foreground/50 hover:text-primary disabled:opacity-20"><ChevronUp className="h-3 w-3" /></button>
                                     <button onClick={() => moveEquipInList(list.name, idx, 'down')} disabled={idx === list.machineIds.length - 1} title="Bajar" className="px-0.5 text-muted-foreground/50 hover:text-primary disabled:opacity-20"><ChevronDown className="h-3 w-3" /></button>
                                     <button onClick={() => removeEquipFromList(list.name, id)} title="Quitar de la lista" className="px-0.5 text-muted-foreground/50 hover:text-red-400"><X className="h-3 w-3" /></button>
@@ -1569,7 +1569,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                           </div>
                           <button
                             onClick={() => handleArchiveManualMachine(m)}
-                            className="hidden h-5 w-5 shrink-0 items-center justify-center rounded text-muted-foreground/40 transition-all hover:bg-amber-500/10 hover:text-amber-500 group-hover:flex"
+                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-muted-foreground/40 transition-all hover:bg-amber-500/10 hover:text-amber-500 [@media(hover:hover)]:hidden [@media(hover:hover)]:group-hover:flex"
                             title="Archivar equipo manual"
                           >
                             <Archive className="h-3 w-3" />

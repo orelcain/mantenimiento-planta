@@ -411,7 +411,7 @@ export function EquipmentCard({
                 {isAdmin && (
                   <button
                     onClick={handleStartEdit}
-                    className="hidden group-hover:flex items-center justify-center w-4 h-4 rounded hover:bg-muted/50 text-muted-foreground/40 hover:text-foreground transition-colors shrink-0"
+                    className="flex [@media(hover:hover)]:hidden [@media(hover:hover)]:group-hover:flex items-center justify-center w-4 h-4 rounded hover:bg-muted/50 text-muted-foreground/40 hover:text-foreground transition-colors shrink-0"
                     title="Editar nombre"
                   >
                     <Pencil className="h-2.5 w-2.5" />
@@ -480,7 +480,7 @@ export function EquipmentCard({
                 className={`shrink-0 p-0.5 rounded transition-colors ${
                   isFavoriteMachine
                     ? 'text-yellow-400'
-                    : 'text-muted-foreground/20 hover:text-yellow-400/60 hidden group-hover:inline-flex'
+                    : 'text-muted-foreground/20 hover:text-yellow-400/60 inline-flex [@media(hover:hover)]:hidden [@media(hover:hover)]:group-hover:inline-flex'
                 }`}
                 title={isFavoriteMachine ? 'Quitar de favoritos' : 'Agregar a favoritos'}
               >
@@ -491,7 +491,7 @@ export function EquipmentCard({
             {onDeleteEquipment && (
               <button
                 onClick={ev => { ev.stopPropagation(); onDeleteEquipment(equipment.id, displayName) }}
-                className="shrink-0 p-0.5 rounded text-muted-foreground/20 hover:text-red-400 hidden group-hover:inline-flex transition-colors"
+                className="shrink-0 p-0.5 rounded text-muted-foreground/20 hover:text-red-400 inline-flex [@media(hover:hover)]:hidden [@media(hover:hover)]:group-hover:inline-flex transition-colors"
                 title="Eliminar equipo"
               >
                 <X className="h-3 w-3" />
@@ -512,7 +512,7 @@ export function EquipmentCard({
                 'flex items-center justify-center w-4 h-4 rounded transition-colors shrink-0',
                 pinned
                   ? 'text-amber-500 bg-amber-500/15'
-                  : 'hidden group-hover:flex text-muted-foreground/30 hover:text-muted-foreground hover:bg-muted/50',
+                  : 'flex [@media(hover:hover)]:hidden [@media(hover:hover)]:group-hover:flex text-muted-foreground/30 hover:text-muted-foreground hover:bg-muted/50',
               ].join(' ')}
               title={pinned ? 'Desfijar estado' : 'Fijar expandido/colapsado'}
             >
@@ -526,7 +526,7 @@ export function EquipmentCard({
           <button
             onClick={handleToggleHidden}
             disabled={togglingHidden}
-            className="hidden group-hover:flex items-center justify-center w-5 h-5 rounded hover:bg-muted/50 text-muted-foreground/40 hover:text-foreground transition-colors shrink-0"
+            className="flex [@media(hover:hover)]:hidden [@media(hover:hover)]:group-hover:flex items-center justify-center w-5 h-5 rounded hover:bg-muted/50 text-muted-foreground/40 hover:text-foreground transition-colors shrink-0"
             title={isHidden ? 'Mostrar equipo' : 'Ocultar equipo'}
           >
             {togglingHidden ? <Loader2 className="h-3 w-3 animate-spin" /> : isHidden ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
@@ -537,7 +537,7 @@ export function EquipmentCard({
         {isAdmin && onChildAdded && (
           <button
             onClick={handleStartAddChild}
-            className="hidden group-hover:flex items-center justify-center w-5 h-5 rounded hover:bg-primary/20 text-muted-foreground/40 hover:text-primary transition-colors shrink-0"
+            className="flex [@media(hover:hover)]:hidden [@media(hover:hover)]:group-hover:flex items-center justify-center w-5 h-5 rounded hover:bg-primary/20 text-muted-foreground/40 hover:text-primary transition-colors shrink-0"
             title="Agregar sub-equipo"
           >
             <Plus className="h-3 w-3" />
