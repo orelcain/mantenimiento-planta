@@ -193,6 +193,9 @@ export function MainLayout() {
   const isPlanosAguasRoute = location.pathname.startsWith('/planos-aguas')
   const isAprendizajeRoute = location.pathname.startsWith('/aprendizaje')
   const isMapRoute = location.pathname.startsWith('/map')
+  // Repuestos: lente área-first con 3 paneles (sidebar/lista/detalle) que scrollean
+  // independientes → necesita contenedor de altura acotada + overflow-hidden (como Clima/HMI).
+  const isRepuestosRoute = location.pathname.startsWith('/repuestos')
   const shouldHideDesktopSidebar =
     sidebarCollapsed || (isGanttRoute && ganttFocusMode && !sidebarPeekOpen)
 
@@ -1107,7 +1110,7 @@ export function MainLayout() {
         <main
           id="main-content"
           className={`${
-            isClimaRoute || isHmiKnuroRoute || isBaader200Route || isMapRoute || isPlanosAguasRoute
+            isClimaRoute || isHmiKnuroRoute || isBaader200Route || isMapRoute || isPlanosAguasRoute || isRepuestosRoute
               ? 'h-[calc(100vh-3.5rem-4rem)] lg:h-[calc(100vh-3.5rem)] p-0 overflow-hidden'
               : isAprendizajeRoute
               ? 'p-0 w-full max-w-[100vw] overflow-x-hidden pb-16 lg:pb-0'

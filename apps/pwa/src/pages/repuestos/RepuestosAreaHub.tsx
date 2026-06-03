@@ -169,6 +169,8 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   const [showDetail, setShowDetail] = useState(false)
   // Equipo seleccionado desde el sidebar / chips de favoritos (clave = linkedMachineId || nodeId) para resaltarlo.
   const [selectedEquipKey, setSelectedEquipKey] = useState<string | null>(null)
+  // Nombre del equipo seleccionado, para mostrarlo como título (en vez del área).
+  const [selectedEquipName, setSelectedEquipName] = useState<string>('')
 
   // Filtros + paginación de la tabla de repuestos
   const [repQuery, setRepQuery] = useState('')
@@ -400,7 +402,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   }, [areaFavOnly, favoriteAreaIds, equipFavKeys, getNodePath, areaTree])
 
   // Clic en chip de equipo → ir a su área + filtrar la tabla a ese equipo + revelar equipos.
-  const handleFavEquipClick = useCallback((favKey: string) => {
+  const handleFavEquipClick = useCallback((favKey: string, displayName?: string) => {
     const eq = getGlobalEquipmentCache() || []
     const e = eq.find((x) => (x.linkedMachineId || x.id) === favKey) || eq.find((x) => x.id === favKey)
     const areaId = e?.parentId || (e?.path && e.path.length ? e.path[e.path.length - 1] : null)
@@ -420,6 +422,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
     setRepEquipoFilter(m ? m.nombre : 'all')
     // Clave = id del NODO del equipo (para resaltarlo en el sidebar y reducir los M/B a ese equipo).
     setSelectedEquipKey(e?.id ?? favKey)
+    setSelectedEquipName(displayName || (e as { alias?: string } | undefined)?.alias || e?.nombre || (m ? m.nombre : favKey))
     setSelectedRowKey(null)
     setSelectedAssetId(null)
     setSidebarMobileOpen(false)
@@ -974,6 +977,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
     // Seleccionar el área (no un equipo) limpia el filtro de equipo → muestra todo el área.
     setRepEquipoFilter('all')
     setSelectedEquipKey(null)
+    setSelectedEquipName('')
     setSelectedRowKey(null)
     setSelectedAssetId(null)
     // Abrir ancestros para contexto
@@ -997,6 +1001,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
     setSelectedAreaId(null)
     setRepEquipoFilter('all')
     setSelectedEquipKey(null)
+    setSelectedEquipName('')
   }, [])
 
   // ══════════════════════════════════════════════════════════════════
@@ -1153,7 +1158,10 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
     [assets, selectedAssetId],
   )
 
-  const title = showingAll ? 'Todas las áreas' : (selectedNode?.nombre ?? 'Selecciona un área')
+  // Si hay un equipo seleccionado, el título es el equipo (no el área); el área baja al breadcrumb.
+  const title = selectedEquipKey
+    ? (selectedEquipName || 'Equipo')
+    : (showingAll ? 'Todas las áreas' : (selectedNode?.nombre ?? 'Selecciona un área'))
 
   // Herramientas admin de catálogo — compartidas entre toolbar desktop y overflow móvil.
   const adminTools = isAdmin
@@ -1188,7 +1196,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
         onMobileClose={() => setSidebarMobileOpen(false)}
         collapsed={sidebarCollapsed}
         onToggleCollapse={toggleSidebarCollapse}
-        onSelectEquipment={(_node, leaf) => handleFavEquipClick(leaf.linkedMachineId || leaf.id)}
+        onSelectEquipment={(_node, leaf) => handleFavEquipClick(leaf.linkedMachineId || leaf.id, leaf.alias || leaf.nombre)}
         selectedEquipKey={selectedEquipKey}
         equipFavKeys={equipFavKeys}
         onToggleEquipFav={(leaf) => handleEquipStar(leaf.linkedMachineId || leaf.id, undefined, leaf.alias || leaf.nombre)}
@@ -1337,7 +1345,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                             {list.machineIds.map((id, idx) => (
                               <span key={id} className="group inline-flex items-center overflow-hidden rounded-full border border-border bg-background">
                                 <button
-                                  onClick={() => handleFavEquipClick(id)}
+                                  onClick={() => handleFavEquipClick(id, list.machineNames?.[id] || equipNameMap.get(id))}
                                   className="px-2.5 py-1 text-[11px] font-medium text-foreground transition hover:bg-primary/10 hover:text-primary"
                                 >
                                   {list.machineNames?.[id] || equipNameMap.get(id) || id}
@@ -1364,14 +1372,16 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
           {/* Cabecera del área */}
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              {breadcrumb.length > 1 && (
+              {/* Breadcrumb: con equipo seleccionado incluye el área; si no, la deja para el título. */}
+              {(selectedEquipKey ? breadcrumb.length > 0 : breadcrumb.length > 1) && (
                 <div className="mb-0.5 truncate text-[11px] text-muted-foreground">
-                  {breadcrumb.slice(0, -1).join(' › ')}
+                  {(selectedEquipKey ? breadcrumb : breadcrumb.slice(0, -1)).join(' › ')}
                 </div>
               )}
               <div className="flex items-center gap-2">
+                {selectedEquipKey && <Cog className="h-5 w-5 shrink-0 text-cyan-500" />}
                 <h1 className="truncate text-xl font-bold text-foreground">{title}</h1>
-                {selectedNode && !repQuery.trim() && (
+                {selectedNode && !repQuery.trim() && !selectedEquipKey && (
                   <Badge variant="secondary" className="tabular-nums">{eqCount} equipos</Badge>
                 )}
                 {repQuery.trim() && (
@@ -1380,15 +1390,23 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
                   </Badge>
                 )}
               </div>
-              {repEquipoFilter !== 'all' && (
+              {selectedEquipKey ? (
                 <button
-                  onClick={() => { setRepEquipoFilter('all'); setSelectedEquipKey(null) }}
+                  onClick={() => { setRepEquipoFilter('all'); setSelectedEquipKey(null); setSelectedEquipName('') }}
+                  className="mt-1 inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-muted/40 px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                  title="Volver a ver todos los repuestos del área"
+                >
+                  <ChevronLeft className="h-3 w-3 shrink-0" /> Volver a <span className="truncate font-semibold">{selectedNode?.nombre ?? 'el área'}</span>
+                </button>
+              ) : repEquipoFilter !== 'all' ? (
+                <button
+                  onClick={() => { setRepEquipoFilter('all'); setSelectedEquipName('') }}
                   className="mt-1 inline-flex max-w-full items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary transition hover:bg-primary/20"
                   title="Quitar filtro de equipo — ver todos los repuestos del área"
                 >
                   <Cog className="h-3 w-3 shrink-0" /> <span className="truncate">{repEquipoFilter}</span> <X className="h-3 w-3 shrink-0 opacity-70" />
                 </button>
-              )}
+              ) : null}
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2">
               {isAdmin && (selectedAreaId || showingAll) && (
@@ -1670,7 +1688,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
               </div>
               {/* Selects: 2-up en móvil (grid), fila única en ≥sm (sm:contents disuelve el grid) */}
               <div className="grid grid-cols-2 gap-2 sm:contents">
-              <Select value={repEquipoFilter} onValueChange={(v) => { setRepEquipoFilter(v); setSelectedEquipKey(null) }}>
+              <Select value={repEquipoFilter} onValueChange={(v) => { setRepEquipoFilter(v); setSelectedEquipKey(null); setSelectedEquipName('') }}>
                 <SelectTrigger className="w-full sm:w-[190px]"><SelectValue placeholder="Todos los equipos" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos los equipos</SelectItem>
