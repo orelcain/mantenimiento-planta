@@ -99,7 +99,8 @@ function EquipmentRow({ leaf, depth, selected, onClick, isFav, onToggleFav }: {
           onClick={(e) => { e.stopPropagation(); onToggleFav() }}
           className={[
             'shrink-0 rounded p-1 transition',
-            isFav ? 'text-amber-400' : 'text-muted-foreground/30 opacity-0 group-hover:opacity-100 hover:text-amber-400',
+            // En táctil siempre visible (para poder marcar); en mouse, oculta hasta hover de la fila.
+            isFav ? 'text-amber-400' : 'text-muted-foreground/30 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 hover:text-amber-400',
           ].join(' ')}
           title={isFav ? 'Quitar de favoritos' : 'Marcar equipo como favorito'}
           aria-label="Equipo favorito"
@@ -178,7 +179,8 @@ function AreaRow({
             onClick={(e) => { e.stopPropagation(); onToggleAreaFav(node.id) }}
             className={[
               'shrink-0 rounded p-1 transition',
-              isFav ? 'text-amber-400' : 'text-muted-foreground/30 opacity-0 group-hover:opacity-100 hover:text-amber-400',
+              // En táctil siempre visible (para poder marcar); en mouse, oculta hasta hover de la fila.
+              isFav ? 'text-amber-400' : 'text-muted-foreground/30 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 hover:text-amber-400',
             ].join(' ')}
             title={isFav ? 'Quitar de áreas favoritas' : 'Marcar área como favorita'}
             aria-label="Área favorita"
@@ -258,7 +260,8 @@ export function AreaSidebar({
       )}
       <aside
         className={[
-          'flex h-full w-72 shrink-0 flex-col border-r border-border bg-card/40',
+          // Móvil: fondo OPACO (drawer sobre el contenido); desktop: sutil translúcido.
+          'flex h-full w-72 shrink-0 flex-col border-r border-border bg-card sm:bg-card/40',
           // Base (móvil): drawer fijo deslizable
           'fixed inset-y-0 left-0 z-40 shadow-xl transition-transform duration-200',
           mobileOpen ? 'translate-x-0' : '-translate-x-full',

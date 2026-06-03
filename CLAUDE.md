@@ -1127,6 +1127,8 @@ Detalle completo, inventario de ~22 features y gotchas en memoria auto `project_
 - 🔲 **Mejora futura:** auto-expandir áreas con favoritos al activar "solo favoritos" (hoy quedan colapsadas, hay que expandir a mano). Favoritos profundos (nivel ≥6 no cargado aún) no se detectan hasta expandir.
 - 🔲 **P2 audit sidebar:** guías de indentación (líneas) para jerarquía profunda · hit-area de estrella/chevron aún <40px (base 14px/rem lo limita; la fila completa ya es el target principal) · ancho del drawer móvil (252px sobre 375).
 
+**Fix móvil del sidebar (v3.66.0):** el drawer estaba translúcido (`bg-card/40` dejaba ver el contenido detrás) → ahora **opaco en móvil** (`bg-card sm:bg-card/40`). Las estrellas de favorito (área + equipo) usaban `opacity-0 group-hover:opacity-100` → invisibles en táctil (no se podían marcar favoritos en móvil) → patrón `opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100` (visible en touch, hover-reveal en mouse). Verificado: drawer `rgb(22,36,47)` sin alfa · tap equipo en móvil filtra a 127 + cierra drawer + chip · estrella `opacity-100` base + override hover:hover (preview reporta hover:hover, fix se valida por CSS).
+
 ### 🖥️ Seed 8 motores SUMITOMO — referencia del script (HECHO ✅)
 - **Idempotente**: docId `asset-sumitomo-<slug>`. `--force` sobrescribe + re-sube fotos.
 - **Datos** (equipo · modelo · SAP): Baader 200 / desperdicio filete / filete / transversal Baader 142 / curva → `RNYM08-1320B-30` · `3300124073` | Z elevadora HG → `RNYM1-1320A-30` · `3300124072` | alimentación Baader 142 → `RNYM1-1320A-7` · `3300124071` | alimentación Gea → `RNYMS05-1320C-30` · `3300124070`.
