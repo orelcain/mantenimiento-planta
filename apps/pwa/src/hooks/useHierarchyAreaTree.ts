@@ -22,7 +22,7 @@ import {
   isEquipmentNode,
 } from '@/types/hierarchy'
 
-// Equipo SAP (hoja) que cuelga de un área en el sidebar.
+// Equipo SAP que cuelga de un área en el sidebar. Puede tener sub-equipos anidados.
 export interface EquipmentLeaf {
   id: string
   nombre: string
@@ -30,6 +30,7 @@ export interface EquipmentLeaf {
   codigo: string
   oculto?: boolean
   linkedMachineId?: string
+  children: EquipmentLeaf[]
 }
 
 // Nodo de área para el sidebar — extiende con conteo de equipos hijos
@@ -51,6 +52,22 @@ function isAreaNode(node: HierarchyNode): boolean {
   // Áreas tienen código alfanumérico no vacío (ej: "PROD-001")
   // Equipos tienen código numérico (ej: "720004316") o vacío
   return !!node.codigo && !isEquipmentNode(node.codigo)
+}
+
+/** Carga los hijos (sub-equipos) de una lista de nodos equipo, con caché por nodo. */
+async function loadSubEquipmentNodes(equipNodes: HierarchyNode[]): Promise<HierarchyNode[]> {
+  if (equipNodes.length === 0) return []
+  const hierarchyRef = collection(db, 'hierarchy')
+  const results = await Promise.all(equipNodes.map(async (eq) => {
+    const cachedSub = areaChildrenCache.get(eq.id)
+    if (cachedSub && Date.now() - cachedSub.ts < CACHE_TTL) return cachedSub.nodes
+    const qSub = query(hierarchyRef, where('parentId', '==', eq.id), where('activo', '==', true), orderBy('orden', 'asc'))
+    const snapSub = await getDocs(qSub)
+    const subNodes: HierarchyNode[] = snapSub.docs.map(d => ({ id: d.id, ...d.data() } as HierarchyNode))
+    areaChildrenCache.set(eq.id, { nodes: subNodes, equipCount: 0, ts: Date.now() })
+    return subNodes
+  }))
+  return results.flat()
 }
 
 function buildAreaTree(nodes: HierarchyNode[]): AreaTreeNode[] {
@@ -92,30 +109,37 @@ function buildAreaTree(nodes: HierarchyNode[]): AreaTreeNode[] {
     }
   }
 
-  // Adjuntar equipos (hijos numéricos / sin código) a su área padre, ordenados por `orden`.
-  const equipByParent = new Map<string, { leaf: EquipmentLeaf; orden: number }[]>()
-  for (const n of nodes) {
-    if (!isAreaNode(n) && n.parentId && nodeMap.has(n.parentId)) {
-      const arr = equipByParent.get(n.parentId) ?? []
-      arr.push({
-        leaf: {
-          id: n.id,
-          nombre: n.nombre,
-          alias: (n as HierarchyNode & { alias?: string }).alias,
-          codigo: n.codigo,
-          oculto: (n as HierarchyNode & { oculto?: boolean }).oculto ?? false,
-          linkedMachineId: (n as HierarchyNode & { linkedMachineId?: string }).linkedMachineId,
-        },
-        orden: (n as HierarchyNode & { orden?: number }).orden ?? 0,
-      })
-      equipByParent.set(n.parentId, arr)
+  // Equipos: construir el subárbol completo (equipo → sub-equipos numéricos) desde los nodos cargados.
+  const equipNodes = nodes.filter((n) => !isAreaNode(n))
+  const leafMap = new Map<string, EquipmentLeaf>()
+  const ordenOf = new Map<string, number>()
+  for (const n of equipNodes) {
+    leafMap.set(n.id, {
+      id: n.id,
+      nombre: n.nombre,
+      alias: (n as HierarchyNode & { alias?: string }).alias,
+      codigo: n.codigo,
+      oculto: (n as HierarchyNode & { oculto?: boolean }).oculto ?? false,
+      linkedMachineId: (n as HierarchyNode & { linkedMachineId?: string }).linkedMachineId,
+      children: [],
+    })
+    ordenOf.set(n.id, (n as HierarchyNode & { orden?: number }).orden ?? 0)
+  }
+  const byOrden = (a: EquipmentLeaf, b: EquipmentLeaf) => (ordenOf.get(a.id) ?? 0) - (ordenOf.get(b.id) ?? 0)
+  // Anidar sub-equipos bajo su equipo padre
+  for (const n of equipNodes) {
+    if (n.parentId && leafMap.has(n.parentId)) {
+      leafMap.get(n.parentId)!.children.push(leafMap.get(n.id)!)
     }
   }
-  for (const [parentId, arr] of equipByParent) {
-    arr.sort((a, b) => a.orden - b.orden)
-    const parent = nodeMap.get(parentId)
-    if (parent) parent.equipment = arr.map((x) => x.leaf)
+  for (const leaf of leafMap.values()) leaf.children.sort(byOrden)
+  // Adjuntar equipos raíz (cuyo padre es un área) a su área
+  for (const n of equipNodes) {
+    if (n.parentId && nodeMap.has(n.parentId)) {
+      nodeMap.get(n.parentId)!.equipment.push(leafMap.get(n.id)!)
+    }
   }
+  for (const area of nodeMap.values()) area.equipment.sort(byOrden)
 
   return rootNodes
 }
@@ -183,16 +207,22 @@ export function useHierarchyAreaTree() {
     load()
   }, [])
 
-  // Expandir un nodo: cargar sus hijos-área y equipos directos
+  // Expandir un nodo: cargar sus hijos-área, equipos directos y los sub-equipos de esos equipos.
   const expandNode = useCallback(async (nodeId: string) => {
+    const mergeIntoAllNodes = (toAdd: HierarchyNode[]) => {
+      setAllNodes(prev => {
+        const ids = new Set(prev.map(n => n.id))
+        const news = toAdd.filter(n => !ids.has(n.id))
+        return news.length > 0 ? [...prev, ...news] : prev
+      })
+    }
+
     const cached = areaChildrenCache.get(nodeId)
     if (cached && Date.now() - cached.ts < CACHE_TTL) {
-      // Ya tenemos los hijos en cache — agregarlos si no están ya
-      setAllNodes(prev => {
-        const existingIds = new Set(prev.map(n => n.id))
-        const newNodes = cached.nodes.filter(n => !existingIds.has(n.id))
-        return newNodes.length > 0 ? [...prev, ...newNodes] : prev
-      })
+      // La caché pudo venir del bloque de nietos (sin sub-equipos) → asegurarlos igual.
+      const directEquip = cached.nodes.filter(n => !isAreaNode(n) && n.parentId === nodeId)
+      const subEquip = await loadSubEquipmentNodes(directEquip)
+      mergeIntoAllNodes([...cached.nodes, ...subEquip])
       return
     }
 
@@ -245,11 +275,12 @@ export function useHierarchyAreaTree() {
         childNodes.push(...grandchildren)
       }
 
-      setAllNodes(prev => {
-        const existingIds = new Set(prev.map(n => n.id))
-        const newNodes = childNodes.filter(n => !existingIds.has(n.id))
-        return newNodes.length > 0 ? [...prev, ...newNodes] : prev
-      })
+      // Sub-equipos de los equipos DIRECTOS del nodo (no de los nietos) para anidarlos.
+      const directEquip = childNodes.filter(n => !isAreaNode(n) && n.parentId === nodeId)
+      const subEquip = await loadSubEquipmentNodes(directEquip)
+      if (subEquip.length > 0) childNodes.push(...subEquip)
+
+      mergeIntoAllNodes(childNodes)
     } catch (err) {
       logger.error('Error expanding node', err instanceof Error ? err : new Error(String(err)))
     } finally {

@@ -7,7 +7,7 @@
  *
  * Reutiliza useHierarchyAreaTree (mismo árbol que EquipmentNavigator).
  */
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { ChevronRight, ChevronsLeft, Layers, Loader2, List, X, Star, Cog } from 'lucide-react'
 import { useHierarchyAreaTree, type AreaTreeNode, type EquipmentLeaf } from '@/hooks/useHierarchyAreaTree'
 
@@ -68,47 +68,88 @@ function countEquip(node: AreaTreeNode): number {
   return total
 }
 
-/** Fila de equipo (hoja) bajo un área — clic filtra la tabla a ese equipo. */
-function EquipmentRow({ leaf, depth, selected, onClick, isFav, onToggleFav }: {
-  leaf: EquipmentLeaf; depth: number; selected: boolean; onClick: () => void; isFav?: boolean; onToggleFav?: () => void
-}) {
+/** Fila de equipo bajo un área — clic filtra la tabla a ese equipo; expandible si tiene sub-equipos. */
+function EquipmentRow({
+  leaf, areaNode, depth, selectedEquipKey, equipFavKeys, favoritesOnly, onSelectArea, onSelectEquipment, onToggleEquipFav,
+}: {
+  leaf: EquipmentLeaf; areaNode: AreaTreeNode; depth: number
+} & Pick<AreaSidebarProps, 'selectedEquipKey' | 'equipFavKeys' | 'favoritesOnly' | 'onSelectArea' | 'onSelectEquipment' | 'onToggleEquipFav'>) {
+  const [expanded, setExpanded] = useState(false)
+  const visibleChildren = leaf.children.filter((c) => !c.oculto && (!favoritesOnly || isLeafFav(c, equipFavKeys)))
+  const hasChildren = visibleChildren.length > 0
+  const selected = !!selectedEquipKey && (selectedEquipKey === leaf.id || selectedEquipKey === leaf.linkedMachineId)
+  const isFav = isLeafFav(leaf, equipFavKeys)
+  const handleSelect = () => (onSelectEquipment ? onSelectEquipment(areaNode, leaf) : onSelectArea(areaNode))
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onClick}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } }}
-      style={{ paddingLeft: `${10 + depth * 14}px` }}
-      className={[
-        'group relative flex items-center gap-2 pr-2 py-2 cursor-pointer select-none border-l-2 transition-colors',
-        selected
-          ? 'border-l-primary bg-primary/10 text-primary'
-          : 'border-l-transparent text-foreground/70 hover:bg-muted/40 hover:text-foreground',
-      ].join(' ')}
-      title={leaf.nombre}
-    >
-      <Cog className={['h-3.5 w-3.5 shrink-0', selected ? 'text-primary' : 'text-cyan-500/60'].join(' ')} />
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-[11px] leading-tight">{leaf.alias || leaf.nombre}</div>
-        {leaf.codigo && (
-          <div className="truncate font-mono text-[9px] leading-tight text-muted-foreground/60">{leaf.codigo}</div>
+    <>
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={handleSelect}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSelect() } }}
+        style={{ paddingLeft: `${10 + depth * 14}px` }}
+        className={[
+          'group relative flex items-center gap-2 pr-2 py-2 cursor-pointer select-none border-l-2 transition-colors',
+          selected
+            ? 'border-l-primary bg-primary/10 text-primary'
+            : 'border-l-transparent text-foreground/70 hover:bg-muted/40 hover:text-foreground',
+        ].join(' ')}
+        title={leaf.nombre}
+      >
+        {hasChildren ? (
+          <button
+            onClick={(e) => { e.stopPropagation(); setExpanded((v) => !v) }}
+            className="-ml-1 flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-muted"
+            aria-label={expanded ? 'Colapsar sub-equipos' : 'Expandir sub-equipos'}
+          >
+            <ChevronRight className={['h-4 w-4 transition-transform', expanded ? 'rotate-90' : ''].join(' ')} />
+          </button>
+        ) : (
+          <span className="-ml-1 flex h-6 w-6 shrink-0 items-center justify-center">
+            <Cog className={['h-3.5 w-3.5', selected ? 'text-primary' : 'text-cyan-500/60'].join(' ')} />
+          </span>
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[11px] leading-tight">{leaf.alias || leaf.nombre}</div>
+          {leaf.codigo && (
+            <div className="truncate font-mono text-[9px] leading-tight text-muted-foreground/60">{leaf.codigo}</div>
+          )}
+        </div>
+        {onToggleEquipFav && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onToggleEquipFav(leaf) }}
+            className={[
+              'shrink-0 rounded p-1 transition',
+              // En táctil siempre visible (para poder marcar); en mouse, oculta hasta hover de la fila.
+              isFav ? 'text-amber-400' : 'text-muted-foreground/30 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 hover:text-amber-400',
+            ].join(' ')}
+            title={isFav ? 'Quitar de favoritos' : 'Marcar equipo como favorito'}
+            aria-label="Equipo favorito"
+          >
+            <Star className={['h-3 w-3', isFav ? 'fill-current' : ''].join(' ')} />
+          </button>
         )}
       </div>
-      {onToggleFav && (
-        <button
-          onClick={(e) => { e.stopPropagation(); onToggleFav() }}
-          className={[
-            'shrink-0 rounded p-1 transition',
-            // En táctil siempre visible (para poder marcar); en mouse, oculta hasta hover de la fila.
-            isFav ? 'text-amber-400' : 'text-muted-foreground/30 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 hover:text-amber-400',
-          ].join(' ')}
-          title={isFav ? 'Quitar de favoritos' : 'Marcar equipo como favorito'}
-          aria-label="Equipo favorito"
-        >
-          <Star className={['h-3 w-3', isFav ? 'fill-current' : ''].join(' ')} />
-        </button>
+      {expanded && hasChildren && (
+        <div className="relative">
+          <span aria-hidden className="pointer-events-none absolute inset-y-0 w-px bg-border/40" style={{ left: `${10 + depth * 14 + 11}px` }} />
+          {visibleChildren.map((c) => (
+            <EquipmentRow
+              key={c.id}
+              leaf={c}
+              areaNode={areaNode}
+              depth={depth + 1}
+              selectedEquipKey={selectedEquipKey}
+              equipFavKeys={equipFavKeys}
+              favoritesOnly={favoritesOnly}
+              onSelectArea={onSelectArea}
+              onSelectEquipment={onSelectEquipment}
+              onToggleEquipFav={onToggleEquipFav}
+            />
+          ))}
+        </div>
       )}
-    </div>
+    </>
   )
 }
 
@@ -222,11 +263,14 @@ function AreaRow({
             <EquipmentRow
               key={eq.id}
               leaf={eq}
+              areaNode={node}
               depth={depth + 1}
-              selected={!!selectedEquipKey && (selectedEquipKey === eq.id || selectedEquipKey === eq.linkedMachineId)}
-              onClick={() => (onSelectEquipment ? onSelectEquipment(node, eq) : onSelectArea(node))}
-              isFav={isLeafFav(eq, equipFavKeys)}
-              onToggleFav={onToggleEquipFav ? () => onToggleEquipFav(eq) : undefined}
+              selectedEquipKey={selectedEquipKey}
+              equipFavKeys={equipFavKeys}
+              favoritesOnly={favoritesOnly}
+              onSelectArea={onSelectArea}
+              onSelectEquipment={onSelectEquipment}
+              onToggleEquipFav={onToggleEquipFav}
             />
           ))}
         </div>
@@ -240,7 +284,15 @@ export function AreaSidebar({
   favoritesOnly = false, onToggleFavoritesOnly, openNodes, onToggleNode, onShowAll, showingAll,
   mobileOpen = false, onMobileClose, collapsed = false, onToggleCollapse,
 }: AreaSidebarProps) {
-  const { areaTree, loading } = useHierarchyAreaTree()
+  const { areaTree, loading, expandNode } = useHierarchyAreaTree()
+
+  // Esta instancia del hook tiene su PROPIO allNodes (separado del hub). Al abrir un nodo,
+  // cargar sus hijos/sub-equipos en ESTE árbol (la caché por nodeId es compartida → barato),
+  // además de propagar el toggle de openNodes al hub.
+  const toggleNode = (id: string) => {
+    if (!openNodes[id]) expandNode(id)
+    onToggleNode(id)
+  }
 
   // Saltar la raíz única (CHONCHI) y mostrar sus hijos directamente, como EquipmentNavigator.
   const roots = useMemo(() => {
@@ -324,7 +376,7 @@ export function AreaSidebar({
               favoriteAreaIds={favoriteAreaIds}
               onToggleAreaFav={onToggleAreaFav}
               openNodes={openNodes}
-              onToggleNode={onToggleNode}
+              onToggleNode={toggleNode}
             />
           ))
         )}
