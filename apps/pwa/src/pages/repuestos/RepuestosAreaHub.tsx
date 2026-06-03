@@ -392,10 +392,12 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   }, [areaFavOnly, favoriteAreaIds, equipFavKeys, getNodePath, areaTree])
 
   // Clic en chip de equipo → ir a su área + filtrar la tabla a ese equipo + revelar equipos.
-  const handleFavEquipClick = useCallback((favKey: string, displayName?: string) => {
+  const handleFavEquipClick = useCallback((favKey: string, displayName?: string, areaIdHint?: string | null) => {
     const eq = getGlobalEquipmentCache() || []
     const e = eq.find((x) => (x.linkedMachineId || x.id) === favKey) || eq.find((x) => x.id === favKey)
-    const areaId = e?.parentId || (e?.path && e.path.length ? e.path[e.path.length - 1] : null)
+    // areaIdHint: el área que el sidebar ya conoce (no depende del cache). Si no
+    // viene (chips de favoritos), se deriva del cache de equipos.
+    const areaId = areaIdHint || e?.parentId || (e?.path && e.path.length ? e.path[e.path.length - 1] : null)
     if (areaId) {
       setSelectedAreaId(areaId)
       setShowingAll(false)
@@ -477,8 +479,10 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
   // Motores/bombas del alcance: si hay un equipo seleccionado, solo los de ese equipo
   // (por ancestría del nodo); si no, los del área seleccionada.
   const areaAssets = useMemo(() => {
-    if (showingAll) return linkedAssets
+    // Un equipo enfocado SIEMPRE reduce los M/B a ese equipo, incluso si showingAll
+    // está activo (evita mostrar los M/B de toda la planta con un equipo enfocado).
     if (selectedEquipKey) return linkedAssets.filter((a) => isUnder(a.hierarchyNodeId, selectedEquipKey))
+    if (showingAll) return linkedAssets
     if (!selectedAreaId) return []
     return linkedAssets.filter((a) => isUnder(a.hierarchyNodeId, selectedAreaId))
   }, [linkedAssets, showingAll, selectedEquipKey, selectedAreaId, isUnder])
@@ -1038,7 +1042,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
         onMobileClose={() => setSidebarMobileOpen(false)}
         collapsed={sidebarCollapsed}
         onToggleCollapse={toggleSidebarCollapse}
-        onSelectEquipment={(_node, leaf) => handleFavEquipClick(leaf.linkedMachineId || leaf.id, leaf.alias || leaf.nombre)}
+        onSelectEquipment={(node, leaf) => handleFavEquipClick(leaf.linkedMachineId || leaf.id, leaf.alias || leaf.nombre, node.id)}
         selectedEquipKey={selectedEquipKey}
         equipFavKeys={equipFavKeys}
         onToggleEquipFav={(leaf) => handleEquipStar(leaf.linkedMachineId || leaf.id, undefined, leaf.alias || leaf.nombre)}

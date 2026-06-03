@@ -33,10 +33,13 @@ export function invalidateGlobalEquipmentCache() {
   cacheTimestamp = 0
 }
 
-/** Acceder al cache de equipos globales (null si no cargado aún) */
+/** Acceder al cache de equipos globales (null solo si nunca se ha cargado).
+ *  El TTL gobierna la RECARGA (en el effect del hook), no la lectura: devolver
+ *  null aquí tras 5 min hacía que lectores en vivo —p.ej. resolver el área de un
+ *  equipo en el hub de Repuestos— perdieran los datos y degradaran la UX
+ *  (breadcrumb y "Volver a {área}" se vaciaban). Datos cacheados > null. */
 export function getGlobalEquipmentCache(): GlobalEquipmentResult[] | null {
-  if (cachedEquipment && Date.now() - cacheTimestamp < CACHE_TTL) return cachedEquipment
-  return null
+  return cachedEquipment
 }
 
 export function useGlobalEquipmentSearch(searchQuery: string, minChars = 2) {
