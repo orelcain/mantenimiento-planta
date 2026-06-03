@@ -191,7 +191,13 @@ function AreaRow({
       </div>
 
       {isOpen && (node.children.length > 0 || visibleEquip.length > 0) && (
-        <div>
+        <div className="relative">
+          {/* Guía de indentación: línea vertical alineada bajo el chevron del padre */}
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-y-0 w-px bg-border/40"
+            style={{ left: `${10 + depth * 14 + 11}px` }}
+          />
           {node.children.map((child) => (
             <AreaRow
               key={child.id}

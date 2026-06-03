@@ -375,6 +375,30 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
     })
   }, [])
 
+  // Al activar "solo favoritos", auto-expandir (una vez) las áreas con favoritos
+  // —áreas favoritas o con equipos favoritos— recorriendo el árbol ya cargado.
+  // El ref evita re-expandir si el técnico colapsa algo manualmente luego.
+  const favExpandedRef = useRef(false)
+  useEffect(() => {
+    if (!areaFavOnly) { favExpandedRef.current = false; return }
+    if (favExpandedRef.current) return
+    const toOpen: Record<string, boolean> = {}
+    const walk = (nodes: AreaTreeNode[]) => {
+      for (const n of nodes) {
+        const hasFavEquip = n.equipment.some((e) => !e.oculto && equipFavKeys.has(e.linkedMachineId || e.id))
+        if (hasFavEquip || favoriteAreaIds.has(n.id)) {
+          getNodePath(n.id).forEach((p) => { toOpen[p.id] = true })
+        }
+        if (n.children.length > 0) walk(n.children)
+      }
+    }
+    walk(areaTree)
+    if (Object.keys(toOpen).length > 0) {
+      setOpenNodes((prev) => ({ ...prev, ...toOpen }))
+      favExpandedRef.current = true
+    }
+  }, [areaFavOnly, favoriteAreaIds, equipFavKeys, getNodePath, areaTree])
+
   // Clic en chip de equipo → ir a su área + filtrar la tabla a ese equipo + revelar equipos.
   const handleFavEquipClick = useCallback((favKey: string) => {
     const eq = getGlobalEquipmentCache() || []

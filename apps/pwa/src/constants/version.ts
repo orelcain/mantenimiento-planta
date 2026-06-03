@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '3.66.0' as const
+export const APP_VERSION = '3.67.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-06-02' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'fix(repuestos): drawer del sidebar opaco en móvil + estrellas de favorito visibles en táctil' as const
+export const VERSION_NAME = 'feat(repuestos): auto-expandir áreas con favoritos al activar el filtro + guías de indentación en el árbol' as const
 
 /**
  * Nota:
