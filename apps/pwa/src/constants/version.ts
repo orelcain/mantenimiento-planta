@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '3.69.0' as const
+export const APP_VERSION = '3.70.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-06-02' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'feat(repuestos): título = equipo seleccionado + scroll independiente de los 3 paneles (sidebar/lista/detalle)' as const
+export const VERSION_NAME = 'refactor(repuestos): quitar la "Estructura de equipos del área (admin)" del panel (la navegación vive en el sidebar)' as const
 
 /**
  * Nota:
