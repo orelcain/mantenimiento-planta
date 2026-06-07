@@ -1742,7 +1742,7 @@ function ItemDrawer({ item, loadMovimientos, onClose, onEdit, onMovimiento, addP
                       onClick={() => { onViewInEquipo(e.machineId); onClose() }}
                       className="shrink-0 text-[9px] text-primary hover:text-primary/80 hover:underline transition-colors"
                     >
-                      Ver equipo
+                      Ver en Áreas
                     </button>
                   )}
                 </div>

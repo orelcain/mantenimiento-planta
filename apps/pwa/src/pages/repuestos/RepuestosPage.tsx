@@ -1,35 +1,31 @@
 /**
  * RepuestosPage — Contenedor principal del módulo de repuestos
  *
- * 3 vistas vinculadas:
- *  - Por equipo  → catálogo por máquina + jerarquía (jefe mantenimiento)
- *  - Buscar      → búsqueda global instantánea (técnico en terreno) [default móvil]
- *  - Bodega      → stock real (próximamente)
+ * 3 vistas:
+ *  - Áreas   → hub área-first (default); reemplaza "Por equipo" retirado en v3.75.0
+ *  - Mapas   → CatalogoBases (planos de aguas / mapas de planta)
+ *  - Bodega  → stock real
  *
  * Vinculación:
- *  Buscar → "Ver en equipo"   → cambia a "Por equipo" con máquina pre-seleccionada
- *  Equipo → "Buscar similar"  → cambia a "Buscar" con query pre-cargada
+ *  Bodega → "Ver en Áreas" → cambia a Áreas con machineId como query inicial
+ *  Áreas  → "Buscar similar" → recarga query en el hub
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { Layers, Package, Map, LayoutGrid } from 'lucide-react'
-import { RepuestosDashboard } from './Dashboard'
+import { useState, useEffect, useCallback } from 'react'
+import { Package, Map, LayoutGrid } from 'lucide-react'
 import { BodegaView } from './BodegaView'
 import { CatalogoBases } from './CatalogoBases'
 import { RepuestosAreaHub } from './RepuestosAreaHub'
-import { useMachineContext } from '@/contexts/MachineContext'
 
-type Tab = 'areas' | 'equipo' | 'bodega' | 'bases'
+type Tab = 'areas' | 'bodega' | 'bases'
 
 const STORAGE_KEY = 'repuestos-active-tab'
 
-/** Detecta móvil en el primer render */
 function getDefaultTab(): Tab {
   try {
     const saved = localStorage.getItem(STORAGE_KEY) as Tab | null
-    if (saved === 'areas' || saved === 'equipo' || saved === 'bodega' || saved === 'bases') return saved
+    if (saved === 'areas' || saved === 'bodega' || saved === 'bases') return saved
   } catch { /* noop */ }
-  // El hub área-first es responsive (drawer en móvil) → default único en todas las pantallas
   return 'areas'
 }
 
@@ -42,24 +38,17 @@ interface TabDef {
 }
 
 const TABS: TabDef[] = [
-  { id: 'areas',   label: 'Áreas',      mobileLabel: 'Áreas',  icon: LayoutGrid },
-  { id: 'equipo',  label: 'Por equipo', mobileLabel: 'Equipo', icon: Layers  },
-  { id: 'bases',   label: 'Mapas',      mobileLabel: 'Mapas',  icon: Map     },
-  { id: 'bodega',  label: 'Bodega',     mobileLabel: 'Bodega', icon: Package },
+  { id: 'areas',  label: 'Áreas',  mobileLabel: 'Áreas',  icon: LayoutGrid },
+  { id: 'bases',  label: 'Mapas',  mobileLabel: 'Mapas',  icon: Map        },
+  { id: 'bodega', label: 'Bodega', mobileLabel: 'Bodega', icon: Package    },
 ]
 
 export function RepuestosPage() {
-  const { setCurrentMachine } = useMachineContext()
-
   const [activeTab, setActiveTab] = useState<Tab>(getDefaultTab)
   // Lazy mount: solo renderiza un tab la primera vez que se activa
   const [mountedTabs, setMountedTabs] = useState<Set<Tab>>(new Set([getDefaultTab()]))
 
-  // jumpMachineId: al saltar desde Buscador → Equipo, auto-selecciona esta máquina
-  const jumpMachineIdRef = useRef<string | null>(null)
-  const [jumpMachineId, setJumpMachineId] = useState<string | null>(null)
-
-  // jumpQuery: al saltar desde Equipo → Buscar, pre-carga esta query
+  // jumpQuery: saltar a Áreas con query pre-cargada (desde Bodega "Ver en Áreas" o "Buscar similar")
   const [jumpQuery, setJumpQuery] = useState<string>('')
 
   // Persiste tab activo + lazy mount
@@ -68,22 +57,13 @@ export function RepuestosPage() {
     setMountedTabs(prev => prev.has(activeTab) ? prev : new Set([...prev, activeTab]))
   }, [activeTab])
 
-  // ── "Ver en equipo" desde Buscador ──────────────────────────────
-  const handleViewInCatalog = useCallback(async (machineId: string) => {
-    // Pre-selecciona la máquina en el contexto compartido
-    await setCurrentMachine(machineId)
-    jumpMachineIdRef.current = machineId
-    setJumpMachineId(machineId)
-    setActiveTab('equipo')
-  }, [setCurrentMachine])
-
-  // Limpiar jumpMachineId una vez que el Dashboard lo consumió
-  const handleJumpConsumed = useCallback(() => {
-    jumpMachineIdRef.current = null
-    setJumpMachineId(null)
+  // ── "Ver en Áreas" desde Bodega → salta al hub con el machineId como query ──
+  const handleViewInAreas = useCallback((machineId: string) => {
+    setJumpQuery(machineId)
+    setActiveTab('areas')
   }, [])
 
-  // ── "Buscar similar" desde Catálogo/Bodega → búsqueda global del hub Áreas ──
+  // ── "Buscar similar" → hub con query ──
   const handleSearchSimilar = useCallback((query: string) => {
     setJumpQuery(query)
     setActiveTab('areas')
@@ -121,10 +101,6 @@ export function RepuestosPage() {
                     {badge}
                   </span>
                 )}
-                {/* Dot de estado si tiene jump pendiente */}
-                {id === 'equipo' && jumpMachineId && (
-                  <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse shrink-0" />
-                )}
               </button>
             )
           })}
@@ -140,16 +116,6 @@ export function RepuestosPage() {
           )}
         </div>
 
-        <div className={activeTab === 'equipo' ? '' : 'hidden'}>
-          {mountedTabs.has('equipo') && (
-            <RepuestosDashboard
-              jumpMachineId={jumpMachineId}
-              onJumpConsumed={handleJumpConsumed}
-              onSearchSimilar={handleSearchSimilar}
-            />
-          )}
-        </div>
-
         <div className={activeTab === 'bases' ? '' : 'hidden'}>
           {mountedTabs.has('bases') && (
             <CatalogoBases />
@@ -159,7 +125,7 @@ export function RepuestosPage() {
         <div className={activeTab === 'bodega' ? '' : 'hidden'}>
           {mountedTabs.has('bodega') && (
             <BodegaView
-              onViewInEquipo={handleViewInCatalog}
+              onViewInEquipo={handleViewInAreas}
               onSearchSimilar={handleSearchSimilar}
             />
           )}
