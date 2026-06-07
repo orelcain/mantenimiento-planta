@@ -2,11 +2,8 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '3.73.0' as const
+export const APP_VERSION = '3.74.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
-
-
-
 
 /**
  * Fecha de la versión actual
@@ -16,13 +13,12 @@ export const VERSION_DATE = '2026-06-07' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'feat(repuestos): fotos reales editables en panel de detalle — upload WebP + delete' as const
+export const VERSION_NAME = 'feat(repuestos): Wave 2 - PDFs del equipo desde panel de detalle' as const
 
 /**
  * Nota:
  * Esta versión se sincroniza para pruebas vía GitHub Pages.
  */
-
 
 /**
  * Información completa de la versión

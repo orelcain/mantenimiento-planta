@@ -49,10 +49,11 @@ import { ImportRepuestosModal } from './ImportRepuestosModal'
 import { ExportReportModal } from '@/components/repuestos/ExportReportModal'
 import { normalizeForSearch } from '@/utils/repuestos'
 import { MachineManager } from '@/components/repuestos/MachineManager'
+import { MachineManualPanel } from '@/components/repuestos/MachineManualPanel'
 import { InlineEditName } from '@/components/repuestos/InlineEditName'
 import type { PlantAsset, Machine, RepuestoFormData, TechnicalSpecs, MachineImage } from '@/types/repuestos'
 
-type RepAction = 'edit' | 'specs' | 'photos' | 'gallery' | 'manual' | 'manualSearch' | 'relocate' | 'delete'
+type RepAction = 'edit' | 'specs' | 'photos' | 'gallery' | 'manual' | 'manualSearch' | 'machineManual' | 'relocate' | 'delete'
 type SortCol = 'codigoSAP' | 'textoBreve' | 'equipo' | 'stock' | 'tipo'
 
 type StockFilter = 'all' | StockStatus
@@ -1596,6 +1597,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
           onGallery={() => startAction('gallery')}
           onManual={() => startAction('manual')}
           onManualSearch={() => startAction('manualSearch')}
+          onMachineManuals={() => startAction('machineManual')}
           isFavorite={favKeys.has(selectedRep.rowKey)}
           onToggleFavorite={() => toggleFav(selectedRep.rowKey)}
           onAddToList={() => setAddToListRowKey(selectedRep.rowKey)}
@@ -1928,6 +1930,19 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
             invalidateGlobalRepuestosCache(); loadAll()
           }}
         />
+      )}
+
+      {/* Manuales PDF del equipo (MachineManualPanel) */}
+      {actionTarget?.kind === 'machineManual' && actionMachine && (
+        <Dialog open onOpenChange={(o) => !o && setActionTarget(null)}>
+          <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-base">Manuales — {actionMachine.nombre}</DialogTitle>
+              <DialogDescription>PDFs del equipo: subir, ver y gestionar manuales técnicos.</DialogDescription>
+            </DialogHeader>
+            <MachineManualPanel machine={actionMachine} />
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* Confirmar eliminación */}
