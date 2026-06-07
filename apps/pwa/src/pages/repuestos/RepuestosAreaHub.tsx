@@ -849,6 +849,18 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
     [actionTarget, crudUpdate, colPathOf, refreshCatalog, toast],
   )
 
+  // Guardar fotos reales actualizadas (desde RepuestoPhotosModal editable)
+  const handleSaveFotosReales = useCallback(
+    async (fotos: import('@/types/repuestos').ImagenRepuesto[]) => {
+      if (!actionTarget) return
+      const { source } = actionTarget
+      await crudUpdate(colPathOf(source.machineId), source.repuesto.id, { fotosReales: fotos }, source.repuesto)
+      toast({ title: 'Fotos actualizadas', variant: 'success' })
+      await refreshCatalog()
+    },
+    [actionTarget, crudUpdate, colPathOf, refreshCatalog, toast],
+  )
+
   const handleConfirmDelete = useCallback(async () => {
     if (!actionTarget || actionTarget.kind !== 'delete') return
     setSavingRep(true)
@@ -1865,7 +1877,7 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
         />
       )}
 
-      {/* Fotos (solo lectura) */}
+      {/* Fotos (lectura para todos; editable para admin) */}
       {actionTarget?.kind === 'photos' && actionRep && (
         <RepuestoPhotosModal
           open
@@ -1873,6 +1885,10 @@ export function RepuestosAreaHub({ initialQuery, onQueryConsumed }: RepuestosAre
           fotosReales={actionRep.fotosReales || []}
           imagenesManual={actionRep.imagenesManual || []}
           repuestoName={actionRep.textoBreve || actionRep.codigoSAP || 'Repuesto'}
+          isAdmin={isAdmin}
+          machineId={actionMachineId}
+          repuestoId={actionRep.id}
+          onSaveFotos={isAdmin ? handleSaveFotosReales : undefined}
         />
       )}
 

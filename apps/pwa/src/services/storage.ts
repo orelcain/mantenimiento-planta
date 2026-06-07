@@ -321,3 +321,37 @@ export async function deleteBodegaPhoto(url: string): Promise<void> {
     logger.error('Error eliminando foto bodega', error instanceof Error ? error : new Error(String(error)))
   }
 }
+
+// ── Fotos reales de repuestos (catálogo) ──
+
+/**
+ * Sube una foto real de un repuesto a Storage.
+ * Ruta: repuestos/{machineId}/{repuestoId}/fotos/{uuid}.webp
+ */
+export async function uploadRepuestoFoto(
+  machineId: string,
+  repuestoId: string,
+  file: File,
+): Promise<string> {
+  const validation = validateFile(file)
+  if (!validation.valid) throw new Error(validation.error)
+
+  const { file: fileToUpload } = await processImageForUpload(file, IMAGE_PRESETS.photo)
+  const fileName = `${generateId()}.webp`
+  const storageRef = ref(storage, `repuestos/${machineId}/${repuestoId}/fotos/${fileName}`)
+
+  await uploadBytes(storageRef, fileToUpload, { contentType: 'image/webp' })
+  return await getDownloadURL(storageRef)
+}
+
+/**
+ * Elimina una foto real de un repuesto de Storage.
+ */
+export async function deleteRepuestoFoto(url: string): Promise<void> {
+  try {
+    const storageRef = ref(storage, url)
+    await deleteObject(storageRef)
+  } catch (error) {
+    logger.error('Error eliminando foto repuesto', error instanceof Error ? error : new Error(String(error)))
+  }
+}
