@@ -213,7 +213,7 @@ header .badge { font-size: 11px; font-weight: 600; padding: 2px 8px; background:
 .day-view-toggle { display: flex; background: var(--bg2); border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,.08); flex-shrink: 0; }
 .day-view-btn { width: 32px; height: 32px; border: none; background: none; color: var(--hint); font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .15s; }
 .day-view-btn.active { background: var(--accent); color: var(--acctxt); }
-.estreno-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 10px 12px; }
+.estreno-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; padding: 10px 12px; }
 .estreno-grid-card { cursor: pointer; transition: transform .15s; position: relative; }
 .estreno-grid-card:active { transform: scale(.97); }
 .estreno-grid-card.is-tracked .egc-poster { box-shadow: 0 0 0 2.5px var(--accent); }
