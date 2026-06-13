@@ -3,6 +3,14 @@
 > Sistema de mantenimiento industrial para plantas de procesamiento de pescado.
 > PWA con soporte offline, monorepo Turbo, React + Vite + Firebase.
 
+## 🤝 Equipo de agentes (local · Codex · Claude) — leer al iniciar
+
+Este repo lo trabajan varios agentes. Para no pisarse ni romper prod, leer:
+
+- **`.ai/MEMORY.md`, `.ai/WORKLOG.md`, `.ai/TASKS.md`** (en este repo) — estado, bitácora y tablero de tareas. Reclamar tarea en `TASKS.md` antes de trabajar.
+- **Memoria empresa** (en OneDrive, si tienes acceso local): `C:\Users\orelc\OneDrive\ANTARFOOD\AI_PROJECT_MEMORY.md`, `AI_TEAM_PROTOCOL.md`, `AI_PROJECT_REGISTRY.md`. (Codex cloud no las ve → guíate por `.ai/`.)
+- **Regla de oro:** `main` auto-despliega a producción → nunca commitear directo a `main`; 1 tarea = 1 rama; PR + tsc/eslint verde + revisión de otro agente; el merge lo aprueba el humano. Commits con pie `Agent: <nombre>`.
+
 ## Rutina de sesión (OBLIGATORIO — aplica a Claude Code desktop y claude.ai web)
 
 ### 🟢 INICIO — Flujo de 2 pasos
